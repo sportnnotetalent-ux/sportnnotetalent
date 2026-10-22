@@ -20,6 +20,8 @@ Founder, signing in on Android: the keyboard sat over the password box, typed bl
 - **Chat:** the composer stays above the keyboard on Android too (`KeyboardAvoidingBox`; the old KeyboardAvoidingView was iOS-only with a guessed header offset).
 - **Sign-in:** keyboard "Next" on the email goes to the password; "Go" on the password signs in. Tapping a button while the keyboard is up works first time (`keyboardShouldPersistTaps="handled"`).
 - **Web:** `public/index.html` viewport `interactive-widget=resizes-content` (Android Chrome shrinks the page for the keyboard; Safari scrolls the field into view itself).
+- **Shipped 2026-10-22:** commit 6bf0c1b; Android OTA update group 8bc9b62e (channel preview); web published to sportnnote.expo.app.
+- **Android follow-up (same day):** on the founder's phone (update 01a163d9, confirmed in analytics) the field still stopped half under the keyboard. RN Android reports the keyboard's top from the top of the screen but measures views from just under the status bar (RootViewUtil.getViewportOffset), so the keyboard read one status bar too low. `keyboardTopOf` now takes the status bar height off on Android.
 - Verified: tsc clean; 4352 pass / 0 fail (+ tests/keyboard-safe-fields.test.mts); web demo — schedule-match date picker, country-code sheet, quick-options break note render as before. The native keyboard itself can only be checked on a phone (no emulator here).
 
 ### 2026-10-22 — Deep wave round 2: the founder's answers, five match tabs, rugby league (SD-169, SD-170)

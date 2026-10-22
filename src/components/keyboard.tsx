@@ -24,11 +24,11 @@
  */
 import React, { createContext, forwardRef, useCallback, useContext, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import {
-  Dimensions, Keyboard, Platform, ScrollView, StyleSheet, TextInput, View,
+  Dimensions, Keyboard, Platform, ScrollView, StatusBar, StyleSheet, TextInput, View,
   useWindowDimensions,
   type KeyboardEvent, type LayoutChangeEvent, type ScrollViewProps, type StyleProp, type TextInputProps, type ViewProps, type ViewStyle,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { initialWindowMetrics, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { keyboardTopOf, revealTarget, sheetPlacement } from './keyboardMath.ts';
 
 const NATIVE = Platform.OS !== 'web';
@@ -74,7 +74,9 @@ function emit(top: number | null) {
 function start() {
   if (started || !NATIVE) return;
   started = true;
-  const on = (e: KeyboardEvent) => emit(keyboardTopOf(e, Platform.OS, Dimensions.get('screen').height));
+  // Android measures views from just under the status bar (see keyboardTopOf)
+  const androidTopOffset = Platform.OS === 'android' ? (StatusBar.currentHeight ?? initialWindowMetrics?.insets.top ?? 0) : 0;
+  const on = (e: KeyboardEvent) => emit(keyboardTopOf(e, Platform.OS, Dimensions.get('screen').height, androidTopOffset));
   if (Platform.OS === 'ios') {
     Keyboard.addListener('keyboardWillShow', on);
     Keyboard.addListener('keyboardWillChangeFrame', on);

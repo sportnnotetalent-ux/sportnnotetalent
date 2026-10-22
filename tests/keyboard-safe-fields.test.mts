@@ -15,6 +15,12 @@ describe('keyboard top', () => {
     assert.equal(keyboardTopOf(ev(470, 300), 'android', 840), 470);
     assert.equal(keyboardTopOf(ev(840, 300), 'android', 840), 540);
   });
+  test('Android: in the coordinates views are measured in (from under the status bar)', () => {
+    // a 36 dp status bar: the keyboard's top at 470 on screen is 434 for measureInWindow
+    assert.equal(keyboardTopOf(ev(470, 300), 'android', 840, 36), 434);
+    assert.equal(keyboardTopOf(ev(840, 300), 'android', 840, 36), 504);
+    assert.equal(keyboardTopOf(ev(508, 336), 'ios', 844, 36), 508); // iOS measures from the screen top
+  });
   test('no height = no keyboard', () => {
     assert.equal(keyboardTopOf(ev(500, 0), 'android', 840), null);
     assert.equal(keyboardTopOf({}, 'ios', 844), null);
