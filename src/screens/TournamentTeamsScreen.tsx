@@ -15,7 +15,7 @@ import { QualifiersCard, qualifiedBadge, useFeeders } from '../components/Feeder
 import { isEventSport } from '../sports/eventSports';
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, Switch, Linking, Platform, Share } from 'react-native';
-import { KeyboardAwareScrollView } from '../components/keyboard';
+import { KeyboardAwareScrollView, KeyboardFooterLayout } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -375,291 +375,298 @@ export default function TournamentTeamsScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
-        <ScreenTitle title={`Participating ${nounPl}`} subtitle={tournament?.name ?? 'Register who’s in'} />
-
-        {tourSports.length > 1 && (
+      <KeyboardFooterLayout
+        safeBottom={false}
+        footer={(
           <>
-            <Text style={textStyles.muted}>Sport</Text>
-            <View style={st.chips}>
-              {tourSports.map((s) => (
-                <SelectChip key={s} label={`${getSport(s).icon} ${getSport(s).name}`} active={sport === s} onPress={() => pickSport(s)} />
-              ))}
-            </View>
+            <FormError message={error} />
+            <Button
+              label={busy ? 'Saving…' : !dirty ? 'Done' : entryMode === 'invited' ? 'Send invites & save' : `Save ${selected.length} participant${selected.length === 1 ? '' : 's'}`}
+              onPress={save}
+              disabled={busy}
+            />
           </>
         )}
+      >
+        <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
+          <ScreenTitle title={`Participating ${nounPl}`} subtitle={tournament?.name ?? 'Register who’s in'} />
 
-        {/* Division selector — when the meet runs age × gender divisions, teams
-            are rostered per division. */}
-        {categories.length > 0 && (
-          <>
-            <Text style={textStyles.muted}>Division</Text>
-            <View style={st.chips}>
-              {categories.map((c) => (
-                <SelectChip key={c.id} label={c.label} active={activeCat === c.id} onPress={() => pickCategory(c.id)} />
-              ))}
-            </View>
-          </>
-        )}
-
-        {tournament && <RegistrationBanner tournament={tournament} enteredCount={enteredCount} />}
-
-        {/* SD-154: qualifiers from feeder tournaments (county → national, zonal → national) */}
-        <QualifiersCard tournamentId={params.tournamentId} sport={sport} entries={entries} feeders={feeders} onAdded={() => setTick((t) => t + 1)} />
-
-        {/* Join link: captains enter their own team from one WhatsApp link (or
-            type its code under Settings → "Join a team with a code"). Entries are confirmed at once. */}
-        {pMode === 'team' && (inviteNeedsDb ? (
-          <Text style={textStyles.muted}>Join by link · Needs the latest database update</Text>
-        ) : inviteToken !== undefined && (
-          <Card style={{ gap: theme.spacing(2) }}>
-            <View style={st.rowBetween}>
-              <Text style={[textStyles.body, st.flex1]}>🔗 Teams can join by link</Text>
-              <Switch value={!!inviteToken} onValueChange={(v) => void toggleInvite(v)} disabled={inviteBusy} accessibilityLabel="Teams can join by link" />
-            </View>
-            {inviteToken ? (
-              <>
-                <Text style={textStyles.muted}>Captains open the link (or type the code under Settings → “Join a team with a code”) and pick their team — it’s in at once.</Text>
-                <InviteQrShare
-                  kind="tournament"
-                  name={tournament?.name ?? 'tournament'}
-                  token={inviteToken}
-                  size={148}
-                  message={tournamentInviteMessage({ tournamentName: tournament?.name ?? 'our tournament', inviterName: profile?.fullName, token: inviteToken })}
-                  caption={[`Enter your team in ${inviteLabel('Tournament', tournament?.name ?? '')}`, `SportnNote · code ${inviteToken}`]}
-                />
-                <Text style={st.code} selectable>{inviteToken}</Text>
-                <View style={st.chips}>
-                  <Button label={waFirst ? '💬 WhatsApp' : '📤 Share'} variant="ghost" onPress={() => shareInviteWhatsApp(inviteToken)} />
-                  <Button label={copied ? 'Copied ✓' : 'Copy link'} variant="ghost" onPress={() => void copyInviteLink(inviteToken)} />
-                </View>
-                <Text style={textStyles.muted}>Turn this off once every team is in.</Text>
-              </>
-            ) : (
-              <Text style={textStyles.muted}>Off — turn it on to share one link every captain can use to enter their team.</Text>
-            )}
-          </Card>
-        ))}
-
-        {/* Lifecycle gate: requests to join (approve/decline), pending invites
-            (confirm/cancel), and withdrawals (reinstate/remove). Only confirmed
-            teams count toward the format. */}
-        {(pending.length > 0 || invited.length > 0 || withdrawn.length > 0) && (
-          <Card style={{ gap: theme.spacing(3) }}>
-            {pending.length > 0 && (
-              <View style={{ gap: theme.spacing(2) }}>
-                <Text style={textStyles.h3}>Requests to join · {pending.length}</Text>
-                {pending.map((e) => (
-                  <View key={e.team.id} style={st.entryRow}>
-                    <Text style={[textStyles.body, st.flex1]} numberOfLines={1}>{teamLabel(e.team)}</Text>
-                    <Button label="Accept" onPress={() => decide(e, true)} disabled={busy} />
-                    <Button label="Decline" variant="ghost" onPress={() => decide(e, false)} disabled={busy} />
-                  </View>
-                ))}
-              </View>
-            )}
-            {invited.length > 0 && (
-              <View style={{ gap: theme.spacing(2) }}>
-                <Text style={textStyles.h3}>Invited · {invited.length}</Text>
-                <Text style={textStyles.muted}>Awaiting the captain’s acceptance — or confirm them yourself.</Text>
-                {invited.map((e) => (
-                  <View key={e.team.id} style={st.entryRow}>
-                    <Text style={[textStyles.body, st.flex1]} numberOfLines={1}>{teamLabel(e.team)}</Text>
-                    <Button label="Confirm" onPress={() => decide(e, true)} disabled={busy} />
-                    <Button label="Cancel" variant="ghost" onPress={() => decide(e, false)} disabled={busy} />
-                  </View>
-                ))}
-              </View>
-            )}
-            {withdrawn.length > 0 && (
-              <View style={{ gap: theme.spacing(2) }}>
-                <Text style={textStyles.h3}>Withdrawn · {withdrawn.length}</Text>
-                <Text style={textStyles.muted}>Pulled out — kept for the record, and out of the fixtures. Reinstate to bring a team back.</Text>
-                {withdrawn.map((e) => (
-                  <View key={e.team.id} style={st.entryRow}>
-                    <Text style={[textStyles.body, st.flex1, st.dim]} numberOfLines={1}>{teamLabel(e.team)}</Text>
-                    <Button label="Reinstate" onPress={() => changeStatus(e, 'confirmed')} disabled={busy} />
-                    <Button label="Remove" variant="ghost" onPress={() => removeEntry(e)} disabled={busy} />
-                  </View>
-                ))}
-              </View>
-            )}
-          </Card>
-        )}
-
-        {/* Confirmed teams — each can be withdrawn (soft, keeps history) without
-            losing its place in past results. */}
-        {confirmedInScope.length > 0 && (
-          <Card style={{ gap: theme.spacing(2) }}>
-            <Text style={textStyles.h3}>In the tournament · {confirmedInScope.length}</Text>
-            <Text style={textStyles.muted}>
-              Match day: tap Check in as each {noun} arrives · {confirmedInScope.filter((e) => e.checkedInAt).length}/{confirmedInScope.length} here
-            </Text>
-            {confirmedInScope.map((e) => (
-              <View key={e.team.id} style={st.entryRow}>
-                <View style={st.flex1}>
-                  <Text style={textStyles.body} numberOfLines={1}>{e.checkedInAt ? '✅ ' : ''}{teamLabel(e.team)}</Text>
-                  {qualifiedBadge(e, feeders) ? <Text style={textStyles.muted} numberOfLines={1}>{qualifiedBadge(e, feeders)}</Text> : null}
-                  {pMode === 'team' && (() => {
-                    const s = setup[e.team.id];
-                    const next = !s ? null : !s.hasCaptain ? 'No captain yet' : s.players === 0 ? 'No players yet' : null;
-                    return next || manageable.has(e.team.id) ? (
-                      <Text style={textStyles.muted} numberOfLines={1}>
-                        {next}{next && manageable.has(e.team.id) ? ' · ' : ''}
-                        {manageable.has(e.team.id) && (
-                          <Text style={st.link} accessibilityRole="link" onPress={() => nav.navigate('EditTeam', { teamId: e.team.id })}>Edit</Text>
-                        )}
-                      </Text>
-                    ) : null;
-                  })()}
-                </View>
-                <SelectChip label={e.checkedInAt ? 'Checked in' : 'Check in'} active={!!e.checkedInAt} onPress={() => void toggleCheckIn(e)} />
-                <Button label="Withdraw" variant="ghost" onPress={() => changeStatus(e, 'withdrawn')} disabled={busy} />
-              </View>
-            ))}
-          </Card>
-        )}
-
-        <View style={st.rowBetween}>
-          <Text style={textStyles.h3}>{selected.length} {selected.length === 1 ? noun : nounPl} in</Text>
-          {pickable.length > 0 && (
-            <Text style={st.link} onPress={() => { setDirty(true); setSelected(selected.length === pickable.length ? [] : pickable.map((t) => t.id)); }}>
-              {selected.length === pickable.length ? 'Clear all' : 'Select all'}
-            </Text>
-          )}
-        </View>
-
-        {unregisteredInFixtures.length > 0 && (
-          <Text style={st.hint} onPress={() => { setDirty(true); setSelected((p) => [...new Set([...p, ...inFixtures])]); }}>
-            ＋ {unregisteredInFixtures.length} {unregisteredInFixtures.length === 1 ? noun : nounPl} already playing here aren’t registered — tap to add them.
-          </Text>
-        )}
-
-        {pickable.length > 0 && (
-          <View style={st.chips}>
-            <SelectChip label="Add directly" active={entryMode === 'confirmed'} onPress={() => setEntryMode('confirmed')} />
-            <SelectChip label="Invite (captain accepts)" active={entryMode === 'invited'} onPress={() => setEntryMode('invited')} />
-          </View>
-        )}
-
-        {/* Inter-house tournament hosted by a school → one tap enters its Houses. */}
-        {pMode === 'team' && tournament?.participation === 'inter_house' && tournament?.hostOrgId && (
-          <Button
-            label={busy ? 'Adding…' : '🏠 Enter the school’s Houses'}
-            variant="ghost"
-            disabled={busy}
-            onPress={async () => {
-              setBusy(true);
-              try {
-                const n = await enterOrgHousesAsTeams(params.tournamentId, tournament.hostOrgId!, sport);
-                if (n === 0) setError('This school hasn’t set up any Houses yet — add them in the school’s Members tab.');
-                setTick((x) => x + 1);
-              } finally { setBusy(false); }
-            }}
-          />
-        )}
-
-        {/* Pick one of your own multi-sport teams — its captain + squad come with
-            it (spec §16). Picking a club that doesn't play this sport yet mints its
-            profile on the fly. Individual/pairs entries don't use clubs. */}
-        {pMode === 'team' && (
-          <ClubQuickPick
-            sport={sport}
-            selectedTeamIds={selected}
-            onPicked={(team) => { setDirty(true); setSelected((p) => [...new Set([...p, team.id])]); setTick((n) => n + 1); }}
-          />
-        )}
-
-        {pickable.length === 0 ? (
-          <Text style={textStyles.muted}>No {sportName} {nounPl} to add yet. Add one below.</Text>
-        ) : (() => {
-          const hits = filterTeams(pickable, query, selected);
-          const shown = showAll ? hits : hits.slice(0, CHIP_CAP);
-          return (
+          {tourSports.length > 1 && (
             <>
-              <TextField label="" value={query} onChange={(v) => { setQuery(v); setShowAll(false); }} placeholder={`Search ${nounPl}`} autoCapitalize="none" />
-              {hits.length === 0 ? (
-                <Text style={textStyles.muted}>No {nounPl} match “{query.trim()}”.</Text>
+              <Text style={textStyles.muted}>Sport</Text>
+              <View style={st.chips}>
+                {tourSports.map((s) => (
+                  <SelectChip key={s} label={`${getSport(s).icon} ${getSport(s).name}`} active={sport === s} onPress={() => pickSport(s)} />
+                ))}
+              </View>
+            </>
+          )}
+
+          {/* Division selector — when the meet runs age × gender divisions, teams
+              are rostered per division. */}
+          {categories.length > 0 && (
+            <>
+              <Text style={textStyles.muted}>Division</Text>
+              <View style={st.chips}>
+                {categories.map((c) => (
+                  <SelectChip key={c.id} label={c.label} active={activeCat === c.id} onPress={() => pickCategory(c.id)} />
+                ))}
+              </View>
+            </>
+          )}
+
+          {tournament && <RegistrationBanner tournament={tournament} enteredCount={enteredCount} />}
+
+          {/* SD-154: qualifiers from feeder tournaments (county → national, zonal → national) */}
+          <QualifiersCard tournamentId={params.tournamentId} sport={sport} entries={entries} feeders={feeders} onAdded={() => setTick((t) => t + 1)} />
+
+          {/* Join link: captains enter their own team from one WhatsApp link (or
+              type its code under Settings → "Join a team with a code"). Entries are confirmed at once. */}
+          {pMode === 'team' && (inviteNeedsDb ? (
+            <Text style={textStyles.muted}>Join by link · Needs the latest database update</Text>
+          ) : inviteToken !== undefined && (
+            <Card style={{ gap: theme.spacing(2) }}>
+              <View style={st.rowBetween}>
+                <Text style={[textStyles.body, st.flex1]}>🔗 Teams can join by link</Text>
+                <Switch value={!!inviteToken} onValueChange={(v) => void toggleInvite(v)} disabled={inviteBusy} accessibilityLabel="Teams can join by link" />
+              </View>
+              {inviteToken ? (
+                <>
+                  <Text style={textStyles.muted}>Captains open the link (or type the code under Settings → “Join a team with a code”) and pick their team — it’s in at once.</Text>
+                  <InviteQrShare
+                    kind="tournament"
+                    name={tournament?.name ?? 'tournament'}
+                    token={inviteToken}
+                    size={148}
+                    message={tournamentInviteMessage({ tournamentName: tournament?.name ?? 'our tournament', inviterName: profile?.fullName, token: inviteToken })}
+                    caption={[`Enter your team in ${inviteLabel('Tournament', tournament?.name ?? '')}`, `SportnNote · code ${inviteToken}`]}
+                  />
+                  <Text style={st.code} selectable>{inviteToken}</Text>
+                  <View style={st.chips}>
+                    <Button label={waFirst ? '💬 WhatsApp' : '📤 Share'} variant="ghost" onPress={() => shareInviteWhatsApp(inviteToken)} />
+                    <Button label={copied ? 'Copied ✓' : 'Copy link'} variant="ghost" onPress={() => void copyInviteLink(inviteToken)} />
+                  </View>
+                  <Text style={textStyles.muted}>Turn this off once every team is in.</Text>
+                </>
               ) : (
-                <View style={st.chips}>
-                  {shown.map((t) => (
-                    <SelectChip key={t.id} label={teamLabel(t)} active={selected.includes(t.id)} onPress={() => toggle(t.id)} />
+                <Text style={textStyles.muted}>Off — turn it on to share one link every captain can use to enter their team.</Text>
+              )}
+            </Card>
+          ))}
+
+          {/* Lifecycle gate: requests to join (approve/decline), pending invites
+              (confirm/cancel), and withdrawals (reinstate/remove). Only confirmed
+              teams count toward the format. */}
+          {(pending.length > 0 || invited.length > 0 || withdrawn.length > 0) && (
+            <Card style={{ gap: theme.spacing(3) }}>
+              {pending.length > 0 && (
+                <View style={{ gap: theme.spacing(2) }}>
+                  <Text style={textStyles.h3}>Requests to join · {pending.length}</Text>
+                  {pending.map((e) => (
+                    <View key={e.team.id} style={st.entryRow}>
+                      <Text style={[textStyles.body, st.flex1]} numberOfLines={1}>{teamLabel(e.team)}</Text>
+                      <Button label="Accept" onPress={() => decide(e, true)} disabled={busy} />
+                      <Button label="Decline" variant="ghost" onPress={() => decide(e, false)} disabled={busy} />
+                    </View>
                   ))}
                 </View>
               )}
-              {hits.length > shown.length && (
-                <Text style={st.link} accessibilityRole="button" onPress={() => setShowAll(true)}>Show all {hits.length}</Text>
-              )}
-            </>
-          );
-        })()}
-
-        {/* Inline add-a-team so an organizer can build the roster without leaving. */}
-        {adding ? (
-          <Card style={{ gap: theme.spacing(3) }}>
-            <Text style={textStyles.h3}>Add {/^[aeiou]/i.test(sportName) ? 'an' : 'a'} {sportName} {noun}</Text>
-            <View style={st.row}>
-              <View style={st.flex2}><TextField label="Name" value={name} onChange={setName} placeholder={pMode === 'individual' ? 'Rafael Nadal' : pMode === 'pairs' ? 'Nadal / Alcaraz' : 'Red House'} /></View>
-              <View style={st.flex1}><TextField label="Short" value={short} onChange={setShort} placeholder={pMode === 'team' ? 'RED' : 'RN'} autoCapitalize="characters" /></View>
-            </View>
-            <Text style={textStyles.muted}>Colour</Text>
-            <View style={st.chips}>
-              {PALETTE.map((c) => (
-                <Text key={c} accessibilityRole="button" onPress={() => setColor(c)} style={[st.swatch, { backgroundColor: c }, color === c && st.swatchActive]} />
-              ))}
-            </View>
-
-            {/* Optional contact: for a team it's the manager/captain (invited to
-                claim the team & set its squad); for a pair, whoever to reach. An
-                individual entrant is their own contact, so this is hidden there. */}
-            {pMode !== 'individual' && (mgrOpen ? (
-              <View style={{ gap: theme.spacing(2) }}>
-                <Text style={textStyles.muted}>
-                  {pMode === 'pairs' ? 'Pair contact — invited to claim the entry and set both players.' : 'Team manager / captain — they’ll be invited to claim the team and set its squad.'}
-                </Text>
-                <TextField label={pMode === 'pairs' ? 'Contact name' : 'Manager name'} value={mgrName} onChange={setMgrName} placeholder={pMode === 'pairs' ? 'Who to reach for this pair?' : 'Who runs this team?'} />
-                <View style={st.wrapRow}>
-                  <View style={st.wrapCell}><PhoneField label="Phone" value={mgrPhone} onChange={setMgrPhone} /></View>
-                  <View style={st.wrapCell}><TextField label="Email" value={mgrEmail} onChange={setMgrEmail} placeholder="name@email.com" autoCapitalize="none" /></View>
+              {invited.length > 0 && (
+                <View style={{ gap: theme.spacing(2) }}>
+                  <Text style={textStyles.h3}>Invited · {invited.length}</Text>
+                  <Text style={textStyles.muted}>Awaiting the captain’s acceptance — or confirm them yourself.</Text>
+                  {invited.map((e) => (
+                    <View key={e.team.id} style={st.entryRow}>
+                      <Text style={[textStyles.body, st.flex1]} numberOfLines={1}>{teamLabel(e.team)}</Text>
+                      <Button label="Confirm" onPress={() => decide(e, true)} disabled={busy} />
+                      <Button label="Cancel" variant="ghost" onPress={() => decide(e, false)} disabled={busy} />
+                    </View>
+                  ))}
                 </View>
-              </View>
-            ) : (
-              <Text style={st.link} onPress={() => setMgrOpen(true)}>＋ Add a {pMode === 'pairs' ? 'pair' : 'team'} contact (optional)</Text>
-            ))}
+              )}
+              {withdrawn.length > 0 && (
+                <View style={{ gap: theme.spacing(2) }}>
+                  <Text style={textStyles.h3}>Withdrawn · {withdrawn.length}</Text>
+                  <Text style={textStyles.muted}>Pulled out — kept for the record, and out of the fixtures. Reinstate to bring a team back.</Text>
+                  {withdrawn.map((e) => (
+                    <View key={e.team.id} style={st.entryRow}>
+                      <Text style={[textStyles.body, st.flex1, st.dim]} numberOfLines={1}>{teamLabel(e.team)}</Text>
+                      <Button label="Reinstate" onPress={() => changeStatus(e, 'confirmed')} disabled={busy} />
+                      <Button label="Remove" variant="ghost" onPress={() => removeEntry(e)} disabled={busy} />
+                    </View>
+                  ))}
+                </View>
+              )}
+            </Card>
+          )}
 
-            <View style={st.row}>
-              <View style={st.flex1}><Button label="Cancel" variant="ghost" onPress={() => { setAdding(false); setError(null); }} /></View>
-              <View style={st.flex1}><Button label={busy ? 'Adding…' : 'Add & select'} onPress={addNewTeam} disabled={busy} /></View>
-            </View>
-          </Card>
-        ) : (
-          <Button label={`＋ New ${noun}`} variant="ghost" onPress={() => setAdding(true)} />
-        )}
-
-        {added && (
-          <Card style={{ gap: theme.spacing(2) }}>
-            <Text style={textStyles.body}>{added.note}</Text>
-            {added.link && (
-              <View style={st.chips}>
-                {added.phone ? (
-                  <View style={[st.chips, !waFirst && { flexDirection: 'row-reverse', justifyContent: 'flex-end' }]}>
-                    <Button label="💬 WhatsApp" variant="ghost" onPress={() => openWhatsApp(added.phone!, inviteMessage({ name: added.name ?? '', inviterName, link: added.link!, context: added.context, role: 'manage' }))} />
-                    <Button label="✉️ SMS" variant="ghost" onPress={() => openSms(added.phone!, inviteMessage({ name: added.name ?? '', inviterName, link: added.link!, context: added.context, role: 'manage' }))} />
+          {/* Confirmed teams — each can be withdrawn (soft, keeps history) without
+              losing its place in past results. */}
+          {confirmedInScope.length > 0 && (
+            <Card style={{ gap: theme.spacing(2) }}>
+              <Text style={textStyles.h3}>In the tournament · {confirmedInScope.length}</Text>
+              <Text style={textStyles.muted}>
+                Match day: tap Check in as each {noun} arrives · {confirmedInScope.filter((e) => e.checkedInAt).length}/{confirmedInScope.length} here
+              </Text>
+              {confirmedInScope.map((e) => (
+                <View key={e.team.id} style={st.entryRow}>
+                  <View style={st.flex1}>
+                    <Text style={textStyles.body} numberOfLines={1}>{e.checkedInAt ? '✅ ' : ''}{teamLabel(e.team)}</Text>
+                    {qualifiedBadge(e, feeders) ? <Text style={textStyles.muted} numberOfLines={1}>{qualifiedBadge(e, feeders)}</Text> : null}
+                    {pMode === 'team' && (() => {
+                      const s = setup[e.team.id];
+                      const next = !s ? null : !s.hasCaptain ? 'No captain yet' : s.players === 0 ? 'No players yet' : null;
+                      return next || manageable.has(e.team.id) ? (
+                        <Text style={textStyles.muted} numberOfLines={1}>
+                          {next}{next && manageable.has(e.team.id) ? ' · ' : ''}
+                          {manageable.has(e.team.id) && (
+                            <Text style={st.link} accessibilityRole="link" onPress={() => nav.navigate('EditTeam', { teamId: e.team.id })}>Edit</Text>
+                          )}
+                        </Text>
+                      ) : null;
+                    })()}
                   </View>
-                ) : null}
-              </View>
-            )}
-            <Text style={st.link} onPress={() => setAdded(null)}>Dismiss</Text>
-          </Card>
-        )}
+                  <SelectChip label={e.checkedInAt ? 'Checked in' : 'Check in'} active={!!e.checkedInAt} onPress={() => void toggleCheckIn(e)} />
+                  <Button label="Withdraw" variant="ghost" onPress={() => changeStatus(e, 'withdrawn')} disabled={busy} />
+                </View>
+              ))}
+            </Card>
+          )}
 
-        <FormError message={error} />
-        <Button
-          label={busy ? 'Saving…' : !dirty ? 'Done' : entryMode === 'invited' ? 'Send invites & save' : `Save ${selected.length} participant${selected.length === 1 ? '' : 's'}`}
-          onPress={save}
-          disabled={busy}
-        />
-      </KeyboardAwareScrollView>
+          <View style={st.rowBetween}>
+            <Text style={textStyles.h3}>{selected.length} {selected.length === 1 ? noun : nounPl} in</Text>
+            {pickable.length > 0 && (
+              <Text style={st.link} onPress={() => { setDirty(true); setSelected(selected.length === pickable.length ? [] : pickable.map((t) => t.id)); }}>
+                {selected.length === pickable.length ? 'Clear all' : 'Select all'}
+              </Text>
+            )}
+          </View>
+
+          {unregisteredInFixtures.length > 0 && (
+            <Text style={st.hint} onPress={() => { setDirty(true); setSelected((p) => [...new Set([...p, ...inFixtures])]); }}>
+              ＋ {unregisteredInFixtures.length} {unregisteredInFixtures.length === 1 ? noun : nounPl} already playing here aren’t registered — tap to add them.
+            </Text>
+          )}
+
+          {pickable.length > 0 && (
+            <View style={st.chips}>
+              <SelectChip label="Add directly" active={entryMode === 'confirmed'} onPress={() => setEntryMode('confirmed')} />
+              <SelectChip label="Invite (captain accepts)" active={entryMode === 'invited'} onPress={() => setEntryMode('invited')} />
+            </View>
+          )}
+
+          {/* Inter-house tournament hosted by a school → one tap enters its Houses. */}
+          {pMode === 'team' && tournament?.participation === 'inter_house' && tournament?.hostOrgId && (
+            <Button
+              label={busy ? 'Adding…' : '🏠 Enter the school’s Houses'}
+              variant="ghost"
+              disabled={busy}
+              onPress={async () => {
+                setBusy(true);
+                try {
+                  const n = await enterOrgHousesAsTeams(params.tournamentId, tournament.hostOrgId!, sport);
+                  if (n === 0) setError('This school hasn’t set up any Houses yet — add them in the school’s Members tab.');
+                  setTick((x) => x + 1);
+                } finally { setBusy(false); }
+              }}
+            />
+          )}
+
+          {/* Pick one of your own multi-sport teams — its captain + squad come with
+              it (spec §16). Picking a club that doesn't play this sport yet mints its
+              profile on the fly. Individual/pairs entries don't use clubs. */}
+          {pMode === 'team' && (
+            <ClubQuickPick
+              sport={sport}
+              selectedTeamIds={selected}
+              onPicked={(team) => { setDirty(true); setSelected((p) => [...new Set([...p, team.id])]); setTick((n) => n + 1); }}
+            />
+          )}
+
+          {pickable.length === 0 ? (
+            <Text style={textStyles.muted}>No {sportName} {nounPl} to add yet. Add one below.</Text>
+          ) : (() => {
+            const hits = filterTeams(pickable, query, selected);
+            const shown = showAll ? hits : hits.slice(0, CHIP_CAP);
+            return (
+              <>
+                <TextField label="" value={query} onChange={(v) => { setQuery(v); setShowAll(false); }} placeholder={`Search ${nounPl}`} autoCapitalize="none" />
+                {hits.length === 0 ? (
+                  <Text style={textStyles.muted}>No {nounPl} match “{query.trim()}”.</Text>
+                ) : (
+                  <View style={st.chips}>
+                    {shown.map((t) => (
+                      <SelectChip key={t.id} label={teamLabel(t)} active={selected.includes(t.id)} onPress={() => toggle(t.id)} />
+                    ))}
+                  </View>
+                )}
+                {hits.length > shown.length && (
+                  <Text style={st.link} accessibilityRole="button" onPress={() => setShowAll(true)}>Show all {hits.length}</Text>
+                )}
+              </>
+            );
+          })()}
+
+          {/* Inline add-a-team so an organizer can build the roster without leaving. */}
+          {adding ? (
+            <Card style={{ gap: theme.spacing(3) }}>
+              <Text style={textStyles.h3}>Add {/^[aeiou]/i.test(sportName) ? 'an' : 'a'} {sportName} {noun}</Text>
+              <View style={st.row}>
+                <View style={st.flex2}><TextField label="Name" value={name} onChange={setName} placeholder={pMode === 'individual' ? 'Rafael Nadal' : pMode === 'pairs' ? 'Nadal / Alcaraz' : 'Red House'} /></View>
+                <View style={st.flex1}><TextField label="Short" value={short} onChange={setShort} placeholder={pMode === 'team' ? 'RED' : 'RN'} autoCapitalize="characters" /></View>
+              </View>
+              <Text style={textStyles.muted}>Colour</Text>
+              <View style={st.chips}>
+                {PALETTE.map((c) => (
+                  <Text key={c} accessibilityRole="button" onPress={() => setColor(c)} style={[st.swatch, { backgroundColor: c }, color === c && st.swatchActive]} />
+                ))}
+              </View>
+
+              {/* Optional contact: for a team it's the manager/captain (invited to
+                  claim the team & set its squad); for a pair, whoever to reach. An
+                  individual entrant is their own contact, so this is hidden there. */}
+              {pMode !== 'individual' && (mgrOpen ? (
+                <View style={{ gap: theme.spacing(2) }}>
+                  <Text style={textStyles.muted}>
+                    {pMode === 'pairs' ? 'Pair contact — invited to claim the entry and set both players.' : 'Team manager / captain — they’ll be invited to claim the team and set its squad.'}
+                  </Text>
+                  <TextField label={pMode === 'pairs' ? 'Contact name' : 'Manager name'} value={mgrName} onChange={setMgrName} placeholder={pMode === 'pairs' ? 'Who to reach for this pair?' : 'Who runs this team?'} />
+                  <View style={st.wrapRow}>
+                    <View style={st.wrapCell}><PhoneField label="Phone" value={mgrPhone} onChange={setMgrPhone} /></View>
+                    <View style={st.wrapCell}><TextField label="Email" value={mgrEmail} onChange={setMgrEmail} placeholder="name@email.com" autoCapitalize="none" /></View>
+                  </View>
+                </View>
+              ) : (
+                <Text style={st.link} onPress={() => setMgrOpen(true)}>＋ Add a {pMode === 'pairs' ? 'pair' : 'team'} contact (optional)</Text>
+              ))}
+
+              <View style={st.row}>
+                <View style={st.flex1}><Button label="Cancel" variant="ghost" onPress={() => { setAdding(false); setError(null); }} /></View>
+                <View style={st.flex1}><Button label={busy ? 'Adding…' : 'Add & select'} onPress={addNewTeam} disabled={busy} /></View>
+              </View>
+            </Card>
+          ) : (
+            <Button label={`＋ New ${noun}`} variant="ghost" onPress={() => setAdding(true)} />
+          )}
+
+          {added && (
+            <Card style={{ gap: theme.spacing(2) }}>
+              <Text style={textStyles.body}>{added.note}</Text>
+              {added.link && (
+                <View style={st.chips}>
+                  {added.phone ? (
+                    <View style={[st.chips, !waFirst && { flexDirection: 'row-reverse', justifyContent: 'flex-end' }]}>
+                      <Button label="💬 WhatsApp" variant="ghost" onPress={() => openWhatsApp(added.phone!, inviteMessage({ name: added.name ?? '', inviterName, link: added.link!, context: added.context, role: 'manage' }))} />
+                      <Button label="✉️ SMS" variant="ghost" onPress={() => openSms(added.phone!, inviteMessage({ name: added.name ?? '', inviterName, link: added.link!, context: added.context, role: 'manage' }))} />
+                    </View>
+                  ) : null}
+                </View>
+              )}
+              <Text style={st.link} onPress={() => setAdded(null)}>Dismiss</Text>
+            </Card>
+          )}
+        </KeyboardAwareScrollView>
+      </KeyboardFooterLayout>
     </SafeAreaView>
   );
 }

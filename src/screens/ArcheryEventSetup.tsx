@@ -7,7 +7,7 @@
  *  route's sport is 'archery'. */
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, TextInput, StyleSheet } from 'react-native';
-import { KeyboardAwareScrollView } from '../components/keyboard';
+import { KeyboardAwareScrollView, KeyboardFooterLayout } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -177,94 +177,102 @@ export function ArcheryEventSetup({ tournamentId }: { tournamentId?: string }) {
   const size = withMatches ? bracketSize(field) : 0;
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
-        <ScreenTitle title="🏹 New archery event" subtitle={tournament?.name} />
-        {/* SD-141: the meet's competition rules, checked before the meet starts */}
-        <CompetitionRulesCard tournament={tournament} sport={'archery'} />
+      <KeyboardFooterLayout
+        safeBottom={false}
+        footer={(
+          <>
+            <FormError message={error} />
+            <Button label={busy ? 'Creating…' : 'Create event & start list'} onPress={() => void create()} disabled={busy || !entrants} />
+          </>
+        )}
+      >
+        <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
+          <ScreenTitle title="🏹 New archery event" subtitle={tournament?.name} />
+          {/* SD-141: the meet's competition rules, checked before the meet starts */}
+          <CompetitionRulesCard tournament={tournament} sport={'archery'} />
 
-        <Card style={st.card}>
-          <Text style={textStyles.h3}>1 · Bow & round</Text>
-          <View style={st.wrap}>
-            <SelectChip label="Individual" active={mode === 'ind'} onPress={() => setMode('ind')} />
-            <SelectChip label="Team (3)" active={mode === 'team'} onPress={() => setMode('team')} />
-            <SelectChip label="Mixed team (1 + 1)" active={mode === 'mixed'} onPress={() => setMode('mixed')} />
-          </View>
-          {teamMode ? <Text style={textStyles.muted}>{mode === 'team' ? 'Three archers of one gender' : 'A man and a woman'}: the team score is their ranking-round scores added; the best teams go to team match play — {matchRuleText(matchFormatOf(bow), matchSpecOf(discipline))}</Text> : null}
-          <View style={st.wrap}>{(['R', 'C', 'B'] as Bow[]).map((b) => <SelectChip key={b} label={BOW_LABEL[b]} active={bow === b} onPress={() => setBow(b)} />)}</View>
-          <View style={st.wrap}>
-            <SelectChip label="Outdoor (72 arrows)" active={!indoor} onPress={() => setIndoor(false)} />
-            <SelectChip label="Indoor 18 m (60 arrows)" active={indoor} onPress={() => setIndoor(true)} />
-          </View>
-          <View style={st.wrap}>{ARCH_AGES.map((a) => <SelectChip key={a.key} label={a.label} active={age === a.key} onPress={() => setAge(a.key)} />)}</View>
-          <Text style={textStyles.muted}>{ARCH_AGES.find((a) => a.key === age)?.note}.</Text>
-          {mode !== 'mixed' ? (
-            <View style={st.wrap}>
-              <SelectChip label={adult ? 'Men' : 'Boys'} active={gender === 'M'} onPress={() => setGender('M')} />
-              <SelectChip label={adult ? 'Women' : 'Girls'} active={gender === 'F'} onPress={() => setGender('F')} />
-            </View>
-          ) : null}
-          <Text style={st.label}>Round</Text>
-          <View style={st.wrap}>
-            {rounds.map((r) => <SelectChip key={r.key} label={`${r.distance} m${r.level === 'wa' ? ' (WA)' : ''}`} active={round.key === r.key} onPress={() => setRoundKey(r.key)} />)}
-          </View>
-          <Text style={textStyles.muted}>{roundLine(round)} — {round.note}. Each distance keeps its own records and PBs. Event: {round.label}{teamMode ? (mode === 'mixed' ? ' mixed team' : ' team') : ''} {categoryLabel(cat)}.</Text>
-        </Card>
-
-        {teamMode ? (
           <Card style={st.card}>
-            <Text style={textStyles.h3}>2 · Teams ({teams.length})</Text>
-            <Text style={st.label}>Scores from the ranking round{srcEvents.length !== 1 ? 's' : ''}</Text>
-            {srcEvents.length ? (
-              <View style={st.wrap}>
-                {srcEvents.map((e) => {
-                  const on = srcKeys.includes(e.eventKey);
-                  return <SelectChip key={e.eventKey} label={`${on ? '✓ ' : ''}${e.title}`} active={on} onPress={() => setSrcPicked(on ? srcKeys.filter((k) => k !== e.eventKey) : [...srcKeys, e.eventKey])} />;
-                })}
-              </View>
-            ) : <Text style={textStyles.muted}>No {round.label} {mode === 'mixed' ? '' : categoryLabel(cat)} ranking round in this meet yet — add the individual event first, or type each member’s score on the team ranking.</Text>}
-            {best.size ? <SelectChip label={`Fill every house’s team with its best ${mode === 'mixed' ? 'man and woman' : '3'}`} active={false} onPress={fillAll} /> : null}
-            <TeamBuilder sources={sources} playerById={playerById} players={players} seatNames={seatNames} fits={fitsSeat} teams={teams} onChange={setTeams}
-              suggest={lookup.size ? suggest : undefined} hint={`Add a team from a house, then pick its ${mode === 'mixed' ? 'man and woman' : 'three archers'} — or “Fill”.`} />
-          </Card>
-        ) : null}
-
-        {!teamMode ? <Card style={st.card}>
-          <Text style={textStyles.h3}>2 · Archers ({picks.length})</Text>
-          <View style={st.wrap}>
-            <SelectChip label="All" active={filter == null} onPress={() => setFilter(null)} />
-            {sources.map((s) => <SelectChip key={s.key} label={s.name} dotColor={s.colorHex} active={filter === s.key} onPress={() => setFilter(s.key)} />)}
-          </View>
-          <TextInput style={st.input} value={query} onChangeText={setQuery} placeholder="Search any player by name" placeholderTextColor={theme.colors.textMuted} accessibilityLabel="Search players" />
-          <SelectChip label={eligibleOnly ? `✓ ${gender === 'M' ? (adult ? 'Men' : 'Boys') : (adult ? 'Women' : 'Girls')} only` : 'Showing everyone'} active={eligibleOnly} onPress={() => setEligibleOnly(!eligibleOnly)} />
-          <View style={st.wrap}>
-            {pool.map((p) => {
-              const on = picks.includes(p.id);
-              return <SelectChip key={p.id} label={`${on ? '✓ ' : ''}${p.fullName}`} dotColor={p.houseColor} active={on} onPress={() => toggle(p.id)} />;
-            })}
-            {!pool.length && <Text style={textStyles.muted}>No archers match. Players without a gender are always shown.</Text>}
-          </View>
-        </Card> : null}
-
-        <Card style={st.card}>
-          <Text style={textStyles.h3}>3 · Match play</Text>
-          {choices.length > 1 ? (
+            <Text style={textStyles.h3}>1 · Bow & round</Text>
             <View style={st.wrap}>
-              {choices.filter((k) => !teamMode || k <= 16).map((k) => <SelectChip key={k} label={k ? (k === entrants && (k & (k - 1)) !== 0 ? `All ${k} (byes)` : `Top ${k}`) : 'No match play'} active={(withMatches ? field : 0) === k} onPress={() => setBracketN(k)} />)}
+              <SelectChip label="Individual" active={mode === 'ind'} onPress={() => setMode('ind')} />
+              <SelectChip label="Team (3)" active={mode === 'team'} onPress={() => setMode('team')} />
+              <SelectChip label="Mixed team (1 + 1)" active={mode === 'mixed'} onPress={() => setMode('mixed')} />
             </View>
-          ) : null}
-          <Text style={textStyles.muted}>
-            {withMatches
-              ? `The best ${field}${teamMode ? ' teams' : ''} after the ${teamMode ? 'team ranking' : 'ranking round'} are seeded into a bracket of ${size} (1 v ${size}, ${size / 2} v ${size / 2 + 1} …)${size > field ? `; the top ${size - field} seed${size - field === 1 ? '' : 's'} get a bye` : ''}. ${teamMode ? matchRuleText(matchFormatOf(bow), matchSpecOf(discipline)) : matchFormatOf(bow) === 'sets' ? 'Set system: ends of 3 arrows, 2 set points for the higher end, 1 each for a tie, first to 6; 5–5 → a one-arrow shoot-off.' : 'Compound: 5 ends of 3 arrows, the higher total wins; level → a one-arrow shoot-off.'} The semi-final losers shoot for bronze.`
-              : `No match play: the ${teamMode ? 'team ranking' : 'ranking round'} decides the medals (a tie for a medal: a shoot-off).`}
-          </Text>
-          <Text style={textStyles.muted}>Ranking ties (WA): the higher score, then more 10s (X included), then more X. Level for the last match-play place: a shoot-off; other equal ranks: a coin toss for the seed.</Text>
-        </Card>
+            {teamMode ? <Text style={textStyles.muted}>{mode === 'team' ? 'Three archers of one gender' : 'A man and a woman'}: the team score is their ranking-round scores added; the best teams go to team match play — {matchRuleText(matchFormatOf(bow), matchSpecOf(discipline))}</Text> : null}
+            <View style={st.wrap}>{(['R', 'C', 'B'] as Bow[]).map((b) => <SelectChip key={b} label={BOW_LABEL[b]} active={bow === b} onPress={() => setBow(b)} />)}</View>
+            <View style={st.wrap}>
+              <SelectChip label="Outdoor (72 arrows)" active={!indoor} onPress={() => setIndoor(false)} />
+              <SelectChip label="Indoor 18 m (60 arrows)" active={indoor} onPress={() => setIndoor(true)} />
+            </View>
+            <View style={st.wrap}>{ARCH_AGES.map((a) => <SelectChip key={a.key} label={a.label} active={age === a.key} onPress={() => setAge(a.key)} />)}</View>
+            <Text style={textStyles.muted}>{ARCH_AGES.find((a) => a.key === age)?.note}.</Text>
+            {mode !== 'mixed' ? (
+              <View style={st.wrap}>
+                <SelectChip label={adult ? 'Men' : 'Boys'} active={gender === 'M'} onPress={() => setGender('M')} />
+                <SelectChip label={adult ? 'Women' : 'Girls'} active={gender === 'F'} onPress={() => setGender('F')} />
+              </View>
+            ) : null}
+            <Text style={st.label}>Round</Text>
+            <View style={st.wrap}>
+              {rounds.map((r) => <SelectChip key={r.key} label={`${r.distance} m${r.level === 'wa' ? ' (WA)' : ''}`} active={round.key === r.key} onPress={() => setRoundKey(r.key)} />)}
+            </View>
+            <Text style={textStyles.muted}>{roundLine(round)} — {round.note}. Each distance keeps its own records and PBs. Event: {round.label}{teamMode ? (mode === 'mixed' ? ' mixed team' : ' team') : ''} {categoryLabel(cat)}.</Text>
+          </Card>
 
-        <ScheduleCard state={schedule} tournamentId={tournamentId} discipline={discipline} plan={withMatches ? [{ phase: 'qualification', heats: 1 }, { phase: 'final', heats: 1 }] : undefined} athleteIds={teamMode ? teams.flatMap((t) => t.seats.filter((x): x is string => !!x)) : picks} />
-        <EventOfficials tournament={tournament} value={officials} onChange={setOfficials} />
-        <FormError message={error} />
-        <Button label={busy ? 'Creating…' : 'Create event & start list'} onPress={() => void create()} disabled={busy || !entrants} />
-      </KeyboardAwareScrollView>
+          {teamMode ? (
+            <Card style={st.card}>
+              <Text style={textStyles.h3}>2 · Teams ({teams.length})</Text>
+              <Text style={st.label}>Scores from the ranking round{srcEvents.length !== 1 ? 's' : ''}</Text>
+              {srcEvents.length ? (
+                <View style={st.wrap}>
+                  {srcEvents.map((e) => {
+                    const on = srcKeys.includes(e.eventKey);
+                    return <SelectChip key={e.eventKey} label={`${on ? '✓ ' : ''}${e.title}`} active={on} onPress={() => setSrcPicked(on ? srcKeys.filter((k) => k !== e.eventKey) : [...srcKeys, e.eventKey])} />;
+                  })}
+                </View>
+              ) : <Text style={textStyles.muted}>No {round.label} {mode === 'mixed' ? '' : categoryLabel(cat)} ranking round in this meet yet — add the individual event first, or type each member’s score on the team ranking.</Text>}
+              {best.size ? <SelectChip label={`Fill every house’s team with its best ${mode === 'mixed' ? 'man and woman' : '3'}`} active={false} onPress={fillAll} /> : null}
+              <TeamBuilder sources={sources} playerById={playerById} players={players} seatNames={seatNames} fits={fitsSeat} teams={teams} onChange={setTeams}
+                suggest={lookup.size ? suggest : undefined} hint={`Add a team from a house, then pick its ${mode === 'mixed' ? 'man and woman' : 'three archers'} — or “Fill”.`} />
+            </Card>
+          ) : null}
+
+          {!teamMode ? <Card style={st.card}>
+            <Text style={textStyles.h3}>2 · Archers ({picks.length})</Text>
+            <View style={st.wrap}>
+              <SelectChip label="All" active={filter == null} onPress={() => setFilter(null)} />
+              {sources.map((s) => <SelectChip key={s.key} label={s.name} dotColor={s.colorHex} active={filter === s.key} onPress={() => setFilter(s.key)} />)}
+            </View>
+            <TextInput style={st.input} value={query} onChangeText={setQuery} placeholder="Search any player by name" placeholderTextColor={theme.colors.textMuted} accessibilityLabel="Search players" />
+            <SelectChip label={eligibleOnly ? `✓ ${gender === 'M' ? (adult ? 'Men' : 'Boys') : (adult ? 'Women' : 'Girls')} only` : 'Showing everyone'} active={eligibleOnly} onPress={() => setEligibleOnly(!eligibleOnly)} />
+            <View style={st.wrap}>
+              {pool.map((p) => {
+                const on = picks.includes(p.id);
+                return <SelectChip key={p.id} label={`${on ? '✓ ' : ''}${p.fullName}`} dotColor={p.houseColor} active={on} onPress={() => toggle(p.id)} />;
+              })}
+              {!pool.length && <Text style={textStyles.muted}>No archers match. Players without a gender are always shown.</Text>}
+            </View>
+          </Card> : null}
+
+          <Card style={st.card}>
+            <Text style={textStyles.h3}>3 · Match play</Text>
+            {choices.length > 1 ? (
+              <View style={st.wrap}>
+                {choices.filter((k) => !teamMode || k <= 16).map((k) => <SelectChip key={k} label={k ? (k === entrants && (k & (k - 1)) !== 0 ? `All ${k} (byes)` : `Top ${k}`) : 'No match play'} active={(withMatches ? field : 0) === k} onPress={() => setBracketN(k)} />)}
+              </View>
+            ) : null}
+            <Text style={textStyles.muted}>
+              {withMatches
+                ? `The best ${field}${teamMode ? ' teams' : ''} after the ${teamMode ? 'team ranking' : 'ranking round'} are seeded into a bracket of ${size} (1 v ${size}, ${size / 2} v ${size / 2 + 1} …)${size > field ? `; the top ${size - field} seed${size - field === 1 ? '' : 's'} get a bye` : ''}. ${teamMode ? matchRuleText(matchFormatOf(bow), matchSpecOf(discipline)) : matchFormatOf(bow) === 'sets' ? 'Set system: ends of 3 arrows, 2 set points for the higher end, 1 each for a tie, first to 6; 5–5 → a one-arrow shoot-off.' : 'Compound: 5 ends of 3 arrows, the higher total wins; level → a one-arrow shoot-off.'} The semi-final losers shoot for bronze.`
+                : `No match play: the ${teamMode ? 'team ranking' : 'ranking round'} decides the medals (a tie for a medal: a shoot-off).`}
+            </Text>
+            <Text style={textStyles.muted}>Ranking ties (WA): the higher score, then more 10s (X included), then more X. Level for the last match-play place: a shoot-off; other equal ranks: a coin toss for the seed.</Text>
+          </Card>
+
+          <ScheduleCard state={schedule} tournamentId={tournamentId} discipline={discipline} plan={withMatches ? [{ phase: 'qualification', heats: 1 }, { phase: 'final', heats: 1 }] : undefined} athleteIds={teamMode ? teams.flatMap((t) => t.seats.filter((x): x is string => !!x)) : picks} />
+          <EventOfficials tournament={tournament} value={officials} onChange={setOfficials} />
+        </KeyboardAwareScrollView>
+      </KeyboardFooterLayout>
     </SafeAreaView>
   );
 }

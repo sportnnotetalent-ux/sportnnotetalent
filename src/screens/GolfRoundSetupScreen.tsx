@@ -4,7 +4,7 @@
  *  same course/format, players carried over through an optional cut. */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
-import { KeyboardAwareScrollView } from '../components/keyboard';
+import { KeyboardAwareScrollView, KeyboardFooterLayout } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -244,125 +244,132 @@ export default function GolfRoundSetupScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
-        <ScreenTitle title={params?.nextOf ? `⛳ Round ${roundNo}` : '⛳ New golf round'} subtitle="Stroke play or Stableford — everyone on one leaderboard" />
-        <TextField label="Round name" value={title} onChange={setTitle} placeholder="e.g. Sunday medal" />
-
-        <FieldLabel>Course</FieldLabel>
-        <View style={st.chips}>
-          {courses.map((c) => <SelectChip key={c.id} label={`${c.name}${c.city ? ` · ${c.city}` : ''}`} active={c.id === courseId} onPress={() => { setCourseId(c.id); setTee(undefined); }} />)}
-          <SelectChip label="＋ New course" active={newCourse} onPress={() => setNewCourse(!newCourse)} />
-        </View>
-        {newCourse && <GolfCourseEditor onSave={saveCourse} onCancel={() => setNewCourse(false)} />}
-        {course && !newCourse && mayEditCourse && (
-          <Text style={st.link} accessibilityRole="button" onPress={() => nav.navigate('GolfCourseEdit', { courseId: course.id })}>
-            ✏️ Edit {course.name} — pars, stroke indexes, tees{course.tees.length < 2 ? ' (add tees here)' : ''}
-          </Text>
-        )}
-        {course && course.tees.length > 1 && (
-          <View style={st.chips}>
-            {course.tees.map((t) => <SelectChip key={t.name} label={`${t.name} tees${t.gender === 'F' ? ' (women)' : t.gender === 'M' ? ' (men)' : ''}`} active={(tee ?? course.tees[0].name) === t.name} onPress={() => setTee(t.name)} />)}
-          </View>
-        )}
-
-        <SportFormatEditor sport="golf" value={format} onChange={(k, v) => setFormat((f) => ({ ...f, [k]: v }))} heading="format" omitKeys={['extraHoles']} />
-        {competition === 'match' && <Text style={st.warn}>Match play is head-to-head — set it up from “Start a friendly” or a tournament bracket.</Text>}
-
-        <DateTimeField label="First tee time" value={when} onChange={setWhen} />
-
-        <FieldLabel>Players · Handicap Index (optional)</FieldLabel>
-        {picks.map((p) => (
-          <View key={p.playerId} style={st.playerRow}>
-            <Text style={[textStyles.body, st.flex]} numberOfLines={1}>{p.name}</Text>
-            <TextInput
-              style={st.idxInput}
-              value={p.index}
-              onChangeText={(v) => setPicks((ps) => ps.map((x) => (x.playerId === p.playerId ? { ...x, index: v } : x)))}
-              placeholder="HI"
-              placeholderTextColor={theme.colors.textMuted}
-              accessibilityLabel={`${p.name} handicap index`}
-              autoCapitalize="none"
-            />
-            {course && course.tees.length > 1 && (
-              <TouchableOpacity accessibilityRole="button" accessibilityLabel={`${p.name}'s tee: ${p.tee ?? roundTee}. Tap to change`} onPress={() => cycleTee(p.playerId)} style={[st.teamChip, !p.tee && st.teamChipOff]}>
-                <Text style={st.teamChipTxt} numberOfLines={1}>{p.tee ?? roundTee}</Text>
-              </TouchableOpacity>
-            )}
-            {teamOn && (
-              <TouchableOpacity accessibilityRole="button" accessibilityLabel={`${p.name}'s team: ${teamLabel(p.teamId)}. Tap to change`} onPress={() => cycleTeam(p.playerId)} style={[st.teamChip, !p.teamId && st.teamChipOff]}>
-                <Text style={st.teamChipTxt} numberOfLines={1}>{teamLabel(p.teamId)}</Text>
-              </TouchableOpacity>
-            )}
-            <Text style={st.remove} accessibilityRole="button" accessibilityLabel={`Remove ${p.name}`} onPress={() => setPicks((ps) => ps.filter((x) => x.playerId !== p.playerId))}>✕</Text>
-          </View>
-        ))}
-        {!params?.nextOf && (
+      <KeyboardFooterLayout
+        safeBottom={false}
+        footer={(
           <>
-            <View style={st.chips}><SelectChip label="👤 Add me" active={false} onPress={() => void addMe()} /></View>
-            <TextField label="" value={query} onChange={setQuery} placeholder="Search players (type 3+ letters)…" autoCapitalize="none" />
-            {results.length > 0 && <View style={st.chips}>{results.map((p) => <SelectChip key={p.id} label={`👤 ${p.fullName}`} active={false} onPress={() => { addPlayer(p.id, p.fullName); setQuery(''); }} />)}</View>}
-            {q.length >= 2 && <Text style={st.link} accessibilityRole="button" onPress={() => void addNew()}>＋ Add “{query.trim()}” as a new player</Text>}
+            <FormError message={error} />
+            <Button label={busy ? 'Creating…' : '⛳ Create round'} onPress={submit} disabled={busy} />
           </>
         )}
-        {prev && (
-          <Card style={{ gap: theme.spacing(2) }}>
-            <Text style={textStyles.h3}>✂️ Cut (optional)</Text>
-            <Text style={textStyles.muted}>Keep the top N on the leaderboard so far, plus ties. Leave blank for no cut.</Text>
-            <TextField label="Top N (and ties)" value={cutN} onChange={(v) => setCutN(v.replace(/[^0-9]/g, ''))} placeholder="e.g. 50" autoCapitalize="none" />
-          </Card>
-        )}
+      >
+        <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
+          <ScreenTitle title={params?.nextOf ? `⛳ Round ${roundNo}` : '⛳ New golf round'} subtitle="Stroke play or Stableford — everyone on one leaderboard" />
+          <TextField label="Round name" value={title} onChange={setTitle} placeholder="e.g. Sunday medal" />
 
-        {/* SD-76 — team stroke play: best N of M scores count */}
-        {competition !== 'match' && (
-          <Card style={{ gap: theme.spacing(2) }}>
+          <FieldLabel>Course</FieldLabel>
+          <View style={st.chips}>
+            {courses.map((c) => <SelectChip key={c.id} label={`${c.name}${c.city ? ` · ${c.city}` : ''}`} active={c.id === courseId} onPress={() => { setCourseId(c.id); setTee(undefined); }} />)}
+            <SelectChip label="＋ New course" active={newCourse} onPress={() => setNewCourse(!newCourse)} />
+          </View>
+          {newCourse && <GolfCourseEditor onSave={saveCourse} onCancel={() => setNewCourse(false)} />}
+          {course && !newCourse && mayEditCourse && (
+            <Text style={st.link} accessibilityRole="button" onPress={() => nav.navigate('GolfCourseEdit', { courseId: course.id })}>
+              ✏️ Edit {course.name} — pars, stroke indexes, tees{course.tees.length < 2 ? ' (add tees here)' : ''}
+            </Text>
+          )}
+          {course && course.tees.length > 1 && (
             <View style={st.chips}>
-              <SelectChip label={teamOn ? '✓ Team competition' : '👥 Team competition (best N of M)'} active={teamOn} onPress={() => setTeamOn(!teamOn)} />
+              {course.tees.map((t) => <SelectChip key={t.name} label={`${t.name} tees${t.gender === 'F' ? ' (women)' : t.gender === 'M' ? ' (men)' : ''}`} active={(tee ?? course.tees[0].name) === t.name} onPress={() => setTee(t.name)} />)}
             </View>
-            {teamOn && (
-              <>
-                <Text style={textStyles.muted}>Each team’s best scores count — the rest are dropped. Everyone still plays on the individual leaderboard too.</Text>
-                <View style={st.chips}>
-                  <Text style={textStyles.muted}>Best</Text>
-                  {[1, 2, 3, 4, 5].map((n) => <SelectChip key={n} label={String(n)} active={teamRule.count === n} onPress={() => setTeamRule((r) => ({ ...r, count: n }))} />)}
-                  <Text style={textStyles.muted}>count</Text>
-                </View>
-                <View style={st.chips}>
-                  <SelectChip label="Per round" active={teamRule.mode === 'round'} onPress={() => setTeamRule((r) => ({ ...r, mode: 'round' }))} />
-                  <SelectChip label="Per hole (best ball)" active={teamRule.mode === 'hole'} onPress={() => setTeamRule((r) => ({ ...r, mode: 'hole' }))} />
-                  {competition !== 'stableford' && (
-                    <>
-                      <SelectChip label="Gross" active={teamRule.basis === 'gross'} onPress={() => setTeamRule((r) => ({ ...r, basis: 'gross' }))} />
-                      <SelectChip label="Net" active={teamRule.basis === 'net'} onPress={() => setTeamRule((r) => ({ ...r, basis: 'net' }))} />
-                    </>
-                  )}
-                </View>
-                <FieldLabel>Teams in this round</FieldLabel>
-                <View style={st.chips}>
-                  {allTeams.filter((t) => t.sport === 'golf' || roundTeams.includes(t.id)).map((t) => (
-                    <SelectChip key={t.id} label={t.name} active={roundTeams.includes(t.id)}
-                      onPress={() => setRoundTeams((ts) => (ts.includes(t.id) ? ts.filter((x) => x !== t.id) : [...ts, t.id]))} />
-                  ))}
-                </View>
-                <View style={st.row}>
-                  <View style={st.flex}><TextField label="" value={newTeam} onChange={setNewTeam} placeholder="New team, e.g. DPS Hyderabad" /></View>
-                  <Button label="＋ Add" variant="ghost" onPress={() => void addNewTeam()} />
-                </View>
-                <Text style={textStyles.muted}>Then tap the team chip on each player below.</Text>
-              </>
-            )}
-          </Card>
-        )}
+          )}
 
-        <FieldLabel>Groups</FieldLabel>
-        <View style={st.chips}>
-          {[2, 3, 4].map((n) => <SelectChip key={n} label={`${n}-ball`} active={groupSize === n} onPress={() => setGroupSize(n)} />)}
-          {[8, 10, 12].map((n) => <SelectChip key={`i${n}`} label={`every ${n} min`} active={interval === n} onPress={() => setIntervalMin(n)} />)}
-        </View>
-        <Text style={textStyles.muted}>{picks.length ? `${Math.ceil(picks.length / groupSize)} group(s), first tee ${when.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}.` : 'Add players to see the groups.'}</Text>
+          <SportFormatEditor sport="golf" value={format} onChange={(k, v) => setFormat((f) => ({ ...f, [k]: v }))} heading="format" omitKeys={['extraHoles']} />
+          {competition === 'match' && <Text style={st.warn}>Match play is head-to-head — set it up from “Start a friendly” or a tournament bracket.</Text>}
 
-        <FormError message={error} />
-        <Button label={busy ? 'Creating…' : '⛳ Create round'} onPress={submit} disabled={busy} />
-      </KeyboardAwareScrollView>
+          <DateTimeField label="First tee time" value={when} onChange={setWhen} />
+
+          <FieldLabel>Players · Handicap Index (optional)</FieldLabel>
+          {picks.map((p) => (
+            <View key={p.playerId} style={st.playerRow}>
+              <Text style={[textStyles.body, st.flex]} numberOfLines={1}>{p.name}</Text>
+              <TextInput
+                style={st.idxInput}
+                value={p.index}
+                onChangeText={(v) => setPicks((ps) => ps.map((x) => (x.playerId === p.playerId ? { ...x, index: v } : x)))}
+                placeholder="HI"
+                placeholderTextColor={theme.colors.textMuted}
+                accessibilityLabel={`${p.name} handicap index`}
+                autoCapitalize="none"
+              />
+              {course && course.tees.length > 1 && (
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel={`${p.name}'s tee: ${p.tee ?? roundTee}. Tap to change`} onPress={() => cycleTee(p.playerId)} style={[st.teamChip, !p.tee && st.teamChipOff]}>
+                  <Text style={st.teamChipTxt} numberOfLines={1}>{p.tee ?? roundTee}</Text>
+                </TouchableOpacity>
+              )}
+              {teamOn && (
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel={`${p.name}'s team: ${teamLabel(p.teamId)}. Tap to change`} onPress={() => cycleTeam(p.playerId)} style={[st.teamChip, !p.teamId && st.teamChipOff]}>
+                  <Text style={st.teamChipTxt} numberOfLines={1}>{teamLabel(p.teamId)}</Text>
+                </TouchableOpacity>
+              )}
+              <Text style={st.remove} accessibilityRole="button" accessibilityLabel={`Remove ${p.name}`} onPress={() => setPicks((ps) => ps.filter((x) => x.playerId !== p.playerId))}>✕</Text>
+            </View>
+          ))}
+          {!params?.nextOf && (
+            <>
+              <View style={st.chips}><SelectChip label="👤 Add me" active={false} onPress={() => void addMe()} /></View>
+              <TextField label="" value={query} onChange={setQuery} placeholder="Search players (type 3+ letters)…" autoCapitalize="none" />
+              {results.length > 0 && <View style={st.chips}>{results.map((p) => <SelectChip key={p.id} label={`👤 ${p.fullName}`} active={false} onPress={() => { addPlayer(p.id, p.fullName); setQuery(''); }} />)}</View>}
+              {q.length >= 2 && <Text style={st.link} accessibilityRole="button" onPress={() => void addNew()}>＋ Add “{query.trim()}” as a new player</Text>}
+            </>
+          )}
+          {prev && (
+            <Card style={{ gap: theme.spacing(2) }}>
+              <Text style={textStyles.h3}>✂️ Cut (optional)</Text>
+              <Text style={textStyles.muted}>Keep the top N on the leaderboard so far, plus ties. Leave blank for no cut.</Text>
+              <TextField label="Top N (and ties)" value={cutN} onChange={(v) => setCutN(v.replace(/[^0-9]/g, ''))} placeholder="e.g. 50" autoCapitalize="none" />
+            </Card>
+          )}
+
+          {/* SD-76 — team stroke play: best N of M scores count */}
+          {competition !== 'match' && (
+            <Card style={{ gap: theme.spacing(2) }}>
+              <View style={st.chips}>
+                <SelectChip label={teamOn ? '✓ Team competition' : '👥 Team competition (best N of M)'} active={teamOn} onPress={() => setTeamOn(!teamOn)} />
+              </View>
+              {teamOn && (
+                <>
+                  <Text style={textStyles.muted}>Each team’s best scores count — the rest are dropped. Everyone still plays on the individual leaderboard too.</Text>
+                  <View style={st.chips}>
+                    <Text style={textStyles.muted}>Best</Text>
+                    {[1, 2, 3, 4, 5].map((n) => <SelectChip key={n} label={String(n)} active={teamRule.count === n} onPress={() => setTeamRule((r) => ({ ...r, count: n }))} />)}
+                    <Text style={textStyles.muted}>count</Text>
+                  </View>
+                  <View style={st.chips}>
+                    <SelectChip label="Per round" active={teamRule.mode === 'round'} onPress={() => setTeamRule((r) => ({ ...r, mode: 'round' }))} />
+                    <SelectChip label="Per hole (best ball)" active={teamRule.mode === 'hole'} onPress={() => setTeamRule((r) => ({ ...r, mode: 'hole' }))} />
+                    {competition !== 'stableford' && (
+                      <>
+                        <SelectChip label="Gross" active={teamRule.basis === 'gross'} onPress={() => setTeamRule((r) => ({ ...r, basis: 'gross' }))} />
+                        <SelectChip label="Net" active={teamRule.basis === 'net'} onPress={() => setTeamRule((r) => ({ ...r, basis: 'net' }))} />
+                      </>
+                    )}
+                  </View>
+                  <FieldLabel>Teams in this round</FieldLabel>
+                  <View style={st.chips}>
+                    {allTeams.filter((t) => t.sport === 'golf' || roundTeams.includes(t.id)).map((t) => (
+                      <SelectChip key={t.id} label={t.name} active={roundTeams.includes(t.id)}
+                        onPress={() => setRoundTeams((ts) => (ts.includes(t.id) ? ts.filter((x) => x !== t.id) : [...ts, t.id]))} />
+                    ))}
+                  </View>
+                  <View style={st.row}>
+                    <View style={st.flex}><TextField label="" value={newTeam} onChange={setNewTeam} placeholder="New team, e.g. DPS Hyderabad" /></View>
+                    <Button label="＋ Add" variant="ghost" onPress={() => void addNewTeam()} />
+                  </View>
+                  <Text style={textStyles.muted}>Then tap the team chip on each player below.</Text>
+                </>
+              )}
+            </Card>
+          )}
+
+          <FieldLabel>Groups</FieldLabel>
+          <View style={st.chips}>
+            {[2, 3, 4].map((n) => <SelectChip key={n} label={`${n}-ball`} active={groupSize === n} onPress={() => setGroupSize(n)} />)}
+            {[8, 10, 12].map((n) => <SelectChip key={`i${n}`} label={`every ${n} min`} active={interval === n} onPress={() => setIntervalMin(n)} />)}
+          </View>
+          <Text style={textStyles.muted}>{picks.length ? `${Math.ceil(picks.length / groupSize)} group(s), first tee ${when.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}.` : 'Add players to see the groups.'}</Text>
+        </KeyboardAwareScrollView>
+      </KeyboardFooterLayout>
     </SafeAreaView>
   );
 }

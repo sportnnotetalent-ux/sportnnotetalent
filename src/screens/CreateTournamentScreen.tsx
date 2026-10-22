@@ -5,7 +5,7 @@ import { regionFormatDefaults } from '../core/units';
 import { regionStore } from '../core/region';
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { KeyboardAwareScrollView } from '../components/keyboard';
+import { KeyboardAwareScrollView, KeyboardFooterLayout } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -213,143 +213,150 @@ export default function CreateTournamentScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
-        <ScreenTitle title="New tournament" subtitle="Set up your meet & its format" />
-        <TournamentImagesField logoUrl={logoUrl} bannerUrl={bannerUrl} onLogo={setLogoUrl} onBanner={setBannerUrl} />
-        <TextField label="Name" value={name} onChange={setName} placeholder="Annual Sports Meet 2026" />
-        <TournamentPlaceFields value={details} onChange={patchDetails} knownVenues={knownVenues} />
+      <KeyboardFooterLayout
+        safeBottom={false}
+        footer={(
+          <>
+            <FormError message={error} />
+            <Button label={busy ? 'Creating…' : 'Create tournament'} onPress={submit} />
+          </>
+        )}
+      >
+        <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
+          <ScreenTitle title="New tournament" subtitle="Set up your meet & its format" />
+          <TournamentImagesField logoUrl={logoUrl} bannerUrl={bannerUrl} onLogo={setLogoUrl} onBanner={setBannerUrl} />
+          <TextField label="Name" value={name} onChange={setName} placeholder="Annual Sports Meet 2026" />
+          <TournamentPlaceFields value={details} onChange={patchDetails} knownVenues={knownVenues} />
 
-        <FieldLabel>Host</FieldLabel>
-        <View style={st.chips}>
-          <SelectChip label={myName ? `🙋 Myself (${myName})` : '🙋 Myself'} active={hostChoice === 'self'} onPress={() => setHostChoice('self')} />
-          {myOrgs.map((o) => (
-            <SelectChip key={o.id} label={`🏛️ ${o.name}`} active={hostChoice === o.id} onPress={() => setHostChoice(o.id)} />
-          ))}
-        </View>
-        <Text style={st.hint}>
-          {hostChoice === 'self'
-            ? 'You host this tournament personally.'
-            : 'Everyone in this organization can manage it and gets host reminders.'}
-        </Text>
-
-        <FieldLabel>Contested by</FieldLabel>
-        <View style={st.chips}>
-          {PARTICIPATION_OPTS.map((o) => (
-            <SelectChip key={o.key} label={o.key === 'inter_house' ? `🏠 ${term(market, 'interHouse')}` : o.label} active={participation === o.key} onPress={() => setParticipation(o.key)} />
-          ))}
-        </View>
-        <Text style={st.hint}>{PARTICIPATION_OPTS.find((o) => o.key === participation)?.hint}</Text>
-
-        {/* Add other people as co-hosts — look them up, or invite them to install. */}
-        <CoHostPicker
-          value={coHosts}
-          onChange={setCoHosts}
-          inviterName={myName}
-          excludeIds={myId ? [myId] : []}
-          context={name.trim() || undefined}
-        />
-
-        {/* Divisions (age × gender) — school meets run many at once. Optional. */}
-        <DivisionsEditor value={divisions} onChange={setDivisions} market={market} />
-
-
-        <View style={st.row}>
-          <View style={st.flex}><DateField label="Start date" value={start} onChange={setStart} /></View>
-          <View style={st.flex}><DateField label="End date" value={end} onChange={setEnd} /></View>
-        </View>
-
-        <FieldLabel>Sports</FieldLabel>
-        <View style={st.chips}>
-          {SPORT_LIST.map((s) => (
-            <SelectChip key={s.id} label={`${s.icon} ${s.name}`} active={sports.includes(s.id)} onPress={() => toggleSport(s.id)} />
-          ))}
-        </View>
-
-        {sports.length > 1 && <MedalScoringEditor sports={sports} value={scoring} onChange={setScoring} />}
-
-        {/* Singles vs Doubles up front for racket sports — the first thing that
-            shapes the whole competition (individuals vs pairs), so it's not buried
-            in per-sport settings. */}
-        {sports.filter((s) => getSport(s).participantKind === 'both').map((s) => {
-          const pps = Number((formats[s] as Record<string, unknown> | undefined)?.playersPerSide ?? 1);
-          const setPps = (n: number) => { tournamentDraft.setField(s, 'playersPerSide', n); setFormats(tournamentDraft.all() as FormatMap); };
-          return (
-            <View key={s} style={{ gap: theme.spacing(2) }}>
-              <FieldLabel>{getSport(s).icon} {getSport(s).name} — format</FieldLabel>
-              <View style={st.chips}>
-                <SelectChip label="👤 Singles" active={pps < 2} onPress={() => setPps(1)} />
-                <SelectChip label="👥 Doubles (pairs)" active={pps >= 2} onPress={() => setPps(2)} />
-              </View>
-            </View>
-          );
-        })}
-
-        <SportBasics sports={sports} onChanged={() => setFormats(tournamentDraft.all() as FormatMap)} />
-
-        {/* SD-140: each team sport's walkover score, asked here (prefilled with the federation default) */}
-        <WalkoverSetupCard sports={sports} onChanged={() => setFormats(tournamentDraft.all() as FormatMap)} />
-
-        <SportSettingsButtons sports={sports} />
-
-        <TournamentContactFields value={details} onChange={patchDetails} />
-
-        <FieldLabel>Player reminders</FieldLabel>
-        <View style={st.chips}>
-          <SelectChip label="Each player's own settings" active={!customReminders} onPress={() => setCustomReminders(false)} />
-          <SelectChip label="Custom for this tournament" active={customReminders} onPress={() => setCustomReminders(true)} />
-        </View>
-        {customReminders && (
+          <FieldLabel>Host</FieldLabel>
           <View style={st.chips}>
-            {LEAD_OPTIONS.map((o) => (
-              <SelectChip
-                key={o.key}
-                label={o.label}
-                active={reminderMins.includes(o.minutes)}
-                onPress={() => setReminderMins((prev) => (prev.includes(o.minutes) ? prev.filter((x) => x !== o.minutes) : [...prev, o.minutes]))}
-              />
+            <SelectChip label={myName ? `🙋 Myself (${myName})` : '🙋 Myself'} active={hostChoice === 'self'} onPress={() => setHostChoice('self')} />
+            {myOrgs.map((o) => (
+              <SelectChip key={o.id} label={`🏛️ ${o.name}`} active={hostChoice === o.id} onPress={() => setHostChoice(o.id)} />
             ))}
           </View>
-        )}
-        <Text style={st.hint}>
-          {customReminders
-            ? 'Everyone playing in this tournament is reminded before kickoff on these times.'
-            : 'Each player is reminded using their own settings from Profile.'}
-        </Text>
+          <Text style={st.hint}>
+            {hostChoice === 'self'
+              ? 'You host this tournament personally.'
+              : 'Everyone in this organization can manage it and gets host reminders.'}
+          </Text>
 
-        <FieldLabel>Registration</FieldLabel>
-        <View style={st.chips}>
-          <SelectChip label="🔓 Open — teams can find & request to join" active={isOpen} onPress={() => setIsOpen(true)} />
-          <SelectChip label="🔒 Invite only" active={!isOpen} onPress={() => setIsOpen(false)} />
-        </View>
-        <Text style={st.hint}>Open tournaments appear in Discover for teams to register.</Text>
-
-        {isOpen && (
-          <View style={{ gap: theme.spacing(3) }}>
-            {regDeadline ? (
-              <View style={{ gap: theme.spacing(2) }}>
-                <DateTimeField label="Registration deadline" value={regDeadline} onChange={setRegDeadline} />
-                <Text style={st.linkText} onPress={() => setRegDeadline(null)}>Remove deadline</Text>
-              </View>
-            ) : (
-              <SelectChip label="＋ Add a registration deadline" active={false} onPress={() => { const d = new Date(); d.setDate(d.getDate() + 7); d.setHours(23, 59, 0, 0); setRegDeadline(d); }} />
-            )}
-            <View style={st.capRow}>
-              <View style={st.capCell}>
-                <FieldLabel>Min teams</FieldLabel>
-                <NumStepper value={minTeams} min={0} max={128} onChange={setMinTeams} zeroLabel="—" />
-              </View>
-              <View style={st.capCell}>
-                <FieldLabel>Max teams (cap)</FieldLabel>
-                <NumStepper value={maxTeams} min={0} max={128} onChange={setMaxTeams} zeroLabel="∞" />
-              </View>
-            </View>
-            <Text style={textStyles.muted}>Below the minimum is just a heads-up; the maximum caps public sign-ups (you can still add teams yourself).</Text>
+          <FieldLabel>Contested by</FieldLabel>
+          <View style={st.chips}>
+            {PARTICIPATION_OPTS.map((o) => (
+              <SelectChip key={o.key} label={o.key === 'inter_house' ? `🏠 ${term(market, 'interHouse')}` : o.label} active={participation === o.key} onPress={() => setParticipation(o.key)} />
+            ))}
           </View>
-        )}
+          <Text style={st.hint}>{PARTICIPATION_OPTS.find((o) => o.key === participation)?.hint}</Text>
 
-        <FormError message={error} />
-        <Button label={busy ? 'Creating…' : 'Create tournament'} onPress={submit} />
-      </KeyboardAwareScrollView>
+          {/* Add other people as co-hosts — look them up, or invite them to install. */}
+          <CoHostPicker
+            value={coHosts}
+            onChange={setCoHosts}
+            inviterName={myName}
+            excludeIds={myId ? [myId] : []}
+            context={name.trim() || undefined}
+          />
+
+          {/* Divisions (age × gender) — school meets run many at once. Optional. */}
+          <DivisionsEditor value={divisions} onChange={setDivisions} market={market} />
+
+
+          <View style={st.row}>
+            <View style={st.flex}><DateField label="Start date" value={start} onChange={setStart} /></View>
+            <View style={st.flex}><DateField label="End date" value={end} onChange={setEnd} /></View>
+          </View>
+
+          <FieldLabel>Sports</FieldLabel>
+          <View style={st.chips}>
+            {SPORT_LIST.map((s) => (
+              <SelectChip key={s.id} label={`${s.icon} ${s.name}`} active={sports.includes(s.id)} onPress={() => toggleSport(s.id)} />
+            ))}
+          </View>
+
+          {sports.length > 1 && <MedalScoringEditor sports={sports} value={scoring} onChange={setScoring} />}
+
+          {/* Singles vs Doubles up front for racket sports — the first thing that
+              shapes the whole competition (individuals vs pairs), so it's not buried
+              in per-sport settings. */}
+          {sports.filter((s) => getSport(s).participantKind === 'both').map((s) => {
+            const pps = Number((formats[s] as Record<string, unknown> | undefined)?.playersPerSide ?? 1);
+            const setPps = (n: number) => { tournamentDraft.setField(s, 'playersPerSide', n); setFormats(tournamentDraft.all() as FormatMap); };
+            return (
+              <View key={s} style={{ gap: theme.spacing(2) }}>
+                <FieldLabel>{getSport(s).icon} {getSport(s).name} — format</FieldLabel>
+                <View style={st.chips}>
+                  <SelectChip label="👤 Singles" active={pps < 2} onPress={() => setPps(1)} />
+                  <SelectChip label="👥 Doubles (pairs)" active={pps >= 2} onPress={() => setPps(2)} />
+                </View>
+              </View>
+            );
+          })}
+
+          <SportBasics sports={sports} onChanged={() => setFormats(tournamentDraft.all() as FormatMap)} />
+
+          {/* SD-140: each team sport's walkover score, asked here (prefilled with the federation default) */}
+          <WalkoverSetupCard sports={sports} onChanged={() => setFormats(tournamentDraft.all() as FormatMap)} />
+
+          <SportSettingsButtons sports={sports} />
+
+          <TournamentContactFields value={details} onChange={patchDetails} />
+
+          <FieldLabel>Player reminders</FieldLabel>
+          <View style={st.chips}>
+            <SelectChip label="Each player's own settings" active={!customReminders} onPress={() => setCustomReminders(false)} />
+            <SelectChip label="Custom for this tournament" active={customReminders} onPress={() => setCustomReminders(true)} />
+          </View>
+          {customReminders && (
+            <View style={st.chips}>
+              {LEAD_OPTIONS.map((o) => (
+                <SelectChip
+                  key={o.key}
+                  label={o.label}
+                  active={reminderMins.includes(o.minutes)}
+                  onPress={() => setReminderMins((prev) => (prev.includes(o.minutes) ? prev.filter((x) => x !== o.minutes) : [...prev, o.minutes]))}
+                />
+              ))}
+            </View>
+          )}
+          <Text style={st.hint}>
+            {customReminders
+              ? 'Everyone playing in this tournament is reminded before kickoff on these times.'
+              : 'Each player is reminded using their own settings from Profile.'}
+          </Text>
+
+          <FieldLabel>Registration</FieldLabel>
+          <View style={st.chips}>
+            <SelectChip label="🔓 Open — teams can find & request to join" active={isOpen} onPress={() => setIsOpen(true)} />
+            <SelectChip label="🔒 Invite only" active={!isOpen} onPress={() => setIsOpen(false)} />
+          </View>
+          <Text style={st.hint}>Open tournaments appear in Discover for teams to register.</Text>
+
+          {isOpen && (
+            <View style={{ gap: theme.spacing(3) }}>
+              {regDeadline ? (
+                <View style={{ gap: theme.spacing(2) }}>
+                  <DateTimeField label="Registration deadline" value={regDeadline} onChange={setRegDeadline} />
+                  <Text style={st.linkText} onPress={() => setRegDeadline(null)}>Remove deadline</Text>
+                </View>
+              ) : (
+                <SelectChip label="＋ Add a registration deadline" active={false} onPress={() => { const d = new Date(); d.setDate(d.getDate() + 7); d.setHours(23, 59, 0, 0); setRegDeadline(d); }} />
+              )}
+              <View style={st.capRow}>
+                <View style={st.capCell}>
+                  <FieldLabel>Min teams</FieldLabel>
+                  <NumStepper value={minTeams} min={0} max={128} onChange={setMinTeams} zeroLabel="—" />
+                </View>
+                <View style={st.capCell}>
+                  <FieldLabel>Max teams (cap)</FieldLabel>
+                  <NumStepper value={maxTeams} min={0} max={128} onChange={setMaxTeams} zeroLabel="∞" />
+                </View>
+              </View>
+              <Text style={textStyles.muted}>Below the minimum is just a heads-up; the maximum caps public sign-ups (you can still add teams yourself).</Text>
+            </View>
+          )}
+        </KeyboardAwareScrollView>
+      </KeyboardFooterLayout>
     </SafeAreaView>
   );
 }

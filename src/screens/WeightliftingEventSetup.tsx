@@ -7,7 +7,7 @@
  *  route's sport is 'weightlifting'. */
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, TextInput, StyleSheet } from 'react-native';
-import { KeyboardAwareScrollView } from '../components/keyboard';
+import { KeyboardAwareScrollView, KeyboardFooterLayout } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -132,76 +132,84 @@ export function WeightliftingEventSetup({ tournamentId }: { tournamentId?: strin
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
-        <ScreenTitle title="🏋️ New weightlifting event" subtitle={tournament?.name} />
-        {/* SD-141: the meet's competition rules, checked before the meet starts */}
-        <CompetitionRulesCard tournament={tournament} sport={'weightlifting'} />
+      <KeyboardFooterLayout
+        safeBottom={false}
+        footer={(
+          <>
+            <FormError message={error} />
+            <Button label={busy ? 'Creating…' : 'Create event & weigh-in list'} onPress={() => void create()} disabled={busy || !picks.length} />
+          </>
+        )}
+      >
+        <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
+          <ScreenTitle title="🏋️ New weightlifting event" subtitle={tournament?.name} />
+          {/* SD-141: the meet's competition rules, checked before the meet starts */}
+          <CompetitionRulesCard tournament={tournament} sport={'weightlifting'} />
 
-        <Card style={st.card}>
-          <Text style={textStyles.h3}>1 · Category</Text>
-          <View style={st.wrap}>{WL_AGES.map((a) => <SelectChip key={a.key} label={a.label} active={age === a.key} onPress={() => setAge(a.key)} />)}</View>
-          <Text style={textStyles.muted}>{WL_AGES.find((a) => a.key === age)?.note}.</Text>
-          <View style={st.wrap}>
-            <SelectChip label={adult ? 'Men' : 'Boys'} active={gender === 'M'} onPress={() => setGender('M')} />
-            <SelectChip label={adult ? 'Women' : 'Girls'} active={gender === 'F'} onPress={() => setGender('F')} />
-          </View>
-          <Text style={st.label}>Bodyweight category</Text>
-          <View style={st.wrap}>{classes.map((c) => <SelectChip key={c} label={c} active={cls === c} onPress={() => setCls(c)} />)}</View>
-          <Text style={textStyles.muted}>{age === 'School' ? 'School categories are a house choice — check them against your school board or federation.' : 'IWF bodyweight categories in force from 1 June 2025.'} One event per category: {categoryLabel(cat)}.</Text>
-        </Card>
-
-        <Card style={st.card}>
-          <Text style={textStyles.h3}>2 · Lifters ({picks.length})</Text>
-          <View style={st.wrap}>
-            <SelectChip label="All" active={filter == null} onPress={() => setFilter(null)} />
-            {sources.map((s) => <SelectChip key={s.key} label={s.name} dotColor={s.colorHex} active={filter === s.key} onPress={() => setFilter(s.key)} />)}
-          </View>
-          <TextInput style={st.input} value={query} onChangeText={setQuery} placeholder="Search any player by name" placeholderTextColor={theme.colors.textMuted} accessibilityLabel="Search players" />
-          <SelectChip label={eligibleOnly ? `✓ ${gender === 'M' ? (adult ? 'Men' : 'Boys') : (adult ? 'Women' : 'Girls')} only` : 'Showing everyone'} active={eligibleOnly} onPress={() => setEligibleOnly(!eligibleOnly)} />
-          <View style={st.wrap}>
-            {pool.map((p) => {
-              const on = picks.some((x) => x.playerId === p.id);
-              return <SelectChip key={p.id} label={`${on ? '✓ ' : ''}${p.fullName}`} dotColor={p.houseColor} active={on} onPress={() => toggle(p.id)} />;
-            })}
-            {!pool.length && <Text style={textStyles.muted}>No lifters match. Players without a gender are always shown.</Text>}
-          </View>
-          {picks.length > 0 && (
-            <View style={{ gap: theme.spacing(2) }}>
-              <Text style={st.label}>Opening weights (optional — or declare them at the weigh-in)</Text>
-              <View style={st.pickRow}>
-                <Text style={[st.head, { flex: 1 }]}>Lifter</Text>
-                <Text style={[st.head, { width: 64, textAlign: 'center' }]}>Snatch</Text>
-                <Text style={[st.head, { width: 64, textAlign: 'center' }]}>C&J</Text>
-                <Text style={{ width: 18 }} />
-              </View>
-              {picks.map((p) => (
-                <View key={p.playerId} style={st.pickRow}>
-                  <Text style={[st.name, { flex: 1 }]} numberOfLines={1}>{playerById.get(p.playerId)?.fullName}</Text>
-                  {(['sn', 'cj'] as const).map((k) => (
-                    <TextInput key={k} style={[st.input, { width: 64 }]} value={p[k]} placeholder="kg" placeholderTextColor={theme.colors.textMuted} keyboardType="number-pad"
-                      accessibilityLabel={`${k === 'sn' ? 'Snatch' : 'Clean and jerk'} opening for ${playerById.get(p.playerId)?.fullName}`}
-                      onChangeText={(t) => setPicks((ps) => ps.map((x) => (x.playerId === p.playerId ? { ...x, [k]: t } : x)))} />
-                  ))}
-                  <Text style={st.remove} onPress={() => toggle(p.playerId)}>✕</Text>
-                </View>
-              ))}
-              <Text style={textStyles.muted}>Whole kilograms. Lot numbers are drawn when you create the event — they set the weigh-in order and who lifts first at equal weights.</Text>
+          <Card style={st.card}>
+            <Text style={textStyles.h3}>1 · Category</Text>
+            <View style={st.wrap}>{WL_AGES.map((a) => <SelectChip key={a.key} label={a.label} active={age === a.key} onPress={() => setAge(a.key)} />)}</View>
+            <Text style={textStyles.muted}>{WL_AGES.find((a) => a.key === age)?.note}.</Text>
+            <View style={st.wrap}>
+              <SelectChip label={adult ? 'Men' : 'Boys'} active={gender === 'M'} onPress={() => setGender('M')} />
+              <SelectChip label={adult ? 'Women' : 'Girls'} active={gender === 'F'} onPress={() => setGender('F')} />
             </View>
-          )}
-        </Card>
+            <Text style={st.label}>Bodyweight category</Text>
+            <View style={st.wrap}>{classes.map((c) => <SelectChip key={c} label={c} active={cls === c} onPress={() => setCls(c)} />)}</View>
+            <Text style={textStyles.muted}>{age === 'School' ? 'School categories are a house choice — check them against your school board or federation.' : 'IWF bodyweight categories in force from 1 June 2025.'} One event per category: {categoryLabel(cat)}.</Text>
+          </Card>
 
-        <Card style={st.card}>
-          <Text style={textStyles.h3}>3 · How it runs</Text>
-          <Text style={textStyles.muted}>
-            Weigh-in, then the snatch and the clean & jerk — three attempts each. The bar only goes up: the lightest declared weight lifts next. Best snatch + best clean & jerk = the total; no good lift in either = no total. Equal totals: whoever lifted the total first ranks higher. {settings.liftMedals ? 'Medals for the snatch, the clean & jerk and the total (meet setting).' : 'Medals for the total (meet setting — turn on snatch and C&J medals in Weightlifting settings).'}
-          </Text>
-        </Card>
+          <Card style={st.card}>
+            <Text style={textStyles.h3}>2 · Lifters ({picks.length})</Text>
+            <View style={st.wrap}>
+              <SelectChip label="All" active={filter == null} onPress={() => setFilter(null)} />
+              {sources.map((s) => <SelectChip key={s.key} label={s.name} dotColor={s.colorHex} active={filter === s.key} onPress={() => setFilter(s.key)} />)}
+            </View>
+            <TextInput style={st.input} value={query} onChangeText={setQuery} placeholder="Search any player by name" placeholderTextColor={theme.colors.textMuted} accessibilityLabel="Search players" />
+            <SelectChip label={eligibleOnly ? `✓ ${gender === 'M' ? (adult ? 'Men' : 'Boys') : (adult ? 'Women' : 'Girls')} only` : 'Showing everyone'} active={eligibleOnly} onPress={() => setEligibleOnly(!eligibleOnly)} />
+            <View style={st.wrap}>
+              {pool.map((p) => {
+                const on = picks.some((x) => x.playerId === p.id);
+                return <SelectChip key={p.id} label={`${on ? '✓ ' : ''}${p.fullName}`} dotColor={p.houseColor} active={on} onPress={() => toggle(p.id)} />;
+              })}
+              {!pool.length && <Text style={textStyles.muted}>No lifters match. Players without a gender are always shown.</Text>}
+            </View>
+            {picks.length > 0 && (
+              <View style={{ gap: theme.spacing(2) }}>
+                <Text style={st.label}>Opening weights (optional — or declare them at the weigh-in)</Text>
+                <View style={st.pickRow}>
+                  <Text style={[st.head, { flex: 1 }]}>Lifter</Text>
+                  <Text style={[st.head, { width: 64, textAlign: 'center' }]}>Snatch</Text>
+                  <Text style={[st.head, { width: 64, textAlign: 'center' }]}>C&J</Text>
+                  <Text style={{ width: 18 }} />
+                </View>
+                {picks.map((p) => (
+                  <View key={p.playerId} style={st.pickRow}>
+                    <Text style={[st.name, { flex: 1 }]} numberOfLines={1}>{playerById.get(p.playerId)?.fullName}</Text>
+                    {(['sn', 'cj'] as const).map((k) => (
+                      <TextInput key={k} style={[st.input, { width: 64 }]} value={p[k]} placeholder="kg" placeholderTextColor={theme.colors.textMuted} keyboardType="number-pad"
+                        accessibilityLabel={`${k === 'sn' ? 'Snatch' : 'Clean and jerk'} opening for ${playerById.get(p.playerId)?.fullName}`}
+                        onChangeText={(t) => setPicks((ps) => ps.map((x) => (x.playerId === p.playerId ? { ...x, [k]: t } : x)))} />
+                    ))}
+                    <Text style={st.remove} onPress={() => toggle(p.playerId)}>✕</Text>
+                  </View>
+                ))}
+                <Text style={textStyles.muted}>Whole kilograms. Lot numbers are drawn when you create the event — they set the weigh-in order and who lifts first at equal weights.</Text>
+              </View>
+            )}
+          </Card>
 
-        <ScheduleCard state={schedule} tournamentId={tournamentId} discipline="wl.total" athleteIds={picks.map((p) => p.playerId)} />
-        <EventOfficials tournament={tournament} value={officials} onChange={setOfficials} />
-        <FormError message={error} />
-        <Button label={busy ? 'Creating…' : 'Create event & weigh-in list'} onPress={() => void create()} disabled={busy || !picks.length} />
-      </KeyboardAwareScrollView>
+          <Card style={st.card}>
+            <Text style={textStyles.h3}>3 · How it runs</Text>
+            <Text style={textStyles.muted}>
+              Weigh-in, then the snatch and the clean & jerk — three attempts each. The bar only goes up: the lightest declared weight lifts next. Best snatch + best clean & jerk = the total; no good lift in either = no total. Equal totals: whoever lifted the total first ranks higher. {settings.liftMedals ? 'Medals for the snatch, the clean & jerk and the total (meet setting).' : 'Medals for the total (meet setting — turn on snatch and C&J medals in Weightlifting settings).'}
+            </Text>
+          </Card>
+
+          <ScheduleCard state={schedule} tournamentId={tournamentId} discipline="wl.total" athleteIds={picks.map((p) => p.playerId)} />
+          <EventOfficials tournament={tournament} value={officials} onChange={setOfficials} />
+        </KeyboardAwareScrollView>
+      </KeyboardFooterLayout>
     </SafeAreaView>
   );
 }

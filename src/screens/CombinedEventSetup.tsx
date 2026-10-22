@@ -8,7 +8,7 @@
  *  for `mode: 'combined'`. */
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, TextInput, StyleSheet } from 'react-native';
-import { KeyboardAwareScrollView } from '../components/keyboard';
+import { KeyboardAwareScrollView, KeyboardFooterLayout } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -143,90 +143,98 @@ export function CombinedEventSetup({ tournamentId }: { tournamentId?: string }) 
   const hh = hurdles ? hurdleHeight(hurdles, cat) : undefined;
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
-        <ScreenTitle title="🏅 New combined event" subtitle={tournament?.name} />
-        {/* SD-141: the meet's competition rules, checked before the meet starts */}
-        <CompetitionRulesCard tournament={tournament} sport={'athletics'} />
+      <KeyboardFooterLayout
+        safeBottom={false}
+        footer={(
+          <>
+            <FormError message={error} />
+            <Button label={busy ? 'Creating…' : `Create ${label.toLowerCase()} & first start list`} onPress={() => void create()} disabled={busy || !picks.length || events.length < 2} />
+          </>
+        )}
+      >
+        <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
+          <ScreenTitle title="🏅 New combined event" subtitle={tournament?.name} />
+          {/* SD-141: the meet's competition rules, checked before the meet starts */}
+          <CompetitionRulesCard tournament={tournament} sport={'athletics'} />
 
-        <Card style={st.card}>
-          <Text style={textStyles.h3}>1 · Category</Text>
-          <View style={st.wrap}>{AGE_GROUPS.map((a) => <SelectChip key={a} label={a} active={age === a} onPress={() => setAge(a)} />)}</View>
-          <View style={st.wrap}>
-            <SelectChip label="Boys / Men" active={gender === 'M'} onPress={() => setGender('M')} />
-            <SelectChip label="Girls / Women" active={gender === 'F'} onPress={() => setGender('F')} />
-          </View>
-          <Text style={textStyles.muted}>Scored on the World Athletics {gender === 'M' ? 'men’s' : 'women’s'} Combined Events tables — the same tables at every age; younger groups use lighter implements and lower hurdles.</Text>
-        </Card>
-
-        <Card style={st.card}>
-          <Text style={textStyles.h3}>2 · Event</Text>
-          <View style={st.wrap}>
-            {presets.map((p) => <SelectChip key={p.kind} label={p.label} active={kind === p.kind} onPress={() => setKind(p.kind)} />)}
-            <SelectChip label="✎ House’s own list" active={kind === 'x'} onPress={() => setKind('x')} />
-          </View>
-          {preset && kind !== 'x' ? <Text style={textStyles.muted}>{preset.note}</Text> : <Text style={textStyles.muted}>Tap events in the order they are held (2–10). Only events the scoring tables cover can be picked.</Text>}
-          <Text style={st.label}>Order</Text>
-          {events.length === 0 ? <Text style={textStyles.muted}>No events yet.</Text> : events.map((d, i) => (
-            <View key={d} style={st.row}>
-              <Text style={[textStyles.body, { flex: 1 }]}>{day2 != null && i === day2 ? '— Day 2 —\n' : ''}{i + 1}. {disciplineOf(d)?.label ?? shortName(d)}{THROWS.includes(d) && impl[d] ? ` (${impl[d]})` : ''}</Text>
-              {i > 0 && <SelectChip label="↑" active={false} onPress={() => moveUp(i)} />}
-              <SelectChip label="✕" active={false} onPress={() => toggleEvent(d)} />
+          <Card style={st.card}>
+            <Text style={textStyles.h3}>1 · Category</Text>
+            <View style={st.wrap}>{AGE_GROUPS.map((a) => <SelectChip key={a} label={a} active={age === a} onPress={() => setAge(a)} />)}</View>
+            <View style={st.wrap}>
+              <SelectChip label="Boys / Men" active={gender === 'M'} onPress={() => setGender('M')} />
+              <SelectChip label="Girls / Women" active={gender === 'F'} onPress={() => setGender('F')} />
             </View>
-          ))}
-          <Text style={st.label}>Add / remove events</Text>
-          <View style={st.wrap}>
-            {SCORABLE[gender].map((d) => <SelectChip key={d} label={`${events.includes(d) ? '✓ ' : ''}${shortName(d)}`} active={events.includes(d)} disabled={!events.includes(d) && events.length >= 10} onPress={() => toggleEvent(d)} />)}
-          </View>
-          {custom && events.length >= 2 ? <Text style={textStyles.muted}>Not the standard list — kept as “{label}” with its own records and bests.</Text> : null}
-          <Text style={st.label}>Days</Text>
-          <View style={st.wrap}>
-            <SelectChip label="One day" active={day2 == null} onPress={() => setDay2(null)} />
-            {events.length >= 4 && events.slice(1).map((_, i) => i + 1).filter((i) => i >= 2 && i <= events.length - 2).map((i) => (
-              <SelectChip key={i} label={`Day 2 from ${i + 1}. ${shortName(events[i])}`} active={day2 === i} onPress={() => setDay2(i)} />
+            <Text style={textStyles.muted}>Scored on the World Athletics {gender === 'M' ? 'men’s' : 'women’s'} Combined Events tables — the same tables at every age; younger groups use lighter implements and lower hurdles.</Text>
+          </Card>
+
+          <Card style={st.card}>
+            <Text style={textStyles.h3}>2 · Event</Text>
+            <View style={st.wrap}>
+              {presets.map((p) => <SelectChip key={p.kind} label={p.label} active={kind === p.kind} onPress={() => setKind(p.kind)} />)}
+              <SelectChip label="✎ House’s own list" active={kind === 'x'} onPress={() => setKind('x')} />
+            </View>
+            {preset && kind !== 'x' ? <Text style={textStyles.muted}>{preset.note}</Text> : <Text style={textStyles.muted}>Tap events in the order they are held (2–10). Only events the scoring tables cover can be picked.</Text>}
+            <Text style={st.label}>Order</Text>
+            {events.length === 0 ? <Text style={textStyles.muted}>No events yet.</Text> : events.map((d, i) => (
+              <View key={d} style={st.row}>
+                <Text style={[textStyles.body, { flex: 1 }]}>{day2 != null && i === day2 ? '— Day 2 —\n' : ''}{i + 1}. {disciplineOf(d)?.label ?? shortName(d)}{THROWS.includes(d) && impl[d] ? ` (${impl[d]})` : ''}</Text>
+                {i > 0 && <SelectChip label="↑" active={false} onPress={() => moveUp(i)} />}
+                <SelectChip label="✕" active={false} onPress={() => toggleEvent(d)} />
+              </View>
             ))}
-          </View>
-          <Text style={textStyles.muted}>TR 39: at least 30 minutes between one event and the next for each athlete; two-day events on consecutive days.</Text>
-        </Card>
-
-        <Card style={st.card}>
-          <Text style={textStyles.h3}>3 · Implements & timing</Text>
-          {THROWS.filter((d) => events.includes(d)).map((d) => (
-            <View key={d} style={st.row}>
-              <Text style={[st.label, { width: 90 }]}>{shortName(d)}</Text>
-              <TextInput style={[st.input, { flex: 1 }]} value={impl[d] ?? ''} onChangeText={(v) => setImpl((m) => ({ ...m, [d]: v }))} placeholder="e.g. 3 kg" placeholderTextColor={theme.colors.textMuted} accessibilityLabel={`${shortName(d)} implement`} />
+            <Text style={st.label}>Add / remove events</Text>
+            <View style={st.wrap}>
+              {SCORABLE[gender].map((d) => <SelectChip key={d} label={`${events.includes(d) ? '✓ ' : ''}${shortName(d)}`} active={events.includes(d)} disabled={!events.includes(d) && events.length >= 10} onPress={() => toggleEvent(d)} />)}
             </View>
-          ))}
-          {THROWS.some((d) => events.includes(d)) ? <Text style={textStyles.muted}>{['U18', 'U20', 'Open'].includes(age) ? 'World Athletics implements for the category.' : 'School / federation practice for the category — check yours.'}</Text> : null}
-          {hurdles ? <Text style={textStyles.muted}>{shortName(hurdles)}: {hh ? `hurdles ${hh} (World Athletics ${categoryLabel(cat)})` : 'hurdle height per your federation / school board'}.</Text> : null}
-          <SelectChip label={handTimed ? '✓ Hand-timed meet (stopwatches)' : 'Fully automatic timing'} active={handTimed} onPress={() => setHandTimed(!handTimed)} />
-          <Text style={textStyles.muted}>{handTimed ? 'Hand times are scored after the usual conversion (+0.24 s up to 200 m and the sprint hurdles, +0.14 s for 400 m).' : 'A time marked “hand” is converted before scoring and the total can’t be a record.'}</Text>
-          <SelectChip label={noGauge ? '✓ No wind gauge' : 'Wind gauge in use'} active={noGauge} onPress={() => setNoGauge(!noGauge)} />
-        </Card>
+            {custom && events.length >= 2 ? <Text style={textStyles.muted}>Not the standard list — kept as “{label}” with its own records and bests.</Text> : null}
+            <Text style={st.label}>Days</Text>
+            <View style={st.wrap}>
+              <SelectChip label="One day" active={day2 == null} onPress={() => setDay2(null)} />
+              {events.length >= 4 && events.slice(1).map((_, i) => i + 1).filter((i) => i >= 2 && i <= events.length - 2).map((i) => (
+                <SelectChip key={i} label={`Day 2 from ${i + 1}. ${shortName(events[i])}`} active={day2 === i} onPress={() => setDay2(i)} />
+              ))}
+            </View>
+            <Text style={textStyles.muted}>TR 39: at least 30 minutes between one event and the next for each athlete; two-day events on consecutive days.</Text>
+          </Card>
 
-        <Card style={st.card}>
-          <Text style={textStyles.h3}>4 · Athletes ({picks.length})</Text>
-          <View style={st.wrap}>
-            <SelectChip label="All" active={filter == null} onPress={() => setFilter(null)} />
-            {sources.map((s) => <SelectChip key={s.key} label={s.name} dotColor={s.colorHex} active={filter === s.key} onPress={() => setFilter(s.key)} />)}
-          </View>
-          <TextInput style={st.input} value={query} onChangeText={setQuery} placeholder="Search any player by name" placeholderTextColor={theme.colors.textMuted} accessibilityLabel="Search players" />
-          <SelectChip label={eligibleOnly ? `✓ ${categoryLabel(cat)} only` : 'Showing everyone'} active={eligibleOnly} onPress={() => setEligibleOnly(!eligibleOnly)} />
-          <AgeBasisNote tournament={tournament} sport={'athletics'} basis={ages.basis} cutoff={ages.cutoff} canEdit={!!tournament} onSaved={ages.setBasis} />
-          <View style={st.wrap}>
-            {pool.map((p) => {
-              const on = picks.includes(p.id);
-              return <SelectChip key={p.id} label={`${on ? '✓ ' : ''}${p.fullName}`} dotColor={p.houseColor} active={on} onPress={() => toggle(p.id)} />;
-            })}
-            {!pool.length && <Text style={textStyles.muted}>No athletes match. Players without a gender or date of birth are always shown.</Text>}
-          </View>
-        </Card>
+          <Card style={st.card}>
+            <Text style={textStyles.h3}>3 · Implements & timing</Text>
+            {THROWS.filter((d) => events.includes(d)).map((d) => (
+              <View key={d} style={st.row}>
+                <Text style={[st.label, { width: 90 }]}>{shortName(d)}</Text>
+                <TextInput style={[st.input, { flex: 1 }]} value={impl[d] ?? ''} onChangeText={(v) => setImpl((m) => ({ ...m, [d]: v }))} placeholder="e.g. 3 kg" placeholderTextColor={theme.colors.textMuted} accessibilityLabel={`${shortName(d)} implement`} />
+              </View>
+            ))}
+            {THROWS.some((d) => events.includes(d)) ? <Text style={textStyles.muted}>{['U18', 'U20', 'Open'].includes(age) ? 'World Athletics implements for the category.' : 'School / federation practice for the category — check yours.'}</Text> : null}
+            {hurdles ? <Text style={textStyles.muted}>{shortName(hurdles)}: {hh ? `hurdles ${hh} (World Athletics ${categoryLabel(cat)})` : 'hurdle height per your federation / school board'}.</Text> : null}
+            <SelectChip label={handTimed ? '✓ Hand-timed meet (stopwatches)' : 'Fully automatic timing'} active={handTimed} onPress={() => setHandTimed(!handTimed)} />
+            <Text style={textStyles.muted}>{handTimed ? 'Hand times are scored after the usual conversion (+0.24 s up to 200 m and the sprint hurdles, +0.14 s for 400 m).' : 'A time marked “hand” is converted before scoring and the total can’t be a record.'}</Text>
+            <SelectChip label={noGauge ? '✓ No wind gauge' : 'Wind gauge in use'} active={noGauge} onPress={() => setNoGauge(!noGauge)} />
+          </Card>
 
-        <ScheduleCard state={schedule} tournamentId={tournamentId} discipline={events[0] ?? 'ath.100m'} combined={events.length >= 2 ? { events, ...(day2 != null && day2 > 0 && day2 < events.length ? { day2 } : {}) } : undefined} athleteIds={picks} />
-        <EventOfficials tournament={tournament} value={officials} onChange={setOfficials} />
-        <FormError message={error} />
-        <Text style={textStyles.muted}>{events.length ? `${label} ${categoryLabel(cat)}: ${events.map(shortName).join(', ')}.` : ''} Each event is entered on the usual track / field screen; the running total and places update after every event.</Text>
-        <Button label={busy ? 'Creating…' : `Create ${label.toLowerCase()} & first start list`} onPress={() => void create()} disabled={busy || !picks.length || events.length < 2} />
-      </KeyboardAwareScrollView>
+          <Card style={st.card}>
+            <Text style={textStyles.h3}>4 · Athletes ({picks.length})</Text>
+            <View style={st.wrap}>
+              <SelectChip label="All" active={filter == null} onPress={() => setFilter(null)} />
+              {sources.map((s) => <SelectChip key={s.key} label={s.name} dotColor={s.colorHex} active={filter === s.key} onPress={() => setFilter(s.key)} />)}
+            </View>
+            <TextInput style={st.input} value={query} onChangeText={setQuery} placeholder="Search any player by name" placeholderTextColor={theme.colors.textMuted} accessibilityLabel="Search players" />
+            <SelectChip label={eligibleOnly ? `✓ ${categoryLabel(cat)} only` : 'Showing everyone'} active={eligibleOnly} onPress={() => setEligibleOnly(!eligibleOnly)} />
+            <AgeBasisNote tournament={tournament} sport={'athletics'} basis={ages.basis} cutoff={ages.cutoff} canEdit={!!tournament} onSaved={ages.setBasis} />
+            <View style={st.wrap}>
+              {pool.map((p) => {
+                const on = picks.includes(p.id);
+                return <SelectChip key={p.id} label={`${on ? '✓ ' : ''}${p.fullName}`} dotColor={p.houseColor} active={on} onPress={() => toggle(p.id)} />;
+              })}
+              {!pool.length && <Text style={textStyles.muted}>No athletes match. Players without a gender or date of birth are always shown.</Text>}
+            </View>
+          </Card>
+
+          <ScheduleCard state={schedule} tournamentId={tournamentId} discipline={events[0] ?? 'ath.100m'} combined={events.length >= 2 ? { events, ...(day2 != null && day2 > 0 && day2 < events.length ? { day2 } : {}) } : undefined} athleteIds={picks} />
+          <EventOfficials tournament={tournament} value={officials} onChange={setOfficials} />
+          <Text style={textStyles.muted}>{events.length ? `${label} ${categoryLabel(cat)}: ${events.map(shortName).join(', ')}.` : ''} Each event is entered on the usual track / field screen; the running total and places update after every event.</Text>
+        </KeyboardAwareScrollView>
+      </KeyboardFooterLayout>
     </SafeAreaView>
   );
 }

@@ -7,7 +7,7 @@
  *  drawn. Rendered by AthleticsEventSetupScreen for sport 'rowing' / 'canoe'. */
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, TextInput, StyleSheet } from 'react-native';
-import { KeyboardAwareScrollView } from '../components/keyboard';
+import { KeyboardAwareScrollView, KeyboardFooterLayout } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -201,136 +201,144 @@ export function CrewEventSetup({ tournamentId, sport }: { tournamentId?: string;
   const distances = rowing ? ROW_DISTANCES : CANOE_DISTANCES;
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
-        <ScreenTitle title={rowing ? '🚣 New rowing race' : '🛶 New canoe sprint race'} subtitle={tournament?.name} />
-        {/* SD-141: the meet's competition rules, checked before the meet starts */}
-        <CompetitionRulesCard tournament={tournament} sport={sport} />
+      <KeyboardFooterLayout
+        safeBottom={false}
+        footer={(
+          <>
+            <FormError message={error} />
+            <Button label={busy ? 'Creating…' : 'Create race & draw lanes'} onPress={() => void create()} disabled={busy || !entrants} />
+          </>
+        )}
+      >
+        <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
+          <ScreenTitle title={rowing ? '🚣 New rowing race' : '🛶 New canoe sprint race'} subtitle={tournament?.name} />
+          {/* SD-141: the meet's competition rules, checked before the meet starts */}
+          <CompetitionRulesCard tournament={tournament} sport={sport} />
 
-        <Card style={st.card}>
-          <Text style={textStyles.h3}>1 · Boat & distance</Text>
-          <View style={st.wrap}>{boats.map((b) => <SelectChip key={b.code} label={b.short} active={boat === b.code} onPress={() => setBoat(b.code)} />)}</View>
-          <Text style={textStyles.muted}>{ev.boat.label}{ev.boat.cox ? ' (with a cox)' : ''} — {seats.join(', ')}.</Text>
-          <View style={st.wrap}>{distances.map((d) => <SelectChip key={d} label={`${d} m`} active={distance === d} onPress={() => setDistance(d)} />)}</View>
-          <Text style={textStyles.muted}>{rowing ? '2000 m is the championship distance; 1000 m for masters, 1500 / 1000 / 500 m for school and junior regattas.' : 'Olympic sprint distances are 200, 500 and 1000 m; 5000 m is the long-distance race (no lanes after the start).'}</Text>
-          <View style={st.wrap}>{AGES.map((a) => <SelectChip key={a.key} label={a.label} active={age === a.key} onPress={() => setAge(a.key)} />)}</View>
-          <View style={st.wrap}>
-            <SelectChip label={adult ? 'Men' : 'Boys'} active={gender === 'M'} onPress={() => setGender('M')} />
-            <SelectChip label={adult ? 'Women' : 'Girls'} active={gender === 'F'} onPress={() => setGender('F')} />
-            {(!single || !rowing) && <SelectChip label="Mixed" active={gender === 'X'} onPress={() => setGender('X')} />}
-          </View>
-          {rowing && (
-            <View style={st.wrap}>{ROW_CLASSES.map((c) => <SelectChip key={c} label={c} active={cls === c} onPress={() => setCls(c)} />)}</View>
-          )}
-          {rowing && cls !== 'Open' ? <Text style={textStyles.muted}>{cls === 'Lightweight' ? 'Lightweight: crews are weighed before racing (the weigh-in itself is not recorded here).' : `Para rowing ${cls}: classified athletes; para events race 2000 m.`} Records and bests stay apart from open boats.</Text> : null}
-          <Text style={textStyles.muted}>Event: {ev.label} {categoryLabel(cat)}{range ? ` · usual times ${formatMark(range.min, def)} – ${formatMark(range.max, def)} (outside that asks to confirm)` : ''}.</Text>
-        </Card>
+          <Card style={st.card}>
+            <Text style={textStyles.h3}>1 · Boat & distance</Text>
+            <View style={st.wrap}>{boats.map((b) => <SelectChip key={b.code} label={b.short} active={boat === b.code} onPress={() => setBoat(b.code)} />)}</View>
+            <Text style={textStyles.muted}>{ev.boat.label}{ev.boat.cox ? ' (with a cox)' : ''} — {seats.join(', ')}.</Text>
+            <View style={st.wrap}>{distances.map((d) => <SelectChip key={d} label={`${d} m`} active={distance === d} onPress={() => setDistance(d)} />)}</View>
+            <Text style={textStyles.muted}>{rowing ? '2000 m is the championship distance; 1000 m for masters, 1500 / 1000 / 500 m for school and junior regattas.' : 'Olympic sprint distances are 200, 500 and 1000 m; 5000 m is the long-distance race (no lanes after the start).'}</Text>
+            <View style={st.wrap}>{AGES.map((a) => <SelectChip key={a.key} label={a.label} active={age === a.key} onPress={() => setAge(a.key)} />)}</View>
+            <View style={st.wrap}>
+              <SelectChip label={adult ? 'Men' : 'Boys'} active={gender === 'M'} onPress={() => setGender('M')} />
+              <SelectChip label={adult ? 'Women' : 'Girls'} active={gender === 'F'} onPress={() => setGender('F')} />
+              {(!single || !rowing) && <SelectChip label="Mixed" active={gender === 'X'} onPress={() => setGender('X')} />}
+            </View>
+            {rowing && (
+              <View style={st.wrap}>{ROW_CLASSES.map((c) => <SelectChip key={c} label={c} active={cls === c} onPress={() => setCls(c)} />)}</View>
+            )}
+            {rowing && cls !== 'Open' ? <Text style={textStyles.muted}>{cls === 'Lightweight' ? 'Lightweight: crews are weighed before racing (the weigh-in itself is not recorded here).' : `Para rowing ${cls}: classified athletes; para events race 2000 m.`} Records and bests stay apart from open boats.</Text> : null}
+            <Text style={textStyles.muted}>Event: {ev.label} {categoryLabel(cat)}{range ? ` · usual times ${formatMark(range.min, def)} – ${formatMark(range.max, def)} (outside that asks to confirm)` : ''}.</Text>
+          </Card>
 
-        <Card style={st.card}>
-          <Text style={textStyles.h3}>2 · {word} ({entrants})</Text>
-          <TextInput style={st.input} value={query} onChangeText={setQuery} placeholder="Search any player by name" placeholderTextColor={theme.colors.textMuted} accessibilityLabel="Search players" />
-          <SelectChip label={eligibleOnly ? `✓ ${gender === 'X' ? 'Everyone (mixed)' : gender === 'M' ? (adult ? 'Men' : 'Boys') : (adult ? 'Women' : 'Girls')} only` : 'Showing everyone'} active={eligibleOnly} onPress={() => setEligibleOnly(!eligibleOnly)} />
-          {single ? (
-            <>
-              <View style={st.wrap}>
-                <SelectChip label="All" active={filter == null} onPress={() => setFilter(null)} />
-                {sources.map((s) => <SelectChip key={s.key} label={s.name} dotColor={s.colorHex} active={filter === s.key} onPress={() => setFilter(s.key)} />)}
-              </View>
-              <View style={st.wrap}>
-                {singlePool.map((p) => {
-                  const on = picks.includes(p.id);
-                  return <SelectChip key={p.id} label={`${on ? '✓ ' : ''}${p.fullName}`} dotColor={p.houseColor} active={on} onPress={() => toggle(p.id)} />;
+          <Card style={st.card}>
+            <Text style={textStyles.h3}>2 · {word} ({entrants})</Text>
+            <TextInput style={st.input} value={query} onChangeText={setQuery} placeholder="Search any player by name" placeholderTextColor={theme.colors.textMuted} accessibilityLabel="Search players" />
+            <SelectChip label={eligibleOnly ? `✓ ${gender === 'X' ? 'Everyone (mixed)' : gender === 'M' ? (adult ? 'Men' : 'Boys') : (adult ? 'Women' : 'Girls')} only` : 'Showing everyone'} active={eligibleOnly} onPress={() => setEligibleOnly(!eligibleOnly)} />
+            {single ? (
+              <>
+                <View style={st.wrap}>
+                  <SelectChip label="All" active={filter == null} onPress={() => setFilter(null)} />
+                  {sources.map((s) => <SelectChip key={s.key} label={s.name} dotColor={s.colorHex} active={filter === s.key} onPress={() => setFilter(s.key)} />)}
+                </View>
+                <View style={st.wrap}>
+                  {singlePool.map((p) => {
+                    const on = picks.includes(p.id);
+                    return <SelectChip key={p.id} label={`${on ? '✓ ' : ''}${p.fullName}`} dotColor={p.houseColor} active={on} onPress={() => toggle(p.id)} />;
+                  })}
+                  {!singlePool.length && <Text style={textStyles.muted}>Nobody matches. Players without a gender are always shown.</Text>}
+                </View>
+              </>
+            ) : (
+              <>
+                <Text style={st.label}>＋ Add a crew from</Text>
+                <View style={st.wrap}>
+                  {sources.map((s) => <SelectChip key={s.key} label={s.name} dotColor={s.colorHex} active={false} onPress={() => addCrew(s)} />)}
+                  <SelectChip label="Any players" active={false} onPress={() => addCrew()} />
+                </View>
+                {crews.map((c) => {
+                  const src = sources.find((s) => s.key === c.source);
+                  const err = crewError(ev.key, c.seats.map((pid, i) => (pid ? { playerId: pid, name: nameOf(pid), ...(ev.boat.cox && i === seats.length - 1 ? { cox: true } : {}) } : undefined)));
+                  const open = active?.crew === c.id;
+                  return (
+                    <View key={c.id} style={[st.crew, open && { borderColor: theme.colors.primary }]}>
+                      <View style={st.crewHead}>
+                        <TextInput style={[st.input, { flex: 1 }]} value={c.name} onChangeText={(t) => setCrews((cs) => cs.map((x) => (x.id === c.id ? { ...x, name: t } : x)))} accessibilityLabel="Crew name" />
+                        <SelectChip label="✕" active={false} onPress={() => { setCrews((cs) => cs.filter((x) => x.id !== c.id)); if (open) setActive(null); }} />
+                      </View>
+                      <View style={st.wrap}>
+                        {seats.map((sn, i) => {
+                          const pid = c.seats[i];
+                          const on = open && active?.seat === i;
+                          return <SelectChip key={i} label={`${sn}: ${pid ? nameOf(pid).split(' ')[0] : '—'}`} active={on} onPress={() => (pid && !on ? clearSeat(c.id, i) : setActive({ crew: c.id, seat: i }))} />;
+                        })}
+                      </View>
+                      {src && c.seats.some((x) => !x) ? <SelectChip label={`Fill empty seats from ${src.name}`} active={false} onPress={() => fillCrew(c.id)} /> : null}
+                      {open ? (
+                        <>
+                          <Text style={textStyles.muted}>Tap a player for {seats[active!.seat]}{src ? ` (${src.name})` : ''}; tap a filled seat to clear it.</Text>
+                          <View style={st.wrap}>
+                            {pool(src).filter((p) => !taken.has(p.id)).map((p) => <SelectChip key={p.id} label={p.fullName} dotColor={p.houseColor} active={false} onPress={() => assign(p.id)} />)}
+                          </View>
+                        </>
+                      ) : null}
+                      {err ? <Text style={textStyles.muted}>{err}</Text> : <Text style={textStyles.muted}>✓ Crew complete.</Text>}
+                    </View>
+                  );
                 })}
-                {!singlePool.length && <Text style={textStyles.muted}>Nobody matches. Players without a gender are always shown.</Text>}
-              </View>
-            </>
-          ) : (
-            <>
-              <Text style={st.label}>＋ Add a crew from</Text>
-              <View style={st.wrap}>
-                {sources.map((s) => <SelectChip key={s.key} label={s.name} dotColor={s.colorHex} active={false} onPress={() => addCrew(s)} />)}
-                <SelectChip label="Any players" active={false} onPress={() => addCrew()} />
-              </View>
-              {crews.map((c) => {
-                const src = sources.find((s) => s.key === c.source);
-                const err = crewError(ev.key, c.seats.map((pid, i) => (pid ? { playerId: pid, name: nameOf(pid), ...(ev.boat.cox && i === seats.length - 1 ? { cox: true } : {}) } : undefined)));
-                const open = active?.crew === c.id;
-                return (
-                  <View key={c.id} style={[st.crew, open && { borderColor: theme.colors.primary }]}>
-                    <View style={st.crewHead}>
-                      <TextInput style={[st.input, { flex: 1 }]} value={c.name} onChangeText={(t) => setCrews((cs) => cs.map((x) => (x.id === c.id ? { ...x, name: t } : x)))} accessibilityLabel="Crew name" />
-                      <SelectChip label="✕" active={false} onPress={() => { setCrews((cs) => cs.filter((x) => x.id !== c.id)); if (open) setActive(null); }} />
+                {!crews.length && <Text style={textStyles.muted}>Add a crew from a team or house, then pick its {rowing ? 'rowers seat by seat (bow first)' : 'paddlers seat by seat (front first)'}{ev.boat.cox ? ' and the cox' : ''} — or “Fill empty seats”.</Text>}
+              </>
+            )}
+          </Card>
+
+          <Card style={st.card}>
+            <Text style={textStyles.h3}>3 · Lanes & progression</Text>
+            <View style={st.wrap}>
+              {(rowing ? [4, 5, 6, 8] : [5, 6, 8, 9]).map((n) => <SelectChip key={n} label={`${n} lanes`} active={lanes === n} onPress={() => setLanes(n)} />)}
+            </View>
+            {entrants > 0 ? (
+              <>
+                <View style={st.wrap}>
+                  {presets.map((p) => <SelectChip key={p.key} label={p.label} active={presetKey !== 'custom' && preset?.key === p.key} onPress={() => setPresetKey(p.key)} />)}
+                  {entrants > lanes && <SelectChip label="Custom rule" active={presetKey === 'custom'} onPress={() => setPresetKey('custom')} />}
+                </View>
+                {presetKey === 'custom' && (
+                  <View style={{ gap: theme.spacing(2) }}>
+                    <View style={st.wrap}>
+                      <Text style={st.label}>Heats</Text>
+                      {[1, 2, 3, 4, 5, 6].map((h) => <SelectChip key={h} label={String(h)} active={custom.heats === h} onPress={() => setCustom({ ...custom, heats: h })} />)}
                     </View>
                     <View style={st.wrap}>
-                      {seats.map((sn, i) => {
-                        const pid = c.seats[i];
-                        const on = open && active?.seat === i;
-                        return <SelectChip key={i} label={`${sn}: ${pid ? nameOf(pid).split(' ')[0] : '—'}`} active={on} onPress={() => (pid && !on ? clearSeat(c.id, i) : setActive({ crew: c.id, seat: i }))} />;
-                      })}
+                      <Text style={st.label}>Straight to Final A per heat</Text>
+                      {[1, 2, 3].map((d) => <SelectChip key={d} label={String(d)} active={custom.direct === d} onPress={() => setCustom({ ...custom, direct: d })} />)}
                     </View>
-                    {src && c.seats.some((x) => !x) ? <SelectChip label={`Fill empty seats from ${src.name}`} active={false} onPress={() => fillCrew(c.id)} /> : null}
-                    {open ? (
-                      <>
-                        <Text style={textStyles.muted}>Tap a player for {seats[active!.seat]}{src ? ` (${src.name})` : ''}; tap a filled seat to clear it.</Text>
-                        <View style={st.wrap}>
-                          {pool(src).filter((p) => !taken.has(p.id)).map((p) => <SelectChip key={p.id} label={p.fullName} dotColor={p.houseColor} active={false} onPress={() => assign(p.id)} />)}
-                        </View>
-                      </>
-                    ) : null}
-                    {err ? <Text style={textStyles.muted}>{err}</Text> : <Text style={textStyles.muted}>✓ Crew complete.</Text>}
+                    <View style={st.wrap}>
+                      <SelectChip label="Rest → repechage" active={custom.repechage} onPress={() => setCustom({ ...custom, repechage: !custom.repechage })} />
+                      <SelectChip label="Final B" active={custom.finalB} onPress={() => setCustom({ ...custom, finalB: !custom.finalB })} />
+                    </View>
                   </View>
-                );
-              })}
-              {!crews.length && <Text style={textStyles.muted}>Add a crew from a team or house, then pick its {rowing ? 'rowers seat by seat (bow first)' : 'paddlers seat by seat (front first)'}{ev.boat.cox ? ' and the cox' : ''} — or “Fill empty seats”.</Text>}
-            </>
-          )}
-        </Card>
+                )}
+                <Text style={textStyles.body}>{describeCrewPlan(plan)}</Text>
+                {overfull ? <Text style={st.bad}>More {single ? 'boats' : 'crews'} per race than lanes — add a heat.</Text> : null}
+                <Text style={textStyles.muted}>
+                  {rowing
+                    ? 'World Rowing progression (Rules of Racing, progression-system tables): heat winners go straight on, the repechage fills the next round, the rest race the lower final. Finals A / B: Final B’s winner places after Final A’s last.'
+                    : 'ICF progression (Canoe Sprint Competition Rules, heats / semi-finals / finals by number of boats): the best of the heats may go straight to Final A; the semi-finals fill it, the next go to Final B.'}
+                  {' '}Heats and lanes are drawn; later rounds put the best ranked in the centre lanes. A dead heat on a qualifying line: both go through unless a re-row / draw is entered.
+                </Text>
+              </>
+            ) : <Text style={textStyles.muted}>Add {single ? (rowing ? 'scullers' : 'paddlers') : 'crews'} to see the progression.</Text>}
+            {crewEventOfSplits(ev.key) ? <SelectChip label={splits ? `✓ ${rowing ? '500 m splits' : 'Intermediate times'}` : `${rowing ? '500 m splits' : 'Intermediate times'} off`} active={splits} onPress={() => setSplits(!splits)} /> : null}
+            <Text style={textStyles.muted}>{meet.handTimed ? 'Hand timing (regatta setting): times to 1/100.' : 'Photo finish: type thousandths with the “.000” chip — they decide the order; the official time shows to 1/100.'}</Text>
+          </Card>
 
-        <Card style={st.card}>
-          <Text style={textStyles.h3}>3 · Lanes & progression</Text>
-          <View style={st.wrap}>
-            {(rowing ? [4, 5, 6, 8] : [5, 6, 8, 9]).map((n) => <SelectChip key={n} label={`${n} lanes`} active={lanes === n} onPress={() => setLanes(n)} />)}
-          </View>
-          {entrants > 0 ? (
-            <>
-              <View style={st.wrap}>
-                {presets.map((p) => <SelectChip key={p.key} label={p.label} active={presetKey !== 'custom' && preset?.key === p.key} onPress={() => setPresetKey(p.key)} />)}
-                {entrants > lanes && <SelectChip label="Custom rule" active={presetKey === 'custom'} onPress={() => setPresetKey('custom')} />}
-              </View>
-              {presetKey === 'custom' && (
-                <View style={{ gap: theme.spacing(2) }}>
-                  <View style={st.wrap}>
-                    <Text style={st.label}>Heats</Text>
-                    {[1, 2, 3, 4, 5, 6].map((h) => <SelectChip key={h} label={String(h)} active={custom.heats === h} onPress={() => setCustom({ ...custom, heats: h })} />)}
-                  </View>
-                  <View style={st.wrap}>
-                    <Text style={st.label}>Straight to Final A per heat</Text>
-                    {[1, 2, 3].map((d) => <SelectChip key={d} label={String(d)} active={custom.direct === d} onPress={() => setCustom({ ...custom, direct: d })} />)}
-                  </View>
-                  <View style={st.wrap}>
-                    <SelectChip label="Rest → repechage" active={custom.repechage} onPress={() => setCustom({ ...custom, repechage: !custom.repechage })} />
-                    <SelectChip label="Final B" active={custom.finalB} onPress={() => setCustom({ ...custom, finalB: !custom.finalB })} />
-                  </View>
-                </View>
-              )}
-              <Text style={textStyles.body}>{describeCrewPlan(plan)}</Text>
-              {overfull ? <Text style={st.bad}>More {single ? 'boats' : 'crews'} per race than lanes — add a heat.</Text> : null}
-              <Text style={textStyles.muted}>
-                {rowing
-                  ? 'World Rowing progression (Rules of Racing, progression-system tables): heat winners go straight on, the repechage fills the next round, the rest race the lower final. Finals A / B: Final B’s winner places after Final A’s last.'
-                  : 'ICF progression (Canoe Sprint Competition Rules, heats / semi-finals / finals by number of boats): the best of the heats may go straight to Final A; the semi-finals fill it, the next go to Final B.'}
-                {' '}Heats and lanes are drawn; later rounds put the best ranked in the centre lanes. A dead heat on a qualifying line: both go through unless a re-row / draw is entered.
-              </Text>
-            </>
-          ) : <Text style={textStyles.muted}>Add {single ? (rowing ? 'scullers' : 'paddlers') : 'crews'} to see the progression.</Text>}
-          {crewEventOfSplits(ev.key) ? <SelectChip label={splits ? `✓ ${rowing ? '500 m splits' : 'Intermediate times'}` : `${rowing ? '500 m splits' : 'Intermediate times'} off`} active={splits} onPress={() => setSplits(!splits)} /> : null}
-          <Text style={textStyles.muted}>{meet.handTimed ? 'Hand timing (regatta setting): times to 1/100.' : 'Photo finish: type thousandths with the “.000” chip — they decide the order; the official time shows to 1/100.'}</Text>
-        </Card>
-
-        <ScheduleCard state={schedule} tournamentId={tournamentId} discipline={ev.key} plan={plan} athleteIds={single ? picks : crews.flatMap((c) => c.seats.filter((x): x is string => !!x))} />
-        <EventOfficials tournament={tournament} value={officials} onChange={setOfficials} />
-        <FormError message={error} />
-        <Button label={busy ? 'Creating…' : 'Create race & draw lanes'} onPress={() => void create()} disabled={busy || !entrants} />
-      </KeyboardAwareScrollView>
+          <ScheduleCard state={schedule} tournamentId={tournamentId} discipline={ev.key} plan={plan} athleteIds={single ? picks : crews.flatMap((c) => c.seats.filter((x): x is string => !!x))} />
+          <EventOfficials tournament={tournament} value={officials} onChange={setOfficials} />
+        </KeyboardAwareScrollView>
+      </KeyboardFooterLayout>
     </SafeAreaView>
   );
 }

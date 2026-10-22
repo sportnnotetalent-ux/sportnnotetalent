@@ -7,7 +7,7 @@
  *  child's own profile. */
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, Platform } from 'react-native';
-import { KeyboardAwareScrollView } from '../components/keyboard';
+import { KeyboardAwareScrollView, KeyboardFooterLayout } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -120,61 +120,68 @@ export default function RosterImportScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
-        <ScreenTitle title="📥 Import a roster" subtitle={where} />
-        <Card style={{ gap: theme.spacing(2) }}>
-          <Text style={textStyles.muted}>From your school system or a spreadsheet saved as CSV. Columns, any order: Name (or First name + Last name), Date of birth, Gender, Class / Year, House, Team, Jersey, Guardian name, Guardian email, Guardian phone. Dates are {dateOrderWords(region.dateOrder)}.</Text>
-          <View style={st.chips}>
-            {Platform.OS === 'web' ? <Button label="📂 Choose CSV file" variant="ghost" onPress={() => void chooseFile()} /> : null}
-            <Button label="⬇ Template" variant="ghost" onPress={() => { downloadText('roster-template.csv', 'text/csv', ROSTER_TEMPLATE(region.dateOrder)); }} />
-          </View>
-          {fileNote ? <Text style={textStyles.muted}>{fileNote}</Text> : null}
-          <TextField label={Platform.OS === 'web' ? '…or paste the rows (with the header row)' : 'Paste the rows (with the header row)'} value={text} onChange={(v) => { setText(v); setFileNote(null); setDone(null); }} multiline
-            placeholder={ROSTER_TEMPLATE(region.dateOrder).trim()} autoCapitalize="none" />
-          <Text style={textStyles.muted}>🔒 Guardian contacts stay private: only the guardian, {org ? 'the school’s admins' : 'the team’s managers'} and coaches see them. Children never get their own contact details from an import.</Text>
-        </Card>
-
-        {parsed?.missingName ? <Text style={st.warn}>⚠ No Name column found — add a header row with “Name” (or “First name” and “Last name”).</Text> : null}
-        {parsed?.ambiguousDates ? (
-          <Card style={{ gap: theme.spacing(1) }}>
-            <Text style={st.warn}>⚠ Every date fits both ways — is 04/05/2012 the 4th of May or April 5th?</Text>
+      <KeyboardFooterLayout
+        safeBottom={false}
+        footer={(
+          <>
+            <FormError message={error} />
+            {done ? <Text style={textStyles.muted}>✅ {done}</Text> : null}
+            <Button label={busy ? 'Importing…' : `Import ${newRows.length + linkOnly.length} ${newRows.length + linkOnly.length === 1 ? 'person' : 'people'} into ${where}`} disabled={busy || !(newRows.length + linkOnly.length)} onPress={() => void run()} />
+            {done ? <Button label="Done" variant="ghost" onPress={() => nav.goBack()} /> : null}
+          </>
+        )}
+      >
+        <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
+          <ScreenTitle title="📥 Import a roster" subtitle={where} />
+          <Card style={{ gap: theme.spacing(2) }}>
+            <Text style={textStyles.muted}>From your school system or a spreadsheet saved as CSV. Columns, any order: Name (or First name + Last name), Date of birth, Gender, Class / Year, House, Team, Jersey, Guardian name, Guardian email, Guardian phone. Dates are {dateOrderWords(region.dateOrder)}.</Text>
             <View style={st.chips}>
-              <SelectChip label="Day first (4 May)" active={(forceOrder ?? parsed.dateOrder) === 'DMY'} onPress={() => setForceOrder('DMY')} />
-              <SelectChip label="Month first (April 5)" active={(forceOrder ?? parsed.dateOrder) === 'MDY'} onPress={() => setForceOrder('MDY')} />
+              {Platform.OS === 'web' ? <Button label="📂 Choose CSV file" variant="ghost" onPress={() => void chooseFile()} /> : null}
+              <Button label="⬇ Template" variant="ghost" onPress={() => { downloadText('roster-template.csv', 'text/csv', ROSTER_TEMPLATE(region.dateOrder)); }} />
             </View>
+            {fileNote ? <Text style={textStyles.muted}>{fileNote}</Text> : null}
+            <TextField label={Platform.OS === 'web' ? '…or paste the rows (with the header row)' : 'Paste the rows (with the header row)'} value={text} onChange={(v) => { setText(v); setFileNote(null); setDone(null); }} multiline
+              placeholder={ROSTER_TEMPLATE(region.dateOrder).trim()} autoCapitalize="none" />
+            <Text style={textStyles.muted}>🔒 Guardian contacts stay private: only the guardian, {org ? 'the school’s admins' : 'the team’s managers'} and coaches see them. Children never get their own contact details from an import.</Text>
           </Card>
-        ) : parsed?.orderFromFile ? <Text style={textStyles.muted}>Dates read {dateOrderWords(parsed.orderFromFile)} (the file says so). <Text style={st.link} onPress={() => setForceOrder(otherOrder)}>Read them {dateOrderWords(otherOrder)}</Text></Text> : null}
 
-        {rows.length ? (
-          <Card style={{ gap: theme.spacing(1.5) }}>
-            <Text style={textStyles.h3}>Preview · {rows.length} row{rows.length === 1 ? '' : 's'}</Text>
-            <Text style={textStyles.muted}>{newRows.length} new · {rows.filter((r) => r.duplicateOf || r.dupInFile != null).length} already there · {rows.filter((r) => r.errors.length).length} can’t be read</Text>
-            {rows.map((r) => {
-              const status = r.errors.length ? `✗ ${r.errors.join('; ')}`
-                : r.dupInFile != null ? `↺ Same as line ${r.dupInFile}`
-                : r.duplicateOf ? (team && !inTeam.has(r.duplicateOf.id) ? `＋ Already at the school (${r.duplicateOf.why}) — added to the squad` : keepDup ? `＋ Added again (${r.duplicateOf.why})` : `↺ Already here (${r.duplicateOf.why}) — skipped`)
-                : '＋ New';
-              const minor = r.dob ? ageOn(r.dob) < 18 : false;
-              return (
-                <View key={r.line} style={st.row}>
-                  <Text style={[textStyles.body, st.bold]} numberOfLines={1}>{r.line}. {r.fullName || '—'}</Text>
-                  <Text style={textStyles.muted} numberOfLines={2}>
-                    {[r.dob ? `${spelledDate(r.dob)}${minor ? ' · under 18' : ''}` : '', r.gender, r.standard, r.house ? `${r.house} House` : '', r.team, r.jersey != null ? `#${r.jersey}` : '', r.guardian ? `guardian: ${r.guardian.name}${r.guardian.email ? ' ✉' : ''}${r.guardian.phone ? ' ☎' : ''}` : ''].filter(Boolean).join(' · ')}
-                  </Text>
-                  <Text style={[textStyles.muted, r.errors.length ? st.warn : null]}>{status}</Text>
-                  {r.warnings.length ? <Text style={textStyles.muted}>⚠ {r.warnings.join('; ')}</Text> : null}
-                </View>
-              );
-            })}
-            {rows.some((r) => r.duplicateOf) ? <SelectChip label={keepDup ? '✓ Add look-alikes as new people' : 'Add look-alikes as new people'} active={keepDup} onPress={() => setKeepDup(!keepDup)} /> : null}
-          </Card>
-        ) : null}
+          {parsed?.missingName ? <Text style={st.warn}>⚠ No Name column found — add a header row with “Name” (or “First name” and “Last name”).</Text> : null}
+          {parsed?.ambiguousDates ? (
+            <Card style={{ gap: theme.spacing(1) }}>
+              <Text style={st.warn}>⚠ Every date fits both ways — is 04/05/2012 the 4th of May or April 5th?</Text>
+              <View style={st.chips}>
+                <SelectChip label="Day first (4 May)" active={(forceOrder ?? parsed.dateOrder) === 'DMY'} onPress={() => setForceOrder('DMY')} />
+                <SelectChip label="Month first (April 5)" active={(forceOrder ?? parsed.dateOrder) === 'MDY'} onPress={() => setForceOrder('MDY')} />
+              </View>
+            </Card>
+          ) : parsed?.orderFromFile ? <Text style={textStyles.muted}>Dates read {dateOrderWords(parsed.orderFromFile)} (the file says so). <Text style={st.link} onPress={() => setForceOrder(otherOrder)}>Read them {dateOrderWords(otherOrder)}</Text></Text> : null}
 
-        <FormError message={error} />
-        {done ? <Text style={textStyles.muted}>✅ {done}</Text> : null}
-        <Button label={busy ? 'Importing…' : `Import ${newRows.length + linkOnly.length} ${newRows.length + linkOnly.length === 1 ? 'person' : 'people'} into ${where}`} disabled={busy || !(newRows.length + linkOnly.length)} onPress={() => void run()} />
-        {done ? <Button label="Done" variant="ghost" onPress={() => nav.goBack()} /> : null}
-      </KeyboardAwareScrollView>
+          {rows.length ? (
+            <Card style={{ gap: theme.spacing(1.5) }}>
+              <Text style={textStyles.h3}>Preview · {rows.length} row{rows.length === 1 ? '' : 's'}</Text>
+              <Text style={textStyles.muted}>{newRows.length} new · {rows.filter((r) => r.duplicateOf || r.dupInFile != null).length} already there · {rows.filter((r) => r.errors.length).length} can’t be read</Text>
+              {rows.map((r) => {
+                const status = r.errors.length ? `✗ ${r.errors.join('; ')}`
+                  : r.dupInFile != null ? `↺ Same as line ${r.dupInFile}`
+                  : r.duplicateOf ? (team && !inTeam.has(r.duplicateOf.id) ? `＋ Already at the school (${r.duplicateOf.why}) — added to the squad` : keepDup ? `＋ Added again (${r.duplicateOf.why})` : `↺ Already here (${r.duplicateOf.why}) — skipped`)
+                  : '＋ New';
+                const minor = r.dob ? ageOn(r.dob) < 18 : false;
+                return (
+                  <View key={r.line} style={st.row}>
+                    <Text style={[textStyles.body, st.bold]} numberOfLines={1}>{r.line}. {r.fullName || '—'}</Text>
+                    <Text style={textStyles.muted} numberOfLines={2}>
+                      {[r.dob ? `${spelledDate(r.dob)}${minor ? ' · under 18' : ''}` : '', r.gender, r.standard, r.house ? `${r.house} House` : '', r.team, r.jersey != null ? `#${r.jersey}` : '', r.guardian ? `guardian: ${r.guardian.name}${r.guardian.email ? ' ✉' : ''}${r.guardian.phone ? ' ☎' : ''}` : ''].filter(Boolean).join(' · ')}
+                    </Text>
+                    <Text style={[textStyles.muted, r.errors.length ? st.warn : null]}>{status}</Text>
+                    {r.warnings.length ? <Text style={textStyles.muted}>⚠ {r.warnings.join('; ')}</Text> : null}
+                  </View>
+                );
+              })}
+              {rows.some((r) => r.duplicateOf) ? <SelectChip label={keepDup ? '✓ Add look-alikes as new people' : 'Add look-alikes as new people'} active={keepDup} onPress={() => setKeepDup(!keepDup)} /> : null}
+            </Card>
+          ) : null}
+        </KeyboardAwareScrollView>
+      </KeyboardFooterLayout>
     </SafeAreaView>
   );
 }

@@ -9,7 +9,7 @@
  *  route's sport is 'shooting'. */
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, TextInput, StyleSheet } from 'react-native';
-import { KeyboardAwareScrollView } from '../components/keyboard';
+import { KeyboardAwareScrollView, KeyboardFooterLayout } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -191,116 +191,124 @@ export function ShootingEventSetup({ tournamentId }: { tournamentId?: string }) 
   const finalChoices = ev.final && !team && !team3 ? [0, 4, 6, 8].filter((k) => k === 0 || k < entrants || k === ev.final!.finalists) : [];
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
-        <ScreenTitle title="🎯 New shooting event" subtitle={tournament?.name} />
-        {/* SD-141: the meet's competition rules, checked before the meet starts */}
-        <CompetitionRulesCard tournament={tournament} sport={'shooting'} />
+      <KeyboardFooterLayout
+        safeBottom={false}
+        footer={(
+          <>
+            <FormError message={error} />
+            <Button label={busy ? 'Creating…' : 'Create event & start list'} onPress={() => void create()} disabled={busy || !entrants} />
+          </>
+        )}
+      >
+        <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
+          <ScreenTitle title="🎯 New shooting event" subtitle={tournament?.name} />
+          {/* SD-141: the meet's competition rules, checked before the meet starts */}
+          <CompetitionRulesCard tournament={tournament} sport={'shooting'} />
 
-        <Card style={st.card}>
-          <Text style={textStyles.h3}>1 · Event</Text>
-          <View style={st.wrap}>{SHOOT_EVENTS.filter((e) => e.level !== 'nrai').map((e) => <SelectChip key={e.key} label={e.label} active={evKey === e.key} onPress={() => { setEvKey(e.key); setPicks([]); setFinalists(null); }} />)}</View>
-          {/* round 2: the NRAI school classes (India) */}
-          <Text style={st.label}>NRAI school classes</Text>
-          <View style={st.wrap}>{SHOOT_EVENTS.filter((e) => e.level === 'nrai').map((e) => <SelectChip key={e.key} label={e.label} active={evKey === e.key} onPress={() => { setEvKey(e.key); setPicks([]); setFinalists(null); }} />)}</View>
-          <Text style={textStyles.muted}>{ev.rules}.</Text>
-          {!team ? (
-            <View style={st.wrap}>
-              <SelectChip label="Individual" active={!of3} onPress={() => setOf3(false)} />
-              <SelectChip label="Team of 3" active={of3} onPress={() => setOf3(true)} />
-            </View>
-          ) : null}
-          {team3 ? <Text style={textStyles.muted}>Team of 3: each team’s score is its three shooters’ {ev.label} match scores added (no separate team firing). Ties: {ev.scoring === 'integer' ? 'inner tens, then ' : ''}the last series of all three added, back series by series.</Text> : null}
-          <View style={st.wrap}>{SHOOT_AGES.map((a) => <SelectChip key={a.key} label={a.label} active={age === a.key} onPress={() => setAge(a.key)} />)}</View>
-          <Text style={textStyles.muted}>{SHOOT_AGES.find((a) => a.key === age)?.note}.</Text>
-          {!team ? (
-            <View style={st.wrap}>
-              <SelectChip label={adult ? 'Men' : 'Boys'} active={gender === 'M'} onPress={() => setGender('M')} />
-              <SelectChip label={adult ? 'Women' : 'Girls'} active={gender === 'F'} onPress={() => setGender('F')} />
-            </View>
-          ) : <Text style={textStyles.muted}>Mixed team: a man and a woman, 30 shots each — the team total ranks{medalMatches ? '; the best 4 teams shoot the medal matches' : ''}.</Text>}
-          <Text style={st.label}>Match</Text>
-          <View style={st.wrap}>
-            {ev.shotOptions.map((k) => <SelectChip key={k} label={`${k} ${ev.scoring === 'hits' ? 'targets' : 'shots'}${k === ev.shots ? ' (ISSF)' : ''}`} active={shots === k} onPress={() => setShots(k)} />)}
-          </View>
-          <Text style={textStyles.muted}>{n} series of {ev.seriesOf}{ev.positions ? ` — ${ev.positions.length === 3 ? 'kneeling, prone, standing' : ''}` : ''}. {shots !== ev.shots ? 'A shorter match keeps its own records and PBs.' : ''} Event: {ev.label} {categoryLabel(cat)}.</Text>
-        </Card>
-
-        {team3 ? (
           <Card style={st.card}>
-            <Text style={textStyles.h3}>2 · Teams ({teams.length})</Text>
-            <Text style={st.label}>Scores from the individual match{srcEvents.length !== 1 ? 'es' : ''}</Text>
-            {srcEvents.length ? (
+            <Text style={textStyles.h3}>1 · Event</Text>
+            <View style={st.wrap}>{SHOOT_EVENTS.filter((e) => e.level !== 'nrai').map((e) => <SelectChip key={e.key} label={e.label} active={evKey === e.key} onPress={() => { setEvKey(e.key); setPicks([]); setFinalists(null); }} />)}</View>
+            {/* round 2: the NRAI school classes (India) */}
+            <Text style={st.label}>NRAI school classes</Text>
+            <View style={st.wrap}>{SHOOT_EVENTS.filter((e) => e.level === 'nrai').map((e) => <SelectChip key={e.key} label={e.label} active={evKey === e.key} onPress={() => { setEvKey(e.key); setPicks([]); setFinalists(null); }} />)}</View>
+            <Text style={textStyles.muted}>{ev.rules}.</Text>
+            {!team ? (
               <View style={st.wrap}>
-                {srcEvents.map((e) => {
-                  const on = srcKeys.includes(e.eventKey);
-                  return <SelectChip key={e.eventKey} label={`${on ? '✓ ' : ''}${e.title}`} active={on} onPress={() => setSrcPicked(on ? srcKeys.filter((k) => k !== e.eventKey) : [...srcKeys, e.eventKey])} />;
-                })}
-              </View>
-            ) : <Text style={textStyles.muted}>No {ev.label} {categoryLabel(cat)} match in this meet yet — add the individual event first, or type each member’s score on the team sheet.</Text>}
-            {best.size ? <SelectChip label="Fill every house’s team with its best 3" active={false} onPress={fillAll} /> : null}
-            <TeamBuilder sources={sources} playerById={playerById} players={players} seatNames={['Shooter 1', 'Shooter 2', 'Shooter 3']}
-              fits={(p) => !eligibleOnly || eligibleFor({ gender }, { gender: p.gender, age: ageOf(p) })} teams={teams} onChange={setTeams} suggest={lookup.size ? suggest : undefined} />
-            {lookup.size ? <Text style={textStyles.muted}>Best first: {[...lookup.values()].filter((m) => m.mark != null).length} shooters have a {ev.label} score ({scoreText([...lookup.values()].reduce((a, m) => Math.max(a, m.mark ?? 0), 0), ev.scoring)} top).</Text> : null}
-          </Card>
-        ) : null}
-
-        {!team3 ? <Card style={st.card}>
-          <Text style={textStyles.h3}>2 · {team ? `Teams (${pairs.length})` : `Shooters (${picks.length})`}</Text>
-          <View style={st.wrap}>
-            <SelectChip label="All" active={filter == null} onPress={() => setFilter(null)} />
-            {sources.map((s) => <SelectChip key={s.key} label={s.name} dotColor={s.colorHex} active={filter === s.key} onPress={() => setFilter(s.key)} />)}
-          </View>
-          <TextInput style={st.input} value={query} onChangeText={setQuery} placeholder="Search any player by name" placeholderTextColor={theme.colors.textMuted} accessibilityLabel="Search players" />
-          {!team && <SelectChip label={eligibleOnly ? `✓ ${gender === 'M' ? (adult ? 'Men' : 'Boys') : (adult ? 'Women' : 'Girls')} only` : 'Showing everyone'} active={eligibleOnly} onPress={() => setEligibleOnly(!eligibleOnly)} />}
-          {team && <Text style={textStyles.muted}>Tap two shooters for each team, in order (a man and a woman).</Text>}
-          <View style={st.wrap}>
-            {pool.map((p) => {
-              const on = picks.includes(p.id);
-              return <SelectChip key={p.id} label={`${on ? '✓ ' : ''}${p.fullName}`} dotColor={p.houseColor} active={on} onPress={() => toggle(p.id)} />;
-            })}
-            {!pool.length && <Text style={textStyles.muted}>No shooters match. Players without a gender are always shown.</Text>}
-          </View>
-          {team && pairs.length > 0 && pairs.map(([a, b], i) => <Text key={i} style={textStyles.body}>Team {i + 1}: {nameOf(a)} + {nameOf(b)}</Text>)}
-        </Card> : null}
-
-        <Card style={st.card}>
-          <Text style={textStyles.h3}>3 · Scoring & {team ? 'medals' : 'final'}</Text>
-          {!team3 ? <View style={st.wrap}>
-            <SelectChip label={ev.scoring === 'integer' ? 'By series (total + X)' : 'By series'} active={mode === 'series'} onPress={() => setMode('series')} />
-            {ev.scoring !== 'hits' && <SelectChip label="Shot by shot" active={mode === 'shot'} onPress={() => setMode('shot')} />}
-          </View> : null}
-          <Text style={textStyles.muted}>{team3 ? 'The team sheet takes each member’s score from the individual match (or the official types it).' : mode === 'series' ? `Enter each series total${ev.scoring === 'integer' ? ' and its inner tens (X)' : ''} as the range scores it.` : `Type each series' shots in one line${ev.scoring === 'decimal' ? ' (10.4 10.2 …)' : ' (10 9 X … — X is an inner ten)'}; shot-by-shot also breaks the last ties.`}</Text>
-          {finalChoices.length > 0 ? (
-            <>
-              <Text style={st.label}>Final</Text>
-              <View style={st.wrap}>
-                {finalChoices.map((k) => <SelectChip key={k} label={k ? `Final of ${k}` : 'No final'} active={fin === k} disabled={k > 0 && k >= entrants} onPress={() => setFinalists(k)} />)}
-              </View>
-              <Text style={textStyles.muted}>
-                {fin && finalOk
-                  ? `The best ${fin} after the match shoot a final from zero: ${ev.final!.stage}. Eliminations after shot ${finalSchedule(ev.final!, fin).join(', ')}; shot ${ev.final!.last} decides gold. Equal lowest totals shoot off.`
-                  : fin ? `A final of ${fin} needs more than ${fin} shooters.` : 'No final: the match decides the medals (equal medal places: a shoot-off).'}
-              </Text>
-            </>
-          ) : (
-            <>
-            {team && entrants >= SHOOT_MATCH_TEAMS ? (
-              <View style={st.wrap}>
-                <SelectChip label="Medal matches (ISSF)" active={medalMatches} onPress={() => setMatchesPick(true)} />
-                <SelectChip label="The total decides" active={!medalMatches} onPress={() => setMatchesPick(false)} />
+                <SelectChip label="Individual" active={!of3} onPress={() => setOf3(false)} />
+                <SelectChip label="Team of 3" active={of3} onPress={() => setOf3(true)} />
               </View>
             ) : null}
-            <Text style={textStyles.muted}>{team3 ? 'Team of 3: no final — the added scores decide the medals (equal medal places: a shoot-off).' : team ? (medalMatches ? 'Mixed team: the best 4 teams after the qualification shoot the medal matches — 1st v 2nd for gold, 3rd v 4th for bronze; one shot per athlete a series, 2 points for the higher series, first to 16.' : `Mixed team: ranked on the team total${entrants < SHOOT_MATCH_TEAMS ? ' (medal matches need 4 teams)' : ''}.`) : ev.scoring === 'hits' ? 'Qualification only: the match decides the medals (equal medal places: a shoot-off).' : 'The 25 m hit-scored final is not run here: the match decides the medals.'}</Text>
-            </>
-          )}
-          <Text style={textStyles.muted}>Ties (ISSF): {ev.scoring === 'integer' ? 'more inner tens, then ' : ''}{ev.positions ? 'standing, kneeling, prone totals, then ' : ''}the higher last {ev.scoring === 'hits' ? 'round' : '10-shot series'}, back series by series{ev.scoring !== 'hits' ? ', then shot by shot when shots are entered' : ''}.</Text>
-        </Card>
+            {team3 ? <Text style={textStyles.muted}>Team of 3: each team’s score is its three shooters’ {ev.label} match scores added (no separate team firing). Ties: {ev.scoring === 'integer' ? 'inner tens, then ' : ''}the last series of all three added, back series by series.</Text> : null}
+            <View style={st.wrap}>{SHOOT_AGES.map((a) => <SelectChip key={a.key} label={a.label} active={age === a.key} onPress={() => setAge(a.key)} />)}</View>
+            <Text style={textStyles.muted}>{SHOOT_AGES.find((a) => a.key === age)?.note}.</Text>
+            {!team ? (
+              <View style={st.wrap}>
+                <SelectChip label={adult ? 'Men' : 'Boys'} active={gender === 'M'} onPress={() => setGender('M')} />
+                <SelectChip label={adult ? 'Women' : 'Girls'} active={gender === 'F'} onPress={() => setGender('F')} />
+              </View>
+            ) : <Text style={textStyles.muted}>Mixed team: a man and a woman, 30 shots each — the team total ranks{medalMatches ? '; the best 4 teams shoot the medal matches' : ''}.</Text>}
+            <Text style={st.label}>Match</Text>
+            <View style={st.wrap}>
+              {ev.shotOptions.map((k) => <SelectChip key={k} label={`${k} ${ev.scoring === 'hits' ? 'targets' : 'shots'}${k === ev.shots ? ' (ISSF)' : ''}`} active={shots === k} onPress={() => setShots(k)} />)}
+            </View>
+            <Text style={textStyles.muted}>{n} series of {ev.seriesOf}{ev.positions ? ` — ${ev.positions.length === 3 ? 'kneeling, prone, standing' : ''}` : ''}. {shots !== ev.shots ? 'A shorter match keeps its own records and PBs.' : ''} Event: {ev.label} {categoryLabel(cat)}.</Text>
+          </Card>
 
-        <ScheduleCard state={schedule} tournamentId={tournamentId} discipline={discipline} plan={(!!ev.final && !team && !team3 && finalOk) || medalMatches ? [{ phase: 'qualification', heats: 1 }, { phase: 'final', heats: 1 }] : undefined} athleteIds={team3 ? teams.flatMap((t) => t.seats.filter((x): x is string => !!x)) : picks} />
-        <EventOfficials tournament={tournament} value={officials} onChange={setOfficials} />
-        <FormError message={error} />
-        <Button label={busy ? 'Creating…' : 'Create event & start list'} onPress={() => void create()} disabled={busy || !entrants} />
-      </KeyboardAwareScrollView>
+          {team3 ? (
+            <Card style={st.card}>
+              <Text style={textStyles.h3}>2 · Teams ({teams.length})</Text>
+              <Text style={st.label}>Scores from the individual match{srcEvents.length !== 1 ? 'es' : ''}</Text>
+              {srcEvents.length ? (
+                <View style={st.wrap}>
+                  {srcEvents.map((e) => {
+                    const on = srcKeys.includes(e.eventKey);
+                    return <SelectChip key={e.eventKey} label={`${on ? '✓ ' : ''}${e.title}`} active={on} onPress={() => setSrcPicked(on ? srcKeys.filter((k) => k !== e.eventKey) : [...srcKeys, e.eventKey])} />;
+                  })}
+                </View>
+              ) : <Text style={textStyles.muted}>No {ev.label} {categoryLabel(cat)} match in this meet yet — add the individual event first, or type each member’s score on the team sheet.</Text>}
+              {best.size ? <SelectChip label="Fill every house’s team with its best 3" active={false} onPress={fillAll} /> : null}
+              <TeamBuilder sources={sources} playerById={playerById} players={players} seatNames={['Shooter 1', 'Shooter 2', 'Shooter 3']}
+                fits={(p) => !eligibleOnly || eligibleFor({ gender }, { gender: p.gender, age: ageOf(p) })} teams={teams} onChange={setTeams} suggest={lookup.size ? suggest : undefined} />
+              {lookup.size ? <Text style={textStyles.muted}>Best first: {[...lookup.values()].filter((m) => m.mark != null).length} shooters have a {ev.label} score ({scoreText([...lookup.values()].reduce((a, m) => Math.max(a, m.mark ?? 0), 0), ev.scoring)} top).</Text> : null}
+            </Card>
+          ) : null}
+
+          {!team3 ? <Card style={st.card}>
+            <Text style={textStyles.h3}>2 · {team ? `Teams (${pairs.length})` : `Shooters (${picks.length})`}</Text>
+            <View style={st.wrap}>
+              <SelectChip label="All" active={filter == null} onPress={() => setFilter(null)} />
+              {sources.map((s) => <SelectChip key={s.key} label={s.name} dotColor={s.colorHex} active={filter === s.key} onPress={() => setFilter(s.key)} />)}
+            </View>
+            <TextInput style={st.input} value={query} onChangeText={setQuery} placeholder="Search any player by name" placeholderTextColor={theme.colors.textMuted} accessibilityLabel="Search players" />
+            {!team && <SelectChip label={eligibleOnly ? `✓ ${gender === 'M' ? (adult ? 'Men' : 'Boys') : (adult ? 'Women' : 'Girls')} only` : 'Showing everyone'} active={eligibleOnly} onPress={() => setEligibleOnly(!eligibleOnly)} />}
+            {team && <Text style={textStyles.muted}>Tap two shooters for each team, in order (a man and a woman).</Text>}
+            <View style={st.wrap}>
+              {pool.map((p) => {
+                const on = picks.includes(p.id);
+                return <SelectChip key={p.id} label={`${on ? '✓ ' : ''}${p.fullName}`} dotColor={p.houseColor} active={on} onPress={() => toggle(p.id)} />;
+              })}
+              {!pool.length && <Text style={textStyles.muted}>No shooters match. Players without a gender are always shown.</Text>}
+            </View>
+            {team && pairs.length > 0 && pairs.map(([a, b], i) => <Text key={i} style={textStyles.body}>Team {i + 1}: {nameOf(a)} + {nameOf(b)}</Text>)}
+          </Card> : null}
+
+          <Card style={st.card}>
+            <Text style={textStyles.h3}>3 · Scoring & {team ? 'medals' : 'final'}</Text>
+            {!team3 ? <View style={st.wrap}>
+              <SelectChip label={ev.scoring === 'integer' ? 'By series (total + X)' : 'By series'} active={mode === 'series'} onPress={() => setMode('series')} />
+              {ev.scoring !== 'hits' && <SelectChip label="Shot by shot" active={mode === 'shot'} onPress={() => setMode('shot')} />}
+            </View> : null}
+            <Text style={textStyles.muted}>{team3 ? 'The team sheet takes each member’s score from the individual match (or the official types it).' : mode === 'series' ? `Enter each series total${ev.scoring === 'integer' ? ' and its inner tens (X)' : ''} as the range scores it.` : `Type each series' shots in one line${ev.scoring === 'decimal' ? ' (10.4 10.2 …)' : ' (10 9 X … — X is an inner ten)'}; shot-by-shot also breaks the last ties.`}</Text>
+            {finalChoices.length > 0 ? (
+              <>
+                <Text style={st.label}>Final</Text>
+                <View style={st.wrap}>
+                  {finalChoices.map((k) => <SelectChip key={k} label={k ? `Final of ${k}` : 'No final'} active={fin === k} disabled={k > 0 && k >= entrants} onPress={() => setFinalists(k)} />)}
+                </View>
+                <Text style={textStyles.muted}>
+                  {fin && finalOk
+                    ? `The best ${fin} after the match shoot a final from zero: ${ev.final!.stage}. Eliminations after shot ${finalSchedule(ev.final!, fin).join(', ')}; shot ${ev.final!.last} decides gold. Equal lowest totals shoot off.`
+                    : fin ? `A final of ${fin} needs more than ${fin} shooters.` : 'No final: the match decides the medals (equal medal places: a shoot-off).'}
+                </Text>
+              </>
+            ) : (
+              <>
+              {team && entrants >= SHOOT_MATCH_TEAMS ? (
+                <View style={st.wrap}>
+                  <SelectChip label="Medal matches (ISSF)" active={medalMatches} onPress={() => setMatchesPick(true)} />
+                  <SelectChip label="The total decides" active={!medalMatches} onPress={() => setMatchesPick(false)} />
+                </View>
+              ) : null}
+              <Text style={textStyles.muted}>{team3 ? 'Team of 3: no final — the added scores decide the medals (equal medal places: a shoot-off).' : team ? (medalMatches ? 'Mixed team: the best 4 teams after the qualification shoot the medal matches — 1st v 2nd for gold, 3rd v 4th for bronze; one shot per athlete a series, 2 points for the higher series, first to 16.' : `Mixed team: ranked on the team total${entrants < SHOOT_MATCH_TEAMS ? ' (medal matches need 4 teams)' : ''}.`) : ev.scoring === 'hits' ? 'Qualification only: the match decides the medals (equal medal places: a shoot-off).' : 'The 25 m hit-scored final is not run here: the match decides the medals.'}</Text>
+              </>
+            )}
+            <Text style={textStyles.muted}>Ties (ISSF): {ev.scoring === 'integer' ? 'more inner tens, then ' : ''}{ev.positions ? 'standing, kneeling, prone totals, then ' : ''}the higher last {ev.scoring === 'hits' ? 'round' : '10-shot series'}, back series by series{ev.scoring !== 'hits' ? ', then shot by shot when shots are entered' : ''}.</Text>
+          </Card>
+
+          <ScheduleCard state={schedule} tournamentId={tournamentId} discipline={discipline} plan={(!!ev.final && !team && !team3 && finalOk) || medalMatches ? [{ phase: 'qualification', heats: 1 }, { phase: 'final', heats: 1 }] : undefined} athleteIds={team3 ? teams.flatMap((t) => t.seats.filter((x): x is string => !!x)) : picks} />
+          <EventOfficials tournament={tournament} value={officials} onChange={setOfficials} />
+        </KeyboardAwareScrollView>
+      </KeyboardFooterLayout>
     </SafeAreaView>
   );
 }

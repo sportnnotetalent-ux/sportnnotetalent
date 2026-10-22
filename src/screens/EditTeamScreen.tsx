@@ -6,7 +6,7 @@
  *  works for a team that has never played a match. */
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { KeyboardAwareScrollView } from '../components/keyboard';
+import { KeyboardAwareScrollView, KeyboardFooterLayout } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -123,62 +123,69 @@ export default function EditTeamScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
-        <ScreenTitle title="Edit team" subtitle={team.name} />
-
-        {isClubTeam ? (
-          <Text style={st.link} accessibilityRole="link" onPress={() => nav.navigate('ClubHome', { clubId: team.clubId! })}>
-            Name and logo belong to {clubName ?? 'the club'} — edit them on the club page ›
-          </Text>
-        ) : (
+      <KeyboardFooterLayout
+        safeBottom={false}
+        footer={(
           <>
-            {supported ? (
-              <LogoPicker
-                logoUrl={logoUrl}
-                canManage
-                kind="club-logo"
-                size={72}
-                placeholder="🛡️"
-                label="Add logo"
-                onPick={async (url) => { await updateTeam(team.id, { logoUrl: url }); setLogoUrl(url); }}
-              />
-            ) : null}
-            <View style={st.row}>
-              <View style={st.flex2}><TextField label="Team name" value={name} onChange={setName} placeholder="Red House" /></View>
-              <View style={st.flex1}><TextField label="Short (2–4)" value={short} onChange={(v) => setShort(v.toUpperCase().slice(0, 4))} placeholder="RED" autoCapitalize="characters" /></View>
-            </View>
+            <FormError message={error} />
+            <Button label={busy ? 'Saving…' : 'Save'} onPress={save} disabled={busy} />
           </>
         )}
+      >
+        <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
+          <ScreenTitle title="Edit team" subtitle={team.name} />
 
-        <Text style={textStyles.muted}>Colour</Text>
-        <View style={st.chips}>
-          {PALETTE.map((c) => (
-            <Text key={c} accessibilityRole="button" accessibilityLabel={`Colour ${c}`} accessibilityState={{ selected: color === c }} onPress={() => setColor(c)} style={[st.swatch, { backgroundColor: c }, color === c && st.swatchActive]} />
-          ))}
-        </View>
+          {isClubTeam ? (
+            <Text style={st.link} accessibilityRole="link" onPress={() => nav.navigate('ClubHome', { clubId: team.clubId! })}>
+              Name and logo belong to {clubName ?? 'the club'} — edit them on the club page ›
+            </Text>
+          ) : (
+            <>
+              {supported ? (
+                <LogoPicker
+                  logoUrl={logoUrl}
+                  canManage
+                  kind="club-logo"
+                  size={72}
+                  placeholder="🛡️"
+                  label="Add logo"
+                  onPick={async (url) => { await updateTeam(team.id, { logoUrl: url }); setLogoUrl(url); }}
+                />
+              ) : null}
+              <View style={st.row}>
+                <View style={st.flex2}><TextField label="Team name" value={name} onChange={setName} placeholder="Red House" /></View>
+                <View style={st.flex1}><TextField label="Short (2–4)" value={short} onChange={(v) => setShort(v.toUpperCase().slice(0, 4))} placeholder="RED" autoCapitalize="characters" /></View>
+              </View>
+            </>
+          )}
 
-        <Text style={textStyles.muted}>Level (optional) · for a school with more than one {team.sport === 'football' ? 'side' : 'team'} in this sport — shown as “{teamLabel({ name: isClubTeam ? team.name : name || team.name, level: level || 'JV' })}”</Text>
-        <View style={st.chips}>
-          <SelectChip label="None" active={!level.trim()} onPress={() => setLevel('')} />
-          {levelSuggestions(region.country).map((l) => <SelectChip key={l} label={l} active={level.trim().toLowerCase() === l.toLowerCase()} onPress={() => setLevel(l)} />)}
-        </View>
-        <TextField label="Or type a level" value={level} onChange={(v) => setLevel(v.slice(0, 30))} placeholder="U13 A" autoCapitalize="words" />
+          <Text style={textStyles.muted}>Colour</Text>
+          <View style={st.chips}>
+            {PALETTE.map((c) => (
+              <Text key={c} accessibilityRole="button" accessibilityLabel={`Colour ${c}`} accessibilityState={{ selected: color === c }} onPress={() => setColor(c)} style={[st.swatch, { backgroundColor: c }, color === c && st.swatchActive]} />
+            ))}
+          </View>
 
-        {supported ? (
-          <TextField label="City / town" value={city} onChange={setCity} placeholder="Hyderabad" autoCapitalize="words" />
-        ) : (
-          <Text style={textStyles.muted}>Logo and city · Needs the latest database update</Text>
-        )}
+          <Text style={textStyles.muted}>Level (optional) · for a school with more than one {team.sport === 'football' ? 'side' : 'team'} in this sport — shown as “{teamLabel({ name: isClubTeam ? team.name : name || team.name, level: level || 'JV' })}”</Text>
+          <View style={st.chips}>
+            <SelectChip label="None" active={!level.trim()} onPress={() => setLevel('')} />
+            {levelSuggestions(region.country).map((l) => <SelectChip key={l} label={l} active={level.trim().toLowerCase() === l.toLowerCase()} onPress={() => setLevel(l)} />)}
+          </View>
+          <TextField label="Or type a level" value={level} onChange={(v) => setLevel(v.slice(0, 30))} placeholder="U13 A" autoCapitalize="words" />
 
-        <FormError message={error} />
-        <Button label={busy ? 'Saving…' : 'Save'} onPress={save} disabled={busy} />
+          {supported ? (
+            <TextField label="City / town" value={city} onChange={setCity} placeholder="Hyderabad" autoCapitalize="words" />
+          ) : (
+            <Text style={textStyles.muted}>Logo and city · Needs the latest database update</Text>
+          )}
 
-        <Card style={{ gap: theme.spacing(2), marginTop: theme.spacing(4) }}>
-          <Text style={textStyles.body}>Delete team</Text>
-          <Text style={textStyles.muted}>Only for a team that has never played a match. To take a team out of a tournament, remove it there instead.</Text>
-          <Button label="Delete team" variant="ghost" onPress={remove} disabled={busy} />
-        </Card>
-      </KeyboardAwareScrollView>
+          <Card style={{ gap: theme.spacing(2), marginTop: theme.spacing(4) }}>
+            <Text style={textStyles.body}>Delete team</Text>
+            <Text style={textStyles.muted}>Only for a team that has never played a match. To take a team out of a tournament, remove it there instead.</Text>
+            <Button label="Delete team" variant="ghost" onPress={remove} disabled={busy} />
+          </Card>
+        </KeyboardAwareScrollView>
+      </KeyboardFooterLayout>
     </SafeAreaView>
   );
 }

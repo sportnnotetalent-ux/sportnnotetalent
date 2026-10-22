@@ -17,6 +17,12 @@
  *       is pinned to the top and kept short enough to clear the keyboard.
  *   useKeyboardFocus         onFocus / onBlur for an input, so the enclosing
  *       scroll view or sheet reacts at once (others are noticed within 250 ms).
+ *   KeyboardFooterLayout     a form's primary action pinned at the bottom of
+ *       the screen; while typing it rides on top of the keyboard and the field
+ *       stays in view above it (the top-app form pattern).
+ *   useFormField             keyboard "Next" moves to the next field down the
+ *       form; the last field's key is "Done" and closes the keyboard.
+ * Dragging a form closes the keyboard (on-drag / iOS interactive).
  *
  * Web: the browser does it — public/index.html asks Android Chrome to resize
  * the page for the keyboard (interactive-widget=resizes-content); Safari
@@ -29,7 +35,8 @@ import {
   type KeyboardEvent, type LayoutChangeEvent, type ScrollViewProps, type StyleProp, type TextInputProps, type ViewProps, type ViewStyle,
 } from 'react-native';
 import { initialWindowMetrics, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { keyboardTopOf, revealTarget, sheetPlacement } from './keyboardMath.ts';
+import { theme } from '../core/theme';
+import { fieldOrder, keyboardTopOf, revealTarget, sheetPlacement } from './keyboardMath.ts';
 
 const NATIVE = Platform.OS !== 'web';
 
@@ -104,9 +111,12 @@ interface FocusSink { onInputFocus: () => void; onInputBlur: () => void }
 const FocusContext = createContext<FocusSink | null>(null);
 /** Inside a keyboard-aware view: a nested one leaves the work to the outer. */
 const InsideAware = createContext(false);
-/** Inside a pop-up sheet: the sheet itself moves clear of the keyboard, so a
- *  scroll view in it only scrolls the field into view (no extra shrinking). */
+/** Inside a pop-up sheet: the sheet itself moves clear of the keyboard. */
 const InSheet = createContext(false);
+/** Something around it (a sheet, a footer layout) already moves clear of the
+ *  keyboard, so a scroll view only scrolls the field into view — no extra
+ *  shrinking. */
+const RevealOnly = createContext(false);
 
 type FocusEvent = Parameters<NonNullable<TextInputProps['onFocus']>>[0];
 /** onFocus / onBlur for a TextInput: tells the enclosing scroll view or sheet
@@ -184,11 +194,20 @@ function sizedByItself(style: StyleProp<ViewStyle>): boolean {
  *  nested scroll views (and web) behave as a plain ScrollView. */
 export const KeyboardAwareScrollView = forwardRef<ScrollView, ScrollViewProps>(function KeyboardAwareScrollView(props, ref) {
   const nested = useContext(InsideAware);
-  const keyboardShouldPersistTaps = props.keyboardShouldPersistTaps ?? 'handled';
-  if (!NATIVE || props.horizontal || nested || sizedByItself(props.style)) {
-    return <ScrollView ref={ref} {...props} keyboardShouldPersistTaps={keyboardShouldPersistTaps} />;
-  }
-  return <AwareScrollView ref={ref} {...props} keyboardShouldPersistTaps={keyboardShouldPersistTaps} />;
+  const outerFields = useContext(FieldsContext);
+  const own = useMemo(() => createFieldRegistry(), []);
+  const defaults = {
+    keyboardShouldPersistTaps: props.keyboardShouldPersistTaps ?? ('handled' as const),
+    // dragging the form closes the keyboard, as in the top apps (not a sideways chip row)
+    keyboardDismissMode: props.keyboardDismissMode ?? (props.horizontal ? undefined : Platform.OS === 'ios' ? 'interactive' as const : 'on-drag' as const),
+  };
+  const plain = !NATIVE || props.horizontal || nested || sizedByItself(props.style);
+  const body = plain
+    ? <ScrollView ref={ref} {...props} {...defaults} />
+    : <AwareScrollView ref={ref} {...props} {...defaults} />;
+  // one "Next" chain per form (a nested scroll view joins its parent's)
+  if (props.horizontal || (nested && outerFields)) return body;
+  return <FieldsContext.Provider value={own}>{body}</FieldsContext.Provider>;
 });
 
 const AwareScrollView = forwardRef<ScrollView, ScrollViewProps>(function AwareScrollView({ onLayout, ...props }, ref) {
@@ -231,12 +250,14 @@ const AwareScrollView = forwardRef<ScrollView, ScrollViewProps>(function AwareSc
   }, [reveal]);
 
   const { overlap: kbOverlap, focus } = useKeyboardOverlap(box, onKeyboardChange);
-  const overlap = inSheet ? 0 : kbOverlap;
+  const overlap = useContext(RevealOnly) ? 0 : kbOverlap;
   kbTop.current = useKeyboardState().top;
 
   const handleLayout = (e: LayoutChangeEvent) => {
     onLayout?.(e);
-    if (revealNext.current) { revealNext.current = false; reveal(); }
+    // the frame changed (we, or a footer layout / sheet around us, made room
+    // for the keyboard): bring the field into view in the new frame
+    if (revealNext.current || kbTop.current != null) { revealNext.current = false; reveal(); }
   };
 
   return (
@@ -298,13 +319,119 @@ export function KeyboardSheetScope({ value, children }: { value: FocusSink; chil
   return (
     <InsideAware.Provider value={false}>
       <InSheet.Provider value={true}>
-        <FocusContext.Provider value={value}>{children}</FocusContext.Provider>
+        <RevealOnly.Provider value={true}>
+          {/* a sheet's fields are their own "Next" chain, not the form's behind it */}
+          <FieldsContext.Provider value={null}>
+            <FocusContext.Provider value={value}>{children}</FocusContext.Provider>
+          </FieldsContext.Provider>
+        </RevealOnly.Provider>
       </InSheet.Provider>
     </InsideAware.Provider>
   );
 }
 
+/* ------------------------- the form footer layout ------------------------- */
+
+/** A form screen: its scroll view (a KeyboardAwareScrollView) plus the
+ *  primary action pinned underneath. While typing, the whole layout ends at
+ *  the keyboard's top, so the action rides on the keyboard and the field
+ *  stays in view above it. `safeBottom`: clear the home indicator / gesture
+ *  bar when the keyboard is down (off when the screen's SafeAreaView already
+ *  does). */
+export function KeyboardFooterLayout({ footer, children, style, safeBottom = true }: {
+  footer: React.ReactNode;
+  children: React.ReactNode;
+  style?: StyleProp<ViewStyle>;
+  safeBottom?: boolean;
+}) {
+  const box = useRef<View>(null);
+  const { overlap } = useKeyboardOverlap(box);
+  const insets = useSafeAreaInsets();
+  const up = NATIVE && overlap > 0;
+  return (
+    <View ref={box} style={[st.layout, style, up ? { paddingBottom: overlap } : null]} collapsable={false}>
+      <RevealOnly.Provider value={true}>{children}</RevealOnly.Provider>
+      {footer ? <View style={[st.footer, { paddingBottom: theme.spacing(3) + (safeBottom && !up ? insets.bottom : 0) }]}>{footer}</View> : null}
+    </View>
+  );
+}
+
+/* ---------------------------- keyboard "Next" ----------------------------- */
+
+interface FieldRegistry {
+  add: (f: React.RefObject<TextInput | null>) => () => void;
+  subscribe: (f: () => void) => () => void;
+  isLast: (f: React.RefObject<TextInput | null>) => boolean;
+  next: (from: React.RefObject<TextInput | null>) => void;
+}
+const FieldsContext = createContext<FieldRegistry | null>(null);
+
+/** Where each field sits on screen (in reading order), measured on demand. */
+function measureFields(fields: React.RefObject<TextInput | null>[], then: (placed: { f: React.RefObject<TextInput | null>; x: number; y: number }[]) => void) {
+  const placed: { f: React.RefObject<TextInput | null>; x: number; y: number }[] = [];
+  let pending = fields.length;
+  if (!pending) { then(placed); return; }
+  for (const f of fields) {
+    const node = f.current as unknown as Measurable | null;
+    if (!node) { if (--pending === 0) then(placed); continue; }
+    node.measureInWindow((x, y, w, h) => {
+      if (w > 0 && h > 0) placed.push({ f, x, y });
+      if (--pending === 0) then(placed.sort((a, b) => fieldOrder(a, b)));
+    });
+  }
+}
+
+function createFieldRegistry(): FieldRegistry {
+  const fields = new Set<React.RefObject<TextInput | null>>();
+  const listeners = new Set<() => void>();
+  let last: React.RefObject<TextInput | null> | null = null;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  // which field is last moves when fields come and go (conditional fields)
+  const recompute = () => {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => measureFields([...fields], (placed) => {
+      const now = placed.length ? placed[placed.length - 1].f : null;
+      if (now !== last) { last = now; listeners.forEach((l) => l()); }
+    }), 80);
+  };
+  return {
+    add: (f) => { fields.add(f); recompute(); return () => { fields.delete(f); recompute(); }; },
+    subscribe: (l) => { listeners.add(l); return () => { listeners.delete(l); }; },
+    isLast: (f) => last === f,
+    next: (from) => measureFields([...fields], (placed) => {
+      const i = placed.findIndex((p) => p.f === from);
+      const to = i >= 0 ? placed[i + 1] : undefined;
+      if (to?.f.current) to.f.current.focus();
+      else Keyboard.dismiss();
+    }),
+  };
+}
+
+/** For a single-line field in a form: keyboard "Next" moves to the next field
+ *  down the form; the last field shows "Done" and closes the keyboard. Spread
+ *  the result onto the TextInput (it includes the ref). */
+export function useFormField(multiline = false) {
+  const reg = useContext(FieldsContext);
+  const ref = useRef<TextInput>(null);
+  const [last, setLast] = useState(false);
+  useEffect(() => {
+    if (!reg || multiline) return;
+    const off = reg.add(ref);
+    const unsub = reg.subscribe(() => setLast(reg.isLast(ref)));
+    return () => { off(); unsub(); };
+  }, [reg, multiline]);
+  if (!reg || multiline) return { ref };
+  return last
+    ? { ref, returnKeyType: 'done' as const, submitBehavior: 'blurAndSubmit' as const }
+    : { ref, returnKeyType: 'next' as const, submitBehavior: 'submit' as const, onSubmitEditing: () => reg.next(ref) };
+}
+
 const st = StyleSheet.create({
   // like a ScrollView's own default: fill the parent, shrink to fit a capped one
   box: { flexGrow: 1, flexShrink: 1 },
+  layout: { flex: 1 },
+  footer: {
+    paddingHorizontal: theme.spacing(4), paddingTop: theme.spacing(3), gap: theme.spacing(2),
+    backgroundColor: theme.colors.bg, borderTopWidth: 1, borderTopColor: theme.colors.border,
+  },
 });

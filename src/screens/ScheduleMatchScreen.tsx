@@ -4,7 +4,7 @@
  *  fall back to a search (type 3+ letters) so the list never sprawls. */
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { KeyboardAwareScrollView } from '../components/keyboard';
+import { KeyboardAwareScrollView, KeyboardFooterLayout } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -350,179 +350,190 @@ export default function ScheduleMatchScreen() {
   // set up on its own screen; match play stays head-to-head here.
   const golfField = sport === 'golf' && String(format.competition ?? 'stroke') !== 'match';
 
+  // the match form (not a results sport or golf, which link to their own setup)
+  // pins its schedule / start button above the keyboard
+  const matchForm = !golfField && !['athletics', 'swimming', 'cycling', 'rowing', 'canoe', 'archery', 'shooting', 'weightlifting'].includes(sport ?? '');
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
-        <ScreenTitle
-          title={cloneOf ? 'Clone match' : isFriendly ? 'Start a friendly' : 'Schedule a match'}
-          subtitle={cloneOf ? (cloneReady ? 'Same teams, squads, venue & rules — kicks off now. The toss is re-done.' : 'Loading the match to copy…') : isFriendly ? 'A quick game — no tournament needed' : 'Pick sport, teams & time'}
-        />
+      <KeyboardFooterLayout
+        safeBottom={false}
+        footer={matchForm ? (
+          <>
+            <FormError message={error} />
+            <Button
+              label={
+                busy
+                  ? isImmediate ? 'Starting…' : 'Scheduling…'
+                  : isFriendly
+                    ? isImmediate ? '▶ Create & score now' : '📅 Schedule friendly'
+                    : 'Schedule match'
+              }
+              onPress={submit}
+            />
+          </>
+        ) : null}
+      >
+        <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
+          <ScreenTitle
+            title={cloneOf ? 'Clone match' : isFriendly ? 'Start a friendly' : 'Schedule a match'}
+            subtitle={cloneOf ? (cloneReady ? 'Same teams, squads, venue & rules — kicks off now. The toss is re-done.' : 'Loading the match to copy…') : isFriendly ? 'A quick game — no tournament needed' : 'Pick sport, teams & time'}
+          />
 
-        <SportPicker sport={sport} onPick={pickSport} />
+          <SportPicker sport={sport} onPick={pickSport} />
 
-        {sport === 'athletics' ? (
+          {sport === 'athletics' ? (
+            <>
+              <Text style={textStyles.muted}>
+                🏃 Athletics isn’t a match: each race is an event with heats and a final. Add the event, its athletes (or relay teams), rounds and lanes, then enter times heat by heat.
+              </Text>
+              <Button label="🏃 Set up an athletics event →" onPress={() => nav.navigate('AthleticsEventSetup', { tournamentId })} />
+            </>
+          ) : sport === 'swimming' ? (
+            <>
+              <Text style={textStyles.muted}>
+                🏊 Swimming isn’t a match: each race is an event — a timed final, or heats and a final. Add the event, its swimmers (or relay teams), rounds and lanes, then enter times heat by heat.
+              </Text>
+              <Button label="🏊 Set up a swimming event →" onPress={() => nav.navigate('AthleticsEventSetup', { tournamentId, sport: 'swimming' })} />
+            </>
+          ) : sport === 'cycling' ? (
+            <>
+              <Text style={textStyles.muted}>🚴 Cycling isn’t a match: each race (time trial, road race, stage race, pursuit, sprint, keirin, points race …) is an event. Add the race, the category and the riders, then enter times or the order on the line.</Text>
+              <Button label="🚴 Set up a cycling race →" onPress={() => nav.navigate('AthleticsEventSetup', { tournamentId, sport: 'cycling' })} />
+            </>
+          ) : sport === 'rowing' || sport === 'canoe' ? (
+            <>
+              <Text style={textStyles.muted}>
+                {sport === 'rowing' ? '🚣 Rowing isn’t a match: each race (1x, 2x, 4+, 8+ …) is an event with heats, a repechage and Finals A / B. Add the boat class, the crews seat by seat, the progression and lanes, then enter finish times race by race.' : '🛶 Canoe sprint isn’t a match: each race (K1 … C4, 200 / 500 / 1000 m) is an event with heats, semi-finals and Finals A / B. Add the boat, the paddlers, the progression and lanes, then enter finish times race by race.'}
+              </Text>
+              <Button label={sport === 'rowing' ? '🚣 Set up a rowing race →' : '🛶 Set up a canoe sprint race →'} onPress={() => nav.navigate('AthleticsEventSetup', { tournamentId, sport })} />
+            </>
+          ) : sport === 'archery' ? (
+            <>
+              <Text style={textStyles.muted}>
+                🏹 Archery isn’t a single match: each event (Recurve 70 m, Compound 50 m …) is a ranking round of ends, then a seeded match-play bracket with a bronze medal match. Add the event and its archers, then enter each end as it is scored.
+              </Text>
+              <Button label="🏹 Set up an archery event →" onPress={() => nav.navigate('AthleticsEventSetup', { tournamentId, sport: 'archery' })} />
+            </>
+          ) : sport === 'shooting' ? (
+            <>
+              <Text style={textStyles.muted}>
+                🎯 Shooting isn’t a match: each event (10 m Air Rifle, 10 m Air Pistol …) is a qualification of series, then a final for the best eight. Add the event and its shooters, then enter each series as it is scored.
+              </Text>
+              <Button label="🎯 Set up a shooting event →" onPress={() => nav.navigate('AthleticsEventSetup', { tournamentId, sport: 'shooting' })} />
+            </>
+          ) : sport === 'weightlifting' ? (
+            <>
+              <Text style={textStyles.muted}>
+                🏋️ Weightlifting isn’t a match: each bodyweight category is an event — weigh-in, then three snatch and three clean & jerk attempts per lifter. Add the category and its lifters, then enter each attempt as it is lifted.
+              </Text>
+              <Button label="🏋️ Set up a weightlifting event →" onPress={() => nav.navigate('AthleticsEventSetup', { tournamentId, sport: 'weightlifting' })} />
+            </>
+          ) : golfField ? (
+            <>
+              <SportFormatEditor sport="golf" value={format} onChange={(k, v) => setFormat((f) => ({ ...f, [k]: v }))} omitKeys={['extraHoles']} />
+              <Text style={textStyles.muted}>
+                ⛳ Stroke play and Stableford put everyone on one leaderboard — pick the course, add your group (and Handicap Indexes), and score hole by hole. Choose “Match play” above for a head-to-head game.
+              </Text>
+              <Button label="⛳ Set up the round →" onPress={() => nav.navigate('GolfRoundSetup', { tournamentId, competition: String(format.competition ?? 'stroke'), holes: String(format.holes ?? '18') })} />
+            </>
+          ) : (
           <>
-            <Text style={textStyles.muted}>
-              🏃 Athletics isn’t a match: each race is an event with heats and a final. Add the event, its athletes (or relay teams), rounds and lanes, then enter times heat by heat.
-            </Text>
-            <Button label="🏃 Set up an athletics event →" onPress={() => nav.navigate('AthleticsEventSetup', { tournamentId })} />
-          </>
-        ) : sport === 'swimming' ? (
-          <>
-            <Text style={textStyles.muted}>
-              🏊 Swimming isn’t a match: each race is an event — a timed final, or heats and a final. Add the event, its swimmers (or relay teams), rounds and lanes, then enter times heat by heat.
-            </Text>
-            <Button label="🏊 Set up a swimming event →" onPress={() => nav.navigate('AthleticsEventSetup', { tournamentId, sport: 'swimming' })} />
-          </>
-        ) : sport === 'cycling' ? (
-          <>
-            <Text style={textStyles.muted}>🚴 Cycling isn’t a match: each race (time trial, road race, stage race, pursuit, sprint, keirin, points race …) is an event. Add the race, the category and the riders, then enter times or the order on the line.</Text>
-            <Button label="🚴 Set up a cycling race →" onPress={() => nav.navigate('AthleticsEventSetup', { tournamentId, sport: 'cycling' })} />
-          </>
-        ) : sport === 'rowing' || sport === 'canoe' ? (
-          <>
-            <Text style={textStyles.muted}>
-              {sport === 'rowing' ? '🚣 Rowing isn’t a match: each race (1x, 2x, 4+, 8+ …) is an event with heats, a repechage and Finals A / B. Add the boat class, the crews seat by seat, the progression and lanes, then enter finish times race by race.' : '🛶 Canoe sprint isn’t a match: each race (K1 … C4, 200 / 500 / 1000 m) is an event with heats, semi-finals and Finals A / B. Add the boat, the paddlers, the progression and lanes, then enter finish times race by race.'}
-            </Text>
-            <Button label={sport === 'rowing' ? '🚣 Set up a rowing race →' : '🛶 Set up a canoe sprint race →'} onPress={() => nav.navigate('AthleticsEventSetup', { tournamentId, sport })} />
-          </>
-        ) : sport === 'archery' ? (
-          <>
-            <Text style={textStyles.muted}>
-              🏹 Archery isn’t a single match: each event (Recurve 70 m, Compound 50 m …) is a ranking round of ends, then a seeded match-play bracket with a bronze medal match. Add the event and its archers, then enter each end as it is scored.
-            </Text>
-            <Button label="🏹 Set up an archery event →" onPress={() => nav.navigate('AthleticsEventSetup', { tournamentId, sport: 'archery' })} />
-          </>
-        ) : sport === 'shooting' ? (
-          <>
-            <Text style={textStyles.muted}>
-              🎯 Shooting isn’t a match: each event (10 m Air Rifle, 10 m Air Pistol …) is a qualification of series, then a final for the best eight. Add the event and its shooters, then enter each series as it is scored.
-            </Text>
-            <Button label="🎯 Set up a shooting event →" onPress={() => nav.navigate('AthleticsEventSetup', { tournamentId, sport: 'shooting' })} />
-          </>
-        ) : sport === 'weightlifting' ? (
-          <>
-            <Text style={textStyles.muted}>
-              🏋️ Weightlifting isn’t a match: each bodyweight category is an event — weigh-in, then three snatch and three clean & jerk attempts per lifter. Add the category and its lifters, then enter each attempt as it is lifted.
-            </Text>
-            <Button label="🏋️ Set up a weightlifting event →" onPress={() => nav.navigate('AthleticsEventSetup', { tournamentId, sport: 'weightlifting' })} />
-          </>
-        ) : golfField ? (
-          <>
-            <SportFormatEditor sport="golf" value={format} onChange={(k, v) => setFormat((f) => ({ ...f, [k]: v }))} omitKeys={['extraHoles']} />
-            <Text style={textStyles.muted}>
-              ⛳ Stroke play and Stableford put everyone on one leaderboard — pick the course, add your group (and Handicap Indexes), and score hole by hole. Choose “Match play” above for a head-to-head game.
-            </Text>
-            <Button label="⛳ Set up the round →" onPress={() => nav.navigate('GolfRoundSetup', { tournamentId, competition: String(format.competition ?? 'stroke'), holes: String(format.holes ?? '18') })} />
-          </>
-        ) : (
-        <>
-        {sport && (
-          <>
-            {/* Racket sports pick their structure first — Singles (one player a
-                side) or Doubles (a pair) — so the participant picker below adapts. */}
-            {getSport(sport).participantKind === 'both' && (
-              <View style={{ gap: theme.spacing(2) }}>
-                <FieldLabel>Format</FieldLabel>
-                <View style={st.chips}>
-                  <SelectChip label="👤 Singles" active={mode === 'individual'} onPress={() => setStructure(1)} />
-                  <SelectChip label="👥 Doubles" active={mode === 'pairs'} onPress={() => setStructure(2)} />
+          {sport && (
+            <>
+              {/* Racket sports pick their structure first — Singles (one player a
+                  side) or Doubles (a pair) — so the participant picker below adapts. */}
+              {getSport(sport).participantKind === 'both' && (
+                <View style={{ gap: theme.spacing(2) }}>
+                  <FieldLabel>Format</FieldLabel>
+                  <View style={st.chips}>
+                    <SelectChip label="👤 Singles" active={mode === 'individual'} onPress={() => setStructure(1)} />
+                    <SelectChip label="👥 Doubles" active={mode === 'pairs'} onPress={() => setStructure(2)} />
+                  </View>
                 </View>
-              </View>
-            )}
+              )}
 
-            {mode === 'team' ? (
-              <>
-                {sport && (
-                  <ClubQuickPick
-                    sport={sport}
-                    selectedTeamIds={[home, away].filter(Boolean) as string[]}
-                    onPicked={(team) => {
-                      // Fill the first empty side; ignore a duplicate of the other side.
-                      if (!home) setHome(team.id);
-                      else if (!away && team.id !== home) setAway(team.id);
-                      setTeamNonce((n) => n + 1);
-                    }}
-                  />
-                )}
-                <TeamPicker noun="team" label="Home team" teams={teams} selected={home} onSelect={setHome} onClear={() => setHome(null)} onCreate={makeCreateHandler('home')} />
-                <TeamPicker noun="team" label="Away team" teams={teams} selected={away} onSelect={setAway} onClear={() => setAway(null)} onCreate={makeCreateHandler('away')} />
-              </>
-            ) : mode === 'individual' ? (
-              <>
-                <TeamPicker noun="player" label="Player 1" teams={teams} selected={home} onSelect={setHome} onClear={() => setHome(null)} onCreate={makeCreateHandler('home')} onPickMe={pickMe('home')} meName={profile?.fullName} people={people} onSelectPerson={pickPerson('home')} />
-                <TeamPicker noun="player" label="Player 2" teams={teams} selected={away} onSelect={setAway} onClear={() => setAway(null)} onCreate={makeCreateHandler('away')} people={people} onSelectPerson={pickPerson('away')} />
-              </>
-            ) : (
-              <>
-                <Text style={textStyles.muted}>A doubles side is a pair of two players. Pick an existing pair, or name both partners.</Text>
-                <TeamPicker noun="pair" label="Pair 1" teams={teams} selected={home} onSelect={setHome} onClear={() => setHome(null)} onCreate={makeCreateHandler('home')} onCreatePair={makePairCreateHandler('home')} />
-                <TeamPicker noun="pair" label="Pair 2" teams={teams} selected={away} onSelect={setAway} onClear={() => setAway(null)} onCreate={makeCreateHandler('away')} onCreatePair={makePairCreateHandler('away')} />
-              </>
-            )}
+              {mode === 'team' ? (
+                <>
+                  {sport && (
+                    <ClubQuickPick
+                      sport={sport}
+                      selectedTeamIds={[home, away].filter(Boolean) as string[]}
+                      onPicked={(team) => {
+                        // Fill the first empty side; ignore a duplicate of the other side.
+                        if (!home) setHome(team.id);
+                        else if (!away && team.id !== home) setAway(team.id);
+                        setTeamNonce((n) => n + 1);
+                      }}
+                    />
+                  )}
+                  <TeamPicker noun="team" label="Home team" teams={teams} selected={home} onSelect={setHome} onClear={() => setHome(null)} onCreate={makeCreateHandler('home')} />
+                  <TeamPicker noun="team" label="Away team" teams={teams} selected={away} onSelect={setAway} onClear={() => setAway(null)} onCreate={makeCreateHandler('away')} />
+                </>
+              ) : mode === 'individual' ? (
+                <>
+                  <TeamPicker noun="player" label="Player 1" teams={teams} selected={home} onSelect={setHome} onClear={() => setHome(null)} onCreate={makeCreateHandler('home')} onPickMe={pickMe('home')} meName={profile?.fullName} people={people} onSelectPerson={pickPerson('home')} />
+                  <TeamPicker noun="player" label="Player 2" teams={teams} selected={away} onSelect={setAway} onClear={() => setAway(null)} onCreate={makeCreateHandler('away')} people={people} onSelectPerson={pickPerson('away')} />
+                </>
+              ) : (
+                <>
+                  <Text style={textStyles.muted}>A doubles side is a pair of two players. Pick an existing pair, or name both partners.</Text>
+                  <TeamPicker noun="pair" label="Pair 1" teams={teams} selected={home} onSelect={setHome} onClear={() => setHome(null)} onCreate={makeCreateHandler('home')} onCreatePair={makePairCreateHandler('home')} />
+                  <TeamPicker noun="pair" label="Pair 2" teams={teams} selected={away} onSelect={setAway} onClear={() => setAway(null)} onCreate={makeCreateHandler('away')} onCreatePair={makePairCreateHandler('away')} />
+                </>
+              )}
 
-            <DateTimeField label="Kickoff" value={when} onChange={(d) => { whenTouched.current = true; setWhen(d); }} timeZone={tournament?.timeZone} />
+              <DateTimeField label="Kickoff" value={when} onChange={(d) => { whenTouched.current = true; setWhen(d); }} timeZone={tournament?.timeZone} />
 
-            {/* Phase tag — only for tournament matches. Lets an organizer place a
-                match precisely: a group game, or a specific knockout tie that then
-                shows in the right round of the bracket. */}
-            {!isFriendly && (
-              <View style={{ gap: theme.spacing(2) }}>
-                <FieldLabel>Stage</FieldLabel>
-                <View style={st.chips}>
-                  <SelectChip label="League" active={phase === 'league'} onPress={() => setPhase('league')} />
-                  <SelectChip label="👥 Group" active={phase === 'group'} onPress={() => setPhase('group')} />
-                  {KO_STAGES.map((s) => (
-                    <SelectChip key={s} label={KO_STAGE_LABEL[s]} active={phase === s} onPress={() => setPhase(s)} />
-                  ))}
+              {/* Phase tag — only for tournament matches. Lets an organizer place a
+                  match precisely: a group game, or a specific knockout tie that then
+                  shows in the right round of the bracket. */}
+              {!isFriendly && (
+                <View style={{ gap: theme.spacing(2) }}>
+                  <FieldLabel>Stage</FieldLabel>
+                  <View style={st.chips}>
+                    <SelectChip label="League" active={phase === 'league'} onPress={() => setPhase('league')} />
+                    <SelectChip label="👥 Group" active={phase === 'group'} onPress={() => setPhase('group')} />
+                    {KO_STAGES.map((s) => (
+                      <SelectChip key={s} label={KO_STAGE_LABEL[s]} active={phase === s} onPress={() => setPhase(s)} />
+                    ))}
+                  </View>
+                  {phase === 'group' && (
+                    <TextField label="Group" value={groupLabel} onChange={(t) => setGroupLabel(t.replace(/[^a-zA-Z0-9]/g, '').slice(0, 3).toUpperCase())} placeholder="A" autoCapitalize="characters" />
+                  )}
                 </View>
-                {phase === 'group' && (
-                  <TextField label="Group" value={groupLabel} onChange={(t) => setGroupLabel(t.replace(/[^a-zA-Z0-9]/g, '').slice(0, 3).toUpperCase())} placeholder="A" autoCapitalize="characters" />
-                )}
-              </View>
-            )}
+              )}
 
-            {(getSport(sport).formatFields ?? []).length > 0 && (
-              <SportFormatEditor
-                sport={sport}
-                value={format}
-                onChange={(k, v) => setFormat((f) => ({ ...f, [k]: v }))}
-                // Singles/Doubles is chosen up front for racket sports, so don't repeat it here.
-                omitKeys={getSport(sport).participantKind === 'both' ? ['playersPerSide'] : undefined}
-              />
-            )}
+              {(getSport(sport).formatFields ?? []).length > 0 && (
+                <SportFormatEditor
+                  sport={sport}
+                  value={format}
+                  onChange={(k, v) => setFormat((f) => ({ ...f, [k]: v }))}
+                  // Singles/Doubles is chosen up front for racket sports, so don't repeat it here.
+                  omitKeys={getSport(sport).participantKind === 'both' ? ['playersPerSide'] : undefined}
+                />
+              )}
+            </>
+          )}
+
+          <VenueField venue={venue} onVenue={setVenue} venueUrl={venueUrl} onVenueUrl={setVenueUrl} knownVenues={knownVenues} />
+
+          <ConflictNotice conflicts={conflicts} />
+
+          <TextField
+            label="Live stream link (optional)"
+            value={stream}
+            onChange={setStream}
+            placeholder="youtu.be/… · youtube.com/live/… · twitch.tv/…"
+            autoCapitalize="none"
+          />
+          <Text style={textStyles.muted}>
+            Add a YouTube or Twitch link and it shows at the top of the live match. You can also set or change it later from the match’s Info tab.
+          </Text>
+
           </>
-        )}
-
-        <VenueField venue={venue} onVenue={setVenue} venueUrl={venueUrl} onVenueUrl={setVenueUrl} knownVenues={knownVenues} />
-
-        <ConflictNotice conflicts={conflicts} />
-
-        <TextField
-          label="Live stream link (optional)"
-          value={stream}
-          onChange={setStream}
-          placeholder="youtu.be/… · youtube.com/live/… · twitch.tv/…"
-          autoCapitalize="none"
-        />
-        <Text style={textStyles.muted}>
-          Add a YouTube or Twitch link and it shows at the top of the live match. You can also set or change it later from the match’s Info tab.
-        </Text>
-
-        <FormError message={error} />
-        <Button
-          label={
-            busy
-              ? isImmediate ? 'Starting…' : 'Scheduling…'
-              : isFriendly
-                ? isImmediate ? '▶ Create & score now' : '📅 Schedule friendly'
-                : 'Schedule match'
-          }
-          onPress={submit}
-        />
-        </>
-        )}
-      </KeyboardAwareScrollView>
+          )}
+        </KeyboardAwareScrollView>
+      </KeyboardFooterLayout>
     </SafeAreaView>
   );
 }

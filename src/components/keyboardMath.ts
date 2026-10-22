@@ -52,3 +52,9 @@ export function sheetPlacement({ os, focused, top, winH, safeTop }: { os: string
   }
   return {};
 }
+
+/** Reading order of two fields on screen: top to bottom, then left to right
+ *  on the same row (within 4 px). */
+export function fieldOrder(a: { x: number; y: number }, b: { x: number; y: number }): number {
+  return Math.abs(a.y - b.y) <= 4 ? a.x - b.x : a.y - b.y;
+}

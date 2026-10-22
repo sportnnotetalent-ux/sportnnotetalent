@@ -5,7 +5,7 @@
  *  renders it and runs the sequential create (safe to retry after a failure). */
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Platform, Share } from 'react-native';
-import { KeyboardAwareScrollView } from '../components/keyboard';
+import { KeyboardAwareScrollView, KeyboardFooterLayout } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -189,104 +189,107 @@ export default function ImportScheduleScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
-        <ScreenTitle title="Import schedule" subtitle={tournament.name} />
+      <KeyboardFooterLayout
+        safeBottom={false}
+        footer={rows.length > 0 ? (
+          <>
+            <FormError message={error} />
+            <Button label={label} onPress={() => void create()} disabled={busy || n === 0} />
+          </>
+        ) : null}
+      >
+        <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
+          <ScreenTitle title="Import schedule" subtitle={tournament.name} />
 
-        <Card style={st.card}>
-          <Text style={textStyles.h3}>1 · Get the template</Text>
-          <Text style={textStyles.muted}>
-            One row per match. Dates like {exampleDate(region.dateOrder, '2026-10-12')} ({region.dateOrder === 'MDY' ? 'month first' : 'day first'}), times like 4:30 pm in {zoneLabel(zone)}. Team names must match your teams.
-            {multiSport ? ' Add the sport on every row.' : ''}
-          </Text>
-          <Button label="⬇ Download template (CSV)" variant="ghost" onPress={() => void downloadTemplate()} />
-          {tourSportTeams.length ? (
-            <View style={st.chips}>
-              {tourSportTeams.map((t) => <Pill key={t.id} label={multiSport ? `${getSport(t.sport).icon} ${t.name}` : t.name} />)}
-            </View>
-          ) : (
-            <TouchableOpacity onPress={() => nav.navigate('TournamentTeams', { tournamentId: tid })} accessibilityRole="link">
-              <Text style={st.link}>No teams in this tournament yet — add them first →</Text>
-            </TouchableOpacity>
-          )}
-        </Card>
-
-        <Card style={st.card}>
-          <Text style={textStyles.h3}>2 · Add your matches</Text>
-          {Platform.OS === 'web' && <Button label="📂 Choose CSV file" variant="ghost" onPress={() => void chooseFile()} />}
-          <FormError message={fileError} />
-          {fileNote ? <Text style={textStyles.muted}>{fileNote}</Text> : null}
-          <TextField
-            label={Platform.OS === 'web' ? '…or paste rows from Excel / Google Sheets' : 'Paste rows from Excel / Google Sheets'}
-            value={text}
-            onChange={(v) => { setText(v); setFileNote(null); setFileError(null); }}
-            placeholder={`date\ttime\thome_team\taway_team\tvenue\n${exampleDate(region.dateOrder, '2026-10-12')}\t4:30 pm\tRed House\tBlue House\tMain Ground`}
-            autoCapitalize="none"
-            multiline
-          />
-          {result && !result.hasHeader && rows.length > 0 && (
-            <Text style={textStyles.muted}>No header row — reading columns as date, time, home team, away team, venue, group, stage, sport.</Text>
-          )}
-          {dates && (dates.verdict === 'ambiguous' || dates.verdict === 'mixed' || dates.switched || forceOrder) && (
-            <View style={st.dateNote}>
-              <Text style={[textStyles.muted, { color: theme.colors.accent }]}>
-                {dates.verdict === 'mixed'
-                  ? '⚠ Some dates read day-first and others month-first. Pick one and check the rows marked ✕.'
-                  : dates.switched
-                    ? `Your dates are ${dateOrderWords(dates.order)} (a date like ${dates.order === 'MDY' ? '10/25' : '25/10'} proves it), so they're read that way.`
-                    : `⚠ Dates like ${exampleDate(dates.order, '2026-03-05')} could be 5 March or 3 May. Reading them ${dateOrderWords(dates.order)}${firstDate ? ` — the first match is ${spelledDate(firstDate)}` : ''}. Is that right?`}
-              </Text>
+          <Card style={st.card}>
+            <Text style={textStyles.h3}>1 · Get the template</Text>
+            <Text style={textStyles.muted}>
+              One row per match. Dates like {exampleDate(region.dateOrder, '2026-10-12')} ({region.dateOrder === 'MDY' ? 'month first' : 'day first'}), times like 4:30 pm in {zoneLabel(zone)}. Team names must match your teams.
+              {multiSport ? ' Add the sport on every row.' : ''}
+            </Text>
+            <Button label="⬇ Download template (CSV)" variant="ghost" onPress={() => void downloadTemplate()} />
+            {tourSportTeams.length ? (
               <View style={st.chips}>
-                <SelectChip label="Day first (DD/MM)" active={dates.order === 'DMY'} onPress={() => setForceOrder('DMY')} />
-                <SelectChip label="Month first (MM/DD)" active={dates.order === 'MDY'} onPress={() => setForceOrder('MDY')} />
+                {tourSportTeams.map((t) => <Pill key={t.id} label={multiSport ? `${getSport(t.sport).icon} ${t.name}` : t.name} />)}
               </View>
-            </View>
-          )}
-          {result && result.unknownColumns.length > 0 && (
-            <Text style={textStyles.muted}>Ignored columns: {result.unknownColumns.join(', ')}</Text>
-          )}
-        </Card>
-
-        {rows.length > 0 && (
-          <View style={st.preview}>
-            <Text style={textStyles.h3}>3 · Check and create</Text>
-            <View style={st.chips}>
-              <Pill label={`✓ ${summary.ok} ready`} color={theme.colors.primary + '22'} textColor={theme.colors.primary} />
-              <Pill label={`⚠ ${summary.warn} to check`} color={theme.colors.accent + '22'} textColor={theme.colors.accent} />
-              <Pill label={`✕ ${summary.error} won't import`} color={theme.colors.danger + '22'} textColor={theme.colors.danger} />
-              {skip.size > 0 && <Pill label={`${skip.size} skipped`} />}
-            </View>
-            {summary.guessed > 0 && (
-              <Text style={[textStyles.muted, { color: theme.colors.accent }]}>
-                ⚠ {summary.guessed} row{summary.guessed === 1 ? '' : 's'} will import with the suggested team name (“Did you mean…?”). Tap “Use …” to confirm, or skip the row.
-              </Text>
+            ) : (
+              <TouchableOpacity onPress={() => nav.navigate('TournamentTeams', { tournamentId: tid })} accessibilityRole="link">
+                <Text style={st.link}>No teams in this tournament yet — add them first →</Text>
+              </TouchableOpacity>
             )}
-            <View style={st.chips}>
-              <SelectChip label="All" active={!onlyProblems} onPress={() => setOnlyProblems(false)} />
-              <SelectChip label={`Problems (${summary.warn + summary.error})`} active={onlyProblems} onPress={() => setOnlyProblems(true)} />
-            </View>
-            {shown.map((r) => (
-              <RowCard
-                key={r.line}
-                row={r}
-                zone={zone}
-                skipped={skip.has(r.line)}
-                created={isCreated(r)}
-                onSkip={() => toggleSkip(r.line)}
-                onFix={fixCell}
-                onAddTeams={() => nav.navigate('TournamentTeams', { tournamentId: tid })}
-              />
-            ))}
-            {onlyProblems && shown.length === 0 && <Text style={textStyles.muted}>No problems — every row is ready.</Text>}
-          </View>
-        )}
-      </KeyboardAwareScrollView>
+          </Card>
 
-      {rows.length > 0 && (
-        <View style={st.footer}>
-          <FormError message={error} />
-          <Button label={label} onPress={() => void create()} disabled={busy || n === 0} />
-        </View>
-      )}
+          <Card style={st.card}>
+            <Text style={textStyles.h3}>2 · Add your matches</Text>
+            {Platform.OS === 'web' && <Button label="📂 Choose CSV file" variant="ghost" onPress={() => void chooseFile()} />}
+            <FormError message={fileError} />
+            {fileNote ? <Text style={textStyles.muted}>{fileNote}</Text> : null}
+            <TextField
+              label={Platform.OS === 'web' ? '…or paste rows from Excel / Google Sheets' : 'Paste rows from Excel / Google Sheets'}
+              value={text}
+              onChange={(v) => { setText(v); setFileNote(null); setFileError(null); }}
+              placeholder={`date\ttime\thome_team\taway_team\tvenue\n${exampleDate(region.dateOrder, '2026-10-12')}\t4:30 pm\tRed House\tBlue House\tMain Ground`}
+              autoCapitalize="none"
+              multiline
+            />
+            {result && !result.hasHeader && rows.length > 0 && (
+              <Text style={textStyles.muted}>No header row — reading columns as date, time, home team, away team, venue, group, stage, sport.</Text>
+            )}
+            {dates && (dates.verdict === 'ambiguous' || dates.verdict === 'mixed' || dates.switched || forceOrder) && (
+              <View style={st.dateNote}>
+                <Text style={[textStyles.muted, { color: theme.colors.accent }]}>
+                  {dates.verdict === 'mixed'
+                    ? '⚠ Some dates read day-first and others month-first. Pick one and check the rows marked ✕.'
+                    : dates.switched
+                      ? `Your dates are ${dateOrderWords(dates.order)} (a date like ${dates.order === 'MDY' ? '10/25' : '25/10'} proves it), so they're read that way.`
+                      : `⚠ Dates like ${exampleDate(dates.order, '2026-03-05')} could be 5 March or 3 May. Reading them ${dateOrderWords(dates.order)}${firstDate ? ` — the first match is ${spelledDate(firstDate)}` : ''}. Is that right?`}
+                </Text>
+                <View style={st.chips}>
+                  <SelectChip label="Day first (DD/MM)" active={dates.order === 'DMY'} onPress={() => setForceOrder('DMY')} />
+                  <SelectChip label="Month first (MM/DD)" active={dates.order === 'MDY'} onPress={() => setForceOrder('MDY')} />
+                </View>
+              </View>
+            )}
+            {result && result.unknownColumns.length > 0 && (
+              <Text style={textStyles.muted}>Ignored columns: {result.unknownColumns.join(', ')}</Text>
+            )}
+          </Card>
+
+          {rows.length > 0 && (
+            <View style={st.preview}>
+              <Text style={textStyles.h3}>3 · Check and create</Text>
+              <View style={st.chips}>
+                <Pill label={`✓ ${summary.ok} ready`} color={theme.colors.primary + '22'} textColor={theme.colors.primary} />
+                <Pill label={`⚠ ${summary.warn} to check`} color={theme.colors.accent + '22'} textColor={theme.colors.accent} />
+                <Pill label={`✕ ${summary.error} won't import`} color={theme.colors.danger + '22'} textColor={theme.colors.danger} />
+                {skip.size > 0 && <Pill label={`${skip.size} skipped`} />}
+              </View>
+              {summary.guessed > 0 && (
+                <Text style={[textStyles.muted, { color: theme.colors.accent }]}>
+                  ⚠ {summary.guessed} row{summary.guessed === 1 ? '' : 's'} will import with the suggested team name (“Did you mean…?”). Tap “Use …” to confirm, or skip the row.
+                </Text>
+              )}
+              <View style={st.chips}>
+                <SelectChip label="All" active={!onlyProblems} onPress={() => setOnlyProblems(false)} />
+                <SelectChip label={`Problems (${summary.warn + summary.error})`} active={onlyProblems} onPress={() => setOnlyProblems(true)} />
+              </View>
+              {shown.map((r) => (
+                <RowCard
+                  key={r.line}
+                  row={r}
+                  zone={zone}
+                  skipped={skip.has(r.line)}
+                  created={isCreated(r)}
+                  onSkip={() => toggleSkip(r.line)}
+                  onFix={fixCell}
+                  onAddTeams={() => nav.navigate('TournamentTeams', { tournamentId: tid })}
+                />
+              ))}
+              {onlyProblems && shown.length === 0 && <Text style={textStyles.muted}>No problems — every row is ready.</Text>}
+            </View>
+          )}
+        </KeyboardAwareScrollView>
+      </KeyboardFooterLayout>
     </SafeAreaView>
   );
 }
@@ -358,5 +361,4 @@ const st = StyleSheet.create({
   skip: { color: theme.colors.danger, fontSize: theme.font.h3, fontWeight: '800', paddingHorizontal: theme.spacing(1) },
   restore: { color: theme.colors.primary, fontSize: theme.font.small, fontWeight: '700' },
   done: { color: theme.colors.primary, fontSize: theme.font.small, fontWeight: '800' },
-  footer: { padding: theme.spacing(4), gap: theme.spacing(2), borderTopWidth: 1, borderTopColor: theme.colors.border, backgroundColor: theme.colors.bg },
 });

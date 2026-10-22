@@ -10,7 +10,7 @@
  *  The save goes through adminPatch so nothing the server would lock is sent. */
 import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Switch } from 'react-native';
-import { KeyboardAwareScrollView } from '../components/keyboard';
+import { KeyboardAwareScrollView, KeyboardFooterLayout } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { theme } from '../core/theme';
@@ -251,223 +251,230 @@ export default function EditProfileScreen({ route, navigation }: Props) {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
-        {asAdmin ? (
-          <ScreenTitle title="Edit player details" subtitle={`You added ${loaded.name || 'this player'} — they can change these once they join`} />
-        ) : (
-          <ScreenTitle title="Edit profile" subtitle="Your details, as you want them shown" />
+      <KeyboardFooterLayout
+        safeBottom={false}
+        footer={(
+          <>
+            <FormError message={error} />
+            <Button label={busy ? 'Saving…' : asAdmin ? 'Save details' : 'Save profile'} onPress={save} />
+          </>
         )}
-
-        <View style={st.photoRow}>
-          <LogoPicker
-            logoUrl={photoUrl || undefined}
-            canManage
-            kind="player-photo"
-            shape="circle"
-            size={72}
-            placeholder={initials}
-            label="Add photo"
-            onPick={(url) => setPhotoUrl(url)}
-          />
-          {asAdmin && (
-            <View style={st.jerseyCol}>
-              <TextField label="Shirt no." value={jersey} onChange={(v) => setJersey(v.replace(/[^0-9]/g, '').slice(0, 3))} placeholder="10" autoCapitalize="none" />
-            </View>
+      >
+        <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
+          {asAdmin ? (
+            <ScreenTitle title="Edit player details" subtitle={`You added ${loaded.name || 'this player'} — they can change these once they join`} />
+          ) : (
+            <ScreenTitle title="Edit profile" subtitle="Your details, as you want them shown" />
           )}
-        </View>
 
-        <TextField label="Full name" value={name} onChange={setName} placeholder="First & last name" />
-        <View style={st.row}>
-          <View style={st.flex}><TextField label="Location (city)" value={city} onChange={setCity} placeholder="Bengaluru" /></View>
-          <View style={st.flex}>
-            <DateField label={asAdmin ? 'Date of birth (optional)' : 'Date of birth'} value={dob} onChange={setDob} />
-            {age !== undefined ? <Text style={st.ageHint}>Age: {age} yrs</Text> : null}
+          <View style={st.photoRow}>
+            <LogoPicker
+              logoUrl={photoUrl || undefined}
+              canManage
+              kind="player-photo"
+              shape="circle"
+              size={72}
+              placeholder={initials}
+              label="Add photo"
+              onPick={(url) => setPhotoUrl(url)}
+            />
+            {asAdmin && (
+              <View style={st.jerseyCol}>
+                <TextField label="Shirt no." value={jersey} onChange={(v) => setJersey(v.replace(/[^0-9]/g, '').slice(0, 3))} placeholder="10" autoCapitalize="none" />
+              </View>
+            )}
           </View>
-        </View>
 
-        <View style={{ gap: theme.spacing(1) }}>
-          <FieldLabel>Gender</FieldLabel>
+          <TextField label="Full name" value={name} onChange={setName} placeholder="First & last name" />
+          <View style={st.row}>
+            <View style={st.flex}><TextField label="Location (city)" value={city} onChange={setCity} placeholder="Bengaluru" /></View>
+            <View style={st.flex}>
+              <DateField label={asAdmin ? 'Date of birth (optional)' : 'Date of birth'} value={dob} onChange={setDob} />
+              {age !== undefined ? <Text style={st.ageHint}>Age: {age} yrs</Text> : null}
+            </View>
+          </View>
+
+          <View style={{ gap: theme.spacing(1) }}>
+            <FieldLabel>Gender</FieldLabel>
+            <View style={st.chips}>
+              {GENDERS.map((g) => (
+                <SelectChip key={g} label={g} active={gender === g} onPress={() => setGender(gender === g ? '' : g)} />
+              ))}
+            </View>
+          </View>
+
+          <View style={st.wrapRow}>
+            <View style={st.wrapCell}>
+              {asAdmin && loaded.phone ? (
+                <OnFile label="Contact number" />
+              ) : (
+                <PhoneField label="Contact number" value={phone} onChange={setPhone} optional />
+              )}
+            </View>
+            <View style={st.wrapCell}>
+              {asAdmin && loaded.email ? (
+                <OnFile label="Email" />
+              ) : (
+                <TextField label="Email" value={email} onChange={setEmail} placeholder={asAdmin ? 'name@email.com' : 'you@email.com'} autoCapitalize="none" />
+              )}
+            </View>
+          </View>
+          {asAdmin && (loaded.phone || loaded.email) ? (
+            <Text style={textStyles.muted}>A number or email on file can’t be changed — it’s how they claim this profile. Ask support if it’s wrong.</Text>
+          ) : null}
+          {!asAdmin && (<>
+          <Card style={{ gap: theme.spacing(2) }}>
+            <Text style={textStyles.h3}>🔒 Who can see your contact details</Text>
+            {guardianRequired ? (
+              <Text style={textStyles.muted}>
+                Hidden. Players under 18 can&apos;t show their contact details publicly — coaches and scouts reach you through your parent/guardian.
+              </Text>
+            ) : (
+              <>
+                <Text style={textStyles.muted}>
+                  Hidden by default — only you and SportnNote support can see them. Turn one on to show it on your public profile.
+                </Text>
+                <View style={st.switchRow}>
+                  <Text style={[textStyles.body, st.flex]}>Show my mobile number</Text>
+                  <Switch value={showPhone && !!phone.trim()} onValueChange={setShowPhone} disabled={!phone.trim()} accessibilityLabel="Show my mobile number on my profile" />
+                </View>
+                <View style={st.switchRow}>
+                  <Text style={[textStyles.body, st.flex]}>Show my email</Text>
+                  <Switch value={showEmail && !!email.trim()} onValueChange={setShowEmail} disabled={!email.trim()} accessibilityLabel="Show my email on my profile" />
+                </View>
+                <View style={st.switchRow}>
+                  <View style={st.flex}>
+                    <Text style={textStyles.body}>Let people find me by my phone or email</Text>
+                    <Text style={textStyles.muted}>Members who already know your number or email can find your profile in Discover. They still won’t see it.</Text>
+                  </View>
+                  <Switch value={findable} onValueChange={setFindable} accessibilityLabel="Let people find me by my phone or email" />
+                </View>
+              </>
+            )}
+          </Card>
+
+          <TextField label="About you (optional)" value={bio} onChange={setBio} placeholder="A short note about you — how you play, what you're into…" multiline />
+          </>)}
+
+          {showGuardian && (
+          <Card style={{ gap: theme.spacing(2) }}>
+            <Text style={textStyles.h3}>👪 Parent / Guardian {guardianRequired ? '· required' : asAdmin ? '· recommended' : '(optional)'}</Text>
+            {guardianRequired && (
+              <Text style={st.requiredNote}>Required — this player is under 18. Add a name and a phone or email.</Text>
+            )}
+            {asAdmin && (
+              <Text style={st.requiredNote}>Recommended — this player is under 18. Add a parent or guardian so someone can be reached.</Text>
+            )}
+            {asAdmin && guardianOnFile ? (
+              <Text style={textStyles.muted}>A guardian is already on file.</Text>
+            ) : (<>
+            <Text style={textStyles.muted}>
+              For young players who don&apos;t have their own phone or email, a parent/guardian can be the point of contact. Their phone &amp; email are verified, and you can upload a document on your profile to confirm age &amp; guardianship.
+            </Text>
+            <TextField label="Guardian name" value={gName} onChange={setGName} placeholder="e.g. Priya Mehta" />
+            <View style={st.wrapRow}>
+              <View style={st.wrapCell}><PhoneField label="Guardian phone" value={gPhone} onChange={setGPhone} /></View>
+              <View style={st.wrapCell}><TextField label="Guardian email" value={gEmail} onChange={setGEmail} placeholder="parent@email.com" autoCapitalize="none" /></View>
+            </View>
+            </>)}
+          </Card>
+          )}
+
+          <Text style={[textStyles.h3, st.section]}>{asAdmin ? 'Sports they play' : 'Sports you play'}</Text>
           <View style={st.chips}>
-            {GENDERS.map((g) => (
-              <SelectChip key={g} label={g} active={gender === g} onPress={() => setGender(gender === g ? '' : g)} />
+            {SPORT_LIST.map((s) => (
+              <SelectChip key={s.id} label={`${s.icon} ${s.name}`} active={sports.includes(s.id)} onPress={() => toggleSport(s.id)} />
             ))}
           </View>
-        </View>
 
-        <View style={st.wrapRow}>
-          <View style={st.wrapCell}>
-            {asAdmin && loaded.phone ? (
-              <OnFile label="Contact number" />
-            ) : (
-              <PhoneField label="Contact number" value={phone} onChange={setPhone} optional />
-            )}
-          </View>
-          <View style={st.wrapCell}>
-            {asAdmin && loaded.email ? (
-              <OnFile label="Email" />
-            ) : (
-              <TextField label="Email" value={email} onChange={setEmail} placeholder={asAdmin ? 'name@email.com' : 'you@email.com'} autoCapitalize="none" />
-            )}
-          </View>
-        </View>
-        {asAdmin && (loaded.phone || loaded.email) ? (
-          <Text style={textStyles.muted}>A number or email on file can’t be changed — it’s how they claim this profile. Ask support if it’s wrong.</Text>
-        ) : null}
-        {!asAdmin && (<>
-        <Card style={{ gap: theme.spacing(2) }}>
-          <Text style={textStyles.h3}>🔒 Who can see your contact details</Text>
-          {guardianRequired ? (
-            <Text style={textStyles.muted}>
-              Hidden. Players under 18 can&apos;t show their contact details publicly — coaches and scouts reach you through your parent/guardian.
-            </Text>
-          ) : (
-            <>
-              <Text style={textStyles.muted}>
-                Hidden by default — only you and SportnNote support can see them. Turn one on to show it on your public profile.
-              </Text>
-              <View style={st.switchRow}>
-                <Text style={[textStyles.body, st.flex]}>Show my mobile number</Text>
-                <Switch value={showPhone && !!phone.trim()} onValueChange={setShowPhone} disabled={!phone.trim()} accessibilityLabel="Show my mobile number on my profile" />
-              </View>
-              <View style={st.switchRow}>
-                <Text style={[textStyles.body, st.flex]}>Show my email</Text>
-                <Switch value={showEmail && !!email.trim()} onValueChange={setShowEmail} disabled={!email.trim()} accessibilityLabel="Show my email on my profile" />
-              </View>
-              <View style={st.switchRow}>
-                <View style={st.flex}>
-                  <Text style={textStyles.body}>Let people find me by my phone or email</Text>
-                  <Text style={textStyles.muted}>Members who already know your number or email can find your profile in Discover. They still won’t see it.</Text>
-                </View>
-                <Switch value={findable} onValueChange={setFindable} accessibilityLabel="Let people find me by my phone or email" />
-              </View>
-            </>
-          )}
-        </Card>
+          {sports.map((s) => {
+            const d = details[s] ?? {};
+            const fields = SPORT_SIDE_FIELDS[s];
+            const teams = d.teams ?? [];
+            return (
+              <Card key={s} style={{ gap: theme.spacing(2) }}>
+                <Text style={textStyles.h3}>{getSport(s).icon} {getSport(s).name}</Text>
+                <TextField
+                  label="Position / role"
+                  value={d.position ?? ''}
+                  onChange={(v) => patchDetail(s, { position: v })}
+                  placeholder={POSITION_HINT[s]}
+                />
 
-        <TextField label="About you (optional)" value={bio} onChange={setBio} placeholder="A short note about you — how you play, what you're into…" multiline />
-        </>)}
-
-        {showGuardian && (
-        <Card style={{ gap: theme.spacing(2) }}>
-          <Text style={textStyles.h3}>👪 Parent / Guardian {guardianRequired ? '· required' : asAdmin ? '· recommended' : '(optional)'}</Text>
-          {guardianRequired && (
-            <Text style={st.requiredNote}>Required — this player is under 18. Add a name and a phone or email.</Text>
-          )}
-          {asAdmin && (
-            <Text style={st.requiredNote}>Recommended — this player is under 18. Add a parent or guardian so someone can be reached.</Text>
-          )}
-          {asAdmin && guardianOnFile ? (
-            <Text style={textStyles.muted}>A guardian is already on file.</Text>
-          ) : (<>
-          <Text style={textStyles.muted}>
-            For young players who don&apos;t have their own phone or email, a parent/guardian can be the point of contact. Their phone &amp; email are verified, and you can upload a document on your profile to confirm age &amp; guardianship.
-          </Text>
-          <TextField label="Guardian name" value={gName} onChange={setGName} placeholder="e.g. Priya Mehta" />
-          <View style={st.wrapRow}>
-            <View style={st.wrapCell}><PhoneField label="Guardian phone" value={gPhone} onChange={setGPhone} /></View>
-            <View style={st.wrapCell}><TextField label="Guardian email" value={gEmail} onChange={setGEmail} placeholder="parent@email.com" autoCapitalize="none" /></View>
-          </View>
-          </>)}
-        </Card>
-        )}
-
-        <Text style={[textStyles.h3, st.section]}>{asAdmin ? 'Sports they play' : 'Sports you play'}</Text>
-        <View style={st.chips}>
-          {SPORT_LIST.map((s) => (
-            <SelectChip key={s.id} label={`${s.icon} ${s.name}`} active={sports.includes(s.id)} onPress={() => toggleSport(s.id)} />
-          ))}
-        </View>
-
-        {sports.map((s) => {
-          const d = details[s] ?? {};
-          const fields = SPORT_SIDE_FIELDS[s];
-          const teams = d.teams ?? [];
-          return (
-            <Card key={s} style={{ gap: theme.spacing(2) }}>
-              <Text style={textStyles.h3}>{getSport(s).icon} {getSport(s).name}</Text>
-              <TextField
-                label="Position / role"
-                value={d.position ?? ''}
-                onChange={(v) => patchDetail(s, { position: v })}
-                placeholder={POSITION_HINT[s]}
-              />
-
-              {fields.map((f) => (
-                <View key={f.key} style={{ gap: theme.spacing(1) }}>
-                  <FieldLabel>{f.label}</FieldLabel>
-                  <View style={st.chips}>
-                    {f.options.map((opt) => (
-                      <SelectChip key={opt} label={opt} active={d.sides?.[f.key] === opt} onPress={() => setSide(s, f.key, opt)} />
-                    ))}
+                {fields.map((f) => (
+                  <View key={f.key} style={{ gap: theme.spacing(1) }}>
+                    <FieldLabel>{f.label}</FieldLabel>
+                    <View style={st.chips}>
+                      {f.options.map((opt) => (
+                        <SelectChip key={opt} label={opt} active={d.sides?.[f.key] === opt} onPress={() => setSide(s, f.key, opt)} />
+                      ))}
+                    </View>
                   </View>
-                </View>
-              ))}
+                ))}
 
-              {/* SD-85 — chess ratings, typed by hand (no FIDE lookup) */}
-              {(SPORT_RATING_FIELDS[s] ?? []).length > 0 && (
-                <View style={{ gap: theme.spacing(1) }}>
-                  <FieldLabel>Ratings</FieldLabel>
-                  <View style={st.ratingGrid}>
-                    {(SPORT_RATING_FIELDS[s] ?? []).map((f) => {
-                      const raw = (d.ratings as Record<string, unknown> | undefined)?.[f.key];
-                      const v = raw == null ? '' : String(raw);
-                      const bad = !!v.trim() && (f.key === 'fideId' ? !validFideId(v) : parseRating(v) === undefined);
-                      return (
-                        <View key={f.key} style={st.ratingCell}>
-                          <TextField
-                            label={f.label} value={v} placeholder={f.placeholder} autoCapitalize="none"
-                            onChange={(t) => patchDetail(s, { ratings: { ...(d.ratings ?? {}), [f.key]: t.replace(/[^0-9]/g, '') } as never })}
-                          />
-                          {bad ? <Text style={st.ratingBad}>{f.key === 'fideId' ? '4–10 digits' : '100–3500'}</Text> : null}
-                        </View>
-                      );
-                    })}
-                  </View>
-                  <Text style={textStyles.muted}>Type them from ratings.fide.com — the app doesn't look them up. Used to seed Swiss round 1 and for the unofficial performance rating.</Text>
-                </View>
-              )}
-
-              {/* SD-84 — golf: the player's own WHS Handicap Index */}
-              {s === 'golf' && (() => {
-                const v = hiText ?? showIndex(d.handicapIndex);
-                const bad = !!v.trim() && parseIndex(v) == null;
-                return (
+                {/* SD-85 — chess ratings, typed by hand (no FIDE lookup) */}
+                {(SPORT_RATING_FIELDS[s] ?? []).length > 0 && (
                   <View style={{ gap: theme.spacing(1) }}>
-                    <TextField label="Handicap Index (WHS)" value={v} onChange={setHiText} placeholder="e.g. 12.4 or +1.2" autoCapitalize="none" />
-                    {bad ? <Text style={{ color: theme.colors.danger, fontSize: theme.font.small }}>A number up to 54.0, one decimal (+ for a plus handicap)</Text> : null}
-                    <Text style={textStyles.muted}>The index your club or the IGU gives you — the app never issues one. It fills in round setup and match-play shots.</Text>
+                    <FieldLabel>Ratings</FieldLabel>
+                    <View style={st.ratingGrid}>
+                      {(SPORT_RATING_FIELDS[s] ?? []).map((f) => {
+                        const raw = (d.ratings as Record<string, unknown> | undefined)?.[f.key];
+                        const v = raw == null ? '' : String(raw);
+                        const bad = !!v.trim() && (f.key === 'fideId' ? !validFideId(v) : parseRating(v) === undefined);
+                        return (
+                          <View key={f.key} style={st.ratingCell}>
+                            <TextField
+                              label={f.label} value={v} placeholder={f.placeholder} autoCapitalize="none"
+                              onChange={(t) => patchDetail(s, { ratings: { ...(d.ratings ?? {}), [f.key]: t.replace(/[^0-9]/g, '') } as never })}
+                            />
+                            {bad ? <Text style={st.ratingBad}>{f.key === 'fideId' ? '4–10 digits' : '100–3500'}</Text> : null}
+                          </View>
+                        );
+                      })}
+                    </View>
+                    <Text style={textStyles.muted}>Type them from ratings.fide.com — the app doesn't look them up. Used to seed Swiss round 1 and for the unofficial performance rating.</Text>
                   </View>
-                );
-              })()}
+                )}
 
-              <View style={{ marginTop: theme.spacing(1) }}><FieldLabel>Teams represented</FieldLabel></View>
-              {teams.map((t, i) => (
-                <View key={i} style={st.teamRow}>
-                  <View style={{ flex: 1 }}>
-                    <TextField label="Team / club" value={t.name} onChange={(v) => updateTeam(s, i, { name: v })} placeholder="Red House" />
-                  </View>
-                  <View style={st.jerseyCol}>
-                    <TextField
-                      label="Jersey"
-                      value={t.jersey != null ? String(t.jersey) : ''}
-                      onChange={(v) => updateTeam(s, i, { jersey: v.trim() ? Number(v.replace(/[^0-9]/g, '')) : undefined })}
-                      placeholder="10"
-                      autoCapitalize="none"
-                    />
-                  </View>
-                  <TouchableOpacity accessibilityRole="button" accessibilityLabel="Remove team" onPress={() => removeTeam(s, i)} style={st.removeBtn} activeOpacity={0.7}>
-                    <Text style={st.removeTxt}>✕</Text>
-                  </TouchableOpacity>
-                </View>
-              ))}
-              <Text style={st.addLink} accessibilityRole="button" onPress={() => addTeam(s)}>+ Add team</Text>
-            </Card>
-          );
-        })}
+                {/* SD-84 — golf: the player's own WHS Handicap Index */}
+                {s === 'golf' && (() => {
+                  const v = hiText ?? showIndex(d.handicapIndex);
+                  const bad = !!v.trim() && parseIndex(v) == null;
+                  return (
+                    <View style={{ gap: theme.spacing(1) }}>
+                      <TextField label="Handicap Index (WHS)" value={v} onChange={setHiText} placeholder="e.g. 12.4 or +1.2" autoCapitalize="none" />
+                      {bad ? <Text style={{ color: theme.colors.danger, fontSize: theme.font.small }}>A number up to 54.0, one decimal (+ for a plus handicap)</Text> : null}
+                      <Text style={textStyles.muted}>The index your club or the IGU gives you — the app never issues one. It fills in round setup and match-play shots.</Text>
+                    </View>
+                  );
+                })()}
 
-        <FormError message={error} />
-        <Button label={busy ? 'Saving…' : asAdmin ? 'Save details' : 'Save profile'} onPress={save} />
-      </KeyboardAwareScrollView>
+                <View style={{ marginTop: theme.spacing(1) }}><FieldLabel>Teams represented</FieldLabel></View>
+                {teams.map((t, i) => (
+                  <View key={i} style={st.teamRow}>
+                    <View style={{ flex: 1 }}>
+                      <TextField label="Team / club" value={t.name} onChange={(v) => updateTeam(s, i, { name: v })} placeholder="Red House" />
+                    </View>
+                    <View style={st.jerseyCol}>
+                      <TextField
+                        label="Jersey"
+                        value={t.jersey != null ? String(t.jersey) : ''}
+                        onChange={(v) => updateTeam(s, i, { jersey: v.trim() ? Number(v.replace(/[^0-9]/g, '')) : undefined })}
+                        placeholder="10"
+                        autoCapitalize="none"
+                      />
+                    </View>
+                    <TouchableOpacity accessibilityRole="button" accessibilityLabel="Remove team" onPress={() => removeTeam(s, i)} style={st.removeBtn} activeOpacity={0.7}>
+                      <Text style={st.removeTxt}>✕</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+                <Text style={st.addLink} accessibilityRole="button" onPress={() => addTeam(s)}>+ Add team</Text>
+              </Card>
+            );
+          })}
+        </KeyboardAwareScrollView>
+      </KeyboardFooterLayout>
     </SafeAreaView>
   );
 }

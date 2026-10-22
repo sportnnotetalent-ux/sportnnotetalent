@@ -7,7 +7,7 @@
  *  lets you fine-tune positions afterwards. */
 import React, { useCallback, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { KeyboardAwareScrollView } from '../components/keyboard';
+import { KeyboardAwareScrollView, KeyboardFooterLayout } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -231,93 +231,94 @@ export default function MatchSquadScreen() {
         )}
       </View>
 
-      <KeyboardAwareScrollView contentContainerStyle={st.content}>
-        {TESTING_ALLOW_UNVERIFIED && (
-          <View style={st.testBanner}>
-            <Text style={st.testBannerText}>
-              ⚠️ Testing mode: eligibility checks are off — unverified players can be fielded. This will be re-enabled before go-live.
-            </Text>
-          </View>
-        )}
-        {roster.length === 0 ? (
-          <EmptyState icon="👥" title="No players in this team’s squad yet" hint="Add them from the match Info tab (＋ Add players to this team)." compact />
-        ) : (
-          roster.map((p) => {
-            const role = roles[p.id] ?? 'out';
-            const elig = matchEligibility(p);
-            const elsewhere = taken.has(p.id);
-            const canField = canFieldPlayer(p) && !elsewhere; // eligible (or testing override) and not on the other side today
-            const overridden = !elig.ok && canField; // fieldable only because of the override
-            const played = locked.has(p.id) && role !== 'out';
-            const disableStart = !canField || (role !== 'start' && xiFull);
-            const ban = isSuspended(suspended, p);
-            return (
-              <View key={p.id} style={[st.row, !canField && st.rowLocked, role !== 'out' && st.rowActive]}>
-                <View style={{ flex: 1 }}>
-                  <Text style={[textStyles.body, !canField && st.lockedName]}>
-                    {p.fullName}{p.jerseyNo ? ` · #${p.jerseyNo}` : ''}{p.invited ? '  ⏳' : ''}
-                  </Text>
-                  {p.invited && !elsewhere ? <RemindInstall playerId={p.id} name={p.fullName} phone={p.phone} teamName={teamName} /> : null}
-                  {ban ? <Text style={st.lockReason}>🟥 Suspended for this match · {ban.reason}</Text> : null}
-                  {elsewhere ? (
-                    <Text style={st.lockReason}>Playing for {otherName} in this match</Text>
-                  ) : !elig.ok ? (
-                    <Text style={overridden ? st.overrideReason : st.lockReason}>
-                      {overridden ? '⚠️' : '🔒'} {elig.reason}{overridden ? ' · allowed (testing)' : ''}
+      <KeyboardFooterLayout
+        safeBottom={false}
+        footer={<Button label={busy ? 'Saving…' : 'Save matchday squad'} onPress={save} />}
+      >
+        <KeyboardAwareScrollView contentContainerStyle={st.content}>
+          {TESTING_ALLOW_UNVERIFIED && (
+            <View style={st.testBanner}>
+              <Text style={st.testBannerText}>
+                ⚠️ Testing mode: eligibility checks are off — unverified players can be fielded. This will be re-enabled before go-live.
+              </Text>
+            </View>
+          )}
+          {roster.length === 0 ? (
+            <EmptyState icon="👥" title="No players in this team’s squad yet" hint="Add them from the match Info tab (＋ Add players to this team)." compact />
+          ) : (
+            roster.map((p) => {
+              const role = roles[p.id] ?? 'out';
+              const elig = matchEligibility(p);
+              const elsewhere = taken.has(p.id);
+              const canField = canFieldPlayer(p) && !elsewhere; // eligible (or testing override) and not on the other side today
+              const overridden = !elig.ok && canField; // fieldable only because of the override
+              const played = locked.has(p.id) && role !== 'out';
+              const disableStart = !canField || (role !== 'start' && xiFull);
+              const ban = isSuspended(suspended, p);
+              return (
+                <View key={p.id} style={[st.row, !canField && st.rowLocked, role !== 'out' && st.rowActive]}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[textStyles.body, !canField && st.lockedName]}>
+                      {p.fullName}{p.jerseyNo ? ` · #${p.jerseyNo}` : ''}{p.invited ? '  ⏳' : ''}
+                    </Text>
+                    {p.invited && !elsewhere ? <RemindInstall playerId={p.id} name={p.fullName} phone={p.phone} teamName={teamName} /> : null}
+                    {ban ? <Text style={st.lockReason}>🟥 Suspended for this match · {ban.reason}</Text> : null}
+                    {elsewhere ? (
+                      <Text style={st.lockReason}>Playing for {otherName} in this match</Text>
+                    ) : !elig.ok ? (
+                      <Text style={overridden ? st.overrideReason : st.lockReason}>
+                        {overridden ? '⚠️' : '🔒'} {elig.reason}{overridden ? ' · allowed (testing)' : ''}
+                      </Text>
+                    ) : null}
+                  </View>
+                  {played ? (
+                    <Text style={st.playedTag} accessibilityLabel={`${p.fullName} has played — can't be removed`}>✓ played</Text>
+                  ) : canField ? (
+                    <View style={st.toggles}>
+                      <Toggle label="Start" active={role === 'start'} disabled={disableStart} color={theme.colors.primary} onPress={() => void pickRole(p.id, 'start')} />
+                      <Toggle label="Bench" active={role === 'sub'} color={theme.colors.accent} onPress={() => void pickRole(p.id, 'sub')} />
+                    </View>
+                  ) : (
+                    <Text style={st.lockTag}>{elsewhere ? 'Other side' : 'Not eligible'}</Text>
+                  )}
+                  {teamId && !played ? (
+                    <Text
+                      style={st.removeLink}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Remove ${p.fullName} from ${teamName}`}
+                      onPress={async () => { await removePlayerFromTeam(teamId, p.id, matchId); setRosterNonce((n) => n + 1); }}
+                    >
+                      ✕
                     </Text>
                   ) : null}
                 </View>
-                {played ? (
-                  <Text style={st.playedTag} accessibilityLabel={`${p.fullName} has played — can't be removed`}>✓ played</Text>
-                ) : canField ? (
-                  <View style={st.toggles}>
-                    <Toggle label="Start" active={role === 'start'} disabled={disableStart} color={theme.colors.primary} onPress={() => void pickRole(p.id, 'start')} />
-                    <Toggle label="Bench" active={role === 'sub'} color={theme.colors.accent} onPress={() => void pickRole(p.id, 'sub')} />
-                  </View>
-                ) : (
-                  <Text style={st.lockTag}>{elsewhere ? 'Other side' : 'Not eligible'}</Text>
-                )}
-                {teamId && !played ? (
-                  <Text
-                    style={st.removeLink}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Remove ${p.fullName} from ${teamName}`}
-                    onPress={async () => { await removePlayerFromTeam(teamId, p.id, matchId); setRosterNonce((n) => n + 1); }}
-                  >
-                    ✕
-                  </Text>
-                ) : null}
-              </View>
-            );
-          })
-        )}
+              );
+            })
+          )}
 
-        {/* Grow the squad right here — adds persist to the team for every match. */}
-        {teamId && (
-          <AddInvitePlayer
-            fixedSide="home"
-            title={roster.length === 0 ? '＋ Add players to this squad' : '＋ Add another player'}
-            homeTeamId={teamId} awayTeamId={teamId}
-            homeTeamName={teamName} awayTeamName={teamName}
-            sport={sport} matchId={matchId}
-            invited={roster.filter((p) => p.invited)}
-            existingIds={roster.map((p) => p.id)}
-            defaultOpen={roster.length === 0}
-            onChanged={() => setRosterNonce((n) => n + 1)}
-          />
-        )}
+          {/* Grow the squad right here — adds persist to the team for every match. */}
+          {teamId && (
+            <AddInvitePlayer
+              fixedSide="home"
+              title={roster.length === 0 ? '＋ Add players to this squad' : '＋ Add another player'}
+              homeTeamId={teamId} awayTeamId={teamId}
+              homeTeamName={teamName} awayTeamName={teamName}
+              sport={sport} matchId={matchId}
+              invited={roster.filter((p) => p.invited)}
+              existingIds={roster.map((p) => p.id)}
+              defaultOpen={roster.length === 0}
+              onChanged={() => setRosterNonce((n) => n + 1)}
+            />
+          )}
 
-        {hasPitch && roster.length > 0 && (
-          <TouchableOpacity accessibilityRole="button" style={st.pitchBtn} activeOpacity={0.85} onPress={arrangeOnPitch} disabled={busy}>
-            <Text style={st.pitchText}>⚽ Arrange on pitch (optional) ›</Text>
-            <Text style={st.pitchHint}>Set exact positions & formation. Skip it — starters auto-fill the pitch.</Text>
-          </TouchableOpacity>
-        )}
-      </KeyboardAwareScrollView>
-
-      <View style={st.footer}>
-        <Button label={busy ? 'Saving…' : 'Save matchday squad'} onPress={save} />
-      </View>
+          {hasPitch && roster.length > 0 && (
+            <TouchableOpacity accessibilityRole="button" style={st.pitchBtn} activeOpacity={0.85} onPress={arrangeOnPitch} disabled={busy}>
+              <Text style={st.pitchText}>⚽ Arrange on pitch (optional) ›</Text>
+              <Text style={st.pitchHint}>Set exact positions & formation. Skip it — starters auto-fill the pitch.</Text>
+            </TouchableOpacity>
+          )}
+        </KeyboardAwareScrollView>
+      </KeyboardFooterLayout>
     </SafeAreaView>
   );
 }
@@ -369,5 +370,4 @@ const st = StyleSheet.create({
   pitchBtn: { marginTop: theme.spacing(3), backgroundColor: theme.colors.surface, borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.colors.border, borderStyle: 'dashed', padding: theme.spacing(3), gap: 2 },
   pitchText: { color: theme.colors.primary, fontSize: theme.font.body, fontWeight: '800' },
   pitchHint: { color: theme.colors.textMuted, fontSize: theme.font.tiny },
-  footer: { padding: theme.spacing(4), paddingTop: theme.spacing(3), borderTopWidth: 1, borderTopColor: theme.colors.border },
 });

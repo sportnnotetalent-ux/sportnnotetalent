@@ -3,7 +3,7 @@
  *  are managed on the tournament page; those aren't repeated here. */
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { KeyboardAwareScrollView } from '../components/keyboard';
+import { KeyboardAwareScrollView, KeyboardFooterLayout } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -193,83 +193,89 @@ export default function EditTournamentScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
-        <ScreenTitle title="Edit tournament" subtitle={tournament.name} />
-
-        <TournamentImagesField
-          logoUrl={logoUrl}
-          bannerUrl={bannerUrl}
-          onLogo={async (url) => { await setTournamentLogo(params.tournamentId, url); setLogoUrl(url); }}
-          onBanner={async (url) => { await setTournamentBanner(params.tournamentId, url); setBannerUrl(url); }}
-        />
-
-        <TextField label="Name" value={name} onChange={setName} placeholder="Annual Sports Meet 2026" />
-
-        <TournamentPlaceFields value={details} onChange={patchDetails} knownVenues={knownVenues} />
-
-        <View style={st.row}>
-          <View style={st.flex}><DateField label="Start date" value={start} onChange={setStart} /></View>
-          <View style={st.flex}><DateField label="End date" value={end} onChange={setEnd} /></View>
-        </View>
-
-        <FieldLabel>Sports</FieldLabel>
-        <View style={st.chips}>
-          {SPORT_LIST.map((sp) => (
-            <SelectChip key={sp.id} label={`${sp.icon} ${sp.name}`} active={sports.includes(sp.id)} onPress={() => toggleSport(sp.id)} />
-          ))}
-        </View>
-        {removed.length > 0 && (
-          <Text style={st.warn}>Removing {removed.map((sp) => getSport(sp).name).join(', ')} hides it here — games already scheduled in it are kept, not deleted.</Text>
-        )}
-
-        {sports.length > 1 && <MedalScoringEditor sports={sports} value={scoring} onChange={setScoring} />}
-
-        <SportBasics sports={sports} onChanged={() => setFormats(tournamentDraft.all() as FormatMap)} />
-
-        {/* SD-140: a sport added now asks for its walkover score (the rest live in each sport's settings) */}
-        <WalkoverSetupCard sports={sports.filter((sp) => !tournament.sports.includes(sp))} onChanged={() => setFormats(tournamentDraft.all() as FormatMap)} />
-
-        <SportSettingsButtons sports={sports} />
-
-        <TournamentContactFields value={details} onChange={patchDetails} />
-
-        <FieldLabel>Registration</FieldLabel>
-        <View style={st.chips}>
-          <SelectChip label="🔓 Open — teams can find & request to join" active={isOpen} onPress={() => setIsOpen(true)} />
-          <SelectChip label="🔒 Invite only" active={!isOpen} onPress={() => setIsOpen(false)} />
-        </View>
-
-        {isOpen && (
-          <View style={{ gap: theme.spacing(3) }}>
-            {regDeadline ? (
-              <View style={{ gap: theme.spacing(2) }}>
-                <DateTimeField label="Registration deadline" value={regDeadline} onChange={setRegDeadline} />
-                <Text style={st.linkText} onPress={() => setRegDeadline(null)}>Remove deadline</Text>
-              </View>
-            ) : (
-              <SelectChip label="＋ Add a registration deadline" active={false} onPress={() => { const d = new Date(); d.setDate(d.getDate() + 7); d.setHours(23, 59, 0, 0); setRegDeadline(d); }} />
-            )}
-            <View style={st.capRow}>
-              <View style={st.capCell}>
-                <FieldLabel>Min teams</FieldLabel>
-                <NumberStepper value={minTeams} min={0} max={128} onChange={setMinTeams} zeroLabel="—" />
-              </View>
-              <View style={st.capCell}>
-                <FieldLabel>Max teams (cap)</FieldLabel>
-                <NumberStepper value={maxTeams} min={0} max={128} onChange={setMaxTeams} zeroLabel="∞" />
-              </View>
-            </View>
-            <Text style={textStyles.muted}>Below the minimum is just a heads-up; the maximum caps public sign-ups (you can still add teams yourself).</Text>
+      {/* Sticky action bar (rides on the keyboard): delete is secondary (left), save is the main action. */}
+      <KeyboardFooterLayout
+        safeBottom={false}
+        footer={(
+          <View style={st.bar}>
+            <Text style={st.delete} accessibilityRole="button" onPress={busy ? undefined : remove}>Delete tournament</Text>
+            <Button label={busy ? 'Saving…' : 'Save changes'} onPress={save} disabled={busy} />
           </View>
         )}
+      >
+        <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
+          <ScreenTitle title="Edit tournament" subtitle={tournament.name} />
 
-        <FormError message={error} />
-      </KeyboardAwareScrollView>
-      {/* Sticky action bar: delete is secondary (left), save is the main action. */}
-      <View style={st.bar}>
-        <Text style={st.delete} accessibilityRole="button" onPress={busy ? undefined : remove}>Delete tournament</Text>
-        <Button label={busy ? 'Saving…' : 'Save changes'} onPress={save} disabled={busy} />
-      </View>
+          <TournamentImagesField
+            logoUrl={logoUrl}
+            bannerUrl={bannerUrl}
+            onLogo={async (url) => { await setTournamentLogo(params.tournamentId, url); setLogoUrl(url); }}
+            onBanner={async (url) => { await setTournamentBanner(params.tournamentId, url); setBannerUrl(url); }}
+          />
+
+          <TextField label="Name" value={name} onChange={setName} placeholder="Annual Sports Meet 2026" />
+
+          <TournamentPlaceFields value={details} onChange={patchDetails} knownVenues={knownVenues} />
+
+          <View style={st.row}>
+            <View style={st.flex}><DateField label="Start date" value={start} onChange={setStart} /></View>
+            <View style={st.flex}><DateField label="End date" value={end} onChange={setEnd} /></View>
+          </View>
+
+          <FieldLabel>Sports</FieldLabel>
+          <View style={st.chips}>
+            {SPORT_LIST.map((sp) => (
+              <SelectChip key={sp.id} label={`${sp.icon} ${sp.name}`} active={sports.includes(sp.id)} onPress={() => toggleSport(sp.id)} />
+            ))}
+          </View>
+          {removed.length > 0 && (
+            <Text style={st.warn}>Removing {removed.map((sp) => getSport(sp).name).join(', ')} hides it here — games already scheduled in it are kept, not deleted.</Text>
+          )}
+
+          {sports.length > 1 && <MedalScoringEditor sports={sports} value={scoring} onChange={setScoring} />}
+
+          <SportBasics sports={sports} onChanged={() => setFormats(tournamentDraft.all() as FormatMap)} />
+
+          {/* SD-140: a sport added now asks for its walkover score (the rest live in each sport's settings) */}
+          <WalkoverSetupCard sports={sports.filter((sp) => !tournament.sports.includes(sp))} onChanged={() => setFormats(tournamentDraft.all() as FormatMap)} />
+
+          <SportSettingsButtons sports={sports} />
+
+          <TournamentContactFields value={details} onChange={patchDetails} />
+
+          <FieldLabel>Registration</FieldLabel>
+          <View style={st.chips}>
+            <SelectChip label="🔓 Open — teams can find & request to join" active={isOpen} onPress={() => setIsOpen(true)} />
+            <SelectChip label="🔒 Invite only" active={!isOpen} onPress={() => setIsOpen(false)} />
+          </View>
+
+          {isOpen && (
+            <View style={{ gap: theme.spacing(3) }}>
+              {regDeadline ? (
+                <View style={{ gap: theme.spacing(2) }}>
+                  <DateTimeField label="Registration deadline" value={regDeadline} onChange={setRegDeadline} />
+                  <Text style={st.linkText} onPress={() => setRegDeadline(null)}>Remove deadline</Text>
+                </View>
+              ) : (
+                <SelectChip label="＋ Add a registration deadline" active={false} onPress={() => { const d = new Date(); d.setDate(d.getDate() + 7); d.setHours(23, 59, 0, 0); setRegDeadline(d); }} />
+              )}
+              <View style={st.capRow}>
+                <View style={st.capCell}>
+                  <FieldLabel>Min teams</FieldLabel>
+                  <NumberStepper value={minTeams} min={0} max={128} onChange={setMinTeams} zeroLabel="—" />
+                </View>
+                <View style={st.capCell}>
+                  <FieldLabel>Max teams (cap)</FieldLabel>
+                  <NumberStepper value={maxTeams} min={0} max={128} onChange={setMaxTeams} zeroLabel="∞" />
+                </View>
+              </View>
+              <Text style={textStyles.muted}>Below the minimum is just a heads-up; the maximum caps public sign-ups (you can still add teams yourself).</Text>
+            </View>
+          )}
+
+          <FormError message={error} />
+        </KeyboardAwareScrollView>
+      </KeyboardFooterLayout>
     </SafeAreaView>
   );
 }
@@ -288,11 +294,7 @@ function NumberStepper({ value, min, max, onChange, zeroLabel }: { value: number
 
 const st = StyleSheet.create({
   safe: { flex: 1, backgroundColor: theme.colors.bg },
-  bar: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: theme.spacing(3),
-    paddingHorizontal: theme.spacing(4), paddingVertical: theme.spacing(3),
-    borderTopWidth: 1, borderTopColor: theme.colors.border, backgroundColor: theme.colors.bg,
-  },
+  bar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: theme.spacing(3) },
   delete: { color: theme.colors.danger, fontWeight: '800', fontSize: theme.font.body },
   content: { padding: theme.spacing(4), gap: theme.spacing(3) },
   row: { flexDirection: 'row', gap: theme.spacing(3) },

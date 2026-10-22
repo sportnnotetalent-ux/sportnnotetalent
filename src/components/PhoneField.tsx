@@ -9,7 +9,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, Modal, Pressable, StyleSheet, Text, TextInput, TouchableOpacity, View, type StyleProp, type TextStyle } from 'react-native';
 import { theme } from '../core/theme';
-import { KeyboardSheetScope, useKeyboardFocus, useKeyboardSheet } from './keyboard';
+import { KeyboardSheetScope, useFormField, useKeyboardFocus, useKeyboardSheet } from './keyboard';
 import {
   type CountryCode, countryFlag, countryName, defaultPhoneCountry, dialCode, examplePhone,
   isValidPhone, joinPhone, phoneCountries, setPreferredPhoneCountry, setSavedCountrySource, splitPhone,
@@ -47,6 +47,7 @@ export function PhoneField({
   const [picking, setPicking] = useState(false);
   // keyboard: the number stays above it; the country list's search lifts its sheet
   const kbFocus = useKeyboardFocus(undefined, () => setTouched(true));
+  const formField = useFormField();
   const kbSheet = useKeyboardSheet(picking);
   const lastEmitted = useRef(value);
 
@@ -112,6 +113,7 @@ export function PhoneField({
           value={national}
           onChangeText={onText}
           {...kbFocus}
+          {...formField}
           placeholder={example || 'Mobile number'}
           placeholderTextColor={theme.colors.textMuted}
           keyboardType="phone-pad"

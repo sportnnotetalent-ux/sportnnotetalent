@@ -5,7 +5,7 @@
  */
 import React, { useState } from 'react';
 import { View, Text, Linking, Platform, StyleSheet } from 'react-native';
-import { KeyboardAwareScrollView } from '../components/keyboard';
+import { KeyboardAwareScrollView, KeyboardFooterLayout } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { theme } from '../core/theme';
@@ -72,29 +72,37 @@ export default function FeedbackScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
-        <View style={{ gap: theme.spacing(1) }}>
-          <Text style={textStyles.h2}>Send feedback</Text>
-          <Text style={textStyles.muted}>Bugs, ideas, anything confusing — it goes straight to the team.</Text>
-        </View>
-        <View style={st.kinds}>
-          {KINDS.map((k) => <SelectChip key={k.id} label={k.label} active={kind === k.id} onPress={() => setKind(k.id)} />)}
-        </View>
-        <TextField
-          label={kind === 'bug' ? 'What happened? What did you expect?' : 'Tell us'}
-          value={text}
-          onChange={setText}
-          placeholder={kind === 'bug' ? 'I tapped End match and…' : 'It would be great if…'}
-          multiline
-        />
-        {trail.length ? (
-          <Card>
-            <Text style={textStyles.muted}>We’ll include the screens you were on ({trail.slice(-3).join(' → ')}), your app version and device type — nothing else.</Text>
-          </Card>
-        ) : null}
-        <FormError message={error} />
-        <Button label={busy ? 'Sending…' : 'Send'} onPress={() => void send()} disabled={busy} />
-      </KeyboardAwareScrollView>
+      <KeyboardFooterLayout
+        safeBottom={false}
+        footer={(
+          <>
+            <FormError message={error} />
+            <Button label={busy ? 'Sending…' : 'Send'} onPress={() => void send()} disabled={busy} />
+          </>
+        )}
+      >
+        <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
+          <View style={{ gap: theme.spacing(1) }}>
+            <Text style={textStyles.h2}>Send feedback</Text>
+            <Text style={textStyles.muted}>Bugs, ideas, anything confusing — it goes straight to the team.</Text>
+          </View>
+          <View style={st.kinds}>
+            {KINDS.map((k) => <SelectChip key={k.id} label={k.label} active={kind === k.id} onPress={() => setKind(k.id)} />)}
+          </View>
+          <TextField
+            label={kind === 'bug' ? 'What happened? What did you expect?' : 'Tell us'}
+            value={text}
+            onChange={setText}
+            placeholder={kind === 'bug' ? 'I tapped End match and…' : 'It would be great if…'}
+            multiline
+          />
+          {trail.length ? (
+            <Card>
+              <Text style={textStyles.muted}>We’ll include the screens you were on ({trail.slice(-3).join(' → ')}), your app version and device type — nothing else.</Text>
+            </Card>
+          ) : null}
+        </KeyboardAwareScrollView>
+      </KeyboardFooterLayout>
     </SafeAreaView>
   );
 }

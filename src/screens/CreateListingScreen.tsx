@@ -2,7 +2,7 @@
  *  ground. Fields adapt to the kind; contact prefills from your profile. */
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { KeyboardAwareScrollView } from '../components/keyboard';
+import { KeyboardAwareScrollView, KeyboardFooterLayout } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { theme } from '../core/theme';
@@ -92,72 +92,79 @@ export default function CreateListingScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
-        <ScreenTitle title="Post a listing" subtitle="What are you looking for?" />
-
-        <View style={st.chips}>
-          {LISTING_KINDS.map((k) => (
-            <SelectChip key={k.kind} label={`${k.icon} ${k.label}`} active={kind === k.kind} onPress={() => setKind(k.kind)} />
-          ))}
-        </View>
-
-        <FieldLabel>Sport</FieldLabel>
-        <View style={st.chips}>
-          {SPORT_LIST.map((s) => (
-            <SelectChip key={s.id} label={`${s.icon} ${s.name}`} active={sport === s.id} onPress={() => setSport(s.id)} />
-          ))}
-        </View>
-
-        {isTeamKind(kind) && (
-          <TextField label="Team name" value={teamName} onChange={setTeamName} placeholder="e.g. Bengaluru Strikers" />
+      <KeyboardFooterLayout
+        safeBottom={false}
+        footer={(
+          <>
+            <FormError message={error} />
+            <Button label={busy ? 'Posting…' : 'Post listing'} onPress={submit} />
+          </>
         )}
-        {wantsPosition(kind) && (
-          <TextField
-            label={positionLabel(kind)}
-            value={position}
-            onChange={setPosition}
-            placeholder={kind === 'player_seeking_team' ? 'e.g. Right-arm pacer, can bat' : 'e.g. Goalkeeper'}
-          />
-        )}
-        <TextField label="City / area" value={city} onChange={setCity} placeholder="Bengaluru" />
-        {wantsSchedule(kind) && (
-          <TextField
-            label={kind === 'team_seeking_ground' ? 'When do you need it?' : 'Preferred date / time'}
-            value={preferredDate}
-            onChange={setPreferredDate}
-            placeholder="e.g. Sat 21 Jun, 6 PM"
-          />
-        )}
-        {wantsLevel(kind) && (
-          <View style={{ gap: theme.spacing(1) }}>
-            <FieldLabel>Level of play</FieldLabel>
-            <View style={st.chips}>
-              {LISTING_LEVELS.map((lv) => (
-                <SelectChip key={lv} label={lv} active={level === lv} onPress={() => setLevel(level === lv ? '' : lv)} />
-              ))}
-            </View>
+      >
+        <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
+          <ScreenTitle title="Post a listing" subtitle="What are you looking for?" />
+
+          <View style={st.chips}>
+            {LISTING_KINDS.map((k) => (
+              <SelectChip key={k.kind} label={`${k.icon} ${k.label}`} active={kind === k.kind} onPress={() => setKind(k.kind)} />
+            ))}
           </View>
-        )}
-        <TextField
-          label="Details"
-          value={details}
-          onChange={setDetails}
-          placeholder={`What ${getSport(sport).name.toLowerCase()} ${isTeamKind(kind) ? 'your team needs' : 'you’re looking for'} — availability, level, timing…`}
-          multiline
-        />
-        <PhoneField label="Contact number (WhatsApp)" value={phone} onChange={setPhone} optional />
-        <Text style={textStyles.muted}>
-          Shared on the post so interested people can reach you.
-          {phone.trim()
-            ? contactVerified
-              ? ' ✓ This is your verified number.'
-              : ' This number isn’t verified — verify it in your profile to show a verified badge.'
-            : ''}
-        </Text>
 
-        <FormError message={error} />
-        <Button label={busy ? 'Posting…' : 'Post listing'} onPress={submit} />
-      </KeyboardAwareScrollView>
+          <FieldLabel>Sport</FieldLabel>
+          <View style={st.chips}>
+            {SPORT_LIST.map((s) => (
+              <SelectChip key={s.id} label={`${s.icon} ${s.name}`} active={sport === s.id} onPress={() => setSport(s.id)} />
+            ))}
+          </View>
+
+          {isTeamKind(kind) && (
+            <TextField label="Team name" value={teamName} onChange={setTeamName} placeholder="e.g. Bengaluru Strikers" />
+          )}
+          {wantsPosition(kind) && (
+            <TextField
+              label={positionLabel(kind)}
+              value={position}
+              onChange={setPosition}
+              placeholder={kind === 'player_seeking_team' ? 'e.g. Right-arm pacer, can bat' : 'e.g. Goalkeeper'}
+            />
+          )}
+          <TextField label="City / area" value={city} onChange={setCity} placeholder="Bengaluru" />
+          {wantsSchedule(kind) && (
+            <TextField
+              label={kind === 'team_seeking_ground' ? 'When do you need it?' : 'Preferred date / time'}
+              value={preferredDate}
+              onChange={setPreferredDate}
+              placeholder="e.g. Sat 21 Jun, 6 PM"
+            />
+          )}
+          {wantsLevel(kind) && (
+            <View style={{ gap: theme.spacing(1) }}>
+              <FieldLabel>Level of play</FieldLabel>
+              <View style={st.chips}>
+                {LISTING_LEVELS.map((lv) => (
+                  <SelectChip key={lv} label={lv} active={level === lv} onPress={() => setLevel(level === lv ? '' : lv)} />
+                ))}
+              </View>
+            </View>
+          )}
+          <TextField
+            label="Details"
+            value={details}
+            onChange={setDetails}
+            placeholder={`What ${getSport(sport).name.toLowerCase()} ${isTeamKind(kind) ? 'your team needs' : 'you’re looking for'} — availability, level, timing…`}
+            multiline
+          />
+          <PhoneField label="Contact number (WhatsApp)" value={phone} onChange={setPhone} optional />
+          <Text style={textStyles.muted}>
+            Shared on the post so interested people can reach you.
+            {phone.trim()
+              ? contactVerified
+                ? ' ✓ This is your verified number.'
+                : ' This number isn’t verified — verify it in your profile to show a verified badge.'
+              : ''}
+          </Text>
+        </KeyboardAwareScrollView>
+      </KeyboardFooterLayout>
     </SafeAreaView>
   );
 }

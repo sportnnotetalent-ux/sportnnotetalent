@@ -11,7 +11,7 @@
  *  (SW 3.1 — no lane draw) and the timed-final / heats → final presets. */
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
-import { KeyboardAwareScrollView } from '../components/keyboard';
+import { KeyboardAwareScrollView, KeyboardFooterLayout } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -300,247 +300,255 @@ function TrackSwimEventSetup() {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
-        <ScreenTitle title={swim ? '🏊 New swimming event' : '🏃 New event'} subtitle={tournament?.name} />
-        {/* SD-141: the meet's competition rules, checked before the meet starts */}
-        <CompetitionRulesCard tournament={tournament} sport={sport} />
-        {/* SD-92: road races, race walks and cross-country have their own setup */}
-        {!swim && <Button label="🌳 Road race, race walk or cross-country →" variant="ghost" onPress={() => nav.setParams({ mode: 'road' })} />}
-        {/* SD-93: decathlon / heptathlon / school pentathlon have their own setup */}
-        {!swim && <Button label="🏅 Combined event (decathlon, heptathlon, pentathlon) →" variant="ghost" onPress={() => nav.setParams({ mode: 'combined' })} />}
-
-        <Card style={st.card}>
-          <Text style={textStyles.h3}>1 · Category</Text>
-          <View style={st.wrap}>{[...AGE_GROUPS, ...marketBands].map((a) => <SelectChip key={a} label={a} active={age === a} onPress={() => setAge(a)} />)}</View>
-          {ageRule ? <Text style={textStyles.muted}>{age}: {ageRule}.</Text> : null}
-          <View style={st.wrap}>
-            <SelectChip label="Boys" active={gender === 'M'} onPress={() => setGender('M')} />
-            <SelectChip label="Girls" active={gender === 'F'} onPress={() => setGender('F')} />
-            <SelectChip label={swim ? 'Mixed (relays)' : 'Mixed'} active={gender === 'X'} onPress={() => setGender('X')} />
-          </View>
-          {swim && (
-            <>
-              <View style={st.wrap}>{COURSES.map((c) => <SelectChip key={c.key} label={c.label} active={course === c.key} onPress={() => setCourse(c.key)} />)}</View>
-              <Text style={textStyles.muted}>{sw.lanes} lanes{sw.lanes === 10 ? ' (0–9)' : ''}. Records and personal bests are kept per pool length. Mixed relays are 2 boys + 2 girls (SW 10.11).</Text>
-            </>
-          )}
-        </Card>
-
-        <Card style={st.card}>
-          <Text style={textStyles.h3}>2 · Event</Text>
-          {(swim ? SWIM_GROUPS : ATH_GROUPS).map((g: string) => {
-            const list = events.filter((e) => e.group === g);
-            if (!list.length) return null;
-            return (
-              <View key={g} style={{ gap: theme.spacing(1) }}>
-                <Text style={st.label}>{GROUP_TITLE[g]}</Text>
-                <View style={st.wrap}>{list.map((e) => {
-                  const imp = implementSpec(e.discipline, cat)?.text;
-                  return <SelectChip key={e.discipline} label={`${e.label}${imp ? ` · ${imp}` : ''}${e.optional ? ' (optional)' : ''}`} active={discipline === e.discipline} onPress={() => setDiscipline(e.discipline)} />;
-                })}</View>
-              </View>
-            );
-          })}
-          <Text style={textStyles.muted}>
-            {def.label} {categoryLabel(cat)}
-            {swim
-              ? `${relay ? ` · ${legLabels(def.key).join(' → ')}` : ''} · ${courseLabel(course)} · ${def.lanes} lanes · seeded on entry times (World Aquatics SW 3.1)`
-              : field
-              ? `${vertical ? ' · bar heights, 3 tries a height' : ` · ${def.attempts?.count ?? 3} trials, then ${def.attempts?.extra ?? 3} more for the best ${def.attempts?.finalists ?? 8}`}${spec ? ` · ${implementNote(spec, cat)}` : ''}`
-              : `${def.wind ? ' · wind gauge' : ''}${def.lanes ? ' · in lanes' : ' · no lanes'}${hurdles ? ` · hurdles ${hurdles}` : ''}`}
-          </Text>
-          {events.find((e) => e.discipline === discipline)?.optional && (def.key === 'ath.pv' || def.key === 'ath.ht') ? <Text style={textStyles.muted}>Optional event: needs a {def.key === 'ath.pv' ? 'pole-vault landing bed and poles' : 'hammer cage'}.</Text> : null}
-        </Card>
-
-        <Card style={st.card}>
-          <Text style={textStyles.h3}>3 · {relay ? 'Relay teams' : swim ? 'Swimmers' : 'Athletes'} ({n})</Text>
-          {relay ? (
-            <>
-              <Text style={textStyles.muted}>Add a team per house; tap it to pick its {swim ? 'swimmers in order' : 'runners in leg order'} (4, plus up to 2 reserves).{gender === 'X' ? ` Mixed: 2 boys + 2 girls${!swim && sportRule(tournament?.formats?.athletics as Record<string, unknown> | undefined, 'mixedOrder') === 'MWMW' ? ', legs in the order boy, girl, boy, girl (meet rule)' : ', in any order the team chooses'}.` : ''}</Text>
-              <SelectChip label={eligibleOnly ? `✓ ${categoryLabel(cat)} only` : 'Showing everyone'} active={eligibleOnly} onPress={() => setEligibleOnly(!eligibleOnly)} />
-              <AgeBasisNote tournament={tournament} sport={swim ? 'swimming' : 'athletics'} basis={ages.basis} cutoff={ages.cutoff} canEdit={!!tournament} onSaved={ages.setBasis} />
-              <View style={st.wrap}>{sources.map((s) => <SelectChip key={s.key} label={`＋ ${s.name}`} dotColor={s.colorHex} active={false} onPress={() => addRelay(s)} />)}</View>
-              {!sources.length && <Text style={textStyles.muted}>No teams or houses yet — add the houses as teams in the tournament first.</Text>}
-              {relays.map((r) => {
-                const open = openRelay === r.key;
-                const cands = r.source.playerIds.map((id) => playerById.get(id)).filter((p): p is Player => !!p && (!eligibleOnly || eligibleFor(cat, { gender: p.gender, age: ages.ageFor(p), grade: ages.gradeFor(p) })));
-                return (
-                  <View key={r.key} style={st.relay}>
-                    <TouchableOpacity accessibilityRole="button" onPress={() => setOpenRelay(open ? null : r.key)} style={st.relayHead}>
-                      <View style={[st.dot, { backgroundColor: r.source.colorHex ?? theme.colors.border }]} />
-                      <Text style={[st.name, { flex: 1 }]} numberOfLines={1}>{r.label}</Text>
-                      <Text style={textStyles.muted}>{r.members.length}/4{r.members.length > 4 ? `+${r.members.length - 4}` : ''}</Text>
-                      <Text style={st.remove} onPress={() => setRelays((rs) => rs.filter((x) => x.key !== r.key))}>Remove</Text>
-                    </TouchableOpacity>
-                    {r.members.length > 0 && <Text style={textStyles.muted} numberOfLines={2}>{r.members.map((id, i) => `${i < 4 ? (swim ? legLabels(def.key)[i].replace('Backstroke', 'Back').replace('Breaststroke', 'Breast').replace('Butterfly', 'Fly').replace('Freestyle', 'Free') : `Leg ${i + 1}`) : 'Res'}: ${playerById.get(id)?.fullName.split(' ')[0] ?? ''}`).join(' · ')}</Text>}
-                    {open && (
-                      <View style={st.wrap}>
-                        {cands.map((p) => {
-                          const i = r.members.indexOf(p.id);
-                          return <SelectChip key={p.id} label={`${i >= 0 ? `${i + 1}. ` : ''}${p.fullName}`} active={i >= 0} onPress={() => toggleLeg(r.key, p.id)} />;
-                        })}
-                        {!cands.length && <Text style={textStyles.muted}>No eligible athletes in {r.source.name} — tap “{categoryLabel(cat)} only” to show everyone.</Text>}
-                      </View>
-                    )}
-                  </View>
-                );
-              })}
-            </>
-          ) : (
-            <>
-              {/* SD-128: the athletes ticked for this event on the entries matrix */}
-              {entered.some((id) => !picks.some((x) => x.playerId === id)) ? <Button label={`📋 Add the meet entries (${entered.length})`} variant="ghost" onPress={useEntries} /> : null}
-              <View style={st.wrap}>
-                <SelectChip label="All" active={filter == null} onPress={() => setFilter(null)} />
-                {sources.map((s) => <SelectChip key={s.key} label={s.name} dotColor={s.colorHex} active={filter === s.key} onPress={() => setFilter(s.key)} />)}
-              </View>
-              <TextInput style={st.input} value={query} onChangeText={setQuery} placeholder="Search any player by name" placeholderTextColor={theme.colors.textMuted} accessibilityLabel="Search players" />
-              <SelectChip label={eligibleOnly ? `✓ ${categoryLabel(cat)} only` : `Showing everyone`} active={eligibleOnly} onPress={() => setEligibleOnly(!eligibleOnly)} />
-              <AgeBasisNote tournament={tournament} sport={swim ? 'swimming' : 'athletics'} basis={ages.basis} cutoff={ages.cutoff} canEdit={!!tournament} onSaved={ages.setBasis} />
-              <View style={st.wrap}>
-                {pool.map((p) => {
-                  const on = picks.some((x) => x.playerId === p.id);
-                  return <SelectChip key={p.id} label={`${on ? '✓ ' : ''}${p.fullName}`} dotColor={p.houseColor} active={on} onPress={() => toggle(p.id)} />;
-                })}
-                {!pool.length && <Text style={textStyles.muted}>No {swim ? 'swimmers' : 'athletes'} match. Players without a gender or date of birth are always shown.</Text>}
-              </View>
-              {picks.length > 0 && (
-                <View style={{ gap: theme.spacing(2) }}>
-                  <Text style={st.label}>Entry marks (seeding · optional)</Text>
-                  <View style={st.wrap}>
-                    <SelectChip label="Fill from PB" active={false} onPress={() => void fillSeeds('pb')} />
-                    <SelectChip label="Fill from SB" active={false} onPress={() => void fillSeeds('sb')} />
-                  </View>
-                  {seedNote ? <Text style={textStyles.muted}>{seedNote}</Text> : null}
-                  {picks.map((p) => (
-                    <View key={p.playerId} style={st.pickRow}>
-                      <Text style={[st.name, { flex: 1 }]} numberOfLines={1}>{playerById.get(p.playerId)?.fullName}</Text>
-                      <TextInput style={[st.input, { width: 92 }]} value={p.seed} placeholder={field ? (vertical ? '1.35' : '5.12') : swim ? '3245' : '1185'} placeholderTextColor={theme.colors.textMuted} keyboardType={field ? 'decimal-pad' : 'number-pad'}
-                        accessibilityLabel={`Entry mark for ${playerById.get(p.playerId)?.fullName}`} onChangeText={(t) => setPicks((ps) => ps.map((x) => (x.playerId === p.playerId ? { ...x, seed: t } : x)))} />
-                      <Text style={st.remove} onPress={() => toggle(p.playerId)}>✕</Text>
-                    </View>
-                  ))}
-                  <Text style={textStyles.muted}>{field
-                    ? 'Entry marks in metres (5.12). They spread the best athletes over the qualification groups; the order of trials is drawn.'
-                    : swim
-                    ? 'Entry times — digits fill from the right: 3245 = 32.45, 11520 = 1:15.20. Swimmers without a time are seeded slowest (SW 3.1.1); ties and no-times are drawn.'
-                    : 'Digits fill from the right: 1185 = 11.85, 25034 = 2:50.34. Seeded athletes are spread across the heats (fastest first); the rest are drawn.'}</Text>
-                </View>
-              )}
-            </>
-          )}
-        </Card>
-
-        {n > 0 && (
-          <Card style={st.card}>
-            <Text style={textStyles.h3}>4 · Rounds</Text>
-            <View style={st.wrap}>{presets.map((p) => <SelectChip key={p.key} label={p.label} active={preset?.key === p.key} onPress={() => setPresetKey(p.key)} />)}</View>
-            {preset && <Text style={textStyles.body}>{describePlan(preset.plan)}</Text>}
-            {field && preset?.plan.some((p) => p.phase === 'qualification') && (
-              <View style={st.pickRow}>
-                <Text style={st.label}>Qualifying standard (optional)</Text>
-                <TextInput style={[st.input, { width: 92 }]} value={standard} onChangeText={setStandard} placeholder={vertical ? '1.40' : '5.20'} placeholderTextColor={theme.colors.textMuted}
-                  keyboardType="decimal-pad" accessibilityLabel="Qualifying standard in metres" />
-              </View>
-            )}
-            <Text style={textStyles.muted}>{field
-              ? `${vertical ? 'Final: up to 3 tries at each height; three failures in a row and the athlete is out.' : 'Final: every athlete has 3 trials, then the best 8 (and anyone tied for 8th) get 3 more — with 8 or fewer, everyone gets 6.'}${presets.some((p) => p.key === 'qual') ? ' Qualification: reaching the standard is Q; if fewer than 12 do, the best of the rest fill the final to 12 (q).' : ''}`
-              : swim
-              ? 'Timed final: every heat counts — places and medals come from the times across all heats. Heats → final: the fastest go through on time (equal times at the line: a swim-off, SW 3.2.3). Each next round is seeded for you.'
-              : 'Q = first places in each heat; q = the fastest of the rest. A timed final ranks every heat together on time. You can close each round when its results are in — the next one is seeded for you.'}</Text>
-          </Card>
+      <KeyboardFooterLayout
+        safeBottom={false}
+        footer={(
+          <>
+            <FormError message={error} />
+            <Button label={busy ? 'Creating…' : 'Create event & start list'} onPress={() => void create()} disabled={busy || !n} />
+          </>
         )}
+      >
+        <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
+          <ScreenTitle title={swim ? '🏊 New swimming event' : '🏃 New event'} subtitle={tournament?.name} />
+          {/* SD-141: the meet's competition rules, checked before the meet starts */}
+          <CompetitionRulesCard tournament={tournament} sport={sport} />
+          {/* SD-92: road races, race walks and cross-country have their own setup */}
+          {!swim && <Button label="🌳 Road race, race walk or cross-country →" variant="ghost" onPress={() => nav.setParams({ mode: 'road' })} />}
+          {/* SD-93: decathlon / heptathlon / school pentathlon have their own setup */}
+          {!swim && <Button label="🏅 Combined event (decathlon, heptathlon, pentathlon) →" variant="ghost" onPress={() => nav.setParams({ mode: 'combined' })} />}
 
-        {n > 0 && field ? (
           <Card style={st.card}>
-            <Text style={textStyles.h3}>5 · {vertical ? 'Bar heights' : 'Event settings'}</Text>
-            {vertical ? (
+            <Text style={textStyles.h3}>1 · Category</Text>
+            <View style={st.wrap}>{[...AGE_GROUPS, ...marketBands].map((a) => <SelectChip key={a} label={a} active={age === a} onPress={() => setAge(a)} />)}</View>
+            {ageRule ? <Text style={textStyles.muted}>{age}: {ageRule}.</Text> : null}
+            <View style={st.wrap}>
+              <SelectChip label="Boys" active={gender === 'M'} onPress={() => setGender('M')} />
+              <SelectChip label="Girls" active={gender === 'F'} onPress={() => setGender('F')} />
+              <SelectChip label={swim ? 'Mixed (relays)' : 'Mixed'} active={gender === 'X'} onPress={() => setGender('X')} />
+            </View>
+            {swim && (
               <>
-                <View style={st.pickRow}>
-                  <Text style={[st.label, { flex: 1 }]}>Opening height (m)</Text>
-                  <TextInput style={[st.input, { width: 92 }]} value={barStart} onChangeText={setBarStart} keyboardType="decimal-pad" accessibilityLabel="Opening bar height" />
+                <View style={st.wrap}>{COURSES.map((c) => <SelectChip key={c.key} label={c.label} active={course === c.key} onPress={() => setCourse(c.key)} />)}</View>
+                <Text style={textStyles.muted}>{sw.lanes} lanes{sw.lanes === 10 ? ' (0–9)' : ''}. Records and personal bests are kept per pool length. Mixed relays are 2 boys + 2 girls (SW 10.11).</Text>
+              </>
+            )}
+          </Card>
+
+          <Card style={st.card}>
+            <Text style={textStyles.h3}>2 · Event</Text>
+            {(swim ? SWIM_GROUPS : ATH_GROUPS).map((g: string) => {
+              const list = events.filter((e) => e.group === g);
+              if (!list.length) return null;
+              return (
+                <View key={g} style={{ gap: theme.spacing(1) }}>
+                  <Text style={st.label}>{GROUP_TITLE[g]}</Text>
+                  <View style={st.wrap}>{list.map((e) => {
+                    const imp = implementSpec(e.discipline, cat)?.text;
+                    return <SelectChip key={e.discipline} label={`${e.label}${imp ? ` · ${imp}` : ''}${e.optional ? ' (optional)' : ''}`} active={discipline === e.discipline} onPress={() => setDiscipline(e.discipline)} />;
+                  })}</View>
                 </View>
-                <Text style={st.label}>Raise by</Text>
-                <View style={st.wrap}>{stepChoices.map((x) => <SelectChip key={x} label={cm(x)} active={Math.abs(barStep - x) < 1e-9} onPress={() => setBarStep(x)} />)}</View>
-                <View style={st.pickRow}>
-                  <Text style={[st.label, { flex: 1 }]}>From this height (m), raise by</Text>
-                  <TextInput style={[st.input, { width: 92 }]} value={barChange} onChangeText={setBarChange} keyboardType="decimal-pad" accessibilityLabel="Height where the raise changes" />
-                </View>
-                <View style={st.wrap}>{stepChoices.filter((x) => x <= barStep + 1e-9).map((x) => <SelectChip key={x} label={cm(x)} active={Math.abs(barStep2 - x) < 1e-9} onPress={() => setBarStep2(x)} />)}</View>
-                {bar.length ? <Text style={textStyles.body}>{bar.map((h) => h.toFixed(2)).join(' · ')}</Text> : null}
-                {barError ? <Text style={st.remove}>{barError}</Text> : null}
-                <Text style={textStyles.muted}>The bar never goes up by less than {cm(minBarStep(def))}, and the raise never grows (World Athletics TR 26.4). You can add heights during the event; athletes may start at any height.</Text>
+              );
+            })}
+            <Text style={textStyles.muted}>
+              {def.label} {categoryLabel(cat)}
+              {swim
+                ? `${relay ? ` · ${legLabels(def.key).join(' → ')}` : ''} · ${courseLabel(course)} · ${def.lanes} lanes · seeded on entry times (World Aquatics SW 3.1)`
+                : field
+                ? `${vertical ? ' · bar heights, 3 tries a height' : ` · ${def.attempts?.count ?? 3} trials, then ${def.attempts?.extra ?? 3} more for the best ${def.attempts?.finalists ?? 8}`}${spec ? ` · ${implementNote(spec, cat)}` : ''}`
+                : `${def.wind ? ' · wind gauge' : ''}${def.lanes ? ' · in lanes' : ' · no lanes'}${hurdles ? ` · hurdles ${hurdles}` : ''}`}
+            </Text>
+            {events.find((e) => e.discipline === discipline)?.optional && (def.key === 'ath.pv' || def.key === 'ath.ht') ? <Text style={textStyles.muted}>Optional event: needs a {def.key === 'ath.pv' ? 'pole-vault landing bed and poles' : 'hammer cage'}.</Text> : null}
+          </Card>
+
+          <Card style={st.card}>
+            <Text style={textStyles.h3}>3 · {relay ? 'Relay teams' : swim ? 'Swimmers' : 'Athletes'} ({n})</Text>
+            {relay ? (
+              <>
+                <Text style={textStyles.muted}>Add a team per house; tap it to pick its {swim ? 'swimmers in order' : 'runners in leg order'} (4, plus up to 2 reserves).{gender === 'X' ? ` Mixed: 2 boys + 2 girls${!swim && sportRule(tournament?.formats?.athletics as Record<string, unknown> | undefined, 'mixedOrder') === 'MWMW' ? ', legs in the order boy, girl, boy, girl (meet rule)' : ', in any order the team chooses'}.` : ''}</Text>
+                <SelectChip label={eligibleOnly ? `✓ ${categoryLabel(cat)} only` : 'Showing everyone'} active={eligibleOnly} onPress={() => setEligibleOnly(!eligibleOnly)} />
+                <AgeBasisNote tournament={tournament} sport={swim ? 'swimming' : 'athletics'} basis={ages.basis} cutoff={ages.cutoff} canEdit={!!tournament} onSaved={ages.setBasis} />
+                <View style={st.wrap}>{sources.map((s) => <SelectChip key={s.key} label={`＋ ${s.name}`} dotColor={s.colorHex} active={false} onPress={() => addRelay(s)} />)}</View>
+                {!sources.length && <Text style={textStyles.muted}>No teams or houses yet — add the houses as teams in the tournament first.</Text>}
+                {relays.map((r) => {
+                  const open = openRelay === r.key;
+                  const cands = r.source.playerIds.map((id) => playerById.get(id)).filter((p): p is Player => !!p && (!eligibleOnly || eligibleFor(cat, { gender: p.gender, age: ages.ageFor(p), grade: ages.gradeFor(p) })));
+                  return (
+                    <View key={r.key} style={st.relay}>
+                      <TouchableOpacity accessibilityRole="button" onPress={() => setOpenRelay(open ? null : r.key)} style={st.relayHead}>
+                        <View style={[st.dot, { backgroundColor: r.source.colorHex ?? theme.colors.border }]} />
+                        <Text style={[st.name, { flex: 1 }]} numberOfLines={1}>{r.label}</Text>
+                        <Text style={textStyles.muted}>{r.members.length}/4{r.members.length > 4 ? `+${r.members.length - 4}` : ''}</Text>
+                        <Text style={st.remove} onPress={() => setRelays((rs) => rs.filter((x) => x.key !== r.key))}>Remove</Text>
+                      </TouchableOpacity>
+                      {r.members.length > 0 && <Text style={textStyles.muted} numberOfLines={2}>{r.members.map((id, i) => `${i < 4 ? (swim ? legLabels(def.key)[i].replace('Backstroke', 'Back').replace('Breaststroke', 'Breast').replace('Butterfly', 'Fly').replace('Freestyle', 'Free') : `Leg ${i + 1}`) : 'Res'}: ${playerById.get(id)?.fullName.split(' ')[0] ?? ''}`).join(' · ')}</Text>}
+                      {open && (
+                        <View style={st.wrap}>
+                          {cands.map((p) => {
+                            const i = r.members.indexOf(p.id);
+                            return <SelectChip key={p.id} label={`${i >= 0 ? `${i + 1}. ` : ''}${p.fullName}`} active={i >= 0} onPress={() => toggleLeg(r.key, p.id)} />;
+                          })}
+                          {!cands.length && <Text style={textStyles.muted}>No eligible athletes in {r.source.name} — tap “{categoryLabel(cat)} only” to show everyone.</Text>}
+                        </View>
+                      )}
+                    </View>
+                  );
+                })}
               </>
             ) : (
               <>
-                {['ath.sp', 'ath.dt', 'ath.jt', 'ath.ht'].includes(def.key) && (
-                  <>
-                    <View style={st.pickRow}>
-                      <Text style={[st.label, { flex: 1 }]}>Implement</Text>
-                      <TextInput style={[st.input, { width: 110 }]} value={implement} onChangeText={setImplement} placeholder="e.g. 4 kg" placeholderTextColor={theme.colors.textMuted} accessibilityLabel="Implement weight" />
+                {/* SD-128: the athletes ticked for this event on the entries matrix */}
+                {entered.some((id) => !picks.some((x) => x.playerId === id)) ? <Button label={`📋 Add the meet entries (${entered.length})`} variant="ghost" onPress={useEntries} /> : null}
+                <View style={st.wrap}>
+                  <SelectChip label="All" active={filter == null} onPress={() => setFilter(null)} />
+                  {sources.map((s) => <SelectChip key={s.key} label={s.name} dotColor={s.colorHex} active={filter === s.key} onPress={() => setFilter(s.key)} />)}
+                </View>
+                <TextInput style={st.input} value={query} onChangeText={setQuery} placeholder="Search any player by name" placeholderTextColor={theme.colors.textMuted} accessibilityLabel="Search players" />
+                <SelectChip label={eligibleOnly ? `✓ ${categoryLabel(cat)} only` : `Showing everyone`} active={eligibleOnly} onPress={() => setEligibleOnly(!eligibleOnly)} />
+                <AgeBasisNote tournament={tournament} sport={swim ? 'swimming' : 'athletics'} basis={ages.basis} cutoff={ages.cutoff} canEdit={!!tournament} onSaved={ages.setBasis} />
+                <View style={st.wrap}>
+                  {pool.map((p) => {
+                    const on = picks.some((x) => x.playerId === p.id);
+                    return <SelectChip key={p.id} label={`${on ? '✓ ' : ''}${p.fullName}`} dotColor={p.houseColor} active={on} onPress={() => toggle(p.id)} />;
+                  })}
+                  {!pool.length && <Text style={textStyles.muted}>No {swim ? 'swimmers' : 'athletes'} match. Players without a gender or date of birth are always shown.</Text>}
+                </View>
+                {picks.length > 0 && (
+                  <View style={{ gap: theme.spacing(2) }}>
+                    <Text style={st.label}>Entry marks (seeding · optional)</Text>
+                    <View style={st.wrap}>
+                      <SelectChip label="Fill from PB" active={false} onPress={() => void fillSeeds('pb')} />
+                      <SelectChip label="Fill from SB" active={false} onPress={() => void fillSeeds('sb')} />
                     </View>
-                    <Text style={textStyles.muted}>{spec ? implementNote(spec, cat) : 'Type the weight your federation uses for this category.'}. Personal bests are kept per implement weight.</Text>
-                  </>
-                )}
-                {def.key === 'ath.tj' && (
-                  <>
-                    <Text style={st.label}>Take-off board (m from the sand)</Text>
-                    <View style={st.wrap}>{TJ_BOARDS.map((b) => <SelectChip key={b} label={`${b} m`} active={board === b} onPress={() => setBoard(b)} />)}</View>
-                    <Text style={textStyles.muted}>World Athletics recommends at least 13 m (men) and 11 m (women) at international meets; school meets use shorter boards.</Text>
-                  </>
-                )}
-                {def.wind === 'attempt' && (
-                  <>
-                    <SelectChip label={gauge ? '✓ Wind gauge at the pit' : 'No wind gauge'} active={gauge} onPress={() => setGauge(!gauge)} />
-                    <Text style={textStyles.muted}>{gauge
-                      ? 'Type the wind for each jump. Over +2.0 m/s is wind-aided: it counts for places, not for PBs or records.'
-                      : 'Jumps without a wind reading count for PBs and meet records.'}</Text>
-                  </>
+                    {seedNote ? <Text style={textStyles.muted}>{seedNote}</Text> : null}
+                    {picks.map((p) => (
+                      <View key={p.playerId} style={st.pickRow}>
+                        <Text style={[st.name, { flex: 1 }]} numberOfLines={1}>{playerById.get(p.playerId)?.fullName}</Text>
+                        <TextInput style={[st.input, { width: 92 }]} value={p.seed} placeholder={field ? (vertical ? '1.35' : '5.12') : swim ? '3245' : '1185'} placeholderTextColor={theme.colors.textMuted} keyboardType={field ? 'decimal-pad' : 'number-pad'}
+                          accessibilityLabel={`Entry mark for ${playerById.get(p.playerId)?.fullName}`} onChangeText={(t) => setPicks((ps) => ps.map((x) => (x.playerId === p.playerId ? { ...x, seed: t } : x)))} />
+                        <Text style={st.remove} onPress={() => toggle(p.playerId)}>✕</Text>
+                      </View>
+                    ))}
+                    <Text style={textStyles.muted}>{field
+                      ? 'Entry marks in metres (5.12). They spread the best athletes over the qualification groups; the order of trials is drawn.'
+                      : swim
+                      ? 'Entry times — digits fill from the right: 3245 = 32.45, 11520 = 1:15.20. Swimmers without a time are seeded slowest (SW 3.1.1); ties and no-times are drawn.'
+                      : 'Digits fill from the right: 1185 = 11.85, 25034 = 2:50.34. Seeded athletes are spread across the heats (fastest first); the rest are drawn.'}</Text>
+                  </View>
                 )}
               </>
             )}
           </Card>
-        ) : null}
 
-        {n > 0 && field ? (
-          <Card style={st.card}>
-            <Text style={textStyles.h3}>6 · Order of trials</Text>
-            <View style={st.wrap}>
-              <SelectChip label="Draw the order" active={lanes === 'draw'} onPress={() => setLanes('draw')} />
-              <SelectChip label="Best entry mark last" active={lanes === 'seeded'} onPress={() => setLanes('seeded')} />
-            </View>
-            <Text style={textStyles.muted}>World Athletics draws the order (TR 25.5).{vertical ? ' The same order is kept at every height.' : ' After round 3 the best 8 go in reverse order of the standings, the leader last.'}</Text>
-          </Card>
-        ) : null}
+          {n > 0 && (
+            <Card style={st.card}>
+              <Text style={textStyles.h3}>4 · Rounds</Text>
+              <View style={st.wrap}>{presets.map((p) => <SelectChip key={p.key} label={p.label} active={preset?.key === p.key} onPress={() => setPresetKey(p.key)} />)}</View>
+              {preset && <Text style={textStyles.body}>{describePlan(preset.plan)}</Text>}
+              {field && preset?.plan.some((p) => p.phase === 'qualification') && (
+                <View style={st.pickRow}>
+                  <Text style={st.label}>Qualifying standard (optional)</Text>
+                  <TextInput style={[st.input, { width: 92 }]} value={standard} onChangeText={setStandard} placeholder={vertical ? '1.40' : '5.20'} placeholderTextColor={theme.colors.textMuted}
+                    keyboardType="decimal-pad" accessibilityLabel="Qualifying standard in metres" />
+                </View>
+              )}
+              <Text style={textStyles.muted}>{field
+                ? `${vertical ? 'Final: up to 3 tries at each height; three failures in a row and the athlete is out.' : 'Final: every athlete has 3 trials, then the best 8 (and anyone tied for 8th) get 3 more — with 8 or fewer, everyone gets 6.'}${presets.some((p) => p.key === 'qual') ? ' Qualification: reaching the standard is Q; if fewer than 12 do, the best of the rest fill the final to 12 (q).' : ''}`
+                : swim
+                ? 'Timed final: every heat counts — places and medals come from the times across all heats. Heats → final: the fastest go through on time (equal times at the line: a swim-off, SW 3.2.3). Each next round is seeded for you.'
+                : 'Q = first places in each heat; q = the fastest of the rest. A timed final ranks every heat together on time. You can close each round when its results are in — the next one is seeded for you.'}</Text>
+            </Card>
+          )}
 
-        {n > 0 && swim ? (
-          <Card style={st.card}>
-            <Text style={textStyles.h3}>5 · Heats & lanes</Text>
-            <Text style={textStyles.muted}>World Aquatics seeding: preliminary heats are circle-seeded — the fastest swimmers in the last heats (SW 3.1.1), at least three in the first heat; a timed final puts the fastest in the last heat. In each heat the fastest swims lane {sw.lanes === 6 ? 3 : 4}, the next on their left, then right and left (SW 3.1.2). You can still change lanes on the start list.</Text>
-          </Card>
-        ) : null}
+          {n > 0 && field ? (
+            <Card style={st.card}>
+              <Text style={textStyles.h3}>5 · {vertical ? 'Bar heights' : 'Event settings'}</Text>
+              {vertical ? (
+                <>
+                  <View style={st.pickRow}>
+                    <Text style={[st.label, { flex: 1 }]}>Opening height (m)</Text>
+                    <TextInput style={[st.input, { width: 92 }]} value={barStart} onChangeText={setBarStart} keyboardType="decimal-pad" accessibilityLabel="Opening bar height" />
+                  </View>
+                  <Text style={st.label}>Raise by</Text>
+                  <View style={st.wrap}>{stepChoices.map((x) => <SelectChip key={x} label={cm(x)} active={Math.abs(barStep - x) < 1e-9} onPress={() => setBarStep(x)} />)}</View>
+                  <View style={st.pickRow}>
+                    <Text style={[st.label, { flex: 1 }]}>From this height (m), raise by</Text>
+                    <TextInput style={[st.input, { width: 92 }]} value={barChange} onChangeText={setBarChange} keyboardType="decimal-pad" accessibilityLabel="Height where the raise changes" />
+                  </View>
+                  <View style={st.wrap}>{stepChoices.filter((x) => x <= barStep + 1e-9).map((x) => <SelectChip key={x} label={cm(x)} active={Math.abs(barStep2 - x) < 1e-9} onPress={() => setBarStep2(x)} />)}</View>
+                  {bar.length ? <Text style={textStyles.body}>{bar.map((h) => h.toFixed(2)).join(' · ')}</Text> : null}
+                  {barError ? <Text style={st.remove}>{barError}</Text> : null}
+                  <Text style={textStyles.muted}>The bar never goes up by less than {cm(minBarStep(def))}, and the raise never grows (World Athletics TR 26.4). You can add heights during the event; athletes may start at any height.</Text>
+                </>
+              ) : (
+                <>
+                  {['ath.sp', 'ath.dt', 'ath.jt', 'ath.ht'].includes(def.key) && (
+                    <>
+                      <View style={st.pickRow}>
+                        <Text style={[st.label, { flex: 1 }]}>Implement</Text>
+                        <TextInput style={[st.input, { width: 110 }]} value={implement} onChangeText={setImplement} placeholder="e.g. 4 kg" placeholderTextColor={theme.colors.textMuted} accessibilityLabel="Implement weight" />
+                      </View>
+                      <Text style={textStyles.muted}>{spec ? implementNote(spec, cat) : 'Type the weight your federation uses for this category.'}. Personal bests are kept per implement weight.</Text>
+                    </>
+                  )}
+                  {def.key === 'ath.tj' && (
+                    <>
+                      <Text style={st.label}>Take-off board (m from the sand)</Text>
+                      <View style={st.wrap}>{TJ_BOARDS.map((b) => <SelectChip key={b} label={`${b} m`} active={board === b} onPress={() => setBoard(b)} />)}</View>
+                      <Text style={textStyles.muted}>World Athletics recommends at least 13 m (men) and 11 m (women) at international meets; school meets use shorter boards.</Text>
+                    </>
+                  )}
+                  {def.wind === 'attempt' && (
+                    <>
+                      <SelectChip label={gauge ? '✓ Wind gauge at the pit' : 'No wind gauge'} active={gauge} onPress={() => setGauge(!gauge)} />
+                      <Text style={textStyles.muted}>{gauge
+                        ? 'Type the wind for each jump. Over +2.0 m/s is wind-aided: it counts for places, not for PBs or records.'
+                        : 'Jumps without a wind reading count for PBs and meet records.'}</Text>
+                    </>
+                  )}
+                </>
+              )}
+            </Card>
+          ) : null}
 
-        {n > 0 && def.lanes && !field && !swim ? (
-          <Card style={st.card}>
-            <Text style={textStyles.h3}>5 · Lanes</Text>
-            <View style={st.wrap}>
-              <SelectChip label="Draw lanes" active={lanes === 'draw'} onPress={() => setLanes('draw')} />
-              <SelectChip label="Fastest in the middle" active={lanes === 'seeded'} onPress={() => setLanes('seeded')} />
-            </View>
-            <Text style={textStyles.muted}>
-              {lanes === 'draw' ? 'World Athletics first round: heats are seeded, lanes drawn. Later rounds draw by ranking (top 4 → lanes 3–6).' : 'The best seed gets lane 4, then 5, 3, 6 …'} You can change any lane on the start list.
-            </Text>
-          </Card>
-        ) : null}
+          {n > 0 && field ? (
+            <Card style={st.card}>
+              <Text style={textStyles.h3}>6 · Order of trials</Text>
+              <View style={st.wrap}>
+                <SelectChip label="Draw the order" active={lanes === 'draw'} onPress={() => setLanes('draw')} />
+                <SelectChip label="Best entry mark last" active={lanes === 'seeded'} onPress={() => setLanes('seeded')} />
+              </View>
+              <Text style={textStyles.muted}>World Athletics draws the order (TR 25.5).{vertical ? ' The same order is kept at every height.' : ' After round 3 the best 8 go in reverse order of the standings, the leader last.'}</Text>
+            </Card>
+          ) : null}
 
-        {!swim && meet.handTimed ? <Text style={textStyles.muted}>This meet is hand-timed (Athletics settings): times are read to the tenth and count for meet records.</Text> : null}
-        {swim && sw.manual ? <Text style={textStyles.muted}>Manual timing (Swimming settings): times to 1/100 from the lane's watches (SW 11.3) count for meet records.</Text> : null}
-        <EventTrackCard def={def} f={{ reaction: swim ? sw.reaction : meet.reaction, splits: swim ? sw.splits : undefined, track }} meet={tournament?.formats?.[sport] as Record<string, unknown> | undefined} onChange={setTrack} />
-        {n > 0 ? <ScheduleCard state={schedule} tournamentId={tournamentId} discipline={def.key} plan={preset?.plan} athleteIds={relay ? relays.flatMap((r) => r.members) : picks.map((p) => p.playerId)} /> : null}
-        <EventOfficials tournament={tournament} value={officials} onChange={setOfficials} />
-        <FormError message={error} />
-        <Button label={busy ? 'Creating…' : 'Create event & start list'} onPress={() => void create()} disabled={busy || !n} />
-      </KeyboardAwareScrollView>
+          {n > 0 && swim ? (
+            <Card style={st.card}>
+              <Text style={textStyles.h3}>5 · Heats & lanes</Text>
+              <Text style={textStyles.muted}>World Aquatics seeding: preliminary heats are circle-seeded — the fastest swimmers in the last heats (SW 3.1.1), at least three in the first heat; a timed final puts the fastest in the last heat. In each heat the fastest swims lane {sw.lanes === 6 ? 3 : 4}, the next on their left, then right and left (SW 3.1.2). You can still change lanes on the start list.</Text>
+            </Card>
+          ) : null}
+
+          {n > 0 && def.lanes && !field && !swim ? (
+            <Card style={st.card}>
+              <Text style={textStyles.h3}>5 · Lanes</Text>
+              <View style={st.wrap}>
+                <SelectChip label="Draw lanes" active={lanes === 'draw'} onPress={() => setLanes('draw')} />
+                <SelectChip label="Fastest in the middle" active={lanes === 'seeded'} onPress={() => setLanes('seeded')} />
+              </View>
+              <Text style={textStyles.muted}>
+                {lanes === 'draw' ? 'World Athletics first round: heats are seeded, lanes drawn. Later rounds draw by ranking (top 4 → lanes 3–6).' : 'The best seed gets lane 4, then 5, 3, 6 …'} You can change any lane on the start list.
+              </Text>
+            </Card>
+          ) : null}
+
+          {!swim && meet.handTimed ? <Text style={textStyles.muted}>This meet is hand-timed (Athletics settings): times are read to the tenth and count for meet records.</Text> : null}
+          {swim && sw.manual ? <Text style={textStyles.muted}>Manual timing (Swimming settings): times to 1/100 from the lane's watches (SW 11.3) count for meet records.</Text> : null}
+          <EventTrackCard def={def} f={{ reaction: swim ? sw.reaction : meet.reaction, splits: swim ? sw.splits : undefined, track }} meet={tournament?.formats?.[sport] as Record<string, unknown> | undefined} onChange={setTrack} />
+          {n > 0 ? <ScheduleCard state={schedule} tournamentId={tournamentId} discipline={def.key} plan={preset?.plan} athleteIds={relay ? relays.flatMap((r) => r.members) : picks.map((p) => p.playerId)} /> : null}
+          <EventOfficials tournament={tournament} value={officials} onChange={setOfficials} />
+        </KeyboardAwareScrollView>
+      </KeyboardFooterLayout>
     </SafeAreaView>
   );
 }

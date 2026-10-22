@@ -3,7 +3,7 @@
  *  host recurring sports events year after year (all tracked under it). */
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { KeyboardAwareScrollView } from '../components/keyboard';
+import { KeyboardAwareScrollView, KeyboardFooterLayout } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { theme } from '../core/theme';
@@ -75,53 +75,61 @@ export default function CreateCommunityScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
-        <ScreenTitle title="New community" subtitle="A school, club, company… that runs sports events" />
-
-        <TextField label="Name" value={name} onChange={setName} placeholder="Greenwood High School" />
-
-        <FieldLabel>Type</FieldLabel>
-        <View style={st.chips}>
-          {COMMUNITY_TYPES.map((t) => (
-            <SelectChip key={t} label={t} active={typeChoice === t} onPress={() => setTypeChoice(t)} />
-          ))}
-          <SelectChip label={CUSTOM} active={typeChoice === CUSTOM} onPress={() => setTypeChoice(CUSTOM)} />
-        </View>
-        {typeChoice === CUSTOM && (
-          <TextField label="Custom type" value={customType} onChange={setCustomType} placeholder="e.g. Alumni association" />
-        )}
-
-        {academic && (
+      {/* the create button stays pinned below the form and rides on the keyboard */}
+      <KeyboardFooterLayout
+        safeBottom={false}
+        footer={(
           <>
-            <FieldLabel>School system</FieldLabel>
-            <View style={st.chips}>
-              {(showMarkets ? MARKET_ORDER : [market]).map((m) => (
-                <SelectChip key={m} label={`${MARKETS[m].flag} ${MARKETS[m].name}`} active={market === m} onPress={() => pickMarket(m)} />
-              ))}
-              {!showMarkets && <SelectChip label="Change…" active={false} onPress={() => setShowMarkets(true)} />}
-            </View>
-            <Text style={textStyles.muted}>Sets class names, age groups and the age cut-off for your events. You can change it later.</Text>
-            <TextField label="Graduating class (students leave after this)" value={gradStd} onChange={(v) => { setGradTouched(true); setGradStd(v); }} placeholder={suggestedGraduatingStandard(market)} autoCapitalize="words" />
-            {MARKETS[market].graduating.length > 1 && (
-              <View style={st.chips}>
-                {MARKETS[market].graduating.map((g) => (
-                  <SelectChip key={g} label={g} active={gradStd.trim() === g} onPress={() => { setGradTouched(true); setGradStd(g); }} />
-                ))}
-              </View>
-            )}
+            <FormError message={error} />
+            <Button label={busy ? 'Creating…' : 'Create community'} onPress={submit} />
           </>
         )}
+      >
+        <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
+          <ScreenTitle title="New community" subtitle="A school, club, company… that runs sports events" />
 
-        <TextField label="City" value={city} onChange={setCity} placeholder="Bengaluru" />
-        <View style={st.wrapRow}>
-          <View style={st.wrapCell}><TextField label="Email" value={email} onChange={setEmail} placeholder="sports@…" autoCapitalize="none" /></View>
-          <View style={st.wrapCell}><PhoneField label="Phone" value={phone} onChange={setPhone} optional /></View>
-        </View>
-        <Text style={textStyles.muted}>You'll be its first admin. Add members, a logo, and organize events from the community page.</Text>
+          <TextField label="Name" value={name} onChange={setName} placeholder="Greenwood High School" />
 
-        <FormError message={error} />
-        <Button label={busy ? 'Creating…' : 'Create community'} onPress={submit} />
-      </KeyboardAwareScrollView>
+          <FieldLabel>Type</FieldLabel>
+          <View style={st.chips}>
+            {COMMUNITY_TYPES.map((t) => (
+              <SelectChip key={t} label={t} active={typeChoice === t} onPress={() => setTypeChoice(t)} />
+            ))}
+            <SelectChip label={CUSTOM} active={typeChoice === CUSTOM} onPress={() => setTypeChoice(CUSTOM)} />
+          </View>
+          {typeChoice === CUSTOM && (
+            <TextField label="Custom type" value={customType} onChange={setCustomType} placeholder="e.g. Alumni association" />
+          )}
+
+          {academic && (
+            <>
+              <FieldLabel>School system</FieldLabel>
+              <View style={st.chips}>
+                {(showMarkets ? MARKET_ORDER : [market]).map((m) => (
+                  <SelectChip key={m} label={`${MARKETS[m].flag} ${MARKETS[m].name}`} active={market === m} onPress={() => pickMarket(m)} />
+                ))}
+                {!showMarkets && <SelectChip label="Change…" active={false} onPress={() => setShowMarkets(true)} />}
+              </View>
+              <Text style={textStyles.muted}>Sets class names, age groups and the age cut-off for your events. You can change it later.</Text>
+              <TextField label="Graduating class (students leave after this)" value={gradStd} onChange={(v) => { setGradTouched(true); setGradStd(v); }} placeholder={suggestedGraduatingStandard(market)} autoCapitalize="words" />
+              {MARKETS[market].graduating.length > 1 && (
+                <View style={st.chips}>
+                  {MARKETS[market].graduating.map((g) => (
+                    <SelectChip key={g} label={g} active={gradStd.trim() === g} onPress={() => { setGradTouched(true); setGradStd(g); }} />
+                  ))}
+                </View>
+              )}
+            </>
+          )}
+
+          <TextField label="City" value={city} onChange={setCity} placeholder="Bengaluru" />
+          <View style={st.wrapRow}>
+            <View style={st.wrapCell}><TextField label="Email" value={email} onChange={setEmail} placeholder="sports@…" autoCapitalize="none" /></View>
+            <View style={st.wrapCell}><PhoneField label="Phone" value={phone} onChange={setPhone} optional /></View>
+          </View>
+          <Text style={textStyles.muted}>You'll be its first admin. Add members, a logo, and organize events from the community page.</Text>
+        </KeyboardAwareScrollView>
+      </KeyboardFooterLayout>
     </SafeAreaView>
   );
 }

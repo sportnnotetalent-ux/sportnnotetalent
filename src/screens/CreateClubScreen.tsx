@@ -5,7 +5,7 @@
  *  from the team dashboard. On create we land on the dashboard. */
 import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { KeyboardAwareScrollView } from '../components/keyboard';
+import { KeyboardAwareScrollView, KeyboardFooterLayout } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -70,56 +70,63 @@ export default function CreateClubScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
-        <ScreenTitle title="Create your team" subtitle="One team, many sports — add the rest later" />
+      <KeyboardFooterLayout
+        safeBottom={false}
+        footer={(
+          <>
+            <FormError message={error} />
+            <Button label={busy ? 'Creating…' : 'Create team'} onPress={create} />
+          </>
+        )}
+      >
+        <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
+          <ScreenTitle title="Create your team" subtitle="One team, many sports — add the rest later" />
 
-        <Card style={{ gap: theme.spacing(3) }}>
-          <View style={{ alignItems: 'center' }}>
-            <LogoPicker logoUrl={logoUrl} canManage onPick={setLogoUrl} kind="club-logo" size={72} placeholder="🛡️" label="Add logo" />
-          </View>
-          <View style={st.row}>
-            <View style={st.flex2}>
-              <TextField label="Team name" value={name} onChange={setName} placeholder="Hyderabad Warriors" />
+          <Card style={{ gap: theme.spacing(3) }}>
+            <View style={{ alignItems: 'center' }}>
+              <LogoPicker logoUrl={logoUrl} canManage onPick={setLogoUrl} kind="club-logo" size={72} placeholder="🛡️" label="Add logo" />
             </View>
-            <View style={st.flex1}>
-              <TextField label="Short" value={short} onChange={setShort} placeholder="HW" autoCapitalize="characters" />
+            <View style={st.row}>
+              <View style={st.flex2}>
+                <TextField label="Team name" value={name} onChange={setName} placeholder="Hyderabad Warriors" />
+              </View>
+              <View style={st.flex1}>
+                <TextField label="Short" value={short} onChange={setShort} placeholder="HW" autoCapitalize="characters" />
+              </View>
             </View>
-          </View>
-          <TextField label="City / Town" value={city} onChange={setCity} placeholder="Hyderabad" />
+            <TextField label="City / Town" value={city} onChange={setCity} placeholder="Hyderabad" />
 
-          <View>
-            <Text style={textStyles.muted}>Team colour</Text>
+            <View>
+              <Text style={textStyles.muted}>Team colour</Text>
+              <View style={st.chips}>
+                {PALETTE.map((c) => (
+                  <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Colour ${c}`}
+                    key={c} onPress={() => setColor(c)}
+                    style={[st.swatch, { backgroundColor: c }, color === c && st.swatchActive]} />
+                ))}
+              </View>
+            </View>
+          </Card>
+
+          <Card style={{ gap: theme.spacing(2) }}>
+            <Text style={textStyles.h3}>Which sports does this team play?</Text>
+            <Text style={textStyles.muted}>Pick one or more. You can add or remove sports anytime.</Text>
             <View style={st.chips}>
-              {PALETTE.map((c) => (
-                <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Colour ${c}`}
-                  key={c} onPress={() => setColor(c)}
-                  style={[st.swatch, { backgroundColor: c }, color === c && st.swatchActive]} />
+              {SPORT_LIST.map((s) => (
+                <SelectChip key={s.id} label={`${s.icon} ${s.name}`} active={sports.includes(s.id)} onPress={() => toggleSport(s.id)} />
               ))}
             </View>
-          </View>
-        </Card>
+          </Card>
 
-        <Card style={{ gap: theme.spacing(2) }}>
-          <Text style={textStyles.h3}>Which sports does this team play?</Text>
-          <Text style={textStyles.muted}>Pick one or more. You can add or remove sports anytime.</Text>
-          <View style={st.chips}>
-            {SPORT_LIST.map((s) => (
-              <SelectChip key={s.id} label={`${s.icon} ${s.name}`} active={sports.includes(s.id)} onPress={() => toggleSport(s.id)} />
-            ))}
-          </View>
-        </Card>
-
-        <TouchableOpacity accessibilityRole="checkbox" accessibilityState={{ checked: addMe }} onPress={() => setAddMe((v) => !v)} style={st.check}>
-          <View style={[st.box, addMe && st.boxOn]}>{addMe && <Text style={st.tick}>✓</Text>}</View>
-          <View style={{ flex: 1 }}>
-            <Text style={textStyles.body}>Add myself to this team</Text>
-            <Text style={textStyles.muted}>You’ll be the first member — and its admin.</Text>
-          </View>
-        </TouchableOpacity>
-
-        <FormError message={error} />
-        <Button label={busy ? 'Creating…' : 'Create team'} onPress={create} />
-      </KeyboardAwareScrollView>
+          <TouchableOpacity accessibilityRole="checkbox" accessibilityState={{ checked: addMe }} onPress={() => setAddMe((v) => !v)} style={st.check}>
+            <View style={[st.box, addMe && st.boxOn]}>{addMe && <Text style={st.tick}>✓</Text>}</View>
+            <View style={{ flex: 1 }}>
+              <Text style={textStyles.body}>Add myself to this team</Text>
+              <Text style={textStyles.muted}>You’ll be the first member — and its admin.</Text>
+            </View>
+          </TouchableOpacity>
+        </KeyboardAwareScrollView>
+      </KeyboardFooterLayout>
     </SafeAreaView>
   );
 }

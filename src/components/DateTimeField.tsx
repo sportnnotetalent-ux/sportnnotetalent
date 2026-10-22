@@ -11,7 +11,7 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Modal, ScrollView, StyleSheet } from 'react-native';
 import { theme } from '../core/theme';
 import { textStyles } from './ui';
-import { KeyboardAwareScrollView, KeyboardSheetScope, useKeyboardFocus, useKeyboardSheet } from './keyboard';
+import { KeyboardAwareScrollView, KeyboardSheetScope, useFormField, useKeyboardFocus, useKeyboardSheet } from './keyboard';
 import { formatDateTime, isoToWall, useUserTimeZone, wallTimeToIso, zoneLabel } from '../core/time';
 import { useRegion, weekdayOrder, leadingBlanks } from '../core/region';
 
@@ -288,6 +288,7 @@ function TimeEditor({ time, hour12, onChange }: { time: string; hour12: boolean;
 
 function Stepper({ label, text, onUp, onDown, onText }: { label: string; text: string; onUp: () => void; onDown: () => void; onText: (n: number) => void }) {
   const kbFocus = useKeyboardFocus();
+  const formField = useFormField();
   return (
     <View style={st.stepper}>
       <TouchableOpacity style={st.stepBtn} onPress={onUp} hitSlop={6} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={`${label} up`}><Text style={st.stepTxt}>▲</Text></TouchableOpacity>
@@ -300,6 +301,7 @@ function Stepper({ label, text, onUp, onDown, onText }: { label: string; text: s
         maxLength={2}
         selectTextOnFocus
         {...kbFocus}
+        {...formField}
       />
       <TouchableOpacity style={st.stepBtn} onPress={onDown} hitSlop={6} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={`${label} down`}><Text style={st.stepTxt}>▼</Text></TouchableOpacity>
     </View>

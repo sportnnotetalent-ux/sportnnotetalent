@@ -13,6 +13,14 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-22 — Forms the top-app way: the main button rides on the keyboard
+Founder: "Even the create community button should show above keyboard right? Act as a UI expert of top app firms."
+- **Pinned primary action (`KeyboardFooterLayout`, components/keyboard.tsx):** on 23 form screens the create / save / send button (with its error message) moves out of the bottom of the form into a footer pinned under it; while typing, the footer sits on top of the keyboard and the field stays in view above it. Create community, team, tournament, series, listing; every results-sport event setup (athletics, archery, combined, crew, cycling, road, shooting, weightlifting); golf round setup; schedule match (match form only — the results sports link to their own setup); edit profile, edit team (delete stays in the form), tournament teams, roster import, feedback; and the three screens that already had a bottom bar (edit tournament, import schedule, match squad), which now rise with the keyboard too.
+- **Keyboard "Next" / "Done" (`useFormField`):** in a form, a text / phone / time field's return key moves to the next field down the screen (reading order, measured); the last one shows "Done" and closes the keyboard.
+- **Dragging a form closes the keyboard** (Android on-drag, iOS interactive); tapping empty space already did.
+- Left as they are (the action belongs where it is): two-step flows (find → join), hubs, search, live scoring, sign-in (its "Go" key signs in).
+- Verified: tsc clean; 4354 pass / 0 fail (+ reading-order test); web demo — create community / tournament, edit tournament, schedule match (cricket pinned, athletics none); "Next" walks Name → Graduating class → City → Email → Phone ("done").
+
 ### 2026-10-22 — Keyboard never covers a field (Android, iOS, web)
 Founder, signing in on Android: the keyboard sat over the password box, typed blind. Cause: Expo SDK 56 / RN 0.85 draw Android edge-to-edge, so the window no longer shrinks for the keyboard; only the chat screen handled it (and only on iOS).
 - **`src/components/keyboard.tsx` (new, pure maths in `keyboardMath.ts`):** `KeyboardAwareScrollView` replaces the ScrollView on all 86 screens that have one — while the keyboard is up and the focused field is inside it, the scroll area ends at the keyboard's top and the field is scrolled into view (focus changes re-checked too: Android sends no event for them). Horizontal / nested / fixed-height scroll views and web behave as before.

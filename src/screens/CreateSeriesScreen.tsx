@@ -5,7 +5,7 @@
  *  scored like any normal game and the series standing updates automatically. */
 import React, { useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { KeyboardAwareScrollView } from '../components/keyboard';
+import { KeyboardAwareScrollView, KeyboardFooterLayout } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -95,61 +95,68 @@ export default function CreateSeriesScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
-        <ScreenTitle title="New series / tie" subtitle="Several matches, one winner" />
-
-        <Dropdown label="Sport" value={sport ? `${getSport(sport).icon}  ${getSport(sport).name}` : null} placeholder="Select a sport"
-          options={SPORT_LIST.map((s) => ({ id: s.id, label: `${s.icon}  ${s.name}` }))} onPick={(id) => pickSport(id as SportId)} />
-
-        {sport && (
+      <KeyboardFooterLayout
+        safeBottom={false}
+        footer={(
           <>
-            <Dropdown label={isTie ? 'Team A (named first)' : 'Team A (hosts leg 1)'} value={teamName(teamA) || null} placeholder="Pick team A"
-              options={teams.filter((t) => t.id !== teamB).map((t) => ({ id: t.id, label: t.name }))} onPick={setTeamA} />
-            <Dropdown label="Team B" value={teamName(teamB) || null} placeholder="Pick team B"
-              options={teams.filter((t) => t.id !== teamA).map((t) => ({ id: t.id, label: t.name }))} onPick={setTeamB} />
-
-            <View style={{ gap: theme.spacing(2) }}>
-              <FieldLabel>Format</FieldLabel>
-              <View style={st.chips}>
-                {FORMATS.map((f) => <SelectChip key={f.id} label={f.label} active={format === f.id} onPress={() => setFormat(f.id)} />)}
-              </View>
-              <Text style={textStyles.muted}>{FORMATS.find((f) => f.id === format)!.hint}</Text>
-            </View>
-
-            {isTie && (
-              <TieSetup sport={sport} value={tieSpec} onChange={setTieSpec} oneOff teamAName={teamName(teamA) || undefined} teamBName={teamName(teamB) || undefined} />
-            )}
-
-            {format !== 'aggregate' && !isTie && (
-              <View style={{ gap: theme.spacing(2) }}>
-                <FieldLabel>{format === 'best_of' ? 'Best of' : 'Rubbers'}</FieldLabel>
-                <View style={st.chips}>
-                  {ODD_LEGS.map((n) => <SelectChip key={n} label={`${n}`} active={legs === n} onPress={() => setLegs(n)} />)}
-                  <Stepper value={legs} onChange={(v) => setLegs(Math.max(1, Math.min(15, v)))} />
-                </View>
-                <Text style={textStyles.muted}>
-                  {format === 'best_of' ? `First to ${Math.floor(legs / 2) + 1} wins. Later games are dead rubbers once decided.` : `Most wins of ${legs} takes the tie.`}
-                </Text>
-              </View>
-            )}
-
-            {format === 'aggregate' && (
-              <SelectChip label={awayGoals ? '✓ Away-goals tiebreak' : 'Away-goals tiebreak'} active={awayGoals} onPress={() => setAwayGoals((v) => !v)} />
-            )}
-
-            <TextField label="Series name (optional)" value={name} onChange={setName} placeholder="e.g. India tour of Australia" />
-            <DateTimeField label={isTie ? 'Tie starts' : 'First match'} value={when} onChange={setWhen} />
-            <Text style={textStyles.muted}>
-              {isTie
-                ? `${legsCount} rubbers will be created${tieSpec?.gap ? `, ${tieSpec.gap} min apart` : ', all at the same time'}. Enter both lineups on the tie page.`
-                : `${legsCount} match${legsCount === 1 ? '' : 'es'} will be created, three days apart, alternating home & away.`}
-            </Text>
+            <FormError message={error} />
+            <Button label={busy ? 'Creating…' : isTie ? `Create tie (${legsCount} rubbers)` : `Create series (${legsCount} match${legsCount === 1 ? '' : 'es'})`} onPress={submit} disabled={busy || !sport} />
           </>
         )}
+      >
+        <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
+          <ScreenTitle title="New series / tie" subtitle="Several matches, one winner" />
 
-        <FormError message={error} />
-        <Button label={busy ? 'Creating…' : isTie ? `Create tie (${legsCount} rubbers)` : `Create series (${legsCount} match${legsCount === 1 ? '' : 'es'})`} onPress={submit} disabled={busy || !sport} />
-      </KeyboardAwareScrollView>
+          <Dropdown label="Sport" value={sport ? `${getSport(sport).icon}  ${getSport(sport).name}` : null} placeholder="Select a sport"
+            options={SPORT_LIST.map((s) => ({ id: s.id, label: `${s.icon}  ${s.name}` }))} onPick={(id) => pickSport(id as SportId)} />
+
+          {sport && (
+            <>
+              <Dropdown label={isTie ? 'Team A (named first)' : 'Team A (hosts leg 1)'} value={teamName(teamA) || null} placeholder="Pick team A"
+                options={teams.filter((t) => t.id !== teamB).map((t) => ({ id: t.id, label: t.name }))} onPick={setTeamA} />
+              <Dropdown label="Team B" value={teamName(teamB) || null} placeholder="Pick team B"
+                options={teams.filter((t) => t.id !== teamA).map((t) => ({ id: t.id, label: t.name }))} onPick={setTeamB} />
+
+              <View style={{ gap: theme.spacing(2) }}>
+                <FieldLabel>Format</FieldLabel>
+                <View style={st.chips}>
+                  {FORMATS.map((f) => <SelectChip key={f.id} label={f.label} active={format === f.id} onPress={() => setFormat(f.id)} />)}
+                </View>
+                <Text style={textStyles.muted}>{FORMATS.find((f) => f.id === format)!.hint}</Text>
+              </View>
+
+              {isTie && (
+                <TieSetup sport={sport} value={tieSpec} onChange={setTieSpec} oneOff teamAName={teamName(teamA) || undefined} teamBName={teamName(teamB) || undefined} />
+              )}
+
+              {format !== 'aggregate' && !isTie && (
+                <View style={{ gap: theme.spacing(2) }}>
+                  <FieldLabel>{format === 'best_of' ? 'Best of' : 'Rubbers'}</FieldLabel>
+                  <View style={st.chips}>
+                    {ODD_LEGS.map((n) => <SelectChip key={n} label={`${n}`} active={legs === n} onPress={() => setLegs(n)} />)}
+                    <Stepper value={legs} onChange={(v) => setLegs(Math.max(1, Math.min(15, v)))} />
+                  </View>
+                  <Text style={textStyles.muted}>
+                    {format === 'best_of' ? `First to ${Math.floor(legs / 2) + 1} wins. Later games are dead rubbers once decided.` : `Most wins of ${legs} takes the tie.`}
+                  </Text>
+                </View>
+              )}
+
+              {format === 'aggregate' && (
+                <SelectChip label={awayGoals ? '✓ Away-goals tiebreak' : 'Away-goals tiebreak'} active={awayGoals} onPress={() => setAwayGoals((v) => !v)} />
+              )}
+
+              <TextField label="Series name (optional)" value={name} onChange={setName} placeholder="e.g. India tour of Australia" />
+              <DateTimeField label={isTie ? 'Tie starts' : 'First match'} value={when} onChange={setWhen} />
+              <Text style={textStyles.muted}>
+                {isTie
+                  ? `${legsCount} rubbers will be created${tieSpec?.gap ? `, ${tieSpec.gap} min apart` : ', all at the same time'}. Enter both lineups on the tie page.`
+                  : `${legsCount} match${legsCount === 1 ? '' : 'es'} will be created, three days apart, alternating home & away.`}
+              </Text>
+            </>
+          )}
+        </KeyboardAwareScrollView>
+      </KeyboardFooterLayout>
     </SafeAreaView>
   );
 }

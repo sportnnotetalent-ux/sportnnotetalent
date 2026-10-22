@@ -2,7 +2,7 @@
  *  field above the on-screen keyboard (src/components/keyboardMath.ts). */
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { keyboardTopOf, revealTarget, sheetPlacement, REVEAL_MARGIN } from '../src/components/keyboardMath.ts';
+import { fieldOrder, keyboardTopOf, revealTarget, sheetPlacement, REVEAL_MARGIN } from '../src/components/keyboardMath.ts';
 
 const ev = (screenY: number, height: number) => ({ endCoordinates: { screenY, height } });
 
@@ -66,5 +66,17 @@ describe('pop-up sheets', () => {
     assert.equal(p.sheet?.maxHeight, 320);
     // even a tall keyboard (45% of the screen, under the status bar) clears it
     assert.ok(32 + 320 <= 800 * 0.55);
+  });
+});
+
+describe('keyboard "Next" order', () => {
+  test('top to bottom, then left to right on the same row', () => {
+    const fields = [
+      { id: 'phone', x: 16, y: 640 },
+      { id: 'city', x: 16, y: 420 },
+      { id: 'pin', x: 200, y: 421 }, // beside City (1 px off the row)
+      { id: 'name', x: 16, y: 120 },
+    ];
+    assert.deepEqual([...fields].sort(fieldOrder).map((f) => f.id), ['name', 'city', 'pin', 'phone']);
   });
 });

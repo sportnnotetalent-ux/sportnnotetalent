@@ -7,7 +7,7 @@
  *  Start order is drawn. Rendered by AthleticsEventSetupScreen for sport 'cycling'. */
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, TextInput, StyleSheet } from 'react-native';
-import { KeyboardAwareScrollView } from '../components/keyboard';
+import { KeyboardAwareScrollView, KeyboardFooterLayout } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -191,136 +191,144 @@ export function CyclingEventSetup({ tournamentId }: { tournamentId?: string }) {
   const S = sprintCount(lapsN, everyN);
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
-        <ScreenTitle title="🚴 New cycling race" subtitle={tournament?.name} />
-        {/* SD-141: the meet's competition rules, checked before the meet starts */}
-        <CompetitionRulesCard tournament={tournament} sport={'cycling'} />
+      <KeyboardFooterLayout
+        safeBottom={false}
+        footer={(
+          <>
+            <FormError message={error} />
+            <Button label={busy ? 'Creating…' : 'Create race & start list'} onPress={() => void create()} disabled={busy || !n} />
+          </>
+        )}
+      >
+        <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
+          <ScreenTitle title="🚴 New cycling race" subtitle={tournament?.name} />
+          {/* SD-141: the meet's competition rules, checked before the meet starts */}
+          <CompetitionRulesCard tournament={tournament} sport={'cycling'} />
 
-        <Card style={st.card}>
-          <Text style={textStyles.h3}>1 · Race</Text>
-          <View style={st.wrap}>
-            <SelectChip label="Road" active={setting === 'road'} onPress={() => setSetting('road')} />
-            <SelectChip label="Track (velodrome)" active={setting === 'track'} onPress={() => setSetting('track')} />
-          </View>
-          <View style={st.wrap}>
-            {(setting === 'road' ? ROAD : TRACK).map((k) => <SelectChip key={k} label={KIND_LABEL[k]} active={kind === k} onPress={() => setKind(k)} />)}
-          </View>
-          <Text style={textStyles.muted}>{KIND_NOTE[kind]}</Text>
-          {kind === 'itt' && (
-            <>
-              <Text style={st.label}>Distance</Text>
-              <View style={st.wrap}>{CYC_EVENTS.filter((e) => e.kind === 'itt').map((e) => <SelectChip key={e.key} label={`${(e.metres ?? 0) / 1000} km`} active={ev.key === e.key} onPress={() => setDist({ ...dist, itt: (e.metres ?? 0) / 1000 })} />)}</View>
-            </>
-          )}
-          {(kind === 'ip' || kind === 'tt') && (
-            <>
-              <Text style={st.label}>Distance</Text>
-              <View style={st.wrap}>{CYC_EVENTS.filter((e) => e.kind === kind).map((e) => <SelectChip key={e.key} label={`${e.metres} m`} active={ev.key === e.key} onPress={() => setDist({ ...dist, [kind]: e.metres ?? 0 })} />)}</View>
-              <Text style={textStyles.muted}>{kind === 'ip' ? 'UCI: 4000 m elite and U23, 3000 m juniors (men) / 2000 m junior women; schools often ride 2000 m.' : 'UCI: 1000 m (the kilo) for men, 500 m for women and juniors.'} Each distance keeps its own records and PBs.</Text>
-            </>
-          )}
-          {kind === 'tp' && (
-            <>
-              <Text style={st.label}>Distance</Text>
-              <View style={st.wrap}>{CYC_TEAM_EVENTS.filter((e) => e.kind === 'tp').map((e) => <SelectChip key={e.key} label={`${e.metres} m`} active={ev.key === e.key} onPress={() => setDist({ ...dist, tp: e.metres ?? 4000 })} />)}</View>
-              <Text style={textStyles.muted}>UCI: 4000 m for elite, U23 and junior teams; 3000 m is a school / youth distance (a house choice). Each distance keeps its own records.</Text>
-            </>
-          )}
-          {(kind === 'itt' || kind === 'stage') && (
-            <>
-              <Text style={st.label}>Start interval{kind === 'stage' ? ' (time-trial stages)' : ''}</Text>
-              <View style={st.wrap}>{[30, 60, 120].map((s) => <SelectChip key={s} label={s < 60 ? `${s} s` : `${s / 60} min`} active={interval === s} onPress={() => setStartGap(s)} />)}</View>
-            </>
-          )}
-          {(kind === 'rr' || kind === 'stage') && (
-            <TextInput style={st.input} value={km} onChangeText={setKm} placeholder={kind === 'stage' ? 'Total distance in km (optional)' : 'Distance in km (optional, e.g. 40)'} placeholderTextColor={theme.colors.textMuted} keyboardType="number-pad" accessibilityLabel="Distance in km" />
-          )}
-          {kind === 'stage' && (
-            <>
-              <Text style={st.label}>Stages ({stages.length})</Text>
-              <View style={st.wrap}>
-                {stages.map((t, i) => <SelectChip key={i} label={`${i + 1}: ${t === 'itt' ? 'time trial' : 'road'}`} active={false} onPress={() => setStages(stages.map((x, j) => (j === i ? (x === 'road' ? 'itt' : 'road') : x)))} />)}
-              </View>
-              <View style={st.wrap}>
-                <SelectChip label="＋ Road stage" active={false} onPress={() => setStages([...stages, 'road'])} />
-                <SelectChip label="＋ Time-trial stage" active={false} onPress={() => setStages([...stages, 'itt'])} />
-                {stages.length > 1 ? <SelectChip label="− Last stage" active={false} onPress={() => setStages(stages.slice(0, -1))} /> : null}
-              </View>
-              <Text style={textStyles.muted}>Tap a stage to switch road / time trial. Riders who don’t finish a stage (DNF) or finish outside the time limit (OTL) are out of the race.</Text>
-            </>
-          )}
-          {(kind === 'points' || kind === 'scratch') && (
-            <View style={st.wrap}>
-              <TextInput style={[st.input, { width: 120 }]} value={laps} onChangeText={setLaps} placeholder={`Laps (${kind === 'points' ? 40 : 20})`} placeholderTextColor={theme.colors.textMuted} keyboardType="number-pad" accessibilityLabel="Laps" />
-              {kind === 'points' && <TextInput style={[st.input, { width: 150 }]} value={every} onChangeText={setEvery} placeholder="Sprint every (10) laps" placeholderTextColor={theme.colors.textMuted} keyboardType="number-pad" accessibilityLabel="Sprint every N laps" />}
-            </View>
-          )}
-          {kind === 'points' && <Text style={textStyles.muted}>{S} sprint{S === 1 ? '' : 's'} — the last one is the finish (double points).</Text>}
-        </Card>
-
-        <Card style={st.card}>
-          <Text style={textStyles.h3}>2 · Category</Text>
-          <View style={st.wrap}>{AGES.map((a) => <SelectChip key={a.key} label={a.label} active={age === a.key} onPress={() => setAge(a.key)} />)}</View>
-          <Text style={textStyles.muted}>{AGES.find((a) => a.key === age)?.note}.</Text>
-          <View style={st.wrap}>
-            <SelectChip label={adult ? 'Men' : 'Boys'} active={gender === 'M'} onPress={() => setGender('M')} />
-            <SelectChip label={adult ? 'Women' : 'Girls'} active={gender === 'F'} onPress={() => setGender('F')} />
-            <SelectChip label="Mixed" active={gender === 'X'} onPress={() => setGender('X')} />
-          </View>
-          <Text style={textStyles.muted}>Event: {ev.label} {categoryLabel(cat)}.</Text>
-        </Card>
-
-        {teamKind ? (
           <Card style={st.card}>
-            <Text style={textStyles.h3}>3 · Teams ({teams.length})</Text>
-            <AgeBasisNote tournament={tournament} sport={'cycling'} basis={ages.basis} cutoff={ages.cutoff} canEdit={!!tournament} onSaved={ages.setBasis} />
-            <TeamBuilder sources={sources} playerById={playerById} players={players} seatNames={Array.from({ length: ev.riders ?? 4 }, (_, i) => `Rider ${i + 1}`)}
-              fits={(p) => !eligibleOnly || gender === 'X' || eligibleFor(cat, { gender: p.gender, age: ages.ageFor(p), grade: ages.gradeFor(p) })} teams={teams} onChange={setTeams}
-              hint={`Add a team from a house, then pick its ${ev.riders} riders in starting order — or “Fill empty seats”.`} />
-          </Card>
-        ) : null}
-
-        {!teamKind ? <Card style={st.card}>
-          <Text style={textStyles.h3}>3 · Riders ({n})</Text>
-          <View style={st.wrap}>
-            <SelectChip label="All" active={filter == null} onPress={() => setFilter(null)} />
-            {sources.map((s) => <SelectChip key={s.key} label={s.name} dotColor={s.colorHex} active={filter === s.key} onPress={() => setFilter(s.key)} />)}
-          </View>
-          <TextInput style={st.input} value={query} onChangeText={setQuery} placeholder="Search any player by name" placeholderTextColor={theme.colors.textMuted} accessibilityLabel="Search players" />
-          <SelectChip label={eligibleOnly ? `✓ ${categoryLabel(cat)} only` : 'Showing everyone'} active={eligibleOnly} onPress={() => setEligibleOnly(!eligibleOnly)} />
-          <AgeBasisNote tournament={tournament} sport={'cycling'} basis={ages.basis} cutoff={ages.cutoff} canEdit={!!tournament} onSaved={ages.setBasis} />
-          <View style={st.wrap}>
-            {pool.map((p) => {
-              const on = picks.includes(p.id);
-              return <SelectChip key={p.id} label={`${on ? '✓ ' : ''}${p.fullName}`} dotColor={p.houseColor} active={on} onPress={() => toggle(p.id)} />;
-            })}
-            {!pool.length && <Text style={textStyles.muted}>No riders match. Players without a gender or date of birth are always shown.</Text>}
-          </View>
-        </Card> : null}
-
-        <Card style={st.card}>
-          <Text style={textStyles.h3}>4 · Rounds</Text>
-          {kind === 'sprint' && n >= 2 && (
-            <>
-              <Text style={st.label}>Match play field</Text>
-              <View style={st.wrap}>{sprintFields(n).map((k) => <SelectChip key={k} label={k === n && (k & (k - 1)) !== 0 ? `All ${k} (byes)` : `Top ${k}`} active={sprintField === k} onPress={() => setField(k)} />)}</View>
+            <Text style={textStyles.h3}>1 · Race</Text>
+            <View style={st.wrap}>
+              <SelectChip label="Road" active={setting === 'road'} onPress={() => setSetting('road')} />
+              <SelectChip label="Track (velodrome)" active={setting === 'track'} onPress={() => setSetting('track')} />
+            </View>
+            <View style={st.wrap}>
+              {(setting === 'road' ? ROAD : TRACK).map((k) => <SelectChip key={k} label={KIND_LABEL[k]} active={kind === k} onPress={() => setKind(k)} />)}
+            </View>
+            <Text style={textStyles.muted}>{KIND_NOTE[kind]}</Text>
+            {kind === 'itt' && (
+              <>
+                <Text style={st.label}>Distance</Text>
+                <View style={st.wrap}>{CYC_EVENTS.filter((e) => e.kind === 'itt').map((e) => <SelectChip key={e.key} label={`${(e.metres ?? 0) / 1000} km`} active={ev.key === e.key} onPress={() => setDist({ ...dist, itt: (e.metres ?? 0) / 1000 })} />)}</View>
+              </>
+            )}
+            {(kind === 'ip' || kind === 'tt') && (
+              <>
+                <Text style={st.label}>Distance</Text>
+                <View style={st.wrap}>{CYC_EVENTS.filter((e) => e.kind === kind).map((e) => <SelectChip key={e.key} label={`${e.metres} m`} active={ev.key === e.key} onPress={() => setDist({ ...dist, [kind]: e.metres ?? 0 })} />)}</View>
+                <Text style={textStyles.muted}>{kind === 'ip' ? 'UCI: 4000 m elite and U23, 3000 m juniors (men) / 2000 m junior women; schools often ride 2000 m.' : 'UCI: 1000 m (the kilo) for men, 500 m for women and juniors.'} Each distance keeps its own records and PBs.</Text>
+              </>
+            )}
+            {kind === 'tp' && (
+              <>
+                <Text style={st.label}>Distance</Text>
+                <View style={st.wrap}>{CYC_TEAM_EVENTS.filter((e) => e.kind === 'tp').map((e) => <SelectChip key={e.key} label={`${e.metres} m`} active={ev.key === e.key} onPress={() => setDist({ ...dist, tp: e.metres ?? 4000 })} />)}</View>
+                <Text style={textStyles.muted}>UCI: 4000 m for elite, U23 and junior teams; 3000 m is a school / youth distance (a house choice). Each distance keeps its own records.</Text>
+              </>
+            )}
+            {(kind === 'itt' || kind === 'stage') && (
+              <>
+                <Text style={st.label}>Start interval{kind === 'stage' ? ' (time-trial stages)' : ''}</Text>
+                <View style={st.wrap}>{[30, 60, 120].map((s) => <SelectChip key={s} label={s < 60 ? `${s} s` : `${s / 60} min`} active={interval === s} onPress={() => setStartGap(s)} />)}</View>
+              </>
+            )}
+            {(kind === 'rr' || kind === 'stage') && (
+              <TextInput style={st.input} value={km} onChangeText={setKm} placeholder={kind === 'stage' ? 'Total distance in km (optional)' : 'Distance in km (optional, e.g. 40)'} placeholderTextColor={theme.colors.textMuted} keyboardType="number-pad" accessibilityLabel="Distance in km" />
+            )}
+            {kind === 'stage' && (
+              <>
+                <Text style={st.label}>Stages ({stages.length})</Text>
+                <View style={st.wrap}>
+                  {stages.map((t, i) => <SelectChip key={i} label={`${i + 1}: ${t === 'itt' ? 'time trial' : 'road'}`} active={false} onPress={() => setStages(stages.map((x, j) => (j === i ? (x === 'road' ? 'itt' : 'road') : x)))} />)}
+                </View>
+                <View style={st.wrap}>
+                  <SelectChip label="＋ Road stage" active={false} onPress={() => setStages([...stages, 'road'])} />
+                  <SelectChip label="＋ Time-trial stage" active={false} onPress={() => setStages([...stages, 'itt'])} />
+                  {stages.length > 1 ? <SelectChip label="− Last stage" active={false} onPress={() => setStages(stages.slice(0, -1))} /> : null}
+                </View>
+                <Text style={textStyles.muted}>Tap a stage to switch road / time trial. Riders who don’t finish a stage (DNF) or finish outside the time limit (OTL) are out of the race.</Text>
+              </>
+            )}
+            {(kind === 'points' || kind === 'scratch') && (
               <View style={st.wrap}>
-                <SelectChip label="Best of three heats" active={bo === 3} onPress={() => setBo(3)} />
-                <SelectChip label="One heat per match" active={bo === 1} onPress={() => setBo(1)} />
+                <TextInput style={[st.input, { width: 120 }]} value={laps} onChangeText={setLaps} placeholder={`Laps (${kind === 'points' ? 40 : 20})`} placeholderTextColor={theme.colors.textMuted} keyboardType="number-pad" accessibilityLabel="Laps" />
+                {kind === 'points' && <TextInput style={[st.input, { width: 150 }]} value={every} onChangeText={setEvery} placeholder="Sprint every (10) laps" placeholderTextColor={theme.colors.textMuted} keyboardType="number-pad" accessibilityLabel="Sprint every N laps" />}
               </View>
-            </>
-          )}
-          <Text style={textStyles.muted}>{n ? describeCycPlan(kind, plan, stages) : 'Add riders to see the rounds.'}</Text>
-          {kind === 'ip' && n > 0 && n < 4 ? <Text style={textStyles.muted}>Fewer than 4 riders: one race on time, no finals.</Text> : null}
-          {teamKind && n > 0 && (n < 4 || oneRound) ? <Text style={textStyles.muted}>{oneRound ? 'Meet rule: one round, the times decide.' : 'Fewer than 4 teams: one round on time, no finals.'}</Text> : null}
-          {handTimed ? <Text style={textStyles.muted}>Hand timing is on for this meet (Points & timing).</Text> : null}
-        </Card>
+            )}
+            {kind === 'points' && <Text style={textStyles.muted}>{S} sprint{S === 1 ? '' : 's'} — the last one is the finish (double points).</Text>}
+          </Card>
 
-        <ScheduleCard state={schedule} tournamentId={tournamentId} discipline={ev.key} plan={plan} stage={kind === 'stage'} athleteIds={teamKind ? teams.flatMap((t) => t.seats.filter((x): x is string => !!x)) : picks} />
-        <EventOfficials tournament={tournament} value={officials} onChange={setOfficials} />
-        <FormError message={error} />
-        <Button label={busy ? 'Creating…' : 'Create race & start list'} onPress={() => void create()} disabled={busy || !n} />
-      </KeyboardAwareScrollView>
+          <Card style={st.card}>
+            <Text style={textStyles.h3}>2 · Category</Text>
+            <View style={st.wrap}>{AGES.map((a) => <SelectChip key={a.key} label={a.label} active={age === a.key} onPress={() => setAge(a.key)} />)}</View>
+            <Text style={textStyles.muted}>{AGES.find((a) => a.key === age)?.note}.</Text>
+            <View style={st.wrap}>
+              <SelectChip label={adult ? 'Men' : 'Boys'} active={gender === 'M'} onPress={() => setGender('M')} />
+              <SelectChip label={adult ? 'Women' : 'Girls'} active={gender === 'F'} onPress={() => setGender('F')} />
+              <SelectChip label="Mixed" active={gender === 'X'} onPress={() => setGender('X')} />
+            </View>
+            <Text style={textStyles.muted}>Event: {ev.label} {categoryLabel(cat)}.</Text>
+          </Card>
+
+          {teamKind ? (
+            <Card style={st.card}>
+              <Text style={textStyles.h3}>3 · Teams ({teams.length})</Text>
+              <AgeBasisNote tournament={tournament} sport={'cycling'} basis={ages.basis} cutoff={ages.cutoff} canEdit={!!tournament} onSaved={ages.setBasis} />
+              <TeamBuilder sources={sources} playerById={playerById} players={players} seatNames={Array.from({ length: ev.riders ?? 4 }, (_, i) => `Rider ${i + 1}`)}
+                fits={(p) => !eligibleOnly || gender === 'X' || eligibleFor(cat, { gender: p.gender, age: ages.ageFor(p), grade: ages.gradeFor(p) })} teams={teams} onChange={setTeams}
+                hint={`Add a team from a house, then pick its ${ev.riders} riders in starting order — or “Fill empty seats”.`} />
+            </Card>
+          ) : null}
+
+          {!teamKind ? <Card style={st.card}>
+            <Text style={textStyles.h3}>3 · Riders ({n})</Text>
+            <View style={st.wrap}>
+              <SelectChip label="All" active={filter == null} onPress={() => setFilter(null)} />
+              {sources.map((s) => <SelectChip key={s.key} label={s.name} dotColor={s.colorHex} active={filter === s.key} onPress={() => setFilter(s.key)} />)}
+            </View>
+            <TextInput style={st.input} value={query} onChangeText={setQuery} placeholder="Search any player by name" placeholderTextColor={theme.colors.textMuted} accessibilityLabel="Search players" />
+            <SelectChip label={eligibleOnly ? `✓ ${categoryLabel(cat)} only` : 'Showing everyone'} active={eligibleOnly} onPress={() => setEligibleOnly(!eligibleOnly)} />
+            <AgeBasisNote tournament={tournament} sport={'cycling'} basis={ages.basis} cutoff={ages.cutoff} canEdit={!!tournament} onSaved={ages.setBasis} />
+            <View style={st.wrap}>
+              {pool.map((p) => {
+                const on = picks.includes(p.id);
+                return <SelectChip key={p.id} label={`${on ? '✓ ' : ''}${p.fullName}`} dotColor={p.houseColor} active={on} onPress={() => toggle(p.id)} />;
+              })}
+              {!pool.length && <Text style={textStyles.muted}>No riders match. Players without a gender or date of birth are always shown.</Text>}
+            </View>
+          </Card> : null}
+
+          <Card style={st.card}>
+            <Text style={textStyles.h3}>4 · Rounds</Text>
+            {kind === 'sprint' && n >= 2 && (
+              <>
+                <Text style={st.label}>Match play field</Text>
+                <View style={st.wrap}>{sprintFields(n).map((k) => <SelectChip key={k} label={k === n && (k & (k - 1)) !== 0 ? `All ${k} (byes)` : `Top ${k}`} active={sprintField === k} onPress={() => setField(k)} />)}</View>
+                <View style={st.wrap}>
+                  <SelectChip label="Best of three heats" active={bo === 3} onPress={() => setBo(3)} />
+                  <SelectChip label="One heat per match" active={bo === 1} onPress={() => setBo(1)} />
+                </View>
+              </>
+            )}
+            <Text style={textStyles.muted}>{n ? describeCycPlan(kind, plan, stages) : 'Add riders to see the rounds.'}</Text>
+            {kind === 'ip' && n > 0 && n < 4 ? <Text style={textStyles.muted}>Fewer than 4 riders: one race on time, no finals.</Text> : null}
+            {teamKind && n > 0 && (n < 4 || oneRound) ? <Text style={textStyles.muted}>{oneRound ? 'Meet rule: one round, the times decide.' : 'Fewer than 4 teams: one round on time, no finals.'}</Text> : null}
+            {handTimed ? <Text style={textStyles.muted}>Hand timing is on for this meet (Points & timing).</Text> : null}
+          </Card>
+
+          <ScheduleCard state={schedule} tournamentId={tournamentId} discipline={ev.key} plan={plan} stage={kind === 'stage'} athleteIds={teamKind ? teams.flatMap((t) => t.seats.filter((x): x is string => !!x)) : picks} />
+          <EventOfficials tournament={tournament} value={officials} onChange={setOfficials} />
+        </KeyboardAwareScrollView>
+      </KeyboardFooterLayout>
     </SafeAreaView>
   );
 }
