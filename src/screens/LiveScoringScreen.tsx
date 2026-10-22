@@ -1381,7 +1381,15 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
 
   const homePlaced = homeLineup.filter((s) => s.playerId).length;
   const awayPlaced = awayLineup.filter((s) => s.playerId).length;
-  const courtNode = !plugin.lineupsInExtras && plugin.Court && (homeLineup.length > 0 || awayLineup.length > 0) ? (
+  // Racket sports (2026-10-22): a live doubles serve diagram instead of the
+  // Lineups court — there is nothing to "place" in singles (one player a side,
+  // changing halves every point), so singles shows no court at all.
+  const courtNode = plugin.ServeCourt ? (
+    <plugin.ServeCourt
+      state={state} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor}
+      homeRoster={homeScoreRoster} awayRoster={awayScoreRoster} canScore={canScore} dispatch={dispatch}
+    />
+  ) : !plugin.lineupsInExtras && plugin.Court && (homeLineup.length > 0 || awayLineup.length > 0) ? (
     <View style={st.lineups}>
       <View style={st.lineupHeader}>
         <Text style={textStyles.h3}>Lineups</Text>

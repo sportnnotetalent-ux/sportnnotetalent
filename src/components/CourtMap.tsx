@@ -17,7 +17,7 @@ function initials(slot: LineupSlot): string {
 function Dot({ slot, color, top, left }: { slot: LineupSlot; color: string; top: string; left: string }) {
   return (
     <View style={[styles.dotWrap, { top: top as any, left: left as any }]}>
-      <View style={[styles.dot, { backgroundColor: color, borderColor: slot.playerId ? '#fff' : 'transparent' }]}>
+      <View style={[styles.dot, { backgroundColor: color, borderColor: slot.playerId ? '#fff' : 'transparent' }, slot.highlight && styles.dotHi]}>
         <Text style={styles.dotText} numberOfLines={1}>{initials(slot)}</Text>
       </View>
       {slot.playerName ? (
@@ -25,6 +25,7 @@ function Dot({ slot, color, top, left }: { slot: LineupSlot; color: string; top:
       ) : (
         <Text style={styles.pos} numberOfLines={1}>{slot.position}</Text>
       )}
+      {slot.tag ? <Text style={[styles.tag, slot.highlight && styles.tagHi]} numberOfLines={1}>{slot.tag}</Text> : null}
     </View>
   );
 }
@@ -85,4 +86,7 @@ const styles = StyleSheet.create({
   dotText: { color: '#06120D', fontSize: 11, fontWeight: '800' },
   name: { color: '#fff', fontSize: 9, fontWeight: '600', marginTop: 1 },
   pos: { color: COURT_LINE, fontSize: 9, fontWeight: '700', marginTop: 1 },
+  dotHi: { width: 36, height: 36, borderRadius: 18, marginTop: -18, borderWidth: 3 },
+  tag: { color: 'rgba(255,255,255,0.75)', fontSize: 9, fontWeight: '700', marginTop: 1 },
+  tagHi: { color: '#FFE45C' },
 });

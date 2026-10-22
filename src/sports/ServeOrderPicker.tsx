@@ -4,6 +4,10 @@
  * (ITF Rules 5–6, FIP). Shown before the set's first point; a pick dispatches
  * SET_SERVE_ORDER { side, slot } and serve.ts rotates from it. Without a pick
  * the roster order applies (the chip shown as chosen).
+ *
+ * 2026-10-22 — and, optionally, who receives in the deuce court (ITF Rule 14:
+ * kept for the set). Display only — it names the receiver in the Score tab's
+ * serve diagram; SET_SERVE_ORDER { recvSide, recvSlot }. No pick → "?" there.
  */
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
@@ -11,7 +15,7 @@ import { theme } from '../core/theme';
 import { SelectChip } from '../components/ui';
 import type { Player } from '../core/types';
 import type { ScoreAction } from './types';
-import { serveOrderOpen, setFirstSlot, type ServeState } from './serve';
+import { serveOrderOpen, setFirstSlot, deuceReceiverSlot, type ServeState } from './serve';
 
 export function ServeOrderPicker({
   state, homeName, awayName, homeRoster, awayRoster, dispatch, icon,
@@ -41,6 +45,20 @@ export function ServeOrderPicker({
             {roster.map((p, slot) => (
               <SelectChip key={p.id} label={p.fullName} active={cur === slot}
                 onPress={() => dispatch({ type: 'SET_SERVE_ORDER', payload: { side: t, slot, playerId: p.id, playerName: p.fullName } })} />
+            ))}
+          </View>
+        );
+      })}
+      <Text style={st.meta}>Optional: who receives in the deuce court this set (names the receiver on the Score tab).</Text>
+      {sides.map((t) => {
+        const roster = (t === 'home' ? homeRoster : awayRoster).slice(0, 2);
+        const cur = deuceReceiverSlot(state, t);
+        return (
+          <View key={`r-${t}`} style={st.chips}>
+            <Text style={[st.meta, st.team]}>{t === 'home' ? homeName : awayName} · deuce court:</Text>
+            {roster.map((p, slot) => (
+              <SelectChip key={p.id} label={p.fullName} active={cur === slot}
+                onPress={() => dispatch({ type: 'SET_SERVE_ORDER', payload: { recvSide: t, recvSlot: slot } })} />
             ))}
           </View>
         );

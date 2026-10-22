@@ -13,6 +13,14 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-22 — Racket courts: no Lineups court in singles; a live doubles serve diagram
+Founder, on a singles tennis match: "what is the tennis map trying to portray?" — the generic team-sport Lineups court (two empty "Deuce" / "Ad" places a side, "0 v 0 placed"), meaningless in singles.
+- **Singles** (tennis, padel, badminton, pickleball): no court on the Score tab.
+- **Doubles:** a **Next point** diagram replaces it — "Aisha serves from the right service court to Divya", all four players placed (server highlighted, receiver diagonal, partners in the other half; pickleball shows the "4-2-1" call). Derived from the score each point (`src/sports/serveCourt.ts`): tennis / padel from `serveInfo` + points in the game (deuce / ad), badminton from `badmintonDoublesTurn`, pickleball from `serveSpot` / `rightCourtId`; deciding no-ad / golden points note that the receivers choose.
+- **Tennis / padel receiving order** (ITF Rule 14, kept per set): optional pick in the set's serving-order card, or one tap on the diagram for the scorer — `SET_SERVE_ORDER { recvSide, recvSlot }` → `recvOrder`. Display only (no score or stat change); until picked the receiver shows as "?".
+- `SportPlugin.ServeCourt` (replaces the Lineups court when set); CourtMap dots gain an optional `tag` / `highlight`.
+- Verified: tsc clean; 3979 pass / 0 fail (+ tests/serve-court.test.mts); demo — tennis singles shows no court, badminton doubles shows the diagram correctly oriented; no console errors.
+
 ### 2026-10-22 — "Mine" means mine: teams, tournaments, matches, reminders (audit + fixes)
 Founder found a friend could see the founder's tennis team under Organize → My teams. Three parallel audits (teams / tournaments / matches+stats) found the same class of bug across the app; all fixed. View-only leaks — edits were always limited to admins/creators (UI + RLS).
 - **One rule, `getMyScope(profileId)`** (repos.ts): teams = created (profile) · captain / vice-captain / team admin · roster / team_members · team_staff · club teams (member or creator); managed teams/clubs separately. Tournaments = hosting (host_ids · organizer_id · org where I'm an active Owner/Admin/Organizer) · playing (a team of mine entered) · officiating. Cached 10 s per profile. `getMyTeams()` reads those teams.

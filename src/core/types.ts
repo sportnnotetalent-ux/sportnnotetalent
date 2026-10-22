@@ -799,6 +799,10 @@ export interface LineupSlot {
   playerName?: string;
   /** wears the captain's armband — shown as a "C" badge on the lineup */
   isCaptain?: boolean;
+  /** a short role line under the name (the doubles serve diagram: "🎾 serves") */
+  tag?: string;
+  /** emphasise this dot (the server) */
+  highlight?: boolean;
 }
 
 export interface MatchLineup {

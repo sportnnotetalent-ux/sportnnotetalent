@@ -7,7 +7,7 @@
 import type { LiveEvent } from '../liveEvents';
 import type { ScoreAction } from '../types';
 import type { PointInput } from '../rallyEdit.ts';
-import { serveInfo as serveInfoOf, gamesPlayed as gamesPlayedOf, withServeOrder, type ServeOrder } from '../serve.ts';
+import { serveInfo as serveInfoOf, gamesPlayed as gamesPlayedOf, withServeOrder, withRecvOrder, type ServeOrder } from '../serve.ts';
 import { scoreLine as lineOf, finalSummary, type Pair, type LineScore } from '../scoreline.ts';
 import type { ScoreSummary } from '../types';
 import { applyPointDetail, detailFlags, initDetailFlags } from '../pointDetail.ts';
@@ -62,6 +62,8 @@ export interface TennisState {
   /** SD-104 — doubles serving order picked per set (SET_SERVE_ORDER); absent →
    *  roster order. Kept across an EDIT_LOG replay. See serve.ts. */
   serveOrder?: ServeOrder;
+  /** doubles: per set, the slot receiving in the deuce court (display only; SET_SERVE_ORDER recvSide / recvSlot) */
+  recvOrder?: ServeOrder;
   /** SD-107 — optional point detail (how each point was won) is being
    *  captured; absent / false = off (D8). Format key / SET_DETAIL. */
   pointDetail?: boolean;
@@ -231,7 +233,7 @@ const core = (s: TennisState, a: ScoreAction): TennisState => {
   // SD-104 — doubles: which player of a pair serves its first game of this set
   // (ITF / FIP: each pair chooses at the start of every set). Pre-first-point of
   // the set only; no score effect and no timeline event.
-  if (a.type === 'SET_SERVE_ORDER') return withServeOrder(s, a.payload as Record<string, unknown> | undefined);
+  if (a.type === 'SET_SERVE_ORDER') return withRecvOrder(withServeOrder(s, a.payload as Record<string, unknown> | undefined), a.payload as Record<string, unknown> | undefined);
   // SD-115: a `v:2` payload may FIX the first server mid-match — serve is only
   // derived (first server + games played), so the score never changes; the
   // serve / hold / break figures re-derive from the corrected opener.

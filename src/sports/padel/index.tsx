@@ -37,6 +37,8 @@ import { cellText } from '../scoreline';
 import { durationLine, stampDispatch, withDuration } from '../conduct';
 import { makeRacketQuickOptions } from '../RacketQuickOptions';
 import { SetLineBoard } from '../SetLineBoard';
+import { ServeCourtPanel } from '../ServeCourtPanel';
+import { setServeCourt } from '../serveCourt';
 export type { PadelState } from './engine';
 
 const ScoringControls: SportPlugin<PadelState>['ScoringControls'] = ({ state, dispatch: rawDispatch, homeName, awayName, homeColor, awayColor, homeRoster = [], awayRoster = [] }) => {
@@ -157,6 +159,15 @@ const PadelScoreboard: NonNullable<SportPlugin<PadelState>['Scoreboard']> = ({ s
   );
 };
 
+/** Doubles serve diagram for the next point (replaces the Lineups court). */
+const PADEL_COURT = makeCourt('padel')!;
+const PadelServeCourt: NonNullable<SportPlugin<PadelState>['ServeCourt']> = (p) => {
+  const s = p.state as PadelState;
+  const ids = (r: Player[]) => r.map((x) => x.id);
+  const view = setServeCourt('padel', s, { home: ids(p.homeRoster), away: ids(p.awayRoster) }, inTiebreak(s), !!decidingPoint(s) && !inTiebreak(s));
+  return <ServeCourtPanel view={view} Court={PADEL_COURT} {...p} />;
+};
+
 export const padelPlugin: SportPlugin<PadelState> = {
   id: 'padel',
   name: 'Padel',
@@ -191,6 +202,7 @@ export const padelPlugin: SportPlugin<PadelState> = {
   liveSettings: detailLiveSettings('padel'),
   formation: () => courtFormation('padel'),
   Court: makeCourt('padel'),
+  ServeCourt: PadelServeCourt,
   voice: { hints: ['point home', 'point away', '{name} scores'], parse: pointVoice },
   formatFields: [
     {

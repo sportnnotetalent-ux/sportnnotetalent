@@ -27,6 +27,20 @@ export type ScoringArchetype =
 
 /** Player stat credit carried alongside a scoring action (a side-channel the
  *  reducer ignores; the live-match layer turns it into a stat line). */
+/** Props of a plugin's live doubles serve diagram (SportPlugin.ServeCourt). */
+export interface ServeCourtProps {
+  state: unknown;
+  homeName: string;
+  awayName: string;
+  homeColor?: string;
+  awayColor?: string;
+  homeRoster: Player[];
+  awayRoster: Player[];
+  /** the scorer may set the tennis / padel receiving order from the diagram */
+  canScore?: boolean;
+  dispatch?: (a: ScoreAction) => void;
+}
+
 export interface Attribution {
   playerId: string;
   stat: string;
@@ -437,6 +451,10 @@ export interface SportPlugin<S = unknown> {
    */
   formation?: (perSide?: number) => LineupSlot[];
   Court?: React.FC<CourtProps>;
+  /** Racket doubles (2026-10-22): a live serve diagram derived from the score
+   *  (who serves from which half to whom). When set it REPLACES the Lineups
+   *  court on the Score tab; it renders nothing in singles. */
+  ServeCourt?: React.FC<ServeCourtProps>;
   /** Extra tiles for the in-play Quick options sheet (parity #13) — e.g.
    *  cricket's 🧤 Change keeper. `onDone(message)` closes the sheet and shows
    *  the message as a short toast. */

@@ -28,6 +28,8 @@ import { durationLine, stampDispatch, withDuration } from '../conduct';
 import { makeRacketQuickOptions } from '../RacketQuickOptions';
 import { badmintonDoublesTurn } from '../doublesOrder';
 import { DoublesOrderPicker } from '../DoublesOrderPicker';
+import { ServeCourtPanel } from '../ServeCourtPanel';
+import { badmintonServeCourt } from '../serveCourt';
 export { serve, type BadmintonState } from './engine';
 
 const ScoringControls: SportPlugin<BadmintonState>['ScoringControls'] = ({ state, dispatch: rawDispatch, homeName, awayName, homeColor, awayColor, homeRoster = [], awayRoster = [] }) => {
@@ -136,6 +138,14 @@ const BadmintonScoreboard: NonNullable<SportPlugin<BadmintonState>['Scoreboard']
   );
 };
 
+/** Doubles serve diagram for the next point (BWF Law 11; replaces the Lineups court). */
+const BADMINTON_COURT = makeCourt('badminton')!;
+const BadmintonServeCourt: NonNullable<SportPlugin<BadmintonState>['ServeCourt']> = (p) => {
+  const ids = (r: Player[]) => r.map((x) => x.id);
+  const view = badmintonServeCourt(p.state as BadmintonState, { home: ids(p.homeRoster), away: ids(p.awayRoster) });
+  return <ServeCourtPanel view={view} Court={BADMINTON_COURT} {...p} />;
+};
+
 export const badmintonPlugin: SportPlugin<BadmintonState> = {
   id: 'badminton',
   name: 'Badminton',
@@ -169,6 +179,7 @@ export const badmintonPlugin: SportPlugin<BadmintonState> = {
   liveSettings: detailLiveSettings('badminton'),
   formation: () => courtFormation('badminton'),
   Court: makeCourt('badminton'),
+  ServeCourt: BadmintonServeCourt,
   voice: { hints: ['point home', 'point away', '{name} scores'], parse: pointVoice },
   formatFields: [
     {

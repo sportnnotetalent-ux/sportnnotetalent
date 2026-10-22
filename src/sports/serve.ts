@@ -31,6 +31,11 @@ export interface ServeState {
   /** SD-104 — doubles: per set index, the roster slot (0/1) each pair chose to
    *  serve its first service game of that set. Absent → roster order. */
   serveOrder?: ServeOrder;
+  /** Doubles: per set index, the roster slot (0/1) of each pair's player who
+   *  receives in the DEUCE (right) court that set (ITF Rule 14 — a pair keeps
+   *  its receiving order for the set). Display only (the serve diagram); never
+   *  changes a score or a stat. Absent → not known. */
+  recvOrder?: ServeOrder;
 }
 
 /** SD-104 — per set (index = completed sets before it), each pair's first server slot. */
@@ -85,6 +90,25 @@ export function withServeOrder<T extends ServeState & { ended?: boolean; doubles
   order[i] = { ...(order[i] ?? {}), [side]: slot };
   return { ...s, serveOrder: order };
 }
+
+/** Apply SET_SERVE_ORDER { recvSide, recvSlot } — which of `recvSide`'s pair
+ *  receives in the deuce court this set. Display only, so it may be set (or
+ *  corrected) at any point of the set; doubles, not after the match. */
+export function withRecvOrder<T extends ServeState & { ended?: boolean; doubles?: boolean }>(s: T, payload: Record<string, unknown> | undefined): T {
+  const side = payload?.recvSide;
+  const slot = payload?.recvSlot;
+  if (!s.doubles || s.ended || (side !== 'home' && side !== 'away') || (slot !== 0 && slot !== 1)) return s;
+  const order: ServeOrder = [...(s.recvOrder ?? [])];
+  const i = s.sets.length;
+  order[i] = { ...(order[i] ?? {}), [side]: slot };
+  return { ...s, recvOrder: order };
+}
+
+/** The slot of `side`'s deuce-court receiver in the current set, if picked. */
+export const deuceReceiverSlot = (s: ServeState, side: Side): 0 | 1 | undefined => {
+  const v = s.recvOrder?.[s.sets.length]?.[side];
+  return v === 0 || v === 1 ? v : undefined;
+};
 
 /** Who is serving right now: side + (doubles) which of the pair (slot 0/1).
  *  `inTiebreak` is passed in because each sport decides its own tiebreak rule. */

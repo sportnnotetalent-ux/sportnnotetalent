@@ -28,6 +28,8 @@ import { tennisTotals } from '../racketTotals';
 import { cellText } from '../scoreline';
 import { durationLine, stampDispatch, withDuration } from '../conduct';
 import { makeRacketQuickOptions } from '../RacketQuickOptions';
+import { ServeCourtPanel } from '../ServeCourtPanel';
+import { setServeCourt } from '../serveCourt';
 
 
 const ScoringControls: SportPlugin<TennisState>['ScoringControls'] = ({ state, dispatch: rawDispatch, homeName, awayName, homeColor, awayColor, homeRoster = [], awayRoster = [] }) => {
@@ -147,6 +149,17 @@ const TennisScoreboard: NonNullable<SportPlugin<TennisState>['Scoreboard']> = ({
   );
 };
 
+/** Doubles: who serves from which half to whom, for the next point (replaces
+ *  the Lineups court; nothing in singles). */
+const TENNIS_COURT = makeCourt('tennis')!;
+const TennisServeCourt: NonNullable<SportPlugin<TennisState>['ServeCourt']> = (p) => {
+  const s = p.state as TennisState;
+  const ids = (r: Player[]) => r.map((x) => x.id);
+  const deciding = !inTiebreak(s) && s.noAd && s.pts.home === 3 && s.pts.away === 3;
+  const view = setServeCourt('tennis', s, { home: ids(p.homeRoster), away: ids(p.awayRoster) }, inTiebreak(s), deciding);
+  return <ServeCourtPanel view={view} Court={TENNIS_COURT} {...p} />;
+};
+
 export const tennisPlugin: SportPlugin<TennisState> = {
   id: 'tennis',
   name: 'Tennis',
@@ -180,6 +193,7 @@ export const tennisPlugin: SportPlugin<TennisState> = {
   liveSettings: detailLiveSettings('tennis'),
   formation: () => courtFormation('tennis'),
   Court: makeCourt('tennis'),
+  ServeCourt: TennisServeCourt,
   voice: { hints: ['point home', 'ace {name}', 'double fault {name}'], parse: tennisVoice },
   formatFields: [
     {

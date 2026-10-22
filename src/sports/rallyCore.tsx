@@ -38,6 +38,8 @@ import { durationLine, stampDispatch, withDuration } from './conduct';
 import { makeRacketQuickOptions } from './RacketQuickOptions';
 import { ttDoublesTurn, ttGameStartOrder } from './doublesOrder';
 import { DoublesOrderPicker } from './DoublesOrderPicker';
+import { ServeCourtPanel } from './ServeCourtPanel';
+import { pickleballServeCourt } from './serveCourt';
 import { makeRallyEngine, rallySummary, rallyScoreLine, rallyLineScore, rallyServingSide, rallyRows, rallyInputs, serveSpot, serverId, startPair, type RallyState } from './rallyEngine';
 
 export type { RallyState } from './rallyEngine';
@@ -386,6 +388,8 @@ export function makeRallyPlugin(opts: RallyOpts): SportPlugin<RallyState> {
     voice: { hints: ['rally home', 'rally away', 'point home'], parse: pointVoice },
     formation: opts.hasCourt ? () => courtFormation(opts.id) : undefined,
     Court: opts.hasCourt ? makeCourt(opts.id) : undefined,
+    // Pickleball doubles: who serves from which court to whom (replaces Lineups)
+    ...(opts.id === 'pickleball' && opts.hasCourt ? { ServeCourt: makePickleballServeCourt(makeCourt(opts.id)!) } : {}),
     // deep wave — + the "Stats to track" defaults for every match of the format
     formatFields: [...opts.formatFields, ...trackFormatFields(opts.id)],
   };
@@ -408,3 +412,13 @@ const ctrl = StyleSheet.create({
     paddingVertical: theme.spacing(1), paddingHorizontal: theme.spacing(3),
   },
 });
+
+/** Pickleball doubles serve diagram for the next rally (nothing in singles). */
+function makePickleballServeCourt(Court: NonNullable<SportPlugin<RallyState>['Court']>): NonNullable<SportPlugin<RallyState>['ServeCourt']> {
+  const PickleballServeCourt: NonNullable<SportPlugin<RallyState>['ServeCourt']> = (p) => {
+    const ids = (r: Player[]) => r.map((x) => x.id);
+    const view = pickleballServeCourt(p.state as RallyState, { home: ids(p.homeRoster), away: ids(p.awayRoster) });
+    return <ServeCourtPanel view={view} Court={Court} {...p} />;
+  };
+  return PickleballServeCourt;
+}
