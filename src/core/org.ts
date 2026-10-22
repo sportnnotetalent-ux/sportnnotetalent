@@ -300,21 +300,24 @@ export const activeOrgInCategory = (
     ? activeOrgsForPlayer(orgs, playerId).find((o) => o.type === category && o.id !== exceptOrgId)
     : undefined;
 
-/** Everyone responsible for a tournament: for an org-hosted event, the org's
- *  Admins & Organizers (Scorers and plain Members don't run events); otherwise
- *  the listed individual host ids. */
+/** Everyone responsible for a tournament: the listed individual hosts (co-hosts
+ *  too), plus — for an org-hosted event — the org's active Owners, Admins &
+ *  Organizers (Scorers and plain Members don't run events). Mirrors the
+ *  server's can_manage_tournament (which also keeps co-hosts of org events). */
 export function tournamentHostPlayerIds(t: Tournament, orgs: Organization[]): string[] {
+  const out = new Set(t.hostIds ?? []);
   if (t.hostOrgId) {
     const org = orgs.find((o) => o.id === t.hostOrgId);
-    return org
-      ? org.members
-          .filter((m) => !m.until && (m.role === 'Owner' || m.role === 'Admin' || m.role === 'Organizer'))
-          .map((m) => m.playerId)
-      : [];
+    for (const m of org?.members ?? []) {
+      if (!m.until && (m.role === 'Owner' || m.role === 'Admin' || m.role === 'Organizer')) out.add(m.playerId);
+    }
   }
-  return t.hostIds ?? [];
+  return [...out];
 }
 
-/** Can this player manage the tournament (assign scorers, edit hosts/logo)? */
-export const canManageTournament = (t: Tournament, orgs: Organization[], playerId?: string | null): boolean =>
-  !!playerId && tournamentHostPlayerIds(t, orgs).includes(playerId);
+/** Can this person manage the tournament (assign scorers, edit hosts/logo)? A
+ *  host by player id, or its organiser account (`organizerId`, a PROFILE id —
+ *  pass `profileId` to check it). */
+export const canManageTournament = (t: Tournament, orgs: Organization[], playerId?: string | null, profileId?: string | null): boolean =>
+  (!!profileId && !!t.organizerId && t.organizerId === profileId) ||
+  (!!playerId && tournamentHostPlayerIds(t, orgs).includes(playerId));

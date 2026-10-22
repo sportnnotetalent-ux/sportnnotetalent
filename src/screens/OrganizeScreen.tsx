@@ -74,7 +74,7 @@ export default function OrganizeScreen() {
           // haven't finished yet. Live first, then upcoming, by start date.
           const order: Record<Status, number> = { live: 0, upcoming: 1, completed: 2 };
           const mine = all
-            .filter((t) => canManageTournament(t, orgs, myId) && statusOf(t) !== 'completed')
+            .filter((t) => canManageTournament(t, orgs, myId, profile?.id) && statusOf(t) !== 'completed')
             .sort((a, b) => order[statusOf(a)] - order[statusOf(b)] || a.startDate.localeCompare(b.startDate));
           setHosted(mine);
           setFallback(current);

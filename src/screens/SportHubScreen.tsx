@@ -90,7 +90,7 @@ export default function SportHubScreen() {
         <ScrollView contentContainerStyle={st.content}>
           <ScreenTitle title={`${plugin.icon} ${plugin.name}`} subtitle={tournamentName} />
           {tournament ? (
-            <AthleticsHub sport={sport} tournament={tournament} canOrganize={canOrganize(profile?.role) || canManageTournament(tournament, orgs, me)} />
+            <AthleticsHub sport={sport} tournament={tournament} canOrganize={canOrganize(profile?.role) || canManageTournament(tournament, orgs, me, profile?.id)} />
           ) : <Text style={textStyles.muted}>Loading…</Text>}
         </ScrollView>
       </SafeAreaView>

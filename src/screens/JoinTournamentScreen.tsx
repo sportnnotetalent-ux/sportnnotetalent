@@ -16,7 +16,7 @@ import { isGuestSession, promptSignIn } from '../core/guest';
 import { notice } from '../core/confirm';
 import { getSport } from '../sports/registry';
 import { useCaptainships, useTournamentCategories } from '../data/hooks';
-import { getTournamentInvite, redeemTournamentInvite, getTeams, canManageTeam, getMyPlayerId, createTeam, type TournamentInviteInfo } from '../data/repos';
+import { getTournamentInvite, redeemTournamentInvite, getMyTeams, createTeam, type TournamentInviteInfo } from '../data/repos';
 import { filterTeams } from '../core/teamSearch';
 import { OpenInAppBanner } from '../components/OpenInAppBanner';
 import type { SportId, Team } from '../core/types';
@@ -73,14 +73,11 @@ export default function JoinTournamentScreen() {
     if (!info?.active) return;
     let on = true;
     void (async () => {
-      const sports = info.sports.length ? info.sports : [undefined];
-      const lists = await Promise.all(sports.map((s) => getTeams(s)));
-      const candidates = lists.flat().filter((t) => !t.adhoc);
-      const myPlayerId = await getMyPlayerId(profile?.id);
-      const ctx = { profileId: profile?.id, myPlayerId, role: profile?.role };
-      const oks = await Promise.all(candidates.map((t) => canManageTeam(t.id, { ...ctx, isCaptainStore: isCaptain(t.id) }).catch(() => false)));
+      // The teams I manage (the app-wide rule, getMyScope) in this tournament's
+      // sports — one read, instead of a permission call per team on the platform.
+      const managed = (await getMyTeams(profile?.id, { managedOnly: true })).filter((t) => !t.adhoc);
+      const mine = info.sports.length ? managed.filter((t) => info.sports.includes(t.sport)) : managed;
       if (!on) return;
-      const mine = candidates.filter((_, i) => oks[i]);
       setMyTeams(mine);
       if (mine.length === 1) setTeamId(mine[0].id);
     })();

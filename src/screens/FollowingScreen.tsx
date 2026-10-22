@@ -9,7 +9,9 @@ import { Card, Pill, ScreenTitle, textStyles } from '../components/ui';
 import { SectionHeader, SECTION_CAP } from '../components/SectionHeader';
 import { FollowBell } from '../components/FollowBell';
 import { useAuth } from '../core/auth';
-import { useFollow, usePlayers, useTeams, useTournament } from '../data/hooks';
+import { useFollow, usePlayers, useTeams } from '../data/hooks';
+import { getTournaments } from '../data/repos';
+import type { Tournament } from '../core/types';
 import { getSport } from '../sports/registry';
 import type { RootStackParamList } from '../navigation/types';
 
@@ -21,7 +23,8 @@ export default function FollowingScreen() {
   const { idsOfType, toggle } = useFollow(profile?.id);
   const players = usePlayers();
   const teams = useTeams();
-  const tournament = useTournament();
+  const [tournaments, setTournaments] = React.useState<Tournament[]>([]);
+  React.useEffect(() => { let on = true; getTournaments().then((t) => on && setTournaments(t)); return () => { on = false; }; }, []);
 
   const playerIds = idsOfType('player');
   const teamIds = idsOfType('team');
@@ -29,7 +32,8 @@ export default function FollowingScreen() {
 
   const followedPlayers = players.filter((p) => playerIds.includes(p.id));
   const followedTeams = teams.filter((t) => teamIds.includes(t.id));
-  const followedTournaments = tournament && tournamentIds.includes(tournament.id) ? [tournament] : [];
+  // every followed tournament (this used to show only the app's oldest one, and only if followed)
+  const followedTournaments = tournaments.filter((t) => tournamentIds.includes(t.id));
   const total = followedPlayers.length + followedTeams.length + followedTournaments.length;
 
   const [showAllTournaments, setShowAllTournaments] = React.useState(false);

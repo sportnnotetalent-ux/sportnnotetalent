@@ -102,7 +102,7 @@ export default function StandingsScreen() {
   const orgs = useOrganizations();
   const [myId, setMyId] = useState<string | null>(null);
   useEffect(() => { let on = true; getMyPlayerId(profile?.id).then((id) => on && setMyId(id)); return () => { on = false; }; }, [profile?.id]);
-  const canManage = !!tournament && canManageTournament(tournament, orgs, myId);
+  const canManage = !!tournament && canManageTournament(tournament, orgs, myId, profile?.id);
   const [rows, setRows] = useState<ManualStandingRow[]>([]);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);

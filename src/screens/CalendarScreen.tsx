@@ -9,15 +9,14 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { theme } from '../core/theme';
 import { EmptyState, Card, Pill, SelectChip, textStyles } from '../components/ui';
-import { useMatches, useOrganizations, useFollow } from '../data/hooks';
-import { getTournaments, getMyPlayerId, getPlayer } from '../data/repos';
-import { orgsForPlayer } from '../core/org';
+import { useMatches, useMyTournaments, useScopedMatches } from '../data/hooks';
+import { getTournaments } from '../data/repos';
 import { useAuth } from '../core/auth';
 import { getSport } from '../sports/registry';
 import { exportToCalendar, type CalEvent } from '../core/ics';
 import { formatDay, formatDayShort } from '../core/dates';
 import { matchLine } from '../sports/matchLine';
-import type { Match, Tournament, Player } from '../core/types';
+import type { Match, Tournament } from '../core/types';
 import type { RootStackParamList } from '../navigation/types';
 import { useParamState } from '../navigation/useParamState';
 import { formatTime, localDay, todayIn, useUserTimeZone } from '../core/time';
@@ -35,39 +34,29 @@ export default function CalendarScreen() {
   const nav = useNavigation<Nav>();
   const { profile } = useAuth();
   const { matches: allMatches } = useMatches('all');
-  const orgs = useOrganizations();
-  const { idsOfType } = useFollow(profile?.id);
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
-  const [me, setMe] = useState<Player | null>(null);
   useFocusEffect(
     useCallback(() => {
       let on = true;
       getTournaments().then((t) => on && setTournaments(t));
-      getMyPlayerId(profile?.id).then((id) => { if (id) getPlayer(id).then((p) => { if (on) setMe(p); }); });
       return () => { on = false; };
-    }, [profile?.id])
+    }, [])
   );
 
   const [scope, setScope] = useState<'mine' | 'all'>('mine');
-  const myId = me?.id;
 
-  // "Mine" = matches I play/score/host, and tournaments I host, follow, belong to
-  // via my community, or have a match in.
-  const isMyTeam = (t: Match['homeTeam']) =>
-    !!myId && ((t.roster?.includes(myId) ?? false) || (!!me?.houseName && t.name === me.houseName));
-  const isMyMatch = (m: Match) =>
-    !!myId && (m.scorerId === myId || (m.hostIds?.includes(myId) ?? false) || isMyTeam(m.homeTeam) || isMyTeam(m.awayTeam));
-  const myOrgIds = useMemo(() => new Set(orgsForPlayer(orgs, myId).map((o) => o.id)), [orgs, myId]);
-  const followedTournaments = useMemo(() => new Set(idsOfType('tournament')), [idsOfType]);
-  const myMatchTournamentIds = useMemo(
-    () => new Set(allMatches.filter(isMyMatch).map((m) => m.tournamentId).filter((id): id is string => !!id)),
-    [allMatches, myId, me?.houseName]
-  );
-  const isMyTournament = (t: Tournament) =>
-    !!myId && ((t.hostIds?.includes(myId) ?? false) || (!!t.hostOrgId && myOrgIds.has(t.hostOrgId)) || followedTournaments.has(t.id) || myMatchTournamentIds.has(t.id));
+  // "Mine" = the app-wide rule (repos getMyScope): matches I play in (any team
+  // that's mine), score, host or officiate; tournaments I host (incl. via my
+  // org), play in, officiate or follow — plus any with a match of mine.
+  const { mine: myMatches } = useScopedMatches(profile?.id);
+  const myTournaments = useMyTournaments(profile?.id);
+  const myTournamentIds = useMemo(() => new Set([
+    ...myTournaments.map((t) => t.id),
+    ...myMatches.map((m) => m.tournamentId).filter((id): id is string => !!id),
+  ]), [myTournaments, myMatches]);
 
-  const matches = scope === 'mine' ? allMatches.filter(isMyMatch) : allMatches;
-  const scopedTournaments = scope === 'mine' ? tournaments.filter(isMyTournament) : tournaments;
+  const matches = scope === 'mine' ? myMatches : allMatches;
+  const scopedTournaments = scope === 'mine' ? tournaments.filter((t) => myTournamentIds.has(t.id)) : tournaments;
 
   // SD-150: days and "today" are in the app's zone, not UTC or the device clock.
   const zone = useUserTimeZone();

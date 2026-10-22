@@ -5,6 +5,7 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { theme } from '../core/theme';
 import { ProfileView } from '../components/ProfileView';
+import { MineCard } from '../components/MineCard';
 import { useAuth } from '../core/auth';
 import { getMyPlayerId, createMyPlayer } from '../data/repos';
 import type { RootStackParamList } from '../navigation/types';
@@ -57,6 +58,14 @@ export default function ProfileScreen() {
         onCreateProfile={createProfile}
         creating={creating}
         onSignOut={signOut}
+        mine={(
+          <MineCard
+            onTeams={() => nav.navigate('Clubs')}
+            onTournaments={() => nav.navigate('MyTournaments')}
+            onMatches={() => nav.navigate('Tabs', { screen: 'Matches' })}
+            onCalendar={() => nav.navigate('Calendar')}
+          />
+        )}
       />
     </SafeAreaView>
   );

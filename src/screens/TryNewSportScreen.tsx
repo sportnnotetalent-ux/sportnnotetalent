@@ -59,8 +59,10 @@ export default function TryNewSportScreen() {
 
   const organize = () => {
     if (!chosen) return;
-    const t = tournaments.find((x) => x.sports.includes(chosen)) ?? tournaments[0];
-    if (t) nav.navigate('ScheduleMatch', { tournamentId: t.id, sport: chosen });
+    // Into one of MY tournaments that has the sport, else a friendly — never
+    // someone else's tournament (tournaments[0] used to be anyone's).
+    const t = tournaments.find((x) => x.sports.includes(chosen));
+    nav.navigate('ScheduleMatch', t ? { tournamentId: t.id, sport: chosen } : { sport: chosen });
   };
 
   return (

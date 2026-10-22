@@ -79,7 +79,7 @@ export default function MatchSquadScreen() {
     useCallback(() => {
       let on = true;
       Promise.all([
-        getRoster(teamName, sport, teamId), getMatchSquads(matchId), getLineup(matchId, sport, playersPerSide), getLastSquadForTeam(teamName, sport, matchId),
+        getRoster(teamName, sport, teamId), getMatchSquads(matchId), getLineup(matchId, sport, playersPerSide), getLastSquadForTeam(teamName, sport, matchId, teamId),
       ]).then(([rs, squads, lu, last]) => {
         if (!on) return;
         setRoster(rs);

@@ -33,7 +33,7 @@ export default function OrganizerDashboardScreen() {
       let on = true;
       Promise.all([getMyPlayerId(profile?.id), getTournaments(), getOrganizations()]).then(([myId, all, orgs]) => {
         if (!on) return;
-        setHosted(all.filter((t) => canManageTournament(t, orgs, myId)));
+        setHosted(all.filter((t) => canManageTournament(t, orgs, myId, profile?.id)));
         setLoaded(true);
       });
       return () => { on = false; };

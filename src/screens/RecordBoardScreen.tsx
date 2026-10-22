@@ -38,7 +38,7 @@ export default function RecordBoardScreen() {
   const orgs = useOrganizations();
   const [me, setMe] = useState<string | null>(null);
   useEffect(() => { void getMyPlayerId(profile?.id).then(setMe).catch(() => {}); }, [profile?.id]);
-  const canEdit = canOrganize(profile?.role) || (!!tournament && canManageTournament(tournament, orgs, me));
+  const canEdit = canOrganize(profile?.role) || (!!tournament && canManageTournament(tournament, orgs, me, profile?.id));
   const school = !!tournament?.hostOrgId;
 
   const [book, setBook] = useState<RecordMark[]>([]);

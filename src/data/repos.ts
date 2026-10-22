@@ -275,8 +275,10 @@ const toTournament = (data: any): Tournament => ({
   createdBy: data.created_by ?? undefined,
   participation: data.participation ?? undefined,
   logoUrl: data.logo_url ?? undefined,
-  // prefer the multi-host array; fall back to the legacy single organizer_id
-  hostIds: data.host_ids ?? (data.organizer_id ? [data.organizer_id] : undefined),
+  // host_ids hold PLAYER ids. organizer_id is a PROFILE id — kept apart (it
+  // used to be copied in here, where it could never match a player).
+  hostIds: data.host_ids ?? undefined,
+  organizerId: data.organizer_id ?? undefined,
   isOpen: data.is_open ?? undefined,
   registrationDeadline: data.registration_deadline ?? undefined,
   minTeams: data.min_teams ?? undefined,
@@ -405,32 +407,134 @@ async function readHomeFeed(): Promise<HomeFeedRaw | null> {
   });
 }
 
-/** Tournaments the user plays in or follows (organizer-owned + followed). In
+/** Tournaments that are the user's — hosted, played in, officiated (getMyScope)
+ *  — plus the ones they follow. Never "everything" when that set is empty: a
+ *  new user's Home used to list every tournament on the platform as theirs. In
  *  demo mode the local user runs the sample meets, so all are returned. */
 export async function getMyTournaments(profileId?: string, followedIds: string[] = []): Promise<Tournament[]> {
-  // Perf F-09(4): the same answer from the one Home read, when it's there.
-  const feed = profileId ? await readHomeFeed() : null;
-  if (feed) {
-    const live = feed.tournaments.map(toTournament).filter(isLiveTournament);
-    const pid = feed.player_id;
-    // = the host_ids "contains my player" read below (deleted ones drop out next)
-    const hosted = pid ? feed.tournaments.filter((r) => Array.isArray(r.host_ids) && r.host_ids.includes(pid)).map((r) => r.id as string) : [];
-    const ids = new Set([...hosted, ...followedIds]);
-    const scoped = live.filter((t) => ids.has(t.id));
-    return scoped.length ? scoped : live;
+  if (!isSupabaseConfigured || !supabase) return getTournaments();
+  if (!profileId) return [];
+  const [all, scope] = await Promise.all([getTournaments(), getMyScope(profileId)]);
+  const ids = new Set([...scope.tournamentIds, ...followedIds]);
+  return all.filter((t) => ids.has(t.id));
+}
+
+/** Everything that's the signed-in person's own — ONE rule, used by every "my …"
+ *  surface (My teams, Home switcher, Matches "mine", Calendar, Profile):
+ *  - teams: created by them (profile id), captain / vice-captain / team admin,
+ *    on the roster or team_members, claimed staff (team_staff), or a sport team
+ *    of a club they belong to or created. (`managedTeamIds`: the ones they can
+ *    manage — not just play on.)
+ *  - tournaments: hosting (host_ids; organizer_id = their profile; or an org
+ *    where they're an active Owner / Admin / Organizer hosts it), playing (one
+ *    of their teams is entered, not withdrawn) and officiating
+ *    (tournament_officials).
+ *  Player-id vs profile-id: rosters / captains / host_ids / officials hold
+ *  PLAYER ids; created_by / organizer_id / team_staff hold PROFILE ids. Reads
+ *  are public (RLS select = true) — this is the filter that keeps "mine" mine. */
+export interface MyScope {
+  playerId: string | null;
+  teamIds: Set<string>;
+  managedTeamIds: Set<string>;
+  clubIds: Set<string>;
+  /** clubs they can manage (club admin or creator) */
+  managedClubIds: Set<string>;
+  tournamentIds: Set<string>;
+  hostedTournamentIds: Set<string>;
+  playingTournamentIds: Set<string>;
+  officiatingTournamentIds: Set<string>;
+  /** orgs where they're an active Owner / Admin / Organizer */
+  adminOrgIds: Set<string>;
+}
+
+const emptyScope = (playerId: string | null): MyScope => ({
+  playerId, teamIds: new Set(), managedTeamIds: new Set(), clubIds: new Set(), managedClubIds: new Set(), tournamentIds: new Set(),
+  hostedTournamentIds: new Set(), playingTournamentIds: new Set(), officiatingTournamentIds: new Set(), adminOrgIds: new Set(),
+});
+
+export async function getMyScope(profileId?: string): Promise<MyScope> {
+  const pid = await getMyPlayerId(profileId);
+  if (!isSupabaseConfigured || !supabase) return demoScope(profileId, pid);
+  if (!profileId) return emptyScope(null);
+  const raw = await cachedRows(`myscope:${profileId}`, async () => liveScopeIds(profileId, pid));
+  if (!raw) return emptyScope(pid);
+  return {
+    playerId: pid,
+    teamIds: new Set(raw.teams), managedTeamIds: new Set(raw.managed), clubIds: new Set(raw.clubs), managedClubIds: new Set(raw.managedClubs),
+    tournamentIds: new Set([...raw.hosted, ...raw.playing, ...raw.officiating]),
+    hostedTournamentIds: new Set(raw.hosted), playingTournamentIds: new Set(raw.playing),
+    officiatingTournamentIds: new Set(raw.officiating), adminOrgIds: new Set(raw.adminOrgs),
+  };
+}
+
+type ScopeIds = { teams: string[]; managed: string[]; clubs: string[]; managedClubs: string[]; hosted: string[]; playing: string[]; officiating: string[]; adminOrgs: string[] };
+
+async function liveScopeIds(profileId: string, pid: string | null): Promise<ScopeIds> {
+  const sb = supabase!;
+  const ids = (rows: unknown, key: string) => ((rows as Record<string, string>[] | null) ?? []).map((r) => r[key]).filter(Boolean);
+  const clubs = (await getClubsForPlayer(pid, profileId)).map((c) => c.id);
+  const managedOr = [`created_by.eq.${profileId}`, ...(pid ? [`captain_id.eq.${pid}`, `vice_captain_id.eq.${pid}`, `admin_ids.cs.{${pid}}`] : [])];
+  const [managedRes, rosterRes, membersRes, staffRes, clubTeamsRes, orgRes, officialsRes] = await Promise.all([
+    sb.from('teams').select('id').or(managedOr.join(',')),
+    pid ? sb.from('teams').select('id').contains('roster', [pid]) : Promise.resolve({ data: [] }),
+    pid ? sb.from('team_members').select('team_id').eq('player_id', pid) : Promise.resolve({ data: [] }),
+    sb.from('team_staff').select('team_id').eq('profile_id', profileId),
+    clubs.length ? sb.from('teams').select('id').in('club_id', clubs) : Promise.resolve({ data: [] }),
+    pid ? sb.from('org_members').select('org_id').eq('player_id', pid).is('until', null).in('role', ['Owner', 'Admin', 'Organizer']) : Promise.resolve({ data: [] }),
+    pid ? sb.from('tournament_officials').select('tournament_id').eq('player_id', pid) : Promise.resolve({ data: [] }),
+  ]);
+  const managed = new Set([...ids(managedRes.data, 'id'), ...ids(staffRes.data, 'team_id')]);
+  const teams = new Set([...managed, ...ids(rosterRes.data, 'id'), ...ids(membersRes.data, 'team_id'), ...ids(clubTeamsRes.data, 'id')]);
+  // A club admin / creator manages the club's sport teams too.
+  const adminClubs = new Set<string>();
+  if (clubs.length) {
+    const { data: adm } = pid ? await sb.from('club_members').select('club_id').eq('player_id', pid).eq('role', 'admin') : { data: [] };
+    for (const c of ids(adm, 'club_id')) adminClubs.add(c);
+    const created = (await getClubsForPlayer(null, profileId)).map((c) => c.id);
+    for (const c of created) adminClubs.add(c);
+    if (adminClubs.size) {
+      const { data: ct } = await sb.from('teams').select('id').in('club_id', [...adminClubs]);
+      for (const id of ids(ct, 'id')) managed.add(id);
+    }
   }
-  const all = await getTournaments();
-  if (!isSupabaseConfigured || !supabase || !profileId) return all;
-  // host_ids hold player ids (the same identity the host UI checks), so resolve
-  // the signed-in player first.
-  const myPlayerId = await getMyPlayerId(profileId);
-  const { data } = myPlayerId
-    ? await withTournamentCols<any[]>((cols) => supabase!.from('tournaments').select(cols).contains('host_ids', [myPlayerId]))
-    : { data: [] as unknown[] };
-  const mine = ((data as any[]) ?? []).map(toTournament);
-  const ids = new Set([...mine.map((t) => t.id), ...followedIds]);
-  const scoped = all.filter((t) => ids.has(t.id));
-  return scoped.length ? scoped : all;
+  const adminOrgs = ids(orgRes.data, 'org_id');
+  const hostOr = [`organizer_id.eq.${profileId}`, ...(pid ? [`host_ids.cs.{${pid}}`] : []), ...(adminOrgs.length ? [`host_org_id.in.(${adminOrgs.join(',')})`] : [])];
+  const teamList = [...teams];
+  const [hostedRes, entriesRes] = await Promise.all([
+    sb.from('tournaments').select('id').or(hostOr.join(',')),
+    teamList.length ? sb.from('tournament_teams').select('tournament_id').in('team_id', teamList) : Promise.resolve({ data: [] }),
+  ]);
+  return {
+    teams: teamList, managed: [...managed], clubs, managedClubs: [...adminClubs],
+    hosted: ids(hostedRes.data, 'id'), playing: [...new Set(ids(entriesRes.data, 'tournament_id'))],
+    officiating: [...new Set(ids(officialsRes.data, 'tournament_id'))], adminOrgs,
+  };
+}
+
+/** Demo: the same rule over the local store (the demo user is players[0]). */
+async function demoScope(profileId: string | undefined, pid: string | null): Promise<MyScope> {
+  const s = emptyScope(pid);
+  const clubs = await getClubsForPlayer(pid, profileId);
+  for (const c of clubs) {
+    s.clubIds.add(c.id);
+    if ((profileId && c.createdBy === profileId) || demo.clubMembers.some((m) => m.clubId === c.id && m.playerId === pid && m.role === 'admin')) s.managedClubIds.add(c.id);
+  }
+  const rosters = await getTeamRosters(demo.teams.map((t) => t.id));
+  for (const t of demo.teams) {
+    const mineManaged = demo.captainTeams.has(t.id) || (!!t.clubId && s.clubIds.has(t.clubId));
+    if (mineManaged) s.managedTeamIds.add(t.id);
+    if (mineManaged || (pid && (rosters.get(t.id) ?? []).includes(pid))) s.teamIds.add(t.id);
+  }
+  for (const o of demo.organizations) {
+    if (o.members.some((m) => m.playerId === pid && !m.until && (m.role === 'Owner' || m.role === 'Admin' || m.role === 'Organizer'))) s.adminOrgIds.add(o.id);
+  }
+  for (const t of demo.tournaments) {
+    if ((pid && t.hostIds?.includes(pid)) || (t.hostOrgId && s.adminOrgIds.has(t.hostOrgId))) s.hostedTournamentIds.add(t.id);
+  }
+  for (const e of demo.tournamentTeams) if (s.teamIds.has(e.teamId)) s.playingTournamentIds.add(e.tournamentId);
+  for (const o of demo.tournamentOfficials) if (o.playerId === pid) s.officiatingTournamentIds.add(o.tournamentId);
+  s.tournamentIds = new Set([...s.hostedTournamentIds, ...s.playingTournamentIds, ...s.officiatingTournamentIds]);
+  return s;
 }
 
 /** Ids of soft-deleted tournaments (parity #09); none before migration 0041. */
@@ -528,6 +632,23 @@ export async function getTeamRosters(teamIds: string[]): Promise<Map<string, str
   return out;
 }
 
+/** Live: the matches of the scope's teams and hosted / officiated tournaments
+ *  (one read; none when the scope is empty). Demo: getScopedMatches reads all. */
+async function getMatchesForScope(scope: MyScope): Promise<Match[]> {
+  if (!isSupabaseConfigured || !supabase) return [];
+  const tours = [...scope.hostedTournamentIds, ...scope.officiatingTournamentIds];
+  const teams = [...scope.teamIds];
+  const ors = [
+    ...(tours.length ? [`tournament_id.in.(${tours.join(',')})`] : []),
+    ...(teams.length ? [`home_team_id.in.(${teams.join(',')})`, `away_team_id.in.(${teams.join(',')})`] : []),
+  ];
+  if (!ors.length) return [];
+  const { data, error } = await withMatchCols<unknown[]>((cols) =>
+    supabase!.from('matches').select(cols).or(ors.join(',')).order('starts_at', { ascending: true }));
+  if (error || !data) return [];
+  return (data as unknown as MatchRow[]).map(toMatch);
+}
+
 /** Split all matches into the signed-in user's two views:
  *  - `mine`: matches they play in (a team they're on) or organize/score (a match
  *    or tournament they host, or are the designated scorer of).
@@ -537,12 +658,23 @@ export async function getTeamRosters(teamIds: string[]): Promise<Map<string, str
 export async function getScopedMatches(profileId?: string): Promise<{ mine: Match[]; feed: Match[] }> {
   // Perf F-09(4): one round trip (home_feed) when the database has it; it applies
   // the rule below on the server, through the same RLS. Else the reads below.
-  const homeFeed = profileId ? await readHomeFeed() : null;
+  const [homeFeed, scope] = await Promise.all([profileId ? readHomeFeed() : Promise.resolve(null), getMyScope(profileId)]);
+  // The shared "mine" rule (getMyScope) on top of the per-match one: matches of
+  // a tournament they host (incl. through their org) or officiate, and of any
+  // team that's theirs (incl. one they captain / run but aren't rostered on).
+  const scopeMine = (m: Match) =>
+    (!!m.tournamentId && (scope.hostedTournamentIds.has(m.tournamentId) || scope.officiatingTournamentIds.has(m.tournamentId))) ||
+    (!!m.homeTeam && scope.teamIds.has(m.homeTeam.id)) || (!!m.awayTeam && scope.teamIds.has(m.awayTeam.id));
   if (homeFeed) {
     const deleted = new Set(homeFeed.tournaments.filter((t) => t.deleted_at).map((t) => t.id as string));
     const feed = homeFeed.matches.map(toMatch).filter(visibleAfterDelete(deleted));
+    // home_feed's server rule predates getMyScope: add what it misses.
+    const extra = (await getMatchesForScope(scope)).filter(visibleAfterDelete(deleted));
+    const seen = new Set(feed.map((m) => m.id));
+    for (const m of extra) if (!seen.has(m.id)) { feed.push(m); seen.add(m.id); }
+    feed.sort((x, y) => x.startsAt.localeCompare(y.startsAt));
     const mineIds = new Set(homeFeed.mine_ids);
-    return { mine: feed.filter((m) => mineIds.has(m.id)), feed };
+    return { mine: feed.filter((m) => mineIds.has(m.id) || scopeMine(m)), feed };
   }
   const [matches, myPlayerId, followKeys, tournaments] = await Promise.all([
     getMatches(), getMyPlayerId(profileId), getFollows(profileId), getTournaments(),
@@ -565,6 +697,7 @@ export async function getScopedMatches(profileId?: string): Promise<{ mine: Matc
   const myTours = new Set(tournaments.filter((t) => myPlayerId && t.hostIds?.includes(myPlayerId)).map((t) => t.id));
 
   const isMine = (m: Match) =>
+    scopeMine(m) ||
     !!(myPlayerId && (m.hostIds?.includes(myPlayerId) || m.scorerId === myPlayerId || m.scorerIds?.includes(myPlayerId))) ||
     (!!m.homeTeam && myTeams.has(m.homeTeam.id)) || (!!m.awayTeam && myTeams.has(m.awayTeam.id)) ||
     (!!m.tournamentId && myTours.has(m.tournamentId));
@@ -627,6 +760,26 @@ export async function getTeams(sport?: SportId): Promise<Team[]> {
 /** `in()` lists are chunked so a long id list never makes an oversized URL. */
 const ID_CHUNK = 100;
 const chunked = <T,>(xs: T[]): T[][] => { const out: T[][] = []; for (let i = 0; i < xs.length; i += ID_CHUNK) out.push(xs.slice(i, i + ID_CHUNK)); return out; };
+
+/** The signed-in person's per-sport teams (getMyScope): ones they play on,
+ *  captain, run, created, or that belong to their club. `managedOnly`: just the
+ *  ones they can manage. `sport` narrows it. Sorted by name. */
+export async function getMyTeams(profileId?: string, opts: { managedOnly?: boolean; sport?: SportId } = {}): Promise<Team[]> {
+  const scope = await getMyScope(profileId);
+  const ids = opts.managedOnly ? scope.managedTeamIds : scope.teamIds;
+  if (!ids.size) return [];
+  if (!isSupabaseConfigured || !supabase) {
+    return demo.teams.filter((t) => ids.has(t.id) && (!opts.sport || t.sport === opts.sport)).sort((a, b) => a.name.localeCompare(b.name));
+  }
+  const out: Team[] = [];
+  for (const part of chunked([...ids])) {
+    const run = (cols: string) => { let q = supabase!.from('teams').select(cols).in('id', part); if (opts.sport) q = q.eq('sport', opts.sport); return q; };
+    let res = teamLevelMissing ? null : await run('id,name,short_name,sport,color_hex,org_id,club_id,roster,level,adhoc');
+    if (!res || res.error) { if (res) teamLevelMissing = true; res = await run('id,name,short_name,sport,color_hex,org_id,club_id,roster,adhoc'); }
+    if (!res.error && res.data) out.push(...(res.data as unknown as TeamRow[]).map(toTeam));
+  }
+  return out.sort((a, b) => a.name.localeCompare(b.name));
+}
 
 /** getTeamLeaders for many teams in one read (perf F-08c: the reminder engine
  *  made one request per team every minute). Same value per id as getTeamLeaders,
@@ -694,7 +847,9 @@ export async function canManageTeam(teamId: string, ctx: { profileId?: string; m
   const local = async () => canManageTeamLocal({ ...ctx, leaders: await getTeamLeaders(teamId) });
   if (!isSupabaseConfigured || !supabase) return local();
   const { data, error } = await supabase.rpc('can_manage_team', { p_team: teamId });
-  if (error) return local();
+  // Live, if the check fails: the leadership rule only — never the self-chosen
+  // 'organizer' role (it made every team "yours" on a network error).
+  if (error) return canManageTeamLocal({ ...ctx, role: undefined, leaders: await getTeamLeaders(teamId) });
   return data === true;
 }
 
@@ -2529,10 +2684,7 @@ export async function invitePlayer(args: {
     // first so house-derived members aren't dropped.
     const { data: teamRow } = await supabase.from('teams').select('roster').eq('id', args.teamId).maybeSingle();
     let base = (teamRow?.roster ?? null) as string[] | null;
-    if (!base || base.length === 0) {
-      const { data: house } = await supabase.from('players').select('id').eq('house_name', args.teamName).contains('sports', [args.sport]);
-      base = (house as { id: string }[] | null)?.map((r) => r.id) ?? [];
-    }
+    if (!base || base.length === 0) base = await liveDerivedSquadIds(args.teamId, args.teamName, args.sport);
     await supabase.from('teams').update({ roster: [...new Set([...base, playerId])] }).eq('id', args.teamId);
   };
 
@@ -3354,20 +3506,22 @@ export async function setMatchSquad(matchId: string, side: 'home' | 'away', squa
  *  picker can offer a one-tap "copy last XI". Returns null if the team has no
  *  prior match with a set squad. (Demo-first; live is a post-pilot follow-up.) */
 export async function getLastSquadForTeam(
-  teamName: string, sport: SportId, excludeMatchId: string,
+  teamName: string, sport: SportId, excludeMatchId: string, teamId?: string,
 ): Promise<{ starters: string[]; subs: string[] } | null> {
   // Works in both demo and live: getMatches() and getMatchSquads() each own the
   // demo↔live split, so we just compose them — the team's most recent prior match
   // in this sport that has a saved squad wins. (Previously demo-only; the live
   // branch returned null, so "Copy last match's XI" never offered anything once
-  // pointed at Supabase.)
+  // pointed at Supabase.) Matched by team id when known — two teams can share a
+  // name, and the other one's squad must never be offered.
+  const isTeam = (t: { id: string; name: string }) => (teamId ? t.id === teamId : t.name === teamName);
   const all = await getMatches();
   const past = all
-    .filter((m) => m.id !== excludeMatchId && m.sport === sport && (m.homeTeam.name === teamName || m.awayTeam.name === teamName))
+    .filter((m) => m.id !== excludeMatchId && m.sport === sport && (isTeam(m.homeTeam) || isTeam(m.awayTeam)))
     .sort((a, b) => b.startsAt.localeCompare(a.startsAt));
   for (const m of past) {
     const sq = await getMatchSquads(m.id);
-    const s = sq[m.homeTeam.name === teamName ? 'home' : 'away'];
+    const s = sq[isTeam(m.homeTeam) ? 'home' : 'away'];
     if (s && (s.starters.length || s.subs.length)) return { starters: s.starters, subs: s.subs };
   }
   return null;
@@ -3531,17 +3685,35 @@ export async function getRoster(teamName: string, sport: SportId, teamId?: strin
     ? await supabase.from('teams').select('id, roster').eq('id', teamId).limit(1)
     : await supabase.from('teams').select('id, roster').eq('name', teamName).eq('sport', sport).limit(1);
   const explicit = (teamRows?.[0]?.roster ?? null) as string[] | null;
-  if (explicit && explicit.length) {
-    const { data } = await readPlayers((cols) => supabase!.from(PLAYERS_READ).select(cols).in('id', explicit));
-    return (data as PlayerRow[] | null)?.map(toPlayer) ?? [];
-  }
-  const { data, error } = await readPlayers((cols) => supabase!
-    .from(PLAYERS_READ)
-    .select(cols)
-    .eq('house_name', teamName)
-    .contains('sports', [sport]));
+  const ids = explicit && explicit.length ? explicit : await liveDerivedSquadIds(teamRows?.[0]?.id as string | undefined, teamName, sport);
+  if (!ids.length) return [];
+  const { data, error } = await readPlayers((cols) => supabase!.from(PLAYERS_READ).select(cols).in('id', ids));
   if (error || !data) return [];
   return (data as PlayerRow[]).map(toPlayer);
+}
+
+/** Live: the squad of a team with no explicit roster — its `team_members` rows,
+ *  plus (house teams) players whose house matches the team name WITHIN the
+ *  team's own community (active org members). Never a platform-wide name
+ *  match: another school's "Red House" would otherwise land in this squad. */
+async function liveDerivedSquadIds(teamId: string | undefined, teamName: string, sport: SportId): Promise<string[]> {
+  if (!supabase || !teamId) return [];
+  const [{ data: team }, { data: tm }] = await Promise.all([
+    supabase.from('teams').select('org_id').eq('id', teamId).maybeSingle(),
+    supabase.from('team_members').select('player_id').eq('team_id', teamId),
+  ]);
+  const out = new Set(((tm as { player_id: string }[] | null) ?? []).map((r) => r.player_id));
+  const orgId = (team as { org_id?: string | null } | null)?.org_id;
+  if (orgId) {
+    const { data: om } = await supabase.from('org_members').select('player_id').eq('org_id', orgId).is('until', null);
+    const members = ((om as { player_id: string }[] | null) ?? []).map((r) => r.player_id);
+    if (members.length) {
+      const { data: house } = await supabase.from('players').select('id')
+        .in('id', members).eq('house_name', teamName).contains('sports', [sport]);
+      for (const r of (house as { id: string }[] | null) ?? []) out.add(r.id);
+    }
+  }
+  return [...out];
 }
 
 /** Credit `by` of `stat` to a player for a match — the live-scoring → profile
@@ -4015,8 +4187,10 @@ export async function getMyPlayerId(profileId?: string): Promise<string | null> 
   // Perf F-10: memoised per profile (cleared on sign-out / account switch, set by
   // createMyPlayer) — it was a fresh read 6–8 times at launch.
   return myPlayerIdMemo.get(profileId, async (pid) => {
-    const { data } = await supabase!.from('players').select('id').eq('profile_id', pid).single();
-    return data?.id ?? null;
+    // The oldest linked row: an account with two player rows (no unique index on
+    // profile_id) used to resolve to NONE with .single(), emptying every "mine".
+    const { data } = await supabase!.from('players').select('id').eq('profile_id', pid).order('created_at', { ascending: true }).limit(1);
+    return (data as { id: string }[] | null)?.[0]?.id ?? null;
   });
 }
 
@@ -5079,19 +5253,28 @@ export async function getClub(clubId: string): Promise<Club | null> {
   return toClub(data as ClubRow);
 }
 
-/** The clubs a person belongs to (any role) — their "my teams" set, used to let
- *  them enter one of their teams into a game or tournament. */
-export async function getClubsForPlayer(playerId: string): Promise<Club[]> {
-  if (!playerId) return [];
+/** The clubs a person belongs to (any role) — their "my teams" set: the My teams
+ *  list, and the quick-pick for entering one of their teams into a game or
+ *  tournament. `profileId` also includes teams they created without joining as a
+ *  member (clubs.created_by is a PROFILE id; club_members.player_id a PLAYER id). */
+export async function getClubsForPlayer(playerId: string | null, profileId?: string): Promise<Club[]> {
+  if (!playerId && !profileId) return [];
   if (!isSupabaseConfigured || !supabase) {
     const ids = new Set(demo.clubMembers.filter((m) => m.playerId === playerId).map((m) => m.clubId));
-    return demo.clubs.filter((c) => ids.has(c.id));
+    return demo.clubs.filter((c) => ids.has(c.id) || (!!profileId && c.createdBy === profileId));
   }
-  const { data, error } = await supabase.from('club_members').select('club_id').eq('player_id', playerId);
-  if (error || !data) return [];
-  const ids = [...new Set((data as { club_id: string }[]).map((r) => r.club_id))];
-  if (!ids.length) return [];
-  const res = await supabase.from('clubs').select(CLUB_COLS).in('id', ids).order('name');
+  let ids: string[] = [];
+  if (playerId) {
+    const { data, error } = await supabase.from('club_members').select('club_id').eq('player_id', playerId);
+    if (error || !data) return [];
+    ids = [...new Set((data as { club_id: string }[]).map((r) => r.club_id))];
+  }
+  const ors = [
+    ...(ids.length ? [`id.in.(${ids.join(',')})`] : []),
+    ...(profileId ? [`created_by.eq.${profileId}`] : []),
+  ];
+  if (!ors.length) return [];
+  const res = await supabase.from('clubs').select(CLUB_COLS).or(ors.join(',')).order('name');
   if (res.error || !res.data) return [];
   return (res.data as ClubRow[]).map(toClub);
 }

@@ -5,12 +5,12 @@
  *  the organiser never has to rebuild a team they already manage. Renders nothing
  *  when the person has no clubs. */
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Alert } from 'react-native';
 import { theme } from '../core/theme';
 import { SelectChip, textStyles } from './ui';
 import { getSport } from '../sports/registry';
 import { useAuth } from '../core/auth';
-import { getClubsForPlayer, getClubSports, getClubTeam, addClubSport, getMyPlayerId } from '../data/repos';
+import { getClubsForPlayer, getClubSports, getClubTeam, addClubSport, getMyPlayerId, getMyScope } from '../data/repos';
 import type { Club, SportId, Team } from '../core/types';
 
 export function ClubQuickPick({ sport, selectedTeamIds, onPicked }: {
@@ -24,12 +24,15 @@ export function ClubQuickPick({ sport, selectedTeamIds, onPicked }: {
   const [clubs, setClubs] = useState<Club[]>([]);
   const [sportsByClub, setSportsByClub] = useState<Record<string, SportId[]>>({});
   const [teamByClub, setTeamByClub] = useState<Record<string, Team | null>>({});
+  // clubs I can add a sport to (club admin / creator) — a plain member can only
+  // pick a club that already plays this sport
+  const [canAdd, setCanAdd] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
     const myId = await getMyPlayerId(profile?.id);
-    if (!myId) { setClubs([]); return; }
-    const list = await getClubsForPlayer(myId);
+    const [list, scope] = await Promise.all([getClubsForPlayer(myId, profile?.id), getMyScope(profile?.id)]);
+    setCanAdd(scope.managedClubIds);
     const sportsPairs = await Promise.all(list.map(async (c) => [c.id, await getClubSports(c.id)] as const));
     const teamPairs = await Promise.all(list.map(async (c) => [c.id, await getClubTeam(c.id, sport)] as const));
     setClubs(list);
@@ -39,7 +42,8 @@ export function ClubQuickPick({ sport, selectedTeamIds, onPicked }: {
 
   useEffect(() => { load(); }, [load]);
 
-  if (!clubs.length) return null;
+  const shown = clubs.filter((c) => (sportsByClub[c.id] ?? []).includes(sport) || canAdd.has(c.id));
+  if (!shown.length) return null;
   const sportName = getSport(sport).name;
 
   async function pick(club: Club) {
@@ -49,6 +53,8 @@ export function ClubQuickPick({ sport, selectedTeamIds, onPicked }: {
       onPicked(team);
       // Refresh so a newly-minted sport row now shows as an active/known chip.
       if (!teamByClub[club.id]) await load();
+    } catch (e) {
+      Alert.alert('Couldn’t add the sport', e instanceof Error ? e.message : 'Only the team’s admins can add a sport to it.');
     } finally { setBusy(false); }
   }
 
@@ -56,7 +62,7 @@ export function ClubQuickPick({ sport, selectedTeamIds, onPicked }: {
     <View style={{ gap: theme.spacing(2) }}>
       <Text style={textStyles.muted}>Your teams</Text>
       <View style={st.chips}>
-        {clubs.map((c) => {
+        {shown.map((c) => {
           const plays = (sportsByClub[c.id] ?? []).includes(sport);
           const team = teamByClub[c.id];
           const active = !!team && selectedTeamIds.includes(team.id);

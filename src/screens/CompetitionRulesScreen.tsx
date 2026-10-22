@@ -44,7 +44,7 @@ export default function CompetitionRulesScreen() {
   const orgs = useOrganizations();
   const [me, setMe] = useState<string | null>(null);
   useEffect(() => { void getMyPlayerId(profile?.id).then(setMe).catch(() => setMe(null)); }, [profile?.id]);
-  const canManage = canOrganize(profile?.role) || (!!tournament && canManageTournament(tournament, orgs, me));
+  const canManage = canOrganize(profile?.role) || (!!tournament && canManageTournament(tournament, orgs, me, profile?.id));
 
   const defs = useMemo(() => rulesFor(sport), [sport]);
   const saved = (tournament?.formats?.[sport as SportId] ?? {}) as Record<string, unknown>;

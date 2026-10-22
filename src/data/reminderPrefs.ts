@@ -35,13 +35,8 @@ export function formatLead(m: number): string {
   return `${m} min before`;
 }
 
-/** Friendly "starts <x>" label for a reminder body (handles any value). */
-export const shortByMinutes = (m: number): string => {
-  if (m % 1440 === 0) { const d = m / 1440; return d === 1 ? 'tomorrow' : `in ${d} days`; }
-  if (m % 60 === 0) { const h = m / 60; return `in ${h} hour${h > 1 ? 's' : ''}`; }
-  if (m > 60) { const h = Math.floor(m / 60); return `in ${h}h ${m % 60}m`; }
-  return `in ${m} min`;
-};
+/** Friendly "starts <x>" label for a reminder body — lives with the pure reminder rules. */
+export { shortByMinutes } from './reminderRules';
 
 const PREFS_KEY = 'sportfolio.reminderPrefs.v1';
 const sortedDesc = (xs: number[]) => [...new Set(xs)].sort((a, b) => b - a);

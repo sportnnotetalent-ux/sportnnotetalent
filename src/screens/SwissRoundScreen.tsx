@@ -43,7 +43,7 @@ export default function SwissRoundScreen() {
   const orgs = useOrganizations();
   const [myId, setMyId] = useState<string | null>(null);
   React.useEffect(() => { let on = true; void getMyPlayerId(profile?.id).then((id) => on && setMyId(id)).catch(() => {}); return () => { on = false; }; }, [profile?.id]);
-  const canEdit = tournament ? canManageTournament(tournament, orgs, myId) : false;
+  const canEdit = tournament ? canManageTournament(tournament, orgs, myId, profile?.id) : false;
 
   const matches = useMemo(() => all.filter((m) => m.sport === sport), [all, sport]);
   const rounds = useMemo(() => swissRoundsIn(matches), [matches]);

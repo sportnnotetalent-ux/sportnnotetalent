@@ -243,8 +243,15 @@ async function handleMatchStatus(record: MatchRecord, oldStatus: string | null |
   // Players in the match: the match squads, else the team rosters.
   let playerIds = (squads ?? []).flatMap((s) => [...idsOf(s.starters), ...idsOf(s.subs)]);
   if (!playerIds.length && teamIds.length) {
-    const { data: members } = await supabase.from('team_members').select('player_id').in('team_id', teamIds);
-    playerIds = (members ?? []).map((m) => m.player_id as string);
+    // the teams' explicit rosters (where the app keeps membership) + team_members
+    const [{ data: rosterRows }, { data: members }] = await Promise.all([
+      supabase.from('teams').select('roster').in('id', teamIds),
+      supabase.from('team_members').select('player_id').in('team_id', teamIds),
+    ]);
+    playerIds = [...new Set([
+      ...(rosterRows ?? []).flatMap((t) => idsOf((t as { roster?: unknown }).roster)),
+      ...(members ?? []).map((m) => m.player_id as string),
+    ])];
   }
 
   // SD-48: a tie rubber reaches team / tournament followers only as the tie

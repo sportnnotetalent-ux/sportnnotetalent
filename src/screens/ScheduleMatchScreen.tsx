@@ -21,7 +21,7 @@ import { SPORT_LIST, getSport, participantMode, type ParticipantMode } from '../
 import { useTeams, useMatches, usePlayers, useTournamentById } from '../data/hooks';
 import { venueOptions } from '../data/tournamentForm';
 import { findScheduleConflicts, knownVenueNames } from '../data/scheduleConflicts';
-import { createMatch, createTeam, createReplacementPlayer, getMyPlayerId, setMatchScorer, getMatch, getTournaments, getMatchSquads, setMatchSquad } from '../data/repos';
+import { createMatch, createTeam, createReplacementPlayer, createMyPlayer, getMyPlayerId, setMatchScorer, getMatch, getTournaments, getMatchSquads, setMatchSquad } from '../data/repos';
 import { cloneDraft } from '../data/matchHousekeeping';
 import { useAuth } from '../core/auth';
 import { KO_STAGES, KO_STAGE_LABEL, isKoStage, type KoStage } from '../data/bracket';
@@ -231,11 +231,21 @@ export default function ScheduleMatchScreen() {
   // match taps once instead of typing their name.
   const pickMe = (side: 'home' | 'away') => async () => {
     if (!sport || !profile?.fullName) return;
-    const myId = await getMyPlayerId(profile.id);
+    // My own player row (made now if I don't have one) — never a same-named
+    // entry, which could be someone else's.
+    const myId = (await getMyPlayerId(profile.id)) ?? (await createMyPlayer(profile.id).catch(() => null));
     const me = myId ? allPlayers.find((p) => p.id === myId) : undefined;
     if (me) { await pickPerson(side)(me.id); return; }
-    const mine = teams.find((t) => t.name.toLowerCase() === profile.fullName.toLowerCase());
-    if (mine) { (side === 'home' ? setHome : setAway)(mine.id); return; }
+    if (myId) {
+      try {
+        const team = await createTeam({ name: profile.fullName, shortName: shortFrom(profile.fullName), sport, colorHex: TEAM_PALETTE[teams.length % TEAM_PALETTE.length], adhoc: true, roster: [myId] });
+        setTeamNonce((n) => n + 1);
+        (side === 'home' ? setHome : setAway)(team.id);
+      } catch {
+        setError('Could not add you.');
+      }
+      return;
+    }
     await makeCreateHandler(side)(profile.fullName);
   };
 

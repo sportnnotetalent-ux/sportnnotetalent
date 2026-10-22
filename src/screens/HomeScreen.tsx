@@ -108,8 +108,12 @@ export default function HomeScreen() {
   const openSport = (sport: Match['sport']) => {
     // A specific tournament is needed for a sport section; default to the first
     // tournament that actually features the sport when "All" is selected.
-    const t = selected ?? tournaments.find((x) => x.sports.includes(sport)) ?? tournaments[0];
-    if (t) nav.navigate('SportHub', { tournamentId: t.id, sport, tournamentName: t.name });
+    const t = selected ?? tournaments.find((x) => x.sports.includes(sport));
+    if (t) return nav.navigate('SportHub', { tournamentId: t.id, sport, tournamentName: t.name });
+    // None of MY tournaments features the sport: open my own stats in it (never a
+    // stranger's tournament — tournaments[0] used to be anyone's).
+    if (playerId) nav.navigate('SportProfile', { playerId, sport });
+    else nav.navigate('Tabs', { screen: 'Discover', params: { in: 'tournaments' } });
   };
 
   return (

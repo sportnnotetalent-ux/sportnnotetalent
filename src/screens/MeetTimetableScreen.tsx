@@ -67,7 +67,7 @@ export default function MeetTimetableScreen() {
   }, [tournamentId, profile?.id]);
   useFocusEffect(useCallback(() => { void load(); }, [load]));
 
-  const canEdit = canOrganize(profile?.role) || (!!tournament && canManageTournament(tournament, orgs, me));
+  const canEdit = canOrganize(profile?.role) || (!!tournament && canManageTournament(tournament, orgs, me, profile?.id));
   const items = useMemo(() => buildTimetable(events), [events, mz.zone]); // eslint-disable-line react-hooks/exhaustive-deps
   const days = useMemo(() => timetableDays(items, tournament ? { start: tournament.startDate, end: tournament.endDate } : undefined), [items, tournament]);
   const tbd = useMemo(() => unscheduled(items), [items]);

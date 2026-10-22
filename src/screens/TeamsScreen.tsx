@@ -1,18 +1,22 @@
 /** Manage teams/houses: list existing + add a new one (name, short code, sport,
- *  colour). Demo mode appends to the local store; live mode inserts to Supabase. */
+ *  colour). Scoped (2026-10-22): acting as a community → that community's teams
+ *  (a new team joins it); personally → the teams I run (created / captain /
+ *  admin). It used to list every team on the platform. Demo mode appends to the
+ *  local store; live mode inserts to Supabase. */
 import { teamLabel } from '../core/teamLevels';
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { theme } from '../core/theme';
 import { Card, Button, TextField, SelectChip, ScreenTitle, FormError, textStyles } from '../components/ui';
 import { SectionHeader, SECTION_CAP } from '../components/SectionHeader';
 import { SPORT_LIST, getSport } from '../sports/registry';
-import { useTeams } from '../data/hooks';
-import { createTeam } from '../data/repos';
-import type { SportId } from '../core/types';
+import { createTeam, getMyTeams, getTeamsForOrg } from '../data/repos';
+import { useAuth } from '../core/auth';
+import { useActiveOrg } from '../core/orgContext';
+import type { SportId, Team } from '../core/types';
 import type { RootStackParamList } from '../navigation/types';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -22,7 +26,14 @@ const PALETTE = ['#FF5C5C', '#4DA3FF', '#3DDC97', '#FFB454', '#B98AFF', '#FF8AC4
 export default function TeamsScreen() {
   const nav = useNavigation<Nav>();
   const [tick, setTick] = useState(0); // bump to refetch after adding
-  const teams = useTeams(undefined, tick);
+  const { profile } = useAuth();
+  const { activeOrg } = useActiveOrg();
+  const [teams, setTeams] = useState<Team[]>([]);
+  useFocusEffect(useCallback(() => {
+    let on = true;
+    (activeOrg ? getTeamsForOrg(activeOrg.id) : getMyTeams(profile?.id, { managedOnly: true })).then((t) => on && setTeams(t));
+    return () => { on = false; };
+  }, [activeOrg?.id, profile?.id, tick]));
   const [name, setName] = useState('');
   const [short, setShort] = useState('');
   const [sport, setSport] = useState<SportId>('football');
@@ -37,7 +48,7 @@ export default function TeamsScreen() {
     setError(null);
     setBusy(true);
     try {
-      const team = await createTeam({ name: name.trim(), shortName: short.trim().toUpperCase(), sport, colorHex: color });
+      const team = await createTeam({ name: name.trim(), shortName: short.trim().toUpperCase(), sport, colorHex: color, ...(activeOrg ? { orgId: activeOrg.id } : {}) });
       setName('');
       setShort('');
       setTick((t) => t + 1);
@@ -62,7 +73,7 @@ export default function TeamsScreen() {
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
       <ScrollView contentContainerStyle={st.content}>
-        <ScreenTitle title="Teams" subtitle="Houses & teams across sports" />
+        <ScreenTitle title="Teams" subtitle={activeOrg ? `${activeOrg.name} · houses & teams` : 'Teams you run'} />
 
         <Card style={{ gap: theme.spacing(3) }}>
           <Text style={textStyles.h3}>Add a team</Text>

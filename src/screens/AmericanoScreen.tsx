@@ -33,7 +33,7 @@ export default function AmericanoScreen() {
   const orgs = useOrganizations();
   const [myId, setMyId] = useState<string | null>(null);
   useEffect(() => { let on = true; getMyPlayerId(profile?.id).then((id) => on && setMyId(id)); return () => { on = false; }; }, [profile?.id]);
-  const canManage = !!tournament && canManageTournament(tournament, orgs, myId);
+  const canManage = !!tournament && canManageTournament(tournament, orgs, myId, profile?.id);
 
   const [state, setState] = useState<AmericanoState>(() => readAmericano(tournament?.formats?.[sport]));
   const [dirty, setDirty] = useState(false);

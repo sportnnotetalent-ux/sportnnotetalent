@@ -13,8 +13,9 @@ import { theme } from '../core/theme';
 import { Button, Card, Pill, ScreenTitle, SelectChip, TextField, FormError, LoadingState, textStyles } from '../components/ui';
 import { defaultsFor } from '../components/FormatEditor';
 import { SPORT_LIST, getSport } from '../sports/registry';
-import { useMatches, useTeams, useTournamentById, useTournamentTeams } from '../data/hooks';
-import { addTournamentTeams, createMatch, getMyPlayerId } from '../data/repos';
+import { useMatches, useTournamentById, useTournamentTeams } from '../data/hooks';
+import { addTournamentTeams, createMatch, getMyPlayerId, getMyTeams, getTeamsForOrg } from '../data/repos';
+import type { Team } from '../core/types';
 import { importFromText, importSummary, templateCsv, slugify, type ImportField, type ImportRow } from '../data/scheduleImport';
 import { matchFormatFor } from '../data/matchFormat';
 import { isEliminationStage, isKoStage, KO_STAGE_LABEL } from '../data/bracket';
@@ -52,7 +53,23 @@ export default function ImportScheduleScreen() {
   // Typed times are wall times at the venue: the tournament's zone, else the viewer's.
   const zone = eventZone(tournament, viewerZone);
   const entered = useTournamentTeams(tid);
-  const allTeams = useTeams();
+  // Teams a typed name may resolve to beyond the entered ones: the organiser's
+  // own teams and the host community's — never any same-named team on the
+  // platform (another school's "Red House" used to be auto-entered).
+  const [allTeams, setAllTeams] = useState<Team[]>([]);
+  useEffect(() => {
+    let on = true;
+    Promise.all([
+      getMyTeams(profile?.id, { managedOnly: true }),
+      tournament?.hostOrgId ? getTeamsForOrg(tournament.hostOrgId) : Promise.resolve([] as Team[]),
+    ]).then(([mine, org]) => {
+      if (!on) return;
+      const byId = new Map<string, Team>();
+      for (const t of [...mine, ...org]) byId.set(t.id, t);
+      setAllTeams([...byId.values()]);
+    });
+    return () => { on = false; };
+  }, [profile?.id, tournament?.hostOrgId]);
   const { matches } = useMatches('all');
   const tourMatches = useMemo(() => matches.filter((m) => m.tournamentId === tid), [matches, tid]);
 

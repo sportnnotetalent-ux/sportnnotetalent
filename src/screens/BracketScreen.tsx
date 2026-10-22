@@ -111,7 +111,7 @@ export default function BracketScreen() {
     getMyPlayerId(profile?.id).then((id) => on && setMyId(id));
     return () => { on = false; };
   }, [profile?.id]);
-  const canManage = tournament ? canManageTournament(tournament, orgs, myId) : false;
+  const canManage = tournament ? canManageTournament(tournament, orgs, myId, profile?.id) : false;
 
   useEffect(() => {
     if (tournament) nav.setOptions({ title: tournament.name });

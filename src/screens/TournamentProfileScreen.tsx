@@ -30,10 +30,10 @@ import { fixturesPrintHtml, fixturesShareText, type FixtureRow } from '../core/f
 import { eventZone, formatDate, formatTime, zoneShortName } from '../core/time';
 import { tournamentStatus, matchProgress } from '../core/tournament';
 import { useAuth } from '../core/auth';
-import { useTournamentById, useTeamSummaries, useFollow, useLeagueData, usePlayers, useOrganizations, useTournamentTeams, useTournamentEntries, useCaptainships } from '../data/hooks';
+import { useTournamentById, useTeamSummaries, useFollow, useLeagueData, usePlayers, useOrganizations, useTournamentTeams, useTournamentEntries } from '../data/hooks';
 import { LeaderMinimums } from '../components/LeaderMinimums';
 import { readLeaderMins, leaderMinsPatch, type LeaderMins } from '../data/leaderMinimums';
-import { getMyPlayerId, patchTournamentFormat, setTournamentHosts, setTournamentLogo, setTournamentBanner, getTournamentBanner, setTournamentReminderLeads, requestJoinTournament, setTournamentTeamStatus, transferTournamentOwnership, getOwnershipEvents, getTournamentOfficials, assignTournamentOfficial, unassignTournamentOfficial, getTournamentAwards, getTeamRosters } from '../data/repos';
+import { getMyPlayerId, patchTournamentFormat, setTournamentHosts, setTournamentLogo, setTournamentBanner, getTournamentBanner, setTournamentReminderLeads, requestJoinTournament, setTournamentTeamStatus, transferTournamentOwnership, getOwnershipEvents, getTournamentOfficials, assignTournamentOfficial, unassignTournamentOfficial, getTournamentAwards, getTeamRosters, getMyTeams } from '../data/repos';
 import { TournamentAwardsTab } from '../components/TournamentAwardsTab';
 import { LeaderSplitChips, useLeaderSplits } from '../components/LeaderSplitChips';
 import { DisciplineTable } from '../components/DisciplineTable';
@@ -169,7 +169,7 @@ export default function TournamentProfileScreen() {
   const playerName = (id: string) => allPlayers.find((p) => p.id === id)?.fullName ?? extraPeople[id];
   const hostOrg = tournament?.hostOrgId ? orgs.find((o) => o.id === tournament.hostOrgId) : undefined;
   // Manage = an individual host, or any member of the hosting org.
-  const canManageHosts = tournament ? canManageTournament(tournament, orgs, myId) : false;
+  const canManageHosts = tournament ? canManageTournament(tournament, orgs, myId, profile?.id) : false;
   const saveHosts = (ids: string[]) => {
     setHostIds(ids);
     if (tournament) void setTournamentHosts(tournament.id, ids);
@@ -185,14 +185,21 @@ export default function TournamentProfileScreen() {
   };
   // Captain self-service: enter one of your teams into this tournament (a
   // 'pending' entry the organizer approves), or accept an invite for your team.
-  const { ids: captainIds } = useCaptainships();
   const [entryTick, setEntryTick] = useState(0);
+  // The teams I can enter: every team I manage (creator, captain / vice-captain,
+  // team admin, club admin, claimed staff — getMyScope) that plays one of this
+  // tournament's sports. (It used to need a team_staff captain row AND a team
+  // that had already played a match, so an invited captain saw no Accept.)
+  const [myManagedTeams, setMyManagedTeams] = useState<{ id: string; name: string; sport: string }[]>([]);
+  useEffect(() => {
+    let on = true;
+    getMyTeams(profile?.id, { managedOnly: true }).then((t) => on && setMyManagedTeams(t));
+    return () => { on = false; };
+  }, [profile?.id, entryTick]);
   const entries = useTournamentEntries(params.tournamentId, undefined, entryTick);
   const [entryNote, setEntryNote] = useState<string | null>(null);
   const statusByTeam = new Map(entries.map((e) => [e.team.id, e.status]));
-  const myEligibleTeams = teams.filter(
-    (t) => captainIds.includes(t.id) && t.sports.some((s) => (tournament?.sports ?? []).includes(s)),
-  );
+  const myEligibleTeams = myManagedTeams.filter((t) => (tournament?.sports ?? []).includes(t.sport as never));
   const notifyHosts = (title: string, body: string) => {
     if (!tournament) return;
     for (const hid of tournamentHostPlayerIds(tournament, orgs)) void notify({ title, body, playerId: hid });

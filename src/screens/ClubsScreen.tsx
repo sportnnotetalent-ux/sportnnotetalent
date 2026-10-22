@@ -10,8 +10,9 @@ import { theme } from '../core/theme';
 import { readableOn } from '../core/contrast';
 import { Card, Button, ScreenTitle, LoadingState, EmptyState, textStyles } from '../components/ui';
 import { getSport } from '../sports/registry';
-import { getClubs, getClubSports } from '../data/repos';
-import type { Club, SportId } from '../core/types';
+import { getClubsForPlayer, getClubSports, getMyPlayerId, getMyTeams } from '../data/repos';
+import { useAuth } from '../core/auth';
+import type { Club, SportId, Team } from '../core/types';
 import type { RootStackParamList } from '../navigation/types';
 import { displayableImage } from '../core/imageUrl';
 import { isSupabaseConfigured } from '../core/supabase';
@@ -20,17 +21,24 @@ type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 export default function ClubsScreen() {
   const nav = useNavigation<Nav>();
+  const { profile } = useAuth();
   const [clubs, setClubs] = useState<Club[]>([]);
   const [sportsByClub, setSportsByClub] = useState<Record<string, SportId[]>>({});
+  // per-sport teams that are mine but not part of a club (made for a match or a
+  // tournament, or ones I captain / play on)
+  const [single, setSingle] = useState<Team[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Only the teams you're a member of or created — not every team on the platform.
   const load = useCallback(async () => {
-    const list = await getClubs();
+    const myId = await getMyPlayerId(profile?.id);
+    const [list, teams] = await Promise.all([getClubsForPlayer(myId, profile?.id), getMyTeams(profile?.id)]);
     const pairs = await Promise.all(list.map(async (c) => [c.id, await getClubSports(c.id)] as const));
     setClubs(list);
     setSportsByClub(Object.fromEntries(pairs));
+    setSingle(teams.filter((t) => !t.clubId && !t.adhoc));
     setLoading(false);
-  }, []);
+  }, [profile?.id]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
@@ -43,7 +51,7 @@ export default function ClubsScreen() {
 
         {loading ? (
           <LoadingState />
-        ) : clubs.length === 0 ? (
+        ) : clubs.length === 0 && single.length === 0 ? (
           <EmptyState icon="🛡️" title="No teams yet" hint="Create your team, pick the sports it plays, and add your teammates." />
         ) : (
           clubs.map((c) => {
@@ -70,6 +78,28 @@ export default function ClubsScreen() {
               </TouchableOpacity>
             );
           })
+        )}
+
+        {!loading && single.length > 0 && (
+          <View style={{ gap: theme.spacing(2) }}>
+            <Text style={textStyles.h3}>Single-sport teams</Text>
+            <Text style={textStyles.muted}>Teams you play for, captain or run that aren’t part of a multi-sport team.</Text>
+            {single.map((t) => (
+              <TouchableOpacity key={t.id} accessibilityRole="button" accessibilityLabel={`Open ${t.name}`}
+                onPress={() => nav.navigate('Team', { teamId: t.id })}>
+                <Card style={st.row}>
+                  <View style={[st.badge, { backgroundColor: t.colorHex ?? theme.colors.primary }]}>
+                    <Text style={[st.badgeText, { color: readableOn(t.colorHex ?? theme.colors.primary) }]}>{t.shortName?.slice(0, 3) || t.name.slice(0, 2).toUpperCase()}</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={textStyles.body}>{t.name}</Text>
+                    <Text style={textStyles.muted}>{getSport(t.sport).icon} {getSport(t.sport).name}</Text>
+                  </View>
+                  <Text style={st.chev}>›</Text>
+                </Card>
+              </TouchableOpacity>
+            ))}
+          </View>
         )}
       </ScrollView>
     </SafeAreaView>

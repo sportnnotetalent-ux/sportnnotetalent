@@ -132,13 +132,20 @@ Deno.serve(async (req) => {
   const teamIds = [...new Set(dueMatches.flatMap((x) => [x.m.home_team_id, x.m.away_team_id]).filter(Boolean) as string[])];
 
   const [{ data: teams }, { data: squads }, { data: members }] = await Promise.all([
-    supabase.from('teams').select('id, name, short_name').in('id', teamIds),
+    supabase.from('teams').select('id, name, short_name, roster').in('id', teamIds),
     supabase.from('match_squads').select('match_id, side, starters, subs').in('match_id', matchIds),
     supabase.from('team_members').select('team_id, player_id').in('team_id', teamIds),
   ]);
   const teamById = new Map((teams ?? []).map((t) => [t.id, t]));
+  // A team's players = its explicit roster (where the app keeps membership) plus
+  // any team_members rows — team_members alone missed every roster player.
   const rosterByTeam = new Map<string, string[]>();
-  for (const r of members ?? []) rosterByTeam.set(r.team_id as string, [...(rosterByTeam.get(r.team_id as string) ?? []), r.player_id as string]);
+  for (const t of teams ?? []) rosterByTeam.set(t.id as string, idsOf((t as { roster?: unknown }).roster));
+  for (const r of members ?? []) {
+    const arr = rosterByTeam.get(r.team_id as string) ?? [];
+    if (!arr.includes(r.player_id as string)) arr.push(r.player_id as string);
+    rosterByTeam.set(r.team_id as string, arr);
+  }
   const squadByMatchSide = new Map<string, string[]>();
   for (const s of squads ?? []) squadByMatchSide.set(`${s.match_id}:${s.side}`, [...idsOf(s.starters), ...idsOf(s.subs)]);
 

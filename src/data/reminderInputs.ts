@@ -24,6 +24,9 @@ export interface ReminderReads {
   teamLeaders(teamIds: string[]): Promise<Record<string, TeamLeadership>>;
   /** matchId → squads, one entry per requested id */
   matchSquads(matchIds: string[]): Promise<Record<string, MatchSquads>>;
+  /** teamId → the team's player ids (explicit roster + team_members) — who plays
+   *  when no matchday squad is saved. Optional: absent = match rows' own rosters. */
+  teamRosters?(teamIds: string[]): Promise<Map<string, string[]>>;
   players(): Promise<Player[]>;
   /** the viewer's followed player ids that still want "before they play" alerts */
   followedPlayerIds(): Set<string>;
@@ -35,6 +38,8 @@ export interface ReminderInputs {
   orgs: Organization[];
   leadersByTeam: Record<string, TeamLeadership>;
   squadsByMatch: Record<string, MatchSquads>;
+  /** teamId → player ids (see ReminderReads.teamRosters) */
+  rostersByTeam?: Record<string, string[]>;
   players: Player[];
   playerNameById: Record<string, string>;
   followedPlayerIds: Set<string>;
@@ -51,13 +56,15 @@ export async function gatherReminderInputsWith(reads: ReminderReads, now: number
   const upcoming = matches.filter((m) => m.status === 'scheduled');
   const teamIds = Array.from(new Set(upcoming.flatMap((m) => [m.homeTeam.id, m.awayTeam.id])));
   const matchIds = upcoming.map((m) => m.id);
-  const [leadersByTeam, squadsByMatch, players] = await Promise.all([
+  const [leadersByTeam, squadsByMatch, players, rosters] = await Promise.all([
     teamIds.length ? reads.teamLeaders(teamIds) : Promise.resolve({} as Record<string, TeamLeadership>),
     matchIds.length ? reads.matchSquads(matchIds) : Promise.resolve({} as Record<string, MatchSquads>),
     reads.players(),
+    teamIds.length && reads.teamRosters ? reads.teamRosters(teamIds) : Promise.resolve(null),
   ]);
   const playerNameById = Object.fromEntries(players.map((p) => [p.id, p.fullName]));
-  return { matches, tournaments, orgs, leadersByTeam, squadsByMatch, players, playerNameById, followedPlayerIds: reads.followedPlayerIds() };
+  const rostersByTeam = rosters ? Object.fromEntries(rosters) : undefined;
+  return { matches, tournaments, orgs, leadersByTeam, squadsByMatch, ...(rostersByTeam ? { rostersByTeam } : {}), players, playerNameById, followedPlayerIds: reads.followedPlayerIds() };
 }
 
 export interface TickerTimers {

@@ -133,6 +133,8 @@ export type RootStackParamList = {
    *  the simple create flow; ClubHome = the team dashboard; ClubSport = one sport's
    *  profile (captain/VC, squad, roles). See migration 0018. */
   Clubs: undefined;
+  /** every tournament that's mine: hosting / playing / officiating / following */
+  MyTournaments: undefined;
   CreateClub: { orgId?: string } | undefined;
   ClubHome: { clubId: string };
   ClubSport: { clubId: string; sport: SportId; /** SD-154: one squad (JV, B team) when the club has several */ teamId?: string };

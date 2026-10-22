@@ -45,6 +45,7 @@ export function ProfileView({
   onCreateProfile,
   creating,
   onSignOut,
+  mine,
 }: {
   playerId: string | null;
   /** `name` labels the 🔔 alert-settings sheet (falls back to the player's name). */
@@ -72,6 +73,8 @@ export function ProfileView({
   creating?: boolean;
   /** own profile: sign out of the account */
   onSignOut?: () => void;
+  /** own profile: the "Mine" card — rendered under Edit profile */
+  mine?: React.ReactNode;
 }) {
   const { player, stats: allStats, official, friendly } = usePlayerProfile(playerId);
   const orgs = useOrganizations();
@@ -197,6 +200,7 @@ export function ProfileView({
       {onEditProfile && (
         <Button label="✎ Edit profile" variant="ghost" onPress={onEditProfile} />
       )}
+      {ownProfile && mine}
       {!onEditProfile && onAdminEdit && (
         <Button label="✎ Edit player details" variant="ghost" onPress={onAdminEdit} />
       )}

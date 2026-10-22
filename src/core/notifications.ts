@@ -28,11 +28,13 @@ export function setCurrentPlayerId(id: string | null) {
   currentPlayerId = id;
 }
 
-export async function notify(input: { title: string; body: string; playerId?: string; matchId?: string }) {
+/** `self`: for THIS device's viewer even though `playerId` names someone else
+ *  (a "player you follow plays in 1 hour" reminder links to that player). */
+export async function notify(input: { title: string; body: string; playerId?: string; matchId?: string; self?: boolean }) {
   // Addressed to another user → send a remote push to their devices (works when
   // their app is closed / phone locked). It must NOT show on this (the sender's)
   // device or land in this device's in-app feed.
-  if (input.playerId && currentPlayerId && input.playerId !== currentPlayerId) {
+  if (!input.self && input.playerId && currentPlayerId && input.playerId !== currentPlayerId) {
     try {
       const { pushToPlayers } = await import('../data/repos');
       await pushToPlayers([input.playerId], { title: input.title, body: input.body, matchId: input.matchId });
@@ -43,7 +45,8 @@ export async function notify(input: { title: string; body: string; playerId?: st
   }
 
   // For me (or no specific target): in-app feed + an immediate local banner.
-  notifyStore.push({ ...input, at: Date.now() });
+  const { self: _self, ...item } = input;
+  notifyStore.push({ ...item, at: Date.now() });
   const N = await getNotif();
   if (!N) return;
   try {

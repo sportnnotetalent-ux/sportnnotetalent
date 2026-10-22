@@ -653,6 +653,9 @@ export interface Tournament {
   /** the player who originally created this tournament — retained even after the
    *  tournament is transferred to an organization or another owner ("Created by"). */
   createdBy?: UUID;
+  /** the organiser ACCOUNT (tournaments.organizer_id — a PROFILE id, unlike
+   *  hostIds / createdBy which are player ids). The server lets it manage. */
+  organizerId?: UUID;
   /** How this tournament is contested (spec §25) — the tournament defines its own
    *  participation, independent of the underlying team/house/student structure:
    *  'open' teams (default), 'inter_house' (a school's Houses compete), 'school_team'
