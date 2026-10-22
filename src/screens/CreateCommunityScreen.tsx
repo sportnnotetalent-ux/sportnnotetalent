@@ -2,7 +2,8 @@
  *  Pick a standard type or enter a custom one. Once created, the community can
  *  host recurring sports events year after year (all tracked under it). */
 import React, { useEffect, useState } from 'react';
-import { ScrollView, View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { theme } from '../core/theme';
@@ -74,7 +75,7 @@ export default function CreateCommunityScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
         <ScreenTitle title="New community" subtitle="A school, club, company… that runs sports events" />
 
         <TextField label="Name" value={name} onChange={setName} placeholder="Greenwood High School" />
@@ -120,7 +121,7 @@ export default function CreateCommunityScreen({ navigation }: Props) {
 
         <FormError message={error} />
         <Button label={busy ? 'Creating…' : 'Create community'} onPress={submit} />
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

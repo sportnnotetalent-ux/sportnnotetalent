@@ -10,7 +10,8 @@ import { useMeetZone } from '../data/useMeetZone';
 import { useRegion } from '../core/region';
 import { fieldUnitsOf, massUnitsOf } from '../core/units';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, type ScrollView } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, useFocusEffect, useIsFocused } from '@react-navigation/native';
 import { useKeepAwakeWhile } from '../core/keepAwake';
@@ -628,7 +629,7 @@ export default function ResultsEventScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <ScrollView ref={scroller} contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView ref={scroller} contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
         <View>
           <Text style={textStyles.h2}>{f.eventTitle ?? def.label}</Text>
           <Text style={textStyles.muted}>
@@ -944,7 +945,7 @@ export default function ResultsEventScreen() {
             ? <Button label={busy ? 'Reopening…' : isFinal ? (arch ? `↺ Reopen ${pName(f.phase).toLowerCase()}` : '↺ Reopen final') : `↺ Reopen ${pName(f.phase).toLowerCase()}`} variant="ghost" onPress={() => void doReopen()} disabled={busy} />
             : <Text style={textStyles.muted}>Locked. {reopen.reason}</Text>
         )}
-      </ScrollView>
+      </KeyboardAwareScrollView>
       {undo ? (
         <View style={st.snack} accessibilityLiveRegion="polite">
           <Text style={st.snackTxt} numberOfLines={1}>{undo.label} saved</Text>
@@ -1558,7 +1559,7 @@ function HeightGrid({ def, entries, current }: { def: DisciplineDef; entries: Re
   if (!heights.length) return null;
   return (
     <Card style={{ padding: theme.spacing(2) }}>
-      <ScrollView horizontal showsHorizontalScrollIndicator>
+      <KeyboardAwareScrollView horizontal showsHorizontalScrollIndicator>
         <View>
           <View style={st.gridRow}>
             <Text style={[st.gridName, st.gridHead]}>Athlete</Text>
@@ -1574,7 +1575,7 @@ function HeightGrid({ def, entries, current }: { def: DisciplineDef; entries: Re
             );
           })}
         </View>
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </Card>
   );
 }

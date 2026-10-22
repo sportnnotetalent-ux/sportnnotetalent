@@ -4,7 +4,8 @@
  *  the support team can open this; here it's reachable in the demo for review. */
 import React, { useCallback, useState } from 'react';
 import { formatPhone } from '../core/phone';
-import { ScrollView, View, Text, StyleSheet, Linking } from 'react-native';
+import { View, Text, StyleSheet, Linking } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { theme } from '../core/theme';
@@ -67,7 +68,7 @@ export default function VerificationReviewScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={st.content}>
+      <KeyboardAwareScrollView contentContainerStyle={st.content}>
         <ScreenTitle title="🛡️ Verification review" subtitle="Support · age & guardian documents" />
 
         {!support ? (
@@ -122,7 +123,7 @@ export default function VerificationReviewScreen() {
         )}
         </>
         )}
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

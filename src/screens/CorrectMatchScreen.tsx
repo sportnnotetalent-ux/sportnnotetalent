@@ -5,7 +5,8 @@
  * (scorers and match hosts for 24 h after the end; tournament hosts anytime).
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { ScrollView, View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import { theme } from '../core/theme';
@@ -105,7 +106,7 @@ export default function CorrectMatchScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
         <ScreenTitle title="Correct match" subtitle={`${home} vs ${away} · ${score(current)} · ${resultText(current)}`} />
         {!plan ? (
           <>
@@ -140,7 +141,7 @@ export default function CorrectMatchScreen() {
             {unfinished ? <FormError message="This change leaves the match unfinished, so the result would be lost." /> : null}
           </View>
         )}
-      </ScrollView>
+      </KeyboardAwareScrollView>
       <View style={st.bar}>
         {!plan ? (
           <Button label={busy ? 'Working…' : `Preview (${ops.length} change${ops.length === 1 ? '' : 's'})`} onPress={() => void preview()} disabled={busy || ops.length === 0} />

@@ -9,7 +9,8 @@
  *  never shown, and a guardian is recommended for under-18s but not required.
  *  The save goes through adminPatch so nothing the server would lock is sent. */
 import React, { useEffect, useState } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Switch } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Switch } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { theme } from '../core/theme';
@@ -250,7 +251,7 @@ export default function EditProfileScreen({ route, navigation }: Props) {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
         {asAdmin ? (
           <ScreenTitle title="Edit player details" subtitle={`You added ${loaded.name || 'this player'} — they can change these once they join`} />
         ) : (
@@ -466,7 +467,7 @@ export default function EditProfileScreen({ route, navigation }: Props) {
 
         <FormError message={error} />
         <Button label={busy ? 'Saving…' : asAdmin ? 'Save details' : 'Save profile'} onPress={save} />
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

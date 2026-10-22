@@ -6,7 +6,8 @@
  *  Guardian contacts go on the child's guardian record (private), never on the
  *  child's own profile. */
 import React, { useEffect, useMemo, useState } from 'react';
-import { ScrollView, View, Text, StyleSheet, Platform } from 'react-native';
+import { View, Text, StyleSheet, Platform } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -119,7 +120,7 @@ export default function RosterImportScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
         <ScreenTitle title="📥 Import a roster" subtitle={where} />
         <Card style={{ gap: theme.spacing(2) }}>
           <Text style={textStyles.muted}>From your school system or a spreadsheet saved as CSV. Columns, any order: Name (or First name + Last name), Date of birth, Gender, Class / Year, House, Team, Jersey, Guardian name, Guardian email, Guardian phone. Dates are {dateOrderWords(region.dateOrder)}.</Text>
@@ -173,7 +174,7 @@ export default function RosterImportScreen() {
         {done ? <Text style={textStyles.muted}>✅ {done}</Text> : null}
         <Button label={busy ? 'Importing…' : `Import ${newRows.length + linkOnly.length} ${newRows.length + linkOnly.length === 1 ? 'person' : 'people'} into ${where}`} disabled={busy || !(newRows.length + linkOnly.length)} onPress={() => void run()} />
         {done ? <Button label="Done" variant="ghost" onPress={() => nav.goBack()} /> : null}
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

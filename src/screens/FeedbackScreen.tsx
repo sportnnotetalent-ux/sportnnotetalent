@@ -4,7 +4,8 @@
  * tagged with the kind and the screens the user was on just before.
  */
 import React, { useState } from 'react';
-import { ScrollView, View, Text, Linking, Platform, StyleSheet } from 'react-native';
+import { View, Text, Linking, Platform, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { theme } from '../core/theme';
@@ -71,7 +72,7 @@ export default function FeedbackScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
         <View style={{ gap: theme.spacing(1) }}>
           <Text style={textStyles.h2}>Send feedback</Text>
           <Text style={textStyles.muted}>Bugs, ideas, anything confusing — it goes straight to the team.</Text>
@@ -93,7 +94,7 @@ export default function FeedbackScreen() {
         ) : null}
         <FormError message={error} />
         <Button label={busy ? 'Sending…' : 'Send'} onPress={() => void send()} disabled={busy} />
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

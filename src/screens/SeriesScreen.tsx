@@ -3,7 +3,8 @@
  *  the normal live-scoring screen. The standing recomputes from the legs' results
  *  each time it's opened, so scoring a leg and coming back updates the series. */
 import React, { useEffect, useMemo, useState } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -94,7 +95,7 @@ export default function SeriesScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={st.content}>
+      <KeyboardAwareScrollView contentContainerStyle={st.content}>
         <ScreenTitle title={series.name || `${teamAName} v ${teamBName}`} subtitle={isTie ? `Team tie · ${series.legsPlanned} rubbers` : FORMAT_LABEL[series.format](series.legsPlanned)} />
         {isTie ? <TeamTieView initial={series} canManage={canManage} tz={tz} onOpen={openLeg} me={{ playerId: myId, profileId: profile?.id, role: profile?.role }} /> : (<>
 
@@ -169,7 +170,7 @@ export default function SeriesScreen() {
             <FormError message={error} />
           </View>
         )}
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

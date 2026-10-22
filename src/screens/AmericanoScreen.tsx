@@ -3,7 +3,8 @@
  *  players, generate the rotation, enter each game's score, and see the live
  *  individual leaderboard. State rides the tournament's formats[sport] JSONB. */
 import React, { useEffect, useMemo, useState } from 'react';
-import { ScrollView, View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -83,7 +84,7 @@ export default function AmericanoScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
         <ScreenTitle title={`${getSport(sport).icon} Americano`} subtitle="Rotate partners each round · individual points" />
 
         {/* Leaderboard first — it's the point of Americano. */}
@@ -179,7 +180,7 @@ export default function AmericanoScreen() {
             )}
           </>
         )}
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

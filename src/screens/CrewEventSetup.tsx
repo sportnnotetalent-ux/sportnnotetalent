@@ -6,7 +6,8 @@
  *  number of crews, or a custom rule) and the lanes. Heats and lanes are
  *  drawn. Rendered by AthleticsEventSetupScreen for sport 'rowing' / 'canoe'. */
 import React, { useEffect, useMemo, useState } from 'react';
-import { ScrollView, View, Text, TextInput, StyleSheet } from 'react-native';
+import { View, Text, TextInput, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -200,7 +201,7 @@ export function CrewEventSetup({ tournamentId, sport }: { tournamentId?: string;
   const distances = rowing ? ROW_DISTANCES : CANOE_DISTANCES;
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
         <ScreenTitle title={rowing ? '🚣 New rowing race' : '🛶 New canoe sprint race'} subtitle={tournament?.name} />
         {/* SD-141: the meet's competition rules, checked before the meet starts */}
         <CompetitionRulesCard tournament={tournament} sport={sport} />
@@ -329,7 +330,7 @@ export function CrewEventSetup({ tournamentId, sport }: { tournamentId?: string;
         <EventOfficials tournament={tournament} value={officials} onChange={setOfficials} />
         <FormError message={error} />
         <Button label={busy ? 'Creating…' : 'Create race & draw lanes'} onPress={() => void create()} disabled={busy || !entrants} />
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

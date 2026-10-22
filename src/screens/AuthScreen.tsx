@@ -7,8 +7,9 @@
  *
  *  NOTE: live-only — this screen never mounts in demo mode, so it can't be
  *  previewed against the demo build. Verify on a staging Supabase project. */
-import React, { useEffect, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView, useKeyboardFocus } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -174,12 +175,14 @@ export default function AuthScreen() {
   };
 
   const showPassword = mode === 'up' || (mode === 'in' && flow === 'password');
+  // keyboard "Next" on the email moves to the password; "Go" on a sign-in password signs in
+  const passwordRef = useRef<TextInput>(null);
   const codeFlow = mode === 'in' && (flow === 'otp' || flow === 'reset');
   const otpPhone = mode === 'in' && flow === 'otp' && otpChannel === 'phone';
 
   return (
     <SafeAreaView style={st.safe}>
-      <ScrollView contentContainerStyle={st.content}>
+      <KeyboardAwareScrollView contentContainerStyle={st.content}>
         <View style={st.brand}>
           <Logo size={72} />
           <Text style={st.logo}>Sport<Text style={st.logoAccent}>nNote</Text></Text>
@@ -226,9 +229,20 @@ export default function AuthScreen() {
               </View>
             </View>
           )}
-          {!otpPhone && <Field label="Email" value={email} onChange={setEmail} placeholder="you@school.edu" keyboardType="email-address" autoComplete="email" />}
+          {!otpPhone && (
+            <Field
+              label="Email" value={email} onChange={setEmail} placeholder="you@school.edu" keyboardType="email-address" autoComplete="email"
+              {...(showPassword ? { returnKeyType: 'next' as const, onSubmitEditing: () => passwordRef.current?.focus() } : {})}
+            />
+          )}
           {otpPhone && <PhoneField label="Mobile number" value={mobile} onChange={setMobile} labelStyle={textStyles.muted} />}
-          {showPassword && <Field label="Password" value={password} onChange={setPassword} placeholder="••••••••" secure autoComplete={mode === 'up' ? 'new-password' : 'current-password'} />}
+          {showPassword && (
+            <Field
+              label="Password" value={password} onChange={setPassword} placeholder="••••••••" secure autoComplete={mode === 'up' ? 'new-password' : 'current-password'}
+              inputRef={passwordRef}
+              {...(mode === 'in' ? { returnKeyType: 'go' as const, onSubmitEditing: () => { if (!busy) void submitPassword(); } } : {})}
+            />
+          )}
 
           {/* OTP / reset: the 6-digit code, plus a new password for reset. */}
           {codeFlow && sent && <Field label="6-digit code" value={code} onChange={setCode} placeholder="123456" keyboardType="number-pad" autoComplete="one-time-code" />}
@@ -328,7 +342,7 @@ export default function AuthScreen() {
             </>
           )}
         </Card>
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }
@@ -341,6 +355,9 @@ function Field({
   secure,
   keyboardType,
   autoComplete,
+  inputRef,
+  returnKeyType,
+  onSubmitEditing,
 }: {
   label: string;
   value: string;
@@ -350,7 +367,12 @@ function Field({
   keyboardType?: 'email-address' | 'number-pad';
   /** SD-155 (1.3.5): lets password managers / autofill identify the field. */
   autoComplete?: 'email' | 'current-password' | 'new-password' | 'one-time-code' | 'name';
+  inputRef?: React.Ref<TextInput>;
+  returnKeyType?: 'next' | 'go';
+  onSubmitEditing?: () => void;
 }) {
+  // keeps the field above the keyboard
+  const kbFocus = useKeyboardFocus();
   return (
     <View style={{ gap: theme.spacing(1) }}>
       <Text style={textStyles.muted}>{label}</Text>
@@ -366,6 +388,11 @@ function Field({
         // SD-155: the <Text> above isn't tied to the input, so name it here too.
         accessibilityLabel={label}
         autoComplete={autoComplete}
+        ref={inputRef}
+        returnKeyType={returnKeyType}
+        onSubmitEditing={onSubmitEditing}
+        submitBehavior={returnKeyType === 'next' ? 'submit' : undefined}
+        {...kbFocus}
       />
     </View>
   );

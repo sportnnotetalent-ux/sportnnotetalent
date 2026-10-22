@@ -7,7 +7,8 @@
  *  seeded when the one before is closed. Rendered by AthleticsEventSetupScreen
  *  for `mode: 'combined'`. */
 import React, { useEffect, useMemo, useState } from 'react';
-import { ScrollView, View, Text, TextInput, StyleSheet } from 'react-native';
+import { View, Text, TextInput, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -142,7 +143,7 @@ export function CombinedEventSetup({ tournamentId }: { tournamentId?: string }) 
   const hh = hurdles ? hurdleHeight(hurdles, cat) : undefined;
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
         <ScreenTitle title="🏅 New combined event" subtitle={tournament?.name} />
         {/* SD-141: the meet's competition rules, checked before the meet starts */}
         <CompetitionRulesCard tournament={tournament} sport={'athletics'} />
@@ -225,7 +226,7 @@ export function CombinedEventSetup({ tournamentId }: { tournamentId?: string }) 
         <FormError message={error} />
         <Text style={textStyles.muted}>{events.length ? `${label} ${categoryLabel(cat)}: ${events.map(shortName).join(', ')}.` : ''} Each event is entered on the usual track / field screen; the running total and places update after every event.</Text>
         <Button label={busy ? 'Creating…' : `Create ${label.toLowerCase()} & first start list`} onPress={() => void create()} disabled={busy || !picks.length || events.length < 2} />
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

@@ -27,7 +27,8 @@ import { canCorrectMatch, correctionHoursLeft, formatTimeLeft } from '../core/ro
 import { standingsConfigFromFormat, noResultPoints } from '../data/standings';
 import { lockStatus, type ScoringLock } from '../core/scoringLock';
 import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { shareMessage } from '../core/share';
 import { PersonPicker } from '../components/PersonPicker';
 import { useParamState } from '../navigation/useParamState';
@@ -2171,7 +2172,7 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
     return (
       <SafeAreaView style={st.safe} edges={['top']}>
        <DisputeMaskProvider value={maskValue}>
-        <ScrollView contentContainerStyle={st.content}>
+        <KeyboardAwareScrollView contentContainerStyle={st.content}>
           {header}
           {/* SD-155: screen readers hear every score change (polite live region). */}
           <LiveAnnouncer message={scoreSentence(homeTeamName ?? homeName, shownSummary.homeScore, awayTeamName ?? awayName, shownSummary.awayScore, shownSummary.statusLine)} />
@@ -2194,13 +2195,13 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
             </TouchableOpacity>
           )}
           {scrollTabs ? (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.tabScroll}>
+            <KeyboardAwareScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.tabScroll}>
               {TABS.map((t) => (
                 <TouchableOpacity key={t.key} style={[st.tabChip, activeTab === t.key && st.tabActive]} activeOpacity={0.8} accessibilityRole="tab" accessibilityLabel={t.label} accessibilityState={{ selected: activeTab === t.key }} aria-selected={activeTab === t.key} onPress={() => setTab(t.key)}>
                   <Text style={[st.tabText, activeTab === t.key && st.tabTextActive]}>{t.label}</Text>
                 </TouchableOpacity>
               ))}
-            </ScrollView>
+            </KeyboardAwareScrollView>
           ) : (
             <View style={st.tabBar}>
               {TABS.map((t) => (
@@ -2468,7 +2469,7 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
           )}
 
           {noteNode}
-        </ScrollView>
+        </KeyboardAwareScrollView>
         <QuickOptionsSheet
           visible={quickOpen} onClose={() => setQuickOpen(false)}
           homeName={fullHome} awayName={fullAway}

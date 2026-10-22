@@ -2,7 +2,8 @@
  *  with) a code, we resolve it to a team, and on claim they become its captain
  *  and can manage the squad. */
 import React, { useState } from 'react';
-import { ScrollView, View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -58,7 +59,7 @@ export default function JoinTeamScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
         <ScreenTitle title="Join a team" subtitle="Enter a squad invite code, or a tournament code (T-…) to enter your team in a tournament" />
 
         <TextField label="Invite code" value={code} onChange={setCode} placeholder="JOIN-1001" autoCapitalize="characters" />
@@ -77,7 +78,7 @@ export default function JoinTeamScreen() {
         <Text style={st.note}>
           Opening a shared link ({APP_HOST}/join/CODE) brings you here with the code filled in.
         </Text>
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

@@ -4,7 +4,8 @@
  *  contingent can be marked out of a sport it doesn't field — its fixtures there
  *  then become walkovers for its opponents. */
 import React, { useCallback, useState } from 'react';
-import { ScrollView, View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -66,7 +67,7 @@ export default function ContingentsScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
         <ScreenTitle title="Contingents" subtitle={`${contingents.length} across ${sports.length} sport${sports.length === 1 ? '' : 's'}`} />
 
         <Card style={{ gap: theme.spacing(2) }}>
@@ -96,7 +97,7 @@ export default function ContingentsScreen() {
 
         {contingents.length === 0 && <Text style={textStyles.muted}>No contingents yet — add the teams that will compete across the meet.</Text>}
         <Button label="Done" variant="ghost" onPress={() => nav.goBack()} />
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

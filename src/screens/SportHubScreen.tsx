@@ -2,7 +2,8 @@
  *  game, the league table, and the statistics rail. Reached from the Home sport
  *  chips and from a tournament's sport list. */
 import React, { useEffect, useMemo, useState } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -87,12 +88,12 @@ export default function SportHubScreen() {
   if (isEventSport(sport)) {
     return (
       <SafeAreaView style={st.safe} edges={['bottom']}>
-        <ScrollView contentContainerStyle={st.content}>
+        <KeyboardAwareScrollView contentContainerStyle={st.content}>
           <ScreenTitle title={`${plugin.icon} ${plugin.name}`} subtitle={tournamentName} />
           {tournament ? (
             <AthleticsHub sport={sport} tournament={tournament} canOrganize={canOrganize(profile?.role) || canManageTournament(tournament, orgs, me, profile?.id)} />
           ) : <Text style={textStyles.muted}>Loading…</Text>}
-        </ScrollView>
+        </KeyboardAwareScrollView>
       </SafeAreaView>
     );
   }
@@ -102,17 +103,17 @@ export default function SportHubScreen() {
   if (sport === 'golf' && String(golfFmt?.competition ?? 'stroke') !== 'match') {
     return (
       <SafeAreaView style={st.safe} edges={['bottom']}>
-        <ScrollView contentContainerStyle={st.content}>
+        <KeyboardAwareScrollView contentContainerStyle={st.content}>
           <ScreenTitle title={`${plugin.icon} ${plugin.name}`} subtitle={tournamentName} />
           <GolfTournamentHub tournamentId={tournamentId} format={golfFmt} canOrganize={canOrganize(profile?.role)} />
-        </ScrollView>
+        </KeyboardAwareScrollView>
       </SafeAreaView>
     );
   }
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={st.content}>
+      <KeyboardAwareScrollView contentContainerStyle={st.content}>
         <ScreenTitle title={`${plugin.icon} ${plugin.name}`} subtitle={tournamentName} />
 
         <DivisionTabs categories={divisions} activeCat={activeCat} onChange={setActiveCat} />
@@ -196,7 +197,7 @@ export default function SportHubScreen() {
             })}
           </>
         )}
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

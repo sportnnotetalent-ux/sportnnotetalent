@@ -3,7 +3,8 @@
  *  — plus the live leaderboard. Card saves are offline-safe (data/golf outbox).
  *  See docs/sports/GOLF_DESIGN.md §6. */
 import React, { useEffect, useMemo, useState } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { confirmMatchAction, askConfirm } from '../components/ConfirmSheet';
 import { GolfEntryAdminSheet } from '../components/golf/GolfEntryAdminSheet';
@@ -350,7 +351,7 @@ export default function GolfRoundScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
         <View style={st.headRow}>
           <View style={{ flex: 1 }}>
             <Text style={textStyles.h3}>⛳ {ev.title}</Text>
@@ -582,7 +583,7 @@ export default function GolfRoundScreen() {
             )}
           </>
         )}
-      </ScrollView>
+      </KeyboardAwareScrollView>
       {adminEntry && (
         <GolfEntryAdminSheet
           visible={!!adminEntry}

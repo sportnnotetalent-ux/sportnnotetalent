@@ -9,6 +9,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, Modal, Pressable, StyleSheet, Text, TextInput, TouchableOpacity, View, type StyleProp, type TextStyle } from 'react-native';
 import { theme } from '../core/theme';
+import { KeyboardSheetScope, useKeyboardFocus, useKeyboardSheet } from './keyboard';
 import {
   type CountryCode, countryFlag, countryName, defaultPhoneCountry, dialCode, examplePhone,
   isValidPhone, joinPhone, phoneCountries, setPreferredPhoneCountry, setSavedCountrySource, splitPhone,
@@ -44,6 +45,9 @@ export function PhoneField({
   const [national, setNational] = useState(initial.national);
   const [touched, setTouched] = useState(false);
   const [picking, setPicking] = useState(false);
+  // keyboard: the number stays above it; the country list's search lifts its sheet
+  const kbFocus = useKeyboardFocus(undefined, () => setTouched(true));
+  const kbSheet = useKeyboardSheet(picking);
   const lastEmitted = useRef(value);
 
   // A value set from outside (profile loaded, form reset) re-seeds the field.
@@ -107,7 +111,7 @@ export function PhoneField({
           accessibilityLabel={a11y}
           value={national}
           onChangeText={onText}
-          onBlur={() => setTouched(true)}
+          {...kbFocus}
           placeholder={example || 'Mobile number'}
           placeholderTextColor={theme.colors.textMuted}
           keyboardType="phone-pad"
@@ -123,9 +127,11 @@ export function PhoneField({
       ) : hint ? <Text style={st.hint}>{hint}</Text> : null}
 
       <Modal visible={picking} transparent animationType="fade" onRequestClose={() => setPicking(false)}>
-        <Pressable style={st.backdrop} onPress={() => setPicking(false)} accessibilityRole="button" accessibilityLabel="Close country list">
-          <Pressable style={st.sheet} onPress={(e) => e.stopPropagation()} accessibilityRole="none" tabIndex={-1}>
-            <CountryList current={country} onPick={pick} />
+        <Pressable style={[st.backdrop, kbSheet.backdrop]} onPress={() => setPicking(false)} accessibilityRole="button" accessibilityLabel="Close country list">
+          <Pressable ref={kbSheet.panel} style={[st.sheet, kbSheet.sheet]} onPress={(e) => e.stopPropagation()} accessibilityRole="none" tabIndex={-1}>
+            <KeyboardSheetScope value={kbSheet.scope}>
+              <CountryList current={country} onPick={pick} />
+            </KeyboardSheetScope>
           </Pressable>
         </Pressable>
       </Modal>
@@ -135,6 +141,7 @@ export function PhoneField({
 
 function CountryList({ current, onPick }: { current: CountryCode; onPick: (c: CountryCode) => void }) {
   const [q, setQ] = useState('');
+  const kbFocus = useKeyboardFocus();
   const all = phoneCountries();
   const needle = q.trim().toLowerCase().replace(/^\+/, '');
   const list = needle
@@ -152,6 +159,7 @@ function CountryList({ current, onPick }: { current: CountryCode; onPick: (c: Co
         accessibilityLabel="Search country or code"
         autoCapitalize="none"
         autoCorrect={false}
+        {...kbFocus}
       />
       <FlatList
         data={list}

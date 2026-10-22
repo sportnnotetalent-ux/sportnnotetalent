@@ -6,7 +6,8 @@
  *  tournament they are read-only. Team sports in the same tournament link to
  *  their bans and walkover scores (SD-126 / SD-140 settings). */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -126,7 +127,7 @@ export default function CompetitionRulesScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
         <ScreenTitle title="📜 Competition rules" subtitle={`${tournament.name} · ${name}`} />
         <Text style={textStyles.muted}>Pick these before the meet starts. The standard rule is already chosen for each one and says where it comes from. Rules marked “verify” were set from memory — check them against your federation or school board circular.</Text>
         {!lock ? <Text style={textStyles.muted}>Checking for results…</Text> : locked ? (
@@ -200,7 +201,7 @@ export default function CompetitionRulesScreen() {
             <Button label="Back to standard" variant="ghost" onPress={() => void reset()} disabled={busy} />
           </View>
         )}
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

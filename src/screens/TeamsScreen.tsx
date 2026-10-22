@@ -5,7 +5,8 @@
  *  local store; live mode inserts to Supabase. */
 import { teamLabel } from '../core/teamLevels';
 import React, { useCallback, useState } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -72,7 +73,7 @@ export default function TeamsScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={st.content}>
+      <KeyboardAwareScrollView contentContainerStyle={st.content}>
         <ScreenTitle title="Teams" subtitle={activeOrg ? `${activeOrg.name} · houses & teams` : 'Teams you run'} />
 
         <Card style={{ gap: theme.spacing(3) }}>
@@ -162,7 +163,7 @@ export default function TeamsScreen() {
             ))}
           </View>
         )}
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

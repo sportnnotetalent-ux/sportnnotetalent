@@ -1,7 +1,8 @@
 /** Organizer hub — the two primary actions (new tournament, schedule a match)
  *  up top, followed by the tournaments this user is currently hosting. */
 import React, { useCallback, useState } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -92,7 +93,7 @@ export default function OrganizeScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['top']}>
-      <ScrollView contentContainerStyle={st.content}>
+      <KeyboardAwareScrollView contentContainerStyle={st.content}>
         <ScreenTitle title="Organize" subtitle="Run your sports meet" />
 
         {/* Acting-as context: Personal, or one of your organizations. */}
@@ -204,7 +205,7 @@ export default function OrganizeScreen() {
             </Card>
           </TouchableOpacity>
         ))}
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

@@ -2,7 +2,8 @@
  *  Completed matches open the same full page as a live game (final score, info,
  *  lineups, summary) so the app keeps a browsable history of every game. */
 import React, { useEffect, useState } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -98,7 +99,7 @@ export default function MatchesScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['top']}>
-      <ScrollView contentContainerStyle={st.content}>
+      <KeyboardAwareScrollView contentContainerStyle={st.content}>
         <ScreenTitle title="Matches" subtitle="Games you play, organize or score" />
 
         <View style={st.segment}>
@@ -122,12 +123,12 @@ export default function MatchesScreen() {
           })}
         </View>
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.filters}>
+        <KeyboardAwareScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.filters}>
           <SelectChip label="All" active={filter === 'all'} onPress={() => setFilter('all')} />
           {SPORT_LIST.map((s) => (
             <SelectChip key={s.id} label={`${s.icon} ${s.name}`} active={filter === s.id} onPress={() => setFilter(s.id)} />
           ))}
-        </ScrollView>
+        </KeyboardAwareScrollView>
 
         {loading ? (
           <LoadingState label="Loading matches…" />
@@ -142,7 +143,7 @@ export default function MatchesScreen() {
             <MatchCard key={m.id} match={m} onPress={() => open(m)} onStart={iScore(m) ? () => open(m, 'scoring') : undefined} />
           ))
         )}
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

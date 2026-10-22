@@ -10,7 +10,8 @@ import { defaultSchoolYear, regionStore } from '../core/region';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { formatPhone } from '../core/phone';
 import { PhoneField } from '../components/PhoneField';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -426,7 +427,7 @@ export default function OrganizationScreen() {
         ))}
       </View>
 
-      <ScrollView contentContainerStyle={st.content}>
+      <KeyboardAwareScrollView contentContainerStyle={st.content}>
         {/* ───────────────────────── Details ───────────────────────── */}
         {tab === 'details' && (
           canManage && editing ? (
@@ -710,7 +711,7 @@ export default function OrganizationScreen() {
             )}
           </>
         )}
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

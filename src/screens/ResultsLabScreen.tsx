@@ -5,7 +5,8 @@
  *  (Wave 4 registers them); this screen exists so the generic entry screen and
  *  results sheet can be exercised end to end. */
 import React, { useCallback, useState } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -61,7 +62,7 @@ export default function ResultsLabScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={st.content}>
+      <KeyboardAwareScrollView contentContainerStyle={st.content}>
         <View>
           <Text style={textStyles.h2}>Results lab</Text>
           <Text style={textStyles.muted}>Developer preview of the timed / measured results engine. Athletics meets use the tournament's Athletics page (SD-90).</Text>
@@ -87,7 +88,7 @@ export default function ResultsLabScreen() {
             </TouchableOpacity>
           );
         })}
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

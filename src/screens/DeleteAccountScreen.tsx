@@ -3,7 +3,8 @@
  * typing DELETE. Server: delete-account edge function (migration 0030).
  */
 import React, { useState } from 'react';
-import { ScrollView, View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { theme } from '../core/theme';
 import { Button, Card, FormError, TextField, textStyles } from '../components/ui';
@@ -32,7 +33,7 @@ export default function DeleteAccountScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
         <Text style={textStyles.h2}>Delete my account</Text>
         <Card style={{ gap: theme.spacing(2) }}>
           <Text style={[textStyles.body, { fontWeight: '700' }]}>What’s deleted, permanently</Text>
@@ -52,7 +53,7 @@ export default function DeleteAccountScreen() {
         <View style={{ opacity: ready ? 1 : 0.5 }}>
           <Button label={busy ? 'Deleting…' : 'Delete my account'} variant="danger" onPress={() => void confirm()} disabled={!ready || busy} />
         </View>
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

@@ -3,7 +3,8 @@
  *  (round-robin or knockout round 1), they review/adjust times, then we create
  *  every match at once. Manual scheduling is untouched; this is an extra path. */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ScrollView, View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -554,7 +555,7 @@ export default function GenerateFixturesScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
         <ScreenTitle title="Auto-generate fixtures" subtitle={tournament?.name ?? 'Bulk-schedule matches'} />
         {/* Prerequisite (parity #08): fixtures need at least two participants. */}
         {participants.length < 2 && (
@@ -942,7 +943,7 @@ export default function GenerateFixturesScreen() {
             </View>
           )
         )}
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

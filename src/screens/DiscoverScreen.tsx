@@ -3,7 +3,8 @@
  *  browse content for an empty query; "Connect" is the noticeboard where players
  *  find teams and teams find players, opponents and grounds. */
 import React, { useEffect, useRef, useState } from 'react';
-import { ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -211,7 +212,7 @@ export default function DiscoverScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['top']}>
-      <ScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
         <ScreenTitle title="Discover" subtitle="People & opportunities across the community" />
 
         <View style={st.segment}>
@@ -263,12 +264,12 @@ export default function DiscoverScreen() {
 
         {search.active ? (
           <>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.chips} keyboardShouldPersistTaps="handled">
+            <KeyboardAwareScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.chips} keyboardShouldPersistTaps="handled">
               <SelectChip label="All" active={tab === 'all'} onPress={() => setTab('all')} />
               {(['players', 'teams', 'matches', 'tournaments'] as SearchKind[]).map((k) => (
                 <SelectChip key={k} label={`${KIND_LABEL[k]} ${search.loading && total === 0 ? '…' : counts[k]}`} active={tab === k} onPress={() => setTab(k)} />
               ))}
-            </ScrollView>
+            </KeyboardAwareScrollView>
 
             {tab === 'players' && <PlayerFilters value={filters} onChange={setFilters} cities={cities} />}
             {sportNote}
@@ -358,7 +359,7 @@ export default function DiscoverScreen() {
         )}
           </>
         )}
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

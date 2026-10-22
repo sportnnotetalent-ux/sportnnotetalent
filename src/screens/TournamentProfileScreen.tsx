@@ -4,7 +4,8 @@
 import { QualifiesToCard } from '../components/FeederCards';
 import { notice } from '../core/confirm';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Platform, Linking } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Platform, Linking, type ScrollView } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -565,13 +566,13 @@ export default function TournamentProfileScreen() {
           );
         })()}
         {/* Tab bar */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.tabBar}>
+        <KeyboardAwareScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.tabBar}>
           {TABS.map((t) => (
             <TouchableOpacity accessibilityRole="tab" accessibilityState={{ selected: activeTab === t }} aria-selected={activeTab === t} key={t} onPress={() => setTab(t)} style={[st.tabBtn, activeTab === t && st.tabBtnActive]} activeOpacity={0.8}>
               <Text style={[st.tabText, activeTab === t && st.tabTextActive]}>{tabLabel(t)}</Text>
             </TouchableOpacity>
           ))}
-        </ScrollView>
+        </KeyboardAwareScrollView>
       </View>
 
       {/* ------------------------------ AWARDS ------------------------------ */}
@@ -584,7 +585,7 @@ export default function TournamentProfileScreen() {
           onPlayer={(id) => nav.navigate('PlayerProfile', { playerId: id })}
         />
       ) : (
-      <ScrollView ref={scrollRef} contentContainerStyle={st.content}>
+      <KeyboardAwareScrollView ref={scrollRef} contentContainerStyle={st.content}>
         {/* ------------------------------- INFO ------------------------------- */}
         {activeTab === 'Info' && (
           <>
@@ -973,12 +974,12 @@ export default function TournamentProfileScreen() {
               ))}
             </View>
             {!singleSport && (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.chips}>
+              <KeyboardAwareScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.chips}>
                 <SelectChip label="All sports" active={matchSport === 'all'} onPress={() => setMatchSport('all')} />
                 {sports.map((s) => (
                   <SelectChip key={s} label={`${getSport(s).icon} ${getSport(s).name}`} active={matchSport === s} onPress={() => setMatchSport(s)} />
                 ))}
-              </ScrollView>
+              </KeyboardAwareScrollView>
             )}
             {(matchTab === 'upcoming' ? upcomingMatches : completedMatches).length === 0 ? (
               <EmptyState icon={matchTab === 'upcoming' ? '📅' : '🏁'} title={matchTab === 'upcoming' ? 'No upcoming matches' : 'No completed matches yet'} compact />
@@ -1055,11 +1056,11 @@ export default function TournamentProfileScreen() {
             {/* Per-sport standings + statistics */}
             <Text style={[textStyles.h3, st.section]}>{singleSport ? '🏆 Standings' : '📊 By sport'}</Text>
             {!singleSport && (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.chips}>
+              <KeyboardAwareScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.chips}>
                 {sports.map((s) => (
                   <SelectChip key={s} label={`${getSport(s).icon} ${getSport(s).name}`} active={activeSport === s} onPress={() => setSport(s)} />
                 ))}
-              </ScrollView>
+              </KeyboardAwareScrollView>
             )}
             {/* One table per league phase (parity #07) — groups, Super phase, Swiss;
                 knockouts are never in a table (the bracket shows them). */}
@@ -1158,7 +1159,7 @@ export default function TournamentProfileScreen() {
             )}
           </>
         )}
-      </ScrollView>
+      </KeyboardAwareScrollView>
       )}
     </SafeAreaView>
   );

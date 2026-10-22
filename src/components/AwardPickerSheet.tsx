@@ -3,7 +3,8 @@
  *  "How is this ranked?" link, optional side tabs (the POTM change: home / away)
  *  and an optional search box. Tapping a row selects it and closes the sheet. */
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, TouchableOpacity, Modal, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, Modal, Pressable, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView, KeyboardSheetScope, useKeyboardSheet } from './keyboard';
 import { theme } from '../core/theme';
 import { SelectChip, TextField, textStyles } from './ui';
 import { RankBadge } from './Rank';
@@ -41,6 +42,8 @@ export function AwardPickerSheet({
   onClose: () => void;
 }) {
   const [tab, setTab] = useState(tabs?.[0]?.key ?? '');
+  // keyboard: the sheet stays above it while one of its fields is focused
+  const kbSheet = useKeyboardSheet(visible);
   const [q, setQ] = useState('');
   useEffect(() => { if (visible) { setQ(''); setTab(tabs?.[0]?.key ?? ''); } }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps
   const base = tabs ? (tabs.find((t) => t.key === tab)?.rows ?? []) : (rows ?? []);
@@ -51,45 +54,47 @@ export function AwardPickerSheet({
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={st.backdrop} onPress={onClose} accessibilityLabel="Close">
-        <Pressable style={st.sheet} onPress={(e) => e.stopPropagation()}>
-          <View style={st.head}>
-            <View style={{ flex: 1 }}>
-              <Text style={st.title} numberOfLines={2}>{title}</Text>
-              {subtitle ? <Text style={textStyles.muted} numberOfLines={2}>{subtitle}</Text> : null}
+      <Pressable style={[st.backdrop, kbSheet.backdrop]} onPress={onClose} accessibilityLabel="Close">
+        <Pressable ref={kbSheet.panel} style={[st.sheet, kbSheet.sheet]} onPress={(e) => e.stopPropagation()}>
+          <KeyboardSheetScope value={kbSheet.scope}>
+            <View style={st.head}>
+              <View style={{ flex: 1 }}>
+                <Text style={st.title} numberOfLines={2}>{title}</Text>
+                {subtitle ? <Text style={textStyles.muted} numberOfLines={2}>{subtitle}</Text> : null}
+              </View>
+              <Text style={st.close} accessibilityRole="button" accessibilityLabel="Close" onPress={onClose}>✕</Text>
             </View>
-            <Text style={st.close} accessibilityRole="button" accessibilityLabel="Close" onPress={onClose}>✕</Text>
-          </View>
-          {howRanked ? (
-            <Text style={st.link} accessibilityRole="button" onPress={() => notice('How is this ranked?', howRanked)}>How is this ranked?</Text>
-          ) : null}
-          {tabs && tabs.length > 1 ? (
-            <View style={st.chips}>
-              {tabs.map((t) => <SelectChip key={t.key} label={t.label} dotColor={t.color} active={tab === t.key} onPress={() => setTab(t.key)} />)}
-            </View>
-          ) : null}
-          {searchable ? <TextField label="Search players" value={q} onChange={setQ} placeholder="Name or team" autoCapitalize="none" /> : null}
-          <ScrollView contentContainerStyle={{ gap: 2 }} keyboardShouldPersistTaps="handled">
-            {list.length === 0 ? (
-              <Text style={[textStyles.muted, { paddingVertical: theme.spacing(3) }]}>{emptyLabel ?? 'No players yet.'}</Text>
-            ) : list.map((r, i) => (
-              <TouchableOpacity
-                key={r.id} accessibilityRole="button" accessibilityLabel={`Pick ${r.name}`} accessibilityState={{ selected: selectedId === r.id }}
-                activeOpacity={0.8} onPress={() => onPick(r)} style={[st.row, selectedId === r.id && st.rowActive]}
-              >
-                {ranked ? <RankBadge index={i} width={22} /> : null}
-                <View style={[st.avatar, { backgroundColor: r.teamColor ?? theme.colors.surfaceAlt }]}>
-                  <Text style={st.avatarText}>{initials(r.name)}</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={textStyles.body} numberOfLines={1}>{r.name}{r.teamName ? <Text style={textStyles.muted}> · {r.teamName}</Text> : null}</Text>
-                  {r.detail ? <Text style={st.detail} numberOfLines={1}>{r.detail}</Text> : null}
-                </View>
-                {r.value !== undefined ? <Text style={st.value}>{r.value}</Text> : null}
-                {selectedId === r.id ? <Text style={st.check}>✓</Text> : null}
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+            {howRanked ? (
+              <Text style={st.link} accessibilityRole="button" onPress={() => notice('How is this ranked?', howRanked)}>How is this ranked?</Text>
+            ) : null}
+            {tabs && tabs.length > 1 ? (
+              <View style={st.chips}>
+                {tabs.map((t) => <SelectChip key={t.key} label={t.label} dotColor={t.color} active={tab === t.key} onPress={() => setTab(t.key)} />)}
+              </View>
+            ) : null}
+            {searchable ? <TextField label="Search players" value={q} onChange={setQ} placeholder="Name or team" autoCapitalize="none" /> : null}
+            <KeyboardAwareScrollView contentContainerStyle={{ gap: 2 }} keyboardShouldPersistTaps="handled">
+              {list.length === 0 ? (
+                <Text style={[textStyles.muted, { paddingVertical: theme.spacing(3) }]}>{emptyLabel ?? 'No players yet.'}</Text>
+              ) : list.map((r, i) => (
+                <TouchableOpacity
+                  key={r.id} accessibilityRole="button" accessibilityLabel={`Pick ${r.name}`} accessibilityState={{ selected: selectedId === r.id }}
+                  activeOpacity={0.8} onPress={() => onPick(r)} style={[st.row, selectedId === r.id && st.rowActive]}
+                >
+                  {ranked ? <RankBadge index={i} width={22} /> : null}
+                  <View style={[st.avatar, { backgroundColor: r.teamColor ?? theme.colors.surfaceAlt }]}>
+                    <Text style={st.avatarText}>{initials(r.name)}</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={textStyles.body} numberOfLines={1}>{r.name}{r.teamName ? <Text style={textStyles.muted}> · {r.teamName}</Text> : null}</Text>
+                    {r.detail ? <Text style={st.detail} numberOfLines={1}>{r.detail}</Text> : null}
+                  </View>
+                  {r.value !== undefined ? <Text style={st.value}>{r.value}</Text> : null}
+                  {selectedId === r.id ? <Text style={st.check}>✓</Text> : null}
+                </TouchableOpacity>
+              ))}
+            </KeyboardAwareScrollView>
+          </KeyboardSheetScope>
         </Pressable>
       </Pressable>
     </Modal>

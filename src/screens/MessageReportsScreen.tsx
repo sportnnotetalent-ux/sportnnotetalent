@@ -3,7 +3,8 @@
  *  turn off the sender's messaging (and lift that later). Resolving a report
  *  resolves every open report on the same message. */
 import React, { useCallback, useState } from 'react';
-import { ScrollView, View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { confirmAction } from '../core/confirm';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -51,7 +52,7 @@ export default function MessageReportsScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={st.content}>
+      <KeyboardAwareScrollView contentContainerStyle={st.content}>
         <ScreenTitle title="Message reports" subtitle="Reported in-app messages" />
         <View style={st.chips}>
           <SelectChip label="Open" active={filter === 'open'} onPress={() => setFilter('open')} />
@@ -100,7 +101,7 @@ export default function MessageReportsScreen() {
             </Card>
           );
         })}
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

@@ -6,7 +6,8 @@
  * and the delete-account edge function ({ childPlayerId }).
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import { ScrollView, Text, View, StyleSheet } from 'react-native';
+import { Text, View, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -97,7 +98,7 @@ export default function ManageChildScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
         <ScreenTitle title={child.fullName} subtitle={`You’re their linked parent/guardian${child.age !== undefined ? ` · age ${child.age}` : ''}`} />
 
         <Card style={st.gap}>
@@ -142,7 +143,7 @@ export default function ManageChildScreen() {
 
         <FormError message={error} />
         {note && <Text style={[textStyles.body, { color: theme.colors.primary }]}>{note}</Text>}
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

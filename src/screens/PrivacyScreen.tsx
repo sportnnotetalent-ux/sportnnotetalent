@@ -10,7 +10,8 @@
  *   • Parent or guardian: manage your child's account.
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import { ScrollView, Text, View, StyleSheet } from 'react-native';
+import { Text, View, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -71,7 +72,7 @@ export default function PrivacyScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={st.content}>
+      <KeyboardAwareScrollView contentContainerStyle={st.content}>
         <ScreenTitle title="Your data & privacy" subtitle="See, download and control what SportnNote keeps about you" />
         {status === undefined && <LoadingState />}
 
@@ -168,7 +169,7 @@ export default function PrivacyScreen() {
           <Button label="🔒 Privacy Policy" variant="ghost" onPress={() => nav.navigate('Legal', { doc: 'privacy' })} />
           {!demo && <Button label="🗑️ Delete my account" variant="ghost" onPress={() => nav.navigate('DeleteAccount')} />}
         </View>
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

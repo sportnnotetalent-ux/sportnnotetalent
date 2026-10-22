@@ -3,7 +3,8 @@
  *  rounds keep what was recorded unless the organiser taps "Recompute
  *  finished rounds" (asked first). */
 import React, { useCallback, useEffect, useState } from 'react';
-import { ScrollView, Text, StyleSheet } from 'react-native';
+import { Text, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -65,7 +66,7 @@ export default function GolfCourseEditScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
         <ScreenTitle title="⛳ Edit course" subtitle={course.name} />
         {!mayEdit ? (
           <Card><Text style={textStyles.body}>Only the person who added this course can edit it. Ask them, or add your own copy from “＋ New course”.</Text></Card>
@@ -97,7 +98,7 @@ export default function GolfCourseEditScreen() {
             <GolfCourseEditor key={saved ? 'after' : 'before'} initial={course} onSave={save} onCancel={() => nav.goBack()} />
           </>
         )}
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

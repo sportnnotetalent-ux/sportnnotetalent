@@ -3,7 +3,8 @@
  *  week start, school-year start and units. Everything is on this phone; the
  *  time zone is also saved to the account so reminder emails use it. */
 import React, { useState } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { theme } from '../core/theme';
 import { Card, ScreenTitle, SelectChip, textStyles } from '../components/ui';
@@ -38,7 +39,7 @@ export default function RegionSettingsScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
         <ScreenTitle title="Region" subtitle="Country, time zone and how dates and times read" />
 
         <Card style={st.card}>
@@ -96,7 +97,7 @@ export default function RegionSettingsScreen() {
             <SelectChip label="US (feet, miles)" active={region.units === 'us'} onPress={() => set('units', 'us')} />
           </Row>
         </Card>
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

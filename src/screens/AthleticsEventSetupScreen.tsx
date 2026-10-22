@@ -10,7 +10,8 @@
  *  pool length, events by stroke, medley-relay legs, World Aquatics seeding
  *  (SW 3.1 — no lane draw) and the timed-final / heats → final presets. */
 import React, { useEffect, useMemo, useState } from 'react';
-import { ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -299,7 +300,7 @@ function TrackSwimEventSetup() {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
         <ScreenTitle title={swim ? '🏊 New swimming event' : '🏃 New event'} subtitle={tournament?.name} />
         {/* SD-141: the meet's competition rules, checked before the meet starts */}
         <CompetitionRulesCard tournament={tournament} sport={sport} />
@@ -539,7 +540,7 @@ function TrackSwimEventSetup() {
         <EventOfficials tournament={tournament} value={officials} onChange={setOfficials} />
         <FormError message={error} />
         <Button label={busy ? 'Creating…' : 'Create event & start list'} onPress={() => void create()} disabled={busy || !n} />
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

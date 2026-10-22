@@ -3,7 +3,8 @@
  *  Modes: share out evenly (default), by ground, or one scorer for all. Tap a
  *  match's scorer chip to cycle through the pool before saving. */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ScrollView, View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -149,18 +150,18 @@ export default function AssignScorersScreen() {
   if (!scorers.length) {
     return (
       <SafeAreaView style={st.safe} edges={['bottom']}>
-        <ScrollView contentContainerStyle={st.body}>
+        <KeyboardAwareScrollView contentContainerStyle={st.body}>
           <ScreenTitle title="Assign scorers" subtitle={tournament?.name} />
           <EmptyState icon="🎽" title="Add scorers first" hint="Add the tournament’s scorers under Manage → Scorers & officials, then come back to share out the fixtures." />
           <Button label="Back to the tournament" variant="ghost" onPress={() => nav.goBack()} />
-        </ScrollView>
+        </KeyboardAwareScrollView>
       </SafeAreaView>
     );
   }
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={st.body}>
+      <KeyboardAwareScrollView contentContainerStyle={st.body}>
         <ScreenTitle title="Assign scorers" subtitle={`${tournament?.name ?? ''} · ${scorers.length} scorer${scorers.length === 1 ? '' : 's'}`} />
 
         <View style={st.chips}>
@@ -214,7 +215,7 @@ export default function AssignScorersScreen() {
             })}
           </View>
         ))}
-      </ScrollView>
+      </KeyboardAwareScrollView>
       {count > 0 && (
         <View style={st.footer}>
           <Button label={busy ? 'Assigning…' : `Assign ${count} match${count === 1 ? '' : 'es'}`} onPress={() => void save(plan)} disabled={busy} />

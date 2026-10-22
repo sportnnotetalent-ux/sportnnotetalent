@@ -7,7 +7,8 @@
  * (src/data/legal.ts). Either version can be opened from the other.
  */
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet, Text } from 'react-native';
+import { StyleSheet, Text } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRoute, type RouteProp } from '@react-navigation/native';
 import { theme } from '../core/theme';
@@ -23,12 +24,12 @@ export default function LegalScreen() {
   const other = country === 'IN' ? 'INTL' : 'IN';
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={st.content}>
+      <KeyboardAwareScrollView contentContainerStyle={st.content}>
         <Markdown content={content} />
         <Text style={st.switch} accessibilityRole="link" onPress={() => setCountry(other)}>
           {other === 'IN' ? 'Read the version for users in India' : 'Read the version for users outside India'}
         </Text>
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

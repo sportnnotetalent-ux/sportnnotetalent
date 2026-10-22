@@ -7,7 +7,8 @@
  *  pre-fills from the ticks. Every results-engine sport; athletics and
  *  swimming also show their school programme's events before they're set up. */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -166,7 +167,7 @@ export default function MeetEntriesScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
         <ScreenTitle title={`📋 ${words.icon} Meet entries`} subtitle={tournament?.name} />
 
         <CapsCard caps={doc.caps} onChange={setCaps} />
@@ -225,7 +226,7 @@ export default function MeetEntriesScreen() {
 
         <BulkAdd sport={sport} tournamentId={tournamentId} doc={doc} meet={meet} athletes={athletes} players={players} sources={sources} course={course}
           onDone={async (msg, change) => { if (change) await saveDoc(change); reload(); await loadMeet(); setInfo(msg); }} />
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }
@@ -273,7 +274,7 @@ function Grid({ cols, rows, doc, counts, busy, onTap }: {
           );
         })}
       </View>
-      <ScrollView horizontal showsHorizontalScrollIndicator contentContainerStyle={{ flexDirection: 'column' }}>
+      <KeyboardAwareScrollView horizontal showsHorizontalScrollIndicator contentContainerStyle={{ flexDirection: 'column' }}>
         <View style={{ flexDirection: 'row' }}>
           {cols.map((c) => (
             <View key={c.slot + (c.eventKey ?? '')} style={st.hcell}>
@@ -297,7 +298,7 @@ function Grid({ cols, rows, doc, counts, busy, onTap }: {
             })}
           </View>
         ))}
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </View>
   );
 }

@@ -2,7 +2,8 @@
  *  row shows the team, its city and the sports it plays; tapping opens the team
  *  dashboard. This is the home of the Team Creation & Management system (spec §12). */
 import React, { useCallback, useState } from 'react';
-import { ScrollView, View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -44,7 +45,7 @@ export default function ClubsScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={st.content}>
+      <KeyboardAwareScrollView contentContainerStyle={st.content}>
         <ScreenTitle title="Teams" subtitle="One team, many sports" />
         <Button label="+ Create a team" onPress={() => nav.navigate('CreateClub')} />
         <Button label="Have an invite code? Join a team" variant="ghost" onPress={() => nav.navigate('JoinClub')} />
@@ -101,7 +102,7 @@ export default function ClubsScreen() {
             ))}
           </View>
         )}
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

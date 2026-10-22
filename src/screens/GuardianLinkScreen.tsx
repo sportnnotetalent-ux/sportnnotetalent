@@ -3,7 +3,8 @@
  *  on, messages about the child come to this account (the child never receives
  *  them), and the guardian email counts as verified. */
 import React, { useEffect, useState } from 'react';
-import { ScrollView, Text, View, StyleSheet } from 'react-native';
+import { Text, View, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -39,7 +40,7 @@ export default function GuardianLinkScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
         <ScreenTitle title="Link as a parent/guardian" subtitle="Receive messages about your child" />
         <Text style={textStyles.muted}>
           Coaches and scouts can&apos;t message players under 18 directly — their messages come to the parent/guardian. Enter the code we emailed you. Use your own account, not your child&apos;s.
@@ -65,7 +66,7 @@ export default function GuardianLinkScreen() {
             <Button label="💬 Open messages" variant="ghost" onPress={() => nav.navigate('Messages')} />
           </Card>
         )}
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

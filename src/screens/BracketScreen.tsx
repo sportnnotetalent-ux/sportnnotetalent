@@ -6,7 +6,8 @@
  *    (byes for non-power-of-two) as a preview. Group-stage matches are excluded
  *    from both, so a grouped tournament's bracket shows only its knockout. */
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { ScrollView, View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -305,16 +306,16 @@ export default function BracketScreen() {
   return (
     <TeamTap.Provider value={tournamentId ? openJourney : undefined}>
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={st.content}>
+      <KeyboardAwareScrollView contentContainerStyle={st.content}>
         <ScreenTitle title="Knockout bracket" subtitle={subtitle} />
         {(isStaged || de || dcActive) && <Text style={textStyles.muted}>Tap a name to see their whole journey.{anyLive ? ' Live — updates every 30 seconds.' : ''}</Text>}
 
         {sports.length > 1 && (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.chips}>
+          <KeyboardAwareScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.chips}>
             {sports.map((s) => (
               <SelectChip key={s} label={`${getSport(s).icon} ${getSport(s).name}`} active={activeSport === s} onPress={() => setSport(s)} />
             ))}
-          </ScrollView>
+          </KeyboardAwareScrollView>
         )}
 
         <DivisionTabs categories={divisions} activeCat={activeCat} onChange={setActiveCat} />
@@ -466,7 +467,7 @@ export default function BracketScreen() {
             ))}
           </>
         )}
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
     </TeamTap.Provider>
   );
@@ -517,7 +518,7 @@ function DrawColumns({ rounds, sideName, sideColor }: {
   rounds: DrawRound[]; sideName: (s: DrawSide) => string; sideColor: (s: DrawSide) => string | undefined;
 }) {
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator nestedScrollEnabled contentContainerStyle={st.cols}>
+    <KeyboardAwareScrollView horizontal showsHorizontalScrollIndicator nestedScrollEnabled contentContainerStyle={st.cols}>
       {rounds.map((r) => (
         <View key={r.stage} style={st.col}>
           <Text style={st.colHead} numberOfLines={1}>{r.label}</Text>
@@ -526,7 +527,7 @@ function DrawColumns({ rounds, sideName, sideColor }: {
           </View>
         </View>
       ))}
-    </ScrollView>
+    </KeyboardAwareScrollView>
   );
 }
 

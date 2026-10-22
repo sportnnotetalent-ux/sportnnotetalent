@@ -8,7 +8,8 @@
  *  Firing points are drawn. Rendered by AthleticsEventSetupScreen when the
  *  route's sport is 'shooting'. */
 import React, { useEffect, useMemo, useState } from 'react';
-import { ScrollView, View, Text, TextInput, StyleSheet } from 'react-native';
+import { View, Text, TextInput, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -190,7 +191,7 @@ export function ShootingEventSetup({ tournamentId }: { tournamentId?: string }) 
   const finalChoices = ev.final && !team && !team3 ? [0, 4, 6, 8].filter((k) => k === 0 || k < entrants || k === ev.final!.finalists) : [];
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
         <ScreenTitle title="🎯 New shooting event" subtitle={tournament?.name} />
         {/* SD-141: the meet's competition rules, checked before the meet starts */}
         <CompetitionRulesCard tournament={tournament} sport={'shooting'} />
@@ -299,7 +300,7 @@ export function ShootingEventSetup({ tournamentId }: { tournamentId?: string }) 
         <EventOfficials tournament={tournament} value={officials} onChange={setOfficials} />
         <FormError message={error} />
         <Button label={busy ? 'Creating…' : 'Create event & start list'} onPress={() => void create()} disabled={busy || !entrants} />
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

@@ -2,7 +2,8 @@
  *  head-to-head), record per sport, squad, matches — and a follow toggle. */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { collapseTies, isTieMatch } from '../data/teamTie';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, type ScrollView } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -192,7 +193,7 @@ export default function TeamProfileScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <ScrollView ref={scrollRef} contentContainerStyle={st.content}>
+      <KeyboardAwareScrollView ref={scrollRef} contentContainerStyle={st.content}>
         <View style={st.headerRow}>
           <View style={[st.crest, { backgroundColor: (team.colorHex ?? theme.colors.surfaceAlt) + '33', borderColor: team.colorHex ?? theme.colors.border }]}>
             <Text style={[st.crestText, { color: team.colorHex ?? theme.colors.text }]}>
@@ -234,7 +235,7 @@ export default function TeamProfileScreen() {
             </View>
           )}
           {(filters.tournaments.length > 0 || filters.seasons.length > 0) && (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.chipRow}>
+            <KeyboardAwareScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.chipRow}>
               {filters.tournaments.length > 0 && (
                 <>
                   <SelectChip label="All events" active={!sel.tournament} onPress={() => setStatTour('')} />
@@ -251,7 +252,7 @@ export default function TeamProfileScreen() {
                   ))}
                 </>
               )}
-            </ScrollView>
+            </KeyboardAwareScrollView>
           )}
           {stats.played === 0 ? (
             hasEventResults ? null : <EmptyState icon="📊" title="No results yet" hint="Stats appear here after this team’s first finished match or final." compact />
@@ -436,7 +437,7 @@ export default function TeamProfileScreen() {
             ))}
           </>
         )}
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

@@ -2,7 +2,8 @@
  *  choose how to get started: organize a game, organize a tournament, or watch
  *  the upcoming games of the teams/tournaments they follow in that sport. */
 import React, { useMemo, useState } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -67,7 +68,7 @@ export default function TryNewSportScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={st.content}>
+      <KeyboardAwareScrollView contentContainerStyle={st.content}>
         <ScreenTitle
           title="Try a new sport"
           subtitle={chosen ? `Get started with ${getSport(chosen).name}` : 'Pick a sport you haven’t played yet'}
@@ -132,7 +133,7 @@ export default function TryNewSportScreen() {
             )}
           </>
         )}
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

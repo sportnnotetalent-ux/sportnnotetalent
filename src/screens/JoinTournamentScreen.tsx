@@ -4,7 +4,8 @@
  *  manage — or makes one — and it's in the tournament at once (confirmed).
  *  Guests see the tournament name and a sign-in button that brings them back. */
 import React, { useEffect, useState } from 'react';
-import { ScrollView, View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -126,7 +127,7 @@ export default function JoinTournamentScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
         <ScreenTitle title="Enter a tournament" subtitle="Use the code or link the organiser shared" />
         {params?.token ? <OpenInAppBanner path={`join-tournament/${params.token}`} /> : null}
 
@@ -226,7 +227,7 @@ export default function JoinTournamentScreen() {
             />
           </Card>
         )}
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

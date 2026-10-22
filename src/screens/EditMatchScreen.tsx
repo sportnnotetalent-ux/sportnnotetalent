@@ -2,7 +2,8 @@
  *  mark it postponed / cancelled, without deleting and recreating it. Host-only;
  *  only for a match that hasn't started (scheduled / postponed / cancelled). */
 import React, { useEffect, useState, useMemo } from 'react';
-import { ScrollView, View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -127,7 +128,7 @@ export default function EditMatchScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
         <ScreenTitle title="Reschedule match" subtitle={`${home} vs ${away}`} />
 
         {started ? (
@@ -189,7 +190,7 @@ export default function EditMatchScreen() {
             </View>
           </>
         )}
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

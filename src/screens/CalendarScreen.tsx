@@ -3,7 +3,8 @@
  *  single place to see it on a timeline. Tap a day for that day's items, or
  *  switch to Agenda for the upcoming list. */
 import React, { useCallback, useMemo, useState } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -206,7 +207,7 @@ export default function CalendarScreen() {
         <SelectChip label="🌐 All" active={scope === 'all'} onPress={() => setScope('all')} />
       </View>
 
-      <ScrollView contentContainerStyle={st.content}>
+      <KeyboardAwareScrollView contentContainerStyle={st.content}>
         {view === 'month' ? (
           <>
             <View style={st.monthHead}>
@@ -280,7 +281,7 @@ export default function CalendarScreen() {
             )}
           </>
         )}
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

@@ -2,7 +2,8 @@
  *  and sport-specific details (e.g. football position/foot/teams, editable on
  *  your own profile). Reached by tapping a sport on the main profile. */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -192,7 +193,7 @@ export default function SportProfileScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={st.content}>
+      <KeyboardAwareScrollView contentContainerStyle={st.content}>
         <ScreenTitle title={`${plugin.icon} ${plugin.name}`} />
 
         {hasSplit && (
@@ -205,7 +206,7 @@ export default function SportProfileScreen() {
 
         {splits.length > 0 && (
           <View style={{ gap: theme.spacing(2) }}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.chipRow}>
+            <KeyboardAwareScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.chipRow}>
               {splits.map((o) => {
                 const cur = o.values.find((x) => x.key === activeSel[o.dim]);
                 return (
@@ -218,18 +219,18 @@ export default function SportProfileScreen() {
                 );
               })}
               {filtered && <SelectChip label="✕ Clear" active={false} onPress={() => { setSel({}); setOpenDim(null); }} />}
-            </ScrollView>
+            </KeyboardAwareScrollView>
             {(() => {
               const o = splits.find((x) => x.dim === openDim);
               if (!o) return null;
               const pick = (k?: string) => setSel((p) => ({ ...p, [o.dim]: k }));
               return (
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.chipRow}>
+                <KeyboardAwareScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.chipRow}>
                   <SelectChip label="All" active={activeSel[o.dim] == null} onPress={() => pick(undefined)} />
                   {o.values.map((x) => (
                     <SelectChip key={x.key} label={`${x.label} · ${x.count}`} active={activeSel[o.dim] === x.key} onPress={() => pick(x.key)} />
                   ))}
-                </ScrollView>
+                </KeyboardAwareScrollView>
               );
             })()}
           </View>
@@ -587,7 +588,7 @@ export default function SportProfileScreen() {
           </>
         )}
 
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

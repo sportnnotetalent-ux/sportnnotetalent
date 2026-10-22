@@ -8,7 +8,8 @@
  * and a natural anchor for Help & support.
  */
 import React, { useState, useSyncExternalStore } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -96,7 +97,7 @@ export default function SettingsScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={st.content}>
+      <KeyboardAwareScrollView contentContainerStyle={st.content}>
         <Group title="Preferences">
           <Row icon="🔔" label="Match reminders" value={reminderSummary} onPress={() => nav.navigate('NotificationPrefs')} />
           <View style={st.divider} />
@@ -161,7 +162,7 @@ export default function SettingsScreen() {
             <Text style={st.signOutText}>Sign out</Text>
           </TouchableOpacity>
         )}
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

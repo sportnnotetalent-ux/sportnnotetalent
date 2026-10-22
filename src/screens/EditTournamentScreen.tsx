@@ -2,7 +2,8 @@
  *  knockout format, and per-sport formats. Host/co-hosts, divisions and reminders
  *  are managed on the tournament page; those aren't repeated here. */
 import React, { useCallback, useEffect, useState } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -192,7 +193,7 @@ export default function EditTournamentScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
         <ScreenTitle title="Edit tournament" subtitle={tournament.name} />
 
         <TournamentImagesField
@@ -263,7 +264,7 @@ export default function EditTournamentScreen() {
         )}
 
         <FormError message={error} />
-      </ScrollView>
+      </KeyboardAwareScrollView>
       {/* Sticky action bar: delete is secondary (left), save is the main action. */}
       <View style={st.bar}>
         <Text style={st.delete} accessibilityRole="button" onPress={busy ? undefined : remove}>Delete tournament</Text>

@@ -2,7 +2,8 @@
  *  the code (or deep-links in with it), we resolve it to a club, and on Join they're
  *  added to the club as a member and land on the team dashboard. */
 import React, { useEffect, useState } from 'react';
-import { ScrollView, View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -58,7 +59,7 @@ export default function JoinClubScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
         <ScreenTitle title="Join a team" subtitle="Enter the invite code you were sent" />
         {params?.token ? <OpenInAppBanner path={`join-club/${params.token}`} /> : null}
         <TextField label="Invite code" value={code} onChange={setCode} placeholder="JOIN-1001" autoCapitalize="characters" />
@@ -73,7 +74,7 @@ export default function JoinClubScreen() {
             <Button label={busy ? 'Joining…' : 'Join team'} onPress={join} disabled={busy} />
           </Card>
         )}
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

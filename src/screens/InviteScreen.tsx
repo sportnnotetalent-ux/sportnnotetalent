@@ -7,7 +7,8 @@
  * open links to build previews, so opening the page must never report anyone.
  */
 import React, { useEffect, useState } from 'react';
-import { ScrollView, View, Text, StyleSheet, Linking } from 'react-native';
+import { View, Text, StyleSheet, Linking } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -60,7 +61,7 @@ export default function InviteScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
         <View style={st.brand}><Logo size={56} /></View>
 
         {reported === 'done' ? (
@@ -104,7 +105,7 @@ export default function InviteScreen() {
             <Text style={st.muted} accessibilityRole="button" onPress={() => setNotMe(true)}>Not you? Didn’t expect this?</Text>
           )
         )}
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

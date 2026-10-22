@@ -10,7 +10,8 @@
  * With no query it's a browsable help centre grouped by category.
  */
 import React, { useMemo, useState } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, Linking, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, Linking, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Constants from 'expo-constants';
 import { theme } from '../core/theme';
@@ -118,7 +119,7 @@ export default function SupportScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
         <View style={{ gap: theme.spacing(1) }}>
           <Text style={textStyles.h2}>How can we help?</Text>
           <Text style={textStyles.muted}>Search our help guides, or email us and we'll get back to you.</Text>
@@ -201,7 +202,7 @@ export default function SupportScreen() {
             </Card>
           </View>
         )}
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

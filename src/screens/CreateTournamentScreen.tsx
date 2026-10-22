@@ -4,7 +4,8 @@
 import { regionFormatDefaults } from '../core/units';
 import { regionStore } from '../core/region';
 import React, { useCallback, useEffect, useState } from 'react';
-import { ScrollView, View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -212,7 +213,7 @@ export default function CreateTournamentScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
         <ScreenTitle title="New tournament" subtitle="Set up your meet & its format" />
         <TournamentImagesField logoUrl={logoUrl} bannerUrl={bannerUrl} onLogo={setLogoUrl} onBanner={setBannerUrl} />
         <TextField label="Name" value={name} onChange={setName} placeholder="Annual Sports Meet 2026" />
@@ -348,7 +349,7 @@ export default function CreateTournamentScreen() {
 
         <FormError message={error} />
         <Button label={busy ? 'Creating…' : 'Create tournament'} onPress={submit} />
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

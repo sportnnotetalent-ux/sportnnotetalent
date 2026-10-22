@@ -3,7 +3,8 @@
  *  you send a join-request that an Owner/Admin accepts. Shows your pending request
  *  state and hides communities you already belong to. */
 import React, { useCallback, useEffect, useState } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -49,7 +50,7 @@ export default function DiscoverOrgsScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
         <ScreenTitle title="Find a community" subtitle="Search organizations and request to join" />
         <TextField label="" value={query} onChange={setQuery} placeholder="Search by name, city or type" autoCapitalize="none" />
 
@@ -77,7 +78,7 @@ export default function DiscoverOrgsScreen() {
             );
           })
         )}
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

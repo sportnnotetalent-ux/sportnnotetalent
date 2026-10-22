@@ -4,7 +4,8 @@
  *  MEMBERS with their team-level role (admin | member). Team administration lives
  *  here; sport-specific leadership (captains) lives inside each sport's profile. */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -130,7 +131,7 @@ export default function ClubHomeScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={st.content}>
+      <KeyboardAwareScrollView contentContainerStyle={st.content}>
         {/* Header */}
         <Card style={st.header}>
           {club.logoUrl || amAdmin ? (
@@ -288,7 +289,7 @@ export default function ClubHomeScreen() {
             )}
           </Card>
         ))}
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

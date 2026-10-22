@@ -3,7 +3,8 @@
  *  sport adds (cricket: Change keeper). A `Modal` sheet like ContextSwitcher.
  *  Each tile either acts and closes, or opens a small panel inside the sheet. */
 import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, Modal, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, Modal, Pressable, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView, KeyboardSheetScope, useKeyboardSheet } from './keyboard';
 import { theme } from '../core/theme';
 import { Button, SelectChip, TextField, textStyles } from './ui';
 import { BREAK_KINDS, BREAK_LABELS, type BreakKind } from '../data/matchHousekeeping';
@@ -32,6 +33,8 @@ type Panel = null | 'break' | 'squad' | 'settings';
 
 export function QuickOptionsSheet({ visible, onClose, homeName, awayName, onBreak, onSquad, onScorer, onScorecard, settingsPanel, pluginTiles }: QuickOptionsSheetProps) {
   const [panel, setPanel] = useState<Panel>(null);
+  // keyboard: the sheet stays above it while one of its fields is focused
+  const kbSheet = useKeyboardSheet(visible);
   const [kind, setKind] = useState<BreakKind | null>(null);
   const [note, setNote] = useState('');
   useEffect(() => { if (!visible) { setPanel(null); setKind(null); setNote(''); } }, [visible]);
@@ -45,47 +48,49 @@ export function QuickOptionsSheet({ visible, onClose, homeName, awayName, onBrea
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={st.backdrop} onPress={onClose} accessibilityLabel="Close quick options">
-        <Pressable style={st.sheet} onPress={(e) => e.stopPropagation()}>
-          <ScrollView contentContainerStyle={{ gap: theme.spacing(3) }} keyboardShouldPersistTaps="handled">
-            <View style={st.head}>
-              <Text style={st.title}>{panel === 'break' ? '⏸ Match break' : panel === 'squad' ? '👥 Change squad' : panel === 'settings' ? '⚙️ Match settings' : 'Quick options'}</Text>
-              <Text style={st.close} accessibilityRole="button" onPress={panel ? () => setPanel(null) : onClose}>{panel ? '‹ Back' : '✕'}</Text>
-            </View>
+      <Pressable style={[st.backdrop, kbSheet.backdrop]} onPress={onClose} accessibilityLabel="Close quick options">
+        <Pressable ref={kbSheet.panel} style={[st.sheet, kbSheet.sheet]} onPress={(e) => e.stopPropagation()}>
+          <KeyboardSheetScope value={kbSheet.scope}>
+            <KeyboardAwareScrollView contentContainerStyle={{ gap: theme.spacing(3) }} keyboardShouldPersistTaps="handled">
+              <View style={st.head}>
+                <Text style={st.title}>{panel === 'break' ? '⏸ Match break' : panel === 'squad' ? '👥 Change squad' : panel === 'settings' ? '⚙️ Match settings' : 'Quick options'}</Text>
+                <Text style={st.close} accessibilityRole="button" onPress={panel ? () => setPanel(null) : onClose}>{panel ? '‹ Back' : '✕'}</Text>
+              </View>
 
-            {panel === null && (
-              <>
+              {panel === null && (
+                <>
+                  <View style={st.grid}>
+                    {onBreak && <Tile icon="⏸" label="Match break" hint="Drinks, rain, stumps…" onPress={() => setPanel('break')} />}
+                    {onSquad && <Tile icon="👥" label="Change squad" hint="Add or bench players" onPress={() => setPanel('squad')} />}
+                    {onScorer && <Tile icon="🎯" label="Change scorer" hint="Scorers & officials" onPress={() => { onClose(); onScorer(); }} />}
+                    {onScorecard && <Tile icon="📋" label="Full scorecard" hint="See the whole card" onPress={() => { onClose(); onScorecard(); }} />}
+                    {settingsPanel ? <Tile icon="⚙️" label="Match settings" hint="This match only" onPress={() => setPanel('settings')} /> : null}
+                  </View>
+                  {pluginTiles}
+                </>
+              )}
+
+              {panel === 'break' && (
+                <View style={{ gap: theme.spacing(3) }}>
+                  <Text style={textStyles.muted}>Play pauses for everyone watching. Nothing is added to the score, so undo stays clean.</Text>
+                  <View style={st.chips}>
+                    {BREAK_KINDS.map((k) => <SelectChip key={k} label={BREAK_LABELS[k]} active={kind === k} onPress={() => setKind(k)} />)}
+                  </View>
+                  {kind === 'other' && <TextField label="What's the break?" value={note} onChange={setNote} placeholder="e.g. Power cut" />}
+                  <Button label="⏸ Start break" disabled={!kind || (kind === 'other' && !note.trim())} onPress={startBreak} />
+                </View>
+              )}
+
+              {panel === 'settings' && settingsPanel}
+
+              {panel === 'squad' && onSquad && (
                 <View style={st.grid}>
-                  {onBreak && <Tile icon="⏸" label="Match break" hint="Drinks, rain, stumps…" onPress={() => setPanel('break')} />}
-                  {onSquad && <Tile icon="👥" label="Change squad" hint="Add or bench players" onPress={() => setPanel('squad')} />}
-                  {onScorer && <Tile icon="🎯" label="Change scorer" hint="Scorers & officials" onPress={() => { onClose(); onScorer(); }} />}
-                  {onScorecard && <Tile icon="📋" label="Full scorecard" hint="See the whole card" onPress={() => { onClose(); onScorecard(); }} />}
-                  {settingsPanel ? <Tile icon="⚙️" label="Match settings" hint="This match only" onPress={() => setPanel('settings')} /> : null}
+                  <Tile icon="🏠" label={homeName} hint="Edit squad" onPress={() => { onClose(); onSquad('home'); }} />
+                  <Tile icon="✈️" label={awayName} hint="Edit squad" onPress={() => { onClose(); onSquad('away'); }} />
                 </View>
-                {pluginTiles}
-              </>
-            )}
-
-            {panel === 'break' && (
-              <View style={{ gap: theme.spacing(3) }}>
-                <Text style={textStyles.muted}>Play pauses for everyone watching. Nothing is added to the score, so undo stays clean.</Text>
-                <View style={st.chips}>
-                  {BREAK_KINDS.map((k) => <SelectChip key={k} label={BREAK_LABELS[k]} active={kind === k} onPress={() => setKind(k)} />)}
-                </View>
-                {kind === 'other' && <TextField label="What's the break?" value={note} onChange={setNote} placeholder="e.g. Power cut" />}
-                <Button label="⏸ Start break" disabled={!kind || (kind === 'other' && !note.trim())} onPress={startBreak} />
-              </View>
-            )}
-
-            {panel === 'settings' && settingsPanel}
-
-            {panel === 'squad' && onSquad && (
-              <View style={st.grid}>
-                <Tile icon="🏠" label={homeName} hint="Edit squad" onPress={() => { onClose(); onSquad('home'); }} />
-                <Tile icon="✈️" label={awayName} hint="Edit squad" onPress={() => { onClose(); onSquad('away'); }} />
-              </View>
-            )}
-          </ScrollView>
+              )}
+            </KeyboardAwareScrollView>
+          </KeyboardSheetScope>
         </Pressable>
       </Pressable>
     </Modal>

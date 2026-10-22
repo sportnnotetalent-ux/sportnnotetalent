@@ -3,7 +3,8 @@
  *  first send). Under-18s are reached through their parent/guardian; the sender
  *  never sees the guardian's details. Block + report live in the header menu. */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
+import { ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import { KeyboardAvoidingBox } from '../components/keyboard';
 import { confirmAction, notice } from '../core/confirm';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
@@ -81,11 +82,16 @@ export default function ConversationScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={90}>
+      {/* the composer stays above the keyboard on Android and iOS (the old
+          KeyboardAvoidingView was iOS-only and guessed the header height) */}
+      <KeyboardAvoidingBox style={{ flex: 1 }}>
         <ScrollView
           ref={scroll}
           contentContainerStyle={st.content}
           onContentSizeChange={() => scroll.current?.scrollToEnd({ animated: false })}
+          // the keyboard shrinks the list: keep the latest message in view
+          onLayout={() => scroll.current?.scrollToEnd({ animated: false })}
+          keyboardShouldPersistTaps="handled"
         >
           {!threadId && (
             <Text style={[textStyles.muted, st.center]}>
@@ -132,7 +138,7 @@ export default function ConversationScreen() {
           </TouchableOpacity>
         </View>
         )}
-      </KeyboardAvoidingView>
+      </KeyboardAvoidingBox>
     </SafeAreaView>
   );
 }

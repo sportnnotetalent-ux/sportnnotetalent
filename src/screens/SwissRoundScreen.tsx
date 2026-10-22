@@ -5,7 +5,8 @@
  *  together after one confirm. Each result goes through the game's own log,
  *  exactly as recording it on the game does. */
 import React, { useMemo, useState } from 'react';
-import { ScrollView, View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -130,7 +131,7 @@ export default function SwissRoundScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
         <ScreenTitle title={`Round ${round}`} subtitle={`${event} · Swiss`} />
         {rounds.length > 1 && (
           <View style={st.chips}>
@@ -198,7 +199,7 @@ export default function SwissRoundScreen() {
             )}
           </>
         )}
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

@@ -9,7 +9,8 @@
  * locked meanwhile keeps its record).
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRoute, type RouteProp } from '@react-navigation/native';
 import { theme } from '../core/theme';
@@ -105,7 +106,7 @@ export default function RecordBoardScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
         <ScreenTitle title="📖 Record board" subtitle={tournament?.name} />
         <Text style={textStyles.muted}>Enter the records your school already has, so the first final of each event doesn’t automatically set a record. A final flags MR{school ? ' / SR' : ''} only when it beats the board.</Text>
 
@@ -176,7 +177,7 @@ export default function RecordBoardScreen() {
             ))}
           </Card>
         )}
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

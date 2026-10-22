@@ -5,7 +5,8 @@
  *  lists / heat sheets, field cards, results, house table) for a day. */
 import { useMeetZone } from '../data/useMeetZone';
 import React, { useCallback, useMemo, useState } from 'react';
-import { ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -148,7 +149,7 @@ export default function MeetTimetableScreen() {
   if (loading) return <LoadingState />;
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
         <ScreenTitle title="🗓 Timetable" subtitle={tournament?.name} />
         <Text style={textStyles.muted}>Times are {mz.short} — the venue's local time.</Text>
 
@@ -172,9 +173,9 @@ export default function MeetTimetableScreen() {
         )}
 
         {days.length > 0 ? (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.tabs}>
+          <KeyboardAwareScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.tabs}>
             {days.map((d) => <SelectChip key={d.day} label={`${d.label}${d.day === today ? ' · today' : ''}`} active={d.day === day?.day} onPress={() => setDay(d.day)} />)}
-          </ScrollView>
+          </KeyboardAwareScrollView>
         ) : null}
         <FormError message={error} />
         {note ? <Text style={textStyles.muted}>{note}</Text> : null}
@@ -268,7 +269,7 @@ export default function MeetTimetableScreen() {
           <Button label="🏅 House table" variant="ghost" onPress={() => void printTable()} />
           {day ? <Button label="📤 Share this day's timetable" variant="ghost" onPress={() => void shareMessage(timetableText(header.name, day), 'tournament')} /> : null}
         </Card>
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

@@ -7,7 +7,8 @@
  *  straight through: openers default to #1 & #2 and each wicket suggests the next
  *  batter in order — no reducer change needed. */
 import React, { useCallback, useState } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -100,7 +101,7 @@ export default function CricketLineupScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={st.content}>
+      <KeyboardAwareScrollView contentContainerStyle={st.content}>
         <ScreenTitle title="Batting order" subtitle="Tap players in the order they bat" />
 
         <View style={st.tabs}>
@@ -171,7 +172,7 @@ export default function CricketLineupScreen() {
         )}
 
         <Button label={busy ? 'Saving…' : 'Save batting order'} onPress={save} style={{ marginTop: theme.spacing(2) }} />
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

@@ -5,7 +5,8 @@
  *  captain cricket and be a mere squad member in football. Backed by the per-sport
  *  `teams` row (its captain_id / vice_captain_id / roster) + team_player_roles. */
 import React, { useCallback, useEffect, useState } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -136,7 +137,7 @@ export default function ClubSportScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={st.content}>
+      <KeyboardAwareScrollView contentContainerStyle={st.content}>
         <ScreenTitle title={`${plugin.icon} ${plugin.name}`} subtitle={`${team ? teamLabel(team) : club?.name ?? 'Team'} — ${plugin.name} profile`} />
 
         {/* SD-154: squads / levels (Varsity, JV, A, B) — each has its own captain and squad */}
@@ -227,7 +228,7 @@ export default function ClubSportScreen() {
         <Text style={[textStyles.muted, { marginTop: theme.spacing(2) }]}>
           {squad.length} in the {plugin.name} squad. Captains, roles and this squad are specific to {plugin.name} — other sports keep their own.
         </Text>
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

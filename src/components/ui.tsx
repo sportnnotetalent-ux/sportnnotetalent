@@ -12,6 +12,7 @@ import {
   StyleProp,
 } from 'react-native';
 import { theme } from '../core/theme';
+import { useKeyboardFocus } from './keyboard';
 import { readableOn } from '../core/contrast';
 import { toggleA11y } from '../core/a11y';
 
@@ -228,6 +229,8 @@ export function TextField({
   autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
   multiline?: boolean;
 }) {
+  // keeps the field above the keyboard (the scroll view / sheet it sits in)
+  const kbFocus = useKeyboardFocus();
   return (
     <View style={{ gap: theme.spacing(1) }}>
       {/* Empty label (e.g. a bare search box) renders nothing, so no empty gap. */}
@@ -245,6 +248,7 @@ export function TextField({
         multiline={multiline}
         numberOfLines={multiline ? 4 : undefined}
         textAlignVertical={multiline ? 'top' : 'center'}
+        {...kbFocus}
       />
     </View>
   );

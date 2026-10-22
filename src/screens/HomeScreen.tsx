@@ -4,7 +4,8 @@
  *  matches below, and a sport row jumps into each sport's section (schedule,
  *  organize, standings & stats). Deep standings/stats live on those pages. */
 import React, { useCallback, useEffect, useState } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Modal, Pressable, useWindowDimensions } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Modal, Pressable, useWindowDimensions } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -118,7 +119,7 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['top']}>
-      <ScrollView contentContainerStyle={st.content}>
+      <KeyboardAwareScrollView contentContainerStyle={st.content}>
         {/* Header: wordmark · search · notifications · quick-actions toggle */}
         <View style={st.header}>
           <Logo size={40} />
@@ -222,14 +223,14 @@ export default function HomeScreen() {
         {tournaments.length > 0 && (
           <View style={{ gap: theme.spacing(2) }}>
             <Text style={st.eyebrow}>Tournament</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.chips}>
+            <KeyboardAwareScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.chips}>
               {tournaments.length > 1 && (
                 <SelectChip label="All" active={selectedId === null} onPress={() => setSelectedId(null)} />
               )}
               {tournaments.map((t) => (
                 <SelectChip key={t.id} label={t.name} active={selectedId === t.id} onPress={() => setSelectedId(t.id)} />
               ))}
-            </ScrollView>
+            </KeyboardAwareScrollView>
             {selected && (
               <TouchableOpacity
                 activeOpacity={0.8}
@@ -312,7 +313,7 @@ export default function HomeScreen() {
             <Text style={st.chevron}>›</Text>
           </TouchableOpacity>
         )}
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

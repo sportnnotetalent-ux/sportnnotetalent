@@ -2,7 +2,8 @@
  *  set of lead times — quick presets or a custom "N minutes/hours/days before".
  *  Applies to matches they play in and players they follow (see reminders.ts). */
 import React, { useState, useSyncExternalStore } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { theme } from '../core/theme';
 import { Card, Button, TextField, SelectChip, ScreenTitle, FieldLabel, textStyles } from '../components/ui';
@@ -31,7 +32,7 @@ export default function NotificationPrefsScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
         <ScreenTitle title="Match reminders" subtitle="When to remind you before your matches" />
         <WebPushCard />
 
@@ -85,7 +86,7 @@ export default function NotificationPrefsScreen() {
         <Text style={textStyles.muted}>
           Organizers can set their own reminder times per tournament, which override yours for that tournament&apos;s matches.
         </Text>
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

@@ -3,7 +3,8 @@
  *  groups/tee times. With `nextOf`, sets up the NEXT round of a tournament —
  *  same course/format, players carried over through an optional cut. */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -243,7 +244,7 @@ export default function GolfRoundSetupScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
         <ScreenTitle title={params?.nextOf ? `⛳ Round ${roundNo}` : '⛳ New golf round'} subtitle="Stroke play or Stableford — everyone on one leaderboard" />
         <TextField label="Round name" value={title} onChange={setTitle} placeholder="e.g. Sunday medal" />
 
@@ -361,7 +362,7 @@ export default function GolfRoundSetupScreen() {
 
         <FormError message={error} />
         <Button label={busy ? 'Creating…' : '⛳ Create round'} onPress={submit} disabled={busy} />
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

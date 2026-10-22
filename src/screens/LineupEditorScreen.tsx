@@ -5,7 +5,8 @@
  *  + subs) that feeds the scoring roster — so they never diverge. Only football
  *  has selectable formations; every other sport uses its fixed position set. */
 import React, { useCallback, useState } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -131,7 +132,7 @@ export default function LineupEditorScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={st.content}>
+      <KeyboardAwareScrollView contentContainerStyle={st.content}>
         <ScreenTitle title="Edit lineup" subtitle="Assign players to positions" />
 
         {/* Only the side(s) the viewer may edit — a captain sees only their own team. */}
@@ -209,7 +210,7 @@ export default function LineupEditorScreen() {
         </View>
 
         <Button label={busy ? 'Saving…' : 'Save lineup & squad'} onPress={save} style={{ marginTop: theme.spacing(2) }} />
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

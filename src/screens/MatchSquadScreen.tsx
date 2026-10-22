@@ -6,7 +6,8 @@
  *  logic work without touching the pitch); an optional "Arrange on pitch" hand-off
  *  lets you fine-tune positions afterwards. */
 import React, { useCallback, useState } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -230,7 +231,7 @@ export default function MatchSquadScreen() {
         )}
       </View>
 
-      <ScrollView contentContainerStyle={st.content}>
+      <KeyboardAwareScrollView contentContainerStyle={st.content}>
         {TESTING_ALLOW_UNVERIFIED && (
           <View style={st.testBanner}>
             <Text style={st.testBannerText}>
@@ -312,7 +313,7 @@ export default function MatchSquadScreen() {
             <Text style={st.pitchHint}>Set exact positions & formation. Skip it — starters auto-fill the pitch.</Text>
           </TouchableOpacity>
         )}
-      </ScrollView>
+      </KeyboardAwareScrollView>
 
       <View style={st.footer}>
         <Button label={busy ? 'Saving…' : 'Save matchday squad'} onPress={save} />

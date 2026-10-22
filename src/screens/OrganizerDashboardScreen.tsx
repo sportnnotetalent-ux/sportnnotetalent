@@ -2,7 +2,8 @@
  *  every tournament you manage: how much is scored, what still needs a scorer,
  *  what has no fixtures yet, and what's ready to close. Read-only + tap-through. */
 import React, { useCallback, useState } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -45,7 +46,7 @@ export default function OrganizerDashboardScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['top']}>
-      <ScrollView contentContainerStyle={st.content}>
+      <KeyboardAwareScrollView contentContainerStyle={st.content}>
         <ScreenTitle title="Organizer dashboard" subtitle="What's left to run, across your tournaments" />
 
         {!loaded ? (
@@ -84,7 +85,7 @@ export default function OrganizerDashboardScreen() {
             ))}
           </>
         )}
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

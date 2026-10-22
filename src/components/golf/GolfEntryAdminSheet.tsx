@@ -4,7 +4,8 @@
  *  recompute) and remove the entry. Opened by a long-press on a leaderboard
  *  row or the ⋯ on a scorecard. Presentational: the round screen saves. */
 import React, { useEffect, useState } from 'react';
-import { Modal, Pressable, ScrollView, Text, View, StyleSheet } from 'react-native';
+import { Modal, Pressable, Text, View, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView, KeyboardSheetScope, useKeyboardSheet } from '../keyboard';
 import { theme } from '../../core/theme';
 import { Button, SelectChip, TextField, FormError, textStyles } from '../ui';
 import { parseIndex, showIndex } from '../../data/golfLeaderboard';
@@ -44,6 +45,8 @@ export function GolfEntryAdminSheet({
 }) {
   const current: Choice = status === 'wd' || status === 'dq' || status === 'dns' ? status : 'playing';
   const [choice, setChoice] = useState<Choice>(current);
+  // keyboard: the sheet stays above it while one of its fields is focused
+  const kbSheet = useKeyboardSheet(visible);
   const [reason, setReason] = useState(admin?.reason ?? '');
   const [idx, setIdx] = useState(showIndex(handicapIndex));
   const [error, setError] = useState<string | null>(null);
@@ -70,42 +73,44 @@ export function GolfEntryAdminSheet({
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={st.backdrop} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close entry admin">
-        <Pressable style={st.sheet} onPress={(e) => e.stopPropagation()} accessibilityRole="none" tabIndex={-1}>
-          <ScrollView contentContainerStyle={{ gap: theme.spacing(3) }} keyboardShouldPersistTaps="handled">
-            <View style={st.head}>
-              <Text style={st.title} numberOfLines={1}>⛳ {name}</Text>
-              <Text style={st.close} accessibilityRole="button" accessibilityLabel="Close" onPress={onClose}>✕</Text>
-            </View>
-            <Text style={textStyles.muted}>Organiser only · {thru > 0 ? `thru ${thru}` : 'not started'}</Text>
+      <Pressable style={[st.backdrop, kbSheet.backdrop]} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close entry admin">
+        <Pressable ref={kbSheet.panel} style={[st.sheet, kbSheet.sheet]} onPress={(e) => e.stopPropagation()} accessibilityRole="none" tabIndex={-1}>
+          <KeyboardSheetScope value={kbSheet.scope}>
+            <KeyboardAwareScrollView contentContainerStyle={{ gap: theme.spacing(3) }} keyboardShouldPersistTaps="handled">
+              <View style={st.head}>
+                <Text style={st.title} numberOfLines={1}>⛳ {name}</Text>
+                <Text style={st.close} accessibilityRole="button" accessibilityLabel="Close" onPress={onClose}>✕</Text>
+              </View>
+              <Text style={textStyles.muted}>Organiser only · {thru > 0 ? `thru ${thru}` : 'not started'}</Text>
 
-            <Text style={st.section}>Status</Text>
-            <View style={st.chips}>
-              {(['playing', 'wd', 'dq', 'dns'] as Choice[]).map((c) => (
-                <SelectChip key={c} label={LABEL[c]} active={choice === c} onPress={() => { setChoice(c); if (c !== current) setReason(''); }} />
-              ))}
-            </View>
-            <Text style={textStyles.muted}>{HINT[choice]}{choice === 'dns' && thru > 0 ? ' (They have scores on the card — WD fits better.)' : ''}</Text>
-            {choice !== 'playing' && (
-              <>
-                <View style={st.chips}>
-                  {REASONS[choice].map((r) => <SelectChip key={r} label={r} active={reason === r} onPress={() => setReason(reason === r ? '' : r)} />)}
-                </View>
-                <TextField label="Reason (shown on the leaderboard)" value={reason} onChange={setReason} placeholder="e.g. Back injury" />
-              </>
-            )}
-            <Button label={busy ? 'Saving…' : choice === 'playing' ? (current === 'playing' ? 'No change' : '↺ Reinstate') : `Save ${choice.toUpperCase()}`} onPress={() => void applyStatus()} disabled={busy || !statusChanged} />
+              <Text style={st.section}>Status</Text>
+              <View style={st.chips}>
+                {(['playing', 'wd', 'dq', 'dns'] as Choice[]).map((c) => (
+                  <SelectChip key={c} label={LABEL[c]} active={choice === c} onPress={() => { setChoice(c); if (c !== current) setReason(''); }} />
+                ))}
+              </View>
+              <Text style={textStyles.muted}>{HINT[choice]}{choice === 'dns' && thru > 0 ? ' (They have scores on the card — WD fits better.)' : ''}</Text>
+              {choice !== 'playing' && (
+                <>
+                  <View style={st.chips}>
+                    {REASONS[choice].map((r) => <SelectChip key={r} label={r} active={reason === r} onPress={() => setReason(reason === r ? '' : r)} />)}
+                  </View>
+                  <TextField label="Reason (shown on the leaderboard)" value={reason} onChange={setReason} placeholder="e.g. Back injury" />
+                </>
+              )}
+              <Button label={busy ? 'Saving…' : choice === 'playing' ? (current === 'playing' ? 'No change' : '↺ Reinstate') : `Save ${choice.toUpperCase()}`} onPress={() => void applyStatus()} disabled={busy || !statusChanged} />
 
-            <Text style={st.section}>Handicap Index</Text>
-            <TextField label="Index (e.g. 12.4, or +1.2 for a plus handicap)" value={idx} onChange={setIdx} placeholder="Blank = no handicap" autoCapitalize="none" />
-            {idxBad ? <Text style={st.warn}>Enter 0–54 (one decimal), or a plus handicap up to +10.</Text> : null}
-            {roundState !== 'scheduled' ? <Text style={textStyles.muted}>Strokes received and net scores recompute for the whole card{roundState === 'completed' ? '; the round\'s stat lines are rewritten.' : '.'}</Text> : null}
-            <Button label={busy ? 'Saving…' : 'Save handicap'} variant="ghost" onPress={() => void run(() => onHandicap(idxValue))} disabled={busy || !idxChanged} />
+              <Text style={st.section}>Handicap Index</Text>
+              <TextField label="Index (e.g. 12.4, or +1.2 for a plus handicap)" value={idx} onChange={setIdx} placeholder="Blank = no handicap" autoCapitalize="none" />
+              {idxBad ? <Text style={st.warn}>Enter 0–54 (one decimal), or a plus handicap up to +10.</Text> : null}
+              {roundState !== 'scheduled' ? <Text style={textStyles.muted}>Strokes received and net scores recompute for the whole card{roundState === 'completed' ? '; the round\'s stat lines are rewritten.' : '.'}</Text> : null}
+              <Button label={busy ? 'Saving…' : 'Save handicap'} variant="ghost" onPress={() => void run(() => onHandicap(idxValue))} disabled={busy || !idxChanged} />
 
-            <Text style={st.section}>Entry</Text>
-            <Button label="🗑 Remove from this round…" variant="danger" onPress={onRemove} disabled={busy} />
-            <FormError message={error} />
-          </ScrollView>
+              <Text style={st.section}>Entry</Text>
+              <Button label="🗑 Remove from this round…" variant="danger" onPress={onRemove} disabled={busy} />
+              <FormError message={error} />
+            </KeyboardAwareScrollView>
+          </KeyboardSheetScope>
         </Pressable>
       </Pressable>
     </Modal>

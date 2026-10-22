@@ -4,7 +4,8 @@
  *  sport profile ("Compare with…" — without a second player it lists everyone
  *  they've met, plus a search). Reads existing data only (stat lines + matches). */
 import React, { useEffect, useMemo, useState } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -105,7 +106,7 @@ export default function HeadToHeadScreen() {
   const drawWord = sport === 'cricket' ? 'Tied' : 'Drawn';
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={st.content}>
+      <KeyboardAwareScrollView contentContainerStyle={st.content}>
         <Text style={textStyles.muted}>{plugin.icon} {plugin.name} · {teamMode ? 'team vs team' : 'player vs player'}</Text>
         <View style={st.vsRow}>
           <TouchableOpacity style={st.side} accessibilityRole="link" onPress={() => openSide('a')}>
@@ -159,7 +160,7 @@ export default function HeadToHeadScreen() {
             )}
           </>
         )}
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }
@@ -184,7 +185,7 @@ function ComparePicker({ sport, a, aName, opponents, names, loading, onPick }: {
   }, [q, sport, a]);
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
         <Text style={textStyles.h3}>Compare {aName} with…</Text>
         <TextField label="" value={q} onChange={setQ} placeholder="Search a player by name" autoCapitalize="words" />
         {found.length > 0 && (
@@ -210,7 +211,7 @@ function ComparePicker({ sport, a, aName, opponents, names, loading, onPick }: {
             ))}
           </Card>
         )}
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

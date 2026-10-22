@@ -14,7 +14,8 @@ import { teamLabel } from '../core/teamLevels';
 import { QualifiersCard, qualifiedBadge, useFeeders } from '../components/FeederCards';
 import { isEventSport } from '../sports/eventSports';
 import React, { useEffect, useMemo, useState } from 'react';
-import { ScrollView, View, Text, StyleSheet, Switch, Linking, Platform, Share } from 'react-native';
+import { View, Text, StyleSheet, Switch, Linking, Platform, Share } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -374,7 +375,7 @@ export default function TournamentTeamsScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
         <ScreenTitle title={`Participating ${nounPl}`} subtitle={tournament?.name ?? 'Register who’s in'} />
 
         {tourSports.length > 1 && (
@@ -658,7 +659,7 @@ export default function TournamentTeamsScreen() {
           onPress={save}
           disabled={busy}
         />
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

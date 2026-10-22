@@ -4,7 +4,8 @@
  *  Cup, Thomas/Uber Cup, team squash). Spins up the child matches; each is then
  *  scored like any normal game and the series standing updates automatically. */
 import React, { useMemo, useState } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -94,7 +95,7 @@ export default function CreateSeriesScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
         <ScreenTitle title="New series / tie" subtitle="Several matches, one winner" />
 
         <Dropdown label="Sport" value={sport ? `${getSport(sport).icon}  ${getSport(sport).name}` : null} placeholder="Select a sport"
@@ -148,7 +149,7 @@ export default function CreateSeriesScreen() {
 
         <FormError message={error} />
         <Button label={busy ? 'Creating…' : isTie ? `Create tie (${legsCount} rubbers)` : `Create series (${legsCount} match${legsCount === 1 ? '' : 'es'})`} onPress={submit} disabled={busy || !sport} />
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

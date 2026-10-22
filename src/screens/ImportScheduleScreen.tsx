@@ -4,7 +4,8 @@
  *  All the parsing/validation lives in data/scheduleImport.ts; this screen only
  *  renders it and runs the sequential create (safe to retry after a failure). */
 import React, { useEffect, useMemo, useState } from 'react';
-import { ScrollView, View, Text, StyleSheet, TouchableOpacity, Platform, Share } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform, Share } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -188,7 +189,7 @@ export default function ImportScheduleScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
         <ScreenTitle title="Import schedule" subtitle={tournament.name} />
 
         <Card style={st.card}>
@@ -278,7 +279,7 @@ export default function ImportScheduleScreen() {
             {onlyProblems && shown.length === 0 && <Text style={textStyles.muted}>No problems — every row is ready.</Text>}
           </View>
         )}
-      </ScrollView>
+      </KeyboardAwareScrollView>
 
       {rows.length > 0 && (
         <View style={st.footer}>

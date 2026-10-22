@@ -3,7 +3,8 @@
  *  score and how it was decided, and the final place. Opened from a standings
  *  row, a bracket side, the team page and the player's sport profile. */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ScrollView, View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -50,14 +51,14 @@ export default function TeamJourneyScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={st.content}>
+      <KeyboardAwareScrollView contentContainerStyle={st.content}>
         <ScreenTitle title="Tournament journey" subtitle={tournament?.name} />
         {sports.length > 1 && (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.chips}>
+          <KeyboardAwareScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.chips}>
             {sports.map((s) => (
               <SelectChip key={s} label={`${getSport(s).icon} ${getSport(s).name}`} active={sport === s} onPress={() => setPicked(s)} />
             ))}
-          </ScrollView>
+          </KeyboardAwareScrollView>
         )}
         {loading && !matches.length ? <LoadingState /> : !journey ? (
           <EmptyState icon="🧭" title="No matches here yet" hint="The journey fills in once this entrant has a fixture in the tournament." compact />
@@ -75,7 +76,7 @@ export default function TeamJourneyScreen() {
           <Button label="📊 Standings" variant="ghost" onPress={() => nav.navigate('Standings', { tournamentId, sport })} />
           <Button label="👥 Team page" variant="ghost" onPress={() => nav.navigate('Team', { teamId })} />
         </View>
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

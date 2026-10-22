@@ -5,7 +5,8 @@
  *  A club's sport team takes its name and logo from the club page. Delete only
  *  works for a team that has never played a match. */
 import React, { useEffect, useState } from 'react';
-import { ScrollView, View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -122,7 +123,7 @@ export default function EditTeamScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
         <ScreenTitle title="Edit team" subtitle={team.name} />
 
         {isClubTeam ? (
@@ -177,7 +178,7 @@ export default function EditTeamScreen() {
           <Text style={textStyles.muted}>Only for a team that has never played a match. To take a team out of a tournament, remove it there instead.</Text>
           <Button label="Delete team" variant="ghost" onPress={remove} disabled={busy} />
         </Card>
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

@@ -2,7 +2,8 @@
  *  leaders. A sport selector appears for multi-sport meets; a single-sport
  *  tournament just shows that sport. */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -148,15 +149,15 @@ export default function StandingsScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={st.content}>
+      <KeyboardAwareScrollView contentContainerStyle={st.content}>
         <ScreenTitle title="Standings" />
 
         {sports.length > 1 && (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.chips}>
+          <KeyboardAwareScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.chips}>
             {sports.map((s) => (
               <SelectChip key={s} label={`${getSport(s).icon} ${getSport(s).name}`} active={activeSport === s} onPress={() => setSport(s)} />
             ))}
-          </ScrollView>
+          </KeyboardAwareScrollView>
         )}
 
         <DivisionTabs categories={divisions} activeCat={activeCat} onChange={setActiveCat} />
@@ -268,7 +269,7 @@ export default function StandingsScreen() {
           })
         )}
         </>)}
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }
@@ -400,7 +401,7 @@ function PhaseTable({ title, phaseKey, rows, adjustments, canManage, expanded, o
                   </TouchableOpacity>
                 ))}
               </View>
-              <ScrollView horizontal showsHorizontalScrollIndicator style={{ flex: 1 }} contentContainerStyle={{ minWidth: '100%' }}>
+              <KeyboardAwareScrollView horizontal showsHorizontalScrollIndicator style={{ flex: 1 }} contentContainerStyle={{ minWidth: '100%' }}>
                 <View>
                   <View style={[st.row, st.head, st.splitHead]}>
                     {heads}
@@ -415,7 +416,7 @@ function PhaseTable({ title, phaseKey, rows, adjustments, canManage, expanded, o
                     </TouchableOpacity>
                   ))}
                 </View>
-              </ScrollView>
+              </KeyboardAwareScrollView>
             </View>
           ) : (
             <>

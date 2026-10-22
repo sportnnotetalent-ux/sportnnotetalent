@@ -6,7 +6,8 @@
  *  qualifying → finals, sprint qualifying → match play, keirin heats → final).
  *  Start order is drawn. Rendered by AthleticsEventSetupScreen for sport 'cycling'. */
 import React, { useEffect, useMemo, useState } from 'react';
-import { ScrollView, View, Text, TextInput, StyleSheet } from 'react-native';
+import { View, Text, TextInput, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -190,7 +191,7 @@ export function CyclingEventSetup({ tournamentId }: { tournamentId?: string }) {
   const S = sprintCount(lapsN, everyN);
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
         <ScreenTitle title="🚴 New cycling race" subtitle={tournament?.name} />
         {/* SD-141: the meet's competition rules, checked before the meet starts */}
         <CompetitionRulesCard tournament={tournament} sport={'cycling'} />
@@ -319,7 +320,7 @@ export function CyclingEventSetup({ tournamentId }: { tournamentId?: string }) {
         <EventOfficials tournament={tournament} value={officials} onChange={setOfficials} />
         <FormError message={error} />
         <Button label={busy ? 'Creating…' : 'Create race & start list'} onPress={() => void create()} disabled={busy || !n} />
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

@@ -3,7 +3,8 @@
  *  Sport is a compact picklist; teams lead with the ones you've played for and
  *  fall back to a search (type 3+ letters) so the list never sprawls. */
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -351,7 +352,7 @@ export default function ScheduleMatchScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
         <ScreenTitle
           title={cloneOf ? 'Clone match' : isFriendly ? 'Start a friendly' : 'Schedule a match'}
           subtitle={cloneOf ? (cloneReady ? 'Same teams, squads, venue & rules — kicks off now. The toss is re-done.' : 'Loading the match to copy…') : isFriendly ? 'A quick game — no tournament needed' : 'Pick sport, teams & time'}
@@ -521,7 +522,7 @@ export default function ScheduleMatchScreen() {
         />
         </>
         )}
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

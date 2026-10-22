@@ -13,6 +13,15 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-22 — Keyboard never covers a field (Android, iOS, web)
+Founder, signing in on Android: the keyboard sat over the password box, typed blind. Cause: Expo SDK 56 / RN 0.85 draw Android edge-to-edge, so the window no longer shrinks for the keyboard; only the chat screen handled it (and only on iOS).
+- **`src/components/keyboard.tsx` (new, pure maths in `keyboardMath.ts`):** `KeyboardAwareScrollView` replaces the ScrollView on all 86 screens that have one — while the keyboard is up and the focused field is inside it, the scroll area ends at the keyboard's top and the field is scrolled into view (focus changes re-checked too: Android sends no event for them). Horizontal / nested / fixed-height scroll views and web behave as before.
+- **Pop-up sheets** (quick options, award picker, golf entry admin, country code, date & time): iOS lifts the sheet onto the keyboard; an Android Modal reports no keyboard, so while one of its fields is focused the sheet pins to the top at 40% height. The date picker scrolls now (its time boxes were under the keyboard).
+- **Chat:** the composer stays above the keyboard on Android too (`KeyboardAvoidingBox`; the old KeyboardAvoidingView was iOS-only with a guessed header offset).
+- **Sign-in:** keyboard "Next" on the email goes to the password; "Go" on the password signs in. Tapping a button while the keyboard is up works first time (`keyboardShouldPersistTaps="handled"`).
+- **Web:** `public/index.html` viewport `interactive-widget=resizes-content` (Android Chrome shrinks the page for the keyboard; Safari scrolls the field into view itself).
+- Verified: tsc clean; 4352 pass / 0 fail (+ tests/keyboard-safe-fields.test.mts); web demo — schedule-match date picker, country-code sheet, quick-options break note render as before. The native keyboard itself can only be checked on a phone (no emulator here).
+
 ### 2026-10-22 — Deep wave round 2: the founder's answers, five match tabs, rugby league (SD-169, SD-170)
 The founder answered every question in the deep-wave review doc; ten parallel worktree engineers built the answers, merged into one tree.
 - **Five match tabs for every head-to-head sport (SD-169):** Info · Commentary · Stats · Summary · Scoring, one purpose each, nothing shown twice. `SportPlugin.matchTabs` slots (Info / Situation / Commentary / Stats / SummaryExtras / AfterMatch) replace `LiveExtras` + `liveViews`; "Key moments" is a filter inside Commentary. The tab row now fits across a 320–375 px phone (it scrolled "Scoring" off-screen). Contract: docs/sport-depth/deep-wave/match-tabs.md; guard test tests/match-tabs.test.mts.

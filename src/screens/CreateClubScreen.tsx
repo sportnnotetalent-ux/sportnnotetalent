@@ -4,7 +4,8 @@
  *  Everything else — captains, squads, roles, more admins — is configured later
  *  from the team dashboard. On create we land on the dashboard. */
 import React, { useEffect, useState } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -69,7 +70,7 @@ export default function CreateClubScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
+      <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
         <ScreenTitle title="Create your team" subtitle="One team, many sports — add the rest later" />
 
         <Card style={{ gap: theme.spacing(3) }}>
@@ -118,7 +119,7 @@ export default function CreateClubScreen() {
 
         <FormError message={error} />
         <Button label={busy ? 'Creating…' : 'Create team'} onPress={create} />
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }
