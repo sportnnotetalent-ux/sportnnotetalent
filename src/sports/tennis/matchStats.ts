@@ -30,15 +30,21 @@
  *     points it came in; won = those it won.
  *   - Serve speed: the km/h of the serve that started the point (the 1st
  *     serve if it went in, else the 2nd). 1st / 2nd averages need 1st / 2nd
- *     serve tracking; without it a single "Serve average".
+ *     serve tracking; without it a single "Serve average". Round 2: shown in
+ *     the match's unit (km/h or mph, `speedUnit`); the log and the career
+ *     keys stay km/h.
+ *   - Rally length (round 2): the match's buckets (its scheme, plus any other
+ *     bucket a point carries — `matchRallyBuckets`); an old match reads the
+ *     ATP 0–4 / 5–8 / 9+ as before.
  *   - Winners / errors keep SD-107's meaning (aces and service winners are
  *     their own rows). Return winners / return unforced errors = shot "Return".
  */
 import { pointInputs, type PointInput } from '../rallyEdit.ts';
 import { serveStats, type ServeBlock, type ServeRosters, type ServeRow, type ServeStats, type SideServe } from '../serveStats.ts';
 import {
-  RALLY_BUCKETS, RALLY_LABEL, SHOTS, SHOT_LABEL, detailTracked, netSides, netTracked, rallyTracked, speedTracked, strokeOf,
-  type RallyBucket, type Shot, type Wing,
+  RALLY_LABEL, SHOTS, SHOT_LABEL, allRallyBuckets, detailTracked, matchRallyBuckets, netSides, netTracked, rallyBucketsOf, rallyKey, rallyTracked,
+  speedText, speedTracked, speedUnitOf, strokeOf,
+  type RallyBucket, type Shot, type SpeedUnit, type Wing,
 } from '../pointDetail.ts';
 import type { TennisState } from './engine.ts';
 
@@ -57,7 +63,13 @@ export interface TPoint { i: number; p: PointInput; server: Side; serverId?: str
 /** What this match tracked (D8: a panel / row shows only for these). */
 export interface TennisCoverage { detail: boolean; serve: boolean; net: boolean; rally: boolean; speed: boolean }
 
-export interface TennisView { st: ServeStats; points: TPoint[]; cov: TennisCoverage }
+export interface TennisView {
+  st: ServeStats; points: TPoint[]; cov: TennisCoverage;
+  /** round 2 — the rally-length buckets this match reads with */
+  buckets: RallyBucket[];
+  /** round 2 — the unit serve speeds show in */
+  unit: SpeedUnit;
+}
 
 /** Replay `state` once; null when it isn't a tennis match state. */
 export function tennisView(state: unknown, rosters: ServeRosters = {}): TennisView | null {
@@ -69,6 +81,7 @@ export function tennisView(state: unknown, rosters: ServeRosters = {}): TennisVi
   return {
     st, points,
     cov: { detail: detailTracked(s), serve: st.serveTracked, net: netTracked(s), rally: rallyTracked(s), speed: speedTracked(s) },
+    buckets: matchRallyBuckets('tennis', s), unit: speedUnitOf(s),
   };
 }
 
@@ -103,8 +116,8 @@ export interface TennisTally {
   home: TennisSide; away: TennisSide;
   /** points carrying point detail */
   described: number;
-  /** points with a rally length: per bucket, points played and won per side */
-  rally: Record<RallyBucket, { total: number; home: number; away: number }>;
+  /** points with a rally length: per bucket (the match's), points played and won per side */
+  rally: Record<string, { total: number; home: number; away: number }>;
 }
 
 const zeroCats = () => Object.fromEntries(RALLY_CATS.map((c) => [c.id, Object.fromEntries([...SHOTS, 'all'].map((k) => [k, 0]))])) as TennisSide['cats'];
@@ -118,7 +131,7 @@ const zeroSide = (): TennisSide => ({
 export function tennisTally(v: TennisView, scope: Scope = 'all'): TennisTally {
   const out: TennisTally = {
     home: zeroSide(), away: zeroSide(), described: 0,
-    rally: Object.fromEntries(RALLY_BUCKETS.map((b) => [b, { total: 0, home: 0, away: 0 }])) as TennisTally['rally'],
+    rally: Object.fromEntries((v.buckets ?? rallyBucketsOf('tennis')).map((b) => [b, { total: 0, home: 0, away: 0 }])),
   };
   for (const t of v.points) {
     if (scope !== 'all' && t.period !== scope) continue;
@@ -142,7 +155,7 @@ export function tennisTally(v: TennisView, scope: Scope = 'all'): TennisTally {
       else if (pd.how === 'sw') out[W].sw += 1;
     }
     for (const n of netSides(p, W)) { out[n].netPlayed += 1; if (n === W) out[n].netWon += 1; }
-    if (p.rallyLen) { const r = out.rally[p.rallyLen]; r.total += 1; r[W] += 1; }
+    if (p.rallyLen && out.rally[p.rallyLen]) { const r = out.rally[p.rallyLen]; r.total += 1; r[W] += 1; }
     if (typeof p.kmh === 'number' && !p.df) {
       out[S].speed.all.push(p.kmh);
       if (sv) out[S].speed[sv].push(p.kmh);
@@ -167,7 +180,6 @@ const frac = (n: number, d: number) => (d ? `${n}/${d} (${Math.round((100 * n) /
 const pctOf = (n: number, d: number) => (d ? (100 * n) / d : 0);
 const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : undefined);
 const max = (xs: number[]) => (xs.length ? Math.max(...xs) : undefined);
-const kmhText = (n: number | undefined) => (n === undefined ? '–' : `${Math.round(n)} km/h`);
 
 /** The serve block of a scope (null = a set with no point yet). */
 export function blockOf(v: TennisView, scope: Scope): ServeBlock | null {
@@ -211,7 +223,7 @@ export function keyStats(v: TennisView, scope: Scope = 'all'): StatSection[] {
   if (cov.speed) {
     const kmh = (key: string, label: string, f: (x: TennisSide) => number | undefined) => {
       const h = f(t.home), a = f(t.away);
-      service.push({ key, label, home: kmhText(h), away: kmhText(a), hv: h ?? 0, av: a ?? 0 });
+      service.push({ key, label, home: speedText(h, v.unit), away: speedText(a, v.unit), hv: h ?? 0, av: a ?? 0 });
     };
     kmh('kmhMax', 'Fastest serve', (x) => max(x.speed.all));
     if (cov.serve) {
@@ -304,10 +316,10 @@ export function strokeSummary(v: TennisView, scope: Scope = 'all'): Array<{ cat:
   return RALLY_CATS.map((c) => ({ cat: c.id, label: c.label, short: c.short, home: t.home.cats[c.id].all, away: t.away.cats[c.id].all }));
 }
 
-/** RALLY LENGTH — points won per side per bucket, with the share of that bucket. */
+/** RALLY LENGTH — points won per side per bucket (the match's), with the share of that bucket. */
 export function rallyLengthRows(v: TennisView, scope: Scope = 'all'): ServeRow[] {
   const t = tennisTally(v, scope);
-  return RALLY_BUCKETS.map((bk) => {
+  return v.buckets.map((bk) => {
     const r = t.rally[bk];
     const txt = (n: number) => (r.total ? `${n} (${Math.round((100 * n) / r.total)}%)` : '–');
     return { key: bk, label: RALLY_LABEL[bk], home: txt(r.home), away: txt(r.away), hv: r.home, av: r.away };
@@ -322,7 +334,8 @@ export function rallyLengthRows(v: TennisView, scope: Scope = 'all'): ServeRow[]
  *   net points       netPts / netPtsWon — the side's (doubles: both players,
  *                    as rcvPts: the scorer marks a side, not a player)
  *   rally length     rl04Pts / rl04Won · rl58Pts / rl58Won · rl9Pts / rl9Won
- *                    — the side's points in that bucket / won
+ *                    — the side's points in that bucket / won (round 2: the
+ *                    match's buckets, e.g. rl13Pts … for 1–3 / 4–6 / 7–9 / 10+)
  *   return in play   rtnInPlay / rtnInPlayOf — the side's (point detail)
  *   serve speed      the SERVING player's (named server only, as srvPts):
  *                    srvKmhSum / srvKmhN (every serve with a speed),
@@ -336,12 +349,10 @@ export function tennisCareerKeys(v: TennisView | null, side: Side, playerId: str
   const me = t[side];
   if (v.cov.net) Object.assign(out, { netPts: me.netPlayed, netPtsWon: me.netWon });
   if (v.cov.rally) {
-    const r = t.rally;
-    Object.assign(out, {
-      rl04Pts: r['0-4'].total, rl04Won: r['0-4'][side],
-      rl58Pts: r['5-8'].total, rl58Won: r['5-8'][side],
-      rl9Pts: r['9+'].total, rl9Won: r['9+'][side],
-    });
+    for (const b of v.buckets) {
+      out[`${rallyKey(b)}Pts`] = t.rally[b].total;
+      out[`${rallyKey(b)}Won`] = t.rally[b][side];
+    }
   }
   if (v.cov.detail) Object.assign(out, { rtnInPlay: me.ret.all.inPlay, rtnInPlayOf: me.ret.all.known });
   if (v.cov.speed && v.st.serverKnown) {
@@ -362,8 +373,9 @@ export function tennisCareerKeys(v: TennisView | null, side: Side, playerId: str
   return out;
 }
 
-/** Every key `tennisCareerKeys` can write (docs, schema and tests). */
-export const TENNIS_EXTRA_KEYS = [
-  'netPts', 'netPtsWon', 'rl04Pts', 'rl04Won', 'rl58Pts', 'rl58Won', 'rl9Pts', 'rl9Won', 'rtnInPlay', 'rtnInPlayOf',
+/** Every key `tennisCareerKeys` can write (docs, schema and tests); round 2:
+ *  the rally keys of every bucket scheme. */
+export const TENNIS_EXTRA_KEYS: readonly string[] = [
+  'netPts', 'netPtsWon', ...allRallyBuckets('tennis').flatMap((b) => [`${rallyKey(b)}Pts`, `${rallyKey(b)}Won`]), 'rtnInPlay', 'rtnInPlayOf',
   'srvKmhSum', 'srvKmhN', 'srv1KmhSum', 'srv1KmhN', 'srv2KmhSum', 'srv2KmhN', 'srvKmhMax',
-] as const;
+];

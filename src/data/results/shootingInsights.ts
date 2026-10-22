@@ -17,7 +17,7 @@ import type { DisciplineDef, ResultEntry } from './model.ts';
 import { rankEntries } from './rank.ts';
 import { finalState, isFinalRows } from './shootingRank.ts';
 import { isShootMatchRows, shootMatchState } from './shootMatch.ts';
-import { positionOf, seriesCount, shootEventOf, sumTenths, fromTenths, POSITION_LABEL, type Position, type ShootEventDef } from './shootingDefs.ts';
+import { positionOf, seriesCount, shootEventOf, sumTenths, fromTenths, finalPenaltyTotal, netFinalShots, POSITION_LABEL, type Position, type ShootEventDef } from './shootingDefs.ts';
 import { netSeries, perfectSeries, penaltyTotal, scoreText, totalText } from './shooting.ts';
 import { FeedBuilder, MEDAL_ICON, ordinalOf, placesOf, type FeedItem } from './insightFeed.ts';
 
@@ -123,7 +123,8 @@ function finalFeed(entries: ResultEntry[], ev: ShootEventDef): FeedItem[] {
   for (let k = 1; k <= maxFired; k++) {
     const inK = field.filter((e) => (e.result.fshots?.length ?? 0) >= k && !((outAfter.get(e.id) ?? Infinity) < k));
     if (!inK.length) continue;
-    const tot = (e: ResultEntry) => sumTenths(e.result.fshots!.slice(0, k));
+    // round 2: totals net of final penalties (the shot as fired is still shown)
+    const tot = (e: ResultEntry) => sumTenths(netFinalShots(e.result).slice(0, k));
     const sorted = [...inK].sort((a, b) => tot(b) - tot(a) || (a.result.order ?? 99) - (b.result.order ?? 99));
     const top = Math.max(...inK.map((e) => e.result.fshots![k - 1]));
     const bestBy = inK.filter((e) => e.result.fshots![k - 1] === top).map((e) => short.get(e.id)!);
@@ -134,6 +135,11 @@ function finalFeed(entries: ResultEntry[], ev: ShootEventDef): FeedItem[] {
       `Best ${bestBy.join(', ')} ${t1(top)} · ${level ? 'level at the top on' : `${leader.name} leads on`} ${t1(fromTenths(tot(leader)))}${second && !level ? ` (+${t1(margin / 10)})` : ''}`,
       { tag: `Shot ${k}`, tone: 'info', detail: sorted.map((e) => `${short.get(e.id)} ${t1(e.result.fshots![k - 1])}`).join(' · ') },
     );
+    // round 2: a penalty given on this shot
+    for (const e of inK) {
+      const p = e.result.fpen?.[k - 1];
+      if (p) fb.push(`Penalty — ${e.name} −${p} on shot ${k} (${t1(e.result.fshots![k - 1])} counts ${t1(netFinalShots(e.result)[k - 1])})`, { tag: `Shot ${k}`, tone: 'bad' });
+    }
     if (!level && leader.id !== lead) {
       if (lead) fb.push(`${leader.name} takes the lead`, { tag: `Shot ${k}`, tone: 'lead' });
       lead = leader.id;
@@ -225,6 +231,8 @@ export interface FinalistStats {
   tens: number;
   /** place after each checkpoint (null = out by then / not fired yet) */
   ranks: (number | null)[];
+  /** round 2: penalty points given in the final (counted shots) — only when there was one */
+  pen?: number;
 }
 export interface ShootFinalStats {
   kind: 'final';
@@ -233,6 +241,8 @@ export interface ShootFinalStats {
   finalists: FinalistStats[];
   leadChanges: number;
   bestShot?: { names: string[]; value: number };
+  /** round 2: penalty points given in the final, all finalists — only when there was one */
+  penalties?: number;
 }
 
 function shotStats(shots: (number | 'X')[], decimal: boolean): ShotStats {
@@ -309,7 +319,7 @@ function finalStats(entries: ResultEntry[], ev: ShootEventDef): ShootFinalStats 
   const counted = (e: ResultEntry) => Math.min(e.result.fshots?.length ?? 0, outAfter.get(e.id) ?? st.last);
   const rankAt = (p: number) => {
     const inP = field.filter((e) => (e.result.fshots?.length ?? 0) >= p && !((outAfter.get(e.id) ?? Infinity) < p));
-    const tot = (e: ResultEntry) => sumTenths(e.result.fshots!.slice(0, p));
+    const tot = (e: ResultEntry) => sumTenths(netFinalShots(e.result).slice(0, p));
     const sorted = [...inP].sort((a, b) => tot(b) - tot(a));
     const pl = placesOf(sorted, (a, b) => tot(a) === tot(b));
     return new Map(sorted.map((e, j) => [e.id, pl[j].place]));
@@ -317,11 +327,13 @@ function finalStats(entries: ResultEntry[], ev: ShootEventDef): ShootFinalStats 
   const at = checkpoints.map(rankAt);
   const finalists: FinalistStats[] = field.map((e) => {
     const shots = (e.result.fshots ?? []).slice(0, counted(e));
-    const total = fromTenths(sumTenths(shots));
+    // round 2: the total (and the average) net of final penalties; best / 10.0+ as fired
+    const total = fromTenths(sumTenths(netFinalShots(e.result).slice(0, counted(e))));
     return {
       id: e.id, name: e.name, place: st.places.get(e.id)?.place, shots: shots.length, total,
       avg: shots.length ? Math.round((total / shots.length) * 100) / 100 : 0, best: shots.length ? Math.max(...shots) : 0, tens: shots.filter((v) => v >= 10).length,
       ranks: at.map((m) => m.get(e.id) ?? null),
+      ...(finalPenaltyTotal({ fpen: (e.result.fpen ?? []).slice(0, counted(e)) }) > 0 ? { pen: finalPenaltyTotal({ fpen: (e.result.fpen ?? []).slice(0, counted(e)) }) } : {}),
     };
   }).sort((a, b) => (a.place ?? 99) - (b.place ?? 99) || b.total - a.total);
   let leadChanges = 0, lead: string | undefined;
@@ -339,5 +351,6 @@ function finalStats(entries: ResultEntry[], ev: ShootEventDef): ShootFinalStats 
     if (!bestShot || f.best > bestShot.value) bestShot = { names: [f.name], value: f.best };
     else if (f.best === bestShot.value) bestShot.names.push(f.name);
   }
-  return { kind: 'final', checkpoints, finalists, leadChanges, bestShot };
+  const penalties = fromTenths(finalists.reduce((a, f) => a + Math.round((f.pen ?? 0) * 10), 0));
+  return { kind: 'final', checkpoints, finalists, leadChanges, bestShot, ...(penalties > 0 ? { penalties } : {}) };
 }

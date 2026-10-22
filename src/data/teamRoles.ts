@@ -19,6 +19,7 @@ export const TEAM_ROLES: Partial<Record<SportId, string[]>> = {
   baseball: ['Pitcher', 'Catcher', 'Infielder', 'Outfielder', 'Designated hitter'],
   netball: ['Goal shooter', 'Goal attack', 'Wing attack', 'Centre', 'Wing defence', 'Goal defence', 'Goal keeper'],
   rugby: ['Prop', 'Hooker', 'Lock', 'Back row', 'Scrum-half', 'Fly-half', 'Centre', 'Back three'],
+  rugby_league: ['Fullback', 'Wing', 'Centre', 'Five-eighth', 'Halfback', 'Prop', 'Hooker', 'Second row', 'Lock'],
 };
 
 /** Valid roles for a sport (empty when the sport has no squad-role concept). */

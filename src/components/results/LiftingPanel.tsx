@@ -11,6 +11,8 @@
  *  (`wlLights`), a "Jury reverses" button (`wlJury`) — and the IWF two-change
  *  limit (`wlChanges`, asks before a third change, never refuses); each cell
  *  shows its lights (2-1), a jury reversal (J) and weight changes (Δ2).
+ *  Round 2: the lifting clock (LiftingClock — 1 min, 2 min for consecutive
+ *  attempts, a warning at 30 s; the meet can switch it off with `wlClock`).
  *  Pure rules live in data/results/weightlifting.ts. */
 import { formatLb } from '../../core/units';
 import React, { useEffect, useMemo, useState } from 'react';
@@ -21,9 +23,10 @@ import { askConfirm } from '../ConfirmSheet';
 import {
   activeLift, liftingOrder, callText, declareError, declare, recordLift, pendingIndex, taken, weighInIssue, classForBodyweight,
   summarizeLifts, bombedOutOf, fmtKg, WL_RANGE, BIG_JUMP, LIFT_LABEL, LIFT_SHORT, LIFTS, ordinal,
-  ruleOf, changeLimitIssue, juryReverse, decisionText, lightsScore,
+  ruleOf, changeLimitIssue, juryReverse, decisionText, lightsScore, clockAllowance,
   type EntryResult, type LiftAttempt, type Lift, type ResultEntry, type CompRules,
 } from '../../data/results';
+import { LiftingClock } from './LiftingClock';
 
 type Save = (entryId: string, next: EntryResult, undoLabel?: string) => void;
 const kgOf = (t: string): number | undefined => { const v = Number(t.trim().replace(',', '.')); return t.trim() && Number.isFinite(v) ? v : undefined; };
@@ -187,6 +190,8 @@ export function NextLiftCard({ entries, seq, onSave, rules, lb }: { entries: Res
     if (ok) decide({ pass: true });
   };
   const lightsDone = lights.every((x) => x != null);
+  // round 2: the lifting clock (IWF 1 min / 2 min for consecutive attempts) — the meet can switch it off
+  const clock = ruleOf(rules, 'wlClock') !== 'off' && cur.kg != null ? clockAllowance(entries, cur) : null;
   return (
     <Card style={st.upCard}>
       <View style={st.headRow}>
@@ -195,6 +200,7 @@ export function NextLiftCard({ entries, seq, onSave, rules, lb }: { entries: Res
       </View>
       <Text style={st.upName} accessibilityRole="header">Next: {callText(cur)}</Text>
       {lb && cur.kg != null ? <Text style={textStyles.muted}>{formatLb(cur.kg)} (kg counts)</Text> : null}
+      {clock ? <LiftingClock seconds={clock.seconds} consecutive={clock.consecutive} callKey={`${cur.entryId}:${cur.lift}:${cur.attempt}`} /> : null}
       {cur.kg == null ? (
         <View style={st.headRow}>
           <TextInput style={[st.input, { width: 90 }]} value={kg} onChangeText={setKg} placeholder="kg" placeholderTextColor={theme.colors.textMuted} keyboardType="number-pad" accessibilityLabel={`Declare ${first}'s weight`} onSubmitEditing={() => void changeWeight()} />

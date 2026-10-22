@@ -36,6 +36,7 @@ import { netballStats } from './netball/stats.ts';
 import { baseballStats } from './baseball/stats.ts';
 import { americanFootballStats } from './american_football/stats.ts';
 import { rugbyStats } from './rugby/stats.ts';
+import { rugbyLeagueStats } from './rugby_league/stats.ts';
 
 export const STAT_SCHEMAS: { [S in SportId]: SportStatSchema<S> } = {
   football: footballStats,
@@ -67,6 +68,7 @@ export const STAT_SCHEMAS: { [S in SportId]: SportStatSchema<S> } = {
   baseball: baseballStats, // SD-144
   american_football: americanFootballStats,
   rugby: rugbyStats,
+  rugby_league: rugbyLeagueStats,
 };
 
 export const STAT_SPORTS = Object.keys(STAT_SCHEMAS) as SportId[];

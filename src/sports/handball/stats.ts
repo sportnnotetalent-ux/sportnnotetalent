@@ -27,11 +27,21 @@ const typeStats: StatDef[] = TYPES.flatMap(([k, label, short, abbr]) => [
   { key: `${k}Pct`, label: `${label} %`, source: 'derived' as const, group: 'types', format: { unit: 'percent' as const, dp: 0 },
     agg: { kind: 'rate' as const, num: `${k}Goals`, den: `${k}Shots`, scale: 100, dp: 0 } },
 ]);
+/** Round 2 (founder) — MVP points for a save by position, ON TOP of the 1.5
+ *  every save already earns (the position keys are a split of `saves`, so a
+ *  full weight would count the save twice). The bonus follows how often that
+ *  attempt scores (IHF / EHF shooting %: 9 m ≈ 45 %, wing ≈ 60 %, 6 m,
+ *  breakthrough and 7 m ≈ 70–75 %, fast break ≈ 80 %): a save is worth
+ *  1.5 × that rate ÷ the 9 m rate, and the bonus is what that adds to 1.5,
+ *  to the half point — 9 m is the baseline save (no bonus), a wing save +0.5,
+ *  a 6 m / breakthrough / fast-break / 7 m save +1. */
+export const SAVE_BONUS: Record<string, number> = { sixM: 1, nineM: 0, wing: 0.5, breakthrough: 1, fastBreak: 1, sevenM: 1 };
 /** Deep wave — the IHF goalkeeper line by position (statTotals, keeper lines
  *  only: keyed, so an older line reads "not tracked", never 0). The save %
  *  doubles as the team figure on the match centre. */
 const keeperTypeStats: StatDef[] = TYPES.flatMap(([k, label, short]) => [
-  { key: `${k}Saves`, label: `${label} saves`, short: `${short} saves`, one: `${short} save`, group: 'keeperTypes', coverage: 'keyed' as const },
+  { key: `${k}Saves`, label: `${label} saves`, short: `${short} saves`, one: `${short} save`, group: 'keeperTypes', coverage: 'keyed' as const,
+    ...(SAVE_BONUS[k] ? { weight: SAVE_BONUS[k] } : {}) },
   { key: `${k}Conceded`, label: `${label} goals conceded`, short: `${short} conceded`, group: 'keeperTypes', format: { unit: 'count' as const, better: 'lower' as const }, coverage: 'keyed' as const },
   { key: `${k}SavePct`, label: `${label} save %`, source: 'derived' as const, group: 'keeperTypes', format: { unit: 'percent' as const, dp: 0 },
     agg: { kind: 'rate' as const, num: `${k}Saves`, den: [`${k}Saves`, `${k}Conceded`], scale: 100, dp: 0, over: 'keeper' } },
@@ -55,7 +65,8 @@ export const handballStats: SportStatSchema<'handball'> = {
     { key: 'steals', label: 'Steals', short: 'steals', one: 'steal', abbr: 'ST', group: 'defence', weight: 1.5 },
     { ...BLOCKS, abbr: 'BS', group: 'defence', weight: 1.5 },
     { key: 'technicalFaults', label: 'Technical faults', short: 'technical faults', one: 'technical fault', compact: 'tech. faults', compactOne: 'tech. fault', abbr: 'TF', group: 'defence', format: { unit: 'count', better: 'lower' }, weight: -1 },
-    { key: 'sevenMSaves', label: '7 m saves', short: '7 m saves', one: '7 m save', group: 'goalkeeping', abbr: '7MSV' },
+    // round 2: a 7 m save's bonus on top of the save (SAVE_BONUS)
+    { key: 'sevenMSaves', label: '7 m saves', short: '7 m saves', one: '7 m save', group: 'goalkeeping', abbr: '7MSV', weight: SAVE_BONUS.sevenM },
     ...typeStats,
     ...keeperTypeStats,
     // deep wave: goals into an empty goal (IHF "EG"), 7-metre throws won (when
@@ -64,6 +75,11 @@ export const handballStats: SportStatSchema<'handball'> = {
     { key: 'emptyGoalGoals', label: 'Empty-goal goals', short: 'empty-goal goals', one: 'empty-goal goal', group: 'types', coverage: 'keyed' },
     { key: 'sevenMDrawn', label: '7 m throws won', short: '7 m throws won', one: '7 m throw won', compact: '7 m won', group: 'attack', coverage: 'keyed' },
     { key: 'soSaves', label: 'Shoot-out saves', short: 'shoot-out saves', one: 'shoot-out save', compact: 'SO saves', group: 'goalkeeping', coverage: 'keyed' },
+    // round 2: minutes with an empty goal (IHF 4:1, the 7th-court-player
+    // time) — a team figure on the match centre, and on the career of the
+    // keeper who was taken off; only for a match that used the empty goal
+    // (keyed), to one decimal (a spell is often under a minute)
+    { key: 'emptyGoalMinutes', label: 'Minutes with an empty goal', short: 'empty-goal mins', compact: 'empty-goal mins', group: 'goalkeeping', format: { unit: 'decimal', dp: 1 }, coverage: 'keyed' },
     { ...YELLOW_CARDS, group: 'discipline', weight: -1, abbr: 'YC' },
     { key: 'twoMinutes', label: '2-minute suspensions', short: '2-min suspensions', one: '2-min suspension', compact: "2'", abbr: "2'", group: 'discipline', weight: -2, suspension: { minutes: 2 } },
     { ...RED_CARDS, group: 'discipline', weight: -6, abbr: 'D', suspension: { permanent: true } },
@@ -119,7 +135,7 @@ export const handballStats: SportStatSchema<'handball'> = {
     { id: 'types', title: 'Goals by type', rows: [...TYPES.flatMap(([k]) => [{ stat: `${k}Goals`, hideZero: true }, { stat: `${k}Pct` }]), { stat: 'emptyGoalGoals', hideZero: true }] },
     { id: 'defence', title: 'Defence & ball', rows: [{ stat: 'steals' }, { stat: 'blocks' }, { stat: 'technicalFaults' }] },
     { id: 'playing', title: 'Playing time', rows: [{ stat: 'minutes' }] },
-    { id: 'goalkeeping', title: 'Goalkeeping', rows: [{ stat: 'saves' }, { stat: 'goalsConceded' }, { stat: 'savePct' }, { stat: 'sevenMSaves' }, { stat: 'sevenMSavePct' }, { stat: 'concededPerGame' }, { stat: 'soSaves', hideZero: true }] },
+    { id: 'goalkeeping', title: 'Goalkeeping', rows: [{ stat: 'saves' }, { stat: 'goalsConceded' }, { stat: 'savePct' }, { stat: 'sevenMSaves' }, { stat: 'sevenMSavePct' }, { stat: 'concededPerGame' }, { stat: 'soSaves', hideZero: true }, { stat: 'emptyGoalMinutes', hideZero: true }] },
     // deep wave: the IHF keeper line by position (save % from 6 m, 9 m …)
     { id: 'keeperTypes', title: 'Saves by position', rows: TYPES.map(([k]) => ({ stat: `${k}SavePct` })) },
     { id: 'shootout', title: '7 m shoot-outs', rows: [{ stat: 'soGoals', hideZero: true }, { stat: 'soTaken', hideZero: true }, { stat: 'soConversion' }] },
@@ -175,6 +191,8 @@ export const handballCentre: CentreCategory[] = [
   ] },
   { id: 'keeping', label: 'Goalkeeping', rows: [
     { key: 'savePct', label: 'Save %' }, 'saves', 'sevenMSaves', ...TYPES.map(([k]) => `${k}SavePct`), 'sevenMSavePct',
+    // round 2: only once a side used the empty goal
+    { key: 'emptyGoalMinutes', label: 'Minutes with an empty goal (7th court player)' },
   ] },
   { id: 'ball', label: 'Ball & defence', rows: ['steals', 'blocks', 'technicalFaults', 'tfSteps', 'tfDouble', 'tfArea', 'tfOffensive', 'tfPassive', 'tfPass', 'tfOther'] },
   { id: 'discipline', label: 'Discipline', rows: [

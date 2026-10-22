@@ -97,10 +97,17 @@ export const footballStats: SportStatSchema<'football'> = {
     // tracked it; statTotals writes them only for a match that tracked them).
     // Key passes and clearances are live taps; the shot-detail keys are
     // derived from the shots / goals (never live).
-    { key: 'keyPasses', label: 'Key passes', short: 'key passes', one: 'key pass', group: 'passing', coverage: 'keyed' },
+    // Round 2 (founder): MVP weights, appended after the golden ones (order
+    // breaks ties, so the original order is kept as is). A key pass (the pass
+    // before a shot that wasn't a goal — the assist is its own key) = 1, like
+    // an attacking play / a tackle and a sixth of an assist; a clearance = 0.5,
+    // half a tackle or interception (it relieves pressure, it rarely wins the
+    // ball — Opta-style ratings weigh it below both). On the rating line too, so
+    // a player whose only figure is a key pass still gets a rating.
+    { key: 'keyPasses', label: 'Key passes', short: 'key passes', one: 'key pass', group: 'passing', coverage: 'keyed', weight: 1, matchSummary: true },
     { key: 'chancesCreated', label: 'Chances created', short: 'chances created', one: 'chance created', source: 'derived', group: 'passing',
       agg: { kind: 'sum', keys: ['keyPasses', 'assists'], over: 'keyPassLines' }, coverOf: 'keyPassLines' },
-    { key: 'clearances', label: 'Clearances', short: 'clearances', one: 'clearance', group: 'defence', coverage: 'keyed' },
+    { key: 'clearances', label: 'Clearances', short: 'clearances', one: 'clearance', group: 'defence', coverage: 'keyed', weight: 0.5, matchSummary: true },
     { key: 'shotsInBox', label: 'Shots inside the box', short: 'shots inside the box', one: 'shot inside the box', compact: 'in-box shots', compactOne: 'in-box shot', group: 'attack', coverage: 'keyed' },
     { key: 'shotsOutBox', label: 'Shots outside the box', short: 'shots outside the box', one: 'shot outside the box', compact: 'long shots', compactOne: 'long shot', group: 'attack', coverage: 'keyed' },
     { key: 'goalsInBox', label: 'Goals inside the box', short: 'goals inside the box', one: 'goal inside the box', group: 'attack', coverage: 'keyed' },

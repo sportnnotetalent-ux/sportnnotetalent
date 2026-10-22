@@ -38,6 +38,7 @@ Weight changes are always counted. The IWF allows two changes per attempt, so a 
 
 ## Step by step: run the session
 1. The card under the weigh-in shows who is up, e.g. **Next: Asha Rao · 87 kg · 2nd attempt**, and the next three.
+   The clock under it shows **1:00** (or **2:00** when the lifter follows themself). Tap **Start** when the lifter is called and **Stop** when the bar leaves the platform. It changes colour at 30 seconds left and shows **Time** at 0:00. It is only a guide for the officials; the referees still decide, and the organiser can switch it off.
 2. Tap **✓ Good lift** or **✗ No lift**. To record the lights, tap **3 lights** and set each referee to white or red; two whites is a good lift.
 3. The next attempt is set for you: 1 kg more after a good lift, the same weight after a no lift. For another weight, type it and tap **Change kg**.
 4. A lifter who gives up an attempt: tap **Declined**. It counts as a no lift.
@@ -45,6 +46,8 @@ Weight changes are always counted. The IWF allows two changes per attempt, so a 
 6. After the last snatch, the card moves to the clean & jerk.
 7. To fix a mistake, tap the attempt in the lifter's row and change the weight, or tap **✓ Good**, **✗ No lift** or **Clear**. **Undo** at the bottom takes back the last decision.
 8. When all attempts are taken, tap **🏁 Finish & lock results**. The check lists lifters with no attempts and any new meet record.
+
+When the organiser shows **Sinclair** or **Robi points**, the results sheet lists each lifter's points, and the weightlifting page lists the best lifters across categories. With the **team classification** on, the weightlifting page also shows the IWF team table for each age group and gender.
 
 > **Important:** The app refuses half kilos, a weight lighter than the last attempt, or less than 1 kg more after a good lift. Unusual weights, like 850 kg or a jump of over 20 kg, ask **Check this weight** or **Big jump** first.
 

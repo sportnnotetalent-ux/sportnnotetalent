@@ -9,6 +9,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { theme } from '../../core/theme';
 import { Card, Pill, textStyles } from '../ui';
+import { RecordsSetCard } from './RecordsSetCard';
 import { formatDay } from '../../core/dates';
 import { getPhaseInfos } from '../../data/resultsStore';
 import { cyclingCareer, type PhaseInfo, teamCareerText } from '../../data/results';
@@ -53,6 +54,8 @@ export function CyclingCareer({ lines }: { lines: StatLine[] }) {
 
       {/* SD-137b: team events (archery / shooting teams, team pursuit / sprint) */}
       {teamCareerText({ events: c.teamEvents, golds: c.teamGolds, silvers: c.teamSilvers, bronzes: c.teamBronzes }) ? <Text style={textStyles.muted}>{teamCareerText({ events: c.teamEvents, golds: c.teamGolds, silvers: c.teamSilvers, bronzes: c.teamBronzes })}</Text> : null}
+      {/* timed races round 2: meet / school records broken */}
+      <RecordsSetCard c={c} />
       <Text style={st.section}>Best times</Text>
       {c.bests.length === 0 ? <Text style={textStyles.muted}>No times yet — each time trial, pursuit and the sprint’s flying 200 m keep their own best, per distance.</Text> : (
         <Card style={{ gap: theme.spacing(2) }}>

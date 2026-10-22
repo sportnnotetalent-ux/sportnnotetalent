@@ -135,7 +135,8 @@ describe('"Stats to track" toggles', () => {
     assert.equal(v.pitchMap, true);
     assert.equal(v.shotCtrl, false);
     const grouped = LOCAL_RULE_FIELDS.filter((f) => f.group === 'Stats to track').map((f) => f.key);
-    assert.deepEqual(grouped, ['wagonWheel', 'pitchMap', 'shotCtrl', 'ballSpeed', 'bowlerType']);
+    // round 2 appended the wide / no-ball reason
+    assert.deepEqual(grouped, ['wagonWheel', 'pitchMap', 'shotCtrl', 'ballSpeed', 'bowlerType', 'extraWhy']);
     assert.deepEqual(trackingOf(s.rules), { pitch: true });
     assert.equal(trackingOf(STANDARD_RULES), undefined);
   });

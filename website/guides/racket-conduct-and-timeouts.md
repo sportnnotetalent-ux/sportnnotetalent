@@ -56,7 +56,7 @@ Timeouts never change the score.
 When the referee calls a let, tap **🔁 Let · Asha Rao asked** (the player who appealed) under the point buttons. The rally is replayed and nobody scores. The commentary shows "Let · Appeal by Asha Rao · rally replayed", and "Match stats" counts lets asked under **Referee decisions**. For a stroke or no let, tap **✋ Stroke → …** or **🚫 No let → …**; one tap scores the rally and records the decision.
 
 ## How long the match took
-On the **Score** tab, a line above the box score shows the time, for example "⏱ 1 h 05 min · G1 21 min · G2 18 min" (sets in tennis and padel). When the match ends, the time is added to the result line. It is worked out from when you tapped each point, so it shows only for matches scored with this version.
+On the **Stats** tab, a line above the box score shows the time, for example "⏱ 1 h 05 min · G1 21 min · G2 18 min" (sets in tennis and padel). When the match ends, the time is added to the result line. It is worked out from when you tapped each point, so it shows only for matches scored with this version.
 
 ## Common questions
 ### I gave the wrong penalty. How do I fix it?

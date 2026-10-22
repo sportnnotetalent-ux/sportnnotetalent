@@ -69,6 +69,7 @@ const CHOICES: Partial<Record<SportId, string[]>> = {
   baseball: ['9-0', '7-0'],
   american_football: ['1-0', '2-0'],
   rugby: ['28-0', '20-0', '5-0'],
+  rugby_league: ['24-0', '20-0', '4-0'],
   basketball: ['20-0', '2-0'],
   volleyball: ['3-0', '2-0'],
   kabaddi: ['10-0', '5-0'],

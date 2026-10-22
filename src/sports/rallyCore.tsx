@@ -300,28 +300,25 @@ export function makeRallyPlugin(opts: RallyOpts): SportPlugin<RallyState> {
     );
   };
 
-  const LiveExtras: NonNullable<SportPlugin<RallyState>['LiveExtras']> = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster, onPlayer }) => {
+  /** Match tabs (2026-10-22): the commentary on its own tab (pickleball
+   *  doubles' serve diagram, `ServeCourt`, sits on top of it); the stats on
+   *  Stats. The game scores are on the scoreboard header above every tab. */
+  type TabProps = Parameters<NonNullable<SportPlugin<RallyState>['LiveExtras']>>[0];
+  /** Deep wave — commentary by game, newest first (serve changes, side-outs /
+   *  hand-outs, lets and the change-ends cues inline). */
+  const Commentary = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster }: TabProps) => (
+    <RacketCommentary sport={opts.id} icon={opts.icon} state={state as RallyState} homeName={homeName} awayName={awayName} homeRoster={homeRoster} awayRoster={awayRoster} homeColor={homeColor} awayColor={awayColor} />
+  );
+  const Stats = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster, onPlayer }: TabProps) => {
     const s = state as RallyState;
     return (
       <View style={{ gap: theme.spacing(3) }}>
-        <Text style={ctrl.label}>Games</Text>
-        <View style={ctrl.gamesRow}>
-          {s.games.length === 0 ? (
-            <Text style={textStyles.muted}>Game 1 in progress…</Text>
-          ) : (
-            s.games.map((g, i) => <Text key={i} style={ctrl.gameChip}>G{i + 1}: {g[0]}-{g[1]}</Text>)
-          )}
-        </View>
         {/* SD-22 / deep wave: key stats, serve, shots, rally length — replayed from the point log, per game */}
         <MatchStatsPanel sport={opts.id} state={s} homeName={homeName} awayName={awayName} homeRoster={homeRoster} awayRoster={awayRoster} homeColor={homeColor} awayColor={awayColor} />
         {/* SD-54 — match and game durations (from the scorer's tap times) */}
         {durationLine(s.events, 'G') ? <Text style={textStyles.muted}>{durationLine(s.events, 'G')}</Text> : null}
         <Text style={ctrl.label}>Box score</Text>
         <MatchBoxScore sport={opts.id} source={rallyBox(s, { homeRoster, awayRoster }, opts.id)} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} onPlayer={onPlayer} />
-        {/* deep wave — commentary by game, newest first (replaces the rally log:
-            serve changes, side-outs / hand-outs, lets and the change-ends cues are inline) */}
-        <Text style={ctrl.label}>Commentary</Text>
-        <RacketCommentary sport={opts.id} icon={opts.icon} state={s} homeName={homeName} awayName={awayName} homeRoster={homeRoster} awayRoster={awayRoster} homeColor={homeColor} awayColor={awayColor} />
       </View>
     );
   };
@@ -381,7 +378,7 @@ export function makeRallyPlugin(opts: RallyOpts): SportPlugin<RallyState> {
     statTotalsPartial: true,
     statTotalsNeedsPlayers: true,
     ScoringControls,
-    LiveExtras,
+    matchTabs: { Commentary, Stats },
     // SD-107 / deep wave — "Stats to track": point detail, rally length (+ pickleball
     // kitchen line and 3rd shot) — event mode: from the next rally
     liveSettings: detailLiveSettings(opts.id) as SportPlugin<RallyState>['liveSettings'],

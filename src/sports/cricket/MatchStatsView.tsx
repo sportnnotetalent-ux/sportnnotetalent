@@ -69,7 +69,7 @@ export function CricketMatchStats({ state: s, homeName, awayName, homeColor = th
         <>
           {plan ? (
             <View style={st.chips}>
-              {(['all', 'pp', 'middle', 'death'] as PhaseFilter[]).filter((p) => p !== 'pp' || plan.pp > 0).map((p) => (
+              {(['all', ...plan.phases] as PhaseFilter[]).map((p) => (
                 <SelectChip key={p} label={p === 'all' ? 'Match' : p === 'pp' ? 'Powerplay' : p === 'middle' ? 'Middle' : 'Death'} active={phase === p} onPress={() => setPhase(p)} />
               ))}
             </View>
@@ -185,7 +185,7 @@ function Bowling({ s, side, onPlayer }: { s: CricketState; side: Side; onPlayer?
         {['O', 'R', 'W', 'Econ', 'Dot%'].map((h) => <Text key={h} style={[st.cNum, st.th]}>{h}</Text>)}
       </View>
       {rows.map((b) => {
-        const ph = plan ? (['pp', 'middle', 'death'] as Phase[]).filter((p) => (p !== 'pp' || plan.pp > 0) && b.phaseEcon[p] !== '–')
+        const ph = plan ? plan.phases.filter((p) => b.phaseEcon[p] !== '–')
           .map((p) => `${p === 'pp' ? 'PP' : p === 'middle' ? 'mid' : 'death'} ${b.phaseEcon[p]}`).join(' · ') : '';
         const extra = [
           b.type ?? '',
@@ -193,6 +193,7 @@ function Bowling({ s, side, onPlayer }: { s: CricketState; side: Side; onPlayer?
           ph ? `econ ${ph}` : '',
           b.falseShotPct ? `false shots ${b.falseShotPct}` : '',
           b.speed ? `${b.speed.avg} km/h avg · max ${b.speed.max}` : '',
+          b.extrasWhy ?? '',
         ].filter(Boolean).join(' · ');
         return (
           <View key={b.id} style={st.trow}>
@@ -221,8 +222,8 @@ function Phases({ s, sides, nameOf, colorOf }: { s: CricketState; sides: Side[];
       {sides.map((sd) => {
         const inn = (s.log ?? []).find((r) => r.side === sd && !r.cross)?.inn ?? 1;
         const plan = phasePlan(s, inn);
-        if (!plan) return <Text key={sd} style={st.empty}>{nameOf(sd)}: no phases for an innings this long / short.</Text>;
-        const phases = (['pp', 'middle', 'death'] as Phase[]).filter((p) => p !== 'pp' || plan.pp > 0);
+        if (!plan) return <Text key={sd} style={st.empty}>{nameOf(sd)}: no phases (an innings this long / short, or phases set to None in Match rules).</Text>;
+        const phases = plan.phases;
         return (
           <View key={sd} style={st.card}>
             <View style={st.cmpTeam}><View style={[st.dot, { backgroundColor: colorOf(sd) }]} /><Text style={st.team}>{nameOf(sd)} batting</Text></View>

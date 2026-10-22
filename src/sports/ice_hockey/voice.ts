@@ -10,7 +10,9 @@
  *   "full time" / "final" (the last period only).
  *   Deep wave — when that stat is tracked: "faceoff Rao" / "faceoff home",
  *   "hit Rao", "blocked shot Rao", "takeaway Rao", "giveaway Rao",
- *   "missed shot Rao" / "wide Rao".
+ *   "missed shot Rao" / "wide Rao". Round 2 — with faceoff zones tracked,
+ *   "faceoff Rao offensive zone" / "… neutral zone" / "… defensive zone"
+ *   (the winner's view; no zone said = none recorded).
  * Anything that closes a period or the match asks first (`iceHockeyVoiceEnds`).
  */
 import type { Player } from '../../core/types';
@@ -18,7 +20,8 @@ import type { ScoreAction, VoiceContext, VoiceEnding } from '../types';
 import { deburr, matchPlayer, resolveSide, withoutTeams } from '../voiceMatch.ts';
 import {
   creditAttribution, eventCredits, goalFlagsNow, goalieAt, matchSec, nextIsOvertime, periodLong, periodStarted, timeoutLeft,
-  tallyTracked, flagOf, FLAG_KEYS, INFRACTIONS, LIVE_KEYS, TRACK_FLAGS, type IceEvent, type IceHockeyState, type PenKind, type Side, type TallyKind,
+  tallyTracked, zonesTracked, flagOf, FLAG_KEYS, FO_ZONE_KEYS, INFRACTIONS, LIVE_KEYS, TRACK_FLAGS,
+  type FoZone, type IceEvent, type IceHockeyState, type PenKind, type Side, type TallyKind,
 } from './engine.ts';
 
 const TRACKED: string[] = LIVE_KEYS.filter((k) => k !== 'soTaken' && k !== 'soGoals');
@@ -30,6 +33,12 @@ const TALLY_WORDS: [TallyKind, RegExp][] = [
   ['takeaway', /\btake ?-?aways?\b/],
   ['giveaway', /\bgive ?-?aways?\b/],
   ['hit', /\bhits?\b|\bbody ?check(ed|s)?\b/],
+];
+/** round 2: the faceoff's zone, from the winner's view ("faceoff Rao offensive zone") */
+const ZONE_WORDS: [FoZone, RegExp][] = [
+  ['oz', /\b(offensive|attacking)( zone)?\b|\bo-? ?zone\b/],
+  ['nz', /\bneutral( zone)?\b|\bcent(er|re) ice\b/],
+  ['dz', /\bdefensive( zone)?\b|\bd-? ?zone\b/],
 ];
 const other = (s: Side): Side => (s === 'home' ? 'away' : 'home');
 const vid = (now: number, n = 0) => `v${now.toString(36)}${n || ''}${Math.random().toString(36).slice(2, 5)}`;
@@ -91,10 +100,13 @@ export function iceHockeyVoice(text: string, ctx: VoiceContext): ScoreAction[] |
   if (/\b(goalie|goaltender|keeper)\b.*\bback\b/.test(q)) return [{ type: 'BACK', side, payload: stamp() }];
   const tally = !/\bgoal\b/.test(q) ? TALLY_WORDS.find(([k, re]) => re.test(q) && tallyTracked(s, flagOf(k)))?.[0] : undefined;
   if (tally) {
-    const tracked = [...TRACKED, ...TRACK_FLAGS.filter((f) => tallyTracked(s, f)).flatMap((f) => FLAG_KEYS[f])];
-    const c = eventCredits({ type: 'tally', side, tally, playerId: player?.id, playerName: player?.fullName }, s.pimScale);
+    const zones = zonesTracked(s);
+    const tracked = [...TRACKED, ...TRACK_FLAGS.filter((f) => tallyTracked(s, f)).flatMap((f) => FLAG_KEYS[f]), ...(zones ? FO_ZONE_KEYS : [])];
+    // round 2: a zone said with a faceoff (zones tracked) — "faceoff Rao offensive zone"
+    const zone = tally === 'faceoff' && zones ? ZONE_WORDS.find(([, re]) => re.test(q))?.[0] : undefined;
+    const c = eventCredits({ type: 'tally', side, tally, playerId: player?.id, playerName: player?.fullName, ...(zone ? { zone } : {}) }, s.pimScale);
     const a1 = creditAttribution(c.first, 1, tracked);
-    return [{ type: 'TALLY', side, payload: { kind: tally, ...stamp() }, ...(a1 ? { attribution: a1 } : {}) }];
+    return [{ type: 'TALLY', side, payload: { kind: tally, ...(zone ? { zone } : {}), ...stamp() }, ...(a1 ? { attribution: a1 } : {}) }];
   }
   const pen = penKindOf(q);
   if (pen && !/\bgoal\b/.test(q)) {

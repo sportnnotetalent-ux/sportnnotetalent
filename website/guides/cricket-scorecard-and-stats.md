@@ -11,7 +11,7 @@ updated: 2026-10-11
 The scorecard shows who scored, when each wicket fell and which over turned the match. After the match, figures go to each player's profile and the tournament's leaders.
 
 ## Before you start
-- Anyone who can see the match can read it. Open the match and tap the **Scorecard** tab. Tap a team's name to open or close their innings.
+- Anyone who can see the match can read it. Open the match and tap the **Stats** tab; the **Scorecard** opens first. Tap a team's name to open or close their innings.
 
 ## The batting table
 - **R** runs, **B** balls faced, **4s** and **6s** boundaries, **SR** strike rate.

@@ -36,8 +36,10 @@ Score an ice hockey game on one phone. You run the clock and tap what happens; t
 ## Stats to track (optional)
 In **⚙️ Match settings → Stats to track** (organisers: the format) switch on **Faceoffs**, **Hits & blocked shots**, **Giveaways & takeaways** or **Missed shots**. Extra buttons appear under each team. **⚪ Faceoff won** is one tap: name the two centres once with **⚪ Centres … change**. For the others, tap the player or **Team (no name)**. Anything left off is never shown as 0.
 
+With **Faceoffs** on, you can also switch on **Faceoff zones**. Each **⚪ Faceoff won** then asks one more tap: where the draw was. The buttons name the end of the rink, so you can't get it backwards. If the Kings win a draw in the Wolves' end, tap **Wolves end**. For a draw at centre ice or the neutral-zone dots, tap **Neutral zone**, and for one in their own end, **Kings end**. Not sure? Tap **Skip the zone**. **Match stats** then shows each team's faceoffs won by zone, and player profiles show FO% in the offensive, neutral and defensive zones.
+
 ## Play-by-play and match stats
-The **Score** tab has **Play-by-play** (every moment by period with the score after each goal), **Match stats** (goals by strength, power play and penalty kill, power-play time, penalties by infraction, save %, faceoffs, by period), **Box score** and **Key moments**.
+The **Commentary** tab is the play-by-play (every moment by period with the score after each goal); tap **Key moments** to keep only the big ones. The **Stats** tab has **Match stats** (goals by strength, power play and penalty kill, power-play time, penalties by infraction, save %, faceoffs and faceoffs by zone, by period) and the **Box score**.
 
 ## How the penalty box works
 - Under the clock you see who is in the box and the time left, plus the strength, for example "5 v 4 · Lakeview Wolves power play".

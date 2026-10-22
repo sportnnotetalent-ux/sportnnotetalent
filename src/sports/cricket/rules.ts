@@ -7,7 +7,7 @@
  * changes are SET_RULES events (payloads use the same CONFIG keys), so past
  * balls keep the rules they were bowled under.
  */
-import type { FormatField, LiveSettings } from '../types';
+import type { FormatField, FormatValue, LiveSettings } from '../types';
 import type { CricketState } from './engine.ts';
 
 export interface CricketRules {
@@ -36,12 +36,48 @@ export interface CricketRules {
   shotCtrl?: true;
   ballSpeed?: true;
   bowlerType?: true;
+  /** Round 2 — "Stats to track": the reason for a wide / no-ball (a chip
+   *  after the extra). Present only when on. */
+  extraWhy?: true;
+  /** Round 2 — the stats PHASES (organiser options, phases.ts; not playing
+   *  rules — the format's `powerplayOvers` sets fielding restrictions):
+   *  powerplay overs (absent = the format's, 0 = none, N = overs 1–N) and the
+   *  death overs (absent = automatic, 0 = none, N = the last N). Present only
+   *  when the organiser chose something other than the default. */
+  phasePP?: number;
+  phaseDeath?: number;
+  /** Round 2 — fast short-pitched balls allowed per over (ICC playing
+   *  conditions; absent = the standard for the format: 1 up to 20 overs, else
+   *  2 — `bouncerLimit`; 0 = no limit). Drives the bouncer warning, which reads
+   *  the pitch map's "Bouncer" length. Present only when set. */
+  bouncerMax?: number;
 }
 
 /** Deep wave — the optional capture toggles ("Stats to track"), in chip order. */
-export const TRACK_KEYS = ['pitchMap', 'shotCtrl', 'ballSpeed', 'bowlerType'] as const;
+export const TRACK_KEYS = ['pitchMap', 'shotCtrl', 'ballSpeed', 'bowlerType', 'extraWhy'] as const;
 export type TrackKey = typeof TRACK_KEYS[number];
-const TRACK_WORD: Record<TrackKey, string> = { pitchMap: 'Pitch map', shotCtrl: 'Shot control', ballSpeed: 'Ball speed', bowlerType: 'Bowler type' };
+const TRACK_WORD: Record<TrackKey, string> = { pitchMap: 'Pitch map', shotCtrl: 'Shot control', ballSpeed: 'Ball speed', bowlerType: 'Bowler type', extraWhy: 'Wide / no-ball reason' };
+/** Round 2 — the organiser's option keys (stats phases, bouncer limit):
+ *  'auto' or absent = the standard default; a number = the choice. */
+export const OPTION_KEYS = ['phasePP', 'phaseDeath', 'bouncerMax'] as const;
+export type OptionKey = typeof OPTION_KEYS[number];
+const isAuto = (v: unknown) => v === undefined || v === null || v === '' || v === 'auto';
+/** A whole number 0–max, or undefined for the default ('auto' / absent / junk). */
+const optNum = (v: unknown, max: number): number | undefined => {
+  if (isAuto(v)) return undefined;
+  const n = Math.floor(Number(v));
+  return Number.isFinite(n) && n >= 0 ? Math.min(max, n) : undefined;
+};
+const OPTION_MAX: Record<OptionKey, number> = { phasePP: 50, phaseDeath: 50, bouncerMax: 6 };
+/** The option keys that are set (absent = the default, so older states keep their shape). */
+const optionsOn = (get: (k: OptionKey) => unknown): Partial<Pick<CricketRules, OptionKey>> => {
+  const out: Partial<Pick<CricketRules, OptionKey>> = {};
+  for (const k of OPTION_KEYS) {
+    const v = optNum(get(k), OPTION_MAX[k]);
+    if (v !== undefined) out[k] = v;
+  }
+  return out;
+};
 /** The capture keys that are on (absent keys = off, so the shape stays lean). */
 const trackOn = (get: (k: TrackKey) => unknown): Partial<Pick<CricketRules, TrackKey>> => {
   const out: Partial<Pick<CricketRules, TrackKey>> = {};
@@ -56,7 +92,7 @@ export const STANDARD_RULES: CricketRules = {
 
 /** Config (format / SET_RULES payload) keys. Two differ from CricketRules:
  *  byesAllowed ⇄ byes, legByesAllowed ⇄ legByes. The rest are identical. */
-export const RULE_CONFIG_KEYS = ['wideRuns', 'wideLegal', 'noBallRuns', 'noBallLegal', 'freeHit', 'stdLastOvers', 'byesAllowed', 'legByesAllowed', 'wagonWheel', 'retireAt', 'retireBack', ...TRACK_KEYS] as const;
+export const RULE_CONFIG_KEYS = ['wideRuns', 'wideLegal', 'noBallRuns', 'noBallLegal', 'freeHit', 'stdLastOvers', 'byesAllowed', 'legByesAllowed', 'wagonWheel', 'retireAt', 'retireBack', ...TRACK_KEYS, ...OPTION_KEYS] as const;
 
 const clamp05 = (v: unknown, d: number) => {
   const n = Math.floor(Number(v));
@@ -86,6 +122,8 @@ export function rulesFromConfig(config?: Record<string, unknown> | null): Cricke
     ...(retireOf(c.retireAt) > 0 ? { retireAt: retireOf(c.retireAt), retireBack: bool(c.retireBack, true) } : {}),
     // Deep wave — only when on (older states: no keys).
     ...trackOn((k) => bool(c[k], false)),
+    // Round 2 — only when not the default (older states: no keys).
+    ...optionsOn((k) => c[k]),
   };
 }
 
@@ -97,6 +135,7 @@ export function rulesToConfig(r: CricketRules = STANDARD_RULES): Record<string, 
     wagonWheel: r.wagonWheel,
     ...(r.retireAt ? { retireAt: r.retireAt, retireBack: r.retireBack !== false } : {}),
     ...trackOn((k) => r[k]),
+    ...optionsOn((k) => r[k]),
   };
 }
 
@@ -124,10 +163,11 @@ export function effectiveRules(s: Pick<CricketState, 'rules' | 'oversLimit' | 's
   return { ...r, wideRuns: STANDARD_RULES.wideRuns, wideLegal: STANDARD_RULES.wideLegal, noBallRuns: STANDARD_RULES.noBallRuns, noBallLegal: STANDARD_RULES.noBallLegal };
 }
 
-/** Standard playing rules? The wagon wheel is a capture setting, not a rule. */
+/** Standard playing rules? The wagon wheel is a capture setting, not a rule;
+ *  nor are the stats phases — but a bouncer limit is. */
 export const isStandard = (r: CricketRules) =>
   (Object.keys(STANDARD_RULES) as (keyof CricketRules)[]).every((k) => k === 'wagonWheel' || r[k] === STANDARD_RULES[k])
-  && !r.retireAt;
+  && !r.retireAt && r.bouncerMax === undefined;
 
 const runsWord = (n: number) => `${n} run${n === 1 ? '' : 's'}`;
 
@@ -143,8 +183,20 @@ export function rulesChip(r: CricketRules): string {
   if (!r.legByes) parts.push('no leg byes');
   if (r.stdLastOvers > 0) parts.push(`normal last ${r.stdLastOvers}`);
   if (r.retireAt) parts.push(`retire at ${r.retireAt}`);
+  if (r.bouncerMax !== undefined) parts.push(r.bouncerMax > 0 ? `${r.bouncerMax} bouncer${r.bouncerMax === 1 ? '' : 's'}/over` : 'no bouncer limit');
   return parts.join(' · ');
 }
+
+const oversWord = (n: number) => `${n} over${n === 1 ? '' : 's'}`;
+/** Round 2 — "Powerplay phase: overs 1–4" / "No powerplay phase" / "Powerplay phase: the format's". */
+export const phasePPText = (n?: number): string =>
+  (n === undefined ? 'Powerplay phase: the format’s' : n === 0 ? 'No powerplay phase' : `Powerplay phase: overs 1–${n}`);
+/** Round 2 — "Death phase: last 4 overs" / "No death phase" / "Death phase: automatic". */
+export const phaseDeathText = (n?: number): string =>
+  (n === undefined ? 'Death phase: automatic' : n === 0 ? 'No death phase' : `Death phase: last ${oversWord(n)}`);
+/** Round 2 — "Bouncers: 2 per over" / "No bouncer limit" / "Bouncer limit: standard". */
+export const bouncerText = (n?: number): string =>
+  (n === undefined ? 'Bouncer limit: standard' : n === 0 ? 'No bouncer limit' : `Bouncers: ${n} per over`);
 
 /** Timeline text for a rules change: "Wide 2 runs · counts as a ball". */
 export function describeRulesChange(prev: CricketRules, next: CricketRules): string {
@@ -171,6 +223,10 @@ export function describeRulesChange(prev: CricketRules, next: CricketRules): str
   if (prev.wagonWheel !== next.wagonWheel) parts.push(next.wagonWheel ? 'Wagon wheel on' : 'Wagon wheel off');
   // Deep wave
   for (const k of TRACK_KEYS) if (!!prev[k] !== !!next[k]) parts.push(`${TRACK_WORD[k]} ${next[k] ? 'on' : 'off'}`);
+  // Round 2 — organiser options
+  if (prev.phasePP !== next.phasePP) parts.push(phasePPText(next.phasePP));
+  if (prev.phaseDeath !== next.phaseDeath) parts.push(phaseDeathText(next.phaseDeath));
+  if (prev.bouncerMax !== next.bouncerMax) parts.push(bouncerText(next.bouncerMax));
   return parts.join(' · ');
 }
 
@@ -204,11 +260,34 @@ export const LOCAL_RULE_FIELDS: FormatField[] = [
   { key: 'shotCtrl', label: 'Shot control (beaten / edged)', type: 'toggle', default: false, advanced: true, hint: 'tap Beaten / Edged / Mistimed on a false shot — untagged balls count as in control', group: 'Stats to track' },
   { key: 'ballSpeed', label: 'Ball speed (speed gun)', type: 'toggle', default: false, advanced: true, hint: 'type the km/h after a ball', group: 'Stats to track' },
   { key: 'bowlerType', label: 'Bowler type (pace / spin)', type: 'toggle', default: false, advanced: true, hint: 'one tap per bowler — free when the profile has it', group: 'Stats to track' },
+  // Round 2 — why a wide / no-ball was called (an optional chip after the extra)
+  { key: 'extraWhy', label: 'Wide / no-ball reason', type: 'toggle', default: false, advanced: true, hint: 'tap why after a wide (down leg, outside off, over head) or a no-ball (front foot, height, bouncers, fielding)', group: 'Stats to track' },
+  // Round 2 — the stats phases (organiser options; the format's powerplay still sets fielding restrictions)
+  { key: 'phasePP', label: 'Stats phases — powerplay', type: 'choice', default: 'auto', advanced: true,
+    hint: 'splits the Stats tab and careers into powerplay / middle / death',
+    options: [
+      { value: 'auto', label: 'Format’s powerplay' }, { value: 0, label: 'None' },
+      ...[2, 3, 4, 5, 6, 8, 10, 15].map((n) => ({ value: n, label: `Overs 1–${n}` })),
+    ] },
+  { key: 'phaseDeath', label: 'Stats phases — death overs', type: 'choice', default: 'auto', advanced: true,
+    hint: 'automatic = the last quarter (T20 16–20; the last 10 from 40 overs up)',
+    options: [
+      { value: 'auto', label: 'Automatic' }, { value: 0, label: 'None' },
+      ...[1, 2, 3, 4, 5, 6, 8, 10].map((n) => ({ value: n, label: `Last ${oversWord(n)}` })),
+    ] },
+  // Round 2 — bouncers per over (ICC: 1 in T20, 2 in longer cricket); the warning reads the pitch map
+  { key: 'bouncerMax', label: 'Bouncers allowed per over', type: 'choice', default: 'auto', advanced: true,
+    hint: 'with the pitch map on, a warning once the limit is reached — the next bouncer is a no-ball',
+    options: [
+      { value: 'auto', label: 'Standard (T20 1 · longer 2)' }, { value: 0, label: 'No limit' },
+      ...[1, 2, 3].map((n) => ({ value: n, label: String(n) })),
+    ] },
 ];
 
-export const LOCAL_RULE_DEFAULTS: Record<string, number | boolean> = {
+export const LOCAL_RULE_DEFAULTS: Record<string, FormatValue> = {
   ...rulesToConfig(STANDARD_RULES), retireAt: 0, retireBack: true,
   ...Object.fromEntries(TRACK_KEYS.map((k) => [k, false])),
+  ...Object.fromEntries(OPTION_KEYS.map((k) => [k, 'auto'])),
 };
 
 /** Cricket's live settings (event mode): before ball 1 a change patches the
@@ -221,7 +300,10 @@ export const CRICKET_LIVE_SETTINGS: LiveSettings<CricketState> = {
   fields: LOCAL_RULE_FIELDS,
   read: (s) => {
     const r = rulesOf(s);
-    return { ...rulesToConfig(r), retireAt: r.retireAt ?? 0, retireBack: r.retireBack !== false, ...Object.fromEntries(TRACK_KEYS.map((k) => [k, !!r[k]])) };
+    return {
+      ...rulesToConfig(r), retireAt: r.retireAt ?? 0, retireBack: r.retireBack !== false, ...Object.fromEntries(TRACK_KEYS.map((k) => [k, !!r[k]])),
+      ...Object.fromEntries(OPTION_KEYS.map((k) => [k, r[k] ?? 'auto'])),
+    };
   },
   beforeStart: cricketBeforeStart,
   defaults: LOCAL_RULE_DEFAULTS,

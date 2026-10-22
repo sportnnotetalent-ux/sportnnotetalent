@@ -89,6 +89,25 @@ export const FLAG_KEYS: Record<TrackFlag, string[]> = {
   trackFaceoffs: ['faceoffWins', 'faceoffLosses'], trackPhysical: ['checks', 'shotBlocks'], trackPuck: ['giveaways', 'takeaways'], trackAttempts: ['missedShots'],
 };
 
+/** Round 2 — the faceoff ZONE (optional, only with Faceoffs tracked: its own
+ *  toggle `trackFaceoffZones`). Stored on the faceoff tally from the WINNER's
+ *  view: 'oz' = the winner's offensive zone (in the loser's end), 'nz' =
+ *  neutral, 'dz' = the winner's defensive zone (in the winner's own end). The
+ *  losing centre's zone is the mirror (oz ↔ dz, nz stays) — NHL play-by-play
+ *  reads the zone the same way ("won Off. Zone"). */
+export type FoZone = 'oz' | 'nz' | 'dz';
+export const FO_ZONES: FoZone[] = ['oz', 'nz', 'dz'];
+export const FO_ZONE_LABEL: Record<FoZone, string> = { oz: 'Offensive zone', nz: 'Neutral zone', dz: 'Defensive zone' };
+export const FO_ZONE_SHORT: Record<FoZone, string> = { oz: 'OZ', nz: 'NZ', dz: 'DZ' };
+export const isFoZone = (v: unknown): v is FoZone => v === 'oz' || v === 'nz' || v === 'dz';
+/** The same draw from the other side: offensive ↔ defensive, neutral stays. */
+export const mirrorZone = (z: FoZone): FoZone => (z === 'oz' ? 'dz' : z === 'dz' ? 'oz' : 'nz');
+const ZONE_SUFFIX: Record<FoZone, string> = { oz: 'Oz', nz: 'Nz', dz: 'Dz' };
+/** The per-zone key a faceoff credits ('faceoffWinsOz', 'faceoffLossesDz' …). */
+export const foZoneKey = (won: boolean, z: FoZone): string => `${won ? 'faceoffWins' : 'faceoffLosses'}${ZONE_SUFFIX[z]}`;
+/** every per-zone key (written only when the match tracked zones — keyed) */
+export const FO_ZONE_KEYS = ['faceoffWinsOz', 'faceoffWinsNz', 'faceoffWinsDz', 'faceoffLossesOz', 'faceoffLossesNz', 'faceoffLossesDz'] as const;
+
 export interface Who { id?: string; name?: string }
 
 export interface IceEvent {
@@ -124,6 +143,8 @@ export interface IceEvent {
    *  blocker / the team that gave it away / took it / shot wide; a faceoff's
    *  loser is `second…`, on the other side) */
   tally?: TallyKind;
+  /** round 2 — a faceoff's zone from the WINNER's view (zones tracked only) */
+  zone?: FoZone;
 }
 
 export interface SoShot { scored: boolean; playerId?: string; playerName?: string }
@@ -170,6 +191,8 @@ export interface IceHockeyState {
   trackPhysical?: boolean;
   trackPuck?: boolean;
   trackAttempts?: boolean;
+  /** round 2 — faceoff zones (one more tap per draw; only with Faceoffs) */
+  trackFaceoffZones?: boolean;
   shootout: { home: SoShot[]; away: SoShot[]; first: Side; sdFirst?: Side } | null;
   shootoutWinner?: Side;
   agg?: AggPrior;
@@ -213,6 +236,7 @@ export const init = (config?: Record<string, unknown>): IceHockeyState => {
     pimScale: config?.pimScale === 'nhl' ? 'nhl' : 'iihf',
     plusMinus: bool(config?.plusMinus, false),
     ...Object.fromEntries(TRACK_FLAGS.filter((f) => bool(config?.[f], false)).map((f) => [f, true])),
+    ...(bool(config?.trackFaceoffZones, false) ? { trackFaceoffZones: true } : {}),
     shootout: null,
     ...(aggPriorFromConfig(config) ? { agg: aggPriorFromConfig(config) } : {}),
   };
@@ -315,7 +339,7 @@ export type Credit = { playerId: string; playerName?: string; stats: Record<stri
 /** The stat-line credits one event writes: [primary, second, third]. A save
  *  is credited to the OTHER side's goalie (`side` on the credit). */
 export function eventCredits(
-  e: Pick<IceEvent, 'type' | 'side' | 'playerId' | 'playerName' | 'secondId' | 'secondName' | 'thirdId' | 'thirdName' | 'strength' | 'en' | 'ps' | 'gkId' | 'gkName' | 'pen' | 'tally'>,
+  e: Pick<IceEvent, 'type' | 'side' | 'playerId' | 'playerName' | 'secondId' | 'secondName' | 'thirdId' | 'thirdName' | 'strength' | 'en' | 'ps' | 'gkId' | 'gkName' | 'pen' | 'tally' | 'zone'>,
   scale: 'iihf' | 'nhl' = 'iihf',
 ): { first?: Credit; second?: Credit; third?: Credit } {
   const p = (stats: Record<string, number>) => (e.playerId ? { playerId: e.playerId, playerName: e.playerName, stats } : undefined);
@@ -344,9 +368,11 @@ export function eventCredits(
     }
     case 'tally': {
       if (!e.tally) return {};
+      // round 2: a faceoff's zone credits each centre's own zone (the loser's is the mirror)
+      const z = e.tally === 'faceoff' && isFoZone(e.zone) ? e.zone : undefined;
       const loser = e.tally === 'faceoff' && e.secondId
-        ? { playerId: e.secondId, playerName: e.secondName, stats: { faceoffLosses: 1 }, side: (e.side === 'home' ? 'away' : 'home') as Side } : undefined;
-      return { first: p({ [TALLY_KEY[e.tally]]: 1 }), second: loser };
+        ? { playerId: e.secondId, playerName: e.secondName, stats: { faceoffLosses: 1, ...(z ? { [foZoneKey(false, mirrorZone(z))]: 1 } : {}) }, side: (e.side === 'home' ? 'away' : 'home') as Side } : undefined;
+      return { first: p({ [TALLY_KEY[e.tally]]: 1, ...(z ? { [foZoneKey(true, z)]: 1 } : {}) }), second: loser };
     }
     default:
       return {};
@@ -681,7 +707,12 @@ export const reducer = (s: IceHockeyState, a: ScoreAction): IceHockeyState => {
       // deep wave: an optional tally (faceoff / hit / block / giveaway / takeaway / missed shot)
       const kind = a.payload?.kind as TallyKind;
       if (!side || !TALLY_KINDS.includes(kind)) return s;
-      return push(s, { type: 'tally', side, tally: kind, ...who1, ...(kind === 'faceoff' && p2?.playerId ? { secondId: p2.playerId, ...(p2.playerName ? { secondName: p2.playerName } : {}) } : {}) });
+      // round 2: a faceoff may carry its zone (winner's view); an unknown zone is ignored
+      const zone = kind === 'faceoff' && isFoZone(a.payload?.zone) ? (a.payload!.zone as FoZone) : undefined;
+      return push(s, {
+        type: 'tally', side, tally: kind, ...who1, ...(kind === 'faceoff' && p2?.playerId ? { secondId: p2.playerId, ...(p2.playerName ? { secondName: p2.playerName } : {}) } : {}),
+        ...(zone ? { zone } : {}),
+      });
     }
     case 'TIMEOUT': {
       if (!side) return s;
@@ -784,7 +815,9 @@ export function teamFigures(s: IceHockeyState, side: Side, scope: 'all' | number
 
 /** Deep wave — the manpower penalties that put the OTHER side on a power play
  *  at some point (more skaters by the penalties): a 4-on-4 from coincident
- *  minors isn't one, a double minor that outlasts its 4-on-4 is. PURE. */
+ *  minors isn't one, a double minor that outlasts its 4-on-4 is. Counted per
+ *  PENALTY (NHL convention, kept in round 2): a 5-on-3 from two penalties is
+ *  two opportunities. PURE. */
 export function ppOpportunities(s: IceHockeyState, endSec = Math.max(matchSec(s), ...s.events.map((e) => e.sec), 0)): BoxPen[] {
   const box = penaltyBox(s, endSec);
   const iv = box.all.filter((p) => !p.coincident && p.start != null).map((p) => ({ p, from: p.start!, to: Math.min(endSec, p.end ?? endSec) }));
@@ -819,6 +852,7 @@ export function standingsUnits(s: IceHockeyState): { overtime?: boolean; decided
 /** Deep wave — the "Stats to track" toggles (live settings + the match format). */
 export const TRACK_FIELDS: FormatField[] = [
   { key: 'trackFaceoffs', label: 'Faceoffs', type: 'toggle', default: false, group: 'Stats to track', hint: 'One tap per draw for the team that won it (name the centres once) — FO% by player' },
+  { key: 'trackFaceoffZones', label: 'Faceoff zones', type: 'toggle', default: false, group: 'Stats to track', hint: 'With Faceoffs on: one more tap per draw — in whose end it was (or neutral) — FO% by zone' },
   { key: 'trackPhysical', label: 'Hits & blocked shots', type: 'toggle', default: false, group: 'Stats to track', hint: 'Hit / Block buttons — who made it (optional)' },
   { key: 'trackPuck', label: 'Giveaways & takeaways', type: 'toggle', default: false, group: 'Stats to track', hint: 'Who lost / won the puck (optional)' },
   { key: 'trackAttempts', label: 'Missed shots (shot attempts)', type: 'toggle', default: false, group: 'Stats to track', hint: 'Shots wide / over the net — shot attempts with blocks' },
@@ -826,6 +860,10 @@ export const TRACK_FIELDS: FormatField[] = [
 /** Is this tally tracked in the match — its toggle on, or any recorded? */
 export const tallyTracked = (s: Pick<IceHockeyState, TrackFlag | 'events'>, f: TrackFlag): boolean =>
   s[f] === true || s.events.some((e) => e.type === 'tally' && !!e.tally && TRACK_KINDS[f].includes(e.tally));
+/** Round 2 — are faceoff zones tracked: the toggle on with Faceoffs tracked,
+ *  or any faceoff recorded with its zone? (Never on an old match.) */
+export const zonesTracked = (s: Pick<IceHockeyState, TrackFlag | 'trackFaceoffZones' | 'events'>): boolean =>
+  (s.trackFaceoffZones === true && tallyTracked(s, 'trackFaceoffs')) || s.events.some((e) => e.type === 'tally' && e.tally === 'faceoff' && isFoZone(e.zone));
 
 export const ICE_HOCKEY_LIVE_SETTINGS: LiveSettings<IceHockeyState> = {
   title: '⚙️ Match settings',
@@ -837,6 +875,6 @@ export const ICE_HOCKEY_LIVE_SETTINGS: LiveSettings<IceHockeyState> = {
     { key: 'plusMinus', label: 'Track +/- (who was on the ice at each goal)', type: 'toggle', default: false, group: 'Stats' },
     ...TRACK_FIELDS,
   ] as FormatField[],
-  read: (s) => ({ periodMinutes: s.periodMinutes, stopClock: s.stopClock, plusMinus: s.plusMinus, ...Object.fromEntries(TRACK_FLAGS.map((f) => [f, s[f] === true])) }),
-  defaults: { periodMinutes: 20, stopClock: true, plusMinus: false, ...Object.fromEntries(TRACK_FLAGS.map((f) => [f, false])) },
+  read: (s) => ({ periodMinutes: s.periodMinutes, stopClock: s.stopClock, plusMinus: s.plusMinus, ...Object.fromEntries(TRACK_FLAGS.map((f) => [f, s[f] === true])), trackFaceoffZones: s.trackFaceoffZones === true }),
+  defaults: { periodMinutes: 20, stopClock: true, plusMinus: false, ...Object.fromEntries(TRACK_FLAGS.map((f) => [f, false])), trackFaceoffZones: false },
 };

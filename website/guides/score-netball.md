@@ -59,7 +59,9 @@ Group matches keep a draw. In a knockout, a level score at the end of the fourth
 3. After the match, use [Correct a finished match](/guides/correct-a-finished-match/).
 
 ## What you get
-- **Score** tab: goals per quarter, then **Play-by-play** (every moment in words with the running score, by quarter), **Team stats** (shooting by GS and GA, centre passes and centre-pass-to-goal %, gains, intercepts, deflections, rebounds, turnovers by type and penalties, for the match or one quarter) and **Players** (each player's line).
+- The scoreboard shows goals per quarter on top of every tab.
+- **Commentary** tab: the play-by-play (every moment in words with the running score, by quarter).
+- **Stats** tab: **Team stats** (shooting by GS and GA, centre passes and centre-pass-to-goal %, gains, intercepts, deflections, rebounds, turnovers by type and penalties, for the match or one quarter) and **Players** (each player's line).
 - **Summary**: Player of the match and the top shooter.
 - Player profiles: goals, attempts, shooting %, goals per game, intercepts, quarters at each position and, where you tracked them, gains, centre pass receives and super shots.
 - Tournament tables use **World Netball 2-1-0** (ties on goal percentage, then goal difference, then head-to-head) or **Goal difference**. See [Points table and adjustments](/guides/points-table-and-adjustments/).

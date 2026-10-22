@@ -33,6 +33,7 @@ export type SportId =
   | 'handball'
   | 'ice_hockey'
   | 'rugby'
+  | 'rugby_league'
   | 'baseball'
   | 'netball'
   | 'american_football';

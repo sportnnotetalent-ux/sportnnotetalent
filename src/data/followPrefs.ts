@@ -29,8 +29,9 @@ export const ALERTS: Record<FollowType, AlertOption[]> = {
   player: [
     { key: 'reminder', label: 'Before they play', hint: 'At your reminder times (Settings → Match reminders)' },
     { ...START, hint: 'When their match goes live' },
-    { ...RESULT },
-    { key: 'scores', label: 'Goals, wickets & big moments', hint: 'Each time they score, in any sport' },
+    // timed races round 2: a heat they won (athletics, swimming, rowing, canoe) and a personal best now push too
+    { ...RESULT, hint: 'Who won — full time, a final locked, a heat they won, a golf round finished' },
+    { key: 'scores', label: 'Goals, wickets & big moments', hint: 'Each time they score, in any sport — and personal bests' },
   ],
   team: [{ ...START, hint: 'When the team’s match goes live' }, { ...RESULT }],
   tournament: [{ ...START, hint: 'When any match in it goes live' }, { ...RESULT }],

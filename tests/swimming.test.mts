@@ -296,7 +296,8 @@ describe('records per pool length, house table, careers', () => {
     assert.deepEqual(markKeyDiscipline('m_sw_100breast_sc'), { discipline: 'swim.100breast', course: 'SCM' });
     const rows = rankEntries(phases[0].entries, F50);
     const lines = phaseLines(phases[0].format, rows, eventAwards(rows));
-    assert.deepEqual(lines[0].stats, { place: 1, finals: 1, golds: 1, races: 1, posPoints: 8, mark: 33.1, m_sw_50free_lc: 33.1 });
+    // timed races round 2: a timed final's heats count as heats won — the winner won her heat too
+    assert.deepEqual(lines[0].stats, { place: 1, finals: 1, golds: 1, races: 1, heatWins: 1, posPoints: 8, mark: 33.1, m_sw_50free_lc: 33.1 });
     const rl = phaseLines(phases[1].format, rankEntries(phases[1].entries, MED4));
     assert.equal(rl.filter((l) => l.stats.relays === 1).length, 16); // 4 teams × 4 legs (the DQ team too: dq = 1)
     assert.equal(rl.find((l) => l.playerId === 'm30')!.stats.dq, 1);

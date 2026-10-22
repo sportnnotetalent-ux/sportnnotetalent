@@ -143,6 +143,8 @@ export function RallyPointEditor({
       if (was.atNet) item.atNet = was.atNet;
       if (was.rallyLen) item.rallyLen = was.rallyLen;
       if (typeof was.kmh === 'number') item.kmh = was.kmh;
+      // round 2 — and pickleball's 3rd shot (it was lost on an edited rally)
+      if (was.third) item.third = was.third;
     }
     if (draft.mode === 'edit') {
       commit(list.map((p, i) => (i === draft.index ? item : p)));

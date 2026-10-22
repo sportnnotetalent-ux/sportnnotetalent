@@ -8,13 +8,14 @@ order: 46
 updated: 2026-10-22
 ---
 
-Every cricket match now has three tabs: **Scorecard**, **Commentary** and **Stats**. The commentary and stats come from the balls you already score, so they cost the scorer nothing. If you want more depth, such as a pitch map or how often batters were beaten, switch it on under **Stats to track**. Every extra tap is optional.
+Every cricket match has the same tabs as every other sport: **Info**, **Commentary**, **Stats** (the **Scorecard** first, then **Match stats**), **Summary** and, for the scorer, **Scoring**. The score sits above all of them. The commentary and stats come from the balls you already score, so they cost the scorer nothing. If you want more depth, such as a pitch map or how often batters were beaten, switch it on under **Stats to track**. Every extra tap is optional.
 
 ## Before you start
 - Anyone who can see the match can read the Commentary and Stats tabs.
 - To track extra detail, you must score the match (a listed scorer or a host). Organisers can switch it on for a whole tournament under **⚙ Customize this format**.
 
 ## The Commentary tab
+- On top, **This over** shows the balls of the over in progress and, in a chase, what's still needed: runs, balls, the target, the required rate and the live DLS par.
 - Each ball reads like a broadcaster's commentary, for example "12.4 Bumrah to Kohli, FOUR, short of a length outside off, pulled to deep mid-wicket". The score after the ball is shown under it.
 - Balls are grouped by over, newest first. Each over shows its runs, the score, the run rate, the two batters, the bowler's figures and, in a chase, what's still needed.
 - Wickets show how the batter was out and their final line, for example "Kohli c Rahul b Bumrah 45 (31b 4x4 1x6) SR 145.16".
@@ -23,6 +24,7 @@ Every cricket match now has three tabs: **Scorecard**, **Commentary** and **Stat
 - The time of day appears on balls scored with the latest app.
 
 ## The Stats tab
+The **Scorecard** opens first (see [Read the scorecard and career stats](/guides/cricket-scorecard-and-stats/)). Tap **Match stats** for:
 - **Compare**: both teams side by side, with bars. It shows runs, run rate, 4s, 6s, boundary %, dot-ball %, scoring-shot %, balls per boundary, economy, how the wickets fell, extras and fielding. Pick **Powerplay**, **Middle** or **Death** to compare one phase.
 - **Batting** and **Bowling**: each player's strike rate, dot %, boundary %, economy in each phase, 4s and 6s conceded, wides and no-balls.
 - **Phases**: runs, run rate, dot % and boundaries for the powerplay, middle and death overs of each innings.

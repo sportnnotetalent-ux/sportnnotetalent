@@ -24,7 +24,7 @@
  *
  * PURE (no React Native) — node tests load it.
  */
-import type { Player } from '../core/types';
+import type { Player, StatLine } from '../core/types';
 
 /** The FIDE rating lists (B.02: standard, rapid, blitz). */
 export type RatingList = 'standard' | 'rapid' | 'blitz';
@@ -159,3 +159,31 @@ export function performance(gs: PerformanceGame[]): Performance {
 
 /** The line every ARO / TPR figure carries. */
 export const UNOFFICIAL_NOTE = 'Unofficial — not FIDE-rated. ARO / TPR use the ratings players entered on their profiles (FIDE B.02 table 8.1a).';
+
+/* -------------------- Round 2 · the TPR tournament leader -------------------- */
+
+/** Round 2 — a tournament's chess lines with the performance-rating keys the
+ *  `tpr` leader ranks by (chess/stats.ts): per line, the games played over the
+ *  board (`games` — forfeits are not games) against an opponent rated on the
+ *  event's list (`timeControl` → standard / rapid / blitz), that rating × the
+ *  games (`tprOppSum`) and the points scored (`tprPts`: wins + ½ draws). The
+ *  opponent is the match's other line. Unrated opponents add nothing (as in
+ *  ARO, C.07 art. 10.1); lines that gain nothing stay as they are, so the
+ *  leader shows only where ratings exist. Not stored — derived each time
+ *  from the ratings on the players' profiles (like the crosstable's TPR). */
+export function withChessPerformance(lines: StatLine[], players: Pick<Player, 'id' | 'sportDetails'>[], timeControl?: unknown): StatLine[] {
+  const list = ratingListFor(timeControl);
+  const rating = new Map(players.map((p) => [p.id, ratingOn(chessRatingsOf(p), list)] as const));
+  const byMatch = new Map<string, StatLine[]>();
+  for (const l of lines) if (l.sport === 'chess' && l.matchId) byMatch.set(l.matchId, [...(byMatch.get(l.matchId) ?? []), l]);
+  return lines.map((l) => {
+    if (l.sport !== 'chess' || !l.matchId) return l;
+    const games = Number(l.stats?.games) || 0;
+    if (games <= 0) return l;
+    const opp = (byMatch.get(l.matchId) ?? []).filter((x) => x.playerId !== l.playerId);
+    const r = opp.length === 1 ? rating.get(opp[0].playerId) : undefined;
+    if (r === undefined) return l;
+    const pts = (Number(l.stats.wins) || 0) + 0.5 * (Number(l.stats.draws) || 0);
+    return { ...l, stats: { ...l.stats, tprGames: games, tprOppSum: r * games, tprPts: pts } };
+  });
+}

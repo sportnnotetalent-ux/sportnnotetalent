@@ -81,6 +81,9 @@ export function carromFeed(s: CarromState, names: { home: string; away: string }
       if (dues.length) sub.push(`Dues — ${dues.join(' · ')}`);
       const qm = (['home', 'away'] as Side[]).filter((sd) => det?.qMiss?.[sd]).map((sd) => `${name(sd)}${(det!.qMiss![sd] ?? 0) > 1 ? ` ×${det!.qMiss![sd]}` : ''}`);
       if (qm.length) sub.push(`Queen pocketed, cover missed — ${qm.join(' · ')}`);
+      // Round 2 — ICF r.102–112: the board ended on the loser's foul
+      const ef = b?.endFoul;
+      if (ef && (ef.striker || ef.improper)) sub.push(`Ended on ${name(l)}'s foul — ${[ef.striker ? 'striker pocketed +1' : '', ef.improper ? 'foul stroke +1' : ''].filter(Boolean).join(', ')}`);
       items.push({
         id: `${g.game}-${r.n}`, text, score, side: w, ...(icon ? { icon } : {}), ...(big ? { big } : {}),
         ...(sub.length ? { sub: sub.join(' · ') } : {}), ...(b?.at ? { at: b.at } : {}),

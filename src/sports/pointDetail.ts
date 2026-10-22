@@ -50,6 +50,19 @@
  *     (pickleball), and pickleball's 3rd shot (`third`: drop / drive / lob);
  *   - capture switch `thirdDetail` (pickleball) beside the others.
  *
+ * Round 2 (founder's answers, racket family):
+ *   - serve speed may be typed and shown in mph (`speedUnit`, a match / format
+ *     option, default km/h); the log always stores km/h (`validSpeed`,
+ *     `speedText` convert on entry and display);
+ *   - badminton adds Jump smash and Block to its shots;
+ *   - rally-length buckets are an organiser option per sport
+ *     (`rallyBuckets` = a scheme id, RALLY_SCHEMES; the current buckets stay
+ *     the default). A point keeps the bucket it was tagged with, so an old
+ *     match (no scheme) reads exactly as before (`matchRallyBuckets`);
+ *   - pickleball's kitchen-line mark gains "Nobody got there" (`atNet:
+ *     'none'`), so kitchen ARRIVAL % can be read once a match has used it
+ *     (`arrivalTracked`).
+ *
  * PURE (no React Native): engines, statTotals, the panel and tests import it.
  */
 import type { LiveEvent } from './liveEvents';
@@ -156,7 +169,7 @@ export const DEPTH_SPORTS: readonly DepthSport[] = ['badminton', 'tabletennis', 
  *  is the same; a sport's list is `RACKET_SHOTS[sport]`). The ids that were
  *  SD-107 winner strokes keep their id, so their career keys carry on. */
 export type RShot =
-  | 'smash' | 'drop' | 'clear' | 'netShot' | 'netKill' | 'drive' | 'lift' | 'push' | 'serve'
+  | 'smash' | 'jumpSmash' | 'drop' | 'clear' | 'netShot' | 'netKill' | 'drive' | 'lift' | 'push' | 'serve'
   | 'receive' | 'flick' | 'chop' | 'loop' | 'block' | 'lob'
   | 'boast' | 'volley' | 'kill' | 'nick'
   | 'return' | 'x3' | 'bandeja' | 'vibora' | 'chiquita' | 'bajada' | 'wall'
@@ -165,10 +178,10 @@ export interface ShotDef { id: RShot; label: string; chip: string }
 const sh = (id: RShot, label: string, chip = label): ShotDef => ({ id, label, chip });
 /** Each sport's shot types, in chip order (federation / broadcast names). */
 export const RACKET_SHOTS: Record<DepthSport, readonly ShotDef[]> = {
-  // BWF
+  // BWF (round 2: + jump smash, + block — the defensive block of a smash)
   badminton: [
-    sh('smash', 'Smash'), sh('drop', 'Drop shot', 'Drop'), sh('clear', 'Clear'), sh('netShot', 'Net shot'), sh('netKill', 'Net kill'),
-    sh('drive', 'Drive'), sh('lift', 'Lift'), sh('push', 'Push'), sh('serve', 'Serve'),
+    sh('smash', 'Smash'), sh('jumpSmash', 'Jump smash'), sh('drop', 'Drop shot', 'Drop'), sh('clear', 'Clear'), sh('netShot', 'Net shot'), sh('netKill', 'Net kill'),
+    sh('drive', 'Drive'), sh('lift', 'Lift'), sh('push', 'Push'), sh('block', 'Block'), sh('serve', 'Serve'),
   ],
   // ITTF / WTT (the serve itself is Ace / Service fault)
   tabletennis: [
@@ -246,11 +259,18 @@ export const THIRD_SHOTS: readonly ThirdShot[] = ['drop', 'drive', 'lob'];
 export const THIRD_LABEL: Record<ThirdShot, string> = { drop: '3rd-shot drop', drive: '3rd-shot drive', lob: '3rd-shot lob' };
 const validThird = (v: unknown): ThirdShot | null | undefined => (v === null ? null : v === 'drop' || v === 'drive' || v === 'lob' ? v : undefined);
 
-/** SD-157 — who came to the net on a point. */
-export type NetMark = 'home' | 'away' | 'both';
+/** SD-157 — who came to the net on a point. Round 2: pickleball's kitchen
+ *  line may be marked 'none' — nobody got there (`hasNobodyMark`), which is
+ *  what lets kitchen ARRIVAL % be read. */
+export type NetMark = 'home' | 'away' | 'both' | 'none';
+/** Round 2 — the sports whose net mark offers "Nobody" (pickleball's kitchen line). */
+export const hasNobodyMark = (s: DetailSport | undefined) => s === 'pickleball';
 /** SD-157 — rally length buckets (shots in the rally, the serve included).
- *  Deep wave: each sport has its own three (`rallyBucketsOf`). */
-export type RallyBucket = '0-4' | '5-8' | '9+' | '5-10' | '11+' | '1-2' | '3-4' | '5+' | '0-5' | '6-15' | '16+';
+ *  Deep wave: each sport has its own three (`rallyBucketsOf`). Round 2: the
+ *  organiser may pick another standard set (RALLY_SCHEMES). */
+export type RallyBucket =
+  | '0-4' | '5-8' | '9+' | '5-10' | '11+' | '1-2' | '3-4' | '5+' | '0-5' | '6-15' | '16+'
+  | '1-3' | '4-6' | '7-9' | '10+' | '0-10' | '11-20' | '21+' | '5-6' | '7+';
 /** Tennis' buckets (SD-157). */
 export const RALLY_BUCKETS: readonly RallyBucket[] = ['0-4', '5-8', '9+'];
 export const RALLY_LABEL: Record<RallyBucket, string> = {
@@ -258,37 +278,126 @@ export const RALLY_LABEL: Record<RallyBucket, string> = {
   '5-10': '5–10 shots', '11+': '11+ shots',
   '1-2': '1–2 shots', '3-4': '3–4 shots', '5+': '5+ shots',
   '0-5': '0–5 shots', '6-15': '6–15 shots', '16+': '16+ shots',
+  '1-3': '1–3 shots', '4-6': '4–6 shots', '7-9': '7–9 shots', '10+': '10+ shots',
+  '0-10': '0–10 shots', '11-20': '11–20 shots', '21+': '21+ shots',
+  '5-6': '5–6 shots', '7+': '7+ shots',
 };
 /** Deep wave — each sport's rally-length buckets (one scorer can count them):
  *  tennis / padel / pickleball 0–4 · 5–8 · 9+; badminton 0–4 · 5–10 · 11+;
  *  table tennis the three phases 1–2 (serve, receive) · 3–4 (3rd, 4th ball)
- *  · 5+ (rally); squash 0–5 · 6–15 · 16+. */
+ *  · 5+ (rally); squash 0–5 · 6–15 · 16+. Round 2: these are the DEFAULT
+ *  scheme of each sport (RALLY_SCHEMES). */
 export const RALLY_BUCKETS_OF: Record<DetailSport, readonly RallyBucket[]> = {
   tennis: RALLY_BUCKETS, padel: RALLY_BUCKETS, pickleball: RALLY_BUCKETS,
   badminton: ['0-4', '5-10', '11+'],
   tabletennis: ['1-2', '3-4', '5+'],
   squash: ['0-5', '6-15', '16+'],
 };
-export const rallyBucketsOf = (sport: DetailSport): readonly RallyBucket[] => RALLY_BUCKETS_OF[sport];
+
+/** Round 2 — a standard set of rally-length buckets an organiser can pick
+ *  (format / Scoring settings `rallyBuckets` = its id). */
+export interface RallyScheme { id: string; label: string; buckets: readonly RallyBucket[] }
+/** The default scheme's id (every sport): the deep-wave buckets above. */
+export const DEFAULT_RALLY_SCHEME = 'std';
+/** Finer, four buckets — the tennis Match Charting Project's (Tennis Abstract). */
+const chart = (note: string): RallyScheme => ({ id: 'chart', label: `1–3 · 4–6 · 7–9 · 10+ (${note})`, buckets: ['1-3', '4-6', '7-9', '10+'] });
+/** Round 2 — each sport's rally-length schemes, the default first (the
+ *  buckets every match used before this option existed). */
+export const RALLY_SCHEMES: Record<DetailSport, readonly RallyScheme[]> = {
+  tennis: [{ id: 'std', label: '0–4 · 5–8 · 9+ (ATP standard)', buckets: RALLY_BUCKETS }, chart('Match Charting')],
+  padel: [{ id: 'std', label: '0–4 · 5–8 · 9+ (standard)', buckets: RALLY_BUCKETS }, chart('finer')],
+  pickleball: [{ id: 'std', label: '0–4 · 5–8 · 9+ (standard)', buckets: RALLY_BUCKETS }, chart('finer')],
+  badminton: [{ id: 'std', label: '0–4 · 5–10 · 11+ (standard)', buckets: RALLY_BUCKETS_OF.badminton }, chart('finer')],
+  // table tennis: the three-phase method, or the four-phase one (5–6
+  // transition, 7+ stalemate) — serve & 3rd ball / receive & 4th ball stay
+  tabletennis: [
+    { id: 'std', label: '1–2 · 3–4 · 5+ (three phases)', buckets: RALLY_BUCKETS_OF.tabletennis },
+    { id: 'four', label: '1–2 · 3–4 · 5–6 · 7+ (four phases)', buckets: ['1-2', '3-4', '5-6', '7+'] },
+  ],
+  // squash: school-length rallies, or the long rallies of senior / PSA play
+  squash: [
+    { id: 'std', label: '0–5 · 6–15 · 16+ (standard)', buckets: RALLY_BUCKETS_OF.squash },
+    { id: 'long', label: '0–10 · 11–20 · 21+ (long rallies)', buckets: ['0-10', '11-20', '21+'] },
+  ],
+};
+/** The scheme `id` names for `sport` (unknown / absent → the default). */
+export const rallySchemeOf = (sport: DetailSport, id?: unknown): RallyScheme =>
+  RALLY_SCHEMES[sport].find((x) => x.id === id) ?? RALLY_SCHEMES[sport][0];
+/** The buckets of `sport` — its default scheme, or the scheme `scheme` names. */
+export const rallyBucketsOf = (sport: DetailSport, scheme?: unknown): readonly RallyBucket[] => rallySchemeOf(sport, scheme).buckets;
+/** A bucket's lower and upper shot counts ('9+' → [9, ∞]). */
+const bucketRange = (b: RallyBucket): [number, number] => {
+  const m = /^(\d+)(?:-(\d+)|\+)$/.exec(b);
+  return m ? [Number(m[1]), m[2] ? Number(m[2]) : Infinity] : [0, 0];
+};
+const byLength = (a: RallyBucket, b: RallyBucket) => bucketRange(a)[0] - bucketRange(b)[0] || bucketRange(a)[1] - bucketRange(b)[1];
+/** Every bucket any scheme of `sport` offers (valid on a point; declared in
+ *  the schema; career rows), the default scheme's first. */
+export const allRallyBuckets = (sport: DetailSport): RallyBucket[] =>
+  [...new Set(RALLY_SCHEMES[sport].flatMap((x) => x.buckets))];
+/** The buckets a match reads with: its scheme's, plus any other bucket of the
+ *  sport its points carry (the scheme changed mid-match), by length. An old
+ *  match (no scheme) → the default buckets, as before. */
+export function matchRallyBuckets(sport: DetailSport, s: { rallyBuckets?: unknown; events?: LiveEvent[] } | null | undefined): RallyBucket[] {
+  const base = rallyBucketsOf(sport, s?.rallyBuckets);
+  const used = new Set((s?.events ?? []).map((e) => e.rallyLen).filter(Boolean));
+  const extra = allRallyBuckets(sport).filter((b) => used.has(b) && !base.includes(b));
+  return extra.length ? [...base, ...extra].sort(byLength) : [...base];
+}
 /** A bucket's career-key stem: '0-4' → rl04, '9+' → rl9, '5-10' → rl510. */
 export const rallyKey = (b: RallyBucket): string => `rl${b.replace(/[-+]/g, '')}`;
-/** Table tennis' names for its buckets (the three-phase analysis). */
-export const TT_PHASE_LABEL: Partial<Record<RallyBucket, string>> = { '1-2': 'Serve & receive (1–2)', '3-4': '3rd & 4th ball (3–4)', '5+': 'Rally (5+)' };
+/** Table tennis' names for its buckets (the three-phase analysis; round 2:
+ *  the four-phase one's transition and stalemate). */
+export const TT_PHASE_LABEL: Partial<Record<RallyBucket, string>> = {
+  '1-2': 'Serve & receive (1–2)', '3-4': '3rd & 4th ball (3–4)', '5+': 'Rally (5+)', '5-6': 'Transition (5–6)', '7+': 'Stalemate (7+)',
+};
 /** SD-157 — plausible serve speeds (km/h): a slow junior serve up to just
  *  over the fastest ever recorded (263 km/h). Outside it the value is refused. */
 export const KMH_MIN = 30;
 export const KMH_MAX = 270;
+const toNumber = (v: unknown): number => (typeof v === 'string' ? (v.trim() ? Number(v.trim().replace(',', '.')) : NaN) : typeof v === 'number' ? v : NaN);
 /** A valid speed (rounded to a whole km/h), else undefined. */
 export function validKmh(v: unknown): number | undefined {
-  const n = typeof v === 'string' ? (v.trim() ? Number(v.trim().replace(',', '.')) : NaN) : typeof v === 'number' ? v : NaN;
+  const n = toNumber(v);
   if (!Number.isFinite(n)) return undefined;
   const r = Math.round(n);
   return r >= KMH_MIN && r <= KMH_MAX ? r : undefined;
 }
-const validNet = (v: unknown): NetMark | null | undefined => (v === null ? null : v === 'home' || v === 'away' || v === 'both' ? v : undefined);
-/** A bucket of `sport` (tennis when none is named — the tennis engine's call). */
+
+/** Round 2 — the unit serve speeds are typed and shown in (a match / format
+ *  option, `speedUnit`; default km/h). The log always stores km/h. */
+export type SpeedUnit = 'kmh' | 'mph';
+export const SPEED_UNITS: readonly SpeedUnit[] = ['kmh', 'mph'];
+export const SPEED_UNIT_LABEL: Record<SpeedUnit, string> = { kmh: 'km/h', mph: 'mph' };
+export const KMH_PER_MPH = 1.609344;
+/** The mph range that matches KMH_MIN–KMH_MAX (19 mph ≈ 31 km/h, 168 mph ≈ 270 km/h). */
+export const MPH_MIN = 19;
+export const MPH_MAX = 168;
+/** A match state's speed unit (anything but 'mph' reads km/h). */
+export const speedUnitOf = (s: unknown): SpeedUnit => ((s as { speedUnit?: unknown } | null | undefined)?.speedUnit === 'mph' ? 'mph' : 'kmh');
+/** The typing range in `unit`. */
+export const speedRange = (unit: SpeedUnit): [number, number] => (unit === 'mph' ? [MPH_MIN, MPH_MAX] : [KMH_MIN, KMH_MAX]);
+/** A typed speed in `unit` → the whole km/h to store, else undefined (out of
+ *  range). mph is rounded to a whole mph first, so what was typed reads back. */
+export function validSpeed(v: unknown, unit: SpeedUnit = 'kmh'): number | undefined {
+  if (unit === 'kmh') return validKmh(v);
+  const n = toNumber(v);
+  if (!Number.isFinite(n)) return undefined;
+  const r = Math.round(n);
+  return r >= MPH_MIN && r <= MPH_MAX ? validKmh(r * KMH_PER_MPH) : undefined;
+}
+/** A stored km/h in `unit`, whole (averages included). */
+export const speedIn = (kmh: number, unit: SpeedUnit = 'kmh'): number => Math.round(unit === 'mph' ? kmh / KMH_PER_MPH : kmh);
+/** "193 km/h" / "120 mph"; '–' for none. */
+export const speedText = (kmh: number | undefined, unit: SpeedUnit = 'kmh'): string =>
+  (kmh === undefined ? '–' : `${speedIn(kmh, unit)} ${SPEED_UNIT_LABEL[unit]}`);
+
+const validNet = (v: unknown, sport?: DetailSport): NetMark | null | undefined =>
+  (v === null ? null : v === 'home' || v === 'away' || v === 'both' ? v : v === 'none' && hasNobodyMark(sport) ? 'none' : undefined);
+/** A bucket of `sport` (tennis when none is named — the tennis engine's call):
+ *  any of its schemes' (the capture offers the match's). */
 const validRally = (v: unknown, sport: DetailSport = 'tennis'): RallyBucket | null | undefined =>
-  (v === null ? null : typeof v === 'string' && (RALLY_BUCKETS_OF[sport] as readonly string[]).includes(v) ? v as RallyBucket : undefined);
+  (v === null ? null : typeof v === 'string' && (allRallyBuckets(sport) as readonly string[]).includes(v) ? v as RallyBucket : undefined);
 const validKmhOrNull = (v: unknown): number | null | undefined => (v === null ? null : validKmh(v));
 
 /** Stroke and error-type ids → labels (one map for every sport). */
@@ -531,6 +640,8 @@ const validPd = (v: unknown, sport?: DetailSport): PointDetail | null | undefine
  * Deep wave — `sport` names the engine's sport (absent = tennis, as the
  * tennis engine calls it): its shots and rally buckets are the valid ones;
  * payload.third (pickleball 3rd shot: 'drop' / 'drive' / 'lob') as atNet.
+ * Round 2 — rallyLen: any bucket of the sport's schemes; pickleball's atNet
+ * may be 'none' (nobody got to the kitchen line).
  */
 export function applyPointDetail(events: LiveEvent[], payload: Record<string, unknown> | undefined, sport?: DetailSport): LiveEvent[] | null {
   let i = events.length - 1;
@@ -540,7 +651,7 @@ export function applyPointDetail(events: LiveEvent[], payload: Record<string, un
   if (e.df) return null;
   const pd = validPd(payload?.pd, sport);
   const sv = payload?.serve === 1 || payload?.serve === 2 ? payload.serve : undefined;
-  const net = validNet(payload?.atNet);
+  const net = validNet(payload?.atNet, sport);
   const rl = validRally(payload?.rallyLen, sport);
   const kmh = validKmhOrNull(payload?.kmh);
   const third = sport === 'pickleball' ? validThird(payload?.third) : undefined;
@@ -580,24 +691,39 @@ export function annotationsOf(p: { pd?: PointDetail; atNet?: NetMark; rallyLen?:
  *  pickleball's 3rd shot (`thirdDetail`). */
 export const DETAIL_FLAG_KEYS = ['pointDetail', 'serveDetail', 'netDetail', 'rallyDetail', 'speedDetail', 'thirdDetail'] as const;
 export type DetailFlagKey = typeof DETAIL_FLAG_KEYS[number];
-export type DetailFlags = Partial<Record<DetailFlagKey, boolean>>;
+
+/** Round 2 — the capture OPTIONS beside the switches (format keys and
+ *  SET_DETAIL payload keys): the serve-speed unit (tennis) and the
+ *  rally-length scheme (every racket sport). Absent = the default. */
+export interface DetailOptions { speedUnit?: SpeedUnit; rallyBuckets?: string }
+export type DetailFlags = Partial<Record<DetailFlagKey, boolean>> & DetailOptions;
 
 /** `SET_DETAIL` — the scorer's capture settings (event mode: applies from the
- *  next point; earlier points keep what they had). Returns the flags patch. */
+ *  next point; earlier points keep what they had). Returns the flags patch.
+ *  Round 2: `speedUnit` ('kmh' / 'mph' — display and typing only, the log is
+ *  km/h) and `rallyBuckets` (a scheme id; points already tagged keep theirs). */
 export function detailFlags(payload: Record<string, unknown> | undefined, cur: DetailFlags): DetailFlags | null {
   const out: DetailFlags = {};
   for (const k of DETAIL_FLAG_KEYS) {
     const v = payload?.[k];
     if (typeof v === 'boolean' && v !== !!cur[k]) out[k] = v;
   }
+  const u = payload?.speedUnit;
+  if ((u === 'kmh' || u === 'mph') && u !== (cur.speedUnit ?? 'kmh')) out.speedUnit = u;
+  const rb = payload?.rallyBuckets;
+  if (typeof rb === 'string' && rb && rb !== (cur.rallyBuckets ?? DEFAULT_RALLY_SCHEME)) out.rallyBuckets = rb;
   return Object.keys(out).length ? out : null;
 }
 
 /** The flags `init` reads from a match format (absent unless switched on, so
- *  an old match's state is unchanged). */
-export function initDetailFlags(config?: Record<string, unknown>): Partial<Record<DetailFlagKey, true>> {
-  const out: Partial<Record<DetailFlagKey, true>> = {};
+ *  an old match's state is unchanged). Round 2: a non-default speed unit /
+ *  rally scheme too (the default leaves the state as it was). */
+export function initDetailFlags(config?: Record<string, unknown>): Partial<Record<DetailFlagKey, true>> & DetailOptions {
+  const out: Partial<Record<DetailFlagKey, true>> & DetailOptions = {};
   for (const k of DETAIL_FLAG_KEYS) if (config?.[k] === true) out[k] = true;
+  if (config?.speedUnit === 'mph') out.speedUnit = 'mph';
+  const rb = config?.rallyBuckets;
+  if (typeof rb === 'string' && rb && rb !== DEFAULT_RALLY_SCHEME) out.rallyBuckets = rb;
   return out;
 }
 
@@ -639,18 +765,26 @@ export const rallyTracked = (s: Tracks): boolean =>
 /** SD-157 — did this match track serve speed? */
 export const speedTracked = (s: Tracks): boolean =>
   !!s && (s.speedDetail === true || (s.events ?? []).some((e) => typeof e.kmh === 'number'));
+/** Round 2 — did this (pickleball) match track kitchen ARRIVAL? Only once a
+ *  rally was marked "Nobody got there": before that chip an unmarked rally
+ *  may have meant nobody, so an older match never reads a false 100%. */
+export const arrivalTracked = (s: { events?: LiveEvent[] } | null | undefined): boolean =>
+  !!s && (s.events ?? []).some((e) => e.atNet === 'none');
 
 /** SD-157 — the net mark after the scorer toggles `side` on `cur` (both on →
- *  'both'; none → null, which clears it). */
+ *  'both'; none → null, which clears it). Round 2: a side replaces "Nobody". */
 export function toggleNet(cur: NetMark | undefined, side: Side): NetMark | null {
-  const on = new Set<Side>(cur === 'both' ? ['home', 'away'] : cur ? [cur] : []);
+  const on = new Set<Side>(cur === 'both' ? ['home', 'away'] : cur === 'home' || cur === 'away' ? [cur] : []);
   if (on.has(side)) on.delete(side); else on.add(side);
   return on.size === 2 ? 'both' : on.size === 1 ? [...on][0] : null;
 }
+/** Round 2 — the mark after the scorer taps "Nobody" (again → cleared). */
+export const toggleNobody = (cur: NetMark | undefined): NetMark | null => (cur === 'none' ? null : 'none');
 
 /** SD-157 — the sides at the net on a point (`atNet`; a legacy `pd.net` =
- *  the point winner). `winner` = who won the point. */
+ *  the point winner). `winner` = who won the point. 'none' → nobody. */
 export function netSides(p: { atNet?: NetMark; pd?: PointDetail }, winner: Side | undefined): Side[] {
+  if (p.atNet === 'none') return [];
   if (p.atNet === 'both') return ['home', 'away'];
   if (p.atNet === 'home' || p.atNet === 'away') return [p.atNet];
   return p.pd?.net === true && winner ? [winner] : [];

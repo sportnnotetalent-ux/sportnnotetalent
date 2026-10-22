@@ -91,6 +91,7 @@ export const FLOW_CONTROLS: Partial<Record<SportId, MatchAction[]>> = {
   baseball: ['fullTime'],
   american_football: ['endPeriod', 'fullTime'],
   rugby: ['endPeriod', 'fullTime'],
+  rugby_league: ['endPeriod', 'fullTime'],
 };
 
 /** Field / timed events run on their own screens; their finish lives at the

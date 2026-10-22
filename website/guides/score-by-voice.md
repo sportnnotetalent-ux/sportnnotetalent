@@ -3,7 +3,7 @@ title: Score a match by voice
 description: Call the play out loud (or type it) and the app logs it. Every call can wait for your tap, and ending a period or the match always asks first.
 category: Live scoring
 audience: Scorers
-sports: football, cricket, basketball, volleyball, kabaddi, hockey, handball, netball, rugby, ice hockey, tennis, badminton, table tennis, squash, padel, pickleball, carrom, golf
+sports: football, cricket, basketball, volleyball, kabaddi, hockey, handball, netball, rugby, rugby league, ice hockey, tennis, badminton, table tennis, squash, padel, pickleball, carrom, golf
 order: 35
 updated: 2026-10-11
 ---
@@ -41,6 +41,7 @@ Football's own voice panel asks back ("who scored?"); its "end half" and "full t
 - **Handball**: "goal Rao" (9 m unless you say "wing", "7 m"…), "7 m saved Rao", "two minutes Rao", "end half".
 - **Netball**: "goal GS", "miss GA", "intercept Rao", "centre home", "end quarter".
 - **Rugby**: "try Rao", "conversion good", "penalty goal Khan", "yellow Rao", "end half".
+- **Rugby league**: "try Rao assist Khan", "conversion good", "field goal Khan", "sin bin Rao", "tackle", "six again", "end half".
 - **Ice hockey**: "goal Rao assist Khan", "penalty two minutes tripping Rao", "save home", "end period".
 - **Tennis, badminton, table tennis, squash, padel, pickleball**: "point home", "Rao scores", "ace Rao", "double fault Rao" (tennis).
 - **Carrom**: the board winner and the coins left, for example "board home 5" or "Rao 3 queen". "Penalty home" gives a penalty board.

@@ -13,7 +13,7 @@ Score a football match on one phone. The app runs the clock, stamps each moment'
 ## Before you start
 - You must be a scorer or host of the match or its tournament. See [Scorers and officials](/guides/scorers-and-officials/) and [Only one phone scores at a time](/guides/one-scorer-at-a-time/).
 - The organiser picks the format (**11-a-side**, **7-a-side**, **5s turf**, **Futsal** or **Custom**) and **If level at full time**.
-- Set both lineups on the **Lineups** tab with **Set lineup & formation**. Use **Arrange on pitch (optional)** to put your keeper in the GK spot.
+- Set both lineups on the **Info** tab, under the matchday squads, with **Set lineup & formation**. Use **Arrange on pitch (optional)** to put your keeper in the GK spot.
 
 ## Step by step: kick off and score
 1. Open the match → **Scoring** and tap **Kick off**. Joined late? Type the minute under "Already underway?" first.
@@ -29,8 +29,9 @@ Score a football match on one phone. The app runs the clock, stamps each moment'
 Minutes count the FIFA way: 10 minutes 30 seconds in is 11', and added time is 45+2' or 90+3', never 47'. Older matches keep their stamped minutes.
 
 ## Commentary, team stats and the box score
-- The **Commentary** tab is the live text, half by half and newest first: every moment as a sentence ("Attempt saved. Arjun (Red House) shot from outside the box is saved by Rohan.") with its minute and the score after it. A match summary (scorers, red cards, HT) sits on top; **Key events** keeps goals, cards, subs and penalties.
-- The **Stats** tab groups the team stats like a broadcast match centre: **Top stats**, **Attack**, **Passing**, **Defence**, **Goalkeeping**, **Set pieces**, **Discipline**, for the whole match or one half ("Not tracked" lists what's switched off). Each box score lists starters (*), then substitutes, with a **Totals** row and a **#** column when the squad has numbers.
+- The **Commentary** tab is the live text, half by half and newest first: every moment as a sentence ("Attempt saved. Arjun (Red House) shot from outside the box is saved by Rohan.") with its minute and the score after it. **Key events** keeps goals, cards, subs and penalties.
+- The **Stats** tab groups the team stats like a broadcast match centre: **Top stats**, **Attack**, **Passing**, **Defence**, **Goalkeeping**, **Set pieces**, **Discipline**, for the whole match or one half ("Not tracked" lists what's switched off). Each box score lists starters (*), then substitutes, with a **Totals** row and a **#** column when the squad has numbers. Game flow (biggest lead, goals in a row) is at the bottom.
+- The **Summary** tab has the result with the match facts (scorers, red cards, HT), Player of the Match and every player's rating.
 
 ## Deeper stats (optional)
 Off by default, so scoring stays one tap per moment. Switch any on in **⚙️ Scoring settings → Deeper stats** (organisers: **⚙ Customize this format**):

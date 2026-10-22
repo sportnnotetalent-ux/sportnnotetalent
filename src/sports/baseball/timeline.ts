@@ -2,7 +2,7 @@
  *  scorer's correction list. PURE. */
 import type { LiveEvent } from '../liveEvents';
 import {
-  OUTCOME_LABEL, RUNNER_LABEL, halfShort, inningOf, isTop,
+  BATTED_BALL_LABEL, OUTCOME_LABEL, RUNNER_LABEL, halfShort, inningOf, isTop,
   type BaseballEvent, type BaseballState, type Move, type Outcome, type RunnerKind,
 } from './engine.ts';
 
@@ -31,6 +31,8 @@ export function describeEvent(e: BaseballEvent): { icon: string; label: string; 
         e.batter?.name,
         e.fielders ? `(${e.fielders})` : '',
         e.zone ? `→ ${e.zone}` : '',
+        // round 2: the tapped batted-ball type ("line drive")
+        e.btype ? BATTED_BALL_LABEL[e.btype].toLowerCase() : '',
         e.rbi ? `${e.rbi} RBI` : '',
         ...runners,
       ].filter(Boolean).join(' · ');

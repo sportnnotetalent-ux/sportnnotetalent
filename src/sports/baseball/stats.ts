@@ -13,8 +13,14 @@
  *  scoring position → AVG with RISP, two-out RBI), GO / AO and inherited
  *  runners – scored, and — pitch by pitch only — strikes / balls thrown
  *  (strike %), first-pitch strikes (first-pitch strike %). The pitching box
- *  gains a P-S (pitches-strikes) pair. */
-import type { Qualifier, SportStatSchema } from '../statSchema.ts';
+ *  gains a P-S (pitches-strikes) pair.
+ *
+ *  Round 2 — batted-ball type (only games that tracked it, keyed): batters'
+ *  ground balls / line drives / fly balls / popups and the same allowed by
+ *  pitchers, with GB % / LD % / FB % / PU % (Statcast: each over all typed
+ *  batted balls, popups their own family; house minimum 30 batted balls).
+ *  GO-AO now counts a sacrifice bunt as a ground out (founder). */
+import type { Qualifier, SportStatSchema, StatDef } from '../statSchema.ts';
 
 /** House minimums (organisers can change them, leaderMins): 10 at bats for
  *  AVG / SLG, 10 plate appearances for OBP / OPS, 3 innings for ERA / WHIP. */
@@ -27,6 +33,35 @@ const OBP_DEN = ['atBats', 'baseOnBalls', 'hitByPitch', 'sacFlies'];
 /** total bases: H + 2B + 2×3B + 3×HR */
 const TB = ['hits', 'twoB', 'threeB', 'threeB', 'homeRuns', 'homeRuns', 'homeRuns'];
 const sum = (t: Record<string, number>, ks: string[]) => ks.reduce((a, k) => a + (t[k] ?? 0), 0);
+
+/** Round 2 — batted-ball types (house minimum: 30 typed batted balls for a %). */
+const bb30: Qualifier = { den: 30, unit: { label: 'batted balls', one: 'batted ball' } };
+const TYPES = [
+  { k: 'groundBalls', p: 'pitchGroundBalls', pct: 'groundBallPct', label: 'Ground balls', one: 'ground ball', ab: 'GB' },
+  { k: 'lineDrives', p: 'pitchLineDrives', pct: 'lineDrivePct', label: 'Line drives', one: 'line drive', ab: 'LD' },
+  { k: 'flyBalls', p: 'pitchFlyBalls', pct: 'flyBallPct', label: 'Fly balls', one: 'fly ball', ab: 'FB' },
+  { k: 'popups', p: 'pitchPopups', pct: 'popupPct', label: 'Popups', one: 'popup', ab: 'PU' },
+] as const;
+const BAT_TYPED = TYPES.map((t) => t.k);
+const PITCH_TYPED = TYPES.map((t) => t.p);
+const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
+/** the counts (keyed) and the % of all typed batted balls, batters and pitchers */
+function battedBallStats(): StatDef[] {
+  return [
+    ...TYPES.map((t): StatDef => ({ key: t.k, label: t.label, short: t.label.toLowerCase(), one: t.one, abbr: t.ab, group: 'battedBalls', coverage: 'keyed' })),
+    { key: 'battedBalls', label: 'Batted balls (with a type)', short: 'batted balls', one: 'batted ball', abbr: 'BIP', source: 'derived', group: 'battedBalls', coverage: 'keyed', agg: { kind: 'sum', keys: [...BAT_TYPED] } },
+    ...TYPES.map((t): StatDef => ({
+      key: t.pct, label: `${cap(t.one)} %`, short: `${t.one} %`, abbr: `${t.ab}%`, source: 'derived', group: 'battedBalls', format: { unit: 'percent', dp: 1 }, coverage: 'keyed',
+      agg: { kind: 'rate', num: t.k, den: [...BAT_TYPED], scale: 100, dp: 1, qualifier: bb30 }, tieBreak: [{ key: t.k, better: 'higher' }],
+    })),
+    ...TYPES.map((t): StatDef => ({ key: t.p, label: `${t.label} allowed`, short: `${t.label.toLowerCase()} allowed`, one: `${t.one} allowed`, abbr: t.ab, group: 'pitching', coverage: 'keyed' })),
+    { key: 'pitchBattedBalls', label: 'Batted balls allowed (with a type)', short: 'batted balls allowed', one: 'batted ball allowed', abbr: 'BIP', source: 'derived', group: 'pitching', coverage: 'keyed', agg: { kind: 'sum', keys: [...PITCH_TYPED] } },
+    ...TYPES.map((t): StatDef => ({
+      key: `pitch${cap(t.pct)}`, label: `${cap(t.one)} % (pitching)`, short: `${t.one} % allowed`, abbr: `${t.ab}%`, source: 'derived', group: 'pitching', format: { unit: 'percent', dp: 1 }, coverage: 'keyed',
+      agg: { kind: 'rate', num: t.p, den: [...PITCH_TYPED], scale: 100, dp: 1, qualifier: bb30 }, tieBreak: [{ key: t.p, better: 'higher' }],
+    })),
+  ];
+}
 
 export const baseballStats: SportStatSchema<'baseball'> = {
   sport: 'baseball',
@@ -115,6 +150,8 @@ export const baseballStats: SportStatSchema<'baseball'> = {
     { key: 'firstPitchStrikePct', label: 'First-pitch strike %', short: 'first-pitch strike %', abbr: 'F-STR%', source: 'derived', group: 'pitching', format: { unit: 'percent', dp: 1 }, coverage: 'keyed',
       agg: { kind: 'rate', num: 'firstPitchStrikes', den: 'firstPitches', scale: 100, dp: 1, qualifier: { den: 30, unit: { label: 'batters faced', one: 'batter faced' } } },
       tieBreak: [{ key: 'firstPitchStrikes', better: 'higher' }] },
+    // round 2 — batted-ball types (keyed: only games that tracked them)
+    ...battedBallStats(),
     // fielding (from the scorer's notation, when asked)
     { key: 'putouts', label: 'Putouts', short: 'putouts', one: 'putout', abbr: 'PO', group: 'fielding', coverage: 'present', weight: 0.25 },
     { key: 'fieldAssists', label: 'Assists (fielding)', short: 'fielding assists', one: 'fielding assist', abbr: 'A', group: 'fielding', coverage: 'present', weight: 0.25 },
@@ -137,6 +174,10 @@ export const baseballStats: SportStatSchema<'baseball'> = {
     { id: 'situational', title: 'Situational hitting', rows: [
       { stat: 'rispAvg', label: 'AVG with RISP' }, { stat: 'rispHits' }, { stat: 'rispAb' }, { stat: 'twoOutRbi' },
     ] },
+    // round 2 — batted-ball types (tracked games only)
+    { id: 'battedBalls', title: 'Batted balls', rows: [
+      { stat: 'battedBalls' }, ...TYPES.map((t) => ({ stat: t.pct, label: `${t.ab} %` })),
+    ] },
     { id: 'running', title: 'Base running', rows: [{ stat: 'stolenBases' }, { stat: 'caughtStealing', hideZero: true }] },
     { id: 'pitching', title: 'Pitching', leadWhen: 'pitched', rows: [
       { stat: 'gamesPitched' }, { stat: 'pitchWins', label: 'W' }, { stat: 'pitchLosses', label: 'L' }, { stat: 'pitchSaves', label: 'SV', hideZero: true },
@@ -145,6 +186,9 @@ export const baseballStats: SportStatSchema<'baseball'> = {
       // deep wave
       { stat: 'strikePct', label: 'Strike %' }, { stat: 'firstPitchStrikePct', label: 'First-pitch strike %' }, { stat: 'goAo', label: 'GO/AO' },
       { stat: 'inheritedRunners', hideZero: true }, { stat: 'inheritedScored', hideZero: true },
+    ] },
+    { id: 'battedBallsAllowed', title: 'Batted balls allowed', rows: [
+      { stat: 'pitchBattedBalls' }, ...TYPES.map((t) => ({ stat: `pitch${cap(t.pct)}`, label: `${t.ab} %` })),
     ] },
     { id: 'fielding', title: 'Fielding', rows: [{ stat: 'putouts', hideZero: true }, { stat: 'fieldAssists', hideZero: true }, { stat: 'fieldErrors', hideZero: true }] },
     { id: 'bests', title: 'Bests', rows: [{ stat: 'mostHits', label: 'Most hits (game)', hideZero: true }, { stat: 'mostKPitched', label: 'Most strikeouts (game, pitching)', hideZero: true }] },
@@ -171,7 +215,7 @@ export const baseballStats: SportStatSchema<'baseball'> = {
     'hits', 'homeRuns', 'baseOnBalls', 'strikeouts', 'stolenBases', { key: 'teamErrors', label: 'Errors' }, { key: 'leftOnBase', label: 'Left on base' },
     'battingAvg', { key: 'teamPitches', label: 'Pitches thrown' },
   ],
-  leaders: ['battingAvg', 'homeRuns', 'rbi', 'hits', 'ops', 'stolenBases', 'era', 'kPitched', 'whip', 'pitchWins', 'pitchSaves', 'rispAvg', 'twoOutRbi', 'strikePct', 'firstPitchStrikePct'],
+  leaders: ['battingAvg', 'homeRuns', 'rbi', 'hits', 'ops', 'stolenBases', 'era', 'kPitched', 'whip', 'pitchWins', 'pitchSaves', 'rispAvg', 'twoOutRbi', 'strikePct', 'firstPitchStrikePct', 'pitchGroundBallPct'],
   headline: ['hits', 'homeRuns', 'rbi', 'kPitched'],
   awards: [
     { stat: 'battingAvg', icon: '🏏', label: 'Batting champion', match: false,

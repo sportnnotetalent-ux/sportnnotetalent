@@ -309,6 +309,8 @@ function annotations(sport: DepthSport, p: PointInput, W: Side, playerOf: (s: Si
   const nw = NET_WORDS[sport];
   const net = nw ? netSides(p, W) : [];
   if (nw && net.length) out.push(`${nw.at}: ${net.map((x) => playerOf(x)).join(' & ')}`);
+  // round 2 — pickleball: nobody got to the kitchen line
+  else if (nw && p.atNet === 'none') out.push(`Nobody ${nw.at.toLowerCase()}`);
   if (p.third) out.push(THIRD_LABEL[p.third]);
   return out;
 }

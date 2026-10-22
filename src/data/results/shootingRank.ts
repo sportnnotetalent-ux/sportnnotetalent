@@ -16,12 +16,13 @@
  * each elimination point the lowest total (after that shot) is out, a tie for
  * it is decided by single-shot shoot-offs (decimal, not added to the total);
  * the last shot decides gold, a tie for gold is shot off. Eliminated finalists
- * take the places from the bottom up.
+ * take the places from the bottom up. Round 2: a penalty in the final (2
+ * points off the shot it was given on — `fpen`) counts in every total.
  */
 import type { DisciplineDef, RankedEntry, ResultEntry, ResultFlag, ResultStatus } from './model.ts';
 import { STATUS_ORDER } from './model.ts';
 import { sharedPositions } from './positions.ts';
-import { finalSchedule, fromTenths, positionOf, shootEventOf, sumTenths, tenths, type ShootEventDef } from './shootingDefs.ts';
+import { finalSchedule, fromTenths, netFinalShots, positionOf, shootEventOf, sumTenths, tenths, type ShootEventDef } from './shootingDefs.ts';
 
 /** An inner ten beats a plain ten shot by shot. */
 const shotValue = (v: number | 'X'): number => (v === 'X' ? 10.5 : v);
@@ -92,7 +93,8 @@ export interface FinalState {
 }
 
 const competing = (e: ResultEntry) => !['DNS', 'WD', 'DQ'].includes(e.result?.status ?? 'ok');
-const tot = (e: ResultEntry, upTo: number) => sumTenths((e.result.fshots ?? []).slice(0, upTo));
+// round 2: net of any penalty given in the final (identical without one)
+const tot = (e: ResultEntry, upTo: number) => sumTenths(netFinalShots(e.result).slice(0, upTo));
 
 /**
  * Resolve a tie at an elimination point: `k` of `group` go out. Shoot-off shots

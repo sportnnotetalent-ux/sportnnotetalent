@@ -139,6 +139,15 @@ export const MATCH_RECORD_TYPES: Partial<Record<SportId, MatchRecordType[]>> = {
     { key: 'tryHatTrick', label: 'Try hat-tricks', who: 'player' },
     { key: 'playerPoints', label: 'Most points by a player', who: 'player' },
   ],
+  // rugby league (rugby_league/records.ts)
+  rugby_league: [
+    { key: 'teamHigh', label: 'Highest team scores', who: 'team' },
+    { key: 'biggestWin', label: 'Biggest wins', who: 'team' },
+    { key: 'mostGoals', label: 'Most points in a match', who: 'match' },
+    { key: 'fastestTry', label: 'Fastest try', dir: 'low', who: 'player' },
+    { key: 'tryHatTrick', label: 'Try hat-tricks', who: 'player' },
+    { key: 'playerPoints', label: 'Most points by a player', who: 'player' },
+  ],
   basketball: [
     { key: 'teamHigh', label: 'Highest team scores', who: 'team' },
     { key: 'biggestWin', label: 'Biggest wins', who: 'team' },

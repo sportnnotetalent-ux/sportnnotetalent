@@ -10,10 +10,13 @@
  * follows every run; end-of-half lines ("Middle of the 3rd: …", "End of the
  * 3rd: …") and the final. Derived from the event log only (log order, a
  * correction at its own place), so a correction or an undo re-derives it. PURE.
+ * Round 2: a batted-ball type the scorer TAPPED shapes the sentence ("hits a
+ * line-drive single", "lines out", "pops out"); a type only implied by the out
+ * changes nothing (the outcome already says it), so older games read the same.
  */
 import {
   HITS, halfLong, inningOf, isTop, battingSide, lastInning, withAnn, zoneOf, PITCH_TYPE_LABEL,
-  type Ann, type BaseballEvent, type BaseballState, type Move, type Side, type Zone,
+  type Ann, type BaseballEvent, type BaseballState, type BattedBall, type Move, type Side, type Zone,
 } from './engine.ts';
 import { andList, groupLines, newestFirst, nth, plural, scoreText, type FeedGroup, type FeedLine } from '../feedGroups.ts';
 
@@ -39,6 +42,12 @@ const chainText = (ns: number[]): string => [POS_WORD[ns[0]], ...ns.slice(1).map
 const dirOf = (e: BaseballEvent): string => { const z = zoneOf(e); return z ? ` ${DIR[z]}` : ''; };
 const onPitch = (e: BaseballEvent): string => (e.ptype ? ` on a ${PITCH_TYPE_LABEL[e.ptype].toLowerCase()}` : '');
 const who = (m: Move): string => m.name ?? `the runner on ${BASE[m.from]}`;
+/** round 2: a tapped batted-ball type as an adjective ("a line-drive single") */
+const BB_ADJ: Record<BattedBall, string> = { GB: 'ground-ball', LD: 'line-drive', FB: 'fly-ball', PU: 'pop-up' };
+/** a hit's sentence with a tapped type: "Rao hits a line-drive double to left" */
+const typedHit = (b: string, e: BaseballEvent, what: string): string => `${b} hits a ${BB_ADJ[e.btype!]} ${what}${dirOf(e)}${onPitch(e)}`;
+/** the verb of an air out / double play by the tapped type */
+const AIR_VERB: Record<BattedBall, string> = { GB: 'grounds', LD: 'lines', FB: 'flies', PU: 'pops' };
 
 /** The runner moves of a play as sentences: "Iyer and Rao score. Khan to 3rd. Das out at 2nd." */
 export function runnerText(moves: Move[], runs: number, opts: { batter?: boolean } = {}): string {
@@ -67,12 +76,12 @@ export function paSentence(s: BaseballState, e: BaseballEvent, a?: Ann): string 
   const count = s.cfg.pitches && a && (a.np ?? 0) >= 2 ? ` (${a.balls}-${a.strikes}, ${plural(a.np!, 'pitch', 'pitches')})` : '';
   const rbi = e.rbi ?? 0;
   switch (e.outcome) {
-    case '1B': return `${b} singles${dirOf(e)}${onPitch(e)}.`;
-    case '2B': return `${b} doubles${dirOf(e)}${onPitch(e)}.`;
-    case '3B': return `${b} triples${dirOf(e)}${onPitch(e)}.`;
+    case '1B': return e.btype ? `${typedHit(b, e, 'single')}.` : `${b} singles${dirOf(e)}${onPitch(e)}.`;
+    case '2B': return e.btype ? `${typedHit(b, e, 'double')}.` : `${b} doubles${dirOf(e)}${onPitch(e)}.`;
+    case '3B': return e.btype ? `${typedHit(b, e, 'triple')}.` : `${b} triples${dirOf(e)}${onPitch(e)}.`;
     case 'HR': return rbi >= 4 || (a?.runs ?? 0) >= 4
-      ? `${b} hits a grand slam${dirOf(e)}${onPitch(e)}!`
-      : `${b} homers${dirOf(e)}${onPitch(e)}${rbi >= 2 ? ` — ${rbi} RBI` : ''}.`;
+      ? (e.btype ? `${typedHit(b, e, 'grand slam')}!` : `${b} hits a grand slam${dirOf(e)}${onPitch(e)}!`)
+      : `${e.btype ? typedHit(b, e, 'home run') : `${b} homers${dirOf(e)}${onPitch(e)}`}${rbi >= 2 ? ` — ${rbi} RBI` : ''}.`;
     case 'BB': return `${b} walks${count}.`;
     case 'IBB': return `${b} is intentionally walked.`;
     case 'HBP': return `${b} is hit by ${e.ptype ? `a ${PITCH_TYPE_LABEL[e.ptype].toLowerCase()}` : 'a pitch'}.`;
@@ -83,12 +92,12 @@ export function paSentence(s: BaseballState, e: BaseballEvent, a?: Ann): string 
       return `${b} grounds out${dirOf(e)}.`;
     case 'FO': {
       const infield = ns.length ? ns[0] <= 6 : (['3B', 'SS', '2B', '1B', 'P', 'C'] as (Zone | undefined)[]).includes(zoneOf(e));
-      return `${b} ${infield ? 'pops' : 'flies'} out${dirOf(e)}${f}.`;
+      return `${b} ${e.btype ? AIR_VERB[e.btype] : infield ? 'pops' : 'flies'} out${dirOf(e)}${f}.`;
     }
     case 'LO': return `${b} lines out${dirOf(e)}${f}.`;
     case 'SF': return `${b} hits a sacrifice fly${dirOf(e)}${f}.`;
     case 'SH': return `${b} lays down a sacrifice bunt${ns.length >= 2 ? `, ${chainText(ns)}` : ''}${f}.`;
-    case 'DP': return `${b} grounds into a double play${ns.length >= 2 ? `, ${chainText(ns)}` : dirOf(e)}${f}.`;
+    case 'DP': return `${b} ${e.btype ? AIR_VERB[e.btype] : 'grounds'} into a double play${ns.length >= 2 ? `, ${chainText(ns)}` : dirOf(e)}${f}.`;
     case 'FC': return `${b} reaches on a fielder's choice${ns.length ? `, ${chainText(ns)}` : dirOf(e)}${f}.`;
     case 'E': {
       const n = /^E(\d{1,2})$/i.exec(e.fielders?.trim() ?? '');

@@ -12,6 +12,7 @@ import { theme } from '../../core/theme';
 import { useMask } from '../../core/disputeMask';
 import { Button, SelectChip } from '../../components/ui';
 import type { CricketState } from './engine';
+import { ShareOverButton } from './ShareCardView';
 import { symbolTone } from './engine';
 import {
   cricketCommentary, filterItems, overHeadline, clockText,
@@ -71,14 +72,25 @@ function Item({ it }: { it: ComItem }) {
   );
 }
 
-function OverBlock({ o, filter }: { o: ComOver; filter: ComFilter }) {
+/** What a "Share over" needs; absent → no button. */
+interface ShareCtx { state: CricketState; homeName: string; awayName: string; matchId?: string; tournamentName?: string; superOver?: boolean }
+
+function OverBlock({ o, filter, inn, share }: { o: ComOver; filter: ComFilter; inn: ComInnings; share?: ShareCtx }) {
   const mask = useMask();
   const items = filterItems(o.items, filter);
   if ((filter === 'wickets' || filter === 'boundaries') && items.length === 0) return null;
   return (
     <View style={st.over}>
       <View style={st.overHead}>
-        <Text style={st.overTitle}>{overHeadline(o)}{o.t ? `  ·  ${clockText(o.t)}` : ''}</Text>
+        <View style={st.overTitleRow}>
+          <Text style={[st.overTitle, { flex: 1 }]}>{overHeadline(o)}{o.t ? `  ·  ${clockText(o.t)}` : ''}</Text>
+          {share ? (
+            <ShareOverButton
+              state={share.state} homeName={share.homeName} awayName={share.awayName} matchId={share.matchId} tournamentName={share.tournamentName}
+              over={{ inn: inn.inn, side: inn.side, over: o.over, ...(share.superOver ? { superOver: true } : {}) }}
+            />
+          ) : null}
+        </View>
         <Text style={st.overMeta} numberOfLines={3}>
           {[...o.batters, o.bowlerFigs].filter(Boolean).map((x) => mask.text(x)).join('  ·  ')}
         </Text>
@@ -90,7 +102,7 @@ function OverBlock({ o, filter }: { o: ComOver; filter: ComFilter }) {
   );
 }
 
-function InningsBlock({ inn, filter }: { inn: ComInnings; filter: ComFilter }) {
+function InningsBlock({ inn, filter, share }: { inn: ComInnings; filter: ComFilter; share?: ShareCtx }) {
   const [shown, setShown] = useState(PAGE);
   const overs = inn.overs.slice(0, shown);
   const more = inn.overs.length - overs.length;
@@ -102,7 +114,7 @@ function InningsBlock({ inn, filter }: { inn: ComInnings; filter: ComFilter }) {
         {inn.start ? <Text style={st.innMeta}>{clockText(inn.start)}–{clockText(inn.end!)}{mins ? ` · ${mins} min` : ''}</Text> : null}
       </View>
       {inn.overs.length === 0 && inn.pre.length === 0 ? <Text style={st.empty}>No balls yet.</Text> : null}
-      {overs.map((o) => <OverBlock key={o.id} o={o} filter={filter} />)}
+      {overs.map((o) => <OverBlock key={o.id} o={o} filter={filter} inn={inn} share={share} />)}
       {more > 0 ? (
         <Button label={`Show earlier overs (${more} more)`} variant="ghost" onPress={() => setShown((n) => n + PAGE * 2)} />
       ) : filter === 'all' ? inn.pre.map((n) => <Item key={n.id} it={n} />) : null}
@@ -110,8 +122,10 @@ function InningsBlock({ inn, filter }: { inn: ComInnings; filter: ComFilter }) {
   );
 }
 
-export function CricketCommentary({ state, homeName, awayName }: {
+export function CricketCommentary({ state, homeName, awayName, matchId, tournamentName }: {
   state: CricketState; homeName: string; awayName: string;
+  /** with a match id, each over block gets "Share over" (cricket round 2) */
+  matchId?: string; tournamentName?: string;
 }) {
   const com = useMemo(() => cricketCommentary(state, { home: homeName, away: awayName }), [state, homeName, awayName]);
   const [filter, setFilter] = useState<ComFilter>('all');
@@ -134,7 +148,12 @@ export function CricketCommentary({ state, homeName, awayName }: {
       <View style={st.chips}>
         {FILTERS.map((f) => <SelectChip key={f.key} label={f.label} active={filter === f.key} onPress={() => setFilter(f.key)} />)}
       </View>
-      {active.inns.map((inn) => <InningsBlock key={`${inn.id}:${filter}`} inn={inn} filter={filter} />)}
+      {active.inns.map((inn) => (
+        <InningsBlock
+          key={`${inn.id}:${filter}`} inn={inn} filter={filter}
+          share={matchId ? { state, homeName, awayName, matchId, tournamentName, superOver: active.key === 'so' } : undefined}
+        />
+      ))}
     </View>
   );
 }
@@ -146,6 +165,7 @@ const st = StyleSheet.create({
   innTitle: { color: theme.colors.text, fontSize: theme.font.body, fontWeight: '800', flexShrink: 1 },
   innMeta: { color: theme.colors.textMuted, fontSize: theme.font.tiny },
   over: { backgroundColor: theme.colors.surface, borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.colors.border, overflow: 'hidden' },
+  overTitleRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(2) },
   overHead: { backgroundColor: theme.colors.surfaceAlt, paddingVertical: theme.spacing(2), paddingHorizontal: theme.spacing(3), gap: 2 },
   overTitle: { color: theme.colors.text, fontSize: theme.font.small, fontWeight: '800' },
   overMeta: { color: theme.colors.textMuted, fontSize: theme.font.tiny },

@@ -9,6 +9,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { theme } from '../../core/theme';
 import { Card, Pill, textStyles } from '../ui';
+import { RecordsSetCard } from './RecordsSetCard';
 import { formatDay } from '../../core/dates';
 import { getPhaseInfos } from '../../data/resultsStore';
 import { crewCareer, type PhaseInfo } from '../../data/results';
@@ -45,6 +46,8 @@ export function CrewCareer({ lines, sport }: { lines: StatLine[]; sport: 'rowing
       {c.coxed > 0 && <Text style={textStyles.muted}>Coxed {c.coxed} race{c.coxed === 1 ? '' : 's'}.</Text>}
       {/* deep wave: heats / repechages / semi-finals won (only once one is on record) */}
       {c.heatWins > 0 && <Text style={textStyles.muted}>🏁 Won {c.heatWins} heat{c.heatWins === 1 ? '' : 's'} / repechage{c.heatWins === 1 ? '' : 's'} / semi-final{c.heatWins === 1 ? '' : 's'}.</Text>}
+      {/* timed races round 2: meet / school records broken */}
+      <RecordsSetCard c={c} />
 
       <Text style={st.section}>Best times</Text>
       {c.bests.length === 0 ? <Text style={textStyles.muted}>No times yet — each boat class and distance keeps its own best.</Text> : (

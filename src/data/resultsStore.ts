@@ -29,6 +29,8 @@ import {
   combinedKey, markKey, type CombinedKind, type CombinedTable, type CombinedPhaseInput,
   plannedSlot, type PhaseSched, dayKey,
   shootMatchEntrant, SHOOT_MATCH_TEAMS, memberLookup, type MemberScore,
+  // timed races round 2: records set, heat-win / PB highlights, per-event "Stats to track"
+  isTimedRaceSport, newRecordsSet, withRecordKeys, raceHighlights, goldPbIds, type RecordSetMark, type ResultHighlights, type ResultFlag, type TrackOverrides,
 } from './results';
 import { removeFieldEntry } from './golf';
 import { applyRecordOps, recordOpsFor, bestRecords, type RecordOp } from './results/recordBook';
@@ -40,6 +42,22 @@ import { phaseRules, zeroLanes, type CompRules } from './results/competitionRule
  *  Never blocks the lock: the push is a courtesy, the result is what matters. */
 async function saveResultAlert(id: string, alert: ResultAlert): Promise<void> {
   try { await updateFieldEventFormat(id, { alert }); } catch { /* no alert — the push falls back to the stat lines */ }
+}
+
+/** Timed races round 2 — leave the round's heat wins / PBs on the row
+ *  (format.highlights) for the follower push. Cleared when a re-close has
+ *  none; never blocks the close. */
+async function saveHighlights(phase: FieldEvent, highlights: ResultHighlights | null): Promise<void> {
+  if (!highlights && !(phase.format as Record<string, unknown> | undefined)?.highlights) return;
+  try { await updateFieldEventFormat(phase.id, { highlights }); } catch { /* no push — the result is what matters */ }
+}
+
+/** What the official saw when closing a round / locking a final (the screen's
+ *  ranking): PB / SB / record flags per entry id, and the school record book. */
+export interface CloseOptions {
+  flags?: Map<string, ResultFlag[]>;
+  /** the organisation's school records (SR) the sheet was flagged against */
+  schoolBook?: RecordMark[];
 }
 import { isEventSport } from '../sports/eventSports';
 
@@ -103,6 +121,8 @@ export interface NewResultsEvent {
   teamFrom?: { eventKeys: string[] };
   /** SD-137b: an ISSF mixed team event — the best 4 teams go on to the medal matches */
   shootMatch?: boolean;
+  /** timed races round 2: this event's own "Stats to track" (overrides of the meet's) */
+  track?: TrackOverrides;
 }
 
 // SD-95: archery phases read "Ranking round" / "Match play"
@@ -212,6 +232,7 @@ export async function createResultsEvent(input: NewResultsEvent): Promise<FieldE
     ...(rules ? { rules } : {}),
     ...(input.teamFrom?.eventKeys.length ? { teamFrom: input.teamFrom } : {}),
     ...(input.shootMatch ? { shootMatch: true } : {}),
+    ...(input.track && Object.keys(input.track).length ? { track: input.track } : {}),
   };
   const ev = await insertPhase({
     tournamentId: input.tournamentId, sport: def.sport as SportId, title: phaseTitle(eventTitle, fmt), roundNo: 1,
@@ -318,7 +339,7 @@ export async function setPhaseStatus(id: string, status: FieldEvent['status']): 
  * phase's heats and lanes. Returns the new phase. The qualifiers keep their
  * team snapshot and relay members.
  */
-export async function advancePhase(phase: FieldEvent, entries: FieldEntry[], nameOf: (id: string) => string): Promise<FieldEvent> {
+export async function advancePhase(phase: FieldEvent, entries: FieldEntry[], nameOf: (id: string) => string, opts: CloseOptions = {}): Promise<FieldEvent> {
   const f = phaseOf(phase);
   const base = f && disciplineOf(f.discipline);
   const def = base ? phaseDiscipline(base, f) : null;
@@ -334,10 +355,10 @@ export async function advancePhase(phase: FieldEvent, entries: FieldEntry[], nam
     const kind = cycKind(def.key);
     if (kind === 'stage' && f.progression.stage) return advanceStage(phase, f, def, entries, byHeat, next);
     if (kind === 'sprint' && next.phase === 'final') return advanceToBracket(phase, f, def, entries, [...byHeat.values()].flat(), next);
-    if (f.progression.routes?.length) return advanceCrewPhase(phase, f, def, entries, byHeat, next, (rows) => cycLines(f, rows));
+    if (f.progression.routes?.length) return advanceCrewPhase(phase, f, def, entries, byHeat, next, (rows) => cycLines(f, rows), opts);
   }
   // SD-99 / SD-100: rowing / canoe — places routed to the repechage, semis or lettered finals
-  if (f.progression.routes?.length) return advanceCrewPhase(phase, f, def, entries, byHeat, next);
+  if (f.progression.routes?.length) return advanceCrewPhase(phase, f, def, entries, byHeat, next, undefined, opts);
   // SD-95: archery — the ranking round seeds a match-play bracket (SD-137b: the team ranking a team bracket)
   if (def.sport === 'archery' && next.phase === 'final') return advanceToBracket(phase, f, def, entries, [...byHeat.values()].flat(), next);
   // SD-137b: ISSF mixed team — the best 4 teams go to the gold / bronze medal matches
@@ -365,6 +386,8 @@ export async function advancePhase(phase: FieldEvent, entries: FieldEntry[], nam
     const extra = def.sport === 'shooting' && next.phase === 'final' && !!f.shootFinal ? finalistResult(r) : {};
     return { playerId: old.playerId || undefined, teamId: old.teamId, heat: s.heat, result: { lane: s.lane, order: s.order, bib: r.bib, team: r.team, name: r.name, members: r.members, ...extra } };
   }));
+  // timed races round 2: heat winners and PBs for the follower push
+  await saveHighlights(phase, raceHighlights(f, def, [...byHeat.values()].flatMap((rows) => withQualification(rows, q)), { final: false, flags: opts.flags }));
   await setPhaseStatus(phase.id, 'completed');
   return ev;
 }
@@ -461,7 +484,7 @@ export async function memberScoresFrom(eventKeys: string[]): Promise<Map<string,
  * format (`carry`) and join when their round is seeded.
  */
 async function advanceCrewPhase(phase: FieldEvent, f: PhaseFormat, def: DisciplineDef, entries: FieldEntry[], byHeat: Map<number, RankedEntry[]>, next: PlannedPhase,
-  lines: (rows: RankedEntry[]) => { playerId: string; stats: Record<string, number>; won: boolean }[] = (rows) => crewLines(f, rows)): Promise<FieldEvent> {
+  lines: (rows: RankedEntry[]) => { playerId: string; stats: Record<string, number>; won: boolean }[] = (rows) => crewLines(f, rows), opts: CloseOptions = {}): Promise<FieldEvent> {
   const { seeded, carry } = advanceCrews(byHeat, f, next, def.lanes ?? 6);
   if (!seeded.length && !carry.length) throw new Error(def.sport === 'cycling' ? 'No rider has a time yet — enter the results first.' : 'No crew has a time yet — enter the results first.');
   await writePhaseLines(phase, f, lines([...byHeat.values()].flat()));
@@ -477,6 +500,8 @@ async function advanceCrewPhase(phase: FieldEvent, f: PhaseFormat, def: Discipli
     const r = src.result;
     return { playerId: src.playerId || undefined, teamId: src.teamId, heat: s.heat, result: { lane: s.lane, order: s.order, bib: r.bib, team: r.team, name: r.name, members: r.members, ...(s.race && races ? { race: s.race } : {}) } };
   }));
+  // timed races round 2: heat winners and PBs for the follower push
+  await saveHighlights(phase, raceHighlights(f, def, [...byHeat.values()].flat(), { final: false, flags: opts.flags }));
   await setPhaseStatus(phase.id, 'completed');
   return ev;
 }
@@ -666,6 +691,16 @@ export async function resyncFinalLines(phase: FieldEvent, entries: FieldEntry[],
   return lines.length;
 }
 
+/* ------------------ timed races round 2: per-event Stats to track ------------------ */
+
+/** Set an event's own "Stats to track" (overrides of the meet's; undefined =
+ *  follow the meet) on every phase of the event. Capture choices only — no
+ *  result changes. */
+export async function setEventTracking(eventKey: string, track: TrackOverrides | undefined): Promise<void> {
+  const phases = await getResultsPhases({ eventKey });
+  for (const p of phases) await patchPhaseFormat(p.id, { track });
+}
+
 /* -------------------------- SD-130 event officials -------------------------- */
 
 /** Set who runs an event (results entry, closing rounds, locking the final):
@@ -697,7 +732,7 @@ export async function getMeetAges(tournamentId: string, sport: string, ids: stri
 
 /** Finish a final: lock it and write any new meet / school record. Athletics
  *  (SD-90) also writes each athlete's stat line with medals and points. */
-export async function completeFinal(phase: FieldEvent, entries: FieldEntry[], nameOf: (id: string) => string, scopes: RecordScope[] = ['MR'], points?: PointsSettings): Promise<RecordMark[]> {
+export async function completeFinal(phase: FieldEvent, entries: FieldEntry[], nameOf: (id: string) => string, scopes: RecordScope[] = ['MR'], points?: PointsSettings, opts: CloseOptions = {}): Promise<RecordMark[]> {
   const f = phaseOf(phase);
   const def = f && disciplineOf(f.discipline);
   if (!f || !def) throw new Error('Not a results event');
@@ -705,14 +740,13 @@ export async function completeFinal(phase: FieldEvent, entries: FieldEntry[], na
   if (f.combined) return completeCombined(phase, f, def, entries, nameOf, scopes, points);
   // A timed final (several heats) ranks across heats — the whole phase at once.
   const rows = rankEntries(entries.map((e) => toResultEntry(e, nameOf)), def, { handLegal: looseLegal(f) });
-  // SD-130: the lines are computed apart, so a failed save can be re-synced later
-  const lines = finalLinesFor(f, def, entries, nameOf, rows, points);
-  if (lines) await writePhaseLines(phase, f, lines);
   const book = await getRecordBook(phase.tournamentId, def.sport);
   const cat = categoryKey(f.category);
   // SD-112: an out-of-range mark nobody confirmed never sets a record.
   // SD-97: a weightlifting session sets snatch, C&J and total records.
   let next = book;
+  // timed races round 2: the school book (SR) the sheet was flagged against, beaten by this final?
+  let school = opts.schoolBook ?? [];
   // SD-92: a road / walk time sets a record only on a certified course (gun time); cross-country never
   for (const d of roadRecordsAllowed(f) ? recordDefsFor(def) : []) {
     // SD-96: a shooting final's rows read as their qualification scores (a final score is no record)
@@ -721,13 +755,25 @@ export async function completeFinal(phase: FieldEvent, entries: FieldEntry[], na
     const view = def.sport === 'shooting' ? qualView : def.sport === 'archery' || (def.sport === 'cycling' && rows.some((r) => r.entry.result.mp != null)) ? archQualView : null;
     const dRows = view ? rankEntries(view(entries.map((e) => toResultEntry(e, nameOf))), d) : d === def ? rows : rankEntries(entries.map((e) => toResultEntry(e, nameOf)), d);
     next = updateRecords(rowsForRecords(dRows, d, f.category?.course), d, cat, next, dayKey(phase.startsAt), scopes, f.eventKey);
+    if (school.length) school = updateRecords(rowsForRecords(dRows, d, f.category?.course), d, cat, school, dayKey(phase.startsAt), ['SR'], f.eventKey);
   }
+  // timed races round 2: the records this final broke (with their holders' ids) — kept on the
+  // phase and written as mrSet / srSet on the holders' lines (a re-sync reads them back)
+  const recordsSet: RecordSetMark[] = isTimedRaceSport(def.sport)
+    ? [...scopes.flatMap((sc) => newRecordsSet(book, next, sc, f.eventKey)), ...newRecordsSet(opts.schoolBook ?? [], school, 'SR', f.eventKey)]
+    : [];
+  const fl: PhaseFormat = { ...f, recordsSet: recordsSet.length ? recordsSet : undefined };
+  // SD-130: the lines are computed apart, so a failed save can be re-synced later
+  const lines = finalLinesFor(fl, def, entries, nameOf, rows, points);
+  if (lines) await writePhaseLines(phase, f, lines);
   // SD-112: keep what the book said before, so "Reopen final" can put it back
-  await patchPhaseFormat(phase.id, { recordsBefore: recordDefsFor(def).flatMap((d) => recordsFor(book, d.key, cat)) });
+  await patchPhaseFormat(phase.id, { recordsBefore: recordDefsFor(def).flatMap((d) => recordsFor(book, d.key, cat)), ...(recordsSet.length || f.recordsSet ? { recordsSet: fl.recordsSet } : {}) });
   // SD-130: only the records this final set are sent, merged on the server (no lost writes)
   if (next !== book) next = await commitRecords(phase, def.sport, book, next);
   // SD-131: the podium for the follower push (read by notify-followers once the status flips)
-  await saveResultAlert(phase.id, finalAlert(rows, f.eventTitle));
+  // round 2: a gold medallist's PB rides on it; the others' heat wins (timed final) / PBs go as highlights
+  await saveResultAlert(phase.id, finalAlert(rows, f.eventTitle, isTimedRaceSport(def.sport) ? goldPbIds(rows, opts.flags) : undefined));
+  await saveHighlights(phase, raceHighlights(f, def, rows, { final: true, flags: opts.flags }));
   await setPhaseStatus(phase.id, 'completed');
   return next;
 }
@@ -735,8 +781,15 @@ export async function completeFinal(phase: FieldEvent, entries: FieldEntry[], na
 type StatLine = { playerId: string; stats: Record<string, number>; won: boolean };
 
 /** SD-130 — the stat lines a locked (non-combined) final writes; null = none
- *  (not an event sport). Shared by completeFinal and the re-sync. */
+ *  (not an event sport). Shared by completeFinal and the re-sync. Timed races
+ *  round 2: the holders of a record this final broke get mrSet / srSet
+ *  (from the phase's `recordsSet`). */
 function finalLinesFor(f: PhaseFormat, def: DisciplineDef, entries: FieldEntry[], nameOf: (id: string) => string, rows: RankedEntry[], points?: PointsSettings): StatLine[] | null {
+  const lines = baseFinalLines(f, def, entries, nameOf, rows, points);
+  return lines && isTimedRaceSport(def.sport) ? withRecordKeys(lines, f.recordsSet) : lines;
+}
+
+function baseFinalLines(f: PhaseFormat, def: DisciplineDef, entries: FieldEntry[], nameOf: (id: string) => string, rows: RankedEntry[], points?: PointsSettings): StatLine[] | null {
   if (def.capture === 'lifts') {
     // SD-97: weightlifting lines — best snatch / C&J / total, make rate, medals
     return liftLines(f, entries.map((e) => toResultEntry(e, nameOf)), points ?? {});

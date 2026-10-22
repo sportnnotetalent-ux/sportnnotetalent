@@ -32,11 +32,12 @@ import {
   init, reducer, isComplete, result, matchSec, periodLen, clockFace, periodName, periodLong, periodStarted, running, timeUp,
   eventCredits, creditAttribution, centreInfo, lineupAt, timeoutCheck, sanctionsOf, totalPeriods, isOpen, playOnLead, other,
   NETBALL_PRESETS, NETBALL_LIVE_SETTINGS, LIVE_KEYS, POSITIONS, POS_AREAS,
-  superShotLive, goalPoints, TURNOVER_TYPES, TURNOVER_LABEL,
+  superShotLive, superShotText, SUPER_SHOT_RULE_OPTIONS, goalPoints, TURNOVER_TYPES, TURNOVER_LABEL,
   type NetballEvent, type NetballState, type Pos, type Sanction, type Side, type StatKind, type StopReason, type PenaltyKind, type TurnoverType,
 } from './engine';
 import { PlayFeed } from '../PlayFeed';
 import { CategoryStatsPanel } from '../CategoryStatsPanel';
+import { SubViews } from '../SubViews';
 import { netballFeed } from './commentary';
 import { netballPanel, nbPanelPeriods } from './panel';
 import { netballTotals, netballLiveField, unavailable } from './totals';
@@ -185,6 +186,8 @@ const ScoringControls: SportPlugin<NetballState>['ScoringControls'] = ({
   };
   // Deep wave: an armed super shot scores 2 / is a super-shot attempt (then disarms)
   const superArmed = (sd: Side) => armed === sd && !!s.superShot && (superShotLive(s, Date.now()) || !!editAt);
+  // Round 2: "Super shot" / "2-point shot" and its zone, per the organiser's preset
+  const ssText = superShotText(s);
   const goal = (sd: Side, pos: Pos, shooter: Player | null, feeder: Player | null) => {
     const two = superArmed(sd);
     setArmed(null);
@@ -541,7 +544,7 @@ const ScoringControls: SportPlugin<NetballState>['ScoringControls'] = ({
         <View style={c.row}>{shotBtn(sd, 'GS', true)}{shotBtn(sd, 'GA', true)}</View>
         {/* Deep wave — the super-shot window (a format that uses them): arm the next shot as a 2-pointer */}
         {s.superShot && superShotLive(s, now) && periodStarted(s) ? (
-          <SelectChip label={armed === sd ? '⭐ Super shot — next shot' : '⭐ Super shot'} accessibilityLabel={`Super shot: the next ${name(sd)} shot is from the super-shot zone`}
+          <SelectChip label={armed === sd ? `⭐ ${ssText.name} — next shot` : `⭐ ${ssText.name}`} accessibilityLabel={`${ssText.name}: the next ${name(sd)} shot is from ${ssText.zone}`}
             active={armed === sd} onPress={() => setArmed(armed === sd ? null : sd)} />
         ) : null}
         {more ? (
@@ -730,25 +733,23 @@ const NetballScoreboard: NonNullable<SportPlugin<NetballState>['Scoreboard']> = 
   );
 };
 
-const LiveExtras: NonNullable<SportPlugin<NetballState>['LiveExtras']> = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster, onPlayer }) => {
+/** Match tabs (2026-10-22): the play-by-play on Commentary; the broadcast
+ *  team stats and the players' box on Stats. */
+type TabProps = Parameters<NonNullable<SportPlugin<NetballState>['LiveExtras']>>[0];
+const NetballCommentary = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster, onPlayer }: TabProps) => (
+  <PlayFeed groups={netballFeed(state as NetballState, { home: homeName, away: awayName })} homeColor={homeColor} awayColor={awayColor} homeRoster={homeRoster} awayRoster={awayRoster} onPlayer={onPlayer} allLabel="Match" />
+);
+const NetballStats = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster, onPlayer }: TabProps) => {
   const s = state as NetballState;
-  // Deep wave: the commentary, the broadcast team stats, the players' box
-  const [view, setView] = useState<'pbp' | 'team' | 'box'>('pbp');
   return (
-    <View style={{ gap: theme.spacing(3) }}>
-      <View style={c.grid}>
-        <SelectChip label="Play-by-play" active={view === 'pbp'} onPress={() => setView('pbp')} />
-        <SelectChip label="Team stats" active={view === 'team'} onPress={() => setView('team')} />
-        <SelectChip label="Players" active={view === 'box'} onPress={() => setView('box')} />
-      </View>
-      {view === 'pbp' ? (
-        <PlayFeed groups={netballFeed(s, { home: homeName, away: awayName })} homeColor={homeColor} awayColor={awayColor} homeRoster={homeRoster} awayRoster={awayRoster} onPlayer={onPlayer} allLabel="Match" />
-      ) : view === 'team' ? (
+    <SubViews label="Stats view" views={[
+      { key: 'team', label: 'Team stats', render: () => (
         <CategoryStatsPanel periods={nbPanelPeriods(s)} data={(scope) => netballPanel(s, scope)} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} />
-      ) : (
+      ) },
+      { key: 'box', label: 'Players', render: () => (
         <MatchBoxScore sport="netball" show="box" source={netballBox(s, { homeRoster, awayRoster })} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} onPlayer={onPlayer} />
-      )}
-    </View>
+      ) },
+    ]} />
   );
 };
 
@@ -793,7 +794,7 @@ export const netballPlugin: SportPlugin<NetballState> = {
   ScoringControls,
   LiveClock,
   Scoreboard: NetballScoreboard,
-  LiveExtras,
+  matchTabs: { Commentary: NetballCommentary, Stats: NetballStats },
   formation: () => netballFormation(),
   Court: NetballCourt,
   liveSettings: NETBALL_LIVE_SETTINGS,
@@ -810,13 +811,20 @@ export const netballPlugin: SportPlugin<NetballState> = {
     { key: 'suspensionMinutes', label: 'Suspension (minutes of play)', type: 'number', default: 2, min: 1, max: 10, advanced: true, hint: 'World Netball: 2 — check your competition' },
     { key: 'timeoutsPerHalf', label: 'Team time-outs a half', type: 'count', default: 0, min: 0, max: 3, advanced: true, hint: 'none in the international rules; some leagues allow 2' },
     { key: 'detail', label: 'Ask for feeds & rebounds', type: 'toggle', default: false, advanced: true, hint: 'goal assists, feeds and rebounds (one more tap a shot)' },
-    // Deep wave — "Stats to track" (off by default; the scorer can switch them in ⚙️ Match settings)
-    { key: 'trackCpr', label: 'Track centre pass receives', type: 'toggle', default: false, advanced: true, group: 'Stats to track', hint: 'who caught each centre pass (one tap, optional)' },
+    // Deep wave — "Stats to track" (the scorer can switch them in ⚙️ Match settings).
+    // Round 2: centre pass receives come on with the International 4 × 15 preset (its `set`).
+    { key: 'trackCpr', label: 'Track centre pass receives', type: 'toggle', default: false, advanced: true, group: 'Stats to track', hint: 'who caught each centre pass (one tap, optional) · on with International 4 × 15' },
     { key: 'trackGains', label: 'Track gains & pick-ups', type: 'toggle', default: false, advanced: true, group: 'Stats to track', hint: 'deflection with / without gain, pick-ups — gains and gain-to-goal %' },
     { key: 'trackTurnovers', label: 'Track turnover types', type: 'toggle', default: false, advanced: true, group: 'Stats to track', hint: 'bad pass, footwork, held ball, offside…' },
-    // Deep wave — Super Netball's 2-point super shot (an organiser rule, off by default)
-    { key: 'superShot', label: '2-point super shots', type: 'toggle', default: false, advanced: true, hint: 'Super Netball: goals from the super-shot zone score 2 in the last minutes of each quarter' },
-    { key: 'ssMinutes', label: 'Super-shot window (last N min of a quarter)', type: 'number', default: 5, min: 0, max: 15, advanced: true, hint: 'Super Netball 5 · 0 = the whole quarter' },
+    // Deep wave — the 2-point super shot, an organiser rule, off by default.
+    // Round 2: the league presets (engine SUPER_SHOT_PRESETS) or a custom window.
+    // An older format's plain `superShot` toggle still replays (superShotConfig).
+    {
+      key: 'superShotRule', label: '2-point super shots', type: 'choice', default: 'off', advanced: true, options: SUPER_SHOT_RULE_OPTIONS,
+      hint: 'Off in the World Netball rules · Super Netball & UK Super League: 2 from the outer circle, last 5 min of each quarter + extra time · ANZ Premiership: 2 from 3.5 m+, last 5 min of each quarter',
+    },
+    { key: 'ssMinutes', label: 'Custom super-shot window (last N min of a quarter)', type: 'number', default: 5, min: 0, max: 15, advanced: true, hint: 'Custom window only · 0 = the whole quarter' },
+    { key: 'ssExtraTime', label: 'Custom: super shots all through extra time', type: 'toggle', default: false, advanced: true, hint: 'Custom window only' },
     {
       key: 'decider', label: 'If level at full time', type: 'choice', default: 'none',
       options: [

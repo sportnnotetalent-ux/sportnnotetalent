@@ -13,6 +13,9 @@
  *   whom (doubles errors); plus padel's 2nd serve, who was at the net (padel)
  *   / the kitchen line (pickleball), the rally length, and pickleball's 3rd
  *   shot when those options are on.
+ * Round 2: the Rally chips offer the match's bucket scheme (`rallyBuckets`,
+ * an organiser option); pickleball's kitchen-line row adds "Nobody" (nobody
+ * got to the kitchen line), which is what kitchen ARRIVAL % is read from.
  * Every tap dispatches POINT_DETAIL (annotates that rally; no score effect;
  * undo removes it). The options live in the Scoring settings card and in the
  * "Extra stats: Choose" chips here (SET_DETAIL: from the next rally).
@@ -29,13 +32,13 @@ import { pointRows, type EditRow } from './rallyEdit';
 import { serveStats } from './serveStats';
 import {
   DETAIL_HOWS, NET_WORDS, RALLY_LABEL, RACKET_SHOTS, STROKES, THIRD_LABEL, THIRD_SHOTS, TT_PHASE_LABEL, WINGS, WING_LABEL,
-  errTypeOf, howDef, pdText, rallyBucketsOf, shotOf, toggleNet, winnerSide,
+  errTypeOf, hasNobodyMark, howDef, pdText, rallyBucketsOf, shotOf, toggleNet, toggleNobody, winnerSide,
   type DepthSport, type How, type PointDetail, type Wing,
 } from './pointDetail';
 import { trackFields } from './pointDetailSettings';
 
 type Side = 'home' | 'away';
-type Flags = { pointDetail?: boolean; serveDetail?: boolean; netDetail?: boolean; rallyDetail?: boolean; thirdDetail?: boolean };
+type Flags = { pointDetail?: boolean; serveDetail?: boolean; netDetail?: boolean; rallyDetail?: boolean; thirdDetail?: boolean; rallyBuckets?: string };
 
 export function PointDetailRow({
   sport, state, dispatch, homeName, awayName, homeRoster = [], awayRoster = [], rowsOf = pointRows,
@@ -131,7 +134,8 @@ export function PointDetailRow({
   const summary = [
     pd ? pdText(pd, true, sport) : '',
     e.serve === 2 ? '2nd serve' : '',
-    nw && e.atNet ? `${nw.at.toLowerCase()}: ${e.atNet === 'both' ? 'both' : nameOf(e.atNet)}` : '',
+    !nw || !e.atNet ? '' : e.atNet === 'none' ? `nobody ${nw.at.toLowerCase()}`
+      : `${nw.at.toLowerCase()}: ${e.atNet === 'both' ? 'both' : nameOf(e.atNet)}`,
     e.rallyLen ? bucketText(e.rallyLen) : '',
     e.third ? THIRD_LABEL[e.third] : '',
   ].filter(Boolean).join(' · ');
@@ -192,12 +196,16 @@ export function PointDetailRow({
             <SelectChip key={side} label={nameOf(side)} active={e.atNet === side || e.atNet === 'both'}
               accessibilityLabel={`${nameOf(side)}: ${nw.at.toLowerCase()}`} onPress={() => send({ atNet: toggleNet(e.atNet, side) })} />
           ))}
+          {hasNobodyMark(sport) && (
+            <SelectChip label="Nobody" active={e.atNet === 'none'}
+              accessibilityLabel={`Nobody got ${nw.at.toLowerCase().replace(/^at /, 'to ')}`} onPress={() => send({ atNet: toggleNobody(e.atNet) })} />
+          )}
         </View>
       )}
       {on.rallyDetail && (
         <View style={st.chips}>
           <Text style={[st.meta, st.rowLabel]}>Rally:</Text>
-          {rallyBucketsOf(sport).map((b) => (
+          {rallyBucketsOf(sport, state.rallyBuckets).map((b) => (
             <SelectChip key={b} label={bucketText(b)} active={e.rallyLen === b} onPress={() => send({ rallyLen: e.rallyLen === b ? null : b })} />
           ))}
         </View>

@@ -11,6 +11,8 @@ import { countRow, nonEmpty, ofPct, type CompareCategory, type CompareRow } from
 /** Per-side totals over a set of boards (indexes into `s.boards`). */
 interface SideAgg {
   points: number; boards: number; penaltyPts: number; best: number; coins: number;
+  /** Round 2 — points from board-ending fouls (ICF r.102–112, foulScore) */
+  endFoulPts: number;
   white: number; black: number;
   queens: number; queens22: number; queenLost: number; qMiss: number;
   broke: number; brokeWon: number; brk: number; brkN: number;
@@ -18,7 +20,7 @@ interface SideAgg {
 }
 
 const zero = (): SideAgg => ({
-  points: 0, boards: 0, penaltyPts: 0, best: 0, coins: 0, white: 0, black: 0,
+  points: 0, boards: 0, penaltyPts: 0, best: 0, coins: 0, endFoulPts: 0, white: 0, black: 0,
   queens: 0, queens22: 0, queenLost: 0, qMiss: 0, broke: 0, brokeWon: 0, brk: 0, brkN: 0,
   fouls: {}, foulsAll: 0, dues: 0,
 });
@@ -40,6 +42,7 @@ export function carromMatchStats(s: CarromState, game?: number): CompareCategory
     const l: Side = w === 'home' ? 'away' : 'home';
     const W = agg[w], L = agg[l];
     W.points += capped[i];
+    if (b.endFoul) W.endFoulPts += (b.endFoul.striker ? 1 : 0) + (b.endFoul.improper ? 1 : 0);
     if (b.penalty) { W.penaltyPts += capped[i]; }
     else {
       W.boards += 1;
@@ -87,6 +90,7 @@ export function carromMatchStats(s: CarromState, game?: number): CompareCategory
     countRow('coins', 'Coins pocketed', H.coins, A.coins),
   ];
   if (H.penaltyPts || A.penaltyPts) scoring.push(countRow('pen', 'Penalty-board points', H.penaltyPts, A.penaltyPts));
+  if (H.endFoulPts || A.endFoulPts) scoring.push(countRow('endFoul', 'Points from the opponent\'s board-ending fouls', H.endFoulPts, A.endFoulPts));
   if (slamAny) {
     scoring.push(countRow('white', 'White slams', H.white, A.white));
     scoring.push(countRow('black', 'Black slams', H.black, A.black));

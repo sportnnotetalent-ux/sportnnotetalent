@@ -2,7 +2,7 @@
  *  scoring by par (3 / 4 / 5) and by nine, birdie-or-better and bogey-or-worse
  *  rates, bounce back, holes in one; driving distance on measured holes;
  *  putting splits (one- / three-putt %, birdie conversion, first putts holed by
- *  length). From the golf stat schema's deep-wave sections — a row shows only
+ *  length); round 2 — up and downs (around the green), drives also in metres. From the golf stat schema's deep-wave sections — a row shows only
  *  once a round carries it, with "over N of M rounds" when only some did
  *  (older rounds read "not tracked", never 0). */
 import React from 'react';
@@ -11,8 +11,15 @@ import { theme } from '../../core/theme';
 import { careerSections } from '../../data/career';
 import { statSchema } from '../../sports/statSchemas';
 import type { StatLine } from '../../core/types';
+import { YARD_M } from '../../sports/golf/engine';
 
-const DEEP_SECTIONS = ['byPar', 'driving', 'putting'];
+const DEEP_SECTIONS = ['byPar', 'driving', 'around', 'putting'];
+/** Round 2 — drives are kept in yards; the career adds the metric figure. */
+const DRIVE_ROWS = ['drivingDistance', 'longDrive'];
+const withMetres = (key: string, value: string): string => {
+  const n = Number(value);
+  return DRIVE_ROWS.includes(key) && Number.isFinite(n) && n > 0 ? `${value} (${(n * YARD_M).toFixed(key === 'longDrive' ? 0 : 1)} m)` : value;
+};
 
 export function GolfCareerDepth({ lines }: { lines: StatLine[] }) {
   const schema = statSchema('golf');
@@ -27,7 +34,7 @@ export function GolfCareerDepth({ lines }: { lines: StatLine[] }) {
           {s.rows.map((r) => (
             <View key={r.key} style={st.row}>
               <Text style={st.label}>{r.label}{r.coverage ? <Text style={st.cov}>{`  over ${r.coverage.tracked} of ${r.coverage.total} rounds`}</Text> : null}</Text>
-              <Text style={st.value}>{r.value}</Text>
+              <Text style={st.value}>{withMetres(r.key, r.value)}</Text>
             </View>
           ))}
         </View>

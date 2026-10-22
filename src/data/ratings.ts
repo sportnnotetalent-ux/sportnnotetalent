@@ -7,7 +7,7 @@
  */
 import type { Match, Player, SportId, StatLine, TournamentAward } from '../core/types';
 import { STAT_SPORTS, mvpWeights, matchSummaryLabels, labelCompact, matchAwards, tournamentAwards, eligibilityOf, awardDef, statSchema } from '../sports/statSchemas.ts';
-import { aggregateValue, qualifierOf, qualifierText, rankPlayers, statDefIn, type Qualifier, type StatDef } from '../sports/statSchema.ts';
+import { aggregateValue, qualifierOf, qualifierText, rankPlayers, statDefIn, statInputs, trackedIn, type Qualifier, type StatDef } from '../sports/statSchema.ts';
 import { effectiveQualifier, withLineResults, type LeaderMins } from './leaderMinimums.ts';
 import { cricketCareer } from './cricketCareer.ts';
 import { isGoalkeeper } from '../sports/football/keepers.ts';
@@ -131,6 +131,42 @@ export const TOURNAMENT_AWARD_SLOTS: Record<SportId, AwardSlot[]> = Object.fromE
   ]),
 ) as Record<SportId, AwardSlot[]>;
 
+/** This sport's lines among `lines`, restricted to a tournament's matches
+ *  (and SD-49 field events) when `matchIds` is given. */
+function tournamentLines(lines: StatLine[], sport: SportId, opts: Pick<AwardRankOptions, 'matchIds' | 'eventIds'> = {}): StatLine[] {
+  const ids = opts.matchIds ? new Set(opts.matchIds) : null;
+  const evs = opts.eventIds ? new Set(opts.eventIds) : null;
+  return lines.filter((l) => l.sport === sport && (!ids || ids.has(l.matchId) || (!!l.eventId && !!evs?.has(l.eventId))));
+}
+
+/** Volleyball-kabaddi round 2 — is a slot offered over these lines? A slot
+ *  for an optional category (`onlyIfTracked`: volleyball's Best receiver /
+ *  digger / setter / libero) is, only when some line tracked every input of
+ *  what it ranks by and passes that stat's `over` filter (Best receiver: a
+ *  match that named the aced receiver). Every other slot always is. */
+export function awardSlotTracked(sport: SportId, slot: string, lines: StatLine[]): boolean {
+  const a = awardDef(sport, slot);
+  const schema = statSchema(sport);
+  if (!a?.onlyIfTracked || !schema) return true;
+  const def = statDefIn(schema, a.rankBy ?? a.stat);
+  if (!def) return true;
+  const inputs = statInputs(def);
+  const over = def.agg && 'over' in def.agg && def.agg.over ? schema.filters?.[def.agg.over] : undefined;
+  return lines.some((l) => l.sport === sport && inputs.every((k) => trackedIn(schema, l, k)) && (!over || over(l)));
+}
+
+/** The award slots a tournament offers for a sport: the fixed slots, less any
+ *  `onlyIfTracked` slot no match of the tournament tracked (round 2). `keep`
+ *  = slots that already hold an award (a draft or a published one) — they
+ *  stay listed so the host can still see / clear them. Order is unchanged. */
+export function tournamentAwardSlots(
+  lines: StatLine[], sport: SportId, opts: Pick<AwardRankOptions, 'matchIds' | 'eventIds'> = {}, keep: Iterable<string> = [],
+): AwardSlot[] {
+  const mine = tournamentLines(lines, sport, opts);
+  const kept = new Set(keep);
+  return (TOURNAMENT_AWARD_SLOTS[sport] ?? []).filter((s) => kept.has(s.slot) || awardSlotTracked(sport, s.slot, mine));
+}
+
 /** Icon for an award (custom awards get a medal). A retired slot (racket "Top
  *  scorer", chess "Most wins") keeps its icon on awards already published. */
 export const awardIcon = (sport: SportId, slot: string): string =>
@@ -239,7 +275,7 @@ function generatedFormula(sport: SportId, r: SlotRank, min: string | undefined):
         : `Most ${long(a.key ?? def.key)} in this tournament's matches`;
       break;
     case 'perGame': what = `${def.label}: total ${keysText(a.key)}, divided by games played`; break;
-    case 'perSet': what = `${def.label}: total ${long(a.key)}, divided by the sets the player was on court for`; break;
+    case 'perSet': what = `${def.label}: total ${keysText(a.key)}, divided by the sets the player was on court for`; break;
     case 'rate': {
       const n = Array.isArray(a.num) ? null : statDefIn(schema!, a.num);
       const d = Array.isArray(a.den) ? null : statDefIn(schema!, a.den);
@@ -296,9 +332,7 @@ export function rankAwardCandidates(
   lines: StatLine[], players: Player[], sport: SportId, slot: string, limit = 10,
   opts: AwardRankOptions = {},
 ): AwardCandidate[] {
-  const ids = opts.matchIds ? new Set(opts.matchIds) : null;
-  const evs = opts.eventIds ? new Set(opts.eventIds) : null;
-  const mine = withLineResults(lines.filter((l) => l.sport === sport && (!ids || ids.has(l.matchId) || (!!l.eventId && !!evs?.has(l.eventId)))), opts.matches);
+  const mine = withLineResults(tournamentLines(lines, sport, opts), opts.matches);
   const byId = new Map(players.map((p) => [p.id, p] as const));
   const linesOf = new Map<string, StatLine[]>();
   for (const l of mine) (linesOf.get(l.playerId) ?? linesOf.set(l.playerId, []).get(l.playerId)!).push(l);
@@ -399,11 +433,12 @@ export function awardFrom(sport: SportId, slot: string, label: string, c: AwardC
 }
 
 /** The suggested awards: the #1 candidate in each of the sport's slots (slots
- *  with no candidate are left out). */
+ *  with no candidate, or not offered — round 2's `onlyIfTracked` — are left
+ *  out). */
 export function defaultAwards(
   lines: StatLine[], players: Player[], sport: SportId, opts: AwardRankOptions = {},
 ): TournamentAward[] {
-  return (TOURNAMENT_AWARD_SLOTS[sport] ?? []).flatMap((s) => {
+  return tournamentAwardSlots(lines, sport, opts).flatMap((s) => {
     const top = rankAwardCandidates(lines, players, sport, s.slot, 1, opts)[0];
     return top ? [awardFrom(sport, s.slot, s.label, top)] : [];
   });

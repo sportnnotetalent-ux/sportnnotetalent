@@ -16,7 +16,7 @@ import { tennisBox } from '../boxSources';
 import { SetLineBoard } from '../SetLineBoard';
 import { RallyPointEditor } from '../RallyPointEditor';
 import { ServeOrderPicker } from '../ServeOrderPicker';
-import { detailLiveSettings } from '../pointDetailSettings';
+import { detailLiveSettings, trackFormatFields } from '../pointDetailSettings';
 import { TennisPointDetail } from './PointCapture';
 import { TennisStatsPanel } from './StatsPanel';
 import { TennisCommentary } from './Commentary';
@@ -101,27 +101,24 @@ const ScoringControls: SportPlugin<TennisState>['ScoringControls'] = ({ state, d
   );
 };
 
-const LiveExtras: NonNullable<SportPlugin<TennisState>['LiveExtras']> = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster, onPlayer }) => {
+/** Match tabs (2026-10-22): the commentary on its own tab (the doubles serve
+ *  diagram, `ServeCourt`, sits on top of it); the stats on Stats. The set
+ *  scores are on the scoreboard header above every tab. */
+type TabProps = Parameters<NonNullable<SportPlugin<TennisState>['LiveExtras']>>[0];
+/** SD-158 — commentary by game, newest first. */
+const TennisCommentaryTab = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster }: TabProps) => (
+  <TennisCommentary state={state as TennisState} homeName={homeName} awayName={awayName} homeRoster={homeRoster} awayRoster={awayRoster} homeColor={homeColor} awayColor={awayColor} />
+);
+const TennisStats = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster, onPlayer }: TabProps) => {
   const s = state as TennisState;
   return (
     <View style={{ gap: theme.spacing(3) }}>
-      <Text style={ctrl.label}>Sets</Text>
-      <View style={ctrl.setsRow}>
-        {s.sets.length === 0 ? (
-          <Text style={textStyles.muted}>Set 1 in progress · games {s.games.home}-{s.games.away}</Text>
-        ) : (
-          (lineScore(s)?.done ?? []).map((c, i) => <Text key={i} style={ctrl.setChip}>S{i + 1}: {cellText(c)}</Text>)
-        )}
-      </View>
       {/* SD-22 / SD-157: key stats, serve & return, rally — replayed from the point log, per set */}
       <TennisStatsPanel state={s} homeName={homeName} awayName={awayName} homeRoster={homeRoster} awayRoster={awayRoster} homeColor={homeColor} awayColor={awayColor} />
       {/* SD-54 — match and set durations (from the scorer's tap times) */}
       {durationLine(s.events, 'S') ? <Text style={textStyles.muted}>{durationLine(s.events, 'S')}</Text> : null}
       <Text style={ctrl.label}>Player stats</Text>
       <MatchBoxScore sport="tennis" source={tennisBox(s, { homeRoster, awayRoster })} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} onPlayer={onPlayer} />
-      {/* SD-158 — commentary by game, newest first (replaces the point log) */}
-      <Text style={ctrl.label}>Commentary</Text>
-      <TennisCommentary state={s} homeName={homeName} awayName={awayName} homeRoster={homeRoster} awayRoster={awayRoster} homeColor={homeColor} awayColor={awayColor} />
     </View>
   );
 };
@@ -188,7 +185,7 @@ export const tennisPlugin: SportPlugin<TennisState> = {
   lineScore,
   retireTerms: true,
   ScoringControls,
-  LiveExtras,
+  matchTabs: { Commentary: TennisCommentaryTab, Stats: TennisStats },
   // SD-107 — Point detail / 1st & 2nd serve (event mode: from the next point)
   liveSettings: detailLiveSettings('tennis'),
   formation: () => courtFormation('tennis'),
@@ -269,6 +266,10 @@ export const tennisPlugin: SportPlugin<TennisState> = {
         { value: 6, label: '10-point at 6-6 (Grand Slam)' },
       ],
     },
+    // racket round 2 — "Stats to track", the serve-speed unit (km/h / mph) and
+    // the rally-length buckets as advanced format fields (an organiser's
+    // default for every match of the format; the scorer can still change them)
+    ...trackFormatFields('tennis'),
   ],
 };
 

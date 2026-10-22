@@ -12,7 +12,8 @@
  *  - Set piece: lineouts on the own throw and scrums on the own feed (won of
  *    total, %), steals (the other side's lost ones).
  *  - Possession & territory: time-weighted on the playing clock from the
- *    scorer's switches.
+ *    scorer's switches; round 2: "Ball dead" spells run neither clock, and
+ *    the note then gives the ball-in-play time.
  *  - Discipline: penalties conceded (and by offence), free kicks, yellow / red
  *    cards, sin-bin time served.
  *  - Turnovers conceded (and by cause).
@@ -25,7 +26,7 @@
  * inside the 22).
  */
 import {
-  ballTime, detailTracked, matchSec, penaltiesTracked, periodLong, playedOffset, pointsOf, tallyTracked, teamFigures, totalPeriods,
+  ballTime, deadSpans, detailTracked, matchSec, penaltiesTracked, periodLong, playedOffset, pointsOf, tallyTracked, teamFigures, totalPeriods,
   CAUSE_LABEL, INFRINGEMENTS, INFRINGEMENT_LABEL, TURNOVER_CAUSES, minuteText,
   type RugbyEvent, type RugbyState, type Side,
 } from './engine.ts';
@@ -89,8 +90,9 @@ export function sinBinTime(s: RugbyState, side: Side, scope: 'all' | number = 'a
 const count = (s: RugbyState, side: Side, scope: 'all' | number, f: (e: RugbyEvent) => boolean) =>
   s.events.filter((e) => e.side === side && inScope(e, scope) && f(e)).length;
 
-/** The possession / territory note: from the scorer's switches (and from when, if late). */
-function ballNote(s: RugbyState, scope: 'all' | number, from: number | undefined): string {
+/** The possession / territory note: from the scorer's switches (and from when,
+ *  if late); with "Ball dead" used, the ball-in-play time it measured. */
+function ballNote(s: RugbyState, scope: 'all' | number, from: number | undefined, inPlay?: number): string {
   const start = scope === 'all' ? 0 : playedOffset(s, scope);
   let late = '';
   if (from !== undefined && from - start > 60) {
@@ -98,8 +100,11 @@ function ballNote(s: RugbyState, scope: 'all' | number, from: number | undefined
     while (p < s.period && playedOffset(s, p + 1) <= from) p++;
     late = ` (from ${minuteText(s, p, from - playedOffset(s, p))})`;
   }
-  return `Time on the playing clock from the scorer's taps${late}.`;
+  const bip = inPlay !== undefined ? ` Ball in play ${clock(inPlay)} — "Ball dead" spells left out.` : '';
+  return `Time on the playing clock from the scorer's taps${late}.${bip}`;
 }
+/** "34:05" (minutes can pass 60). */
+const clock = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
 
 /** The sheet for a scope ('all' or a period). `nowSec` = the live playing second. */
 export function rugbySheet(s: RugbyState, scope: 'all' | number = 'all', nowSec?: number): StatSheet {
@@ -113,6 +118,11 @@ export function rugbySheet(s: RugbyState, scope: 'all' | number = 'all', nowSec?
   const possOn = tallyTracked(s, 'trackPossession');
   const poss = possOn ? ballTime(s, 'poss', scope, nowSec) : null;
   const terr = possOn ? ballTime(s, 'terr', scope, nowSec) : null;
+  // round 2: with "Ball dead" used in the scope, the possession clock IS the ball-in-play time
+  const w0 = scope === 'all' ? 0 : playedOffset(s, scope);
+  const w1 = scope === 'all' || scope >= s.period ? Infinity : playedOffset(s, scope + 1);
+  const deadUsed = possOn && deadSpans(s, Math.max(nowSec ?? matchSec(s), 0)).some(([a, b]) => b > w0 && a < w1);
+  const inPlay = deadUsed && poss ? poss.home + poss.away : undefined;
   const pensOn = penaltiesTracked(s);
   const typesOn = tallyTracked(s, 'trackPenalties');
   const pens = (sd: Side) => (sd === 'home' ? H : A).tally.penalty + ((sd === 'home' ? H : A).detail.penaltiesGivenAway ?? 0);
@@ -154,7 +164,7 @@ export function rugbySheet(s: RugbyState, scope: 'all' | number = 'all', nowSec?
     possOn && section('possession', 'Possession & territory', [
       poss && shareRow('possession', 'Possession', poss.home, poss.away),
       terr && shareRow('territory', 'Territory', terr.home, terr.away),
-    ], ballNote(s, scope, [poss?.from, terr?.from].filter((x): x is number => x !== undefined).sort((a, b) => a - b)[0])),
+    ], ballNote(s, scope, [poss?.from, terr?.from].filter((x): x is number => x !== undefined).sort((a, b) => a - b)[0], inPlay)),
     section('discipline', 'Discipline', [
       pensOn && countRow('penaltiesConceded', 'Penalties conceded', pens('home'), pens('away'), { lowerBetter: true }),
       typesOn && countRow('freeKicks', 'Free kicks conceded', H.tally.freeKick, A.tally.freeKick, { lowerBetter: true }),

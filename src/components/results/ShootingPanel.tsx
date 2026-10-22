@@ -14,8 +14,9 @@ import { theme } from '../../core/theme';
 import { Card, SelectChip, textStyles } from '../ui';
 import { askConfirm } from '../ConfirmSheet';
 import {
-  seriesCount, positionOf, parseShot, seriesError, seriesLow, setSeries, seriesFromShots, scoreText, totalText, finalState, finalShotError,
+  seriesCount, positionOf, stageOf, parseShot, seriesError, seriesLow, setSeries, seriesFromShots, scoreText, totalText, finalState, finalShotError,
   setFinalShot, addShootOff, finalStatusText, ordinal, POSITION_LABEL, ruleOf, setPenalty, penaltyTotal, PENALTY_POINTS,
+  setFinalPenalty, finalPenaltyTotal, netFinalShots,
   type EntryResult, type ResultEntry, type ShootEventDef, type CompRules,
 } from '../../data/results';
 
@@ -64,7 +65,7 @@ export function SeriesCard({ entries, ev, shots, mode, editable, onSave, rules }
         ))}
       </View>
       <Text style={textStyles.muted}>
-        {pos ? `${POSITION_LABEL[pos]} · ` : ''}{per} {ev.scoring === 'hits' ? 'targets' : 'shots'} · {mode === 'shot' ? `type the shots in one line${ev.scoring === 'integer' ? ' (X = inner ten)' : ''}` : ev.scoring === 'integer' ? 'the series total and its inner tens (X)' : ev.scoring === 'hits' ? 'targets hit' : 'the series total (decimal)'}
+        {pos ? `${POSITION_LABEL[pos]} · ` : ''}{stageOf(ev, shots, cur) ? `${stageOf(ev, shots, cur)} stage · ` : ''}{per} {ev.scoring === 'hits' ? 'targets' : 'shots'} · {mode === 'shot' ? `type the shots in one line${ev.scoring === 'integer' ? ' (X = inner ten)' : ''}` : ev.scoring === 'integer' ? 'the series total and its inner tens (X)' : ev.scoring === 'hits' ? 'targets hit' : 'the series total (decimal)'}
       </Text>
       {rows.map((e) => (
         <SeriesInput key={`${e.id}:${cur}:${e.result.series?.[cur] ?? ''}:${e.result.seriesX?.[cur] ?? ''}`} e={e} i={cur} per={per} ev={ev} mode={mode} editable={editable} onSave={onSave} pens={pens} />
@@ -167,7 +168,8 @@ function readShots(t: string, ev: ShootEventDef): { shots: (number | 'X')[]; tot
 
 /* ---------------------------------- final ---------------------------------- */
 
-export function FinalCard({ entries, ev, editable, onSave }: { entries: ResultEntry[]; ev: ShootEventDef; editable: boolean; onSave: Save }) {
+export function FinalCard({ entries, ev, editable, onSave, rules }: { entries: ResultEntry[]; ev: ShootEventDef; editable: boolean; onSave: Save; /** round 2: the meet's rules — `shootPen` also gives a −2 on a final shot */ rules?: CompRules }) {
+  const pens = ruleOf(rules, 'shootPen') === true;
   const state = useMemo(() => finalState(entries, ev), [entries, ev]);
   const byId = useMemo(() => new Map(entries.map((e) => [e.id, e])), [entries]);
   const nameOf = (id: string) => byId.get(id)?.name ?? '';
@@ -203,7 +205,7 @@ export function FinalCard({ entries, ev, editable, onSave }: { entries: ResultEn
             const fired = (e.result.fshots ?? []).length;
             const has = fired >= state.nextShot;
             return (
-              <ShotRow key={`${e.id}:${state.nextShot}:${fired}`} name={e.name} lot={e.result.order} sub={`${total(e.id)} after ${fired} shot${fired === 1 ? '' : 's'}${fired ? ` · last ${e.result.fshots![fired - 1].toFixed(1)}` : ''}`}
+              <ShotRow key={`${e.id}:${state.nextShot}:${fired}`} name={e.name} lot={e.result.order} sub={`${total(e.id)} after ${fired} shot${fired === 1 ? '' : 's'}${fired ? ` · last ${e.result.fshots![fired - 1].toFixed(1)}` : ''}${finalPenaltyTotal(e.result) ? ` · penalty −${finalPenaltyTotal(e.result)}` : ''}`}
                 value={has ? e.result.fshots![state.nextShot - 1] : undefined} done={has}
                 onSave={(v) => onSave(e.id, setFinalShot(e.result, fired, v), `Shot ${fired + 1} ${v.toFixed(1)} · ${first(e.name)}`)} />
             );
@@ -217,7 +219,8 @@ export function FinalCard({ entries, ev, editable, onSave }: { entries: ResultEn
           <View style={st.wrap}>
             {entries.filter(inPlay).map((e) => <SelectChip key={e.id} label={first(e.name)} active={fixing === e.id} onPress={() => setFixing(fixing === e.id ? null : e.id)} />)}
           </View>
-          {fixing && byId.get(fixing) && <ShotFixer key={fixing} e={byId.get(fixing)!} passed={passed} onSave={onSave} onDone={() => setFixing(null)} />}
+          {fixing && byId.get(fixing) && <ShotFixer key={fixing} e={byId.get(fixing)!} passed={passed} onSave={onSave} onDone={() => setFixing(null)} pens={pens} />}
+          {pens ? <Text style={st.hint}>Penalty: tap the finalist, then the shot it was given on — 2 points come off that shot and the totals and eliminations follow.</Text> : null}
         </View>
       )}
     </Card>
@@ -253,9 +256,11 @@ function ShotRow({ name, lot, sub, value, done, onSave }: { name: string; lot?: 
   );
 }
 
-/** Correct one finalist's shots: tap a shot to change it, or take the last one off. */
-function ShotFixer({ e, passed, onSave, onDone }: { e: ResultEntry; passed: number; onSave: Save; onDone: () => void }) {
+/** Correct one finalist's shots: tap a shot to change it, or take the last one off
+ *  (round 2: or give a 2-point penalty on it, when the meet tracks penalties). */
+function ShotFixer({ e, passed, onSave, onDone, pens }: { e: ResultEntry; passed: number; onSave: Save; onDone: () => void; pens?: boolean }) {
   const shots = e.result.fshots ?? [];
+  const net = netFinalShots(e.result);
   const [i, setI] = useState<number | null>(null);
   const [t, setT] = useState('');
   const [err, setErr] = useState<string | null>(null);
@@ -267,6 +272,13 @@ function ShotFixer({ e, passed, onSave, onDone }: { e: ResultEntry; passed: numb
     if (bad) { setErr(bad); return; }
     if (!(await warn(i))) return;
     onSave(e.id, setFinalShot(e.result, i, v!), `Shot ${i + 1} → ${v!.toFixed(1)} · ${first(e.name)}`);
+    onDone();
+  };
+  // ISSF 6.12.6.2 b: 2 points; dry firing in a 10 m / 50 m final 1 point (6.17.1.14 e)
+  const penalty = async (next: number) => {
+    if (i == null || (e.result.fpen?.[i] ?? 0) === next) return;
+    if (!(await warn(i))) return;
+    onSave(e.id, setFinalPenalty(e.result, i, next), next ? `Shot ${i + 1} penalty −${next} · ${first(e.name)}` : `Shot ${i + 1} penalty cleared · ${first(e.name)}`);
     onDone();
   };
   const removeLast = async () => {
@@ -281,9 +293,10 @@ function ShotFixer({ e, passed, onSave, onDone }: { e: ResultEntry; passed: numb
     <View style={st.editor}>
       <View style={st.wrap}>
         {shots.length ? shots.map((v, k) => (
-          <TouchableOpacity key={k} accessibilityRole="button" accessibilityLabel={`Shot ${k + 1}: ${v.toFixed(1)}`} onPress={() => { setI(k); setT(v.toFixed(1)); setErr(null); }} style={[st.cell, i === k && st.cellOn]}>
+          <TouchableOpacity key={k} accessibilityRole="button" accessibilityLabel={`Shot ${k + 1}: ${v.toFixed(1)}${e.result.fpen?.[k] ? `, penalty minus ${e.result.fpen[k]}, counts ${net[k].toFixed(1)}` : ''}`} onPress={() => { setI(k); setT(v.toFixed(1)); setErr(null); }} style={[st.cell, i === k && st.cellOn]}>
             <Text style={st.cellNo}>{k + 1}</Text>
             <Text style={st.cellTxt}>{v.toFixed(1)}</Text>
+            {e.result.fpen?.[k] ? <Text style={[st.cellNo, { color: theme.colors.danger }]}>−{e.result.fpen[k]}</Text> : null}
           </TouchableOpacity>
         )) : <Text style={textStyles.muted}>No final shots yet.</Text>}
       </View>
@@ -293,6 +306,14 @@ function ShotFixer({ e, passed, onSave, onDone }: { e: ResultEntry; passed: numb
           <SelectChip label={`Set shot ${i + 1}`} active={false} onPress={() => void apply()} />
         </View>
       )}
+      {i != null && (pens || e.result.fpen?.[i]) ? (
+        <View style={st.wrap}>
+          <Text style={st.head}>Penalty on shot {i + 1}</Text>
+          <SelectChip label={`−${PENALTY_POINTS}`} active={e.result.fpen?.[i] === PENALTY_POINTS} onPress={() => void penalty(PENALTY_POINTS)} />
+          <SelectChip label="−1 dry fire" active={e.result.fpen?.[i] === 1} onPress={() => void penalty(1)} />
+          <SelectChip label="None" active={!e.result.fpen?.[i]} onPress={() => void penalty(0)} />
+        </View>
+      ) : null}
       {shots.length > 0 && <SelectChip label="Remove the last shot" active={false} onPress={() => void removeLast()} />}
       {err ? <Text style={st.bad}>{err}</Text> : null}
     </View>

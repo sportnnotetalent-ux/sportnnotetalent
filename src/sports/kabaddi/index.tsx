@@ -725,16 +725,19 @@ const LiveClock: NonNullable<SportPlugin<KabaddiState>['LiveClock']> = ({ state 
   );
 };
 
-/** Deep wave — the Score tab: the raid-by-raid commentary (replaces the flat
- *  timeline; grouped by half, running score, tags), the PKL match centre
- *  (categories + half filter + top performers — replaces the box score's
- *  comparison rows) and the player box at PKL depth. */
-const LiveExtras: NonNullable<SportPlugin<KabaddiState>['LiveExtras']> = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster, onPlayer }) => {
+/** Match tabs (2026-10-22): the raid-by-raid commentary (grouped by half,
+ *  running score, tags) on Commentary; the PKL match centre (categories + half
+ *  filter + leaders per half) and the player box at PKL depth on Stats. */
+type TabProps = Parameters<NonNullable<SportPlugin<KabaddiState>['LiveExtras']>>[0];
+const KabaddiCommentary = ({ state, homeName, awayName, homeColor, awayColor }: TabProps) => {
   const s = state as KabaddiState;
   const feed = useMemo(() => kabaddiCommentary(s, { home: homeName, away: awayName }), [s, homeName, awayName]);
+  return <FeedView groups={feed} homeColor={homeColor} awayColor={awayColor} emptyText="No raids yet." title="Commentary · raid by raid" />;
+};
+const KabaddiStats = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster, onPlayer }: TabProps) => {
+  const s = state as KabaddiState;
   return (
     <View style={{ gap: theme.spacing(3) }}>
-      <FeedView groups={feed} homeColor={homeColor} awayColor={awayColor} emptyText="No raids yet." title="Commentary · raid by raid" />
       <KabaddiStatsPanel state={s} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} />
       <Text style={ctrl.label}>Player stats</Text>
       <MatchBoxScore sport="kabaddi" schema={KABADDI_DEEP_BOX} show="box" source={kabaddiDeepBox(s, { homeRoster, awayRoster })} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} onPlayer={onPlayer} />
@@ -802,7 +805,8 @@ export const kabaddiPlugin: SportPlugin<KabaddiState> = {
   statTotalsNeedsPlayers: true,
   ScoringControls,
   LiveClock,
-  LiveExtras,
+  // its match centre has its own Game flow category (no shared card under it)
+  matchTabs: { Commentary: KabaddiCommentary, Stats: KabaddiStats, ownGameFlow: true },
   // deep wave — "Stats to track": raid skill, defenders touched (both off by default)
   liveSettings: KABADDI_LIVE_SETTINGS,
   formation: () => courtFormation('kabaddi'),

@@ -21,6 +21,8 @@ import { Button, Card, FormError, SelectChip, ScreenTitle, textStyles } from '..
 import type { RootStackParamList } from '../navigation/types';
 import { usePlayers, useTournamentById } from '../data/hooks';
 import { EventOfficials } from '../components/results/EventOfficials';
+// timed races round 2: this event's own "Stats to track"
+import { EventTrackCard } from '../components/results/EventTrackCard';
 import { AgeBasisNote } from '../components/results/AgeBasisNote';
 import { useMeetAges } from '../data/useMeetAges';
 import { getTournamentTeams, getTeamRosters } from '../data/repos';
@@ -31,6 +33,7 @@ import {
   fieldEventsFor, isFieldDiscipline, implementSpec, implementNote, defaultBoard, TJ_BOARDS, defaultBar, barPlan, barProgressionError, minBarStep,
   swimMeetSettings, swimEventsFor, phaseDiscipline, legLabels, mixedRelayError, COURSES, courseLabel,
   type Category, type RoundsPreset, type PlannedPhase, type Course,
+  trackOptions, type TrackOverrides,
 } from '../data/results';
 import { getEntriesDoc } from '../data/meetEntriesStore';
 import { tickedFor, slotKey, matchTeam, type MeetEntriesDoc } from '../data/results';
@@ -61,6 +64,13 @@ const GROUP_TITLE: Record<string, string> = {
 const ATH_GROUPS = ['sprint', 'distance', 'hurdles', 'relay', 'jumps', 'throws'] as const;
 const SWIM_GROUPS = ['free', 'back', 'breast', 'fly', 'im', 'relay'] as const;
 const cm = (v: number) => `${Math.round(v * 100)} cm`;
+/** Timed races round 2: keep only the overrides this event offers. */
+const trackFor = (t: TrackOverrides | undefined, def: Parameters<typeof trackOptions>[0]): TrackOverrides | undefined => {
+  if (!t) return undefined;
+  const keys = new Set<string>(trackOptions(def).map((o) => o.key));
+  const out = Object.fromEntries(Object.entries(t).filter(([k]) => keys.has(k))) as TrackOverrides;
+  return Object.keys(out).length ? out : undefined;
+};
 
 /** SD-97: weightlifting has its own setup (bodyweight categories, lifters, lots). */
 export default function AthleticsEventSetupScreen() {
@@ -90,6 +100,8 @@ function TrackSwimEventSetup() {
   const [course, setCourse] = useState<Course>(sw.course);
   useEffect(() => { setCourse(sw.course); }, [sw.course]);
   const manual = swim ? sw.manual : meet.handTimed;
+  // timed races round 2: "Stats to track" for this event only (overrides of the meet's)
+  const [track, setTrack] = useState<TrackOverrides | undefined>(undefined);
 
   // SD-128: opened from the entries matrix → that event, pre-filled from its ticks
   const [age, setAge] = useState<string>(params?.age ?? (swim ? 'U12' : 'U14'));
@@ -274,6 +286,8 @@ function TrackSwimEventSetup() {
         discipline: def.key, category: cat, tournamentId, entrants, plan, lanes: !swim && (def.lanes || field) ? lanes : 'seeded',
         startsAt: schedule.startsAt, sched: schedule.value, handTimed: manual, reaction: swim ? sw.reaction : meet.reaction,
         ...(swim ? { venueLanes: sw.lanes, splits: sw.splits } : {}),
+        // round 2: only the overrides this event offers (a 100 m keeps no lap-time choice)
+        track: trackFor(track, def),
         ...(field ? {
           bar: vertical ? bar : undefined, implement: implement.trim() || undefined, board: def.key === 'ath.tj' ? board : undefined,
           noWindGauge: def.wind === 'attempt' && !gauge ? true : undefined,
@@ -520,6 +534,7 @@ function TrackSwimEventSetup() {
 
         {!swim && meet.handTimed ? <Text style={textStyles.muted}>This meet is hand-timed (Athletics settings): times are read to the tenth and count for meet records.</Text> : null}
         {swim && sw.manual ? <Text style={textStyles.muted}>Manual timing (Swimming settings): times to 1/100 from the lane's watches (SW 11.3) count for meet records.</Text> : null}
+        <EventTrackCard def={def} f={{ reaction: swim ? sw.reaction : meet.reaction, splits: swim ? sw.splits : undefined, track }} meet={tournament?.formats?.[sport] as Record<string, unknown> | undefined} onChange={setTrack} />
         {n > 0 ? <ScheduleCard state={schedule} tournamentId={tournamentId} discipline={def.key} plan={preset?.plan} athleteIds={relay ? relays.flatMap((r) => r.members) : picks.map((p) => p.playerId)} /> : null}
         <EventOfficials tournament={tournament} value={officials} onChange={setOfficials} />
         <FormError message={error} />

@@ -1,6 +1,9 @@
 /** Generic post-match (or live) summary for any sport without its own Summary:
  *  the result, an MVP, and every contributor's 1–5 star rating built from the
- *  match's recorded stat lines. Cricket ships a richer state-based summary. */
+ *  match's recorded stat lines. Cricket ships a richer state-based summary.
+ *  Match tabs (2026-10-22): this is the Summary tab — the result and the
+ *  people only; box scores and team stats live on the Stats tab. While the
+ *  match is live the ratings read "Live — provisional". */
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { theme } from '../core/theme';
@@ -17,7 +20,7 @@ const initials = (name?: string): string =>
 
 export function MatchSummary({
   statLines, sport, homeRoster, awayRoster, homeName, awayName, homeColor = theme.colors.home, awayColor = theme.colors.away,
-  summary, scoreLine, complete, live, onPlayer, potm,
+  summary, scoreLine, complete, live, onPlayer, potm, afterResult,
 }: {
   statLines: StatLine[];
   sport: SportId;
@@ -37,6 +40,9 @@ export function MatchSummary({
   onPlayer?: (id: string) => void;
   /** the stored Player of the Match override (parity #21) — beats the computed MVP */
   potm?: PotmProp;
+  /** match tabs: the result's own detail, right under the result (a sport's
+   *  `matchTabs.SummaryExtras` — the scorers, sendings-off) */
+  afterResult?: React.ReactNode;
 }) {
   const { players, mvp: computedMvp } = matchRatings(statLines, sport, homeRoster, awayRoster);
   // REVIEW Decision 10: a stored override always wins over the (re)computed MVP.
@@ -84,6 +90,7 @@ export function MatchSummary({
           <Text style={st.drawn}>Match drawn</Text>
         ) : null}
       </View>
+      {afterResult}
 
       {mvp && (
         <TouchableOpacity accessibilityRole="button" activeOpacity={0.85} onPress={() => mvp.id && onPlayer?.(mvp.id)} style={st.mvp}>
@@ -120,7 +127,7 @@ export function MatchSummary({
         </View>
       )}
 
-      <Text style={[textStyles.h3, { marginTop: theme.spacing(1) }]}>{complete ? 'Player ratings · out of 5' : 'Player ratings · so far'}</Text>
+      <Text style={[textStyles.h3, { marginTop: theme.spacing(1) }]}>{complete ? 'Player ratings · out of 5' : 'Player ratings · Live — provisional'}</Text>
       {players.length > 0 && (
         <Text style={st.note}>
           {complete

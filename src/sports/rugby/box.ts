@@ -5,8 +5,9 @@
  * can be credited with (a penalty try, an unattributed score) land on the
  * "Team" row so the totals equal the score. Team figures feed the comparison:
  * penalty tries, lineouts and scrums on the team's own throw / feed. Deep
- * wave: the "Stats to track" player keys (PC, TC, OL) are on every row only
- * when the match tracked them (D8 — the column stays hidden otherwise).
+ * wave: the "Stats to track" player keys (PC, TC, OL; round 2: FKC) are on
+ * every row only when the match tracked them (D8 — the column stays hidden
+ * otherwise).
  */
 import type { Player } from '../../core/types';
 import type { BoxRowInput, BoxSideInput, MatchBoxSource } from '../boxScore.ts';
@@ -74,6 +75,8 @@ export function rugbyBox(s: RugbyState, ctx: RugbyBoxContext = {}): MatchBoxSour
         if (tallies.includes('penaltiesGivenAway')) want.penaltiesGivenAway = (f.detail.penaltiesGivenAway ?? 0) + f.tally.penalty;
         if (tallies.includes('turnoversConceded')) want.turnoversConceded = f.tally.turnover;
         if (tallies.includes('offloads')) want.offloads = f.tally.offload;
+        // round 2: unnamed free kicks too, once the match credits free kicks to players
+        if (tallies.includes('freeKicksConceded')) want.freeKicksConceded = f.tally.freeKick;
         const teamStats: Record<string, number> = {};
         for (const [k, v] of Object.entries(want)) {
           const left = v - sum(k);

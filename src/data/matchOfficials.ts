@@ -100,6 +100,14 @@ export const OFFICIAL_SLOTS: Partial<Record<SportId, OfficialSlot[]>> = {
     { key: 'tmo', label: 'TMO', group: ['TMO', 'TMOs'] },
     COMMENTATOR,
   ],
+  // Rugby league: the referee, two touch judges and the video referee (elite)
+  rugby_league: [
+    { key: 'referee', label: 'Referee', group: ['Referee', 'Referees'] },
+    { key: 'touch1', label: 'Touch judge 1', group: ['Touch judge', 'Touch judges'] },
+    { key: 'touch2', label: 'Touch judge 2', group: ['Touch judge', 'Touch judges'] },
+    { key: 'video', label: 'Video referee', group: ['Video referee', 'Video referees'] },
+    COMMENTATOR,
+  ],
   kabaddi: [
     { key: 'referee', label: 'Referee', group: ['Referee', 'Referees'] },
     { key: 'umpire1', label: 'Umpire 1', group: UMPIRES },

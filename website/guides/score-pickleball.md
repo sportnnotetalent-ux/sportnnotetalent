@@ -42,7 +42,7 @@ A banner shows **↔ Change ends** after each game, and in the last game when a 
 A chip under the board shows **GAME POINT** or **MATCH POINT** with the team's name. In side-out scoring only the serving team can have one; in rally scoring both can show one at once.
 
 ## Match stats
-The **Score** tab's "Match stats" (per match or game) has tabs:
+The **Stats** tab's "Match stats" (per match or game) has tabs:
 - **Key stats**: Serve (side-out scoring: rallies won on serve, side-out %, side-outs won, service turns, points per service turn, serve to 2nd server; rally scoring: points won on serve and receive; service faults when described), Winners & errors, Points won (kitchen-line rallies won, total, streaks, biggest lead) and game / match points converted and saved.
 - **Serve**: every serve and receive figure; doubles adds points won by server.
 - **Shots** (with point detail): winners, unforced or forced errors by shot, for either wing or **Forehand** / **Backhand** only; a stroke summary; errors and service faults by type.
@@ -68,7 +68,7 @@ After each rally a "Last point" card appears, even for a side-out rally. Tap wha
 Errors count against the opponent (doubles: pick who under **By:**).
 
 ## Commentary
-Under the stats, "Commentary" tells the match game by game, newest first, the game in play on top:
+The **Commentary** tab tells the match game by game, newest first, the game in play on top:
 - "Red House wins game 1" with the game score, e.g. **11-7**, and where the match stands.
 - Each rally: "Point to Red House" (side-out scoring: "Rally to Blue House" when it only won the serve), the match time and, if you described it, a line like "Asha Rao loses the point with a Forehand Dink Unforced Error (kitchen fault)". On the right, the call after the rally, server first: **4-2-1** in side-out doubles, else **4-2**; "Second server" or "Side out · Blue House to serve" when the serve moves.
 - The kitchen line, rally length and 3rd shot you marked; change ends, timeouts and fouls; who served first.

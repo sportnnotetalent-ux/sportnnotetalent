@@ -302,11 +302,11 @@ describe('netball deep · commentary and team stats', () => {
 
 describe('netball deep · scorer UI guards', () => {
   const src = readFileSync(new URL('../src/sports/netball/index.tsx', import.meta.url), 'utf8');
-  test('the "Stats to track" switches (off by default); super shots are an organiser rule', () => {
+  test('the "Stats to track" switches (off by default — round 2: CPR on, the international standard); super shots are an organiser rule', () => {
     const keys = NETBALL_LIVE_SETTINGS.fields.filter((f) => f.group === 'Stats to track').map((f) => f.key);
     assert.deepEqual(keys, ['detail', 'trackCpr', 'trackGains', 'trackTurnovers']);
-    assert.ok(NETBALL_LIVE_SETTINGS.fields.every((f) => f.type !== 'toggle' || f.default === false || f.key === 'stopClock'));
-    assert.match(src, /key: 'superShot', label: '2-point super shots', type: 'toggle', default: false/);
+    assert.ok(NETBALL_LIVE_SETTINGS.fields.every((f) => f.type !== 'toggle' || f.default === false || f.key === 'stopClock' || f.key === 'trackCpr'));
+    assert.match(src, /key: 'superShotRule', label: '2-point super shots', type: 'choice', default: 'off'/);
   });
   test('CPR is one tap on the centre strip; outcome / type steps follow the player; the views', () => {
     assert.match(src, /fire\(\{ type: 'CPR', side: cp, payload: \{ playerId: p\.id, playerName: p\.fullName, pos \} \}\)/);

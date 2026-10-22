@@ -35,7 +35,9 @@ const ser = (series: number[], xs: number[] = [], scoring: 'decimal' | 'integer'
 
 describe('the ISSF programme', () => {
   test('events, scoring and match lengths', () => {
-    assert.deepEqual(SHOOT_EVENTS.map((e) => e.key), ['shoot.10mar', 'shoot.10map', 'shoot.50m3p', 'shoot.25mp', 'shoot.25mrf', 'shoot.10marx', 'shoot.10mapx', 'shoot.trap', 'shoot.skeet']);
+    // round 2 (precision-strength item 4): the new ISSF events and the NRAI school classes come last
+    assert.deepEqual(SHOOT_EVENTS.map((e) => e.key), ['shoot.10mar', 'shoot.10map', 'shoot.50m3p', 'shoot.25mp', 'shoot.25mrf', 'shoot.10marx', 'shoot.10mapx', 'shoot.trap', 'shoot.skeet',
+      'shoot.50mpr', 'shoot.25msp', 'shoot.25mcf', 'shoot.50mp', 'shoot.10mps', 'shoot.10mos']);
     assert.equal(AR.dp, 1); assert.equal(AP.dp, 0); assert.equal(AR.tie, 'issf'); assert.equal(AR.capture, 'target');
     assert.equal(disciplineOf('shoot.10marx')!.teamSize, 2);
     assert.equal(maxShot('decimal'), 10.9); assert.equal(maxShot('integer'), 10); assert.equal(maxShot('hits'), 1);

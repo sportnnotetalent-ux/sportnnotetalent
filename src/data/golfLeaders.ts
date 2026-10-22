@@ -13,6 +13,7 @@ import type { FieldEntry, FieldEvent, GolfCourse, StatLine, TournamentScoring } 
 import { buildLeaderboard, golfFormatOf } from './golfLeaderboard.ts';
 import { eventAwards, DEFAULT_EVENT_POINTS, type FieldResultInput } from './results/medals.ts';
 import type { RankedEntry } from './results/model.ts';
+import { distUnitOf, YARD_M, type DistUnit } from '../sports/golf/engine.ts';
 
 /** A tournament's stat lines (GEN-18): match lines of its matches, plus
  *  field-event lines (no match) whose event — a golf round, a results-engine
@@ -21,8 +22,9 @@ export function scopeTournamentLines(lines: StatLine[], matchIds: Set<string>, e
   return lines.filter((l) => (l.eventId ? eventIds.has(l.eventId) : matchIds.has(l.matchId)));
 }
 
-/** Leader categories that only stroke play / Stableford rounds produce. */
-export const GOLF_STROKE_LEADERS = ['lowRound', 'lowRound9', 'scoringAvg', 'puttsPerRound', 'girPct'] as const;
+/** Leader categories that only stroke play / Stableford rounds produce.
+ *  Round 2 — putts per GIR, driving distance, par-3 / 4 / 5 scoring averages. */
+export const GOLF_STROKE_LEADERS = ['lowRound', 'lowRound9', 'scoringAvg', 'puttsPerRound', 'girPct', 'puttsPerGir', 'drivingDistance', 'p3Avg', 'p4Avg', 'p5Avg'] as const;
 
 /** Is this golf tournament played as match play? (format `competition`) */
 export const isGolfMatchPlay = (format?: Record<string, unknown>) => String(format?.competition ?? 'stroke') === 'match';
@@ -35,10 +37,23 @@ export const isGolfMatchPlay = (format?: Record<string, unknown>) => String(form
  * already dropped by `categoryLeaders`.
  */
 export function golfLeaderCategories<T extends { key: string }>(cats: T[], format?: Record<string, unknown>): T[] {
-  if (isGolfMatchPlay(format)) return cats;
-  const order = ['lowRound', 'lowRound9', 'scoringAvg', 'birdies', 'eagles', 'puttsPerRound', 'girPct'];
+  const shown = cats.map((c) => inUnit(c, distUnitOf(format)));
+  if (isGolfMatchPlay(format)) return shown;
+  const order = ['lowRound', 'lowRound9', 'scoringAvg', 'birdies', 'eagles', 'puttsPerRound', 'girPct', 'puttsPerGir', 'drivingDistance', 'p3Avg', 'p4Avg', 'p5Avg'];
   const rank = (k: string) => { const i = order.indexOf(k); return i < 0 ? order.length : i; };
-  return cats.filter((c) => c.key !== 'holesWon').sort((a, b) => rank(a.key) - rank(b.key));
+  return shown.filter((c) => c.key !== 'holesWon').sort((a, b) => rank(a.key) - rank(b.key));
+}
+
+/** Round 2 — driving distance in the tournament's unit: lines keep yards, a
+ *  metres tournament (format `distUnit: 'm'`) shows the leaders in metres. */
+function inUnit<T extends { key: string }>(c: T, unit: DistUnit): T {
+  if (c.key !== 'drivingDistance' || unit !== 'm') return c;
+  const cat = c as T & { label?: string; leaders?: { value: number; display?: string }[] };
+  return {
+    ...cat,
+    ...(cat.label ? { label: cat.label.replace('(yd)', '(m)') } : {}),
+    ...(cat.leaders ? { leaders: cat.leaders.map((l) => ({ ...l, display: (l.value * YARD_M).toFixed(1) })) } : {}),
+  };
 }
 
 /** The team a golfer scores for in a multi-sport table. */

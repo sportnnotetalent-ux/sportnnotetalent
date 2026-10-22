@@ -12,14 +12,17 @@ import type { RankedEntry } from './model.ts';
 
 export type AlertMedalKind = 'gold' | 'silver' | 'bronze';
 
-export interface AlertMedal { medal: AlertMedalKind; playerId?: string; teamId?: string; name: string; mark?: string }
+export interface AlertMedal { medal: AlertMedalKind; playerId?: string; teamId?: string; name: string; mark?: string;
+  /** timed races round 2: a gold medallist who set a personal best ("— PB" on the push) */
+  pb?: boolean }
 export interface ResultAlert { v: 1; kind: 'final' | 'golf'; event?: string; medals: AlertMedal[] }
 
 const MEDALS: AlertMedalKind[] = ['gold', 'silver', 'bronze'];
 const medalAt = (p: number | null | undefined): AlertMedalKind | undefined => (p != null && p >= 1 && p <= 3 ? MEDALS[p - 1] : undefined);
 
-/** A results final: the podium of the ranked rows (ties share a medal). */
-export function finalAlert(rows: Pick<RankedEntry, 'position' | 'entry' | 'bestText'>[], event?: string): ResultAlert {
+/** A results final: the podium of the ranked rows (ties share a medal).
+ *  Round 2: `pbIds` = gold medallists (player ids) who set a PB. */
+export function finalAlert(rows: Pick<RankedEntry, 'position' | 'entry' | 'bestText'>[], event?: string, pbIds?: ReadonlySet<string>): ResultAlert {
   const medals: AlertMedal[] = [];
   for (const r of rows) {
     const medal = medalAt(r.position);
@@ -29,6 +32,7 @@ export function finalAlert(rows: Pick<RankedEntry, 'position' | 'entry' | 'bestT
       medal, name: e.name,
       ...(e.athleteId ? { playerId: e.athleteId } : e.team?.id ? { teamId: e.team.id } : {}),
       ...(r.bestText ? { mark: r.bestText } : {}),
+      ...(medal === 'gold' && e.athleteId && pbIds?.has(e.athleteId) ? { pb: true } : {}),
     });
   }
   return { v: 1, kind: 'final', ...(event ? { event } : {}), medals };

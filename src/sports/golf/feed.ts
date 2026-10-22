@@ -13,8 +13,8 @@
  *     first, from the match's event log (state).
  */
 import {
-  derivedGir, matchState, summarize, PUTT_BUCKETS, driveYards, toParLabel,
-  type GolfCard, type Hole,
+  derivedGir, matchState, summarize, PUTT_BUCKETS, driveYards, driveIn, puttBucketText, upAndDown, toParLabel,
+  type DistUnit, type GolfCard, type Hole,
 } from './engine.ts';
 import { matchHole, holeNumber } from './matchStrokes.ts';
 import type { GolfMatchState } from './match.ts';
@@ -45,12 +45,13 @@ const cap = (t: string) => (t ? t[0].toUpperCase() + t.slice(1) : t);
 /** The captured detail of one hole in plain words ('' when none was kept):
  *  "268-yd drive · missed the fairway left · greenside bunker · sand save ·
  *  1 putt from 3–10 ft · 1 penalty stroke". */
-export function holeStory(card: GolfCard, i: number, hole: Hole): string {
+export function holeStory(card: GolfCard, i: number, hole: Hole, unit: DistUnit = 'yd'): string {
   const st = card.strokes[i];
   if (typeof st !== 'number') return '';
   const parts: string[] = [];
   const yd = driveYards(card.drive?.[i]);
-  if (yd != null && hole.par >= 4) parts.push(`${yd}-yd drive`);
+  // Round 2 — the drive in the round's unit ("268-yd drive" / "245-m drive")
+  if (yd != null && hole.par >= 4) parts.push(`${driveIn(yd, unit)}-${unit === 'm' ? 'm' : 'yd'} drive`);
   const firB = card.fir?.[i];
   const dir = card.firDir?.[i] ?? (firB == null ? null : firB ? 'hit' : 'miss');
   if (hole.par >= 4 && dir) parts.push(dir === 'hit' ? 'found the fairway' : dir === 'L' ? 'missed the fairway left' : dir === 'R' ? 'missed the fairway right' : 'missed the fairway');
@@ -68,15 +69,22 @@ export function holeStory(card: GolfCard, i: number, hole: Hole): string {
   else if (bunker) parts.push('greenside bunker');
   if (putted) {
     const fb = card.firstPutt?.[i];
-    const from = typeof fb === 'number' && PUTT_BUCKETS[fb] ? PUTT_BUCKETS[fb].long : null;
+    const from = typeof fb === 'number' && PUTT_BUCKETS[fb] ? puttBucketText(fb, unit, true) : null;
     if (p === 0) parts.push('holed out from off the green');
     else if (p === 1) parts.push(`1 putt${from ? ` from ${from}` : ''}`);
     else parts.push(`${p} putts${p >= 3 ? ' (three-putt)' : ''}${from ? `, first from ${from}` : ''}`);
   }
   // a sand save (out of the greenside bunker and in within one putt — as
   // roundStats counts it), else a scramble (missed the green, par or better)
+  // Round 2 — with the shots from off the green recorded: an up and down
+  // (2 shots or fewer from there) or how many it took
+  const og = card.offGreen?.[i];
+  const ud = upAndDown(og, p);
   if (bunker && (putted ? (p as number) <= 1 : st <= hole.par)) parts.push('sand save');
-  else if (gir === false && st <= hole.par) parts.push(st === hole.par ? 'saved par' : 'up and down for birdie');
+  else if (ud != null) {
+    if (ud) parts.push(st === hole.par ? 'up and down to save par' : st < hole.par ? `up and down for ${scoreName(st, hole.par)}` : 'up and down');
+    else parts.push(`${og} shot${og === 1 ? '' : 's'} from off the green, no up and down`);
+  } else if (gir === false && st <= hole.par) parts.push(st === hole.par ? 'saved par' : 'up and down for birdie');
   return cap(parts.join(' · '));
 }
 
@@ -96,7 +104,7 @@ const SCORE_ICON: Record<string, string> = { 'hole in one': '🎯', albatross: '
 
 /** The field's commentary: groups by hole (newest hole first). `only` = one
  *  player's feed. */
-export function golfRoundFeed(players: FeedPlayer[], o: { scoring: 'stroke' | 'stableford'; net?: boolean; only?: string }): FeedGroup[] {
+export function golfRoundFeed(players: FeedPlayer[], o: { scoring: 'stroke' | 'stableford'; net?: boolean; only?: string; unit?: DistUnit }): FeedGroup[] {
   const list = o.only ? players.filter((p) => p.id === o.only) : players;
   const n = Math.max(0, ...players.map((p) => p.holes.length));
   const groups: FeedGroup[] = [];
@@ -115,7 +123,7 @@ export function golfRoundFeed(players: FeedPlayer[], o: { scoring: 'stroke' | 's
       const name = scoreName(st, hole.par);
       const rcv = pl.received[i] ?? 0;
       const net = rcv ? ` (net ${st - rcv})` : '';
-      const story = holeStory(pl.card, i, hole);
+      const story = holeStory(pl.card, i, hole, o.unit);
       const icon = SCORE_ICON[name];
       items.push({
         id: `${pl.id}-${i}`, order,

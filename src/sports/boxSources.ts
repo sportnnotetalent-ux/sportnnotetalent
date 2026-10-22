@@ -50,6 +50,8 @@ import { afBox } from './american_football/box.ts';
 import type { AFState } from './american_football/engine.ts';
 import { rugbyBox } from './rugby/box.ts';
 import type { RugbyState } from './rugby/engine.ts';
+import { leagueBox } from './rugby_league/box.ts';
+import type { LeagueState } from './rugby_league/engine.ts';
 
 type Side = 'home' | 'away';
 const other = (s: Side): Side => (s === 'home' ? 'away' : 'home');
@@ -594,6 +596,7 @@ export function matchBoxSource(sport: SportId, state: unknown, ctx: BoxContext =
     case 'netball': return netballBox(state as NetballState, ctx);
     case 'american_football': return afBox(state as AFState, ctx);
     case 'rugby': return rugbyBox(state as RugbyState, ctx);
+    case 'rugby_league': return leagueBox(state as LeagueState, ctx);
     default: return undefined;
   }
 }

@@ -50,7 +50,7 @@ Pick the libero as the player coming on or going off in **🔁 Sub**. Libero swa
 - 9-a-side: tap **↻ Set serving order (1–9)** and tap the nine players in the order they serve. When a team wins the serve back, the next player serves. There are no I–VI positions and no libero, and the substitution limit is 3 a set unless the organiser changes it. 9-a-side rules vary, so check yours.
 
 ## What you get
-- The **Score** tab adds "Match stats": points won on serve, side-out %, aces, serve errors, the longest run and set points saved, per match or set, and each server's points won on serve.
+- The **Stats** tab adds "Match stats": points won on serve, side-out %, aces, serve errors, the longest run and set points saved, per match or set, and each server's points won on serve.
 - A "Substitutions" list shows each change with the set and score, for example "Set 2 · 20-22 · Red House: ⬇ Kiran Rao ⬆ Sneha Rao".
 - **Serve errors** go on the server's profile. **Sets played** includes every substitute and libero who came on.
 

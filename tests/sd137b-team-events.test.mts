@@ -43,8 +43,11 @@ describe('team disciplines', () => {
     assert.equal(phaseNameOf({ discipline: 'arch.r70.team', phase: 'final', plan: [{ phase: 'qualification' }, { phase: 'final' }] }), 'Team match play');
     assert.equal(phaseNameOf({ discipline: 'arch.r70', phase: 'final', plan: [{ phase: 'qualification' }, { phase: 'final' }] }), 'Match play');
   });
-  test('shooting teams of 3 from the individual events; the ISSF list itself is unchanged', () => {
-    assert.equal(SHOOT_EVENTS.length, 9);
+  test('shooting teams of 3 from the individual events; the event list itself is unchanged by them', () => {
+    // round 2 (precision-strength item 4) deliberately adds 6 events: 50 m Rifle Prone, 25 m Standard /
+    // Centre-Fire Pistol, 50 m Pistol, NRAI 10 m peep / open sight — still no team key in the list
+    assert.equal(SHOOT_EVENTS.length, 15);
+    assert.ok(SHOOT_EVENTS.every((e) => !e.key.endsWith('.team')));
     const t = shootTeamOf('shoot.10map.team')!;
     assert.equal(t.teamSize, 3); assert.equal(t.label, '10 m Air Pistol Team'); assert.equal(t.final, undefined);
     assert.equal(shootEventOf('shoot.10map.team')!.scoring, 'integer');

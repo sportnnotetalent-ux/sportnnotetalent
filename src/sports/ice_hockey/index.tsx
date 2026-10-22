@@ -27,7 +27,7 @@ import { confirmMatchAction } from '../../components/ConfirmSheet';
 import { LineScoreboard } from '../../components/LineScoreboard';
 import { MatchBoxScore } from '../../components/BoxScore';
 import { FieldBanner } from '../FieldBanner';
-import { LiveTimeline } from '../LiveTimeline';
+import { SubViews } from '../SubViews';
 import type { Player } from '../../core/types';
 import type { ScoreAction, SportPlugin } from '../types';
 import {
@@ -35,8 +35,8 @@ import {
   periodStarted, running, eventCredits, creditAttribution, goalFlagsNow, goalieAt, goalieOf, netEmpty, penaltyBox, partEnd, skatersOn, baseSkaters,
   soScore, nextShooter, needsSdPick, iceHockeyScoreLine, timeoutLeft, totalPeriods, nextIsOvertime, eventWhen, standingsUnits, ejects,
   ICE_HOCKEY_PRESETS, ICE_HOCKEY_LIVE_SETTINGS, PEN_LABEL, INFRACTIONS, STRENGTH_LABEL, LIVE_KEYS,
-  TALLY_LABEL, TRACK_FLAGS, TRACK_KINDS, TRACK_FIELDS, FLAG_KEYS, tallyTracked,
-  type IceEvent, type IceHockeyState, type PenKind, type Side, type Strength, type TallyKind,
+  TALLY_LABEL, TRACK_FLAGS, TRACK_KINDS, TRACK_FIELDS, FLAG_KEYS, FO_ZONE_KEYS, tallyTracked, zonesTracked,
+  type FoZone, type IceEvent, type IceHockeyState, type PenKind, type Side, type Strength, type TallyKind,
 } from './engine';
 import { iceHockeyCommentary, iceScopeLabel, ICE_FEED_TAGS } from './commentary';
 import { iceHockeySheet } from './sheet';
@@ -55,8 +55,8 @@ const opp = (s: Side): Side => (s === 'home' ? 'away' : 'home');
 const uid = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 const isGoaliePos = (p?: string | null) => !!p && /^\s*(g|gk|goalie|goaltender|goal\s*-?\s*keeper|netminder)\s*$/i.test(p);
 const BASE_TRACKED: string[] = LIVE_KEYS.filter((k) => k !== 'soTaken' && k !== 'soGoals');
-/** the keys this match tracks (the base set + the optional tallies switched on) */
-const trackedKeys = (s: IceHockeyState): string[] => [...BASE_TRACKED, ...TRACK_FLAGS.filter((f) => tallyTracked(s, f)).flatMap((f) => FLAG_KEYS[f])];
+/** the keys this match tracks (the base set + the optional tallies switched on + round 2's faceoff zones) */
+const trackedKeys = (s: IceHockeyState): string[] => [...BASE_TRACKED, ...TRACK_FLAGS.filter((f) => tallyTracked(s, f)).flatMap((f) => FLAG_KEYS[f]), ...(zonesTracked(s) ? FO_ZONE_KEYS : [])];
 const TALLY_CHIP: Record<TallyKind, string> = { faceoff: '⚪ Faceoff won', hit: '💥 Hit', block: '🛡 Block', takeaway: '🔄 Takeaway', giveaway: '🔄 Giveaway', missed: '↗ Missed shot' };
 const PEN_MENU: PenKind[] = ['minor', 'double', 'major', 'majorGm', 'misconduct', 'gm', 'match', 'bench'];
 
@@ -101,7 +101,9 @@ type Flow =
   | { mode: 'ps'; side: Side; step: 'result' | 'player'; res?: 'saved' | 'missed' }
   | { mode: 'gk'; side: Side }
   | { mode: 'tally'; side: Side; kind: TallyKind }
-  | { mode: 'centres'; side: Side };
+  | { mode: 'centres'; side: Side }
+  /** round 2: faceoff zones on — the one extra tap (where the draw was) */
+  | { mode: 'foZone'; side: Side };
 
 /* -------------------------------- controls --------------------------------- */
 
@@ -188,10 +190,12 @@ const ScoringControls: SportPlugin<IceHockeyState>['ScoringControls'] = ({
     const cr = eventCredits(e, s.pimScale);
     return { attribution: creditAttribution(cr.first, 1, TRACKED), attribution2: creditAttribution(cr.second, 1, TRACKED), third: creditAttribution(cr.third, 1, TRACKED) };
   };
-  /** deep wave: an optional tally (a faceoff credits the winning centre and the loser) */
-  const tally = (sd: Side, kind: TallyKind, p: Player | null | undefined, loser?: Player | null) => {
-    const cr = credit({ type: 'tally', side: sd, tally: kind, playerId: p?.id, playerName: p?.fullName, ...(kind === 'faceoff' && loser ? { secondId: loser.id, secondName: loser.fullName } : {}) });
-    fire({ type: 'TALLY', side: sd, payload: { kind }, attribution: cr.attribution, attribution2: cr.attribution2 });
+  /** deep wave: an optional tally (a faceoff credits the winning centre and the loser;
+   *  round 2: with zones tracked, the zone from the winner's view) */
+  const tally = (sd: Side, kind: TallyKind, p: Player | null | undefined, loser?: Player | null, zone?: FoZone) => {
+    const z = kind === 'faceoff' ? zone : undefined;
+    const cr = credit({ type: 'tally', side: sd, tally: kind, playerId: p?.id, playerName: p?.fullName, ...(kind === 'faceoff' && loser ? { secondId: loser.id, secondName: loser.fullName } : {}), ...(z ? { zone: z } : {}) });
+    fire({ type: 'TALLY', side: sd, payload: { kind, ...(z ? { zone: z } : {}) }, attribution: cr.attribution, attribution2: cr.attribution2 });
     setFlow(null);
   };
   const goal = (sd: Side, d: GoalDraft, a2: Player | null, ice?: { home: string[]; away: string[] }) => {
@@ -487,6 +491,24 @@ const ScoringControls: SportPlugin<IceHockeyState>['ScoringControls'] = ({
               skip={{ label: 'Team (no name)', onPress: () => tally(sd, flow.kind, null) }} />
           </View>
         );
+      case 'foZone': {
+        // round 2: where was the draw? Named by the END it was in, so it can't be read backwards;
+        // stored from the winner's view (in the other team's end = offensive zone)
+        const o = opp(sd);
+        const pick = (z?: FoZone) => tally(sd, 'faceoff', centres[sd], centres[o], z);
+        return (
+          <View style={c.panel}>{head('Faceoff won')}
+            <Text style={c.small}>Where was the draw?</Text>
+            <View style={c.grid}>
+              <Button label={`${name(o)} end`} accessibilityLabel={`In the ${name(o)} end: offensive zone for ${name(sd)}`} variant="ghost" style={c.third} onPress={() => pick('oz')} />
+              <Button label="Neutral zone" accessibilityLabel="Neutral zone" variant="ghost" style={c.third} onPress={() => pick('nz')} />
+              <Button label={`${name(sd)} end`} accessibilityLabel={`In the ${name(sd)} end: defensive zone for ${name(sd)}`} variant="ghost" style={c.third} onPress={() => pick('dz')} />
+            </View>
+            <Text style={c.meta}>{name(sd)} won it: the {name(o)} end is their offensive zone, their own end their defensive zone.</Text>
+            <Text style={[c.link, c.tap]} accessibilityRole="button" onPress={() => pick()}>Skip the zone</Text>
+          </View>
+        );
+      }
       case 'centres':
         return (
           <View style={c.panel}>{head('Centres on the draw')}
@@ -515,7 +537,10 @@ const ScoringControls: SportPlugin<IceHockeyState>['ScoringControls'] = ({
     <View style={c.chips} accessibilityLabel={`More stats for ${name(sd)}`}>
       {kindsOn.map((k) => (
         <Chip key={k} label={TALLY_CHIP[k]} on={false} a11y={`${TALLY_LABEL[k]}, ${name(sd)}`}
-          onPress={() => (k === 'faceoff' ? tally(sd, 'faceoff', centres[sd], centres[opp(sd)]) : setFlow({ mode: 'tally', side: sd, kind: k }))} />
+          onPress={() => (k === 'faceoff'
+            // round 2: faceoff zones on → one more tap (the zone); off → one tap, as before
+            ? (s.trackFaceoffZones ? setFlow({ mode: 'foZone', side: sd }) : tally(sd, 'faceoff', centres[sd], centres[opp(sd)]))
+            : setFlow({ mode: 'tally', side: sd, kind: k }))} />
       ))}
     </View>
   ) : null);
@@ -689,34 +714,35 @@ const IceHockeyScoreboard: NonNullable<SportPlugin<IceHockeyState>['Scoreboard']
   );
 };
 
-/** Deep wave: the Score tab's views — the play-by-play commentary, the
- *  broadcast match stats (period / category filters), the box score and the
- *  key-moments timeline. */
-const VIEWS = [{ key: 'pbp', label: 'Play-by-play' }, { key: 'stats', label: 'Match stats' }, { key: 'box', label: 'Box score' }, { key: 'timeline', label: 'Key moments' }] as const;
+/** The Stats tab's views — the broadcast match stats (period / category
+ *  filters) and the box score. */
+const VIEWS = [{ key: 'stats', label: 'Match stats' }, { key: 'box', label: 'Box score' }] as const;
 
-const LiveExtras: NonNullable<SportPlugin<IceHockeyState>['LiveExtras']> = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster, onPlayer }) => {
+/** Match tabs (2026-10-22): the play-by-play on Commentary (its "Key moments"
+ *  chip replaces the old separate Key-moments view); match stats and the box
+ *  score on Stats. */
+type TabProps = Parameters<NonNullable<SportPlugin<IceHockeyState>['LiveExtras']>>[0];
+const IceHockeyCommentary = ({ state, homeName, awayName, homeColor, awayColor }: TabProps) => {
   const s = state as IceHockeyState;
-  const [view, setView] = useState<(typeof VIEWS)[number]['key']>('pbp');
-  const names = { home: homeName, away: awayName };
+  return (
+    <GroupedFeed groups={iceHockeyCommentary(s, { home: homeName, away: awayName })} homeColor={homeColor} awayColor={awayColor} tags={ICE_FEED_TAGS} scopeLabel={iceScopeLabel(s)}
+      emptyText="No plays yet — the commentary fills in from the first face-off." />
+  );
+};
+const IceHockeyStats = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster, onPlayer }: TabProps) => {
+  const s = state as IceHockeyState;
   const n = Math.min(totalPeriods(s), Math.max(1, s.period));
   const scopes = n >= 2 ? Array.from({ length: n }, (_, i) => ({ value: i + 1, label: periodName(s, i + 1) })) : [];
   return (
-    <View style={{ gap: theme.spacing(3) }}>
-      <View style={c.chips} accessibilityRole="tablist">
-        {VIEWS.map((v) => <SelectChip key={v.key} label={v.label} active={view === v.key} onPress={() => setView(v.key)} />)}
-      </View>
-      {view === 'pbp' ? (
-        <GroupedFeed groups={iceHockeyCommentary(s, names)} homeColor={homeColor} awayColor={awayColor} tags={ICE_FEED_TAGS} scopeLabel={iceScopeLabel(s)}
-          emptyText="No plays yet — the commentary fills in from the first face-off." />
-      ) : view === 'stats' ? (
+    <SubViews label="Stats view" views={VIEWS.map((v) => ({
+      ...v,
+      render: () => v.key === 'stats' ? (
         <StatSheetView build={(sc) => iceHockeySheet(s, sc, s.ended ? undefined : matchSec(s, Date.now()))} scopes={scopes}
           homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} />
-      ) : view === 'box' ? (
-        <MatchBoxScore sport="ice_hockey" source={iceHockeyBox(s, { homeRoster, awayRoster })} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} onPlayer={onPlayer} show="box" />
       ) : (
-        <LiveTimeline events={iceHockeyTimeline(s, names)} homeColor={homeColor} awayColor={awayColor} emptyText="No goals or penalties yet." homeRoster={homeRoster} awayRoster={awayRoster} onPlayer={onPlayer} />
-      )}
-    </View>
+        <MatchBoxScore sport="ice_hockey" source={iceHockeyBox(s, { homeRoster, awayRoster })} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} onPlayer={onPlayer} show="box" />
+      ),
+    }))} />
   );
 };
 
@@ -785,7 +811,7 @@ export const iceHockeyPlugin: SportPlugin<IceHockeyState> = {
   ScoringControls,
   LiveClock,
   Scoreboard: IceHockeyScoreboard,
-  LiveExtras,
+  matchTabs: { Commentary: IceHockeyCommentary, Stats: IceHockeyStats },
   formation: (perSide) => iceHockeyFormation(perSide),
   Court: IceRink,
   liveSettings: ICE_HOCKEY_LIVE_SETTINGS,
@@ -828,6 +854,7 @@ const c = StyleSheet.create({
   row: { flexDirection: 'row', gap: theme.spacing(2), alignItems: 'flex-end' },
   flex: { flex: 1 },
   typeBtn: { flexBasis: '46%', flexGrow: 1 },
+  third: { flexBasis: '30%', flexGrow: 1 },
   cols: { flexDirection: 'row', gap: theme.spacing(2) },
   col: { flex: 1, gap: theme.spacing(2), minWidth: 0 },
   team: { fontSize: theme.font.small, fontWeight: '800', textAlign: 'center' },

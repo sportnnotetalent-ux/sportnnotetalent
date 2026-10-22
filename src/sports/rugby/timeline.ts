@@ -82,6 +82,8 @@ export function rugbyUndoLabel(step: { type: string; prev: unknown; next: unknow
   if (step.type === 'SO') return 'kicking competition kick';
   if (step.type === 'POSSESSION') return 'possession switch';
   if (step.type === 'TERRITORY') return 'territory switch';
+  // round 2: the possession bar's "Ball dead" switch
+  if (step.type === 'BALL_DEAD') return 'ball dead / live switch';
   if (!prev?.events || !next?.events || next.events.length <= prev.events.length) return null;
   const e = next.events[next.events.length - 1];
   const d = describeEvent(e);

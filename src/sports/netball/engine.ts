@@ -156,18 +156,92 @@ export interface NetballState {
    *  time). Only on the state when the format sets it. */
   superShot?: boolean;
   ssMinutes?: number;
+  /** Court-team round 2 — super shots all through extra time (and the
+   *  play-on after it), as Super Netball and the UK Super League play them.
+   *  Only on the state when the rule says so. */
+  ssEt?: true;
+  /** Court-team round 2 — the organiser's super-shot preset (format key
+   *  `superShotRule`). Only on the state when one is chosen; a format with
+   *  the deep wave's plain `superShot` toggle has none. */
+  ssRule?: SuperShotRule;
 }
 
 /* --------------------------------- format ---------------------------------- */
 
+/** Court-team round 2 — centre pass receives (CPR) are tracked by default on
+ *  the international 4 × 15 preset (founder 2026-10-22; still switchable
+ *  off). The other presets set it off, so a preset switch never carries it. */
 export const NETBALL_PRESETS: Record<string, { label: string; set: Record<string, number | string | boolean> }> = {
-  international: { label: 'International 4 × 15', set: { periods: 4, periodMinutes: 15 } },
-  school: { label: 'School 4 × 10', set: { periods: 4, periodMinutes: 10 } },
-  halves: { label: 'Halves 2 × 20', set: { periods: 2, periodMinutes: 20 } },
+  international: { label: 'International 4 × 15', set: { periods: 4, periodMinutes: 15, trackCpr: true } },
+  school: { label: 'School 4 × 10', set: { periods: 4, periodMinutes: 10, trackCpr: false } },
+  halves: { label: 'Halves 2 × 20', set: { periods: 2, periodMinutes: 20, trackCpr: false } },
 };
 
 const bool = (v: unknown, d: boolean) => (v === undefined || v === null || v === '' ? d : v === true || v === 'true' || v === 1);
 const numOr = (v: unknown, d: number, min = 0) => { const n = Number(v); return Number.isFinite(n) && v !== '' && v != null ? Math.max(min, n) : d; };
+
+/* ------------------------------ super shots -------------------------------- */
+
+/** Court-team round 2 — the 2-point super-shot rule, an organiser choice
+ *  (format key `superShotRule`). 'off' (the default) = the World Netball
+ *  rules: the Netball World Cup, the Commonwealth Games and most leagues
+ *  score every goal 1. The league presets as each league publishes them
+ *  (verify each season): */
+export type SuperShotRule = 'off' | 'ssn' | 'nsl' | 'anz' | 'custom';
+export interface SuperShotPreset {
+  label: string;
+  /** what the scorer sees on the arm chip */
+  name: string;
+  /** where a 2-pointer is taken from (accessibility / hints) */
+  zone: string;
+  /** the window: the last N minutes of each regular quarter */
+  minutes: number;
+  /** also all through extra time (and the play-on after it) */
+  extraTime: boolean;
+}
+export const SUPER_SHOT_PRESETS: Record<'ssn' | 'nsl' | 'anz', SuperShotPreset> = {
+  // Suncorp Super Netball (Australia, since 2020): the "Super Shot" from the
+  // outer 1.9 m of the circle (the super-shot zone), last 5 minutes of each
+  // quarter (the "Power 5"), and all of extra time.
+  ssn: { label: 'Super Netball (AUS)', name: 'Super shot', zone: 'the super-shot zone', minutes: 5, extraTime: true },
+  // Netball Super League (UK, since 2025): two goals from the outer part of
+  // the circle, last 5 minutes of each quarter, and all of extra time.
+  nsl: { label: 'Super League (UK)', name: 'Super shot', zone: 'the outer circle', minutes: 5, extraTime: true },
+  // ANZ Premiership (New Zealand, since 2025): two points for a shot from
+  // 3.5 m or further (the FAST5 line), last 5 minutes of each quarter.
+  anz: { label: 'ANZ Premiership (NZ)', name: '2-point shot', zone: '3.5 m or further from the post', minutes: 5, extraTime: false },
+};
+/** The organiser's choices, in the order the format editor shows them. */
+export const SUPER_SHOT_RULE_OPTIONS: { value: SuperShotRule; label: string }[] = [
+  { value: 'off', label: 'Off (World Netball)' },
+  ...(Object.entries(SUPER_SHOT_PRESETS) as [SuperShotRule, SuperShotPreset][]).map(([value, p]) => ({ value, label: p.label })),
+  { value: 'custom', label: 'Custom window' },
+];
+const isRule = (v: unknown): v is SuperShotRule => v === 'off' || v === 'ssn' || v === 'nsl' || v === 'anz' || v === 'custom';
+
+/** The super-shot fields a stored config puts on the state ({} = none):
+ *  - a chosen `superShotRule` decides (a preset's window, or Custom's
+ *    `ssMinutes` + `ssExtraTime`; 'off' = none);
+ *  - a config without the key (the deep wave's) keeps reading its plain
+ *    `superShot` toggle + `ssMinutes`, so it replays to exactly the state it
+ *    had. */
+export function superShotConfig(config?: Record<string, unknown>): Pick<NetballState, 'superShot' | 'ssMinutes' | 'ssEt' | 'ssRule'> {
+  const rule = config?.superShotRule;
+  if (rule == null || rule === '' || !isRule(rule)) {
+    return bool(config?.superShot, false) ? { superShot: true, ssMinutes: Math.floor(numOr(config?.ssMinutes, 5)) } : {};
+  }
+  if (rule === 'off') return {};
+  if (rule === 'custom') {
+    return { superShot: true, ssMinutes: Math.floor(numOr(config?.ssMinutes, 5)), ...(bool(config?.ssExtraTime, false) ? { ssEt: true as const } : {}), ssRule: rule };
+  }
+  const p = SUPER_SHOT_PRESETS[rule];
+  return { superShot: true, ssMinutes: p.minutes, ...(p.extraTime ? { ssEt: true as const } : {}), ssRule: rule };
+}
+/** "Super shot" / "2-point shot" and where it's taken from, for this match. */
+export function superShotText(s: Pick<NetballState, 'ssRule'>): { name: string; zone: string } {
+  const p = s.ssRule && s.ssRule !== 'off' && s.ssRule !== 'custom' ? SUPER_SHOT_PRESETS[s.ssRule] : undefined;
+  return p ? { name: p.name, zone: p.zone } : { name: 'Super shot', zone: 'the super-shot zone' };
+}
 
 export const init = (config?: Record<string, unknown>): NetballState => {
   const periods = Number(config?.periods) === 2 ? 2 : 4;
@@ -187,7 +261,7 @@ export const init = (config?: Record<string, unknown>): NetballState => {
     ...(config?.trackCpr != null ? { trackCpr: bool(config.trackCpr, false) } : {}),
     ...(config?.trackGains != null ? { trackGains: bool(config.trackGains, false) } : {}),
     ...(config?.trackTurnovers != null ? { trackTurnovers: bool(config.trackTurnovers, false) } : {}),
-    ...(bool(config?.superShot, false) ? { superShot: true, ssMinutes: Math.floor(numOr(config?.ssMinutes, 5)) } : {}),
+    ...superShotConfig(config),
   };
 };
 
@@ -242,9 +316,11 @@ const stopAt = (s: NetballState, at: number): NetballState['clock'] =>
   s.clock.since ? { ms: s.clock.ms + Math.max(0, at - s.clock.since) } : s.clock;
 
 /** Deep wave — is the super-shot window open (the last `ssMinutes` of a
- *  regular quarter, on a format that uses super shots)? */
+ *  regular quarter, on a format that uses super shots)? Round 2: all through
+ *  extra time too when the rule says so (`ssEt`). */
 export function superShotLive(s: NetballState, now = 0): boolean {
-  if (!s.superShot || s.period > s.periods) return false;
+  if (!s.superShot) return false;
+  if (s.period > s.periods) return s.ssEt === true;
   const len = periodLen(s, s.period);
   return !s.ssMinutes || len - periodSec(s, now) <= s.ssMinutes * 60;
 }
@@ -638,11 +714,12 @@ export const NETBALL_LIVE_SETTINGS: LiveSettings<NetballState> = {
     { key: 'periodMinutes', label: 'Quarter length', type: 'number', default: 15, min: 1, max: 20, step: 1, hint: 'min / period' },
     // Deep wave — "Stats to track": each applies from the next play (plays stamp their own detail)
     { key: 'detail', label: 'Feeds & rebounds', type: 'toggle', default: false, group: 'Stats to track' },
-    { key: 'trackCpr', label: 'Centre pass receives', type: 'toggle', default: false, group: 'Stats to track' },
+    // Round 2: on by default with the international 4 × 15 preset — the "Standard"
+    { key: 'trackCpr', label: 'Centre pass receives', type: 'toggle', default: true, group: 'Stats to track' },
     { key: 'trackGains', label: 'Gains & pick-ups', type: 'toggle', default: false, group: 'Stats to track' },
     { key: 'trackTurnovers', label: 'Turnover types', type: 'toggle', default: false, group: 'Stats to track' },
     { key: 'stopClock', label: 'Stop clock on suspensions', type: 'toggle', default: true, group: 'Clock' },
   ] as FormatField[],
   read: (s) => ({ periodMinutes: s.periodMinutes, detail: s.detail, trackCpr: s.trackCpr === true, trackGains: s.trackGains === true, trackTurnovers: s.trackTurnovers === true, stopClock: s.stopClock }),
-  defaults: { periodMinutes: 15, detail: false, trackCpr: false, trackGains: false, trackTurnovers: false, stopClock: true },
+  defaults: { periodMinutes: 15, detail: false, trackCpr: true, trackGains: false, trackTurnovers: false, stopClock: true },
 };

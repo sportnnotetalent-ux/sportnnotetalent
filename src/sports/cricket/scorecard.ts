@@ -11,6 +11,7 @@
  */
 import { oversStr, other, NO_BOWLER, type BallRec, type CricketState, type FieldNote } from './engine.ts';
 import { detailByRec, isDeliveryRec as isDeliveryRec2, isPace } from './detail.ts';
+import { phasePlan, phaseOf, type Phase } from './phases.ts';
 
 type Side = 'home' | 'away';
 
@@ -31,6 +32,15 @@ export const charged = (r: BallRec) => r.bat + r.wd + r.nb;
 /** Team runs on this ball, extras included (and a #20 bonus / deduction, so an
  *  over's runs always add up to the worm's `cum`). */
 const teamRuns = (r: BallRec) => r.bat + r.wd + r.nb + r.b + r.lb + (r.pen ?? 0) + (r.adj ?? 0);
+
+/** A boundary off the bat: a '4' / '6' chip, or 4 / 6 off the bat on a no-ball
+ *  (the log doesn't keep a no-ball's all-run flag — read as a boundary). The
+ *  match Stats tab (matchStats.ts re-exports it) and the new-era careers. */
+export const boundaryOf = (r: BallRec): 0 | 4 | 6 => {
+  if (r.sym === '4' || r.sym === '6') return Number(r.sym) as 4 | 6;
+  if (r.ext === 'nb' && (r.bat === 4 || r.bat === 6) && r.b + r.lb === 0) return r.bat as 4 | 6;
+  return 0;
+};
 
 export interface Extras { b: number; lb: number; wd: number; nb: number; pen: number }
 
@@ -195,6 +205,14 @@ export const DEEP_TOTAL_KEYS = [
   'kphN', 'kphSum', 'kphMax',
 ] as const;
 
+/** Round 2 — the new-era keys (see `eraTotals`). */
+export const ERA_TOTAL_KEYS = [
+  'newEra', 'dotsF', 'bndRuns',
+  'ballsPP', 'runsPP', 'ballsMid', 'runsMid', 'ballsDeath', 'runsDeath',
+] as const;
+/** Round 2 — direct-hit run outs (a fielder with one). */
+export const DIRECT_HIT_KEY = 'directHits';
+
 /** The stat keys `statTotals` owns (absolute at sync time). */
 export const CRICKET_TOTAL_KEYS = [
   'runs', 'ballsFaced', 'fours', 'sixes', 'innings', 'notOut',
@@ -210,7 +228,69 @@ export const CRICKET_TOTAL_KEYS = [
   // Deep wave — only in a match that captured them (`deepTotals`): batting vs
   // pace / spin (bowler types), shot control (false shots), ball speed
   ...DEEP_TOTAL_KEYS,
+  // Round 2 — only on a new-era match (`eraTotals`); direct hits only on a
+  // fielder who made one
+  ...ERA_TOTAL_KEYS, DIRECT_HIT_KEY,
 ] as const;
+
+/**
+ * Round 2 — the NEW-ERA marker. A match is "new-era" when its ball log carries
+ * the scorer's device time stamps (`BallRec.t`, `payload.at`): every ball
+ * tapped on the app from the deep wave on is stamped; no older match has one.
+ * Only a new-era match writes the figures below to careers, so the totals of
+ * every older match stay byte-identical (the frozen replay test pins that) and
+ * the career rows built on them count only the matches that carry them.
+ * (Voice-scored balls aren't stamped yet: a match scored ONLY by voice reads as
+ * an older one.)
+ */
+export const isNewEra = (s: Pick<CricketState, 'log'>): boolean => (s.log ?? []).some((r) => r.t !== undefined && !r.cross);
+
+/**
+ * Round 2 — the new-era career figures, absolute, for a new-era match only
+ * (`{}` otherwise):
+ *   - every player in the match: `newEra` = 1 (the marker on the line);
+ *   - batters: dot balls faced (`dotsF`: a ball faced with no run off the bat)
+ *     and runs in boundaries (`bndRuns`: 4s and 6s off the bat) — career dot %
+ *     = dotsF ÷ balls faced, boundary % = bndRuns ÷ runs, over new-era lines;
+ *   - bowlers: legal balls and runs conceded in each PHASE the match has
+ *     (powerplay / middle / death — the organiser's phases, phases.ts):
+ *     `ballsPP runsPP`, `ballsMid runsMid`, `ballsDeath runsDeath` (0 when the
+ *     bowler didn't bowl in that phase; left out when the match has no such
+ *     phase — a Test, a match with "None").
+ * Regulation innings only (a Super Over is a separate state).
+ */
+export function eraTotals(s: CricketState): Record<string, { side: Side; stats: Record<string, number> }> {
+  const out: Record<string, { side: Side; stats: Record<string, number> }> = {};
+  if (!isNewEra(s)) return out;
+  const log = s.log ?? [];
+  const entry = (id: string, side: Side) => (out[id] ??= { side, stats: { newEra: 1 } }).stats;
+  const PK: Record<Phase, [string, string]> = { pp: ['ballsPP', 'runsPP'], middle: ['ballsMid', 'runsMid'], death: ['ballsDeath', 'runsDeath'] };
+  const plans = { 1: phasePlan(s, 1), 2: phasePlan(s, 2) };
+  const phases = new Set<Phase>([...(plans[1]?.phases ?? []), ...(plans[2]?.phases ?? [])]);
+  for (const [id, c] of Object.entries(s.batting)) Object.assign(entry(id, c.side), { dotsF: 0, bndRuns: 0 });
+  for (const [id, c] of Object.entries(s.bowling)) {
+    if (!c.balls && !c.runs && !c.wickets && !(c.overs?.length)) continue;
+    const st = entry(id, c.side);
+    for (const p of phases) { st[PK[p][0]] = 0; st[PK[p][1]] = 0; }
+  }
+  const faced = (r: BallRec) => r.ext === 'nb' || (r.legal && r.ext !== 'wd');
+  for (const r of log) {
+    if (r.cross || !isDeliveryRec2(r)) continue;
+    const bat = r.strikerId ? out[r.strikerId]?.stats : undefined;
+    if (bat && 'dotsF' in bat) {
+      if (faced(r) && r.bat === 0) bat.dotsF += 1;
+      bat.bndRuns += boundaryOf(r);
+    }
+    const bowl = r.bowlerId ? out[r.bowlerId]?.stats : undefined;
+    const plan = plans[r.inn];
+    if (!bowl || !plan) continue;
+    const [bk, rk] = PK[phaseOf(r, plan)];
+    if (!(bk in bowl)) continue;
+    if (r.legal) bowl[bk] += 1;
+    bowl[rk] += charged(r);
+  }
+  return out;
+}
 
 /**
  * Deep wave — the optional depth as absolute per-player figures, ONLY for a
@@ -353,6 +433,13 @@ export function statTotals(s: CricketState): Record<string, { side: Side; stats:
     if (!side) continue;
     Object.assign(entry(id, side).stats, { catches: f.catches, stumpings: f.stumpings, runouts: f.runouts });
   }
+  // Round 2 — direct-hit run outs: only on a fielder who made one (the chip is
+  // optional, so a run out without it isn't "not a direct hit").
+  for (const d of s.dismissals) {
+    if (!d.direct || !d.fielderId || !out[d.fielderId]) continue;
+    const st = out[d.fielderId].stats;
+    st[DIRECT_HIT_KEY] = (st[DIRECT_HIT_KEY] ?? 0) + 1;
+  }
   // Fielding notes (parity #20): a fielder with any note carries all three
   // keys (absolute, so they agree with the FIELD_NOTE attribution increments).
   for (const n of s.fieldNotes ?? []) {
@@ -383,6 +470,13 @@ export function statTotals(s: CricketState): Record<string, { side: Side; stats:
     const st = entry(id, out[id]?.side ?? e.side).stats;
     Object.assign(st, e.stats);
     for (const k of ['catches', 'stumpings', 'runouts']) st[k] ??= 0;
+  }
+  // Round 2 — the new-era figures (a new-era match only), and its marker on
+  // every line of the match.
+  const era = eraTotals(s);
+  if (Object.keys(era).length) {
+    for (const [id, e] of Object.entries(era)) Object.assign(entry(id, out[id]?.side ?? e.side).stats, e.stats);
+    for (const e of Object.values(out)) e.stats.newEra = 1;
   }
   return out;
 }

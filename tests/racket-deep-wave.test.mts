@@ -57,7 +57,8 @@ describe('deep wave · the model (wing + each sport\'s shots)', () => {
       assert.ok(DETAIL_HOWS[sp].find((h) => h.how === 'ue')!.strokes!.length >= 2, sp);
       assert.equal(DETAIL_HOWS[sp].find((h) => h.how === 'winner')!.strokes, undefined, sp);
     }
-    assert.deepEqual(RACKET_SHOTS.badminton.map((d) => d.id), ['smash', 'drop', 'clear', 'netShot', 'netKill', 'drive', 'lift', 'push', 'serve']);
+    // round 2: + jump smash and block (founder)
+    assert.deepEqual(RACKET_SHOTS.badminton.map((d) => d.id), ['smash', 'jumpSmash', 'drop', 'clear', 'netShot', 'netKill', 'drive', 'lift', 'push', 'block', 'serve']);
     assert.deepEqual(RACKET_SHOTS.tabletennis.map((d) => d.id), ['receive', 'flick', 'push', 'chop', 'loop', 'block', 'smash', 'lob']);
     assert.deepEqual(RACKET_SHOTS.squash.map((d) => d.id), ['drive', 'drop', 'boast', 'volley', 'lob', 'kill', 'nick']);
     assert.ok(['bandeja', 'vibora', 'x3', 'chiquita', 'bajada', 'wall'].every((k) => RACKET_SHOTS.padel.some((d) => d.id === k)));
@@ -151,7 +152,8 @@ describe('deep wave · Decision 8 — old logs', () => {
       const totals = sp === 'badminton' ? badmintonTotals(s as never, SINGLES) : sp === 'padel' ? padelTotals(s as never, SINGLES) : rallyTotals(s as never, SINGLES, sp);
       for (const k of [...racketExtraKeys(sp), ...detailKeys(sp)]) assert.equal(k in totals.h1.stats, false, `${sp}.${k}`);
       const v = racketView(sp, s, R1)!;
-      assert.deepEqual(v.cov, { detail: null, serve: false, net: false, rally: false, third: false }, sp);
+      assert.deepEqual(v.cov, { detail: null, serve: false, net: false, rally: false, third: false, arrival: false }, sp);
+      assert.deepEqual(v.buckets, rallyBucketsOf(sp), sp); // round 2: the default buckets, as before
       assert.ok(!keyStats(v).some((x) => x.id === 'shots' || x.id === 'decisions'), sp);
     }
   });
@@ -184,7 +186,10 @@ describe('deep wave · "Stats to track"', () => {
     assert.equal(trackFields('pickleball').find((f) => f.key === 'netDetail')!.label, 'Kitchen line');
     for (const sp of DEPTH_SPORTS) {
       const ls = detailLiveSettings(sp);
-      assert.ok(ls.fields.every((f) => f.type === 'toggle' && f.default === false && f.group === 'Stats to track' && (f.hint ?? '').length > 20), sp);
+      const toggles = ls.fields.filter((f) => f.type === 'toggle');
+      assert.ok(toggles.every((f) => f.default === false && f.group === 'Stats to track' && (f.hint ?? '').length > 20), sp);
+      // round 2: + the rally-length buckets option (a choice, the deep-wave buckets by default)
+      assert.deepEqual(ls.fields.filter((f) => f.type !== 'toggle').map((f) => [f.key, f.default]), [['rallyBuckets', 'std']], sp);
       assert.ok(trackFormatFields(sp).every((f) => f.advanced === true), sp);
     }
   });
@@ -225,7 +230,7 @@ describe('deep wave · match stats', () => {
   const s = run(badminton.reducer, badminton.init({}), BAD);
   const v = racketView('badminton', s, R1)!;
   test('coverage, tally and key stats', () => {
-    assert.deepEqual(v.cov, { detail: 'full', serve: false, net: false, rally: true, third: false });
+    assert.deepEqual(v.cov, { detail: 'full', serve: false, net: false, rally: true, third: false, arrival: false });
     const t = racketTally(v);
     assert.deepEqual([t.home.winners, t.home.ue, t.home.fe, t.away.sf, t.described], [1, 1, 1, 1, 4]);
     const ks = keyStats(v);
@@ -293,7 +298,7 @@ describe('deep wave · match stats', () => {
       P('home'), D({ third: 'drop', atNet: 'home' }),
     ]);
     const vp = racketView('pickleball', pb, { home: ['h1', 'h2'], away: ['a1', 'a2'] })!;
-    assert.deepEqual(vp.cov, { detail: null, serve: false, net: true, rally: false, third: true });
+    assert.deepEqual(vp.cov, { detail: null, serve: false, net: true, rally: false, third: true, arrival: false });
     const serve = keyStats(vp).find((x) => x.id === 'serve')!;
     assert.deepEqual(serve.rows.map((r) => r.label).slice(0, 2), ['Rallies won on serve', 'Side-out % (receive rallies won)']);
     assert.ok(serve.rows.some((r) => r.key === 'ho' && r.away === '1'));

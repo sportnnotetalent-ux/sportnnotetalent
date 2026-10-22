@@ -13,7 +13,7 @@ import type { VoiceEnding } from './types';
 import * as hk from './hockey/engine.ts';
 import * as hb from './handball/engine.ts';
 import { rugbyVoice, rugbyVoiceEnds } from './rugby/voice.ts';
-import { boardCloses, boardPoints, nextBreaker, slamFor, PENALTY_POINTS, type CarromState } from './carrom/engine.ts';
+import { boardCloses, boardValue, nextBreaker, slamFor, type CarromState } from './carrom/engine.ts';
 import { creditedPlayers } from './carrom/totals.ts';
 import { holeWinner } from './golf/engine.ts';
 import { matchHole, scoreStatKey } from './golf/matchStrokes.ts';
@@ -381,7 +381,8 @@ export function carromVoice(text: string, ctx: VoiceContext): ScoreAction[] | nu
   const perSide = s.perSide ?? 1;
   const roster = rosterOf(ctx, side);
   const players = creditedPlayers(roster, perSide, player ? [player.id] : []);
-  const value = penalty ? PENALTY_POINTS : boardPoints(coins!, queen, s.current[side], s);
+  // round 2 — the board's value under the match's rules (ICF foul penalties)
+  const value = boardValue(s, s.current[side], { coins: coins ?? 0, queen, penalty });
   const credit = Math.min(value, Math.max(0, s.target - s.current[side]));
   const attr = (p: Player) => ({ playerId: p.id, playerName: p.fullName, stat: 'points', by: credit, ...(penalty ? {} : { extra: { boards: 1, ...(queen ? { queens: 1 } : {}) } }) });
   return [{
@@ -467,6 +468,8 @@ export function kabaddiExtrasVoice(text: string, ctx: VoiceContext): ScoreAction
 (globalThis as unknown as Record<string, unknown>).__sportfolioVoice = { pointVoice, basketballVoice, kabaddiVoice, cricketVoice, tennisVoice, volleyballVoice, hockeyVoice, handballVoice, carromVoice, golfMatchVoice, rugbyVoice };
 /** SD-143 — rugby's grammar lives next to its engine (./rugby/voice.ts). */
 export { rugbyVoice, rugbyVoiceEnds };
+/** Rugby league's grammar lives next to its engine (./rugby_league/voice.ts). */
+export { leagueVoice, leagueVoiceEnds } from './rugby_league/voice.ts';
 /** SD-145 — ice hockey's grammar lives next to its engine (./ice_hockey/voice.ts). */
 export { iceHockeyVoice, iceHockeyVoiceEnds } from './ice_hockey/voice.ts';
 /** SD-144 — baseball / softball's grammar lives next to its engine (./baseball/voice.ts). */

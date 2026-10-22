@@ -203,6 +203,15 @@ function formatFor(sport: SportId, cfg: Cfg, state: Cfg): SplitValue | undefined
       const name = vr === '7s' ? 'Sevens' : vr === '10s' ? 'Tens' : '15s';
       return m ? v(`${vr}-${m}`, `${name} · 2 × ${m}`) : v(vr, name);
     }
+    case 'rugby_league': {
+      // 13s / Nines, and the half length (junior presets)
+      const n = numOf(cfg.playersPerSide) ?? numOf(state.playersPerSide);
+      const vr = strOf(cfg.variant) ?? strOf(state.variant) ?? (n === 9 ? '9s' : n ? '13s' : undefined);
+      const m = numOf(cfg.periodMinutes) ?? numOf(state.periodMinutes);
+      if (!vr) return undefined;
+      const name = vr === '9s' ? 'Nines' : '13s';
+      return m ? v(`${vr}-${m}`, `${name} · 2 × ${m}`) : v(vr, name);
+    }
     case 'basketball': {
       const n = numOf(cfg.playersPerSide);
       return n === 3 ? v('3x3', '3x3') : n ? v(`${n}v${n}`, `${n}-on-${n}`) : undefined;

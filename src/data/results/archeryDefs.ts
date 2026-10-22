@@ -8,7 +8,8 @@
  *    recurve 70 m on the 122 cm face, compound 50 m on the 80 cm 6-ring face,
  *    barebow 50 m on the 122 cm face. U18 recurve shoots 60 m.
  *  - Ranking round, indoor: 60 arrows at 18 m in 20 ends of 3, 40 cm faces
- *    (recurve / compound triple faces; compound scores the small inner 10).
+ *    (compound: the triple face, scoring the small inner 10; recurve: the
+ *    single 40 cm face or the triple face — the organiser's choice, round 2).
  *  - An arrow scores X (an inner 10, counted 10), 10 … 1, or M (a miss, 0).
  *  - Ties in the ranking round: most 10s (X included), then most X; still level
  *    → a shoot-off for a place that decides who enters match play, otherwise a
@@ -54,9 +55,13 @@ export interface ArchRoundDef {
    *  (X), the 40 cm triple face 6–10; an arrow outside it is a miss (M).
    *  Absent = a full face (1–10). */
   minRing?: number;
+  /** Round 2: the organiser picks the face (rule `archIndoorFace`): the single
+   *  40 cm face (rings 1–10 — the default, for schools) or the WA triple face
+   *  (rings 6–10, as at World Archery indoor championships). */
+  faceChoice?: boolean;
 }
 
-const out = (bow: Bow, distance: number, face: string, level: 'wa' | 'school', note: string): ArchRoundDef => ({
+const out =(bow: Bow, distance: number, face: string, level: 'wa' | 'school', note: string): ArchRoundDef => ({
   key: `arch.${bow.toLowerCase()}${distance}`, label: `${BOW_LABEL[bow]} ${distance} m`, short: `${bow}${distance}`,
   bow, distance, indoor: false, arrows: 72, perEnd: 6, face, level, note,
 });
@@ -75,10 +80,32 @@ export const ARCH_ROUNDS: ArchRoundDef[] = [
   out('C', 30, '80 cm face', 'school', 'school (a house choice)'),
   out('B', 50, '122 cm face', 'wa', 'WA barebow'),
   out('B', 30, '122 cm face', 'school', 'school (a house choice)'),
-  ind('R', 18, '40 cm triple face', 'wa', 'WA indoor'),
+  // Round 2: single 40 cm face (1–10) by default; the WA triple face (6–10) is the organiser's choice
+  { ...ind('R', 18, '40 cm face', 'wa', 'WA indoor'), faceChoice: true },
   { ...ind('C', 18, '40 cm triple face, inner 10', 'wa', 'WA indoor'), minRing: 6 },
   ind('B', 18, '40 cm face', 'wa', 'WA indoor'),
 ];
+
+/** Round 2: the face a round is shot on at this meet, with its lowest ring. */
+export interface ArchFace { face: string; minRing?: number; triple: boolean }
+/** The rule key and its standard default (kept here too: this file has no imports). */
+export const INDOOR_FACE_RULE = 'archIndoorFace';
+/**
+ * The face of a round under the meet's rules (`PhaseFormat.rules` / `def.rules`):
+ * recurve indoor reads `archIndoorFace` — 'full' (default: the single 40 cm
+ * face, 1–10) or 'triple' (the vertical triple face, 6–10, anything outside
+ * the 6 ring is M). Every other round keeps its own face.
+ */
+export function faceOf(round: ArchRoundDef, rules?: Record<string, unknown> | null): ArchFace {
+  if (round.faceChoice && rules?.[INDOOR_FACE_RULE] === 'triple') return { face: '40 cm triple face', minRing: 6, triple: true };
+  return { face: round.face, ...(round.minRing ? { minRing: round.minRing } : {}), triple: /triple/.test(round.face) };
+}
+/** The round as shot at this meet (its face and lowest ring follow the rules). */
+export function roundWithFace(round: ArchRoundDef, rules?: Record<string, unknown> | null): ArchRoundDef {
+  if (!round.faceChoice) return round;
+  const f = faceOf(round, rules);
+  return { ...round, face: f.face, ...(f.minRing ? { minRing: f.minRing } : {}) };
+}
 
 export const archRoundOf = (key?: string): ArchRoundDef | undefined =>
   ARCH_ROUNDS.find((r) => r.key === key) ?? (key && TEAM_SUFFIX.test(key) ? ARCH_ROUNDS.find((r) => r.key === key.replace(TEAM_SUFFIX, '')) : undefined);
@@ -146,6 +173,35 @@ export const endSum = (arrows: Arrow[]): number => arrows.reduce<number>((s, a) 
 /** 10s as WA counts them for ties: X included. */
 export const endTens = (arrows: Arrow[]): number => arrows.filter((a) => a === 'X' || a === 10).length;
 export const endXs = (arrows: Arrow[]): number => arrows.filter((a) => a === 'X').length;
+
+/* --------------------- round 2: arrows credited to each archer --------------------- */
+
+/** Arrows each archer shoots in an end of a team / mixed team match (WA: 2), or the whole end. */
+export const perArcherOf = (spec: MatchSpec): number => (spec.so > 1 ? Math.max(1, Math.round(spec.arrows / spec.so)) : spec.arrows);
+
+/**
+ * A team end typed archer by archer (member 0's arrows, then member 1's …,
+ * `per` each) → the end as stored (highest first, as `sortEnd`) and who shot
+ * each arrow (`by`, member indexes in the same order).
+ */
+export function creditEnd(inOrder: Arrow[], per: number): { arrows: Arrow[]; by: number[] } {
+  const p = Math.max(1, per);
+  const rows = inOrder.map((a, j) => ({ a, m: Math.floor(j / p) }));
+  rows.sort((x, y) => arrowRank(y.a) - arrowRank(x.a) || x.m - y.m);
+  return { arrows: rows.map((r) => r.a), by: rows.map((r) => r.m) };
+}
+
+/** Does `by` credit this end: one member index (0 … size−1) per arrow? */
+export const creditsEnd = (arrows: Arrow[] | undefined, by: number[] | undefined, size: number): boolean =>
+  !!arrows?.length && !!by && by.length === arrows.length && by.every((m) => Number.isInteger(m) && m >= 0 && m < size);
+
+/** A credited end back in archer order (member 0's arrows first) — to correct it; null when not credited. */
+export function endInArcherOrder(arrows: Arrow[] | undefined, by: number[] | undefined, size: number): Arrow[] | null {
+  if (!creditsEnd(arrows, by, size)) return null;
+  const out: Arrow[] = [];
+  for (let m = 0; m < size; m++) arrows!.forEach((a, j) => { if (by![j] === m) out.push(a); });
+  return out;
+}
 
 /** One arrow as typed / tapped: "X", "10" … "1", "M" (or 0). */
 export function parseArrow(t: string): Arrow | null {

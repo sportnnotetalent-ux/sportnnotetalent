@@ -52,10 +52,9 @@ Above the scoring panels you see this quarter's team fouls. Under FIBA rules, fr
 A D foul disqualifies the player, and so do 2 technicals, 2 unsportsmanlike fouls, or one of each (FIBA). The app asks first, then logs the foul and the ejection. To send a player off for anything else, use **🟥 Eject** at the bottom of the foul panel.
 
 ## Play-by-play, team stats and the box score
-On the **Score** tab, pick a view:
-- **Play-by-play:** every play in words, newest first, by quarter, with the clock and the running score ("Arjun makes a corner 3 (assist: Ben)").
-- **Team stats:** shooting, a scoring breakdown (second-chance points, points off turnovers, bench points, time leading), rebounds and fouls, for the game or one quarter.
-- **Box score**, in FIBA order: PTS, FGM-A, FG%, 2PM-A, 2P%, 3PM-A, 3P%, FTM-A, FT%, OREB, DREB, REB, AST, STL, BLK, TO, PF, FD and EFF. The Summary tab shows it too. Columns you didn't track stay hidden. Plays without a player go on a "Team" row, and "Team fouls" under the tables lists each quarter.
+- **Commentary** tab, the play-by-play: every play in words, newest first, by quarter, with the clock and the running score ("Arjun makes a corner 3 (assist: Ben)").
+- **Stats** tab → **Team stats:** shooting, a scoring breakdown (second-chance points, points off turnovers, bench points, time leading), rebounds and fouls, for the game or one quarter.
+- **Stats** tab → **Box score**, in FIBA order: PTS, FGM-A, FG%, 2PM-A, 2P%, 3PM-A, 3P%, FTM-A, FT%, OREB, DREB, REB, AST, STL, BLK, TO, PF, FD and EFF. Columns you didn't track stay hidden. Plays without a player go on a "Team" row, and "Team fouls" under the tables lists each quarter.
 
 ## Minutes and plus/minus
 Under **🔀 Substitutions**, tap **Manage**, then **Set five** for each team. The app follows every **🔀 Substitute**, adds **MIN** and **+/-** from the game clock, and the player rows list only the five on court.

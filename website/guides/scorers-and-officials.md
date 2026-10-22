@@ -54,7 +54,7 @@ Hosts don't need to add themselves. A host of the match or its tournament can sc
 3. Tap **＋ Add** next to a role.
 4. Tap a tournament referee, search for a person, or type just a name (for example "Mr Rao, PE teacher") and tap **Save**.
 
-The officials then show on the match's **Summary** tab for everyone.
+The officials then show on the match's **Info** tab for everyone.
 
 > **Note:** Scorers can edit officials until the match ends. Hosts can edit them at any time.
 

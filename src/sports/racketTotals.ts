@@ -40,6 +40,9 @@
  *   the detail keys), rally length rl…Pts / rl…Won (table tennis + the
  *   serve3 / receive4 phases), padel net points netPts / netPtsWon,
  *   pickleball kitchenPts / kitchenWon and thirdDrop / thirdDropWon ….
+ *   Round 2: rally keys follow the match's bucket scheme (rl13Pts …),
+ *   pickleball kitchen arrival kitchenArrOf / kitchenSrvArr(Of) /
+ *   kitchenRcvArr(Of) once "Nobody" was used, squash letsAsked.
  * NOT owned: tennis `doubleFaults` (credited through attribution2) — it stays
  * on increments, so the racket plugins set `statTotalsPartial`. SD-104: a double
  * fault recorded with `payload.df` is marked on its point (`event.df`), so an
@@ -55,7 +58,7 @@ import { type PadelState, setTiebreaks as padelTiebreaks, standingsUnits as pade
 import { serveStats, serveCareerKeys, type ServeSport } from './serveStats.ts';
 import { detailCoverage, detailKeys, detailPlayerCredits, type DepthSport, type DetailSport } from './pointDetail.ts';
 import { tennisCareerKeys, tennisView } from './tennis/matchStats.ts';
-import { racketCareerKeys, racketView } from './racketMatchStats.ts';
+import { hasRacketExtras, racketCareerKeys, racketView } from './racketMatchStats.ts';
 
 type Side = 'home' | 'away';
 type PerSide = { home: number; away: number };
@@ -290,11 +293,12 @@ function withTennisExtras(s: TennisState | null | undefined, totals: Record<stri
 
 /** Deep wave — the other racket sports' optional rally length (table tennis
  *  phases), net / kitchen-line and 3rd-shot keys (racketMatchStats.ts
- *  `racketCareerKeys`), on a match that tracked them only. */
+ *  `racketCareerKeys`), on a match that tracked them only. Round 2: + the
+ *  pickleball kitchen-arrival keys and squash's lets asked. */
 function withRacketExtras(sport: DepthSport | undefined, s: { events?: LiveEvent[] } | null | undefined, totals: Record<string, StatTotalsEntry>, ctx?: StatTotalsContext): Record<string, StatTotalsEntry> {
   if (!sport || !s || !Array.isArray(s.events)) return totals;
   const v = racketView(sport, s, serverRosters(totals, ctx));
-  if (!v || !(v.cov.rally || v.cov.net || v.cov.third)) return totals;
+  if (!v || !hasRacketExtras(v)) return totals;
   const bySide = { home: racketCareerKeys(v, 'home'), away: racketCareerKeys(v, 'away') };
   const out: Record<string, StatTotalsEntry> = {};
   for (const [id, e] of Object.entries(totals)) out[id] = { ...e, stats: { ...e.stats, ...bySide[e.side] } };

@@ -39,6 +39,11 @@
  * (and lines) never change. The sheet (./sheet.ts) and the commentary
  * (./commentary.ts) read them.
  *
+ * Round 2 (founder answers): a free kick credits the player who conceded it
+ * (optional — `freeKicksConceded`, keyed once a match asked for the player);
+ * the possession bar's "Ball dead" switch (`BALL_DEAD`) pauses the possession
+ * and territory clocks at stoppages.
+ *
  * Every credit a live action writes on a stat line comes from `eventCredits`
  * (the controls build the attribution from it, and `rugbyTotals` sums it over
  * the state), so the absolute statTotals equal the live increments (SD-19).
@@ -74,10 +79,12 @@ export const TALLY_KINDS: TallyKind[] = ['penalty', 'freeKick', 'turnover', 'ent
 export const TALLY_LABEL: Record<TallyKind, string> = {
   penalty: 'Penalty conceded', freeKick: 'Free kick conceded', turnover: 'Turnover conceded', entry: '22 entry', offload: 'Offload',
 };
-/** the stat-line key a tally credits to its player (free kicks and 22 entries are the team's) */
-export const TALLY_KEY: Partial<Record<TallyKind, string>> = { penalty: 'penaltiesGivenAway', turnover: 'turnoversConceded', offload: 'offloads' };
+/** the stat-line key a tally credits to its player (22 entries are the team's).
+ *  Round 2 (founder): a free kick credits the player who conceded it — optional,
+ *  like a penalty; older one-tap free kicks were the team's. */
+export const TALLY_KEY: Partial<Record<TallyKind, string>> = { penalty: 'penaltiesGivenAway', freeKick: 'freeKicksConceded', turnover: 'turnoversConceded', offload: 'offloads' };
 /** every player key a tally can write */
-export const TALLY_KEYS = ['penaltiesGivenAway', 'turnoversConceded', 'offloads'] as const;
+export const TALLY_KEYS = ['penaltiesGivenAway', 'freeKicksConceded', 'turnoversConceded', 'offloads'] as const;
 export type TrackFlag = 'trackPenalties' | 'trackTurnovers' | 'trackEntries' | 'trackPossession' | 'trackOffloads';
 export const TRACK_FLAGS: TrackFlag[] = ['trackPenalties', 'trackTurnovers', 'trackEntries', 'trackPossession', 'trackOffloads'];
 /** the tallies each toggle switches on (possession / territory are switches, not tallies) */
@@ -102,8 +109,11 @@ export const CAUSE_LABEL: Record<TurnoverCause, string> = {
   knockOn: 'Knock-on', forwardPass: 'Forward pass', handling: 'Handling error', breakdown: 'Lost at ruck / maul', kickOut: 'Kicked out on the full', other: 'Other',
 };
 /** a possession / territory switch on the playing clock (`side` = who has the
- *  ball / whose territory: play in the OTHER side's half) */
-export interface BallMark { kind: 'poss' | 'terr'; side: Side; sec: number; period: number }
+ *  ball / whose territory: play in the OTHER side's half). Round 2: a `dead`
+ *  possession mark = the "Ball dead" switch — from `sec` neither side's
+ *  possession or territory clock runs until the next possession tap (`side`
+ *  keeps who had it, so "Ball live" resumes with them). */
+export interface BallMark { kind: 'poss' | 'terr'; side: Side; sec: number; period: number; dead?: true }
 
 export const KICK_LABEL: Record<KickKind, string> = { conv: 'Conversion', pen: 'Penalty goal', drop: 'Drop goal' };
 export const KICK_POINTS: Record<KickKind, number> = { conv: 2, pen: 3, drop: 3 };
@@ -151,6 +161,10 @@ export interface RugbyEvent {
   infringement?: Infringement;
   /** a turnover's cause (optional) */
   cause?: TurnoverCause;
+  /** round 2 — a free kick recorded with the player asked (named or "Team (no
+   *  name)"): free kicks are credited to players in a match once one was asked.
+   *  An older one-tap free kick never has it, so its match never shows a false 0. */
+  asked?: boolean;
 }
 
 export interface Kick { scored: boolean; playerId?: string; playerName?: string }
@@ -376,7 +390,7 @@ export function eventCredits(e: Pick<RugbyEvent, 'type' | 'playerId' | 'playerNa
     case 'detail':
       return e.detail ? { first: p({ [DETAIL_STAT[e.detail]]: 1 }) } : {};
     case 'tally': {
-      // deep wave: a penalty / turnover conceded or an offload credits its player; free kicks and 22 entries are the team's
+      // deep wave: a penalty / turnover conceded or an offload credits its player (round 2: a free kick too); 22 entries are the team's
       const key = e.tally ? TALLY_KEY[e.tally] : undefined;
       return key ? { first: p({ [key]: 1 }) } : {};
     }
@@ -553,16 +567,26 @@ export const reducer = (s: RugbyState, a: ScoreAction): RugbyState => {
         type: 'tally', side, tally: kind, ...(TALLY_KEY[kind] ? who1 : {}),
         ...(kind === 'penalty' && INFRINGEMENTS.includes(inf) ? { infringement: inf } : {}),
         ...(kind === 'turnover' && TURNOVER_CAUSES.includes(cause) ? { cause } : {}),
+        ...(kind === 'freeKick' && a.payload?.asked === true ? { asked: true } : {}),
       });
     }
     case 'POSSESSION':
     case 'TERRITORY': {
-      // deep wave: who has the ball / whose territory from now on (a tap on the side already set changes nothing)
+      // deep wave: who has the ball / whose territory from now on (a tap on the side already set changes nothing —
+      // round 2: unless the ball is dead, when any possession tap brings it back to life)
       if (!side) return s;
       const kind = a.type === 'POSSESSION' ? 'poss' : 'terr';
       const cur = currentBall(s, kind);
-      if (cur === side) return s;
+      if (cur === side && !(kind === 'poss' && ballDead(s))) return s;
       return { ...s, ball: [...(s.ball ?? []), { kind, side, sec, period }] };
+    }
+    case 'BALL_DEAD': {
+      // round 2: the possession bar's "Ball dead" switch — `dead: false` = "Ball live" (back with the side that had it)
+      const cur = currentBall(s, 'poss');
+      if (!cur) return s;
+      const dead = a.payload?.dead !== false;
+      if (dead === ballDead(s)) return s;
+      return { ...s, ball: [...(s.ball ?? []), { kind: 'poss', side: cur, sec, period, ...(dead ? { dead: true as const } : {}) }] };
     }
     case 'REMOVE_EVENT': {
       const id = String(a.payload?.id ?? '');
@@ -668,33 +692,66 @@ export const tallyTracked = (s: Pick<RugbyState, TrackFlag | 'events' | 'ball'>,
   || (f === 'trackPossession' && !!s.ball?.length);
 /** Penalties conceded are counted — from the detail button or the penalty toggle. */
 export const penaltiesTracked = (s: RugbyState): boolean => detailTracked(s) || tallyTracked(s, 'trackPenalties');
+/** Round 2 — free kicks are credited to players in this match: one was
+ *  recorded with the player asked (or names a player). Old one-tap free kicks
+ *  never were, so their matches never carry the key. */
+export const freeKicksAsked = (s: Pick<RugbyState, 'events'>): boolean =>
+  s.events.some((e) => e.type === 'tally' && e.tally === 'freeKick' && (e.asked === true || !!e.playerId || !!e.playerName));
 /** The tracked player keys of the toggles (every line reads 0 for them). */
-export const trackedTallyKeys = (s: RugbyState): string[] => [...new Set(TRACK_FLAGS.filter((f) => tallyTracked(s, f)).flatMap((f) => FLAG_KEYS[f]))];
+export const trackedTallyKeys = (s: RugbyState): string[] => [...new Set([
+  ...TRACK_FLAGS.filter((f) => tallyTracked(s, f)).flatMap((f) => FLAG_KEYS[f]),
+  ...(freeKicksAsked(s) ? ['freeKicksConceded'] : []),
+])];
 
-/** Who has the ball (`poss`) / whose territory it is (`terr`) right now. */
+/** The switches of one kind in time order (a backfilled tap at its own time). */
+const marksOf = (s: Pick<RugbyState, 'ball'>, kind: 'poss' | 'terr'): BallMark[] =>
+  (s.ball ?? []).map((m, i) => ({ m, i })).filter((x) => x.m.kind === kind).sort((x, y) => x.m.sec - y.m.sec || x.i - y.i).map((x) => x.m);
+/** Who has the ball (`poss`) / whose territory it is (`terr`) right now (after
+ *  a "Ball dead": who had it — `ballDead` says it's dead). */
 export function currentBall(s: Pick<RugbyState, 'ball'>, kind: 'poss' | 'terr'): Side | undefined {
-  const marks = (s.ball ?? []).map((m, i) => ({ m, i })).filter((x) => x.m.kind === kind).sort((x, y) => x.m.sec - y.m.sec || x.i - y.i);
-  return marks[marks.length - 1]?.m.side;
+  const marks = marksOf(s, kind);
+  return marks[marks.length - 1]?.side;
+}
+/** Round 2 — is the ball dead now (the "Ball dead" switch on, no tap since)? */
+export const ballDead = (s: Pick<RugbyState, 'ball'>): boolean => {
+  const marks = marksOf(s, 'poss');
+  return marks[marks.length - 1]?.dead === true;
+};
+/** Round 2 — the "ball dead" spans [from, to) in playing seconds up to `end`:
+ *  each runs from a "Ball dead" to the next possession tap. */
+export function deadSpans(s: Pick<RugbyState, 'ball'>, end: number): [number, number][] {
+  const marks = marksOf(s, 'poss');
+  const out: [number, number][] = [];
+  marks.forEach((m, i) => {
+    if (!m.dead) return;
+    const to = Math.min(marks[i + 1]?.sec ?? end, end);
+    if (to > m.sec) out.push([m.sec, to]);
+  });
+  return out;
 }
 
 /** Playing seconds each side had the ball (`poss`) or the territory (`terr`)
  *  over a scope, from the scorer's switches: time-weighted on the PLAYING clock
  *  (the referee's watch — stoppages don't count, half-time is no time), each
- *  switch holding until the next one (across half-time too). `from` = the
- *  playing second of the first switch in the scope. PURE. */
+ *  switch holding until the next one (across half-time too). Round 2: while
+ *  the "Ball dead" switch is on, neither clock runs (possession and territory
+ *  are ball-in-play measures). `from` = the playing second of the first switch
+ *  in the scope. PURE. */
 export function ballTime(s: RugbyState, kind: 'poss' | 'terr', scope: 'all' | number = 'all', nowSec?: number): { home: number; away: number; from?: number } {
   const end = Math.max(nowSec ?? matchSec(s), 0);
-  const marks = (s.ball ?? []).map((m, i) => ({ m, i })).filter((x) => x.m.kind === kind).sort((x, y) => x.m.sec - y.m.sec || x.i - y.i).map((x) => x.m);
+  const marks = marksOf(s, kind);
+  const dead = kind === 'terr' ? deadSpans(s, end) : [];
   const w0 = scope === 'all' ? 0 : playedOffset(s, scope);
   const w1 = scope === 'all' || scope >= s.period ? Infinity : playedOffset(s, scope + 1);
   const out: { home: number; away: number; from?: number } = { home: 0, away: 0 };
   marks.forEach((m, i) => {
     const from = Math.max(m.sec, w0);
     const to = Math.min(marks[i + 1]?.sec ?? end, end, w1);
-    if (to > from) {
-      out[m.side] += to - from;
-      if (out.from === undefined) out.from = from;
-    }
+    if (to <= from) return;
+    if (out.from === undefined) out.from = from;
+    // a dead possession mark runs nobody's clock; territory loses the dead spans inside its interval
+    const live = m.dead ? 0 : to - from - dead.reduce((t, [a, b]) => t + Math.max(0, Math.min(b, to) - Math.max(a, from)), 0);
+    if (live > 0) out[m.side] += live;
   });
   return out;
 }
@@ -713,10 +770,10 @@ export const rugbyStandingsUnits = (s: RugbyState) => (s && Array.isArray(s.even
 
 /** Deep wave — the "Stats to track" toggles (live settings + the match format). */
 export const TRACK_FIELDS: FormatField[] = [
-  { key: 'trackPenalties', label: 'Penalties by offence & free kicks', type: 'toggle', default: false, group: 'Stats to track', hint: 'A ⚖ Penalty button: the offence and the player (both optional); Free kick in one tap' },
+  { key: 'trackPenalties', label: 'Penalties by offence & free kicks', type: 'toggle', default: false, group: 'Stats to track', hint: 'A ⚖ Penalty button: the offence and the player (both optional); a Free kick button: the player (optional)' },
   { key: 'trackTurnovers', label: 'Turnovers conceded', type: 'toggle', default: false, group: 'Stats to track', hint: 'Knock-ons, forward passes, handling errors… the cause and the player (both optional)' },
   { key: 'trackEntries', label: '22 entries', type: 'toggle', default: false, group: 'Stats to track', hint: 'One tap when a team gets into the opposition 22 — points per entry' },
-  { key: 'trackPossession', label: 'Possession & territory', type: 'toggle', default: false, group: 'Stats to track', hint: 'Tap who has the ball and which half play is in — % on the playing clock' },
+  { key: 'trackPossession', label: 'Possession & territory', type: 'toggle', default: false, group: 'Stats to track', hint: 'Tap who has the ball and which half play is in — % on the playing clock; "Ball dead" pauses both at stoppages' },
   { key: 'trackOffloads', label: 'Offloads', type: 'toggle', default: false, group: 'Stats to track', hint: 'An Offload button — who made it (optional)' },
 ];
 

@@ -32,8 +32,8 @@ import {
 } from '../data/golf';
 import { isSupabaseConfigured } from '../core/supabase';
 import {
-  summarize, toParLabel, cardSigned, clampPutts, MAX_HOLE_STROKES,
-  type GolfCard, type HoleScore, type EntryAdmin, type FairwayDir, type GolfTrackKey,
+  summarize, toParLabel, cardSigned, clampPutts, MAX_HOLE_STROKES, distUnitOf,
+  type GolfCard, type HoleScore, type EntryAdmin, type FairwayDir, type GolfTrackKey, type DistUnit,
 } from '../sports/golf/engine';
 import { cleanTrack, LEGACY_STATS_ROW, roundTrackOf, effectiveTrack, driveHolesOf, withTrack, stampHole } from '../sports/golf/track';
 import type { FeedPlayer } from '../sports/golf/feed';
@@ -153,8 +153,14 @@ export default function GolfRoundScreen() {
   const roundTrack = roundTrackOf(ev.format);
   const track = effectiveTrack(roundTrack, phoneTrack);
   const driveHoles = driveHolesOf(ev.format);
+  // Round 2 — yards (default) or metres for the whole round (organiser)
+  const unit = distUnitOf(ev.format);
   const saveRoundTrack = async (next: GolfTrackKey[], dh: number[]) => {
     try { await updateFieldEventFormat(ev.id, { track: next, driveHoles: dh }); await reload(); }
+    catch (err) { setError(err instanceof Error ? err.message : 'Could not save'); }
+  };
+  const saveUnit = async (u: DistUnit) => {
+    try { await updateFieldEventFormat(ev.id, { distUnit: u }); await reload(); }
     catch (err) { setError(err instanceof Error ? err.message : 'Could not save'); }
   };
   // Deep wave — every card for the commentary / round stats (no DNS)
@@ -230,6 +236,12 @@ export default function GolfRoundScreen() {
     const drive = [...(c.drive ?? new Array(n).fill(null))];
     drive[hole] = yards;
     return { ...c, drive };
+  });
+  // Round 2 — shots from off the green (up and downs)
+  const setOffGreen = (e: FieldEntry, shots: number | null) => setDetail(e, (c, n) => {
+    const offGreen = [...(c.offGreen ?? new Array(n).fill(null))];
+    offGreen[hole] = shots;
+    return { ...c, offGreen };
   });
 
   /* ---------------------- SD-35 entry admin (organiser) --------------------- */
@@ -471,7 +483,8 @@ export default function GolfRoundScreen() {
                   {track.length > 0 && typeof v === 'number' && (
                     <GolfHoleStats card={card} hole={h} i={hole} track={track} driveHoles={driveHoles} canMark={canMark} name={nameOf(e.playerId)}
                       onFairway={(d) => void setFairway(e, d)} onBunker={() => void toggleBunker(e)} onPenalty={(by) => void stepPenalty(e, by)}
-                      onFirstPutt={(b) => void setFirstPutt(e, b)} onDrive={(yd) => void setDrive(e, yd)} />
+                      onFirstPutt={(b) => void setFirstPutt(e, b)} onDrive={(yd) => void setDrive(e, yd)}
+                      unit={unit} onOffGreen={(k) => void setOffGreen(e, k)} />
                   )}
                   {/* SD-117c (Rule 3.3b) — certify the card once every hole has a score */}
                   {sum.thru >= holes.length ? (
@@ -488,7 +501,8 @@ export default function GolfRoundScreen() {
             {/* Deep wave — "Stats to track" (off by default, D8): the organiser
                 sets it for the round, else each marker's phone */}
             <GolfTrackCard track={track} roundTrack={roundTrack} isHost={isHost} holes={holes} driveHoles={driveHoles}
-              onRound={(t, dh) => void saveRoundTrack(t, dh)} onPhone={savePhoneTrack} />
+              onRound={(t, dh) => void saveRoundTrack(t, dh)} onPhone={savePhoneTrack}
+              unit={unit} onUnit={isHost ? (u) => void saveUnit(u) : undefined} />
             <View style={st.tabs}>
               <SelectChip label="📋 Full card" active={fullCard} onPress={() => setFullCard(!fullCard)} />
             </View>
@@ -516,13 +530,13 @@ export default function GolfRoundScreen() {
               <SelectChip label="📊 Round stats" active={boardView === 'stats'} onPress={() => setBoardView('stats')} />
             </View>
             {boardView === 'feed' ? (
-              <GolfRoundFeed players={feedPlayers} scoring={fmt.scoring} net={fmt.net} />
+              <GolfRoundFeed players={feedPlayers} scoring={fmt.scoring} net={fmt.net} unit={unit} />
             ) : boardView === 'stats' ? (
-              <GolfRoundStats players={feedPlayers} initial={me ?? undefined} />
+              <GolfRoundStats players={feedPlayers} initial={me ?? undefined} unit={unit} />
             ) : golfTeamFormatOf(ev) && boardView === 'teams' ? (
               <GolfTeamBoard events={[ev]} entries={merged} courses={[course]} nameOf={nameOf} teamName={(id) => teams.get(id)?.name ?? 'Team'} />
             ) : (
-            <GolfLeaderboard rows={board} scoring={fmt.scoring} nameOf={nameOf} cards={lbCards} holesInRound={holes.length}
+            <GolfLeaderboard rows={board} scoring={fmt.scoring} nameOf={nameOf} cards={lbCards} holesInRound={holes.length} unit={unit}
               onLongPressRow={isHost ? openAdminForPlayer : undefined}
               onShareCard={(pid) => { const c = lbCards.get(pid); if (c) void shareMessage(cardShareText(nameOf(pid), course.name, c.holes, c.card, c.received), 'golf'); }} />
             )}

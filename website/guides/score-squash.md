@@ -52,7 +52,7 @@ GAMES won and a points column per game, with a dot by the serving side. The resu
 A chip under the board shows **GAME POINT** or **MATCH POINT** with the side's name. In English scoring only the server can have one; in PAR both sides can show one at once.
 
 ## Match stats
-The **Score** tab's "Match stats" (per match or game) has tabs:
+The **Stats** tab's "Match stats" (per match or game) has tabs:
 - **Key stats**: Serve (points won on serve and receive in PAR; rallies won on serve, hand-out %, hand-outs won and points per service turn in English), Winners & errors, **Referee decisions**, Points won (total, streaks, biggest lead) and game / match points converted and saved.
 - **Serve**: every serve and receive figure.
 - **Shots** (with point detail): winners, unforced or forced errors by shot, for either wing or **Forehand** / **Backhand** only; a stroke summary; errors and service faults by type.
@@ -75,7 +75,7 @@ After each rally a "Last point" card appears. Tap what you know, or **Skip**:
 Winners and strokes count for the rally winner; errors and no lets against the opponent (doubles: pick who under **By:**).
 
 ## Commentary
-Under the stats, "Commentary" tells the match game by game, newest first, the game in play on top:
+The **Commentary** tab tells the match game by game, newest first, the game in play on top:
 - "Asha Rao wins game 3" with the game score, e.g. **11-7**, and where the match stands.
 - Each rally: "Point to Asha Rao" (English scoring: "Rally to Asha Rao" when it only won the serve back), the match time and, if you described it, a line like "Meera Iyer loses the point with a Backhand Drop Unforced Error (tin)" or "Stroke to Asha Rao". On the right, the score as the marker calls it, the server's score first; "Hand-out · Meera Iyer to serve" when the serve changes.
 - Lets ("Appeal by Meera Iyer · rally replayed"), conduct, the 90 s between games and who served first.

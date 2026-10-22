@@ -18,10 +18,11 @@
  * and kind (`ballEventMatches`), everything in between is a note.
  */
 import {
-  oversStr, runRate, DISMISSAL_NAME, NO_BOWLER, inPowerplay, HUNDRED_PP_BALLS,
+  oversStr, runRate, DISMISSAL_NAME, NO_BOWLER, inPowerplay,
   type BallRec, type CricketState, type ShotRec,
 } from './engine.ts';
-import { detailByRec, isDeliveryRec, recStamp, pitchPhrase, controlPhrase, fieldPosition, type BallDetailRec } from './detail.ts';
+import { detailByRec, isDeliveryRec, recStamp, pitchPhrase, controlPhrase, fieldPosition, extraWhyPhrase, type BallDetailRec } from './detail.ts';
+import { phasePPBalls } from './phases.ts';
 import type { LiveEvent } from '../liveEvents';
 
 type Side = 'home' | 'away';
@@ -198,17 +199,17 @@ const faced = (r: BallRec) => r.ext === 'nb' || (r.legal && r.ext !== 'wd' && is
 const charged = (r: BallRec) => r.bat + r.wd + r.nb;
 const teamRuns = (r: BallRec) => r.bat + r.wd + r.nb + r.b + r.lb + (r.pen ?? 0) + (r.adj ?? 0);
 
-/** Powerplay length (legal balls) of an innings: The Hundred 25; else the format's overs. */
-function ppBalls(s: CricketState): number {
-  if (s.hundred) return HUNDRED_PP_BALLS;
-  return s.powerplayOvers > 0 ? s.powerplayOvers * s.ballsPerOver : 0;
-}
+/** Powerplay length (legal balls) of an innings: the powerplay PHASE —
+ *  round 2: the organiser's choice, else The Hundred 25 / the format's overs. */
+const ppBalls = (s: CricketState): number => phasePPBalls(s);
 
 /** Commentary for one (regulation or Super Over) state. */
 function build(s: CricketState, names: { home: string; away: string }, prefix: string): ComInnings[] {
   const bpo = s.ballsPerOver;
   const log = s.log ?? [];
   const details = detailByRec(log, s.detail, bpo);
+  // Round 2 — run outs marked as a direct hit: the batter out → the fielder
+  const directBy = new Map(s.dismissals.filter((d) => d.direct && d.outId).map((d) => [d.outId!, d.fielderName || 'the fielder']));
   const shotKey = (inn: number, side: string, at: string, batterId: string, nb: boolean) => `${inn}:${side}:${at}:${batterId}:${nb ? 'nb' : ''}`;
   const shots = new Map((s.shots ?? []).map((x) => [shotKey(x.inn, x.side, x.at, x.batterId, !!x.nb), x]));
   const events = [...(s.events ?? [])].sort((a, b) => a.id - b.id);
@@ -378,6 +379,9 @@ function build(s: CricketState, names: { home: string; away: string }, prefix: s
         const { outcome, tone } = outcomeOf(r);
         const wkt = !!r.out && r.out.kind !== 'retired';
         const parts: string[] = [];
+        // Round 2 — why the wide / no-ball was called ("down the leg side", "overstepped")
+        const why = extraWhyPhrase(r.ext, det?.why);
+        if (why) parts.push(why);
         const pitch = pitchPhrase(det);
         if (pitch) parts.push(pitch);
         if (det?.kph) parts.push(`${det.kph} km/h`);
@@ -389,7 +393,8 @@ function build(s: CricketState, names: { home: string; away: string }, prefix: s
         if (wkt && r.out) {
           const how = DISMISSAL_NAME[r.out.kind] ?? 'Out';
           const caughtAt = r.out.kind === 'caught' && det?.cz ? ` at ${fieldPosition(det.cz, det.cdeep)}` : '';
-          head = `${outcome}! ${how}${caughtAt}`;
+          const direct = r.out.kind === 'runout' && directBy.has(r.out.id) ? ` — direct hit from ${directBy.get(r.out.id)}` : '';
+          head = `${outcome}! ${how}${caughtAt}${direct}`;
         }
         ball = {
           kind: 'ball', id: `${prefix}b${i}`, stamp, outcome, tone, score: `${r.tr}/${r.tw}`, sym: r.sym,

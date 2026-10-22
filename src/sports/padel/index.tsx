@@ -113,28 +113,25 @@ const ScoringControls: SportPlugin<PadelState>['ScoringControls'] = ({ state, di
   );
 };
 
-const LiveExtras: NonNullable<SportPlugin<PadelState>['LiveExtras']> = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster, onPlayer }) => {
+/** Match tabs (2026-10-22): the commentary on its own tab (the doubles serve
+ *  diagram, `ServeCourt`, sits on top of it); the stats on Stats. The set
+ *  scores are on the scoreboard header above every tab. */
+type TabProps = Parameters<NonNullable<SportPlugin<PadelState>['LiveExtras']>>[0];
+/** Deep wave — commentary by game, newest first (holds / breaks, golden / star
+ *  points and the change-ends cues inline). */
+const PadelCommentary = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster }: TabProps) => (
+  <RacketCommentary sport="padel" icon="🟡" state={state as PadelState} homeName={homeName} awayName={awayName} homeRoster={homeRoster} awayRoster={awayRoster} homeColor={homeColor} awayColor={awayColor} />
+);
+const PadelStats = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster, onPlayer }: TabProps) => {
   const s = state as PadelState;
   return (
     <View style={{ gap: theme.spacing(3) }}>
-      <Text style={ctrl.label}>Sets</Text>
-      <View style={ctrl.setsRow}>
-        {s.sets.length === 0 ? (
-          <Text style={textStyles.muted}>{matchTbActive(s) ? 'Match tiebreak in progress' : `Set 1 in progress · games ${s.games.home}-${s.games.away}`}</Text>
-        ) : (
-          (lineScore(s)?.done ?? []).map((c, i) => <Text key={i} style={ctrl.setChip}>S{i + 1}: {cellText(c)}</Text>)
-        )}
-      </View>
       {/* SD-22 / deep wave: key stats, serve, shots, rally length — replayed from the point log, per set */}
       <MatchStatsPanel sport="padel" state={s} homeName={homeName} awayName={awayName} homeRoster={homeRoster} awayRoster={awayRoster} homeColor={homeColor} awayColor={awayColor} />
       {/* SD-54 — match and set durations (from the scorer's tap times) */}
       {durationLine(s.events, 'S') ? <Text style={textStyles.muted}>{durationLine(s.events, 'S')}</Text> : null}
       <Text style={ctrl.label}>Box score</Text>
       <MatchBoxScore sport="padel" source={padelBox(s, { homeRoster, awayRoster })} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} onPlayer={onPlayer} />
-      {/* deep wave — commentary by game, newest first (replaces the point log:
-          holds / breaks, golden / star points and the change-ends cues are inline) */}
-      <Text style={ctrl.label}>Commentary</Text>
-      <RacketCommentary sport="padel" icon="🟡" state={s} homeName={homeName} awayName={awayName} homeRoster={homeRoster} awayRoster={awayRoster} homeColor={homeColor} awayColor={awayColor} />
     </View>
   );
 };
@@ -196,7 +193,7 @@ export const padelPlugin: SportPlugin<PadelState> = {
   retireTerms: true,
   Scoreboard: PadelScoreboard,
   ScoringControls,
-  LiveExtras,
+  matchTabs: { Commentary: PadelCommentary, Stats: PadelStats },
   // SD-107 / deep wave — "Stats to track": point detail, 1st / 2nd serve, net
   // points, rally length (event mode: from the next point)
   liveSettings: detailLiveSettings('padel'),

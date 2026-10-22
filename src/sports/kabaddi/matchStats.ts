@@ -15,7 +15,7 @@
 import type { KabaddiState, RaidEntry } from './engine.ts';
 import { extrasOf, isShootoutEvent, perRaidByIndex, replayOf, raidSkillLabel, RAID_SKILLS, TACKLE_TYPES, tackleTypeLabel } from './engine.ts';
 import type { RaidBreakdown } from './rules.ts';
-import { kabaddiMatchCentre } from './totals.ts';
+import { kabaddiMatchCentre, kabaddiTouchedTracked, unsuccessfulTacklers } from './totals.ts';
 import { countRow, pctRow, ratioRow, type CmpCat, type CmpRow, type Side } from '../netraid/feed.ts';
 
 const other = (s: Side): Side => (s === 'home' ? 'away' : 'home');
@@ -99,7 +99,17 @@ export function kabaddiMatchStats(s: KabaddiState, scope: KbScope = 'all'): Kaba
     ];
     if (chances[0] + chances[1] > 0) defending.push(ratioRow('stChance', 'Super tackle chances taken', c.home.superTackles, chances[0], c.away.superTackles, chances[1]));
     if (lineOuts[0] + lineOuts[1] > 0) defending.push(countRow('lineOuts', 'Defenders stepped out (line-outs)', lineOuts[0], lineOuts[1], { better: 'lower' }));
-    cats.push({ id: 'defending', title: 'Defending', rows: defending, note: 'Tackle attempts = successful tackles + raids that touched and got back.' });
+    // round 2 — "Defenders touched" tracked: each named defender touched by a
+    // raider who got back is an unsuccessful tackle (totals.ts)
+    let note = 'Tackle attempts = successful tackles + raids that touched and got back.';
+    if (kabaddiTouchedTracked(s)) {
+      const unsucc = H((x) => rs.filter((y) => y.r.side === other(x)).reduce((t, y) => t + unsuccessfulTacklers(y.r, y.b).length, 0));
+      defending.push(countRow('unsuccTkl', 'Unsuccessful tackles (defenders named)', unsucc[0], unsucc[1], { better: 'lower' }));
+      const back = rs.filter((y) => !y.b.raiderOut && y.b.touchPts > 0);
+      const named = back.filter((y) => unsuccessfulTacklers(y.r, y.b).length > 0).length;
+      note += ` Unsuccessful tackles = defenders named as touched by a raider who got back (${named} of ${back.length} such raid${back.length === 1 ? '' : 's'} named them).`;
+    }
+    cats.push({ id: 'defending', title: 'Defending', rows: defending, note });
 
     /* ------------- all-outs ------------- */
     cats.push({ id: 'allouts', title: 'All-outs', rows: [

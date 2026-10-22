@@ -105,7 +105,8 @@ describe('carrom: Record says when it closes a game', () => {
     // SD-68: a penalty board needs no coins; any other board waits for the pick
     assert.ok(/const ready = penalty \|\| coins != null/.test(c));
     assert.ok(/disabled=\{!ready\}/.test(c));
-    assert.ok(/boardCloses\(s, winner, coins \?\? 0, queen, penalty\)/.test(c));
+    // (round 2: + the board-ending foul under the ICF foul-penalty rule)
+    assert.ok(/boardCloses\(s, winner, coins \?\? 0, queen, penalty(, ef)?\)/.test(c));
   });
 });
 

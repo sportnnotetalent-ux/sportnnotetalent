@@ -63,6 +63,16 @@
  * reminder_sends (event_id, lead_key 'final' | 'round', kind 'follower'), so a
  * final reopened and locked again never pushes twice.
  *
+ * HEAT WINS AND PBs (timed races round 2): the same 'field_status' call also
+ * reads `format.highlights` (written by the app as a round closes or a final
+ * locks — athletics, swimming, rowing, canoe, cycling): heats won and personal
+ * bests. Followers of those athletes (a relay's / crew's members) get ONE push
+ * per event about the athletes they follow — a heat win needs their "Result"
+ * switch, a PB their "big moments" (scores) switch; ids are checked against the
+ * entries, names read from players / teams. Ledger: reminder_sends (event_id,
+ * lead_key 'highlights', kind 'follower'), so a round reopened and closed again
+ * never pushes twice. Team / tournament followers keep the one final push.
+ *
  * ALERT CHOICES: a follower whose follows.prefs has `scores: false` gets no stat
  * pushes; `start: false` / `result: false` skip the status pushes. Before the
  * migration the prefs column is absent → the select falls back and everyone gets
@@ -77,6 +87,7 @@ import { safeEqual } from '../_shared/guard.ts';
 import { webPushToProfiles } from '../_shared/webpush.ts';
 import { allowedPlayerFollows, keepAllowedFollows } from '../_shared/minorFollows.ts';
 import { alertText, eventName, parseAlert, phaseKind, recordsSetBy, type AlertMedal, type RecordSet } from '../_shared/resultAlert.ts';
+import { highlightTargets, highlightText, itemsFor, parseHighlights, type Highlight, type Prefs as HighlightPrefs } from '../_shared/resultHighlights.ts';
 
 const WEBHOOK_SECRET = Deno.env.get('WEBHOOK_SECRET') ?? '';
 
@@ -320,7 +331,9 @@ async function handleFieldStatus(rec: FieldStatusRecord): Promise<Response> {
     .select('id, sport, tournament_id, title, round_no, status, format').eq('id', rec.id).maybeSingle();
   if (!ev || ev.status !== 'completed') return json({ skipped: 'not completed' });
   const kind = phaseKind(ev.sport as string, ev.format);
-  if (!kind) return json({ skipped: 'not a final' });
+  // timed races round 2: a round closing can carry heat wins / PBs (format.highlights)
+  const hasHighlights = !!(ev.format as Record<string, unknown> | null)?.highlights;
+  if (!kind && !hasHighlights) return json({ skipped: 'not a final' });
 
   // Who is in it: athletes (relay / crew members too) and the teams / houses they score for.
   const q = (cols: string) => supabase.from('field_entries').select(cols).eq('event_id', ev.id);
@@ -341,6 +354,10 @@ async function handleFieldStatus(rec: FieldStatusRecord): Promise<Response> {
     }
   }
 
+  // Timed races round 2: heat wins and PBs → the athletes' followers (one push each)
+  const hl = hasHighlights ? await handleHighlights(ev, playerIds, teamIds).catch((e) => ({ status: 'error', message: String(e) })) : undefined;
+  if (!kind) return json({ skipped: 'not a final', highlights: hl });
+
   // The podium: the app's summary (ids checked against the entries), else the stat lines.
   const stored = parseAlert((ev.format as Record<string, unknown> | null)?.alert);
   let medals: AlertMedal[] = (stored?.medals ?? []).filter((m) =>
@@ -358,7 +375,7 @@ async function handleFieldStatus(rec: FieldStatusRecord): Promise<Response> {
       medals = [{ medal: 'gold', ...(isUuid(relay.team_id) ? { teamId: relay.team_id } : isUuid(t?.id) ? { teamId: t!.id } : {}), name: typeof t?.name === 'string' ? t.name : '' }];
     }
   }
-  if (!medals.some((m) => m.medal === 'gold')) return json({ skipped: 'no winner' });
+  if (!medals.some((m) => m.medal === 'gold')) return json({ skipped: 'no winner', highlights: hl });
 
   // Names from the database (the stored ones are the fallback for a team snapshot).
   const pIds = [...new Set(medals.map((m) => m.playerId).filter((x): x is string => !!x))];
@@ -393,7 +410,7 @@ async function handleFieldStatus(rec: FieldStatusRecord): Promise<Response> {
     tournament: t?.name ?? null,
     inTournament: !!ev.tournament_id,
   });
-  if (!text) return json({ skipped: 'no winner' });
+  if (!text) return json({ skipped: 'no winner', highlights: hl });
 
   const [playerF, teamF, tourF] = await Promise.all([
     followersOf('player', [...playerIds]),
@@ -401,7 +418,7 @@ async function handleFieldStatus(rec: FieldStatusRecord): Promise<Response> {
     followersOf('tournament', ev.tournament_id ? [ev.tournament_id as string] : []),
   ]);
   const recipients = [...new Set([...playerF, ...teamF, ...tourF].filter((f) => wants(f.prefs, 'result')).map((f) => f.follower_id))];
-  if (!recipients.length) return json({ kind, sent: 0, recipients: 0 });
+  if (!recipients.length) return json({ kind, sent: 0, recipients: 0, highlights: hl });
 
   // Ledger: one push per (event, profile), ever — claim first so a re-lock or a
   // concurrent call can't double-send.
@@ -412,13 +429,86 @@ async function handleFieldStatus(rec: FieldStatusRecord): Promise<Response> {
       { onConflict: 'event_id,lead_key,recipient_id,kind', ignoreDuplicates: true })
     .select('recipient_id');
   // no event_id column yet → send nothing rather than risk repeats
-  if (claimErr) return json({ kind, error: 'ledger', message: claimErr.message }, 500);
+  if (claimErr) return json({ kind, error: 'ledger', message: claimErr.message, highlights: hl }, 500);
   const toSend = ((claimed ?? []) as { recipient_id: string }[]).map((r) => r.recipient_id);
-  if (!toSend.length) return json({ kind, sent: 0, recipients: 0, duplicate: true });
+  if (!toSend.length) return json({ kind, sent: 0, recipients: 0, duplicate: true, highlights: hl });
 
   const url = kind === 'golf' ? `/g/${ev.id}` : `/r/${ev.id}`;
   const out = await sendToProfiles(toSend, text.title, text.body, { url, eventId: ev.id });
-  return json({ kind, recipients: toSend.length, ...out });
+  return json({ kind, recipients: toSend.length, ...out, highlights: hl });
+}
+
+/**
+ * Timed races round 2 — heat wins and personal bests (format.highlights) to the
+ * followers of those athletes: one push per follower per event, cut to their
+ * alert choices; ids checked against the event's entries; names from the database.
+ */
+async function handleHighlights(
+  ev: { id: string; title?: unknown; format?: unknown; tournament_id?: unknown },
+  playerIds: Set<string>,
+  teamIds: Set<string>,
+): Promise<Record<string, unknown>> {
+  const stored = parseHighlights((ev.format as Record<string, unknown> | null)?.highlights);
+  if (!stored) return { status: 'none' };
+  // only athletes who are in this event (a relay's / crew's members included)
+  const items: Highlight[] = stored.items.flatMap((h) => {
+    if (h.playerId) return playerIds.has(h.playerId) ? [h] : [];
+    const memberIds = (h.memberIds ?? []).filter((id) => playerIds.has(id));
+    return memberIds.length ? [{ ...h, memberIds, ...(h.teamId && teamIds.has(h.teamId) ? {} : { teamId: undefined }) }] : [];
+  });
+  if (!items.length) return { status: 'none' };
+
+  const pIds = [...new Set(items.map((h) => h.playerId).filter((x): x is string => !!x))];
+  const tIds = [...new Set(items.map((h) => h.teamId).filter((x): x is string => !!x))];
+  const [{ data: ps }, { data: ts }, { data: tourney }] = await Promise.all([
+    pIds.length ? supabase.from('players').select('id, full_name').in('id', pIds) : Promise.resolve({ data: [] as { id: string; full_name: string }[] }),
+    tIds.length ? supabase.from('teams').select('id, name').in('id', tIds) : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+    ev.tournament_id ? supabase.from('tournaments').select('name').eq('id', ev.tournament_id as string).maybeSingle() : Promise.resolve({ data: null }),
+  ]);
+  const pName = new Map((ps ?? []).map((p) => [p.id, p.full_name as string]));
+  const tName = new Map((ts ?? []).map((t) => [t.id, t.name as string]));
+  const named = items.map((h) => ({ ...h, name: (h.playerId && pName.get(h.playerId)) || (h.teamId && tName.get(h.teamId)) || h.name || 'An athlete' }));
+
+  // each follower → the athletes they follow here, with that follow's choices
+  const follows = await followersOf('player', [...new Set(named.flatMap(highlightTargets))]);
+  const byFollower = new Map<string, Map<string, HighlightPrefs>>();
+  for (const f of follows) {
+    if (!f.target_id) continue;
+    const m = byFollower.get(f.follower_id) ?? new Map<string, HighlightPrefs>();
+    m.set(f.target_id, (f.prefs ?? null) as HighlightPrefs);
+    byFollower.set(f.follower_id, m);
+  }
+  const event = stored.event ?? eventName(String(ev.title ?? ''), ev.format);
+  const tour = (tourney as { name?: string } | null)?.name ?? null;
+  const plan = [...byFollower].flatMap(([id, m]) => {
+    const text = highlightText(itemsFor(named, m), event, tour);
+    return text ? [{ id, text }] : [];
+  });
+  if (!plan.length) return { status: 'no followers' };
+
+  // Ledger: one highlights push per (event, profile), ever — claim first.
+  const { data: claimed, error: claimErr } = await supabase
+    .from('reminder_sends')
+    .upsert(plan.map((p) => ({ event_id: ev.id, lead_key: 'highlights', recipient_id: p.id, kind: 'follower' })),
+      { onConflict: 'event_id,lead_key,recipient_id,kind', ignoreDuplicates: true })
+    .select('recipient_id');
+  if (claimErr) return { status: 'ledger', message: claimErr.message };
+  const mine = new Set(((claimed ?? []) as { recipient_id: string }[]).map((r) => r.recipient_id));
+  // the same message to many followers goes as one batch
+  const groups = new Map<string, { title: string; body: string; ids: string[] }>();
+  for (const p of plan) {
+    if (!mine.has(p.id)) continue;
+    const k = `${p.text.title}\n${p.text.body}`;
+    const g = groups.get(k) ?? { ...p.text, ids: [] };
+    g.ids.push(p.id);
+    groups.set(k, g);
+  }
+  let sent = 0, web = 0, recipients = 0;
+  for (const g of groups.values()) {
+    const out = await sendToProfiles(g.ids, g.title, g.body, { url: `/r/${ev.id}`, eventId: ev.id });
+    sent += out.sent; web += out.web; recipients += g.ids.length;
+  }
+  return { status: recipients ? 'sent' : 'duplicate', recipients, sent, web };
 }
 
 interface StatLineRecord {

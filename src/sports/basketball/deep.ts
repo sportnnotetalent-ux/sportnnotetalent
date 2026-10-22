@@ -13,7 +13,8 @@
  *  - shot zones: only plays logged with "Shot zones" on carry a `zone`; the
  *    figures count charted shots and say how many of all were charted;
  *  - fast breaks: makes logged with "Fast-break points" on carry `fbt`; the
- *    tag `fb` marks the fast breaks among them;
+ *    tag `fb` marks the fast breaks among them; their points include the
+ *    made and-one free throw (NBA convention — `fastBreakPlays`);
  *  - fouls drawn: fouls logged with "Fouls drawn" on carry `fdt` (+ who);
  *  - second-chance points: from typed (off / def) rebounds, so only shown once
  *    the match typed one; points off turnovers once a turnover / steal exists.
@@ -78,6 +79,72 @@ export const foulsDrawnOn = (s: BasketballState, c = bbCoverage(s)): boolean => 
 
 /* ------------------------- possessions (derived) ---------------------------- */
 
+/** After a made basket by `side`, does play `e` still belong to that
+ *  possession? Its and-one free throw (any free throw of that side), the
+ *  assist, the other side's foul that gave the and-one, a time-out or a
+ *  substitution do; anything else means the possession is over. */
+const sameBasketPossession = (e: BBEvent, side: Side): boolean =>
+  ((e.type === 'freethrow' || e.type === 'assist') && e.side === side)
+  || (e.type === 'foul' && e.side !== side) || e.type === 'timeout' || e.type === 'sub';
+
+/** Two plays by the same player — by id where both carry one, else by name.
+ *  A play with no player (team-credited) is compatible with anyone. */
+const sameShooter = (a: BBEvent, b: BBEvent): boolean =>
+  !a.playerName || !b.playerName || (a.pid && b.pid ? a.pid === b.pid : a.playerName === b.playerName);
+
+/**
+ * Court-team round 2 — the and-one free throw of each made field goal,
+ * DERIVED from the order of the plays (so an old log pairs up exactly as a
+ * new one): the first free throw by the same side — and the same shooter,
+ * where both plays name one — that follows the basket in the same
+ * possession (`sameBasketPossession`: the foul that gave it, the assist, a
+ * time-out or a sub may sit between them) and the same period. An and-one is
+ * ONE shot: a free throw that opens a trip of two or more (the same side and
+ * shooter back to back) belongs to another foul, not to the basket.
+ * Map: basket id → its and-one free throw (made or missed).
+ */
+export function andOneFreeThrows(s: BasketballState): Map<number, BBEvent> {
+  const out = new Map<number, BBEvent>();
+  const halfCourt = s.targetPoints > 0;
+  const ev = gameOrder(s.events);
+  let basket: BBEvent | null = null;
+  for (let i = 0; i < ev.length; i++) {
+    const e = ev[i];
+    if (basket && e.quarter !== basket.quarter) basket = null;
+    if (basket && e.type === 'freethrow' && e.side === basket.side && sameShooter(basket, e)) {
+      const next = ev[i + 1];
+      const trip = !!next && next.type === 'freethrow' && next.side === e.side && next.quarter === e.quarter && next.playerName === e.playerName;
+      if (!trip) out.set(basket.id, e);
+      basket = null;
+      continue;
+    }
+    if (basket && !sameBasketPossession(e, basket.side)) basket = null;
+    if (e.type === 'score' && isFieldGoal(e.points ?? 0, halfCourt)) basket = e;
+  }
+  return out;
+}
+
+/**
+ * Fast-break points by play (event id → points). A basket tagged ⚡ counts
+ * its points and — the NBA convention, founder 2026-10-22 — its made and-one
+ * free throw too (all the points of the fast-break possession). Derived, so
+ * a match whose fast breaks were tagged before this rule recomputes the same
+ * way on its next render (and its career line at the next completion or
+ * correction).
+ */
+export function fastBreakPlays(s: BasketballState): Map<number, number> {
+  const out = new Map<number, number>();
+  const halfCourt = s.targetPoints > 0;
+  let ands: Map<number, BBEvent> | undefined;
+  for (const e of s.events) {
+    if (e.type !== 'score' || !e.fb || !isFieldGoal(e.points ?? 0, halfCourt)) continue;
+    out.set(e.id, e.points ?? 0);
+    const ft = (ands ??= andOneFreeThrows(s)).get(e.id);
+    if (ft?.made) out.set(ft.id, 1);
+  }
+  return out;
+}
+
 export interface PossessionTag { second?: true; offTo?: true }
 
 /**
@@ -104,8 +171,7 @@ export function possessionTags(s: BasketballState): Map<number, PossessionTag> {
     if (e.quarter !== q) { sc = null; to = null; closeAfter = null; q = e.quarter; }
     // a made basket ends the possession — its and-one free throw (and the
     // foul that gave it, the assist, a time-out or a sub) still belong to it
-    if (closeAfter && !((e.type === 'freethrow' || e.type === 'assist') && e.side === closeAfter)
-      && !(e.type === 'foul' && e.side !== closeAfter) && e.type !== 'timeout' && e.type !== 'sub') {
+    if (closeAfter && !sameBasketPossession(e, closeAfter)) {
       close(closeAfter); closeAfter = null;
     }
     const pts = pointsOf(e);
@@ -207,8 +273,9 @@ export interface BbTeamFigures {
 const blankZones = (): Record<ShotZone, ZoneLine> =>
   Object.fromEntries(SHOT_ZONES.map((z) => [z, { made: 0, att: 0, points: 0 }])) as Record<ShotZone, ZoneLine>;
 
-/** A side's figures over a scope (a period, or the whole game). */
-export function bbTeamFigures(s: BasketballState, side: Side, scope: BbScope = 'all', tags = possessionTags(s)): BbTeamFigures {
+/** A side's figures over a scope (a period, or the whole game). Fast-break
+ *  points include the made and-one free throw (`fastBreakPlays`). */
+export function bbTeamFigures(s: BasketballState, side: Side, scope: BbScope = 'all', tags = possessionTags(s), fbp = fastBreakPlays(s)): BbTeamFigures {
   const halfCourt = s.targetPoints > 0;
   const tracked = bbCoverage(s).shots;
   const f: BbTeamFigures = {
@@ -226,6 +293,7 @@ export function bbTeamFigures(s: BasketballState, side: Side, scope: BbScope = '
     const tag = tags.get(e.id);
     if (tag?.second) f.second += pts;
     if (tag?.offTo) f.offTo += pts;
+    f.fastBreak += fbp.get(e.id) ?? 0;
     switch (e.type) {
       case 'score': {
         const p = e.points ?? 0;
@@ -235,7 +303,6 @@ export function bbTeamFigures(s: BasketballState, side: Side, scope: BbScope = '
         if (p === 3) { f.tpm++; if (tracked) f.tpa++; f.from3 += p; }
         if (arc) { f.arcM++; if (tracked) f.arcA++; f.fromArc += p; } else { f.inM++; if (tracked) f.inA++; f.fromIn += p; }
         if (e.zone) { const z = f.zones[e.zone]; z.made++; z.att++; z.points += p; if (e.zone === 'paint') f.paint += p; }
-        if (e.fb) f.fastBreak += p;
         break;
       }
       case 'miss': {
@@ -308,8 +375,10 @@ export function bbDeepKeys(s: BasketballState, c = bbCoverage(s)): string[] {
   return out;
 }
 
-/** One play's deep credits: [who (name, id, side), keys]. */
-function deepCredits(s: BasketballState, e: BBEvent, keys: Set<string>): { name?: string; pid?: string; side: Side; stats: Record<string, number> }[] {
+/** One play's deep credits: [who (name, id, side), keys]. `fbp` = the
+ *  fast-break points by play (the made and-one free throw is credited to its
+ *  shooter, as its point is). */
+function deepCredits(s: BasketballState, e: BBEvent, keys: Set<string>, fbp: Map<number, number>): { name?: string; pid?: string; side: Side; stats: Record<string, number> }[] {
   const out: { name?: string; pid?: string; side: Side; stats: Record<string, number> }[] = [];
   const add = (name: string | undefined, pid: string | undefined, side: Side, stats: Record<string, number>) => {
     const kept = Object.fromEntries(Object.entries(stats).filter(([k]) => keys.has(k)));
@@ -330,6 +399,8 @@ function deepCredits(s: BasketballState, e: BBEvent, keys: Set<string>): { name?
     add(e.playerName, e.pid, e.side, st);
   } else if (e.type === 'foul' && (e.drawn || e.drawnPid)) {
     add(e.drawn, e.drawnPid, other(e.side), { foulsDrawn: 1 });
+  } else if (e.type === 'freethrow' && fbp.has(e.id)) {
+    add(e.playerName, e.pid, e.side, { fastBreakPoints: fbp.get(e.id)! });
   }
   return out;
 }
@@ -342,8 +413,9 @@ export function bbDeepTotals(s: BasketballState): { keys: string[]; lines: Recor
   const lines: Record<string, StatTotalsEntry> = {};
   if (!keys.length) return { keys, lines };
   const set = new Set(keys);
+  const fbp = fastBreakPlays(s);
   for (const e of s.events) {
-    for (const c of deepCredits(s, e, set)) {
+    for (const c of deepCredits(s, e, set, fbp)) {
       const id = c.pid ?? (c.name ? s.ids?.[c.name] : undefined);
       if (!id) continue;
       const line = lines[id] ?? (lines[id] = { side: c.side, stats: {} });
@@ -366,9 +438,10 @@ export function bbDeepRows(s: BasketballState, scope: BbScope = 'all'): {
   const out = { zero, home: { rows: new Map<string, Record<string, number>>(), team: {} as Record<string, number> }, away: { rows: new Map<string, Record<string, number>>(), team: {} as Record<string, number> } };
   if (!keys.length) return out;
   const set = new Set(keys);
+  const fbp = fastBreakPlays(s);
   for (const e of s.events) {
     if (!inScope(e, scope)) continue;
-    for (const c of deepCredits(s, e, set)) {
+    for (const c of deepCredits(s, e, set, fbp)) {
       const bucket = c.name ? (out[c.side].rows.get(c.name) ?? out[c.side].rows.set(c.name, {}).get(c.name)!) : out[c.side].team;
       for (const [k, v] of Object.entries(c.stats)) bucket[k] = (bucket[k] ?? 0) + v;
     }

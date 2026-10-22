@@ -7,18 +7,24 @@
  *  - pitchers: pitches–strikes ("98-62"), strike %, first-pitch strikes (the
  *    first pitch of a plate appearance is a strike: called, swinging, foul or
  *    put in play), batters faced, ground outs – fly outs (GO-AO from the
- *    outcomes: groundout / double play vs flyout / lineout / sac fly),
+ *    outcomes: groundout / double play / sac bunt — round 2, founder — vs
+ *    flyout / lineout / sac fly; a fielder's choice is neither: the batter
+ *    isn't out),
  *    inherited runners – scored, the pitch mix (when pitch types are tracked);
  *  - fielding: errors, double plays turned (a play that made 2+ outs), putouts
  *    / assists from the notation;
  *  - spray: balls in play and hits by zone (the scorer's tap, else the
- *    fielders' notation).
+ *    fielders' notation);
+ *  - round 2 — batted-ball type (ground ball / line drive / fly ball /
+ *    popup): the scorer's tap, else what the out fixes (`battedBallOf`), per
+ *    batter, per pitcher (allowed) and per team. Readers gate on
+ *    `trackTracked(s, 'battedBallTypes')` (never a false 0).
  * Pitch-count figures mean something only with pitch-by-pitch on
  * (`cfg.pitches`) — readers gate on it (never a false 0).
  */
 import {
-  HITS, NO_AB, inningOf, other, whoKey, withAnn, zoneOf,
-  type Ann, type BaseballEvent, type BaseballState, type Outcome, type Side, type Zone,
+  HITS, NO_AB, IN_PLAY, battedBallOf, inningOf, other, whoKey, withAnn, zoneOf,
+  type Ann, type BaseballEvent, type BaseballState, type BattedBall, type Outcome, type Side, type Zone,
 } from './engine.ts';
 
 export type Scope = 'all' | number;
@@ -39,7 +45,8 @@ export function notation(f?: string): { po: number[]; a: number[]; e: number[] }
 /** a strike for the pitch count: called, swinging, foul or put in play (a
  *  hit batter is a ball — MLB pitch-count convention) */
 const STRIKE = new Set(['called', 'swinging', 'foul', 'inplay']);
-export const GROUND_OUT: Outcome[] = ['GO', 'DP'];
+/** round 2 (founder): a sacrifice bunt counts as a ground out */
+export const GROUND_OUT: Outcome[] = ['GO', 'DP', 'SH'];
 export const AIR_OUT: Outcome[] = ['FO', 'LO', 'SF'];
 
 /** Did this event carry a pitch (a PITCH, or a plate appearance's final pitch)? */
@@ -57,6 +64,11 @@ export function annIn(s: BaseballState, e: BaseballEvent, scope: Scope = 'all'):
   return scope === 'all' || inningOf(a.half) === scope ? a : undefined;
 }
 
+/** Round 2 — batted-ball counts (GB / LD / FB / PU) */
+export type BattedCounts = Record<BattedBall, number>;
+export const noBatted = (): BattedCounts => ({ GB: 0, LD: 0, FB: 0, PU: 0 });
+export const battedTotal = (c: BattedCounts): number => c.GB + c.LD + c.FB + c.PU;
+
 /** the pitcher charged with an event's pitch / plate appearance */
 export const pitcherKeyOf = (e: BaseballEvent, a?: Ann): string | undefined => whoKey(e.pitcher) ?? a?.pk;
 
@@ -67,6 +79,8 @@ export interface PitcherFigures {
   pitches: number; strikes: number; balls: number; firstPitches: number; firstStrikes: number;
   bf: number; k: number; bb: number; go: number; ao: number; ir: number; irs: number;
   mix: Record<string, number>;
+  /** round 2: batted balls allowed by type */
+  batted: BattedCounts;
 }
 
 /** Each pitcher's figures (in order of appearance) over a scope. */
@@ -80,7 +94,7 @@ export function pitcherFigures(state: BaseballState, scope: Scope = 'all'): Pitc
       const sp = s.g.spells.find((x) => x.key === key);
       p = {
         key, ...(sp?.id ?? w?.id ? { id: sp?.id ?? w?.id } : {}), ...(sp?.name ?? w?.name ? { name: sp?.name ?? w?.name } : {}), side, first: sp?.first ?? false,
-        pitches: 0, strikes: 0, balls: 0, firstPitches: 0, firstStrikes: 0, bf: 0, k: 0, bb: 0, go: 0, ao: 0, ir: 0, irs: 0, mix: {},
+        pitches: 0, strikes: 0, balls: 0, firstPitches: 0, firstStrikes: 0, bf: 0, k: 0, bb: 0, go: 0, ao: 0, ir: 0, irs: 0, mix: {}, batted: noBatted(),
       };
       out.set(key, p);
     }
@@ -111,6 +125,8 @@ export function pitcherFigures(state: BaseballState, scope: Scope = 'all'): Pitc
       if (e.outcome === 'BB' || e.outcome === 'IBB') p.bb++;
       if (GROUND_OUT.includes(e.outcome)) p.go++;
       if (AIR_OUT.includes(e.outcome)) p.ao++;
+      const bt = battedBallOf(e);
+      if (bt) p.batted[bt]++;
     }
   }
   for (const r of s.g.runs) {
@@ -130,7 +146,7 @@ export function mixText(mix: Record<string, number>, label: (t: string) => strin
 
 /* --------------------------------- batters --------------------------------- */
 
-export interface BatterFigures { key: string; id?: string; name?: string; side: Side; rispAb: number; rispHits: number; twoOutRbi: number }
+export interface BatterFigures { key: string; id?: string; name?: string; side: Side; rispAb: number; rispHits: number; twoOutRbi: number; batted: BattedCounts }
 
 /** Each batter's situational figures over a scope. */
 export function batterFigures(state: BaseballState, scope: Scope = 'all'): BatterFigures[] {
@@ -142,9 +158,11 @@ export function batterFigures(state: BaseballState, scope: Scope = 'all'): Batte
     const key = whoKey(e.batter);
     if (!a || !key) continue;
     let b = out.get(key);
-    if (!b) { b = { key, ...(e.batter?.id ? { id: e.batter.id } : {}), ...(e.batter?.name ? { name: e.batter.name } : {}), side: e.side, rispAb: 0, rispHits: 0, twoOutRbi: 0 }; out.set(key, b); }
+    if (!b) { b = { key, ...(e.batter?.id ? { id: e.batter.id } : {}), ...(e.batter?.name ? { name: e.batter.name } : {}), side: e.side, rispAb: 0, rispHits: 0, twoOutRbi: 0, batted: noBatted() }; out.set(key, b); }
     if (risp(a) && isAb(e.outcome)) { b.rispAb++; if (HITS.includes(e.outcome)) b.rispHits++; }
     if (a.outs === 2 && (e.rbi ?? 0) > 0) b.twoOutRbi += e.rbi!;
+    const bt = battedBallOf(e);
+    if (bt) b.batted[bt]++;
   }
   return [...out.values()];
 }
@@ -164,6 +182,8 @@ export interface TeamSplit {
   mix: Record<string, number>;
   /** this side's balls in play by zone (at bat) */
   zones: Partial<Record<Zone, { bip: number; hits: number }>>;
+  /** round 2: this side's balls in play (at bat) by type, and those with no type */
+  batted: BattedCounts; untyped: number;
 }
 
 /** A side's figures over a scope: at bat, and the other side's turns in the field. */
@@ -173,7 +193,7 @@ export function teamSplit(state: BaseballState, side: Side, scope: Scope = 'all'
     runs: 0, pa: 0, ab: 0, hits: 0, doubles: 0, triples: 0, homeRuns: 0, bb: 0, hbp: 0, so: 0, sf: 0, sh: 0, rbi: 0,
     rispAb: 0, rispHits: 0, twoOutRbi: 0, lob: 0, gidp: 0, sb: 0, cs: 0, pickedOff: 0,
     pitches: 0, strikes: 0, firstPitches: 0, firstStrikes: 0, bf: 0, kPitched: 0, bbAllowed: 0, go: 0, ao: 0, wp: 0, bk: 0, pb: 0, ir: 0, irs: 0,
-    errors: 0, dp: 0, putouts: 0, assists: 0, mix: {}, zones: {},
+    errors: 0, dp: 0, putouts: 0, assists: 0, mix: {}, zones: {}, batted: noBatted(), untyped: 0,
   };
   s.g.line.forEach((r, h) => { if ((h % 2 === 0 ? 'away' : 'home') === side && (scope === 'all' || inningOf(h) === scope)) t.runs += r ?? 0; });
   for (const e of s.events) {
@@ -222,6 +242,7 @@ export function teamSplit(state: BaseballState, side: Side, scope: Scope = 'all'
       if (a.outs === 2) t.twoOutRbi += e.rbi ?? 0;
       const z = zoneOf(e);
       if (z) { const c = (t.zones[z] ??= { bip: 0, hits: 0 }); c.bip++; if (HITS.includes(o)) c.hits++; }
+      if (IN_PLAY.includes(o)) { const bt = battedBallOf(e); if (bt) t.batted[bt]++; else t.untyped++; }
     } else {
       t.bf++;
       if (o === 'K') t.kPitched++;

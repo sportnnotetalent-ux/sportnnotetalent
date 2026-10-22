@@ -32,6 +32,9 @@ export function crewStats<S extends CrewSport>(sport: S): SportStatSchema<S> {
       { key: 'finalsA', label: 'A finals', short: 'A finals', one: 'A final', group: 'racing' },
       // deep wave (timed races): heats / repechages / semi-finals won
       { key: 'heatWins', label: 'Heats won', short: 'heats won', one: 'heat won', group: 'racing' },
+      // timed races round 2: meet / school records broken (only when a record was set with the holder's id)
+      { key: 'mrSet', label: 'Meet records set', short: 'meet records', one: 'meet record', group: 'medals' },
+      { key: 'srSet', label: 'School records set', short: 'school records', one: 'school record', group: 'medals' },
       ...(rowing ? [{ key: 'cox', label: 'Races as cox', short: 'as cox', one: 'race as cox', group: 'racing' }] : []),
       { key: 'golds', label: 'Golds', short: 'golds', one: 'gold', group: 'medals', weight: 3 },
       { key: 'silvers', label: 'Silvers', short: 'silvers', one: 'silver', group: 'medals', weight: 2 },
@@ -48,7 +51,7 @@ export function crewStats<S extends CrewSport>(sport: S): SportStatSchema<S> {
     ],
     sections: [
       { id: 'bests', title: 'Personal bests', rows: pbStats.map((s) => ({ stat: s.key, hideZero: true })) },
-      { id: 'medals', title: 'Medals', rows: [{ stat: 'golds' }, { stat: 'silvers' }, { stat: 'bronzes' }, { stat: 'finalsA' }, { stat: 'heatWins', hideZero: true }] },
+      { id: 'medals', title: 'Medals', rows: [{ stat: 'golds' }, { stat: 'silvers' }, { stat: 'bronzes' }, { stat: 'finalsA' }, { stat: 'heatWins', hideZero: true }, { stat: 'mrSet', hideZero: true }, { stat: 'srSet', hideZero: true }] },
     ],
     careerView: 'measured',
     history: ['golds', 'silvers', 'bronzes'],

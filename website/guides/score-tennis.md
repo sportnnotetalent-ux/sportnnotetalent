@@ -47,7 +47,7 @@ POINTS shows the current game, with a games column per set and a 🎾 dot by the
 A chip under the board shows **MATCH POINT**, **SET POINT** or **BREAK POINT** with the side's name.
 
 ## Match stats
-The **Score** tab's "Match stats" (per match or set) has tabs:
+The **Stats** tab's "Match stats" (per match or set) has tabs:
 - **Key stats**: Service (aces, double faults, and with the options below 1st serve in, win 1st / 2nd serve, fastest serve and serve averages), Winners & errors, Points won (break points, net points, receiving and total points) and Games (holds, breaks, break points saved, streaks).
 - **Serve & return**: aces, service and return points played and won, and return points in play. With 1st / 2nd serve tracked, switch between **Total**, **1st serve** and **2nd serve**.
 - **Rally** (with point detail): forehand and backhand winners, unforced and forced errors by shot, and a stroke summary.
@@ -72,7 +72,7 @@ After each point, a "Last point" card appears. Tap what you know, or **Skip**:
 Winners count for the point winner, errors against the opponent (doubles: pick who under **By:**). The box score adds **W**, **UE**, **FE**.
 
 ## Commentary
-Under the stats, "Commentary" tells the match game by game, newest first, the game in play on top:
+The **Commentary** tab tells the match game by game, newest first, the game in play on top:
 - "Asha Rao wins the game" with the set score, e.g. **1-1**.
 - Each point: "Point to Asha Rao", the match time and, if you described it, a line like "Meera Iyer loses the point with a Backhand Forced Error". On the right, the score after the point, server first: **30 - 15**, **40 - AD**, **Game**.
 - Code violations and timeouts where they happened, and who served the game.

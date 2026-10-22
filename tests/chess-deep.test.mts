@@ -155,9 +155,12 @@ describe('deep wave · chess engine: MOVES / OPENING / SET_TRACK', () => {
     const s = chess.reducer(chess.init(), { type: 'SET_TRACK', payload: { trackMoves: true, trackClock: true } });
     assert.deepEqual(s.track, { moves: true, clock: true });
   });
-  test('a knockout mini-match keeps no move list', () => {
+  // Round 2 (founder): a knockout match keeps ONE list per game — moves typed
+  // after game 1's result are the game in play's (game 2), not game 1's
+  test('a knockout mini-match keeps one move list per game (round 2)', () => {
     const s = run([{ type: 'RESULT', payload: { winner: 'draw', method: 'agreement', ko: { games: 2 } } }, { type: 'MOVES', payload: { add: ['e4'] } }]);
-    assert.equal(s.game, undefined);
+    assert.deepEqual(s.game?.san, ['e4']);
+    assert.equal(s.ko?.games[0].game, undefined);
   });
 });
 

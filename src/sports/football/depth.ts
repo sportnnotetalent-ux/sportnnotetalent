@@ -8,9 +8,11 @@
  *  - shot detail: inside / outside the box, big chances (and big chances
  *    missed), shots that hit the woodwork;
  *  - key passes (the pass that set up a shot; chances created = key passes +
- *    assists), clearances, goal kicks and throw-ins, card reasons.
+ *    assists), clearances, goal kicks and throw-ins, card reasons;
+ *  - goals ruled out (round 2: a toggle — school matches have no VAR; a match
+ *    that logged one still shows it).
  * Free (derived from what every match already logs): shots off target,
- * penalties taken / scored, goals ruled out, team save %.
+ * penalties taken / scored, team save %.
  *
  * A figure the match didn't track is never written as 0: player keys are
  * written only for a match that tracked them (keyed coverage), and team
@@ -38,6 +40,11 @@ export const clearancesTracked = (s: Pick<FootballState, 'deep' | 'stats'>): boo
   s.deep?.clearances === true || (s.stats ?? []).some((e) => e.kind === 'clearance');
 export const setPiecesTracked = (s: Pick<FootballState, 'deep' | 'stats'>): boolean =>
   s.deep?.setPieces === true || (s.stats ?? []).some((e) => e.kind === 'goalKick' || e.kind === 'throwIn');
+/** Round 2 — goals ruled out: the toggle (the button shows only then), or
+ *  any logged (an older match, or one that switched it off later, keeps what
+ *  it logged). */
+export const ruledOutTracked = (s: Pick<FootballState, 'deep' | 'events'>): boolean =>
+  s.deep?.ruledOut === true || (s.events ?? []).some((e) => e.type === 'nogoal');
 
 /** The optional live-credited keys to zero-fill on credited players' lines
  *  (only for a match that tracked them — no false 0 elsewhere). */
@@ -120,8 +127,10 @@ export function footballDepthTeamStats(s: FootballState): Record<Side, Record<st
   if (pensTaken('home') + pensTaken('away') > 0) {
     for (const side of SIDES) { out[side].penaltiesTaken = pensTaken(side); out[side].penaltyGoals = goals(side, (e) => e.goalType === 'penalty'); }
   }
+  // round 2: only for a match that tracked them (the toggle, or one logged) —
+  // a tracked match with none reads 0 v 0, an untracked one has no row
   const ruledOut = (side: Side) => (s.events ?? []).filter((e) => e.type === 'nogoal' && e.side === side).length;
-  if (ruledOut('home') + ruledOut('away') > 0) for (const side of SIDES) out[side].goalsRuledOut = ruledOut(side);
+  if (ruledOutTracked(s)) for (const side of SIDES) out[side].goalsRuledOut = ruledOut(side);
   return out;
 }
 

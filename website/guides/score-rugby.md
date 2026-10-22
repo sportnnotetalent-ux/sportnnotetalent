@@ -49,16 +49,16 @@ Score a rugby union match on one phone: you run the clock and tap what happens; 
 ## Stats to track
 All off by default. Switch them on in the match format or **⚙️ Match settings**; each adds its own buttons:
 - **Tackles, carries, set pieces**: a **📋 Detail** button (tackles, carries, line breaks, turnovers won, lineouts, scrums…).
-- **Penalties by offence & free kicks**: **⚖ Penalty conceded** (offence and player optional) and one-tap **🏳 Free kick conceded**.
+- **Penalties by offence & free kicks**: **⚖ Penalty conceded** (offence and player optional) and **🏳 Free kick conceded** (tap the player, or **Team (no name)**).
 - **Turnovers conceded**: knock-on, forward pass… (cause and player optional).
 - **22 entries**: one tap; gives points per 22 entry.
-- **Possession & territory**: tap **Ball: team** and **In … half** as play changes.
+- **Possession & territory**: tap **Ball: team** and **In … half** as play changes. At a stoppage (scrum, lineout, kick at goal, injury) tap **⏸ Ball dead** to pause both; tap the team with the ball, or **▶ Ball live**, when play restarts.
 - **Offloads**.
 
 Stats you don't track never show as 0.
 
 ## Play-by-play and match stats
-Under the score: **Play-by-play** (commentary by half, newest first, with the running score), **Match stats** (team v team, by half and category), **Box score** and **Key moments**.
+The **Commentary** tab is the play-by-play by half, newest first, with the running score; tap **Key moments** to keep only the big ones. The **Stats** tab has **Match stats** (team v team, by half and category) and the **Box score**.
 
 ## Fix a mistake
 - **↶ Undo** says what it will remove, for example "Undo Try · Asha Rao (12-7)".

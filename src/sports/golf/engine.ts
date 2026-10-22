@@ -184,19 +184,27 @@ export interface GolfCard {
   /** Deep wave — when each hole's score was entered (ms, the marker's clock)
    *  — the commentary's time. Absent on older cards. */
   holeAt?: (number | null)[];
+  /** Round 2 — shots played from off the green around it (chips, pitches,
+   *  greenside bunker shots) before the ball was on the green or holed: the
+   *  up-and-down capture (tracked with 'upDown'; null = not recorded, 3 = 3+). */
+  offGreen?: (number | null)[];
 }
 
-/** Deep wave — the optional stats a marker can keep per hole. */
-export type GolfTrackKey = 'putts' | 'fairway' | 'bunker' | 'penalties' | 'firstPutt' | 'drive';
-export const GOLF_TRACK_KEYS: GolfTrackKey[] = ['putts', 'fairway', 'bunker', 'penalties', 'firstPutt', 'drive'];
+/** Deep wave — the optional stats a marker can keep per hole. Round 2 adds
+ *  'upDown' (shots from off the green → up and downs). */
+export type GolfTrackKey = 'putts' | 'fairway' | 'bunker' | 'upDown' | 'penalties' | 'firstPutt' | 'drive';
+export const GOLF_TRACK_KEYS: GolfTrackKey[] = ['putts', 'fairway', 'bunker', 'upDown', 'penalties', 'firstPutt', 'drive'];
 
 /** Deep wave — first-putt length buckets, in feet (the PGA TOUR's putting
- *  splits: inside 3 ft, 3–10 ft, 10–20 ft, over 20 ft). Index = the card value. */
+ *  splits: inside 3 ft, 3–10 ft, 10–20 ft, over 20 ft). Index = the card value.
+ *  Round 2 — `mLabel` / `mLong`: the metric equivalents a metres round shows
+ *  (3 ft ≈ 1 m, 10 ft ≈ 3 m, 20 ft ≈ 6 m); the bucket (and its career key) is
+ *  the same, so rounds in either unit add up. */
 export const PUTT_BUCKETS = [
-  { label: '< 3 ft', long: 'inside 3 ft', key: 'fpUnder3' },
-  { label: '3–10 ft', long: '3–10 ft', key: 'fp3to10' },
-  { label: '10–20 ft', long: '10–20 ft', key: 'fp10to20' },
-  { label: '20 ft+', long: 'over 20 ft', key: 'fpOver20' },
+  { label: '< 3 ft', long: 'inside 3 ft', key: 'fpUnder3', mLabel: '< 1 m', mLong: 'inside 1 m' },
+  { label: '3–10 ft', long: '3–10 ft', key: 'fp3to10', mLabel: '1–3 m', mLong: '1–3 m' },
+  { label: '10–20 ft', long: '10–20 ft', key: 'fp10to20', mLabel: '3–6 m', mLong: '3–6 m' },
+  { label: '20 ft+', long: 'over 20 ft', key: 'fpOver20', mLabel: '6 m+', mLong: 'over 6 m' },
 ] as const;
 
 /** Deep wave — a sensible drive in yards (50–450), else null. */
@@ -204,6 +212,46 @@ export const driveYards = (v: unknown): number | null => {
   const n = Math.round(Number(v));
   return Number.isFinite(n) && n >= 50 && n <= 450 ? n : null;
 };
+
+/* ---------------------- Round 2 · yards or metres ---------------------- */
+
+/** The round's distance unit: yards (the PGA TOUR / DP World Tour unit, the
+ *  default) or metres (an organiser option — format `distUnit: 'm'`). Cards
+ *  always store yards, so careers add up across rounds in either unit. */
+export type DistUnit = 'yd' | 'm';
+export const YARD_M = 0.9144;
+export const distUnitOf = (format: Record<string, unknown> | undefined | null): DistUnit => (format?.distUnit === 'm' ? 'm' : 'yd');
+/** Yards → whole metres (a metre is longer than a yard, so every whole metre
+ *  maps to its own whole yard and back: the round trip is exact). */
+export const ydToM = (yd: number): number => Math.round(yd * YARD_M);
+export const mToYd = (m: number): number => Math.round(m / YARD_M);
+/** A typed drive in the round's unit → stored yards (null when out of range). */
+export const driveFromInput = (v: unknown, unit: DistUnit): number | null => {
+  const n = Math.round(Number(v));
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return driveYards(unit === 'm' ? mToYd(n) : n);
+};
+/** A stored drive (yards) in the round's unit: the number, and "268 yd" / "245 m". */
+export const driveIn = (yd: number, unit: DistUnit): number => (unit === 'm' ? ydToM(yd) : yd);
+export const distText = (yd: number, unit: DistUnit, dp = 0): string =>
+  `${unit === 'm' ? (yd * YARD_M).toFixed(dp) : yd.toFixed(dp)} ${unit === 'm' ? 'm' : 'yd'}`;
+/** A first-putt bucket's label in the round's unit (`long` = "inside 3 ft"). */
+export const puttBucketText = (k: number, unit: DistUnit, long = false): string => {
+  const b = PUTT_BUCKETS[k];
+  if (!b) return '';
+  return unit === 'm' ? (long ? b.mLong : b.mLabel) : (long ? b.long : b.label);
+};
+
+/** Round 2 — an up and down (the PGA TOUR's term, as its Sand Save % defines
+ *  it: "it took the player 2 shots or less to put the ball in the hole from
+ *  that point"): from the first shot off the green, holed in two strokes or
+ *  fewer — chip + one putt, or a chip-in — whatever the score. A chance is a
+ *  hole with at least one shot from off the green and the putts entered.
+ *  null = not a chance (or not recorded). */
+export function upAndDown(offGreen: number | null | undefined, putts: number | null | undefined): boolean | null {
+  if (typeof offGreen !== 'number' || offGreen < 1 || typeof putts !== 'number') return null;
+  return offGreen + putts <= 2;
+}
 
 /** SD-45 — a par-4 / par-5 tee shot: missed left, hit, missed right. */
 export type FairwayDir = 'L' | 'hit' | 'R';
@@ -577,6 +625,9 @@ export function roundStats(card: GolfCard, holes: Hole[], received: number[]): R
   const legacy = !tr && cardHasDetail(card);
   const on = (k: GolfTrackKey) => legacy || !!tr?.includes(k);
   const fairOn = on('fairway'), puttOn = on('putts'), sandOn = on('bunker');
+  // Round 2 — up and downs (a card kept with 'upDown': never an SD-45 card)
+  const udOn = !!tr?.includes('upDown');
+  if (udOn) Object.assign(out, { udChances: 0, upDowns: 0 });
   if (fairOn) Object.assign(out, { firLeft: 0, firRight: 0 });
   if (puttOn) Object.assign(out, { scrambles: 0, scrambleHoles: 0, puttsGir: 0, girPutted: 0 });
   if (sandOn) Object.assign(out, { sandSaves: 0, sandHoles: 0 });
@@ -645,6 +696,11 @@ export function roundStats(card: GolfCard, holes: Hole[], received: number[]): R
     if (puttOn) {
       if (g === false) { out.scrambleHoles += 1; if (st <= h.par) out.scrambles += 1; }
       if (g === true && typeof p === 'number') { out.girPutted += 1; out.puttsGir += p; }
+    }
+    // Round 2 — up and down from off the green (2 shots or fewer to hole out)
+    if (udOn) {
+      const ud = upAndDown(card.offGreen?.[i], p);
+      if (ud != null) { out.udChances += 1; if (ud) out.upDowns += 1; }
     }
     if (sandOn && card.bunker?.[i] === true) {
       out.sandHoles += 1;

@@ -38,6 +38,7 @@ const DURATION_MIN: Partial<Record<SportId, number>> = {
   baseball: 180, // 9 innings ≈ 2.5–3 h (7-inning softball / youth ≈ 1.5–2 h) + turnaround
   netball: 75, // 4 × 15 + 3/5/3 min intervals + held time + turnaround
   rugby: 120, // 2 × 40 + time added + half-time + turnaround (sevens matches are far shorter)
+  rugby_league: 120, // 2 × 40 + half-time + golden point + turnaround (Nines matches are far shorter)
   shooting: 150, // a qualification relay (60 shots) + the final
   archery: 240, // a 72-arrow ranking round (~2.5 h) + match play
   rowing: 120, // a session of races (2000 m ≈ 6–8 min, 10–15 min apart)

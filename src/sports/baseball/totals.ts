@@ -16,25 +16,34 @@
  * Deep wave (./situational.ts — derived from the log, never credited live):
  *  - batters: `rispAb` / `rispHits` (at bats and hits with runners in scoring
  *    position), `twoOutRbi` — every batter who came up (0 = a true 0);
- *  - pitchers: `pitchGroundOuts` / `pitchFlyOuts` (GO-AO) for every pitcher;
+ *  - pitchers: `pitchGroundOuts` / `pitchFlyOuts` (GO-AO; round 2: a
+ *    sacrifice bunt counts as a ground out) for every pitcher;
  *    `inheritedRunners` / `inheritedScored` for relievers; and ONLY with
  *    pitch-by-pitch on: `strikesThrown`, `ballsThrown`, `firstPitchStrikes`,
  *    `firstPitches` (a game scored outcomes-only never gets false zeros).
+ * Round 2 — ONLY when the game tracked batted-ball types: batters
+ * `groundBalls` / `lineDrives` / `flyBalls` / `popups`, pitchers (allowed)
+ * `pitchGroundBalls` / `pitchLineDrives` / `pitchFlyBalls` / `pitchPopups`
+ * (the scorer's tap, else what the out fixes — `battedBallOf`).
  */
 import {
-  eventCredits, whoKey, other, withAnn, POS_NUM, LIVE_KEYS,
-  type BaseballEvent, type BaseballState, type Side, type Who,
+  eventCredits, whoKey, other, withAnn, trackTracked, POS_NUM, LIVE_KEYS,
+  type BaseballEvent, type BaseballState, type BattedBall, type Side, type Who,
 } from './engine.ts';
 import { batterFigures, notation, pitcherFigures } from './situational.ts';
 
 /** deep wave: free situational keys (any log) and the pitch-by-pitch ones */
 export const SITUATIONAL_KEYS = ['rispAb', 'rispHits', 'twoOutRbi', 'pitchGroundOuts', 'pitchFlyOuts', 'inheritedRunners', 'inheritedScored'] as const;
 export const PITCH_COUNT_KEYS = ['strikesThrown', 'ballsThrown', 'firstPitchStrikes', 'firstPitches'] as const;
+/** round 2: batted-ball type keys (games that tracked them only) — batter, pitcher (allowed) */
+export const BATTED_KEY: Record<BattedBall, string> = { GB: 'groundBalls', LD: 'lineDrives', FB: 'flyBalls', PU: 'popups' };
+export const PITCH_BATTED_KEY: Record<BattedBall, string> = { GB: 'pitchGroundBalls', LD: 'pitchLineDrives', FB: 'pitchFlyBalls', PU: 'pitchPopups' };
+export const BATTED_BALL_KEYS = ['groundBalls', 'lineDrives', 'flyBalls', 'popups', 'pitchGroundBalls', 'pitchLineDrives', 'pitchFlyBalls', 'pitchPopups'] as const;
 
 export const DERIVED_KEYS = [
   'runs', 'pitches', 'runsAllowed', 'earnedRuns', 'erN', 'pitchWins', 'pitchLosses', 'pitchSaves', 'gamesPitched',
   'putouts', 'fieldAssists', 'fieldErrors',
-  ...SITUATIONAL_KEYS, ...PITCH_COUNT_KEYS,
+  ...SITUATIONAL_KEYS, ...PITCH_COUNT_KEYS, ...BATTED_BALL_KEYS,
 ] as const;
 export const OWNED_LIVE_KEYS = LIVE_KEYS;
 
@@ -101,18 +110,22 @@ export function baseballTotals(s: BaseballState): Record<string, Line> {
   }
   // deep wave: situational figures — derived from the log, never credited live
   const st = withAnn(s);
+  // round 2: batted-ball types only when the game tracked them (else absent: "not tracked")
+  const typed = trackTracked(st, 'battedBallTypes');
   for (const b of batterFigures(st)) {
     if (!b.id) continue;
     const l = line(b.id, b.side).stats;
     l.rispAb = b.rispAb;
     l.rispHits = b.rispHits;
     l.twoOutRbi = b.twoOutRbi;
+    if (typed) for (const [t, k] of Object.entries(BATTED_KEY)) l[k] = b.batted[t as BattedBall];
   }
   for (const p of pitcherFigures(st)) {
     if (p.key.startsWith('name:')) continue;
     const l = line(p.key, p.side).stats;
     l.pitchGroundOuts = p.go;
     l.pitchFlyOuts = p.ao;
+    if (typed) for (const [t, k] of Object.entries(PITCH_BATTED_KEY)) l[k] = p.batted[t as BattedBall];
     const sp = st.g.spells.find((x) => x.key === p.key);
     if ((sp && !sp.first) || p.ir > 0) { l.inheritedRunners = p.ir; l.inheritedScored = p.irs; }
     // pitch counts mean something only pitch by pitch (else: absent, "not tracked")

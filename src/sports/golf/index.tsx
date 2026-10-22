@@ -153,18 +153,22 @@ const ScoringControls: SportPlugin<GolfMatchState>['ScoringControls'] = ({ state
   );
 };
 
-const LiveExtras: NonNullable<SportPlugin<GolfMatchState>['LiveExtras']> = ({ state, homeName, awayName, homeColor, awayColor, homeRoster = [], awayRoster = [] }) => {
-  const s = state as GolfMatchState;
-  // a player's own name (a 1-v-1 match), else the side's
-  const nm = (side: 'home' | 'away') => (side === 'home' ? homeRoster : awayRoster)[0]?.fullName ?? (side === 'home' ? homeName : awayName);
-  // Deep wave — hole-by-hole commentary, newest first by nine, with the match
-  // state after each hole and the time it was recorded (golf/feed.ts)
-  return (
-    <View style={{ gap: theme.spacing(2) }}>
-      {s.strokes ? <Text style={textStyles.muted}>⛳ {strokesLine(s.strokes, nm('home'), nm('away'))}</Text> : null}
-      <CommentaryFeed title="🎙 Hole by hole" groups={golfMatchFeed(s, { home: nm('home'), away: nm('away') })} homeColor={homeColor} awayColor={awayColor} empty="No holes played yet." />
-    </View>
-  );
+/** Match tabs (2026-10-22): the handicap strokes on Info (a match-setup fact),
+ *  the hole-by-hole commentary on Commentary. Match play has no Stats tab. */
+type TabProps = Parameters<NonNullable<SportPlugin<GolfMatchState>['LiveExtras']>>[0];
+// a player's own name (a 1-v-1 match), else the side's
+const golfName = ({ homeName, awayName, homeRoster = [], awayRoster = [] }: TabProps) =>
+  (side: 'home' | 'away') => (side === 'home' ? homeRoster : awayRoster)[0]?.fullName ?? (side === 'home' ? homeName : awayName);
+const GolfStrokes = (p: TabProps) => {
+  const s = p.state as GolfMatchState;
+  const nm = golfName(p);
+  return s.strokes ? <Text style={textStyles.muted}>⛳ {strokesLine(s.strokes, nm('home'), nm('away'))}</Text> : null;
+};
+// Deep wave — hole-by-hole commentary, newest first by nine, with the match
+// state after each hole and the time it was recorded (golf/feed.ts)
+const GolfCommentary = (p: TabProps) => {
+  const nm = golfName(p);
+  return <CommentaryFeed title="🎙 Hole by hole" groups={golfMatchFeed(p.state as GolfMatchState, { home: nm('home'), away: nm('away') })} homeColor={p.homeColor} awayColor={p.awayColor} empty="No holes played yet." />;
 };
 
 export const golfPlugin: SportPlugin<GolfMatchState> = {
@@ -198,7 +202,7 @@ export const golfPlugin: SportPlugin<GolfMatchState> = {
   // SD-137a — voice scoring (period / match ends ask first)
   voice: { hints: ['hole home', '{name} wins the hole', 'halved', 'strokes 4 5'], parse: golfMatchVoice },
   ScoringControls,
-  LiveExtras,
+  matchTabs: { Info: GolfStrokes, Commentary: GolfCommentary },
   formatFields: [
     {
       key: 'preset', label: 'Format', type: 'preset', default: 'stroke',
@@ -251,6 +255,16 @@ export const golfPlugin: SportPlugin<GolfMatchState> = {
       options: [
         { value: 'both', label: 'Can win both' },
         { value: 'one', label: 'One prize each (gross first)' },
+      ],
+    },
+    // Round 2 — drives and first-putt lengths in yards (the PGA TOUR / DP
+    // World Tour unit, default) or metres; cards always store yards
+    {
+      key: 'distUnit', label: 'Distances', type: 'choice', default: 'yd', advanced: true,
+      hint: 'measured drives and first-putt lengths (Stats to track)',
+      options: [
+        { value: 'yd', label: 'Yards' },
+        { value: 'm', label: 'Metres' },
       ],
     },
     {

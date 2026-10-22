@@ -11,13 +11,14 @@
  *    replay), short-handed goals.
  *  - Penalties: count, PIM, minors / majors / misconducts, and by infraction.
  *  - Goaltending: saves, save % (empty-net goals don't count against).
- *  - Faceoffs, hits, blocked shots, takeaways / giveaways — only when tracked.
+ *  - Faceoffs (and, round 2, by zone), hits, blocked shots, takeaways /
+ *    giveaways — only when tracked.
  *  - Shots by period (the IIHF game sheet line) on the Overall view.
  * Rows exist only for what the match tracked (never a false 0).
  */
 import {
-  matchSec, penaltyBox, penMinutes, periodLen, periodName, periodOffset, tallyTracked, teamFigures, totalPeriods,
-  type IceEvent, type IceHockeyState, type PenKind, type Side, type TallyKind,
+  matchSec, mirrorZone, penaltyBox, penMinutes, periodLen, periodName, periodOffset, tallyTracked, teamFigures, totalPeriods, zonesTracked,
+  FO_ZONES, FO_ZONE_LABEL, type FoZone, type IceEvent, type IceHockeyState, type PenKind, type Side, type TallyKind,
 } from './engine.ts';
 import { countRow, madeRow, rateRow, section, sheet, timeRow, type StatSheet } from '../compareSheet.ts';
 
@@ -61,6 +62,22 @@ const inScope = (e: IceEvent, scope: 'all' | number) => scope === 'all' || e.per
 const tallies = (s: IceHockeyState, side: Side, kind: TallyKind, scope: 'all' | number) =>
   s.events.filter((e) => e.type === 'tally' && e.tally === kind && e.side === side && inScope(e, scope)).length;
 
+/** Round 2 — a side's faceoffs by zone from ITS OWN view (offensive = in the
+ *  other team's end): draws won there and taken there. A draw the side lost
+ *  counts in the mirror of the winner's zone. Faceoffs with no zone are left
+ *  out (they still count in the overall FO %). */
+export function faceoffZones(s: IceHockeyState, side: Side, scope: 'all' | number = 'all'): Record<FoZone, { won: number; total: number }> {
+  const out = { oz: { won: 0, total: 0 }, nz: { won: 0, total: 0 }, dz: { won: 0, total: 0 } };
+  for (const e of s.events) {
+    if (e.type !== 'tally' || e.tally !== 'faceoff' || !e.zone || !inScope(e, scope)) continue;
+    const mine = e.side === side;
+    const z = mine ? e.zone : mirrorZone(e.zone);
+    out[z].total += 1;
+    if (mine) out[z].won += 1;
+  }
+  return out;
+}
+
 /** Goals by kind for one side over a scope. */
 export function goalsBy(s: IceHockeyState, side: Side, scope: 'all' | number = 'all') {
   const g = s.events.filter((e) => e.type === 'goal' && e.side === side && inScope(e, scope));
@@ -101,6 +118,8 @@ export function iceHockeySheet(s: IceHockeyState, scope: 'all' | number = 'all',
   const attempts = tallyTracked(s, 'trackAttempts');
   const physical = tallyTracked(s, 'trackPhysical');
   const missed = t('missed'), blocks = t('block');
+  const zones = zonesTracked(s);
+  const zh = faceoffZones(s, 'home', scope), za = faceoffZones(s, 'away', scope);
   // goals against that count against a goalie (not into an empty net)
   const gaGk = (sd: Side) => s.events.filter((e) => e.type === 'goal' && e.side === other(sd) && !e.en && inScope(e, scope)).length;
   const pp = powerPlayTime(s, scope, nowSec);
@@ -143,7 +162,9 @@ export function iceHockeySheet(s: IceHockeyState, scope: 'all' | number = 'all',
     tallyTracked(s, 'trackFaceoffs') && section('fo', 'Faceoffs', [
       countRow('fow', 'Faceoffs won', t('faceoff').h, t('faceoff').a),
       rateRow('foPct', 'Faceoff %', t('faceoff').h, t('faceoff').h + t('faceoff').a, t('faceoff').a, t('faceoff').h + t('faceoff').a, { dp: 1 }),
-    ]),
+      // round 2: won / taken and % in each zone, each team from its own end (zones tracked only)
+      ...(zones ? FO_ZONES.map((z) => madeRow(`fo:${z}`, FO_ZONE_LABEL[z], zh[z].won, zh[z].total, za[z].won, za[z].total, { dp: 1 })) : []),
+    ], zones ? 'Zones from each team’s own view: offensive = in the other team’s end.' : undefined),
     (physical || tallyTracked(s, 'trackPuck')) && section('phys', 'Hits & puck battles', [
       physical && countRow('hits', 'Hits', t('hit').h, t('hit').a),
       physical && countRow('blocks', 'Blocked shots', blocks.h, blocks.a),

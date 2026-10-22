@@ -81,9 +81,18 @@ export const volleyballStats: SportStatSchema<'volleyball'> = {
     // Defence: digs (FIVB Best Digger = digs per set)
     { key: 'digs', label: 'Digs', short: 'digs', one: 'dig', abbr: 'DIG', group: 'defence', coverage: 'keyed' },
     { key: 'digsPerSet', label: 'Digs per set', abbr: 'DIG/S', source: 'derived', group: 'defence', format: { unit: 'decimal', dp: 2 }, agg: { kind: 'perSet', key: 'digs', sets: 'setsPlayed', dp: 2, qualifier: q }, tieBreak: [{ key: 'digs', better: 'higher' }] },
-    // Setting: the setter named on a kill (FIVB Best Setter = excellent sets per set)
+    // Setting: the setter named on a kill. FIVB ranks Best Setter by excellent
+    // sets per set; ours ranks by set assists per set (founder, round 2: kept)
     { key: 'setAssists', label: 'Set assists', short: 'set assists', one: 'set assist', abbr: 'SET', group: 'setting', coverage: 'keyed' },
     { key: 'setAssistsPerSet', label: 'Set assists per set', abbr: 'SET/S', source: 'derived', group: 'setting', format: { unit: 'decimal', dp: 2 }, agg: { kind: 'perSet', key: 'setAssists', sets: 'setsPlayed', dp: 2, qualifier: q }, tieBreak: [{ key: 'setAssists', better: 'higher' }] },
+    // Round 2 (founder) — FIVB Best Libero: excellent digs + excellent
+    // receptions per set on court. A logged dig is a successful dig (FIVB
+    // "excellent"); a "Perfect" (#) reception grade is FIVB's excellent
+    // reception. Only lines that tracked BOTH categories count (perSet over
+    // two keys), so a match with digs but no reception grades is no 0.
+    { key: 'digsReceptionsPerSet', label: 'Digs + perfect receptions per set', abbr: 'D+R/S', source: 'derived', group: 'defence', format: { unit: 'decimal', dp: 2 },
+      agg: { kind: 'perSet', key: ['digs', 'receptionsPerfect'], sets: 'setsPlayed', dp: 2, qualifier: q },
+      tieBreak: [{ key: 'digs', better: 'higher' }, { key: 'receptionsPerfect', better: 'higher' }] },
     // Serve: rallies served (free once the toss + both rotations are recorded)
     { key: 'serveAttempts', label: 'Serve attempts', short: 'serves', one: 'serve', abbr: 'SRV', group: 'serve', coverage: 'keyed' },
     { key: 'aceRate', label: 'Ace %', source: 'derived', group: 'serve', format: { unit: 'percent', dp: 1 }, agg: { kind: 'rate', num: 'aces', den: 'serveAttempts', scale: 100, dp: 1 } },
@@ -106,7 +115,7 @@ export const volleyballStats: SportStatSchema<'volleyball'> = {
     { id: 'block', title: 'Block', rows: [{ stat: 'blocks' }, { stat: 'blocksPerSet' }] },
     { id: 'reception', title: 'Reception', rows: [{ stat: 'receptions' }, { stat: 'receptionPerfectPct' }, { stat: 'receptionPositivePct' }, { stat: 'receptionErrors' }, { stat: 'receptionEff' }] },
     // deep wave — optional categories ("not tracked" rows hide)
-    { id: 'defence', title: 'Defence', rows: [{ stat: 'digs' }, { stat: 'digsPerSet' }] },
+    { id: 'defence', title: 'Defence', rows: [{ stat: 'digs' }, { stat: 'digsPerSet' }, { stat: 'digsReceptionsPerSet' }] },
     { id: 'setting', title: 'Setting', rows: [{ stat: 'setAssists' }, { stat: 'setAssistsPerSet' }] },
     { id: 'errors', title: 'Errors', rows: [{ stat: 'errors' }] },
     { id: 'record', title: 'Sets', rows: [{ stat: 'setsPlayed' }, { stat: 'setsWL' }, { stat: 'setsPct' }] },
@@ -124,7 +133,7 @@ export const volleyballStats: SportStatSchema<'volleyball'> = {
   // `points` since SD-04); Best Server / Blocker by aces / blocks per set.
   // SD-81: Best Attacker by attack efficiency (min attempts) from matches
   // scored in "Detailed stats"; "Most attack points" stays for every match.
-  // Setter / libero / receiver / digger: custom awards.
+  // Setter / libero / receiver / digger: optional categories (below).
   awards: [
     { stat: 'points', icon: '🏐', label: 'Top scorer', tournamentLabel: 'Best scorer', tieBreak: [{ key: 'pointsPerSet', better: 'higher' }] },
     { stat: 'aces', icon: '💥', label: 'Aces', tournamentLabel: 'Best server', rankBy: 'acesPerSet' },
@@ -132,10 +141,15 @@ export const volleyballStats: SportStatSchema<'volleyball'> = {
     { stat: 'attackPoints', icon: '⚡', label: 'Attack points', tournamentLabel: 'Most attack points', match: false },
     { stat: 'attackKills', icon: '🎯', label: 'Attack efficiency', tournamentLabel: 'Best attacker', rankBy: 'attackEff', match: false },
     // deep wave — FIVB Best Receiver / Digger / Setter, from matches that
-    // tracked the category (tournament slots only)
-    { stat: 'receptions', icon: '📥', label: 'Reception efficiency', tournamentLabel: 'Best receiver', rankBy: 'receptionEff', match: false },
-    { stat: 'digs', icon: '🛡️', label: 'Digs', tournamentLabel: 'Best digger', rankBy: 'digsPerSet', match: false },
-    { stat: 'setAssists', icon: '🤝', label: 'Set assists', tournamentLabel: 'Best setter', rankBy: 'setAssistsPerSet', match: false },
+    // tracked the category (tournament slots only). Round 2 (founder): Best
+    // Setter stays on set assists per set; + Best Libero (digs + perfect
+    // receptions per set, min sets on court); the four slots are offered only
+    // when some match of the tournament tracked their category
+    // (`onlyIfTracked`).
+    { stat: 'receptions', icon: '📥', label: 'Reception efficiency', tournamentLabel: 'Best receiver', rankBy: 'receptionEff', match: false, onlyIfTracked: true },
+    { stat: 'digs', icon: '🛡️', label: 'Digs', tournamentLabel: 'Best digger', rankBy: 'digsPerSet', match: false, onlyIfTracked: true },
+    { stat: 'setAssists', icon: '🤝', label: 'Set assists', tournamentLabel: 'Best setter', rankBy: 'setAssistsPerSet', match: false, onlyIfTracked: true },
+    { stat: 'digsReceptionsPerSet', icon: '🎽', label: 'Digs + perfect receptions per set', tournamentLabel: 'Best libero', match: false, onlyIfTracked: true },
   ],
   scoreUnit: 'sets',
 };

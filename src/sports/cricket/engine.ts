@@ -60,7 +60,14 @@ interface DismissalRecord {
   /** a run-out's 2nd fielder (parity #16) — scorecard text & record only, no stat */
   fielder2Id?: string;
   fielder2Name?: string;
+  /** Round 2 — a run out by a DIRECT HIT from `fielderId` (an optional chip in
+   *  the run-out flow, payload `direct: true`). Absent on older logs. */
+  direct?: true;
 }
+
+/** Round 2 — a run out the payload marks as a direct hit (needs a fielder). */
+const directHit = (kind: string, p: Record<string, unknown> | undefined, fielderId?: string): boolean =>
+  kind === 'runout' && p?.direct === true && !!fielderId;
 
 export interface CricketState {
   oversLimit: number;
@@ -1391,6 +1398,7 @@ const step = (s: CricketState, a: ScoreAction): CricketState => {
       const fielderName = kind === 'stumped' ? keeper : (a.payload?.fielderName as string | undefined);
       const record: DismissalRecord = { kind, outId, bowlerId: info.bowlerId, fielderId, fielderName };
       if (fielder2Id || fielder2Name) { record.fielder2Id = fielder2Id; record.fielder2Name = fielder2Name; }
+      if (directHit(kind, a.payload, fielderId)) record.direct = true;
 
       const next: CricketState = touchBowler({
         ...s,
@@ -1566,6 +1574,7 @@ const step = (s: CricketState, a: ScoreAction): CricketState => {
           ? { kind: 'runout', outId, fielderId, fielderName }
           : { kind: wk, outId, bowlerId: info.bowlerId, fielderId, fielderName };
         if (fielder2Id || fielder2Name) { record.fielder2Id = fielder2Id; record.fielder2Name = fielder2Name; }
+        if (!legacy && directHit(wk, a.payload, fielderId)) record.direct = true;
         const tail = completed > 0 ? ` (${runsText(completed, isNoBall ? runsAs : 'bat')})` : '';
         let next: CricketState = legalBits(touchBowler({
           ...s,

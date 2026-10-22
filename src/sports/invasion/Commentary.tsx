@@ -4,7 +4,8 @@
  * by half / quarter / period with the score at the end of each, every row with
  * its time stamp, a plain sentence and the running score after it. A "Key
  * events" filter keeps goals, cards, substitutions, penalties and shoot-out
- * kicks. The match facts block (scorers, sendings-off, notes) sits on top.
+ * kicks. The match facts block (scorers, sendings-off, notes) is its own
+ * `MatchFactsCard` — match tabs: on the Summary tab, with the result.
  */
 import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
@@ -42,22 +43,8 @@ export function Commentary({
   const sections = useMemo(() => feedSections(items, labelOf, { majorOnly: keyOnly, periods }), [items, labelOf, keyOnly, periods]);
   const color = (sd?: 'home' | 'away') => (sd === 'home' ? homeColor : sd === 'away' ? awayColor : theme.colors.textMuted);
   let shown = 0;
-  const factsBlock = facts && (facts.home.length || facts.away.length || facts.notes.length) ? (
-    <View style={st.facts} accessibilityLabel="Match summary">
-      <Text style={st.factsTitle}>MATCH SUMMARY</Text>
-      <View style={st.factsCols}>
-        {(['home', 'away'] as const).map((sd) => (
-          <View key={sd} style={[st.factsCol, sd === 'away' && { alignItems: 'flex-end' }]}>
-            <Text style={[st.factsTeam, { color: color(sd) }]} numberOfLines={1}>{sd === 'home' ? homeName : awayName}</Text>
-            {facts[sd].length ? facts[sd].map((l, i) => (
-              <Text key={i} style={[st.factsLine, sd === 'away' && { textAlign: 'right' }]}>{mask.text(l)}</Text>
-            )) : <Text style={[st.factsLine, st.muted]}>—</Text>}
-          </View>
-        ))}
-      </View>
-      {facts.notes.map((n) => <Text key={n} style={st.factsNote}>{n}</Text>)}
-    </View>
-  ) : null;
+  // Match tabs: the sports pass no facts here — they show on Summary (MatchFactsCard)
+  const factsBlock = facts ? <MatchFactsCard facts={facts} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} /> : null;
   if (!items.length) {
     return (
       <View style={{ gap: theme.spacing(3) }}>
@@ -107,6 +94,42 @@ export function Commentary({
       ) : null}
     </View>
   );
+}
+
+/** The match facts block (scorers, sendings-off, notes) — match tabs: shown
+ *  with the result on the Summary tab. Nothing to show → null. */
+export function MatchFactsCard({ facts, homeName, awayName, homeColor = theme.colors.home, awayColor = theme.colors.away }: {
+  facts: MatchFacts;
+  homeName: string;
+  awayName: string;
+  homeColor?: string;
+  awayColor?: string;
+}) {
+  const mask = useMask();
+  if (!(facts.home.length || facts.away.length || facts.notes.length)) return null;
+  const color = (sd: 'home' | 'away') => (sd === 'home' ? homeColor : awayColor);
+  return (
+    <View style={st.facts} accessibilityLabel="Match facts">
+      <Text style={st.factsTitle}>MATCH FACTS</Text>
+      <View style={st.factsCols}>
+        {(['home', 'away'] as const).map((sd) => (
+          <View key={sd} style={[st.factsCol, sd === 'away' && { alignItems: 'flex-end' }]}>
+            <Text style={[st.factsTeam, { color: color(sd) }]} numberOfLines={1}>{sd === 'home' ? homeName : awayName}</Text>
+            {facts[sd].length ? facts[sd].map((l, i) => (
+              <Text key={i} style={[st.factsLine, sd === 'away' && { textAlign: 'right' }]}>{mask.text(l)}</Text>
+            )) : <Text style={[st.factsLine, st.muted]}>—</Text>}
+          </View>
+        ))}
+      </View>
+      {facts.notes.map((n) => <Text key={n} style={st.factsNote}>{n}</Text>)}
+    </View>
+  );
+}
+
+/** Match tabs: the facts that belong with the result — possession is a stat
+ *  (the Stats tab's match centre shows it), so it is left out. */
+export function resultFacts(f: MatchFacts): MatchFacts {
+  return { ...f, notes: f.notes.filter((n) => !/^Possession\b/.test(n)) };
 }
 
 const st = StyleSheet.create({

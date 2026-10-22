@@ -20,6 +20,7 @@ import { iceHockeyMatchRecords } from './ice_hockey/records.ts';
 import { baseballMatchRecords } from './baseball/records.ts';
 import { netballMatchRecords } from './netball/records.ts';
 import { afMatchRecords } from './american_football/records.ts';
+import { leagueMatchRecords } from './rugby_league/records.ts';
 import { minuteText as rugbyMinute, pointsOf as rugbyPoints, type RugbyState } from './rugby/engine.ts';
 import type { BasketballState } from './basketball/engine.ts';
 import { eventCredits } from './basketball/credits.ts';
@@ -374,6 +375,7 @@ export const MATCH_RECORD_HOOKS: Partial<Record<SportId, (state: any) => MatchRe
   netball: netballMatchRecords,
   american_football: afMatchRecords,
   rugby: rugbyMatchRecords,
+  rugby_league: leagueMatchRecords,
   basketball: basketballMatchRecords,
   kabaddi: kabaddiMatchRecords,
   chess: chessMatchRecords,

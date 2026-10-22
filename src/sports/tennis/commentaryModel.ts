@@ -27,7 +27,7 @@
 import type { LiveEvent } from '../liveEvents';
 import { pointRows, replayPoints, type PointInput } from '../rallyEdit.ts';
 import { isMark } from '../conduct.ts';
-import { RALLY_LABEL, strokeOf, strokePhrase, netSides } from '../pointDetail.ts';
+import { RALLY_LABEL, speedText, speedUnitOf, strokeOf, strokePhrase, netSides } from '../pointDetail.ts';
 import { inTiebreak, reducer, serveInfo, tennisCue, tiebreakInfo, type TennisState } from './engine.ts';
 
 type Side = 'home' | 'away';
@@ -172,7 +172,8 @@ export function tennisCommentary(state: TennisState | null | undefined, names: C
       const net = netSides(p, W);
       const meta = [
         p.serve === 2 && !p.df ? '2nd serve' : '',
-        typeof p.kmh === 'number' ? `${p.kmh} km/h` : '',
+        // round 2: in the match's unit (km/h or mph; the log is km/h)
+        typeof p.kmh === 'number' ? speedText(p.kmh, speedUnitOf(state)) : '',
         p.rallyLen ? RALLY_LABEL[p.rallyLen] : '',
         net.length ? `At the net: ${net.map((x) => playerOf(x)).join(' & ')}` : '',
       ].filter(Boolean).join(' · ');

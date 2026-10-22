@@ -2,7 +2,10 @@
 import type { SectionDef, SportStatSchema, StatDef } from '../statSchema.ts';
 import { ACES, POINTS } from '../sharedStats.ts';
 import { BEST_SERVER, DETAIL_BOX, pointDetailStats, racketCareerStats, racketLeaders, racketMvp, racketRecordStats, racketResultStats, racketSections, racketServeStats, serveDetailStats } from '../rallyStats.ts';
-import { RETIRED_TENNIS_KEYS, SHOTS, SHOT_LABEL, WINGS, WING_LABEL, shotKey, wingKey, type How, type Shot } from '../pointDetail.ts';
+import {
+  RALLY_LABEL, RETIRED_TENNIS_KEYS, SHOTS, SHOT_LABEL, WINGS, WING_LABEL, allRallyBuckets, rallyBucketsOf, rallyKey, shotKey, wingKey,
+  type How, type RallyBucket, type Shot,
+} from '../pointDetail.ts';
 
 // ------------------------------------------------ SD-157 tennis detail --
 
@@ -38,6 +41,24 @@ const RETIRED_OF: Partial<Record<string, string[]>> = {
 };
 const withRetired = (key: string): Partial<StatDef> => (RETIRED_OF[key] ? { agg: { kind: 'sum', keys: [key, ...RETIRED_OF[key]!] } } : {});
 
+/** Round 2 — the leaderboard minimum for "Fastest serve": serves clocked
+ *  over the player's tracked matches (an organiser can change it). */
+export const FASTEST_SERVE_MIN = { den: 10, unit: { label: 'serves clocked', one: 'serve clocked' } };
+
+/** The rally-length keys of one bucket (the side's points / won, and the
+ *  rate) — labels shared with the other racket sports' keys of that name. */
+const rallyDefs = (b: RallyBucket): { pts: StatDef; won: StatDef; pct: StatDef } => {
+  const k = rallyKey(b), d = b.replace('-', '–');
+  return {
+    pts: keyed(`${k}Pts`, `Points, rally ${RALLY_LABEL[b]}`, `points (rally ${d})`, `point (rally ${d})`, { group: 'rally' }),
+    won: keyed(`${k}Won`, `Points won, rally ${RALLY_LABEL[b]}`, `points won (rally ${d})`, `point won (rally ${d})`, { group: 'rally' }),
+    pct: pctRate(`${k}Pct`, `Points won % · rally ${RALLY_LABEL[b]}`, `${k}Won`, `${k}Pts`, { group: 'rally' }),
+  };
+};
+/** The ATP buckets (0–4 / 5–8 / 9+, as before), then the other scheme's. */
+const STD_BUCKETS = rallyBucketsOf('tennis');
+const MORE_BUCKETS = allRallyBuckets('tennis').filter((b) => !STD_BUCKETS.includes(b));
+
 /** SD-157 — winners / unforced / forced errors by wing and by shot type,
  *  the retired volley keys, net points, rally length, return in play and
  *  serve speed. */
@@ -55,19 +76,15 @@ export function tennisDetailStats(): StatDef[] {
     keyed('rtnInPlay', 'Returns in play', 'returns in play', 'return in play', { group: 'serve' }),
     keyed('rtnInPlayOf', 'Returnable serves', 'returnable serves', 'returnable serve', { group: 'serve' }),
     pctRate('rtnInPlayPct', 'Return in play %', 'rtnInPlay', 'rtnInPlayOf', { group: 'serve' }),
-    // rally length (the side's points in each bucket / won)
-    keyed('rl04Pts', 'Points, rally 0–4 shots', 'points (rally 0–4)', 'point (rally 0–4)', { group: 'rally' }),
-    keyed('rl04Won', 'Points won, rally 0–4 shots', 'points won (rally 0–4)', 'point won (rally 0–4)', { group: 'rally' }),
-    keyed('rl58Pts', 'Points, rally 5–8 shots', 'points (rally 5–8)', 'point (rally 5–8)', { group: 'rally' }),
-    keyed('rl58Won', 'Points won, rally 5–8 shots', 'points won (rally 5–8)', 'point won (rally 5–8)', { group: 'rally' }),
-    keyed('rl9Pts', 'Points, rally 9+ shots', 'points (rally 9+)', 'point (rally 9+)', { group: 'rally' }),
-    keyed('rl9Won', 'Points won, rally 9+ shots', 'points won (rally 9+)', 'point won (rally 9+)', { group: 'rally' }),
-    pctRate('rl04Pct', 'Points won % · rally 0–4 shots', 'rl04Won', 'rl04Pts', { group: 'rally' }),
-    pctRate('rl58Pct', 'Points won % · rally 5–8 shots', 'rl58Won', 'rl58Pts', { group: 'rally' }),
-    pctRate('rl9Pct', 'Points won % · rally 9+ shots', 'rl9Won', 'rl9Pts', { group: 'rally' }),
-    // serve speed (the serving player's): fastest = the best single match
+    // rally length (the side's points in each bucket / won): the ATP buckets,
+    // then (round 2) the other bucket scheme an organiser may pick
+    ...STD_BUCKETS.flatMap((b) => { const r = rallyDefs(b); return [r.pts, r.won]; }),
+    ...STD_BUCKETS.map((b) => rallyDefs(b).pct),
+    ...MORE_BUCKETS.flatMap((b) => { const r = rallyDefs(b); return [r.pts, r.won, r.pct]; }),
+    // serve speed (the serving player's): fastest = the best single match;
+    // round 2: a tournament leader once a player has 10 serves clocked
     { key: 'srvKmhMax', label: 'Fastest serve (km/h)', short: 'fastest serve (km/h)', one: 'fastest serve (km/h)', leaderLabel: 'Fastest serve', group: 'serve', coverage: 'keyed',
-      format: { unit: 'decimal', dp: 0 }, agg: { kind: 'max' } },
+      format: { unit: 'decimal', dp: 0 }, agg: { kind: 'max', den: 'srvKmhN', qualifier: FASTEST_SERVE_MIN }, tieBreak: [{ key: 'serveKmh', better: 'higher' }] },
     keyed('srvKmhSum', 'Serve speed total (km/h)', 'km/h (serves)', 'km/h (serves)', { group: 'serve' }),
     keyed('srvKmhN', 'Serves with a speed', 'serves with a speed', 'serve with a speed', { group: 'serve' }),
     keyed('srv1KmhSum', '1st serve speed total (km/h)', 'km/h (1st serves)', 'km/h (1st serves)', { group: 'serve' }),
@@ -100,7 +117,7 @@ function tennisSections(): SectionDef[] {
   return [
     ...base,
     tennisShotSection(),
-    { id: 'rally', title: 'Rally length', rows: [{ stat: 'rl04Pct' }, { stat: 'rl58Pct' }, { stat: 'rl9Pct' }] },
+    { id: 'rally', title: 'Rally length', rows: [...STD_BUCKETS, ...MORE_BUCKETS].map((b) => ({ stat: `${rallyKey(b)}Pct` })) },
   ];
 }
 
@@ -132,7 +149,8 @@ export const tennisStats: SportStatSchema<'tennis'> = {
   sections: tennisSections(),
   careerView: 'sections',
   box: [{ columns: ['points', 'aces', 'doubleFaults', ...DETAIL_BOX] }],
-  // SD-27 (TN-10): results first, never rally points; SD-157: fastest serve last
+  // SD-27 (TN-10): results first, never rally points; SD-157: fastest serve
+  // last (round 2: with a minimum of 10 serves clocked)
   leaders: [...racketLeaders(true, ['aces', 'winnersPerMatch']), 'srvKmhMax'],
   mvp: racketMvp(true),
   headline: ['points', 'aces'],

@@ -330,6 +330,13 @@ export const FIELD_RULES = {
     /** World Rugby global law trial: replaceable after 20 minutes */
     red20: { shortFor: 20 },
   },
+  rugby_league: {
+    clock: 'playing minutes: the halves as actually played (play on after the siren included), 2 × 40 / Nines 2 × 9, golden point',
+    /** sin bin (format `sinBinMinutes`: 10, Nines 3 — verify) */
+    sinBin: { minutes: 10 },
+    /** send-off: off for good, not replaced */
+    sendOff: { shortFor: undefined },
+  },
   volleyball: {
     clock: 'none — sets played (a player who was on court in a set)',
   },

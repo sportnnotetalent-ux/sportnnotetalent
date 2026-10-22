@@ -234,8 +234,9 @@ describe('deep wave · pitch types and spray zones (optional capture)', () => {
     assert.ok(!baseballSheet(play(start({ askFielders: true }), [P('GO', { fielders: '6-3' })]).s).sections.some((x) => x.key === 'spray'), 'notation alone is not a spray chart');
   });
   test('live settings and the format carry the toggles (off by default)', () => {
-    assert.deepEqual(TRACK_FIELDS.map((f) => [f.key, f.default, f.group]), [['pitchTypes', false, 'Stats to track'], ['sprayZones', false, 'Stats to track']]);
-    assert.deepEqual(BASEBALL_LIVE_SETTINGS.read(init({ pitchTypes: true })), { pitches: true, askFielders: false, pitchTypes: true, sprayZones: false });
+    // round 2 added the "Batted-ball type" toggle (battedBallTypes) to both lists
+    assert.deepEqual(TRACK_FIELDS.map((f) => [f.key, f.default, f.group]), [['pitchTypes', false, 'Stats to track'], ['sprayZones', false, 'Stats to track'], ['battedBallTypes', false, 'Stats to track']]);
+    assert.deepEqual(BASEBALL_LIVE_SETTINGS.read(init({ pitchTypes: true })), { pitches: true, askFielders: false, pitchTypes: true, sprayZones: false, battedBallTypes: false });
     assert.equal(BASEBALL_LIVE_SETTINGS.mode, 'config');
     assert.equal(BASEBALL_LIVE_SETTINGS.defaults?.sprayZones, false);
   });

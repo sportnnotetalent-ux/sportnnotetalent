@@ -31,7 +31,7 @@ An archery competition is a list of events, such as Recurve 70 m Senior Men. Eac
 4. Tap **E1**, **E2** and so on to go back to an end, then tap an archer to correct it.
 5. With match play, tap **Close ranking round → seed match play**. Without it, tap **🏁 Finish & lock results**.
 
-> **Important:** An end is exactly 6 arrows outdoors and 3 indoors, so it can never score more than 60 or 30. The app refuses anything else. Compound 50 m uses the 80 cm 6-ring face and compound indoor the triple face, so their keypads only show 5 (or 6) to X and M: an arrow outside the last ring is a miss.
+> **Important:** An end is exactly 6 arrows outdoors and 3 indoors, so it can never score more than 60 or 30. The app refuses anything else. Compound 50 m uses the 80 cm 6-ring face and compound indoor the triple face, so their keypads only show 5 (or 6) to X and M: an arrow outside the last ring is a miss. Recurve indoor uses the single 40 cm face (1 to 10) unless the organiser picks the triple face in **Competition rules**; then it works like compound indoor.
 
 ## How the ranking round is decided
 - The higher score wins. If scores are level, more 10s (X included) ranks higher, then more X.
@@ -60,7 +60,7 @@ An archery competition is a list of events, such as Recurve 70 m Senior Men. Eac
 
 ## Common questions
 ### Can we run team or mixed team events?
-Yes. See [team events](/guides/team-events-in-meets/).
+Yes. See [team events](/guides/team-events-in-meets/). If the organiser switches on **Arrows per archer in team matches**, each team end is entered archer by archer (2 arrows each), so every archer also gets their own team-match average on their profile.
 
 ### We locked the results and found a mistake.
 An organiser can tap **↺ Reopen match play**. Its records and points are rolled back until you lock it again. The ranking round can be reopened only while match play has no scores.

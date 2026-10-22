@@ -19,7 +19,7 @@ import { medalStandings } from '../../data/medalStandings';
 import {
   categoryKey, categoryLabel, disciplineOf, eventLeaders, eventStatus, formatMark, meetFieldResults, meetSettings, topAthletes,
   swimMeetSettings, courseLabel, courseShort, eventMeetSettings, wlMeetSettings, sinclairTotal, summarizeLifts, fmtKg, sinclairSet, sportRule, pointsLabel,
-  isCrewSport, crewMeetSettings, champTieOf,
+  isCrewSport, crewMeetSettings, champTieOf, bestLifters, wlTeamClassification, placesText, ROBI_WR,
   type MeetEvent, type RecordMark,
 } from '../../data/results';
 import { eventWords, eventPrefix, type EventSport } from '../../sports/eventSports';
@@ -65,6 +65,12 @@ export function AthleticsHub({ tournament, canOrganize, sport = 'athletics' }: {
     }
     return out.sort((a, b) => b.points - a.points).slice(0, 5);
   }, [events, wlSettings?.sinclair, fmt?.sinclairPeriod]); // eslint-disable-line react-hooks/exhaustive-deps
+  // round 2: best lifters by Robi points (the meet's reference totals, else the IWF world records)
+  const robiOn = wl && sportRule(fmt, 'robi') === true;
+  const robi = useMemo(() => (robiOn ? bestLifters(events, 'robi', fmt).slice(0, 5) : []), [events, robiOn, fmt?.robiRefM, fmt?.robiRefF]); // eslint-disable-line react-hooks/exhaustive-deps
+  // round 2: the IWF team classification — its own result next to the house table
+  const teamMode = wl ? String(sportRule(fmt, 'wlTeamClass')) : 'off';
+  const teamClass = useMemo(() => (teamMode === 'total' || teamMode === 'all' ? wlTeamClassification(events, { lifts: teamMode }) : []), [events, teamMode]);
 
   // Programme by category (age, then Boys / Girls / Mixed).
   const byCat = useMemo(() => {
@@ -209,6 +215,46 @@ export function AthleticsHub({ tournament, canOrganize, sport = 'athletics' }: {
           </Card>
         </>
       )}
+
+      {robi.length > 0 && (
+        <>
+          <SectionHeader title="⚖️ Best lifters (Robi)" count={robi.length} />
+          <Card style={{ gap: theme.spacing(2) }}>
+            {robi.map((a, i) => (
+              <TouchableOpacity key={a.id} accessibilityRole="button" disabled={!a.athleteId} onPress={() => a.athleteId && nav.navigate('PlayerProfile', { playerId: a.athleteId })}>
+                <View style={st.lead}>
+                  <Text style={st.rank}>{i + 1}</Text>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={textStyles.body} numberOfLines={1}>{a.name}{a.team ? <Text style={textStyles.muted}>  {a.team}</Text> : null}</Text>
+                    <Text style={textStyles.muted} numberOfLines={1}>{a.category} · {a.total} kg of {a.ref} kg</Text>
+                  </View>
+                  <Text style={st.mark}>{a.robi!.toFixed(2)}</Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+            <Text style={textStyles.muted}>Robi points: 1000 × (total ÷ the category’s reference total)^3.32 — the reference scores 1000. References: {fmt?.robiRefM || fmt?.robiRefF ? 'this meet’s, else ' : ''}the IWF senior world records{ROBI_WR.asOf ? ` (${ROBI_WR.asOf})` : ''}.</Text>
+          </Card>
+        </>
+      )}
+
+      {teamClass.map((g) => (
+        <View key={g.key} style={{ gap: theme.spacing(2) }}>
+          <SectionHeader title={`🏆 Team classification — ${g.label}`} count={g.rows.length} />
+          <Card style={{ gap: theme.spacing(2) }}>
+            {g.rows.map((t) => (
+              <View key={t.teamId ?? t.team} style={st.lead}>
+                <Text style={st.rank}>{t.tie ? '=' : ''}{t.position}</Text>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={textStyles.body} numberOfLines={1}>{t.team}</Text>
+                  <Text style={textStyles.muted} numberOfLines={1}>{t.lifters} lifter{t.lifters === 1 ? '' : 's'}{placesText(t.places) ? ` · ${placesText(t.places)}` : ''}</Text>
+                </View>
+                <Text style={st.mark}>{t.points}</Text>
+              </View>
+            ))}
+            <Text style={textStyles.muted}>IWF team points 28-25-23-22-21 … 1 per place in each category{teamMode === 'all' ? ' — snatch, clean & jerk and total' : ' (total)'}; equal points: more 1st places, then 2nd places. {g.sessions} categor{g.sessions === 1 ? 'y' : 'ies'} finished. The house table keeps the meet’s own points.</Text>
+          </Card>
+        </View>
+      ))}
 
       {/* SD-130: the school's existing records (historic board) */}
       {canOrganize && <Button label="📖 Record board — add your school’s records" variant="ghost" onPress={() => nav.navigate('RecordBoard', { tournamentId: tournament.id, sport })} />}

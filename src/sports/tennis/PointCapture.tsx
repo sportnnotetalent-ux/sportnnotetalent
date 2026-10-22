@@ -9,6 +9,9 @@
  * Every tap dispatches POINT_DETAIL (annotates that point; no score effect;
  * undo removes it). The options themselves live in the Scoring settings card
  * and in the "Extra stats" chips here (SET_DETAIL: from the next point).
+ * Round 2: the serve speed is typed in the match's unit — km/h or mph, with a
+ * one-tap switch beside the box (SET_DETAIL speedUnit) — and stored in km/h;
+ * the Rally chips offer the match's bucket scheme (`rallyBuckets`).
  * See pointDetail.ts for the model and tennis/matchStats.ts for the figures.
  */
 import React, { useMemo, useState } from 'react';
@@ -20,8 +23,9 @@ import type { ScoreAction } from '../types';
 import { pointRows } from '../rallyEdit';
 import { serveStats } from '../serveStats';
 import {
-  DETAIL_HOWS, KMH_MAX, KMH_MIN, RALLY_BUCKETS, RALLY_LABEL, SHOTS, SHOT_LABEL, WINGS, WING_LABEL,
-  howDef, pdText, strokeOf, toggleNet, validKmh, winnerSide, type How, type PointDetail, type Shot, type Wing,
+  DETAIL_HOWS, RALLY_LABEL, SHOTS, SHOT_LABEL, SPEED_UNITS, SPEED_UNIT_LABEL, WINGS, WING_LABEL,
+  howDef, pdText, rallyBucketsOf, speedIn, speedRange, speedText, speedUnitOf, strokeOf, toggleNet, validSpeed, winnerSide,
+  type How, type PointDetail, type Shot, type SpeedUnit, type Wing,
 } from '../pointDetail';
 import { TENNIS_TRACK_FIELDS } from '../pointDetailSettings';
 import type { TennisState } from './engine';
@@ -106,6 +110,7 @@ export function TennisPointDetail({
     send({ pd: next });
   };
   const serve2 = on.serveDetail && (e.serve === 1 || e.serve === 2);
+  const unit = speedUnitOf(s);
   // nothing to describe on this point (an ace with only point detail on …)
   if (!hows.length && !pd && !serve2 && !on.netDetail && !on.rallyDetail && !on.speedDetail) {
     return <View style={st.bare}>{options}{chooser}</View>;
@@ -114,9 +119,9 @@ export function TennisPointDetail({
   const summary = [
     pd ? pdText(pd) : isAce ? 'Ace' : '',
     e.serve === 2 ? '2nd serve' : '',
-    e.atNet ? `at the net: ${e.atNet === 'both' ? 'both' : nameOf(e.atNet)}` : '',
+    e.atNet === 'home' || e.atNet === 'away' ? `at the net: ${nameOf(e.atNet)}` : e.atNet === 'both' ? 'at the net: both' : '',
     e.rallyLen ? RALLY_LABEL[e.rallyLen] : '',
-    typeof e.kmh === 'number' ? `${e.kmh} km/h` : '',
+    typeof e.kmh === 'number' ? speedText(e.kmh, unit) : '',
   ].filter(Boolean).join(' · ');
 
   return (
@@ -172,24 +177,31 @@ export function TennisPointDetail({
       {on.rallyDetail && (
         <View style={st.chips}>
           <Text style={[st.meta, st.rowLabel]}>Rally:</Text>
-          {RALLY_BUCKETS.map((b) => (
+          {rallyBucketsOf('tennis', (s as { rallyBuckets?: unknown }).rallyBuckets).map((b) => (
             <SelectChip key={b} label={RALLY_LABEL[b]} active={e.rallyLen === b} onPress={() => send({ rallyLen: e.rallyLen === b ? null : b })} />
           ))}
         </View>
       )}
       {on.speedDetail && (
-        <SpeedInput key={e.id} value={e.kmh} onValid={(kmh) => send({ kmh })} onClear={() => send({ kmh: null })} />
+        <SpeedInput key={`${e.id}:${unit}`} value={e.kmh} unit={unit} onValid={(kmh) => send({ kmh })} onClear={() => send({ kmh: null })}
+          onUnit={(u) => dispatch({ type: 'SET_DETAIL', payload: { speedUnit: u } })} />
       )}
       {summary ? <Text style={st.meta}>✓ {summary}</Text> : null}
     </View>
   );
 }
 
-/** The serve's km/h for the last point: dispatched as soon as the typed
- *  value is plausible (KMH_MIN–KMH_MAX), so it always lands on this point. */
-function SpeedInput({ value, onValid, onClear }: { value?: number; onValid: (kmh: number) => void; onClear: () => void }) {
-  const [txt, setTxt] = useState(value ? String(value) : '');
-  const bad = txt.trim() !== '' && validKmh(txt) === undefined;
+/** The serve's speed for the last point, typed in the match's unit (km/h or
+ *  mph): dispatched in km/h as soon as the typed value is plausible (30–270
+ *  km/h, 19–168 mph), so it always lands on this point. The unit chip
+ *  switches the match's unit (the stored km/h is unchanged). */
+function SpeedInput({ value, unit, onValid, onClear, onUnit }: {
+  value?: number; unit: SpeedUnit; onValid: (kmh: number) => void; onClear: () => void; onUnit: (u: SpeedUnit) => void;
+}) {
+  const [txt, setTxt] = useState(typeof value === 'number' ? String(speedIn(value, unit)) : '');
+  const bad = txt.trim() !== '' && validSpeed(txt, unit) === undefined;
+  const [lo, hi] = speedRange(unit);
+  const words = unit === 'mph' ? 'miles per hour' : 'kilometres per hour';
   return (
     <View style={st.chips}>
       <Text style={[st.meta, st.rowLabel]}>Serve speed:</Text>
@@ -198,22 +210,25 @@ function SpeedInput({ value, onValid, onClear }: { value?: number; onValid: (kmh
         onChangeText={(t) => {
           const clean = t.replace(/[^0-9]/g, '').slice(0, 3);
           setTxt(clean);
-          const ok = validKmh(clean);
+          const ok = validSpeed(clean, unit);
           if (ok !== undefined && ok !== value) onValid(ok);
         }}
         keyboardType="number-pad"
         inputMode="numeric"
         maxLength={3}
-        placeholder="km/h"
+        placeholder={SPEED_UNIT_LABEL[unit]}
         placeholderTextColor={theme.colors.textMuted}
-        accessibilityLabel="Serve speed in kilometres per hour"
+        accessibilityLabel={`Serve speed in ${words}`}
         style={[st.input, bad && st.inputBad]}
       />
-      <Text style={[st.meta, st.rowLabel]}>km/h</Text>
+      {SPEED_UNITS.map((u) => (
+        <SelectChip key={u} label={SPEED_UNIT_LABEL[u]} active={unit === u}
+          accessibilityLabel={`Type serve speeds in ${SPEED_UNIT_LABEL[u]}`} onPress={() => { if (u !== unit) onUnit(u); }} />
+      ))}
       {typeof value === 'number' && (
         <SelectChip label="Clear" active={false} accessibilityLabel="Clear the serve speed" onPress={() => { setTxt(''); onClear(); }} />
       )}
-      {bad ? <Text style={[st.err, st.rowLabel]}>Type {KMH_MIN}–{KMH_MAX}</Text> : null}
+      {bad ? <Text style={[st.err, st.rowLabel]}>Type {lo}–{hi}</Text> : null}
     </View>
   );
 }

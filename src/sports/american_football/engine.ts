@@ -116,6 +116,11 @@ export interface AFEvent {
   /** deep wave — a tackle for loss (a run / catch that lost yards), recorded
    *  with "Pass breakups & tackles for loss" on */
   tfl?: boolean;
+  /** round 2 — an interception recorded with "Defensive detail" on: the
+   *  defender is also credited a pass defended (the NFL counts interceptions
+   *  in passes defended). Set at record time, so a log replays the same;
+   *  older interceptions never have it. */
+  pdef?: boolean;
 }
 
 export interface XiStamp { players?: { id: string; name: string }[] }
@@ -371,7 +376,7 @@ export const DEEP_KEYS = ['targets', 'passDef', 'tfl', 'timesSacked', 'sackYdsLo
 export const LIVE_KEYS = [...SCORE_KEYS, ...PBP_KEYS, ...DETAIL_KEYS, ...DEEP_KEYS] as const;
 
 type Credit = { playerId: string; playerName?: string; stats: Record<string, number> };
-type CreditEvent = Pick<AFEvent, 'type' | 'playerId' | 'playerName' | 'secondId' | 'secondName' | 'how' | 'yards' | 'kind' | 'good' | 'play' | 'pbp' | 'tgt' | 'tfl'>;
+type CreditEvent = Pick<AFEvent, 'type' | 'playerId' | 'playerName' | 'secondId' | 'secondName' | 'how' | 'yards' | 'kind' | 'good' | 'play' | 'pbp' | 'tgt' | 'tfl' | 'pdef'>;
 
 /** The stat-line credits one event writes: [primary player, second player]. */
 export function eventCredits(e: CreditEvent): { first?: Credit; second?: Credit } {
@@ -414,7 +419,8 @@ export function eventCredits(e: CreditEvent): { first?: Credit; second?: Credit 
         case 'inc': return { first: p({ passAtt: 1 }), ...(e.tgt ? { second: q({ targets: 1 }) } : {}) };
         // the quarterback (deep wave: the last passer, when known) and the defender
         case 'sack': return { first: p({ timesSacked: 1, sackYdsLost: Math.abs(y) }), second: q({ sacks: 1 }) };
-        case 'int': return { first: p({ passAtt: 1, passInt: 1 }), second: q({ defInt: 1 }) };
+        // round 2: with "Defensive detail" on, an interception is also a pass defended (NFL)
+        case 'int': return { first: p({ passAtt: 1, passInt: 1 }), second: q({ defInt: 1, ...(e.pdef ? { passDef: 1 } : {}) }) };
         case 'fumble': return { first: p({ fumblesLost: 1 }), second: q({ fumRec: 1 }) };
         case 'punt': return { first: p({ punts: 1, puntYds: y }) };
         default: return {};
@@ -481,6 +487,8 @@ export function buildPlay(s: AFState, side: Side, inp: PlayInput, stamp: Record<
   const d = s.drive && s.drive.off === side ? s.drive : null;
   const y = Math.round(Number(inp.yards) || 0);
   const tgt = inp.tgt && (inp.play === 'pass' || inp.play === 'inc') ? { tgt: true } : {};
+  // round 2: an interception while "Defensive detail" is on also counts as a pass defended
+  const pdef = inp.play === 'int' && s.trackDefence === true ? { pdef: true } : {};
   if (d && (inp.play === 'run' || inp.play === 'pass') && d.spot + y >= s.field) {
     const yards = s.field - d.spot;
     const ev: CreditEvent = inp.play === 'run'
@@ -491,11 +499,11 @@ export function buildPlay(s: AFState, side: Side, inp: PlayInput, stamp: Record<
   if (d && (inp.play === 'run' || inp.play === 'sack' || inp.play === 'kneel') && d.spot + y <= 0) {
     return { type: 'SAFETY', side: other(side), payload: { ...stamp }, ...credit({ type: 'safety', ...(inp.play === 'sack' ? who1(inp.p2) : {}) }) };
   }
-  const ev: CreditEvent = { type: 'play', play: inp.play, yards: y, pbp: true, ...who1(inp.p1), ...who2(inp.p2), ...tgt };
+  const ev: CreditEvent = { type: 'play', play: inp.play, yards: y, pbp: true, ...who1(inp.p1), ...who2(inp.p2), ...tgt, ...pdef };
   return {
     type: 'PLAY', side,
     payload: {
-      play: inp.play, yards: y, ...tgt, ...stamp,
+      play: inp.play, yards: y, ...tgt, ...pdef, ...stamp,
       ...(inp.newSpot !== undefined ? { newSpot: inp.newSpot } : {}), ...(inp.ret !== undefined ? { ret: inp.ret } : {}),
       ...(inp.foul ? { foul: inp.foul } : {}), ...(inp.on ? { on: inp.on } : {}),
       ...(inp.autoFirst ? { autoFirst: true } : {}), ...(inp.lossOfDown ? { lossOfDown: true } : {}),
@@ -762,6 +770,7 @@ export const reducer = (s: AFState, a: ScoreAction): AFState => {
         ...(a.payload?.autoFirst ? { autoFirst: true } : {}), ...(a.payload?.lossOfDown ? { lossOfDown: true } : {}),
         ...(!w1.playerName && typeof a.payload?.p1Name === 'string' ? { playerName: a.payload.p1Name as string } : {}),
         ...(a.payload?.tgt === true && (play === 'pass' || play === 'inc') ? { tgt: true } : {}),
+        ...(a.payload?.pdef === true && play === 'int' ? { pdef: true } : {}),
       };
       const d = s.drive;
       let drive = d;
@@ -937,7 +946,7 @@ export const isPbp = (s: Pick<AFState, 'mode' | 'events'>): boolean => s.mode ==
 /** Is a "Stats to track" toggle tracked in the match — on, or any such event recorded? */
 export function afTracked(s: Pick<AFState, TrackFlag | 'events'>, f: TrackFlag): boolean {
   if (s[f] === true) return true;
-  return f === 'trackTargets' ? s.events.some((e) => e.tgt) : s.events.some((e) => e.type === 'pd' || e.tfl);
+  return f === 'trackTargets' ? s.events.some((e) => e.tgt) : s.events.some((e) => e.type === 'pd' || e.tfl || e.pdef);
 }
 /** Tackles tracked (the toggle, or any tackle recorded). */
 export const tacklesTracked = (s: Pick<AFState, 'trackTackles' | 'events'>): boolean => s.trackTackles || s.events.some((e) => e.type === 'tackle');
@@ -1006,7 +1015,7 @@ export function afScoreLine(s: AFState, perspective?: Side): string {
  *  they act in play-by-play mode). */
 export const TRACK_FIELDS: FormatField[] = [
   { key: 'trackTargets', label: 'Targets (who a pass was meant for)', type: 'toggle', default: false, group: 'Stats to track', hint: 'Play by play: one optional tap after ✗ Incomplete — receivers get targets (complete + incomplete)' },
-  { key: 'trackDefence', label: 'Pass breakups & tackles for loss', type: 'toggle', default: false, group: 'Stats to track', hint: 'Play by play: who broke up an incomplete pass (optional tap); with tackles asked, a run or catch that lost yards is a tackle for loss' },
+  { key: 'trackDefence', label: 'Pass breakups & tackles for loss', type: 'toggle', default: false, group: 'Stats to track', hint: 'Play by play: who broke up an incomplete pass (optional tap) — an interception counts as a pass defended too (NFL); with tackles asked, a run or catch that lost yards is a tackle for loss' },
 ];
 
 export const AF_LIVE_SETTINGS: LiveSettings<AFState> = {

@@ -37,7 +37,7 @@ import { handballBox } from './box';
 import { describeEvent, eventWhen, timelineEvents } from './timeline';
 import { handballFeed, handballFacts, handballFeedPeriods, handballPeriodLabel } from './feed';
 import { handballCentre } from './stats';
-import { Commentary } from '../invasion/Commentary';
+import { Commentary, MatchFactsCard, resultFacts } from '../invasion/Commentary';
 import { MatchCentre } from '../invasion/MatchCentre';
 import { handballTickerDetail, handballTickerFlash } from './ticker';
 import { handballFormation, HandballCourt } from './court';
@@ -691,28 +691,24 @@ const HandballScoreboard: NonNullable<SportPlugin<HandballState>['Scoreboard']> 
   );
 };
 
-/** Deep wave: Commentary (live text by half with the match clock, running
- *  score and match facts) or the match centre (team stats by category and
- *  half, then each side's player box). */
-const LiveExtras: NonNullable<SportPlugin<HandballState>['LiveExtras']> = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster, onPlayer }) => {
+/** Match tabs (2026-10-22): the live text by half with the match clock
+ *  (Commentary), the match centre — team stats by category and half, then each
+ *  side's player box (Stats) — and the match facts with the result (Summary). */
+type TabProps = Parameters<NonNullable<SportPlugin<HandballState>['LiveExtras']>>[0];
+const HandballCommentary = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster, onPlayer }: TabProps) => {
   const s = state as HandballState;
-  const [view, setView] = useState<'commentary' | 'stats'>('commentary');
   return (
-    <View style={{ gap: theme.spacing(3) }}>
-      <View style={c.grid}>
-        <SelectChip label="📝 Commentary" active={view === 'commentary'} onPress={() => setView('commentary')} />
-        <SelectChip label="📊 Match stats" active={view === 'stats'} onPress={() => setView('stats')} />
-      </View>
-      {view === 'commentary' ? (
-        <Commentary items={handballFeed(s, { home: homeName, away: awayName })} labelOf={handballPeriodLabel(s)} periods={handballFeedPeriods(s)} facts={handballFacts(s)}
-          homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} homeRoster={homeRoster} awayRoster={awayRoster} onPlayer={onPlayer}
-          emptyText="No goals or sanctions yet — every moment you log appears here." />
-      ) : (
-        <MatchCentre sport="handball" source={handballBox(s, { homeRoster, awayRoster })} categories={handballCentre} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} onPlayer={onPlayer} />
-      )}
-    </View>
+    <Commentary items={handballFeed(s, { home: homeName, away: awayName })} labelOf={handballPeriodLabel(s)} periods={handballFeedPeriods(s)}
+      homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} homeRoster={homeRoster} awayRoster={awayRoster} onPlayer={onPlayer}
+      emptyText="No goals or sanctions yet — every moment you log appears here." />
   );
 };
+const HandballStats = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster, onPlayer }: TabProps) => (
+  <MatchCentre sport="handball" source={handballBox(state as HandballState, { homeRoster, awayRoster })} categories={handballCentre} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} onPlayer={onPlayer} />
+);
+const HandballFacts = ({ state, homeName, awayName, homeColor, awayColor }: TabProps) => (
+  <MatchFactsCard facts={resultFacts(handballFacts(state as HandballState))} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} />
+);
 
 /* --------------------------------- plugin ---------------------------------- */
 
@@ -751,7 +747,7 @@ export const handballPlugin: SportPlugin<HandballState> = {
   ScoringControls,
   LiveClock,
   Scoreboard: HandballScoreboard,
-  LiveExtras,
+  matchTabs: { Commentary: HandballCommentary, Stats: HandballStats, SummaryExtras: HandballFacts },
   formation: (perSide) => handballFormation(perSide),
   Court: HandballCourt,
   liveSettings: HANDBALL_LIVE_SETTINGS,

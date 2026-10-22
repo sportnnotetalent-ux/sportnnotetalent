@@ -34,7 +34,9 @@ import { EntriesPanel } from '../components/results/EntriesPanel';
 import { SyncBanner, ResyncButton, OfficialsCard } from '../components/results/RecordSync';
 // deep wave (timed races): Stats to track captures, race analysis, rounds path, commentary
 import { EventDepthPanel, TakeoverField, AthDqChips } from '../components/results/RaceDepth';
-import { raceTracking, splitsOffered, takeoversOffered, chipOffered, athDqReasonStale } from '../data/results/raceDepth';
+import { raceTracking, splitsOffered, takeoversOffered, chipOffered, athDqReasonStale, reactionOffered, entrySplitDistances, entryLapPoints, resultWithSplits, lapPointsDiffer, type RaceTracking } from '../data/results/raceDepth';
+// timed races round 2: "Stats to track" per event
+import { EventTrackCard } from '../components/results/EventTrackCard';
 import type { RootStackParamList } from '../navigation/types';
 import { useParamState } from '../navigation/useParamState';
 import { getPlayers, getMyPlayerId } from '../data/repos';
@@ -42,6 +44,7 @@ import type { FieldEntry, FieldEvent } from '../core/types';
 import {
   getPhase, getResultsPhases, getPhaseEntries, saveEntryResult, patchPhaseFormat, setPhaseStatus, advancePhase,
   completeFinal, getMarkHistory, getRecordBook, getOrgRecordBook, moveEntry, reopenPhase, getCombinedPhases, getCombinedHistory,
+  setEventTracking,
 } from '../data/resultsStore';
 import {
   disciplineOf, phaseOf, phaseLabel, toResultEntry, rankByHeat, qualify, withQualification, withRecordFlags,
@@ -349,7 +352,17 @@ export default function ResultsEventScreen() {
 
   const course = f.category?.course;
   // deep wave: the meet's "Stats to track" (lap / leg times, take-overs, intermediate times)
-  const track = raceTracking(def.sport, tournament?.formats?.[def.sport as never] as Record<string, unknown> | undefined);
+  // round 2: + this event's own overrides (f.track)
+  const meetTrack = tournament?.formats?.[def.sport as never] as Record<string, unknown> | undefined;
+  const track = raceTracking(def.sport, meetTrack, f.track);
+  const saveTracking = async (t: typeof f.track) => {
+    try {
+      await setEventTracking(f.eventKey, t);
+      setPhase({ ...phase, format: { ...phase.format, results: { ...f, track: t } } });
+    } catch (err) { setError((err as Error).message); }
+  };
+  // round 2: what the official saw (PB / SB / record flags) goes with the close / lock — heat-win / PB alerts
+  const shownFlags = new Map([...ranked.values()].flat().filter((r) => r.flags.length).map((r) => [r.id, r.flags] as const));
   // SD-93: "4. Long jump" — the next event of a combined event
   const ceNextName = comb && !ceLast ? `${comb.index + 2}. ${disciplineOf(comb.events[comb.index + 1])?.label ?? ''}` : '';
   const advance = async () => {
@@ -377,7 +390,7 @@ export default function ResultsEventScreen() {
     if (!ok) return;
     setBusy(true);
     try {
-      const ev = await advancePhase(phase, merged, nameOf);
+      const ev = await advancePhase(phase, merged, nameOf, { flags: shownFlags });
       nav.replace('ResultsEvent', { phaseId: ev.id });
     } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
   };
@@ -403,7 +416,7 @@ export default function ResultsEventScreen() {
     setBusy(true);
     try {
       const pts = isEventSport(def.sport) ? pointsFor(def.sport, tournament?.formats?.[def.sport] as Record<string, unknown> | undefined) : undefined;
-      const book = await completeFinal(phase, merged, nameOf, ['MR'], pts);
+      const book = await completeFinal(phase, merged, nameOf, ['MR'], pts, { flags: shownFlags, schoolBook: srBook });
       const keys = recordDefsFor(def).map((d) => d.key);
       // SD-130: only the records this final set (a historic record still standing isn't news)
       const mine = book.filter((r) => keys.includes(r.discipline) && r.category === categoryKey(f.category) && r.eventKey === f.eventKey);
@@ -648,7 +661,7 @@ export default function ResultsEventScreen() {
         {comb ? <Text style={textStyles.muted}>{combinedHeader(f, def)}</Text> : null}
         {fieldNote ? <Text style={textStyles.muted}>{fieldNote}</Text> : null}
         {shoot ? <Text style={textStyles.muted}>{shoot.rules} · {shotsOf(shoot, f.category)} shots{shootFinalPhase ? ` · final from zero: ${shoot.final?.stage ?? 'single shots'}, eliminations from the bottom` : f.shootFinal ? ' · the best go to an elimination final' : f.shootMatch ? '' : ' · no final: the match decides the medals'}{shootFinalPhase ? ' · a tie for an elimination or for gold: shoot-off' : ruleOf(f.rules, 'shootTie') === 'inner' ? ` · ties: ${shoot.scoring === 'integer' ? 'inner tens, then ' : ''}${ruleOf(f.rules, 'shootOff') === 'share' ? 'shared' : 'shared (a medal place: shoot-off)'} (meet rule)` : ` · ties: ${shoot.scoring === 'integer' ? 'inner tens, then ' : ''}${shoot.positions ? 'standing, kneeling, prone, then ' : ''}the last series back`}</Text> : null}
-        {arch ? <Text style={textStyles.muted}>World Archery · {BOW_LABEL[arch.bow]}{archTeamOf(def.key) ? ` · ${archTeamOf(def.key)!.kind === 'team' ? 'team of 3' : 'mixed team (a man and a woman)'}` : ''} · {archBracket ? (archTeamOf(def.key) ? matchRuleText(matchFormatOf(arch.bow), matchSpecOf(def.key)) : matchFormatOf(arch.bow) === 'sets' ? 'set system: ends of 3, 2 points an end, first to 6; 5–5 → one-arrow shoot-off' : 'cumulative: 5 ends of 3, higher total; level → one-arrow shoot-off') + (ruleOf(f.rules, 'archShootOff') === 'repeat' ? ' (level arrows shoot again — meet rule)' : '') : `${teamRank ? `team score = the members’ ${roundLine(arch).split(' · ')[0]} ranking scores added` : roundLine(arch)} · ties: ${ruleOf(f.rules, 'archTie') === 'xs' ? 'most X, then most 10s (meet rule)' : 'most 10s (X included), then most X'}${f.progression ? ` · the best go to ${teamRank ? 'team ' : ''}match play` : ` · no match play: the ${teamRank ? 'team ranking' : 'ranking round'} decides the medals`}`}</Text> : null}
+        {arch ? <Text style={textStyles.muted}>World Archery · {BOW_LABEL[arch.bow]}{archTeamOf(def.key) ? ` · ${archTeamOf(def.key)!.kind === 'team' ? 'team of 3' : 'mixed team (a man and a woman)'}` : ''} · {archBracket ? (archTeamOf(def.key) ? matchRuleText(matchFormatOf(arch.bow), matchSpecOf(def.key)) : matchFormatOf(arch.bow) === 'sets' ? 'set system: ends of 3, 2 points an end, first to 6; 5–5 → one-arrow shoot-off' : 'cumulative: 5 ends of 3, higher total; level → one-arrow shoot-off') + (ruleOf(f.rules, 'archShootOff') === 'repeat' ? ' (level arrows shoot again — meet rule)' : '') : `${teamRank ? `team score = the members’ ${roundLine(arch).split(' · ')[0]} ranking scores added` : roundLine(arch, f.rules)} · ties: ${ruleOf(f.rules, 'archTie') === 'xs' ? 'most X, then most 10s (meet rule)' : 'most 10s (X included), then most X'}${f.progression ? ` · the best go to ${teamRank ? 'team ' : ''}match play` : ` · no match play: the ${teamRank ? 'team ranking' : 'ranking round'} decides the medals`}`}</Text> : null}
         {shootMatches ? <Text style={textStyles.muted}>Medal matches: gold 1st v 2nd, bronze 3rd v 4th · first to 16 points.</Text> : f.shootMatch ? <Text style={textStyles.muted}>The best 4 teams go to the medal matches (gold 1 v 2, bronze 3 v 4, first to 16 points).</Text> : null}
         {lifts ? <Text style={textStyles.muted}>IWF: snatch then clean & jerk, 3 attempts each · equal totals → whoever lifted the total first{f.rules && (ruleOf(f.rules, 'wlStep') !== 1 || ruleOf(f.rules, 'wlRepeat') !== 'same' || ruleOf(f.rules, 'wlOrder') !== 'iwf') ? ` · meet rules: +${ruleOf(f.rules, 'wlStep')} kg after a good lift${ruleOf(f.rules, 'wlRepeat') === 'up' ? ' and after a no lift' : ''}${ruleOf(f.rules, 'wlOrder') === 'simple' ? ', order by bar → attempt → lot' : ''}` : ''} · medals for {meet?.liftMedals ? 'snatch, C&J and total' : 'the total'}{curLift && phase.status !== 'completed' ? ` · now: ${curLift === 'snatch' ? 'snatch' : 'clean & jerk'}` : ''}</Text> : null}
         <FormError message={error} />
@@ -675,6 +688,8 @@ export default function ResultsEventScreen() {
               </Text>
             )}
 
+            {/* timed races round 2: this event's own "Stats to track" (organisers, any time) */}
+            {canManage && phase.status !== 'completed' ? <EventTrackCard def={def} f={f} meet={meetTrack} busy={busy} onChange={(t) => void saveTracking(t)} /> : null}
             {comb && (comb.fsWarned ?? []).includes(activeHeat) ? (
               <Text style={st.badTxt}>⚠ This race has had its false start — a further one disqualifies (TR 39.8.3).</Text>
             ) : null}
@@ -711,7 +726,7 @@ export default function ResultsEventScreen() {
             {shoot && !shootFinalPhase && !shootMatches && !teamRank && (editable || anyMark) && (
               <SeriesCard entries={heatRes} ev={shoot} shots={shotsOf(shoot, f.category)} mode={f.shootEntry ?? 'series'} editable={editable} onSave={saveLift} rules={f.rules} />
             )}
-            {arch && !archBracket && !teamRank && (editable || anyMark) && <EndCard entries={heatRes} round={arch} editable={editable} onSave={saveLift} />}
+            {arch && !archBracket && !teamRank && (editable || anyMark) && <EndCard entries={heatRes} round={arch} editable={editable} onSave={saveLift} rules={f.rules} />}
             {/* SD-98 cycling: the order on the line, a stage, a points race, sprint match play */}
             {orderEv && cycK && cycK !== 'points' && cycK !== 'stage' && (editable || anyMark) && (
               <FinishOrderCard def={def} kind={cycK} entries={heatRes} editable={editable} onSave={saveLift} statuses={statusesFor(def)} />
@@ -727,7 +742,7 @@ export default function ResultsEventScreen() {
             {/* SD-92: road / walk / XC — tap (or bib) in finish order, times optional */}
             {roadEv && (editable || anyMark) && <RoadFinishCard def={def} entries={heatRes} editable={editable} onSave={saveLift} road={f.road} age={f.category?.age} chip={chipOffered(def, f, track)} />}
             {arch && archBracket && <BracketCard entries={resEntries} round={arch} fmt={matchFormatOf(arch.bow)} editable={editable} onSave={saveLift} rules={f.rules} discipline={def.key} />}
-            {shoot && shootFinalPhase && phase.status !== 'completed' && <FinalCard entries={heatRes} ev={shoot} editable={editable} onSave={saveLift} />}
+            {shoot && shootFinalPhase && phase.status !== 'completed' && <FinalCard entries={heatRes} ev={shoot} editable={editable} onSave={saveLift} rules={f.rules} />}
             {lifts && editable && <NextLiftCard entries={heatRes} seq={nextSeq(resEntries)} onSave={saveLift} rules={f.rules} lb={showLb} />}
             {def.capture === 'attempts' && editable && (
               <AttemptCard def={def} up={nextUp} rows={heatRows} heatRes={heatRes} phaseKind={f.phase} onSave={saveAttempt} />
@@ -808,7 +823,7 @@ export default function ResultsEventScreen() {
                   {/* SD-112: splits stay folded behind "＋ Splits" (a 1500 m card would show 29 boxes) */}
                   {editable && splitsOffered(def, f, track) && (r.status ?? 'ok') === 'ok' && (
                     openSplits.has(e.id) || r.splits?.length
-                      ? <SplitsField key={`${e.id}:s:${(r.splits ?? []).join(',')}`} def={def} r={r} onChange={(n) => void save(e, n)} />
+                      ? <SplitsField key={`${e.id}:s:${(r.splits ?? []).join(',')}:${entryLapPoints(r, track)}`} def={def} r={r} track={track} onChange={(n) => void save(e, n)} />
                       : <SelectChip label="＋ Splits" active={false} onPress={() => setOpenSplits((cur) => new Set(cur).add(e.id))} />
                   )}
                   {editable && takeoversOffered(def, track) && (r.status ?? 'ok') !== 'DNS' && (
@@ -818,7 +833,7 @@ export default function ResultsEventScreen() {
                   {isPursuitKind(cycK) && raceFinal && editable && (r.status ?? 'ok') === 'ok' && (
                     <SelectChip label={r.caught ? '✓ Caught (loses the race)' : 'Caught'} active={!!r.caught} onPress={() => void save(e, { ...r, caught: !r.caught || undefined })} />
                   )}
-                  {f.reaction && def.unit === 'time' && editable && (
+                  {reactionOffered(def, f, track) && editable && (
                     <ReactionField value={r.reaction} swim={swim} onSave={(v) => void save(e, { ...r, reaction: v })} />
                   )}
                   {swim && editable && swimOff.has(e.id) && (
@@ -885,7 +900,7 @@ export default function ResultsEventScreen() {
               </>
             )}
             {/* Deep wave: weightlifting / shooting / archery — event stats + the full commentary */}
-            {anyMark ? <PrecisionInsights def={def} f={f} entries={resEntries} mode="full" /> : null}
+            {anyMark ? <PrecisionInsights def={def} f={f} entries={resEntries} mode="full" fmt={(tournament?.formats as Record<string, unknown> | undefined)?.[def.sport] as Record<string, unknown> | undefined} /> : null}
             {awards.length > 0 && (
               <Card style={{ gap: theme.spacing(1) }}>
                 <Text style={textStyles.h3}>Medals & points</Text>
@@ -1185,9 +1200,12 @@ function WatchesField({ def, r, course, register, onNext, onChange }: {
   );
 }
 
-/** SD-94: cumulative 50 m splits (stopwatch digits or "1:05.30"). */
-function SplitsField({ def, r, onChange }: { def: DisciplineDef; r: EntryResult; onChange: Change }) {
-  const ds = splitDistances(def.key);
+/** SD-94: cumulative 50 m splits (stopwatch digits or "1:05.30").
+ *  Round 2: athletics laps at the event's lap points (a result keeps its own). */
+function SplitsField({ def, r, track, onChange }: { def: DisciplineDef; r: EntryResult; track: RaceTracking; onChange: Change }) {
+  const ds = entrySplitDistances(def, r, track);
+  // lapsFrom is only kept where the two choices differ (1000 m, 1500 m, 3000 m)
+  const from = lapPointsDiffer(def.key) && !def.teamSize ? entryLapPoints(r, track) : 'finish';
   const [t, setT] = useState(ds.map((_, i) => (r.splits?.[i] != null ? formatMark(r.splits[i], def) : '')));
   const read = (x: string) => (!x.trim() ? undefined : (/[.:,]/.test(x) ? parseMark(x, def)?.mark : digitsToTime(x)) ?? NaN);
   const vals = t.map(read);
@@ -1196,7 +1214,7 @@ function SplitsField({ def, r, onChange }: { def: DisciplineDef; r: EntryResult;
     if (err) return;
     const list = vals as (number | undefined)[];
     while (list.length && list[list.length - 1] == null) list.pop();
-    if (JSON.stringify(list) !== JSON.stringify(r.splits ?? [])) onChange({ ...r, splits: list.length ? (list as number[]) : undefined });
+    if (JSON.stringify(list) !== JSON.stringify(r.splits ?? [])) onChange(resultWithSplits(r, list.length ? (list as number[]) : undefined, from));
   };
   const legs = swimEventOf(def.key);
   return (

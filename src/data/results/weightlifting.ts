@@ -36,6 +36,7 @@ import { rankEntries } from './rank.ts';
 import { eventAwards, type Award, type PointsConfig } from './medals.ts';
 import type { RecordMark } from './records.ts';
 import { ruleOf, parseClassList, type CompRules } from './competitionRules.ts';
+import { robiPoints, robiRef } from './robi.ts';
 
 export type Lift = 'snatch' | 'cj';
 export const LIFTS: Lift[] = ['snatch', 'cj'];
@@ -430,6 +431,7 @@ export interface LiftLine { playerId: string; stats: Record<string, number>; won
  *   Deep wave (free — from the attempts already stored): snMade / snAtt and
  *   cjMade / cjAtt (make rate per lift), o1Made / o1Att (openers made) — each
  *   pair only when that lift had an attempt.
+ *   Round 2: robi (Robi points — only when the category has a reference total).
  */
 export function liftLines(f: Pick<PhaseFormat, 'category' | 'rules'>, entries: ResultEntry[], cfg: PointsConfig & { liftMedals?: boolean } = {}): LiftLine[] {
   const total = rankEntries(entries, disciplineOf('wl.total')!);
@@ -471,6 +473,9 @@ export function liftLines(f: Pick<PhaseFormat, 'category' | 'rules'>, entries: R
     if (res.bodyweight != null) s.bw = res.bodyweight;
     const sin = sinclairTotal(s.m_wl_total, res.bodyweight, f.category?.gender, ruleOf(f.rules, 'sinclairPeriod'));
     if (sin != null) s.sinclair = sin;
+    // round 2: Robi points against the category's reference total (the meet's, else the IWF world record) — only when there is one
+    const robi = robiPoints(s.m_wl_total, robiRef(f.category, f.rules)?.kg);
+    if (robi != null) s.robi = robi;
     out.push({ playerId: e.athleteId, stats: s, won: t?.medal === 'gold' });
   }
   return out;
@@ -491,7 +496,7 @@ export interface LiftingCareer {
   /** good lifts ÷ attempts, 0–100 (null with no attempts) */
   makeRate: number | null;
   bombOuts: number;
-  bests: { key: 'snatch' | 'cj' | 'total' | 'sinclair'; label: string; pb: LiftBest; sb?: LiftBest }[];
+  bests: { key: 'snatch' | 'cj' | 'total' | 'sinclair' | 'robi'; label: string; pb: LiftBest; sb?: LiftBest }[];
   history: { eventId: string; title: string; date: string; text: string; place?: number; medal?: 'gold' | 'silver' | 'bronze'; flags: string[] }[];
   /** Deep wave: make rate of the snatch, the clean & jerk and the openers —
    *  only over sessions whose lines carry them (null = never recorded, not 0%) */
@@ -510,6 +515,8 @@ const BEST_KEYS = [
   { key: 'cj', stat: 'm_wl_cj', label: 'Clean & jerk' },
   { key: 'total', stat: 'm_wl_total', label: 'Total' },
   { key: 'sinclair', stat: 'sinclair', label: 'Sinclair total' },
+  // round 2: only sessions whose category had a Robi reference wrote it
+  { key: 'robi', stat: 'robi', label: 'Robi points' },
 ] as const;
 
 /** A lifter's career from their weightlifting stat lines (each `eventId` = the
@@ -537,9 +544,10 @@ export function liftingCareer(
     for (const b of BEST_KEYS) {
       const v = s[b.stat];
       if (v == null) continue;
-      const best: LiftBest = { value: v, text: b.key === 'sinclair' ? v.toFixed(2) : `${v} kg`, date, eventId: l.eventId ?? '', category: info?.category ? categoryLabel(info.category) : undefined };
+      const pts = b.key === 'sinclair' || b.key === 'robi';
+      const best: LiftBest = { value: v, text: pts ? v.toFixed(2) : `${v} kg`, date, eventId: l.eventId ?? '', category: info?.category ? categoryLabel(info.category) : undefined };
       const prev = pbSoFar.get(b.key);
-      if (prev == null || v > prev) { if (prev != null && b.key !== 'sinclair') flags.push(`PB ${b.key === 'cj' ? 'C&J' : b.label.toLowerCase()}`); pbSoFar.set(b.key, v); }
+      if (prev == null || v > prev) { if (prev != null && !pts) flags.push(`PB ${b.key === 'cj' ? 'C&J' : b.label.toLowerCase()}`); pbSoFar.set(b.key, v); }
       const row = bests.get(b.key) ?? { key: b.key, label: b.label, pb: best };
       if (v > row.pb.value) row.pb = best;
       if (day >= seasonFrom && (!row.sb || v > row.sb.value)) row.sb = best;

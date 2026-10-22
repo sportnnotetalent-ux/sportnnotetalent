@@ -59,6 +59,7 @@ const AUDITED_SPORTS = [
   'netball', // SD-146
   'baseball', // SD-144
   'american_football', // SD-147
+  'rugby_league', // rugby league — audited on arrival (2026-10-22)
 ];
 
 function coreFiles(): string[] {

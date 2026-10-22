@@ -7,7 +7,7 @@
  * didn't track is left out (never a false 0) and the field column pools only
  * the players whose cards tracked it.
  */
-import { roundStats, summarize, toParLabel, PUTT_BUCKETS, type GolfCard, type Hole } from './engine.ts';
+import { roundStats, summarize, toParLabel, PUTT_BUCKETS, YARD_M, puttBucketText, type DistUnit, type GolfCard, type Hole } from './engine.ts';
 import { nonEmpty, type CompareCategory, type CompareRow } from '../gcc/model.ts';
 
 export type NinePart = 'all' | 'out' | 'in';
@@ -24,6 +24,7 @@ export function sliceRound(r: RoundInput, part: NinePart): RoundInput {
     ...(c.putts ? { putts: cut(c.putts) } : {}), ...(c.fir ? { fir: cut(c.fir) } : {}), ...(c.gir ? { gir: cut(c.gir) } : {}),
     ...(c.penalties ? { penalties: cut(c.penalties) } : {}), ...(c.firDir ? { firDir: cut(c.firDir) } : {}), ...(c.bunker ? { bunker: cut(c.bunker) } : {}),
     ...(c.firstPutt ? { firstPutt: cut(c.firstPutt) } : {}), ...(c.drive ? { drive: cut(c.drive) } : {}), ...(c.track ? { track: c.track } : {}),
+    ...(c.offGreen ? { offGreen: cut(c.offGreen) } : {}),
   };
   return { card, holes: r.holes.slice(a, b), received: r.received.slice(a, b) };
 }
@@ -31,8 +32,10 @@ export function sliceRound(r: RoundInput, part: NinePart): RoundInput {
 type Fig = Record<string, number>;
 const fmt = (n: number, dp: number) => (Number.isInteger(n) && dp === 0 ? String(n) : n.toFixed(dp));
 
-/** The panel: `me` (one player's round) beside the `field` (the others). */
-export function golfStatSheet(me: RoundInput, field: RoundInput[], part: NinePart = 'all'): CompareCategory[] {
+/** The panel: `me` (one player's round) beside the `field` (the others).
+ *  Round 2 — `unit`: the round's distance unit (drives in yards or metres,
+ *  first-putt buckets in feet or their metre equivalents). */
+export function golfStatSheet(me: RoundInput, field: RoundInput[], part: NinePart = 'all', unit: DistUnit = 'yd'): CompareCategory[] {
   const mine = sliceRound(me, part);
   const M = roundStats(mine.card, mine.holes, mine.received);
   const F = field.map((r) => { const x = sliceRound(r, part); return roundStats(x.card, x.holes, x.received); });
@@ -58,12 +61,15 @@ export function golfStatSheet(me: RoundInput, field: RoundInput[], part: NinePar
     };
   };
   /** an average num ÷ den to `dp` places (par-3 scoring, putts per GIR, yards) */
-  const avg = (key: string, label: string, num: string, den: string, dp: number, better: 'higher' | 'lower', unit = ''): CompareRow | null => {
+  const avg = (key: string, label: string, num: string, den: string, dp: number, better: 'higher' | 'lower', suffix = '', scale = 1): CompareRow | null => {
     if (!(den in M) || !M[den]) return null;
     const fs = withKey(den);
     const fn = fs.reduce((t, s) => t + (s[num] ?? 0), 0), fd = fs.reduce((t, s) => t + (s[den] ?? 0), 0);
-    return { key, label, home: `${(M[num] / M[den]).toFixed(dp)}${unit}`, away: fd ? `${(fn / fd).toFixed(dp)}${unit}` : '–', hv: M[num] / M[den], ...(fd ? { av: fn / fd } : {}), better };
+    return { key, label, home: `${((M[num] / M[den]) * scale).toFixed(dp)}${suffix}`, away: fd ? `${((fn / fd) * scale).toFixed(dp)}${suffix}` : '–', hv: M[num] / M[den], ...(fd ? { av: fn / fd } : {}), better };
   };
+  // Round 2 — drives shown in the round's unit (stored in yards)
+  const dScale = unit === 'm' ? YARD_M : 1;
+  const dUnit = unit === 'm' ? 'm' : 'yd';
   const keep = (rows: (CompareRow | null)[]) => rows.filter((r): r is CompareRow => !!r);
 
   // the score: gross (to par) beside the field's mean over cards as far along
@@ -93,15 +99,18 @@ export function golfStatSheet(me: RoundInput, field: RoundInput[], part: NinePar
     rate('fir', 'Fairways hit', 'firHit', 'firHoles'),
     'firLeft' in M ? count('firL', 'Missed left', (s) => s.firLeft ?? 0, 'firLeft', 'lower') : null,
     'firRight' in M ? count('firR', 'Missed right', (s) => s.firRight ?? 0, 'firRight', 'lower') : null,
-    avg('dd', 'Driving distance (measured)', 'driveYds', 'drives', 0, 'higher', ' yd'),
-    'longDrive' in M ? count('long', 'Longest drive (yd)', (s) => s.longDrive ?? 0, 'longDrive') : null,
+    avg('dd', 'Driving distance (measured)', 'driveYds', 'drives', 0, 'higher', ` ${dUnit}`, dScale),
+    'longDrive' in M ? count('long', `Longest drive (${dUnit})`, (s) => Math.round((s.longDrive ?? 0) * dScale), 'longDrive') : null,
   ]);
   const approach = keep([
     rate('gir', 'Greens in regulation', 'girHit', 'girHoles'),
     rate('conv', 'Birdie conversion (on GIR)', 'girBirdies', 'girHit'),
   ]);
   const around = keep([
-    rate('scr', 'Scrambling (up & down)', 'scrambles', 'scrambleHoles'),
+    // Round 2 — up and downs tracked apart from scrambling: the row reads
+    // "Scrambling" once the card has them (older cards keep the old label)
+    rate('scr', 'udChances' in M ? 'Scrambling' : 'Scrambling (up & down)', 'scrambles', 'scrambleHoles'),
+    rate('ud', 'Up and downs', 'upDowns', 'udChances'),
     rate('sand', 'Sand saves', 'sandSaves', 'sandHoles'),
   ]);
   const putting = keep([
@@ -109,7 +118,7 @@ export function golfStatSheet(me: RoundInput, field: RoundInput[], part: NinePar
     avg('ppg', 'Putts per GIR', 'puttsGir', 'girPutted', 2, 'lower'),
     'onePutts' in M ? count('one', 'One-putts', (s) => s.onePutts ?? 0, 'onePutts') : null,
     'threePutts' in M ? count('three', 'Three-putts', (s) => s.threePutts ?? 0, 'threePutts', 'lower') : null,
-    ...PUTT_BUCKETS.map((b) => rate(b.key, `First putt holed ${b.long}`, `${b.key}Made`, b.key)),
+    ...PUTT_BUCKETS.map((b, k) => rate(b.key, `First putt holed ${puttBucketText(k, unit, true)}`, `${b.key}Made`, b.key)),
   ]);
   const pens = Array.isArray(me.card.penalties) || (Array.isArray(me.card.track) && me.card.track.includes('penalties'))
     ? keep([count('pen', 'Penalty strokes', (s) => s.penalties ?? 0, 'penalties', 'lower')]) : [];

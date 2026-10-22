@@ -13,12 +13,17 @@
  *  - Pitch mix (pitch types tracked), Fielding (errors, double plays turned,
  *    passed balls, putouts / assists from the notation), Spray (balls in play
  *    and hits by zone, when tracked).
+ *  - Round 2 — Batted balls (when tracked): ground balls, line drives, fly
+ *    balls, popups per team at bat, each with its % of the typed balls in play.
  * A row exists only for what the game tracked (never a false 0).
  */
-import { ZONES, ZONE_LABEL, PITCH_TYPE_LABEL, isPitchType, trackTracked, type BaseballState } from './engine.ts';
+import { BATTED_BALLS, ZONES, ZONE_LABEL, PITCH_TYPE_LABEL, isPitchType, trackTracked, type BaseballState } from './engine.ts';
 import { countRow, madeRow, rateRow, section, sheet, textRow, type SheetRow, type StatSheet } from '../compareSheet.ts';
 import { nth } from '../feedGroups.ts';
-import { fieldersNoted, inningsPlayed, teamSplit, type Scope, type TeamSplit } from './situational.ts';
+import { battedTotal, fieldersNoted, inningsPlayed, teamSplit, type Scope, type TeamSplit } from './situational.ts';
+
+/** round 2: the sheet's batted-ball rows (plural labels) */
+const BATTED_ROW: Record<(typeof BATTED_BALLS)[number], string> = { GB: 'Ground balls', LD: 'Line drives', FB: 'Fly balls', PU: 'Popups' };
 
 /** ".250" — a batting average the way box scores print it ('–' with no at bats). */
 export function avgText(n: number, d: number): string {
@@ -55,6 +60,8 @@ export function baseballSheet(s: BaseballState, scope: Scope = 'all'): StatSheet
   const counts = s.cfg.pitches;
   const types = trackTracked(s, 'pitchTypes');
   const spray = trackTracked(s, 'sprayZones');
+  const typed = trackTracked(s, 'battedBallTypes');
+  const pctOf = (n: number, d: number) => (d > 0 ? ` (${Math.round((n / d) * 100)}%)` : '');
   const noted = fieldersNoted(s);
   const ho = obpOf(H), ao = obpOf(A);
   const mixKeys = [...new Set([...Object.keys(H.mix), ...Object.keys(A.mix)])].sort((x, y) => (H.mix[y] ?? 0) + (A.mix[y] ?? 0) - (H.mix[x] ?? 0) - (A.mix[x] ?? 0));
@@ -116,6 +123,14 @@ export function baseballSheet(s: BaseballState, scope: Scope = 'all'): StatSheet
       const t = (c?: { bip: number; hits: number }) => (c ? `${c.bip} · ${c.hits} H` : '0');
       return textRow(`zone:${z}`, ZONE_LABEL[z], t(h), t(a));
     }), 'Where each team put the ball in play (the scorer’s taps and the fielders’ notation).'),
+    // round 2: batted-ball types — each % over the team's typed balls in play (Statcast: popups their own family)
+    typed && (battedTotal(H.batted) + battedTotal(A.batted) + H.untyped + A.untyped > 0) && section('batted', 'Batted balls', [
+      ...BATTED_BALLS.map((t): SheetRow => {
+        const h = H.batted[t], a = A.batted[t];
+        return { key: `bb:${t}`, label: BATTED_ROW[t], home: `${h}${pctOf(h, battedTotal(H.batted))}`, away: `${a}${pctOf(a, battedTotal(A.batted))}`, h, a, plain: true };
+      }),
+      (H.untyped || A.untyped) && countRow('untyped', 'Balls in play with no type', H.untyped, A.untyped, { plain: true }),
+    ], 'Each team at bat. Outs fill the type in (groundout = ground ball, lineout = line drive, fly out = fly ball, or a popup when an infielder caught it); hits need the tap. % of the balls with a type.'),
   ]);
 }
 

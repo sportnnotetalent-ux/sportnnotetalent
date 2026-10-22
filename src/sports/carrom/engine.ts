@@ -40,16 +40,35 @@ export interface BoardResult {
   /** Deep wave — when the board was recorded (the scorer's clock, ms;
    *  `payload.at`). Absent on older boards. */
   at?: number;
+  /** Round 2 — the foul on the stroke that ENDED the board, by the side that
+   *  lost it (ICF r.102–112, "if demanded"): the Striker pocketed (a Due, +1
+   *  to the board winner) and / or an improper (foul) stroke (+1). Only on a
+   *  match scored with `foulScore` (older matches: absent). */
+  endFoul?: EndFoul;
 }
+
+/** Round 2 — ICF r.102–112: what the board-ending stroke's foul adds to the
+ *  board winner's points (each part claimed by the winner). */
+export interface EndFoul { striker?: true; improper?: true }
 
 /** Deep wave — carrom foul types for the optional foul log (ICF Laws: the
  *  striker pocketed, touching a coin / the striker out of turn, a foul stroke
  *  from the base line / arrow / hand position; thumbing is legal under ICF and
- *  is a foul only where the event's own rules ban it). */
-export type FoulType = 'striker' | 'touch' | 'thumb' | 'line' | 'other';
-export const FOUL_TYPES: FoulType[] = ['striker', 'touch', 'line', 'thumb', 'other'];
+ *  is a foul only where the event's own rules ban it).
+ *  Round 2 — "line / hand" splits into the ICF / AICF terms: BASE LINE (the
+ *  Striker must touch both base lines, r.130), ARROW LINE (no part of the
+ *  body but the hand beyond the arrow lines, r.32; the Striker on the arrow
+ *  from a base circle, r.130) and ELBOW CROSSING (the playing elbow within
+ *  the playing surface / past the arrow, r.37). `line` stays readable for
+ *  boards recorded before the split. */
+export type FoulType = 'striker' | 'touch' | 'base' | 'arrow' | 'elbow' | 'thumb' | 'line' | 'other';
+/** Every type a board can carry (display order; `line` = before the split). */
+export const FOUL_TYPES: FoulType[] = ['striker', 'touch', 'base', 'arrow', 'elbow', 'line', 'thumb', 'other'];
+/** Round 2 — the chips the board form offers (no legacy `line`). */
+export const FOUL_CHIPS: FoulType[] = ['striker', 'touch', 'base', 'arrow', 'elbow', 'thumb', 'other'];
 export const FOUL_LABEL: Record<FoulType, string> = {
-  striker: 'Striker pocketed', touch: 'Touching', line: 'Line / hand', thumb: 'Thumbing', other: 'Other foul',
+  striker: 'Striker pocketed', touch: 'Touching', base: 'Base line', arrow: 'Arrow line', elbow: 'Elbow crossing',
+  line: 'Line / hand', thumb: 'Thumbing', other: 'Other foul',
 };
 
 /** Deep wave — the optional detail of one board. Each part is present only
@@ -64,7 +83,17 @@ export interface BoardDetail {
   brk?: number;
   /** the Queen pocketed but the cover missed (she goes back), per side */
   qMiss?: { home?: number; away?: number };
+  /** Round 2 — the foul chips were the split ones (base line / arrow /
+   *  elbow): a board without it may hold a "line / hand" foul */
+  split?: true;
+  /** Round 2 — doubles: WHO fouled (the "who" chip), per side, by player id.
+   *  Present (even empty) = recorded with the who chips; a side's players are
+   *  credited only on a board where every foul and due of the side has a who. */
+  who?: { home?: Record<string, PlayerFouls>; away?: Record<string, PlayerFouls> };
 }
+
+/** Round 2 — one doubles player's fouls / dues on a board. */
+export interface PlayerFouls { fouls?: Partial<Record<FoulType, number>>; dues?: number }
 
 /** Deep wave — the optional stats the scorer tracks (Stats to track). */
 export interface CarromTrack { fouls?: boolean; brk?: boolean; qMiss?: boolean }
@@ -103,7 +132,43 @@ export function readDetail(v: unknown): BoardDetail | undefined {
   const brk = cnt(o.brk, 9);
   if (brk != null) det.brk = brk;
   if (o.qMiss && typeof o.qMiss === 'object') det.qMiss = sideCounts(o.qMiss) ?? {};
+  // Round 2 — only with a foul log (new payload keys: old logs carry none)
+  if (det.fouls && o.split === true) det.split = true;
+  if (det.fouls && o.who && typeof o.who === 'object') {
+    const w = o.who as Record<string, unknown>;
+    const who: NonNullable<BoardDetail['who']> = {};
+    for (const sd of ['home', 'away'] as const) {
+      const x = w[sd];
+      if (!x || typeof x !== 'object') continue;
+      const players: Record<string, PlayerFouls> = {};
+      for (const [id, v] of Object.entries(x as Record<string, unknown>)) {
+        if (!id || !v || typeof v !== 'object') continue;
+        const pv = v as Record<string, unknown>;
+        const by: Partial<Record<FoulType, number>> = {};
+        if (pv.fouls && typeof pv.fouls === 'object') for (const t of FOUL_TYPES) { const n = cnt((pv.fouls as Record<string, unknown>)[t]); if (n) by[t] = n; }
+        const dues = cnt(pv.dues);
+        if (Object.keys(by).length || dues) players[id] = { ...(Object.keys(by).length ? { fouls: by } : {}), ...(dues ? { dues } : {}) };
+      }
+      if (Object.keys(players).length) who[sd] = players;
+    }
+    det.who = who;
+  }
   return Object.keys(det).length ? det : undefined;
+}
+
+/** Round 2 — a doubles side's fouls fully attributed on a board (every foul
+ *  by type and every due has a who)? Then each player's own counts. null =
+ *  not recorded with the who chips, or not every foul has a who. */
+export function whoFouls(det: BoardDetail | undefined, side: Side): Record<string, PlayerFouls> | null {
+  if (!det?.fouls || !det.who) return null;
+  const players = det.who[side] ?? {};
+  const sideBy = det.fouls[side] ?? {};
+  for (const t of FOUL_TYPES) {
+    const sum = Object.values(players).reduce((n, p) => n + (p.fouls?.[t] ?? 0), 0);
+    if (sum !== (sideBy[t] ?? 0)) return null;
+  }
+  const dues = Object.values(players).reduce((n, p) => n + (p.dues ?? 0), 0);
+  return dues === (det.dues?.[side] ?? 0) ? players : null;
 }
 
 /** Deep wave — the tracking flags from the format (`trackFouls`,
@@ -119,6 +184,11 @@ function readTrack(v: Record<string, unknown> | undefined, base?: CarromTrack): 
 
 /** SD-68 (CR-07) — what a penalty board gives the opponent. */
 export const PENALTY_POINTS = 3;
+/** Round 2 — ICF r.102–109: once the awarded side has 22 or more, a board lost
+ *  "by 3 points" (the Queen's value) is lost by 1 (with `foulScore`). */
+export const PENALTY_POINTS_22 = 1;
+/** Round 2 — ICF r.55: the most a board can be worth. */
+export const MAX_BOARD_POINTS = 12;
 
 /** SD-117c — the three-way Queen chip. */
 export type QueenBy = 'winner' | 'loser' | 'none';
@@ -163,6 +233,13 @@ export interface CarromState {
   /** Deep wave — the optional stats being tracked (Stats to track: the format
    *  before board 1, then SET_TRACK from the next board). Absent = none. */
   track?: CarromTrack;
+  /** Round 2 — ICF foul penalties in the score (format `foulScore`, an
+   *  organiser option, on by default for matches created from now on):
+   *  a penalty board is worth 3, or 1 once the awarded side has 22+ (r.102–
+   *  109); the board-ending stroke's foul adds +1 for the Striker / +1 for an
+   *  improper stroke (r.102–112); a board is worth 12 at most (r.55). Absent
+   *  on every older match — its boards replay exactly as before. */
+  foulScore?: true;
 }
 
 /** SD-117c — one board as the editor replays it (EDIT_LOG). */
@@ -176,6 +253,8 @@ export interface BoardInput {
   /** Deep wave — kept through a correction */
   det?: BoardDetail;
   at?: number;
+  /** Round 2 — the board-ending stroke's foul (with `foulScore`) */
+  endFoul?: EndFoul;
 }
 
 export function init(config?: Record<string, unknown>): CarromState {
@@ -190,7 +269,33 @@ export function init(config?: Record<string, unknown>): CarromState {
     perSide: Number(config?.playersPerSide ?? 1) >= 2 ? 2 : 1,
     // Deep wave — only when the organiser switched a stat on (older formats: absent)
     ...(() => { const t = readTrack(config); return t ? { track: t } : {}; })(),
+    // Round 2 — ICF foul penalties in the score (the format's default is on;
+    // a match created before has no key: its score rules are unchanged)
+    ...(config?.foulScore === true ? { foulScore: true as const } : {}),
   };
+}
+
+/** Round 2 — a board-ending foul from a payload (unknown keys dropped). */
+export function readEndFoul(v: unknown): EndFoul | undefined {
+  if (!v || typeof v !== 'object') return undefined;
+  const o = v as Record<string, unknown>;
+  const f: EndFoul = { ...(o.striker === true ? { striker: true as const } : {}), ...(o.improper === true ? { improper: true as const } : {}) };
+  return Object.keys(f).length ? f : undefined;
+}
+
+/** Round 2 — what a board is worth to its winner, every rule applied: a
+ *  penalty board (3; with `foulScore` 1 once the winner has 22+), else the
+ *  coins + a counted Queen; with `foulScore` plus the board-ending foul (+1
+ *  Striker, +1 improper stroke), at most 12 (r.55). Without `foulScore` this
+ *  is exactly the board value every older match was scored with. */
+export function boardValue(
+  s: Pick<CarromState, 'queenValue' | 'queenCutoff' | 'foulScore'>, winnerTotal: number,
+  b: { coins?: number; queen?: boolean; penalty?: boolean; endFoul?: EndFoul },
+): number {
+  if (!s.foulScore) return b.penalty ? PENALTY_POINTS : boardPoints(b.coins ?? 0, !!b.queen, winnerTotal, s);
+  const base = b.penalty ? (winnerTotal < s.queenCutoff ? PENALTY_POINTS : PENALTY_POINTS_22) : boardPoints(b.coins ?? 0, !!b.queen, winnerTotal, s);
+  const extra = (b.endFoul?.striker ? 1 : 0) + (b.endFoul?.improper ? 1 : 0);
+  return Math.min(MAX_BOARD_POINTS, base + extra);
 }
 
 /** Points a board is worth to its winner, given their total before the board. */
@@ -271,7 +376,10 @@ export function reducer(s: CarromState, a: { type: string; side?: Side; payload?
   // the three-way chip wins over the old flag; old logs carry only `queen`
   const queen = penalty ? false : queenBy ? queenBy === 'winner' : !!a.payload?.queen;
   const slam = !penalty && (a.payload?.slam === 'white' || a.payload?.slam === 'black') ? (a.payload!.slam as Slam) : undefined;
-  const pts = penalty ? PENALTY_POINTS : boardPoints(coins, queen, s.current[side], s);
+  // Round 2 — the board-ending foul counts only with `foulScore` (older
+  // matches: ignored, so a stray key can't move an old score)
+  const endFoul = s.foulScore ? readEndFoul(a.payload?.endFoul) : undefined;
+  const pts = boardValue(s, s.current[side], { coins, queen, penalty, endFoul });
   const gameNo = s.games.length + 1;
   const current = { ...s.current, [side]: s.current[side] + pts };
   const boardsInGame = s.boardsInGame + 1;
@@ -279,7 +387,7 @@ export function reducer(s: CarromState, a: { type: string; side?: Side; payload?
   const det = readDetail(a.payload?.det);
   const at = Number(a.payload?.at);
   const boards = [...s.boards, { winner: side, coins, queen, points: pts, game: gameNo, ...(slam ? { slam } : {}), ...(queenBy ? { queenBy } : {}), ...(penalty ? { penalty: true as const } : {}),
-    ...(det ? { det } : {}), ...(Number.isFinite(at) && at > 0 ? { at } : {}) }];
+    ...(det ? { det } : {}), ...(Number.isFinite(at) && at > 0 ? { at } : {}), ...(endFoul ? { endFoul } : {}) }];
   const credited = creditsOf(side, a, s.credited);
   if (credited) s = { ...s, credited };
   // SD-117c — this board's own credits (for the editor's replay)
@@ -340,9 +448,9 @@ export function standingsUnits(s: CarromState): { points: { home: number; away: 
  *  ("✓ Record board · wins Game 2"). Pure: replays the board on a copy.
  *  `winner` is the side that takes the game — after the board limit that can
  *  be the side that LOST this board. null = the game goes on. */
-export function boardCloses(s: CarromState, side: Side, coins: number, queen: boolean, penalty = false): { kind: 'game' | 'match'; game: number; winner: Side } | null {
+export function boardCloses(s: CarromState, side: Side, coins: number, queen: boolean, penalty = false, endFoul?: EndFoul): { kind: 'game' | 'match'; game: number; winner: Side } | null {
   if (s.ended) return null;
-  const next = reducer(s, { type: 'BOARD', side, payload: penalty ? { penalty: true } : { coins, queen } });
+  const next = reducer(s, { type: 'BOARD', side, payload: { ...(penalty ? { penalty: true } : { coins, queen }), ...(endFoul ? { endFoul } : {}) } });
   if (next.games.length === s.games.length) return null;
   const winner: Side = next.gamesWon.home > s.gamesWon.home ? 'home' : 'away';
   return { kind: next.ended ? 'match' : 'game', game: next.games.length, winner };
@@ -437,8 +545,9 @@ const attrOf = (c?: CarromCredit): Attr => (c ? { ...(c.id ? { playerId: c.id } 
 
 /** The BOARD action one corrected board replays as. */
 export function boardAction(b: BoardInput): { type: string; side: Side; payload: Record<string, unknown>; attribution?: Attr; attribution2?: Attr } {
-  // Deep wave — the board's detail and time stamp ride along (absent = as before)
-  const extra = { ...(b.det ? { det: b.det } : {}), ...(b.at ? { at: b.at } : {}) };
+  // Deep wave — the board's detail and time stamp ride along (absent = as
+  // before); round 2 — and the board-ending foul
+  const extra = { ...(b.det ? { det: b.det } : {}), ...(b.at ? { at: b.at } : {}), ...(b.endFoul ? { endFoul: b.endFoul } : {}) };
   return {
     type: 'BOARD', side: b.side,
     payload: b.penalty ? { coins: 0, queen: false, penalty: true, ...extra }
@@ -460,7 +569,7 @@ export function boardInputs(s: CarromState): BoardInput[] {
     ...(b.queenBy ? { queenBy: b.queenBy } : {}), ...(b.slam ? { slam: b.slam } : {}),
     ...(b.penalty ? { penalty: true } : {}),
     ...(s.boardBy?.[i]?.length ? { by: s.boardBy[i] } : {}),
-    ...(b.det ? { det: b.det } : {}), ...(b.at ? { at: b.at } : {}),
+    ...(b.det ? { det: b.det } : {}), ...(b.at ? { at: b.at } : {}), ...(b.endFoul ? { endFoul: b.endFoul } : {}),
   }));
 }
 

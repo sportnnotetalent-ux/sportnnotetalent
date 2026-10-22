@@ -1,6 +1,7 @@
 /** SD-96 — add a shooting event to a meet: the ISSF event (10 m Air Rifle,
  *  10 m Air Pistol, 50 m Rifle 3 Positions, 25 m Pistol / Rapid Fire, mixed
- *  team, trap / skeet), the age group and gender, the match length (60 shots,
+ *  team, trap / skeet; round 2: 50 m Rifle Prone, 25 m Standard / Centre-Fire
+ *  Pistol, 50 m Pistol and the NRAI peep / open sight school classes), the age group and gender, the match length (60 shots,
  *  or a junior / school 40 …), the shooters (pairs for a mixed team) from the
  *  tournament's teams / houses or any player, how the range scores (by series
  *  or shot by shot), and the final (8, a smaller school final, or none).
@@ -196,7 +197,10 @@ export function ShootingEventSetup({ tournamentId }: { tournamentId?: string }) 
 
         <Card style={st.card}>
           <Text style={textStyles.h3}>1 · Event</Text>
-          <View style={st.wrap}>{SHOOT_EVENTS.map((e) => <SelectChip key={e.key} label={e.label} active={evKey === e.key} onPress={() => { setEvKey(e.key); setPicks([]); setFinalists(null); }} />)}</View>
+          <View style={st.wrap}>{SHOOT_EVENTS.filter((e) => e.level !== 'nrai').map((e) => <SelectChip key={e.key} label={e.label} active={evKey === e.key} onPress={() => { setEvKey(e.key); setPicks([]); setFinalists(null); }} />)}</View>
+          {/* round 2: the NRAI school classes (India) */}
+          <Text style={st.label}>NRAI school classes</Text>
+          <View style={st.wrap}>{SHOOT_EVENTS.filter((e) => e.level === 'nrai').map((e) => <SelectChip key={e.key} label={e.label} active={evKey === e.key} onPress={() => { setEvKey(e.key); setPicks([]); setFinalists(null); }} />)}</View>
           <Text style={textStyles.muted}>{ev.rules}.</Text>
           {!team ? (
             <View style={st.wrap}>

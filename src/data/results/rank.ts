@@ -9,7 +9,7 @@ import { STATUS_ORDER, type DisciplineDef, type RankedEntry, type ResultEntry, t
 import { bestLiftAttempt, effectiveStatus, formatMark, summarizeAttempts, summarizeHeights, summarizeLifts, windLegal } from './marks.ts';
 import { compareKeys, sharedPositions } from './positions.ts';
 import { isFinalRows, qualKeys, rankShootFinal } from './shootingRank.ts';
-import { shootEventOf, sumTenths, fromTenths } from './shootingDefs.ts';
+import { shootEventOf, sumTenths, fromTenths, netFinalShots } from './shootingDefs.ts';
 import { isBracketRows, rankArcheryBracket } from './archeryBracket.ts';
 import { archRoundOf, endsOf } from './archeryDefs.ts';
 import { isCyclingRanked, rankCycling } from './cyclingRank.ts';
@@ -91,7 +91,8 @@ export function performanceOf(e: ResultEntry, def: DisciplineDef, upToAttempt?: 
         // SD-96: a finalist's row (elimination final) is ranked by rankShootFinal;
         // on its own it shows the final total and never counts for records / PBs
         if (Array.isArray(r.fshots)) {
-          const t = r.fshots.length ? fromTenths(sumTenths(r.fshots)) : null;
+          // round 2: net of final penalties (`fpen`), as the elimination final ranks it
+          const t = r.fshots.length ? fromTenths(sumTenths(netFinalShots(r))) : null;
           return { status, best: t, bestLegal: null, legal: false, keys: [t ?? -Infinity], flags };
         }
         const best = r.mark ?? (r.series?.length ? fromTenths(sumTenths(r.series)) : null);

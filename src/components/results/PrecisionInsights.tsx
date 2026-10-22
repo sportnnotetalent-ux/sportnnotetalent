@@ -15,13 +15,14 @@ import {
   activeLift, liftFeed, liftSessionStats, liftStatsLine, winnerLine, lightsScore, LIFTS, LIFT_SHORT, taken,
   shootEvent, shotsOf, shootFeed, shootStats, scoreText, seriesTag, POSITION_LABEL,
   archRound, archFeed, archStats, ordinalOf,
+  sessionBestLifter, sportRule, robiRef, sinclairSet, fmtKg,
   type DisciplineDef, type PhaseFormat, type ResultEntry, type FeedItem, type FeedTone,
   type ShootSeriesStats, type ShootFinalStats, type ArchRoundStats, type ArchBracketStats, type ShootEventDef,
 } from '../../data/results';
 
 type Mode = 'live' | 'full';
 
-export function PrecisionInsights({ def, f, entries, mode }: { def: DisciplineDef; f: PhaseFormat; entries: ResultEntry[]; mode: Mode }) {
+export function PrecisionInsights({ def, f, entries, mode, fmt }: { def: DisciplineDef; f: PhaseFormat; entries: ResultEntry[]; mode: Mode; /** round 2: the tournament's settings for the sport (best-lifter points on the sheet) */ fmt?: Record<string, unknown> }) {
   const shoot = def.sport === 'shooting' ? shootEvent(def) : undefined;
   const arch = def.sport === 'archery' ? archRound(def) : undefined;
   const lifts = def.capture === 'lifts';
@@ -36,6 +37,7 @@ export function PrecisionInsights({ def, f, entries, mode }: { def: DisciplineDe
   return (
     <>
       {mode === 'full' && lifts ? <LiftStatsCard entries={entries} /> : null}
+      {mode === 'full' && lifts ? <BestLifterCard entries={entries} f={f} fmt={fmt} /> : null}
       {mode === 'full' && shoot ? <ShootStatsCard entries={entries} def={def} ev={shoot} shots={shots} /> : null}
       {mode === 'full' && arch ? <ArchStatsCard entries={entries} def={def} /> : null}
       <FeedCard items={feed} initial={mode === 'live' ? 3 : 12} />
@@ -121,6 +123,41 @@ function LiftStatsCard({ entries }: { entries: ResultEntry[] }) {
   );
 }
 
+/** Round 2: Sinclair and Robi points of this session's lifters (when the meet shows either). */
+function BestLifterCard({ entries, f, fmt }: { entries: ResultEntry[]; f: PhaseFormat; fmt?: Record<string, unknown> }) {
+  const sin = sportRule(fmt, 'sinclair') === true;
+  const rob = sportRule(fmt, 'robi') === true;
+  const rules = useMemo(() => ({ ...(typeof fmt?.robiRefM === 'string' && fmt.robiRefM ? { robiRefM: fmt.robiRefM } : {}), ...(typeof fmt?.robiRefF === 'string' && fmt.robiRefF ? { robiRefF: fmt.robiRefF } : {}), ...(f.rules ?? {}) }), [fmt, f.rules]);
+  const rows = useMemo(() => (sin || rob ? sessionBestLifter(entries, { category: f.category, rules }, sportRule(fmt, 'sinclairPeriod')) : []), [entries, f.category, rules, sin, rob, fmt]);
+  if (!rows.length) return null;
+  const ref = robiRef(f.category, rules);
+  return (
+    <Card style={st.card}>
+      <Text style={textStyles.h3}>⚖️ Best-lifter points</Text>
+      <View style={st.tableHead}>
+        <Text style={[st.head, { flex: 1 }]}>LIFTER</Text>
+        <Text style={[st.head, st.numS]}>TOTAL</Text>
+        {sin ? <Text style={[st.head, st.num]}>SINCLAIR</Text> : null}
+        {rob ? <Text style={[st.head, st.num]}>ROBI</Text> : null}
+      </View>
+      {rows.map((r) => (
+        <View key={r.id} style={st.headRow}>
+          <Text style={[st.name, { flex: 1 }]} numberOfLines={1}>{r.name}{r.bw != null ? <Text style={st.detail}>  bw {fmtKg(r.bw)}</Text> : null}</Text>
+          <Text style={[st.val, st.numS]}>{r.total}</Text>
+          {sin ? <Text style={[st.val, st.num]}>{r.sinclair != null ? r.sinclair.toFixed(2) : '–'}</Text> : null}
+          {rob ? <Text style={[st.val, st.num]}>{r.robi != null ? r.robi.toFixed(2) : '–'}</Text> : null}
+        </View>
+      ))}
+      <Text style={st.detail}>
+        {[
+          sin ? `Sinclair: total × the coefficient for the bodyweight (${sinclairSet(sportRule(fmt, 'sinclairPeriod')).period}); no bodyweight, no Sinclair.` : '',
+          rob ? (ref ? `Robi: 1000 × (total ÷ ${ref.kg} kg)^3.32 — ${ref.from === 'meet' ? 'this meet’s reference total' : 'the IWF senior world-record total'} for the category.` : 'Robi: no reference total for this category — add one in Competition rules.') : '',
+        ].filter(Boolean).join(' ')}
+      </Text>
+    </Card>
+  );
+}
+
 /* ---------------------------------- shooting --------------------------------- */
 
 function ShootStatsCard({ entries, def, ev, shots }: { entries: ResultEntry[]; def: DisciplineDef; ev: ShootEventDef; shots: number }) {
@@ -175,6 +212,8 @@ function ShootFinalCard({ s }: { s: ShootFinalStats }) {
     <Card style={st.card}>
       <Text style={textStyles.h3}>📊 Final stats</Text>
       {s.bestShot ? <Row label="Best shot" value={`${s.bestShot.names.join(', ')} ${s.bestShot.value.toFixed(1)}`} /> : null}
+      {/* round 2: penalties in the final (2 points off a shot) */}
+      {s.penalties ? <Row label="Penalties" value={`−${s.penalties} points (${s.finalists.filter((x) => x.pen).map((x) => `${x.name} −${x.pen}`).join(', ')})`} bad /> : null}
       <Row label="Lead changes" value={String(s.leadChanges)} />
       <View style={st.tableHead}>
         <Text style={[st.head, { flex: 1 }]}>FINALIST</Text>
@@ -263,6 +302,26 @@ function ArchBracketCard({ s }: { s: ArchBracketStats }) {
         </View>
       ))}
       <Text style={st.detail}>Sets = won-shared-lost (set system). Average arrow over the ends that counted.</Text>
+      {/* round 2: team matches with each arrow credited to its archer */}
+      {s.perArcher?.length ? (
+        <View style={{ gap: theme.spacing(1) }}>
+          <View style={st.tableHead}>
+            <Text style={[st.head, { flex: 1 }]}>EACH ARCHER (TEAM MATCHES)</Text>
+            <Text style={[st.head, st.numS]}>ARR</Text>
+            <Text style={[st.head, st.num]}>AVG</Text>
+            <Text style={[st.head, st.num]}>10s / X</Text>
+          </View>
+          {s.perArcher.map((a) => (
+            <View key={`${a.teamId}:${a.member}`} style={st.headRow}>
+              <Text style={[st.name, { flex: 1 }]} numberOfLines={1}>{a.name} <Text style={st.detail}>{a.team}</Text></Text>
+              <Text style={[st.val, st.numS]}>{a.arrows}</Text>
+              <Text style={[st.val, st.num]}>{a.avgArrow.toFixed(2)}</Text>
+              <Text style={[st.val, st.num]}>{a.tens} / {a.xs}</Text>
+            </View>
+          ))}
+          <Text style={st.detail}>From the ends entered archer by archer; shoot-off arrows are not counted.</Text>
+        </View>
+      ) : null}
     </Card>
   );
 }

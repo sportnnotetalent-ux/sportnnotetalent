@@ -6,10 +6,10 @@
  * A drive = consecutive snaps by one offence (runs, passes, sacks, turnovers,
  * punts, field-goal attempts, accepted penalties, touchdowns from scrimmage).
  * Kickoffs are NOT part of a drive (they say how the ball was obtained). Per
- * drive: the start spot (the first snap's ball spot), plays (scrimmage plays —
- * runs, passes incl. incomplete / intercepted, sacks, fumbles, kneels and the
- * scoring play; punts, field-goal attempts and penalties are not plays, as on
- * drive charts [verify]), net yards (field position at the end − the start, so
+ * drive: the start spot (the first snap's ball spot), plays (runs, passes
+ * incl. incomplete / intercepted, sacks, fumbles, kneels, the scoring play
+ * and — round 2, as the NFL drive chart counts them — punts and field-goal
+ * attempts; penalties are not plays), net yards (field position at the end − the start, so
  * penalties count), time on the game clock (from the previous possession
  * moment to the drive's last play — the time-of-possession convention), the
  * result: touchdown, field goal, missed FG, punt, downs (a failed 4th / flag
@@ -71,7 +71,11 @@ export { halfKey };
 const halfStart = (s: AFState, p: number): number => (isOT(s, p) || s.periods !== 4 ? p : p <= 2 ? 1 : 3);
 
 const SNAPS = new Set(['run', 'pass', 'inc', 'sack', 'int', 'fumble', 'kneel', 'punt', 'downs', 'penalty']);
-const PLAYS = new Set(['run', 'pass', 'inc', 'sack', 'int', 'fumble', 'kneel']);
+/** snaps counted as drive plays (round 2: punts count, as on NFL drive charts) */
+const PLAYS = new Set(['run', 'pass', 'inc', 'sack', 'int', 'fumble', 'kneel', 'punt']);
+/** …and the snaps that end the possession on a down already used (a punt is a
+ *  play but never a failed 4th down) */
+const DOWN_PLAYS = new Set(['run', 'pass', 'inc', 'sack', 'int', 'fumble', 'kneel']);
 const POSSESSION = new Set(['play', 'td', 'fg', 'safety', 'try', 'defTry', 'possEnd']);
 
 /** A red-zone (tackle) / past-midfield (flag) spot. */
@@ -156,6 +160,8 @@ export function afDrives(s: AFState): DriveLog {
         d.end = spot;
         close('td');
       } else if (e.type === 'fg') {
+        // round 2: a field-goal attempt is a drive play (NFL drive chart)
+        d.plays++;
         if (e.good) d.points += pointsOf(e);
         d.end = spot;
         close(e.good ? 'fg' : 'fgMissed');
@@ -172,7 +178,7 @@ export function afDrives(s: AFState): DriveLog {
         else if (play === 'fumble') close('fumble');
         else if (play === 'punt') close('punt');
         else if (play === 'downs') close('downs');
-        else if (e.pre && !e.first && e.pre.down >= s.downs && (play === 'penalty' ? e.on === e.side && !!e.lossOfDown : PLAYS.has(play!))) close('downs');
+        else if (e.pre && !e.first && e.pre.down >= s.downs && (play === 'penalty' ? e.on === e.side && !!e.lossOfDown : DOWN_PLAYS.has(play!))) close('downs');
       }
     } else if (e.type === 'safety') {
       // the offence (`off`) tackled in its own end zone

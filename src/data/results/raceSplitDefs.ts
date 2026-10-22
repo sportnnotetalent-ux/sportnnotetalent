@@ -38,6 +38,41 @@ const ATH_SPLITS: Record<string, number[]> = {
 /** Athletics: where lap / changeover times are read ([] = none). */
 export const athSplitDistances = (key: string): number[] => [...(ATH_SPLITS[key] ?? [])];
 
+/**
+ * Timed races round 2 — where the meet reads its athletics LAP times (an
+ * organiser choice under "Stats to track"):
+ *  - 'finish' (the default, and every result saved before round 2): each time
+ *    the field passes the finish line — one timekeeper (1500 m: 300 / 700 /
+ *    1100 m);
+ *  - 'start': every 400 m from the start, as the Diamond League / World
+ *    Athletics live splits read them (1500 m: 400 / 800 / 1200 m) — needs a
+ *    timekeeper at the 400 m points (a second one on the back straight when
+ *    the race starts there).
+ * They differ only for 1000 m, 1500 m and 3000 m (an 800 m's bell IS 400 m from
+ * the start; a 400 m keeps its 200 m point either way). Relays always read the
+ * changeovers.
+ */
+export type LapPoints = 'finish' | 'start';
+export const LAP_POINT_CHOICES: LapPoints[] = ['finish', 'start'];
+export const lapPointsOf = (v: unknown): LapPoints => (v === 'start' ? 'start' : 'finish');
+
+const every400 = (total: number): number[] => { const out: number[] = []; for (let d = 400; d < total; d += 400) out.push(d); return out; };
+const ATH_FROM_START: Record<string, number[]> = {
+  'ath.1000m': every400(1000),
+  'ath.1500m': every400(1500),
+  'ath.3000m': every400(3000),
+};
+
+/** Athletics lap points for a race under a choice ([] = none). */
+export const athLapDistances = (key: string, from: LapPoints = 'finish'): number[] =>
+  (from === 'start' && ATH_FROM_START[key] ? [...ATH_FROM_START[key]] : athSplitDistances(key));
+
+/** Do the two lap-point choices read different points for this race? */
+export const lapPointsDiffer = (key: string): boolean => !!ATH_FROM_START[key];
+
+/** "Finish-line passes" / "Every 400 m from the start". */
+export const lapPointsLabel = (p: LapPoints): string => (p === 'start' ? 'Every 400 m from the start' : 'Finish-line passes');
+
 /** Cycling: where intermediate times are read ([] = none). */
 export function cycSplitDistances(key: string): number[] {
   const m = /^cyc\.(ip|tp|tt|ts|itt)\.(\d+)$/.exec(key);

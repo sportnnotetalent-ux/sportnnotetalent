@@ -23,7 +23,7 @@ import { golfLeaderCategories } from '../../data/golfLeaders';
 import { patchTournamentFormat } from '../../data/repos';
 import { prizeSetupOf, prizeSetupPatch, prizeCutoff, type PrizeSetup, type PrizeContext } from '../../data/prizeCategories';
 import { PrizeCategoryBar, PrizeList, useCategoryRows } from '../PrizeCategories';
-import { toParLabel } from '../../sports/golf/engine';
+import { toParLabel, distUnitOf } from '../../sports/golf/engine';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -124,7 +124,7 @@ export function GolfTournamentHub({ tournamentId, format, canOrganize }: { tourn
       {/* SD-134 — divisions on one leaderboard */}
       <PrizeCategoryBar sport="golf" setup={divSetup} canEdit={canOrganize} onSave={saveDivs} active={div} onPick={setDiv}
         ids={rows.map((r) => r.id)} nameOf={nameOf} ctx={divCtx} />
-      <GolfLeaderboard rows={shownRows} scoring={scoring} nameOf={nameOf} roundCols={cells} cards={cards}
+      <GolfLeaderboard rows={shownRows} scoring={scoring} nameOf={nameOf} roundCols={cells} cards={cards} unit={distUnitOf(cardEv?.format ?? format)}
         cardTitle={cardEv ? `Round ${cardEv.roundNo} card` : undefined} />
       {rows.length > 0 && <Text style={textStyles.muted}>Tap a player for their card{events.length > 1 ? ' (pick the round above)' : ''}. F = round finished · – = not teed off.</Text>}
       {divSetup && divSetup.cats.length > 0 && rows.some((r) => r.thru > 0 || r.grossTotal > 0) && (

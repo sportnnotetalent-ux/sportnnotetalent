@@ -75,6 +75,43 @@ export function bowlTypeFromProfile(sides?: Record<string, string> | null): Bowl
 export const asBowlType = (v: unknown): BowlType | null =>
   ((BOWL_TYPES as readonly string[]).includes(String(v)) ? (v as BowlType) : null);
 
+/** Round 2 — why a WIDE was called (Law 22): down the leg side, wide outside
+ *  off, over head height (a bouncer too high — ICC playing conditions), other. */
+export const WIDE_WHY = ['leg', 'off', 'high', 'other'] as const;
+/** Round 2 — why a NO-BALL was called (Laws 21, 41.6–41.7, 28.4): over the
+ *  front line, a full toss above waist height, over the bouncer limit, a
+ *  fielding restriction (too many fielders outside the ring / behind square),
+ *  other. */
+export const NB_WHY = ['foot', 'height', 'bouncer', 'field', 'other'] as const;
+export type WideWhy = typeof WIDE_WHY[number];
+export type NbWhy = typeof NB_WHY[number];
+export type ExtraWhy = WideWhy | NbWhy;
+export const WIDE_WHY_LABEL: Record<WideWhy, string> = { leg: 'Down leg', off: 'Outside off', high: 'Over head height', other: 'Other' };
+export const NB_WHY_LABEL: Record<NbWhy, string> = { foot: 'Front foot', height: 'Above waist (full toss)', bouncer: 'Bouncer limit', field: 'Fielding restriction', other: 'Other' };
+const WIDE_WHY_PHRASE: Record<WideWhy, string> = { leg: 'down the leg side', off: 'too wide outside off', high: 'over head height', other: '' };
+const NB_WHY_PHRASE: Record<NbWhy, string> = { foot: 'overstepped', height: 'a full toss above the waist', bouncer: 'one bouncer too many this over', field: 'fielding restriction breached', other: '' };
+const isWhy = (v: unknown): v is ExtraWhy => (WIDE_WHY as readonly string[]).includes(String(v)) || (NB_WHY as readonly string[]).includes(String(v));
+/** The reason as it applies to this extra (a wide's reason on a wide, a
+ *  no-ball's on a no-ball; anything else — e.g. after an edit flipped the
+ *  extra — is ignored). */
+export function extraWhyOf(ext: 'wd' | 'nb' | undefined, why: string | undefined): ExtraWhy | undefined {
+  if (!why || !ext) return undefined;
+  if (ext === 'wd') return (WIDE_WHY as readonly string[]).includes(why) ? (why as WideWhy) : undefined;
+  return (NB_WHY as readonly string[]).includes(why) ? (why as NbWhy) : undefined;
+}
+/** "Down leg" / "Front foot" — the chip / table label ('' when none). */
+export function extraWhyLabel(ext: 'wd' | 'nb' | undefined, why: string | undefined): string {
+  const w = extraWhyOf(ext, why);
+  if (!w) return '';
+  return ext === 'wd' ? WIDE_WHY_LABEL[w as WideWhy] : NB_WHY_LABEL[w as NbWhy];
+}
+/** "down the leg side" / "overstepped" — the commentary words ('' for other / none). */
+export function extraWhyPhrase(ext: 'wd' | 'nb' | undefined, why: string | undefined): string {
+  const w = extraWhyOf(ext, why);
+  if (!w) return '';
+  return ext === 'wd' ? WIDE_WHY_PHRASE[w as WideWhy] : NB_WHY_PHRASE[w as NbWhy];
+}
+
 /** Fielding positions for a wagon zone (1–8, right-hander frame) in the ring or deep. */
 const POSITIONS: [string, string][] = [
   ['mid-off', 'long-off'], ['cover', 'deep cover'], ['point', 'deep point'], ['the slips', 'third man'],
@@ -104,9 +141,11 @@ export interface BallDetailRec {
   /** a catch: where it was taken (zone 1–8, right-hander frame) and deep */
   cz?: number;
   cdeep?: true;
+  /** Round 2 — why the wide / no-ball was called (WIDE_WHY / NB_WHY) */
+  why?: ExtraWhy;
 }
 
-const FIELDS = ['len', 'line', 'ctrl', 'kph', 'cz', 'cdeep'] as const;
+const FIELDS = ['len', 'line', 'ctrl', 'kph', 'cz', 'cdeep', 'why'] as const;
 const text = (v: unknown): string | undefined => {
   const x = typeof v === 'string' ? v.trim().slice(0, 80) : '';
   return x || undefined;
@@ -144,6 +183,7 @@ export function applyDetailPatch(list: BallDetailRec[] | undefined, p: Record<st
   take('kph', asKph);
   take('cz', (v) => { const z = Number(v); return Number.isInteger(z) && z >= 1 && z <= 8 ? z : null; });
   take('cdeep', (v) => (v === true ? true : null));
+  take('why', (v) => (isWhy(v) ? v : null));
   if (!any) return null;
   const all = list ?? [];
   const same = (x: BallDetailRec) => x.inn === inn && x.side === side && x.d === d;
@@ -214,9 +254,13 @@ export const controlPhrase = (c?: Control): string => (c === 'beaten' ? 'beaten'
 /** Is the detail's control a false shot? */
 export const isFalseShot = (x?: Pick<BallDetailRec, 'ctrl'>): boolean => !!x?.ctrl;
 
-/** Optional capture toggles in force (rules keys) → the BallRec `trk` marker. */
-export interface Tracking { ctrl?: true; pitch?: true; speed?: true }
-export function trackingOf(r: { pitchMap?: boolean; shotCtrl?: boolean; ballSpeed?: boolean } | undefined): Tracking | undefined {
-  if (!r || !(r.pitchMap || r.shotCtrl || r.ballSpeed)) return undefined;
-  return { ...(r.shotCtrl ? { ctrl: true as const } : {}), ...(r.pitchMap ? { pitch: true as const } : {}), ...(r.ballSpeed ? { speed: true as const } : {}) };
+/** Optional capture toggles in force (rules keys) → the BallRec `trk` marker.
+ *  Round 2: `why` = the wide / no-ball reason was being tracked. */
+export interface Tracking { ctrl?: true; pitch?: true; speed?: true; why?: true }
+export function trackingOf(r: { pitchMap?: boolean; shotCtrl?: boolean; ballSpeed?: boolean; extraWhy?: boolean } | undefined): Tracking | undefined {
+  if (!r || !(r.pitchMap || r.shotCtrl || r.ballSpeed || r.extraWhy)) return undefined;
+  return {
+    ...(r.shotCtrl ? { ctrl: true as const } : {}), ...(r.pitchMap ? { pitch: true as const } : {}), ...(r.ballSpeed ? { speed: true as const } : {}),
+    ...(r.extraWhy ? { why: true as const } : {}),
+  };
 }

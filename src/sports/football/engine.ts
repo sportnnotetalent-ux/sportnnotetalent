@@ -133,18 +133,22 @@ export interface TrackConfig {
  *  match keeps its exact shape.
  *  shotDetail: inside / outside the box, big chance, woodwork (Opta);
  *  keyPasses: the pass that set up a shot; clearances; setPieces: goal kicks
- *  and throw-ins (FIFA team stats); cardReasons: why each card was shown. */
+ *  and throw-ins (FIFA team stats); cardReasons: why each card was shown;
+ *  ruledOut (round 2): the "Goal ruled out" button (offside / foul / VAR) —
+ *  off by default, school matches have no VAR. A match that logged one keeps
+ *  it in the commentary and the match centre whatever the toggle says. */
 export interface DeepTrack {
   shotDetail?: boolean;
   keyPasses?: boolean;
   clearances?: boolean;
   setPieces?: boolean;
   cardReasons?: boolean;
+  ruledOut?: boolean;
 }
 
 export const TRACK_KEYS: (keyof TrackConfig)[] = ['shots', 'possession', 'fouls', 'cards', 'offsides', 'corners', 'tackles', 'interceptions', 'saves', 'passes', 'crosses', 'dribbles', 'handball', 'attackContribution', 'defenceContribution'];
 /** Deep wave — the optional depth toggles (format key `track` + Capitalised). */
-export const DEEP_TRACK_KEYS = ['shotDetail', 'keyPasses', 'clearances', 'setPieces', 'cardReasons'] as const;
+export const DEEP_TRACK_KEYS = ['shotDetail', 'keyPasses', 'clearances', 'setPieces', 'cardReasons', 'ruledOut'] as const;
 export type DeepTrackKey = typeof DEEP_TRACK_KEYS[number];
 /** Deep wave — the switched-on depth from the format (undefined = none). */
 export function readDeepTrack(config?: Record<string, unknown>): DeepTrack | undefined {
@@ -186,6 +190,8 @@ export const DEEP_TRACKABLE: [DeepTrackKey, string, string][] = [
   ['clearances', 'Clearances', 'a defensive action button'],
   ['setPieces', 'Goal kicks & throw-ins', 'team counts (FIFA)'],
   ['cardReasons', 'Card reasons', 'foul, dissent, time-wasting…'],
+  // round 2 (founder): behind a toggle — school matches have no VAR
+  ['ruledOut', 'Goals ruled out', 'offside, foul or VAR — the score never moves'],
 ];
 const trackKey = (k: string) => `track${k[0].toUpperCase()}${k.slice(1)}`;
 /** Deep wave — the optional toggles as format fields (live settings group;

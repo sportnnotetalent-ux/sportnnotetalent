@@ -17,3 +17,12 @@ export function mergeMatchConfig(tourFormat?: Format | null, matchFormat?: Forma
   if (!tourFormat && !matchFormat) return undefined;
   return { ...(tourFormat ?? {}), ...stripInternal(matchFormat) };
 }
+
+/** "Edit match info": only the keys the host CHANGED from what the form showed
+ *  (the match's format over today's defaults) are saved, so re-saving an older
+ *  match never stamps it with newer defaults it never had. */
+export function changedFormatKeys<V>(shown: Record<string, V>, edited: Record<string, V>): Record<string, V> {
+  const out: Record<string, V> = {};
+  for (const [k, v] of Object.entries(edited)) if (shown[k] !== v) out[k] = v;
+  return out;
+}

@@ -51,6 +51,8 @@ export function ArcheryCareer({ lines }: { lines: StatLine[] }) {
       ) : null}
       {/* SD-137b: team events (archery / shooting teams, team pursuit / sprint) */}
       {teamCareerText(c.team) ? <Text style={textStyles.muted}>{teamCareerText(c.team)}</Text> : null}
+      {/* round 2: the archer's own arrows in team matches (when the meet credited them) */}
+      {c.teamArrows ? <Text style={textStyles.muted}>Own arrows in team matches: average {c.teamArrows.avgArrow.toFixed(2)} ({c.teamArrows.arrows} arrows, {c.teamArrows.tens} 10s, {c.teamArrows.xs} X)</Text> : null}
       <Text style={st.section}>Personal bests (ranking round)</Text>
       {c.bests.length === 0 ? <Text style={textStyles.muted}>No complete ranking round yet.</Text> : (
         <Card style={{ gap: theme.spacing(2) }}>

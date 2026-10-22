@@ -15,11 +15,19 @@
  * table tennis' three phases), padel 1st / 2nd serve and Net points,
  * pickleball Kitchen line and 3rd shot. The same toggles are advanced format
  * fields, so an organiser can switch them on for a whole tournament.
+ *
+ * Round 2 — two options beside the toggles (choice fields, same card and the
+ * same advanced format fields): the serve-speed unit (tennis: km/h or mph;
+ * the log stays km/h) and the rally-length buckets (every racket sport: the
+ * deep-wave buckets by default, or a standard alternative, RALLY_SCHEMES).
  */
 import type { FormatField, LiveSettings } from './types';
-import { NET_WORDS, type DetailFlagKey, type DetailSport } from './pointDetail.ts';
+import { DEFAULT_RALLY_SCHEME, NET_WORDS, RALLY_SCHEMES, SPEED_UNITS, SPEED_UNIT_LABEL, rallySchemeOf, speedUnitOf, type DetailFlagKey, type DetailSport } from './pointDetail.ts';
 
-type Flags = { pointDetail?: boolean; serveDetail?: boolean; netDetail?: boolean; rallyDetail?: boolean; speedDetail?: boolean; thirdDetail?: boolean; events?: unknown[] };
+type Flags = {
+  pointDetail?: boolean; serveDetail?: boolean; netDetail?: boolean; rallyDetail?: boolean; speedDetail?: boolean; thirdDetail?: boolean;
+  speedUnit?: string; rallyBuckets?: string; events?: unknown[];
+};
 
 export interface TrackField { key: DetailFlagKey; label: string; hint: string }
 
@@ -29,22 +37,22 @@ export const TENNIS_TRACK_FIELDS: ReadonlyArray<{ key: 'pointDetail' | 'serveDet
   { key: 'serveDetail', label: '1st / 2nd serve', hint: 'Mark points played on a 2nd serve: 1st serve %, 1st / 2nd serve points won' },
   { key: 'netDetail', label: 'Net points', hint: 'Who came to the net: net points played and won' },
   { key: 'rallyDetail', label: 'Rally length', hint: 'Tap 0–4, 5–8 or 9+ shots: points won by rally length' },
-  { key: 'speedDetail', label: 'Serve speed', hint: 'Type the serve speed in km/h: fastest serve and averages' },
+  { key: 'speedDetail', label: 'Serve speed', hint: 'Type the serve speed (km/h or mph, see the unit below): fastest serve and averages' },
 ];
 
 const POINT_HINT: Record<Exclude<DetailSport, 'tennis'>, string> = {
-  badminton: 'How each rally ended (winner, forced / unforced error, service fault), then forehand / backhand and the shot: smash, drop, clear, net shot, net kill, drive, lift, push, serve',
+  badminton: 'How each rally ended (winner, forced / unforced error, service fault), then forehand / backhand and the shot: smash, jump smash, drop, clear, net shot, net kill, drive, lift, push, block, serve',
   tabletennis: 'How each rally ended (ace, winner, forced / unforced error, service fault), then forehand / backhand and the shot: receive, flick, push, chop, loop, block, smash, lob',
   squash: 'How each rally ended (winner, forced / unforced error, service fault, stroke, no let), then forehand / backhand and the shot: drive, drop, boast, volley, lob, kill, nick',
   padel: 'How each point ended (ace, service winner, winner, forced / unforced error), then forehand / backhand and the shot: return, volley, bandeja, víbora, smash, por tres, lob, chiquita, bajada, off the glass, drop',
   pickleball: 'How each rally ended (winner, forced / unforced error, service fault), then forehand / backhand and the shot: return, drive, drop, dink, volley, reset, lob, overhead, Erne, ATP',
 };
 const RALLY_HINT: Record<Exclude<DetailSport, 'tennis'>, string> = {
-  badminton: 'Tap 0–4, 5–10 or 11+ shots: points won by rally length',
-  tabletennis: 'Tap 1–2, 3–4 or 5+ shots: the three phases — serve & 3rd ball, receive & 4th ball, rally',
-  squash: 'Tap 0–5, 6–15 or 16+ shots: points won by rally length',
-  padel: 'Tap 0–4, 5–8 or 9+ shots: points won by rally length',
-  pickleball: 'Tap 0–4, 5–8 or 9+ shots: points won by rally length',
+  badminton: 'Tap 0–4, 5–10 or 11+ shots (or the buckets chosen below): points won by rally length',
+  tabletennis: 'Tap 1–2, 3–4 or 5+ shots (or the four phases below): serve & 3rd ball, receive & 4th ball, rally',
+  squash: 'Tap 0–5, 6–15 or 16+ shots (or the buckets chosen below): points won by rally length',
+  padel: 'Tap 0–4, 5–8 or 9+ shots (or the buckets chosen below): points won by rally length',
+  pickleball: 'Tap 0–4, 5–8 or 9+ shots (or the buckets chosen below): points won by rally length',
 };
 
 /** The "Stats to track" options of `sport`, in card order (each off by default). */
@@ -56,7 +64,9 @@ export function trackFields(sport: DetailSport): TrackField[] {
   if (nw) {
     out.push({
       key: 'netDetail', label: nw.option,
-      hint: sport === 'pickleball' ? 'Which team(s) got to the kitchen line: kitchen-line rallies played and won' : 'Who was at the net: net points played and won',
+      hint: sport === 'pickleball'
+        ? 'Which team(s) got to the kitchen line, or nobody: kitchen-line rallies won and kitchen arrival %'
+        : 'Who was at the net: net points played and won',
     });
   }
   out.push({ key: 'rallyDetail', label: 'Rally length', hint: RALLY_HINT[sport] });
@@ -64,9 +74,32 @@ export function trackFields(sport: DetailSport): TrackField[] {
   return out;
 }
 
+/** Round 2 — the options beside the toggles: tennis' serve-speed unit and
+ *  every sport's rally-length buckets (choice fields; default = as before). */
+export function trackOptionFields(sport: DetailSport): FormatField[] {
+  const out: FormatField[] = [];
+  if (sport === 'tennis') {
+    out.push({
+      key: 'speedUnit', label: 'Serve speed unit', type: 'choice', default: 'kmh',
+      options: SPEED_UNITS.map((u) => ({ value: u, label: SPEED_UNIT_LABEL[u] })),
+      hint: 'Serve speeds are typed and shown in this unit (always saved in km/h)',
+    });
+  }
+  out.push({
+    key: 'rallyBuckets', label: 'Rally-length buckets', type: 'choice', default: DEFAULT_RALLY_SCHEME,
+    options: RALLY_SCHEMES[sport].map((x) => ({ value: x.id, label: x.label })),
+    hint: 'The shot counts the Rally chips offer (rallies already tagged keep theirs)',
+  });
+  return out;
+}
+
 export function detailLiveSettings(sport: DetailSport): LiveSettings<Flags> {
   const tf = trackFields(sport);
-  const fields: FormatField[] = tf.map((f) => ({ key: f.key, label: f.label, type: 'toggle', default: false, group: 'Stats to track', hint: f.hint }));
+  const opts = trackOptionFields(sport);
+  const fields: FormatField[] = [
+    ...tf.map((f): FormatField => ({ key: f.key, label: f.label, type: 'toggle', default: false, group: 'Stats to track', hint: f.hint })),
+    ...opts,
+  ];
   return {
     title: '⚙️ Scoring settings',
     hint: sport === 'tennis'
@@ -76,8 +109,12 @@ export function detailLiveSettings(sport: DetailSport): LiveSettings<Flags> {
     actionType: 'SET_DETAIL',
     beforeStart: (s) => !(s.events ?? []).length,
     fields,
-    read: (s) => Object.fromEntries(tf.map((f) => [f.key, s[f.key] === true])),
-    defaults: Object.fromEntries(tf.map((f) => [f.key, false])),
+    read: (s) => ({
+      ...Object.fromEntries(tf.map((f) => [f.key, s[f.key] === true])),
+      ...(sport === 'tennis' ? { speedUnit: speedUnitOf(s) } : {}),
+      rallyBuckets: rallySchemeOf(sport, s.rallyBuckets).id,
+    }),
+    defaults: { ...Object.fromEntries(tf.map((f) => [f.key, false])), ...Object.fromEntries(opts.map((f) => [f.key, f.default])) },
   };
 }
 

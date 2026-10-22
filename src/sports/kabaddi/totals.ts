@@ -10,7 +10,8 @@
  *      raidsOut (the raider ended up out: tackled or a failed do-or-die),
  *      touchPoints, bonusPoints, superRaids (3+ raid points),
  *      doOrDieRaids, doOrDiePoints, tackles (raiders the player tackled),
- *      superTackles.
+ *      superTackles; with "Defenders touched" tracked, touchedOut and
+ *      (round 2) unsuccessfulTackles (keyed — `unsuccessfulTacklers`).
  *    A failed do-or-die (no tackle made) gives the defence its point but
  *    credits no defender.
  *  • `kabaddiMatchCentre` — the PKL match-centre figures per team (points
@@ -65,6 +66,29 @@ export const kabaddiDisciplineTracked = (s: KabaddiState): boolean => s.caughtTo
 export const kabaddiTouchedTracked = (s: KabaddiState): boolean => !!s?.track?.touched || raidsOf(s).some((r) => !!r.touched?.length);
 /** Deep wave — a defender's times put out by a raider's touch (keyed). */
 export const KABADDI_TOUCHED_KEY = 'touchedOut';
+/** Round 2 — a defender's unsuccessful tackles (keyed, with `touchedOut`). */
+export const KABADDI_UNSUCCESSFUL_TACKLE_KEY = 'unsuccessfulTackles';
+
+/**
+ * Round 2 (founder) — the defenders charged an UNSUCCESSFUL TACKLE on one
+ * raid, from the "Defenders touched" capture:
+ *   - the raider got back: not tackled, not stepped out (line-out), not a
+ *     failed do-or-die (`b.raiderOut` false);
+ *   - and his touch points counted (`b.touchPts` > 0);
+ *   - then each defender the scorer NAMED under "Who was touched?" (the first
+ *     `touchPts` names — the touches that scored) is charged one.
+ * A raid that named nobody charges nobody; one that named some of its touches
+ * charges only those named (never a guess). A raider caught after touching
+ * (where the format still counts his touches) was tackled successfully — the
+ * touched defenders are out (`touchedOut`) but not charged here. Defenders
+ * who stepped out without a touch (line-outs) aren't touched, and a defender
+ * who went for the raider without being touched can't be seen from this
+ * capture — neither is counted.
+ */
+export function unsuccessfulTacklers(r: Pick<RaidEntry, 'touched'>, b: Pick<RaidBreakdown, 'raiderOut' | 'touchPts'>): { id?: string; name: string }[] {
+  if (b.raiderOut || !(b.touchPts > 0)) return [];
+  return (r.touched ?? []).slice(0, b.touchPts);
+}
 
 export function kabaddiTotals(s: KabaddiState, ctx?: StatTotalsContext): Record<string, StatTotalsEntry> {
   const byName = (side: Side, name?: string) =>
@@ -76,12 +100,13 @@ export function kabaddiTotals(s: KabaddiState, ctx?: StatTotalsContext): Record<
   const out: Record<string, StatTotalsEntry> = {};
   let unknown = false;
   let touchedUnknown = false;
+  let unsuccessfulUnknown = false;
   const entry = (id: string, side: Side) => {
     if (!out[id]) {
       const stats: Record<string, number> = { raidPoints: 0, tacklePoints: 0 };
       if (counts) for (const k of KABADDI_COUNT_KEYS) stats[k] = 0;
       if (disc) for (const k of KABADDI_DISCIPLINE_KEYS) stats[k] = 0;
-      if (touched) stats[KABADDI_TOUCHED_KEY] = 0;
+      if (touched) { stats[KABADDI_TOUCHED_KEY] = 0; stats[KABADDI_UNSUCCESSFUL_TACKLE_KEY] = 0; }
       out[id] = { side, stats };
     }
     return out[id].stats;
@@ -124,6 +149,15 @@ export function kabaddiTotals(s: KabaddiState, ctx?: StatTotalsContext): Record<
         else touchedUnknown = true;
       }
     }
+    // round 2: named defenders touched by a raider who got back
+    if (touched) {
+      const d = other(r.side);
+      for (const p of unsuccessfulTacklers(r, b)) {
+        const id = idOf(d, p.id, p.name);
+        if (id) add(entry(id, d), KABADDI_UNSUCCESSFUL_TACKLE_KEY, 1);
+        else unsuccessfulUnknown = true;
+      }
+    }
   }
   // SD-59 / SD-72: cards and technical points conceded (the player at fault
   // is on the other side from the point)
@@ -147,6 +181,7 @@ export function kabaddiTotals(s: KabaddiState, ctx?: StatTotalsContext): Record<
   // a touched name that can't be matched to a player: the key is left out
   // for everyone (never a partial count — the sync would zero real figures)
   if (touchedUnknown) for (const t of Object.values(out)) delete t.stats[KABADDI_TOUCHED_KEY];
+  if (unsuccessfulUnknown) for (const t of Object.values(out)) delete t.stats[KABADDI_UNSUCCESSFUL_TACKLE_KEY];
   return out;
 }
 

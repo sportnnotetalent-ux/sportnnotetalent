@@ -12,7 +12,7 @@ import { TextField } from '../../components/ui';
 import { theme } from '../../core/theme';
 import { Button, SelectChip } from '../../components/ui';
 import { askConfirm, confirmMatchAction } from '../../components/ConfirmSheet';
-import { GameFlowCard } from '../../components/GameFlowCard';
+import { SubViews } from '../SubViews';
 import { MatchBoxScore } from '../../components/BoxScore';
 import { basketballBox } from '../boxSources';
 import { basketballStatTotals, shotsTracked } from './totals';
@@ -37,6 +37,7 @@ import {
   isFouledOut, isPlayerOut, isEjected, inBonus, timeoutStatus, onCourtNames, teamFoulsThisQuarter,
   disqualifyingFoul, freeThrowsFor,
   gameSec, clockLeft, clockRunning, timedPeriod, timeUp, clockText, possessionAfterFoul,
+  BB_TRACK_DEFAULTS, scoringLayout,
 } from "./engine";
 
 /** SD-117 (B12): the foul-type chips, FIBA's U and D included. */
@@ -526,7 +527,7 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
           </View>
         )}
         {/* Deep wave: a charted basket can be re-entered with its zone */}
-        {edit.type === 'score' && editSel && (state.trackZones || edit.zone) && (
+        {edit.type === 'score' && editSel && (scoringLayout(state) === 'zones' || edit.zone) && (
           <View style={ctrl.chips}>
             {ZONE_BTN.map((b) => (
               <SelectChip key={b.zone} label={`+${zoneValue(b.zone)} ${b.short}`} accessibilityLabel={`${zoneValue(b.zone)} points ${b.long}`} active={edit.zone === b.zone}
@@ -569,7 +570,10 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
   const toLine = (['home', 'away'] as const).map((side) => ({ side, t: toStatus(side) }));
   const toTracked = toLine.some(({ t }) => t.left != null);
 
-  const zones = state.trackZones === true;
+  // Court-team round 2: the zone buttons are the default layout for new
+  // matches (BB_TRACK_DEFAULTS); a match whose format lacks the key — every
+  // older one — keeps the plain +2 / +3 row it was scored with.
+  const zones = scoringLayout(state) === 'zones';
   const ScoreSide = ({ side, name, variant }: { side: 'home' | 'away'; name: string; variant: 'home' | 'away' }) => {
     const roster = courtOf(side);
     const selected = sel[side];
@@ -925,45 +929,28 @@ const LiveClock: NonNullable<SportPlugin<BasketballState>['LiveClock']> = ({ sta
   );
 };
 
-const LiveExtras: NonNullable<SportPlugin<BasketballState>['LiveExtras']> = ({
-  state,
-  homeName,
-  awayName,
-  homeColor,
-  awayColor,
-  homeRoster,
-  awayRoster,
-  homeLineup,
-  awayLineup,
-  onPlayer,
-}) => {
+/** Match tabs (2026-10-22): the play-by-play on Commentary; the broadcast
+ *  team stats (with the shot chart) and the FIBA box score on Stats. The
+ *  screen adds Game flow (SD-50) under Stats. */
+type TabProps = Parameters<NonNullable<SportPlugin<BasketballState>['LiveExtras']>>[0];
+const BasketballCommentary = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster, onPlayer }: TabProps) => (
+  <PlayFeed groups={basketballFeed(state as BasketballState, { home: homeName, away: awayName })} homeColor={homeColor} awayColor={awayColor} homeRoster={homeRoster} awayRoster={awayRoster} onPlayer={onPlayer} allLabel="Game" />
+);
+const BasketballStats = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster, homeLineup, awayLineup, onPlayer }: TabProps) => {
   const s = state as BasketballState;
-  // Deep wave: three views — the commentary, the broadcast team stats (with
-  // the shot chart and game flow) and the FIBA box score.
-  const [view, setView] = useState<'pbp' | 'team' | 'box'>('pbp');
   const starters = { home: startersOf(homeLineup), away: startersOf(awayLineup) };
   return (
-    <View style={{ gap: theme.spacing(3) }}>
-      <View style={ctrl.chips}>
-        <SelectChip label="Play-by-play" active={view === 'pbp'} onPress={() => setView('pbp')} />
-        <SelectChip label="Team stats" active={view === 'team'} onPress={() => setView('team')} />
-        <SelectChip label="Box score" active={view === 'box'} onPress={() => setView('box')} />
-      </View>
-      {view === 'pbp' ? (
-        <PlayFeed groups={basketballFeed(s, { home: homeName, away: awayName })} homeColor={homeColor} awayColor={awayColor} homeRoster={homeRoster} awayRoster={awayRoster} onPlayer={onPlayer} allLabel="Game" />
-      ) : view === 'team' ? (
-        <>
-          <CategoryStatsPanel periods={bbPanelPeriods(s)} data={(scope) => basketballPanel(s, scope, { starters, now: Date.now() })}
-            homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} matchLabel="Game">
-            {(scope) => <ShotChart state={s} scope={scope} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} />}
-          </CategoryStatsPanel>
-          {/* SD-50: biggest lead, lead changes, times tied, runs, bench points */}
-          <GameFlowCard sport="basketball" state={s} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} homeLineup={homeLineup} awayLineup={awayLineup} />
-        </>
-      ) : (
+    <SubViews label="Stats view" views={[
+      { key: 'team', label: 'Team stats', render: () => (
+        <CategoryStatsPanel periods={bbPanelPeriods(s)} data={(scope) => basketballPanel(s, scope, { starters, now: Date.now() })}
+          homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} matchLabel="Game">
+          {(scope) => <ShotChart state={s} scope={scope} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} />}
+        </CategoryStatsPanel>
+      ) },
+      { key: 'box', label: 'Box score', render: () => (
         <MatchBoxScore sport="basketball" show="box" source={basketballBox(s, { homeRoster, awayRoster, homeName, awayName })} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} onPlayer={onPlayer} />
-      )}
-    </View>
+      ) },
+    ]} />
   );
 };
 
@@ -997,7 +984,8 @@ const BasketballScoreboard: NonNullable<SportPlugin<BasketballState>['Scoreboard
 };
 
 /** SD-31 — the scorer's coverage toggle (config mode: patches the match
- *  format; each make records its own `fga`, so past plays keep their credit). */
+ *  format; each make records its own `fga`, so past plays keep their credit).
+ *  Round 2: "Standard" = BB_TRACK_DEFAULTS (shot zones on, the rest off). */
 const BASKETBALL_LIVE_SETTINGS: LiveSettings<BasketballState> = {
   title: '⚙️ Scoring settings',
   hint: 'Stats to track — capture only what this scorer can keep up with. A switch applies from the next play (earlier plays keep what they had); this match only.',
@@ -1005,13 +993,13 @@ const BASKETBALL_LIVE_SETTINGS: LiveSettings<BasketballState> = {
   // Deep wave: each play stamps its own detail (`fga`, `zone`, `fbt`, `fdt`),
   // so a config patch + replay never rewrites what earlier plays captured.
   fields: [
-    { key: 'trackMisses', label: 'Track missed shots', type: 'toggle', default: false, group: 'Stats to track', hint: 'Miss 2 / Miss 3 buttons — FG%, 3P% and full EFF' },
-    { key: 'trackZones', label: 'Shot zones', type: 'toggle', default: false, group: 'Stats to track', hint: 'Paint / Mid / Corner / Top buttons instead of +2 / +3 — shot chart, points in the paint' },
-    { key: 'trackFastBreak', label: 'Fast-break points', type: 'toggle', default: false, group: 'Stats to track', hint: '⚡ Fast break after a basket' },
-    { key: 'trackFoulsDrawn', label: 'Fouls drawn', type: 'toggle', default: false, group: 'Stats to track', hint: 'Who was fouled (FD) — the free-throw shooter is then picked for you' },
+    { key: 'trackMisses', label: 'Track missed shots', type: 'toggle', default: BB_TRACK_DEFAULTS.trackMisses, group: 'Stats to track', hint: 'Miss 2 / Miss 3 buttons — FG%, 3P% and full EFF' },
+    { key: 'trackZones', label: 'Shot zones', type: 'toggle', default: BB_TRACK_DEFAULTS.trackZones, group: 'Stats to track', hint: 'On (standard): +2 Paint / +2 Mid / +3 Corner / +3 Top — shot chart, points in the paint. Off: plain +2 / +3' },
+    { key: 'trackFastBreak', label: 'Fast-break points', type: 'toggle', default: BB_TRACK_DEFAULTS.trackFastBreak, group: 'Stats to track', hint: '⚡ Fast break after a basket — its points, the and-one free throw included' },
+    { key: 'trackFoulsDrawn', label: 'Fouls drawn', type: 'toggle', default: BB_TRACK_DEFAULTS.trackFoulsDrawn, group: 'Stats to track', hint: 'Who was fouled (FD) — the free-throw shooter is then picked for you' },
   ],
-  read: (s) => ({ trackMisses: s.trackMisses === true, trackZones: s.trackZones === true, trackFastBreak: s.trackFastBreak === true, trackFoulsDrawn: s.trackFoulsDrawn === true }),
-  defaults: { trackMisses: false, trackZones: false, trackFastBreak: false, trackFoulsDrawn: false },
+  read: (s) => ({ trackMisses: s.trackMisses === true, trackZones: scoringLayout(s) === 'zones', trackFastBreak: s.trackFastBreak === true, trackFoulsDrawn: s.trackFoulsDrawn === true }),
+  defaults: { ...BB_TRACK_DEFAULTS },
 };
 
 export const basketballPlugin: SportPlugin<BasketballState> = {
@@ -1038,7 +1026,7 @@ export const basketballPlugin: SportPlugin<BasketballState> = {
   }),
   ScoringControls,
   LiveClock,
-  LiveExtras,
+  matchTabs: { Commentary: BasketballCommentary, Stats: BasketballStats },
   formation: () => courtFormation('basketball'),
   Court: makeCourt('basketball'),
   voice: { hints: ['two {name}', 'three {name}', 'miss three {name}', 'free throw {name}', 'rebound {name}', 'steal {name}', 'block {name}', 'foul {name}'], parse: basketballVoice },
@@ -1075,11 +1063,13 @@ export const basketballPlugin: SportPlugin<BasketballState> = {
     { key: 'techIsTeamFoul', label: 'Technical fouls count as team fouls', type: 'toggle', default: true, advanced: true, hint: 'FIBA yes · NBA no' },
     { key: 'otFoulsCarry', label: 'Overtime team fouls carry over from the last quarter', type: 'toggle', default: true, advanced: true, hint: 'FIBA yes · NBA resets' },
     { key: 'overtimeMinutes', label: 'Overtime length (min)', type: 'number', default: 5, min: 1, max: 10, advanced: true, hint: 'played when tied after regulation; repeats until decided' },
-    { key: 'trackMisses', label: 'Track missed shots', type: 'toggle', default: false, hint: 'Miss 2 / Miss 3 buttons — FG%, 3P% and full EFF' },
-    // Deep wave — "Stats to track" (off by default; the scorer can also switch them in ⚙️ Scoring settings)
-    { key: 'trackZones', label: 'Track shot zones', type: 'toggle', default: false, advanced: true, group: 'Stats to track', hint: 'Paint / mid-range / corner 3 / above-the-break buttons — shot chart, points in the paint' },
-    { key: 'trackFastBreak', label: 'Tag fast-break points', type: 'toggle', default: false, advanced: true, group: 'Stats to track', hint: '⚡ Fast break after a basket' },
-    { key: 'trackFoulsDrawn', label: 'Track fouls drawn', type: 'toggle', default: false, advanced: true, group: 'Stats to track', hint: 'who was fouled (FD in the box score)' },
+    { key: 'trackMisses', label: 'Track missed shots', type: 'toggle', default: BB_TRACK_DEFAULTS.trackMisses, hint: 'Miss 2 / Miss 3 buttons — FG%, 3P% and full EFF' },
+    // Deep wave — "Stats to track" (the scorer can also switch them in ⚙️ Scoring settings).
+    // Round 2: the shot-zone buttons are the default layout for a new match and
+    // shown without Customize, so switching back to plain +2 / +3 is one tap.
+    { key: 'trackZones', label: 'Shot-zone scoring buttons', type: 'toggle', default: BB_TRACK_DEFAULTS.trackZones, group: 'Stats to track', hint: 'On (standard): +2 Paint · +2 Mid · +3 Corner · +3 Top — shot chart, points in the paint · Off: plain +2 / +3' },
+    { key: 'trackFastBreak', label: 'Tag fast-break points', type: 'toggle', default: BB_TRACK_DEFAULTS.trackFastBreak, advanced: true, group: 'Stats to track', hint: '⚡ Fast break after a basket (and-one free throw included)' },
+    { key: 'trackFoulsDrawn', label: 'Track fouls drawn', type: 'toggle', default: BB_TRACK_DEFAULTS.trackFoulsDrawn, advanced: true, group: 'Stats to track', hint: 'who was fouled (FD in the box score)' },
     // SD-132: the stoppable game clock (start / stop on whistles, set time)
     { key: 'gameClock', label: 'Stoppable game clock', type: 'toggle', default: true, hint: 'Start / stop it on whistles — exact minutes, +/- and timeout limits' },
     { key: 'otTarget', label: 'Overtime: first to N points', type: 'number', default: 0, min: 0, max: 5, advanced: true, hint: '0 = timed overtime · 3×3: 2' },

@@ -42,12 +42,17 @@ export const carromStats: SportStatSchema<'carrom'> = {
     { key: 'slams', label: 'Slams', short: 'slams', one: 'slam', source: 'derived', group: 'record', agg: { kind: 'sum', keys: ['whiteSlams', 'blackSlams'] } },
     // Deep wave — "Stats to track" (statTotals writes them only for a match
     // that tracked them: 'keyed', an older line reads "not tracked", never 0).
-    // Fouls and missed covers are singles only (the board log doesn't say
-    // which doubles partner fouled).
+    // Missed covers are singles only; fouls are singles, or — round 2 — a
+    // doubles partner's own from the "who" chips.
     { key: 'fouls', label: 'Fouls', short: 'fouls', one: 'foul', group: 'discipline', format: { unit: 'count', better: 'lower' }, coverage: 'keyed' },
     { key: 'foulStriker', label: 'Fouls: striker pocketed', short: 'striker fouls', one: 'striker foul', group: 'discipline', format: { unit: 'count', better: 'lower' }, coverage: 'keyed' },
     { key: 'foulTouch', label: 'Fouls: touching', short: 'touching fouls', one: 'touching foul', group: 'discipline', format: { unit: 'count', better: 'lower' }, coverage: 'keyed' },
     { key: 'foulLine', label: 'Fouls: line / hand', short: 'line fouls', one: 'line foul', group: 'discipline', format: { unit: 'count', better: 'lower' }, coverage: 'keyed' },
+    // Round 2 — "line / hand" split into the ICF / AICF terms (boards recorded
+    // from now on; an older line keeps its "line / hand" count)
+    { key: 'foulBase', label: 'Fouls: base line', short: 'base-line fouls', one: 'base-line foul', group: 'discipline', format: { unit: 'count', better: 'lower' }, coverage: 'keyed' },
+    { key: 'foulArrow', label: 'Fouls: arrow line', short: 'arrow-line fouls', one: 'arrow-line foul', group: 'discipline', format: { unit: 'count', better: 'lower' }, coverage: 'keyed' },
+    { key: 'foulElbow', label: 'Fouls: elbow crossing', short: 'elbow fouls', one: 'elbow foul', group: 'discipline', format: { unit: 'count', better: 'lower' }, coverage: 'keyed' },
     { key: 'foulThumb', label: 'Fouls: thumbing', short: 'thumbing fouls', one: 'thumbing foul', group: 'discipline', format: { unit: 'count', better: 'lower' }, coverage: 'keyed' },
     { key: 'foulOther', label: 'Fouls: other', short: 'other fouls', one: 'other foul', group: 'discipline', format: { unit: 'count', better: 'lower' }, coverage: 'keyed' },
     { key: 'dues', label: 'Dues', short: 'dues', one: 'due', group: 'discipline', format: { unit: 'count', better: 'lower' }, coverage: 'keyed' },
@@ -75,6 +80,7 @@ export const carromStats: SportStatSchema<'carrom'> = {
     { id: 'discipline', title: 'Fouls & dues', rows: [
       { stat: 'fouls' }, { stat: 'foulsPerBoard' }, { stat: 'dues' },
       { stat: 'foulStriker', label: 'Striker pocketed', hideZero: true }, { stat: 'foulTouch', label: 'Touching', hideZero: true },
+      { stat: 'foulBase', label: 'Base line', hideZero: true }, { stat: 'foulArrow', label: 'Arrow line', hideZero: true }, { stat: 'foulElbow', label: 'Elbow crossing', hideZero: true },
       { stat: 'foulLine', label: 'Line / hand', hideZero: true }, { stat: 'foulThumb', label: 'Thumbing', hideZero: true }, { stat: 'foulOther', label: 'Other', hideZero: true },
       { stat: 'queenMisses' },
     ] },

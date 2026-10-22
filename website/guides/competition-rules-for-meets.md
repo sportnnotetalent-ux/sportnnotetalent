@@ -32,6 +32,9 @@ Weightlifting:
 - **After a no lift**: repeat the same weight (IWF) or go up.
 - **Bodyweight categories**: by age group (IWF 2025, IWF youth or the school list), one list for everyone, or your own list of kg limits.
 - **Medals** for the snatch and the clean & jerk, and **Sinclair** totals with the coefficients you choose.
+- **Robi points** as a second best-lifter measure. Each category's reference total is the IWF senior world record unless you type your own (for example "60: 290, 65: 312"). Youth and school categories need your own reference.
+- **Team classification**: off, or the IWF table (28, 25, 23, 22, 21 … 1 points a place) on the total, or on the snatch, clean & jerk and total. It is shown next to the house table.
+- **Lifting clock**: on (1 minute an attempt, 2 minutes for consecutive attempts, signals at 30 s) or off. It only helps the officials and nothing about it is saved.
 - **Changes of a declared weight**: two per attempt (IWF; the app asks before a third) or no limit.
 - **Stats to track**: the referees' lights on every attempt, and jury reversals. Both are off unless you switch them on.
 
@@ -45,9 +48,9 @@ Athletics:
 
 Swimming: false starts (disqualified, or the first one recalled), 50 m splits, and whether a 10-lane pool is numbered 0–9 or 1–10.
 
-Archery: whether 10s or Xs break a tie, how a level shoot-off arrow is settled, and the bracket sizes. Team events (archery, shooting, cycling, mixed relays) have their own choices — see [team events](/guides/team-events-in-meets/).
+Archery: whether 10s or Xs break a tie, how a level shoot-off arrow is settled, and the bracket sizes. **Recurve indoor face**: the single 40 cm face (rings 1–10, the school default) or the triple face (rings 6–10, as at World Archery indoor events). Under **Stats to track**, **Arrows per archer in team matches** lets you enter each team's arrows archer by archer; it is off unless you switch it on. Team events (archery, shooting, cycling, mixed relays) have their own choices — see [team events](/guides/team-events-in-meets/).
 
-Shooting: the tie-break, the final size, and whether equal medal places with no final are shot off or shared. Under **Stats to track**, **Penalties** adds a −2 button to each series; it is off unless you switch it on.
+Shooting: the tie-break, the final size, and whether equal medal places with no final are shot off or shared. Under **Stats to track**, **Penalties** adds a −2 button to each series and to each final shot; it is off unless you switch it on.
 
 Cycling: the gap that starts a new time group, the GC tie-break, and the points per sprint.
 

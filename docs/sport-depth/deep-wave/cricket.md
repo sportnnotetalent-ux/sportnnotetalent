@@ -136,6 +136,8 @@ Leader labels are ready for "Fastest ball" and "Best control %".
 
 ## 4. Open questions for the founder
 
+> **Answered (2026-10-22).** The founder answered every question below. Round 2 builds the answers: see [cricket-round2.md](cricket-round2.md). Hindi / regional commentary is not wanted for now.
+
 1. **Leader rails.** Turn on "Fastest ball" and "Best control %" (with a minimum, e.g. 60 balls tracked) as tournament leaders?
 2. **Phase lengths.** Keep the automatic powerplay / death? Should a school T20 with no fielding restrictions still show "overs 1–6" as a powerplay? Or make them organiser options?
 3. **Bowling type from the profile** is applied even when "Bowler type" is off. OK? Or only when switched on?

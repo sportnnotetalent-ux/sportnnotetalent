@@ -15,7 +15,7 @@
  */
 import type { ArchSide, DisciplineDef, ResultEntry } from './model.ts';
 import { rankEntries } from './rank.ts';
-import { archRoundOf, endSum, endTens, endXs, endsOf, matchFormatOf, type ArchRoundDef, type Arrow } from './archeryDefs.ts';
+import { archRoundOf, archTeamOf, creditsEnd, endSum, endTens, endXs, endsOf, faceOf, matchFormatOf, type ArchRoundDef, type Arrow } from './archeryDefs.ts';
 import { archMatch, bracketState, isBracketRows, roundShort, type BMatch, type BracketState } from './archeryBracket.ts';
 import { ruleOf } from './competitionRules.ts';
 import { FeedBuilder, MEDAL_ICON, ordinalOf, placesOf, type FeedItem } from './insightFeed.ts';
@@ -114,13 +114,15 @@ function bracketFeed(entries: ResultEntry[], def: DisciplineDef, round: ArchRoun
     let ca = 0, cb = 0;
     m.out.ends.forEach((e, k) => {
       const ea = A?.ends?.[k], eb = B?.ends?.[k];
+      // round 2: a team end credited archer by archer — who shot what, as the detail line
+      const detail = [creditText(byId.get(m.a ?? ''), A, k), creditText(byId.get(m.b ?? ''), B, k)].filter(Boolean).join('  |  ') || undefined;
       if (fmt === 'sets') {
         ca += e.pa; cb += e.pb;
         const who = e.pa === 2 ? `${name(m.a)} takes the set` : e.pb === 2 ? `${name(m.b)} takes the set` : 'set shared';
-        fb.push(`${name(m.a)} ${endDash(ea)} = ${e.a} v ${name(m.b)} ${endDash(eb)} = ${e.b} — ${who}, ${ca}-${cb}`, { tag: `${tag} E${k + 1}`, tone: 'info' });
+        fb.push(`${name(m.a)} ${endDash(ea)} = ${e.a} v ${name(m.b)} ${endDash(eb)} = ${e.b} — ${who}, ${ca}-${cb}`, { tag: `${tag} E${k + 1}`, tone: 'info', ...(detail ? { detail } : {}) });
       } else {
         ca += e.a; cb += e.b;
-        fb.push(`${name(m.a)} ${endDash(ea)} = ${e.a} v ${name(m.b)} ${endDash(eb)} = ${e.b} — ${ca}-${cb}`, { tag: `${tag} E${k + 1}`, tone: 'info' });
+        fb.push(`${name(m.a)} ${endDash(ea)} = ${e.a} v ${name(m.b)} ${endDash(eb)} = ${e.b} — ${ca}-${cb}`, { tag: `${tag} E${k + 1}`, tone: 'info', ...(detail ? { detail } : {}) });
       }
     });
     if (m.out.shootOff && ((A?.so?.length ?? 0) || (B?.so?.length ?? 0))) {
@@ -147,6 +149,17 @@ function bracketFeed(entries: ResultEntry[], def: DisciplineDef, round: ArchRoun
     if (podium.length) fb.push(podium.map(([id, p]) => `${MEDAL_ICON[p.place]} ${name(id)}`).join(' · '), { tone: 'medal', tag: 'Result' });
   }
   return fb.newestFirst();
+}
+
+/** Round 2: "Asha X-9 · Bina 10-8 · Chitra 9-7" for a credited team end ('' otherwise). */
+export function creditText(row: ResultEntry | undefined, sd: ArchSide | undefined, k: number): string {
+  const members = row?.result.members ?? [];
+  const end = sd?.ends?.[k], who = sd?.by?.[k];
+  if (!members.length || !creditsEnd(end, who, members.length)) return '';
+  return members.map((mem, mi) => {
+    const mine = end!.filter((_, j) => who![j] === mi);
+    return mine.length ? `${mem.name.split(' ')[0]} ${endDash(mine)}` : '';
+  }).filter(Boolean).join(' · ');
 }
 
 /* ---------------------------------- stats ---------------------------------- */
@@ -187,7 +200,14 @@ export interface ArchBracketStats {
   /** the highest-scoring match end */
   bestEnd?: { names: string[]; value: number };
   shootOffs: number;
+  /** Round 2: team matches with arrows credited to each archer — one row per
+   *  archer who has credited arrows (absent when none were credited) */
+  perArcher?: TeamArcherStats[];
 }
+
+/** Round 2: one archer's credited arrows in team / mixed team matches (ends that counted). */
+export interface ArcherCredit { member: number; arrows: number; points: number; tens: number; xs: number; ends: number }
+export interface TeamArcherStats extends ArcherCredit { teamId: string; team: string; name: string; playerId?: string; avgArrow: number }
 
 /** "X 10 9 8 7 ≤6 M" counts over a list of arrows. */
 export function arrowDistribution(arrows: Arrow[], minRing = 1): ArrowDistribution[] {
@@ -223,7 +243,8 @@ export function archStats(entries: ResultEntry[], def: DisciplineDef): ArchRound
       xPerEnd: ends.length ? Math.round((endXs(all) / ends.length) * 100) / 100 : 0,
       bestEnd: Math.max(...sums), worstEnd: Math.min(...sums),
       ...(ends.length > half ? { halves: [endSum(ends.slice(0, half).flat()), endSum(ends.slice(half).flat())] as [number, number] } : {}),
-      dist: arrowDistribution(all, round.minRing ?? 1),
+      // round 2: the face the meet chose (recurve indoor: single 1–10 or triple 6–10)
+      dist: arrowDistribution(all, faceOf(round, def.rules).minRing ?? 1),
     };
   }).sort((a, b) => (a.place ?? 999) - (b.place ?? 999) || b.total - a.total);
   const best = <K extends 'bestEnd' | 'xs'>(k: K) => {
@@ -266,6 +287,33 @@ export function matchPlayOf(st: BracketState, id: string, sideOf: (id: string, k
   return o;
 }
 
+/**
+ * Round 2: the arrows each archer of team row `id` shot, from the ends credited
+ * archer by archer (`ArchSide.by`) in the ends that counted (walkovers and byes
+ * not counted, as `matchPlayOf`). Shoot-off arrows are not counted. Only
+ * archers with at least one credited arrow are returned (no false 0s).
+ */
+export function creditedArrows(st: BracketState, id: string, sideOf: (id: string, key: string) => ArchSide | undefined, size: number): ArcherCredit[] {
+  const by = new Map<number, ArcherCredit>();
+  for (const m of st.matches) {
+    if (!m.out || m.bye || m.out.walkover || (m.a !== id && m.b !== id)) continue;
+    const side = sideOf(id, m.key);
+    (side?.ends ?? []).slice(0, m.out.ends.length).forEach((end, k) => {
+      const who = side?.by?.[k];
+      if (!creditsEnd(end, who, size)) return;
+      const seen = new Set<number>();
+      end.forEach((a, j) => {
+        const mi = who![j];
+        const c = by.get(mi) ?? { member: mi, arrows: 0, points: 0, tens: 0, xs: 0, ends: 0 };
+        c.arrows += 1; c.points += endSum([a]); c.tens += endTens([a]); c.xs += endXs([a]);
+        if (!seen.has(mi)) { c.ends += 1; seen.add(mi); }
+        by.set(mi, c);
+      });
+    });
+  }
+  return [...by.values()].sort((a, b) => a.member - b.member);
+}
+
 function bracketStats(entries: ResultEntry[], def: DisciplineDef, round: ArchRoundDef): ArchBracketStats | null {
   const fmt = matchFormatOf(round.bow);
   const st = bracketState(entries, fmt, archMatch(fmt, def.rules, def.key));
@@ -280,5 +328,16 @@ function bracketStats(entries: ResultEntry[], def: DisciplineDef, round: ArchRou
   if (!archers.length) return null;
   const v = Math.max(...archers.map((a) => a.bestEnd));
   const shootOffs = st.matches.filter((m) => m.out?.soWon).length;
-  return { kind: 'bracket', archers, bestEnd: v > 0 ? { names: archers.filter((a) => a.bestEnd === v).map((a) => a.name), value: v } : undefined, shootOffs };
+  // round 2: arrows credited to each archer of a team (team / mixed team matches)
+  const size = archTeamOf(def.key)?.size ?? 0;
+  const perArcher: TeamArcherStats[] = [];
+  if (size) for (const e of rows) {
+    for (const c of creditedArrows(st, e.id, sideOf, size)) {
+      const mem = e.result.members?.[c.member];
+      if (!mem) continue;
+      perArcher.push({ ...c, teamId: e.id, team: e.name, name: mem.name, ...(mem.playerId ? { playerId: mem.playerId } : {}), avgArrow: Math.round((c.points / c.arrows) * 100) / 100 });
+    }
+  }
+  perArcher.sort((a, b) => b.avgArrow - a.avgArrow || b.arrows - a.arrows || a.name.localeCompare(b.name));
+  return { kind: 'bracket', archers, bestEnd: v > 0 ? { names: archers.filter((a) => a.bestEnd === v).map((a) => a.name), value: v } : undefined, shootOffs, ...(perArcher.length ? { perArcher } : {}) };
 }

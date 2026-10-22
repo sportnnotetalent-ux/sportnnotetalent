@@ -38,13 +38,27 @@
  *     for the receiver; 5+ shots is the rally phase.
  *   - 3rd shot (pickleball): the serving team's shot after the return; won =
  *     the serving team won the rally (side-out scoring: kept serve or scored).
+ *
+ * Round 2 (founder's answers):
+ *   - rally length reads the match's buckets (`matchRallyBuckets`: its
+ *     scheme — an organiser option — plus any other bucket its points carry);
+ *     an old match reads the deep-wave buckets as before. Table tennis' phase
+ *     rows follow the scheme (three phases, or four: transition 5–6,
+ *     stalemate 7+); serve & 3rd ball / receive & 4th ball are the same in both;
+ *   - kitchen ARRIVAL (pickleball, once a rally was marked "Nobody"): over the
+ *     rallies with a kitchen-line mark (a side, both or nobody), how often
+ *     each side got there — overall, when serving, when returning (PPA);
+ *   - squash "lets asked" go into careers per player (the appealing side's
+ *     player; doubles: both — the button names a side), on a match where a
+ *     let was asked with the side named.
  */
 import { pointInputs, type PointInput } from './rallyEdit.ts';
 import { rallyInputs } from './rallyEngine.ts';
 import { serveStats, serveRows, type ServeBlock, type ServeRosters, type ServeRow, type ServeStats, type SideServe } from './serveStats.ts';
 import {
   DETAIL_HOWS, NET_WORDS, RALLY_LABEL, STROKES, THIRD_LABEL, THIRD_SHOTS, TT_PHASE_LABEL, WINGS, WING_LABEL,
-  detailCoverage, errTypeOf, howDef, netSides, netTracked, rallyBucketsOf, rallyKey, rallyTracked, shotIdsOf, shotLabel, shotOf, thirdTracked,
+  allRallyBuckets, arrivalTracked, detailCoverage, errTypeOf, hasNobodyMark, howDef, matchRallyBuckets, netSides, netTracked, rallyKey, rallyTracked,
+  shotIdsOf, shotLabel, shotOf, thirdTracked,
   type DepthSport, type RallyBucket, type ThirdShot, type Wing,
 } from './pointDetail.ts';
 import type { LiveEvent } from './liveEvents';
@@ -71,16 +85,22 @@ export interface RacketCoverage {
   rally: boolean;
   /** pickleball 3rd shot */
   third: boolean;
+  /** round 2 — pickleball kitchen arrival (a rally was marked "Nobody") */
+  arrival: boolean;
 }
 
 /** A squash Let record: who appealed (when named) and its game. */
 export interface LetMark { side?: Side; period: number }
 
-export interface RacketView { sport: DepthSport; st: ServeStats; points: RPoint[]; cov: RacketCoverage; lets: LetMark[] }
+export interface RacketView {
+  sport: DepthSport; st: ServeStats; points: RPoint[]; cov: RacketCoverage; lets: LetMark[];
+  /** round 2 — the rally-length buckets this match reads with */
+  buckets: RallyBucket[];
+}
 
 /** Replay `state` once; null when it isn't a match state of `sport`. */
 export function racketView(sport: DepthSport, state: unknown, rosters: ServeRosters = {}): RacketView | null {
-  const s = state as { events?: LiveEvent[]; pointDetail?: boolean; netDetail?: boolean; rallyDetail?: boolean; thirdDetail?: boolean } | null;
+  const s = state as { events?: LiveEvent[]; pointDetail?: boolean; netDetail?: boolean; rallyDetail?: boolean; thirdDetail?: boolean; rallyBuckets?: string } | null;
   const st = serveStats(sport, s, rosters);
   if (!st || !s) return null;
   const events = s.events ?? [];
@@ -89,15 +109,18 @@ export function racketView(sport: DepthSport, state: unknown, rosters: ServeRost
   const lets: LetMark[] = events.filter((e) => e.kind === 'let').map((e) => ({
     ...(e.side === 'home' || e.side === 'away' ? { side: e.side } : {}), period: e.game ?? e.set ?? 1,
   }));
+  const net = !!NET_WORDS[sport] && netTracked(s);
   return {
     sport, st, points, lets,
     cov: {
       detail: detailCoverage(sport, s),
       serve: st.serveTracked,
-      net: !!NET_WORDS[sport] && netTracked(s),
+      net,
       rally: rallyTracked(s),
       third: sport === 'pickleball' && thirdTracked(s),
+      arrival: net && hasNobodyMark(sport) && arrivalTracked(s),
     },
+    buckets: matchRallyBuckets(sport, s),
   };
 }
 
@@ -115,6 +138,9 @@ export const WING_SELS: ReadonlyArray<{ wing: WingSel; label: string }> = [
 ];
 
 export interface PhaseTally { srvP: number; srvW: number; rcvP: number; rcvW: number }
+/** Round 2 — kitchen arrival: rallies with a kitchen-line mark (`of`) and
+ *  those the side got there (`n`). */
+export interface Arrival { n: number; of: number }
 export interface RSide {
   winners: number; ue: number; fe: number; aces: number; sw: number; sf: number;
   /** squash decisions: strokes won / conceded, no lets (appeals refused) */
@@ -128,6 +154,8 @@ export interface RSide {
   third: Record<ThirdShot, { n: number; won: number }>;
   /** per rally bucket: points this side served / won, received / won */
   phase: Record<string, PhaseTally>;
+  /** round 2 — kitchen arrival: over every marked rally, when serving, when returning */
+  arrival: { all: Arrival; srv: Arrival; rcv: Arrival };
 }
 export interface RTally {
   home: RSide; away: RSide;
@@ -138,7 +166,7 @@ export interface RTally {
   rally: Record<string, { total: number; home: number; away: number }>;
 }
 
-const zeroSide = (sport: DepthSport): RSide => {
+const zeroSide = (sport: DepthSport, buckets: readonly RallyBucket[]): RSide => {
   const ids = ['all', ...shotIdsOf(sport)];
   const byShot = () => Object.fromEntries(ids.map((k) => [k, 0])) as Record<string, number>;
   const byWing = () => ({ all: byShot(), fh: byShot(), bh: byShot() });
@@ -147,7 +175,8 @@ const zeroSide = (sport: DepthSport): RSide => {
     shots: { winner: byWing(), ue: byWing(), fe: byWing() },
     errTypes: {}, sfTypes: {}, netPlayed: 0, netWon: 0,
     third: { drop: { n: 0, won: 0 }, drive: { n: 0, won: 0 }, lob: { n: 0, won: 0 } },
-    phase: Object.fromEntries(rallyBucketsOf(sport).map((b) => [b, { srvP: 0, srvW: 0, rcvP: 0, rcvW: 0 }])),
+    phase: Object.fromEntries(buckets.map((b) => [b, { srvP: 0, srvW: 0, rcvP: 0, rcvW: 0 }])),
+    arrival: { all: { n: 0, of: 0 }, srv: { n: 0, of: 0 }, rcv: { n: 0, of: 0 } },
   };
 };
 
@@ -156,9 +185,9 @@ const inScope = (t: RPoint, scope: Scope) => scope === 'all' || t.period === sco
 /** Per-side detail figures over the match or one game / set. */
 export function racketTally(v: RacketView, scope: Scope = 'all'): RTally {
   const { sport } = v;
-  const buckets = rallyBucketsOf(sport);
+  const buckets = v.buckets;
   const out: RTally = {
-    home: zeroSide(sport), away: zeroSide(sport), described: 0, buckets,
+    home: zeroSide(sport, buckets), away: zeroSide(sport, buckets), described: 0, buckets,
     rally: Object.fromEntries(buckets.map((b) => [b, { total: 0, home: 0, away: 0 }])),
   };
   for (const t of v.points) {
@@ -193,7 +222,17 @@ export function racketTally(v: RacketView, scope: Scope = 'all'): RTally {
       if (et && pd.how === 'ue') out[L].errTypes[et] = (out[L].errTypes[et] ?? 0) + 1;
       if (et && pd.how === 'sf') out[L].sfTypes[et] = (out[L].sfTypes[et] ?? 0) + 1;
     }
-    for (const n of netSides(p, W)) { out[n].netPlayed += 1; if (n === W) out[n].netWon += 1; }
+    const at = netSides(p, W);
+    for (const n of at) { out[n].netPlayed += 1; if (n === W) out[n].netWon += 1; }
+    // round 2 — kitchen arrival over the rallies with a mark (a side, both or nobody)
+    if (v.cov.arrival && p.atNet) {
+      for (const x of ['home', 'away'] as Side[]) {
+        const a = out[x].arrival, got = at.includes(x) ? 1 : 0;
+        a.all.of += 1; a.all.n += got;
+        const k = x === S ? a.srv : a.rcv;
+        k.of += 1; k.n += got;
+      }
+    }
     if (p.rallyLen && out.rally[p.rallyLen]) {
       const r = out.rally[p.rallyLen];
       r.total += 1; r[W] += 1;
@@ -317,6 +356,14 @@ export function keyStats(v: RacketView, scope: Scope = 'all'): StatSection[] {
     const nw = NET_WORDS[sport]!;
     points.push(ratioRow('net', nw.won, t.home.netWon, t.home.netPlayed, t.away.netWon, t.away.netPlayed));
   }
+  // round 2 — pickleball kitchen arrival (PPA: overall, serving, returning)
+  if (cov.arrival) {
+    const arr = (key: string, label: string, k: 'all' | 'srv' | 'rcv') =>
+      points.push(ratioRow(key, label, t.home.arrival[k].n, t.home.arrival[k].of, t.away.arrival[k].n, t.away.arrival[k].of));
+    arr('arr', 'Kitchen arrival', 'all');
+    arr('arrSrv', 'Kitchen arrival · serving', 'srv');
+    arr('arrRcv', 'Kitchen arrival · returning', 'rcv');
+  }
   if (setSport) pw.ratio('rcv', 'Receiving points won', (x) => x.rcvWon, (x) => x.rcvPlayed);
   pw.ratio('tot', st.sideOut ? 'Rallies won' : 'Total points won', (x) => x.won, () => b.rallies);
   pw.count('run', 'Most points in a row', b.home.run, b.away.run);
@@ -419,10 +466,15 @@ export function phaseRows(v: RacketView, scope: Scope = 'all'): ServeRow[] {
         sum(t.home, short, (p) => p.srvW), sum(t.home, short, (p) => p.srvP), sum(t.away, short, (p) => p.srvW), sum(t.away, short, (p) => p.srvP)),
       ratioRow('receive4', 'Receive & 4th ball (shots 1–4)',
         sum(t.home, short, (p) => p.rcvW), sum(t.home, short, (p) => p.rcvP), sum(t.away, short, (p) => p.rcvW), sum(t.away, short, (p) => p.rcvP)),
-      ratioRow('rally5', 'Rally (5+ shots)',
-        sum(t.home, ['5+'], (p) => p.srvW + p.rcvW), sum(t.home, ['5+'], (p) => p.srvP + p.rcvP),
-        sum(t.away, ['5+'], (p) => p.srvW + p.rcvW), sum(t.away, ['5+'], (p) => p.srvP + p.rcvP)),
     ];
+    // the rally phase(s) after the 4th shot: 5+ (three phases), or 5–6
+    // transition and 7+ stalemate (four phases)
+    for (const b of t.buckets.filter((x) => !short.includes(x))) {
+      const name = (TT_PHASE_LABEL[b] ?? RALLY_LABEL[b]).replace(/ \(.*\)$/, '');
+      rows.push(ratioRow(b === '5+' ? 'rally5' : `rally-${b}`, `${name} (${RALLY_LABEL[b]})`,
+        sum(t.home, [b], (p) => p.srvW + p.rcvW), sum(t.home, [b], (p) => p.srvP + p.rcvP),
+        sum(t.away, [b], (p) => p.srvW + p.rcvW), sum(t.away, [b], (p) => p.srvP + p.rcvP)));
+    }
     return rows;
   }
   // the buckets that occurred (a row with no rally on either side is left out)
@@ -456,6 +508,13 @@ export function thirdShotRows(v: RacketView, scope: Scope = 'all'): ServeRow[] {
  *                  receive4Won (the phases ending by the 4th shot)
  *   net / kitchen  padel netPts / netPtsWon, pickleball kitchenPts / kitchenWon
  *   3rd shot       pickleball thirdDrop / thirdDropWon, thirdDrive / …, thirdLob / …
+ * Round 2:
+ *   rally length   the match's buckets (rl13Pts … for another scheme)
+ *   arrival        pickleball kitchenArrOf (rallies with a kitchen-line mark;
+ *                  arrived = kitchenPts), kitchenSrvArr / kitchenSrvArrOf,
+ *                  kitchenRcvArr / kitchenRcvArrOf (once "Nobody" was used)
+ *   lets           squash letsAsked: the lets this side asked (a match where
+ *                  a let was asked with the side named)
  */
 export function racketCareerKeys(v: RacketView | null, side: Side): Record<string, number> {
   if (!v) return {};
@@ -484,15 +543,40 @@ export function racketCareerKeys(v: RacketView | null, side: Side): Record<strin
       thirdLob: me.third.lob.n, thirdLobWon: me.third.lob.won,
     });
   }
+  if (v.cov.arrival) {
+    Object.assign(out, {
+      kitchenArrOf: me.arrival.all.of,
+      kitchenSrvArr: me.arrival.srv.n, kitchenSrvArrOf: me.arrival.srv.of,
+      kitchenRcvArr: me.arrival.rcv.n, kitchenRcvArrOf: me.arrival.rcv.of,
+    });
+  }
+  if (letsTracked(v)) out[LETS_KEY] = v.lets.filter((l) => l.side === side).length;
   return out;
 }
 
-/** Every key `racketCareerKeys` can write for `sport` (docs, schema and tests). */
+/** Round 2 — squash: a let was asked with the side named (the per-side Let
+ *  buttons), so "lets asked" can be credited. An older match (one unnamed
+ *  Let button) or one without lets writes nothing — never a false 0. */
+export const letsTracked = (v: RacketView | null): boolean => !!v && v.sport === 'squash' && v.lets.some((l) => !!l.side);
+
+/** Does this match write any of the extra career keys? */
+export const hasRacketExtras = (v: RacketView | null): boolean =>
+  !!v && (v.cov.rally || v.cov.net || v.cov.third || v.cov.arrival || letsTracked(v));
+
+/** Every key `racketCareerKeys` can write for `sport` (docs, schema and
+ *  tests) — round 2: every bucket scheme's rally keys, pickleball arrival,
+ *  squash lets asked. */
 export function racketExtraKeys(sport: DepthSport): string[] {
-  const out = rallyBucketsOf(sport).flatMap((b) => [`${rallyKey(b)}Pts`, `${rallyKey(b)}Won`]);
+  const out = allRallyBuckets(sport).flatMap((b) => [`${rallyKey(b)}Pts`, `${rallyKey(b)}Won`]);
   if (sport === 'tabletennis') out.push('serve3Pts', 'serve3Won', 'receive4Pts', 'receive4Won');
   const nw = NET_WORDS[sport];
   if (nw) out.push(nw.keys.pts, nw.keys.won);
   if (sport === 'pickleball') out.push('thirdDrop', 'thirdDropWon', 'thirdDrive', 'thirdDriveWon', 'thirdLob', 'thirdLobWon');
+  if (hasNobodyMark(sport)) out.push(...ARRIVAL_KEYS);
+  if (sport === 'squash') out.push(LETS_KEY);
   return out;
 }
+/** Round 2 — pickleball kitchen-arrival keys (arrived overall = kitchenPts). */
+export const ARRIVAL_KEYS = ['kitchenArrOf', 'kitchenSrvArr', 'kitchenSrvArrOf', 'kitchenRcvArr', 'kitchenRcvArrOf'] as const;
+/** Round 2 — squash: lets asked, per player. */
+export const LETS_KEY = 'letsAsked';

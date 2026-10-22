@@ -115,7 +115,7 @@ describe('deep wave · football — off by default, old states unchanged', () =>
   test('live settings: a "Deeper stats (optional)" group, read from `deep`, defaults off', () => {
     const LS = football.FOOTBALL_LIVE_SETTINGS;
     const keys = LS.fields.filter((f) => f.group === 'Deeper stats (optional)').map((f) => f.key);
-    assert.deepEqual(keys, ['trackShotDetail', 'trackKeyPasses', 'trackClearances', 'trackSetPieces', 'trackCardReasons']);
+    assert.deepEqual(keys, ['trackShotDetail', 'trackKeyPasses', 'trackClearances', 'trackSetPieces', 'trackCardReasons', 'trackRuledOut']);
     assert.equal(LS.read(football.init({})).trackShotDetail, false);
     assert.equal(LS.read(football.init({ trackShotDetail: true })).trackShotDetail, true);
     for (const k of keys) assert.equal(LS.defaults?.[k], false);

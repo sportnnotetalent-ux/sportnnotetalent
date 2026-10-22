@@ -53,6 +53,7 @@ import { isEventSport, eventWords, eventPrefix } from '../sports/eventSports';
 import { MedalTable } from '../components/MedalTable';
 import { useGolfRounds } from '../data/useGolf';
 import { golfFieldResults, golfLeaderCategories, golfPositionPoints, isGolfMatchPlay } from '../data/golfLeaders';
+import { withChessPerformance } from '../data/chessRatings';
 import { groupTables, superPhaseLabel, standingsPhases } from '../data/groups';
 import { groupViews, groupHeading } from '../data/tournamentHistory';
 import type { SportId } from '../core/types';
@@ -433,11 +434,15 @@ export default function TournamentProfileScreen() {
   const categories = useMemo(
     () => {
       if (!activeSport) return [];
-      const cats = categoryLeaders(leaderScope.lines, players, activeSport, { matches, mins });
+      // Round 2 — chess: the performance-rating keys from the players' ratings (TPR leader)
+      const ls = activeSport === 'chess'
+        ? withChessPerformance(leaderScope.lines, allPlayers.length ? allPlayers : players, (tournament?.formats?.chess as Record<string, unknown> | undefined)?.timeControl)
+        : leaderScope.lines;
+      const cats = categoryLeaders(ls, players, activeSport, { matches, mins });
       // SD-49: golf in golf order — stroke play drops "Holes won"
       return activeSport === 'golf' ? golfLeaderCategories(cats, golfFmt) : cats;
     },
-    [leaderScope.lines, players, activeSport, matches, mins, golfFmt]
+    [leaderScope.lines, players, activeSport, matches, mins, golfFmt, allPlayers, tournament?.formats]
   );
   const saveMins = async (next: LeaderMins) => {
     if (!tournament || !activeSport) return;

@@ -28,6 +28,8 @@ import { phaseLabel } from './plan.ts';
 import { formatMark } from './marks.ts';
 import { betterMark } from './rank.ts';
 import { swimLaneOrder } from './swimming.ts';
+import { heatWinnerIds } from './heatWins.ts';
+import type { CareerRecord } from './recordsSet.ts';
 import type { Award } from './medals.ts';
 import { crewEventOf, seatNames, CREW_LANES, CREW_EVENTS, type CrewSport } from './crewDefs.ts';
 export * from './crewDefs.ts';
@@ -346,10 +348,12 @@ export interface CrewLine { playerId: string; stats: Record<string, number>; won
  * A finals reached, medals, DNF / DQ, the seat (1 = bow / front) and `cox`.
  * Singles also get position points (crew boats score for the house only).
  */
-export function crewLines(f: Pick<PhaseFormat, 'discipline' | 'phase'>, ranked: RankedEntry[], awards: Award[] = []): CrewLine[] {
+export function crewLines(f: Pick<PhaseFormat, 'discipline' | 'phase'> & Partial<Pick<PhaseFormat, 'races'>>, ranked: RankedEntry[], awards: Award[] = []): CrewLine[] {
   const def = disciplineOf(f.discipline);
   if (!def) return [];
   const byEntry = new Map(awards.map((a) => [a.entryId, a]));
+  // timed races round 2: heats won — a round's heat winners, and each heat's fastest in a timed final
+  const heatWon = heatWinnerIds(f, ranked);
   const out: CrewLine[] = [];
   for (const r of ranked) {
     if (r.status === 'DNS' || r.status === 'WD') continue;
@@ -359,8 +363,8 @@ export function crewLines(f: Pick<PhaseFormat, 'discipline' | 'phase'>, ranked: 
     if (r.status === 'DNF') s.dnf = 1;
     if (r.status === 'DQ' || r.status === 'FS') s.dq = 1;
     if (f.phase === 'final') { s.finals = 1; if ((r.entry.result.race ?? 'A') === 'A') s.finalsA = 1; }
-    // deep wave: a heat / repechage / semi-final won (a final won is a gold)
-    else if (r.position === 1) s.heatWins = 1;
+    // deep wave: a heat / repechage / semi-final won (a final won is a gold; round 2: a timed final's heats count)
+    if (heatWon.has(r.id)) s.heatWins = 1;
     if (a?.medal === 'gold') s.golds = 1;
     if (a?.medal === 'silver') s.silvers = 1;
     if (a?.medal === 'bronze') s.bronzes = 1;
@@ -390,18 +394,23 @@ export interface CrewCareer {
   coxed: number;
   /** deep wave: heats / repechages / semi-finals won */
   heatWins: number;
+  /** timed races round 2: meet / school records set (lines with mrSet / srSet), newest first */
+  meetRecords: number;
+  schoolRecords: number;
+  records: CareerRecord[];
   bests: { key: string; label: string; pb: CrewBest; sb?: CrewBest }[];
   history: { eventId: string; title: string; date: string; text: string; place?: number; medal?: 'gold' | 'silver' | 'bronze'; flags: string[] }[];
 }
 
 /** The rowing / canoe career from a player's lines (oldest → PB flags "at the time"). History newest first. */
 export function crewCareer(lines: { eventId?: string; stats: Record<string, number>; date?: string; opponent?: string }[], phases: Map<string, CrewPhaseInfo>, seasonFrom: string): CrewCareer {
-  const c: CrewCareer = { races: 0, finals: 0, finalsA: 0, golds: 0, silvers: 0, bronzes: 0, points: 0, coxed: 0, heatWins: 0, bests: [], history: [] };
+  const c: CrewCareer = { races: 0, finals: 0, finalsA: 0, golds: 0, silvers: 0, bronzes: 0, points: 0, coxed: 0, heatWins: 0, meetRecords: 0, schoolRecords: 0, records: [], bests: [], history: [] };
   const bests = new Map<string, CrewCareer['bests'][number]>();
   const pbSoFar = new Map<string, number>();
   for (const l of [...lines].sort((a, b) => (a.date ?? '').localeCompare(b.date ?? ''))) {
     const s = l.stats ?? {};
     c.races += s.races ?? 0; c.finals += s.finals ?? 0; c.finalsA += s.finalsA ?? 0; c.coxed += s.cox ?? 0; c.heatWins += s.heatWins ?? 0;
+    c.meetRecords += s.mrSet ?? 0; c.schoolRecords += s.srSet ?? 0;
     c.golds += s.golds ?? 0; c.silvers += s.silvers ?? 0; c.bronzes += s.bronzes ?? 0; c.points += s.posPoints ?? 0;
     const info = l.eventId ? phases.get(l.eventId) : undefined;
     const key = Object.keys(s).find((k) => crewKeyDiscipline(k));
@@ -423,7 +432,12 @@ export function crewCareer(lines: { eventId?: string; stats: Record<string, numb
     const ce = def ? crewEventOf(def.key) : null;
     const seat = s.cox ? 'cox' : s.seat && ce && ce.boat.seats > 1 ? seatNames(ce)[s.seat - 1]?.toLowerCase() : '';
     const text = [s.place ? ord(s.place) : s.dnf ? 'DNF' : s.dq ? 'DQ' : '', def && s.mark != null ? formatMark(s.mark, def) : '', seat ? `(${/^\d+$/.test(seat) ? `seat ${seat}` : seat})` : ''].filter(Boolean).join(' ');
+    // timed races round 2: a record this crew set
+    if (s.mrSet) flags.push('MR');
+    if (s.srSet) flags.push('SR');
     c.history.push({ eventId: l.eventId ?? '', title: info?.title ?? l.opponent ?? 'Race', date, text, place: s.place, medal, flags });
+    // newest first, a final's meet record before its school record
+    c.records.unshift(...(['MR', 'SR'] as const).filter((sc) => (sc === 'MR' ? s.mrSet : s.srSet)).map((scope) => ({ scope, title: info?.title ?? l.opponent ?? 'Race', text: def && s.mark != null ? formatMark(s.mark, def) : '', date, eventId: l.eventId ?? '' })));
   }
   c.points = Math.round(c.points * 100) / 100;
   const order = (k: string) => { const i = DISC_ORDER.indexOf(k); return i < 0 ? 999 : i; };

@@ -31,6 +31,7 @@ export const KO_DECIDER: Partial<Record<SportId, string>> = {
   american_football: 'standard', // SD-147: the rules' own overtime (flag conversions / Kansas / NFL playoff)
   kabaddi: 'extra_time', // extra time, then golden raid
   rugby: 'standard', // SD-143: 15s RWC-style ET 2×10 → sudden death → kicks; sevens / tens sudden-death periods
+  rugby_league: 'gpFinal', // NRL / Super League finals: golden point until someone scores
 };
 
 /** Does this sport's level knockout match need a decider in its format? */
@@ -56,6 +57,15 @@ export function stageAwareFormat(
     // play Kansas OT in the regular season, NFL 10-min OT may end tied, or
     // 'none' = the tie stands); a knockout game always resolves.
     if (elimination && (f.decider == null || f.decider === '' || f.decider === 'none' || f.decider === 'nfl')) f.decider = 'standard';
+    return f as MatchFormat;
+  }
+  if (sport === 'rugby_league') {
+    // League games keep the organiser's golden point (NRL / Super League
+    // regular season: 2 × 5 min, then the draw stands) — but never the
+    // finals' "until someone scores"; a knockout game always resolves.
+    if (elimination) { if (f.decider == null || f.decider === '' || f.decider === 'none' || f.decider === 'gp') f.decider = 'gpFinal'; }
+    else if (f.decider === 'gpFinal') f.decider = 'gp';
+    else if (f.decider == null || f.decider === '') f.decider = 'none';
     return f as MatchFormat;
   }
   if (sport === 'baseball') {

@@ -12,6 +12,7 @@ import {
   shootEventOf, seriesLine, totalText, archRoundOf, archRowText, isBracketRows, bracketState, bracketFormat, archMatch, bracketRowText, isCrewSport, crewMembersText,
   cycRowText, cycKind, sprintBracket, isRoadDiscipline, roadRowText, memberScoresText, scoreText,
   type DisciplineDef, type RankedEntry, type ResultFlag, type RoadFormat,
+  finalPenaltyTotal,
 } from '../../data/results';
 
 const FLAG_COLOR: Partial<Record<ResultFlag, string>> = {
@@ -55,7 +56,7 @@ export function seriesText(r: RankedEntry, def: DisciplineDef, road?: RoadFormat
   // SD-137b: a team ranked on its members' scores — each member's score
   if (res.ms?.length && !r.entry.athleteId) return memberScoresText(res, (v) => (shoot ? scoreText(v, shoot.scoring) : String(v)));
   if (shoot) {
-    if (Array.isArray(res.fshots)) return [res.fshots.length ? `${res.fshots.length} shot${res.fshots.length === 1 ? '' : 's'}: ${res.fshots.slice(-5).map((v) => v.toFixed(1)).join(' ')}${res.fshots.length > 5 ? ' …' : ''}` : '', res.qual ? `Q ${totalText(res.qual.mark, res.qual.xs, shoot.scoring)}` : ''].filter(Boolean).join(' · ');
+    if (Array.isArray(res.fshots)) return [res.fshots.length ? `${res.fshots.length} shot${res.fshots.length === 1 ? '' : 's'}: ${res.fshots.slice(-5).map((v) => v.toFixed(1)).join(' ')}${res.fshots.length > 5 ? ' …' : ''}` : '', res.qual ? `Q ${totalText(res.qual.mark, res.qual.xs, shoot.scoring)}` : '', /* round 2: a final penalty */ finalPenaltyTotal(res) ? `penalty −${finalPenaltyTotal(res)}` : ''].filter(Boolean).join(' · ');
     const members = res.members?.length ? res.members.map((m) => m.name).join(' / ') : '';
     const line = seriesLine(res, shoot, (res.series?.length ?? 0) * shoot.seriesOf);
     return [members, line, shoot.scoring === 'integer' && res.xs != null && res.mark != null ? totalText(res.mark, res.xs, 'integer') : ''].filter(Boolean).join(' · ');

@@ -59,6 +59,8 @@ The founder's ask (2026-10-22), from the ATP Grand Slam "Match Stats" page: capt
 - **Group name** — *chosen:* "Stats to track" (the founder's words). Football and racket sports still say "Stats captured" (see open questions).
 
 ### 4. Open questions for the founder
+> **Answered 2026-10-22, built in [court-team-round2.md](court-team-round2.md).**
+
 1. Should **"Track missed shots"** default on for the FIBA preset in tournaments (audit-2 P2)? I left everything off.
 2. Should **fast-break points** include the and-one free throw (NBA counts all points of the possession)?
 3. Should the zone buttons be the **default** layout once a school scorer has used them, or stay opt-in per match?
@@ -114,6 +116,8 @@ Exact shot x/y, shot distance, contested shots, deflections / screen assists / h
 - **Goals vs points** — *chosen:* `goals` counts goals (a super shot = 1 goal + 1 super shot); the team score is points. The box "G" total equals the score only without super shots.
 
 ### 4. Open questions for the founder
+> **Answered 2026-10-22, built in [court-team-round2.md](court-team-round2.md).**
+
 1. Do any **Indian / Gulf / UK** competitions use 2-point shots? (The Netball Super League may have adopted one; I couldn't verify.) If so, is the window "last 5 minutes" there too, and does it apply in extra time?
 2. Should **gains** include the opposition's turnovers (my choice) or only the ball-winning plays?
 3. Is **CPR** worth surfacing by default on the 4 × 15 international preset (it's a tap per centre pass, about 120 a match)?

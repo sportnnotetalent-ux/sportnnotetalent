@@ -8,7 +8,7 @@
  */
 import {
   eventWhen, mmss, penaltyBox, periodLong, periodName, periodOffset, soScore, teamFigures, totalPeriods, ejects, isOvertime,
-  PEN_LABEL, type IceEvent, type IceHockeyState, type Side,
+  FO_ZONE_LABEL, PEN_LABEL, type IceEvent, type IceHockeyState, type Side,
 } from './engine.ts';
 import { andList, groupLines, newestFirst, scoreText, type FeedGroup, type FeedLine } from '../feedGroups.ts';
 
@@ -55,7 +55,8 @@ export function sentence(s: IceHockeyState, e: IceEvent, names: Names, coinciden
     case 'tally': {
       const who = e.playerName ? `${e.playerName} (${team})` : team;
       switch (e.tally) {
-        case 'faceoff': return { icon: '⚪', text: `${who} win${e.playerName ? 's' : ''} the faceoff${e.secondName ? ` against ${e.secondName}` : ''}.`, tags: ['faceoff'] };
+        // round 2: the zone from the winner's view, as NHL play-by-play reads it ("won Off. Zone")
+        case 'faceoff': return { icon: '⚪', text: `${who} win${e.playerName ? 's' : ''} the faceoff${e.secondName ? ` against ${e.secondName}` : ''}${e.zone ? ` in the ${FO_ZONE_LABEL[e.zone].toLowerCase()}` : ''}.`, tags: ['faceoff'] };
         case 'hit': return { icon: '💥', text: `Hit by ${who}.`, tags: ['play'] };
         case 'block': return { icon: '🛡', text: `${who} block${e.playerName ? 's' : ''} a ${opp} shot.`, tags: ['shot'] };
         case 'giveaway': return { icon: '🔄', text: `Giveaway — ${who} lose${e.playerName ? 's' : ''} the puck.`, tags: ['play'] };

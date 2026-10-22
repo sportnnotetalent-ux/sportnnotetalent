@@ -4,7 +4,7 @@
  * Captures the full set of in-game events an organizer logs live: goals (with
  * scorer + assist), yellow/red cards, substitutions and own goals — each
  * attributed to a player and stamped with the match minute. A running clock and
- * an event timeline render on the live page (LiveExtras), visible to everyone.
+ * the commentary render on the live page (match tabs), visible to everyone.
  *
  * Clean sheets are NOT a live action (SD-09): the plugin's `statTotals` derives
  * them from the state — the goalkeeper on the pitch longest for a side that
@@ -30,7 +30,7 @@ import { FieldBanner } from '../FieldBanner';
 import { footballCentreSource } from './centre';
 import { footballCentre } from './stats';
 import { footballFeed, footballFacts, footballFeedPeriods, FOOTBALL_PERIOD_LABEL } from './feed';
-import { Commentary } from '../invasion/Commentary';
+import { Commentary, MatchFactsCard, resultFacts } from '../invasion/Commentary';
 import { MatchCentre } from '../invasion/MatchCentre';
 import {
   CARD_REASONS, CARD_REASON_LABEL, NO_GOAL_LABEL, ZONE_LABEL,
@@ -1211,8 +1211,12 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
         <Text style={ctrl.label}>🥅 Penalty</Text>
         <Text style={ctrl.meta}>Who won it, who took it, and whether it was scored, saved or missed.</Text>
         <Button label="Award a penalty" variant="ghost" onPress={() => setFlow({ mode: 'pen', step: 'team' })} />
-        {/* deep wave: a goal ruled out (offside / foul / VAR) — a timeline row, the score never moved */}
-        <Button label="🚫 Goal ruled out" accessibilityLabel="Log a goal ruled out (offside, foul, handball, VAR)" variant="ghost" onPress={() => setFlow({ mode: 'nogoal', step: 'team' })} />
+        {/* deep wave: a goal ruled out (offside / foul / VAR) — a timeline row, the score never moved.
+            Round 2: only with the "Goals ruled out" toggle on (school matches have no VAR);
+            one already logged stays in the commentary / match centre either way. */}
+        {deep.ruledOut ? (
+          <Button label="🚫 Goal ruled out" accessibilityLabel="Log a goal ruled out (offside, foul, handball, VAR)" variant="ghost" onPress={() => setFlow({ mode: 'nogoal', step: 'team' })} />
+        ) : null}
       </View>
 
       {ACTION_GROUPS.map((g) => {
@@ -1592,62 +1596,51 @@ const LiveClock: NonNullable<SportPlugin<FootballState>['LiveClock']> = ({ state
   );
 };
 
-/** Football contributes Lineups / Stats / Timeline as their own top-level tabs on
- *  the live screen (the screen calls LiveExtras with each view's key). */
-const FOOTBALL_VIEWS = [
-  { key: 'lineups', label: 'Lineups' },
-  { key: 'stats', label: 'Stats' },
-  // deep wave: the timeline is now the minute-by-minute commentary
-  { key: 'timeline', label: 'Commentary' },
-];
+/** Match tabs (2026-10-22): football's slots — Lineups on Info, the
+ *  minute-by-minute commentary, the match centre on Stats and the match facts
+ *  (scorers, sendings-off) with the result on Summary. */
+type TabProps = Parameters<NonNullable<SportPlugin<FootballState>['LiveExtras']>>[0];
 
-const LiveExtras: NonNullable<SportPlugin<FootballState>['LiveExtras']> = ({
-  state,
-  homeName,
-  awayName,
-  homeColor,
-  awayColor,
-  homeRoster,
-  awayRoster,
-  homeLineup,
-  awayLineup,
-  homeManager,
-  awayManager,
-  homeFormation,
-  awayFormation,
-  canEditHome,
-  canEditAway,
-  onEditLineup,
-  onPlayer,
-  view = 'lineups',
-}) => {
+/** Info: both XIs on the pitch, benches, managers and formations. */
+const FootballLineups = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster, homeLineup, awayLineup, homeManager, awayManager, homeFormation, awayFormation, canEditHome, canEditAway, onEditLineup, onPlayer }: TabProps) => {
   const s = state as FootballState;
-  const hc = homeColor ?? theme.colors.home;
-  const ac = awayColor ?? theme.colors.away;
-  if (view === 'timeline') {
-    // Deep wave: minute-by-minute commentary by half (running score, match
-    // facts on top; "Key events" keeps goals, cards, subs, penalties)
-    return (
-      <Commentary items={footballFeed(s, { home: homeName, away: awayName })} labelOf={FOOTBALL_PERIOD_LABEL} periods={footballFeedPeriods(s)} facts={footballFacts(s, Date.now())}
-        homeName={homeName} awayName={awayName} homeColor={hc} awayColor={ac} homeRoster={homeRoster} awayRoster={awayRoster} onPlayer={onPlayer}
-        emptyText="No events yet — updates appear here as the match unfolds." />
-    );
-  }
-  if (view === 'stats') {
-    // Deep wave: the match centre — team stats by category and half, then
-    // each side's player box score (SD-23 / FB-09)
-    return <MatchCentre sport="football" source={footballCentreSource(s, { homeRoster, awayRoster, homeName, awayName })} categories={footballCentre} homeName={homeName} awayName={awayName} homeColor={hc} awayColor={ac} onPlayer={onPlayer} />;
-  }
   return (
     <LineupView
       homeLineup={homeLineup} awayLineup={awayLineup} homeRoster={homeRoster} awayRoster={awayRoster}
-      events={s.events} minuteFormat={{ halfMinutes: s.halfMinutes, etMinutes: s.etMinutes }} homeName={homeName} awayName={awayName} homeColor={hc} awayColor={ac}
+      events={s.events} minuteFormat={{ halfMinutes: s.halfMinutes, etMinutes: s.etMinutes }} homeName={homeName} awayName={awayName}
+      homeColor={homeColor ?? theme.colors.home} awayColor={awayColor ?? theme.colors.away}
       homeManager={homeManager} awayManager={awayManager}
       homeFormation={homeFormation} awayFormation={awayFormation}
       canEditHome={canEditHome} canEditAway={canEditAway} onEditLineup={onEditLineup} onPlayer={onPlayer}
     />
   );
 };
+
+/** Commentary: minute-by-minute by half with the running score ("Key events"
+ *  keeps goals, cards, subs, penalties). */
+const FootballCommentary = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster, onPlayer }: TabProps) => {
+  const s = state as FootballState;
+  return (
+    <Commentary items={footballFeed(s, { home: homeName, away: awayName })} labelOf={FOOTBALL_PERIOD_LABEL} periods={footballFeedPeriods(s)}
+      homeName={homeName} awayName={awayName} homeColor={homeColor ?? theme.colors.home} awayColor={awayColor ?? theme.colors.away}
+      homeRoster={homeRoster} awayRoster={awayRoster} onPlayer={onPlayer}
+      emptyText="No events yet — updates appear here as the match unfolds." />
+  );
+};
+
+/** Stats: the match centre — team stats by category and half, then each
+ *  side's player box score (SD-23 / FB-09). */
+const FootballStats = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster, onPlayer }: TabProps) => {
+  const s = state as FootballState;
+  return <MatchCentre sport="football" source={footballCentreSource(s, { homeRoster, awayRoster, homeName, awayName })} categories={footballCentre} homeName={homeName} awayName={awayName} homeColor={homeColor ?? theme.colors.home} awayColor={awayColor ?? theme.colors.away} onPlayer={onPlayer} />;
+};
+
+/** Summary: the scorers, sendings-off, half-time and shoot-out lines
+ *  (possession is a stat — it stays on Stats). */
+const FootballFacts = ({ state, homeName, awayName, homeColor, awayColor }: TabProps) => (
+  <MatchFactsCard facts={resultFacts(footballFacts(state as FootballState, Date.now()))}
+    homeName={homeName} awayName={awayName} homeColor={homeColor ?? theme.colors.home} awayColor={awayColor ?? theme.colors.away} />
+);
 
 /** Football's pitch as the generic Court (positions mirrored per side). */
 const Court: NonNullable<SportPlugin<FootballState>['Court']> = ({ homeLineup, awayLineup, homeColor, awayColor }) => (
@@ -1703,14 +1696,11 @@ export const footballPlugin: SportPlugin<FootballState> = {
   // SD-56: the match card's line under the score ("HT 1-0")
   cardLine: (s) => halfTimeText(s),
   ScoringControls,
-  LiveExtras,
+  // Match tabs: its own lineups view replaces the generic court on Info.
+  matchTabs: { Info: FootballLineups, Commentary: FootballCommentary, Stats: FootballStats, SummaryExtras: FootballFacts },
   LiveClock,
   formation: emptyFormation,
   Court,
-  // football renders its own rich lineups inside LiveExtras (the LINEUPS sub-tab),
-  // so the generic court isn't shown twice on the live screen.
-  lineupsInExtras: true,
-  liveViews: FOOTBALL_VIEWS,
   liveSettings: FOOTBALL_LIVE_SETTINGS,
   formatFields: [
     {

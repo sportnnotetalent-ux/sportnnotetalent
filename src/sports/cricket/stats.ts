@@ -34,6 +34,14 @@ export const QUALIFIERS = {
   econ: { den: 60, note: 'min 10 overs', unit: { label: 'overs', one: 'over', per: 6 } },
 } as const;
 
+/** Round 2 (founder) — the tracked-detail leaders rank only on a real sample:
+ *  control % over 60 tracked balls faced (≈ 3 T20 innings), the fastest ball
+ *  over 12 balls clocked (two overs). An organiser can change either (SD-27). */
+export const DETAIL_QUALIFIERS = {
+  ctrl: { den: 60, unit: { label: 'tracked balls faced', one: 'tracked ball faced' } },
+  fastest: { den: 12, unit: { label: 'balls clocked', one: 'ball clocked' } },
+} as const;
+
 export const cricketStats: SportStatSchema<'cricket'> = {
   sport: 'cricket',
   /** SD-25 — career split chips (line context) */
@@ -58,6 +66,18 @@ export const cricketStats: SportStatSchema<'cricket'> = {
     ctrlBowl: (l) => n(l, 'ctlBowled') > 0,
     /** balls clocked by a speed gun */
     clocked: (l) => n(l, 'kphN') > 0,
+    // Round 2 — new-era lines (scorecard.ts `isNewEra`: a match scored on a
+    // stamping app) carry dot / boundary / phase figures; older lines never
+    /** batted in a new-era match */
+    eraBat: (l) => batted(l) && hasKey(l, 'dotsF'),
+    /** bowled in a new-era match */
+    eraBowl: (l) => hasKey(l, 'newEra') && n(l, 'ballsBowled') > 0,
+    /** bowled in that phase of a new-era match */
+    ppBowled: (l) => n(l, 'ballsPP') > 0,
+    midBowled: (l) => n(l, 'ballsMid') > 0,
+    deathBowled: (l) => n(l, 'ballsDeath') > 0,
+    /** made a direct-hit run out */
+    directHit: (l) => n(l, 'directHits') > 0,
   },
   stats: [
     // ── batting
@@ -146,14 +166,44 @@ export const cricketStats: SportStatSchema<'cricket'> = {
       agg: { kind: 'rate', num: 'rPace', den: 'oPace', over: 'vsTyped' }, coverOf: 'batted' },
     { key: 'avgSpin', label: 'Average vs spin', source: 'derived', group: 'batting', format: { unit: 'decimal', dp: 1 },
       agg: { kind: 'rate', num: 'rSpin', den: 'oSpin', over: 'vsTyped' }, coverOf: 'batted' },
+    // Round 2: both now tournament leaders, with a minimum sample (QUALIFIERS)
     { key: 'ctrlPct', label: 'Control %', leaderLabel: 'Best control %', source: 'derived', group: 'batting', format: { unit: 'percent', dp: 0 },
-      agg: { kind: 'rate', num: ['ctlBalls', '-falseShots'], den: 'ctlBalls', scale: 100, over: 'ctrlBat' }, coverOf: 'batted' },
+      agg: { kind: 'rate', num: ['ctlBalls', '-falseShots'], den: 'ctlBalls', scale: 100, over: 'ctrlBat', qualifier: DETAIL_QUALIFIERS.ctrl }, coverOf: 'batted',
+      tieBreak: [{ key: 'ctlBalls', better: 'higher' }] },
     { key: 'fsPct', label: 'False shots induced %', source: 'derived', group: 'bowling', format: { unit: 'percent', dp: 0 },
       agg: { kind: 'rate', num: 'fsInduced', den: 'ctlBowled', scale: 100, over: 'ctrlBowl' }, coverOf: 'bowledAny' },
     { key: 'fastest', label: 'Fastest ball (km/h)', leaderLabel: 'Fastest ball', source: 'derived', group: 'bowling', format: { unit: 'count' },
-      agg: { kind: 'max', key: 'kphMax', over: 'clocked' }, coverOf: 'bowledAny' },
+      agg: { kind: 'max', key: 'kphMax', over: 'clocked', den: 'kphN', qualifier: DETAIL_QUALIFIERS.fastest }, coverOf: 'bowledAny',
+      tieBreak: [{ key: 'avgKph', better: 'higher' }] },
     { key: 'avgKph', label: 'Average speed (km/h)', source: 'derived', group: 'bowling', format: { unit: 'decimal', dp: 1 },
       agg: { kind: 'rate', num: 'kphSum', den: 'kphN', over: 'clocked' }, coverOf: 'bowledAny' },
+    // ── Round 2: the new-era keys (statTotals writes them only for a match
+    // scored on a stamping app — scorecard.ts `eraTotals`; an older line never
+    // carries them, so its totals and its career never move)
+    { key: 'newEra', label: 'New-era matches', short: 'new-era matches', one: 'new-era match', coverage: 'keyed' },
+    { key: 'dotsF', label: 'Dot balls faced', short: 'dot balls faced', one: 'dot ball faced', group: 'batting', coverage: 'keyed' },
+    { key: 'bndRuns', label: 'Runs in boundaries', short: 'runs in boundaries', group: 'batting', coverage: 'keyed' },
+    { key: 'ballsPP', label: 'Balls bowled · powerplay', short: 'powerplay balls', group: 'bowling', coverage: 'keyed' },
+    { key: 'runsPP', label: 'Runs conceded · powerplay', short: 'powerplay runs conceded', group: 'bowling', coverage: 'keyed' },
+    { key: 'ballsMid', label: 'Balls bowled · middle overs', short: 'middle-overs balls', group: 'bowling', coverage: 'keyed' },
+    { key: 'runsMid', label: 'Runs conceded · middle overs', short: 'middle-overs runs conceded', group: 'bowling', coverage: 'keyed' },
+    { key: 'ballsDeath', label: 'Balls bowled · death overs', short: 'death-overs balls', group: 'bowling', coverage: 'keyed' },
+    { key: 'runsDeath', label: 'Runs conceded · death overs', short: 'death-overs runs conceded', group: 'bowling', coverage: 'keyed' },
+    { key: 'dotPct', label: 'Dot-ball %', source: 'derived', group: 'batting', format: { unit: 'percent', dp: 0, better: 'lower' },
+      agg: { kind: 'rate', num: 'dotsF', den: 'ballsFaced', scale: 100, over: 'eraBat' }, coverOf: 'batted' },
+    { key: 'bndPct', label: 'Boundary %', source: 'derived', group: 'batting', format: { unit: 'percent', dp: 0 },
+      agg: { kind: 'rate', num: 'bndRuns', den: 'runs', scale: 100, over: 'eraBat' }, coverOf: 'batted' },
+    { key: 'bowlDotPct', label: 'Dot-ball % (bowling)', source: 'derived', group: 'bowling', format: { unit: 'percent', dp: 0 },
+      agg: { kind: 'rate', num: 'dots', den: 'ballsBowled', scale: 100, over: 'eraBowl' }, coverOf: 'bowledAny' },
+    { key: 'econPP', label: 'Economy · powerplay', source: 'derived', group: 'bowling', format: { unit: 'decimal', dp: 2, better: 'lower' },
+      agg: { kind: 'rate', num: 'runsPP', den: 'ballsPP', scale: 6, over: 'ppBowled' }, coverOf: 'bowledAny' },
+    { key: 'econMid', label: 'Economy · middle overs', source: 'derived', group: 'bowling', format: { unit: 'decimal', dp: 2, better: 'lower' },
+      agg: { kind: 'rate', num: 'runsMid', den: 'ballsMid', scale: 6, over: 'midBowled' }, coverOf: 'bowledAny' },
+    { key: 'econDeath', label: 'Economy · death overs', source: 'derived', group: 'bowling', format: { unit: 'decimal', dp: 2, better: 'lower' },
+      agg: { kind: 'rate', num: 'runsDeath', den: 'ballsDeath', scale: 6, over: 'deathBowled' }, coverOf: 'bowledAny' },
+    // Round 2 — a direct-hit run out (optional chip): shown once a player has one
+    { key: 'directHits', label: 'Direct-hit run outs', short: 'direct hits', one: 'direct hit', group: 'fielding', coverage: 'keyed',
+      agg: { kind: 'sum', over: 'directHit' }, coverOf: 'directHit' },
   ],
   sections: [
     { id: 'batting', title: 'Batting', rows: [
@@ -165,6 +215,8 @@ export const cricketStats: SportStatSchema<'cricket'> = {
       { stat: 'srPace', label: 'SR vs pace' }, { stat: 'srSpin', label: 'SR vs spin' },
       { stat: 'avgPace', label: 'Avg vs pace' }, { stat: 'avgSpin', label: 'Avg vs spin' },
       { stat: 'ctrlPct' },
+      // Round 2 — new-era matches only (with an "x of y innings" note)
+      { stat: 'dotPct', label: 'Dot %' }, { stat: 'bndPct', label: 'Boundary %' },
     ] },
     { id: 'bowling', title: 'Bowling', rows: [
       { stat: 'overs' }, { stat: 'wickets' }, { stat: 'runsConceded', label: 'Runs' }, { stat: 'maidens' }, { stat: 'dots' },
@@ -173,11 +225,16 @@ export const cricketStats: SportStatSchema<'cricket'> = {
       { stat: 'bowlInnings', label: 'Inns' }, { stat: 'fourW' }, { stat: 'fiveW' },
       // Deep wave — only once a match tracked them
       { stat: 'fsPct' }, { stat: 'fastest' }, { stat: 'avgKph' },
+      // Round 2 — new-era matches only
+      { stat: 'bowlDotPct', label: 'Dot %' },
+      { stat: 'econPP', label: 'Econ (powerplay)' }, { stat: 'econMid', label: 'Econ (middle)' }, { stat: 'econDeath', label: 'Econ (death)' },
     ] },
     { id: 'fielding', title: 'Fielding', rows: [
       ...['catches', 'stumpings', 'runouts', 'dropped', 'runsSaved', 'runsMissed'].map((stat) => ({ stat })),
       // SD-69 — only for a player who kept wicket in a re-synced match
       { stat: 'wkCatches', label: 'Ct as keeper' }, { stat: 'wkDismissals', label: 'Keeper dismissals' },
+      // Round 2 — once they have one
+      { stat: 'directHits', label: 'Direct hits' },
     ] },
   ],
   careerView: 'sections',
@@ -188,9 +245,9 @@ export const cricketStats: SportStatSchema<'cricket'> = {
   // SD-16: records leaders after the original three (CK-01); SD-38: 4s / 6s /
   // maidens / dots / ducks; SD-69: keeper dismissals (re-synced lines)
   leaders: ['runs', 'wickets', 'catches', 'highest', 'best', 'avg', 'sr', 'econ', 'fifties', 'hundreds',
-    'fours', 'sixes', 'maidens', 'dots', 'ducks', 'wkDismissals'],
-  // (Deep wave: `fastest` and `ctrlPct` carry leader labels, ready to append
-  // here once the founder wants those rails — tests pin this list.)
+    'fours', 'sixes', 'maidens', 'dots', 'ducks', 'wkDismissals',
+    // Round 2 (founder: yes) — the tracked-detail rails, each with a minimum
+    'fastest', 'ctrlPct'],
   headline: ['runs', 'wickets'],
   // cricket ships its own richer per-match summary: tournament slots only
   awards: [

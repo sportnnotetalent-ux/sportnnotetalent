@@ -10,7 +10,7 @@
  * correction changes it at once. A figure that was never recorded is absent
  * (never 0). Pure.
  */
-import type { DisciplineDef, EntryResult, PhaseFormat, RankedEntry, ResultEntry, ResultFlag } from './model.ts';
+import type { DisciplineDef, EntryResult, PhaseFormat, RankedEntry, ResultEntry, ResultFlag, TrackOverrides } from './model.ts';
 import { disciplineOf, looseLegal, phaseDiscipline } from './model.ts';
 import { formatMark } from './marks.ts';
 import { rankByHeat, rankEntries } from './rank.ts';
@@ -18,7 +18,7 @@ import { qualify, withQualification } from './progression.ts';
 import { splitDistances, swimEventOf } from './swimming.ts';
 import { isCrewSport, routeCrews, routeTarget } from './crews.ts';
 import { combinedPhaseName } from './combined.ts';
-import { distanceLabel, raceMetres } from './raceSplitDefs.ts';
+import { athLapDistances, distanceLabel, lapPointsDiffer, lapPointsOf, raceMetres, type LapPoints } from './raceSplitDefs.ts';
 
 export * from './raceSplitDefs.ts';
 
@@ -48,19 +48,132 @@ export interface RaceTracking {
   cycSplits: boolean;
   /** athletics road races: the chip (net) time beside the official gun time */
   chipTimes: boolean;
+  /** round 2 — athletics lap times: at the finish-line passes (default) or every 400 m from the start */
+  lapPoints: LapPoints;
 }
 
-export function raceTracking(sport: string | null | undefined, fmt?: Record<string, unknown> | null): RaceTracking {
-  const on = (k: string) => fmt?.[k] === true;
+/** The on / off "Stats to track" keys (lapPoints is a choice). */
+export type TrackKey = Exclude<keyof RaceTracking, 'lapPoints'>;
+export const TRACK_KEYS: TrackKey[] = ['reaction', 'lapSplits', 'relayLegs', 'splits', 'takeovers', 'cycSplits', 'chipTimes'];
+
+/**
+ * The meet's "Stats to track" (`tournament.formats[sport]`) and — round 2 —
+ * the event's own overrides (`PhaseFormat.track`; an absent key follows the
+ * meet). A key that isn't the sport's stays off whatever an override says.
+ */
+export function raceTracking(sport: string | null | undefined, fmt?: Record<string, unknown> | null, own?: TrackOverrides | null): RaceTracking {
+  const on = (k: TrackKey) => (typeof own?.[k] === 'boolean' ? own[k] === true : fmt?.[k] === true);
   return {
     reaction: (sport === 'athletics' || sport === 'swimming') && on('reaction'),
     lapSplits: sport === 'athletics' && on('lapSplits'),
     relayLegs: sport === 'athletics' && on('relayLegs'),
-    splits: sport === 'swimming' ? fmt?.splits !== false : (sport === 'rowing' || sport === 'canoe') && on('splits'),
+    splits: sport === 'swimming' ? (typeof own?.splits === 'boolean' ? own.splits : fmt?.splits !== false) : (sport === 'rowing' || sport === 'canoe') && on('splits'),
     takeovers: sport === 'swimming' && on('takeovers'),
     cycSplits: sport === 'cycling' && on('cycSplits'),
     chipTimes: sport === 'athletics' && on('chipTimes'),
+    lapPoints: sport === 'athletics' ? lapPointsOf(own?.lapPoints ?? fmt?.lapPoints) : 'finish',
   };
+}
+
+/* ----------------------- round 2: per-event overrides ---------------------- */
+
+export interface TrackOption {
+  key: TrackKey | 'lapPoints';
+  label: string;
+  hint: string;
+}
+
+const OPT: Record<TrackKey | 'lapPoints', Omit<TrackOption, 'key'>> = {
+  reaction: { label: 'Reaction times', hint: 'from a start-information system / the blocks' },
+  lapSplits: { label: 'Lap times', hint: 'each runner every lap, with places at each split' },
+  lapPoints: { label: 'Lap points', hint: 'where the lap times are read' },
+  relayLegs: { label: 'Relay leg times', hint: 'the time at each changeover → every runner’s leg' },
+  splits: { label: 'Splits', hint: 'intermediate times at the usual points' },
+  takeovers: { label: 'Relay take-over times', hint: 'the pads’ reading for legs 2–4' },
+  cycSplits: { label: 'Intermediate times', hint: 'every 1000 m / lap / the time check' },
+  chipTimes: { label: 'Chip times', hint: 'the chip (net) time beside the official gun time' },
+};
+
+/**
+ * The "Stats to track" an EVENT can set for itself (round 2 — the founder:
+ * meet-wide and per-event), only the ones that mean something for it: a
+ * 1500 m offers reaction, lap times and where they are read; a relay its leg
+ * times; a swim relay its take-overs; a road race its chip times. [] = none
+ * (field events, order races …).
+ */
+export function trackOptions(def: Pick<DisciplineDef, 'key' | 'sport' | 'teamSize' | 'capture' | 'tie' | 'unit'>, f?: Partial<Pick<PhaseFormat, 'road'>> | null): TrackOption[] {
+  const keys: (TrackKey | 'lapPoints')[] = [];
+  const timed = def.capture === 'single' && def.unit === 'time';
+  if (def.sport === 'athletics') {
+    if (def.tie === 'road') {
+      if (/^ath\.(road|walk)\.(?!t)/.test(def.key) && f?.road?.timing !== 'chip') keys.push('chipTimes');
+    } else if (timed) {
+      keys.push('reaction');
+      if (def.teamSize) { if (splitDistances(def.key).length) keys.push('relayLegs'); }
+      else if (splitDistances(def.key).length) { keys.push('lapSplits'); if (lapPointsDiffer(def.key)) keys.push('lapPoints'); }
+    }
+  } else if (def.sport === 'swimming' && timed) {
+    if (splitDistances(def.key).length) keys.push('splits');
+    keys.push('reaction');
+    if (def.teamSize) keys.push('takeovers');
+  } else if (isCrewSport(def.sport)) {
+    if (def.capture === 'single' && splitDistances(def.key).length) keys.push('splits');
+  } else if (def.sport === 'cycling') {
+    if (def.capture === 'single' && splitDistances(def.key).length) keys.push('cycSplits');
+  }
+  return keys.map((key) => ({ key, ...OPT[key] }));
+}
+
+/**
+ * The event's overrides after setting one value: a value equal to what the
+ * meet / phase gives anyway is dropped (the key follows the meet again), so
+ * "back to the meet's choice" is just picking it. Undefined = no overrides.
+ */
+export function setTrackOverride(cur: TrackOverrides | null | undefined, key: TrackKey | 'lapPoints', value: boolean | LapPoints, base: RaceTracking): TrackOverrides | undefined {
+  const next: TrackOverrides = { ...(cur ?? {}) };
+  if (key === 'lapPoints') {
+    if (value === base.lapPoints) delete next.lapPoints; else next.lapPoints = value as LapPoints;
+  } else if (value === base[key]) delete next[key];
+  else next[key] = value as boolean;
+  return Object.keys(next).length ? next : undefined;
+}
+
+/**
+ * What an event captures before its own overrides: the meet's choices, with
+ * the phase's own flags where they decide (reaction set at creation, SD-90;
+ * swimming / crew splits per phase, SD-94 / SD-99) — the base the per-event
+ * card compares against (picking the base value drops the override).
+ */
+export function trackDefaults(sport: string | null | undefined, meet: Record<string, unknown> | null | undefined, f: Partial<Pick<PhaseFormat, 'reaction' | 'splits'>>): RaceTracking {
+  const t = raceTracking(sport, meet);
+  return {
+    ...t,
+    reaction: (sport === 'athletics' || sport === 'swimming') && (!!f.reaction || t.reaction),
+    splits: sport === 'swimming' ? f.splits ?? true : isCrewSport(sport) ? !!f.splits : t.splits,
+  };
+}
+
+/** What the event captures now: its defaults with its own overrides on top. */
+export function trackEffective(sport: string | null | undefined, meet: Record<string, unknown> | null | undefined, f: Partial<Pick<PhaseFormat, 'reaction' | 'splits' | 'track'>>): RaceTracking {
+  const base = trackDefaults(sport, meet, f);
+  const own = f.track ?? {};
+  // an override counts only for a key the sport has
+  const pick = (k: TrackKey) => (typeof own[k] === 'boolean' ? own[k] === true && raceTracking(sport, { [k]: true })[k] : base[k]);
+  return {
+    reaction: pick('reaction'), lapSplits: pick('lapSplits'), relayLegs: pick('relayLegs'), splits: pick('splits'),
+    takeovers: pick('takeovers'), cycSplits: pick('cycSplits'), chipTimes: pick('chipTimes'),
+    lapPoints: sport === 'athletics' && own.lapPoints ? lapPointsOf(own.lapPoints) : base.lapPoints,
+  };
+}
+
+/** Is a reaction-time box offered on this phase? The event's override, else the
+ *  phase's own flag (set at creation, SD-90) or the meet's current choice.
+ *  Not on the road (no start-information system on a road course). */
+export function reactionOffered(def: Pick<DisciplineDef, 'sport' | 'unit'> & Partial<Pick<DisciplineDef, 'tie'>>, f: Pick<PhaseFormat, 'reaction'> & Partial<Pick<PhaseFormat, 'track'>>, meet: Pick<RaceTracking, 'reaction'>): boolean {
+  if (def.unit !== 'time') return false;
+  if (def.tie === 'road' && !f.reaction) return false;
+  if (typeof f.track?.reaction === 'boolean') return f.track.reaction && (def.sport === 'athletics' || def.sport === 'swimming');
+  return !!f.reaction || meet.reaction;
 }
 
 /**
@@ -70,10 +183,12 @@ export function raceTracking(sport: string | null | undefined, fmt?: Record<stri
  * the meet's "Stats to track" (so turning one on mid-meet works for events
  * already set up).
  */
-export function splitsOffered(def: Pick<DisciplineDef, 'key' | 'sport' | 'teamSize' | 'capture'>, f: Pick<PhaseFormat, 'splits'>, t: RaceTracking): boolean {
+export function splitsOffered(def: Pick<DisciplineDef, 'key' | 'sport' | 'teamSize' | 'capture'>, f: Pick<PhaseFormat, 'splits'> & Partial<Pick<PhaseFormat, 'track'>>, t: RaceTracking): boolean {
   if (def.capture !== 'single' || !splitDistances(def.key).length) return false;
-  if (def.sport === 'swimming') return f.splits ?? true;
-  if (isCrewSport(def.sport)) return !!f.splits;
+  // round 2: the event's own choice wins over the phase's SD-94 / SD-99 flag
+  const own = typeof f.track?.splits === 'boolean' ? f.track.splits : undefined;
+  if (def.sport === 'swimming') return own ?? f.splits ?? true;
+  if (isCrewSport(def.sport)) return own ?? !!f.splits;
   if (def.sport === 'athletics') return def.teamSize ? t.relayLegs : t.lapSplits;
   if (def.sport === 'cycling') return t.cycSplits;
   return false;
@@ -94,10 +209,36 @@ export interface SplitPoint {
   seg?: number;
 }
 
+/**
+ * Round 2 — where THIS result's splits were read: an athletics race's lap
+ * times read every 400 m from the start carry `lapsFrom: 'start'`; anything
+ * else (every older result) reads at the discipline's usual points.
+ */
+export function splitDistancesFor(key: string, r?: Pick<EntryResult, 'lapsFrom'> | null): number[] {
+  return key.startsWith('ath.') && r?.lapsFrom === 'start' ? athLapDistances(key, 'start') : splitDistances(key);
+}
+
+/** The lap points a result's split boxes use: its own when it has splits, else the meet's / event's choice. */
+export function entryLapPoints(r: Pick<EntryResult, 'splits' | 'lapsFrom'>, t: Pick<RaceTracking, 'lapPoints'>): LapPoints {
+  return r.splits?.some((x) => x != null) ? (r.lapsFrom === 'start' ? 'start' : 'finish') : t.lapPoints;
+}
+
+/** The split boxes on the entry screen for this result (athletics laps follow the lap-point choice). */
+export function entrySplitDistances(def: Pick<DisciplineDef, 'key' | 'teamSize'>, r: Pick<EntryResult, 'splits' | 'lapsFrom'>, t: Pick<RaceTracking, 'lapPoints'>): number[] {
+  return def.key.startsWith('ath.') && !def.teamSize ? athLapDistances(def.key, entryLapPoints(r, t)) : splitDistances(def.key);
+}
+
+/** The result after typing its splits: `lapsFrom: 'start'` only on athletics laps read from the start (absent = the usual points). */
+export function resultWithSplits<R extends EntryResult>(r: R, splits: number[] | undefined, from: LapPoints): R {
+  const { lapsFrom: _drop, ...rest } = r;
+  void _drop;
+  return { ...rest, splits, ...(splits?.length && from === 'start' ? { lapsFrom: 'start' as const } : {}) } as R;
+}
+
 /** The cumulative times at every split point and the finish, with each
  *  segment. [] when no split was recorded (old results look exactly as before). */
-export function splitPoints(def: Pick<DisciplineDef, 'key'>, r: Pick<EntryResult, 'splits' | 'mark' | 'status'>, yards = false): SplitPoint[] {
-  const ds = splitDistances(def.key);
+export function splitPoints(def: Pick<DisciplineDef, 'key'>, r: Pick<EntryResult, 'splits' | 'mark' | 'status' | 'lapsFrom'>, yards = false): SplitPoint[] {
+  const ds = splitDistancesFor(def.key, r);
   if (!ds.length || !r.splits?.some((x) => x != null)) return [];
   const total = raceMetres(def.key);
   const pts: { at: number; time?: number }[] = ds.map((d, i) => ({ at: d, time: r.splits?.[i] ?? undefined }));
@@ -125,13 +266,27 @@ export function splitPlaces(rows: { id: string; result: Pick<EntryResult, 'split
   return out;
 }
 
+/**
+ * Round 2 — each entry's place at each of ITS OWN split points (1 = leading),
+ * among the entries timed at that same distance. Rows may read different
+ * points (an organiser switched the lap points mid-heat); index i =
+ * splitDistancesFor(key, row)[i]. Equal times share the place.
+ */
+export function splitPlacesFor(def: Pick<DisciplineDef, 'key'>, rows: { id: string; result: Pick<EntryResult, 'splits' | 'lapsFrom'> }[]): Map<string, (number | undefined)[]> {
+  const at = rows.map((r) => ({ id: r.id, ds: splitDistancesFor(def.key, r.result), sp: r.result.splits ?? [] }));
+  const byDist = new Map<number, number[]>();
+  for (const a of at) a.ds.forEach((d, i) => { const t = a.sp[i]; if (t != null) byDist.set(d, [...(byDist.get(d) ?? []), t]); });
+  const placeAt = (d: number, t: number) => (byDist.get(d) ?? []).filter((x) => x < t).length + 1;
+  return new Map(at.map((a) => [a.id, a.ds.map((d, i) => (a.sp[i] != null ? placeAt(d, a.sp[i] as number) : undefined))]));
+}
+
 /** "led at every split" / "came from 4th at 1100 m" / "took the lead by 1000 m" —
  *  the winner's race from the splits, or null without them. */
 export function winnerSplitStory(def: Pick<DisciplineDef, 'key'>, rows: RankedEntry[]): string | null {
-  const ds = splitDistances(def.key);
   const win = rows.find((r) => r.position === 1);
+  const ds = win ? splitDistancesFor(def.key, win.entry.result) : [];
   if (!ds.length || !win || !win.entry.result.splits?.some((x) => x != null)) return null;
-  const places = splitPlaces(rows.filter((r) => r.status === 'ok').map((r) => ({ id: r.id, result: r.entry.result })), ds.length).get(win.id) ?? [];
+  const places = splitPlacesFor(def, rows.filter((r) => r.status === 'ok').map((r) => ({ id: r.id, result: r.entry.result }))).get(win.id) ?? [];
   const known = places.map((p, i) => ({ p, at: ds[i] })).filter((x) => x.p != null) as { p: number; at: number }[];
   if (!known.length) return null;
   if (known.every((x) => x.p === 1)) return known.length > 1 ? 'led at every split' : `led at ${distanceLabel(known[0].at)}`;
@@ -141,19 +296,23 @@ export function winnerSplitStory(def: Pick<DisciplineDef, 'key'>, rows: RankedEn
   return took ? `took the lead by ${distanceLabel(took.at)}` : null;
 }
 
-/** The fastest segment over the last split → finish (the last lap / length / 500 m). */
+/** The fastest segment over the last split → finish (the last lap / length / 500 m).
+ *  Round 2: like is compared with like — when rows read different lap points,
+ *  the last segment most of them share (the first one on a tie). */
 export function fastestFinish(def: Pick<DisciplineDef, 'key'>, rows: RankedEntry[]): { id: string; name: string; seg: number; label: string } | null {
-  let best: { id: string; name: string; seg: number; label: string } | null = null;
+  const segs: { id: string; name: string; seg: number; label: string }[] = [];
   for (const r of rows) {
     if (r.status !== 'ok') continue;
     const pts = splitPoints(def, r.entry.result);
     const lastSeg = pts[pts.length - 1];
     if (!lastSeg?.seg || pts.length < 2) continue;
     const from = pts[pts.length - 2];
-    const label = `${lastSeg.at - from.at} m`;
-    if (!best || lastSeg.seg < best.seg) best = { id: r.id, name: r.entry.name, seg: lastSeg.seg, label };
+    segs.push({ id: r.id, name: r.entry.name, seg: lastSeg.seg, label: `${lastSeg.at - from.at} m` });
   }
-  return best;
+  if (!segs.length) return null;
+  const count = (l: string) => segs.filter((x) => x.label === l).length;
+  const label = segs.map((x) => x.label).reduce((a, b) => (count(b) > count(a) ? b : a));
+  return segs.filter((x) => x.label === label).reduce((a, b) => (b.seg < a.seg ? b : a));
 }
 
 /* ------------------------------ relay legs ------------------------------- */
@@ -441,10 +600,11 @@ export interface HeatAnalysis {
 
 /** Everything the race-analysis card shows for one heat (only what was recorded). */
 export function heatAnalysis(def: DisciplineDef, heat: number, rows: RankedEntry[], yards = false): HeatAnalysis {
-  const ds = splitDistances(def.key);
   const total = raceMetres(def.key);
   const withSplits = rows.filter((r) => r.entry.result.splits?.some((x) => x != null));
-  const places = splitPlaces(rows.filter((r) => r.status === 'ok').map((r) => ({ id: r.id, result: r.entry.result })), ds.length);
+  // round 2: every point any row was read at (athletics laps at the finish line or from the start)
+  const ds = [...new Set(withSplits.flatMap((r) => splitDistancesFor(def.key, r.entry.result)))].sort((a, b) => a - b);
+  const places = splitPlacesFor(def, rows.filter((r) => r.status === 'ok').map((r) => ({ id: r.id, result: r.entry.result })));
   const legs = def.teamSize ? rows.flatMap((r) => { const l = relayLegs(def, r.entry.result); return l ? [{ id: r.id, name: r.entry.name, legs: l }] : []; }) : [];
   let fastestLeg: HeatAnalysis['fastestLeg'] = null;
   // leg 1 includes the reaction (a standing start) — the fastest leg is from the flying legs when there are any

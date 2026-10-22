@@ -4,11 +4,11 @@
  *  (src/sports/racketTotals.ts), plus the SD-22 serve / return keys replayed
  *  from the point log (src/sports/serveStats.ts). PURE. */
 import type { SportId } from '../core/types';
-import type { AwardDef, MvpDef, Qualifier, SectionDef, SportStatSchema, StatDef } from './statSchema.ts';
+import type { AwardDef, MvpDef, Qualifier, SectionDef, SportStatSchema, StatAgg, StatDef } from './statSchema.ts';
 import { ACES, POINTS } from './sharedStats.ts';
 import {
   DETAIL_HOWS, HOW_KEY, NET_KEY, NET_WORDS, RALLY_LABEL, STROKES, STROKES_CONCEDED, THIRD_LABEL, THIRD_SHOTS, TT_PHASE_LABEL, WINGS, WING_LABEL,
-  hasNetFlag, hasThirdShot, rallyBucketsOf, rallyKey, shotIdsOf, shotKey, shotLabel, strokeKey, wingKey,
+  allRallyBuckets, hasNetFlag, hasNobodyMark, hasThirdShot, rallyKey, shotIdsOf, shotKey, shotLabel, strokeKey, wingKey,
   type DepthSport, type DetailSport, type ThirdShot,
 } from './pointDetail.ts';
 
@@ -250,6 +250,9 @@ export function shotSection(sport: DetailSport): SectionDef {
   // deep wave — padel net points / pickleball kitchen line (tracked matches only)
   const nw = sport !== 'tennis' ? NET_WORDS[sport] : undefined;
   if (nw) extra.push(nw.keys.won, nw.keys.pct);
+  // round 2 — pickleball kitchen arrival; squash lets asked (tracked matches only)
+  if (hasNobodyMark(sport)) extra.push(...ARRIVAL_RATES);
+  if (sport === 'squash') extra.push('letsAsked');
   const strokes = DETAIL_HOWS[sport].flatMap((h) => (h.strokes ?? []).map((st) => strokeKey(h.how, st)!));
   // deep wave — by wing, then by shot (a row shows once the player has one)
   const ws = sport === 'tennis' ? [] : DETAIL_HOWS[sport].filter((h) => h.wingShot);
@@ -265,6 +268,25 @@ const pctOf = (key: string, label: string, num: string | string[], den: string |
 });
 const keyedIn = (group: string) => (key: string, label: string, short: string, one: string): StatDef => ({ key, label, short, one, group, coverage: 'keyed' });
 
+/** Round 2 — leaderboard minimums for the depth rates the founder made
+ *  leaders (organisers can change them per tournament), sized like
+ *  RACKET_MINIMUMS for a school event of 3–6 matches:
+ *    - padel net points won %: 20 net points (≈ 2 matches with net tracking);
+ *    - pickleball 3rd-shot drop success %: 15 drops (≈ 1–2 matches);
+ *    - table tennis serve & 3rd ball won %: 30 such points (≈ 1–2 matches). */
+export const DEPTH_MINIMUMS = {
+  netPts: { den: 20, unit: { label: 'net points', one: 'net point' } } as Qualifier,
+  thirdDrop: { den: 15, unit: { label: '3rd-shot drops', one: '3rd-shot drop' } } as Qualifier,
+  serve3Pts: { den: 30, unit: { label: 'serve & 3rd ball points', one: 'serve & 3rd ball point' } } as Qualifier,
+};
+/** Round 2 — the depth leaders per sport (appended after the racket leaders). */
+export const DEPTH_LEADERS: Partial<Record<DetailSport, string[]>> = { padel: ['netPtsPct'], pickleball: ['thirdDropPct'], tabletennis: ['serve3Pct'] };
+/** A depth rate made a leader: its leaderboard name, minimum and tie-break. */
+const asLeader = (d: StatDef, leaderLabel: string, qualifier: Qualifier, tie: string): StatDef =>
+  ({ ...d, leaderLabel, agg: { ...(d.agg as Extract<StatAgg, { kind: 'rate' }>), qualifier }, tieBreak: [{ key: tie, better: 'higher' }] });
+/** Round 2 — pickleball kitchen-arrival rates (career rows). */
+const ARRIVAL_RATES = ['kitchenArrPct', 'kitchenSrvArrPct', 'kitchenRcvArrPct'];
+
 /** Deep wave — the depth keys statTotals writes for `sport` when the match
  *  tracked them (racketMatchStats.ts `racketCareerKeys`), with their rates:
  *    rally length   rl…Pts / rl…Won per bucket (the side's points / won);
@@ -274,11 +296,15 @@ const keyedIn = (group: string) => (key: string, label: string, short: string, o
  *                   4th ball) — the three-phase analysis with rl5;
  *    net / kitchen  netPts / netPtsWon (padel, pickleball; the side's);
  *    3rd shot       third{Drop,Drive,Lob} / …Won (pickleball; the serving
- *                   side's 3rd shot and the rallies it won). */
+ *                   side's 3rd shot and the rallies it won).
+ *  Round 2: every bucket scheme's keys (an organiser option — RALLY_SCHEMES;
+ *  a key shared across sports reads the same everywhere); pickleball kitchen
+ *  arrival (kitchenArrOf …, rates over kitchenPts); squash letsAsked; and
+ *  three rates made leaders with a minimum (DEPTH_LEADERS / DEPTH_MINIMUMS). */
 export function racketDepthStats(sport: DepthSport): StatDef[] {
   const out: StatDef[] = [];
   const rally = keyedIn('rally');
-  for (const b of rallyBucketsOf(sport)) {
+  for (const b of allRallyBuckets(sport)) {
     // the labels tennis' keys of the same name read with (rl04Pts …)
     const k = rallyKey(b), dash = b.replace('-', '–');
     const phase = sport === 'tabletennis' ? TT_PHASE_LABEL[b] : undefined;
@@ -295,7 +321,7 @@ export function racketDepthStats(sport: DepthSport): StatDef[] {
       rally('serve3Won', 'Serve & 3rd ball points won', 'serve & 3rd ball points won', 'serve & 3rd ball point won'),
       rally('receive4Pts', 'Receive & 4th ball points', 'receive & 4th ball points', 'receive & 4th ball point'),
       rally('receive4Won', 'Receive & 4th ball points won', 'receive & 4th ball points won', 'receive & 4th ball point won'),
-      pctOf('serve3Pct', 'Serve & 3rd ball won %', 'serve3Won', 'serve3Pts', 'rally'),
+      asLeader(pctOf('serve3Pct', 'Serve & 3rd ball won %', 'serve3Won', 'serve3Pts', 'rally'), 'Serve & 3rd ball won %', DEPTH_MINIMUMS.serve3Pts, 'serve3Won'),
       pctOf('receive4Pct', 'Receive & 4th ball won %', 'receive4Won', 'receive4Pts', 'rally'),
     );
   }
@@ -303,11 +329,31 @@ export function racketDepthStats(sport: DepthSport): StatDef[] {
   if (nw) {
     // padel: tennis' net keys and words; pickleball: its own kitchen-line keys
     const net = keyedIn('shots');
+    const pct = pctOf(nw.keys.pct, `${nw.won} %`, nw.keys.won, nw.keys.pts, 'shots');
     out.push(
       net(nw.keys.pts, nw.points, nw.points.toLowerCase(), nw.one),
       net(nw.keys.won, nw.won, nw.won.toLowerCase(), `${nw.one} won`),
-      pctOf(nw.keys.pct, `${nw.won} %`, nw.keys.won, nw.keys.pts, 'shots'),
+      // round 2: padel's net points won % is a leader (min 20 net points)
+      sport === 'padel' ? asLeader(pct, 'Net points won %', DEPTH_MINIMUMS.netPts, nw.keys.won) : pct,
     );
+  }
+  if (hasNobodyMark(sport)) {
+    // round 2 — kitchen arrival (rallies with a kitchen-line mark; arrived = kitchenPts)
+    const arr = keyedIn('shots');
+    out.push(
+      arr('kitchenArrOf', 'Rallies tracked for kitchen arrival', 'rallies tracked for kitchen arrival', 'rally tracked for kitchen arrival'),
+      arr('kitchenSrvArr', 'Kitchen arrivals when serving', 'kitchen arrivals when serving', 'kitchen arrival when serving'),
+      arr('kitchenSrvArrOf', 'Serving rallies tracked for kitchen arrival', 'serving rallies tracked for kitchen arrival', 'serving rally tracked for kitchen arrival'),
+      arr('kitchenRcvArr', 'Kitchen arrivals when returning', 'kitchen arrivals when returning', 'kitchen arrival when returning'),
+      arr('kitchenRcvArrOf', 'Returning rallies tracked for kitchen arrival', 'returning rallies tracked for kitchen arrival', 'returning rally tracked for kitchen arrival'),
+      pctOf('kitchenArrPct', 'Kitchen arrival %', 'kitchenPts', 'kitchenArrOf', 'shots'),
+      pctOf('kitchenSrvArrPct', 'Kitchen arrival % · serving', 'kitchenSrvArr', 'kitchenSrvArrOf', 'shots'),
+      pctOf('kitchenRcvArrPct', 'Kitchen arrival % · returning', 'kitchenRcvArr', 'kitchenRcvArrOf', 'shots'),
+    );
+  }
+  if (sport === 'squash') {
+    // round 2 — lets asked (the appealing player's; matches with a named let only)
+    out.push({ ...keyedIn('shots')('letsAsked', 'Lets asked', 'lets asked', 'let asked'), format: { unit: 'count', better: 'lower' } });
   }
   if (hasThirdShot(sport)) {
     const third = keyedIn('third');
@@ -317,7 +363,10 @@ export function racketDepthStats(sport: DepthSport): StatDef[] {
       out.push(
         third(k, `${lab}s`, `${lab}s`, lab),
         third(`${k}Won`, `${lab}s · rally won`, `${lab}s (rally won)`, `${lab} (rally won)`),
-        pctOf(`${k}Pct`, `Rallies won after a ${lab} %`, `${k}Won`, k, 'third'),
+        // round 2: the 3rd-shot drop's success % is a leader (min 15 drops)
+        t === 'drop'
+          ? asLeader(pctOf(`${k}Pct`, `Rallies won after a ${lab} %`, `${k}Won`, k, 'third'), '3rd-shot drop success %', DEPTH_MINIMUMS.thirdDrop, `${k}Won`)
+          : pctOf(`${k}Pct`, `Rallies won after a ${lab} %`, `${k}Won`, k, 'third'),
         pctOf(`${k}Share`, `${lab} use %`, k, all, 'third'),
       );
     }
@@ -333,7 +382,7 @@ export const thirdKey = (t: ThirdShot): string => `third${t.charAt(0).toUpperCas
 export function racketDepthSections(sport: DepthSport): SectionDef[] {
   const rows = [
     ...(sport === 'tabletennis' ? [{ stat: 'serve3Pct' }, { stat: 'receive4Pct' }] : []),
-    ...rallyBucketsOf(sport).map((b) => ({ stat: `${rallyKey(b)}Pct` })),
+    ...allRallyBuckets(sport).map((b) => ({ stat: `${rallyKey(b)}Pct` })),
   ];
   const out: SectionDef[] = [{ id: 'rally', title: sport === 'tabletennis' ? 'Rally phases' : 'Rally length', rows }];
   if (hasThirdShot(sport)) {
@@ -383,7 +432,9 @@ export function rallyStats<S extends SportId>(sport: S, icon: string, opts: { se
     box: [{ columns: ['points', ...DETAIL_BOX] }],
     // SD-27 (GEN-14): racket leaders and awards rank by results, not rally
     // points; "Top scorer" is retired (kept so published awards keep their icon)
-    leaders: racketLeaders(!!opts.sets, ['winnersPerMatch']),
+    // round 2: + the sport's depth leader (padel net points won %, pickleball
+    // 3rd-shot drop success %, table tennis serve & 3rd ball won %), last
+    leaders: [...racketLeaders(!!opts.sets, ['winnersPerMatch']), ...(DEPTH_LEADERS[ds] ?? [])],
     mvp: racketMvp(!!opts.sets),
     headline: ['points'],
     awards: [{ stat: 'points', icon, label: 'Top scorer', match: false, tournament: false }, BEST_SERVER],

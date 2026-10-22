@@ -3,7 +3,7 @@
  * move-by-move scoring; the board is the players'. Scoring is the standard
  * 1 / ½ / 0, so Swiss and round-robin tables read like a crosstable.
  */
-import { replayMoves, START_FEN } from './board.ts';
+import { replayMoves, parseFen, boardEnd, START_FEN } from './board.ts';
 import { readMoveList } from './pgn.ts';
 import { detectOpening, ecoCode, nameForEco } from './openings.ts';
 
@@ -97,6 +97,11 @@ export interface KoGame {
   clock?: { white?: number; black?: number };
   /** Deep wave — when the result was recorded (ms) */
   at?: number;
+  /** Round 2 — this game's move list (typed while it was played, or pasted
+   *  after: MOVES `koGame`). Absent on every older knockout game. */
+  game?: ChessMoves;
+  /** Round 2 — this game's opening, named by hand / a PGN tag */
+  opening?: { eco: string; name?: string; manual?: boolean };
 }
 export interface KoState { plan: KoPlan; games: KoGame[] }
 
@@ -216,7 +221,8 @@ export interface ChessState {
   ko?: KoState;
   /** Deep wave — the move list (MOVES: typed move by move, or a pasted PGN /
    *  SAN list, during or after the game). Absent = result only (every older
-   *  game). Not kept for a knockout mini-match. */
+   *  game). Round 2 — in a knockout match it is the game IN PLAY: recording
+   *  that game's result moves it into its `KoGame` (one list per game). */
   game?: ChessMoves;
   /** Deep wave — the opening named by hand (OPENING) or by a pasted PGN's
    *  [ECO] / [Opening] tags; otherwise `openingOf` reads it from the moves */
@@ -264,43 +270,96 @@ export function init(config?: Record<string, unknown>): ChessState {
     ...(hasKo ? { koPlan: koPlanFrom(config) } : {}), ...(track ? { track } : {}) };
 }
 
+/** One game's move list and opening (the game in play, or a knockout game). */
+interface MoveSlot { game?: ChessMoves; opening?: { eco: string; name?: string; manual?: boolean } }
+
 /** Deep wave — MOVES: `pgn` (a pasted game or list — replaces the moves),
  *  `add` (moves typed during the game, checked from the current position;
  *  `clk` = the clock after the last one), or `drop` (take back the last n).
- *  Only legal moves are kept (up to the first that isn't). No score effect. */
-function movesReducer(s: ChessState, p: Record<string, unknown>): ChessState {
+ *  Only legal moves are kept (up to the first that isn't). No score effect.
+ *  Round 2 — works on one slot (the game in play, or a knockout game);
+ *  null = nothing changed. */
+function movesOn(slot: MoveSlot, p: Record<string, unknown>): MoveSlot | null {
   const at = stampOf(p.at);
   if (typeof p.pgn === 'string') {
     const r = readMoveList(p.pgn);
-    if (!r.san.length) return s;
+    if (!r.san.length) return null;
     const game: ChessMoves = {
       san: r.san, fen: r.fen, ...(r.start ? { start: r.start } : {}),
       ...(r.clocks.some((x) => x != null) ? { clk: r.clocks } : {}), ...(at ? { at: r.san.map(() => at) } : {}),
     };
     const eco = ecoCode(r.tags.ECO);
-    const keep = s.opening?.manual ? { opening: s.opening } : eco ? { opening: { eco, ...(r.tags.Opening ? { name: r.tags.Opening } : {}) } } : {};
-    const { opening: _o, ...rest } = s;
-    return { ...rest, ...keep, game, seq: s.seq + 1 };
+    const keep = slot.opening?.manual ? { opening: slot.opening } : eco ? { opening: { eco, ...(r.tags.Opening ? { name: r.tags.Opening } : {}) } } : {};
+    return { ...keep, game };
   }
-  const prev: ChessMoves = s.game ?? { san: [], fen: START_FEN };
+  const prev: ChessMoves = slot.game ?? { san: [], fen: START_FEN };
+  const op = slot.opening ? { opening: slot.opening } : {};
   if (typeof p.drop === 'number' && p.drop > 0) {
-    if (!s.game?.san.length) return s;
+    if (!slot.game?.san.length) return null;
     const n = Math.max(0, prev.san.length - Math.floor(p.drop));
-    if (n === 0) { const { game: _g, ...rest } = s; return { ...rest, seq: s.seq + 1 }; }
+    if (n === 0) return { ...op };
     const rep = replayMoves(prev.san.slice(0, n), prev.start ?? START_FEN);
-    return { ...s, game: { ...prev, san: prev.san.slice(0, n), fen: rep.fen, ...(prev.clk ? { clk: prev.clk.slice(0, n) } : {}), ...(prev.at ? { at: prev.at.slice(0, n) } : {}) }, seq: s.seq + 1 };
+    return { ...op, game: { ...prev, san: prev.san.slice(0, n), fen: rep.fen, ...(prev.clk ? { clk: prev.clk.slice(0, n) } : {}), ...(prev.at ? { at: prev.at.slice(0, n) } : {}) } };
   }
   if (Array.isArray(p.add)) {
     const rep = replayMoves(p.add.map(String), prev.fen);
     const k = rep.san.length;
-    if (!k) return s;
+    if (!k) return null;
     const clkIn = typeof p.clk === 'number' && Number.isFinite(p.clk) && p.clk >= 0 ? Math.round(p.clk) : null;
     const old = prev.san.length;
     const clk = prev.clk || clkIn != null ? [...(prev.clk ?? new Array<number | null>(old).fill(null)), ...rep.san.map((_, i) => (i === k - 1 ? clkIn : null))] : undefined;
     const ats = prev.at || at ? [...(prev.at ?? new Array<number | null>(old).fill(null)), ...rep.san.map(() => at ?? null)] : undefined;
-    return { ...s, game: { ...prev, san: [...prev.san, ...rep.san], fen: rep.fen, ...(clk ? { clk } : {}), ...(ats ? { at: ats } : {}) }, seq: s.seq + 1 };
+    return { ...op, game: { ...prev, san: [...prev.san, ...rep.san], fen: rep.fen, ...(clk ? { clk } : {}), ...(ats ? { at: ats } : {}) } };
   }
-  return s;
+  return null;
+}
+
+/** OPENING on a slot: a typed ECO (by hand), or none = clear. */
+function openingOn(slot: MoveSlot, p: Record<string, unknown> | undefined): MoveSlot {
+  const eco = ecoCode(p?.eco);
+  const rest: MoveSlot = slot.game ? { game: slot.game } : {};
+  if (!eco) return rest;
+  const name = typeof p?.name === 'string' && p.name.trim() ? p.name.trim() : nameForEco(eco) ?? undefined;
+  return { ...rest, opening: { eco, ...(name ? { name } : {}), manual: true } };
+}
+
+/** The game in play's slot. */
+const slotOf = (x: MoveSlot): MoveSlot => ({ ...(x.game ? { game: x.game } : {}), ...(x.opening ? { opening: x.opening } : {}) });
+
+/** Put a slot back on the state (the game in play) — keys absent when empty. */
+function withSlot(s: ChessState, slot: MoveSlot): ChessState {
+  const rest: ChessState = { ...s };
+  delete rest.game;
+  delete rest.opening;
+  return { ...rest, ...(slot.game ? { game: slot.game } : {}), ...(slot.opening ? { opening: slot.opening } : {}), seq: s.seq + 1 };
+}
+
+/** Round 2 — a MOVES / OPENING aimed at knockout game `k` (payload `koGame`):
+ *  the list of a game already recorded (pasted after it). */
+function onKoGame(s: ChessState, k: number, f: (slot: MoveSlot) => MoveSlot | null): ChessState {
+  const g = s.ko?.games[k];
+  if (!s.ko || !g) return s;
+  const next = f(slotOf(g));
+  if (!next) return s;
+  const base: KoGame = { ...g };
+  delete base.game;
+  delete base.opening;
+  const games = s.ko.games.map((x, i) => (i === k ? { ...base, ...(next.game ? { game: next.game } : {}), ...(next.opening ? { opening: next.opening } : {}) } : x));
+  return { ...s, ko: { ...s.ko, games }, seq: s.seq + 1 };
+}
+
+/** Round 2 — the result the moves on the board show: checkmate (the side to
+ *  move is mated — the other colour wins) or stalemate (a draw). The controls
+ *  pre-select it; the arbiter still confirms. null = the game goes on (or no
+ *  moves). */
+export function boardResult(s: Pick<ChessState, 'game'>): { pick: 'white' | 'black' | 'draw'; method: 'checkmate' | 'stalemate' } | null {
+  if (!s.game?.san.length) return null;
+  const p = parseFen(s.game.fen);
+  if (!p) return null;
+  const end = boardEnd(p);
+  if (end === 'checkmate') return { pick: p.turn === 'w' ? 'black' : 'white', method: 'checkmate' };
+  if (end === 'stalemate') return { pick: 'draw', method: 'stalemate' };
+  return null;
 }
 
 /** Actions: SET_WHITE {side}, RESULT {winner, method, moves?}. PLAYED is a no-op
@@ -308,13 +367,20 @@ function movesReducer(s: ChessState, p: Record<string, unknown>): ChessState {
 export function reducer(s: ChessState, a: { type: string; side?: Side; payload?: Record<string, unknown> }): ChessState {
   // Deep wave — optional detail (new action types: no older log has them).
   // The move list and the opening may be added after the game too.
-  if (a.type === 'MOVES') return s.ko ? s : movesReducer(s, a.payload ?? {});
+  // Round 2 — in a knockout match the list is the game in play's (moved into
+  // its KoGame when the result is recorded), or a recorded game's (`koGame`).
+  // No older log has MOVES / OPENING on a knockout match (they were ignored).
+  if (a.type === 'MOVES') {
+    const p = a.payload ?? {};
+    if (typeof p.koGame === 'number') return onKoGame(s, Math.floor(p.koGame), (slot) => movesOn(slot, p));
+    if (s.ko && s.ended) return s;
+    const next = movesOn(slotOf(s), p);
+    return next ? withSlot(s, next) : s;
+  }
   if (a.type === 'OPENING') {
-    const eco = ecoCode(a.payload?.eco);
-    const { opening: _o, ...rest } = s;
-    if (!eco) return { ...rest, seq: s.seq + 1 };
-    const name = typeof a.payload?.name === 'string' && a.payload.name.trim() ? a.payload.name.trim() : nameForEco(eco) ?? undefined;
-    return { ...rest, opening: { eco, ...(name ? { name } : {}), manual: true }, seq: s.seq + 1 };
+    const p = a.payload ?? {};
+    if (typeof p.koGame === 'number') return onKoGame(s, Math.floor(p.koGame), (slot) => openingOn(slot, p));
+    return withSlot(s, openingOn(slotOf(s), p));
   }
   if (a.type === 'SET_TRACK') {
     if (s.ended) return s;
@@ -345,15 +411,21 @@ export function reducer(s: ChessState, a: { type: string; side?: Side; payload?:
     const stamped = stampOf(a.payload?.at);
     if (ko) {
       const at = koStatus(ko);
-      const game: KoGame = { phase: at.phase, white: s.white, winner, ...(method ? { method } : {}), ...(moves ? { moves } : {}), ...(clock && Object.keys(clock).length ? { clock } : {}), ...(stamped ? { at: stamped } : {}) };
+      // Round 2 — the game in play's move list / opening go with its result
+      // (absent on every older knockout game: nothing moves)
+      const game: KoGame = { phase: at.phase, white: s.white, winner, ...(method ? { method } : {}), ...(moves ? { moves } : {}), ...(clock && Object.keys(clock).length ? { clock } : {}), ...(stamped ? { at: stamped } : {}),
+        ...slotOf(s) };
       const next: KoState = { ...ko, games: [...ko.games, game] };
       const st = koStatus(next);
+      const base: ChessState = { ...s };
+      delete base.game;
+      delete base.opening;
       if (st.winner) {
-        return { ...s, ko: next, winner: st.winner, method, moves, ...(clock && Object.keys(clock).length ? { clock } : {}), ...(stamped ? { resultAt: stamped } : {}), ended: true, seq: s.seq + 1 };
+        return { ...base, ko: next, winner: st.winner, method, moves, ...(clock && Object.keys(clock).length ? { clock } : {}), ...(stamped ? { resultAt: stamped } : {}), ended: true, seq: s.seq + 1 };
       }
       // Undecided: the next game. Colours alternate (the arbiter can still
       // switch them with SET_WHITE — e.g. the Armageddon draw of lots).
-      const { winner: _w, method: _m, moves: _mv, clock: _c, ...rest } = s;
+      const { winner: _w, method: _m, moves: _mv, clock: _c, ...rest } = base;
       return { ...rest, ko: next, white: s.white === 'home' ? 'away' : 'home', seq: s.seq + 1 };
     }
     return { ...s, winner, method, moves, ...(clock && Object.keys(clock).length ? { clock } : {}), ...(stamped ? { resultAt: stamped } : {}), ended: true, seq: s.seq + 1 };

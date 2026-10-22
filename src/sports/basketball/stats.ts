@@ -57,7 +57,8 @@ export const basketballStats: SportStatSchema<'basketball'> = {
     // match that tracked it ('keyed' — a line without the key is "not
     // tracked", never 0). 2PM / 2PA: full-court games (2PA with misses
     // tracked); shot zones: "Shot zones" on; FD: "Fouls drawn" on;
-    // fast-break points: "Fast-break points" on.
+    // fast-break points: "Fast-break points" on (round 2: the made and-one
+    // free throw included, credited to its shooter — NBA convention).
     { key: 'twosMade', label: '2-pointers made', short: '2s', one: '2', abbr: '2PM', group: 'scoring', coverage: 'keyed' },
     { key: 'twosAtt', label: '2-pointers attempted', short: '2P att', abbr: '2PA', group: 'scoring', coverage: 'keyed' },
     { key: 'paintMade', label: 'Paint field goals made', short: 'paint FG made', abbr: 'PNT', group: 'zones', coverage: 'keyed' },

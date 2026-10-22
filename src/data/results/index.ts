@@ -35,3 +35,12 @@ export * from './precisionRules.ts';
 export * from './liftingInsights.ts';
 export * from './shootingInsights.ts';
 export * from './archeryInsights.ts';
+// Round 2 (precision-strength): lifting clock, Robi points / best lifter, IWF team classification
+export * from './liftingClock.ts';
+export * from './robi.ts';
+export * from './liftingPoints.ts';
+export * from './liftingTeam.ts';
+// Timed races round 2: heat wins in timed finals, records set on profiles, heat-win / PB follower alerts
+export * from './heatWins.ts';
+export * from './recordsSet.ts';
+export * from './raceHighlights.ts';

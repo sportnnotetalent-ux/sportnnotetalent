@@ -12,7 +12,8 @@ import { eventCredits, periodName, teamFigures, totalPeriods, LIVE_KEYS, GOAL_KE
 import { handballTotals } from './totals.ts';
 import { handballDepthFigures, handballUntracked } from './depth.ts';
 
-export interface HandballBoxContext { homeRoster?: Player[]; awayRoster?: Player[] }
+/** `now` (round 2): the clock for a goal that is empty right now (default: now). */
+export interface HandballBoxContext { homeRoster?: Player[]; awayRoster?: Player[]; now?: number }
 
 /** every key a row carries (the comparison sums line keys over the rows) */
 const ROW_KEYS = LIVE_KEYS.filter((k) => k !== 'soTaken' && k !== 'soGoals');
@@ -74,8 +75,9 @@ export function handballBox(s: HandballState, ctx: HandballBoxContext = {}): Mat
         return {
           rows: [...rows.values()],
           ...(Object.keys(teamStats).length ? { team: { label: 'Team / officials', stats: teamStats } } : {}),
-          // deep wave: save % (overall and by position), empty-goal goals, fault kinds
-          teamStats: { timeouts: f.timeouts, ...handballDepthFigures(s, sd, scope) },
+          // deep wave: save % (overall and by position), empty-goal goals (and,
+          // round 2, minutes with an empty goal), fault kinds
+          teamStats: { timeouts: f.timeouts, ...handballDepthFigures(s, sd, scope, ctx.now ?? Date.now()) },
         };
       };
       const untracked = handballUntracked(s);

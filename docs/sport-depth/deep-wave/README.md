@@ -2,6 +2,8 @@
 
 The founder asked for broadcast-depth scoring, commentary and stats for every sport, with the option to choose what to track, built in one go with recommended options where unsure, and doubts listed for a later review. This page collects **every decision taken on your behalf and every open question**, per family. Full gap audits, what was built and follow-ups are in each family doc.
 
+**Where it shows:** every match now has five tabs — Info · Commentary · Stats · Summary · Scoring — one purpose each, nothing shown twice: [match-tabs.md](match-tabs.md).
+
 **Ground rules every family followed:** scoring stays one tap; all new depth is an optional "Stats to track" toggle (off by default) unless it is free from the existing log; old matches replay identically; nothing untracked shows as 0; career keys are written only when tracked; no migrations.
 
 ## ⚠️ Figures that change on matches already played

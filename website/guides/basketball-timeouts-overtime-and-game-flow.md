@@ -32,13 +32,13 @@ Basketball has no draws: a level game plays overtime periods (5 minutes under FI
 4. Without that setting you see "End level, no overtime…". It asks "End the game level?" first; tap **No, go back** to play overtime.
 
 ## Game flow
-On the **Score** and **Summary** tabs, under the box score, "Game flow" shows:
+At the bottom of the **Stats** tab, "Game flow" shows:
 - **Biggest lead** for each team, with when it happened and the score then.
 - **Largest run**: the most points a team scored in a row while the other scored none, such as "10-0".
 - **Lead changes** and **Times tied**.
 - **Bench points**: points by players who didn't start. It shows once the starting five is known, from **Set five** under **🔀 Substitutions** or the match lineup.
 
-Everything is worked out from the play-by-play, so an edit or undo updates it straight away. Football, hockey, handball and kabaddi matches show the same block on the **Summary** tab. Goal sports show "Most goals in a row" instead of runs and need at least 2 goals.
+Everything is worked out from the play-by-play, so an edit or undo updates it straight away. Football, hockey, handball, ice hockey, netball, rugby, American football and baseball matches show the same block on the **Stats** tab; kabaddi's match centre has its own **Game flow** category. Goal sports show "Most goals in a row" instead of runs and need at least 2 goals.
 
 ## Common questions
 ### A timeout I logged was wrong. How do I remove it?

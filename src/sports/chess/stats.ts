@@ -3,6 +3,15 @@
  *  `losses` is 0 losses, never "not tracked" — SD-24). */
 import type { SportStatSchema } from '../statSchema.ts';
 import type { StatLine } from '../../core/types';
+import { dpFor } from '../../data/chessRatings.ts';
+
+/** Round 2 — TPR from summed figures: ARO (the opponents' average, rounded
+ *  half up, C.07 art. 10.1) + dp(p) (B.02 table 8.1a, p = points ÷ games);
+ *  undefined with no rated game. */
+export function tprOf(games: number, oppSum: number, pts: number): number | undefined {
+  if (!(games > 0)) return undefined;
+  return Math.floor(oppSum / games + 0.5) + dpFor(pts / games);
+}
 
 /** SD-36 (CH-05) — how a game was won, as a key on the WINNER's line (new
  *  results only: older lines carry none, so the rows say over how many wins
@@ -98,6 +107,18 @@ export const chessStats: SportStatSchema<'chess'> = {
     { key: 'thinkSecs', label: 'Thinking time (seconds)', short: 'seconds thinking', group: 'game', coverage: 'keyed' },
     { key: 'avgThink', label: 'Average time per move (s)', source: 'derived', coverage: 'keyed', group: 'game', format: { unit: 'decimal', dp: 1 },
       agg: { kind: 'rate', num: 'thinkSecs', den: 'clkMoves', dp: 1 } },
+    // Round 2 — the tournament performance rating (FIDE C.07 art. 10.2 / B.02
+    // 8.1: TPR = ARO + dp(p)) as a leader. The keys are NOT stored: the
+    // tournament page adds them to its lines from the ratings players entered
+    // (data/chessRatings.ts withChessPerformance — played games against a
+    // rated opponent on the event's list), so a line without them is "not
+    // tracked" and the category shows only where ratings exist. Unofficial.
+    { key: 'tprGames', label: 'Games against rated opponents', short: 'rated games', one: 'rated game', group: 'perf', coverage: 'keyed' },
+    { key: 'tprOppSum', label: 'Opponents\' ratings (sum)', short: 'opponent ratings', group: 'perf', coverage: 'keyed' },
+    { key: 'tprPts', label: 'Points against rated opponents', short: 'points v rated', group: 'perf', format: { unit: 'points' }, coverage: 'keyed' },
+    { key: 'tpr', label: 'Performance rating (TPR)', leaderLabel: 'Performance rating (TPR, unofficial)', source: 'derived', coverage: 'keyed', group: 'perf', format: { unit: 'count' },
+      agg: { kind: 'formula', keys: ['tprGames', 'tprOppSum', 'tprPts'], den: 'tprGames', compute: (t) => tprOf(t.tprGames, t.tprOppSum, t.tprPts),
+        qualifier: { den: 5, unit: { label: 'rated games', one: 'rated game' } } } },
   ],
   sections: [
     { id: 'results', title: 'Results', rows: [{ stat: 'games' }, { stat: 'score' }, { stat: 'scorePct' }, { stat: 'wins' }, { stat: 'draws' }, { stat: 'losses' }, { stat: 'forfeitWins' }, { stat: 'forfeitLosses' }] },
@@ -113,8 +134,8 @@ export const chessStats: SportStatSchema<'chess'> = {
   // the result is the row's pill; the row shows colour · time control instead
   history: [],
   // SD-27 (CH-12): score (1 / ½ / 0), score % (min games), wins — not "most draws".
-  // Performance rating needs player ratings (not stored yet).
-  leaders: ['score', 'scorePct', 'wins'],
+  // Round 2 — the performance rating (TPR, min 5 rated games) where ratings exist.
+  leaders: ['score', 'scorePct', 'wins', 'tpr'],
   // the Player of the Tournament: most points, then most wins (FIDE's WIN)
   mvp: {
     stat: 'score', tieBreak: [{ key: 'wins', better: 'higher' }],

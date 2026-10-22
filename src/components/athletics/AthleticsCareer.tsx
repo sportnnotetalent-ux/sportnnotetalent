@@ -9,6 +9,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { theme } from '../../core/theme';
 import { Card, Pill, textStyles } from '../ui';
+import { RecordsSetCard } from '../results/RecordsSetCard';
 import { formatDay } from '../../core/dates';
 import { getPhaseInfos } from '../../data/resultsStore';
 import { athleticsCareer, ordSuffix, type PhaseInfo } from '../../data/results';
@@ -48,6 +49,8 @@ export function AthleticsCareer({ lines }: { lines: StatLine[] }) {
       {(c.heatWins > 0 || c.bestReaction) && (
         <Text style={textStyles.muted}>{[c.heatWins ? `🏁 ${c.heatWins} heat${c.heatWins === 1 ? '' : 's'} / semi-final${c.heatWins === 1 ? '' : 's'} won` : '', c.bestReaction ? `⚡ best reaction ${c.bestReaction.value.toFixed(3)} s (${c.bestReaction.title})` : ''].filter(Boolean).join('  ·  ')}</Text>
       )}
+      {/* timed races round 2: meet / school records broken (only once one is on record) */}
+      <RecordsSetCard c={c} />
 
       {/* SD-92: road races, race walks, cross-country (places and team medals) */}
       {c.road + c.walks + c.xc > 0 && (

@@ -44,7 +44,7 @@ A missed reception is the other team's ace, so record that as an **Ace** instead
 - **Positive reception %** = (perfect + good) ÷ receptions, and **Perfect reception %** the same for perfect passes only.
 
 ## Where you see them
-- **Box score**: the Score and Summary tabs add **ATT** (attempts) and **EFF** (efficiency) for each player and the team totals, with **SE** (serve errors) and **ERR** (errors) when players were named. A set filter works as usual.
+- **Box score**: the **Stats** tab adds **ATT** (attempts) and **EFF** (efficiency) for each player and the team totals, with **SE** (serve errors) and **ERR** (errors) when players were named. A set filter works as usual.
 - **Player profile**: the **Attack** section adds attack attempts, kills, attack errors, attacks blocked, efficiency and success %. A **Reception** section shows receptions and the two percentages.
 - **Tournament leaders** add **Attack efficiency**, for players with at least 10 attempts.
 - **Awards**: the tournament awards include **Best attacker**, ranked by attack efficiency. **Most attack points** stays for organisers who don't use detailed stats.

@@ -52,7 +52,7 @@ GAMES won and a points column per game, with a 🏓 dot by the serving side. The
 A chip under the board shows **GAME POINT** or **MATCH POINT** with the side's name.
 
 ## Match stats
-The **Score** tab's "Match stats" (per match or game) has tabs:
+The **Stats** tab's "Match stats" (per match or game) has tabs:
 - **Key stats**: Serve (aces and service faults when described, points won on serve and on receive), Winners & errors, Points won (total, streaks, biggest lead) and game / match points converted and saved.
 - **Serve**: every serve and receive figure; doubles show each server's line once a serving order was picked, else the pair's.
 - **Shots** (with point detail): winners, unforced or forced errors by shot, for either wing or **Forehand** / **Backhand** only; a stroke summary; errors and service faults by type.
@@ -75,7 +75,7 @@ After each point a "Last point" card appears. Tap what you know, or **Skip**:
 Errors count against the opponent (doubles: pick who under **By:**). The box score adds **W**, **UE**, **FE**.
 
 ## Commentary
-Under the stats, "Commentary" tells the match game by game, newest first, the game in play on top:
+The **Commentary** tab tells the match game by game, newest first, the game in play on top:
 - "Asha Rao wins game 2" with the game score, e.g. **11-9**, and where the match stands.
 - Each point: "Point to Asha Rao", the match time and, if you described it, a line like "Meera Iyer loses the point with a Forehand Loop (Topspin) Unforced Error (out)". On the right, the score as the umpire calls it, the server's score first; "Change of service · Meera Iyer to serve" every two points (every point from 10-all).
 - Change of ends, the timeout, cards and who served first in each game.

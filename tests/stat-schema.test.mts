@@ -67,7 +67,7 @@ const pick = <T,>(o: Record<string, T>) => Object.fromEntries(KEPT.map((sp) => [
 
 describe('SD-15 — every sport has a valid schema', () => {
   test('14 sports, one schema each, keyed by its own sport', () => {
-    assert.deepEqual([...STAT_SPORTS].sort(), [...SPORTS, 'athletics', 'hockey', 'swimming', 'weightlifting', 'handball', 'shooting', 'archery', 'rowing', 'canoe', 'cycling', 'rugby', 'netball', 'ice_hockey', 'american_football', 'baseball'].sort()); // SD-144 baseball // SD-147 american football // SD-145 ice hockey; SD-146 netball; SD-143 rugby; SD-90 athletics, SD-101 hockey, SD-94 swimming, SD-97 weightlifting, SD-102 handball, SD-96 shooting, SD-95 archery, SD-99 rowing, SD-100 canoe, SD-98 cycling went live after the golden snapshot
+    assert.deepEqual([...STAT_SPORTS].sort(), [...SPORTS, 'athletics', 'hockey', 'swimming', 'weightlifting', 'handball', 'shooting', 'archery', 'rowing', 'canoe', 'cycling', 'rugby', 'netball', 'ice_hockey', 'american_football', 'baseball', 'rugby_league'].sort()); // rugby league (2026-10-22); SD-144 baseball // SD-147 american football // SD-145 ice hockey; SD-146 netball; SD-143 rugby; SD-90 athletics, SD-101 hockey, SD-94 swimming, SD-97 weightlifting, SD-102 handball, SD-96 shooting, SD-95 archery, SD-99 rowing, SD-100 canoe, SD-98 cycling went live after the golden snapshot
     for (const sp of STAT_SPORTS) assert.equal(STAT_SCHEMAS[sp].sport, sp);
   });
   test('every reference resolves (sections, box, leaders, headline, awards, aggregations)', () => {
@@ -183,16 +183,24 @@ describe('SD-15 — every stat key a plugin writes is declared', () => {
 
 describe('SD-15 — the old maps are derived views, equal to the golden values', () => {
   test('MVP weights (non-zero, in the same order — order breaks ties)', () => {
+    // Deep wave round 2 (founder, on purpose): football's key passes (1) and
+    // clearances (0.5) are weighted, appended after the golden weights so the
+    // original order (and its tie-breaks) is unchanged.
+    const APPENDED: Record<string, [string, number][]> = { football: [['keyPasses', 1], ['clearances', 0.5]] };
     for (const sp of KEPT) {
-      const want = (golden.STAT_WEIGHTS[sp] as [string, number][]).filter(([, w]) => w !== 0);
+      const want = [...(golden.STAT_WEIGHTS[sp] as [string, number][]).filter(([, w]) => w !== 0), ...(APPENDED[sp] ?? [])];
       assert.deepEqual(Object.entries(STAT_WEIGHTS[sp as SportId]), want, sp);
     }
   });
   test('per-match rating labels (STAT_LABELS)', () => {
     // SD-144 appended baseball's rating-line keys (no other sport writes them)
     const SD144 = ['hits', 'homeRuns', 'rbi', 'stolenBases', 'kPitched'];
-    assert.deepEqual(Object.fromEntries(Object.entries(STAT_LABELS).filter(([k]) => !SD144.includes(k))), golden.STAT_LABELS);
+    // deep wave round 2: football's newly weighted key passes / clearances
+    // explain the rating line too
+    const ROUND2 = ['keyPasses', 'clearances'];
+    assert.deepEqual(Object.fromEntries(Object.entries(STAT_LABELS).filter(([k]) => !SD144.includes(k) && !ROUND2.includes(k))), golden.STAT_LABELS);
     assert.deepEqual(SD144.map((k) => STAT_LABELS[k]), ['hits', 'home runs', 'RBI', 'stolen bases', 'strikeouts pitched']);
+    assert.deepEqual(ROUND2.map((k) => STAT_LABELS[k]), ['key passes', 'clearances']);
   });
   test('per-match role awards (SPORT_AWARDS)', () => assert.deepEqual(pick(SPORT_AWARDS), pick(golden.SPORT_AWARDS)));
   test('tournament award slots', () => {
@@ -216,8 +224,11 @@ describe('SD-15 — the old maps are derived views, equal to the golden values',
     assert.deepEqual(STAT_CATEGORIES.football.slice(golden.STAT_CATEGORIES.football.length).map((c) => c.key), ['goalsPer90', 'savePct', 'chancesCreated', 'keyPasses', 'clearances']);
     assert.deepEqual(STAT_CATEGORIES.cricket.slice(golden.STAT_CATEGORIES.cricket.length).map((c) => c.label),
       ['Highest score', 'Best bowling', 'Best batting average', 'Best strike rate', 'Best economy', 'Most 50s', 'Most 100s',
-        'Most 4s', 'Most 6s', 'Most maidens', 'Most dot balls', 'Most ducks', 'Most keeper dismissals']);
-    assert.deepEqual(STAT_CATEGORIES.golf.map((c) => c.key), ['birdies', 'lowRound', 'lowRound9', 'scoringAvg', 'eagles', 'puttsPerRound', 'girPct', 'holesWon']);
+        'Most 4s', 'Most 6s', 'Most maidens', 'Most dot balls', 'Most ducks', 'Most keeper dismissals',
+        // cricket round 2 — the tracked-detail rails
+        'Fastest ball', 'Best control %']);
+    // (golf round 2 added putts per GIR, driving distance and par-3 / 4 / 5 averages before holes won)
+    assert.deepEqual(STAT_CATEGORIES.golf.map((c) => c.key), ['birdies', 'lowRound', 'lowRound9', 'scoringAvg', 'eagles', 'puttsPerRound', 'girPct', 'puttsPerGir', 'drivingDistance', 'p3Avg', 'p4Avg', 'p5Avg', 'holesWon']);
     for (const sp of KEPT) assert.deepEqual(leaderStat(sp as SportId), golden.leaderStat[sp]);
   });
   test('headline order', () => {

@@ -99,7 +99,8 @@ describe('SD-49 — golf leader categories from field lines', () => {
     const all = categoryLeaders(withMatch, players, 'golf');
     assert.ok(all.some((c) => c.key === 'holesWon'));
     const stroke = golfLeaderCategories(all, { competition: 'stroke' });
-    assert.deepEqual(stroke.map((c) => c.key), ['lowRound', 'lowRound9', 'scoringAvg', 'birdies', 'puttsPerRound']);
+    // round 2: the par-3 / 4 / 5 averages rank too (2 complete 18-hole rounds = 8 / 20 / 8 holes)
+    assert.deepEqual(stroke.map((c) => c.key), ['lowRound', 'lowRound9', 'scoringAvg', 'birdies', 'puttsPerRound', 'p3Avg', 'p4Avg', 'p5Avg']);
     assert.deepEqual(golfLeaderCategories(all, { competition: 'match' }).map((c) => c.key), all.map((c) => c.key));
     assert.deepEqual(golfLeaderCategories(all, undefined).some((c) => c.key === 'holesWon'), false, 'no format = stroke play');
     assert.equal(isGolfMatchPlay({ competition: 'match' }), true);

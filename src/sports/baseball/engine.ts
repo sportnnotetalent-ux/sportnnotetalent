@@ -108,9 +108,59 @@ export function zoneOfNotation(f?: string): Zone | undefined {
 export const zoneOf = (e: Pick<BaseballEvent, 'zone' | 'fielders' | 'outcome'>): Zone | undefined =>
   (e.outcome && !IN_PLAY.includes(e.outcome) ? undefined : e.zone ?? zoneOfNotation(e.fielders));
 
+/** Round 2 — the batted-ball type (Statcast families): ground ball, line
+ *  drive, fly ball, popup. An optional tap on a ball in play (`btype`); the
+ *  outs that fix it fill it in by themselves (`battedBallOf`). */
+export const BATTED_BALLS = ['GB', 'LD', 'FB', 'PU'] as const;
+export type BattedBall = (typeof BATTED_BALLS)[number];
+export const isBattedBall = (v: unknown): v is BattedBall => typeof v === 'string' && (BATTED_BALLS as readonly string[]).includes(v);
+export const BATTED_BALL_LABEL: Record<BattedBall, string> = { GB: 'Ground ball', LD: 'Line drive', FB: 'Fly ball', PU: 'Popup' };
+/** the chip text (one word each, for one-handed tapping) */
+export const BATTED_BALL_CHIP: Record<BattedBall, string> = { GB: 'Grounder', LD: 'Liner', FB: 'Fly ball', PU: 'Popup' };
+const INFIELD_ZONES: Zone[] = ['3B', 'SS', '2B', '1B', 'P', 'C'];
+/** The type an out fixes by itself (the scorer's tap, `btype`, always wins):
+ *  traditional letter notation first — "L6" line drive, "P4" / "IF" popup,
+ *  "G6-3" grounder, "F8" fly ball ("F6", an infielder's fly, is a popup);
+ *  then the outcome — groundout, double play, sacrifice bunt and fielder's
+ *  choice are ground balls (OBR: a fielder's choice is a fielder handling a
+ *  fair grounder), a lineout a line drive, a sacrifice fly a fly ball, a fly /
+ *  pop out a popup when an infielder (or catcher) took it — by the notation or
+ *  the zone — else a fly ball. Hits and errors: none (any type can be one —
+ *  only the tap says). */
+export function battedBallOfPlay(e: Pick<BaseballEvent, 'outcome' | 'fielders' | 'zone'>): BattedBall | undefined {
+  const o = e.outcome;
+  if (!o || !IN_PLAY.includes(o)) return undefined;
+  const f = (e.fielders ?? '').trim().toUpperCase();
+  // a letter then a fielder ("L6", "F8", "G6-3"), or the infield fly ("IF", "IF4")
+  const m = /^E/.test(f) ? null : /^(IF|LD|L|P|G|F)\s*-?\s*(\d{1,2})/.exec(f);
+  const letter = m?.[1] ?? (/^IF\b/.test(f) ? 'IF' : undefined);
+  if (letter) {
+    if (letter === 'L' || letter === 'LD') return 'LD';
+    if (letter === 'P' || letter === 'IF') return 'PU';
+    if (letter === 'G') return 'GB';
+    const n = Number(m?.[2] ?? 0);
+    return n >= 1 && n <= 6 ? 'PU' : 'FB';
+  }
+  switch (o) {
+    case 'GO': case 'DP': case 'SH': case 'FC': return 'GB';
+    case 'LO': return 'LD';
+    case 'SF': return 'FB';
+    case 'FO': {
+      const first = /^\D*(\d{1,2})/.exec(f);
+      const n = first ? Number(first[1]) : 0;
+      if (n) return n <= 6 ? 'PU' : 'FB';
+      return e.zone && INFIELD_ZONES.includes(e.zone) ? 'PU' : 'FB';
+    }
+    default: return undefined;
+  }
+}
+/** A ball in play's type: the scorer's tap, else what the out fixes. */
+export const battedBallOf = (e: Pick<BaseballEvent, 'btype' | 'outcome' | 'fielders' | 'zone'>): BattedBall | undefined =>
+  (!e.outcome || !IN_PLAY.includes(e.outcome) ? undefined : e.btype ?? battedBallOfPlay(e));
+
 /** The "Stats to track" toggles (live settings + the match format, off by default). */
-export type TrackFlag = 'pitchTypes' | 'sprayZones';
-export const TRACK_FLAGS: TrackFlag[] = ['pitchTypes', 'sprayZones'];
+export type TrackFlag = 'pitchTypes' | 'sprayZones' | 'battedBallTypes';
+export const TRACK_FLAGS: TrackFlag[] = ['pitchTypes', 'sprayZones', 'battedBallTypes'];
 
 export const OUTCOME_LABEL: Record<Outcome, string> = {
   '1B': 'Single', '2B': 'Double', '3B': 'Triple', HR: 'Home run',
@@ -157,6 +207,8 @@ export interface BaseballEvent {
    *  plate appearance's final pitch) and where a ball in play went */
   ptype?: PitchType;
   zone?: Zone;
+  /** round 2 (optional): the batted-ball type the scorer tapped (balls in play only) */
+  btype?: BattedBall;
 }
 
 /* --------------------------------- format ---------------------------------- */
@@ -190,6 +242,8 @@ export interface BaseballConfig {
   /** deep wave "Stats to track" — present only when on (old matches never have them) */
   pitchTypes?: true;
   sprayZones?: true;
+  /** round 2 */
+  battedBallTypes?: true;
 }
 
 export const BASEBALL_PRESETS: Record<string, { label: string; set: Record<string, number | string | boolean> }> = {
@@ -729,6 +783,8 @@ export const reducer = (s: BaseballState, a: ScoreAction): BaseballState => {
         // deep wave (optional): the final pitch's type, where the ball went
         ...(pitch && o !== 'IBB' && isPitchType(p.ptype) ? { ptype: p.ptype } : {}),
         ...(IN_PLAY.includes(o) && isZone(p.zone) ? { zone: p.zone } : {}),
+        // round 2 (optional): the batted-ball type (unknown values ignored)
+        ...(IN_PLAY.includes(o) && isBattedBall(p.btype) ? { btype: p.btype } : {}),
       });
     }
     case 'RUNNER': {
@@ -858,6 +914,8 @@ export interface PlayOpts {
   moves?: Move[]; pitch?: BaseballEvent['pitch']; fielders?: string; rbi?: number; uid?: string; extra?: Record<string, unknown>;
   /** deep wave (optional capture): where the ball went, the final pitch's type */
   zone?: Zone; ptype?: PitchType;
+  /** round 2 (optional capture): the batted-ball type */
+  btype?: BattedBall;
 }
 
 /** RBI the play earns by default (OBR 9.04, simplified): the runs it scored,
@@ -876,6 +934,7 @@ export function buildPlay(s: BaseballState, o: Outcome, opts: PlayOpts = {}): Sc
     payload: {
       ...(opts.extra ?? {}), uid, outcome: o, ...(pitch ? { pitch } : {}), batter, ...(sit.pitcher ? { pitcher: sit.pitcher } : {}), moves, ...(opts.fielders ? { fielders: opts.fielders } : {}),
       ...(opts.zone && IN_PLAY.includes(o) ? { zone: opts.zone } : {}), ...(opts.ptype && pitch ? { ptype: opts.ptype } : {}),
+      ...(opts.btype && IN_PLAY.includes(o) ? { btype: opts.btype } : {}),
     },
   };
   const pv = preview(s, base);
@@ -994,10 +1053,11 @@ export const cardLine = (s: BaseballState): string => (s?.g ? statusText(s) : ''
 export const TRACK_FIELDS: FormatField[] = [
   { key: 'pitchTypes', label: 'Pitch types', type: 'toggle', default: false, group: 'Stats to track', hint: 'A chip row over the pitch pad (FB SL CH … / softball Rise Drop …): tap the type, then the pitch — pitch mix per pitcher. Needs pitch-by-pitch' },
   { key: 'sprayZones', label: 'Where the ball went (spray)', type: 'toggle', default: false, group: 'Stats to track', hint: 'Optional LF · CF · RF … chips when the ball is put in play — hits and balls in play by zone' },
+  { key: 'battedBallTypes', label: 'Batted-ball type', type: 'toggle', default: false, group: 'Stats to track', hint: 'Optional Grounder · Liner · Fly ball · Popup chips when the ball is put in play (outs fill it in themselves) — GB / LD / FB % for batters and pitchers' },
 ];
 /** Is this capture tracked in the game — its toggle on, or any recorded? */
 export const trackTracked = (s: Pick<BaseballState, 'cfg' | 'events'>, f: TrackFlag): boolean =>
-  s.cfg[f] === true || s.events.some((e) => (f === 'pitchTypes' ? !!e.ptype : !!e.zone));
+  s.cfg[f] === true || s.events.some((e) => (f === 'pitchTypes' ? !!e.ptype : f === 'sprayZones' ? !!e.zone : !!e.btype));
 
 export const BASEBALL_LIVE_SETTINGS: LiveSettings<BaseballState> = {
   title: '⚙️ Scoring settings',

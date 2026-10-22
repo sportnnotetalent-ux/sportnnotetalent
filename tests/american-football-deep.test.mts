@@ -153,10 +153,11 @@ describe('deep wave · drives from the play-by-play log', () => {
   test('segmentation: offence, start, plays, net yards, result, how obtained', () => {
     assert.deepEqual(drives.map((d) => [d.off, d.start, d.plays, d.yards, d.result ?? 'live', d.obtained]), [
       ['home', 25, 6, 75, 'td', 'kickoff'],
-      ['away', 25, 3, -3, 'punt', 'kickoff'],
+      // round 2 (founder): punts and field-goal attempts are drive plays, as on NFL drive charts (3 → 4, 4 → 5)
+      ['away', 25, 4, -3, 'punt', 'kickoff'],
       ['home', 38, 4, 6, 'downs', 'punt'],
       ['away', 56, 2, 10, 'int', 'downs'],
-      ['home', 30, 4, 50, 'fg', 'int'],
+      ['home', 30, 5, 50, 'fg', 'int'],
       ['away', 35, 1, 4, 'half', 'kickoff'],
       ['home', 25, 1, 3, 'live', 'kickoff'],
     ]);

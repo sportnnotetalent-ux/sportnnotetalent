@@ -4,7 +4,7 @@
  * and the Swiss pairing engine fits open tournaments directly. Each player is
  * credited a game (+ win/draw/loss) on their profile when the result is recorded.
  */
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity } from 'react-native';
 import { theme } from '../../core/theme';
 import { Button, SelectChip, textStyles } from '../../components/ui';
@@ -18,7 +18,7 @@ import {
   type ChessMethod, type ChessState, type Side, type KoState,
 } from './engine';
 import { chessResultCredit } from './stats';
-import { listMoves, openingOf } from './engine';
+import { listMoves, openingOf, boardResult } from './engine';
 import { MovesPanel } from './MovesPanel';
 import { chessFeed } from './gameFeed';
 import { chessGameStats, phasesOf, type Phase } from './gameStats';
@@ -66,8 +66,21 @@ const ScoringControls: SportPlugin<ChessState>['ScoringControls'] = ({ state, di
   const [clockW, setClockW] = useState('');
   const [clockB, setClockB] = useState('');
   const [busy, setBusy] = useState(false);
+  // Round 2 — a knockout game already recorded whose moves are being pasted
   // A person's full name reads better than a team code ("AM") in a 1-v-1 game.
   const nameOf = (side: Side) => (side === 'home' ? homeRoster : awayRoster)[0]?.fullName ?? (side === 'home' ? homeName : awayName);
+  // Round 2 — mate / stalemate on the entered moves pre-selects the result
+  // (and its method); the arbiter still confirms with Record. Taking the move
+  // back clears a pre-selection the scorer didn't change.
+  const onBoard = s.ended ? null : boardResult(s);
+  const endKey = onBoard ? `${s.game?.san.length}:${onBoard.method}` : '';
+  const [auto, setAuto] = useState(false);
+  useEffect(() => {
+    if (onBoard) {
+      if (pick == null || auto) { setPick(onBoard.pick); setMethod(onBoard.method); setAuto(true); }
+    } else if (auto) { setPick(null); setMethod(null); setAuto(false); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [endKey]);
 
   if (s.ended && s.ko && s.ko.games.length > 1) {
     const st = koStatus(s.ko);
@@ -131,16 +144,17 @@ const ScoringControls: SportPlugin<ChessState>['ScoringControls'] = ({ state, di
       type: 'RESULT',
       side: winner === 'draw' ? undefined : winner,
       // Deep wave — the length from the move list when none was typed; `at` for the commentary
-      payload: { winner, method: sentMethod, moves: dff ? undefined : Number(moves) || (s.game && !s.ko ? listMoves(s.game) || undefined : undefined), ...(clock ? { clock } : {}), at: Date.now(),
+      // (round 2: in a knockout match s.game is the game in play's list)
+      payload: { winner, method: sentMethod, moves: dff ? undefined : Number(moves) || listMoves(s.game) || undefined, ...(clock ? { clock } : {}), at: Date.now(),
         // SD-121 — the first game of a knockout match carries the plan
         ...(knockout && !s.ko ? { ko: koNow.plan } : {}) },
       attribution: credit('home'),
       attribution2: credit('away'),
     });
     // SD-121 — a knockout goes on to its next game: a clean form
-    setPick(null); setMethod(null); setMoves(''); setClockW(''); setClockB(''); setWhiteDraft(null); setUnlockColour(false);
+    setPick(null); setMethod(null); setMoves(''); setClockW(''); setClockB(''); setWhiteDraft(null); setUnlockColour(false); setAuto(false);
   };
-  const choose = (p: Pick | null) => { setPick(p); setMethod(null); };
+  const choose = (p: Pick | null) => { setPick(p); setMethod(null); setAuto(false); };
   const tile = (p: Pick, score: string, caption: string, names: string) => (
     <TouchableOpacity key={p} onPress={() => choose(p)} activeOpacity={0.8} accessibilityRole="button"
       accessibilityLabel={`${score} ${caption} — ${names}`} accessibilityState={{ selected: pick === p }} aria-pressed={pick === p}
@@ -153,8 +167,14 @@ const ScoringControls: SportPlugin<ChessState>['ScoringControls'] = ({ state, di
 
   return (
     <View style={{ gap: theme.spacing(4) }}>
-      {/* Deep wave — the optional move list (Stats to track · Move list) */}
-      {s.track?.moves && !koOn ? <MovesPanel state={s} dispatch={dispatch} nameOf={nameOf} /> : null}
+      {/* Deep wave — the optional move list (Stats to track · Move list);
+          round 2 — in a knockout match, one list per game (the game in play,
+          or paste a game already recorded) */}
+      {s.track?.moves ? <MovesPanel key={`now${s.ko?.games.length ?? 0}`} state={s} dispatch={dispatch} nameOf={nameOf} /> : null}
+      {s.track?.moves ? <KoMovesPaste s={s} dispatch={dispatch} nameOf={nameOf} /> : null}
+      {onBoard && auto ? (
+        <Text style={ctrl.meta}>{onBoard.method === 'checkmate' ? '#️⃣ Checkmate' : '🤝 Stalemate'} on the board — {onBoard.pick === 'draw' ? '½-½' : onBoard.pick === 'white' ? '1-0' : '0-1'} is pre-selected. Check it, then record.</Text>
+      ) : null}
       {koAt ? (
         <View style={ctrl.koBox}>
           <Text style={ctrl.label}>🏆 Knockout · {koPhaseText(koNow, koAt.phase, koAt.game)}</Text>
@@ -268,7 +288,7 @@ export const chessPlugin: SportPlugin<ChessState> = {
   // SD-67 — the scoreboard names who has White ("♔ Anand has White")
   Scoreboard: ChessScoreboard,
   // Deep wave — commentary (move by move / the result) and the game stats
-  LiveExtras: ChessLiveExtras,
+  matchTabs: { Commentary: ChessCommentary, Stats: ChessStats, AfterMatch: ChessAfterMatch },
   // Deep wave — Undo names the move(s) it takes back ("Undo move Nf3")
   undoLabel: (step) => {
     if (step?.type !== 'MOVES') return null;
@@ -325,43 +345,76 @@ export const chessPlugin: SportPlugin<ChessState> = {
   ],
 };
 
-/** Deep wave — the Score tab: commentary (moves newest first, or the result)
- *  and the game stats panel (White vs Black; whole game or a phase). */
-function ChessLiveExtras({ state, homeName, awayName, homeColor, awayColor, homeRoster = [], awayRoster = [], dispatch, canScore }: Parameters<NonNullable<SportPlugin<ChessState>['LiveExtras']>>[0]) {
-  const s = state as ChessState;
-  const [view, setView] = useState<'feed' | 'stats'>('feed');
+/** Match tabs (2026-10-22): the commentary (moves newest first, or the
+ *  result) on Commentary; the opening and the game stats panel (White vs
+ *  Black; whole game or a phase) on Stats; attaching the moves after the game
+ *  on Scoring (scorers). */
+type TabProps = Parameters<NonNullable<SportPlugin<ChessState>['LiveExtras']>>[0];
+const chessNameOf = ({ homeName, awayName, homeRoster = [], awayRoster = [] }: TabProps) =>
+  (side: Side) => (side === 'home' ? homeRoster : awayRoster)[0]?.fullName ?? (side === 'home' ? homeName : awayName);
+
+function ChessCommentary(p: TabProps) {
+  const s = p.state as ChessState;
+  const nameOf = chessNameOf(p);
+  return (
+    <CommentaryFeed title={null} groups={chessFeed(s, { home: nameOf('home'), away: nameOf('away') })}
+      homeColor={p.homeColor} awayColor={p.awayColor} empty="No moves yet." />
+  );
+}
+
+function ChessStats(p: TabProps) {
+  const s = p.state as ChessState;
+  const { homeColor, awayColor } = p;
   const [phase, setPhase] = useState<Phase | 'all'>('all');
-  const nameOf = (side: Side) => (side === 'home' ? homeRoster : awayRoster)[0]?.fullName ?? (side === 'home' ? homeName : awayName);
+  const nameOf = chessNameOf(p);
   const black: Side = s.white === 'home' ? 'away' : 'home';
   const hasMoves = !!s.game?.san.length && !s.ko;
-  if (!s.ended && !hasMoves && !s.ko?.games.length) return null;
   const op = openingOf(s);
   const phases = phasesOf(s);
   return (
     <View style={{ gap: theme.spacing(2) }}>
       {op ? <Text style={textStyles.muted}>📖 {op.eco} · {op.name}</Text> : null}
-      {/* Deep wave — after the game (the Scoring tab then only says "Match
-          complete"), a scorer can still attach the moves (PGN) and the opening */}
-      {s.ended && canScore && dispatch && !s.ko && !isDoubleForfeit(s.method) && !isForfeit(s.method)
-        ? <MovesPanel state={s} dispatch={dispatch} nameOf={nameOf} after /> : null}
       {hasMoves ? (
-        <View style={ctrl.chips}>
-          <SelectChip label="🎙 Commentary" active={view === 'feed'} onPress={() => setView('feed')} />
-          <SelectChip label="📊 Game stats" active={view === 'stats'} onPress={() => setView('stats')} />
-        </View>
-      ) : null}
-      {view === 'stats' && hasMoves ? (
         <CompareTable title={null} homeName={`♔ ${nameOf(s.white)}`} awayName={`♚ ${nameOf(black)}`}
           homeColor={s.white === 'home' ? homeColor : awayColor} awayColor={s.white === 'home' ? awayColor : homeColor}
           categories={chessGameStats(s, phase)} unit={phase} onUnit={(k) => setPhase(k as Phase | 'all')}
-          units={[{ key: 'all', label: 'Game' }, ...phases.map((p) => ({ key: p, label: p[0].toUpperCase() + p.slice(1) }))]}
+          units={[{ key: 'all', label: 'Game' }, ...phases.map((ph) => ({ key: ph, label: ph[0].toUpperCase() + ph.slice(1) }))]}
           footnote="Opening = the first 10 moves; the endgame starts once both sides have 13 points of pieces or fewer besides pawns." />
       ) : (
-        <CommentaryFeed title={hasMoves ? null : '🎙 Commentary'} groups={chessFeed(s, { home: nameOf('home'), away: nameOf('away') })}
-          homeColor={homeColor} awayColor={awayColor} empty="No moves yet." />
+        <Text style={textStyles.muted}>Game stats come from the move list — switch it on under ⚙️ Stats to track, or paste the moves (PGN) after the game.</Text>
       )}
     </View>
   );
+}
+
+/** Round 2 — a knockout match: paste the moves (PGN) of a game already
+ *  played, one list per game (MOVES / OPENING `koGame`). A forfeited game has
+ *  no moves to paste. */
+function KoMovesPaste({ s, dispatch, nameOf }: { s: ChessState; dispatch: (a: { type: string; payload?: Record<string, unknown> }) => void; nameOf: (side: 'home' | 'away') => string }) {
+  const [pick, setPick] = useState<number | null>(null);
+  const games = (s.ko?.games ?? []).map((g, k) => ({ g, k })).filter(({ g }) => !isForfeit(g.method) && !isDoubleForfeit(g.method));
+  if (!games.length) return null;
+  return (
+    <View style={{ gap: theme.spacing(2) }}>
+      <View style={ctrl.chips}>
+        <Text style={ctrl.meta}>Moves of a game already played:</Text>
+        {games.map(({ g, k }) => (
+          <SelectChip key={k} label={`Game ${k + 1}${g.game?.san.length ? ' ✓' : ''}`} active={pick === k} onPress={() => setPick(pick === k ? null : k)} />
+        ))}
+      </View>
+      {pick != null && s.ko?.games[pick] ? <MovesPanel key={`ko${pick}`} state={s} dispatch={dispatch} nameOf={nameOf} koGame={pick} after /> : null}
+    </View>
+  );
+}
+
+/** Scoring tab, after the game: a scorer can still attach the moves (PGN)
+ *  and the opening — in a knockout match, each game's. */
+function ChessAfterMatch(p: TabProps) {
+  const s = p.state as ChessState;
+  if (!s.ended || !p.canScore || !p.dispatch) return null;
+  if (s.ko) return <KoMovesPaste s={s} dispatch={p.dispatch} nameOf={chessNameOf(p)} />;
+  if (isDoubleForfeit(s.method) || isForfeit(s.method)) return null;
+  return <MovesPanel state={s} dispatch={p.dispatch} nameOf={chessNameOf(p)} after />;
 }
 
 /** "♔ {name} has White" — the generic summary only knows home / away. */

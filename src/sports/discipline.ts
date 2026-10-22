@@ -32,6 +32,7 @@ import { NETBALL_DISCIPLINE } from './netball/discipline.ts';
 import { BASEBALL_DISCIPLINE } from './baseball/discipline.ts';
 import { AF_DISCIPLINE } from './american_football/discipline.ts';
 import { RUGBY_DISCIPLINE } from './rugby/discipline.ts';
+import { RUGBY_LEAGUE_DISCIPLINE } from './rugby_league/discipline.ts';
 import { BASKETBALL_DISCIPLINE } from './basketball/discipline.ts';
 import { KABADDI_DISCIPLINE } from './kabaddi/discipline.ts';
 
@@ -88,6 +89,7 @@ export const DISCIPLINE_SPECS: Partial<Record<SportId, SportDisciplineSpec>> = {
   baseball: BASEBALL_DISCIPLINE,
   american_football: AF_DISCIPLINE,
   rugby: RUGBY_DISCIPLINE,
+  rugby_league: RUGBY_LEAGUE_DISCIPLINE,
   basketball: BASKETBALL_DISCIPLINE,
   kabaddi: KABADDI_DISCIPLINE,
 };

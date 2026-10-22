@@ -11,7 +11,7 @@
  * add their own disciplines on the same engine.
  */
 import type { Category, DisciplineDef, PhaseFormat, PhaseKind, Progression, RankedEntry, ResultEntry } from './model.ts';
-import type { RecordMark } from './records.ts';
+import { recordHolderIds, type RecordMark } from './records.ts';
 import { categoryKey, categoryLabel, disciplineOf, looseLegal, phaseDiscipline } from './model.ts';
 import { formatMark } from './marks.ts';
 import { rankEntries, betterMark } from './rank.ts';
@@ -29,6 +29,8 @@ import { roadMarkKey, roadKeyDiscipline, roadEventOf, roadRecordsAllowed, phaseT
 import { combinedStandings, combinedAwards, combinedDone, combinedRanked } from './combined.ts';
 import { isCombinedKey } from './combinedDefs.ts';
 import { ruleOf } from './competitionRules.ts';
+import { heatWinnerIds } from './heatWins.ts';
+import type { CareerRecord } from './recordsSet.ts';
 import { ageBandOf, fitsBand } from '../../core/divisions.ts';
 
 /* ------------------------------ meet settings ----------------------------- */
@@ -417,10 +419,12 @@ export interface PhaseLine { playerId: string; stats: Record<string, number>; wo
  *   discipline's legal mark key), wind, hand, Q / q, finals, golds / silvers /
  *   bronzes, posPoints (position points), dnf / dq.
  */
-export function phaseLines(f: Pick<PhaseFormat, 'discipline' | 'phase' | 'category' | 'rules'>, ranked: RankedEntry[], awards: Award[] = []): PhaseLine[] {
+export function phaseLines(f: Pick<PhaseFormat, 'discipline' | 'phase' | 'category' | 'rules'> & Partial<Pick<PhaseFormat, 'races'>>, ranked: RankedEntry[], awards: Award[] = []): PhaseLine[] {
   const def = disciplineOf(f.discipline);
   if (!def) return [];
   const byEntry = new Map(awards.map((a) => [a.entryId, a]));
+  // timed races round 2: heats won — a round's heat winners, and each heat's fastest in a timed final
+  const heatWon = heatWinnerIds(f, ranked);
   const out: PhaseLine[] = [];
   for (const r of ranked) {
     if (r.status === 'DNS' || r.status === 'WD') continue;
@@ -444,8 +448,9 @@ export function phaseLines(f: Pick<PhaseFormat, 'discipline' | 'phase' | 'catego
     }
     // SD-91: a field event counts as an event, not a race
     if (def.capture === 'single') s.races = 1; else s.field = 1;
-    // deep wave: a heat / semi-final / repechage won (a final won is a gold) and the reaction time when it was read
-    if (def.capture === 'single' && r.position === 1 && f.phase !== 'final') s.heatWins = 1;
+    // deep wave: a heat / semi-final / repechage won (a single final won is a gold; round 2: the
+    // heats of a timed final count too) and the reaction time when it was read
+    if (def.capture === 'single' && heatWon.has(r.id)) s.heatWins = 1;
     if (def.capture === 'single' && r.entry.result.reaction != null) s.reaction = r.entry.result.reaction;
     if (a && a.points > 0) s.posPoints = a.points;
     if (r.best != null) s.mark = r.best;
@@ -492,6 +497,10 @@ export interface AthleticsCareer {
   heatWins: number;
   /** deep wave: the best reaction time read (races only; absent when none was read) */
   bestReaction?: { value: number; title: string; date: string; eventId: string };
+  /** timed races round 2: meet / school records set (lines with mrSet / srSet), newest first */
+  meetRecords: number;
+  schoolRecords: number;
+  records: CareerRecord[];
   /** SD-92: the best cross-country place (courses differ — places, not times) */
   bestXc?: { place: number; title: string; date: string; eventId: string };
   /** personal bests per event (hurdles per event + category: the barrier height
@@ -508,7 +517,7 @@ export function athleticsCareer(
   phases: Map<string, PhaseInfo>,
   seasonFrom: string,
 ): AthleticsCareer {
-  const c: AthleticsCareer = { races: 0, relays: 0, field: 0, finals: 0, golds: 0, silvers: 0, bronzes: 0, points: 0, road: 0, walks: 0, xc: 0, teamGolds: 0, teamSilvers: 0, teamBronzes: 0, teamScored: 0, combined: 0, heatWins: 0, bests: [], history: [] };
+  const c: AthleticsCareer = { races: 0, relays: 0, field: 0, finals: 0, golds: 0, silvers: 0, bronzes: 0, points: 0, road: 0, walks: 0, xc: 0, teamGolds: 0, teamSilvers: 0, teamBronzes: 0, teamScored: 0, combined: 0, heatWins: 0, meetRecords: 0, schoolRecords: 0, records: [], bests: [], history: [] };
   const bests = new Map<string, { key: string; label: string; pb: CareerBest; sb?: CareerBest }>();
   // Oldest first, so a PB / SB flag on the history reads "at the time".
   const sorted = [...lines].sort((a, b) => (a.date ?? '').localeCompare(b.date ?? ''));
@@ -522,6 +531,7 @@ export function athleticsCareer(
     c.teamGolds += s.teamGolds ?? 0; c.teamSilvers += s.teamSilvers ?? 0; c.teamBronzes += s.teamBronzes ?? 0; c.teamScored += s.teamScorer ?? 0;
     c.combined += s.combined ?? 0;
     c.heatWins += s.heatWins ?? 0;
+    c.meetRecords += s.mrSet ?? 0; c.schoolRecords += s.srSet ?? 0;
     const info = l.eventId ? phases.get(l.eventId) : undefined;
     if (s.reaction != null && (!c.bestReaction || s.reaction < c.bestReaction.value)) c.bestReaction = { value: s.reaction, title: info?.title ?? l.opponent ?? 'Race', date: info?.date ?? l.date ?? '', eventId: l.eventId ?? '' };
     const key = Object.keys(s).find((k) => k.startsWith('m_'));
@@ -559,6 +569,9 @@ export function athleticsCareer(
       bests.set(bk, row);
     }
     if (s.qualified) flags.push('Q');
+    // timed races round 2: a record this result set
+    if (s.mrSet) flags.push('MR');
+    if (s.srSet) flags.push('SR');
     const medal = s.golds ? 'gold' : s.silvers ? 'silver' : s.bronzes ? 'bronze' : undefined;
     const markText = def && s.mark != null ? formatMark(s.mark, def) + (s.hand ? 'h' : '') + (ce ? ' pts' : '') : '';
     const text = [
@@ -577,6 +590,8 @@ export function athleticsCareer(
     // SD-93: the total reads as the combined event ("Decathlon U18 Boys"), not its last event
     const title = s.combined ? info?.eventTitle ?? info?.title ?? l.opponent ?? 'Combined event' : info?.title ?? l.opponent ?? (s.field ? 'Field event' : 'Race');
     c.history.push({ eventId: l.eventId ?? '', title, date, discipline, text, place: s.place, medal, flags });
+    // newest first, a final's meet record before its school record
+    c.records.unshift(...(['MR', 'SR'] as const).filter((sc) => (sc === 'MR' ? s.mrSet : s.srSet)).map((scope) => ({ scope, title: info?.eventTitle ?? title, text: markText, date, eventId: l.eventId ?? '' })));
   }
   c.points = Math.round(c.points * 100) / 100;
   c.bests = [...bests.values()].sort((a, b) => order(a.pb.discipline) - order(b.pb.discipline) || a.key.localeCompare(b.key));
@@ -743,7 +758,7 @@ export function deriveRecordBook(events: MeetEvent[], scope: 'MR' | 'SR'): Recor
         if (r.position == null || r.bestLegal == null) continue;
         const k = `${base.key}|${cat}`;
         const cur = out.get(k);
-        if (!cur || r.bestLegal > cur.value) out.set(k, { scope, discipline: base.key, category: cat, value: r.bestLegal, holder: r.entry.name, team: r.entry.team?.name, date: last.date.slice(0, 10), eventKey: e.eventKey });
+        if (!cur || r.bestLegal > cur.value) out.set(k, { scope, discipline: base.key, category: cat, value: r.bestLegal, holder: r.entry.name, ...recordHolderIds(r.entry), team: r.entry.team?.name, date: last.date.slice(0, 10), eventKey: e.eventKey });
       }
       continue;
     }
@@ -756,7 +771,7 @@ export function deriveRecordBook(events: MeetEvent[], scope: 'MR' | 'SR'): Recor
         const k = `${def.key}|${cat}`;
         const cur = out.get(k);
         if (!cur || betterMark(r.bestLegal, cur.value, def)) {
-          out.set(k, { scope, discipline: def.key, category: cat, value: r.bestLegal, holder: r.entry.name, team: r.entry.team?.name, date: p.date.slice(0, 10), eventKey: e.eventKey });
+          out.set(k, { scope, discipline: def.key, category: cat, value: r.bestLegal, holder: r.entry.name, ...recordHolderIds(r.entry), team: r.entry.team?.name, date: p.date.slice(0, 10), eventKey: e.eventKey });
         }
       }
     }

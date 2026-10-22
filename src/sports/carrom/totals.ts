@@ -32,7 +32,7 @@
  * totals are always right; only the in-between live line may lag.
  */
 import type { StatTotalsContext, StatTotalsEntry } from '../types';
-import { boardBreakers, breakerPlayers, creditedPoints, FOUL_TYPES, type CarromState, type FoulType } from './engine.ts';
+import { boardBreakers, breakerPlayers, creditedPoints, whoFouls, FOUL_TYPES, type CarromState, type FoulType } from './engine.ts';
 
 type Side = 'home' | 'away';
 const SIDES: Side[] = ['home', 'away'];
@@ -52,18 +52,43 @@ export const CARROM_QUEEN_KEYS = ['lostQueens'] as const;
 /** Deep wave — the optional "Stats to track" keys ('keyed': written only on a
  *  match that tracked them; never credited live):
  *   fouls / foulStriker / foulTouch / foulLine / foulThumb / foulOther / dues /
- *     foulBoards — the foul log (SINGLES only: in doubles a foul is one
- *     partner's, which the board log doesn't say, so careers don't get it);
+ *     foulBoards — the foul log (singles: the side's; round 2 — doubles: each
+ *     partner's own, from the "who" chips, on fully attributed boards);
+ *     foulBase / foulArrow / foulElbow — round 2's split of "line / hand";
  *   brkPocketed / brkTracked — coins pocketed with the player's own break
  *     strokes, over the breaks where the count was recorded (singles, or
  *     doubles with a recorded break order);
  *   queenMisses / qMissBoards — the Queen pocketed but the cover missed
  *     (singles only, like fouls). */
-export const CARROM_FOUL_KEYS = ['fouls', 'foulStriker', 'foulTouch', 'foulLine', 'foulThumb', 'foulOther', 'dues', 'foulBoards'] as const;
+export const CARROM_FOUL_KEYS = ['fouls', 'foulStriker', 'foulTouch', 'foulLine', 'foulThumb', 'foulOther', 'dues', 'foulBoards', 'foulBase', 'foulArrow', 'foulElbow'] as const;
 export const CARROM_BRK_KEYS = ['brkPocketed', 'brkTracked'] as const;
 export const CARROM_QMISS_KEYS = ['queenMisses', 'qMissBoards'] as const;
 const FOUL_KEY: Record<FoulType, typeof CARROM_FOUL_KEYS[number]> = {
   striker: 'foulStriker', touch: 'foulTouch', line: 'foulLine', thumb: 'foulThumb', other: 'foulOther',
+  // Round 2 — the split "line / hand" (ICF / AICF): base line, arrow, elbow
+  base: 'foulBase', arrow: 'foulArrow', elbow: 'foulElbow',
+};
+/** The foul keys every tracked line gets; `foulLine` only when a board was
+ *  recorded before the split, the split three only when one was after it —
+ *  so an older line keeps exactly its keys and no split type reads a false 0. */
+const FOUL_BASE_KEYS = ['fouls', 'foulStriker', 'foulTouch', 'foulThumb', 'foulOther', 'dues', 'foulBoards'] as const;
+const SPLIT_KEYS = ['foulBase', 'foulArrow', 'foulElbow'] as const;
+
+/** The foul keys (all 0) for a set of tracked boards. */
+function foulZeros(boards: { det?: { split?: true } }[]): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const k of FOUL_BASE_KEYS) out[k] = 0;
+  if (boards.some((b) => !b.det?.split)) out.foulLine = 0;
+  if (boards.some((b) => b.det?.split)) for (const k of SPLIT_KEYS) out[k] = 0;
+  return out;
+}
+const addFouls = (out: Record<string, number>, by: Partial<Record<FoulType, number>> | undefined, dues: number) => {
+  for (const t of FOUL_TYPES) {
+    const n = by?.[t] ?? 0;
+    if (!n) continue;
+    out[FOUL_KEY[t]] = (out[FOUL_KEY[t]] ?? 0) + n; out.fouls += n;
+  }
+  out.dues += dues;
 };
 
 /** Deep wave — one side's tracked figures (fouls, dues, missed covers) over
@@ -73,20 +98,31 @@ export function carromTrackedRecord(s: CarromState, side: Side): Record<string, 
   const boards = s?.boards ?? [];
   const fb = boards.filter((b) => b.det?.fouls);
   if (fb.length) {
-    for (const k of CARROM_FOUL_KEYS) out[k] = 0;
+    Object.assign(out, foulZeros(fb));
     out.foulBoards = fb.length;
-    for (const b of fb) {
-      for (const t of FOUL_TYPES) {
-        const n = b.det!.fouls![side]?.[t] ?? 0;
-        out[FOUL_KEY[t]] += n; out.fouls += n;
-      }
-      out.dues += b.det!.dues?.[side] ?? 0;
-    }
+    for (const b of fb) addFouls(out, b.det!.fouls![side], b.det!.dues?.[side] ?? 0);
   }
   const qb = boards.filter((b) => b.det?.qMiss);
   if (qb.length) {
     out.qMissBoards = qb.length;
     out.queenMisses = qb.reduce((t, b) => t + (b.det!.qMiss![side] ?? 0), 0);
+  }
+  return out;
+}
+
+/** Round 2 — a DOUBLES player's own foul log, from the "who" chips: over
+ *  the boards where every foul and due of their side has a who (`whoFouls`),
+ *  their own counts (0 on a board where only the partner fouled). {} when no
+ *  board is fully attributed — an older doubles match (no who chips) never
+ *  gets foul keys, as before. */
+export function carromPlayerFouls(s: CarromState, side: Side, playerId: string): Record<string, number> {
+  const fb = (s?.boards ?? []).filter((b) => whoFouls(b.det, side));
+  if (!fb.length) return {};
+  const out = foulZeros(fb);
+  out.foulBoards = fb.length;
+  for (const b of fb) {
+    const me = whoFouls(b.det, side)![playerId];
+    addFouls(out, me?.fouls, me?.dues ?? 0);
   }
   return out;
 }
@@ -187,6 +223,8 @@ export function carromStatTotals(s: CarromState, ctx?: StatTotalsContext): Recor
       // side's; doubles: only with a recorded break order)
       const bp = mine ? brk.get(id) : list.length === 1 ? brk.get(`side:${side}`) : undefined;
       if (bp) Object.assign(own, { brkPocketed: bp.pocketed, brkTracked: bp.tracked });
+      // Round 2 — doubles: each partner's own fouls (the who chips)
+      if (list.length === 2) Object.assign(own, carromPlayerFouls(s, side, id));
       out[id] = { side, stats: { ...stats, ...own }, ...(list.length === 2 ? { partnerId: list.find((x) => x !== id) } : {}) };
     }
   }

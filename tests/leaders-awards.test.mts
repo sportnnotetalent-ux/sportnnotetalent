@@ -44,22 +44,27 @@ describe('SD-27 — sport-correct leader categories', () => {
     assert.deepEqual(keys('basketball'), ['ppg', 'rpg', 'apg', 'spg', 'bpg', 'effPg', 'points', 'rebounds', 'assists', 'doubleDoubles']);
     assert.deepEqual(keys('volleyball'), ['points', 'attackPoints', 'aces', 'blocks', 'pointsPerSet', 'acesPerSet', 'blocksPerSet', 'attackEff', 'digsPerSet', 'setAssistsPerSet', 'receptionEff']); // SD-81; deep wave (FIVB digger / setter / receiver)
     assert.deepEqual(keys('kabaddi'), ['matchPoints', 'raidPoints', 'tacklePoints', 'ptsPerMatch', 'raidPerMatch', 'tacklePerMatch', 'super10s', 'high5s', 'successfulRaids', 'superRaids', 'tackles', 'superTackles', 'doOrDiePoints', 'raidStrikeRate']); // deep wave (PKL stat leaders)
-    assert.deepEqual(keys('chess'), ['score', 'scorePct', 'wins']);
+    assert.deepEqual(keys('chess'), ['score', 'scorePct', 'wins', 'tpr']); // round 2: performance rating where ratings exist
     assert.deepEqual(keys('carrom'), ['points', 'boards', 'queens', 'pointsPerMatch']);
     // SD-107 appended "Most winners per match" (point detail) before the serve rates;
     // SD-157 appended "Fastest serve" (serve speed tracking) last
     assert.deepEqual(keys('tennis'), ['matchesWon', 'winPct', 'setsWon', 'gamesWon', 'aces', 'winnersPerMatch', 'srvPtsPct', 'holdPct', 'bpWonPct', 'srvKmhMax']);
-    assert.deepEqual(keys('padel'), ['matchesWon', 'winPct', 'setsWon', 'gamesWon', 'winnersPerMatch', 'srvPtsPct', 'holdPct', 'bpWonPct']);
-    for (const sp of ['badminton', 'tabletennis', 'squash', 'pickleball'] as SportId[]) {
+    // racket round 2: padel net points won %, table tennis serve & 3rd ball won %,
+    // pickleball 3rd-shot drop success % appended last (each with a minimum)
+    assert.deepEqual(keys('padel'), ['matchesWon', 'winPct', 'setsWon', 'gamesWon', 'winnersPerMatch', 'srvPtsPct', 'holdPct', 'bpWonPct', 'netPtsPct']);
+    for (const sp of ['badminton', 'squash'] as SportId[]) {
       assert.deepEqual(keys(sp), ['matchesWon', 'winPct', 'gamesWon', 'gamesPct', 'winnersPerMatch', 'srvPtsPct'], sp);
     }
+    assert.deepEqual(keys('tabletennis'), ['matchesWon', 'winPct', 'gamesWon', 'gamesPct', 'winnersPerMatch', 'srvPtsPct', 'serve3Pct']);
+    assert.deepEqual(keys('pickleball'), ['matchesWon', 'winPct', 'gamesWon', 'gamesPct', 'winnersPerMatch', 'srvPtsPct', 'thirdDropPct']);
     // football keeps its 14 and appends goals per 90 / save % (and, deep wave,
     // chances created / key passes / clearances); cricket keeps SD-16's records
     assert.deepEqual(keys('football').slice(14), ['goalsPer90', 'savePct', 'chancesCreated', 'keyPasses', 'clearances']);
     assert.equal(keys('football').length, 19);
-    // SD-38 / SD-69 appended 4s / 6s / maidens / dots / ducks / keeper dismissals
+    // SD-38 / SD-69 appended 4s / 6s / maidens / dots / ducks / keeper dismissals;
+    // cricket round 2 the fastest ball and best control % (tracked detail)
     assert.deepEqual(keys('cricket'), ['runs', 'wickets', 'catches', 'highest', 'best', 'avg', 'sr', 'econ', 'fifties', 'hundreds',
-      'fours', 'sixes', 'maidens', 'dots', 'ducks', 'wkDismissals']);
+      'fours', 'sixes', 'maidens', 'dots', 'ducks', 'wkDismissals', 'fastest', 'ctrlPct']);
   });
   test('racket sports never rank or award rally points; no "Top scorer"', () => {
     for (const sp of RACKET) {
@@ -84,7 +89,7 @@ describe('SD-27 — award slots and MVP weights from the schema', () => {
   const slots = (sp: SportId) => TOURNAMENT_AWARD_SLOTS[sp].map((s) => [s.slot, s.label]);
   test('slots per sport (slot keys kept where a slot already existed)', () => {
     assert.deepEqual(slots('basketball'), [['mvp', 'Player of the Tournament'], ['points', 'Top scorer'], ['rebounds', 'Top rebounder'], ['assists', 'Playmaker']]);
-    assert.deepEqual(slots('volleyball'), [['mvp', 'Player of the Tournament'], ['points', 'Best scorer'], ['aces', 'Best server'], ['blocks', 'Best blocker'], ['attackPoints', 'Most attack points'], ['attackKills', 'Best attacker'], ['receptions', 'Best receiver'], ['digs', 'Best digger'], ['setAssists', 'Best setter']]); // SD-81; deep wave
+    assert.deepEqual(slots('volleyball'), [['mvp', 'Player of the Tournament'], ['points', 'Best scorer'], ['aces', 'Best server'], ['blocks', 'Best blocker'], ['attackPoints', 'Most attack points'], ['attackKills', 'Best attacker'], ['receptions', 'Best receiver'], ['digs', 'Best digger'], ['setAssists', 'Best setter'], ['digsReceptionsPerSet', 'Best libero']]); // SD-81; deep wave; round 2 (Best libero)
     assert.deepEqual(slots('kabaddi'), [['mvp', 'Player of the Tournament'], ['raidPoints', 'Best raider'], ['tacklePoints', 'Best defender']]);
     assert.deepEqual(slots('chess'), [['mvp', 'Player of the Tournament'], ['scorePct', 'Best score %']]);
     assert.deepEqual(slots('carrom'), [['mvp', 'Player of the Tournament'], ['points', 'Top scorer'], ['queens', 'Queens']]);
@@ -209,12 +214,20 @@ describe('SD-27 — minimums and the organiser override', () => {
       ['ppg', 3, 2, 'min 3 games'], ['rpg', 2, 2, 'min 2 games'], ['apg', 2, 2, 'min 2 games'],
       ['spg', 2, 2, 'min 2 games'], ['bpg', 2, 2, 'min 2 games'], ['effPg', 2, 2, 'min 2 games'],
     ]);
+    // racket round 2: "Fastest serve" ranks once a player has 10 serves clocked
     assert.deepEqual(minimumRows('tennis').map((r) => [r.key, r.text]), [
       ['winPct', 'min 3 matches'], ['winnersPerMatch', 'min 3 matches'], ['srvPtsPct', 'min 30 service points'], ['holdPct', 'min 6 service games'], ['bpWonPct', 'min 5 break point chances'],
+      ['srvKmhMax', 'min 10 serves clocked'],
     ]);
-    assert.deepEqual(minimumRows('cricket').map((r) => [r.key, r.text]), [['avg', 'min 3 innings'], ['sr', 'min 30 balls'], ['econ', 'min 10 overs']]);
-    // SD-49: golf's stroke-play rates rank with a minimum
-    assert.deepEqual(minimumRows('golf').map((r) => [r.key, r.text]), [['scoringAvg', 'min 2 rounds'], ['puttsPerRound', 'min 18 holes putted'], ['girPct', 'min 18 greens tracked']]);
+    assert.deepEqual(minimumRows('cricket').map((r) => [r.key, r.text]), [['avg', 'min 3 innings'], ['sr', 'min 30 balls'], ['econ', 'min 10 overs'],
+      // cricket round 2 — the tracked-detail leaders rank on a sample
+      ['fastest', 'min 12 balls clocked'], ['ctrlPct', 'min 60 tracked balls faced']]);
+    // SD-49: golf's stroke-play rates rank with a minimum; round 2 added putts
+    // per GIR, driving distance and the par-3 / 4 / 5 scoring averages
+    assert.deepEqual(minimumRows('golf').map((r) => [r.key, r.text]), [
+      ['scoringAvg', 'min 2 rounds'], ['puttsPerRound', 'min 18 holes putted'], ['girPct', 'min 18 greens tracked'],
+      ['puttsPerGir', 'min 9 greens hit'], ['drivingDistance', 'min 4 drives measured'], ['p3Avg', 'min 8 par 3s'], ['p4Avg', 'min 20 par 4s'], ['p5Avg', 'min 8 par 5s'],
+    ]);
   });
 });
 

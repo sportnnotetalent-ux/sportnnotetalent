@@ -27,6 +27,8 @@ export interface AlertMedal {
   name: string;
   /** the mark as the sheet shows it: "13.42", "5.12", "1:02.34", "185", "−3 (69)", "38 pts" */
   mark?: string;
+  /** timed races round 2: a gold medallist who set a personal best — "— PB" on the title */
+  pb?: boolean;
 }
 
 /** Stored on field_events.format.alert when a final is locked / a round finished. */
@@ -75,6 +77,7 @@ export function parseAlert(raw: unknown): ResultAlert | null {
       ...(isId(x.playerId) ? { playerId: x.playerId } : {}),
       ...(isId(x.teamId) ? { teamId: x.teamId } : {}),
       ...(cleanMark(x.mark) ? { mark: cleanMark(x.mark) } : {}),
+      ...(x.pb === true && x.medal === 'gold' ? { pb: true } : {}),
     });
   }
   return { v: 1, kind: r.kind, ...(cleanName(r.event) ? { event: cleanName(r.event) } : {}), medals };
@@ -136,7 +139,7 @@ export interface AlertTextInput {
   kind: 'final' | 'golf';
   /** "U14 Girls 100 m" / the golf round's title */
   event: string;
-  medals: Pick<AlertMedal, 'medal' | 'name' | 'mark'>[];
+  medals: Pick<AlertMedal, 'medal' | 'name' | 'mark' | 'pb'>[];
   records?: RecordSet[];
   /** the tournament's name (body line) */
   tournament?: string | null;
@@ -166,6 +169,8 @@ export function alertText(a: AlertTextInput): { title: string; body: string } | 
     const verb = golds.length > 1 ? 'shared gold in' : 'won';
     title = `🥇 ${who} ${verb} ${a.event}${mark ? ` in ${mark}` : ''}`;
     if (own.length) title += ` — ${[...new Set(own.map((r) => scopeText(r.scope)))].join(' & ')}`;
+    // timed races round 2: the winner's personal best (a record of theirs says more)
+    else if (golds.some((m) => m.pb)) title += ' — PB';
     const podium = (['silver', 'bronze'] as Medal[]).map((m) => {
       const names = a.medals.filter((x) => x.medal === m).map((x) => x.name);
       return names.length ? `${m === 'silver' ? '🥈' : '🥉'} ${names.join(', ')}` : '';

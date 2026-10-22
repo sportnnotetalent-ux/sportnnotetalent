@@ -13,6 +13,7 @@
  *   cricket (SD-12)               P W T L NR NRR Pts
  *   chess                         P W-D-L Pts SB …
  *   rugby (SD-143)                P W D L PF PA ± (TF TD) (BP) Pts
+ *   rugby league                  P W D L PF PA ± Pts
  *   ice hockey (SD-145)           P W OTW OTL L GF GA GD Pts (NHL: P W OTL L …)
  *
  * plus one column for every per-row tie-breaker of the active chain that the
@@ -74,7 +75,7 @@ export const halfText = (n: number) => {
   return Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/0+$/, '');
 };
 
-const SPORTS_WITH_DRAWS = new Set<string>(['football', 'hockey', 'handball', 'kabaddi', 'rugby', 'netball']);
+const SPORTS_WITH_DRAWS = new Set<string>(['football', 'hockey', 'handball', 'kabaddi', 'rugby', 'netball', 'rugby_league']);
 
 /** SD-48 — is this a team-tie table (its chain uses a rubber-count / game-
  *  points criterion)? */

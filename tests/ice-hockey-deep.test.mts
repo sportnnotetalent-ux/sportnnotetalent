@@ -158,7 +158,8 @@ describe('deep wave · optional tallies (faceoffs, hits, blocks, giveaways, take
     const r = ICE_HOCKEY_LIVE_SETTINGS.read(run([], { trackFaceoffs: true }));
     assert.equal(r.trackFaceoffs, true);
     assert.equal(r.trackPhysical, false);
-    assert.equal(ICE_HOCKEY_LIVE_SETTINGS.fields.filter((f) => f.group === 'Stats to track').length, 4);
+    // round 2 added "Faceoff zones" (trackFaceoffZones) to the group: 4 → 5
+    assert.equal(ICE_HOCKEY_LIVE_SETTINGS.fields.filter((f) => f.group === 'Stats to track').length, 5);
   });
   test('the key-moments timeline leaves tallies out', () => {
     const s = run(log, SPORT.config);

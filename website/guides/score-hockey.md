@@ -56,8 +56,9 @@ Off by default. Switch on in **⚙️ Match settings → Stats to track** (organ
 - **Video referrals**: a **📺 Referral** button per team, then **Upheld** or **Not upheld**.
 
 ## What you get
-- **Score** tab → **📝 Commentary**: the live text quarter by quarter, newest first, with the minute and the score after every moment, and a match summary on top. **Key events** keeps goals, corners, cards and subs.
-- **📊 Match stats**: **Top stats**, **Attack** (circle entries, shots wide / blocked, conversion), **Corners & strokes**, **Goalkeeping** (save %), **Discipline**, for the match or one quarter, then each player's line.
+- **Commentary** tab: the live text quarter by quarter, newest first, with the minute and the score after every moment. **Key events** keeps goals, corners, cards and subs.
+- **Stats** tab: **Top stats**, **Attack** (circle entries, shots wide / blocked, conversion), **Corners & strokes**, **Goalkeeping** (save %), **Discipline**, for the match or one quarter, then each player's line, and the game flow.
+- **Summary** tab: the result with the match facts (scorers, sendings-off), Player of the Match and every player's rating.
 - Player profiles: goals per game, field, PC and stroke goals, keeper save %, clean sheets and minutes suspended.
 - Tournament tables use **FIH 3-1-0**, or **FIH + shoot-out bonus** (a draw goes to a shoot-out: winner 2 points, loser 1). See [Points table and adjustments](/guides/points-table-and-adjustments/).
 

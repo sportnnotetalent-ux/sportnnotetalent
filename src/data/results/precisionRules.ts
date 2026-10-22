@@ -34,11 +34,67 @@ export const PRECISION_RULES: RuleDef[] = [
     source: 'IWF TCRR jury, as remembered (verify)',
   },
 
+  // round 2: the competition clock (a scorer aid — never a result)
+  {
+    key: 'wlClock', sports: ['weightlifting'], group: 'Lifting order', label: 'Lifting clock', kind: 'choice', phase: true, default: 'iwf',
+    choices: [{ value: 'iwf', label: 'On — 1 minute an attempt, 2 minutes for consecutive attempts, warning at 30 s (IWF)' }, { value: 'off', label: 'Off — no clock on the entry screen' }],
+    help: 'A countdown on the entry screen that the official starts when the lifter is called. It only helps the officials — the referees still decide, and nothing about the clock is saved.',
+    source: 'IWF TCRR (time allowed for an attempt) — see round-2 notes',
+  },
+  // round 2: Robi points as well as Sinclair
+  {
+    key: 'robi', sports: ['weightlifting'], group: 'Medals', label: 'Best lifter (Robi points)', kind: 'choice', default: false,
+    choices: [{ value: true, label: 'Show Robi points' }, { value: false, label: 'Off' }],
+    help: 'Compares lifters across bodyweight categories against each category’s world-record total: the record scores 1000 points, half of it 100. Shown on each results sheet and as a best-lifter list.',
+    source: 'IWF Robi points (formula by R. Nagy) — see round-2 notes',
+  },
+  {
+    key: 'robiRefM', sports: ['weightlifting'], group: 'Medals', label: 'Robi reference totals — men / boys (kg)', kind: 'text', phase: true, default: '',
+    showIf: { key: 'robi', value: true },
+    help: 'The reference total for each category, "category: kg", separated by commas: "60: 290, 65: 312, +110: 470". Empty: the IWF senior world-record totals for the IWF categories; a category with no reference shows no Robi points.',
+    source: 'organiser; default = IWF senior world records (see round-2 notes)',
+  },
+  {
+    key: 'robiRefF', sports: ['weightlifting'], group: 'Medals', label: 'Robi reference totals — women / girls (kg)', kind: 'text', phase: true, default: '',
+    showIf: { key: 'robi', value: true },
+    help: 'As for men: "48: 200, 53: 230, +86: 330". Empty: the IWF senior world-record totals for the IWF categories.',
+    source: 'organiser; default = IWF senior world records (see round-2 notes)',
+  },
+  // round 2: the IWF team classification — its own result next to the house table
+  {
+    key: 'wlTeamClass', sports: ['weightlifting'], group: 'Team classification', label: 'IWF team classification', kind: 'choice', default: 'off',
+    choices: [
+      { value: 'off', label: 'Off — the house table only' },
+      { value: 'total', label: 'On — 28-25-23-22-21 … points per category on the total' },
+      { value: 'all', label: 'On — points for the snatch, the clean & jerk and the total' },
+    ],
+    help: 'A team table per age group and gender: each lifter’s place in their category earns their team 28, 25, 23, 22, 21 … 1 points. Equal points: more 1st places, then more 2nd places. It is shown next to the house table, which keeps the meet’s own points.',
+    source: 'IWF team classification points — see round-2 notes',
+  },
+
   /* --------------------------------- shooting --------------------------------- */
   {
     key: 'shootPen', sports: ['shooting'], group: 'Stats to track', label: 'Penalties', kind: 'choice', phase: true, default: false,
-    choices: [{ value: false, label: 'Off' }, { value: true, label: 'On — a −2 button on each series' }],
-    help: 'A penalty deducts 2 points from the series it happened in (shots before START or after STOP, rule breaches). Totals, ties and records use the score after the deduction; the sheet shows it.',
-    source: 'ISSF GTR penalties (2-point deduction), as remembered (verify)',
+    choices: [{ value: false, label: 'Off' }, { value: true, label: 'On — a −2 button on each series and on each final shot' }],
+    help: 'A penalty deducts 2 points: from the series it happened in, or in a final from the shot it was given on (shots before START or after STOP, rule breaches). Totals, ties, eliminations and records use the score after the deduction; the sheet shows it.',
+    source: 'ISSF GTR penalties (2-point deduction) — see round-2 notes',
+  },
+
+  /* ---------------------------------- archery ---------------------------------- */
+  // round 2: the recurve indoor face is the organiser's choice
+  {
+    key: 'archIndoorFace', sports: ['archery'], group: 'Faces', label: 'Recurve indoor face (18 m)', kind: 'choice', phase: true, default: 'full',
+    choices: [
+      { value: 'full', label: 'Single 40 cm face — rings 1 to 10 (school default)' },
+      { value: 'triple', label: 'Triple 40 cm face — rings 6 to 10, outside is a miss (World Archery indoor)' },
+    ],
+    help: 'Recurve archers indoors shoot either one full 40 cm face or the vertical triple face that only has the 6 to 10 rings. With the triple face the keypad shows 6 to X and M only.',
+    source: 'World Archery Book 3 (indoor faces) — see round-2 notes; single face = school default (founder)',
+  },
+  {
+    key: 'archTeamArrows', sports: ['archery'], group: 'Stats to track', label: 'Arrows per archer in team matches', kind: 'choice', phase: true, default: false,
+    choices: [{ value: false, label: 'Off — each team’s arrows as one end' }, { value: true, label: 'On — enter each team’s arrows archer by archer' }],
+    help: 'In team and mixed team matches each archer’s arrows are entered in turn, so every archer gets their own team-match arrows, average, 10s and X on their profile. The team’s score is the same either way.',
+    source: 'World Archery team matches (2 arrows per archer an end) — see round-2 notes',
   },
 ];

@@ -11,13 +11,13 @@ import { GolfScorecard } from './GolfScorecard';
 import { GolfRoundFeed, GolfRoundStats } from './GolfRoundDeep';
 import { theme } from '../../core/theme';
 import { SelectChip, textStyles } from '../ui';
-import { toParLabel, roundStats, cardHasDetail, type GolfCard, type Hole, type RankRow, type GolfScoring } from '../../sports/golf/engine';
+import { toParLabel, roundStats, cardHasDetail, type DistUnit, type GolfCard, type Hole, type RankRow, type GolfScoring } from '../../sports/golf/engine';
 import { thruLabel, type RoundCell } from '../../data/golfLeaderboard';
 
 export interface LeaderboardCard { holes: Hole[]; card: GolfCard; received: number[] }
 
 export function GolfLeaderboard({
-  rows, scoring, nameOf, cards, holesInRound, cutAfter, emptyLabel = 'No scores yet.', roundCols, onLongPressRow, cardTitle, onShareCard,
+  rows, scoring, nameOf, cards, holesInRound, cutAfter, emptyLabel = 'No scores yet.', roundCols, onLongPressRow, cardTitle, onShareCard, unit,
 }: {
   rows: RankRow[];
   scoring: GolfScoring;
@@ -37,6 +37,8 @@ export function GolfLeaderboard({
   cardTitle?: string;
   /** SD-88 — share a player's card */
   onShareCard?: (playerId: string) => void;
+  /** Round 2 — the round's distance unit (the card drill-down's stats / feed) */
+  unit?: DistUnit;
 }) {
   const [open, setOpen] = useState<string | null>(null);
   if (!rows.length) return <Text style={textStyles.muted}>{emptyLabel}</Text>;
@@ -103,7 +105,7 @@ export function GolfLeaderboard({
                   <View style={st.detailWrap}>
                     {cardTitle ? <Text style={st.cardTitle}>{cardTitle}</Text> : null}
                     <CardDetail {...c} name={nameOf(r.id)} stableford={scoring === 'stableford'} onShare={onShareCard ? () => onShareCard(r.id) : undefined}
-                      playerId={r.id} field={[...(cards?.entries() ?? [])].filter(([id]) => id !== r.id).map(([id, x]) => ({ id, name: nameOf(id), ...x }))} />
+                      playerId={r.id} unit={unit} field={[...(cards?.entries() ?? [])].filter(([id]) => id !== r.id).map(([id, x]) => ({ id, name: nameOf(id), ...x }))} />
                   </View>
                 )}
                 {open === r.id && !c && cards && <Text style={[textStyles.muted, st.noCard]}>Not in this round.</Text>}
@@ -137,8 +139,8 @@ export function cardStatsLine({ holes, card, received }: LeaderboardCard): strin
 /** SD-88 — the player's card as a proper scorecard (Out / In / Tot, par and
  *  SI rows, birdie ◯ / bogey □ shapes, net / points / putts rows). Sized to
  *  the screen so it scrolls inside its own box, not the leaderboard's. */
-export function CardDetail({ holes, card, received, name = 'Score', stableford = false, onShare, playerId = 'me', field }: LeaderboardCard & {
-  name?: string; stableford?: boolean; onShare?: () => void;
+export function CardDetail({ holes, card, received, name = 'Score', stableford = false, onShare, playerId = 'me', field, unit }: LeaderboardCard & {
+  name?: string; stableford?: boolean; onShare?: () => void; unit?: DistUnit;
   /** Deep wave — the player's id and the round's other cards (Stats vs the field) */
   playerId?: string; field?: (LeaderboardCard & { id: string; name: string })[];
 }) {
@@ -156,8 +158,8 @@ export function CardDetail({ holes, card, received, name = 'Score', stableford =
       </View>
       {view === 'card' && <GolfScorecard holes={holes} players={[{ name, card, received }]} stableford={stableford} onShare={onShare} />}
       {view === 'card' && line ? <Text style={st.statsLine}>{line}</Text> : null}
-      {view === 'stats' && <GolfRoundStats players={[me, ...(field ?? [])]} fixed={playerId} />}
-      {view === 'feed' && <GolfRoundFeed players={[me]} scoring={stableford ? 'stableford' : 'stroke'} only={playerId} />}
+      {view === 'stats' && <GolfRoundStats players={[me, ...(field ?? [])]} fixed={playerId} unit={unit} />}
+      {view === 'feed' && <GolfRoundFeed players={[me]} scoring={stableford ? 'stableford' : 'stroke'} only={playerId} unit={unit} />}
     </View>
   );
 }

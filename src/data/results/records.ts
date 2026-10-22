@@ -4,7 +4,7 @@
  * (> +2.0 m/s) or no-wind-reading sprint / horizontal jump, or a hand time, is
  * shown but never a PB / SB / record. "=" marks an equalled best. Pure.
  */
-import type { DisciplineDef, RankedEntry, ResultFlag } from './model.ts';
+import type { DisciplineDef, RankedEntry, ResultEntry, ResultFlag } from './model.ts';
 import { betterMark } from './rank.ts';
 
 /** One earlier legal mark by an athlete (from their completed results). */
@@ -26,6 +26,12 @@ export interface RecordMark {
   category: string;
   value: number;
   holder: string;
+  /** Timed races round 2: the holder's player id (an individual) — written
+   *  with every new record; older / historic entries have none and simply
+   *  don't count on profiles */
+  holderId?: string;
+  /** Timed races round 2: a relay's / crew's members' player ids (the holder is the team) */
+  holderIds?: string[];
   team?: string;
   date?: string;
   /** the event (PhaseFormat.eventKey) that set it — its own sheet shows "MR", not "=MR" */
@@ -96,10 +102,21 @@ export function updateRecords(rows: RankedEntry[], def: DisciplineDef, category:
     const cur = out.find((x) => x.scope === scope && x.discipline === def.key && x.category === category);
     if (cur && !betterMark(best, cur.value, def)) continue;
     out = out.filter((x) => x !== cur);
-    out.push({ scope, discipline: def.key, category, value: best, holder: holder.entry.name, team: holder.entry.team?.name, date, ...(eventKey ? { eventKey } : {}) });
+    out.push({ scope, discipline: def.key, category, value: best, holder: holder.entry.name, ...recordHolderIds(holder.entry), team: holder.entry.team?.name, date, ...(eventKey ? { eventKey } : {}) });
   }
   return out;
 }
+
+/** Timed races round 2: who a record belongs to, by id — the athlete, or a
+ *  relay's / crew's members (none known → nothing, the name stands alone). */
+export function recordHolderIds(e: Pick<ResultEntry, 'athleteId' | 'result'>): Pick<RecordMark, 'holderId' | 'holderIds'> {
+  if (e.athleteId) return { holderId: e.athleteId };
+  const ids = [...new Set((e.result.members ?? []).map((m) => m.playerId).filter((x): x is string => !!x))];
+  return ids.length ? { holderIds: ids } : {};
+}
+
+/** The player ids a record names (empty for an older / historic entry). */
+export const recordPlayerIds = (r: Pick<RecordMark, 'holderId' | 'holderIds'>): string[] => (r.holderId ? [r.holderId] : [...(r.holderIds ?? [])]);
 
 /** An athlete's PB and SB in a discipline, from their history. */
 export function personalBests(history: MarkHistory[], athleteId: string, def: DisciplineDef, seasonFrom: string): { pb: number | null; sb: number | null } {

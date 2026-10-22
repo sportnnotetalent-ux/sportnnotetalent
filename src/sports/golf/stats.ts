@@ -17,6 +17,8 @@ const keyedFree = { coverage: 'keyed' as const };
 const keyedPutts = { coverage: 'keyed' as const, mode: 'putts' };
 const keyedFirstPutt = { coverage: 'keyed' as const, mode: 'firstPutt' };
 const keyedDrive = { coverage: 'keyed' as const, mode: 'drive' };
+/** Round 2 — up and downs (tracked: 'upDown', shots from off the green). */
+const keyedUpDown = { coverage: 'keyed' as const, mode: 'upDown' };
 
 /** SD-49 — "68 (−4)": a round's gross with its score to par. */
 const toPar = (n: number) => (n === 0 ? 'E' : n > 0 ? `+${n}` : `−${Math.abs(n)}`);
@@ -97,8 +99,10 @@ export const golfStats: SportStatSchema<'golf'> = {
       agg: { kind: 'rate', num: 'scrambles', den: 'scrambleHoles', scale: 100, dp: 0 } },
     { key: 'sandSavePct', label: 'Sand saves', source: 'derived', group: 'shots', format: { unit: 'percent', dp: 0 },
       agg: { kind: 'rate', num: 'sandSaves', den: 'sandHoles', scale: 100, dp: 0 } },
-    { key: 'puttsPerGir', label: 'Putts per GIR', source: 'derived', group: 'shots', format: { unit: 'count', dp: 2, better: 'lower' },
-      agg: { kind: 'rate', num: 'puttsGir', den: 'girPutted', dp: 2 } },
+    // Round 2 — a tournament leader (the PGA TOUR's "Putting Average"), so it
+    // ranks with a minimum of greens hit (an organiser can change it)
+    { key: 'puttsPerGir', label: 'Putts per GIR', leaderLabel: 'Fewest putts per GIR', source: 'derived', group: 'shots', format: { unit: 'count', dp: 2, better: 'lower' },
+      agg: { kind: 'rate', num: 'puttsGir', den: 'girPutted', dp: 2, qualifier: { den: 9, unit: { label: 'greens hit', one: 'green hit' } } } },
     // Deep wave — free figures from the strokes (every round finished from now
     // on: 'keyed', an older line reads "not tracked" and stays out of the rates)
     { key: 'holesInOne', label: 'Holes in one', short: 'holes in one', one: 'hole in one', group: 'scoring', ...keyedFree },
@@ -113,11 +117,11 @@ export const golfStats: SportStatSchema<'golf'> = {
     { key: 'inStrokes', label: 'Back nine strokes (complete 18-hole rounds)', short: 'back nine strokes', group: 'byPar', format: { unit: 'strokes' }, ...keyedFree },
     { key: 'bounceOps', label: 'Holes after a bogey or worse', short: 'bounce-back chances', group: 'byPar', ...keyedFree },
     { key: 'bounceBacks', label: 'Bounce backs', short: 'bounce backs', one: 'bounce back', group: 'byPar', ...keyedFree },
-    { key: 'p3Avg', label: 'Par 3 scoring avg', source: 'derived', coverage: 'keyed', group: 'byPar', format: { unit: 'strokes', dp: 2 },
+    { key: 'p3Avg', label: 'Par 3 scoring avg', leaderLabel: 'Par 3 scoring average', source: 'derived', coverage: 'keyed', group: 'byPar', format: { unit: 'strokes', dp: 2 },
       agg: { kind: 'rate', num: 'p3Strokes', den: 'p3Holes', dp: 2, qualifier: { den: 8, unit: { label: 'par 3s', one: 'par 3' } } } },
-    { key: 'p4Avg', label: 'Par 4 scoring avg', source: 'derived', coverage: 'keyed', group: 'byPar', format: { unit: 'strokes', dp: 2 },
+    { key: 'p4Avg', label: 'Par 4 scoring avg', leaderLabel: 'Par 4 scoring average', source: 'derived', coverage: 'keyed', group: 'byPar', format: { unit: 'strokes', dp: 2 },
       agg: { kind: 'rate', num: 'p4Strokes', den: 'p4Holes', dp: 2, qualifier: { den: 20, unit: { label: 'par 4s', one: 'par 4' } } } },
-    { key: 'p5Avg', label: 'Par 5 scoring avg', source: 'derived', coverage: 'keyed', group: 'byPar', format: { unit: 'strokes', dp: 2 },
+    { key: 'p5Avg', label: 'Par 5 scoring avg', leaderLabel: 'Par 5 scoring average', source: 'derived', coverage: 'keyed', group: 'byPar', format: { unit: 'strokes', dp: 2 },
       agg: { kind: 'rate', num: 'p5Strokes', den: 'p5Holes', dp: 2, qualifier: { den: 8, unit: { label: 'par 5s', one: 'par 5' } } } },
     { key: 'front9Avg', label: 'Front nine scoring avg', source: 'derived', coverage: 'keyed', group: 'byPar', format: { unit: 'strokes', dp: 1 },
       agg: { kind: 'rate', over: 'nines', num: 'outStrokes', den: 'completeRounds', dp: 1 } },
@@ -151,8 +155,16 @@ export const golfStats: SportStatSchema<'golf'> = {
     { key: 'drives', label: 'Drives measured', short: 'drives measured', one: 'drive measured', group: 'driving', ...keyedDrive },
     { key: 'driveYds', label: 'Measured drive yards', short: 'drive yards', group: 'driving', ...keyedDrive },
     { key: 'longDrive', label: 'Longest drive (yd)', short: 'longest drive', group: 'driving', format: { unit: 'count' }, agg: { kind: 'max' }, ...keyedDrive },
-    { key: 'drivingDistance', label: 'Driving distance (yd)', leaderLabel: 'Driving distance', source: 'derived', coverage: 'keyed', group: 'driving', format: { unit: 'decimal', dp: 1 },
+    // Round 2 — a tournament leader; golfLeaderCategories shows it in metres
+    // for a metres tournament (stored in yards)
+    { key: 'drivingDistance', label: 'Driving distance (yd)', leaderLabel: 'Driving distance (yd)', source: 'derived', coverage: 'keyed', group: 'driving', format: { unit: 'decimal', dp: 1 },
       agg: { kind: 'rate', num: 'driveYds', den: 'drives', dp: 1, qualifier: { den: 4, unit: { label: 'drives measured', one: 'drive measured' } } } },
+    // Round 2 — up and downs, apart from scrambling (PGA TOUR: 2 shots or
+    // fewer to hole out from off the green, whatever the score)
+    { key: 'udChances', label: 'Up-and-down chances', short: 'up-and-down chances', one: 'up-and-down chance', group: 'around', ...keyedUpDown },
+    { key: 'upDowns', label: 'Up and downs', short: 'up and downs', one: 'up and down', group: 'around', ...keyedUpDown },
+    { key: 'upDownPct', label: 'Up and downs', source: 'derived', coverage: 'keyed', group: 'around', format: { unit: 'percent', dp: 0 },
+      agg: { kind: 'rate', num: 'upDowns', den: 'udChances', scale: 100, dp: 0 } },
   ],
   sections: [
     { id: 'rounds', title: 'Rounds', rows: [{ stat: 'rounds' }, { stat: 'scoringAvg' }] },
@@ -167,6 +179,8 @@ export const golfStats: SportStatSchema<'golf'> = {
       { stat: 'holesInOne', hideZero: true }, { stat: 'albatrosses', hideZero: true },
     ] },
     { id: 'driving', title: 'Off the tee', rows: [{ stat: 'drivingDistance' }, { stat: 'longDrive' }, { stat: 'drives' }] },
+    // Round 2 — up and downs (each row only once a line carries it)
+    { id: 'around', title: 'Around the green', rows: [{ stat: 'upDownPct' }, { stat: 'udChances' }] },
     { id: 'putting', title: 'Putting', rows: [
       { stat: 'onePuttPct' }, { stat: 'threePuttPct' }, { stat: 'birdieConversion' },
       ...PUTT_BUCKETS.map((b) => ({ stat: `${b.key}Pct` })),
@@ -177,7 +191,9 @@ export const golfStats: SportStatSchema<'golf'> = {
   // the stroke-play categories only rank lines from finished rounds, and
   // `holesWon` only exists in match play (golfLeaders.ts orders / drops them
   // by the tournament's competition)
-  leaders: ['birdies', 'lowRound', 'lowRound9', 'scoringAvg', 'eagles', 'puttsPerRound', 'girPct', 'holesWon'],
+  // Round 2 — putts per GIR, driving distance and par-3 / 4 / 5 scoring
+  // averages join the leaders (each with its minimum)
+  leaders: ['birdies', 'lowRound', 'lowRound9', 'scoringAvg', 'eagles', 'puttsPerRound', 'girPct', 'puttsPerGir', 'drivingDistance', 'p3Avg', 'p4Avg', 'p5Avg', 'holesWon'],
   headline: ['rounds', 'birdies', 'eagles'],
   awards: [
     { stat: 'birdies', icon: '🐦', label: 'Most birdies' },

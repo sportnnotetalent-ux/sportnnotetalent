@@ -27,7 +27,7 @@ import { Button, SelectChip, TextField } from '../../components/ui';
 import { confirmMatchAction } from '../../components/ConfirmSheet';
 import { LineScoreboard } from '../../components/LineScoreboard';
 import { MatchBoxScore } from '../../components/BoxScore';
-import { LiveTimeline } from '../LiveTimeline';
+import { SubViews } from '../SubViews';
 import type { Player } from '../../core/types';
 import type { ScoreAction, SportPlugin } from '../types';
 import {
@@ -819,42 +819,40 @@ const AFScoreboard: NonNullable<SportPlugin<AFState>['Scoreboard']> = ({ state, 
   );
 };
 
-/** Deep wave: the Score tab's views — the play-by-play commentary (by drive /
- *  by quarter), the broadcast team stats (quarter / category filters), the
- *  drive chart (play by play only), the box score and the key moments. */
+/** The Stats tab's views — the broadcast team stats (quarter / category
+ *  filters), the drive chart (play by play only) and the box score. */
 const VIEWS = [
-  { key: 'pbp', label: 'Play-by-play' }, { key: 'stats', label: 'Match stats' }, { key: 'drives', label: 'Drives' },
-  { key: 'box', label: 'Box score' }, { key: 'timeline', label: 'Key moments' },
+  { key: 'stats', label: 'Match stats' }, { key: 'drives', label: 'Drives' }, { key: 'box', label: 'Box score' },
 ] as const;
 
-const LiveExtras: NonNullable<SportPlugin<AFState>['LiveExtras']> = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster, onPlayer }) => {
+/** Match tabs (2026-10-22): the play-by-play by drive / quarter on Commentary
+ *  (its "Key moments" chip replaces the old separate Key-moments view); match
+ *  stats, drives and the box score on Stats. */
+type TabProps = Parameters<NonNullable<SportPlugin<AFState>['LiveExtras']>>[0];
+const AFCommentary = ({ state, homeName, awayName, homeColor, awayColor }: TabProps) => {
   const s = state as AFState;
-  const [view, setView] = useState<(typeof VIEWS)[number]['key']>('pbp');
-  const names = { home: homeName, away: awayName };
+  return (
+    <GroupedFeed groups={afCommentary(s, { home: homeName, away: awayName })} homeColor={homeColor} awayColor={awayColor} tags={AF_FEED_TAGS} scopeLabel={afScopeLabel(s)}
+      emptyText="No plays yet — the commentary fills in from the kickoff." />
+  );
+};
+const AFStats = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster, onPlayer }: TabProps) => {
+  const s = state as AFState;
   const hasDrives = afDrives(s).drives.length > 0;
-  const views = VIEWS.filter((v) => v.key !== 'drives' || hasDrives);
-  const active = views.some((v) => v.key === view) ? view : 'pbp';
   const n = Math.min(totalPeriods(s), Math.max(1, s.period));
   const scopes = n >= 2 ? Array.from({ length: n }, (_, i) => ({ value: i + 1, label: periodName(s, i + 1) })) : [];
   return (
-    <View style={{ gap: theme.spacing(3) }}>
-      <View style={c.grid} accessibilityRole="tablist">
-        {views.map((v) => <SelectChip key={v.key} label={v.label} active={active === v.key} onPress={() => setView(v.key)} />)}
-      </View>
-      {active === 'pbp' ? (
-        <GroupedFeed groups={afCommentary(s, names)} homeColor={homeColor} awayColor={awayColor} tags={AF_FEED_TAGS} scopeLabel={afScopeLabel(s)}
-          emptyText="No plays yet — the commentary fills in from the kickoff." />
-      ) : active === 'stats' ? (
+    <SubViews label="Stats view" views={VIEWS.filter((v) => v.key !== 'drives' || hasDrives).map((v) => ({
+      ...v,
+      render: () => v.key === 'stats' ? (
         <StatSheetView build={(sc) => afSheet(s, sc, s.ended ? undefined : matchSec(s, Date.now()))} scopes={scopes}
           homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} />
-      ) : active === 'drives' ? (
+      ) : v.key === 'drives' ? (
         <DriveChart s={s} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} />
-      ) : active === 'box' ? (
-        <MatchBoxScore sport="american_football" source={afBox(s, { homeRoster, awayRoster, homeName, awayName })} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} onPlayer={onPlayer} show="box" />
       ) : (
-        <LiveTimeline events={afTimeline(s)} homeColor={homeColor} awayColor={awayColor} emptyText="No scores yet." homeRoster={homeRoster} awayRoster={awayRoster} onPlayer={onPlayer} />
-      )}
-    </View>
+        <MatchBoxScore sport="american_football" source={afBox(s, { homeRoster, awayRoster, homeName, awayName })} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} onPlayer={onPlayer} show="box" />
+      ),
+    }))} />
   );
 };
 
@@ -889,7 +887,7 @@ export const americanFootballPlugin: SportPlugin<AFState> = {
   ScoringControls,
   LiveClock,
   Scoreboard: AFScoreboard,
-  LiveExtras,
+  matchTabs: { Commentary: AFCommentary, Stats: AFStats },
   formation: (perSide) => afFormation(perSide),
   Court: AFField,
   liveSettings: AF_LIVE_SETTINGS,

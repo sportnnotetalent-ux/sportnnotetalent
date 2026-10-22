@@ -5,6 +5,8 @@
  * chess.com, lichess, or a typed list) during or after it. Every move is
  * checked against the position before it is kept; the first one that isn't
  * legal is named. The opening (ECO) is read from the moves, or set by hand.
+ * Round 2 — a knockout match keeps one list per game: the game in play's, or
+ * (`koGame`) a game already recorded.
  */
 import React, { useMemo, useState } from 'react';
 import { View, Text, TextInput, StyleSheet } from 'react-native';
@@ -17,24 +19,31 @@ import { readMoveList, movetext } from './pgn';
 import { ecoCode, nameForEco } from './openings';
 import { parseFen, START_FEN } from './board';
 
-export function MovesPanel({ state: s, dispatch, nameOf, after = false }: {
+export function MovesPanel({ state: s, dispatch, nameOf, after = false, koGame }: {
   state: ChessState;
   dispatch: (a: ScoreAction) => void;
   nameOf: (side: Side) => string;
   /** the game is over: paste / replace the whole game */
   after?: boolean;
+  /** Round 2 — a knockout game already recorded (its own list: MOVES /
+   *  OPENING `koGame`); absent = the game in play */
+  koGame?: number;
 }) {
   const [text, setText] = useState('');
   const [clk, setClk] = useState('');
   const [paste, setPaste] = useState(after);
   const [eco, setEco] = useState('');
   const [ecoOpen, setEcoOpen] = useState(false);
-  const game = s.game;
+  const kg = koGame != null ? s.ko?.games[koGame] : undefined;
+  const game = koGame != null ? kg?.game : s.game;
+  const opening = koGame != null ? kg?.opening : s.opening;
+  const white: Side = kg?.white ?? s.white;
+  const target = koGame != null ? { koGame } : {};
   const n = game?.san.length ?? 0;
   const pos = parseFen(game?.fen ?? START_FEN);
-  const toMove: Side = pos?.turn === 'b' ? (s.white === 'home' ? 'away' : 'home') : s.white;
+  const toMove: Side = pos?.turn === 'b' ? (white === 'home' ? 'away' : 'home') : white;
   const read = useMemo(() => (text.trim() ? readMoveList(text, paste ? undefined : game?.fen) : null), [text, paste, game?.fen]);
-  const op = openingOf(s);
+  const op = openingOf({ game, opening });
   // the last few moves, numbered from where the game started
   const first = parseFen(game?.start ?? START_FEN);
   const from = Math.max(0, n - 6);
@@ -46,9 +55,9 @@ export function MovesPanel({ state: s, dispatch, nameOf, after = false }: {
     if (!read || !read.san.length) return;
     if (paste) {
       if (n && !(await askConfirm({ title: 'Replace the moves?', message: `The ${n} moves recorded so far are replaced by the ${read.san.length} you pasted.`, yesLabel: 'Yes, replace', noLabel: 'No, keep them', tone: 'caution' }))) return;
-      dispatch({ type: 'MOVES', payload: { pgn: text, at: Date.now() } });
+      dispatch({ type: 'MOVES', payload: { pgn: text, at: Date.now(), ...target } });
     } else {
-      dispatch({ type: 'MOVES', payload: { add: read.san, at: Date.now(), ...(clkSecs != null ? { clk: clkSecs } : {}) } });
+      dispatch({ type: 'MOVES', payload: { add: read.san, at: Date.now(), ...(clkSecs != null ? { clk: clkSecs } : {}), ...target } });
     }
     setText(''); setClk('');
   };
@@ -84,7 +93,7 @@ export function MovesPanel({ state: s, dispatch, nameOf, after = false }: {
       ) : null}
       <View style={st.row}>
         <Button label={paste ? (n ? 'Replace the moves…' : 'Save the moves') : 'Add move'} style={{ flex: 1 }} disabled={!ok} onPress={() => void save()} />
-        {!paste && n ? <Button label="⌫ Last move" variant="ghost" onPress={() => dispatch({ type: 'MOVES', payload: { drop: 1 } })} /> : null}
+        {!paste && n ? <Button label="⌫ Last move" variant="ghost" onPress={() => dispatch({ type: 'MOVES', payload: { drop: 1, ...target } })} /> : null}
       </View>
       {!after ? (
         <Text style={st.link} accessibilityRole="button" onPress={() => { setPaste(!paste); setText(''); }}>
@@ -96,12 +105,12 @@ export function MovesPanel({ state: s, dispatch, nameOf, after = false }: {
         <View style={st.row}>
           <TextInput style={[st.input, { flex: 1 }, eco && !ecoCode(eco) ? st.bad : null]} value={eco} onChangeText={(t) => setEco(t.toUpperCase().slice(0, 3))}
             placeholder="ECO, e.g. B90" placeholderTextColor={theme.colors.textMuted} autoCapitalize="characters" accessibilityLabel="Opening ECO code" />
-          <Button label="Set" disabled={!ecoCode(eco)} onPress={() => { dispatch({ type: 'OPENING', payload: { eco: ecoCode(eco) } }); setEcoOpen(false); setEco(''); }} />
-          {s.opening?.manual ? <Button label="Clear" variant="ghost" onPress={() => { dispatch({ type: 'OPENING', payload: {} }); setEcoOpen(false); }} /> : null}
+          <Button label="Set" disabled={!ecoCode(eco)} onPress={() => { dispatch({ type: 'OPENING', payload: { eco: ecoCode(eco), ...target } }); setEcoOpen(false); setEco(''); }} />
+          {opening?.manual ? <Button label="Clear" variant="ghost" onPress={() => { dispatch({ type: 'OPENING', payload: { ...target } }); setEcoOpen(false); }} /> : null}
         </View>
       ) : (
         <View style={st.chips}>
-          <SelectChip label={op ? `Opening: ${op.eco}` : 'Opening (ECO)…'} active={!!s.opening?.manual} onPress={() => setEcoOpen(true)} />
+          <SelectChip label={op ? `Opening: ${op.eco}` : 'Opening (ECO)…'} active={!!opening?.manual} onPress={() => setEcoOpen(true)} />
           {eco && ecoCode(eco) ? <Text style={st.meta}>{nameForEco(ecoCode(eco)!) ?? ''}</Text> : null}
         </View>
       )}

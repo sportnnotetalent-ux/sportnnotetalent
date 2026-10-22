@@ -31,6 +31,9 @@
  *   rugby       28-0       common competition practice (no World Rugby law;
  *                          e.g. club / union regulations) — verify; with a
  *                          bonus-point table the winner also takes the try bonus
+ *   rugby_league 24-0      house default by analogy with union's 28-0 (four
+ *                          converted tries) — no IRL law; verify against your
+ *                          competition's rules
  * Other sports have no default (a walkover adds nothing, as today); the
  * organiser can still set one per tournament. Chess forfeits keep their own
  * FIDE handling (standings.ts `isChessForfeit`).
@@ -66,11 +69,12 @@ export const WALKOVER_SCORES: Partial<Record<SportId, WalkoverRule>> = {
   netball: { win: 20, loss: 0, source: 'competition rules', verify: true },
   american_football: { win: 1, loss: 0, source: 'NFHS / NCAA; the NFL uses 2-0', verify: true },
   rugby: { win: 28, loss: 0, source: 'competition rules', verify: true },
+  rugby_league: { win: 24, loss: 0, source: 'competition rules', verify: true },
   baseball: { win: 9, loss: 0, source: 'OBR 7.03 / WBSC', verify: true },
 };
 
 /** Sports whose table can carry a walkover score (match sports with a score). */
-export const WALKOVER_SCORE_SPORTS: SportId[] = ['football', 'basketball', 'volleyball', 'hockey', 'handball', 'ice_hockey', 'kabaddi', 'rugby', 'netball', 'american_football', 'baseball'];
+export const WALKOVER_SCORE_SPORTS: SportId[] = ['football', 'basketball', 'volleyball', 'hockey', 'handball', 'ice_hockey', 'kabaddi', 'rugby', 'netball', 'american_football', 'baseball', 'rugby_league'];
 
 export interface ActiveWalkoverRule extends WalkoverRule {
   /** true = the organiser's own score */

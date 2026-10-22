@@ -18,9 +18,11 @@ import type { ScoreAction } from '../types';
 import type { BallRec, CricketState } from './engine';
 import {
   LENGTH_LABEL, LINE_LABEL, CONTROL_LABEL, CONTROLS, BOWL_KINDS, BOWL_KIND_LABEL, BOWL_TYPE_LABEL,
+  WIDE_WHY, NB_WHY, WIDE_WHY_LABEL, NB_WHY_LABEL, extraWhyOf,
   bowlTypeCode, bowlKindOf, isLeftArm, asKph, recStamp, deliveryOrdinals, fieldPosition,
   type Length, type Line, type BallDetailRec, type BowlType,
 } from './detail';
+import { bouncerNoteFor } from './bouncers';
 import { WagonField } from './WagonWheel';
 import { mirrorZone } from './wagon';
 
@@ -60,20 +62,36 @@ export function BallDetailPanel({ state, target, dispatch, lh, catchSpot, onDone
   const [kph, setKph] = useState(tag?.kph ? String(tag.kph) : '');
   useEffect(() => { setKph(tag?.kph ? String(tag.kph) : ''); }, [tag?.kph, d]);
   const n = asKph(kph);
-  const any = !!(tag?.len || tag?.line || tag?.ctrl || tag?.kph || tag?.cz);
+  const any = !!(tag?.len || tag?.line || tag?.ctrl || tag?.kph || tag?.cz || tag?.why);
   const sel = tag?.cz ? { zone: lh ? mirrorZone(tag.cz) : tag.cz, deep: !!tag.cdeep } : null;
+  // Round 2 — why the wide / no-ball was called (reason chips for that extra)
+  const whyChips = trk.why && rec.ext ? (rec.ext === 'wd'
+    ? WIDE_WHY.map((k) => ({ k: k as string, label: WIDE_WHY_LABEL[k] }))
+    : NB_WHY.map((k) => ({ k: k as string, label: NB_WHY_LABEL[k] }))) : [];
+  const why = extraWhyOf(rec.ext, tag?.why);
+  // Round 2 — this bouncer reaches / passes the over's limit
+  const bouncerNote = trk.pitch ? bouncerNoteFor(state, rec, tag?.len === 'bouncer') : null;
   return (
     <View style={st.panel}>
       <View style={st.head}>
         <Text style={st.title} numberOfLines={2}>📍 Ball {at} — detail <Text style={st.muted}>(optional)</Text></Text>
         <Button label={any ? 'Done' : 'Skip'} variant="ghost" style={st.btn} onPress={onDone} />
       </View>
+      {whyChips.length ? (
+        <>
+          <Text style={st.muted}>Why was it {rec.ext === 'wd' ? 'a wide' : 'a no-ball'}?</Text>
+          <View style={st.chips}>
+            {whyChips.map(({ k, label }) => <SelectChip key={k} label={label} active={why === k} onPress={() => send({ why: why === k ? null : k })} />)}
+          </View>
+        </>
+      ) : null}
       {trk.pitch ? (
         <>
           <Text style={st.muted}>Length</Text>
           <View style={st.chips}>
             {LEN_CHIPS.map((k) => <SelectChip key={k} label={LENGTH_LABEL[k]} active={tag?.len === k} onPress={() => send({ len: tag?.len === k ? null : k })} />)}
           </View>
+          {bouncerNote ? <Text style={st.warn} accessibilityLiveRegion="polite">{bouncerNote}</Text> : null}
           <Text style={st.muted}>Line (to the batter)</Text>
           <View style={st.chips}>
             {LINE_CHIPS.map((k) => <SelectChip key={k} label={LINE_LABEL[k]} active={tag?.line === k} onPress={() => send({ line: tag?.line === k ? null : k })} />)}
@@ -148,6 +166,7 @@ const st = StyleSheet.create({
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: theme.spacing(2) },
   title: { flex: 1, color: theme.colors.text, fontSize: theme.font.body, fontWeight: '700' },
   muted: { color: theme.colors.textMuted, fontSize: theme.font.small },
+  warn: { color: theme.colors.danger, fontSize: theme.font.small, fontWeight: '800' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing(2) },
   row: { flexDirection: 'row', gap: theme.spacing(2), alignItems: 'center' },
   btn: { paddingVertical: theme.spacing(1.5), paddingHorizontal: theme.spacing(3) },

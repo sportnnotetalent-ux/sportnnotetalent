@@ -73,6 +73,7 @@ export const SPORT_SIDE_FIELDS: Record<SportId, SideField[]> = {
   baseball: [{ key: 'bats', label: 'Bats', options: ['Right', 'Left', 'Switch'] }, { key: 'throws', label: 'Throws', options: ['Right', 'Left'] }],
   netball: [{ key: 'area', label: 'Plays mostly', options: ['Shooting circle', 'Midcourt', 'Defence circle'] }],
   rugby: [{ key: 'foot', label: 'Kicking foot', options: ['Right', 'Left', 'Both'] }],
+  rugby_league: [{ key: 'foot', label: 'Kicking foot', options: ['Right', 'Left', 'Both'] }],
 };
 
 export const POSITION_HINT: Record<SportId, string> = {
@@ -105,6 +106,7 @@ export const POSITION_HINT: Record<SportId, string> = {
   netball: 'e.g. GS, GA, WA, C, WD, GD, GK',
   american_football: 'e.g. QB, RB, WR, TE, OL, DL, LB, CB, S, K (flag: QB, C, WR, Rusher, DB)',
   rugby: 'e.g. Prop, Hooker, Lock, Flanker, Number 8, Scrum-half, Fly-half, Centre, Wing, Full-back',
+  rugby_league: 'e.g. Fullback, Wing, Centre, Five-eighth / Stand-off, Halfback / Scrum-half, Prop, Hooker, Second row, Lock / Loose forward',
 };
 
 /** SD-85 — typed rating fields a sport's profile offers (stored under

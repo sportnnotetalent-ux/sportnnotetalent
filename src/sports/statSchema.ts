@@ -92,7 +92,11 @@ export type StatAgg =
       /** SD-82 — the best single line by a signed sum of keys instead of one
        *  (kabaddi best match = raid + tackle points); a line counts when it
        *  carries any of them */
-      keys?: SignedKeys }
+      keys?: SignedKeys;
+      /** Round 2 (tennis "Fastest serve") — a leaderboard minimum for a best
+       *  single figure: `den` = the keys whose sum over the lines that carry
+       *  the figure the qualifier's `den` reads (serves clocked) */
+      den?: SignedKeys; qualifier?: Qualifier }
   | { kind: 'min'; key?: string; over?: string }
   /** best single-line figure: order lines by `by` (first decides, the rest
    *  break ties), render the winning line. "–" when no line qualifies. */
@@ -104,8 +108,10 @@ export type StatAgg =
    *  appearance lines count; a match that didn't track it isn't a 0) */
   | { kind: 'perGame'; key: SignedKeys; dp?: number; qualifier?: Qualifier; over?: string }
   /** Σkey ÷ sets played (`sets`, default setsWon + setsLost), over the lines
-   *  that tracked the key AND carry the set keys */
-  | { kind: 'perSet'; key: string; sets?: SignedKeys; dp?: number; qualifier?: Qualifier; over?: string }
+   *  that tracked the key AND carry the set keys. `key` may be a signed sum of
+   *  several keys (volleyball's Best libero: digs + perfect receptions per
+   *  set) — then a line counts only when it tracked every one of them. */
+  | { kind: 'perSet'; key: SignedKeys; sets?: SignedKeys; dp?: number; qualifier?: Qualifier; over?: string }
   /** SD-24 — a won-lost pair "12-5" (Σa – Σb) over the lines that CARRY one of
    *  the keys (a legacy line without them is not a 0-0); value = Σa */
   | { kind: 'pair'; a: SignedKeys; b: SignedKeys; over?: string }
@@ -222,6 +228,13 @@ export interface AwardDef {
   /** hand-written "How is this ranked?" text, when the generated one reads
    *  worse (the Golden Glove) */
   howRanked?: string;
+  /** Volleyball-kabaddi round 2 — an award for an optional "Stats to track"
+   *  category (volleyball's Best receiver / digger / setter / libero): the
+   *  tournament slot appears only when some line of the tournament tracked
+   *  what it ranks by — every input of its `rankBy` stat (else `stat`), and
+   *  that stat's `over` filter (`awardSlotTracked`, src/data/ratings.ts).
+   *  Absent = the slot is always offered. */
+  onlyIfTracked?: boolean;
 }
 
 /** SD-27 — a sport whose Player of the Tournament ranks by one stat (and its
@@ -476,7 +489,7 @@ function inputsOf(def: StatDef): string[] {
     case 'rate': return [...bare(a.num), ...bare(a.den)];
     case 'perGame': return bare(a.key);
     case 'pair': return [...bare(a.a), ...bare(a.b)];
-    case 'perSet': return [a.key];
+    case 'perSet': return bare(a.key);
     case 'countIf': return a.keys ?? (a.key ? [a.key] : []);
     case 'best': return a.by.map((b) => b.key);
     case 'appearance': return [def.key];
@@ -534,9 +547,10 @@ export function aggregateValue<S extends string>(schema: SportStatSchema<S>, def
         if (!carries(l)) continue;
         if (!line || (agg.kind === 'max' ? val(l) > val(line) : val(l) < val(line))) line = l;
       }
-      if (!line) return none(cov.length);
+      const den = agg.kind === 'max' && agg.den ? cov.filter(carries).reduce((a, l) => a + signed(l, agg.den!), 0) : undefined;
+      if (!line) return { ...none(cov.length), ...(den !== undefined ? { den } : {}) };
       const v = val(line);
-      return { value: v, text: formatValue(v, def.format), tracked: true, games: cov.length, line };
+      return { value: v, text: formatValue(v, def.format), tracked: true, games: cov.length, line, ...(den !== undefined ? { den } : {}) };
     }
     case 'best': {
       const ls = linesFor(schema, lines, agg.over);
@@ -575,7 +589,7 @@ export function aggregateValue<S extends string>(schema: SportStatSchema<S>, def
       const ls = tracked.filter((l) => keyList(sets).some((k) => !k.startsWith('-') && hasKey(l, k)));
       const d = ls.reduce((a, l) => a + signed(l, sets), 0);
       if (d <= 0) return { ...none(ls.length), den: d };
-      const v = ls.reduce((a, l) => a + num(l, agg.key), 0) / d;
+      const v = ls.reduce((a, l) => a + signed(l, agg.key), 0) / d;
       return { value: v, text: v.toFixed(agg.dp ?? def.format?.dp ?? 2), tracked: true, games: ls.length, den: d };
     }
     case 'pair': {
@@ -665,10 +679,11 @@ export function rankDirection(def: StatDef): Better {
   return 'higher';
 }
 
-/** The qualifier a stat declares (rates / per-game / per-set). */
+/** The qualifier a stat declares (rates / per-game / per-set; round 2: a
+ *  best single figure with a `den`). */
 export const qualifierOf = (def: StatDef): Qualifier | undefined => {
   const a = def.agg;
-  return a && (a.kind === 'rate' || a.kind === 'perGame' || a.kind === 'perSet' || a.kind === 'result' || a.kind === 'formula') ? a.qualifier : undefined;
+  return a && (a.kind === 'rate' || a.kind === 'perGame' || a.kind === 'perSet' || a.kind === 'result' || a.kind === 'formula' || a.kind === 'max') ? a.qualifier : undefined;
 };
 
 /** SD-27 — the minimum's size in the unit an organiser types it in (and the
@@ -702,7 +717,7 @@ export function qualifierText<S extends string>(schema: SportStatSchema<S>, def:
   if (q.games) parts.push(`${q.games} ${q.games === 1 ? 'game' : 'games'}`);
   if (q.den) {
     const a = def.agg;
-    const denKey = a?.kind === 'rate' ? bare(a.den)[0] : a?.kind === 'formula' ? a.den : undefined;
+    const denKey = a?.kind === 'rate' ? bare(a.den)[0] : a?.kind === 'formula' ? a.den : a?.kind === 'max' && a.den ? bare(a.den)[0] : undefined;
     const d = denKey ? statDefIn(schema, denKey) : undefined;
     const unit = a?.kind === 'perSet' ? (q.den === 1 ? 'set' : 'sets') : d ? (q.den === 1 ? oneOf(d) : shortOf(d)) : '';
     parts.push(`${q.den}${unit ? ` ${unit}` : ''}`);
@@ -819,6 +834,8 @@ export function validateSchema<S extends string>(schema: SportStatSchema<S>): st
     }
     if ((a.kind === 'max' || a.kind === 'min') && a.key) need(a.key, w);
     if (a.kind === 'max' && a.keys) signedKeys(a.keys).forEach((k) => need(k, w));
+    if (a.kind === 'max' && a.den) signedKeys(a.den).forEach((k) => need(k, w));
+    if (a.kind === 'max' && a.qualifier?.den != null && !a.den) errs.push(`${w}: a best figure's den minimum needs agg.den`);
     if (a.kind === 'best') a.by.forEach((b) => need(b.key, w));
     if (a.kind === 'formula') { a.keys.forEach((k) => need(k, w)); if (a.den && !a.keys.includes(a.den)) errs.push(`${w}: formula den must be one of its keys`); }
   }

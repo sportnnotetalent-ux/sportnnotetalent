@@ -27,7 +27,7 @@ Tapped the wrong area? Tap the right one; the newest tap wins. **↶ Undo** also
 > **Tip:** For a left-hander, tap **Left-hander** first. The field flips, so Cover is on the left. The app remembers it for that batter until you leave the screen. If the player's profile says "Left-handed", it's already set.
 
 ## Where the drawing appears
-- **Scorecard** tab: open an innings, then **Wagon wheel**. Pick a batter. You see their lines, runs per area, 4s and 6s, the off-side and leg-side split, and "5 of 8 scoring shots tagged".
+- **Stats** tab → **Scorecard**: open an innings, then **Wagon wheel**. Pick a batter. You see their lines, runs per area, 4s and 6s, the off-side and leg-side split, and "5 of 8 scoring shots tagged".
 - The batter's cricket profile shows a **Wagon wheel** of runs by area from every tagged match.
 
 ## The field areas

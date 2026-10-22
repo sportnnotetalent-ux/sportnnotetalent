@@ -146,7 +146,8 @@ describe('SD-157 · capture (POINT_DETAIL atNet / rallyLen / kmh)', () => {
   test('set, clear, ignore invalid; never on a double fault; the score never moves', () => {
     const s0 = run([FS('home'), P('home')]);
     assert.equal(applyPointDetail(s0.events, { kmh: 999 }), null);
-    assert.equal(applyPointDetail(s0.events, { rallyLen: '10+', atNet: 'none' }), null);
+    // ('10+' is a tennis bucket since racket round 2 — the Match Charting scheme; '5-10' never is)
+    assert.equal(applyPointDetail(s0.events, { rallyLen: '5-10', atNet: 'none' }), null);
     const s1 = run([FS('home'), P('home'), D({ kmh: '182', rallyLen: '9+', atNet: 'both' })]);
     const e = s1.events.at(-1)!;
     assert.deepEqual([e.kmh, e.rallyLen, e.atNet], [182, '9+', 'both']);
@@ -326,8 +327,13 @@ describe('SD-157 · schema, career rows, leaders, settings', () => {
     assert.equal(aggregateValue(sch, statDefIn(sch, 'serveKmh')!, lines).text, '183');
     assert.equal(aggregateValue(sch, statDefIn(sch, 'firstServeKmh')!, lines).text, '180');
     assert.equal(aggregateValue(sch, statDefIn(sch, 'srvKmhMax')!, [line({ points: 3 })]).tracked, false);
-    const ranked = rankPlayers(sch, statDefIn(sch, 'srvKmhMax')!, [line({ srvKmhMax: 190 }, 'x1', 'p1'), line({ srvKmhMax: 205 }, 'x2', 'p2'), line({ points: 1 }, 'x3', 'p3')]);
-    assert.deepEqual(ranked.map((r) => r.playerId), ['p2', 'p1']);
+    // racket round 2: a leader once a player has 10 serves clocked (p4's 230 is on 3)
+    const ranked = rankPlayers(sch, statDefIn(sch, 'srvKmhMax')!, [
+      line({ srvKmhMax: 190, srvKmhN: 6 }, 'x1', 'p1'), line({ srvKmhMax: 180, srvKmhN: 5 }, 'x5', 'p1'),
+      line({ srvKmhMax: 205, srvKmhN: 12 }, 'x2', 'p2'), line({ points: 1 }, 'x3', 'p3'), line({ srvKmhMax: 230, srvKmhN: 3 }, 'x4', 'p4'),
+    ]);
+    assert.deepEqual(ranked.map((r) => [r.playerId, r.value, r.den]), [['p2', 205, 12], ['p1', 190, 11]]);
+    assert.equal(rankPlayers(sch, statDefIn(sch, 'srvKmhMax')!, [line({ srvKmhMax: 230, srvKmhN: 3 }, 'x4', 'p4')], { qualifier: null }).length, 1);
   });
   test('career sections: speed, return in play, net % and rally length only when tracked', () => {
     const secs = careerSections(sch, [line({ srvKmhMax: 200, srvKmhSum: 200, srvKmhN: 1, netPts: 4, netPtsWon: 3, rl04Pts: 5, rl04Won: 3, rtnInPlay: 6, rtnInPlayOf: 8, winners: 2 })]);
@@ -342,16 +348,19 @@ describe('SD-157 · schema, career rows, leaders, settings', () => {
   });
   test('Scoring settings: every option under "Stats to track" with a hint; event mode', () => {
     const ls = detailLiveSettings('tennis');
-    assert.deepEqual(ls.fields.map((f) => [f.key, f.group]), TENNIS_TRACK_FIELDS.map((f) => [f.key, 'Stats to track']));
-    assert.ok(ls.fields.every((f) => f.type === 'toggle' && f.default === false && (f.hint ?? '').length > 10));
+    // racket round 2: the toggles, then two options (serve-speed unit, rally-length buckets)
+    const toggles = ls.fields.filter((f) => f.type === 'toggle');
+    assert.deepEqual(toggles.map((f) => [f.key, f.group]), TENNIS_TRACK_FIELDS.map((f) => [f.key, 'Stats to track']));
+    assert.ok(toggles.every((f) => f.default === false && (f.hint ?? '').length > 10));
+    assert.deepEqual(ls.fields.filter((f) => f.type !== 'toggle').map((f) => [f.key, f.type, f.default]), [['speedUnit', 'choice', 'kmh'], ['rallyBuckets', 'choice', 'std']]);
     const fresh = tennis.init();
-    assert.deepEqual(ls.read(fresh), { pointDetail: false, serveDetail: false, netDetail: false, rallyDetail: false, speedDetail: false });
+    assert.deepEqual(ls.read(fresh), { pointDetail: false, serveDetail: false, netDetail: false, rallyDetail: false, speedDetail: false, speedUnit: 'kmh', rallyBuckets: 'std' });
     assert.deepEqual(planLiveApply(ls as never, fresh, 0, ls.read(fresh), { ...ls.read(fresh), speedDetail: true }), { kind: 'format', patch: { speedDetail: true } });
     const live = run([FS('home'), P('home')]);
     const plan = planLiveApply(ls as never, live, 1, ls.read(live), { ...ls.read(live), rallyDetail: true, netDetail: true });
     assert.deepEqual(plan, { kind: 'event', action: { type: 'SET_DETAIL', payload: { rallyDetail: true, netDetail: true } } });
-    assert.deepEqual(ls.read(tennis.reducer(live, (plan as { action: ScoreAction }).action)), { pointDetail: false, serveDetail: false, netDetail: true, rallyDetail: true, speedDetail: false });
-    // the other racket sports have their own card (deep wave: padel adds net points and rally length)
-    assert.deepEqual(detailLiveSettings('padel').fields.map((f) => f.key), ['pointDetail', 'serveDetail', 'netDetail', 'rallyDetail']);
+    assert.deepEqual(ls.read(tennis.reducer(live, (plan as { action: ScoreAction }).action)), { pointDetail: false, serveDetail: false, netDetail: true, rallyDetail: true, speedDetail: false, speedUnit: 'kmh', rallyBuckets: 'std' });
+    // the other racket sports have their own card (deep wave: padel adds net points and rally length; round 2: its buckets option)
+    assert.deepEqual(detailLiveSettings('padel').fields.map((f) => f.key), ['pointDetail', 'serveDetail', 'netDetail', 'rallyDetail', 'rallyBuckets']);
   });
 });

@@ -42,10 +42,10 @@ One raid can score for both teams. You record each raid once, and the app works 
 With **Do-or-die raid** on, a team's raid after two empty raids in a row is do-or-die ("⚠ DO-OR-DIE raid"). If it scores nothing, the raider is out and the defence gets 1 point even without a tackle ("Do-or-die stop +1").
 
 ## Reading the board and the match centre
-The scoreboard shows each team's total and a column per half. The **Score** tab has three parts:
-- **Commentary**: one line per raid with the score after it, such as "Raid 23 — Pardeep (Patna): 2 touch points + bonus". It also shows the minute, who was left on the mat and tags like DO-OR-DIE, SUPER RAID, SUPER TACKLE, ALL OUT and SUPER 10. Halves are listed newest first. Tap **⭐ Key moments** to see only the big ones.
-- **Match centre**: team against team, the way PKL shows it. It covers points (touch and bonus split), raiding (strike rate, not-out %, do-or-die), defending (tackle strike rate, super tackles, super-tackle chances taken), all outs, discipline, skills and game flow, plus each team's top raider and defender. Tap **1st half** or **2nd half** to filter, or a category to focus.
-- **Player stats**: raid points, tackle points and total for each player. On a match logged with the raid form you also get raids, successful, empty and out raids, touch and bonus points, super raids, tackles and super tackles.
+The scoreboard shows each team's total and a column per half, on top of every tab.
+- **Commentary** tab: one line per raid with the score after it, such as "Raid 23 — Pardeep (Patna): 2 touch points + bonus". It also shows the minute, who was left on the mat and tags like DO-OR-DIE, SUPER RAID, SUPER TACKLE, ALL OUT and SUPER 10. Halves are listed newest first. Tap **⭐ Key moments** to see only the big ones.
+- **Stats** tab → **Match centre**: team against team, the way PKL shows it. It covers points (touch and bonus split), raiding (strike rate, not-out %, do-or-die), defending (tackle strike rate, super tackles, super-tackle chances taken), all outs, discipline, skills and game flow, plus each team's top raider and defender. Tap **1st half** or **2nd half** to filter, or a category to focus.
+- **Stats** tab → **Player stats**: raid points, tackle points and total for each player. On a match logged with the raid form you also get raids, successful, empty and out raids, touch and bonus points, super raids, tackles and super tackles.
 
 ## Stats to track (optional)
 Open **⚙️ Stats to track** to add **Raid skill** (hand touch, running hand touch, toe touch, kick, dubki, escape) or **Defenders touched** (tap who the raider touched, so the app knows who is out by name). Both are off by default. Each one adds one optional row to the raid form from the next raid.

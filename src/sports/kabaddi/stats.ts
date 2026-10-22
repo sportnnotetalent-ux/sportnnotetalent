@@ -48,12 +48,22 @@ export const kabaddiStats: SportStatSchema<'kabaddi'> = {
     { key: 'tackles', label: 'Tackles', leaderLabel: 'Successful tackles', short: 'tackles', one: 'tackle', abbr: 'TKS', group: 'defending', coverage: 'present' },
     { key: 'superTackles', label: 'Super tackles', short: 'super tackles', one: 'super tackle', abbr: 'SPT', group: 'defending', coverage: 'present' },
     // SD-82 (KB-04) — career rates from those counts. Tackle % needs failed
-    // tackle attempts per defender, which one scorer can't capture (audit §5).
+    // tackle attempts per defender: round 2 gives it from "Defenders touched"
+    // (tackleSuccessRate below), for the matches that named them.
     { key: 'raidStrikeRate', label: 'Raid strike rate', short: 'raid strike rate', source: 'derived', group: 'raiding', format: { unit: 'percent', dp: 0 }, agg: { kind: 'rate', num: 'successfulRaids', den: 'raids', scale: 100, dp: 0, qualifier: KABADDI_MIN_RAIDS },
       tieBreak: [{ key: 'successfulRaids', better: 'higher' }] },
     // Deep wave — "Defenders touched" tracking (keyed: only matches that named
     // the touched defenders carry it; every other match reads "not tracked")
     { key: 'touchedOut', label: 'Times raided out', short: 'times raided out', one: 'time raided out', abbr: 'ROUT', group: 'defending', coverage: 'keyed', format: { unit: 'count', better: 'lower' } },
+    // Round 2 (founder) — a named defender touched by a raider who got back
+    // (totals.ts `unsuccessfulTacklers`): an unsuccessful tackle. Keyed with
+    // touchedOut, so only "Defenders touched" matches carry it.
+    { key: 'unsuccessfulTackles', label: 'Unsuccessful tackles', short: 'unsuccessful tackles', one: 'unsuccessful tackle', abbr: 'UTK', group: 'defending', coverage: 'keyed', format: { unit: 'count', better: 'lower' } },
+    // successful ÷ (successful + unsuccessful) — over those matches only (the
+    // keyed input): a match that didn't name the touched isn't a 100%
+    { key: 'tackleSuccessRate', label: 'Tackle success %', short: 'tackle success', source: 'derived', group: 'defending', format: { unit: 'percent', dp: 0 },
+      agg: { kind: 'rate', num: 'tackles', den: ['tackles', 'unsuccessfulTackles'], scale: 100, dp: 0 },
+      tieBreak: [{ key: 'tackles', better: 'higher' }] },
     { key: 'notOutRate', label: 'Not-out %', short: 'not out', source: 'derived', group: 'raiding', format: { unit: 'percent', dp: 0 }, agg: { kind: 'rate', num: ['raids', '-raidsOut'], den: 'raids', scale: 100, dp: 0 } },
     // SD-59 / SD-72 — discipline (keyed: only matches that track cards /
     // technical points carry the keys; older matches read "not tracked")
@@ -78,8 +88,8 @@ export const kabaddiStats: SportStatSchema<'kabaddi'> = {
     ] },
     { id: 'defending', title: 'Defending', rows: [
       { stat: 'tacklePoints' }, { stat: 'tacklePerMatch' }, { stat: 'tackles', label: 'Successful tackles' }, { stat: 'superTackles', hideZero: true }, { stat: 'high5s', hideZero: true },
-      // deep wave — "Defenders touched" tracking only
-      { stat: 'touchedOut' },
+      // deep wave / round 2 — "Defenders touched" tracking only
+      { stat: 'touchedOut' }, { stat: 'unsuccessfulTackles' }, { stat: 'tackleSuccessRate' },
     ] },
     { id: 'discipline', title: 'Discipline', rows: [
       { stat: 'greenCards', hideZero: true }, { stat: 'yellowCards', hideZero: true }, { stat: 'redCards', hideZero: true }, { stat: 'techPointsConceded', hideZero: true },

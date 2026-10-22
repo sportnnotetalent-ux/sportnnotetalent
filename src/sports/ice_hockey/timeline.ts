@@ -2,7 +2,7 @@
  *  the scorer's correction list. PURE. */
 import type { LiveEvent } from '../liveEvents';
 import { shootoutOrderRows } from '../shootoutOrder.ts';
-import { eventWhen, mmss, periodOffset, PEN_LABEL, STRENGTH_LABEL, TALLY_LABEL, type IceEvent, type IceHockeyState } from './engine.ts';
+import { eventWhen, mmss, periodOffset, FO_ZONE_SHORT, PEN_LABEL, STRENGTH_LABEL, TALLY_LABEL, type IceEvent, type IceHockeyState } from './engine.ts';
 
 const PEN_ICON = { minor: '⏱', bench: '⏱', double: '⏱', major: '🟥', majorGm: '🟥', misconduct: '🕙', gm: '🚫', match: '🚫' } as const;
 
@@ -45,7 +45,8 @@ export function describeEvent(e: IceEvent): { icon: string; label: string; detai
       const k = e.tally ?? 'hit';
       return {
         icon: k === 'faceoff' ? '⚪' : k === 'hit' ? '💥' : k === 'block' ? '🛡' : k === 'missed' ? '↗' : '🔄',
-        label: TALLY_LABEL[k],
+        // round 2: a faceoff's zone (the winner's view) — "OZ"
+        label: `${TALLY_LABEL[k]}${k === 'faceoff' && e.zone ? ` (${FO_ZONE_SHORT[e.zone]})` : ''}`,
         detail: [e.playerName, k === 'faceoff' && e.secondName ? `v ${e.secondName}` : ''].filter(Boolean).join(' ') || undefined,
       };
     }

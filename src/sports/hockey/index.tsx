@@ -34,7 +34,7 @@ import {
 import { hockeyPossession } from './depth';
 import { hockeyFeed, hockeyFacts, hockeyFeedPeriods, hockeyPeriodLabel } from './feed';
 import { hockeyCentre } from './stats';
-import { Commentary } from '../invasion/Commentary';
+import { Commentary, MatchFactsCard, resultFacts } from '../invasion/Commentary';
 import { MatchCentre } from '../invasion/MatchCentre';
 import { hockeyTotals, hockeyLiveField, hockeyField, unavailable } from './totals';
 import { hockeyBox } from './box';
@@ -703,28 +703,24 @@ const HockeyScoreboard: NonNullable<SportPlugin<HockeyState>['Scoreboard']> = ({
   );
 };
 
-/** Deep wave: Commentary (live text by quarter with the running score and the
- *  match facts) or the match centre (team stats by category and period, then
- *  each side's player box). */
-const LiveExtras: NonNullable<SportPlugin<HockeyState>['LiveExtras']> = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster, onPlayer }) => {
+/** Match tabs (2026-10-22): the live text by quarter (Commentary), the match
+ *  centre — team stats by category and period, then each side's player box
+ *  (Stats) — and the match facts with the result (Summary). */
+type TabProps = Parameters<NonNullable<SportPlugin<HockeyState>['LiveExtras']>>[0];
+const HockeyCommentary = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster, onPlayer }: TabProps) => {
   const s = state as HockeyState;
-  const [view, setView] = useState<'commentary' | 'stats'>('commentary');
   return (
-    <View style={{ gap: theme.spacing(3) }}>
-      <View style={c.tabs}>
-        <SelectChip label="📝 Commentary" active={view === 'commentary'} onPress={() => setView('commentary')} />
-        <SelectChip label="📊 Match stats" active={view === 'stats'} onPress={() => setView('stats')} />
-      </View>
-      {view === 'commentary' ? (
-        <Commentary items={hockeyFeed(s, { home: homeName, away: awayName })} labelOf={hockeyPeriodLabel(s)} periods={hockeyFeedPeriods(s)} facts={hockeyFacts(s, Date.now())}
-          homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} homeRoster={homeRoster} awayRoster={awayRoster} onPlayer={onPlayer}
-          emptyText="No goals, corners or cards yet — every moment you log appears here." />
-      ) : (
-        <MatchCentre sport="hockey" source={hockeyBox(s, { homeRoster, awayRoster })} categories={hockeyCentre} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} onPlayer={onPlayer} />
-      )}
-    </View>
+    <Commentary items={hockeyFeed(s, { home: homeName, away: awayName })} labelOf={hockeyPeriodLabel(s)} periods={hockeyFeedPeriods(s)}
+      homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} homeRoster={homeRoster} awayRoster={awayRoster} onPlayer={onPlayer}
+      emptyText="No goals, corners or cards yet — every moment you log appears here." />
   );
 };
+const HockeyStats = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster, onPlayer }: TabProps) => (
+  <MatchCentre sport="hockey" source={hockeyBox(state as HockeyState, { homeRoster, awayRoster })} categories={hockeyCentre} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} onPlayer={onPlayer} />
+);
+const HockeyFacts = ({ state, homeName, awayName, homeColor, awayColor }: TabProps) => (
+  <MatchFactsCard facts={resultFacts(hockeyFacts(state as HockeyState, Date.now()))} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} />
+);
 
 /* --------------------------------- plugin ---------------------------------- */
 
@@ -763,7 +759,7 @@ export const hockeyPlugin: SportPlugin<HockeyState> = {
   ScoringControls,
   LiveClock,
   Scoreboard: HockeyScoreboard,
-  LiveExtras,
+  matchTabs: { Commentary: HockeyCommentary, Stats: HockeyStats, SummaryExtras: HockeyFacts },
   formation: (perSide) => hockeyFormation(perSide),
   Court: HockeyPitch,
   liveSettings: HOCKEY_LIVE_SETTINGS,

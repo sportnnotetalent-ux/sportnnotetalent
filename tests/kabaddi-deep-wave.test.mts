@@ -122,7 +122,7 @@ describe('deep wave · touchedOut (keyed)', () => {
   test('contract: live raid / tackle points = credits on every prefix; counts + touchedOut derived ≥ 0', () => {
     const sp: TotalsSport<KabaddiState> = {
       name: 'kabaddi', init, reducer, statTotals: kabaddiTotals, partial: true, config: { ...CFG, trackTouched: true, trackSkills: true }, ctx: CTX,
-      derived: [...KABADDI_COUNT_KEYS, 'touchedOut'],
+      derived: [...KABADDI_COUNT_KEYS, 'touchedOut', 'unsuccessfulTackles'], // round 2: + unsuccessful tackles
     };
     const m = new Scorer({ ...CFG, trackTouched: true, trackSkills: true }).push({ type: 'KICKOFF', payload: { at: 1 } });
     m.raid({ side: 'home', raider: H[0], touches: 2, bonus: true, skill: 'hand', touched: [A[0], A[1]] });
@@ -259,7 +259,7 @@ describe('deep wave · deep box, schema', () => {
     assert.equal(c.get('away|Deepak')!.tackles, 1);
     assert.equal(kabaddiPlayerCounts(m.s, 1).get('home|Pardeep')!.raids, 1);
     const t = buildBoxTable(KABADDI_DEEP_BOX, kabaddiDeepBox(m.s, { homeRoster: H as never, awayRoster: A as never }).data('all'));
-    assert.deepEqual(t.columns.map((x) => x.abbr), ['RAID', 'TKL', 'PTS', 'R', 'SUC', 'EMP', 'OUT', 'TCH', 'BNS', 'SPR', 'DDP', 'TKS', 'SPT', 'ROUT']);
+    assert.deepEqual(t.columns.map((x) => x.abbr), ['RAID', 'TKL', 'PTS', 'R', 'SUC', 'EMP', 'OUT', 'TCH', 'BNS', 'SPR', 'DDP', 'TKS', 'SPT', 'ROUT', 'UTK']); // round 2: UTK
     const arjun = t.away.rows.find((r) => r.name === 'Arjun')!;
     assert.equal(arjun.playerId, 'a1');
     // an untracked match keeps the old three columns

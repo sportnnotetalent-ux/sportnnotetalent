@@ -64,7 +64,7 @@ On the **🏆 Leaderboard** tab:
 - **📊 Round stats** shows one player beside the field average, in the PGA TOUR's groups (Scoring, Off the tee, Approach, Around the green, Putting), for the round or **Out** / **In**. It includes par-3, par-4 and par-5 scoring and bounce back.
 - Tap a player's row for their card, then **📊 Stats** or **🎙 Hole by hole**.
 
-In match play, the **Score** tab tells the match hole by hole, for example "Hole 7 (par 4): Asha wins with a birdie 3 to Ravi's par 4 · Asha 2 UP thru 7".
+In match play, the **Commentary** tab tells the match hole by hole, for example "Hole 7 (par 4): Asha wins with a birdie 3 to Ravi's par 4 · Asha 2 UP thru 7".
 
 ## Gross and net prizes
 In stroke play with handicaps, the **🏆 Leaderboard** tab shows **Best gross** and **Best net** side by side, with one prize place per four players (up to three).

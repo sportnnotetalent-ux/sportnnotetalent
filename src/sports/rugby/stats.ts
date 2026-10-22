@@ -5,7 +5,8 @@
  *  turnovers won, penalties conceded — keyed: only matches that tracked
  *  them). Deep wave: offloads and turnovers conceded (keyed, from their
  *  "Stats to track" toggles; penalties conceded can also come from the
- *  penalty toggle). Every line key is absolute — `statTotals` (./totals.ts)
+ *  penalty toggle). Round 2: free kicks conceded (keyed — only matches whose
+ *  free kicks asked for the player). Every line key is absolute — `statTotals` (./totals.ts)
  *  owns the whole line. A key shared with another sport keeps its labels. */
 import type { Qualifier, SportStatSchema } from '../statSchema.ts';
 import { POINTS, RED_CARDS, YELLOW_CARDS } from '../sharedStats.ts';
@@ -41,6 +42,8 @@ export const rugbyStats: SportStatSchema<'rugby'> = {
     { key: 'carries', label: 'Carries', short: 'carries', one: 'carry', group: 'attack', weight: 0.2, coverage: 'keyed', abbr: 'CA' },
     { key: 'lineBreaks', label: 'Line breaks', short: 'line breaks', one: 'line break', group: 'attack', weight: 1, coverage: 'keyed', abbr: 'LB' },
     { key: 'penaltiesGivenAway', label: 'Penalties conceded', short: 'penalties conceded', one: 'penalty conceded', group: 'discipline', weight: -0.5, coverage: 'keyed', abbr: 'PC', format: { unit: 'count', better: 'lower' } },
+    // round 2 — free kicks credit the player who conceded them (optional; keyed)
+    { key: 'freeKicksConceded', label: 'Free kicks conceded', short: 'free kicks conceded', one: 'free kick conceded', group: 'discipline', coverage: 'keyed', abbr: 'FKC', format: { unit: 'count', better: 'lower' } },
     // deep wave — optional "Stats to track" (keyed: only matches that tracked them carry them)
     { key: 'offloads', label: 'Offloads', short: 'offloads', one: 'offload', group: 'attack', weight: 0.5, coverage: 'keyed', abbr: 'OL' },
     { key: 'turnoversConceded', label: 'Turnovers conceded', short: 'turnovers conceded', one: 'turnover conceded', group: 'attack', weight: -0.3, coverage: 'keyed', abbr: 'TC', format: { unit: 'count', better: 'lower' } },
@@ -81,7 +84,7 @@ export const rugbyStats: SportStatSchema<'rugby'> = {
     { id: 'playing', title: 'Playing time', rows: [{ stat: 'minutes' }] },
     { id: 'shootout', title: 'Kicking competitions', rows: [{ stat: 'soGoals', hideZero: true }, { stat: 'soTaken', hideZero: true }] },
     { id: 'bests', title: 'Bests', rows: [{ stat: 'mostTries', label: 'Most tries (match)', hideZero: true }, { stat: 'mostPoints', label: 'Most points (match)', hideZero: true }] },
-    { id: 'discipline', title: 'Discipline', rows: [{ stat: 'yellowCards' }, { stat: 'redCards' }, { stat: 'penaltiesGivenAway' }] },
+    { id: 'discipline', title: 'Discipline', rows: [{ stat: 'yellowCards' }, { stat: 'redCards' }, { stat: 'penaltiesGivenAway' }, { stat: 'freeKicksConceded' }] },
   ],
   careerView: 'sections',
   history: ['points', 'tries', 'conversions', 'penGoals'],
@@ -101,12 +104,13 @@ export const rugbyStats: SportStatSchema<'rugby'> = {
     { key: 'turnoversWon', abbr: 'TW' },
     { key: 'turnoversConceded', abbr: 'TC' },
     { key: 'penaltiesGivenAway', abbr: 'PC' },
+    { key: 'freeKicksConceded', abbr: 'FKC' },
     { key: 'yellowCards', abbr: 'YC', label: 'Yellow cards' },
     { key: 'redCards', abbr: 'RC', label: 'Red cards' },
   ] }],
   compare: [
     'tries', 'penaltyTries', 'conversions', 'conversionAttempts', 'penGoals', 'penGoalAttempts', 'dropGoals',
-    'lineoutsWon', 'lineoutsLost', 'scrumsWon', 'scrumsLost', 'tackles', 'missedTackles', 'carries', 'lineBreaks', 'offloads', 'turnoversWon', 'turnoversConceded', 'penaltiesGivenAway',
+    'lineoutsWon', 'lineoutsLost', 'scrumsWon', 'scrumsLost', 'tackles', 'missedTackles', 'carries', 'lineBreaks', 'offloads', 'turnoversWon', 'turnoversConceded', 'penaltiesGivenAway', 'freeKicksConceded',
     'yellowCards', 'redCards',
   ],
   leaders: ['points', 'tries', 'conversions', 'penGoals', 'goalKickPct', 'tryAssists', 'pointsPerGame', 'tackles', 'turnoversWon', 'lineBreaks', 'offloads'],

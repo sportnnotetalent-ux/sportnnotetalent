@@ -16,9 +16,9 @@ import { SetLineBoard } from '../SetLineBoard';
 import { MatchBoxScore } from '../../components/BoxScore';
 import { carromBox } from '../boxSources';
 import {
-  init, reducer, result, boardPoints, boardCloses, creditedPoints, PENALTY_POINTS, summary, scoreLine, lineScore, standingsUnits,
-  nextBreaker, nextBreakerPlayer, boardBreakers, breakerPlayers, slamFor, boardInputs, boardCorrection, FOUL_TYPES, FOUL_LABEL,
-  type BoardDetail, type BoardInput, type CarromState, type FoulType, type QueenBy, type Side, type Slam,
+  init, reducer, result, boardValue, boardCloses, creditedPoints, summary, scoreLine, lineScore, standingsUnits,
+  nextBreaker, nextBreakerPlayer, boardBreakers, breakerPlayers, slamFor, boardInputs, boardCorrection, FOUL_TYPES, FOUL_CHIPS, FOUL_LABEL,
+  type BoardDetail, type BoardInput, type CarromState, type EndFoul, type FoulType, type PlayerFouls, type QueenBy, type Side, type Slam,
 } from './engine';
 import { carromFeed } from './feed';
 import { carromGames, carromMatchStats } from './matchStats';
@@ -55,6 +55,13 @@ const ScoringControls: SportPlugin<CarromState>['ScoringControls'] = ({ state, d
   const [dues, setDues] = useState<Record<Side, number>>({ home: 0, away: 0 });
   const [brk, setBrk] = useState<number | null>(null);
   const [qMiss, setQMiss] = useState<Record<Side, number>>({ home: 0, away: 0 });
+  // Round 2 — doubles: who is fouling (the "who" chip, kept until changed)
+  // and each player's own fouls / dues on this board
+  const [who, setWho] = useState<Record<Side, string | null>>({ home: null, away: null });
+  const [whoLog, setWhoLog] = useState<Record<Side, Record<string, PlayerFouls>>>({ home: {}, away: {} });
+  // Round 2 — ICF r.102–112: the board-ending stroke's foul (with foulScore)
+  const [endFoul, setEndFoul] = useState<EndFoul>({});
+  const [endOpen, setEndOpen] = useState(false);
   if (s.ended) return <Text style={textStyles.muted}>Match over.</Text>;
   const track = s.track ?? {};
   // SD-117c (CR-04) — who breaks this board (toss, then alternating)
@@ -69,10 +76,14 @@ const ScoringControls: SportPlugin<CarromState>['ScoringControls'] = ({ state, d
   const players = winner ? creditedPlayers(roster, perSide, picked[winner]) : [];
   // SD-37: the game score counts at most to 25, and so do the players' points
   const ready = penalty || coins != null;
-  const value = winner && ready ? (penalty ? PENALTY_POINTS : boardPoints(coins!, queen, s.current[winner], s)) : 0;
+  // Round 2 — every score rule in one place (ICF foul penalties with foulScore)
+  const ef: EndFoul | undefined = s.foulScore && (endFoul.striker || endFoul.improper) ? endFoul : undefined;
+  const value = winner && ready ? boardValue(s, s.current[winner], { coins: coins ?? 0, queen, penalty, endFoul: ef }) : 0;
+  const penaltyValue = winner ? boardValue(s, s.current[winner], { penalty: true }) : 0;
   const credit = winner && ready ? Math.min(value, Math.max(0, s.target - s.current[winner])) : 0;
   // SD-116: say on the button when this board closes the game / the match
-  const closes = winner && ready ? boardCloses(s, winner, coins ?? 0, queen, penalty) : null;
+  const closes = winner && ready ? boardCloses(s, winner, coins ?? 0, queen, penalty, ef) : null;
+  const loser: Side | null = winner ? (winner === 'home' ? 'away' : 'home') : null;
   const queenCounts = winner ? s.current[winner] < s.queenCutoff : true;
   const togglePick = (side: Side, id: string) => setPicked((cur) => {
     const now = creditedPlayers(roster, perSide, cur[side]).map((p) => p.id);
@@ -84,8 +95,10 @@ const ScoringControls: SportPlugin<CarromState>['ScoringControls'] = ({ state, d
   // recorded" until a chip is tapped)
   const detail = (): BoardDetail | undefined => {
     if (penalty) return undefined;
+    // Round 2 — the split foul chips (`split`) and, in doubles, who fouled
     const det: BoardDetail = {
-      ...(track.fouls ? { fouls: { home: fouls.home, away: fouls.away }, dues: { home: dues.home, away: dues.away } } : {}),
+      ...(track.fouls ? { fouls: { home: fouls.home, away: fouls.away }, dues: { home: dues.home, away: dues.away }, split: true as const,
+        ...(perSide === 2 ? { who: { home: whoLog.home, away: whoLog.away } } : {}) } : {}),
       ...(track.brk && breaker && brk != null ? { brk } : {}),
       ...(track.qMiss ? { qMiss: { home: qMiss.home, away: qMiss.away } } : {}),
     };
@@ -99,16 +112,48 @@ const ScoringControls: SportPlugin<CarromState>['ScoringControls'] = ({ state, d
     dispatch({
       type: 'BOARD', side: winner,
       // Deep wave — `at` (the scorer's clock) for the commentary; `det` when tracked
-      payload: penalty ? { coins: 0, queen: false, penalty: true, at: Date.now() }
-        : { coins, queen, ...(queenBy ? { queenBy } : {}), ...(slam ? { slam } : {}), ...(det ? { det } : {}), at: Date.now() },
+      payload: penalty ? { coins: 0, queen: false, penalty: true, at: Date.now(), ...(ef ? { endFoul: ef } : {}) }
+        : { coins, queen, ...(queenBy ? { queenBy } : {}), ...(slam ? { slam } : {}), ...(det ? { det } : {}), at: Date.now(), ...(ef ? { endFoul: ef } : {}) },
       // SD-37: a board is the side's — both doubles partners are credited
       attribution: players[0] ? attr(players[0]) : undefined,
       attribution2: players[1] ? attr(players[1]) : undefined,
     });
     setWinner(null); setCoins(null); setQueenBy(null); setSlam(null); setPenalty(false);
     setFouls({ home: {}, away: {} }); setDues({ home: 0, away: 0 }); setBrk(null); setQMiss({ home: 0, away: 0 });
+    setWhoLog({ home: {}, away: {} }); setEndFoul({}); setEndOpen(false);
   };
-  const addFoul = (sd: Side, t: FoulType) => setFouls((f) => ({ ...f, [sd]: { ...f[sd], [t]: Math.min(20, (f[sd][t] ?? 0) + 1) } }));
+  // Round 2 — doubles: a foul / due also goes to the player picked with the who chip
+  const logWho = (sd: Side, f: (p: PlayerFouls) => PlayerFouls) => {
+    const id = perSide === 2 ? who[sd] : null;
+    if (!id) return;
+    setWhoLog((w) => ({ ...w, [sd]: { ...w[sd], [id]: f(w[sd][id] ?? {}) } }));
+  };
+  const addFoul = (sd: Side, t: FoulType, by: 1 | -1 = 1) => {
+    if (by < 0 && !(fouls[sd][t] ?? 0)) return;
+    setFouls((f) => ({ ...f, [sd]: { ...f[sd], [t]: Math.max(0, Math.min(20, (f[sd][t] ?? 0) + by)) } }));
+    if (by > 0) logWho(sd, (p) => ({ ...p, fouls: { ...p.fouls, [t]: Math.min(20, (p.fouls?.[t] ?? 0) + 1) } }));
+  };
+  const addDue = (sd: Side) => {
+    setDues((d) => ({ ...d, [sd]: Math.min(20, d[sd] + 1) }));
+    logWho(sd, (p) => ({ ...p, dues: Math.min(20, (p.dues ?? 0) + 1) }));
+  };
+  // Round 2 — the board-ending foul; the Striker pocketed is also a striker
+  // foul in the foul log when fouls are tracked (one tap, not two)
+  const toggleEnd = (k: keyof EndFoul) => {
+    const on = !endFoul[k];
+    setEndFoul((e) => { const n = { ...e }; if (on) n[k] = true; else delete n[k]; return n; });
+    if (k === 'striker' && track.fouls && loser) addFoul(loser, 'striker', on ? 1 : -1);
+  };
+  // a different board winner: the slam and the board-ending foul (the old
+  // loser's) are cleared — with its auto-logged striker foul
+  const pickWinner = (sd: Side) => {
+    if (winner !== sd) {
+      setSlam(null);
+      if (endFoul.striker && track.fouls && loser) addFoul(loser, 'striker', -1);
+      setEndFoul({}); setEndOpen(false);
+    }
+    setWinner(sd);
+  };
   const foulCount = (sd: Side) => FOUL_TYPES.reduce((n, t) => n + (fouls[sd][t] ?? 0), 0) + dues[sd];
   const orderOf = (side: Side) => {
     const pair = pairOf(side);
@@ -157,8 +202,8 @@ const ScoringControls: SportPlugin<CarromState>['ScoringControls'] = ({ state, d
       <View style={{ gap: theme.spacing(2) }}>
         <Text style={ctrl.label}>Board won by</Text>
         <View style={ctrl.row}>
-          <Button label={nameOf('home')} variant={winner === 'home' ? 'home' : 'ghost'} style={ctrl.flex} onPress={() => { if (winner !== 'home') setSlam(null); setWinner('home'); }} />
-          <Button label={nameOf('away')} variant={winner === 'away' ? 'away' : 'ghost'} style={ctrl.flex} onPress={() => { if (winner !== 'away') setSlam(null); setWinner('away'); }} />
+          <Button label={nameOf('home')} variant={winner === 'home' ? 'home' : 'ghost'} style={ctrl.flex} onPress={() => pickWinner('home')} />
+          <Button label={nameOf('away')} variant={winner === 'away' ? 'away' : 'ghost'} style={ctrl.flex} onPress={() => pickWinner('away')} />
         </View>
       </View>
       {winner && (
@@ -174,16 +219,18 @@ const ScoringControls: SportPlugin<CarromState>['ScoringControls'] = ({ state, d
           {/* SD-68 (CR-07) — a penalty board instead of a played-out one */}
           <View style={ctrl.chips}>
             <SelectChip label="Board played out" active={!penalty} onPress={() => setPenalty(false)} />
-            <SelectChip label={`⚠️ Penalty board · +${PENALTY_POINTS} to ${nameOf(winner)}`} active={penalty} onPress={() => { setPenalty(true); setSlam(null); setQueenBy(null); }} />
+            <SelectChip label={`⚠️ Penalty board · +${penaltyValue} to ${nameOf(winner)}`} active={penalty} onPress={() => { setPenalty(true); setSlam(null); setQueenBy(null); }} />
           </View>
           {penalty ? (
-            <Text style={ctrl.meta}>The opponent was penalised: {nameOf(winner)} get {PENALTY_POINTS} points. It is not counted as a board won, a Queen or a slam.</Text>
+            <Text style={ctrl.meta}>The opponent was penalised: {nameOf(winner)} get {penaltyValue} point{penaltyValue === 1 ? '' : 's'}{s.foulScore && penaltyValue < 3 ? ' (1, not 3, at 22 or more — ICF)' : ''}. It is not counted as a board won, a Queen or a slam.</Text>
           ) : (<>
           <View style={{ gap: theme.spacing(2) }}>
             <Text style={ctrl.label}>Opponent's coins left{coins == null ? <Text style={ctrl.meta}> · tap one</Text> : null}</Text>
             <View style={ctrl.chips}>
               {Array.from({ length: 10 }, (_, n) => <SelectChip key={n} label={String(n)} active={coins === n} onPress={() => setCoins(n)} />)}
             </View>
+            {/* Round 2 — ICF r.53 / r.55: a foul's penalty coin is back on the board (count it); a due still owed is written off */}
+            {s.foulScore ? <Text style={ctrl.meta}>Count the penalty coins put back on the board. A due still owed when the board ends is written off (ICF).</Text> : null}
           </View>
           {/* SD-117c — who covered the Queen: winner (+3 under 22) / loser (no points) / nobody */}
           <View style={{ gap: theme.spacing(2) }}>
@@ -222,17 +269,33 @@ const ScoringControls: SportPlugin<CarromState>['ScoringControls'] = ({ state, d
           {track.fouls ? (
             <View style={{ gap: theme.spacing(2) }}>
               <Text style={ctrl.label}>Fouls this board <Text style={ctrl.meta}>(tap each foul · none = no fouls)</Text></Text>
-              {(['home', 'away'] as Side[]).map((sd) => (
-                <View key={sd} style={ctrl.chips}>
-                  <Text style={[ctrl.meta, ctrl.foulName]} numberOfLines={1}>{nameOf(sd)}</Text>
-                  {FOUL_TYPES.map((t) => {
-                    const n = fouls[sd][t] ?? 0;
-                    return <SelectChip key={t} label={`${FOUL_LABEL[t]}${n ? ` ×${n}` : ''}`} active={n > 0} onPress={() => addFoul(sd, t)} accessibilityLabel={`${FOUL_LABEL[t]} foul by ${nameOf(sd)}, now ${n}`} />;
-                  })}
-                  <SelectChip label={`Due${dues[sd] ? ` ×${dues[sd]}` : ''}`} active={dues[sd] > 0} onPress={() => setDues((d) => ({ ...d, [sd]: Math.min(20, d[sd] + 1) }))} accessibilityLabel={`A due owed by ${nameOf(sd)}, now ${dues[sd]}`} />
-                  {foulCount(sd) > 0 ? <SelectChip label="Clear" active={false} onPress={() => { setFouls((f) => ({ ...f, [sd]: {} })); setDues((d) => ({ ...d, [sd]: 0 })); }} accessibilityLabel={`Clear ${nameOf(sd)}'s fouls`} /> : null}
-                </View>
-              ))}
+              {(['home', 'away'] as Side[]).map((sd) => {
+                // Round 2 — doubles: pick who fouled first (careers carry it)
+                const pair = perSide === 2 ? pairOf(sd) : [];
+                return (
+                  <View key={sd} style={ctrl.chips}>
+                    <Text style={[ctrl.meta, ctrl.foulName]} numberOfLines={1}>{nameOf(sd)}</Text>
+                    {pair.length === 2 ? (
+                      <View style={[ctrl.chips, ctrl.whoRow]}>
+                        <Text style={ctrl.meta}>Who:</Text>
+                        {pair.map((p) => {
+                          const mine = whoLog[sd][p.id];
+                          const n = FOUL_TYPES.reduce((t, k) => t + (mine?.fouls?.[k] ?? 0), 0) + (mine?.dues ?? 0);
+                          return <SelectChip key={p.id} label={`${p.fullName.split(' ')[0]}${n ? ` ×${n}` : ''}`} active={who[sd] === p.id}
+                            onPress={() => setWho((w) => ({ ...w, [sd]: w[sd] === p.id ? null : p.id }))} accessibilityLabel={`${p.fullName} committed the next foul`} />;
+                        })}
+                      </View>
+                    ) : null}
+                    {FOUL_CHIPS.map((t) => {
+                      const n = fouls[sd][t] ?? 0;
+                      return <SelectChip key={t} label={`${FOUL_LABEL[t]}${n ? ` ×${n}` : ''}`} active={n > 0} onPress={() => addFoul(sd, t)} accessibilityLabel={`${FOUL_LABEL[t]} foul by ${nameOf(sd)}, now ${n}`} />;
+                    })}
+                    <SelectChip label={`Due${dues[sd] ? ` ×${dues[sd]}` : ''}`} active={dues[sd] > 0} onPress={() => addDue(sd)} accessibilityLabel={`A due owed by ${nameOf(sd)}, now ${dues[sd]}`} />
+                    {foulCount(sd) > 0 ? <SelectChip label="Clear" active={false} onPress={() => { setFouls((f) => ({ ...f, [sd]: {} })); setDues((d) => ({ ...d, [sd]: 0 })); setWhoLog((w) => ({ ...w, [sd]: {} })); }} accessibilityLabel={`Clear ${nameOf(sd)}'s fouls`} /> : null}
+                  </View>
+                );
+              })}
+              {perSide === 2 ? <Text style={ctrl.meta}>Doubles: tap who fouled before the foul so it goes on their own record (a foul without a who stays the pair's).</Text> : null}
             </View>
           ) : null}
           {track.qMiss ? (
@@ -247,6 +310,19 @@ const ScoringControls: SportPlugin<CarromState>['ScoringControls'] = ({ state, d
             </View>
           ) : null}
           </>)}
+          {/* Round 2 — ICF r.102–112: the board ended on the loser's foul
+              (the Striker pocketed / an improper stroke) — extra points, if claimed */}
+          {s.foulScore && loser ? (endOpen || endFoul.striker || endFoul.improper ? (
+            <View style={{ gap: theme.spacing(2) }}>
+              <Text style={ctrl.label}>Board ended on {nameOf(loser)}'s foul <Text style={ctrl.meta}>(claimed · ICF)</Text></Text>
+              <View style={ctrl.chips}>
+                <SelectChip label="Striker pocketed · +1" active={!!endFoul.striker} onPress={() => toggleEnd('striker')} accessibilityLabel={`${nameOf(loser)} pocketed the striker on the last stroke: one more point to ${nameOf(winner)}`} />
+                <SelectChip label="Foul stroke · +1" active={!!endFoul.improper} onPress={() => toggleEnd('improper')} accessibilityLabel={`${nameOf(loser)}'s last stroke was a foul: one more point to ${nameOf(winner)}`} />
+              </View>
+            </View>
+          ) : (
+            <Text style={ctrl.link} accessibilityRole="button" onPress={() => setEndOpen(true)}>Board ended on {nameOf(loser)}'s foul?</Text>
+          )) : null}
           <Button
             label={!ready ? '✓ Record board — pick the coins left'
               : `✓ Record ${penalty ? 'penalty board' : 'board'} · +${credit}${closes ? ` · ${closes.winner === winner ? '' : `${nameOf(closes.winner)} `}wins ${closes.kind === 'match' ? 'the match' : `Game ${closes.game}`}` : credit < value ? ` (game at ${s.target})` : ''}`}
@@ -323,7 +399,7 @@ function BoardEditor({ state: s, dispatch, nameOf, homeRoster, awayRoster }: {
               </View>
               <View style={ctrl.chips}>
                 <SelectChip label="Played out" active={!draft.b.penalty} onPress={() => setDraft({ ...draft, b: { ...draft.b, penalty: false } })} />
-                <SelectChip label={`⚠️ Penalty · +${PENALTY_POINTS}`} active={!!draft.b.penalty} onPress={() => setDraft({ ...draft, b: { ...draft.b, penalty: true, coins: 0, queen: false, queenBy: undefined, slam: undefined } })} />
+                <SelectChip label="⚠️ Penalty board" active={!!draft.b.penalty} onPress={() => setDraft({ ...draft, b: { ...draft.b, penalty: true, coins: 0, queen: false, queenBy: undefined, slam: undefined } })} />
               </View>
               {!draft.b.penalty && (<>
               <Text style={ctrl.meta}>Opponent's coins left</Text>
@@ -362,55 +438,41 @@ function BoardEditor({ state: s, dispatch, nameOf, homeRoster, awayRoster }: {
   );
 }
 
-const LiveExtras: NonNullable<SportPlugin<CarromState>['LiveExtras']> = ({ state, homeName, awayName, homeColor, awayColor, homeRoster = [], awayRoster = [] }) => {
-  const s = state as CarromState;
-  // Deep wave — names in the commentary: a singles player's own name
+/** Match tabs (2026-10-22): the board-by-board commentary (newest first, by
+ *  game) on Commentary; the match stats panel (whole match or one game;
+ *  scoring, Queen, break, fouls), the box score and the ICF score sheet on
+ *  Stats. The games are on the scoreboard header above every tab. */
+type TabProps = Parameters<NonNullable<SportPlugin<CarromState>['LiveExtras']>>[0];
+/** A singles player's own name, else the side's. */
+const carromNames = ({ homeName, awayName, homeRoster = [], awayRoster = [] }: TabProps) => {
   const nm = (side: Side) => {
     const r = side === 'home' ? homeRoster : awayRoster;
     return r.length === 1 ? r[0].fullName : side === 'home' ? homeName : awayName;
   };
-  return (
-    <View style={{ gap: theme.spacing(3) }}>
-      {s.boards.length > 0 && <CarromDeep state={s} homeName={nm('home')} awayName={nm('away')} homeColor={homeColor} awayColor={awayColor} />}
-      <Text style={ctrl.label}>Games</Text>
-      <View style={ctrl.chips}>
-        {s.games.length === 0 ? <Text style={textStyles.muted}>Game 1 in progress…</Text>
-          : s.games.map((g, i) => <Text key={i} style={ctrl.chip}>G{i + 1}: {g[0]}-{g[1]}</Text>)}
-      </View>
-      {/* SD-23: points / boards / queens per side, per game */}
-      {s.boards.length > 0 && (
-        <MatchBoxScore sport="carrom" source={carromBox(s)} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} />
-      )}
-      {/* SD-68 (CR-03) — the ICF score sheet: board · breaker · winner · coins · Queen · running total */}
-      <Text style={ctrl.label}>Score sheet</Text>
-      {s.boards.length === 0 ? <Text style={textStyles.muted}>No boards yet.</Text> : (
-        <ScoreSheet state={s} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} />
-      )}
-    </View>
-  );
+  return { home: nm('home'), away: nm('away') };
 };
-
-/** Deep wave — board-by-board commentary (newest first, by game) and the
- *  match stats panel (whole match or one game; scoring, Queen, break, fouls). */
-function CarromDeep({ state: s, homeName, awayName, homeColor, awayColor }: { state: CarromState; homeName: string; awayName: string; homeColor?: string; awayColor?: string }) {
-  const [view, setView] = useState<'feed' | 'stats'>('feed');
+const CarromCommentary = (p: TabProps) => (
+  <CommentaryFeed title={null} groups={carromFeed(p.state as CarromState, carromNames(p))} homeColor={p.homeColor} awayColor={p.awayColor} empty="No boards yet." />
+);
+function CarromStats(p: TabProps) {
+  const s = p.state as CarromState;
+  const { homeName, awayName, homeColor, awayColor } = p;
+  const names = carromNames(p);
   const [unit, setUnit] = useState('all');
+  if (s.boards.length === 0) return <Text style={textStyles.muted}>No boards yet.</Text>;
   const games = carromGames(s);
   const g = unit === 'all' ? undefined : Number(unit);
   return (
-    <View style={{ gap: theme.spacing(2) }}>
-      <View style={ctrl.chips}>
-        <SelectChip label="🎙 Commentary" active={view === 'feed'} onPress={() => setView('feed')} />
-        <SelectChip label="📊 Match stats" active={view === 'stats'} onPress={() => setView('stats')} />
-      </View>
-      {view === 'feed' ? (
-        <CommentaryFeed title={null} groups={carromFeed(s, { home: homeName, away: awayName })} homeColor={homeColor} awayColor={awayColor} empty="No boards yet." />
-      ) : (
-        <CompareTable title={null} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor}
-          categories={carromMatchStats(s, g)} unit={unit} onUnit={setUnit}
-          units={[{ key: 'all', label: 'Match' }, ...games.map((n) => ({ key: String(n), label: `Game ${n}` }))]}
-          footnote={s.track ? undefined : 'More detail (fouls, coins on the break, missed covers): switch it on under ⚙️ Stats to track.'} />
-      )}
+    <View style={{ gap: theme.spacing(3) }}>
+      <CompareTable title={null} homeName={names.home} awayName={names.away} homeColor={homeColor} awayColor={awayColor}
+        categories={carromMatchStats(s, g)} unit={unit} onUnit={setUnit}
+        units={[{ key: 'all', label: 'Match' }, ...games.map((n) => ({ key: String(n), label: `Game ${n}` }))]}
+        footnote={s.track ? undefined : 'More detail (fouls, coins on the break, missed covers): switch it on under ⚙️ Stats to track.'} />
+      {/* SD-23: points / boards / queens per side, per game */}
+      <MatchBoxScore sport="carrom" source={carromBox(s)} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} />
+      {/* SD-68 (CR-03) — the ICF score sheet: board · breaker · winner · coins · Queen · running total */}
+      <Text style={ctrl.label}>Score sheet</Text>
+      <ScoreSheet state={s} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} />
     </View>
   );
 }
@@ -454,7 +516,7 @@ export const carromPlugin: SportPlugin<CarromState> = {
   // SD-137a — voice scoring (period / match ends ask first)
   voice: { hints: ['board home 5', '{name} 3 queen', 'board away 9 slam', 'penalty home'], parse: carromVoice, ends: carromVoiceEnds },
   ScoringControls,
-  LiveExtras,
+  matchTabs: { Commentary: CarromCommentary, Stats: CarromStats },
   // Deep wave — "Stats to track": optional detail on the board form (event
   // mode: the format before board 1, then SET_TRACK from the next board)
   liveSettings: {
@@ -463,7 +525,7 @@ export const carromPlugin: SportPlugin<CarromState> = {
     mode: 'event',
     actionType: 'SET_TRACK',
     fields: [
-      { key: 'trackFouls', label: 'Fouls & dues', type: 'toggle', default: false, group: 'Stats to track', hint: 'Fouls by type (striker pocketed, touching, line / hand, thumbing) and dues, per board' },
+      { key: 'trackFouls', label: 'Fouls & dues', type: 'toggle', default: false, group: 'Stats to track', hint: 'Fouls by type (striker pocketed, touching, base line, arrow line, elbow crossing, thumbing) and dues, per board; doubles: who fouled' },
       { key: 'trackBreak', label: 'Coins on the break', type: 'toggle', default: false, group: 'Stats to track', hint: 'How many coins the breaker pocketed with the break stroke' },
       { key: 'trackQueenMiss', label: 'Missed Queen covers', type: 'toggle', default: false, group: 'Stats to track', hint: 'The Queen pocketed but the cover missed (she goes back)' },
     ],
@@ -496,6 +558,10 @@ export const carromPlugin: SportPlugin<CarromState> = {
         { value: 1, label: 'Single game' },
       ],
     },
+    // Round 2 — ICF foul penalties in the score (on by default; a match
+    // created before this option has no key and keeps its score rules)
+    { key: 'foulScore', label: 'ICF foul penalties in the score', type: 'toggle', default: true, advanced: true,
+      hint: 'a penalty board is 3 (1 at 22+); a board ended on a foul: +1 striker, +1 foul stroke; 12 a board at most' },
     // Deep wave — the organiser can switch the optional stats on for every match
     { key: 'trackFouls', label: 'Track fouls & dues', type: 'toggle', default: false, advanced: true, group: 'Stats to track', hint: 'optional rows on the board form' },
     { key: 'trackBreak', label: 'Track coins on the break', type: 'toggle', default: false, advanced: true, group: 'Stats to track' },
@@ -512,6 +578,7 @@ const ctrl = StyleSheet.create({
   link: { color: theme.colors.primary, fontSize: theme.font.small, fontWeight: '700' },
   breakLine: { color: theme.colors.text, fontSize: theme.font.body, fontWeight: '800' },
   foulName: { width: '100%', fontWeight: '800' },
+  whoRow: { width: '100%', alignItems: 'center' },
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   draftBox: { gap: theme.spacing(2), backgroundColor: theme.colors.surfaceAlt, borderRadius: theme.radius.md, padding: theme.spacing(3) },
   editRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(2), paddingVertical: theme.spacing(2), borderBottomWidth: 1, borderBottomColor: theme.colors.border },

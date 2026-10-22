@@ -15,7 +15,7 @@ import { shareMessage } from '../core/share';
 import { awardsShareText } from '../core/shareText';
 import { saveTournamentAwards, logActivity, AWARDS_DB_MESSAGE } from '../data/repos';
 import {
-  TOURNAMENT_AWARD_SLOTS, rankAwardCandidates, defaultAwards, awardFrom, awardId, awardIcon, awardFormula, type AwardCandidate,
+  tournamentAwardSlots, rankAwardCandidates, defaultAwards, awardFrom, awardId, awardIcon, awardFormula, type AwardCandidate,
 } from '../data/ratings';
 import type { Match, Player, SportId, StatLine, Tournament, TournamentAward, TournamentAwards } from '../core/types';
 import { readLeaderMins, type LeaderMins } from '../data/leaderMinimums';
@@ -218,7 +218,12 @@ export function TournamentAwardsTab({
   }
 
   // -------------------------------- Host draft --------------------------------
-  const slots = sport ? TOURNAMENT_AWARD_SLOTS[sport] ?? [] : [];
+  // round 2: a slot for an optional "Stats to track" category (volleyball's
+  // Best receiver / digger / setter / libero) shows only when a match here
+  // tracked it — or when it already holds an award (so it can be cleared)
+  const slots = sport
+    ? tournamentAwardSlots(rankLines, sport, optsFor(sport), current.filter((i) => i.sport === sport && i.slot !== 'custom').map((i) => i.slot))
+    : [];
   const customs = current.filter((i) => i.slot === 'custom' && i.sport === sport);
   const hasPlayers = linePlayerRows.length > 0;
   const sportItems = current.filter((i) => i.sport === sport);

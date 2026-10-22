@@ -8,6 +8,10 @@
  *     one-arrow shoot-off and "closest to the centre", walkovers; a correction
  *     that changes who went through asks first and clears the later scores
  *     that no longer belong.
+ *  Round 2: the recurve indoor face follows the meet's rule (`archIndoorFace`:
+ *  single 40 cm face 1–10 by default, or the triple face 6–10), and with
+ *  `archTeamArrows` a team end is entered archer by archer (2 arrows each) so
+ *  every arrow is credited to its archer.
  *  Pure rules live in data/results/archery.ts and archeryBracket.ts. */
 import React, { useMemo, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
@@ -18,6 +22,7 @@ import {
   endsOf, endSum, endText, parseEnd, archRowText, setEnd, sortEnd,
   bracketState, staleMatchData, outcomeText, roundShort, setMatchEnd, setMatchSo, setCloser, setWalkover, clearMatches,
   matchSpecOf, setMatchSoRound,
+  faceOf, ruleOf, perArcherOf, endInArcherOrder,
   type Arrow, type ArchRoundDef, type ArchMatchFormat, type BMatch, type EntryResult, type ResultEntry, type CompRules, type MatchSpec, archMatch,
 } from '../../data/results';
 
@@ -48,6 +53,30 @@ function Keypad({ onKey, onBack, disabled, minRing }: { onKey: (a: Arrow) => voi
   );
 }
 
+/** Round 2: a team end entered archer by archer — `per` boxes under each archer's name. */
+function CreditBoxes({ arrows, per, names, active }: { arrows: Arrow[]; per: number; names: string[]; active?: boolean }) {
+  return (
+    <View style={st.boxes}>
+      {names.map((nm, mi) => (
+        <View key={mi} style={{ gap: 2, alignItems: 'center' }}>
+          <Text style={st.sub} numberOfLines={1}>{nm.split(' ')[0]}</Text>
+          <View style={{ flexDirection: 'row', gap: theme.spacing(0.5) }}>
+            {Array.from({ length: per }, (_, j) => {
+              const i = mi * per + j;
+              return (
+                <View key={j} style={[st.box, active && i === arrows.length && st.boxNext]}>
+                  <Text style={st.boxTxt}>{arrows[i] != null ? String(arrows[i]) : ''}</Text>
+                </View>
+              );
+            })}
+          </View>
+        </View>
+      ))}
+      <Text style={st.boxSum}>{arrows.length ? `= ${endSum(arrows)}` : ''}</Text>
+    </View>
+  );
+}
+
 /** The arrow boxes of an end being entered. */
 function ArrowBoxes({ arrows, n, active }: { arrows: Arrow[]; n: number; active?: boolean }) {
   return (
@@ -64,8 +93,9 @@ function ArrowBoxes({ arrows, n, active }: { arrows: Arrow[]; n: number; active?
 
 /* ------------------------------ ranking round ------------------------------ */
 
-export function EndCard({ entries, round, editable, onSave }: { entries: ResultEntry[]; round: ArchRoundDef; editable: boolean; onSave: Save }) {
+export function EndCard({ entries, round, editable, onSave, rules }: { entries: ResultEntry[]; round: ArchRoundDef; editable: boolean; onSave: Save; /** round 2: the meet's rules — the recurve indoor face (single 1–10 / triple 6–10) */ rules?: CompRules }) {
   const n = endsOf(round);
+  const minRing = faceOf(round, rules).minRing;
   const rows = useMemo(() => entries.filter(inPlay).sort((a, b) => (a.result.order ?? 99) - (b.result.order ?? 99)), [entries]);
   const shot = (e: ResultEntry, i: number) => !!e.result.ends?.[i]?.length;
   const doneIn = (i: number) => rows.filter((e) => shot(e, i)).length;
@@ -104,7 +134,7 @@ export function EndCard({ entries, round, editable, onSave }: { entries: ResultE
   };
   const submitTyped = () => {
     if (!typed.trim()) return;
-    const p = parseEnd(typed, round.perEnd, round.minRing);
+    const p = parseEnd(typed, round.perEnd, minRing);
     if ('error' in p) { setErr(p.error); return; }
     commit(p.arrows);
   };
@@ -149,7 +179,7 @@ export function EndCard({ entries, round, editable, onSave }: { entries: ResultE
           {blocked ? <Text style={st.bad}>End {(up.result.ends?.length ?? 0) + 1} first.</Text> : (
             <>
               <ArrowBoxes arrows={buf} n={round.perEnd} active />
-              <Keypad onKey={key} onBack={() => setBuf(buf.slice(0, -1))} minRing={round.minRing} />
+              <Keypad onKey={key} onBack={() => setBuf(buf.slice(0, -1))} minRing={minRing} />
               <View style={st.headRow}>
                 <TextInput style={[st.input, { flex: 1 }, !!err && st.inputBad]} value={typed} onChangeText={setTyped} placeholder={round.perEnd === 6 ? 'or type: X 10 9 9 8 7 = 53' : 'or type: X 10 9 = 29'}
                   placeholderTextColor={theme.colors.textMuted} autoCapitalize="characters" accessibilityLabel={`Type end ${cur + 1} of ${up.name}`} onSubmitEditing={submitTyped} />
@@ -171,6 +201,8 @@ export function EndCard({ entries, round, editable, onSave }: { entries: ResultE
 export function BracketCard({ entries, round, fmt, editable, onSave, rules, discipline }: { entries: ResultEntry[]; round: ArchRoundDef; fmt: ArchMatchFormat; editable: boolean; onSave: Save; /** SD-141: the meet's shoot-off rule */ rules?: CompRules; /** SD-137b: the bracket's discipline (a team / mixed team key → team matches) */ discipline?: string }) {
   const spec = matchSpecOf(discipline);
   const teamWord = spec.so > 1;
+  // round 2: the meet credits each team arrow to its archer ("Stats to track")
+  const credit = teamWord && ruleOf(rules, 'archTeamArrows') === true;
   const match = useMemo(() => archMatch(fmt, rules, discipline), [fmt, rules, discipline]);
   const state = useMemo(() => bracketState(entries, fmt, match), [entries, fmt, match]);
   const byId = useMemo(() => new Map(entries.map((e) => [e.id, e])), [entries]);
@@ -214,7 +246,7 @@ export function BracketCard({ entries, round, fmt, editable, onSave, rules, disc
         </View>
       ))}
       {sel && sel.known && !sel.bye && sel.a && sel.b ? (
-        <MatchScorer key={`${sel.key}:${sel.slot}:${sel.a}:${sel.b}`} m={sel} rounds={state.rounds} entries={entries} fmt={fmt} editable={editable} onSave={onSave} match={match} spec={spec} minRing={round.minRing} />
+        <MatchScorer key={`${sel.key}:${sel.slot}:${sel.a}:${sel.b}`} m={sel} rounds={state.rounds} entries={entries} fmt={fmt} editable={editable} onSave={onSave} match={match} spec={spec} minRing={faceOf(round, rules).minRing} credit={credit} />
       ) : null}
     </Card>
   );
@@ -229,17 +261,27 @@ export function matchRuleText(fmt: ArchMatchFormat, spec: MatchSpec): string {
     : `Cumulative: ${spec.ends} ends of ${spec.arrows} arrows${per}, the higher total wins. Level: ${so}.`;
 }
 
-function MatchScorer({ m, rounds, entries, fmt, editable, onSave, match, spec, minRing }: { m: BMatch; rounds: number; entries: ResultEntry[]; fmt: ArchMatchFormat; editable: boolean; onSave: Save; match?: ReturnType<typeof archMatch>; spec: MatchSpec; minRing?: number }) {
+function MatchScorer({ m, rounds, entries, fmt, editable, onSave, match, spec, minRing, credit: creditOn }: { m: BMatch; rounds: number; entries: ResultEntry[]; fmt: ArchMatchFormat; editable: boolean; onSave: Save; match?: ReturnType<typeof archMatch>; spec: MatchSpec; minRing?: number; /** round 2: enter each team's arrows archer by archer */ credit?: boolean }) {
   const MATCH_ARROWS = spec.arrows, MATCH_ENDS = spec.ends, SO = spec.so;
   const ea = entries.find((e) => e.id === m.a)!, eb = entries.find((e) => e.id === m.b)!;
   const A = ea.result.mp?.[m.key], B = eb.result.mp?.[m.key];
+  // round 2: arrows credited to each archer — both teams need their members listed
+  const PER = perArcherOf(spec);
+  const namesA = (ea.result.members ?? []).map((x) => x.name), namesB = (eb.result.members ?? []).map((x) => x.name);
+  const credit = !!creditOn && namesA.length * PER === MATCH_ARROWS && namesB.length * PER === MATCH_ARROWS;
+  /** an end to correct: archer by archer when credited (or empty, to credit it now) */
+  const loadEnd = (side: typeof A, names: string[], k: number): Arrow[] => {
+    const ends = side?.ends?.[k] ?? [];
+    if (!credit) return ends;
+    return endInArcherOrder(ends, side?.by?.[k], names.length) ?? [];
+  };
   const out = m.out!;
   const nm = (id?: string) => entries.find((e) => e.id === id)?.name ?? '';
   const nextEnd = out.nextEnd != null ? out.nextEnd - 1 : null;
   const [edit, setEdit] = useState<number | null>(null);
   const idx = edit ?? nextEnd;
-  const [bufA, setBufA] = useState<Arrow[]>(edit != null ? A?.ends?.[edit] ?? [] : []);
-  const [bufB, setBufB] = useState<Arrow[]>(edit != null ? B?.ends?.[edit] ?? [] : []);
+  const [bufA, setBufA] = useState<Arrow[]>(edit != null ? loadEnd(A, namesA, edit) : []);
+  const [bufB, setBufB] = useState<Arrow[]>(edit != null ? loadEnd(B, namesB, edit) : []);
   const [side, setSide] = useState<'a' | 'b'>('a');
   const [again, setAgain] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -250,7 +292,7 @@ function MatchScorer({ m, rounds, entries, fmt, editable, onSave, match, spec, m
   const per = soRound != null && soArrows && idx == null ? SO : MATCH_ARROWS;
 
   const startEdit = (k: number) => {
-    setEdit(k); setBufA(A?.ends?.[k] ?? []); setBufB(B?.ends?.[k] ?? []); setSide('a'); setErr(null);
+    setEdit(k); setBufA(loadEnd(A, namesA, k)); setBufB(loadEnd(B, namesB, k)); setSide('a'); setErr(null);
   };
   const key = (a: Arrow) => {
     setErr(null);
@@ -286,7 +328,8 @@ function MatchScorer({ m, rounds, entries, fmt, editable, onSave, match, spec, m
     if (bufA.length !== MATCH_ARROWS || bufB.length !== MATCH_ARROWS) { setErr(`Both ${SO > 1 ? 'teams' : 'archers'} need ${MATCH_ARROWS} arrows.`); return; }
     setBusy(true);
     try {
-      const ra = setMatchEnd(ea.result, m.key, idx, bufA), rb = setMatchEnd(eb.result, m.key, idx, bufB);
+      const by = credit ? { per: PER } : undefined;
+      const ra = setMatchEnd(ea.result, m.key, idx, bufA, by), rb = setMatchEnd(eb.result, m.key, idx, bufB, by);
       const ok = await apply(ra, rb, `${roundShort(m.round, rounds)} E${idx + 1} ${endSum(bufA)}–${endSum(bufB)}`);
       if (ok) { setBufA([]); setBufB([]); setSide('a'); setEdit(null); }
     } finally { setBusy(false); }
@@ -358,9 +401,12 @@ function MatchScorer({ m, rounds, entries, fmt, editable, onSave, match, spec, m
           {(['a', 'b'] as const).map((s) => (
             <TouchableOpacity key={s} accessibilityRole="button" accessibilityLabel={`Enter for ${s === 'a' ? ea.name : eb.name}`} onPress={() => setSide(s)} style={[st.row, side === s && st.rowOn]}>
               <Text style={[st.name, { width: 92 }]} numberOfLines={1}>{first(s === 'a' ? ea.name : eb.name)}</Text>
-              <ArrowBoxes arrows={s === 'a' ? bufA : bufB} n={per} active={side === s} />
+              {credit && idx != null
+                ? <CreditBoxes arrows={s === 'a' ? bufA : bufB} per={PER} names={s === 'a' ? namesA : namesB} active={side === s} />
+                : <ArrowBoxes arrows={s === 'a' ? bufA : bufB} n={per} active={side === s} />}
             </TouchableOpacity>
           ))}
+          {credit && idx != null ? <Text style={st.hint}>Each archer’s {PER} arrows in turn — they count for the team and for the archer’s own team-match average.</Text> : null}
           <Keypad onKey={key} onBack={back} minRing={minRing} />
           {idx != null
             ? <Button label={busy ? 'Saving…' : `Save end ${idx + 1}${bufA.length === MATCH_ARROWS && bufB.length === MATCH_ARROWS ? ` (${endSum(bufA)}–${endSum(bufB)})` : ''}`} onPress={() => void saveEnd()} disabled={busy} />

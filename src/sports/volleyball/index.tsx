@@ -262,29 +262,24 @@ function courtPlayers(roster: Player[], lineup: { playerId?: string; playerName?
 // Timeouts per set come from the format (2 indoor, 1 beach — SD-117b).
 const ScoringControls = makeSetScoringControls({ icon: '🏐', blocks: true, serve: true, detail: true });
 
-/** Deep wave — the Score tab: sets, the broadcast match stats (FIVB VIS
- *  categories, rotation analysis, by server — replaces SD-58's generic serve
- *  panel), the player box at VIS depth, and the rally-by-rally commentary
- *  grouped by set (substitutions, timeouts and sanctions sit where they
- *  happened — it replaces SD-71's separate substitution list and the flat
- *  point log). */
-const LiveExtras: NonNullable<SportPlugin<VolleyballState>['LiveExtras']> = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster, onPlayer }) => {
+/** Match tabs (2026-10-22): the rally-by-rally commentary grouped by set
+ *  (substitutions, timeouts and sanctions sit where they happened) on
+ *  Commentary; the broadcast match stats (FIVB VIS categories, rotation
+ *  analysis, by server) and the player box at VIS depth on Stats. The set
+ *  scores are on the scoreboard header above every tab. */
+type TabProps = Parameters<NonNullable<SportPlugin<VolleyballState>['LiveExtras']>>[0];
+const VolleyballCommentary = ({ state, homeName, awayName, homeColor, awayColor }: TabProps) => {
   const s = state as VolleyballState;
   const feed = useMemo(() => volleyballCommentary(s, { home: homeName, away: awayName }), [s, homeName, awayName]);
+  return <FeedView groups={feed} homeColor={homeColor} awayColor={awayColor} emptyText="No points yet." title="Commentary · rally by rally" />;
+};
+const VolleyballStats = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster, onPlayer }: TabProps) => {
+  const s = state as VolleyballState;
   return (
     <View style={{ gap: theme.spacing(3) }}>
-      <Text style={ctrl.label}>Sets</Text>
-      <View style={ctrl.setsRow}>
-        {s.sets.length === 0 ? (
-          <Text style={textStyles.muted}>Set 1 in progress…</Text>
-        ) : (
-          s.sets.map((g, i) => <Text key={i} style={ctrl.setChip}>S{i + 1}: {g[0]}-{g[1]}</Text>)
-        )}
-      </View>
       <VolleyballStatsPanel state={s} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} />
       <Text style={ctrl.label}>Player stats</Text>
       <MatchBoxScore sport="volleyball" schema={VOLLEYBALL_DEEP_BOX} show="box" source={volleyballDeepBox(s, { homeRoster, awayRoster })} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} onPlayer={onPlayer} />
-      <FeedView groups={feed} homeColor={homeColor} awayColor={awayColor} emptyText="No points yet." title="Commentary · rally by rally" />
     </View>
   );
 };
@@ -338,7 +333,7 @@ export const volleyballPlugin: SportPlugin<VolleyballState> = {
     detailLine: `Sets — ${s.setsWon.home}:${s.setsWon.away} · ${s.setsToWin === 1 ? 'single set' : `best of ${s.setsToWin * 2 - 1}`} · to ${setTarget(s)}${isDecider(s) ? ' (decider)' : ''}`,
   }),
   ScoringControls,
-  LiveExtras,
+  matchTabs: { Commentary: VolleyballCommentary, Stats: VolleyballStats },
   // deep wave — "Stats to track": attack attempts, reception, digs, set assists (all off by default)
   liveSettings: VOLLEYBALL_LIVE_SETTINGS,
   // SD-136 — FIVB sanctions (misconduct 21, delays 16.2) in Quick options

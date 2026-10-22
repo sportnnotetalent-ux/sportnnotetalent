@@ -16,7 +16,9 @@
  *   3rd shot      pickleball drop / drive / lob (3rd shot)
  * Tabs and rows appear only for what the match tracked (D8). Every figure is
  * replayed from the point log (racketMatchStats.ts) — old and corrected
- * matches included.
+ * matches included. Round 2: rally length follows the match's bucket scheme
+ * (table tennis: three or four phases); pickleball's Key stats add kitchen
+ * arrival (overall / serving / returning) once a rally was marked "Nobody".
  */
 import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
@@ -161,7 +163,9 @@ export function MatchStatsPanel({
           <View style={st.section}>
             <Text style={st.sub}>{sport === 'tabletennis' ? 'POINTS WON BY PHASE (SHOTS IN THE RALLY)' : 'POINTS WON BY RALLY LENGTH'}</Text>
             {rallyLengthRows(v, active).map(bar)}
-            <Text style={[st.sub, { marginTop: theme.spacing(2) }]}>{sport === 'tabletennis' ? 'THREE-PHASE ANALYSIS' : 'ON SERVE / ON RECEIVE'}</Text>
+            <Text style={[st.sub, { marginTop: theme.spacing(2) }]}>
+              {sport !== 'tabletennis' ? 'ON SERVE / ON RECEIVE' : v.buckets.includes('7+') ? 'FOUR-PHASE ANALYSIS' : 'THREE-PHASE ANALYSIS'}
+            </Text>
             {phaseRows(v, active).map(bar)}
           </View>
         )}

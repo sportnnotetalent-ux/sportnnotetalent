@@ -10,33 +10,38 @@ import { CommentaryFeed } from '../../sports/gcc/CommentaryFeed';
 import { CompareTable } from '../../sports/gcc/CompareTable';
 import { golfRoundFeed, type FeedPlayer } from '../../sports/golf/feed';
 import { golfStatSheet, type NinePart } from '../../sports/golf/statSheet';
+import type { DistUnit } from '../../sports/golf/engine';
 
 const short = (name: string) => name.split(' ')[0] || name;
 
 /** The field's hole-by-hole commentary, with a player filter. */
-export function GolfRoundFeed({ players, scoring, net, only: fixed }: {
+export function GolfRoundFeed({ players, scoring, net, only: fixed, unit }: {
   players: FeedPlayer[];
   scoring: 'stroke' | 'stableford';
   net?: boolean;
   /** one player's feed only (no filter chips) */
   only?: string;
+  /** Round 2 — the round's distance unit (yards by default) */
+  unit?: DistUnit;
 }) {
   const [who, setWho] = useState('all');
   const only = fixed ?? (who === 'all' ? undefined : who);
   const filters = fixed ? undefined : [{ key: 'all', label: 'Everyone' }, ...players.map((p) => ({ key: p.id, label: short(p.name) }))];
   return (
-    <CommentaryFeed title={fixed ? null : '🎙 Hole by hole'} groups={golfRoundFeed(players, { scoring, net, only })}
+    <CommentaryFeed title={fixed ? null : '🎙 Hole by hole'} groups={golfRoundFeed(players, { scoring, net, only, unit })}
       filters={players.length > 1 ? filters : undefined} filter={who} onFilter={setWho} empty="No holes scored yet." />
   );
 }
 
 /** One player's round stats beside the field average; whole round or a nine. */
-export function GolfRoundStats({ players, initial, fixed }: {
+export function GolfRoundStats({ players, initial, fixed, unit }: {
   players: FeedPlayer[];
   /** the player shown first (e.g. me) */
   initial?: string;
   /** one player only (the card drill-down) */
   fixed?: string;
+  /** Round 2 — the round's distance unit (yards by default) */
+  unit?: DistUnit;
 }) {
   const [pid, setPid] = useState<string>(fixed ?? initial ?? players[0]?.id ?? '');
   const [part, setPart] = useState<NinePart>('all');
@@ -54,7 +59,7 @@ export function GolfRoundStats({ players, initial, fixed }: {
       <CompareTable
         title={fixed ? null : '📊 Round stats'}
         homeName={me.name} awayName="Field avg" single={!field.length}
-        categories={golfStatSheet(me, field, part)}
+        categories={golfStatSheet(me, field, part, unit)}
         units={nines ? [{ key: 'all', label: 'Round' }, { key: 'out', label: 'Out (1–9)' }, { key: 'in', label: 'In (10–18)' }] : undefined}
         unit={part} onUnit={(k) => setPart(k as NinePart)}
         empty="No holes scored yet."

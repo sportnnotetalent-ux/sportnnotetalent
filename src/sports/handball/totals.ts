@@ -171,7 +171,8 @@ export function handballTotals(s: HandballState): Record<string, { side: Side; s
       l[KEEPER_CONCEDED_KEY[t]] = (l[KEEPER_CONCEDED_KEY[t]] ?? 0) + (k.byType[t] ?? 0);
     }
   }
-  // deep wave: goals into an empty goal; shoot-out keepers' saves
+  // deep wave: goals into an empty goal; shoot-out keepers' saves; (round 2)
+  // the taken-off keeper's minutes with an empty goal
   for (const [id, d] of Object.entries(handballDerivedCredits(s))) add(id, d.side, d.stats);
   const drawn = sevenMDrawnTracked(s);
   for (const l of Object.values(out)) {
@@ -186,5 +187,7 @@ export const DERIVED_KEYS = [
   'minutes', 'suspensionMinutes', 'goalsConceded', 'sevenMConceded',
   // deep wave
   ...FIELD_SHOT_TYPES.flatMap((t) => [KEEPER_SAVE_KEY[t], KEEPER_CONCEDED_KEY[t]]), 'emptyGoalGoals', 'soSaves',
+  // round 2: the taken-off keeper's minutes with an empty goal
+  'emptyGoalMinutes',
 ] as const;
 export const OWNED_LIVE_KEYS = LIVE_KEYS;

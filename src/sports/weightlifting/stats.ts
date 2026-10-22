@@ -55,6 +55,8 @@ export const weightliftingStats: SportStatSchema<'weightlifting'> = {
     { key: 'mark', label: 'Mark', short: 'mark', group: 'line', format: kg, agg: { kind: 'max' } }, // the total (shared key / label with athletics)
     { key: 'bw', label: 'Bodyweight', short: 'bodyweight', group: 'line', format: { unit: 'decimal', dp: 2 }, agg: { kind: 'min' } },
     { key: 'sinclair', label: 'Sinclair total', short: 'Sinclair', group: 'line', format: { unit: 'points', dp: 2 }, agg: { kind: 'max' } },
+    // round 2: Robi points — only sessions whose category had a reference total wrote it
+    { key: 'robi', label: 'Robi points', short: 'Robi', group: 'line', coverage: 'keyed', format: { unit: 'points', dp: 2 }, agg: { kind: 'max' } },
     { key: 'dq', label: 'Disqualified', short: 'DQ', group: 'line', format: { unit: 'count', better: 'lower' } },
     ...markStats,
     ...pbStats,

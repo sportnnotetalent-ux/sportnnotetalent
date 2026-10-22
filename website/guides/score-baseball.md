@@ -36,9 +36,10 @@ Score a baseball or softball game on one phone. Tap each pitch; when the ball is
 3. Tap **More** for an **Intentional walk** or an **Ejection**.
 
 ## Stats to track
-Both are off by default. Switch them on in the match settings or the match format.
+All are off by default. Switch them on in the match settings or the match format.
 - **Pitch types**: a chip row over the pitch pad (FB, SL, CH … or Rise, Drop … in softball). Tap the type, then the pitch. It counts for that pitch only.
 - **Where the ball went (spray)**: an optional **Where?** row (LF, CF, RF, SS …) in the in-play sheet. Tap a zone before the outcome, or skip it.
+- **Batted-ball type**: an optional **Batted ball?** row (**Grounder**, **Liner**, **Fly ball**, **Popup**) in the in-play sheet. Outs fill it in by themselves: a groundout is a ground ball, a lineout a line drive, and a fly out a fly ball, or a popup when an infielder caught it. Tap it on hits, or to correct an out. **Match stats** and player profiles then show ground-ball, line-drive, fly-ball and popup %.
 
 ## How the game ends
 Three outs end the half-inning; you never end one. The game ends by itself:
@@ -56,7 +57,8 @@ If time runs out or the weather stops play, tap **🏁 Call game (time / weather
 
 ## What you get
 - The line score (runs per inning, hits, errors) with the diamond, count and outs.
-- **Score** tab: **Play-by-play** by half-inning with the running score; **Match stats** by inning (with runners in scoring position, left on base, pitches–strikes, first-pitch strikes, ground outs–fly outs, double plays, and pitch mix and spray when tracked); **Box score** (batting and pitching, W, L, SV and box notes); **Key moments**.
+- **Commentary** tab: the play-by-play by half-inning with the running score (**Key moments** keeps the big plays).
+- **Stats** tab: **Match stats** by inning (with runners in scoring position, left on base, pitches–strikes, first-pitch strikes, ground outs–fly outs (a sacrifice bunt counts as a ground out), double plays, and pitch mix, spray and batted balls when tracked); **Box score** (batting and pitching, W, L, SV and box notes).
 - Player profiles: AVG, OBP, SLG, OPS, AVG with runners in scoring position, two-out RBI, home runs and steals; for pitchers W-L, IP, ERA, WHIP, strikeouts, strike % and first-pitch strike %. ERA uses each format's innings (7 in softball, 9 in baseball).
 - Tournament tables use **WBSC (win %, TQB)**: winning percentage, then head-to-head, team quality balance (runs per inning scored minus allowed, between the tied teams), earned-run TQB and batting average. Or pick **Win % · run difference**. See [Points table and adjustments](/guides/points-table-and-adjustments/).
 - Tournament Records: no-hitters, perfect games, hitting for the cycle, grand slams and the most strikeouts in a game.

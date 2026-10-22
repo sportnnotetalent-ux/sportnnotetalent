@@ -35,7 +35,7 @@ If the first innings can't restart, end it at the ball play stopped, even mid-ov
 Everything the first innings lost counts in the target, including the unfinished over.
 
 ## Live DLS par
-With DLS on, the chase shows **☔ DLS par now: 58 · Hilltop 4 ahead** under the scoring buttons, and spectators see it on the **Summary** tab. It updates every ball, so everyone knows who leads if rain stops play.
+With DLS on, the chase shows **☔ DLS par now: 58 · Hilltop 4 ahead** under the scoring buttons, and spectators see it at the top of the **Commentary** tab. It updates every ball, so everyone knows who leads if rain stops play.
 
 ## How DLS works, in plain words
 DLS measures what rain took from each side (overs and wickets left) with a standard table and scales the target.

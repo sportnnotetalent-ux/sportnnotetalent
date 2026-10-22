@@ -21,6 +21,7 @@ import { pointsOf } from './basketball/events.ts';
 import { pointsOf as afPointsOf, eventWhen as afWhen, type AFState } from './american_football/engine.ts';
 import { halfShort as bbHalf, type BaseballState } from './baseball/engine.ts';
 import { pointsOf as rugbyPointsOf, minuteText as rugbyMinute, type RugbyState } from './rugby/engine.ts';
+import { pointsOf as leaguePointsOf, minuteText as leagueMinute, type LeagueState } from './rugby_league/engine.ts';
 
 type Side = 'home' | 'away';
 
@@ -120,7 +121,7 @@ function basketballPlays(s: BasketballState): FlowScore[] {
 interface MinuteEvent { type?: string; kind?: string; side?: Side; minute?: number; half?: number; period?: number; sec?: number; id?: number | string; points?: number; stamp?: string }
 
 /** Which sports have a game-flow block. */
-export const GAME_FLOW_SPORTS = ['basketball', 'football', 'hockey', 'handball', 'ice_hockey', 'kabaddi', 'rugby', 'netball', 'american_football', 'baseball'] as const;
+export const GAME_FLOW_SPORTS = ['basketball', 'football', 'hockey', 'handball', 'ice_hockey', 'kabaddi', 'rugby', 'netball', 'american_football', 'baseball', 'rugby_league'] as const;
 
 /** Game flow for a sport's stored state; null = not a running-score sport,
  *  or nothing scored yet (goals sports: fewer than 2 goals says nothing). */
@@ -184,6 +185,14 @@ export function gameFlowFor(sport: string, state: unknown, starters?: Starters):
       const rs = state as RugbyState;
       plays = [...rs.events].filter((e) => rugbyPointsOf(e) > 0).sort((a, b) => a.period - b.period || a.psec - b.psec)
         .map((e) => ({ side: e.side, points: rugbyPointsOf(e), at: rugbyMinute(rs, e.period, e.psec) }));
+      break;
+    }
+    case 'rugby_league': {
+      // every score (try 4 / bonus 5, penalty try 4, conversion / penalty goal 2, field goal 1 or 2), in match order
+      unit = 'points';
+      const ls = state as LeagueState;
+      plays = [...ls.events].filter((e) => leaguePointsOf(e) > 0).sort((a, b) => a.period - b.period || a.psec - b.psec)
+        .map((e) => ({ side: e.side, points: leaguePointsOf(e), at: leagueMinute(ls, e.period, e.psec) }));
       break;
     }
     case 'american_football': {

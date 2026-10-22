@@ -50,6 +50,9 @@ export const cyclingStats: SportStatSchema<'cycling'> = {
     { key: 'silvers', label: 'Silvers', short: 'silvers', one: 'silver', group: 'medals', weight: 2 },
     { key: 'bronzes', label: 'Bronzes', short: 'bronzes', one: 'bronze', group: 'medals', weight: 1 },
     { key: 'posPoints', label: 'Position points', short: 'position pts', one: 'position pt', group: 'medals', format: { unit: 'points', dp: 1 } },
+    // timed races round 2: meet / school records broken (only when a record was set with the holder's id)
+    { key: 'mrSet', label: 'Meet records set', short: 'meet records', one: 'meet record', group: 'medals' },
+    { key: 'srSet', label: 'School records set', short: 'school records', one: 'school record', group: 'medals' },
     { key: 'place', label: 'Place', short: 'place', group: 'line', format: { unit: 'count', better: 'lower' }, agg: { kind: 'min' } },
     { key: 'mark', label: 'Mark', short: 'mark', group: 'line', format: fmtFor(2), agg: { kind: 'min' } },
     { key: 'hand', label: 'Hand-timed', short: 'hand-timed', group: 'line' },
@@ -62,7 +65,7 @@ export const cyclingStats: SportStatSchema<'cycling'> = {
   sections: [
     { id: 'bests', title: 'Personal bests', rows: pbStats.map((s) => ({ stat: s.key, hideZero: true })) },
     { id: 'racing', title: 'Racing', rows: [{ stat: 'races' }, { stat: 'raceWins' }, { stat: 'stageWins' }, { stat: 'sprintW' }, { stat: 'prPts' }] },
-    { id: 'medals', title: 'Medals', rows: [{ stat: 'golds' }, { stat: 'silvers' }, { stat: 'bronzes' }] },
+    { id: 'medals', title: 'Medals', rows: [{ stat: 'golds' }, { stat: 'silvers' }, { stat: 'bronzes' }, { stat: 'mrSet', hideZero: true }, { stat: 'srSet', hideZero: true }] },
   ],
   careerView: 'measured',
   history: ['golds', 'silvers', 'bronzes'],

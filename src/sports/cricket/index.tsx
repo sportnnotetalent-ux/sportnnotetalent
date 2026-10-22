@@ -11,7 +11,7 @@
  * card — so a viewer replaying the log sees the same scorecard. The reducer is
  * pure; striker/bowler identity rides in each action's payload.
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { theme } from '../../core/theme';
 import { useMask } from '../../core/disputeMask';
@@ -46,9 +46,12 @@ import { OverEditor } from './OverEditor';
 import { cricketTickerDetail, cricketTickerFlash } from './ticker';
 // Deep wave — commentary, match stats, optional ball detail
 import { CricketCommentary } from './CommentaryView';
+import { CricketShareCard } from './ShareCardView';
 import { CricketMatchStats } from './MatchStatsView';
+import { SubViews } from '../SubViews';
 import { BallDetailPanel, BowlTypeChips, detailTarget, profileLeftArm } from './BallDetailPanel';
 import { bowlTypeFromProfile } from './detail';
+import { bouncerStatus, bouncerSlot } from './bouncers';
 import { inningsTop } from './matchStats';
 import {
   LOCAL_RULE_FIELDS, CRICKET_LIVE_SETTINGS, rulesOf, effectiveRules, inStandardWindow, isStandard,
@@ -715,6 +718,8 @@ const ScoringControls: SportPlugin<CricketState>['ScoringControls'] = ({
     runsAs?: RunsWere; nbRunsAs?: 'bat' | 'bye' | 'legbye';
     /** run out: 2nd fielder; null = skipped */
     fielder2?: Player | null;
+    /** Round 2 — run out: a direct hit by the fielder (optional chip) */
+    direct?: boolean;
     /** run out / obstructing: where the wicket was broken */
     end?: 'striker' | 'bowler';
     /** SD-113 (A6) — the next batter picked; committed by "Confirm wicket" */
@@ -851,6 +856,8 @@ const ScoringControls: SportPlugin<CricketState>['ScoringControls'] = ({
       newBatId: newBat?.id, newBatName: newBat?.fullName,
     };
     if (kind === 'runout' && wf.fielder2) { payload.fielder2Id = wf.fielder2.id; payload.fielder2Name = wf.fielder2.fullName; }
+    // Round 2 — a direct hit (career key for the fielder); score-neutral
+    if (kind === 'runout' && wf.direct && wf.fielder) payload.direct = true;
     // SD-113 (A3/R1): no batter left to come in — the innings closes on this wicket.
     if (closeInnings) { payload.v = 2; payload.noBatterLeft = true; }
     // SD-113 (R2): an armed penalty rides on a delivery (not retired / timed out / Mankad).
@@ -914,7 +921,8 @@ const ScoringControls: SportPlugin<CricketState>['ScoringControls'] = ({
     const offTail = !takesRuns && wf.offExtra ? ` · off a ${wf.offExtra === 'wide' ? 'wide' : 'no-ball'}` : '';
     const endTail = takesRuns && wf.end ? ` · ${wf.end === 'striker' ? 'striker' : 'bowler'}'s end` : '';
     const nextTail = wf.newBat ? ` · next in: ${wf.newBat.fullName}` : '';
-    const wktRecap = k ? `${batterKnown ? `${outName} ` : ''}${descriptor}${runsTail}${offTail}${endTail}${nextTail}` : '';
+    const directTail = k === 'runout' && wf.direct && wf.fielder ? ' · direct hit' : '';
+    const wktRecap = k ? `${batterKnown ? `${outName} ` : ''}${descriptor}${directTail}${runsTail}${offTail}${endTail}${nextTail}` : '';
     // "Next ball: X faces" — from where the wicket was broken (run out /
     // obstructing), else the new batter takes the vacated end; then the over end.
     const onExtraNow = takesRuns ? (wf.runsAs === 'wide' || wf.runsAs === 'noball' ? wf.runsAs : undefined) : wf.offExtra;
@@ -1013,11 +1021,15 @@ const ScoringControls: SportPlugin<CricketState>['ScoringControls'] = ({
           </>
         )}
 
-        {/* Run out: the 2nd fielder is optional — folded, never a step. */}
+        {/* Run out: the 2nd fielder is optional — folded, never a step. Round 2:
+            so is "Direct hit" (the fielder hit the stumps; no 2nd fielder). */}
         {k === 'runout' && !!wf.fielder && (
-          wf.fielder2 === undefined ? (
+          wf.fielder2 === undefined || wf.direct ? (
             <View style={ctrl.chips}>
-              <SelectChip label="+ 2nd fielder (optional)" active={false} onPress={() => setWf({ ...wf, fielder2: null })} />
+              <SelectChip label="🎯 Direct hit (optional)" active={!!wf.direct}
+                accessibilityLabel={`Direct hit by ${wf.fielder.fullName}`}
+                onPress={() => setWf({ ...wf, direct: !wf.direct, fielder2: undefined })} />
+              {!wf.direct && <SelectChip label="+ 2nd fielder (optional)" active={false} onPress={() => setWf({ ...wf, fielder2: null })} />}
             </View>
           ) : (
             <>
@@ -1190,7 +1202,9 @@ const ScoringControls: SportPlugin<CricketState>['ScoringControls'] = ({
   const dCatch = !!(dTarget && rules.wagonWheel && dTarget.rec.out?.kind === 'caught');
   const dKey = dTarget ? `${dTarget.rec.inn}:${dTarget.rec.side}:${dTarget.d}` : '';
   const dTrk = dTarget?.rec.trk ?? {};
-  const dHas = !!(dTrk.pitch || dTrk.speed || (dTrk.ctrl && dTarget?.rec.ext !== 'wd') || dCatch);
+  const dHas = !!(dTrk.pitch || dTrk.speed || (dTrk.ctrl && dTarget?.rec.ext !== 'wd') || dCatch
+    // Round 2 — the wide / no-ball reason
+    || (dTrk.why && (dTarget?.rec.ext === 'wd' || dTarget?.rec.ext === 'nb')));
   const detailPanel = dOk && dTarget && dHas && detailSkip !== dKey ? (() => {
     const sid = dTarget.rec.strikerId;
     const bp = sid ? battingRoster.find((p) => p.id === sid) : undefined;
@@ -1210,9 +1224,12 @@ const ScoringControls: SportPlugin<CricketState>['ScoringControls'] = ({
   // penalty, or who's on strike. It never appears / disappears, so the pad never
   // moves between taps; a free hit also tints the pad's frame.
   const penLine = ballPen ? `⚖️ +${ballPen.runs} to ${ballPen.teamName} (${ballPen.reason}) on this ball` : '';
+  // Round 2 — the bouncer limit (pitch map on): reached / passed this over.
+  const bouncerLine = !soActive ? bouncerSlot(bouncerStatus(state)) : null;
   const slotText = state.freeHit
     ? `🟢 FREE HIT — can’t be out bowled, caught, lbw or stumped${penLine ? ` · ${penLine}` : ''}`
-    : penLine || `🏏 ${strikerName ?? '—'} on strike${bowlerName ? ` · 🎯 ${bowlerName}` : ''}`;
+    : penLine || bouncerLine || `🏏 ${strikerName ?? '—'} on strike${bowlerName ? ` · 🎯 ${bowlerName}` : ''}`;
+  const slotWarn = !state.freeHit && !ballPen && !!bouncerLine;
 
   return (
     <View style={{ gap: theme.spacing(4) }}>
@@ -1402,9 +1419,9 @@ const ScoringControls: SportPlugin<CricketState>['ScoringControls'] = ({
       {/* SD-113 (F2) — ONE scoring block: the run pad, then Wicket / Wide / No
           ball, each panel opening right under its own buttons (F1). */}
       <View style={{ gap: theme.spacing(2) }}>
-        <View style={[ctrl.padSlot, state.freeHit && ctrl.padSlotFreeHit, !state.freeHit && !!ballPen && ctrl.padSlotPen]}
+        <View style={[ctrl.padSlot, state.freeHit && ctrl.padSlotFreeHit, !state.freeHit && !!ballPen && ctrl.padSlotPen, slotWarn && ctrl.padSlotWarn]}
           accessibilityLiveRegion="polite" accessibilityLabel={slotText}>
-          <Text style={[ctrl.padSlotText, state.freeHit && ctrl.freeHitText, !state.freeHit && !!ballPen && ctrl.padSlotPenText]} numberOfLines={1}>{slotText}</Text>
+          <Text style={[ctrl.padSlotText, state.freeHit && ctrl.freeHitText, !state.freeHit && !!ballPen && ctrl.padSlotPenText, slotWarn && ctrl.padSlotWarnText]} numberOfLines={1}>{slotText}</Text>
         </View>
         {/* Runs — credited to the on-strike batsman; strike rotates automatically. */}
         <View style={[ctrl.padFrame, state.freeHit && ctrl.padFrameFreeHit]}>
@@ -1865,49 +1882,10 @@ const CricketSummary: NonNullable<SportPlugin<CricketState>['Summary']> = ({ sta
         </View>
       );
     }
-    const bat = s.battingSide;
-    const inn = s.scores[bat];
-    // In the chase, spell out the equation a spectator wants — target, runs still
-    // needed, balls left and the required rate — which otherwise only ever showed
-    // in the scorer's own controls (Super Over / DLS), never to a view-only viewer.
-    const inChase = s.innings === 2 && !!s.target;
-    const runsNeeded = Math.max(0, (s.target ?? 0) - inn.runs);
-    const ballsLeft = Math.max(0, s.oversLimit * s.ballsPerOver - inn.balls);
-    const rrr = ballsLeft > 0 ? (runsNeeded / (ballsLeft / s.ballsPerOver)).toFixed(2) : '—';
+    // Match tabs: the live score sits on the header and the chase equation on
+    // top of Commentary (CricketSituation) — Summary keeps the people.
     return (
       <View style={{ gap: theme.spacing(3) }}>
-        <View style={sum.liveResult}>
-          <View style={sum.liveHead}>
-            <View style={sum.liveTag}><View style={sum.liveDot} /><Text style={sum.liveTagText}>LIVE</Text></View>
-            <Text style={sum.liveInnings}>Innings {s.innings}</Text>
-          </View>
-          {s.pendingTie ? (
-            <Text style={sum.liveLine}>🔥 Scores level</Text>
-          ) : (
-            <>
-              <View style={sum.liveScoreRow}>
-                <Text style={[sum.liveTeam, { color: teamColor(bat) }]} numberOfLines={1}>{teamName(bat)}</Text>
-                <Text style={[sum.liveScore, { color: teamColor(bat) }]}>{inn.runs}/{inn.wickets}</Text>
-                <Text style={sum.liveOvers}>({oversStr(inn.balls, s.ballsPerOver)} ov)</Text>
-              </View>
-              <Text style={sum.liveRR}>Run rate {runRate(inn.runs, inn.balls, s.ballsPerOver)}</Text>
-              {inChase ? (
-                <View style={sum.chaseStrip}>
-                  <Text style={sum.chaseNeed}>Need {runsNeeded} off {ballsLeft}</Text>
-                  <Text style={sum.chaseMeta}>Target {s.target}{targetTag(s)} · RRR {rrr}</Text>
-                  {/* SD-133 — live DLS par for spectators too (DLS on). */}
-                  {(() => {
-                    const par = s.dls && !s.dlsLocked ? rainStopPar(s) : null;
-                    if (par == null) return null;
-                    const d = inn.runs - par;
-                    return <Text style={sum.chaseMeta}>☔ DLS par now {par} · {d > 0 ? `${d} ahead` : d < 0 ? `${-d} behind` : 'level'}</Text>;
-                  })()}
-                </View>
-              ) : null}
-            </>
-          )}
-        </View>
-
         <InningsSummary s={s} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} onPlayer={onPlayer} />
         <Text style={ctrl.label}>Standouts so far</Text>
         {mvp && <Award icon="🔥" label="Top performer" p={mvp} detail={mvpDetail(mvp)} />}
@@ -1916,7 +1894,7 @@ const CricketSummary: NonNullable<SportPlugin<CricketState>['Summary']> = ({ sta
           <View style={sum.half}>{bestBowl && <Award icon="🎯" label="Top bowl" p={bestBowl} detail={bowlLine(bestBowl)} />}</View>
         </View>
 
-        <Text style={[ctrl.label, { marginTop: theme.spacing(2) }]}>Player ratings · so far</Text>
+        <Text style={[ctrl.label, { marginTop: theme.spacing(2) }]}>Player ratings · Live — provisional</Text>
         <Text style={ctrl.meta}>Updates every ball — final ratings lock when the match ends.</Text>
         {ratingsBlock()}
       </View>
@@ -2232,36 +2210,84 @@ function BallChip({ sym }: { sym: string }) {
   );
 }
 
-const LiveExtras: NonNullable<SportPlugin<CricketState>['LiveExtras']> = ({ state, homeName, awayName, homeColor, awayColor, homeRoster = [], awayRoster = [], onPlayer, view }) => {
+/** Match tabs (2026-10-22): cricket's slots — the This-over strip on top of
+ *  Commentary, the ball-by-ball, and Stats opening on the Scorecard (then the
+ *  match centre). The Player of the Match lives on Summary only. */
+type TabProps = Parameters<NonNullable<SportPlugin<CricketState>['LiveExtras']>>[0];
+
+/** Commentary, on top — the situation now: "This over" (the balls of the
+ *  over in progress) and, in the chase, the equation a spectator wants —
+ *  runs needed, balls left, the target, the required rate and the live DLS
+ *  par (SD-133; it used to sit on the live Summary). */
+const CricketSituation = ({ state }: TabProps) => {
+  const s = state as CricketState;
+  if (s.ended) return null;
+  const inn = s.scores[s.battingSide];
+  const inChase = s.innings === 2 && !!s.target && !s.pendingTie;
+  const runsNeeded = Math.max(0, (s.target ?? 0) - inn.runs);
+  const ballsLeft = Math.max(0, s.oversLimit * s.ballsPerOver - inn.balls);
+  const rrr = ballsLeft > 0 ? (runsNeeded / (ballsLeft / s.ballsPerOver)).toFixed(2) : '—';
+  const par = inChase && s.dls && !s.dlsLocked ? rainStopPar(s) : null;
+  return (
+    <View style={{ gap: theme.spacing(2) }}>
+      <View style={ctrl.overRow} accessibilityLabel="This over">
+        <Text style={ctrl.meta}>This over</Text>
+        {s.thisOver.length === 0 ? (
+          <Text style={ctrl.meta}>—</Text>
+        ) : (
+          <>
+            {s.thisOver.map((sym, i) => <BallChip key={i} sym={sym} />)}
+            <Text style={ctrl.overRuns}>{s.thisOver.reduce((a, x) => a + ballRuns(x, effectiveRules(s)), 0)} runs</Text>
+          </>
+        )}
+      </View>
+      {inChase ? (
+        <View style={sum.chaseStrip}>
+          <Text style={sum.chaseNeed}>Need {runsNeeded} off {ballsLeft}</Text>
+          <Text style={sum.chaseMeta}>Target {s.target}{targetTag(s)} · RRR {rrr}</Text>
+          {par != null ? (
+            <Text style={sum.chaseMeta}>☔ DLS par now {par} · {inn.runs - par > 0 ? `${inn.runs - par} ahead` : inn.runs - par < 0 ? `${par - inn.runs} behind` : 'level'}</Text>
+          ) : null}
+        </View>
+      ) : null}
+    </View>
+  );
+};
+
+/** Commentary: ESPNcricinfo-style ball-by-ball with the over summaries. */
+const CricketCommentaryTab = ({ state, homeName, awayName, matchId, tournamentName }: TabProps) => (
+  <CricketCommentary state={state as CricketState} homeName={homeName} awayName={awayName} matchId={matchId} tournamentName={tournamentName} />
+);
+
+/** Summary, under the result and ratings: the WhatsApp card — end of the 1st
+ *  innings, then the result (cricket round 2, the founder's yes). */
+const CricketShareTab = ({ state, homeName, awayName, matchId, tournamentName, potmName, resultLine }: TabProps) => {
+  const s = state as CricketState;
+  const mask = useMask();
+  // the same Player of the Match as the Summary above: the stored pick, else
+  // the legacy / computed one (cricketAutoPotm)
+  const auto = useMemo(() => {
+    if (potmName || !s.ended) return undefined;
+    const { players, mvp } = matchRatings(s);
+    return cricketAutoPotm(s, players, mvp);
+  }, [s, potmName]);
+  const potm = potmName ?? (auto ? mask.byId(auto.id, auto.name) : undefined);
+  return (
+    <CricketShareCard
+      state={state} homeName={homeName} awayName={awayName} matchId={matchId}
+      tournamentName={tournamentName} potmName={potm} resultLine={resultLine}
+    />
+  );
+};
+
+/** Stats, first view — both innings (tap a team to open / close its card). */
+function CricketScorecard({ state, homeName, awayName, homeColor, awayColor, homeRoster = [], awayRoster = [], onPlayer }: TabProps) {
   const s = state as CricketState;
   // Default the open innings to whoever is batting (or the chase, post-match).
   const [open, setOpen] = useState<'home' | 'away' | null>(s.battingSide);
   const toggle = (side: 'home' | 'away') => setOpen((o) => (o === side ? null : side));
-  // Deep wave — the Commentary and Stats tabs (CRICKET_VIEWS).
-  if (view === 'commentary') return <CricketCommentary state={s} homeName={homeName} awayName={awayName} />;
-  if (view === 'stats') {
-    return <CricketMatchStats state={s} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} onPlayer={onPlayer} />;
-  }
-
   return (
     <View style={{ gap: theme.spacing(3) }}>
-      <View style={ctrl.scTitleRow}>
-        <Text style={ctrl.label}>Scorecard</Text>
-        {!s.ended && (
-          <View style={ctrl.overRow}>
-            <Text style={ctrl.meta}>This over</Text>
-            {s.thisOver.length === 0 ? (
-              <Text style={ctrl.meta}>—</Text>
-            ) : (
-              <>
-                {s.thisOver.map((sym, i) => <BallChip key={i} sym={sym} />)}
-                <Text style={ctrl.overRuns}>{s.thisOver.reduce((a, x) => a + ballRuns(x, effectiveRules(s)), 0)} runs</Text>
-              </>
-            )}
-          </View>
-        )}
-      </View>
-
       <InningsCard
         s={s} side="home" name={homeName} color={homeColor ?? theme.colors.home}
         roster={homeRoster} batting={s.battingSide === 'home'} open={open === 'home'} onToggle={() => toggle('home')} onPlayer={onPlayer}
@@ -2270,22 +2296,20 @@ const LiveExtras: NonNullable<SportPlugin<CricketState>['LiveExtras']> = ({ stat
         s={s} side="away" name={awayName} color={awayColor ?? theme.colors.away}
         roster={awayRoster} batting={s.battingSide === 'away'} open={open === 'away'} onToggle={() => toggle('away')} onPlayer={onPlayer}
       />
-
-      {s.potm ? <Text style={ctrl.potm} {...playerLink(idByName(s.potm, homeRoster, awayRoster), s.potm, onPlayer)}>🏅 Player of the Match: {s.potm}</Text> : null}
-
-      {/* Deep wave — ball-by-ball now lives on the Commentary tab (with the
-          over summaries), the deeper numbers on the Stats tab. */}
-      <Text style={ctrl.meta}>Ball-by-ball commentary and match stats (phases, matchups, worm, Manhattan) are on the Commentary and Stats tabs.</Text>
     </View>
   );
-};
+}
 
-/** Deep wave — cricket's content tabs: Scorecard · Commentary · Stats. */
-const CRICKET_VIEWS = [
-  { key: 'score', label: 'Scorecard' },
-  { key: 'commentary', label: 'Commentary' },
-  { key: 'stats', label: 'Stats' },
-];
+/** Stats: Scorecard first, then the match centre (compare, batting, bowling,
+ *  phases, matchups, worm / Manhattan, pitch map). */
+const CricketStatsTab = (p: TabProps) => (
+  <SubViews label="Stats view" views={[
+    { key: 'scorecard', label: 'Scorecard', render: () => <CricketScorecard {...p} /> },
+    { key: 'centre', label: 'Match stats', render: () => (
+      <CricketMatchStats state={p.state as CricketState} homeName={p.homeName} awayName={p.awayName} homeColor={p.homeColor} awayColor={p.awayColor} onPlayer={p.onPlayer} />
+    ) },
+  ]} />
+);
 
 /** Quick options (parity #13): 🧤 Change keeper — the fielding side's roster,
  *  † on the current keeper; a tap sends SET_KEEPER (logged once a ball is bowled).
@@ -2453,11 +2477,11 @@ export const cricketPlugin: SportPlugin<CricketState> = {
   },
   ScoringControls,
   LiveClock,
-  LiveExtras,
-  liveViews: CRICKET_VIEWS,
+  // Match tabs: the scoreboard header now sits on top of every tab (the
+  // scorecard, which used to stand in for it, is the first view of Stats).
+  matchTabs: { Situation: CricketSituation, Commentary: CricketCommentaryTab, Stats: CricketStatsTab, SummaryExtras: CricketShareTab },
   Summary: CricketSummary,
   autoPotm: (st) => { const { players, mvp } = matchRatings(st); const a = cricketAutoPotm(st, players, mvp); return a ? { id: a.id, name: a.name } : undefined; },
-  hideScoreboard: true,
   voice: { hints: ['four', 'six', 'dot', 'wicket', 'wide', 'two runs', 'five', 'all run four'], parse: cricketVoice },
   formatFields: [
     {
@@ -2552,6 +2576,9 @@ const ctrl = StyleSheet.create({
   padSlotPen: { backgroundColor: theme.colors.accent + '1A', borderColor: theme.colors.accent },
   padSlotText: { color: theme.colors.textMuted, fontSize: theme.font.small, fontWeight: '700' },
   padSlotPenText: { color: theme.colors.accent, fontWeight: '900' },
+  // Round 2 — the bouncer-limit warning
+  padSlotWarn: { backgroundColor: theme.colors.danger + '14', borderColor: theme.colors.danger },
+  padSlotWarnText: { color: theme.colors.danger, fontWeight: '900' },
   padFrame: { borderWidth: 2, borderColor: 'transparent', borderRadius: theme.radius.md, padding: 2 },
   padFrameFreeHit: { borderColor: theme.colors.primary },
   wktRecap: { backgroundColor: theme.colors.danger + '1A', borderRadius: theme.radius.sm, paddingVertical: theme.spacing(2), paddingHorizontal: theme.spacing(3), alignSelf: 'flex-start' },

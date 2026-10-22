@@ -4,6 +4,11 @@
  * renders the universal <Scoreboard/> from `plugin.summary`, and mounts the
  * plugin's own <ScoringControls/>. Adding a sport never touches this file.
  *
+ * Match tabs (2026-10-22): every match shows Info · Commentary · Stats ·
+ * Summary · Scoring under the scoreboard header — one purpose per tab, and no
+ * piece of information in two of them. The sport fills `plugin.matchTabs`
+ * (docs/sport-depth/deep-wave/match-tabs.md).
+ *
  * Where realtime fits later: every dispatched action would also be persisted to
  * Supabase (an `events` row) and broadcast on a realtime channel so viewers see
  * the score update instantly. The reducer being pure means the server can
@@ -13,7 +18,7 @@ import { notice, confirmAction } from '../core/confirm';
 import { confirmMatchAction } from '../components/ConfirmSheet';
 import { matchControls, showsControl } from '../core/matchSafety';
 import { getDeviceId } from '../core/deviceId';
-import { mergeMatchConfig } from '../core/matchConfig';
+import { mergeMatchConfig, changedFormatKeys } from '../core/matchConfig';
 import { manualResultLine as baseResultLine, isNoResult } from '../core/matchResult';
 import { matchScoreLine, finalBoard, resultMark } from '../sports/scoreline';
 import { isEliminationStage } from '../data/bracket';
@@ -22,7 +27,7 @@ import { canCorrectMatch, correctionHoursLeft, formatTimeLeft } from '../core/ro
 import { standingsConfigFromFormat, noResultPoints } from '../data/standings';
 import { lockStatus, type ScoringLock } from '../core/scoringLock';
 import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { ScrollView, View, Text, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native';
 import { shareMessage } from '../core/share';
 import { PersonPicker } from '../components/PersonPicker';
 import { useParamState } from '../navigation/useParamState';
@@ -51,7 +56,7 @@ import { QuickOptionsSheet } from '../components/QuickOptionsSheet';
 import { LiveSettingsCard } from '../components/LiveSettingsCard';
 import { OverlayPanel } from '../components/OverlayPanel';
 import type { TickerMeta } from '../sports/ticker';
-import { slotsFor, officialsLine, isCommentarySlot, type MatchOfficial } from '../data/matchOfficials';
+import { slotsFor, isCommentarySlot, type MatchOfficial } from '../data/matchOfficials';
 import { LiveStream } from '../components/LiveStream';
 import { DisputeMaskProvider } from '../core/disputeMask';
 import { SelectChip, TextField, Button } from '../components/ui';
@@ -79,6 +84,7 @@ import { GameFlowCard } from '../components/GameFlowCard';
 import { matchBoxSource } from '../sports/boxSources';
 import type { MatchEventRecord, MatchResult, ResultKind, DisputeEvent, LineupSlot, Match, MatchDispute, MatchPotm, MatchSquads, Player, SportId, StatLine, TeamLeadership } from '../core/types';
 import type { RootStackParamList } from '../navigation/types';
+import type { LiveExtrasProps, MatchTabs } from '../sports/types';
 import { RemindInstall } from '../components/RemindInstall';
 import { LiveAnnouncer, scoreSentence } from '../components/LiveAnnouncer';
 import { realName } from '../core/invite';
@@ -658,18 +664,25 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
   const [editVenue, setEditVenue] = useState('');
   const [editVenueUrl, setEditVenueUrl] = useState('');
   const [editFmt, setEditFmt] = useState<Record<string, FormatVal>>({});
+  // What the form showed when opened (the match's format over today's defaults):
+  // only keys the host CHANGES from this are saved, so re-saving an older match
+  // never stamps it with newer defaults (e.g. basketball shot zones, netball CPR).
+  const [editFmtShown, setEditFmtShown] = useState<Record<string, FormatVal>>({});
   const openEditInfo = () => {
     setEditWhen(meta.startsAt ? new Date(meta.startsAt) : new Date());
     setEditVenue(meta.venueName ?? '');
     setEditVenueUrl(meta.venueMapsUrl ?? '');
-    setEditFmt({ ...defaultsFor(getSport(sport).formatFields ?? []), ...((meta.config as Record<string, FormatVal>) ?? {}) });
+    const shown = { ...defaultsFor(getSport(sport).formatFields ?? []), ...((meta.config as Record<string, FormatVal>) ?? {}) };
+    setEditFmt(shown);
+    setEditFmtShown(shown);
     setEditInfo(true);
   };
   const saveInfo = async () => {
     if (!matchId) return;
     await rescheduleMatch(matchId, { startsAt: editWhen.toISOString(), venueName: editVenue.trim() || null, venueMapsUrl: editVenueUrl.trim() || null });
-    await setMatchFormat(matchId, editFmt as Record<string, number | string | boolean>);
-    setMeta((m) => ({ ...m, startsAt: editWhen.toISOString(), venueName: editVenue.trim() || undefined, venueMapsUrl: editVenueUrl.trim() || undefined, config: editFmt as Record<string, unknown> }));
+    const changed = changedFormatKeys(editFmtShown, editFmt);
+    if (Object.keys(changed).length) await setMatchFormat(matchId, changed as Record<string, number | string | boolean>);
+    setMeta((m) => ({ ...m, startsAt: editWhen.toISOString(), venueName: editVenue.trim() || undefined, venueMapsUrl: editVenueUrl.trim() || undefined, config: { ...((m.config as Record<string, unknown>) ?? {}), ...changed } }));
     setEditInfo(false);
   };
 
@@ -775,7 +788,8 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
     }
   };
 
-  // The live screen splits into Info / Score / Summary tabs for every sport.
+  // The live screen splits into Info · Commentary · Stats · Summary · Scoring
+  // for every sport (match tabs, below); old tab names map via LEGACY_TABS.
   const [tab, setTab] = useParamState<string>('tab', '');
   // null = untouched (an empty team you can fill starts open); 'closed' = user closed them.
   const [infoOpen, setInfoOpen] = useState<'home' | 'away' | 'closed' | null>(null);
@@ -1274,7 +1288,7 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
             <TouchableOpacity style={st.assignBtn} activeOpacity={0.85} accessibilityRole="button" onPress={() => void takeOver()}>
               <Text style={st.assignBtnText}>Take over scoring</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={st.lockWatch} activeOpacity={0.85} accessibilityRole="button" onPress={() => setTab(contentViews[0].key)}>
+            <TouchableOpacity style={st.lockWatch} activeOpacity={0.85} accessibilityRole="button" onPress={() => setTab(watchTab)}>
               <Text style={st.lockWatchText}>Watch live</Text>
             </TouchableOpacity>
           </View>
@@ -1366,30 +1380,38 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
     />
   );
 
-  const renderLiveExtras = (view?: string) => plugin.LiveExtras ? (
-    <plugin.LiveExtras
-      state={state} dispatch={dispatch} canScore={canScore} matchId={matchId}
-      homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor}
-      homeRoster={homeScoreRoster} awayRoster={awayScoreRoster} homeLineup={homeLineup} awayLineup={awayLineup}
-      homeManager={meta.managers?.home} awayManager={meta.managers?.away} view={view}
-      homeFormation={homeFormation} awayFormation={awayFormation}
-      canEditHome={canEditHome} canEditAway={canEditAway} onEditLineup={editSquad}
-      onPlayer={openPlayer}
-    />
-  ) : null;
-  const liveExtrasNode = renderLiveExtras();
+  // Match tabs (2026-10-22): the sport's slots — every one gets the same props
+  // (the old LiveExtras props). docs/sport-depth/deep-wave/match-tabs.md
+  const tabSlots: MatchTabs = plugin.matchTabs ?? {};
+  const slotProps: LiveExtrasProps = {
+    state, dispatch, canScore, matchId,
+    homeName, awayName, homeColor, awayColor,
+    homeRoster: homeScoreRoster, awayRoster: awayScoreRoster, homeLineup, awayLineup,
+    homeManager: meta.managers?.home, awayManager: meta.managers?.away,
+    homeFormation, awayFormation,
+    canEditHome, canEditAway, onEditLineup: editSquad,
+    onPlayer: openPlayer,
+    tournamentName: meta.tournamentName, potmName: potmProp?.name,
+    resultLine: meta.result ? manualResultLine(meta.result, fullHome, fullAway) : undefined,
+  };
+  const renderSlot = (Slot?: React.FC<LiveExtrasProps>) => (Slot ? <Slot {...slotProps} /> : null);
+  // A plugin still on the single legacy widget shows it on the Stats tab.
+  const LegacyExtras = !plugin.matchTabs ? plugin.LiveExtras : undefined;
 
   const homePlaced = homeLineup.filter((s) => s.playerId).length;
   const awayPlaced = awayLineup.filter((s) => s.playerId).length;
-  // Racket sports (2026-10-22): a live doubles serve diagram instead of the
-  // Lineups court — there is nothing to "place" in singles (one player a side,
-  // changing halves every point), so singles shows no court at all.
-  const courtNode = plugin.ServeCourt ? (
+  // Racket sports (2026-10-22): a live doubles serve diagram — the "situation
+  // now" on top of Commentary. It renders nothing in singles (one player a
+  // side, changing halves every point), and a sport with it has no Lineups court.
+  const serveCourtNode = plugin.ServeCourt ? (
     <plugin.ServeCourt
       state={state} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor}
       homeRoster={homeScoreRoster} awayRoster={awayScoreRoster} canScore={canScore} dispatch={dispatch}
     />
-  ) : !plugin.lineupsInExtras && plugin.Court && (homeLineup.length > 0 || awayLineup.length > 0) ? (
+  ) : null;
+  // Info tab — squads & lineups: the sport's own lineups view (football), else
+  // the generic Lineups court for a sport with a court and placed players.
+  const lineupsNode = tabSlots.Info ? renderSlot(tabSlots.Info) : !plugin.ServeCourt && plugin.Court && (homeLineup.length > 0 || awayLineup.length > 0) ? (
     <View style={st.lineups}>
       <View style={st.lineupHeader}>
         <Text style={textStyles.h3}>Lineups</Text>
@@ -1423,24 +1445,40 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
     </Text>
   );
 
-  // Every sport gets the same shape: Info · <content views> · Summary · Scoring
-  // (Scoring is the scorer-only tab holding the live controls, so they don't sit
-  // below every view). A plugin can contribute multiple content views via
-  // `liveViews`; otherwise it gets a single combined Score/Scorecard tab.
-  const liveViews = plugin.liveViews ?? null;
-  const contentViews = liveViews ?? [{ key: 'score', label: plugin.id === 'cricket' ? 'Scorecard' : 'Score' }];
+  // Match tabs (2026-10-22) — every sport gets the same five, one purpose each
+  // and nothing shown in two of them: Info · Commentary · Stats · Summary ·
+  // Scoring. Commentary / Stats show when the sport has them (golf match play
+  // has no Stats); Scoring is the scorer-only tab holding the live controls.
+  // SD-23 fallback: a sport without a Stats slot still gets the shared box score.
+  const fallbackBox = !tabSlots.Stats ? matchBoxSource(sport, state, { homeRoster: homeScoreRoster, awayRoster: awayScoreRoster }) : undefined;
+  const hasCommentary = !!tabSlots.Commentary;
+  const hasStats = !!tabSlots.Stats || !!LegacyExtras || !!fallbackBox;
   const TABS: { key: string; label: string }[] = [
     { key: 'info', label: 'Info' },
-    ...contentViews,
+    ...(hasCommentary ? [{ key: 'commentary', label: 'Commentary' }] : []),
+    ...(hasStats ? [{ key: 'stats', label: 'Stats' }] : []),
     { key: 'summary', label: 'Summary' },
     ...(canScore ? [{ key: 'scoring', label: 'Scoring' }] : []),
   ];
+  // Where a viewer follows play: the feed, else the numbers, else the summary.
+  const watchTab = hasCommentary ? 'commentary' : hasStats ? 'stats' : 'summary';
+  // A viewer lands by the match's state — upcoming → Info, live → Commentary,
+  // finished → Summary — fixed once the match has loaded, so a kick-off or the
+  // final whistle never yanks them off the tab they are reading.
+  const [landing, setLanding] = useState<string | null>(null);
+  const loaded = !hasMatch || (!!meta.status && !syncing);
+  const landingNow = complete ? 'summary' : started || meta.status === 'live' ? watchTab : 'info';
+  useEffect(() => { if (loaded && landing == null) setLanding(landingNow); }, [loaded, landing, landingNow]);
   // Listed scorers land on Scoring; a host does too when nobody else is down to
-  // score. Otherwise a host lands on the match view with Scoring one tap away.
-  const defaultTab = canScore && (iAmListedScorer || scorerIds.length === 0) ? 'scoring' : contentViews[0].key;
-  const activeTab = TABS.some((tb) => tb.key === tab) ? tab : defaultTab;
-  // SD-23: the shared box score source for the Summary tab (undefined: cricket, chess, golf)
-  const summaryBox = activeTab === 'summary' ? matchBoxSource(sport, state, { homeRoster: homeScoreRoster, awayRoster: awayScoreRoster }) : undefined;
+  // score. Otherwise a host lands on the viewer's tab with Scoring one tap away.
+  // A match already over when it opens lands everyone on Summary (one that ends
+  // while scoring keeps the scorer on Scoring — its Undo hold is there).
+  const defaultTab = canScore && (iAmListedScorer || scorerIds.length === 0) && landing !== 'summary' ? 'scoring' : (landing ?? landingNow);
+  // Old tab names (saved params, links): Score / Scorecard / Box score → Stats,
+  // football's Lineups → Info, Timeline / Play-by-play → Commentary.
+  const legacyTab = LEGACY_TABS[tab];
+  const wantedTab = legacyTab ? (TABS.some((tb) => tb.key === legacyTab) ? legacyTab : watchTab) : tab;
+  const activeTab = TABS.some((tb) => tb.key === wantedTab) ? wantedTab : defaultTab;
 
   // Scoring lock: read it on focus and every 15 s on the Scoring tab; an allowed
   // scorer opening a match nobody is scoring takes it silently (resume = no dialog).
@@ -1488,7 +1526,12 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
       notice('Couldn’t hand over', e instanceof Error ? e.message : 'Please try again.');
     }
   };
-  const scrollTabs = TABS.length > 3;
+  // All five match tabs fit across a phone (a scrolling bar hid "Scoring" off
+  // the right edge at 375 px): each tab is as wide as its label, the spare
+  // width shared out; under 360 px the labels drop a size.
+  const { width: winW } = useWindowDimensions();
+  const scrollTabs = TABS.length > 5;
+  const tightTabs = winW < 360;
     const fmt = meta.config ?? {};
     const dateStr = meta.startsAt ? formatDateTime(meta.startsAt, viewerTz) : '—';
     // Countdown for an upcoming match — "adding to calendar" only makes sense before
@@ -2162,38 +2205,49 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
             <View style={st.tabBar}>
               {TABS.map((t) => (
                 <TouchableOpacity key={t.key} style={[st.tab, activeTab === t.key && st.tabActive]} activeOpacity={0.8} accessibilityRole="tab" accessibilityLabel={t.label} accessibilityState={{ selected: activeTab === t.key }} aria-selected={activeTab === t.key} onPress={() => setTab(t.key)}>
-                  <Text style={[st.tabText, activeTab === t.key && st.tabTextActive]}>{t.label}</Text>
+                  <Text numberOfLines={1} style={[st.tabText, tightTabs && st.tabTextTight, activeTab === t.key && st.tabTextActive]}>{t.label}</Text>
                 </TouchableOpacity>
               ))}
             </View>
           )}
 
-          {/* A plugin-contributed content view (e.g. football Lineups/Stats/Timeline). */}
-          {liveViews && liveViews.some((v) => v.key === activeTab) && renderLiveExtras(activeTab)}
-
-          {/* The combined Score/Scorecard tab for sports without explicit views. */}
-          {!liveViews && activeTab === 'score' && (
-            <>
-              {liveExtrasNode}
-              {courtNode}
-            </>
+          {/* Commentary — the live event-by-event feed only, with a small
+              "situation now" on top (racket doubles' serve diagram, cricket's
+              This over). Key moments are a filter inside the feed. */}
+          {activeTab === 'commentary' && (
+            <View style={{ gap: theme.spacing(3) }}>
+              {serveCourtNode}
+              {renderSlot(tabSlots.Situation)}
+              {renderSlot(tabSlots.Commentary)}
+            </View>
           )}
 
-          {/* The scorer's controls live on their own tab now. */}
+          {/* Stats — team comparison, box scores / scorecards, charts and their
+              period / category filters; then the shared Game flow (SD-50). */}
+          {activeTab === 'stats' && (
+            <View style={{ gap: theme.spacing(3) }}>
+              {tabSlots.Stats ? renderSlot(tabSlots.Stats) : LegacyExtras ? <LegacyExtras {...slotProps} /> : null}
+              {/* SD-23 fallback: the shared box score (+ team comparison) for a
+                  sport without a Stats slot of its own. */}
+              {started && fallbackBox ? (
+                <MatchBoxScore
+                  sport={sport} source={fallbackBox} homeName={homeName} awayName={awayName}
+                  homeColor={homeColor} awayColor={awayColor} onPlayer={openPlayer}
+                />
+              ) : null}
+              {/* SD-50: game flow (lead changes, times tied, runs, bench points) —
+                  running-score sports only; renders nothing otherwise. */}
+              {started && !tabSlots.ownGameFlow ? (
+                <GameFlowCard sport={sport} state={state} homeName={homeName} awayName={awayName}
+                  homeColor={homeColor} awayColor={awayColor} homeLineup={homeLineup} awayLineup={awayLineup} />
+              ) : null}
+            </View>
+          )}
+
+          {/* Scoring — the scorer's controls only (the match identity, the
+              result and the stats live on their own tabs). */}
           {activeTab === 'scoring' && (
             <>
-              <View style={st.infoCard}>
-                <MatchHeader
-                  sportIcon={plugin.icon} sportName={plugin.name}
-                  statusLabel={statusLabel} matchLive={matchLive} complete={complete}
-                  homeName={homeTeamName ?? homeName} awayName={awayTeamName ?? awayName}
-                  homeColor={homeColor} awayColor={awayColor}
-                  hasMatch={hasMatch} logoUrl={meta.logoUrl} canManage={canManage}
-                  onPickLogo={async (url) => { if (matchId) { await setMatchLogo(matchId, url); setMeta((m) => ({ ...m, logoUrl: url })); } }}
-                  onTeamPress={meta.homeTeamId && meta.awayTeamId ? openSide : undefined}
-                  teamLinkLabel={soloSides ? 'Player profile ›' : 'Team profile ›'}
-                />
-              </View>
               {matchId && canScore && (lostTo || rejectedCount > 0) ? (
                 <View style={[st.syncBanner, st.syncOffline]}>
                   <View style={{ flex: 1 }}>
@@ -2226,7 +2280,6 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
                   />
                 )
               )}
-              {retiredBanner}
               {resultHoldNote}
               {undoBar}
               {liveEditBar}
@@ -2240,6 +2293,8 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
                 />
               )}
               {!retiredLocally && controlsNode}
+              {/* After the match: a sport's tidy-up tools (chess: attach the moves). */}
+              {complete && canScore ? renderSlot(tabSlots.AfterMatch) : null}
               {/* ☰ Quick options (parity #13): breaks, squad, scorer, scorecard, sport tiles. */}
               {canScore && started && !complete && !retiredLocally && (
                 <TouchableOpacity style={st.quickBar} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel="Quick options" onPress={() => setQuickOpen(true)}>
@@ -2251,9 +2306,9 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
             </>
           )}
 
+          {/* Info — when · where · format · hosts / officials · squads & lineups. */}
           {activeTab === 'info' && (
             <View style={{ gap: theme.spacing(3) }}>
-              {meta.result ? retiredBanner : null}
               {correctionCard}
               <View style={st.infoCard}>
                 <MatchHeader
@@ -2357,6 +2412,7 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
               <Text style={textStyles.h3}>Matchday squads</Text>
               {squadCard('home')}
               {squadCard('away')}
+              {lineupsNode}
               {hasMatch && (isHost || canScore) && (
                 <View style={st.infoCard}>
                   <InfoRow icon="🔁" label="Clone match" value="Same teams, squads & rules ›"
@@ -2368,21 +2424,14 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
             </View>
           )}
 
+          {/* Summary — the result and the people: the result line, Player of
+              the Match, awards / top performers and the ratings (provisional
+              while live). No stats tables here — they are on Stats. */}
           {activeTab === 'summary' && (
             <View style={{ gap: theme.spacing(3) }}>
-              {meta.result ? retiredBanner : null}
-              <View style={st.infoCard}>
-                <MatchHeader
-                  sportIcon={plugin.icon} sportName={plugin.name}
-                  statusLabel={statusLabel} matchLive={matchLive} complete={complete}
-                  homeName={homeTeamName ?? homeName} awayName={awayTeamName ?? awayName}
-                  homeColor={homeColor} awayColor={awayColor}
-                  hasMatch={hasMatch} logoUrl={meta.logoUrl} canManage={canManage}
-                  onPickLogo={async (url) => { if (matchId) { await setMatchLogo(matchId, url); setMeta((m) => ({ ...m, logoUrl: url })); } }}
-                  onTeamPress={meta.homeTeamId && meta.awayTeamId ? openSide : undefined}
-                  teamLinkLabel={soloSides ? 'Player profile ›' : 'Team profile ›'}
-                />
-              </View>
+              {/* a match closed by hand: its result line (a sport's own Summary
+                  shows it itself — manualResultLine) */}
+              {plugin.Summary ? null : retiredBanner}
               {plugin.Summary ? (
               <plugin.Summary
                 state={state} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor}
@@ -2397,26 +2446,11 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
                 summary={shownSummary} scoreLine={fullLine || undefined} complete={complete} live={matchLive}
                 onPlayer={(pid) => navigation.navigate('PlayerProfile', { playerId: pid })}
                 potm={potmProp}
+                afterResult={renderSlot(tabSlots.SummaryExtras)}
               />
               )}
-              {/* SD-23: the same box score (+ team comparison) on every sport's
-                  Summary — cricket keeps its innings scorecard. */}
-              {started && summaryBox ? (
-                <View style={{ gap: theme.spacing(2) }}>
-                  <Text style={textStyles.h3}>Box score</Text>
-                  <MatchBoxScore
-                    sport={sport} source={summaryBox} homeName={homeName} awayName={awayName}
-                    homeColor={homeColor} awayColor={awayColor}
-                    onPlayer={(pid) => navigation.navigate('PlayerProfile', { playerId: pid })}
-                  />
-                </View>
-              ) : null}
-              {/* SD-50: game flow (lead changes, times tied, runs, bench points) —
-                  running-score sports only; renders nothing otherwise. */}
-              {started ? (
-                <GameFlowCard sport={sport} state={state} homeName={homeName} awayName={awayName}
-                  homeColor={homeColor} awayColor={awayColor} homeLineup={homeLineup} awayLineup={awayLineup} />
-              ) : null}
+              {/* a sport with its own Summary: its result detail below it */}
+              {plugin.Summary ? renderSlot(tabSlots.SummaryExtras) : null}
               {canChangePotm && (homeRoster.length > 0 || awayRoster.length > 0) ? (
                 <Button variant="ghost" label="Change Player of the Match" onPress={() => setPotmOpen(true)} />
               ) : null}
@@ -2430,9 +2464,6 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
                 ]}
                 onPick={(r) => void changePotm(r)}
               />
-              {officials.available && officials.list.length > 0 && (
-                <Text style={[textStyles.muted, { textAlign: 'center' }]}>{officialsLine(officials.list, sport)}</Text>
-              )}
             </View>
           )}
 
@@ -2444,7 +2475,7 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
           onBreak={(kind, note) => void startBreak(kind, note)}
           onSquad={hasMatch && canEditSquad ? (sd) => void editSquad(sd) : undefined}
           onScorer={hasMatch ? () => setTab('info') : undefined}
-          onScorecard={() => setTab(contentViews[0].key)}
+          onScorecard={() => setTab(hasStats ? 'stats' : watchTab)}
           settingsPanel={showLiveSettings && !complete ? liveSettingsCard((msg) => { setQuickOpen(false); setToast(msg); }) : undefined}
           pluginTiles={plugin.QuickOptions ? (
             <plugin.QuickOptions
@@ -2464,6 +2495,14 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
       </SafeAreaView>
     );
 }
+
+/** Match tabs (2026-10-22): the tab names before the five-tab layout, mapped to
+ *  where their content lives now (saved `tab` params, old links). */
+const LEGACY_TABS: Record<string, string> = {
+  score: 'stats', scorecard: 'stats', box: 'stats',
+  lineups: 'info',
+  timeline: 'commentary', pbp: 'commentary', feed: 'commentary',
+};
 
 /** Up to two initials from a name, for the scorer avatar. */
 function scorerInitials(name?: string): string {
@@ -2503,6 +2542,8 @@ function formatLine(sport: SportId, fmt: Record<string, unknown>): string {
   if (sport === 'netball' && fmt.periodMinutes != null) parts.push(`${fmt.periods ?? 4} × ${fmt.periodMinutes} min`);
   if (sport === 'american_football' && fmt.periodMinutes != null) parts.push(`${fmt.variant === 'tackle' ? 'Tackle' : 'Flag'} · ${fmt.periods ?? (fmt.variant === 'tackle' ? 4 : 2)} × ${fmt.periodMinutes} min`);
   if (sport === 'rugby' && fmt.periodMinutes != null) parts.push(`${fmt.variant === '7s' ? 'Sevens · ' : fmt.variant === '10s' ? 'Tens · ' : ''}2 × ${fmt.periodMinutes} min`);
+  // (the "13-a-side" / "9-a-side" part above already names the variant)
+  if (sport === 'rugby_league' && fmt.periodMinutes != null) parts.push(`2 × ${fmt.periodMinutes} min${fmt.decider === 'gp' ? ' · golden point' : fmt.decider === 'gpFinal' ? ' · golden point to a score' : ''}`);
   return parts.length ? parts.join(' · ') : '—';
 }
 
@@ -2628,11 +2669,12 @@ const st = StyleSheet.create({
   content: { padding: theme.spacing(4), gap: theme.spacing(4) },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   tabBar: { flexDirection: 'row', backgroundColor: theme.colors.surfaceAlt, borderRadius: theme.radius.pill, padding: 3 },
-  tab: { flex: 1, paddingVertical: theme.spacing(2), borderRadius: theme.radius.pill, alignItems: 'center' },
+  tab: { flexGrow: 1, flexShrink: 1, flexBasis: 'auto', paddingVertical: theme.spacing(2), paddingHorizontal: theme.spacing(1.5), borderRadius: theme.radius.pill, alignItems: 'center' },
   tabScroll: { gap: theme.spacing(1), backgroundColor: theme.colors.surfaceAlt, borderRadius: theme.radius.pill, padding: 3 },
   tabChip: { paddingVertical: theme.spacing(2), paddingHorizontal: theme.spacing(4), borderRadius: theme.radius.pill, alignItems: 'center' },
   tabActive: { backgroundColor: theme.colors.primary },
   tabText: { color: theme.colors.textMuted, fontSize: theme.font.small, fontWeight: '700' },
+  tabTextTight: { fontSize: 11 },
   tabTextActive: { color: '#06120D', fontWeight: '800' },
   infoCard: { backgroundColor: theme.colors.surface, borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.colors.border, padding: theme.spacing(4), gap: theme.spacing(2), ...theme.shadow.card },
   infoRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: theme.spacing(3), paddingVertical: theme.spacing(1) },

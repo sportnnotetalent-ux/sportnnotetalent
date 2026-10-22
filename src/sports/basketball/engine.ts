@@ -132,6 +132,19 @@ export const init = (config?: Record<string, unknown>): BasketballState => ({
   ...(config?.trackFoulsDrawn != null ? { trackFoulsDrawn: config.trackFoulsDrawn === true } : {}),
 });
 
+/** Court-team round 2 — the "Stats to track" standards for a NEW match: the
+ *  format editor's defaults and the live settings' "Standard". The shot-zone
+ *  buttons (+2 Paint · +2 Mid · +3 Corner · +3 Top; 3×3: +1 / +2) are the
+ *  default scoring layout (founder 2026-10-22); switched off, the plain
+ *  +2 / +3 row comes back. Missed shots, fast breaks and fouls drawn stay
+ *  opt-in. `init` never applies these: a stored config without the key —
+ *  every match made before — keeps the layout it was scored with. */
+export const BB_TRACK_DEFAULTS = { trackMisses: false, trackZones: true, trackFastBreak: false, trackFoulsDrawn: false } as const;
+
+/** The scoring buttons a match shows: the zone buttons only when its format
+ *  says so (`trackZones: true`); absent or off = plain +2 / +3. */
+export const scoringLayout = (s: Pick<BasketballState, 'trackZones'>): 'zones' | 'plain' => (s.trackZones === true ? 'zones' : 'plain');
+
 /* ------------------------------ SD-132 clock ------------------------------- */
 
 /** Length of period `q` in seconds (regulation, else overtime). */

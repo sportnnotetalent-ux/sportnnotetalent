@@ -6,10 +6,10 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { theme } from '../../core/theme';
 import { SelectChip, textStyles } from '../ui';
-import { GOLF_TRACK_KEYS, type GolfTrackKey, type Hole } from '../../sports/golf/engine';
-import { GOLF_TRACK_LABEL, cleanTrack } from '../../sports/golf/track';
+import { GOLF_TRACK_KEYS, type DistUnit, type GolfTrackKey, type Hole } from '../../sports/golf/engine';
+import { GOLF_TRACK_LABEL, cleanTrack, trackHint } from '../../sports/golf/track';
 
-export function GolfTrackCard({ track, roundTrack, isHost, holes, driveHoles, onRound, onPhone }: {
+export function GolfTrackCard({ track, roundTrack, isHost, holes, driveHoles, onRound, onPhone, unit = 'yd', onUnit }: {
   /** what this marker tracks now */
   track: GolfTrackKey[];
   /** the round's own setting (null = none: the phone decides) */
@@ -21,14 +21,18 @@ export function GolfTrackCard({ track, roundTrack, isHost, holes, driveHoles, on
   onRound: (track: GolfTrackKey[], driveHoles: number[]) => void;
   /** a marker: save on this phone */
   onPhone: (track: GolfTrackKey[]) => void;
+  /** Round 2 — the round's distance unit (yards by default) */
+  unit?: DistUnit;
+  /** Round 2 — organiser: switch the round to yards / metres */
+  onUnit?: (unit: DistUnit) => void;
 }) {
   const [open, setOpen] = useState(false);
   const editable = isHost || !roundTrack;
   const save = (next: GolfTrackKey[], dh = driveHoles) => (isHost ? onRound(cleanTrack(next), dh) : onPhone(cleanTrack(next)));
   const toggle = (k: GolfTrackKey) => {
     const on = track.includes(k);
-    // first-putt length needs putts; switching putts off drops it too
-    const next = on ? track.filter((x) => x !== k && !(k === 'putts' && x === 'firstPutt')) : [...track, k];
+    // first-putt length and up and downs need putts; switching putts off drops them too
+    const next = on ? track.filter((x) => x !== k && !(k === 'putts' && (x === 'firstPutt' || x === 'upDown'))) : [...track, k];
     save(next);
   };
   const who = roundTrack ? (isHost ? 'for every marker in this round' : 'set by the organiser') : isHost ? 'for every marker in this round' : 'on this phone';
@@ -46,10 +50,18 @@ export function GolfTrackCard({ track, roundTrack, isHost, holes, driveHoles, on
           <View style={st.chips}>
             {GOLF_TRACK_KEYS.map((k) => (
               <SelectChip key={k} label={GOLF_TRACK_LABEL[k].label} active={track.includes(k)} disabled={!editable} onPress={() => toggle(k)}
-                accessibilityLabel={`${GOLF_TRACK_LABEL[k].label}: ${GOLF_TRACK_LABEL[k].hint}`} />
+                accessibilityLabel={`${GOLF_TRACK_LABEL[k].label}: ${trackHint(k, unit)}`} />
             ))}
           </View>
-          {track.map((k) => <Text key={k} style={st.hint}>• {GOLF_TRACK_LABEL[k].label}: {GOLF_TRACK_LABEL[k].hint}</Text>)}
+          {track.map((k) => <Text key={k} style={st.hint}>• {GOLF_TRACK_LABEL[k].label}: {trackHint(k, unit)}</Text>)}
+          {/* Round 2 — yards (default) or metres, for every marker in the round */}
+          {(track.includes('drive') || track.includes('firstPutt')) && (isHost && onUnit ? (
+            <View style={st.chips}>
+              <Text style={st.hint}>Distances in</Text>
+              <SelectChip label="Yards" active={unit === 'yd'} onPress={() => unit !== 'yd' && onUnit('yd')} accessibilityLabel="Distances in yards" />
+              <SelectChip label="Metres" active={unit === 'm'} onPress={() => unit !== 'm' && onUnit('m')} accessibilityLabel="Distances in metres" />
+            </View>
+          ) : unit === 'm' ? <Text style={st.hint}>Distances are in metres (set by the organiser).</Text> : null)}
           {track.includes('drive') && isHost && long.length > 0 && (
             <View style={{ gap: theme.spacing(1) }}>
               <Text style={st.hint}>Measured holes (the PGA TOUR measures two, played in opposite directions). None picked = any par 4 / 5.</Text>

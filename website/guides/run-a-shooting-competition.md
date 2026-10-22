@@ -17,7 +17,7 @@ A shooting competition is a list of events, such as 10 m Air Rifle Junior Men. E
 
 ## Step by step: add an event
 1. Open the tournament, then **Manage** → **Shooting — events**, and tap **＋ Add a shooting event**.
-2. **Event:** pick the event, for example **10 m Air Rifle** or **10 m Air Pistol**.
+2. **Event:** pick the event, for example **10 m Air Rifle** or **10 m Air Pistol**. The list also has 50 m Rifle Prone, 25 m Standard Pistol, 25 m Centre-Fire Pistol and 50 m Pistol (none of these has a final), and, under **NRAI school classes**, 10 m Peep Sight and 10 m Open Sight Air Rifle (40 shots by default).
 3. Pick **Senior**, **Junior**, **Youth** or **School**, then **Men** or **Women** (Boys or Girls for youth and school).
 4. **Match:** the ISSF length is marked **(ISSF)**. Youth and school start on a shorter match, such as 40 shots, which keeps its own records and PBs.
 5. **Shooters:** tap a house or search any player, then tap each shooter. For a mixed team, tap two shooters for each team, in order.
@@ -44,6 +44,7 @@ A shooting competition is a list of events, such as 10 m Air Rifle Junior Men. E
 4. If the lowest totals are level, the card switches to **Shoot-off**. Each tied shooter fires one shot; the lowest goes out. If they are level again, they fire again. Shoot-off shots are not added to the total.
 5. On the last shot (24 for 10 m), the higher total wins gold. A tie for gold is also shot off.
 6. To fix a shot, tap the finalist under **Correct a shot**, tap the shot, then type the new value and tap **Set shot**. A shot fired before an elimination asks first, because the places may change.
+   With **Penalties** switched on, the same place gives a penalty: tap the shot it was given on, then **−2** (or **−1 dry fire**). The points come off that shot, never below 0, and the totals and eliminations follow.
 7. When the card says **Final complete**, tap **🏁 Finish & lock results**.
 
 ## How places are decided

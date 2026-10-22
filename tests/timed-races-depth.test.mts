@@ -75,7 +75,8 @@ describe('where intermediate times are read', () => {
 
 describe('"Stats to track" — off by default, swimming splits as before', () => {
   test('raceTracking reads the sport settings; everything new is off unless switched on', () => {
-    assert.deepEqual(raceTracking('athletics', {}), { reaction: false, lapSplits: false, relayLegs: false, splits: false, takeovers: false, cycSplits: false, chipTimes: false });
+    // round 2: + where the lap times are read (finish-line passes by default)
+    assert.deepEqual(raceTracking('athletics', {}), { reaction: false, lapSplits: false, relayLegs: false, splits: false, takeovers: false, cycSplits: false, chipTimes: false, lapPoints: 'finish' });
     assert.equal(raceTracking('swimming', {}).splits, true);
     assert.equal(raceTracking('swimming', { splits: false }).splits, false);
     assert.equal(raceTracking('rowing', {}).splits, false);

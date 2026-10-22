@@ -12,7 +12,8 @@
  *     move list (the player's own moves);
  *   clkMoves / thinkSecs — the thinking time per move, from the clocks
  *     recorded with the moves.
- * A knockout mini-match (several games in one fixture) writes none of them.
+ * A knockout mini-match (several games in one fixture): round 2 — the games
+ * kept with their own move list, summed (an older knockout match: none).
  */
 import type { StatTotalsContext, StatTotalsEntry } from '../types';
 import { isDoubleForfeit, isForfeit, listMoves, type ChessState, type Side } from './engine.ts';
@@ -39,14 +40,28 @@ export function chessSideFigures(s: ChessState, side: Side): Record<string, numb
   return out;
 }
 
+/** Round 2 — a knockout match: each game kept with its own move list counts
+ *  as a game (summed per side); games without a list write nothing, so every
+ *  older knockout match still writes none. */
+export function chessKoFigures(s: ChessState, side: Side): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const g of s?.ko?.games ?? []) {
+    if (!g.game?.san.length) continue;
+    const one: ChessState = { white: g.white, timeControl: s.timeControl, ...(s.tcExact ? { tcExact: s.tcExact } : {}), winner: g.winner, ...(g.method ? { method: g.method } : {}),
+      ...(g.moves ? { moves: g.moves } : {}), ended: true, seq: 0, game: g.game };
+    for (const [k, v] of Object.entries(chessSideFigures(one, side))) out[k] = (out[k] ?? 0) + v;
+  }
+  return out;
+}
+
 /** The plugin's `statTotals`: each side's player (ctx) gets their figures. */
 export function chessStatTotals(s: ChessState, ctx?: StatTotalsContext): Record<string, StatTotalsEntry> {
   const out: Record<string, StatTotalsEntry> = {};
-  if (!s || s.ko) return out;
+  if (!s) return out;
   for (const side of ['home', 'away'] as Side[]) {
     const id = ctx?.players?.[side]?.[0]?.id;
     if (!id) continue;
-    const figs = chessSideFigures(s, side);
+    const figs = s.ko ? chessKoFigures(s, side) : chessSideFigures(s, side);
     if (Object.keys(figs).length) out[id] = { side, stats: figs };
   }
   return out;

@@ -513,6 +513,13 @@ const BODY_PRESETS: Record<string, PointsPreset[]> = {
     preset('sevens', 'Sevens 3-2-1', '3 a win, 2 a draw, 1 a loss, 0 a no-show; ties: head-to-head, points difference, try difference, points, lots',
       { winPoints: 3, drawPoints: 2, lossPoints: 1, forfeitLossPoints: 0, tieBreak: 'h2h,diff,triesDiff,for,lots' }),
   ],
+  // Rugby league — NRL / Super League ladder: 2 a win, 1 a draw (a golden-point
+  // draw included), 0 a loss; ties on points difference, then points scored
+  // (NRL — verify per competition; the NRL also gives 2 for a bye).
+  rugby_league: [
+    preset('nrl', 'NRL / Super League 2-1-0', '2 a win, 1 a draw, 0 a loss; ties: points difference, points scored, lots',
+      { winPoints: 2, drawPoints: 1, lossPoints: 0, tieBreak: 'diff,for,lots' }),
+  ],
 };
 
 /** Chess (SD-26): the FIDE Swiss order and the elite round-robin order, both

@@ -86,7 +86,7 @@ export function sentence(s: RugbyState, e: RugbyEvent, names: Names): { text: st
     case 'tally':
       switch (e.tally) {
         case 'penalty': return { icon: '⚖', tags: ['disc'], text: `Penalty conceded by ${who}${e.infringement ? ` — ${OFFENCE_TEXT[e.infringement]}` : ''}.` };
-        case 'freeKick': return { icon: '🏳', tags: ['disc'], text: `Free kick against ${team}.` };
+        case 'freeKick': return { icon: '🏳', tags: ['disc'], text: `Free kick against ${team}${e.playerName ? ` — conceded by ${e.playerName}` : ''}.` };
         case 'turnover': return { icon: '🔄', tags: ['detail'], text: `Turnover conceded by ${who}${e.cause ? ` — ${CAUSE_TEXT[e.cause]}` : ''}.` };
         case 'entry': return { icon: '⏩', tags: ['detail'], text: `${team} get into the ${opp} 22.` };
         default: return { icon: '🤲', tags: ['detail'], text: `Offload by ${who}.` };

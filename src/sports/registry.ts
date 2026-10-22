@@ -33,6 +33,7 @@ import { iceHockeyPlugin } from './ice_hockey';
 import { netballPlugin } from './netball';
 import { americanFootballPlugin } from './american_football';
 import { rugbyPlugin } from './rugby';
+import { rugbyLeaguePlugin } from './rugby_league';
 import { baseballPlugin } from './baseball';
 import { STAT_SCHEMAS } from './statSchemas';
 import { MATCH_RECORD_HOOKS } from './matchRecordHooks';
@@ -68,6 +69,7 @@ export const SPORTS: Record<SportId, SportPlugin<any>> = {
   netball: netballPlugin,
   american_football: americanFootballPlugin,
   rugby: rugbyPlugin,
+  rugby_league: rugbyLeaguePlugin,
   baseball: baseballPlugin,
 };
 

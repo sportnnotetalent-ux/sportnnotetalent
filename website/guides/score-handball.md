@@ -62,8 +62,9 @@ Off by default. Switch on in **⚙️ Match settings → Stats to track** (organ
 - **7 m won by**: after **🎯 7 m**, tap who won it, or **Skip**.
 
 ## What you get
-- **Score** tab → **📝 Commentary**: the live text half by half with the match clock and the score after every moment, and a summary on top (top scorers, HT). **Key events** keeps goals, 7 m, sanctions and time-outs.
-- **📊 Match stats**: **Top stats**, **Shooting** (goals and % from each position), **Goalkeeping** (save % overall and from 6 m, 9 m, wing, breakthrough, fast break and 7 m), **Ball & defence**, **Discipline**, for the match or one half, then each player's line.
+- **Commentary** tab: the live text half by half with the match clock and the score after every moment. **Key events** keeps goals, 7 m, sanctions and time-outs.
+- **Stats** tab: **Top stats**, **Shooting** (goals and % from each position), **Goalkeeping** (save % overall and from 6 m, 9 m, wing, breakthrough, fast break and 7 m), **Ball & defence**, **Discipline**, for the match or one half, then each player's line, and the game flow.
+- **Summary** tab: the result with the match facts (scorers, sendings-off, HT), Player of the Match and every player's rating.
 - Player profiles: goals per game, shooting %, 7 m %, goals by type, keeper save % (also by position), discipline.
 - Tournament tables use **IHF 2-1-0** (ties: head-to-head points, then head-to-head goal difference and goals, then overall), or **Simple 2-1-0**. See [Points table and adjustments](/guides/points-table-and-adjustments/).
 

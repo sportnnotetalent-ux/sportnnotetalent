@@ -159,12 +159,14 @@ describe('deep wave · optional tallies (penalties, free kicks, turnovers, 22 en
     assert.equal(bad.events[0].infringement, undefined, 'an unknown offence is dropped');
     assert.equal(bad.events[1].playerId, undefined, 'a 22 entry is the team\'s');
   });
-  test('credits: penalty → penaltiesGivenAway, turnover → turnoversConceded, offload → offloads; free kicks and entries none', () => {
+  test('credits: penalty → penaltiesGivenAway, turnover → turnoversConceded, offload → offloads; 22 entries none (round 2: a named free kick → freeKicksConceded)', () => {
     assert.deepEqual(eventCredits({ type: 'tally', tally: 'penalty', playerId: 'a7' }).first?.stats, { penaltiesGivenAway: 1 });
     assert.deepEqual(eventCredits({ type: 'tally', tally: 'turnover', playerId: 'h9' }).first?.stats, { turnoversConceded: 1 });
     assert.deepEqual(eventCredits({ type: 'tally', tally: 'offload', playerId: 'h12' }).first?.stats, { offloads: 1 });
     assert.deepEqual(eventCredits({ type: 'tally', tally: 'entry', playerId: 'h1' }), {});
-    assert.deepEqual(eventCredits({ type: 'tally', tally: 'freeKick', playerId: 'h1' }), {});
+    // round 2 (founder): free kicks credit a player (optional) — was {} (team only)
+    assert.deepEqual(eventCredits({ type: 'tally', tally: 'freeKick', playerId: 'h1' }).first?.stats, { freeKicksConceded: 1 });
+    assert.equal(eventCredits({ type: 'tally', tally: 'freeKick' }).first, undefined, 'a team free kick credits nobody');
   });
   test('statTotals = live sums on every prefix; tracked keys read 0 for everyone else', () => {
     const t = assertContract(SPORT, records, { every: 1 });

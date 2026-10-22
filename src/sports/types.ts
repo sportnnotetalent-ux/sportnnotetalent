@@ -144,9 +144,9 @@ export interface ScoringControlsProps<S> {
 }
 
 /**
- * Optional rich, viewer-visible widget a sport can render on the live match
- * page beneath the scoreboard (e.g. football's pitch map). The generic screen
- * stays sport-agnostic; only plugins that set this render anything.
+ * The props every match-tab slot gets (`MatchTabs`; the legacy `LiveExtras`
+ * takes the same). The generic screen stays sport-agnostic; only plugins that
+ * fill a slot render anything in it.
  */
 export interface LiveExtrasProps {
   /** current match state (sport-specific shape) — for clocks, timelines, etc. */
@@ -160,7 +160,7 @@ export interface LiveExtrasProps {
   awayRoster?: Player[];
   homeLineup?: LineupSlot[];
   awayLineup?: LineupSlot[];
-  /** when the plugin declares `liveViews`, which one to render (e.g. 'lineups') */
+  /** legacy: a view key for an old LiveExtras (match-tab slots ignore it) */
   view?: string;
   /** optional team managers/coaches (shown in the lineups view) */
   homeManager?: string;
@@ -178,6 +178,56 @@ export interface LiveExtrasProps {
   /** dispatch + write permission, for post-match actions like Player of the Match */
   dispatch?: (action: ScoreAction) => void;
   canScore?: boolean;
+  /** the match's tournament, Player of the Match and — for a match closed by
+   *  hand — its result line (for share cards: cricket's WhatsApp card) */
+  tournamentName?: string;
+  potmName?: string;
+  resultLine?: string;
+}
+
+/**
+ * Match tabs (2026-10-22, the founder's decision) — every head-to-head match
+ * (LiveScoringScreen) shows the same five tabs, each with ONE purpose, and no
+ * piece of information appears in two of them. The scoreboard header above
+ * the tabs is shared by all five.
+ *
+ *   Info        when · where · format · hosts / officials · squads & lineups
+ *   Commentary  the live event-by-event feed only (+ a "situation now" widget)
+ *   Stats       team comparison, box scores / scorecards, charts, filters
+ *   Summary     the result and the people: result line, ratings, Player of
+ *               the Match, awards (while live: provisional ratings)
+ *   Scoring     scorer controls only (scorers / hosts)
+ *
+ * A sport fills the slots it has; LiveScoringScreen places them and adds the
+ * shared pieces (Info cards, the Lineups court, the serve diagram, Game flow,
+ * the result + ratings, the scorer controls). Commentary / Stats show only
+ * when the sport fills them. Contract: docs/sport-depth/deep-wave/match-tabs.md.
+ */
+export interface MatchTabs {
+  /** Info tab, under the matchday squads: the sport's own lineups view
+   *  (football's formation pitch with bench and managers) or a match-setup
+   *  fact (golf's handicap strokes). Absent → the generic Lineups court when
+   *  the sport has a `Court` (and no `ServeCourt`). */
+  Info?: React.FC<LiveExtrasProps>;
+  /** Commentary tab, on top: a small "situation now" widget (cricket's This
+   *  over). Racket doubles get `ServeCourt` there without filling this. */
+  Situation?: React.FC<LiveExtrasProps>;
+  /** Commentary tab: the event-by-event feed only. "Key moments" is a filter
+   *  inside the feed, never its own view. */
+  Commentary?: React.FC<LiveExtrasProps>;
+  /** Stats tab: team comparison, box scores / scorecards, charts and period /
+   *  category filters (a sub-switch of its own if needed — `SubViews`). The
+   *  screen adds the shared Game flow card (SD-50) under it. */
+  Stats?: React.FC<LiveExtrasProps>;
+  /** The sport's Stats already shows game flow (kabaddi's match centre has a
+   *  Game flow category) — the screen skips the shared card. */
+  ownGameFlow?: boolean;
+  /** Summary tab, under the result, Player of the Match and ratings: the
+   *  result's own detail (the invasion sports' scorers / sendings-off). */
+  SummaryExtras?: React.FC<LiveExtrasProps>;
+  /** Scoring tab, after the match (scorers only): tidy-up that isn't live
+   *  scoring (chess attaches the move list / PGN and the opening). */
+  AfterMatch?: React.FC<LiveExtrasProps>;
 }
 
 /** Props for a sport-supplied scoreboard replacement. */
@@ -393,7 +443,10 @@ export interface SportPlugin<S = unknown> {
   standingsUnits?: (state: S) => import('../data/standings').StandingsUnits | null;
   /** The scorer's control panel for this sport. */
   ScoringControls: React.FC<ScoringControlsProps<S>>;
-  /** Optional rich widget shown on the live page (e.g. football pitch map). */
+  /** The match tabs' sport slots (Commentary, Stats, …) — see `MatchTabs`. */
+  matchTabs?: MatchTabs;
+  /** Legacy single live widget, for a plugin without `matchTabs`: the screen
+   *  shows it on the Stats tab (so nothing disappears). Prefer `matchTabs`. */
   LiveExtras?: React.FC<LiveExtrasProps>;
   /** Optional live widget rendered inside the scoreboard (e.g. a match clock). */
   LiveClock?: React.FC<{ state: unknown }>;
@@ -403,22 +456,14 @@ export interface SportPlugin<S = unknown> {
    * innings board) render their own; the live screen uses this when present.
    */
   Scoreboard?: React.FC<ScoreboardProps>;
-  /** Suppress the top scoreboard (e.g. cricket, whose scorecard shows the score). */
+  /** Suppress the scoreboard header above the tabs. No sport sets it since
+   *  the match tabs: the header stays on top of every tab (cricket's
+   *  scorecard, which used to stand in for it, moved into Stats). */
   hideScoreboard?: boolean;
-  /** The sport renders its own lineups inside LiveExtras (e.g. football's LINEUPS
-   *  sub-tab), so the live screen skips the generic court to avoid duplication. */
-  lineupsInExtras?: boolean;
   /**
-   * Optional content views the plugin contributes as their own top-level tabs on
-   * the live screen (e.g. football → Lineups / Stats / Timeline). The live screen
-   * renders each by calling `LiveExtras` with that view's `key`. When omitted, the
-   * sport keeps the single combined "Score" tab.
-   */
-  liveViews?: { key: string; label: string }[];
-  /**
-   * Optional post-match summary (best performances, MVP, per-player ratings).
-   * Sports without one fall back to the generic stat-line summary; either way
-   * the live screen splits into Info / Score / Summary tabs.
+   * Optional Summary-tab body (the result, Player of the Match, top
+   * performers, per-player ratings — provisional while live). Sports without
+   * one get the generic stat-line summary (components/MatchSummary.tsx).
    */
   Summary?: React.FC<SummaryProps>;
   /** With a Summary: the Player of the Match it shows when there is no stored
@@ -452,8 +497,9 @@ export interface SportPlugin<S = unknown> {
   formation?: (perSide?: number) => LineupSlot[];
   Court?: React.FC<CourtProps>;
   /** Racket doubles (2026-10-22): a live serve diagram derived from the score
-   *  (who serves from which half to whom). When set it REPLACES the Lineups
-   *  court on the Score tab; it renders nothing in singles. */
+   *  (who serves from which half to whom) — the "situation now" widget on top
+   *  of the Commentary tab. A sport with it shows no Lineups court; it renders
+   *  nothing in singles. */
   ServeCourt?: React.FC<ServeCourtProps>;
   /** Extra tiles for the in-play Quick options sheet (parity #13) — e.g.
    *  cricket's 🧤 Change keeper. `onDone(message)` closes the sheet and shows

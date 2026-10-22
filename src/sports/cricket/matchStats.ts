@@ -11,82 +11,25 @@
  * shows a 0 for something that wasn't tracked: tracked figures come back as
  * `null` when the match didn't capture them. Pure and JSX-free (node tests).
  */
-import { oversStr, runRate, other, NO_BOWLER, HUNDRED_PP_BALLS, type BallRec, type CricketState } from './engine.ts';
+import { oversStr, runRate, other, NO_BOWLER, type BallRec, type CricketState } from './engine.ts';
+import { phasePlan, phaseOf, PHASES, type Phase, type PhaseFilter } from './phases.ts';
 import {
-  detailByRec, isDeliveryRec, isPace, LENGTHS, LINES, BOWL_TYPE_LABEL,
-  type BallDetailRec, type BowlType, type Length, type Line,
+  detailByRec, isDeliveryRec, isPace, LENGTHS, LINES, BOWL_TYPE_LABEL, WIDE_WHY, NB_WHY, WIDE_WHY_LABEL, NB_WHY_LABEL, extraWhyOf,
+  type BallDetailRec, type BowlType, type Length, type Line, type WideWhy, type NbWhy,
 } from './detail.ts';
-import { partnerships, overHistory } from './scorecard.ts';
+import { partnerships, overHistory, boundaryOf } from './scorecard.ts';
 
 type Side = 'home' | 'away';
-export type Phase = 'pp' | 'middle' | 'death';
-export type PhaseFilter = 'all' | Phase;
-
-// ─── Phases ───────────────────────────────────────────────────────────────────
-
-/** An innings' length in overs as it was played (rain cuts included, best known). */
-export function inningsOvers(s: CricketState, inn: 1 | 2): number {
-  if (inn === 2 || s.innings === 1) return s.oversLimit;
-  if (s.inn1Rain) return Math.ceil(s.inn1Rain.balls / s.ballsPerOver);
-  if (s.r1Lost !== 0) return s.inn2Overs ?? s.oversLimit;
-  return s.inn1Overs ?? s.oversLimit;
-}
-
-export interface PhasePlan {
-  /** legal balls in the powerplay (0 = none) */
-  pp: number;
-  /** the death phase starts after this many legal balls */
-  deathFrom: number;
-  /** "Overs 1–6" … */
-  labels: Record<Phase, string>;
-}
-
-/**
- * Powerplay / middle / death (CricViz / Cricinfo phases): the powerplay is the
- * format's own (The Hundred: 25 balls; none when the format has none); the
- * death is the last quarter of the innings (T20: 16–20, T10: 8–10), the last
- * 10 overs from 40 overs up (ODI: 41–50). Null for a timeless / Test-style
- * innings or one too short to split (under 4 overs).
- */
-export function phasePlan(s: CricketState, inn: 1 | 2): PhasePlan | null {
-  const bpo = s.ballsPerOver;
-  const len = inningsOvers(s, inn);
-  if (len >= 100 || len < 4) return null;
-  const total = len * bpo;
-  const pp = s.hundred ? HUNDRED_PP_BALLS : Math.min(s.powerplayOvers * bpo, total);
-  const deathBalls = s.hundred ? 25 : (len >= 40 ? 10 : Math.max(1, Math.round(len / 4))) * bpo;
-  const deathFrom = Math.max(pp, total - deathBalls);
-  const span = (a: number, b: number) => (s.hundred || a % bpo !== 0 || b % bpo !== 0
-    ? `Balls ${a + 1}–${b}` : a / bpo + 1 === b / bpo ? `Over ${b / bpo}` : `Overs ${a / bpo + 1}–${b / bpo}`);
-  return {
-    pp, deathFrom,
-    labels: { pp: pp > 0 ? `Powerplay · ${span(0, pp)}` : 'Powerplay', middle: `Middle · ${span(pp, deathFrom)}`, death: `Death · ${span(deathFrom, total)}` },
-  };
-}
-
-/** The (1-based) legal ball a record belongs to: a wide / no-ball / penalty
- *  belongs to the ball being bowled. */
-const ballNo = (r: BallRec) => (r.legal ? r.lb6 : r.lb6 + 1);
-export function phaseOf(r: BallRec, plan: PhasePlan | null): Phase {
-  if (!plan) return 'middle';
-  const n = ballNo(r);
-  if (n <= plan.pp) return 'pp';
-  if (n > plan.deathFrom) return 'death';
-  return 'middle';
-}
+// Round 2 — the phases (organiser options) live in phases.ts, the boundary
+// rule in scorecard.ts (the careers use it too); re-exported here.
+export { inningsOvers, phasePlan, phaseOf, type Phase, type PhaseFilter, type PhasePlan } from './phases.ts';
+export { boundaryOf } from './scorecard.ts';
 
 // ─── Per-ball helpers ─────────────────────────────────────────────────────────
 
 const faced = (r: BallRec) => r.ext === 'nb' || (r.legal && r.ext !== 'wd' && isDeliveryRec(r));
 const charged = (r: BallRec) => r.bat + r.wd + r.nb;
 const teamRuns = (r: BallRec) => r.bat + r.wd + r.nb + r.b + r.lb + (r.pen ?? 0) + (r.adj ?? 0);
-/** A boundary off the bat: a '4' / '6' chip, or 4 / 6 off the bat on a no-ball
- *  (the log doesn't keep a no-ball's all-run flag — read as a boundary). */
-export const boundaryOf = (r: BallRec): 0 | 4 | 6 => {
-  if (r.sym === '4' || r.sym === '6') return Number(r.sym) as 4 | 6;
-  if (r.ext === 'nb' && (r.bat === 4 || r.bat === 6) && r.b + r.lb === 0) return r.bat as 4 | 6;
-  return 0;
-};
 const wicketFor = (r: BallRec) => !!r.out && r.out.kind !== 'retired';
 const bowlersWicket = (r: BallRec) => wicketFor(r) && !NO_BOWLER.includes(r.out!.kind);
 
@@ -122,6 +65,9 @@ export interface TeamBat {
   /** runs / balls / outs vs typed bowlers — null when no bowler has a type */
   pace: { runs: number; balls: number; outs: number } | null;
   spin: { runs: number; balls: number; outs: number } | null;
+  /** Round 2 — why the wides / no-balls were called: tracked extras, how many
+   *  were tagged, and the count per reason. Null when not tracked. */
+  why: { extras: number; tagged: number; wd: Record<WideWhy, number>; nb: Record<NbWhy, number> } | null;
 }
 
 /** `side`'s batting innings (the opposition's bowling), for one phase or all. */
@@ -129,7 +75,7 @@ export function teamBatting(s: CricketState, side: Side, f: PhaseFilter = 'all')
   const recs = inningsRecs(s, side).filter((j) => inPhase(j, f));
   const t: TeamBat = {
     runs: 0, wkts: 0, legal: 0, faced: 0, dots: 0, fours: 0, sixes: 0, boundaryRuns: 0, scoring: 0,
-    extras: { b: 0, lb: 0, wd: 0, nb: 0, pen: 0 }, control: null, pitch: null, speed: null, pace: null, spin: null,
+    extras: { b: 0, lb: 0, wd: 0, nb: 0, pen: 0 }, control: null, pitch: null, speed: null, pace: null, spin: null, why: null,
   };
   const types = s.bowlTypes ?? {};
   const typed = Object.keys(types).length > 0;
@@ -157,6 +103,16 @@ export function teamBatting(s: CricketState, side: Side, f: PhaseFilter = 'all')
       if (d?.len || d?.line) p.tagged += 1;
       if (d?.len) p.lengths[d.len] += 1;
       if (d?.line) p.lines[d.line] += 1;
+    }
+    if (r.trk?.why && r.ext) {
+      const w = (t.why ??= { extras: 0, tagged: 0, wd: zeroes(WIDE_WHY), nb: zeroes(NB_WHY) });
+      w.extras += 1;
+      const why = extraWhyOf(r.ext, d?.why);
+      if (why) {
+        w.tagged += 1;
+        if (r.ext === 'wd') w.wd[why as WideWhy] += 1;
+        else w.nb[why as NbWhy] += 1;
+      }
     }
     if (d?.kph) {
       const sp = (t.speed ??= { n: 0, avg: 0, max: 0 });
@@ -265,6 +221,8 @@ export function compareSections(s: CricketState, f: PhaseFilter = 'all'): Compar
     if (fh.notes || fa.notes) {
       rows.push(row('Drops', fh.drops, fa.drops, n0, 'lower'), row('Runs saved', fh.saved, fa.saved, n0, 'higher'), row('Runs missed', fh.missed, fa.missed, n0, 'lower'));
     }
+    // Round 2 — only once a direct hit was marked (the chip is optional)
+    if (fh.directHits || fa.directHits) rows.push(row('Direct-hit run outs', fh.directHits ?? 0, fa.directHits ?? 0, n0, 'higher'));
     out.push({ title: 'Fielding', rows });
   }
 
@@ -298,6 +256,26 @@ export function compareSections(s: CricketState, f: PhaseFilter = 'all'): Compar
       txt('vs spin', line(bh.spin), line(ba.spin)),
     ] });
   }
+  // Round 2 — why the wides / no-balls were called, per BOWLING team (home
+  // bowled at away's innings). Only the reasons that happened.
+  if (bh.why || ba.why) {
+    const wh = ba.why;
+    const wa = bh.why;
+    const rows: CompareRow[] = [
+      txt('Wides / no-balls tagged', wh ? `${wh.tagged} of ${wh.extras}` : 'not tracked', wa ? `${wa.tagged} of ${wa.extras}` : 'not tracked'),
+    ];
+    for (const k of WIDE_WHY) {
+      const h = wh?.wd[k] ?? 0;
+      const a = wa?.wd[k] ?? 0;
+      if (h || a) rows.push(row(`Wide · ${WIDE_WHY_LABEL[k].toLowerCase()}`, h, a, n0, 'lower'));
+    }
+    for (const k of NB_WHY) {
+      const h = wh?.nb[k] ?? 0;
+      const a = wa?.nb[k] ?? 0;
+      if (h || a) rows.push(row(`No-ball · ${NB_WHY_LABEL[k].toLowerCase()}`, h, a, n0, 'lower'));
+    }
+    out.push({ title: 'Wides & no-balls — why (tracked)', rows });
+  }
   return out.filter((sec) => sec.rows.length > 0 && (batted(s, 'home') || batted(s, 'away')));
 }
 
@@ -320,15 +298,21 @@ export function howOut(s: CricketState, side: Side): string {
 
 // ─── Fielding ─────────────────────────────────────────────────────────────────
 
-export interface Fielding { catches: number; runOuts: number; stumpings: number; drops: number; saved: number; missed: number; notes: number }
+export interface Fielding {
+  catches: number; runOuts: number; stumpings: number; drops: number; saved: number; missed: number; notes: number;
+  /** Round 2 — run outs marked as a direct hit (only once one was marked) */
+  directHits?: number;
+}
 /** `side`'s fielding (in the innings it bowled at). */
 export function fielding(s: CricketState, side: Side): Fielding {
   const f: Fielding = { catches: 0, runOuts: 0, stumpings: 0, drops: 0, saved: 0, missed: 0, notes: 0 };
+  const direct = new Set(s.dismissals.filter((d) => d.direct && d.outId).map((d) => d.outId!));
   for (const r of s.log ?? []) {
     if (r.side !== other(side) || r.cross || !r.out) continue;
     if (r.out.kind === 'caught') f.catches += 1;
     else if (r.out.kind === 'stumped') f.stumpings += 1;
     else if (r.out.kind === 'runout' || r.out.kind === 'mankad') f.runOuts += 1;
+    if (r.out.kind === 'runout' && direct.has(r.out.id)) f.directHits = (f.directHits ?? 0) + 1;
   }
   for (const n of s.fieldNotes ?? []) {
     if (n.side !== side) continue;
@@ -393,6 +377,8 @@ export interface BowlerRow {
   /** tracked only */
   falseShotPct?: string;
   speed?: { avg: string; max: number; n: number };
+  /** Round 2 — why their wides / no-balls were called ("wd down leg 2 · nb front foot 1") */
+  extrasWhy?: string;
 }
 
 /** The bowlers who bowled at `side`'s innings. */
@@ -421,7 +407,7 @@ export function bowlingRows(s: CricketState, side: Side): BowlerRow[] {
     const wkts = recs.filter((j) => j.r.bowlerId === id && bowlersWicket(j.r)).length;
     const dots = mine.filter((j) => j.r.legal && charged(j.r) === 0).length;
     const econ = (b: number, r: number) => (b ? ((r / b) * bpo).toFixed(2) : '–');
-    const phaseEcon = (['pp', 'middle', 'death'] as Phase[]).reduce((acc, ph) => {
+    const phaseEcon = PHASES.reduce((acc, ph) => {
       const p = mine.filter((j) => j.phase === ph);
       acc[ph] = econ(p.filter((j) => j.r.legal).length, p.reduce((a, j) => a + charged(j.r), 0));
       return acc;
@@ -439,8 +425,28 @@ export function bowlingRows(s: CricketState, side: Side): BowlerRow[] {
     if (ctl.length) row.falseShotPct = pct(ctl.filter((j) => j.d?.ctrl).length, ctl.length);
     const kph = mine.map((j) => j.d?.kph).filter((k): k is number => !!k);
     if (kph.length) row.speed = { avg: (kph.reduce((a, b) => a + b, 0) / kph.length).toFixed(1), max: Math.max(...kph), n: kph.length };
+    const why = extrasWhyText(mine);
+    if (why) row.extrasWhy = why;
     return row;
   });
+}
+
+/** Round 2 — "wd down leg 2, outside off 1 · nb front foot 1" over some
+ *  deliveries ('' when none of them carries a reason). */
+export function extrasWhyText(recs: { r: BallRec; d?: BallDetailRec }[]): string {
+  const wd: Partial<Record<WideWhy, number>> = {};
+  const nb: Partial<Record<NbWhy, number>> = {};
+  for (const { r, d } of recs) {
+    const w = extraWhyOf(r.ext, d?.why);
+    if (!w) continue;
+    if (r.ext === 'wd') wd[w as WideWhy] = (wd[w as WideWhy] ?? 0) + 1;
+    else nb[w as NbWhy] = (nb[w as NbWhy] ?? 0) + 1;
+  }
+  const part = <K extends string>(tag: string, keys: readonly K[], counts: Partial<Record<K, number>>, label: Record<K, string>) => {
+    const xs = keys.filter((k) => counts[k]).map((k) => `${label[k].toLowerCase()} ${counts[k]}`);
+    return xs.length ? `${tag} ${xs.join(', ')}` : '';
+  };
+  return [part('wd', WIDE_WHY, wd, WIDE_WHY_LABEL), part('nb', NB_WHY, nb, NB_WHY_LABEL)].filter(Boolean).join(' · ');
 }
 
 // ─── Matchups ─────────────────────────────────────────────────────────────────

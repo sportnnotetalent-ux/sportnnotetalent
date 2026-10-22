@@ -70,7 +70,13 @@ export const athleticsPlugin: SportPlugin<AthleticsMatchState> = {
     },
     // deep wave (timed races): "Stats to track" — optional depth the meet switches on; off = today's fast entry
     { key: 'reaction', label: 'Reaction times', type: 'toggle', default: false, advanced: true, group: 'Stats to track', hint: 'a start-information system reads reaction times' },
-    { key: 'lapSplits', label: 'Lap times', type: 'toggle', default: false, advanced: true, group: 'Stats to track', hint: 'a timekeeper at the finish line reads each runner every lap (400 m and longer) — lap times, places at each split' },
+    { key: 'lapSplits', label: 'Lap times', type: 'toggle', default: false, advanced: true, group: 'Stats to track', hint: 'a timekeeper reads each runner every lap (400 m and longer) — lap times, places at each split; Lap points sets where' },
+    // timed races round 2: where lap times are read (1000 m, 1500 m, 3000 m) — finish-line passes stay the default
+    {
+      key: 'lapPoints', label: 'Lap points', type: 'choice', default: 'finish', advanced: true, group: 'Stats to track',
+      hint: 'with lap times on: one timekeeper at the finish line, or every 400 m from the start like the Diamond League (a second timekeeper where the race starts on the back straight)',
+      options: [{ value: 'finish', label: 'Finish-line passes' }, { value: 'start', label: 'Every 400 m from the start' }],
+    },
     { key: 'relayLegs', label: 'Relay leg times', type: 'toggle', default: false, advanced: true, group: 'Stats to track', hint: 'the time at each changeover — every runner’s leg time and the fastest leg' },
     { key: 'chipTimes', label: 'Chip times (road)', type: 'toggle', default: false, advanced: true, group: 'Stats to track', hint: 'a road race timed by the gun can show each runner’s chip (net) time too — the gun time stays official' },
   ],

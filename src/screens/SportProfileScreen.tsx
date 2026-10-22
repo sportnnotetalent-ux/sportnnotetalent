@@ -45,6 +45,7 @@ import { FormStrip } from '../components/FormStrip';
 import { WagonWheelView } from '../sports/cricket/WagonWheel';
 import { careerZones } from '../sports/cricket/wagon';
 import { TournamentJourneyList, type JourneyEntry } from '../components/TournamentHistory';
+import { ChessRepertoire } from '../sports/chess/ChessRepertoire';
 
 
 
@@ -413,6 +414,8 @@ export default function SportProfileScreen() {
                       </View>
                     </React.Fragment>
                   ))}
+                  {/* Round 2 — chess: the opening repertoire (as White / as Black) */}
+                  {sport === 'chess' && <ChessRepertoire lines={history} matchById={matchById} />}
                   {/* SD-133 (CK-11) — career wagon wheel from the tagged shots (wz1…wz8). */}
                   {sport === 'cricket' && (() => {
                     const ww = careerZones(history);

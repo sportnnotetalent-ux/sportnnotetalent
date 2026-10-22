@@ -53,7 +53,7 @@ POINTS shows the current game, a games column per set (match tiebreak: "TB") and
 A chip under the board shows **MATCH POINT**, **SET POINT** or **BREAK POINT** with the pair's name.
 
 ## Match stats
-The **Score** tab's "Match stats" (per match or set) has tabs:
+The **Stats** tab's "Match stats" (per match or set) has tabs:
 - **Key stats**: Serve (aces, double faults, service winners and, with 1st / 2nd serve on, 1st serve in and points won on the 1st / 2nd serve), Winners & errors, Points won (break points, net points, receiving and total points, streaks) and Games (holds, breaks, break points saved, golden / star points won, set and match points saved).
 - **Serve**: every service and return figure, plus each player's serve.
 - **Shots** (with point detail): winners, unforced or forced errors by shot, for either wing or **Forehand** / **Backhand** only; a stroke summary; errors by type.
@@ -78,7 +78,7 @@ After each point a "Last point" card appears. Tap what you know, or **Skip**:
 Errors count against the opponent (pick who under **By:**).
 
 ## Commentary
-Under the stats, "Commentary" tells the match game by game, newest first, the game in play on top ("Set 1 · Game 4", "Set 2 · Tiebreak", "Set 3 · Match tiebreak"):
+The **Commentary** tab tells the match game by game, newest first, the game in play on top ("Set 1 · Game 4", "Set 2 · Tiebreak", "Set 3 · Match tiebreak"):
 - "Red House wins the game" with the set score, e.g. **3-1**, and "Break of serve", "Game and set" or "Game, set and match".
 - Each point: "Point to Red House", the match time and, if you described it, a line like "Asha Rao wins the point with a Forehand Bandeja Winner". On the right, the score after the point, server first: **30 - 15**, **40 - 40**, **Game**; "Golden point" or "Star point" on a deciding point.
 - Change ends, code violations and who is serving each game.

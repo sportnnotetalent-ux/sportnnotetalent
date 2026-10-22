@@ -48,12 +48,12 @@ A drive panel shows who has the ball, the down and distance, and the spot ("Lion
 Optional switches in **⚙️ Game settings** or the match format (play by play, all off by default):
 - **Ask who made the tackle / flag pull**: a tap after every run and catch.
 - **Targets**: after **✗ Incomplete**, tap who it was for (or skip). Catches count too.
-- **Pass breakups & tackles for loss**: after **✗ Incomplete**, tap who broke it up (or skip). With tackles on, a loss is a tackle for loss.
+- **Pass breakups & tackles for loss**: after **✗ Incomplete**, tap who broke it up (or skip). An interception also counts as a pass defended for the player who made it, as the NFL counts it. With tackles on, a loss is a tackle for loss.
 
 Sacks are charged to the last passer automatically.
 
 ## Play-by-play and match stats
-Under the score, pick **Play-by-play** (each snap, grouped by drive), **Match stats** (first downs, yards, 3rd and 4th downs, red zone, turnovers, possession, by quarter), **Drives**, **Box score** or **Key moments**.
+The **Commentary** tab is the play-by-play (each snap, grouped by drive); tap **Key moments** to keep only the big ones. The **Stats** tab has **Match stats** (first downs, yards, 3rd and 4th downs, red zone, turnovers, possession, by quarter), **Drives** and the **Box score**. On the drive chart, punts and field-goal attempts count as plays, as on an NFL drive chart.
 
 ## Overtime
 - Level after regulation? Pick who has the ball first after the coin toss.

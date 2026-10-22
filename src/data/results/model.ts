@@ -249,7 +249,22 @@ export interface PhaseFormat {
   /** SD-137b: an ISSF mixed team event whose qualification sends the best 4
    *  teams to the medal matches (gold 1 v 2, bronze 3 v 4, first to 16 points) */
   shootMatch?: boolean;
+  /** Timed races round 2: this event's own "Stats to track" — overrides of the
+   *  meet's choices (tournament.formats[sport]); an absent key follows the
+   *  meet. Set on every phase of the event (later rounds copy the format). */
+  track?: TrackOverrides;
+  /** Timed races round 2: the records this final set when it was locked — the
+   *  meet record (book) and the school record (against the organisation's
+   *  book), with the holders' player ids; their stat lines carry `mrSet` /
+   *  `srSet` from it (a re-sync writes the same). Absent before round 2. */
+  recordsSet?: Pick<RecordMark, 'scope' | 'discipline' | 'value' | 'holderId' | 'holderIds'>[];
 }
+
+/** Timed races round 2: an event's own "Stats to track" (raceDepth.ts raceTracking). */
+export type TrackOverrides = Partial<Record<'reaction' | 'lapSplits' | 'relayLegs' | 'splits' | 'takeovers' | 'cycSplits' | 'chipTimes', boolean>> & {
+  /** athletics lap times at the finish-line passes or every 400 m from the start */
+  lapPoints?: 'finish' | 'start';
+};
 
 /** SD-137b: one team member's score in the individual event the team is ranked
  *  on (archery ranking round / shooting qualification), in member order. */
@@ -404,6 +419,10 @@ export interface EntryResult {
   /** SD-96: an elimination final's shots in order (decimal) — present (even
    *  empty) on every finalist's row; the final is ranked by elimination */
   fshots?: number[];
+  /** Round 2 (precision-strength): penalty points deducted from final shot `i`
+   *  (ISSF: 2 points, from the shot it was given on) — the final's totals and
+   *  eliminations use the net shot. Absent = no penalty in the final. */
+  fpen?: number[];
   /** SD-96: final shoot-offs, keyed by the shot after which the tie arose ("12") — one shot per round */
   so?: Record<string, number[]>;
   /** SD-96: the qualification score carried into the final (records / sheet) */
@@ -445,6 +464,10 @@ export interface EntryResult {
   /** deep wave: a road race's chip (net) time when the meet tracks both — the
    *  official time stays the gun time in `mark` (World Athletics TR 19.25) */
   chip?: number;
+  /** Timed races round 2: an athletics race's lap times (`splits`) were read
+   *  every 400 m from the start; absent = at the finish-line passes (the
+   *  default and every older result) — raceSplitDefs.ts athLapDistances */
+  lapsFrom?: 'start';
   /** SD-94: what the DQ was for ("Early take-off, leg 3") — shown with the rule reference */
   reason?: string;
   /** SD-94: the manual times from the lane's watches (SW 11.3) the official time came from */
@@ -498,6 +521,11 @@ export interface ArchSide {
   wo?: boolean;
   /** SD-98 track sprint: each heat of the match — 1 = won it, 0 = lost (or relegated) */
   heats?: number[];
+  /** Round 2 (precision-strength): archery team / mixed team matches — who shot
+   *  each arrow of end k: `by[k][j]` is the index (in the row's `members`) of
+   *  the archer of arrow `ends[k][j]`. Only when the meet credits arrows to each
+   *  archer; an end without it (or that doesn't match) credits nobody. */
+  by?: number[][];
 }
 
 /** One entry in one phase, as the engine sees it. */

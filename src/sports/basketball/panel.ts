@@ -14,7 +14,7 @@ import { compactPanel, countRow, maRow, shareText, type PanelCategory, type Pane
 import { periodLabel, type BasketballState } from './engine.ts';
 import { SHOT_ZONES, zoneLabel } from './events.ts';
 import {
-  bbCoverage, bbTeamFigures, benchPoints, fastBreakOn, foulsDrawnOn, mmss, possessionTags, timeLeading, zonesOn,
+  bbCoverage, bbTeamFigures, benchPoints, fastBreakOn, fastBreakPlays, foulsDrawnOn, mmss, possessionTags, timeLeading, zonesOn,
   type BbScope,
 } from './deep.ts';
 
@@ -33,8 +33,9 @@ export function basketballPanel(s: BasketballState, scope: BbScope = 'all', ctx:
   const cov = bbCoverage(s);
   const halfCourt = s.targetPoints > 0;
   const tags = possessionTags(s);
-  const H = bbTeamFigures(s, 'home', scope, tags);
-  const A = bbTeamFigures(s, 'away', scope, tags);
+  const fbp = fastBreakPlays(s);
+  const H = bbTeamFigures(s, 'home', scope, tags, fbp);
+  const A = bbTeamFigures(s, 'away', scope, tags, fbp);
   const notes: string[] = [];
 
   /* ---- shooting ---- */

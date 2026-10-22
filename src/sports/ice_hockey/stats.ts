@@ -16,6 +16,36 @@ const q2: Qualifier = { games: 2, unit: { label: 'games', one: 'game' } };
 const count = (key: string, label: string, short: string, one: string, abbr: string, group: string, extra: Partial<StatDef> = {}): StatDef =>
   ({ key, label, short, one, abbr, group, ...extra });
 
+/** Round 2 — the faceoff zones (each centre's own view: offensive = in the
+ *  other team's end). Keys `faceoffWinsOz` … `faceoffLossesDz` (./engine.ts
+ *  `foZoneKey`). */
+const ZONES = [
+  { sfx: 'Oz', word: 'Offensive', ab: 'OZ' },
+  { sfx: 'Nz', word: 'Neutral', ab: 'NZ' },
+  { sfx: 'Dz', word: 'Defensive', ab: 'DZ' },
+] as const;
+function zoneKeys(): StatDef[] {
+  return ZONES.flatMap((z) => {
+    const w = z.word.toLowerCase();
+    return [
+      { key: `faceoffWins${z.sfx}`, label: `Faceoffs won (${w} zone)`, short: `${w}-zone faceoffs won`, one: `${w}-zone faceoff won`, abbr: `${z.ab} FOW`, group: 'faceoffs', coverage: 'keyed' },
+      { key: `faceoffLosses${z.sfx}`, label: `Faceoffs lost (${w} zone)`, short: `${w}-zone faceoffs lost`, one: `${w}-zone faceoff lost`, abbr: `${z.ab} FOL`, group: 'faceoffs', coverage: 'keyed' },
+    ] satisfies StatDef[];
+  });
+}
+function zoneFigures(): StatDef[] {
+  return ZONES.flatMap((z) => {
+    const w = z.word.toLowerCase();
+    const won = `faceoffWins${z.sfx}`, lost = `faceoffLosses${z.sfx}`;
+    return [
+      { key: `faceoffs${z.sfx}`, label: `Faceoffs, ${w} zone (won-lost)`, short: `${w}-zone faceoffs`, source: 'derived', group: 'faceoffs', coverage: 'keyed', agg: { kind: 'pair', a: won, b: lost } },
+      { key: `faceoffPct${z.sfx}`, label: `Faceoff % (${w} zone)`, short: `${w}-zone faceoff %`, source: 'derived', group: 'faceoffs', format: { unit: 'percent', dp: 1 }, abbr: `${z.ab} FO%`, coverage: 'keyed',
+        agg: { kind: 'rate', num: won, den: [won, lost], scale: 100, dp: 1, qualifier: { den: 20, unit: { label: `${w}-zone faceoffs`, one: `${w}-zone faceoff` } } },
+        tieBreak: [{ key: won, better: 'higher' }] },
+    ] satisfies StatDef[];
+  });
+}
+
 export const iceHockeyStats: SportStatSchema<'ice_hockey'> = {
   sport: 'ice_hockey',
   splits: ['format', 'tournament', 'season', 'opponent'],
@@ -54,6 +84,8 @@ export const iceHockeyStats: SportStatSchema<'ice_hockey'> = {
     { key: 'takeaways', label: 'Takeaways', short: 'takeaways', one: 'takeaway', abbr: 'TK', group: 'physical', coverage: 'keyed', weight: 0.3 },
     { key: 'giveaways', label: 'Giveaways', short: 'giveaways', one: 'giveaway', abbr: 'GV', group: 'physical', coverage: 'keyed', weight: -0.2, format: { unit: 'count', better: 'lower' } },
     { key: 'missedShots', label: 'Missed shots', short: 'missed shots', one: 'missed shot', abbr: 'MS', group: 'scoring', coverage: 'keyed' },
+    // round 2 — faceoffs by zone, each centre from his own side (keyed: only matches that tracked zones)
+    ...zoneKeys(),
     // shoot-out (never counted as goals)
     { key: 'soGoals', label: 'Shoot-out goals', short: 'shoot-out goals', one: 'shoot-out goal', group: 'shootout' },
     { key: 'soTaken', label: 'Shoot-out attempts', short: 'shoot-out attempts', one: 'shoot-out attempt', group: 'shootout' },
@@ -74,6 +106,8 @@ export const iceHockeyStats: SportStatSchema<'ice_hockey'> = {
     { key: 'faceoffPct', label: 'Faceoff %', short: 'faceoff %', source: 'derived', group: 'faceoffs', format: { unit: 'percent', dp: 1 }, abbr: 'FO%', coverage: 'keyed',
       agg: { kind: 'rate', num: 'faceoffWins', den: ['faceoffWins', 'faceoffLosses'], scale: 100, dp: 1, qualifier: { den: 20, unit: { label: 'faceoffs', one: 'faceoff' } } },
       tieBreak: [{ key: 'faceoffWins', better: 'higher' }] },
+    // round 2 — won-lost and FO % by zone (the same 20-draw minimum, per zone)
+    ...zoneFigures(),
     // goalies — save % = saves ÷ shots against; GAA = goals against × 60 ÷ minutes in net
     { key: 'savePct', label: 'Save %', source: 'derived', group: 'goalkeeping', format: { unit: 'percent', dp: 1 }, abbr: 'SV%',
       agg: { kind: 'rate', num: 'saves', den: 'shotsAgainst', scale: 100, dp: 1, over: 'keeper', qualifier: { den: 30, unit: { label: 'shots faced', one: 'shot faced' } } },
@@ -102,7 +136,10 @@ export const iceHockeyStats: SportStatSchema<'ice_hockey'> = {
       { stat: 'penaltyMinutes' }, { stat: 'minors', hideZero: true }, { stat: 'majors', hideZero: true }, { stat: 'misconducts', hideZero: true },
       { stat: 'gameMisconducts', hideZero: true }, { stat: 'matchPenalties', hideZero: true },
     ] },
-    { id: 'faceoffs', title: 'Faceoffs', rows: [{ stat: 'faceoffWins' }, { stat: 'faceoffLosses' }, { stat: 'faceoffPct' }] },
+    { id: 'faceoffs', title: 'Faceoffs', rows: [
+      { stat: 'faceoffWins' }, { stat: 'faceoffLosses' }, { stat: 'faceoffPct' },
+      ...ZONES.flatMap((z) => [{ stat: `faceoffs${z.sfx}`, label: `${z.word} zone (won-lost)` }, { stat: `faceoffPct${z.sfx}`, label: `FO% · ${z.word.toLowerCase()} zone` }]),
+    ] },
     { id: 'physical', title: 'Hits, blocks & puck battles', rows: [{ stat: 'checks' }, { stat: 'shotBlocks' }, { stat: 'takeaways' }, { stat: 'giveaways' }, { stat: 'missedShots' }] },
     { id: 'shootout', title: 'Shoot-outs', rows: [{ stat: 'soGoals', hideZero: true }, { stat: 'soTaken', hideZero: true }, { stat: 'soConversion' }] },
     { id: 'bests', title: 'Bests', rows: [

@@ -34,12 +34,11 @@ Recording the result is all a game needs. If you want more, a scorer or host can
 - **Move list (SAN / PGN)**: a **♟ Moves** box appears on the Scoring tab. Type each move as it is played, for example `Nf3`, or several at once (`e4 e5 Nf3`); coordinates like `g1f3` work too. Every move is checked against the position, so a move that isn't legal is named ("Ke3: not a legal move here") and not kept. **⌫ Last move** takes one back.
 - **Clock after each move**: type the clock reading after the move (`1:23:05` or `4:07`). The app works out the time each move took (with the increment).
 
-During the game you can also tap **📋 Paste a whole game (PGN)…**. After the game, a scorer finds the **♟ Moves** box on the **Score** tab: paste the moves from a DGT board, chess.com or lichess (clocks included) and tap **Save the moves**. The opening is read from the moves, for example "B90 · Sicilian Defense: Najdorf Variation"; tap **Opening (ECO)…** to set it by hand. When you record the result without typing the number of moves, it is filled in from the list.
+During the game you can also tap **📋 Paste a whole game (PGN)…**. After the game, a scorer finds the **♟ Moves** box on the **Scoring** tab: paste the moves from a DGT board, chess.com or lichess (clocks included) and tap **Save the moves**. The opening is read from the moves, for example "B90 · Sicilian Defense: Najdorf Variation"; tap **Opening (ECO)…** to set it by hand. When you record the result without typing the number of moves, it is filled in from the list.
 
 ## The commentary and the game stats
-On the **Score** tab:
-- **🎙 Commentary** tells the game move by move, newest first, for example "23. Nxe5+ — Anand: knight takes the pawn on e5, check", with the material after it, the clock and the time it was entered. The result sits on top. Without a move list it shows the result in words, with the method, the number of moves and the clocks.
-- **📊 Game stats** compares White and Black: moves, captures, material captured, checks, castling, promotions, material on the board, time left, average time per move and the longest think, for the whole game or the **Opening** (first 10 moves), **Middlegame** or **Endgame**.
+- The **Commentary** tab tells the game move by move, newest first, for example "23. Nxe5+ — Anand: knight takes the pawn on e5, check", with the material after it, the clock and the time it was entered. The result sits on top. Without a move list it shows the result in words, with the method, the number of moves and the clocks.
+- The **Stats** tab shows the opening and **Game stats**, which compare White and Black: moves, captures, material captured, checks, castling, promotions, material on the board, time left, average time per move and the longest think, for the whole game or the **Opening** (first 10 moves), **Middlegame** or **Endgame**.
 
 On a player's profile, **Game record** shows the average game length, checks and material captured per game, castled %, promotions and the average time per move, once a game carries them.
 

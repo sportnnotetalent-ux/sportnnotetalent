@@ -20,7 +20,7 @@ import { finalState, isFinalRows, type FinalState } from './shootingRank.ts';
 import { isShootMatchRows, shootMatchState } from './shootMatch.ts';
 import { isTeamRow, teamLines, teamCareer } from './teamEvents.ts';
 import { shootTeamOf } from './shootingDefs.ts';
-import { maxShot, seriesCount, shootEventOf, sumTenths, fromTenths, tenths, positionOf, POSITION_LABEL, type ShootEventDef, type ShotScoring } from './shootingDefs.ts';
+import { maxShot, seriesCount, shootEventOf, sumTenths, fromTenths, tenths, positionOf, finalPenaltyTotal, POSITION_LABEL, type ShootEventDef, type ShotScoring } from './shootingDefs.ts';
 
 export * from './shootingDefs.ts';
 export { finalState, isFinalRows, qualKeys, rankShootFinal, type FinalState, type FinalElimination } from './shootingRank.ts';
@@ -189,12 +189,34 @@ export function finalistResult(q: EntryResult): Pick<EntryResult, 'fshots' | 'qu
   return { fshots: [], qual: { mark: q.mark ?? 0, ...(q.xs != null ? { xs: q.xs } : {}), ...(q.series ? { series: q.series } : {}) } };
 }
 
-/** Add / correct final shot `i` (0-based) for a finalist. */
+/** Add / correct final shot `i` (0-based) for a finalist (round 2: removing
+ *  shots takes their penalties off too). */
 export function setFinalShot(r: EntryResult, i: number, v: number | null): EntryResult {
   const f = [...(r.fshots ?? [])];
-  if (v == null) f.splice(i);
-  else { if (i > f.length) return r; f[i] = v; }
+  if (v == null) {
+    f.splice(i);
+    if (r.fpen) {
+      const p = r.fpen.slice(0, i);
+      const { fpen: _p, ...rest } = r;
+      return { ...rest, fshots: f, ...(p.some((x) => x > 0) ? { fpen: p } : {}) };
+    }
+  } else { if (i > f.length) return r; f[i] = v; }
   return { ...r, fshots: f };
+}
+
+/**
+ * Round 2: a penalty in the final — `points` deducted from final shot `i`
+ * (ISSF: 2 points, from the shot it was given on; 0 clears it). The final's
+ * totals and eliminations use the net shot. A shot not fired yet can't carry one.
+ */
+export function setFinalPenalty(r: EntryResult, i: number, points: number): EntryResult {
+  if ((r.fshots ?? []).length <= i || i < 0 || !(points >= 0)) return r;
+  const pen = [...(r.fpen ?? [])];
+  while (pen.length <= i) pen.push(0);
+  pen[i] = points;
+  while (pen.length && !pen[pen.length - 1]) pen.pop();
+  const { fpen: _p, ...rest } = r;
+  return pen.some((x) => x > 0) ? { ...rest, fpen: pen } : rest;
 }
 
 /** Add a shoot-off shot at elimination point `after` (round = its index + 1). */
@@ -254,7 +276,8 @@ export interface ShootLine { playerId: string; stats: Record<string, number>; wo
  * Deep wave (free — from what is stored): bestSer (the best series as shot),
  * perfect (series of all tens / all targets — integer and hits scoring, only
  * when there is one), pen (penalty points, only when deducted), fShots (the
- * final shots counted in fpts — the average final shot).
+ * final shots counted in fpts — the average final shot). Round 2: a final's
+ * penalties (`fpen`, on the shots that count) are written as `pen` too.
  */
 export function shootLines(f: Pick<PhaseFormat, 'discipline' | 'category'> & Partial<Pick<PhaseFormat, 'shootMatch'>>, ranked: RankedEntry[], kind: 'qual' | 'match' | 'final', awards: Award[] = []): ShootLine[] {
   const ev = shootEventOf(f.discipline);
@@ -297,6 +320,9 @@ export function shootLines(f: Pick<PhaseFormat, 'discipline' | 'category'> & Par
         const out = fin?.out.find((o) => o.id === r.id);
         const n = out ? out.after : Math.min((res.fshots ?? []).length, fin?.last ?? (res.fshots ?? []).length);
         if (n > 0) s.fShots = n;
+        // round 2: penalties given in the final (on the shots that count) — the same `pen` key as the match
+        const fp = finalPenaltyTotal({ fpen: (res.fpen ?? []).slice(0, n) });
+        if (fp > 0) s.pen = fp;
       }
     } else {
       s.comps = 1;
