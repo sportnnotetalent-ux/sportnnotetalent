@@ -20,6 +20,7 @@ Founder: "Even the create community button should show above keyboard right? Act
 - **Dragging a form closes the keyboard** (Android on-drag, iOS interactive); tapping empty space already did.
 - Left as they are (the action belongs where it is): two-step flows (find → join), hubs, search, live scoring, sign-in (its "Go" key signs in).
 - Verified: tsc clean; 4354 pass / 0 fail (+ reading-order test); web demo — create community / tournament, edit tournament, schedule match (cricket pinned, athletics none); "Next" walks Name → Graduating class → City → Email → Phone ("done").
+- **Shipped + confirmed on Android 2026-10-22:** commit 0fec61c; OTA b23a9427 (runs as 01a16460) + web. The founder tested New community on their Android phone: the Create button sits on the keyboard (analytics confirm the phone ran 01a16460, which includes the status-bar fix).
 
 ### 2026-10-22 — Keyboard never covers a field (Android, iOS, web)
 Founder, signing in on Android: the keyboard sat over the password box, typed blind. Cause: Expo SDK 56 / RN 0.85 draw Android edge-to-edge, so the window no longer shrinks for the keyboard; only the chat screen handled it (and only on iOS).
