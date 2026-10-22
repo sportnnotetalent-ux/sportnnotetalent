@@ -34,12 +34,18 @@ import {
   init, reducer, isComplete, result, matchSec, periodSec, periodLen, remainingSec, clockFace, periodName, periodLong, periodStarted, running,
   eventCredits, creditAttribution, credit, buildPlay, foulsFor, timeoutsLeft, isOT, clockless, isLast, downText, spotText, toGo, touchback,
   fgDistance, pointsOf, eventWhen, other, afScoreLine, totalPeriods,
-  AF_PRESETS, AF_LIVE_SETTINGS,
+  AF_PRESETS, AF_LIVE_SETTINGS, TRACK_FIELDS,
   type AFEvent, type AFState, type Side, type TdHow, type TryKind, type Who, type Foul,
 } from './engine';
 import { afTotals } from './totals';
 import { afBox } from './box';
-import { afTimeline, afPlays, describeEvent, afUndoLabel } from './timeline';
+import { afTimeline, describeEvent, afUndoLabel } from './timeline';
+import { afCommentary, afScopeLabel, AF_FEED_TAGS } from './commentary';
+import { afSheet } from './sheet';
+import { afDrives } from './drives';
+import { DriveChart } from './DriveChart';
+import { GroupedFeed } from '../GroupedFeed';
+import { StatSheetView } from '../StatSheetView';
 import { afTickerDetail, afTickerFlash } from './ticker';
 import { afFormation, AFField } from './field';
 import { usePendingEdit } from '../usePendingEdit';
@@ -94,10 +100,11 @@ type Flow =
   | { mode: 'fg'; side: Side; step: 'result' | 'kicker'; yards: string; good?: boolean }
   | { mode: 'safety'; side: Side }
   | { mode: 'eject'; side: Side }
-  | { mode: 'tackle'; side: Side }
+  | { mode: 'tackle'; side: Side; loss?: boolean }
   | { mode: 'run'; side: Side; step: 'who' | 'yards'; p1?: Player | null }
   | { mode: 'pass'; side: Side; step: 'passer' | 'receiver' | 'yards'; p1?: Who; p2?: Player | null }
-  | { mode: 'inc'; side: Side }
+  | { mode: 'inc'; side: Side; step: 'passer' | 'target'; p1?: Who }
+  | { mode: 'pd'; side: Side }
   | { mode: 'sack'; side: Side; step: 'who' | 'yards'; p2?: Player | null }
   | { mode: 'int'; side: Side; step: 'who' | 'spot'; p2?: Player | null }
   | { mode: 'fumble'; side: Side; step: 'who' | 'rec' | 'spot'; p1?: Player | null; p2?: Player | null }
@@ -183,11 +190,21 @@ const ScoringControls: SportPlugin<AFState>['ScoringControls'] = ({
     setFlow(null);
   };
   const play = (sd: Side, inp: Parameters<typeof buildPlay>[2]) => {
-    const a = buildPlay(s, sd, inp, stamp());
+    // deep wave: a completion recorded with "Targets" on credits its receiver a target
+    const a = buildPlay(s, sd, { ...inp, ...(s.trackTargets && (inp.play === 'pass' || (inp.play === 'inc' && inp.p2)) ? { tgt: true } : {}) }, stamp());
     dispatch(a);
-    // a tackle / flag pull after a gain, when tracked
-    if (s.trackTackles && a.type === 'PLAY' && (inp.play === 'run' || inp.play === 'pass')) setFlow({ mode: 'tackle', side: other(sd) });
+    // deep wave: who broke up an incomplete pass (optional), when tracked
+    if (s.trackDefence && a.type === 'PLAY' && inp.play === 'inc') setFlow({ mode: 'pd', side: other(sd) });
+    // a tackle / flag pull after a gain, when tracked (a loss = a tackle for loss with defensive detail on)
+    else if (s.trackTackles && a.type === 'PLAY' && (inp.play === 'run' || inp.play === 'pass')) setFlow({ mode: 'tackle', side: other(sd), loss: !!s.trackDefence && (inp.yards ?? 0) < 0 });
     else setFlow(null);
+  };
+  /** ✗ Incomplete: one tap with a known passer; the intended receiver is an optional step with "Targets" on. */
+  const incomplete = (sd: Side) => {
+    const qb = lastPasser(s, sd);
+    if (s.trackTargets) setFlow({ mode: 'inc', side: sd, step: qb ? 'target' : 'passer', p1: qb });
+    else if (qb) play(sd, { play: 'inc', p1: qb });
+    else setFlow({ mode: 'inc', side: sd, step: 'passer' });
   };
 
   /* ---- correct the timeline ---- */
@@ -336,10 +353,39 @@ const ScoringControls: SportPlugin<AFState>['ScoringControls'] = ({
       }
       case 'tackle': {
         const sd = flow.side;
+        const loss = !!flow.loss;
         return (
-          <View style={c.panel}>{head(flag ? 'Flag pulled by' : 'Tackle by', sd)}
-            <PlayerGrid players={players(sd)} onPick={(p) => { dispatch({ type: 'TACKLE', side: sd, payload: stamp(), ...credit({ type: 'tackle', playerId: p.id, playerName: p.fullName }) }); setFlow(null); }}
-              skip={{ label: 'Skip', onPress: () => setFlow(null) }} />
+          <View style={c.panel}>{head(flag ? (loss ? 'Flag pulled for a loss by' : 'Flag pulled by') : loss ? 'Tackle for loss by' : 'Tackle by', sd)}
+            <PlayerGrid players={players(sd)} onPick={(p) => {
+              dispatch({ type: 'TACKLE', side: sd, payload: { ...stamp(), ...(loss ? { tfl: true } : {}) }, ...credit({ type: 'tackle', tfl: loss || undefined, playerId: p.id, playerName: p.fullName }) });
+              setFlow(null);
+            }} skip={{ label: 'Skip', onPress: () => setFlow(null) }} />
+          </View>
+        );
+      }
+      case 'pd': {
+        // deep wave: who broke up the incomplete pass (passes defended) — optional
+        const sd = flow.side;
+        return (
+          <View style={c.panel}>{head('Pass broken up by', sd)}
+            <PlayerGrid players={players(sd)} onPick={(p) => { dispatch({ type: 'PASS_DEF', side: sd, payload: stamp(), ...credit({ type: 'pd', playerId: p.id, playerName: p.fullName }) }); setFlow(null); }}
+              skip={{ label: 'Nobody / skip', onPress: () => setFlow(null) }} />
+          </View>
+        );
+      }
+      case 'inc': {
+        const sd = flow.side;
+        if (flow.step === 'passer') return (
+          <View style={c.panel}>{head('Pass incomplete — passer', sd)}
+            <PlayerGrid players={players(sd)} onPick={(p) => (s.trackTargets ? setFlow({ ...flow, p1: who(p), step: 'target' }) : play(sd, { play: 'inc', p1: who(p) }))}
+              skip={{ label: 'Skip passer', onPress: () => (s.trackTargets ? setFlow({ ...flow, p1: undefined, step: 'target' }) : play(sd, { play: 'inc' })) }} />
+          </View>
+        );
+        return (
+          <View style={c.panel}>{head('Pass incomplete — intended for', sd)}
+            <Text style={c.meta}>Passer: {flow.p1?.name ?? '—'} · <Text style={c.linkInline} accessibilityRole="button" onPress={() => setFlow({ ...flow, step: 'passer' })}>change</Text></Text>
+            <PlayerGrid players={players(sd).filter((p) => p.id !== flow.p1?.id)} onPick={(p) => play(sd, { play: 'inc', p1: flow.p1, p2: who(p) })}
+              skip={{ label: 'No target / skip', onPress: () => play(sd, { play: 'inc', p1: flow.p1 }) }} />
           </View>
         );
       }
@@ -384,7 +430,7 @@ const ScoringControls: SportPlugin<AFState>['ScoringControls'] = ({
         );
         return (
           <View style={c.panel}>{head('Sack — yards lost', sd)}
-            <YardsPad chips={[-1, -2, -3, -4, -5, -6, -7, -8, -10]} onPick={(y) => play(sd, { play: 'sack', yards: -Math.abs(y), p2: who(flow.p2) })} label="Yards lost" />
+            <YardsPad chips={[-1, -2, -3, -4, -5, -6, -7, -8, -10]} onPick={(y) => play(sd, { play: 'sack', yards: -Math.abs(y), p1: lastPasser(s, sd), p2: who(flow.p2) })} label="Yards lost" />
           </View>
         );
       }
@@ -579,10 +625,7 @@ const ScoringControls: SportPlugin<AFState>['ScoringControls'] = ({
             const qb = lastPasser(s, sd);
             setFlow(qb ? { mode: 'pass', side: sd, step: 'receiver', p1: qb } : { mode: 'pass', side: sd, step: 'passer' });
           }} />
-          <Button label="✗ Incomplete" accessibilityLabel="Pass incomplete" variant="ghost" style={c.third} onPress={() => {
-            const qb = lastPasser(s, sd);
-            if (qb) play(sd, { play: 'inc', p1: qb }); else setFlow({ mode: 'inc', side: sd });
-          }} />
+          <Button label="✗ Incomplete" accessibilityLabel="Pass incomplete" variant="ghost" style={c.third} onPress={() => incomplete(sd)} />
           <Button label="💥 Sack" variant="ghost" style={c.third} onPress={() => setFlow({ mode: 'sack', side: sd, step: 'who' })} />
           <Button label="🔄 Interception" variant="ghost" style={c.third} onPress={() => setFlow({ mode: 'int', side: sd, step: 'who' })} />
           <Button label="🏈 Fumble lost" variant="ghost" style={c.third} onPress={() => setFlow({ mode: 'fumble', side: sd, step: 'who' })} />
@@ -776,26 +819,41 @@ const AFScoreboard: NonNullable<SportPlugin<AFState>['Scoreboard']> = ({ state, 
   );
 };
 
+/** Deep wave: the Score tab's views — the play-by-play commentary (by drive /
+ *  by quarter), the broadcast team stats (quarter / category filters), the
+ *  drive chart (play by play only), the box score and the key moments. */
+const VIEWS = [
+  { key: 'pbp', label: 'Play-by-play' }, { key: 'stats', label: 'Match stats' }, { key: 'drives', label: 'Drives' },
+  { key: 'box', label: 'Box score' }, { key: 'timeline', label: 'Key moments' },
+] as const;
+
 const LiveExtras: NonNullable<SportPlugin<AFState>['LiveExtras']> = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster, onPlayer }) => {
   const s = state as AFState;
-  const plays = s.mode === 'pbp' ? afPlays(s, 15) : [];
+  const [view, setView] = useState<(typeof VIEWS)[number]['key']>('pbp');
+  const names = { home: homeName, away: awayName };
+  const hasDrives = afDrives(s).drives.length > 0;
+  const views = VIEWS.filter((v) => v.key !== 'drives' || hasDrives);
+  const active = views.some((v) => v.key === view) ? view : 'pbp';
+  const n = Math.min(totalPeriods(s), Math.max(1, s.period));
+  const scopes = n >= 2 ? Array.from({ length: n }, (_, i) => ({ value: i + 1, label: periodName(s, i + 1) })) : [];
   return (
     <View style={{ gap: theme.spacing(3) }}>
-      <Text style={c.h}>Scoring summary</Text>
-      <LiveTimeline events={afTimeline(s)} homeColor={homeColor} awayColor={awayColor} emptyText="No scores yet." homeRoster={homeRoster} awayRoster={awayRoster} onPlayer={onPlayer} />
-      {plays.length ? (
-        <>
-          <Text style={c.h}>Play by play</Text>
-          {plays.map((p) => (
-            <View key={p.id} style={c.editRow}>
-              <Text style={c.editWhen}>{p.when}</Text>
-              <Text style={c.editLabel}>{p.side === 'home' ? homeName : awayName} · {p.text}</Text>
-            </View>
-          ))}
-        </>
-      ) : null}
-      <Text style={c.h}>Box score</Text>
-      <MatchBoxScore sport="american_football" source={afBox(s, { homeRoster, awayRoster, homeName, awayName })} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} onPlayer={onPlayer} />
+      <View style={c.grid} accessibilityRole="tablist">
+        {views.map((v) => <SelectChip key={v.key} label={v.label} active={active === v.key} onPress={() => setView(v.key)} />)}
+      </View>
+      {active === 'pbp' ? (
+        <GroupedFeed groups={afCommentary(s, names)} homeColor={homeColor} awayColor={awayColor} tags={AF_FEED_TAGS} scopeLabel={afScopeLabel(s)}
+          emptyText="No plays yet — the commentary fills in from the kickoff." />
+      ) : active === 'stats' ? (
+        <StatSheetView build={(sc) => afSheet(s, sc, s.ended ? undefined : matchSec(s, Date.now()))} scopes={scopes}
+          homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} />
+      ) : active === 'drives' ? (
+        <DriveChart s={s} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} />
+      ) : active === 'box' ? (
+        <MatchBoxScore sport="american_football" source={afBox(s, { homeRoster, awayRoster, homeName, awayName })} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} onPlayer={onPlayer} show="box" />
+      ) : (
+        <LiveTimeline events={afTimeline(s)} homeColor={homeColor} awayColor={awayColor} emptyText="No scores yet." homeRoster={homeRoster} awayRoster={awayRoster} onPlayer={onPlayer} />
+      )}
     </View>
   );
 };
@@ -857,6 +915,8 @@ export const americanFootballPlugin: SportPlugin<AFState> = {
     { key: 'timeoutsPerHalf', label: 'Timeouts per team per half', type: 'number', default: 2, min: 0, max: 5, advanced: true, hint: 'NFL / NCAA / NFHS: 3 · IFAF flag: 2 (verify)' },
     { key: 'twoMinute', label: 'Two-minute warning (NFL)', type: 'toggle', default: false, advanced: true, hint: 'the clock stops at 2:00 of the 2nd and 4th quarters' },
     { key: 'trackTackles', label: 'Ask who made the tackle / flag pull (play by play)', type: 'toggle', default: false, advanced: true },
+    // deep wave — "Stats to track" (off by default)
+    ...TRACK_FIELDS.map((f) => ({ ...f, advanced: true })),
     {
       key: 'decider', label: 'If tied at the end of regulation', type: 'choice', default: 'flag',
       options: [

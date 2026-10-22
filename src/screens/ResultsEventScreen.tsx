@@ -25,12 +25,16 @@ import { ResultsSheet, Flags, windText } from '../components/results/ResultsShee
 import { WeighInCard, NextLiftCard, LiftGrid } from '../components/results/LiftingPanel';
 import { SeriesCard, FinalCard } from '../components/results/ShootingPanel';
 import { EndCard, BracketCard, matchRuleText } from '../components/results/ArcheryPanel';
+import { PrecisionInsights } from '../components/results/PrecisionInsights';
 import { TeamScoresCard, ShootMatchCard } from '../components/results/TeamEventPanel';
 import { FinishOrderCard, StageCard, PointsRaceCard, SprintBracketCard, cycHeader } from '../components/results/CyclingPanel';
 import { RoadFinishCard, TeamTable, roadHeader } from '../components/results/RoadPanel';
 import { CombinedStandingsCard, CombinedSheet } from '../components/results/CombinedPanel';
 import { EntriesPanel } from '../components/results/EntriesPanel';
 import { SyncBanner, ResyncButton, OfficialsCard } from '../components/results/RecordSync';
+// deep wave (timed races): Stats to track captures, race analysis, rounds path, commentary
+import { EventDepthPanel, TakeoverField, AthDqChips } from '../components/results/RaceDepth';
+import { raceTracking, splitsOffered, takeoversOffered, chipOffered, athDqReasonStale } from '../data/results/raceDepth';
 import type { RootStackParamList } from '../navigation/types';
 import { useParamState } from '../navigation/useParamState';
 import { getPlayers, getMyPlayerId } from '../data/repos';
@@ -159,10 +163,10 @@ export default function ResultsEventScreen() {
   // Who may enter results: the event's creator / hosts, the tournament's
   // managers, or an organiser. Everyone else (a shared /r/ link) reads.
   const canEdit = !!phase && (canOrganize(profile?.role) || phase.createdBy === profile?.id || (!!me && (phase.hostIds ?? []).includes(me))
-    || (!!tournament && canManageTournament(tournament, orgs, me)));
+    || (!!tournament && canManageTournament(tournament, orgs, me, profile?.id)));
   const view = canEdit ? tab : 'sheet';
   // SD-112: reopening a locked round / final is the organiser's call (not a scorer's)
-  const canManage = !!phase && (canOrganize(profile?.role) || phase.createdBy === profile?.id || (!!tournament && canManageTournament(tournament, orgs, me)));
+  const canManage = !!phase && (canOrganize(profile?.role) || phase.createdBy === profile?.id || (!!tournament && canManageTournament(tournament, orgs, me, profile?.id)));
 
   const load = useCallback(async () => {
     const ev = await getPhase(params.phaseId);
@@ -344,6 +348,8 @@ export default function ResultsEventScreen() {
   };
 
   const course = f.category?.course;
+  // deep wave: the meet's "Stats to track" (lap / leg times, take-overs, intermediate times)
+  const track = raceTracking(def.sport, tournament?.formats?.[def.sport as never] as Record<string, unknown> | undefined);
   // SD-93: "4. Long jump" — the next event of a combined event
   const ceNextName = comb && !ceLast ? `${comb.index + 2}. ${disciplineOf(comb.events[comb.index + 1])?.label ?? ''}` : '';
   const advance = async () => {
@@ -703,7 +709,7 @@ export default function ResultsEventScreen() {
             )}
             {shootMatches && <ShootMatchCard entries={resEntries} discipline={def.key} editable={editable} onSave={saveLift} />}
             {shoot && !shootFinalPhase && !shootMatches && !teamRank && (editable || anyMark) && (
-              <SeriesCard entries={heatRes} ev={shoot} shots={shotsOf(shoot, f.category)} mode={f.shootEntry ?? 'series'} editable={editable} onSave={saveLift} />
+              <SeriesCard entries={heatRes} ev={shoot} shots={shotsOf(shoot, f.category)} mode={f.shootEntry ?? 'series'} editable={editable} onSave={saveLift} rules={f.rules} />
             )}
             {arch && !archBracket && !teamRank && (editable || anyMark) && <EndCard entries={heatRes} round={arch} editable={editable} onSave={saveLift} />}
             {/* SD-98 cycling: the order on the line, a stage, a points race, sprint match play */}
@@ -719,7 +725,7 @@ export default function ResultsEventScreen() {
             )}
             {sprintBr && <SprintBracketCard entries={resEntries} editable={editable} onSave={saveLift} />}
             {/* SD-92: road / walk / XC — tap (or bib) in finish order, times optional */}
-            {roadEv && (editable || anyMark) && <RoadFinishCard def={def} entries={heatRes} editable={editable} onSave={saveLift} road={f.road} age={f.category?.age} />}
+            {roadEv && (editable || anyMark) && <RoadFinishCard def={def} entries={heatRes} editable={editable} onSave={saveLift} road={f.road} age={f.category?.age} chip={chipOffered(def, f, track)} />}
             {arch && archBracket && <BracketCard entries={resEntries} round={arch} fmt={matchFormatOf(arch.bow)} editable={editable} onSave={saveLift} rules={f.rules} discipline={def.key} />}
             {shoot && shootFinalPhase && phase.status !== 'completed' && <FinalCard entries={heatRes} ev={shoot} editable={editable} onSave={saveLift} />}
             {lifts && editable && <NextLiftCard entries={heatRes} seq={nextSeq(resEntries)} onSave={saveLift} rules={f.rules} lb={showLb} />}
@@ -800,10 +806,13 @@ export default function ResultsEventScreen() {
                       register={(x) => { inputs.current.set(e.id, x); }} onNext={() => focusAfter(e.id)} onChange={(n) => void save(e, n)} />
                   )}
                   {/* SD-112: splits stay folded behind "＋ Splits" (a 1500 m card would show 29 boxes) */}
-                  {(swim || crew) && editable && (swim ? (f.splits ?? true) : !!f.splits) && splitDistances(def.key).length > 0 && (r.status ?? 'ok') === 'ok' && (
+                  {editable && splitsOffered(def, f, track) && (r.status ?? 'ok') === 'ok' && (
                     openSplits.has(e.id) || r.splits?.length
                       ? <SplitsField key={`${e.id}:s:${(r.splits ?? []).join(',')}`} def={def} r={r} onChange={(n) => void save(e, n)} />
                       : <SelectChip label="＋ Splits" active={false} onPress={() => setOpenSplits((cur) => new Set(cur).add(e.id))} />
+                  )}
+                  {editable && takeoversOffered(def, track) && (r.status ?? 'ok') !== 'DNS' && (
+                    <TakeoverField key={`${e.id}:t:${(r.takeovers ?? []).join(',')}`} r={r} onSave={(t) => void save(e, { ...r, takeovers: t })} />
                   )}
                   {/* SD-98: a pursuit final ends when one rider catches the other */}
                   {isPursuitKind(cycK) && raceFinal && editable && (r.status ?? 'ok') === 'ok' && (
@@ -849,6 +858,8 @@ export default function ResultsEventScreen() {
               // SD-97: during the snatch nobody has a total yet — show the snatch standings
               ? <ResultsSheet def={disciplineOf(LIFT_DISCIPLINE.snatch)!} title="Live — snatch standings" heats={new Map([[1, liftRanked.snatch]])} />
               : <ResultsSheet def={def} title={cycK === 'stage' ? `GC after stage ${f.phaseNo}` : 'Live ranking'} subtitle={heats.length > 1 ? heatName(activeHeat) : undefined} heats={new Map([[activeHeat, heatRows]])} wind={windByHeat} notes={notes} road={f.road} />}
+            {/* Deep wave: weightlifting / shooting / archery — the newest commentary lines */}
+            {anyMark ? <PrecisionInsights def={def} f={f} entries={resEntries} mode="live" /> : null}
             {comb ? <CombinedStandingsCard rows={ceRows} c={comb} current={comb.index} title={`Standings after ${combinedPhaseName(f)}${phase.status === 'completed' ? '' : ' (live)'}`} flags={ceFlags} /> : null}
             {cycK === 'stage' && anyMark ? <StageSheets def={def} stageNo={f.phaseNo} entries={heatRes} /> : null}
             {f.road?.team ? <TeamTable rows={teams} scorers={f.road.team.scorers} basis={f.road.team.basis} size={f.road.team.size} /> : null}
@@ -864,6 +875,7 @@ export default function ResultsEventScreen() {
             {comb ? <CombinedSheet rows={ceRows} c={comb} title={`${f.eventTitle ?? ''} — ${ceLast && phase.status === 'completed' ? 'final classification' : `after ${combinedPhaseName(f)}`}`} subtitle={`${disciplineOf(comb.key)?.label ?? ''} · ${comb.table === 'M' ? 'men’s' : 'women’s'} scoring tables · ${meetDay(phase.startsAt)}`} flags={ceFlags} /> : null}
             <ResultsSheet def={def} title={phase.title} subtitle={`${categoryLabel(f.category)}${swim ? ` · ${courseLabel(f.category?.course)}` : ''} · ${meetDay(phase.startsAt)}`} heats={overall && anyMark ? new Map([[0, overall]]) : ranked} wind={windByHeat} overall={!!overall && anyMark} heatLabel={heatName} notes={notes} road={f.road} />
             {f.jumpOff ? <Text style={textStyles.muted}>{jumpOffText(f.jumpOff, def, resEntries)}</Text> : null}
+            <EventDepthPanel phase={phase} f={f} def={def} phases={phases} entries={resEntries} ranked={ranked} nameOf={nameOf} heatLabel={heatName} yards={course === 'SCY'} />
             {cycK === 'stage' && anyMark ? <StageSheets def={def} stageNo={f.phaseNo} entries={resEntries} /> : null}
             {f.road?.team && anyMark ? <TeamTable rows={teams} scorers={f.road.team.scorers} basis={f.road.team.basis} size={f.road.team.size} /> : null}
             {lifts && liftRanked && anyMark && (
@@ -872,6 +884,8 @@ export default function ResultsEventScreen() {
                 <ResultsSheet def={disciplineOf(LIFT_DISCIPLINE.cj)!} title="Clean & jerk" heats={new Map([[1, liftRanked.cj]])} />
               </>
             )}
+            {/* Deep wave: weightlifting / shooting / archery — event stats + the full commentary */}
+            {anyMark ? <PrecisionInsights def={def} f={f} entries={resEntries} mode="full" /> : null}
             {awards.length > 0 && (
               <Card style={{ gap: theme.spacing(1) }}>
                 <Text style={textStyles.h3}>Medals & points</Text>
@@ -1274,8 +1288,9 @@ function StatusChips({ def, r, onChange, onFalseStart }: { def: DisciplineDef; r
         ))}
       </View>
       {(s === 'DQ' || s === 'FS') && (
-        <RuleRef value={r.ruleRef} hint={ruleHint(def)} onSave={(v) => onChange({ ...r, ruleRef: v || undefined })} />
+        <RuleRef key={r.ruleRef ?? ''} value={r.ruleRef} hint={ruleHint(def)} onSave={(v) => onChange({ ...r, ruleRef: v || undefined, ...(athDqReasonStale(r, v) ? { reason: undefined } : {}) })} />
       )}
+      {s === 'DQ' && <AthDqChips def={def} r={r} onChange={onChange} />}
     </View>
   );
 }

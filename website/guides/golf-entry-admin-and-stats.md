@@ -1,18 +1,18 @@
 ---
 title: Golf entry admin, stats and prizes
-description: Withdraw, disqualify or mark a golfer as did not start, change a handicap, track fairways and bunkers, and show gross and net prizes or a playoff.
+description: Withdraw or disqualify a golfer, fix a handicap, choose the stats to track, follow the hole-by-hole commentary and round stats, and show gross / net prizes.
 category: Tournaments
 audience: Organisers, Scorers, Players
 sports: golf
 order: 81
-updated: 2026-10-11
+updated: 2026-10-22
 ---
 
 A player gets hurt on the 9th, someone never turns up, a handicap was typed wrong, or two players tie for first. This guide shows how the organiser handles each, how a marker records fairways, bunkers and penalties, and how gross and net prizes are shown. For scoring a round and the leaderboard, see [Run a golf event](/guides/golf-scoring-and-leaderboard/).
 
 ## Before you start
 - Only a host of the round (the organiser) can withdraw, disqualify, change a handicap or remove a player.
-- Any marker in the group can use the stats row.
+- Any marker in the group can record the stats being tracked.
 
 ## Step by step: withdraw, disqualify or did not start
 1. Open the round. On the **📝 Scorecard** tab, tap **⋯** next to the player's name. On the **🏆 Leaderboard** tab you can also press and hold the player's row.
@@ -38,14 +38,33 @@ You can do this before or after the round starts. The strokes the player receive
 
 > **Tip:** If the player has already played some holes, mark them WD instead. Their scores stay on record.
 
-## Step by step: the stats row
-1. On the **📝 Scorecard** tab, tap **Stats: fairway · bunker · penalties** under the cards. Your phone remembers this for your next round. Putts turn on with it.
-2. After entering the strokes on a par 4 or par 5, tap where the tee shot finished: **◀ L**, **✓** (fairway hit) or **R ▶**. Tap again to clear it.
-3. Tap **⛱ Bunker** if the player was in a greenside bunker.
-4. Tap **Pen 0** to add a penalty stroke (it counts up). Tap **−** to take one off.
-5. Enter the putts. The card then shows **GIR ✓** or **GIR ✗**: a green in regulation means on the green in two shots fewer than par (strokes minus putts).
+## Step by step: choose the stats to track
+Strokes are always kept, and they are all a quick round needs. Each extra stat adds one row on the hole card.
 
-The app then works out fairways hit (misses left and right), scrambling (par or better after missing the green), sand saves (out of a greenside bunker and down in one putt or fewer) and putts per green hit. Tap a player on the leaderboard to see the round's line, for example "GIR 12/18 · FW 9/14 (L2 R3)". The stats row is off by default, so quick rounds stay quick.
+1. On the **📝 Scorecard** tab, under the cards, tap **Change** on **⚙️ Stats to track**.
+2. Tap the stats you want: **Putts**, **Fairways**, **Bunkers**, **Penalties**, **First-putt length** and **Driving distance**.
+   - If you are the organiser, your choice applies to every marker in the round, so every card is kept the same way.
+   - If the organiser hasn't chosen, each marker's phone remembers its own choice.
+3. With **Driving distance** on, the organiser can tap the **measured holes** (the PGA TOUR measures two, played in opposite directions). With none picked, any par 4 or par 5 can be measured.
+
+## Step by step: record the stats on a hole
+1. Enter the strokes as usual (**−**, **+** or **Par**).
+2. **Putts**: tap 0–4, or **5+**. The card shows **GIR ✓** or **GIR ✗**: a green in regulation means on the green in two shots fewer than par (strokes minus putts).
+3. **Fairways** (par 4 and par 5): tap **◀ L**, **✓** (hit) or **R ▶**. Tap again to clear it.
+4. **Driving distance**: type the yards on a measured hole, for example `268`.
+5. **Bunkers**: tap **⛱ Bunker** if the player was in a greenside bunker.
+6. **Penalties**: tap **Pen 0** to add a penalty stroke; **−** takes one off.
+7. **First-putt length** (once a putt is entered): tap **< 3 ft**, **3–10 ft**, **10–20 ft** or **20 ft+**.
+
+The app works out fairways hit (misses left and right), greens in regulation, scrambling (par or better after missing the green), sand saves (out of a greenside bunker and down in one putt or fewer), putts per green hit, one-putts and three-putts, birdie conversion and putts holed by length. Nothing is required: skip a row and that hole simply isn't counted, never as a 0.
+
+## The commentary and the round stats
+On the **🏆 Leaderboard** tab:
+- **🎙 Commentary** tells the round hole by hole, newest first, for example "Asha Rao — birdie 3 · 3 under through 7", with the detail that was tracked ("Found the fairway · green in regulation · 1 putt from 3–10 ft"), the time it was entered and each hole's field average. Tap a name to follow one player.
+- **📊 Round stats** shows one player beside the field average, in the PGA TOUR's groups (Scoring, Off the tee, Approach, Around the green, Putting), for the round or **Out** / **In**. It includes par-3, par-4 and par-5 scoring and bounce back.
+- Tap a player's row for their card, then **📊 Stats** or **🎙 Hole by hole**.
+
+In match play, the **Score** tab tells the match hole by hole, for example "Hole 7 (par 4): Asha wins with a birdie 3 to Ravi's par 4 · Asha 2 UP thru 7".
 
 ## Gross and net prizes
 In stroke play with handicaps, the **🏆 Leaderboard** tab shows **Best gross** and **Best net** side by side, with one prize place per four players (up to three).
@@ -62,3 +81,4 @@ Open a player's profile and choose golf to see their rounds, scoring average and
 
 - **Best round** only compares complete 18-hole rounds with no pick-ups. A 9-hole round is shown on its own as **Best 9 holes**.
 - **Scrambling**, **Sand saves** and **Putts per GIR** appear once a round was kept with the stats row. A ☁ means only some rounds tracked it. Older rounds count as not tracked, never as 0%.
+- **Scoring by par and nine** (par-3 / 4 / 5 scoring averages, front and back nine averages, birdie or better %, bogey or worse %, bounce back, holes in one), **Off the tee** (driving distance on measured holes, longest drive) and **Putting** (one-putt %, three-putt %, birdie conversion, putts holed by length) appear once a round carries them, with "over N of M rounds" when only some did.

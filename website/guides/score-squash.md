@@ -5,7 +5,7 @@ category: Live scoring
 audience: Scorers, Organisers
 sports: squash
 order: 60
-updated: 2026-10-11
+updated: 2026-10-22
 ---
 
 In PAR (point-a-rally) squash every rally is a point. In English scoring only the server scores; a lost serve is a hand-out. You tap each rally's winner.
@@ -29,14 +29,14 @@ Wrong first server? Tap **Fix who served first**. Only the serve changes; the sc
 
 ## Referee decisions: let, stroke, no let
 Under the point buttons:
-- **🔁 Let — replay the rally (no point)**.
+- **🔁 Let · Asha Rao asked** (or the other side): the rally is replayed, no point. The app notes who appealed.
 - **✋ Stroke → Asha Rao**: the stroke is awarded, so Asha wins the rally.
 - **🚫 No let → Asha Rao**: the opponent's appeal is refused, so Asha wins the rally.
 
-One tap scores the rally (in English scoring it can be a hand-out) and records the decision, even with point detail off. The decision counts appear in "Match stats" and on profiles; winners and errors stay "not tracked" unless point detail was on.
+One tap scores the rally (in English scoring it can be a hand-out) and records the decision, even with point detail off. "Match stats" lists them under **Referee decisions** (lets asked, strokes won, no lets), and strokes / no lets go on profiles; winners and errors stay "not tracked" unless point detail was on.
 
 ## Between games
-After each game a banner shows **⏸ Up to 90 s between games**. The same mark appears in the rally log.
+After each game a banner shows **⏸ Up to 90 s between games**. The same mark appears in the commentary.
 
 ## Step by step: English scoring
 1. On the **Scoring** tab, the top box says "English scoring" and shows the server.
@@ -52,17 +52,35 @@ GAMES won and a points column per game, with a dot by the serving side. The resu
 A chip under the board shows **GAME POINT** or **MATCH POINT** with the side's name. In English scoring only the server can have one; in PAR both sides can show one at once.
 
 ## Match stats
-The **Score** tab's "Match stats" show points won on serve and receive (PAR), or hand-outs won and points per service turn (English), plus streaks and game or match points saved.
+The **Score** tab's "Match stats" (per match or game) has tabs:
+- **Key stats**: Serve (points won on serve and receive in PAR; rallies won on serve, hand-out %, hand-outs won and points per service turn in English), Winners & errors, **Referee decisions**, Points won (total, streaks, biggest lead) and game / match points converted and saved.
+- **Serve**: every serve and receive figure.
+- **Shots** (with point detail): winners, unforced or forced errors by shot, for either wing or **Forehand** / **Backhand** only; a stroke summary; errors and service faults by type.
+- **Rally length** (with rally length tracked): points won after 0–5, 6–15 and 16+ shots, and on serve / on receive.
 
-## Point detail (optional)
-Off by default. Turn it on with **On** in the "🔎 Point detail (optional)" row under the buttons, or the **Point detail** toggle in "⚙️ Scoring settings".
+A tab or row only shows when the match tracked it.
 
-After each rally, "How was it won? · Asha Rao" appears. Tap a chip or **Skip**; nothing is required.
-- **Winner** + **Drive**, **Drop**, **Boast**, **Volley**, **Nick**.
-- **Forced error**, **Unforced error** + **Tin**, **Out**, or **Service fault**.
-- **Stroke** and **No let** are here too, for the last rally.
+## Extra stats (optional)
+Scoring stays one tap per rally. To track more, open **⚙️ Scoring settings** and pick under **Stats to track**, or tap **Choose** next to "📊 Extra stats" under the point buttons. All are off by default; an organiser can switch them on for every match of a format under **⚙ Customize this format**. A change during play counts from the next rally.
+- **Point detail**: how the rally ended.
+- **Rally length**: 0–5, 6–15 or 16+ shots.
+
+After each rally a "Last point" card appears. Tap what you know, or **Skip**:
+1. **Winner**, **Forced error**, **Unforced error**, **Service fault** (receiver won), **Stroke** or **No let**.
+2. **Forehand** or **Backhand**.
+3. The shot: **Drive**, **Drop**, **Boast**, **Volley**, **Lob**, **Kill**, **Nick**.
+4. For an unforced error, **Error:** **Tin** or **Out**; for a service fault, **Fault:** **Short**, **Foot fault** or **Out**.
+5. With rally length on: **0–5**, **6–15** or **16+ shots**.
 
 Winners and strokes count for the rally winner; errors and no lets against the opponent (doubles: pick who under **By:**).
+
+## Commentary
+Under the stats, "Commentary" tells the match game by game, newest first, the game in play on top:
+- "Asha Rao wins game 3" with the game score, e.g. **11-7**, and where the match stands.
+- Each rally: "Point to Asha Rao" (English scoring: "Rally to Asha Rao" when it only won the serve back), the match time and, if you described it, a line like "Meera Iyer loses the point with a Backhand Drop Unforced Error (tin)" or "Stroke to Asha Rao". On the right, the score as the marker calls it, the server's score first; "Hand-out · Meera Iyer to serve" when the serve changes.
+- Lets ("Appeal by Meera Iyer · rally replayed"), conduct, the 90 s between games and who served first.
+
+It updates after every rally and after a correction.
 
 ## Fix a mistake
 - Wrong tap just now? The Undo bar names what it removes, e.g. "↶ Undo: point to Asha Rao (7-5)". Each tap undoes one step.

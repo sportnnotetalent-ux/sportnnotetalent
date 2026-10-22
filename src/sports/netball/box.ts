@@ -10,6 +10,7 @@ import type { Player } from '../../core/types';
 import type { BoxRowInput, BoxSideInput, MatchBoxSource } from '../boxScore.ts';
 import { centreInfo, eventCredits, periodName, teamFigures, totalPeriods, LIVE_KEYS, POSITIONS, type NetballState, type Side } from './engine.ts';
 import { netballTotals } from './totals.ts';
+import { nbDeepCredits, nbDeepKeys } from './deep.ts';
 
 export interface NetballBoxContext { homeRoster?: Player[]; awayRoster?: Player[] }
 
@@ -26,6 +27,9 @@ export function netballBox(s: NetballState, ctx: NetballBoxContext = {}): MatchB
     data: (scope) => {
       const totals = scope === 'all' ? netballTotals(s) : {};
       const cp = scope === 'all' ? centreInfo(s) : undefined;
+      // Deep wave: CPR / gains / pick-ups / super shots, only when tracked
+      const deepKeys = nbDeepKeys(s);
+      const deepSet = new Set(deepKeys);
       const side = (sd: Side): BoxSideInput => {
         const roster = (sd === 'home' ? ctx.homeRoster : ctx.awayRoster) ?? [];
         const rows = new Map<string, BoxRowInput>();
@@ -36,7 +40,7 @@ export function netballBox(s: NetballState, ctx: NetballBoxContext = {}): MatchB
           let r = rows.get(k);
           if (!r) {
             const nm = name ?? roster.find((p) => p.id === id)?.fullName ?? 'Player';
-            r = { name: nm, ...(id ? { playerId: id } : {}), stats: Object.fromEntries(ROW_KEYS.map((x) => [x, 0])) };
+            r = { name: nm, ...(id ? { playerId: id } : {}), stats: Object.fromEntries([...ROW_KEYS, ...deepKeys].map((x) => [x, 0])) };
             rows.set(k, r);
           }
           return r;
@@ -51,6 +55,8 @@ export function netballBox(s: NetballState, ctx: NetballBoxContext = {}): MatchB
             const r = row(cr.playerId, cr.playerName);
             if (r) for (const [k, v] of Object.entries(cr.stats)) if (k in r.stats) r.stats[k] += v;
           }
+          const d = deepKeys.length ? nbDeepCredits(s, e, deepSet) : undefined;
+          if (d) { const r = row(d.id, d.name); if (r) for (const [k, v] of Object.entries(d.stats)) r.stats[k] = (r.stats[k] ?? 0) + v; }
         }
         if (scope === 'all') {
           for (const [id, t] of Object.entries(totals)) {

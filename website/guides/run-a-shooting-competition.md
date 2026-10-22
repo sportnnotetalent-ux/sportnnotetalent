@@ -5,7 +5,7 @@ category: Tournaments
 audience: Organisers, Scorers, Players, Parents & fans
 sports: shooting
 order: 89
-updated: 2026-10-11
+updated: 2026-10-22
 ---
 
 A shooting competition is a list of events, such as 10 m Air Rifle Junior Men. Each event is a match of series, and for 10 m air rifle, 10 m air pistol and 50 m rifle 3 positions the best shooters then shoot a final. You type each series or shot on a phone; the app ranks with the ISSF tie rules, runs the final's eliminations and shoot-offs, and updates medals, house points, records and profiles.
@@ -35,6 +35,8 @@ A shooting competition is a list of events, such as 10 m Air Rifle Junior Men. E
 
 > **Important:** A series can never be more than its maximum: 109.0 for 10 decimal shots, 100 for 10 integer shots. The app refuses it. A very low series asks **Check this series** before saving.
 
+> **Note:** Penalties are optional. When the organiser switches on **Penalties** in **Competition rules → Stats to track**, each saved series shows **＋ Penalty −2**. Tap it again for −4; a third tap clears it. The total, the ties and the records use the score after the deduction.
+
 ## Step by step: run the final
 1. Finalists start from zero. The **FINAL** card shows the shot to fire, for example **Shot 11 of 24 · next elimination after shot 16**.
 2. Type each finalist's shot as it appears on the monitor: `10.5`, or just `105`. Final shots are always decimal, for pistol too.
@@ -50,13 +52,15 @@ A shooting competition is a list of events, such as 10 m Air Rifle Junior Men. E
 - **Final:** the first out is last. With 8 finalists the 10 m final eliminates from shot 12 (later with fewer); in 50 m 3 positions two go out after shot 40.
 
 ## What everyone sees
+- **Commentary**, newest first. In the match, each series shows every shooter's score and running total with their place, the best series, the leader and any perfect series. In the final, each shot shows every finalist's value, the leader and the gap, then shoot-offs, eliminations and the podium. It is built from the results, so a correction rewrites it.
+- **Match stats** on the results sheet: each shooter's best and worst series, the spread, the average series and inner tens, position totals in 3 positions, and the shot distribution when shots were entered one by one. The final shows shots, average shot, best shot, shots of 10.0 or more and the place after each elimination.
 - **House table** and **Best shooters (points)** on the Shooting page and the tournament's **Stats** tab.
 - **Meet records** per event and match length. Records are match scores; a final score is never a record.
-- **Shooter profiles:** competitions, finals reached, inner-ten rate, medals, personal and season bests per event, and the average per 10 shots.
+- **Shooter profiles:** competitions, finals reached, inner-ten rate, medals, personal and season bests per event, the average per 10 shots, the best series, perfect series and the average final shot.
 
 ## Common questions
 ### Are the 25 m and shotgun finals run here?
-Not yet: 25 m, trap and skeet medals come from the match. Mixed teams rank on the team total, without medal matches.
+Not yet: 25 m, trap and skeet medals come from the match. Teams of 3 and mixed team medal matches are covered in [team events](/guides/team-events-in-meets/).
 
 ### We locked the results and found a mistake.
 An organiser can tap **↺ Reopen final**. Its records go back to the previous holders, and its points leave the house table until you lock it again.

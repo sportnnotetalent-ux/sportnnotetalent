@@ -5,7 +5,7 @@ category: Live scoring
 audience: Scorers, Organisers
 sports: netball
 order: 52
-updated: 2026-10-12
+updated: 2026-10-22
 ---
 
 Score a netball match on one phone. Set the seven positions once and every goal is one tap on the shooter's name. The app runs the clock, shows whose centre pass it is, times suspensions and builds the stats.
@@ -13,7 +13,7 @@ Score a netball match on one phone. Set the seven positions once and every goal 
 ## Before you start
 - You must be a scorer or host of the match or its tournament. See [Scorers and officials](/guides/scorers-and-officials/) and [Only one phone scores at a time](/guides/one-scorer-at-a-time/).
 - The organiser picks the **Format**: **International 4 × 15**, **School 4 × 10**, **Halves 2 × 20** or **Custom**, and **If level at full time**: **Draw stands (league)** or **Extra time, then play on (World Netball)**.
-- Add both teams' players. Under **⚙ Customize this format** you can turn on **Ask for feeds & rebounds**, change the suspension length, or allow team time-outs if your league uses them.
+- Add both teams' players. Under **⚙ Customize this format** you can turn on **Ask for feeds & rebounds**, change the suspension length, allow team time-outs, or play **2-point super shots** (Super Netball rules) if your league uses them.
 
 ## Step by step: set up and start
 1. Open the match → **Scoring** and tap **▶ Start the match**.
@@ -29,6 +29,13 @@ Score a netball match on one phone. Set the seven positions once and every goal 
 5. With **Ask for feeds & rebounds** on, a goal then asks "Goal assist — who fed the circle?", and a miss asks for the feed and the rebound.
 
 > **Tip:** Hands busy? Tap **🎤 Voice scoring** and say "goal GS home", "miss GA away" or "centre away". See [Score by voice](/guides/score-by-voice/).
+
+## More stats to track (optional)
+In **⚙️ Match settings**, turn on only what you can keep up with. Each switch applies from the next play.
+- **Centre pass receives:** under the centre-pass strip, tap who caught it (**WA**, **GA**, **WD** or **GD**).
+- **Gains & pick-ups:** after a deflection, tap **Gain — won it** or **No gain**. **🤲 Pick-up** joins **More**.
+- **Turnover types:** after the player, tap **Bad pass**, **Footwork**, **Held ball** and so on (or **Skip**).
+- **Super shots** (if your format plays them): in the last minutes of a quarter, tap **⭐ Super shot**, then the goal. It scores 2.
 
 ## Held time, subs and breaks
 1. When the umpires hold time, tap **⏸ Hold** and pick **🩹 Injury / illness**, **🩸 Blood**, **⇄ Tactical change** or **Other**. The clock stops; tap **▶ Resume** when play restarts.
@@ -52,9 +59,9 @@ Group matches keep a draw. In a knockout, a level score at the end of the fourth
 3. After the match, use [Correct a finished match](/guides/correct-a-finished-match/).
 
 ## What you get
-- **Score** tab: the timeline, goals per quarter, team stats (attempts, shooting %, centre passes, centre-pass goals, goals from gains, intercepts, penalties, sanctions) and each player's line.
+- **Score** tab: goals per quarter, then **Play-by-play** (every moment in words with the running score, by quarter), **Team stats** (shooting by GS and GA, centre passes and centre-pass-to-goal %, gains, intercepts, deflections, rebounds, turnovers by type and penalties, for the match or one quarter) and **Players** (each player's line).
 - **Summary**: Player of the match and the top shooter.
-- Player profiles: goals, attempts, shooting %, goals per game, intercepts and quarters played at each position.
+- Player profiles: goals, attempts, shooting %, goals per game, intercepts, quarters at each position and, where you tracked them, gains, centre pass receives and super shots.
 - Tournament tables use **World Netball 2-1-0** (ties on goal percentage, then goal difference, then head-to-head) or **Goal difference**. See [Points table and adjustments](/guides/points-table-and-adjustments/).
 - Tournament Records: highest scores, biggest wins, most goals by a player, perfect shooting (10+ attempts).
 

@@ -190,7 +190,7 @@ describe('SD-19 · contract: the sports that had totals before', () => {
   test('basketball (SD-40 box keys + SD-29 MIN / +/-): live credits, misses, removals', () => {
     const sp: TotalsSport<basketball.BasketballState> = {
       name: 'basketball', init: basketball.init, reducer: basketball.reducer, partial: true, config: { trackMisses: true },
-      statTotals: basketballStatTotals, derived: ['minutes', 'plusMinus'], signed: ['plusMinus'],
+      statTotals: basketballStatTotals, derived: ['minutes', 'plusMinus', 'twosMade', 'twosAtt'], signed: ['plusMinus'], // deep wave: 2PM / 2PA are statTotals-only
     };
     const pl = (id: string, name: string, type: string, payload: Record<string, unknown>, c: Record<string, number>): ScoreAction =>
       ({ type, side: id.startsWith('h') ? 'home' : 'away', payload: { ...payload, pid: id, quarter: 1, minute: 1 }, attribution: bbCredit(id, name, c) });

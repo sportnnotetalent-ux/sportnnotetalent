@@ -8,8 +8,9 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, useWindowDimensions } from 'react-native';
 import { GolfScorecard } from './GolfScorecard';
+import { GolfRoundFeed, GolfRoundStats } from './GolfRoundDeep';
 import { theme } from '../../core/theme';
-import { textStyles } from '../ui';
+import { SelectChip, textStyles } from '../ui';
 import { toParLabel, roundStats, cardHasDetail, type GolfCard, type Hole, type RankRow, type GolfScoring } from '../../sports/golf/engine';
 import { thruLabel, type RoundCell } from '../../data/golfLeaderboard';
 
@@ -101,7 +102,8 @@ export function GolfLeaderboard({
                 {open === r.id && c && (
                   <View style={st.detailWrap}>
                     {cardTitle ? <Text style={st.cardTitle}>{cardTitle}</Text> : null}
-                    <CardDetail {...c} name={nameOf(r.id)} stableford={scoring === 'stableford'} onShare={onShareCard ? () => onShareCard(r.id) : undefined} />
+                    <CardDetail {...c} name={nameOf(r.id)} stableford={scoring === 'stableford'} onShare={onShareCard ? () => onShareCard(r.id) : undefined}
+                      playerId={r.id} field={[...(cards?.entries() ?? [])].filter(([id]) => id !== r.id).map(([id, x]) => ({ id, name: nameOf(id), ...x }))} />
                   </View>
                 )}
                 {open === r.id && !c && cards && <Text style={[textStyles.muted, st.noCard]}>Not in this round.</Text>}
@@ -135,13 +137,27 @@ export function cardStatsLine({ holes, card, received }: LeaderboardCard): strin
 /** SD-88 — the player's card as a proper scorecard (Out / In / Tot, par and
  *  SI rows, birdie ◯ / bogey □ shapes, net / points / putts rows). Sized to
  *  the screen so it scrolls inside its own box, not the leaderboard's. */
-export function CardDetail({ holes, card, received, name = 'Score', stableford = false, onShare }: LeaderboardCard & { name?: string; stableford?: boolean; onShare?: () => void }) {
+export function CardDetail({ holes, card, received, name = 'Score', stableford = false, onShare, playerId = 'me', field }: LeaderboardCard & {
+  name?: string; stableford?: boolean; onShare?: () => void;
+  /** Deep wave — the player's id and the round's other cards (Stats vs the field) */
+  playerId?: string; field?: (LeaderboardCard & { id: string; name: string })[];
+}) {
   const line = cardStatsLine({ holes, card, received });
   const { width } = useWindowDimensions();
+  // Deep wave — Card · Stats (vs the field) · Hole by hole
+  const [view, setView] = useState<'card' | 'stats' | 'feed'>('card');
+  const me = { id: playerId, name, card, holes, received };
   return (
     <View style={[st.detail, { width: Math.min(width - theme.spacing(8) - 2, 760) }]}>
-      <GolfScorecard holes={holes} players={[{ name, card, received }]} stableford={stableford} onShare={onShare} />
-      {line ? <Text style={st.statsLine}>{line}</Text> : null}
+      <View style={st.views}>
+        <SelectChip label="📋 Card" active={view === 'card'} onPress={() => setView('card')} />
+        <SelectChip label="📊 Stats" active={view === 'stats'} onPress={() => setView('stats')} />
+        <SelectChip label="🎙 Hole by hole" active={view === 'feed'} onPress={() => setView('feed')} />
+      </View>
+      {view === 'card' && <GolfScorecard holes={holes} players={[{ name, card, received }]} stableford={stableford} onShare={onShare} />}
+      {view === 'card' && line ? <Text style={st.statsLine}>{line}</Text> : null}
+      {view === 'stats' && <GolfRoundStats players={[me, ...(field ?? [])]} fixed={playerId} />}
+      {view === 'feed' && <GolfRoundFeed players={[me]} scoring={stableford ? 'stableford' : 'stroke'} only={playerId} />}
     </View>
   );
 }
@@ -171,5 +187,6 @@ const st = StyleSheet.create({
   cardTitle: { color: theme.colors.textMuted, fontSize: theme.font.tiny, fontWeight: '800', textTransform: 'uppercase', paddingHorizontal: theme.spacing(3), paddingTop: theme.spacing(2) },
   detail: { padding: theme.spacing(2), gap: theme.spacing(2) },
   statsLine: { color: theme.colors.text, fontSize: theme.font.small, fontWeight: '600' },
+  views: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing(2) },
   noCard: { paddingHorizontal: theme.spacing(3), paddingVertical: theme.spacing(2) },
 });

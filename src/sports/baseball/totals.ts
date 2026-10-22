@@ -13,15 +13,28 @@
  *  - fielding from the scorer's notation (when asked): `putouts`,
  *    `fieldAssists`, `fieldErrors` (the last fielder in "6-3" makes the
  *    putout, the others assist; "E5" is the third baseman's error).
+ * Deep wave (./situational.ts — derived from the log, never credited live):
+ *  - batters: `rispAb` / `rispHits` (at bats and hits with runners in scoring
+ *    position), `twoOutRbi` — every batter who came up (0 = a true 0);
+ *  - pitchers: `pitchGroundOuts` / `pitchFlyOuts` (GO-AO) for every pitcher;
+ *    `inheritedRunners` / `inheritedScored` for relievers; and ONLY with
+ *    pitch-by-pitch on: `strikesThrown`, `ballsThrown`, `firstPitchStrikes`,
+ *    `firstPitches` (a game scored outcomes-only never gets false zeros).
  */
 import {
-  eventCredits, whoKey, other, POS_NUM, LIVE_KEYS,
+  eventCredits, whoKey, other, withAnn, POS_NUM, LIVE_KEYS,
   type BaseballEvent, type BaseballState, type Side, type Who,
 } from './engine.ts';
+import { batterFigures, notation, pitcherFigures } from './situational.ts';
+
+/** deep wave: free situational keys (any log) and the pitch-by-pitch ones */
+export const SITUATIONAL_KEYS = ['rispAb', 'rispHits', 'twoOutRbi', 'pitchGroundOuts', 'pitchFlyOuts', 'inheritedRunners', 'inheritedScored'] as const;
+export const PITCH_COUNT_KEYS = ['strikesThrown', 'ballsThrown', 'firstPitchStrikes', 'firstPitches'] as const;
 
 export const DERIVED_KEYS = [
   'runs', 'pitches', 'runsAllowed', 'earnedRuns', 'erN', 'pitchWins', 'pitchLosses', 'pitchSaves', 'gamesPitched',
   'putouts', 'fieldAssists', 'fieldErrors',
+  ...SITUATIONAL_KEYS, ...PITCH_COUNT_KEYS,
 ] as const;
 export const OWNED_LIVE_KEYS = LIVE_KEYS;
 
@@ -37,18 +50,7 @@ export function fielderAt(s: BaseballState, side: Side, n: number, pitcher?: Who
   return e ? { ...(e.id ? { id: e.id } : {}), name: e.name } : undefined;
 }
 
-/** "6-4-3" → putout 3, assists 6 and 4; "F8" → putout 8; "E5" → error 5. */
-export function notation(f?: string): { po: number[]; a: number[]; e: number[] } {
-  const out = { po: [] as number[], a: [] as number[], e: [] as number[] };
-  if (!f) return out;
-  const err = /^E(\d{1,2})$/i.exec(f.trim());
-  if (err) { out.e.push(Number(err[1])); return out; }
-  const nums = (f.match(/\d{1,2}/g) ?? []).map(Number).filter((n) => n >= 1 && n <= 10);
-  if (!nums.length) return out;
-  out.po.push(nums[nums.length - 1]);
-  out.a.push(...nums.slice(0, -1).filter((n, i, xs) => xs.indexOf(n) === i && n !== nums[nums.length - 1]));
-  return out;
-}
+export { notation };
 
 export function baseballTotals(s: BaseballState): Record<string, Line> {
   const out: Record<string, Line> = {};
@@ -96,6 +98,30 @@ export function baseballTotals(s: BaseballState): Record<string, Line> {
     if (e.type !== 'pa' || !e.side || !e.batter?.id) continue;
     const l = line(e.batter.id, e.side).stats;
     for (const k of ['plateAppearances', 'atBats', 'hits', 'runs', 'rbi'] as const) l[k] ??= 0;
+  }
+  // deep wave: situational figures — derived from the log, never credited live
+  const st = withAnn(s);
+  for (const b of batterFigures(st)) {
+    if (!b.id) continue;
+    const l = line(b.id, b.side).stats;
+    l.rispAb = b.rispAb;
+    l.rispHits = b.rispHits;
+    l.twoOutRbi = b.twoOutRbi;
+  }
+  for (const p of pitcherFigures(st)) {
+    if (p.key.startsWith('name:')) continue;
+    const l = line(p.key, p.side).stats;
+    l.pitchGroundOuts = p.go;
+    l.pitchFlyOuts = p.ao;
+    const sp = st.g.spells.find((x) => x.key === p.key);
+    if ((sp && !sp.first) || p.ir > 0) { l.inheritedRunners = p.ir; l.inheritedScored = p.irs; }
+    // pitch counts mean something only pitch by pitch (else: absent, "not tracked")
+    if (st.cfg.pitches) {
+      l.strikesThrown = p.strikes;
+      l.ballsThrown = p.balls;
+      l.firstPitchStrikes = p.firstStrikes;
+      l.firstPitches = p.firstPitches;
+    }
   }
   return out;
 }

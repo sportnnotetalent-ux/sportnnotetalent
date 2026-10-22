@@ -28,7 +28,26 @@ export interface CricketRules {
   retireAt?: number;
   /** …and may come back once everyone else has batted (default yes). */
   retireBack?: boolean;
+  /** Deep wave — "Stats to track" (capture settings, not playing rules; each
+   *  key present only when on, so older states keep their exact shape):
+   *  a pitch map (length + line) per delivery, shot control (false shots),
+   *  ball speed (km/h from a speed gun), and each bowler's type. */
+  pitchMap?: true;
+  shotCtrl?: true;
+  ballSpeed?: true;
+  bowlerType?: true;
 }
+
+/** Deep wave — the optional capture toggles ("Stats to track"), in chip order. */
+export const TRACK_KEYS = ['pitchMap', 'shotCtrl', 'ballSpeed', 'bowlerType'] as const;
+export type TrackKey = typeof TRACK_KEYS[number];
+const TRACK_WORD: Record<TrackKey, string> = { pitchMap: 'Pitch map', shotCtrl: 'Shot control', ballSpeed: 'Ball speed', bowlerType: 'Bowler type' };
+/** The capture keys that are on (absent keys = off, so the shape stays lean). */
+const trackOn = (get: (k: TrackKey) => unknown): Partial<Pick<CricketRules, TrackKey>> => {
+  const out: Partial<Pick<CricketRules, TrackKey>> = {};
+  for (const k of TRACK_KEYS) if (get(k)) out[k] = true;
+  return out;
+};
 
 export const STANDARD_RULES: CricketRules = {
   wideRuns: 1, wideLegal: false, noBallRuns: 1, noBallLegal: false,
@@ -37,7 +56,7 @@ export const STANDARD_RULES: CricketRules = {
 
 /** Config (format / SET_RULES payload) keys. Two differ from CricketRules:
  *  byesAllowed ⇄ byes, legByesAllowed ⇄ legByes. The rest are identical. */
-export const RULE_CONFIG_KEYS = ['wideRuns', 'wideLegal', 'noBallRuns', 'noBallLegal', 'freeHit', 'stdLastOvers', 'byesAllowed', 'legByesAllowed', 'wagonWheel', 'retireAt', 'retireBack'] as const;
+export const RULE_CONFIG_KEYS = ['wideRuns', 'wideLegal', 'noBallRuns', 'noBallLegal', 'freeHit', 'stdLastOvers', 'byesAllowed', 'legByesAllowed', 'wagonWheel', 'retireAt', 'retireBack', ...TRACK_KEYS] as const;
 
 const clamp05 = (v: unknown, d: number) => {
   const n = Math.floor(Number(v));
@@ -65,6 +84,8 @@ export function rulesFromConfig(config?: Record<string, unknown> | null): Cricke
     wagonWheel: bool(c.wagonWheel, STANDARD_RULES.wagonWheel),
     // SD-133 — only when on (older states: no keys).
     ...(retireOf(c.retireAt) > 0 ? { retireAt: retireOf(c.retireAt), retireBack: bool(c.retireBack, true) } : {}),
+    // Deep wave — only when on (older states: no keys).
+    ...trackOn((k) => bool(c[k], false)),
   };
 }
 
@@ -75,6 +96,7 @@ export function rulesToConfig(r: CricketRules = STANDARD_RULES): Record<string, 
     freeHit: r.freeHit, stdLastOvers: r.stdLastOvers, byesAllowed: r.byes, legByesAllowed: r.legByes,
     wagonWheel: r.wagonWheel,
     ...(r.retireAt ? { retireAt: r.retireAt, retireBack: r.retireBack !== false } : {}),
+    ...trackOn((k) => r[k]),
   };
 }
 
@@ -147,6 +169,8 @@ export function describeRulesChange(prev: CricketRules, next: CricketRules): str
   if ((prev.retireAt ?? 0) !== (next.retireAt ?? 0)) parts.push(next.retireAt ? `Batters retire at ${next.retireAt}` : 'No retire limit');
   else if (next.retireAt && (prev.retireBack !== false) !== (next.retireBack !== false)) parts.push(next.retireBack !== false ? 'Retired batters may return' : 'Retired batters can’t return');
   if (prev.wagonWheel !== next.wagonWheel) parts.push(next.wagonWheel ? 'Wagon wheel on' : 'Wagon wheel off');
+  // Deep wave
+  for (const k of TRACK_KEYS) if (!!prev[k] !== !!next[k]) parts.push(`${TRACK_WORD[k]} ${next[k] ? 'on' : 'off'}`);
   return parts.join(' · ');
 }
 
@@ -174,22 +198,30 @@ export const LOCAL_RULE_FIELDS: FormatField[] = [
   { key: 'retireAt', label: 'Batters retire at (runs)', type: 'number', default: 0, min: 0, max: 500, advanced: true, hint: '0 = off · e.g. 25 in school cricket — the batter retires not out' },
   { key: 'retireBack', label: 'Retired batters may bat again', type: 'toggle', default: true, advanced: true, hint: 'once everyone else has batted' },
   // SD-133 (CK-11) — wagon wheel + shot type after each scoring shot (optional taps)
-  { key: 'wagonWheel', label: 'Wagon wheel (where each shot went)', type: 'toggle', default: false, advanced: true, hint: 'an optional field tap after each scoring shot' },
+  { key: 'wagonWheel', label: 'Wagon wheel (where each shot went)', type: 'toggle', default: false, advanced: true, hint: 'an optional field tap after each scoring shot', group: 'Stats to track' },
+  // Deep wave — optional depth, one chip row ("Stats to track"); every tap is optional
+  { key: 'pitchMap', label: 'Pitch map (line & length)', type: 'toggle', default: false, advanced: true, hint: 'optional length + line chips after each ball', group: 'Stats to track' },
+  { key: 'shotCtrl', label: 'Shot control (beaten / edged)', type: 'toggle', default: false, advanced: true, hint: 'tap Beaten / Edged / Mistimed on a false shot — untagged balls count as in control', group: 'Stats to track' },
+  { key: 'ballSpeed', label: 'Ball speed (speed gun)', type: 'toggle', default: false, advanced: true, hint: 'type the km/h after a ball', group: 'Stats to track' },
+  { key: 'bowlerType', label: 'Bowler type (pace / spin)', type: 'toggle', default: false, advanced: true, hint: 'one tap per bowler — free when the profile has it', group: 'Stats to track' },
 ];
 
-export const LOCAL_RULE_DEFAULTS: Record<string, number | boolean> = { ...rulesToConfig(STANDARD_RULES), retireAt: 0, retireBack: true };
+export const LOCAL_RULE_DEFAULTS: Record<string, number | boolean> = {
+  ...rulesToConfig(STANDARD_RULES), retireAt: 0, retireBack: true,
+  ...Object.fromEntries(TRACK_KEYS.map((k) => [k, false])),
+};
 
 /** Cricket's live settings (event mode): before ball 1 a change patches the
  *  match format; after it, Apply logs SET_RULES (from the next ball). */
 export const CRICKET_LIVE_SETTINGS: LiveSettings<CricketState> = {
   title: '⚙️ Match rules',
-  hint: 'Local rules for this match — wides, no-balls, byes.',
+  hint: 'Local rules for this match — wides, no-balls, byes — and the optional stats to track.',
   mode: 'event',
   actionType: 'SET_RULES',
   fields: LOCAL_RULE_FIELDS,
   read: (s) => {
     const r = rulesOf(s);
-    return { ...rulesToConfig(r), retireAt: r.retireAt ?? 0, retireBack: r.retireBack !== false };
+    return { ...rulesToConfig(r), retireAt: r.retireAt ?? 0, retireBack: r.retireBack !== false, ...Object.fromEntries(TRACK_KEYS.map((k) => [k, !!r[k]])) };
   },
   beforeStart: cricketBeforeStart,
   defaults: LOCAL_RULE_DEFAULTS,

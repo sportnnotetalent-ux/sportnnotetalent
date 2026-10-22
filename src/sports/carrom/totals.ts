@@ -32,7 +32,7 @@
  * totals are always right; only the in-between live line may lag.
  */
 import type { StatTotalsContext, StatTotalsEntry } from '../types';
-import { boardBreakers, breakerPlayers, creditedPoints, type CarromState } from './engine.ts';
+import { boardBreakers, breakerPlayers, creditedPoints, FOUL_TYPES, type CarromState, type FoulType } from './engine.ts';
 
 type Side = 'home' | 'away';
 const SIDES: Side[] = ['home', 'away'];
@@ -49,6 +49,63 @@ export const CARROM_DERIVED_KEYS = ['gamesWon', 'gamesLost', 'boardsPlayed', 'wh
  *     Queen chip was used on any board). */
 export const CARROM_BREAK_KEYS = ['boardBreaks', 'boardBreaksWon'] as const;
 export const CARROM_QUEEN_KEYS = ['lostQueens'] as const;
+/** Deep wave — the optional "Stats to track" keys ('keyed': written only on a
+ *  match that tracked them; never credited live):
+ *   fouls / foulStriker / foulTouch / foulLine / foulThumb / foulOther / dues /
+ *     foulBoards — the foul log (SINGLES only: in doubles a foul is one
+ *     partner's, which the board log doesn't say, so careers don't get it);
+ *   brkPocketed / brkTracked — coins pocketed with the player's own break
+ *     strokes, over the breaks where the count was recorded (singles, or
+ *     doubles with a recorded break order);
+ *   queenMisses / qMissBoards — the Queen pocketed but the cover missed
+ *     (singles only, like fouls). */
+export const CARROM_FOUL_KEYS = ['fouls', 'foulStriker', 'foulTouch', 'foulLine', 'foulThumb', 'foulOther', 'dues', 'foulBoards'] as const;
+export const CARROM_BRK_KEYS = ['brkPocketed', 'brkTracked'] as const;
+export const CARROM_QMISS_KEYS = ['queenMisses', 'qMissBoards'] as const;
+const FOUL_KEY: Record<FoulType, typeof CARROM_FOUL_KEYS[number]> = {
+  striker: 'foulStriker', touch: 'foulTouch', line: 'foulLine', thumb: 'foulThumb', other: 'foulOther',
+};
+
+/** Deep wave — one side's tracked figures (fouls, dues, missed covers) over
+ *  the boards that tracked them; {} when the match tracked none. */
+export function carromTrackedRecord(s: CarromState, side: Side): Record<string, number> {
+  const out: Record<string, number> = {};
+  const boards = s?.boards ?? [];
+  const fb = boards.filter((b) => b.det?.fouls);
+  if (fb.length) {
+    for (const k of CARROM_FOUL_KEYS) out[k] = 0;
+    out.foulBoards = fb.length;
+    for (const b of fb) {
+      for (const t of FOUL_TYPES) {
+        const n = b.det!.fouls![side]?.[t] ?? 0;
+        out[FOUL_KEY[t]] += n; out.fouls += n;
+      }
+      out.dues += b.det!.dues?.[side] ?? 0;
+    }
+  }
+  const qb = boards.filter((b) => b.det?.qMiss);
+  if (qb.length) {
+    out.qMissBoards = qb.length;
+    out.queenMisses = qb.reduce((t, b) => t + (b.det!.qMiss![side] ?? 0), 0);
+  }
+  return out;
+}
+
+/** Deep wave — coins pocketed on the break by whoever broke (a side, or a
+ *  doubles player with a recorded break order): { pocketed, tracked } per key. */
+function breakPockets(s: CarromState): Map<string, { pocketed: number; tracked: number }> {
+  const out = new Map<string, { pocketed: number; tracked: number }>();
+  const sides = boardBreakers(s);
+  const players = s?.breakOrder ? breakerPlayers(s) : [];
+  (s?.boards ?? []).forEach((b, i) => {
+    if (b.det?.brk == null || !sides[i]) return;
+    const key = players[i]?.id ?? `side:${sides[i]}`;
+    const t = out.get(key) ?? { pocketed: 0, tracked: 0 };
+    t.pocketed += b.det.brk; t.tracked += 1;
+    out.set(key, t);
+  });
+  return out;
+}
 
 /** One side's record for the match. */
 export function carromSideRecord(s: CarromState, side: Side): Record<string, number> {
@@ -116,12 +173,20 @@ export function carromStatTotals(s: CarromState, ctx?: StatTotalsContext): Recor
     for (const k of [...CARROM_BREAK_KEYS, ...CARROM_QUEEN_KEYS]) if (k in rec) stats[k] = rec[k];
     if (resolved) for (const k of CARROM_BOX_KEYS) stats[k] = rec[k];
     const list = ids[side];
+    // Deep wave — the tracked foul log and missed covers: a singles player's
+    // own (in doubles the log doesn't say which partner, so careers skip it)
+    if (list.length === 1) Object.assign(stats, carromTrackedRecord(s, side));
+    const brk = breakPockets(s);
     // SD-134 — doubles with a recorded break order: each partner's OWN breaks
     const mine = s.breakOrder?.[side] && s.firstBreak ? breakerPlayers(s) : null;
     for (const id of list) {
       const own: Record<string, number> = mine && s.breakOrder![side]!.some((c) => c.id === id)
         ? { boardBreaks: mine.filter((c) => c?.id === id).length, boardBreaksWon: s.boards.filter((b, i) => mine[i]?.id === id && b.winner === side).length }
         : {};
+      // Deep wave — coins on the break: the player's own breaks (singles: the
+      // side's; doubles: only with a recorded break order)
+      const bp = mine ? brk.get(id) : list.length === 1 ? brk.get(`side:${side}`) : undefined;
+      if (bp) Object.assign(own, { brkPocketed: bp.pocketed, brkTracked: bp.tracked });
       out[id] = { side, stats: { ...stats, ...own }, ...(list.length === 2 ? { partnerId: list.find((x) => x !== id) } : {}) };
     }
   }

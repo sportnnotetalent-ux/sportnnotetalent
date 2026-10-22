@@ -94,13 +94,37 @@ export function seriesFromShots(shots: (number | 'X')[]): { total: number; xs: n
   return { total: fromTenths(sumTenths(shots.map((v) => (v === 'X' ? 10 : v)))), xs: shots.filter((v) => v === 'X').length };
 }
 
-/** Recompute the match total (`mark`) and inner tens (`xs`) from the series. */
+/** Recompute the match total (`mark`) and inner tens (`xs`) from the series
+ *  (deep wave: net of any penalty deductions, `pen`). */
 export function withTotals(r: EntryResult, s: ShotScoring): EntryResult {
   const series = r.series ?? [];
   const filled = series.filter((v) => v != null);
   const xs = s === 'integer' || (r.seriesX ?? []).some((x) => x != null) ? (r.seriesX ?? []).reduce((a: number, x) => a + (x ?? 0), 0) : undefined;
-  const mark = filled.length ? fromTenths(sumTenths(filled)) : undefined;
+  const pen = penaltyTotal(r);
+  const mark = filled.length ? fromTenths(sumTenths(filled) - tenths(pen)) : undefined;
   return { ...r, mark, xs };
+}
+
+/** Deep wave: penalty points deducted over the whole match (0 without any). */
+export const penaltyTotal = (r: Pick<EntryResult, 'pen'>): number => (r.pen ?? []).reduce((a: number, v) => a + (v ?? 0), 0);
+
+/** Deep wave: series `i` net of its penalty (what ties and the sheet compare). */
+export const netSeries = (r: Pick<EntryResult, 'series' | 'pen'>): number[] => (r.series ?? []).map((v, i) => fromTenths(tenths(v) - tenths(r.pen?.[i] ?? 0)));
+
+/** The deduction for one penalty (ISSF: 2 points). */
+export const PENALTY_POINTS = 2;
+
+/**
+ * Deep wave: set the penalty deducted from series `i` (0, 2, 4 … points); the
+ * match total follows. A series not entered yet can't carry one.
+ */
+export function setPenalty(r: EntryResult, i: number, points: number, s: ShotScoring): EntryResult {
+  if ((r.series ?? []).length <= i || !(points >= 0)) return r;
+  const pen = [...(r.pen ?? [])];
+  while (pen.length <= i) pen.push(0);
+  pen[i] = points;
+  const any = pen.some((v) => v > 0);
+  return withTotals({ ...r, pen: any ? pen : undefined }, s);
 }
 
 /**
@@ -112,8 +136,9 @@ export function setSeries(r: EntryResult, i: number, s: ShotScoring, v: { total:
   const series = [...(r.series ?? [])];
   const sx = [...(r.seriesX ?? [])];
   const shots = [...(r.shots ?? [])];
+  const pen = r.pen ? [...r.pen] : undefined;
   if (v == null) {
-    series.splice(i, 1); sx.splice(i, 1); shots.splice(i, 1);
+    series.splice(i, 1); sx.splice(i, 1); shots.splice(i, 1); pen?.splice(i, 1);
     // keep later series in place: only the last series can really be cleared
   } else {
     const fromShots = v.shots ? seriesFromShots(v.shots) : null;
@@ -125,19 +150,32 @@ export function setSeries(r: EntryResult, i: number, s: ShotScoring, v: { total:
     if (v.shots) { while (shots.length < i) shots.push([]); shots[i] = v.shots; }
     else if (shots[i]) shots[i] = [];
   }
-  const next: EntryResult = { ...r, series, seriesX: sx, ...(shots.some((x) => x?.length) ? { shots } : { shots: undefined }) };
+  const next: EntryResult = { ...r, series, seriesX: sx, ...(shots.some((x) => x?.length) ? { shots } : { shots: undefined }), ...(r.pen ? { pen: pen?.some((x) => x > 0) ? pen : undefined } : {}) };
   return withTotals(next, s);
 }
 
 /** Series entered / due. */
 export const seriesDone = (r: EntryResult): number => (r.series ?? []).length;
 
+/** Shots in series `i` of a match of `shots` (the last series of a 25-shot round may be short). */
+export const shotsInSeries = (ev: ShootEventDef, shots: number, i: number): number => Math.max(0, Math.min(ev.seriesOf, shots - i * ev.seriesOf));
+
+/**
+ * Deep wave: series shot "clean" — every shot a 10 (integer scoring: 100 in a
+ * series of 10, 50 in a series of 5) or every target hit (shotgun). Decimal
+ * scoring has no perfect series (10.9 every shot). As shot, before penalties.
+ */
+export function perfectSeries(r: Pick<EntryResult, 'series'>, ev: ShootEventDef, shots: number): number {
+  if (ev.scoring === 'decimal') return 0;
+  return (r.series ?? []).filter((v, i) => { const n = shotsInSeries(ev, shots, i); return n > 0 && v === n * (ev.scoring === 'hits' ? 1 : 10); }).length;
+}
+
 /** "S1 98 · S2 97 …" or with positions "K 195 · P 199 · S 190". */
 export function seriesLine(r: EntryResult, ev: ShootEventDef, shots: number): string {
   const series = r.series ?? [];
   if (!series.length) return '';
   const xs = r.seriesX ?? [];
-  const one = (v: number, i: number) => `${scoreText(v, ev.scoring)}${ev.scoring === 'integer' && xs[i] ? `·${xs[i]}x` : ''}`;
+  const one = (v: number, i: number) => `${scoreText(v, ev.scoring)}${ev.scoring === 'integer' && xs[i] ? `·${xs[i]}x` : ''}${r.pen?.[i] ? `−${r.pen[i]}` : ''}`;
   if (ev.positions) {
     const by = new Map<string, number[]>();
     series.forEach((v, i) => { const p = positionOf(ev, shots, i)!; by.set(p, [...(by.get(p) ?? []), v]); });
@@ -213,6 +251,10 @@ export interface ShootLine { playerId: string; stats: Record<string, number>; wo
  *   integer scoring), qualified (made the final), dq;
  *   final: finals, place, fpts (final score), golds / silvers / bronzes, posPoints.
  * `kind`: 'qual' (a qualification with a final after it), 'match' (no final), 'final'.
+ * Deep wave (free — from what is stored): bestSer (the best series as shot),
+ * perfect (series of all tens / all targets — integer and hits scoring, only
+ * when there is one), pen (penalty points, only when deducted), fShots (the
+ * final shots counted in fpts — the average final shot).
  */
 export function shootLines(f: Pick<PhaseFormat, 'discipline' | 'category'> & Partial<Pick<PhaseFormat, 'shootMatch'>>, ranked: RankedEntry[], kind: 'qual' | 'match' | 'final', awards: Award[] = []): ShootLine[] {
   const ev = shootEventOf(f.discipline);
@@ -225,6 +267,8 @@ export function shootLines(f: Pick<PhaseFormat, 'discipline' | 'category'> & Par
   const rows = ranked.map((r) => r.entry);
   const matches = isShootMatchRows(rows) ? shootMatchState(rows) : null;
   const teamEvent = !!shootTeamOf(f.discipline) || !!matches || !!f.shootMatch;
+  // deep wave: each finalist's counted shots (to the elimination shot, or the last)
+  const fin = kind === 'final' && isFinalRows(rows) ? finalState(rows, ev) : null;
   for (const r of ranked) {
     if (r.status === 'DNS' || r.status === 'WD') continue;
     if (teamEvent && isTeamRow(r.entry)) {
@@ -248,7 +292,12 @@ export function shootLines(f: Pick<PhaseFormat, 'discipline' | 'category'> & Par
     if (kind === 'final') {
       s.finals = 1;
       if (r.position != null) s.place = r.position;
-      if (r.best != null) s.fpts = r.best;
+      if (r.best != null) {
+        s.fpts = r.best;
+        const out = fin?.out.find((o) => o.id === r.id);
+        const n = out ? out.after : Math.min((res.fshots ?? []).length, fin?.last ?? (res.fshots ?? []).length);
+        if (n > 0) s.fShots = n;
+      }
     } else {
       s.comps = 1;
       if (kind === 'match' && r.position != null) s.place = r.position;
@@ -260,6 +309,13 @@ export function shootLines(f: Pick<PhaseFormat, 'discipline' | 'category'> & Par
         if (ev.scoring === 'integer') { s.xs = res.xs ?? 0; s.xShots = s.shots; }
         // a complete match counts as the score (PB / record line)
         if (r.bestLegal != null && nSeries >= seriesCount(ev, shotsOf(ev, f.category))) s[shootMarkKey(ev.key, f.category?.shots)] = r.bestLegal;
+        // deep wave: the best series as shot, perfect series, penalty points
+        const raw = res.series ?? [];
+        s.bestSer = Math.max(...raw);
+        const perfect = perfectSeries(res, ev, shotsOf(ev, f.category));
+        if (perfect) s.perfect = perfect;
+        const pen = penaltyTotal(res);
+        if (pen > 0) s.pen = pen;
       }
       if (r.flags.includes('Q') || r.flags.includes('q')) s.qualified = 1;
     }
@@ -280,8 +336,15 @@ export interface ShootingCareer {
   /** inner tens ÷ shots in integer-scored matches, 0–100 (null without any) */
   innerRate: number | null;
   xs: number; xShots: number;
-  /** best match score per event + match length, with the average per 10 shots */
-  bests: { key: string; label: string; pb: ShootBest; sb?: ShootBest; avg10?: number; avgText?: string; matches: number }[];
+  /** best match score per event + match length, with the average per 10 shots
+   *  (deep wave: and the best series shot in that event, when recorded) */
+  bests: { key: string; label: string; pb: ShootBest; sb?: ShootBest; avg10?: number; avgText?: string; matches: number; bestSeries?: number; bestSeriesText?: string }[];
+  /** Deep wave: perfect series (all tens / all targets), penalty points, and
+   *  the average final shot over finals that recorded their shot count (null = none) */
+  perfect: number;
+  penalties: number;
+  finalAvg: number | null;
+  finalShots: number;
   history: { eventId: string; title: string; date: string; text: string; place?: number; medal?: 'gold' | 'silver' | 'bronze'; flags: string[] }[];
   /** SD-137b: team events (teams of 3, mixed team medal matches), their medals (also counted above) and team matches */
   team: { events: number; golds: number; silvers: number; bronzes: number; won: number; lost: number };
@@ -295,7 +358,8 @@ export function shootingCareer(
   phases: Map<string, { discipline: string; title: string; date: string; category?: Category; eventTitle?: string; phase?: string }>,
   seasonFrom: string,
 ): ShootingCareer {
-  const c: ShootingCareer = { comps: 0, finals: 0, golds: 0, silvers: 0, bronzes: 0, points: 0, innerRate: null, xs: 0, xShots: 0, bests: [], history: [], team: teamCareer(lines) };
+  const c: ShootingCareer = { comps: 0, finals: 0, golds: 0, silvers: 0, bronzes: 0, points: 0, innerRate: null, xs: 0, xShots: 0, bests: [], history: [], team: teamCareer(lines), perfect: 0, penalties: 0, finalAvg: null, finalShots: 0 };
+  let finalPts = 0;
   const bests = new Map<string, ShootingCareer['bests'][number] & { ptsSum: number; shotSum: number; scoring: ShotScoring }>();
   const sorted = [...lines].sort((a, b) => (a.date ?? '').localeCompare(b.date ?? ''));
   const pbSoFar = new Map<string, number>();
@@ -308,6 +372,8 @@ export function shootingCareer(
     c.comps += s.comps ?? 0; c.finals += s.finals ?? 0;
     c.golds += s.golds ?? 0; c.silvers += s.silvers ?? 0; c.bronzes += s.bronzes ?? 0;
     c.points += s.posPoints ?? 0; c.xs += s.xs ?? 0; c.xShots += s.xShots ?? 0;
+    c.perfect += s.perfect ?? 0; c.penalties += s.pen ?? 0;
+    if (s.fShots && s.fpts != null) { c.finalShots += s.fShots; finalPts += s.fpts; }
     const date = info?.date ?? l.date ?? '';
     const flags: string[] = [];
     if (ev && s.pts != null && s.shots) {
@@ -315,6 +381,7 @@ export function shootingCareer(
       const bk = `${ev.key}|${shots}`;
       const row = bests.get(bk) ?? { key: bk, label: `${ev.label}${shots !== ev.shots ? ` (${shots} shots)` : ''}`, pb: { value: -1, text: '', date: '', eventId: '' }, matches: 0, ptsSum: 0, shotSum: 0, scoring: ev.scoring };
       row.ptsSum += s.pts; row.shotSum += s.shots;
+      if (s.bestSer != null && (row.bestSeries == null || s.bestSer > row.bestSeries)) { row.bestSeries = s.bestSer; row.bestSeriesText = scoreText(s.bestSer, ev.scoring); }
       const v = key ? s[key] : undefined;
       if (v != null) {
         row.matches += 1;
@@ -327,6 +394,8 @@ export function shootingCareer(
       bests.set(bk, row);
     }
     if (s.qualified) flags.push('final');
+    if (s.perfect) flags.push(`${s.perfect} perfect series`);
+    if (s.pen) flags.push(`−${s.pen} penalty`);
     const medal = s.golds ? 'gold' : s.silvers ? 'silver' : s.bronzes ? 'bronze' : undefined;
     const sc = ev?.scoring ?? 'integer';
     const text = s.teamEv
@@ -338,6 +407,8 @@ export function shootingCareer(
   }
   c.points = Math.round(c.points * 100) / 100;
   c.innerRate = c.xShots ? Math.round((c.xs / c.xShots) * 1000) / 10 : null;
+  c.finalAvg = c.finalShots ? Math.round((finalPts / c.finalShots) * 100) / 100 : null;
+  c.penalties = Math.round(c.penalties * 10) / 10;
   c.bests = [...bests.values()].filter((b) => b.shotSum > 0).map(({ ptsSum, shotSum, scoring, ...b }) => {
     const per = scoring === 'hits' ? 25 : 10;
     const avg = Math.round((ptsSum / shotSum) * per * 10) / 10;

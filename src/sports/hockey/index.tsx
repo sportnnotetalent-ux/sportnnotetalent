@@ -19,22 +19,26 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { theme } from '../../core/theme';
-import { Button, TextField } from '../../components/ui';
+import { Button, TextField, SelectChip } from '../../components/ui';
 import { confirmMatchAction } from '../../components/ConfirmSheet';
 import { LineScoreboard } from '../../components/LineScoreboard';
-import { MatchBoxScore } from '../../components/BoxScore';
 import { FieldBanner } from '../FieldBanner';
-import { LiveTimeline } from '../LiveTimeline';
 import type { Player } from '../../core/types';
 import type { ScoreAction, SportPlugin } from '../types';
 import {
   init, reducer, isComplete, result, levelAtEnd, aggLine, matchSec, periodSec, clockFace, periodName, periodLong, periodStarted, running,
   eventCredits, creditAttribution, currentKeeper, soScore, nextShooter, needsSdPick, hockeyScoreLine, HOCKEY_PRESETS, HOCKEY_LIVE_SETTINGS,
+  HOCKEY_TRACK_FIELDS, openPc,
   type CardColour, type GoalType, type HockeyEvent, type HockeyState, type Side,
 } from './engine';
+import { hockeyPossession } from './depth';
+import { hockeyFeed, hockeyFacts, hockeyFeedPeriods, hockeyPeriodLabel } from './feed';
+import { hockeyCentre } from './stats';
+import { Commentary } from '../invasion/Commentary';
+import { MatchCentre } from '../invasion/MatchCentre';
 import { hockeyTotals, hockeyLiveField, hockeyField, unavailable } from './totals';
 import { hockeyBox } from './box';
-import { hockeyTimeline, describeEvent, eventWhen, timelineEvents, GOAL_LABEL } from './timeline';
+import { describeEvent, eventWhen, timelineEvents, GOAL_LABEL } from './timeline';
 import { hockeyTickerDetail, hockeyTickerFlash } from './ticker';
 import { hockeyFormation, HockeyPitch } from './pitch';
 import { usePendingEdit } from '../usePendingEdit';
@@ -70,11 +74,13 @@ function PlayerGrid({ players, onPick, skip }: { players: Player[]; onPick: (p: 
 // `pc` (SD-117, H6): the attempt comes from this penalty corner (its id).
 type Flow =
   | { mode: 'goal'; side: Side; step: 'type' | 'scorer' | 'assist'; goalType?: GoalType; scorer?: Player | null; pc?: string }
-  | { mode: 'shot'; side: Side; step: 'result' | 'player'; onGoal?: boolean; pc?: string }
+  | { mode: 'shot'; side: Side; step: 'result' | 'player'; onGoal?: boolean; miss?: 'wide' | 'blocked'; pc?: string }
   | { mode: 'stroke'; side: Side; step: 'result' | 'player'; outcome?: 'saved' | 'missed'; pc?: string }
   | { mode: 'card'; side: Side; step: 'colour' | 'player'; card?: CardColour; minutes?: number }
   | { mode: 'sub'; side: Side; step: 'off' | 'on'; off?: Player }
-  | { mode: 'gk'; side: Side };
+  | { mode: 'gk'; side: Side }
+  // deep wave: a video referral (only when tracked)
+  | { mode: 'referral'; side: Side };
 
 /* -------------------------------- controls --------------------------------- */
 
@@ -170,9 +176,10 @@ const ScoringControls: SportPlugin<HockeyState>['ScoringControls'] = ({
     const gk = keeper(keeperSide);
     fire({ type: 'SAVE', side: keeperSide, payload: { ref }, ...credit({ type: 'save', playerId: gk?.id, playerName: gk?.fullName }) });
   };
-  const shot = (sd: Side, onGoal: boolean, p: Player | null, pc?: string) => {
+  // deep wave: a miss says wide or blocked (one tap either way)
+  const shot = (sd: Side, onGoal: boolean, p: Player | null, pc?: string, miss?: 'wide' | 'blocked') => {
     const id = uid();
-    fire({ type: 'SHOT', side: sd, payload: { onGoal, uid: id, ...pcLink(pc) }, ...credit({ type: 'shot', onGoal, playerId: p?.id, playerName: p?.fullName }) });
+    fire({ type: 'SHOT', side: sd, payload: { onGoal, uid: id, ...(!onGoal && miss ? { miss } : {}), ...pcLink(pc) }, ...credit({ type: 'shot', onGoal, playerId: p?.id, playerName: p?.fullName }) });
     if (onGoal) save(opp(sd), id);
     setFlow(null);
     if (pc) setPcOpen(null);
@@ -208,7 +215,7 @@ const ScoringControls: SportPlugin<HockeyState>['ScoringControls'] = ({
   const remove = (e: HockeyEvent) => { for (const a of removalActions(e)) dispatch(a); };
   // SD-114: held until the re-entry commits — Cancel keeps the event as it was.
   const edit = (e: HockeyEvent) => {
-    if (e.type === 'pc' || e.type === 'save') { remove(e); return; }
+    if (e.type === 'pc' || e.type === 'save' || e.type === 'referral') { remove(e); return; }
     holdRemoval(removalActions(e));
     setEditAt({ sec: e.sec, period: e.period });
     setShowEdit(false);
@@ -247,6 +254,17 @@ const ScoringControls: SportPlugin<HockeyState>['ScoringControls'] = ({
   };
 
   /* ---- shoot-out ---- */
+  // deep wave: saved vs missed (one tap either way) and the keeper facing it
+  // (the other side's keeper) — the keeper's shoot-out saves come from these
+  const soAttempt = (sd: Side, outcome: 'scored' | 'saved' | 'missed') => {
+    const gk = keeper(opp(sd));
+    dispatch({
+      type: 'SO', side: sd,
+      payload: { scored: outcome === 'scored', outcome, ...(gk ? { keeperId: gk.id, keeperName: gk.fullName } : {}) },
+      ...(soTaker ? { attribution: { playerId: soTaker.id, stat: 'soTaken', playerName: soTaker.fullName, ...(outcome === 'scored' ? { extra: { soGoals: 1 } } : {}) } } : {}),
+    });
+    setSoTaker(null);
+  };
   const level = levelAtEnd(s); // SD-120: on aggregate in a new leg 2
   if (s.ended) {
     if (s.shootout) {
@@ -283,15 +301,11 @@ const ScoringControls: SportPlugin<HockeyState>['ScoringControls'] = ({
                 <Text style={c.small}>Taker (optional)</Text>
                 <PlayerGrid players={onField(nextSide).filter((p) => p.id !== soTaker?.id)} onPick={(p) => setSoTaker(p)} />
                 {soTaker ? <Text style={c.meta}>Taker: {soTaker.fullName}</Text> : null}
+                {keeper(opp(nextSide)) ? <Text style={c.meta}>🧤 Keeper: {keeper(opp(nextSide))!.fullName}</Text> : null}
                 <View style={c.row}>
-                  <Button label="✓ Scored" color={color(nextSide)} style={c.flex} onPress={() => {
-                    dispatch({ type: 'SO', side: nextSide, payload: { scored: true }, ...(soTaker ? { attribution: { playerId: soTaker.id, stat: 'soTaken', playerName: soTaker.fullName, extra: { soGoals: 1 } } } : {}) });
-                    setSoTaker(null);
-                  }} />
-                  <Button label="✗ Missed / saved" variant="ghost" style={c.flex} onPress={() => {
-                    dispatch({ type: 'SO', side: nextSide, payload: { scored: false }, ...(soTaker ? { attribution: { playerId: soTaker.id, stat: 'soTaken', playerName: soTaker.fullName } } : {}) });
-                    setSoTaker(null);
-                  }} />
+                  <Button label="✓ Scored" color={color(nextSide)} style={c.flex} onPress={() => soAttempt(nextSide, 'scored')} />
+                  <Button label="🧤 Saved" variant="ghost" style={c.flex} onPress={() => soAttempt(nextSide, 'saved')} />
+                  <Button label="✗ Missed" variant="ghost" style={c.flex} onPress={() => soAttempt(nextSide, 'missed')} />
                 </View>
               </>
             )}
@@ -338,7 +352,9 @@ const ScoringControls: SportPlugin<HockeyState>['ScoringControls'] = ({
           <View style={c.panel}>{head('Goal')}
             <View style={c.row}>
               {(['field', 'pc', 'stroke'] as const).filter((t) => t !== 'pc' || s.penaltyCorners).map((t) => (
-                <Button key={t} label={t === 'field' ? 'Field goal' : t === 'pc' ? 'From PC' : 'Stroke'} variant="ghost" style={c.flex} onPress={() => setFlow({ ...flow, goalType: t, step: 'scorer' })} />
+                <Button key={t} label={t === 'field' ? 'Field goal' : t === 'pc' ? 'From PC' : 'Stroke'} variant="ghost" style={c.flex}
+                  // deep wave: a PC goal settles the side's open corner (its outcome)
+                  onPress={() => setFlow({ ...flow, goalType: t, step: 'scorer', ...(t === 'pc' && !flow.pc && openPc(s, sd) ? { pc: openPc(s, sd)!.id } : {}) })} />
               ))}
             </View>
           </View>
@@ -361,14 +377,18 @@ const ScoringControls: SportPlugin<HockeyState>['ScoringControls'] = ({
           <View style={c.panel}>{head('Shot')}
             <View style={c.row}>
               <Button label="On goal — saved" variant="ghost" style={c.flex} onPress={() => setFlow({ ...flow, onGoal: true, step: 'player' })} />
-              <Button label="Off target / blocked" variant="ghost" style={c.flex} onPress={() => setFlow({ ...flow, onGoal: false, step: 'player' })} />
+            </View>
+            {/* deep wave: wide vs blocked — still one tap */}
+            <View style={c.row}>
+              <Button label="↗ Wide" accessibilityLabel="Shot wide of the goal" variant="ghost" style={c.flex} onPress={() => setFlow({ ...flow, onGoal: false, miss: 'wide', step: 'player' })} />
+              <Button label="🛡 Blocked" accessibilityLabel="Shot blocked by a defender" variant="ghost" style={c.flex} onPress={() => setFlow({ ...flow, onGoal: false, miss: 'blocked', step: 'player' })} />
             </View>
             {keeper(opp(sd)) ? <Text style={c.meta}>A save goes to {keeper(opp(sd))!.fullName} (keeper).</Text> : null}
           </View>
         );
         return (
-          <View style={c.panel}>{head(flow.onGoal ? 'Shot on goal' : 'Shot off target')}
-            <PlayerGrid players={onField(sd)} onPick={(p) => shot(sd, !!flow.onGoal, p, flow.pc)} skip={{ label: 'Skip player', onPress: () => shot(sd, !!flow.onGoal, null, flow.pc) }} />
+          <View style={c.panel}>{head(flow.onGoal ? 'Shot on goal' : flow.miss === 'blocked' ? 'Shot blocked' : 'Shot wide')}
+            <PlayerGrid players={onField(sd)} onPick={(p) => shot(sd, !!flow.onGoal, p, flow.pc, flow.miss)} skip={{ label: 'Skip player', onPress: () => shot(sd, !!flow.onGoal, null, flow.pc, flow.miss) }} />
           </View>
         );
       case 'stroke':
@@ -423,6 +443,16 @@ const ScoringControls: SportPlugin<HockeyState>['ScoringControls'] = ({
             <PlayerGrid players={[...onField(sd), ...bench(sd)]} onPick={(p) => setKeeper(sd, p)} />
           </View>
         );
+      case 'referral':
+        return (
+          <View style={c.panel}>{head('📺 Video referral')}
+            <View style={c.row}>
+              <Button label="✓ Upheld" variant="ghost" style={c.flex} onPress={() => { fire({ type: 'REFERRAL', side: sd, payload: { upheld: true } }); setFlow(null); }} />
+              <Button label="✗ Not upheld" variant="ghost" style={c.flex} onPress={() => { fire({ type: 'REFERRAL', side: sd, payload: { upheld: false } }); setFlow(null); }} />
+            </View>
+            <Text style={c.meta}>Upheld: the team keeps its referral. Not upheld: it is lost.</Text>
+          </View>
+        );
     }
   })();
 
@@ -440,6 +470,7 @@ const ScoringControls: SportPlugin<HockeyState>['ScoringControls'] = ({
         <Button label="⚪ Stroke" variant="ghost" onPress={() => setFlow({ mode: 'stroke', side: sd, step: 'result' })} />
         <Button label="🟨 Card" variant="ghost" onPress={() => setFlow({ mode: 'card', side: sd, step: 'colour' })} />
         <Button label="🔁 Sub" variant="ghost" onPress={() => setFlow({ mode: 'sub', side: sd, step: 'off' })} />
+        {s.track?.referrals ? <Button label="📺 Referral" accessibilityLabel={`Video referral by ${name(sd)}`} variant="ghost" onPress={() => setFlow({ mode: 'referral', side: sd })} /> : null}
         <Text style={c.gk} accessibilityRole="button" onPress={() => setFlow({ mode: 'gk', side: sd })} numberOfLines={2}>
           🧤 {gk ? gk.fullName : 'Set keeper'} ›
         </Text>
@@ -520,6 +551,23 @@ const ScoringControls: SportPlugin<HockeyState>['ScoringControls'] = ({
         </View>
       ) : null}
 
+      {/* deep wave: possession on the game clock (only when tracked) */}
+      {s.track?.possession && !flow && !pastAt ? (() => {
+        const poss = hockeyPossession(s, 'all', now);
+        const has = s.poss?.length ? s.poss[s.poss.length - 1].side : undefined;
+        return (
+          <View style={c.circlePanel}>
+            <Text style={c.small}>⚽ Possession{poss ? ` · ${name('home')} ${poss.home}% – ${poss.away}% ${name('away')}` : ' — tap who has the ball'}</Text>
+            <View style={c.cols}>
+              {(['home', 'away'] as const).map((sd) => (
+                <Button key={sd} label={`${has === sd ? '● ' : ''}Ball: ${name(sd)}`} accessibilityLabel={`${name(sd)} have the ball`} variant={has === sd ? 'primary' : 'ghost'} color={has === sd ? color(sd) : undefined} style={c.flex}
+                  onPress={() => fire({ type: 'POSS', side: sd })} />
+              ))}
+            </View>
+          </View>
+        );
+      })() : null}
+
       {pcOpen && !flow ? (() => {
         // SD-117 (H6): how the corner ended — each outcome is linked to the PC
         const { side: sd, id } = pcOpen;
@@ -536,7 +584,7 @@ const ScoringControls: SportPlugin<HockeyState>['ScoringControls'] = ({
               <Button label="🧤 Saved" variant="ghost" style={c.flex} onPress={() => setFlow({ mode: 'shot', side: sd, step: 'player', onGoal: true, pc: id })} />
             </View>
             <View style={c.row}>
-              <Button label="↗ Wide" variant="ghost" style={c.flex} onPress={() => setFlow({ mode: 'shot', side: sd, step: 'player', onGoal: false, pc: id })} />
+              <Button label="↗ Wide" variant="ghost" style={c.flex} onPress={() => setFlow({ mode: 'shot', side: sd, step: 'player', onGoal: false, miss: 'wide', pc: id })} />
               <Button label="🛡 Defended" variant="ghost" style={c.flex} onPress={() => { settle('defended'); setPcOpen(null); }} />
             </View>
             <View style={c.row}>
@@ -588,7 +636,7 @@ function EditList({ s, show, setShow, onRemove, onEdit, homeName, awayName }: {
           <View key={e.id} style={c.editRow}>
             <Text style={c.editWhen}>{eventWhen(s, e)}</Text>
             <Text style={c.editLabel} numberOfLines={2}>{d.icon} {d.label} · {e.side === 'home' ? homeName : awayName}{d.detail ? ` · ${d.detail}` : ''}</Text>
-            {onEdit && e.type !== 'pc' && e.type !== 'save' ? <RowAction label="✎ Edit" tone="edit" a11y={`Edit ${d.label}`} onPress={() => onEdit(e)} /> : null}
+            {onEdit && e.type !== 'pc' && e.type !== 'save' && e.type !== 'referral' ? <RowAction label="✎ Edit" tone="edit" a11y={`Edit ${d.label}`} onPress={() => onEdit(e)} /> : null}
             <RowAction label="✕" tone="remove" a11y={`Remove ${d.label}`} onPress={() => void confirmRemove(`${d.label} (${eventWhen(s, e)})`, () => onRemove(e),
               s.events.some((x) => x.type === 'save' && x.ref === e.id) ? 'The keeper\'s save on it goes too. The score and player stats re-adjust.' : undefined)} />
           </View>
@@ -655,14 +703,25 @@ const HockeyScoreboard: NonNullable<SportPlugin<HockeyState>['Scoreboard']> = ({
   );
 };
 
+/** Deep wave: Commentary (live text by quarter with the running score and the
+ *  match facts) or the match centre (team stats by category and period, then
+ *  each side's player box). */
 const LiveExtras: NonNullable<SportPlugin<HockeyState>['LiveExtras']> = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster, onPlayer }) => {
   const s = state as HockeyState;
+  const [view, setView] = useState<'commentary' | 'stats'>('commentary');
   return (
     <View style={{ gap: theme.spacing(3) }}>
-      <Text style={c.h}>Timeline</Text>
-      <LiveTimeline events={hockeyTimeline(s, { home: homeName, away: awayName })} homeColor={homeColor} awayColor={awayColor} emptyText="No goals or cards yet." homeRoster={homeRoster} awayRoster={awayRoster} onPlayer={onPlayer} />
-      <Text style={c.h}>Match stats</Text>
-      <MatchBoxScore sport="hockey" source={hockeyBox(s, { homeRoster, awayRoster })} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} onPlayer={onPlayer} />
+      <View style={c.tabs}>
+        <SelectChip label="📝 Commentary" active={view === 'commentary'} onPress={() => setView('commentary')} />
+        <SelectChip label="📊 Match stats" active={view === 'stats'} onPress={() => setView('stats')} />
+      </View>
+      {view === 'commentary' ? (
+        <Commentary items={hockeyFeed(s, { home: homeName, away: awayName })} labelOf={hockeyPeriodLabel(s)} periods={hockeyFeedPeriods(s)} facts={hockeyFacts(s, Date.now())}
+          homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} homeRoster={homeRoster} awayRoster={awayRoster} onPlayer={onPlayer}
+          emptyText="No goals, corners or cards yet — every moment you log appears here." />
+      ) : (
+        <MatchCentre sport="hockey" source={hockeyBox(s, { homeRoster, awayRoster })} categories={hockeyCentre} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} onPlayer={onPlayer} />
+      )}
     </View>
   );
 };
@@ -721,6 +780,8 @@ export const hockeyPlugin: SportPlugin<HockeyState> = {
     { key: 'periodMinutes', label: 'Minutes per period', type: 'number', default: 15, min: 1, max: 45, advanced: true },
     { key: 'stopClock', label: 'Stop the clock for goals & penalty corners', type: 'toggle', default: true, advanced: true, hint: 'as international matches do; you restart it' },
     { key: 'penaltyCorners', label: 'Penalty corners', type: 'toggle', default: true, advanced: true, hint: 'off for Hockey5s' },
+    // deep wave: the optional "Stats to track" an organiser can switch on for an event
+    ...HOCKEY_TRACK_FIELDS.map((f) => ({ ...f, label: `Track ${f.label.toLowerCase()}`, advanced: true })),
     {
       key: 'decider', label: 'If level at full time', type: 'choice', default: 'none',
       options: [
@@ -767,6 +828,7 @@ const c = StyleSheet.create({
   circlePanel: { gap: theme.spacing(1) },
   circleRow: { flexDirection: 'row', gap: theme.spacing(1), alignItems: 'center', minWidth: 0 },
   link: { color: theme.colors.primary, fontSize: theme.font.small, fontWeight: '800' },
+  tabs: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing(2) },
   editRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(2), paddingVertical: theme.spacing(2), borderTopWidth: 1, borderTopColor: theme.colors.border },
   editWhen: { color: theme.colors.accent, fontSize: theme.font.tiny, fontWeight: '800', width: 56 },
   editLabel: { flex: 1, color: theme.colors.text, fontSize: theme.font.small },

@@ -15,7 +15,12 @@
  *    ejections behind their own buttons;
  *  - outs, half-innings, the walk-off, the run rule and extra innings (with
  *    the tie-break runners) happen by themselves; only a CALLED game (time /
- *    weather) is ended by hand — and it asks first (SD-106).
+ *    weather) is ended by hand — and it asks first (SD-106);
+ *  - deep wave "Stats to track" (off by default; off = the pad as before):
+ *    pitch types (a chip row over the pitch pad — the pick rides on the next
+ *    pitch only) and spray zones (an optional "Where?" row in the in-play
+ *    sheet). The Score tab's views: Play-by-play (by half-inning) · Match
+ *    stats · Box score (with MLB-style notes) · Key moments.
  * Corrections: "Correct the plays" removes a play, re-enters it at its place
  * in the log (SD-114: the removal is held until the new play is in), or marks
  * its runs earned / unearned (the scorer's override).
@@ -24,19 +29,23 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { theme } from '../../core/theme';
 import { ensureContrast } from '../../core/contrast';
-import { Button, TextField } from '../../components/ui';
+import { Button, SelectChip, TextField } from '../../components/ui';
 import { confirmMatchAction } from '../../components/ConfirmSheet';
 import { LineScoreboard } from '../../components/LineScoreboard';
 import { MatchBoxScore } from '../../components/BoxScore';
 import { LiveTimeline } from '../LiveTimeline';
+import { GroupedFeed } from '../GroupedFeed';
+import { StatSheetView } from '../StatSheetView';
 import type { Player } from '../../core/types';
 import type { ScoreAction, SportPlugin } from '../types';
 import {
   init, reducer, isComplete, result, cardLine, statusText, situation, defaultMoves, defaultRunnerMoves, withStays, buildPitch, buildPlay, buildRunner,
-  stateAfter, eventCredits, creditAttribution, halfLong, halfShort, inningOf, whoKey, mercyText, newUid, defaultRbi,
-  BASEBALL_PRESETS, BASEBALL_LIVE_SETTINGS, OUTCOME_LABEL, RUNNER_LABEL, POSITIONS,
-  type BaseballEvent, type BaseballState, type Dest, type LineupEntry, type Move, type Outcome, type RunnerKind, type Side, type Who,
+  stateAfter, eventCredits, creditAttribution, halfLong, halfShort, inningOf, whoKey, mercyText, newUid, defaultRbi, pitchTypesFor,
+  BASEBALL_PRESETS, BASEBALL_LIVE_SETTINGS, OUTCOME_LABEL, RUNNER_LABEL, POSITIONS, TRACK_FIELDS, ZONES, ZONE_LABEL, IN_PLAY, PITCH_TYPE_LABEL, PITCH_TYPE_CHIP,
+  type BaseballEvent, type BaseballState, type Dest, type LineupEntry, type Move, type Outcome, type PitchType, type RunnerKind, type Side, type Who, type Zone,
 } from './engine';
+import { baseballCommentary, baseballScopeLabel, BASEBALL_FEED_TAGS } from './commentary';
+import { baseballSheet, inningScopes } from './sheet';
 import { baseballTotals } from './totals';
 import { baseballBox, baseballPitchingBox } from './box';
 import { baseballPitchingStats } from './stats';
@@ -101,7 +110,12 @@ const ScoringControls: SportPlugin<BaseballState>['ScoringControls'] = ({
   const [editAfter, setEditAfter] = useState<string | null>(null);
   const [showEdit, setShowEdit] = useState(false);
   const [official, setOfficial] = useState('');
+  /** deep wave (optional capture): the type picked for the NEXT pitch, where the ball went */
+  const [ptype, setPtype] = useState<PitchType | null>(null);
+  const [zone, setZone] = useState<Zone | null>(null);
   useEffect(() => { if (flow === null && editAfter !== null) { setEditAfter(null); dropHeldRemoval(); } }, [flow]); // eslint-disable-line react-hooks/exhaustive-deps
+  // a cancelled play forgets its zone (a picked pitch type waits for the pitch)
+  useEffect(() => { if (flow === null) setZone(null); }, [flow]);
   const s = useMemo(() => (editAfter !== null ? stateAfter(view, editAfter) : view), [view, editAfter]);
   const g = s.g;
 
@@ -148,6 +162,8 @@ const ScoringControls: SportPlugin<BaseballState>['ScoringControls'] = ({
     dispatch(a);
     if (editAfter !== null) { setEditAfter(null); }
     setFlow(null);
+    setPtype(null);
+    setZone(null);
   };
   const extra = (): Record<string, unknown> => (editAfter !== null ? { after: editAfter, edit: true } : {});
 
@@ -160,9 +176,11 @@ const ScoringControls: SportPlugin<BaseballState>['ScoringControls'] = ({
   const askFielders = s.cfg.askFielders;
 
   /* ---- plays ---- */
-  const pitch = (k: 'ball' | 'called' | 'swinging' | 'foul') => fire(buildPitch(s, k, extra()));
+  /** the optional capture riding on a play: the zone (balls in play), the final pitch's type */
+  const captured = (o: Outcome): { zone?: Zone; ptype?: PitchType } => ({ ...(zone && IN_PLAY.includes(o) ? { zone } : {}), ...(ptype ? { ptype } : {}) });
+  const pitch = (k: 'ball' | 'called' | 'swinging' | 'foul') => fire(buildPitch(s, k, { ...extra(), ...(ptype ? { ptype } : {}) }));
   const playNow = (o: Outcome, opts: { moves?: Move[]; fielders?: string; rbi?: number } = {}) =>
-    fire(buildPlay(s, o, { ...opts, extra: extra() }));
+    fire(buildPlay(s, o, { ...opts, ...captured(o), extra: extra() }));
   const outcome = (o: Outcome) => {
     const needsSheet = (runners.length > 0 && !['HR', '3B', 'BB', 'IBB', 'HBP', 'K'].includes(o)) || o === 'E' || (askFielders && FIELDED.includes(o));
     if (!needsSheet) { playNow(o); return; }
@@ -222,6 +240,26 @@ const ScoringControls: SportPlugin<BaseballState>['ScoringControls'] = ({
     );
   }
 
+  /* ---- deep wave: optional capture chips (only when switched on) ---- */
+  /** "Where?" — tap a zone (optional) before the outcome; it rides on the play */
+  const zoneRow = s.cfg.sprayZones ? (
+    <View style={{ gap: theme.spacing(1) }}>
+      <Text style={c.small}>Where? (optional){zone ? ` · ${ZONE_LABEL[zone]}` : ''}</Text>
+      <View style={c.chips} accessibilityLabel="Where the ball went">
+        {ZONES.map((z) => <SelectChip key={z} label={z} active={zone === z} accessibilityLabel={`${ZONE_LABEL[z]}${zone === z ? ', picked' : ''}`} onPress={() => setZone(zone === z ? null : z)} />)}
+      </View>
+    </View>
+  ) : null;
+  /** pitch type — tap it, then the pitch; it applies to that one pitch */
+  const typeRow = s.cfg.pitchTypes && s.cfg.pitches ? (
+    <View style={{ gap: theme.spacing(1) }}>
+      <Text style={c.small}>Next pitch type (optional){ptype ? ` · ${PITCH_TYPE_LABEL[ptype]}` : ''}</Text>
+      <View style={c.chips} accessibilityLabel="Pitch type for the next pitch">
+        {pitchTypesFor(s.cfg).map((t) => <SelectChip key={t} label={PITCH_TYPE_CHIP[t]} active={ptype === t} accessibilityLabel={`${PITCH_TYPE_LABEL[t]}${ptype === t ? ', picked' : ''} — for the next pitch`} onPress={() => setPtype(ptype === t ? null : t)} />)}
+      </View>
+    </View>
+  ) : null;
+
   /* ---- flows ---- */
   const head = (t: string, sd?: Side) => (
     <View style={c.flowHead}>
@@ -235,6 +273,7 @@ const ScoringControls: SportPlugin<BaseballState>['ScoringControls'] = ({
       case 'inplay':
         return (
           <View style={c.panel}>{head(`In play · ${sit.batter.name}`, bat)}
+            {zoneRow}
             <Text style={c.small}>Hit</Text>
             <View style={c.grid}>{HIT_BTNS.map((o) => <Button key={o} label={SHORT[o]!} color={color(bat)} style={c.quarter} onPress={() => outcome(o)} />)}</View>
             <Text style={c.small}>Out</Text>
@@ -247,7 +286,7 @@ const ScoringControls: SportPlugin<BaseballState>['ScoringControls'] = ({
       case 'advance': {
         const f = flow;
         const draft = (): ScoreAction => (f.outcome
-          ? buildPlay(s, f.outcome, { moves: f.moves, fielders: f.fielders || undefined, ...(f.rbi !== undefined ? { rbi: f.rbi } : {}), extra: extra() })
+          ? buildPlay(s, f.outcome, { moves: f.moves, fielders: f.fielders || undefined, ...(f.rbi !== undefined ? { rbi: f.rbi } : {}), ...captured(f.outcome), extra: extra() })
           : buildRunner(s, f.rk!, f.moves, extra()));
         const a = draft();
         const runs = (reducer(s, { ...a, payload: { ...a.payload, uid: '__pv' } }).g.ann.__pv?.runs) ?? 0;
@@ -286,6 +325,7 @@ const ScoringControls: SportPlugin<BaseballState>['ScoringControls'] = ({
                 </View>
               </View>
             ) : null}
+            {f.outcome && IN_PLAY.includes(f.outcome) ? zoneRow : null}
             {f.outcome ? (
               <View style={c.rbiRow}>
                 <Text style={c.meta}>RBI</Text>
@@ -495,6 +535,7 @@ const ScoringControls: SportPlugin<BaseballState>['ScoringControls'] = ({
         <>
           {s.cfg.pitches ? (
             <View style={c.pad}>
+              {typeRow}
               <View style={c.row}>
                 <Button label="Ball" accessibilityLabel={`Ball, count ${g.balls}-${g.strikes}`} variant="ghost" style={c.flex} onPress={() => pitch('ball')} />
                 <Button label="Strike" accessibilityLabel="Called strike (looking)" variant="ghost" style={c.flex} onPress={() => pitch('called')} />
@@ -508,6 +549,7 @@ const ScoringControls: SportPlugin<BaseballState>['ScoringControls'] = ({
             </View>
           ) : (
             <View style={c.pad}>
+              {zoneRow}
               <View style={c.grid}>
                 {HIT_BTNS.map((o) => <Button key={o} label={SHORT[o]!} color={color(bat)} style={c.quarter} onPress={() => outcome(o)} />)}
                 <Button label="Walk" variant="ghost" style={c.quarter} onPress={() => outcome('BB')} />
@@ -611,16 +653,39 @@ const BaseballScoreboard: NonNullable<SportPlugin<BaseballState>['Scoreboard']> 
   );
 };
 
+/** Deep wave: the Score tab's views — the play-by-play commentary (by
+ *  half-inning), the broadcast match stats (inning / category filters), the
+ *  batting + pitching box scores with their notes, and the key-moments
+ *  timeline. The line score and the diamond stay on the scoreboard above. */
+const VIEWS = [{ key: 'pbp', label: 'Play-by-play' }, { key: 'stats', label: 'Match stats' }, { key: 'box', label: 'Box score' }, { key: 'timeline', label: 'Key moments' }] as const;
+
 const LiveExtras: NonNullable<SportPlugin<BaseballState>['LiveExtras']> = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster, onPlayer }) => {
   const s = state as BaseballState;
+  const [view, setView] = useState<(typeof VIEWS)[number]['key']>('pbp');
+  if (!s?.g) return null;
+  const names = { home: homeName, away: awayName };
+  const ctx = { homeRoster, awayRoster, names };
   return (
     <View style={{ gap: theme.spacing(3) }}>
-      <Text style={c.h}>Plays</Text>
-      <LiveTimeline events={baseballTimeline(s)} homeColor={homeColor} awayColor={awayColor} emptyText="No plays yet." homeRoster={homeRoster} awayRoster={awayRoster} onPlayer={onPlayer} />
-      <Text style={c.h}>Batting</Text>
-      <MatchBoxScore sport="baseball" source={baseballBox(s, { homeRoster, awayRoster })} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} onPlayer={onPlayer} />
-      {s.g?.spells.length || s.starters?.home || s.starters?.away ? <Text style={c.h}>Pitching</Text> : null}
-      <MatchBoxScore sport="baseball" schema={baseballPitchingStats} show="box" source={baseballPitchingBox(s, { homeRoster, awayRoster })} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} onPlayer={onPlayer} />
+      <View style={c.chips} accessibilityRole="tablist">
+        {VIEWS.map((v) => <SelectChip key={v.key} label={v.label} active={view === v.key} onPress={() => setView(v.key)} />)}
+      </View>
+      {view === 'pbp' ? (
+        <GroupedFeed groups={baseballCommentary(s, names)} homeColor={homeColor} awayColor={awayColor} tags={BASEBALL_FEED_TAGS} scopeLabel={baseballScopeLabel}
+          emptyText="No plays yet — the play-by-play fills in from the first pitch." />
+      ) : view === 'stats' ? (
+        <StatSheetView build={(sc) => baseballSheet(s, sc)} scopes={inningScopes(s)}
+          homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} />
+      ) : view === 'box' ? (
+        <>
+          <Text style={c.h}>Batting</Text>
+          <MatchBoxScore sport="baseball" source={baseballBox(s, ctx)} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} onPlayer={onPlayer} />
+          {s.g.spells.length || s.starters?.home || s.starters?.away ? <Text style={c.h}>Pitching</Text> : null}
+          <MatchBoxScore sport="baseball" schema={baseballPitchingStats} show="box" source={baseballPitchingBox(s, ctx)} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} onPlayer={onPlayer} />
+        </>
+      ) : (
+        <LiveTimeline events={baseballTimeline(s)} homeColor={homeColor} awayColor={awayColor} emptyText="No plays yet." homeRoster={homeRoster} awayRoster={awayRoster} onPlayer={onPlayer} />
+      )}
     </View>
   );
 };
@@ -706,6 +771,8 @@ export const baseballPlugin: SportPlugin<BaseballState> = {
     { key: 'maxInnings', label: 'Stop after inning (0 = play on)', type: 'number', default: 0, min: 0, max: 20, advanced: true },
     { key: 'pitches', label: 'Pitch-by-pitch (balls & strikes)', type: 'toggle', default: true, advanced: true },
     { key: 'askFielders', label: 'Ask for fielders (6-3)', type: 'toggle', default: false, advanced: true },
+    // deep wave: "Stats to track" (off by default)
+    ...TRACK_FIELDS.map((f) => ({ ...f, advanced: true })),
   ],
 };
 
@@ -731,6 +798,7 @@ const c = StyleSheet.create({
   flowHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: theme.spacing(2) },
   cancel: { color: theme.colors.textMuted, fontSize: theme.font.small, fontWeight: '700', paddingHorizontal: theme.spacing(2), paddingVertical: theme.spacing(3), minHeight: 44 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing(2) },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing(1) },
   pchip: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(1), minHeight: 44, paddingVertical: theme.spacing(2), paddingHorizontal: theme.spacing(3), borderRadius: theme.radius.pill, backgroundColor: theme.colors.surfaceAlt, maxWidth: '100%' },
   pnum: { color: theme.colors.textMuted, fontSize: theme.font.tiny, fontWeight: '800' },
   pname: { color: theme.colors.text, fontSize: theme.font.small, fontWeight: '700', flexShrink: 1 },

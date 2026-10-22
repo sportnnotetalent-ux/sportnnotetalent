@@ -8,6 +8,9 @@
  *   "misconduct Rao", "game misconduct Rao", "match penalty Rao",
  *   "bench minor home", "time-out home", "pull goalie home", "end period",
  *   "full time" / "final" (the last period only).
+ *   Deep wave — when that stat is tracked: "faceoff Rao" / "faceoff home",
+ *   "hit Rao", "blocked shot Rao", "takeaway Rao", "giveaway Rao",
+ *   "missed shot Rao" / "wide Rao".
  * Anything that closes a period or the match asks first (`iceHockeyVoiceEnds`).
  */
 import type { Player } from '../../core/types';
@@ -15,10 +18,19 @@ import type { ScoreAction, VoiceContext, VoiceEnding } from '../types';
 import { deburr, matchPlayer, resolveSide, withoutTeams } from '../voiceMatch.ts';
 import {
   creditAttribution, eventCredits, goalFlagsNow, goalieAt, matchSec, nextIsOvertime, periodLong, periodStarted, timeoutLeft,
-  INFRACTIONS, LIVE_KEYS, type IceEvent, type IceHockeyState, type PenKind, type Side,
+  tallyTracked, flagOf, FLAG_KEYS, INFRACTIONS, LIVE_KEYS, TRACK_FLAGS, type IceEvent, type IceHockeyState, type PenKind, type Side, type TallyKind,
 } from './engine.ts';
 
 const TRACKED: string[] = LIVE_KEYS.filter((k) => k !== 'soTaken' && k !== 'soGoals');
+/** deep wave: the optional tallies by voice (checked before "shot" / penalties) */
+const TALLY_WORDS: [TallyKind, RegExp][] = [
+  ['faceoff', /\bface ?-?offs?\b|\bdraw won\b|\bwins? the draw\b/],
+  ['block', /\bblock(ed|s)?\b/],
+  ['missed', /\bmiss(ed|es)? (the )?(net|shot)\b|\bmissed shot\b|\bshot wide\b|\bwide\b/],
+  ['takeaway', /\btake ?-?aways?\b/],
+  ['giveaway', /\bgive ?-?aways?\b/],
+  ['hit', /\bhits?\b|\bbody ?check(ed|s)?\b/],
+];
 const other = (s: Side): Side => (s === 'home' ? 'away' : 'home');
 const vid = (now: number, n = 0) => `v${now.toString(36)}${n || ''}${Math.random().toString(36).slice(2, 5)}`;
 const END_WORDS = /\b(full ?time|final (whistle|horn|buzzer)|end (of )?(the )?(match|game)|\bfinal\b)\b/;
@@ -77,6 +89,13 @@ export function iceHockeyVoice(text: string, ctx: VoiceContext): ScoreAction[] |
   if (/\btime ?out\b/.test(q)) return timeoutLeft(s, side) > 0 ? [{ type: 'TIMEOUT', side, payload: stamp() }] : null;
   if (/\bpull(ed)?\b.*\b(goalie|goaltender|keeper)\b|\bempty net\b.*\bpull/.test(q)) return [{ type: 'PULL', side, payload: stamp() }];
   if (/\b(goalie|goaltender|keeper)\b.*\bback\b/.test(q)) return [{ type: 'BACK', side, payload: stamp() }];
+  const tally = !/\bgoal\b/.test(q) ? TALLY_WORDS.find(([k, re]) => re.test(q) && tallyTracked(s, flagOf(k)))?.[0] : undefined;
+  if (tally) {
+    const tracked = [...TRACKED, ...TRACK_FLAGS.filter((f) => tallyTracked(s, f)).flatMap((f) => FLAG_KEYS[f])];
+    const c = eventCredits({ type: 'tally', side, tally, playerId: player?.id, playerName: player?.fullName }, s.pimScale);
+    const a1 = creditAttribution(c.first, 1, tracked);
+    return [{ type: 'TALLY', side, payload: { kind: tally, ...stamp() }, ...(a1 ? { attribution: a1 } : {}) }];
+  }
   const pen = penKindOf(q);
   if (pen && !/\bgoal\b/.test(q)) {
     const infraction = INFRACTIONS.find((x) => q.includes(deburr(x)));

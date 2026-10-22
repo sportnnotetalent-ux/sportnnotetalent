@@ -127,7 +127,13 @@ describe('SD-45 — the per-hole stats row', () => {
     assert.equal(cardHasDetail(old), false);
     assert.equal(s.girHoles, 0, 'GIR is not derived on a pre-stats-row card');
     for (const k of ['scrambles', 'scrambleHoles', 'sandSaves', 'sandHoles', 'puttsGir', 'girPutted', 'firLeft', 'firRight']) assert.equal(k in s, false, k);
-    assert.deepEqual(Object.keys(s).sort(), ['birdies', 'bogeys', 'doubles', 'eagles', 'firHit', 'firHoles', 'girHit', 'girHoles', 'holes', 'pars', 'penalties', 'putts', 'puttHoles', 'rounds', 'stableford', 'strokes'].sort());
+    // Deep wave — the SD-45 keys stay off an old card; the only additions are
+    // the free figures from the strokes (holes in one, par-3/4/5 scoring,
+    // bounce back) and the putting splits from the putts it already had — the
+    // score and every older key are unchanged.
+    const DEEP_FREE = ['holesInOne', 'albatrosses', 'p3Holes', 'p3Strokes', 'p4Holes', 'p4Strokes', 'p5Holes', 'p5Strokes', 'bounceOps', 'bounceBacks', 'onePutts', 'threePutts'];
+    assert.deepEqual(Object.keys(s).filter((k) => !DEEP_FREE.includes(k)).sort(), ['birdies', 'bogeys', 'doubles', 'eagles', 'firHit', 'firHoles', 'girHit', 'girHoles', 'holes', 'pars', 'penalties', 'putts', 'puttHoles', 'rounds', 'stableford', 'strokes'].sort());
+    assert.deepEqual(Object.keys(s).filter((k) => DEEP_FREE.includes(k)).sort(), [...DEEP_FREE].sort());
   });
 
   test('a stats-row card: GIR, fairways (par 4/5 only), scrambling, sand saves, putts per GIR, penalties', () => {

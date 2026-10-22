@@ -37,7 +37,8 @@ function countbackBlocks(series: number[], ev: ShootEventDef): number[] {
 
 /** Comparison keys for a qualification / match result (bigger first). */
 export function qualKeys(r: ResultEntry['result'], ev: ShootEventDef, innerOnly = false): (number | undefined)[] {
-  const series = r.series ?? [];
+  // deep wave: a series with a penalty compares net of it (identical when there is none)
+  const series = r.pen?.some((p) => p > 0) ? (r.series ?? []).map((v, i) => fromTenths(tenths(v) - tenths(r.pen?.[i] ?? 0))) : r.series ?? [];
   const total = r.mark != null ? tenths(r.mark) : sumTenths(series);
   const keys: (number | undefined)[] = [total];
   if (ev.scoring === 'integer') keys.push(r.xs ?? 0);

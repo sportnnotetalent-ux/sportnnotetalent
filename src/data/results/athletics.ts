@@ -19,7 +19,7 @@ import { eventAwards, type Award, type FieldResultInput, type PointsConfig } fro
 import type { PlannedPhase } from './plan.ts';
 import { fieldRoundPresets } from './field.ts';
 import { phaseLabel } from './plan.ts';
-import { swimRoundPresets, courseShort, swimLabel, timedFinalPlan, SWIM_ORDER, swimMeetSettings } from './swimming.ts';
+import { swimRoundPresets, courseShort, swimLabel, timedFinalPlan, SWIM_ORDER, swimMeetSettings, leadOffDiscipline, leadOffSplit } from './swimming.ts';
 import { liftAwards, recordDefsFor, wlMeetSettings } from './weightlifting.ts';
 import { shootMeetSettings } from './shooting.ts';
 import { archMeetSettings, phaseNameOf } from './archery.ts';
@@ -28,6 +28,7 @@ import { cycMeetSettings } from './cycling.ts';
 import { roadMarkKey, roadKeyDiscipline, roadEventOf, roadRecordsAllowed, phaseTeams, teamAwards } from './road.ts';
 import { combinedStandings, combinedAwards, combinedDone, combinedRanked } from './combined.ts';
 import { isCombinedKey } from './combinedDefs.ts';
+import { ruleOf } from './competitionRules.ts';
 import { ageBandOf, fitsBand } from '../../core/divisions.ts';
 
 /* ------------------------------ meet settings ----------------------------- */
@@ -416,7 +417,7 @@ export interface PhaseLine { playerId: string; stats: Record<string, number>; wo
  *   discipline's legal mark key), wind, hand, Q / q, finals, golds / silvers /
  *   bronzes, posPoints (position points), dnf / dq.
  */
-export function phaseLines(f: Pick<PhaseFormat, 'discipline' | 'phase' | 'category'>, ranked: RankedEntry[], awards: Award[] = []): PhaseLine[] {
+export function phaseLines(f: Pick<PhaseFormat, 'discipline' | 'phase' | 'category' | 'rules'>, ranked: RankedEntry[], awards: Award[] = []): PhaseLine[] {
   const def = disciplineOf(f.discipline);
   if (!def) return [];
   const byEntry = new Map(awards.map((a) => [a.entryId, a]));
@@ -436,11 +437,16 @@ export function phaseLines(f: Pick<PhaseFormat, 'discipline' | 'phase' | 'catego
     const relay = !r.entry.athleteId;
     if (relay) {
       s.relays = 1;
-      for (const m of r.entry.result.members ?? []) if (m.playerId) out.push({ playerId: m.playerId, stats: { ...s }, won: a?.medal === 'gold' });
+      // deep wave: the lead-off swimmer's split stands as an individual time (World Aquatics; never a mixed relay)
+      const lead = leadOffLine(def.key, f, r);
+      (r.entry.result.members ?? []).forEach((m, i) => { if (m.playerId) out.push({ playerId: m.playerId, stats: i === 0 && lead ? { ...s, ...lead } : { ...s }, won: a?.medal === 'gold' }); });
       continue;
     }
     // SD-91: a field event counts as an event, not a race
     if (def.capture === 'single') s.races = 1; else s.field = 1;
+    // deep wave: a heat / semi-final / repechage won (a final won is a gold) and the reaction time when it was read
+    if (def.capture === 'single' && r.position === 1 && f.phase !== 'final') s.heatWins = 1;
+    if (def.capture === 'single' && r.entry.result.reaction != null) s.reaction = r.entry.result.reaction;
     if (a && a.points > 0) s.posPoints = a.points;
     if (r.best != null) s.mark = r.best;
     if (r.bestLegal != null) s[markKey(def.key, f.category?.course)] = r.bestLegal;
@@ -451,6 +457,19 @@ export function phaseLines(f: Pick<PhaseFormat, 'discipline' | 'phase' | 'catego
     out.push({ playerId: r.entry.athleteId!, stats: s, won: a?.medal === 'gold' });
   }
   return out;
+}
+
+/** Deep wave: the lead-off swimmer's individual time from a relay's splits —
+ *  the individual event's mark key (`m_sw_100free_lc`), or null: not swimming,
+ *  a mixed relay, the relay not a valid swim, no split at the first leg, or the
+ *  meet's `swimLeadOff` rule says relay only. */
+export function leadOffLine(discipline: string, f: Pick<PhaseFormat, 'category' | 'rules'>, r: RankedEntry): Record<string, number> | null {
+  if (!discipline.startsWith('swim.') || f.category?.gender === 'X' || r.status !== 'ok' || r.bestLegal == null) return null;
+  if (ruleOf(f.rules, 'swimLeadOff') === false) return null;
+  const ind = leadOffDiscipline(discipline);
+  const t = leadOffSplit(discipline, r.entry.result.splits);
+  if (!ind || t == null) return null;
+  return { [markKey(ind, f.category?.course)]: t };
 }
 
 /* --------------------------------- career --------------------------------- */
@@ -469,6 +488,10 @@ export interface AthleticsCareer {
   teamGolds: number; teamSilvers: number; teamBronzes: number; teamScored: number;
   /** SD-93: combined events completed (decathlon, heptathlon, pentathlon …) */
   combined: number;
+  /** deep wave: heats / semi-finals won (a final won is a gold) */
+  heatWins: number;
+  /** deep wave: the best reaction time read (races only; absent when none was read) */
+  bestReaction?: { value: number; title: string; date: string; eventId: string };
   /** SD-92: the best cross-country place (courses differ — places, not times) */
   bestXc?: { place: number; title: string; date: string; eventId: string };
   /** personal bests per event (hurdles per event + category: the barrier height
@@ -485,7 +508,7 @@ export function athleticsCareer(
   phases: Map<string, PhaseInfo>,
   seasonFrom: string,
 ): AthleticsCareer {
-  const c: AthleticsCareer = { races: 0, relays: 0, field: 0, finals: 0, golds: 0, silvers: 0, bronzes: 0, points: 0, road: 0, walks: 0, xc: 0, teamGolds: 0, teamSilvers: 0, teamBronzes: 0, teamScored: 0, combined: 0, bests: [], history: [] };
+  const c: AthleticsCareer = { races: 0, relays: 0, field: 0, finals: 0, golds: 0, silvers: 0, bronzes: 0, points: 0, road: 0, walks: 0, xc: 0, teamGolds: 0, teamSilvers: 0, teamBronzes: 0, teamScored: 0, combined: 0, heatWins: 0, bests: [], history: [] };
   const bests = new Map<string, { key: string; label: string; pb: CareerBest; sb?: CareerBest }>();
   // Oldest first, so a PB / SB flag on the history reads "at the time".
   const sorted = [...lines].sort((a, b) => (a.date ?? '').localeCompare(b.date ?? ''));
@@ -498,15 +521,18 @@ export function athleticsCareer(
     c.road += s.road ?? 0; c.walks += s.walks ?? 0; c.xc += s.xc ?? 0;
     c.teamGolds += s.teamGolds ?? 0; c.teamSilvers += s.teamSilvers ?? 0; c.teamBronzes += s.teamBronzes ?? 0; c.teamScored += s.teamScorer ?? 0;
     c.combined += s.combined ?? 0;
+    c.heatWins += s.heatWins ?? 0;
     const info = l.eventId ? phases.get(l.eventId) : undefined;
+    if (s.reaction != null && (!c.bestReaction || s.reaction < c.bestReaction.value)) c.bestReaction = { value: s.reaction, title: info?.title ?? l.opponent ?? 'Race', date: info?.date ?? l.date ?? '', eventId: l.eventId ?? '' };
     const key = Object.keys(s).find((k) => k.startsWith('m_'));
     if (s.xc && s.place && (!c.bestXc || s.place < c.bestXc.place)) c.bestXc = { place: s.place, title: info?.title ?? l.opponent ?? 'Cross-country', date: info?.date ?? l.date ?? '', eventId: l.eventId ?? '' };
     const fromKey = key ? markKeyDiscipline(key) : undefined;
     // SD-93: a combined event's total line comes from its last event's phase — the discipline is the combined event's
-    const discipline = s.combined ? (fromKey && isCombinedKey(fromKey.discipline) ? fromKey.discipline : info?.combinedKey ?? fromKey?.discipline) : info?.discipline ?? fromKey?.discipline;
+    // deep wave: a relay lead-off's time belongs to the individual event its key names (not the relay)
+    const discipline = s.combined ? (fromKey && isCombinedKey(fromKey.discipline) ? fromKey.discipline : info?.combinedKey ?? fromKey?.discipline) : s.relays && fromKey ? fromKey.discipline : info?.discipline ?? fromKey?.discipline;
     const ce = !!discipline && isCombinedKey(discipline);
     // SD-94: swimming PBs per pool length
-    const course = info?.category?.course ?? fromKey?.course;
+    const course = s.relays && fromKey?.course ? fromKey.course : info?.category?.course ?? fromKey?.course;
     const def = discipline ? disciplineOf(discipline) : undefined;
     // the full timestamp (shown in local time); the day for the season
     const date = info?.date ?? l.date ?? '';
@@ -540,6 +566,8 @@ export function athleticsCareer(
       markText,
       s.wind != null ? `(${s.wind > 0 ? '+' : ''}${s.wind.toFixed(1)})` : '',
       s.relays ? 'relay' : '',
+      // deep wave: the lead-off swimmer's individual time
+      s.relays && def && key && s[key] != null ? `· lead-off ${formatMark(s[key], def)}` : '',
       // SD-92: the team's place in a road / XC team score
       s.teamPlace ? `· team ${s.teamPlace}${ordSuffix(s.teamPlace)}${s.teamGolds ? ' 🥇' : s.teamSilvers ? ' 🥈' : s.teamBronzes ? ' 🥉' : ''}` : '',
       s.walkCards ? `· ${s.walkCards} red card${s.walkCards === 1 ? '' : 's'}` : '',

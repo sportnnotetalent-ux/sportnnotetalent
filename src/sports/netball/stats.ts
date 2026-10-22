@@ -40,6 +40,17 @@ export const netballStats: SportStatSchema<'netball'> = {
     { key: 'suspensions', label: 'Suspensions', short: 'suspensions', one: 'suspension', abbr: 'S', group: 'discipline', weight: -4, suspension: { minutes: 2 } },
     { key: 'orderedOff', label: 'Ordered off', short: 'times ordered off', one: 'ordered off', abbr: 'OFF', group: 'discipline', weight: -8, suspension: { permanent: true } },
     { key: 'suspensionMinutes', label: 'Minutes suspended', short: 'mins suspended', group: 'discipline', format: { unit: 'minutes', better: 'lower' }, coverage: 'present' },
+    // Deep wave (court-team): statTotals-only keys, each written only for a
+    // match that tracked it ('keyed' — never a false 0): centre pass
+    // receives ("Centre pass receives" on), gains / pick-ups / deflection
+    // outcomes ("Gains & pick-ups" on), super shots (a format that uses them).
+    { key: 'centrePassReceives', label: 'Centre pass receives', short: 'centre pass receives', one: 'centre pass receive', abbr: 'CPR', group: 'attack', coverage: 'keyed' },
+    { key: 'gains', label: 'Gains', short: 'gains', one: 'gain', abbr: 'GN', group: 'defence', coverage: 'keyed' },
+    { key: 'pickups', label: 'Pick-ups', short: 'pick-ups', one: 'pick-up', abbr: 'PU', group: 'defence', coverage: 'keyed' },
+    { key: 'deflectionsGain', label: 'Deflections with gain', short: 'deflections with gain', one: 'deflection with gain', abbr: 'DG', group: 'defence', coverage: 'keyed' },
+    { key: 'deflectionsNoGain', label: 'Deflections with no gain', short: 'deflections with no gain', one: 'deflection with no gain', abbr: 'DNG', group: 'defence', coverage: 'keyed' },
+    { key: 'superShots', label: 'Super shots', short: 'super shots', one: 'super shot', abbr: 'SS', group: 'shooting', coverage: 'keyed' },
+    { key: 'superShotAttempts', label: 'Super shot attempts', short: 'super shot attempts', one: 'super shot attempt', abbr: 'SSA', group: 'shooting', coverage: 'keyed' },
     // statTotals-only: playing time and positions
     { key: 'minutes', label: 'Minutes', short: 'mins', group: 'playing', format: { unit: 'minutes' }, coverage: 'present', abbr: 'MIN' },
     { key: 'quarters', label: 'Quarters played', short: 'quarters', one: 'quarter', group: 'playing', format: { unit: 'count' }, coverage: 'present', abbr: 'Q' },
@@ -52,6 +63,11 @@ export const netballStats: SportStatSchema<'netball'> = {
       agg: { kind: 'perGame', key: 'goals', dp: 1, qualifier: q2 }, tieBreak: [{ key: 'goals', better: 'higher' }] },
     { key: 'interceptsPerGame', label: 'Intercepts per game', short: 'intercepts per game', source: 'derived', group: 'defence', format: { unit: 'decimal', dp: 1 },
       agg: { kind: 'perGame', key: 'intercepts', dp: 1, qualifier: q2 }, tieBreak: [{ key: 'intercepts', better: 'higher' }] },
+    // Deep wave — super shot % and gains per game, over the games that tracked them
+    { key: 'superShotPct', label: 'Super shot %', abbr: 'SS%', source: 'derived', group: 'shooting', format: { unit: 'percent', dp: 0 }, coverage: 'keyed',
+      agg: { kind: 'rate', num: 'superShots', den: 'superShotAttempts', scale: 100, dp: 0 } },
+    { key: 'gainsPerGame', label: 'Gains per game', short: 'gains per game', source: 'derived', group: 'defence', format: { unit: 'decimal', dp: 1 }, coverage: 'keyed',
+      agg: { kind: 'perGame', key: 'gains', dp: 1, qualifier: q2 }, tieBreak: [{ key: 'gains', better: 'higher' }] },
     { key: 'mostGoals', label: 'Most goals in a match', short: 'most goals', source: 'derived', group: 'bests', agg: { kind: 'max', key: 'goals' } },
     { key: 'mostIntercepts', label: 'Most intercepts in a match', short: 'most intercepts', source: 'derived', group: 'bests', agg: { kind: 'max', key: 'intercepts' } },
     // team-level match figures (the comparison panel), never on a player line
@@ -61,9 +77,12 @@ export const netballStats: SportStatSchema<'netball'> = {
     { key: 'timeouts', label: 'Team time-outs', short: 'team time-outs', one: 'team time-out', source: 'team' },
   ],
   sections: [
-    { id: 'shooting', title: 'Shooting', rows: [{ stat: 'goals' }, { stat: 'attempts' }, { stat: 'shotPct' }, { stat: 'goalsPerGame' }] },
-    { id: 'attack', title: 'Attack', rows: [{ stat: 'goalAssists' }, { stat: 'feeds' }] },
-    { id: 'defence', title: 'Defence & ball', rows: [{ stat: 'intercepts' }, { stat: 'interceptsPerGame' }, { stat: 'deflections' }, { stat: 'rebounds' }, { stat: 'turnovers' }] },
+    { id: 'shooting', title: 'Shooting', rows: [{ stat: 'goals' }, { stat: 'attempts' }, { stat: 'shotPct' }, { stat: 'goalsPerGame' }, { stat: 'superShots', hideZero: true }, { stat: 'superShotPct' }] },
+    { id: 'attack', title: 'Attack', rows: [{ stat: 'goalAssists' }, { stat: 'feeds' }, { stat: 'centrePassReceives' }] },
+    { id: 'defence', title: 'Defence & ball', rows: [
+      { stat: 'gains' }, { stat: 'gainsPerGame' }, { stat: 'intercepts' }, { stat: 'interceptsPerGame' }, { stat: 'deflections' },
+      { stat: 'deflectionsGain', hideZero: true }, { stat: 'pickups', hideZero: true }, { stat: 'rebounds' }, { stat: 'turnovers' },
+    ] },
     { id: 'positions', title: 'Positions played', rows: [{ stat: 'quarters' }, ...POSITIONS.map((p) => ({ stat: `q${p}`, label: `${p} · ${POS_LONG[p]}`, hideZero: true }))] },
     { id: 'playing', title: 'Playing time', rows: [{ stat: 'minutes' }] },
     { id: 'bests', title: 'Bests', rows: [{ stat: 'mostGoals', label: 'Most goals (match)', hideZero: true }, { stat: 'mostIntercepts', label: 'Most intercepts (match)', hideZero: true }] },
@@ -83,11 +102,15 @@ export const netballStats: SportStatSchema<'netball'> = {
     { key: 'rebounds', abbr: 'REB' },
     { key: 'turnovers', abbr: 'TO' },
     { key: 'penaltiesConceded', abbr: 'PEN' },
+    // Deep wave — only on a match that tracked them
+    { key: 'centrePassReceives', abbr: 'CPR' },
+    { key: 'gains', abbr: 'GN' },
+    { key: 'superShots', abbr: 'SS' },
     { key: 'warnings', abbr: 'W', occasional: true },
     { key: 'suspensions', abbr: 'S', occasional: true },
   ] }],
   compare: [
-    'attempts', 'shotPct', 'centrePasses', 'cpGoals', 'gainGoals', 'goalAssists', 'feeds', 'intercepts', 'deflections', 'rebounds', 'turnovers',
+    'attempts', 'shotPct', 'superShots', 'centrePasses', 'cpGoals', 'gainGoals', 'centrePassReceives', 'gains', 'goalAssists', 'feeds', 'intercepts', 'deflections', 'pickups', 'rebounds', 'turnovers',
     'penaltiesConceded', 'contacts', 'obstructions', 'warnings', 'suspensions', 'timeouts',
   ],
   leaders: ['goals', 'shotPct', 'goalsPerGame', 'goalAssists', 'intercepts', 'deflections', 'rebounds', 'feeds'],

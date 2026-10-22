@@ -10,6 +10,7 @@ import type { Player } from '../../core/types';
 import type { BoxRowInput, BoxSideInput, MatchBoxSource } from '../boxScore.ts';
 import { eventCredits, periodName, teamFigures, totalPeriods, LIVE_KEYS, GOAL_KEY, SHOT_KEY, SHOT_TYPES, type HandballState, type Side } from './engine.ts';
 import { handballTotals } from './totals.ts';
+import { handballDepthFigures, handballUntracked } from './depth.ts';
 
 export interface HandballBoxContext { homeRoster?: Player[]; awayRoster?: Player[] }
 
@@ -73,10 +74,12 @@ export function handballBox(s: HandballState, ctx: HandballBoxContext = {}): Mat
         return {
           rows: [...rows.values()],
           ...(Object.keys(teamStats).length ? { team: { label: 'Team / officials', stats: teamStats } } : {}),
-          teamStats: { timeouts: f.timeouts },
+          // deep wave: save % (overall and by position), empty-goal goals, fault kinds
+          teamStats: { timeouts: f.timeouts, ...handballDepthFigures(s, sd, scope) },
         };
       };
-      return { home: side('home'), away: side('away') };
+      const untracked = handballUntracked(s);
+      return { home: side('home'), away: side('away'), ...(untracked.length ? { untracked } : null) };
     },
   };
 }

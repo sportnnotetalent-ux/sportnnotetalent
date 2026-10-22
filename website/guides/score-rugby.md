@@ -5,7 +5,7 @@ category: Live scoring
 audience: Scorers, Organisers
 sports: rugby
 order: 52
-updated: 2026-10-12
+updated: 2026-10-22
 ---
 
 Score a rugby union match on one phone: you run the clock and tap what happens; the app adds the points, times sin-bins and builds the stats.
@@ -46,15 +46,25 @@ Score a rugby union match on one phone: you run the clock and tap what happens; 
 - In sudden death the first score ends the match.
 - Kicking competition: pick who kicks first, then tap **✓ Over** or **✗ Missed**: five each, then one each.
 
-## Optional detail
-Turn on **Track tackles, carries and set pieces** for a **📋 Detail** button: tackles, missed tackles, carries, line breaks, turnovers won, penalties conceded, lineouts and scrums. Untracked matches never show these as 0.
+## Stats to track
+All off by default. Switch them on in the match format or **⚙️ Match settings**; each adds its own buttons:
+- **Tackles, carries, set pieces**: a **📋 Detail** button (tackles, carries, line breaks, turnovers won, lineouts, scrums…).
+- **Penalties by offence & free kicks**: **⚖ Penalty conceded** (offence and player optional) and one-tap **🏳 Free kick conceded**.
+- **Turnovers conceded**: knock-on, forward pass… (cause and player optional).
+- **22 entries**: one tap; gives points per 22 entry.
+- **Possession & territory**: tap **Ball: team** and **In … half** as play changes.
+- **Offloads**.
+
+Stats you don't track never show as 0.
+
+## Play-by-play and match stats
+Under the score: **Play-by-play** (commentary by half, newest first, with the running score), **Match stats** (team v team, by half and category), **Box score** and **Key moments**.
 
 ## Fix a mistake
 - **↶ Undo** says what it will remove, for example "Undo Try · Asha Rao (12-7)".
 - **✎ Correct the timeline** lists every moment. **✕** removes one after asking. **✎ Edit** re-enters it at its original time, and **Cancel** keeps the original.
 
 ## What you get
-- A box score (T, C, PG, DG, PTS, YC, RC) per half or match, a timeline and the score by half.
 - Careers and leaderboards: points, tries, try assists, conversion % and goal-kicking %, plus Top try scorer and Top points scorer awards.
 - Tables use bonus points by default (4 a win, 2 a draw, +1 for 4+ tries, +1 for losing by 7 or fewer; ties on points difference, then tries). Organisers can switch to **Rugby World Cup**, **4-2-0 (no bonus points)** or **Sevens 3-2-1**.
 - A walkover counts 28-0 with the try bonus; change it if your competition differs.

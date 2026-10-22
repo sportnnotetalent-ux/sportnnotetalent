@@ -76,11 +76,38 @@ export const chessStats: SportStatSchema<'chess'> = {
     { key: 'winsResign', label: 'By resignation', short: 'wins by resignation', one: 'win by resignation', group: 'how', coverage: 'core', agg: { kind: 'sum', over: 'winHow' }, coverOf: 'wonOtb' },
     { key: 'winsTime', label: 'On time', short: 'wins on time', one: 'win on time', group: 'how', coverage: 'core', agg: { kind: 'sum', over: 'winHow' }, coverOf: 'wonOtb' },
     { key: 'winsOther', label: 'Other', short: 'other wins', one: 'other win', group: 'how', coverage: 'core', agg: { kind: 'sum', over: 'winHow' }, coverOf: 'wonOtb' },
+    // Deep wave — the game record (chess/totals.ts statTotals: 'keyed', only
+    // on games that have them; an older line reads "not tracked", never 0)
+    { key: 'lenGames', label: 'Games with a length', short: 'games with a length', one: 'game with a length', group: 'game', coverage: 'keyed' },
+    { key: 'lenMoves', label: 'Moves played (game length)', short: 'moves', one: 'move', group: 'game', coverage: 'keyed' },
+    { key: 'avgLength', label: 'Average game length (moves)', source: 'derived', coverage: 'keyed', group: 'game', format: { unit: 'decimal', dp: 1 },
+      agg: { kind: 'rate', num: 'lenMoves', den: 'lenGames', dp: 1 } },
+    { key: 'mvGames', label: 'Games with moves recorded', short: 'games with moves', one: 'game with moves', group: 'game', coverage: 'keyed' },
+    { key: 'checksGiven', label: 'Checks given', short: 'checks', one: 'check', group: 'game', coverage: 'keyed' },
+    { key: 'captures', label: 'Captures', short: 'captures', one: 'capture', group: 'game', coverage: 'keyed' },
+    { key: 'matWon', label: 'Material captured (points)', short: 'material captured', group: 'game', format: { unit: 'points' }, coverage: 'keyed' },
+    { key: 'castled', label: 'Games castled', short: 'games castled', one: 'game castled', group: 'game', coverage: 'keyed' },
+    { key: 'promotions', label: 'Promotions', short: 'promotions', one: 'promotion', group: 'game', coverage: 'keyed' },
+    { key: 'castledPct', label: 'Castled %', source: 'derived', coverage: 'keyed', group: 'game', format: { unit: 'percent', dp: 0 },
+      agg: { kind: 'rate', num: 'castled', den: 'mvGames', scale: 100, dp: 0 } },
+    { key: 'checksPerGame', label: 'Checks per game', source: 'derived', coverage: 'keyed', group: 'game', format: { unit: 'decimal', dp: 1 },
+      agg: { kind: 'rate', num: 'checksGiven', den: 'mvGames', dp: 1 } },
+    { key: 'matPerGame', label: 'Material captured per game', source: 'derived', coverage: 'keyed', group: 'game', format: { unit: 'decimal', dp: 1 },
+      agg: { kind: 'rate', num: 'matWon', den: 'mvGames', dp: 1 } },
+    { key: 'clkMoves', label: 'Moves timed', short: 'moves timed', one: 'move timed', group: 'game', coverage: 'keyed' },
+    { key: 'thinkSecs', label: 'Thinking time (seconds)', short: 'seconds thinking', group: 'game', coverage: 'keyed' },
+    { key: 'avgThink', label: 'Average time per move (s)', source: 'derived', coverage: 'keyed', group: 'game', format: { unit: 'decimal', dp: 1 },
+      agg: { kind: 'rate', num: 'thinkSecs', den: 'clkMoves', dp: 1 } },
   ],
   sections: [
     { id: 'results', title: 'Results', rows: [{ stat: 'games' }, { stat: 'score' }, { stat: 'scorePct' }, { stat: 'wins' }, { stat: 'draws' }, { stat: 'losses' }, { stat: 'forfeitWins' }, { stat: 'forfeitLosses' }] },
     // SD-36 — shown once any win recorded how it ended
     { id: 'how', title: 'Wins by method', rows: [{ stat: 'winsMate' }, { stat: 'winsResign' }, { stat: 'winsTime' }, { stat: 'winsOther', label: 'Other (illegal, arbiter)' }] },
+    // Deep wave — shown once a game recorded its length / moves / clocks
+    { id: 'game', title: 'Game record', rows: [
+      { stat: 'avgLength' }, { stat: 'mvGames' }, { stat: 'checksPerGame' }, { stat: 'matPerGame' }, { stat: 'castledPct' },
+      { stat: 'promotions', hideZero: true }, { stat: 'avgThink' },
+    ] },
   ],
   careerView: 'sections',
   // the result is the row's pill; the row shows colour · time control instead

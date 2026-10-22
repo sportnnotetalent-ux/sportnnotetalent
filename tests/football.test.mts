@@ -168,7 +168,9 @@ describe('live settings (parity #14): trackX still drives state.track', async ()
     assert.equal(init({ ...(plan.kind === 'format' ? plan.patch : {}) }).track.shots, false);
   });
   test('stats-captured toggles share one group; half length is a ±5 stepper', () => {
-    assert.ok(LS.fields.filter((f) => f.type === 'toggle').every((f) => f.group === 'Stats captured'));
+    // (deep wave: the optional depth toggles have their own "Deeper stats" group)
+    assert.ok(LS.fields.filter((f) => f.type === 'toggle').every((f) => f.group === 'Stats captured' || f.group === 'Deeper stats (optional)'));
+    assert.deepEqual(LS.fields.filter((f) => f.group === 'Deeper stats (optional)').map((f) => f.key), ['trackShotDetail', 'trackKeyPasses', 'trackClearances', 'trackSetPieces', 'trackCardReasons']);
     const hm = LS.fields.find((f) => f.key === 'halfMinutes')!;
     assert.deepEqual([hm.step, hm.min, hm.max], [5, 5, 60]);
   });

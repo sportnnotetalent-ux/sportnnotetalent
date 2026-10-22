@@ -115,6 +115,9 @@ export const athleticsStats: SportStatSchema<'athletics'> = {
     { key: 'cePts', label: 'Combined-event points', short: 'CE pts', one: 'CE pt', group: 'line', format: { unit: 'points', dp: 0 }, agg: { kind: 'max' } },
     { key: 'finals', label: 'Finals', short: 'finals', one: 'final', group: 'racing' },
     { key: 'qualified', label: 'Rounds qualified from', short: 'qualified', group: 'racing' },
+    // deep wave (timed races): heats / semi-finals won; the reaction time when a start system read it
+    { key: 'heatWins', label: 'Heats won', short: 'heats won', one: 'heat won', group: 'racing' },
+    { key: 'reaction', label: 'Best reaction time', short: 'best reaction', group: 'line', format: { unit: 'decimal', dp: 3, better: 'lower' }, agg: { kind: 'min' } },
     // golds / silvers keep the shared labels (sharedStats.ts)
     { key: 'golds', label: 'Golds', short: 'golds', one: 'gold', group: 'medals', weight: 3 },
     { key: 'silvers', label: 'Silvers', short: 'silvers', one: 'silver', group: 'medals', weight: 2 },
@@ -138,7 +141,7 @@ export const athleticsStats: SportStatSchema<'athletics'> = {
   ],
   sections: [
     { id: 'bests', title: 'Personal bests', rows: [...pbStats, ...fieldPbStats, ...roadPbStats, ...cePbStats].map((s) => ({ stat: s.key, hideZero: true })) },
-    { id: 'medals', title: 'Medals', rows: [{ stat: 'golds' }, { stat: 'silvers' }, { stat: 'bronzes' }, { stat: 'finals' }, { stat: 'teamGolds', hideZero: true }, { stat: 'teamSilvers', hideZero: true }, { stat: 'teamBronzes', hideZero: true }] },
+    { id: 'medals', title: 'Medals', rows: [{ stat: 'golds' }, { stat: 'silvers' }, { stat: 'bronzes' }, { stat: 'finals' }, { stat: 'heatWins', hideZero: true }, { stat: 'teamGolds', hideZero: true }, { stat: 'teamSilvers', hideZero: true }, { stat: 'teamBronzes', hideZero: true }] },
   ],
   careerView: 'measured',
   history: ['golds', 'silvers', 'bronzes'],

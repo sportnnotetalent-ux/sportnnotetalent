@@ -81,7 +81,9 @@ export function seriesText(r: RankedEntry, def: DisciplineDef, road?: RoadFormat
     ? res.members.slice(0, def.teamSize ?? 4).map((m, i) => (swim && LEG_SHORT[legs[i]] ? `${LEG_SHORT[legs[i]]} ${m.name}` : m.name)).join(', ')
     : '';
   const splits = swim ? splitsText(res.splits, (v) => formatMark(v, def), def.key, /\d yd\b/.test(def.label) ? 'SCY' : undefined) : '';
-  return [members, splits].filter(Boolean).join(' · ');
+  // deep wave: the reaction time, as on a federation results sheet — only when the meet read it
+  const rt = res.reaction != null && r.entry.athleteId ? `RT ${res.reaction.toFixed(3)}` : '';
+  return [rt, members, splits].filter(Boolean).join(' · ');
 }
 
 export function ResultsSheet({ def, title, subtitle, heats, wind, overall, heatLabel, notes, road }: {

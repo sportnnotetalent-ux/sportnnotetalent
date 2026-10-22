@@ -5,7 +5,7 @@ category: Live scoring
 audience: Scorers, Organisers
 sports: padel
 order: 61
-updated: 2026-10-11
+updated: 2026-10-22
 ---
 
 Padel uses tennis scoring, with advantage, a golden point or the 2026 Star Point at deuce. You tap who won each point.
@@ -45,7 +45,7 @@ A banner above the point buttons says when to change ends:
 - After an even set: "⏸ Set break (120 s) · ends change after game 1".
 - In a tiebreak or match tiebreak, every 6 points.
 
-The same cues appear in the point log, where each game reads "✅ Hold · Red House" or "💥 Break · Blue House".
+The same cues appear in the commentary, after the point that triggered them; a game the receivers won reads "Break of serve".
 
 ## Reading the board
 POINTS shows the current game, a games column per set (match tiebreak: "TB") and a 🟡 dot by the serving pair.
@@ -53,20 +53,37 @@ POINTS shows the current game, a games column per set (match tiebreak: "TB") and
 A chip under the board shows **MATCH POINT**, **SET POINT** or **BREAK POINT** with the pair's name.
 
 ## Match stats
-The **Score** tab's "Match stats" show service and return points won, holds, breaks, break points, golden / star points won and streaks, plus each player's serve.
+The **Score** tab's "Match stats" (per match or set) has tabs:
+- **Key stats**: Serve (aces, double faults, service winners and, with 1st / 2nd serve on, 1st serve in and points won on the 1st / 2nd serve), Winners & errors, Points won (break points, net points, receiving and total points, streaks) and Games (holds, breaks, break points saved, golden / star points won, set and match points saved).
+- **Serve**: every service and return figure, plus each player's serve.
+- **Shots** (with point detail): winners, unforced or forced errors by shot, for either wing or **Forehand** / **Backhand** only; a stroke summary; errors by type.
+- **Rally length** (with rally length tracked): points won after 0–4, 5–8 and 9+ shots, and on serve / on receive.
 
-## Point detail (optional)
-Off by default. Turn it on with **On** in the "🔎 Point detail (optional)" row under the buttons.
+A tab or row only shows when the match tracked it. Aces from the one-tap **Ace** button count even with point detail off.
 
-After each point, "How was it won? · Asha Rao" appears. Tap a chip or **Skip**; nothing is required.
-- **Ace** or **Service winner** (server won).
-- **Winner** + **Smash**, **Smash out ×3/×4**, **Volley**, **Bandeja**, **Víbora**, **Drop**, **Lob**.
-- **Forced error**, or **Unforced error** + **Net**, **Out**.
+## Extra stats (optional)
+Scoring stays one tap per point. To track more, open **⚙️ Scoring settings** and pick under **Stats to track**, or tap **Choose** next to "📊 Extra stats" under the point buttons. All are off by default; an organiser can switch them on for every match of a format under **⚙ Customize this format**. A change during play counts from the next point.
+- **Point detail**: how the point ended.
+- **1st / 2nd serve**: every point counts as a 1st-serve point unless you tap **2nd serve** after it; a double fault counts as a 2nd serve.
+- **Net points**: which pair was at the net.
+- **Rally length**: 0–4, 5–8 or 9+ shots.
+
+After each point a "Last point" card appears. Tap what you know, or **Skip**:
+1. **Ace** or **Service winner** (server won), **Winner**, **Forced error** or **Unforced error**.
+2. **Forehand** or **Backhand**.
+3. The shot: **Return**, **Volley**, **Bandeja**, **Víbora**, **Smash**, **Por tres** (smash out ×3 / ×4), **Lob**, **Chiquita**, **Bajada**, **Off the glass**, **Drop**.
+4. For an unforced error, **Error:** **Net** or **Out**.
+5. With the other options on: **2nd serve**, **At the net** (tap one or both pairs) and the **Rally** length.
 
 Errors count against the opponent (pick who under **By:**).
 
-## 1st and 2nd serve (optional)
-Tap **1st / 2nd serve** in the same row (or in "⚙️ Scoring settings"). Every point then counts as a 1st-serve point unless you tap **2nd serve** after it; a double fault counts as a 2nd serve. "Match stats" add 1st serve in %, and 1st and 2nd serve points won, per player.
+## Commentary
+Under the stats, "Commentary" tells the match game by game, newest first, the game in play on top ("Set 1 · Game 4", "Set 2 · Tiebreak", "Set 3 · Match tiebreak"):
+- "Red House wins the game" with the set score, e.g. **3-1**, and "Break of serve", "Game and set" or "Game, set and match".
+- Each point: "Point to Red House", the match time and, if you described it, a line like "Asha Rao wins the point with a Forehand Bandeja Winner". On the right, the score after the point, server first: **30 - 15**, **40 - 40**, **Game**; "Golden point" or "Star point" on a deciding point.
+- Change ends, code violations and who is serving each game.
+
+It updates after every point and after a correction.
 
 ## Fix a mistake
 - Wrong tap just now? The Undo bar names what it removes, e.g. "↶ Undo: point to Red House (30-15)".

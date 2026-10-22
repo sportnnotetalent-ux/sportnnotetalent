@@ -5,7 +5,7 @@ category: Tournaments
 audience: Organisers, Scorers, Players, Parents & fans
 sports: athletics
 order: 87
-updated: 2026-10-11
+updated: 2026-10-22
 ---
 
 In a cross-country or road race everyone starts together, so the finish order decides the places. You tap each runner, or type their bib, as they finish. Times are optional. With team scoring on, the app adds up each house's places, and both the individual and the team results earn house points.
@@ -54,6 +54,8 @@ Choose **🟥 Red card**, then tap a walker for each red card the chief judge ge
 
 ## What everyone sees
 The **Results sheet** shows place, bib, name, house and time, with the team table below. **Medals & points** lists the individual and team medals, and both count on the house table. **📤 Share** sends the results and team scores as a message. Athlete profiles show road and cross-country races, PBs per distance, the best cross-country place and team medals.
+
+> **Tip:** A gun-timed road race can show each runner's chip time too (**Stats to track** → **Chip times (road)**). See [Track deeper race stats and follow the commentary](/guides/race-stats-and-live-commentary/).
 
 ## Common questions
 ### Can I add times later?

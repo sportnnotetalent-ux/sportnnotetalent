@@ -5,7 +5,7 @@ category: Tournaments
 audience: Organisers, Scorers, Players, Parents & fans
 sports: cycling
 order: 95
-updated: 2026-10-11
+updated: 2026-10-22
 ---
 
 A cycling day is a list of races, such as the U16 Boys time trial 10 km. Time trials go by the clock, road races by the order on the line, and track sprints run as a bracket. You enter results on a phone, and the app works out places, medals, house points and records.
@@ -64,6 +64,8 @@ A cycling day is a list of races, such as the U16 Boys time trial 10 km. Time tr
 ## What everyone sees
 - The **House table** and **Meet records** (time trials, pursuits and the flying 200 m, per distance).
 - **Rider profiles:** races, wins, medals, and personal and season bests per distance.
+
+> **Tip:** Pursuit, kilo, team sprint and time-trial intermediate times are an option under **Stats to track**. See [Track deeper race stats and follow the commentary](/guides/race-stats-and-live-commentary/).
 
 ## Common questions
 ### Why does the 10th rider show s.t.?

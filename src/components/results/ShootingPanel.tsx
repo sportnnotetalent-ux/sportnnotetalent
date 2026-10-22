@@ -15,8 +15,8 @@ import { Card, SelectChip, textStyles } from '../ui';
 import { askConfirm } from '../ConfirmSheet';
 import {
   seriesCount, positionOf, parseShot, seriesError, seriesLow, setSeries, seriesFromShots, scoreText, totalText, finalState, finalShotError,
-  setFinalShot, addShootOff, finalStatusText, ordinal, POSITION_LABEL,
-  type EntryResult, type ResultEntry, type ShootEventDef,
+  setFinalShot, addShootOff, finalStatusText, ordinal, POSITION_LABEL, ruleOf, setPenalty, penaltyTotal, PENALTY_POINTS,
+  type EntryResult, type ResultEntry, type ShootEventDef, type CompRules,
 } from '../../data/results';
 
 type Save = (entryId: string, next: EntryResult, undoLabel?: string) => void;
@@ -36,9 +36,12 @@ export function readFinalShot(t: string): number | undefined {
 
 /* --------------------------------- series --------------------------------- */
 
-export function SeriesCard({ entries, ev, shots, mode, editable, onSave }: {
+export function SeriesCard({ entries, ev, shots, mode, editable, onSave, rules }: {
   entries: ResultEntry[]; ev: ShootEventDef; shots: number; mode: 'series' | 'shot'; editable: boolean; onSave: Save;
+  /** deep wave: the meet's rules — `shootPen` shows a −2 penalty button on each series */
+  rules?: CompRules;
 }) {
+  const pens = ruleOf(rules, 'shootPen') === true;
   const n = seriesCount(ev, shots);
   const rows = useMemo(() => entries.filter(inPlay).sort((a, b) => (a.result.order ?? 99) - (b.result.order ?? 99)), [entries]);
   const doneIn = (i: number) => rows.filter((e) => (e.result.series ?? []).length > i).length;
@@ -64,14 +67,14 @@ export function SeriesCard({ entries, ev, shots, mode, editable, onSave }: {
         {pos ? `${POSITION_LABEL[pos]} · ` : ''}{per} {ev.scoring === 'hits' ? 'targets' : 'shots'} · {mode === 'shot' ? `type the shots in one line${ev.scoring === 'integer' ? ' (X = inner ten)' : ''}` : ev.scoring === 'integer' ? 'the series total and its inner tens (X)' : ev.scoring === 'hits' ? 'targets hit' : 'the series total (decimal)'}
       </Text>
       {rows.map((e) => (
-        <SeriesInput key={`${e.id}:${cur}:${e.result.series?.[cur] ?? ''}:${e.result.seriesX?.[cur] ?? ''}`} e={e} i={cur} per={per} ev={ev} mode={mode} editable={editable} onSave={onSave} />
+        <SeriesInput key={`${e.id}:${cur}:${e.result.series?.[cur] ?? ''}:${e.result.seriesX?.[cur] ?? ''}`} e={e} i={cur} per={per} ev={ev} mode={mode} editable={editable} onSave={onSave} pens={pens} />
       ))}
       {!rows.length && <Text style={textStyles.muted}>No shooters in play.</Text>}
     </Card>
   );
 }
 
-function SeriesInput({ e, i, per, ev, mode, editable, onSave }: { e: ResultEntry; i: number; per: number; ev: ShootEventDef; mode: 'series' | 'shot'; editable: boolean; onSave: Save }) {
+function SeriesInput({ e, i, per, ev, mode, editable, onSave, pens }: { e: ResultEntry; i: number; per: number; ev: ShootEventDef; mode: 'series' | 'shot'; editable: boolean; onSave: Save; pens?: boolean }) {
   const r = e.result;
   const have = r.series?.[i];
   const shotsHere = r.shots?.[i];
@@ -122,7 +125,7 @@ function SeriesInput({ e, i, per, ev, mode, editable, onSave }: { e: ResultEntry
         <Text style={st.lot}>{r.order ?? '–'}</Text>
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text style={st.name} numberOfLines={1}>{e.name}</Text>
-          <Text style={st.sub} numberOfLines={1}>{r.mark != null ? `${so} series · ${totalText(r.mark, ev.scoring === 'integer' ? r.xs : undefined, ev.scoring)}` : 'no series yet'}</Text>
+          <Text style={st.sub} numberOfLines={1}>{r.mark != null ? `${so} series · ${totalText(r.mark, ev.scoring === 'integer' ? r.xs : undefined, ev.scoring)}${penaltyTotal(r) ? ` (after −${penaltyTotal(r)} penalty)` : ''}` : 'no series yet'}</Text>
         </View>
         {blocked ? <Text style={st.sub}>S{so + 1} first</Text> : (
           <>
@@ -138,6 +141,13 @@ function SeriesInput({ e, i, per, ev, mode, editable, onSave }: { e: ResultEntry
         )}
       </View>
       {preview && !('error' in preview) ? <Text style={st.hint}>{preview.shots.length} shots = {scoreText(preview.total, ev.scoring)}{preview.xs ? ` · ${preview.xs}x` : ''}</Text> : null}
+      {/* deep wave: a 2-point penalty on this series (ISSF) — tap to add another, a third tap clears */}
+      {pens && have != null && (editable || r.pen?.[i]) ? (
+        <View style={st.wrap}>
+          <SelectChip label={r.pen?.[i] ? `Penalty −${r.pen[i]} (tap to change)` : `＋ Penalty −${PENALTY_POINTS}`} active={!!r.pen?.[i]} disabled={!editable}
+            onPress={() => { const now = r.pen?.[i] ?? 0; const next = now >= 2 * PENALTY_POINTS ? 0 : now + PENALTY_POINTS; onSave(e.id, setPenalty(r, i, next, ev.scoring), next ? `S${i + 1} penalty −${next} · ${first(e.name)}` : `S${i + 1} penalty cleared · ${first(e.name)}`); }} />
+        </View>
+      ) : null}
       {err ? <Text style={st.bad}>{err}</Text> : null}
     </View>
   );

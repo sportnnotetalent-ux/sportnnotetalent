@@ -5,7 +5,7 @@ category: Live scoring
 audience: Scorers, Organisers
 sports: hockey
 order: 50
-updated: 2026-10-11
+updated: 2026-10-22
 ---
 
 Score a hockey match on one phone. You run the game clock and tap what happens; the app times suspensions and builds the stats.
@@ -23,9 +23,9 @@ Score a hockey match on one phone. You run the game clock and tap what happens; 
 5. Clock wrong, or you joined late? Tap **⏱ Set clock**, type the time left (for example `8:30`) and tap **Set**.
 
 ## Step by step: log the play
-1. **🏑 Goal**: choose **Field goal**, **From PC** or **Stroke**, then tap the scorer, then the assist or **No assist**. If you don't know who scored, tap **Team goal (no scorer)**.
+1. **🏑 Goal**: choose **Field goal**, **From PC** or **Stroke**, then tap the scorer, then the assist or **No assist**. If you don't know who scored, tap **Team goal (no scorer)**. A goal **From PC** settles the open corner as "goal".
 2. **🚩 PC**: a penalty corner. A panel asks how it ended: **🏑 Goal**, **🧤 Saved** or **↗ Wide** (then the shooter), **🛡 Defended**, **⚪ Stroke awarded** (then the stroke) or **🔁 Re-awarded** (a new corner). **Later** closes it.
-3. **🎯 Shot**: tap **On goal — saved** or **Off target / blocked**, then the shooter (or **Skip player**). A save goes to the other team's keeper.
+3. **🎯 Shot**: tap **On goal — saved**, **↗ Wide** or **🛡 Blocked**, then the shooter (or **Skip player**). A save goes to the other team's keeper.
 4. **⚪ Stroke**: tap **Scored** (then the scorer), **Saved** or **Missed**.
 5. **🔁 Sub**: tap who comes off, then who comes on. Subs are rolling. If the keeper comes off, the player coming on takes over in goal.
 6. **Circle entries**: tap the team's button each time it carries the ball into the shooting circle; **−1** takes one back.
@@ -40,7 +40,7 @@ Score a hockey match on one phone. You run the game clock and tap what happens; 
 ## Shoot-out
 Level at full time with a shoot-out decider? You see "Level — the match goes to a shoot-out". Group games never go to one; knockouts always do. In leg 2 of a [two-legged tie](/guides/knockouts-and-who-goes-through/), level means level on aggregate.
 1. Under "Who shoots first?", tap the team the umpires' toss gives first ([shoot-out order](/guides/choose-shoot-out-order/)).
-2. For each attempt, tap the taker (optional), then **✓ Scored** or **✗ Missed / saved**. "Next:" tells you whose turn it is.
+2. For each attempt, tap the taker (optional), then **✓ Scored**, **🧤 Saved** or **✗ Missed**. "Next:" tells you whose turn it is; a save goes to the keeper shown.
 3. Still level after five each? Tap who shoots first in sudden death (FIH: the team that went second). It runs until one team leads after equal attempts.
 
 The result keeps the level score and adds the shoot-out, for example "2–2" and "SO 4–3". Shoot-out goals aren't counted as goals in player stats.
@@ -50,8 +50,14 @@ The result keeps the level score and adds the shoot-out, for example "2–2" and
 2. Missed a goal or card? Under **⏪ Backfill a missed moment**, type the match minute and tap **Backfill**. A bar at the top shows where your taps are stamped. Log it, then tap **▶ Back to live**.
 3. After the match, use [Correct a finished match](/guides/correct-a-finished-match/).
 
+## Deeper stats (optional)
+Off by default. Switch on in **⚙️ Match settings → Stats to track** (organisers: under **Customize**):
+- **Possession**: tap **Ball: India** / **Ball: Japan** when the ball changes hands. The % runs on the game clock, so it pauses when the clock stops.
+- **Video referrals**: a **📺 Referral** button per team, then **Upheld** or **Not upheld**.
+
 ## What you get
-- **Score** tab: the timeline, team stats (circle entries, shots, penalty corners, PC conversion, strokes, saves, cards) and each player's line.
+- **Score** tab → **📝 Commentary**: the live text quarter by quarter, newest first, with the minute and the score after every moment, and a match summary on top. **Key events** keeps goals, corners, cards and subs.
+- **📊 Match stats**: **Top stats**, **Attack** (circle entries, shots wide / blocked, conversion), **Corners & strokes**, **Goalkeeping** (save %), **Discipline**, for the match or one quarter, then each player's line.
 - Player profiles: goals per game, field, PC and stroke goals, keeper save %, clean sheets and minutes suspended.
 - Tournament tables use **FIH 3-1-0**, or **FIH + shoot-out bonus** (a draw goes to a shoot-out: winner 2 points, loser 1). See [Points table and adjustments](/guides/points-table-and-adjustments/).
 

@@ -40,6 +40,9 @@ export const swimmingStats: SportStatSchema<'swimming'> = {
     { key: 'relays', label: 'Relay legs', short: 'relay legs', one: 'relay leg', group: 'racing' },
     { key: 'finals', label: 'Finals', short: 'finals', one: 'final', group: 'racing' },
     { key: 'qualified', label: 'Rounds qualified from', short: 'qualified', group: 'racing' },
+    // deep wave (timed races): heats / semi-finals won; the reaction time when touchpads read it
+    { key: 'heatWins', label: 'Heats won', short: 'heats won', one: 'heat won', group: 'racing' },
+    { key: 'reaction', label: 'Best reaction time', short: 'best reaction', group: 'line', format: { unit: 'decimal', dp: 3, better: 'lower' }, agg: { kind: 'min' } },
     { key: 'golds', label: 'Golds', short: 'golds', one: 'gold', group: 'medals', weight: 3 },
     { key: 'silvers', label: 'Silvers', short: 'silvers', one: 'silver', group: 'medals', weight: 2 },
     { key: 'bronzes', label: 'Bronzes', short: 'bronzes', one: 'bronze', group: 'medals', weight: 1 },
@@ -54,7 +57,7 @@ export const swimmingStats: SportStatSchema<'swimming'> = {
   ],
   sections: [
     { id: 'bests', title: 'Personal bests', rows: pbStats.map((s) => ({ stat: s.key, hideZero: true })) },
-    { id: 'medals', title: 'Medals', rows: [{ stat: 'golds' }, { stat: 'silvers' }, { stat: 'bronzes' }, { stat: 'finals' }] },
+    { id: 'medals', title: 'Medals', rows: [{ stat: 'golds' }, { stat: 'silvers' }, { stat: 'bronzes' }, { stat: 'finals' }, { stat: 'heatWins', hideZero: true }] },
   ],
   careerView: 'measured',
   history: ['golds', 'silvers', 'bronzes'],

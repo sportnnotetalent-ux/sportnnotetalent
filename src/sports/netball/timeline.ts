@@ -1,10 +1,10 @@
 /** SD-146 — netball events as timeline rows (the shared LiveTimeline) and the
  *  scorer's correction list. PURE. */
 import type { LiveEvent } from '../liveEvents';
-import { clockText, periodName, secInPeriod, type NetballEvent, type NetballState } from './engine.ts';
+import { clockText, periodName, secInPeriod, TURNOVER_LABEL, type NetballEvent, type NetballState } from './engine.ts';
 
-const STAT_LABEL = { intercept: 'Intercept', deflection: 'Deflection', rebound: 'Rebound', turnover: 'Turnover' } as const;
-const STAT_ICON = { intercept: '🖐', deflection: '☝️', rebound: '⤴️', turnover: '⚠️' } as const;
+const STAT_LABEL = { intercept: 'Intercept', deflection: 'Deflection', rebound: 'Rebound', turnover: 'Turnover', pickup: 'Pick-up' } as const;
+const STAT_ICON = { intercept: '🖐', deflection: '☝️', rebound: '⤴️', turnover: '⚠️', pickup: '🤲' } as const;
 const PEN_LABEL = { contact: 'Contact', obstruction: 'Obstruction', other: 'Penalty' } as const;
 const STOP_LABEL = { injury: 'Time held — injury / illness', blood: 'Time held — blood', tactical: 'Time held — tactical change', other: 'Time held' } as const;
 
@@ -13,11 +13,17 @@ const STOP_LABEL = { injury: 'Time held — injury / illness', blood: 'Time held
 export function describeEvent(e: NetballEvent, answer?: string): { icon: string; label: string; detail?: string } {
   switch (e.type) {
     case 'goal':
-      return { icon: '🥅', label: `Goal${e.pos ? ` · ${e.pos}` : ''}`, detail: [e.playerName ?? (e.pos ? undefined : 'Team goal'), e.secondName ? `feed ${e.secondName}` : ''].filter(Boolean).join(' · ') || undefined };
+      // deep wave: a 2-point super shot reads as one
+      return { icon: e.points === 2 ? '⭐' : '🥅', label: `${e.points === 2 ? 'Super shot (2)' : 'Goal'}${e.pos ? ` · ${e.pos}` : ''}`, detail: [e.playerName ?? (e.pos ? undefined : 'Team goal'), e.secondName ? `feed ${e.secondName}` : ''].filter(Boolean).join(' · ') || undefined };
     case 'miss':
-      return { icon: '↗', label: `Missed shot${e.pos ? ` · ${e.pos}` : ''}`, detail: [e.playerName, e.secondName ? `feed ${e.secondName}` : '', answer ? `rebound ${answer}` : ''].filter(Boolean).join(' · ') || undefined };
-    case 'stat':
-      return { icon: STAT_ICON[e.stat ?? 'intercept'], label: STAT_LABEL[e.stat ?? 'intercept'], detail: e.playerName };
+      return { icon: '↗', label: `Missed ${e.ss ? 'super shot' : 'shot'}${e.pos ? ` · ${e.pos}` : ''}`, detail: [e.playerName, e.secondName ? `feed ${e.secondName}` : '', answer ? `rebound ${answer}` : ''].filter(Boolean).join(' · ') || undefined };
+    case 'stat': {
+      // deep wave: a deflection's outcome, a turnover's type
+      const how = e.stat === 'deflection' && typeof e.gain === 'boolean' ? (e.gain ? 'gain' : 'no gain') : e.stat === 'turnover' && e.tt ? TURNOVER_LABEL[e.tt].toLowerCase() : '';
+      return { icon: STAT_ICON[e.stat ?? 'intercept'], label: `${STAT_LABEL[e.stat ?? 'intercept']}${how ? ` · ${how}` : ''}`, detail: e.playerName };
+    }
+    case 'cpr':
+      return { icon: '⚪', label: `Centre pass received${e.pos ? ` · ${e.pos}` : ''}`, detail: e.playerName };
     case 'penalty':
       return { icon: '✋', label: `Penalty · ${PEN_LABEL[e.penalty ?? 'other']}`, detail: e.playerName };
     case 'sanction': {

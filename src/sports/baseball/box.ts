@@ -5,13 +5,53 @@
  * second table): IP H R ER BB SO HR NP ERA per pitcher who appeared. Both
  * come from the same absolute totals the stat lines get (./totals.ts). The
  * team comparison reads errors, left on base and pitches thrown.
+ * Deep wave: with pitch by pitch on, P-S (pitches-strikes) replaces NP; both
+ * tables carry MLB-style notes (team RISP, two-out RBI, double plays turned;
+ * first-pitch strikes–batters faced, ground outs–fly outs, batters faced,
+ * inherited runners–scored, the pitch mix when tracked).
  */
 import type { Player } from '../../core/types';
 import type { BoxRowInput, BoxSideInput, MatchBoxSource } from '../boxScore.ts';
-import { batterStats, whoKey, type BaseballState, type Side } from './engine.ts';
+import { batterStats, whoKey, PITCH_TYPE_CHIP, isPitchType, type BaseballState, type Side } from './engine.ts';
 import { baseballTotals, teamFigures } from './totals.ts';
+import { batterFigures, mixText, pitcherFigures, teamSplit } from './situational.ts';
 
-export interface BaseballBoxContext { homeRoster?: Player[]; awayRoster?: Player[] }
+/** `names` (deep wave): the team names the box notes use ("RISP: Owls 2-for-9") */
+export interface BaseballBoxContext { homeRoster?: Player[]; awayRoster?: Player[]; names?: { home: string; away: string } }
+
+const teamName = (ctx: BaseballBoxContext, sd: Side) => ctx.names?.[sd] ?? (sd === 'home' ? 'Home' : 'Visitors');
+/** "A 2 · B 1" — non-empty parts joined */
+const joinParts = (xs: (string | false | undefined | null)[]) => xs.filter(Boolean).join(' · ');
+
+/** Deep wave — the batting box notes (MLB / WBSC box-score style): team RISP
+ *  "2-for-9", two-out RBI by batter, double plays turned. */
+export function battingNotes(s: BaseballState, ctx: BaseballBoxContext = {}): string[] {
+  const out: string[] = [];
+  const sides: Side[] = ['away', 'home'];
+  const t = { away: teamSplit(s, 'away'), home: teamSplit(s, 'home') };
+  if (t.away.rispAb + t.home.rispAb > 0) out.push(`With RISP: ${joinParts(sides.map((sd) => `${teamName(ctx, sd)} ${t[sd].rispHits}-for-${t[sd].rispAb}`))}`);
+  const two = batterFigures(s).filter((b) => b.twoOutRbi > 0);
+  if (two.length) out.push(`2-out RBI: ${joinParts(two.map((b) => `${nameIn(b.side === 'home' ? ctx.homeRoster : ctx.awayRoster, b.id, b.name)} ${b.twoOutRbi}`))}`);
+  if (t.away.dp + t.home.dp > 0) out.push(`DP turned: ${joinParts(sides.map((sd) => t[sd].dp > 0 && `${teamName(ctx, sd)} ${t[sd].dp}`))}`);
+  return out;
+}
+
+/** Deep wave — the pitching box notes: first-pitch strikes–batters faced
+ *  (pitch by pitch), ground outs–fly outs, batters faced, inherited runners–
+ *  scored, the pitch mix (when pitch types are tracked). */
+export function pitchingNotes(s: BaseballState, ctx: BaseballBoxContext = {}): string[] {
+  const ps = pitcherFigures(s).filter((p) => p.bf > 0 || p.pitches > 0);
+  if (!ps.length) return [];
+  const nm = (p: (typeof ps)[number]) => nameIn(p.side === 'home' ? ctx.homeRoster : ctx.awayRoster, p.id, p.name);
+  const out: string[] = [];
+  if (s.cfg.pitches && ps.some((p) => p.firstPitches > 0)) out.push(`First-pitch strikes–batters faced: ${joinParts(ps.map((p) => `${nm(p)} ${p.firstStrikes}-${p.firstPitches}`))}`);
+  out.push(`Ground outs–fly outs: ${joinParts(ps.map((p) => `${nm(p)} ${p.go}-${p.ao}`))}`);
+  out.push(`Batters faced: ${joinParts(ps.map((p) => `${nm(p)} ${p.bf}`))}`);
+  const ir = ps.filter((p) => p.ir > 0);
+  if (ir.length) out.push(`Inherited runners–scored: ${joinParts(ir.map((p) => `${nm(p)} ${p.ir}-${p.irs}`))}`);
+  for (const p of ps) if (Object.keys(p.mix).length) out.push(`Pitch mix · ${nm(p)}: ${mixText(p.mix, (t) => (isPitchType(t) ? PITCH_TYPE_CHIP[t] : t))}`);
+  return out;
+}
 
 const BAT_KEYS = ['plateAppearances', 'atBats', 'runs', 'hits', 'twoB', 'threeB', 'homeRuns', 'rbi', 'baseOnBalls', 'hitByPitch', 'strikeouts', 'sacFlies', 'sacBunts', 'stolenBases'] as const;
 const PITCH_KEYS = ['outsPitched', 'hitsAllowed', 'runsAllowed', 'earnedRuns', 'erN', 'bbAllowed', 'kPitched', 'hrAllowed', 'pitches'] as const;
@@ -42,6 +82,7 @@ export function baseballBox(s: BaseballState, ctx: BaseballBoxContext = {}): Mat
   return {
     periods: [],
     emptyText: 'No batters yet.',
+    notes: () => battingNotes(s, ctx),
     data: () => {
       const lines = battingLines(s);
       const side = (sd: Side): BoxSideInput => {
@@ -76,8 +117,11 @@ export function baseballPitchingBox(s: BaseballState, ctx: BaseballBoxContext = 
   return {
     periods: [],
     emptyText: 'No pitchers yet.',
+    notes: () => pitchingNotes(s, ctx),
     data: () => {
       const totals = baseballTotals(s);
+      // deep wave: pitch by pitch → a P-S (pitches-strikes) column in place of NP
+      const strikes = s.cfg.pitches ? new Map(pitcherFigures(s).map((p) => [p.key, p.strikes])) : undefined;
       const side = (sd: Side): BoxSideInput => {
         const roster = sd === 'home' ? ctx.homeRoster : ctx.awayRoster;
         const rows: BoxRowInput[] = [];
@@ -88,16 +132,17 @@ export function baseballPitchingBox(s: BaseballState, ctx: BaseballBoxContext = 
           const t = sp.id ? totals[sp.id]?.stats ?? {} : {};
           const stats: Record<string, number> = {};
           for (const k of PITCH_KEYS) if (!OCCASIONAL.has(k) || (t[k] ?? 0) > 0) stats[k] = t[k] ?? (k === 'pitches' ? s.g.pitches[sp.key] ?? 0 : 0);
+          if (strikes) stats.strikesThrown = strikes.get(sp.key) ?? 0;
           const dec = s.g.decisions;
           const tag = dec?.w === sp.key ? ' (W)' : dec?.l === sp.key ? ' (L)' : dec?.sv === sp.key ? ' (SV)' : '';
           rows.push({ name: `${nameIn(roster, sp.id, sp.name)}${tag}`, ...(sp.id ? { playerId: sp.id } : {}), stats, ...(sp.first ? { starter: true } : {}) });
         }
         // a starter named before the first pitch
         const st = s.starters[sd];
-        if (st && !seen.has(whoKey(st) ?? '')) rows.unshift({ name: nameIn(roster, st.id, st.name), ...(st.id ? { playerId: st.id } : {}), stats: Object.fromEntries(PITCH_KEYS.filter((k) => !OCCASIONAL.has(k)).map((k) => [k, 0])), starter: true });
+        if (st && !seen.has(whoKey(st) ?? '')) rows.unshift({ name: nameIn(roster, st.id, st.name), ...(st.id ? { playerId: st.id } : {}), stats: Object.fromEntries([...PITCH_KEYS.filter((k) => !OCCASIONAL.has(k)), ...(strikes ? ['strikesThrown'] : [])].map((k) => [k, 0])), starter: true });
         return { rows };
       };
-      return { home: side('home'), away: side('away') };
+      return { home: side('home'), away: side('away'), ...(strikes ? { untracked: ['pitches'] } : {}) };
     },
   };
 }

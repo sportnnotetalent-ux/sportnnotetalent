@@ -61,13 +61,15 @@ export const swimmingPlugin: SportPlugin<SwimmingMatchState> = {
       options: [{ value: 1, label: 'Same as individual' }, { value: 2, label: 'Double' }],
     },
     { key: 'handTimed', label: 'Manual timing', type: 'toggle', default: false, onCreate: true, hint: 'stopwatches, no touchpads: times to 1/100 from the lane’s watches (SW 11.3) count for meet records' },
-    { key: 'splits', label: '50 m splits', type: 'toggle', default: true, advanced: true, hint: 'record the time at every 50 m (races over 50 m)' },
-    { key: 'reaction', label: 'Reaction times', type: 'toggle', default: false, advanced: true, hint: 'touchpad timing reads each start' },
     // SD-130: who is the individual champion when two athletes have the same points
     {
       key: 'champTie', label: 'Champion tie-break', type: 'choice', default: 'medals', advanced: true,
       hint: 'the individual champion of each age group: most position points; if level…',
       options: [{ value: 'medals', label: 'More golds, then silvers, bronzes' }, { value: 'share', label: 'Joint champions' }],
     },
+    // deep wave (timed races): "Stats to track" — optional depth the meet switches on
+    { key: 'splits', label: '50 m splits', type: 'toggle', default: true, advanced: true, group: 'Stats to track', hint: 'record the time at every 50 m (races over 50 m) — lap times, places at each split; a relay’s lead-off time goes on the swimmer’s profile' },
+    { key: 'reaction', label: 'Reaction times', type: 'toggle', default: false, advanced: true, group: 'Stats to track', hint: 'touchpad timing reads each start' },
+    { key: 'takeovers', label: 'Relay take-over times', type: 'toggle', default: false, advanced: true, group: 'Stats to track', hint: 'the pads’ take-over reading for legs 2–4 (earlier than −0.03 s is flagged for the take-off judge)' },
   ],
 };

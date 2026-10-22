@@ -40,6 +40,12 @@ export interface RaidEntry extends RaidOutcome {
   hidden?: boolean;
   /** SD-117b: how the raider was tackled (optional chip — TACKLE_TYPES key) */
   tt?: string;
+  /** deep wave — how the raid points were scored (optional chip, "Raid
+   *  skill" tracking — RAID_SKILLS key) */
+  sk?: string;
+  /** deep wave — the defenders touched, named (optional, "Defenders touched"
+   *  tracking): who went out — named revival order, a defender's times out */
+  touched?: { id?: string; name: string }[];
 }
 
 /** SD-59 / SD-72 — a technical point or a card in `extras[]` (log order by
@@ -83,6 +89,22 @@ export const TACKLE_TYPES: Array<{ key: string; label: string }> = [
   { key: 'chain', label: 'Chain' },
 ];
 export const tackleTypeLabel = (k?: string) => (k ? TACKLE_TYPES.find((t) => t.key === k)?.label ?? k : undefined);
+
+/** Deep wave — how a raider scored (optional chip with "Raid skill"
+ *  tracking on; the PKL match centre's raid skills). */
+export const RAID_SKILLS: Array<{ key: string; label: string }> = [
+  { key: 'hand', label: 'Hand touch' },
+  { key: 'running', label: 'Running hand touch' },
+  { key: 'toe', label: 'Toe touch' },
+  { key: 'kick', label: 'Kick' },
+  { key: 'dubki', label: 'Dubki' },
+  { key: 'escape', label: 'Escape (broke the tackle)' },
+];
+export const raidSkillLabel = (k?: string) => (k ? RAID_SKILLS.find((t) => t.key === k)?.label ?? k : undefined);
+
+/** Deep wave — what this match tracks beyond the raid form (format keys
+ *  `trackSkills` / `trackTouched`, or a SET_TRACK during play). */
+export interface KabaddiTrack { skills?: true; touched?: true }
 
 /** SD-117b — team timeouts per half (PKL / AKFI: 2 per team per half). */
 export const TIMEOUTS_PER_HALF = 2;
@@ -139,6 +161,10 @@ export interface KabaddiState {
   /** LEGACY replay only: raids an old (mis-ordinal) remove took out of play
    *  while their line stayed on the timeline. Display only. */
   orphanRaids?: RaidEntry[];
+  /** deep wave — "Stats to track": raid skill / defenders touched chips.
+   *  Stamped only when on (format keys or SET_TRACK), so older states keep
+   *  their shape. */
+  track?: KabaddiTrack;
   /** players currently off the mat (out) per side */
   out: { home: number; away: number };
   /** consecutive empty raids per side (3rd is do-or-die) */
@@ -171,7 +197,33 @@ export const init = (config?: Record<string, unknown>): KabaddiState => ({
   // SD-136: only formats that carry the keys (older states keep their shape)
   ...(typeof config?.superTackle === 'boolean' ? { superTackle: config.superTackle } : null),
   ...(typeof config?.doOrDie === 'boolean' ? { doOrDie: config.doOrDie } : null),
+  // deep wave: only when the format turns tracking on (older states keep their shape)
+  ...(config?.trackSkills === true || config?.trackTouched === true
+    ? { track: { ...(config.trackSkills === true ? { skills: true as const } : null), ...(config.trackTouched === true ? { touched: true as const } : null) } }
+    : null),
 });
+
+/** Deep wave — the SET_TRACK step: `trackSkills` / `trackTouched` booleans
+ *  (the changed keys of the ⚙️ Stats to track card). Applies from the next
+ *  raid; raids already logged keep what they had. */
+function setTrack(s: KabaddiState, p: Record<string, unknown> | undefined): KabaddiState {
+  if (!p || (typeof p.trackSkills !== 'boolean' && typeof p.trackTouched !== 'boolean')) return s;
+  const skills = typeof p.trackSkills === 'boolean' ? p.trackSkills : !!s.track?.skills;
+  const touched = typeof p.trackTouched === 'boolean' ? p.trackTouched : !!s.track?.touched;
+  if (skills === !!s.track?.skills && touched === !!s.track?.touched) return s;
+  return { ...s, track: { ...(skills ? { skills: true as const } : null), ...(touched ? { touched: true as const } : null) } };
+}
+
+/** The touched defenders a raid form names (cleaned; at most `n`). */
+function touchedList(v: unknown, n: number): RaidEntry['touched'] | undefined {
+  if (!Array.isArray(v) || n <= 0) return undefined;
+  const out = v
+    .map((x) => x as { id?: unknown; name?: unknown })
+    .filter((x) => x && typeof x.name === 'string' && x.name)
+    .map((x) => ({ ...(typeof x.id === 'string' && x.id ? { id: x.id } : null), name: String(x.name) }))
+    .slice(0, n);
+  return out.length ? out : undefined;
+}
 
 /** SD-117b — drop the pause mark (the clock stops / restarts). A state without
  *  one is returned as is, so older logs replay to exactly the same shape. */
@@ -253,9 +305,10 @@ export function expectedRaider(s: KabaddiState): Side | null {
 }
 
 /** SD-117b — names of the players currently out, per side, as far as the log
- *  knows them. Defenders touched aren't named (KB-10), so they are anonymous
- *  places in the queue; revival is first out, first in (the rules), and an
- *  all-out brings everyone back. Display only (the Raider chip dims them). */
+ *  knows them. Defenders touched are anonymous places in the queue unless the
+ *  match names them (deep wave "Defenders touched", KB-10); revival is first
+ *  out, first in (the rules), and an all-out brings everyone back. Display
+ *  only (the Raider chip dims them). */
 export function outPlayers(s: KabaddiState): Record<Side, string[]> {
   const cfg = kabaddiCfg(s);
   const q: Record<Side, (string | null)[]> = { home: [], away: [] };
@@ -281,7 +334,8 @@ export function outPlayers(s: KabaddiState): Record<Side, string[]> {
     if (!b) break;
     const opp = other(r.side);
     const sent = b.touchPts + (b.defOutPts ?? 0);
-    for (let k = 0; k < sent; k++) q[opp].push(null);
+    // deep wave: defenders touched by name (when tracked) join the queue named
+    for (let k = 0; k < sent; k++) q[opp].push(k < b.touchPts ? r.touched?.[k]?.name ?? null : null);
     if (cfg.style === 'sanjeevani') q[r.side].splice(0, sent);
     if (b.raiderOut) {
       q[r.side].push(r.raider ?? null);
@@ -383,6 +437,8 @@ export interface RaidForm {
   side: Side; touches: number; bonus: boolean; tackled: boolean; raider?: Who; tackler?: Who; editOf?: number; tackleType?: string;
   /** SD-59: defenders who stepped out (line-out) / the raider stepped out */
   defOut?: number; lineOut?: boolean;
+  /** deep wave: the raid skill (RAID_SKILLS key) and the defenders touched */
+  skill?: string; touched?: Who[];
 }
 
 /** The engine input for a raid form (v2). SD-59: a raider line-out is not a
@@ -438,6 +494,9 @@ export function raidActions(s: KabaddiState, f: RaidForm, idOf?: (name?: string)
       ...(tackler ? { tacklerId: tackler.id, tacklerName: tackler.fullName } : null),
       // SD-117b: optional, only on a tackled raid
       ...(f.tackled && !f.lineOut && f.tackleType ? { tackleType: f.tackleType } : null),
+      // deep wave: optional, only on a raid that scored / touched
+      ...(f.skill && (raidPts > 0 || f.skill === 'escape') ? { skill: f.skill } : null),
+      ...(f.touched?.length && !f.lineOut && outcome.touches > 0 ? { touched: f.touched.slice(0, outcome.touches).map((p) => ({ id: p.id, name: p.fullName })) } : null),
       ...(f.editOf != null ? { replaces: f.editOf } : null),
     },
   });
@@ -622,6 +681,9 @@ export const reducer = (s: KabaddiState, a: ScoreAction): KabaddiState => {
         events: [...s.events, { id: s.seq + 1, stamp: `${minute}'`, icon: '⏱️', label: 'Timeout', side: a.side, kind: 'timeout', minute, half: hf }],
       };
     }
+    case 'SET_TRACK':
+      // deep wave (new action): the ⚙️ Stats to track switches
+      return setTrack(s, a.payload);
     case 'RAID':
       return pushPt('RAID');
     case 'TACKLE':
@@ -662,6 +724,9 @@ export const reducer = (s: KabaddiState, a: ScoreAction): KabaddiState => {
         ...(str(p.tacklerName) ?? attr2?.playerName ? { tackler: str(p.tacklerName) ?? attr2?.playerName } : null),
         ...(str(p.tacklerId) ?? attr2?.playerId ? { tacklerId: str(p.tacklerId) ?? attr2?.playerId } : null),
         ...(outcome.raiderOut && str(p.tackleType) ? { tt: str(p.tackleType) } : null),
+        // deep wave (new optional keys): raid skill, the defenders touched
+        ...(str(p.skill) ? { sk: str(p.skill) } : null),
+        ...(touchedList(p.touched, outcome.touches) ? { touched: touchedList(p.touched, outcome.touches) } : null),
       };
       // SD-72: the clock time orders the raid against suspensions (live raids only)
       const t = replaces >= 0 ? prev[replaces].t : liveT(s, a);

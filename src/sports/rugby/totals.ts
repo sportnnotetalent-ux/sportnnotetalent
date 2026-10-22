@@ -13,10 +13,14 @@
  *
  * statTotals owns the WHOLE line: every live key is the sum of `eventCredits`
  * over the state, plus `minutes` (sides with a line-up). The optional detail
- * keys are owned only when the match tracks detail.
+ * keys are owned only when the match tracks detail; the deep-wave keys
+ * (penalties conceded, turnovers conceded, offloads) only when their "Stats to
+ * track" toggle is on or one was recorded.
  */
 import { trackField, timeLeft, type FieldEvent, type FieldLog, type FieldResult, type Who } from '../onField.ts';
-import { eventCredits, matchSec, pointsOf, DETAIL_STATS, type RugbyEvent, type RugbyState, type Side } from './engine.ts';
+import {
+  detailTracked, eventCredits, matchSec, pointsOf, trackedTallyKeys, DETAIL_STATS, type RugbyEvent, type RugbyState, type Side,
+} from './engine.ts';
 
 const stamped = (s: RugbyState, side: Side): boolean => !!s.xi?.[side]?.players?.length;
 /** sent off (a red, a second yellow, a 20-minute red) */
@@ -101,10 +105,13 @@ export function rugbyTotals(s: RugbyState): Record<string, { side: Side; stats: 
     if (!p.played || !p.id || !stamped(s, p.side)) continue;
     line(p.id, p.side).stats.minutes = Math.round(p.minutes);
   }
-  const detail = s.trackDetail || s.events.some((e) => e.type === 'detail');
+  const detail = detailTracked(s);
+  // deep wave: a tracked "Stats to track" key reads 0 for everyone with a line (untracked: absent, never a false 0)
+  const tallies = trackedTallyKeys(s);
   for (const l of Object.values(out)) {
     for (const k of ['points', 'tries', 'conversions', 'conversionAttempts', 'penGoals', 'penGoalAttempts', 'dropGoals', 'dropGoalAttempts', 'yellowCards', 'redCards'] as const) l.stats[k] ??= 0;
     if (detail) for (const k of DETAIL_STATS) l.stats[k] ??= 0;
+    for (const k of tallies) l.stats[k] ??= 0;
   }
   return out;
 }

@@ -7,6 +7,10 @@
  *     change the declared weight, declined; the next attempt is declared
  *     automatically (+1 kg after a good lift, the same after a no lift);
  *   - LiftGrid: one lifter's 3 + 3 attempts, tap a cell to correct it.
+ *  Deep wave: the meet's "Stats to track" — referees' lights on every attempt
+ *  (`wlLights`), a "Jury reverses" button (`wlJury`) — and the IWF two-change
+ *  limit (`wlChanges`, asks before a third change, never refuses); each cell
+ *  shows its lights (2-1), a jury reversal (J) and weight changes (Δ2).
  *  Pure rules live in data/results/weightlifting.ts. */
 import { formatLb } from '../../core/units';
 import React, { useEffect, useMemo, useState } from 'react';
@@ -17,6 +21,7 @@ import { askConfirm } from '../ConfirmSheet';
 import {
   activeLift, liftingOrder, callText, declareError, declare, recordLift, pendingIndex, taken, weighInIssue, classForBodyweight,
   summarizeLifts, bombedOutOf, fmtKg, WL_RANGE, BIG_JUMP, LIFT_LABEL, LIFT_SHORT, LIFTS, ordinal,
+  ruleOf, changeLimitIssue, juryReverse, decisionText, lightsScore,
   type EntryResult, type LiftAttempt, type Lift, type ResultEntry, type CompRules,
 } from '../../data/results';
 
@@ -142,7 +147,8 @@ export function NextLiftCard({ entries, seq, onSave, rules, lb }: { entries: Res
   const lift = activeLift(entries);
   const order = useMemo(() => (lift ? liftingOrder(entries, lift, rules) : []), [entries, lift, rules]);
   const cur = order[0];
-  const [lightsMode, setLightsMode] = useState(false);
+  const [lightsMode, setLightsMode] = useState(ruleOf(rules, 'wlLights') === true);
+  const jury = ruleOf(rules, 'wlJury') === true;
   const [lights, setLights] = useState<(boolean | null)[]>([null, null, null]);
   const [kg, setKg] = useState('');
   const [err, setErr] = useState<string | null>(null);
@@ -153,6 +159,7 @@ export function NextLiftCard({ entries, seq, onSave, rules, lb }: { entries: Res
       <Card style={st.upCard}>
         <Text style={textStyles.h3}>✅ All attempts taken</Text>
         <Text style={textStyles.muted}>Check the results below, then Finish & lock.</Text>
+        {jury ? <LastDecision entries={entries} onSave={onSave} rules={rules} /> : null}
       </Card>
     );
   }
@@ -169,6 +176,9 @@ export function NextLiftCard({ entries, seq, onSave, rules, lb }: { entries: Res
   const changeWeight = async () => {
     const v = kgOf(kg);
     if (v == null) { setErr('Type the weight in kg.'); return; }
+    // deep wave: IWF two changes an attempt — ask before a third (never refused)
+    const over = changeLimitIssue(list, v, rules);
+    if (over && !(await askConfirm({ title: 'A third change?', message: `${first}: ${over} Record it anyway?`, yesLabel: `Yes, ${v} kg`, noLabel: 'No, keep it', tone: 'caution' }))) return;
     const next = await declared(list, lift, v, setErr, rules);
     if (next) onSave(e.id, { ...r, lifts: { ...r.lifts, [lift]: next } });
   };
@@ -224,6 +234,7 @@ export function NextLiftCard({ entries, seq, onSave, rules, lb }: { entries: Res
         </>
       )}
       {err ? <Text style={st.bad}>{err}</Text> : null}
+      {jury ? <LastDecision entries={entries} onSave={onSave} rules={rules} /> : null}
       {order.length > 1 && (
         <View style={{ gap: 2 }}>
           {order.slice(1, 4).map((c) => <Text key={`${c.entryId}${c.attempt}`} style={textStyles.muted} numberOfLines={1}>Then: {callText(c)}</Text>)}
@@ -231,6 +242,28 @@ export function NextLiftCard({ entries, seq, onSave, rules, lb }: { entries: Res
       )}
       <Text style={st.hint}>The lightest bar lifts first; at the same weight the earlier attempt, the bigger jump, then the lower lot. After a decision the next attempt is set to +1 kg (good) or the same weight (no lift) — change it if the coach declares another.</Text>
     </Card>
+  );
+}
+
+/** Deep wave: the latest decision, with "Jury reverses" (the meet tracks jury reversals). */
+function LastDecision({ entries, onSave, rules }: { entries: ResultEntry[]; onSave: Save; rules?: CompRules }) {
+  let last: { e: ResultEntry; lift: Lift; i: number; a: LiftAttempt } | null = null;
+  for (const e of entries) for (const lift of LIFTS) (e.result.lifts?.[lift] ?? []).forEach((a, i) => {
+    if (taken(a) && !a.pass && a.seq != null && (!last || a.seq > (last.a.seq ?? 0))) last = { e, lift, i, a };
+  });
+  if (!last) return null;
+  const { e, lift, i, a } = last as { e: ResultEntry; lift: Lift; i: number; a: LiftAttempt };
+  const first = e.name.split(' ')[0];
+  const reverse = async () => {
+    const to = a.good ? 'no lift' : 'good lift';
+    const ok = await askConfirm({ title: a.jury ? 'Undo the jury reversal?' : 'Jury reverses the decision?', message: `${e.name}, ${LIFT_LABEL[lift].toLowerCase()} attempt ${i + 1} at ${a.kg} kg becomes a ${to}${a.jury ? ' — the referees’ decision again' : ''}. The ranking and the next weight follow.`, yesLabel: `Yes, ${to}`, noLabel: 'No', tone: 'caution' });
+    if (ok) onSave(e.id, { ...e.result, lifts: { ...e.result.lifts, [lift]: juryReverse(e.result.lifts?.[lift], i, rules) } }, `${a.jury ? 'Jury reversal undone' : 'Jury reversal'} · ${first} ${a.kg} kg`);
+  };
+  return (
+    <View style={st.wrap}>
+      <Text style={[textStyles.muted, { flexShrink: 1 }]} numberOfLines={2}>Last: {LIFT_SHORT[lift]} {i + 1} · {e.name} {a.kg} kg — {decisionText(a)}</Text>
+      <SelectChip label={a.jury ? '⚖ Undo jury reversal' : '⚖ Jury reverses'} active={!!a.jury} onPress={() => void reverse()} />
+    </View>
   );
 }
 
@@ -260,7 +293,7 @@ export function LiftGrid({ r, editable, onChange, rules, lb }: { r: EntryResult;
     if (bad) { setErr(bad); return; }
     if (v !== cur?.kg) { const c = await checkWeight(sel.lift, v, sel.i > 0 ? list[sel.i - 1]?.kg : undefined); if (!c.ok) return; }
     const next: LiftAttempt = { ...(cur ?? {}), kg: v, auto: undefined };
-    if (good !== undefined) { next.good = good; next.pass = undefined; next.lights = undefined; }
+    if (good !== undefined) { next.good = good; next.pass = undefined; next.lights = undefined; next.jury = undefined; }
     list[sel.i] = next;
     onChange({ ...r, lifts: { ...r.lifts, [sel.lift]: list } });
     setSel(null);
@@ -285,11 +318,14 @@ export function LiftGrid({ r, editable, onChange, rules, lb }: { r: EntryResult;
             const a = r.lifts?.[lift]?.[i];
             const on = sel?.lift === lift && sel.i === i;
             const txt = a ? (a.pass ? `${a.kg} –` : `${a.kg}`) : '';
+            // deep wave: the referees' lights, a jury reversal, weight changes
+            const sub = a ? [lightsScore(a) ?? '', a.jury ? 'J' : '', a.chg?.length ? `Δ${a.chg.length}` : ''].filter(Boolean).join(' ') : '';
             return (
               <TouchableOpacity key={i} accessibilityRole="button" disabled={!editable} onPress={() => pick(lift, i)}
-                accessibilityLabel={`${LIFT_LABEL[lift]} attempt ${i + 1}: ${a ? `${a.kg} kg ${a.pass ? 'declined' : a.good === true ? 'good lift' : a.good === false ? 'no lift' : 'declared'}` : 'empty'}`}
+                accessibilityLabel={`${LIFT_LABEL[lift]} attempt ${i + 1}: ${a ? `${a.kg} kg ${taken(a) ? decisionText(a) : 'declared'}${a.chg?.length ? `, weight changed ${a.chg.length === 1 ? 'once' : `${a.chg.length} times`}` : ''}` : 'empty'}`}
                 style={[st.cell, a?.good === true && st.cellGood, a?.good === false && st.cellBad, a && !taken(a) && st.cellDeclared, on && st.cellOn]}>
                 <Text style={[st.cellTxt, a?.good === false && st.cellTxtBad, a && !taken(a) && { color: theme.colors.textMuted }]}>{txt || '·'}</Text>
+                {sub ? <Text style={st.cellSub}>{sub}</Text> : null}
               </TouchableOpacity>
             );
           })}
@@ -310,8 +346,12 @@ export function LiftGrid({ r, editable, onChange, rules, lb }: { r: EntryResult;
                 <SelectChip label="✗ No lift" active={cur.good === false && !cur.pass} onPress={() => void apply(false)} />
               </>
             ) : <SelectChip label="Set weight" active={false} onPress={() => void apply()} />}
+            {cur && taken(cur) && !cur.pass && (ruleOf(rules, 'wlJury') === true || cur.jury) ? (
+              <SelectChip label={cur.jury ? '⚖ Jury reversed ✓' : '⚖ Jury reversed'} active={!!cur.jury} onPress={() => { onChange({ ...r, lifts: { ...r.lifts, [sel.lift]: juryReverse(list, sel.i, rules) } }); setSel(null); }} />
+            ) : null}
             {cur ? <SelectChip label="Clear" active={false} onPress={() => void clear()} /> : null}
           </View>
+          {cur && taken(cur) && (cur.lights?.length === 3 || cur.chg?.length) ? <Text style={st.hint}>{decisionText(cur)}{cur.chg?.length ? ` · declared ${[...cur.chg, cur.kg].join(' → ')} kg` : ''}</Text> : null}
           {err ? <Text style={st.bad}>{err}</Text> : null}
         </View>
       )}
@@ -353,6 +393,7 @@ const st = StyleSheet.create({
   cellOn: { borderColor: theme.colors.primary, borderStyle: 'solid' },
   cellTxt: { color: theme.colors.text, fontSize: theme.font.small, fontWeight: '800', fontVariant: ['tabular-nums'] },
   cellTxtBad: { color: theme.colors.danger, textDecorationLine: 'line-through' },
+  cellSub: { color: theme.colors.textMuted, fontSize: 10, fontWeight: '700' },
   best: { color: theme.colors.text, fontWeight: '900', textAlign: 'right', fontVariant: ['tabular-nums'] },
   editor: { gap: theme.spacing(2), padding: theme.spacing(2), borderRadius: theme.radius.sm, borderWidth: 1, borderColor: theme.colors.border },
 });

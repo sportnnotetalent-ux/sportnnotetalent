@@ -13,6 +13,7 @@ import type { LiveEvent } from '../liveEvents';
 // accept it too.
 import { resourcePct, resourcePctV1, revisedTarget } from './dls.ts';
 import { rulesFromConfig, rulesOf, effectiveRules, patchRules, describeRulesChange, type CricketRules } from './rules.ts';
+import { applyDetailPatch, asBowlType, trackingOf, type BallDetailRec, type BowlType, type Tracking } from './detail.ts';
 
 interface Innings {
   runs: number;
@@ -187,6 +188,12 @@ export interface CricketState {
   /** SD-133 — wagon wheel + shot type (CK-11): one record per tagged scoring
    *  shot (`SHOT`). Absent until the first one — older states are unchanged. */
   shots?: ShotRec[];
+  /** Deep wave — optional per-delivery detail (`BALL_DETAIL`, v:2: pitch map,
+   *  shot control, speed, catch position). Absent until the first one. */
+  detail?: BallDetailRec[];
+  /** Deep wave — each bowler's type (pace / spin), by player id: from
+   *  SET_BOWLER's `btype` (the profile, free) or SET_BOWL_TYPE. Absent until set. */
+  bowlTypes?: Record<string, BowlType>;
 }
 
 /** SD-133 — fielding zones for the wagon wheel, clockwise from straight (for a
@@ -278,6 +285,12 @@ export interface BallRec {
   sym?: string;
   /** a wide / no-ball delivery (counted even when its penalty is 0) */
   ext?: 'wd' | 'nb';
+  /** Deep wave — when the scorer's device logged it (ms, `payload.at`).
+   *  Only on balls scored by a client that stamps them (older logs: none). */
+  t?: number;
+  /** Deep wave — the optional detail being tracked for this delivery (from
+   *  the "Stats to track" toggles in force). Only present when one is on. */
+  trk?: Tracking;
 }
 
 /** A Super Over: a self-contained 1-over, 2-wicket mini-match run through this
@@ -942,8 +955,37 @@ function applyShot(s: CricketState, a: ScoreAction): CricketState {
   return { ...s, shots: [...list.filter((x) => !same(x)), rec] };
 }
 
+/** Deep wave — BALL_DETAIL (v:2): merge a delivery's optional detail (pitch
+ *  map, shot control, speed, catch position — detail.ts). Score-neutral; a
+ *  live Super Over's ball goes to that innings. */
+function applyBallDetail(s: CricketState, a: ScoreAction): CricketState {
+  if (s.superOver && !s.superOver.state.ended) {
+    const inner = applyBallDetail(s.superOver.state, a);
+    return inner === s.superOver.state ? s : { ...s, superOver: { ...s.superOver, state: inner } };
+  }
+  const next = applyDetailPatch(s.detail, a.payload ?? {});
+  return next ? { ...s, detail: next } : s;
+}
+
+/** Deep wave — SET_BOWL_TYPE (v:2): a bowler's type (`btype` code; null
+ *  clears). Score-neutral; kept on the match (a Super Over reads it there). */
+function applyBowlType(s: CricketState, a: ScoreAction): CricketState {
+  const p = a.payload ?? {};
+  const id = textOf(p.id);
+  if (p.v !== 2 || !id) return s;
+  const t = asBowlType(p.btype);
+  const cur = s.bowlTypes ?? {};
+  if (t === null && p.btype !== null) return s;
+  if ((cur[id] ?? null) === t) return s;
+  const { [id]: _old, ...rest } = cur;
+  return { ...s, bowlTypes: t ? { ...rest, [id]: t } : rest };
+}
+
 const step = (s: CricketState, a: ScoreAction): CricketState => {
   if (a.type === 'SHOT') return applyShot(s, a);
+  // Deep wave — optional detail: score-neutral, allowed after the match ended.
+  if (a.type === 'BALL_DETAIL') return applyBallDetail(s, a);
+  if (a.type === 'SET_BOWL_TYPE') return applyBowlType(s, a);
   if (s.ended && a.type !== 'END' && a.type !== 'POTM') return s;
 
   // ── Change overs (parity #18) ─────────────────────────────────────────────
@@ -1662,6 +1704,10 @@ const step = (s: CricketState, a: ScoreAction): CricketState => {
       const card: BowlCard = { name, side: other(bat), runs: 0, balls: 0, wickets: 0, dots: 0, extras: 0 };
       const bowling = s.bowling[id] ? s.bowling : { ...s.bowling, [id]: card };
       let next: CricketState = { ...s, bowlerId: id, bowlerName: name, bowling };
+      // Deep wave — the bowler's type riding on the pick (from the profile);
+      // never overwrites one already set. Absent on older logs.
+      const btype = asBowlType(a.payload?.btype);
+      if (btype && !s.bowlTypes?.[id]) next = { ...next, bowlTypes: { ...s.bowlTypes, [id]: btype } };
       const stamp = oversStr(cur.balls, s.ballsPerOver);
       const events = [...s.events];
       if (forced) {
@@ -1835,6 +1881,14 @@ function ballRec(s: CricketState, a: ScoreAction, next: CricketState): BallRec {
   const sym = logSymbol(a, wd);
   if (sym !== undefined) rec.sym = sym;
   if (ext) rec.ext = ext;
+  // Deep wave — the device clock (only a stamping client sends `at`) and the
+  // optional detail tracked on this delivery. Both absent on older logs.
+  const t = Number(a.payload?.at);
+  if (Number.isFinite(t) && t > 0) rec.t = t;
+  if (sym !== undefined && out?.kind !== 'mankad') {
+    const trk = trackingOf(rulesOf(s));
+    if (trk) rec.trk = trk;
+  }
   return rec;
 }
 
@@ -1877,11 +1931,15 @@ function withBallPenalty(s: CricketState, a: ScoreAction, pen: BallPenalty): Cri
 }
 
 /** The state to persist in `matches.state` (parity #19): without the derived
- *  `log` (incl. a Super Over's) — `getMatches` reads every match's state. */
+ *  `log` (incl. a Super Over's) — `getMatches` reads every match's state.
+ *  Deep wave: the per-delivery `detail` is left out too (up to one record a
+ *  ball; replay rebuilds it from the BALL_DETAIL events, and everything that
+ *  reads it needs the replayed log anyway). Absent on older states → their
+ *  snapshot is unchanged. */
 export function snapshotState(s: CricketState): CricketState {
-  const { log: _log, ...rest } = s;
+  const { log: _log, detail: _detail, ...rest } = s;
   if (!rest.superOver) return rest;
-  const { log: _inner, ...inner } = rest.superOver.state;
+  const { log: _inner, detail: _innerDetail, ...inner } = rest.superOver.state;
   return { ...rest, superOver: { ...rest.superOver, state: inner } };
 }
 

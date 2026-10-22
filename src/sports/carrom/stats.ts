@@ -40,6 +40,26 @@ export const carromStats: SportStatSchema<'carrom'> = {
     { key: 'boardPct', label: 'Boards won %', source: 'derived', group: 'record', format: { unit: 'percent', dp: 0 }, agg: { kind: 'rate', num: 'boards', den: 'boardsPlayed', scale: 100, dp: 0, over: 'recorded' } },
     { key: 'pointsPerBoard', label: 'Points per board won', source: 'derived', group: 'scoring', format: { unit: 'decimal', dp: 1 }, agg: { kind: 'rate', num: 'points', den: 'boards', dp: 1, over: 'recorded' } },
     { key: 'slams', label: 'Slams', short: 'slams', one: 'slam', source: 'derived', group: 'record', agg: { kind: 'sum', keys: ['whiteSlams', 'blackSlams'] } },
+    // Deep wave — "Stats to track" (statTotals writes them only for a match
+    // that tracked them: 'keyed', an older line reads "not tracked", never 0).
+    // Fouls and missed covers are singles only (the board log doesn't say
+    // which doubles partner fouled).
+    { key: 'fouls', label: 'Fouls', short: 'fouls', one: 'foul', group: 'discipline', format: { unit: 'count', better: 'lower' }, coverage: 'keyed' },
+    { key: 'foulStriker', label: 'Fouls: striker pocketed', short: 'striker fouls', one: 'striker foul', group: 'discipline', format: { unit: 'count', better: 'lower' }, coverage: 'keyed' },
+    { key: 'foulTouch', label: 'Fouls: touching', short: 'touching fouls', one: 'touching foul', group: 'discipline', format: { unit: 'count', better: 'lower' }, coverage: 'keyed' },
+    { key: 'foulLine', label: 'Fouls: line / hand', short: 'line fouls', one: 'line foul', group: 'discipline', format: { unit: 'count', better: 'lower' }, coverage: 'keyed' },
+    { key: 'foulThumb', label: 'Fouls: thumbing', short: 'thumbing fouls', one: 'thumbing foul', group: 'discipline', format: { unit: 'count', better: 'lower' }, coverage: 'keyed' },
+    { key: 'foulOther', label: 'Fouls: other', short: 'other fouls', one: 'other foul', group: 'discipline', format: { unit: 'count', better: 'lower' }, coverage: 'keyed' },
+    { key: 'dues', label: 'Dues', short: 'dues', one: 'due', group: 'discipline', format: { unit: 'count', better: 'lower' }, coverage: 'keyed' },
+    { key: 'foulBoards', label: 'Boards with fouls tracked', short: 'boards tracked', one: 'board tracked', group: 'discipline', coverage: 'keyed' },
+    { key: 'foulsPerBoard', label: 'Fouls per board', source: 'derived', group: 'discipline', format: { unit: 'decimal', dp: 2, better: 'lower' },
+      agg: { kind: 'rate', num: 'fouls', den: 'foulBoards', dp: 2, qualifier: { den: 8, unit: { label: 'boards', one: 'board' } } } },
+    { key: 'queenMisses', label: 'Queen covers missed', short: 'missed covers', one: 'missed cover', group: 'discipline', format: { unit: 'count', better: 'lower' }, coverage: 'keyed' },
+    { key: 'qMissBoards', label: 'Boards with covers tracked', short: 'boards tracked', one: 'board tracked', group: 'discipline', coverage: 'keyed' },
+    { key: 'brkPocketed', label: 'Coins pocketed on the break', short: 'coins on the break', one: 'coin on the break', group: 'record', coverage: 'keyed' },
+    { key: 'brkTracked', label: 'Breaks tracked', short: 'breaks tracked', one: 'break tracked', group: 'record', coverage: 'keyed' },
+    { key: 'brkAvg', label: 'Coins per break', leaderLabel: 'Most coins per break', source: 'derived', group: 'record', format: { unit: 'decimal', dp: 2 },
+      agg: { kind: 'rate', num: 'brkPocketed', den: 'brkTracked', dp: 2, qualifier: { den: 8, unit: { label: 'breaks', one: 'break' } } } },
   ],
   // SD-86: rates over lines statTotals wrote (capped points, boards played) —
   // an older line (finisher-only, uncapped) stays out of them
@@ -49,6 +69,14 @@ export const carromStats: SportStatSchema<'carrom'> = {
     { id: 'scoring', title: 'Scoring', rows: [
       { stat: 'points' }, { stat: 'pointsPerMatch' }, { stat: 'pointsPerBoard' }, { stat: 'boards', label: 'Boards won' }, { stat: 'queens' }, { stat: 'lostQueens' },
       { stat: 'whiteSlams' }, { stat: 'blackSlams' }, { stat: 'highPoints', label: 'Best match' },
+    ] },
+    // Deep wave — shown only once a line tracked them
+    { id: 'break', title: 'The break', rows: [{ stat: 'brkAvg' }, { stat: 'brkPocketed' }] },
+    { id: 'discipline', title: 'Fouls & dues', rows: [
+      { stat: 'fouls' }, { stat: 'foulsPerBoard' }, { stat: 'dues' },
+      { stat: 'foulStriker', label: 'Striker pocketed', hideZero: true }, { stat: 'foulTouch', label: 'Touching', hideZero: true },
+      { stat: 'foulLine', label: 'Line / hand', hideZero: true }, { stat: 'foulThumb', label: 'Thumbing', hideZero: true }, { stat: 'foulOther', label: 'Other', hideZero: true },
+      { stat: 'queenMisses' },
     ] },
   ],
   careerView: 'sections',

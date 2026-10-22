@@ -19,7 +19,7 @@ import { replayPoints, type PointCredits, type PointInput, type PointKind } from
 import { pointsLineScore, type LineScore } from '../scoreline.ts';
 import { serveReducer, serveTracked, firstServer, type VbSub } from './rotation.ts';
 import { detailReducer, initDetail, type VbDetailEntry, type VbDetailToggle } from './detail.ts';
-import { keepMarks } from '../conduct.ts';
+import { keepMarks, withStamps } from '../conduct.ts';
 import { isPointKind } from '../rallyEdit.ts';
 import { fromPen, isSanctionLevel, oppSide, sanctionDef, sanctionLabel, toPen, type VbSanction } from './sanctions.ts';
 import type { PenMark } from '../conduct';
@@ -298,7 +298,13 @@ export function technicalTimeoutDue(s: VolleyballState): boolean {
   return s.current.home + s.current.away === 21;
 }
 
-export const reducer = (s: VolleyballState, a: ScoreAction): VolleyballState => {
+/** Deep wave — every step's new timeline events carry its `payload.at` (the
+ *  scorer's clock, sent by the controls): the commentary's elapsed minute and
+ *  set durations. An older log's actions carry no `at`, so they replay to
+ *  exactly the same state; an EDIT_LOG replays each point's stamp. */
+export const reducer = (s: VolleyballState, a: ScoreAction): VolleyballState => stamped(s, a);
+
+const core = (s: VolleyballState, a: ScoreAction): VolleyballState => {
   // Timeline correction: STAT_ADJUST only reconciles player profiles (no match
   // effect); EDIT_LOG replays a corrected point list so the score & sets re-derive.
   if (a.type === 'STAT_ADJUST') return s;
@@ -368,6 +374,13 @@ export const reducer = (s: VolleyballState, a: ScoreAction): VolleyballState => 
   if (ended) events.push({ id: ++seq, stamp: 'Match', icon: '🏆', label: 'Match won', detail: `${setsWon.home}-${setsWon.away} sets`, side: won });
   return { ...s, current: { home: 0, away: 0 }, setsWon, sets, events, seq, ended };
 };
+const stamped = withStamps(core);
+
+/** Deep wave — the scoring steps the controls stamp with the scorer's clock. */
+const STAMP_TYPES = new Set(['POINT', 'ATTACK', 'BLOCK', 'ACE', 'OPP_ERROR', 'SERVE_ERROR', 'TIMEOUT', 'CONDUCT']);
+/** The action with the scorer's clock (`payload.at`) when it's a scoring step. */
+export const stampAction = (a: ScoreAction, now: number = Date.now()): ScoreAction =>
+  STAMP_TYPES.has(a.type) && a.payload?.at == null ? { ...a, payload: { ...(a.payload ?? {}), at: now } } : a;
 
 /** SD-136 — CONDUCT (a new sanction) / PENALTY_POINT (a penalty point
  *  replayed from a corrected list). A penalty scores like any rally won (the

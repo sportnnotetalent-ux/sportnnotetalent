@@ -49,10 +49,32 @@ export const SHOT_LABEL: Record<ShotType, string> = {
 
 export interface Who { id?: string; name?: string }
 
+/** Deep wave — the technical fault's kind (optional chip, `trackFaultTypes`). */
+export type FaultType = 'steps' | 'double' | 'area' | 'offensive' | 'passive' | 'pass' | 'other';
+export const FAULT_TYPES: FaultType[] = ['steps', 'double', 'area', 'offensive', 'passive', 'pass', 'other'];
+export const FAULT_LABEL: Record<FaultType, string> = {
+  steps: 'Steps', double: 'Double dribble', area: 'Area violation', offensive: 'Offensive foul', passive: 'Passive play', pass: 'Bad pass / catch', other: 'Other',
+};
+/** The team figure each fault kind counts into (match centre). */
+export const FAULT_KEY: Record<FaultType, string> = {
+  steps: 'tfSteps', double: 'tfDouble', area: 'tfArea', offensive: 'tfOffensive', passive: 'tfPassive', pass: 'tfPass', other: 'tfOther',
+};
+
+/** Deep wave — optional depth (format keys `trackFaultTypes`,
+ *  `trackSevenMDrawn`). Absent = nothing extra (older states keep their shape). */
+export interface HandballTrack {
+  /** a chip for the technical fault's kind (steps, double dribble, area …) */
+  faultTypes?: boolean;
+  /** who won each 7-metre throw (`sevenMDrawn`) */
+  sevenMDrawn?: boolean;
+}
+
 export interface HandballEvent {
   /** stable id from the action (`payload.uid`) */
   id: string;
-  type: 'goal' | 'miss' | 'save' | 'block' | 'turnover' | 'steal' | 'card' | 'timeout' | 'sub' | 'gk';
+  /** deep wave: `empty` = a side takes its keeper off for a 7th court player
+   *  (`on`) or brings one back; `drawn` = a 7-metre throw won by a player */
+  type: 'goal' | 'miss' | 'save' | 'block' | 'turnover' | 'steal' | 'card' | 'timeout' | 'sub' | 'gk' | 'empty' | 'drawn';
   side: Side;
   /** game-clock seconds since the start of the match (playing time) */
   sec: number;
@@ -76,9 +98,19 @@ export interface HandballEvent {
   official?: string;
   /** save / block / steal: the attempt or turnover (its id) it answers */
   ref?: string;
+  /** deep wave: a technical fault's kind (new logs, when tracked) */
+  fault?: FaultType;
+  /** deep wave: `empty` — the goal is now empty (true) / the keeper is back (false) */
+  on?: boolean;
 }
 
-export interface SoThrow { scored: boolean; playerId?: string; playerName?: string }
+/** `outcome` / keeper (deep wave, new logs only): saved by the keeper or
+ *  missed; older throws carry `scored` only. */
+export interface SoThrow {
+  scored: boolean; playerId?: string; playerName?: string;
+  outcome?: 'scored' | 'saved' | 'missed';
+  keeperId?: string; keeperName?: string;
+}
 
 export interface XiStamp {
   players?: { id: string; name: string }[];
@@ -115,6 +147,8 @@ export interface HandballState {
    *  means level on aggregate (absent on every other match). */
   agg?: AggPrior;
   xi?: { home?: XiStamp; away?: XiStamp };
+  /** deep wave: what this match tracks beyond the default (absent = nothing) */
+  track?: HandballTrack;
 }
 
 /* --------------------------------- format ---------------------------------- */
@@ -141,8 +175,18 @@ export const init = (config?: Record<string, unknown>): HandballState => {
     stopClock: bool(config?.stopClock, true),
     shootout: null,
     ...(aggPriorFromConfig(config) ? { agg: aggPriorFromConfig(config) } : {}),
+    ...(readHandballTrack(config) ? { track: readHandballTrack(config) } : {}),
   };
 };
+
+/** Deep wave — the optional tracking from the format (undefined = none on, so
+ *  an older format keeps the old state shape). */
+export function readHandballTrack(config?: Record<string, unknown>): HandballTrack | undefined {
+  const t: HandballTrack = {};
+  if (config?.trackFaultTypes === true) t.faultTypes = true;
+  if (config?.trackSevenMDrawn === true) t.sevenMDrawn = true;
+  return Object.keys(t).length ? t : undefined;
+}
 
 /* ---------------------------------- clock ---------------------------------- */
 
@@ -222,6 +266,8 @@ export const SUSPENSION_MINUTES = 2;
 export const LIVE_KEYS = [
   'goals', 'shots', ...Object.values(GOAL_KEY), ...Object.values(SHOT_KEY), 'assists', 'saves', 'sevenMSaves', 'blocks',
   'technicalFaults', 'steals', 'yellowCards', 'twoMinutes', 'redCards', 'blueCards', 'soTaken', 'soGoals',
+  // deep wave: the player who won a 7-metre throw (only when tracked)
+  'sevenMDrawn',
 ] as const;
 
 type Credit = { playerId: string; playerName?: string; stats: Record<string, number> };
@@ -246,6 +292,8 @@ export function eventCredits(e: Pick<HandballEvent, 'type' | 'playerId' | 'playe
       return { first: p({ technicalFaults: 1 }) };
     case 'steal':
       return { first: p({ steals: 1 }) };
+    case 'drawn':
+      return { first: p({ sevenMDrawn: 1 }) };
     case 'card':
       if (e.card === 'yellow') return { first: p({ yellowCards: 1 }) };
       if (e.card === 'red') return { first: p(e.blue ? { redCards: 1, blueCards: 1 } : { redCards: 1 }) };
@@ -381,7 +429,20 @@ export const reducer = (s: HandballState, a: ScoreAction): HandballState => {
     }
     case 'TURNOVER': {
       if (!side) return s;
-      return push(s, { type: 'turnover', side, ...who1 });
+      // deep wave: the fault's kind (new logs only — an absent key keeps old states)
+      const fault = FAULT_TYPES.includes(a.payload?.fault as FaultType) ? { fault: a.payload!.fault as FaultType } : {};
+      return push(s, { type: 'turnover', side, ...who1, ...fault });
+    }
+    case 'EMPTY_GOAL': {
+      // deep wave: the side takes its keeper off for a 7th court player (`on`),
+      // or brings a keeper back — goals into the empty goal aren't charged to him
+      if (!side) return s;
+      return push(s, { type: 'empty', side, on: a.payload?.on !== false });
+    }
+    case 'DRAWN': {
+      // deep wave: a 7-metre throw won by a player (credits `sevenMDrawn`)
+      if (!side) return s;
+      return push(s, { type: 'drawn', side, ...who1 });
     }
     case 'STEAL': {
       if (!side) return s;
@@ -457,7 +518,16 @@ export const reducer = (s: HandballState, a: ScoreAction): HandballState => {
     }
     case 'SO': {
       if (!s.shootout || s.shootoutWinner || !side) return s;
-      const kick: SoThrow = { scored: a.payload?.scored === true, ...(p1?.playerId ? { playerId: p1.playerId } : {}), ...(p1?.playerName ? { playerName: p1.playerName } : {}) };
+      // deep wave: new logs carry the outcome and the keeper facing the throw
+      const p = a.payload ?? {};
+      const outcome = p.outcome === 'scored' || p.outcome === 'saved' || p.outcome === 'missed' ? p.outcome : undefined;
+      const str = (v: unknown) => (typeof v === 'string' && v ? v : undefined);
+      const kick: SoThrow = {
+        scored: outcome ? outcome === 'scored' : p.scored === true,
+        ...(p1?.playerId ? { playerId: p1.playerId } : {}), ...(p1?.playerName ? { playerName: p1.playerName } : {}),
+        ...(outcome ? { outcome } : {}),
+        ...(str(p.keeperId) ? { keeperId: str(p.keeperId) } : {}), ...(str(p.keeperName) ? { keeperName: str(p.keeperName) } : {}),
+      };
       const so = { ...s.shootout, [side]: [...s.shootout[side], kick] };
       return { ...s, shootout: so, shootoutWinner: decideShootout(so.home, so.away) };
     }
@@ -491,15 +561,37 @@ export function result(s: HandballState): { winner: Side | 'draw'; home: number;
  *  goes in goal). */
 export function keeperAt(s: HandballState, side: Side, uptoIndex = s.events.length): Who | undefined {
   let gk: Who | undefined = s.xi?.[side]?.gk ? { id: s.xi[side]!.gk!.id, name: s.xi[side]!.gk!.name } : undefined;
+  // deep wave (IHF 4:1): an empty goal parks the keeper — nobody is in goal
+  // (no saves, no goals conceded) until a keeper comes back
+  let parked: Who | undefined;
+  let empty = false;
   for (let i = 0; i < uptoIndex && i < s.events.length; i++) {
     const e = s.events[i];
     if (e.side !== side) continue;
-    if (e.type === 'gk') gk = { id: e.playerId, name: e.playerName };
+    if (e.type === 'empty') {
+      if (e.on !== false && !empty) { parked = gk; gk = undefined; empty = true; }
+      else if (e.on === false && empty) { gk = parked; parked = undefined; empty = false; }
+      continue;
+    }
+    if (e.type === 'gk') { gk = { id: e.playerId, name: e.playerName }; empty = false; parked = undefined; }
     else if (e.type === 'sub' && gk && ((e.playerId && e.playerId === gk.id) || (!e.playerId && e.playerName && e.playerName === gk.name))) {
       gk = e.secondId || e.secondName ? { id: e.secondId, name: e.secondName } : undefined;
     }
   }
   return gk;
+}
+
+/** Deep wave — is `side`'s goal empty after the first `uptoIndex` events
+ *  (its keeper off for a 7th court player)? */
+export function goalEmpty(s: HandballState, side: Side, uptoIndex = s.events.length): boolean {
+  let empty = false;
+  for (let i = 0; i < uptoIndex && i < s.events.length; i++) {
+    const e = s.events[i];
+    if (e.side !== side) continue;
+    if (e.type === 'empty') empty = e.on !== false;
+    else if (e.type === 'gk') empty = false;
+  }
+  return empty;
 }
 export const currentKeeper = (s: HandballState, side: Side) => keeperAt(s, side);
 
@@ -545,6 +637,13 @@ export function handballScoreLine(s: HandballState, perspective?: Side): string 
 
 /* --------------------------- live settings (#14) --------------------------- */
 
+/** Deep wave — the optional "Stats to track" (off by default: one tap per
+ *  event stays the default; these add a chip / a step when on). */
+export const HANDBALL_TRACK_FIELDS: FormatField[] = [
+  { key: 'trackFaultTypes', label: 'Technical fault types', type: 'toggle', default: false, group: 'Stats to track', hint: 'steps, double dribble, area, offensive foul, passive play…' },
+  { key: 'trackSevenMDrawn', label: '7 m won by', type: 'toggle', default: false, group: 'Stats to track', hint: 'who won each 7-metre throw' },
+];
+
 export const HANDBALL_LIVE_SETTINGS: LiveSettings<HandballState> = {
   title: '⚙️ Match settings',
   hint: 'Applies to this match only.',
@@ -552,7 +651,8 @@ export const HANDBALL_LIVE_SETTINGS: LiveSettings<HandballState> = {
   fields: [
     { key: 'periodMinutes', label: 'Half length', type: 'number', default: 30, min: 1, max: 45, step: 1, hint: 'min / half' },
     { key: 'stopClock', label: 'Stop clock on suspensions', type: 'toggle', default: true, group: 'Clock' },
+    ...HANDBALL_TRACK_FIELDS,
   ] as FormatField[],
-  read: (s) => ({ periodMinutes: s.periodMinutes, stopClock: s.stopClock }),
-  defaults: { periodMinutes: 30, stopClock: true },
+  read: (s) => ({ periodMinutes: s.periodMinutes, stopClock: s.stopClock, trackFaultTypes: s.track?.faultTypes === true, trackSevenMDrawn: s.track?.sevenMDrawn === true }),
+  defaults: { periodMinutes: 30, stopClock: true, trackFaultTypes: false, trackSevenMDrawn: false },
 };

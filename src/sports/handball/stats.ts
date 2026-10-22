@@ -6,6 +6,7 @@
  *  owns the whole line. A key shared with another sport keeps its labels. */
 import type { Qualifier, SportStatSchema, StatDef } from '../statSchema.ts';
 import { ASSISTS, BLOCKS, RED_CARDS, SAVES, YELLOW_CARDS } from '../sharedStats.ts';
+import type { CentreCategory } from '../invasion/centre.ts';
 
 /** House minimums (not from the IHF regulations): 2 matches for a per-match
  *  figure, 20 shots on goal faced for a keeper's save %, 20 attempts for
@@ -25,6 +26,15 @@ const typeStats: StatDef[] = TYPES.flatMap(([k, label, short, abbr]) => [
   { key: `${k}Shots`, label: `${label} attempts`, short: `${short} attempts`, one: `${short} attempt`, group: 'types', abbr: `${abbr}S` },
   { key: `${k}Pct`, label: `${label} %`, source: 'derived' as const, group: 'types', format: { unit: 'percent' as const, dp: 0 },
     agg: { kind: 'rate' as const, num: `${k}Goals`, den: `${k}Shots`, scale: 100, dp: 0 } },
+]);
+/** Deep wave — the IHF goalkeeper line by position (statTotals, keeper lines
+ *  only: keyed, so an older line reads "not tracked", never 0). The save %
+ *  doubles as the team figure on the match centre. */
+const keeperTypeStats: StatDef[] = TYPES.flatMap(([k, label, short]) => [
+  { key: `${k}Saves`, label: `${label} saves`, short: `${short} saves`, one: `${short} save`, group: 'keeperTypes', coverage: 'keyed' as const },
+  { key: `${k}Conceded`, label: `${label} goals conceded`, short: `${short} conceded`, group: 'keeperTypes', format: { unit: 'count' as const, better: 'lower' as const }, coverage: 'keyed' as const },
+  { key: `${k}SavePct`, label: `${label} save %`, source: 'derived' as const, group: 'keeperTypes', format: { unit: 'percent' as const, dp: 0 },
+    agg: { kind: 'rate' as const, num: `${k}Saves`, den: [`${k}Saves`, `${k}Conceded`], scale: 100, dp: 0, over: 'keeper' } },
 ]);
 
 export const handballStats: SportStatSchema<'handball'> = {
@@ -47,6 +57,13 @@ export const handballStats: SportStatSchema<'handball'> = {
     { key: 'technicalFaults', label: 'Technical faults', short: 'technical faults', one: 'technical fault', compact: 'tech. faults', compactOne: 'tech. fault', abbr: 'TF', group: 'defence', format: { unit: 'count', better: 'lower' }, weight: -1 },
     { key: 'sevenMSaves', label: '7 m saves', short: '7 m saves', one: '7 m save', group: 'goalkeeping', abbr: '7MSV' },
     ...typeStats,
+    ...keeperTypeStats,
+    // deep wave: goals into an empty goal (IHF "EG"), 7-metre throws won (when
+    // tracked) and the keeper's shoot-out saves — keyed: only lines that
+    // carry them tracked them
+    { key: 'emptyGoalGoals', label: 'Empty-goal goals', short: 'empty-goal goals', one: 'empty-goal goal', group: 'types', coverage: 'keyed' },
+    { key: 'sevenMDrawn', label: '7 m throws won', short: '7 m throws won', one: '7 m throw won', compact: '7 m won', group: 'attack', coverage: 'keyed' },
+    { key: 'soSaves', label: 'Shoot-out saves', short: 'shoot-out saves', one: 'shoot-out save', compact: 'SO saves', group: 'goalkeeping', coverage: 'keyed' },
     { ...YELLOW_CARDS, group: 'discipline', weight: -1, abbr: 'YC' },
     { key: 'twoMinutes', label: '2-minute suspensions', short: '2-min suspensions', one: '2-min suspension', compact: "2'", abbr: "2'", group: 'discipline', weight: -2, suspension: { minutes: 2 } },
     { ...RED_CARDS, group: 'discipline', weight: -6, abbr: 'D', suspension: { permanent: true } },
@@ -82,6 +99,14 @@ export const handballStats: SportStatSchema<'handball'> = {
       agg: { kind: 'perGame', key: 'goalsConceded', dp: 2, over: 'keeper' } },
     // team-level match figures (the comparison panel), never on a player line
     { key: 'timeouts', label: 'Team time-outs', short: 'team time-outs', one: 'team time-out', source: 'team' },
+    // deep wave — technical faults by kind (only when tracked)
+    { key: 'tfSteps', label: 'Steps', short: 'steps', source: 'team' },
+    { key: 'tfDouble', label: 'Double dribbles', short: 'double dribbles', one: 'double dribble', source: 'team' },
+    { key: 'tfArea', label: 'Area violations', short: 'area violations', one: 'area violation', source: 'team' },
+    { key: 'tfOffensive', label: 'Offensive fouls', short: 'offensive fouls', one: 'offensive foul', source: 'team' },
+    { key: 'tfPassive', label: 'Passive play', short: 'passive play', source: 'team' },
+    { key: 'tfPass', label: 'Bad passes / catches', short: 'bad passes / catches', one: 'bad pass / catch', source: 'team' },
+    { key: 'tfOther', label: 'Other technical faults', short: 'other technical faults', one: 'other technical fault', source: 'team' },
   ],
   filters: {
     keeper: (l) => l.stats != null && 'goalsConceded' in l.stats,
@@ -89,12 +114,14 @@ export const handballStats: SportStatSchema<'handball'> = {
   sections: [
     { id: 'attack', title: 'Attack', rows: [
       { stat: 'goals' }, { stat: 'goalsPerGame' }, { stat: 'shots' }, { stat: 'shotPct' }, { stat: 'assists' },
-      { stat: 'sevenMGoals' }, { stat: 'sevenMTaken' }, { stat: 'sevenMPct' },
+      { stat: 'sevenMGoals' }, { stat: 'sevenMTaken' }, { stat: 'sevenMPct' }, { stat: 'sevenMDrawn', hideZero: true },
     ] },
-    { id: 'types', title: 'Goals by type', rows: TYPES.flatMap(([k]) => [{ stat: `${k}Goals`, hideZero: true }, { stat: `${k}Pct` }]) },
+    { id: 'types', title: 'Goals by type', rows: [...TYPES.flatMap(([k]) => [{ stat: `${k}Goals`, hideZero: true }, { stat: `${k}Pct` }]), { stat: 'emptyGoalGoals', hideZero: true }] },
     { id: 'defence', title: 'Defence & ball', rows: [{ stat: 'steals' }, { stat: 'blocks' }, { stat: 'technicalFaults' }] },
     { id: 'playing', title: 'Playing time', rows: [{ stat: 'minutes' }] },
-    { id: 'goalkeeping', title: 'Goalkeeping', rows: [{ stat: 'saves' }, { stat: 'goalsConceded' }, { stat: 'savePct' }, { stat: 'sevenMSaves' }, { stat: 'sevenMSavePct' }, { stat: 'concededPerGame' }] },
+    { id: 'goalkeeping', title: 'Goalkeeping', rows: [{ stat: 'saves' }, { stat: 'goalsConceded' }, { stat: 'savePct' }, { stat: 'sevenMSaves' }, { stat: 'sevenMSavePct' }, { stat: 'concededPerGame' }, { stat: 'soSaves', hideZero: true }] },
+    // deep wave: the IHF keeper line by position (save % from 6 m, 9 m …)
+    { id: 'keeperTypes', title: 'Saves by position', rows: TYPES.map(([k]) => ({ stat: `${k}SavePct` })) },
     { id: 'shootout', title: '7 m shoot-outs', rows: [{ stat: 'soGoals', hideZero: true }, { stat: 'soTaken', hideZero: true }, { stat: 'soConversion' }] },
     { id: 'bests', title: 'Bests', rows: [{ stat: 'mostGoals', label: 'Most goals (match)', hideZero: true }, { stat: 'mostSaves', label: 'Most saves (match)', hideZero: true }] },
     { id: 'discipline', title: 'Discipline', rows: [{ stat: 'yellowCards' }, { stat: 'twoMinutes' }, { stat: 'redCards', label: 'Disqualifications' }, { stat: 'blueCards', hideZero: true }, { stat: 'suspensionMinutes' }] },
@@ -122,7 +149,8 @@ export const handballStats: SportStatSchema<'handball'> = {
     'saves', 'steals', 'blocks', 'technicalFaults', 'timeouts',
     { key: 'yellowCards', label: 'Warnings' }, { key: 'twoMinutes', label: '2-minute suspensions' }, { key: 'redCards', label: 'Disqualifications' },
   ],
-  leaders: ['goals', 'sevenMGoals', 'assists', 'goalsPerGame', 'shotPct', 'saves', 'savePct', 'steals', 'blocks'],
+  // deep wave: 7 m throws won (only lines that tracked it rank)
+  leaders: ['goals', 'sevenMGoals', 'assists', 'goalsPerGame', 'shotPct', 'saves', 'savePct', 'steals', 'blocks', 'sevenMDrawn'],
   headline: ['goals', 'saves', 'assists', 'steals'],
   awards: [
     { stat: 'goals', icon: '🤾', label: 'Top scorer' },
@@ -131,3 +159,26 @@ export const handballStats: SportStatSchema<'handball'> = {
   ],
   scoreUnit: 'goals',
 };
+
+/** Deep wave — the match centre's categories (IHF match statistics: shooting
+ *  by position, the goalkeeper line by position, ball, sanctions). A row
+ *  neither side has is dropped; one the match didn't track reads "not
+ *  tracked". */
+export const handballCentre: CentreCategory[] = [
+  { id: 'top', label: 'Top stats', rows: [
+    { key: 'shotPct', label: 'Shooting %' }, 'shots', { key: 'savePct', label: 'Save %' }, 'saves',
+    'sevenMGoals', 'sevenMTaken', 'technicalFaults', 'steals', { key: 'twoMinutes', label: '2-minute suspensions' },
+  ] },
+  { id: 'shooting', label: 'Shooting', rows: [
+    ...TYPES.flatMap(([k, label]) => [`${k}Goals`, { key: `${k}Pct`, label: `${label} shooting %` }]),
+    'sevenMGoals', { key: 'sevenMPct', label: '7 m %' }, 'emptyGoalGoals', 'sevenMDrawn', 'assists',
+  ] },
+  { id: 'keeping', label: 'Goalkeeping', rows: [
+    { key: 'savePct', label: 'Save %' }, 'saves', 'sevenMSaves', ...TYPES.map(([k]) => `${k}SavePct`), 'sevenMSavePct',
+  ] },
+  { id: 'ball', label: 'Ball & defence', rows: ['steals', 'blocks', 'technicalFaults', 'tfSteps', 'tfDouble', 'tfArea', 'tfOffensive', 'tfPassive', 'tfPass', 'tfOther'] },
+  { id: 'discipline', label: 'Discipline', rows: [
+    { key: 'yellowCards', label: 'Warnings' }, { key: 'twoMinutes', label: '2-minute suspensions' }, { key: 'redCards', label: 'Disqualifications' },
+    { key: 'blueCards', label: 'Blue cards' }, 'timeouts',
+  ] },
+];

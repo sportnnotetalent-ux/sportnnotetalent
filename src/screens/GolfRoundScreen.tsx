@@ -32,9 +32,14 @@ import {
 } from '../data/golf';
 import { isSupabaseConfigured } from '../core/supabase';
 import {
-  summarize, toParLabel, cardSigned, clampPutts, cardHasDetail, derivedGir, MAX_HOLE_STROKES,
-  type GolfCard, type HoleScore, type EntryAdmin, type FairwayDir,
+  summarize, toParLabel, cardSigned, clampPutts, MAX_HOLE_STROKES,
+  type GolfCard, type HoleScore, type EntryAdmin, type FairwayDir, type GolfTrackKey,
 } from '../sports/golf/engine';
+import { cleanTrack, LEGACY_STATS_ROW, roundTrackOf, effectiveTrack, driveHolesOf, withTrack, stampHole } from '../sports/golf/track';
+import type { FeedPlayer } from '../sports/golf/feed';
+import { GolfTrackCard } from '../components/golf/GolfTrackCard';
+import { GolfHoleStats } from '../components/golf/GolfHoleStats';
+import { GolfRoundFeed, GolfRoundStats } from '../components/golf/GolfRoundDeep';
 import type { FieldEntry } from '../core/types';
 import type { RootStackParamList } from '../navigation/types';
 import { useParamState } from '../navigation/useParamState';
@@ -44,6 +49,9 @@ type Nav = NativeStackNavigationProp<RootStackParamList>;
 /** SD-45 (D8) — the per-hole stats row is off by default and remembered per
  *  scorer (this phone), like the other detail modes. */
 const STATS_ROW_KEY = 'sportfolio.golfStatsRow.v1';
+/** Deep wave — the phone's own "Stats to track" (when the round sets none);
+ *  a phone that had the SD-45 stats row on starts with its four stats. */
+const TRACK_KEY = 'sportfolio.golfTrack.v1';
 
 export default function GolfRoundScreen() {
   const nav = useNavigation<Nav>();
@@ -58,19 +66,22 @@ export default function GolfRoundScreen() {
   const [me, setMe] = useState<string | null>(null);
   const [group, setGroup] = useState<number | null>(null);
   const [hole, setHole] = useState(0);
-  const [trackPutts, setTrackPutts] = useState(false);
-  const [statsRow, setStatsRow] = useState(false);
-  // SD-88 — the group's whole card; SD-76 — players / teams board
+  // Deep wave — "Stats to track": the round's (organiser) setting, else this phone's
+  const [phoneTrack, setPhoneTrack] = useState<GolfTrackKey[]>([]);
+  // SD-88 — the group's whole card; SD-76 — players / teams board; deep wave — commentary / round stats
   const [fullCard, setFullCard] = useState(false);
-  const [boardView, setBoardView] = useState<'players' | 'teams'>('players');
+  const [boardView, setBoardView] = useState<'players' | 'teams' | 'feed' | 'stats'>('players');
   const [adminFor, setAdminFor] = useState<string | null>(null); // SD-35 entry id
   useEffect(() => {
-    AsyncStorage.getItem(STATS_ROW_KEY).then((v) => { if (v === '1') setStatsRow(true); }).catch(() => {});
+    AsyncStorage.multiGet([TRACK_KEY, STATS_ROW_KEY]).then((kv) => {
+      const raw = kv.find(([k]) => k === TRACK_KEY)?.[1];
+      if (raw) { try { setPhoneTrack(cleanTrack(JSON.parse(raw))); return; } catch { /* fall through */ } }
+      if (kv.find(([k]) => k === STATS_ROW_KEY)?.[1] === '1') setPhoneTrack(LEGACY_STATS_ROW);
+    }).catch(() => {});
   }, []);
-  const toggleStatsRow = () => {
-    const next = !statsRow;
-    setStatsRow(next);
-    AsyncStorage.setItem(STATS_ROW_KEY, next ? '1' : '0').catch(() => {});
+  const savePhoneTrack = (next: GolfTrackKey[]) => {
+    setPhoneTrack(next);
+    AsyncStorage.setItem(TRACK_KEY, JSON.stringify(next)).catch(() => {});
   };
   const [local, setLocal] = useState<Map<string, GolfCard>>(new Map()); // optimistic cards
   const [pendingSync, setPendingSync] = useState(0);
@@ -138,14 +149,29 @@ export default function GolfRoundScreen() {
   const holes = ctxByEntry.values().next().value?.holes ?? [];
   const h = holes[hole];
   const groupEntries = entries.filter((e) => e.groupNo === activeGroup);
+  // Deep wave — what this marker tracks (the round's setting wins)
+  const roundTrack = roundTrackOf(ev.format);
+  const track = effectiveTrack(roundTrack, phoneTrack);
+  const driveHoles = driveHolesOf(ev.format);
+  const saveRoundTrack = async (next: GolfTrackKey[], dh: number[]) => {
+    try { await updateFieldEventFormat(ev.id, { track: next, driveHoles: dh }); await reload(); }
+    catch (err) { setError(err instanceof Error ? err.message : 'Could not save'); }
+  };
+  // Deep wave — every card for the commentary / round stats (no DNS)
+  const feedPlayers: FeedPlayer[] = entries.filter((e) => entryStatusOf({ ...e, result: cardFor(e, holes.length) }) !== 'dns').flatMap((e) => {
+    const c = ctxByEntry.get(e.id);
+    return c ? [{ id: e.playerId, name: nameOf(e.playerId), card: cardFor(e, c.holes.length), holes: c.holes, received: c.received }] : [];
+  });
 
   const setStroke = async (e: FieldEntry, value: HoleScore, putts?: number | null) => {
     if (!canMark || ev.status === 'completed') return;
     tapFeedback(); // SD-110
     const n = holes.length;
     const cur = cardFor(e, n);
-    const card: GolfCard = withDetail({ ...cur, strokes: [...cur.strokes] }, n);
+    let card: GolfCard = withDetail({ ...cur, strokes: [...cur.strokes] }, n);
     card.strokes[hole] = value;
+    // Deep wave — when the hole's score was entered (the commentary's time)
+    if (cur.strokes[hole] !== value) card = stampHole(card, n, hole, value == null ? null : Date.now());
     if (putts !== undefined) {
       card.putts = [...(cur.putts ?? new Array(n).fill(null))];
       card.putts[hole] = putts;
@@ -163,11 +189,11 @@ export default function GolfRoundScreen() {
     catch (err) { setError(err instanceof Error ? err.message : 'Could not save'); }
   };
 
-  // SD-45 — in stats mode a card carries the stats-row arrays (so GIR,
-  // scrambling … are derived from it); older / non-stats cards stay as they are.
+  // SD-45 / deep wave — a card kept with "Stats to track" carries the arrays
+  // and the `track` it was kept with (so GIR, scrambling … are derived stat by
+  // stat); strokes-only cards stay exactly as they are.
   function withDetail(card: GolfCard, n: number): GolfCard {
-    if (!statsRow || cardHasDetail(card)) return card;
-    return { ...card, firDir: new Array(n).fill(null), bunker: new Array(n).fill(null) };
+    return withTrack(card, n, track);
   }
   const setDetail = async (e: FieldEntry, patch: (c: GolfCard, n: number) => GolfCard) => {
     if (!canMark || ev.status === 'completed') return;
@@ -193,6 +219,17 @@ export default function GolfRoundScreen() {
     const next = Math.max(0, (penalties[hole] ?? 0) + by);
     penalties[hole] = next || null;
     return { ...c, penalties };
+  });
+  // Deep wave — the first putt's length (a bucket) and the measured drive
+  const setFirstPutt = (e: FieldEntry, bucket: number | null) => setDetail(e, (c, n) => {
+    const firstPutt = [...(c.firstPutt ?? new Array(n).fill(null))];
+    firstPutt[hole] = bucket;
+    return { ...c, firstPutt };
+  });
+  const setDrive = (e: FieldEntry, yards: number | null) => setDetail(e, (c, n) => {
+    const drive = [...(c.drive ?? new Array(n).fill(null))];
+    drive[hole] = yards;
+    return { ...c, drive };
   });
 
   /* ---------------------- SD-35 entry admin (organiser) --------------------- */
@@ -388,7 +425,6 @@ export default function GolfRoundScreen() {
                 );
               }
               const pv = card.putts?.[hole];
-              const gir = derivedGir(v, pv, par);
               return (
                 <Card key={e.id} style={{ gap: theme.spacing(2) }}>
                   <View style={st.headRow}>
@@ -413,7 +449,7 @@ export default function GolfRoundScreen() {
                     <SelectChip label={fmt.scoring === 'stableford' ? 'Pick up' : 'Pick up (NR)'} active={v === 'P'} onPress={() => canMark && void pickUp(e, v)} />
                     {v != null && <SelectChip label="Clear…" active={false} onPress={() => canMark && void clearHole(e)} />}
                   </View>
-                  {(trackPutts || statsRow) && typeof v === 'number' && (() => {
+                  {track.includes('putts') && typeof v === 'number' && (() => {
                     // SD-117c — 0–4 as chips, then "5+" steps up; never more than the strokes
                     const high = typeof pv === 'number' && pv >= 5;
                     return (
@@ -429,24 +465,13 @@ export default function GolfRoundScreen() {
                       </View>
                     );
                   })()}
-                  {/* SD-45 — the stats row: fairway (par 4 / 5), greenside bunker,
-                      penalty strokes; GIR from strokes − putts ≤ par − 2 */}
-                  {statsRow && typeof v === 'number' && (
-                    <View style={st.tabs}>
-                      {par >= 4 && (
-                        <>
-                          <Text style={textStyles.muted}>FW</Text>
-                          {(['L', 'hit', 'R'] as FairwayDir[]).map((d) => (
-                            <SelectChip key={d} label={d === 'L' ? '◀ L' : d === 'R' ? 'R ▶' : '✓'} active={card.firDir?.[hole] === d}
-                              onPress={() => canMark && void setFairway(e, d)} />
-                          ))}
-                        </>
-                      )}
-                      <SelectChip label="⛱ Bunker" active={card.bunker?.[hole] === true} onPress={() => canMark && void toggleBunker(e)} />
-                      <SelectChip label={`Pen ${card.penalties?.[hole] ?? 0}`} active={(card.penalties?.[hole] ?? 0) > 0} onPress={() => canMark && void stepPenalty(e, 1)} />
-                      {(card.penalties?.[hole] ?? 0) > 0 && <SelectChip label="−" active={false} onPress={() => canMark && void stepPenalty(e, -1)} />}
-                      <Text style={[textStyles.muted, gir && st.girHit]}>{gir == null ? 'GIR: add putts' : gir ? 'GIR ✓' : 'GIR ✗'}</Text>
-                    </View>
+                  {/* SD-45 / deep wave — the tracked stats row: fairway (par 4 / 5),
+                      measured drive, greenside bunker, penalty strokes, the first
+                      putt's length; GIR from strokes − putts ≤ par − 2 */}
+                  {track.length > 0 && typeof v === 'number' && (
+                    <GolfHoleStats card={card} hole={h} i={hole} track={track} driveHoles={driveHoles} canMark={canMark} name={nameOf(e.playerId)}
+                      onFairway={(d) => void setFairway(e, d)} onBunker={() => void toggleBunker(e)} onPenalty={(by) => void stepPenalty(e, by)}
+                      onFirstPutt={(b) => void setFirstPutt(e, b)} onDrive={(yd) => void setDrive(e, yd)} />
                   )}
                   {/* SD-117c (Rule 3.3b) — certify the card once every hole has a score */}
                   {sum.thru >= holes.length ? (
@@ -460,10 +485,11 @@ export default function GolfRoundScreen() {
               );
             })}
 
+            {/* Deep wave — "Stats to track" (off by default, D8): the organiser
+                sets it for the round, else each marker's phone */}
+            <GolfTrackCard track={track} roundTrack={roundTrack} isHost={isHost} holes={holes} driveHoles={driveHoles}
+              onRound={(t, dh) => void saveRoundTrack(t, dh)} onPhone={savePhoneTrack} />
             <View style={st.tabs}>
-              <SelectChip label={trackPutts || statsRow ? '✓ Tracking putts' : 'Track putts'} active={trackPutts || statsRow} onPress={() => !statsRow && setTrackPutts(!trackPutts)} />
-              {/* SD-45 — remembered on this phone; off by default (D8) */}
-              <SelectChip label={statsRow ? '✓ Stats: fairway · bunker · penalties' : 'Stats: fairway · bunker · penalties'} active={statsRow} onPress={toggleStatsRow} />
               <SelectChip label="📋 Full card" active={fullCard} onPress={() => setFullCard(!fullCard)} />
             </View>
             {/* SD-88 — the group's scorecard: Out / In / Tot, shapes, net, points, putts */}
@@ -481,14 +507,19 @@ export default function GolfRoundScreen() {
 
         {tab === 'board' && (
           <>
-            {/* SD-76 — team stroke play: the team board beside the players' */}
-            {golfTeamFormatOf(ev) && (
-              <View style={st.tabs}>
-                <SelectChip label="🏌️ Players" active={boardView === 'players'} onPress={() => setBoardView('players')} />
-                <SelectChip label="👥 Teams" active={boardView === 'teams'} onPress={() => setBoardView('teams')} />
-              </View>
-            )}
-            {golfTeamFormatOf(ev) && boardView === 'teams' ? (
+            {/* SD-76 — team stroke play: the team board beside the players';
+                deep wave — the hole-by-hole commentary and the round stats */}
+            <View style={st.tabs}>
+              <SelectChip label="🏌️ Players" active={boardView === 'players'} onPress={() => setBoardView('players')} />
+              {golfTeamFormatOf(ev) && <SelectChip label="👥 Teams" active={boardView === 'teams'} onPress={() => setBoardView('teams')} />}
+              <SelectChip label="🎙 Commentary" active={boardView === 'feed'} onPress={() => setBoardView('feed')} />
+              <SelectChip label="📊 Round stats" active={boardView === 'stats'} onPress={() => setBoardView('stats')} />
+            </View>
+            {boardView === 'feed' ? (
+              <GolfRoundFeed players={feedPlayers} scoring={fmt.scoring} net={fmt.net} />
+            ) : boardView === 'stats' ? (
+              <GolfRoundStats players={feedPlayers} initial={me ?? undefined} />
+            ) : golfTeamFormatOf(ev) && boardView === 'teams' ? (
               <GolfTeamBoard events={[ev]} entries={merged} courses={[course]} nameOf={nameOf} teamName={(id) => teams.get(id)?.name ?? 'Team'} />
             ) : (
             <GolfLeaderboard rows={board} scoring={fmt.scoring} nameOf={nameOf} cards={lbCards} holesInRound={holes.length}

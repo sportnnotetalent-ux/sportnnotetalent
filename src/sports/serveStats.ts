@@ -147,7 +147,15 @@ export interface ServeStats {
   /** SD-107 — who served the last rally and who won it (the point-detail row
    *  offers service options by it); absent before the first rally */
   last?: { server: Side; winner: Side };
+  /** SD-157 — every replayed rally in order (penalty points excluded): its
+   *  index in the point list (`pointInputs` / the adapter's inputs), the
+   *  server (side + named player), the winner, the period and whether it was
+   *  a tiebreak point. Tennis' detail panels and careers read it. */
+  trace: RallyTrace[];
 }
+
+/** SD-157 — one rally of the replay. */
+export interface RallyTrace { i: number; server: Side; serverId?: string; winner: Side; period: number; tb: boolean }
 
 /** Player ids per side, in roster order (doubles slot 0 / 1). */
 export type ServeRosters = { home?: string[]; away?: string[] };
@@ -395,7 +403,9 @@ export function serveStats(sport: ServeSport, state: unknown, rosters: ServeRost
   let gamePts: Side[] = [];
   let gpPeriod = 0;
   const trackGame = (s: AnyState) => { if (fam === 'game') { const p = ad.period(s); if (p !== gpPeriod) { gamePts = []; gpPeriod = p; } } };
-  for (const p of inputs) {
+  const trace: RallyTrace[] = [];
+  for (let pi = 0; pi < inputs.length; pi++) {
+    const p = inputs[pi];
     // SD-53 — a conduct penalty point is no rally: replay it (the score moves)
     // but leave it out of every serve / return figure.
     if (p.pen) {
@@ -497,6 +507,7 @@ export function serveStats(sport: ServeSport, state: unknown, rosters: ServeRost
       }
     }
     last = { server: S, winner: W };
+    trace.push({ i: pi, server: S, ...(srv.id ? { serverId: srv.id } : {}), winner: W, period: per, tb: srv.tb });
     lastWinner = W; // rally scoring: the rally winner serves next (side-out reads state.serving)
     cur = next;
     if (scored) gamePts = [...gamePts, scorer ?? W];
@@ -504,7 +515,7 @@ export function serveStats(sport: ServeSport, state: unknown, rosters: ServeRost
   // A period with no rally yet (the next game at 0-0) isn't listed.
   for (let i = 0; i < periods.length; i++) periods[i] ??= zeroBlock();
   const consistent = ad.key(cur) === ad.key({ ...s0, events: [] } as AnyState);
-  return { sport, unit: fam === 'set' ? 'set' : 'game', sideOut, doubles, golden, ...(star ? { star } : {}), match, periods, serverKnown, consistent, serveTracked, ...(last ? { last } : {}) };
+  return { sport, unit: fam === 'set' ? 'set' : 'game', sideOut, doubles, golden, ...(star ? { star } : {}), match, periods, serverKnown, consistent, serveTracked, ...(last ? { last } : {}), trace };
 }
 
 // -------------------------------------------------- career keys (SD-19) --

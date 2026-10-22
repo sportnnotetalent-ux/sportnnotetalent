@@ -5,7 +5,7 @@ category: Tournaments
 audience: Organisers, Scorers, Players, Parents & fans
 sports: athletics
 order: 86
-updated: 2026-10-11
+updated: 2026-10-22
 ---
 
 Field events run on trials, not heats. The app shows who is up, ranks everyone as you go and settles ties the World Athletics way. Finals add house points like track finals. Combined events: [decathlon, heptathlon, pentathlon](/guides/run-a-combined-event/).
@@ -52,6 +52,8 @@ If athletes are still level for 1st when everyone is out, the card shows **Tie f
 - A jump with wind over +2.0 m/s is wind-aided, shown with a "w". It counts for places but not for personal bests or meet records; the best legal jump is used instead.
 - Without a gauge at the pit, jumps with no wind reading count for records.
 - **Best by event** on the Athletics page shows the best mark per category. Athlete profiles show each personal best with its wind or implement.
+
+> **Tip:** Every trial and bar height appears in the event's **📣 Commentary** ("takes the lead", "clears 1.75 at the second attempt"). See [Track deeper race stats and follow the commentary](/guides/race-stats-and-live-commentary/).
 
 ## Common questions
 ### Can I share the results?

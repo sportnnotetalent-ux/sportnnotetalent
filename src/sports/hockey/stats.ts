@@ -5,6 +5,7 @@
  *  shared with football keeps football's labels (tested). */
 import type { Qualifier, SportStatSchema } from '../statSchema.ts';
 import { ASSISTS, RED_CARDS, SAVES, YELLOW_CARDS } from '../sharedStats.ts';
+import type { CentreCategory } from '../invasion/centre.ts';
 
 /** House minimums (not from the FIH regulations): 2 matches for a per-match
  *  figure, 10 shots faced for a keeper's save %. */
@@ -40,6 +41,9 @@ export const hockeyStats: SportStatSchema<'hockey'> = {
     // shoot-out (never counted as goals)
     { key: 'soGoals', label: 'Shoot-out goals', short: 'shoot-out goals', one: 'shoot-out goal', group: 'shootout' },
     { key: 'soTaken', label: 'Shoot-out attempts', short: 'shoot-out attempts', one: 'shoot-out attempt', group: 'shootout' },
+    // deep wave: the keeper's shoot-out saves (statTotals; only a keeper named
+    // on an attempt carries it — keyed, never a false 0)
+    { key: 'soSaves', label: 'Shoot-out saves', short: 'shoot-out saves', one: 'shoot-out save', compact: 'SO saves', group: 'goalkeeping', coverage: 'keyed' },
     // career rates and bests
     { key: 'goalsPerGame', label: 'Goals per game', short: 'goals per game', source: 'derived', group: 'attack', format: { unit: 'decimal', dp: 2 },
       agg: { kind: 'perGame', key: 'goals', dp: 2, qualifier: q2 }, tieBreak: [{ key: 'goals', better: 'higher' }] },
@@ -62,6 +66,13 @@ export const hockeyStats: SportStatSchema<'hockey'> = {
     // SD-117 (H7): FIH circle entries — a team figure, only for a match that
     // logged them (box.ts lists it "not tracked" otherwise, D8)
     { key: 'circleEntries', label: 'Circle entries', short: 'circle entries', one: 'circle entry', source: 'team' },
+    // deep wave — match-centre team figures (only for a match that tracked
+    // them: depth.ts lists the rest "not tracked")
+    { key: 'possession', label: 'Possession', short: 'possession', source: 'team', format: { unit: 'percent' } },
+    { key: 'shotsWide', label: 'Shots wide', short: 'shots wide', one: 'shot wide', source: 'team' },
+    { key: 'blockedShots', label: 'Blocked shots', short: 'blocked shots', one: 'blocked shot', source: 'team' },
+    { key: 'referralsWon', label: 'Video referrals upheld', short: 'referrals upheld', one: 'referral upheld', source: 'team' },
+    { key: 'referralsLost', label: 'Video referrals lost', short: 'referrals lost', one: 'referral lost', source: 'team' },
   ],
   filters: {
     keeper: (l) => l.stats != null && 'goalsConceded' in l.stats,
@@ -72,7 +83,7 @@ export const hockeyStats: SportStatSchema<'hockey'> = {
       { stat: 'assists' }, { stat: 'shots' }, { stat: 'shotsOnGoal' }, { stat: 'conversion' }, { stat: 'strokesMissed', hideZero: true },
     ] },
     { id: 'playing', title: 'Playing time', rows: [{ stat: 'minutes' }] },
-    { id: 'goalkeeping', title: 'Goalkeeping', rows: [{ stat: 'cleanSheets' }, { stat: 'saves' }, { stat: 'goalsConceded' }, { stat: 'savePct' }, { stat: 'concededPerGame' }] },
+    { id: 'goalkeeping', title: 'Goalkeeping', rows: [{ stat: 'cleanSheets' }, { stat: 'saves' }, { stat: 'goalsConceded' }, { stat: 'savePct' }, { stat: 'concededPerGame' }, { stat: 'soSaves', hideZero: true }] },
     { id: 'shootout', title: 'Shoot-outs', rows: [{ stat: 'soGoals', hideZero: true }, { stat: 'soTaken', hideZero: true }, { stat: 'soConversion' }] },
     { id: 'bests', title: 'Bests', rows: [{ stat: 'mostGoals', label: 'Most goals (match)', hideZero: true }, { stat: 'hatTricks', hideZero: true }] },
     { id: 'discipline', title: 'Discipline', rows: [{ stat: 'greenCards' }, { stat: 'yellowCards' }, { stat: 'redCards' }, { stat: 'suspensionMinutes' }] },
@@ -106,3 +117,17 @@ export const hockeyStats: SportStatSchema<'hockey'> = {
   ],
   scoreUnit: 'goals',
 };
+
+/** Deep wave — the match centre's categories (FIH match statistics order). A
+ *  row neither side has is dropped; one the match didn't track reads "not
+ *  tracked". */
+export const hockeyCentre: CentreCategory[] = [
+  { id: 'top', label: 'Top stats', rows: ['possession', 'circleEntries', 'shots', 'shotsOnGoal', 'pcs', 'pcConversion', 'saves'] },
+  { id: 'attack', label: 'Attack', rows: ['circleEntries', 'shots', 'shotsOnGoal', 'shotsWide', 'blockedShots', { key: 'conversion', label: 'Shot conversion' }, 'fieldGoals'] },
+  { id: 'setPieces', label: 'Corners & strokes', rows: ['pcs', 'pcGoals', 'pcConversion', 'strokesAwarded', 'strokeGoals'] },
+  { id: 'keeping', label: 'Goalkeeping', rows: ['saves', { key: 'savePct', label: 'Save %' }] },
+  { id: 'discipline', label: 'Discipline', rows: [
+    { key: 'greenCards', label: 'Green cards' }, { key: 'yellowCards', label: 'Yellow cards' }, { key: 'redCards', label: 'Red cards' },
+    { key: 'suspensionMinutes', label: 'Minutes suspended' }, 'referralsWon', 'referralsLost',
+  ] },
+];

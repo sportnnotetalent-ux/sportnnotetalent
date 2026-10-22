@@ -28,6 +28,11 @@ export interface GolfMatchState {
   strokes?: MatchStrokes;
   /** SD-87 — each hole's gross strokes, when they were entered */
   scores?: ({ home: number; away: number } | null)[];
+  /** Deep wave — when each hole was recorded (ms, the scorer's clock;
+   *  `payload.at`), for the commentary. Absent on older logs. */
+  holeAt?: (number | null)[];
+  /** Deep wave — when the match was conceded (ms) */
+  concededAt?: number;
 }
 
 export const initGolfMatch = (config?: Record<string, unknown>): GolfMatchState => ({
@@ -38,6 +43,8 @@ export const initGolfMatch = (config?: Record<string, unknown>): GolfMatchState 
   seq: 0,
   ...(String(config?.holes) === 'back9' ? { firstHole: 10 } : {}),
 });
+
+const stamp = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : null);
 
 const strokeCount = (v: unknown) => (typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= 20 ? v : null);
 
@@ -58,10 +65,20 @@ export const golfMatchReducer = (s: GolfMatchState, a: { type: string; side?: 'h
     } else if (s.scores) {
       next.scores = [...s.scores, null];
     }
+    // Deep wave — the hole's time stamp (a new optional key: old logs carry none)
+    const at = stamp(a.payload?.at);
+    if (at != null) {
+      const times = [...(s.holeAt ?? s.holes.map(() => null))];
+      times[holes.length - 1] = at;
+      next.holeAt = times;
+    } else if (s.holeAt) {
+      next.holeAt = [...s.holeAt, null];
+    }
     return next;
   }
   if (a.type === 'CONCEDE' && (a.side === 'home' || a.side === 'away')) {
-    return { ...s, conceded: a.side, ended: true, seq: s.seq + 1 };
+    const at = stamp(a.payload?.at);
+    return { ...s, conceded: a.side, ended: true, seq: s.seq + 1, ...(at != null ? { concededAt: at } : {}) };
   }
   // SD-87 — set (or clear, with no payload) the handicap strokes
   if (a.type === 'SET_STROKES') {

@@ -52,6 +52,10 @@ export interface PadelState {
    *  served while on carry `serve` (1, or 2 after a 1st-serve fault / a double
    *  fault). Absent on older matches (D8). */
   serveDetail?: boolean;
+  /** Deep wave — "Net points" (who was at the net) and "Rally length"
+   *  tracking (as tennis SD-157); absent = off (D8). Format key / SET_DETAIL. */
+  netDetail?: boolean;
+  rallyDetail?: boolean;
   events: LiveEvent[];
   seq: number;
   ended: boolean;
@@ -201,7 +205,7 @@ const core = (s: PadelState, a: ScoreAction): PadelState => {
   // SD-107 — capture setting (from the next point) and a point's detail
   // (annotates the last point; allowed after the match point too).
   if (a.type === 'SET_DETAIL') { const f = detailFlags(a.payload, s); return f ? { ...s, ...f } : s; }
-  if (a.type === 'POINT_DETAIL') { const ev = applyPointDetail(s.events, a.payload); return ev ? { ...s, events: ev } : s; }
+  if (a.type === 'POINT_DETAIL') { const ev = applyPointDetail(s.events, a.payload, 'padel'); return ev ? { ...s, events: ev } : s; }
   // SD-53 — code violations (warning → point → game)
   const extra = applyRacketExtras(s, a, conductOps);
   if (extra) return extra;
@@ -223,7 +227,7 @@ const core = (s: PadelState, a: ScoreAction): PadelState => {
   if (a.type === 'POINT') {
     const next = scorePoint(s, a.side, a.attribution?.playerName, a.attribution?.playerId || undefined, undefined, serve);
     if (a.payload?.pd == null) return next;
-    const ev = applyPointDetail(next.events, { pd: a.payload.pd });
+    const ev = applyPointDetail(next.events, { pd: a.payload.pd }, 'padel');
     return ev ? { ...next, events: ev } : next;
   }
   return s;

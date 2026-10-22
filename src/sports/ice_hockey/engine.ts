@@ -63,12 +63,38 @@ export const INFRACTIONS = [
 ] as const;
 export const STRENGTH_LABEL: Record<Strength, string> = { ev: 'Even strength', pp: 'Power play', sh: 'Short-handed' };
 
+/** Deep wave — the optional "Stats to track" (off by default; the organiser or
+ *  the scorer switches them on): faceoffs, hits, blocked shots, giveaways /
+ *  takeaways, missed shots. Each is one `TALLY` action (`payload.kind`). */
+export type TallyKind = 'faceoff' | 'hit' | 'block' | 'giveaway' | 'takeaway' | 'missed';
+export const TALLY_KINDS: TallyKind[] = ['faceoff', 'hit', 'block', 'giveaway', 'takeaway', 'missed'];
+export const TALLY_LABEL: Record<TallyKind, string> = {
+  faceoff: 'Faceoff won', hit: 'Hit', block: 'Blocked shot', giveaway: 'Giveaway', takeaway: 'Takeaway', missed: 'Missed shot',
+};
+/** the stat-line key each tally credits (a faceoff also credits the loser `faceoffLosses`) */
+export const TALLY_KEY: Record<TallyKind, string> = {
+  faceoff: 'faceoffWins', hit: 'checks', block: 'shotBlocks', giveaway: 'giveaways', takeaway: 'takeaways', missed: 'missedShots',
+};
+/** the toggles (format / live-settings keys) and the tallies each switches on */
+export type TrackFlag = 'trackFaceoffs' | 'trackPhysical' | 'trackPuck' | 'trackAttempts';
+export const TRACK_FLAGS: TrackFlag[] = ['trackFaceoffs', 'trackPhysical', 'trackPuck', 'trackAttempts'];
+export const TRACK_KINDS: Record<TrackFlag, TallyKind[]> = {
+  trackFaceoffs: ['faceoff'], trackPhysical: ['hit', 'block'], trackPuck: ['giveaway', 'takeaway'], trackAttempts: ['missed'],
+};
+export const flagOf = (k: TallyKind): TrackFlag => TRACK_FLAGS.find((f) => TRACK_KINDS[f].includes(k))!;
+/** every key a tally can write (faceoff losses included) */
+export const TALLY_KEYS = ['faceoffWins', 'faceoffLosses', 'checks', 'shotBlocks', 'giveaways', 'takeaways', 'missedShots'] as const;
+/** the keys a toggle owns on every stat line once it's on */
+export const FLAG_KEYS: Record<TrackFlag, string[]> = {
+  trackFaceoffs: ['faceoffWins', 'faceoffLosses'], trackPhysical: ['checks', 'shotBlocks'], trackPuck: ['giveaways', 'takeaways'], trackAttempts: ['missedShots'],
+};
+
 export interface Who { id?: string; name?: string }
 
 export interface IceEvent {
   /** stable id from the action (`payload.uid`) */
   id: string;
-  type: 'goal' | 'shot' | 'miss' | 'pen' | 'gk' | 'pull' | 'back' | 'timeout';
+  type: 'goal' | 'shot' | 'miss' | 'pen' | 'gk' | 'pull' | 'back' | 'timeout' | 'tally';
   side: Side;
   /** elapsed game seconds since the start of the match (playing time) */
   sec: number;
@@ -94,6 +120,10 @@ export interface IceEvent {
   infraction?: string;
   /** +/- tracking: skaters on the ice for each side when the goal went in */
   onIce?: { home?: string[]; away?: string[] };
+  /** deep wave — an optional tally (`side` = the faceoff winner / hitter /
+   *  blocker / the team that gave it away / took it / shot wide; a faceoff's
+   *  loser is `second…`, on the other side) */
+  tally?: TallyKind;
 }
 
 export interface SoShot { scored: boolean; playerId?: string; playerName?: string }
@@ -135,6 +165,11 @@ export interface IceHockeyState {
   pimScale: 'iihf' | 'nhl';
   /** +/- tracking: who was on the ice at each goal (optional) */
   plusMinus: boolean;
+  /** deep wave — "Stats to track" (absent = off; old matches never have them) */
+  trackFaceoffs?: boolean;
+  trackPhysical?: boolean;
+  trackPuck?: boolean;
+  trackAttempts?: boolean;
   shootout: { home: SoShot[]; away: SoShot[]; first: Side; sdFirst?: Side } | null;
   shootoutWinner?: Side;
   agg?: AggPrior;
@@ -177,6 +212,7 @@ export const init = (config?: Record<string, unknown>): IceHockeyState => {
     stopClock: bool(config?.stopClock, true),
     pimScale: config?.pimScale === 'nhl' ? 'nhl' : 'iihf',
     plusMinus: bool(config?.plusMinus, false),
+    ...Object.fromEntries(TRACK_FLAGS.filter((f) => bool(config?.[f], false)).map((f) => [f, true])),
     shootout: null,
     ...(aggPriorFromConfig(config) ? { agg: aggPriorFromConfig(config) } : {}),
   };
@@ -279,7 +315,7 @@ export type Credit = { playerId: string; playerName?: string; stats: Record<stri
 /** The stat-line credits one event writes: [primary, second, third]. A save
  *  is credited to the OTHER side's goalie (`side` on the credit). */
 export function eventCredits(
-  e: Pick<IceEvent, 'type' | 'side' | 'playerId' | 'playerName' | 'secondId' | 'secondName' | 'thirdId' | 'thirdName' | 'strength' | 'en' | 'ps' | 'gkId' | 'gkName' | 'pen'>,
+  e: Pick<IceEvent, 'type' | 'side' | 'playerId' | 'playerName' | 'secondId' | 'secondName' | 'thirdId' | 'thirdName' | 'strength' | 'en' | 'ps' | 'gkId' | 'gkName' | 'pen' | 'tally'>,
   scale: 'iihf' | 'nhl' = 'iihf',
 ): { first?: Credit; second?: Credit; third?: Credit } {
   const p = (stats: Record<string, number>) => (e.playerId ? { playerId: e.playerId, playerName: e.playerName, stats } : undefined);
@@ -305,6 +341,12 @@ export function eventCredits(
       if (!e.pen) return {};
       const key = PEN_COUNT_KEY[e.pen];
       return { first: p({ penaltyMinutes: penMinutes(e.pen, scale), ...(key ? { [key]: 1 } : {}) }) };
+    }
+    case 'tally': {
+      if (!e.tally) return {};
+      const loser = e.tally === 'faceoff' && e.secondId
+        ? { playerId: e.secondId, playerName: e.secondName, stats: { faceoffLosses: 1 }, side: (e.side === 'home' ? 'away' : 'home') as Side } : undefined;
+      return { first: p({ [TALLY_KEY[e.tally]]: 1 }), second: loser };
     }
     default:
       return {};
@@ -635,6 +677,12 @@ export const reducer = (s: IceHockeyState, a: ScoreAction): IceHockeyState => {
     }
     case 'PULL': return side ? push(s, { type: 'pull', side }) : s;
     case 'BACK': return side ? push(s, { type: 'back', side }) : s;
+    case 'TALLY': {
+      // deep wave: an optional tally (faceoff / hit / block / giveaway / takeaway / missed shot)
+      const kind = a.payload?.kind as TallyKind;
+      if (!side || !TALLY_KINDS.includes(kind)) return s;
+      return push(s, { type: 'tally', side, tally: kind, ...who1, ...(kind === 'faceoff' && p2?.playerId ? { secondId: p2.playerId, ...(p2.playerName ? { secondName: p2.playerName } : {}) } : {}) });
+    }
     case 'TIMEOUT': {
       if (!side) return s;
       const next = push(s, { type: 'timeout', side });
@@ -728,9 +776,27 @@ export function teamFigures(s: IceHockeyState, side: Side, scope: 'all' | number
       else if (e.type === 'timeout') f.timeouts++;
     } else if (e.side === opp && e.type === 'shot') f.saves++;
   }
-  const box = penaltyBox(s);
-  f.ppChances = box.all.filter((p) => p.side === opp && !p.coincident && (scope === 'all' || s.events.find((e) => e.id === p.id)?.period === scope)).length;
+  // deep wave: an opportunity is a penalty that left this side a skater up at
+  // some point (coincident minors at full strength — 4 on 4 — aren't)
+  f.ppChances = ppOpportunities(s).filter((p) => p.side === opp && (scope === 'all' || s.events.find((e) => e.id === p.id)?.period === scope)).length;
   return f;
+}
+
+/** Deep wave — the manpower penalties that put the OTHER side on a power play
+ *  at some point (more skaters by the penalties): a 4-on-4 from coincident
+ *  minors isn't one, a double minor that outlasts its 4-on-4 is. PURE. */
+export function ppOpportunities(s: IceHockeyState, endSec = Math.max(matchSec(s), ...s.events.map((e) => e.sec), 0)): BoxPen[] {
+  const box = penaltyBox(s, endSec);
+  const iv = box.all.filter((p) => !p.coincident && p.start != null).map((p) => ({ p, from: p.start!, to: Math.min(endSec, p.end ?? endSec) }));
+  const cuts = [...new Set(iv.flatMap((x) => [x.from, x.to]))].sort((a, b) => a - b);
+  const adv = new Set<BoxPen>();
+  for (let i = 0; i + 1 < cuts.length; i++) {
+    const mid = (cuts[i] + cuts[i + 1]) / 2;
+    const on = iv.filter((x) => x.from <= mid && mid < x.to);
+    const h = on.filter((x) => x.p.side === 'home').length, a = on.filter((x) => x.p.side === 'away').length;
+    if (h !== a) for (const x of on) if (x.p.side === (h > a ? 'home' : 'away')) adv.add(x.p);
+  }
+  return iv.filter((x) => adv.has(x.p)).map((x) => x.p);
 }
 
 /** The line under the score: the shoot-out ("SO 3–2"), '' otherwise. */
@@ -750,6 +816,17 @@ export function standingsUnits(s: IceHockeyState): { overtime?: boolean; decided
 
 /* --------------------------- live settings (#14) --------------------------- */
 
+/** Deep wave — the "Stats to track" toggles (live settings + the match format). */
+export const TRACK_FIELDS: FormatField[] = [
+  { key: 'trackFaceoffs', label: 'Faceoffs', type: 'toggle', default: false, group: 'Stats to track', hint: 'One tap per draw for the team that won it (name the centres once) — FO% by player' },
+  { key: 'trackPhysical', label: 'Hits & blocked shots', type: 'toggle', default: false, group: 'Stats to track', hint: 'Hit / Block buttons — who made it (optional)' },
+  { key: 'trackPuck', label: 'Giveaways & takeaways', type: 'toggle', default: false, group: 'Stats to track', hint: 'Who lost / won the puck (optional)' },
+  { key: 'trackAttempts', label: 'Missed shots (shot attempts)', type: 'toggle', default: false, group: 'Stats to track', hint: 'Shots wide / over the net — shot attempts with blocks' },
+];
+/** Is this tally tracked in the match — its toggle on, or any recorded? */
+export const tallyTracked = (s: Pick<IceHockeyState, TrackFlag | 'events'>, f: TrackFlag): boolean =>
+  s[f] === true || s.events.some((e) => e.type === 'tally' && !!e.tally && TRACK_KINDS[f].includes(e.tally));
+
 export const ICE_HOCKEY_LIVE_SETTINGS: LiveSettings<IceHockeyState> = {
   title: '⚙️ Match settings',
   hint: 'Applies to this match only.',
@@ -758,7 +835,8 @@ export const ICE_HOCKEY_LIVE_SETTINGS: LiveSettings<IceHockeyState> = {
     { key: 'periodMinutes', label: 'Period length', type: 'number', default: 20, min: 1, max: 30, step: 1, hint: 'min / period' },
     { key: 'stopClock', label: 'Stop the clock on goals and penalties', type: 'toggle', default: true, group: 'Clock' },
     { key: 'plusMinus', label: 'Track +/- (who was on the ice at each goal)', type: 'toggle', default: false, group: 'Stats' },
+    ...TRACK_FIELDS,
   ] as FormatField[],
-  read: (s) => ({ periodMinutes: s.periodMinutes, stopClock: s.stopClock, plusMinus: s.plusMinus }),
-  defaults: { periodMinutes: 20, stopClock: true, plusMinus: false },
+  read: (s) => ({ periodMinutes: s.periodMinutes, stopClock: s.stopClock, plusMinus: s.plusMinus, ...Object.fromEntries(TRACK_FLAGS.map((f) => [f, s[f] === true])) }),
+  defaults: { periodMinutes: 20, stopClock: true, plusMinus: false, ...Object.fromEntries(TRACK_FLAGS.map((f) => [f, false])) },
 };

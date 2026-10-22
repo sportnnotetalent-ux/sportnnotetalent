@@ -15,6 +15,7 @@
  */
 import { trackField, suspensionEvent, timeLeft, type FieldEvent, type FieldLog, type FieldResult, type Who } from '../onField.ts';
 import { eventCredits, CARD_MINUTES, keeperAt, matchSec, LIVE_KEYS, type HockeyState, type Side } from './engine.ts';
+import { hockeyShootoutKeepers } from './depth.ts';
 
 const stamped = (s: HockeyState, side: Side): boolean => !!s.xi?.[side]?.players?.length;
 
@@ -119,6 +120,8 @@ export function hockeyTotals(s: HockeyState): Record<string, { side: Side; stats
   for (const side of ['home', 'away'] as const) {
     for (const k of s.shootout?.[side] ?? []) if (k.playerId) add(k.playerId, side, { soTaken: 1, soGoals: k.scored ? 1 : 0 });
   }
+  // deep wave: the shoot-out keeper's saves (attempts that name the keeper)
+  for (const [id, k] of Object.entries(hockeyShootoutKeepers(s))) add(id, k.side, k.stats);
   // minutes: every player of a side with a line-up who took the field
   for (const p of hockeyField(s).players) {
     if (!p.played || !p.id || !stamped(s, p.side)) continue;
@@ -146,5 +149,5 @@ export function hockeyTotals(s: HockeyState): Record<string, { side: Side; stats
 }
 
 /** The keys statTotals owns that no live action credits (contract rule 5). */
-export const DERIVED_KEYS = ['minutes', 'suspensionMinutes', 'goalsConceded', 'cleanSheets'] as const;
+export const DERIVED_KEYS = ['minutes', 'suspensionMinutes', 'goalsConceded', 'cleanSheets', 'soSaves'] as const;
 export const OWNED_LIVE_KEYS = LIVE_KEYS;

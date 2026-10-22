@@ -5,10 +5,10 @@ category: Live scoring
 audience: Scorers, Organisers
 sports: ice hockey
 order: 52
-updated: 2026-10-12
+updated: 2026-10-22
 ---
 
-Score an ice hockey game on one phone. You start and stop the clock at every whistle and tap what happens; the app runs the penalty box, works out power plays and builds the box score.
+Score an ice hockey game on one phone. You run the clock and tap what happens; the app runs the penalty box, works out power plays and builds the stats.
 
 ## Before you start
 - You must be a scorer or host of the game or its tournament. See [Scorers and officials](/guides/scorers-and-officials/) and [Only one phone scores at a time](/guides/one-scorer-at-a-time/).
@@ -33,17 +33,23 @@ Score an ice hockey game on one phone. You start and stop the clock at every whi
 
 > **Tip:** Turn on **Track +/- (who was on the ice at each goal)** in **⚙️ Match settings** and, after each goal, tap the skaters who were on the ice. Power-play goals don't count for +/-.
 
+## Stats to track (optional)
+In **⚙️ Match settings → Stats to track** (organisers: the format) switch on **Faceoffs**, **Hits & blocked shots**, **Giveaways & takeaways** or **Missed shots**. Extra buttons appear under each team. **⚪ Faceoff won** is one tap: name the two centres once with **⚪ Centres … change**. For the others, tap the player or **Team (no name)**. Anything left off is never shown as 0.
+
+## Play-by-play and match stats
+The **Score** tab has **Play-by-play** (every moment by period with the score after each goal), **Match stats** (goals by strength, power play and penalty kill, power-play time, penalties by infraction, save %, faceoffs, by period), **Box score** and **Key moments**.
+
 ## How the penalty box works
 - Under the clock you see who is in the box and the time left, plus the strength, for example "5 v 4 · Lakeview Wolves power play".
 - A power-play goal ends the earliest minor of the team that is short. A double minor loses only the 2 minutes being served. Majors run in full.
 - No team drops below 3 skaters. A third penalty waits until one of the first two ends.
-- One minor each at the same stoppage with both teams at full strength plays 4 on 4. Other matching penalties cancel out, so the teams stay at full strength.
-- A misconduct sits the player for 10 minutes without leaving the team short. A game misconduct or match penalty puts the player out of the game. For a match penalty, a team-mate serves 5 minutes.
+- One minor each at the same stoppage at full strength plays 4 on 4 (not a power play). Other matching penalties cancel out.
+- A misconduct sits the player for 10 minutes; the team isn't short. A game misconduct or match penalty puts the player out of the game.
 
 ## Step by step: overtime and the shoot-out
-1. Overtime is sudden death. The first goal ends the game. Round-robin overtime is 5 minutes, 3 on 3. A penalty there makes it 4 on 3.
-2. Still level? Tap **🏁 Final horn**, then pick who shoots first, for example **NH first** (teams show by short name).
-3. Tap a shooter (optional), then **✓ Scored** or **✗ Saved / missed**. The shoot-out stops as soon as one team can't catch up.
+1. Overtime is sudden death. Round-robin overtime is 5 minutes, 3 on 3 (a penalty makes it 4 on 3).
+2. Still level? Tap **🏁 Final horn**, then pick who shoots first.
+3. Tap a shooter (optional), then **✓ Scored** or **✗ Saved / missed**. It stops once one team can't catch up.
 4. Level after the set number of shooters (IIHF 5, NHL 3)? The app asks who shoots first in sudden death.
 5. The shoot-out winner gets one extra goal in the final score, for example 2–1. No player is credited with that goal.
 

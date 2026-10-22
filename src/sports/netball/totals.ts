@@ -16,6 +16,7 @@
  */
 import { trackField, timeLeft, type FieldEvent, type FieldLog, type FieldResult, type Who } from '../onField.ts';
 import { eventCredits, lineupAt, matchSec, periodStarted, LIVE_KEYS, POSITIONS, type NetballState, type Pos, type Side } from './engine.ts';
+import { nbDeepTotals, NB_DEEP_KEYS } from './deep.ts';
 
 const stamped = (s: NetballState, side: Side): boolean => !!s.xi?.[side] && Object.keys(s.xi[side]!.pos ?? {}).length > 0;
 
@@ -137,12 +138,17 @@ export function netballTotals(s: NetballState): Record<string, { side: Side; sta
       for (const pos of POSITIONS) l[`q${pos}`] = r.byPos.get(pos)?.size ?? 0;
     }
   }
+  // Deep wave: CPR, gains, pick-ups, deflection outcomes, super shots — each
+  // only on a match that tracked it, zero-filled on every line (a tracked 0)
+  const deep = nbDeepTotals(s);
+  for (const [id, d] of Object.entries(deep.lines)) add(id, d.side, d.stats);
   for (const l of Object.values(out)) {
     for (const k of ['goals', 'attempts'] as const) l.stats[k] ??= 0;
+    for (const k of deep.keys) l.stats[k] ??= 0;
   }
   return out;
 }
 
 /** The keys statTotals owns that no live action credits (contract rule 5). */
-export const DERIVED_KEYS = ['minutes', 'quarters', ...POSITIONS.map((p) => `q${p}`), 'suspensionMinutes'] as const;
+export const DERIVED_KEYS = ['minutes', 'quarters', ...POSITIONS.map((p) => `q${p}`), 'suspensionMinutes', ...NB_DEEP_KEYS] as const;
 export const OWNED_LIVE_KEYS = LIVE_KEYS;

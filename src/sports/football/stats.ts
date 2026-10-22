@@ -4,6 +4,7 @@
  *  "not tracked" (D8). */
 import type { SportStatSchema } from '../statSchema.ts';
 import { ASSISTS, BLOCKS, FOULS, RED_CARDS, SAVES, YELLOW_CARDS } from '../sharedStats.ts';
+import type { CentreCategory } from '../invasion/centre.ts';
 
 const opt = (mode: string) => ({ coverage: 'optional' as const, mode });
 
@@ -92,11 +93,33 @@ export const footballStats: SportStatSchema<'football'> = {
       eligible: 'goalkeeper', tieBreak: [{ key: 'saves', better: 'higher' }] },
     { key: 'concededPerGame', label: 'Conceded per game', short: 'conceded per game', source: 'derived', group: 'goalkeeping', format: { unit: 'decimal', dp: 2, better: 'lower' },
       agg: { kind: 'perGame', key: 'goalsConceded', dp: 2, over: 'keeper' } },
+    // Deep wave — optional depth (keyed: only a line that carries the key
+    // tracked it; statTotals writes them only for a match that tracked them).
+    // Key passes and clearances are live taps; the shot-detail keys are
+    // derived from the shots / goals (never live).
+    { key: 'keyPasses', label: 'Key passes', short: 'key passes', one: 'key pass', group: 'passing', coverage: 'keyed' },
+    { key: 'chancesCreated', label: 'Chances created', short: 'chances created', one: 'chance created', source: 'derived', group: 'passing',
+      agg: { kind: 'sum', keys: ['keyPasses', 'assists'], over: 'keyPassLines' }, coverOf: 'keyPassLines' },
+    { key: 'clearances', label: 'Clearances', short: 'clearances', one: 'clearance', group: 'defence', coverage: 'keyed' },
+    { key: 'shotsInBox', label: 'Shots inside the box', short: 'shots inside the box', one: 'shot inside the box', compact: 'in-box shots', compactOne: 'in-box shot', group: 'attack', coverage: 'keyed' },
+    { key: 'shotsOutBox', label: 'Shots outside the box', short: 'shots outside the box', one: 'shot outside the box', compact: 'long shots', compactOne: 'long shot', group: 'attack', coverage: 'keyed' },
+    { key: 'goalsInBox', label: 'Goals inside the box', short: 'goals inside the box', one: 'goal inside the box', group: 'attack', coverage: 'keyed' },
+    { key: 'goalsOutBox', label: 'Goals from outside the box', short: 'goals from outside the box', one: 'goal from outside the box', compact: 'long-range goals', compactOne: 'long-range goal', group: 'attack', coverage: 'keyed' },
+    { key: 'bigChances', label: 'Big chances', short: 'big chances', one: 'big chance', group: 'attack', coverage: 'keyed' },
+    { key: 'bigChancesMissed', label: 'Big chances missed', short: 'big chances missed', one: 'big chance missed', group: 'attack', format: { unit: 'count', better: 'lower' }, coverage: 'keyed' },
+    { key: 'woodwork', label: 'Hit woodwork', short: 'woodwork hits', one: 'woodwork hit', group: 'attack', coverage: 'keyed' },
     // team-level match stats (the comparison panel), never on a player line
     { key: 'corners', label: 'Corners', short: 'corners', one: 'corner', source: 'team' },
     { key: 'blockedShots', label: 'Blocked shots', short: 'blocked shots', one: 'blocked shot', source: 'team' },
     { key: 'possession', label: 'Possession', short: 'possession', source: 'team', format: { unit: 'percent' } },
     { key: 'passAccuracy', label: 'Pass accuracy', short: 'pass accuracy', source: 'team', format: { unit: 'percent' } },
+    // deep wave — match-centre team figures (free ones from every log, the
+    // rest only when tracked)
+    { key: 'shotsOffTarget', label: 'Shots off target', short: 'shots off target', one: 'shot off target', source: 'team' },
+    { key: 'penaltiesTaken', label: 'Penalties taken', short: 'penalties taken', one: 'penalty taken', source: 'team' },
+    { key: 'goalKicks', label: 'Goal kicks', short: 'goal kicks', one: 'goal kick', source: 'team' },
+    { key: 'throwIns', label: 'Throw-ins', short: 'throw-ins', one: 'throw-in', source: 'team' },
+    { key: 'goalsRuledOut', label: 'Goals ruled out', short: 'goals ruled out', one: 'goal ruled out', source: 'team' },
   ],
   filters: {
     withMinutes: (l) => Number(l.stats?.minutes) > 0,
@@ -105,12 +128,16 @@ export const footballStats: SportStatSchema<'football'> = {
     keeperMinutes: (l) => l.stats != null && 'goalsConceded' in l.stats && Number(l.stats.minutes) > 0,
     lineupKnown: (l) => typeof l.stats?.starts === 'number',
     appeared: () => true,
+    // deep wave: lines from matches that tracked key passes
+    keyPassLines: (l) => l.stats != null && 'keyPasses' in l.stats,
   },
   sections: [
-    { id: 'attack', title: 'Attack', rows: ['goals', 'goalsPerGame', 'goalsPer90', 'minutesPerGoal', 'goalsAssists', 'openPlayGoals', 'penaltyGoals', 'freekickGoals', 'headedGoals', 'assists', 'shots', 'shotsOnTarget', 'shotAccuracy', 'conversion', 'attackingContributions', 'crosses', 'dribbles', 'penaltiesWon', 'penaltiesMissed', 'penKicksTaken', 'penKicksScored']
-      .map((stat) => (stat === 'headedGoals' || stat.startsWith('penKicks') ? { stat, hideZero: true } : { stat })) },
-    { id: 'passing', title: 'Passing', rows: [{ stat: 'passes' }, { stat: 'passesComplete' }] },
-    { id: 'defence', title: 'Defence', rows: [{ stat: 'tackles' }, { stat: 'interceptions' }, { stat: 'blocks' }, { stat: 'defensiveContributions' }] },
+    // deep wave: shot detail rows (keyed — hidden for a player whose matches
+    // never tracked them; goals from outside the box only once there is one)
+    { id: 'attack', title: 'Attack', rows: ['goals', 'goalsPerGame', 'goalsPer90', 'minutesPerGoal', 'goalsAssists', 'openPlayGoals', 'penaltyGoals', 'freekickGoals', 'headedGoals', 'goalsOutBox', 'assists', 'shots', 'shotsOnTarget', 'shotAccuracy', 'conversion', 'shotsInBox', 'shotsOutBox', 'bigChances', 'bigChancesMissed', 'woodwork', 'attackingContributions', 'crosses', 'dribbles', 'penaltiesWon', 'penaltiesMissed', 'penKicksTaken', 'penKicksScored']
+      .map((stat) => (stat === 'headedGoals' || stat === 'goalsOutBox' || stat === 'woodwork' || stat.startsWith('penKicks') ? { stat, hideZero: true } : { stat })) },
+    { id: 'passing', title: 'Passing', rows: [{ stat: 'passes' }, { stat: 'passesComplete' }, { stat: 'keyPasses' }, { stat: 'chancesCreated' }] },
+    { id: 'defence', title: 'Defence', rows: [{ stat: 'tackles' }, { stat: 'interceptions' }, { stat: 'clearances' }, { stat: 'blocks' }, { stat: 'defensiveContributions' }] },
     { id: 'playing', title: 'Playing time', rows: [{ stat: 'started' }, { stat: 'subApps', hideZero: true }, { stat: 'minutes' }, { stat: 'minutesPerGame' }] },
     // SD-39 — leads the career when most of the player's games were in goal
     { id: 'goalkeeping', title: 'Goalkeeping', leadWhen: 'keeper', rows: [{ stat: 'keeperApps' }, { stat: 'cleanSheets' }, { stat: 'saves' }, { stat: 'goalsConceded' }, { stat: 'savePct' }, { stat: 'concededPerGame' }, { stat: 'concededPer90' }, { stat: 'shootoutSaves', hideZero: true }] },
@@ -143,7 +170,9 @@ export const footballStats: SportStatSchema<'football'> = {
   ],
   // SD-27: goals per 90 (min minutes) and keepers' save % (min shots faced)
   // follow the original categories
-  leaders: ['goals', 'openPlayGoals', 'penaltyGoals', 'freekickGoals', 'assists', 'cleanSheets', 'shots', 'shotsOnTarget', 'tackles', 'interceptions', 'saves', 'passes', 'attackingContributions', 'defensiveContributions', 'goalsPer90', 'savePct'],
+  // deep wave: chances created, key passes and clearances (only lines that
+  // tracked them rank)
+  leaders: ['goals', 'openPlayGoals', 'penaltyGoals', 'freekickGoals', 'assists', 'cleanSheets', 'shots', 'shotsOnTarget', 'tackles', 'interceptions', 'saves', 'passes', 'attackingContributions', 'defensiveContributions', 'goalsPer90', 'savePct', 'chancesCreated', 'keyPasses', 'clearances'],
   headline: ['goals', 'assists', 'shotsOnTarget', 'tackles', 'saves', 'passes'],
   awards: [
     { stat: 'goals', icon: '⚽', label: 'Top scorer' },
@@ -154,3 +183,22 @@ export const footballStats: SportStatSchema<'football'> = {
   ],
   scoreUnit: 'goals',
 };
+
+/** Deep wave — the match centre's categories (Premier League / FIFA match
+ *  centre). A row neither side has is dropped; one the match didn't track
+ *  reads "not tracked". */
+export const footballCentre: CentreCategory[] = [
+  { id: 'top', label: 'Top stats', rows: [
+    { key: 'possession', overallOnly: true }, 'shots', 'shotsOnTarget', 'bigChances', 'corners', 'saves', 'fouls',
+    { key: 'yellowCards', label: 'Yellow cards' }, { key: 'redCards', label: 'Red cards' },
+  ] },
+  { id: 'attack', label: 'Attack', rows: [
+    'shots', 'shotsOnTarget', 'shotsOffTarget', 'blockedShots', 'woodwork', 'shotsInBox', 'shotsOutBox', 'bigChances', 'bigChancesMissed',
+    'penaltiesTaken', { key: 'penaltyGoals', label: 'Penalties scored' }, 'offsides', 'goalsRuledOut', 'attackingContributions',
+  ] },
+  { id: 'passing', label: 'Passing', rows: [{ key: 'possession', overallOnly: true }, 'passes', 'passAccuracy', 'keyPasses', 'crosses', 'dribbles'] },
+  { id: 'defence', label: 'Defence', rows: ['tackles', 'interceptions', 'clearances', 'defensiveContributions'] },
+  { id: 'keeping', label: 'Goalkeeping', rows: ['saves', { key: 'savePct', label: 'Save %' }, 'goalKicks'] },
+  { id: 'setPieces', label: 'Set pieces', rows: ['corners', 'throwIns', 'goalKicks', 'penaltiesTaken', 'offsides'] },
+  { id: 'discipline', label: 'Discipline', rows: ['fouls', { key: 'yellowCards', label: 'Yellow cards' }, { key: 'redCards', label: 'Red cards' }, 'handballs', 'offsides'] },
+];

@@ -309,6 +309,8 @@ describe('SD-82 — kabaddi career rates', () => {
     assert.deepEqual(c.raiding, {
       'Raid pts': '15', 'Raid pts per match': '5.0', 'Most in a match': '8', Raids: '16',
       'Raid strike rate': '50%', 'Not-out %': '81%', 'Super raids': '1',
+      // deep wave (volleyball-kabaddi): the PKL raider card's split rows
+      'Successful raids': '8', 'Empty raids': '5',
     });
     assert.deepEqual(c.defending, { 'Tackle pts': '8', 'Tackle pts per match': '2.7', 'Successful tackles': '6', 'Super tackles': '1', 'High 5s': '1' });
     // best match links to its line

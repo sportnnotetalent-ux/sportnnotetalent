@@ -60,19 +60,28 @@ export const kabaddiCountsTracked = (s: KabaddiState): boolean => plainLines(s).
 /** SD-72: cards / technical points conceded are tracked on this match. */
 export const kabaddiDisciplineTracked = (s: KabaddiState): boolean => s.caughtTouches != null || extrasOf(s).length > 0;
 
+/** Deep wave — defenders touched are named on this match ("Defenders touched"
+ *  tracking on, or a raid that named one): `touchedOut` is written then. */
+export const kabaddiTouchedTracked = (s: KabaddiState): boolean => !!s?.track?.touched || raidsOf(s).some((r) => !!r.touched?.length);
+/** Deep wave — a defender's times put out by a raider's touch (keyed). */
+export const KABADDI_TOUCHED_KEY = 'touchedOut';
+
 export function kabaddiTotals(s: KabaddiState, ctx?: StatTotalsContext): Record<string, StatTotalsEntry> {
   const byName = (side: Side, name?: string) =>
     name ? ctx?.players?.[side].find((p) => p.name && p.name.trim().toLowerCase() === name.trim().toLowerCase())?.id : undefined;
   const idOf = (side: Side, id?: string, name?: string) => id ?? byName(side, name);
   const counts = kabaddiCountsTracked(s);
   const disc = kabaddiDisciplineTracked(s);
+  const touched = counts && kabaddiTouchedTracked(s);
   const out: Record<string, StatTotalsEntry> = {};
   let unknown = false;
+  let touchedUnknown = false;
   const entry = (id: string, side: Side) => {
     if (!out[id]) {
       const stats: Record<string, number> = { raidPoints: 0, tacklePoints: 0 };
       if (counts) for (const k of KABADDI_COUNT_KEYS) stats[k] = 0;
       if (disc) for (const k of KABADDI_DISCIPLINE_KEYS) stats[k] = 0;
+      if (touched) stats[KABADDI_TOUCHED_KEY] = 0;
       out[id] = { side, stats };
     }
     return out[id].stats;
@@ -105,6 +114,16 @@ export function kabaddiTotals(s: KabaddiState, ctx?: StatTotalsContext): Record<
         add(st, 'superTackles', b.superTackle ? 1 : 0);
       } else unknown = true;
     }
+    // deep wave: the defenders the raider touched out, by name (only the
+    // touches that counted — a caught raider's void touches send nobody out)
+    if (touched && b.touchPts > 0) {
+      const d = other(r.side);
+      for (const p of (r.touched ?? []).slice(0, b.touchPts)) {
+        const id = idOf(d, p.id, p.name);
+        if (id) add(entry(id, d), KABADDI_TOUCHED_KEY, 1);
+        else touchedUnknown = true;
+      }
+    }
   }
   // SD-59 / SD-72: cards and technical points conceded (the player at fault
   // is on the other side from the point)
@@ -125,6 +144,9 @@ export function kabaddiTotals(s: KabaddiState, ctx?: StatTotalsContext): Record<
     entry(id, e.side)[e.kind === 'raid' ? 'raidPoints' : 'tacklePoints'] += e.points;
   }
   if (unknown) for (const t of Object.values(out)) { delete t.stats.raidPoints; delete t.stats.tacklePoints; }
+  // a touched name that can't be matched to a player: the key is left out
+  // for everyone (never a partial count — the sync would zero real figures)
+  if (touchedUnknown) for (const t of Object.values(out)) delete t.stats[KABADDI_TOUCHED_KEY];
   return out;
 }
 

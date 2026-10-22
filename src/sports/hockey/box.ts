@@ -9,8 +9,10 @@ import type { Player } from '../../core/types';
 import type { BoxRowInput, BoxSideInput, MatchBoxSource } from '../boxScore.ts';
 import { eventCredits, periodName, teamFigures, pcConversion, circlesTracked, type HockeyState, type Side } from './engine.ts';
 import { hockeyTotals } from './totals.ts';
+import { hockeyDepthFigures, hockeyUntracked } from './depth.ts';
 
-export interface HockeyBoxContext { homeRoster?: Player[]; awayRoster?: Player[] }
+/** `now` (deep wave): the clock for live possession % (default: now). */
+export interface HockeyBoxContext { homeRoster?: Player[]; awayRoster?: Player[]; now?: number }
 
 const ROW_KEYS = ['goals', 'assists', 'shots', 'shotsOnGoal', 'pcGoals', 'saves', 'greenCards', 'yellowCards', 'redCards'] as const;
 
@@ -75,10 +77,15 @@ export function hockeyBox(s: HockeyState, ctx: HockeyBoxContext = {}): MatchBoxS
         return {
           rows: [...rows.values()],
           ...(Object.keys(teamStats).length ? { team: { label: 'Team', stats: teamStats } } : {}),
-          teamStats: { pcs: f.pcs, strokesAwarded: f.strokes, ...(conv !== null ? { pcConversion: conv } : {}), ...(circles ? { circleEntries: f.circleEntries } : {}) },
+          teamStats: {
+            pcs: f.pcs, strokesAwarded: f.strokes, ...(conv !== null ? { pcConversion: conv } : {}), ...(circles ? { circleEntries: f.circleEntries } : {}),
+            // deep wave: possession, wide / blocked, save %, minutes suspended, referrals
+            ...hockeyDepthFigures(s, sd, scope, ctx.now ?? Date.now()),
+          },
         };
       };
-      return { home: side('home'), away: side('away'), ...(circles ? null : { untracked: ['circleEntries'] }) };
+      const untracked = [...(circles ? [] : ['circleEntries']), ...hockeyUntracked(s)];
+      return { home: side('home'), away: side('away'), ...(untracked.length ? { untracked } : null) };
     },
   };
 }

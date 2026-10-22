@@ -198,7 +198,8 @@ describe('U14 Boys 100 m: 12 entrants → 2 heats → final', () => {
     const ranked = [...byHeat.values()].flatMap((rows) => withQualification(rows, q));
     const lines = phaseLines(fmt('heat', 1), ranked);
     const l1 = lines.find((l) => l.playerId === 'p1')!;
-    assert.deepEqual(l1.stats, { place: 1, qualified: 1, races: 1, mark: 12.05, [markKey('ath.100m')]: 12.05, wind: 1.1 });
+    // deep wave: the heat winner's line also counts a heat won (absent for everyone else)
+    assert.deepEqual(l1.stats, { place: 1, qualified: 1, races: 1, heatWins: 1, mark: 12.05, [markKey('ath.100m')]: 12.05, wind: 1.1 });
     const l7 = lines.find((l) => l.playerId === 'p7')!;
     assert.equal(l7.stats.m_100m, undefined); // +2.4 → not legal, no PB
     assert.equal(l7.stats.mark, 12.11);

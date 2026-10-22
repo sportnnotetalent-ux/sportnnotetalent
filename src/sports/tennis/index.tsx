@@ -7,7 +7,6 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { theme } from '../../core/theme';
 import { textStyles } from '../../components/ui';
-import { LiveTimeline } from '../LiveTimeline';
 import type { Player } from '../../core/types';
 import type { SportPlugin } from '../types';
 import { tennisVoice } from '../voiceParsers';
@@ -16,15 +15,15 @@ import { MatchBoxScore } from '../../components/BoxScore';
 import { tennisBox } from '../boxSources';
 import { SetLineBoard } from '../SetLineBoard';
 import { RallyPointEditor } from '../RallyPointEditor';
-import { MatchStatsPanel } from '../MatchStatsPanel';
 import { ServeOrderPicker } from '../ServeOrderPicker';
-import { PointDetailRow } from '../PointDetailRow';
 import { detailLiveSettings } from '../pointDetailSettings';
+import { TennisPointDetail } from './PointCapture';
+import { TennisStatsPanel } from './StatsPanel';
+import { TennisCommentary } from './Commentary';
 import { PointButtons, SecondaryAction, ServeFirstPicker } from '../PointButtons';
 import { pointPressure, pressureText } from '../pointStatus';
 import { init, reducer, disp, inTiebreak, other, serveInfo, gamesPlayed, summary, scoreLine, lineScore, standingsUnits, tennisCue, tiebreakBanner, type TennisState } from './engine';
-import { CueBanner, useCueTimeline } from '../CueBanner';
-import { pointInputs } from '../rallyEdit';
+import { CueBanner } from '../CueBanner';
 import { tennisTotals } from '../racketTotals';
 import { cellText } from '../scoreline';
 import { durationLine, stampDispatch, withDuration } from '../conduct';
@@ -88,8 +87,9 @@ const ScoringControls: SportPlugin<TennisState>['ScoringControls'] = ({ state, d
         <SecondaryAction label={`🎯 Ace · ${by}`} color={serverColor} onPress={() => act('ACE', serve.side, 'aces', serverP)} />
         <SecondaryAction label={`⚠️ Double fault · ${by} → point ${receiverSideName}`} onPress={() => doubleFault(serve.side, serverP)} />
       </View>}
-      {/* SD-107 — optional "how was it won?" for the last point */}
-      <PointDetailRow sport="tennis" state={s} dispatch={dispatch} homeName={homeName} awayName={awayName} homeRoster={homeRoster} awayRoster={awayRoster} />
+      {/* SD-107 / SD-157 — optional detail for the last point: how, forehand /
+          backhand + shot, 2nd serve, net, rally length, serve speed */}
+      <TennisPointDetail state={s} dispatch={dispatch} homeName={homeName} awayName={awayName} homeRoster={homeRoster} awayRoster={awayRoster} />
       <RallyPointEditor
         events={s.events} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor}
         homeRoster={homeRoster} awayRoster={awayRoster} dispatch={dispatch} hasAce pointIcon="🎾" doubleFault detailSport="tennis"
@@ -101,8 +101,6 @@ const ScoringControls: SportPlugin<TennisState>['ScoringControls'] = ({ state, d
 
 const LiveExtras: NonNullable<SportPlugin<TennisState>['LiveExtras']> = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster, onPlayer }) => {
   const s = state as TennisState;
-  // SD-117c — change-ends markers on the point log (derived, display only)
-  const timeline = useCueTimeline(reducer, s, pointInputs, tennisCue);
   return (
     <View style={{ gap: theme.spacing(3) }}>
       <Text style={ctrl.label}>Sets</Text>
@@ -113,14 +111,15 @@ const LiveExtras: NonNullable<SportPlugin<TennisState>['LiveExtras']> = ({ state
           (lineScore(s)?.done ?? []).map((c, i) => <Text key={i} style={ctrl.setChip}>S{i + 1}: {cellText(c)}</Text>)
         )}
       </View>
-      {/* SD-22: serve / return figures replayed from the point log, per set */}
-      <MatchStatsPanel sport="tennis" state={s} homeName={homeName} awayName={awayName} homeRoster={homeRoster} awayRoster={awayRoster} homeColor={homeColor} awayColor={awayColor} />
+      {/* SD-22 / SD-157: key stats, serve & return, rally — replayed from the point log, per set */}
+      <TennisStatsPanel state={s} homeName={homeName} awayName={awayName} homeRoster={homeRoster} awayRoster={awayRoster} homeColor={homeColor} awayColor={awayColor} />
       {/* SD-54 — match and set durations (from the scorer's tap times) */}
       {durationLine(s.events, 'S') ? <Text style={textStyles.muted}>{durationLine(s.events, 'S')}</Text> : null}
       <Text style={ctrl.label}>Player stats</Text>
       <MatchBoxScore sport="tennis" source={tennisBox(s, { homeRoster, awayRoster })} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} onPlayer={onPlayer} />
-      <Text style={ctrl.label}>Point log</Text>
-      <LiveTimeline events={timeline} homeColor={homeColor} awayColor={awayColor} emptyText="No points yet." homeRoster={homeRoster} awayRoster={awayRoster} onPlayer={onPlayer} />
+      {/* SD-158 — commentary by game, newest first (replaces the point log) */}
+      <Text style={ctrl.label}>Commentary</Text>
+      <TennisCommentary state={s} homeName={homeName} awayName={awayName} homeRoster={homeRoster} awayRoster={awayRoster} homeColor={homeColor} awayColor={awayColor} />
     </View>
   );
 };

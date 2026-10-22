@@ -55,6 +55,6 @@ export const canoePlugin: SportPlugin<CanoeMatchState> = {
       options: [{ value: 1, label: 'Same as single boats' }, { value: 2, label: 'Double' }],
     },
     { key: 'handTimed', label: 'Hand timing', type: 'toggle', default: false, onCreate: true, hint: 'stopwatches at the finish, no photo finish: times to 1/100 count for regatta records' },
-    { key: 'splits', label: 'Intermediate times', type: 'toggle', default: false, advanced: true, hint: 'record each boat’s time every 250 m (every 100 m over 200 m, every 1000 m over 5000 m)' },
+    { key: 'splits', label: 'Intermediate times', type: 'toggle', default: false, advanced: true, group: 'Stats to track', hint: 'record each boat’s time every 250 m (every 100 m over 200 m, every 1000 m over 5000 m)' },
   ],
 };

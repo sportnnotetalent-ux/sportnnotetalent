@@ -4,11 +4,15 @@
  * whole match), plus MIN from the field tracker (Overall only). Points nobody
  * can be credited with (a penalty try, an unattributed score) land on the
  * "Team" row so the totals equal the score. Team figures feed the comparison:
- * penalty tries, lineouts and scrums on the team's own throw / feed.
+ * penalty tries, lineouts and scrums on the team's own throw / feed. Deep
+ * wave: the "Stats to track" player keys (PC, TC, OL) are on every row only
+ * when the match tracked them (D8 — the column stays hidden otherwise).
  */
 import type { Player } from '../../core/types';
 import type { BoxRowInput, BoxSideInput, MatchBoxSource } from '../boxScore.ts';
-import { eventCredits, periodName, teamFigures, totalPeriods, LIVE_KEYS, DETAIL_STATS, type RugbyState, type Side } from './engine.ts';
+import {
+  detailTracked, eventCredits, periodName, teamFigures, totalPeriods, trackedTallyKeys, LIVE_KEYS, DETAIL_STATS, type RugbyState, type Side,
+} from './engine.ts';
 import { rugbyTotals } from './totals.ts';
 
 export interface RugbyBoxContext { homeRoster?: Player[]; awayRoster?: Player[] }
@@ -19,8 +23,10 @@ const TEAM_KEYS = ['points', 'tries', 'conversions', 'conversionAttempts', 'penG
 export function rugbyBox(s: RugbyState, ctx: RugbyBoxContext = {}): MatchBoxSource {
   const n = Math.min(totalPeriods(s), Math.max(1, s.period));
   const periods = n >= 2 ? Array.from({ length: n }, (_, i) => ({ value: i + 1, label: periodName(s, i + 1) })) : [];
-  const detail = s.trackDetail || s.events.some((e) => e.type === 'detail');
-  const ROW_KEYS = detail ? [...CORE_KEYS, ...DETAIL_STATS] : CORE_KEYS;
+  const detail = detailTracked(s);
+  // deep wave: a tracked toggle's keys read 0 on every row (an untracked one is absent: no column)
+  const tallies = trackedTallyKeys(s);
+  const ROW_KEYS = [...new Set([...CORE_KEYS, ...(detail ? DETAIL_STATS : []), ...tallies])];
   return {
     periods,
     emptyText: 'No players yet.',
@@ -64,6 +70,10 @@ export function rugbyBox(s: RugbyState, ctx: RugbyBoxContext = {}): MatchBoxSour
         const sum = (k: string) => [...rows.values()].reduce((a, r) => a + (r.stats[k] ?? 0), 0);
         const want: Record<string, number> = Object.fromEntries(TEAM_KEYS.map((k) => [k, f[k]]));
         if (detail) for (const k of DETAIL_STATS) want[k] = f.detail[k] ?? 0;
+        // deep wave: unnamed penalties / turnovers / offloads land on the Team row
+        if (tallies.includes('penaltiesGivenAway')) want.penaltiesGivenAway = (f.detail.penaltiesGivenAway ?? 0) + f.tally.penalty;
+        if (tallies.includes('turnoversConceded')) want.turnoversConceded = f.tally.turnover;
+        if (tallies.includes('offloads')) want.offloads = f.tally.offload;
         const teamStats: Record<string, number> = {};
         for (const [k, v] of Object.entries(want)) {
           const left = v - sum(k);

@@ -21,7 +21,11 @@ const pbStats: StatDef[] = EVENTS.map((e) => ({
 export const shootingStats: SportStatSchema<'shooting'> = {
   sport: 'shooting',
   events: SHOOT_EVENTS.map((e) => ({ key: e.key, label: e.label, format: fmtOf(e.scoring === 'decimal' ? 1 : 0) })) satisfies MeasuredEventDef[],
-  filters: Object.fromEntries(EVENTS.map((e) => [`m_${e.key}`, (l: StatLine) => l.stats?.[`m_${e.key}`] != null])),
+  filters: {
+    ...Object.fromEntries(EVENTS.map((e) => [`m_${e.key}`, (l: StatLine) => l.stats?.[`m_${e.key}`] != null])),
+    // deep wave: finals that recorded their shot count (older final lines have fpts only)
+    hasFShots: (l: StatLine) => l.stats?.fShots != null,
+  },
   stats: [
     { key: 'comps', label: 'Competitions', short: 'competitions', one: 'competition', group: 'shooting' },
     { key: 'finals', label: 'Finals', short: 'finals', one: 'final', group: 'shooting' },
@@ -39,12 +43,18 @@ export const shootingStats: SportStatSchema<'shooting'> = {
     { key: 'qualified', label: 'Rounds qualified from', short: 'qualified', group: 'line' },
     { key: 'fpts', label: 'Final score', short: 'final score', group: 'line', format: { unit: 'points', dp: 1 }, agg: { kind: 'max' } },
     { key: 'dq', label: 'Disqualified', short: 'DQ', group: 'line', format: { unit: 'count', better: 'lower' } },
+    // Deep wave: only on lines that wrote them (never a false 0)
+    { key: 'bestSer', label: 'Best series', short: 'best series', group: 'line', coverage: 'keyed', format: { unit: 'points', dp: 1 }, agg: { kind: 'max' } },
+    { key: 'perfect', label: 'Perfect series', short: 'perfect series', one: 'perfect series', group: 'shooting', coverage: 'keyed' },
+    { key: 'pen', label: 'Penalty points', short: 'penalty pts', one: 'penalty pt', group: 'shooting', coverage: 'keyed', format: { unit: 'points', dp: 0, better: 'lower' } },
+    { key: 'fShots', label: 'Final shots', short: 'final shots', one: 'final shot', group: 'shooting', coverage: 'keyed' },
+    { key: 'finalAvg', label: 'Average final shot', short: 'avg final shot', source: 'derived', group: 'shooting', format: { unit: 'points', dp: 2 }, agg: { kind: 'rate', num: 'fpts', den: 'fShots', dp: 2, over: 'hasFShots', qualifier: { den: 10 } } },
     ...markStats,
     ...pbStats,
   ],
   sections: [
     { id: 'bests', title: 'Personal bests', rows: pbStats.map((s) => ({ stat: s.key, hideZero: true })) },
-    { id: 'shooting', title: 'Shooting', rows: [{ stat: 'comps' }, { stat: 'finals' }, { stat: 'shots' }, { stat: 'innerRate' }] },
+    { id: 'shooting', title: 'Shooting', rows: [{ stat: 'comps' }, { stat: 'finals' }, { stat: 'shots' }, { stat: 'innerRate' }, { stat: 'finalAvg', hideZero: true }, { stat: 'perfect', hideZero: true }] },
     { id: 'medals', title: 'Medals', rows: [{ stat: 'golds' }, { stat: 'silvers' }, { stat: 'bronzes' }] },
   ],
   careerView: 'measured',

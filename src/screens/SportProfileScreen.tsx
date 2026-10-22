@@ -32,6 +32,7 @@ import { ArcheryCareer } from '../components/results/ArcheryCareer';
 import { CrewCareer } from '../components/results/CrewCareer';
 import { CyclingCareer } from '../components/results/CyclingCareer';
 import { GolfHandicapCard } from '../components/golf/GolfHandicapCard';
+import { GolfCareerDepth } from '../components/golf/GolfCareerDepth';
 import { getMyPlayerId, getPlayerEditAccess, getTournaments, getStatLinesForMatches, getPlayerNames } from '../data/repos';
 import type { StatLine, Tournament } from '../core/types';
 import type { EditAccess } from '../core/playerEditAccess';
@@ -288,6 +289,8 @@ export default function SportProfileScreen() {
                       </View>
                     );
                   })()}
+                  {/* Deep wave — scoring by par / nine, driving, putting splits */}
+                  <GolfCareerDepth lines={stats.recent.filter((l) => l.sport === 'golf')} />
                   {/* SD-84 — Handicap Index, differentials, unofficial estimate */}
                   <GolfHandicapCard index={player.sportDetails?.golf?.handicapIndex} lines={stats.recent.filter((l) => l.sport === 'golf')} />
                 </>

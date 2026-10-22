@@ -19,23 +19,26 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { theme } from '../../core/theme';
-import { Button, TextField } from '../../components/ui';
+import { Button, TextField, SelectChip } from '../../components/ui';
 import { confirmMatchAction } from '../../components/ConfirmSheet';
 import { LineScoreboard } from '../../components/LineScoreboard';
-import { MatchBoxScore } from '../../components/BoxScore';
 import { FieldBanner } from '../FieldBanner';
-import { LiveTimeline } from '../LiveTimeline';
 import type { Player } from '../../core/types';
 import type { ScoreAction, SportPlugin } from '../types';
 import {
   init, reducer, isComplete, result, levelAtEnd, aggLine, matchSec, periodSec, periodLen, clockFace, clockText, periodName, periodLong, periodStarted, running,
   eventCredits, creditAttribution, currentKeeper, soScore, nextThrower, needsSdPick, handballScoreLine, timeoutCheck, suspensionsOf, hasYellow, teamYellows,
   totalPeriods, maxEtRounds, HANDBALL_PRESETS, HANDBALL_LIVE_SETTINGS, SHOT_LABEL, SHOT_TYPES, LIVE_KEYS,
-  type HandballEvent, type HandballState, type MissResult, type Sanction, type ShotType, type Side,
+  HANDBALL_TRACK_FIELDS, FAULT_TYPES, FAULT_LABEL, goalEmpty,
+  type FaultType, type HandballEvent, type HandballState, type MissResult, type Sanction, type ShotType, type Side,
 } from './engine';
 import { handballTotals, handballLiveField, handballField, unavailable } from './totals';
 import { handballBox } from './box';
-import { handballTimeline, describeEvent, eventWhen, timelineEvents } from './timeline';
+import { describeEvent, eventWhen, timelineEvents } from './timeline';
+import { handballFeed, handballFacts, handballFeedPeriods, handballPeriodLabel } from './feed';
+import { handballCentre } from './stats';
+import { Commentary } from '../invasion/Commentary';
+import { MatchCentre } from '../invasion/MatchCentre';
 import { handballTickerDetail, handballTickerFlash } from './ticker';
 import { handballFormation, HandballCourt } from './court';
 import { usePendingEdit } from '../usePendingEdit';
@@ -72,8 +75,10 @@ function PlayerGrid({ players, onPick, skip }: { players: Player[]; onPick: (p: 
 type Flow =
   | { mode: 'goal'; side: Side; step: 'type' | 'scorer' | 'assist'; shotType?: ShotType; scorer?: Player | null }
   | { mode: 'shot'; side: Side; step: 'type' | 'result' | 'player' | 'blocker'; shotType?: ShotType; result?: MissResult; shooter?: Player | null }
-  | { mode: 'seven'; side: Side; step: 'result' | 'player'; result?: 'saved' | 'missed' }
-  | { mode: 'turnover'; side: Side; step: 'kind' | 'player' | 'stealer'; stolen?: boolean; loser?: Player | null }
+  // `drawn` (deep wave, when tracked): who won the 7-metre throw, first
+  | { mode: 'seven'; side: Side; step: 'drawn' | 'result' | 'player'; result?: 'saved' | 'missed' }
+  // `fault` (deep wave, when tracked): the technical fault's kind
+  | { mode: 'turnover'; side: Side; step: 'kind' | 'player' | 'stealer'; stolen?: boolean; loser?: Player | null; fault?: FaultType }
   | { mode: 'card'; side: Side; step: 'kind' | 'player'; card?: Sanction; blue?: boolean }
   | { mode: 'sub'; side: Side; step: 'off' | 'on'; off?: Player | null }
   | { mode: 'gk'; side: Side };
@@ -175,9 +180,9 @@ const ScoringControls: SportPlugin<HandballState>['ScoringControls'] = ({
     if (res === 'blocked' && blocker) fire({ type: 'BLOCK', side: opp(sd), payload: { ref: id }, ...credit({ type: 'block', playerId: blocker.id, playerName: blocker.fullName }) });
     setFlow(null);
   };
-  const turnover = (sd: Side, p: Player | null, stealer?: Player | null) => {
+  const turnover = (sd: Side, p: Player | null, stealer?: Player | null, fault?: FaultType) => {
     const id = uid();
-    fire({ type: 'TURNOVER', side: sd, payload: { uid: id, ...(stealer !== undefined ? { stolen: true } : {}) }, ...credit({ type: 'turnover', playerId: p?.id, playerName: p?.fullName }) });
+    fire({ type: 'TURNOVER', side: sd, payload: { uid: id, ...(stealer !== undefined ? { stolen: true } : {}), ...(fault ? { fault } : {}) }, ...credit({ type: 'turnover', playerId: p?.id, playerName: p?.fullName }) });
     if (stealer) fire({ type: 'STEAL', side: opp(sd), payload: { ref: id }, ...credit({ type: 'steal', playerId: stealer.id, playerName: stealer.fullName }) });
     setFlow(null);
   };
@@ -199,6 +204,10 @@ const ScoringControls: SportPlugin<HandballState>['ScoringControls'] = ({
     setFlow(null);
   };
   const timeout = (sd: Side) => fire({ type: 'TIMEOUT', side: sd });
+  // deep wave: who won a 7-metre throw (when tracked)
+  const drawn = (sd: Side, p: Player) => fire({ type: 'DRAWN', side: sd, ...credit({ type: 'drawn', playerId: p.id, playerName: p.fullName }) });
+  // deep wave (IHF 4:1): the keeper off for a 7th court player, or back
+  const emptyGoal = (sd: Side, on: boolean) => fire({ type: 'EMPTY_GOAL', side: sd, payload: { on } });
 
   /* ---- correct the timeline ---- */
   const isAnswer = (e: HandballEvent) => (e.type === 'save' || e.type === 'block' || e.type === 'steal') && !!e.ref;
@@ -212,7 +221,7 @@ const ScoringControls: SportPlugin<HandballState>['ScoringControls'] = ({
   };
   const remove = (e: HandballEvent) => { for (const a of removalActions(e)) dispatch(a); };
   const edit = (e: HandballEvent) => {
-    if (e.type === 'timeout' || isAnswer(e) || e.type === 'save') { remove(e); return; }
+    if (e.type === 'timeout' || isAnswer(e) || e.type === 'save' || e.type === 'empty' || e.type === 'drawn') { remove(e); return; }
     holdRemoval(removalActions(e));
     setEditAt({ sec: e.sec, period: e.period });
     setShowEdit(false);
@@ -258,6 +267,16 @@ const ScoringControls: SportPlugin<HandballState>['ScoringControls'] = ({
   };
 
   /* ---- after the final whistle: 7-metre throws ---- */
+  // deep wave: saved vs missed (one tap either way) and the keeper facing it
+  const soThrow = (sd: Side, outcome: 'scored' | 'saved' | 'missed') => {
+    const gk = keeper(opp(sd));
+    dispatch({
+      type: 'SO', side: sd,
+      payload: { scored: outcome === 'scored', outcome, ...(gk ? { keeperId: gk.id, keeperName: gk.fullName } : {}) },
+      ...(soTaker ? { attribution: { playerId: soTaker.id, stat: 'soTaken', playerName: soTaker.fullName, ...(outcome === 'scored' ? { extra: { soGoals: 1 } } : {}) } } : {}),
+    });
+    setSoTaker(null);
+  };
   if (s.ended) {
     if (s.shootout) {
       const sc = soScore(s);
@@ -291,15 +310,11 @@ const ScoringControls: SportPlugin<HandballState>['ScoringControls'] = ({
                 <Text style={c.small}>Thrower (optional)</Text>
                 <PlayerGrid players={sanctionable(nextSide).filter((p) => p.id !== soTaker?.id)} onPick={(p) => setSoTaker(p)} />
                 {soTaker ? <Text style={c.meta}>Thrower: {soTaker.fullName}</Text> : null}
+                {keeper(opp(nextSide)) ? <Text style={c.meta}>🧤 Keeper: {keeper(opp(nextSide))!.fullName}</Text> : null}
                 <View style={c.row}>
-                  <Button label="✓ Scored" color={color(nextSide)} style={c.flex} onPress={() => {
-                    dispatch({ type: 'SO', side: nextSide, payload: { scored: true }, ...(soTaker ? { attribution: { playerId: soTaker.id, stat: 'soTaken', playerName: soTaker.fullName, extra: { soGoals: 1 } } } : {}) });
-                    setSoTaker(null);
-                  }} />
-                  <Button label="✗ Missed / saved" variant="ghost" style={c.flex} onPress={() => {
-                    dispatch({ type: 'SO', side: nextSide, payload: { scored: false }, ...(soTaker ? { attribution: { playerId: soTaker.id, stat: 'soTaken', playerName: soTaker.fullName } } : {}) });
-                    setSoTaker(null);
-                  }} />
+                  <Button label="✓ Scored" color={color(nextSide)} style={c.flex} onPress={() => soThrow(nextSide, 'scored')} />
+                  <Button label="🧤 Saved" variant="ghost" style={c.flex} onPress={() => soThrow(nextSide, 'saved')} />
+                  <Button label="✗ Missed" variant="ghost" style={c.flex} onPress={() => soThrow(nextSide, 'missed')} />
                 </View>
               </>
             )}
@@ -399,6 +414,14 @@ const ScoringControls: SportPlugin<HandballState>['ScoringControls'] = ({
           </View>
         );
       case 'seven':
+        // deep wave: who won the throw (optional step, only when tracked)
+        if (flow.step === 'drawn') return (
+          <View style={c.panel}>{head('7-metre throw')}
+            <Text style={c.small}>Who won it?</Text>
+            <PlayerGrid players={onCourt(sd)} onPick={(p) => { drawn(sd, p); setFlow({ ...flow, step: 'result' }); }}
+              skip={{ label: 'Skip', onPress: () => setFlow({ ...flow, step: 'result' }) }} />
+          </View>
+        );
         if (flow.step === 'result') return (
           <View style={c.panel}>{head('7-metre throw')}
             <View style={c.row}>
@@ -426,8 +449,14 @@ const ScoringControls: SportPlugin<HandballState>['ScoringControls'] = ({
         );
         if (flow.step === 'player') return (
           <View style={c.panel}>{head(flow.stolen ? 'Who lost the ball?' : 'Technical fault — who?')}
-            <PlayerGrid players={onCourt(sd)} onPick={(p) => (flow.stolen ? setFlow({ ...flow, loser: p, step: 'stealer' }) : turnover(sd, p))}
-              skip={{ label: 'Skip player', onPress: () => (flow.stolen ? setFlow({ ...flow, loser: null, step: 'stealer' }) : turnover(sd, null)) }} />
+            {/* deep wave: the fault's kind — an optional chip before the player (no extra tap) */}
+            {!flow.stolen && s.track?.faultTypes ? (
+              <View style={c.grid}>
+                {FAULT_TYPES.map((f) => <SelectChip key={f} label={FAULT_LABEL[f]} active={flow.fault === f} onPress={() => setFlow({ ...flow, fault: flow.fault === f ? undefined : f })} />)}
+              </View>
+            ) : null}
+            <PlayerGrid players={onCourt(sd)} onPick={(p) => (flow.stolen ? setFlow({ ...flow, loser: p, step: 'stealer' }) : turnover(sd, p, undefined, flow.fault))}
+              skip={{ label: 'Skip player', onPress: () => (flow.stolen ? setFlow({ ...flow, loser: null, step: 'stealer' }) : turnover(sd, null, undefined, flow.fault)) }} />
           </View>
         );
         return (
@@ -503,16 +532,28 @@ const ScoringControls: SportPlugin<HandballState>['ScoringControls'] = ({
       <View key={sd} style={c.col}>
         <Text style={[c.team, { color: color(sd) }]} numberOfLines={1}>{name(sd)}</Text>
         <Button label="🤾 Goal" color={color(sd)} onPress={() => setFlow({ mode: 'goal', side: sd, step: 'type' })} />
-        <Button label="🎯 7 m" accessibilityLabel="7-metre throw" variant="ghost" onPress={() => setFlow({ mode: 'seven', side: sd, step: 'result' })} />
+        <Button label="🎯 7 m" accessibilityLabel="7-metre throw" variant="ghost" onPress={() => setFlow({ mode: 'seven', side: sd, step: s.track?.sevenMDrawn ? 'drawn' : 'result' })} />
         <Button label="↗ Shot" accessibilityLabel="Shot without a goal" variant="ghost" onPress={() => setFlow({ mode: 'shot', side: sd, step: 'type' })} />
         <Button label="⚠️ Turnover" variant="ghost" onPress={() => setFlow({ mode: 'turnover', side: sd, step: 'kind' })} />
         <Button label="🟨 Card" accessibilityLabel="Sanction" variant="ghost" onPress={() => setFlow({ mode: 'card', side: sd, step: 'kind' })} />
         <Button label="🔁 Sub" variant="ghost" onPress={() => setFlow({ mode: 'sub', side: sd, step: 'off' })} />
         <Button label={`⏸ Time-out · ${to.left}`} accessibilityLabel={`Team time-out for ${name(sd)}, ${to.left} left`} variant="ghost" disabled={!to.ok || !periodStarted(s)} onPress={() => timeout(sd)} />
         {!to.ok && to.reason && to.left > 0 ? <Text style={c.gk}>{to.reason}</Text> : null}
-        <Text style={c.gk} accessibilityRole="button" onPress={() => setFlow({ mode: 'gk', side: sd })} numberOfLines={2}>
-          🧤 {gk ? gk.fullName : 'Set keeper'} ›
-        </Text>
+        {goalEmpty(s, sd) ? (
+          <Text style={c.short} accessibilityRole="button" accessibilityLabel={`${name(sd)} goal is empty — tap when the keeper is back`} onPress={() => emptyGoal(sd, false)} numberOfLines={2}>
+            🥅 Empty goal · keeper back ›
+          </Text>
+        ) : (
+          <>
+            <Text style={c.gk} accessibilityRole="button" onPress={() => setFlow({ mode: 'gk', side: sd })} numberOfLines={2}>
+              🧤 {gk ? gk.fullName : 'Set keeper'} ›
+            </Text>
+            {/* deep wave (IHF 4:1): keeper off for a 7th court player */}
+            <Text style={c.gk} accessibilityRole="button" accessibilityLabel={`${name(sd)} take the keeper off for a 7th court player`} onPress={() => emptyGoal(sd, true)} numberOfLines={1}>
+              🥅 Empty goal ›
+            </Text>
+          </>
+        )}
         {live.short[sd] > 0 ? <Text style={c.short}>Playing {live.short[sd]} short</Text> : null}
       </View>
     );
@@ -582,7 +623,7 @@ function EditList({ s, show, setShow, onRemove, onEdit, homeName, awayName }: {
           <View key={e.id} style={c.editRow}>
             <Text style={c.editWhen}>{eventWhen(s, e)}</Text>
             <Text style={c.editLabel} numberOfLines={2}>{d.icon} {d.label} · {e.side === 'home' ? homeName : awayName}{d.detail ? ` · ${d.detail}` : ''}</Text>
-            {onEdit && e.type !== 'timeout' && e.type !== 'save' && e.type !== 'block' && e.type !== 'steal' ? <RowAction label="✎ Edit" tone="edit" a11y={`Edit ${d.label}`} onPress={() => onEdit(e)} /> : null}
+            {onEdit && e.type !== 'timeout' && e.type !== 'save' && e.type !== 'block' && e.type !== 'steal' && e.type !== 'empty' && e.type !== 'drawn' ? <RowAction label="✎ Edit" tone="edit" a11y={`Edit ${d.label}`} onPress={() => onEdit(e)} /> : null}
             <RowAction label="✕" tone="remove" a11y={`Remove ${d.label}`} onPress={() => void confirmRemove(`${d.label} (${eventWhen(s, e)})`, () => onRemove(e),
               answers.length ? 'The linked save / block / steal goes too. The score and player stats re-adjust.' : undefined)} />
           </View>
@@ -650,14 +691,25 @@ const HandballScoreboard: NonNullable<SportPlugin<HandballState>['Scoreboard']> 
   );
 };
 
+/** Deep wave: Commentary (live text by half with the match clock, running
+ *  score and match facts) or the match centre (team stats by category and
+ *  half, then each side's player box). */
 const LiveExtras: NonNullable<SportPlugin<HandballState>['LiveExtras']> = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster, onPlayer }) => {
   const s = state as HandballState;
+  const [view, setView] = useState<'commentary' | 'stats'>('commentary');
   return (
     <View style={{ gap: theme.spacing(3) }}>
-      <Text style={c.h}>Timeline</Text>
-      <LiveTimeline events={handballTimeline(s, { home: homeName, away: awayName })} homeColor={homeColor} awayColor={awayColor} emptyText="No goals or sanctions yet." homeRoster={homeRoster} awayRoster={awayRoster} onPlayer={onPlayer} />
-      <Text style={c.h}>Match stats</Text>
-      <MatchBoxScore sport="handball" source={handballBox(s, { homeRoster, awayRoster })} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} onPlayer={onPlayer} />
+      <View style={c.grid}>
+        <SelectChip label="📝 Commentary" active={view === 'commentary'} onPress={() => setView('commentary')} />
+        <SelectChip label="📊 Match stats" active={view === 'stats'} onPress={() => setView('stats')} />
+      </View>
+      {view === 'commentary' ? (
+        <Commentary items={handballFeed(s, { home: homeName, away: awayName })} labelOf={handballPeriodLabel(s)} periods={handballFeedPeriods(s)} facts={handballFacts(s)}
+          homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} homeRoster={homeRoster} awayRoster={awayRoster} onPlayer={onPlayer}
+          emptyText="No goals or sanctions yet — every moment you log appears here." />
+      ) : (
+        <MatchCentre sport="handball" source={handballBox(s, { homeRoster, awayRoster })} categories={handballCentre} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} onPlayer={onPlayer} />
+      )}
     </View>
   );
 };
@@ -714,6 +766,8 @@ export const handballPlugin: SportPlugin<HandballState> = {
     { key: 'playersPerSide', label: 'Players per side (incl. keeper)', type: 'count', default: 7, min: 4, max: 7, advanced: true },
     { key: 'periodMinutes', label: 'Minutes per half', type: 'number', default: 30, min: 1, max: 45, advanced: true },
     { key: 'stopClock', label: 'Stop the clock for suspensions', type: 'toggle', default: true, advanced: true, hint: 'IHF 2:9 — the clock always stops for a team time-out' },
+    // deep wave: the optional "Stats to track" an organiser can switch on for an event
+    ...HANDBALL_TRACK_FIELDS.map((f) => ({ ...f, label: `Track ${f.label.charAt(0).toLowerCase()}${f.label.slice(1)}`, advanced: true })),
     {
       key: 'decider', label: 'If level at full time', type: 'choice', default: 'none',
       options: [

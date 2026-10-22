@@ -70,7 +70,8 @@ export interface Drive { off: Side; down: number; spot: number; line: number }
 export interface AFEvent {
   /** stable id from the action (`payload.uid`) */
   id: string;
-  type: 'td' | 'try' | 'defTry' | 'fg' | 'safety' | 'timeout' | 'play' | 'tackle' | 'possEnd' | 'eject';
+  /** deep wave: 'pd' = a pass defended (broken up) on an incompletion — optional */
+  type: 'td' | 'try' | 'defTry' | 'fg' | 'safety' | 'timeout' | 'play' | 'tackle' | 'possEnd' | 'eject' | 'pd';
   /** scoring plays: the scoring team; plays: the offence; tackle: the defence */
   side: Side;
   /** game seconds elapsed (the periods before at full length + this one) */
@@ -109,6 +110,12 @@ export interface AFEvent {
   pre?: { down: number; toGo: number; spot: number };
   /** the play gained a first down */
   first?: boolean;
+  /** deep wave — a pass recorded with "Targets" on: the receiver (complete /
+   *  intended on an incompletion) is credited a target. Old events never have it. */
+  tgt?: boolean;
+  /** deep wave — a tackle for loss (a run / catch that lost yards), recorded
+   *  with "Pass breakups & tackles for loss" on */
+  tfl?: boolean;
 }
 
 export interface XiStamp { players?: { id: string; name: string }[] }
@@ -141,6 +148,11 @@ export interface AFState {
   mode: Mode;
   /** play-by-play: ask who made the tackle (flag pull) after a play */
   trackTackles: boolean;
+  /** deep wave — "Stats to track" (absent = off; old matches never have them):
+   *  targets (the intended receiver on an incompletion) and defensive detail
+   *  (passes defended; tackles for loss when tackles are tracked) */
+  trackTargets?: boolean;
+  trackDefence?: boolean;
   /** yards between the goal lines (tackle 100, flag 50) */
   field: number;
   /** downs per series (tackle 4, flag 3) */
@@ -171,6 +183,15 @@ export const AF_PRESETS: Record<string, { label: string; set: Record<string, num
   ncaa: { label: 'Tackle · College 4 × 15', set: { variant: 'tackle', rules: 'ncaa', playersPerSide: 11, periods: 4, periodMinutes: 15, timeoutsPerHalf: 3, twoMinute: false, decider: 'kansas', otSpot: 25 } },
   nfhs: { label: 'Tackle · High school (NFHS) 4 × 12', set: { variant: 'tackle', rules: 'nfhs', playersPerSide: 11, periods: 4, periodMinutes: 12, timeoutsPerHalf: 3, twoMinute: false, decider: 'kansas', otSpot: 10 } },
 };
+
+/** Deep wave — the optional "Stats to track" (off by default; play by play
+ *  only). Targets: one optional tap after ✗ Incomplete (who it was for) and
+ *  every completion recorded while on credits its receiver a target.
+ *  Defensive detail: one optional tap after ✗ Incomplete (who broke it up →
+ *  passes defended) and, with tackles tracked, a tackle on a run / catch that
+ *  lost yards is a tackle for loss. */
+export type TrackFlag = 'trackTargets' | 'trackDefence';
+export const TRACK_FLAGS: TrackFlag[] = ['trackTargets', 'trackDefence'];
 
 const bool = (v: unknown, d: boolean) => (v === undefined || v === null || v === '' ? d : v === true || v === 'true' || v === 1);
 const num = (v: unknown, d: number, min = 0) => { const n = Number(v); return v === undefined || v === null || v === '' || !Number.isFinite(n) ? d : Math.max(min, n); };
@@ -210,6 +231,8 @@ export const init = (cfg?: Record<string, unknown>): AFState => {
     otSpot: num(config?.otSpot, rules === 'ncaa' ? 25 : 10, 1),
     mode: config?.mode === 'pbp' || config?.mode === true || config?.mode === 'true' ? 'pbp' : 'score',
     trackTackles: bool(config?.trackTackles, false),
+    // deep wave: only when on (an old match's state shape never changes)
+    ...Object.fromEntries(TRACK_FLAGS.filter((f) => bool(config?.[f], false)).map((f) => [f, true])),
     field: flag ? 50 : 100,
     downs: flag ? 3 : 4,
     flagStart: num(config?.flagStart, 5, 1),
@@ -341,22 +364,28 @@ export const PBP_KEYS = [
   'passComp', 'passAtt', 'passYds', 'passInt', 'rushAtt', 'rushYds', 'rec', 'recYds', 'sacks', 'defInt', 'fumblesLost', 'fumRec', 'punts', 'puntYds',
 ] as const;
 export const DETAIL_KEYS = ['tackles'] as const;
-export const LIVE_KEYS = [...SCORE_KEYS, ...PBP_KEYS, ...DETAIL_KEYS] as const;
+/** Deep wave — keys written only when tracked: targets (receivers), passes
+ *  defended / tackles for loss (defenders), times sacked / sack yards lost
+ *  (the quarterback — credited from the last passer, no extra tap). */
+export const DEEP_KEYS = ['targets', 'passDef', 'tfl', 'timesSacked', 'sackYdsLost'] as const;
+export const LIVE_KEYS = [...SCORE_KEYS, ...PBP_KEYS, ...DETAIL_KEYS, ...DEEP_KEYS] as const;
 
 type Credit = { playerId: string; playerName?: string; stats: Record<string, number> };
-type CreditEvent = Pick<AFEvent, 'type' | 'playerId' | 'playerName' | 'secondId' | 'secondName' | 'how' | 'yards' | 'kind' | 'good' | 'play' | 'pbp'>;
+type CreditEvent = Pick<AFEvent, 'type' | 'playerId' | 'playerName' | 'secondId' | 'secondName' | 'how' | 'yards' | 'kind' | 'good' | 'play' | 'pbp' | 'tgt' | 'tfl'>;
 
 /** The stat-line credits one event writes: [primary player, second player]. */
 export function eventCredits(e: CreditEvent): { first?: Credit; second?: Credit } {
   const p = (stats: Record<string, number>) => (e.playerId ? { playerId: e.playerId, playerName: e.playerName, stats } : undefined);
   const q = (stats: Record<string, number>) => (e.secondId ? { playerId: e.secondId, playerName: e.secondName, stats } : undefined);
   const y = Math.round(Number(e.yards) || 0);
+  // deep wave: a completion / incompletion recorded with "Targets" on
+  const tg: Record<string, number> = e.tgt ? { targets: 1 } : {};
   switch (e.type) {
     case 'td': {
       const base = { points: TD_POINTS, touchdowns: 1 };
       if (e.how === 'run') return { first: p({ ...base, rushTD: 1, ...(e.pbp ? { rushAtt: 1, rushYds: y } : {}) }) };
       if (e.how === 'pass') return {
-        first: p({ ...base, recTD: 1, ...(e.pbp ? { rec: 1, recYds: y } : {}) }),
+        first: p({ ...base, recTD: 1, ...(e.pbp ? { rec: 1, recYds: y, ...tg } : {}) }),
         second: q({ passTD: 1, ...(e.pbp ? { passComp: 1, passAtt: 1, passYds: y } : {}) }),
       };
       return { first: p({ ...base, retTD: 1 }) };
@@ -374,13 +403,17 @@ export function eventCredits(e: CreditEvent): { first?: Credit; second?: Credit 
     case 'eject':
       return { first: p({ ejections: 1 }) };
     case 'tackle':
-      return { first: p({ tackles: 1 }) };
+      return { first: p({ tackles: 1, ...(e.tfl ? { tfl: 1 } : {}) }) };
+    case 'pd':
+      return { first: p({ passDef: 1 }) };
     case 'play':
       switch (e.play) {
         case 'run': case 'kneel': return { first: p({ rushAtt: 1, rushYds: y }) };
-        case 'pass': return { first: p({ passComp: 1, passAtt: 1, passYds: y }), second: q({ rec: 1, recYds: y }) };
-        case 'inc': return { first: p({ passAtt: 1 }) };
-        case 'sack': return { second: q({ sacks: 1 }) };
+        case 'pass': return { first: p({ passComp: 1, passAtt: 1, passYds: y }), second: q({ rec: 1, recYds: y, ...tg }) };
+        // the intended receiver (a target) only when recorded with "Targets" on
+        case 'inc': return { first: p({ passAtt: 1 }), ...(e.tgt ? { second: q({ targets: 1 }) } : {}) };
+        // the quarterback (deep wave: the last passer, when known) and the defender
+        case 'sack': return { first: p({ timesSacked: 1, sackYdsLost: Math.abs(y) }), second: q({ sacks: 1 }) };
         case 'int': return { first: p({ passAtt: 1, passInt: 1 }), second: q({ defInt: 1 }) };
         case 'fumble': return { first: p({ fumblesLost: 1 }), second: q({ fumRec: 1 }) };
         case 'punt': return { first: p({ punts: 1, puntYds: y }) };
@@ -432,6 +465,9 @@ export interface PlayInput {
   newSpot?: number;
   ret?: number;
   foul?: string; on?: Side; autoFirst?: boolean; lossOfDown?: boolean;
+  /** deep wave: a pass (complete / incomplete) recorded with "Targets" on —
+   *  the receiver (`p2`, the intended one on an incompletion) gets a target */
+  tgt?: boolean;
 }
 
 const who1 = (w?: Who) => (w?.id ? { playerId: w.id, ...(w.name ? { playerName: w.name } : {}) } : w?.name ? { playerName: w.name } : {});
@@ -444,21 +480,22 @@ const who2 = (w?: Who) => (w?.id ? { secondId: w.id, ...(w.name ? { secondName: 
 export function buildPlay(s: AFState, side: Side, inp: PlayInput, stamp: Record<string, unknown> = {}): ScoreAction {
   const d = s.drive && s.drive.off === side ? s.drive : null;
   const y = Math.round(Number(inp.yards) || 0);
+  const tgt = inp.tgt && (inp.play === 'pass' || inp.play === 'inc') ? { tgt: true } : {};
   if (d && (inp.play === 'run' || inp.play === 'pass') && d.spot + y >= s.field) {
     const yards = s.field - d.spot;
     const ev: CreditEvent = inp.play === 'run'
       ? { type: 'td', how: 'run', yards, pbp: true, ...who1(inp.p1) }
-      : { type: 'td', how: 'pass', yards, pbp: true, ...who1(inp.p2), ...who2(inp.p1) };
-    return { type: 'TD', side, payload: { how: ev.how, yards, pbp: true, ...stamp }, ...credit(ev) };
+      : { type: 'td', how: 'pass', yards, pbp: true, ...who1(inp.p2), ...who2(inp.p1), ...tgt };
+    return { type: 'TD', side, payload: { how: ev.how, yards, pbp: true, ...(inp.play === 'pass' ? tgt : {}), ...stamp }, ...credit(ev) };
   }
   if (d && (inp.play === 'run' || inp.play === 'sack' || inp.play === 'kneel') && d.spot + y <= 0) {
     return { type: 'SAFETY', side: other(side), payload: { ...stamp }, ...credit({ type: 'safety', ...(inp.play === 'sack' ? who1(inp.p2) : {}) }) };
   }
-  const ev: CreditEvent = { type: 'play', play: inp.play, yards: y, pbp: true, ...who1(inp.p1), ...who2(inp.p2) };
+  const ev: CreditEvent = { type: 'play', play: inp.play, yards: y, pbp: true, ...who1(inp.p1), ...who2(inp.p2), ...tgt };
   return {
     type: 'PLAY', side,
     payload: {
-      play: inp.play, yards: y, ...stamp,
+      play: inp.play, yards: y, ...tgt, ...stamp,
       ...(inp.newSpot !== undefined ? { newSpot: inp.newSpot } : {}), ...(inp.ret !== undefined ? { ret: inp.ret } : {}),
       ...(inp.foul ? { foul: inp.foul } : {}), ...(inp.on ? { on: inp.on } : {}),
       ...(inp.autoFirst ? { autoFirst: true } : {}), ...(inp.lossOfDown ? { lossOfDown: true } : {}),
@@ -633,7 +670,12 @@ export const reducer = (s: AFState, a: ScoreAction): AFState => {
       const how = (['run', 'pass', 'int', 'fumble', 'punt', 'kick', 'other'] as TdHow[]).includes(a.payload?.how as TdHow) ? (a.payload!.how as TdHow) : 'run';
       // whose possession it was: a return TD is the defence's (or the receiving team's)
       const defensive = how === 'int' || how === 'fumble';
-      let st = push(score(s, side, TD_POINTS), { type: 'td', side, how, ...(yards !== undefined ? { yards } : {}), ...w1, ...w2, ...(a.payload?.pbp === true && (how === 'run' || how === 'pass') ? { pbp: true } : {}), ...situation });
+      let st = push(score(s, side, TD_POINTS), {
+        type: 'td', side, how, ...(yards !== undefined ? { yards } : {}), ...w1, ...w2, ...(a.payload?.pbp === true && (how === 'run' || how === 'pass') ? { pbp: true } : {}),
+        // deep wave: a touchdown pass recorded with "Targets" on
+        ...(a.payload?.pbp === true && how === 'pass' && a.payload?.tgt === true ? { tgt: true } : {}),
+        ...situation,
+      });
       if (live && otTdEnds(st, side, defensive)) return { ...st, ended: true, clock: stopAt(st, at), played: [...st.played.slice(0, st.period - 1), periodSec(st, at)], drive: null, pendingTry: undefined };
       st = { ...st, pendingTry: side, drive: null, kickBy: undefined };
       return st;
@@ -689,7 +731,12 @@ export const reducer = (s: AFState, a: ScoreAction): AFState => {
     }
     case 'TACKLE': {
       if (!side) return s;
-      return push(s, { type: 'tackle', side, ...w1 });
+      return push(s, { type: 'tackle', side, ...w1, ...(a.payload?.tfl === true ? { tfl: true } : {}) });
+    }
+    case 'PASS_DEF': {
+      // deep wave: who broke up an incomplete pass (`side` = the defence)
+      if (!side) return s;
+      return push(s, { type: 'pd', side, ...w1 });
     }
     case 'EJECT': {
       if (!side) return s;
@@ -714,6 +761,7 @@ export const reducer = (s: AFState, a: ScoreAction): AFState => {
         ...(typeof a.payload?.foul === 'string' ? { foul: a.payload.foul as string } : {}), ...(on ? { on } : {}),
         ...(a.payload?.autoFirst ? { autoFirst: true } : {}), ...(a.payload?.lossOfDown ? { lossOfDown: true } : {}),
         ...(!w1.playerName && typeof a.payload?.p1Name === 'string' ? { playerName: a.payload.p1Name as string } : {}),
+        ...(a.payload?.tgt === true && (play === 'pass' || play === 'inc') ? { tgt: true } : {}),
       };
       const d = s.drive;
       let drive = d;
@@ -810,11 +858,27 @@ export interface AFTeamFigures {
   firstDowns: number; rushYds: number; passYds: number; sackYds: number; totalYards: number;
   plays: number; turnovers: number; penalties: number; penaltyYds: number; sacked: number;
   thirdConv: number; thirdAtt: number; timeouts: number; top: number;
+  /* deep wave (the broadcast "Team stats"; play-by-play figures are 0 in a score-only game) */
+  /** first downs by how (a touchdown from scrimmage counts as a first down — NFL / NCAA) */
+  firstRush: number; firstPass: number; firstPen: number;
+  rushAtt: number; passComp: number; passAtt: number; intThrown: number; fumblesLost: number;
+  fourthConv: number; fourthAtt: number;
+  rushTD: number; passTD: number; retTD: number; safeties: number; defTries: number;
+  patMade: number; patAtt: number; twoMade: number; twoAtt: number; oneMade: number; oneAtt: number;
+  /** longest field goal made (yards, when given) */
+  fgLong: number;
+  punts: number; puntYds: number;
+  /** punts this side returned (a return recorded, or a punt-return TD) and the yards */
+  puntRets: number; puntRetYds: number;
 }
+const SCRIMMAGE = ['run', 'pass', 'inc', 'sack', 'int', 'fumble', 'kneel'];
 export function teamFigures(s: AFState, side: Side, scope: 'all' | number = 'all', nowSec?: number): AFTeamFigures {
   const f: AFTeamFigures = {
     points: 0, touchdowns: 0, fgMade: 0, fgAtt: 0, firstDowns: 0, rushYds: 0, passYds: 0, sackYds: 0, totalYards: 0,
     plays: 0, turnovers: 0, penalties: 0, penaltyYds: 0, sacked: 0, thirdConv: 0, thirdAtt: 0, timeouts: 0, top: 0,
+    firstRush: 0, firstPass: 0, firstPen: 0, rushAtt: 0, passComp: 0, passAtt: 0, intThrown: 0, fumblesLost: 0, fourthConv: 0, fourthAtt: 0,
+    rushTD: 0, passTD: 0, retTD: 0, safeties: 0, defTries: 0, patMade: 0, patAtt: 0, twoMade: 0, twoAtt: 0, oneMade: 0, oneAtt: 0,
+    fgLong: 0, punts: 0, puntYds: 0, puntRets: 0, puntRetYds: 0,
   };
   const inScope = (e: AFEvent) => scope === 'all' || e.period === scope;
   const evs = s.events;
@@ -824,22 +888,43 @@ export function teamFigures(s: AFState, side: Side, scope: 'all' | number = 'all
     if (e.side === side) f.points += pointsOf(e);
     if (e.type === 'td' && e.side === side) {
       f.touchdowns++;
-      if (e.pbp && e.how === 'run') { f.rushYds += e.yards ?? 0; f.plays++; }
-      if (e.pbp && e.how === 'pass') { f.passYds += e.yards ?? 0; f.plays++; }
+      if (e.how === 'run') f.rushTD++; else if (e.how === 'pass') f.passTD++; else if (e.how !== 'other') f.retTD++;
+      if (e.how === 'punt') { f.puntRets++; f.puntRetYds += Math.max(0, e.yards ?? 0); }
+      if (e.pbp && e.how === 'run') { f.rushYds += e.yards ?? 0; f.plays++; f.rushAtt++; }
+      if (e.pbp && e.how === 'pass') { f.passYds += e.yards ?? 0; f.plays++; f.passComp++; f.passAtt++; }
+      // a touchdown from scrimmage counts as a first down (and converts a 3rd / 4th down)
+      if (e.pbp && e.pre) { f.firstDowns++; if (e.how === 'pass') f.firstPass++; else f.firstRush++; }
       if (e.pre?.down === 3 && e.pbp) { f.thirdAtt++; f.thirdConv++; }
+      if (e.pre?.down === 4 && e.pbp) { f.fourthAtt++; f.fourthConv++; }
     }
-    if (e.type === 'fg' && e.side === side) { f.fgAtt++; if (e.good) f.fgMade++; }
+    if (e.type === 'fg' && e.side === side) { f.fgAtt++; if (e.good) { f.fgMade++; f.fgLong = Math.max(f.fgLong, e.yards ?? 0); } }
+    if (e.type === 'safety' && e.side === side) f.safeties++;
+    if (e.type === 'defTry' && e.side === side) f.defTries++;
+    if (e.type === 'try' && e.side === side && !e.none) {
+      if (e.kind === 'kick') { f.patAtt++; if (e.good) f.patMade++; }
+      else if (e.kind === 'two') { f.twoAtt++; if (e.good) f.twoMade++; }
+      else { f.oneAtt++; if (e.good) f.oneMade++; }
+    }
     if (e.type === 'timeout' && e.side === side) f.timeouts++;
     if (e.type === 'play') {
-      if (e.play === 'penalty') { if (e.on === side) { f.penalties++; f.penaltyYds += Math.abs(e.yards ?? 0); } if (e.side === side && e.first) f.firstDowns++; continue; }
+      if (e.play === 'penalty') {
+        if (e.on === side) { f.penalties++; f.penaltyYds += Math.abs(e.yards ?? 0); }
+        if (e.side === side && e.first) { f.firstDowns++; f.firstPen++; }
+        continue;
+      }
+      // the other side's punt: our return
+      if (e.play === 'punt' && e.side !== side && typeof e.ret === 'number') { f.puntRets++; f.puntRetYds += e.ret; }
       if (e.side !== side) continue;
-      if (e.first) f.firstDowns++;
-      if (e.play === 'run' || e.play === 'kneel') { f.rushYds += e.yards ?? 0; f.plays++; }
-      else if (e.play === 'pass') { f.passYds += e.yards ?? 0; f.plays++; }
-      else if (e.play === 'inc') f.plays++;
+      if (e.first) { f.firstDowns++; if (e.play === 'pass') f.firstPass++; else f.firstRush++; }
+      if (e.play === 'run' || e.play === 'kneel') { f.rushYds += e.yards ?? 0; f.plays++; f.rushAtt++; }
+      else if (e.play === 'pass') { f.passYds += e.yards ?? 0; f.plays++; f.passComp++; f.passAtt++; }
+      else if (e.play === 'inc') { f.plays++; f.passAtt++; }
       else if (e.play === 'sack') { f.sacked++; f.sackYds += Math.abs(e.yards ?? 0); f.plays++; }
-      else if (e.play === 'int' || e.play === 'fumble') { f.turnovers++; f.plays++; }
-      if (e.pre?.down === 3 && ['run', 'pass', 'inc', 'sack', 'int', 'fumble', 'kneel'].includes(e.play ?? '')) { f.thirdAtt++; if (e.first) f.thirdConv++; }
+      else if (e.play === 'int') { f.turnovers++; f.plays++; f.passAtt++; f.intThrown++; }
+      else if (e.play === 'fumble') { f.turnovers++; f.plays++; f.fumblesLost++; }
+      else if (e.play === 'punt') { f.punts++; f.puntYds += Math.abs(e.yards ?? 0); }
+      if (e.pre?.down === 3 && SCRIMMAGE.includes(e.play ?? '')) { f.thirdAtt++; if (e.first) f.thirdConv++; }
+      if (e.pre?.down === 4 && SCRIMMAGE.includes(e.play ?? '')) { f.fourthAtt++; if (e.first) f.fourthConv++; }
     }
   }
   f.totalYards = f.rushYds + f.passYds - f.sackYds;
@@ -847,21 +932,64 @@ export function teamFigures(s: AFState, side: Side, scope: 'all' | number = 'all
   return f;
 }
 
+/** Was the match (or part of it) scored play by play? */
+export const isPbp = (s: Pick<AFState, 'mode' | 'events'>): boolean => s.mode === 'pbp' || s.events.some((e) => e.pbp);
+/** Is a "Stats to track" toggle tracked in the match — on, or any such event recorded? */
+export function afTracked(s: Pick<AFState, TrackFlag | 'events'>, f: TrackFlag): boolean {
+  if (s[f] === true) return true;
+  return f === 'trackTargets' ? s.events.some((e) => e.tgt) : s.events.some((e) => e.type === 'pd' || e.tfl);
+}
+/** Tackles tracked (the toggle, or any tackle recorded). */
+export const tacklesTracked = (s: Pick<AFState, 'trackTackles' | 'events'>): boolean => s.trackTackles || s.events.some((e) => e.type === 'tackle');
+/** Times sacked is known once a sack names the quarterback (deep wave — no extra tap). */
+export const sackedTracked = (s: Pick<AFState, 'events'>): boolean => s.events.some((e) => e.type === 'play' && e.play === 'sack' && !!e.playerId);
+/** The deep-wave keys a match tracks (they read 0 on every line; absent otherwise). */
+export function deepKeys(s: AFState): string[] {
+  const out: string[] = [];
+  if (afTracked(s, 'trackTargets')) out.push('targets');
+  if (afTracked(s, 'trackDefence')) out.push('passDef', ...(tacklesTracked(s) ? ['tfl'] : []));
+  if (sackedTracked(s)) out.push('timesSacked', 'sackYdsLost');
+  return out;
+}
+
 /** Time of possession (seconds, play-by-play): the game time between plays
  *  credited to the offence at each snap. */
 export function possessionTime(s: AFState, nowSec?: number): { home: number; away: number } {
   const t = { home: 0, away: 0 };
+  for (const iv of possessionIntervals(s, nowSec)) t[iv.side] += Math.max(0, iv.to - iv.from);
+  return t;
+}
+
+/** Drives and possession never cross half-time (nor an overtime period). */
+export const halfKey = (s: Pick<AFState, 'plan' | 'periods'>, p: number): string => (isOT(s, p) ? `ot${p}` : `h${halfOf(s, p)}`);
+/** The game seconds a half (or an overtime period) starts / ends at. */
+const halfBounds = (s: AFState, p: number): [number, number] => {
+  const first = isOT(s, p) || s.periods !== 4 ? p : p <= 2 ? 1 : 3;
+  const last = isOT(s, p) || s.periods !== 4 ? p : p <= 2 ? 2 : 4;
+  return [playedOffset(s, first), playedOffset(s, last) + (s.played[last - 1] ?? periodLen(s, last))];
+};
+
+/** Time of possession as intervals (game seconds): the time after a play
+ *  belongs to whoever has the ball next — the next snap's offence, or (after
+ *  the last play) the current drive; at half-time the rest of the half stays
+ *  with the last offence and the new half starts with the next one (deep wave). */
+export function possessionIntervals(s: AFState, nowSec?: number): { side: Side; from: number; to: number }[] {
+  const out: { side: Side; from: number; to: number }[] = [];
   const evs = s.events.filter((e) => e.off && (e.type === 'play' || e.type === 'td' || e.type === 'fg' || e.type === 'safety')).sort((x, y) => x.sec - y.sec);
-  // the time after a play belongs to whoever has the ball next: the next snap's
-  // offence, or (after the last play) the current drive
+  const gameEnd = s.ended ? playedOffset(s) + (s.played[s.period - 1] ?? 0) : nowSec ?? matchSec(s);
   for (let i = 0; i < evs.length; i++) {
     const e = evs[i];
     const nx = evs[i + 1];
-    const end = nx ? nx.sec : (s.ended ? playedOffset(s) + (s.played[s.period - 1] ?? 0) : nowSec ?? matchSec(s));
-    const holder = nx ? nx.off! : s.drive?.off ?? e.off!;
-    t[holder] += Math.max(0, end - e.sec);
+    const nextP = nx ? nx.period : s.period;
+    if (halfKey(s, nextP) !== halfKey(s, e.period)) {
+      out.push({ side: e.off!, from: e.sec, to: halfBounds(s, e.period)[1] });
+      const holder = nx ? nx.off! : s.drive?.off;
+      if (holder) out.push({ side: holder, from: halfBounds(s, nextP)[0], to: nx ? nx.sec : gameEnd });
+      continue;
+    }
+    out.push({ side: nx ? nx.off! : s.drive?.off ?? e.off!, from: e.sec, to: nx ? nx.sec : gameEnd });
   }
-  return t;
+  return out;
 }
 
 /** SD-20 — the line under the score: the situation (play-by-play) or the OT round. */
@@ -874,6 +1002,13 @@ export function afScoreLine(s: AFState, perspective?: Side): string {
 
 /* --------------------------- live settings (#14) --------------------------- */
 
+/** Deep wave — the "Stats to track" toggles (live settings + the match format;
+ *  they act in play-by-play mode). */
+export const TRACK_FIELDS: FormatField[] = [
+  { key: 'trackTargets', label: 'Targets (who a pass was meant for)', type: 'toggle', default: false, group: 'Stats to track', hint: 'Play by play: one optional tap after ✗ Incomplete — receivers get targets (complete + incomplete)' },
+  { key: 'trackDefence', label: 'Pass breakups & tackles for loss', type: 'toggle', default: false, group: 'Stats to track', hint: 'Play by play: who broke up an incomplete pass (optional tap); with tackles asked, a run or catch that lost yards is a tackle for loss' },
+];
+
 export const AF_LIVE_SETTINGS: LiveSettings<AFState> = {
   title: '⚙️ Game settings',
   hint: 'Applies to this game only.',
@@ -882,8 +1017,12 @@ export const AF_LIVE_SETTINGS: LiveSettings<AFState> = {
     { key: 'periodMinutes', label: 'Period length', type: 'number', default: 15, min: 1, max: 30, step: 1, hint: 'min / quarter or half' },
     { key: 'timeoutsPerHalf', label: 'Timeouts per half', type: 'number', default: 3, min: 0, max: 5, step: 1 },
     { key: 'mode', label: 'Play-by-play (downs, yards, player stats)', type: 'toggle', default: false, group: 'Detail' },
-    { key: 'trackTackles', label: 'Ask who made the tackle / flag pull', type: 'toggle', default: false, group: 'Detail' },
+    { key: 'trackTackles', label: 'Ask who made the tackle / flag pull', type: 'toggle', default: false, group: 'Stats to track' },
+    ...TRACK_FIELDS,
   ] as FormatField[],
-  read: (s) => ({ periodMinutes: s.periodMinutes, timeoutsPerHalf: s.timeoutsPerHalf, mode: s.mode === 'pbp', trackTackles: s.trackTackles }),
-  defaults: { periodMinutes: 15, timeoutsPerHalf: 3, mode: false, trackTackles: false },
+  read: (s) => ({
+    periodMinutes: s.periodMinutes, timeoutsPerHalf: s.timeoutsPerHalf, mode: s.mode === 'pbp', trackTackles: s.trackTackles,
+    ...Object.fromEntries(TRACK_FLAGS.map((f) => [f, s[f] === true])),
+  }),
+  defaults: { periodMinutes: 15, timeoutsPerHalf: 3, mode: false, trackTackles: false, ...Object.fromEntries(TRACK_FLAGS.map((f) => [f, false])) },
 };

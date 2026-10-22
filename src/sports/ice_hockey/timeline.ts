@@ -2,7 +2,7 @@
  *  the scorer's correction list. PURE. */
 import type { LiveEvent } from '../liveEvents';
 import { shootoutOrderRows } from '../shootoutOrder.ts';
-import { eventWhen, mmss, periodOffset, PEN_LABEL, STRENGTH_LABEL, type IceEvent, type IceHockeyState } from './engine.ts';
+import { eventWhen, mmss, periodOffset, PEN_LABEL, STRENGTH_LABEL, TALLY_LABEL, type IceEvent, type IceHockeyState } from './engine.ts';
 
 const PEN_ICON = { minor: '⏱', bench: '⏱', double: '⏱', major: '🟥', majorGm: '🟥', misconduct: '🕙', gm: '🚫', match: '🚫' } as const;
 
@@ -41,13 +41,22 @@ export function describeEvent(e: IceEvent): { icon: string; label: string; detai
       return { icon: '🧤', label: 'Goalie back in net' };
     case 'timeout':
       return { icon: '⏸', label: 'Team time-out' };
+    case 'tally': {
+      const k = e.tally ?? 'hit';
+      return {
+        icon: k === 'faceoff' ? '⚪' : k === 'hit' ? '💥' : k === 'block' ? '🛡' : k === 'missed' ? '↗' : '🔄',
+        label: TALLY_LABEL[k],
+        detail: [e.playerName, k === 'faceoff' && e.secondName ? `v ${e.secondName}` : ''].filter(Boolean).join(' ') || undefined,
+      };
+    }
   }
 }
 
-/** The viewer timeline (LiveTimeline sorts by id: game time). Shots are left
- *  out (there are dozens) — they're in the box score and the comparison. */
+/** The viewer timeline (LiveTimeline sorts by id: game time). Shots and the
+ *  optional tallies are left out (there are dozens) — they're in the box
+ *  score, the stats sheet and the commentary. */
 export function iceHockeyTimeline(s: IceHockeyState, names?: { home?: string; away?: string }): LiveEvent[] {
-  return [...s.events.filter((e) => e.type !== 'shot').map((e, i) => {
+  return [...s.events.filter((e) => e.type !== 'shot' && e.type !== 'tally').map((e, i) => {
     const d = describeEvent(e);
     return {
       id: e.sec * 1000 + i,

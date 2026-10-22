@@ -5,7 +5,7 @@ category: Cricket scoring
 audience: Scorers, Organisers
 sports: cricket
 order: 5
-updated: 2026-10-11
+updated: 2026-10-22
 ---
 
 Score a whole cricket match on one phone, ball by ball. You tap what happened on each delivery and the app keeps the score, overs, strike, the cards and the result. This guide goes from the toss to the last ball, with links to the detailed guides.
@@ -22,7 +22,7 @@ Score a whole cricket match on one phone, ball by ball. You tap what happened on
 4. Tap the two openers. The first name you tap is the striker, the second the non-striker.
 5. Under "Over 1 — pick … bowler", tap the bowler.
 
-> **Tip:** Want a wide worth 2, no byes, or batters who retire at 25? Set it before the first ball. See [Cricket local rules](/guides/cricket-local-rules/). To record where each shot went, see [Wagon wheel and shot types](/guides/cricket-wagon-wheel/).
+> **Tip:** Want a wide worth 2, no byes, or batters who retire at 25? Set it before the first ball. See [Cricket local rules](/guides/cricket-local-rules/). To record where each shot went, see [Wagon wheel and shot types](/guides/cricket-wagon-wheel/). For a pitch map, false shots, ball speed or bowler types, switch them on under **Stats to track**. See [Commentary, match stats and stats to track](/guides/score-cricket-commentary-and-stats/).
 
 ## Step by step: scoring each ball
 1. Tap the runs off the bat: **0**, **1**, **2**, **3**, **4** or **6**. A 4 or 6 is a boundary. Strike changes by itself on odd runs and at the end of the over.
@@ -61,6 +61,8 @@ If the scores finish level, the app offers a Super Over (or ends it as a tie if 
 
 ## After the match
 The result, the scorecard and every player's figures are saved, and career stats update, also for a match ended early with **End match**. See [Read the scorecard and career stats](/guides/cricket-scorecard-and-stats/).
+
+Viewers can follow every ball on the **Commentary** tab and compare the teams on the **Stats** tab, live and after the match. See [Commentary, match stats and stats to track](/guides/score-cricket-commentary-and-stats/).
 
 ## Common questions
 ### The wrong batter is on strike. How do I fix it?

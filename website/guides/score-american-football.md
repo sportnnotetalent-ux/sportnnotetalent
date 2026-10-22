@@ -5,7 +5,7 @@ category: Live scoring
 audience: Scorers, Organisers
 sports: american_football
 order: 53
-updated: 2026-10-12
+updated: 2026-10-22
 ---
 
 Score a flag or tackle game on one phone. By default you tap only the scoring plays; play by play also tracks the downs, the ball and player stats.
@@ -44,7 +44,16 @@ A drive panel shows who has the ball, the down and distance, and the spot ("Lion
 5. Penalties: pick the foul. It shows the usual yards, automatic first down or loss of down; you can change the yards. Don't record declined penalties.
 6. Ball in the wrong place? Tap **📍 Set** to choose the team, down, spot and yards to go.
 
-> **Tip:** **Ask who made the tackle / flag pull** adds a tap after every run and catch: turn it on only with a helper.
+## Stats to track
+Optional switches in **⚙️ Game settings** or the match format (play by play, all off by default):
+- **Ask who made the tackle / flag pull**: a tap after every run and catch.
+- **Targets**: after **✗ Incomplete**, tap who it was for (or skip). Catches count too.
+- **Pass breakups & tackles for loss**: after **✗ Incomplete**, tap who broke it up (or skip). With tackles on, a loss is a tackle for loss.
+
+Sacks are charged to the last passer automatically.
+
+## Play-by-play and match stats
+Under the score, pick **Play-by-play** (each snap, grouped by drive), **Match stats** (first downs, yards, 3rd and 4th downs, red zone, turnovers, possession, by quarter), **Drives**, **Box score** or **Key moments**.
 
 ## Overtime
 - Level after regulation? Pick who has the ball first after the coin toss.
@@ -58,7 +67,7 @@ A drive panel shows who has the ball, the down and distance, and the spot ("Lion
 - **✎ Correct the timeline**: **✕** removes a moment after asking; **✎ Edit** re-enters a score at its original time (**Cancel** keeps the original).
 
 ## What you get
-- The score by quarter, a scoring summary and a box score (TD, FG, XP, PTS). Play by play adds passing, rushing, receiving and defence, plus first downs, total yards, turnovers, penalties, time of possession and 3rd downs.
+- The score by quarter, the scoring plays and a box score (TD, FG, XP, PTS). Play by play adds passing, rushing, receiving, defence and punting.
 - Careers and leaderboards: touchdowns, yards, passer rating (NFL formula, 20 attempts to rank), field goal %, Top touchdown scorer and Top passer.
 - Tables rank by win % (a tie counts half), then head-to-head, points difference and points scored.
 - A walkover counts 1-0 (NFHS, college); the organiser can change it.

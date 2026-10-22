@@ -55,6 +55,6 @@ export const rowingPlugin: SportPlugin<RowingMatchState> = {
       options: [{ value: 1, label: 'Same as single boats' }, { value: 2, label: 'Double' }],
     },
     { key: 'handTimed', label: 'Hand timing', type: 'toggle', default: false, onCreate: true, hint: 'stopwatches at the finish, no photo finish: times to 1/100 count for regatta records' },
-    { key: 'splits', label: '500 m splits', type: 'toggle', default: false, advanced: true, hint: 'record each crew’s time at every 500 m' },
+    { key: 'splits', label: '500 m splits', type: 'toggle', default: false, advanced: true, group: 'Stats to track', hint: 'record each crew’s time at every 500 m' },
   ],
 };

@@ -1,11 +1,11 @@
 ---
 title: How to score a carrom match
-description: Score carrom board by board to ICF rules: who won, coins left, the Queen, penalty boards. The app keeps the 25-point games and an ICF score sheet.
+description: Score carrom board by board to ICF rules, with an ICF score sheet, commentary and match stats; fouls, coins on the break and missed covers are optional.
 category: Live scoring
 audience: Scorers, Organisers
 sports: carrom
 order: 62
-updated: 2026-10-11
+updated: 2026-10-22
 ---
 
 Carrom is scored one board at a time. The board winner scores one point for each of the opponent's coins still on it, plus 3 for a covered Queen. The app adds up the games and the match to ICF rules.
@@ -37,11 +37,22 @@ Carrom is scored one board at a time. The board winner scores one point for each
 
 The break alternates board by board (penalty boards too), and each new game opens with the other side breaking. In doubles both partners get the board's points, and before the toss you tap who breaks first for each side. Partners then take turns (A1, B1, A2, B2), the line names the player ("⚪ Bilal (NOR) to break"), and each partner's **Boards broken** counts their own breaks. If the team list has more players than the side, a **Played by** row appears: tap who played.
 
+## Optional: fouls, the break and missed covers
+A board stays one form. For more detail, a scorer or host can switch on **⚙️ Stats to track** (on the **Info** tab or in **☰ Quick options**; the organiser can set it for every match under the format's advanced options). It applies from the next board.
+- **Fouls & dues**: under the board form, tap each foul for the player who made it — **Striker pocketed**, **Touching**, **Line / hand**, **Thumbing** (only where your event's rules ban it; ICF allows thumbing) or **Other foul** — and **Due** for a coin owed. No taps means no fouls on that board.
+- **Coins on the break**: tap how many coins the breaker pocketed with the break stroke (0–5+). It needs the toss recorded.
+- **Missed Queen covers**: tap the player each time the Queen was pocketed but the cover missed.
+
 ## If the toss was wrong or missed
 Tap **Fix the toss** (or **Record who broke the first board**) and pick who really broke first. The score stays.
 
 ## Reading the score sheet
 Below the scoreboard, the **Score sheet** follows the ICF referee's sheet: one table per game, then a row per board: **#**, **Break**, **Won by**, **Coins**, **Queen**, **Pts** and the running total. **PEN** marks a penalty board, ⚪ / ⚫ a White or Black slam, and * a tie-break board. In the Queen column, 👑 +3 counted, 👑 0 means covered at 22 or more, and 👑 L covered by the loser. The **Box score** compares points, boards and Queens.
+
+## The commentary and the match stats
+Above the score sheet:
+- **🎙 Commentary** tells the match board by board, newest first, grouped by game: "Board 5 — Rahul clears with the Queen, +4 (1 coin left + Queen) · Rahul leads 17–9", with who broke, the tracked detail and the time.
+- **📊 Match stats** compares the players for the match or one game: points, boards won, points per board won, best board, coins pocketed, slams, Queens (and those covered by the loser), boards broken and won on the break, coins on the break, fouls by type and dues. A stat tracked on only some boards says so.
 
 ## Fix a mistake
 - Wrong tap just now? Tap **↶ Undo**. Tap it again to go back further.
@@ -62,3 +73,4 @@ Points add up to the game scores (penalty points included). See [Filter a player
 ## Common questions
 ### Why did the Queen add nothing?
 The winner was already on 22 or more. Under ICF rules the Queen only counts up to 21.
+- **The break** shows coins pocketed on the break and coins per break, and **Fouls & dues** shows fouls (by type), fouls per board, dues and missed Queen covers, once a match tracked them. Fouls and missed covers go on careers in singles only: in doubles the board doesn't say which partner fouled.

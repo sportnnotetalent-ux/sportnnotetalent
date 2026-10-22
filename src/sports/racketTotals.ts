@@ -28,6 +28,18 @@
  *   tracked it: winners / forcedErrors / unforcedErrors (+ by stroke), and
  *   the sport's aces / serviceWinners / serviceFaults / strokes / net points;
  *   tennis 1st / 2nd serve keys (srv1Pts …) with the serve keys above.
+ *   SD-157 tennis (each only on a match that tracked it, tennis/matchStats.ts):
+ *   winners / UE / FE by wing (winnersFh, ueBh, feFh …) and by shot type
+ *   (winnersGs, ueReturn, feVolley …; the retired winnersFhVolley /
+ *   winnersBhVolley written as 0), net points netPts / netPtsWon, rally length
+ *   rl04Pts / rl04Won …, return in play rtnInPlay / rtnInPlayOf, and the
+ *   serving player's speed srvKmhSum / srvKmhN (+ 1st / 2nd) and srvKmhMax.
+ *   Deep wave (badminton, table tennis, squash, padel, pickleball — each only
+ *   on a match that tracked it, racketMatchStats.ts): winners / UE / FE by
+ *   wing and the sport's shots, errors and service faults by type (through
+ *   the detail keys), rally length rl…Pts / rl…Won (table tennis + the
+ *   serve3 / receive4 phases), padel net points netPts / netPtsWon,
+ *   pickleball kitchenPts / kitchenWon and thirdDrop / thirdDropWon ….
  * NOT owned: tennis `doubleFaults` (credited through attribution2) — it stays
  * on increments, so the racket plugins set `statTotalsPartial`. SD-104: a double
  * fault recorded with `payload.df` is marked on its point (`event.df`), so an
@@ -41,7 +53,9 @@ import type { BadmintonState } from './badminton/engine.ts';
 import { type TennisState, setTiebreaks as tennisTiebreaks, standingsUnits as tennisGames } from './tennis/engine.ts';
 import { type PadelState, setTiebreaks as padelTiebreaks, standingsUnits as padelGames } from './padel/engine.ts';
 import { serveStats, serveCareerKeys, type ServeSport } from './serveStats.ts';
-import { detailCoverage, detailKeys, detailPlayerCredits, type DetailSport } from './pointDetail.ts';
+import { detailCoverage, detailKeys, detailPlayerCredits, type DepthSport, type DetailSport } from './pointDetail.ts';
+import { tennisCareerKeys, tennisView } from './tennis/matchStats.ts';
+import { racketCareerKeys, racketView } from './racketMatchStats.ts';
 
 type Side = 'home' | 'away';
 type PerSide = { home: number; away: number };
@@ -211,15 +225,21 @@ export function playerTotals(
 /** SD-22 — add the replayed serve / return keys to every line. The server is
  *  named from ctx's roster order (as the live controls do); singles with no ctx
  *  falls back to the one player credited on the side. */
-function withServe(sport: ServeSport | undefined, s: { events?: LiveEvent[] } | null | undefined, totals: Record<string, StatTotalsEntry>, ctx?: StatTotalsContext): Record<string, StatTotalsEntry> {
-  if (!sport || !s) return totals;
+/** The player ids per side that name the server: ctx's roster order (as the
+ *  live controls do); singles with no ctx falls back to the side's one line. */
+function serverRosters(totals: Record<string, StatTotalsEntry>, ctx?: StatTotalsContext): { home: string[]; away: string[] } {
   const ids = (side: Side) => {
     const fromCtx = (ctx?.players?.[side] ?? []).map((p) => p.id).filter(Boolean);
     if (fromCtx.length) return fromCtx;
     const mine = Object.entries(totals).filter(([, e]) => e.side === side).map(([id]) => id);
     return mine.length === 1 ? mine : [];
   };
-  const st = serveStats(sport, s, { home: ids('home'), away: ids('away') });
+  return { home: ids('home'), away: ids('away') };
+}
+
+function withServe(sport: ServeSport | undefined, s: { events?: LiveEvent[] } | null | undefined, totals: Record<string, StatTotalsEntry>, ctx?: StatTotalsContext): Record<string, StatTotalsEntry> {
+  if (!sport || !s) return totals;
+  const st = serveStats(sport, s, serverRosters(totals, ctx));
   if (!st) return totals;
   const out: Record<string, StatTotalsEntry> = {};
   for (const [id, e] of Object.entries(totals)) out[id] = { ...e, stats: { ...e.stats, ...serveCareerKeys(st, e.side, id) } };
@@ -256,20 +276,45 @@ function withDetail(sport: DetailSport | undefined, s: { events?: LiveEvent[]; p
   return out;
 }
 
+/** SD-157 — tennis' optional net points / rally length / return in play /
+ *  serve speed keys (tennis/matchStats.ts `tennisCareerKeys`), on a match
+ *  that tracked them only. */
+function withTennisExtras(s: TennisState | null | undefined, totals: Record<string, StatTotalsEntry>, ctx?: StatTotalsContext): Record<string, StatTotalsEntry> {
+  if (!s || !Array.isArray(s.events)) return totals;
+  const v = tennisView(s, serverRosters(totals, ctx));
+  if (!v || !(v.cov.net || v.cov.rally || v.cov.detail || v.cov.speed)) return totals;
+  const out: Record<string, StatTotalsEntry> = {};
+  for (const [id, e] of Object.entries(totals)) out[id] = { ...e, stats: { ...e.stats, ...tennisCareerKeys(v, e.side, id) } };
+  return out;
+}
+
+/** Deep wave — the other racket sports' optional rally length (table tennis
+ *  phases), net / kitchen-line and 3rd-shot keys (racketMatchStats.ts
+ *  `racketCareerKeys`), on a match that tracked them only. */
+function withRacketExtras(sport: DepthSport | undefined, s: { events?: LiveEvent[] } | null | undefined, totals: Record<string, StatTotalsEntry>, ctx?: StatTotalsContext): Record<string, StatTotalsEntry> {
+  if (!sport || !s || !Array.isArray(s.events)) return totals;
+  const v = racketView(sport, s, serverRosters(totals, ctx));
+  if (!v || !(v.cov.rally || v.cov.net || v.cov.third)) return totals;
+  const bySide = { home: racketCareerKeys(v, 'home'), away: racketCareerKeys(v, 'away') };
+  const out: Record<string, StatTotalsEntry> = {};
+  for (const [id, e] of Object.entries(totals)) out[id] = { ...e, stats: { ...e.stats, ...bySide[e.side] } };
+  return out;
+}
+
 export const tennisTotals = (s: TennisState, ctx?: StatTotalsContext) =>
-  withDetail('tennis', s, withServe('tennis', s, playerTotals(s?.events, tennisRecord(s), TENNIS_CREDITS, !!s?.doubles, ctx), ctx), ctx);
+  withTennisExtras(s, withDetail('tennis', s, withServe('tennis', s, playerTotals(s?.events, tennisRecord(s), TENNIS_CREDITS, !!s?.doubles, ctx), ctx), ctx), ctx);
 
 export const padelTotals = (s: PadelState, ctx?: StatTotalsContext) =>
-  withDetail('padel', s, withServe('padel', s, playerTotals(s?.events, padelRecord(s), POINT_CREDITS, s?.doubles !== false, ctx), ctx), ctx);
+  withRacketExtras('padel', s, withDetail('padel', s, withServe('padel', s, playerTotals(s?.events, padelRecord(s), POINT_CREDITS, s?.doubles !== false, ctx), ctx), ctx), ctx);
 
 export const badmintonTotals = (s: BadmintonState, ctx?: StatTotalsContext) =>
-  withDetail('badminton', s, withServe('badminton', s, playerTotals(s?.events, gamesRecord(s), POINT_CREDITS, !!s?.doubles, ctx), ctx), ctx);
+  withRacketExtras('badminton', s, withDetail('badminton', s, withServe('badminton', s, playerTotals(s?.events, gamesRecord(s), POINT_CREDITS, !!s?.doubles, ctx), ctx), ctx), ctx);
 
 /** Table tennis, squash, pickleball. A side-out 'rally' event credits nobody.
  *  `sport` names the serve rule (the rally state doesn't know its sport):
  *  without it the SD-22 serve keys are left out (unknown, not 0). */
 export const rallyTotals = (s: RallyState, ctx?: StatTotalsContext, sport?: 'tabletennis' | 'squash' | 'pickleball') =>
-  withDetail(sport, s, withServe(sport, s, playerTotals(s?.events, gamesRecord(s), POINT_CREDITS, !!s?.doubles, ctx), ctx), ctx);
+  withRacketExtras(sport, s, withDetail(sport, s, withServe(sport, s, playerTotals(s?.events, gamesRecord(s), POINT_CREDITS, !!s?.doubles, ctx), ctx), ctx), ctx);
 
 /** The keys each sport's totals own (for docs, schema and tests). */
 export const RACKET_RECORD_KEYS = ['ptsWon', 'ptsLost', 'gamesWon', 'gamesLost', 'decidersPlayed', 'decidersWon'] as const;

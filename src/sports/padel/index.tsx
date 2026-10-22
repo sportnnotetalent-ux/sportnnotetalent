@@ -16,24 +16,22 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { theme } from '../../core/theme';
 import { textStyles } from '../../components/ui';
-import { LiveTimeline } from '../LiveTimeline';
 import { MatchBoxScore } from '../../components/BoxScore';
 import { padelBox } from '../boxSources';
 import { RallyPointEditor } from '../RallyPointEditor';
 import { MatchStatsPanel } from '../MatchStatsPanel';
 import { ServeOrderPicker } from '../ServeOrderPicker';
 import { PointDetailRow } from '../PointDetailRow';
-import { detailLiveSettings } from '../pointDetailSettings';
+import { detailLiveSettings, trackFormatFields } from '../pointDetailSettings';
+import { RacketCommentary } from '../RacketCommentary';
 import { PointButtons, SecondaryAction, ServeFirstPicker } from '../PointButtons';
-import { CueBanner, useCueTimeline } from '../CueBanner';
-import { pointInputs } from '../rallyEdit';
+import { CueBanner } from '../CueBanner';
 import { pointPressure, pressureText } from '../pointStatus';
 import type { Player } from '../../core/types';
 import type { SportPlugin } from '../types';
 import { pointVoice } from '../voiceParsers';
 import { courtFormation, makeCourt } from '../courts';
 import { init, reducer, disp, inTiebreak, matchTbActive, serveInfo, gamesPlayed, summary, scoreLine, lineScore, standingsUnits, padelCue, other, decidingPoint, deuceNo, type PadelState } from './engine';
-import { setSportGameLabels } from '../gameLabels';
 import { padelTotals } from '../racketTotals';
 import { cellText } from '../scoreline';
 import { durationLine, stampDispatch, withDuration } from '../conduct';
@@ -100,7 +98,8 @@ const ScoringControls: SportPlugin<PadelState>['ScoringControls'] = ({ state, di
         <SecondaryAction label={`🎯 Ace · ${by}`} color={serve.side === 'home' ? homeColor : awayColor} onPress={ace} />
         <SecondaryAction label={`⚠️ Double fault · ${by} → point ${receiverSideName}`} onPress={doubleFault} />
       </View>}
-      {/* SD-107 — optional "how was it won?" for the last point */}
+      {/* SD-107 / deep wave — optional detail for the last point: how, forehand /
+          backhand + shot, 2nd serve, net points, rally length */}
       <PointDetailRow sport="padel" state={s} dispatch={dispatch} homeName={homeName} awayName={awayName} homeRoster={homeRoster} awayRoster={awayRoster} />
       {/* SD-21 — edit / delete / insert a past point; the engine replays it (EDIT_LOG). */}
       <RallyPointEditor
@@ -114,12 +113,6 @@ const ScoringControls: SportPlugin<PadelState>['ScoringControls'] = ({ state, di
 
 const LiveExtras: NonNullable<SportPlugin<PadelState>['LiveExtras']> = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster, onPlayer }) => {
   const s = state as PadelState;
-  // SD-117c — change-ends markers on the point log (derived, display only)
-  const cued = useCueTimeline(reducer, s, pointInputs, padelCue);
-  // SD-75 — "Hold · Lions" / "Break · Tigers", sets and match with team names (display only)
-  const timeline = React.useMemo(() => setSportGameLabels(cued, s, { home: homeName, away: awayName }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [cued, s.firstServer, homeName, awayName]);
   return (
     <View style={{ gap: theme.spacing(3) }}>
       <Text style={ctrl.label}>Sets</Text>
@@ -130,14 +123,16 @@ const LiveExtras: NonNullable<SportPlugin<PadelState>['LiveExtras']> = ({ state,
           (lineScore(s)?.done ?? []).map((c, i) => <Text key={i} style={ctrl.setChip}>S{i + 1}: {cellText(c)}</Text>)
         )}
       </View>
-      {/* SD-22: serve / return figures replayed from the point log, per set */}
+      {/* SD-22 / deep wave: key stats, serve, shots, rally length — replayed from the point log, per set */}
       <MatchStatsPanel sport="padel" state={s} homeName={homeName} awayName={awayName} homeRoster={homeRoster} awayRoster={awayRoster} homeColor={homeColor} awayColor={awayColor} />
       {/* SD-54 — match and set durations (from the scorer's tap times) */}
       {durationLine(s.events, 'S') ? <Text style={textStyles.muted}>{durationLine(s.events, 'S')}</Text> : null}
       <Text style={ctrl.label}>Box score</Text>
       <MatchBoxScore sport="padel" source={padelBox(s, { homeRoster, awayRoster })} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} onPlayer={onPlayer} />
-      <Text style={ctrl.label}>Point log</Text>
-      <LiveTimeline events={timeline} homeColor={homeColor} awayColor={awayColor} emptyText="No points yet." homeRoster={homeRoster} awayRoster={awayRoster} onPlayer={onPlayer} />
+      {/* deep wave — commentary by game, newest first (replaces the point log:
+          holds / breaks, golden / star points and the change-ends cues are inline) */}
+      <Text style={ctrl.label}>Commentary</Text>
+      <RacketCommentary sport="padel" icon="🟡" state={s} homeName={homeName} awayName={awayName} homeRoster={homeRoster} awayRoster={awayRoster} homeColor={homeColor} awayColor={awayColor} />
     </View>
   );
 };
@@ -191,7 +186,8 @@ export const padelPlugin: SportPlugin<PadelState> = {
   Scoreboard: PadelScoreboard,
   ScoringControls,
   LiveExtras,
-  // SD-107 — the optional point-detail setting (event mode: from the next point)
+  // SD-107 / deep wave — "Stats to track": point detail, 1st / 2nd serve, net
+  // points, rally length (event mode: from the next point)
   liveSettings: detailLiveSettings('padel'),
   formation: () => courtFormation('padel'),
   Court: makeCourt('padel'),
@@ -247,6 +243,9 @@ export const padelPlugin: SportPlugin<PadelState> = {
         { value: 'match10', label: 'Match tiebreak (to 10)' },
       ],
     },
+    // deep wave — "Stats to track" defaults for every match of this format
+    // (the scorer can still change them per match in ⚙️ Scoring settings)
+    ...trackFormatFields('padel'),
   ],
 };
 

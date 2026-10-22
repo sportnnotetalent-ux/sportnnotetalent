@@ -5,7 +5,7 @@ category: Live scoring
 audience: Scorers, Organisers
 sports: volleyball
 order: 55
-updated: 2026-10-11
+updated: 2026-10-22
 ---
 
 Record each rally once; the app keeps the serve, sets and player stats.
@@ -55,7 +55,13 @@ Open **☰ Quick options** and tap **Sanction** or **Delay**. Pick the team and,
 - **Expulsion** (rest of the set) or **Disqualification** (rest of the match): no point, and the app reminds you to substitute the player.
 
 ## Reading the board and the stats
-"Player stats" and "Team stats" are on the **Score** and **Summary** tabs; tap **Set 1**, **Set 2** … to filter. Columns for serve errors (**SE**) and errors (**ERR**) appear when players were named.
+The **Score** tab has three parts:
+- **Match stats**: team against team, by skill (scoring, attack and block, serve, reception, defence, game flow). Tap **Set 1**, **Set 2** … to filter, or a category to focus. If you recorded the toss and rotation, you also get side-out %, points won on serve, a line for each server and a **rotation analysis** (points won with each player at position I).
+- **Player stats**: a column only appears when the match recorded it, for example serve errors (**SE**), digs (**DIG**) or set assists (**SET**).
+- **Commentary**: every rally as a sentence with the score after it, such as "Point Italy — kill by Asha (set by Bela)". Sets are listed newest first, with set point, "set point saved" and runs marked. Tap **⭐ Key moments** to see only the big ones.
+
+## Stats to track (optional)
+Open **⚙️ Stats to track** to choose extra detail for this match: **Attack attempts** (for efficiency), **Reception quality** (# / + / − and who was aced), **Digs** and **Set assists**. Everything is off by default. Each one you turn on adds an optional prompt under the point buttons from the next rally. If play is too fast, skip it.
 
 ## Sets played
 At the first point the app notes who is on court. **Sets played** counts each set a player was on court or scored in, substitutes and liberos included. Per-set figures divide by it, as the FIVB does.

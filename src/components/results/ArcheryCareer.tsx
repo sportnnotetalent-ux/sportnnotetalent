@@ -45,6 +45,10 @@ export function ArcheryCareer({ lines }: { lines: StatLine[] }) {
         <Text style={st.medals}>{c.golds} 🥇  {c.silvers} 🥈  {c.bronzes} 🥉{c.points ? `  ·  ${c.points} points` : ''}</Text>
       )}
 
+      {/* deep wave: only what was recorded — X per end (rounds that kept their end count), match-play average arrow, shoot-offs */}
+      {c.xPerEnd != null || c.match || c.shootOffs.won + c.shootOffs.lost > 0 ? (
+        <Text style={textStyles.muted}>{[c.xPerEnd != null ? `${c.xPerEnd.toFixed(2)} X per end` : '', c.match ? `average arrow in matches ${c.match.avgArrow.toFixed(2)} (${c.match.arrows} arrows, ${c.match.tens} 10s, ${c.match.xs} X)` : '', c.shootOffs.won + c.shootOffs.lost ? `shoot-offs won ${c.shootOffs.won} of ${c.shootOffs.won + c.shootOffs.lost}` : ''].filter(Boolean).join(' · ')}</Text>
+      ) : null}
       {/* SD-137b: team events (archery / shooting teams, team pursuit / sprint) */}
       {teamCareerText(c.team) ? <Text style={textStyles.muted}>{teamCareerText(c.team)}</Text> : null}
       <Text style={st.section}>Personal bests (ranking round)</Text>
@@ -60,7 +64,7 @@ export function ArcheryCareer({ lines }: { lines: StatLine[] }) {
               <View style={st.bestRow}>
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text style={textStyles.body} numberOfLines={1}>{b.label}</Text>
-                  <Text style={textStyles.muted} numberOfLines={1}>{[`avg arrow ${b.avgArrow.toFixed(2)}`, b.pb.date ? formatDay(b.pb.date) : ''].filter(Boolean).join(' · ')}</Text>
+                  <Text style={textStyles.muted} numberOfLines={1}>{[`avg arrow ${b.avgArrow.toFixed(2)}`, b.bestEnd != null ? `best end ${b.bestEnd}` : '', b.pb.date ? formatDay(b.pb.date) : ''].filter(Boolean).join(' · ')}</Text>
                 </View>
                 <Text style={[st.mark, st.col]}>{b.pb.value || '–'}</Text>
                 <Text style={[st.markSb, st.col]}>{b.sb?.value ?? '–'}</Text>

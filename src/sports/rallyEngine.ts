@@ -46,6 +46,12 @@ export interface RallyState {
   /** SD-107 — optional point detail (how each rally was won) is being
    *  captured; absent / false = off (D8). Format key / SET_DETAIL. */
   pointDetail?: boolean;
+  /** Deep wave — "Rally length" (every rally sport), "Kitchen line"
+   *  (`netDetail`, pickleball) and "3rd shot" (`thirdDetail`, pickleball)
+   *  tracking; absent / false = off (D8). Format key / SET_DETAIL. */
+  rallyDetail?: boolean;
+  netDetail?: boolean;
+  thirdDetail?: boolean;
   /** SD-62 — table tennis doubles: per game, the picked first server /
    *  receiver (player ids, SET_SERVE_ORDER). Absent → roster order. */
   dblOrder?: DoublesOrder;
@@ -198,7 +204,7 @@ export function makeRallyEngine(opts: RallyEngineOpts) {
     // SD-107 — capture setting (from the next point) and a point's detail
     // (annotates the last point; allowed after the match point too).
     if (a.type === 'SET_DETAIL') { const f = detailFlags(a.payload, s); return f ? { ...s, ...f } : s; }
-    if (a.type === 'POINT_DETAIL') { const ev = applyPointDetail(s.events, a.payload); return ev ? { ...s, events: ev } : s; }
+    if (a.type === 'POINT_DETAIL') { const ev = applyPointDetail(s.events, a.payload, opts.id); return ev ? { ...s, events: ev } : s; }
     if (a.type !== 'POINT' || !a.side || s.ended) return s;
     // SD-135 — a point that carries its detail (squash Stroke / No let quick
     // buttons): annotated exactly as a POINT_DETAIL right after it would be
@@ -207,7 +213,7 @@ export function makeRallyEngine(opts: RallyEngineOpts) {
       const { pd, ...rest } = a.payload;
       const next = core(s, { ...a, payload: rest });
       if (next === s) return s;
-      const ev = applyPointDetail(next.events, { pd });
+      const ev = applyPointDetail(next.events, { pd }, opts.id);
       return ev ? { ...next, events: ev } : next;
     }
     const gameNo = s.games.length + 1;

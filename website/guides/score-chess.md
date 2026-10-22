@@ -1,11 +1,11 @@
 ---
 title: How to record a chess game result
-description: Record a chess result the arbiter's way: 1-0, ½-½ or 0-1 with White first, how it ended, and a check before it is saved.
+description: Record a chess result the arbiter's way (1-0, ½-½, 0-1, White first), and optionally the moves, opening and clocks for a move-by-move commentary.
 category: Live scoring
 audience: Scorers, Organisers
 sports: chess
 order: 63
-updated: 2026-10-11
+updated: 2026-10-22
 ---
 
 Chess is scored once per game: who won, or a draw, and how it ended. The app writes the result the way an arbiter does, White first: 1-0 when White wins, ½-½ for a draw and 0-1 when Black wins. Players get 1, ½ or 0 points in the table.
@@ -28,6 +28,22 @@ Chess is scored once per game: who won, or a draw, and how it ended. The app wri
 Once saved, the game closes, the table updates and followers get the result. The scoreboard names who had White, for example "♔ Aarav has White".
 
 A win's method also feeds the player's profile: **Wins by method** (checkmate, resignation, on time, other) and **Unbeaten run** (games in a row without a loss).
+
+## Optional: the moves, the opening and the clocks
+Recording the result is all a game needs. If you want more, a scorer or host can switch on **⚙️ Stats to track** (on the **Info** tab or in **☰ Quick options**), or the organiser can set it for every game in the event's format:
+- **Move list (SAN / PGN)**: a **♟ Moves** box appears on the Scoring tab. Type each move as it is played, for example `Nf3`, or several at once (`e4 e5 Nf3`); coordinates like `g1f3` work too. Every move is checked against the position, so a move that isn't legal is named ("Ke3: not a legal move here") and not kept. **⌫ Last move** takes one back.
+- **Clock after each move**: type the clock reading after the move (`1:23:05` or `4:07`). The app works out the time each move took (with the increment).
+
+During the game you can also tap **📋 Paste a whole game (PGN)…**. After the game, a scorer finds the **♟ Moves** box on the **Score** tab: paste the moves from a DGT board, chess.com or lichess (clocks included) and tap **Save the moves**. The opening is read from the moves, for example "B90 · Sicilian Defense: Najdorf Variation"; tap **Opening (ECO)…** to set it by hand. When you record the result without typing the number of moves, it is filled in from the list.
+
+## The commentary and the game stats
+On the **Score** tab:
+- **🎙 Commentary** tells the game move by move, newest first, for example "23. Nxe5+ — Anand: knight takes the pawn on e5, check", with the material after it, the clock and the time it was entered. The result sits on top. Without a move list it shows the result in words, with the method, the number of moves and the clocks.
+- **📊 Game stats** compares White and Black: moves, captures, material captured, checks, castling, promotions, material on the board, time left, average time per move and the longest think, for the whole game or the **Opening** (first 10 moves), **Middlegame** or **Endgame**.
+
+On a player's profile, **Game record** shows the average game length, checks and material captured per game, castled %, promotions and the average time per move, once a game carries them.
+
+In a team match, the tie page lists the games **board by board**, for example "Board 1: Anand (W) 1-0 Carlsen (B) · Resignation · 41 moves · C60 Ruy Lopez", and each team's score with White and with Black.
 
 ## If the colours were swapped at the board
 The colour is locked so a stray tap can't change the pairing. If the players really did swap, tap **Colours wrong? Change…**, then tap the player who had White. The note "Saved with the result" means nothing changes until you record the result. The 1-0 and 0-1 boxes follow the new colours.

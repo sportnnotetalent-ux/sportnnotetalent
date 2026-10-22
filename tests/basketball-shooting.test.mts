@@ -116,7 +116,8 @@ describe('SD-40 · the FIBA box score', () => {
   const src = basketballBox(s, { homeRoster: HOME, awayRoster: AWAY, homeName: 'Reds', awayName: 'Blues' });
   const t = buildBoxTable(SCHEMA, src.data('all'));
   test('columns: M-A pairs, %, OREB / DREB, EFF (no five set → no MIN / +/-)', () => {
-    assert.deepEqual(t.columns.map((c) => c.abbr), ['PTS', 'FGM-A', 'FG%', '3PM-A', '3P%', 'FTM-A', 'FT%', 'OREB', 'DREB', 'REB', 'AST', 'STL', 'BLK', 'TO', 'PF', 'EFF']);
+    // deep wave: FIBA's 2PM-A / 2P% sit after FG% (full court, misses tracked)
+    assert.deepEqual(t.columns.map((c) => c.abbr), ['PTS', 'FGM-A', 'FG%', '2PM-A', '2P%', '3PM-A', '3P%', 'FTM-A', 'FT%', 'OREB', 'DREB', 'REB', 'AST', 'STL', 'BLK', 'TO', 'PF', 'EFF']);
   });
   test('Arjun: 3-7 FG, 1-3 3P, 2-3 FT, 43% / 33% / 67%', () => {
     assert.equal(cellOf(t, 'home', 'Arjun', 'PTS'), '9');
@@ -178,7 +179,7 @@ describe('SD-40 · the FIBA box score', () => {
 
 const SP: TotalsSport<BasketballState> = {
   name: 'basketball', init, reducer, statTotals: basketballStatTotals, partial: true, config: TRACK,
-  derived: ['minutes', 'plusMinus'], signed: ['plusMinus'],
+  derived: ['minutes', 'plusMinus', 'twosMade', 'twosAtt'], signed: ['plusMinus'], // deep wave: 2PM / 2PA are statTotals-only
 };
 
 describe('SD-40 · basketball statTotals (SD-19 contract)', () => {

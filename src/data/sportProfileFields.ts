@@ -23,6 +23,9 @@ export const SPORT_SIDE_FIELDS: Record<SportId, SideField[]> = {
   cricket: [
     { key: 'bat', label: 'Batting', options: ['Right-handed', 'Left-handed'] },
     { key: 'bowl', label: 'Bowling arm', options: ['Right-arm', 'Left-arm', "Doesn't bowl"] },
+    // Deep wave — pace or spin (with the arm above → RF / RM / OB / LB / LF / LM /
+    // SLA / LWS); rides free on the scorer's bowler pick (batting vs pace / spin)
+    { key: 'bowlType', label: 'Bowling type', options: ['Fast', 'Medium', 'Finger spin', 'Wrist spin'] },
   ],
   // Shooting/dominant hand.
   basketball: [{ key: 'hand', label: 'Dominant hand', options: ['Right', 'Left', 'Both'] }],

@@ -32,7 +32,9 @@ export function describeEvent(e: AFEvent, s?: Pick<AFState, 'field' | 'variant'>
     case 'timeout':
       return { icon: '⏸', label: 'Timeout' };
     case 'tackle':
-      return { icon: '🤚', label: 'Tackle', detail: e.playerName };
+      return { icon: '🤚', label: e.tfl ? 'Tackle for loss' : 'Tackle', detail: e.playerName };
+    case 'pd':
+      return { icon: '🖐', label: 'Pass defended', detail: e.playerName };
     case 'eject':
       return { icon: '🚫', label: 'Ejected', detail: e.playerName };
     case 'possEnd':
@@ -43,8 +45,8 @@ export function describeEvent(e: AFEvent, s?: Pick<AFState, 'field' | 'variant'>
       let detail: string | undefined;
       if (p === 'run' || p === 'kneel') detail = [e.playerName, yds(e.yards)].filter(Boolean).join(' · ');
       else if (p === 'pass') detail = [`${e.playerName ?? '?'} → ${e.secondName ?? '?'}`, yds(e.yards)].join(' · ');
-      else if (p === 'inc') detail = e.playerName;
-      else if (p === 'sack') detail = [e.secondName, yds(e.yards)].filter(Boolean).join(' · ');
+      else if (p === 'inc') detail = [e.playerName, e.tgt && e.secondName ? `for ${e.secondName}` : ''].filter(Boolean).join(' · ') || undefined;
+      else if (p === 'sack') detail = [e.secondName, e.playerName ? `QB ${e.playerName}` : '', yds(e.yards)].filter(Boolean).join(' · ');
       else if (p === 'int') detail = [e.secondName && `by ${e.secondName}`, e.playerName && `thrown by ${e.playerName}`].filter(Boolean).join(' · ');
       else if (p === 'fumble') detail = [e.playerName, e.secondName && `recovered by ${e.secondName}`].filter(Boolean).join(' · ');
       else if (p === 'punt') detail = [e.playerName, yds(e.yards)].filter(Boolean).join(' · ');
@@ -57,7 +59,7 @@ export function describeEvent(e: AFEvent, s?: Pick<AFState, 'field' | 'variant'>
 /** The viewer timeline: scores, misses, timeouts, turnovers and penalties
  *  (ordinary gains stay in the play-by-play list, not here). */
 export function afTimeline(s: AFState): LiveEvent[] {
-  const shown = (e: AFEvent) => e.type !== 'tackle' && e.type !== 'possEnd' && !(e.type === 'play' && !['int', 'fumble', 'downs', 'penalty'].includes(e.play ?? ''));
+  const shown = (e: AFEvent) => e.type !== 'tackle' && e.type !== 'pd' && e.type !== 'possEnd' && !(e.type === 'play' && !['int', 'fumble', 'downs', 'penalty'].includes(e.play ?? ''));
   return s.events.map((e, i) => ({ e, i })).filter(({ e }) => shown(e)).map(({ e, i }) => {
     const d = describeEvent(e, s);
     const name = e.type === 'play' && (e.play === 'int' || e.play === 'fumble') ? e.secondName : e.playerName;
@@ -79,7 +81,7 @@ export function afTimeline(s: AFState): LiveEvent[] {
 
 /** The play-by-play list (newest first) for the live page. */
 export function afPlays(s: AFState, limit = 30): { id: string; when: string; side: Side; text: string }[] {
-  return [...s.events].reverse().filter((e) => e.type !== 'tackle').slice(0, limit).map((e) => {
+  return [...s.events].reverse().filter((e) => e.type !== 'tackle' && e.type !== 'pd').slice(0, limit).map((e) => {
     const d = describeEvent(e, s);
     return { id: e.id, when: eventWhen(s, e), side: e.side, text: `${d.icon} ${d.label}${d.detail ? ` · ${d.detail}` : ''}` };
   });

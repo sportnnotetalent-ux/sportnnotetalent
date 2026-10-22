@@ -28,12 +28,12 @@ const KEYS: Arrow[][] = [['X', 10, 9, 8, 7, 6], [5, 4, 3, 2, 1, 'M']];
 
 /* --------------------------------- keypad --------------------------------- */
 
-function Keypad({ onKey, onBack, disabled }: { onKey: (a: Arrow) => void; onBack: () => void; disabled?: boolean }) {
+function Keypad({ onKey, onBack, disabled, minRing }: { onKey: (a: Arrow) => void; onBack: () => void; disabled?: boolean; /** deep wave: a 6-ring / triple face has no rings below 5 / 6 */ minRing?: number }) {
   return (
     <View style={{ gap: theme.spacing(1.5) }}>
       {KEYS.map((row, i) => (
         <View key={i} style={st.keyRow}>
-          {row.map((a) => (
+          {row.filter((a) => !minRing || typeof a !== 'number' || a >= minRing).map((a) => (
             <TouchableOpacity key={String(a)} accessibilityRole="button" accessibilityLabel={a === 'M' ? 'Miss' : a === 'X' ? 'X, inner ten' : String(a)} disabled={disabled}
               onPress={() => onKey(a)} style={[st.key, a === 'X' || a === 10 ? st.keyGold : a === 'M' ? st.keyMiss : null, disabled && { opacity: 0.4 }]}>
               <Text style={st.keyTxt}>{String(a)}</Text>
@@ -104,7 +104,7 @@ export function EndCard({ entries, round, editable, onSave }: { entries: ResultE
   };
   const submitTyped = () => {
     if (!typed.trim()) return;
-    const p = parseEnd(typed, round.perEnd);
+    const p = parseEnd(typed, round.perEnd, round.minRing);
     if ('error' in p) { setErr(p.error); return; }
     commit(p.arrows);
   };
@@ -149,7 +149,7 @@ export function EndCard({ entries, round, editable, onSave }: { entries: ResultE
           {blocked ? <Text style={st.bad}>End {(up.result.ends?.length ?? 0) + 1} first.</Text> : (
             <>
               <ArrowBoxes arrows={buf} n={round.perEnd} active />
-              <Keypad onKey={key} onBack={() => setBuf(buf.slice(0, -1))} />
+              <Keypad onKey={key} onBack={() => setBuf(buf.slice(0, -1))} minRing={round.minRing} />
               <View style={st.headRow}>
                 <TextInput style={[st.input, { flex: 1 }, !!err && st.inputBad]} value={typed} onChangeText={setTyped} placeholder={round.perEnd === 6 ? 'or type: X 10 9 9 8 7 = 53' : 'or type: X 10 9 = 29'}
                   placeholderTextColor={theme.colors.textMuted} autoCapitalize="characters" accessibilityLabel={`Type end ${cur + 1} of ${up.name}`} onSubmitEditing={submitTyped} />
@@ -214,7 +214,7 @@ export function BracketCard({ entries, round, fmt, editable, onSave, rules, disc
         </View>
       ))}
       {sel && sel.known && !sel.bye && sel.a && sel.b ? (
-        <MatchScorer key={`${sel.key}:${sel.slot}:${sel.a}:${sel.b}`} m={sel} rounds={state.rounds} entries={entries} fmt={fmt} editable={editable} onSave={onSave} match={match} spec={spec} />
+        <MatchScorer key={`${sel.key}:${sel.slot}:${sel.a}:${sel.b}`} m={sel} rounds={state.rounds} entries={entries} fmt={fmt} editable={editable} onSave={onSave} match={match} spec={spec} minRing={round.minRing} />
       ) : null}
     </Card>
   );
@@ -229,7 +229,7 @@ export function matchRuleText(fmt: ArchMatchFormat, spec: MatchSpec): string {
     : `Cumulative: ${spec.ends} ends of ${spec.arrows} arrows${per}, the higher total wins. Level: ${so}.`;
 }
 
-function MatchScorer({ m, rounds, entries, fmt, editable, onSave, match, spec }: { m: BMatch; rounds: number; entries: ResultEntry[]; fmt: ArchMatchFormat; editable: boolean; onSave: Save; match?: ReturnType<typeof archMatch>; spec: MatchSpec }) {
+function MatchScorer({ m, rounds, entries, fmt, editable, onSave, match, spec, minRing }: { m: BMatch; rounds: number; entries: ResultEntry[]; fmt: ArchMatchFormat; editable: boolean; onSave: Save; match?: ReturnType<typeof archMatch>; spec: MatchSpec; minRing?: number }) {
   const MATCH_ARROWS = spec.arrows, MATCH_ENDS = spec.ends, SO = spec.so;
   const ea = entries.find((e) => e.id === m.a)!, eb = entries.find((e) => e.id === m.b)!;
   const A = ea.result.mp?.[m.key], B = eb.result.mp?.[m.key];
@@ -361,7 +361,7 @@ function MatchScorer({ m, rounds, entries, fmt, editable, onSave, match, spec }:
               <ArrowBoxes arrows={s === 'a' ? bufA : bufB} n={per} active={side === s} />
             </TouchableOpacity>
           ))}
-          <Keypad onKey={key} onBack={back} />
+          <Keypad onKey={key} onBack={back} minRing={minRing} />
           {idx != null
             ? <Button label={busy ? 'Saving…' : `Save end ${idx + 1}${bufA.length === MATCH_ARROWS && bufB.length === MATCH_ARROWS ? ` (${endSum(bufA)}–${endSum(bufB)})` : ''}`} onPress={() => void saveEnd()} disabled={busy} />
             : <Button label={busy ? 'Saving…' : 'Save shoot-off arrows'} onPress={() => void saveSo()} disabled={busy} />}

@@ -3,16 +3,20 @@
  * Raid and tackle points are attributed to players and logged to the timeline
  * with the match minute.
  */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { theme } from '../../core/theme';
 import { Button, SelectChip, TextField, textStyles } from '../../components/ui';
 import { askConfirm, confirmMatchAction } from '../../components/ConfirmSheet';
 import { FieldBanner } from '../FieldBanner';
-import { LiveTimeline } from '../LiveTimeline';
 import { MatchBoxScore } from '../../components/BoxScore';
-import { kabaddiBox } from '../boxSources';
 import type { LiveEvent } from '../liveEvents';
+// deep wave — PKL match centre, the deep player box, raid-by-raid commentary, Stats to track
+import { KabaddiStatsPanel } from './StatsPanel';
+import { kabaddiDeepBox, KABADDI_DEEP_BOX } from './deepBox';
+import { kabaddiCommentary } from './commentary';
+import { FeedView } from '../netraid/FeedView';
+import { KABADDI_LIVE_SETTINGS } from './settings';
 import type { Player } from '../../core/types';
 import type { ScoreAction, SportPlugin } from '../types';
 import { kabaddiVoice } from '../voiceParsers';
@@ -25,7 +29,7 @@ import { kabaddiTotals, kabaddiSuspended } from './totals.ts';
 import {
   init, reducer, currentMinute, halfLabel, previewRaid, raidOfEvent, raidReversals, raidActions, isRaidHead, kabaddiWinner, halfPoints, defendersOnMat,
   expectedRaider, outPlayers, clockPaused, timeoutsUsed, TIMEOUTS_PER_HALF, TACKLE_TYPES,
-  formOutcome, matNow, kabaddiCfg, touchChips, unavailable, cardsOf, suggestedCard, TECH_REASONS, CARD_ICON,
+  formOutcome, matNow, kabaddiCfg, touchChips, unavailable, cardsOf, suggestedCard, TECH_REASONS, CARD_ICON, RAID_SKILLS,
   type KabaddiState, type KabaddiEvent, type CardColour,
 } from './engine.ts';
 
@@ -83,6 +87,8 @@ const ScoringControls: SportPlugin<KabaddiState>['ScoringControls'] = ({ state, 
     editOf?: number; at?: { minute: number; half: number }; tackleType?: string;
     /** SD-59: line-outs */
     defOut?: number; lineOut?: boolean;
+    /** deep wave ("Stats to track"): raid skill, defenders touched */
+    skill?: string; touched?: Player[];
   } | null>(null);
   // SD-59: a technical point (to `side`); SD-72: a card (to a player of `side`)
   const [tech, setTech] = useState<{ side?: 'home' | 'away'; reason?: string; by?: Player } | null>(null);
@@ -140,6 +146,8 @@ const ScoringControls: SportPlugin<KabaddiState>['ScoringControls'] = ({ state, 
         raider: byId(raid.raiderId, raid.raider), tackler: raid.raiderOut ? byId(raid.tacklerId, raid.tackler) : undefined,
         tackleType: raid.raiderOut ? raid.tt : undefined,
         ...(raid.defOut ? { defOut: raid.defOut } : null), ...(raid.lineOut ? { lineOut: true } : null),
+        ...(raid.sk ? { skill: raid.sk } : null),
+        ...(raid.touched?.length ? { touched: raid.touched.map((p) => byId(p.id, p.name)).filter((p): p is Player => !!p) } : null),
         editOf: raid.eid, at: { minute: raid.minute ?? 0, half: raid.half ?? state.half },
       });
       return;
@@ -384,6 +392,26 @@ const ScoringControls: SportPlugin<KabaddiState>['ScoringControls'] = ({ state, 
                 {noTouches
                   ? <Text style={ctrl.meta}>{raidFlow.lineOut ? 'Raider stepped out — his touches don’t count.' : 'Raider caught — touches don’t score and the touched defenders stay in (a bonus still counts).'}</Text>
                   : raidFlow.touches > onMat && <Text style={ctrl.doOrDie}>Only {onMat} defender{onMat === 1 ? '' : 's'} on the mat — this raid counts {onMat} touch{onMat === 1 ? '' : 'es'}.</Text>}
+                {/* deep wave — "Defenders touched" (Stats to track): who goes out, by name */}
+                {state.track?.touched && !noTouches && raidFlow.touches > 0 && (() => {
+                  const defSide = raidFlow.side === 'home' ? 'away' : 'home';
+                  const picked = raidFlow.touched ?? [];
+                  const defenders = onField(defSide, rosterFor(defSide)).filter((p) => raidFlow.editOf != null || (!outNow[defSide].includes(p.fullName) && !unavName(defSide, p.fullName)));
+                  if (!defenders.length) return null;
+                  const max = Math.min(raidFlow.touches, onMat);
+                  return (
+                    <>
+                      <Text style={ctrl.meta}>Who was touched? (optional · {picked.length}/{max})</Text>
+                      <View style={ctrl.chips}>
+                        {defenders.map((p) => {
+                          const on = picked.some((x) => x.id === p.id);
+                          return <SelectChip key={p.id} label={p.fullName} active={on} disabled={!on && picked.length >= max}
+                            onPress={() => setRaidFlow({ ...raidFlow, touched: on ? picked.filter((x) => x.id !== p.id) : [...picked, p] })} />;
+                        })}
+                      </View>
+                    </>
+                  );
+                })()}
                 <Text style={ctrl.meta}>Line-out: defenders who stepped out (no struggle) — out, +1 each to the raiders</Text>
                 <View style={ctrl.chips}>
                   {[0, 1, 2].map((n) => (
@@ -400,6 +428,18 @@ const ScoringControls: SportPlugin<KabaddiState>['ScoringControls'] = ({ state, 
             {/* SD-59: the raider stepped out of bounds — out, +1 to the defence, no tackle */}
             <SelectChip label={`Raider stepped out: ${raidFlow.lineOut ? 'Yes' : 'No'}`} active={!!raidFlow.lineOut} onPress={() => setRaidFlow({ ...raidFlow, lineOut: !raidFlow.lineOut || undefined, ...(!raidFlow.lineOut ? { tackled: false, tackler: undefined, tackleType: undefined } : null) })} />
           </View>
+          {/* deep wave — "Raid skill" (Stats to track): how the points were scored */}
+          {state.track?.skills && !raidFlow.lineOut && (
+            <>
+              <Text style={ctrl.meta}>Raid skill (optional{raidFlow.touches > 0 || raidFlow.bonus ? '' : ' — Escape for an empty raid that broke a tackle'})</Text>
+              <View style={ctrl.chips}>
+                {RAID_SKILLS.map((k) => (
+                  <SelectChip key={k.key} label={k.label} active={raidFlow.skill === k.key}
+                    onPress={() => setRaidFlow({ ...raidFlow, skill: raidFlow.skill === k.key ? undefined : k.key })} />
+                ))}
+              </View>
+            </>
+          )}
           {/* Who made the tackle? Credits the defender their tackle (or super-tackle) point. */}
           {raidFlow.tackled && (() => {
             const defSide = raidFlow.side === 'home' ? 'away' : 'home';
@@ -685,14 +725,19 @@ const LiveClock: NonNullable<SportPlugin<KabaddiState>['LiveClock']> = ({ state 
   );
 };
 
+/** Deep wave — the Score tab: the raid-by-raid commentary (replaces the flat
+ *  timeline; grouped by half, running score, tags), the PKL match centre
+ *  (categories + half filter + top performers — replaces the box score's
+ *  comparison rows) and the player box at PKL depth. */
 const LiveExtras: NonNullable<SportPlugin<KabaddiState>['LiveExtras']> = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster, onPlayer }) => {
   const s = state as KabaddiState;
+  const feed = useMemo(() => kabaddiCommentary(s, { home: homeName, away: awayName }), [s, homeName, awayName]);
   return (
     <View style={{ gap: theme.spacing(3) }}>
-      <Text style={ctrl.label}>Timeline</Text>
-      <LiveTimeline events={s.events} homeColor={homeColor} awayColor={awayColor} emptyText="No raids yet." homeRoster={homeRoster} awayRoster={awayRoster} onPlayer={onPlayer} />
+      <FeedView groups={feed} homeColor={homeColor} awayColor={awayColor} emptyText="No raids yet." title="Commentary · raid by raid" />
+      <KabaddiStatsPanel state={s} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} />
       <Text style={ctrl.label}>Player stats</Text>
-      <MatchBoxScore sport="kabaddi" source={kabaddiBox(s, { homeRoster, awayRoster })} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} onPlayer={onPlayer} />
+      <MatchBoxScore sport="kabaddi" schema={KABADDI_DEEP_BOX} show="box" source={kabaddiDeepBox(s, { homeRoster, awayRoster })} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} onPlayer={onPlayer} />
     </View>
   );
 };
@@ -758,6 +803,8 @@ export const kabaddiPlugin: SportPlugin<KabaddiState> = {
   ScoringControls,
   LiveClock,
   LiveExtras,
+  // deep wave — "Stats to track": raid skill, defenders touched (both off by default)
+  liveSettings: KABADDI_LIVE_SETTINGS,
   formation: () => courtFormation('kabaddi'),
   Court: makeCourt('kabaddi'),
   voice: { hints: ['raid {name}', 'tackle {name}', 'raid away'], parse: kabaddiVoice },
@@ -808,6 +855,9 @@ export const kabaddiPlugin: SportPlugin<KabaddiState> = {
     { key: 'subReturn', label: 'Substituted players may return', type: 'toggle', default: true, advanced: true },
     { key: 'halfMinutes', label: 'Minutes per half', type: 'number', default: 20, min: 5, max: 30 },
     { key: 'extraTimeMinutes', label: 'Extra-time half (min)', type: 'number', default: 5, min: 1, max: 15, advanced: true, hint: 'used only for the “extra time” decider' },
+    // deep wave — "Stats to track" defaults for every match of this format
+    // (the scorer can still change them per match in ⚙️ Stats to track)
+    ...KABADDI_LIVE_SETTINGS.fields.map((f) => ({ ...f, advanced: true })),
   ],
 };
 

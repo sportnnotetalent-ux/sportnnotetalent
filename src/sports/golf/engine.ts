@@ -170,7 +170,40 @@ export interface GolfCard {
    *  start, with a reason (the status column holds wd / dq; a DNS is stored as
    *  `wd` + `admin.status: 'dns'` — no migration). Absent = playing as normal. */
   admin?: EntryAdmin;
+  /** Deep wave — the stats this card was kept with ("Stats to track"). When
+   *  present it decides, stat by stat, which keys the round's line gets (a
+   *  card kept with putts only gets no fairway keys); absent = the SD-45 rule
+   *  (either stats-row array = every stats-row key). */
+  track?: GolfTrackKey[];
+  /** Deep wave — the first putt's length, as a bucket index into
+   *  `PUTT_BUCKETS` (null = not recorded) — tracked with 'firstPutt' */
+  firstPutt?: (number | null)[];
+  /** Deep wave — the measured drive on a par 4 / 5, in yards (null = not
+   *  measured) — tracked with 'drive' */
+  drive?: (number | null)[];
+  /** Deep wave — when each hole's score was entered (ms, the marker's clock)
+   *  — the commentary's time. Absent on older cards. */
+  holeAt?: (number | null)[];
 }
+
+/** Deep wave — the optional stats a marker can keep per hole. */
+export type GolfTrackKey = 'putts' | 'fairway' | 'bunker' | 'penalties' | 'firstPutt' | 'drive';
+export const GOLF_TRACK_KEYS: GolfTrackKey[] = ['putts', 'fairway', 'bunker', 'penalties', 'firstPutt', 'drive'];
+
+/** Deep wave — first-putt length buckets, in feet (the PGA TOUR's putting
+ *  splits: inside 3 ft, 3–10 ft, 10–20 ft, over 20 ft). Index = the card value. */
+export const PUTT_BUCKETS = [
+  { label: '< 3 ft', long: 'inside 3 ft', key: 'fpUnder3' },
+  { label: '3–10 ft', long: '3–10 ft', key: 'fp3to10' },
+  { label: '10–20 ft', long: '10–20 ft', key: 'fp10to20' },
+  { label: '20 ft+', long: 'over 20 ft', key: 'fpOver20' },
+] as const;
+
+/** Deep wave — a sensible drive in yards (50–450), else null. */
+export const driveYards = (v: unknown): number | null => {
+  const n = Math.round(Number(v));
+  return Number.isFinite(n) && n >= 50 && n <= 450 ? n : null;
+};
 
 /** SD-45 — a par-4 / par-5 tee shot: missed left, hit, missed right. */
 export type FairwayDir = 'L' | 'hit' | 'R';
@@ -537,11 +570,28 @@ export function roundStats(card: GolfCard, holes: Hole[], received: number[]): R
     eagles: 0, birdies: 0, pars: 0, bogeys: 0, doubles: 0,
     putts: 0, puttHoles: 0, girHit: 0, girHoles: 0, firHit: 0, firHoles: 0, penalties: 0,
   };
-  // SD-45 — stats-mode cards add their keys (absent on older lines = not tracked)
-  const detail = cardHasDetail(card);
-  if (detail) Object.assign(out, { firLeft: 0, firRight: 0, scrambles: 0, scrambleHoles: 0, sandSaves: 0, sandHoles: 0, puttsGir: 0, girPutted: 0 });
+  // SD-45 — stats-mode cards add their keys (absent on older lines = not tracked).
+  // Deep wave — a card kept with "Stats to track" (`card.track`) gets them stat
+  // by stat; an SD-45 card (no `track`) keeps the old all-together rule.
+  const tr = Array.isArray(card.track) ? card.track : null;
+  const legacy = !tr && cardHasDetail(card);
+  const on = (k: GolfTrackKey) => legacy || !!tr?.includes(k);
+  const fairOn = on('fairway'), puttOn = on('putts'), sandOn = on('bunker');
+  if (fairOn) Object.assign(out, { firLeft: 0, firRight: 0 });
+  if (puttOn) Object.assign(out, { scrambles: 0, scrambleHoles: 0, puttsGir: 0, girPutted: 0 });
+  if (sandOn) Object.assign(out, { sandSaves: 0, sandHoles: 0 });
+  // Deep wave — free figures from the strokes alone (every round from now on):
+  // aces and albatrosses (inside "Eagles+"), par-3 / 4 / 5 scoring, bounce back
+  Object.assign(out, { holesInOne: 0, albatrosses: 0, p3Holes: 0, p3Strokes: 0, p4Holes: 0, p4Strokes: 0, p5Holes: 0, p5Strokes: 0, bounceOps: 0, bounceBacks: 0 });
   // An 18-hole-equivalent stroke total, only for complete rounds with no pickup.
   if (s.complete && !s.noReturn) { out.toPar = s.toPar; out.completeRounds = 1; out.completeStrokes = s.gross * (18 / holes.length); }
+  // Deep wave — front / back nine (Out / In) on a complete 18-hole round
+  if (s.complete && !s.noReturn && holes.length === 18) {
+    const nine = (from: number) => card.strokes.slice(from, from + 9).reduce<number>((t, x) => t + (typeof x === 'number' ? x : 0), 0);
+    Object.assign(out, { outStrokes: nine(0), inStrokes: nine(9) });
+  }
+  const fpOn = on('firstPutt') && Array.isArray(card.firstPutt);
+  if (fpOn) for (const b of PUTT_BUCKETS) { out[b.key] = 0; out[`${b.key}Made`] = 0; }
   holes.forEach((h, i) => {
     const st = card.strokes[i];
     if (typeof st === 'number') {
@@ -551,23 +601,52 @@ export function roundStats(card: GolfCard, holes: Hole[], received: number[]): R
       else if (d === 0) out.pars += 1;
       else if (d === 1) out.bogeys += 1;
       else out.doubles += 1;
+      if (st === 1) out.holesInOne += 1;
+      if (d === -3) out.albatrosses += 1;
+      if (h.par >= 3 && h.par <= 5) { out[`p${h.par}Holes`] += 1; out[`p${h.par}Strokes`] += st; }
+      // bounce back (PGA TOUR): over par on a hole, under par on the next
+      const prev = i > 0 ? card.strokes[i - 1] : null;
+      if (typeof prev === 'number' && prev > holes[i - 1].par) { out.bounceOps += 1; if (d < 0) out.bounceBacks += 1; }
     }
     const p = card.putts?.[i];
     if (typeof p === 'number') { out.putts += p; out.puttHoles += 1; }
-    const g = card.gir?.[i] ?? (detail ? derivedGir(st, p, h.par) : null);
+    const g = card.gir?.[i] ?? (puttOn ? derivedGir(st, p, h.par) : null);
     if (g != null) { out.girHoles += 1; if (g) out.girHit += 1; }
     const dir = card.firDir?.[i] ?? null;
     const f = card.fir?.[i] ?? (dir ? dir === 'hit' : null);
     if (f != null && h.par >= 4) { out.firHoles += 1; if (f) out.firHit += 1; }
     const pen = card.penalties?.[i];
     if (typeof pen === 'number') out.penalties += pen;
-    if (!detail || typeof st !== 'number') return;
+    if (typeof st !== 'number') return;
+    // Deep wave — putting splits (whenever putts were entered on the hole)
+    if (typeof p === 'number') {
+      out.onePutts = (out.onePutts ?? 0) + (p === 1 ? 1 : 0);
+      out.threePutts = (out.threePutts ?? 0) + (p >= 3 ? 1 : 0);
+      const fb = fpOn ? card.firstPutt?.[i] : null;
+      if (typeof fb === 'number' && PUTT_BUCKETS[fb] && p >= 1) {
+        out[PUTT_BUCKETS[fb].key] += 1;
+        if (p === 1) out[`${PUTT_BUCKETS[fb].key}Made`] += 1;
+      }
+    }
+    // birdie conversion: birdie or better on a green hit in regulation
+    if (g != null) out.girBirdies = (out.girBirdies ?? 0) + (g && st < h.par ? 1 : 0);
+    // Deep wave — the measured drive (par 4 / 5)
+    const yd = on('drive') ? driveYards(card.drive?.[i]) : null;
+    if (yd != null && h.par >= 4) {
+      out.drives = (out.drives ?? 0) + 1;
+      out.driveYds = (out.driveYds ?? 0) + yd;
+      out.longDrive = Math.max(out.longDrive ?? 0, yd);
+    }
     // SD-45 — derived from the stats row (keyed: only stats-mode cards carry them)
-    if (dir === 'L' && h.par >= 4) out.firLeft += 1;
-    if (dir === 'R' && h.par >= 4) out.firRight += 1;
-    if (g === false) { out.scrambleHoles += 1; if (st <= h.par) out.scrambles += 1; }
-    if (g === true && typeof p === 'number') { out.girPutted += 1; out.puttsGir += p; }
-    if (card.bunker?.[i] === true) {
+    if (fairOn) {
+      if (dir === 'L' && h.par >= 4) out.firLeft += 1;
+      if (dir === 'R' && h.par >= 4) out.firRight += 1;
+    }
+    if (puttOn) {
+      if (g === false) { out.scrambleHoles += 1; if (st <= h.par) out.scrambles += 1; }
+      if (g === true && typeof p === 'number') { out.girPutted += 1; out.puttsGir += p; }
+    }
+    if (sandOn && card.bunker?.[i] === true) {
       out.sandHoles += 1;
       // up and down from the greenside bunker: out + at most one putt (without
       // putts entered: par or better)

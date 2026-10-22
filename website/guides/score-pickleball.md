@@ -5,7 +5,7 @@ category: Live scoring
 audience: Scorers, Organisers
 sports: pickleball
 order: 56
-updated: 2026-10-11
+updated: 2026-10-22
 ---
 
 In side-out pickleball only the serving team scores. You tap who won each rally; the app works out the call, such as 4-2-1, and names the server.
@@ -36,23 +36,44 @@ The call is serving score, receiving score, server number, e.g. "Serving: Asha R
 - Rally doubles: one server per turn. A team that wins a rally on its own serve swaps sides and the same player serves again. A team that wins the serve back doesn't swap; whoever stands on the right (even score) or left (odd score) serves. The serving line names them, e.g. "Serving: Bina Shah (left) · 3-2".
 
 ## Change ends
-A banner shows **↔ Change ends** after each game, and in the last game when a team first reaches 6 (games to 11), 8 (to 15) or 11 (to 21). The same marks appear in the rally log. Up to 2 minutes are allowed between games.
+A banner shows **↔ Change ends** after each game, and in the last game when a team first reaches 6 (games to 11), 8 (to 15) or 11 (to 21). The same marks appear in the commentary. Up to 2 minutes are allowed between games.
 
 ## Reading the board
 A chip under the board shows **GAME POINT** or **MATCH POINT** with the team's name. In side-out scoring only the serving team can have one; in rally scoring both can show one at once.
 
 ## Match stats
-The **Score** tab shows "Match stats" (side-outs, points on serve and receive, streaks, game points saved; doubles adds points won by server) and a "Box score" of each player's points.
+The **Score** tab's "Match stats" (per match or game) has tabs:
+- **Key stats**: Serve (side-out scoring: rallies won on serve, side-out %, side-outs won, service turns, points per service turn, serve to 2nd server; rally scoring: points won on serve and receive; service faults when described), Winners & errors, Points won (kitchen-line rallies won, total, streaks, biggest lead) and game / match points converted and saved.
+- **Serve**: every serve and receive figure; doubles adds points won by server.
+- **Shots** (with point detail): winners, unforced or forced errors by shot, for either wing or **Forehand** / **Backhand** only; a stroke summary; errors and service faults by type.
+- **Rally length** (with rally length tracked): rallies won after 0–4, 5–8 and 9+ shots, and on serve / on receive.
+- **3rd shot** (with 3rd shot tracked): how often each team played a **drop**, **drive** or **lob** as its 3rd shot, and the rallies it won after each.
 
-## Point detail (optional)
-Off by default. Turn it on with **On** in the "🔎 Point detail (optional)" row under the buttons.
+A tab or row only shows when the match tracked it. The "Box score" lists each player's points.
 
-After each rally, "How was it won? · Asha Rao" appears, even for a side-out rally. Tap a chip or **Skip**; nothing is required.
-- **Winner** + **Drive**, **Dink**, **Volley**, **Overhead**, **Erne**, **ATP**, **Lob**.
-- **Forced error**, or **Unforced error** + **Net**, **Out**.
-- **Service fault** (receiver won).
+## Extra stats (optional)
+Scoring stays one tap per rally. To track more, open **⚙️ Scoring settings** and pick under **Stats to track**, or tap **Choose** next to "📊 Extra stats" under the point buttons. All are off by default; an organiser can switch them on for every match of a format under **⚙ Customize this format**. A change during play counts from the next rally.
+- **Point detail**: how the rally ended.
+- **Kitchen line**: which team(s) got to the kitchen (non-volley zone) line.
+- **Rally length**: 0–4, 5–8 or 9+ shots.
+- **3rd shot**: the serving team's 3rd shot.
+
+After each rally a "Last point" card appears, even for a side-out rally. Tap what you know, or **Skip**:
+1. **Winner**, **Forced error**, **Unforced error** or **Service fault** (receiver won).
+2. **Forehand** or **Backhand**.
+3. The shot: **Return**, **Drive**, **Drop**, **Dink**, **Volley**, **Reset**, **Lob**, **Overhead**, **Erne**, **ATP**.
+4. For an unforced error, **Error:** **Net**, **Out**, **Kitchen** or **Foot fault**; for a service fault, **Fault:** the same four.
+5. With the other options on: **At the kitchen line** (tap one or both teams), the **Rally** length and the **3rd shot** (**Drop**, **Drive** or **Lob**).
 
 Errors count against the opponent (doubles: pick who under **By:**).
+
+## Commentary
+Under the stats, "Commentary" tells the match game by game, newest first, the game in play on top:
+- "Red House wins game 1" with the game score, e.g. **11-7**, and where the match stands.
+- Each rally: "Point to Red House" (side-out scoring: "Rally to Blue House" when it only won the serve), the match time and, if you described it, a line like "Asha Rao loses the point with a Forehand Dink Unforced Error (kitchen fault)". On the right, the call after the rally, server first: **4-2-1** in side-out doubles, else **4-2**; "Second server" or "Side out · Blue House to serve" when the serve moves.
+- The kitchen line, rally length and 3rd shot you marked; change ends, timeouts and fouls; who served first.
+
+It updates after every rally and after a correction.
 
 ## Games and the end of the match
 - A game ends at the target (11, 15 or 21) with a two-point lead, unless the format is win by 1.

@@ -61,6 +61,57 @@ export const NO_AB: Outcome[] = ['BB', 'IBB', 'HBP', 'SF', 'SH'];
 /** the outcomes where the batter is put out at the plate / before 1B */
 export const BATTER_OUT: Outcome[] = ['K', 'GO', 'FO', 'LO', 'SF', 'SH', 'DP'];
 
+/* -------------------- deep wave: optional "Stats to track" ------------------- */
+
+/** Pitch types (WBSC / MLB Statcast families). Baseball: four-seam fastball,
+ *  sinker, cutter, slider, curveball, changeup, splitter, knuckleball.
+ *  Softball (fast pitch): rise, drop, curve, change-up, screw. The scorer
+ *  picks one before a pitch; it rides on that one pitch (`ptype`). */
+export const BASEBALL_PITCH_TYPES = ['FB', 'SI', 'CT', 'SL', 'CB', 'CH', 'SPL', 'KN'] as const;
+export const SOFTBALL_PITCH_TYPES = ['RISE', 'DROP', 'CURVE', 'CH', 'SCREW'] as const;
+export type PitchType = (typeof BASEBALL_PITCH_TYPES)[number] | (typeof SOFTBALL_PITCH_TYPES)[number];
+export const PITCH_TYPE_LABEL: Record<PitchType, string> = {
+  FB: 'Fastball', SI: 'Sinker', CT: 'Cutter', SL: 'Slider', CB: 'Curveball', CH: 'Changeup', SPL: 'Splitter', KN: 'Knuckleball',
+  RISE: 'Rise ball', DROP: 'Drop ball', CURVE: 'Curve', SCREW: 'Screwball',
+};
+/** the chip text (softball's read as words) */
+export const PITCH_TYPE_CHIP: Record<PitchType, string> = {
+  FB: 'FB', SI: 'SI', CT: 'CT', SL: 'SL', CB: 'CB', CH: 'CH', SPL: 'SPL', KN: 'KN',
+  RISE: 'Rise', DROP: 'Drop', CURVE: 'Curve', SCREW: 'Screw',
+};
+const ALL_PITCH_TYPES = new Set<string>([...BASEBALL_PITCH_TYPES, ...SOFTBALL_PITCH_TYPES]);
+export const isPitchType = (v: unknown): v is PitchType => typeof v === 'string' && ALL_PITCH_TYPES.has(v);
+/** the chip row for the format (fast / slow pitch softball → softball's) */
+export const pitchTypesFor = (cfg: Pick<BaseballConfig, 'preset'>): readonly PitchType[] =>
+  (cfg.preset === 'softball' || cfg.preset === 'slowpitch' ? SOFTBALL_PITCH_TYPES : BASEBALL_PITCH_TYPES);
+
+/** Where a ball in play went (the spray chart zones): the outfield (left,
+ *  left-centre, centre, right-centre, right) and the infield positions. */
+export const ZONES = ['LF', 'LC', 'CF', 'RC', 'RF', '3B', 'SS', '2B', '1B', 'P', 'C'] as const;
+export type Zone = (typeof ZONES)[number];
+export const isZone = (v: unknown): v is Zone => typeof v === 'string' && (ZONES as readonly string[]).includes(v);
+export const ZONE_LABEL: Record<Zone, string> = {
+  LF: 'Left field', LC: 'Left-centre', CF: 'Centre field', RC: 'Right-centre', RF: 'Right field',
+  '3B': 'Third base', SS: 'Shortstop', '2B': 'Second base', '1B': 'First base', P: 'Pitcher', C: 'Catcher',
+};
+/** the outcomes where the ball was put in play (a zone can be recorded) */
+export const IN_PLAY: Outcome[] = ['1B', '2B', '3B', 'HR', 'GO', 'FO', 'LO', 'SF', 'SH', 'FC', 'E', 'DP'];
+/** scorer's position number → its zone (1 P … 9 RF; 10, the slow-pitch extra fielder, plays short centre) */
+const POS_ZONE: Record<number, Zone> = { 1: 'P', 2: 'C', 3: '1B', 4: '2B', 5: '3B', 6: 'SS', 7: 'LF', 8: 'CF', 9: 'RF', 10: 'CF' };
+/** The zone the scorer's notation implies: the first fielder to touch the
+ *  ball ("6-3" → SS, "F8" / "8" → CF, "E5" → 3B). */
+export function zoneOfNotation(f?: string): Zone | undefined {
+  const m = f ? /(\d{1,2})/.exec(f) : null;
+  return m ? POS_ZONE[Number(m[1])] : undefined;
+}
+/** A play's zone: the scorer's tap, else the fielders' notation. */
+export const zoneOf = (e: Pick<BaseballEvent, 'zone' | 'fielders' | 'outcome'>): Zone | undefined =>
+  (e.outcome && !IN_PLAY.includes(e.outcome) ? undefined : e.zone ?? zoneOfNotation(e.fielders));
+
+/** The "Stats to track" toggles (live settings + the match format, off by default). */
+export type TrackFlag = 'pitchTypes' | 'sprayZones';
+export const TRACK_FLAGS: TrackFlag[] = ['pitchTypes', 'sprayZones'];
+
 export const OUTCOME_LABEL: Record<Outcome, string> = {
   '1B': 'Single', '2B': 'Double', '3B': 'Triple', HR: 'Home run',
   BB: 'Walk', IBB: 'Intentional walk', HBP: 'Hit by pitch', K: 'Strikeout',
@@ -102,6 +153,10 @@ export interface BaseballEvent {
   earned?: boolean;
   /** eject: a team official instead of a player */
   official?: string;
+  /** deep wave (optional): the type of this event's pitch (a PITCH, or a
+   *  plate appearance's final pitch) and where a ball in play went */
+  ptype?: PitchType;
+  zone?: Zone;
 }
 
 /* --------------------------------- format ---------------------------------- */
@@ -132,6 +187,9 @@ export interface BaseballConfig {
   askFielders: boolean;
   /** which preset (for labels / format split) */
   preset: string;
+  /** deep wave "Stats to track" — present only when on (old matches never have them) */
+  pitchTypes?: true;
+  sprayZones?: true;
 }
 
 export const BASEBALL_PRESETS: Record<string, { label: string; set: Record<string, number | string | boolean> }> = {
@@ -174,6 +232,7 @@ export function readConfig(config?: Record<string, unknown>): BaseballConfig {
     pitches: bool(config?.pitches, true),
     askFielders: bool(config?.askFielders, false),
     preset,
+    ...Object.fromEntries(TRACK_FLAGS.filter((f) => bool(config?.[f], false)).map((f) => [f, true])),
   };
 }
 
@@ -194,10 +253,22 @@ const mercyLead = (cfg: BaseballConfig, inning: number): number | undefined => {
 
 /* ---------------------------------- state ---------------------------------- */
 
-export interface Runner { id?: string; name?: string; slot?: number; resp?: string; respName?: string; ue: boolean }
-export interface RunCredit { event: string; side: Side; runnerId?: string; runnerName?: string; resp?: string; respName?: string; earned: boolean }
-/** per event: the situation BEFORE it (for stamps, edits) and what it did */
-export interface Ann { half: number; outs: number; balls: number; strikes: number; runs: number; outsMade: number; ignored?: boolean; score: { home: number; away: number } }
+/** `ir` (deep wave): the reliever who inherited this runner (OBR 9.16(g) — the
+ *  run stays charged to `resp`; `ir` only feeds inherited runners scored) */
+export interface Runner { id?: string; name?: string; slot?: number; resp?: string; respName?: string; ue: boolean; ir?: string }
+export interface RunCredit { event: string; side: Side; runnerId?: string; runnerName?: string; resp?: string; respName?: string; earned: boolean; ir?: string }
+/** per event: the situation BEFORE it (for stamps, edits) and what it did.
+ *  Deep wave (all derived, so an old log replays to the same game):
+ *  `on` = the bases occupied before a plate appearance (bit 1 = 1st, 2 = 2nd,
+ *  4 = 3rd — runners in scoring position = `on & 6`); `pk` = the pitcher on
+ *  the mound (whoKey); `fp` = this event carried the first pitch of a plate
+ *  appearance; `np` = pitches in the plate appearance (on its closing play);
+ *  `lob` = runners left on base by the play that ended a half-inning; `inh` =
+ *  runners a reliever inherited (on his pitching change). */
+export interface Ann {
+  half: number; outs: number; balls: number; strikes: number; runs: number; outsMade: number; ignored?: boolean; score: { home: number; away: number };
+  on?: number; pk?: string; fp?: true; np?: number; lob?: number; inh?: number;
+}
 export interface PitcherSpell { key: string; id?: string; name?: string; side: Side; leadAtEntry: number; outs: number; first: boolean; last?: boolean }
 
 export interface Game {
@@ -279,7 +350,9 @@ export function derive(cfg: BaseballConfig, s: Pick<BaseballState, 'lineup' | 's
   const leadLog: { leader: Side; winPitcher?: string; losePitcher?: string }[] = [];
   let leader: Side | null = null;
 
-  const resetCount = () => { g.balls = cfg.startBalls; g.strikes = cfg.startStrikes; };
+  /** pitches thrown in the plate appearance so far (deep wave: first pitch, P/PA) */
+  let paPitches = 0;
+  const resetCount = () => { g.balls = cfg.startBalls; g.strikes = cfg.startStrikes; paPitches = 0; };
   const startHalf = () => {
     g.bases = [null, null, null];
     g.outs = 0;
@@ -310,15 +383,18 @@ export function derive(cfg: BaseballConfig, s: Pick<BaseballState, 'lineup' | 's
     if (inning >= cfg.innings && d !== 0) { g.ended = true; g.endReason = 'reg'; return; }
     if (inning >= cfg.innings && d === 0 && (cfg.allowTies || (cfg.maxInnings > 0 && inning >= cfg.maxInnings))) { g.ended = true; g.endReason = 'tie'; }
   };
-  const halfOver = () => {
-    if (g.outs < 3) return;
+  /** the 3rd out ends the half: returns the runners left on base (-1 = not over) */
+  const halfOver = (): number => {
+    if (g.outs < 3) return -1;
     const bat = battingSide(g.half);
-    g.lob[bat] += g.bases.filter(Boolean).length;
+    const left = g.bases.filter(Boolean).length;
+    g.lob[bat] += left;
     const done = g.half;
     endIfOver(done);
     g.half = done + 1;
     if (!g.ended) startHalf();
     else { g.bases = [null, null, null]; g.outs = 0; resetCount(); }
+    return left;
   };
 
   const runnerFromMove = (m: Move, e: BaseballEvent): Runner => {
@@ -362,7 +438,7 @@ export function derive(cfg: BaseballConfig, s: Pick<BaseballState, 'lineup' | 's
         g.line[g.half] = (g.line[g.half] ?? 0) + 1;
         runs++;
         const earned = !r.ue && e.outcome !== 'E' && e.kind !== 'PB';
-        g.runs.push({ event: e.id, side: bat, ...(r.id ?? m.id ? { runnerId: r.id ?? m.id } : {}), ...(r.name ?? m.name ? { runnerName: r.name ?? m.name } : {}), resp: r.resp, respName: r.respName, earned });
+        g.runs.push({ event: e.id, side: bat, ...(r.id ?? m.id ? { runnerId: r.id ?? m.id } : {}), ...(r.name ?? m.name ? { runnerName: r.name ?? m.name } : {}), resp: r.resp, respName: r.respName, earned, ...(r.ir ? { ir: r.ir } : {}) });
         // lead changes (pitchers of record)
         const d = g.score.home - g.score.away;
         const now: Side | null = d > 0 ? 'home' : d < 0 ? 'away' : null;
@@ -395,6 +471,13 @@ export function derive(cfg: BaseballConfig, s: Pick<BaseballState, 'lineup' | 's
       const on: LineupEntry = { ...(e.on.id ? { id: e.on.id } : {}), name: e.on.name ?? 'Player' };
       const slotOk = typeof e.slot === 'number' && e.slot >= 0 && e.slot < g.order[side].length;
       if (e.kind === 'p') {
+        // deep wave: a reliever coming in mid-inning inherits the runners on base
+        const ir = whoKey(e.on);
+        if (!g.ended && ir && side === other(battingSide(g.half)) && whoKey(g.pitcher[side]) !== ir) {
+          let n = 0;
+          for (const r of g.bases) if (r) { r.ir = ir; n++; }
+          if (n) ann.inh = n;
+        }
         g.pitcher[side] = e.on;
         if (!g.ended) spellOf(side);
         if (slotOk && !cfg.dh) g.order[side][e.slot!] = { ...on, pos: 'P' };
@@ -416,15 +499,24 @@ export function derive(cfg: BaseballConfig, s: Pick<BaseballState, 'lineup' | 's
     const field = other(bat);
     const pKey = whoKey(e.pitcher ?? g.pitcher[field]);
     const spell = spellOf(field);
+    if (pKey) ann.pk = pKey;
+    /** deep wave: a pitch thrown — the first of the plate appearance? */
+    const thrown = () => { if (paPitches === 0) ann.fp = true; paPitches++; };
     if (e.type === 'pitch') {
       if (pKey) g.pitches[pKey] = (g.pitches[pKey] ?? 0) + 1;
+      thrown();
       if (e.pitch === 'ball') g.balls = Math.min(3, g.balls + 1);
       else if (e.pitch === 'called' || e.pitch === 'swinging') g.strikes = Math.min(2, g.strikes + 1);
       else if (e.pitch === 'foul' && g.strikes < 2) g.strikes++;
       continue;
     }
     if (e.type === 'pa') {
-      if (pKey && e.outcome !== 'IBB' && e.pitch) g.pitches[pKey] = (g.pitches[pKey] ?? 0) + 1;
+      ann.on = (g.bases[0] ? 1 : 0) | (g.bases[1] ? 2 : 0) | (g.bases[2] ? 4 : 0);
+      if (e.outcome !== 'IBB' && e.pitch) {
+        if (pKey) g.pitches[pKey] = (g.pitches[pKey] ?? 0) + 1;
+        thrown();
+      }
+      if (paPitches > 0) ann.np = paPitches;
       const r = applyMoves(e);
       ann.runs = r.runs; ann.outsMade = r.outs;
       if (spell) spell.outs += r.outs;
@@ -434,14 +526,14 @@ export function derive(cfg: BaseballConfig, s: Pick<BaseballState, 'lineup' | 's
       const slot = typeof e.batter?.slot === 'number' ? e.batter.slot : g.next[bat];
       g.next[bat] = (slot + 1) % n;
       resetCount();
-      if (!g.ended) halfOver();
+      if (!g.ended) { const left = halfOver(); if (left >= 0) ann.lob = left; }
       continue;
     }
     if (e.type === 'runner') {
       const r = applyMoves(e);
       ann.runs = r.runs; ann.outsMade = r.outs;
       if (spell) spell.outs += r.outs;
-      if (!g.ended) halfOver();
+      if (!g.ended) { const left = halfOver(); if (left >= 0) ann.lob = left; }
     }
   }
   if (s.called && !g.ended) { g.ended = true; g.endReason = 'called'; }
@@ -619,7 +711,7 @@ export const reducer = (s: BaseballState, a: ScoreAction): BaseballState => {
       const k = p.kind;
       if (!side || (k !== 'ball' && k !== 'called' && k !== 'swinging' && k !== 'foul')) return s;
       const pitcher = whoIn(p.pitcher);
-      return push({ type: 'pitch', side, pitch: k, ...(pitcher ? { pitcher } : {}) });
+      return push({ type: 'pitch', side, pitch: k, ...(pitcher ? { pitcher } : {}), ...(isPitchType(p.ptype) ? { ptype: p.ptype } : {}) });
     }
     case 'PLAY': {
       const o = p.outcome as Outcome;
@@ -634,6 +726,9 @@ export const reducer = (s: BaseballState, a: ScoreAction): BaseballState => {
         ...(pitcher ? { pitcher } : {}),
         moves: movesIn(p.moves), outs: Number(p.outs) || 0, rbi: Number(p.rbi) || 0,
         ...(typeof p.fielders === 'string' && p.fielders ? { fielders: p.fielders } : {}),
+        // deep wave (optional): the final pitch's type, where the ball went
+        ...(pitch && o !== 'IBB' && isPitchType(p.ptype) ? { ptype: p.ptype } : {}),
+        ...(IN_PLAY.includes(o) && isZone(p.zone) ? { zone: p.zone } : {}),
       });
     }
     case 'RUNNER': {
@@ -759,7 +854,11 @@ function preview(s: BaseballState, a: ScoreAction): { runs: number; outs: number
 let uidN = 0;
 export const newUid = (): string => `b${Date.now().toString(36)}${(uidN++).toString(36)}${Math.random().toString(36).slice(2, 5)}`;
 
-export interface PlayOpts { moves?: Move[]; pitch?: BaseballEvent['pitch']; fielders?: string; rbi?: number; uid?: string; extra?: Record<string, unknown> }
+export interface PlayOpts {
+  moves?: Move[]; pitch?: BaseballEvent['pitch']; fielders?: string; rbi?: number; uid?: string; extra?: Record<string, unknown>;
+  /** deep wave (optional capture): where the ball went, the final pitch's type */
+  zone?: Zone; ptype?: PitchType;
+}
 
 /** RBI the play earns by default (OBR 9.04, simplified): the runs it scored,
  *  none on an error or a double play. */
@@ -774,7 +873,10 @@ export function buildPlay(s: BaseballState, o: Outcome, opts: PlayOpts = {}): Sc
   const batter = { ...(sit.batter.id ? { id: sit.batter.id } : {}), name: sit.batter.name, slot: sit.batter.slot };
   const base: ScoreAction = {
     type: 'PLAY', side: sit.bat,
-    payload: { ...(opts.extra ?? {}), uid, outcome: o, ...(pitch ? { pitch } : {}), batter, ...(sit.pitcher ? { pitcher: sit.pitcher } : {}), moves, ...(opts.fielders ? { fielders: opts.fielders } : {}) },
+    payload: {
+      ...(opts.extra ?? {}), uid, outcome: o, ...(pitch ? { pitch } : {}), batter, ...(sit.pitcher ? { pitcher: sit.pitcher } : {}), moves, ...(opts.fielders ? { fielders: opts.fielders } : {}),
+      ...(opts.zone && IN_PLAY.includes(o) ? { zone: opts.zone } : {}), ...(opts.ptype && pitch ? { ptype: opts.ptype } : {}),
+    },
   };
   const pv = preview(s, base);
   const rbi = opts.rbi ?? defaultRbi(o, pv.runs);
@@ -822,6 +924,14 @@ export function stateAfter(s: BaseballState, after: string): BaseballState {
   const events = s.events.slice(0, i + 1);
   const st = { ...s, events, called: false };
   return { ...st, g: derive(s.cfg, st) };
+}
+
+/** Deep wave: the state with its derived annotations (`Ann.on` …). A state
+ *  saved before they existed is re-derived once from its own log — the same
+ *  game, the same score. */
+export function withAnn(s: BaseballState): BaseballState {
+  const stale = s.events.some((e) => { const a = s.g.ann[e.id]; return e.type === 'pa' && !!a && !a.ignored && a.on === undefined; });
+  return stale ? { ...s, g: derive(s.cfg, s) } : s;
 }
 
 /* ----------------------------- derived figures ----------------------------- */
@@ -880,6 +990,15 @@ export const cardLine = (s: BaseballState): string => (s?.g ? statusText(s) : ''
 
 /* --------------------------- live settings (#14) --------------------------- */
 
+/** Deep wave — the "Stats to track" toggles (live settings + the match format). */
+export const TRACK_FIELDS: FormatField[] = [
+  { key: 'pitchTypes', label: 'Pitch types', type: 'toggle', default: false, group: 'Stats to track', hint: 'A chip row over the pitch pad (FB SL CH … / softball Rise Drop …): tap the type, then the pitch — pitch mix per pitcher. Needs pitch-by-pitch' },
+  { key: 'sprayZones', label: 'Where the ball went (spray)', type: 'toggle', default: false, group: 'Stats to track', hint: 'Optional LF · CF · RF … chips when the ball is put in play — hits and balls in play by zone' },
+];
+/** Is this capture tracked in the game — its toggle on, or any recorded? */
+export const trackTracked = (s: Pick<BaseballState, 'cfg' | 'events'>, f: TrackFlag): boolean =>
+  s.cfg[f] === true || s.events.some((e) => (f === 'pitchTypes' ? !!e.ptype : !!e.zone));
+
 export const BASEBALL_LIVE_SETTINGS: LiveSettings<BaseballState> = {
   title: '⚙️ Scoring settings',
   hint: 'Applies to this game only.',
@@ -887,7 +1006,8 @@ export const BASEBALL_LIVE_SETTINGS: LiveSettings<BaseballState> = {
   fields: [
     { key: 'pitches', label: 'Pitch-by-pitch (balls & strikes)', type: 'toggle', default: true, group: 'Detail' },
     { key: 'askFielders', label: 'Ask for fielders (6-3)', type: 'toggle', default: false, group: 'Detail' },
+    ...TRACK_FIELDS,
   ] as FormatField[],
-  read: (s) => ({ pitches: s.cfg.pitches, askFielders: s.cfg.askFielders }),
-  defaults: { pitches: true, askFielders: false },
+  read: (s) => ({ pitches: s.cfg.pitches, askFielders: s.cfg.askFielders, ...Object.fromEntries(TRACK_FLAGS.map((f) => [f, s.cfg[f] === true])) }),
+  defaults: { pitches: true, askFielders: false, ...Object.fromEntries(TRACK_FLAGS.map((f) => [f, false])) },
 };

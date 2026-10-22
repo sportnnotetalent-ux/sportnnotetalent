@@ -6,7 +6,14 @@
  *  key is absolute — `statTotals` (./totals.ts) owns the whole line.
  *
  *  ERA reads `erN` (earned runs × the format's innings) so a 7-inning softball
- *  ERA and a 9-inning baseball ERA each come out on their own scale. */
+ *  ERA and a 9-inning baseball ERA each come out on their own scale.
+ *
+ *  Deep wave (all derived by statTotals, `coverage: 'keyed'` so a line from
+ *  before them never reads as 0): situational hitting (AB / H with runners in
+ *  scoring position → AVG with RISP, two-out RBI), GO / AO and inherited
+ *  runners – scored, and — pitch by pitch only — strikes / balls thrown
+ *  (strike %), first-pitch strikes (first-pitch strike %). The pitching box
+ *  gains a P-S (pitches-strikes) pair. */
 import type { Qualifier, SportStatSchema } from '../statSchema.ts';
 
 /** House minimums (organisers can change them, leaderMins): 10 at bats for
@@ -83,6 +90,31 @@ export const baseballStats: SportStatSchema<'baseball'> = {
       agg: { kind: 'rate', num: 'erN', den: 'outsPitched', scale: 3, dp: 2, qualifier: ip3 }, tieBreak: [{ key: 'outsPitched', better: 'higher' }] },
     { key: 'whip', label: 'Walks + hits per inning (WHIP)', short: 'WHIP', abbr: 'WHIP', source: 'derived', group: 'pitching', format: { unit: 'decimal', dp: 2, better: 'lower' },
       agg: { kind: 'rate', num: ['bbAllowed', 'hitsAllowed'], den: 'outsPitched', scale: 3, dp: 2, qualifier: ip3 }, tieBreak: [{ key: 'outsPitched', better: 'higher' }] },
+    // deep wave — situational hitting (derived from the log; keyed: a line from
+    // before the deep wave carries none, so it never reads as a 0)
+    { key: 'rispAb', label: 'At bats with runners in scoring position', short: 'at bats with RISP', one: 'at bat with RISP', abbr: 'AB RISP', group: 'situational', coverage: 'keyed' },
+    { key: 'rispHits', label: 'Hits with runners in scoring position', short: 'hits with RISP', one: 'hit with RISP', abbr: 'H RISP', group: 'situational', coverage: 'keyed', weight: 0.5 },
+    { key: 'rispAvg', label: 'Batting average with RISP', short: 'AVG with RISP', abbr: 'RISP', source: 'derived', group: 'situational', format: { unit: 'avg', dp: 3 }, coverage: 'keyed',
+      agg: { kind: 'rate', num: 'rispHits', den: 'rispAb', dp: 3, qualifier: { den: 10, unit: { label: 'at bats with RISP', one: 'at bat with RISP' } } }, tieBreak: [{ key: 'rispHits', better: 'higher' }] },
+    { key: 'twoOutRbi', label: 'Two-out RBI', short: 'two-out RBI', abbr: '2-out RBI', group: 'situational', coverage: 'keyed', weight: 0.5 },
+    // deep wave — pitching from the log: ground outs – fly outs, inherited runners
+    { key: 'pitchGroundOuts', label: 'Ground outs (pitching)', short: 'ground outs induced', one: 'ground out induced', abbr: 'GO', group: 'pitching', coverage: 'keyed' },
+    { key: 'pitchFlyOuts', label: 'Fly outs (pitching)', short: 'fly outs induced', one: 'fly out induced', abbr: 'AO', group: 'pitching', coverage: 'keyed' },
+    { key: 'goAo', label: 'Ground out / fly out ratio', short: 'GO/AO', abbr: 'GO/AO', source: 'derived', group: 'pitching', format: { unit: 'decimal', dp: 2 }, coverage: 'keyed',
+      agg: { kind: 'rate', num: 'pitchGroundOuts', den: 'pitchFlyOuts', dp: 2 } },
+    { key: 'inheritedRunners', label: 'Inherited runners', short: 'inherited runners', one: 'inherited runner', abbr: 'IR', group: 'pitching', coverage: 'keyed' },
+    { key: 'inheritedScored', label: 'Inherited runners scored', short: 'inherited runners scored', one: 'inherited runner scored', abbr: 'IRS', group: 'pitching', format: { unit: 'count', better: 'lower' }, coverage: 'keyed' },
+    // deep wave — pitch by pitch only (the game's balls & strikes)
+    { key: 'strikesThrown', label: 'Strikes thrown', short: 'strikes thrown', one: 'strike thrown', abbr: 'S', group: 'pitching', coverage: 'keyed' },
+    { key: 'ballsThrown', label: 'Balls thrown', short: 'balls thrown', one: 'ball thrown', abbr: 'B', group: 'pitching', coverage: 'keyed' },
+    { key: 'strikePct', label: 'Strike %', short: 'strike %', abbr: 'STR%', source: 'derived', group: 'pitching', format: { unit: 'percent', dp: 1 }, coverage: 'keyed',
+      agg: { kind: 'rate', num: 'strikesThrown', den: ['strikesThrown', 'ballsThrown'], scale: 100, dp: 1, qualifier: { den: 100, unit: { label: 'pitches', one: 'pitch' } } },
+      tieBreak: [{ key: 'strikesThrown', better: 'higher' }] },
+    { key: 'firstPitchStrikes', label: 'First-pitch strikes', short: 'first-pitch strikes', one: 'first-pitch strike', abbr: 'FPS', group: 'pitching', coverage: 'keyed' },
+    { key: 'firstPitches', label: 'Batters faced (first pitch tracked)', short: 'first pitches', one: 'first pitch', abbr: 'FP', group: 'pitching', coverage: 'keyed' },
+    { key: 'firstPitchStrikePct', label: 'First-pitch strike %', short: 'first-pitch strike %', abbr: 'F-STR%', source: 'derived', group: 'pitching', format: { unit: 'percent', dp: 1 }, coverage: 'keyed',
+      agg: { kind: 'rate', num: 'firstPitchStrikes', den: 'firstPitches', scale: 100, dp: 1, qualifier: { den: 30, unit: { label: 'batters faced', one: 'batter faced' } } },
+      tieBreak: [{ key: 'firstPitchStrikes', better: 'higher' }] },
     // fielding (from the scorer's notation, when asked)
     { key: 'putouts', label: 'Putouts', short: 'putouts', one: 'putout', abbr: 'PO', group: 'fielding', coverage: 'present', weight: 0.25 },
     { key: 'fieldAssists', label: 'Assists (fielding)', short: 'fielding assists', one: 'fielding assist', abbr: 'A', group: 'fielding', coverage: 'present', weight: 0.25 },
@@ -102,11 +134,17 @@ export const baseballStats: SportStatSchema<'baseball'> = {
       { stat: 'sacFlies', hideZero: true }, { stat: 'sacBunts', hideZero: true }, { stat: 'gidp', hideZero: true },
       { stat: 'battingAvg', label: 'AVG' }, { stat: 'obp', label: 'OBP' }, { stat: 'slg', label: 'SLG' }, { stat: 'ops', label: 'OPS' }, { stat: 'totalBases' },
     ] },
+    { id: 'situational', title: 'Situational hitting', rows: [
+      { stat: 'rispAvg', label: 'AVG with RISP' }, { stat: 'rispHits' }, { stat: 'rispAb' }, { stat: 'twoOutRbi' },
+    ] },
     { id: 'running', title: 'Base running', rows: [{ stat: 'stolenBases' }, { stat: 'caughtStealing', hideZero: true }] },
     { id: 'pitching', title: 'Pitching', leadWhen: 'pitched', rows: [
       { stat: 'gamesPitched' }, { stat: 'pitchWins', label: 'W' }, { stat: 'pitchLosses', label: 'L' }, { stat: 'pitchSaves', label: 'SV', hideZero: true },
       { stat: 'outsPitched', label: 'IP' }, { stat: 'era', label: 'ERA' }, { stat: 'whip', label: 'WHIP' }, { stat: 'hitsAllowed' }, { stat: 'runsAllowed' }, { stat: 'earnedRuns' },
       { stat: 'bbAllowed' }, { stat: 'kPitched' }, { stat: 'hrAllowed' }, { stat: 'hbpAllowed', hideZero: true }, { stat: 'battersFaced' }, { stat: 'pitches' },
+      // deep wave
+      { stat: 'strikePct', label: 'Strike %' }, { stat: 'firstPitchStrikePct', label: 'First-pitch strike %' }, { stat: 'goAo', label: 'GO/AO' },
+      { stat: 'inheritedRunners', hideZero: true }, { stat: 'inheritedScored', hideZero: true },
     ] },
     { id: 'fielding', title: 'Fielding', rows: [{ stat: 'putouts', hideZero: true }, { stat: 'fieldAssists', hideZero: true }, { stat: 'fieldErrors', hideZero: true }] },
     { id: 'bests', title: 'Bests', rows: [{ stat: 'mostHits', label: 'Most hits (game)', hideZero: true }, { stat: 'mostKPitched', label: 'Most strikeouts (game, pitching)', hideZero: true }] },
@@ -133,7 +171,7 @@ export const baseballStats: SportStatSchema<'baseball'> = {
     'hits', 'homeRuns', 'baseOnBalls', 'strikeouts', 'stolenBases', { key: 'teamErrors', label: 'Errors' }, { key: 'leftOnBase', label: 'Left on base' },
     'battingAvg', { key: 'teamPitches', label: 'Pitches thrown' },
   ],
-  leaders: ['battingAvg', 'homeRuns', 'rbi', 'hits', 'ops', 'stolenBases', 'era', 'kPitched', 'whip', 'pitchWins', 'pitchSaves'],
+  leaders: ['battingAvg', 'homeRuns', 'rbi', 'hits', 'ops', 'stolenBases', 'era', 'kPitched', 'whip', 'pitchWins', 'pitchSaves', 'rispAvg', 'twoOutRbi', 'strikePct', 'firstPitchStrikePct'],
   headline: ['hits', 'homeRuns', 'rbi', 'kPitched'],
   awards: [
     { stat: 'battingAvg', icon: '🏏', label: 'Batting champion', match: false,
@@ -159,6 +197,8 @@ export const baseballPitchingStats: SportStatSchema<'baseball'> = {
     { key: 'kPitched', abbr: 'SO' },
     { key: 'hrAllowed', abbr: 'HR', occasional: true },
     { key: 'pitches', abbr: 'NP' },
+    // deep wave: pitches-strikes with pitch-by-pitch on (NP hides then — ./box.ts)
+    { key: 'ps', abbr: 'P-S', label: 'Pitches-strikes', pair: ['pitches', 'strikesThrown'] },
     { key: 'era', abbr: 'ERA' },
   ] }],
   compare: [],

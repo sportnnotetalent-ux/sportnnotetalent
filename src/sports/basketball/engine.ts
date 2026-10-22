@@ -6,7 +6,7 @@
  */
 import type { ScoreAction } from '../types';
 import { aggPriorFromConfig, levelForDecider, type AggPrior } from '../aggregate.ts';
-import { pointsOf, type BBEvent, type DqReason, type FoulType, type ReboundType } from './events.ts';
+import { isShotZone, pointsOf, type BBEvent, type DqReason, type FoulType, type ReboundType } from './events.ts';
 
 export interface BasketballState {
   home: number;
@@ -85,6 +85,14 @@ export interface BasketballState {
    *  team fouls 7–9 → 2 free throws, 10+ → 2 free throws + possession, a
    *  shooting foul inside the arc 1 free throw (3×3 Art. 15). Absent = legacy. */
   ladder3x3?: true;
+  /** Deep wave — "Stats to track" (format keys `trackZones`, `trackFastBreak`,
+   *  `trackFoulsDrawn`): only on the state when the stored config carries the
+   *  key, so older matches keep their exact state shape. They only change
+   *  what the controls ask for; each play stamps its own detail (`zone`,
+   *  `fbt`, `fdt`), so switching one on mid-game applies from the next play. */
+  trackZones?: boolean;
+  trackFastBreak?: boolean;
+  trackFoulsDrawn?: boolean;
 }
 
 /** SD-29: merge name → id pairs into the state (only when a payload has any,
@@ -118,6 +126,10 @@ export const init = (config?: Record<string, unknown>): BasketballState => ({
   ...(config?.gameClock === true ? { gc: { ms: 0 } } : {}),
   ...(Number(config?.otTarget) > 0 ? { otTarget: Number(config?.otTarget) } : {}),
   ...(config?.foulLadder === '3x3' ? { ladder3x3: true as const } : {}),
+  // Deep wave — present only when the stored config carries the key.
+  ...(config?.trackZones != null ? { trackZones: config.trackZones === true } : {}),
+  ...(config?.trackFastBreak != null ? { trackFastBreak: config.trackFastBreak === true } : {}),
+  ...(config?.trackFoulsDrawn != null ? { trackFoulsDrawn: config.trackFoulsDrawn === true } : {}),
 });
 
 /* ------------------------------ SD-132 clock ------------------------------- */
@@ -360,7 +372,9 @@ export const reducer = (s: BasketballState, a: ScoreAction): BasketballState => 
 };
 
 const reduce = (s: BasketballState, a: ScoreAction): BasketballState => {
-  if (s.ended && a.type !== 'END') return s;
+  // Deep wave: a TAG (fast break) still lands on the basket that ended a
+  // first-to-N game; nothing else changes a finished game.
+  if (s.ended && a.type !== 'END' && a.type !== 'TAG') return s;
   const minute = Number(a.payload?.minute ?? currentMinute(s));
   const quarter = Number(a.payload?.quarter ?? s.quarter);
   const name = a.attribution?.playerName;
@@ -393,6 +407,13 @@ const reduce = (s: BasketballState, a: ScoreAction): BasketballState => {
     if (pts > 0 && ev.type === 'score' && logged.gc && secIn !== undefined && lastTwoMinutes(logged, quarter, secIn)) return whistle(logged);
     return logged;
   };
+  // Deep wave: optional shot detail rides on the play (new logs only) — the
+  // zone it was taken from, and whether fast breaks were being tagged.
+  const shotDetail = (): Partial<BBEvent> => ({
+    ...(isShotZone(a.payload?.zone) ? { zone: a.payload.zone } : {}),
+    ...(a.payload?.fbt === true ? { fbt: true as const } : {}),
+    ...(a.payload?.fb === true ? { fb: true as const } : {}),
+  });
   switch (a.type) {
     case 'KICKOFF':
       // SD-132: tip-off starts the game clock too
@@ -418,14 +439,28 @@ const reduce = (s: BasketballState, a: ScoreAction): BasketballState => {
       const pts = Number(a.payload?.points ?? 0);
       // First-to-N games (3×3 to 21, streetball) end the moment the target is
       // reached with the required margin.
-      return scorePoints(a.side, pts, { minute, type: 'score', side: a.side, playerName: name, points: pts, ...(a.payload?.fga === true ? { fga: true as const } : {}) });
+      return scorePoints(a.side, pts, { minute, type: 'score', side: a.side, playerName: name, points: pts, ...(a.payload?.fga === true ? { fga: true as const } : {}), ...shotDetail() });
     }
     case 'MISS': {
       // SD-31: a missed field goal (2 or 3; 3×3: 1 or 2) — logged for FGA /
       // FG% / EFF only; the score doesn't move.
       if (!a.side || isPlayerOut(s, name, who)) return s;
       const pts = Number(a.payload?.points ?? 2);
-      return push(s, { minute, type: 'miss', side: a.side, playerName: name, points: pts }, quarter);
+      return push(s, { minute, type: 'miss', side: a.side, playerName: name, points: pts, ...(isShotZone(a.payload?.zone) ? { zone: a.payload.zone } : {}) }, quarter);
+    }
+    case 'TAG': {
+      // Deep wave: tag (or untag) a made basket as a fast break after it went
+      // in — the "⚡ Fast break" chip under the Assist? prompt. By `id`, or
+      // (the live chip) the side's latest made field goal in the log. Only a
+      // made field goal can carry it; nothing found changes nothing.
+      if (typeof a.payload?.fb !== 'boolean') return s;
+      const fg = (e: BBEvent) => e.type === 'score' && ((e.points ?? 0) >= 2 || (s.targetPoints > 0 && e.points === 1));
+      const ev = a.payload?.id != null
+        ? s.events.find((e) => e.id === Number(a.payload!.id) && fg(e))
+        : a.side ? [...s.events].reverse().find((e) => e.side === a.side && fg(e)) : undefined;
+      if (!ev) return s;
+      const tagged: BBEvent = a.payload.fb ? { ...ev, fb: true } : (({ fb: _drop, ...rest }) => rest)(ev);
+      return { ...s, events: s.events.map((e) => (e === ev ? tagged : e)) };
     }
     case 'FREE_THROW': {
       // One free-throw attempt. A make adds a point; a miss is logged for the
@@ -449,7 +484,13 @@ const reduce = (s: BasketballState, a: ScoreAction): BasketballState => {
     case 'FOUL':
       // count the foul, but never beyond the limit (already fouled out)
       return a.side && !isPlayerOut(s, name, who)
-        ? whistle(push(s, { minute, type: 'foul', side: a.side, playerName: name, foulType: (a.payload?.foulType as FoulType | undefined) ?? 'personal' }, quarter))
+        ? whistle(push(s, {
+          minute, type: 'foul', side: a.side, playerName: name, foulType: (a.payload?.foulType as FoulType | undefined) ?? 'personal',
+          // Deep wave: "Fouls drawn" — who was fouled (new logs only)
+          ...(a.payload?.fdt === true ? { fdt: true as const } : {}),
+          ...(typeof a.payload?.drawn === 'string' && a.payload.drawn ? { drawn: a.payload.drawn } : {}),
+          ...(typeof a.payload?.drawnPid === 'string' && a.payload.drawnPid ? { drawnPid: a.payload.drawnPid } : {}),
+        }, quarter))
         : s;
     case 'TIMEOUT':
       return a.side ? whistle(push(s, { minute, type: 'timeout', side: a.side }, quarter)) : s;

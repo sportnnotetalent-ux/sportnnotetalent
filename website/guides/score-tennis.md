@@ -5,7 +5,7 @@ category: Live scoring
 audience: Scorers, Organisers
 sports: tennis
 order: 57
-updated: 2026-10-11
+updated: 2026-10-22
 ---
 
 You tap each point; the app handles 15-30-40, deuce, tiebreaks and serve.
@@ -47,16 +47,37 @@ POINTS shows the current game, with a games column per set and a 🎾 dot by the
 A chip under the board shows **MATCH POINT**, **SET POINT** or **BREAK POINT** with the side's name.
 
 ## Match stats
-The **Score** tab's "Match stats" (per match or set) show aces, serve and return points won, holds and breaks, break points, set and match points saved, and streaks. The "Box score" lists each player's points, aces and double faults (**DF**, counted against the server who served them).
+The **Score** tab's "Match stats" (per match or set) has tabs:
+- **Key stats**: Service (aces, double faults, and with the options below 1st serve in, win 1st / 2nd serve, fastest serve and serve averages), Winners & errors, Points won (break points, net points, receiving and total points) and Games (holds, breaks, break points saved, streaks).
+- **Serve & return**: aces, service and return points played and won, and return points in play. With 1st / 2nd serve tracked, switch between **Total**, **1st serve** and **2nd serve**.
+- **Rally** (with point detail): forehand and backhand winners, unforced and forced errors by shot, and a stroke summary.
+- **Rally length** (with rally length tracked): points won after 0–4, 5–8 and 9+ shots.
 
-## Point detail (optional)
-Off by default. Turn it on with **On** in the "🔎 Point detail (optional)" row under the buttons.
+A row only shows when the match tracked it. "Return points in play" counts serves that landed in (double faults are left out) where the return came back into play. The "Box score" lists each player's points, aces and double faults (**DF**, counted against the server who served them).
 
-After each point, "How was it won? · Asha Rao" appears. Tap a chip or **Skip**; nothing is required.
-- **Service winner**, **Winner** (with the stroke, e.g. **Forehand**, **Drop**, **Return**), **Forced error** or **Unforced error** (with the stroke).
-- **1st / 2nd serve**: points count as 1st-serve unless you tap **2nd serve**.
+## Extra stats (optional)
+Scoring stays one tap per point. To track more, open **⚙️ Scoring settings** and pick under **Stats to track**, or tap **Choose** next to "📊 Extra stats" under the point buttons. All are off by default. A change during play counts from the next point.
+- **Point detail**: how the point ended.
+- **1st / 2nd serve**: points count as 1st serve unless you tap **2nd serve**.
+- **Net points**: who came to the net.
+- **Rally length**: 0–4, 5–8 or 9+ shots.
+- **Serve speed**: the serve's speed in km/h (30–270).
+
+After each point, a "Last point" card appears. Tap what you know, or **Skip**:
+1. **Service winner**, **Winner**, **Forced error** or **Unforced error** (Ace and Double fault keep their own buttons).
+2. **Forehand** or **Backhand**.
+3. The shot, e.g. **Groundstroke**, **Return**, **Volley**, **Passing**, **Drop shot** (optional).
+4. With the other options on: **2nd serve**, **At the net** (tap one or both sides), **Rally** length, and type the **Serve speed**.
 
 Winners count for the point winner, errors against the opponent (doubles: pick who under **By:**). The box score adds **W**, **UE**, **FE**.
+
+## Commentary
+Under the stats, "Commentary" tells the match game by game, newest first, the game in play on top:
+- "Asha Rao wins the game" with the set score, e.g. **1-1**.
+- Each point: "Point to Asha Rao", the match time and, if you described it, a line like "Meera Iyer loses the point with a Backhand Forced Error". On the right, the score after the point, server first: **30 - 15**, **40 - AD**, **Game**.
+- Code violations and timeouts where they happened, and who served the game.
+
+It updates after every point and after a correction.
 
 ## Fix a mistake
 - Wrong tap just now? The Undo bar names what it removes, e.g. "↶ Undo: point to Aarav Mehta (30-15)".
@@ -72,7 +93,7 @@ The app replays the match. After the match, see [Correct a match after full time
 The match ends itself. For an injury, tap **🏁 End match…** → **Retired**. See [End a match early](/guides/end-a-match-early/). Code and time violations, medical timeouts and match time: see [Code violations, cards and timeouts](/guides/racket-conduct-and-timeouts/).
 
 ## What goes on the player's profile
-The player's tennis page adds **W-L**, **Win %**, **Match play**, **Serve & return** and **Shot making** (from point-detail matches). See [Filter a player's career stats](/guides/filter-career-stats/).
+The player's tennis page adds **W-L**, **Win %**, **Match play**, **Serve & return** (with fastest serve and serve averages from serve-speed matches) and **Shot making** (from point-detail matches), plus **Rally length** when it was tracked. Tournament leaders include **Fastest serve**. See [Filter a player's career stats](/guides/filter-career-stats/).
 
 ## Common questions
 ### How does a Fast4 set work?

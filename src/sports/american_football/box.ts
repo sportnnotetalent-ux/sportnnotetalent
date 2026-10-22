@@ -9,20 +9,26 @@
 import type { Player } from '../../core/types';
 import type { BoxRowInput, BoxSideInput, MatchBoxSource } from '../boxScore.ts';
 import {
-  eventCredits, secondIsDefence, periodName, teamFigures, totalPeriods, mmss, matchSec, other,
+  deepKeys, eventCredits, isPbp, secondIsDefence, periodName, tacklesTracked, teamFigures, totalPeriods, mmss, matchSec, other,
   PBP_KEYS, SCORE_KEYS, type AFState, type Side,
 } from './engine.ts';
+import { longGain } from './totals.ts';
 
 export interface AFBoxContext { homeRoster?: Player[]; awayRoster?: Player[]; homeName?: string; awayName?: string }
 
 const ROW_SCORE = SCORE_KEYS.filter((k) => k !== 'ejections');
+/** flag football has no kicking game: no FG / extra-point / punting columns of zeros */
+const KICKING = new Set(['fgMade', 'fgAtt', 'patMade', 'patAtt', 'punts', 'puntYds']);
 
 export function afBox(s: AFState, ctx: AFBoxContext = {}): MatchBoxSource {
   const n = Math.min(totalPeriods(s), Math.max(1, s.period));
   const periods = n >= 2 ? Array.from({ length: n }, (_, i) => ({ value: i + 1, label: periodName(s, i + 1) })) : [];
-  const pbp = s.mode === 'pbp' || s.events.some((e) => e.pbp);
-  const tackles = s.trackTackles || s.events.some((e) => e.type === 'tackle');
-  const ROW_KEYS: string[] = [...ROW_SCORE, ...(pbp ? PBP_KEYS : []), ...(tackles ? ['tackles'] : [])];
+  const pbp = isPbp(s);
+  const tackles = tacklesTracked(s);
+  const flag = s.variant === 'flag';
+  // deep wave: the optional keys read 0 on every row only when tracked (else no column)
+  const ROW_KEYS: string[] = [...ROW_SCORE, ...(pbp ? PBP_KEYS : []), ...(tackles ? ['tackles'] : []), ...deepKeys(s)]
+    .filter((k) => !flag || !KICKING.has(k));
   return {
     periods,
     emptyText: 'No players yet.',
@@ -65,6 +71,18 @@ export function afBox(s: AFState, ctx: AFBoxContext = {}): MatchBoxSource {
             if (!cr) continue;
             const r = row(cr.playerId, cr.playerName);
             if (r) for (const [k, v] of Object.entries(cr.stats)) if (k in r.stats) r.stats[k] += v;
+          }
+          if (e.side !== sd) continue;
+          // longest run / catch and field goal (derived: only on the rows that have one)
+          const g = longGain(e);
+          const rg = g?.id ? row(g.id, g.name) : undefined;
+          if (g && rg) {
+            const k = g.kind === 'rush' ? 'rushLong' : 'recLong';
+            rg.stats[k] = Math.max(rg.stats[k] ?? 0, g.yards, 0);
+          }
+          if (e.type === 'fg' && e.good && e.yards && e.playerId) {
+            const rk = row(e.playerId, e.playerName);
+            if (rk) rk.stats.fgLong = Math.max(rk.stats.fgLong ?? 0, e.yards);
           }
         }
         const f = teamFigures(s, sd, scope);

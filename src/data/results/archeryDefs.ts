@@ -50,6 +50,10 @@ export interface ArchRoundDef {
   /** 'wa' = a World Archery round; 'school' = a house preset (shorter / bigger face) */
   level: 'wa' | 'school';
   note: string;
+  /** Deep wave: the lowest ring the face has — the 80 cm 6-ring face scores 5–10
+   *  (X), the 40 cm triple face 6–10; an arrow outside it is a miss (M).
+   *  Absent = a full face (1–10). */
+  minRing?: number;
 }
 
 const out = (bow: Bow, distance: number, face: string, level: 'wa' | 'school', note: string): ArchRoundDef => ({
@@ -67,12 +71,12 @@ export const ARCH_ROUNDS: ArchRoundDef[] = [
   out('R', 40, '122 cm face', 'school', 'club / U15 (a house choice)'),
   out('R', 30, '80 cm face', 'school', 'school (a house choice)'),
   out('R', 20, '80 cm face', 'school', 'school beginners (a house choice)'),
-  out('C', 50, '80 cm 6-ring face', 'wa', 'WA senior, U21 and U18'),
+  { ...out('C', 50, '80 cm 6-ring face', 'wa', 'WA senior, U21 and U18'), minRing: 5 },
   out('C', 30, '80 cm face', 'school', 'school (a house choice)'),
   out('B', 50, '122 cm face', 'wa', 'WA barebow'),
   out('B', 30, '122 cm face', 'school', 'school (a house choice)'),
   ind('R', 18, '40 cm triple face', 'wa', 'WA indoor'),
-  ind('C', 18, '40 cm triple face, inner 10', 'wa', 'WA indoor'),
+  { ...ind('C', 18, '40 cm triple face, inner 10', 'wa', 'WA indoor'), minRing: 6 },
   ind('B', 18, '40 cm face', 'wa', 'WA indoor'),
 ];
 

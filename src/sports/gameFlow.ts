@@ -153,9 +153,14 @@ export function gameFlowFor(sport: string, state: unknown, starters?: Starters):
     case 'hockey':
     case 'handball':
     case 'ice_hockey': // SD-145: goal events carry period + game second
-    case 'netball':
       plays = byKeys(evs.filter((e) => e.type === 'goal' && e.side), (e) => num(e.period, 1), (e) => num(e.sec))
         .map((e) => goal(e, `${Math.floor(num(e.sec) / 60)}'`));
+      break;
+    case 'netball':
+      // deep wave: a 2-point super shot (organiser rule) counts its points
+      plays = byKeys(evs.filter((e) => e.type === 'goal' && e.side), (e) => num(e.period, 1), (e) => num(e.sec))
+        .map((e) => ({ ...goal(e, `${Math.floor(num(e.sec) / 60)}'`), points: num(e.points, 1) }));
+      if (plays.some((p) => p.points > 1)) unit = 'points';
       break;
     case 'kabaddi':
       unit = 'points';

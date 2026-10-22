@@ -22,7 +22,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { theme } from '../../core/theme';
 import { ensureContrast } from '../../core/contrast';
-import { Button, TextField } from '../../components/ui';
+import { Button, SelectChip, TextField } from '../../components/ui';
 import { confirmMatchAction } from '../../components/ConfirmSheet';
 import { LineScoreboard } from '../../components/LineScoreboard';
 import { MatchBoxScore } from '../../components/BoxScore';
@@ -35,8 +35,13 @@ import {
   periodStarted, running, eventCredits, creditAttribution, goalFlagsNow, goalieAt, goalieOf, netEmpty, penaltyBox, partEnd, skatersOn, baseSkaters,
   soScore, nextShooter, needsSdPick, iceHockeyScoreLine, timeoutLeft, totalPeriods, nextIsOvertime, eventWhen, standingsUnits, ejects,
   ICE_HOCKEY_PRESETS, ICE_HOCKEY_LIVE_SETTINGS, PEN_LABEL, INFRACTIONS, STRENGTH_LABEL, LIVE_KEYS,
-  type IceEvent, type IceHockeyState, type PenKind, type Side, type Strength,
+  TALLY_LABEL, TRACK_FLAGS, TRACK_KINDS, TRACK_FIELDS, FLAG_KEYS, tallyTracked,
+  type IceEvent, type IceHockeyState, type PenKind, type Side, type Strength, type TallyKind,
 } from './engine';
+import { iceHockeyCommentary, iceScopeLabel, ICE_FEED_TAGS } from './commentary';
+import { iceHockeySheet } from './sheet';
+import { GroupedFeed } from '../GroupedFeed';
+import { StatSheetView } from '../StatSheetView';
 import { iceHockeyTotals } from './totals';
 import { iceHockeyBox } from './box';
 import { iceHockeyTimeline, describeEvent, goalTags } from './timeline';
@@ -49,7 +54,10 @@ import { BackfillBar, RowAction, confirmRemove } from '../TimelineControls';
 const opp = (s: Side): Side => (s === 'home' ? 'away' : 'home');
 const uid = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 const isGoaliePos = (p?: string | null) => !!p && /^\s*(g|gk|goalie|goaltender|goal\s*-?\s*keeper|netminder)\s*$/i.test(p);
-const TRACKED: string[] = LIVE_KEYS.filter((k) => k !== 'soTaken' && k !== 'soGoals');
+const BASE_TRACKED: string[] = LIVE_KEYS.filter((k) => k !== 'soTaken' && k !== 'soGoals');
+/** the keys this match tracks (the base set + the optional tallies switched on) */
+const trackedKeys = (s: IceHockeyState): string[] => [...BASE_TRACKED, ...TRACK_FLAGS.filter((f) => tallyTracked(s, f)).flatMap((f) => FLAG_KEYS[f])];
+const TALLY_CHIP: Record<TallyKind, string> = { faceoff: '⚪ Faceoff won', hit: '💥 Hit', block: '🛡 Block', takeaway: '🔄 Takeaway', giveaway: '🔄 Giveaway', missed: '↗ Missed shot' };
 const PEN_MENU: PenKind[] = ['minor', 'double', 'major', 'majorGm', 'misconduct', 'gm', 'match', 'bench'];
 
 /* ------------------------------ player picker ------------------------------ */
@@ -91,7 +99,9 @@ type Flow =
   | { mode: 'shot'; side: Side }
   | { mode: 'pen'; side: Side; step: 'kind' | 'infraction' | 'player'; pen?: PenKind; infraction?: string }
   | { mode: 'ps'; side: Side; step: 'result' | 'player'; res?: 'saved' | 'missed' }
-  | { mode: 'gk'; side: Side };
+  | { mode: 'gk'; side: Side }
+  | { mode: 'tally'; side: Side; kind: TallyKind }
+  | { mode: 'centres'; side: Side };
 
 /* -------------------------------- controls --------------------------------- */
 
@@ -106,6 +116,8 @@ const ScoringControls: SportPlugin<IceHockeyState>['ScoringControls'] = ({
   const [setting, setSetting] = useState(false);
   const [soTaker, setSoTaker] = useState<Player | null>(null);
   const [onIce, setOnIce] = useState<{ home: Set<string>; away: Set<string> }>({ home: new Set(), away: new Set() });
+  /** deep wave: the centres taking the draws (one-tap faceoffs credit them) */
+  const [centres, setCentres] = useState<{ home?: Player; away?: Player }>({});
   const [, tick] = useState(0);
   useEffect(() => {
     if (!running(s)) return;
@@ -171,9 +183,16 @@ const ScoringControls: SportPlugin<IceHockeyState>['ScoringControls'] = ({
   const theGoalie = (sd: Side) => { const g = goalieOf(s, sd); return g?.id ? byId(sd, g.id, g.name) : undefined; };
 
   /* ---- recorders ---- */
+  const TRACKED = trackedKeys(s);
   const credit = (e: Parameters<typeof eventCredits>[0]) => {
     const cr = eventCredits(e, s.pimScale);
     return { attribution: creditAttribution(cr.first, 1, TRACKED), attribution2: creditAttribution(cr.second, 1, TRACKED), third: creditAttribution(cr.third, 1, TRACKED) };
+  };
+  /** deep wave: an optional tally (a faceoff credits the winning centre and the loser) */
+  const tally = (sd: Side, kind: TallyKind, p: Player | null | undefined, loser?: Player | null) => {
+    const cr = credit({ type: 'tally', side: sd, tally: kind, playerId: p?.id, playerName: p?.fullName, ...(kind === 'faceoff' && loser ? { secondId: loser.id, secondName: loser.fullName } : {}) });
+    fire({ type: 'TALLY', side: sd, payload: { kind }, attribution: cr.attribution, attribution2: cr.attribution2 });
+    setFlow(null);
   };
   const goal = (sd: Side, d: GoalDraft, a2: Player | null, ice?: { home: string[]; away: string[] }) => {
     const id = uid();
@@ -460,12 +479,46 @@ const ScoringControls: SportPlugin<IceHockeyState>['ScoringControls'] = ({
             <PlayerGrid players={dressed(sd)} onPick={(p) => setGoalie(sd, p)} />
           </View>
         );
+      case 'tally':
+        return (
+          <View style={c.panel}>{head(TALLY_LABEL[flow.kind])}
+            <Text style={c.small}>Who? (optional)</Text>
+            <PlayerGrid players={flow.kind === 'block' ? dressed(sd).filter((p) => !inBox(sd).has(p.id)) : skatersOf(sd)} onPick={(p) => tally(sd, flow.kind, p)}
+              skip={{ label: 'Team (no name)', onPress: () => tally(sd, flow.kind, null) }} />
+          </View>
+        );
+      case 'centres':
+        return (
+          <View style={c.panel}>{head('Centres on the draw')}
+            <Text style={c.meta}>Faceoff won credits these two (the winner and the loser). Change them when the lines change.</Text>
+            {(['home', 'away'] as const).map((side) => (
+              <View key={side} style={{ gap: theme.spacing(1) }}>
+                <Text style={c.small}>{name(side)}{centres[side] ? ` · ${centres[side]!.fullName}` : ''}</Text>
+                <PlayerGrid players={skatersOf(side)} picked={new Set(centres[side] ? [centres[side]!.id] : [])} onPick={(p) => setCentres((cur) => ({ ...cur, [side]: p }))} />
+              </View>
+            ))}
+            <View style={c.row}>
+              <Button label="✓ Done" style={c.flex} onPress={() => setFlow(null)} />
+              <Button label="Clear" variant="ghost" onPress={() => { setCentres({}); setFlow(null); }} />
+            </View>
+          </View>
+        );
     }
   })();
 
   const on = skatersOn(s, box);
   const base = baseSkaters(s);
   const pulled = { home: netEmpty(s, 'home'), away: netEmpty(s, 'away') };
+  /** deep wave: the tallies switched on for this match (the toggle, not just past events) */
+  const kindsOn: TallyKind[] = TRACK_FLAGS.filter((f) => s[f] === true).flatMap((f) => TRACK_KINDS[f]);
+  const extras = (sd: Side) => (kindsOn.length ? (
+    <View style={c.chips} accessibilityLabel={`More stats for ${name(sd)}`}>
+      {kindsOn.map((k) => (
+        <Chip key={k} label={TALLY_CHIP[k]} on={false} a11y={`${TALLY_LABEL[k]}, ${name(sd)}`}
+          onPress={() => (k === 'faceoff' ? tally(sd, 'faceoff', centres[sd], centres[opp(sd)]) : setFlow({ mode: 'tally', side: sd, kind: k }))} />
+      ))}
+    </View>
+  ) : null);
   const sideCol = (sd: Side) => {
     const gk = theGoalie(sd);
     const toLeft = timeoutLeft(s, sd);
@@ -479,6 +532,7 @@ const ScoringControls: SportPlugin<IceHockeyState>['ScoringControls'] = ({
         <Button label={pulled[sd] ? '🧤 Goalie back' : '🥅 Pull goalie'} accessibilityLabel={pulled[sd] ? `${name(sd)} goalie back in net` : `${name(sd)} pull the goalie for an extra skater`}
           variant="ghost" onPress={() => fire({ type: pulled[sd] ? 'BACK' : 'PULL', side: sd })} />
         <Button label={`⏸ Time-out · ${toLeft}`} accessibilityLabel={`Team time-out for ${name(sd)}, ${toLeft} left`} variant="ghost" disabled={toLeft === 0 || !periodStarted(s)} onPress={() => fire({ type: 'TIMEOUT', side: sd })} />
+        {periodStarted(s) ? extras(sd) : null}
         <Text style={[c.gk, c.tap]} accessibilityRole="button" accessibilityLabel={`Goalie for ${name(sd)}: ${gk ? gk.fullName : 'not set'}. Change`} onPress={() => setFlow({ mode: 'gk', side: sd })} numberOfLines={2}>
           🧤 {gk ? `${gk.fullName}${pulled[sd] ? ' (pulled)' : ''}` : 'Set goalie'} ›
         </Text>
@@ -536,6 +590,11 @@ const ScoringControls: SportPlugin<IceHockeyState>['ScoringControls'] = ({
       </View>
 
       {flowPanel ?? <View style={c.cols}>{sideCol('home')}{sideCol('away')}</View>}
+      {!flowPanel && s.trackFaceoffs ? (
+        <Text style={[c.gk, c.tap]} accessibilityRole="button" onPress={() => setFlow({ mode: 'centres', side: 'home' })}>
+          ⚪ Centres: {centres.home?.fullName ?? '—'} v {centres.away?.fullName ?? '—'} · change ›
+        </Text>
+      ) : null}
 
       <EditList s={s} show={showEdit} setShow={setShowEdit} onRemove={remove} onEdit={edit} homeName={homeName} awayName={awayName} />
       {last ? <Button label="🏁 Final horn" accessibilityLabel="End the game (final horn)" variant="danger" disabled={!periodStarted(s)} onPress={() => void endPeriod()} /> : null}
@@ -630,14 +689,33 @@ const IceHockeyScoreboard: NonNullable<SportPlugin<IceHockeyState>['Scoreboard']
   );
 };
 
+/** Deep wave: the Score tab's views — the play-by-play commentary, the
+ *  broadcast match stats (period / category filters), the box score and the
+ *  key-moments timeline. */
+const VIEWS = [{ key: 'pbp', label: 'Play-by-play' }, { key: 'stats', label: 'Match stats' }, { key: 'box', label: 'Box score' }, { key: 'timeline', label: 'Key moments' }] as const;
+
 const LiveExtras: NonNullable<SportPlugin<IceHockeyState>['LiveExtras']> = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster, onPlayer }) => {
   const s = state as IceHockeyState;
+  const [view, setView] = useState<(typeof VIEWS)[number]['key']>('pbp');
+  const names = { home: homeName, away: awayName };
+  const n = Math.min(totalPeriods(s), Math.max(1, s.period));
+  const scopes = n >= 2 ? Array.from({ length: n }, (_, i) => ({ value: i + 1, label: periodName(s, i + 1) })) : [];
   return (
     <View style={{ gap: theme.spacing(3) }}>
-      <Text style={c.h}>Timeline</Text>
-      <LiveTimeline events={iceHockeyTimeline(s, { home: homeName, away: awayName })} homeColor={homeColor} awayColor={awayColor} emptyText="No goals or penalties yet." homeRoster={homeRoster} awayRoster={awayRoster} onPlayer={onPlayer} />
-      <Text style={c.h}>Box score</Text>
-      <MatchBoxScore sport="ice_hockey" source={iceHockeyBox(s, { homeRoster, awayRoster })} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} onPlayer={onPlayer} />
+      <View style={c.chips} accessibilityRole="tablist">
+        {VIEWS.map((v) => <SelectChip key={v.key} label={v.label} active={view === v.key} onPress={() => setView(v.key)} />)}
+      </View>
+      {view === 'pbp' ? (
+        <GroupedFeed groups={iceHockeyCommentary(s, names)} homeColor={homeColor} awayColor={awayColor} tags={ICE_FEED_TAGS} scopeLabel={iceScopeLabel(s)}
+          emptyText="No plays yet — the commentary fills in from the first face-off." />
+      ) : view === 'stats' ? (
+        <StatSheetView build={(sc) => iceHockeySheet(s, sc, s.ended ? undefined : matchSec(s, Date.now()))} scopes={scopes}
+          homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} />
+      ) : view === 'box' ? (
+        <MatchBoxScore sport="ice_hockey" source={iceHockeyBox(s, { homeRoster, awayRoster })} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} onPlayer={onPlayer} show="box" />
+      ) : (
+        <LiveTimeline events={iceHockeyTimeline(s, names)} homeColor={homeColor} awayColor={awayColor} emptyText="No goals or penalties yet." homeRoster={homeRoster} awayRoster={awayRoster} onPlayer={onPlayer} />
+      )}
     </View>
   );
 };
@@ -703,7 +781,7 @@ export const iceHockeyPlugin: SportPlugin<IceHockeyState> = {
   tickerDetail: iceHockeyTickerDetail,
   tickerFlash: iceHockeyTickerFlash,
   undoLabel: iceHockeyUndoLabel,
-  voice: { hints: ['goal {name} assist {name}', 'power play goal {name}', 'shot {name}', 'two minutes tripping {name}', 'time-out home', 'end period'], parse: iceHockeyVoice, ends: iceHockeyVoiceEnds },
+  voice: { hints: ['goal {name} assist {name}', 'power play goal {name}', 'shot {name}', 'two minutes tripping {name}', 'time-out home', 'end period', 'faceoff {name} (when tracked)'], parse: iceHockeyVoice, ends: iceHockeyVoiceEnds },
   ScoringControls,
   LiveClock,
   Scoreboard: IceHockeyScoreboard,
@@ -739,6 +817,7 @@ export const iceHockeyPlugin: SportPlugin<IceHockeyState> = {
     { key: 'soRounds', label: 'Shoot-out shooters a side', type: 'count', default: 5, min: 1, max: 5, advanced: true, hint: 'IIHF 5, NHL 3' },
     { key: 'stopClock', label: 'Stop the clock on goals and penalties', type: 'toggle', default: true, advanced: true },
     { key: 'plusMinus', label: 'Track +/- (pick who was on the ice at each goal)', type: 'toggle', default: false, advanced: true },
+    ...TRACK_FIELDS.map((f) => ({ ...f, advanced: true })),
     { key: 'allowTies', label: 'League games may end tied (no overtime)', type: 'toggle', default: false, advanced: true, hint: 'groups otherwise play overtime + a shoot-out' },
   ],
 };

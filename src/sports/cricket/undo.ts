@@ -17,6 +17,9 @@ const QUIET: Record<string, string> = {
   SET_CAPTAIN: 'captain pick',
   SET_KEEPER: 'keeper pick',
   SHOT: 'wagon-wheel tag',
+  // Deep wave — optional detail
+  BALL_DETAIL: 'ball detail',
+  SET_BOWL_TYPE: 'bowler type',
   START_SUPER_OVER: 'Super Over start',
   POTM: 'player of the match',
   END: 'match end',

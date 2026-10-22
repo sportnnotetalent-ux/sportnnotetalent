@@ -160,13 +160,56 @@ export function declareError(list: LiftAttempt[] | undefined, idx: number, kg: n
   return null;
 }
 
-/** Declare (or change) the next attempt's weight. Returns the new list. */
+/** Declare (or change) the next attempt's weight. Returns the new list.
+ *  Deep wave: changing a coach's declaration (not the app's automatic one)
+ *  keeps the earlier weight in `chg` — IWF allows two changes an attempt. */
 export function declare(list: LiftAttempt[] | undefined, kg: number, rangeOk?: boolean): LiftAttempt[] {
   const l = [...(list ?? [])];
   const i = pendingIndex(l);
-  const a: LiftAttempt = { kg, ...(rangeOk ? { rangeOk: true } : {}) };
+  const prev = i >= 0 ? l[i] : undefined;
+  const chg = prev && !prev.auto && prev.kg !== kg ? [...(prev.chg ?? []), prev.kg] : prev && !prev.auto ? prev.chg : undefined;
+  const a: LiftAttempt = { kg, ...(rangeOk ? { rangeOk: true } : {}), ...(chg?.length ? { chg } : {}) };
   if (i >= 0) l[i] = a;
   else if (l.length < 3) l.push(a);
+  return l;
+}
+
+/** Deep wave: changes of the declared weight made so far on an attempt. */
+export const changeCount = (a?: LiftAttempt): number => a?.chg?.length ?? 0;
+
+/**
+ * Deep wave: would declaring `kg` for the pending attempt go over the meet's
+ * change limit (IWF two — the `wlChanges` rule; 0 = no limit)? The message to
+ * ask with, or null. Replacing the app's automatic declaration is the coach's
+ * declaration, not a change.
+ */
+export function changeLimitIssue(list: LiftAttempt[] | undefined, kg: number, rules?: CompRules | null): string | null {
+  const limit = Number(ruleOf(rules, 'wlChanges'));
+  if (!(limit > 0)) return null;
+  const i = pendingIndex(list);
+  const cur = i >= 0 ? (list ?? [])[i] : undefined;
+  if (!cur || cur.auto || cur.kg === kg) return null;
+  const n = changeCount(cur) + 1;
+  if (n <= limit) return null;
+  return `This would be change ${n} of this attempt's weight (${[...(cur.chg ?? []), cur.kg].join(' → ')} → ${kg} kg). The meet allows ${limit === 2 ? 'two changes (IWF)' : `${limit}`}.`;
+}
+
+/**
+ * Deep wave: the jury reverses decided attempt `i` (good ↔ no lift); reversing
+ * again puts the referees' decision back. The referees' lights stay as they
+ * were. If the next attempt still holds the app's automatic declaration, it
+ * follows the new decision (+1 kg after a good lift, the same after a no lift).
+ * A declined attempt can't be reversed.
+ */
+export function juryReverse(list: LiftAttempt[] | undefined, i: number, rules?: CompRules | null): LiftAttempt[] {
+  const l = [...(list ?? [])];
+  const a = l[i];
+  if (!a || a.pass || a.good === undefined) return l;
+  const { jury: _j, ...rest } = a;
+  const next: LiftAttempt = { ...rest, good: !a.good, ...(a.jury ? {} : { jury: true }) };
+  l[i] = next;
+  const after = l[i + 1];
+  if (after && after.auto && !taken(after)) l[i + 1] = { kg: autoNext(next.kg, next.good === true, rules), auto: true };
   return l;
 }
 
@@ -190,7 +233,7 @@ export function recordLift(list: LiftAttempt[] | undefined, decision: { good?: b
   const i = pendingIndex(l);
   if (i < 0) return l;
   const good = decision.pass ? undefined : decision.lights?.length === 3 ? majority(decision.lights) : !!decision.good;
-  const done: LiftAttempt = { kg: l[i].kg, seq, ...(l[i].rangeOk ? { rangeOk: true } : {}), ...(decision.pass ? { pass: true, good: false } : { good }), ...(decision.lights?.length === 3 ? { lights: decision.lights } : {}) };
+  const done: LiftAttempt = { kg: l[i].kg, seq, ...(l[i].rangeOk ? { rangeOk: true } : {}), ...(decision.pass ? { pass: true, good: false } : { good }), ...(decision.lights?.length === 3 ? { lights: decision.lights } : {}), ...(l[i].chg?.length ? { chg: l[i].chg } : {}) };
   l[i] = done;
   if (i < 2 && l.length === i + 1) l.push({ kg: autoNext(done.kg, done.good === true, rules), auto: true });
   return l;
@@ -283,6 +326,19 @@ export function makeCount(lifts: EntryResult['lifts']): { made: number; attempte
   return { made, attempted };
 }
 
+/** Deep wave: good lifts / attempts per lift, and the openers (each lift's
+ *  first attempt). Declined attempts aren't attempts (as `makeCount`). */
+export function liftCounts(lifts: EntryResult['lifts']): Record<Lift | 'open', { made: number; attempted: number }> {
+  const out = { snatch: { made: 0, attempted: 0 }, cj: { made: 0, attempted: 0 }, open: { made: 0, attempted: 0 } };
+  for (const l of LIFTS) (lifts?.[l] ?? []).forEach((a, i) => {
+    if (a.pass || a.good === undefined) return;
+    out[l].attempted += 1;
+    if (a.good) out[l].made += 1;
+    if (i === 0) { out.open.attempted += 1; if (a.good) out.open.made += 1; }
+  });
+  return out;
+}
+
 /** One lift's attempts for a sheet: "80 (83) 83" — no lifts in brackets, declined "–". */
 export function liftSeries(list?: LiftAttempt[]): string {
   return (list ?? []).filter(taken).map((a) => (a.pass ? '–' : a.good ? String(a.kg) : `(${a.kg})`)).join(' ');
@@ -371,6 +427,9 @@ export interface LiftLine { playerId: string; stats: Record<string, number>; won
  *   liftSilvers / liftBronzes (snatch + C&J medals, when awarded), posPoints,
  *   m_wl_snatch / m_wl_cj / m_wl_total (best good lifts — an out-of-range weight
  *   nobody confirmed is left out), made / attempted, bombOut, bw, sinclair, dq.
+ *   Deep wave (free — from the attempts already stored): snMade / snAtt and
+ *   cjMade / cjAtt (make rate per lift), o1Made / o1Att (openers made) — each
+ *   pair only when that lift had an attempt.
  */
 export function liftLines(f: Pick<PhaseFormat, 'category' | 'rules'>, entries: ResultEntry[], cfg: PointsConfig & { liftMedals?: boolean } = {}): LiftLine[] {
   const total = rankEntries(entries, disciplineOf('wl.total')!);
@@ -404,6 +463,10 @@ export function liftLines(f: Pick<PhaseFormat, 'category' | 'rules'>, entries: R
     if (sum.total != null && sn != null && cj != null) { s.m_wl_total = sum.total; s.mark = sum.total; }
     const mc = makeCount(res.lifts);
     s.made = mc.made; s.attempted = mc.attempted;
+    const pc = liftCounts(res.lifts);
+    if (pc.snatch.attempted) { s.snMade = pc.snatch.made; s.snAtt = pc.snatch.attempted; }
+    if (pc.cj.attempted) { s.cjMade = pc.cj.made; s.cjAtt = pc.cj.attempted; }
+    if (pc.open.attempted) { s.o1Made = pc.open.made; s.o1Att = pc.open.attempted; }
     if (r.status === 'NM') s.bombOut = 1;
     if (res.bodyweight != null) s.bw = res.bodyweight;
     const sin = sinclairTotal(s.m_wl_total, res.bodyweight, f.category?.gender, ruleOf(f.rules, 'sinclairPeriod'));
@@ -430,7 +493,17 @@ export interface LiftingCareer {
   bombOuts: number;
   bests: { key: 'snatch' | 'cj' | 'total' | 'sinclair'; label: string; pb: LiftBest; sb?: LiftBest }[];
   history: { eventId: string; title: string; date: string; text: string; place?: number; medal?: 'gold' | 'silver' | 'bronze'; flags: string[] }[];
+  /** Deep wave: make rate of the snatch, the clean & jerk and the openers —
+   *  only over sessions whose lines carry them (null = never recorded, not 0%) */
+  perLift: Record<Lift | 'open', LiftRate | null>;
+  /** Deep wave: the best snatch / C&J / total in each bodyweight category lifted
+   *  in (known sessions only), heaviest category first */
+  byCategory: { category: string; snatch?: LiftBest; cj?: LiftBest; total?: LiftBest }[];
 }
+
+/** Deep wave: good lifts of attempts, and the rate 0–100 (1 dp). */
+export interface LiftRate { made: number; attempted: number; rate: number }
+const rateOf = (made: number, attempted: number): LiftRate | null => (attempted ? { made, attempted, rate: Math.round((made / attempted) * 1000) / 10 } : null);
 
 const BEST_KEYS = [
   { key: 'snatch', stat: 'm_wl_snatch', label: 'Snatch' },
@@ -446,8 +519,10 @@ export function liftingCareer(
   phases: Map<string, { title: string; date: string; category?: Category; eventTitle?: string }>,
   seasonFrom: string,
 ): LiftingCareer {
-  const c: LiftingCareer = { comps: 0, golds: 0, silvers: 0, bronzes: 0, liftMedals: 0, points: 0, made: 0, attempted: 0, makeRate: null, bombOuts: 0, bests: [], history: [] };
+  const c: LiftingCareer = { comps: 0, golds: 0, silvers: 0, bronzes: 0, liftMedals: 0, points: 0, made: 0, attempted: 0, makeRate: null, bombOuts: 0, bests: [], history: [], perLift: { snatch: null, cj: null, open: null }, byCategory: [] };
   const bests = new Map<string, { key: LiftingCareer['bests'][number]['key']; label: string; pb: LiftBest; sb?: LiftBest }>();
+  const per = { snatch: [0, 0], cj: [0, 0], open: [0, 0] };
+  const cats = new Map<string, { category: string; upTo: number; snatch?: LiftBest; cj?: LiftBest; total?: LiftBest }>();
   const sorted = [...lines].sort((a, b) => (a.date ?? '').localeCompare(b.date ?? ''));
   const pbSoFar = new Map<string, number>();
   for (const l of sorted) {
@@ -471,6 +546,20 @@ export function liftingCareer(
       bests.set(b.key, row);
     }
     if (s.bombOut) flags.push('no total');
+    // Deep wave: per-lift make rates (lines that carry them) and bests per category
+    if (s.snAtt != null) { per.snatch[0] += s.snMade ?? 0; per.snatch[1] += s.snAtt; }
+    if (s.cjAtt != null) { per.cj[0] += s.cjMade ?? 0; per.cj[1] += s.cjAtt; }
+    if (s.o1Att != null) { per.open[0] += s.o1Made ?? 0; per.open[1] += s.o1Att; }
+    if (info?.category?.weightClass) {
+      const label = categoryLabel(info.category);
+      const lim = classLimit(info.category.weightClass);
+      const row = cats.get(label) ?? { category: label, upTo: lim.upTo ?? (lim.over != null ? lim.over + 0.5 : 0) };
+      for (const [k, stat] of [['snatch', 'm_wl_snatch'], ['cj', 'm_wl_cj'], ['total', 'm_wl_total']] as const) {
+        const v = s[stat];
+        if (v != null && (!row[k] || v > row[k]!.value)) row[k] = { value: v, text: `${v} kg`, date, eventId: l.eventId ?? '', category: label };
+      }
+      cats.set(label, row);
+    }
     const medal = s.golds ? 'gold' : s.silvers ? 'silver' : s.bronzes ? 'bronze' : undefined;
     const text = [
       s.place ? `${s.place}${ordinal(s.place).replace(/^\d+/, '')}` : s.dq ? 'DQ' : '',
@@ -482,6 +571,8 @@ export function liftingCareer(
   c.points = Math.round(c.points * 100) / 100;
   c.makeRate = c.attempted ? Math.round((c.made / c.attempted) * 1000) / 10 : null;
   c.bests = BEST_KEYS.map((b) => bests.get(b.key)).filter((x): x is NonNullable<typeof x> => !!x);
+  c.perLift = { snatch: rateOf(per.snatch[0], per.snatch[1]), cj: rateOf(per.cj[0], per.cj[1]), open: rateOf(per.open[0], per.open[1]) };
+  c.byCategory = [...cats.values()].filter((r) => r.snatch || r.cj || r.total).sort((a, b) => b.upTo - a.upTo).map(({ upTo: _u, ...r }) => r);
   c.history.reverse();
   return c;
 }

@@ -7,7 +7,6 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { theme } from '../../core/theme';
 import { textStyles } from '../../components/ui';
-import { LiveTimeline } from '../LiveTimeline';
 import type { Player } from '../../core/types';
 import type { SportPlugin } from '../types';
 import { courtFormation, makeCourt } from '../courts';
@@ -18,12 +17,12 @@ import { SetLineBoard } from '../SetLineBoard';
 import { RallyPointEditor } from '../RallyPointEditor';
 import { MatchStatsPanel } from '../MatchStatsPanel';
 import { PointDetailRow } from '../PointDetailRow';
-import { detailLiveSettings } from '../pointDetailSettings';
+import { detailLiveSettings, trackFormatFields } from '../pointDetailSettings';
+import { RacketCommentary } from '../RacketCommentary';
 import { PointButtons, ServeFirstPicker } from '../PointButtons';
 import { pointPressure, pressureText } from '../pointStatus';
 import { init, reducer, serve, summary, scoreLine, lineScore, standingsUnits, badmintonCue, type BadmintonState } from './engine';
-import { CueBanner, useCueTimeline } from '../CueBanner';
-import { pointInputs } from '../rallyEdit';
+import { CueBanner } from '../CueBanner';
 import { badmintonTotals } from '../racketTotals';
 import { durationLine, stampDispatch, withDuration } from '../conduct';
 import { makeRacketQuickOptions } from '../RacketQuickOptions';
@@ -82,7 +81,8 @@ const ScoringControls: SportPlugin<BadmintonState>['ScoringControls'] = ({ state
         disabled={needsServer} disabledHint="Pick who serves first to start scoring."
         onPoint={point}
       />
-      {/* SD-107 — optional "how was it won?" for the last rally */}
+      {/* SD-107 / deep wave — optional detail for the last rally: how, forehand /
+          backhand + shot, error / service-fault type, rally length */}
       <PointDetailRow sport="badminton" state={s} dispatch={dispatch} homeName={homeName} awayName={awayName} homeRoster={homeRoster} awayRoster={awayRoster} />
       <RallyPointEditor
         events={s.events} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor}
@@ -95,8 +95,6 @@ const ScoringControls: SportPlugin<BadmintonState>['ScoringControls'] = ({ state
 
 const LiveExtras: NonNullable<SportPlugin<BadmintonState>['LiveExtras']> = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster, onPlayer }) => {
   const s = state as BadmintonState;
-  // SD-117c — interval / change-ends markers on the rally log (display only)
-  const timeline = useCueTimeline(reducer, s, pointInputs, badmintonCue);
   return (
     <View style={{ gap: theme.spacing(3) }}>
       <Text style={ctrl.label}>Games</Text>
@@ -107,14 +105,16 @@ const LiveExtras: NonNullable<SportPlugin<BadmintonState>['LiveExtras']> = ({ st
           s.games.map((g, i) => <Text key={i} style={ctrl.gameChip}>G{i + 1}: {g[0]}-{g[1]}</Text>)
         )}
       </View>
-      {/* SD-22: serve / return figures replayed from the point log, per set */}
+      {/* SD-22 / deep wave: key stats, serve, shots, rally length — replayed from the point log, per game */}
       <MatchStatsPanel sport="badminton" state={s} homeName={homeName} awayName={awayName} homeRoster={homeRoster} awayRoster={awayRoster} homeColor={homeColor} awayColor={awayColor} />
       {/* SD-54 — match and game durations (from the scorer's tap times) */}
       {durationLine(s.events, 'G') ? <Text style={textStyles.muted}>{durationLine(s.events, 'G')}</Text> : null}
       <Text style={ctrl.label}>Player stats</Text>
       <MatchBoxScore sport="badminton" source={badmintonBox(s, { homeRoster, awayRoster })} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} onPlayer={onPlayer} />
-      <Text style={ctrl.label}>Rally log</Text>
-      <LiveTimeline events={timeline} homeColor={homeColor} awayColor={awayColor} emptyText="No rallies yet." homeRoster={homeRoster} awayRoster={awayRoster} onPlayer={onPlayer} />
+      {/* deep wave — commentary by game, newest first (replaces the rally log;
+          the interval / change-ends cues are inline) */}
+      <Text style={ctrl.label}>Commentary</Text>
+      <RacketCommentary sport="badminton" icon="🏸" state={s} homeName={homeName} awayName={awayName} homeRoster={homeRoster} awayRoster={awayRoster} homeColor={homeColor} awayColor={awayColor} />
     </View>
   );
 };
@@ -165,7 +165,7 @@ export const badmintonPlugin: SportPlugin<BadmintonState> = {
   retireTerms: true,
   ScoringControls,
   LiveExtras,
-  // SD-107 — the optional point-detail setting (event mode: from the next point)
+  // SD-107 / deep wave — "Stats to track": point detail, rally length (event mode: from the next rally)
   liveSettings: detailLiveSettings('badminton'),
   formation: () => courtFormation('badminton'),
   Court: makeCourt('badminton'),
@@ -205,6 +205,9 @@ export const badmintonPlugin: SportPlugin<BadmintonState> = {
         { value: 1, label: 'Single game' },
       ],
     },
+    // deep wave — "Stats to track" defaults for every match of this format
+    // (the scorer can still change them per match in ⚙️ Scoring settings)
+    ...trackFormatFields('badminton'),
   ],
 };
 

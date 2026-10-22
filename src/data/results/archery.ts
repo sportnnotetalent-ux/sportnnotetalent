@@ -26,6 +26,7 @@ import { archMatch, bracketState, isBracketRows, outcomeText, roundShort, type B
 import { cycPhaseName } from './cyclingDefs.ts';
 import { archTeamOf } from './archeryDefs.ts';
 import { isTeamRow, teamLines, teamCareer } from './teamEvents.ts';
+import { matchPlayOf } from './archeryInsights.ts';
 
 export * from './archeryDefs.ts';
 export {
@@ -66,7 +67,7 @@ export function phaseNameOf(f: { discipline: string; phase: PhaseKind; plan?: { 
  * run together when unambiguous ("X109987" is not — use spaces). An optional
  * "= 53" checks the arrows against the scorecard's end total.
  */
-export function parseEnd(text: string, perEnd: number): { arrows: Arrow[] } | { error: string } {
+export function parseEnd(text: string, perEnd: number, minRing?: number): { arrows: Arrow[] } | { error: string } {
   const [lhs, rhs] = text.split('=');
   const parts = lhs.trim().split(/[\s,;]+/).filter(Boolean);
   if (!parts.length) return { error: 'Type the arrows, e.g. X 10 9 8 7 M.' };
@@ -76,7 +77,7 @@ export function parseEnd(text: string, perEnd: number): { arrows: Arrow[] } | { 
     if (a == null) return { error: `Arrow ${arrows.length + 1}: "${p}" isn't a score (X, 10 … 1, M).` };
     arrows.push(a);
   }
-  const bad = endError(arrows, perEnd);
+  const bad = endError(arrows, perEnd, minRing);
   if (bad) return { error: bad };
   if (rhs != null && rhs.trim()) {
     const t = Number(rhs.trim());
@@ -86,10 +87,12 @@ export function parseEnd(text: string, perEnd: number): { arrows: Arrow[] } | { 
   return { arrows: sortEnd(arrows) };
 }
 
-/** Hard limits of an end: exactly `perEnd` arrows (6 outdoor / 3 indoor and in matches), each X / 10 … 1 / M. */
-export function endError(arrows: Arrow[], perEnd: number): string | null {
+/** Hard limits of an end: exactly `perEnd` arrows (6 outdoor / 3 indoor and in matches), each X / 10 … 1 / M
+ *  (deep wave: `minRing` — a 6-ring / triple face has no rings below 5 / 6: such an arrow is M). */
+export function endError(arrows: Arrow[], perEnd: number, minRing?: number): string | null {
   if (arrows.length !== perEnd) return `${arrows.length} arrow${arrows.length === 1 ? '' : 's'} — an end here is ${perEnd} arrows.`;
   if (arrows.some((a) => parseArrow(String(a)) == null)) return 'An arrow scores X, 10 … 1 or M.';
+  if (minRing && minRing > 1 && arrows.some((a) => typeof a === 'number' && a < minRing)) return `This face has rings ${minRing}–10 (X) only — an arrow outside the ${minRing} ring is M.`;
   if (endSum(arrows) > endMax(perEnd)) return `An end of ${perEnd} can't score more than ${endMax(perEnd)}.`;
   return null;
 }
@@ -238,6 +241,9 @@ export interface ArchLine { playerId: string; stats: Record<string, number>; won
  *   match play ('bracket'): brackets, mW / mL (matches won / lost), sp / spA (set
  *     points won / against, set system), place;
  *   medals (golds / silvers / bronzes) and posPoints on the deciding phase.
+ * Deep wave (free — from the arrows already stored): ranking rEnds (ends shot —
+ * X per end), n9 (9s), bestEnd; match play mArrows / mPts (average arrow in
+ * matches), mTens / mXs, soW / soL (shoot-offs won / lost, only when shot).
  */
 export function archLines(f: Pick<PhaseFormat, 'discipline' | 'category' | 'rules'>, ranked: RankedEntry[], kind: 'qual' | 'match' | 'bracket', awards: Award[] = [], seeded: Set<string> = new Set()): ArchLine[] {
   const round = archRoundOf(f.discipline);
@@ -281,11 +287,18 @@ export function archLines(f: Pick<PhaseFormat, 'discipline' | 'category' | 'rule
       }
       s.mW = w; s.mL = l;
       if (st.fmt === 'sets') { s.sp = sp; s.spA = spA; }
+      const mp = matchPlayOf(st, r.id, (id, key) => ranked.find((x) => x.id === id)?.entry.result.mp?.[key]);
+      if (mp.arrows) { s.mArrows = mp.arrows; s.mPts = mp.points; s.mTens = mp.tens; s.mXs = mp.xs; }
+      if (mp.shootOffs.won) s.soW = mp.shootOffs.won;
+      if (mp.shootOffs.lost) s.soL = mp.shootOffs.lost;
     } else {
       s.comps = 1;
       const ends = (res.ends ?? []).filter((e) => e?.length);
       const t = archTotals(ends);
-      if (ends.length) { s.arrows = t.arrows; s.pts = t.mark; s.tens = t.tens; s.xs = t.xs; }
+      if (ends.length) {
+        s.arrows = t.arrows; s.pts = t.mark; s.tens = t.tens; s.xs = t.xs;
+        s.rEnds = ends.length; s.n9 = ends.flat().filter((a) => a === 9).length; s.bestEnd = Math.max(...ends.map(endSum));
+      }
       if (r.bestLegal != null && ends.length >= endsOf(round)) s[archMarkKey(round.key)] = r.bestLegal;
       if (kind === 'match' && r.position != null) s.place = r.position;
       if (kind === 'qual' && r.position != null) s.rPlace = r.position;
@@ -310,8 +323,15 @@ export interface ArcheryCareer {
   avgArrow: number | null;
   /** 10s (X included) and X per 100 arrows */
   tenRate: number | null; xRate: number | null;
-  /** best complete ranking round per round (PB / SB) with the average arrow */
-  bests: { key: string; label: string; pb: ArchBest; sb?: ArchBest; avgArrow: number; rounds: number }[];
+  /** best complete ranking round per round (PB / SB) with the average arrow
+   *  (deep wave: and the best end shot in that round, when recorded) */
+  bests: { key: string; label: string; pb: ArchBest; sb?: ArchBest; avgArrow: number; rounds: number; bestEnd?: number }[];
+  /** Deep wave: X per end over ranking rounds that recorded their ends (null = none) */
+  xPerEnd: number | null;
+  /** Deep wave: arrows shot in matches, the average arrow and 10s / X there (null = none recorded) */
+  match: { arrows: number; points: number; avgArrow: number; tens: number; xs: number } | null;
+  /** Deep wave: shoot-offs in match play won / lost */
+  shootOffs: { won: number; lost: number };
   history: { eventId: string; title: string; date: string; text: string; place?: number; medal?: 'gold' | 'silver' | 'bronze'; flags: string[] }[];
   /** SD-137b: team / mixed team events, their medals (also in the medal counts above) and team matches */
   team: { events: number; golds: number; silvers: number; bronzes: number; won: number; lost: number };
@@ -326,7 +346,9 @@ export function archeryCareer(
   phases: Map<string, { discipline: string; title: string; date: string; category?: Category; eventTitle?: string; phase?: string }>,
   seasonFrom: string,
 ): ArcheryCareer {
-  const c: ArcheryCareer = { comps: 0, brackets: 0, mW: 0, mL: 0, sp: 0, spA: 0, golds: 0, silvers: 0, bronzes: 0, points: 0, arrows: 0, pts: 0, tens: 0, xs: 0, avgArrow: null, tenRate: null, xRate: null, bests: [], history: [], team: teamCareer(lines) };
+  const c: ArcheryCareer = { comps: 0, brackets: 0, mW: 0, mL: 0, sp: 0, spA: 0, golds: 0, silvers: 0, bronzes: 0, points: 0, arrows: 0, pts: 0, tens: 0, xs: 0, avgArrow: null, tenRate: null, xRate: null, bests: [], history: [], team: teamCareer(lines), xPerEnd: null, match: null, shootOffs: { won: 0, lost: 0 } };
+  let endXsSum = 0, endsSum = 0;
+  const m = { arrows: 0, points: 0, tens: 0, xs: 0 };
   const bests = new Map<string, ArcheryCareer['bests'][number] & { ptsSum: number; arrowSum: number }>();
   const sorted = [...lines].sort((a, b) => (a.date ?? '').localeCompare(b.date ?? ''));
   const pbSoFar = new Map<string, number>();
@@ -340,11 +362,15 @@ export function archeryCareer(
     c.mW += s.mW ?? 0; c.mL += s.mL ?? 0; c.sp += s.sp ?? 0; c.spA += s.spA ?? 0;
     c.golds += s.golds ?? 0; c.silvers += s.silvers ?? 0; c.bronzes += s.bronzes ?? 0; c.points += s.posPoints ?? 0;
     c.arrows += s.arrows ?? 0; c.pts += s.pts ?? 0; c.tens += s.tens ?? 0; c.xs += s.xs ?? 0;
+    if (s.rEnds) { endsSum += s.rEnds; endXsSum += s.xs ?? 0; }
+    if (s.mArrows) { m.arrows += s.mArrows; m.points += s.mPts ?? 0; m.tens += s.mTens ?? 0; m.xs += s.mXs ?? 0; }
+    c.shootOffs.won += s.soW ?? 0; c.shootOffs.lost += s.soL ?? 0;
     const date = info?.date ?? l.date ?? '';
     const flags: string[] = [];
     if (round && s.arrows) {
       const row = bests.get(round.key) ?? { key: round.key, label: `${round.label} (${round.arrows} arrows)`, pb: { value: -1, text: '', date: '', eventId: '' }, avgArrow: 0, rounds: 0, ptsSum: 0, arrowSum: 0 };
       row.ptsSum += s.pts ?? 0; row.arrowSum += s.arrows;
+      if (s.bestEnd != null && (row.bestEnd == null || s.bestEnd > row.bestEnd)) row.bestEnd = s.bestEnd;
       const v = key ? s[key] : undefined;
       if (v != null) {
         row.rounds += 1;
@@ -361,7 +387,7 @@ export function archeryCareer(
     const text = s.teamEv
       ? ['team', s.place ? ord(s.place) : '', s.tmW != null ? `team matches won ${s.tmW}, lost ${s.tmL ?? 0}` : ''].filter(Boolean).join(' · ')
       : s.brackets
-      ? [s.place ? `${ord(s.place)} in match play` : 'match play', `won ${s.mW ?? 0}, lost ${s.mL ?? 0}`, s.sp != null ? `${s.sp} set points` : ''].filter(Boolean).join(' · ')
+      ? [s.place ? `${ord(s.place)} in match play` : 'match play', `won ${s.mW ?? 0}, lost ${s.mL ?? 0}`, s.sp != null ? `${s.sp} set points` : '', s.mArrows ? `avg arrow ${((s.mPts ?? 0) / s.mArrows).toFixed(2)}` : ''].filter(Boolean).join(' · ')
       : [s.place ? ord(s.place) : s.rPlace ? `${ord(s.rPlace)} in the ranking round` : s.dq ? 'DQ' : '', s.pts != null ? `${s.pts}` : '', s.arrows ? `${s.arrows} arrows` : ''].filter(Boolean).join(' · ');
     c.history.push({ eventId: l.eventId ?? '', title: info?.title ?? l.opponent ?? 'Archery', date, text, place: s.place, medal, flags });
   }
@@ -369,6 +395,8 @@ export function archeryCareer(
   c.avgArrow = c.arrows ? Math.round((c.pts / c.arrows) * 100) / 100 : null;
   c.tenRate = pct(c.tens, c.arrows);
   c.xRate = pct(c.xs, c.arrows);
+  c.xPerEnd = endsSum ? Math.round((endXsSum / endsSum) * 100) / 100 : null;
+  c.match = m.arrows ? { ...m, avgArrow: Math.round((m.points / m.arrows) * 100) / 100 } : null;
   c.bests = [...bests.values()].filter((b) => b.arrowSum > 0).map(({ ptsSum, arrowSum, ...b }) => ({
     ...b, pb: b.pb.value >= 0 ? b.pb : { ...b.pb, value: 0, text: '–' }, avgArrow: Math.round((ptsSum / arrowSum) * 100) / 100,
   }));

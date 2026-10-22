@@ -54,6 +54,32 @@ export interface BBEvent {
   /** SD-132: the game-clock second (played in its period) on plays logged
    *  with the stoppable clock. Absent on older logs. */
   sec?: number;
+  /** Deep wave — where a field goal (made or missed) was taken from, on shots
+   *  logged with "Shot zones" on. Absent = not charted. */
+  zone?: ShotZone;
+  /** Deep wave — a made field goal logged while "Fast-break points" was
+   *  tracked (it counts toward the coverage); `fb` = tagged a fast break. */
+  fbt?: true;
+  fb?: true;
+  /** Deep wave — a foul logged while "Fouls drawn" was tracked (`fdt`), and
+   *  the player who drew it (name + id), when the scorer picked one. */
+  fdt?: true;
+  drawn?: string;
+  drawnPid?: string;
+}
+
+/** Deep wave — the broadcast shot-chart zones (NBA / FIBA LiveStats): the
+ *  restricted area / paint, mid-range (inside the arc, outside the paint),
+ *  the corner 3 and the 3 above the break. In 3×3 the arc shots score 2. */
+export type ShotZone = 'paint' | 'mid' | 'c3' | 'ab3';
+export const SHOT_ZONES: ShotZone[] = ['paint', 'mid', 'c3', 'ab3'];
+export const isShotZone = (z: unknown): z is ShotZone => z === 'paint' || z === 'mid' || z === 'c3' || z === 'ab3';
+/** Is the zone behind the arc (a 3 — or a 2 in a half-court game)? */
+export const zoneBehindArc = (z: ShotZone): boolean => z === 'c3' || z === 'ab3';
+/** "Paint", "Mid-range", "Corner 3", "Above-the-break 3" (half-court: "Corner 2"…). */
+export function zoneLabel(z: ShotZone, halfCourt = false): string {
+  const arc = halfCourt ? '2' : '3';
+  return z === 'paint' ? 'Paint' : z === 'mid' ? 'Mid-range' : z === 'c3' ? `Corner ${arc}` : `Above-the-break ${arc}`;
 }
 
 export const BB_META: Record<BBEventType, { icon: string; label: string }> = {

@@ -133,7 +133,12 @@ export function rotationFor(s: VolleyballState, n: number, side: Side): { player
 
 export const liberosOf = (s: VolleyballState, side: Side): CourtPlayer[] => s.liberos?.[side] ?? [];
 
-export interface RallyServe { set: number; side: Side | null; serverId?: string; serverName?: string; /** SD-136: a penalty point (no rally served) */ pen?: true }
+export interface RallyServe {
+  set: number; side: Side | null; serverId?: string; serverName?: string; /** SD-136: a penalty point (no rally served) */ pen?: true;
+  /** deep wave — the player at position I of each side whose rotation is
+   *  known (the "rotation" the side played the rally in — rotation analysis) */
+  atI?: { home?: CourtPlayer; away?: CourtPlayer };
+}
 
 export interface SetCourt {
   n: number;
@@ -218,7 +223,12 @@ export function trackCourt(s: VolleyballState): VbTrack {
       const e = s.events[pts[i]];
       const W = e.side as Side;
       const srv = S && ord[S] ? c[S]?.[0] : undefined;
-      out[order.get(pts[i])!] = { set: n, side: S, ...(srv ? { serverId: srv.id, serverName: srv.name } : {}), ...(e.pen ? { pen: true as const } : {}) };
+      const hI = ord.home ? c.home?.[0] : undefined;
+      const aI = ord.away ? c.away?.[0] : undefined;
+      out[order.get(pts[i])!] = {
+        set: n, side: S, ...(srv ? { serverId: srv.id, serverName: srv.name } : {}), ...(e.pen ? { pen: true as const } : {}),
+        ...(hI || aI ? { atI: { ...(hI ? { home: { ...hI } } : {}), ...(aI ? { away: { ...aI } } : {}) } } : {}),
+      };
       // side-out: the team that wins the serve back rotates one place (FIVB 7.6.2)
       if (S && W !== S && ord[W] && c[W] && c[W]!.length > 1) c[W] = [...c[W]!.slice(1), c[W]![0]];
       S = W;

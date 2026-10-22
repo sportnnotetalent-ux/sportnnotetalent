@@ -2,7 +2,9 @@
  *  scorer's correction list and the named Undo. PURE. */
 import type { LiveEvent } from '../liveEvents';
 import { shootoutOrderRows } from '../shootoutOrder.ts';
-import { minuteText, periodName, clockAt, pointsOf, DETAIL_LABEL, KICK_LABEL, type RugbyEvent, type RugbyState } from './engine.ts';
+import {
+  minuteText, periodName, clockAt, pointsOf, CAUSE_LABEL, DETAIL_LABEL, INFRINGEMENT_LABEL, KICK_LABEL, TALLY_LABEL, type RugbyEvent, type RugbyState,
+} from './engine.ts';
 
 /** One row's icon + words ("🏉 Try · Asha Rao · assist Meera"). */
 export function describeEvent(e: RugbyEvent): { icon: string; label: string; detail?: string } {
@@ -29,13 +31,23 @@ export function describeEvent(e: RugbyEvent): { icon: string; label: string; det
       return { icon: '📋', label: DETAIL_LABEL[e.detail ?? 'tackle'], detail: e.playerName };
     case 'setpiece':
       return { icon: e.piece === 'scrum' ? '🤼' : '🙌', label: `${e.piece === 'scrum' ? 'Scrum' : 'Lineout'} ${e.won ? 'won' : 'lost'} (own ${e.piece === 'scrum' ? 'feed' : 'throw'})` };
+    case 'tally': {
+      const k = e.tally ?? 'entry';
+      const why = k === 'penalty' && e.infringement ? INFRINGEMENT_LABEL[e.infringement] : k === 'turnover' && e.cause ? CAUSE_LABEL[e.cause] : '';
+      return {
+        icon: k === 'penalty' ? '⚖' : k === 'freeKick' ? '🏳' : k === 'turnover' ? '🔄' : k === 'entry' ? '⏩' : '🤲',
+        label: TALLY_LABEL[k],
+        ...(e.playerName || why ? { detail: [e.playerName, why].filter(Boolean).join(' · ') } : {}),
+      };
+    }
   }
 }
 
 /** The viewer timeline (LiveTimeline sorts by id: period, then playing time).
- *  Detail and set-piece rows stay off it (they'd drown the scores). */
+ *  Detail, set-piece and the optional tally rows stay off it (they'd drown
+ *  the scores) — they're in the commentary, the stats sheet and the box. */
 export function rugbyTimeline(s: RugbyState, names?: { home?: string; away?: string }): LiveEvent[] {
-  return [...s.events.map((e, i) => ({ e, i })).filter(({ e }) => e.type !== 'detail' && e.type !== 'setpiece').map(({ e, i }) => {
+  return [...s.events.map((e, i) => ({ e, i })).filter(({ e }) => e.type !== 'detail' && e.type !== 'setpiece' && e.type !== 'tally').map(({ e, i }) => {
     const d = describeEvent(e);
     const name = e.type === 'sub' ? e.secondName : e.official ? undefined : e.playerName;
     return {
@@ -68,6 +80,8 @@ export function rugbyUndoLabel(step: { type: string; prev: unknown; next: unknow
   if (step.type === 'XI') return 'line-up';
   if (step.type === 'SO_ORDER' || step.type === 'START_SHOOTOUT') return 'kicking order pick';
   if (step.type === 'SO') return 'kicking competition kick';
+  if (step.type === 'POSSESSION') return 'possession switch';
+  if (step.type === 'TERRITORY') return 'territory switch';
   if (!prev?.events || !next?.events || next.events.length <= prev.events.length) return null;
   const e = next.events[next.events.length - 1];
   const d = describeEvent(e);

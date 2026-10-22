@@ -21,23 +21,27 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { theme } from '../../core/theme';
 import { ensureContrast } from '../../core/contrast';
-import { Button, TextField } from '../../components/ui';
+import { Button, SelectChip, TextField } from '../../components/ui';
 import { confirmMatchAction } from '../../components/ConfirmSheet';
 import { LineScoreboard } from '../../components/LineScoreboard';
 import { MatchBoxScore } from '../../components/BoxScore';
 import { FieldBanner } from '../FieldBanner';
-import { LiveTimeline } from '../LiveTimeline';
 import type { Player } from '../../core/types';
 import type { ScoreAction, SportPlugin } from '../types';
 import {
   init, reducer, isComplete, result, matchSec, periodLen, clockFace, periodName, periodLong, periodStarted, running, timeUp,
   eventCredits, creditAttribution, centreInfo, lineupAt, timeoutCheck, sanctionsOf, totalPeriods, isOpen, playOnLead, other,
   NETBALL_PRESETS, NETBALL_LIVE_SETTINGS, LIVE_KEYS, POSITIONS, POS_AREAS,
-  type NetballEvent, type NetballState, type Pos, type Sanction, type Side, type StatKind, type StopReason, type PenaltyKind,
+  superShotLive, goalPoints, TURNOVER_TYPES, TURNOVER_LABEL,
+  type NetballEvent, type NetballState, type Pos, type Sanction, type Side, type StatKind, type StopReason, type PenaltyKind, type TurnoverType,
 } from './engine';
+import { PlayFeed } from '../PlayFeed';
+import { CategoryStatsPanel } from '../CategoryStatsPanel';
+import { netballFeed } from './commentary';
+import { netballPanel, nbPanelPeriods } from './panel';
 import { netballTotals, netballLiveField, unavailable } from './totals';
 import { netballBox } from './box';
-import { netballTimeline, describeEvent, eventWhen, timelineEvents } from './timeline';
+import { describeEvent, eventWhen, timelineEvents } from './timeline';
 import { netballTickerDetail, netballTickerFlash } from './ticker';
 import { netballFormation, NetballCourt } from './court';
 import { usePendingEdit } from '../usePendingEdit';
@@ -54,6 +58,10 @@ const STAT_BTN: { kind: StatKind; label: string; a11y: string }[] = [
   { kind: 'rebound', label: '⤴️ Rebound', a11y: 'Rebound' },
   { kind: 'turnover', label: '⚠️ Turnover', a11y: 'Turnover (lost the ball)' },
 ];
+/** Deep wave — "Gains & pick-ups": a loose ball won (statTotals-only credit). */
+const PICKUP_BTN: { kind: StatKind; label: string; a11y: string } = { kind: 'pickup', label: '🤲 Pick-up', a11y: 'Pick-up (loose ball won)' };
+/** Deep wave — who can take a centre pass (the centre third, not the C). */
+const CPR_POS: Pos[] = ['WA', 'GA', 'WD', 'GD'];
 
 /* ------------------------------ player picker ------------------------------ */
 
@@ -80,7 +88,8 @@ type Flow =
   | { mode: 'goal'; side: Side; pos: Pos; shooter: Player | null; step: 'feed' }
   | { mode: 'miss'; side: Side; pos: Pos; shooter: Player | null; step: 'feed' | 'rebound'; feeder?: Player | null }
   | { mode: 'shooter'; side: Side; pos: Pos; miss: boolean }
-  | { mode: 'stat'; side: Side; kind: StatKind }
+  // Deep wave: a deflection's outcome / a turnover's type follow the player (when tracked)
+  | { mode: 'stat'; side: Side; kind: StatKind; player?: Player | null; step?: 'outcome' }
   | { mode: 'penalty'; side: Side; step: 'kind' | 'player'; kind?: PenaltyKind }
   | { mode: 'sanction'; side: Side; step: 'kind' | 'player'; kind?: Sanction }
   | { mode: 'sub'; side: Side; step: 'off' | 'on' | 'pos'; off?: Player | null; on?: Player }
@@ -100,13 +109,16 @@ const ScoringControls: SportPlugin<NetballState>['ScoringControls'] = ({
   const [clockInput, setClockInput] = useState('');
   const [setting, setSetting] = useState(false);
   const [official, setOfficial] = useState('');
+  // Deep wave: "⭐ Super shot" armed for the next shot of this side (super-shot formats)
+  const [armed, setArmed] = useState<Side | null>(null);
   const [, tick] = useState(0);
   useEffect(() => {
     if (!running(s)) return;
     const id = setInterval(() => tick((n) => n + 1), 1000);
     return () => clearInterval(id);
   }, [s.clock.since, s.ended]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { if (flow === null && editAt) { setEditAt(null); dropHeldRemoval(); } }, [flow]); // eslint-disable-line react-hooks/exhaustive-deps
+  // deep wave: a cancelled re-entry of a super shot doesn't leave the next shot armed
+  useEffect(() => { if (flow === null && editAt) { setEditAt(null); dropHeldRemoval(); setArmed(null); } }, [flow]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const now = Date.now();
   const name = (sd: Side) => (sd === 'home' ? homeName : awayName);
@@ -171,13 +183,19 @@ const ScoringControls: SportPlugin<NetballState>['ScoringControls'] = ({
     const cr = eventCredits(e);
     return { attribution: creditAttribution(cr.first, 1, TRACKED), attribution2: creditAttribution(cr.second, 1, TRACKED) };
   };
+  // Deep wave: an armed super shot scores 2 / is a super-shot attempt (then disarms)
+  const superArmed = (sd: Side) => armed === sd && !!s.superShot && (superShotLive(s, Date.now()) || !!editAt);
   const goal = (sd: Side, pos: Pos, shooter: Player | null, feeder: Player | null) => {
-    fire({ type: 'GOAL', side: sd, payload: { pos }, ...credit({ type: 'goal', playerId: shooter?.id, playerName: shooter?.fullName, secondId: feeder?.id, secondName: feeder?.fullName }) });
+    const two = superArmed(sd);
+    setArmed(null);
+    fire({ type: 'GOAL', side: sd, payload: { pos, ...(two ? { points: 2 } : {}) }, ...credit({ type: 'goal', playerId: shooter?.id, playerName: shooter?.fullName, secondId: feeder?.id, secondName: feeder?.fullName }) });
     setFlow(null);
   };
   const miss = (sd: Side, pos: Pos, shooter: Player | null, feeder: Player | null, rebound?: { side: Side; p: Player } | null) => {
     const id = uid();
-    fire({ type: 'MISS', side: sd, payload: { pos, uid: id }, ...credit({ type: 'miss', playerId: shooter?.id, playerName: shooter?.fullName, secondId: feeder?.id, secondName: feeder?.fullName }) });
+    const ss = superArmed(sd);
+    setArmed(null);
+    fire({ type: 'MISS', side: sd, payload: { pos, uid: id, ...(ss ? { ss: true } : {}) }, ...credit({ type: 'miss', playerId: shooter?.id, playerName: shooter?.fullName, secondId: feeder?.id, secondName: feeder?.fullName }) });
     if (rebound) fire({ type: 'STAT', side: rebound.side, payload: { kind: 'rebound', ref: id }, ...credit({ type: 'stat', stat: REBOUND, playerId: rebound.p.id, playerName: rebound.p.fullName }) });
     setFlow(null);
   };
@@ -191,9 +209,16 @@ const ScoringControls: SportPlugin<NetballState>['ScoringControls'] = ({
     if (!s.detail) { if (isMiss) miss(sd, pos, shooter, null); else goal(sd, pos, shooter, null); return; }
     setFlow(isMiss ? { mode: 'miss', side: sd, pos, shooter, step: 'feed' } : { mode: 'goal', side: sd, pos, shooter, step: 'feed' });
   };
-  const stat = (sd: Side, kind: StatKind, p: Player | null) => {
-    fire({ type: 'STAT', side: sd, payload: { kind }, ...credit({ type: 'stat', stat: kind, playerId: p?.id, playerName: p?.fullName }) });
+  const stat = (sd: Side, kind: StatKind, p: Player | null, extra: { gain?: boolean; tt?: TurnoverType } = {}) => {
+    // deep wave: a pick-up is a statTotals-only credit, so its player rides in the payload
+    const who = kind === 'pickup' && p ? { playerId: p.id, playerName: p.fullName } : {};
+    fire({ type: 'STAT', side: sd, payload: { kind, ...who, ...(typeof extra.gain === 'boolean' ? { gain: extra.gain } : {}), ...(extra.tt ? { tt: extra.tt } : {}) }, ...credit({ type: 'stat', stat: kind, playerId: p?.id, playerName: p?.fullName }) });
     setFlow(null);
+  };
+  /** after the player: a deflection's outcome / a turnover's type when tracked */
+  const statPicked = (sd: Side, kind: StatKind, p: Player | null) => {
+    if ((kind === 'deflection' && s.trackGains) || (kind === 'turnover' && s.trackTurnovers)) setFlow({ mode: 'stat', side: sd, kind, player: p, step: 'outcome' });
+    else stat(sd, kind, p);
   };
   const penalty = (sd: Side, kind: PenaltyKind, p: Player | null) => {
     fire({ type: 'PENALTY', side: sd, payload: { penalty: kind }, ...credit({ type: 'penalty', penalty: kind, playerId: p?.id, playerName: p?.fullName }) });
@@ -243,12 +268,12 @@ const ScoringControls: SportPlugin<NetballState>['ScoringControls'] = ({
   };
   const remove = (e: NetballEvent) => { for (const a of removalActions(e)) dispatch(a); };
   const edit = (e: NetballEvent) => {
-    if (!e.side || e.type === 'timeout' || e.type === 'stop' || e.type === 'centre' || isAnswer(e)) { remove(e); return; }
+    if (!e.side || e.type === 'timeout' || e.type === 'stop' || e.type === 'centre' || e.type === 'cpr' || isAnswer(e)) { remove(e); return; }
     holdRemoval(removalActions(e));
     setEditAt({ sec: e.sec, period: e.period });
     setShowEdit(false);
     const sd = e.side;
-    if (e.type === 'goal' || e.type === 'miss') setFlow({ mode: 'shooter', side: sd, pos: e.pos ?? 'GS', miss: e.type === 'miss' });
+    if (e.type === 'goal' || e.type === 'miss') { setArmed(e.points === 2 || e.ss ? sd : null); setFlow({ mode: 'shooter', side: sd, pos: e.pos ?? 'GS', miss: e.type === 'miss' }); }
     else if (e.type === 'stat') setFlow({ mode: 'stat', side: sd, kind: e.stat ?? 'intercept' });
     else if (e.type === 'penalty') setFlow({ mode: 'penalty', side: sd, step: 'kind' });
     else if (e.type === 'sanction') setFlow({ mode: 'sanction', side: sd, step: 'kind' });
@@ -298,6 +323,15 @@ const ScoringControls: SportPlugin<NetballState>['ScoringControls'] = ({
   }
 
   const cp = centreInfo(s).now;
+  // Deep wave: this centre pass already has its receiver (since the last goal / quarter start)
+  const cprLogged = (() => {
+    for (let i = s.events.length - 1; i >= 0; i--) {
+      const e = s.events[i];
+      if (e.period !== s.period || e.type === 'goal' || e.type === 'centre') return false;
+      if (e.type === 'cpr') return true;
+    }
+    return false;
+  })();
   const needToss = !s.firstCentre && s.period === 1 && !periodStarted(s) && !s.events.some((e) => e.type === 'goal');
 
   /* ---- flows ---- */
@@ -363,10 +397,32 @@ const ScoringControls: SportPlugin<NetballState>['ScoringControls'] = ({
           );
         }
       case 'stat': {
-        const b = STAT_BTN.find((x) => x.kind === flow.kind)!;
+        const b = [...STAT_BTN, PICKUP_BTN].find((x) => x.kind === flow.kind)!;
+        if (flow.step === 'outcome') {
+          const who = flow.player ? ` · ${flow.player.fullName}` : '';
+          // Deep wave — "Gains & pick-ups": did the deflection win the ball?
+          if (flow.kind === 'deflection') return (
+            <View style={c.panel}>{head(`${b.label}${who}`, sd)}
+              <View style={c.row}>
+                <Button label="Gain — won it" variant="ghost" style={c.flex} onPress={() => stat(sd, flow.kind, flow.player ?? null, { gain: true })} />
+                <Button label="No gain" variant="ghost" style={c.flex} onPress={() => stat(sd, flow.kind, flow.player ?? null, { gain: false })} />
+              </View>
+              <Text style={c.cancel} accessibilityRole="button" onPress={() => stat(sd, flow.kind, flow.player ?? null)}>Skip</Text>
+            </View>
+          );
+          // Deep wave — "Turnover types"
+          return (
+            <View style={c.panel}>{head(`${b.label}${who}`, sd)}
+              <View style={c.grid}>
+                {TURNOVER_TYPES.map((t) => <SelectChip key={t} label={TURNOVER_LABEL[t]} active={false} onPress={() => stat(sd, flow.kind, flow.player ?? null, { tt: t })} />)}
+                <SelectChip label="Skip" active={false} onPress={() => stat(sd, flow.kind, flow.player ?? null)} />
+              </View>
+            </View>
+          );
+        }
         return (
           <View style={c.panel}>{head(b.label, sd)}
-            <PlayerGrid players={onCourt(sd)} tag={tagOf(sd)} onPick={(p) => stat(sd, flow.kind, p)} skip={{ label: 'Skip player', onPress: () => stat(sd, flow.kind, null) }} />
+            <PlayerGrid players={onCourt(sd)} tag={tagOf(sd)} onPick={(p) => statPicked(sd, flow.kind, p)} skip={{ label: 'Skip player', onPress: () => statPicked(sd, flow.kind, null) }} />
           </View>
         );
       }
@@ -483,9 +539,14 @@ const ScoringControls: SportPlugin<NetballState>['ScoringControls'] = ({
         {shotBtn(sd, 'GS', false)}
         {shotBtn(sd, 'GA', false)}
         <View style={c.row}>{shotBtn(sd, 'GS', true)}{shotBtn(sd, 'GA', true)}</View>
+        {/* Deep wave — the super-shot window (a format that uses them): arm the next shot as a 2-pointer */}
+        {s.superShot && superShotLive(s, now) && periodStarted(s) ? (
+          <SelectChip label={armed === sd ? '⭐ Super shot — next shot' : '⭐ Super shot'} accessibilityLabel={`Super shot: the next ${name(sd)} shot is from the super-shot zone`}
+            active={armed === sd} onPress={() => setArmed(armed === sd ? null : sd)} />
+        ) : null}
         {more ? (
           <>
-            {STAT_BTN.map((b) => <Button key={b.kind} label={b.label} accessibilityLabel={`${b.a11y}, ${name(sd)}`} variant="ghost" onPress={() => setFlow({ mode: 'stat', side: sd, kind: b.kind })} />)}
+            {[...STAT_BTN, ...(s.trackGains ? [PICKUP_BTN] : [])].map((b) => <Button key={b.kind} label={b.label} accessibilityLabel={`${b.a11y}, ${name(sd)}`} variant="ghost" onPress={() => setFlow({ mode: 'stat', side: sd, kind: b.kind })} />)}
             <Button label="✋ Penalty" accessibilityLabel={`Penalty against ${name(sd)}`} variant="ghost" onPress={() => setFlow({ mode: 'penalty', side: sd, step: 'kind' })} />
             <Button label="🟨 Sanction" accessibilityLabel={`Sanction, ${name(sd)}`} variant="ghost" onPress={() => setFlow({ mode: 'sanction', side: sd, step: 'kind' })} />
             <Button label="🔁 Sub" accessibilityLabel={`Substitution, ${name(sd)}`} variant="ghost" onPress={() => setFlow({ mode: 'sub', side: sd, step: 'off' })} />
@@ -560,6 +621,19 @@ const ScoringControls: SportPlugin<NetballState>['ScoringControls'] = ({
           </TouchableOpacity>
         </View>
       ) : null}
+      {/* Deep wave — "Centre pass receives": who caught this centre pass (one tap, optional) */}
+      {cp && !needToss && s.trackCpr && periodStarted(s) && !flowPanel && !cprLogged ? (
+        <View style={c.grid}>
+          <Text style={c.small}>Received by</Text>
+          {CPR_POS.map((pos) => {
+            const p = lineup(cp)[pos];
+            return p && !gone(cp, p) ? (
+              <SelectChip key={pos} label={`${pos} · ${p.fullName.split(' ')[0]}`} accessibilityLabel={`Centre pass received by ${p.fullName}, ${pos}`} active={false}
+                onPress={() => fire({ type: 'CPR', side: cp, payload: { playerId: p.id, playerName: p.fullName, pos } })} />
+            ) : null;
+          })}
+        </View>
+      ) : null}
 
       {flowPanel ?? (
         <>
@@ -588,7 +662,7 @@ function EditList({ s, show, setShow, onRemove, onEdit, homeName, awayName }: {
       <Text style={c.link} accessibilityRole="button" onPress={() => setShow(!show)}>{show ? 'Hide' : '✎ Correct the timeline'}</Text>
       {show ? [...timelineEvents(s)].reverse().slice(0, 40).map(({ e, answer, answers }) => {
         const d = describeEvent(e, answer);
-        const editable = !!e.side && e.type !== 'timeout' && e.type !== 'stop' && e.type !== 'centre';
+        const editable = !!e.side && e.type !== 'timeout' && e.type !== 'stop' && e.type !== 'centre' && e.type !== 'cpr'; // deep wave: a CPR is remove-only
         return (
           <View key={e.id} style={c.editRow}>
             <Text style={c.editWhen}>{eventWhen(s, e)}</Text>
@@ -639,7 +713,8 @@ const NetballScoreboard: NonNullable<SportPlugin<NetballState>['Scoreboard']> = 
   const s = state as NetballState;
   const n = Math.max(totalPeriods(s), s.period);
   const columns = Array.from({ length: n }, (_, i) => ({ label: periodName(s, i + 1), highlight: !s.ended && i + 1 === s.period }));
-  const goals = (sd: Side, p: number) => s.events.filter((e) => e.type === 'goal' && e.side === sd && e.period === p).length;
+  // deep wave: points per quarter (a super shot counts 2)
+  const goals = (sd: Side, p: number) => s.events.filter((e) => e.type === 'goal' && e.side === sd && e.period === p).reduce((n, e) => n + goalPoints(e), 0);
   const cells = (sd: Side) => Array.from({ length: n }, (_, i) => (i + 1 <= s.period || s.ended ? String(goals(sd, i + 1)) : ''));
   const r = result(s);
   return (
@@ -657,12 +732,22 @@ const NetballScoreboard: NonNullable<SportPlugin<NetballState>['Scoreboard']> = 
 
 const LiveExtras: NonNullable<SportPlugin<NetballState>['LiveExtras']> = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster, onPlayer }) => {
   const s = state as NetballState;
+  // Deep wave: the commentary, the broadcast team stats, the players' box
+  const [view, setView] = useState<'pbp' | 'team' | 'box'>('pbp');
   return (
     <View style={{ gap: theme.spacing(3) }}>
-      <Text style={c.h}>Timeline</Text>
-      <LiveTimeline events={netballTimeline(s, { home: homeName, away: awayName })} homeColor={homeColor} awayColor={awayColor} emptyText="No goals yet." homeRoster={homeRoster} awayRoster={awayRoster} onPlayer={onPlayer} />
-      <Text style={c.h}>Match stats</Text>
-      <MatchBoxScore sport="netball" source={netballBox(s, { homeRoster, awayRoster })} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} onPlayer={onPlayer} />
+      <View style={c.grid}>
+        <SelectChip label="Play-by-play" active={view === 'pbp'} onPress={() => setView('pbp')} />
+        <SelectChip label="Team stats" active={view === 'team'} onPress={() => setView('team')} />
+        <SelectChip label="Players" active={view === 'box'} onPress={() => setView('box')} />
+      </View>
+      {view === 'pbp' ? (
+        <PlayFeed groups={netballFeed(s, { home: homeName, away: awayName })} homeColor={homeColor} awayColor={awayColor} homeRoster={homeRoster} awayRoster={awayRoster} onPlayer={onPlayer} allLabel="Match" />
+      ) : view === 'team' ? (
+        <CategoryStatsPanel periods={nbPanelPeriods(s)} data={(scope) => netballPanel(s, scope)} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} />
+      ) : (
+        <MatchBoxScore sport="netball" show="box" source={netballBox(s, { homeRoster, awayRoster })} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} onPlayer={onPlayer} />
+      )}
     </View>
   );
 };
@@ -725,6 +810,13 @@ export const netballPlugin: SportPlugin<NetballState> = {
     { key: 'suspensionMinutes', label: 'Suspension (minutes of play)', type: 'number', default: 2, min: 1, max: 10, advanced: true, hint: 'World Netball: 2 — check your competition' },
     { key: 'timeoutsPerHalf', label: 'Team time-outs a half', type: 'count', default: 0, min: 0, max: 3, advanced: true, hint: 'none in the international rules; some leagues allow 2' },
     { key: 'detail', label: 'Ask for feeds & rebounds', type: 'toggle', default: false, advanced: true, hint: 'goal assists, feeds and rebounds (one more tap a shot)' },
+    // Deep wave — "Stats to track" (off by default; the scorer can switch them in ⚙️ Match settings)
+    { key: 'trackCpr', label: 'Track centre pass receives', type: 'toggle', default: false, advanced: true, group: 'Stats to track', hint: 'who caught each centre pass (one tap, optional)' },
+    { key: 'trackGains', label: 'Track gains & pick-ups', type: 'toggle', default: false, advanced: true, group: 'Stats to track', hint: 'deflection with / without gain, pick-ups — gains and gain-to-goal %' },
+    { key: 'trackTurnovers', label: 'Track turnover types', type: 'toggle', default: false, advanced: true, group: 'Stats to track', hint: 'bad pass, footwork, held ball, offside…' },
+    // Deep wave — Super Netball's 2-point super shot (an organiser rule, off by default)
+    { key: 'superShot', label: '2-point super shots', type: 'toggle', default: false, advanced: true, hint: 'Super Netball: goals from the super-shot zone score 2 in the last minutes of each quarter' },
+    { key: 'ssMinutes', label: 'Super-shot window (last N min of a quarter)', type: 'number', default: 5, min: 0, max: 15, advanced: true, hint: 'Super Netball 5 · 0 = the whole quarter' },
     {
       key: 'decider', label: 'If level at full time', type: 'choice', default: 'none',
       options: [

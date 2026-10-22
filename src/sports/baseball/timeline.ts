@@ -30,6 +30,7 @@ export function describeEvent(e: BaseballEvent): { icon: string; label: string; 
       const detail = [
         e.batter?.name,
         e.fielders ? `(${e.fielders})` : '',
+        e.zone ? `→ ${e.zone}` : '',
         e.rbi ? `${e.rbi} RBI` : '',
         ...runners,
       ].filter(Boolean).join(' · ');

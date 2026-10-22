@@ -32,6 +32,8 @@ Weightlifting:
 - **After a no lift**: repeat the same weight (IWF) or go up.
 - **Bodyweight categories**: by age group (IWF 2025, IWF youth or the school list), one list for everyone, or your own list of kg limits.
 - **Medals** for the snatch and the clean & jerk, and **Sinclair** totals with the coefficients you choose.
+- **Changes of a declared weight**: two per attempt (IWF; the app asks before a third) or no limit.
+- **Stats to track**: the referees' lights on every attempt, and jury reversals. Both are off unless you switch them on.
 
 Athletics:
 - **False starts**: zero tolerance, where the athlete is disqualified, or one per race, where the next false start disqualifies. Combined events have their own choice.
@@ -45,7 +47,7 @@ Swimming: false starts (disqualified, or the first one recalled), 50 m splits, a
 
 Archery: whether 10s or Xs break a tie, how a level shoot-off arrow is settled, and the bracket sizes. Team events (archery, shooting, cycling, mixed relays) have their own choices — see [team events](/guides/team-events-in-meets/).
 
-Shooting: the tie-break, the final size, and whether equal medal places with no final are shot off or shared.
+Shooting: the tie-break, the final size, and whether equal medal places with no final are shot off or shared. Under **Stats to track**, **Penalties** adds a −2 button to each series; it is off unless you switch it on.
 
 Cycling: the gap that starts a new time group, the GC tie-break, and the points per sprint.
 

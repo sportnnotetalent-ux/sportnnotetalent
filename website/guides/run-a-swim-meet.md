@@ -5,7 +5,7 @@ category: Tournaments
 audience: Organisers, Scorers, Players, Parents & fans
 sports: swimming
 order: 87
-updated: 2026-10-12
+updated: 2026-10-22
 ---
 
 A swim meet is a list of events (say 50 m freestyle U12 Girls), each swum in one or more heats. You enter times on a phone; the app seeds heats the World Aquatics way, ranks swimmers, adds house points and keeps records and personal bests per pool length.
@@ -52,6 +52,8 @@ A swim meet is a list of events (say 50 m freestyle U12 Girls), each swum in one
 - **House table:** on the Swimming page and the tournament's **Stats** tab. Relays can score double (**⚙ Pool, points & timing**).
 - **Best by event**, **Best swimmers (points)** from individual finals, and **Meet records**, marked LC (50 m pool), SC (25 m pool) or SCY (25 yd pool), kept apart as World Aquatics does. When a school hosts, **School records** show its earlier meets' best times.
 - **Swimmer profiles:** races, medals, and a PB and SB per event and pool length.
+
+> **Tip:** Relay take-over times, reaction times and the race analysis (splits with places, relay legs, lead-off times on profiles): see [Track deeper race stats and follow the commentary](/guides/race-stats-and-live-commentary/).
 
 ## Common questions
 ### Is a timed final fair?

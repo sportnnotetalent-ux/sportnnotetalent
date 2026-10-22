@@ -15,13 +15,13 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { theme } from '../core/theme';
 import { SelectChip, textStyles } from '../components/ui';
-import { LiveTimeline } from './LiveTimeline';
 import { MatchBoxScore } from '../components/BoxScore';
 import { rallyBox } from './boxSources';
 import { RallyPointEditor } from './RallyPointEditor';
 import { MatchStatsPanel } from './MatchStatsPanel';
 import { PointDetailRow } from './PointDetailRow';
-import { detailLiveSettings } from './pointDetailSettings';
+import { detailLiveSettings, trackFormatFields } from './pointDetailSettings';
+import { RacketCommentary } from './RacketCommentary';
 import { PointButtons, SecondaryAction, ServeFirstPicker } from './PointButtons';
 import { pointPressure, pressureText } from './pointStatus';
 import type { LiveEvent } from './liveEvents';
@@ -31,7 +31,7 @@ import { courtFormation, makeCourt } from './courts';
 import { pointVoice } from './voiceParsers';
 import { ttServer, ttServeHint } from './tabletennis/serve';
 import { rallyCueOf } from './courtCues';
-import { CueBanner, useCueTimeline } from './CueBanner';
+import { CueBanner } from './CueBanner';
 import { rallyTotals } from './racketTotals';
 import { SetLineBoard } from './SetLineBoard';
 import { durationLine, stampDispatch, withDuration } from './conduct';
@@ -110,7 +110,11 @@ export function makeRallyPlugin(opts: RallyOpts): SportPlugin<RallyState> {
     };
     const letRow = opts.id === 'squash' && !s.ended && (s.serverPicked || s.events.length > 0) ? (
       <View style={{ gap: theme.spacing(2) }}>
-        <SecondaryAction label="🔁 Let — replay the rally (no point)" onPress={() => dispatch({ type: 'LET' })} />
+        {/* deep wave — who appealed (PSA lets per player); the rally is replayed, no point */}
+        <View style={ctrl.row}>
+          <View style={ctrl.flex}><SecondaryAction color={homeColor} label={`🔁 Let · ${homeName} asked`} onPress={() => dispatch({ type: 'LET', side: 'home' })} /></View>
+          <View style={ctrl.flex}><SecondaryAction color={awayColor} label={`🔁 Let · ${awayName} asked`} onPress={() => dispatch({ type: 'LET', side: 'away' })} /></View>
+        </View>
         <View style={ctrl.row}>
           <View style={ctrl.flex}><SecondaryAction color={homeColor} label={`✋ Stroke → ${homeName}`} onPress={() => decide('home', 'stroke')} /></View>
           <View style={ctrl.flex}><SecondaryAction color={awayColor} label={`✋ Stroke → ${awayName}`} onPress={() => decide('away', 'stroke')} /></View>
@@ -296,8 +300,6 @@ export function makeRallyPlugin(opts: RallyOpts): SportPlugin<RallyState> {
 
   const LiveExtras: NonNullable<SportPlugin<RallyState>['LiveExtras']> = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster, onPlayer }) => {
     const s = state as RallyState;
-    // SD-117c (table tennis) — change-ends markers on the rally log (display only)
-    const timeline = useCueTimeline(reducer, s, rallyInputs, cueOf);
     return (
       <View style={{ gap: theme.spacing(3) }}>
         <Text style={ctrl.label}>Games</Text>
@@ -308,14 +310,16 @@ export function makeRallyPlugin(opts: RallyOpts): SportPlugin<RallyState> {
             s.games.map((g, i) => <Text key={i} style={ctrl.gameChip}>G{i + 1}: {g[0]}-{g[1]}</Text>)
           )}
         </View>
-        {/* SD-22: serve / return figures replayed from the point log, per set */}
+        {/* SD-22 / deep wave: key stats, serve, shots, rally length — replayed from the point log, per game */}
         <MatchStatsPanel sport={opts.id} state={s} homeName={homeName} awayName={awayName} homeRoster={homeRoster} awayRoster={awayRoster} homeColor={homeColor} awayColor={awayColor} />
         {/* SD-54 — match and game durations (from the scorer's tap times) */}
         {durationLine(s.events, 'G') ? <Text style={textStyles.muted}>{durationLine(s.events, 'G')}</Text> : null}
         <Text style={ctrl.label}>Box score</Text>
         <MatchBoxScore sport={opts.id} source={rallyBox(s, { homeRoster, awayRoster }, opts.id)} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} onPlayer={onPlayer} />
-        <Text style={ctrl.label}>Rally log</Text>
-        <LiveTimeline events={timeline} homeColor={homeColor} awayColor={awayColor} emptyText="No rallies yet." homeRoster={homeRoster} awayRoster={awayRoster} onPlayer={onPlayer} />
+        {/* deep wave — commentary by game, newest first (replaces the rally log:
+            serve changes, side-outs / hand-outs, lets and the change-ends cues are inline) */}
+        <Text style={ctrl.label}>Commentary</Text>
+        <RacketCommentary sport={opts.id} icon={opts.icon} state={s} homeName={homeName} awayName={awayName} homeRoster={homeRoster} awayRoster={awayRoster} homeColor={homeColor} awayColor={awayColor} />
       </View>
     );
   };
@@ -376,12 +380,14 @@ export function makeRallyPlugin(opts: RallyOpts): SportPlugin<RallyState> {
     statTotalsNeedsPlayers: true,
     ScoringControls,
     LiveExtras,
-    // SD-107 — the optional point-detail setting (event mode: from the next rally)
+    // SD-107 / deep wave — "Stats to track": point detail, rally length (+ pickleball
+    // kitchen line and 3rd shot) — event mode: from the next rally
     liveSettings: detailLiveSettings(opts.id) as SportPlugin<RallyState>['liveSettings'],
     voice: { hints: ['rally home', 'rally away', 'point home'], parse: pointVoice },
     formation: opts.hasCourt ? () => courtFormation(opts.id) : undefined,
     Court: opts.hasCourt ? makeCourt(opts.id) : undefined,
-    formatFields: opts.formatFields,
+    // deep wave — + the "Stats to track" defaults for every match of the format
+    formatFields: [...opts.formatFields, ...trackFormatFields(opts.id)],
   };
 }
 

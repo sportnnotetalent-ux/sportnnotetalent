@@ -44,7 +44,8 @@ export interface HockeyEvent {
   /** stable id from the action (`payload.uid`), so a later REMOVE_EVENT still
    *  finds it after an earlier row is voided by a correction */
   id: string;
-  type: 'goal' | 'pc' | 'stroke' | 'shot' | 'save' | 'card' | 'sub' | 'gk';
+  /** `referral` (deep wave): a team's video referral, only when tracked */
+  type: 'goal' | 'pc' | 'stroke' | 'shot' | 'save' | 'card' | 'sub' | 'gk' | 'referral';
   side: Side;
   /** game-clock seconds since the start of the match (playing time) */
   sec: number;
@@ -70,12 +71,35 @@ export interface HockeyEvent {
   pcRef?: string;
   /** SD-117 (H6): a penalty corner's outcome (new logs only) */
   pcResult?: PcResult;
+  /** deep wave: a shot that missed the goal — wide of the goal, or blocked by
+   *  a defender (new logs only; older shots off target don't say which) */
+  miss?: 'wide' | 'blocked';
+  /** deep wave: a video referral's outcome (upheld = the team keeps it) */
+  upheld?: boolean;
 }
+
+/** Deep wave — optional depth a scorer / organiser switches on (format keys
+ *  `trackPossession`, `trackReferrals`). Absent = nothing extra tracked (every
+ *  older match keeps its exact state shape). */
+export interface HockeyTrack {
+  /** tap who has the ball → possession % on the game clock (FIH match stats) */
+  possession?: boolean;
+  /** FIH video referrals per team, upheld / not upheld */
+  referrals?: boolean;
+}
+/** Deep wave — one possession change: `side` has the ball from game second `sec`. */
+export interface PossMark { side: Side; sec: number; period: number }
 
 /** SD-117 (H7): one circle entry (an attack into the shooting circle). */
 export interface CircleEntry { side: Side; sec: number; period: number }
 
-export interface SoKick { scored: boolean; playerId?: string; playerName?: string }
+/** `outcome` / keeper (deep wave, new logs only): a miss saved by the keeper
+ *  or missed (wide / foul / out of time); older kicks carry `scored` only. */
+export interface SoKick {
+  scored: boolean; playerId?: string; playerName?: string;
+  outcome?: 'scored' | 'saved' | 'missed';
+  keeperId?: string; keeperName?: string;
+}
 
 export interface XiStamp {
   players?: { id: string; name: string }[];
@@ -115,6 +139,10 @@ export interface HockeyState {
   /** SD-117 (H7): circle entries, once the scorer logs the first one (absent
    *  = not tracked: older matches keep their exact state shape). */
   circles?: CircleEntry[];
+  /** deep wave: what this match tracks beyond the default (absent = nothing) */
+  track?: HockeyTrack;
+  /** deep wave: possession changes (absent until the first one is logged) */
+  poss?: PossMark[];
 }
 
 /* --------------------------------- format ---------------------------------- */
@@ -146,8 +174,18 @@ export const init = (config?: Record<string, unknown>): HockeyState => {
     penaltyCorners: bool(config?.penaltyCorners, true),
     shootout: null,
     ...(aggPriorFromConfig(config) ? { agg: aggPriorFromConfig(config) } : {}),
+    ...(readHockeyTrack(config) ? { track: readHockeyTrack(config) } : {}),
   };
 };
+
+/** Deep wave — the optional tracking from the format (undefined = none on, so
+ *  an older format keeps the old state shape). */
+export function readHockeyTrack(config?: Record<string, unknown>): HockeyTrack | undefined {
+  const t: HockeyTrack = {};
+  if (config?.trackPossession === true) t.possession = true;
+  if (config?.trackReferrals === true) t.referrals = true;
+  return Object.keys(t).length ? t : undefined;
+}
 
 /* ---------------------------------- clock ---------------------------------- */
 
@@ -346,7 +384,21 @@ export const reducer = (s: HockeyState, a: ScoreAction): HockeyState => {
     }
     case 'SHOT': {
       if (!side) return s;
-      return linkPc(push(s, { type: 'shot', side, onGoal: a.payload?.onGoal === true, ...who1, ...ref }), a.payload?.onGoal === true ? 'saved' : 'wide');
+      // deep wave: wide vs blocked (new logs only — an absent key keeps old states)
+      const miss = a.payload?.onGoal !== true && (a.payload?.miss === 'wide' || a.payload?.miss === 'blocked') ? { miss: a.payload.miss as 'wide' | 'blocked' } : {};
+      return linkPc(push(s, { type: 'shot', side, onGoal: a.payload?.onGoal === true, ...miss, ...who1, ...ref }), a.payload?.onGoal === true ? 'saved' : 'wide');
+    }
+    case 'POSS': {
+      // deep wave: `side` has the ball from now (game clock); a repeat is ignored
+      if (!side) return s;
+      const list = s.poss ?? [];
+      if (list.length && list[list.length - 1].side === side) return s;
+      return { ...s, poss: [...list, { side, sec, period }] };
+    }
+    case 'REFERRAL': {
+      // deep wave: a team's video referral and its outcome
+      if (!side) return s;
+      return push(s, { type: 'referral', side, upheld: a.payload?.upheld === true });
     }
     case 'PC_OUTCOME': {
       // SD-117 (H6): defended / stroke awarded (no attempt of its own to carry it)
@@ -428,7 +480,16 @@ export const reducer = (s: HockeyState, a: ScoreAction): HockeyState => {
     }
     case 'SO': {
       if (!s.shootout || s.shootoutWinner || !side) return s;
-      const kick: SoKick = { scored: a.payload?.scored === true, ...(p1?.playerId ? { playerId: p1.playerId } : {}), ...(p1?.playerName ? { playerName: p1.playerName } : {}) };
+      // deep wave: new logs carry the outcome and the keeper facing the attempt
+      const p = a.payload ?? {};
+      const outcome = p.outcome === 'scored' || p.outcome === 'saved' || p.outcome === 'missed' ? p.outcome : undefined;
+      const str = (v: unknown) => (typeof v === 'string' && v ? v : undefined);
+      const kick: SoKick = {
+        scored: outcome ? outcome === 'scored' : p.scored === true,
+        ...(p1?.playerId ? { playerId: p1.playerId } : {}), ...(p1?.playerName ? { playerName: p1.playerName } : {}),
+        ...(outcome ? { outcome } : {}),
+        ...(str(p.keeperId) ? { keeperId: str(p.keeperId) } : {}), ...(str(p.keeperName) ? { keeperName: str(p.keeperName) } : {}),
+      };
       const so = { ...s.shootout, [side]: [...s.shootout[side], kick] };
       return { ...s, shootout: so, shootoutWinner: decideShootout(so.home, so.away) };
     }
@@ -533,6 +594,13 @@ export function hockeyScoreLine(s: HockeyState, perspective?: Side): string {
 
 /* --------------------------- live settings (#14) --------------------------- */
 
+/** Deep wave — the optional "Stats to track" (off by default: one tap per
+ *  event stays the default; these add their own buttons when on). */
+export const HOCKEY_TRACK_FIELDS: FormatField[] = [
+  { key: 'trackPossession', label: 'Possession', type: 'toggle', default: false, group: 'Stats to track', hint: 'tap who has the ball; % on the game clock' },
+  { key: 'trackReferrals', label: 'Video referrals', type: 'toggle', default: false, group: 'Stats to track', hint: 'per team, upheld or not' },
+];
+
 export const HOCKEY_LIVE_SETTINGS: LiveSettings<HockeyState> = {
   title: '⚙️ Match settings',
   hint: 'Applies to this match only.',
@@ -540,7 +608,8 @@ export const HOCKEY_LIVE_SETTINGS: LiveSettings<HockeyState> = {
   fields: [
     { key: 'periodMinutes', label: 'Period length', type: 'number', default: 15, min: 1, max: 45, step: 1, hint: 'min / period' },
     { key: 'stopClock', label: 'Stop clock on goals & PCs', type: 'toggle', default: true, group: 'Clock' },
+    ...HOCKEY_TRACK_FIELDS,
   ] as FormatField[],
-  read: (s) => ({ periodMinutes: s.periodMinutes, stopClock: s.stopClock }),
-  defaults: { periodMinutes: 15, stopClock: true },
+  read: (s) => ({ periodMinutes: s.periodMinutes, stopClock: s.stopClock, trackPossession: s.track?.possession === true, trackReferrals: s.track?.referrals === true }),
+  defaults: { periodMinutes: 15, stopClock: true, trackPossession: false, trackReferrals: false },
 };

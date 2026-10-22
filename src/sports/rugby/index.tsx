@@ -15,6 +15,13 @@
  * lineouts and scrums. A level knockout match goes to extra time / sudden
  * death / a kicking competition as the organiser chose.
  *
+ * Deep wave — optional "Stats to track" (off by default): penalties by
+ * offence & free kicks, turnovers conceded, 22 entries, possession &
+ * territory, offloads. Their chips show per side only when switched on (one
+ * tap for 22 entries / free kicks; the offence / cause and the player are
+ * optional). The live views: Play-by-play (grouped commentary) · Match stats
+ * (the broadcast sheet) · Box score · Key moments (the timeline).
+ *
  * Corrections: "Correct the timeline" removes or re-enters a past moment
  * (REMOVE_EVENT with the reversed credits, then the same flow stamped at the
  * original time; Cancel keeps the event — SD-114).
@@ -22,7 +29,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { theme } from '../../core/theme';
-import { Button, TextField } from '../../components/ui';
+import { Button, SelectChip, TextField } from '../../components/ui';
 import { confirmMatchAction } from '../../components/ConfirmSheet';
 import { LineScoreboard } from '../../components/LineScoreboard';
 import { MatchBoxScore } from '../../components/BoxScore';
@@ -33,12 +40,17 @@ import type { ScoreAction, SportPlugin } from '../types';
 import {
   init, reducer, isComplete, result, levelAtEnd, aggLine, matchSec, periodSec, periodLen, clockFace, clockAt, periodName, periodLong, periodStarted, running,
   eventCredits, creditAttribution, soScore, nextKicker, needsSdPick, rugbyScoreLine, yellowsOf, subsUsed, openTemps, totalPeriods, nextPlan, kicksAfter,
-  isSuddenDeath, pointsOf, rugbyStandingsUnits, nominalOffset,
+  isSuddenDeath, pointsOf, rugbyStandingsUnits, nominalOffset, trackedTallyKeys, currentBall, ballTime,
   RUGBY_PRESETS, RUGBY_LIVE_SETTINGS, LIVE_KEYS, DETAIL_KEYS, DETAIL_LABEL, KICK_LABEL,
-  type RugbyEvent, type RugbyState, type KickKind, type CardKind, type DetailKey, type Side,
+  TALLY_LABEL, TRACK_FLAGS, TRACK_KINDS, TRACK_FIELDS, INFRINGEMENTS, INFRINGEMENT_LABEL, TURNOVER_CAUSES, CAUSE_LABEL,
+  type RugbyEvent, type RugbyState, type KickKind, type CardKind, type DetailKey, type Side, type TallyKind,
 } from './engine';
 import { rugbyTotals, rugbyLiveField, rugbyField, unavailable } from './totals';
 import { rugbyBox } from './box';
+import { rugbyCommentary, rugbyScopeLabel, RUGBY_FEED_TAGS } from './commentary';
+import { rugbySheet } from './sheet';
+import { GroupedFeed } from '../GroupedFeed';
+import { StatSheetView } from '../StatSheetView';
 import { rugbyTimeline, describeEvent, eventWhen, rugbyUndoLabel } from './timeline';
 import { rugbyTickerDetail, rugbyTickerFlash } from './ticker';
 import { rugbyFormation, RugbyPitch } from './pitch';
@@ -47,7 +59,23 @@ import { BackfillBar, RowAction, confirmRemove } from '../TimelineControls';
 import { rugbyVoice, rugbyVoiceEnds, rugbyLast } from './voice';
 
 const uid = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
-const TRACKED: string[] = LIVE_KEYS.filter((k) => k !== 'soTaken' && k !== 'soGoals');
+const BASE_TRACKED: string[] = LIVE_KEYS.filter((k) => k !== 'soTaken' && k !== 'soGoals');
+/** the keys this match tracks (the base set + the "Stats to track" switched on) */
+const trackedKeys = (s: RugbyState): string[] => [...BASE_TRACKED, ...trackedTallyKeys(s)];
+/** deep wave: the per-side chips of the "Stats to track" */
+const TALLY_CHIP: Record<TallyKind, string> = {
+  penalty: '⚖ Penalty conceded', freeKick: '🏳 Free kick conceded', turnover: '🔄 Turnover conceded', entry: '⏩ 22 entry', offload: '🤲 Offload',
+};
+/** the tallies a one-tap chip records for the team (no player, no follow-up) */
+const ONE_TAP: TallyKind[] = ['entry', 'freeKick'];
+
+function Chip({ label, on, onPress, a11y }: { label: string; on: boolean; onPress: () => void; a11y?: string }) {
+  return (
+    <TouchableOpacity style={[c.chip, on ? c.chipOn : null]} onPress={onPress} accessibilityRole="button" accessibilityState={{ selected: on }} accessibilityLabel={a11y ?? label}>
+      <Text style={[c.chipTxt, on ? c.chipTxtOn : null]}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
 
 /* ------------------------------ player picker ------------------------------ */
 
@@ -77,7 +105,9 @@ type Flow =
   | { mode: 'kick'; side: Side; step: 'kind' | 'result' | 'kicker'; kick?: KickKind; made?: boolean }
   | { mode: 'card'; side: Side; step: 'kind' | 'player'; card?: CardKind; red20?: boolean }
   | { mode: 'sub'; side: Side; step: 'kind' | 'off' | 'on' | 'back'; kind?: SubKind; off?: Player | null }
-  | { mode: 'detail'; side: Side; step: 'kind' | 'player'; detail?: DetailKey };
+  | { mode: 'detail'; side: Side; step: 'kind' | 'player'; detail?: DetailKey }
+  /** deep wave: a penalty (offence) / turnover (cause) / offload — the pick and the player optional */
+  | { mode: 'tally'; side: Side; kind: TallyKind; pick?: string };
 
 /* -------------------------------- controls --------------------------------- */
 
@@ -151,9 +181,21 @@ const ScoringControls: SportPlugin<RugbyState>['ScoringControls'] = ({
   const kickers = (sd: Side): Player[] => onField(sd);
 
   /* ---- recorders ---- */
+  const TRACKED = trackedKeys(s);
   const credit = (e: Parameters<typeof eventCredits>[0]) => {
     const cr = eventCredits(e);
     return { attribution: creditAttribution(cr.first, 1, TRACKED), attribution2: creditAttribution(cr.second, 1, TRACKED) };
+  };
+  /** deep wave: a "Stats to track" tally (the offence / cause and the player optional) */
+  const tally = (sd: Side, kind: TallyKind, p: Player | null, pick?: string) => {
+    const why = pick ? (kind === 'penalty' ? { infringement: pick } : kind === 'turnover' ? { cause: pick } : {}) : {};
+    fire({ type: 'TALLY', side: sd, payload: { kind, ...why }, ...credit({ type: 'tally', tally: kind, playerId: p?.id, playerName: p?.fullName }) });
+    setFlow(null);
+  };
+  /** deep wave: possession / territory switch (a tap on the side already set does nothing) */
+  const ball = (type: 'POSSESSION' | 'TERRITORY', sd: Side) => {
+    if (currentBall(s, type === 'POSSESSION' ? 'poss' : 'terr') === sd) return;
+    fire({ type, side: sd });
   };
   const scoreTry = (sd: Side, scorer: Player | null, assist: Player | null) => {
     fire({ type: 'TRY', side: sd, ...credit({ type: 'try', playerId: scorer?.id, playerName: scorer?.fullName, secondId: assist?.id, secondName: assist?.fullName }) });
@@ -195,7 +237,7 @@ const ScoringControls: SportPlugin<RugbyState>['ScoringControls'] = ({
   };
   const remove = (e: RugbyEvent) => { for (const a of removalActions(e)) dispatch(a); };
   const edit = (e: RugbyEvent) => {
-    if (e.type === 'pentry' || e.type === 'setpiece') { remove(e); return; }
+    if (e.type === 'pentry' || e.type === 'setpiece' || (e.type === 'tally' && ONE_TAP.includes(e.tally ?? 'entry'))) { remove(e); return; }
     holdRemoval(removalActions(e));
     setEditAt({ sec: e.sec, psec: e.psec, period: e.period });
     setShowEdit(false);
@@ -204,6 +246,7 @@ const ScoringControls: SportPlugin<RugbyState>['ScoringControls'] = ({
     else if (e.type === 'card') setFlow({ mode: 'card', side: e.side, step: 'kind' });
     else if (e.type === 'sub') setFlow({ mode: 'sub', side: e.side, step: 'kind' });
     else if (e.type === 'detail') setFlow({ mode: 'detail', side: e.side, step: 'kind' });
+    else if (e.type === 'tally' && e.tally) setFlow({ mode: 'tally', side: e.side, kind: e.tally, pick: e.infringement ?? e.cause });
   };
 
   /* ---- clock ---- */
@@ -438,7 +481,8 @@ const ScoringControls: SportPlugin<RugbyState>['ScoringControls'] = ({
         if (flow.step === 'kind') return (
           <View style={c.panel}>{head('Detail')}
             <View style={c.grid}>
-              {DETAIL_KEYS.map((d) => <Button key={d} label={DETAIL_LABEL[d]} variant="ghost" style={c.typeBtn} onPress={() => setFlow({ ...flow, detail: d, step: 'player' })} />)}
+              {/* with "Penalties by offence" on, penalties go through its own button (offence + player) */}
+              {DETAIL_KEYS.filter((d) => !(d === 'penaltyConceded' && s.trackPenalties)).map((d) => <Button key={d} label={DETAIL_LABEL[d]} variant="ghost" style={c.typeBtn} onPress={() => setFlow({ ...flow, detail: d, step: 'player' })} />)}
             </View>
             <Text style={c.small}>Set piece on {name(sd)}’s throw / feed</Text>
             <View style={c.row}>
@@ -456,10 +500,40 @@ const ScoringControls: SportPlugin<RugbyState>['ScoringControls'] = ({
             <PlayerGrid players={onField(sd)} onPick={(p) => detail(sd, flow.detail ?? 'tackle', p)} skip={{ label: 'Skip player', onPress: () => detail(sd, flow.detail ?? 'tackle', null) }} />
           </View>
         );
+      case 'tally': {
+        // one panel: the offence / cause chips (optional, pick then the player), then who — the player tap records it
+        const opts: [string, string][] = flow.kind === 'penalty' ? INFRINGEMENTS.map((k) => [k, INFRINGEMENT_LABEL[k]])
+          : flow.kind === 'turnover' ? TURNOVER_CAUSES.map((k) => [k, CAUSE_LABEL[k]]) : [];
+        return (
+          <View style={c.panel}>{head(TALLY_LABEL[flow.kind])}
+            {opts.length ? (
+              <>
+                <Text style={c.small}>{flow.kind === 'penalty' ? 'Offence (optional)' : 'How (optional)'}</Text>
+                <View style={c.chips}>
+                  {opts.map(([k, l]) => <Chip key={k} label={l} on={flow.pick === k} onPress={() => setFlow({ ...flow, pick: flow.pick === k ? undefined : k })} />)}
+                </View>
+              </>
+            ) : null}
+            <Text style={c.small}>Who? (optional — tapping records it)</Text>
+            <PlayerGrid players={onField(sd)} onPick={(p) => tally(sd, flow.kind, p, flow.pick)}
+              skip={{ label: 'Team (no name)', onPress: () => tally(sd, flow.kind, null, flow.pick) }} />
+          </View>
+        );
+      }
     }
   })();
 
   const live = rugbyLiveField(s, now);
+  /** deep wave: the tallies switched on for this match (the toggle, not just past events) */
+  const kindsOn: TallyKind[] = TRACK_FLAGS.filter((f) => s[f] === true).flatMap((f) => TRACK_KINDS[f]);
+  const extras = (sd: Side) => (kindsOn.length && periodStarted(s) ? (
+    <View style={c.chips} accessibilityLabel={`More stats for ${name(sd)}`}>
+      {kindsOn.map((k) => (
+        <Chip key={k} label={TALLY_CHIP[k]} on={false} a11y={`${TALLY_LABEL[k]}, ${name(sd)}`}
+          onPress={() => (ONE_TAP.includes(k) ? tally(sd, k, null) : setFlow({ mode: 'tally', side: sd, kind: k }))} />
+      ))}
+    </View>
+  ) : null);
   const sideCol = (sd: Side) => (
     <View key={sd} style={c.col}>
       <Text style={[c.team, { color: color(sd) }]} numberOfLines={1}>{name(sd)}</Text>
@@ -469,9 +543,36 @@ const ScoringControls: SportPlugin<RugbyState>['ScoringControls'] = ({
       <Button label="🟨 Card" variant="ghost" onPress={() => setFlow({ mode: 'card', side: sd, step: 'kind' })} />
       <Button label="🔁 Sub" accessibilityLabel="Replacement" variant="ghost" onPress={() => setFlow({ mode: 'sub', side: sd, step: 'kind' })} />
       {s.trackDetail ? <Button label="📋 Detail" accessibilityLabel="Tackles, carries, set pieces" variant="ghost" onPress={() => setFlow({ mode: 'detail', side: sd, step: 'kind' })} /> : null}
+      {extras(sd)}
       {live.short[sd] > 0 ? <Text style={c.short}>Playing {live.short[sd]} short</Text> : null}
     </View>
   );
+
+  /* ---- deep wave: possession & territory switches ---- */
+  const ballPanel = s.trackPossession ? (() => {
+    const at = matchSec(s, now);
+    const pos = ballTime(s, 'poss', 'all', at), ter = ballTime(s, 'terr', 'all', at);
+    const pct = (x: { home: number; away: number }) => (x.home + x.away > 0 ? `${Math.round((x.home / (x.home + x.away)) * 100)}% – ${100 - Math.round((x.home / (x.home + x.away)) * 100)}%` : '–');
+    const hasBall = currentBall(s, 'poss'), hasTerr = currentBall(s, 'terr');
+    return (
+      <View style={c.panel}>
+        <Text style={c.small}>Possession {pct(pos)} · Territory {pct(ter)}</Text>
+        <View style={c.row}>
+          {(['home', 'away'] as const).map((sd) => (
+            <Button key={sd} label={`${hasBall === sd ? '● ' : ''}Ball: ${name(sd)}`} variant={hasBall === sd ? sd : 'ghost'} color={color(sd)} style={c.flex}
+              selected={hasBall === sd} accessibilityLabel={`${name(sd)} have the ball`} onPress={() => ball('POSSESSION', sd)} />
+          ))}
+        </View>
+        <View style={c.row}>
+          {(['home', 'away'] as const).map((sd) => (
+            <Button key={sd} label={`${hasTerr === sd ? '● ' : ''}In ${name(sd === 'home' ? 'away' : 'home')} half`} variant={hasTerr === sd ? sd : 'ghost'} color={color(sd)} style={c.flex}
+              selected={hasTerr === sd} accessibilityLabel={`Play in the ${name(sd === 'home' ? 'away' : 'home')} half: ${name(sd)} territory`} onPress={() => ball('TERRITORY', sd)} />
+          ))}
+        </View>
+        <Text style={c.meta}>Tap when the ball changes hands and when play crosses halfway — time on the playing clock drives the %.</Text>
+      </View>
+    );
+  })() : null;
 
   const ps = periodSec(s, now);
   const len = periodLen(s, s.period);
@@ -508,7 +609,10 @@ const ScoringControls: SportPlugin<RugbyState>['ScoringControls'] = ({
       </View>
 
       {flowPanel ?? (
-        <View style={c.cols}>{sideCol('home')}{sideCol('away')}</View>
+        <>
+          {ballPanel}
+          <View style={c.cols}>{sideCol('home')}{sideCol('away')}</View>
+        </>
       )}
 
       <EditList s={s} show={showEdit} setShow={setShowEdit} onRemove={remove} onEdit={edit} homeName={homeName} awayName={awayName} />
@@ -532,7 +636,7 @@ function EditList({ s, show, setShow, onRemove, onEdit, homeName, awayName }: {
           <View key={e.id} style={c.editRow}>
             <Text style={c.editWhen}>{eventWhen(s, e)}</Text>
             <Text style={c.editLabel} numberOfLines={2}>{d.icon} {d.label} · {e.side === 'home' ? homeName : awayName}{d.detail ? ` · ${d.detail}` : ''}</Text>
-            {onEdit && e.type !== 'pentry' && e.type !== 'setpiece' ? <RowAction label="✎ Edit" tone="edit" a11y={`Edit ${d.label}`} onPress={() => onEdit(e)} /> : null}
+            {onEdit && e.type !== 'pentry' && e.type !== 'setpiece' && !(e.type === 'tally' && ONE_TAP.includes(e.tally ?? 'entry')) ? <RowAction label="✎ Edit" tone="edit" a11y={`Edit ${d.label}`} onPress={() => onEdit(e)} /> : null}
             <RowAction label="✕" tone="remove" a11y={`Remove ${d.label}`} onPress={() => void confirmRemove(`${d.label} (${eventWhen(s, e)})`, () => onRemove(e),
               pointsOf(e) ? 'The score and player stats re-adjust.' : undefined)} />
           </View>
@@ -600,14 +704,33 @@ const RugbyScoreboard: NonNullable<SportPlugin<RugbyState>['Scoreboard']> = ({ s
   );
 };
 
+/** Deep wave: the Score tab's views — the play-by-play commentary, the
+ *  broadcast match stats (half / category filters), the box score and the
+ *  key-moments timeline. (The sin-bin banner stays on the scoreboard.) */
+const VIEWS = [{ key: 'pbp', label: 'Play-by-play' }, { key: 'stats', label: 'Match stats' }, { key: 'box', label: 'Box score' }, { key: 'timeline', label: 'Key moments' }] as const;
+
 const LiveExtras: NonNullable<SportPlugin<RugbyState>['LiveExtras']> = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster, onPlayer }) => {
   const s = state as RugbyState;
+  const [view, setView] = useState<(typeof VIEWS)[number]['key']>('pbp');
+  const names = { home: homeName, away: awayName };
+  const n = Math.min(totalPeriods(s), Math.max(1, s.period));
+  const scopes = n >= 2 ? Array.from({ length: n }, (_, i) => ({ value: i + 1, label: periodName(s, i + 1) })) : [];
   return (
     <View style={{ gap: theme.spacing(3) }}>
-      <Text style={c.h}>Timeline</Text>
-      <LiveTimeline events={rugbyTimeline(s, { home: homeName, away: awayName })} homeColor={homeColor} awayColor={awayColor} emptyText="No scores or cards yet." homeRoster={homeRoster} awayRoster={awayRoster} onPlayer={onPlayer} />
-      <Text style={c.h}>Match stats</Text>
-      <MatchBoxScore sport="rugby" source={rugbyBox(s, { homeRoster, awayRoster })} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} onPlayer={onPlayer} />
+      <View style={c.chips} accessibilityRole="tablist">
+        {VIEWS.map((v) => <SelectChip key={v.key} label={v.label} active={view === v.key} onPress={() => setView(v.key)} />)}
+      </View>
+      {view === 'pbp' ? (
+        <GroupedFeed groups={rugbyCommentary(s, names)} homeColor={homeColor} awayColor={awayColor} tags={RUGBY_FEED_TAGS} scopeLabel={rugbyScopeLabel(s)}
+          emptyText="Nothing yet — the commentary fills in from the kick-off." />
+      ) : view === 'stats' ? (
+        <StatSheetView build={(sc) => rugbySheet(s, sc, s.ended ? undefined : matchSec(s, Date.now()))} scopes={scopes}
+          homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} />
+      ) : view === 'box' ? (
+        <MatchBoxScore sport="rugby" source={rugbyBox(s, { homeRoster, awayRoster })} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} onPlayer={onPlayer} show="box" />
+      ) : (
+        <LiveTimeline events={rugbyTimeline(s, names)} homeColor={homeColor} awayColor={awayColor} emptyText="No scores or cards yet." homeRoster={homeRoster} awayRoster={awayRoster} onPlayer={onPlayer} />
+      )}
     </View>
   );
 };
@@ -668,6 +791,7 @@ export const rugbyPlugin: SportPlugin<RugbyState> = {
     { key: 'rolling', label: 'Rolling replacements (age-grade)', type: 'toggle', default: false, advanced: true, hint: 'a replaced player may come back on' },
     { key: 'red20', label: '20-minute red card (World Rugby trial)', type: 'toggle', default: false, advanced: true, hint: 'the scorer can give a 20-minute red: replaceable after 20 minutes; two yellows = a 20-minute red' },
     { key: 'trackDetail', label: 'Track tackles, carries and set pieces', type: 'toggle', default: false, advanced: true },
+    ...TRACK_FIELDS.map((f) => ({ ...f, advanced: true })),
     {
       key: 'decider', label: 'If level at full time', type: 'choice', default: 'none',
       options: [
@@ -708,6 +832,11 @@ const c = StyleSheet.create({
   flowHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: theme.spacing(2) },
   cancel: { color: theme.colors.textMuted, fontSize: theme.font.small, fontWeight: '700', paddingVertical: theme.spacing(3), paddingHorizontal: theme.spacing(2) },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing(2) },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing(1) },
+  chip: { paddingVertical: theme.spacing(2), paddingHorizontal: theme.spacing(3), borderRadius: theme.radius.pill, borderWidth: 1, borderColor: theme.colors.inputBorder, minHeight: 44, justifyContent: 'center' },
+  chipOn: { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
+  chipTxt: { color: theme.colors.text, fontSize: theme.font.small, fontWeight: '700' },
+  chipTxtOn: { color: theme.colors.onFill },
   pchip: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: theme.spacing(1), paddingVertical: theme.spacing(2), paddingHorizontal: theme.spacing(3), borderRadius: theme.radius.pill, backgroundColor: theme.colors.surfaceAlt, maxWidth: '100%' },
   pnum: { color: theme.colors.textMuted, fontSize: theme.font.tiny, fontWeight: '800' },
   pname: { color: theme.colors.text, fontSize: theme.font.small, fontWeight: '700', flexShrink: 1 },

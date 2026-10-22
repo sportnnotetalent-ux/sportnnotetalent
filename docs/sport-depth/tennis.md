@@ -84,6 +84,7 @@ Summary: the **scoring system is international-grade**: 0/15/30/40, deuce/ad, no
 | Surface / ranking points | Adv | — | Out of scope | School context; no surface field. |
 
 ## 5. Out of scope (needs tracking / extra spotters)
+> 2026-10-22 (SD-157): serve speed (fastest, 1st / 2nd average), rally length (0–4 / 5–8 / 9+ buckets), net points and the forehand / backhand × shot-type split are now **optional scorer-entered** captures (off by default; see BACKLOG SD-157). Placement, depth, spin and Hawk-Eye data stay out of scope.
 - Serve speed (fastest, average 1st/2nd serve), serve placement (wide/body/T), return depth, shot placement maps.
 - Rally length (stroke counts per point). A single scorer can't count reliably; Hawk-Eye data in pro tennis.
 - Distance run, spin rates, Hawk-Eye challenges.

@@ -3,34 +3,36 @@
  * (win by 2), best of 3 sets. Each point is logged with HOW it was won (attack,
  * block, ace, opponent error) — see ./engine.ts for who that credits.
  */
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { theme } from '../../core/theme';
 import { readableOn } from '../../core/contrast';
 import { SelectChip, Button, textStyles } from '../../components/ui';
-import { LiveTimeline } from '../LiveTimeline';
 import { scoreLine, finalSummary } from '../scoreline';
-import type { LiveEvent } from '../liveEvents';
 import type { Player } from '../../core/types';
 import type { ScoreAction, SportPlugin } from '../types';
 import { volleyballVoice } from '../voiceParsers';
 import { courtFormation, makeCourt } from '../courts';
 import { MatchBoxScore } from '../../components/BoxScore';
-import { volleyballBox } from '../boxSources';
 import { volleyballStatTotals } from './totals';
 import { SetLineBoard } from '../SetLineBoard';
 import { RallyPointEditor } from '../RallyPointEditor';
 import {
   init, reducer, isDecider, setTarget, VB_OUTCOMES, VB_ERROR_TYPES, volleyballCredits, outcomeAction, outcomeChip, standingsUnits, lineScore,
-  servingSide, switchSidesDue, technicalTimeoutDue, timeoutsPerSet, type VolleyballState, type VbOutcome,
+  servingSide, switchSidesDue, technicalTimeoutDue, timeoutsPerSet, stampAction, type VolleyballState, type VbOutcome,
 } from './engine';
 import { pointPressure, pressureText } from '../pointStatus';
 import { trackCourt, liberoCue, setNoOf, type VbTrack } from './rotation';
 import { ServePanel, asPlayer } from './ServePanel';
 import { VolleyballDetailRow } from './DetailRow';
-import { MatchStatsPanel } from '../MatchStatsPanel';
 import { VolleyballQuickOptions } from './SanctionOptions';
 import { barredPlayers } from './sanctions';
+// deep wave — broadcast match stats, the FIVB VIS box, rally-by-rally commentary
+import { VolleyballStatsPanel } from './StatsPanel';
+import { volleyballDeepBox, VOLLEYBALL_DEEP_BOX } from './deepBox';
+import { volleyballCommentary } from './commentary';
+import { FeedView } from '../netraid/FeedView';
+import { VOLLEYBALL_LIVE_SETTINGS } from './settings';
 
 export { isDecider, setTarget } from './engine';
 export type { VolleyballState } from './engine';
@@ -156,7 +158,8 @@ export function makeSetScoringControls(opts: { icon: string; blocks: boolean; ti
           if (players.length) rawDispatch({ type: 'LINEUP', payload: { team: side, players } });
         }
       }
-      rawDispatch(a);
+      // deep wave — scoring steps carry the scorer's clock (commentary minute, set durations)
+      rawDispatch(stampAction(a));
     };
     const editorKinds = VB_OUTCOMES
       .filter((o) => opts.blocks || o.kind !== 'block')
@@ -259,8 +262,15 @@ function courtPlayers(roster: Player[], lineup: { playerId?: string; playerName?
 // Timeouts per set come from the format (2 indoor, 1 beach — SD-117b).
 const ScoringControls = makeSetScoringControls({ icon: '🏐', blocks: true, serve: true, detail: true });
 
+/** Deep wave — the Score tab: sets, the broadcast match stats (FIVB VIS
+ *  categories, rotation analysis, by server — replaces SD-58's generic serve
+ *  panel), the player box at VIS depth, and the rally-by-rally commentary
+ *  grouped by set (substitutions, timeouts and sanctions sit where they
+ *  happened — it replaces SD-71's separate substitution list and the flat
+ *  point log). */
 const LiveExtras: NonNullable<SportPlugin<VolleyballState>['LiveExtras']> = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster, onPlayer }) => {
   const s = state as VolleyballState;
+  const feed = useMemo(() => volleyballCommentary(s, { home: homeName, away: awayName }), [s, homeName, awayName]);
   return (
     <View style={{ gap: theme.spacing(3) }}>
       <Text style={ctrl.label}>Sets</Text>
@@ -271,32 +281,13 @@ const LiveExtras: NonNullable<SportPlugin<VolleyballState>['LiveExtras']> = ({ s
           s.sets.map((g, i) => <Text key={i} style={ctrl.setChip}>S{i + 1}: {g[0]}-{g[1]}</Text>)
         )}
       </View>
+      <VolleyballStatsPanel state={s} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} />
       <Text style={ctrl.label}>Player stats</Text>
-      <MatchBoxScore sport="volleyball" source={volleyballBox(s, { homeRoster, awayRoster })} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} onPlayer={onPlayer} />
-      {/* SD-58: serve / side-out figures once the toss is recorded (null otherwise) */}
-      <MatchStatsPanel sport="volleyball" state={s} homeName={homeName} awayName={awayName} homeRoster={homeRoster} awayRoster={awayRoster} homeColor={homeColor} awayColor={awayColor} />
-      {(s.subs?.length ?? 0) > 0 && (
-        <>
-          <Text style={ctrl.label}>Substitutions</Text>
-          {subLines(s, homeName, awayName).map((l, i) => <Text key={i} style={textStyles.muted}>{l}</Text>)}
-        </>
-      )}
-      <Text style={ctrl.label}>Point log</Text>
-      <LiveTimeline events={s.events} homeColor={homeColor} awayColor={awayColor} emptyText="No points yet." homeRoster={homeRoster} awayRoster={awayRoster} onPlayer={onPlayer} />
+      <MatchBoxScore sport="volleyball" schema={VOLLEYBALL_DEEP_BOX} show="box" source={volleyballDeepBox(s, { homeRoster, awayRoster })} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} onPlayer={onPlayer} />
+      <FeedView groups={feed} homeColor={homeColor} awayColor={awayColor} emptyText="No points yet." title="Commentary · rally by rally" />
     </View>
   );
 };
-
-/** SD-71 — "Set 2 · 8-6 · Home: ⬇ Asha ⬆ Bela (libero)" per sub. */
-function subLines(s: VolleyballState, homeName: string, awayName: string): string[] {
-  const KIND: Record<string, string> = { exceptional: ' (exceptional — injury)', libero: ' (libero)' };
-  return (s.subs ?? []).map((x) => {
-    const pts = s.events.filter((e) => e.set === x.set && e.side && ['point', 'attack', 'block', 'ace', 'opperror', 'serveerror'].includes(e.kind ?? '')).slice(0, x.at);
-    const h = pts.filter((e) => e.side === 'home').length;
-    const a = pts.length - h;
-    return `Set ${x.set} · ${h}-${a} · ${x.side === 'home' ? homeName : awayName}: ⬇ ${x.off.name} ⬆ ${x.on.name}${KIND[x.kind] ?? ''}`;
-  });
-}
 
 /** Broadcast-style board: SETS won + a column of points per set, the live set
  *  highlighted — the layout volleyball TV graphics use. */
@@ -348,6 +339,8 @@ export const volleyballPlugin: SportPlugin<VolleyballState> = {
   }),
   ScoringControls,
   LiveExtras,
+  // deep wave — "Stats to track": attack attempts, reception, digs, set assists (all off by default)
+  liveSettings: VOLLEYBALL_LIVE_SETTINGS,
   // SD-136 — FIVB sanctions (misconduct 21, delays 16.2) in Quick options
   QuickOptions: VolleyballQuickOptions,
   formation: () => courtFormation('volleyball'),
@@ -388,6 +381,9 @@ export const volleyballPlugin: SportPlugin<VolleyballState> = {
     // SD-117b: FIVB indoor 2 per team per set; beach 1 (+ a technical timeout
     // at 21 points in sets 1–2, shown as a cue)
     { key: 'timeoutsPerSet', label: 'Timeouts per team per set', type: 'count', default: 2, min: 0, max: 3, advanced: true, hint: '2 indoor · 1 beach' },
+    // deep wave — "Stats to track" defaults for every match of this format
+    // (the scorer can still change them per match in ⚙️ Stats to track)
+    ...VOLLEYBALL_LIVE_SETTINGS.fields.map((f) => ({ ...f, advanced: true })),
   ],
 };
 

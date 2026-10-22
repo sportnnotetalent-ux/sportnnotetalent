@@ -18,7 +18,7 @@
 import type { LiveEvent } from './liveEvents';
 import type { ScoreAction } from './types';
 import { DOUBLE_FAULT_STAT } from './tennis/doubleFault.ts';
-import type { PointDetail } from './pointDetail.ts';
+import { annotationsOf, type NetMark, type PointDetail, type RallyBucket, type ThirdShot } from './pointDetail.ts';
 
 /** Kinds of scored point a rally sport logs — each is a single point for `side`.
  *  'point' = a point whose outcome wasn't recorded (every legacy point). The rest
@@ -48,6 +48,15 @@ export interface PointInput {
   pd?: PointDetail;
   /** SD-107 — tennis: served on the 1st or 2nd serve (serve tracking on). */
   serve?: 1 | 2;
+  /** SD-157 — tennis: who came to the net, the rally length, the serve speed
+   *  (replayed with the POINT_DETAIL that follows the point). */
+  atNet?: NetMark;
+  rallyLen?: RallyBucket;
+  kmh?: number;
+  /** Deep wave — pickleball's 3rd shot (replayed with the POINT_DETAIL). The
+   *  net mark and rally length above also ride on padel / pickleball /
+   *  badminton / table tennis / squash points and side-out rallies. */
+  third?: ThirdShot;
   /** SD-117b — volleyball: an "Opp. fault" point's optional detail (error
    *  type + the erring opponent). Replayed with the fault; charges `errors`. */
   oe?: { type?: string; playerId?: string; playerName?: string };
@@ -79,10 +88,16 @@ export const pointRows = (events: LiveEvent[]): EditRow[] =>
     .map((e) => ({
       e,
       p: e.kind === 'rally'
-        ? { side: e.wonBy as 'home' | 'away', kind: 'rally' as const, ...(e.pd ? { pd: { ...e.pd } } : {}), ...(e.at ? { at: e.at } : {}) }
+        ? { side: e.wonBy as 'home' | 'away', kind: 'rally' as const, ...(e.pd ? { pd: { ...e.pd } } : {}), ...(e.at ? { at: e.at } : {}),
+          // deep wave — a side-out rally keeps its kitchen mark / rally length / 3rd shot
+          ...(e.atNet ? { atNet: e.atNet } : {}), ...(e.rallyLen ? { rallyLen: e.rallyLen } : {}), ...(e.third ? { third: e.third } : {}) }
         // SD-19: the credited player's id rides along when the event has one,
         // so an EDIT_LOG keeps ids (absolute statTotals) instead of names only.
-        : { side: e.side as 'home' | 'away', kind: e.kind as PointKind, playerName: e.playerName, ...(e.playerId ? { playerId: e.playerId } : {}), ...(e.df ? { df: { ...e.df } } : {}), ...(e.pd ? { pd: { ...e.pd } } : {}), ...(e.serve ? { serve: e.serve } : {}), ...(e.oe ? { oe: { ...e.oe } } : {}), ...(e.pen ? { pen: { ...e.pen } } : {}), ...(e.at ? { at: e.at } : {}) },
+        : { side: e.side as 'home' | 'away', kind: e.kind as PointKind, playerName: e.playerName, ...(e.playerId ? { playerId: e.playerId } : {}), ...(e.df ? { df: { ...e.df } } : {}), ...(e.pd ? { pd: { ...e.pd } } : {}), ...(e.serve ? { serve: e.serve } : {}), ...(e.oe ? { oe: { ...e.oe } } : {}), ...(e.pen ? { pen: { ...e.pen } } : {}), ...(e.at ? { at: e.at } : {}),
+          // SD-157 — tennis net / rally length / serve speed ride along
+          ...(e.atNet ? { atNet: e.atNet } : {}), ...(e.rallyLen ? { rallyLen: e.rallyLen } : {}), ...(typeof e.kmh === 'number' ? { kmh: e.kmh } : {}),
+          // deep wave — pickleball's 3rd shot
+          ...(e.third ? { third: e.third } : {}) },
     }));
 
 /** Reconstruct the ordered scoring inputs from a sport's point log, so replaying
@@ -108,8 +123,10 @@ export const defaultCredits: PointCredits = (kind) => (kind === 'rally' ? {} : {
 export function replayPoints<S>(reducer: (s: S, a: ScoreAction) => S, cleared: S, points: PointInput[]): S {
   return points.reduce((s, p) => {
     const next = reducer(s, replayAction(p));
-    // SD-107 — the point's detail rides along (old lists carry none)
-    return p.pd ? reducer(next, { type: 'POINT_DETAIL', payload: { pd: p.pd } }) : next;
+    // SD-107 — the point's detail rides along (old lists carry none);
+    // SD-157 — with tennis' net / rally length / serve speed
+    const ann = annotationsOf(p);
+    return Object.keys(ann).length ? reducer(next, { type: 'POINT_DETAIL', payload: ann }) : next;
   }, cleared);
 }
 

@@ -5,7 +5,7 @@ category: Tournaments
 audience: Organisers, Scorers, Players, Parents & fans
 sports: rowing
 order: 90
-updated: 2026-10-11
+updated: 2026-10-22
 ---
 
 A regatta is a list of races, such as the 1x 2000 m Senior Men. Each race is a straight final, or heats, a repechage and Finals A and B, as World Rowing runs it. You type finish times on a phone, and the app sends each crew to its next race and credits every rower and the cox.
@@ -48,6 +48,8 @@ A regatta is a list of races, such as the 1x 2000 m Senior Men. Each race is a s
 - **Finals A/B:** places run on. Final A decides the medals and Final B's winner is 7th after a six-boat Final A, even with a faster time.
 - **House table, Fastest by event and Meet records:** one record per boat class, distance and category, set by the first final of each.
 - **Rower profiles:** races, A finals, medals, the best time per boat class and distance, and the seat raced.
+
+> **Tip:** With 500 m splits on, the race analysis shows each crew's place at every 500 m and how the winner raced. See [Track deeper race stats and follow the commentary](/guides/race-stats-and-live-commentary/).
 
 ## Common questions
 ### Why did a faster Final B crew finish behind Final A?

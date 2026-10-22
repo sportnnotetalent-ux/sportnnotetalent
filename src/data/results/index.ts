@@ -27,3 +27,11 @@ export * from './champions.ts';
 export * from './competitionRules.ts';
 export * from './teamEvents.ts';
 export * from './shootMatch.ts';
+export * from './raceDepth.ts';
+export * from './raceCommentary.ts';
+// Deep wave (precision-strength): results commentary + stats for weightlifting, shooting, archery
+export * from './insightFeed.ts';
+export * from './precisionRules.ts';
+export * from './liftingInsights.ts';
+export * from './shootingInsights.ts';
+export * from './archeryInsights.ts';

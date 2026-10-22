@@ -7,6 +7,9 @@ import { YELLOW_CARDS, RED_CARDS } from '../sharedStats.ts';
 /** SD-27 (KB-08) — minimum matches before a per-match figure ranks. */
 export const KABADDI_MIN_MATCHES: Qualifier = { games: 2, unit: { label: 'matches', one: 'match' } };
 const q = KABADDI_MIN_MATCHES;
+/** Deep wave — raid strike rate ranks among raiders with at least this many
+ *  raids (PKL leaderboards use a minimum; organisers can change it). */
+export const KABADDI_MIN_RAIDS: Qualifier = { den: 10, unit: { label: 'raids', one: 'raid' } };
 
 export const kabaddiStats: SportStatSchema<'kabaddi'> = {
   sport: 'kabaddi',
@@ -33,20 +36,24 @@ export const kabaddiStats: SportStatSchema<'kabaddi'> = {
     { key: 'bestMatch', label: 'Best match', leaderLabel: 'Most points in a match', short: 'best match', source: 'derived', group: 'overall', agg: { kind: 'max', keys: ['raidPoints', 'tacklePoints'] } },
     // SD-33 (KB-02) — absolute counts statTotals writes from the raid replay
     // ('present': a line written before SD-33 doesn't carry them — not a 0)
-    { key: 'raids', label: 'Raids', short: 'raids', one: 'raid', group: 'raiding', coverage: 'present' },
-    { key: 'successfulRaids', label: 'Successful raids', short: 'successful raids', one: 'successful raid', group: 'raiding', coverage: 'present' },
-    { key: 'emptyRaids', label: 'Empty raids', short: 'empty raids', one: 'empty raid', group: 'raiding', coverage: 'present' },
-    { key: 'raidsOut', label: 'Unsuccessful raids', short: 'unsuccessful raids', one: 'unsuccessful raid', group: 'raiding', coverage: 'present' },
-    { key: 'touchPoints', label: 'Touch pts', short: 'touch pts', group: 'raiding', coverage: 'present' },
-    { key: 'bonusPoints', label: 'Bonus pts', short: 'bonus pts', group: 'raiding', coverage: 'present' },
-    { key: 'superRaids', label: 'Super raids', short: 'super raids', one: 'super raid', group: 'raiding', coverage: 'present' },
-    { key: 'doOrDieRaids', label: 'Do-or-die raids', short: 'do-or-die raids', one: 'do-or-die raid', group: 'raiding', coverage: 'present' },
-    { key: 'doOrDiePoints', label: 'Do-or-die pts', short: 'do-or-die pts', group: 'raiding', coverage: 'present' },
-    { key: 'tackles', label: 'Tackles', short: 'tackles', one: 'tackle', group: 'defending', coverage: 'present' },
-    { key: 'superTackles', label: 'Super tackles', short: 'super tackles', one: 'super tackle', group: 'defending', coverage: 'present' },
+    { key: 'raids', label: 'Raids', short: 'raids', one: 'raid', abbr: 'R', group: 'raiding', coverage: 'present' },
+    { key: 'successfulRaids', label: 'Successful raids', short: 'successful raids', one: 'successful raid', abbr: 'SUC', group: 'raiding', coverage: 'present' },
+    { key: 'emptyRaids', label: 'Empty raids', short: 'empty raids', one: 'empty raid', abbr: 'EMP', group: 'raiding', coverage: 'present' },
+    { key: 'raidsOut', label: 'Unsuccessful raids', short: 'unsuccessful raids', one: 'unsuccessful raid', abbr: 'OUT', group: 'raiding', coverage: 'present' },
+    { key: 'touchPoints', label: 'Touch pts', short: 'touch pts', abbr: 'TCH', group: 'raiding', coverage: 'present' },
+    { key: 'bonusPoints', label: 'Bonus pts', short: 'bonus pts', abbr: 'BNS', group: 'raiding', coverage: 'present' },
+    { key: 'superRaids', label: 'Super raids', short: 'super raids', one: 'super raid', abbr: 'SPR', group: 'raiding', coverage: 'present' },
+    { key: 'doOrDieRaids', label: 'Do-or-die raids', short: 'do-or-die raids', one: 'do-or-die raid', abbr: 'DOD', group: 'raiding', coverage: 'present' },
+    { key: 'doOrDiePoints', label: 'Do-or-die pts', short: 'do-or-die pts', abbr: 'DDP', group: 'raiding', coverage: 'present' },
+    { key: 'tackles', label: 'Tackles', leaderLabel: 'Successful tackles', short: 'tackles', one: 'tackle', abbr: 'TKS', group: 'defending', coverage: 'present' },
+    { key: 'superTackles', label: 'Super tackles', short: 'super tackles', one: 'super tackle', abbr: 'SPT', group: 'defending', coverage: 'present' },
     // SD-82 (KB-04) — career rates from those counts. Tackle % needs failed
     // tackle attempts per defender, which one scorer can't capture (audit §5).
-    { key: 'raidStrikeRate', label: 'Raid strike rate', short: 'raid strike rate', source: 'derived', group: 'raiding', format: { unit: 'percent', dp: 0 }, agg: { kind: 'rate', num: 'successfulRaids', den: 'raids', scale: 100, dp: 0 } },
+    { key: 'raidStrikeRate', label: 'Raid strike rate', short: 'raid strike rate', source: 'derived', group: 'raiding', format: { unit: 'percent', dp: 0 }, agg: { kind: 'rate', num: 'successfulRaids', den: 'raids', scale: 100, dp: 0, qualifier: KABADDI_MIN_RAIDS },
+      tieBreak: [{ key: 'successfulRaids', better: 'higher' }] },
+    // Deep wave — "Defenders touched" tracking (keyed: only matches that named
+    // the touched defenders carry it; every other match reads "not tracked")
+    { key: 'touchedOut', label: 'Times raided out', short: 'times raided out', one: 'time raided out', abbr: 'ROUT', group: 'defending', coverage: 'keyed', format: { unit: 'count', better: 'lower' } },
     { key: 'notOutRate', label: 'Not-out %', short: 'not out', source: 'derived', group: 'raiding', format: { unit: 'percent', dp: 0 }, agg: { kind: 'rate', num: ['raids', '-raidsOut'], den: 'raids', scale: 100, dp: 0 } },
     // SD-59 / SD-72 — discipline (keyed: only matches that track cards /
     // technical points carry the keys; older matches read "not tracked")
@@ -66,9 +73,13 @@ export const kabaddiStats: SportStatSchema<'kabaddi'> = {
     { id: 'raiding', title: 'Raiding', rows: [
       { stat: 'raidPoints' }, { stat: 'raidPerMatch' }, { stat: 'highRaid', label: 'Most in a match' }, { stat: 'raids' },
       { stat: 'raidStrikeRate' }, { stat: 'notOutRate' }, { stat: 'superRaids', hideZero: true }, { stat: 'super10s', hideZero: true },
+      // deep wave — the PKL raider card's split
+      { stat: 'successfulRaids' }, { stat: 'emptyRaids' }, { stat: 'touchPoints' }, { stat: 'bonusPoints' }, { stat: 'doOrDiePoints', hideZero: true },
     ] },
     { id: 'defending', title: 'Defending', rows: [
       { stat: 'tacklePoints' }, { stat: 'tacklePerMatch' }, { stat: 'tackles', label: 'Successful tackles' }, { stat: 'superTackles', hideZero: true }, { stat: 'high5s', hideZero: true },
+      // deep wave — "Defenders touched" tracking only
+      { stat: 'touchedOut' },
     ] },
     { id: 'discipline', title: 'Discipline', rows: [
       { stat: 'greenCards', hideZero: true }, { stat: 'yellowCards', hideZero: true }, { stat: 'redCards', hideZero: true }, { stat: 'techPointsConceded', hideZero: true },
@@ -83,7 +94,10 @@ export const kabaddiStats: SportStatSchema<'kabaddi'> = {
     { key: 'tackles', label: 'Successful tackles' }, 'tackleStrikeRate', 'superTackles', 'allOuts',
   ],
   // SD-27 (KB-08): total, raid and tackle points, per match (min matches), milestones
-  leaders: ['matchPoints', 'raidPoints', 'tacklePoints', 'ptsPerMatch', 'raidPerMatch', 'tacklePerMatch', 'super10s', 'high5s'],
+  // deep wave: + the PKL stat leaders (successful raids / tackles, super raids /
+  // tackles, do-or-die points, raid strike rate with a minimum of raids)
+  leaders: ['matchPoints', 'raidPoints', 'tacklePoints', 'ptsPerMatch', 'raidPerMatch', 'tacklePerMatch', 'super10s', 'high5s',
+    'successfulRaids', 'superRaids', 'tackles', 'superTackles', 'doOrDiePoints', 'raidStrikeRate'],
   headline: ['raidPoints', 'tacklePoints'],
   awards: [
     { stat: 'raidPoints', icon: '🤼', label: 'Top raider', tournamentLabel: 'Best raider' },

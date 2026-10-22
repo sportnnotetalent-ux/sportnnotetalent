@@ -331,5 +331,6 @@ export function teamText(rows: TeamResult[]): string {
 export function roadRowText(r: RankedEntry, f?: Pick<PhaseFormat, 'discipline' | 'road'> | null): string {
   const ev = roadEventOf(f?.discipline);
   const res = r.entry.result ?? {};
-  return [ev?.kind === 'walk' ? walkCards(res, f?.road, ev.metres).text : ''].filter(Boolean).join(' · ');
+  // deep wave: the chip (net) time beside the official gun time, when the meet tracks it
+  return [ev?.kind === 'walk' ? walkCards(res, f?.road, ev.metres).text : '', res.chip != null ? `chip ${formatMark(res.chip, { unit: 'time', dp: ev?.track ? 2 : 0 })}` : ''].filter(Boolean).join(' · ');
 }

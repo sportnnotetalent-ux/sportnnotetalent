@@ -3,6 +3,10 @@
  * move-by-move scoring; the board is the players'. Scoring is the standard
  * 1 / ½ / 0, so Swiss and round-robin tables read like a crosstable.
  */
+import { replayMoves, START_FEN } from './board.ts';
+import { readMoveList } from './pgn.ts';
+import { detectOpening, ecoCode, nameForEco } from './openings.ts';
+
 export type Side = 'home' | 'away';
 export type ChessMethod =
   | 'checkmate' | 'resignation' | 'time' | 'agreement' | 'stalemate'
@@ -91,8 +95,27 @@ export interface KoGame {
   method?: ChessMethod;
   moves?: number;
   clock?: { white?: number; black?: number };
+  /** Deep wave — when the result was recorded (ms) */
+  at?: number;
 }
 export interface KoState { plan: KoPlan; games: KoGame[] }
+
+/** Deep wave — the optional move list of a game (FIDE Laws App. C, SAN). */
+export interface ChessMoves {
+  /** normalised SAN, in order from the start position */
+  san: string[];
+  /** the position after the last move (FEN) — adding moves checks from here */
+  fen: string;
+  /** a non-standard starting position (a pasted PGN's [FEN] tag) */
+  start?: string;
+  /** the clock left after each move, seconds (null = not recorded) */
+  clk?: (number | null)[];
+  /** when each move was entered (ms, the scorer's clock) */
+  at?: (number | null)[];
+}
+
+/** Deep wave — the optional detail being tracked ("Stats to track"). */
+export interface ChessTrack { moves?: boolean; clock?: boolean }
 
 const clampInt = (v: unknown, lo: number, hi: number, dv: number): number => {
   const n = Math.floor(Number(v));
@@ -191,7 +214,40 @@ export interface ChessState {
    *  is undecided the top-level winner / method are empty; once decided,
    *  `winner` is the side that goes through. */
   ko?: KoState;
+  /** Deep wave — the move list (MOVES: typed move by move, or a pasted PGN /
+   *  SAN list, during or after the game). Absent = result only (every older
+   *  game). Not kept for a knockout mini-match. */
+  game?: ChessMoves;
+  /** Deep wave — the opening named by hand (OPENING) or by a pasted PGN's
+   *  [ECO] / [Opening] tags; otherwise `openingOf` reads it from the moves */
+  opening?: { eco: string; name?: string; manual?: boolean };
+  /** Deep wave — Stats to track (the format before the game, then SET_TRACK) */
+  track?: ChessTrack;
+  /** Deep wave — when the result was recorded (ms) */
+  resultAt?: number;
 }
+
+/** Deep wave — the tracking flags from the format (`trackMoves`,
+ *  `trackClock`) or a SET_TRACK payload; undefined when none is on. */
+function readTrack(v: Record<string, unknown> | undefined, base?: ChessTrack): ChessTrack | undefined {
+  const t: ChessTrack = { ...(base ?? {}) };
+  if (v?.trackMoves !== undefined) t.moves = v.trackMoves === true;
+  if (v?.trackClock !== undefined) t.clock = v.trackClock === true;
+  for (const k of Object.keys(t) as (keyof ChessTrack)[]) if (!t[k]) delete t[k];
+  return Object.keys(t).length ? t : undefined;
+}
+const stampOf = (v: unknown): number | undefined => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : undefined);
+
+/** Deep wave — the game's opening: named by hand / a PGN tag, else the
+ *  longest ECO line the moves follow; null when neither. */
+export function openingOf(s: Pick<ChessState, 'game' | 'opening'>): { eco: string; name: string } | null {
+  if (s.opening?.eco) return { eco: s.opening.eco, name: s.opening.name ?? nameForEco(s.opening.eco) ?? `ECO ${s.opening.eco}` };
+  const d = s.game?.san.length && !s.game.start ? detectOpening(s.game.san) : null;
+  return d ? { eco: d.eco, name: d.name } : null;
+}
+
+/** Deep wave — the game's length in moves from the list (full moves). */
+export const listMoves = (g: ChessMoves | undefined): number => (g ? Math.ceil(g.san.length / 2) : 0);
 
 /** `config.white` (SD-26) is the fixture's colour from the Swiss pairing;
  *  absent (every older fixture) = home has White, as before. The scorer can
@@ -202,13 +258,70 @@ export function init(config?: Record<string, unknown>): ChessState {
   const tcExact = exactTimeControl(config?.tcBase, config?.tcInc);
   // SD-121 — only when the format has a knockout plan (older fixtures unchanged)
   const hasKo = config && ['koGames', 'koRapidPairs', 'koBlitzPairs'].some((k) => config[k] != null);
+  // Deep wave — Stats to track, only when the organiser switched one on
+  const track = readTrack(config);
   return { white, timeControl: String(config?.timeControl ?? 'rapid'), ...(tcExact ? { tcExact } : {}), ended: false, seq: 0,
-    ...(hasKo ? { koPlan: koPlanFrom(config) } : {}) };
+    ...(hasKo ? { koPlan: koPlanFrom(config) } : {}), ...(track ? { track } : {}) };
+}
+
+/** Deep wave — MOVES: `pgn` (a pasted game or list — replaces the moves),
+ *  `add` (moves typed during the game, checked from the current position;
+ *  `clk` = the clock after the last one), or `drop` (take back the last n).
+ *  Only legal moves are kept (up to the first that isn't). No score effect. */
+function movesReducer(s: ChessState, p: Record<string, unknown>): ChessState {
+  const at = stampOf(p.at);
+  if (typeof p.pgn === 'string') {
+    const r = readMoveList(p.pgn);
+    if (!r.san.length) return s;
+    const game: ChessMoves = {
+      san: r.san, fen: r.fen, ...(r.start ? { start: r.start } : {}),
+      ...(r.clocks.some((x) => x != null) ? { clk: r.clocks } : {}), ...(at ? { at: r.san.map(() => at) } : {}),
+    };
+    const eco = ecoCode(r.tags.ECO);
+    const keep = s.opening?.manual ? { opening: s.opening } : eco ? { opening: { eco, ...(r.tags.Opening ? { name: r.tags.Opening } : {}) } } : {};
+    const { opening: _o, ...rest } = s;
+    return { ...rest, ...keep, game, seq: s.seq + 1 };
+  }
+  const prev: ChessMoves = s.game ?? { san: [], fen: START_FEN };
+  if (typeof p.drop === 'number' && p.drop > 0) {
+    if (!s.game?.san.length) return s;
+    const n = Math.max(0, prev.san.length - Math.floor(p.drop));
+    if (n === 0) { const { game: _g, ...rest } = s; return { ...rest, seq: s.seq + 1 }; }
+    const rep = replayMoves(prev.san.slice(0, n), prev.start ?? START_FEN);
+    return { ...s, game: { ...prev, san: prev.san.slice(0, n), fen: rep.fen, ...(prev.clk ? { clk: prev.clk.slice(0, n) } : {}), ...(prev.at ? { at: prev.at.slice(0, n) } : {}) }, seq: s.seq + 1 };
+  }
+  if (Array.isArray(p.add)) {
+    const rep = replayMoves(p.add.map(String), prev.fen);
+    const k = rep.san.length;
+    if (!k) return s;
+    const clkIn = typeof p.clk === 'number' && Number.isFinite(p.clk) && p.clk >= 0 ? Math.round(p.clk) : null;
+    const old = prev.san.length;
+    const clk = prev.clk || clkIn != null ? [...(prev.clk ?? new Array<number | null>(old).fill(null)), ...rep.san.map((_, i) => (i === k - 1 ? clkIn : null))] : undefined;
+    const ats = prev.at || at ? [...(prev.at ?? new Array<number | null>(old).fill(null)), ...rep.san.map(() => at ?? null)] : undefined;
+    return { ...s, game: { ...prev, san: [...prev.san, ...rep.san], fen: rep.fen, ...(clk ? { clk } : {}), ...(ats ? { at: ats } : {}) }, seq: s.seq + 1 };
+  }
+  return s;
 }
 
 /** Actions: SET_WHITE {side}, RESULT {winner, method, moves?}. PLAYED is a no-op
  *  carrier the controls use to credit each player a game for their profile. */
 export function reducer(s: ChessState, a: { type: string; side?: Side; payload?: Record<string, unknown> }): ChessState {
+  // Deep wave — optional detail (new action types: no older log has them).
+  // The move list and the opening may be added after the game too.
+  if (a.type === 'MOVES') return s.ko ? s : movesReducer(s, a.payload ?? {});
+  if (a.type === 'OPENING') {
+    const eco = ecoCode(a.payload?.eco);
+    const { opening: _o, ...rest } = s;
+    if (!eco) return { ...rest, seq: s.seq + 1 };
+    const name = typeof a.payload?.name === 'string' && a.payload.name.trim() ? a.payload.name.trim() : nameForEco(eco) ?? undefined;
+    return { ...rest, opening: { eco, ...(name ? { name } : {}), manual: true }, seq: s.seq + 1 };
+  }
+  if (a.type === 'SET_TRACK') {
+    if (s.ended) return s;
+    const t = readTrack(a.payload, s.track);
+    const { track: _t, ...rest } = s;
+    return t ? { ...rest, track: t } : rest;
+  }
   if (a.type === 'SET_WHITE' && !s.ended) {
     const side = (a.payload?.side ?? a.side) as Side | undefined;
     return side === 'home' || side === 'away' ? { ...s, white: side } : s;
@@ -228,20 +341,22 @@ export function reducer(s: ChessState, a: { type: string; side?: Side; payload?:
     const clock = c && typeof c === 'object' ? { ...(secs(c.white) != null ? { white: secs(c.white) } : {}), ...(secs(c.black) != null ? { black: secs(c.black) } : {}) } : undefined;
     // SD-121 — a knockout match: this result is ONE game of it.
     const ko: KoState | undefined = s.ko ?? (a.payload?.ko ? { plan: koPlanFrom(a.payload.ko), games: [] } : undefined);
+    // Deep wave — when the result was recorded (a new optional key)
+    const stamped = stampOf(a.payload?.at);
     if (ko) {
       const at = koStatus(ko);
-      const game: KoGame = { phase: at.phase, white: s.white, winner, ...(method ? { method } : {}), ...(moves ? { moves } : {}), ...(clock && Object.keys(clock).length ? { clock } : {}) };
+      const game: KoGame = { phase: at.phase, white: s.white, winner, ...(method ? { method } : {}), ...(moves ? { moves } : {}), ...(clock && Object.keys(clock).length ? { clock } : {}), ...(stamped ? { at: stamped } : {}) };
       const next: KoState = { ...ko, games: [...ko.games, game] };
       const st = koStatus(next);
       if (st.winner) {
-        return { ...s, ko: next, winner: st.winner, method, moves, ...(clock && Object.keys(clock).length ? { clock } : {}), ended: true, seq: s.seq + 1 };
+        return { ...s, ko: next, winner: st.winner, method, moves, ...(clock && Object.keys(clock).length ? { clock } : {}), ...(stamped ? { resultAt: stamped } : {}), ended: true, seq: s.seq + 1 };
       }
       // Undecided: the next game. Colours alternate (the arbiter can still
       // switch them with SET_WHITE — e.g. the Armageddon draw of lots).
       const { winner: _w, method: _m, moves: _mv, clock: _c, ...rest } = s;
       return { ...rest, ko: next, white: s.white === 'home' ? 'away' : 'home', seq: s.seq + 1 };
     }
-    return { ...s, winner, method, moves, ...(clock && Object.keys(clock).length ? { clock } : {}), ended: true, seq: s.seq + 1 };
+    return { ...s, winner, method, moves, ...(clock && Object.keys(clock).length ? { clock } : {}), ...(stamped ? { resultAt: stamped } : {}), ended: true, seq: s.seq + 1 };
   }
   return s;
 }

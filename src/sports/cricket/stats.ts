@@ -50,6 +50,14 @@ export const cricketStats: SportStatSchema<'cricket'> = {
     bowledAny: (l) => hasKey(l, 'ballsBowled') || n(l, 'wickets') > 0,
     /** SD-69 — kept wicket in this match (`wk`, from statTotals: re-synced lines) */
     kept: (l) => n(l, 'wk') > 0,
+    // Deep wave — lines from a match that captured the optional depth
+    /** bowler types known → batting vs pace / spin on the line */
+    vsTyped: (l) => hasKey(l, 'bPace'),
+    /** shot control tracked on balls this player faced / bowled */
+    ctrlBat: (l) => n(l, 'ctlBalls') > 0,
+    ctrlBowl: (l) => n(l, 'ctlBowled') > 0,
+    /** balls clocked by a speed gun */
+    clocked: (l) => n(l, 'kphN') > 0,
   },
   stats: [
     // ── batting
@@ -115,6 +123,37 @@ export const cricketStats: SportStatSchema<'cricket'> = {
       agg: { kind: 'sum', over: 'kept' }, coverOf: 'kept' },
     { key: 'wkDismissals', label: 'Keeper dismissals', leaderLabel: 'Most keeper dismissals', short: 'keeper dismissals', one: 'keeper dismissal', source: 'derived', group: 'fielding',
       agg: { kind: 'sum', keys: ['wkCatches', 'stumpings'], over: 'kept' }, coverOf: 'kept', tieBreak: [{ key: 'stumpings', better: 'higher' }] },
+    // ── Deep wave: optional depth (statTotals writes these only for a match that
+    // captured it — `coverage: 'keyed'`: a line without the key is "not tracked")
+    { key: 'bPace', label: 'Balls faced vs pace', short: 'balls vs pace', group: 'batting', coverage: 'keyed' },
+    { key: 'rPace', label: 'Runs vs pace', short: 'runs vs pace', group: 'batting', coverage: 'keyed' },
+    { key: 'oPace', label: 'Dismissed by pace', short: 'dismissals by pace', group: 'batting', coverage: 'keyed' },
+    { key: 'bSpin', label: 'Balls faced vs spin', short: 'balls vs spin', group: 'batting', coverage: 'keyed' },
+    { key: 'rSpin', label: 'Runs vs spin', short: 'runs vs spin', group: 'batting', coverage: 'keyed' },
+    { key: 'oSpin', label: 'Dismissed by spin', short: 'dismissals by spin', group: 'batting', coverage: 'keyed' },
+    { key: 'ctlBalls', label: 'Balls faced (control tracked)', short: 'tracked balls faced', group: 'batting', coverage: 'keyed' },
+    { key: 'falseShots', label: 'False shots', short: 'false shots', one: 'false shot', group: 'batting', coverage: 'keyed' },
+    { key: 'ctlBowled', label: 'Balls bowled (control tracked)', short: 'tracked balls bowled', group: 'bowling', coverage: 'keyed' },
+    { key: 'fsInduced', label: 'False shots induced', short: 'false shots induced', one: 'false shot induced', group: 'bowling', coverage: 'keyed' },
+    { key: 'kphN', label: 'Balls clocked', short: 'balls clocked', one: 'ball clocked', group: 'bowling', coverage: 'keyed' },
+    { key: 'kphSum', label: 'Speed total (km/h)', group: 'bowling', coverage: 'keyed' },
+    { key: 'kphMax', label: 'Fastest ball in a match (km/h)', group: 'bowling', coverage: 'keyed', agg: { kind: 'max' } },
+    { key: 'srPace', label: 'Strike rate vs pace', abbr: 'SR v pace', source: 'derived', group: 'batting', format: { unit: 'decimal', dp: 1 },
+      agg: { kind: 'rate', num: 'rPace', den: 'bPace', scale: 100, over: 'vsTyped' }, coverOf: 'batted' },
+    { key: 'srSpin', label: 'Strike rate vs spin', abbr: 'SR v spin', source: 'derived', group: 'batting', format: { unit: 'decimal', dp: 1 },
+      agg: { kind: 'rate', num: 'rSpin', den: 'bSpin', scale: 100, over: 'vsTyped' }, coverOf: 'batted' },
+    { key: 'avgPace', label: 'Average vs pace', source: 'derived', group: 'batting', format: { unit: 'decimal', dp: 1 },
+      agg: { kind: 'rate', num: 'rPace', den: 'oPace', over: 'vsTyped' }, coverOf: 'batted' },
+    { key: 'avgSpin', label: 'Average vs spin', source: 'derived', group: 'batting', format: { unit: 'decimal', dp: 1 },
+      agg: { kind: 'rate', num: 'rSpin', den: 'oSpin', over: 'vsTyped' }, coverOf: 'batted' },
+    { key: 'ctrlPct', label: 'Control %', leaderLabel: 'Best control %', source: 'derived', group: 'batting', format: { unit: 'percent', dp: 0 },
+      agg: { kind: 'rate', num: ['ctlBalls', '-falseShots'], den: 'ctlBalls', scale: 100, over: 'ctrlBat' }, coverOf: 'batted' },
+    { key: 'fsPct', label: 'False shots induced %', source: 'derived', group: 'bowling', format: { unit: 'percent', dp: 0 },
+      agg: { kind: 'rate', num: 'fsInduced', den: 'ctlBowled', scale: 100, over: 'ctrlBowl' }, coverOf: 'bowledAny' },
+    { key: 'fastest', label: 'Fastest ball (km/h)', leaderLabel: 'Fastest ball', source: 'derived', group: 'bowling', format: { unit: 'count' },
+      agg: { kind: 'max', key: 'kphMax', over: 'clocked' }, coverOf: 'bowledAny' },
+    { key: 'avgKph', label: 'Average speed (km/h)', source: 'derived', group: 'bowling', format: { unit: 'decimal', dp: 1 },
+      agg: { kind: 'rate', num: 'kphSum', den: 'kphN', over: 'clocked' }, coverOf: 'bowledAny' },
   ],
   sections: [
     { id: 'batting', title: 'Batting', rows: [
@@ -122,12 +161,18 @@ export const cricketStats: SportStatSchema<'cricket'> = {
       { stat: 'fours' }, { stat: 'sixes' }, { stat: 'fifties' }, { stat: 'hundreds' },
       // SD-79 (shown once a full scorecard line gives them)
       { stat: 'bf', label: 'BF' }, { stat: 'ducks' },
+      // Deep wave — only once a match tracked them (hidden otherwise, never 0)
+      { stat: 'srPace', label: 'SR vs pace' }, { stat: 'srSpin', label: 'SR vs spin' },
+      { stat: 'avgPace', label: 'Avg vs pace' }, { stat: 'avgSpin', label: 'Avg vs spin' },
+      { stat: 'ctrlPct' },
     ] },
     { id: 'bowling', title: 'Bowling', rows: [
       { stat: 'overs' }, { stat: 'wickets' }, { stat: 'runsConceded', label: 'Runs' }, { stat: 'maidens' }, { stat: 'dots' },
       { stat: 'econ', label: 'Econ' }, { stat: 'bowlAvg', label: 'Avg' }, { stat: 'bowlSr', label: 'SR' }, { stat: 'best', label: 'Best' },
       // SD-79
       { stat: 'bowlInnings', label: 'Inns' }, { stat: 'fourW' }, { stat: 'fiveW' },
+      // Deep wave — only once a match tracked them
+      { stat: 'fsPct' }, { stat: 'fastest' }, { stat: 'avgKph' },
     ] },
     { id: 'fielding', title: 'Fielding', rows: [
       ...['catches', 'stumpings', 'runouts', 'dropped', 'runsSaved', 'runsMissed'].map((stat) => ({ stat })),
@@ -144,6 +189,8 @@ export const cricketStats: SportStatSchema<'cricket'> = {
   // maidens / dots / ducks; SD-69: keeper dismissals (re-synced lines)
   leaders: ['runs', 'wickets', 'catches', 'highest', 'best', 'avg', 'sr', 'econ', 'fifties', 'hundreds',
     'fours', 'sixes', 'maidens', 'dots', 'ducks', 'wkDismissals'],
+  // (Deep wave: `fastest` and `ctrlPct` carry leader labels, ready to append
+  // here once the founder wants those rails — tests pin this list.)
   headline: ['runs', 'wickets'],
   // cricket ships its own richer per-match summary: tournament slots only
   awards: [

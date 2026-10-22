@@ -18,6 +18,13 @@ import {
   type ChessMethod, type ChessState, type Side, type KoState,
 } from './engine';
 import { chessResultCredit } from './stats';
+import { listMoves, openingOf } from './engine';
+import { MovesPanel } from './MovesPanel';
+import { chessFeed } from './gameFeed';
+import { chessGameStats, phasesOf, type Phase } from './gameStats';
+import { chessStatTotals } from './totals';
+import { CommentaryFeed } from '../gcc/CommentaryFeed';
+import { CompareTable } from '../gcc/CompareTable';
 
 const half = (n: number) => String(n).replace('.5', '½').replace(/^0½$/, '½');
 
@@ -75,15 +82,17 @@ const ScoringControls: SportPlugin<ChessState>['ScoringControls'] = ({ state, di
   }
   if (s.ended) {
     return (
-      <View style={ctrl.box}>
-        <Text style={ctrl.big}>{resultString(s)}</Text>
-        <Text style={textStyles.body}>
-          {isDoubleForfeit(s.method) ? 'Neither player played — both lose' : s.winner === 'draw' ? 'Draw' : `${nameOf(s.winner as Side)} won`}{s.method ? ` · ${METHOD_LABEL[s.method]}` : ''}{s.moves ? ` · ${s.moves} moves` : ''}
-        </Text>
-        <Text style={textStyles.muted}>♔ {nameOf(s.white)} had White</Text>
-        {s.clock && (s.clock.white != null || s.clock.black != null) ? (
-          <Text style={textStyles.muted}>⏱ Time left · White {s.clock.white != null ? clockText(s.clock.white) : '–'} · Black {s.clock.black != null ? clockText(s.clock.black) : '–'}</Text>
-        ) : null}
+      <View style={{ gap: theme.spacing(3) }}>
+        <View style={ctrl.box}>
+          <Text style={ctrl.big}>{resultString(s)}</Text>
+          <Text style={textStyles.body}>
+            {isDoubleForfeit(s.method) ? 'Neither player played — both lose' : s.winner === 'draw' ? 'Draw' : `${nameOf(s.winner as Side)} won`}{s.method ? ` · ${METHOD_LABEL[s.method]}` : ''}{s.moves ? ` · ${s.moves} moves` : ''}
+          </Text>
+          <Text style={textStyles.muted}>♔ {nameOf(s.white)} had White</Text>
+          {s.clock && (s.clock.white != null || s.clock.black != null) ? (
+            <Text style={textStyles.muted}>⏱ Time left · White {s.clock.white != null ? clockText(s.clock.white) : '–'} · Black {s.clock.black != null ? clockText(s.clock.black) : '–'}</Text>
+          ) : null}
+        </View>
       </View>
     );
   }
@@ -121,7 +130,8 @@ const ScoringControls: SportPlugin<ChessState>['ScoringControls'] = ({ state, di
     dispatch({
       type: 'RESULT',
       side: winner === 'draw' ? undefined : winner,
-      payload: { winner, method: sentMethod, moves: dff ? undefined : Number(moves) || undefined, ...(clock ? { clock } : {}),
+      // Deep wave — the length from the move list when none was typed; `at` for the commentary
+      payload: { winner, method: sentMethod, moves: dff ? undefined : Number(moves) || (s.game && !s.ko ? listMoves(s.game) || undefined : undefined), ...(clock ? { clock } : {}), at: Date.now(),
         // SD-121 — the first game of a knockout match carries the plan
         ...(knockout && !s.ko ? { ko: koNow.plan } : {}) },
       attribution: credit('home'),
@@ -143,6 +153,8 @@ const ScoringControls: SportPlugin<ChessState>['ScoringControls'] = ({ state, di
 
   return (
     <View style={{ gap: theme.spacing(4) }}>
+      {/* Deep wave — the optional move list (Stats to track · Move list) */}
+      {s.track?.moves && !koOn ? <MovesPanel state={s} dispatch={dispatch} nameOf={nameOf} /> : null}
       {koAt ? (
         <View style={ctrl.koBox}>
           <Text style={ctrl.label}>🏆 Knockout · {koPhaseText(koNow, koAt.phase, koAt.game)}</Text>
@@ -255,6 +267,33 @@ export const chessPlugin: SportPlugin<ChessState> = {
   ScoringControls,
   // SD-67 — the scoreboard names who has White ("♔ Anand has White")
   Scoreboard: ChessScoreboard,
+  // Deep wave — commentary (move by move / the result) and the game stats
+  LiveExtras: ChessLiveExtras,
+  // Deep wave — Undo names the move(s) it takes back ("Undo move Nf3")
+  undoLabel: (step) => {
+    if (step?.type !== 'MOVES') return null;
+    const a = (step.prev as ChessState | undefined)?.game?.san ?? [];
+    const b = (step.next as ChessState | undefined)?.game?.san ?? [];
+    if (b.length > a.length && a.every((m, i) => b[i] === m)) return `move${b.length - a.length > 1 ? 's' : ''} ${b.slice(a.length).join(' ')}`;
+    return 'move list';
+  },
+  // Deep wave — the game-record figures from the move list (partial: the
+  // result credit stays live)
+  statTotals: chessStatTotals,
+  statTotalsNeedsPlayers: true,
+  statTotalsPartial: true,
+  liveSettings: {
+    title: '⚙️ Stats to track',
+    hint: 'Optional. Recording the result stays the same; the move list can also be pasted after the game.',
+    mode: 'event',
+    actionType: 'SET_TRACK',
+    fields: [
+      { key: 'trackMoves', label: 'Move list (SAN / PGN)', type: 'toggle', default: false, group: 'Stats to track', hint: 'Type each move as it is played (checked for legality) — commentary, opening, game stats' },
+      { key: 'trackClock', label: 'Clock after each move', type: 'toggle', default: false, group: 'Stats to track', hint: 'With the move list: the time left after each move → time used per move' },
+    ],
+    read: (st) => ({ trackMoves: !!st.track?.moves, trackClock: !!st.track?.clock }),
+    defaults: { trackMoves: false, trackClock: false },
+  },
   formatFields: [
     {
       key: 'timeControl', label: 'Time control', type: 'choice', default: 'rapid',
@@ -280,8 +319,50 @@ export const chessPlugin: SportPlugin<ChessState> = {
       hint: '2 games each, then blitz' },
     { key: 'koBlitzPairs', label: 'Knockout: blitz tie-break pairs', type: 'number', default: 1, min: 0, max: 4, advanced: true,
       hint: '2 games each; still level → one Armageddon game (a draw = Black goes through)' },
+    // Deep wave — the organiser can switch the move list on for every game
+    { key: 'trackMoves', label: 'Track the move list', type: 'toggle', default: false, advanced: true, group: 'Stats to track', hint: 'scorers type each move (or paste the PGN)' },
+    { key: 'trackClock', label: 'Track the clock after each move', type: 'toggle', default: false, advanced: true, group: 'Stats to track' },
   ],
 };
+
+/** Deep wave — the Score tab: commentary (moves newest first, or the result)
+ *  and the game stats panel (White vs Black; whole game or a phase). */
+function ChessLiveExtras({ state, homeName, awayName, homeColor, awayColor, homeRoster = [], awayRoster = [], dispatch, canScore }: Parameters<NonNullable<SportPlugin<ChessState>['LiveExtras']>>[0]) {
+  const s = state as ChessState;
+  const [view, setView] = useState<'feed' | 'stats'>('feed');
+  const [phase, setPhase] = useState<Phase | 'all'>('all');
+  const nameOf = (side: Side) => (side === 'home' ? homeRoster : awayRoster)[0]?.fullName ?? (side === 'home' ? homeName : awayName);
+  const black: Side = s.white === 'home' ? 'away' : 'home';
+  const hasMoves = !!s.game?.san.length && !s.ko;
+  if (!s.ended && !hasMoves && !s.ko?.games.length) return null;
+  const op = openingOf(s);
+  const phases = phasesOf(s);
+  return (
+    <View style={{ gap: theme.spacing(2) }}>
+      {op ? <Text style={textStyles.muted}>📖 {op.eco} · {op.name}</Text> : null}
+      {/* Deep wave — after the game (the Scoring tab then only says "Match
+          complete"), a scorer can still attach the moves (PGN) and the opening */}
+      {s.ended && canScore && dispatch && !s.ko && !isDoubleForfeit(s.method) && !isForfeit(s.method)
+        ? <MovesPanel state={s} dispatch={dispatch} nameOf={nameOf} after /> : null}
+      {hasMoves ? (
+        <View style={ctrl.chips}>
+          <SelectChip label="🎙 Commentary" active={view === 'feed'} onPress={() => setView('feed')} />
+          <SelectChip label="📊 Game stats" active={view === 'stats'} onPress={() => setView('stats')} />
+        </View>
+      ) : null}
+      {view === 'stats' && hasMoves ? (
+        <CompareTable title={null} homeName={`♔ ${nameOf(s.white)}`} awayName={`♚ ${nameOf(black)}`}
+          homeColor={s.white === 'home' ? homeColor : awayColor} awayColor={s.white === 'home' ? awayColor : homeColor}
+          categories={chessGameStats(s, phase)} unit={phase} onUnit={(k) => setPhase(k as Phase | 'all')}
+          units={[{ key: 'all', label: 'Game' }, ...phases.map((p) => ({ key: p, label: p[0].toUpperCase() + p.slice(1) }))]}
+          footnote="Opening = the first 10 moves; the endgame starts once both sides have 13 points of pieces or fewer besides pawns." />
+      ) : (
+        <CommentaryFeed title={hasMoves ? null : '🎙 Commentary'} groups={chessFeed(s, { home: nameOf('home'), away: nameOf('away') })}
+          homeColor={homeColor} awayColor={awayColor} empty="No moves yet." />
+      )}
+    </View>
+  );
+}
 
 /** "♔ {name} has White" — the generic summary only knows home / away. */
 export function whiteLine(s: ChessState, homeName: string, awayName: string): string {

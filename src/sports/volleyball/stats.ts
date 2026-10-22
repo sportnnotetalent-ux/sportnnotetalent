@@ -10,6 +10,9 @@ const q = VOLLEYBALL_MIN_SETS;
 /** SD-81 — attack efficiency / success rank among attackers with at least
  *  this many attempts (organisers can change it). */
 export const VOLLEYBALL_MIN_ATTEMPTS: Qualifier = { den: 10, unit: { label: 'attack attempts', one: 'attack attempt' } };
+/** Deep wave — FIVB Best Receiver ranks reception efficiency among players
+ *  with at least this many receptions (organisers can change it). */
+export const VOLLEYBALL_MIN_RECEPTIONS: Qualifier = { den: 10, unit: { label: 'receptions', one: 'reception' } };
 import { ACES, BLOCKS, HIGH_POINTS, POINTS } from '../sharedStats.ts';
 
 export const volleyballStats: SportStatSchema<'volleyball'> = {
@@ -18,6 +21,8 @@ export const volleyballStats: SportStatSchema<'volleyball'> = {
   splits: ['format', 'tournament', 'season', 'opponent'],
   /** SD-137a — tournament / hub leaderboard + awards chips (indoor / beach / 9-a-side) */
   leaderSplits: ['format'],
+  /** deep wave — lines from matches that named the aced receiver */
+  filters: { acedNamed: (l) => l.stats != null && typeof l.stats.receptionErrors === 'number' },
   stats: [
     { ...POINTS, group: 'attack', weight: 1 },
     { ...ACES, group: 'serve', weight: 2 },
@@ -63,6 +68,25 @@ export const volleyballStats: SportStatSchema<'volleyball'> = {
     { key: 'receptionsPositive', label: 'Positive receptions', short: 'positive receptions', one: 'positive reception', group: 'reception', coverage: 'keyed' },
     { key: 'receptionPerfectPct', label: 'Perfect reception %', source: 'derived', group: 'reception', format: { unit: 'percent', dp: 0 }, agg: { kind: 'rate', num: 'receptionsPerfect', den: 'receptions', scale: 100, dp: 0 } },
     { key: 'receptionPositivePct', label: 'Positive reception %', source: 'derived', group: 'reception', format: { unit: 'percent', dp: 0 }, agg: { kind: 'rate', num: 'receptionsPositive', den: 'receptions', scale: 100, dp: 0 } },
+    // Deep wave (volleyball-kabaddi) — optional "Stats to track" categories.
+    // 'keyed': written only by a match that captured the category, so every
+    // other match reads "not tracked", never 0.
+    // Reception: who was aced (a reception error — FIVB VIS reception errors)
+    { key: 'receptionErrors', label: 'Reception errors', short: 'reception errors', one: 'reception error', abbr: 'RE', group: 'reception', coverage: 'keyed', format: { unit: 'count', better: 'lower' } },
+    // FIVB Best Receiver: (perfect − errors) ÷ receptions, over matches that
+    // named the aced receiver (an older graded match would read too high)
+    { key: 'receptionEff', label: 'Reception efficiency', abbr: 'R.EFF', source: 'derived', group: 'reception', format: { unit: 'percent', dp: 0 },
+      agg: { kind: 'rate', num: ['receptionsPerfect', '-receptionErrors'], den: 'receptions', scale: 100, dp: 0, over: 'acedNamed', qualifier: VOLLEYBALL_MIN_RECEPTIONS },
+      tieBreak: [{ key: 'receptions', better: 'higher' }] },
+    // Defence: digs (FIVB Best Digger = digs per set)
+    { key: 'digs', label: 'Digs', short: 'digs', one: 'dig', abbr: 'DIG', group: 'defence', coverage: 'keyed' },
+    { key: 'digsPerSet', label: 'Digs per set', abbr: 'DIG/S', source: 'derived', group: 'defence', format: { unit: 'decimal', dp: 2 }, agg: { kind: 'perSet', key: 'digs', sets: 'setsPlayed', dp: 2, qualifier: q }, tieBreak: [{ key: 'digs', better: 'higher' }] },
+    // Setting: the setter named on a kill (FIVB Best Setter = excellent sets per set)
+    { key: 'setAssists', label: 'Set assists', short: 'set assists', one: 'set assist', abbr: 'SET', group: 'setting', coverage: 'keyed' },
+    { key: 'setAssistsPerSet', label: 'Set assists per set', abbr: 'SET/S', source: 'derived', group: 'setting', format: { unit: 'decimal', dp: 2 }, agg: { kind: 'perSet', key: 'setAssists', sets: 'setsPlayed', dp: 2, qualifier: q }, tieBreak: [{ key: 'setAssists', better: 'higher' }] },
+    // Serve: rallies served (free once the toss + both rotations are recorded)
+    { key: 'serveAttempts', label: 'Serve attempts', short: 'serves', one: 'serve', abbr: 'SRV', group: 'serve', coverage: 'keyed' },
+    { key: 'aceRate', label: 'Ace %', source: 'derived', group: 'serve', format: { unit: 'percent', dp: 1 }, agg: { kind: 'rate', num: 'aces', den: 'serveAttempts', scale: 100, dp: 1 } },
     { key: 'pointsPerSet', label: 'Points per set', abbr: 'PTS/S', source: 'derived', group: 'attack', format: { unit: 'decimal', dp: 2 }, agg: { kind: 'perSet', key: 'points', sets: 'setsPlayed', dp: 2, qualifier: q }, tieBreak: [{ key: 'points', better: 'higher' }] },
     { key: 'acesPerSet', label: 'Aces per set', abbr: 'ACE/S', source: 'derived', group: 'serve', format: { unit: 'decimal', dp: 2 }, agg: { kind: 'perSet', key: 'aces', sets: 'setsPlayed', dp: 2, qualifier: q }, tieBreak: [{ key: 'aces', better: 'higher' }] },
     { key: 'blocksPerSet', label: 'Blocks per set', abbr: 'BLK/S', source: 'derived', group: 'block', format: { unit: 'decimal', dp: 2 }, agg: { kind: 'perSet', key: 'blocks', sets: 'setsPlayed', dp: 2, qualifier: q }, tieBreak: [{ key: 'blocks', better: 'higher' }] },
@@ -78,9 +102,12 @@ export const volleyballStats: SportStatSchema<'volleyball'> = {
       // SD-81 — detail-mode matches only (hidden as "not tracked" otherwise)
       { stat: 'attackAttempts' }, { stat: 'attackKills', label: 'Kills (detailed matches)' }, { stat: 'attackErrors' }, { stat: 'attacksBlocked' }, { stat: 'attackEff' }, { stat: 'attackSuccess' },
     ] },
-    { id: 'serve', title: 'Serve', rows: [{ stat: 'aces' }, { stat: 'acesPerSet' }, { stat: 'serveErrors' }] },
+    { id: 'serve', title: 'Serve', rows: [{ stat: 'aces' }, { stat: 'acesPerSet' }, { stat: 'serveErrors' }, { stat: 'serveAttempts' }, { stat: 'aceRate' }] },
     { id: 'block', title: 'Block', rows: [{ stat: 'blocks' }, { stat: 'blocksPerSet' }] },
-    { id: 'reception', title: 'Reception', rows: [{ stat: 'receptions' }, { stat: 'receptionPerfectPct' }, { stat: 'receptionPositivePct' }] },
+    { id: 'reception', title: 'Reception', rows: [{ stat: 'receptions' }, { stat: 'receptionPerfectPct' }, { stat: 'receptionPositivePct' }, { stat: 'receptionErrors' }, { stat: 'receptionEff' }] },
+    // deep wave — optional categories ("not tracked" rows hide)
+    { id: 'defence', title: 'Defence', rows: [{ stat: 'digs' }, { stat: 'digsPerSet' }] },
+    { id: 'setting', title: 'Setting', rows: [{ stat: 'setAssists' }, { stat: 'setAssistsPerSet' }] },
     { id: 'errors', title: 'Errors', rows: [{ stat: 'errors' }] },
     { id: 'record', title: 'Sets', rows: [{ stat: 'setsPlayed' }, { stat: 'setsWL' }, { stat: 'setsPct' }] },
   ],
@@ -89,8 +116,9 @@ export const volleyballStats: SportStatSchema<'volleyball'> = {
   // that didn't capture them
   box: [{ columns: [{ key: 'points', emphasis: true }, 'attackPoints', 'aces', 'blocks', 'attackAttempts', 'attackEff', 'serveErrors', 'errors'] }],
   compare: ['points', 'attackPoints', 'blocks', 'aces', 'oppErrors', 'serveErrors'],
-  // SD-27 (VB-08): totals, then FIVB's per-set rates (min sets on court)
-  leaders: ['points', 'attackPoints', 'aces', 'blocks', 'pointsPerSet', 'acesPerSet', 'blocksPerSet', 'attackEff'],
+  // SD-27 (VB-08): totals, then FIVB's per-set rates (min sets on court);
+  // deep wave: FIVB Best Digger / Setter / Receiver figures (optional categories)
+  leaders: ['points', 'attackPoints', 'aces', 'blocks', 'pointsPerSet', 'acesPerSet', 'blocksPerSet', 'attackEff', 'digsPerSet', 'setAssistsPerSet', 'receptionEff'],
   headline: ['points', 'aces'],
   // FIVB individual awards. Best Scorer = attack + block + serve points (all in
   // `points` since SD-04); Best Server / Blocker by aces / blocks per set.
@@ -103,6 +131,11 @@ export const volleyballStats: SportStatSchema<'volleyball'> = {
     { stat: 'blocks', icon: '🧱', label: 'Blocks', tournamentLabel: 'Best blocker', rankBy: 'blocksPerSet' },
     { stat: 'attackPoints', icon: '⚡', label: 'Attack points', tournamentLabel: 'Most attack points', match: false },
     { stat: 'attackKills', icon: '🎯', label: 'Attack efficiency', tournamentLabel: 'Best attacker', rankBy: 'attackEff', match: false },
+    // deep wave — FIVB Best Receiver / Digger / Setter, from matches that
+    // tracked the category (tournament slots only)
+    { stat: 'receptions', icon: '📥', label: 'Reception efficiency', tournamentLabel: 'Best receiver', rankBy: 'receptionEff', match: false },
+    { stat: 'digs', icon: '🛡️', label: 'Digs', tournamentLabel: 'Best digger', rankBy: 'digsPerSet', match: false },
+    { stat: 'setAssists', icon: '🤝', label: 'Set assists', tournamentLabel: 'Best setter', rankBy: 'setAssistsPerSet', match: false },
   ],
   scoreUnit: 'sets',
 };

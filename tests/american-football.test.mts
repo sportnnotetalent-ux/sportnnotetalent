@@ -345,7 +345,8 @@ describe('SD-147 · box score, timeline, ticker, undo label', () => {
     const cols = table.columns.map((c) => c.abbr);
     for (const k of ['C/ATT', 'PYDS', 'CAR', 'RYDS', 'REC', 'RCYDS', 'SCK', 'DINT', 'TKL']) assert.ok(cols.includes(k), k);
     assert.equal(table.home.rows.find((r) => r.name === 'H1')!.cells[cols.indexOf('C/ATT')], '2-2');
-    assert.equal(d.home.teamStats?.firstDowns, 1);
+    // deep wave: the 56-yd touchdown catch from scrimmage counts as a first down (NFL / NCAA)
+    assert.equal(d.home.teamStats?.firstDowns, 2);
     assert.match(src.notes!()[0], /^Time of possession: Lions \d+:\d\d · Bears/);
   });
   test('timeline: scores with the game clock; ticker; TD flash; named Undo', () => {

@@ -2,7 +2,7 @@
  *  scorer's correction list. PURE. */
 import type { LiveEvent } from '../liveEvents';
 import { shootoutOrderRows } from '../shootoutOrder.ts';
-import { clockText, periodName, SHOT_LABEL, type HandballEvent, type HandballState } from './engine.ts';
+import { clockText, periodName, FAULT_LABEL, SHOT_LABEL, type HandballEvent, type HandballState } from './engine.ts';
 
 const CARD_ICON = { yellow: '🟨', twoMin: '⏱', red: '🟥' } as const;
 const MISS_LABEL = { saved: 'saved', missed: 'missed', blocked: 'blocked' } as const;
@@ -23,7 +23,11 @@ export function describeEvent(e: HandballEvent, answer?: string): { icon: string
     case 'block':
       return { icon: '🛡', label: 'Block', detail: e.playerName };
     case 'turnover':
-      return { icon: '⚠️', label: 'Technical fault', detail: [e.playerName, answer ? `steal ${answer}` : ''].filter(Boolean).join(' · ') || undefined };
+      return { icon: '⚠️', label: `Technical fault${e.fault ? ` · ${FAULT_LABEL[e.fault].toLowerCase()}` : ''}`, detail: [e.playerName, answer ? `steal ${answer}` : ''].filter(Boolean).join(' · ') || undefined };
+    case 'empty':
+      return { icon: '🥅', label: e.on === false ? 'Goalkeeper back in goal' : 'Empty goal — 7th court player' };
+    case 'drawn':
+      return { icon: '🎯', label: '7 m throw won', detail: e.playerName };
     case 'steal':
       return { icon: '🖐', label: 'Steal', detail: e.playerName };
     case 'card': {

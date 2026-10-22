@@ -46,6 +46,14 @@ export const iceHockeyStats: SportStatSchema<'ice_hockey'> = {
     { key: 'shutouts', label: 'Shutouts', short: 'shutouts', one: 'shutout', group: 'goalkeeping', weight: 6, coverage: 'present', eligible: 'goalkeeper', abbr: 'SO' },
     { key: 'gkMinutes', label: 'Minutes in net', short: 'mins in net', group: 'goalkeeping', format: { unit: 'minutes' }, coverage: 'present', abbr: 'MIN' },
     { key: 'gkGames', label: 'Games in net', short: 'games in net', one: 'game in net', group: 'goalkeeping', coverage: 'present', abbr: 'GP' },
+    // deep wave — optional "Stats to track" (keyed: only matches that tracked them carry them)
+    { key: 'faceoffWins', label: 'Faceoffs won', short: 'faceoffs won', one: 'faceoff won', abbr: 'FOW', group: 'faceoffs', coverage: 'keyed', weight: 0.1 },
+    { key: 'faceoffLosses', label: 'Faceoffs lost', short: 'faceoffs lost', one: 'faceoff lost', abbr: 'FOL', group: 'faceoffs', coverage: 'keyed' },
+    { key: 'checks', label: 'Hits', short: 'hits', one: 'hit', abbr: 'HIT', group: 'physical', coverage: 'keyed', weight: 0.1 },
+    { key: 'shotBlocks', label: 'Blocked shots', short: 'blocked shots', one: 'blocked shot', abbr: 'BLK', group: 'physical', coverage: 'keyed', weight: 0.3 },
+    { key: 'takeaways', label: 'Takeaways', short: 'takeaways', one: 'takeaway', abbr: 'TK', group: 'physical', coverage: 'keyed', weight: 0.3 },
+    { key: 'giveaways', label: 'Giveaways', short: 'giveaways', one: 'giveaway', abbr: 'GV', group: 'physical', coverage: 'keyed', weight: -0.2, format: { unit: 'count', better: 'lower' } },
+    { key: 'missedShots', label: 'Missed shots', short: 'missed shots', one: 'missed shot', abbr: 'MS', group: 'scoring', coverage: 'keyed' },
     // shoot-out (never counted as goals)
     { key: 'soGoals', label: 'Shoot-out goals', short: 'shoot-out goals', one: 'shoot-out goal', group: 'shootout' },
     { key: 'soTaken', label: 'Shoot-out attempts', short: 'shoot-out attempts', one: 'shoot-out attempt', group: 'shootout' },
@@ -62,6 +70,10 @@ export const iceHockeyStats: SportStatSchema<'ice_hockey'> = {
     { key: 'hatTricks', label: 'Hat-tricks', short: 'hat-tricks', one: 'hat-trick', source: 'derived', group: 'bests', agg: { kind: 'countIf', key: 'goals', gte: 3 } },
     { key: 'soConversion', label: 'Shoot-out %', source: 'derived', group: 'shootout', format: { unit: 'percent', dp: 0 },
       agg: { kind: 'rate', num: 'soGoals', den: 'soTaken', scale: 100, dp: 0 } },
+    // deep wave — faceoff % (house minimum: 20 draws)
+    { key: 'faceoffPct', label: 'Faceoff %', short: 'faceoff %', source: 'derived', group: 'faceoffs', format: { unit: 'percent', dp: 1 }, abbr: 'FO%', coverage: 'keyed',
+      agg: { kind: 'rate', num: 'faceoffWins', den: ['faceoffWins', 'faceoffLosses'], scale: 100, dp: 1, qualifier: { den: 20, unit: { label: 'faceoffs', one: 'faceoff' } } },
+      tieBreak: [{ key: 'faceoffWins', better: 'higher' }] },
     // goalies — save % = saves ÷ shots against; GAA = goals against × 60 ÷ minutes in net
     { key: 'savePct', label: 'Save %', source: 'derived', group: 'goalkeeping', format: { unit: 'percent', dp: 1 }, abbr: 'SV%',
       agg: { kind: 'rate', num: 'saves', den: 'shotsAgainst', scale: 100, dp: 1, over: 'keeper', qualifier: { den: 30, unit: { label: 'shots faced', one: 'shot faced' } } },
@@ -90,6 +102,8 @@ export const iceHockeyStats: SportStatSchema<'ice_hockey'> = {
       { stat: 'penaltyMinutes' }, { stat: 'minors', hideZero: true }, { stat: 'majors', hideZero: true }, { stat: 'misconducts', hideZero: true },
       { stat: 'gameMisconducts', hideZero: true }, { stat: 'matchPenalties', hideZero: true },
     ] },
+    { id: 'faceoffs', title: 'Faceoffs', rows: [{ stat: 'faceoffWins' }, { stat: 'faceoffLosses' }, { stat: 'faceoffPct' }] },
+    { id: 'physical', title: 'Hits, blocks & puck battles', rows: [{ stat: 'checks' }, { stat: 'shotBlocks' }, { stat: 'takeaways' }, { stat: 'giveaways' }, { stat: 'missedShots' }] },
     { id: 'shootout', title: 'Shoot-outs', rows: [{ stat: 'soGoals', hideZero: true }, { stat: 'soTaken', hideZero: true }, { stat: 'soConversion' }] },
     { id: 'bests', title: 'Bests', rows: [
       { stat: 'mostGoals', label: 'Most goals (match)', hideZero: true }, { stat: 'hatTricks', hideZero: true }, { stat: 'mostSaves', label: 'Most saves (match)', hideZero: true },
@@ -105,6 +119,14 @@ export const iceHockeyStats: SportStatSchema<'ice_hockey'> = {
     { key: 'plusMinus', abbr: '+/-', signed: true, total: false, overallOnly: true },
     { key: 'penaltyMinutes', abbr: 'PIM' },
     { key: 'shotsOnGoal', abbr: 'SOG' },
+    // deep wave — shown only when the match tracked them (D8)
+    { key: 'fo', abbr: 'FO', label: 'Faceoffs won-lost', pair: ['faceoffWins', 'faceoffLosses'] },
+    { key: 'faceoffPct', abbr: 'FO%' },
+    { key: 'checks', abbr: 'HIT' },
+    { key: 'shotBlocks', abbr: 'BLK' },
+    { key: 'takeaways', abbr: 'TK' },
+    { key: 'giveaways', abbr: 'GV' },
+    { key: 'missedShots', abbr: 'MS' },
     { key: 'shotsAgainst', abbr: 'SA', overallOnly: true },
     { key: 'saves', abbr: 'SV' },
     { key: 'savePct', abbr: 'SV%', total: false, overallOnly: true },
@@ -114,8 +136,9 @@ export const iceHockeyStats: SportStatSchema<'ice_hockey'> = {
   compare: [
     'shotsOnGoal', 'ppGoals', 'ppChances', 'shGoals', 'saves',
     { key: 'penaltyMinutes', label: 'Penalty minutes' }, 'timeouts',
+    'faceoffWins', 'checks', 'shotBlocks', 'takeaways', 'giveaways',
   ],
-  leaders: ['points', 'goals', 'assists', 'plusMinus', 'pointsPerGame', 'ppGoals', 'shotsOnGoal', 'savePct', 'gaa', 'shutouts', 'penaltyMinutes'],
+  leaders: ['points', 'goals', 'assists', 'plusMinus', 'pointsPerGame', 'ppGoals', 'shotsOnGoal', 'savePct', 'gaa', 'shutouts', 'penaltyMinutes', 'faceoffPct', 'checks', 'shotBlocks', 'takeaways'],
   headline: ['points', 'goals', 'assists', 'saves'],
   awards: [
     { stat: 'points', icon: '🏒', label: 'Top scorer', tieBreak: [{ key: 'goals', better: 'higher' }] },

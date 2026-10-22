@@ -20,6 +20,7 @@ import type { BBEvent } from './basketball/events.ts';
 import { eventCredits } from './basketball/credits.ts';
 import { shotsTracked } from './basketball/totals.ts';
 import { boxFieldByName } from './basketball/fieldTime.ts';
+import { bbDeepRows } from './basketball/deep.ts';
 import { tally as volleyballTally, type VolleyballState } from './volleyball/engine.ts';
 import { detailTally as vbDetailTally, detailTracked as vbDetailTracked } from './volleyball/detail.ts';
 import { tally as kabaddiTally, isShootoutEvent, type KabaddiState } from './kabaddi/engine.ts';
@@ -27,6 +28,7 @@ import { kabaddiMatchCentre, KABADDI_COUNT_KEYS } from './kabaddi/totals.ts';
 import { footballStats, kickText, type FootballState, type TrackConfig } from './football/engine.ts';
 import { footballFieldLog, liveClockMinutes } from './football/fieldTime.ts';
 import { keeperTotals, position } from './football/keepers.ts';
+import { footballPossession } from './football/depth.ts';
 import { trackField } from './onField.ts';
 import type { RallyState } from './rallyEngine.ts';
 import type { TennisState } from './tennis/engine.ts';
@@ -142,11 +144,13 @@ export function basketballBox(s: BasketballState, ctx: BoxContext = {}): MatchBo
     data: (scope) => {
       // SD-29 MIN / +/- / on court: whole-game figures, the Overall view only.
       const field = scope === 'all' ? boxFieldByName(s) : undefined;
+      // Deep wave: 2PM-A, fouls drawn… (each only when the match tracked it)
+      const deep = bbDeepRows(s, scope);
       const side = (sd: Side): BoxSideInput => {
         const roster = rosterOf(ctx, sd);
         const rows = basketballTally(s.events, sd, roster, scope, halfCourt, cov.shots).map((l) => {
           const f = field?.get(l.name);
-          const stats = bbStats(l, cov);
+          const stats = { ...bbStats(l, cov), ...deep.zero, ...deep[sd].rows.get(l.name) };
           if (f?.min !== undefined) stats.minutes = f.min;
           if (f) stats.plusMinus = f.pm;
           return withId({ name: l.name, stats, ...(f?.on ? { on: true } : null) }, roster);
@@ -154,7 +158,7 @@ export function basketballBox(s: BasketballState, ctx: BoxContext = {}): MatchBo
         // points / rebounds … logged with no player: the side's "Team" row
         const team = blankLine('Team');
         for (const e of s.events) if (e.side === sd && !e.playerName && (scope === 'all' || e.quarter === scope)) add(team, e, halfCourt, cov.shots);
-        return { rows, team: { label: 'Team', stats: bbStats(team, cov) } };
+        return { rows, team: { label: 'Team', stats: { ...bbStats(team, cov), ...deep.zero, ...deep[sd].team } } };
       };
       return { home: side('home'), away: side('away'), ...(cov.shots ? null : { untracked: ['fgPct', 'threePct'] }) };
     },
@@ -342,6 +346,7 @@ export function footballBox(s: FootballState, ctx: BoxContext = {}): MatchBoxSou
       const inScope = (h?: number) => scope === 'all' || h === scope;
       const scoped = scope === 'all' ? s : { ...s, stats: s.stats.filter((e) => inScope(e.half)), events: s.events.filter((e) => inScope(e.half)) };
       const { totals, possession, passAcc } = footballStats(scoped, now);
+      const realPossession = !!footballPossession(s, now);
       const minutes = scope === 'all' ? footballMinutes(s, now) : new Map<string, number>();
       const conceded = new Map<string, number>(); // keeper id → goals let in (whole match)
       if (scope === 'all') for (const [id, k] of Object.entries(keeperTotals(s))) conceded.set(`${k.side}|${id}`, k.stats.goalsConceded);
@@ -420,7 +425,10 @@ export function footballBox(s: FootballState, ctx: BoxContext = {}): MatchBoxSou
           // SD-56: the shirt number, where the squad has one
           rows: [...rows.values()].map((r) => numberedRow(withId(r, roster), roster)),
           teamStats: {
-            shots: tt.shots, shotsOnTarget: tt.shotsOnTarget, blockedShots: tt.blockedShots, possession: possession[sd],
+            shots: tt.shots, shotsOnTarget: tt.shotsOnTarget, blockedShots: tt.blockedShots,
+            // possession only when the bar was used and the ball changed hands — the
+            // kick-off alone hands one side a false "100% – 0%" (deep wave, 2026-10-22)
+            ...(realPossession ? { possession: possession[sd] } : {}),
             passes: tt.passes, passAccuracy: passAcc[sd], fouls: tt.fouls, yellowCards: tt.yellow, redCards: tt.red,
             offsides: tt.offsides, corners: tt.corners, tackles: tt.tackles, interceptions: tt.interceptions, saves: tt.saves,
             crosses: tt.crosses, dribbles: tt.dribbles, handballs: tt.handballs,

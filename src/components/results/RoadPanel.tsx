@@ -50,8 +50,10 @@ export function roadHeader(def: DisciplineDef, road?: RoadFormat): string {
   return bits.filter(Boolean).join(' · ');
 }
 
-export function RoadFinishCard({ def, entries, editable, onSave, road, age }: {
+export function RoadFinishCard({ def, entries, editable, onSave, road, age, chip }: {
   def: DisciplineDef; entries: ResultEntry[]; editable: boolean; onSave: Save; road?: RoadFormat; age?: string;
+  /** deep wave: the meet tracks chip (net) times beside the official gun time ("Stats to track") */
+  chip?: boolean;
 }) {
   const ev = roadEventOf(def.key);
   const walk = ev?.kind === 'walk';
@@ -145,6 +147,17 @@ export function RoadFinishCard({ def, entries, editable, onSave, road, age }: {
     return null;
   };
 
+  // deep wave: the chip (net) time — shown beside the gun time, never ranks
+  const saveChip = async (e: ResultEntry, text: string): Promise<string | null> => {
+    if (!text.trim()) { if (e.result.chip != null) onSave(e.id, { ...e.result, chip: undefined }, `Chip time cleared · ${first(e.name)}`); return null; }
+    const t = parseRoadTime(text, def);
+    if (t == null) return 'Can’t read that — h:mm:ss, m:ss or digits (3405 = 34:05)';
+    if (e.result.mark != null && t > e.result.mark) return 'A chip time can’t be slower than the gun time.';
+    if (t === e.result.chip) return null;
+    onSave(e.id, { ...e.result, chip: t }, `chip ${formatMark(t, def)} · ${first(e.name)}`);
+    return null;
+  };
+
   const modes: Mode[] = ['line', ...(walk ? ['card' as const] : []), 'DNF', 'DQ', 'DNS'];
   const chipLabel = (e: ResultEntry) => `${e.result.bib ? `${e.result.bib} ` : ''}${e.name}${e.result.rc ? ` 🟥${e.result.rc}` : ''}`;
   return (
@@ -196,6 +209,10 @@ export function RoadFinishCard({ def, entries, editable, onSave, road, age }: {
               {editable ? (
                 <TimeBox key={`${e.id}:${e.result.mark ?? ''}`} value={e.result.mark != null ? formatMark(e.result.mark, def) : ''} placeholder={i === 0 ? 'Winner’s time (optional) e.g. 3412' : 'time (optional)'}
                   label={`Time for ${e.name}`} onCommit={(x) => saveTime(e, x)} />
+              ) : null}
+              {editable && chip ? (
+                <TimeBox key={`${e.id}:c:${e.result.chip ?? ''}`} value={e.result.chip != null ? formatMark(e.result.chip, def) : ''} placeholder="chip time (optional)"
+                  label={`Chip time for ${e.name}`} onCommit={(x) => saveChip(e, x)} />
               ) : null}
             </View>
           ))}

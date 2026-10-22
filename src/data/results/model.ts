@@ -359,6 +359,13 @@ export interface LiftAttempt {
   auto?: boolean;
   /** SD-112 / SD-97: the official confirmed a weight outside the usual range */
   rangeOk?: boolean;
+  /** Deep wave: the jury reversed the referees' decision (IWF TCRR jury) —
+   *  `good` is the final decision, `lights` stay as the referees showed them */
+  jury?: boolean;
+  /** Deep wave: this attempt's earlier declared weights, oldest first — each
+   *  one was changed by the coach (IWF: two changes an attempt). The app's
+   *  automatic declaration is not counted. */
+  chg?: number[];
 }
 
 /** The result payload stored in `field_entries.result`. Absent fields = not tracked. */
@@ -389,6 +396,9 @@ export interface EntryResult {
   series?: number[];
   /** SD-96: inner tens (X) per series, when entered by series */
   seriesX?: number[];
+  /** Deep wave shooting: penalty points deducted per series (ISSF: 2 points a
+   *  penalty), when the meet tracks penalties — `mark` is net of them */
+  pen?: number[];
   /** SD-96: the shots of each series when entered shot by shot ('X' = an inner ten, integer scoring) */
   shots?: (number | 'X')[][];
   /** SD-96: an elimination final's shots in order (decimal) — present (even
@@ -424,8 +434,17 @@ export interface EntryResult {
   team?: { id?: string; name: string; colorHex?: string };
   /** a relay / crew entry's display name ("Red House A") */
   name?: string;
-  /** SD-94 swimming: cumulative split times (s) every 50 m, the last one before the finish */
+  /** SD-94 swimming: cumulative split times (s) every 50 m, the last one before the finish
+   *  (deep wave: also athletics lap / relay changeover times and cycling intermediate
+   *  times — the points come from `splitDistances`) */
   splits?: number[];
+  /** deep wave (timed races): a swimming relay's take-over times (s) for legs 2–4 from
+   *  the touchpads / start blocks, in leg order (index 0 = leg 2); null = not read.
+   *  Negative = the feet left before the touch (SW 10.13; −0.03 s tolerance) */
+  takeovers?: (number | null)[];
+  /** deep wave: a road race's chip (net) time when the meet tracks both — the
+   *  official time stays the gun time in `mark` (World Athletics TR 19.25) */
+  chip?: number;
   /** SD-94: what the DQ was for ("Early take-off, leg 3") — shown with the rule reference */
   reason?: string;
   /** SD-94: the manual times from the lane's watches (SW 11.3) the official time came from */

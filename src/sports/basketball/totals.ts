@@ -26,6 +26,7 @@ import { mergeTotals } from '../racketTotals.ts';
 import type { BasketballState } from './engine.ts';
 import { eventCredits } from './credits.ts';
 import { basketballTotals } from './fieldTime.ts';
+import { bbDeepTotals } from './deep.ts';
 
 /** Every box key the totals own (FGA / 3PA only on a tracked game). */
 export const BASKETBALL_BOX_KEYS = [
@@ -38,11 +39,15 @@ export const BASKETBALL_ATTEMPT_KEYS = ['fgAtt', 'threesAtt'] as const;
 export const shotsTracked = (s: BasketballState): boolean =>
   s.trackMisses === true || s.events.some((e) => e.type === 'miss' || e.fga === true);
 
-/** The box keys per player id, or {} when a credited name has no id. */
+/** The box keys per player id, or {} when a credited name has no id.
+ *  Deep wave: plus the derived deep keys (deep.ts — 2PM / 2PA, shot zones,
+ *  fouls drawn, fast-break points), each only on a match that tracked it,
+ *  zero-filled on every line (a tracked 0, never a missing figure). */
 export function basketballBoxTotals(s: BasketballState): Record<string, StatTotalsEntry> {
   const halfCourt = s.targetPoints > 0;
   const tracked = shotsTracked(s);
-  const keys = [...BASKETBALL_BOX_KEYS, ...(tracked ? BASKETBALL_ATTEMPT_KEYS : [])];
+  const deep = bbDeepTotals(s);
+  const keys = [...BASKETBALL_BOX_KEYS, ...(tracked ? BASKETBALL_ATTEMPT_KEYS : []), ...deep.keys];
   const out: Record<string, StatTotalsEntry> = {};
   for (const e of s.events) {
     if (!e.playerName) continue;
@@ -52,6 +57,10 @@ export function basketballBoxTotals(s: BasketballState): Record<string, StatTota
     if (!id) return {};
     const line = out[id] ?? (out[id] = { side: e.side, stats: Object.fromEntries(keys.map((k) => [k, 0])) });
     for (const [k, v] of Object.entries(c)) line.stats[k] = (line.stats[k] ?? 0) + v;
+  }
+  for (const [id, d] of Object.entries(deep.lines)) {
+    const line = out[id] ?? (out[id] = { side: d.side, stats: Object.fromEntries(keys.map((k) => [k, 0])) });
+    for (const [k, v] of Object.entries(d.stats)) line.stats[k] = (line.stats[k] ?? 0) + v;
   }
   return out;
 }

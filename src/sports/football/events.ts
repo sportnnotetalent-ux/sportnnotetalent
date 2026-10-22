@@ -1,7 +1,33 @@
 /** A single timeline event during a football match. */
 /** `sinbin` (SD-29): a timed suspension — only when the format sets a sin-bin. */
 /** `timeout` (SD-132): a futsal team time-out (Law 7) — only with futsal rules. */
-export type FootballEventType = 'goal' | 'owngoal' | 'yellow' | 'red' | 'sub' | 'stoppage' | 'sinbin' | 'timeout';
+/** `nogoal` (deep wave): a goal ruled out (offside / foul / handball, after a
+ *  VAR review or not) — a timeline row only, the score never moved. */
+export type FootballEventType = 'goal' | 'owngoal' | 'yellow' | 'red' | 'sub' | 'stoppage' | 'sinbin' | 'timeout' | 'nogoal';
+
+/** Deep wave — where a shot / goal was struck from (Opta: inside / outside
+ *  the box). Optional detail ("Shot detail" tracking). */
+export type ShotZone = 'box' | 'out';
+export const ZONE_LABEL: Record<ShotZone, string> = { box: 'Inside the box', out: 'Outside the box' };
+
+/** Deep wave — why a card was shown (optional, "Card reasons" tracking):
+ *  IFAB Law 12 cautions and sending-off offences, as live text reads them. */
+export type CardReason = 'foul' | 'dissent' | 'unsporting' | 'spa' | 'timewasting' | 'handball' | 'dogso' | 'sfp' | 'violent' | 'other';
+export const CARD_REASONS: CardReason[] = ['foul', 'dissent', 'unsporting', 'spa', 'timewasting', 'handball', 'dogso', 'sfp', 'violent', 'other'];
+/** chip label */
+export const CARD_REASON_LABEL: Record<CardReason, string> = {
+  foul: 'Foul', dissent: 'Dissent', unsporting: 'Unsporting', spa: 'Stopping an attack', timewasting: 'Time-wasting',
+  handball: 'Handball', dogso: 'Denying a goal chance', sfp: 'Serious foul play', violent: 'Violent conduct', other: 'Other',
+};
+/** "… is shown the yellow card for {phrase}" */
+export const CARD_REASON_PHRASE: Record<CardReason, string> = {
+  foul: 'a bad foul', dissent: 'dissent', unsporting: 'unsporting behaviour', spa: 'stopping a promising attack', timewasting: 'time-wasting',
+  handball: 'handball', dogso: 'denying an obvious goal-scoring opportunity', sfp: 'serious foul play', violent: 'violent conduct', other: '',
+};
+
+/** Deep wave — why a goal was ruled out. */
+export type NoGoalReason = 'offside' | 'foul' | 'handball' | 'other';
+export const NO_GOAL_LABEL: Record<NoGoalReason, string> = { offside: 'Offside', foul: 'Foul', handball: 'Handball', other: 'Other' };
 
 export type GoalType = 'open' | 'penalty' | 'freekick' | 'header';
 
@@ -45,6 +71,13 @@ export interface FootballEvent {
    *  not a player — `playerName` is the official's name (or "Team official").
    *  Never on a player's stat line, never sends a player off. New logs only. */
   official?: true;
+  /** deep wave (new logs, when tracked): a goal's zone / big chance; a card's
+   *  reason (CardReason) or a ruled-out goal's (NoGoalReason) */
+  zone?: ShotZone;
+  bigChance?: true;
+  reason?: string;
+  /** deep wave: a ruled-out goal decided after a VAR review */
+  review?: true;
 }
 
 /** SD-117 (F13): is this card a player's (not a team official's)? */
@@ -66,6 +99,7 @@ export const EVENT_META: Record<FootballEventType, { icon: string; label: string
   stoppage: { icon: '⏸️', label: 'Stoppage' },
   sinbin: { icon: '⏱️', label: 'Sin-bin' },
   timeout: { icon: '⏸️', label: 'Time-out' },
+  nogoal: { icon: '🚫', label: 'Goal ruled out' },
 };
 
 /**
@@ -95,7 +129,14 @@ export type StatKind =
   | 'penaltyMissed' // the taker failed to score (saved or off target)
   // SD-08: the defender who blocked a shot (the shot itself is logged as
   // `blocked`, never on target — Opta: shots = on + off + blocked).
-  | 'block';
+  | 'block'
+  // Deep wave (optional tracking): the pass that set up a shot (Opta key
+  // pass; an assist is the one that set up a goal), a defensive clearance,
+  // and the restarts FIFA counts per team (goal kicks, throw-ins).
+  | 'keyPass'
+  | 'clearance'
+  | 'goalKick'
+  | 'throwIn';
 
 export interface StatEvent {
   id: number;
@@ -115,6 +156,13 @@ export interface StatEvent {
   complete?: boolean;
   /** which half it occurred in — 1/2 in regulation, 3/4 in extra time */
   half?: 1 | 2 | 3 | 4;
+  /** deep wave (new logs, "Shot detail" on): where the shot was struck from,
+   *  a big chance (Opta), and a shot that hit the post / bar */
+  zone?: ShotZone;
+  bigChance?: true;
+  woodwork?: true;
+  /** deep wave: a key pass — the id of the shot it set up */
+  ref?: number;
 }
 
 export const STAT_META: Record<StatKind, { icon: string; label: string }> = {
@@ -134,4 +182,8 @@ export const STAT_META: Record<StatKind, { icon: string; label: string }> = {
   penaltyWon: { icon: '⚖️', label: 'Penalty won' },
   penaltyMissed: { icon: '🚫', label: 'Penalty missed' },
   block: { icon: '🧱', label: 'Block' },
+  keyPass: { icon: '🔑', label: 'Key pass' },
+  clearance: { icon: '🦶', label: 'Clearance' },
+  goalKick: { icon: '🥅', label: 'Goal kick' },
+  throwIn: { icon: '🙌', label: 'Throw-in' },
 };

@@ -44,6 +44,11 @@ export function AthleticsCareer({ lines }: { lines: StatLine[] }) {
         <Text style={st.medals}>{c.golds} 🥇  {c.silvers} 🥈  {c.bronzes} 🥉{c.points ? `  ·  ${c.points} points` : ''}</Text>
       )}
 
+      {/* deep wave: heats won and the best reaction time — shown only once recorded */}
+      {(c.heatWins > 0 || c.bestReaction) && (
+        <Text style={textStyles.muted}>{[c.heatWins ? `🏁 ${c.heatWins} heat${c.heatWins === 1 ? '' : 's'} / semi-final${c.heatWins === 1 ? '' : 's'} won` : '', c.bestReaction ? `⚡ best reaction ${c.bestReaction.value.toFixed(3)} s (${c.bestReaction.title})` : ''].filter(Boolean).join('  ·  ')}</Text>
+      )}
+
       {/* SD-92: road races, race walks, cross-country (places and team medals) */}
       {c.road + c.walks + c.xc > 0 && (
         <Card style={{ gap: theme.spacing(1) }}>

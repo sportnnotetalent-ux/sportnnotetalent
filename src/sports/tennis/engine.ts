@@ -68,6 +68,12 @@ export interface TennisState {
   /** SD-107 — 1st / 2nd serve tracking: points served while on carry
    *  `serve` (1, or 2 after a 1st-serve fault / a double fault). */
   serveDetail?: boolean;
+  /** SD-157 — optional capture: who came to the net, rally length (0–4 /
+   *  5–8 / 9+ shots), serve speed (km/h). Absent / false = off; each point
+   *  carries what was tracked on it (`atNet` / `rallyLen` / `kmh`). */
+  netDetail?: boolean;
+  rallyDetail?: boolean;
+  speedDetail?: boolean;
   events: LiveEvent[];
   seq: number;
   ended: boolean;

@@ -16,7 +16,7 @@
  *    and penalty-shot goals don't count (NHL / IIHF statistics).
  */
 import {
-  eventCredits, isComplete, matchSec, result, LIVE_KEYS,
+  eventCredits, isComplete, matchSec, result, tallyTracked, FLAG_KEYS, LIVE_KEYS, TALLY_KEYS, TRACK_FLAGS,
   type IceHockeyState, type Side, type Who,
 } from './engine.ts';
 
@@ -137,12 +137,15 @@ export function iceHockeyTotals(s: IceHockeyState): Record<string, Line> {
       }
     }
   }
+  // deep wave: a tracked tally reads 0 for everyone with a line (untracked: absent, never a false 0)
+  const tracked = TRACK_FLAGS.filter((f) => tallyTracked(s, f)).flatMap((f) => FLAG_KEYS[f]);
   for (const l of Object.values(out)) {
     for (const k of ['goals', 'assists', 'points', 'shotsOnGoal', 'penaltyMinutes'] as const) l.stats[k] ??= 0;
+    for (const k of tracked) l.stats[k] ??= 0;
   }
   return out;
 }
 
 /** The keys statTotals owns that no live action credits (contract rule 5). */
 export const DERIVED_KEYS = ['gkMinutes', 'goalsAgainst', 'shotsAgainst', 'shutouts', 'gkGames', 'gwg', 'plusMinus'] as const;
-export const OWNED_LIVE_KEYS = LIVE_KEYS;
+export const OWNED_LIVE_KEYS = [...LIVE_KEYS, ...TALLY_KEYS] as const;

@@ -41,6 +41,14 @@ export function LiftingCareer({ lines }: { lines: StatLine[] }) {
         <Text style={st.medals}>{c.golds} 🥇  {c.silvers} 🥈  {c.bronzes} 🥉{c.liftMedals ? `  ·  ${c.liftMedals} snatch / C&J medal${c.liftMedals === 1 ? '' : 's'}` : ''}{c.points ? `  ·  ${c.points} points` : ''}</Text>
       )}
       {c.bombOuts > 0 && <Text style={textStyles.muted}>No total in {c.bombOuts} competition{c.bombOuts === 1 ? '' : 's'} (no good lift in the snatch or the clean & jerk).</Text>}
+      {/* deep wave: make rate per lift and of the openers — sessions that recorded them only */}
+      {c.perLift.snatch || c.perLift.cj || c.perLift.open ? (
+        <Text style={textStyles.muted}>{[
+          c.perLift.snatch ? `Snatch ${Math.round(c.perLift.snatch.rate)}% (${c.perLift.snatch.made}/${c.perLift.snatch.attempted})` : '',
+          c.perLift.cj ? `C&J ${Math.round(c.perLift.cj.rate)}% (${c.perLift.cj.made}/${c.perLift.cj.attempted})` : '',
+          c.perLift.open ? `openers ${Math.round(c.perLift.open.rate)}% (${c.perLift.open.made}/${c.perLift.open.attempted})` : '',
+        ].filter(Boolean).join(' · ')}</Text>
+      ) : null}
 
       <Text style={st.section}>Personal bests</Text>
       {c.bests.length === 0 ? <Text style={textStyles.muted}>No good lifts yet.</Text> : (
@@ -63,6 +71,29 @@ export function LiftingCareer({ lines }: { lines: StatLine[] }) {
             </TouchableOpacity>
           ))}
         </Card>
+      )}
+
+      {/* deep wave: bests in each bodyweight category (when the lifter has lifted in more than one) */}
+      {c.byCategory.length > 1 && (
+        <>
+          <Text style={st.section}>Bests by category</Text>
+          <Card style={{ gap: theme.spacing(2) }}>
+            <View style={st.bestRow}>
+              <Text style={[st.head, { flex: 1 }]}>Category</Text>
+              <Text style={[st.head, st.colS]}>Sn</Text>
+              <Text style={[st.head, st.colS]}>C&J</Text>
+              <Text style={[st.head, st.colS]}>Total</Text>
+            </View>
+            {c.byCategory.map((k) => (
+              <View key={k.category} style={st.bestRow}>
+                <Text style={[textStyles.body, { flex: 1 }]} numberOfLines={1}>{k.category}</Text>
+                <Text style={[st.markSb, st.colS]}>{k.snatch?.value ?? '–'}</Text>
+                <Text style={[st.markSb, st.colS]}>{k.cj?.value ?? '–'}</Text>
+                <Text style={[st.mark, st.colS]}>{k.total?.value ?? '–'}</Text>
+              </View>
+            ))}
+          </Card>
+        </>
       )}
 
       {c.history.length > 0 && (
@@ -105,6 +136,7 @@ const st = StyleSheet.create({
   bestRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(2) },
   head: { color: theme.colors.textMuted, fontSize: theme.font.tiny, fontWeight: '700' },
   col: { width: 72, textAlign: 'right' },
+  colS: { width: 52, textAlign: 'right' },
   mark: { color: theme.colors.text, fontWeight: '900', fontVariant: ['tabular-nums'], fontSize: theme.font.body },
   markSb: { color: theme.colors.textMuted, fontWeight: '700', fontVariant: ['tabular-nums'], fontSize: theme.font.body },
   hist: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(3) },

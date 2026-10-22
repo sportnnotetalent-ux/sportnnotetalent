@@ -359,6 +359,8 @@ export function crewLines(f: Pick<PhaseFormat, 'discipline' | 'phase'>, ranked: 
     if (r.status === 'DNF') s.dnf = 1;
     if (r.status === 'DQ' || r.status === 'FS') s.dq = 1;
     if (f.phase === 'final') { s.finals = 1; if ((r.entry.result.race ?? 'A') === 'A') s.finalsA = 1; }
+    // deep wave: a heat / repechage / semi-final won (a final won is a gold)
+    else if (r.position === 1) s.heatWins = 1;
     if (a?.medal === 'gold') s.golds = 1;
     if (a?.medal === 'silver') s.silvers = 1;
     if (a?.medal === 'bronze') s.bronzes = 1;
@@ -386,18 +388,20 @@ export interface CrewCareer {
   races: number; finals: number; finalsA: number; golds: number; silvers: number; bronzes: number; points: number;
   /** races steered as the cox */
   coxed: number;
+  /** deep wave: heats / repechages / semi-finals won */
+  heatWins: number;
   bests: { key: string; label: string; pb: CrewBest; sb?: CrewBest }[];
   history: { eventId: string; title: string; date: string; text: string; place?: number; medal?: 'gold' | 'silver' | 'bronze'; flags: string[] }[];
 }
 
 /** The rowing / canoe career from a player's lines (oldest → PB flags "at the time"). History newest first. */
 export function crewCareer(lines: { eventId?: string; stats: Record<string, number>; date?: string; opponent?: string }[], phases: Map<string, CrewPhaseInfo>, seasonFrom: string): CrewCareer {
-  const c: CrewCareer = { races: 0, finals: 0, finalsA: 0, golds: 0, silvers: 0, bronzes: 0, points: 0, coxed: 0, bests: [], history: [] };
+  const c: CrewCareer = { races: 0, finals: 0, finalsA: 0, golds: 0, silvers: 0, bronzes: 0, points: 0, coxed: 0, heatWins: 0, bests: [], history: [] };
   const bests = new Map<string, CrewCareer['bests'][number]>();
   const pbSoFar = new Map<string, number>();
   for (const l of [...lines].sort((a, b) => (a.date ?? '').localeCompare(b.date ?? ''))) {
     const s = l.stats ?? {};
-    c.races += s.races ?? 0; c.finals += s.finals ?? 0; c.finalsA += s.finalsA ?? 0; c.coxed += s.cox ?? 0;
+    c.races += s.races ?? 0; c.finals += s.finals ?? 0; c.finalsA += s.finalsA ?? 0; c.coxed += s.cox ?? 0; c.heatWins += s.heatWins ?? 0;
     c.golds += s.golds ?? 0; c.silvers += s.silvers ?? 0; c.bronzes += s.bronzes ?? 0; c.points += s.posPoints ?? 0;
     const info = l.eventId ? phases.get(l.eventId) : undefined;
     const key = Object.keys(s).find((k) => crewKeyDiscipline(k));

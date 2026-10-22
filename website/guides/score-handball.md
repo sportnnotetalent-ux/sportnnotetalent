@@ -5,7 +5,7 @@ category: Live scoring
 audience: Scorers, Organisers
 sports: handball
 order: 51
-updated: 2026-10-11
+updated: 2026-10-22
 ---
 
 Score a handball match on one phone. You run the clock and tap what happens; the app times suspensions, counts time-outs and builds the stats.
@@ -29,6 +29,7 @@ Score a handball match on one phone. You run the clock and tap what happens; the
 3. **↗ Shot**: an attempt that didn't score. Choose the type, then **🧤 Saved**, **↗ Missed** or **🛡 Blocked**, then the shooter (and for a block, the defender).
 4. **⚠️ Turnover**: tap **⚠️ Technical fault** or **🖐 Ball stolen**, then the player. For a stolen ball, also tap the defender who stole it.
 5. **🔁 Sub**: tap who comes off, then who comes on. If the keeper comes off, the player coming on goes in goal.
+6. **🥅 Empty goal ›** (under the keeper): the team takes its keeper off for a 7th court player. Goals into the empty goal aren't charged to the keeper and count as empty-goal goals. Tap **keeper back ›** when he returns.
 
 > **Tip:** Hands busy? Tap **🎤 Voice scoring** and say "wing goal Rao", "7 m saved Khan" or "two minutes Rao". See [Score by voice](/guides/score-by-voice/).
 
@@ -45,7 +46,7 @@ Tap **⏸ Time-out** for the team that asks; the clock stops. IHF limits: 3 a ma
 ## Extra time and 7-metre throws
 When it is still level and there is no more extra time, you see "Level — the match goes to 7-metre throws". Group games never go to one; knockouts always do. In leg 2 of a [two-legged tie](/guides/knockouts-and-who-goes-through/), level means level on aggregate.
 1. Under "Who throws first?", tap the team going first after the toss ([shoot-out order](/guides/choose-shoot-out-order/)).
-2. For each throw, tap the thrower (optional), then **✓ Scored** or **✗ Missed / saved**. "Next:" tells you whose turn it is.
+2. For each throw, tap the thrower (optional), then **✓ Scored**, **🧤 Saved** or **✗ Missed**. "Next:" tells you whose turn it is; a save goes to the keeper shown.
 3. Still level after five each? Tap who throws first in sudden death, then one throw each until one team leads.
 
 Shoot-out goals aren't counted as goals in player stats.
@@ -55,9 +56,15 @@ Shoot-out goals aren't counted as goals in player stats.
 2. Tap **✕** to remove a moment (it asks first), or **✎ Edit** to enter it again at its time. **▶ Back to live** or Cancel keeps it as it was.
 3. After the match, use [Correct a finished match](/guides/correct-a-finished-match/).
 
+## Deeper stats (optional)
+Off by default. Switch on in **⚙️ Match settings → Stats to track** (organisers: under **Customize**):
+- **Technical fault types**: chips (steps, double dribble, area, offensive foul, passive play, bad pass) above the player list — no extra tap.
+- **7 m won by**: after **🎯 7 m**, tap who won it, or **Skip**.
+
 ## What you get
-- **Score** tab: the timeline, team stats (shooting %, goals by type, 7 m, saves, steals, blocks, technical faults, time-outs, sanctions) and each player's line.
-- Player profiles: goals per game, shooting %, 7 m %, goals by type, keeper save %, discipline.
+- **Score** tab → **📝 Commentary**: the live text half by half with the match clock and the score after every moment, and a summary on top (top scorers, HT). **Key events** keeps goals, 7 m, sanctions and time-outs.
+- **📊 Match stats**: **Top stats**, **Shooting** (goals and % from each position), **Goalkeeping** (save % overall and from 6 m, 9 m, wing, breakthrough, fast break and 7 m), **Ball & defence**, **Discipline**, for the match or one half, then each player's line.
+- Player profiles: goals per game, shooting %, 7 m %, goals by type, keeper save % (also by position), discipline.
 - Tournament tables use **IHF 2-1-0** (ties: head-to-head points, then head-to-head goal difference and goals, then overall), or **Simple 2-1-0**. See [Points table and adjustments](/guides/points-table-and-adjustments/).
 
 ## Common questions

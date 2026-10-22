@@ -5,7 +5,7 @@ category: Live scoring
 audience: Scorers, Organisers
 sports: tennis, padel, badminton, table tennis, squash, pickleball
 order: 64
-updated: 2026-10-11
+updated: 2026-10-22
 ---
 
 When the umpire gives a warning, a card or a penalty, or a player calls a timeout, the app records it. When a penalty costs a point or a game, it changes the score for you, and it suggests the next penalty from the sport's own rules.
@@ -22,7 +22,7 @@ When the umpire gives a warning, a card or a penalty, or a player calls a timeou
 5. Tap a reason if you like, for example **Racket abuse**.
 6. Read the line above the button, for example "Point to Aarav Mehta.", then tap **Apply: Point penalty**.
 
-The violation goes into the point log, for example "Code violation · point penalty · Racket abuse". The Undo bar names it too: "↶ Undo: code violation · point penalty · Ishaan Verma (30-0)".
+The violation goes into the commentary (the point log), for example "Code violation · point penalty · Racket abuse". The Undo bar names it too: "↶ Undo: code violation · point penalty · Ishaan Verma (30-0)".
 
 ## What each sport's schedule suggests
 - **Tennis** (ITF Point Penalty Schedule): **Warning**, then **Point penalty**, then **Game penalty** for the 3rd violation and every one after that. A **Default** is the Referee's call.
@@ -53,7 +53,7 @@ Pick **Default** (or **Disqualified**, **Conduct match**, **Forfeit**) and tap t
 Timeouts never change the score.
 
 ## Squash: a let
-When the referee calls a let, tap **🔁 Let — replay the rally (no point)** under the point buttons. The log shows "Let · rally replayed · no point". For a stroke or no let, turn on point detail and tap **Stroke** or **No let** after the point.
+When the referee calls a let, tap **🔁 Let · Asha Rao asked** (the player who appealed) under the point buttons. The rally is replayed and nobody scores. The commentary shows "Let · Appeal by Asha Rao · rally replayed", and "Match stats" counts lets asked under **Referee decisions**. For a stroke or no let, tap **✋ Stroke → …** or **🚫 No let → …**; one tap scores the rally and records the decision.
 
 ## How long the match took
 On the **Score** tab, a line above the box score shows the time, for example "⏱ 1 h 05 min · G1 21 min · G2 18 min" (sets in tennis and padel). When the match ends, the time is added to the result line. It is worked out from when you tapped each point, so it shows only for matches scored with this version.

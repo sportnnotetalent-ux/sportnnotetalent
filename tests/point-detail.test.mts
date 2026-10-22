@@ -259,8 +259,10 @@ describe('SD-107 · schema, career, leaders, settings', () => {
   });
   test('live setting: event mode — format before the first point, SET_DETAIL after', () => {
     const ls = detailLiveSettings('tennis');
-    assert.deepEqual(ls.fields.map((f) => f.key), ['pointDetail', 'serveDetail']);
-    assert.deepEqual(detailLiveSettings('badminton').fields.map((f) => f.key), ['pointDetail']);
+    // SD-157: tennis adds net points, rally length and serve speed under "Stats to track"
+    assert.deepEqual(ls.fields.map((f) => f.key), ['pointDetail', 'serveDetail', 'netDetail', 'rallyDetail', 'speedDetail']);
+    // deep wave: badminton's "Stats to track" adds rally length
+    assert.deepEqual(detailLiveSettings('badminton').fields.map((f) => f.key), ['pointDetail', 'rallyDetail']);
     const fresh = tennis.init();
     assert.deepEqual(planLiveApply(ls as never, fresh, 0, ls.read(fresh), { ...ls.read(fresh), pointDetail: true }), { kind: 'format', patch: { pointDetail: true } });
     const live = run(tennis.reducer, fresh, [P('home')]);

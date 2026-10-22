@@ -3,8 +3,10 @@
  *  made and attempted, success %), cards, minutes, the kicking competition,
  *  and the optional detail (tackles, missed tackles, carries, line breaks,
  *  turnovers won, penalties conceded — keyed: only matches that tracked
- *  them). Every line key is absolute — `statTotals` (./totals.ts) owns the
- *  whole line. A key shared with another sport keeps its labels. */
+ *  them). Deep wave: offloads and turnovers conceded (keyed, from their
+ *  "Stats to track" toggles; penalties conceded can also come from the
+ *  penalty toggle). Every line key is absolute — `statTotals` (./totals.ts)
+ *  owns the whole line. A key shared with another sport keeps its labels. */
 import type { Qualifier, SportStatSchema } from '../statSchema.ts';
 import { POINTS, RED_CARDS, YELLOW_CARDS } from '../sharedStats.ts';
 
@@ -39,6 +41,9 @@ export const rugbyStats: SportStatSchema<'rugby'> = {
     { key: 'carries', label: 'Carries', short: 'carries', one: 'carry', group: 'attack', weight: 0.2, coverage: 'keyed', abbr: 'CA' },
     { key: 'lineBreaks', label: 'Line breaks', short: 'line breaks', one: 'line break', group: 'attack', weight: 1, coverage: 'keyed', abbr: 'LB' },
     { key: 'penaltiesGivenAway', label: 'Penalties conceded', short: 'penalties conceded', one: 'penalty conceded', group: 'discipline', weight: -0.5, coverage: 'keyed', abbr: 'PC', format: { unit: 'count', better: 'lower' } },
+    // deep wave — optional "Stats to track" (keyed: only matches that tracked them carry them)
+    { key: 'offloads', label: 'Offloads', short: 'offloads', one: 'offload', group: 'attack', weight: 0.5, coverage: 'keyed', abbr: 'OL' },
+    { key: 'turnoversConceded', label: 'Turnovers conceded', short: 'turnovers conceded', one: 'turnover conceded', group: 'attack', weight: -0.3, coverage: 'keyed', abbr: 'TC', format: { unit: 'count', better: 'lower' } },
     // kicking competition (never points)
     { key: 'soGoals', label: 'Shoot-out goals', short: 'shoot-out goals', one: 'shoot-out goal', group: 'shootout' },
     { key: 'soTaken', label: 'Shoot-out attempts', short: 'shoot-out attempts', one: 'shoot-out attempt', group: 'shootout' },
@@ -71,7 +76,7 @@ export const rugbyStats: SportStatSchema<'rugby'> = {
       { stat: 'penGoals' }, { stat: 'penGoalAttempts' }, { stat: 'goalKickPct' },
       { stat: 'dropGoals', hideZero: true }, { stat: 'dropGoalAttempts', hideZero: true },
     ] },
-    { id: 'attack', title: 'Attack', rows: [{ stat: 'carries' }, { stat: 'lineBreaks' }] },
+    { id: 'attack', title: 'Attack', rows: [{ stat: 'carries' }, { stat: 'lineBreaks' }, { stat: 'offloads' }, { stat: 'turnoversConceded' }] },
     { id: 'defence', title: 'Defence', rows: [{ stat: 'tackles' }, { stat: 'missedTackles' }, { stat: 'tackleSuccessPct' }, { stat: 'turnoversWon' }] },
     { id: 'playing', title: 'Playing time', rows: [{ stat: 'minutes' }] },
     { id: 'shootout', title: 'Kicking competitions', rows: [{ stat: 'soGoals', hideZero: true }, { stat: 'soTaken', hideZero: true }] },
@@ -92,17 +97,19 @@ export const rugbyStats: SportStatSchema<'rugby'> = {
     { key: 'missedTackles', abbr: 'MT' },
     { key: 'carries', abbr: 'CA' },
     { key: 'lineBreaks', abbr: 'LB' },
+    { key: 'offloads', abbr: 'OL' },
     { key: 'turnoversWon', abbr: 'TW' },
+    { key: 'turnoversConceded', abbr: 'TC' },
     { key: 'penaltiesGivenAway', abbr: 'PC' },
     { key: 'yellowCards', abbr: 'YC', label: 'Yellow cards' },
     { key: 'redCards', abbr: 'RC', label: 'Red cards' },
   ] }],
   compare: [
     'tries', 'penaltyTries', 'conversions', 'conversionAttempts', 'penGoals', 'penGoalAttempts', 'dropGoals',
-    'lineoutsWon', 'lineoutsLost', 'scrumsWon', 'scrumsLost', 'tackles', 'missedTackles', 'carries', 'lineBreaks', 'turnoversWon', 'penaltiesGivenAway',
+    'lineoutsWon', 'lineoutsLost', 'scrumsWon', 'scrumsLost', 'tackles', 'missedTackles', 'carries', 'lineBreaks', 'offloads', 'turnoversWon', 'turnoversConceded', 'penaltiesGivenAway',
     'yellowCards', 'redCards',
   ],
-  leaders: ['points', 'tries', 'conversions', 'penGoals', 'goalKickPct', 'tryAssists', 'pointsPerGame', 'tackles', 'turnoversWon'],
+  leaders: ['points', 'tries', 'conversions', 'penGoals', 'goalKickPct', 'tryAssists', 'pointsPerGame', 'tackles', 'turnoversWon', 'lineBreaks', 'offloads'],
   headline: ['points', 'tries', 'conversions', 'tryAssists'],
   awards: [
     { stat: 'tries', icon: '🏉', label: 'Top try scorer', tieBreak: [{ key: 'tryAssists', better: 'higher' }] },

@@ -42,19 +42,21 @@ describe('SD-27 — sport-correct leader categories', () => {
   });
   test('per sport, in order', () => {
     assert.deepEqual(keys('basketball'), ['ppg', 'rpg', 'apg', 'spg', 'bpg', 'effPg', 'points', 'rebounds', 'assists', 'doubleDoubles']);
-    assert.deepEqual(keys('volleyball'), ['points', 'attackPoints', 'aces', 'blocks', 'pointsPerSet', 'acesPerSet', 'blocksPerSet', 'attackEff']); // SD-81
-    assert.deepEqual(keys('kabaddi'), ['matchPoints', 'raidPoints', 'tacklePoints', 'ptsPerMatch', 'raidPerMatch', 'tacklePerMatch', 'super10s', 'high5s']);
+    assert.deepEqual(keys('volleyball'), ['points', 'attackPoints', 'aces', 'blocks', 'pointsPerSet', 'acesPerSet', 'blocksPerSet', 'attackEff', 'digsPerSet', 'setAssistsPerSet', 'receptionEff']); // SD-81; deep wave (FIVB digger / setter / receiver)
+    assert.deepEqual(keys('kabaddi'), ['matchPoints', 'raidPoints', 'tacklePoints', 'ptsPerMatch', 'raidPerMatch', 'tacklePerMatch', 'super10s', 'high5s', 'successfulRaids', 'superRaids', 'tackles', 'superTackles', 'doOrDiePoints', 'raidStrikeRate']); // deep wave (PKL stat leaders)
     assert.deepEqual(keys('chess'), ['score', 'scorePct', 'wins']);
     assert.deepEqual(keys('carrom'), ['points', 'boards', 'queens', 'pointsPerMatch']);
-    // SD-107 appended "Most winners per match" (point detail) before the serve rates
-    assert.deepEqual(keys('tennis'), ['matchesWon', 'winPct', 'setsWon', 'gamesWon', 'aces', 'winnersPerMatch', 'srvPtsPct', 'holdPct', 'bpWonPct']);
+    // SD-107 appended "Most winners per match" (point detail) before the serve rates;
+    // SD-157 appended "Fastest serve" (serve speed tracking) last
+    assert.deepEqual(keys('tennis'), ['matchesWon', 'winPct', 'setsWon', 'gamesWon', 'aces', 'winnersPerMatch', 'srvPtsPct', 'holdPct', 'bpWonPct', 'srvKmhMax']);
     assert.deepEqual(keys('padel'), ['matchesWon', 'winPct', 'setsWon', 'gamesWon', 'winnersPerMatch', 'srvPtsPct', 'holdPct', 'bpWonPct']);
     for (const sp of ['badminton', 'tabletennis', 'squash', 'pickleball'] as SportId[]) {
       assert.deepEqual(keys(sp), ['matchesWon', 'winPct', 'gamesWon', 'gamesPct', 'winnersPerMatch', 'srvPtsPct'], sp);
     }
-    // football keeps its 14 and appends goals per 90 / save %; cricket keeps SD-16's records
-    assert.deepEqual(keys('football').slice(-2), ['goalsPer90', 'savePct']);
-    assert.equal(keys('football').length, 16);
+    // football keeps its 14 and appends goals per 90 / save % (and, deep wave,
+    // chances created / key passes / clearances); cricket keeps SD-16's records
+    assert.deepEqual(keys('football').slice(14), ['goalsPer90', 'savePct', 'chancesCreated', 'keyPasses', 'clearances']);
+    assert.equal(keys('football').length, 19);
     // SD-38 / SD-69 appended 4s / 6s / maidens / dots / ducks / keeper dismissals
     assert.deepEqual(keys('cricket'), ['runs', 'wickets', 'catches', 'highest', 'best', 'avg', 'sr', 'econ', 'fifties', 'hundreds',
       'fours', 'sixes', 'maidens', 'dots', 'ducks', 'wkDismissals']);
@@ -82,7 +84,7 @@ describe('SD-27 — award slots and MVP weights from the schema', () => {
   const slots = (sp: SportId) => TOURNAMENT_AWARD_SLOTS[sp].map((s) => [s.slot, s.label]);
   test('slots per sport (slot keys kept where a slot already existed)', () => {
     assert.deepEqual(slots('basketball'), [['mvp', 'Player of the Tournament'], ['points', 'Top scorer'], ['rebounds', 'Top rebounder'], ['assists', 'Playmaker']]);
-    assert.deepEqual(slots('volleyball'), [['mvp', 'Player of the Tournament'], ['points', 'Best scorer'], ['aces', 'Best server'], ['blocks', 'Best blocker'], ['attackPoints', 'Most attack points'], ['attackKills', 'Best attacker']]); // SD-81
+    assert.deepEqual(slots('volleyball'), [['mvp', 'Player of the Tournament'], ['points', 'Best scorer'], ['aces', 'Best server'], ['blocks', 'Best blocker'], ['attackPoints', 'Most attack points'], ['attackKills', 'Best attacker'], ['receptions', 'Best receiver'], ['digs', 'Best digger'], ['setAssists', 'Best setter']]); // SD-81; deep wave
     assert.deepEqual(slots('kabaddi'), [['mvp', 'Player of the Tournament'], ['raidPoints', 'Best raider'], ['tacklePoints', 'Best defender']]);
     assert.deepEqual(slots('chess'), [['mvp', 'Player of the Tournament'], ['scorePct', 'Best score %']]);
     assert.deepEqual(slots('carrom'), [['mvp', 'Player of the Tournament'], ['points', 'Top scorer'], ['queens', 'Queens']]);

@@ -9,7 +9,8 @@
  * so every selector degrades to an empty result and the UI hides those rows.
  * No React Native imports — node tests load this file (note the `.ts` imports).
  */
-import { oversStr, other, type BallRec, type CricketState, type FieldNote } from './engine.ts';
+import { oversStr, other, NO_BOWLER, type BallRec, type CricketState, type FieldNote } from './engine.ts';
+import { detailByRec, isDeliveryRec as isDeliveryRec2, isPace } from './detail.ts';
 
 type Side = 'home' | 'away';
 
@@ -187,6 +188,13 @@ export function bowlerSplits(s: Pick<CricketState, 'log' | 'ballsPerOver'>, side
   return out;
 }
 
+/** Deep wave — the optional-depth keys (see `deepTotals`). */
+export const DEEP_TOTAL_KEYS = [
+  'bPace', 'rPace', 'oPace', 'bSpin', 'rSpin', 'oSpin',
+  'ctlBalls', 'falseShots', 'ctlBowled', 'fsInduced',
+  'kphN', 'kphSum', 'kphMax',
+] as const;
+
 /** The stat keys `statTotals` owns (absolute at sync time). */
 export const CRICKET_TOTAL_KEYS = [
   'runs', 'ballsFaced', 'fours', 'sixes', 'innings', 'notOut',
@@ -199,7 +207,68 @@ export const CRICKET_TOTAL_KEYS = [
   // SD-133 (CK-11) — wagon wheel: runs per zone + tagged shots; only in a match
   // that tagged any shot (every batter then carries them, 0 when none)
   'wz1', 'wz2', 'wz3', 'wz4', 'wz5', 'wz6', 'wz7', 'wz8', 'wwShots',
+  // Deep wave — only in a match that captured them (`deepTotals`): batting vs
+  // pace / spin (bowler types), shot control (false shots), ball speed
+  ...DEEP_TOTAL_KEYS,
 ] as const;
+
+/**
+ * Deep wave — the optional depth as absolute per-player figures, ONLY for a
+ * match that captured it (an older match has none of it, so its totals are
+ * unchanged — the frozen replay test pins that):
+ *   - bowler types known → every batter: balls / runs off the bat / dismissals
+ *     vs pace (bPace rPace oPace) and vs spin (bSpin rSpin oSpin), over the
+ *     balls bowled by a typed bowler (an untyped bowler's balls aren't counted);
+ *   - shot control tracked → batters: tracked balls faced + false shots
+ *     (ctlBalls, falseShots); bowlers: tracked balls bowled + false shots
+ *     induced (ctlBowled, fsInduced). An untagged tracked ball = in control;
+ *   - speed clocked → bowlers: balls clocked, their sum and the fastest (kphN,
+ *     kphSum, kphMax).
+ * Regulation innings only (a Super Over is a separate state).
+ */
+export function deepTotals(s: CricketState): Record<string, { side: Side; stats: Record<string, number> }> {
+  const out: Record<string, { side: Side; stats: Record<string, number> }> = {};
+  const log = s.log ?? [];
+  if (!log.length) return out;
+  const types = s.bowlTypes ?? {};
+  const typed = Object.keys(types).length > 0;
+  const det = detailByRec(log, s.detail, s.ballsPerOver);
+  const ctlOn = log.some((r) => r.trk?.ctrl);
+  const clocked = det.some((d) => d?.kph);
+  if (!typed && !ctlOn && !clocked) return out;
+  const entry = (id: string, side: Side) => (out[id] ??= { side, stats: {} }).stats;
+  if (typed) {
+    for (const [id, c] of Object.entries(s.batting)) Object.assign(entry(id, c.side), { bPace: 0, rPace: 0, oPace: 0, bSpin: 0, rSpin: 0, oSpin: 0 });
+  }
+  const faced = (r: BallRec) => r.ext === 'nb' || (r.legal && r.ext !== 'wd' && isDeliveryRec2(r));
+  log.forEach((r, i) => {
+    if (r.cross || !isDeliveryRec2(r)) return;
+    const d = det[i];
+    const bat = r.strikerId && s.batting[r.strikerId] ? entry(r.strikerId, s.batting[r.strikerId].side) : undefined;
+    const bowlSide = other(r.side);
+    const bowl = r.bowlerId ? entry(r.bowlerId, s.bowling[r.bowlerId]?.side ?? bowlSide) : undefined;
+    const t = r.bowlerId ? types[r.bowlerId] : undefined;
+    if (typed && t && bat) {
+      const k = isPace(t) ? 'Pace' : 'Spin';
+      bat[`r${k}`] += r.bat;
+      if (faced(r)) bat[`b${k}`] += 1;
+      if (r.out && r.out.kind !== 'retired' && !NO_BOWLER.includes(r.out.kind) && r.out.id === r.strikerId) bat[`o${k}`] += 1;
+    }
+    if (r.trk?.ctrl && faced(r)) {
+      const fs = d?.ctrl ? 1 : 0;
+      if (bat) { bat.ctlBalls = (bat.ctlBalls ?? 0) + 1; bat.falseShots = (bat.falseShots ?? 0) + fs; }
+      if (bowl) { bowl.ctlBowled = (bowl.ctlBowled ?? 0) + 1; bowl.fsInduced = (bowl.fsInduced ?? 0) + fs; }
+    }
+    if (d?.kph && bowl) {
+      bowl.kphN = (bowl.kphN ?? 0) + 1;
+      bowl.kphSum = (bowl.kphSum ?? 0) + d.kph;
+      bowl.kphMax = Math.max(bowl.kphMax ?? 0, d.kph);
+    }
+  });
+  // drop entries that ended up empty (a bowler entry touched by nothing)
+  for (const [id, e] of Object.entries(out)) if (!Object.keys(e.stats).length) delete out[id];
+  return out;
+}
 
 /** FIELD_NOTE kind → the fielder stat it credits (parity #20). */
 export const FIELD_NOTE_STAT = { drop: 'dropped', saved: 'runsSaved', missed: 'runsMissed' } as const;
@@ -309,5 +378,11 @@ export function statTotals(s: CricketState): Record<string, { side: Side; stats:
   // Every involved player carries the fielding keys (0 when none), so a
   // correction that moves a catch away zeroes it.
   for (const e of Object.values(out)) for (const k of ['catches', 'stumpings', 'runouts']) e.stats[k] ??= 0;
+  // Deep wave — the optional depth (only a match that captured it has any).
+  for (const [id, e] of Object.entries(deepTotals(s))) {
+    const st = entry(id, out[id]?.side ?? e.side).stats;
+    Object.assign(st, e.stats);
+    for (const k of ['catches', 'stumpings', 'runouts']) st[k] ??= 0;
+  }
   return out;
 }

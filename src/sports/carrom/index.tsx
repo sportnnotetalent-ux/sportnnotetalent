@@ -17,9 +17,13 @@ import { MatchBoxScore } from '../../components/BoxScore';
 import { carromBox } from '../boxSources';
 import {
   init, reducer, result, boardPoints, boardCloses, creditedPoints, PENALTY_POINTS, summary, scoreLine, lineScore, standingsUnits,
-  nextBreaker, nextBreakerPlayer, boardBreakers, breakerPlayers, slamFor, boardInputs, boardCorrection,
-  type BoardInput, type CarromState, type QueenBy, type Side, type Slam,
+  nextBreaker, nextBreakerPlayer, boardBreakers, breakerPlayers, slamFor, boardInputs, boardCorrection, FOUL_TYPES, FOUL_LABEL,
+  type BoardDetail, type BoardInput, type CarromState, type FoulType, type QueenBy, type Side, type Slam,
 } from './engine';
+import { carromFeed } from './feed';
+import { carromGames, carromMatchStats } from './matchStats';
+import { CommentaryFeed } from '../gcc/CommentaryFeed';
+import { CompareTable } from '../gcc/CompareTable';
 import { carromStatTotals, creditedPlayers } from './totals';
 import { ScoreSheet } from './ScoreSheet';
 import { carromVoice, carromVoiceEnds } from '../voiceParsers';
@@ -45,7 +49,14 @@ const ScoringControls: SportPlugin<CarromState>['ScoringControls'] = ({ state, d
   const [firstOf, setFirstOf] = useState<Record<Side, string | null>>({ home: null, away: null });
   // "Played by" (a roster bigger than the side) — kept from board to board
   const [picked, setPicked] = useState<Record<Side, string[]>>({ home: [], away: [] });
+  // Deep wave — the optional "Stats to track" rows (fouls by type + dues, coins
+  // on the break, missed Queen covers); cleared after each board
+  const [fouls, setFouls] = useState<Record<Side, Partial<Record<FoulType, number>>>>({ home: {}, away: {} });
+  const [dues, setDues] = useState<Record<Side, number>>({ home: 0, away: 0 });
+  const [brk, setBrk] = useState<number | null>(null);
+  const [qMiss, setQMiss] = useState<Record<Side, number>>({ home: 0, away: 0 });
   if (s.ended) return <Text style={textStyles.muted}>Match over.</Text>;
+  const track = s.track ?? {};
   // SD-117c (CR-04) — who breaks this board (toss, then alternating)
   const breaker = nextBreaker(s);
   const breakerP = nextBreakerPlayer(s);
@@ -68,19 +79,37 @@ const ScoringControls: SportPlugin<CarromState>['ScoringControls'] = ({ state, d
     const next = now.includes(id) ? now.filter((x) => x !== id) : [...now, id].slice(-perSide);
     return { ...cur, [side]: next.length ? next : now };
   });
+  // Deep wave — the tracked detail of this board (a part only when tracked;
+  // fouls / dues / missed covers default to none, coins on the break to "not
+  // recorded" until a chip is tapped)
+  const detail = (): BoardDetail | undefined => {
+    if (penalty) return undefined;
+    const det: BoardDetail = {
+      ...(track.fouls ? { fouls: { home: fouls.home, away: fouls.away }, dues: { home: dues.home, away: dues.away } } : {}),
+      ...(track.brk && breaker && brk != null ? { brk } : {}),
+      ...(track.qMiss ? { qMiss: { home: qMiss.home, away: qMiss.away } } : {}),
+    };
+    return Object.keys(det).length ? det : undefined;
+  };
   const record = () => {
     if (!winner || !ready) return;
     // SD-68 — a penalty board credits its points, never a board won / Queen
     const attr = (p: Player) => ({ playerId: p.id, playerName: p.fullName, stat: 'points', by: credit, ...(penalty ? {} : { extra: { boards: 1, ...(queen ? { queens: 1 } : {}) } }) });
+    const det = detail();
     dispatch({
       type: 'BOARD', side: winner,
-      payload: penalty ? { coins: 0, queen: false, penalty: true } : { coins, queen, ...(queenBy ? { queenBy } : {}), ...(slam ? { slam } : {}) },
+      // Deep wave — `at` (the scorer's clock) for the commentary; `det` when tracked
+      payload: penalty ? { coins: 0, queen: false, penalty: true, at: Date.now() }
+        : { coins, queen, ...(queenBy ? { queenBy } : {}), ...(slam ? { slam } : {}), ...(det ? { det } : {}), at: Date.now() },
       // SD-37: a board is the side's — both doubles partners are credited
       attribution: players[0] ? attr(players[0]) : undefined,
       attribution2: players[1] ? attr(players[1]) : undefined,
     });
     setWinner(null); setCoins(null); setQueenBy(null); setSlam(null); setPenalty(false);
+    setFouls({ home: {}, away: {} }); setDues({ home: 0, away: 0 }); setBrk(null); setQMiss({ home: 0, away: 0 });
   };
+  const addFoul = (sd: Side, t: FoulType) => setFouls((f) => ({ ...f, [sd]: { ...f[sd], [t]: Math.min(20, (f[sd][t] ?? 0) + 1) } }));
+  const foulCount = (sd: Side) => FOUL_TYPES.reduce((n, t) => n + (fouls[sd][t] ?? 0), 0) + dues[sd];
   const orderOf = (side: Side) => {
     const pair = pairOf(side);
     const first = pair.find((p) => p.id === firstOf[side]) ?? pair.find((p) => p.id === s.breakOrder?.[side]?.[0]?.id) ?? pair[0];
@@ -179,6 +208,44 @@ const ScoringControls: SportPlugin<CarromState>['ScoringControls'] = ({ state, d
               )}
             </View>
           </View>
+          {/* Deep wave — "Stats to track" rows (only when switched on) */}
+          {track.brk ? (
+            breaker ? (
+              <View style={{ gap: theme.spacing(2) }}>
+                <Text style={ctrl.label}>Break: coins {breakerP?.name ?? nameOf(breaker)} pocketed <Text style={ctrl.meta}>(optional)</Text></Text>
+                <View style={ctrl.chips}>
+                  {[0, 1, 2, 3, 4, 5].map((n) => <SelectChip key={n} label={n === 5 ? '5+' : String(n)} active={brk === n} onPress={() => setBrk(brk === n ? null : n)} />)}
+                </View>
+              </View>
+            ) : <Text style={ctrl.meta}>Record the toss to log coins on the break.</Text>
+          ) : null}
+          {track.fouls ? (
+            <View style={{ gap: theme.spacing(2) }}>
+              <Text style={ctrl.label}>Fouls this board <Text style={ctrl.meta}>(tap each foul · none = no fouls)</Text></Text>
+              {(['home', 'away'] as Side[]).map((sd) => (
+                <View key={sd} style={ctrl.chips}>
+                  <Text style={[ctrl.meta, ctrl.foulName]} numberOfLines={1}>{nameOf(sd)}</Text>
+                  {FOUL_TYPES.map((t) => {
+                    const n = fouls[sd][t] ?? 0;
+                    return <SelectChip key={t} label={`${FOUL_LABEL[t]}${n ? ` ×${n}` : ''}`} active={n > 0} onPress={() => addFoul(sd, t)} accessibilityLabel={`${FOUL_LABEL[t]} foul by ${nameOf(sd)}, now ${n}`} />;
+                  })}
+                  <SelectChip label={`Due${dues[sd] ? ` ×${dues[sd]}` : ''}`} active={dues[sd] > 0} onPress={() => setDues((d) => ({ ...d, [sd]: Math.min(20, d[sd] + 1) }))} accessibilityLabel={`A due owed by ${nameOf(sd)}, now ${dues[sd]}`} />
+                  {foulCount(sd) > 0 ? <SelectChip label="Clear" active={false} onPress={() => { setFouls((f) => ({ ...f, [sd]: {} })); setDues((d) => ({ ...d, [sd]: 0 })); }} accessibilityLabel={`Clear ${nameOf(sd)}'s fouls`} /> : null}
+                </View>
+              ))}
+            </View>
+          ) : null}
+          {track.qMiss ? (
+            <View style={{ gap: theme.spacing(2) }}>
+              <Text style={ctrl.label}>👑 Queen pocketed, cover missed <Text style={ctrl.meta}>(tap per miss)</Text></Text>
+              <View style={ctrl.chips}>
+                {(['home', 'away'] as Side[]).map((sd) => (
+                  <SelectChip key={sd} label={`${nameOf(sd)}${qMiss[sd] ? ` ×${qMiss[sd]}` : ''}`} active={qMiss[sd] > 0} onPress={() => setQMiss((q) => ({ ...q, [sd]: Math.min(9, q[sd] + 1) }))} accessibilityLabel={`${nameOf(sd)} missed the Queen cover, now ${qMiss[sd]}`} />
+                ))}
+                {qMiss.home + qMiss.away > 0 ? <SelectChip label="Clear" active={false} onPress={() => setQMiss({ home: 0, away: 0 })} /> : null}
+              </View>
+            </View>
+          ) : null}
           </>)}
           <Button
             label={!ready ? '✓ Record board — pick the coins left'
@@ -295,10 +362,16 @@ function BoardEditor({ state: s, dispatch, nameOf, homeRoster, awayRoster }: {
   );
 }
 
-const LiveExtras: NonNullable<SportPlugin<CarromState>['LiveExtras']> = ({ state, homeName, awayName, homeColor, awayColor }) => {
+const LiveExtras: NonNullable<SportPlugin<CarromState>['LiveExtras']> = ({ state, homeName, awayName, homeColor, awayColor, homeRoster = [], awayRoster = [] }) => {
   const s = state as CarromState;
+  // Deep wave — names in the commentary: a singles player's own name
+  const nm = (side: Side) => {
+    const r = side === 'home' ? homeRoster : awayRoster;
+    return r.length === 1 ? r[0].fullName : side === 'home' ? homeName : awayName;
+  };
   return (
     <View style={{ gap: theme.spacing(3) }}>
+      {s.boards.length > 0 && <CarromDeep state={s} homeName={nm('home')} awayName={nm('away')} homeColor={homeColor} awayColor={awayColor} />}
       <Text style={ctrl.label}>Games</Text>
       <View style={ctrl.chips}>
         {s.games.length === 0 ? <Text style={textStyles.muted}>Game 1 in progress…</Text>
@@ -316,6 +389,31 @@ const LiveExtras: NonNullable<SportPlugin<CarromState>['LiveExtras']> = ({ state
     </View>
   );
 };
+
+/** Deep wave — board-by-board commentary (newest first, by game) and the
+ *  match stats panel (whole match or one game; scoring, Queen, break, fouls). */
+function CarromDeep({ state: s, homeName, awayName, homeColor, awayColor }: { state: CarromState; homeName: string; awayName: string; homeColor?: string; awayColor?: string }) {
+  const [view, setView] = useState<'feed' | 'stats'>('feed');
+  const [unit, setUnit] = useState('all');
+  const games = carromGames(s);
+  const g = unit === 'all' ? undefined : Number(unit);
+  return (
+    <View style={{ gap: theme.spacing(2) }}>
+      <View style={ctrl.chips}>
+        <SelectChip label="🎙 Commentary" active={view === 'feed'} onPress={() => setView('feed')} />
+        <SelectChip label="📊 Match stats" active={view === 'stats'} onPress={() => setView('stats')} />
+      </View>
+      {view === 'feed' ? (
+        <CommentaryFeed title={null} groups={carromFeed(s, { home: homeName, away: awayName })} homeColor={homeColor} awayColor={awayColor} empty="No boards yet." />
+      ) : (
+        <CompareTable title={null} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor}
+          categories={carromMatchStats(s, g)} unit={unit} onUnit={setUnit}
+          units={[{ key: 'all', label: 'Match' }, ...games.map((n) => ({ key: String(n), label: `Game ${n}` }))]}
+          footnote={s.track ? undefined : 'More detail (fouls, coins on the break, missed covers): switch it on under ⚙️ Stats to track.'} />
+      )}
+    </View>
+  );
+}
 
 /** SD-20 — the LineScoreboard: GAMES won + a column of board points per game,
  *  the live game highlighted. */
@@ -357,6 +455,21 @@ export const carromPlugin: SportPlugin<CarromState> = {
   voice: { hints: ['board home 5', '{name} 3 queen', 'board away 9 slam', 'penalty home'], parse: carromVoice, ends: carromVoiceEnds },
   ScoringControls,
   LiveExtras,
+  // Deep wave — "Stats to track": optional detail on the board form (event
+  // mode: the format before board 1, then SET_TRACK from the next board)
+  liveSettings: {
+    title: '⚙️ Stats to track',
+    hint: 'Optional extra detail. Recording a board stays the same; the extra rows appear on the board form and feed the commentary, match stats and careers.',
+    mode: 'event',
+    actionType: 'SET_TRACK',
+    fields: [
+      { key: 'trackFouls', label: 'Fouls & dues', type: 'toggle', default: false, group: 'Stats to track', hint: 'Fouls by type (striker pocketed, touching, line / hand, thumbing) and dues, per board' },
+      { key: 'trackBreak', label: 'Coins on the break', type: 'toggle', default: false, group: 'Stats to track', hint: 'How many coins the breaker pocketed with the break stroke' },
+      { key: 'trackQueenMiss', label: 'Missed Queen covers', type: 'toggle', default: false, group: 'Stats to track', hint: 'The Queen pocketed but the cover missed (she goes back)' },
+    ],
+    read: (st) => ({ trackFouls: !!st.track?.fouls, trackBreak: !!st.track?.brk, trackQueenMiss: !!st.track?.qMiss }),
+    defaults: { trackFouls: false, trackBreak: false, trackQueenMiss: false },
+  },
   formatFields: [
     {
       key: 'preset', label: 'Format', type: 'preset', default: 'icf',
@@ -383,6 +496,10 @@ export const carromPlugin: SportPlugin<CarromState> = {
         { value: 1, label: 'Single game' },
       ],
     },
+    // Deep wave — the organiser can switch the optional stats on for every match
+    { key: 'trackFouls', label: 'Track fouls & dues', type: 'toggle', default: false, advanced: true, group: 'Stats to track', hint: 'optional rows on the board form' },
+    { key: 'trackBreak', label: 'Track coins on the break', type: 'toggle', default: false, advanced: true, group: 'Stats to track' },
+    { key: 'trackQueenMiss', label: 'Track missed Queen covers', type: 'toggle', default: false, advanced: true, group: 'Stats to track' },
   ],
 };
 
@@ -394,6 +511,7 @@ const ctrl = StyleSheet.create({
   meta: { color: theme.colors.textMuted, fontSize: theme.font.small },
   link: { color: theme.colors.primary, fontSize: theme.font.small, fontWeight: '700' },
   breakLine: { color: theme.colors.text, fontSize: theme.font.body, fontWeight: '800' },
+  foulName: { width: '100%', fontWeight: '800' },
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   draftBox: { gap: theme.spacing(2), backgroundColor: theme.colors.surfaceAlt, borderRadius: theme.radius.md, padding: theme.spacing(3) },
   editRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(2), paddingVertical: theme.spacing(2), borderBottomWidth: 1, borderBottomColor: theme.colors.border },

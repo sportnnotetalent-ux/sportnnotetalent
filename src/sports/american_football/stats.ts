@@ -68,6 +68,16 @@ export const americanFootballStats: SportStatSchema<'american_football'> = {
     pbp(count('punts', 'Punts', 'punts', 'punt', 'PUNT', 'kicking')),
     pbp({ key: 'puntYds', label: 'Punting yards', short: 'punting yards', one: 'punting yard', abbr: 'PNYDS', group: 'kicking' }),
     { key: 'tackles', label: 'Tackles', short: 'tackles', one: 'tackle', abbr: 'TKL', group: 'defence', weight: 0.5, coverage: 'keyed' },
+    // deep wave — optional "Stats to track" (keyed: only games that tracked them carry them)
+    pbp(count('targets', 'Targets', 'targets', 'target', 'TGT', 'receiving')),
+    pbp(count('passDef', 'Passes defended', 'passes defended', 'pass defended', 'PD', 'defence', { weight: 1 })),
+    pbp(count('tfl', 'Tackles for loss', 'tackles for loss', 'tackle for loss', 'TFL', 'defence', { weight: 1 })),
+    // the quarterback on a sack (from the last passer — no extra tap)
+    pbp(count('timesSacked', 'Times sacked', 'times sacked', 'time sacked', 'SKD', 'passing', { format: { unit: 'count', better: 'lower' } })),
+    pbp({ key: 'sackYdsLost', label: 'Yards lost to sacks', short: 'yards lost to sacks', one: 'yard lost to sacks', abbr: 'SYL', group: 'passing', format: { unit: 'count', better: 'lower' } }),
+    // derived from the play-by-play log (never credited live)
+    { key: 'rushLong', label: 'Longest run', short: 'longest run', abbr: 'RLNG', group: 'rushing', format: { unit: 'count' }, agg: { kind: 'max' }, coverage: 'keyed' },
+    { key: 'recLong', label: 'Longest reception', short: 'longest reception', abbr: 'RCLNG', group: 'receiving', format: { unit: 'count' }, agg: { kind: 'max' }, coverage: 'keyed' },
     // career rates and bests
     { key: 'passerRating', label: 'Passer rating', short: 'passer rating', abbr: 'RTG', source: 'derived', group: 'passing', format: { unit: 'decimal', dp: 1 },
       agg: { kind: 'formula', keys: ['passComp', 'passAtt', 'passYds', 'passTD', 'passInt'], compute: passerRating, den: 'passAtt', dp: 1, qualifier: { den: 20, unit: { label: 'pass attempts', one: 'pass attempt' } } },
@@ -104,11 +114,16 @@ export const americanFootballStats: SportStatSchema<'american_football'> = {
     ] },
     { id: 'passing', title: 'Passing', rows: [
       { stat: 'passComp' }, { stat: 'passAtt' }, { stat: 'compPct' }, { stat: 'passYds' }, { stat: 'passTD', hideZero: true }, { stat: 'passInt' }, { stat: 'passerRating' },
+      { stat: 'timesSacked', hideZero: true }, { stat: 'sackYdsLost', hideZero: true },
     ] },
-    { id: 'rushing', title: 'Rushing', rows: [{ stat: 'rushAtt' }, { stat: 'rushYds' }, { stat: 'rushAvg' }, { stat: 'rushTD', hideZero: true }, { stat: 'fumblesLost', hideZero: true }] },
-    { id: 'receiving', title: 'Receiving', rows: [{ stat: 'rec' }, { stat: 'recYds' }, { stat: 'recAvg' }, { stat: 'recTD', hideZero: true }] },
+    { id: 'rushing', title: 'Rushing', rows: [
+      { stat: 'rushAtt' }, { stat: 'rushYds' }, { stat: 'rushAvg' }, { stat: 'rushTD', hideZero: true }, { stat: 'rushLong', hideZero: true }, { stat: 'fumblesLost', hideZero: true },
+    ] },
+    { id: 'receiving', title: 'Receiving', rows: [
+      { stat: 'targets' }, { stat: 'rec' }, { stat: 'recYds' }, { stat: 'recAvg' }, { stat: 'recTD', hideZero: true }, { stat: 'recLong', hideZero: true },
+    ] },
     { id: 'defence', title: 'Defence', rows: [
-      { stat: 'tackles' }, { stat: 'sacks' }, { stat: 'defInt' }, { stat: 'fumRec', hideZero: true }, { stat: 'retTD', hideZero: true },
+      { stat: 'tackles' }, { stat: 'tfl' }, { stat: 'sacks' }, { stat: 'defInt' }, { stat: 'passDef' }, { stat: 'fumRec', hideZero: true }, { stat: 'retTD', hideZero: true },
     ] },
     { id: 'kicking', title: 'Kicking', rows: [
       { stat: 'fgMade', hideZero: true }, { stat: 'fgAtt', hideZero: true }, { stat: 'fgPct' }, { stat: 'fgLong', hideZero: true },
@@ -123,21 +138,34 @@ export const americanFootballStats: SportStatSchema<'american_football'> = {
     { title: 'Passing', columns: [
       { key: 'cmpAtt', abbr: 'C/ATT', label: 'Completions / attempts', pair: ['passComp', 'passAtt'] },
       { key: 'passYds', abbr: 'PYDS' }, { key: 'passTD', abbr: 'PTD' }, { key: 'passInt', abbr: 'INT' },
+      // deep wave: sacked–yards (the quarterback named on a sack), shown when known
+      { key: 'sackedYds', abbr: 'SKD', label: 'Times sacked – yards lost', pair: ['timesSacked', 'sackYdsLost'] },
     ] },
-    { title: 'Rushing', columns: [{ key: 'rushAtt', abbr: 'CAR' }, { key: 'rushYds', abbr: 'RYDS' }, { key: 'rushTD', abbr: 'RTD' }] },
-    { title: 'Receiving', columns: [{ key: 'rec', abbr: 'REC' }, { key: 'recYds', abbr: 'RCYDS' }, { key: 'recTD', abbr: 'RCTD' }] },
-    { title: 'Defence', columns: [{ key: 'tackles', abbr: 'TKL' }, { key: 'sacks', abbr: 'SCK' }, { key: 'defInt', abbr: 'DINT' }, { key: 'retTD', abbr: 'XTD', occasional: true }] },
+    { title: 'Rushing', columns: [
+      { key: 'rushAtt', abbr: 'CAR' }, { key: 'rushYds', abbr: 'RYDS' }, { key: 'rushAvg', abbr: 'YPC' }, { key: 'rushTD', abbr: 'RTD' },
+      { key: 'rushLong', abbr: 'RLNG', total: false },
+    ] },
+    { title: 'Receiving', columns: [
+      { key: 'targets', abbr: 'TGT' }, { key: 'rec', abbr: 'REC' }, { key: 'recYds', abbr: 'RCYDS' }, { key: 'recAvg', abbr: 'YPR' }, { key: 'recTD', abbr: 'RCTD' },
+      { key: 'recLong', abbr: 'RCLNG', total: false },
+    ] },
+    { title: 'Defence', columns: [
+      { key: 'tackles', abbr: 'TKL' }, { key: 'tfl', abbr: 'TFL' }, { key: 'sacks', abbr: 'SCK' }, { key: 'defInt', abbr: 'DINT' }, { key: 'passDef', abbr: 'PD' },
+      { key: 'fumRec', abbr: 'FR', occasional: true }, { key: 'retTD', abbr: 'XTD', occasional: true },
+    ] },
     { title: 'Kicking', columns: [
       { key: 'fg', abbr: 'FG', label: 'Field goals made / attempted', pair: ['fgMade', 'fgAtt'] },
+      { key: 'fgLong', abbr: 'FGLNG', total: false, occasional: true },
       { key: 'xp', abbr: 'XP', label: 'Extra points made / attempted', pair: ['patMade', 'patAtt'] },
       { key: 'twoPt', abbr: '2PT', occasional: true }, { key: 'onePt', abbr: '1PT', occasional: true },
     ] },
+    { title: 'Punting', columns: [{ key: 'punts', abbr: 'PUNT' }, { key: 'puntYds', abbr: 'PNYDS' }, { key: 'puntAvg', abbr: 'PAVG' }] },
     { title: 'Scoring', columns: [{ key: 'touchdowns', abbr: 'TD' }, { key: 'points', abbr: 'PTS', emphasis: true }] },
   ],
   compare: [
     'firstDowns', 'totalYards', 'teamRushYds', 'teamPassYds', 'turnovers', 'sacksAllowed', 'penaltyCount', 'penaltyYds', 'touchdowns', 'fgMade', 'timeoutsUsed',
   ],
-  leaders: ['touchdowns', 'passYds', 'rushYds', 'recYds', 'passerRating', 'points', 'passTD', 'sacks', 'defInt', 'tackles', 'fgMade', 'rushAvg'],
+  leaders: ['touchdowns', 'passYds', 'rushYds', 'recYds', 'passerRating', 'points', 'passTD', 'sacks', 'defInt', 'tackles', 'fgMade', 'rushAvg', 'rec', 'tfl', 'passDef'],
   headline: ['touchdowns', 'passYds', 'rushYds', 'points'],
   awards: [
     { stat: 'touchdowns', icon: '🏈', label: 'Top touchdown scorer', tieBreak: [{ key: 'points', better: 'higher' }] },

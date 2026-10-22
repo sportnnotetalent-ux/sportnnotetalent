@@ -51,7 +51,6 @@ export const athleticsPlugin: SportPlugin<AthleticsMatchState> = {
       options: [{ value: 1, label: 'Same as individual' }, { value: 2, label: 'Double' }],
     },
     { key: 'handTimed', label: 'Hand-timed meet', type: 'toggle', default: false, onCreate: true, hint: 'stopwatches and no wind gauge: hand times count for PBs and meet records (shown "h")' },
-    { key: 'reaction', label: 'Reaction times', type: 'toggle', default: false, advanced: true, hint: 'a start-information system reads reaction times' },
     // SD-154: feet and inches for jumps and throws (US meets) — stored in metres, records metric
     {
       key: 'fieldUnits', label: 'Field marks in', type: 'choice', default: 'auto', onCreate: true,
@@ -69,5 +68,10 @@ export const athleticsPlugin: SportPlugin<AthleticsMatchState> = {
       hint: 'the individual champion of each age group: most position points; if level…',
       options: [{ value: 'medals', label: 'More golds, then silvers, bronzes' }, { value: 'share', label: 'Joint champions' }],
     },
+    // deep wave (timed races): "Stats to track" — optional depth the meet switches on; off = today's fast entry
+    { key: 'reaction', label: 'Reaction times', type: 'toggle', default: false, advanced: true, group: 'Stats to track', hint: 'a start-information system reads reaction times' },
+    { key: 'lapSplits', label: 'Lap times', type: 'toggle', default: false, advanced: true, group: 'Stats to track', hint: 'a timekeeper at the finish line reads each runner every lap (400 m and longer) — lap times, places at each split' },
+    { key: 'relayLegs', label: 'Relay leg times', type: 'toggle', default: false, advanced: true, group: 'Stats to track', hint: 'the time at each changeover — every runner’s leg time and the fastest leg' },
+    { key: 'chipTimes', label: 'Chip times (road)', type: 'toggle', default: false, advanced: true, group: 'Stats to track', hint: 'a road race timed by the gun can show each runner’s chip (net) time too — the gun time stays official' },
   ],
 };

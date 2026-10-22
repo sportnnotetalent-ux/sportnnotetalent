@@ -51,7 +51,16 @@ export const POS_AREAS: Record<Pos, string> = {
   C: 'all thirds (no circles)', WD: 'centre + defending thirds (no circle)', GD: 'centre + defending thirds + circle', GK: 'defending third + circle',
 };
 
-export type StatKind = 'intercept' | 'deflection' | 'rebound' | 'turnover';
+export type StatKind = 'intercept' | 'deflection' | 'rebound' | 'turnover' | 'pickup';
+/** Deep wave — the Champion Data turnover types (World Netball rule names):
+ *  the optional chip after "Turnover" when "Turnover types" is tracked. */
+export type TurnoverType = 'badPass' | 'badHands' | 'footwork' | 'held' | 'offside' | 'overThird' | 'breaking' | 'outOfCourt' | 'other';
+export const TURNOVER_TYPES: TurnoverType[] = ['badPass', 'badHands', 'footwork', 'held', 'offside', 'overThird', 'breaking', 'outOfCourt', 'other'];
+export const TURNOVER_LABEL: Record<TurnoverType, string> = {
+  badPass: 'Bad pass', badHands: 'Bad hands', footwork: 'Footwork', held: 'Held ball', offside: 'Offside',
+  overThird: 'Over a third', breaking: 'Breaking', outOfCourt: 'Out of court', other: 'Other',
+};
+export const isTurnoverType = (v: unknown): v is TurnoverType => typeof v === 'string' && (TURNOVER_TYPES as string[]).includes(v);
 export type PenaltyKind = 'contact' | 'obstruction' | 'other';
 export type Sanction = 'warning' | 'suspension' | 'off';
 export type StopReason = 'injury' | 'blood' | 'tactical' | 'other';
@@ -65,7 +74,7 @@ export interface Who { id?: string; name?: string }
 export interface NetballEvent {
   /** stable id from the action (`payload.uid`) */
   id: string;
-  type: 'goal' | 'miss' | 'stat' | 'penalty' | 'sanction' | 'timeout' | 'stop' | 'sub' | 'pos' | 'centre';
+  type: 'goal' | 'miss' | 'stat' | 'penalty' | 'sanction' | 'timeout' | 'stop' | 'sub' | 'pos' | 'centre' | 'cpr';
   side?: Side;
   /** game-clock seconds since the start of the match (playing time) */
   sec: number;
@@ -89,6 +98,15 @@ export interface NetballEvent {
   ref?: string;
   /** sanction for a team official (never a player line) */
   official?: string;
+  /** Deep wave — a goal's value when it isn't 1: a 2-point super shot
+   *  (organiser rule `superShot`). Absent on every other goal. */
+  points?: number;
+  /** Deep wave — a missed shot from the super-shot zone (organiser rule) */
+  ss?: true;
+  /** Deep wave — a deflection's outcome ("Gains" tracked): true = won the ball */
+  gain?: boolean;
+  /** Deep wave — a turnover's type ("Turnover types" tracked) */
+  tt?: TurnoverType;
 }
 
 export interface XiStamp { pos: Partial<Record<Pos, { id: string; name: string }>> }
@@ -124,6 +142,20 @@ export interface NetballState {
   /** detail mode: ask for the feeder after a goal / attempt and the rebound after a miss */
   detail: boolean;
   xi?: { home?: XiStamp; away?: XiStamp };
+  /** Deep wave — "Stats to track" (format keys; only on the state when the
+   *  stored config carries the key, so older matches keep their exact state):
+   *  centre pass receives, gains (deflection outcome + pick-ups), turnover
+   *  types. They change what the controls ask; each play stamps its own
+   *  detail, so a switch applies from the next play. */
+  trackCpr?: boolean;
+  trackGains?: boolean;
+  trackTurnovers?: boolean;
+  /** Deep wave — the 2-point super shot (Suncorp Super Netball's rule, an
+   *  organiser option, off by default): goals from the super-shot zone score
+   *  2 in the last `ssMinutes` minutes of each regular quarter (5; 0 = any
+   *  time). Only on the state when the format sets it. */
+  superShot?: boolean;
+  ssMinutes?: number;
 }
 
 /* --------------------------------- format ---------------------------------- */
@@ -151,6 +183,11 @@ export const init = (config?: Record<string, unknown>): NetballState => {
     timeoutsPerHalf: Math.floor(numOr(config?.timeoutsPerHalf, 0)),
     stopClock: bool(config?.stopClock, true),
     detail: bool(config?.detail, false),
+    // Deep wave — present only when the stored config carries the key
+    ...(config?.trackCpr != null ? { trackCpr: bool(config.trackCpr, false) } : {}),
+    ...(config?.trackGains != null ? { trackGains: bool(config.trackGains, false) } : {}),
+    ...(config?.trackTurnovers != null ? { trackTurnovers: bool(config.trackTurnovers, false) } : {}),
+    ...(bool(config?.superShot, false) ? { superShot: true, ssMinutes: Math.floor(numOr(config?.ssMinutes, 5)) } : {}),
   };
 };
 
@@ -203,6 +240,16 @@ export const secInPeriod = (s: NetballState, e: Pick<NetballEvent, 'sec' | 'peri
 
 const stopAt = (s: NetballState, at: number): NetballState['clock'] =>
   s.clock.since ? { ms: s.clock.ms + Math.max(0, at - s.clock.since) } : s.clock;
+
+/** Deep wave — is the super-shot window open (the last `ssMinutes` of a
+ *  regular quarter, on a format that uses super shots)? */
+export function superShotLive(s: NetballState, now = 0): boolean {
+  if (!s.superShot || s.period > s.periods) return false;
+  const len = periodLen(s, s.period);
+  return !s.ssMinutes || len - periodSec(s, now) <= s.ssMinutes * 60;
+}
+/** A goal's value (1, or 2 for a super shot). */
+export const goalPoints = (e: Pick<NetballEvent, 'points'>): number => (e.points === 2 ? 2 : 1);
 
 /** The lead a play-on goal needs to end the match. */
 export const playOnLead = (s: Pick<NetballState, 'etThen'>): number => (s.etThen === 'golden' ? 1 : 2);
@@ -276,7 +323,7 @@ export const positionOf = (s: NetballState, side: Side, who: Who): Pos | undefin
 /* --------------------------------- credits --------------------------------- */
 
 /** The stat key each event kind credits. */
-export const STAT_KEY: Record<StatKind, string> = { intercept: 'intercepts', deflection: 'deflections', rebound: 'rebounds', turnover: 'turnovers' };
+export const STAT_KEY: Record<StatKind, string> = { intercept: 'intercepts', deflection: 'deflections', rebound: 'rebounds', turnover: 'turnovers', pickup: 'pickups' };
 export const PENALTY_KEY: Record<PenaltyKind, string | undefined> = { contact: 'contacts', obstruction: 'obstructions', other: undefined };
 export const SANCTION_KEY: Record<Sanction, string> = { warning: 'warnings', suspension: 'suspensions', off: 'orderedOff' };
 /** Every key a live netball action credits (statTotals owns all of them). */
@@ -294,7 +341,8 @@ export function eventCredits(e: Pick<NetballEvent, 'type' | 'playerId' | 'player
   switch (e.type) {
     case 'goal': return { first: p({ goals: 1, attempts: 1 }), second: q({ goalAssists: 1, feeds: 1 }) };
     case 'miss': return { first: p({ attempts: 1 }), second: q({ feeds: 1 }) };
-    case 'stat': return e.stat ? { first: p({ [STAT_KEY[e.stat]]: 1 }) } : {};
+    // Deep wave: a pick-up is credited by statTotals only (deep.ts), never live
+    case 'stat': return e.stat && e.stat !== 'pickup' ? { first: p({ [STAT_KEY[e.stat]]: 1 }) } : {};
     case 'penalty': {
       const k = PENALTY_KEY[e.penalty ?? 'other'];
       return { first: p(k ? { penaltiesConceded: 1, [k]: 1 } : { penaltiesConceded: 1 }) };
@@ -426,8 +474,10 @@ export const reducer = (s: NetballState, a: ScoreAction): NetballState => {
     }
     case 'GOAL': {
       if (!side) return s;
-      const scored = { ...s, [side]: s[side] + 1 } as NetballState;
-      let next = push(scored, { type: 'goal', side, ...(pos ? { pos } : {}), ...who1, ...who2 });
+      // Deep wave: a super shot scores 2 (only on a format that uses them)
+      const two = s.superShot === true && a.payload?.points === 2;
+      const scored = { ...s, [side]: s[side] + (two ? 2 : 1) } as NetballState;
+      let next = push(scored, { type: 'goal', side, ...(pos ? { pos } : {}), ...who1, ...who2, ...(two ? { points: 2 } : {}) });
       // the play-on after extra time ends on the lead (2 goals, or golden goal)
       if (next.playOn && next.period === totalPeriods(next) && Math.abs(next.home - next.away) >= playOnLead(next) && !edit) {
         const clock = stopAt(next, at);
@@ -437,13 +487,16 @@ export const reducer = (s: NetballState, a: ScoreAction): NetballState => {
     }
     case 'MISS': {
       if (!side) return s;
-      return push(s, { type: 'miss', side, ...(pos ? { pos } : {}), ...who1, ...who2 });
+      return push(s, { type: 'miss', side, ...(pos ? { pos } : {}), ...who1, ...who2, ...(s.superShot === true && a.payload?.ss === true ? { ss: true as const } : {}) });
     }
     case 'STAT': {
       const k = a.payload?.kind;
-      if (!side || (k !== 'intercept' && k !== 'deflection' && k !== 'rebound' && k !== 'turnover')) return s;
+      if (!side || (k !== 'intercept' && k !== 'deflection' && k !== 'rebound' && k !== 'turnover' && k !== 'pickup')) return s;
       const ref = typeof a.payload?.ref === 'string' && a.payload.ref ? { ref: a.payload.ref as string } : {};
-      return push(s, { type: 'stat', side, stat: k, ...who1, ...ref });
+      // Deep wave: a deflection's outcome, a turnover's type (new logs only)
+      const gain = k === 'deflection' && typeof a.payload?.gain === 'boolean' ? { gain: a.payload.gain as boolean } : {};
+      const tt = k === 'turnover' && isTurnoverType(a.payload?.tt) ? { tt: a.payload.tt as TurnoverType } : {};
+      return push(s, { type: 'stat', side, stat: k, ...who1, ...ref, ...gain, ...tt });
     }
     case 'PENALTY': {
       if (!side) return s;
@@ -493,12 +546,17 @@ export const reducer = (s: NetballState, a: ScoreAction): NetballState => {
       if (!side) return s;
       return push(s, { type: 'centre', side });
     }
+    case 'CPR': {
+      // Deep wave: who received the centre pass ("Centre pass receives")
+      if (!side || (!('playerId' in who1) && !('playerName' in who1))) return s;
+      return push(s, { type: 'cpr', side, ...who1, ...(pos ? { pos } : {}) });
+    }
     case 'REMOVE_EVENT': {
       const id = String(a.payload?.id ?? '');
       const ev = s.events.find((e) => e.id === id);
       if (!ev) return s;
       const next = { ...s, events: s.events.filter((e) => e !== ev) };
-      if (ev.type === 'goal' && ev.side) return { ...next, [ev.side]: Math.max(0, next[ev.side] - 1) } as NetballState;
+      if (ev.type === 'goal' && ev.side) return { ...next, [ev.side]: Math.max(0, next[ev.side] - goalPoints(ev)) } as NetballState;
       return next;
     }
     case 'END_PERIOD': {
@@ -537,12 +595,14 @@ export function result(s: NetballState): { winner: Side | 'draw'; home: number; 
 /** A side's team figures (comparison panel) over a period scope. */
 export interface NetballTeamFigures {
   goals: number; attempts: number; feeds: number; goalAssists: number; intercepts: number; deflections: number; rebounds: number; turnovers: number;
+  /** Deep wave: pick-ups ("Gains" tracked) */
+  pickups: number;
   penaltiesConceded: number; contacts: number; obstructions: number; warnings: number; suspensions: number; orderedOff: number; timeouts: number;
   byPos: Record<'GS' | 'GA', { goals: number; attempts: number }>;
 }
 export function teamFigures(s: NetballState, side: Side, scope: 'all' | number = 'all'): NetballTeamFigures {
   const f: NetballTeamFigures = {
-    goals: 0, attempts: 0, feeds: 0, goalAssists: 0, intercepts: 0, deflections: 0, rebounds: 0, turnovers: 0,
+    goals: 0, attempts: 0, feeds: 0, goalAssists: 0, intercepts: 0, deflections: 0, rebounds: 0, turnovers: 0, pickups: 0,
     penaltiesConceded: 0, contacts: 0, obstructions: 0, warnings: 0, suspensions: 0, orderedOff: 0, timeouts: 0,
     byPos: { GS: { goals: 0, attempts: 0 }, GA: { goals: 0, attempts: 0 } },
   };
@@ -576,9 +636,13 @@ export const NETBALL_LIVE_SETTINGS: LiveSettings<NetballState> = {
   mode: 'config',
   fields: [
     { key: 'periodMinutes', label: 'Quarter length', type: 'number', default: 15, min: 1, max: 20, step: 1, hint: 'min / period' },
-    { key: 'detail', label: 'Feeds & rebounds', type: 'toggle', default: false, group: 'Detail' },
+    // Deep wave — "Stats to track": each applies from the next play (plays stamp their own detail)
+    { key: 'detail', label: 'Feeds & rebounds', type: 'toggle', default: false, group: 'Stats to track' },
+    { key: 'trackCpr', label: 'Centre pass receives', type: 'toggle', default: false, group: 'Stats to track' },
+    { key: 'trackGains', label: 'Gains & pick-ups', type: 'toggle', default: false, group: 'Stats to track' },
+    { key: 'trackTurnovers', label: 'Turnover types', type: 'toggle', default: false, group: 'Stats to track' },
     { key: 'stopClock', label: 'Stop clock on suspensions', type: 'toggle', default: true, group: 'Clock' },
   ] as FormatField[],
-  read: (s) => ({ periodMinutes: s.periodMinutes, detail: s.detail, stopClock: s.stopClock }),
-  defaults: { periodMinutes: 15, detail: false, stopClock: true },
+  read: (s) => ({ periodMinutes: s.periodMinutes, detail: s.detail, trackCpr: s.trackCpr === true, trackGains: s.trackGains === true, trackTurnovers: s.trackTurnovers === true, stopClock: s.stopClock }),
+  defaults: { periodMinutes: 15, detail: false, trackCpr: false, trackGains: false, trackTurnovers: false, stopClock: true },
 };

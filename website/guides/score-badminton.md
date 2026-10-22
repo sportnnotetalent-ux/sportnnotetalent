@@ -5,7 +5,7 @@ category: Live scoring
 audience: Scorers, Organisers
 sports: badminton
 order: 58
-updated: 2026-10-11
+updated: 2026-10-22
 ---
 
 Every rally scores, and the rally winner serves next. You tap who won each rally; the app keeps the score and shows who serves from which court.
@@ -43,7 +43,7 @@ A banner above the buttons and under the board shows the breaks:
 - "↔ Change ends · interval at 11 in the deciding game (60 s)" in the deciding game.
 - "↔ Change ends · 120 s between games" after each game.
 
-The same cues appear as markers in the rally log.
+The same cues appear in the commentary, after the rally that triggered them.
 
 ## Reading the board
 GAMES won and a points column per game, with a 🏸 dot by the serving side. The result reads like "2–1 · 21-18, 19-21, 21-15".
@@ -51,17 +51,35 @@ GAMES won and a points column per game, with a 🏸 dot by the serving side. The
 A chip under the board shows **GAME POINT** or **MATCH POINT** with the side's name.
 
 ## Match stats
-The **Score** tab's "Match stats" show points won in total, on serve and on receive, streaks, biggest lead and game / match points saved. Doubles serve figures are per player once a serving order was picked, else for the pair.
+The **Score** tab's "Match stats" (per match or game) has tabs:
+- **Key stats**: Serve (points won on serve and on receive, service faults), Winners & errors, Points won (total, streaks, biggest lead) and game / match points converted and saved.
+- **Serve**: every serve and receive figure; doubles show each server's line once a serving order was picked, else the pair's.
+- **Shots** (with point detail): winners, unforced or forced errors by shot, for either wing or **Forehand** / **Backhand** only; a stroke summary; errors and service faults by type.
+- **Rally length** (with rally length tracked): points won after 0–4, 5–10 and 11+ shots, and on serve / on receive.
 
-## Point detail (optional)
-Off by default, so a rally stays one tap. Turn it on with **On** in the "🔎 Point detail (optional)" row under the buttons.
+A tab or row only shows when the match tracked it.
 
-After each rally, "How was it won? · Asha Rao" appears. Tap a chip or **Skip**; nothing is required.
-- **Winner** + **Smash**, **Net kill**, **Drop**, **Clear**, **Drive**, **Push / lift**.
-- **Forced error**, or **Unforced error** + **Net**, **Out**, **Fault** (touch or double hit).
-- **Service fault** (receiver won).
+## Extra stats (optional)
+Scoring stays one tap per rally. To track more, open **⚙️ Scoring settings** and pick under **Stats to track**, or tap **Choose** next to "📊 Extra stats" under the point buttons. All are off by default; an organiser can switch them on for every match of a format under **⚙ Customize this format**. A change during play counts from the next rally.
+- **Point detail**: how the rally ended.
+- **Rally length**: 0–4, 5–10 or 11+ shots.
+
+After each rally a "Last point" card appears. Tap what you know, or **Skip**:
+1. **Winner**, **Forced error**, **Unforced error** or **Service fault** (only when the receiver won).
+2. **Forehand** or **Backhand**.
+3. The shot: **Smash**, **Drop**, **Clear**, **Net shot**, **Net kill**, **Drive**, **Lift**, **Push**, **Serve**.
+4. For an unforced error, **Error:** **Net**, **Out** or **Fault**; for a service fault, **Fault:** **Too high** (above 1.15 m), **Foot fault**, **Net**, **Out** or **Fault**.
+5. With rally length on: **0–4**, **5–10** or **11+ shots**.
 
 Errors and service faults count against the opponent (doubles: pick who under **By:**). The box score adds **W**, **UE**, **FE**.
+
+## Commentary
+Under the stats, "Commentary" tells the match game by game, newest first, the game in play on top:
+- "Asha Rao wins game 1" with the game score, e.g. **21-18**, and where the match stands ("Asha Rao leads 1-0 in games").
+- Each rally: "Point to Asha Rao", the match time and, if you described it, a line like "Meera Iyer loses the point with a Backhand Net Shot Unforced Error (into the net)". On the right, the score as the umpire calls it, the server's score first. "Service over · Meera Iyer to serve" when the serve changes hands.
+- Intervals and change of ends, misconduct and who served first in each game.
+
+It updates after every rally and after a correction.
 
 ## Fix a mistake
 - Wrong tap just now? The Undo bar names what it removes, e.g. "↶ Undo: point to Asha Rao (20-18)". Each tap undoes one step.

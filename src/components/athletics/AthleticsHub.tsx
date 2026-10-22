@@ -13,6 +13,7 @@ import { SectionHeader } from '../SectionHeader';
 import { MedalTable } from '../MedalTable';
 import { ChampionsCard } from '../results/ChampionsCard';
 import { CompetitionRulesCard } from '../results/CompetitionRulesCard';
+import { MeetCommentaryCard } from '../results/RaceDepth';
 import { useMeet } from '../../data/useAthletics';
 import { medalStandings } from '../../data/medalStandings';
 import {
@@ -102,6 +103,8 @@ export function AthleticsHub({ tournament, canOrganize, sport = 'athletics' }: {
       )}
       {/* SD-129: the meet timetable (every event sport) and the printable sheets */}
       <Button label="🗓 Timetable & print sheets" variant="ghost" onPress={() => nav.navigate('MeetTimetable', { tournamentId: tournament.id })} />
+      {/* deep wave (timed races): the meet's live results commentary, newest first */}
+      <MeetCommentaryCard events={events} sport={sport} />
       {swimSettings ? (
         <Text style={textStyles.muted}>{courseLabel(swimSettings.course)} · {swimSettings.lanes} lanes{swimSettings.manual ? ' · manual timing' : ''} · World Aquatics seeding (fastest heat last, fastest in the centre lane).</Text>
       ) : null}

@@ -20,6 +20,7 @@ import {
 } from '../data/teamTie';
 import { chessRatingsOf, ratingListFor, ratingOn } from '../data/chessRatings';
 import { matchLine } from '../sports/matchLine';
+import { ChessTieBoards } from '../sports/chess/ChessTieBoards';
 import type { Match, Player, Role } from '../core/types';
 
 const STATE_TEXT: Record<RubberState, string> = {
@@ -185,6 +186,11 @@ export function TeamTieView({ initial, canManage, tz, onOpen, me }: {
           </TouchableOpacity>
         );
       })}
+      {/* Deep wave — chess: board by board (colours, how each ended, length, opening) */}
+      {series.sport === 'chess' ? (
+        <ChessTieBoards rubbers={tie.rubbers.map((r) => r.m)} label={(i) => rubberLabel(spec, i)} teamA={A.name} teamB={B.name}
+          name={(i, side) => { const ids = rubberPlayers(spec, i, side, lineups[side]); return bothIn && ids ? ids.map(nameOf).join(' / ') : side === 'home' ? A.shortName || A.name : B.shortName || B.name; }} />
+      ) : null}
     </View>
   );
 }

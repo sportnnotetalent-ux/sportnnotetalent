@@ -5,7 +5,7 @@ category: Tournaments
 audience: Organisers, Scorers, Players, Parents & fans
 sports: archery
 order: 90
-updated: 2026-10-11
+updated: 2026-10-22
 ---
 
 An archery competition is a list of events, such as Recurve 70 m Senior Men. Each event is a ranking round of ends, then, if you choose, a seeded match-play bracket with a bronze medal match. You enter the arrows on a phone; the app applies the World Archery rules and updates medals, house points, records and profiles.
@@ -31,7 +31,7 @@ An archery competition is a list of events, such as Recurve 70 m Senior Men. Eac
 4. Tap **E1**, **E2** and so on to go back to an end, then tap an archer to correct it.
 5. With match play, tap **Close ranking round → seed match play**. Without it, tap **🏁 Finish & lock results**.
 
-> **Important:** An end is exactly 6 arrows outdoors and 3 indoors, so it can never score more than 60 or 30. The app refuses anything else.
+> **Important:** An end is exactly 6 arrows outdoors and 3 indoors, so it can never score more than 60 or 30. The app refuses anything else. Compound 50 m uses the 80 cm 6-ring face and compound indoor the triple face, so their keypads only show 5 (or 6) to X and M: an arrow outside the last ring is a miss.
 
 ## How the ranking round is decided
 - The higher score wins. If scores are level, more 10s (X included) ranks higher, then more X.
@@ -52,13 +52,15 @@ An archery competition is a list of events, such as Recurve 70 m Senior Men. Eac
 > **Tip:** To correct a match, tap the end you want to change. If the correction changes who went through, the app asks first. Later scores that no longer fit the bracket are then cleared.
 
 ## What everyone sees
+- **Commentary**, newest first. In the ranking round, each end shows every archer's arrows, end score and running total with their place, the best end and the leader. In match play, each end shows both archers' arrows and the set score, for example **QF E4 · Deepika X-10-9 = 29 v Ankita 9-9-9 = 27 — Deepika takes the set, 5-3**, then shoot-offs, the winners and the podium. It is built from the results, so a correction rewrites it.
+- **Round stats** on the results sheet: average arrow, X per end, best and worst end, and the count of X, 10, 9, 8, 7, lower and M for each archer. **Match play stats** show matches and sets won, shared and lost, the average arrow in matches, the best end and shoot-offs.
 - **Places:** gold, silver, bronze and 4th come from the medal matches. Archers who lose in the same earlier round share a place (all quarter-final losers are 5th), and they share its points.
 - **House table**, **Best archers (points)** and **Meet records** (complete ranking rounds only) on the Archery page.
-- **Archer profiles:** matches won and lost, set points, average arrow, 10 + X rate, medals, and personal and season bests per round.
+- **Archer profiles:** matches won and lost, set points, average arrow, 10 + X rate, medals, personal and season bests per round with the best end, X per end, the average arrow in matches and shoot-offs won.
 
 ## Common questions
 ### Can we run team or mixed team events?
-Not yet. Only individual events work for now.
+Yes. See [team events](/guides/team-events-in-meets/).
 
 ### We locked the results and found a mistake.
 An organiser can tap **↺ Reopen match play**. Its records and points are rolled back until you lock it again. The ranking round can be reopened only while match play has no scores.

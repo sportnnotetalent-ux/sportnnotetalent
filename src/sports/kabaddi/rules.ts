@@ -148,6 +148,13 @@ export interface RaidBreakdown {
   lineOut?: boolean;
   /** SD-83: touches logged on a caught raid that didn't score */
   touchesLost?: number;
+  /** deep wave — defenders on the mat facing the raid (before it) */
+  defBefore?: number;
+  /** deep wave — the raid faced 3 or fewer defenders with super tackles on:
+   *  a super-tackle chance for the defence (PKL "super tackle on") */
+  stChance?: boolean;
+  /** deep wave — players on the mat per side after the raid (and any all-out) */
+  matAfter?: { home: number; away: number };
 }
 
 const other = (s: Side): Side => (s === 'home' ? 'away' : 'home');
@@ -335,6 +342,10 @@ export function replayRaids(raids: RaidOutcome[], cfg: KabaddiCfg, extras: Extra
       ...(defOut ? { defOutPts: defOut } : null),
       ...(lineOut ? { lineOut: true } : null),
       ...(caughtVoid && rawTouches ? { touchesLost: rawTouches } : null),
+      // deep wave — derived only (the score above is computed exactly as before)
+      defBefore: defendersBefore,
+      ...(superTackleOn(cfg) && !amar && defendersBefore <= 3 ? { stChance: true } : null),
+      matAfter: { home: onMat('home'), away: onMat('away') },
     });
   }
   expire(now);

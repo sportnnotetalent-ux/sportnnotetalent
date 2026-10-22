@@ -3,7 +3,7 @@
  *  as it does on-device; the UI lives in index.tsx. Mirrors the basketball /
  *  cricket / kabaddi engines. */
 import type { ScoreAction, LiveSettings, FormatField } from "../types";
-import type { FootballEvent, GoalType, BodyPart, StatEvent, StatKind } from "./events";
+import type { FootballEvent, GoalType, BodyPart, StatEvent, StatKind, ShotZone } from "./events";
 import { isPlayerCard } from "./events.ts";
 import { aggPriorFromConfig, aggregateText, levelForDecider, type AggPrior } from "../aggregate.ts";
 import type { Player } from "../../core/types";
@@ -78,6 +78,9 @@ export interface FootballState {
    *  (none in extra time) and accumulated fouls — from the 6th in a half, a
    *  direct free kick from the 10 m mark (Futsal Laws 7, 12, 13). */
   futsal?: true;
+  /** Deep wave: the optional depth this match tracks (absent = none — every
+   *  older match and the default). */
+  deep?: DeepTrack;
 }
 
 /** SD-80 (FB-14): one shootout kick with who took it, how it went and the
@@ -125,7 +128,30 @@ export interface TrackConfig {
   defenceContribution: boolean;
 }
 
+/** Deep wave — optional depth, OFF unless the format switches it on
+ *  (`trackShotDetail` …); the state carries `deep` only then, so an older
+ *  match keeps its exact shape.
+ *  shotDetail: inside / outside the box, big chance, woodwork (Opta);
+ *  keyPasses: the pass that set up a shot; clearances; setPieces: goal kicks
+ *  and throw-ins (FIFA team stats); cardReasons: why each card was shown. */
+export interface DeepTrack {
+  shotDetail?: boolean;
+  keyPasses?: boolean;
+  clearances?: boolean;
+  setPieces?: boolean;
+  cardReasons?: boolean;
+}
+
 export const TRACK_KEYS: (keyof TrackConfig)[] = ['shots', 'possession', 'fouls', 'cards', 'offsides', 'corners', 'tackles', 'interceptions', 'saves', 'passes', 'crosses', 'dribbles', 'handball', 'attackContribution', 'defenceContribution'];
+/** Deep wave — the optional depth toggles (format key `track` + Capitalised). */
+export const DEEP_TRACK_KEYS = ['shotDetail', 'keyPasses', 'clearances', 'setPieces', 'cardReasons'] as const;
+export type DeepTrackKey = typeof DEEP_TRACK_KEYS[number];
+/** Deep wave — the switched-on depth from the format (undefined = none). */
+export function readDeepTrack(config?: Record<string, unknown>): DeepTrack | undefined {
+  const out: DeepTrack = {};
+  for (const k of DEEP_TRACK_KEYS) if (config?.[`track${k[0].toUpperCase()}${k.slice(1)}`] === true) out[k] = true;
+  return Object.keys(out).length ? out : undefined;
+}
 export const readTrack = (config?: Record<string, unknown>): TrackConfig => {
   const cap = (k: string) => k[0].toUpperCase() + k.slice(1);
   const def: Record<keyof TrackConfig, boolean> = {
@@ -143,14 +169,28 @@ export const readTrack = (config?: Record<string, unknown>): TrackConfig => {
 };
 
 /** The stats a scorer can switch on/off mid-match (parity #14 live settings —
- *  the old inline "Scoring settings" card's set, in the same order). */
+ *  the old inline "Scoring settings" card's set, in the same order; FB-17
+ *  added crosses, dribbles and handballs). */
 const TRACKABLE: [keyof TrackConfig, string][] = [
   ['shots', 'Shots'], ['possession', 'Possession'], ['passes', 'Passes'], ['fouls', 'Fouls'],
   ['cards', 'Cards'], ['offsides', 'Offsides'], ['corners', 'Corners'], ['tackles', 'Tackles'],
   ['interceptions', 'Interceptions'], ['saves', 'Saves'],
   ['attackContribution', 'Attacking play'], ['defenceContribution', 'Defensive play'],
+  ['crosses', 'Crosses'], ['dribbles', 'Dribbles'], ['handball', 'Handballs'],
+];
+/** Deep wave — "Deeper stats (optional)": off by default; each adds a chip or
+ *  a step only when on. */
+export const DEEP_TRACKABLE: [DeepTrackKey, string, string][] = [
+  ['shotDetail', 'Shot detail', 'inside / outside the box, big chances, woodwork'],
+  ['keyPasses', 'Key passes', 'who set up each shot'],
+  ['clearances', 'Clearances', 'a defensive action button'],
+  ['setPieces', 'Goal kicks & throw-ins', 'team counts (FIFA)'],
+  ['cardReasons', 'Card reasons', 'foul, dissent, time-wasting…'],
 ];
 const trackKey = (k: string) => `track${k[0].toUpperCase()}${k.slice(1)}`;
+/** Deep wave — the optional toggles as format fields (live settings group;
+ *  also an organiser's advanced format options). */
+export const DEEP_TRACK_FIELDS: FormatField[] = DEEP_TRACKABLE.map(([k, label, hint]) => ({ key: trackKey(k), label, type: 'toggle', default: false, group: 'Deeper stats (optional)', hint }));
 
 /** Football's live settings (config mode): each tap patches the match format and
  *  the log replays with it, exactly as the old inline card did. */
@@ -159,15 +199,18 @@ export const FOOTBALL_LIVE_SETTINGS: LiveSettings<FootballState> = {
   hint: 'Capture only what this scorer can keep up with — toggles apply to this match only.',
   mode: 'config',
   fields: [
-    ...TRACKABLE.map(([k, label]): FormatField => ({ key: trackKey(k), label, type: 'toggle', default: readTrack()[k], group: 'Stats captured' })),
+    ...TRACKABLE.map(([k, label]): FormatField => ({ key: trackKey(k), label, type: 'toggle', default: readTrack()[k] as boolean, group: 'Stats captured' })),
+    ...DEEP_TRACK_FIELDS,
     { key: 'halfMinutes', label: 'Match length', type: 'number', default: 45, min: 5, max: 60, step: 5, hint: 'min / half' },
   ],
   read: (s) => ({
     ...Object.fromEntries(TRACKABLE.map(([k]) => [trackKey(k), s.track?.[k] ?? false])),
+    ...Object.fromEntries(DEEP_TRACKABLE.map(([k]) => [trackKey(k), s.deep?.[k] === true])),
     halfMinutes: s.halfMinutes ?? 45,
   }),
   defaults: {
     ...Object.fromEntries(TRACKABLE.map(([k]) => [trackKey(k), readTrack()[k]])),
+    ...Object.fromEntries(DEEP_TRACKABLE.map(([k]) => [trackKey(k), false])),
     halfMinutes: 45,
   },
 };
@@ -200,6 +243,8 @@ export const init = (config?: Record<string, unknown>): FootballState => ({
   // SD-132: only on the state when the format sets the key
   ...(config?.stoppedClock === true ? { gc: { ms: 0 } } : {}),
   ...(config?.futsal === true ? { futsal: true as const } : {}),
+  // deep wave: only on the state when the format switches some depth on
+  ...(readDeepTrack(config) ? { deep: readDeepTrack(config) } : {}),
 });
 
 /* --------------------------- SD-132 stopped clock -------------------------- */
@@ -427,6 +472,11 @@ export const reducer = (s: FootballState, a: ScoreAction): FootballState => {
   // SD-117 (F13): a team official's card (new logs only — an absent key keeps
   // old states identical).
   const official = a.payload?.official === true ? { official: true as const } : {};
+  // Deep wave (new logs only, optional tracking): a shot / goal's zone and big
+  // chance, a card's reason. Absent keys keep old states identical.
+  const zone = a.payload?.zone === 'box' || a.payload?.zone === 'out' ? { zone: a.payload.zone as ShotZone } : {};
+  const big = a.payload?.bigChance === true ? { bigChance: true as const } : {};
+  const reason = typeof a.payload?.reason === 'string' && a.payload.reason ? { reason: a.payload.reason } : {};
   switch (a.type) {
     case 'KICKOFF': {
       const at = Number(a.payload?.at);
@@ -497,6 +547,10 @@ export const reducer = (s: FootballState, a: ScoreAction): FootballState => {
         complete: a.payload?.complete as boolean | undefined,
         // SD-08: only new logs carry it (absent key keeps old states identical).
         ...(a.payload?.blocked === true ? { blocked: true } : {}),
+        // deep wave: shot detail and the key pass's shot (new logs only)
+        ...zone, ...big,
+        ...(a.payload?.woodwork === true ? { woodwork: true as const } : {}),
+        ...(typeof a.payload?.ref === 'number' ? { ref: a.payload.ref } : {}),
       };
       let next: FootballState = { ...s, seq: s.seq + 1, stats: [...s.stats, ev] };
       // some actions hand the ball to the other side (foul, corner won, tackle…)
@@ -509,8 +563,29 @@ export const reducer = (s: FootballState, a: ScoreAction): FootballState => {
     case 'GOAL': {
       if (!a.side) return s;
       const scored = { ...s, [a.side]: s[a.side] + 1 } as FootballState;
-      return push(scored, { minute, half: evHalf, type: 'goal', side: a.side, playerName: name, goalType: a.payload?.goalType as FootballEvent['goalType'], bodyPart: a.payload?.bodyPart as BodyPart | undefined, ...pid });
+      return push(scored, { minute, half: evHalf, type: 'goal', side: a.side, playerName: name, goalType: a.payload?.goalType as FootballEvent['goalType'], bodyPart: a.payload?.bodyPart as BodyPart | undefined, ...pid, ...zone, ...big });
     }
+    case 'GOAL_DETAIL': {
+      // deep wave: the zone / big chance of the side's latest goal, picked on
+      // the goal panel after the goal is on the board (`zone: null` clears it)
+      if (!a.side) return s;
+      for (let i = s.events.length - 1; i >= 0; i--) {
+        const e = s.events[i];
+        if (e.type !== 'goal' || e.side !== a.side) continue;
+        const { zone: _z, bigChance: _b, ...rest } = e;
+        const p = a.payload ?? {};
+        const z = 'zone' in p ? (p.zone === 'box' || p.zone === 'out' ? { zone: p.zone as ShotZone } : {}) : (e.zone ? { zone: e.zone } : {});
+        const b = 'bigChance' in p ? (p.bigChance === true ? { bigChance: true as const } : {}) : (e.bigChance ? { bigChance: true as const } : {});
+        const events = [...s.events];
+        events[i] = { ...rest, ...z, ...b };
+        return { ...s, events };
+      }
+      return s;
+    }
+    case 'NO_GOAL':
+      // deep wave: a goal ruled out (offside / foul / handball; after a VAR
+      // review or not) — a timeline row, the score never moved
+      return a.side ? push(s, { minute, half: evHalf, type: 'nogoal', side: a.side, ...(name ? { playerName: name } : {}), ...pid, ...reason, ...(a.payload?.review === true ? { review: true as const } : {}) }) : s;
     case 'OWN_GOAL': {
       if (!a.side) return s; // side = team awarded the goal
       const scored = { ...s, [a.side]: s[a.side] + 1 } as FootballState;
@@ -540,9 +615,9 @@ export const reducer = (s: FootballState, a: ScoreAction): FootballState => {
       // no scoring effect. `reason` (injury / var / cooling / other) is optional.
       return push(s, { minute, half: evHalf, type: 'stoppage', side: a.side ?? 'home', playerName: a.payload?.reason as string | undefined });
     case 'YELLOW':
-      return a.side ? push(s, { minute, half: evHalf, type: 'yellow', side: a.side, playerName: name ?? (a.payload?.officialName as string | undefined), ...pid, ...official }) : s;
+      return a.side ? push(s, { minute, half: evHalf, type: 'yellow', side: a.side, playerName: name ?? (a.payload?.officialName as string | undefined), ...pid, ...official, ...reason }) : s;
     case 'RED':
-      return a.side ? push(s, { minute, half: evHalf, type: 'red', side: a.side, playerName: name ?? (a.payload?.officialName as string | undefined), secondYellow: a.payload?.secondYellow as boolean | undefined, ...pid, ...official }) : s;
+      return a.side ? push(s, { minute, half: evHalf, type: 'red', side: a.side, playerName: name ?? (a.payload?.officialName as string | undefined), secondYellow: a.payload?.secondYellow as boolean | undefined, ...pid, ...official, ...reason }) : s;
     case 'SUSPEND': {
       // SD-29: a sin-bin — the player is off (his side a player down) for the
       // minutes, then back automatically (derived by src/sports/onField.ts).

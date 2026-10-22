@@ -16,7 +16,10 @@ import type { Player } from '../core/types';
 import type { LiveEvent } from './liveEvents';
 import type { ScoreAction } from './types';
 import { pointRows, correctionActions, defaultCredits, type EditRow, type PointCredits, type PointInput, type PointKind } from './rallyEdit';
-import { DETAIL_HOWS, STROKES, howDef, pdText, type DetailSport, type How, type PointDetail } from './pointDetail';
+import {
+  DETAIL_HOWS, RACKET_SHOTS, SHOTS, SHOT_LABEL, STROKES, WINGS, WING_LABEL, errTypeOf, howDef, pdText, shotOf, strokeOf,
+  type DetailSport, type How, type PointDetail, type Shot, type Wing,
+} from './pointDetail';
 import { RowAction, confirmRemove } from './TimelineControls';
 
 /** One choosable point type in the editor. `credited: false` = nobody on the
@@ -132,8 +135,15 @@ export function RallyPointEditor({
       playerName: credited ? draft.playerName : undefined, playerId: credited ? draft.playerId : undefined,
       ...(draft.pd ? { pd: draft.pd } : {}),
     };
-    // SD-107 — an edited point keeps its 1st / 2nd serve (it was served the same way)
-    if (draft.mode === 'edit' && list[draft.index]?.serve) item.serve = list[draft.index].serve;
+    // SD-107 — an edited point keeps its 1st / 2nd serve (it was served the same way);
+    // SD-157 — and who came to the net, the rally length and the serve speed
+    const was = draft.mode === 'edit' ? list[draft.index] : undefined;
+    if (was?.serve) item.serve = was.serve;
+    if (was && draft.kind !== 'df') {
+      if (was.atNet) item.atNet = was.atNet;
+      if (was.rallyLen) item.rallyLen = was.rallyLen;
+      if (typeof was.kmh === 'number') item.kmh = was.kmh;
+    }
     if (draft.mode === 'edit') {
       commit(list.map((p, i) => (i === draft.index ? item : p)));
     } else {
@@ -228,6 +238,52 @@ export function RallyPointEditor({
                         ))}
                       </View>
                     )}
+                    {/* SD-157 — tennis: forehand / backhand + shot (an older stroke id is normalised) */}
+                    {sel?.wingShot && pd && detailSport === 'tennis' && (() => {
+                      const cur = strokeOf(pd);
+                      const set = (wing?: Wing, shot?: Shot) => {
+                        const { stroke: _legacy, wing: _w, shot: _s, ...rest } = pd;
+                        setPd({ ...rest, ...(wing ? { wing } : {}), ...(shot ? { shot } : {}) });
+                      };
+                      return (
+                        <>
+                          <View style={st.chips}>
+                            {WINGS.map((w) => (
+                              <SelectChip key={w} label={WING_LABEL[w]} active={cur.wing === w} onPress={() => set(cur.wing === w ? undefined : w, cur.shot)} />
+                            ))}
+                          </View>
+                          <View style={st.chips}>
+                            {SHOTS.map((k) => (
+                              <SelectChip key={k} label={SHOT_LABEL[k].chip} active={cur.shot === k} onPress={() => set(cur.wing, cur.shot === k ? undefined : k)} />
+                            ))}
+                          </View>
+                        </>
+                      );
+                    })()}
+                    {/* deep wave — the other racket sports: forehand / backhand + the
+                        sport's shot (an older winner id is normalised; an error's type is kept) */}
+                    {sel?.wingShot && pd && detailSport !== 'tennis' && (() => {
+                      const cur = shotOf(detailSport, pd);
+                      const et = errTypeOf(detailSport, pd);
+                      const set = (wing?: Wing, shot?: string) => {
+                        const { stroke: _legacy, wing: _w, shot: _s, ...rest } = pd;
+                        setPd({ ...rest, ...(et ? { stroke: et } : {}), ...(wing ? { wing } : {}), ...(shot ? { shot } : {}) } as PointDetail);
+                      };
+                      return (
+                        <>
+                          <View style={st.chips}>
+                            {WINGS.map((w) => (
+                              <SelectChip key={w} label={WING_LABEL[w]} active={cur.wing === w} onPress={() => set(cur.wing === w ? undefined : w, cur.shot)} />
+                            ))}
+                          </View>
+                          <View style={st.chips}>
+                            {RACKET_SHOTS[detailSport].map((k) => (
+                              <SelectChip key={k.id} label={k.chip} active={cur.shot === k.id} onPress={() => set(cur.wing, cur.shot === k.id ? undefined : k.id)} />
+                            ))}
+                          </View>
+                        </>
+                      );
+                    })()}
                     {sel?.credit === 'loser' && pd && loser.length >= 2 && (
                       <View style={st.chips}>
                         {loser.map((p) => (
@@ -261,7 +317,7 @@ export function RallyPointEditor({
                   <Text style={st.rowLabel} numberOfLines={1}>
                     {p.df
                       ? `⚠️ Double fault${p.df.playerName ? ` by ${p.df.playerName}` : ''} → point ${side === 'home' ? homeName : awayName}`
-                      : `${ROW_ICON[p.kind] ?? pointIcon} ${side === 'home' ? homeName : awayName}${rally ? ` won rally · ${e.label}` : e.playerName ? ` · ${e.playerName}` : e.kind === 'opperror' || e.kind === 'serveerror' ? ` · ${e.label}` : ''}${p.pd ? ` · ${pdText(p.pd, false)}` : ''}`}
+                      : `${ROW_ICON[p.kind] ?? pointIcon} ${side === 'home' ? homeName : awayName}${rally ? ` won rally · ${e.label}` : e.playerName ? ` · ${e.playerName}` : e.kind === 'opperror' || e.kind === 'serveerror' ? ` · ${e.label}` : ''}${p.pd ? ` · ${pdText(p.pd, false, detailSport)}` : ''}`}
                   </Text>
                   {!draft && (
                     // SD-114: ≥44pt targets, spaced; ✕ asks first

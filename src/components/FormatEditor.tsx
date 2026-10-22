@@ -128,14 +128,17 @@ export function SportFormatEditor({
         </View>
       )}
 
-      {rest.map((field) =>
+      {rest.map((field, i) =>
         field.advanced && !revealAdvanced ? null : (
-          <FormatFieldEditor
-            key={field.key}
-            field={field}
-            value={value[field.key] ?? field.default}
-            onChange={(v) => onChange(field.key, v)}
-          />
+          <React.Fragment key={field.key}>
+            {/* deep wave: a heading over toggles that share a group (event sports' "Stats to track") */}
+            {field.group && field.group !== rest[i - 1]?.group ? <Text style={fe.group}>{field.group}</Text> : null}
+            <FormatFieldEditor
+              field={field}
+              value={value[field.key] ?? field.default}
+              onChange={(v) => onChange(field.key, v)}
+            />
+          </React.Fragment>
         )
       )}
 
@@ -155,4 +158,5 @@ const fe = StyleSheet.create({
     borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.colors.border, padding: theme.spacing(3),
   },
   customize: { color: theme.colors.primary, fontSize: theme.font.small, fontWeight: '800' },
+  group: { color: theme.colors.textMuted, fontSize: theme.font.small, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: theme.spacing(1) },
 });

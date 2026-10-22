@@ -5,7 +5,7 @@ category: Live scoring
 audience: Scorers, Organisers
 sports: baseball
 order: 53
-updated: 2026-10-12
+updated: 2026-10-22
 ---
 
 Score a baseball or softball game on one phone. Tap each pitch; when the ball is put in play, pick what happened from a short list. The app keeps the count, outs, bases and line score, and builds every batter's and pitcher's stats.
@@ -22,7 +22,7 @@ Score a baseball or softball game on one phone. Tap each pitch; when the ball is
 4. The first pitch locks the line-ups. After that, changes are substitutions.
 
 ## Step by step: score each pitch
-1. Tap **Ball**, **Strike** (called), **Swinging** or **Foul**. The count shows as dots next to the diamond. A foul with two strikes doesn't add a strike.
+1. Tap **Ball**, **Strike** (called), **Swinging** or **Foul**. A foul with two strikes doesn't add a strike.
 2. Ball four is a walk and strike three a strikeout; the next batter comes up by himself. Tap **HBP** for a hit batter.
 3. When the ball is put in play, tap **In play** and pick the outcome: **Single**, **Double**, **Triple**, **Home run**, **Groundout**, **Fly / pop out**, **Lineout**, **Double play**, **Sac fly**, **Sac bunt**, **Fielder's choice** or **Error**.
 4. With nobody on base, that tap is the whole play. With runners on, each runner and the batter is shown with the usual advance already picked (on a single, everyone moves up one base). Change any of them to **Out**, a base or **Score**, check the **RBI**, then tap **✓ Confirm**.
@@ -34,6 +34,11 @@ Score a baseball or softball game on one phone. Tap each pitch; when the ball is
 1. Tap **Runners** for a steal, caught stealing, wild pitch, passed ball, balk, pick-off or other advance. A steal asks which runner; a wild pitch, passed ball or balk moves every runner up one.
 2. Tap **Subs** for a pinch hitter, pinch runner, pitching change or defensive change. A run scored by a pinch runner still counts against the pitcher who let the original runner on.
 3. Tap **More** for an **Intentional walk** or an **Ejection**.
+
+## Stats to track
+Both are off by default. Switch them on in the match settings or the match format.
+- **Pitch types**: a chip row over the pitch pad (FB, SL, CH … or Rise, Drop … in softball). Tap the type, then the pitch. It counts for that pitch only.
+- **Where the ball went (spray)**: an optional **Where?** row (LF, CF, RF, SS …) in the in-play sheet. Tap a zone before the outcome, or skip it.
 
 ## How the game ends
 Three outs end the half-inning; you never end one. The game ends by itself:
@@ -51,8 +56,8 @@ If time runs out or the weather stops play, tap **🏁 Call game (time / weather
 
 ## What you get
 - The line score (runs per inning, hits, errors) with the diamond, count and outs.
-- **Score** tab: play-by-play, a batting box (AB, R, H, RBI, BB, SO, AVG) and a pitching box (IP, H, R, ER, BB, SO, pitches, ERA, with W, L and SV).
-- Player profiles: AVG, OBP, SLG, OPS, home runs, RBI and steals; for pitchers W-L, IP, ERA, WHIP and strikeouts. ERA uses each format's innings (7 in softball, 9 in baseball).
+- **Score** tab: **Play-by-play** by half-inning with the running score; **Match stats** by inning (with runners in scoring position, left on base, pitches–strikes, first-pitch strikes, ground outs–fly outs, double plays, and pitch mix and spray when tracked); **Box score** (batting and pitching, W, L, SV and box notes); **Key moments**.
+- Player profiles: AVG, OBP, SLG, OPS, AVG with runners in scoring position, two-out RBI, home runs and steals; for pitchers W-L, IP, ERA, WHIP, strikeouts, strike % and first-pitch strike %. ERA uses each format's innings (7 in softball, 9 in baseball).
 - Tournament tables use **WBSC (win %, TQB)**: winning percentage, then head-to-head, team quality balance (runs per inning scored minus allowed, between the tied teams), earned-run TQB and batting average. Or pick **Win % · run difference**. See [Points table and adjustments](/guides/points-table-and-adjustments/).
 - Tournament Records: no-hitters, perfect games, hitting for the cycle, grand slams and the most strikeouts in a game.
 

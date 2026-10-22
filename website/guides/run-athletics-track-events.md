@@ -5,7 +5,7 @@ category: Tournaments
 audience: Organisers, Scorers, Players, Parents & fans
 sports: athletics
 order: 85
-updated: 2026-10-11
+updated: 2026-10-22
 ---
 
 Each race is an event (say 100 m U14 Boys), run as heats and a final that adds points to the house table. You enter times on a phone; the app ranks heats, seeds the final and keeps records and personal bests. For jumps and throws, see [Run athletics field events](/guides/run-athletics-field-events/). For cross-country, road races and race walks, see [Run a cross-country, road race or race walk](/guides/run-a-cross-country-or-road-race/). Combined events: [decathlon, heptathlon, pentathlon](/guides/run-a-combined-event/).
@@ -57,3 +57,5 @@ Each event has a usual range. A time outside it, such as an 800 m typed as 2153 
 ## What everyone sees
 - **House table** (Athletics page and **Stats** tab; tied places share points), **🏆 Champions by category**, **Best by event**, **Best athletes (points)** (individual finals only) and **Meet records**. When a school hosts, **School records** show its earlier meets' best marks and its [record board](/guides/school-record-board/).
 - **Athlete profiles:** every result, medals, and a PB and SB per event.
+
+> **Tip:** Want lap times, relay leg times or reaction times? Switch them on under **⚙ Points & timing** → **Stats to track**, and see the live commentary and race analysis: [Track deeper race stats and follow the commentary](/guides/race-stats-and-live-commentary/).

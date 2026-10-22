@@ -18,6 +18,7 @@
  */
 import { trackField, timeLeft, type FieldEvent, type FieldLog, type FieldResult, type Who } from '../onField.ts';
 import { eventCredits, keeperAt, matchSec, LIVE_KEYS, SUSPENSION_MINUTES, type HandballEvent, type HandballState, type Side } from './engine.ts';
+import { FIELD_SHOT_TYPES, KEEPER_CONCEDED_KEY, KEEPER_SAVE_KEY, handballDerivedCredits, sevenMDrawnTracked } from './depth.ts';
 
 const stamped = (s: HandballState, side: Side): boolean => !!s.xi?.[side]?.players?.length;
 /** an official's pseudo-person on the field log (never a player) */
@@ -88,8 +89,9 @@ export function unavailable(s: HandballState, nowMs: number): { home: Set<string
 }
 
 /** Keeper spells per side on the game clock: goals and 7-m goals conceded. */
-function keeperSpells(s: HandballState): Map<string, { side: Side; id?: string; name?: string; secs: number; conceded: number; conceded7: number }> {
-  const out = new Map<string, { side: Side; id?: string; name?: string; secs: number; conceded: number; conceded7: number }>();
+type Spell = { side: Side; id?: string; name?: string; secs: number; conceded: number; conceded7: number; byType: Record<string, number> };
+function keeperSpells(s: HandballState): Map<string, Spell> {
+  const out = new Map<string, Spell>();
   const end = matchSec(s);
   for (const side of ['home', 'away'] as const) {
     if (!s.xi?.[side]?.gk) continue;
@@ -100,7 +102,7 @@ function keeperSpells(s: HandballState): Map<string, { side: Side; id?: string; 
       const k = key(cur);
       if (!k) return undefined;
       let r = out.get(k);
-      if (!r) { r = { side, ...(cur?.id ? { id: cur.id } : {}), ...(cur?.name ? { name: cur.name } : {}), secs: 0, conceded: 0, conceded7: 0 }; out.set(k, r); }
+      if (!r) { r = { side, ...(cur?.id ? { id: cur.id } : {}), ...(cur?.name ? { name: cur.name } : {}), secs: 0, conceded: 0, conceded7: 0, byType: {} }; out.set(k, r); }
       return r;
     };
     const close = (at: number) => { const r = get(); if (r) r.secs += Math.max(0, at - since); };
@@ -108,10 +110,16 @@ function keeperSpells(s: HandballState): Map<string, { side: Side; id?: string; 
       const e = s.events[i];
       if (e.type === 'goal' && e.side !== side) {
         const r = get();
-        if (r) { r.conceded += 1; if (e.shotType === 'sevenM') r.conceded7 += 1; }
+        if (r) {
+          r.conceded += 1;
+          if (e.shotType === 'sevenM') r.conceded7 += 1;
+          const t = e.shotType ?? 'nineM';
+          r.byType[t] = (r.byType[t] ?? 0) + 1;
+        }
         continue;
       }
-      if (e.side !== side || (e.type !== 'gk' && e.type !== 'sub')) continue;
+      // deep wave: an empty goal (or a keeper back) changes who is in goal too
+      if (e.side !== side || (e.type !== 'gk' && e.type !== 'sub' && e.type !== 'empty')) continue;
       const next = keeperAt(s, side, i + 1);
       if (key(next) !== key(cur)) { close(e.sec); cur = next; since = e.sec; }
     }
@@ -142,18 +150,41 @@ export function handballTotals(s: HandballState): Record<string, { side: Side; s
     if (!p.played || !p.id || !stamped(s, p.side)) continue;
     line(p.id, p.side).stats.minutes = Math.round(p.minutes);
   }
+  // deep wave: the IHF keeper line by position — saves (his save events by the
+  // attempt's type) and goals let in from 6 m / 9 m / wing / breakthrough /
+  // fast break, written for every keeper with a spell (0 included)
+  const savesBy = new Map<string, Record<string, number>>();
+  for (const e of s.events) {
+    if (e.type !== 'save' || !e.playerId) continue;
+    const m = savesBy.get(e.playerId) ?? {};
+    const t = e.shotType ?? 'nineM';
+    m[t] = (m[t] ?? 0) + 1;
+    savesBy.set(e.playerId, m);
+  }
   for (const k of keeperSpells(s).values()) {
     if (!k.id) continue;
     const l = line(k.id, k.side).stats;
-    l.goalsConceded = k.conceded;
-    l.sevenMConceded = k.conceded7;
+    l.goalsConceded = (l.goalsConceded ?? 0) + k.conceded;
+    l.sevenMConceded = (l.sevenMConceded ?? 0) + k.conceded7;
+    for (const t of FIELD_SHOT_TYPES) {
+      l[KEEPER_SAVE_KEY[t]] = savesBy.get(k.id)?.[t] ?? 0;
+      l[KEEPER_CONCEDED_KEY[t]] = (l[KEEPER_CONCEDED_KEY[t]] ?? 0) + (k.byType[t] ?? 0);
+    }
   }
+  // deep wave: goals into an empty goal; shoot-out keepers' saves
+  for (const [id, d] of Object.entries(handballDerivedCredits(s))) add(id, d.side, d.stats);
+  const drawn = sevenMDrawnTracked(s);
   for (const l of Object.values(out)) {
     for (const k of ['goals', 'shots', 'assists', 'yellowCards', 'twoMinutes', 'redCards'] as const) l.stats[k] ??= 0;
+    if (drawn) l.stats.sevenMDrawn ??= 0;
   }
   return out;
 }
 
 /** The keys statTotals owns that no live action credits (contract rule 5). */
-export const DERIVED_KEYS = ['minutes', 'suspensionMinutes', 'goalsConceded', 'sevenMConceded'] as const;
+export const DERIVED_KEYS = [
+  'minutes', 'suspensionMinutes', 'goalsConceded', 'sevenMConceded',
+  // deep wave
+  ...FIELD_SHOT_TYPES.flatMap((t) => [KEEPER_SAVE_KEY[t], KEEPER_CONCEDED_KEY[t]]), 'emptyGoalGoals', 'soSaves',
+] as const;
 export const OWNED_LIVE_KEYS = LIVE_KEYS;

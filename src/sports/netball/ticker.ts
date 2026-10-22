@@ -38,5 +38,6 @@ export function netballTickerFlash(prev: NetballState, next: NetballState): Tick
   const last: NetballEvent | undefined = next.events[next.events.length - 1];
   if (!last || last.type !== 'goal' || !last.side || prev.events.some((e) => e.id === last.id)) return null;
   const who = shortName(last.playerName);
-  return { kind: 'goal', text: `GOAL!${who ? ` ${who}` : ''}${last.pos ? ` (${last.pos})` : ''}`, sub: `${next.home}–${next.away}`, side: last.side };
+  // deep wave: a 2-point super shot flashes as one
+  return { kind: 'goal', text: `${last.points === 2 ? 'SUPER SHOT!' : 'GOAL!'}${who ? ` ${who}` : ''}${last.pos ? ` (${last.pos})` : ''}`, sub: `${next.home}–${next.away}`, side: last.side };
 }

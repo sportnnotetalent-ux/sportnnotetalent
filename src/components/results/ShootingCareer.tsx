@@ -41,6 +41,10 @@ export function ShootingCareer({ lines }: { lines: StatLine[] }) {
         <Text style={st.medals}>{c.golds} 🥇  {c.silvers} 🥈  {c.bronzes} 🥉{c.points ? `  ·  ${c.points} points` : ''}</Text>
       )}
 
+      {/* deep wave: only what was recorded — the average final shot (finals that kept their shot count), perfect series, penalties */}
+      {c.finalAvg != null || c.perfect > 0 || c.penalties > 0 ? (
+        <Text style={textStyles.muted}>{[c.finalAvg != null ? `Average final shot ${c.finalAvg.toFixed(2)} (${c.finalShots} shots)` : '', c.perfect ? `${c.perfect} perfect series` : '', c.penalties ? `${c.penalties} penalty points` : ''].filter(Boolean).join(' · ')}</Text>
+      ) : null}
       {/* SD-137b: team events (archery / shooting teams, team pursuit / sprint) */}
       {teamCareerText(c.team) ? <Text style={textStyles.muted}>{teamCareerText(c.team)}</Text> : null}
       <Text style={st.section}>Personal bests</Text>
@@ -56,7 +60,7 @@ export function ShootingCareer({ lines }: { lines: StatLine[] }) {
               <View style={st.bestRow}>
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text style={textStyles.body} numberOfLines={1}>{b.label}</Text>
-                  <Text style={textStyles.muted} numberOfLines={1}>{[b.avgText ? `avg ${b.avgText}` : '', b.pb.date ? formatDay(b.pb.date) : ''].filter(Boolean).join(' · ')}</Text>
+                  <Text style={textStyles.muted} numberOfLines={1}>{[b.avgText ? `avg ${b.avgText}` : '', b.bestSeriesText ? `best series ${b.bestSeriesText}` : '', b.pb.date ? formatDay(b.pb.date) : ''].filter(Boolean).join(' · ')}</Text>
                 </View>
                 <Text style={[st.mark, st.col]}>{b.pb.text}</Text>
                 <Text style={[st.markSb, st.col]}>{b.sb?.text ?? '–'}</Text>

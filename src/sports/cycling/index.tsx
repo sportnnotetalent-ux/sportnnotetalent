@@ -48,5 +48,7 @@ export const cyclingPlugin: SportPlugin<CyclingMatchState> = {
       ],
     },
     { key: 'handTimed', label: 'Hand timing', type: 'toggle', default: false, onCreate: true, hint: 'stopwatches, no transponders / photo finish: hand times count for the meet’s records' },
+    // deep wave (timed races): "Stats to track" — optional depth the meet switches on
+    { key: 'cycSplits', label: 'Intermediate times', type: 'toggle', default: false, advanced: true, group: 'Stats to track', hint: 'pursuit every 1000 m, kilo / 500 m every lap, team sprint each rider’s lap, a road time trial’s halfway time check' },
   ],
 };

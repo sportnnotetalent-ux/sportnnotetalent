@@ -8,17 +8,21 @@
  */
 import type { Player } from '../../core/types';
 import type { BoxRowInput, BoxSideInput, MatchBoxSource } from '../boxScore.ts';
-import { eventCredits, periodName, teamFigures, totalPeriods, LIVE_KEYS, type IceHockeyState, type Side } from './engine.ts';
+import { eventCredits, periodName, tallyTracked, teamFigures, totalPeriods, FLAG_KEYS, LIVE_KEYS, TALLY_KEYS, TRACK_FLAGS, type IceHockeyState, type Side } from './engine.ts';
 import { iceHockeyTotals } from './totals.ts';
 
 export interface IceHockeyBoxContext { homeRoster?: Player[]; awayRoster?: Player[] }
 
-const ROW_KEYS = ['goals', 'assists', 'points', 'shotsOnGoal', 'penaltyMinutes'] as const;
+const BASE_KEYS = ['goals', 'assists', 'points', 'shotsOnGoal', 'penaltyMinutes'] as const;
 const TEAM_KEYS = ['goals', 'shotsOnGoal', 'penaltyMinutes'] as const;
+/** keys a box row may carry: the live keys and the optional tallies */
+const CREDIT_KEYS = new Set<string>([...LIVE_KEYS, ...TALLY_KEYS]);
 
 export function iceHockeyBox(s: IceHockeyState, ctx: IceHockeyBoxContext = {}): MatchBoxSource {
   const n = Math.min(totalPeriods(s), Math.max(1, s.period));
   const periods = n >= 2 ? Array.from({ length: n }, (_, i) => ({ value: i + 1, label: periodName(s, i + 1) })) : [];
+  // deep wave: a tracked tally's keys read 0 on every row (an untracked one is absent: no column)
+  const ROW_KEYS: string[] = [...BASE_KEYS, ...TRACK_FLAGS.filter((f) => tallyTracked(s, f)).flatMap((f) => FLAG_KEYS[f])];
   return {
     periods,
     emptyText: 'No players yet.',
@@ -48,7 +52,7 @@ export function iceHockeyBox(s: IceHockeyState, ctx: IceHockeyBoxContext = {}): 
             if (!cr || (cr.side ?? e.side) !== sd) continue;
             const r = row(cr.playerId, cr.playerName);
             if (!r) continue;
-            for (const [k, v] of Object.entries(cr.stats)) if ((LIVE_KEYS as readonly string[]).includes(k)) r.stats[k] = (r.stats[k] ?? 0) + v;
+            for (const [k, v] of Object.entries(cr.stats)) if (CREDIT_KEYS.has(k)) r.stats[k] = (r.stats[k] ?? 0) + v;
           }
         }
         if (scope === 'all') {

@@ -19,7 +19,6 @@ import { playerLink, idByName } from '../playerLink';
 import { Button, SelectChip, TextField, textStyles } from '../../components/ui';
 import { askConfirm, confirmMatchAction } from '../../components/ConfirmSheet';
 import { RankBadge, podiumColor } from '../../components/Rank';
-import { LiveTimeline } from '../LiveTimeline';
 import { resolvePotm, type ResolvedPotm } from '../../data/ratings';
 import type { Player } from '../../core/types';
 import type { ScoreAction, SportPlugin, QuickOptionsProps } from '../types';
@@ -45,6 +44,12 @@ import {
 import type { CricketState, DismissalKind, Innings, RunsAs, FieldNoteKind } from './engine';
 import { OverEditor } from './OverEditor';
 import { cricketTickerDetail, cricketTickerFlash } from './ticker';
+// Deep wave — commentary, match stats, optional ball detail
+import { CricketCommentary } from './CommentaryView';
+import { CricketMatchStats } from './MatchStatsView';
+import { BallDetailPanel, BowlTypeChips, detailTarget, profileLeftArm } from './BallDetailPanel';
+import { bowlTypeFromProfile } from './detail';
+import { inningsTop } from './matchStats';
 import {
   LOCAL_RULE_FIELDS, CRICKET_LIVE_SETTINGS, rulesOf, effectiveRules, inStandardWindow, isStandard,
   rulesChip, STANDARD_RULES,
@@ -688,10 +693,18 @@ function MoreRunsPanel({
   );
 }
 
+/** Deep wave — the ball actions this device stamps with its clock (`payload.at`,
+ *  ms): the commentary's times and minutes at the crease come from it. The
+ *  reducer ignores the key, so the score never depends on it. */
+const STAMPED = new Set(['RUNS', 'BYES', 'LEGBYES', 'WICKET', 'EXTRA', 'PENALTY', 'ADJUST']);
+const stampBall = (a: ScoreAction): ScoreAction =>
+  (STAMPED.has(a.type) && a.payload?.at == null ? { ...a, payload: { ...a.payload, at: Date.now() } } : a);
+
 const ScoringControls: SportPlugin<CricketState>['ScoringControls'] = ({
-  state: rootState, dispatch, homeName, awayName, homeColor, awayColor, homeRoster = [], awayRoster = [], homeKeeperId, awayKeeperId,
+  state: rootState, dispatch: dispatchRaw, homeName, awayName, homeColor, awayColor, homeRoster = [], awayRoster = [], homeKeeperId, awayKeeperId,
   knockout, onEndMatch,
 }) => {
+  const dispatch = (a: ScoreAction) => dispatchRaw(stampBall(a));
   const [wf, setWf] = useState<{
     kind?: DismissalKind; fielder?: Player; batterOut?: 'striker' | 'nonstriker'; runs?: number;
     /** the extra this wicket fell on (from the extras pad, or the Off a wide / no-ball toggle) */
@@ -729,6 +742,8 @@ const ScoringControls: SportPlugin<CricketState>['ScoringControls'] = ({
   // SD-133 (CK-11) — wagon wheel: left-hander overrides (this session) and the ball whose panel was skipped.
   const [lhOverride, setLhOverride] = useState<Record<string, boolean>>({});
   const [shotSkip, setShotSkip] = useState<string | null>(null);
+  // Deep wave — the ball whose optional detail panel was closed.
+  const [detailSkip, setDetailSkip] = useState<string | null>(null);
 
   // While a Super Over is live, ALL the live-scoring UI below operates on the
   // nested mini-match; dispatched actions are routed there by the reducer. The
@@ -1166,6 +1181,22 @@ const ScoringControls: SportPlugin<CricketState>['ScoringControls'] = ({
       </View>
     );
   })() : null;
+  // Deep wave — the optional ball detail ("Stats to track") for the LAST
+  // delivery: length / line, a false shot, the speed, where a catch was taken.
+  // Offered only for what was being tracked when that ball was bowled (its
+  // `trk`), below the pad so the pad never moves; gone with the next ball.
+  const dTarget = !soActive ? detailTarget(state) : null;
+  const dOk = dTarget && ((dTarget.rec.inn === state.innings && dTarget.rec.side === state.battingSide) || (state.innings === 2 && dTarget.rec.inn === 1 && cur.balls === 0));
+  const dCatch = !!(dTarget && rules.wagonWheel && dTarget.rec.out?.kind === 'caught');
+  const dKey = dTarget ? `${dTarget.rec.inn}:${dTarget.rec.side}:${dTarget.d}` : '';
+  const dTrk = dTarget?.rec.trk ?? {};
+  const dHas = !!(dTrk.pitch || dTrk.speed || (dTrk.ctrl && dTarget?.rec.ext !== 'wd') || dCatch);
+  const detailPanel = dOk && dTarget && dHas && detailSkip !== dKey ? (() => {
+    const sid = dTarget.rec.strikerId;
+    const bp = sid ? battingRoster.find((p) => p.id === sid) : undefined;
+    const lh = sid ? (lhOverride[sid] ?? bp?.sportDetails?.cricket?.sides?.bat === 'Left-handed') : false;
+    return <BallDetailPanel state={state} target={dTarget} dispatch={dispatch} lh={lh} catchSpot={dCatch} onDone={() => setDetailSkip(dKey)} />;
+  })() : null;
   const pp = inPowerplay(state);
 
   // Over-complete flow: the reducer clears the bowler after the 6th legal ball, so
@@ -1278,7 +1309,9 @@ const ScoringControls: SportPlugin<CricketState>['ScoringControls'] = ({
         // Pickable now: ok, or held back only by the quota while "Allow anyway" is on.
         const pickable = (c: { ok: boolean; reason?: string }) => c.ok || (forceQuota && c.reason === 'quota');
         const pick = (p: Player, c: { ok: boolean; reason?: string }, reason?: 'injury' | 'suspended' | 'other') => {
-          dispatch({ type: 'SET_BOWLER', payload: { id: p.id, name: p.fullName, v: 2, ...(reason ? { reason } : {}), ...(!c.ok && c.reason === 'quota' ? { force: true } : {}) } });
+          // Deep wave — the bowler's type rides along free when the profile has it.
+          const btype = !state.bowlTypes?.[p.id] ? bowlTypeFromProfile(p.sportDetails?.cricket?.sides) : null;
+          dispatch({ type: 'SET_BOWLER', payload: { id: p.id, name: p.fullName, v: 2, ...(reason ? { reason } : {}), ...(!c.ok && c.reason === 'quota' ? { force: true } : {}), ...(btype ? { btype } : {}) } });
           setForceQuota(false);
           setBowlRepl(null);
           setShowBowlers(false);
@@ -1306,6 +1339,11 @@ const ScoringControls: SportPlugin<CricketState>['ScoringControls'] = ({
                 accessibilityLabel={locked ? 'Replace the bowler mid-over' : 'Change the bowler'}
                 onPress={() => (locked ? setBowlRepl('injury') : setShowBowlers(true))} />
             </View>
+            {/* Deep wave — bowler type (pace / spin), one optional tap per bowler */}
+            {rules.bowlerType && bowlerId ? (
+              <BowlTypeChips id={bowlerId} name={bowlerName ?? 'Bowler'} current={(rootState.bowlTypes ?? state.bowlTypes)?.[bowlerId]}
+                profileLeft={profileLeftArm(bowlingRoster.find((p) => p.id === bowlerId))} dispatch={dispatch} />
+            ) : null}
             </View>
           );
         }
@@ -1503,6 +1541,7 @@ const ScoringControls: SportPlugin<CricketState>['ScoringControls'] = ({
       </View>
 
       {shotPanel}
+      {detailPanel}
 
       {/* Parity #20 — penalty to either side, bonus / minus runs, fielding notes.
           Concussion / Impact subs live in Quick options (SD-113 A1). */}
@@ -1663,6 +1702,55 @@ function cricketAutoPotm(s: CricketState, players: PlayerRating[], mvp?: PlayerR
   return resolvePotm(undefined, legacy, mvp);
 }
 
+/** Deep wave — the Cricinfo-style match summary card: each innings' total
+ *  with its top 3 batters and the opposition's top 3 bowlers. */
+function InningsSummary({ s, homeName, awayName, homeColor, awayColor, onPlayer }: {
+  s: CricketState; homeName: string; awayName: string; homeColor: string; awayColor: string; onPlayer?: (id: string) => void;
+}) {
+  const mask = useMask();
+  // who batted first: the toss's choice, else whoever is batting now in innings 1 / batted before the chase
+  const flip = (sd: 'home' | 'away'): 'home' | 'away' => (sd === 'home' ? 'away' : 'home');
+  const first: 'home' | 'away' = s.toss ? (s.toss.decision === 'bat' ? s.toss.winner : flip(s.toss.winner)) : s.innings === 1 ? s.battingSide : flip(s.battingSide);
+  const sides = ([first, flip(first)] as const).filter((sd) => s.scores[sd].balls > 0 || s.scores[sd].runs > 0 || Object.values(s.batting).some((c) => c.side === sd));
+  if (!sides.length) return null;
+  return (
+    <View style={ctrl.card} accessibilityLabel="Match summary by innings">
+      {sides.map((sd, i) => {
+        const t = inningsTop(s, sd);
+        const name = sd === 'home' ? homeName : awayName;
+        const color = sd === 'home' ? homeColor : awayColor;
+        return (
+          <View key={sd} style={[{ gap: theme.spacing(1) }, i > 0 && sum.divider]}>
+            <View style={ctrl.innHead}>
+              <View style={[ctrl.teamDot, { backgroundColor: color }]} />
+              <Text style={[ctrl.innName, { flex: 1 }]} numberOfLines={1}>{name}</Text>
+              <Text style={ctrl.innScore}>{t.total}</Text>
+            </View>
+            <View style={sum.row}>
+              <View style={[sum.half, { gap: 2 }]}>
+                {t.bat.map((b) => (
+                  <View key={b.id} style={ctrl.trow}>
+                    <Text style={[ctrl.meta, { flex: 1 }]} numberOfLines={1} {...playerLink(b.id, mask.byId(b.id, b.name), onPlayer)}>{mask.byId(b.id, b.name)}</Text>
+                    <Text style={ctrl.label}>{b.line}</Text>
+                  </View>
+                ))}
+              </View>
+              <View style={[sum.half, { gap: 2 }]}>
+                {t.bowl.map((b) => (
+                  <View key={b.id} style={ctrl.trow}>
+                    <Text style={[ctrl.meta, { flex: 1 }]} numberOfLines={1} {...playerLink(b.id, mask.byId(b.id, b.name), onPlayer)}>{mask.byId(b.id, b.name)}</Text>
+                    <Text style={ctrl.label}>{b.line}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
 const CricketSummary: NonNullable<SportPlugin<CricketState>['Summary']> = ({ state, homeName, awayName, homeColor = theme.colors.home, awayColor = theme.colors.away, onPlayer, manualResultLine, potm }) => {
   const s = state as CricketState;
   const mask = useMask();
@@ -1820,6 +1908,7 @@ const CricketSummary: NonNullable<SportPlugin<CricketState>['Summary']> = ({ sta
           )}
         </View>
 
+        <InningsSummary s={s} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} onPlayer={onPlayer} />
         <Text style={ctrl.label}>Standouts so far</Text>
         {mvp && <Award icon="🔥" label="Top performer" p={mvp} detail={mvpDetail(mvp)} />}
         <View style={sum.row}>
@@ -1859,6 +1948,7 @@ const CricketSummary: NonNullable<SportPlugin<CricketState>['Summary']> = ({ sta
           : <Text style={sum.drawn}>{resultTail}</Text>}
       </View>
 
+      <InningsSummary s={s} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} onPlayer={onPlayer} />
       <PotmCard />
       <View style={sum.row}>
         <View style={sum.half}>{bestBat && <Award icon="🏏" label="Best bat" p={bestBat} detail={batLine(bestBat)} />}</View>
@@ -2142,11 +2232,16 @@ function BallChip({ sym }: { sym: string }) {
   );
 }
 
-const LiveExtras: NonNullable<SportPlugin<CricketState>['LiveExtras']> = ({ state, homeName, awayName, homeColor, awayColor, homeRoster = [], awayRoster = [], dispatch, canScore, onPlayer }) => {
+const LiveExtras: NonNullable<SportPlugin<CricketState>['LiveExtras']> = ({ state, homeName, awayName, homeColor, awayColor, homeRoster = [], awayRoster = [], onPlayer, view }) => {
   const s = state as CricketState;
   // Default the open innings to whoever is batting (or the chase, post-match).
   const [open, setOpen] = useState<'home' | 'away' | null>(s.battingSide);
   const toggle = (side: 'home' | 'away') => setOpen((o) => (o === side ? null : side));
+  // Deep wave — the Commentary and Stats tabs (CRICKET_VIEWS).
+  if (view === 'commentary') return <CricketCommentary state={s} homeName={homeName} awayName={awayName} />;
+  if (view === 'stats') {
+    return <CricketMatchStats state={s} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} onPlayer={onPlayer} />;
+  }
 
   return (
     <View style={{ gap: theme.spacing(3) }}>
@@ -2178,11 +2273,19 @@ const LiveExtras: NonNullable<SportPlugin<CricketState>['LiveExtras']> = ({ stat
 
       {s.potm ? <Text style={ctrl.potm} {...playerLink(idByName(s.potm, homeRoster, awayRoster), s.potm, onPlayer)}>🏅 Player of the Match: {s.potm}</Text> : null}
 
-      <Text style={ctrl.label}>Ball by ball</Text>
-      <LiveTimeline events={s.events} homeColor={homeColor} awayColor={awayColor} emptyText="No balls bowled yet." />
+      {/* Deep wave — ball-by-ball now lives on the Commentary tab (with the
+          over summaries), the deeper numbers on the Stats tab. */}
+      <Text style={ctrl.meta}>Ball-by-ball commentary and match stats (phases, matchups, worm, Manhattan) are on the Commentary and Stats tabs.</Text>
     </View>
   );
 };
+
+/** Deep wave — cricket's content tabs: Scorecard · Commentary · Stats. */
+const CRICKET_VIEWS = [
+  { key: 'score', label: 'Scorecard' },
+  { key: 'commentary', label: 'Commentary' },
+  { key: 'stats', label: 'Stats' },
+];
 
 /** Quick options (parity #13): 🧤 Change keeper — the fielding side's roster,
  *  † on the current keeper; a tap sends SET_KEEPER (logged once a ball is bowled).
@@ -2351,6 +2454,7 @@ export const cricketPlugin: SportPlugin<CricketState> = {
   ScoringControls,
   LiveClock,
   LiveExtras,
+  liveViews: CRICKET_VIEWS,
   Summary: CricketSummary,
   autoPotm: (st) => { const { players, mvp } = matchRatings(st); const a = cricketAutoPotm(st, players, mvp); return a ? { id: a.id, name: a.name } : undefined; },
   hideScoreboard: true,

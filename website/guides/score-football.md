@@ -5,7 +5,7 @@ category: Live scoring
 audience: Scorers, Organisers
 sports: football
 order: 50
-updated: 2026-10-11
+updated: 2026-10-22
 ---
 
 Score a football match on one phone. The app runs the clock, stamps each moment's minute and keeps the stats.
@@ -23,13 +23,21 @@ Score a football match on one phone. The app runs the clock, stamps each moment'
 5. For a coach or staff card, tap **Card**, the team, then **👔 Team official (coach / staff)**. It is on no player's stats.
 6. For a substitution, tap **Sub — Red House**, the player going off, then the player coming on.
 7. Near the end of each half, tap the added time the fourth official shows (**+1** to **+8**). If the board goes up again, tap **Change**. Then **End 1st Half →**, and later **End Match**.
+8. A goal ruled out (offside, foul, VAR)? Tap **🚫 Goal ruled out**, the team, then the reason. It shows in the commentary; the score doesn't move.
 
 ## How minutes are shown
 Minutes count the FIFA way: 10 minutes 30 seconds in is 11', and added time is 45+2' or 90+3', never 47'. Older matches keep their stamped minutes.
 
-## Team stats and the box score
-- From the second half the scoreboard and the match card show the half-time score, such as "HT 1-0" (after extra time also "FT 2-2").
-- The **Stats** and **Summary** tabs compare the teams ("Not tracked" lists what's switched off). Each box score lists starters (*), then substitutes, with a **Totals** row and a **#** shirt-number column when the squad has numbers. **Show bench** adds unused players.
+## Commentary, team stats and the box score
+- The **Commentary** tab is the live text, half by half and newest first: every moment as a sentence ("Attempt saved. Arjun (Red House) shot from outside the box is saved by Rohan.") with its minute and the score after it. A match summary (scorers, red cards, HT) sits on top; **Key events** keeps goals, cards, subs and penalties.
+- The **Stats** tab groups the team stats like a broadcast match centre: **Top stats**, **Attack**, **Passing**, **Defence**, **Goalkeeping**, **Set pieces**, **Discipline**, for the whole match or one half ("Not tracked" lists what's switched off). Each box score lists starters (*), then substitutes, with a **Totals** row and a **#** column when the squad has numbers.
+
+## Deeper stats (optional)
+Off by default, so scoring stays one tap per moment. Switch any on in **⚙️ Scoring settings → Deeper stats** (organisers: **⚙ Customize this format**):
+- **Shot detail**: **Inside the box**, **Outside the box** and **⭐ Big chance** chips on the shot and goal panels, plus **🥅 Woodwork**. Skipping them costs nothing.
+- **Key passes**: after a shot, tap who set it up, or **Skip**. Profiles add key passes and chances created.
+- **Clearances**, **Goal kicks & throw-ins** and **Card reasons** (a card straight after a foul is "foul").
+A stat you didn't track reads "Not tracked", never 0.
 - An **OG** column appears only in a match with an own goal, on the player's own team. **SO** (shootout kicks scored-taken) and **SOS** (shootout saves) appear after a shootout, with the kick-by-kick list underneath.
 
 ## Player stats at full time

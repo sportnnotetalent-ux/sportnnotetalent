@@ -5,7 +5,7 @@ category: Live scoring
 audience: Scorers, Organisers
 sports: table tennis
 order: 59
-updated: 2026-10-11
+updated: 2026-10-22
 ---
 
 You tap who won each point; the app keeps score and names the next server in doubles.
@@ -44,7 +44,7 @@ A banner above the buttons and under the board says when to change ends:
 - "↔ Change ends · up to 1 min between games" after each game.
 - "↔ Change ends · 5 in the deciding game" when a player first reaches 5 in the last possible game.
 
-The same cues appear as markers in the rally log.
+The same cues appear in the commentary, after the point that triggered them.
 
 ## Reading the board
 GAMES won and a points column per game, with a 🏓 dot by the serving side. The result reads like "3–1 · 11-7, 9-11, 11-5, 11-8".
@@ -52,18 +52,35 @@ GAMES won and a points column per game, with a 🏓 dot by the serving side. The
 A chip under the board shows **GAME POINT** or **MATCH POINT** with the side's name.
 
 ## Match stats
-The **Score** tab's "Match stats" show points won in total, on serve and on receive, streaks, biggest lead and game / match points saved. In doubles serve figures are per player once a serving order was picked, else for the pair.
+The **Score** tab's "Match stats" (per match or game) has tabs:
+- **Key stats**: Serve (aces and service faults when described, points won on serve and on receive), Winners & errors, Points won (total, streaks, biggest lead) and game / match points converted and saved.
+- **Serve**: every serve and receive figure; doubles show each server's line once a serving order was picked, else the pair's.
+- **Shots** (with point detail): winners, unforced or forced errors by shot, for either wing or **Forehand** / **Backhand** only; a stroke summary; errors and service faults by type.
+- **Rally phases** (with rally length tracked): the three-phase analysis coaches use — **serve & 3rd ball** (points ending by the 4th shot on your own serve), **receive & 4th ball** (by the 4th shot on the opponent's serve) and **rally** (5+ shots).
 
-## Point detail (optional)
-Off by default, so a point stays one tap. Turn it on with **On** in the "🔎 Point detail (optional)" row under the buttons.
+A tab or row only shows when the match tracked it.
 
-After each point, "How was it won? · Asha Rao" appears. Tap a chip or **Skip**; nothing is required.
-- **Ace** (server won).
-- **Winner** + **Forehand**, **Backhand**, **Loop**, **Flick**, **Smash**.
-- **Forced error**, or **Unforced error** + **Net**, **Out**.
-- **Service fault** (receiver won).
+## Extra stats (optional)
+Scoring stays one tap per point. To track more, open **⚙️ Scoring settings** and pick under **Stats to track**, or tap **Choose** next to "📊 Extra stats" under the point buttons. All are off by default; an organiser can switch them on for every match of a format under **⚙ Customize this format**. A change during play counts from the next point.
+- **Point detail**: how the point ended.
+- **Rally length**: 1–2 shots (serve, receive), 3–4 (3rd, 4th ball) or 5+ (rally).
+
+After each point a "Last point" card appears. Tap what you know, or **Skip**:
+1. **Ace** (server won), **Winner**, **Forced error**, **Unforced error** or **Service fault** (receiver won).
+2. **Forehand** or **Backhand**.
+3. The shot: **Receive**, **Flick**, **Push**, **Chop**, **Loop**, **Block**, **Smash**, **Lob**.
+4. For an unforced error, **Error:** **Net** or **Out**; for a service fault, **Fault:** **Net**, **Out** or **Illegal**.
+5. With rally length on: the phase the point ended in.
 
 Errors count against the opponent (doubles: pick who under **By:**). The box score adds **W**, **UE**, **FE**.
+
+## Commentary
+Under the stats, "Commentary" tells the match game by game, newest first, the game in play on top:
+- "Asha Rao wins game 2" with the game score, e.g. **11-9**, and where the match stands.
+- Each point: "Point to Asha Rao", the match time and, if you described it, a line like "Meera Iyer loses the point with a Forehand Loop (Topspin) Unforced Error (out)". On the right, the score as the umpire calls it, the server's score first; "Change of service · Meera Iyer to serve" every two points (every point from 10-all).
+- Change of ends, the timeout, cards and who served first in each game.
+
+It updates after every point and after a correction.
 
 ## Fix a mistake
 - Wrong tap just now? The Undo bar names what it removes, e.g. "↶ Undo: point to Asha Rao (7-5)". Each tap undoes one step.

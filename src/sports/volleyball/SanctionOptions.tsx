@@ -15,7 +15,7 @@ import { Tile } from '../../components/QuickOptionsSheet';
 import { askConfirm } from '../../components/ConfirmSheet';
 import type { Player } from '../../core/types';
 import type { QuickOptionsProps } from '../types';
-import type { VolleyballState } from './engine';
+import { stampAction, type VolleyballState } from './engine';
 import {
   VB_MISCONDUCT_REASONS, VB_SANCTIONS, oppSide, sanctionDef, sanctionEffect, sanctionsOf, suggestSanction,
   type VbSanctionLevel, type VbSanctionTrack,
@@ -58,7 +58,7 @@ export function VolleyballQuickOptions({ state, dispatch, homeRoster, awayRoster
         tone: def.effect === 'none' ? 'caution' : 'danger',
       });
       if (!ok) return;
-      dispatch({ type: 'CONDUCT', side, payload });
+      dispatch(stampAction({ type: 'CONDUCT', side, payload }));
     };
     return (
       <View style={st.panel}>

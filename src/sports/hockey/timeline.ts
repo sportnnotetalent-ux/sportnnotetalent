@@ -18,7 +18,7 @@ export function describeEvent(e: HockeyEvent, saver?: string): { icon: string; l
     case 'stroke':
       return { icon: '⚪', label: e.outcome === 'saved' ? 'Penalty stroke saved' : 'Penalty stroke missed', detail: [e.playerName, saver ? `save ${saver}` : ''].filter(Boolean).join(' · ') || undefined };
     case 'shot':
-      return { icon: '🎯', label: `${e.onGoal ? 'Shot on goal — saved' : 'Shot off target'}${e.pcRef ? ' (from PC)' : ''}`, detail: [e.playerName, saver ? `save ${saver}` : ''].filter(Boolean).join(' · ') || undefined };
+      return { icon: '🎯', label: `${e.onGoal ? 'Shot on goal — saved' : e.miss === 'blocked' ? 'Shot blocked' : e.miss === 'wide' ? 'Shot wide' : 'Shot off target'}${e.pcRef ? ' (from PC)' : ''}`, detail: [e.playerName, saver ? `save ${saver}` : ''].filter(Boolean).join(' · ') || undefined };
     case 'save':
       return { icon: '🧤', label: 'Save', detail: e.playerName };
     case 'card': {
@@ -30,6 +30,8 @@ export function describeEvent(e: HockeyEvent, saver?: string): { icon: string; l
       return { icon: '🔁', label: 'Substitution', detail: `${e.secondName ?? '?'} ⬆  ${e.playerName ?? '?'} ⬇` };
     case 'gk':
       return { icon: '🧤', label: 'Goalkeeper', detail: e.playerName };
+    case 'referral':
+      return { icon: '📺', label: `Video referral — ${e.upheld ? 'upheld' : 'not upheld'}` };
   }
 }
 

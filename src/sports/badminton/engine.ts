@@ -38,6 +38,9 @@ export interface BadmintonState {
   /** SD-107 — optional point detail (how each point was won) is being
    *  captured; absent / false = off (D8). Format key / SET_DETAIL. */
   pointDetail?: boolean;
+  /** Deep wave — "Rally length" tracking (0–4 · 5–10 · 11+ shots); absent =
+   *  off (D8). Format key / SET_DETAIL. */
+  rallyDetail?: boolean;
   /** SD-74 — doubles: per game, who serves first / receives first (player ids,
    *  SET_SERVE_ORDER; BWF Law 11.5–11.6). Absent → roster order. */
   dblOrder?: DoublesOrder;
@@ -127,7 +130,7 @@ const core = (s: BadmintonState, a: ScoreAction): BadmintonState => {
   // SD-107 — capture setting (from the next point) and a point's detail
   // (annotates the last point; allowed after the match point too).
   if (a.type === 'SET_DETAIL') { const f = detailFlags(a.payload, s); return f ? { ...s, ...f } : s; }
-  if (a.type === 'POINT_DETAIL') { const ev = applyPointDetail(s.events, a.payload); return ev ? { ...s, events: ev } : s; }
+  if (a.type === 'POINT_DETAIL') { const ev = applyPointDetail(s.events, a.payload, 'badminton'); return ev ? { ...s, events: ev } : s; }
   if (a.type !== 'POINT' || !a.side || s.ended) return s;
   const who = a.attribution?.playerName;
   // SD-19: keep the credited player's id on the point (absolute statTotals).

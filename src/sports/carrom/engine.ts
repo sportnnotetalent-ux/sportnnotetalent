@@ -33,6 +33,88 @@ export interface BoardResult {
    *  toward the board limit) but not a board won, a Queen or a slam. Only on
    *  a board recorded as one (old logs: absent). */
   penalty?: true;
+  /** Deep wave — the optional board detail (fouls by type, dues, coins on the
+   *  break, missed Queen covers), only on a board recorded while that stat was
+   *  tracked (old logs: absent — "not tracked", never 0). */
+  det?: BoardDetail;
+  /** Deep wave — when the board was recorded (the scorer's clock, ms;
+   *  `payload.at`). Absent on older boards. */
+  at?: number;
+}
+
+/** Deep wave — carrom foul types for the optional foul log (ICF Laws: the
+ *  striker pocketed, touching a coin / the striker out of turn, a foul stroke
+ *  from the base line / arrow / hand position; thumbing is legal under ICF and
+ *  is a foul only where the event's own rules ban it). */
+export type FoulType = 'striker' | 'touch' | 'thumb' | 'line' | 'other';
+export const FOUL_TYPES: FoulType[] = ['striker', 'touch', 'line', 'thumb', 'other'];
+export const FOUL_LABEL: Record<FoulType, string> = {
+  striker: 'Striker pocketed', touch: 'Touching', line: 'Line / hand', thumb: 'Thumbing', other: 'Other foul',
+};
+
+/** Deep wave — the optional detail of one board. Each part is present only
+ *  when that stat was tracked for the board (an empty `fouls` = tracked, no
+ *  fouls). */
+export interface BoardDetail {
+  /** fouls per side, by type */
+  fouls?: { home?: Partial<Record<FoulType, number>>; away?: Partial<Record<FoulType, number>> };
+  /** dues per side (a foul with no pocketed coin to return: the coin is owed) */
+  dues?: { home?: number; away?: number };
+  /** coins the breaker pocketed with the break stroke */
+  brk?: number;
+  /** the Queen pocketed but the cover missed (she goes back), per side */
+  qMiss?: { home?: number; away?: number };
+}
+
+/** Deep wave — the optional stats the scorer tracks (Stats to track). */
+export interface CarromTrack { fouls?: boolean; brk?: boolean; qMiss?: boolean }
+
+const cnt = (v: unknown, max = 20): number | undefined => {
+  const n = Math.floor(Number(v));
+  return Number.isFinite(n) && n >= 0 ? Math.min(max, n) : undefined;
+};
+const sideCounts = (v: unknown): { home?: number; away?: number } | undefined => {
+  if (!v || typeof v !== 'object') return undefined;
+  const o = v as Record<string, unknown>;
+  const out: { home?: number; away?: number } = {};
+  for (const sd of ['home', 'away'] as const) { const n = cnt(o[sd]); if (n) out[sd] = n; }
+  return out;
+};
+/** A board detail from a payload (unknown keys / bad counts dropped; zero
+ *  counts dropped inside a tracked part). undefined = nothing tracked. */
+export function readDetail(v: unknown): BoardDetail | undefined {
+  if (!v || typeof v !== 'object') return undefined;
+  const o = v as Record<string, unknown>;
+  const det: BoardDetail = {};
+  if (o.fouls && typeof o.fouls === 'object') {
+    const f = o.fouls as Record<string, unknown>;
+    const fouls: NonNullable<BoardDetail['fouls']> = {};
+    for (const sd of ['home', 'away'] as const) {
+      const x = f[sd];
+      if (!x || typeof x !== 'object') continue;
+      const by: Partial<Record<FoulType, number>> = {};
+      for (const t of FOUL_TYPES) { const n = cnt((x as Record<string, unknown>)[t]); if (n) by[t] = n; }
+      if (Object.keys(by).length) fouls[sd] = by;
+    }
+    det.fouls = fouls;
+    const dues = sideCounts(o.dues);
+    if (dues && Object.keys(dues).length) det.dues = dues;
+  }
+  const brk = cnt(o.brk, 9);
+  if (brk != null) det.brk = brk;
+  if (o.qMiss && typeof o.qMiss === 'object') det.qMiss = sideCounts(o.qMiss) ?? {};
+  return Object.keys(det).length ? det : undefined;
+}
+
+/** Deep wave — the tracking flags from the format (`trackFouls`,
+ *  `trackBreak`, `trackQueenMiss`) or a SET_TRACK payload. */
+function readTrack(v: Record<string, unknown> | undefined, base?: CarromTrack): CarromTrack | undefined {
+  const t: CarromTrack = { ...(base ?? {}) };
+  if (v?.trackFouls !== undefined) t.fouls = v.trackFouls === true;
+  if (v?.trackBreak !== undefined) t.brk = v.trackBreak === true;
+  if (v?.trackQueenMiss !== undefined) t.qMiss = v.trackQueenMiss === true;
+  for (const k of Object.keys(t) as (keyof CarromTrack)[]) if (!t[k]) delete t[k];
+  return Object.keys(t).length ? t : undefined;
 }
 
 /** SD-68 (CR-07) — what a penalty board gives the opponent. */
@@ -78,6 +160,9 @@ export interface CarromState {
    *  ICF doubles rotation, verify). Absent = not recorded (every older match):
    *  only the side's break is shown, as before. */
   breakOrder?: { home?: CarromCredit[]; away?: CarromCredit[] };
+  /** Deep wave — the optional stats being tracked (Stats to track: the format
+   *  before board 1, then SET_TRACK from the next board). Absent = none. */
+  track?: CarromTrack;
 }
 
 /** SD-117c — one board as the editor replays it (EDIT_LOG). */
@@ -88,6 +173,9 @@ export interface BoardInput {
   penalty?: boolean;
   /** the players the board credited (attribution / attribution2) */
   by?: CarromCredit[];
+  /** Deep wave — kept through a correction */
+  det?: BoardDetail;
+  at?: number;
 }
 
 export function init(config?: Record<string, unknown>): CarromState {
@@ -100,6 +188,8 @@ export function init(config?: Record<string, unknown>): CarromState {
     queenCutoff: Number(config?.queenCutoff ?? 22),
     ended: false, seq: 0,
     perSide: Number(config?.playersPerSide ?? 1) >= 2 ? 2 : 1,
+    // Deep wave — only when the organiser switched a stat on (older formats: absent)
+    ...(() => { const t = readTrack(config); return t ? { track: t } : {}; })(),
   };
 }
 
@@ -165,6 +255,13 @@ export function reducer(s: CarromState, a: { type: string; side?: Side; payload?
     const order = readBreakOrder(a.payload?.order);
     return { ...s, firstBreak: side, ...(order ? { breakOrder: order } : {}) };
   }
+  // Deep wave — Stats to track changed during play: applies from the next board
+  if (a.type === 'SET_TRACK') {
+    if (s.ended) return s;
+    const t = readTrack(a.payload, s.track);
+    const { track: _old, ...rest } = s;
+    return t ? { ...rest, track: t } : rest;
+  }
   if (a.type !== 'BOARD' || s.ended || (a.side !== 'home' && a.side !== 'away')) return s;
   const side = a.side;
   const penalty = a.payload?.penalty === true;
@@ -178,7 +275,11 @@ export function reducer(s: CarromState, a: { type: string; side?: Side; payload?
   const gameNo = s.games.length + 1;
   const current = { ...s.current, [side]: s.current[side] + pts };
   const boardsInGame = s.boardsInGame + 1;
-  const boards = [...s.boards, { winner: side, coins, queen, points: pts, game: gameNo, ...(slam ? { slam } : {}), ...(queenBy ? { queenBy } : {}), ...(penalty ? { penalty: true as const } : {}) }];
+  // Deep wave — optional detail + the time stamp (new payload keys: old logs carry none)
+  const det = readDetail(a.payload?.det);
+  const at = Number(a.payload?.at);
+  const boards = [...s.boards, { winner: side, coins, queen, points: pts, game: gameNo, ...(slam ? { slam } : {}), ...(queenBy ? { queenBy } : {}), ...(penalty ? { penalty: true as const } : {}),
+    ...(det ? { det } : {}), ...(Number.isFinite(at) && at > 0 ? { at } : {}) }];
   const credited = creditsOf(side, a, s.credited);
   if (credited) s = { ...s, credited };
   // SD-117c — this board's own credits (for the editor's replay)
@@ -336,10 +437,12 @@ const attrOf = (c?: CarromCredit): Attr => (c ? { ...(c.id ? { playerId: c.id } 
 
 /** The BOARD action one corrected board replays as. */
 export function boardAction(b: BoardInput): { type: string; side: Side; payload: Record<string, unknown>; attribution?: Attr; attribution2?: Attr } {
+  // Deep wave — the board's detail and time stamp ride along (absent = as before)
+  const extra = { ...(b.det ? { det: b.det } : {}), ...(b.at ? { at: b.at } : {}) };
   return {
     type: 'BOARD', side: b.side,
-    payload: b.penalty ? { coins: 0, queen: false, penalty: true }
-      : { coins: b.coins, queen: b.queenBy ? b.queenBy === 'winner' : !!b.queen, ...(b.queenBy ? { queenBy: b.queenBy } : {}), ...(b.slam ? { slam: b.slam } : {}) },
+    payload: b.penalty ? { coins: 0, queen: false, penalty: true, ...extra }
+      : { coins: b.coins, queen: b.queenBy ? b.queenBy === 'winner' : !!b.queen, ...(b.queenBy ? { queenBy: b.queenBy } : {}), ...(b.slam ? { slam: b.slam } : {}), ...extra },
     attribution: attrOf(b.by?.[0]), attribution2: attrOf(b.by?.[1]),
   };
 }
@@ -357,6 +460,7 @@ export function boardInputs(s: CarromState): BoardInput[] {
     ...(b.queenBy ? { queenBy: b.queenBy } : {}), ...(b.slam ? { slam: b.slam } : {}),
     ...(b.penalty ? { penalty: true } : {}),
     ...(s.boardBy?.[i]?.length ? { by: s.boardBy[i] } : {}),
+    ...(b.det ? { det: b.det } : {}), ...(b.at ? { at: b.at } : {}),
   }));
 }
 

@@ -91,8 +91,10 @@ export function afVoice(text: string, ctx: VoiceContext): ScoreAction[] | null {
     const passer = i >= 0 ? matchPlayer(qq.slice(i + 6), roster(side).filter((p) => p.id !== scorer?.id)) : undefined;
     const pbpTd = s.mode === 'pbp' && (how === 'run' || how === 'pass') && s.drive?.off === side;
     const yards = y ?? (pbpTd ? s.field - s.drive!.spot : undefined);
-    const ev = { type: 'td' as const, how, yards, pbp: pbpTd, playerId: scorer?.id, playerName: scorer?.fullName, ...(how === 'pass' && passer ? { secondId: passer.id, secondName: passer.fullName } : {}) };
-    return [{ type: 'TD', side, payload: { how, ...(yards != null ? { yards } : {}), ...(pbpTd ? { pbp: true } : {}), ...stamp() }, ...af.credit(ev) }];
+    // deep wave: a touchdown catch recorded with "Targets" on is a target too
+    const tgt = s.trackTargets && pbpTd && how === 'pass' ? { tgt: true } : {};
+    const ev = { type: 'td' as const, how, yards, pbp: pbpTd, ...tgt, playerId: scorer?.id, playerName: scorer?.fullName, ...(how === 'pass' && passer ? { secondId: passer.id, secondName: passer.fullName } : {}) };
+    return [{ type: 'TD', side, payload: { how, ...(yards != null ? { yards } : {}), ...(pbpTd ? { pbp: true } : {}), ...tgt, ...stamp() }, ...af.credit(ev) }];
   }
 
   // play by play
@@ -102,7 +104,7 @@ export function afVoice(text: string, ctx: VoiceContext): ScoreAction[] | null {
   if (/\bincomplete\b/.test(q)) return [af.buildPlay(s, off, { play: 'inc', p1: lastPasser(s, off) }, stamp())];
   if (/\bsack(ed)?\b/.test(q)) {
     const p = matchPlayer(noNumbers(q), roster(def));
-    return [af.buildPlay(s, off, { play: 'sack', yards: -Math.abs(y ?? 0), p2: who(p) }, stamp())];
+    return [af.buildPlay(s, off, { play: 'sack', yards: -Math.abs(y ?? 0), p1: lastPasser(s, off), p2: who(p) }, stamp())];
   }
   if (/\b(intercept(ed|ion)?|picked)\b/.test(q)) {
     const p = matchPlayer(noNumbers(q), roster(def));
@@ -111,7 +113,7 @@ export function afVoice(text: string, ctx: VoiceContext): ScoreAction[] | null {
   if (/\bpass\b|\bcomplet(e|ed|ion)\b|\bcatch\b/.test(q)) {
     if (y === undefined) return null;
     const rec = matchPlayer(noNumbers(q), roster(off));
-    return [af.buildPlay(s, off, { play: 'pass', yards: y, p1: lastPasser(s, off), p2: who(rec) }, stamp())];
+    return [af.buildPlay(s, off, { play: 'pass', yards: y, p1: lastPasser(s, off), p2: who(rec), ...(s.trackTargets ? { tgt: true } : {}) }, stamp())];
   }
   if (/\b(run|rush|carry|for|gain|loss)\b/.test(q) && y !== undefined) {
     const p = matchPlayer(noNumbers(q), roster(off));

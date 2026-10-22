@@ -19,6 +19,8 @@ import { initGolfMatch, golfMatchReducer, golfMatchStateOf, type GolfMatchState 
 import { matchHole, holeNumber, scoreStatKey, strokesLine } from './matchStrokes';
 import { MatchStrokesSetup } from './MatchStrokesSetup';
 import { golfMatchVoice } from '../voiceParsers';
+import { golfMatchFeed } from './feed';
+import { CommentaryFeed } from '../gcc/CommentaryFeed';
 
 // The state + reducer live in ./match (pure, unit-tested); SD-87 adds the
 // handicap strokes and per-hole gross strokes as optional keys.
@@ -42,7 +44,7 @@ const ScoringControls: SportPlugin<GolfMatchState>['ScoringControls'] = ({ state
     const where = m.played ? ` (${m.status === 'AS' ? 'all square' : `${leaderName} ${m.status}`} thru ${m.played})` : '';
     const ok = await askConfirm(confirmCopy('concede', { what: nm(side), winner: nm(other), detail: `${nm(other)} wins the match${where} and it closes.` }));
     setConceding(false);
-    if (ok) dispatch({ type: 'CONCEDE', side });
+    if (ok) dispatch({ type: 'CONCEDE', side, payload: { at: Date.now() } });
   };
   // SD-87 — a back-nine match reads 10–18 (19 for the first extra hole)
   const holeNo = holeNumber(s.firstHole, m.played);
@@ -54,7 +56,8 @@ const ScoringControls: SportPlugin<GolfMatchState>['ScoringControls'] = ({ state
     const side = winner === 'halved' ? undefined : winner;
     const p = side ? (side === 'home' ? homeRoster : awayRoster)[0] : undefined;
     if (!strokes || !here) {
-      dispatch({ type: 'HOLE', side, payload: { winner }, attribution: p ? { playerId: p.id, playerName: p.fullName, stat: 'holesWon', by: 1, side } : undefined });
+      // deep wave — `at` (the scorer's clock) for the commentary
+      dispatch({ type: 'HOLE', side, payload: { winner, at: Date.now() }, attribution: p ? { playerId: p.id, playerName: p.fullName, stat: 'holesWon', by: 1, side } : undefined });
       return;
     }
     // SD-87 — strokes entered: each player's score on the hole (birdie, par …)
@@ -68,7 +71,7 @@ const ScoringControls: SportPlugin<GolfMatchState>['ScoringControls'] = ({ state
         ? { playerId: pl.id, playerName: pl.fullName, stat: 'holesWon', by: 1, extra: { [key]: 1 }, side: who }
         : { playerId: pl.id, playerName: pl.fullName, stat: key, by: 1, side: who };
     };
-    dispatch({ type: 'HOLE', side, payload: { winner, home: strokes.home, away: strokes.away }, attribution: credit('home'), attribution2: credit('away') });
+    dispatch({ type: 'HOLE', side, payload: { winner, home: strokes.home, away: strokes.away, at: Date.now() }, attribution: credit('home'), attribution2: credit('away') });
   };
   const cur = gross.hole === m.played ? gross : { hole: m.played, home: null, away: null };
   const par = here?.hole.par ?? 4;
@@ -150,25 +153,16 @@ const ScoringControls: SportPlugin<GolfMatchState>['ScoringControls'] = ({ state
   );
 };
 
-const LiveExtras: NonNullable<SportPlugin<GolfMatchState>['LiveExtras']> = ({ state, homeName, awayName }) => {
+const LiveExtras: NonNullable<SportPlugin<GolfMatchState>['LiveExtras']> = ({ state, homeName, awayName, homeColor, awayColor, homeRoster = [], awayRoster = [] }) => {
   const s = state as GolfMatchState;
-  let up = 0;
+  // a player's own name (a 1-v-1 match), else the side's
+  const nm = (side: 'home' | 'away') => (side === 'home' ? homeRoster : awayRoster)[0]?.fullName ?? (side === 'home' ? homeName : awayName);
+  // Deep wave — hole-by-hole commentary, newest first by nine, with the match
+  // state after each hole and the time it was recorded (golf/feed.ts)
   return (
     <View style={{ gap: theme.spacing(2) }}>
-      <Text style={st.label}>Hole by hole</Text>
-      {s.strokes ? <Text style={textStyles.muted}>{strokesLine(s.strokes, homeName, awayName)}</Text> : null}
-      {s.holes.length === 0 ? <Text style={textStyles.muted}>No holes played yet.</Text> : s.holes.map((w, i) => {
-        up += w === 'home' ? 1 : w === 'away' ? -1 : 0;
-        const who = w === 'halved' ? 'Halved' : `${w === 'home' ? homeName : awayName} won`;
-        const state = up === 0 ? 'AS' : `${up > 0 ? homeName : awayName} ${Math.abs(up)} UP`;
-        // SD-87 — the gross strokes (● = a shot received there)
-        const sc = s.scores?.[i];
-        const mh = s.strokes ? matchHole(s.strokes, i) : null;
-        const dot = (n: number) => (n > 0 ? '●'.repeat(n) : '');
-        const strokes = sc ? ` (${sc.home}${mh ? dot(mh.home) : ''}–${sc.away}${mh ? dot(mh.away) : ''})` : '';
-        return <Text key={i} style={textStyles.body}>Hole {holeNumber(s.firstHole, i)}: {who}{strokes} · {state}</Text>;
-      })}
-      {s.conceded ? <Text style={textStyles.body}>🏳 {s.conceded === 'home' ? homeName : awayName} {concededLine(s.holes, s.conceded, s.regulation, s.extraHoles)}</Text> : null}
+      {s.strokes ? <Text style={textStyles.muted}>⛳ {strokesLine(s.strokes, nm('home'), nm('away'))}</Text> : null}
+      <CommentaryFeed title="🎙 Hole by hole" groups={golfMatchFeed(s, { home: nm('home'), away: nm('away') })} homeColor={homeColor} awayColor={awayColor} empty="No holes played yet." />
     </View>
   );
 };

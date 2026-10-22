@@ -19,6 +19,8 @@
  * no `rules` — every event made before SD-141 — reads the defaults, which are
  * exactly the behaviour before SD-141.
  */
+// Deep wave: weightlifting / shooting / archery "Stats to track" + extra rules (no runtime imports of its own)
+import { PRECISION_RULES } from './precisionRules.ts';
 
 export type RuleValue = string | number | boolean;
 /** The rules a phase carries (`PhaseFormat.rules`, `DisciplineDef.rules`): only non-default values. */
@@ -232,6 +234,13 @@ export const COMPETITION_RULES: RuleDef[] = [
     help: 'How the lanes are numbered when the pool has 10 lanes.',
     source: 'World Aquatics SW 3.1.2',
   },
+  {
+    // deep wave (timed races): the lead-off split as an individual time
+    key: 'swimLeadOff', sports: ['swimming'], group: 'Records', label: 'Relay lead-off times', kind: 'choice', phase: true, default: true,
+    choices: yesNo('Count as the first swimmer’s individual time (PB / SB)', 'Relay only'),
+    help: 'The first swimmer of a relay swims a full individual race. With the relay’s splits recorded, that time goes on the swimmer’s profile as an individual time (never in mixed relays).',
+    source: 'World Aquatics SW 11.6 / 12.12 as remembered (verify)',
+  },
 
   /* ---------------------------------- archery ---------------------------------- */
   {
@@ -290,6 +299,8 @@ export const COMPETITION_RULES: RuleDef[] = [
     help: '10 m mixed team events. Medal matches need at least 4 teams; with fewer, the qualification total decides.',
     source: 'ISSF mixed team rules as remembered — rule numbers not checked (verify)',
   },
+  // Deep wave: weightlifting change limit + "Stats to track" (lights, jury), shooting penalties
+  ...PRECISION_RULES,
 
   /* ---------------------------------- cycling ---------------------------------- */
   {

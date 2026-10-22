@@ -212,7 +212,8 @@ describe('SD-15 — the old maps are derived views, equal to the golden values',
       golf: STAT_CATEGORIES.golf.filter((c) => ['birdies', 'holesWon'].includes(c.key)),
     });
     assert.deepEqual(now, pick(golden.STAT_CATEGORIES));
-    assert.deepEqual(STAT_CATEGORIES.football.slice(golden.STAT_CATEGORIES.football.length).map((c) => c.key), ['goalsPer90', 'savePct']);
+    // (the deep wave appended chances created / key passes / clearances)
+    assert.deepEqual(STAT_CATEGORIES.football.slice(golden.STAT_CATEGORIES.football.length).map((c) => c.key), ['goalsPer90', 'savePct', 'chancesCreated', 'keyPasses', 'clearances']);
     assert.deepEqual(STAT_CATEGORIES.cricket.slice(golden.STAT_CATEGORIES.cricket.length).map((c) => c.label),
       ['Highest score', 'Best bowling', 'Best batting average', 'Best strike rate', 'Best economy', 'Most 50s', 'Most 100s',
         'Most 4s', 'Most 6s', 'Most maidens', 'Most dot balls', 'Most ducks', 'Most keeper dismissals']);

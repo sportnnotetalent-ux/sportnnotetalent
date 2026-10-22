@@ -18,6 +18,7 @@ import { DISCIPLINES, disciplineOf } from './model.ts';
 import type { PlannedPhase } from './plan.ts';
 import type { Seeded } from './progression.ts';
 import { crewSplitDistances } from './crewDefs.ts';
+import { raceSplitDistances } from './raceSplitDefs.ts';
 
 /* ------------------------------ events ------------------------------------ */
 
@@ -399,8 +400,9 @@ export function officialManualTime(watches: (number | undefined | null)[]): numb
  *  across the legs — each leg's end is a split). 50 m events have none. */
 export function splitDistances(discipline: string): number[] {
   const e = swimEventOf(discipline);
-  // SD-99 / SD-100: rowing every 500 m, canoe sprint every 250 m (crewDefs.ts)
-  if (!e) return crewSplitDistances(discipline);
+  // SD-99 / SD-100: rowing every 500 m, canoe sprint every 250 m (crewDefs.ts);
+  // deep wave: athletics lap / changeover times, cycling intermediate times (raceSplitDefs.ts)
+  if (!e) { const c = crewSplitDistances(discipline); return c.length ? c : raceSplitDistances(discipline); }
   const out: number[] = [];
   for (let d = 50; d < e.distance; d += 50) out.push(d);
   return out;
@@ -430,6 +432,16 @@ export function splitsText(splits: (number | undefined)[] | undefined, fmt: (v: 
     prev = s;
     return `${ds[i] ?? (i + 1) * 50} ${unit} ${fmt(s)}${lap}`;
   }).filter(Boolean).join(' · ');
+}
+
+/** Deep wave: the individual event a relay's lead-off swimmer swims —
+ *  'swim.4x100free' → 'swim.100free', 'swim.4x100medley' → 'swim.100back'
+ *  (the medley relay starts with backstroke, SW 9.3). */
+export function leadOffDiscipline(discipline: string): string | undefined {
+  const e = swimEventOf(discipline);
+  if (!e?.relay) return undefined;
+  const key = `swim.${e.legDistance}${e.stroke === 'medley' ? 'back' : e.stroke}`;
+  return disciplineOf(key) ? key : undefined;
 }
 
 /** The relay lead-off swimmer's split (SW 11.6: published; SW 12.12: may stand

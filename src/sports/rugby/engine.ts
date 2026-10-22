@@ -32,6 +32,13 @@
  *    each). Standard sevens: sudden-death periods of 5 minutes until a team
  *    scores. In sudden death the first score wins (no conversion).
  *
+ * Deep wave — optional "Stats to track" beyond `trackDetail` (penalties by
+ * offence & free kicks, turnovers conceded, 22 entries, possession &
+ * territory, offloads): `TALLY` events and `POSSESSION` / `TERRITORY`
+ * switches; each flag is in the state only when on, so an old match's state
+ * (and lines) never change. The sheet (./sheet.ts) and the commentary
+ * (./commentary.ts) read them.
+ *
  * Every credit a live action writes on a stat line comes from `eventCredits`
  * (the controls build the attribution from it, and `rugbyTotals` sums it over
  * the state), so the absolute statTotals equal the live increments (SD-19).
@@ -57,6 +64,47 @@ export const DETAIL_STAT: Record<DetailKey, string> = {
 export const DETAIL_LABEL: Record<DetailKey, string> = {
   tackle: 'Tackle', missedTackle: 'Missed tackle', carry: 'Carry', lineBreak: 'Line break', turnoverWon: 'Turnover won', penaltyConceded: 'Penalty conceded',
 };
+/** Deep wave — the optional "Stats to track" (off by default; the organiser or
+ *  the scorer switches each on). Separate from `trackDetail`, so an old match
+ *  that tracked detail never gains a new key. Each capture is one `TALLY`
+ *  action (`payload.kind`); possession and territory are `POSSESSION` /
+ *  `TERRITORY` switches kept in `ball` (not events — there are dozens). */
+export type TallyKind = 'penalty' | 'freeKick' | 'turnover' | 'entry' | 'offload';
+export const TALLY_KINDS: TallyKind[] = ['penalty', 'freeKick', 'turnover', 'entry', 'offload'];
+export const TALLY_LABEL: Record<TallyKind, string> = {
+  penalty: 'Penalty conceded', freeKick: 'Free kick conceded', turnover: 'Turnover conceded', entry: '22 entry', offload: 'Offload',
+};
+/** the stat-line key a tally credits to its player (free kicks and 22 entries are the team's) */
+export const TALLY_KEY: Partial<Record<TallyKind, string>> = { penalty: 'penaltiesGivenAway', turnover: 'turnoversConceded', offload: 'offloads' };
+/** every player key a tally can write */
+export const TALLY_KEYS = ['penaltiesGivenAway', 'turnoversConceded', 'offloads'] as const;
+export type TrackFlag = 'trackPenalties' | 'trackTurnovers' | 'trackEntries' | 'trackPossession' | 'trackOffloads';
+export const TRACK_FLAGS: TrackFlag[] = ['trackPenalties', 'trackTurnovers', 'trackEntries', 'trackPossession', 'trackOffloads'];
+/** the tallies each toggle switches on (possession / territory are switches, not tallies) */
+export const TRACK_KINDS: Record<TrackFlag, TallyKind[]> = {
+  trackPenalties: ['penalty', 'freeKick'], trackTurnovers: ['turnover'], trackEntries: ['entry'], trackPossession: [], trackOffloads: ['offload'],
+};
+/** the player keys a toggle owns on every stat line once it's on */
+export const FLAG_KEYS: Record<TrackFlag, string[]> = {
+  trackPenalties: ['penaltiesGivenAway'], trackTurnovers: ['turnoversConceded'], trackEntries: [], trackPossession: [], trackOffloads: ['offloads'],
+};
+/** World Rugby penalty offences, grouped as match statistics report them (Opta). */
+export type Infringement = 'offside' | 'breakdown' | 'notReleasing' | 'foulPlay' | 'scrum' | 'lineout' | 'obstruction' | 'other';
+export const INFRINGEMENTS: Infringement[] = ['offside', 'breakdown', 'notReleasing', 'foulPlay', 'scrum', 'lineout', 'obstruction', 'other'];
+export const INFRINGEMENT_LABEL: Record<Infringement, string> = {
+  offside: 'Offside', breakdown: 'Ruck / breakdown', notReleasing: 'Not releasing', foulPlay: 'High tackle / foul play',
+  scrum: 'Scrum', lineout: 'Lineout / maul', obstruction: 'Obstruction', other: 'Other',
+};
+/** how a team gave the ball away (turnover conceded) */
+export type TurnoverCause = 'knockOn' | 'forwardPass' | 'handling' | 'breakdown' | 'kickOut' | 'other';
+export const TURNOVER_CAUSES: TurnoverCause[] = ['knockOn', 'forwardPass', 'handling', 'breakdown', 'kickOut', 'other'];
+export const CAUSE_LABEL: Record<TurnoverCause, string> = {
+  knockOn: 'Knock-on', forwardPass: 'Forward pass', handling: 'Handling error', breakdown: 'Lost at ruck / maul', kickOut: 'Kicked out on the full', other: 'Other',
+};
+/** a possession / territory switch on the playing clock (`side` = who has the
+ *  ball / whose territory: play in the OTHER side's half) */
+export interface BallMark { kind: 'poss' | 'terr'; side: Side; sec: number; period: number }
+
 export const KICK_LABEL: Record<KickKind, string> = { conv: 'Conversion', pen: 'Penalty goal', drop: 'Drop goal' };
 export const KICK_POINTS: Record<KickKind, number> = { conv: 2, pen: 3, drop: 3 };
 export const TRY_POINTS = 5;
@@ -67,7 +115,7 @@ export interface Who { id?: string; name?: string }
 export interface RugbyEvent {
   /** stable id from the action (`payload.uid`) */
   id: string;
-  type: 'try' | 'pentry' | 'kick' | 'card' | 'sub' | 'detail' | 'setpiece';
+  type: 'try' | 'pentry' | 'kick' | 'card' | 'sub' | 'detail' | 'setpiece' | 'tally';
   side: Side;
   /** playing seconds since the kick-off (the halves as actually played) */
   sec: number;
@@ -96,6 +144,13 @@ export interface RugbyEvent {
   detail?: DetailKey;
   piece?: SetPiece;
   won?: boolean;
+  /** deep wave — an optional tally (`side` = the team that conceded the
+   *  penalty / free kick / turnover, entered the 22, made the offload) */
+  tally?: TallyKind;
+  /** a penalty's offence (optional — skipped = not recorded) */
+  infringement?: Infringement;
+  /** a turnover's cause (optional) */
+  cause?: TurnoverCause;
 }
 
 export interface Kick { scored: boolean; playerId?: string; playerName?: string }
@@ -128,6 +183,14 @@ export interface RugbyState {
   rolling: boolean;
   /** optional detail: tackles, carries, line breaks, set pieces… */
   trackDetail: boolean;
+  /** deep wave — "Stats to track" (absent = off; old matches never have them) */
+  trackPenalties?: boolean;
+  trackTurnovers?: boolean;
+  trackEntries?: boolean;
+  trackPossession?: boolean;
+  trackOffloads?: boolean;
+  /** deep wave — possession / territory switches (absent until the first one) */
+  ball?: BallMark[];
   /** the kicking competition (`first` = the scorer's pick after the toss;
    *  `sdFirst` = who kicks first in sudden death, picked after 5 each) */
   shootout: { home: Kick[]; away: Kick[]; first: Side; sdFirst?: Side } | null;
@@ -182,6 +245,7 @@ export const init = (config?: Record<string, unknown>): RugbyState => {
     maxSubs: num(config?.maxSubs, p7 || p10 ? 5 : 8),
     rolling: bool(config?.rolling, false),
     trackDetail: bool(config?.trackDetail, false),
+    ...Object.fromEntries(TRACK_FLAGS.filter((f) => bool(config?.[f], false)).map((f) => [f, true])),
     shootout: null,
     ...(aggPriorFromConfig(config) ? { agg: aggPriorFromConfig(config) } : {}),
   };
@@ -296,7 +360,7 @@ const MADE: Record<KickKind, [string, string]> = { conv: ['conversions', 'conver
 type Credit = { playerId: string; playerName?: string; stats: Record<string, number> };
 
 /** The stat-line credits one event writes: [primary player, second player]. */
-export function eventCredits(e: Pick<RugbyEvent, 'type' | 'playerId' | 'playerName' | 'secondId' | 'secondName' | 'kick' | 'made' | 'card' | 'second' | 'official' | 'detail'>): { first?: Credit; second?: Credit } {
+export function eventCredits(e: Pick<RugbyEvent, 'type' | 'playerId' | 'playerName' | 'secondId' | 'secondName' | 'kick' | 'made' | 'card' | 'second' | 'official' | 'detail'> & { tally?: TallyKind }): { first?: Credit; second?: Credit } {
   const p = (stats: Record<string, number>) => (e.playerId && !e.official ? { playerId: e.playerId, playerName: e.playerName, stats } : undefined);
   const q = (stats: Record<string, number>) => (e.secondId ? { playerId: e.secondId, playerName: e.secondName, stats } : undefined);
   switch (e.type) {
@@ -311,6 +375,11 @@ export function eventCredits(e: Pick<RugbyEvent, 'type' | 'playerId' | 'playerNa
       return { first: p(e.second ? { redCards: 1, yellowCards: 1 } : { redCards: 1 }) };
     case 'detail':
       return e.detail ? { first: p({ [DETAIL_STAT[e.detail]]: 1 }) } : {};
+    case 'tally': {
+      // deep wave: a penalty / turnover conceded or an offload credits its player; free kicks and 22 entries are the team's
+      const key = e.tally ? TALLY_KEY[e.tally] : undefined;
+      return key ? { first: p({ [key]: 1 }) } : {};
+    }
     default:
       return {};
   }
@@ -474,6 +543,27 @@ export const reducer = (s: RugbyState, a: ScoreAction): RugbyState => {
       if (!side) return s;
       return push(s, { type: 'setpiece', side, piece, won: a.payload?.won !== false });
     }
+    case 'TALLY': {
+      // deep wave: an optional tally (penalty / free kick / turnover conceded, 22 entry, offload)
+      const kind = a.payload?.kind as TallyKind;
+      if (!side || !TALLY_KINDS.includes(kind)) return s;
+      const inf = a.payload?.infringement as Infringement;
+      const cause = a.payload?.cause as TurnoverCause;
+      return push(s, {
+        type: 'tally', side, tally: kind, ...(TALLY_KEY[kind] ? who1 : {}),
+        ...(kind === 'penalty' && INFRINGEMENTS.includes(inf) ? { infringement: inf } : {}),
+        ...(kind === 'turnover' && TURNOVER_CAUSES.includes(cause) ? { cause } : {}),
+      });
+    }
+    case 'POSSESSION':
+    case 'TERRITORY': {
+      // deep wave: who has the ball / whose territory from now on (a tap on the side already set changes nothing)
+      if (!side) return s;
+      const kind = a.type === 'POSSESSION' ? 'poss' : 'terr';
+      const cur = currentBall(s, kind);
+      if (cur === side) return s;
+      return { ...s, ball: [...(s.ball ?? []), { kind, side, sec, period }] };
+    }
     case 'REMOVE_EVENT': {
       const id = String(a.payload?.id ?? '');
       const ev = s.events.find((e) => e.id === id);
@@ -536,11 +626,14 @@ export interface RugbyTeamFigures {
   yellowCards: number; redCards: number;
   lineoutsWon: number; lineoutsLost: number; scrumsWon: number; scrumsLost: number;
   detail: Record<string, number>;
+  /** deep wave — the optional tallies (count per kind) */
+  tally: Record<TallyKind, number>;
 }
 export function teamFigures(s: RugbyState, side: Side, scope: 'all' | number = 'all'): RugbyTeamFigures {
   const f: RugbyTeamFigures = {
     points: 0, tries: 0, penaltyTries: 0, conversions: 0, conversionAttempts: 0, penGoals: 0, penGoalAttempts: 0, dropGoals: 0, dropGoalAttempts: 0,
     yellowCards: 0, redCards: 0, lineoutsWon: 0, lineoutsLost: 0, scrumsWon: 0, scrumsLost: 0, detail: {},
+    tally: { penalty: 0, freeKick: 0, turnover: 0, entry: 0, offload: 0 },
   };
   for (const e of s.events) {
     if (e.side !== side || (scope !== 'all' && e.period !== scope)) continue;
@@ -557,8 +650,53 @@ export function teamFigures(s: RugbyState, side: Side, scope: 'all' | number = '
     } else if (e.type === 'setpiece') {
       if (e.piece === 'scrum') { if (e.won) f.scrumsWon++; else f.scrumsLost++; } else if (e.won) f.lineoutsWon++; else f.lineoutsLost++;
     } else if (e.type === 'detail' && e.detail) f.detail[DETAIL_STAT[e.detail]] = (f.detail[DETAIL_STAT[e.detail]] ?? 0) + 1;
+    else if (e.type === 'tally' && e.tally) f.tally[e.tally]++;
   }
   return f;
+}
+
+/* ------------------------- deep wave: what's tracked ------------------------- */
+
+/** The optional detail (tackles, carries…) — the toggle on, or any recorded
+ *  (the rule the stat lines have always used). */
+export const detailTracked = (s: Pick<RugbyState, 'trackDetail' | 'events'>): boolean =>
+  s.trackDetail || s.events.some((e) => e.type === 'detail');
+/** Is this "Stats to track" item tracked in the match — its toggle on, or any recorded? */
+export const tallyTracked = (s: Pick<RugbyState, TrackFlag | 'events' | 'ball'>, f: TrackFlag): boolean =>
+  s[f] === true
+  || s.events.some((e) => e.type === 'tally' && !!e.tally && TRACK_KINDS[f].includes(e.tally))
+  || (f === 'trackPossession' && !!s.ball?.length);
+/** Penalties conceded are counted — from the detail button or the penalty toggle. */
+export const penaltiesTracked = (s: RugbyState): boolean => detailTracked(s) || tallyTracked(s, 'trackPenalties');
+/** The tracked player keys of the toggles (every line reads 0 for them). */
+export const trackedTallyKeys = (s: RugbyState): string[] => [...new Set(TRACK_FLAGS.filter((f) => tallyTracked(s, f)).flatMap((f) => FLAG_KEYS[f]))];
+
+/** Who has the ball (`poss`) / whose territory it is (`terr`) right now. */
+export function currentBall(s: Pick<RugbyState, 'ball'>, kind: 'poss' | 'terr'): Side | undefined {
+  const marks = (s.ball ?? []).map((m, i) => ({ m, i })).filter((x) => x.m.kind === kind).sort((x, y) => x.m.sec - y.m.sec || x.i - y.i);
+  return marks[marks.length - 1]?.m.side;
+}
+
+/** Playing seconds each side had the ball (`poss`) or the territory (`terr`)
+ *  over a scope, from the scorer's switches: time-weighted on the PLAYING clock
+ *  (the referee's watch — stoppages don't count, half-time is no time), each
+ *  switch holding until the next one (across half-time too). `from` = the
+ *  playing second of the first switch in the scope. PURE. */
+export function ballTime(s: RugbyState, kind: 'poss' | 'terr', scope: 'all' | number = 'all', nowSec?: number): { home: number; away: number; from?: number } {
+  const end = Math.max(nowSec ?? matchSec(s), 0);
+  const marks = (s.ball ?? []).map((m, i) => ({ m, i })).filter((x) => x.m.kind === kind).sort((x, y) => x.m.sec - y.m.sec || x.i - y.i).map((x) => x.m);
+  const w0 = scope === 'all' ? 0 : playedOffset(s, scope);
+  const w1 = scope === 'all' || scope >= s.period ? Infinity : playedOffset(s, scope + 1);
+  const out: { home: number; away: number; from?: number } = { home: 0, away: 0 };
+  marks.forEach((m, i) => {
+    const from = Math.max(m.sec, w0);
+    const to = Math.min(marks[i + 1]?.sec ?? end, end, w1);
+    if (to > from) {
+      out[m.side] += to - from;
+      if (out.from === undefined) out.from = from;
+    }
+  });
+  return out;
 }
 
 /** SD-20 — the line under the score: the kicking competition ("Kicks 4–3"). */
@@ -573,6 +711,15 @@ export const rugbyStandingsUnits = (s: RugbyState) => (s && Array.isArray(s.even
 
 /* --------------------------- live settings (#14) --------------------------- */
 
+/** Deep wave — the "Stats to track" toggles (live settings + the match format). */
+export const TRACK_FIELDS: FormatField[] = [
+  { key: 'trackPenalties', label: 'Penalties by offence & free kicks', type: 'toggle', default: false, group: 'Stats to track', hint: 'A ⚖ Penalty button: the offence and the player (both optional); Free kick in one tap' },
+  { key: 'trackTurnovers', label: 'Turnovers conceded', type: 'toggle', default: false, group: 'Stats to track', hint: 'Knock-ons, forward passes, handling errors… the cause and the player (both optional)' },
+  { key: 'trackEntries', label: '22 entries', type: 'toggle', default: false, group: 'Stats to track', hint: 'One tap when a team gets into the opposition 22 — points per entry' },
+  { key: 'trackPossession', label: 'Possession & territory', type: 'toggle', default: false, group: 'Stats to track', hint: 'Tap who has the ball and which half play is in — % on the playing clock' },
+  { key: 'trackOffloads', label: 'Offloads', type: 'toggle', default: false, group: 'Stats to track', hint: 'An Offload button — who made it (optional)' },
+];
+
 export const RUGBY_LIVE_SETTINGS: LiveSettings<RugbyState> = {
   title: '⚙️ Match settings',
   hint: 'Applies to this match only.',
@@ -580,8 +727,12 @@ export const RUGBY_LIVE_SETTINGS: LiveSettings<RugbyState> = {
   fields: [
     { key: 'periodMinutes', label: 'Half length', type: 'number', default: 40, min: 1, max: 40, step: 1, hint: 'min / half' },
     { key: 'sinBinMinutes', label: 'Sin-bin', type: 'number', default: 10, min: 1, max: 10, step: 1, hint: 'minutes' },
-    { key: 'trackDetail', label: 'Tackles, carries, set pieces', type: 'toggle', default: false, group: 'Detail' },
+    { key: 'trackDetail', label: 'Tackles, carries, set pieces', type: 'toggle', default: false, group: 'Stats to track' },
+    ...TRACK_FIELDS,
   ] as FormatField[],
-  read: (s) => ({ periodMinutes: s.periodMinutes, sinBinMinutes: s.sinBinMinutes, trackDetail: s.trackDetail }),
-  defaults: { periodMinutes: 40, sinBinMinutes: 10, trackDetail: false },
+  read: (s) => ({
+    periodMinutes: s.periodMinutes, sinBinMinutes: s.sinBinMinutes, trackDetail: s.trackDetail,
+    ...Object.fromEntries(TRACK_FLAGS.map((f) => [f, s[f] === true])),
+  }),
+  defaults: { periodMinutes: 40, sinBinMinutes: 10, trackDetail: false, ...Object.fromEntries(TRACK_FLAGS.map((f) => [f, false])) },
 };

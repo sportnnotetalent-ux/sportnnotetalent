@@ -13,12 +13,16 @@ import { theme } from '../../core/theme';
 import { Button, SelectChip } from '../../components/ui';
 import { askConfirm, confirmMatchAction } from '../../components/ConfirmSheet';
 import { GameFlowCard } from '../../components/GameFlowCard';
-import { Timeline } from './Timeline';
 import { MatchBoxScore } from '../../components/BoxScore';
 import { basketballBox } from '../boxSources';
 import { basketballStatTotals, shotsTracked } from './totals';
 import { creditAttribution, eventCredits, ftCredits, isFieldGoal, makeCredits, missCredits, reboundCredits } from './credits';
-import { BB_META, DQ_LABEL, FOUL_LABEL, pointsOf, type BBEvent, type DqReason, type FoulType, type ReboundType } from './events';
+import { BB_META, DQ_LABEL, FOUL_LABEL, pointsOf, zoneBehindArc, type BBEvent, type DqReason, type FoulType, type ReboundType, type ShotZone } from './events';
+import { PlayFeed } from '../PlayFeed';
+import { CategoryStatsPanel } from '../CategoryStatsPanel';
+import { basketballFeed } from './commentary';
+import { basketballPanel, bbPanelPeriods } from './panel';
+import { ShotChart } from './ShotChart';
 import type { Player } from '../../core/types';
 import type { LiveSettings, ScoreAction, SportPlugin } from '../types';
 import { basketballVoice } from '../voiceParsers';
@@ -61,7 +65,8 @@ type Flow =
   | { kind: 'ft'; side: 'home' | 'away'; shooter?: Player; reason?: string; remaining?: number; total?: number }
   // SD-117 (B3): a player picked first, then the action — no row of look-alike chips to mis-tap
   | { kind: 'act'; side: 'home' | 'away'; player: Player }
-  | { kind: 'foul'; side: 'home' | 'away'; fouler?: Player }
+  // Deep wave: with "Fouls drawn" on, the type is kept while the fouled player is picked
+  | { kind: 'foul'; side: 'home' | 'away'; fouler?: Player; type?: FoulType }
   | { kind: 'rebound'; side: 'home' | 'away'; player: Player }
   | { kind: 'sub'; side: 'home' | 'away'; off?: string }
   | { kind: 'setFive'; side: 'home' | 'away'; picked: string[] }
@@ -88,7 +93,9 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
   const [flow, setFlow] = useState<Flow>(null);
   const [showSubs, setShowSubs] = useState(false);
   // SD-117 (B6): right after a made basket — "Assist?" for the on-court teammates
-  const [assistFor, setAssistFor] = useState<{ side: 'home' | 'away'; scorer?: Player; points: number } | null>(null);
+  // Deep wave: the same box offers "⚡ Fast break" (tags the basket) and, with
+  // Shot zones on, "🔗 And-one" (the bonus free throw).
+  const [assistFor, setAssistFor] = useState<{ side: 'home' | 'away'; scorer?: Player; points: number; fb?: boolean } | null>(null);
 
   // Half-court small-sided ball (3×3 / 2v2 / 1v1 — all first-to-N) scores 1s and
   // 2s only: a made shot is 1, from behind the arc it's 2. Full-court games keep
@@ -121,21 +128,33 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
   // SD-116 (B1): the picked scorer is for ONE shot — cleared after each make /
   // miss, so the next basket isn't silently credited to the previous player.
   const clearSel = (side: 'home' | 'away') => setSel((cur) => (cur[side] ? { ...cur, [side]: undefined } : cur));
-  const score = (side: 'home' | 'away', pts: number, p: Player | undefined = sel[side], fga = tracking) => {
+  // Deep wave: `zone` (Shot zones on), `fbt` (fast breaks being tagged —
+  // an edit keeps the original's), `fb` (an edit keeps the original's tag).
+  const score = (side: 'home' | 'away', pts: number, p: Player | undefined = sel[side], fga = tracking, opts: { zone?: ShotZone; fbt?: boolean; fb?: boolean } = {}) => {
     clearSel(side);
     fire({
       type: 'SCORE',
       side,
-      payload: { points: pts, ...(fga ? { fga: true } : {}), ...pidOf(p) },
+      payload: {
+        points: pts, ...(fga ? { fga: true } : {}), ...pidOf(p),
+        ...(opts.zone ? { zone: opts.zone } : {}), ...((opts.fbt ?? state.trackFastBreak === true) ? { fbt: true } : {}), ...(opts.fb ? { fb: true } : {}),
+      },
       attribution: p ? creditAttribution(p.id, p.fullName, makeCredits(pts, halfCourt, fga)) : undefined,
     });
     // SD-117 (B6): a made field goal asks "Assist?" (live plays only, not an edit)
     if (!edit && isFieldGoal(pts, halfCourt)) setAssistFor({ side, scorer: p, points: pts });
   };
-  const miss = (side: 'home' | 'away', pts: number, p: Player | undefined = sel[side]) => {
+  const miss = (side: 'home' | 'away', pts: number, p: Player | undefined = sel[side], zone?: ShotZone) => {
     clearSel(side);
-    fire({ type: 'MISS', side, payload: { points: pts, ...pidOf(p) }, attribution: p ? creditAttribution(p.id, p.fullName, missCredits(pts)) : undefined });
+    fire({ type: 'MISS', side, payload: { points: pts, ...pidOf(p), ...(zone ? { zone } : {}) }, attribution: p ? creditAttribution(p.id, p.fullName, missCredits(pts)) : undefined });
   };
+  // Deep wave — "Shot zones": a made / missed shot from a zone is one tap
+  // (inside the arc 2, behind it 3; half-court 1 and 2).
+  const zoneValue = (z: ShotZone) => (zoneBehindArc(z) ? (halfCourt ? 2 : 3) : (halfCourt ? 1 : 2));
+  const ZONE_BTN: { zone: ShotZone; short: string; long: string }[] = [
+    { zone: 'paint', short: 'Paint', long: 'in the paint' }, { zone: 'mid', short: 'Mid', long: 'mid-range' },
+    { zone: 'c3', short: 'Corner', long: 'from the corner' }, { zone: 'ab3', short: 'Top', long: 'above the break' },
+  ];
   const stat = (side: 'home' | 'away', type: string, key: string, p: Player) =>
     fire({ type, side, payload: pidOf(p), attribution: { playerId: p.id, stat: key, playerName: p.fullName } });
 
@@ -158,11 +177,14 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
   // held until the re-entry commits — Cancel keeps the play.
   const editEvent = (e: BBEvent) => { holdRemoval([removal(e)]); setShowEdit(false); setEditSel(null); setEdit(e); };
   const cancelEdit = () => { dropHeldRemoval(); setEdit(null); setEditSel(null); };
-  const commitEdit = (p: Player, points?: number) => {
+  const commitEdit = (p: Player, points?: number, zoneFor?: ShotZone) => {
     if (!edit) return;
-    if (edit.type === 'score') score(edit.side, points ?? 0, p, shotsTracked(state));
-    else if (edit.type === 'rebound') fire({ type: 'REBOUND', side: edit.side, payload: { ...(edit.reboundType ? { reboundType: edit.reboundType } : {}), ...pidOf(p) }, attribution: creditAttribution(p.id, p.fullName, reboundCredits(edit.reboundType)) });
-    else if (edit.type === 'foul') fire({ type: 'FOUL', side: edit.side, payload: { foulType: edit.foulType ?? 'personal', ...pidOf(p) }, attribution: { playerId: p.id, stat: 'fouls', playerName: p.fullName } });
+    if (edit.type === 'score') {
+      // Deep wave: the re-entered basket keeps its zone (same value) and fast-break detail
+      const keepZone = edit.zone && zoneValue(edit.zone) === points ? edit.zone : undefined;
+      score(edit.side, points ?? 0, p, shotsTracked(state), { zone: zoneFor ?? keepZone, fbt: edit.fbt === true, fb: edit.fb === true });
+    } else if (edit.type === 'rebound') fire({ type: 'REBOUND', side: edit.side, payload: { ...(edit.reboundType ? { reboundType: edit.reboundType } : {}), ...pidOf(p) }, attribution: creditAttribution(p.id, p.fullName, reboundCredits(edit.reboundType)) });
+    else if (edit.type === 'foul') fire({ type: 'FOUL', side: edit.side, payload: { foulType: edit.foulType ?? 'personal', ...pidOf(p), ...(edit.fdt ? { fdt: true } : {}), ...(edit.drawn ? { drawn: edit.drawn } : {}), ...(edit.drawnPid ? { drawnPid: edit.drawnPid } : {}) }, attribution: { playerId: p.id, stat: 'fouls', playerName: p.fullName } });
     else stat(edit.side, edit.type.toUpperCase(), STAT_KEY[edit.type], p);
     setEdit(null); setEditSel(null);
   };
@@ -202,7 +224,7 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
   // U / D / flagrant 2) — and a personal foul once the fouling side is over the
   // team-foul limit opens the bonus 2 (B8). A D foul, or a 2nd T / 2nd U / T + U,
   // disqualifies (B12): asked first in the ConfirmSheet, then logged + ejected.
-  const recordFoul = async (side: 'home' | 'away', fouler: Player, type: FoulType) => {
+  const recordFoul = async (side: 'home' | 'away', fouler: Player, type: FoulType, drawnBy?: Player | null) => {
     const dq = disqualifyingFoul(state, fouler.fullName, type, { side, pid: fouler.id });
     if (dq && !(await confirmMatchAction('eject', {
       what: fouler.fullName,
@@ -212,11 +234,13 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
     // SD-132 (FIBA 3×3 Art. 15): team foul 10+ → 2 free throws AND the ball
     const ball = possessionAfterFoul(state, side, type);
     const bonus = shots > 0 && (type === 'personal');
-    fire({ type: 'FOUL', side, payload: { foulType: type, ...pidOf(fouler) }, attribution: { playerId: fouler.id, stat: 'fouls', playerName: fouler.fullName } });
+    // Deep wave: "Fouls drawn" — the foul says it was tracked, and who drew it
+    const drawn = state.trackFoulsDrawn ? { fdt: true, ...(drawnBy ? { drawn: drawnBy.fullName, drawnPid: drawnBy.id } : {}) } : {};
+    fire({ type: 'FOUL', side, payload: { foulType: type, ...pidOf(fouler), ...drawn }, attribution: { playerId: fouler.id, stat: 'fouls', playerName: fouler.fullName } });
     if (dq) fireEject(side, fouler, dq);
     if (shots > 0) {
       const why = bonus ? `Bonus — ${nameOf(side)} are over the team-foul limit` : `${FOUL_LABEL[type]} foul on ${fouler.fullName}`;
-      setFlow({ kind: 'ft', side: opp(side), remaining: shots, total: shots, reason: `${why}${dq ? ` · ${fouler.fullName} disqualified` : ''} — ${shots} free throw${shots > 1 ? 's' : ''} for ${nameOf(opp(side))}${ball ? `, then ${nameOf(opp(side))} keep the ball (team foul ${teamFoulsThisQuarter(state, side) + 1})` : ''}` });
+      setFlow({ kind: 'ft', side: opp(side), ...(drawnBy && type !== 'technical' ? { shooter: drawnBy } : {}), remaining: shots, total: shots, reason: `${why}${dq ? ` · ${fouler.fullName} disqualified` : ''} — ${shots} free throw${shots > 1 ? 's' : ''} for ${nameOf(opp(side))}${ball ? `, then ${nameOf(opp(side))} keep the ball (team foul ${teamFoulsThisQuarter(state, side) + 1})` : ''}` });
     } else setFlow(null);
   };
 
@@ -323,12 +347,25 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
                 ))}
               </View>
             </>
+          ) : flow.type ? (
+            // Deep wave — "Fouls drawn": who was fouled (optional; a shooting
+            // foul's free throws then open with that shooter picked)
+            <>
+              <Text style={ctrl.meta}>{FOUL_LABEL[flow.type]} foul on {flow.fouler.fullName} — who was fouled? ({nameOf(opp(flow.side))})</Text>
+              <View style={ctrl.chips}>
+                {courtOf(opp(flow.side)).map((p) => (
+                  <SelectChip key={p.id} label={p.fullName} active={false} disabled={fouledOut(p)} onPress={() => void recordFoul(flow.side, flow.fouler!, flow.type!, p)} />
+                ))}
+                <SelectChip label="Skip" active={false} onPress={() => void recordFoul(flow.side, flow.fouler!, flow.type!, null)} />
+              </View>
+            </>
           ) : (
             <>
               <Text style={ctrl.meta}>{flow.fouler.fullName} — what kind of foul?</Text>
               <View style={ctrl.chips}>
                 {FOUL_TYPES.map((t) => (
-                  <SelectChip key={t} label={FOUL_LABEL[t]} active={false} onPress={() => void recordFoul(flow.side, flow.fouler!, t)} />
+                  <SelectChip key={t} label={FOUL_LABEL[t]} active={false}
+                    onPress={() => (state.trackFoulsDrawn && t !== 'technical' ? setFlow({ ...flow, type: t }) : void recordFoul(flow.side, flow.fouler!, t))} />
                 ))}
               </View>
               <Text style={ctrl.meta}>Free throws open next with the count filled in: technical 1; shooting, U, D, flagrant 2; a personal foul in the bonus 2. A D foul, or a 2nd T / 2nd U / T + U, disqualifies (asks first).</Text>
@@ -488,6 +525,15 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
             ))}
           </View>
         )}
+        {/* Deep wave: a charted basket can be re-entered with its zone */}
+        {edit.type === 'score' && editSel && (state.trackZones || edit.zone) && (
+          <View style={ctrl.chips}>
+            {ZONE_BTN.map((b) => (
+              <SelectChip key={b.zone} label={`+${zoneValue(b.zone)} ${b.short}`} accessibilityLabel={`${zoneValue(b.zone)} points ${b.long}`} active={edit.zone === b.zone}
+                onPress={() => commitEdit(editSel, zoneValue(b.zone), b.zone)} />
+            ))}
+          </View>
+        )}
       </View>
     );
   }
@@ -523,6 +569,7 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
   const toLine = (['home', 'away'] as const).map((side) => ({ side, t: toStatus(side) }));
   const toTracked = toLine.some(({ t }) => t.left != null);
 
+  const zones = state.trackZones === true;
   const ScoreSide = ({ side, name, variant }: { side: 'home' | 'away'; name: string; variant: 'home' | 'away' }) => {
     const roster = courtOf(side);
     const selected = sel[side];
@@ -538,6 +585,35 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
             ))}
           </View>
         )}
+        {zones ? (
+          // Deep wave — "Shot zones": every make / miss is still ONE tap, on the
+          // zone it came from (inside the arc 2, behind it 3; half-court 1 / 2).
+          // The and-one moves to the box after the basket.
+          <>
+            <View style={ctrl.row}>
+              {!halfCourt && <Button label="+1 FT" variant={variant} style={ctrl.flex} onPress={() => { clearSel(side); freeThrow(side, true, selected); }} />}
+              {ZONE_BTN.slice(0, 2).map((b) => (
+                <Button key={b.zone} label={`+${zoneValue(b.zone)} ${b.short}`} accessibilityLabel={`${zoneValue(b.zone)} points ${b.long}, ${name}`} variant={variant} style={ctrl.flex}
+                  onPress={() => score(side, zoneValue(b.zone), selected, tracking, { zone: b.zone })} />
+              ))}
+            </View>
+            <View style={ctrl.row}>
+              {ZONE_BTN.slice(2).map((b) => (
+                <Button key={b.zone} label={`+${zoneValue(b.zone)} ${b.short}`} accessibilityLabel={`${zoneValue(b.zone)} points ${b.long}, ${name}`} variant={variant} style={ctrl.flex}
+                  onPress={() => score(side, zoneValue(b.zone), selected, tracking, { zone: b.zone })} />
+              ))}
+            </View>
+            {tracking && (
+              <View style={ctrl.row}>
+                {ZONE_BTN.map((b) => (
+                  <Button key={b.zone} label={`⭕ ${b.short}`} accessibilityLabel={`Missed ${zoneValue(b.zone)}-pointer ${b.long}, ${name}`} variant="ghost" style={ctrl.flex}
+                    onPress={() => miss(side, zoneValue(b.zone), selected, b.zone)} />
+                ))}
+              </View>
+            )}
+          </>
+        ) : (
+          <>
         <View style={ctrl.row}>
           {/* SD-05: in a full-court game the only 1-point play is a free throw, so
               "+1 FT" logs a made free throw (FTM/FTA counted), not a 1-pt basket. */}
@@ -563,6 +639,8 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
               onPress={() => { score(side, n); setFlow({ kind: 'ft', side, shooter: selected, remaining: 1, total: 1, reason: `And-one — +${n} and the bonus free throw` }); }} />
           ))}
         </View>
+          </>
+        )}
       </View>
     );
   };
@@ -582,18 +660,36 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
       {/* SD-117 (B6): "Assist?" right after a make — the on-court teammates, or Skip */}
       {assistFor && (() => {
         const mates = courtOf(assistFor.side).filter((p) => p.id !== assistFor.scorer?.id && !fouledOut(p));
-        if (!mates.length) return null;
+        // Deep wave: ⚡ Fast break (tags this basket) and, with Shot zones on, 🔗 And-one
+        const fbOn = state.trackFastBreak === true;
+        const andOne = zones;
+        if (!mates.length && !fbOn && !andOne) return null;
+        const whose = assistFor.scorer ? `${assistFor.scorer.fullName}'s` : 'the';
         return (
           <View style={ctrl.assistBox}>
             <View style={ctrl.editHead}>
-              <Text style={[ctrl.label, ctrl.flex]} numberOfLines={2}>🅰️ Assist on {assistFor.scorer ? `${assistFor.scorer.fullName}'s` : 'the'} +{assistFor.points}?</Text>
-              <Button label="Skip" variant="ghost" onPress={() => setAssistFor(null)} />
+              <Text style={[ctrl.label, ctrl.flex]} numberOfLines={2}>{mates.length ? `🅰️ Assist on ${whose} +${assistFor.points}?` : `🏀 ${whose.replace(/^the$/, 'The')} +${assistFor.points}`}</Text>
+              <Button label={mates.length ? 'Skip' : 'Done'} variant="ghost" onPress={() => setAssistFor(null)} />
             </View>
-            <View style={ctrl.chips}>
-              {mates.map((p) => (
-                <SelectChip key={p.id} label={p.fullName} active={false} onPress={() => stat(assistFor.side, 'ASSIST', 'assists', p)} />
-              ))}
-            </View>
+            {mates.length > 0 && (
+              <View style={ctrl.chips}>
+                {mates.map((p) => (
+                  <SelectChip key={p.id} label={p.fullName} active={false} onPress={() => stat(assistFor.side, 'ASSIST', 'assists', p)} />
+                ))}
+              </View>
+            )}
+            {(fbOn || andOne) && (
+              <View style={ctrl.chips}>
+                {fbOn && (
+                  <SelectChip label="⚡ Fast break" accessibilityLabel="Fast break: tag this basket" active={assistFor.fb === true}
+                    onPress={() => { dispatch({ type: 'TAG', side: assistFor.side, payload: { fb: !assistFor.fb } }); setAssistFor({ ...assistFor, fb: !assistFor.fb }); }} />
+                )}
+                {andOne && (
+                  <SelectChip label="🔗 And-one" accessibilityLabel="And-one: log the bonus free throw" active={false}
+                    onPress={() => { setAssistFor(null); setFlow({ kind: 'ft', side: assistFor.side, shooter: assistFor.scorer, remaining: 1, total: 1, reason: `And-one — +${assistFor.points} and the bonus free throw` }); }} />
+                )}
+              </View>
+            )}
           </View>
         );
       })()}
@@ -842,16 +938,41 @@ const LiveExtras: NonNullable<SportPlugin<BasketballState>['LiveExtras']> = ({
   onPlayer,
 }) => {
   const s = state as BasketballState;
+  // Deep wave: three views — the commentary, the broadcast team stats (with
+  // the shot chart and game flow) and the FIBA box score.
+  const [view, setView] = useState<'pbp' | 'team' | 'box'>('pbp');
+  const starters = { home: startersOf(homeLineup), away: startersOf(awayLineup) };
   return (
     <View style={{ gap: theme.spacing(3) }}>
-      <Text style={ctrl.label}>Play-by-play</Text>
-      <Timeline events={s.events} clock={s} homeColor={homeColor} awayColor={awayColor} homeRoster={homeRoster} awayRoster={awayRoster} onPlayer={onPlayer} />
-      <Text style={ctrl.label}>Box score</Text>
-      <MatchBoxScore sport="basketball" source={basketballBox(s, { homeRoster, awayRoster, homeName, awayName })} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} onPlayer={onPlayer} />
-      {/* SD-50: biggest lead, lead changes, times tied, runs, bench points */}
-      <GameFlowCard sport="basketball" state={s} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} homeLineup={homeLineup} awayLineup={awayLineup} />
+      <View style={ctrl.chips}>
+        <SelectChip label="Play-by-play" active={view === 'pbp'} onPress={() => setView('pbp')} />
+        <SelectChip label="Team stats" active={view === 'team'} onPress={() => setView('team')} />
+        <SelectChip label="Box score" active={view === 'box'} onPress={() => setView('box')} />
+      </View>
+      {view === 'pbp' ? (
+        <PlayFeed groups={basketballFeed(s, { home: homeName, away: awayName })} homeColor={homeColor} awayColor={awayColor} homeRoster={homeRoster} awayRoster={awayRoster} onPlayer={onPlayer} allLabel="Game" />
+      ) : view === 'team' ? (
+        <>
+          <CategoryStatsPanel periods={bbPanelPeriods(s)} data={(scope) => basketballPanel(s, scope, { starters, now: Date.now() })}
+            homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} matchLabel="Game">
+            {(scope) => <ShotChart state={s} scope={scope} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} />}
+          </CategoryStatsPanel>
+          {/* SD-50: biggest lead, lead changes, times tied, runs, bench points */}
+          <GameFlowCard sport="basketball" state={s} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} homeLineup={homeLineup} awayLineup={awayLineup} />
+        </>
+      ) : (
+        <MatchBoxScore sport="basketball" show="box" source={basketballBox(s, { homeRoster, awayRoster, homeName, awayName })} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} onPlayer={onPlayer} />
+      )}
     </View>
   );
+};
+
+/** The match lineup's starters (bench points when no five was set on court). */
+const startersOf = (slots?: { playerId?: string; playerName?: string }[]) => {
+  const placed = (slots ?? []).filter((x) => x.playerId || x.playerName);
+  return placed.length
+    ? { ids: placed.map((x) => x.playerId).filter((x): x is string => !!x), names: placed.map((x) => x.playerName).filter((x): x is string => !!x) }
+    : undefined;
 };
 
 /** Broadcast-style board: the TOTAL score + a column of points per quarter, the
@@ -879,11 +1000,18 @@ const BasketballScoreboard: NonNullable<SportPlugin<BasketballState>['Scoreboard
  *  format; each make records its own `fga`, so past plays keep their credit). */
 const BASKETBALL_LIVE_SETTINGS: LiveSettings<BasketballState> = {
   title: '⚙️ Scoring settings',
-  hint: 'Capture only what this scorer can keep up with — applies to this match only.',
+  hint: 'Stats to track — capture only what this scorer can keep up with. A switch applies from the next play (earlier plays keep what they had); this match only.',
   mode: 'config',
-  fields: [{ key: 'trackMisses', label: 'Track missed shots', type: 'toggle', default: false, group: 'Stats captured', hint: 'Miss 2 / Miss 3 buttons — FG%, 3P% and full EFF' }],
-  read: (s) => ({ trackMisses: s.trackMisses === true }),
-  defaults: { trackMisses: false },
+  // Deep wave: each play stamps its own detail (`fga`, `zone`, `fbt`, `fdt`),
+  // so a config patch + replay never rewrites what earlier plays captured.
+  fields: [
+    { key: 'trackMisses', label: 'Track missed shots', type: 'toggle', default: false, group: 'Stats to track', hint: 'Miss 2 / Miss 3 buttons — FG%, 3P% and full EFF' },
+    { key: 'trackZones', label: 'Shot zones', type: 'toggle', default: false, group: 'Stats to track', hint: 'Paint / Mid / Corner / Top buttons instead of +2 / +3 — shot chart, points in the paint' },
+    { key: 'trackFastBreak', label: 'Fast-break points', type: 'toggle', default: false, group: 'Stats to track', hint: '⚡ Fast break after a basket' },
+    { key: 'trackFoulsDrawn', label: 'Fouls drawn', type: 'toggle', default: false, group: 'Stats to track', hint: 'Who was fouled (FD) — the free-throw shooter is then picked for you' },
+  ],
+  read: (s) => ({ trackMisses: s.trackMisses === true, trackZones: s.trackZones === true, trackFastBreak: s.trackFastBreak === true, trackFoulsDrawn: s.trackFoulsDrawn === true }),
+  defaults: { trackMisses: false, trackZones: false, trackFastBreak: false, trackFoulsDrawn: false },
 };
 
 export const basketballPlugin: SportPlugin<BasketballState> = {
@@ -948,6 +1076,10 @@ export const basketballPlugin: SportPlugin<BasketballState> = {
     { key: 'otFoulsCarry', label: 'Overtime team fouls carry over from the last quarter', type: 'toggle', default: true, advanced: true, hint: 'FIBA yes · NBA resets' },
     { key: 'overtimeMinutes', label: 'Overtime length (min)', type: 'number', default: 5, min: 1, max: 10, advanced: true, hint: 'played when tied after regulation; repeats until decided' },
     { key: 'trackMisses', label: 'Track missed shots', type: 'toggle', default: false, hint: 'Miss 2 / Miss 3 buttons — FG%, 3P% and full EFF' },
+    // Deep wave — "Stats to track" (off by default; the scorer can also switch them in ⚙️ Scoring settings)
+    { key: 'trackZones', label: 'Track shot zones', type: 'toggle', default: false, advanced: true, group: 'Stats to track', hint: 'Paint / mid-range / corner 3 / above-the-break buttons — shot chart, points in the paint' },
+    { key: 'trackFastBreak', label: 'Tag fast-break points', type: 'toggle', default: false, advanced: true, group: 'Stats to track', hint: '⚡ Fast break after a basket' },
+    { key: 'trackFoulsDrawn', label: 'Track fouls drawn', type: 'toggle', default: false, advanced: true, group: 'Stats to track', hint: 'who was fouled (FD in the box score)' },
     // SD-132: the stoppable game clock (start / stop on whistles, set time)
     { key: 'gameClock', label: 'Stoppable game clock', type: 'toggle', default: true, hint: 'Start / stop it on whistles — exact minutes, +/- and timeout limits' },
     { key: 'otTarget', label: 'Overtime: first to N points', type: 'number', default: 0, min: 0, max: 5, advanced: true, hint: '0 = timed overtime · 3×3: 2' },

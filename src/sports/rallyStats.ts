@@ -6,7 +6,11 @@
 import type { SportId } from '../core/types';
 import type { AwardDef, MvpDef, Qualifier, SectionDef, SportStatSchema, StatDef } from './statSchema.ts';
 import { ACES, POINTS } from './sharedStats.ts';
-import { DETAIL_HOWS, HOW_KEY, NET_KEY, STROKES, STROKES_CONCEDED, hasNetFlag, strokeKey, type DetailSport } from './pointDetail.ts';
+import {
+  DETAIL_HOWS, HOW_KEY, NET_KEY, NET_WORDS, RALLY_LABEL, STROKES, STROKES_CONCEDED, THIRD_LABEL, THIRD_SHOTS, TT_PHASE_LABEL, WINGS, WING_LABEL,
+  hasNetFlag, hasThirdShot, rallyBucketsOf, rallyKey, shotIdsOf, shotKey, shotLabel, strokeKey, wingKey,
+  type DepthSport, type DetailSport, type ThirdShot,
+} from './pointDetail.ts';
 
 // 'present' (SD-24): absolute statTotals keys, tracked wherever they're on the line
 const rec = (key: string, label: string, short: string, one: string): StatDef =>
@@ -180,8 +184,23 @@ const HOW_DEFS: Record<string, StatDef> = {
   [NET_KEY]: shot(NET_KEY, 'Net points won', 'net points won', 'net point won'),
 };
 
+/** Deep wave — the words a winner / error / service-fault key reads with
+ *  ("Smash winners", "Unforced errors (net kill)", "Service faults (foot
+ *  fault)"), as tennis/stats.ts. */
+const lowerBetter = { format: { unit: 'count' as const, better: 'lower' as const } };
+const WORDS: Record<'winner' | 'ue' | 'fe' | 'sf', { label: (s: string) => string; short: (s: string) => string; one: (s: string) => string; lower?: true }> = {
+  winner: { label: (s) => `${s} winners`, short: (s) => `${s.toLowerCase()} winners`, one: (s) => `${s.toLowerCase()} winner` },
+  ue: { label: (s) => `Unforced errors (${s.toLowerCase()})`, short: (s) => `unforced errors (${s.toLowerCase()})`, one: (s) => `unforced error (${s.toLowerCase()})`, lower: true },
+  fe: { label: (s) => `Forced errors (${s.toLowerCase()})`, short: (s) => `forced errors (${s.toLowerCase()})`, one: (s) => `forced error (${s.toLowerCase()})`, lower: true },
+  sf: { label: (s) => `Service faults (${s.toLowerCase()})`, short: (s) => `service faults (${s.toLowerCase()})`, one: (s) => `service fault (${s.toLowerCase()})`, lower: true },
+};
+const worded = (how: 'winner' | 'ue' | 'fe' | 'sf', key: string, word: string): StatDef =>
+  shot(key, WORDS[how].label(word), WORDS[how].short(word), WORDS[how].one(word), WORDS[how].lower ? lowerBetter : {});
+
 /** SD-107 — the point-detail stats of `sport`: winners / errors (+ by stroke),
- *  its serve outcomes, per-match rates and the winners / UE ratio. */
+ *  its serve outcomes, per-match rates and the winners / UE ratio. Deep wave
+ *  (not tennis — tennis/stats.ts has its own): winners / UE / FE by wing and
+ *  by the sport's shots, errors by type, service faults by type. */
 export function pointDetailStats(sport: DetailSport): StatDef[] {
   const out: StatDef[] = [];
   for (const h of DETAIL_HOWS[sport]) {
@@ -194,8 +213,17 @@ export function pointDetailStats(sport: DetailSport): StatDef[] {
       const lab = STROKES[st]?.label ?? st;
       out.push(h.how === 'winner'
         ? shot(strokeKey('winner', st)!, `${lab} winners`, `${lab.toLowerCase()} winners`, `${lab.toLowerCase()} winner`)
-        : shot(strokeKey('ue', st)!, `Unforced errors (${lab.toLowerCase()})`, `unforced errors (${lab.toLowerCase()})`, `unforced error (${lab.toLowerCase()})`, { format: { unit: 'count', better: 'lower' } }));
+        : h.how === 'sf'
+          ? worded('sf', strokeKey('sf', st)!, lab)
+          : shot(strokeKey('ue', st)!, `Unforced errors (${lab.toLowerCase()})`, `unforced errors (${lab.toLowerCase()})`, `unforced error (${lab.toLowerCase()})`, { format: { unit: 'count', better: 'lower' } }));
     }
+  }
+  if (sport !== 'tennis') {
+    const ws = DETAIL_HOWS[sport].filter((h) => h.wingShot).map((h) => h.how as 'winner' | 'ue' | 'fe');
+    for (const how of ws) for (const w of WINGS) out.push(worded(how, wingKey(how, w)!, WING_LABEL[w]));
+    // one label per shot id across sports (a key shared with tennis or another
+    // sport reads the same everywhere): "Drop shot winners", "Return …"
+    for (const how of ws) for (const id of shotIdsOf(sport)) out.push(worded(how, shotKey(how, id)!, shotLabel(undefined, id)));
   }
   out.push(
     { key: 'winnersPerMatch', label: 'Winners per match', leaderLabel: 'Most winners per match', source: 'derived', group: 'shots', format: { unit: 'decimal', dp: 1 },
@@ -219,8 +247,99 @@ export function shotSection(sport: DetailSport): SectionDef {
     if (h.how === 'stroke') extra.push(STROKES_CONCEDED);
   }
   if (hasNetFlag(sport)) extra.push(NET_KEY);
+  // deep wave — padel net points / pickleball kitchen line (tracked matches only)
+  const nw = sport !== 'tennis' ? NET_WORDS[sport] : undefined;
+  if (nw) extra.push(nw.keys.won, nw.keys.pct);
   const strokes = DETAIL_HOWS[sport].flatMap((h) => (h.strokes ?? []).map((st) => strokeKey(h.how, st)!));
-  return { id: 'shots', title: 'Shot making', rows: [...main.map((stat) => ({ stat })), ...extra.map((stat) => ({ stat })), ...strokes.map((stat) => ({ stat, hideZero: true }))] };
+  // deep wave — by wing, then by shot (a row shows once the player has one)
+  const ws = sport === 'tennis' ? [] : DETAIL_HOWS[sport].filter((h) => h.wingShot);
+  const wings = ws.flatMap((h) => WINGS.map((w) => wingKey(h.how, w)!));
+  const shots = ws.flatMap((h) => shotIdsOf(sport).map((id) => shotKey(h.how, id)!));
+  return { id: 'shots', title: 'Shot making', rows: [...main.map((stat) => ({ stat })), ...extra.map((stat) => ({ stat })), ...[...strokes, ...wings, ...shots].map((stat) => ({ stat, hideZero: true }))] };
+}
+
+// ------------------------------------- deep wave · rally length, net, 3rd shot --
+
+const pctOf = (key: string, label: string, num: string | string[], den: string | string[], group: string): StatDef => ({
+  key, label, source: 'derived', group, format: { unit: 'percent', dp: 0 }, agg: { kind: 'rate', num, den, scale: 100, dp: 0 },
+});
+const keyedIn = (group: string) => (key: string, label: string, short: string, one: string): StatDef => ({ key, label, short, one, group, coverage: 'keyed' });
+
+/** Deep wave — the depth keys statTotals writes for `sport` when the match
+ *  tracked them (racketMatchStats.ts `racketCareerKeys`), with their rates:
+ *    rally length   rl…Pts / rl…Won per bucket (the side's points / won);
+ *                   table tennis also serve3Pts / serve3Won (points ending
+ *                   by the 4th shot on own serve: serve & 3rd ball) and
+ *                   receive4Pts / receive4Won (on the opponent's: receive &
+ *                   4th ball) — the three-phase analysis with rl5;
+ *    net / kitchen  netPts / netPtsWon (padel, pickleball; the side's);
+ *    3rd shot       third{Drop,Drive,Lob} / …Won (pickleball; the serving
+ *                   side's 3rd shot and the rallies it won). */
+export function racketDepthStats(sport: DepthSport): StatDef[] {
+  const out: StatDef[] = [];
+  const rally = keyedIn('rally');
+  for (const b of rallyBucketsOf(sport)) {
+    // the labels tennis' keys of the same name read with (rl04Pts …)
+    const k = rallyKey(b), dash = b.replace('-', '–');
+    const phase = sport === 'tabletennis' ? TT_PHASE_LABEL[b] : undefined;
+    const full = phase ? `${RALLY_LABEL[b]} (${phase.replace(/ \(.*\)$/, '').toLowerCase()})` : RALLY_LABEL[b];
+    out.push(
+      rally(`${k}Pts`, `Points, rally ${full}`, `points (rally ${dash})`, `point (rally ${dash})`),
+      rally(`${k}Won`, `Points won, rally ${full}`, `points won (rally ${dash})`, `point won (rally ${dash})`),
+      pctOf(`${k}Pct`, `Points won % · rally ${full}`, `${k}Won`, `${k}Pts`, 'rally'),
+    );
+  }
+  if (sport === 'tabletennis') {
+    out.push(
+      rally('serve3Pts', 'Serve & 3rd ball points', 'serve & 3rd ball points', 'serve & 3rd ball point'),
+      rally('serve3Won', 'Serve & 3rd ball points won', 'serve & 3rd ball points won', 'serve & 3rd ball point won'),
+      rally('receive4Pts', 'Receive & 4th ball points', 'receive & 4th ball points', 'receive & 4th ball point'),
+      rally('receive4Won', 'Receive & 4th ball points won', 'receive & 4th ball points won', 'receive & 4th ball point won'),
+      pctOf('serve3Pct', 'Serve & 3rd ball won %', 'serve3Won', 'serve3Pts', 'rally'),
+      pctOf('receive4Pct', 'Receive & 4th ball won %', 'receive4Won', 'receive4Pts', 'rally'),
+    );
+  }
+  const nw = NET_WORDS[sport];
+  if (nw) {
+    // padel: tennis' net keys and words; pickleball: its own kitchen-line keys
+    const net = keyedIn('shots');
+    out.push(
+      net(nw.keys.pts, nw.points, nw.points.toLowerCase(), nw.one),
+      net(nw.keys.won, nw.won, nw.won.toLowerCase(), `${nw.one} won`),
+      pctOf(nw.keys.pct, `${nw.won} %`, nw.keys.won, nw.keys.pts, 'shots'),
+    );
+  }
+  if (hasThirdShot(sport)) {
+    const third = keyedIn('third');
+    const all = THIRD_SHOTS.map((t) => thirdKey(t));
+    for (const t of THIRD_SHOTS) {
+      const k = thirdKey(t), lab = THIRD_LABEL[t];
+      out.push(
+        third(k, `${lab}s`, `${lab}s`, lab),
+        third(`${k}Won`, `${lab}s · rally won`, `${lab}s (rally won)`, `${lab} (rally won)`),
+        pctOf(`${k}Pct`, `Rallies won after a ${lab} %`, `${k}Won`, k, 'third'),
+        pctOf(`${k}Share`, `${lab} use %`, k, all, 'third'),
+      );
+    }
+  }
+  return out;
+}
+/** Pickleball 3rd-shot career key: thirdDrop, thirdDrive, thirdLob. */
+export const thirdKey = (t: ThirdShot): string => `third${t.charAt(0).toUpperCase()}${t.slice(1)}`;
+
+/** Deep wave — the career sections for the depth keys (rows nobody tracked
+ *  hide): Rally length (table tennis: the three phases first) and pickleball's
+ *  3rd shot. */
+export function racketDepthSections(sport: DepthSport): SectionDef[] {
+  const rows = [
+    ...(sport === 'tabletennis' ? [{ stat: 'serve3Pct' }, { stat: 'receive4Pct' }] : []),
+    ...rallyBucketsOf(sport).map((b) => ({ stat: `${rallyKey(b)}Pct` })),
+  ];
+  const out: SectionDef[] = [{ id: 'rally', title: sport === 'tabletennis' ? 'Rally phases' : 'Rally length', rows }];
+  if (hasThirdShot(sport)) {
+    out.push({ id: 'third', title: '3rd shot', rows: THIRD_SHOTS.flatMap((t) => [{ stat: `${thirdKey(t)}Share` }, { stat: `${thirdKey(t)}Pct` }]) });
+  }
+  return out;
 }
 
 /** SD-107 — box columns: winners, unforced and forced errors (shown only when
@@ -254,10 +373,12 @@ export function rallyStats<S extends SportId>(sport: S, icon: string, opts: { se
       { ...POINTS, group: 'points', weight: 1 },
       ...racketRecordStats(!!opts.sets, true), ...racketServeStats(!!opts.sets), ...racketCareerStats(!!opts.sets),
       ...racketResultStats(opts.sets ? 'setsPct' : 'gamesPct'),
-      // SD-107 — optional point detail
+      // SD-107 — optional point detail (deep wave: + wing / shot / types)
       ...pointDetailStats(ds),
+      // deep wave — rally length / phases, net or kitchen line, 3rd shot
+      ...(ds === 'tennis' ? [] : racketDepthStats(ds)),
     ],
-    sections: [...racketSections(!!opts.sets), shotSection(ds)],
+    sections: [...racketSections(!!opts.sets), shotSection(ds), ...(ds === 'tennis' ? [] : racketDepthSections(ds))],
     careerView: 'sections',
     box: [{ columns: ['points', ...DETAIL_BOX] }],
     // SD-27 (GEN-14): racket leaders and awards rank by results, not rally

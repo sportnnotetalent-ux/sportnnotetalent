@@ -36,6 +36,19 @@ export interface LiveEvent {
   /** SD-107 — tennis 1st / 2nd serve, on points served while "1st / 2nd
    *  serve" tracking was on (absent = not tracked). A double fault is 2. */
   serve?: 1 | 2;
+  /** SD-157 — tennis "Net points" tracking: who came to the net on this
+   *  point (set by POINT_DETAIL). Absent = not marked (an older point, or
+   *  nobody came in). A legacy `pd.net` means the point winner was at net. */
+  atNet?: import('./pointDetail').NetMark;
+  /** SD-157 — tennis "Rally length" tracking: the shots in the rally, by
+   *  bucket (0–4 · 5–8 · 9+). Absent = not tracked on this point. */
+  rallyLen?: import('./pointDetail').RallyBucket;
+  /** SD-157 — tennis "Serve speed" tracking: km/h of the serve that started
+   *  the point (the 1st serve if it went in, else the 2nd). Absent = none. */
+  kmh?: number;
+  /** Deep wave (racket) — pickleball "3rd shot" tracking: the serving team's
+   *  3rd shot of the rally (drop / drive / lob). Absent = not tracked. */
+  third?: import('./pointDetail').ThirdShot;
   /** SD-117b — volleyball "Opp. fault" detail (optional): what went wrong
    *  (VB_ERROR_TYPES key) and the erring OPPONENT (charged `errors`). Only on
    *  faults logged with it. */

@@ -21,7 +21,11 @@ const pbStats: StatDef[] = ROUNDS.map((e) => ({
 export const archeryStats: SportStatSchema<'archery'> = {
   sport: 'archery',
   events: ARCH_ROUNDS.map((r) => ({ key: r.key, label: r.label, format: fmt })) satisfies MeasuredEventDef[],
-  filters: Object.fromEntries(ROUNDS.map((e) => [`m_${e.key}`, (l: StatLine) => l.stats?.[`m_${e.key}`] != null])),
+  filters: {
+    ...Object.fromEntries(ROUNDS.map((e) => [`m_${e.key}`, (l: StatLine) => l.stats?.[`m_${e.key}`] != null])),
+    // deep wave: ranking rounds that recorded their ends (older lines have X but no end count)
+    hasREnds: (l: StatLine) => l.stats?.rEnds != null,
+  },
   stats: [
     { key: 'comps', label: 'Competitions', short: 'competitions', one: 'competition', group: 'archery' },
     { key: 'arrows', label: 'Arrows', short: 'arrows', one: 'arrow', group: 'archery' },
@@ -43,13 +47,25 @@ export const archeryStats: SportStatSchema<'archery'> = {
     { key: 'rPlace', label: 'Ranking-round place', short: 'ranking place', group: 'line', format: { unit: 'count', better: 'lower' }, agg: { kind: 'min' } },
     { key: 'seeded', label: 'Seeded into match play', short: 'seeded', group: 'line' },
     { key: 'dq', label: 'Disqualified', short: 'DQ', group: 'line', format: { unit: 'count', better: 'lower' } },
+    // Deep wave: only on lines that wrote them (never a false 0)
+    { key: 'rEnds', label: 'Ranking ends', short: 'ranking ends', one: 'ranking end', group: 'archery', coverage: 'keyed' },
+    { key: 'n9', label: '9s', short: '9s', one: '9', group: 'archery', coverage: 'keyed' },
+    { key: 'bestEnd', label: 'Best end', short: 'best end', group: 'line', coverage: 'keyed', format: { unit: 'points', dp: 0 }, agg: { kind: 'max' } },
+    { key: 'xPerEnd', label: 'X per end', short: 'X / end', source: 'derived', group: 'archery', format: { unit: 'decimal', dp: 2 }, agg: { kind: 'rate', num: 'xs', den: 'rEnds', dp: 2, over: 'hasREnds', qualifier: { den: 12 } } },
+    { key: 'mArrows', label: 'Match arrows', short: 'match arrows', one: 'match arrow', group: 'matches', coverage: 'keyed' },
+    { key: 'mPts', label: 'Match points', short: 'match points', one: 'match point', group: 'matches', coverage: 'keyed' },
+    { key: 'mTens', label: 'Match 10s (incl. X)', short: 'match 10s', one: 'match 10', group: 'matches', coverage: 'keyed' },
+    { key: 'mXs', label: 'Match X', short: 'match X', group: 'matches', coverage: 'keyed' },
+    { key: 'mAvgArrow', label: 'Average arrow in matches', short: 'match avg arrow', source: 'derived', group: 'matches', format: { unit: 'points', dp: 2 }, agg: { kind: 'rate', num: 'mPts', den: 'mArrows', dp: 2, qualifier: { den: 15 } } },
+    { key: 'soW', label: 'Shoot-offs won', short: 'shoot-offs won', one: 'shoot-off won', group: 'matches', coverage: 'keyed' },
+    { key: 'soL', label: 'Shoot-offs lost', short: 'shoot-offs lost', one: 'shoot-off lost', group: 'matches', coverage: 'keyed' },
     ...markStats,
     ...pbStats,
   ],
   sections: [
     { id: 'bests', title: 'Personal bests', rows: pbStats.map((s) => ({ stat: s.key, hideZero: true })) },
-    { id: 'archery', title: 'Archery', rows: [{ stat: 'comps' }, { stat: 'arrows' }, { stat: 'avgArrow' }, { stat: 'tenRate' }] },
-    { id: 'matches', title: 'Match play', rows: [{ stat: 'mW' }, { stat: 'mL' }, { stat: 'sp' }] },
+    { id: 'archery', title: 'Archery', rows: [{ stat: 'comps' }, { stat: 'arrows' }, { stat: 'avgArrow' }, { stat: 'tenRate' }, { stat: 'xPerEnd', hideZero: true }] },
+    { id: 'matches', title: 'Match play', rows: [{ stat: 'mW' }, { stat: 'mL' }, { stat: 'sp' }, { stat: 'mAvgArrow', hideZero: true }] },
     { id: 'medals', title: 'Medals', rows: [{ stat: 'golds' }, { stat: 'silvers' }, { stat: 'bronzes' }] },
   ],
   careerView: 'measured',

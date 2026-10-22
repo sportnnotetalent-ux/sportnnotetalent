@@ -5,7 +5,7 @@ category: Tournaments
 audience: Organisers, Scorers, Players, Parents & fans
 sports: weightlifting
 order: 88
-updated: 2026-10-11
+updated: 2026-10-22
 ---
 
 A weightlifting meet is a list of bodyweight categories (say Senior Men 79 kg), each lifted in one session: three snatch attempts per lifter, then three clean & jerk attempts. You tap each decision on a phone; the app keeps the IWF lifting order, adds up totals, and updates medals, house points, records and profiles.
@@ -22,7 +22,14 @@ A weightlifting meet is a list of bodyweight categories (say Senior Men 79 kg), 
 4. **Opening weights (optional):** first snatch and clean & jerk in whole kilograms, or enter them at the weigh-in.
 5. Tap **Create event & weigh-in list**. Each lifter gets a drawn lot number: it sets the weigh-in order and breaks ties in the lifting order.
 
-> **Note:** The weight jump, the lifting order and the category lists are set once per meet in [competition rules](/guides/competition-rules-for-meets/).
+> **Note:** The weight jump, the lifting order, the category lists and the **Stats to track** are set once per meet in [competition rules](/guides/competition-rules-for-meets/).
+
+## Optional: stats to track
+Entry stays one tap per attempt unless the organiser switches more on in **Competition rules → Stats to track** before the meet:
+- **Referees' lights**: every attempt is entered as the three referees' white or red lights, so results and the commentary show 3-0 or 2-1 decisions. You can still use **3 lights** for a single attempt when this is off.
+- **Jury reversals**: a **⚖ Jury reverses** button under the last decision (and on each attempt in the lifter's row). The final decision counts; the referees' lights stay on record.
+
+Weight changes are always counted. The IWF allows two changes per attempt, so a third asks **A third change?** first. It is never refused, and the organiser can turn the limit off.
 
 ## Step by step: weigh-in
 1. Open the category. The **⚖️ Weigh-in** card lists lifters in lot order.
@@ -49,11 +56,13 @@ A weightlifting meet is a list of bodyweight categories (say Senior Men 79 kg), 
 - During the snatch, **Live — snatch standings** shows the order; after that, the live ranking is by total.
 
 ## What everyone sees
+- **Commentary:** every attempt as it happens, newest first, for example **Sn 2 · Asha Rao 88 kg — good lift (3-0)**, plus who leads, each new total, any no total, the snatch standings and the medals. It is built from the results, so a correction rewrites it.
+- **Session stats** on the results sheet: good lifts out of attempts per lift, openers made, the average jump, the heaviest lift, the winning margin, and (when recorded) split decisions, jury reversals and weight changes.
 - **Results sheet:** the total table plus **Snatch** and **Clean & jerk** tables, every attempt shown with no lifts in brackets: 85 (88) 88.
 - **House table:** on the Weightlifting page and the tournament's **Stats** tab.
 - **Best total by category** and **Meet records** for the snatch, the clean & jerk and the total per category; **School records** when a school hosts.
 - **Best lifters (Sinclair):** turn on **Sinclair totals** in **⚙ Medals & points** to compare across categories (IWF 2021–2024 coefficients).
-- **Lifter profiles:** competitions, medals, make rate (good lifts out of attempts), and personal and season bests per lift and total.
+- **Lifter profiles:** competitions, medals, make rate (good lifts out of attempts) overall, per lift and for openers, personal and season bests per lift and total, and the bests in each bodyweight category.
 
 ## Common questions
 ### Can a lifter repeat a weight?

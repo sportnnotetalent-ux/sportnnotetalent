@@ -28,7 +28,11 @@ import { mergeTotals, volleyballSetRecord } from '../racketTotals.ts';
 import { volleyballCredits, type VolleyballState } from './engine.ts';
 import { volleyballTotals } from './fieldTime.ts';
 import type { PointKind } from '../rallyEdit.ts';
-import { detailTally, detailTracked, receptionTracked, VB_ATTACK_KEYS, VB_RECEPTION_KEYS } from './detail.ts';
+import {
+  detailTally, detailTracked, receptionTracked, acedTracked, digTracked, assistTracked,
+  VB_ATTACK_KEYS, VB_RECEPTION_KEYS, VB_RECEPTION_ERROR_KEY, VB_DIG_KEY, VB_ASSIST_KEY,
+} from './detail.ts';
+import { rallyServers, serveTracked } from './rotation.ts';
 
 type Side = 'home' | 'away';
 
@@ -111,8 +115,16 @@ export const VOLLEYBALL_ERROR_KEY = 'errors';
 export function volleyballDetailTotals(s: VolleyballState, ctx: StatTotalsContext | undefined, lines: Record<string, StatTotalsEntry>): Record<string, StatTotalsEntry> {
   const attack = detailTracked(s);
   const recv = receptionTracked(s);
-  if (!attack && !recv) return {};
-  const keys: string[] = [...(attack ? VB_ATTACK_KEYS : []), ...(recv ? VB_RECEPTION_KEYS : [])];
+  // deep wave — reception errors (aced receivers named), digs, set assists:
+  // each only for a match that captured its category
+  const aced = acedTracked(s);
+  const dig = digTracked(s);
+  const assist = assistTracked(s);
+  if (!attack && !recv && !aced && !dig && !assist) return {};
+  const keys: string[] = [
+    ...(attack ? VB_ATTACK_KEYS : []), ...(recv || aced ? VB_RECEPTION_KEYS : []),
+    ...(aced ? [VB_RECEPTION_ERROR_KEY] : []), ...(dig ? [VB_DIG_KEY] : []), ...(assist ? [VB_ASSIST_KEY] : []),
+  ];
   const idx = nameIndex(s, ctx);
   for (const x of s.vd ?? []) if (x.playerId) idx[x.side].set(x.playerName, idx[x.side].get(x.playerName) ?? x.playerId);
   const zero = () => Object.fromEntries(keys.map((k) => [k, 0]));
@@ -127,6 +139,26 @@ export function volleyballDetailTotals(s: VolleyballState, ctx: StatTotalsContex
   return out;
 }
 
+/** Deep wave — `serveAttempts` per player id: the rallies each player served
+ *  (FIVB VIS serve attempts), from the toss + rotation (SD-58). Written only
+ *  when EVERY served rally of the match names its server (a match without
+ *  the toss, or with one side's rotation unknown, reads "not tracked" —
+ *  never a partial count); then on every line (0 for the rest). Penalty
+ *  points aren't served rallies. */
+export function volleyballServeAttemptTotals(s: VolleyballState, lines: Record<string, StatTotalsEntry>): Record<string, StatTotalsEntry> {
+  if (!s?.events || !serveTracked(s)) return {};
+  const rallies = rallyServers(s);
+  if (!rallies.length || rallies.some((r) => !r.serverId || !r.side)) return {};
+  const out: Record<string, StatTotalsEntry> = {};
+  for (const [id, e] of Object.entries(lines)) out[id] = { side: e.side, stats: { [VOLLEYBALL_SERVE_ATTEMPT_KEY]: 0 } };
+  for (const r of rallies) {
+    const line = out[r.serverId!] ?? (out[r.serverId!] = { side: r.side!, stats: { [VOLLEYBALL_SERVE_ATTEMPT_KEY]: 0 } });
+    line.stats[VOLLEYBALL_SERVE_ATTEMPT_KEY] += 1;
+  }
+  return out;
+}
+export const VOLLEYBALL_SERVE_ATTEMPT_KEY = 'serveAttempts';
+
 /** The plugin's `statTotals`: box keys, SD-29 sets played, SD-19 set record,
  *  SD-117b errors (only for a match that named an erring player), SD-58
  *  serve errors (only for a match that named a server who missed). */
@@ -134,6 +166,9 @@ export const volleyballStatTotals = (s: VolleyballState, ctx?: StatTotalsContext
   const base = mergeTotals(mergeTotals(volleyballBoxTotals(s, ctx), volleyballTotals(s)), volleyballSetRecord(s, ctx));
   const withErrors = mergeTotals(base, volleyballErrorTotals(s, ctx, base));
   const withServe = mergeTotals(withErrors, volleyballServeErrorTotals(s, ctx, withErrors));
-  // SD-81 — attack attempts / efficiency inputs and receptions (detail mode)
-  return mergeTotals(withServe, volleyballDetailTotals(s, ctx, withServe));
+  // SD-81 — attack attempts / efficiency inputs and receptions (detail mode);
+  // deep wave — reception errors, digs, set assists (their categories)
+  const withDetail = mergeTotals(withServe, volleyballDetailTotals(s, ctx, withServe));
+  // deep wave — serve attempts (every served rally's server known)
+  return mergeTotals(withDetail, volleyballServeAttemptTotals(s, withDetail));
 };

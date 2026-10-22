@@ -94,6 +94,14 @@ export function LiveSettingsCard({ settings: ls, state, eventCount, canScore, ca
                   return <SelectChip key={f.key} label={f.label} active={on} disabled={!access.editable} onPress={() => change(f.key, !on)} />;
                 })}
               </View>
+              {/* SD-157 — one line per option saying what it tracks */}
+              {it.fields.some((f) => f.hint) && (
+                <View style={{ gap: 2 }}>
+                  {it.fields.filter((f) => f.hint).map((f) => (
+                    <Text key={f.key} style={st.hint}><Text style={st.hintLabel}>{f.label}</Text> · {f.hint}</Text>
+                  ))}
+                </View>
+              )}
             </View>
           );
         }
@@ -141,6 +149,8 @@ const st = StyleSheet.create({
   note: { color: theme.colors.textMuted, fontSize: theme.font.small, fontWeight: '700' },
   section: { color: theme.colors.textMuted, fontSize: theme.font.tiny, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1, marginTop: theme.spacing(2), marginBottom: theme.spacing(1) },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing(2) },
+  hint: { color: theme.colors.textMuted, fontSize: theme.font.tiny },
+  hintLabel: { color: theme.colors.text, fontWeight: '700' },
   stepperRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(3) },
   stepperVal: { color: theme.colors.text, fontSize: theme.font.h3, fontWeight: '900', minWidth: 96, textAlign: 'center' },
   row: { flexDirection: 'row', gap: theme.spacing(3), marginTop: theme.spacing(2) },

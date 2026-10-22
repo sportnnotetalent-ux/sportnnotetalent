@@ -1,5 +1,5 @@
 /** SD-15 — basketball's stat schema (see ../statSchema.ts). PURE. */
-import type { Qualifier, SportStatSchema } from '../statSchema.ts';
+import type { Qualifier, SportStatSchema, StatDef } from '../statSchema.ts';
 
 /** SD-27 (BK-07) — FIBA ranks tournament leaders by per-game average, among
  *  players who played enough of their team's games. A school event is 3–5
@@ -18,6 +18,14 @@ import { hasKey } from '../statSchema.ts';
  *  player of such a game). Older and untracked games are left out of the
  *  rates instead of reading as a false 100%. */
 const SHOTS = { coverage: 'optional' as const, mode: 'trackMisses' };
+
+/** Deep wave — FG% by shot zone over the games that charted zones with
+ *  misses tracked (the zone's attempts key on the line). */
+const zoneRates: StatDef[] = ([['paint', 'Paint FG %', 'PNT%'], ['mid', 'Mid-range FG %', 'MID%'], ['c3', 'Corner 3 %', 'C3%'], ['ab3', 'Above-the-break 3 %', 'AB3%']] as const)
+  .map(([z, label, abbr]) => ({
+    key: `${z}Pct`, label, abbr, source: 'derived' as const, group: 'zones', format: { unit: 'percent' as const, dp: 0 }, coverage: 'keyed' as const,
+    agg: { kind: 'rate' as const, num: `${z}Made`, den: `${z}Att`, scale: 100, dp: 0 },
+  }));
 
 export const basketballStats: SportStatSchema<'basketball'> = {
   sport: 'basketball',
@@ -45,6 +53,23 @@ export const basketballStats: SportStatSchema<'basketball'> = {
     { key: 'oreb', label: 'Offensive rebounds', short: 'off. reb', abbr: 'OREB', group: 'defence' },
     { key: 'dreb', label: 'Defensive rebounds', short: 'def. reb', abbr: 'DREB', group: 'defence' },
     { key: 'ejections', label: 'Ejections', short: 'ejections', one: 'ejection', group: 'discipline' },
+    // Deep wave (court-team): statTotals-only keys, each written only for a
+    // match that tracked it ('keyed' — a line without the key is "not
+    // tracked", never 0). 2PM / 2PA: full-court games (2PA with misses
+    // tracked); shot zones: "Shot zones" on; FD: "Fouls drawn" on;
+    // fast-break points: "Fast-break points" on.
+    { key: 'twosMade', label: '2-pointers made', short: '2s', one: '2', abbr: '2PM', group: 'scoring', coverage: 'keyed' },
+    { key: 'twosAtt', label: '2-pointers attempted', short: '2P att', abbr: '2PA', group: 'scoring', coverage: 'keyed' },
+    { key: 'paintMade', label: 'Paint field goals made', short: 'paint FG made', abbr: 'PNT', group: 'zones', coverage: 'keyed' },
+    { key: 'paintAtt', label: 'Paint field goals attempted', short: 'paint FG att', abbr: 'PNTA', group: 'zones', coverage: 'keyed' },
+    { key: 'midMade', label: 'Mid-range field goals made', short: 'mid-range made', abbr: 'MID', group: 'zones', coverage: 'keyed' },
+    { key: 'midAtt', label: 'Mid-range field goals attempted', short: 'mid-range att', abbr: 'MIDA', group: 'zones', coverage: 'keyed' },
+    { key: 'c3Made', label: 'Corner 3s made', short: 'corner 3s', one: 'corner 3', abbr: 'C3', group: 'zones', coverage: 'keyed' },
+    { key: 'c3Att', label: 'Corner 3s attempted', short: 'corner 3 att', abbr: 'C3A', group: 'zones', coverage: 'keyed' },
+    { key: 'ab3Made', label: 'Above-the-break 3s made', short: 'above-the-break 3s', one: 'above-the-break 3', abbr: 'AB3', group: 'zones', coverage: 'keyed' },
+    { key: 'ab3Att', label: 'Above-the-break 3s attempted', short: 'above-the-break 3 att', abbr: 'AB3A', group: 'zones', coverage: 'keyed' },
+    { key: 'foulsDrawn', label: 'Fouls drawn', short: 'fouls drawn', one: 'foul drawn', abbr: 'FD', group: 'discipline', coverage: 'keyed' },
+    { key: 'fastBreakPoints', label: 'Fast-break points', short: 'fast-break pts', abbr: 'FBP', group: 'scoring', coverage: 'keyed' },
     // SD-29 (BK-10): from the starting five + subs (only when the five was set)
     { key: 'minutes', label: 'Minutes', short: 'mins', abbr: 'MIN', group: 'scoring', format: { unit: 'minutes' } },
     { key: 'plusMinus', label: 'Plus / minus', short: '+/-', abbr: '+/-', group: 'scoring', format: { unit: 'count' } },
@@ -65,6 +90,15 @@ export const basketballStats: SportStatSchema<'basketball'> = {
       agg: { kind: 'pair', a: 'fgMade', b: 'fgAtt', over: 'shotsTracked' } },
     { key: 'threesMA', label: '3-pointers (made-attempted)', abbr: '3PM-A', source: 'derived', group: 'scoring', ...SHOTS,
       agg: { kind: 'pair', a: 'threesMade', b: 'threesAtt', over: 'shotsTracked' } },
+    // Deep wave — 2-pointers (FIBA box 2PM-A / 2P%) and the shot zones (FG% by
+    // zone), over the games that wrote those keys
+    { key: 'twoPct', label: '2-point %', abbr: '2P%', source: 'derived', group: 'scoring', format: { unit: 'percent', dp: 0 }, coverage: 'keyed',
+      agg: { kind: 'rate', num: 'twosMade', den: 'twosAtt', scale: 100, dp: 0 } },
+    { key: 'twosMA', label: '2-pointers (made-attempted)', abbr: '2PM-A', source: 'derived', group: 'scoring', coverage: 'keyed',
+      agg: { kind: 'pair', a: 'twosMade', b: 'twosAtt', over: 'twosTracked' } },
+    ...zoneRates,
+    { key: 'fdpg', label: 'Fouls drawn per game', abbr: 'FD/G', source: 'derived', group: 'discipline', format: { unit: 'decimal', dp: 1 }, coverage: 'keyed',
+      agg: { kind: 'perGame', key: 'foulsDrawn', dp: 1 } },
     // SD-24 (BK-06) — the rest of the per-game line, career highs, triple-doubles
     { key: 'spg', label: 'Steals per game', abbr: 'SPG', source: 'derived', group: 'defence', format: { unit: 'decimal', dp: 1 }, agg: { kind: 'perGame', key: 'steals', dp: 1, qualifier: q }, tieBreak: [{ key: 'steals', better: 'higher' }] },
     { key: 'bpg', label: 'Blocks per game', abbr: 'BPG', source: 'derived', group: 'defence', format: { unit: 'decimal', dp: 1 }, agg: { kind: 'perGame', key: 'blocks', dp: 1, qualifier: q }, tieBreak: [{ key: 'blocks', better: 'higher' }] },
@@ -85,14 +119,20 @@ export const basketballStats: SportStatSchema<'basketball'> = {
     { key: 'doubleDoubles', label: 'Double-doubles', short: 'double-doubles', one: 'double-double', abbr: 'DD', source: 'derived', group: 'scoring',
       agg: { kind: 'countIf', keys: ['points', 'rebounds', 'assists', 'steals', 'blocks'], atLeast: 2, gte: 10 } },
   ],
-  filters: { withMinutes: (l) => l.stats?.minutes != null, shotsTracked: (l) => hasKey(l, 'fgAtt') },
+  filters: { withMinutes: (l) => l.stats?.minutes != null, shotsTracked: (l) => hasKey(l, 'fgAtt'), twosTracked: (l) => hasKey(l, 'twosAtt') },
   // SD-24 (BK-06) + SD-44: FG / 3P made-attempted and % over the games that
   // tracked missed shots (D8), EFF per game
   sections: [
     { id: 'averages', title: 'Per game', rows: ['ppg', 'rpg', 'apg', 'spg', 'bpg', 'effPg', 'topg', 'mpg'].map((stat) => ({ stat })) },
     { id: 'shooting', title: 'Shooting', rows: [
-      { stat: 'fgMA', label: 'Field goals' }, { stat: 'fgPct' }, { stat: 'threesMA', label: '3-pointers' }, { stat: 'threePct' },
+      { stat: 'fgMA', label: 'Field goals' }, { stat: 'fgPct' }, { stat: 'twosMA', label: '2-pointers' }, { stat: 'twoPct' },
+      { stat: 'threesMA', label: '3-pointers' }, { stat: 'threePct' },
       { stat: 'threesMade' }, { stat: 'freeThrowsMade' }, { stat: 'freeThrowsAtt' }, { stat: 'freeThrowPct' },
+    ] },
+    // Deep wave — the shot chart over a career (games with "Shot zones" on)
+    { id: 'zones', title: 'Shot zones', rows: [
+      { stat: 'paintPct', label: 'Paint' }, { stat: 'midPct', label: 'Mid-range' }, { stat: 'c3Pct', label: 'Corner 3' }, { stat: 'ab3Pct', label: 'Above-the-break 3' },
+      { stat: 'paintMade', label: 'Paint baskets', hideZero: true }, { stat: 'c3Made', label: 'Corner 3s', hideZero: true }, { stat: 'fastBreakPoints', hideZero: true },
     ] },
     { id: 'totals', title: 'Totals', rows: ['points', 'rebounds', 'oreb', 'dreb', 'assists', 'steals', 'blocks', 'turnovers', 'minutes', 'plusMinus'].map((stat) => ({ stat })) },
     { id: 'bests', title: 'Career highs', rows: [
@@ -100,7 +140,7 @@ export const basketballStats: SportStatSchema<'basketball'> = {
       { stat: 'highFgMade', label: 'Field goals made', hideZero: true }, { stat: 'highThrees', label: '3-pointers', hideZero: true },
       { stat: 'doubleDoubles', hideZero: true }, { stat: 'tripleDoubles', hideZero: true },
     ] },
-    { id: 'discipline', title: 'Discipline', rows: [{ stat: 'fouls' }, { stat: 'ejections' }] },
+    { id: 'discipline', title: 'Discipline', rows: [{ stat: 'fouls' }, { stat: 'foulsDrawn' }, { stat: 'fdpg' }, { stat: 'ejections' }] },
   ],
   careerView: 'sections',
   // SD-23 / SD-40 (BK-04) — the FIBA box score. MIN and +/- only once the five
@@ -111,9 +151,13 @@ export const basketballStats: SportStatSchema<'basketball'> = {
     { key: 'minutes', overallOnly: true },
     'points',
     { key: 'fg', abbr: 'FGM-A', label: 'Field goals made-attempted', pair: ['fgMade', 'fgAtt'] }, 'fgPct',
+    // Deep wave — FIBA's 2PM-A / 2P% (full-court games with misses tracked)
+    { key: 'two', abbr: '2PM-A', label: '2-pointers made-attempted', pair: ['twosMade', 'twosAtt'] }, 'twoPct',
     { key: 'three', abbr: '3PM-A', label: '3-pointers made-attempted', pair: ['threesMade', 'threesAtt'] }, 'threePct',
     { key: 'ft', abbr: 'FTM-A', label: 'Free throws made-attempted', pair: ['freeThrowsMade', 'freeThrowsAtt'] }, 'freeThrowPct',
     'oreb', 'dreb', 'rebounds', 'assists', 'steals', 'blocks', 'turnovers', 'fouls',
+    // Deep wave — fouls drawn (only when the match tracked them)
+    'foulsDrawn',
     { key: 'plusMinus', signed: true, total: false, overallOnly: true },
     'eff',
   ] }],

@@ -271,12 +271,14 @@ describe('records, stat lines, career, meet', () => {
     const f: Pick<PhaseFormat, 'discipline' | 'category'> = { discipline: 'shoot.10map', category: { age: 'Senior', gender: 'F', shots: 40 } };
     const r = rankEntries([shooter(1, ser([96, 95, 97, 94], [3, 2, 4, 1], 'integer')), shooter(2, ser([90, 91], [0, 1], 'integer'))], AP);
     const lines = shootLines(f, withQualification(r, { marks: new Map([['e1', 'q' as const]]), tieAtLine: [] }), 'qual');
-    assert.deepEqual(lines[0].stats, { comps: 1, qPlace: 1, pts: 382, shots: 40, xs: 10, xShots: 40, m_sh_10map_40: 382, qualified: 1 });
+    // deep wave: + bestSer (the best series as shot)
+    assert.deepEqual(lines[0].stats, { comps: 1, qPlace: 1, pts: 382, shots: 40, xs: 10, xShots: 40, m_sh_10map_40: 382, bestSer: 97, qualified: 1 });
     assert.equal(lines[1].stats.m_sh_10map_40, undefined); // 20 of 40 shots — not a match score
     assert.equal(shootMarkKey('shoot.10map', 60), 'm_sh_10map');
     const fin = rankEntries(Array.from({ length: 8 }, (_, i) => finalist(i + 1, flat(10 + (i + 1) / 10, 24))), AR);
     const fl = shootLines({ discipline: 'shoot.10mar' }, fin, 'final', eventAwards(fin, {}));
-    assert.deepEqual(fl.find((l) => l.playerId === 'p8')!.stats, { finals: 1, place: 1, fpts: 259.2, golds: 1, posPoints: 8 });
+    // deep wave: + fShots (the shots counted in the final score — the average final shot)
+    assert.deepEqual(fl.find((l) => l.playerId === 'p8')!.stats, { finals: 1, place: 1, fpts: 259.2, fShots: 24, golds: 1, posPoints: 8 });
   });
   test('career: PB per event and match length, average per 10 shots, inner-ten rate, finals reached', () => {
     const phases = new Map([

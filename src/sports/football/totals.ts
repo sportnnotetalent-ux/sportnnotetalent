@@ -32,6 +32,7 @@ import { mergeTotals } from '../racketTotals.ts';
 import type { FootballState } from './engine.ts';
 import type { FootballEvent, GoalType, StatEvent, StatKind } from './events.ts';
 import { footballTotals } from './fieldTime.ts';
+import { footballShotDetailTotals, optionalStatKeys, SHOT_DETAIL_KEYS } from './depth.ts';
 
 type Side = 'home' | 'away';
 const other = (s: Side): Side => (s === 'home' ? 'away' : 'home');
@@ -44,6 +45,7 @@ export const STAT_KEY: Partial<Record<StatKind, string>> = {
   shot: 'shots', foul: 'fouls', offside: 'offsides', tackle: 'tackles', interception: 'interceptions', save: 'saves',
   pass: 'passes', cross: 'crosses', dribble: 'dribbles', handball: 'handballs', attackContribution: 'attackingContributions',
   defenceContribution: 'defensiveContributions', penaltyWon: 'penaltiesWon', penaltyMissed: 'penaltiesMissed', block: 'blocks',
+  keyPass: 'keyPasses', clearance: 'clearances',
 };
 
 /** Everything one stat event credits its player live (key + extra). */
@@ -94,8 +96,8 @@ export function shootoutTotals(s: FootballState): Record<string, StatTotalsEntry
   return out;
 }
 
-/** Owned here but never credited live. */
-export const FOOTBALL_DERIVED_KEYS = ['headedGoals', 'ownGoals', 'minutes', 'cleanSheets', 'goalsConceded', ...SHOOTOUT_KEYS] as const;
+/** Owned here but never credited live (deep wave: the shot-detail keys). */
+export const FOOTBALL_DERIVED_KEYS = ['headedGoals', 'ownGoals', 'minutes', 'cleanSheets', 'goalsConceded', ...SHOOTOUT_KEYS, ...SHOT_DETAIL_KEYS] as const;
 
 /** name → id per side, from every id / name pair the state and ctx hold. A
  *  name seen with two different ids on one side is ambiguous (no id). */
@@ -175,7 +177,8 @@ export function footballBoxTotals(s: FootballState, ctx?: StatTotalsContext): Re
   // Zero-fill every owned key on the lines of players credited live, so the
   // sync sets each one (a key nobody has would otherwise not be owned). An
   // OG-only player gets just `ownGoals` (no false zeros on a new line).
-  const keys = [...FOOTBALL_STAT_KEYS, ...(eventsOk ? FOOTBALL_EVENT_KEYS : []), ...(ogOk && Object.keys(ogLines).length ? ['ownGoals'] : [])];
+  // deep wave: key passes / clearances only in a match that tracked them
+  const keys = [...FOOTBALL_STAT_KEYS, ...optionalStatKeys(s), ...(eventsOk ? FOOTBALL_EVENT_KEYS : []), ...(ogOk && Object.keys(ogLines).length ? ['ownGoals'] : [])];
   const out: Lines = {};
   const credited = [statLines, ...(eventsOk ? [eventLines] : [])];
   for (const lines of credited) {
@@ -201,4 +204,5 @@ export function footballBoxTotals(s: FootballState, ctx?: StatTotalsContext): Re
 /** The plugin's `statTotals`: box keys + own goals, then SD-29 minutes and
  *  SD-09 keeper clean sheets / goals conceded. */
 export const footballStatTotals = (s: FootballState, ctx?: StatTotalsContext): Record<string, StatTotalsEntry> =>
-  mergeTotals(footballBoxTotals(s, ctx), footballTotals(s));
+  // deep wave: + the shot-detail keys (only a match that tracked them)
+  mergeTotals(mergeTotals(footballBoxTotals(s, ctx), footballTotals(s)), footballShotDetailTotals(s));

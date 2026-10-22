@@ -5,7 +5,7 @@ category: Tournaments
 audience: Organisers, Scorers, Players, Parents & fans
 sports: canoe
 order: 91
-updated: 2026-10-11
+updated: 2026-10-22
 ---
 
 A canoe sprint regatta is a list of races, such as the K1 500 m Women or the C2 1000 m Men. Each race is a straight final, or heats, semi-finals and Finals A and B on a 9-lane course, as the ICF runs them. You type finish times on a phone. The app sends each boat to its next race, ranks the finals and credits every paddler. Slalom is not covered.
@@ -46,6 +46,8 @@ A canoe sprint regatta is a list of races, such as the K1 500 m Women or the C2 
 - **Finals A/B:** Final A decides the medals and places run on into Final B. After a 9-boat Final A, Final B's winner is 10th.
 - **House table, Fastest by event and Meet records** per boat, distance and category.
 - **Paddler profiles:** every paddler in the boat is credited with the race, time, place and medal. Profiles show races, A finals, medals and the best time per boat and distance.
+
+> **Tip:** With intermediate times on, the race analysis shows each boat's place at every split and how the winner raced. See [Track deeper race stats and follow the commentary](/guides/race-stats-and-live-commentary/).
 
 ## Common questions
 ### Do K1 and C1 records mix?
