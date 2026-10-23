@@ -1,13 +1,22 @@
 # How to share SportnNote
 
-*Updated 2026-10-07.*
+*Updated 2026-10-23.*
+
+## Easiest: Invite a friend (in the app)
+
+Profile → **💌 Invite a friend** (or Organize → 💌 Invite a friend). Pick them from your
+contacts or type their number, then tap **WhatsApp** or **SMS**: the message is written for
+you and carries your personal link (app.sportnnote.in/get/…). It shows the right steps for
+their phone (Android app, or the web app on iPhone), and once they sign up they follow you
+and you get a "joined from your invite" notification. Together in person? Show them the QR
+on that screen.
 
 ## Now (pilot, free)
 
 | | iPhone | Android |
 |---|---|---|
 | **What they get** | The web app | The APK (full app), or the web app |
-| **Link** | **app.sportnnote.in** (or the QR `docs/share/sportnnote-web-qr.png`) | **sportnnote.in** → Download for Android, or the APK link https://expo.dev/artifacts/eas/_feLnILGcdcNyvB-Iy1xeBHUJxgs2Ezdty_33X59VmY.apk (QR `docs/share/sportnnote-android-apk-qr.png`) |
+| **Link** | **app.sportnnote.in** (or the QR `docs/share/sportnnote-web-qr.png`) | **sportnnote.in** → Download for Android, or the APK link https://expo.dev/artifacts/eas/UMrJJ2h73-_liAP607tTRVyDVLGWbr8inMhWcDOjm64.apk (APK 39) (QR `docs/share/sportnnote-android-apk-qr.png`) |
 | **Install** | Open in **Safari** → Share → **Add to Home Screen**. It opens full-screen like an app. | Open the APK link → Download → allow "Install unknown apps" for the browser when asked → Install. |
 | **Updates** | Automatic: every `npm run web:publish` is live on next open. | Code-only changes: `npm run android:ota -- "what changed"` reaches installed APKs (downloaded on next open, applied on the open after). New native features: a new APK to send. |
 | **Missing** | No background push notifications, no QR scanning | Nothing |

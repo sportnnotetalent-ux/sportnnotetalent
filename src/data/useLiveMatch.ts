@@ -27,8 +27,8 @@ import { followStore } from './followStore';
 import { notify } from '../core/notifications';
 import type { MatchEventRecord, SportId } from '../core/types';
 import type { ScoreAction } from '../sports/types';
-import { mergeLog, eventKey, statReversals } from './eventLog';
-import { effectiveLog, undoAmendDeltas, AMEND_TYPE, type AmendOp } from '../sports/amend';
+import { mergeLog, eventKey, statReversals, deriveLog, newestEvent, logAction as toAction, type DerivedLog } from './eventLog';
+import { undoAmendDeltas, AMEND_TYPE, type AmendOp } from '../sports/amend';
 import { planAmendment } from './amendments';
 import { newUuid } from '../core/deviceId';
 import { canWriteWith, type LockStatus } from '../core/scoringLock';
@@ -37,14 +37,6 @@ import { createResultHold, type ResultHold } from './resultHold';
 import { pendingResults, flushPendingResults } from './pendingResults';
 import { tapFeedback, undoFeedback } from '../core/haptics';
 import { withMatchRecords } from '../sports/matchRecords'; // SD-51
-
-const toAction = (e: MatchEventRecord): ScoreAction => ({
-  type: e.type,
-  side: e.side ?? undefined,
-  payload: e.payload ?? undefined,
-  attribution: e.attribution ?? undefined,
-});
-
 
 export interface UseLiveMatch {
   state: unknown;
@@ -135,13 +127,29 @@ export function useLiveMatch(params: {
   const [state, setState] = useState<unknown>(() => plugin.createInitialState(config));
   const [syncing, setSyncing] = useState(!!matchId);
   const [eventCount, setEventCount] = useState(0);
-  const [lastStep, setLastStep] = useState<LastStep | null>(null);
+  const eventCountRef = useRef(eventCount);
+  eventCountRef.current = eventCount;
+  const [lastStep, setLastStepState] = useState<LastStep | null>(null);
+  const lastStepRef = useRef<LastStep | null>(null);
+  const setLastStep = (s: LastStep | null) => { lastStepRef.current = s; setLastStepState(s); };
 
   // Refs avoid stale closures inside the realtime callback and dispatch.
   const stateRef = useRef(state);
   const seqRef = useRef(0);
   // Events already applied here, by clientId (or seq for older events).
   const appliedRef = useRef<Set<string>>(new Set());
+  // Perf F-21 — the raw log as this device knows it (the last rebuild + taps and
+  // realtime events since), so Undo can step the board back before the server answers.
+  const rawRef = useRef<MatchEventRecord[]>([]);
+  // bumped whenever the log changes other than by a local Undo (a rebuild, a tap,
+  // a realtime event) — an Undo that ends up undoing nothing can tell whether
+  // the board it stepped back from is still the right one to put back
+  const logVersionRef = useRef(0);
+  // Undos in flight, the board before the first of them, and whether any popped
+  // its event (the last one of a burst reconciles with the server, once)
+  const undosInFlightRef = useRef(0);
+  const undoBurstRef = useRef<{ raw: MatchEventRecord[]; applied: Set<string>; seq: number; state: unknown; count: number; step: LastStep | null; version: number } | null>(null);
+  const undoPoppedRef = useRef(false);
   useSyncExternalStore(matchOutbox.subscribe, matchOutbox.getSnapshot, matchOutbox.getSnapshot);
   const rejectedCount = matchId && matchOutbox.isRejected(matchId) ? matchOutbox.pendingCount(matchId) : 0;
 
@@ -211,31 +219,20 @@ export function useLiveMatch(params: {
   // Re-derive the whole match from its event log (backend + any unsynced queue).
   // The single source of truth for sync: used on load, on undo, and — in live mode
   // — when an event is deleted upstream or the realtime channel reconnects.
+  const applyLog = (raw: MatchEventRecord[], d: DerivedLog) => {
+    rawRef.current = raw;
+    appliedRef.current = d.applied;
+    seqRef.current = d.maxSeq;
+    setBoth(d.state);
+    setEventCount(raw.length);
+    setLastStep(d.lastStep);
+  };
   const rebuildFromLog = useCallback(async () => {
     if (!matchId) return;
     // Published corrections (AMEND rows, parity #05) apply their edits on replay.
     const raw = mergeLog(await getMatchEvents(matchId), matchOutbox.getPending(matchId));
-    const events = effectiveLog(raw);
-    let s = plugin.createInitialState(config);
-    const applied = new Set<string>();
-    let maxSeq = 0;
-    let before: unknown = s;
-    for (const e of events) {
-      before = s;
-      s = plugin.reducer(s, toAction(e));
-      applied.add(eventKey(e));
-      maxSeq = Math.max(maxSeq, e.seq);
-    }
-    for (const e of raw) { applied.add(eventKey(e)); maxSeq = Math.max(maxSeq, e.seq); }
-    appliedRef.current = applied;
-    seqRef.current = maxSeq;
-    setBoth(s);
-    setEventCount(raw.length);
-    // The newest raw row is what Undo pops; an AMEND row isn't in `events` itself.
-    const tail = raw.reduce<(typeof raw)[number] | undefined>((m, e) => (!m || e.seq >= m.seq ? e : m), undefined);
-    setLastStep(!tail ? null : tail.type === AMEND_TYPE || events[events.length - 1] !== tail
-      ? { type: tail.type, prev: s, next: s }
-      : { type: tail.type, prev: before, next: s });
+    applyLog(raw, deriveLog(plugin, config, raw));
+    logVersionRef.current += 1;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [matchId, plugin, config]);
 
@@ -275,6 +272,8 @@ export function useLiveMatch(params: {
             const key = eventKey(e);
             if (appliedRef.current.has(key)) return; // already applied locally (optimistic)
             appliedRef.current.add(key);
+            rawRef.current = [...rawRef.current, e];
+            logVersionRef.current += 1;
             seqRef.current = Math.max(seqRef.current, e.seq);
             const prev = stateRef.current;
             const next = plugin.reducer(prev, toAction(e));
@@ -380,6 +379,8 @@ export function useLiveMatch(params: {
       // outbox sync it to the backend with retry. The snapshot is derived state,
       // so a best-effort update is fine — it catches up on the next synced event.
       matchOutbox.enqueue(matchId, rec);
+      rawRef.current = [...rawRef.current, rec];
+      logVersionRef.current += 1;
       void syncThenPersist(next).catch(() => {});
     },
     [plugin, matchId, canWrite, canScore, readOnly, sport, homeTeamName, awayTeamName, homeTeamId, awayTeamId, tournamentId, config]
@@ -394,28 +395,62 @@ export function useLiveMatch(params: {
     // SD-111: stop a held result's clock while the undo is in flight, so it can't
     // go out between popping the deciding tap and re-deriving the board.
     hold.pause();
+    // Perf F-21 — the board steps back AT ONCE: drop the newest event from the
+    // log this device holds and re-derive here (no network); the pop and the
+    // rebuild from the server below then confirm it — or put it back.
+    if (undosInFlightRef.current++ === 0) {
+      undoBurstRef.current = { raw: rawRef.current, applied: appliedRef.current, seq: seqRef.current, state: stateRef.current, count: eventCountRef.current, step: lastStepRef.current, version: logVersionRef.current };
+    }
+    const tail = newestEvent(rawRef.current);
+    if (tail) {
+      const rest = rawRef.current.filter((e) => e !== tail);
+      const d = deriveLog(plugin, config, rest);
+      d.applied.add(eventKey(tail)); // its realtime echo, if still on the way, stays ignored (as before)
+      applyLog(rest, d);
+    }
     // Undo the freshest event wherever it lives: an unsynced tap comes off the
     // outbox; otherwise pop it from the backend log (only the active scorer may).
-    let removed: MatchEventRecord | null;
+    let removed: MatchEventRecord | null = null;
     try {
       removed = matchOutbox.pendingCount(matchId) > 0 ? matchOutbox.popLast(matchId) : await popMatchEvent(matchId);
     } catch {
-      hold.resume();
-      return; // scoring moved to another device — the screen shows why
+      // scoring moved to another device — the screen shows why
     }
-    if (!removed) { hold.resume(); return; }
-    // Reverse every stat the event credited (attribution, its extras, and a second
-    // attribution such as a fielder's catch) — otherwise an undone goal lingers.
-    // A correction undoes exactly the stat changes it stored; anything else
-    // reverses the stats its own attribution credited.
-    const reversals = removed.type === AMEND_TYPE ? undoAmendDeltas(removed) : statReversals(removed);
-    for (const r of reversals) void recordStatLine({ matchId, playerId: r.playerId, sport, stat: r.stat, by: r.by, opponent: opponentFor(r) });
-    // Re-derive from the truncated log. In live mode this DELETE also reaches
-    // viewers' realtime subscriptions, which rebuild the same way.
-    await rebuildFromLog();
-    void syncThenPersist(stateRef.current).catch(() => {});
+    if (removed) {
+      // Reverse every stat the event credited (attribution, its extras, and a second
+      // attribution such as a fielder's catch) — otherwise an undone goal lingers.
+      // A correction undoes exactly the stat changes it stored; anything else
+      // reverses the stats its own attribution credited.
+      const reversals = removed.type === AMEND_TYPE ? undoAmendDeltas(removed) : statReversals(removed);
+      for (const r of reversals) void recordStatLine({ matchId, playerId: r.playerId, sport, stat: r.stat, by: r.by, opponent: opponentFor(r) });
+      undoPoppedRef.current = true;
+    } else {
+      hold.resume();
+    }
+    // The last Undo of a burst reconciles, once (the board never flickers back a
+    // step while the next undo is on its way).
+    if (--undosInFlightRef.current > 0) return;
+    const burst = undoBurstRef.current;
+    undoBurstRef.current = null;
+    if (undoPoppedRef.current) {
+      undoPoppedRef.current = false;
+      // Re-derive from the truncated log. In live mode this DELETE also reaches
+      // viewers' realtime subscriptions, which rebuild the same way.
+      await rebuildFromLog();
+      void syncThenPersist(stateRef.current).catch(() => {});
+      return;
+    }
+    // Nothing was undone (refused, or nothing to pop): the board as it was —
+    // or, if the log moved on meanwhile, as the server has it.
+    if (!burst || burst.raw === rawRef.current) return;
+    if (burst.version === logVersionRef.current) {
+      rawRef.current = burst.raw; appliedRef.current = burst.applied; seqRef.current = burst.seq;
+      setBoth(burst.state); setEventCount(burst.count); setLastStep(burst.step);
+    } else {
+      await rebuildFromLog().catch(() => undefined);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [matchId, canWrite, plugin, sport, rebuildFromLog, homeTeamName, awayTeamName]);
+  }, [matchId, canWrite, plugin, sport, config, rebuildFromLog, homeTeamName, awayTeamName]);
 
   // Wipe the match back to "not started" — for a game started/scored by mistake.
   // Drops unsynced taps, deletes the backend log + blanks stat lines, then rebuilds

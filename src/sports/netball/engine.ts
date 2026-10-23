@@ -36,6 +36,11 @@
  * over the state), so the absolute statTotals equal the live increments (SD-19).
  */
 import type { ScoreAction, LiveSettings, FormatField, Attribution } from '../types';
+// Perf F-15 — the format presets / options live in the light meta module.
+import { NETBALL_PRESETS, SUPER_SHOT_PRESETS, SUPER_SHOT_RULE_OPTIONS } from './meta.ts';
+import type { SuperShotRule, SuperShotPreset } from './meta.ts';
+export { NETBALL_PRESETS, SUPER_SHOT_PRESETS, SUPER_SHOT_RULE_OPTIONS };
+export type { SuperShotRule, SuperShotPreset };
 
 export type Side = 'home' | 'away';
 export const POSITIONS = ['GS', 'GA', 'WA', 'C', 'WD', 'GD', 'GK'] as const;
@@ -168,55 +173,14 @@ export interface NetballState {
 
 /* --------------------------------- format ---------------------------------- */
 
-/** Court-team round 2 — centre pass receives (CPR) are tracked by default on
- *  the international 4 × 15 preset (founder 2026-10-22; still switchable
- *  off). The other presets set it off, so a preset switch never carries it. */
-export const NETBALL_PRESETS: Record<string, { label: string; set: Record<string, number | string | boolean> }> = {
-  international: { label: 'International 4 × 15', set: { periods: 4, periodMinutes: 15, trackCpr: true } },
-  school: { label: 'School 4 × 10', set: { periods: 4, periodMinutes: 10, trackCpr: false } },
-  halves: { label: 'Halves 2 × 20', set: { periods: 2, periodMinutes: 20, trackCpr: false } },
-};
+// The format presets live in ./meta.ts (perf F-15: light, for the format
+// pickers); imported and re-exported at the top of this file.
 
 const bool = (v: unknown, d: boolean) => (v === undefined || v === null || v === '' ? d : v === true || v === 'true' || v === 1);
 const numOr = (v: unknown, d: number, min = 0) => { const n = Number(v); return Number.isFinite(n) && v !== '' && v != null ? Math.max(min, n) : d; };
 
 /* ------------------------------ super shots -------------------------------- */
 
-/** Court-team round 2 — the 2-point super-shot rule, an organiser choice
- *  (format key `superShotRule`). 'off' (the default) = the World Netball
- *  rules: the Netball World Cup, the Commonwealth Games and most leagues
- *  score every goal 1. The league presets as each league publishes them
- *  (verify each season): */
-export type SuperShotRule = 'off' | 'ssn' | 'nsl' | 'anz' | 'custom';
-export interface SuperShotPreset {
-  label: string;
-  /** what the scorer sees on the arm chip */
-  name: string;
-  /** where a 2-pointer is taken from (accessibility / hints) */
-  zone: string;
-  /** the window: the last N minutes of each regular quarter */
-  minutes: number;
-  /** also all through extra time (and the play-on after it) */
-  extraTime: boolean;
-}
-export const SUPER_SHOT_PRESETS: Record<'ssn' | 'nsl' | 'anz', SuperShotPreset> = {
-  // Suncorp Super Netball (Australia, since 2020): the "Super Shot" from the
-  // outer 1.9 m of the circle (the super-shot zone), last 5 minutes of each
-  // quarter (the "Power 5"), and all of extra time.
-  ssn: { label: 'Super Netball (AUS)', name: 'Super shot', zone: 'the super-shot zone', minutes: 5, extraTime: true },
-  // Netball Super League (UK, since 2025): two goals from the outer part of
-  // the circle, last 5 minutes of each quarter, and all of extra time.
-  nsl: { label: 'Super League (UK)', name: 'Super shot', zone: 'the outer circle', minutes: 5, extraTime: true },
-  // ANZ Premiership (New Zealand, since 2025): two points for a shot from
-  // 3.5 m or further (the FAST5 line), last 5 minutes of each quarter.
-  anz: { label: 'ANZ Premiership (NZ)', name: '2-point shot', zone: '3.5 m or further from the post', minutes: 5, extraTime: false },
-};
-/** The organiser's choices, in the order the format editor shows them. */
-export const SUPER_SHOT_RULE_OPTIONS: { value: SuperShotRule; label: string }[] = [
-  { value: 'off', label: 'Off (World Netball)' },
-  ...(Object.entries(SUPER_SHOT_PRESETS) as [SuperShotRule, SuperShotPreset][]).map(([value, p]) => ({ value, label: p.label })),
-  { value: 'custom', label: 'Custom window' },
-];
 const isRule = (v: unknown): v is SuperShotRule => v === 'off' || v === 'ssn' || v === 'nsl' || v === 'anz' || v === 'custom';
 
 /** The super-shot fields a stored config puts on the state ({} = none):

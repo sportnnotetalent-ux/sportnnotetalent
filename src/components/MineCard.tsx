@@ -6,17 +6,20 @@ import { Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { theme } from '../core/theme';
 import { Card, textStyles } from './ui';
 
-export function MineCard({ onTeams, onTournaments, onMatches, onCalendar }: {
+export function MineCard({ onTeams, onTournaments, onMatches, onCalendar, onInvite }: {
   onTeams: () => void;
   onTournaments: () => void;
   onMatches: () => void;
   onCalendar: () => void;
+  /** "Invite a friend" — your personal join link (2026-10-23) */
+  onInvite?: () => void;
 }) {
   const rows: { icon: string; label: string; hint: string; onPress: () => void }[] = [
     { icon: '🛡️', label: 'My teams', hint: 'Teams you play for, captain or run', onPress: onTeams },
     { icon: '🏆', label: 'My tournaments', hint: 'Hosting, playing, officiating, following', onPress: onTournaments },
     { icon: '📋', label: 'My matches', hint: 'Games you play, organise or score', onPress: onMatches },
     { icon: '📅', label: 'My calendar', hint: 'Everything of yours by date', onPress: onCalendar },
+    ...(onInvite ? [{ icon: '💌', label: 'Invite a friend', hint: 'WhatsApp or SMS them your link — Android or iPhone', onPress: onInvite }] : []),
   ];
   return (
     <Card style={{ gap: theme.spacing(1) }}>

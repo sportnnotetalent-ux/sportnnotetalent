@@ -44,6 +44,8 @@ import { handballFormation, HandballCourt } from './court';
 import { usePendingEdit } from '../usePendingEdit';
 import { BackfillBar, RowAction, confirmRemove } from '../TimelineControls';
 import { handballVoice, handballVoiceEnds } from '../voiceParsers';
+import { HANDBALL_META } from './meta';
+import { handballMatchRecords } from './records';
 
 const opp = (s: Side): Side => (s === 'home' ? 'away' : 'home');
 const uid = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
@@ -713,10 +715,8 @@ const HandballFacts = ({ state, homeName, awayName, homeColor, awayColor }: TabP
 /* --------------------------------- plugin ---------------------------------- */
 
 export const handballPlugin: SportPlugin<HandballState> = {
-  id: 'handball',
-  name: 'Handball',
-  icon: '🤾',
-  archetype: 'goal-time',
+  ...HANDBALL_META,
+  matchRecords: handballMatchRecords, // SD-51 (set by the registry before perf F-15)
   createInitialState: init,
   reducer,
   isComplete,
@@ -751,30 +751,6 @@ export const handballPlugin: SportPlugin<HandballState> = {
   formation: (perSide) => handballFormation(perSide),
   Court: HandballCourt,
   liveSettings: HANDBALL_LIVE_SETTINGS,
-  formatFields: [
-    {
-      key: 'preset', label: 'Format', type: 'preset', default: 'senior', onCreate: true,
-      options: [
-        ...Object.entries(HANDBALL_PRESETS).map(([value, p]) => ({ value, label: p.label, set: p.set })),
-        { value: 'custom', label: 'Custom' },
-      ],
-    },
-    { key: 'playersPerSide', label: 'Players per side (incl. keeper)', type: 'count', default: 7, min: 4, max: 7, advanced: true },
-    { key: 'periodMinutes', label: 'Minutes per half', type: 'number', default: 30, min: 1, max: 45, advanced: true },
-    { key: 'stopClock', label: 'Stop the clock for suspensions', type: 'toggle', default: true, advanced: true, hint: 'IHF 2:9 — the clock always stops for a team time-out' },
-    // deep wave: the optional "Stats to track" an organiser can switch on for an event
-    ...HANDBALL_TRACK_FIELDS.map((f) => ({ ...f, label: `Track ${f.label.charAt(0).toLowerCase()}${f.label.slice(1)}`, advanced: true })),
-    {
-      key: 'decider', label: 'If level at full time', type: 'choice', default: 'none',
-      options: [
-        { value: 'none', label: 'Draw stands (league)' },
-        { value: 'et2', label: 'Extra time 2 × 5, again if level, then 7 m throws (IHF)' },
-        { value: 'et', label: 'Extra time 2 × 5, then 7 m throws' },
-        { value: 'shootout', label: '7 m throws straight away' },
-      ],
-      hint: 'a knockout match needs a winner',
-    },
-  ],
 };
 
 const c = StyleSheet.create({

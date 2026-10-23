@@ -14,7 +14,7 @@ import { Card, EmptyState, LoadingState, ScreenTitle, SelectChip, Button, textSt
 import { useAuth } from '../core/auth';
 import { useFollow } from '../data/hooks';
 import { getMyScope, getTournaments } from '../data/repos';
-import { getSport } from '../sports/registry';
+import { getSportMeta } from '../sports/sportMeta';
 import { formatDayShort } from '../core/dates';
 import { todayIn, useUserTimeZone } from '../core/time';
 import type { Tournament } from '../core/types';
@@ -86,7 +86,7 @@ export default function MyTournamentsScreen() {
                   <Card style={{ gap: theme.spacing(1) }}>
                     <Text style={textStyles.body}>{t.name}</Text>
                     <Text style={textStyles.muted}>
-                      {t.sports.map((s) => getSport(s).icon).join(' ')} · {formatDayShort(t.startDate)} → {formatDayShort(t.endDate)}
+                      {t.sports.map((s) => getSportMeta(s).icon).join(' ')} · {formatDayShort(t.startDate)} → {formatDayShort(t.endDate)}
                     </Text>
                     <Text style={st.roles}>{roles.map((r) => ROLE_LABEL[r]).join(' · ')}</Text>
                   </Card>

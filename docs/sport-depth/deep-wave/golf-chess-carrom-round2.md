@@ -242,7 +242,17 @@ Putts per round was already a leader.
 ## 6. Follow-ups not built
 
 - ~~**Chess:** pasting a knockout game's moves after the whole match is over.~~ Wired 2026-10-22: the Scoring tab's after-match slot (`matchTabs.AfterMatch`) shows the same "Moves of a game already played" chips once the match ends. A forfeited game offers no paste.
-- **Chess:** a performance-rating award slot. Only the leader was asked for.
-- **Golf:** "chip-ins" and scrambling-by-distance splits. Both are free from `offGreen`.
+- ~~**Chess:** a performance-rating award slot. Only the leader was asked for.~~ Built 2026-10-23: a **Best performance rating** tournament slot (`tpr`, 📊, after Best score %).
+  - It ranks the leader's figure with the leader's minimum: 5 rated games, and an organiser's `leaderMins.tpr` changes both.
+  - It is offered only where ratings exist (`onlyIfTracked`). The tournament page now gives the Awards tab the same rated lines as the leader (`perfLines`).
+  - Ties: more games against rated opponents, then by name.
+  - The candidate line reads "1909 TPR · 5 rated games · 7 m". The `tpr` stat gained `short: 'TPR'`.
+- ~~**Golf:** "chip-ins" and scrambling-by-distance splits. Both are free from `offGreen`.~~ Chip-ins built 2026-10-23. Scrambling by distance was **not** built, because it isn't free.
+  - **Chip-ins** (`chipIn`): at least one shot from off the green and no putt. 3+ shots and then in still counts.
+  - The `chipIns` key is written only on a card kept with up and downs, so there it is a true 0. No other card gets the key.
+  - The round panel shows a "Chip-ins" row once someone on the card or in the field has one.
+  - The profile's "Around the green" section lists chip-ins.
+  - A **Most chip-ins** leader comes after the par averages. It is a count, like birdies, so it has no minimum, and only players with one rank.
+  - **Why no scrambling by distance:** the PGA TOUR's splits (< 10, 10–20, 20–30, > 30 yd) need the distance of the shot played from off the green. No card records that. `offGreen` counts shots, and `firstPutt` is the putt's length after the chip. It would need a new optional per-hole capture.
 - **Golf:** a metres view of the whole career (it shows yards plus metres for drives).
 - **Feature guides on sportnnote.in:** cover the metres option, up and downs, the repertoire, TPR, knockout move lists and the carrom foul-penalty option.

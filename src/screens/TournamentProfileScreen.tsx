@@ -24,7 +24,7 @@ import { PersonPicker } from '../components/PersonPicker';
 import { LogoPicker } from '../components/LogoPicker';
 import { MatchCard } from '../components/MatchCard';
 import { SectionHeader, SECTION_CAP } from '../components/SectionHeader';
-import { getSport, participantMode } from '../sports/registry';
+import { getSportMeta, participantMode } from '../sports/sportMeta';
 import { shareMessage } from '../core/share';
 import { tournamentShareText, tournamentLink, SHARE_BASE } from '../core/shareText';
 import { fixturesPrintHtml, fixturesShareText, type FixtureRow } from '../core/fixturesText';
@@ -78,7 +78,7 @@ import type { Tournament } from '../core/types';
 /** "🏏 T20 · Leather · Turf" — the sport's inline basics (preset + onCreate
  *  fields) that the tournament actually set; empty when none are set. */
 function basicsLine(t: Tournament, sport: SportId): string {
-  const plugin = getSport(sport);
+  const plugin = getSportMeta(sport);
   const fmt = (t.formats as Record<string, Record<string, unknown>> | undefined)?.[sport];
   if (!fmt) return '';
   const parts = inlineFieldKeys(plugin.formatFields).flatMap((k) => {
@@ -146,7 +146,7 @@ export default function TournamentProfileScreen() {
     if (!tournament) return;
     const share = () => void shareMessage(tournamentShareText({
       name: tournament.name,
-      sportLine: tournament.sports.map((sp) => `${getSport(sp).icon} ${getSport(sp).name}`).join(' · '),
+      sportLine: tournament.sports.map((sp) => `${getSportMeta(sp).icon} ${getSportMeta(sp).name}`).join(' · '),
       tournamentId: tournament.id,
     }), 'tournament');
     nav.setOptions({
@@ -311,7 +311,7 @@ export default function TournamentProfileScreen() {
     time: m.startsAt ? formatTime(m.startsAt, evZone) : '',
     home: m.homeTeam.name,
     away: m.awayTeam.name,
-    sportIcon: (tournament?.sports.length ?? 0) > 1 ? getSport(m.sport).icon : undefined,
+    sportIcon: (tournament?.sports.length ?? 0) > 1 ? getSportMeta(m.sport).icon : undefined,
     venue: m.venueName,
     stage: m.group ? `Group ${m.group}` : m.stage ? stageLabel(m.stage) : undefined,
   }));
@@ -431,19 +431,24 @@ export default function TournamentProfileScreen() {
   );
   // SD-43: cricket leaders by format / ball (the SD-25 line context)
   const tourList = useMemo(() => (tournament ? [tournament] : []), [tournament]);
-  const leaderScope = useLeaderSplits(activeSport, lines, matches, tourList);
+  // Round 2 — chess: the performance-rating keys from the players' ratings, for
+  // the TPR leader and (follow-up) the "Best performance rating" award slot.
+  // Not stored; only chess lines change.
+  const perfLines = useMemo(
+    () => (tournament?.sports.includes('chess')
+      ? withChessPerformance(lines, allPlayers.length ? allPlayers : players, (tournament.formats?.chess as Record<string, unknown> | undefined)?.timeControl)
+      : lines),
+    [lines, allPlayers, players, tournament?.sports, tournament?.formats],
+  );
+  const leaderScope = useLeaderSplits(activeSport, perfLines, matches, tourList);
   const categories = useMemo(
     () => {
       if (!activeSport) return [];
-      // Round 2 — chess: the performance-rating keys from the players' ratings (TPR leader)
-      const ls = activeSport === 'chess'
-        ? withChessPerformance(leaderScope.lines, allPlayers.length ? allPlayers : players, (tournament?.formats?.chess as Record<string, unknown> | undefined)?.timeControl)
-        : leaderScope.lines;
-      const cats = categoryLeaders(ls, players, activeSport, { matches, mins });
+      const cats = categoryLeaders(leaderScope.lines, players, activeSport, { matches, mins });
       // SD-49: golf in golf order — stroke play drops "Holes won"
       return activeSport === 'golf' ? golfLeaderCategories(cats, golfFmt) : cats;
     },
-    [leaderScope.lines, players, activeSport, matches, mins, golfFmt, allPlayers, tournament?.formats]
+    [leaderScope.lines, players, activeSport, matches, mins, golfFmt]
   );
   const saveMins = async (next: LeaderMins) => {
     if (!tournament || !activeSport) return;
@@ -578,7 +583,7 @@ export default function TournamentProfileScreen() {
       {/* ------------------------------ AWARDS ------------------------------ */}
       {activeTab === 'Awards' ? (
         <TournamentAwardsTab
-          tournament={tournament} matches={matches} lines={lines} players={players} savedMins={savedMins}
+          tournament={tournament} matches={matches} lines={perfLines} players={players} savedMins={savedMins}
           canManage={canManageHosts} myId={myId} myName={profile?.fullName}
           activeSport={activeSport} onSport={setSport}
           awards={awards} onSaved={setAwards}
@@ -626,7 +631,7 @@ export default function TournamentProfileScreen() {
               <View style={st.tags}>
                 {sports.map((s) => (
                   <TouchableOpacity accessibilityRole="button" key={s} activeOpacity={0.8} onPress={() => nav.navigate('SportHub', { tournamentId: tournament.id, sport: s, tournamentName: tournament.name })}>
-                    <Pill label={`${getSport(s).icon} ${getSport(s).name} ›`} />
+                    <Pill label={`${getSportMeta(s).icon} ${getSportMeta(s).name} ›`} />
                   </TouchableOpacity>
                 ))}
               </View>
@@ -655,7 +660,7 @@ export default function TournamentProfileScreen() {
                   const cfg = structureFromFormat(tournament.formats?.[s]);
                   return (
                     <Text key={s} style={textStyles.muted}>
-                      {sports.length > 1 ? `${getSport(s).icon} ${getSport(s).name}: ` : 'Format: '}
+                      {sports.length > 1 ? `${getSportMeta(s).icon} ${getSportMeta(s).name}: ` : 'Format: '}
                       {cfg ? describeStructure(cfg) : tournament.structure!.replace('_', ' + ')}
                     </Text>
                   );
@@ -791,7 +796,7 @@ export default function TournamentProfileScreen() {
                 const ms = meetSettings(fmt);
                 const sw = sp === 'swimming' ? swimMeetSettings(fmt) : null;
                 const n = meet.events.filter((e) => e.discipline.startsWith(eventPrefix(sp))).length;
-                const name = getSport(sp).name;
+                const name = getSportMeta(sp).name;
                 return (
                   <React.Fragment key={sp}>
                     <HubRow icon={eventWords(sp).icon} title={`${name} — events`} status={n ? `${n} event${n === 1 ? '' : 's'} · add, enter results` : 'None yet — add the first event'}
@@ -802,7 +807,7 @@ export default function TournamentProfileScreen() {
                 );
               }
               return (
-                <HubRow key={sp} icon={getSport(sp).icon} title={`${getSport(sp).name} — format & points`}
+                <HubRow key={sp} icon={getSportMeta(sp).icon} title={`${getSportMeta(sp).name} — format & points`}
                   status={`${cfg ? describeStructure(cfg) : 'Not set yet'} · ${pointsSystemLabel(sp, fmt)}`}
                   onPress={() => nav.navigate('SportSettings', { sport: sp, tournamentId: tournament.id })} />
               );
@@ -818,7 +823,7 @@ export default function TournamentProfileScreen() {
               // Americano sports run their own rotate-partners flow instead of fixtures.
               const amSport = tournament.sports.find((s) => structureFromFormat(tournament.formats?.[s])?.shape === 'americano');
               return amSport
-                ? <HubRow icon="🎾" title={`Americano — ${getSport(amSport).name}`} status="Rounds and partners" onPress={() => nav.navigate('Americano', { tournamentId: tournament.id, sport: amSport })} />
+                ? <HubRow icon="🎾" title={`Americano — ${getSportMeta(amSport).name}`} status="Rounds and partners" onPress={() => nav.navigate('Americano', { tournamentId: tournament.id, sport: amSport })} />
                 : (
                   <>
                     <HubRow icon="📅" title="Schedule a match" status="One fixture at a time" onPress={() => nav.navigate('ScheduleMatch', { tournamentId: tournament.id })} />
@@ -977,7 +982,7 @@ export default function TournamentProfileScreen() {
               <KeyboardAwareScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.chips}>
                 <SelectChip label="All sports" active={matchSport === 'all'} onPress={() => setMatchSport('all')} />
                 {sports.map((s) => (
-                  <SelectChip key={s} label={`${getSport(s).icon} ${getSport(s).name}`} active={matchSport === s} onPress={() => setMatchSport(s)} />
+                  <SelectChip key={s} label={`${getSportMeta(s).icon} ${getSportMeta(s).name}`} active={matchSport === s} onPress={() => setMatchSport(s)} />
                 ))}
               </KeyboardAwareScrollView>
             )}
@@ -1058,7 +1063,7 @@ export default function TournamentProfileScreen() {
             {!singleSport && (
               <KeyboardAwareScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.chips}>
                 {sports.map((s) => (
-                  <SelectChip key={s} label={`${getSport(s).icon} ${getSport(s).name}`} active={activeSport === s} onPress={() => setSport(s)} />
+                  <SelectChip key={s} label={`${getSportMeta(s).icon} ${getSportMeta(s).name}`} active={activeSport === s} onPress={() => setSport(s)} />
                 ))}
               </KeyboardAwareScrollView>
             )}
@@ -1066,7 +1071,7 @@ export default function TournamentProfileScreen() {
                 knockouts are never in a table (the bracket shows them). */}
             {isEventSport(activeSport) ? (
               // SD-90 / SD-94: athletics and swimming have no league table — the programme, leaders and records live on the sport's page.
-              <Button label={`${eventWords(activeSport).icon} ${getSport(activeSport).name} results, leaders & records`} variant="ghost"
+              <Button label={`${eventWords(activeSport).icon} ${getSportMeta(activeSport).name} results, leaders & records`} variant="ghost"
                 onPress={() => nav.navigate('SportHub', { tournamentId: tournament.id, sport: activeSport, tournamentName: tournament.name })} />
             ) : activeSport === 'golf' && golfStroke ? (
               // SD-49: stroke play / Stableford has a leaderboard, not a league table
@@ -1103,13 +1108,13 @@ export default function TournamentProfileScreen() {
               <LeagueTable
                 teams={[]}
                 onTeam={(teamId) => nav.navigate('Team', { teamId })}
-                emptyLabel={`No completed ${getSport(activeSport).name.toLowerCase()} matches yet.`}
+                emptyLabel={`No completed ${getSportMeta(activeSport).name.toLowerCase()} matches yet.`}
               />
             ) : null}
 
             {activeSport && !isEventSport(activeSport) && (categories.length > 0 || leaderScope.options.length > 0) && (
               <>
-                <Text style={[textStyles.h3, st.section]}>📈 {getSport(activeSport).name} leaders</Text>
+                <Text style={[textStyles.h3, st.section]}>📈 {getSportMeta(activeSport).name} leaders</Text>
                 <LeaderSplitChips scope={leaderScope} note="Leaders from" />
                 {categories.length > 0 ? (
                   <>
@@ -1150,7 +1155,7 @@ export default function TournamentProfileScreen() {
                     <View style={[st.dot, { backgroundColor: t.colorHex ?? theme.colors.surfaceAlt }]} />
                     <View style={{ flex: 1 }}>
                       <Text style={textStyles.body}>{t.name}</Text>
-                      <Text style={textStyles.muted}>{t.sports.map((s) => getSport(s).icon).join(' ')}</Text>
+                      <Text style={textStyles.muted}>{t.sports.map((s) => getSportMeta(s).icon).join(' ')}</Text>
                     </View>
                     <Text style={st.chevron}>›</Text>
                   </Card>

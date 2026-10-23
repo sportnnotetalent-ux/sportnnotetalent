@@ -7,7 +7,7 @@ import React from 'react';
 import { View, Text, TextInput, StyleSheet } from 'react-native';
 import { theme } from '../core/theme';
 import { FieldLabel, SelectChip, textStyles } from './ui';
-import { getSport } from '../sports/registry';
+import { getSportMeta } from '../sports/sportMeta';
 import { isEventSport } from '../sports/eventSports';
 import type { SportId, TournamentScoring } from '../core/types';
 
@@ -98,7 +98,7 @@ export function MedalScoringEditor({ sports, value, onChange }: {
               <Text style={textStyles.muted}>Places come from the bracket: final winner 1st, loser 2nd. A 3rd-place match decides 3rd; with none, both semi-final losers share 3rd. Tap a sport to always give both semi-final losers bronze.</Text>
               <View style={st.chips}>
                 {matchSports.map((s) => (
-                  <SelectChip key={s} label={`${getSport(s).icon} ${getSport(s).name}: ${shared[s] ? 'two bronzes' : '3rd-place match'}`} active={!!shared[s]} onPress={() => setShared(s, !shared[s])} />
+                  <SelectChip key={s} label={`${getSportMeta(s).icon} ${getSportMeta(s).name}: ${shared[s] ? 'two bronzes' : '3rd-place match'}`} active={!!shared[s]} onPress={() => setShared(s, !shared[s])} />
                 ))}
               </View>
             </>
@@ -110,7 +110,7 @@ export function MedalScoringEditor({ sports, value, onChange }: {
               <Text style={textStyles.muted}>Multiply a sport’s position points — e.g. a marquee sport worth 2×.</Text>
               {sports.map((s) => (
                 <View key={s} style={st.line}>
-                  <Text style={st.label}>{getSport(s).icon} {getSport(s).name}</Text>
+                  <Text style={st.label}>{getSportMeta(s).icon} {getSportMeta(s).name}</Text>
                   <Counter value={weights[s] ?? 1} min={1} max={5} onChange={(w) => setWeight(s, w)} suffix="×" />
                 </View>
               ))}

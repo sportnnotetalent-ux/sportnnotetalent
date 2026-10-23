@@ -13,7 +13,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { theme } from '../core/theme';
 import { Button, Card, Pill, ScreenTitle, SelectChip, TextField, FormError, LoadingState, textStyles } from '../components/ui';
 import { defaultsFor } from '../components/FormatEditor';
-import { SPORT_LIST, getSport } from '../sports/registry';
+import { SPORT_LIST, getSportMeta } from '../sports/sportMeta';
 import { useMatches, useTournamentById, useTournamentTeams } from '../data/hooks';
 import { addTournamentTeams, createMatch, getMyPlayerId, getMyTeams, getTeamsForOrg } from '../data/repos';
 import type { Team } from '../core/types';
@@ -117,7 +117,7 @@ export default function ImportScheduleScreen() {
 
   async function downloadTemplate() {
     if (!tournament) return;
-    const csv = templateCsv(tournament, entered, { matches: tourMatches, sportName: (id) => getSport(id).name, dateOrder: region.dateOrder });
+    const csv = templateCsv(tournament, entered, { matches: tourMatches, sportName: (id) => getSportMeta(id).name, dateOrder: region.dateOrder });
     const name = `${slugify(tournament.name)}-schedule.csv`;
     if (downloadText(name, 'text/csv;charset=utf-8', csv)) return;
     await Share.share({ title: name, message: csv });
@@ -163,7 +163,7 @@ export default function ImportScheduleScreen() {
             startsAt: d.startsAt,
             venueName: d.venueName,
             hostIds: myId ? [myId] : [],
-            format: matchFormatFor(tournament, d.sport, isEliminationStage(d.stage), defaultsFor(getSport(d.sport).formatFields ?? [], 'tournament')),
+            format: matchFormatFor(tournament, d.sport, isEliminationStage(d.stage), defaultsFor(getSportMeta(d.sport).formatFields ?? [], 'tournament')),
           });
         } catch (e) {
           setError(`Created ${done} of ${total}. Row #${r.line} failed: ${e instanceof Error ? e.message : String(e)}`);
@@ -210,7 +210,7 @@ export default function ImportScheduleScreen() {
             <Button label="⬇ Download template (CSV)" variant="ghost" onPress={() => void downloadTemplate()} />
             {tourSportTeams.length ? (
               <View style={st.chips}>
-                {tourSportTeams.map((t) => <Pill key={t.id} label={multiSport ? `${getSport(t.sport).icon} ${t.name}` : t.name} />)}
+                {tourSportTeams.map((t) => <Pill key={t.id} label={multiSport ? `${getSportMeta(t.sport).icon} ${t.name}` : t.name} />)}
               </View>
             ) : (
               <TouchableOpacity onPress={() => nav.navigate('TournamentTeams', { tournamentId: tid })} accessibilityRole="link">
@@ -319,7 +319,7 @@ function RowCard({ row: r, zone, skipped, created, onSkip, onFix, onAddTeams }: 
         )}
       </View>
       <Text style={st.teams} numberOfLines={2}>
-        {d ? `${getSport(d.sport).icon} ` : ''}{home} <Text style={st.vs}>vs</Text> {away}
+        {d ? `${getSportMeta(d.sport).icon} ` : ''}{home} <Text style={st.vs}>vs</Text> {away}
       </Text>
       {meta ? <Text style={textStyles.muted} numberOfLines={1}>{meta}</Text> : null}
       {!skipped && !created && r.issues.map((i, k) => (

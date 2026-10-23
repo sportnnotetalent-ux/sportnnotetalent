@@ -16,7 +16,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { theme } from '../core/theme';
 import { Button, TextField, SelectChip, ScreenTitle, Card, FieldLabel, FormError, textStyles } from '../components/ui';
 import { DateField } from '../components/DateTimeField';
-import { SPORT_LIST, getSport } from '../sports/registry';
+import { SPORT_LIST, getSportMeta } from '../sports/sportMeta';
 import { SPORT_SIDE_FIELDS, POSITION_HINT, SPORT_RATING_FIELDS } from '../data/sportProfileFields';
 import { cleanRatings, parseRating, validFideId } from '../data/chessRatings';
 import { parseIndex, showIndex } from '../data/golfLeaderboard';
@@ -393,7 +393,7 @@ export default function EditProfileScreen({ route, navigation }: Props) {
             const teams = d.teams ?? [];
             return (
               <Card key={s} style={{ gap: theme.spacing(2) }}>
-                <Text style={textStyles.h3}>{getSport(s).icon} {getSport(s).name}</Text>
+                <Text style={textStyles.h3}>{getSportMeta(s).icon} {getSportMeta(s).name}</Text>
                 <TextField
                   label="Position / role"
                   value={d.position ?? ''}

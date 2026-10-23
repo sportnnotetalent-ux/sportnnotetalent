@@ -16,7 +16,7 @@ import { MatchCard } from '../components/MatchCard';
 import { LiveGolfCards } from '../components/golf/LiveGolfCards';
 import { SectionHeader, SECTION_CAP } from '../components/SectionHeader';
 import { VoiceNav } from '../components/VoiceNav';
-import { SPORT_LIST, getSport } from '../sports/registry';
+import { SPORT_LIST, getSportMeta } from '../sports/sportMeta';
 import { tournamentStatus, matchProgress } from '../core/tournament';
 import { isSupabaseConfigured } from '../core/supabase';
 import { matchEligibility } from '../core/eligibility';
@@ -290,11 +290,11 @@ export default function HomeScreen() {
               activeOpacity={0.85}
               style={st.sportTile}
               accessibilityRole="button"
-              accessibilityLabel={`Open ${getSport(s).name}`}
+              accessibilityLabel={`Open ${getSportMeta(s).name}`}
               onPress={() => openSport(s)}
             >
-              <Text style={st.sportIcon}>{getSport(s).icon}</Text>
-              <Text style={[textStyles.body, { flex: 1 }]} numberOfLines={1}>{getSport(s).name}</Text>
+              <Text style={st.sportIcon}>{getSportMeta(s).icon}</Text>
+              <Text style={[textStyles.body, { flex: 1 }]} numberOfLines={1}>{getSportMeta(s).name}</Text>
               <Text style={st.chevron}>›</Text>
             </TouchableOpacity>
           ))}
@@ -308,7 +308,7 @@ export default function HomeScreen() {
             <Text style={st.sportIcon}>✨</Text>
             <View style={{ flex: 1 }}>
               <Text style={[textStyles.body, { fontWeight: '700' }]}>Try a new sport</Text>
-              <Text style={textStyles.muted}>{newSports.map((s) => getSport(s).icon).join(' ')} · {newSports.length} to explore</Text>
+              <Text style={textStyles.muted}>{newSports.map((s) => getSportMeta(s).icon).join(' ')} · {newSports.length} to explore</Text>
             </View>
             <Text style={st.chevron}>›</Text>
           </TouchableOpacity>

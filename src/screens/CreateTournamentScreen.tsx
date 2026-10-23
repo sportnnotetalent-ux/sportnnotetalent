@@ -24,7 +24,7 @@ import { CoHostPicker, type CoHost } from '../components/CoHostPicker';
 import { DivisionsEditor } from '../components/DivisionsEditor';
 import type { NewTournamentCategory } from '../core/types';
 import { LEAD_OPTIONS, DEFAULT_LEAD_MINUTES } from '../data/reminderPrefs';
-import { SPORT_LIST, getSport } from '../sports/registry';
+import { SPORT_LIST, getSportMeta } from '../sports/sportMeta';
 import { createTournament, getMyPlayerId, getPlayer } from '../data/repos';
 import { useAuth } from '../core/auth';
 import { notice } from '../core/confirm';
@@ -134,7 +134,7 @@ export default function CreateTournamentScreen() {
   const [formats, setFormats] = useState<FormatMap>(
     // A new tournament starts on each sport's international points system (D1).
     // SD-154: plus the creator's region units (a US swim meet starts in a 25-yard pool)
-    initialSport ? { [initialSport]: { ...withNewTournamentPoints(initialSport, defaultsFor(getSport(initialSport).formatFields ?? [], 'tournament')), ...regionFormatDefaults(initialSport, regionStore.get().units) } } : {}
+    initialSport ? { [initialSport]: { ...withNewTournamentPoints(initialSport, defaultsFor(getSportMeta(initialSport).formatFields ?? [], 'tournament')), ...regionFormatDefaults(initialSport, regionStore.get().units) } } : {}
   );
   // Per-sport settings live on their own screens via the shared draft — seed it
   // once with the initial defaults, and pull edits back when we return.
@@ -153,7 +153,7 @@ export default function CreateTournamentScreen() {
         setFormats((f) => { const { [s]: _, ...rest } = f; tournamentDraft.setFormat(s, {}); return rest; });
         return prev.filter((x) => x !== s);
       }
-      const fields = getSport(s).formatFields ?? [];
+      const fields = getSportMeta(s).formatFields ?? [];
       const seeded = { ...withNewTournamentPoints(s, fields.length ? defaultsFor(fields, 'tournament') : {}), ...regionFormatDefaults(s, regionStore.get().units) };
       setFormats((f) => ({ ...f, [s]: seeded }));
       tournamentDraft.setFormat(s, seeded);
@@ -279,12 +279,12 @@ export default function CreateTournamentScreen() {
           {/* Singles vs Doubles up front for racket sports — the first thing that
               shapes the whole competition (individuals vs pairs), so it's not buried
               in per-sport settings. */}
-          {sports.filter((s) => getSport(s).participantKind === 'both').map((s) => {
+          {sports.filter((s) => getSportMeta(s).participantKind === 'both').map((s) => {
             const pps = Number((formats[s] as Record<string, unknown> | undefined)?.playersPerSide ?? 1);
             const setPps = (n: number) => { tournamentDraft.setField(s, 'playersPerSide', n); setFormats(tournamentDraft.all() as FormatMap); };
             return (
               <View key={s} style={{ gap: theme.spacing(2) }}>
-                <FieldLabel>{getSport(s).icon} {getSport(s).name} — format</FieldLabel>
+                <FieldLabel>{getSportMeta(s).icon} {getSportMeta(s).name} — format</FieldLabel>
                 <View style={st.chips}>
                   <SelectChip label="👤 Singles" active={pps < 2} onPress={() => setPps(1)} />
                   <SelectChip label="👥 Doubles (pairs)" active={pps >= 2} onPress={() => setPps(2)} />

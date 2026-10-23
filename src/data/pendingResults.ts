@@ -9,7 +9,7 @@
  * completed snapshot (winner, W/L, standings → the follower push).
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getSport } from '../sports/registry';
+import { loadSport } from '../sports/registry';
 import { getMatchEvents, updateMatchSnapshot, syncMatchStatLines, matchStatTotals } from './repos';
 import { matchOutbox } from './matchOutbox';
 import { mergeLog } from './eventLog';
@@ -61,7 +61,7 @@ async function finalize(r: PendingResult): Promise<void> {
   await matchOutbox.hydrate(r.matchId);
   await matchOutbox.flush(r.matchId);
   const raw = mergeLog(await getMatchEvents(r.matchId), matchOutbox.getPending(r.matchId));
-  const plugin = getSport(r.sport as SportId);
+  const plugin = await loadSport(r.sport as SportId);
   let s: unknown = plugin.createInitialState(r.config);
   for (const e of effectiveLog(raw)) s = plugin.reducer(s, toAction(e));
   if (!plugin.isComplete(s as never)) return; // undone before the app closed — nothing to send

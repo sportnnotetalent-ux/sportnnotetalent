@@ -23,7 +23,7 @@ import { isEventSport } from '../sports/eventSports';
 import { canManageTournament } from '../core/org';
 import { useOrganizations } from '../data/hooks';
 import { getMyPlayerId } from '../data/repos';
-import { getSport } from '../sports/registry';
+import { getSportMeta } from '../sports/sportMeta';
 import { useLeagueData, useDivisions, useTournamentById } from '../data/hooks';
 import { useAuth } from '../core/auth';
 import { canScoreByRole, canOrganize } from '../core/roles';
@@ -40,7 +40,7 @@ export default function SportHubScreen() {
   const { params } = useRoute<RouteProp<RootStackParamList, 'SportHub'>>();
   const { tournamentId, sport, tournamentName } = params;
   const { profile } = useAuth();
-  const plugin = getSport(sport);
+  const plugin = getSportMeta(sport);
   const { matches, lines, players } = useLeagueData(tournamentId);
 
   // Title the nav bar after the tournament (breadcrumb ⟨ Annual Sports Meet 2026);

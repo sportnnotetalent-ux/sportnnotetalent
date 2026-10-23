@@ -13,7 +13,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { theme } from '../core/theme';
 import { Button, TextField, SelectChip, ScreenTitle, FieldLabel, FormError, textStyles } from '../components/ui';
 import { DateTimeField } from '../components/DateTimeField';
-import { SPORT_LIST, getSport } from '../sports/registry';
+import { SPORT_LIST, getSportMeta } from '../sports/sportMeta';
 import { useTeams, useTournamentById } from '../data/hooks';
 import { createSeries, createTeamTie, getMyPlayerId } from '../data/repos';
 import { TieSetup } from '../components/TieSetup';
@@ -107,7 +107,7 @@ export default function CreateSeriesScreen() {
         <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
           <ScreenTitle title="New series / tie" subtitle="Several matches, one winner" />
 
-          <Dropdown label="Sport" value={sport ? `${getSport(sport).icon}  ${getSport(sport).name}` : null} placeholder="Select a sport"
+          <Dropdown label="Sport" value={sport ? `${getSportMeta(sport).icon}  ${getSportMeta(sport).name}` : null} placeholder="Select a sport"
             options={SPORT_LIST.map((s) => ({ id: s.id, label: `${s.icon}  ${s.name}` }))} onPick={(id) => pickSport(id as SportId)} />
 
           {sport && (

@@ -6,7 +6,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import { theme } from '../core/theme';
 import { Card, EmptyState } from './ui';
 import { RankBadge, podiumColor } from './Rank';
-import { getSport } from '../sports/registry';
+import { getSportMeta } from '../sports/sportMeta';
 import type { MedalRow } from '../data/medalStandings';
 import type { SportId } from '../core/types';
 
@@ -39,7 +39,7 @@ export function MedalTable({ rows, emptyLabel = 'No results yet.' }: { rows: Med
                   they scored for this house. */}
               {r.perSport.map((p, k) => (
                 <Text key={`${p.sport}-${k}`} style={st.chip} numberOfLines={1}>
-                  {getSport(p.sport as SportId).icon} {p.shared ? '=' : ''}{ord(p.position)}{p.entrant ? ` ${p.entrant}` : ''} · {p.points}
+                  {getSportMeta(p.sport as SportId).icon} {p.shared ? '=' : ''}{ord(p.position)}{p.entrant ? ` ${p.entrant}` : ''} · {p.points}
                 </Text>
               ))}
               {/* SD-90: timed / measured events — placings and points per sport. */}
@@ -48,7 +48,7 @@ export function MedalTable({ rows, emptyLabel = 'No results yet.' }: { rows: Med
                 const pts = Math.round(evs.reduce((a, e) => a + e.points, 0) * 100) / 100;
                 return (
                   <Text key={`ev-${sp}`} style={st.chip} numberOfLines={1}>
-                    {getSport(sp as SportId)?.icon ?? '🏅'} {evs.length} {evs.length === 1 ? 'placing' : 'placings'} · {pts}
+                    {getSportMeta(sp as SportId)?.icon ?? '🏅'} {evs.length} {evs.length === 1 ? 'placing' : 'placings'} · {pts}
                   </Text>
                 );
               })}

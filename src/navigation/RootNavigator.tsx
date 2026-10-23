@@ -1,5 +1,5 @@
 import React, { Suspense, useEffect, useRef } from 'react';
-import { Text, View, ActivityIndicator, Platform } from 'react-native';
+import { Text, View, ActivityIndicator, Platform, Linking } from 'react-native';
 import { NavigationContainer, DefaultTheme, getStateFromPath, type LinkingOptions } from '@react-navigation/native';
 import { navRef } from './navRef';
 import { promptSignIn, takePendingRoute } from '../core/guest';
@@ -8,16 +8,16 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { theme } from '../core/theme';
 import { useAuth } from '../core/auth';
-import { registerForPush, setCurrentPlayerId } from '../core/notifications';
+import { listenForNotificationTaps, registerForPush, setCurrentPlayerId } from '../core/notifications';
 import { followStore } from '../data/followStore';
+import { applyPendingReferral } from '../data/referral';
 import { flushPendingResults } from '../data/pendingResults';
 import { getFollows, getFollowPrefs, savePushToken, getCaptainTeams, getMyPlayerId } from '../data/repos';
 import { captainStore } from '../data/captainStore';
 import { useReminderEngine } from '../data/reminders';
-import '../data/devSeed'; // registers window.__sportfolioSeedDemo() in dev only
-import '../data/teamTieDemoSeed'; // SD-48: __sportnnoteDemo.seedTeamTies() — demo mode (no backend) only
-import '../data/sd134DemoSeed'; // SD-134: __sportnnoteDemo.seedChessSwiss() / seedGolfDivisions() — demo mode only
-import '../data/sd137bDemoSeed'; // SD-137b: __sportnnoteDemo.seedTeamEvents() — demo mode only
+import { isSupabaseConfigured } from '../core/supabase';
+import { loadSport } from '../sports/registry';
+import type { SportId } from '../core/types';
 import '../data/matchRecordsBackfill'; // SD-51: registers __sportnnoteAdmin.backfillMatchRecords (console only)
 import { OnboardingOverlay } from '../components/OnboardingOverlay';
 import HomeScreen from '../screens/HomeScreen';
@@ -26,6 +26,8 @@ import DiscoverScreen from '../screens/DiscoverScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 const LiveScoringScreen = lazyScreen(() => import('../screens/LiveScoringScreen'));
 const InviteScreen = lazyScreen(() => import('../screens/InviteScreen'));
+const GetAppScreen = lazyScreen(() => import('../screens/GetAppScreen'));
+const InviteFriendScreen = lazyScreen(() => import('../screens/InviteFriendScreen'));
 const CorrectMatchScreen = lazyScreen(() => import('../screens/CorrectMatchScreen'));
 const EditTeamScreen = lazyScreen(() => import('../screens/EditTeamScreen'));
 const JoinTournamentScreen = lazyScreen(() => import('../screens/JoinTournamentScreen'));
@@ -115,6 +117,15 @@ import { lazyScreen, prefetchScreens } from './lazyScreens';
 import { regionStore } from '../core/region';
 import { marketForCountry, term } from '../core/markets';
 
+// Console seeders — perf F-25: loaded only where they do anything (their own
+// chunks on the web), so a live build neither downloads nor runs them.
+if (__DEV__) void import('../data/devSeed'); // registers window.__sportfolioSeedDemo() in dev only
+if (!isSupabaseConfigured) {
+  void import('../data/teamTieDemoSeed'); // SD-48: __sportnnoteDemo.seedTeamTies() — demo mode (no backend) only
+  void import('../data/sd134DemoSeed'); // SD-134: __sportnnoteDemo.seedChessSwiss() / seedGolfDivisions() — demo mode only
+  void import('../data/sd137bDemoSeed'); // SD-137b: __sportnnoteDemo.seedTeamEvents() — demo mode only
+}
+
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<TabParamList>();
 
@@ -122,7 +133,7 @@ const Tab = createBottomTabNavigator<TabParamList>();
 // the Join screen with the code prefilled.
 // Stack screens reachable by URL on web (/GolfRound?eventId=…). Keep in sync with
 // the <Stack.Screen> list below — a screen missing here just opens Home on refresh.
-const STACK_SCREENS = new Set<string>(['Americano', 'AssignScorers', 'AthleticsEventSetup', 'CorrectMatch', 'Bracket', 'Calendar', 'ClubHome', 'ClubSport', 'Clubs', 'MyTournaments', 'CompetitionRules', 'Contingents', 'Conversation', 'CreateClub', 'CreateCommunity', 'CreateListing', 'CreateSeries', 'CreateTournament', 'CricketLineup', 'DeleteAccount', 'DiscoverOrgs', 'EditMatch', 'EditProfile', 'EditTeam', 'EditTournament', 'Feedback', 'Following', 'GenerateFixtures', 'GolfCourseEdit', 'GolfRound', 'GolfRoundSetup', 'GuardianConsent', 'GuardianLink', 'HeadToHead', 'ImportSchedule', 'RosterImport', 'JoinClub', 'JoinTeam', 'JoinTournament', 'Legal', 'LineupEditor', 'LiveScoring', 'ManageChild', 'MatchLink', 'MatchSquad', 'MeetEntries', 'MeetTimetable', 'MessageReports', 'Messages', 'NotificationPrefs', 'RegionSettings', 'Notifications', 'Organization', 'OrganizerDashboard', 'PlayerProfile', 'Privacy', 'RecordBoard', 'ResultsEvent', 'ResultsLab', 'ScanQR', 'ScheduleMatch', 'Series', 'Settings', 'SportHub', 'SportProfile', 'SportSettings', 'Squad', 'Standings', 'Support', 'SwissRound', 'Team', 'TeamJourney', 'Teams', 'Tournament', 'TournamentTeams', 'TryNewSport', 'VerificationReview']);
+const STACK_SCREENS = new Set<string>(['Americano', 'AssignScorers', 'AthleticsEventSetup', 'CorrectMatch', 'Bracket', 'Calendar', 'ClubHome', 'ClubSport', 'Clubs', 'MyTournaments', 'CompetitionRules', 'Contingents', 'Conversation', 'CreateClub', 'CreateCommunity', 'CreateListing', 'CreateSeries', 'CreateTournament', 'CricketLineup', 'DeleteAccount', 'DiscoverOrgs', 'EditMatch', 'EditProfile', 'EditTeam', 'EditTournament', 'Feedback', 'Following', 'GenerateFixtures', 'GolfCourseEdit', 'GolfRound', 'GolfRoundSetup', 'GuardianConsent', 'GuardianLink', 'HeadToHead', 'InviteFriend', 'ImportSchedule', 'RosterImport', 'JoinClub', 'JoinTeam', 'JoinTournament', 'Legal', 'LineupEditor', 'LiveScoring', 'ManageChild', 'MatchLink', 'MatchSquad', 'MeetEntries', 'MeetTimetable', 'MessageReports', 'Messages', 'NotificationPrefs', 'RegionSettings', 'Notifications', 'Organization', 'OrganizerDashboard', 'PlayerProfile', 'Privacy', 'RecordBoard', 'ResultsEvent', 'ResultsLab', 'ScanQR', 'ScheduleMatch', 'Series', 'Settings', 'SportHub', 'SportProfile', 'SportSettings', 'Squad', 'Standings', 'Support', 'SwissRound', 'Team', 'TeamJourney', 'Teams', 'Tournament', 'TournamentTeams', 'TryNewSport', 'VerificationReview']);
 
 // Web deep links / refresh. React Navigation 7 only recognises screens listed in
 // `config`, and a URL that resolves to NO state makes it call resetRoot(undefined),
@@ -167,6 +178,8 @@ const linking: LinkingOptions<RootStackParamList> = {
       // Short share links (core/shareText.ts).
       MatchLink: 'm/:matchId',
       Invite: 'i/:playerId',
+      // "Join me on SportnNote" — a friend's personal invite.
+      GetApp: 'get/:from?',
       Tournament: 't/:tournamentId',
       GolfRound: 'g/:eventId',
       ResultsEvent: 'r/:phaseId',
@@ -178,6 +191,10 @@ const linking: LinkingOptions<RootStackParamList> = {
     },
   },
   getStateFromPath: (path, options) => {
+    // Perf F-15: a link straight to a match names its sport — fetch that sport's
+    // code alongside the screen's (on the web, its own chunk) instead of after it.
+    const linkedSport = /[?&]sport=([a-z_]+)/.exec(path)?.[1];
+    if (linkedSport) void loadSport(linkedSport as SportId).catch(() => undefined);
     const configured = getStateFromPath(path, options);
     if (configured) return configured;
     const [pathname, query = ''] = path.replace(/^\/+/, '').split('?');
@@ -250,7 +267,12 @@ export default function RootNavigator() {
   useEffect(() => {
     if (IS_OVERLAY) return; // the overlay page never registers push or loads follows
     if (!authed) { setCurrentPlayerId(null); return; }
-    Promise.all([getFollows(profile?.id), getFollowPrefs(profile?.id)]).then(([keys, prefs]) => followStore.hydrate(keys, prefs));
+    Promise.all([getFollows(profile?.id), getFollowPrefs(profile?.id)]).then(([keys, prefs]) => followStore.hydrate(keys, prefs))
+      // opened a friend's invite before signing up: follow them now (data/referral.ts)
+      .then(() => (profile?.id ? applyPendingReferral(profile.id) : null))
+      .catch(() => undefined);
+    // a tapped push with an in-app link opens that screen (e.g. a friend who joined)
+    void listenForNotificationTaps((url) => { void Linking.openURL(url); });
     getCaptainTeams(profile?.id).then((ids) => captainStore.hydrate(ids));
     // Know my own player id so notify() can tell "for me" (show locally) from "for
     // someone else" (deliver as a remote push to their device).
@@ -313,6 +335,7 @@ export default function RootNavigator() {
     <>
       <Stack.Screen name="MatchLink" component={MatchLinkScreen} options={{ ...stackScreenOpts, title: 'Match' }} />
       <Stack.Screen name="Invite" component={InviteScreen} options={{ ...stackScreenOpts, title: 'Join SportnNote' }} />
+      <Stack.Screen name="GetApp" component={GetAppScreen} options={{ ...stackScreenOpts, title: 'Join SportnNote' }} />
       <Stack.Screen
       name="LiveScoring"
       component={LiveScoringScreen}
@@ -419,6 +442,7 @@ export default function RootNavigator() {
           <>
             <Stack.Screen name="Tabs" component={Tabs} options={{ headerShown: false }} />
             {publicScreens}
+            <Stack.Screen name="InviteFriend" component={InviteFriendScreen} options={{ ...stackScreenOpts, title: 'Invite a friend' }} />
             <Stack.Screen
               name="CreateTournament"
               component={CreateTournamentScreen}

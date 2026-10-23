@@ -12,6 +12,7 @@ import { View, Text } from 'react-native';
 import { theme } from '../../core/theme';
 import { textStyles } from '../../components/ui';
 import type { SportPlugin } from '../types';
+import { ARCHERY_META } from './meta';
 
 export interface ArcheryMatchState { ended: boolean }
 
@@ -23,11 +24,7 @@ const ScoringControls: SportPlugin<ArcheryMatchState>['ScoringControls'] = () =>
 );
 
 export const archeryPlugin: SportPlugin<ArcheryMatchState> = {
-  id: 'archery',
-  name: 'Archery',
-  icon: '🏹',
-  archetype: 'measured',
-  participantKind: 'individual',
+  ...ARCHERY_META,
   createInitialState: () => ({ ended: false }),
   reducer: (s) => s,
   isComplete: (s) => s.ended,
@@ -35,15 +32,4 @@ export const archeryPlugin: SportPlugin<ArcheryMatchState> = {
   summary: () => ({ homeScore: '', awayScore: '', statusLine: 'Archery event', detailLine: 'Scores are entered on the event page' }),
   ScoringControls,
   correctable: false,
-  formatFields: [
-    {
-      key: 'pointsScheme', label: 'Position points', type: 'choice', default: '8,7,6,5,4,3,2,1', onCreate: true,
-      hint: 'points each place earns for its house / team; tied places share (archers out in the same match-play round share a place)',
-      options: [
-        { value: '8,7,6,5,4,3,2,1', label: '8-7-6-5-4-3-2-1' },
-        { value: '10,8,6,5,4,3,2,1', label: '10-8-6-5-4-3-2-1' },
-        { value: '5,3,1', label: '5-3-1 (medals only)' },
-      ],
-    },
-  ],
 };

@@ -8,7 +8,7 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { theme } from '../core/theme';
 import { Card, Pill, Button, EmptyState, textStyles } from './ui';
-import { getSport } from '../sports/registry';
+import { getSportMeta } from '../sports/sportMeta';
 import { useListings } from '../data/hooks';
 import { PlayerFilters, activeFilterCount, type PlayerFilterState } from './PlayerFilters';
 import { useAuth } from '../core/auth';
@@ -84,14 +84,14 @@ export function ConnectBoard() {
           <Card key={l.id} style={st.card}>
             <View style={st.cardHead}>
               <Pill label={`${meta.icon} ${meta.short}`} color={theme.colors.surfaceAlt} textColor={theme.colors.accent} />
-              <Text style={st.sportIcon}>{getSport(l.sport).icon}</Text>
+              <Text style={st.sportIcon}>{getSportMeta(l.sport).icon}</Text>
               <View style={{ flex: 1 }} />
               <Text style={textStyles.muted}>{timeAgo(l.createdAt, now)}</Text>
             </View>
 
             <Text style={textStyles.h3} numberOfLines={1}>{title}</Text>
             <Text style={textStyles.muted} numberOfLines={1}>
-              {getSport(l.sport).name}
+              {getSportMeta(l.sport).name}
               {l.position ? ` · ${l.position}` : ''}
               {l.city ? ` · 📍 ${l.city}` : ''}
             </Text>

@@ -22,7 +22,7 @@ import { isSupport } from '../core/roles';
 import { TextField } from './ui';
 import { activeOrgsForPlayer, pastOrgsForPlayer, roleInOrg, memberEntry, membershipPeriod, isAcademicCommunity, currentStandard } from '../core/org';
 import { teamsByRecency, teamPeriod, type TeamAffiliation } from '../core/teams';
-import { getSport } from '../sports/registry';
+import { getSportMeta } from '../sports/sportMeta';
 import { sportSummary, hasPartialCoverage, recordText } from '../data/stats';
 import { profileHeadline } from '../data/profileHeadline';
 import type { Player, SportId } from '../core/types';
@@ -187,7 +187,7 @@ export function ProfileView({
           </Text>
           <View style={st.tagRow}>
             {player.sports.map((s) => (
-              <Pill key={s} label={`${getSport(s).icon} ${getSport(s).name}`} />
+              <Pill key={s} label={`${getSportMeta(s).icon} ${getSportMeta(s).name}`} />
             ))}
           </View>
         </View>
@@ -348,9 +348,9 @@ export function ProfileView({
         return (
           <TouchableOpacity accessibilityRole="button" key={b.sport} activeOpacity={0.85} onPress={() => onOpenSport?.(b.sport as SportId)}>
             <Card style={st.sportRow}>
-              <Text style={st.sportIcon}>{getSport(b.sport as SportId).icon}</Text>
+              <Text style={st.sportIcon}>{getSportMeta(b.sport as SportId).icon}</Text>
               <View style={{ flex: 1 }}>
-                <Text style={textStyles.body}>{getSport(b.sport as SportId).name}</Text>
+                <Text style={textStyles.body}>{getSportMeta(b.sport as SportId).name}</Text>
                 {/* SD-90: a measured sport (athletics) has races, not a W-D-L record */}
                 {!isEventSport(b.sport) && (
                 <Text style={textStyles.muted}>
@@ -450,7 +450,7 @@ function Stat({ value, label, narrow }: { value: string; label: string; narrow?:
 /** One club the player has represented, tagging its sport(s), jersey & period. */
 function TeamRow({ team }: { team: TeamAffiliation }) {
   const sub = [
-    team.sports.map((s) => getSport(s).icon).join(' '),
+    team.sports.map((s) => getSportMeta(s).icon).join(' '),
     team.jersey != null ? `#${team.jersey}` : '',
     teamPeriod(team),
   ]

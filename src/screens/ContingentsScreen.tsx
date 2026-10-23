@@ -12,7 +12,7 @@ import type { RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { theme } from '../core/theme';
 import { Card, Button, TextField, SelectChip, ScreenTitle, FieldLabel, FormError, textStyles } from '../components/ui';
-import { getSport } from '../sports/registry';
+import { getSportMeta } from '../sports/sportMeta';
 import { useTournamentById } from '../data/hooks';
 import { getContingents, addContingent, setContingentParticipation, type Contingent } from '../data/repos';
 import type { SportId } from '../core/types';
@@ -73,7 +73,7 @@ export default function ContingentsScreen() {
         <Card style={{ gap: theme.spacing(2) }}>
           <FieldLabel>Add a contingent</FieldLabel>
           <TextField label="" value={name} onChange={setName} placeholder="e.g. Red House, India, Class 10-A" />
-          <Text style={textStyles.muted}>Enters {sports.map((s) => getSport(s).name).join(', ')} at once.</Text>
+          <Text style={textStyles.muted}>Enters {sports.map((s) => getSportMeta(s).name).join(', ')} at once.</Text>
           <Button label={busy ? 'Adding…' : '＋ Add to every sport'} onPress={add} disabled={busy || !name.trim()} />
         </Card>
 
@@ -89,7 +89,7 @@ export default function ContingentsScreen() {
             <View style={st.chips}>
               {sports.map((s) => {
                 const inIt = c.sports.includes(s);
-                return <SelectChip key={s} label={`${getSport(s).icon} ${getSport(s).name}${inIt ? '' : ' · out'}`} active={inIt} onPress={() => toggle(c, s)} />;
+                return <SelectChip key={s} label={`${getSportMeta(s).icon} ${getSportMeta(s).name}${inIt ? '' : ' · out'}`} active={inIt} onPress={() => toggle(c, s)} />;
               })}
             </View>
           </Card>

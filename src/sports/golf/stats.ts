@@ -165,6 +165,10 @@ export const golfStats: SportStatSchema<'golf'> = {
     { key: 'upDowns', label: 'Up and downs', short: 'up and downs', one: 'up and down', group: 'around', ...keyedUpDown },
     { key: 'upDownPct', label: 'Up and downs', source: 'derived', coverage: 'keyed', group: 'around', format: { unit: 'percent', dp: 0 },
       agg: { kind: 'rate', num: 'upDowns', den: 'udChances', scale: 100, dp: 0 } },
+    // Follow-up — chip-ins: holed out from off the green (free from the same
+    // capture). A count leader, like birdies / eagles: no minimum, and only
+    // players with one rank (a round not kept with up and downs is "not tracked").
+    { key: 'chipIns', label: 'Chip-ins', short: 'chip-ins', one: 'chip-in', leaderLabel: 'Most chip-ins', group: 'around', ...keyedUpDown },
   ],
   sections: [
     { id: 'rounds', title: 'Rounds', rows: [{ stat: 'rounds' }, { stat: 'scoringAvg' }] },
@@ -180,7 +184,7 @@ export const golfStats: SportStatSchema<'golf'> = {
     ] },
     { id: 'driving', title: 'Off the tee', rows: [{ stat: 'drivingDistance' }, { stat: 'longDrive' }, { stat: 'drives' }] },
     // Round 2 — up and downs (each row only once a line carries it)
-    { id: 'around', title: 'Around the green', rows: [{ stat: 'upDownPct' }, { stat: 'udChances' }] },
+    { id: 'around', title: 'Around the green', rows: [{ stat: 'upDownPct' }, { stat: 'udChances' }, { stat: 'chipIns' }] },
     { id: 'putting', title: 'Putting', rows: [
       { stat: 'onePuttPct' }, { stat: 'threePuttPct' }, { stat: 'birdieConversion' },
       ...PUTT_BUCKETS.map((b) => ({ stat: `${b.key}Pct` })),
@@ -192,8 +196,8 @@ export const golfStats: SportStatSchema<'golf'> = {
   // `holesWon` only exists in match play (golfLeaders.ts orders / drops them
   // by the tournament's competition)
   // Round 2 — putts per GIR, driving distance and par-3 / 4 / 5 scoring
-  // averages join the leaders (each with its minimum)
-  leaders: ['birdies', 'lowRound', 'lowRound9', 'scoringAvg', 'eagles', 'puttsPerRound', 'girPct', 'puttsPerGir', 'drivingDistance', 'p3Avg', 'p4Avg', 'p5Avg', 'holesWon'],
+  // averages join the leaders (each with its minimum); follow-up: most chip-ins
+  leaders: ['birdies', 'lowRound', 'lowRound9', 'scoringAvg', 'eagles', 'puttsPerRound', 'girPct', 'puttsPerGir', 'drivingDistance', 'p3Avg', 'p4Avg', 'p5Avg', 'chipIns', 'holesWon'],
   headline: ['rounds', 'birdies', 'eagles'],
   awards: [
     { stat: 'birdies', icon: '🐦', label: 'Most birdies' },

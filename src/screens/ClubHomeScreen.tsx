@@ -12,20 +12,20 @@ import type { RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { theme } from '../core/theme';
 import { readableOn } from '../core/contrast';
-import { Card, Button, TextField, SelectChip, ScreenTitle, LoadingState, textStyles } from '../components/ui';
-import { PhoneField } from '../components/PhoneField';
-import { formatPhone } from '../core/phone';
-import { SPORT_LIST, getSport } from '../sports/registry';
+import { Card, SelectChip, ScreenTitle, LoadingState, textStyles } from '../components/ui';
+import { PersonPicker } from '../components/PersonPicker';
+import { SPORT_LIST, getSportMeta } from '../sports/sportMeta';
 import { useAuth } from '../core/auth';
 import {
-  getClub, getClubMembers, getClubSports, getMyPlayerId, getPlayers,
+  getClub, getClubMembers, getClubSports, getMyPlayerId,
   addClubSport, removeClubSport, addClubMember, removeClubMember, setClubMemberRole, invitePerson, createClubInvite, updateClub,
 } from '../data/repos';
 import { LogoPicker } from '../components/LogoPicker';
 import { clubInviteMessage } from '../core/invite';
-import { inviteLabel } from '../core/inviteText';
+import { inviteLabel, playerInviteText } from '../core/inviteText';
+import { SHARE_BASE } from '../core/shareText';
 import { InviteQrShare, type InviteQrShareHandle } from '../components/InviteQrShare';
-import type { Club, ClubMemberView, Player, SportId } from '../core/types';
+import type { Club, ClubMemberView, SportId } from '../core/types';
 import type { RootStackParamList } from '../navigation/types';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -42,23 +42,18 @@ export default function ClubHomeScreen() {
   const [myId, setMyId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const [allPlayers, setAllPlayers] = useState<Player[]>([]);
   const [editSports, setEditSports] = useState(false);
   const [addingMember, setAddingMember] = useState(false);
-  const [addMode, setAddMode] = useState<'search' | 'phone'>('search');
-  const [query, setQuery] = useState('');
-  const [mName, setMName] = useState('');
-  const [mPhone, setMPhone] = useState('');
   const [busy, setBusy] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
   const [inviteCode, setInviteCode] = useState<string | null>(null);
   const qrShare = useRef<InviteQrShareHandle>(null);
 
   const load = useCallback(async () => {
-    const [c, m, s, id, ps] = await Promise.all([
-      getClub(clubId), getClubMembers(clubId), getClubSports(clubId), getMyPlayerId(profile?.id), getPlayers(),
+    const [c, m, s, id] = await Promise.all([
+      getClub(clubId), getClubMembers(clubId), getClubSports(clubId), getMyPlayerId(profile?.id),
     ]);
-    setClub(c); setMembers(m); setSports(s); setMyId(id); setAllPlayers(ps); setLoading(false);
+    setClub(c); setMembers(m); setSports(s); setMyId(id); setLoading(false);
   }, [clubId, profile?.id]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
@@ -75,29 +70,21 @@ export default function ClubHomeScreen() {
     } finally { setBusy(false); }
   }
 
-  async function addByPhone() {
-    if (!mName.trim()) return;
+  // Members are people (PersonPicker): someone on SportnNote by name or exact
+  // mobile number, or a new number added & invited (they claim it by signing up
+  // with it). A typed name only is the marked last resort — not linked to anyone.
+  async function addMember(playerId: string) {
     setBusy(true);
-    try {
-      const { player } = await invitePerson({ name: mName.trim(), phone: mPhone.trim() || undefined });
-      await addClubMember(clubId, player.id);
-      setMName(''); setMPhone(''); setAddingMember(false);
-      await load();
-    } finally { setBusy(false); }
-  }
-
-  async function addExisting(playerId: string) {
-    setBusy(true);
-    try { await addClubMember(clubId, playerId); setQuery(''); await load(); }
+    try { await addClubMember(clubId, playerId); await load(); }
     finally { setBusy(false); }
   }
-
-  // Existing players not already in the club, matched by name / phone.
-  const memberIds = new Set(members.map((m) => m.playerId));
-  const q = query.trim().toLowerCase();
-  const searchResults = q.length < 2 ? [] : allPlayers
-    .filter((p) => !memberIds.has(p.id) && (p.fullName.toLowerCase().includes(q) || (p.phone ?? '').includes(q)))
-    .slice(0, 8);
+  async function addNameOnly(name: string) {
+    const { player } = await invitePerson({ name });
+    await addMember(player.id);
+  }
+  const memberInvite = (who?: string) => playerInviteText({
+    name: who, inviterName: profile?.fullName, context: club ? inviteLabel('Team', club.name) : undefined, link: SHARE_BASE,
+  });
 
   async function removeMember(playerId: string) {
     setBusy(true);
@@ -181,7 +168,7 @@ export default function ClubHomeScreen() {
           <Card><Text style={textStyles.muted}>No sports yet. {amAdmin ? 'Tap Edit to add one.' : ''}</Text></Card>
         ) : (
           sports.map((s) => {
-            const plugin = getSport(s);
+            const plugin = getSportMeta(s);
             return (
               <TouchableOpacity key={s} accessibilityRole="button" accessibilityLabel={`Open ${plugin.name}`}
                 onPress={() => nav.navigate('ClubSport', { clubId, sport: s })}>
@@ -229,33 +216,15 @@ export default function ClubHomeScreen() {
 
         {addingMember && (
           <Card style={{ gap: theme.spacing(2) }}>
-            <View style={st.chips}>
-              <SelectChip label="Search existing" active={addMode === 'search'} onPress={() => setAddMode('search')} />
-              <SelectChip label="New by phone" active={addMode === 'phone'} onPress={() => setAddMode('phone')} />
-            </View>
-            {addMode === 'search' ? (
-              <>
-                <TextField label="Find a player" value={query} onChange={setQuery} placeholder="Name or phone" autoCapitalize="none" />
-                {q.length >= 2 && searchResults.length === 0 && (
-                  <Text style={textStyles.muted}>No matches. Try “New by phone” to invite someone not on the app.</Text>
-                )}
-                {searchResults.map((p) => (
-                  <TouchableOpacity key={p.id} disabled={busy} onPress={() => addExisting(p.id)} accessibilityRole="button" style={st.resultRow}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={textStyles.body}>{p.fullName}</Text>
-                      {!!p.phone && <Text style={textStyles.muted}>{formatPhone(p.phone)}</Text>}
-                    </View>
-                    <Text style={st.link}>Add</Text>
-                  </TouchableOpacity>
-                ))}
-              </>
-            ) : (
-              <>
-                <TextField label="Name" value={mName} onChange={setMName} placeholder="Player name" />
-                <PhoneField label="Phone" value={mPhone} onChange={setMPhone} optional />
-                <Button label={busy ? 'Adding…' : 'Add & invite'} onPress={addByPhone} />
-              </>
-            )}
+            <Text style={textStyles.muted}>Find a player by name or mobile number — or type a new number to add & invite them.</Text>
+            <PersonPicker
+              role="member"
+              excludeIds={members.map((m) => m.playerId)}
+              takenNote={(n) => `${n} is already a member.`}
+              inviteText={memberInvite}
+              onPick={(p) => addMember(p.id)}
+              onNameOnly={addNameOnly}
+            />
           </Card>
         )}
 
@@ -307,7 +276,6 @@ const st = StyleSheet.create({
   sportRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(3) },
   sportIcon: { fontSize: 22 },
   chev: { color: theme.colors.textMuted, fontSize: theme.font.h3, fontWeight: '800' },
-  resultRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(2), paddingVertical: theme.spacing(1) },
   memberRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(2) },
   memberActions: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(3) },
   confirmRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(3) },

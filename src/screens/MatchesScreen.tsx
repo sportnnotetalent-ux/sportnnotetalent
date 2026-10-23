@@ -17,7 +17,7 @@ import { canScoreMatch } from '../core/scoringAccess';
 import { tournamentHostPlayerIds } from '../core/org';
 import { useAuth } from '../core/auth';
 import { canScoreByRole } from '../core/roles';
-import { SPORT_LIST } from '../sports/registry';
+import { SPORT_LIST } from '../sports/sportMeta';
 import type { Match, SportId } from '../core/types';
 import type { RootStackParamList, TabParamList } from '../navigation/types';
 import { useParamState } from '../navigation/useParamState';

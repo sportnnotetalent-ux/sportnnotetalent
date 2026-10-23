@@ -13,7 +13,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import { theme } from '../core/theme';
 import { EmptyState, Card, Button, Pill, ScreenTitle, SelectChip, textStyles, plural } from '../components/ui';
-import { getSport } from '../sports/registry';
+import { getSportMeta } from '../sports/sportMeta';
 import { getTeamSummary, getRoster, createInvite, getTeamLeaders, setTeamLeaders, setTeamAdmins, getMyPlayerId, getTeams, getPlayerEditAccess, getTeamPlayerRoles, setTeamPlayerRoles } from '../data/repos';
 import { rolesForSport, sportHasRoles } from '../data/teamRoles';
 import { PlayerPhoto } from '../components/PlayerPhoto';
@@ -151,7 +151,7 @@ export default function SquadScreen() {
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
       <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
-        <ScreenTitle title={`${team.name} squad`} subtitle={`${plural(squad.length, 'player')} · ${team.sports.map((s) => getSport(s).icon).join(' ')}`} />
+        <ScreenTitle title={`${team.name} squad`} subtitle={`${plural(squad.length, 'player')} · ${team.sports.map((s) => getSportMeta(s).icon).join(' ')}`} />
 
         {captain && <Text style={st.captain}>✓ You’re the captain of {team.name}</Text>}
         {canManage && (
@@ -201,7 +201,7 @@ export default function SquadScreen() {
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={textStyles.body}>{p.fullName}{p.jerseyNo ? ` · #${p.jerseyNo}` : ''}{p.invited ? '  ⏳' : ''}</Text>
-                    <Text style={textStyles.muted}>{p.invited ? 'Invited · not registered yet' : p.sports.map((s) => getSport(s).icon).join(' ')}{pRoles.length && !showRoles ? ` · ${pRoles.join(', ')}` : ''}</Text>
+                    <Text style={textStyles.muted}>{p.invited ? 'Invited · not registered yet' : p.sports.map((s) => getSportMeta(s).icon).join(' ')}{pRoles.length && !showRoles ? ` · ${pRoles.join(', ')}` : ''}</Text>
                     {access[p.id] === 'admin' ? (
                       <Text style={st.link} accessibilityRole="link" onPress={() => nav.navigate('EditProfile', { playerId: p.id, asAdmin: true })}>✎ Edit details</Text>
                     ) : canManage && p.profileId && access[p.id] !== 'self' ? (

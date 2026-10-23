@@ -58,6 +58,8 @@ import {
   gcSec, gcRunning, gcTimeUp, halfLenSec, futsalTimeout, accumulatedFouls, FUTSAL_FOUL_LIMIT, DEEP_TRACK_FIELDS,
 } from "./engine";
 import { aggregateText } from "../aggregate";
+import { FOOTBALL_META } from './meta';
+import { footballMatchRecords } from './records';
 
 /* ------------------------------- Controls ---------------------------------- */
 
@@ -1648,10 +1650,8 @@ const Court: NonNullable<SportPlugin<FootballState>['Court']> = ({ homeLineup, a
 );
 
 export const footballPlugin: SportPlugin<FootballState> = {
-  id: 'football',
-  name: 'Football',
-  icon: '⚽',
-  archetype: 'goal-time',
+  ...FOOTBALL_META,
+  matchRecords: footballMatchRecords, // SD-51 (set by the registry before perf F-15)
   // Score overlay (parity #25): goal scorers per side; GOAL! flash.
   tickerDetail: footballTickerDetail,
   tickerFlash: footballTickerFlash,
@@ -1702,46 +1702,6 @@ export const footballPlugin: SportPlugin<FootballState> = {
   formation: emptyFormation,
   Court,
   liveSettings: FOOTBALL_LIVE_SETTINGS,
-  formatFields: [
-    {
-      key: 'preset', label: 'Format', type: 'preset', default: 'eleven',
-      options: [
-        { value: 'eleven', label: '11-a-side', set: { playersPerSide: 11, halfMinutes: 45, substitutes: 5, subType: 'rolling', stoppedClock: false, futsal: false } },
-        { value: 'sevens', label: '7-a-side', set: { playersPerSide: 7, halfMinutes: 25, substitutes: 5, subType: 'rolling', stoppedClock: false, futsal: false } },
-        { value: 'fives', label: '5s turf', set: { playersPerSide: 5, halfMinutes: 20, substitutes: 5, subType: 'rolling', stoppedClock: false, futsal: false } },
-        // SD-132: futsal — stopped clock (Law 7), time-outs + accumulated fouls, 2 × 5 extra time
-        { value: 'futsal', label: 'Futsal', set: { playersPerSide: 5, halfMinutes: 20, substitutes: 9, subType: 'rolling', stoppedClock: true, futsal: true, extraTimeMinutes: 5 } },
-        { value: 'custom', label: 'Custom' },
-      ],
-    },
-    { key: 'playersPerSide', label: 'Players per side', type: 'count', default: 11, min: 1, max: 11, advanced: true },
-    { key: 'halfMinutes', label: 'Minutes per half', type: 'number', default: 45, min: 1, max: 60 },
-    { key: 'substitutes', label: 'Substitutes per side', type: 'count', default: 5, min: 0, max: 11 },
-    {
-      key: 'subType', label: 'Substitutions', type: 'choice', default: 'rolling',
-      options: [
-        { value: 'rolling', label: 'Rolling (can return)' },
-        { value: 'fixed', label: 'Fixed (no return)' },
-      ],
-    },
-    {
-      key: 'decider', label: 'If level at full time', type: 'choice', default: 'none',
-      options: [
-        { value: 'none', label: 'Draw stands — no extra time or penalties' },
-        { value: 'extra_time', label: 'Extra time, then penalties' },
-        { value: 'penalties', label: 'Penalties straightaway (no extra time)' },
-      ],
-    },
-    { key: 'extraTimeMinutes', label: 'Extra-time half length', type: 'number', default: 15, min: 1, max: 30, advanced: true, hint: 'used only when the decider is “Extra time, then penalties”' },
-    { key: 'extraTimeSubs', label: 'Extra substitutions in extra time', type: 'count', default: 1, min: 0, max: 3, advanced: true },
-    // SD-29: grassroots / youth sin-bin (IFAB trial: 10 minutes). 0 = none.
-    { key: 'sinBinMinutes', label: 'Sin-bin (minutes)', type: 'number', default: 0, min: 0, max: 15, advanced: true, hint: '0 = none · the player returns by himself' },
-    // SD-132: futsal (FIFA Futsal Laws 7, 12, 13)
-    { key: 'stoppedClock', label: 'Stopped clock', type: 'toggle', default: false, advanced: true, hint: 'Futsal: stop and restart the clock on every stoppage' },
-    { key: 'futsal', label: 'Futsal time-outs and accumulated fouls', type: 'toggle', default: false, advanced: true, hint: '1 time-out a half · 6th foul a half = 10 m free kick' },
-    // deep wave: the optional "Deeper stats" an organiser can switch on for an event
-    ...DEEP_TRACK_FIELDS.map((f) => ({ ...f, label: `Track ${f.label.charAt(0).toLowerCase()}${f.label.slice(1)}`, advanced: true })),
-  ],
 };
 
 const ctrl = StyleSheet.create({

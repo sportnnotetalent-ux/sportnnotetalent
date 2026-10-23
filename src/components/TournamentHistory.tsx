@@ -8,7 +8,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { theme } from '../core/theme';
 import { Card, textStyles } from './ui';
 import { PODIUM } from './Rank';
-import { getSport } from '../sports/registry';
+import { getSport, getSportMeta, rethrowIfLoading } from '../sports/registry';
 import { matchLineFor } from '../sports/matchLine';
 import { deciderFromStatus, ordinal, teamJourney, type JourneyOptions, type JourneyStep, type RowMark, type TeamJourney } from '../data/tournamentHistory';
 import { getTournaments } from '../data/repos';
@@ -27,7 +27,8 @@ export function matchDecider(m: Match): string | undefined {
     const line = plugin?.summary?.(m.state as never)?.statusLine;
     const winnerName = m.winner === 'home' ? m.homeTeam.name : m.winner === 'away' ? m.awayTeam.name : undefined;
     return deciderFromStatus(line, m.homeTeam.name, m.awayTeam.name, winnerName);
-  } catch {
+  } catch (e) {
+    rethrowIfLoading(e); // perf F-15: a sport still loading suspends, never reads as no decider
     return undefined;
   }
 }
@@ -36,7 +37,7 @@ export function matchDecider(m: Match): string | undefined {
 export const journeyUiOptions: Pick<JourneyOptions, 'decider' | 'line'> = {
   decider: matchDecider,
   line: (m, teamId) => {
-    try { return matchLineFor(m, teamId); } catch { return ''; }
+    try { return matchLineFor(m, teamId); } catch (e) { rethrowIfLoading(e); return ''; }
   },
 };
 
@@ -195,10 +196,10 @@ export function TournamentJourneyList({ entries, matches, onOpen, title = 'Tourn
         const head = j!.state === 'champion' ? '🏆 Champions' : j!.finish ? j!.finish.label : j!.plateWinner ? '🍽️ Plate winner' : j!.state === 'out' ? 'Out' : 'Still in';
         return (
           <TouchableOpacity key={`${e.tournamentId}|${e.sport}|${e.teamId}`} accessibilityRole="button" activeOpacity={0.85} onPress={() => onOpen(e)}
-            accessibilityLabel={`${t?.name ?? 'Tournament'}, ${getSport(e.sport).name}: ${head}. ${j!.summary}. Open the journey`}>
+            accessibilityLabel={`${t?.name ?? 'Tournament'}, ${getSportMeta(e.sport).name}: ${head}. ${j!.summary}. Open the journey`}>
             <Card style={{ gap: 2 }}>
               <View style={st.row}>
-                <Text style={[textStyles.body, { flex: 1, fontWeight: '700' }]} numberOfLines={1}>{getSport(e.sport).icon} {t?.name ?? 'Tournament'}</Text>
+                <Text style={[textStyles.body, { flex: 1, fontWeight: '700' }]} numberOfLines={1}>{getSportMeta(e.sport).icon} {t?.name ?? 'Tournament'}</Text>
                 <Text style={st.state}>{head}</Text>
                 <Text style={st.chev}>›</Text>
               </View>

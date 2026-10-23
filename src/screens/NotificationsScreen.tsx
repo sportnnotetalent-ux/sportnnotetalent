@@ -14,7 +14,7 @@ import { useAuth } from '../core/auth';
 import { useNotifications, useFollow, usePlayerSummaries } from '../data/hooks';
 import { notifyStore } from '../data/notifyStore';
 import { getMatch } from '../data/repos';
-import { getSport } from '../sports/registry';
+import { getSportMeta } from '../sports/sportMeta';
 import { statLabelShort, APPEARANCE_KEYS } from '../data/stats';
 import { lineResult, RESULT_PILL } from '../data/appearances';
 import type { RootStackParamList } from '../navigation/types';
@@ -153,7 +153,7 @@ export default function NotificationsScreen() {
                 {/* Same results-board language as the SportProfile match history:
                     green left-edge + WON/LOST pill so form is scannable. */}
                 <Card style={[st.row, { borderLeftWidth: 3, borderLeftColor: lineResult(l) === 'W' ? theme.colors.primary : theme.colors.border }]}>
-                  <IconBadge icon={getSport(l.sport).icon} />
+                  <IconBadge icon={getSportMeta(l.sport).icon} />
                   <View style={{ flex: 1 }}>
                     <Text style={textStyles.body} numberOfLines={1}>{player.fullName} vs {l.opponent ?? 'TBD'}</Text>
                     <Text style={textStyles.muted} numberOfLines={1}>

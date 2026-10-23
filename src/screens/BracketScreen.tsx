@@ -17,7 +17,7 @@ import { SelectChip, Button, ScreenTitle, FormError, TextField, textStyles } fro
 import { askConfirm } from '../components/ConfirmSheet';
 import { defaultsFor } from '../components/FormatEditor';
 import { PODIUM } from '../components/Rank';
-import { getSport } from '../sports/registry';
+import { getSportMeta } from '../sports/sportMeta';
 import { matchLine } from '../sports/matchLine';
 import { bracketCellText, compactResult } from '../sports/scoreline';
 import { useAuth } from '../core/auth';
@@ -169,7 +169,7 @@ export default function BracketScreen() {
       const rawFormat = tournament?.formats?.[activeSport] ?? {};
       // SD-48: a sport run as team ties gets its next round as ties too.
       const tieSpec = tournamentTieSpec(rawFormat as Record<string, unknown>);
-      const sportDefaults = defaultsFor(getSport(activeSport).formatFields ?? [], 'tournament');
+      const sportDefaults = defaultsFor(getSportMeta(activeSport).formatFields ?? [], 'tournament');
       for (let i = 0; i < pairs.length; i++) {
         // SD-120: a knockout round always resolves — the sport's decider is set.
         const baseFormat = tieSpec ? rawFormat : matchFormatFor(tournament, activeSport, isEliminationStage(pairs[i].stage), sportDefaults);
@@ -313,7 +313,7 @@ export default function BracketScreen() {
         {sports.length > 1 && (
           <KeyboardAwareScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.chips}>
             {sports.map((s) => (
-              <SelectChip key={s} label={`${getSport(s).icon} ${getSport(s).name}`} active={activeSport === s} onPress={() => setSport(s)} />
+              <SelectChip key={s} label={`${getSportMeta(s).icon} ${getSportMeta(s).name}`} active={activeSport === s} onPress={() => setSport(s)} />
             ))}
           </KeyboardAwareScrollView>
         )}

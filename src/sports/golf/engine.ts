@@ -253,6 +253,15 @@ export function upAndDown(offGreen: number | null | undefined, putts: number | n
   return offGreen + putts <= 2;
 }
 
+/** Follow-up to round 2 — a chip-in: holed out from off the green (at least
+ *  one shot from off the green, no putt) — a chip, pitch or greenside bunker
+ *  shot that went in, however many it took (3+ shots then in still counts).
+ *  Free from the same capture as up and downs. null = not recorded. */
+export function chipIn(offGreen: number | null | undefined, putts: number | null | undefined): boolean | null {
+  if (typeof offGreen !== 'number' || offGreen < 1 || typeof putts !== 'number') return null;
+  return putts === 0;
+}
+
 /** SD-45 — a par-4 / par-5 tee shot: missed left, hit, missed right. */
 export type FairwayDir = 'L' | 'hit' | 'R';
 
@@ -627,7 +636,8 @@ export function roundStats(card: GolfCard, holes: Hole[], received: number[]): R
   const fairOn = on('fairway'), puttOn = on('putts'), sandOn = on('bunker');
   // Round 2 — up and downs (a card kept with 'upDown': never an SD-45 card)
   const udOn = !!tr?.includes('upDown');
-  if (udOn) Object.assign(out, { udChances: 0, upDowns: 0 });
+  // (follow-up: chip-ins come free with it — a true 0 on a card kept with it)
+  if (udOn) Object.assign(out, { udChances: 0, upDowns: 0, chipIns: 0 });
   if (fairOn) Object.assign(out, { firLeft: 0, firRight: 0 });
   if (puttOn) Object.assign(out, { scrambles: 0, scrambleHoles: 0, puttsGir: 0, girPutted: 0 });
   if (sandOn) Object.assign(out, { sandSaves: 0, sandHoles: 0 });
@@ -701,6 +711,7 @@ export function roundStats(card: GolfCard, holes: Hole[], received: number[]): R
     if (udOn) {
       const ud = upAndDown(card.offGreen?.[i], p);
       if (ud != null) { out.udChances += 1; if (ud) out.upDowns += 1; }
+      if (chipIn(card.offGreen?.[i], p)) out.chipIns += 1;
     }
     if (sandOn && card.bunker?.[i] === true) {
       out.sandHoles += 1;

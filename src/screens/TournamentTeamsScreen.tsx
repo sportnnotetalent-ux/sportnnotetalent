@@ -9,7 +9,10 @@
  *  organizer enters them — and a team is a real entity, not an orphan shell. A
  *  new team is attributed to the hosting community, and you can capture a
  *  manager/captain contact who gets invited to claim the team & manage its
- *  squad (a team-claim invite → join link, sent by email / WhatsApp / SMS). */
+ *  squad (a team-claim invite → join link, sent by email / WhatsApp / SMS).
+ *  A singles player or doubles pair is entered as its PEOPLE — picked by name or
+ *  mobile number (EntrantPicker), with them as the entry's roster — so the draw
+ *  is "mine" for each of them and results land on their own profiles. */
 import { teamLabel } from '../core/teamLevels';
 import { QualifiersCard, qualifiedBadge, useFeeders } from '../components/FeederCards';
 import { isEventSport } from '../sports/eventSports';
@@ -25,13 +28,17 @@ import { Card, Button, TextField, SelectChip, ScreenTitle, FormError, textStyles
 import { PhoneField } from '../components/PhoneField';
 import { RegistrationBanner } from '../components/RegistrationBanner';
 import { ClubQuickPick } from '../components/ClubQuickPick';
-import { getSport, participantMode } from '../sports/registry';
+import { getSportMeta, participantMode } from '../sports/sportMeta';
 import { useAuth } from '../core/auth';
 import { useTournamentById, useTeams, useTournamentEntries, useTournamentCategories, useLeagueData, useCaptainships } from '../data/hooks';
-import { addTournamentTeams, removeTournamentTeam, createTeam, invitePerson, setTeamLeaders, createInvite, setTournamentTeamStatus, setTournamentTeamCheckIn, getTeamLeaders, enterOrgHousesAsTeams, getLiveTournamentInvite, setTournamentInvite, getTeamsSetup, canManageTeam, getMyPlayerId, isNeedsDbUpdate } from '../data/repos';
+import { addTournamentTeams, removeTournamentTeam, createTeam, invitePerson, setTeamLeaders, createInvite, setTournamentTeamStatus, setTournamentTeamCheckIn, getTeamLeaders, enterOrgHousesAsTeams, getLiveTournamentInvite, setTournamentInvite, getTeamsSetup, canManageTeam, getMyPlayerId, createMyPlayer, isNeedsDbUpdate } from '../data/repos';
 import { filterTeams } from '../core/teamSearch';
 import { tournamentInviteMessage, tournamentJoinLink } from '../core/tournamentInvite';
-import { inviteLabel } from '../core/inviteText';
+import { inviteLabel, playerInviteText } from '../core/inviteText';
+import { tournamentLink } from '../core/shareText';
+import { EntrantPicker } from '../components/EntrantPicker';
+import { sideForEntrants } from '../data/entrants';
+import { slotId, type EntrantPerson, type EntrantSlot } from '../data/participantEntry';
 import { InviteQrShare } from '../components/InviteQrShare';
 import { confirmAction, notice } from '../core/confirm';
 import { sendInviteEmail, joinLink, inviteMessage, teamAtTournament } from '../core/invite';
@@ -262,6 +269,43 @@ export default function TournamentTeamsScreen() {
     } finally { setBusy(false); }
   }
 
+  // A singles player / doubles pair: the side is its people (EntrantPicker). The
+  // same person / pair already in this division (or picked here) is reused —
+  // never entered twice; otherwise a new entry of the tournament's own is made
+  // with them as its roster (a name-only spot — the marked last resort — becomes
+  // a provisional player). The first real person is its captain, so "Invite
+  // (captain accepts)" reaches them.
+  async function addPeopleEntry(slots: EntrantSlot[]): Promise<boolean> {
+    setError(null); setAdded(null); setBusy(true);
+    try {
+      const here = pickable.filter((t) => entryByTeam.has(t.id) || selected.includes(t.id));
+      const entry = await sideForEntrants(slots, { sport, teams: here, colorHex: PALETTE[allTeams.length % PALETTE.length], orgId: tournament?.hostOrgId });
+      const lead = slots.map(slotId).find(Boolean);
+      if (entry.created && lead) await setTeamLeaders(entry.id, { captainId: lead }).catch(() => {});
+      setAdded({ note: `✅ ${entry.name} ${entry.created ? 'added' : 'selected'}.` });
+      setAdding(false);
+      setDirty(true);
+      setSelected((p) => [...new Set([...p, entry.id])]);
+      setTick((n) => n + 1);
+      return true;
+    } catch (e) {
+      setError(errMsg(e, slots.length > 1 ? 'Could not add the pair' : 'Could not add the player'));
+      return false;
+    } finally { setBusy(false); }
+  }
+  // My own player (made now if I don't have one) — the organiser often plays too.
+  const resolveMe = async (): Promise<EntrantPerson | null> => {
+    if (!profile?.id) return null;
+    const id = (await getMyPlayerId(profile.id)) ?? (await createMyPlayer(profile.id).catch(() => null));
+    return id ? { id, fullName: profile.fullName ?? 'Me' } : null;
+  };
+  // The invite for a player added by a number that isn't on SportnNote yet.
+  const playerInvite = (who?: string) => playerInviteText({
+    name: who, inviterName: profile?.fullName, sportName: getSportMeta(sport).name,
+    context: tournament?.name ? inviteLabel('Tournament', tournament.name) : undefined,
+    link: tournamentLink(params.tournamentId),
+  });
+
   // Organizer acts on a request/invite. `confirm` → the team is in; otherwise the
   // entry is dropped. Either way the team's captain is notified of the outcome.
   async function decide(entry: TournamentEntry, confirm: boolean) {
@@ -362,7 +406,7 @@ export default function TournamentTeamsScreen() {
     } finally { setBusy(false); }
   }
 
-  const sportName = getSport(sport).name;
+  const sportName = getSportMeta(sport).name;
   // Individual sports register individual entrants (a tennis draw is players, not
   // teams), doubles register pairs. Derived from the *currently selected* sport +
   // its format, so a multi-sport meet adapts per sport. Entries ride the same
@@ -396,7 +440,7 @@ export default function TournamentTeamsScreen() {
               <Text style={textStyles.muted}>Sport</Text>
               <View style={st.chips}>
                 {tourSports.map((s) => (
-                  <SelectChip key={s} label={`${getSport(s).icon} ${getSport(s).name}`} active={sport === s} onPress={() => pickSport(s)} />
+                  <SelectChip key={s} label={`${getSportMeta(s).icon} ${getSportMeta(s).name}`} active={sport === s} onPress={() => pickSport(s)} />
                 ))}
               </View>
             </>
@@ -607,13 +651,33 @@ export default function TournamentTeamsScreen() {
             );
           })()}
 
-          {/* Inline add-a-team so an organizer can build the roster without leaving. */}
-          {adding ? (
+          {/* Inline add-a-team so an organizer can build the roster without leaving.
+              A player / pair entry is PEOPLE: the real person (or both partners),
+              picked by name or mobile number — so the entry is theirs ("mine",
+              stats on one profile) — never a free-typed name that links to no one. */}
+          {adding && pMode !== 'team' ? (
+            <Card style={{ gap: theme.spacing(3) }}>
+              <Text style={textStyles.h3}>Add {/^[aeiou]/i.test(sportName) ? 'an' : 'a'} {sportName} {noun}</Text>
+              <Text style={textStyles.muted}>
+                {pMode === 'pairs' ? 'Pick both partners' : 'Pick the player'} — search by name, or type a mobile number to add & invite someone new, so the entry lands on {pMode === 'pairs' ? 'each partner’s' : 'their'} profile.
+              </Text>
+              <EntrantPicker
+                count={pMode === 'pairs' ? 2 : 1}
+                sport={sport}
+                inviteText={playerInvite}
+                onSubmit={addPeopleEntry}
+                submitLabel="＋ Add pair & select"
+                resolveMe={resolveMe}
+                meName={profile?.fullName}
+              />
+              <Button label="Cancel" variant="ghost" onPress={() => { setAdding(false); setError(null); }} />
+            </Card>
+          ) : adding ? (
             <Card style={{ gap: theme.spacing(3) }}>
               <Text style={textStyles.h3}>Add {/^[aeiou]/i.test(sportName) ? 'an' : 'a'} {sportName} {noun}</Text>
               <View style={st.row}>
-                <View style={st.flex2}><TextField label="Name" value={name} onChange={setName} placeholder={pMode === 'individual' ? 'Rafael Nadal' : pMode === 'pairs' ? 'Nadal / Alcaraz' : 'Red House'} /></View>
-                <View style={st.flex1}><TextField label="Short" value={short} onChange={setShort} placeholder={pMode === 'team' ? 'RED' : 'RN'} autoCapitalize="characters" /></View>
+                <View style={st.flex2}><TextField label="Name" value={name} onChange={setName} placeholder="Red House" /></View>
+                <View style={st.flex1}><TextField label="Short" value={short} onChange={setShort} placeholder="RED" autoCapitalize="characters" /></View>
               </View>
               <Text style={textStyles.muted}>Colour</Text>
               <View style={st.chips}>
@@ -622,23 +686,20 @@ export default function TournamentTeamsScreen() {
                 ))}
               </View>
 
-              {/* Optional contact: for a team it's the manager/captain (invited to
-                  claim the team & set its squad); for a pair, whoever to reach. An
-                  individual entrant is their own contact, so this is hidden there. */}
-              {pMode !== 'individual' && (mgrOpen ? (
+              {/* Optional contact: the team's manager/captain (invited to claim the
+                  team & set its squad). */}
+              {mgrOpen ? (
                 <View style={{ gap: theme.spacing(2) }}>
-                  <Text style={textStyles.muted}>
-                    {pMode === 'pairs' ? 'Pair contact — invited to claim the entry and set both players.' : 'Team manager / captain — they’ll be invited to claim the team and set its squad.'}
-                  </Text>
-                  <TextField label={pMode === 'pairs' ? 'Contact name' : 'Manager name'} value={mgrName} onChange={setMgrName} placeholder={pMode === 'pairs' ? 'Who to reach for this pair?' : 'Who runs this team?'} />
+                  <Text style={textStyles.muted}>Team manager / captain — they’ll be invited to claim the team and set its squad.</Text>
+                  <TextField label="Manager name" value={mgrName} onChange={setMgrName} placeholder="Who runs this team?" />
                   <View style={st.wrapRow}>
                     <View style={st.wrapCell}><PhoneField label="Phone" value={mgrPhone} onChange={setMgrPhone} /></View>
                     <View style={st.wrapCell}><TextField label="Email" value={mgrEmail} onChange={setMgrEmail} placeholder="name@email.com" autoCapitalize="none" /></View>
                   </View>
                 </View>
               ) : (
-                <Text style={st.link} onPress={() => setMgrOpen(true)}>＋ Add a {pMode === 'pairs' ? 'pair' : 'team'} contact (optional)</Text>
-              ))}
+                <Text style={st.link} onPress={() => setMgrOpen(true)}>＋ Add a team contact (optional)</Text>
+              )}
 
               <View style={st.row}>
                 <View style={st.flex1}><Button label="Cancel" variant="ghost" onPress={() => { setAdding(false); setError(null); }} /></View>

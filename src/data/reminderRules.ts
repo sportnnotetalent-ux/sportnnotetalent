@@ -3,16 +3,21 @@
  * reminders.ts so they're unit-tested (tests/reminder-rules.test.mts).
  *
  * Scope: a device only ever works out ITS OWN viewer's reminders — matches they
- * play in, squads they captain, matches they host (no scorer yet) or score, and
- * players they follow. Other people's reminders come from the server cron
- * (supabase/functions/notify-upcoming), never from someone else's phone: every
- * device used to compute every upcoming match on the platform and push "You're
- * scoring…" / "No scorer yet…" to strangers (or show them locally when the
- * viewer had no player row).
+ * play in or score, and players they follow. Other people's reminders come from
+ * the server cron (supabase/functions/notify-upcoming), never from someone
+ * else's phone: every device used to compute every upcoming match on the
+ * platform and push "You're scoring…" / "No scorer yet…" to strangers (or show
+ * them locally when the viewer had no player row).
+ *
+ * The PREP nudges — "📋 Squad needed" (captains / vice-captains / team admins
+ * of a side with no matchday squad) and "⚠️ No scorer yet" (a match's hosts) —
+ * are NOT computed here at all any more (2026-10-23): the server cron owns them
+ * (supabase/functions/_shared/prepReminders.ts) and pushes them even when the
+ * app is closed, with a dedup ledger, the reminders-off switch and guardian
+ * routing for under-18s. A device copy on top would show every one twice.
  */
-import { tournamentHostPlayerIds } from '../core/org.ts';
 import { ageOf } from '../core/age.ts';
-import type { Match, MatchSquads, Organization, Player, TeamLeadership, Tournament } from '../core/types';
+import type { Match, MatchSquads, Player, Tournament } from '../core/types';
 
 /** Friendly "starts <x>" label for a reminder body (handles any value). */
 export const shortByMinutes = (m: number): string => {
@@ -46,11 +51,6 @@ export function playersInSide(m: Match, side: 'home' | 'away', squads?: MatchSqu
   return team.roster?.length ? team.roster : rostersByTeam?.[team.id] ?? [];
 }
 
-const HOST_WINDOWS: ReminderWindow[] = [
-  { key: '1d', ms: 24 * HOUR, label: 'tomorrow' },
-  { key: '3h', ms: 3 * HOUR, label: 'in 3 hours' },
-  { key: '1h', ms: 1 * HOUR, label: 'in 1 hour' },
-];
 const SCORER_WINDOWS: ReminderWindow[] = [
   { key: '1d', ms: 24 * HOUR, label: 'tomorrow' },
   { key: '1h', ms: 1 * HOUR, label: 'in 1 hour' },
@@ -66,15 +66,6 @@ export function activeWindow(remaining: number, windows: ReminderWindow[]): Remi
     if (remaining <= upper && remaining > lower) return windows[i];
   }
   return null;
-}
-
-/** Everyone who should be reminded about a match: its own hosts plus its
- *  tournament's hosts — and if the tournament is org-hosted, every member of
- *  that organization (deduped). */
-export function hostsFor(m: Match, tournaments: Tournament[], orgs: Organization[]): string[] {
-  const tour = tournaments.find((t) => t.id === m.tournamentId);
-  const tourHosts = tour ? tournamentHostPlayerIds(tour, orgs) : [];
-  return Array.from(new Set([...(m.hostIds ?? []), ...tourHosts]));
 }
 
 /** `forViewer`: shown to the viewer even though `playerId` (the deep link) is
@@ -105,8 +96,6 @@ export function computeContactReminders(players: Player[], sent: Set<string>): D
 export function computeDueReminders(
   matches: Match[],
   tournaments: Tournament[],
-  orgs: Organization[],
-  leadersByTeam: Record<string, TeamLeadership>,
   squadsByMatch: Record<string, MatchSquads>,
   now: number,
   sent: Set<string>,
@@ -182,47 +171,9 @@ export function computeDueReminders(
       }
     }
 
-    // Squad reminders: each team's captain & vice-captain are nudged until their
-    // matchday XI is set (independent of the scorer reminders below).
-    for (const side of ['home', 'away'] as const) {
-      const team = side === 'home' ? m.homeTeam : m.awayTeam;
-      const squadSet = ((side === 'home' ? squadsByMatch[m.id]?.home : squadsByMatch[m.id]?.away)?.starters.length ?? 0) > 0;
-      if (squadSet) continue;
-      const leaders = leadersByTeam[team.id] ?? {};
-      // only when the viewer is this team's captain / vice-captain
-      const recipients = [leaders.captainId, leaders.viceCaptainId].filter((x): x is string => x === viewerId);
-      if (!recipients.length) continue;
-      const w = activeWindow(remaining, HOST_WINDOWS);
-      if (!w) continue;
-      for (const pid of recipients) {
-        const key = `squad:${m.id}:${side}:${w.key}:${pid}`;
-        if (sent.has(key)) continue;
-        due.push({
-          key,
-          playerId: pid,
-          matchId: m.id,
-          title: `📋 Squad needed — ${team.name}`,
-          body: `Set your matchday squad for ${label} — starts ${w.label}.`,
-        });
-      }
-    }
-
+    // ("Squad needed" / "No scorer yet" come from the server cron — see the top.)
     const scorers = m.scorerIds?.length ? m.scorerIds : m.scorerId ? [m.scorerId] : [];
-    if (!scorers.length) {
-      const w = activeWindow(remaining, HOST_WINDOWS);
-      if (!w) continue;
-      for (const hid of hostsFor(m, tournaments, orgs).filter((h) => h === viewerId)) {
-        const key = `host:${m.id}:${w.key}:${hid}`;
-        if (sent.has(key)) continue;
-        due.push({
-          key,
-          playerId: hid,
-          matchId: m.id,
-          title: `⚠️ No scorer yet — ${label}`,
-          body: `This match starts ${w.label} and still has no scorer. Tap to assign one.`,
-        });
-      }
-    } else if (scorers.includes(viewerId)) {
+    if (scorers.includes(viewerId)) {
       const w = activeWindow(remaining, SCORER_WINDOWS);
       if (!w) continue;
       const key = `scorer:${m.id}:${w.key}:${viewerId}`;
@@ -250,8 +201,8 @@ export interface ScheduledReminder { id: string; fireAt: number; title: string; 
  * this emits every future window as its own dated notification.
  *
  * Scope: the reminders that matter to an individual — matches they play in,
- * players they follow, and matches they're scoring. Host/squad nudges stay on the
- * in-app polling path (organizer-facing, transient).
+ * players they follow, and matches they're scoring. Host/squad nudges are the
+ * server cron's (notify-upcoming).
  */
 export function computeScheduledReminders(
   matches: Match[],

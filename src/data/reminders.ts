@@ -6,16 +6,17 @@
  *
  *  - a match they play in (squad, else the team roster), on the tournament's or
  *    their own lead times; a player they follow is about to play;
- *  - a team they captain still has no matchday squad;
- *  - a match they host has NO scorer yet (a day / 3 h / 1 h before), until one
- *    is assigned; a match they're scoring (a day / 1 h before).
+ *  - a match they're scoring (a day / 1 h before).
  *
  * Everyone else's reminders reach them from the server cron
  * (supabase/functions/notify-upcoming), so their app doesn't need to be open.
+ * So do the PREP nudges — "📋 Squad needed" for captains and "⚠️ No scorer yet"
+ * for hosts (2026-10-23): the cron owns them, so this device never shows them
+ * (it would duplicate the push).
  */
 import { useEffect } from 'react';
 import { AppState } from 'react-native';
-import { getUpcomingMatches, getTournaments, getOrganizations, getMatchSquadsMany, getTeamLeadersMany, getTeamRosters, getPlayers, getMyPlayerId } from './repos';
+import { getUpcomingMatches, getTournaments, getMatchSquadsMany, getTeamRosters, getPlayers, getMyPlayerId } from './repos';
 import { gatherReminderInputsWith, startReminderTicker, type ReminderInputs, type ReminderReads } from './reminderInputs';
 import { reminderPrefsStore } from './reminderPrefs';
 import { followStore } from './followStore';
@@ -23,10 +24,10 @@ import { notify, syncScheduledLocal } from '../core/notifications';
 import { useAuth } from '../core/auth';
 
 export {
-  windowsFromMinutes, playersInSide, activeWindow, hostsFor, computeContactReminders, computeDueReminders, computeScheduledReminders,
+  windowsFromMinutes, playersInSide, activeWindow, computeContactReminders, computeDueReminders, computeScheduledReminders,
 } from './reminderRules';
 export type { ReminderWindow, DueReminder, ScheduledReminder } from './reminderRules';
-import { activeWindow, hostsFor, playersInSide, windowsFromMinutes, computeContactReminders, computeDueReminders, computeScheduledReminders } from './reminderRules';
+import { activeWindow, playersInSide, windowsFromMinutes, computeContactReminders, computeDueReminders, computeScheduledReminders } from './reminderRules';
 
 // Reminders already delivered this session (keeps each window firing once).
 const sent = new Set<string>();
@@ -35,8 +36,6 @@ const sent = new Set<string>();
 const reminderReads: ReminderReads = {
   upcomingMatches: (now) => getUpcomingMatches(now),
   tournaments: () => getTournaments(),
-  organizations: () => getOrganizations(),
-  teamLeaders: (ids) => getTeamLeadersMany(ids),
   matchSquads: (ids) => getMatchSquadsMany(ids),
   teamRosters: (ids) => getTeamRosters(ids),
   players: () => getPlayers(),
@@ -58,7 +57,7 @@ function gatherReminderInputs(now: number): Promise<ReminderInputs> {
 export async function runReminderCheck(now: number = Date.now(), viewerId?: string | null, inputs?: ReminderInputs): Promise<number> {
   const g = inputs ?? await gatherReminderInputs(now);
   const due = computeDueReminders(
-    g.matches, g.tournaments, g.orgs, g.leadersByTeam, g.squadsByMatch, now, sent,
+    g.matches, g.tournaments, g.squadsByMatch, now, sent,
     reminderPrefsStore.get(), viewerId, g.followedPlayerIds, g.playerNameById, g.rostersByTeam,
   );
   // Adult contact-verification nudge (turned 18 without own verified mobile/email)
@@ -90,7 +89,6 @@ export async function syncDeviceReminders(now: number = Date.now(), viewerId?: s
   computeDueReminders,
   computeScheduledReminders,
   activeWindow,
-  hostsFor,
   windowsFromMinutes,
   playersInSide,
 };

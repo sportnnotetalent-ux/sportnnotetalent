@@ -183,7 +183,7 @@ describe('SD-135 · squash Stroke / No let one-tap + 90 s cue', () => {
 describe('SD-135 · tennis ITF doubles preset + DF box column', () => {
   test('the preset: no-ad, set tiebreaks, a 10-point match tiebreak for the 3rd set', () => {
     // the plugin (RN) can't load in node: read the preset's `set` from source
-    const src = readFileSync(new URL('../src/sports/tennis/index.tsx', import.meta.url), 'utf8');
+    const src = (readFileSync(new URL('../src/sports/tennis/index.tsx', import.meta.url), 'utf8') + readFileSync(new URL('../src/sports/tennis/meta.ts', import.meta.url), 'utf8'));
     const m = /value: 'itf_dbl'[^\n]*set: (\{[^}]*\})/.exec(src);
     assert.ok(m, 'itf_dbl preset exists');
     const set = Function(`return (${m![1]})`)() as Record<string, unknown>;

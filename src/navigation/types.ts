@@ -68,6 +68,10 @@ export type RootStackParamList = {
   MatchLink: { matchId: string };
   /** Invite landing (app.sportnnote.in/i/<id>): sign up with the invited number. */
   Invite: { playerId: string; notme?: string };
+  /** "Join me on SportnNote": a friend's personal invite (app.sportnnote.in/get/<inviter>). */
+  GetApp: { from?: string } | undefined;
+  /** Send your personal invite link (WhatsApp / SMS / share / QR). */
+  InviteFriend: undefined;
   DeleteAccount: undefined;
   /** In-app messaging (migration 0027). */
   Messages: undefined;

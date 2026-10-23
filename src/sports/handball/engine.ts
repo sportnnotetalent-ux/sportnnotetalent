@@ -32,6 +32,9 @@
  */
 import type { ScoreAction, LiveSettings, FormatField, Attribution } from '../types';
 import { aggPriorFromConfig, aggregateText, levelForDecider, type AggPrior } from '../aggregate.ts';
+// Perf F-15 — the format presets / options live in the light meta module.
+import { HANDBALL_PRESETS, HANDBALL_TRACK_FIELDS } from './meta.ts';
+export { HANDBALL_PRESETS, HANDBALL_TRACK_FIELDS };
 
 export type Side = 'home' | 'away';
 export type ShotType = 'sixM' | 'nineM' | 'wing' | 'breakthrough' | 'fastBreak' | 'sevenM';
@@ -153,11 +156,8 @@ export interface HandballState {
 
 /* --------------------------------- format ---------------------------------- */
 
-export const HANDBALL_PRESETS: Record<string, { label: string; set: Record<string, number | string | boolean> }> = {
-  senior: { label: 'Senior 2 × 30', set: { playersPerSide: 7, periodMinutes: 30 } },
-  youth25: { label: 'Youth 2 × 25 (12–16)', set: { playersPerSide: 7, periodMinutes: 25 } },
-  youth20: { label: 'Youth 2 × 20 (8–12)', set: { playersPerSide: 7, periodMinutes: 20 } },
-};
+// The format presets live in ./meta.ts (perf F-15: light, for the format
+// pickers); imported and re-exported at the top of this file.
 
 const bool = (v: unknown, d: boolean) => (v === undefined || v === null || v === '' ? d : v === true || v === 'true' || v === 1);
 
@@ -636,13 +636,6 @@ export function handballScoreLine(s: HandballState, perspective?: Side): string 
 }
 
 /* --------------------------- live settings (#14) --------------------------- */
-
-/** Deep wave — the optional "Stats to track" (off by default: one tap per
- *  event stays the default; these add a chip / a step when on). */
-export const HANDBALL_TRACK_FIELDS: FormatField[] = [
-  { key: 'trackFaultTypes', label: 'Technical fault types', type: 'toggle', default: false, group: 'Stats to track', hint: 'steps, double dribble, area, offensive foul, passive play…' },
-  { key: 'trackSevenMDrawn', label: '7 m won by', type: 'toggle', default: false, group: 'Stats to track', hint: 'who won each 7-metre throw' },
-];
 
 export const HANDBALL_LIVE_SETTINGS: LiveSettings<HandballState> = {
   title: '⚙️ Match settings',

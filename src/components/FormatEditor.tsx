@@ -5,7 +5,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { theme } from '../core/theme';
 import { SelectChip, TextField, textStyles } from './ui';
-import { getSport } from '../sports/registry';
+import { getSportMeta } from '../sports/sportMeta';
 import type { FormatField, FormatFieldOption } from '../sports/types';
 import type { SportId } from '../core/types';
 
@@ -93,7 +93,7 @@ export function SportFormatEditor({
    *  advanced reveal and no "Customize" link; the full editor lives elsewhere. */
   onlyKeys?: string[];
 }) {
-  const plugin = getSport(sport);
+  const plugin = getSportMeta(sport);
   const fields = (plugin.formatFields ?? []).filter((f) => !omitKeys?.includes(f.key) && (!onlyKeys || onlyKeys.includes(f.key)));
   const [showAll, setShowAll] = useState(false);
   if (!fields.length) return null;

@@ -16,7 +16,7 @@ import { ConnectBoard } from '../components/ConnectBoard';
 import { PlayerFilters, activeFilterCount, type PlayerFilterState } from '../components/PlayerFilters';
 import { looksLikeContact } from '../data/repos';
 import { SectionHeader, SECTION_CAP } from '../components/SectionHeader';
-import { SPORT_LIST, getSport } from '../sports/registry';
+import { SPORT_LIST, getSportMeta } from '../sports/sportMeta';
 import { usePlayerSearch, useCities, useTeamSummaries, useFollow, useOpenTournaments, useGlobalSearch, type PlayerSummary } from '../data/hooks';
 import { bestTier, matchNames, parseVsQuery, orderSections, MIN_QUERY, type SearchKind } from '../data/search';
 import { tournamentStatus } from '../core/tournament';
@@ -121,13 +121,13 @@ export default function DiscoverScreen() {
             if (!b || !summary) return null;
             return (
               <Text style={st.statLine} numberOfLines={1}>
-                {getSport(b.sport).icon} {summary}{hasPartialCoverage(stats.recent, b) ? ' ☁' : ''}
+                {getSportMeta(b.sport).icon} {summary}{hasPartialCoverage(stats.recent, b) ? ' ☁' : ''}
               </Text>
             );
           })()}
           <View style={st.sportDots}>
             {player.sports.slice(0, 4).map((s) => (
-              <Text key={s} style={st.sportIcon}>{getSport(s).icon}</Text>
+              <Text key={s} style={st.sportIcon}>{getSportMeta(s).icon}</Text>
             ))}
             {/* Added by an organiser, no account yet — so they can't be messaged or claim stats. */}
             {flagUnclaimed && !player.profileId ? <Pill label="Not on app yet" /> : null}
@@ -153,7 +153,7 @@ export default function DiscoverScreen() {
           <View style={[st.teamDot, { backgroundColor: t.colorHex ?? theme.colors.surfaceAlt }]} />
           <View style={{ flex: 1 }}>
             <Text style={textStyles.body}>{t.name}</Text>
-            <Text style={textStyles.muted}>{t.sports.map((s) => getSport(s).icon).join(' ')}</Text>
+            <Text style={textStyles.muted}>{t.sports.map((s) => getSportMeta(s).icon).join(' ')}</Text>
           </View>
         </TouchableOpacity>
         <TouchableOpacity accessibilityRole="button"
@@ -178,7 +178,7 @@ export default function DiscoverScreen() {
           <View style={{ flex: 1 }}>
             <Text style={textStyles.body} numberOfLines={1}>{t.name}</Text>
             <Text style={textStyles.muted} numberOfLines={1}>
-              {t.hostName} · {t.sports.map((s) => getSport(s).icon).join(' ')} · {t.startDate}
+              {t.hostName} · {t.sports.map((s) => getSportMeta(s).icon).join(' ')} · {t.startDate}
             </Text>
           </View>
           {status ? <Pill label={status.label} textColor={status.color} /> : <Text style={st.chevron}>›</Text>}
@@ -205,7 +205,7 @@ export default function DiscoverScreen() {
 
   const sportNote = fSports.length > 0 && tab !== 'players' ? (
     <Text style={textStyles.muted}>
-      Only {fSports.map((s) => getSport(s).icon).join(' ')} {fSports.length === 1 ? getSport(fSports[0]).name : 'these sports'} ·{' '}
+      Only {fSports.map((s) => getSportMeta(s).icon).join(' ')} {fSports.length === 1 ? getSportMeta(fSports[0]).name : 'these sports'} ·{' '}
       <Text style={st.link} accessibilityRole="button" onPress={() => setFilters({ ...filters, sports: [] })}>show all sports</Text>
     </Text>
   ) : null;
@@ -348,7 +348,7 @@ export default function DiscoverScreen() {
         )}
 
         <SectionHeader
-          title={`Teams ${sport !== 'all' ? `· ${getSport(sport).name}` : ''}`}
+          title={`Teams ${sport !== 'all' ? `· ${getSportMeta(sport).name}` : ''}`}
           count={teams.length}
           onSeeAll={teams.length > SECTION_CAP ? () => setShowAllTeams((v) => !v) : undefined}
           expanded={showAllTeams}

@@ -25,18 +25,22 @@ import {
   phaseNameOf, archLines, archQualView, bracketEntrant, bracketSeeds, hasMatchData, advanceCrews, crewLines, isCrewSport,
   cycLines, cycKind, sprintEntrant, stageFinishers, type CycFormat,
   roadLines, phaseTeams, teamAwards, roadRecordsAllowed, type RoadFormat,
-  combinedStandings, combinedAwards, combinedLines, combinedEventLines, combinedRanked, combinedSeed, combinedBar, continuing, nextCombinedFormat,
+  combinedStandings, combinedAwards, combinedEventLines, combinedFinalLines, combinedRanked, combinedSeed, combinedBar, continuing, nextCombinedFormat,
   combinedKey, markKey, type CombinedKind, type CombinedTable, type CombinedPhaseInput,
   plannedSlot, type PhaseSched, dayKey,
   shootMatchEntrant, SHOOT_MATCH_TEAMS, memberLookup, type MemberScore,
   // timed races round 2: records set, heat-win / PB highlights, per-event "Stats to track"
   isTimedRaceSport, newRecordsSet, withRecordKeys, raceHighlights, goldPbIds, type RecordSetMark, type ResultHighlights, type ResultFlag, type TrackOverrides,
+  // follow-up: records held (the records an athlete set that still stand)
+  recordsSetBy, stillHeld, heldKey, type RecordsHeld,
 } from './results';
 import { removeFieldEntry } from './golf';
 import { applyRecordOps, recordOpsFor, bestRecords, type RecordOp } from './results/recordBook';
 import { updateFieldEventFormat } from './golf';
 import { finalAlert, combinedAlert, type ResultAlert } from './results/alerts';
 import { phaseRules, zeroLanes, type CompRules } from './results/competitionRules';
+// Reads past PostgREST's 1,000-row cap (stable order + .range; long .in() lists chunked).
+import { fetchAllPages, fetchAllChunked, chunk } from './paging';
 
 /** SD-131 — leave the podium on the row (format.alert) for the follower push.
  *  Never blocks the lock: the push is a courtesy, the result is what matters. */
@@ -293,10 +297,12 @@ export async function getResultsPhases(filter: { tournamentId?: string; eventKey
   let evs: FieldEvent[];
   if (!live()) evs = demo.fieldEvents.filter((e) => !filter.tournamentId || e.tournamentId === filter.tournamentId);
   else {
-    let q = supabase!.from('field_events').select('*').not('format->results', 'is', null).order('starts_at', { ascending: false });
-    if (filter.tournamentId) q = q.eq('tournament_id', filter.tournamentId);
-    if (filter.eventKey) q = q.eq('format->results->>eventKey', filter.eventKey);
-    const { data } = await q;
+    const { data } = await fetchAllPages((from, to) => {
+      let q = supabase!.from('field_events').select('*').not('format->results', 'is', null);
+      if (filter.tournamentId) q = q.eq('tournament_id', filter.tournamentId);
+      if (filter.eventKey) q = q.eq('format->results->>eventKey', filter.eventKey);
+      return q.order('starts_at', { ascending: false }).order('id').range(from, to);
+    });
     evs = ((data ?? []) as any[]).map(toEvent);
   }
   return evs.filter((e) => { const f = phaseOf(e); return !!f && (!filter.eventKey || f.eventKey === filter.eventKey); })
@@ -679,7 +685,8 @@ export async function resyncFinalLines(phase: FieldEvent, entries: FieldEntry[],
     const res = entries.map((e) => toResultEntry(e, nameOf));
     const ranked = rankEntries(res, phaseDiscipline(def, f), { handLegal: looseLegal(f) });
     const rows = combinedStandings(await combinedPhases(f, nameOf, { id: phase.id, entries }), { final: true });
-    lines = [...combinedEventLines(f, ranked), ...combinedLines(f, rows, combinedAwards(rows, points ?? {}))];
+    // follow-up: a record the total broke (kept on the phase) → mrSet / srSet on the total line
+    lines = combinedFinalLines(f, ranked, rows, combinedAwards(rows, points ?? {}));
   } else {
     const rows = rankEntries(entries.map((e) => toResultEntry(e, nameOf)), def, { handLegal: looseLegal(f) });
     lines = finalLinesFor(f, def, entries, nameOf, rows, points);
@@ -724,9 +731,13 @@ export async function getMeetAges(tournamentId: string, sport: string, ids: stri
   const out = new Map<string, number>();
   const uniq = [...new Set(ids.filter(Boolean))];
   if (!live() || !uniq.length) return out;
-  const { data, error } = await supabase!.rpc('meet_ages', { p_tid: tournamentId, p_sport: sport, p_ids: uniq.slice(0, 2000) });
-  if (error) return out;
-  for (const r of (data ?? []) as { id: string; age: number }[]) if (r.age != null) out.set(r.id, Number(r.age));
+  // At most one row per id: ≤ 500 ids per call stays under the server's 1,000-row
+  // cap (2,000 ids in one call came back with only 1,000 ages) and its 2,000-id limit.
+  for (const part of chunk(uniq, 500)) {
+    const { data, error } = await supabase!.rpc('meet_ages', { p_tid: tournamentId, p_sport: sport, p_ids: part });
+    if (error) return out;
+    for (const r of (data ?? []) as { id: string; age: number }[]) if (r.age != null) out.set(r.id, Number(r.age));
+  }
   return out;
 }
 
@@ -737,7 +748,7 @@ export async function completeFinal(phase: FieldEvent, entries: FieldEntry[], na
   const def = f && disciplineOf(f.discipline);
   if (!f || !def) throw new Error('Not a results event');
   // SD-93: the last event of a combined event — totals, medals, records on the total
-  if (f.combined) return completeCombined(phase, f, def, entries, nameOf, scopes, points);
+  if (f.combined) return completeCombined(phase, f, def, entries, nameOf, scopes, points, opts);
   // A timed final (several heats) ranks across heats — the whole phase at once.
   const rows = rankEntries(entries.map((e) => toResultEntry(e, nameOf)), def, { handLegal: looseLegal(f) });
   const book = await getRecordBook(phase.tournamentId, def.sport);
@@ -899,11 +910,20 @@ export async function getMarkHistory(def: DisciplineDef, athleteIds: string[], e
     const pids = new Set(phases.map((p) => p.id));
     entries = demo.fieldEntries.filter((e) => pids.has(e.eventId) && ids.includes(e.playerId));
   } else {
-    const { data } = await supabase!.from('field_events').select('*').eq('status', 'completed').eq('format->results->>discipline', phaseKey);
+    // Every completed phase of the discipline, any meet — paged; then the athletes'
+    // entries in them, both id lists chunked.
+    const { data } = await fetchAllPages((from, to) => supabase!.from('field_events').select('*').eq('status', 'completed')
+      .eq('format->results->>discipline', phaseKey).order('id').range(from, to));
     phases = ((data ?? []) as any[]).map(toEvent).filter((e) => e.id !== exceptPhaseId && sameCourse(e));
     if (!phases.length) return [];
-    const { data: rows } = await supabase!.from('field_entries').select('*').in('event_id', phases.map((p) => p.id)).in('player_id', ids);
-    entries = ((rows ?? []) as any[]).map(toEntry);
+    const phaseIds = phases.map((p) => p.id);
+    const rows: any[] = [];
+    for (const part of chunk([...new Set(ids)])) {
+      const { data: got } = await fetchAllChunked(phaseIds, (ph, from, to) => supabase!.from('field_entries').select('*')
+        .in('event_id', ph).in('player_id', part).order('id').range(from, to));
+      rows.push(...(got ?? []));
+    }
+    entries = rows.map(toEntry);
   }
   const dateOf = new Map(phases.map((p) => [p.id, dayKey(p.startsAt)])); // SD-154: the venue's day
   const out: MarkHistory[] = [];
@@ -994,7 +1014,7 @@ export async function getOrgRecordBook(orgId: string, exceptTournamentId: string
   let all: { id: string; records: RecordMark[] }[];
   if (!live()) all = demo.tournaments.filter((t) => t.hostOrgId === orgId).map((t) => ({ id: t.id, records: demo.resultRecords[t.id] ?? [] }));
   else {
-    const { data } = await supabase!.from('tournaments').select('id, formats').eq('host_org_id', orgId);
+    const { data } = await fetchAllPages((from, to) => supabase!.from('tournaments').select('id, formats').eq('host_org_id', orgId).order('id').range(from, to));
     all = ((data ?? []) as { id: string; formats?: Record<string, Record<string, unknown>> }[]).map((r) => {
       const raw = r.formats?.[sport]?.records;
       let records: RecordMark[] = [];
@@ -1008,7 +1028,8 @@ export async function getOrgRecordBook(orgId: string, exceptTournamentId: string
   let phases: FieldEvent[];
   if (!live()) phases = demo.fieldEvents.filter((e) => e.sport === sport && e.status === 'completed' && !!e.tournamentId && tids.includes(e.tournamentId));
   else {
-    const { data } = await supabase!.from('field_events').select('*').eq('sport', sport).eq('status', 'completed').in('tournament_id', tids);
+    const { data } = await fetchAllChunked(tids, (part, from, to) => supabase!.from('field_events').select('*').eq('sport', sport)
+      .eq('status', 'completed').in('tournament_id', part).order('id').range(from, to));
     phases = ((data ?? []) as any[]).map(toEvent);
   }
   if (!phases.length) return bestRecords(historic);
@@ -1024,14 +1045,73 @@ export async function getPhaseInfos(ids: string[]): Promise<Map<string, PhaseInf
   let evs: FieldEvent[];
   if (!live()) evs = demo.fieldEvents.filter((e) => uniq.includes(e.id));
   else {
-    const { data } = await supabase!.from('field_events').select('*').in('id', uniq);
+    const { data } = await fetchAllChunked(uniq, (part, from, to) => supabase!.from('field_events').select('*').in('id', part).order('id').range(from, to));
     evs = ((data ?? []) as any[]).map(toEvent);
   }
   for (const e of evs) {
     const f = phaseOf(e);
-    if (f) out.set(e.id, { discipline: f.discipline, category: f.category, phase: f.phase, title: e.title, date: e.startsAt, eventTitle: f.eventTitle, implement: f.implement, ...(f.combined ? { combinedKey: f.combined.key } : {}) });
+    if (f) {
+      out.set(e.id, {
+        discipline: f.discipline, category: f.category, phase: f.phase, title: e.title, date: e.startsAt, eventTitle: f.eventTitle, implement: f.implement, ...(f.combined ? { combinedKey: f.combined.key } : {}),
+        // follow-up (records held): where the final's records live
+        sport: e.sport, ...(e.tournamentId ? { tournamentId: e.tournamentId } : {}), ...(f.recordsSet?.length ? { recordsSet: f.recordsSet } : {}),
+      });
+    }
   }
   return out;
+}
+
+/** A meet's stored record book for a sport, from its tournament row's formats. */
+const storedBook = (formats: Record<string, Record<string, unknown>> | undefined, sport: string): RecordMark[] => {
+  const raw = formats?.[sport]?.records;
+  try { return typeof raw === 'string' ? (JSON.parse(raw) as RecordMark[]) : []; } catch { return []; }
+};
+
+/**
+ * Timed races follow-up — RECORDS HELD: which of the records this athlete set
+ * still stand, as `heldKey`s ("phaseId:MR"). A meet record is checked against
+ * that meet's book; a school record against the meet's host organisation's
+ * school book now (its meets + historic board — getOrgRecordBook). Only the
+ * books of meets where they set a record are read (most athletes: none, no
+ * query). `checked` = the records whose book was read: a record that couldn't
+ * be checked is neither held nor beaten (the card says nothing about it).
+ */
+export async function getRecordsHeld(playerId: string, infos: ReadonlyMap<string, PhaseInfo>): Promise<RecordsHeld> {
+  const checked = new Set<string>();
+  const held = new Set<string>();
+  const none = { checked, held };
+  const refs = recordsSetBy(playerId, infos);
+  if (!refs.length) return none;
+  const tids = [...new Set(refs.flatMap((r) => (r.tournamentId ? [r.tournamentId] : [])))];
+  if (!tids.length) return none;
+  let tours: { id: string; orgId?: string; formats?: Record<string, Record<string, unknown>> }[];
+  if (!live()) tours = demo.tournaments.filter((t) => tids.includes(t.id)).map((t) => ({ id: t.id, orgId: t.hostOrgId }));
+  else {
+    const { data, error } = await supabase!.from('tournaments').select('id, host_org_id, formats').in('id', tids);
+    if (error) return none;
+    tours = ((data ?? []) as { id: string; host_org_id?: string | null; formats?: Record<string, Record<string, unknown>> }[])
+      .map((t) => ({ id: t.id, ...(t.host_org_id ? { orgId: t.host_org_id } : {}), formats: t.formats }));
+  }
+  // one school book per organisation (null = it couldn't be read)
+  const schoolBooks = new Map<string, RecordMark[] | null>();
+  for (const ref of refs) {
+    const t = tours.find((x) => x.id === ref.tournamentId);
+    const sport = ref.sport ?? 'athletics';
+    if (!t) continue;
+    let book: RecordMark[];
+    if (ref.scope === 'MR') book = live() ? storedBook(t.formats, sport) : [...(demo.resultRecords[t.id] ?? [])];
+    else {
+      if (!t.orgId) continue;
+      const k = `${t.orgId}|${sport}`;
+      if (!schoolBooks.has(k)) schoolBooks.set(k, await getOrgRecordBook(t.orgId, undefined, () => '', sport).catch(() => null));
+      const sb = schoolBooks.get(k);
+      if (!sb) continue;
+      book = sb;
+    }
+    checked.add(heldKey(ref));
+    if (stillHeld(ref, book, playerId)) held.add(heldKey(ref));
+  }
+  return { checked, held };
 }
 
 /**
@@ -1148,18 +1228,26 @@ async function advanceCombined(phase: FieldEvent, f: PhaseFormat, def: Disciplin
 }
 
 /** SD-93 — lock the last event: its lines + the totals (places, medals, points,
- *  the legal total as a PB key), and a meet record on the total. */
-async function completeCombined(phase: FieldEvent, f: PhaseFormat, def: DisciplineDef, entries: FieldEntry[], nameOf: (id: string) => string, scopes: RecordScope[], points?: PointsSettings): Promise<RecordMark[]> {
+ *  the legal total as a PB key), and a meet record on the total. Timed races
+ *  follow-up: the records the TOTAL broke — the meet record, and the school
+ *  record against the organisation's book the official saw (`opts.schoolBook`)
+ *  — are kept on this phase (`recordsSet`) and go on the holders' total lines
+ *  as `mrSet` / `srSet`, as for a single event's final. */
+async function completeCombined(phase: FieldEvent, f: PhaseFormat, def: DisciplineDef, entries: FieldEntry[], nameOf: (id: string) => string, scopes: RecordScope[], points?: PointsSettings, opts: CloseOptions = {}): Promise<RecordMark[]> {
   const res = entries.map((e) => toResultEntry(e, nameOf));
   const ranked = rankEntries(res, phaseDiscipline(def, f), { handLegal: looseLegal(f) });
   const rows = combinedStandings(await combinedPhases(f, nameOf, { id: phase.id, entries }), { final: true });
   const awards = combinedAwards(rows, points ?? {});
-  await writePhaseLines(phase, f, [...combinedEventLines(f, ranked), ...combinedLines(f, rows, awards)]);
   const cdef = disciplineOf(f.combined!.key)!;
   const cat = categoryKey(f.category);
   const book = await getRecordBook(phase.tournamentId, 'athletics');
-  let next = updateRecords(combinedRanked(rows, cdef.key), cdef, cat, book, dayKey(phase.startsAt), scopes, f.eventKey);
-  await patchPhaseFormat(phase.id, { recordsBefore: recordsFor(book, cdef.key, cat) });
+  const totals = combinedRanked(rows, cdef.key);
+  let next = updateRecords(totals, cdef, cat, book, dayKey(phase.startsAt), scopes, f.eventKey);
+  const school = opts.schoolBook?.length ? updateRecords(totals, cdef, cat, opts.schoolBook, dayKey(phase.startsAt), ['SR'], f.eventKey) : [];
+  const recordsSet: RecordSetMark[] = [...scopes.flatMap((sc) => newRecordsSet(book, next, sc, f.eventKey)), ...newRecordsSet(opts.schoolBook ?? [], school, 'SR', f.eventKey)];
+  const fl: PhaseFormat = { ...f, recordsSet: recordsSet.length ? recordsSet : undefined };
+  await writePhaseLines(phase, f, combinedFinalLines(fl, ranked, rows, awards));
+  await patchPhaseFormat(phase.id, { recordsBefore: recordsFor(book, cdef.key, cat), ...(recordsSet.length || f.recordsSet ? { recordsSet: fl.recordsSet } : {}) });
   if (next !== book) next = await commitRecords(phase, 'athletics', book, next); // SD-130
   await saveResultAlert(phase.id, combinedAlert(rows, f.eventTitle)); // SD-131
   await setPhaseStatus(phase.id, 'completed');
@@ -1185,7 +1273,8 @@ export async function getCombinedHistory(key: string, athleteIds: string[], exce
     rows = demo.statLines.filter((l) => ids.includes(l.playerId) && l.stats?.[mk] != null && !exceptPhaseIds.includes(l.eventId ?? ''))
       .map((l) => ({ playerId: l.playerId, eventId: l.eventId, value: l.stats[mk], date: (l.date ?? '').slice(0, 10) }));
   } else {
-    const { data } = await supabase!.from('stat_lines').select('player_id, event_id, stats, recorded_at').eq('sport', 'athletics').in('player_id', ids).not(`stats->>${mk}`, 'is', null);
+    const { data } = await fetchAllChunked(ids, (part, from, to) => supabase!.from('stat_lines').select('player_id, event_id, stats, recorded_at')
+      .eq('sport', 'athletics').in('player_id', part).not(`stats->>${mk}`, 'is', null).order('id').range(from, to));
     rows = ((data ?? []) as { player_id: string; event_id?: string; stats: Record<string, number>; recorded_at?: string }[])
       .filter((l) => !exceptPhaseIds.includes(l.event_id ?? ''))
       .map((l) => ({ playerId: l.player_id, eventId: l.event_id, value: Number(l.stats?.[mk]), date: (l.recorded_at ?? '').slice(0, 10) }));

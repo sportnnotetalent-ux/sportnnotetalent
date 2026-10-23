@@ -44,6 +44,8 @@ import { hockeyFormation, HockeyPitch } from './pitch';
 import { usePendingEdit } from '../usePendingEdit';
 import { BackfillBar, RowAction, confirmRemove } from '../TimelineControls';
 import { hockeyVoice, hockeyVoiceEnds } from '../voiceParsers';
+import { HOCKEY_META } from './meta';
+import { hockeyMatchRecords } from './records';
 
 const opp = (s: Side): Side => (s === 'home' ? 'away' : 'home');
 const uid = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
@@ -725,10 +727,8 @@ const HockeyFacts = ({ state, homeName, awayName, homeColor, awayColor }: TabPro
 /* --------------------------------- plugin ---------------------------------- */
 
 export const hockeyPlugin: SportPlugin<HockeyState> = {
-  id: 'hockey',
-  name: 'Hockey',
-  icon: '🏑',
-  archetype: 'goal-time',
+  ...HOCKEY_META,
+  matchRecords: hockeyMatchRecords, // SD-51 (set by the registry before perf F-15)
   createInitialState: init,
   reducer,
   isComplete,
@@ -763,30 +763,6 @@ export const hockeyPlugin: SportPlugin<HockeyState> = {
   formation: (perSide) => hockeyFormation(perSide),
   Court: HockeyPitch,
   liveSettings: HOCKEY_LIVE_SETTINGS,
-  formatFields: [
-    {
-      key: 'preset', label: 'Format', type: 'preset', default: 'fih', onCreate: true,
-      options: [
-        ...Object.entries(HOCKEY_PRESETS).map(([value, p]) => ({ value, label: p.label, set: p.set })),
-        { value: 'custom', label: 'Custom' },
-      ],
-    },
-    { key: 'playersPerSide', label: 'Players per side', type: 'count', default: 11, min: 4, max: 11, advanced: true },
-    { key: 'periods', label: 'Periods', type: 'choice', default: 4, advanced: true, options: [{ value: 4, label: '4 quarters' }, { value: 2, label: '2 halves' }] },
-    { key: 'periodMinutes', label: 'Minutes per period', type: 'number', default: 15, min: 1, max: 45, advanced: true },
-    { key: 'stopClock', label: 'Stop the clock for goals & penalty corners', type: 'toggle', default: true, advanced: true, hint: 'as international matches do; you restart it' },
-    { key: 'penaltyCorners', label: 'Penalty corners', type: 'toggle', default: true, advanced: true, hint: 'off for Hockey5s' },
-    // deep wave: the optional "Stats to track" an organiser can switch on for an event
-    ...HOCKEY_TRACK_FIELDS.map((f) => ({ ...f, label: `Track ${f.label.toLowerCase()}`, advanced: true })),
-    {
-      key: 'decider', label: 'If level at full time', type: 'choice', default: 'none',
-      options: [
-        { value: 'none', label: 'Draw stands' },
-        { value: 'shootout', label: 'Shoot-out (5 each, then sudden death)' },
-      ],
-      hint: 'always a shoot-out in a tournament on “FIH + shoot-out bonus”',
-    },
-  ],
 };
 
 const c = StyleSheet.create({

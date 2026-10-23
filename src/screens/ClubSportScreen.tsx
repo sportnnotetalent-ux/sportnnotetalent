@@ -16,7 +16,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { teamLabel, levelRank, levelSuggestions } from '../core/teamLevels';
 import { useRegion } from '../core/region';
-import { getSport } from '../sports/registry';
+import { getSportMeta } from '../sports/sportMeta';
 import { rolesForSport, sportHasRoles } from '../data/teamRoles';
 import { useAuth } from '../core/auth';
 import {
@@ -36,7 +36,7 @@ export default function ClubSportScreen() {
   // SD-154: every squad this club fields in the sport (Varsity + JV, A + B, U13 …)
   const [squads, setSquads] = useState<Team[]>([]);
   const [newLevel, setNewLevel] = useState('');
-  const plugin = getSport(sport);
+  const plugin = getSportMeta(sport);
   const { profile } = useAuth();
 
   const [club, setClub] = useState<Club | null>(null);

@@ -26,6 +26,9 @@
  */
 import type { ScoreAction, LiveSettings, FormatField, Attribution } from '../types';
 import { aggPriorFromConfig, aggregateText, levelForDecider, type AggPrior } from '../aggregate.ts';
+// Perf F-15 — the format presets / options live in the light meta module.
+import { HOCKEY_PRESETS, HOCKEY_TRACK_FIELDS } from './meta.ts';
+export { HOCKEY_PRESETS, HOCKEY_TRACK_FIELDS };
 
 export type Side = 'home' | 'away';
 export type GoalType = 'field' | 'pc' | 'stroke';
@@ -147,13 +150,8 @@ export interface HockeyState {
 
 /* --------------------------------- format ---------------------------------- */
 
-export const HOCKEY_PRESETS: Record<string, { label: string; set: Record<string, number | string | boolean> }> = {
-  fih: { label: 'FIH 4 × 15', set: { playersPerSide: 11, periods: 4, periodMinutes: 15, stopClock: true, penaltyCorners: true } },
-  school: { label: 'School 2 × 25', set: { playersPerSide: 11, periods: 2, periodMinutes: 25, stopClock: false, penaltyCorners: true } },
-  junior: { label: 'Junior 4 × 10', set: { playersPerSide: 11, periods: 4, periodMinutes: 10, stopClock: false, penaltyCorners: true } },
-  indoor: { label: 'Indoor 6-a-side', set: { playersPerSide: 6, periods: 2, periodMinutes: 20, stopClock: false, penaltyCorners: true } },
-  fives: { label: 'Hockey5s', set: { playersPerSide: 5, periods: 2, periodMinutes: 10, stopClock: false, penaltyCorners: false } },
-};
+// The format presets live in ./meta.ts (perf F-15: light, for the format
+// pickers); imported and re-exported at the top of this file.
 
 const bool = (v: unknown, d: boolean) => (v === undefined || v === null || v === '' ? d : v === true || v === 'true' || v === 1);
 
@@ -593,13 +591,6 @@ export function hockeyScoreLine(s: HockeyState, perspective?: Side): string {
 }
 
 /* --------------------------- live settings (#14) --------------------------- */
-
-/** Deep wave — the optional "Stats to track" (off by default: one tap per
- *  event stays the default; these add their own buttons when on). */
-export const HOCKEY_TRACK_FIELDS: FormatField[] = [
-  { key: 'trackPossession', label: 'Possession', type: 'toggle', default: false, group: 'Stats to track', hint: 'tap who has the ball; % on the game clock' },
-  { key: 'trackReferrals', label: 'Video referrals', type: 'toggle', default: false, group: 'Stats to track', hint: 'per team, upheld or not' },
-];
 
 export const HOCKEY_LIVE_SETTINGS: LiveSettings<HockeyState> = {
   title: '⚙️ Match settings',

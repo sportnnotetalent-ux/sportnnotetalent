@@ -34,6 +34,9 @@
  * runners stay with the earlier pitcher — OBR 9.16(g)).
  */
 import type { ScoreAction, LiveSettings, FormatField, Attribution } from '../types';
+// Perf F-15 — the format presets / options live in the light meta module.
+import { BASEBALL_PRESETS, TRACK_FIELDS } from './meta.ts';
+export { BASEBALL_PRESETS, TRACK_FIELDS };
 
 export type Side = 'home' | 'away';
 export const other = (s: Side): Side => (s === 'home' ? 'away' : 'home');
@@ -245,14 +248,6 @@ export interface BaseballConfig {
   /** round 2 */
   battedBallTypes?: true;
 }
-
-export const BASEBALL_PRESETS: Record<string, { label: string; set: Record<string, number | string | boolean> }> = {
-  baseball: { label: 'Baseball 9 inn (WBSC)', set: { innings: 9, mercy: '15@5,10@7', tiebreak: 'r12', tbFrom: 10, dh: true, lineupSize: 9, startCount: '0-0', foulOut: false } },
-  softball: { label: 'Softball fast pitch 7 inn (WBSC)', set: { innings: 7, mercy: '15@3,10@4,7@5', tiebreak: 'r2', tbFrom: 8, dh: false, lineupSize: 9, startCount: '0-0', foulOut: false } },
-  slowpitch: { label: 'Slow pitch 7 inn', set: { innings: 7, mercy: '20@3,15@4,10@5', tiebreak: 'r2', tbFrom: 8, dh: false, lineupSize: 10, startCount: '1-1', foulOut: true } },
-  youth: { label: 'Youth 6 inn', set: { innings: 6, mercy: '10@4', tiebreak: 'none', tbFrom: 7, dh: true, lineupSize: 9, startCount: '0-0', foulOut: false } },
-  school: { label: 'School 7 inn', set: { innings: 7, mercy: '10@5', tiebreak: 'none', tbFrom: 8, dh: true, lineupSize: 9, startCount: '0-0', foulOut: false } },
-};
 
 const bool = (v: unknown, d: boolean) => (v === undefined || v === null || v === '' ? d : v === true || v === 'true' || v === 1);
 const numOr = (v: unknown, d: number, min = 0, max = 99) => { const n = Number(v); return v !== '' && v != null && Number.isFinite(n) ? Math.min(max, Math.max(min, Math.floor(n))) : d; };
@@ -1049,12 +1044,6 @@ export const cardLine = (s: BaseballState): string => (s?.g ? statusText(s) : ''
 
 /* --------------------------- live settings (#14) --------------------------- */
 
-/** Deep wave — the "Stats to track" toggles (live settings + the match format). */
-export const TRACK_FIELDS: FormatField[] = [
-  { key: 'pitchTypes', label: 'Pitch types', type: 'toggle', default: false, group: 'Stats to track', hint: 'A chip row over the pitch pad (FB SL CH … / softball Rise Drop …): tap the type, then the pitch — pitch mix per pitcher. Needs pitch-by-pitch' },
-  { key: 'sprayZones', label: 'Where the ball went (spray)', type: 'toggle', default: false, group: 'Stats to track', hint: 'Optional LF · CF · RF … chips when the ball is put in play — hits and balls in play by zone' },
-  { key: 'battedBallTypes', label: 'Batted-ball type', type: 'toggle', default: false, group: 'Stats to track', hint: 'Optional Grounder · Liner · Fly ball · Popup chips when the ball is put in play (outs fill it in themselves) — GB / LD / FB % for batters and pitchers' },
-];
 /** Is this capture tracked in the game — its toggle on, or any recorded? */
 export const trackTracked = (s: Pick<BaseballState, 'cfg' | 'events'>, f: TrackFlag): boolean =>
   s.cfg[f] === true || s.events.some((e) => (f === 'pitchTypes' ? !!e.ptype : f === 'sprayZones' ? !!e.zone : !!e.btype));

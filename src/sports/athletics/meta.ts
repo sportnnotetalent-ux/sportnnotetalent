@@ -1,0 +1,60 @@
+/**
+ * Perf F-15 — Athletics's light metadata: what lists, pickers and forms
+ * need (name, icon, who competes, the format options) without the scoring
+ * engine or the scorer UI, which load on demand (see ../registry.ts).
+ * PURE (no React Native): the sport list is in the first download.
+ */
+import type { SportMeta } from '../types';
+
+export const ATHLETICS_META: SportMeta = {
+  id: 'athletics',
+  name: 'Athletics',
+  icon: '🏃',
+  archetype: 'measured',
+  participantKind: 'individual',
+  formatFields: [
+    {
+      key: 'pointsScheme', label: 'Position points', type: 'choice', default: '8,7,6,5,4,3,2,1', onCreate: true,
+      hint: 'points each place earns for its house / team; tied places share',
+      options: [
+        { value: '8,7,6,5,4,3,2,1', label: '8-7-6-5-4-3-2-1' },
+        { value: '10,8,6,5,4,3,2,1', label: '10-8-6-5-4-3-2-1' },
+        { value: '5,3,1', label: '5-3-1 (medals only)' },
+        { value: '7,5,4,3,2,1', label: '7-5-4-3-2-1' },
+      ],
+    },
+    {
+      key: 'relayFactor', label: 'Relay points', type: 'choice', default: 1,
+      options: [{ value: 1, label: 'Same as individual' }, { value: 2, label: 'Double' }],
+    },
+    { key: 'handTimed', label: 'Hand-timed meet', type: 'toggle', default: false, onCreate: true, hint: 'stopwatches and no wind gauge: hand times count for PBs and meet records (shown "h")' },
+    // SD-154: feet and inches for jumps and throws (US meets) — stored in metres, records metric
+    {
+      key: 'fieldUnits', label: 'Field marks in', type: 'choice', default: 'auto', onCreate: true,
+      hint: 'jumps and throws are always stored in metres; this is how they are shown and typed',
+      options: [{ value: 'auto', label: 'Each viewer’s region' }, { value: 'metric', label: 'Metres' }, { value: 'imperial', label: 'Feet and inches' }],
+    },
+    {
+      key: 'distanceUnits', label: 'Road distances', type: 'choice', default: 'auto', advanced: true,
+      hint: 'road and cross-country distances: kilometres, or kilometres with miles alongside',
+      options: [{ value: 'auto', label: 'Each viewer’s region' }, { value: 'km', label: 'Kilometres' }, { value: 'mi', label: 'Kilometres + miles' }],
+    },
+    // SD-130: who is the individual champion when two athletes have the same points
+    {
+      key: 'champTie', label: 'Champion tie-break', type: 'choice', default: 'medals', advanced: true,
+      hint: 'the individual champion of each age group: most position points; if level…',
+      options: [{ value: 'medals', label: 'More golds, then silvers, bronzes' }, { value: 'share', label: 'Joint champions' }],
+    },
+    // deep wave (timed races): "Stats to track" — optional depth the meet switches on; off = today's fast entry
+    { key: 'reaction', label: 'Reaction times', type: 'toggle', default: false, advanced: true, group: 'Stats to track', hint: 'a start-information system reads reaction times' },
+    { key: 'lapSplits', label: 'Lap times', type: 'toggle', default: false, advanced: true, group: 'Stats to track', hint: 'a timekeeper reads each runner every lap (400 m and longer) — lap times, places at each split; Lap points sets where' },
+    // timed races round 2: where lap times are read (1000 m, 1500 m, 3000 m) — finish-line passes stay the default
+    {
+      key: 'lapPoints', label: 'Lap points', type: 'choice', default: 'finish', advanced: true, group: 'Stats to track',
+      hint: 'with lap times on: one timekeeper at the finish line, or every 400 m from the start like the Diamond League (a second timekeeper where the race starts on the back straight)',
+      options: [{ value: 'finish', label: 'Finish-line passes' }, { value: 'start', label: 'Every 400 m from the start' }],
+    },
+    { key: 'relayLegs', label: 'Relay leg times', type: 'toggle', default: false, advanced: true, group: 'Stats to track', hint: 'the time at each changeover — every runner’s leg time and the fastest leg' },
+    { key: 'chipTimes', label: 'Chip times (road)', type: 'toggle', default: false, advanced: true, group: 'Stats to track', hint: 'a road race timed by the gun can show each runner’s chip (net) time too — the gun time stays official' },
+  ],
+};

@@ -8,7 +8,7 @@ import { ScrollView, View, Text, TouchableOpacity, StyleSheet } from 'react-nati
 import { theme } from '../core/theme';
 import { Button, Card, EmptyState, Pill, SelectChip, TextField, textStyles } from './ui';
 import { AwardPickerSheet, type PickerRow } from './AwardPickerSheet';
-import { getSport } from '../sports/registry';
+import { getSportMeta } from '../sports/sportMeta';
 import { confirmAction, notice } from '../core/confirm';
 import { notify } from '../core/notifications';
 import { shareMessage } from '../core/share';
@@ -175,13 +175,13 @@ export function TournamentAwardsTab({
     const items = awards?.items ?? [];
     void shareMessage(awardsShareText({
       tournament: tournament.name, tournamentId: tournament.id,
-      awards: items.map((i) => ({ icon: awardIcon(i.sport, i.slot), label: sports.length > 1 ? `${i.label} (${getSport(i.sport).name})` : i.label, playerName: i.playerName, teamName: i.teamName, detail: i.detail })),
+      awards: items.map((i) => ({ icon: awardIcon(i.sport, i.slot), label: sports.length > 1 ? `${i.label} (${getSportMeta(i.sport).name})` : i.label, playerName: i.playerName, teamName: i.teamName, detail: i.detail })),
     }), 'tournament');
   };
 
   const sportRow = sports.length > 1 ? (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.chips}>
-      {sports.map((s) => <SelectChip key={s} label={`${getSport(s).icon} ${getSport(s).name}`} active={sport === s} onPress={() => onSport(s)} />)}
+      {sports.map((s) => <SelectChip key={s} label={`${getSportMeta(s).icon} ${getSportMeta(s).name}`} active={sport === s} onPress={() => onSport(s)} />)}
     </ScrollView>
   ) : null;
 

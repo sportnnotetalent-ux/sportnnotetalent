@@ -227,8 +227,8 @@ describe('SD-15 — the old maps are derived views, equal to the golden values',
         'Most 4s', 'Most 6s', 'Most maidens', 'Most dot balls', 'Most ducks', 'Most keeper dismissals',
         // cricket round 2 — the tracked-detail rails
         'Fastest ball', 'Best control %']);
-    // (golf round 2 added putts per GIR, driving distance and par-3 / 4 / 5 averages before holes won)
-    assert.deepEqual(STAT_CATEGORIES.golf.map((c) => c.key), ['birdies', 'lowRound', 'lowRound9', 'scoringAvg', 'eagles', 'puttsPerRound', 'girPct', 'puttsPerGir', 'drivingDistance', 'p3Avg', 'p4Avg', 'p5Avg', 'holesWon']);
+    // (golf round 2 added putts per GIR, driving distance and par-3 / 4 / 5 averages before holes won; the follow-up most chip-ins)
+    assert.deepEqual(STAT_CATEGORIES.golf.map((c) => c.key), ['birdies', 'lowRound', 'lowRound9', 'scoringAvg', 'eagles', 'puttsPerRound', 'girPct', 'puttsPerGir', 'drivingDistance', 'p3Avg', 'p4Avg', 'p5Avg', 'chipIns', 'holesWon']);
     for (const sp of KEPT) assert.deepEqual(leaderStat(sp as SportId), golden.leaderStat[sp]);
   });
   test('headline order', () => {

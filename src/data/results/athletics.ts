@@ -480,7 +480,16 @@ export function leadOffLine(discipline: string, f: Pick<PhaseFormat, 'category' 
 /* --------------------------------- career --------------------------------- */
 
 /** What the career needs to know about a phase a line came from. */
-export interface PhaseInfo { discipline: string; category?: Category; phase: PhaseKind; title: string; date: string; eventTitle?: string; implement?: string; /** SD-93: the combined event this phase is an event of ('ath.ce_dec') */ combinedKey?: string }
+export interface PhaseInfo {
+  discipline: string; category?: Category; phase: PhaseKind; title: string; date: string; eventTitle?: string; implement?: string;
+  /** SD-93: the combined event this phase is an event of ('ath.ce_dec') */
+  combinedKey?: string;
+  /** timed races follow-up (records held): the meet, the book's sport and the
+   *  records this final set (PhaseFormat.recordsSet) */
+  tournamentId?: string;
+  sport?: string;
+  recordsSet?: PhaseFormat['recordsSet'];
+}
 
 export interface CareerBest { discipline: string; label: string; category?: string; value: number; text: string; date: string; eventId: string; wind?: number; hand?: boolean; implement?: string }
 export interface CareerRace { eventId: string; title: string; date: string; discipline?: string; text: string; place?: number; medal?: 'gold' | 'silver' | 'bronze'; flags: string[] }

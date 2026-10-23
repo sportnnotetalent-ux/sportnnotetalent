@@ -12,7 +12,7 @@ import type { RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { theme } from '../core/theme';
 import { Card, EmptyState, TextField, Button, textStyles } from '../components/ui';
-import { getSport } from '../sports/registry';
+import { getSportMeta } from '../sports/sportMeta';
 import { matchLine } from '../sports/matchLine';
 import { formatDay } from '../core/dates';
 import { useMatches } from '../data/hooks';
@@ -33,7 +33,7 @@ export default function HeadToHeadScreen() {
   const nav = useNavigation<Nav>();
   const { params } = useRoute<RouteProp<RootStackParamList, 'HeadToHead'>>();
   const { sport, a, b, teamA, teamB } = params;
-  const plugin = getSport(sport);
+  const plugin = getSportMeta(sport);
   const { matches } = useMatches();
   const matchById = useMemo(() => new Map(matches.map((m) => [m.id, m])), [matches]);
   const teamMode = !!(teamA && teamB);

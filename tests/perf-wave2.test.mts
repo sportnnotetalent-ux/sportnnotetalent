@@ -138,7 +138,7 @@ describe('edge-function region pinning abroad (F-22)', () => {
     assert.equal(regionalFunctionPath('join?p=abc&format=json', true), 'join?p=abc&format=json&forceFunctionRegion=ap-south-1');
   });
   test('push senders are never pinned (they call global push services)', () => {
-    for (const f of ['push-send', 'message-notify']) {
+    for (const f of ['push-send', 'message-notify', 'invite-joined']) {
       assert.equal(PINNED_FUNCTIONS.has(f), false);
       assert.equal(regionalFunctionPath(f, true), f);
     }
@@ -150,7 +150,7 @@ describe('edge-function region pinning abroad (F-22)', () => {
     const bare: string[] = [];
     for (const f of files) {
       for (const m of readFileSync(f, 'utf8').matchAll(/functions\.invoke\(\s*'([a-z-]+)'/g)) {
-        if (m[1] !== 'push-send' && m[1] !== 'message-notify') bare.push(`${f}: ${m[1]}`);
+        if (m[1] !== 'push-send' && m[1] !== 'message-notify' && m[1] !== 'invite-joined') bare.push(`${f}: ${m[1]}`);
       }
     }
     assert.deepEqual(bare, []);

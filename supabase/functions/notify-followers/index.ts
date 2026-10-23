@@ -88,6 +88,8 @@ import { webPushToProfiles } from '../_shared/webpush.ts';
 import { allowedPlayerFollows, keepAllowedFollows } from '../_shared/minorFollows.ts';
 import { alertText, eventName, parseAlert, phaseKind, recordsSetBy, type AlertMedal, type RecordSet } from '../_shared/resultAlert.ts';
 import { highlightTargets, highlightText, itemsFor, parseHighlights, type Highlight, type Prefs as HighlightPrefs } from '../_shared/resultHighlights.ts';
+// PostgREST stops at 1,000 rows without saying so: page every list, chunk long .in() lists.
+import { chunk, fetchAllChunked, fetchAllPages } from '../_shared/paging.ts';
 
 const WEBHOOK_SECRET = Deno.env.get('WEBHOOK_SECRET') ?? '';
 
@@ -114,7 +116,10 @@ const json = (body: unknown, status = 200) =>
 /** Followers of the given targets, with their alert choices when the column exists. */
 async function followersOf(targetType: TargetType, ids: string[]): Promise<FollowRow[]> {
   if (!ids.length) return [];
-  const q = (cols: string) => supabase.from('follows').select(cols).eq('target_type', targetType).in('target_id', ids);
+  // A tournament / team / star player can have thousands of followers: every page.
+  const q = (cols: string) => fetchAllChunked(ids, (part, from, to) =>
+    supabase.from('follows').select(cols).eq('target_type', targetType).in('target_id', part)
+      .order('target_id').order('follower_id').range(from, to));
   const withPrefs = await q('follower_id, target_type, target_id, prefs');
   // Pre-migration: no prefs column → everyone wants everything.
   const rows = ((!withPrefs.error ? withPrefs.data : (await q('follower_id, target_type, target_id')).data) ?? []) as unknown as FollowRow[];
@@ -136,15 +141,32 @@ async function sendToProfiles(
   if (!unique.length) return { sent: 0, web: 0 };
   // Web push (iPhone Home Screen app, browsers).
   const web = await webPushToProfiles(unique, { title, body, url: data.url });
-  const { data: tokens } = await supabase.from('push_tokens').select('token').in('profile_id', unique);
+  const { data: tokens } = await fetchAllChunked(unique, (part, from, to) =>
+    supabase.from('push_tokens').select('token').in('profile_id', part).order('profile_id').order('token').range(from, to));
   if (!tokens?.length) return { sent: 0, web };
   const messages = tokens.map((t) => ({ to: t.token, sound: 'default', title, body, data }));
-  await fetch('https://exp.host/--/api/v2/push/send', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify(messages),
-  });
+  // Expo takes at most 100 messages per request (one big request failed whole).
+  for (const batch of chunk(messages, 100)) {
+    await fetch('https://exp.host/--/api/v2/push/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify(batch),
+    });
+  }
   return { sent: messages.length, web };
+}
+
+/** Claim ledger rows (ignoreDuplicates): the rows a call gets back are the ones IT
+ *  claimed. In batches, so no response can be cut short at the 1,000-row cap.
+ *  `ids` null when a batch failed (as a failed single call's data was). */
+async function claim(rows: Record<string, unknown>[], onConflict: string): Promise<{ ids: string[] | null; error: { message: string } | null }> {
+  const ids: string[] = [];
+  for (const part of chunk(rows, 500)) {
+    const { data, error } = await supabase.from('reminder_sends').upsert(part, { onConflict, ignoreDuplicates: true }).select('recipient_id');
+    if (error) return { ids: null, error };
+    for (const r of (data ?? []) as { recipient_id: string }[]) ids.push(r.recipient_id);
+  }
+  return { ids, error: null };
 }
 
 interface MatchRecord {
@@ -207,12 +229,9 @@ async function handleTieResult(record: MatchRecord, tie: NonNullable<ReturnType<
   ]);
   const recipients = [...new Set([...teamF, ...tourF].filter((f) => wants(f.prefs, 'result')).map((f) => f.follower_id))];
   if (!recipients.length) return { tie: 'no followers' };
-  const { data: claimed } = await supabase
-    .from('reminder_sends')
-    .upsert(recipients.map((recipient_id) => ({ match_id: first.id, lead_key: 'tie_result', recipient_id, kind: 'follower' })),
-      { onConflict: 'match_id,lead_key,recipient_id,kind', ignoreDuplicates: true })
-    .select('recipient_id');
-  const toSend = claimed ? (claimed as { recipient_id: string }[]).map((r) => r.recipient_id) : [];
+  const { ids: claimed } = await claim(recipients.map((recipient_id) => ({ match_id: first.id, lead_key: 'tie_result', recipient_id, kind: 'follower' })),
+    'match_id,lead_key,recipient_id,kind');
+  const toSend = claimed ?? [];
   if (!toSend.length) return { tie: 'duplicate' };
   const nameOf = (id: string | null) => {
     const t = (teams ?? []).find((x) => x.id === id);
@@ -257,7 +276,8 @@ async function handleMatchStatus(record: MatchRecord, oldStatus: string | null |
     // the teams' explicit rosters (where the app keeps membership) + team_members
     const [{ data: rosterRows }, { data: members }] = await Promise.all([
       supabase.from('teams').select('roster').in('id', teamIds),
-      supabase.from('team_members').select('player_id').in('team_id', teamIds),
+      fetchAllPages((from, to) => supabase.from('team_members').select('player_id').in('team_id', teamIds)
+        .order('team_id').order('player_id').range(from, to)),
     ]);
     playerIds = [...new Set([
       ...(rosterRows ?? []).flatMap((t) => idsOf((t as { roster?: unknown }).roster)),
@@ -282,23 +302,21 @@ async function handleMatchStatus(record: MatchRecord, oldStatus: string | null |
   if (!recipients.length) return json({ key, sent: 0, recipients: 0, ...(tieOut ? { tieOut } : {}) });
 
   // Ledger: one start + one result per (match, profile), ever.
-  const { data: already } = await supabase
+  const { data: already } = await fetchAllChunked(recipients, (part, from, to) => supabase
     .from('reminder_sends')
     .select('recipient_id')
     .eq('match_id', record.id)
     .eq('lead_key', key)
     .eq('kind', 'follower')
-    .in('recipient_id', recipients);
+    .in('recipient_id', part)
+    .order('recipient_id').range(from, to));
   const done = new Set((already ?? []).map((r) => r.recipient_id as string));
   const fresh = recipients.filter((id) => !done.has(id));
   if (!fresh.length) return json({ key, sent: 0, recipients: 0, duplicate: true });
   // Claim first (ignoreDuplicates) so a concurrent call can't double-send.
-  const { data: claimed } = await supabase
-    .from('reminder_sends')
-    .upsert(fresh.map((recipient_id) => ({ match_id: record.id, lead_key: key, recipient_id, kind: 'follower' })),
-      { onConflict: 'match_id,lead_key,recipient_id,kind', ignoreDuplicates: true })
-    .select('recipient_id');
-  const toSend = claimed ? (claimed as { recipient_id: string }[]).map((r) => r.recipient_id) : fresh;
+  const { ids: claimed } = await claim(fresh.map((recipient_id) => ({ match_id: record.id, lead_key: key, recipient_id, kind: 'follower' })),
+    'match_id,lead_key,recipient_id,kind');
+  const toSend = claimed ?? fresh;
 
   const label = `${home} vs ${away}`;
   const sport = record.sport ? record.sport[0].toUpperCase() + record.sport.slice(1) : 'Match';
@@ -336,7 +354,8 @@ async function handleFieldStatus(rec: FieldStatusRecord): Promise<Response> {
   if (!kind && !hasHighlights) return json({ skipped: 'not a final' });
 
   // Who is in it: athletes (relay / crew members too) and the teams / houses they score for.
-  const q = (cols: string) => supabase.from('field_entries').select(cols).eq('event_id', ev.id);
+  // A big field (a cross-country race) passes 1,000 entries: every page.
+  const q = (cols: string) => fetchAllPages((from, to) => supabase.from('field_entries').select(cols).eq('event_id', ev.id).order('id').range(from, to));
   let entryRes = await q('player_id, team_id, result');
   if (entryRes.error) entryRes = await q('player_id, result'); // before 0051
   const entries = (entryRes.data ?? []) as unknown as FieldEntryRow[];
@@ -363,7 +382,8 @@ async function handleFieldStatus(rec: FieldStatusRecord): Promise<Response> {
   let medals: AlertMedal[] = (stored?.medals ?? []).filter((m) =>
     (m.playerId && playerIds.has(m.playerId)) || (m.teamId && teamIds.has(m.teamId)));
   if (!medals.some((m) => m.medal === 'gold')) {
-    const { data: lines } = await supabase.from('stat_lines').select('player_id, stats, won').eq('event_id', ev.id);
+    const { data: lines } = await fetchAllPages((from, to) =>
+      supabase.from('stat_lines').select('player_id, stats, won').eq('event_id', ev.id).order('id').range(from, to));
     medals = ((lines ?? []) as { player_id: string; stats?: Record<string, number>; won?: boolean }[])
       .filter((l) => (kind === 'golf' ? l.won === true : Number(l.stats?.golds) > 0) && playerIds.has(l.player_id))
       .map((l) => ({ medal: 'gold' as const, playerId: l.player_id, name: '' }));
@@ -423,14 +443,11 @@ async function handleFieldStatus(rec: FieldStatusRecord): Promise<Response> {
   // Ledger: one push per (event, profile), ever — claim first so a re-lock or a
   // concurrent call can't double-send.
   const lead = kind === 'golf' ? 'round' : 'final';
-  const { data: claimed, error: claimErr } = await supabase
-    .from('reminder_sends')
-    .upsert(recipients.map((recipient_id) => ({ event_id: ev.id, lead_key: lead, recipient_id, kind: 'follower' })),
-      { onConflict: 'event_id,lead_key,recipient_id,kind', ignoreDuplicates: true })
-    .select('recipient_id');
+  const { ids: claimed, error: claimErr } = await claim(recipients.map((recipient_id) => ({ event_id: ev.id, lead_key: lead, recipient_id, kind: 'follower' })),
+    'event_id,lead_key,recipient_id,kind');
   // no event_id column yet → send nothing rather than risk repeats
   if (claimErr) return json({ kind, error: 'ledger', message: claimErr.message, highlights: hl }, 500);
-  const toSend = ((claimed ?? []) as { recipient_id: string }[]).map((r) => r.recipient_id);
+  const toSend = claimed ?? [];
   if (!toSend.length) return json({ kind, sent: 0, recipients: 0, duplicate: true, highlights: hl });
 
   const url = kind === 'golf' ? `/g/${ev.id}` : `/r/${ev.id}`;

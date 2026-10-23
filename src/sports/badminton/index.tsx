@@ -30,6 +30,8 @@ import { badmintonDoublesTurn } from '../doublesOrder';
 import { DoublesOrderPicker } from '../DoublesOrderPicker';
 import { ServeCourtPanel } from '../ServeCourtPanel';
 import { badmintonServeCourt } from '../serveCourt';
+import { BADMINTON_META } from './meta';
+import { badmintonMatchRecords } from './records';
 export { serve, type BadmintonState } from './engine';
 
 const ScoringControls: SportPlugin<BadmintonState>['ScoringControls'] = ({ state, dispatch: rawDispatch, homeName, awayName, homeColor, awayColor, homeRoster = [], awayRoster = [] }) => {
@@ -143,11 +145,8 @@ const BadmintonServeCourt: NonNullable<SportPlugin<BadmintonState>['ServeCourt']
 };
 
 export const badmintonPlugin: SportPlugin<BadmintonState> = {
-  id: 'badminton',
-  name: 'Badminton',
-  icon: '🏸',
-  archetype: 'set-game-point',
-  participantKind: 'both', // Singles = individual, Doubles = a pair
+  ...BADMINTON_META,
+  matchRecords: badmintonMatchRecords, // SD-51 (set by the registry before perf F-15)
   createInitialState: init,
   reducer,
   isComplete: (s) => s.ended,
@@ -168,7 +167,6 @@ export const badmintonPlugin: SportPlugin<BadmintonState> = {
   scoreLine,
   // SD-20: the line score + BWF result marks ("21-15, 8-3 ret.").
   lineScore,
-  retireTerms: true,
   ScoringControls,
   matchTabs: { Commentary: BadmintonCommentary, Stats: BadmintonStats },
   // SD-107 / deep wave — "Stats to track": point detail, rally length (event mode: from the next rally)
@@ -177,45 +175,6 @@ export const badmintonPlugin: SportPlugin<BadmintonState> = {
   Court: makeCourt('badminton'),
   ServeCourt: BadmintonServeCourt,
   voice: { hints: ['point home', 'point away', '{name} scores'], parse: pointVoice },
-  formatFields: [
-    {
-      key: 'preset', label: 'Format', type: 'preset', default: 'bwf21',
-      options: [
-        { value: 'bwf21', label: 'BWF · 21 rally', set: { pointsPerGame: 21, cap: 30, gamesToWin: 2, goldenPoint: true } },
-        { value: 'g5x11', label: '5×11 (rally, cap 15)', set: { pointsPerGame: 11, cap: 15, gamesToWin: 3, goldenPoint: true } },
-        { value: 'g15', label: '15-point', set: { pointsPerGame: 15, cap: 21, gamesToWin: 2, goldenPoint: true } },
-        { value: 'single', label: 'Single game to 21', set: { pointsPerGame: 21, cap: 30, gamesToWin: 1, goldenPoint: true } },
-        { value: 'custom', label: 'Custom' },
-      ],
-    },
-    {
-      key: 'playersPerSide', label: 'Players', type: 'choice', default: 1,
-      options: [
-        { value: 1, label: 'Singles' },
-        { value: 2, label: 'Doubles' },
-      ],
-    },
-    { key: 'pointsPerGame', label: 'Points per game', type: 'number', default: 21, min: 5, max: 30, advanced: true },
-    { key: 'cap', label: 'Deuce cap', type: 'number', default: 30, min: 5, max: 40, advanced: true, hint: 'hard ceiling that settles a long deuce' },
-    {
-      key: 'goldenPoint', label: 'At the cap', type: 'choice', default: true, advanced: true,
-      options: [
-        { value: true, label: 'Golden point (next wins)' },
-        { value: false, label: 'Win by 2 (no golden point)' },
-      ],
-    },
-    {
-      key: 'gamesToWin', label: 'Match length', type: 'choice', default: 2,
-      options: [
-        { value: 2, label: 'Best of 3' },
-        { value: 3, label: 'Best of 5' },
-        { value: 1, label: 'Single game' },
-      ],
-    },
-    // deep wave — "Stats to track" defaults for every match of this format
-    // (the scorer can still change them per match in ⚙️ Scoring settings)
-    ...trackFormatFields('badminton'),
-  ],
 };
 
 const ctrl = StyleSheet.create({

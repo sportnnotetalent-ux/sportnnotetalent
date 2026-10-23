@@ -175,9 +175,10 @@ describe('round 2 · volleyball optional-category award slots appear only when t
     for (const sp of ['football', 'cricket', 'kabaddi', 'basketball', 'tennis'] as SportId[]) {
       assert.deepEqual(tournamentAwardSlots([], sp), TOURNAMENT_AWARD_SLOTS[sp], sp);
     }
-    // only the four volleyball slots carry the switch
+    // only the four volleyball slots carry the switch (and, follow-up, chess's
+    // performance rating — offered only where ratings exist)
     const gated = (Object.keys(TOURNAMENT_AWARD_SLOTS) as SportId[]).flatMap((sp) => (statSchema(sp)?.awards ?? []).filter((a) => a.onlyIfTracked).map((a) => `${sp}/${a.stat}`));
-    assert.deepEqual(gated, ['volleyball/receptions', 'volleyball/digs', 'volleyball/setAssists', 'volleyball/digsReceptionsPerSet']);
+    assert.deepEqual(gated, ['volleyball/receptions', 'volleyball/digs', 'volleyball/setAssists', 'volleyball/digsReceptionsPerSet', 'chess/tpr']);
   });
 });
 

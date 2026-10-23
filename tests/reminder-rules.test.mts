@@ -12,8 +12,8 @@ const match = (id: string, over: Record<string, unknown> = {}) => ({
   homeTeam: team('red'), awayTeam: team('blu'), ...over,
 }) as never;
 
-const run = (matches: unknown[], viewerId: string | null, extra: { leaders?: Record<string, unknown>; rosters?: Record<string, string[]>; follows?: string[] } = {}) =>
-  computeDueReminders(matches as never, [], [], (extra.leaders ?? {}) as never, {}, NOW, new Set(), [60], viewerId, new Set(extra.follows ?? []), {}, extra.rosters);
+const run = (matches: unknown[], viewerId: string | null, extra: { rosters?: Record<string, string[]>; follows?: string[] } = {}) =>
+  computeDueReminders(matches as never, [], {}, NOW, new Set(), [60], viewerId, new Set(extra.follows ?? []), {}, extra.rosters);
 
 describe('reminders: only the viewer\'s own', () => {
   test('no player row → nothing at all (used to show every match on the platform)', () => {
@@ -21,9 +21,7 @@ describe('reminders: only the viewer\'s own', () => {
   });
 
   test('a stranger\'s scorer / host / squad reminders are not produced on my device', () => {
-    const due = run([match('m1', { scorerId: 'p-scorer', hostIds: ['p-host'] }), match('m2', { hostIds: ['p-host'] })], 'p-me', {
-      leaders: { red: { captainId: 'p-cap' } },
-    });
+    const due = run([match('m1', { scorerId: 'p-scorer', hostIds: ['p-host'] }), match('m2', { hostIds: ['p-host'] })], 'p-me');
     assert.deepEqual(due, []);
   });
 
@@ -34,15 +32,14 @@ describe('reminders: only the viewer\'s own', () => {
     assert.match(due[0].title, /You're scoring/);
   });
 
-  test('my "no scorer yet" nudge only when I host', () => {
-    assert.equal(run([match('m1', { hostIds: ['p-me'] })], 'p-me').length, 1);
-    assert.equal(run([match('m1', { hostIds: ['p-x'] })], 'p-me').length, 0);
-  });
-
-  test('squad nudge only for the team I captain', () => {
-    const due = run([match('m1', { scorerId: 'p-s' })], 'p-me', { leaders: { red: { captainId: 'p-me' }, blu: { captainId: 'p-x' } } });
-    assert.equal(due.length, 1);
-    assert.match(due[0].title, /Squad needed — RED/);
+  test('"No scorer yet" / "Squad needed" are never computed on a device — the server cron owns them (2026-10-23)', () => {
+    // I host a scorer-less match and play for RED, which has no saved squad: my
+    // own "You play" only — notify-upcoming pushes the prep nudges (once, via the
+    // ledger), so a device copy would show each twice.
+    const due = run([match('m1', { hostIds: ['p-me'] })], 'p-me', { rosters: { red: ['p-me'] } });
+    assert.deepEqual(due.map((d) => d.title), ['⏰ You play in 1 hour — RED vs BLU']);
+    const sched = computeScheduledReminders([match('m1', { startsAt: inMin(3000), hostIds: ['p-me'] })] as never, [], {}, NOW, 'p-me', [60], undefined, {}, { red: ['p-me'] });
+    assert.ok(sched.length > 0 && sched.every((r) => r.id.startsWith('player:')));
   });
 
   test('"You play" from the team roster when no squad is saved (live match rows carry no roster)', () => {

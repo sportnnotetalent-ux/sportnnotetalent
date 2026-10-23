@@ -15,6 +15,8 @@ import { buildLeaderboard, roundContext, cardOf, entryStatusOf, withAdmin, golfF
 import type { EntryAdmin } from '../sports/golf/engine';
 import { roundDifferential } from '../sports/golf/handicap';
 import { golfAlert } from './results/alerts';
+// Reads past PostgREST's 1,000-row cap (stable order + .range; long .in() lists chunked).
+import { fetchAllPages, fetchAllChunked } from './paging';
 
 // Pure leaderboard/format helpers live in golfLeaderboard.ts (testable in node);
 // re-exported so screens keep importing them from here.
@@ -33,7 +35,7 @@ const toCourse = (r: any): GolfCourse => ({
 
 export async function getGolfCourses(): Promise<GolfCourse[]> {
   if (!live()) return [...demo.golfCourses];
-  const { data } = await supabase!.from('golf_courses').select('*').order('name');
+  const { data } = await fetchAllPages((from, to) => supabase!.from('golf_courses').select('*').order('name').order('id').range(from, to));
   return ((data ?? []) as any[]).map(toCourse);
 }
 
@@ -171,11 +173,13 @@ export async function getFieldEvents(filter: { tournamentId?: string; sport?: st
       (!filter.tournamentId || e.tournamentId === filter.tournamentId) && (!filter.sport || e.sport === filter.sport) && (!filter.status || e.status === filter.status),
     ).sort((a, b) => a.roundNo - b.roundNo || a.startsAt.localeCompare(b.startsAt));
   }
-  let q = supabase!.from('field_events').select('*').order('round_no').order('starts_at');
-  if (filter.tournamentId) q = q.eq('tournament_id', filter.tournamentId);
-  if (filter.sport) q = q.eq('sport', filter.sport);
-  if (filter.status) q = q.eq('status', filter.status);
-  const { data } = await q;
+  const { data } = await fetchAllPages((from, to) => {
+    let q = supabase!.from('field_events').select('*');
+    if (filter.tournamentId) q = q.eq('tournament_id', filter.tournamentId);
+    if (filter.sport) q = q.eq('sport', filter.sport);
+    if (filter.status) q = q.eq('status', filter.status);
+    return q.order('round_no').order('starts_at').order('id').range(from, to);
+  });
   return ((data ?? []) as any[]).map(toEvent);
 }
 
@@ -231,7 +235,8 @@ export async function addFieldEntries(eventId: string, entries: NewEntry[], hole
 export async function getFieldEntries(eventIds: string[]): Promise<FieldEntry[]> {
   if (!eventIds.length) return [];
   if (!live()) return demo.fieldEntries.filter((e) => eventIds.includes(e.eventId)).map((e) => ({ ...e, result: pendingCard(e.id) ?? e.result }));
-  const { data } = await supabase!.from('field_entries').select('*').in('event_id', eventIds);
+  // A meet's phases and a big field (a cross-country race) both pass the 1,000-row cap.
+  const { data } = await fetchAllChunked(eventIds, (part, from, to) => supabase!.from('field_entries').select('*').in('event_id', part).order('id').range(from, to));
   return ((data ?? []) as any[]).map(toEntry).map((e) => ({ ...e, result: pendingCard(e.id) ?? e.result }));
 }
 

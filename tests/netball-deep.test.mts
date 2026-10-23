@@ -301,7 +301,7 @@ describe('netball deep · commentary and team stats', () => {
 /* ------------------------------ source guards ------------------------------ */
 
 describe('netball deep · scorer UI guards', () => {
-  const src = readFileSync(new URL('../src/sports/netball/index.tsx', import.meta.url), 'utf8');
+  const src = (readFileSync(new URL('../src/sports/netball/index.tsx', import.meta.url), 'utf8') + readFileSync(new URL('../src/sports/netball/meta.ts', import.meta.url), 'utf8'));
   test('the "Stats to track" switches (off by default — round 2: CPR on, the international standard); super shots are an organiser rule', () => {
     const keys = NETBALL_LIVE_SETTINGS.fields.filter((f) => f.group === 'Stats to track').map((f) => f.key);
     assert.deepEqual(keys, ['detail', 'trackCpr', 'trackGains', 'trackTurnovers']);

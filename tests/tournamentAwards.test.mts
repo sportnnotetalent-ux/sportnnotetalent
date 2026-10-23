@@ -21,7 +21,8 @@ describe('award slots', () => {
   });
   test('cricket: best batter (runs) + best bowler (wickets); chess: best score % (SD-27)', () => {
     assert.deepEqual(TOURNAMENT_AWARD_SLOTS.cricket.map((s) => [s.slot, s.label]), [['mvp', 'Player of the Tournament'], ['runs', 'Best batter'], ['wickets', 'Best bowler']]);
-    assert.deepEqual(TOURNAMENT_AWARD_SLOTS.chess.map((s) => s.slot), ['mvp', 'scorePct']);
+    // follow-up to round 2: + Best performance rating (offered only where ratings exist)
+    assert.deepEqual(TOURNAMENT_AWARD_SLOTS.chess.map((s) => s.slot), ['mvp', 'scorePct', 'tpr']);
   });
   test('football and kabaddi come from the per-match role awards', () => {
     const fb = TOURNAMENT_AWARD_SLOTS.football.map((s) => s.label);

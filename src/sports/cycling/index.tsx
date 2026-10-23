@@ -13,6 +13,7 @@ import { View, Text } from 'react-native';
 import { theme } from '../../core/theme';
 import { textStyles } from '../../components/ui';
 import type { SportPlugin } from '../types';
+import { CYCLING_META } from './meta';
 
 export interface CyclingMatchState { ended: boolean }
 
@@ -24,11 +25,7 @@ const ScoringControls: SportPlugin<CyclingMatchState>['ScoringControls'] = () =>
 );
 
 export const cyclingPlugin: SportPlugin<CyclingMatchState> = {
-  id: 'cycling',
-  name: 'Cycling',
-  icon: '🚴',
-  archetype: 'measured',
-  participantKind: 'individual',
+  ...CYCLING_META,
   createInitialState: () => ({ ended: false }),
   reducer: (s) => s,
   isComplete: (s) => s.ended,
@@ -36,19 +33,4 @@ export const cyclingPlugin: SportPlugin<CyclingMatchState> = {
   summary: () => ({ homeScore: '', awayScore: '', statusLine: 'Cycling event', detailLine: 'Times and finish orders are entered per race on the event page' }),
   ScoringControls,
   correctable: false,
-  formatFields: [
-    {
-      key: 'pointsScheme', label: 'Position points', type: 'choice', default: '8,7,6,5,4,3,2,1', onCreate: true,
-      hint: 'points each place earns for its house / team (the GC for a stage race); tied places share',
-      options: [
-        { value: '8,7,6,5,4,3,2,1', label: '8-7-6-5-4-3-2-1' },
-        { value: '10,8,6,5,4,3,2,1', label: '10-8-6-5-4-3-2-1' },
-        { value: '5,3,1', label: '5-3-1 (medals only)' },
-        { value: '7,5,4,3,2,1', label: '7-5-4-3-2-1' },
-      ],
-    },
-    { key: 'handTimed', label: 'Hand timing', type: 'toggle', default: false, onCreate: true, hint: 'stopwatches, no transponders / photo finish: hand times count for the meet’s records' },
-    // deep wave (timed races): "Stats to track" — optional depth the meet switches on
-    { key: 'cycSplits', label: 'Intermediate times', type: 'toggle', default: false, advanced: true, group: 'Stats to track', hint: 'pursuit every 1000 m, kilo / 500 m every lap, team sprint each rider’s lap, a road time trial’s halfway time check' },
-  ],
 };

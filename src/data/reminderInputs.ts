@@ -6,22 +6,20 @@
  *  (a) one gather per tick, shared by the in-app check and the device schedule
  *      (they used to fetch everything twice a minute);
  *  (b) the first tick waits a few seconds after launch so Home's reads go first;
- *  (c) captains and matchday squads are read in one batched query each, not one
- *      request per team and per match;
+ *  (c) matchday squads are read in one batched query, not one request per
+ *      match (captains and organisations aren't read at all since 2026-10-23 —
+ *      the squad / no-scorer nudges are the server cron's);
  *  (d) only matches that start in the future are read — the reminder maths
  *      already skips everything that has started;
  *  (e) cadence (founder-approved Q3): once when the app opens, then every 5
  *      minutes, plus a check whenever the app comes back to the foreground.
  */
-import type { Match, MatchSquads, Organization, Player, TeamLeadership, Tournament } from '../core/types';
+import type { Match, MatchSquads, Player, Tournament } from '../core/types';
 
 export interface ReminderReads {
   /** matches starting after `now` (any status — the computations filter) */
   upcomingMatches(now: number): Promise<Match[]>;
   tournaments(): Promise<Tournament[]>;
-  organizations(): Promise<Organization[]>;
-  /** teamId → leadership, one entry per requested id */
-  teamLeaders(teamIds: string[]): Promise<Record<string, TeamLeadership>>;
   /** matchId → squads, one entry per requested id */
   matchSquads(matchIds: string[]): Promise<Record<string, MatchSquads>>;
   /** teamId → the team's player ids (explicit roster + team_members) — who plays
@@ -35,8 +33,6 @@ export interface ReminderReads {
 export interface ReminderInputs {
   matches: Match[];
   tournaments: Tournament[];
-  orgs: Organization[];
-  leadersByTeam: Record<string, TeamLeadership>;
   squadsByMatch: Record<string, MatchSquads>;
   /** teamId → player ids (see ReminderReads.teamRosters) */
   rostersByTeam?: Record<string, string[]>;
@@ -48,23 +44,21 @@ export interface ReminderInputs {
 /** Fetch everything the reminder computations need, once, so the "due now" (feed)
  *  and "schedule ahead" (OS) passes share the same snapshot. */
 export async function gatherReminderInputsWith(reads: ReminderReads, now: number): Promise<ReminderInputs> {
-  const [fetched, tournaments, orgs] = await Promise.all([reads.upcomingMatches(now), reads.tournaments(), reads.organizations()]);
+  const [fetched, tournaments] = await Promise.all([reads.upcomingMatches(now), reads.tournaments()]);
   // Same rule the computations apply: anything already started is out.
   const matches = fetched.filter((m) => new Date(m.startsAt).getTime() > now);
-  // Only genuinely-scheduled future games get prep reminders — a postponed or
-  // cancelled match shouldn't nag the host to line up a scorer.
+  // Only genuinely-scheduled future games need their squads / rosters read.
   const upcoming = matches.filter((m) => m.status === 'scheduled');
   const teamIds = Array.from(new Set(upcoming.flatMap((m) => [m.homeTeam.id, m.awayTeam.id])));
   const matchIds = upcoming.map((m) => m.id);
-  const [leadersByTeam, squadsByMatch, players, rosters] = await Promise.all([
-    teamIds.length ? reads.teamLeaders(teamIds) : Promise.resolve({} as Record<string, TeamLeadership>),
+  const [squadsByMatch, players, rosters] = await Promise.all([
     matchIds.length ? reads.matchSquads(matchIds) : Promise.resolve({} as Record<string, MatchSquads>),
     reads.players(),
     teamIds.length && reads.teamRosters ? reads.teamRosters(teamIds) : Promise.resolve(null),
   ]);
   const playerNameById = Object.fromEntries(players.map((p) => [p.id, p.fullName]));
   const rostersByTeam = rosters ? Object.fromEntries(rosters) : undefined;
-  return { matches, tournaments, orgs, leadersByTeam, squadsByMatch, ...(rostersByTeam ? { rostersByTeam } : {}), players, playerNameById, followedPlayerIds: reads.followedPlayerIds() };
+  return { matches, tournaments, squadsByMatch, ...(rostersByTeam ? { rostersByTeam } : {}), players, playerNameById, followedPlayerIds: reads.followedPlayerIds() };
 }
 
 export interface TickerTimers {

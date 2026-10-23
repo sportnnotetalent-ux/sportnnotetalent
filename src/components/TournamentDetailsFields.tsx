@@ -11,7 +11,7 @@ import { Button, FieldLabel, SelectChip, TextField, textStyles } from './ui';
 import { PhoneField } from './PhoneField';
 import { LogoPicker } from './LogoPicker';
 import { SportFormatEditor, type FormatVal } from './FormatEditor';
-import { getSport } from '../sports/registry';
+import { getSportMeta } from '../sports/sportMeta';
 import { tournamentDraft } from '../data/tournamentDraft';
 import { EVENT_CATEGORIES, addGround, inlineFieldKeys } from '../data/tournamentForm';
 import type { TournamentDetails } from '../data/repos';
@@ -141,7 +141,7 @@ export function SportBasics({ sports, onChanged }: { sports: SportId[]; onChange
   return (
     <>
       {sports.map((s) => {
-        const keys = inlineFieldKeys(getSport(s).formatFields);
+        const keys = inlineFieldKeys(getSportMeta(s).formatFields);
         if (!keys.length) return null;
         return (
           <SportFormatEditor

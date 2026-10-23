@@ -133,7 +133,20 @@ export function writeAmericano(fmt: SportFormat | undefined, state: AmericanoSta
   return { ...(fmt ?? {}), [STATE_KEY]: JSON.stringify(state) };
 }
 
-export function newAmericanoPlayer(name: string): { id: string; name: string } {
-  return { id: `ap-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, name: name.trim() };
+/** A player in the field. A person picked on SportnNote (or added and invited by
+ *  their mobile number) keeps their PLAYER id, so the field is real people; a
+ *  typed name with no player behind it — the last resort — gets an `ap-` id. */
+export function newAmericanoPlayer(name: string, playerId?: string): { id: string; name: string } {
+  const clean = name.trim().replace(/\s+/g, ' ');
+  return { id: playerId || `ap-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, name: clean };
+}
+
+/** Is this field entry a real player (vs. a name only)? */
+export const isLinkedAmericanoPlayer = (id: string): boolean => !id.startsWith('ap-');
+
+/** Add a player to the field — the same person never twice; a blank name is ignored. */
+export function addAmericanoPlayer(state: AmericanoState, p: { id: string; name: string }): AmericanoState {
+  if (!p.name.trim() || state.players.some((x) => x.id === p.id)) return state;
+  return { ...state, players: [...state.players, p] };
 }
 

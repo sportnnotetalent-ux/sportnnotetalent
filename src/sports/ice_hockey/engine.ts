@@ -44,6 +44,9 @@
  */
 import type { ScoreAction, LiveSettings, FormatField, Attribution } from '../types';
 import { aggPriorFromConfig, aggregateText, levelForDecider, type AggPrior } from '../aggregate.ts';
+// Perf F-15 — the format presets / options live in the light meta module.
+import { ICE_HOCKEY_PRESETS, TRACK_FIELDS } from './meta.ts';
+export { ICE_HOCKEY_PRESETS, TRACK_FIELDS };
 
 export type Side = 'home' | 'away';
 export type Strength = 'ev' | 'pp' | 'sh';
@@ -201,14 +204,8 @@ export interface IceHockeyState {
 
 /* --------------------------------- format ---------------------------------- */
 
-export const ICE_HOCKEY_PRESETS: Record<string, { label: string; set: Record<string, number | string | boolean> }> = {
-  iihf: { label: 'IIHF 3 × 20', set: { periodMinutes: 20, skaters: 5, otMinutes: 5, otSkaters: 3, poOtMinutes: 10, poOtSkaters: 3, poShootout: true, soRounds: 5, pimScale: 'iihf' } },
-  nhl: { label: 'NHL 3 × 20', set: { periodMinutes: 20, skaters: 5, otMinutes: 5, otSkaters: 3, poOtMinutes: 20, poOtSkaters: 5, poShootout: false, soRounds: 3, pimScale: 'nhl' } },
-  // NFHS: periods of 17 (some states 15) minutes; overtime is a state choice — verify
-  nfhs: { label: 'US high school 3 × 17', set: { periodMinutes: 17, skaters: 5, otMinutes: 8, otSkaters: 4, poOtMinutes: 8, poOtSkaters: 4, poShootout: true, soRounds: 3, pimScale: 'nhl' } },
-  youth15: { label: 'Youth 3 × 15', set: { periodMinutes: 15, skaters: 5, otMinutes: 5, otSkaters: 3, poOtMinutes: 5, poOtSkaters: 3, poShootout: true, soRounds: 3, pimScale: 'iihf' } },
-  youth12: { label: 'Youth 3 × 12', set: { periodMinutes: 12, skaters: 5, otMinutes: 5, otSkaters: 3, poOtMinutes: 5, poOtSkaters: 3, poShootout: true, soRounds: 3, pimScale: 'iihf' } },
-};
+// The format presets live in ./meta.ts (perf F-15: light, for the format
+// pickers); imported and re-exported at the top of this file.
 
 const bool = (v: unknown, d: boolean) => (v === undefined || v === null || v === '' ? d : v === true || v === 'true' || v === 1);
 const num = (v: unknown, d: number, min: number, max: number) => {
@@ -849,14 +846,6 @@ export function standingsUnits(s: IceHockeyState): { overtime?: boolean; decided
 
 /* --------------------------- live settings (#14) --------------------------- */
 
-/** Deep wave — the "Stats to track" toggles (live settings + the match format). */
-export const TRACK_FIELDS: FormatField[] = [
-  { key: 'trackFaceoffs', label: 'Faceoffs', type: 'toggle', default: false, group: 'Stats to track', hint: 'One tap per draw for the team that won it (name the centres once) — FO% by player' },
-  { key: 'trackFaceoffZones', label: 'Faceoff zones', type: 'toggle', default: false, group: 'Stats to track', hint: 'With Faceoffs on: one more tap per draw — in whose end it was (or neutral) — FO% by zone' },
-  { key: 'trackPhysical', label: 'Hits & blocked shots', type: 'toggle', default: false, group: 'Stats to track', hint: 'Hit / Block buttons — who made it (optional)' },
-  { key: 'trackPuck', label: 'Giveaways & takeaways', type: 'toggle', default: false, group: 'Stats to track', hint: 'Who lost / won the puck (optional)' },
-  { key: 'trackAttempts', label: 'Missed shots (shot attempts)', type: 'toggle', default: false, group: 'Stats to track', hint: 'Shots wide / over the net — shot attempts with blocks' },
-];
 /** Is this tally tracked in the match — its toggle on, or any recorded? */
 export const tallyTracked = (s: Pick<IceHockeyState, TrackFlag | 'events'>, f: TrackFlag): boolean =>
   s[f] === true || s.events.some((e) => e.type === 'tally' && !!e.tally && TRACK_KINDS[f].includes(e.tally));

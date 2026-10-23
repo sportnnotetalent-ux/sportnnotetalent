@@ -1,11 +1,14 @@
 /**
- * Add a person (scorer / host / referee / official) by mobile number or name.
+ * Add a person (scorer / host / referee / official — or a player: a singles
+ * opponent, a doubles partner, a golf group, a club member) by mobile number or name.
  *  • A full mobile number that's already on SportnNote → shows them; one tap adds.
  *  • A number that isn't → "Add & invite" on WhatsApp or SMS: they're added right
  *    away (a pending player for that number) and get a message with the match
  *    link — signing up with that number makes the role theirs. Name optional:
  *    they enter it themselves when they join.
  *  • Letters → members whose name matches.
+ *  • Last resort (only where the caller allows it, `onNameOnly`): keep just the
+ *    typed name — clearly marked, as it's not linked to anyone's account.
  * Exact numbers only — no one can browse other people's numbers.
  */
 import React, { useEffect, useState } from 'react';
@@ -17,38 +20,52 @@ import { looksLikeContact } from '../core/contactQuery';
 import { openSms, openWhatsApp } from '../core/connect';
 import { preferredChat } from '../core/chatRegion';
 import { findPlayerByPhone, invitePerson, lookupPeople } from '../data/repos';
-import type { Player } from '../core/types';
+import type { Player, SportId } from '../core/types';
 import { reportError } from '../core/telemetry';
 
-export function PersonPicker({ role, excludeIds = [], onPick, inviteText }: {
-  role: 'scorer' | 'host' | 'referee' | 'official';
+export function PersonPicker({ role, excludeIds = [], onPick, inviteText, sport, cta, takenNote, onNameOnly }: {
+  role: 'scorer' | 'host' | 'referee' | 'official' | 'player' | 'partner' | 'member';
   excludeIds?: string[];
   /** add this player to the role */
   onPick: (player: Player) => Promise<void> | void;
   /** the invite message for someone not on SportnNote yet */
   inviteText: (name?: string) => string;
+  /** the sport a new (invited) player is added to play */
+  sport?: SportId;
+  /** the button on a found number (default "Add as <role>") */
+  cta?: string;
+  /** shown when the number found belongs to someone in `excludeIds` */
+  takenNote?: (name: string) => string;
+  /** Last resort: keep just the typed name — offered under a name search, marked
+   *  as not linked to an account. Omit it and only real people can be added. */
+  onNameOnly?: (name: string) => Promise<void> | void;
 }) {
   const [q, setQ] = useState('');
   const [name, setName] = useState('');
   const [found, setFound] = useState<Player | null | undefined>(undefined); // undefined = not looked up
   const [people, setPeople] = useState<Player[]>([]);
+  // the name the results above are for (so "no one by that name" never flashes mid-search)
+  const [searched, setSearched] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
 
   const isNumber = looksLikeContact(q) === 'phone' && isValidPhone(q);
+  const typedName = q.trim().replace(/\s+/g, ' ');
+  const isNameQuery = typedName.length >= 2 && !/^[+\d\s()-]+$/.test(typedName);
+  const asWhat = `as ${role}`;
 
   useEffect(() => {
     let on = true;
-    setFound(undefined); setPeople([]); setError(null);
+    setFound(undefined); setPeople([]); setError(null); setSearched('');
     const t = setTimeout(async () => {
       try {
         if (isNumber) {
           const p = await findPlayerByPhone(q);
           if (on) setFound(p);
-        } else if (q.trim().length >= 2 && !/^[+\d\s()-]+$/.test(q.trim())) {
+        } else if (isNameQuery) {
           const list = await lookupPeople(q);
-          if (on) setPeople(list.filter((p) => !excludeIds.includes(p.id)).slice(0, 6));
+          if (on) { setPeople(list.filter((p) => !excludeIds.includes(p.id)).slice(0, 6)); setSearched(typedName); }
         }
       } catch (e) {
         if (!on) return;
@@ -64,17 +81,18 @@ export function PersonPicker({ role, excludeIds = [], onPick, inviteText }: {
         } else {
           setError('Couldn’t search just now — try again.');
         }
+        if (!isNumber) setSearched(typedName); // the name-only last resort stays reachable
       }
     }, 400);
     return () => { on = false; clearTimeout(t); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q]);
 
-  const reset = (msg: string) => { setQ(''); setName(''); setFound(undefined); setPeople([]); setDone(msg); };
+  const reset = (msg: string) => { setQ(''); setName(''); setFound(undefined); setPeople([]); setSearched(''); setDone(msg); };
 
   const add = async (p: Player) => {
     setBusy(true); setError(null);
-    try { await onPick(p); reset(`✓ ${p.fullName} added as ${role}`); } catch { setError('Couldn’t add them — try again.'); }
+    try { await onPick(p); reset(`✓ ${p.fullName} added ${asWhat}`); } catch { setError('Couldn’t add them — try again.'); }
     setBusy(false);
   };
 
@@ -89,12 +107,26 @@ export function PersonPicker({ role, excludeIds = [], onPick, inviteText }: {
       const digits = q.replace(/\D/g, '');
       // Placeholder until they join and enter their own name.
       const label = name.trim() || `Invited (…${digits.slice(-4)})`;
-      const res = await invitePerson({ name: label, phone: q });
+      const res = await invitePerson({ name: label, phone: q, sport });
       await onPick(res.player);
-      reset(via === 'none' ? `✓ Added as ${role} — let them know to join with this number` : `✓ Added as ${role} — invite opened in ${via === 'whatsapp' ? 'WhatsApp' : 'Messages'}`);
+      reset(via === 'none' ? `✓ Added ${asWhat} — let them know to join with this number` : `✓ Added ${asWhat} — invite opened in ${via === 'whatsapp' ? 'WhatsApp' : 'Messages'}`);
     } catch (e) {
       reportError(e);
       setError('Couldn’t add that number — try again.');
+    }
+    setBusy(false);
+  };
+
+  // The last resort: just the typed name, not linked to anyone's account.
+  const addNameOnly = async () => {
+    if (!onNameOnly || !isNameQuery || busy) return;
+    setBusy(true); setError(null);
+    try {
+      await onNameOnly(typedName);
+      reset(`✓ ${typedName} added ${asWhat} — name only, not linked to an account`);
+    } catch (e) {
+      reportError(e);
+      setError('Couldn’t add that name — try again.');
     }
     setBusy(false);
   };
@@ -109,11 +141,11 @@ export function PersonPicker({ role, excludeIds = [], onPick, inviteText }: {
       {isNumber && found === undefined && !error && <Text style={textStyles.muted}>Checking…</Text>}
       {isNumber && found && (
         excludeIds.includes(found.id)
-          ? <Text style={textStyles.muted}>{found.fullName} is already a {role}.</Text>
+          ? <Text style={textStyles.muted}>{takenNote ? takenNote(found.fullName) : `${found.fullName} is already a ${role}.`}</Text>
           : (
             <TouchableOpacity accessibilityRole="button" style={st.match} activeOpacity={0.85} onPress={() => void add(found)} disabled={busy}>
               <Text style={st.matchName}>✓ {found.fullName}</Text>
-              <Text style={st.matchCta}>{busy ? 'Adding…' : `Add as ${role}`}</Text>
+              <Text style={st.matchCta}>{busy ? 'Adding…' : cta ?? `Add ${asWhat}`}</Text>
             </TouchableOpacity>
           )
       )}
@@ -143,8 +175,14 @@ export function PersonPicker({ role, excludeIds = [], onPick, inviteText }: {
           <Text style={st.optText}>＋ {p.fullName}{p.city ? ` · ${p.city}` : ''}</Text>
         </TouchableOpacity>
       ))}
-      {!isNumber && q.trim().length >= 2 && people.length === 0 && !/^[+\d\s()-]+$/.test(q.trim()) && (
+      {!isNumber && isNameQuery && searched === typedName && people.length === 0 && !error && (
         <Text style={textStyles.muted}>No members by that name — try their mobile number to invite them.</Text>
+      )}
+      {/* Last resort, under the search: just the name (marked — it links to no one). */}
+      {onNameOnly && !isNumber && isNameQuery && searched === typedName && (
+        <Text style={st.nameOnly} accessibilityRole="button" onPress={() => void addNameOnly()}>
+          ✎ Not on SportnNote and no number? Use “{typedName}” as a name only — not linked to anyone
+        </Text>
       )}
       {/^[+\d\s()-]+$/.test(q.trim()) && !isNumber && q.replace(/\D/g, '').length > 0 && (
         <Text style={textStyles.muted}>{phoneHelp()}</Text>
@@ -159,6 +197,7 @@ const st = StyleSheet.create({
   matchCta: { color: theme.colors.primary, fontWeight: '800', fontSize: theme.font.small },
   invite: { gap: theme.spacing(2), padding: theme.spacing(3), borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceAlt },
   link: { color: theme.colors.textMuted, fontWeight: '700', fontSize: theme.font.small, textAlign: 'center' },
+  nameOnly: { color: theme.colors.textMuted, fontWeight: '700', fontSize: theme.font.small, paddingVertical: theme.spacing(1) },
   opt: { paddingVertical: theme.spacing(2), borderTopWidth: 1, borderTopColor: theme.colors.border },
   optText: { color: theme.colors.text, fontSize: theme.font.body, fontWeight: '600' },
   done: { color: theme.colors.primary, fontWeight: '700', fontSize: theme.font.small },

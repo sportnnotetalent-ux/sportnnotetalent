@@ -91,7 +91,7 @@ describe('SD-27 — award slots and MVP weights from the schema', () => {
     assert.deepEqual(slots('basketball'), [['mvp', 'Player of the Tournament'], ['points', 'Top scorer'], ['rebounds', 'Top rebounder'], ['assists', 'Playmaker']]);
     assert.deepEqual(slots('volleyball'), [['mvp', 'Player of the Tournament'], ['points', 'Best scorer'], ['aces', 'Best server'], ['blocks', 'Best blocker'], ['attackPoints', 'Most attack points'], ['attackKills', 'Best attacker'], ['receptions', 'Best receiver'], ['digs', 'Best digger'], ['setAssists', 'Best setter'], ['digsReceptionsPerSet', 'Best libero']]); // SD-81; deep wave; round 2 (Best libero)
     assert.deepEqual(slots('kabaddi'), [['mvp', 'Player of the Tournament'], ['raidPoints', 'Best raider'], ['tacklePoints', 'Best defender']]);
-    assert.deepEqual(slots('chess'), [['mvp', 'Player of the Tournament'], ['scorePct', 'Best score %']]);
+    assert.deepEqual(slots('chess'), [['mvp', 'Player of the Tournament'], ['scorePct', 'Best score %'], ['tpr', 'Best performance rating']]); // follow-up: TPR award where ratings exist
     assert.deepEqual(slots('carrom'), [['mvp', 'Player of the Tournament'], ['points', 'Top scorer'], ['queens', 'Queens']]);
     assert.deepEqual(slots('tennis'), [['mvp', 'Player of the Tournament'], ['aces', 'Most aces'], ['srvPtsPct', 'Best server']]);
     for (const sp of ['badminton', 'tabletennis', 'squash', 'padel', 'pickleball'] as SportId[]) {

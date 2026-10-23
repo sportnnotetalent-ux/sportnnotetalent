@@ -5,7 +5,7 @@
  * row reverses precisely what it did. Replay applies the ops, so score, result
  * and standings follow automatically.
  */
-import { getSport } from '../sports/registry';
+import { loadSport } from '../sports/registry';
 import { effectiveLog, replayLog, statDeltas, type AmendOp, type StatDelta } from '../sports/amend';
 import { appendMatchEvent, endMatchManually, getMatch, getMatchEvents, mapThroughDisputes, matchStatTotals, recordStatLine, syncMatchStatLines, updateMatchSnapshot } from './repos';
 import { newUuid } from '../core/deviceId';
@@ -16,7 +16,7 @@ import { withMatchRecords } from '../sports/matchRecords'; // SD-51
 /** What publishing would do — for the preview, and what publish then writes. */
 export async function planAmendment(matchId: string, sport: SportId, config: Record<string, unknown> | undefined, ops: AmendOp[], lines: string[], byName: string) {
   const events = await getMatchEvents(matchId);
-  const plugin = getSport(sport);
+  const plugin = await loadSport(sport);
   const maxSeq = events.reduce((m, e) => Math.max(m, e.seq), 0);
   const draft: MatchEventRecord = { seq: maxSeq + 1, type: 'AMEND', side: null, payload: { ops, lines, byName, deltas: [] }, attribution: null };
   const before = effectiveLog(events);

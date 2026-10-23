@@ -13,7 +13,7 @@ import { Card, SelectChip, ScreenTitle, EmptyState, TextField, Button, textStyle
 import { RankBadge, podiumColor } from '../components/Rank';
 import { SectionHeader, SECTION_CAP } from '../components/SectionHeader';
 import { DivisionTabs } from '../components/DivisionTabs';
-import { getSport, participantMode } from '../sports/registry';
+import { getSportMeta, participantMode } from '../sports/sportMeta';
 import { useAuth } from '../core/auth';
 import { canManageTournament } from '../core/org';
 import { useTournament, useTournamentById, useStandings, useDivisions, useOrganizations } from '../data/hooks';
@@ -155,7 +155,7 @@ export default function StandingsScreen() {
         {sports.length > 1 && (
           <KeyboardAwareScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.chips}>
             {sports.map((s) => (
-              <SelectChip key={s} label={`${getSport(s).icon} ${getSport(s).name}`} active={activeSport === s} onPress={() => setSport(s)} />
+              <SelectChip key={s} label={`${getSportMeta(s).icon} ${getSportMeta(s).name}`} active={activeSport === s} onPress={() => setSport(s)} />
             ))}
           </KeyboardAwareScrollView>
         )}
@@ -164,7 +164,7 @@ export default function StandingsScreen() {
 
         {manual && (
           <>
-            <SectionHeader title={`${getSport(activeSport).icon} Scorecard`} count={rows.length} />
+            <SectionHeader title={`${getSportMeta(activeSport).icon} Scorecard`} count={rows.length} />
             {canManage ? (
               <Card style={{ gap: theme.spacing(3) }}>
                 <Text style={textStyles.muted}>You maintain this table by hand. Add each team/player and their record.</Text>
@@ -221,13 +221,13 @@ export default function StandingsScreen() {
             knockout results never appear in a table — the bracket covers them. */}
         {phases.length === 0 ? (
           <>
-            <SectionHeader title={`${getSport(activeSport).icon} Team standings`} count={0} />
-            <Card><EmptyState icon="🏁" title={`No completed ${getSport(activeSport).name.toLowerCase()} matches yet`} hint="The table fills in as results come in." compact /></Card>
+            <SectionHeader title={`${getSportMeta(activeSport).icon} Team standings`} count={0} />
+            <Card><EmptyState icon="🏁" title={`No completed ${getSportMeta(activeSport).name.toLowerCase()} matches yet`} hint="The table fills in as results come in." compact /></Card>
           </>
         ) : phases.map((ph) => {
           const view = views.get(ph.key);
           return (
-            <PhaseTable key={ph.key} title={view ? groupHeading(view) : phases.length === 1 && ph.key === 'league' ? `${getSport(activeSport).icon} ${participant === 'team' ? 'Team' : participant === 'pairs' ? 'Pair' : 'Player'} standings` : ph.title}
+            <PhaseTable key={ph.key} title={view ? groupHeading(view) : phases.length === 1 && ph.key === 'league' ? `${getSportMeta(activeSport).icon} ${participant === 'team' ? 'Team' : participant === 'pairs' ? 'Pair' : 'Player'} standings` : ph.title}
               sport={activeSport} cfg={cfg} participant={participant} phaseKey={ph.key} rows={view ? view.rows : ph.rows} view={view} adjustments={cfg.adjustments ?? []} canManage={canManage}
               expanded={showTeams} onToggle={() => setShowTeams((v) => !v)}
               onTeam={openEntrant}

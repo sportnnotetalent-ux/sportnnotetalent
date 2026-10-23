@@ -42,6 +42,9 @@
  * live increments (SD-19).
  */
 import type { ScoreAction, LiveSettings, FormatField, Attribution } from '../types';
+// Perf F-15 — the format presets / options live in the light meta module.
+import { AF_PRESETS, TRACK_FIELDS } from './meta.ts';
+export { AF_PRESETS, TRACK_FIELDS };
 
 export type Side = 'home' | 'away';
 export type Variant = 'flag' | 'tackle';
@@ -181,13 +184,8 @@ export interface AFState {
 
 /* --------------------------------- format ---------------------------------- */
 
-export const AF_PRESETS: Record<string, { label: string; set: Record<string, number | string | boolean> }> = {
-  flag: { label: 'Flag 5v5 (IFAF) · 2 × 20', set: { variant: 'flag', rules: 'ifaf', playersPerSide: 5, periods: 2, periodMinutes: 20, timeoutsPerHalf: 2, twoMinute: false, decider: 'flag' } },
-  flagSchool: { label: 'Flag 5v5 school · 2 × 15', set: { variant: 'flag', rules: 'ifaf', playersPerSide: 5, periods: 2, periodMinutes: 15, timeoutsPerHalf: 1, twoMinute: false, decider: 'flag' } },
-  nfl: { label: 'Tackle · NFL 4 × 15', set: { variant: 'tackle', rules: 'nfl', playersPerSide: 11, periods: 4, periodMinutes: 15, timeoutsPerHalf: 3, twoMinute: true, decider: 'nfl', otMinutes: 10 } },
-  ncaa: { label: 'Tackle · College 4 × 15', set: { variant: 'tackle', rules: 'ncaa', playersPerSide: 11, periods: 4, periodMinutes: 15, timeoutsPerHalf: 3, twoMinute: false, decider: 'kansas', otSpot: 25 } },
-  nfhs: { label: 'Tackle · High school (NFHS) 4 × 12', set: { variant: 'tackle', rules: 'nfhs', playersPerSide: 11, periods: 4, periodMinutes: 12, timeoutsPerHalf: 3, twoMinute: false, decider: 'kansas', otSpot: 10 } },
-};
+// The format presets live in ./meta.ts (perf F-15: light, for the format
+// pickers); imported and re-exported at the top of this file.
 
 /** Deep wave — the optional "Stats to track" (off by default; play by play
  *  only). Targets: one optional tap after ✗ Incomplete (who it was for) and
@@ -1010,13 +1008,6 @@ export function afScoreLine(s: AFState, perspective?: Side): string {
 }
 
 /* --------------------------- live settings (#14) --------------------------- */
-
-/** Deep wave — the "Stats to track" toggles (live settings + the match format;
- *  they act in play-by-play mode). */
-export const TRACK_FIELDS: FormatField[] = [
-  { key: 'trackTargets', label: 'Targets (who a pass was meant for)', type: 'toggle', default: false, group: 'Stats to track', hint: 'Play by play: one optional tap after ✗ Incomplete — receivers get targets (complete + incomplete)' },
-  { key: 'trackDefence', label: 'Pass breakups & tackles for loss', type: 'toggle', default: false, group: 'Stats to track', hint: 'Play by play: who broke up an incomplete pass (optional tap) — an interception counts as a pass defended too (NFL); with tackles asked, a run or catch that lost yards is a tackle for loss' },
-];
 
 export const AF_LIVE_SETTINGS: LiveSettings<AFState> = {
   title: '⚙️ Game settings',

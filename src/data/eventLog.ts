@@ -6,6 +6,8 @@
  * still-unsynced taps in the order they were made.
  */
 import type { MatchEventRecord } from '../core/types';
+import type { ScoreAction } from '../sports/types';
+import { AMEND_TYPE, effectiveLog } from '../sports/amend.ts';
 
 /** Merge the server log with unsynced taps: server events by seq, then pending
  *  ones the server doesn't have yet (by clientId), numbered after the server's. */
@@ -66,4 +68,60 @@ export function followDisputes(
     if (!d?.replacementId) return id;
     id = d.replacementId;
   }
+}
+
+/* ------------------------ replay (live match + undo) ------------------------ */
+
+/** A stored event as the reducer takes it. */
+export const logAction = (e: MatchEventRecord): ScoreAction => ({
+  type: e.type,
+  side: e.side ?? undefined,
+  payload: e.payload ?? undefined,
+  attribution: e.attribution ?? undefined,
+});
+
+/** The newest event of a raw log — what Undo removes (highest seq; on a tie,
+ *  the later one). */
+export function newestEvent(raw: MatchEventRecord[]): MatchEventRecord | undefined {
+  return raw.reduce<MatchEventRecord | undefined>((m, e) => (!m || e.seq >= m.seq ? e : m), undefined);
+}
+
+/** What replaying a raw log gives the live-match hook. */
+export interface DerivedLog {
+  state: unknown;
+  /** every event this device has applied, by eventKey */
+  applied: Set<string>;
+  maxSeq: number;
+  /** what Undo would remove, with the state before / after it (SD-115) */
+  lastStep: { type: string; prev: unknown; next: unknown } | null;
+}
+
+/** Re-derive a live match from its raw log (backend + unsynced taps): the
+ *  published corrections applied (AMEND rows, parity #05), each event through
+ *  the plugin's pure reducer. Shared by the full rebuild from the server and
+ *  (perf F-21) Undo, which steps the board back from the log it already holds
+ *  before the server confirms. */
+export function deriveLog(
+  plugin: { createInitialState: (config?: Record<string, unknown>) => unknown; reducer: (s: never, a: ScoreAction) => unknown },
+  config: Record<string, unknown> | undefined,
+  raw: MatchEventRecord[],
+): DerivedLog {
+  const events = effectiveLog(raw);
+  let s = plugin.createInitialState(config);
+  const applied = new Set<string>();
+  let maxSeq = 0;
+  let before: unknown = s;
+  for (const e of events) {
+    before = s;
+    s = plugin.reducer(s as never, logAction(e));
+    applied.add(eventKey(e));
+    maxSeq = Math.max(maxSeq, e.seq);
+  }
+  for (const e of raw) { applied.add(eventKey(e)); maxSeq = Math.max(maxSeq, e.seq); }
+  // The newest raw row is what Undo pops; an AMEND row isn't in `events` itself.
+  const tail = newestEvent(raw);
+  const lastStep = !tail ? null : tail.type === AMEND_TYPE || events[events.length - 1] !== tail
+    ? { type: tail.type, prev: s, next: s }
+    : { type: tail.type, prev: before, next: s };
+  return { state: s, applied, maxSeq, lastStep };
 }

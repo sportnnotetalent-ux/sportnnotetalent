@@ -10,7 +10,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { theme } from '../core/theme';
 import { Button, FieldLabel, textStyles } from './ui';
-import { getSport } from '../sports/registry';
+import { getSportMeta } from '../sports/sportMeta';
 import { structureFromFormat, structureFieldFor, shapeForStructure, type StructureShape } from '../data/structureConfig';
 import type { SportId, Tournament, TournamentStructure } from '../core/types';
 import type { RootStackParamList } from '../navigation/types';
@@ -58,7 +58,7 @@ export function SportSettingsButtons({ sports }: { sports: SportId[] }) {
     <View style={st.wrap}>
       <FieldLabel>Set up each sport</FieldLabel>
       {sports.map((s) => (
-        <Button key={s} label={`⚙️ ${getSport(s).icon} ${getSport(s).name} settings ›`} variant="ghost" onPress={() => nav.navigate('SportSettings', { sport: s })} />
+        <Button key={s} label={`⚙️ ${getSportMeta(s).icon} ${getSportMeta(s).name} settings ›`} variant="ghost" onPress={() => nav.navigate('SportSettings', { sport: s })} />
       ))}
       <Text style={textStyles.muted}>Structure, format and tie rules per sport — only what applies to each one.</Text>
     </View>

@@ -18,7 +18,7 @@
 import type { Match, SportId } from '../core/types';
 import { supabase, isSupabaseConfigured } from '../core/supabase';
 import { mergeMatchConfig } from '../core/matchConfig';
-import { getSport } from '../sports/registry';
+import { getSport, loadSports } from '../sports/registry';
 import { replayLog } from '../sports/amend';
 import { recordsDiff, stateWithRecords, type MatchRecordsBlock } from '../sports/matchRecords';
 import { getMatch, getMatches, getMatchEvents, getTournaments } from './repos';
@@ -46,6 +46,7 @@ export async function backfillMatchRecords(opts: { dryRun?: boolean; sports?: Sp
     ? (await Promise.all(opts.matchIds.map((id) => getMatch(id)))).filter((m): m is Match => !!m)
     : await getMatches();
   const want = opts.sports?.length ? new Set<string>(opts.sports) : null;
+  await loadSports(all.map((m) => m.sport)); // perf F-15: plugins load on demand
   const matches = all.filter((m) => m.status === 'completed' && (!want || want.has(m.sport)) && !!getSport(m.sport)?.matchRecords);
   const tours = matches.some((m) => m.tournamentId) ? await getTournaments({ includeDeleted: true }) : [];
 

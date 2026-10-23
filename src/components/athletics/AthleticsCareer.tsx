@@ -50,7 +50,7 @@ export function AthleticsCareer({ lines }: { lines: StatLine[] }) {
         <Text style={textStyles.muted}>{[c.heatWins ? `🏁 ${c.heatWins} heat${c.heatWins === 1 ? '' : 's'} / semi-final${c.heatWins === 1 ? '' : 's'} won` : '', c.bestReaction ? `⚡ best reaction ${c.bestReaction.value.toFixed(3)} s (${c.bestReaction.title})` : ''].filter(Boolean).join('  ·  ')}</Text>
       )}
       {/* timed races round 2: meet / school records broken (only once one is on record) */}
-      <RecordsSetCard c={c} />
+      <RecordsSetCard c={c} playerId={lines[0]?.playerId} infos={infos} />
 
       {/* SD-92: road races, race walks, cross-country (places and team medals) */}
       {c.road + c.walks + c.xc > 0 && (

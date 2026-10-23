@@ -28,7 +28,7 @@ import { getEntriesDoc } from '../data/meetEntriesStore';
 import { getRulesLock, saveCompetitionRules, teamSportsOf, type RulesLock } from '../data/competitionRulesStore';
 import { rulesFor, ruleShown, capsText, parseClassList, type EntryCaps, type RuleDef, type RuleValue } from '../data/results';
 import { isEventSport } from '../sports/eventSports';
-import { getSport } from '../sports/registry';
+import { getSportMeta } from '../sports/sportMeta';
 import type { SportId } from '../core/types';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -75,7 +75,7 @@ export default function CompetitionRulesScreen() {
   const values = draft ?? saved;
   const valueOf = (r: RuleDef): unknown => { const v = values[r.key]; return v === undefined || v === null || v === '' ? r.default : v; };
   const set = (k: string, v: RuleValue) => setDraft((d) => ({ ...(d ?? saved), [k]: v }));
-  const name = isEventSport(sport) ? getSport(sport as SportId).name : sport;
+  const name = isEventSport(sport) ? getSportMeta(sport as SportId).name : sport;
 
   // what Save would write: only the keys that changed; a standard value is stored as "unset"
   const changes = useMemo(() => {
@@ -187,7 +187,7 @@ export default function CompetitionRulesScreen() {
               <Text style={st.bold}>Bans and walkover scores</Text>
               <Text style={textStyles.muted}>Each team sport has its own suspension rules (cards that lead to a ban) and the score a walkover counts as. The federation defaults are already set — open a sport to check or change them.</Text>
               <View style={st.wrap}>
-                {teamSports.map((s) => <Button key={s} label={`⚙ ${getSport(s).name}`} variant="ghost" onPress={() => nav.navigate('SportSettings', { sport: s, tournamentId: tournament.id })} />)}
+                {teamSports.map((s) => <Button key={s} label={`⚙ ${getSportMeta(s).name}`} variant="ghost" onPress={() => nav.navigate('SportSettings', { sport: s, tournamentId: tournament.id })} />)}
               </View>
             </Card>
           </View>

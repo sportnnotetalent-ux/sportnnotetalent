@@ -40,6 +40,7 @@ import { ttDoublesTurn, ttGameStartOrder } from './doublesOrder';
 import { DoublesOrderPicker } from './DoublesOrderPicker';
 import { ServeCourtPanel } from './ServeCourtPanel';
 import { pickleballServeCourt } from './serveCourt';
+import { rallyMatchRecords } from './rallyRecords';
 import { makeRallyEngine, rallySummary, rallyScoreLine, rallyLineScore, rallyServingSide, rallyRows, rallyInputs, serveSpot, serverId, startPair, type RallyState } from './rallyEngine';
 
 export type { RallyState } from './rallyEngine';
@@ -351,6 +352,7 @@ export function makeRallyPlugin(opts: RallyOpts): SportPlugin<RallyState> {
     icon: opts.icon,
     archetype: 'set-game-point',
     participantKind: 'both', // Singles = individual, Doubles = a pair
+    matchRecords: rallyMatchRecords, // SD-51 (set by the registry before perf F-15)
     createInitialState: init,
     reducer,
     isComplete: (s) => s.ended,

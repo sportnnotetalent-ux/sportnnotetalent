@@ -41,6 +41,9 @@
  * the state), so the absolute statTotals equal the live increments (SD-19).
  */
 import type { ScoreAction, LiveSettings, FormatField, Attribution } from '../types';
+// Perf F-15 — the format presets / options live in the light meta module.
+import { LEAGUE_PRESETS, TRACK_FIELDS } from './meta.ts';
+export { LEAGUE_PRESETS, TRACK_FIELDS };
 
 export type Side = 'home' | 'away';
 export type Variant = '13s' | '9s';
@@ -237,16 +240,8 @@ export interface LeagueState {
 
 /* --------------------------------- format ---------------------------------- */
 
-/** Format presets. Junior / school halves are house values (organiser-editable;
- *  check your league's age-grade rules). Nines: Rugby League Nines 9-a-side,
- *  2 × 9 min, unlimited interchange, a shorter sin bin (3 min — verify). */
-export const LEAGUE_PRESETS: Record<string, { label: string; set: Record<string, number | string | boolean> }> = {
-  senior: { label: '13s · 2 × 40', set: { variant: '13s', playersPerSide: 13, periodMinutes: 40, sinBinMinutes: 10, maxInterchanges: 8, setTackles: 6, gpMinutes: 5 } },
-  u18: { label: 'U18 13s · 2 × 35, unlimited interchange', set: { variant: '13s', playersPerSide: 13, periodMinutes: 35, sinBinMinutes: 10, maxInterchanges: 0, setTackles: 6, gpMinutes: 5 } },
-  u16: { label: 'U16 13s · 2 × 30, unlimited interchange', set: { variant: '13s', playersPerSide: 13, periodMinutes: 30, sinBinMinutes: 10, maxInterchanges: 0, setTackles: 6, gpMinutes: 5 } },
-  u14: { label: 'U14 13s · 2 × 25, unlimited interchange', set: { variant: '13s', playersPerSide: 13, periodMinutes: 25, sinBinMinutes: 10, maxInterchanges: 0, setTackles: 6, gpMinutes: 5 } },
-  nines: { label: 'Nines · 2 × 9', set: { variant: '9s', playersPerSide: 9, periodMinutes: 9, sinBinMinutes: 3, maxInterchanges: 0, setTackles: 6, gpMinutes: 5 } },
-};
+// The format presets live in ./meta.ts (perf F-15: light, for the format
+// pickers); imported and re-exported at the top of this file.
 
 const bool = (v: unknown, d: boolean) => (v === undefined || v === null || v === '' ? d : v === true || v === 'true' || v === 1);
 const num = (v: unknown, d: number, min = 0) => { const n = Number(v); return v === undefined || v === null || v === '' || !Number.isFinite(n) ? d : Math.max(min, n); };
@@ -656,14 +651,6 @@ export const trackedDetailKeys = (s: LeagueState): string[] => trackedDetails(s)
 export const leagueStandingsUnits = (s: LeagueState) => (s && Array.isArray(s.events) ? { tries: triesOf(s) } : null);
 
 /* --------------------------- live settings (#14) --------------------------- */
-
-/** The "Stats to track" toggles (live settings + the match format). */
-export const TRACK_FIELDS: FormatField[] = [
-  { key: 'trackSets', label: 'Six-tackle sets', type: 'toggle', default: false, group: 'Stats to track', hint: 'A Tackle button and the tackle count: sets, completion rate, tackles per set, possession' },
-  { key: 'trackDefence', label: 'Tackles & missed tackles', type: 'toggle', default: false, group: 'Stats to track', hint: 'Per player, from the Detail button' },
-  { key: 'trackAttack', label: 'Runs, line breaks & offloads', type: 'toggle', default: false, group: 'Stats to track', hint: 'Per player, from the Detail button' },
-  { key: 'trackErrors', label: 'Errors & penalties conceded', type: 'toggle', default: false, group: 'Stats to track', hint: 'The player or Team (no name)' },
-];
 
 export const LEAGUE_LIVE_SETTINGS: LiveSettings<LeagueState> = {
   title: '⚙️ Match settings',

@@ -18,16 +18,21 @@ import { SportFormatEditor, defaultsFor, type FormatVal } from '../components/Fo
 import { VenueField } from '../components/VenueField';
 import { ConflictNotice } from '../components/ConflictNotice';
 import { ClubQuickPick } from '../components/ClubQuickPick';
-import { SPORT_LIST, getSport, participantMode, type ParticipantMode } from '../sports/registry';
+import { SPORT_LIST, getSportMeta, participantMode, type ParticipantMode } from '../sports/sportMeta';
 import { useTeams, useMatches, usePlayers, useTournamentById } from '../data/hooks';
 import { venueOptions } from '../data/tournamentForm';
 import { findScheduleConflicts, knownVenueNames } from '../data/scheduleConflicts';
-import { createMatch, createTeam, createReplacementPlayer, createMyPlayer, getMyPlayerId, setMatchScorer, getMatch, getTournaments, getMatchSquads, setMatchSquad } from '../data/repos';
+import { createMatch, createTeam, createMyPlayer, getMyPlayerId, setMatchScorer, getMatch, getTournaments, getMatchSquads, setMatchSquad } from '../data/repos';
 import { cloneDraft } from '../data/matchHousekeeping';
 import { useAuth } from '../core/auth';
 import { KO_STAGES, KO_STAGE_LABEL, isKoStage, type KoStage } from '../data/bracket';
 import { stageAwareFormat } from '../data/matchFormat';
-import type { Player, SportId, Team } from '../core/types';
+import { EntrantPicker } from '../components/EntrantPicker';
+import { sideForEntrants } from '../data/entrants';
+import type { EntrantPerson, EntrantSlot } from '../data/participantEntry';
+import { inviteLabel, playerInviteText } from '../core/inviteText';
+import { SHARE_BASE, tournamentLink } from '../core/shareText';
+import type { SportId, Team } from '../core/types';
 
 // What phase of the tournament a match belongs to. 'league' = a plain
 // table/round-robin game (no tag); 'group' = a group-stage game (needs a group
@@ -84,7 +89,7 @@ export default function ScheduleMatchScreen() {
   const [groupLabel, setGroupLabel] = useState('A');
   // Per-match rules — seeded from the sport's defaults so casual users can ignore it.
   const [format, setFormat] = useState<Record<string, FormatVal>>(
-    () => (route.params?.sport ? defaultsFor(getSport(route.params.sport).formatFields ?? []) : {})
+    () => (route.params?.sport ? defaultsFor(getSportMeta(route.params.sport).formatFields ?? []) : {})
   );
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -103,7 +108,7 @@ export default function ScheduleMatchScreen() {
       const d = cloneDraft(src, tour?.formats?.[src.sport] as Record<string, unknown> | undefined);
       if (!on) return;
       setSport(d.sport);
-      setFormat({ ...defaultsFor(getSport(d.sport).formatFields ?? []), ...((d.format as Record<string, FormatVal>) ?? {}) });
+      setFormat({ ...defaultsFor(getSportMeta(d.sport).formatFields ?? []), ...((d.format as Record<string, FormatVal>) ?? {}) });
       setHome(d.homeTeamId);
       setAway(d.awayTeamId);
       cloneNames.current = { home: src.homeTeam.name, away: src.awayTeam.name };
@@ -179,19 +184,15 @@ export default function ScheduleMatchScreen() {
     setSport(s);
     setHome(null);
     setAway(null);
-    setFormat(defaultsFor(getSport(s).formatFields ?? []));
+    setFormat(defaultsFor(getSportMeta(s).formatFields ?? []));
   }
 
-  // Create a brand-new side (team / pair / individual) from a typed name and
-  // select it. Individuals and pairs ride on the same ad-hoc-team plumbing — the
-  // UI just calls them a "player" or "pair", never a team.
+  // Create a brand-new TEAM from a typed name and select it. (Singles players and
+  // doubles pairs are people, not typed names — see makeEntrantHandler.)
   const makeCreateHandler = (side: 'home' | 'away') => async (name: string): Promise<boolean> => {
     if (!sport) return false;
     try {
-      // An individual is a real person: create the player record too and link it
-      // as the entry's roster, so results and stats land on their profile.
-      const solo = participantMode(sport, format) === 'individual' ? await createReplacementPlayer(name, sport) : null;
-      const team = await createTeam({ name, shortName: shortFrom(name), sport, colorHex: TEAM_PALETTE[teams.length % TEAM_PALETTE.length], adhoc: true, ...(solo ? { roster: [solo.id] } : {}) });
+      const team = await createTeam({ name, shortName: shortFrom(name), sport, colorHex: TEAM_PALETTE[teams.length % TEAM_PALETTE.length], adhoc: true });
       setTeamNonce((n) => n + 1); // refetch so it shows in both pickers
       (side === 'home' ? setHome : setAway)(team.id);
       return true;
@@ -201,72 +202,69 @@ export default function ScheduleMatchScreen() {
     }
   };
 
-  // Doubles: create a pair as a team of the two named partners (real player rows
-  // in roster order), so the scorer can see and rotate each server by name.
-  const makePairCreateHandler = (side: 'home' | 'away') => async (a: string, b: string): Promise<boolean> => {
+  // Singles / doubles: the side is its PEOPLE — the real players picked (by name
+  // or mobile number, a new number added & invited), so the match is "mine" for
+  // each of them and the result lands on their one profile. The same person /
+  // pair reuses their existing entry in this sport; a name-only spot (the marked
+  // last resort) becomes a provisional player. Individuals and pairs ride on the
+  // ad-hoc-team plumbing — the UI just calls them a "player" or "pair".
+  const makeEntrantHandler = (side: 'home' | 'away') => async (slots: EntrantSlot[]): Promise<boolean> => {
     if (!sport) return false;
     try {
-      // Both partners carry the pair name as their "house" so the scoring roster
-      // resolves them (getRoster matches by house name, in demo and live alike).
-      const name = `${a.trim()} / ${b.trim()}`;
-      const [pa, pb] = await Promise.all([
-        createReplacementPlayer(a.trim(), sport, name),
-        createReplacementPlayer(b.trim(), sport, name),
-      ]);
-      const team = await createTeam({
-        name, shortName: shortFrom(`${a} ${b}`), sport,
-        colorHex: TEAM_PALETTE[teams.length % TEAM_PALETTE.length], adhoc: true,
-        roster: [pa.id, pb.id],
-      });
-      setTeamNonce((n) => n + 1);
-      (side === 'home' ? setHome : setAway)(team.id);
+      const entry = await sideForEntrants(slots, { sport, teams, colorHex: TEAM_PALETTE[teams.length % TEAM_PALETTE.length], adhoc: true });
+      if (entry.created) setTeamNonce((n) => n + 1); // refetch so it shows in both pickers
+      (side === 'home' ? setHome : setAway)(entry.id);
       return true;
     } catch {
-      setError('Could not create the pair.');
+      setError(slots.length > 1 ? 'Could not create the pair.' : 'Could not add that player.');
       return false;
     }
   };
 
-  // "Me" quick-pick for individual sports: reuse an existing side named after the
-  // signed-in user if one exists, else create it. So a player scoring their own
-  // match taps once instead of typing their name.
-  const pickMe = (side: 'home' | 'away') => async () => {
-    if (!sport || !profile?.fullName) return;
-    // My own player row (made now if I don't have one) — never a same-named
-    // entry, which could be someone else's.
+  // The signed-in user as a person: my own player row (made now if I don't have
+  // one) — never a same-named entry, which could be someone else's.
+  const resolveMe = async (): Promise<EntrantPerson | null> => {
+    if (!profile?.fullName) return null;
     const myId = (await getMyPlayerId(profile.id)) ?? (await createMyPlayer(profile.id).catch(() => null));
-    const me = myId ? allPlayers.find((p) => p.id === myId) : undefined;
-    if (me) { await pickPerson(side)(me.id); return; }
-    if (myId) {
-      try {
-        const team = await createTeam({ name: profile.fullName, shortName: shortFrom(profile.fullName), sport, colorHex: TEAM_PALETTE[teams.length % TEAM_PALETTE.length], adhoc: true, roster: [myId] });
-        setTeamNonce((n) => n + 1);
-        (side === 'home' ? setHome : setAway)(team.id);
-      } catch {
-        setError('Could not add you.');
-      }
-      return;
-    }
-    await makeCreateHandler(side)(profile.fullName);
+    if (!myId) return null;
+    return { id: myId, fullName: allPlayers.find((p) => p.id === myId)?.fullName ?? profile.fullName };
   };
 
-  // Pick an existing PERSON for an individual sport: reuse their one-person entry
-  // in this sport if they have one, else create it (roster = them), so their
-  // profile gets the result.
-  const pickPerson = (side: 'home' | 'away') => async (playerId: string) => {
+  // "Me" quick-pick for singles: a player scoring their own match taps once
+  // instead of typing their name (their existing entry is reused).
+  const pickMe = (side: 'home' | 'away') => async () => {
     if (!sport) return;
-    const p: Player | undefined = allPlayers.find((x) => x.id === playerId);
-    if (!p) return;
-    const existing = teams.find((t) => (t as PickTeam).roster?.length === 1 && (t as PickTeam).roster![0] === p.id);
-    if (existing) { (side === 'home' ? setHome : setAway)(existing.id); return; }
-    try {
-      const team = await createTeam({ name: p.fullName, shortName: shortFrom(p.fullName), sport, colorHex: TEAM_PALETTE[teams.length % TEAM_PALETTE.length], adhoc: true, roster: [p.id] });
-      setTeamNonce((n) => n + 1);
-      (side === 'home' ? setHome : setAway)(team.id);
-    } catch {
-      setError('Could not add that player.');
-    }
+    const me = await resolveMe();
+    if (!me) { setError('Could not add you.'); return; }
+    await makeEntrantHandler(side)([{ kind: 'person', person: me }]);
   };
+
+  // Pick an existing PERSON for singles: reuse their one-person entry in this
+  // sport if they have one, else create it (roster = them).
+  const pickPerson = (side: 'home' | 'away') => async (playerId: string) => {
+    const p = allPlayers.find((x) => x.id === playerId);
+    if (!p) return;
+    await makeEntrantHandler(side)([{ kind: 'person', person: { id: p.id, fullName: p.fullName } }]);
+  };
+
+  // The WhatsApp / SMS invite for a player added by a number not on SportnNote:
+  // signing up with that number makes the entry (and its results) theirs.
+  const playerInvite = (name?: string) => playerInviteText({
+    name, inviterName: profile?.fullName, sportName: sport ? getSportMeta(sport).name : undefined,
+    context: tournament?.name ? inviteLabel('Tournament', tournament.name) : undefined,
+    link: tournamentId ? tournamentLink(tournamentId) : SHARE_BASE,
+  });
+  const entrantPicker = (side: 'home' | 'away', count: 1 | 2) => (
+    <EntrantPicker
+      count={count}
+      sport={sport ?? 'tennis'}
+      inviteText={playerInvite}
+      onSubmit={makeEntrantHandler(side)}
+      // the first pair gets a one-tap "Me" (singles has it on the side itself)
+      resolveMe={count === 2 && side === 'home' ? resolveMe : undefined}
+      meName={profile?.fullName}
+    />
+  );
   // People already represented by a one-person entry in this sport (shown as
   // entries) — the people list skips them so nobody appears twice.
   const soloIds = new Set(teams.map((t) => (t as PickTeam).roster).filter((r): r is string[] => !!r && r.length === 1).map((r) => r[0]));
@@ -442,7 +440,7 @@ export default function ScheduleMatchScreen() {
             <>
               {/* Racket sports pick their structure first — Singles (one player a
                   side) or Doubles (a pair) — so the participant picker below adapts. */}
-              {getSport(sport).participantKind === 'both' && (
+              {getSportMeta(sport).participantKind === 'both' && (
                 <View style={{ gap: theme.spacing(2) }}>
                   <FieldLabel>Format</FieldLabel>
                   <View style={st.chips}>
@@ -471,14 +469,14 @@ export default function ScheduleMatchScreen() {
                 </>
               ) : mode === 'individual' ? (
                 <>
-                  <TeamPicker noun="player" label="Player 1" teams={teams} selected={home} onSelect={setHome} onClear={() => setHome(null)} onCreate={makeCreateHandler('home')} onPickMe={pickMe('home')} meName={profile?.fullName} people={people} onSelectPerson={pickPerson('home')} />
-                  <TeamPicker noun="player" label="Player 2" teams={teams} selected={away} onSelect={setAway} onClear={() => setAway(null)} onCreate={makeCreateHandler('away')} people={people} onSelectPerson={pickPerson('away')} />
+                  <TeamPicker noun="player" label="Player 1" teams={teams} selected={home} onSelect={setHome} onClear={() => setHome(null)} onCreate={makeCreateHandler('home')} newEntrant={entrantPicker('home', 1)} onPickMe={pickMe('home')} meName={profile?.fullName} people={people} onSelectPerson={pickPerson('home')} />
+                  <TeamPicker noun="player" label="Player 2" teams={teams} selected={away} onSelect={setAway} onClear={() => setAway(null)} onCreate={makeCreateHandler('away')} newEntrant={entrantPicker('away', 1)} people={people} onSelectPerson={pickPerson('away')} />
                 </>
               ) : (
                 <>
-                  <Text style={textStyles.muted}>A doubles side is a pair of two players. Pick an existing pair, or name both partners.</Text>
-                  <TeamPicker noun="pair" label="Pair 1" teams={teams} selected={home} onSelect={setHome} onClear={() => setHome(null)} onCreate={makeCreateHandler('home')} onCreatePair={makePairCreateHandler('home')} />
-                  <TeamPicker noun="pair" label="Pair 2" teams={teams} selected={away} onSelect={setAway} onClear={() => setAway(null)} onCreate={makeCreateHandler('away')} onCreatePair={makePairCreateHandler('away')} />
+                  <Text style={textStyles.muted}>A doubles side is a pair of two players. Pick an existing pair, or pick both partners — by name or mobile number, so the match lands on each partner’s profile.</Text>
+                  <TeamPicker noun="pair" label="Pair 1" teams={teams} selected={home} onSelect={setHome} onClear={() => setHome(null)} onCreate={makeCreateHandler('home')} newEntrant={entrantPicker('home', 2)} />
+                  <TeamPicker noun="pair" label="Pair 2" teams={teams} selected={away} onSelect={setAway} onClear={() => setAway(null)} onCreate={makeCreateHandler('away')} newEntrant={entrantPicker('away', 2)} />
                 </>
               )}
 
@@ -503,13 +501,13 @@ export default function ScheduleMatchScreen() {
                 </View>
               )}
 
-              {(getSport(sport).formatFields ?? []).length > 0 && (
+              {(getSportMeta(sport).formatFields ?? []).length > 0 && (
                 <SportFormatEditor
                   sport={sport}
                   value={format}
                   onChange={(k, v) => setFormat((f) => ({ ...f, [k]: v }))}
                   // Singles/Doubles is chosen up front for racket sports, so don't repeat it here.
-                  omitKeys={getSport(sport).participantKind === 'both' ? ['playersPerSide'] : undefined}
+                  omitKeys={getSportMeta(sport).participantKind === 'both' ? ['playersPerSide'] : undefined}
                 />
               )}
             </>
@@ -542,7 +540,7 @@ export default function ScheduleMatchScreen() {
  *  10-chip wall. */
 function SportPicker({ sport, onPick }: { sport: SportId | null; onPick: (s: SportId) => void }) {
   const [open, setOpen] = useState(false);
-  const cur = sport ? getSport(sport) : null;
+  const cur = sport ? getSportMeta(sport) : null;
   return (
     <View style={{ gap: theme.spacing(2) }}>
       <FieldLabel>Sport</FieldLabel>
@@ -572,7 +570,8 @@ function SportPicker({ sport, onPick }: { sport: SportId | null; onPick: (s: Spo
 /** One side of a match. `noun` sets every user-facing word — a team, a pair
  *  (doubles) or a player (singles) — so an individual sport never says "team".
  *  All three still resolve to a side id under the hood. `onPickMe` adds a
- *  one-tap "Me" chip for individual sports. */
+ *  one-tap "Me" chip for individual sports. A team is created from a typed name;
+ *  a player / pair is PEOPLE, picked with `newEntrant` (an EntrantPicker). */
 function TeamPicker({
   label,
   noun = 'team',
@@ -581,7 +580,7 @@ function TeamPicker({
   onSelect,
   onClear,
   onCreate,
-  onCreatePair,
+  newEntrant,
   onPickMe,
   meName,
   people,
@@ -593,10 +592,11 @@ function TeamPicker({
   selected: string | null;
   onSelect: (id: string) => void;
   onClear: () => void;
-  /** create a brand-new side from a typed name; returns true if it succeeded */
+  /** create a brand-new team from a typed name; returns true if it succeeded */
   onCreate: (name: string) => Promise<boolean>;
-  /** doubles pairs: create from two partner names (as a 2-player roster) */
-  onCreatePair?: (a: string, b: string) => Promise<boolean>;
+  /** singles / doubles: who's on a new side — the real people, picked by name or
+   *  mobile number (never a free-typed name that links to no one) */
+  newEntrant?: React.ReactNode;
   /** individual sports only: one-tap select the signed-in user */
   onPickMe?: () => void;
   meName?: string;
@@ -606,9 +606,10 @@ function TeamPicker({
 }) {
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState('');
-  const [nameB, setNameB] = useState('');
   const [busy, setBusy] = useState(false);
   const [query, setQuery] = useState('');
+  // Once a side is chosen the add panel closes, so "Change" starts afresh.
+  useEffect(() => { if (selected) { setCreating(false); setQuery(''); } }, [selected]);
 
   const selectedTeam = teams.find((t) => t.id === selected);
   const q = query.trim().toLowerCase();
@@ -617,8 +618,10 @@ function TeamPicker({
   const personResults = q.length >= 3 && people ? people.filter((p) => p.name.toLowerCase().includes(q)).slice(0, 25 - results.length) : [];
 
   const searchPlaceholder = noun === 'player' ? 'Search players (type 3+ letters)…' : noun === 'pair' ? 'Search pairs (type 3+ letters)…' : 'Search all teams (type 3+ letters)…';
-  const createPlaceholder = noun === 'player' ? 'e.g. Rafael Nadal' : noun === 'pair' ? 'e.g. Nadal / Alcaraz' : 'e.g. Sunday FC';
   const meFirst = meName ? meName.trim().split(/\s+/)[0] : 'Me';
+  // players and pairs are people (picked), only a team is a typed name
+  const pickPeople = !!newEntrant && noun !== 'team';
+  const newLabel = noun === 'player' ? '＋ Someone else (mobile or name)' : `＋ New ${noun}`;
 
   const create = async () => {
     if (!name.trim() || busy) return;
@@ -626,13 +629,6 @@ function TeamPicker({
     const ok = await onCreate(name.trim());
     setBusy(false);
     if (ok) { setName(''); setCreating(false); setQuery(''); }
-  };
-  const createPair = async () => {
-    if (!name.trim() || !nameB.trim() || busy || !onCreatePair) return;
-    setBusy(true);
-    const ok = await onCreatePair(name.trim(), nameB.trim());
-    setBusy(false);
-    if (ok) { setName(''); setNameB(''); setCreating(false); setQuery(''); }
   };
 
   return (
@@ -664,21 +660,17 @@ function TeamPicker({
                 </View>
               )}
               {q.length >= 3 && results.length === 0 && personResults.length === 0 && (
-                <Text style={textStyles.muted}>No {noun}s match “{query.trim()}”. Create one below.</Text>
+                <Text style={textStyles.muted}>
+                  {pickPeople ? `No ${noun}s match “${query.trim()}”. Add them below — their mobile number links the real person.` : `No ${noun}s match “${query.trim()}”. Create one below.`}
+                </Text>
               )}
             </>
           )}
 
-          <SelectChip label={`＋ New ${noun}`} active={creating} onPress={() => setCreating((c) => !c)} />
-          {creating && (onCreatePair ? (
+          <SelectChip label={newLabel} active={creating} onPress={() => setCreating((c) => !c)} />
+          {creating && (pickPeople ? newEntrant : (
             <View style={{ gap: theme.spacing(2) }}>
-              <TextField label="Player 1" value={name} onChange={setName} placeholder="e.g. Rafael Nadal" />
-              <TextField label="Player 2" value={nameB} onChange={setNameB} placeholder="e.g. Carlos Alcaraz" />
-              <Button label={busy ? 'Creating…' : '＋ Create pair'} onPress={createPair} disabled={busy || !name.trim() || !nameB.trim()} />
-            </View>
-          ) : (
-            <View style={{ gap: theme.spacing(2) }}>
-              <TextField label={`New ${noun} name`} value={name} onChange={setName} placeholder={createPlaceholder} />
+              <TextField label={`New ${noun} name`} value={name} onChange={setName} placeholder="e.g. Sunday FC" />
               <Button label={busy ? 'Creating…' : '＋ Create & select'} onPress={create} disabled={busy || !name.trim()} />
             </View>
           ))}

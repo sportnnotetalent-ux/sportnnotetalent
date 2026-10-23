@@ -8,7 +8,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Alert } from 'react-native';
 import { theme } from '../core/theme';
 import { SelectChip, textStyles } from './ui';
-import { getSport } from '../sports/registry';
+import { getSportMeta } from '../sports/sportMeta';
 import { useAuth } from '../core/auth';
 import { getClubsForPlayer, getClubSports, getClubTeam, addClubSport, getMyPlayerId, getMyScope } from '../data/repos';
 import type { Club, SportId, Team } from '../core/types';
@@ -44,7 +44,7 @@ export function ClubQuickPick({ sport, selectedTeamIds, onPicked }: {
 
   const shown = clubs.filter((c) => (sportsByClub[c.id] ?? []).includes(sport) || canAdd.has(c.id));
   if (!shown.length) return null;
-  const sportName = getSport(sport).name;
+  const sportName = getSportMeta(sport).name;
 
   async function pick(club: Club) {
     setBusy(true);

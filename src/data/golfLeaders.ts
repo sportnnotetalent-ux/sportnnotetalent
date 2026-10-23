@@ -23,8 +23,9 @@ export function scopeTournamentLines(lines: StatLine[], matchIds: Set<string>, e
 }
 
 /** Leader categories that only stroke play / Stableford rounds produce.
- *  Round 2 — putts per GIR, driving distance, par-3 / 4 / 5 scoring averages. */
-export const GOLF_STROKE_LEADERS = ['lowRound', 'lowRound9', 'scoringAvg', 'puttsPerRound', 'girPct', 'puttsPerGir', 'drivingDistance', 'p3Avg', 'p4Avg', 'p5Avg'] as const;
+ *  Round 2 — putts per GIR, driving distance, par-3 / 4 / 5 scoring averages;
+ *  follow-up — most chip-ins (from a card kept with up and downs). */
+export const GOLF_STROKE_LEADERS = ['lowRound', 'lowRound9', 'scoringAvg', 'puttsPerRound', 'girPct', 'puttsPerGir', 'drivingDistance', 'p3Avg', 'p4Avg', 'p5Avg', 'chipIns'] as const;
 
 /** Is this golf tournament played as match play? (format `competition`) */
 export const isGolfMatchPlay = (format?: Record<string, unknown>) => String(format?.competition ?? 'stroke') === 'match';
@@ -39,7 +40,7 @@ export const isGolfMatchPlay = (format?: Record<string, unknown>) => String(form
 export function golfLeaderCategories<T extends { key: string }>(cats: T[], format?: Record<string, unknown>): T[] {
   const shown = cats.map((c) => inUnit(c, distUnitOf(format)));
   if (isGolfMatchPlay(format)) return shown;
-  const order = ['lowRound', 'lowRound9', 'scoringAvg', 'birdies', 'eagles', 'puttsPerRound', 'girPct', 'puttsPerGir', 'drivingDistance', 'p3Avg', 'p4Avg', 'p5Avg'];
+  const order = ['lowRound', 'lowRound9', 'scoringAvg', 'birdies', 'eagles', 'puttsPerRound', 'girPct', 'puttsPerGir', 'drivingDistance', 'p3Avg', 'p4Avg', 'p5Avg', 'chipIns'];
   const rank = (k: string) => { const i = order.indexOf(k); return i < 0 ? order.length : i; };
   return shown.filter((c) => c.key !== 'holesWon').sort((a, b) => rank(a.key) - rank(b.key));
 }

@@ -12,7 +12,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { theme } from '../core/theme';
 import { Button, EmptyState, LoadingState, ScreenTitle, SelectChip, textStyles } from '../components/ui';
 import { JourneyView, journeyFor, useLiveRefresh } from '../components/TournamentHistory';
-import { getSport } from '../sports/registry';
+import { getSportMeta } from '../sports/sportMeta';
 import { useLeagueData, useTournamentById } from '../data/hooks';
 import { openMatchViewer } from '../navigation/openMatch';
 import { readSeriesMeta } from '../data/series';
@@ -56,7 +56,7 @@ export default function TeamJourneyScreen() {
         {sports.length > 1 && (
           <KeyboardAwareScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.chips}>
             {sports.map((s) => (
-              <SelectChip key={s} label={`${getSport(s).icon} ${getSport(s).name}`} active={sport === s} onPress={() => setPicked(s)} />
+              <SelectChip key={s} label={`${getSportMeta(s).icon} ${getSportMeta(s).name}`} active={sport === s} onPress={() => setPicked(s)} />
             ))}
           </KeyboardAwareScrollView>
         )}

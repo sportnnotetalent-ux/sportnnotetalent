@@ -573,6 +573,12 @@ export interface SportPlugin<S = unknown> {
   tickerFlash?: (prev: S, next: S) => import('./ticker').TickerFlash | null;
 }
 
+/** Perf F-15 — the LIGHT part of a plugin: what lists, pickers and format forms
+ *  read for any sport (name, icon, who competes, format options) without
+ *  loading its scoring engine or scorer UI. Each sport keeps it in
+ *  `<sport>/meta.ts` (spread into its plugin); sportMeta.ts collects them. */
+export type SportMeta = Pick<SportPlugin, 'id' | 'name' | 'icon' | 'archetype' | 'participantKind' | 'formatFields' | 'retireTerms'>;
+
 /** Props for a sport's Quick-options tiles. */
 export interface QuickOptionsProps {
   state: unknown;

@@ -18,6 +18,7 @@ import { getFieldEntries } from './golf';
 import { eventMeetSettings, teamEventSummary, groupMeet, phaseOf, type TeamEventSportSummary, type TeamMeetInput, type RecordMark, type MeetPhase } from './results';
 import { isEventSport, EVENT_SPORTS, eventPrefix } from '../sports/eventSports';
 import { golfProfileSummary } from '../sports/golf/engine';
+import { fetchAllPages } from './paging';
 
 export interface TeamGolfSummary { rounds: number; wins: number; best18: number | null; best9: number | null }
 export interface TeamEventResults { sports: TeamEventSportSummary[]; golf: TeamGolfSummary | null }
@@ -43,11 +44,15 @@ async function whereEntered(team: { id: string; name: string }, squadIds: string
     const sb = supabase!;
     const eventIds = new Set<string>();
     const add = (r: { data: unknown; error: unknown }) => { if (!r.error) for (const x of (r.data ?? []) as { event_id: string }[]) eventIds.add(x.event_id); };
+    // The intended 2,000 each — a bare .limit(2000) came back with the server's 1,000.
+    const upTo2000 = { maxRows: 2000 };
     const res = await Promise.all([
-      sb.from('field_entries').select('event_id').eq('team_id', team.id).limit(2000),   // after 0051
-      sb.from('field_entries').select('event_id').eq('result->team->>id', team.id).limit(2000),
-      sb.from('field_entries').select('event_id').eq('result->team->>name', team.name).limit(2000),
-      squadIds.length ? sb.from('field_entries').select('event_id').in('player_id', squadIds.slice(0, 300)).limit(2000) : Promise.resolve({ data: [], error: null }),
+      fetchAllPages((from, to) => sb.from('field_entries').select('event_id').eq('team_id', team.id).order('id').range(from, to), upTo2000),   // after 0051
+      fetchAllPages((from, to) => sb.from('field_entries').select('event_id').eq('result->team->>id', team.id).order('id').range(from, to), upTo2000),
+      fetchAllPages((from, to) => sb.from('field_entries').select('event_id').eq('result->team->>name', team.name).order('id').range(from, to), upTo2000),
+      squadIds.length
+        ? fetchAllPages((from, to) => sb.from('field_entries').select('event_id').in('player_id', squadIds.slice(0, 300)).order('id').range(from, to), upTo2000)
+        : Promise.resolve({ data: [], error: null }),
     ]);
     res.forEach(add);
     const ids = [...eventIds];

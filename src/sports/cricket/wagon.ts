@@ -8,7 +8,8 @@
  * 7 Mid-wicket, 8 Mid-on. A left-hander's picture is the mirror image, so a tap
  * on screen zone z is stored as `mirrorZone(z)` — careers then add up in one frame.
  */
-import { ZONES, type ShotRec } from './engine.ts';
+import type { ShotRec } from './engine.ts';
+import { ZONES } from './zones.ts';
 
 /** Screen zone ⇄ stored zone for a left-hander (1↔8, 2↔7, 3↔6, 4↔5). */
 export const mirrorZone = (z: number): number => 9 - z;

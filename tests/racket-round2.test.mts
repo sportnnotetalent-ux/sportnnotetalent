@@ -95,7 +95,7 @@ describe('round 2 · 1 — serve speed in km/h or mph (the log stays km/h)', () 
     const ff = trackFormatFields('tennis').find((f) => f.key === 'speedUnit')!;
     assert.deepEqual([ff.type, ff.default, ff.advanced, ff.options!.map((o) => o.value)], ['choice', 'kmh', true, ['kmh', 'mph']]);
     assert.ok(trackFormatFields('tennis').some((f) => f.key === 'speedDetail' && f.advanced));
-    assert.match(readFileSync(new URL('../src/sports/tennis/index.tsx', import.meta.url), 'utf8'), /\.\.\.trackFormatFields\('tennis'\)/);
+    assert.match((readFileSync(new URL('../src/sports/tennis/index.tsx', import.meta.url), 'utf8') + readFileSync(new URL('../src/sports/tennis/meta.ts', import.meta.url), 'utf8')), /\.\.\.trackFormatFields\('tennis'\)/);
   });
   test('the panel, the commentary show mph; the log and the career keys stay km/h', () => {
     const s = run(tennis.reducer, tennis.init({ speedUnit: 'mph' }), [

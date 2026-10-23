@@ -113,6 +113,21 @@ export function tournamentRoleInviteText(opts: { role: string; name?: string; in
     : `${hi}${who} added you as a ${opts.role} for ${t} on SportnNote 🏆\n\nOpen this link and sign in with this mobile number:\n${opts.link}`;
 }
 
+/** A person added as a PLAYER by their mobile number — a singles opponent, a
+ *  doubles partner, a golf group, an Americano field, a club member: signing up
+ *  with that number makes the entry (and its results) theirs. Sent before the
+ *  pending player exists (the chat app opens inside the tap), so it carries no
+ *  per-person link. `context` is already labelled ("Tournament Open Cup"). */
+export function playerInviteText(opts: { name?: string; inviterName?: string; sportName?: string; context?: string; link: string }): string {
+  const who = opts.inviterName?.trim() || 'A friend';
+  const name = realName(opts.name);
+  const sport = opts.sportName?.trim() ? `${opts.sportName.trim()} ` : '';
+  const where = opts.context?.trim() ? ` in ${opts.context.trim()}` : '';
+  return `Hi${name ? ` ${name}` : ''}! ${who} added you as a ${sport}player${where} on SportnNote 🏅\n\n`
+    + `Open this link and sign up with this mobile number (1 minute, no password) so your matches and stats land on your profile:\n${opts.link}\n\n`
+    + privacyNoticeLine();
+}
+
 /* ------------------------------ open in the app ------------------------------ */
 
 export const ANDROID_PACKAGE = 'in.sportnnote.app';
@@ -129,6 +144,22 @@ export function webDevice(ua: string | undefined, maxTouchPoints = 0): WebDevice
   if (/Android/i.test(s)) return 'android';
   if (/iPhone|iPad|iPod/i.test(s) || (/Macintosh/i.test(s) && maxTouchPoints > 1)) return 'ios';
   return 'other';
+}
+
+/* ------------------------------- a friend -------------------------------- */
+
+/** "Join me on SportnNote" (2026-10-23): the inviter's personal link. It opens
+ *  the GetApp screen — the right steps for the friend's phone (Android app or
+ *  the web app on iPhone) — and once they have an account they follow the
+ *  inviter (data/referral.ts). */
+export const friendInviteLink = (inviterPlayerId: string) => `${SHARE_BASE}/get/${inviterPlayerId}`;
+
+/** The WhatsApp / SMS message that carries it. */
+export function friendInviteText(opts: { link: string; inviterName?: string; friendName?: string }): string {
+  const friend = realName(opts.friendName);
+  const me = (opts.inviterName ?? '').trim();
+  return `${friend ? `Hi ${friend}! ` : 'Hi! '}${me ? `It's ${me}. ` : ''}I'm using SportnNote to score our games and run tournaments 🏆 `
+    + `It's free while it's new. Join me here (Android or iPhone):\n${opts.link}`;
 }
 
 /** An Android Chrome intent link that opens the installed app on `path`

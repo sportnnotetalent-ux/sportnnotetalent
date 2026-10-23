@@ -3,10 +3,17 @@
   <head>
     <meta charset="utf-8" />
     <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
-    <!-- interactive-widget: Android Chrome shrinks the page for the on-screen keyboard, so the field being typed in stays visible (Safari scrolls it into view itself) -->
+    <!-- interactive-widget: Android Chrome shrinks the page for the on-screen keyboard, so the field being typed in stays visible (iPhone Safari: see the script below) -->
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, interactive-widget=resizes-content" />
     <title>%WEB_TITLE%</title>
     <meta name="theme-color" content="#0E1116" />
+    <!-- Link previews (WhatsApp, SMS, iMessage): a shared invite or match link shows a SportnNote card. -->
+    <meta property="og:site_name" content="SportnNote" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="SportnNote: score your games, run tournaments" />
+    <meta property="og:description" content="Live scores, tournaments and everyone's stats in one place. Free while it's new." />
+    <meta property="og:image" content="https://sportnnote.expo.app/icon-512.png" />
+    <meta name="twitter:card" content="summary" />
     <!-- App pages spread by shared link, not search (the marketing site sportnnote.in is indexed). -->
     <meta name="robots" content="noindex, nofollow" />
     <!-- Installable web app (Add to Home Screen) — also required for web push on iPhone. -->
@@ -24,6 +31,40 @@
           navigator.serviceWorker.register('/sw.js').catch(function () {});
         });
       }
+    </script>
+    <script>
+      // iPhone Safari doesn't shrink the page for the on-screen keyboard (Android
+      // Chrome does — interactive-widget above): it slides the whole page up and
+      // leaves it full height, so a button pinned at the bottom sits behind the
+      // keyboard. While a field is focused and the keyboard is up, size the app
+      // to the visible area and undo the slide; restore when it closes.
+      (function () {
+        var vv = window.visualViewport;
+        if (!vv) return;
+        var fitted = false;
+        function typing() {
+          var el = document.activeElement;
+          return !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
+        }
+        function fit() {
+          var root = document.getElementById('root');
+          if (!root) return;
+          var keyboard = window.innerHeight - vv.height;
+          if (typing() && keyboard > 120 && Math.abs(vv.scale - 1) < 0.01) {
+            root.style.height = Math.round(vv.height) + 'px';
+            fitted = true;
+            window.scrollTo(0, 0);
+            var el = document.activeElement;
+            setTimeout(function () { if (el && el.scrollIntoView) el.scrollIntoView({ block: 'nearest' }); }, 0);
+          } else if (fitted) {
+            root.style.height = '';
+            fitted = false;
+          }
+        }
+        vv.addEventListener('resize', fit);
+        vv.addEventListener('scroll', function () { if (fitted && Math.abs(vv.scale - 1) < 0.01) window.scrollTo(0, 0); });
+        document.addEventListener('focusout', function () { setTimeout(fit, 50); });
+      })();
     </script>
     <!-- The `react-native-web` recommended style reset: https://necolas.github.io/react-native-web/docs/setup/#root-element -->
     <style id="expo-reset">

@@ -11,7 +11,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { theme } from '../core/theme';
 import { EmptyState, Card, Pill, SelectChip, ScreenTitle, textStyles, Button } from '../components/ui';
 import { matchLine } from '../sports/matchLine';
-import { getSport } from '../sports/registry';
+import { getSportMeta } from '../sports/sportMeta';
 import { formatDay } from '../core/dates';
 import { useAuth } from '../core/auth';
 import { usePlayerProfile, useMatches } from '../data/hooks';
@@ -61,7 +61,7 @@ export default function SportProfileScreen() {
   const [scope, setScope] = useState<'all' | 'official' | 'friendly'>('all');
   const { matches } = useMatches();
   const matchById = useMemo(() => new Map(matches.map((m) => [m.id, m])), [matches]);
-  const plugin = getSport(sport);
+  const plugin = getSportMeta(sport);
 
   // 'self' = my own profile; 'admin' = an unclaimed player I manage (parity #12).
   const [access, setAccess] = useState<EditAccess>('none');

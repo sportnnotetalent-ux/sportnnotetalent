@@ -10,7 +10,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { theme } from '../core/theme';
 import { readableOn } from '../core/contrast';
 import { Card, Button, ScreenTitle, LoadingState, EmptyState, textStyles } from '../components/ui';
-import { getSport } from '../sports/registry';
+import { getSportMeta } from '../sports/sportMeta';
 import { getClubsForPlayer, getClubSports, getMyPlayerId, getMyTeams } from '../data/repos';
 import { useAuth } from '../core/auth';
 import type { Club, SportId, Team } from '../core/types';
@@ -71,7 +71,7 @@ export default function ClubsScreen() {
                   <View style={{ flex: 1 }}>
                     <Text style={textStyles.body}>{c.name}</Text>
                     <Text style={textStyles.muted}>
-                      {c.city ? `${c.city} · ` : ''}{sports.length ? sports.map((s) => getSport(s).icon).join(' ') : 'No sports yet'}
+                      {c.city ? `${c.city} · ` : ''}{sports.length ? sports.map((s) => getSportMeta(s).icon).join(' ') : 'No sports yet'}
                     </Text>
                   </View>
                   <Text style={st.chev}>›</Text>
@@ -94,7 +94,7 @@ export default function ClubsScreen() {
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={textStyles.body}>{t.name}</Text>
-                    <Text style={textStyles.muted}>{getSport(t.sport).icon} {getSport(t.sport).name}</Text>
+                    <Text style={textStyles.muted}>{getSportMeta(t.sport).icon} {getSportMeta(t.sport).name}</Text>
                   </View>
                   <Text style={st.chev}>›</Text>
                 </Card>

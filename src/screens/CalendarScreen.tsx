@@ -13,7 +13,7 @@ import { EmptyState, Card, Pill, SelectChip, textStyles } from '../components/ui
 import { useMatches, useMyTournaments, useScopedMatches } from '../data/hooks';
 import { getTournaments } from '../data/repos';
 import { useAuth } from '../core/auth';
-import { getSport } from '../sports/registry';
+import { getSportMeta } from '../sports/sportMeta';
 import { exportToCalendar, type CalEvent } from '../core/ics';
 import { formatDay, formatDayShort } from '../core/dates';
 import { matchLine } from '../sports/matchLine';
@@ -119,7 +119,7 @@ export default function CalendarScreen() {
     return (
       <TouchableOpacity accessibilityRole="button" key={m.id} activeOpacity={0.85} onPress={() => openMatch(m)}>
         <Card style={st.itemRow}>
-          <Text style={st.itemIcon}>{getSport(m.sport).icon}</Text>
+          <Text style={st.itemIcon}>{getSportMeta(m.sport).icon}</Text>
           <View style={{ flex: 1 }}>
             <Text style={textStyles.body} numberOfLines={1}>{m.homeTeam.name} vs {m.awayTeam.name}</Text>
             <Text style={textStyles.muted}>
@@ -149,7 +149,7 @@ export default function CalendarScreen() {
         <Text style={st.itemIcon}>🏆</Text>
         <View style={{ flex: 1 }}>
           <Text style={textStyles.body} numberOfLines={1}>{t.name}</Text>
-          <Text style={textStyles.muted}>{t.sports.map((s) => getSport(s).icon).join(' ')} · {formatDayShort(t.startDate)} → {formatDayShort(t.endDate)}{note ? ` · ${note}` : ''}</Text>
+          <Text style={textStyles.muted}>{t.sports.map((s) => getSportMeta(s).icon).join(' ')} · {formatDayShort(t.startDate)} → {formatDayShort(t.endDate)}{note ? ` · ${note}` : ''}</Text>
         </View>
         <Text style={st.chevron}>›</Text>
       </Card>
@@ -177,17 +177,17 @@ export default function CalendarScreen() {
   // Build calendar (.ics) events for export.
   const matchEvent = (m: Match): CalEvent => ({
     uid: `m-${m.id}@sportnnote`,
-    title: `${getSport(m.sport).icon} ${m.homeTeam.name} vs ${m.awayTeam.name}`,
+    title: `${getSportMeta(m.sport).icon} ${m.homeTeam.name} vs ${m.awayTeam.name}`,
     start: m.startsAt,
     location: m.venueName,
-    description: `${getSport(m.sport).name} match`,
+    description: `${getSportMeta(m.sport).name} match`,
   });
   const tournamentEvent = (t: Tournament): CalEvent => ({
     uid: `t-${t.id}@sportnnote`,
     title: `🏆 ${t.name}`,
     start: t.startDate,
     end: t.endDate,
-    description: `${t.sports.map((s) => getSport(s).name).join(', ')} · hosted by ${t.hostName}`,
+    description: `${t.sports.map((s) => getSportMeta(s).name).join(', ')} · hosted by ${t.hostName}`,
   });
   const exportDay = () =>
     void exportToCalendar(`sportnnote-${selected}`, [...selTournaments.map(tournamentEvent), ...selMatches.map(matchEvent)]);

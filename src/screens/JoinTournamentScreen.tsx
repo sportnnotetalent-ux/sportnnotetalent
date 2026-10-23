@@ -15,7 +15,7 @@ import { Card, Button, TextField, SelectChip, ScreenTitle, FormError, textStyles
 import { useAuth } from '../core/auth';
 import { isGuestSession, promptSignIn } from '../core/guest';
 import { notice } from '../core/confirm';
-import { getSport } from '../sports/registry';
+import { getSportMeta } from '../sports/sportMeta';
 import { useCaptainships, useTournamentCategories } from '../data/hooks';
 import { getTournamentInvite, redeemTournamentInvite, getMyTeams, createTeam, type TournamentInviteInfo } from '../data/repos';
 import { filterTeams } from '../core/teamSearch';
@@ -157,14 +157,14 @@ export default function JoinTournamentScreen() {
           <Card style={{ gap: theme.spacing(3) }}>
             <View>
               <Text style={textStyles.h3}>{info.name}</Text>
-              <Text style={textStyles.muted}>{info.sports.map((s) => `${getSport(s).icon} ${getSport(s).name}`).join(' · ')}</Text>
+              <Text style={textStyles.muted}>{info.sports.map((s) => `${getSportMeta(s).icon} ${getSportMeta(s).name}`).join(' · ')}</Text>
             </View>
 
             <Text style={textStyles.h3}>Your teams</Text>
             {myTeams === null ? (
               <Text style={textStyles.muted}>Loading your teams…</Text>
             ) : myTeams.length === 0 ? (
-              <Text style={textStyles.muted}>You don’t manage a {info.sports.map((s) => getSport(s).name).join(' / ')} team yet — make one below.</Text>
+              <Text style={textStyles.muted}>You don’t manage a {info.sports.map((s) => getSportMeta(s).name).join(' / ')} team yet — make one below.</Text>
             ) : (
               <>
                 {myTeams.length > 8 && <TextField label="" value={query} onChange={setQuery} placeholder="Search your teams" autoCapitalize="none" />}
@@ -179,7 +179,7 @@ export default function JoinTournamentScreen() {
                       style={[st.radio, on && st.radioOn]}
                       numberOfLines={1}
                     >
-                      {on ? '◉' : '○'}  {t.name}{multiSport ? `  ${getSport(t.sport).icon}` : ''}
+                      {on ? '◉' : '○'}  {t.name}{multiSport ? `  ${getSportMeta(t.sport).icon}` : ''}
                     </Text>
                   );
                 })}
@@ -191,7 +191,7 @@ export default function JoinTournamentScreen() {
                 {multiSport && (
                   <View style={st.chips}>
                     {info.sports.map((s) => (
-                      <SelectChip key={s} label={`${getSport(s).icon} ${getSport(s).name}`} active={newSport === s} onPress={() => setNewSport(s)} />
+                      <SelectChip key={s} label={`${getSportMeta(s).icon} ${getSportMeta(s).name}`} active={newSport === s} onPress={() => setNewSport(s)} />
                     ))}
                   </View>
                 )}

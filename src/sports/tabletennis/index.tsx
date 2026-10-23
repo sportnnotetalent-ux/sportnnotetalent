@@ -8,13 +8,14 @@
  *   • Singles (default) or doubles.
  */
 import { makeRallyPlugin, type RallyState } from '../rallyCore';
+import { TABLETENNIS_FORMAT_FIELDS, TABLETENNIS_META } from './meta';
 
 export type TableTennisState = RallyState;
 
 export const tableTennisPlugin = makeRallyPlugin({
   id: 'tabletennis',
-  name: 'Table tennis',
-  icon: '🏓',
+  name: TABLETENNIS_META.name,
+  icon: TABLETENNIS_META.icon,
   // Table tennis has no serve-based scoring system; these labels are unused.
   sideOutValue: '__none__',
   sideOutLabel: 'Service',
@@ -24,48 +25,5 @@ export const tableTennisPlugin = makeRallyPlugin({
   hasCourt: false,
   firstServePicker: true,
   serveRule: 'tt',
-  formatFields: [
-    {
-      key: 'preset', label: 'Format', type: 'preset', default: 'bo5',
-      options: [
-        { value: 'bo5', label: 'Best of 5 (to 11)', set: { pointsPerGame: 11, winBy: 2, gamesToWin: 3 } },
-        { value: 'bo7', label: 'Best of 7 (to 11)', set: { pointsPerGame: 11, winBy: 2, gamesToWin: 4 } },
-        { value: 'bo3', label: 'Best of 3 (to 11)', set: { pointsPerGame: 11, winBy: 2, gamesToWin: 2 } },
-        { value: 'legacy21', label: 'Legacy (to 21 · best of 3)', set: { pointsPerGame: 21, winBy: 2, gamesToWin: 2 } },
-        { value: 'custom', label: 'Custom' },
-      ],
-    },
-    // SD-115: who serves first (ITTF 2.13.1 toss) is asked once, on the scoring
-    // screen, with no default; a stored `firstServe` from older formats still seeds it.
-    {
-      key: 'playersPerSide', label: 'Players', type: 'choice', default: 1,
-      options: [
-        { value: 1, label: 'Singles' },
-        { value: 2, label: 'Doubles' },
-      ],
-    },
-    {
-      key: 'pointsPerGame', label: 'Points to win', type: 'choice', default: 11, advanced: true,
-      options: [
-        { value: 11, label: '11' },
-        { value: 21, label: '21' },
-      ],
-    },
-    {
-      key: 'winBy', label: 'Win by', type: 'choice', default: 2, advanced: true,
-      options: [
-        { value: 2, label: 'Win by 2' },
-        { value: 1, label: 'Win by 1' },
-      ],
-    },
-    {
-      key: 'gamesToWin', label: 'Match length', type: 'choice', default: 3,
-      options: [
-        { value: 4, label: 'Best of 7' },
-        { value: 3, label: 'Best of 5' },
-        { value: 2, label: 'Best of 3' },
-        { value: 1, label: 'Single game' },
-      ],
-    },
-  ],
+  formatFields: TABLETENNIS_FORMAT_FIELDS,
 });

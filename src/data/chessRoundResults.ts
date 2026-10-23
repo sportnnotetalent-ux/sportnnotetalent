@@ -6,7 +6,7 @@
  * follower push). A board already decided, or being scored on another phone,
  * is skipped and reported.
  */
-import { getSport } from '../sports/registry';
+import { loadSport } from '../sports/registry';
 import { getMatchEvents, appendMatchEvent, updateMatchSnapshot, recordStatLine, releaseScoring } from './repos';
 import { effectiveLog } from '../sports/amend';
 import { withMatchRecords } from '../sports/matchRecords';
@@ -30,7 +30,7 @@ function sidePlayer(m: Match, side: 'home' | 'away', players: Map<string, Player
 }
 
 export async function recordRoundResults(writes: BoardWrite[], players: Map<string, Player>): Promise<RoundWriteResult> {
-  const plugin = getSport('chess');
+  const plugin = await loadSport('chess');
   const out: RoundWriteResult = { saved: [], skipped: [] };
   for (const w of writes) {
     const m = w.match;

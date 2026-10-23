@@ -14,22 +14,25 @@ import { Button, Card, TextField, SelectChip, ScreenTitle, FieldLabel, FormError
 import { DateTimeField } from '../components/DateTimeField';
 import { SportFormatEditor, defaultsFor, type FormatVal } from '../components/FormatEditor';
 import { useAuth } from '../core/auth';
-import { usePlayers } from '../data/hooks';
+import { usePlayers, useTournamentById } from '../data/hooks';
 import { getMyPlayerId, createReplacementPlayer, getTeams, createTeam } from '../data/repos';
+import { PersonPicker } from '../components/PersonPicker';
+import { inviteLabel, playerInviteText } from '../core/inviteText';
+import { SHARE_BASE, tournamentLink } from '../core/shareText';
 import {
   getGolfCourses, createGolfCourse, createFieldEvent, addFieldEntries, autoGroups, getFieldEvent, getFieldEvents,
   getFieldEntries, buildLeaderboard, golfFormatOf, parseIndex, showIndex, canEditCourse, entryTeesOf,
 } from '../data/golf';
 import { GolfCourseEditor, type CourseDraft } from '../components/golf/GolfCourseEditor';
 import { isSupabaseConfigured } from '../core/supabase';
-import { getSport } from '../sports/registry';
+import { getSportMeta } from '../sports/sportMeta';
 import { holesFor, makesCut, type CutRule } from '../sports/golf/engine';
 import type { GolfCourse, Team } from '../core/types';
 import { golfTeamFormatOf, type GolfTeamFormat } from '../data/golfTeams';
 import type { RootStackParamList } from '../navigation/types';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
-interface Pick { playerId: string; name: string; index: string; /** SD-76 */ teamId?: string; /** SD-122 — own tee (else the round's) */ tee?: string }
+interface Pick { playerId: string; name: string; index: string; /** SD-76 */ teamId?: string; /** SD-122 — own tee (else the round's) */ tee?: string; /** added as a typed name only — not linked to anyone */ nameOnly?: boolean }
 
 // parseIndex / showIndex moved to data/golfLeaderboard (SD-35: the entry-admin
 // sheet edits a handicap too); re-exported for older imports.
@@ -41,6 +44,7 @@ export default function GolfRoundSetupScreen() {
   const { profile } = useAuth();
   const allPlayers = usePlayers();
   const tournamentId = params?.tournamentId;
+  const tournamentName = useTournamentById(tournamentId)?.name;
 
   const [title, setTitle] = useState(tournamentId ? 'Round 1' : 'Round with friends');
   const [roundNo, setRoundNo] = useState(1);
@@ -48,7 +52,7 @@ export default function GolfRoundSetupScreen() {
   const [courseId, setCourseId] = useState<string | null>(null);
   const [tee, setTee] = useState<string | undefined>(undefined);
   const [format, setFormat] = useState<Record<string, FormatVal>>(() => {
-    const d = defaultsFor(getSport('golf').formatFields ?? []);
+    const d = defaultsFor(getSportMeta('golf').formatFields ?? []);
     const comp = params?.competition;
     return {
       ...d,
@@ -58,7 +62,6 @@ export default function GolfRoundSetupScreen() {
   });
   const [when, setWhen] = useState(() => new Date());
   const [picks, setPicks] = useState<Pick[]>([]);
-  const [query, setQuery] = useState('');
   const [groupSize, setGroupSize] = useState(4);
   const [interval, setIntervalMin] = useState(10);
   const [cutN, setCutN] = useState('');
@@ -118,13 +121,11 @@ export default function GolfRoundSetupScreen() {
 
   const course = courses.find((c) => c.id === courseId);
   const competition = String(format.competition ?? 'stroke');
-  const q = query.trim().toLowerCase();
-  const results = q.length >= 3 ? allPlayers.filter((p) => p.fullName.toLowerCase().includes(q) && !picks.some((x) => x.playerId === p.id)).slice(0, 12) : [];
 
   // SD-84 — the Handicap Index pre-fills from the player's golf profile
   const profileIndex = (playerId: string) => allPlayers.find((p) => p.id === playerId)?.sportDetails?.golf?.handicapIndex;
-  const addPlayer = (playerId: string, name: string, index?: number) =>
-    setPicks((ps) => (ps.some((p) => p.playerId === playerId) ? ps : [...ps, { playerId, name, index: showIndex(index ?? profileIndex(playerId)) }]));
+  const addPlayer = (playerId: string, name: string, index?: number, nameOnly?: boolean) =>
+    setPicks((ps) => (ps.some((p) => p.playerId === playerId) ? ps : [...ps, { playerId, name, index: showIndex(index ?? profileIndex(playerId)), ...(nameOnly ? { nameOnly } : {}) }]));
   const teamLabel = (id?: string) => (id ? allTeams.find((t) => t.id === id)?.shortName || allTeams.find((t) => t.id === id)?.name || 'Team' : 'No team');
   // tap a player's team chip: no team → each round team in turn → no team
   const cycleTeam = (playerId: string) => setPicks((ps) => ps.map((p) => {
@@ -148,15 +149,18 @@ export default function GolfRoundSetupScreen() {
     const p = id ? allPlayers.find((x) => x.id === id) : undefined;
     if (p) addPlayer(p.id, p.fullName);
   };
-  const addNew = async () => {
-    const name = query.trim();
-    if (name.length < 2) return;
-    try {
-      const p = await createReplacementPlayer(name, 'golf');
-      addPlayer(p.id, p.fullName);
-      setQuery('');
-    } catch { setError('Could not add that player.'); }
+  // The last resort (PersonPicker's "name only"): a provisional player, marked —
+  // not linked to anyone's account until their mobile number is added to it.
+  const addNameOnly = async (name: string) => {
+    const p = await createReplacementPlayer(name, 'golf');
+    addPlayer(p.id, p.fullName, undefined, true);
   };
+  // The invite for a player added by a number that isn't on SportnNote yet.
+  const playerInvite = (who?: string) => playerInviteText({
+    name: who, inviterName: profile?.fullName, sportName: 'Golf',
+    context: tournamentName ? inviteLabel('Tournament', tournamentName) : undefined,
+    link: tournamentId ? tournamentLink(tournamentId) : SHARE_BASE,
+  });
 
   const saveCourse = async (d: CourseDraft) => {
     setError(null);
@@ -282,7 +286,7 @@ export default function GolfRoundSetupScreen() {
           <FieldLabel>Players · Handicap Index (optional)</FieldLabel>
           {picks.map((p) => (
             <View key={p.playerId} style={st.playerRow}>
-              <Text style={[textStyles.body, st.flex]} numberOfLines={1}>{p.name}</Text>
+              <Text style={[textStyles.body, st.flex]} numberOfLines={1}>{p.name}{p.nameOnly ? ' · name only' : ''}</Text>
               <TextInput
                 style={st.idxInput}
                 value={p.index}
@@ -308,9 +312,17 @@ export default function GolfRoundSetupScreen() {
           {!params?.nextOf && (
             <>
               <View style={st.chips}><SelectChip label="👤 Add me" active={false} onPress={() => void addMe()} /></View>
-              <TextField label="" value={query} onChange={setQuery} placeholder="Search players (type 3+ letters)…" autoCapitalize="none" />
-              {results.length > 0 && <View style={st.chips}>{results.map((p) => <SelectChip key={p.id} label={`👤 ${p.fullName}`} active={false} onPress={() => { addPlayer(p.id, p.fullName); setQuery(''); }} />)}</View>}
-              {q.length >= 2 && <Text style={st.link} accessibilityRole="button" onPress={() => void addNew()}>＋ Add “{query.trim()}” as a new player</Text>}
+              {/* Players are people: search by name, or a mobile number adds &
+                  invites someone new — so the round lands on their profile. */}
+              <PersonPicker
+                role="player"
+                sport="golf"
+                excludeIds={picks.map((p) => p.playerId)}
+                takenNote={(n) => `${n} is already in this round.`}
+                inviteText={playerInvite}
+                onPick={(p) => addPlayer(p.id, p.fullName, p.sportDetails?.golf?.handicapIndex)}
+                onNameOnly={addNameOnly}
+              />
             </>
           )}
           {prev && (

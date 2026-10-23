@@ -6,6 +6,7 @@
  */
 import webpush from 'npm:web-push@3.6.7';
 import { admin } from './guard.ts';
+import { chunk, fetchAllChunked } from './paging.ts';
 
 const PUB = Deno.env.get('VAPID_PUBLIC_KEY') ?? '';
 const PRIV = Deno.env.get('VAPID_PRIVATE_KEY') ?? '';
@@ -28,7 +29,9 @@ export async function webPushMany(items: WebPushItem[]): Promise<number> {
   if (!ready || !items.length) return 0;
   try {
     const ids = [...new Set(items.map((i) => i.profileId))];
-    const { data: subs } = await admin.from('web_push_subscriptions').select('endpoint, profile_id, p256dh, auth').in('profile_id', ids);
+    // Chunked + paged: a reminder run reaches thousands of profiles (PostgREST stops at 1,000 rows).
+    const { data: subs } = await fetchAllChunked(ids, (part, from, to) => admin.from('web_push_subscriptions')
+      .select('endpoint, profile_id, p256dh, auth').in('profile_id', part).order('endpoint').range(from, to));
     if (!subs?.length) return 0;
     const byProfile = new Map<string, typeof subs>();
     for (const s of subs) byProfile.set(s.profile_id as string, [...(byProfile.get(s.profile_id as string) ?? []), s]);
@@ -51,8 +54,10 @@ export async function webPushMany(items: WebPushItem[]): Promise<number> {
         else console.error('web push failed', code ?? (e as Error).message);
       }
     })));
-    if (dead.length) await admin.from('web_push_subscriptions').delete().in('endpoint', dead);
-    if (ok.length) await admin.from('web_push_subscriptions').update({ last_ok_at: new Date().toISOString() }).in('endpoint', [...new Set(ok)]);
+    // Endpoints are long URLs (~200 chars): small .in() lists keep the request URL short.
+    for (const part of chunk(dead, 20)) await admin.from('web_push_subscriptions').delete().in('endpoint', part);
+    const at = new Date().toISOString();
+    for (const part of chunk([...new Set(ok)], 20)) await admin.from('web_push_subscriptions').update({ last_ok_at: at }).in('endpoint', part);
     return sent;
   } catch (e) {
     console.error('webPushMany', e);

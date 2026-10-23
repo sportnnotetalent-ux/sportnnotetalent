@@ -57,6 +57,8 @@ import { rugbyFormation, RugbyPitch } from './pitch';
 import { usePendingEdit } from '../usePendingEdit';
 import { BackfillBar, RowAction, confirmRemove } from '../TimelineControls';
 import { rugbyVoice, rugbyVoiceEnds, rugbyLast } from './voice';
+import { RUGBY_META } from './meta';
+import { rugbyMatchRecords } from './records';
 
 const uid = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 const BASE_TRACKED: string[] = LIVE_KEYS.filter((k) => k !== 'soTaken' && k !== 'soGoals');
@@ -747,10 +749,8 @@ const RugbyStats = ({ state, homeName, awayName, homeColor, awayColor, homeRoste
 /* --------------------------------- plugin ---------------------------------- */
 
 export const rugbyPlugin: SportPlugin<RugbyState> = {
-  id: 'rugby',
-  name: 'Rugby',
-  icon: '🏉',
-  archetype: 'goal-time',
+  ...RUGBY_META,
+  matchRecords: rugbyMatchRecords, // SD-51 (set by the registry before perf F-15)
   createInitialState: init,
   reducer,
   isComplete,
@@ -785,37 +785,6 @@ export const rugbyPlugin: SportPlugin<RugbyState> = {
   formation: (perSide) => rugbyFormation(perSide),
   Court: RugbyPitch,
   liveSettings: RUGBY_LIVE_SETTINGS,
-  formatFields: [
-    {
-      key: 'preset', label: 'Format', type: 'preset', default: 'senior', onCreate: true,
-      options: [
-        ...Object.entries(RUGBY_PRESETS).map(([value, p]) => ({ value, label: p.label, set: p.set })),
-        { value: 'custom', label: 'Custom' },
-      ],
-    },
-    { key: 'playersPerSide', label: 'Players per side', type: 'count', default: 15, min: 7, max: 15, advanced: true },
-    { key: 'periodMinutes', label: 'Minutes per half', type: 'number', default: 40, min: 1, max: 40, advanced: true },
-    { key: 'sinBinMinutes', label: 'Yellow card (sin-bin) minutes', type: 'number', default: 10, min: 1, max: 10, advanced: true, hint: 'Law 9: 10 · sevens: 2' },
-    { key: 'maxSubs', label: 'Replacements allowed (0 = no limit)', type: 'number', default: 8, min: 0, max: 30, advanced: true },
-    { key: 'rolling', label: 'Rolling replacements (age-grade)', type: 'toggle', default: false, advanced: true, hint: 'a replaced player may come back on' },
-    { key: 'red20', label: '20-minute red card (World Rugby trial)', type: 'toggle', default: false, advanced: true, hint: 'the scorer can give a 20-minute red: replaceable after 20 minutes; two yellows = a 20-minute red' },
-    { key: 'trackDetail', label: 'Track tackles, carries and set pieces', type: 'toggle', default: false, advanced: true },
-    ...TRACK_FIELDS.map((f) => ({ ...f, advanced: true })),
-    {
-      key: 'decider', label: 'If level at full time', type: 'choice', default: 'none',
-      options: [
-        { value: 'none', label: 'Draw stands (league)' },
-        { value: 'standard', label: 'Standard knockout (15s: extra time, sudden death, kicks · sevens: sudden death)' },
-        { value: 'et', label: 'Extra time 2 × 10, then 10 min sudden death, then kicks (RWC)' },
-        { value: 'etKicks', label: 'Extra time 2 × 10, then kicks' },
-        { value: 'sd', label: 'Sudden-death periods until someone scores (sevens)' },
-        { value: 'kicks', label: 'Kicking competition straight away' },
-      ],
-      hint: 'a knockout match needs a winner — competition rules differ, so pick yours',
-    },
-    { key: 'etMinutes', label: 'Extra time minutes per half', type: 'number', default: 10, min: 1, max: 20, advanced: true },
-    { key: 'sdMinutes', label: 'Sudden-death period minutes', type: 'number', default: 10, min: 1, max: 20, advanced: true },
-  ],
 };
 
 const c = StyleSheet.create({

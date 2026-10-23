@@ -13,7 +13,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { theme } from '../core/theme';
 import { Card, Button, TextField, SelectChip, ScreenTitle, FormError, textStyles } from '../components/ui';
 import { LogoPicker } from '../components/LogoPicker';
-import { SPORT_LIST } from '../sports/registry';
+import { SPORT_LIST } from '../sports/sportMeta';
 import { useAuth } from '../core/auth';
 import { createClub, getMyPlayerId } from '../data/repos';
 import type { SportId } from '../core/types';

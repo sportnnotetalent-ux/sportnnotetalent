@@ -21,7 +21,7 @@ import { EmptyState, Button, Card, Pill, SelectChip, TextField, ScreenTitle, tex
 import { SectionHeader, SECTION_CAP } from '../components/SectionHeader';
 import { LogoPicker } from '../components/LogoPicker';
 import { DateField } from '../components/DateTimeField';
-import { getSport, SPORT_LIST } from '../sports/registry';
+import { getSportMeta, SPORT_LIST } from '../sports/sportMeta';
 import { useAuth } from '../core/auth';
 import { usePlayers } from '../data/hooks';
 import {
@@ -305,7 +305,7 @@ export default function OrganizationScreen() {
       <Card style={st.eventRow}>
         <View style={{ flex: 1 }}>
           <Text style={textStyles.body} numberOfLines={1}>{t.name}</Text>
-          <Text style={textStyles.muted}>{t.sports.map((s) => getSport(s).icon).join(' ')} · {t.startDate} → {t.endDate}</Text>
+          <Text style={textStyles.muted}>{t.sports.map((s) => getSportMeta(s).icon).join(' ')} · {t.startDate} → {t.endDate}</Text>
         </View>
         <Text style={st.chevron}>›</Text>
       </Card>
@@ -1074,7 +1074,7 @@ function OrgTeams({
               <View style={[st.swatch, { backgroundColor: t.colorHex ?? theme.colors.primary }]} />
               <View style={{ flex: 1 }}>
                 <Text style={textStyles.body}>{t.name} · {t.shortName}</Text>
-                <Text style={textStyles.muted}>{getSport(t.sport).icon} {getSport(t.sport).name} · {t.roster?.length ?? 0} players</Text>
+                <Text style={textStyles.muted}>{getSportMeta(t.sport).icon} {getSportMeta(t.sport).name} · {t.roster?.length ?? 0} players</Text>
               </View>
               {canEdit && (
                 <Text style={st.link} onPress={() => setEditingRoster((v) => (v === t.id ? null : t.id))}>
@@ -1176,7 +1176,7 @@ function RosterEditor({
     <Card style={{ gap: theme.spacing(1) }}>
       <Text style={textStyles.muted}>Tap to add or remove · {roster.length} in squad</Text>
       {eligible.length === 0 ? (
-        <EmptyState icon="👥" title={`No players for ${getSport(team.sport).name} yet`} compact />
+        <EmptyState icon="👥" title={`No players for ${getSportMeta(team.sport).name} yet`} compact />
       ) : (
         eligible.map((p) => {
           const inSquad = roster.includes(p.id);

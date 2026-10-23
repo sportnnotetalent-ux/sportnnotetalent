@@ -8,7 +8,7 @@ import React, { useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, Switch, StyleSheet } from 'react-native';
 import { theme } from '../core/theme';
 import { Card, SelectChip, TextField, textStyles } from './ui';
-import { SPORT_LIST, getSport } from '../sports/registry';
+import { SPORT_LIST, getSportMeta } from '../sports/sportMeta';
 import type { PlayerSearch } from '../data/repos';
 import type { SportId } from '../core/types';
 
@@ -82,7 +82,7 @@ export function PlayerFilters({ value, onChange, cities, sections = ALL_SECTIONS
             <SelectChip key={t} label={`${typeName(t)} ✕`} active onPress={() => set({ types: toggle(value.types, t) })} />
           ))}
           {(value.sports ?? []).map((s) => (
-            <SelectChip key={s} label={`${getSport(s).icon} ${getSport(s).name} ✕`} active onPress={() => set({ sports: toggle(value.sports, s) })} />
+            <SelectChip key={s} label={`${getSportMeta(s).icon} ${getSportMeta(s).name} ✕`} active onPress={() => set({ sports: toggle(value.sports, s) })} />
           ))}
           {(value.cities ?? []).map((c) => (
             <SelectChip key={c} label={`📍 ${c} ✕`} active onPress={() => set({ cities: toggle(value.cities, c) })} />

@@ -34,7 +34,7 @@ const NBA = { regPeriods: 4, foulsToFoulOut: 6, foulsForBonus: 4, techIsTeamFoul
 const OLD_FIBA = { regPeriods: 4, foulsToFoulOut: 5, foulsForBonus: 5 }; // what pre-SD-05 matches stored
 
 describe('SD-05 — presets', () => {
-  const src = readFileSync(new URL('../src/sports/basketball/index.tsx', import.meta.url), 'utf8');
+  const src = (readFileSync(new URL('../src/sports/basketball/index.tsx', import.meta.url), 'utf8') + readFileSync(new URL('../src/sports/basketball/meta.ts', import.meta.url), 'utf8'));
   const preset = (v: string) => src.split('\n').find((l) => l.includes(`value: '${v}'`)) ?? '';
   test('FIBA / NBA / school: penalty after 4 team fouls; FIBA-family flags', () => {
     assert.match(preset('fiba'), /foulsForBonus: 4, techIsTeamFoul: true, otFoulsCarry: true/);

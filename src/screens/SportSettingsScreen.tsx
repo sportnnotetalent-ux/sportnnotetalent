@@ -18,7 +18,7 @@ import { StructureEditor } from '../components/StructureEditor';
 import { PointsEditor } from '../components/PointsEditor';
 import { readDisciplineRule, disciplineRuleText } from '../sports/football/discipline';
 import { SportDisciplineSettings, WalkoverScoreSettings } from '../components/DisciplineSettings';
-import { getSport } from '../sports/registry';
+import { getSportMeta } from '../sports/sportMeta';
 import { structureFromFormat, mergeStructure, shapeForStructure } from '../data/structureConfig';
 import { tournamentDraft } from '../data/tournamentDraft';
 import { useTournamentById } from '../data/hooks';
@@ -33,7 +33,7 @@ export default function SportSettingsScreen() {
   const nav = useNavigation<Nav>();
   const { params } = useRoute<RouteProp<RootStackParamList, 'SportSettings'>>();
   const sport = params.sport;
-  const plugin = getSport(sport);
+  const plugin = getSportMeta(sport);
 
   // Opened from a tournament's admin hub (parity #08): seed the draft from the
   // saved tournament and SAVE this sport directly — only the keys changed here,

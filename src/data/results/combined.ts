@@ -39,6 +39,7 @@ import { barPlan, defaultBar } from './field.ts';
 import { phaseLines, markKey, type PhaseLine } from './athletics.ts';
 import { combinedPoints, combinedEventOf, shortName, type CombinedFormat } from './combinedDefs.ts';
 import { ruleOf } from './competitionRules.ts';
+import { withRecordKeys } from './recordsSet.ts';
 
 export * from './combinedDefs.ts';
 
@@ -360,6 +361,18 @@ export function combinedLines(f: PhaseFormat, rows: CombinedRow[], awards: Award
     if (a && a.points > 0) s.posPoints = a.points;
     return { playerId: r.athleteId, stats: s, won: a?.medal === 'gold' };
   });
+}
+
+/**
+ * Timed races follow-up — every line a locked combined event writes: the last
+ * event's own lines (its marks and points) and the totals. A record the TOTAL
+ * broke (`f.recordsSet`, kept on the last event's phase when it is locked)
+ * goes on its holder's TOTAL line only, as `mrSet` / `srSet` — the event line
+ * is the same athlete's, so it never counts twice. No record → the lines are
+ * exactly what they were before. Shared by the lock and the re-sync.
+ */
+export function combinedFinalLines(f: PhaseFormat, ranked: RankedEntry[], rows: CombinedRow[], awards: Award[] = []): PhaseLine[] {
+  return [...combinedEventLines(f, ranked), ...withRecordKeys(combinedLines(f, rows, awards), f.recordsSet)];
 }
 
 /* ------------------------------------ text ------------------------------------ */

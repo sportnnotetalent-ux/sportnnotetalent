@@ -55,6 +55,8 @@ import { leagueFormation, LeaguePitch } from './pitch';
 import { usePendingEdit } from '../usePendingEdit';
 import { BackfillBar, RowAction, confirmRemove } from '../TimelineControls';
 import { leagueVoice, leagueVoiceEnds, leagueLast } from './voice';
+import { RUGBY_LEAGUE_META } from './meta';
+import { leagueMatchRecords } from './records';
 
 const uid = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 /** the keys this match tracks (the base set + the detail switched on) */
@@ -643,10 +645,8 @@ const LeagueStats = ({ state, homeName, awayName, homeColor, awayColor, homeRost
 /* --------------------------------- plugin ---------------------------------- */
 
 export const rugbyLeaguePlugin: SportPlugin<LeagueState> = {
-  id: 'rugby_league',
-  name: 'Rugby league',
-  icon: '🏉',
-  archetype: 'goal-time',
+  ...RUGBY_LEAGUE_META,
+  matchRecords: leagueMatchRecords, // SD-51 (set by the registry before perf F-15)
   createInitialState: init,
   reducer,
   isComplete,
@@ -673,34 +673,6 @@ export const rugbyLeaguePlugin: SportPlugin<LeagueState> = {
   formation: (perSide) => leagueFormation(perSide),
   Court: LeaguePitch,
   liveSettings: LEAGUE_LIVE_SETTINGS,
-  formatFields: [
-    {
-      key: 'preset', label: 'Format', type: 'preset', default: 'senior', onCreate: true,
-      options: [
-        ...Object.entries(LEAGUE_PRESETS).map(([value, p]) => ({ value, label: p.label, set: p.set })),
-        { value: 'custom', label: 'Custom' },
-      ],
-    },
-    { key: 'playersPerSide', label: 'Players per side', type: 'count', default: 13, min: 9, max: 13, advanced: true },
-    { key: 'periodMinutes', label: 'Minutes per half', type: 'number', default: 40, min: 1, max: 40, advanced: true },
-    { key: 'sinBinMinutes', label: 'Sin bin minutes', type: 'number', default: 10, min: 1, max: 10, advanced: true, hint: 'IRL / NRL: 10 · Nines: 3' },
-    { key: 'maxInterchanges', label: 'Interchanges allowed (0 = unlimited)', type: 'number', default: 8, min: 0, max: 30, advanced: true, hint: 'NRL: 8 · juniors and Nines: unlimited' },
-    { key: 'setTackles', label: 'Tackles in a set', type: 'number', default: 6, min: 3, max: 6, advanced: true, hint: 'the laws: 6 (some Nines events play 5) — used by six-tackle sets' },
-    { key: 'fg2', label: 'Two-point field goal from 40 m (NRL)', type: 'toggle', default: false, advanced: true, hint: 'a successful field goal asks 1 or 2 points' },
-    { key: 'bonusTry', label: 'Bonus try zone (Nines)', type: 'toggle', default: false, advanced: true, hint: 'a try under the posts is worth 5 — the try asks which' },
-    ...TRACK_FIELDS.map((f) => ({ ...f, advanced: true })),
-    {
-      key: 'decider', label: 'If level at full time', type: 'choice', default: 'none',
-      options: [
-        { value: 'none', label: 'Draw stands' },
-        { value: 'gp', label: 'Golden point 2 × 5 min, then the draw stands (NRL / Super League regular season)' },
-        { value: 'gpFinal', label: 'Golden point until someone scores (finals)' },
-      ],
-      hint: 'golden point: the first score of any kind wins at once',
-    },
-    { key: 'gpMinutes', label: 'Golden point period minutes', type: 'number', default: 5, min: 1, max: 10, advanced: true },
-    { key: 'goldenTry', label: 'Golden try: only a try ends extra time (Nines)', type: 'toggle', default: false, advanced: true },
-  ],
 };
 
 const c = StyleSheet.create({

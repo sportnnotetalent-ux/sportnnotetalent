@@ -12,6 +12,8 @@
  * Secrets: CRON_SECRET, RESEND_API_KEY, SUPPORT_EMAIL (recipient).
  */
 import { admin, CORS, json, safeEqual, SERVICE_KEY } from '../_shared/guard.ts';
+// PostgREST stops at 1,000 rows without saying so (a bare .limit(5000) got 1,000): page.
+import { fetchAllPages } from '../_shared/paging.ts';
 
 const CRON_SECRET = Deno.env.get('CRON_SECRET') ?? '';
 const TO = Deno.env.get('SUPPORT_EMAIL') ?? 'sportnnote@gmail.com';
@@ -75,7 +77,8 @@ async function build(): Promise<{ subject: string; text: string }> {
     admin.from('kpi_scorer_retention').select('*').order('cohort', { ascending: false }).limit(8),
     admin.from('kpi_crash_free').select('*').gte('day', week).lt('day', end),
     admin.from('errors_top').select('message, occurrences, users, any_fatal, last_screen, platforms').limit(5),
-    admin.from('support_cases').select('question, tried, handle, app_version, created_at').gte('created_at', fromUtc).lt('created_at', toUtc).order('created_at'),
+    fetchAllPages((from, to) => admin.from('support_cases').select('question, tried, handle, app_version, created_at')
+      .gte('created_at', fromUtc).lt('created_at', toUtc).order('created_at').order('id').range(from, to)),
   ]);
 
   const w = (weekly.data ?? []).find((r: Row) => r.week === week) ?? {};
@@ -133,9 +136,11 @@ async function build(): Promise<{ subject: string; text: string }> {
 async function buildDaily(): Promise<{ subject: string; text: string }> {
   const since = new Date(Date.now() - 24 * 3600_000).toISOString();
   const [events, errors, cases] = await Promise.all([
-    admin.from('analytics_events').select('name, profile_id, props').gte('at', since).limit(5000),
+    // Every event of the day — the counts below must be complete.
+    fetchAllPages((from, to) => admin.from('analytics_events').select('name, profile_id, props').gte('at', since).order('id').range(from, to)),
     admin.from('client_errors').select('message, fatal, screen, platform').gte('at', since).limit(500),
-    admin.from('support_cases').select('question, tried, handle').gte('created_at', since).order('created_at'),
+    fetchAllPages((from, to) => admin.from('support_cases').select('question, tried, handle').gte('created_at', since)
+      .order('created_at').order('id').range(from, to)),
   ]);
   const ev = (events.data ?? []) as Row[];
   const count = (n: string) => ev.filter((e) => e.name === n).length;

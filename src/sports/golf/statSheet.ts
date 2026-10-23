@@ -111,6 +111,9 @@ export function golfStatSheet(me: RoundInput, field: RoundInput[], part: NinePar
     // "Scrambling" once the card has them (older cards keep the old label)
     rate('scr', 'udChances' in M ? 'Scrambling' : 'Scrambling (up & down)', 'scrambles', 'scrambleHoles'),
     rate('ud', 'Up and downs', 'upDowns', 'udChances'),
+    // follow-up — chip-ins (holed from off the green): tracked with up and
+    // downs; the row only once someone on the card or in the field has one
+    (M.chipIns ?? 0) > 0 || withKey('chipIns').some((s) => (s.chipIns ?? 0) > 0) ? count('chip', 'Chip-ins', (s) => s.chipIns ?? 0, 'chipIns') : null,
     rate('sand', 'Sand saves', 'sandSaves', 'sandHoles'),
   ]);
   const putting = keep([

@@ -48,6 +48,8 @@ import { netballFormation, NetballCourt } from './court';
 import { usePendingEdit } from '../usePendingEdit';
 import { BackfillBar, RowAction, confirmRemove } from '../TimelineControls';
 import { netballVoice, netballVoiceEnds, netballLast } from './voice';
+import { NETBALL_META } from './meta';
+import { netballMatchRecords } from './records';
 
 const uid = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 const TRACKED: string[] = [...LIVE_KEYS];
@@ -756,10 +758,8 @@ const NetballStats = ({ state, homeName, awayName, homeColor, awayColor, homeRos
 /* --------------------------------- plugin ---------------------------------- */
 
 export const netballPlugin: SportPlugin<NetballState> = {
-  id: 'netball',
-  name: 'Netball',
-  icon: '🥅',
-  archetype: 'goal-time',
+  ...NETBALL_META,
+  matchRecords: netballMatchRecords, // SD-51 (set by the registry before perf F-15)
   createInitialState: init,
   reducer,
   isComplete,
@@ -798,44 +798,6 @@ export const netballPlugin: SportPlugin<NetballState> = {
   formation: () => netballFormation(),
   Court: NetballCourt,
   liveSettings: NETBALL_LIVE_SETTINGS,
-  formatFields: [
-    {
-      key: 'preset', label: 'Format', type: 'preset', default: 'international', onCreate: true,
-      options: [
-        ...Object.entries(NETBALL_PRESETS).map(([value, p]) => ({ value, label: p.label, set: p.set })),
-        { value: 'custom', label: 'Custom' },
-      ],
-    },
-    { key: 'periods', label: 'Periods', type: 'choice', default: 4, options: [{ value: 4, label: '4 quarters' }, { value: 2, label: '2 halves' }], advanced: true },
-    { key: 'periodMinutes', label: 'Minutes per period', type: 'number', default: 15, min: 1, max: 20, advanced: true },
-    { key: 'suspensionMinutes', label: 'Suspension (minutes of play)', type: 'number', default: 2, min: 1, max: 10, advanced: true, hint: 'World Netball: 2 — check your competition' },
-    { key: 'timeoutsPerHalf', label: 'Team time-outs a half', type: 'count', default: 0, min: 0, max: 3, advanced: true, hint: 'none in the international rules; some leagues allow 2' },
-    { key: 'detail', label: 'Ask for feeds & rebounds', type: 'toggle', default: false, advanced: true, hint: 'goal assists, feeds and rebounds (one more tap a shot)' },
-    // Deep wave — "Stats to track" (the scorer can switch them in ⚙️ Match settings).
-    // Round 2: centre pass receives come on with the International 4 × 15 preset (its `set`).
-    { key: 'trackCpr', label: 'Track centre pass receives', type: 'toggle', default: false, advanced: true, group: 'Stats to track', hint: 'who caught each centre pass (one tap, optional) · on with International 4 × 15' },
-    { key: 'trackGains', label: 'Track gains & pick-ups', type: 'toggle', default: false, advanced: true, group: 'Stats to track', hint: 'deflection with / without gain, pick-ups — gains and gain-to-goal %' },
-    { key: 'trackTurnovers', label: 'Track turnover types', type: 'toggle', default: false, advanced: true, group: 'Stats to track', hint: 'bad pass, footwork, held ball, offside…' },
-    // Deep wave — the 2-point super shot, an organiser rule, off by default.
-    // Round 2: the league presets (engine SUPER_SHOT_PRESETS) or a custom window.
-    // An older format's plain `superShot` toggle still replays (superShotConfig).
-    {
-      key: 'superShotRule', label: '2-point super shots', type: 'choice', default: 'off', advanced: true, options: SUPER_SHOT_RULE_OPTIONS,
-      hint: 'Off in the World Netball rules · Super Netball & UK Super League: 2 from the outer circle, last 5 min of each quarter + extra time · ANZ Premiership: 2 from 3.5 m+, last 5 min of each quarter',
-    },
-    { key: 'ssMinutes', label: 'Custom super-shot window (last N min of a quarter)', type: 'number', default: 5, min: 0, max: 15, advanced: true, hint: 'Custom window only · 0 = the whole quarter' },
-    { key: 'ssExtraTime', label: 'Custom: super shots all through extra time', type: 'toggle', default: false, advanced: true, hint: 'Custom window only' },
-    {
-      key: 'decider', label: 'If level at full time', type: 'choice', default: 'none',
-      options: [
-        { value: 'none', label: 'Draw stands (league)' },
-        { value: 'et', label: 'Extra time, then play on (World Netball)' },
-      ],
-      hint: 'a knockout match needs a winner',
-    },
-    { key: 'etMinutes', label: 'Extra time halves (min)', type: 'choice', default: 7, options: [{ value: 7, label: '2 × 7 (World Netball)' }, { value: 5, label: '2 × 5' }], advanced: true },
-    { key: 'etThen', label: 'Still level after extra time', type: 'choice', default: 'twoGoal', options: [{ value: 'twoGoal', label: 'Play on to a 2-goal lead (World Netball)' }, { value: 'golden', label: 'Golden goal' }], advanced: true },
-  ],
 };
 
 const c = StyleSheet.create({

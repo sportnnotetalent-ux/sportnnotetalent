@@ -13,7 +13,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { theme } from '../core/theme';
 import { Card, Button, TextField, SelectChip, ScreenTitle, FormError, textStyles } from '../components/ui';
 import { SectionHeader, SECTION_CAP } from '../components/SectionHeader';
-import { SPORT_LIST, getSport } from '../sports/registry';
+import { SPORT_LIST, getSportMeta } from '../sports/sportMeta';
 import { createTeam, getMyTeams, getTeamsForOrg } from '../data/repos';
 import { useAuth } from '../core/auth';
 import { useActiveOrg } from '../core/orgContext';
@@ -112,7 +112,7 @@ export default function TeamsScreen() {
         {Object.entries(grouped).map(([sp, list]) => (
           <View key={sp} style={{ gap: theme.spacing(2) }}>
             <SectionHeader
-              title={`${getSport(sp as SportId).icon} ${getSport(sp as SportId).name}`}
+              title={`${getSportMeta(sp as SportId).icon} ${getSportMeta(sp as SportId).name}`}
               count={list.length}
               onSeeAll={list.length > SECTION_CAP ? () => setShowTeams((v) => !v) : undefined}
               expanded={showTeams}
@@ -156,7 +156,7 @@ export default function TeamsScreen() {
                 <Card style={st.teamRow}>
                   <View style={[st.dot, { backgroundColor: t.colorHex }]} />
                   <Text style={[textStyles.body, { flex: 1 }]}>{teamLabel(t)}</Text>
-                  <Text style={textStyles.muted}>{getSport(t.sport as SportId).icon} {t.shortName}</Text>
+                  <Text style={textStyles.muted}>{getSportMeta(t.sport as SportId).icon} {t.shortName}</Text>
                   <Text style={st.chev}>›</Text>
                 </Card>
               </TouchableOpacity>

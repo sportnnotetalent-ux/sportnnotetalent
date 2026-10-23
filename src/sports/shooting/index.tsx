@@ -12,6 +12,7 @@ import { View, Text } from 'react-native';
 import { theme } from '../../core/theme';
 import { textStyles } from '../../components/ui';
 import type { SportPlugin } from '../types';
+import { SHOOTING_META } from './meta';
 
 export interface ShootingMatchState { ended: boolean }
 
@@ -23,11 +24,7 @@ const ScoringControls: SportPlugin<ShootingMatchState>['ScoringControls'] = () =
 );
 
 export const shootingPlugin: SportPlugin<ShootingMatchState> = {
-  id: 'shooting',
-  name: 'Shooting',
-  icon: '🎯',
-  archetype: 'measured',
-  participantKind: 'individual',
+  ...SHOOTING_META,
   createInitialState: () => ({ ended: false }),
   reducer: (s) => s,
   isComplete: (s) => s.ended,
@@ -35,15 +32,4 @@ export const shootingPlugin: SportPlugin<ShootingMatchState> = {
   summary: () => ({ homeScore: '', awayScore: '', statusLine: 'Shooting event', detailLine: 'Scores are entered on the event page' }),
   ScoringControls,
   correctable: false,
-  formatFields: [
-    {
-      key: 'pointsScheme', label: 'Position points', type: 'choice', default: '8,7,6,5,4,3,2,1', onCreate: true,
-      hint: 'points each place earns for its house / team; tied places share',
-      options: [
-        { value: '8,7,6,5,4,3,2,1', label: '8-7-6-5-4-3-2-1' },
-        { value: '10,8,6,5,4,3,2,1', label: '10-8-6-5-4-3-2-1' },
-        { value: '5,3,1', label: '5-3-1 (medals only)' },
-      ],
-    },
-  ],
 };

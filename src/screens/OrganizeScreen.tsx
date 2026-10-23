@@ -16,7 +16,7 @@ import { canManageTournament, orgsForPlayer } from '../core/org';
 import { useActiveOrg } from '../core/orgContext';
 import { ContextSwitcher } from '../components/ContextSwitcher';
 import type { OrgRequest } from '../core/types';
-import { getSport } from '../sports/registry';
+import { getSportMeta } from '../sports/sportMeta';
 import { formatDayShort } from '../core/dates';
 import { eventZone, todayIn } from '../core/time';
 import type { RootStackParamList } from '../navigation/types';
@@ -114,6 +114,7 @@ export default function OrganizeScreen() {
           variant="ghost"
           onPress={() => nav.navigate('CreateSeries', {})}
         />
+        <Button label="💌 Invite a friend" variant="ghost" onPress={() => nav.navigate('InviteFriend')} />
         <Button label="📊 Organizer dashboard" variant="ghost" onPress={() => nav.navigate('OrganizerDashboard')} />
         <Text style={textStyles.muted}>
           Open a tournament to schedule its matches or auto-generate fixtures. A friendly is a one-off game — no tournament needed.
@@ -152,7 +153,7 @@ export default function OrganizeScreen() {
                   </Text>
                   <View style={st.tags}>
                     {t.sports.map((s) => (
-                      <Pill key={s} label={`${getSport(s).icon} ${getSport(s).name}`} />
+                      <Pill key={s} label={`${getSportMeta(s).icon} ${getSportMeta(s).name}`} />
                     ))}
                   </View>
                 </Card>

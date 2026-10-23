@@ -30,7 +30,7 @@ export async function shareFallbackWeb(message: string): Promise<'whatsapp' | 'c
   return 'failed';
 }
 
-export async function shareMessage(message: string, what: 'match' | 'tournament' | 'golf' | 'profile' | 'results'): Promise<void> {
+export async function shareMessage(message: string, what: 'match' | 'tournament' | 'golf' | 'profile' | 'results' | 'invite'): Promise<void> {
   const web = Platform.OS === 'web' && typeof navigator !== 'undefined';
   try {
     if (web && typeof (navigator as { share?: unknown }).share !== 'function') {

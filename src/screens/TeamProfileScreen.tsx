@@ -14,7 +14,7 @@ import { EmptyState, Card, Pill, Button, LoadingState, ScreenTitle, SelectChip, 
 import { useParamState } from '../navigation/useParamState';
 import { MatchCard } from '../components/MatchCard';
 import { SectionHeader, SECTION_CAP } from '../components/SectionHeader';
-import { getSport } from '../sports/registry';
+import { getSportMeta } from '../sports/sportMeta';
 import { useAuth } from '../core/auth';
 import { canScoreByRole } from '../core/roles';
 import { useTeamSummary, useMatches, usePlayers, useFollow, useTeamPermission } from '../data/hooks';
@@ -204,7 +204,7 @@ export default function TeamProfileScreen() {
             <Text style={textStyles.h2}>{team.name}</Text>
             <View style={st.tags}>
               {team.sports.map((s) => (
-                <Pill key={s} label={`${getSport(s).icon} ${getSport(s).name}`} />
+                <Pill key={s} label={`${getSportMeta(s).icon} ${getSportMeta(s).name}`} />
               ))}
             </View>
           </View>
@@ -226,11 +226,11 @@ export default function TeamProfileScreen() {
 
         {/* ── Stats ── */}
         <View onLayout={(e) => setStatsY(e.nativeEvent.layout.y)} style={{ gap: theme.spacing(3) }}>
-          {!(stats.played === 0 && hasEventResults) && <Text style={[textStyles.h3, st.section]}>Stats{sport && sportsPlayed.length === 1 ? ` · ${getSport(sport).icon} ${getSport(sport).name}` : ''}</Text>}
+          {!(stats.played === 0 && hasEventResults) && <Text style={[textStyles.h3, st.section]}>Stats{sport && sportsPlayed.length === 1 ? ` · ${getSportMeta(sport).icon} ${getSportMeta(sport).name}` : ''}</Text>}
           {sportsPlayed.length > 1 && (
             <View style={st.tags}>
               {sportsPlayed.map((sp) => (
-                <SelectChip key={sp} label={`${getSport(sp).icon} ${getSport(sp).name}`} active={sp === sport} onPress={() => setStatSport(sp)} />
+                <SelectChip key={sp} label={`${getSportMeta(sp).icon} ${getSportMeta(sp).name}`} active={sp === sport} onPress={() => setStatSport(sp)} />
               ))}
             </View>
           )}
@@ -377,8 +377,8 @@ export default function TeamProfileScreen() {
             <Text style={[textStyles.h3, st.section]}>Record by sport</Text>
             {records.map(({ sport, row }) => (
               <Card key={sport} style={st.recordRow}>
-                <Text style={st.recordIcon}>{getSport(sport).icon}</Text>
-                <Text style={[textStyles.body, { flex: 1 }]}>{getSport(sport).name}</Text>
+                <Text style={st.recordIcon}>{getSportMeta(sport).icon}</Text>
+                <Text style={[textStyles.body, { flex: 1 }]}>{getSportMeta(sport).name}</Text>
                 <Text style={textStyles.muted}>{recordText(row!.won, row!.drawn, row!.lost, row!.nr, tableLabels(sport))}</Text>
                 <Text style={st.recordPts}>{row!.points} pts</Text>
               </Card>
@@ -412,7 +412,7 @@ export default function TeamProfileScreen() {
                 </View>
                 <View style={{ flex: 1, gap: 4 }}>
                   <Text style={textStyles.body}>{p.fullName}{p.jerseyNo ? ` · #${p.jerseyNo}` : ''}{p.invited ? '  ⏳' : ''}</Text>
-                  <Text style={textStyles.muted}>{p.invited ? 'Invited · hasn’t joined yet' : p.sports.map((s) => getSport(s).icon).join(' ')}</Text>
+                  <Text style={textStyles.muted}>{p.invited ? 'Invited · hasn’t joined yet' : p.sports.map((s) => getSportMeta(s).icon).join(' ')}</Text>
                   {p.invited && p.phone ? <RemindInstall playerId={p.id} name={p.fullName} phone={p.phone} teamName={team.name} /> : null}
                 </View>
               </Card>

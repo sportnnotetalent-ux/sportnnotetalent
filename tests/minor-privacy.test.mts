@@ -136,10 +136,25 @@ describe('alert senders: follows of minors', () => {
     assert.equal(keepAllowedFollows(rows, null).length, 3);
   });
   test('rpc: missing function → null; other error → none (fail closed); ok → pairs', async () => {
-    const client = (res: { data: unknown; error: { code?: string; message?: string } | null }) => ({ rpc: async () => res });
+    // the rpc builder is ordered + ranged (paged past the 1,000-row cap)
+    const client = (res: { data: unknown; error: { code?: string; message?: string } | null }) => {
+      const q = { order: () => q, range: async () => res as { data: { follower_id: string; target_id: string }[] | null; error: { code?: string; message?: string } | null } };
+      return { rpc: () => q };
+    };
     assert.equal(await allowedPlayerFollows(client({ data: null, error: { code: 'PGRST202', message: 'Could not find the function public.allowed_player_follows' } }), ['kid']), null);
     assert.deepEqual(await allowedPlayerFollows(client({ data: null, error: { code: '57014', message: 'timeout' } }), ['kid']), []);
     assert.deepEqual(await allowedPlayerFollows(client({ data: [{ follower_id: 'coach', target_id: 'kid' }], error: null }), ['kid']), [{ follower_id: 'coach', target_id: 'kid' }]);
     assert.deepEqual(await allowedPlayerFollows(client({ data: null, error: null }), []), []);
+  });
+  test('rpc: every allowed pair, past the server\'s 1,000-row cap', async () => {
+    const pairs = Array.from({ length: 2500 }, (_, i) => ({ follower_id: `f${String(i).padStart(4, '0')}`, target_id: 'star' }));
+    const ranges: [number, number][] = [];
+    const q = {
+      order: () => q,
+      range: async (from: number, to: number) => { ranges.push([from, to]); return { data: pairs.slice(from, Math.min(to + 1, from + 1000)), error: null }; },
+    };
+    const got = await allowedPlayerFollows({ rpc: () => q }, ['star']);
+    assert.equal(got!.length, 2500);
+    assert.deepEqual(ranges, [[0, 999], [1000, 1999], [2000, 2999]]);
   });
 });

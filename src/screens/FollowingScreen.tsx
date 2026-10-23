@@ -13,7 +13,7 @@ import { useAuth } from '../core/auth';
 import { useFollow, usePlayers, useTeams } from '../data/hooks';
 import { getTournaments } from '../data/repos';
 import type { Tournament } from '../core/types';
-import { getSport } from '../sports/registry';
+import { getSportMeta } from '../sports/sportMeta';
 import type { RootStackParamList } from '../navigation/types';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -78,7 +78,7 @@ export default function FollowingScreen() {
                 <View style={[st.dot, { backgroundColor: t.colorHex ?? theme.colors.surfaceAlt }]} />
                 <View style={{ flex: 1 }}>
                   <Text style={textStyles.body}>{t.name}</Text>
-                  <Text style={textStyles.muted}>{getSport(t.sport).icon} {getSport(t.sport).name}</Text>
+                  <Text style={textStyles.muted}>{getSportMeta(t.sport).icon} {getSportMeta(t.sport).name}</Text>
                 </View>
                 <Unfollow onPress={() => toggle('team', t.id)} />
                 <FollowBell type="team" id={t.id} name={t.name} />

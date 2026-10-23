@@ -61,7 +61,7 @@ Ground rules kept: entering a result is as fast as before; every new capture is 
   - A re-sync rewrites the same keys from the phase. Reopening removes them with the lines.
 - **Decision:** only a record that stood and was beaten counts. The first mark in an empty book starts the book; it is not "setting a record". This matches the results sheet (no MR / SR flag for it) and the commentary.
 - **Profiles** (athletics, swimming, rowing, canoe, cycling): "🏆 2 meet records · 1 school record set", with each record opening its final (newest first). The results history rows show MR / SR. Stat schemas declare `mrSet` / `srSet` ("Meet records set" / "School records set", hidden at zero).
-- Not done: combined-event totals (the total line and the last event's line belong to the same athlete; a follow-up). Precision sports are left to their owner: their records carry the ids too, but no line keys are written.
+- Not done in this round: combined-event totals (the total line and the last event's line belong to the same athlete). Built later as a follow-up; see Follow-ups. Precision sports are left to their owner: their records carry the ids too, but no line keys are written.
 - **Code:** `src/data/results/recordsSet.ts`, `records.ts` (`recordHolderIds`), `resultsStore.ts` (`completeFinal` / `finalLinesFor`) and `components/results/RecordsSetCard.tsx`.
 
 ## 5. "Stats to track": meet-wide and per event
@@ -105,6 +105,14 @@ Ground rules kept: entering a result is as fast as before; every new capture is 
 
 ## Follow-ups
 
-- Records set for combined-event totals; a "records held" view (standing records) from the book's holder ids.
+- ~~Records set for combined-event totals; a "records held" view (standing records) from the book's holder ids.~~ Built 2026-10-23:
+  - **Combined totals.** Locking the last event keeps the records the TOTAL broke on that phase (`recordsSet`): the meet record, and the school record against the book the official saw (the screen now passes `srBook`).
+  - `combinedFinalLines` puts `mrSet` / `srSet` on the holder's **total** line only. The last event's line is the same athlete's, so it never counts twice. A re-sync writes the same lines.
+  - The career lists the record as the combined event, e.g. "Meet record — Pentathlon U16 Girls, 3412 pts".
+  - The rule is the same as for single events: only a record that stood and was beaten counts.
+  - **Records held.** The "Records set" card now says which of those records still stand: "… set · 1 still held", and "· still held" / "· beaten since" on each record.
+  - A meet record is checked against that meet's book, and a school record against the host organisation's school book now (`getRecordsHeld` → `recordsSetBy` / `stillHeld`). Each check matches the holder's id and the mark.
+  - Only the books of meets where the athlete set a record are read, so an athlete with none causes no query. A book that can't be read says nothing.
+  - **Decision:** "held" means held among the records the athlete *set*. A mark that only started an empty book isn't shown as held, matching "records set" and the results sheet. *Alternative:* list every book entry naming them, which is a small change in `getRecordsHeld`.
 - Make heat-win and PB pushes an organiser option per meet (on by default now).
 - Precision sports (weightlifting, shooting, archery) could opt into `mrSet` / `srSet` and highlights; their owner decides.

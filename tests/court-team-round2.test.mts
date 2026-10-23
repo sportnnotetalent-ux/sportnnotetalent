@@ -132,7 +132,7 @@ describe('round 2 · basketball: shot-zone buttons are the default layout for a 
     assert.equal(scoringLayout(old), 'plain');
     assert.equal(scoringLayout(init({ trackZones: false })), 'plain');
   });
-  const src = readFileSync(new URL('../src/sports/basketball/index.tsx', import.meta.url), 'utf8');
+  const src = (readFileSync(new URL('../src/sports/basketball/index.tsx', import.meta.url), 'utf8') + readFileSync(new URL('../src/sports/basketball/meta.ts', import.meta.url), 'utf8'));
   test('the format offers the switch back without Customize; no preset overrides it; the controls read scoringLayout', () => {
     const line = src.split('\n').find((l) => l.includes("{ key: 'trackZones', label: 'Shot-zone scoring buttons'"));
     assert.ok(line && !line.includes('advanced: true'), 'shown in the format card');
@@ -210,7 +210,7 @@ describe('round 2 · netball: 2-point super shots as organiser presets (default 
     assert.equal(superShotText(nbInit({ superShotRule: 'ssn' })).name, 'Super shot');
     assert.deepEqual(superShotText(nbInit({ superShot: true })), { name: 'Super shot', zone: 'the super-shot zone' });
   });
-  const src = readFileSync(new URL('../src/sports/netball/index.tsx', import.meta.url), 'utf8');
+  const src = (readFileSync(new URL('../src/sports/netball/index.tsx', import.meta.url), 'utf8') + readFileSync(new URL('../src/sports/netball/meta.ts', import.meta.url), 'utf8'));
   test('the format: one choice (default off) with the presets; the custom window fields; no plain toggle any more', () => {
     assert.match(src, /key: 'superShotRule', label: '2-point super shots', type: 'choice', default: 'off', advanced: true, options: SUPER_SHOT_RULE_OPTIONS/);
     assert.match(src, /key: 'ssMinutes'/);

@@ -27,6 +27,8 @@ import { forfeitFor, walkoverFormatFor, isWalkover, WALKOVER_SCORE_SPORTS } from
 import { isLiveTournament } from './tournamentForm';
 import { myPlayerIdMemo } from './myPlayerIdMemo';
 import { readCache } from './readCache';
+// Reads past PostgREST's 1,000-row cap: page with a stable order, chunk long `.in()` lists.
+import { fetchAllPages, fetchAllChunked, chunk, ID_CHUNK } from './paging';
 import {
   orSafe, parseVsQuery, rankByName, filterByName, capIds, collapseTeams, liveOnly, selectMatchHits, matchNames, narrowBySports,
   isSearchable, SEARCH_LIMIT, SEARCH_ID_CAP, type TeamHit, type SearchResults, type SearchKind,
@@ -71,7 +73,7 @@ import {
 import { emptyFormation, defaultFormationFor } from '../sports/football/formation';
 import { isSoleActiveOwner } from '../core/org';
 import { joinBlockReason } from '../core/registration';
-import { getSport } from '../sports/registry';
+import { getSport, loadSport, loadSports } from '../sports/registry';
 import { replayLog } from '../sports/amend';
 import type { StatTotalsContext } from '../sports/types';
 import { mergeMatchConfig } from '../core/matchConfig';
@@ -185,6 +187,16 @@ const toTeam = (r: TeamRow): Team => ({
   adhoc: r.adhoc ?? undefined,
   ...(r.level ? { level: r.level } : {}),
 });
+
+/** Perf F-15 — sport plugins load on demand, and reading a match needs its
+ *  sport's plugin when the match has been played (its result comes from the
+ *  stored state; a played match's set / card lines show on screen). A
+ *  scheduled match needs none. Load those sports before rows become Matches,
+ *  so every Match the data layer hands out can be shown straight away. */
+const readsPlugin = (m: { state?: unknown; status?: string }) => m.state != null || m.status === 'completed' || m.status === 'live';
+function loadMatchSports(ms: readonly { sport: string; state?: unknown; status?: string }[]): Promise<void> {
+  return loadSports(ms.filter(readsPlugin).map((m) => m.sport));
+}
 
 /** A completed match's result, derived from its stored sport state via the sport
  *  plugin — the source of truth for winner + score. Defensive: a malformed state
@@ -368,8 +380,8 @@ async function cachedRows<T>(key: string, load: () => Promise<T | typeof NOT_CAC
 // switcher), and every focus asked again — one cached read serves them all.
 async function sharedTournamentsRead(): Promise<Tournament[]> {
   const rows = await cachedRows<any[]>('tournaments', async () => {
-    const { data, error } = await withTournamentCols<any[]>((cols) =>
-      supabase!.from('tournaments').select(cols).order('start_date', { ascending: false }));
+    const { data, error } = await withTournamentCols<any[]>((cols) => fetchAllPages((from, to) =>
+      supabase!.from('tournaments').select(cols).order('start_date', { ascending: false }).order('id').range(from, to)));
     return error || !data ? NOT_CACHED : data;
   });
   return (rows ?? []).map(toTournament);
@@ -501,8 +513,9 @@ async function liveScopeIds(profileId: string, pid: string | null): Promise<Scop
   const hostOr = [`organizer_id.eq.${profileId}`, ...(pid ? [`host_ids.cs.{${pid}}`] : []), ...(adminOrgs.length ? [`host_org_id.in.(${adminOrgs.join(',')})`] : [])];
   const teamList = [...teams];
   const [hostedRes, entriesRes] = await Promise.all([
-    sb.from('tournaments').select('id').or(hostOr.join(',')),
-    teamList.length ? sb.from('tournament_teams').select('tournament_id').in('team_id', teamList) : Promise.resolve({ data: [] }),
+    fetchAllPages((from, to) => sb.from('tournaments').select('id').or(hostOr.join(',')).order('id').range(from, to)),
+    fetchAllChunked(teamList, (part, from, to) => sb.from('tournament_teams').select('tournament_id, team_id').in('team_id', part)
+      .order('team_id').order('tournament_id').range(from, to)),
   ]);
   return {
     teams: teamList, managed: [...managed], clubs, managedClubs: [...adminClubs],
@@ -540,7 +553,8 @@ async function demoScope(profileId: string | undefined, pid: string | null): Pro
 /** Ids of soft-deleted tournaments (parity #09); none before migration 0041. */
 async function deletedTournamentIds(): Promise<Set<string>> {
   if (!isSupabaseConfigured || !supabase) return new Set(demo.tournaments.filter((t) => !isLiveTournament(t)).map((t) => t.id));
-  const { data, error } = await supabase.from('tournaments').select('id').not('deleted_at', 'is', null);
+  const { data, error } = await fetchAllPages((from, to) =>
+    supabase!.from('tournaments').select('id').not('deleted_at', 'is', null).order('id').range(from, to));
   if (error || !data) return new Set();
   return new Set((data as { id: string }[]).map((r) => r.id));
 }
@@ -570,19 +584,21 @@ async function readMatches(opts: { sport?: SportId; after?: number }): Promise<M
       : m);
     let all = [...demo.matches].sort((a, b) => a.startsAt.localeCompare(b.startsAt)).filter(visibleAfterDelete(deleted)).map(withLv);
     if (after !== undefined) all = all.filter((m) => new Date(m.startsAt).getTime() > after);
-    return sport ? all.filter((m) => m.sport === sport) : all;
+    if (sport) all = all.filter((m) => m.sport === sport);
+    await loadMatchSports(all);
+    return all;
   }
   // Perf F-09: the deleted-tournament ids and the matches are read in parallel
   // (they were two sequential round trips).
   const load = async (): Promise<{ rows: MatchRow[]; deleted: string[] } | typeof NOT_CACHED> => {
     const [deleted, { data, error }] = await Promise.all([
       deletedTournamentIds(),
-      withMatchCols<unknown[]>((cols) => {
-        let q = supabase!.from('matches').select(cols).order('starts_at', { ascending: true });
+      withMatchCols<unknown[]>((cols) => fetchAllPages((from, to) => {
+        let q = supabase!.from('matches').select(cols);
         if (sport) q = q.eq('sport', sport);
         if (after !== undefined) q = q.gt('starts_at', new Date(after).toISOString());
-        return q;
-      }),
+        return q.order('starts_at', { ascending: true }).order('id').range(from, to);
+      })),
     ]);
     if (error || !data) return NOT_CACHED;
     return { rows: data as unknown as MatchRow[], deleted: [...deleted] };
@@ -593,13 +609,19 @@ async function readMatches(opts: { sport?: SportId; after?: number }): Promise<M
     ? await cachedRows(`matches:${sport ?? '*'}`, load)
     : await load().then((r) => (r === NOT_CACHED ? null : r));
   if (!res) return [];
+  await loadMatchSports(res.rows);
   return res.rows.map(toMatch).filter(visibleAfterDelete(new Set(res.deleted)));
 }
 
 export async function getMatch(id: string): Promise<Match | null> {
-  if (!isSupabaseConfigured || !supabase) return demo.matches.find((m) => m.id === id) ?? null;
+  if (!isSupabaseConfigured || !supabase) {
+    const m = demo.matches.find((x) => x.id === id) ?? null;
+    if (m) await loadMatchSports([m]);
+    return m;
+  }
   const { data, error } = await withMatchCols<unknown>((cols) => supabase!.from('matches').select(cols).eq('id', id).single());
   if (error || !data) return null;
+  await loadMatchSports([data as unknown as MatchRow]);
   return toMatch(data as unknown as MatchRow);
 }
 
@@ -619,9 +641,11 @@ export async function getTeamRosters(teamIds: string[]): Promise<Map<string, str
     }
     return out;
   }
+  // Callers pass every team of every match — chunked (URL) and paged (members).
   const [{ data: teamsData }, { data: memberData }] = await Promise.all([
-    supabase.from('teams').select('id, roster').in('id', teamIds),
-    supabase.from('team_members').select('team_id, player_id').in('team_id', teamIds),
+    fetchAllChunked(teamIds, (part, from, to) => supabase!.from('teams').select('id, roster').in('id', part).order('id').range(from, to)),
+    fetchAllChunked(teamIds, (part, from, to) => supabase!.from('team_members').select('team_id, player_id').in('team_id', part)
+      .order('team_id').order('player_id').range(from, to)),
   ]);
   for (const r of (teamsData ?? []) as { id: string; roster: string[] | null }[]) out.set(r.id, [...(r.roster ?? [])]);
   for (const r of (memberData ?? []) as { team_id: string; player_id: string }[]) {
@@ -636,17 +660,31 @@ export async function getTeamRosters(teamIds: string[]): Promise<Map<string, str
  *  (one read; none when the scope is empty). Demo: getScopedMatches reads all. */
 async function getMatchesForScope(scope: MyScope): Promise<Match[]> {
   if (!isSupabaseConfigured || !supabase) return [];
-  const tours = [...scope.hostedTournamentIds, ...scope.officiatingTournamentIds];
-  const teams = [...scope.teamIds];
-  const ors = [
-    ...(tours.length ? [`tournament_id.in.(${tours.join(',')})`] : []),
-    ...(teams.length ? [`home_team_id.in.(${teams.join(',')})`, `away_team_id.in.(${teams.join(',')})`] : []),
-  ];
-  if (!ors.length) return [];
-  const { data, error } = await withMatchCols<unknown[]>((cols) =>
-    supabase!.from('matches').select(cols).or(ors.join(',')).order('starts_at', { ascending: true }));
-  if (error || !data) return [];
-  return (data as unknown as MatchRow[]).map(toMatch);
+  const tours = chunked([...new Set([...scope.hostedTournamentIds, ...scope.officiatingTournamentIds])]);
+  const teams = chunked([...scope.teamIds]);
+  // One paged read per slice of the id lists (one read, as before, up to 100 of
+  // each) — a big organiser's lists would otherwise overrun the URL.
+  const out: MatchRow[] = [];
+  const slices = Math.max(tours.length, teams.length);
+  for (let i = 0; i < slices; i++) {
+    const tp = tours[i] ?? [];
+    const mp = teams[i] ?? [];
+    const ors = [
+      ...(tp.length ? [`tournament_id.in.(${tp.join(',')})`] : []),
+      ...(mp.length ? [`home_team_id.in.(${mp.join(',')})`, `away_team_id.in.(${mp.join(',')})`] : []),
+    ];
+    const { data, error } = await withMatchCols<unknown[]>((cols) => fetchAllPages((from, to) =>
+      supabase!.from('matches').select(cols).or(ors.join(',')).order('starts_at', { ascending: true }).order('id').range(from, to)));
+    if (error || !data) return [];
+    out.push(...(data as unknown as MatchRow[]));
+  }
+  // (Wave 3) the sports of these matches load before Match objects are handed out
+  await loadMatchSports(out);
+  if (slices <= 1) return out.map(toMatch);
+  // Slices can overlap (a hosted tournament's match of one of their teams): once each, kickoff order.
+  const byId = new Map(out.map((r) => [r.id, r] as const));
+  const at = (r: MatchRow) => new Date(r.starts_at).getTime();
+  return [...byId.values()].sort((a, b) => at(a) - at(b) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)).map(toMatch);
 }
 
 /** Split all matches into the signed-in user's two views:
@@ -658,7 +696,9 @@ async function getMatchesForScope(scope: MyScope): Promise<Match[]> {
 export async function getScopedMatches(profileId?: string): Promise<{ mine: Match[]; feed: Match[] }> {
   // Perf F-09(4): one round trip (home_feed) when the database has it; it applies
   // the rule below on the server, through the same RLS. Else the reads below.
-  const [homeFeed, scope] = await Promise.all([profileId ? readHomeFeed() : Promise.resolve(null), getMyScope(profileId)]);
+  // (perf F-15: the feed's sport plugins load while the scope is read)
+  const feedRows = async () => { const f = await readHomeFeed(); if (f) await loadMatchSports(f.matches); return f; };
+  const [homeFeed, scope] = await Promise.all([profileId ? feedRows() : Promise.resolve(null), getMyScope(profileId)]);
   // The shared "mine" rule (getMyScope) on top of the per-match one: matches of
   // a tournament they host (incl. through their org) or officiate, and of any
   // team that's theirs (incl. one they captain / run but aren't rostered on).
@@ -749,7 +789,11 @@ export async function getTeams(sport?: SportId): Promise<Team[]> {
     return sport ? demo.teams.filter((t) => t.sport === sport) : demo.teams;
   }
   // SD-154: with the team level when the column is there (else the old columns)
-  const run = (cols: string) => { let q = supabase!.from('teams').select(cols).order('name'); if (sport) q = q.eq('sport', sport); return q; };
+  const run = (cols: string) => fetchAllPages((from, to) => {
+    let q = supabase!.from('teams').select(cols);
+    if (sport) q = q.eq('sport', sport);
+    return q.order('name').order('id').range(from, to);
+  });
   let res = teamLevelMissing ? null : await run('id,name,short_name,sport,color_hex,org_id,club_id,roster,level');
   if (!res || res.error) { if (res) teamLevelMissing = true; res = await run('id,name,short_name,sport,color_hex,org_id,roster'); }
   const { data, error } = res;
@@ -757,9 +801,8 @@ export async function getTeams(sport?: SportId): Promise<Team[]> {
   return (data as unknown as TeamRow[]).map(toTeam);
 }
 
-/** `in()` lists are chunked so a long id list never makes an oversized URL. */
-const ID_CHUNK = 100;
-const chunked = <T,>(xs: T[]): T[][] => { const out: T[][] = []; for (let i = 0; i < xs.length; i += ID_CHUNK) out.push(xs.slice(i, i + ID_CHUNK)); return out; };
+/** `in()` lists are chunked so a long id list never makes an oversized URL (data/paging.ts). */
+const chunked = <T,>(xs: T[]): T[][] => chunk(xs, ID_CHUNK);
 
 /** The signed-in person's per-sport teams (getMyScope): ones they play on,
  *  captain, run, created, or that belong to their club. `managedOnly`: just the
@@ -779,36 +822,6 @@ export async function getMyTeams(profileId?: string, opts: { managedOnly?: boole
     if (!res.error && res.data) out.push(...(res.data as unknown as TeamRow[]).map(toTeam));
   }
   return out.sort((a, b) => a.name.localeCompare(b.name));
-}
-
-/** getTeamLeaders for many teams in one read (perf F-08c: the reminder engine
- *  made one request per team every minute). Same value per id as getTeamLeaders,
- *  including for ids that don't resolve. */
-export async function getTeamLeadersMany(teamIds: string[]): Promise<Record<string, TeamLeadership>> {
-  const ids = [...new Set(teamIds)];
-  const out: Record<string, TeamLeadership> = {};
-  if (!ids.length) return out;
-  if (!isSupabaseConfigured || !supabase) {
-    for (const id of ids) out[id] = await getTeamLeaders(id);
-    return out;
-  }
-  type Row = { id: string; captain_id: string | null; vice_captain_id: string | null; admin_ids?: string[] | null };
-  const rows: Row[] = [];
-  let withAdmins = true;
-  for (const part of chunked(ids)) {
-    // admin_ids arrives with migration 0042 — before it, adminIds stays undefined.
-    let res: { data: unknown; error: unknown } | null = withAdmins ? await supabase.from('teams').select('id, captain_id, vice_captain_id, admin_ids').in('id', part) : null;
-    if (!res || res.error) { withAdmins = false; res = await supabase.from('teams').select('id, captain_id, vice_captain_id').in('id', part); }
-    rows.push(...((res.data ?? []) as Row[]));
-  }
-  const byId = new Map(rows.map((r) => [r.id, r]));
-  for (const id of ids) {
-    const d = byId.get(id);
-    out[id] = withAdmins
-      ? { captainId: d?.captain_id ?? undefined, viceCaptainId: d?.vice_captain_id ?? undefined, adminIds: d ? (d.admin_ids ?? []) : undefined }
-      : { captainId: d?.captain_id ?? undefined, viceCaptainId: d?.vice_captain_id ?? undefined };
-  }
-  return out;
 }
 
 /** A team's captain & vice-captain (responsible for the matchday squad). */
@@ -957,7 +970,7 @@ export async function getTeamsSetup(teamIds: string[]): Promise<Record<string, {
   if (!isSupabaseConfigured || !supabase) {
     captains = new Set(teamIds.filter((id) => !!demo.teamLeaders[id]?.captainId));
   } else {
-    const { data } = await supabase.from('teams').select('id, captain_id').in('id', teamIds);
+    const { data } = await fetchAllChunked(teamIds, (part, from, to) => supabase!.from('teams').select('id, captain_id').in('id', part).order('id').range(from, to));
     captains = new Set(((data ?? []) as { id: string; captain_id: string | null }[]).filter((r) => r.captain_id).map((r) => r.id));
   }
   for (const id of teamIds) out[id] = { hasCaptain: captains.has(id), players: rosters.get(id)?.length ?? 0 };
@@ -1073,7 +1086,8 @@ export async function getPlayers(): Promise<Player[]> {
   if (!isSupabaseConfigured || !supabase) return demo.players;
   // Perf F-19: through the short-lived read cache (emptied by any write).
   const rows = await cachedRows<PlayerRow[]>('players', async () => {
-    const { data, error } = await readPlayers((cols) => supabase!.from(PLAYERS_READ).select(cols).order('full_name'));
+    const { data, error } = await readPlayers((cols) => fetchAllPages((from, to) =>
+      supabase!.from(PLAYERS_READ).select(cols).order('full_name').order('id').range(from, to)));
     return error || !data ? NOT_CACHED : (data as PlayerRow[]);
   });
   return (rows ?? []).map(toPlayer);
@@ -1136,7 +1150,8 @@ export async function getPlayerStatLines(playerId: string): Promise<StatLine[]> 
   if (!isSupabaseConfigured || !supabase) {
     return demo.statLines.filter((l) => l.playerId === playerId);
   }
-  const { data, error } = await selectStatLines((cols) => supabase!.from('stat_lines').select(cols).eq('player_id', playerId));
+  const { data, error } = await selectStatLines((cols) => fetchAllPages((from, to) =>
+    supabase!.from('stat_lines').select(cols).eq('player_id', playerId).order('id').range(from, to)));
   if (error || !data) return [];
   return (data as StatLineRow[]).map(rowToStatLine);
 }
@@ -1159,7 +1174,8 @@ export async function getStatLinesForMatches(matchIds: string[]): Promise<StatLi
     const set = new Set(matchIds);
     return demo.statLines.filter((l) => set.has(l.matchId));
   }
-  const { data, error } = await selectStatLines((cols) => supabase!.from('stat_lines').select(cols).in('match_id', matchIds));
+  const { data, error } = await selectStatLines((cols) => fetchAllChunked(matchIds, (part, from, to) =>
+    supabase!.from('stat_lines').select(cols).in('match_id', part).order('id').range(from, to)));
   if (error || !data) return [];
   return (data as StatLineRow[]).map(rowToStatLine);
 }
@@ -1171,7 +1187,8 @@ export async function getPlayerNames(ids: string[]): Promise<Map<string, string>
     const set = new Set(ids);
     return new Map(demo.players.filter((p) => set.has(p.id)).map((p) => [p.id, p.fullName]));
   }
-  const { data, error } = await supabase.from(PLAYERS_READ).select('id, full_name').in('id', ids);
+  const { data, error } = await fetchAllChunked(ids, (part, from, to) =>
+    supabase!.from(PLAYERS_READ).select('id, full_name').in('id', part).order('id').range(from, to));
   if (error || !data) return new Map();
   return new Map((data as { id: string; full_name: string }[]).map((r) => [r.id, r.full_name]));
 }
@@ -1327,10 +1344,13 @@ export async function searchMatches(q: string, limit = SEARCH_LIMIT): Promise<Ma
     const { data, error } = await withMatchCols<unknown[]>((cols) => supabase!.from('matches').select(cols)
       .or(ors.join(',')).order('starts_at', { ascending: false }).limit(200));
     if (error) throw new Error('Couldn’t search matches just now.');
+    await loadMatchSports((data ?? []) as unknown as MatchRow[]);
     pool = ((data ?? []) as unknown as MatchRow[]).map(toMatch);
   }
   const hits = selectMatchHits(pool, { a: aIds, b: bIds, tournamentIds: tIds, deletedTournamentIds: deleted });
-  return rankByName(hits, a, matchNames).slice(0, limit);
+  const found = rankByName(hits, a, matchNames).slice(0, limit);
+  if (!isSupabaseConfigured || !supabase) await loadMatchSports(found);
+  return found;
 }
 
 /** Every type at once. A failed type contributes [] (and its message in
@@ -1369,7 +1389,9 @@ export async function getCities(): Promise<string[]> {
   if (!isSupabaseConfigured || !supabase) raw = demo.players.map((p) => p.city);
   else {
     // players_view: a minor's city is only returned to their circle (protect_minors).
-    const { data, error } = await supabase.from(PLAYERS_READ).select('city').not('city', 'is', null).limit(5000);
+    // The intended 5,000 (a bare .limit(5000) came back with the server's 1,000).
+    const { data, error } = await fetchAllPages((from, to) =>
+      supabase!.from(PLAYERS_READ).select('city').not('city', 'is', null).order('id').range(from, to), { maxRows: 5000 });
     if (error || !data) return [];
     raw = data.map((r) => r.city as string | null);
   }
@@ -1392,7 +1414,8 @@ export async function getStatLinesForPlayers(playerIds: string[]): Promise<StatL
     const set = new Set(playerIds);
     return demo.statLines.filter((l) => set.has(l.playerId));
   }
-  const { data, error } = await selectStatLines((cols) => supabase!.from('stat_lines').select(cols).in('player_id', playerIds));
+  const { data, error } = await selectStatLines((cols) => fetchAllChunked(playerIds, (part, from, to) =>
+    supabase!.from('stat_lines').select(cols).in('player_id', part).order('id').range(from, to)));
   if (error || !data) return [];
   return (data as StatLineRow[]).map(rowToStatLine);
 }
@@ -1409,8 +1432,8 @@ export async function getAllStatLines(): Promise<StatLine[]> {
     return heldOut(demo.statLines, openKeys);
   }
   const [{ data, error }, dis] = await Promise.all([
-    selectStatLines((cols) => supabase!.from('stat_lines').select(cols)),
-    supabase.from('match_disputes').select('match_id, player_id').eq('status', 'open'),
+    selectStatLines((cols) => fetchAllPages((from, to) => supabase!.from('stat_lines').select(cols).order('id').range(from, to))),
+    fetchAllPages((from, to) => supabase!.from('match_disputes').select('match_id, player_id').eq('status', 'open').order('id').range(from, to)),
   ]);
   if (error || !data) return [];
   const openKeys = new Set((dis.data ?? []).map((r: { match_id: string; player_id: string }) => `${r.match_id}:${r.player_id}`));
@@ -1479,7 +1502,10 @@ export async function getCaptainTeams(profileId?: string): Promise<string[]> {
 /** Replayable scoring log for a match (newest reducers rebuild state from it). */
 export async function getMatchEvents(matchId: string): Promise<MatchEventRecord[]> {
   if (!isSupabaseConfigured || !supabase) return demo.matchEvents[matchId] ?? [];
-  const read = (cols: string) => supabase!.from('match_events').select(cols).eq('match_id', matchId).order('seq', { ascending: true });
+  // Paged: the replay needs EVERY event (a long cricket match passes 1,000), and
+  // (match_id, seq) is unique, so seq alone is a stable order.
+  const read = (cols: string) => fetchAllPages((from, to) =>
+    supabase!.from('match_events').select(cols).eq('match_id', matchId).order('seq', { ascending: true }).range(from, to));
   let { data, error } = await read('seq, type, side, payload, attribution, created_at, client_id');
   // Before migration 0039 there's no client_id column — read without it.
   if (error && /client_id/.test(error.message)) ({ data, error } = await read('seq, type, side, payload, attribution, created_at'));
@@ -2174,7 +2200,7 @@ export async function statTotalsContext(matchId: string, match?: Match | null): 
  *  the sport needs them. Cricket / football: exactly `statTotals(state)` as
  *  before. Null when the sport has no totals. */
 export async function matchStatTotals(matchId: string, sport: SportId, state: unknown, match?: Match | null): Promise<MatchTotals | null> {
-  const plugin = getSport(sport);
+  const plugin = await loadSport(sport);
   if (!plugin.statTotals) return null;
   if (!plugin.statTotalsNeedsPlayers) return plugin.statTotals(state as never);
   return plugin.statTotals(state as never, await statTotalsContext(matchId, match));
@@ -2196,7 +2222,7 @@ export async function resyncSportLines(
    *  change per match (`perMatch[].keys`) */
   opts: { dryRun?: boolean; keys?: string[] } = {},
 ): Promise<{ matches: number; rowsWritten: number; perMatch: { matchId: string; rows: number; source: 'log' | 'snapshot' | 'skipped'; keys?: string[] }[] }> {
-  const plugin = getSport(sport);
+  const plugin = await loadSport(sport);
   const out = { matches: 0, rowsWritten: 0, perMatch: [] as { matchId: string; rows: number; source: 'log' | 'snapshot' | 'skipped'; keys?: string[] }[] };
   if (!plugin.statTotals) return out;
   const all = matchIds?.length
@@ -2296,7 +2322,7 @@ export async function repairOpponents(opts: { dryRun?: boolean; sports?: SportId
     ]);
     // The side the scoring state itself put each player on (best source).
     let totals: MatchTotals | null = null;
-    const plugin = getSport(m.sport);
+    const plugin = await loadSport(m.sport);
     if (plugin.statTotals) {
       try {
         const tour = tours.find((t) => t.id === m.tournamentId);
@@ -2361,7 +2387,7 @@ export async function syncMatchAppearances(matchId: string, stateArg?: unknown):
     // appearance (or the result) from it; the team keeps the win and score.
     if (WALKOVER_SCORE_SPORTS.includes(m.sport) && isWalkover(m)) return 0;
     const state = stateArg ?? m.state;
-    const plugin = getSport(m.sport);
+    const plugin = await loadSport(m.sport);
     const [squads, lineup, rosters, lines, mapId] = await Promise.all([
       getMatchSquads(matchId),
       getLineup(matchId, m.sport).catch(() => undefined),
@@ -2399,7 +2425,8 @@ export async function syncMatchAppearances(matchId: string, stateArg?: unknown):
 async function getPlayersByIds(ids: string[]): Promise<{ id: string; fullName: string }[]> {
   if (!ids.length) return [];
   if (!isSupabaseConfigured || !supabase) return demo.players.filter((p) => ids.includes(p.id));
-  const { data } = await supabase.from(PLAYERS_READ).select('id, full_name').in('id', ids);
+  const { data } = await fetchAllChunked(ids, (part, from, to) =>
+    supabase!.from(PLAYERS_READ).select('id, full_name').in('id', part).order('id').range(from, to));
   return ((data ?? []) as { id: string; full_name: string }[]).map((r) => ({ id: r.id, fullName: r.full_name }));
 }
 
@@ -2564,7 +2591,8 @@ export async function getReportedPlayerIds(ids: string[]): Promise<Set<string>> 
     for (const id of ids) if (demo.players.find((p) => p.id === id)?.reported) out.add(id);
     return out;
   }
-  const { data, error } = await supabase.from('players').select('id').in('id', ids).not('reported_at', 'is', null);
+  const { data, error } = await fetchAllChunked(ids, (part, from, to) =>
+    supabase!.from('players').select('id').in('id', part).not('reported_at', 'is', null).order('id').range(from, to));
   if (error) return out; // pre-0009: column absent ⇒ no reports surfaced
   for (const r of (data ?? []) as { id: string }[]) out.add(r.id);
   return out;
@@ -2600,19 +2628,20 @@ export interface InvitePlayerResult { player: Player; status: 'existing' | 'invi
  *  to any team) so they can be added as a co-host and invited to install. Mirrors
  *  invitePlayer's model: one number/email ⇒ one identity; new ⇒ a pending row the
  *  invitee claims by registering. The caller sends the actual invite message. */
-export async function invitePerson(args: { name: string; phone?: string; email?: string }): Promise<InvitePlayerResult> {
+export async function invitePerson(args: { name: string; phone?: string; email?: string; /** the sport they're added to play (a new player's first sport) */ sport?: SportId }): Promise<InvitePlayerResult> {
   const name = args.name.trim() || 'Guest';
   const phone = args.phone?.trim();
   const email = args.email?.trim().toLowerCase();
+  const sports: SportId[] = args.sport ? [args.sport] : [];
   const existing = (phone ? await findPlayerByPhone(phone) : null) ?? (email ? await findPlayerByEmail(email) : null);
   if (existing) return { player: existing, status: 'existing' };
   if (!isSupabaseConfigured || !supabase) {
-    const p = addPlayer({ fullName: name, sports: [], phone: toE164(phone) || undefined, email: email || undefined, invited: true });
+    const p = addPlayer({ fullName: name, sports, phone: toE164(phone) || undefined, email: email || undefined, invited: true });
     return { player: p, status: 'invited' };
   }
   const { data, error } = await supabase
     .from('players')
-    .insert({ full_name: name, sports: [], phone: toE164(phone) || null, email: email ?? null, phone_verified: false })
+    .insert({ full_name: name, sports, phone: toE164(phone) || null, email: email ?? null, phone_verified: false })
     .select('id')
     .single();
   if (error || !data) throw new Error(error?.message ?? 'Could not create the invite');
@@ -3047,7 +3076,7 @@ async function syncHandEndedTotals(matchId: string, liveState?: unknown): Promis
   try {
     const m = await getMatch(matchId);
     if (!m) return;
-    const plugin = getSport(m.sport);
+    const plugin = await loadSport(m.sport);
     if (!plugin.statTotals) return;
     let state = liveState;
     if (state === undefined) {
@@ -3235,6 +3264,7 @@ export async function deleteSeries(seriesId: string): Promise<void> {
 export async function getLineup(matchId: string, sport?: SportId, perSide?: number): Promise<MatchLineup> {
   // Blank formation comes from the sport's plugin (football's pitch by default),
   // sized to the team's players-per-side (7-a-side → 7 slots, etc.).
+  if (sport) await loadSport(sport); // perf F-15: plugins load on demand
   const fresh = () => (sport ? getSport(sport).formation?.(perSide) ?? emptyFormation(perSide) : emptyFormation(perSide));
   const def = defaultFormationFor(perSide);
   const blank: MatchLineup = { home: fresh(), away: fresh(), homeFormation: def, awayFormation: def };
@@ -3333,9 +3363,14 @@ export async function setTieAbc(seriesId: string, abc: 'home' | 'away'): Promise
 
 /** Every rubber of a tie (any order). Live: one query on the format key. */
 export async function getTieRubbers(seriesId: string): Promise<Match[]> {
-  if (!isSupabaseConfigured || !supabase) return demo.matches.filter((m) => readSeriesMeta(m)?.id === seriesId);
+  if (!isSupabaseConfigured || !supabase) {
+    const rubbers = demo.matches.filter((m) => readSeriesMeta(m)?.id === seriesId);
+    await loadMatchSports(rubbers);
+    return rubbers;
+  }
   const { data, error } = await withMatchCols<unknown[]>((cols) => supabase!.from('matches').select(cols).eq('format->>__seriesId', seriesId));
   if (error || !data) return [];
+  await loadMatchSports(data as unknown as MatchRow[]);
   return (data as unknown as MatchRow[]).map(toMatch);
 }
 
@@ -3557,10 +3592,11 @@ export type FollowTargetType = 'player' | 'team' | 'tournament';
 /** All of a user's follows as `"<type>:<id>"` keys (for the follow store). */
 export async function getFollows(profileId?: string): Promise<string[]> {
   if (!isSupabaseConfigured || !supabase || !profileId) return [];
-  const { data, error } = await supabase
+  const { data, error } = await fetchAllPages((from, to) => supabase!
     .from('follows')
     .select('target_type, target_id')
-    .eq('follower_id', profileId);
+    .eq('follower_id', profileId)
+    .order('target_type').order('target_id').range(from, to));
   if (error || !data) return [];
   return data.map((r) => `${r.target_type}:${r.target_id}`);
 }
@@ -3595,11 +3631,12 @@ export async function setFollow(
 export async function getFollowPrefs(profileId?: string): Promise<Record<string, FollowPrefs>> {
   if (!isSupabaseConfigured || !supabase || !profileId) return {};
   try {
-    const { data, error } = await supabase
+    const { data, error } = await fetchAllPages((from, to) => supabase!
       .from('follows')
       .select('target_type, target_id, prefs')
       .eq('follower_id', profileId)
-      .not('prefs', 'is', null);
+      .not('prefs', 'is', null)
+      .order('target_type').order('target_id').range(from, to));
     if (error || !data) return {};
     const out: Record<string, FollowPrefs> = {};
     for (const r of data as { target_type: string; target_id: string; prefs: unknown }[]) {
@@ -3687,7 +3724,8 @@ export async function getRoster(teamName: string, sport: SportId, teamId?: strin
   const explicit = (teamRows?.[0]?.roster ?? null) as string[] | null;
   const ids = explicit && explicit.length ? explicit : await liveDerivedSquadIds(teamRows?.[0]?.id as string | undefined, teamName, sport);
   if (!ids.length) return [];
-  const { data, error } = await readPlayers((cols) => supabase!.from(PLAYERS_READ).select(cols).in('id', ids));
+  const { data, error } = await readPlayers((cols) => fetchAllChunked(ids, (part, from, to) =>
+    supabase!.from(PLAYERS_READ).select(cols).in('id', part).order('id').range(from, to)));
   if (error || !data) return [];
   return (data as PlayerRow[]).map(toPlayer);
 }
@@ -3698,18 +3736,21 @@ export async function getRoster(teamName: string, sport: SportId, teamId?: strin
  *  match: another school's "Red House" would otherwise land in this squad. */
 async function liveDerivedSquadIds(teamId: string | undefined, teamName: string, sport: SportId): Promise<string[]> {
   if (!supabase || !teamId) return [];
+  const sb = supabase;
   const [{ data: team }, { data: tm }] = await Promise.all([
-    supabase.from('teams').select('org_id').eq('id', teamId).maybeSingle(),
-    supabase.from('team_members').select('player_id').eq('team_id', teamId),
+    sb.from('teams').select('org_id').eq('id', teamId).maybeSingle(),
+    fetchAllPages((from, to) => sb.from('team_members').select('player_id').eq('team_id', teamId).order('player_id').range(from, to)),
   ]);
   const out = new Set(((tm as { player_id: string }[] | null) ?? []).map((r) => r.player_id));
   const orgId = (team as { org_id?: string | null } | null)?.org_id;
   if (orgId) {
-    const { data: om } = await supabase.from('org_members').select('player_id').eq('org_id', orgId).is('until', null);
+    // A school's active members run into the thousands: paged, then chunked.
+    const { data: om } = await fetchAllPages((from, to) =>
+      sb.from('org_members').select('player_id').eq('org_id', orgId).is('until', null).order('player_id').range(from, to));
     const members = ((om as { player_id: string }[] | null) ?? []).map((r) => r.player_id);
     if (members.length) {
-      const { data: house } = await supabase.from('players').select('id')
-        .in('id', members).eq('house_name', teamName).contains('sports', [sport]);
+      const { data: house } = await fetchAllChunked(members, (part, from, to) => sb.from('players').select('id')
+        .in('id', part).eq('house_name', teamName).contains('sports', [sport]).order('id').range(from, to));
       for (const r of (house as { id: string }[] | null) ?? []) out.add(r.id);
     }
   }
@@ -4082,7 +4123,8 @@ export async function getPendingVerifications(): Promise<Player[]> {
   if (!isSupabaseConfigured || !supabase) {
     return demo.players.filter((p) => p.verification?.status === 'pending');
   }
-  const { data } = await readPlayers((cols) => supabase!.from(PLAYERS_READ).select(cols).eq('verification->>status', 'pending'));
+  const { data } = await readPlayers((cols) => fetchAllPages((from, to) =>
+    supabase!.from(PLAYERS_READ).select(cols).eq('verification->>status', 'pending').order('id').range(from, to)));
   return (data as PlayerRow[] | null)?.map(toPlayer) ?? [];
 }
 
@@ -4129,6 +4171,9 @@ const toListing = (r: any): Listing => ({
 });
 const LISTING_SELECT = 'id, kind, sport, author_id, author_name, team_name, position, city, details, preferred_date, level, contact_phone, contact_verified, created_at';
 
+/** Live noticeboard reads keep the newest this many posts. */
+const LISTINGS_LIMIT = 200;
+
 /** Noticeboard posts, newest first, optionally filtered by kind and/or sport. */
 export async function getListings(filter?: { kind?: Listing['kind']; sport?: SportId }): Promise<Listing[]> {
   if (!isSupabaseConfigured || !supabase) {
@@ -4136,10 +4181,11 @@ export async function getListings(filter?: { kind?: Listing['kind']; sport?: Spo
       (l) => (!filter?.kind || l.kind === filter.kind) && (!filter?.sport || l.sport === filter.sport)
     );
   }
-  let q = supabase.from('listings').select(LISTING_SELECT).order('created_at', { ascending: false });
+  let q = supabase.from('listings').select(LISTING_SELECT);
   if (filter?.kind) q = q.eq('kind', filter.kind);
   if (filter?.sport) q = q.eq('sport', filter.sport);
-  const { data, error } = await q;
+  // A noticeboard: the newest posts matter — an explicit cap below the server's 1,000.
+  const { data, error } = await q.order('created_at', { ascending: false }).order('id').limit(LISTINGS_LIMIT);
   if (error || !data) return [];
   return data.map(toListing);
 }
@@ -4539,12 +4585,17 @@ export async function logActivity(e: { scope: 'org' | 'tournament'; refId: strin
   } catch { /* audit is non-critical */ }
 }
 
+/** Live activity-trail reads keep the newest this many entries. */
+const ACTIVITY_LIMIT = 500;
+
 /** The activity trail for an org or tournament (newest first). */
 export async function getActivity(scope: 'org' | 'tournament', refId: string): Promise<ActivityEvent[]> {
   if (!isSupabaseConfigured || !supabase) {
     return demo.activityLog.filter((a) => a.scope === scope && a.refId === refId).sort((a, b) => b.at.localeCompare(a.at));
   }
-  const { data } = await supabase.from('activity_log').select('*').eq('scope', scope).eq('ref_id', refId).order('at', { ascending: false });
+  // An audit trail grows for years: the newest ACTIVITY_LIMIT entries, capped explicitly.
+  const { data } = await supabase.from('activity_log').select('*').eq('scope', scope).eq('ref_id', refId)
+    .order('at', { ascending: false }).order('id').limit(ACTIVITY_LIMIT);
   return (data ?? []).map((r: any) => ({ id: r.id, scope: r.scope, refId: r.ref_id, action: r.action, detail: r.detail ?? undefined, byPlayerId: r.by_player_id ?? undefined, byName: r.by_name ?? undefined, at: r.at }));
 }
 
@@ -4727,11 +4778,15 @@ const MEMBER_COLS_FULL = `${MEMBER_COLS}, houses`;
 /** Load org_members rows, grouped by org id (optionally for specific orgs). */
 async function loadOrgMemberRows(orgIds?: string[]): Promise<any[]> {
   if (!isSupabaseConfigured || !supabase) return [];
-  const run = (cols: string) => {
+  // A school's members run into the thousands: every page, (org, player) is the key.
+  const page = (cols: string, ids: string[] | null, from: number, to: number) => {
     let q = supabase!.from('org_members').select(cols);
-    if (orgIds && orgIds.length) q = q.in('org_id', orgIds);
-    return q;
+    if (ids) q = q.in('org_id', ids);
+    return q.order('org_id').order('player_id').range(from, to);
   };
+  const run = (cols: string) => (orgIds && orgIds.length
+    ? fetchAllChunked(orgIds, (part, from, to) => page(cols, part, from, to))
+    : fetchAllPages((from, to) => page(cols, null, from, to)));
   let res = await run(MEMBER_COLS_FULL); // houses needs migration 0022
   if (res.error) res = await run(MEMBER_COLS);
   return (res.data ?? []) as any[];
@@ -4808,7 +4863,8 @@ export async function getOrganizations(): Promise<Organization[]> {
   if (!isSupabaseConfigured || !supabase) return demo.organizations;
   // Perf F-19: through the short-lived read cache (emptied by any write).
   const res = await cachedRows<{ orgs: any[]; members: any[] }>('organizations', async () => {
-    const { data, error } = await withOrgCols<any[]>((cols) => supabase!.from('organizations').select(cols).order('name'));
+    const { data, error } = await withOrgCols<any[]>((cols) => fetchAllPages((from, to) =>
+      supabase!.from('organizations').select(cols).order('name').order('id').range(from, to)));
     if (error || !data) return NOT_CACHED;
     return { orgs: data, members: await loadOrgMemberRows() };
   });
@@ -4861,8 +4917,9 @@ export async function setOrgMembers(orgId: string, members: Organization['member
   }
   const keep = new Set(members.map((m) => m.playerId));
   const removed = current.filter((m) => !keep.has(m.playerId)).map((m) => m.playerId);
-  if (removed.length) {
-    const { error } = await supabase.from('org_members').delete().eq('org_id', orgId).in('player_id', removed);
+  // Chunked: a whole class leaving at once would overrun the URL.
+  for (const part of chunked(removed)) {
+    const { error } = await supabase.from('org_members').delete().eq('org_id', orgId).in('player_id', part);
     if (error) throw new Error(error.message);
   }
 }
@@ -4988,9 +5045,11 @@ export async function getOrgRequests(orgId: string, status: OrgRequest['status']
   if (!isSupabaseConfigured || !supabase) {
     return demo.orgRequests.filter((r) => r.orgId === orgId && (status === 'all' || r.status === status));
   }
-  let q = supabase.from('org_requests').select('*').eq('org_id', orgId).order('created_at', { ascending: false });
-  if (status !== 'all') q = q.eq('status', status);
-  const { data } = await q;
+  const { data } = await fetchAllPages((from, to) => {
+    let q = supabase!.from('org_requests').select('*').eq('org_id', orgId);
+    if (status !== 'all') q = q.eq('status', status);
+    return q.order('created_at', { ascending: false }).order('id').range(from, to);
+  });
   return (data ?? []).map(toOrgRequest);
 }
 
@@ -5000,9 +5059,11 @@ export async function getMyOrgRequests(playerId: string, status: OrgRequest['sta
   if (!isSupabaseConfigured || !supabase) {
     return demo.orgRequests.filter((r) => r.playerId === playerId && (status === 'all' || r.status === status));
   }
-  let q = supabase.from('org_requests').select('*').eq('player_id', playerId).order('created_at', { ascending: false });
-  if (status !== 'all') q = q.eq('status', status);
-  const { data } = await q;
+  const { data } = await fetchAllPages((from, to) => {
+    let q = supabase!.from('org_requests').select('*').eq('player_id', playerId);
+    if (status !== 'all') q = q.eq('status', status);
+    return q.order('created_at', { ascending: false }).order('id').range(from, to);
+  });
   return (data ?? []).map(toOrgRequest);
 }
 
@@ -5139,11 +5200,11 @@ export async function createTeam(input: NewTeam): Promise<Team> {
 /** Teams owned by a community. */
 export async function getTeamsForOrg(orgId: string): Promise<Team[]> {
   if (!isSupabaseConfigured || !supabase) return demo.teams.filter((t) => t.orgId === orgId);
-  const { data, error } = await supabase
+  const { data, error } = await fetchAllPages((from, to) => supabase!
     .from('teams')
     .select('id,name,short_name,sport,color_hex,org_id,roster')
     .eq('org_id', orgId)
-    .order('name');
+    .order('name').order('id').range(from, to));
   if (error || !data) return [];
   return (data as TeamRow[]).map(toTeam);
 }
@@ -5240,7 +5301,7 @@ export async function createClub(input: NewClub): Promise<Club> {
 /** All clubs (multi-sport teams). */
 export async function getClubs(): Promise<Club[]> {
   if (!isSupabaseConfigured || !supabase) return [...demo.clubs];
-  const { data, error } = await supabase.from('clubs').select(CLUB_COLS).order('name');
+  const { data, error } = await fetchAllPages((from, to) => supabase!.from('clubs').select(CLUB_COLS).order('name').order('id').range(from, to));
   if (error || !data) return [];
   return (data as ClubRow[]).map(toClub);
 }
@@ -5318,8 +5379,8 @@ export async function getClubMembers(clubId: string): Promise<ClubMemberView[]> 
   if (!isSupabaseConfigured || !supabase) {
     rows = demo.clubMembers.filter((m) => m.clubId === clubId);
   } else {
-    const { data, error } = await supabase
-      .from('club_members').select('club_id, player_id, role, joined_at').eq('club_id', clubId);
+    const { data, error } = await fetchAllPages((from, to) => supabase!
+      .from('club_members').select('club_id, player_id, role, joined_at').eq('club_id', clubId).order('player_id').range(from, to));
     if (error || !data) return [];
     rows = (data as { club_id: string; player_id: string; role: ClubMemberRole; joined_at?: string }[])
       .map((r) => ({ clubId: r.club_id, playerId: r.player_id, role: r.role, joinedAt: r.joined_at ?? undefined }));
@@ -5538,7 +5599,9 @@ export async function getTournamentEntries(tournamentId: string, sport?: SportId
   ];
   let res: { data: unknown; error: unknown } = { data: null, error: true };
   for (const cols of attempts) {
-    res = await supabase.from('tournament_teams').select(cols).eq('tournament_id', tournamentId);
+    // A district meet's entries can pass 1,000 — every page ((tournament, team) is the key).
+    res = await fetchAllPages((from, to) =>
+      supabase!.from('tournament_teams').select(cols).eq('tournament_id', tournamentId).order('team_id').range(from, to));
     if (!res.error) break;
     if (cols.includes(',level)')) teamLevelMissing = true;
   }

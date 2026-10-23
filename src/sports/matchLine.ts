@@ -8,6 +8,7 @@
 import type { Match } from '../core/types';
 import { manualResultLine } from '../core/matchResult';
 import { getSport } from './registry';
+import { getSportMeta } from './sportMeta';
 import { matchScoreLine, type Side } from './scoreline';
 
 type MatchLike = Pick<Match, 'sport' | 'status' | 'state' | 'result' | 'walkover'>;
@@ -27,5 +28,5 @@ export function matchLineFor(m: MatchLike & Pick<Match, 'homeTeam' | 'awayTeam'>
 /** "Asha won — Bina retired" (racket) / "X awarded the match" — the words for a
  *  match closed by hand, in the sport's own terms. */
 export function resultWords(m: Pick<Match, 'sport'> & { result: NonNullable<Match['result']> }, home: string, away: string): string {
-  return manualResultLine(m.result, home, away, { retireTerms: !!getSport(m.sport)?.retireTerms });
+  return manualResultLine(m.result, home, away, { retireTerms: !!getSportMeta(m.sport)?.retireTerms });
 }

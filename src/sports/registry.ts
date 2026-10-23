@@ -1,107 +1,48 @@
 /**
  * Sport registry — the ONLY place the core couples to concrete sports.
- * To add a sport: implement a SportPlugin and add it to this map. Done.
+ * To add a sport: implement a SportPlugin, give it a `<sport>/meta.ts`, and add
+ * it to sportMeta.ts and both sportLoaders files. Done.
+ *
+ * Perf F-15: the plugins load ON DEMAND. Lists, pickers and forms read the
+ * light meta (sportMeta.ts: name, icon, format options) and never need this.
+ * A sport's full plugin (engine, scorer controls, match tabs) is loaded the
+ * first time it is used:
+ *  - phone app: `getSport` requires it synchronously on first use
+ *    (sportLoaders.native.ts) — exactly as before, minus evaluating all of
+ *    them at start-up;
+ *  - web: each sport is its own chunk. The data layer loads the sports of the
+ *    matches it returns before handing them over (`loadSports`), so screens
+ *    find them ready; a screen that renders a sport nothing loaded yet
+ *    suspends (the screen's spinner, like a lazy screen's chunk) until it is.
  */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import type { SportId } from '../core/types';
 import type { SportPlugin } from './types';
 import { setStandingsPointsProvider, setStandingsRateProvider, setStandingsScoreProvider, setStandingsUnitsProvider } from '../data/standings';
-import { footballPlugin } from './football';
-import { cricketPlugin } from './cricket';
-import { basketballPlugin } from './basketball';
-import { badmintonPlugin } from './badminton';
-import { tennisPlugin } from './tennis';
-import { volleyballPlugin } from './volleyball';
-import { kabaddiPlugin } from './kabaddi';
-import { pickleballPlugin } from './pickleball';
-import { padelPlugin } from './padel';
-import { squashPlugin } from './squash';
-import { tableTennisPlugin } from './tabletennis';
-import { chessPlugin } from './chess';
-import { carromPlugin } from './carrom';
-import { golfPlugin } from './golf';
-import { athleticsPlugin } from './athletics';
-import { hockeyPlugin } from './hockey';
-import { swimmingPlugin } from './swimming';
-import { weightliftingPlugin } from './weightlifting';
-import { shootingPlugin } from './shooting';
-import { archeryPlugin } from './archery';
-import { rowingPlugin } from './rowing';
-import { canoePlugin } from './canoe';
-import { cyclingPlugin } from './cycling';
-import { handballPlugin } from './handball';
-import { iceHockeyPlugin } from './ice_hockey';
-import { netballPlugin } from './netball';
-import { americanFootballPlugin } from './american_football';
-import { rugbyPlugin } from './rugby';
-import { rugbyLeaguePlugin } from './rugby_league';
-import { baseballPlugin } from './baseball';
 import { STAT_SCHEMAS } from './statSchemas';
-import { MATCH_RECORD_HOOKS } from './matchRecordHooks';
-import { regionStore } from '../core/region';
-import { marketForCountry, sportDisplayName } from '../core/markets';
+import { isStaleVersionError, reloadForNewVersion } from '../core/staleVersion';
+import { SPORT_META, MARKET_NAMED_SPORTS, withMarketName } from './sportMeta';
+import { importSport, requireSport, LOADS_SYNC } from './sportLoaders';
 
-export const SPORTS: Record<SportId, SportPlugin<any>> = {
-  football: footballPlugin,
-  cricket: cricketPlugin,
-  basketball: basketballPlugin,
-  badminton: badmintonPlugin,
-  tennis: tennisPlugin,
-  volleyball: volleyballPlugin,
-  kabaddi: kabaddiPlugin,
-  pickleball: pickleballPlugin,
-  padel: padelPlugin,
-  squash: squashPlugin,
-  tabletennis: tableTennisPlugin,
-  chess: chessPlugin,
-  carrom: carromPlugin,
-  golf: golfPlugin,
-  athletics: athleticsPlugin,
-  hockey: hockeyPlugin,
-  swimming: swimmingPlugin,
-  weightlifting: weightliftingPlugin,
-  shooting: shootingPlugin,
-  archery: archeryPlugin,
-  rowing: rowingPlugin,
-  canoe: canoePlugin,
-  cycling: cyclingPlugin,
-  handball: handballPlugin,
-  ice_hockey: iceHockeyPlugin,
-  netball: netballPlugin,
-  american_football: americanFootballPlugin,
-  rugby: rugbyPlugin,
-  rugby_league: rugbyLeaguePlugin,
-  baseball: baseballPlugin,
-};
+// The light side, re-exported for code that already imports it from here.
+export { SPORT_LIST, getSportMeta, participantMode, type ParticipantMode } from './sportMeta';
 
-// SD-15: every plugin carries its stat schema (defined next to the plugin in
-// `<sport>/stats.ts`, collected RN-free in statSchemas.ts).
-for (const id of Object.keys(SPORTS) as SportId[]) SPORTS[id].statSchema = STAT_SCHEMAS[id] as SportPlugin<any>['statSchema'];
-// SD-51: the per-match records hook (pure, in matchRecordHooks.ts).
-for (const id of Object.keys(SPORTS) as SportId[]) { const h = MATCH_RECORD_HOOKS[id]; if (h && !SPORTS[id].matchRecords) SPORTS[id].matchRecords = h; }
+const loaded = new Map<SportId, SportPlugin<any>>();
+const pending = new Map<SportId, Promise<SportPlugin<any>>>();
+const failed = new Map<SportId, unknown>();
 
-// SD-153: display names by the viewer's market — "Soccer" and "Field hockey" in
-// the US (where football / hockey mean American football / ice hockey). Ids
-// never change; only `name` is read through the viewer's region.
-for (const id of ['football', 'hockey', 'rugby', 'ice_hockey', 'american_football'] as SportId[]) {
-  const standard = SPORTS[id].name;
-  Object.defineProperty(SPORTS[id], 'name', {
-    get: () => sportDisplayName(id, standard, marketForCountry(regionStore.get().country)),
-    enumerable: true, configurable: true,
-  });
-}
+const known = (id: string): id is SportId => Object.prototype.hasOwnProperty.call(SPORT_META, id);
 
-export const SPORT_LIST = Object.values(SPORTS);
-
-/** How the two sides of a match are picked, resolved for a concrete format.
- *  'team' = pick two teams; 'individual' = pick two people; 'pairs' = pick two
- *  pairs (doubles). A 'both' sport is decided by its `playersPerSide` value. */
-export type ParticipantMode = 'team' | 'individual' | 'pairs';
-export function participantMode(sport: SportId, format?: Record<string, unknown>): ParticipantMode {
-  const kind = SPORTS[sport].participantKind ?? 'team';
-  if (kind === 'team') return 'team';
-  if (kind === 'individual') return 'individual';
-  // 'both' → Singles (1 player a side) is individual, Doubles (2) is a pair.
-  return Number(format?.playersPerSide ?? 1) >= 2 ? 'pairs' : 'individual';
+/** A freshly loaded plugin joins the registry: its stat schema (SD-15, from
+ *  statSchemas.ts) and — football, hockey, rugby, ice hockey, American
+ *  football — its name read through the viewer's market (SD-153). */
+function adopt(id: SportId, plugin: SportPlugin<any>): SportPlugin<any> {
+  const had = loaded.get(id);
+  if (had) return had;
+  plugin.statSchema = STAT_SCHEMAS[id] as SportPlugin<any>['statSchema'];
+  if (MARKET_NAMED_SPORTS.includes(id)) withMarketName(id, plugin, plugin.name);
+  loaded.set(id, plugin);
+  return plugin;
 }
 
 // Let the (RN-free) standings engine compute NRR without importing this registry
@@ -110,20 +51,93 @@ export function participantMode(sport: SportId, format?: Record<string, unknown>
 // circular imports / hot-reload) — by the time a table is ranked, every module
 // is fully initialised.
 let rateWired = false;
-export function getSport(id: SportId): SportPlugin<any> {
-  if (!rateWired) {
-    rateWired = true;
-    // A match closed by hand (parity #04) is charged its full overs when the
-    // sport says so (cricket "count in NRR, all overs").
-    setStandingsRateProvider((sport, state, manual) => {
-      if (state == null) return null;
-      const p = SPORTS[sport];
-      return (manual && p.manualRate ? p.manualRate(state) : p.standingsRate?.(state)) ?? null;
-    });
-    setStandingsPointsProvider((sport, state) => (state == null ? null : SPORTS[sport].standingsPoints?.(state) ?? null));
-    setStandingsScoreProvider((sport, state) => (state == null ? null : SPORTS[sport].standingsScore?.(state) ?? null));
-    // SD-17: sets / games / rally points / fair play for the standings rule kit.
-    setStandingsUnitsProvider((sport, state) => (state == null ? null : SPORTS[sport]?.standingsUnits?.(state) ?? null));
+function wireStandings(): void {
+  if (rateWired) return;
+  rateWired = true;
+  // A match closed by hand (parity #04) is charged its full overs when the
+  // sport says so (cricket "count in NRR, all overs").
+  setStandingsRateProvider((sport, state, manual) => {
+    if (state == null) return null;
+    const p = getSport(sport);
+    return (manual && p.manualRate ? p.manualRate(state) : p.standingsRate?.(state)) ?? null;
+  });
+  setStandingsPointsProvider((sport, state) => (state == null ? null : getSport(sport).standingsPoints?.(state) ?? null));
+  setStandingsScoreProvider((sport, state) => (state == null ? null : getSport(sport).standingsScore?.(state) ?? null));
+  // SD-17: sets / games / rally points / fair play for the standings rule kit.
+  setStandingsUnitsProvider((sport, state) => (state == null ? null : getSport(sport)?.standingsUnits?.(state) ?? null));
+}
+
+/** Load a sport's full plugin (resolves at once when it is already loaded, and
+ *  for an id the app doesn't know — with undefined, as `getSport` returns). */
+export function loadSport(id: SportId): Promise<SportPlugin<any>> {
+  wireStandings();
+  const hit = loaded.get(id);
+  if (hit) return Promise.resolve(hit);
+  if (!known(id)) return Promise.resolve(undefined as never);
+  const sync = requireSport(id);
+  if (sync) return Promise.resolve(adopt(id, sync));
+  let p = pending.get(id);
+  if (!p) {
+    p = importSport(id).then(
+      (plugin) => { pending.delete(id); failed.delete(id); return adopt(id, plugin); },
+      (e: unknown) => {
+        pending.delete(id);
+        // Opened on an older version whose files are gone → fetch the newest app.
+        if (isStaleVersionError(e) && reloadForNewVersion()) return new Promise<never>(() => undefined);
+        failed.set(id, e);
+        throw e;
+      },
+    );
+    pending.set(id, p);
   }
-  return SPORTS[id];
+  return p;
+}
+
+/** Load every sport in `ids` (unknown / empty ids skipped). Never rejects: a
+ *  sport that fails to load is retried by the screen that renders it. */
+export function loadSports(ids: Iterable<string | null | undefined>): Promise<void> {
+  const want = new Set<SportId>();
+  for (const id of ids) if (id && known(id) && !loaded.has(id)) want.add(id);
+  if (!want.size) return Promise.resolve();
+  return Promise.all([...want].map((id) => loadSport(id).catch(() => undefined))).then(() => undefined);
+}
+
+/** The sport's full plugin. Phone app: loaded on first use. Web: when it isn't
+ *  loaded yet, this SUSPENDS the rendering screen (throws the load promise to
+ *  the nearest <Suspense>, the screen spinner) — so outside rendering, `await
+ *  loadSport(id)` first (the data layer does for the matches it returns). An
+ *  unknown id gives undefined, as before. */
+export function getSport(id: SportId): SportPlugin<any> {
+  wireStandings();
+  const hit = loaded.get(id);
+  if (hit) return hit;
+  if (!known(id)) return undefined as never;
+  const sync = requireSport(id);
+  if (sync) return adopt(id, sync);
+  const err = failed.get(id);
+  if (err !== undefined) {
+    // surface the failure once (the error screen); the next render retries
+    failed.delete(id);
+    throw err;
+  }
+  throw loadSport(id);
+}
+
+/** In a `try` around code that reads a plugin during rendering: let a
+ *  suspension (a sport still loading) through instead of swallowing it. */
+export function rethrowIfLoading(e: unknown): void {
+  if (e && typeof (e as PromiseLike<unknown>).then === 'function') throw e;
+}
+
+let prefetched = false;
+/** Web: warm every sport's chunk in the background (after the screens — see
+ *  lazyScreens.ts), one at a time, so opening a match of any sport later is
+ *  instant. The phone app has them in its bundle already. */
+export function prefetchSports(): Promise<void> {
+  if (prefetched || LOADS_SYNC) return Promise.resolve();
+  prefetched = true;
+  return (Object.keys(SPORT_META) as SportId[]).reduce<Promise<void>>(
+    (chain, id) => chain.then(() => loadSport(id).then(() => undefined, () => undefined)),
+    Promise.resolve(),
+  );
 }

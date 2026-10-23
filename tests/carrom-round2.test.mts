@@ -108,7 +108,7 @@ describe('round 2 · carrom ICF foul penalties in the score (foulScore)', () => 
     assert.equal(carrom.init(ICF).foulScore, true);
     assert.equal('foulScore' in carrom.init(), false);
     assert.equal('foulScore' in carrom.init({ foulScore: false }), false);
-    const src = readFileSync(new URL('../src/sports/carrom/index.tsx', import.meta.url), 'utf8');
+    const src = (readFileSync(new URL('../src/sports/carrom/index.tsx', import.meta.url), 'utf8') + readFileSync(new URL('../src/sports/carrom/meta.ts', import.meta.url), 'utf8'));
     assert.match(src, /key: 'foulScore', label: 'ICF foul penalties in the score', type: 'toggle', default: true/);
   });
   test('boardValue: the old rule without the flag; ICF r.102–109 / r.102–112 / r.55 with it', () => {

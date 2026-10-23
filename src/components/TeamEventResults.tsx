@@ -7,7 +7,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { theme } from '../core/theme';
 import { Card, textStyles } from './ui';
-import { getSport } from '../sports/registry';
+import { getSportMeta } from '../sports/sportMeta';
 import { eventWords } from '../sports/eventSports';
 import { medalIcon, type TeamEventSportSummary } from '../data/results';
 import type { TeamGolfSummary } from '../data/teamEventResults';
@@ -26,7 +26,7 @@ export function TeamEventResults({ sports, golf, onOpenResult }: {
   return (
     <View style={{ gap: theme.spacing(3) }}>
       {sports.map((s) => {
-        const sp = getSport(s.sport as SportId);
+        const sp = getSportMeta(s.sport as SportId);
         return (
           <Card key={s.sport} style={{ gap: theme.spacing(2) }}>
             <Text style={textStyles.h3}>{sp.icon} {sp.name}</Text>
@@ -77,7 +77,7 @@ export function TeamEventResults({ sports, golf, onOpenResult }: {
       })}
       {golf && (
         <Card style={{ gap: theme.spacing(2) }}>
-          <Text style={textStyles.h3}>{getSport('golf' as SportId).icon} Golf · stroke play</Text>
+          <Text style={textStyles.h3}>{getSportMeta('golf' as SportId).icon} Golf · stroke play</Text>
           <View style={st.tiles}>
             <Tile value={String(golf.rounds)} label={golf.rounds === 1 ? 'Round' : 'Rounds'} />
             <Tile value={String(golf.wins)} label="Round wins" />

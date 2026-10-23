@@ -134,7 +134,7 @@ describe('2 · lap points — finish-line passes or every 400 m from the start',
     assert.deepEqual([...splitPlacesFor(M1500, rows)], [...splitPlaces(rows, 3)]);
   });
   test('the athletics settings offer the choice under "Stats to track", finish-line passes by default', () => {
-    const src = fs.readFileSync(path.join(ROOT, 'src/sports/athletics/index.tsx'), 'utf8');
+    const src = fs.readFileSync(path.join(ROOT, 'src/sports/athletics/index.tsx'), 'utf8') + fs.readFileSync(path.join(ROOT, 'src/sports/athletics/meta.ts'), 'utf8');
     assert.match(src, /key: 'lapPoints', label: 'Lap points', type: 'choice', default: 'finish', advanced: true, group: 'Stats to track'/);
     assert.match(src, /\{ value: 'finish', label: 'Finish-line passes' \}, \{ value: 'start', label: 'Every 400 m from the start' \}/);
   });

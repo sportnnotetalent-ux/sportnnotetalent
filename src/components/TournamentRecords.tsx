@@ -8,6 +8,7 @@ import { theme } from '../core/theme';
 import { Card, SelectChip, textStyles } from './ui';
 import type { Match, SportId } from '../core/types';
 import { getSport } from '../sports/registry';
+import { getSportMeta } from '../sports/sportMeta';
 import { tournamentRecords, type RecordRow } from '../data/tournamentRecords';
 
 export function TournamentRecords({ sport, matches, onMatch }: {
@@ -15,10 +16,12 @@ export function TournamentRecords({ sport, matches, onMatch }: {
   matches: Match[];
   onMatch: (m: Match) => void;
 }) {
-  const sections = useMemo(
-    () => tournamentRecords(sport, matches, { derive: (m) => getSport(m.sport)?.matchRecords?.(m.state as never) ?? null }),
-    [sport, matches],
-  );
+  const sections = useMemo(() => {
+    // perf F-15: the finished matches' sports are loaded before ranking (a sport
+    // still loading suspends here, outside the ranking's never-throws guard)
+    for (const s of new Set(matches.filter((m) => m.status === 'completed').map((m) => m.sport))) getSport(s);
+    return tournamentRecords(sport, matches, { derive: (m) => getSport(m.sport)?.matchRecords?.(m.state as never) ?? null });
+  }, [sport, matches]);
   const [pick, setPick] = useState<string | null>(null);
   if (!sections.length) return null;
   const cur = sections.find((s) => s.type.key === pick) ?? sections[0];
@@ -34,7 +37,7 @@ export function TournamentRecords({ sport, matches, onMatch }: {
   };
   return (
     <View style={{ gap: theme.spacing(2) }}>
-      <Text style={[textStyles.h3, st.section]}>📜 {getSport(sport).name} records</Text>
+      <Text style={[textStyles.h3, st.section]}>📜 {getSportMeta(sport).name} records</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.chips}>
         {sections.map((s) => (
           <SelectChip key={s.type.key} label={s.type.label} active={s.type.key === cur.type.key} onPress={() => setPick(s.type.key)} />

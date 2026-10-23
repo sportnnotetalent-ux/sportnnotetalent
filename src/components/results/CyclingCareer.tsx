@@ -55,7 +55,7 @@ export function CyclingCareer({ lines }: { lines: StatLine[] }) {
       {/* SD-137b: team events (archery / shooting teams, team pursuit / sprint) */}
       {teamCareerText({ events: c.teamEvents, golds: c.teamGolds, silvers: c.teamSilvers, bronzes: c.teamBronzes }) ? <Text style={textStyles.muted}>{teamCareerText({ events: c.teamEvents, golds: c.teamGolds, silvers: c.teamSilvers, bronzes: c.teamBronzes })}</Text> : null}
       {/* timed races round 2: meet / school records broken */}
-      <RecordsSetCard c={c} />
+      <RecordsSetCard c={c} playerId={lines[0]?.playerId} infos={infos} />
       <Text style={st.section}>Best times</Text>
       {c.bests.length === 0 ? <Text style={textStyles.muted}>No times yet — each time trial, pursuit and the sprint’s flying 200 m keep their own best, per distance.</Text> : (
         <Card style={{ gap: theme.spacing(2) }}>

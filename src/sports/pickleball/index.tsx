@@ -14,13 +14,14 @@
  *   • Format      — singles or doubles (default).
  */
 import { makeRallyPlugin, type RallyState } from '../rallyCore';
+import { PICKLEBALL_FORMAT_FIELDS, PICKLEBALL_META } from './meta';
 
 export type PickleballState = RallyState;
 
 export const pickleballPlugin = makeRallyPlugin({
   id: 'pickleball',
-  name: 'Pickleball',
-  icon: '🥒',
+  name: PICKLEBALL_META.name,
+  icon: PICKLEBALL_META.icon,
   sideOutValue: 'sideout',
   sideOutLabel: 'Side-out',
   serveSystemLabel: 'Side-out scoring',
@@ -30,66 +31,5 @@ export const pickleballPlugin = makeRallyPlugin({
   courtPositions: true,
   // SD-115 — "Who serves first?" on the scoring screen too (no default).
   firstServePicker: true,
-  formatFields: [
-    {
-      key: 'preset', label: 'Format', type: 'preset', default: 'rec', tournamentDefault: 'traditional',
-      // SD-06 / D4: the old rally "Tournament (best of 5)" preset (value
-      // 'tournament') is gone — a stored format keeps its own scoring keys, so
-      // matches made with it still play rally. 'traditional' keeps its value
-      // (it was already side-out best of 3 to 11) and is now the Tournament preset.
-      options: [
-        { value: 'traditional', label: 'Tournament (side-out · best of 3 to 11)', set: { scoring: 'sideout', pointsPerGame: 11, winBy: 2, gamesToWin: 2 } },
-        { value: 'sideout15', label: 'Tournament (side-out · 1 game to 15)', set: { scoring: 'sideout', pointsPerGame: 15, winBy: 2, gamesToWin: 1 } },
-        { value: 'sideout21', label: 'Tournament (side-out · 1 game to 21)', set: { scoring: 'sideout', pointsPerGame: 21, winBy: 2, gamesToWin: 1 } },
-        { value: 'medal', label: 'Medal match (side-out · best of 5 to 11)', set: { scoring: 'sideout', pointsPerGame: 11, winBy: 2, gamesToWin: 3 } },
-        // SD-117c — a rally-scored game to 21 (MLP's game length / the
-        // DreamBreaker), named for what it plays: MLP's "freeze" at 20 (PB-09)
-        // and the DreamBreaker rotation aren't tracked yet, so it isn't called
-        // "MLP". The value stays 'dreambreaker' (stored formats keep working).
-        { value: 'dreambreaker', label: 'Rally to 21 (1 game)', set: { scoring: 'rally', pointsPerGame: 21, winBy: 2, gamesToWin: 1 } },
-        { value: 'rec', label: 'Rec (rally · 11)', set: { scoring: 'rally', pointsPerGame: 11, winBy: 2, gamesToWin: 2 } },
-        { value: 'rec1', label: 'Rec quick (rally · 11 · win by 1)', set: { scoring: 'rally', pointsPerGame: 11, winBy: 1, gamesToWin: 2 } },
-        { value: 'custom', label: 'Custom' },
-      ],
-    },
-    {
-      key: 'playersPerSide', label: 'Players', type: 'choice', default: 2,
-      options: [
-        { value: 2, label: 'Doubles' },
-        { value: 1, label: 'Singles' },
-      ],
-    },
-    {
-      key: 'scoring', label: 'Scoring', type: 'choice', default: 'rally',
-      hint: 'how points are won',
-      options: [
-        { value: 'sideout', label: 'Side-out (tournament)' },
-        { value: 'rally', label: 'Rally (every rally scores)' },
-      ],
-    },
-    {
-      key: 'pointsPerGame', label: 'Points to win', type: 'choice', default: 11, advanced: true,
-      options: [
-        { value: 11, label: '11' },
-        { value: 15, label: '15' },
-        { value: 21, label: '21' },
-      ],
-    },
-    {
-      key: 'winBy', label: 'Win by', type: 'choice', default: 2, advanced: true,
-      hint: '2 is standard; 1 is a casual hard cap',
-      options: [
-        { value: 2, label: 'Win by 2' },
-        { value: 1, label: 'Win by 1' },
-      ],
-    },
-    {
-      key: 'gamesToWin', label: 'Match length', type: 'choice', default: 2, advanced: true,
-      options: [
-        { value: 2, label: 'Best of 3' },
-        { value: 3, label: 'Best of 5' },
-        { value: 1, label: 'Single game' },
-      ],
-    },
-  ],
+  formatFields: PICKLEBALL_FORMAT_FIELDS,
 });

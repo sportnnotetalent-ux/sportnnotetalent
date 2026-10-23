@@ -12,7 +12,7 @@ import { theme } from '../core/theme';
 import { EmptyState, Card, ScreenTitle, textStyles } from '../components/ui';
 import { MatchCard } from '../components/MatchCard';
 import { SectionHeader, SECTION_CAP } from '../components/SectionHeader';
-import { SPORT_LIST, getSport } from '../sports/registry';
+import { SPORT_LIST, getSportMeta } from '../sports/sportMeta';
 import { useAuth } from '../core/auth';
 import { canScoreByRole } from '../core/roles';
 import { useMyTournaments, useMatches, useFollow } from '../data/hooks';
@@ -71,7 +71,7 @@ export default function TryNewSportScreen() {
       <KeyboardAwareScrollView contentContainerStyle={st.content}>
         <ScreenTitle
           title="Try a new sport"
-          subtitle={chosen ? `Get started with ${getSport(chosen).name}` : 'Pick a sport you haven’t played yet'}
+          subtitle={chosen ? `Get started with ${getSportMeta(chosen).name}` : 'Pick a sport you haven’t played yet'}
         />
 
         {/* Step 1 — choose the sport */}
@@ -86,8 +86,8 @@ export default function TryNewSportScreen() {
                 accessibilityState={{ selected: active }}
                 onPress={() => setChosen(active ? null : s)}
               >
-                <Text style={st.tileIcon}>{getSport(s).icon}</Text>
-                <Text style={[textStyles.body, active && st.tileTextActive]} numberOfLines={1}>{getSport(s).name}</Text>
+                <Text style={st.tileIcon}>{getSportMeta(s).icon}</Text>
+                <Text style={[textStyles.body, active && st.tileTextActive]} numberOfLines={1}>{getSportMeta(s).name}</Text>
               </TouchableOpacity>
             );
           })}
@@ -101,13 +101,13 @@ export default function TryNewSportScreen() {
             <ActionRow
               icon="🗓️"
               title="Organize a game"
-              subtitle={`Schedule a ${getSport(chosen).name} match`}
+              subtitle={`Schedule a ${getSportMeta(chosen).name} match`}
               onPress={organize}
             />
             <ActionRow
               icon="🏆"
               title="Organize a tournament"
-              subtitle={`Set up a ${getSport(chosen).name} competition`}
+              subtitle={`Set up a ${getSportMeta(chosen).name} competition`}
               onPress={() => nav.navigate('CreateTournament', { sport: chosen })}
             />
 
@@ -124,8 +124,8 @@ export default function TryNewSportScreen() {
             ) : (
               <Card>
                 <EmptyState
-                  icon={getSport(chosen).icon}
-                  title={`No upcoming ${getSport(chosen).name.toLowerCase()} games yet`}
+                  icon={getSportMeta(chosen).icon}
+                  title={`No upcoming ${getSportMeta(chosen).name.toLowerCase()} games yet`}
                   hint="Follow teams or tournaments from Discover to see their fixtures here."
                   compact
                 />

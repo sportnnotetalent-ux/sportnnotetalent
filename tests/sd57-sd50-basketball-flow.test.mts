@@ -95,7 +95,7 @@ describe('SD-57 — draws only where the format allows', () => {
     assert.equal(init({ allowDraw: true }).allowDraw, true);
   });
   test('UI: a level end offers overtime; "End as a draw" only when allowed; presets carry the timeout rule', () => {
-    const src = readFileSync(new URL('../src/sports/basketball/index.tsx', import.meta.url), 'utf8');
+    const src = (readFileSync(new URL('../src/sports/basketball/index.tsx', import.meta.url), 'utf8') + readFileSync(new URL('../src/sports/basketball/meta.ts', import.meta.url), 'utf8'));
     assert.match(src, /state\.allowDraw \? \(\s*<Button label="End as a draw"/);
     assert.match(src, /noLabel: 'No, go back'/);
     assert.match(src, /key: 'allowDraw'[^\n]*default: false/);

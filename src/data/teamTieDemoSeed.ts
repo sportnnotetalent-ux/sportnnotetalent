@@ -11,7 +11,7 @@
  *     finished, the third with lineups in and its rubbers ready to score
  *   - chess: a 4-board team match with a ½ (2½–1½) */
 import { isSupabaseConfigured } from '../core/supabase';
-import { getSport } from '../sports/registry';
+import { loadSport } from '../sports/registry';
 import {
   createTournament, createTeam, invitePerson, setTeamRoster, addTournamentTeams, createTeamTie, saveTieLineup,
   getTieRubbers, appendMatchEvent, updateMatchSnapshot, matchStatTotals, syncMatchStatLines, settleTie, getTournaments,
@@ -51,7 +51,7 @@ function rallyEvents(games: [number, number][], home: Player[], away: Player[]):
 /** Score one rubber through the event log and close it like the scorer's
  *  completion (snapshot → result, stat lines, appearances). */
 async function play(matchId: string, sport: SportId, events: MatchEventRecord[], cfg: Record<string, unknown>, names: { home: string; away: string }) {
-  const plugin = getSport(sport);
+  const plugin = await loadSport(sport);
   let s = plugin.createInitialState(cfg);
   for (const e of events) {
     await appendMatchEvent(matchId, e);

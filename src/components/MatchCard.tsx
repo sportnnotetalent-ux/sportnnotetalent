@@ -10,6 +10,7 @@ import { View, Text, TouchableOpacity, Animated, StyleSheet } from 'react-native
 import { theme } from '../core/theme';
 import { useReducedMotion } from '../core/a11y';
 import { getSport } from '../sports/registry';
+import { getSportMeta } from '../sports/sportMeta';
 import { openVenue } from '../core/venue';
 import { formatShort, useUserTimeZone, zoneShortName } from '../core/time';
 import type { Match } from '../core/types';
@@ -53,7 +54,9 @@ export function MatchCard({ match, onPress, onStart, timeZone }: {
    *  ("Thu, 4:00 pm GST") when it isn't the viewer's own clock. */
   timeZone?: string;
 }) {
-  const plugin = getSport(match.sport);
+  // Perf F-15: the name and icon come from the light meta; the full plugin is
+  // read only for a played match's card line (the data layer loaded it).
+  const sport = getSportMeta(match.sport);
   const viewerTz = useUserTimeZone(); // default: the viewer's own timezone
   const tz = timeZone || viewerTz;
   const otherClock = tz !== viewerTz && zoneShortName(tz, match.startsAt) !== zoneShortName(viewerTz, match.startsAt);
@@ -73,7 +76,8 @@ export function MatchCard({ match, onPress, onStart, timeZone }: {
   // SD-56: football's half-time score ("HT 1-0") under a live / final score.
   // SD-48: a team tie shown as one fixture (rubbers won; ½ for chess draws)
   const tie = isTieMatch(match);
-  const cardLine = showScore && !setLine && match.state && plugin.cardLine ? safeLine(() => plugin.cardLine!(match.state as never)) : '';
+  const plugin = showScore && !setLine && match.state ? getSport(match.sport) : null;
+  const cardLine = plugin?.cardLine ? safeLine(() => plugin.cardLine!(match.state as never)) : '';
 
   return (
     // The start button sits beside (not inside) the card's touchable — a button
@@ -81,7 +85,7 @@ export function MatchCard({ match, onPress, onStart, timeZone }: {
     <View style={[s.card, live && s.cardLive]}>
     <TouchableOpacity
       accessibilityRole="button"
-      accessibilityLabel={`${plugin.name}: ${teamLabel(match.homeTeam)} versus ${teamLabel(match.awayTeam)}${
+      accessibilityLabel={`${sport.name}: ${teamLabel(match.homeTeam)} versus ${teamLabel(match.awayTeam)}${
         showScore ? `, ${match.score!.home} to ${match.score!.away}${setLine ? ` (${setLine})` : ''}${cardLine ? ` (${cardLine})` : ''}` : ''
       }, ${onBreak ? 'on a break' : live ? 'live now' : done ? 'final' : time}`}
       style={s.body}
@@ -90,7 +94,7 @@ export function MatchCard({ match, onPress, onStart, timeZone }: {
     >
       <View style={s.top}>
         <Text style={s.sport}>
-          {plugin.icon} {plugin.name}
+          {sport.icon} {sport.name}
         </Text>
         {onBreak ? (
           <Text style={s.breakTag}>⏸ BREAK</Text>

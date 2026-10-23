@@ -58,6 +58,8 @@ import { baseballFormation, BaseballField, CountDots, Diamond } from './diamond'
 import { usePendingEdit } from '../usePendingEdit';
 import { BackfillBar, RowAction, confirmRemove } from '../TimelineControls';
 import { baseballVoice, baseballVoiceEnds } from './voice';
+import { BASEBALL_META } from './meta';
+import { baseballMatchRecords } from './records';
 
 const BASE_NAME = ['Home', '1st', '2nd', '3rd'];
 const DESTS: { to: Dest; label: string }[] = [{ to: -1, label: 'Out' }, { to: 1, label: '1B' }, { to: 2, label: '2B' }, { to: 3, label: '3B' }, { to: 4, label: 'Score' }];
@@ -715,10 +717,8 @@ const BaseballStats = ({ state, homeName, awayName, homeColor, awayColor, homeRo
 /* --------------------------------- plugin ---------------------------------- */
 
 export const baseballPlugin: SportPlugin<BaseballState> = {
-  id: 'baseball',
-  name: 'Baseball & softball',
-  icon: '⚾',
-  archetype: 'running-points',
+  ...BASEBALL_META,
+  matchRecords: baseballMatchRecords, // SD-51 (set by the registry before perf F-15)
   createInitialState: init,
   reducer,
   isComplete,
@@ -754,48 +754,6 @@ export const baseballPlugin: SportPlugin<BaseballState> = {
   formation: (perSide) => baseballFormation(perSide),
   Court: BaseballField,
   liveSettings: BASEBALL_LIVE_SETTINGS,
-  formatFields: [
-    {
-      key: 'preset', label: 'Format', type: 'preset', default: 'baseball', onCreate: true,
-      options: [
-        ...Object.entries(BASEBALL_PRESETS).map(([value, p]) => ({ value, label: p.label, set: p.set })),
-        { value: 'custom', label: 'Custom' },
-      ],
-    },
-    { key: 'innings', label: 'Innings', type: 'number', default: 9, min: 3, max: 12, advanced: true },
-    {
-      key: 'mercy', label: 'Run rule (mercy)', type: 'choice', default: '15@5,10@7', advanced: true,
-      options: [
-        { value: '15@5,10@7', label: '15 after 5, 10 after 7 (WBSC baseball)' },
-        { value: '15@3,10@4,7@5', label: '15 after 3, 10 after 4, 7 after 5 (WBSC softball)' },
-        { value: '20@3,15@4,10@5', label: '20 after 3, 15 after 4, 10 after 5 (slow pitch)' },
-        { value: '10@5', label: '10 after 5' },
-        { value: '10@4', label: '10 after 4' },
-        { value: '15@3,10@4', label: '15 after 3, 10 after 4' },
-        { value: '', label: 'None' },
-      ],
-      hint: 'a lead this big after that many innings ends the game — check your competition',
-    },
-    {
-      key: 'tiebreak', label: 'Extra innings', type: 'choice', default: 'r12', advanced: true,
-      options: [
-        { value: 'r12', label: 'Runners on 1st + 2nd (WBSC baseball)' },
-        { value: 'r2', label: 'Runner on 2nd (WBSC softball, MLB)' },
-        { value: 'none', label: 'Play on, bases empty' },
-      ],
-    },
-    { key: 'tbFrom', label: 'Tie-break from inning', type: 'number', default: 10, min: 2, max: 15, advanced: true },
-    { key: 'dh', label: 'Designated hitter', type: 'toggle', default: true, advanced: true },
-    { key: 'lineupSize', label: 'Batters in the order', type: 'count', default: 9, min: 9, max: 15, advanced: true, hint: '10 in slow pitch; more for a continuous batting order' },
-    { key: 'startCount', label: 'Count starts at', type: 'choice', default: '0-0', options: [{ value: '0-0', label: '0-0' }, { value: '1-1', label: '1-1 (slow pitch)' }], advanced: true },
-    { key: 'foulOut', label: 'Foul with two strikes is out', type: 'toggle', default: false, advanced: true, hint: 'slow pitch' },
-    { key: 'allowTies', label: 'A tied game may stand', type: 'toggle', default: false, advanced: true, hint: 'time-limited league games; never in a knockout' },
-    { key: 'maxInnings', label: 'Stop after inning (0 = play on)', type: 'number', default: 0, min: 0, max: 20, advanced: true },
-    { key: 'pitches', label: 'Pitch-by-pitch (balls & strikes)', type: 'toggle', default: true, advanced: true },
-    { key: 'askFielders', label: 'Ask for fielders (6-3)', type: 'toggle', default: false, advanced: true },
-    // deep wave: "Stats to track" (off by default)
-    ...TRACK_FIELDS.map((f) => ({ ...f, advanced: true })),
-  ],
 };
 
 const c = StyleSheet.create({

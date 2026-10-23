@@ -16,7 +16,7 @@ import { teamLabel } from '../core/teamLevels';
 import { eventZone, useUserTimeZone, zoneShortName } from '../core/time';
 import { useRegion, weekdayOrder, exampleDate } from '../core/region';
 import { defaultKickoff, weeklyTimes, parseSkipDates, readTime, dayText, WEEKDAY_SHORT } from '../data/fixtureSchedule';
-import { getSport } from '../sports/registry';
+import { getSportMeta } from '../sports/sportMeta';
 import { useTeams, useTournamentById, useLeagueData, useTournamentTeams, useDivisions } from '../data/hooks';
 import { DivisionTabs } from '../components/DivisionTabs';
 import { createMatch, createTeamTie, getMyPlayerId, updateTournament, patchTournamentFormat, formatDiff } from '../data/repos';
@@ -469,7 +469,7 @@ export default function GenerateFixturesScreen() {
       const myId = await getMyPlayerId(profile?.id);
       // SD-120: the decider is stage-aware per draft, for every sport — a
       // knockout tie always resolves, a league / group / Swiss game's draw stands.
-      const sportDefaults = defaultsFor(getSport(sport).formatFields ?? [], 'tournament');
+      const sportDefaults = defaultsFor(getSportMeta(sport).formatFields ?? [], 'tournament');
       for (const d of drafts) {
         const base = matchFormatFor(tournament, sport, isEliminationStage(d.stage), sportDefaults);
         // SD-124/125: the bracket slot + any draw keys ride on the fixture's format.
@@ -570,7 +570,7 @@ export default function GenerateFixturesScreen() {
             <Text style={textStyles.muted}>Sport</Text>
             <View style={st.chips}>
               {tourSports.map((s) => (
-                <SelectChip key={s} label={`${getSport(s).icon} ${getSport(s).name}`} active={sport === s} onPress={() => pickSport(s)} />
+                <SelectChip key={s} label={`${getSportMeta(s).icon} ${getSportMeta(s).name}`} active={sport === s} onPress={() => pickSport(s)} />
               ))}
             </View>
           </>
@@ -590,7 +590,7 @@ export default function GenerateFixturesScreen() {
             </View>
             {pickTeams.length < 2 ? (
               <Text style={textStyles.muted}>
-                {activeCat ? 'Add at least two teams to this division under “Participating teams” first.' : `Add at least two ${getSport(sport).name} teams under “Manage teams” first.`}
+                {activeCat ? 'Add at least two teams to this division under “Participating teams” first.' : `Add at least two ${getSportMeta(sport).name} teams under “Manage teams” first.`}
               </Text>
             ) : (
               <View style={st.chips}>

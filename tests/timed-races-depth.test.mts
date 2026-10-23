@@ -28,7 +28,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 /** The "Stats to track" toggles a plugin declares: [key, default] (plugins are .tsx — read as text). */
 const statsToTrack = (sport: string): [string, string][] =>
-  [...fs.readFileSync(path.join(ROOT, `src/sports/${sport}/index.tsx`), 'utf8').matchAll(/\{ key: '(\w+)'[^\n]*default: (\w+)[^\n]*group: 'Stats to track'/g)].map((m) => [m[1], m[2]]);
+  [...(fs.readFileSync(path.join(ROOT, `src/sports/${sport}/index.tsx`), 'utf8') + fs.readFileSync(path.join(ROOT, `src/sports/${sport}/meta.ts`), 'utf8')).matchAll(/\{ key: '(\w+)'[^\n]*default: (\w+)[^\n]*group: 'Stats to track'/g)].map((m) => [m[1], m[2]]);
 
 const D = (k: string): DisciplineDef => { const d = disciplineOf(k); assert.ok(d, k); return d!; };
 const run = (id: string, name: string, result: EntryResult, heat = 1, athleteId: string | undefined = `p_${id}`): ResultEntry => ({ id, athleteId, name, heat, result });

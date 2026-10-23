@@ -128,12 +128,11 @@ const match = (id: string, h: number, status: string, home = 'a', away = 'b') =>
   ({ id, sport: 'football', status, startsAt: at(h), homeTeam: team(home), awayTeam: team(away), hostIds: ['host-1'] }) as never;
 
 function fakeReads(matches: unknown[]) {
-  const calls = { leaders: [] as string[][], squads: [] as string[][], players: 0, upcoming: 0 };
+  const calls = { squads: [] as string[][], rosters: [] as string[][], players: 0, upcoming: 0 };
   const reads: ReminderReads = {
     upcomingMatches: async () => { calls.upcoming++; return matches as never; },
     tournaments: async () => [],
-    organizations: async () => [],
-    teamLeaders: async (ids) => { calls.leaders.push(ids); return Object.fromEntries(ids.map((i) => [i, { captainId: `${i}-cap` }])); },
+    teamRosters: async (ids) => { calls.rosters.push(ids); return new Map(ids.map((i) => [i, [`${i}-p1`]])); },
     matchSquads: async (ids) => { calls.squads.push(ids); return Object.fromEntries(ids.map((i) => [i, { home: { starters: [], subs: [] }, away: { starters: [], subs: [] } }])); },
     players: async () => { calls.players++; return [{ id: 'a-p1', fullName: 'Ann' }] as never; },
     followedPlayerIds: () => new Set(['a-p1']),
@@ -142,7 +141,7 @@ function fakeReads(matches: unknown[]) {
 }
 
 describe('reminder gather (F-08a/c/d)', () => {
-  test('captains and squads are ONE batched read each, for future scheduled matches only', async () => {
+  test('squads and rosters are ONE batched read each, for future scheduled matches only', async () => {
     const { reads, calls } = fakeReads([
       match('m1', 2, 'scheduled', 'a', 'b'),
       match('m2', 5, 'scheduled', 'a', 'c'),   // team a again — deduped
@@ -150,19 +149,23 @@ describe('reminder gather (F-08a/c/d)', () => {
       match('m0', -1, 'scheduled', 'f', 'g'),  // already started (server clock skew) — dropped
     ]);
     const g = await gatherReminderInputsWith(reads, NOW);
-    assert.equal(calls.leaders.length, 1);
-    assert.deepEqual([...calls.leaders[0]].sort(), ['a', 'b', 'c']);
+    assert.equal(calls.rosters.length, 1);
+    assert.deepEqual([...calls.rosters[0]].sort(), ['a', 'b', 'c']);
     assert.equal(calls.squads.length, 1);
     assert.deepEqual(calls.squads[0], ['m1', 'm2']);
     assert.deepEqual(g.matches.map((m) => m.id), ['m1', 'm2', 'm3']);
-    assert.equal(g.leadersByTeam.a.captainId, 'a-cap');
+    assert.deepEqual(g.rostersByTeam?.a, ['a-p1']);
+    // Captains / orgs aren't read any more: the squad + no-scorer nudges are the
+    // server cron's (2026-10-23).
+    assert.equal('leadersByTeam' in g, false);
+    assert.equal('orgs' in g, false);
     assert.equal(g.playerNameById['a-p1'], 'Ann');
     assert.ok(g.followedPlayerIds.has('a-p1'));
   });
-  test('no upcoming matches → no leader/squad reads at all', async () => {
+  test('no upcoming matches → no squad/roster reads at all', async () => {
     const { reads, calls } = fakeReads([]);
     await gatherReminderInputsWith(reads, NOW);
-    assert.equal(calls.leaders.length + calls.squads.length, 0);
+    assert.equal(calls.rosters.length + calls.squads.length, 0);
     assert.equal(calls.players, 1);
   });
 });

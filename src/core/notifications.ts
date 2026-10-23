@@ -120,6 +120,22 @@ export async function syncScheduledLocal(
   }
 }
 
+/** A tapped push that carries an in-app link (data.url = sportnnote://…) opens
+ *  that screen — e.g. "your friend joined" → their profile; also when the tap
+ *  launched the app. (Web pushes open their url in the service worker.) */
+let tapsWired = false;
+export async function listenForNotificationTaps(open: (url: string) => void): Promise<void> {
+  const N = await getNotif();
+  if (!N || tapsWired) return;
+  tapsWired = true;
+  const go = (r: { notification: { request: { content: { data?: Record<string, unknown> | null } } } } | null) => {
+    const url = r?.notification.request.content.data?.url;
+    if (typeof url === 'string' && url.startsWith('sportnnote://')) open(url);
+  };
+  try { go(await N.getLastNotificationResponseAsync()); } catch { /* no launch tap */ }
+  N.addNotificationResponseReceivedListener(go);
+}
+
 export async function registerForPush(): Promise<string | null> {
   const N = await getNotif();
   if (!N) return null;

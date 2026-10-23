@@ -7,6 +7,11 @@ import type { FootballEvent, GoalType, BodyPart, StatEvent, StatKind, ShotZone }
 import { isPlayerCard } from "./events.ts";
 import { aggPriorFromConfig, aggregateText, levelForDecider, type AggPrior } from "../aggregate.ts";
 import type { Player } from "../../core/types";
+// Perf F-15 — the format presets / options live in the light meta module.
+import { DEEP_TRACK_KEYS, DEEP_TRACKABLE, trackKey, DEEP_TRACK_FIELDS } from './meta.ts';
+import type { DeepTrackKey } from './meta.ts';
+export { DEEP_TRACK_KEYS, DEEP_TRACKABLE, DEEP_TRACK_FIELDS };
+export type { DeepTrackKey };
 export type Decider = 'none' | 'extra_time' | 'penalties';
 
 export interface FootballState {
@@ -147,9 +152,7 @@ export interface DeepTrack {
 }
 
 export const TRACK_KEYS: (keyof TrackConfig)[] = ['shots', 'possession', 'fouls', 'cards', 'offsides', 'corners', 'tackles', 'interceptions', 'saves', 'passes', 'crosses', 'dribbles', 'handball', 'attackContribution', 'defenceContribution'];
-/** Deep wave — the optional depth toggles (format key `track` + Capitalised). */
-export const DEEP_TRACK_KEYS = ['shotDetail', 'keyPasses', 'clearances', 'setPieces', 'cardReasons', 'ruledOut'] as const;
-export type DeepTrackKey = typeof DEEP_TRACK_KEYS[number];
+
 /** Deep wave — the switched-on depth from the format (undefined = none). */
 export function readDeepTrack(config?: Record<string, unknown>): DeepTrack | undefined {
   const out: DeepTrack = {};
@@ -182,21 +185,6 @@ const TRACKABLE: [keyof TrackConfig, string][] = [
   ['attackContribution', 'Attacking play'], ['defenceContribution', 'Defensive play'],
   ['crosses', 'Crosses'], ['dribbles', 'Dribbles'], ['handball', 'Handballs'],
 ];
-/** Deep wave — "Deeper stats (optional)": off by default; each adds a chip or
- *  a step only when on. */
-export const DEEP_TRACKABLE: [DeepTrackKey, string, string][] = [
-  ['shotDetail', 'Shot detail', 'inside / outside the box, big chances, woodwork'],
-  ['keyPasses', 'Key passes', 'who set up each shot'],
-  ['clearances', 'Clearances', 'a defensive action button'],
-  ['setPieces', 'Goal kicks & throw-ins', 'team counts (FIFA)'],
-  ['cardReasons', 'Card reasons', 'foul, dissent, time-wasting…'],
-  // round 2 (founder): behind a toggle — school matches have no VAR
-  ['ruledOut', 'Goals ruled out', 'offside, foul or VAR — the score never moves'],
-];
-const trackKey = (k: string) => `track${k[0].toUpperCase()}${k.slice(1)}`;
-/** Deep wave — the optional toggles as format fields (live settings group;
- *  also an organiser's advanced format options). */
-export const DEEP_TRACK_FIELDS: FormatField[] = DEEP_TRACKABLE.map(([k, label, hint]) => ({ key: trackKey(k), label, type: 'toggle', default: false, group: 'Deeper stats (optional)', hint }));
 
 /** Football's live settings (config mode): each tap patches the match format and
  *  the log replays with it, exactly as the old inline card did. */

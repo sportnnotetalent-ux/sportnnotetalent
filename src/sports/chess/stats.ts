@@ -116,7 +116,8 @@ export const chessStats: SportStatSchema<'chess'> = {
     { key: 'tprGames', label: 'Games against rated opponents', short: 'rated games', one: 'rated game', group: 'perf', coverage: 'keyed' },
     { key: 'tprOppSum', label: 'Opponents\' ratings (sum)', short: 'opponent ratings', group: 'perf', coverage: 'keyed' },
     { key: 'tprPts', label: 'Points against rated opponents', short: 'points v rated', group: 'perf', format: { unit: 'points' }, coverage: 'keyed' },
-    { key: 'tpr', label: 'Performance rating (TPR)', leaderLabel: 'Performance rating (TPR, unofficial)', source: 'derived', coverage: 'keyed', group: 'perf', format: { unit: 'count' },
+    // (short "TPR": the award candidate's line reads "1909 TPR · 5 rated games")
+    { key: 'tpr', label: 'Performance rating (TPR)', short: 'TPR', leaderLabel: 'Performance rating (TPR, unofficial)', source: 'derived', coverage: 'keyed', group: 'perf', format: { unit: 'count' },
       agg: { kind: 'formula', keys: ['tprGames', 'tprOppSum', 'tprPts'], den: 'tprGames', compute: (t) => tprOf(t.tprGames, t.tprOppSum, t.tprPts),
         qualifier: { den: 5, unit: { label: 'rated games', one: 'rated game' } } } },
   ],
@@ -148,5 +149,12 @@ export const chessStats: SportStatSchema<'chess'> = {
     { stat: 'wins', icon: '♟️', label: 'Most wins', match: false, tournament: false },
     { stat: 'scorePct', icon: '📈', label: 'Best score %', match: false,
       howRanked: 'Score %: points (1 for a win, ½ for a draw) ÷ games played. Players need at least {min} to rank. Ties: the higher score, then more wins, then by name. You choose the winner.' },
+    // Follow-up to round 2 — the performance rating as a tournament award: the
+    // same figure and minimum as the TPR leader (an organiser's `leaderMins.tpr`
+    // moves both). Offered only where ratings exist (`onlyIfTracked`: some line
+    // of the tournament carries the keys withChessPerformance adds).
+    { stat: 'tpr', icon: '📊', label: 'Best performance rating', match: false, onlyIfTracked: true,
+      tieBreak: [{ key: 'tprGames', better: 'higher' }],
+      howRanked: 'Tournament performance rating (TPR), unofficial: the average rating of the rated opponents met over the board, plus the rating difference FIDE gives for the score (B.02 table 8.1a), from the ratings players entered on their profiles. Forfeits and unrated opponents don\'t count. Players need at least {min} to rank. Ties: more games against rated opponents, then by name. You choose the winner.' },
   ],
 };

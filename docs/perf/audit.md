@@ -164,3 +164,37 @@ Wave 2 is therefore: F-04 slimmer `phone-login` · F-09(4) `home_feed` RPC · F-
 
 7. Wave 2 read cache: **keep 10 seconds** (2026-10-13). Wave 2 migration run and `phone-login` deployed the same day; signed-in players_view 175 ms → about 25–35 ms on live.
 8. **Wave 3 parked** by the founder (2026-10-13). Waves 1 and 2 are live. Resume when asked: F-15 lazy sports, F-28 inline requires, F-20/F-21 scoring screen, F-24–F-27 bundle trims (about half a day, no migration expected).
+
+## Wave 3 — built 2026-10-23 (not yet committed, published or shipped)
+
+Q5 (phone sign-in in the APK) stays out, as the founder decided. Base: `aa5a0c6`. Nothing visible changes: same screens, same results, same scoring. Checked with the 4,366 tests and with two web builds side by side (54 pages and every match tab of 9 demo matches, plus scoring and Undo in 4 sports, gave identical page text).
+
+| ID | Status | What changed |
+|---|---|---|
+| **F-15** | Done | Each sport has `<sport>/meta.ts` with its id, name, icon, archetype, who competes, format options and result terms. The plugin spreads it, so the two can't drift. `sportMeta.ts` collects the metas; lists, pickers and forms (52 files) read them. The plugins load on demand through `registry.ts`. On the web each sport is its own chunk (`sportLoaders.ts`). In the APK each sport is required on first use, not at start-up (`sportLoaders.native.ts`). Before a played match is returned, the data layer loads its sport (`loadMatchSports` in repos). A screen that renders a sport not loaded yet shows its spinner until it is. On the web all sports are prefetched in idle time after the screens, and a link straight to a match fetches its sport alongside the screen. Format presets moved from the engines into the metas, and the engines re-export them. `matchRecordHooks` was split into one `records.ts` per sport, so a sport's chunk carries only its own hook. Cricket's `ZONES` got its own module. |
+| **F-28** | Done (APK only) | `metro.config.js` turns on `inlineRequires` for native builds. The web keeps it off because the web is split into chunks instead. |
+| **F-20** | Done (screen level) | `LiveScoringScreen` memoises the sport's controls, the voice panel, the add-player panel, the boards, the tab bar and the header. Share reads the match through a ref, so `setOptions` runs only when the title changes; before, it ran on every tap and re-rendered the navigator. |
+| **F-21** | Done | Undo re-derives the board from the log the device holds (`deriveLog` in `eventLog.ts`, shared with the rebuild) before the server pop. After a burst of undos, the server rebuild runs once. A refused undo puts the board back. |
+| F-24 | Skipped | Q6 keeps the full phone metadata. The `examples` file is only 4 KB, which isn't worth an async placeholder. In the APK, F-28 already defers parsing `phone.ts` until first use. |
+| **F-25** | Done | The demo seed is built on first read (`buildDemo`), so a live build never builds it. The demo and dev console seeders load only in demo mode or dev builds, and only as their own chunks. |
+| **F-26** | Done | `firebasePhone.native.ts` stub, checked at compile time against the web module's API. The APK no longer bundles `@firebase/*` (7 modules). |
+| **F-27** | Done (APK only) | `react-native-svg/css`, imported only by react-native-qrcode-svg's local-SVG logo, which is never used, resolves to `src/core/svgCssStub.ts`. This drops css-tree and entities (125 modules). |
+
+**Measured** (`npx expo export`, demo env, same machine):
+
+| | Before (`aa5a0c6`) | After | Change |
+|---|---|---|---|
+| Web first download (runtime + `__common` + entry), raw | 5,385,245 B | 4,311,204 B | −1,074,041 B (−19.9 %) |
+| … gzip | 1,485,146 B | 1,185,932 B | −299,214 B (−20.1 %) |
+| … modules | 1,407 | 1,310 | −97 |
+| Web entry chunk alone, raw / gzip | 4,943,611 / 1,358,953 | 2,831,478 / 747,382 | −43 % / −45 % (part moved to `__common`) |
+| APK bundle (Hermes `.hbc`) | 11,045,640 B, 2,199 modules | 10,547,908 B, 2,076 modules | −497,732 B (−4.5 %) |
+| Web cold start to first React commit (local, median of 3) | 124 ms | 80 ms | −36 % |
+| Web cold start to Home cards (demo, median of 3) | 315 ms | 284 ms | −10 % |
+| Components re-rendered per scoring tap (median of 30) | football 745 · basketball 731 · volleyball 597 · badminton 511 | 341 · 334 · 265 · 222 | −54 % to −57 % |
+| Time from tap to last commit (desktop, median) | 20.6 · 21.7 · 18.9 · 17.4 ms | 13.8 · 13.2 · 14.5 · 12.4 ms | −23 % to −39 % |
+| Undo: re-derive from the local log (node, 196-event cricket match / 400-event football log) | — | 0.40 ms / 0.16 ms | replaces 2 sequential server round trips (pop + full log read) before the board moved |
+
+**Still in the first web download, and why:** Expo puts any module that two on-demand chunks share into `__common`, which loads at start (docs: "the chunk-splitting heuristic cannot be customized"). The cross-sport helper modules (`boxSources`, `gameFlow`, `voiceParsers`, `serveStats` / `racketTotals`) import many sports' engines, and several sport chunks plus `LiveScoringScreen` import them. So most engines (about 640 KB raw of sports code) still sit in `__common`. Splitting those helpers per sport, or routing them through the plugin, would move about 350 KB raw (about 90 KB gzip) more out of the first download. This is a follow-up, not done here.
+
+**Regression focus for the device pass:** opening a match on the web in the first seconds after launch, before the idle prefetch has the sport (the screen spinner lasts while its chunk loads; a link straight to a match fetches the screen and the sport together), Undo on a slow network (the board steps back at once), End match from a sport's controls, Share on the match header, offline scoring of a sport opened before, and APK start-up with inline requires (sign-in, push registration, reminders, the demo store in demo mode).

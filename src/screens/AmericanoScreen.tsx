@@ -12,15 +12,18 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { theme } from '../core/theme';
 import { Card, SelectChip, ScreenTitle, EmptyState, TextField, Button, textStyles } from '../components/ui';
 import { RankBadge } from '../components/Rank';
-import { getSport } from '../sports/registry';
+import { getSportMeta } from '../sports/sportMeta';
 import { useAuth } from '../core/auth';
 import { canManageTournament } from '../core/org';
 import { useTournamentById, useOrganizations } from '../data/hooks';
 import { getMyPlayerId, updateTournament, patchTournamentFormat, formatDiff } from '../data/repos';
 import {
   americanoSchedule, americanoStandings, suggestedAmericanoRounds, gameKey,
-  readAmericano, writeAmericano, newAmericanoPlayer, type AmericanoState,
+  readAmericano, writeAmericano, newAmericanoPlayer, addAmericanoPlayer, isLinkedAmericanoPlayer, type AmericanoState,
 } from '../data/americano';
+import { PersonPicker } from '../components/PersonPicker';
+import { inviteLabel, playerInviteText } from '../core/inviteText';
+import { tournamentLink } from '../core/shareText';
 import type { RootStackParamList } from '../navigation/types';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -38,7 +41,6 @@ export default function AmericanoScreen() {
 
   const [state, setState] = useState<AmericanoState>(() => readAmericano(tournament?.formats?.[sport]));
   const [dirty, setDirty] = useState(false);
-  const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   // Reload from the tournament when it changes and we've no unsaved edits.
   useEffect(() => {
@@ -62,11 +64,16 @@ export default function AmericanoScreen() {
   const hasSchedule = state.schedule.length > 0;
   const suggested = suggestedAmericanoRounds(state.players.length);
 
-  const addPlayer = () => {
-    if (!name.trim()) return;
-    void persist({ ...state, players: [...state.players, newAmericanoPlayer(name)] });
-    setName('');
-  };
+  // The field is real people: picked by name or mobile number (a new number is
+  // added & invited) — their player id, so they're one person across the app. A
+  // typed name with no player behind it is the marked last resort.
+  const addPlayer = (p: { id: string; name: string }) => persist(addAmericanoPlayer(state, p));
+  const addMe = () => (myId ? addPlayer(newAmericanoPlayer(profile?.fullName ?? 'Me', myId)) : undefined);
+  const playerInvite = (who?: string) => playerInviteText({
+    name: who, inviterName: profile?.fullName, sportName: getSportMeta(sport).name,
+    context: tournament?.name ? inviteLabel('Tournament', tournament.name) : undefined,
+    link: tournamentLink(tournamentId),
+  });
   const removePlayer = (id: string) => void persist({ ...state, players: state.players.filter((p) => p.id !== id) });
   const setTarget = (t: number) => void persist({ ...state, target: t });
   const setRounds = (r: number) => void persist({ ...state, rounds: r });
@@ -85,7 +92,7 @@ export default function AmericanoScreen() {
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
       <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
-        <ScreenTitle title={`${getSport(sport).icon} Americano`} subtitle="Rotate partners each round · individual points" />
+        <ScreenTitle title={`${getSportMeta(sport).icon} Americano`} subtitle="Rotate partners each round · individual points" />
 
         {/* Leaderboard first — it's the point of Americano. */}
         <Text style={textStyles.h3}>🏅 Leaderboard</Text>
@@ -115,14 +122,24 @@ export default function AmericanoScreen() {
             <Card style={{ gap: theme.spacing(2) }}>
               {state.players.map((p) => (
                 <View key={p.id} style={st.playerRow}>
-                  <Text style={[textStyles.body, { flex: 1 }]} numberOfLines={1}>{p.name}</Text>
+                  <Text style={[textStyles.body, { flex: 1 }]} numberOfLines={1}>
+                    {p.name}{isLinkedAmericanoPlayer(p.id) ? '' : ' · name only'}
+                  </Text>
                   <Text style={st.removeX} accessibilityRole="button" accessibilityLabel={`Remove ${p.name}`} onPress={() => removePlayer(p.id)}>✕</Text>
                 </View>
               ))}
-              <View style={st.addRow}>
-                <View style={{ flex: 1 }}><TextField label="" value={name} onChange={setName} placeholder="Add a player" /></View>
-                <Button label="Add" onPress={addPlayer} />
-              </View>
+              {myId && !state.players.some((p) => p.id === myId) && (
+                <View style={st.chips}><SelectChip label="👤 Add me" active={false} onPress={() => void addMe()} /></View>
+              )}
+              <PersonPicker
+                role="player"
+                sport={sport}
+                excludeIds={state.players.map((p) => p.id)}
+                takenNote={(n) => `${n} is already in.`}
+                inviteText={playerInvite}
+                onPick={(p) => addPlayer(newAmericanoPlayer(p.fullName, p.id))}
+                onNameOnly={(n) => addPlayer(newAmericanoPlayer(n))}
+              />
             </Card>
 
             {/* Setup */}
@@ -199,7 +216,6 @@ const st = StyleSheet.create({
   pts: { fontWeight: '900', color: theme.colors.primary },
   playerRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(2) },
   removeX: { color: theme.colors.danger, fontSize: theme.font.body, fontWeight: '900', paddingHorizontal: theme.spacing(2) },
-  addRow: { flexDirection: 'row', alignItems: 'flex-end', gap: theme.spacing(2) },
   lbl: { color: theme.colors.textMuted, fontSize: theme.font.small, fontWeight: '700', marginBottom: theme.spacing(1) },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing(2) },
   roundTitle: { color: theme.colors.text, fontWeight: '800', fontSize: theme.font.body },

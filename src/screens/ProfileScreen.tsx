@@ -64,6 +64,7 @@ export default function ProfileScreen() {
             onTournaments={() => nav.navigate('MyTournaments')}
             onMatches={() => nav.navigate('Tabs', { screen: 'Matches' })}
             onCalendar={() => nav.navigate('Calendar')}
+            onInvite={() => nav.navigate('InviteFriend')}
           />
         )}
       />

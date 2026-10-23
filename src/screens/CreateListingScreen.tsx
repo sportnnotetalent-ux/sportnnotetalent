@@ -9,7 +9,7 @@ import { theme } from '../core/theme';
 import { Button, TextField, SelectChip, ScreenTitle, FieldLabel, FormError, textStyles } from '../components/ui';
 import { PhoneField } from '../components/PhoneField';
 import { samePhone } from '../core/phone';
-import { SPORT_LIST, getSport } from '../sports/registry';
+import { SPORT_LIST, getSportMeta } from '../sports/sportMeta';
 import { useAuth } from '../core/auth';
 import { getMyPlayerId, getPlayer, createListing } from '../data/repos';
 import { LISTING_KINDS, LISTING_LEVELS, wantsSchedule, wantsLevel } from '../core/connect';
@@ -151,7 +151,7 @@ export default function CreateListingScreen({ navigation }: Props) {
             label="Details"
             value={details}
             onChange={setDetails}
-            placeholder={`What ${getSport(sport).name.toLowerCase()} ${isTeamKind(kind) ? 'your team needs' : 'you’re looking for'} — availability, level, timing…`}
+            placeholder={`What ${getSportMeta(sport).name.toLowerCase()} ${isTeamKind(kind) ? 'your team needs' : 'you’re looking for'} — availability, level, timing…`}
             multiline
           />
           <PhoneField label="Contact number (WhatsApp)" value={phone} onChange={setPhone} optional />

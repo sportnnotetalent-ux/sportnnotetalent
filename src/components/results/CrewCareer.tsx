@@ -47,7 +47,7 @@ export function CrewCareer({ lines, sport }: { lines: StatLine[]; sport: 'rowing
       {/* deep wave: heats / repechages / semi-finals won (only once one is on record) */}
       {c.heatWins > 0 && <Text style={textStyles.muted}>🏁 Won {c.heatWins} heat{c.heatWins === 1 ? '' : 's'} / repechage{c.heatWins === 1 ? '' : 's'} / semi-final{c.heatWins === 1 ? '' : 's'}.</Text>}
       {/* timed races round 2: meet / school records broken */}
-      <RecordsSetCard c={c} />
+      <RecordsSetCard c={c} playerId={lines[0]?.playerId} infos={infos} />
 
       <Text style={st.section}>Best times</Text>
       {c.bests.length === 0 ? <Text style={textStyles.muted}>No times yet — each boat class and distance keeps its own best.</Text> : (

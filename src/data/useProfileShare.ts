@@ -2,7 +2,7 @@
 import { useCallback } from 'react';
 import { usePlayerProfile } from './hooks';
 import { sportSummary } from './stats';
-import { getSport } from '../sports/registry';
+import { getSportMeta } from '../sports/sportMeta';
 import { profileShareText } from '../core/shareText';
 import { shareMessage } from '../core/share';
 import type { SportId } from '../core/types';
@@ -12,7 +12,7 @@ export function useProfileShare(playerId: string | null) {
   return useCallback(() => {
     if (!player || !playerId) return;
     const sports = (stats?.bySport ?? []).map((b) => {
-      const sp = getSport(b.sport as SportId);
+      const sp = getSportMeta(b.sport as SportId);
       const summary = sportSummary(b);
       return [`${sp.icon} ${sp.name}`, `${b.matches} ${b.matches === 1 ? 'match' : 'matches'}`, summary].filter(Boolean).join(' · ');
     });

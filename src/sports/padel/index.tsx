@@ -39,6 +39,8 @@ import { makeRacketQuickOptions } from '../RacketQuickOptions';
 import { SetLineBoard } from '../SetLineBoard';
 import { ServeCourtPanel } from '../ServeCourtPanel';
 import { setServeCourt } from '../serveCourt';
+import { PADEL_META } from './meta';
+import { padelMatchRecords } from './records';
 export type { PadelState } from './engine';
 
 const ScoringControls: SportPlugin<PadelState>['ScoringControls'] = ({ state, dispatch: rawDispatch, homeName, awayName, homeColor, awayColor, homeRoster = [], awayRoster = [] }) => {
@@ -166,11 +168,8 @@ const PadelServeCourt: NonNullable<SportPlugin<PadelState>['ServeCourt']> = (p) 
 };
 
 export const padelPlugin: SportPlugin<PadelState> = {
-  id: 'padel',
-  name: 'Padel',
-  icon: '🟡',
-  archetype: 'set-game-point',
-  participantKind: 'both', // doubles-primary, but singles is possible
+  ...PADEL_META,
+  matchRecords: padelMatchRecords, // SD-51 (set by the registry before perf F-15)
   createInitialState: init,
   reducer,
   isComplete: (s) => s.ended,
@@ -190,7 +189,6 @@ export const padelPlugin: SportPlugin<PadelState> = {
   QuickOptions: makeRacketQuickOptions('padel'),
   // SD-20: the line score (board grid, "6-4, 3-2 ret.", [10-7]) + FIP/ITF result marks.
   lineScore,
-  retireTerms: true,
   Scoreboard: PadelScoreboard,
   ScoringControls,
   matchTabs: { Commentary: PadelCommentary, Stats: PadelStats },
@@ -201,61 +199,6 @@ export const padelPlugin: SportPlugin<PadelState> = {
   Court: makeCourt('padel'),
   ServeCourt: PadelServeCourt,
   voice: { hints: ['point home', 'point away', '{name} scores'], parse: pointVoice },
-  formatFields: [
-    {
-      key: 'preset', label: 'Format', type: 'preset', default: 'premier',
-      options: [
-        { value: 'premier', label: 'Golden point (WPT style)', set: { deuce: 'golden', gamesPerSet: 6, setsToWin: 2, decider: 'set' } },
-        // SD-64 — FIP / Premier Padel from 2026 (Rules of Padel, Rule 1 option 2)
-        { value: 'star', label: 'Star Point (FIP / Premier Padel 2026)', set: { deuce: 'star', gamesPerSet: 6, setsToWin: 2, decider: 'set' } },
-        { value: 'classic', label: 'Classic (advantage)', set: { deuce: 'advantage', gamesPerSet: 6, setsToWin: 2, decider: 'set' } },
-        { value: 'short', label: 'Short (to 4, match TB)', set: { deuce: 'golden', gamesPerSet: 4, setsToWin: 2, decider: 'match10' } },
-        { value: 'custom', label: 'Custom' },
-      ],
-    },
-    {
-      key: 'playersPerSide', label: 'Players', type: 'choice', default: 2,
-      options: [
-        { value: 2, label: 'Doubles' },
-        { value: 1, label: 'Singles' },
-      ],
-    },
-    {
-      key: 'deuce', label: 'At deuce', type: 'choice', default: 'advantage',
-      hint: 'how 40-40 is decided',
-      options: [
-        { value: 'advantage', label: 'Advantage (classic)' },
-        { value: 'golden', label: 'Golden point' },
-        { value: 'star', label: 'Star Point (2 advantages, then deciding point)' },
-      ],
-    },
-    {
-      key: 'gamesPerSet', label: 'Games per set', type: 'choice', default: 6, advanced: true,
-      options: [
-        { value: 6, label: 'Standard (to 6)' },
-        { value: 4, label: 'Short (to 4)' },
-      ],
-    },
-    {
-      key: 'setsToWin', label: 'Match length', type: 'choice', default: 2, advanced: true,
-      options: [
-        { value: 2, label: 'Best of 3 sets' },
-        { value: 3, label: 'Best of 5 sets' },
-        { value: 1, label: 'Single set' },
-      ],
-    },
-    {
-      key: 'decider', label: 'Deciding set', type: 'choice', default: 'set', advanced: true,
-      hint: 'how the final set is played',
-      options: [
-        { value: 'set', label: 'Full set' },
-        { value: 'match10', label: 'Match tiebreak (to 10)' },
-      ],
-    },
-    // deep wave — "Stats to track" defaults for every match of this format
-    // (the scorer can still change them per match in ⚙️ Scoring settings)
-    ...trackFormatFields('padel'),
-  ],
 };
 
 const ctrl = StyleSheet.create({

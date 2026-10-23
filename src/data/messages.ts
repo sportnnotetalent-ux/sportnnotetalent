@@ -13,6 +13,7 @@ import { supabase, isSupabaseConfigured } from '../core/supabase';
 import { fnPath } from '../core/functionPath';
 import { ageOf } from '../core/age';
 import { demo, genId } from './demoStore';
+import { fetchAllPages } from './paging';
 
 export interface MessageThread {
   threadId: string;
@@ -128,7 +129,9 @@ export async function replyToThread(threadId: string, body: string): Promise<voi
 /** My conversations, newest first. */
 export async function getMyThreads(): Promise<MessageThread[]> {
   if (!live()) return [...demoThreads].sort((a, b) => b.lastAt.localeCompare(a.lastAt)).map(demoThreadView);
-  const { data, error } = await supabase!.rpc('my_threads');
+  // Every thread (the unread count needs them all): paged past the 1,000-row cap, newest first.
+  const { data, error } = await fetchAllPages((from, to) =>
+    supabase!.rpc('my_threads').order('last_message_at', { ascending: false }).order('thread_id').range(from, to));
   if (error) throw new Error(error.message);
   return ((data ?? []) as any[]).map((r) => ({
     threadId: r.thread_id, subjectPlayerId: r.subject_player_id, subjectName: r.subject_name,
@@ -157,11 +160,13 @@ export async function getThreadMessages(threadId: string, myProfileId?: string):
     return demoMessages.filter((m) => m.threadId === threadId)
       .map((m) => ({ id: m.id, threadId, mine: true, body: m.body, createdAt: m.at }));
   }
+  // The NEWEST 500 (a long thread used to show its first 500 and never the latest),
+  // read newest-first and turned back to oldest-first.
   const { data, error } = await supabase!
     .from('messages').select('id, thread_id, sender_profile_id, body, created_at, removed_at')
-    .eq('thread_id', threadId).order('created_at', { ascending: true }).limit(500);
+    .eq('thread_id', threadId).order('created_at', { ascending: false }).order('id', { ascending: false }).limit(500);
   if (error) throw new Error(error.message);
-  return ((data ?? []) as any[]).map((r) => ({
+  return ((data ?? []) as any[]).reverse().map((r) => ({
     id: r.id, threadId: r.thread_id, mine: r.sender_profile_id === myProfileId, body: r.body, createdAt: r.created_at,
     removed: !!r.removed_at,
   }));

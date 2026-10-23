@@ -438,7 +438,8 @@ export default function ResultsEventScreen() {
     setBusy(true);
     try {
       const pts = pointsFor('athletics', tournament?.formats?.athletics as Record<string, unknown> | undefined);
-      const book = await completeFinal(phase, merged, nameOf, ['MR'], pts);
+      // timed races follow-up: the school book the sheet was flagged against, so a total that beat it counts as a school record set
+      const book = await completeFinal(phase, merged, nameOf, ['MR'], pts, { schoolBook: srBook });
       const mine = book.filter((r) => r.discipline === cdef.key && r.category === cat && r.eventKey === f.eventKey);
       setInfo(mine.length ? `Records: ${mine.map((r) => `${r.scope} ${r.value} pts (${r.holder})`).join(' · ')}` : null);
       await load();

@@ -89,7 +89,7 @@ import type { LiveExtrasProps, MatchTabs } from '../sports/types';
 import { RemindInstall } from '../components/RemindInstall';
 import { LiveAnnouncer, scoreSentence } from '../components/LiveAnnouncer';
 import { realName } from '../core/invite';
-import { matchRoleInviteText } from '../core/inviteText';
+import { inviteLabel, matchRoleInviteText, playerInviteText } from '../core/inviteText';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'LiveScoring'>;
 
@@ -239,7 +239,6 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
   const [remindedSides, setRemindedSides] = useState<Record<'home' | 'away', boolean>>({ home: false, away: false });
   useEffect(() => { setStreamInput(meta.streamUrl ?? ''); }, [meta.streamUrl]);
   // Per-dispute "add a new name" inputs (reassign to someone not in the system).
-  const [newName, setNewName] = useState<Record<string, string>>({});
 
   // One active scorer at a time (parity #03): the lock names who IS scoring;
   // scorerIds only says who MAY. Polled on focus and every 15 s while scoring.
@@ -411,11 +410,16 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
   // SD-20: the set/game line every result surface shows — "6-4, 3-2 ret." for a
   // match closed by hand, "w/o", else the completed sets.
   const resultOpts = { result: meta.result, walkover: meta.walkover };
-  const fullLine = plugin.scoreLine ? matchScoreLine(plugin, state, resultOpts) : '';
+  // (perf F-20: memoised on what they read, so a screen update that isn't a tap
+  // doesn't recompute them or hand the boards new props)
+  const fullLine = useMemo(
+    () => (plugin.scoreLine ? matchScoreLine(plugin, state, { result: meta.result, walkover: meta.walkover }) : ''),
+    [plugin, state, meta.result, meta.walkover],
+  );
   // Closed by hand before the engine's own end → the board reads as final.
-  const closedBoard = (meta.result || meta.walkover) && !plugin.isComplete(state)
-    ? { mark: resultMark(resultOpts, plugin.retireTerms ? 'racket' : 'generic'), winner: meta.result?.winner ?? (meta.winner === 'home' || meta.winner === 'away' ? meta.winner : undefined) }
-    : undefined;
+  const closedBoard = useMemo(() => ((meta.result || meta.walkover) && !plugin.isComplete(state)
+    ? { mark: resultMark({ result: meta.result, walkover: meta.walkover }, plugin.retireTerms ? 'racket' : 'generic'), winner: meta.result?.winner ?? (meta.winner === 'home' || meta.winner === 'away' ? meta.winner : undefined) }
+    : undefined), [plugin, state, meta.result, meta.walkover, meta.winner]);
   // …and the summary card reads sets/games won + the marked line, not the
   // points the match stopped at ("30 : 15").
   const closedFb = closedBoard ? finalBoard(plugin, state, resultOpts) : null;
@@ -434,10 +438,14 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
 
   // Header title reflects the match state: a completed game reads as match
   // details, a live one simply "Live", otherwise the default scoring title.
+  // Perf F-20: Share reads the match through a ref kept current after every
+  // render, so the header is set again only when its title changes — not on
+  // every scoring tap (each setOptions re-rendered the navigator and header).
+  const shareRef = useRef<() => void>(() => undefined);
   useEffect(() => {
     const hName = homeTeamName ?? homeName;
     const aName = awayTeamName ?? awayName;
-    const share = () => {
+    shareRef.current = () => {
       const status = complete ? 'final' : matchLive ? 'live' : 'upcoming';
       const final = showFinalOnly && meta.score;
       // SD-20: a finished set/game match shares sets won + the marked line
@@ -460,6 +468,12 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
         matchId,
       }), 'match');
     };
+  });
+  const titleHome = homeTeamName ?? homeName;
+  const titleAway = awayTeamName ?? awayName;
+  useEffect(() => {
+    const hName = titleHome;
+    const aName = titleAway;
     navigation.setOptions({
       title: complete
         ? `${hName} vs ${aName} · Match Details`
@@ -467,12 +481,12 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
         ? 'Live'
         : 'Live Scoring',
       headerRight: () => (
-        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Share this match" onPress={share} hitSlop={10} style={{ paddingHorizontal: theme.spacing(2) }}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Share this match" onPress={() => shareRef.current()} hitSlop={10} style={{ paddingHorizontal: theme.spacing(2) }}>
           <Text style={{ color: theme.colors.primary, fontWeight: '800', fontSize: theme.font.body }}>Share</Text>
         </TouchableOpacity>
       ),
     });
-  }, [navigation, complete, matchLive, showFinalOnly, meta, summary, state, plugin, matchId, homeName, awayName, homeTeamName, awayTeamName]);
+  }, [navigation, complete, meta.status, titleHome, titleAway]);
 
   // Any host of the match — or of its tournament — manages it: designates the
   // scorer and edits the XI. Per-match ownership, not a global role, and any of
@@ -715,6 +729,12 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
     when: meta.startsAt ? formatDateTime(meta.startsAt) : undefined,
     link: matchId ? matchLink(matchId) : SHARE_BASE,
   });
+  // …and for a PLAYER added by number (a dispute's "who actually played").
+  const playerInvite = (name?: string) => playerInviteText({
+    name, inviterName: profile?.fullName, sportName: getSport(sport).name,
+    context: inviteLabel('Match', `${homeTeamName ?? homeName} vs ${awayTeamName ?? awayName}`),
+    link: matchId ? matchLink(matchId) : SHARE_BASE,
+  });
 
   // When did scoring actually begin? (first event's server time). Refetch when the
   // log changes so a fresh first-tap sets the kickoff for the restart window.
@@ -920,19 +940,19 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
     }
   };
 
-  const header = (
+  const header = useMemo(() => (
     <View style={st.header}>
       <Text style={st.sportName}>{plugin.icon} {plugin.name}</Text>
       <Pill label={live ? 'Synced' : 'Demo'} color={live ? theme.colors.primary + '22' : theme.colors.surfaceAlt} textColor={live ? theme.colors.primary : theme.colors.textMuted} />
     </View>
-  );
+  ), [plugin, live]);
 
   // SD-115 — name what Undo removes ("point to Federer (30-15)"), from the newest
   // logged step and the timeline events it added. A sport may name it its own
   // way (SD-133: cricket "FOUR — Rohit (4.3)").
-  const undoWhat = plugin.undoLabel ? plugin.undoLabel(lastStep) : undoLabel(lastStep, { home: homeName, away: awayName }, (s) => {
+  const undoWhat = useMemo(() => (plugin.undoLabel ? plugin.undoLabel(lastStep) : undoLabel(lastStep, { home: homeName, away: awayName }, (s) => {
     try { const m = plugin.summary(s as never); return m.homeScore != null && m.awayScore != null ? `${m.homeScore}-${m.awayScore}` : null; } catch { return null; }
-  });
+  })), [plugin, lastStep, homeName, awayName]);
   // SD-110 — keep the phone awake while this scorer is on a match in progress.
   const focused = useIsFocused();
   useKeepAwakeWhile(focused && canScore && started && !complete && !retiredLocally);
@@ -1263,6 +1283,49 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
     </View>
   ) : null;
 
+  // Perf F-20 — the sport's scorer controls (the biggest part of the Scoring
+  // tab) re-render only when what they're given changes — a tap's new state —
+  // not on every update of this screen (the sync status after each tap, the
+  // lock poll, a toast). "End match" from the controls always runs the latest
+  // endMatchWith (a ref, not a stale closure).
+  const endMatchWithRef = useRef(endMatchWith);
+  endMatchWithRef.current = endMatchWith;
+  const endFromControls = useCallback((r: { kind: 'no_result' | 'abandoned'; reason: string }) => {
+    void endMatchWithRef.current({ ...r, at: new Date().toISOString() });
+  }, []);
+  const controlsOnEnd = showEndEarly && !knockout ? endFromControls : undefined;
+  const homeKeeperId = squads?.home.keeperId;
+  const awayKeeperId = squads?.away.keeperId;
+  const scoringControlsEl = useMemo(() => (
+    <plugin.ScoringControls
+      state={state} dispatch={dispatch} homeName={homeName} awayName={awayName}
+      homeColor={homeColor} awayColor={awayColor}
+      homeRoster={homeScoreRoster} awayRoster={awayScoreRoster} homeLineup={homeLineup} awayLineup={awayLineup}
+      homeKeeperId={homeKeeperId} awayKeeperId={awayKeeperId}
+      knockout={knockout}
+      onEndMatch={controlsOnEnd}
+    />
+  ), [plugin, state, dispatch, homeName, awayName, homeColor, awayColor, homeScoreRoster, awayScoreRoster, homeLineup, awayLineup, homeKeeperId, awayKeeperId, knockout, controlsOnEnd]);
+  const wouldComplete = useCallback((acts: Parameters<typeof completesMatch>[2]) => completesMatch(plugin, state, acts), [plugin, state]);
+  const voiceEl = useMemo(() => (plugin.voice ? (
+    <VoiceScorer
+      voice={plugin.voice} state={state} dispatch={dispatch}
+      homeName={homeName} awayName={awayName}
+      homeRoster={homeScoreRoster} awayRoster={awayScoreRoster}
+      onUndo={undo}
+      wouldComplete={wouldComplete}
+    />
+  ) : null), [plugin, state, dispatch, homeName, awayName, homeScoreRoster, awayScoreRoster, undo, wouldComplete]);
+  const bumpRoster = useCallback(() => setRosterNonce((n) => n + 1), []);
+  const addInviteEl = useMemo(() => (canScore && !retiredLocally && meta.homeTeamId && meta.awayTeamId ? (
+    <AddInvitePlayer
+      homeTeamId={meta.homeTeamId} awayTeamId={meta.awayTeamId}
+      homeTeamName={homeTeamName} awayTeamName={awayTeamName}
+      sport={sport} matchId={matchId} invited={invitedPlayers}
+      onChanged={bumpRoster}
+    />
+  ) : null), [canScore, retiredLocally, meta.homeTeamId, meta.awayTeamId, homeTeamName, awayTeamName, sport, matchId, invitedPlayers, bumpRoster]);
+
   const controlsNode = (
     <View style={st.controls}>
       {syncing ? (
@@ -1329,23 +1392,8 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
               🔒 {excludedCount} unverified player{excludedCount === 1 ? '' : 's'} hidden — only verified players can be scored (under-18 needs a verified guardian; 18+ needs verified mobile &amp; email).
             </Text>
           )}
-          <plugin.ScoringControls
-            state={state} dispatch={dispatch} homeName={homeName} awayName={awayName}
-            homeColor={homeColor} awayColor={awayColor}
-            homeRoster={homeScoreRoster} awayRoster={awayScoreRoster} homeLineup={homeLineup} awayLineup={awayLineup}
-            homeKeeperId={squads?.home.keeperId} awayKeeperId={squads?.away.keeperId}
-            knockout={knockout}
-            onEndMatch={showEndEarly && !knockout ? (r) => { void endMatchWith({ ...r, at: new Date().toISOString() }); } : undefined}
-          />
-          {plugin.voice && (
-            <VoiceScorer
-              voice={plugin.voice} state={state} dispatch={dispatch}
-              homeName={homeName} awayName={awayName}
-              homeRoster={homeScoreRoster} awayRoster={awayScoreRoster}
-              onUndo={undo}
-              wouldComplete={(acts) => completesMatch(plugin, state, acts)}
-            />
-          )}
+          {scoringControlsEl}
+          {voiceEl}
         </View>
       )}
     </View>
@@ -1372,14 +1420,24 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
 
   // The top scoreboard — a sport supplies its own, else the universal one. Cricket
   // hides it (its scorecard shows the score).
-  const scoreboardNode = plugin.hideScoreboard ? null : plugin.Scoreboard ? (
+  const scoreboardNode = useMemo(() => (plugin.hideScoreboard ? null : plugin.Scoreboard ? (
     <plugin.Scoreboard state={state} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} live={matchLive} closed={closedBoard} />
   ) : (
     <Scoreboard
       summary={summary} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor}
       live={matchLive} centerNode={plugin.LiveClock ? <plugin.LiveClock state={state} /> : undefined}
     />
-  );
+  )), [plugin, state, summary, homeName, awayName, homeColor, awayColor, matchLive, closedBoard]);
+  // The Scoring tab's running score (the board above the tabs is hidden there).
+  const scoringBoardNode = useMemo(() => (plugin.Scoreboard ? (
+    <plugin.Scoreboard state={state} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} live={live} />
+  ) : (
+    <MiniScore
+      summary={summary} homeName={homeName} awayName={awayName}
+      homeColor={homeColor} awayColor={awayColor} live={live}
+      clockNode={plugin.LiveClock ? <plugin.LiveClock state={state} /> : undefined}
+    />
+  )), [plugin, state, summary, homeName, awayName, homeColor, awayColor, live]);
 
   // Match tabs (2026-10-22): the sport's slots — every one gets the same props
   // (the old LiveExtras props). docs/sport-depth/deep-wave/match-tabs.md
@@ -1533,6 +1591,29 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
   const { width: winW } = useWindowDimensions();
   const scrollTabs = TABS.length > 5;
   const tightTabs = winW < 360;
+  // Perf F-20 — the offline banner follows the outbox itself (no re-render from
+  // this screen), and the tab bar keeps its rendered buttons until a tab, the
+  // set of tabs or the width changes (not on every tap).
+  const offlineBannerNode = useMemo(() => (matchId ? <OfflineSyncBanner matchId={matchId} /> : null), [matchId]);
+  const tabsKey = TABS.map((t) => `${t.key}:${t.label}`).join('|');
+  const tabBarNode = useMemo(() => (scrollTabs ? (
+    <KeyboardAwareScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.tabScroll}>
+      {TABS.map((t) => (
+        <TouchableOpacity key={t.key} style={[st.tabChip, activeTab === t.key && st.tabActive]} activeOpacity={0.8} accessibilityRole="tab" accessibilityLabel={t.label} accessibilityState={{ selected: activeTab === t.key }} aria-selected={activeTab === t.key} onPress={() => setTab(t.key)}>
+          <Text style={[st.tabText, activeTab === t.key && st.tabTextActive]}>{t.label}</Text>
+        </TouchableOpacity>
+      ))}
+    </KeyboardAwareScrollView>
+  ) : (
+    <View style={st.tabBar}>
+      {TABS.map((t) => (
+        <TouchableOpacity key={t.key} style={[st.tab, activeTab === t.key && st.tabActive]} activeOpacity={0.8} accessibilityRole="tab" accessibilityLabel={t.label} accessibilityState={{ selected: activeTab === t.key }} aria-selected={activeTab === t.key} onPress={() => setTab(t.key)}>
+          <Text numberOfLines={1} style={[st.tabText, tightTabs && st.tabTextTight, activeTab === t.key && st.tabTextActive]}>{t.label}</Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  )), [tabsKey, activeTab, scrollTabs, tightTabs, setTab]);
     const fmt = meta.config ?? {};
     const dateStr = meta.startsAt ? formatDateTime(meta.startsAt, viewerTz) : '—';
     // Countdown for an upcoming match — "adding to calendar" only makes sense before
@@ -2024,14 +2105,16 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
         notifyStakeholders('🚩 Reassignment needed', `A reported identity in ${homeName} vs ${awayName} was escalated — captains, please confirm who actually played.`);
       });
     };
-    const addNewReplacement = (d: MatchDispute) => {
-      const nm = (newName[d.id] ?? '').trim();
-      if (!nm || !matchId) return;
+    // Who actually played: a real person (picked by name or mobile number, so the
+    // reassigned scores land on their profile), or — the marked last resort — a
+    // typed name, which becomes a provisional player in that side's pool.
+    const pickReplacement = (d: MatchDispute, p: Player) => {
+      rememberPerson(p);
+      return updateDispute(d.id, { replacementId: p.id, replacementName: p.fullName }, disputeActor).then(reloadDisputes);
+    };
+    const addNameReplacement = async (d: MatchDispute, nm: string) => {
       const house = d.side === 'home' ? (homeTeamName ?? homeName) : (awayTeamName ?? awayName);
-      void createReplacementPlayer(nm, sport, house).then((p) => {
-        setNewName((n) => ({ ...n, [d.id]: '' }));
-        void updateDispute(d.id, { replacementId: p.id, replacementName: p.fullName }, disputeActor).then(reloadDisputes);
-      });
+      await pickReplacement(d, await createReplacementPlayer(nm, sport, house));
     };
     const afterResolve = () => {
       reloadDisputes();
@@ -2102,13 +2185,17 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
                         onPress={() => void updateDispute(d.id, { replacementId: p.id, replacementName: p.fullName }, disputeActor).then(reloadDisputes)} />
                     ))}
                   </View>
-                  <Text style={textStyles.muted}>…or someone not listed:</Text>
-                  <View style={{ flexDirection: 'row', gap: theme.spacing(2), alignItems: 'flex-end' }}>
-                    <View style={{ flex: 1 }}>
-                      <TextField label="" value={newName[d.id] ?? ''} onChange={(v) => setNewName((n) => ({ ...n, [d.id]: v }))} placeholder="New player's name" autoCapitalize="words" />
-                    </View>
-                    <Button label="Add" variant="ghost" disabled={!(newName[d.id] ?? '').trim()} onPress={() => addNewReplacement(d)} />
-                  </View>
+                  <Text style={textStyles.muted}>…or someone not listed — by name or mobile number:</Text>
+                  <PersonPicker
+                    role="player"
+                    sport={sport}
+                    excludeIds={[d.playerId]}
+                    cta="Played"
+                    takenNote={(n) => `${n} is the player being replaced.`}
+                    inviteText={playerInvite}
+                    onPick={(p) => pickReplacement(d, p)}
+                    onNameOnly={(nm) => addNameReplacement(d, nm)}
+                  />
                   <Text style={textStyles.muted}>Both captains must confirm:</Text>
                   <View style={st.chipsWrap}>
                     <SelectChip label={`${d.homeCaptainOk ? '✓ ' : ''}${homeName} captain`} active={!!d.homeCaptainOk}
@@ -2194,23 +2281,7 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
               <Text style={st.scoreCtaHint}>No scorer assigned yet. Tap to score from this device — you can hand off to someone else anytime from Info.</Text>
             </TouchableOpacity>
           )}
-          {scrollTabs ? (
-            <KeyboardAwareScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.tabScroll}>
-              {TABS.map((t) => (
-                <TouchableOpacity key={t.key} style={[st.tabChip, activeTab === t.key && st.tabActive]} activeOpacity={0.8} accessibilityRole="tab" accessibilityLabel={t.label} accessibilityState={{ selected: activeTab === t.key }} aria-selected={activeTab === t.key} onPress={() => setTab(t.key)}>
-                  <Text style={[st.tabText, activeTab === t.key && st.tabTextActive]}>{t.label}</Text>
-                </TouchableOpacity>
-              ))}
-            </KeyboardAwareScrollView>
-          ) : (
-            <View style={st.tabBar}>
-              {TABS.map((t) => (
-                <TouchableOpacity key={t.key} style={[st.tab, activeTab === t.key && st.tabActive]} activeOpacity={0.8} accessibilityRole="tab" accessibilityLabel={t.label} accessibilityState={{ selected: activeTab === t.key }} aria-selected={activeTab === t.key} onPress={() => setTab(t.key)}>
-                  <Text numberOfLines={1} style={[st.tabText, tightTabs && st.tabTextTight, activeTab === t.key && st.tabTextActive]}>{t.label}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
+          {tabBarNode}
 
           {/* Commentary — the live event-by-event feed only, with a small
               "situation now" on top (racket doubles' serve diagram, cricket's
@@ -2264,35 +2335,18 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
                   )}
                 </View>
               ) : null}
-              {matchId && canScore && rejectedCount === 0 ? <OfflineSyncBanner matchId={matchId} /> : null}
+              {matchId && canScore && rejectedCount === 0 ? offlineBannerNode : null}
               {/* Running score, so the scorer never leaves this tab to check the
                   state. The big board above the tabs is suppressed here to avoid
                   duplication. Sports with a broadcast board (tennis/volleyball/
                   badminton/basketball/kabaddi) show the same line-score the viewer
                   sees; football/cricket keep the compact one-row MiniScore. */}
-              {started && !complete && (
-                plugin.Scoreboard ? (
-                  <plugin.Scoreboard state={state} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} live={live} />
-                ) : (
-                  <MiniScore
-                    summary={summary} homeName={homeName} awayName={awayName}
-                    homeColor={homeColor} awayColor={awayColor} live={live}
-                    clockNode={plugin.LiveClock ? <plugin.LiveClock state={state} /> : undefined}
-                  />
-                )
-              )}
+              {started && !complete && scoringBoardNode}
               {resultHoldNote}
               {undoBar}
               {liveEditBar}
               {strikeCard}
-              {canScore && !retiredLocally && meta.homeTeamId && meta.awayTeamId && (
-                <AddInvitePlayer
-                  homeTeamId={meta.homeTeamId} awayTeamId={meta.awayTeamId}
-                  homeTeamName={homeTeamName} awayTeamName={awayTeamName}
-                  sport={sport} matchId={matchId} invited={invitedPlayers}
-                  onChanged={() => setRosterNonce((n) => n + 1)}
-                />
-              )}
+              {addInviteEl}
               {!retiredLocally && controlsNode}
               {/* After the match: a sport's tidy-up tools (chess: attach the moves). */}
               {complete && canScore ? renderSlot(tabSlots.AfterMatch) : null}

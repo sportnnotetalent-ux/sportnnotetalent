@@ -806,93 +806,122 @@ function anchorDate(iso: string): string {
   return timePart ? `${shifted}T${timePart}` : shifted;
 }
 
-export const demo = {
-  tournaments: [...TOURNAMENTS, WC_TOURNAMENT].map((t) => ({ ...t, startDate: anchorDate(t.startDate), endDate: anchorDate(t.endDate) })) as Tournament[],
-  organizations: withSeedOwners(SEED_ORGS),
-  /** org membership requests — invites + join-requests (see migration 0020). */
-  orgRequests: [] as OrgRequest[],
-  /** tournament ownership audit trail — created / transferred (see migration 0021). */
-  ownershipEvents: [] as OwnershipEvent[],
-  /** per-tournament scorer/referee assignments (see migration 0024). */
-  tournamentOfficials: [] as TournamentOfficial[],
-  /** general activity/audit trail for orgs & tournaments (see migration 0024). */
-  activityLog: [] as ActivityEvent[],
-  /** tournament awards by tournament id — mirrors tournaments.awards (parity #21). */
-  awards: {} as Record<string, TournamentAwards>,
-  /** Player of the Match overrides by match id — mirrors matches.potm (parity #21). */
-  potm: {} as Record<string, MatchPotm>,
-  matches: ALL_MATCHES.map((m) => ({ ...m, startsAt: anchorDate(m.startsAt) })) as Match[],
-  teams: deriveTeams(ALL_MATCHES),
-  players: [...players, ...WC_PLAYERS, ...BN_PLAYERS, ...PE_PLAYERS, ...AE_PLAYERS],
-  statLines: statLines.map((s) => ({ ...s, date: s.date ? anchorDate(s.date) : s.date })),
-  // m4 (kabaddi) intentionally has empty lineups — kabaddi's positional court is
-  // hidden for now (only 6 kabaddi players per house), so its Score tab shows the
-  // timeline + player stats without a half-empty mat.
-  lineups: { m1: seedLineup(), cg7: seedBasketballLineup(), kc3: seedCupLineup(), m4: { home: [], away: [] }, m10: { home: [], away: [] }, m11: { home: [], away: [] }, m12: { home: [], away: [] }, m5: { home: [], away: [] }, 'm-eng-cro': WC_LINEUP, 'm-bra-nor': BN_LINEUP, 'm-por-esp': PE_LINEUP, 'm-arg-egy': AE_LINEUP } as Record<string, MatchLineup>,
-  /** append-only scoring log per match — mirrors the Supabase match_events table.
-   *  The completed cricket fixtures ship a full ball-by-ball log so they replay to
-   *  a real, ENDED scorecard, and the live cricket fixture (m8) ships a mid-innings
-   *  log so it opens on a real in-progress card (see cricketSeed.ts); the other live
-   *  logs are added below. */
-  matchEvents: { ...CRICKET_MATCH_EVENTS, ...CRICKET_LIVE_EVENTS } as Record<string, MatchEventRecord[]>,
-  /** matchday squads (starting XI + subs) per match */
-  matchSquads: { m1: M1_SQUADS, m4: M4_SQUADS, m10: M10_SQUADS, m11: M11_SQUADS, m12: M12_SQUADS, m5: M5_SQUADS, 'm-eng-cro': WC_SQUADS, 'm-bra-nor': BN_SQUADS, 'm-por-esp': PE_SQUADS, 'm-arg-egy': AE_SQUADS, cg7: CG7_SQUADS, kc3: KC3_SQUADS, ...CRICKET_LIVE_SQUADS } as Record<string, MatchSquads>,
-  /** player participation objections (identity disputes) across matches */
-  disputes: [] as MatchDispute[],
-  /** team invites keyed by token, and the teams the demo user captains */
-  invites: {} as Record<string, TeamInvite>,
-  /** explicit tournament ↔ team registrations (the participating roster). Empty
-   *  by default — the seed tournaments imply their teams via matches; organizers
-   *  register participants up front for new tournaments. Mirrors the live
-   *  `tournament_teams` join table (migration 0003). */
-  tournamentTeams: [] as { tournamentId: string; teamId: string; status: TournamentEntryStatus; categoryId?: string; checkedInAt?: string; /** SD-154 */ qualifiedFrom?: string }[],
-  /** divisions (age × gender) a tournament defines — see migration 0008. */
-  tournamentCategories: [] as TournamentCategory[],
-  /** multi-sport clubs ("teams" in the UI) and their membership / sport roles —
-   *  see migration 0018. Empty by default; the demo seeds houses as per-sport
-   *  Team rows (no club parent), so clubs start empty until the user creates one. */
-  clubs: [] as Club[],
-  clubMembers: [] as ClubMember[],
-  teamPlayerRoles: [] as TeamPlayerRoles[],
-  /** club join invites keyed by token (see migration 0019). */
-  clubInvites: {} as Record<string, ClubInvite>,
-  /** field events (golf rounds…) + their entries — docs/sports/GOLF_DESIGN.md */
-  fieldEvents: [] as FieldEvent[],
-  fieldEntries: [] as FieldEntry[],
-  /** results-engine record books (meet / school records) by tournament id ('' = casual) — SD-28 */
-  resultRecords: {} as Record<string, RecordMark[]>,
-  golfCourses: [
-    {
-      id: 'course-demo',
-      name: 'Demo Golf Club (par 72)',
-      city: 'Hyderabad',
-      // The standard par-72 template (see sports/golf/engine standardPar72).
-      holes: [4, 4, 3, 5, 4, 4, 3, 4, 5, 4, 4, 3, 5, 4, 4, 3, 4, 5].map((par, i) => ({
-        n: i + 1, par, si: [7, 11, 15, 1, 5, 9, 17, 3, 13, 8, 12, 16, 2, 6, 10, 18, 4, 14][i],
-      })),
-      tees: [{ name: 'White' }, { name: 'Blue', courseRating: 72.4, slope: 131 }],
-    },
-  ] as GolfCourse[],
-  captainTeams: new Set<string>(),
-  footballProfiles: {
-    'p-aarav': { position: 'ST', foot: 'Right', teams: ['Red House', 'City Juniors U16'], bio: 'Quick striker, strong finishing.' },
-  } as Record<string, FootballProfile>,
-  /** Connect noticeboard posts (newest first). */
-  listings: SEED_LISTINGS,
-  /** captain & vice-captain per team id (the house mock ids span sports). */
-  teamLeaders: {
-    rh: { captainId: 'p-aarav', viceCaptainId: 'p-rohan' },
-    bh: { captainId: 'p-ishaan', viceCaptainId: 'p-veer' },
-    gh: { captainId: 'p-diya', viceCaptainId: 'p-ananya' },
-    yh: { captainId: 'p-kabir', viceCaptainId: 'p-meera' },
-    bra: { captainId: 'p-bra-4' }, // Marquinhos
-    nor: { captainId: 'p-nor-8' }, // Ødegaard
-    por: { captainId: 'p-por-11' }, // Ronaldo
-    esp: { captainId: 'p-esp-6' }, // Rodri
-    arg: { captainId: 'p-arg-11' }, // Messi
-    egy: { captainId: 'p-egy-10' }, // Salah
-  } as Record<string, TeamLeadership>,
-};
+/** The demo store's contents — built the first time demo mode reads `demo`
+ *  (perf F-25: a live build never does, so it never builds the seed). */
+function buildDemo() {
+  const d = {
+    tournaments: [...TOURNAMENTS, WC_TOURNAMENT].map((t) => ({ ...t, startDate: anchorDate(t.startDate), endDate: anchorDate(t.endDate) })) as Tournament[],
+    organizations: withSeedOwners(SEED_ORGS),
+    /** org membership requests — invites + join-requests (see migration 0020). */
+    orgRequests: [] as OrgRequest[],
+    /** tournament ownership audit trail — created / transferred (see migration 0021). */
+    ownershipEvents: [] as OwnershipEvent[],
+    /** per-tournament scorer/referee assignments (see migration 0024). */
+    tournamentOfficials: [] as TournamentOfficial[],
+    /** general activity/audit trail for orgs & tournaments (see migration 0024). */
+    activityLog: [] as ActivityEvent[],
+    /** tournament awards by tournament id — mirrors tournaments.awards (parity #21). */
+    awards: {} as Record<string, TournamentAwards>,
+    /** Player of the Match overrides by match id — mirrors matches.potm (parity #21). */
+    potm: {} as Record<string, MatchPotm>,
+    matches: ALL_MATCHES.map((m) => ({ ...m, startsAt: anchorDate(m.startsAt) })) as Match[],
+    teams: deriveTeams(ALL_MATCHES),
+    players: [...players, ...WC_PLAYERS, ...BN_PLAYERS, ...PE_PLAYERS, ...AE_PLAYERS],
+    statLines: statLines.map((s) => ({ ...s, date: s.date ? anchorDate(s.date) : s.date })),
+    // m4 (kabaddi) intentionally has empty lineups — kabaddi's positional court is
+    // hidden for now (only 6 kabaddi players per house), so its Score tab shows the
+    // timeline + player stats without a half-empty mat.
+    lineups: { m1: seedLineup(), cg7: seedBasketballLineup(), kc3: seedCupLineup(), m4: { home: [], away: [] }, m10: { home: [], away: [] }, m11: { home: [], away: [] }, m12: { home: [], away: [] }, m5: { home: [], away: [] }, 'm-eng-cro': WC_LINEUP, 'm-bra-nor': BN_LINEUP, 'm-por-esp': PE_LINEUP, 'm-arg-egy': AE_LINEUP } as Record<string, MatchLineup>,
+    /** append-only scoring log per match — mirrors the Supabase match_events table.
+     *  The completed cricket fixtures ship a full ball-by-ball log so they replay to
+     *  a real, ENDED scorecard, and the live cricket fixture (m8) ships a mid-innings
+     *  log so it opens on a real in-progress card (see cricketSeed.ts); the other live
+     *  logs are added below. */
+    matchEvents: { ...CRICKET_MATCH_EVENTS, ...CRICKET_LIVE_EVENTS } as Record<string, MatchEventRecord[]>,
+    /** matchday squads (starting XI + subs) per match */
+    matchSquads: { m1: M1_SQUADS, m4: M4_SQUADS, m10: M10_SQUADS, m11: M11_SQUADS, m12: M12_SQUADS, m5: M5_SQUADS, 'm-eng-cro': WC_SQUADS, 'm-bra-nor': BN_SQUADS, 'm-por-esp': PE_SQUADS, 'm-arg-egy': AE_SQUADS, cg7: CG7_SQUADS, kc3: KC3_SQUADS, ...CRICKET_LIVE_SQUADS } as Record<string, MatchSquads>,
+    /** player participation objections (identity disputes) across matches */
+    disputes: [] as MatchDispute[],
+    /** team invites keyed by token, and the teams the demo user captains */
+    invites: {} as Record<string, TeamInvite>,
+    /** explicit tournament ↔ team registrations (the participating roster). Empty
+     *  by default — the seed tournaments imply their teams via matches; organizers
+     *  register participants up front for new tournaments. Mirrors the live
+     *  `tournament_teams` join table (migration 0003). */
+    tournamentTeams: [] as { tournamentId: string; teamId: string; status: TournamentEntryStatus; categoryId?: string; checkedInAt?: string; /** SD-154 */ qualifiedFrom?: string }[],
+    /** divisions (age × gender) a tournament defines — see migration 0008. */
+    tournamentCategories: [] as TournamentCategory[],
+    /** multi-sport clubs ("teams" in the UI) and their membership / sport roles —
+     *  see migration 0018. Empty by default; the demo seeds houses as per-sport
+     *  Team rows (no club parent), so clubs start empty until the user creates one. */
+    clubs: [] as Club[],
+    clubMembers: [] as ClubMember[],
+    teamPlayerRoles: [] as TeamPlayerRoles[],
+    /** club join invites keyed by token (see migration 0019). */
+    clubInvites: {} as Record<string, ClubInvite>,
+    /** field events (golf rounds…) + their entries — docs/sports/GOLF_DESIGN.md */
+    fieldEvents: [] as FieldEvent[],
+    fieldEntries: [] as FieldEntry[],
+    /** results-engine record books (meet / school records) by tournament id ('' = casual) — SD-28 */
+    resultRecords: {} as Record<string, RecordMark[]>,
+    golfCourses: [
+      {
+        id: 'course-demo',
+        name: 'Demo Golf Club (par 72)',
+        city: 'Hyderabad',
+        // The standard par-72 template (see sports/golf/engine standardPar72).
+        holes: [4, 4, 3, 5, 4, 4, 3, 4, 5, 4, 4, 3, 5, 4, 4, 3, 4, 5].map((par, i) => ({
+          n: i + 1, par, si: [7, 11, 15, 1, 5, 9, 17, 3, 13, 8, 12, 16, 2, 6, 10, 18, 4, 14][i],
+        })),
+        tees: [{ name: 'White' }, { name: 'Blue', courseRating: 72.4, slope: 131 }],
+      },
+    ] as GolfCourse[],
+    captainTeams: new Set<string>(),
+    footballProfiles: {
+      'p-aarav': { position: 'ST', foot: 'Right', teams: ['Red House', 'City Juniors U16'], bio: 'Quick striker, strong finishing.' },
+    } as Record<string, FootballProfile>,
+    /** Connect noticeboard posts (newest first). */
+    listings: SEED_LISTINGS,
+    /** captain & vice-captain per team id (the house mock ids span sports). */
+    teamLeaders: {
+      rh: { captainId: 'p-aarav', viceCaptainId: 'p-rohan' },
+      bh: { captainId: 'p-ishaan', viceCaptainId: 'p-veer' },
+      gh: { captainId: 'p-diya', viceCaptainId: 'p-ananya' },
+      yh: { captainId: 'p-kabir', viceCaptainId: 'p-meera' },
+      bra: { captainId: 'p-bra-4' }, // Marquinhos
+      nor: { captainId: 'p-nor-8' }, // Ødegaard
+      por: { captainId: 'p-por-11' }, // Ronaldo
+      esp: { captainId: 'p-esp-6' }, // Rodri
+      arg: { captainId: 'p-arg-11' }, // Messi
+      egy: { captainId: 'p-egy-10' }, // Salah
+    } as Record<string, TeamLeadership>,
+  };
+  seedLiveLogs(d.matchEvents);
+  return d;
+}
+export type DemoData = ReturnType<typeof buildDemo>;
+const DEMO_KEYS = ['tournaments', 'organizations', 'orgRequests', 'ownershipEvents', 'tournamentOfficials', 'activityLog', 'awards', 'potm', 'matches', 'teams', 'players', 'statLines', 'lineups', 'matchEvents', 'matchSquads', 'disputes', 'invites', 'tournamentTeams', 'tournamentCategories', 'clubs', 'clubMembers', 'teamPlayerRoles', 'clubInvites', 'fieldEvents', 'fieldEntries', 'resultRecords', 'golfCourses', 'captainTeams', 'footballProfiles', 'listings', 'teamLeaders'] as const satisfies readonly (keyof DemoData)[];
+// every key of the store is listed (checked at compile time)
+const everyDemoKey: [Exclude<keyof DemoData, (typeof DEMO_KEYS)[number]>] extends [never] ? true : false = true;
+void everyDemoKey;
+
+/** The in-memory demo store. Each key is built on first touch (read, write,
+ *  spread or Object.keys) and is a plain property from then on. */
+export const demo = {} as DemoData;
+let demoBuilt = false;
+function materializeDemo(): void {
+  if (demoBuilt) return;
+  demoBuilt = true;
+  const d = buildDemo();
+  for (const k of DEMO_KEYS) Object.defineProperty(demo, k, { value: d[k], writable: true, enumerable: true, configurable: true });
+}
+for (const k of DEMO_KEYS) {
+  Object.defineProperty(demo, k, {
+    get() { materializeDemo(); return demo[k]; },
+    set(v: unknown) { materializeDemo(); (demo as Record<string, unknown>)[k] = v; },
+    enumerable: true, configurable: true,
+  });
+}
 
 // ---------- Demo persistence (AsyncStorage) --------------------------------
 // The demo store is in-memory, so a reload/app-kill wipes anything the user
@@ -975,8 +1004,9 @@ export function startDemoAutosave(): void {
   }
 }
 
-// Seed in-progress event logs so the "live" matches show a real, mid-game score
-// (rebuilt through each sport's pure reducer) instead of starting at 0–0.
+// The in-progress event logs (seedLiveLogs, below) give the "live" matches a
+// real, mid-game score (rebuilt through each sport's pure reducer) instead of
+// starting at 0–0. Their clock times count back from the moment this module loaded.
 const nowMs = Date.now();
 const bbScore = (seq: number, side: 'home' | 'away', points: number, minute: number, pid: string, name: string, q = 1): MatchEventRecord =>
   ({ seq, type: 'SCORE', side, payload: { points, minute, quarter: q }, attribution: { playerId: pid, stat: 'points', by: points, playerName: name } });
@@ -1082,244 +1112,249 @@ function tnEvents(completedSets: [number, number][], live: { games: [number, num
   for (let i = 0; i < live.cur[0]; i++) emit('home');
   return out;
 }
-demo.matchEvents['m1'] = [
-  { seq: 1, type: 'KICKOFF', side: null, payload: { at: nowMs - 32 * 60000, possSide: 'home' } },
-  fbStat(2, 'home', 'shot', { onTarget: true, pid: 'p-aarav', name: 'Aarav Mehta', statKey: 'shots', minute: 11 }),
-  { seq: 3, type: 'GOAL', side: 'home', payload: { minute: 12 }, attribution: { playerId: 'p-aarav', stat: 'goals', by: 1, playerName: 'Aarav Mehta' } },
-  fbStat(4, 'home', 'shot', { onTarget: false, pid: 'p-rohan', name: 'Rohan Nair', statKey: 'shots', minute: 15 }),
-  fbStat(5, 'home', 'corner', { minute: 16 }),
-  { seq: 6, type: 'POSSESSION', side: null, payload: { side: 'away', at: nowMs - 22 * 60000 } },
-  fbStat(7, 'away', 'shot', { onTarget: true, pid: 'p-ishaan', name: 'Ishaan Verma', statKey: 'shots', minute: 22 }),
-  { seq: 8, type: 'GOAL', side: 'away', payload: { minute: 23 }, attribution: { playerId: 'p-ishaan', stat: 'goals', by: 1, playerName: 'Ishaan Verma' } },
-  fbStat(9, 'home', 'foul', { pid: 'p-neil', name: 'Neil Kapoor', statKey: 'fouls', possSide: 'away', minute: 25 }),
-  { seq: 10, type: 'POSSESSION', side: null, payload: { side: 'home', at: nowMs - 12 * 60000 } },
-  fbStat(11, 'home', 'shot', { onTarget: false, pid: 'p-neil', name: 'Neil Kapoor', statKey: 'shots', minute: 31 }),
-  { seq: 12, type: 'GOAL', side: 'home', payload: { minute: 33 }, attribution: { playerId: 'p-rohan', stat: 'goals', by: 1, playerName: 'Rohan Nair' } },
-  fbStat(13, 'away', 'offside', { minute: 28 }),
-  { seq: 14, type: 'YELLOW', side: 'home', payload: { minute: 20 }, attribution: { playerId: 'p-rohan', stat: 'yellowCards', by: 1, playerName: 'Rohan Nair' } },
-  { seq: 15, type: 'YELLOW', side: 'away', payload: { minute: 26 }, attribution: { playerId: 'p-ishaan', stat: 'yellowCards', by: 1, playerName: 'Ishaan Verma' } },
-  { seq: 16, type: 'SUB', side: 'home', payload: { minute: 30, offName: 'Varun Kamath', onName: 'Harsha Bhat' }, attribution: null },
-];
-// Split across two quarters (into Q2 now) so the box score's per-quarter toggle
-// has real data on both sides. Final unchanged: home 14 · away 11 (Q1 8–7, Q2 6–4);
-// every player's Overall line is preserved — only the quarter each play lands in changed.
-demo.matchEvents['cg7'] = [
-  { seq: 1, type: 'KICKOFF', side: null, payload: { at: nowMs - 18 * 60000 } },
-  // — Q1 (8–7) —
-  bbScore(2, 'home', 3, 2, 'p-ind-1', 'Tej Anand', 1),
-  bbScore(3, 'away', 3, 3, 'p-kor-1', 'Vinay Kumar', 1),
-  bbScore(4, 'home', 3, 5, 'p-ind-5', 'Akash Pillai', 1),
-  bbScore(5, 'away', 2, 6, 'p-kor-5', 'Rohit Gowda', 1),
-  bbScore(6, 'home', 2, 8, 'p-ind-3', 'Sahil Verma', 1),
-  bbScore(7, 'away', 2, 9, 'p-kor-3', 'Manoj Pai', 1),
-  bbStat(8, 'home', 'ASSIST', 7, 'p-ind-4', 'Nidhi Rao', 1),
-  bbStat(9, 'away', 'ASSIST', 8, 'p-kor-1', 'Vinay Kumar', 1),
-  bbStat(10, 'home', 'REBOUND', 9, 'p-ind-4', 'Nidhi Rao', 1),
-  bbStat(11, 'away', 'REBOUND', 9, 'p-kor-4', 'Priya Shet', 1),
-  // — Q2 (6–4), clock ~4' in —
-  { seq: 12, type: 'NEXT_QUARTER', side: null, payload: {} },
-  { seq: 13, type: 'KICKOFF', side: null, payload: { at: nowMs - 4 * 60000 } },
-  bbScore(14, 'home', 2, 1, 'p-ind-1', 'Tej Anand', 2),
-  bbScore(15, 'away', 2, 2, 'p-kor-1', 'Vinay Kumar', 2),
-  bbScore(16, 'home', 2, 3, 'p-ind-5', 'Akash Pillai', 2),
-  bbScore(17, 'away', 2, 4, 'p-kor-5', 'Rohit Gowda', 2),
-  bbScore(18, 'home', 2, 5, 'p-ind-3', 'Sahil Verma', 2),
-  bbStat(19, 'home', 'ASSIST', 2, 'p-ind-1', 'Tej Anand', 2),
-  bbStat(20, 'away', 'FOUL', 2, 'p-kor-3', 'Manoj Pai', 2),
-  bbStat(21, 'home', 'REBOUND', 3, 'p-ind-5', 'Akash Pillai', 2),
-  bbStat(22, 'away', 'ASSIST', 3, 'p-kor-4', 'Priya Shet', 2),
-  bbStat(23, 'home', 'REBOUND', 4, 'p-ind-4', 'Nidhi Rao', 2),
-  bbStat(24, 'home', 'FOUL', 4, 'p-ind-3', 'Sahil Verma', 2),
-  bbStat(25, 'away', 'REBOUND', 5, 'p-kor-4', 'Priya Shet', 2),
-  bbStat(26, 'home', 'REBOUND', 5, 'p-ind-1', 'Tej Anand', 2),
-  bbStat(27, 'away', 'REBOUND', 6, 'p-kor-5', 'Rohit Gowda', 2),
-  bbStat(28, 'away', 'FOUL', 6, 'p-kor-5', 'Rohit Gowda', 2),
-];
-// Live kabaddi (m4) — Blue House vs Gold House, into the 2nd half. Raid/tackle
-// points across both halves so the Player-stats table's per-half toggle has real
-// data. Final (live): Blue 14 · Gold 13.
-demo.matchEvents['m4'] = [
-  { seq: 1, type: 'KICKOFF', side: null, payload: { at: nowMs - 30 * 60000 } },
-  kabPt(2, 'RAID', 'home', 2, 2, 1, 'p-ishaan', 'Ishaan Verma'),
-  kabPt(3, 'RAID', 'away', 1, 3, 1, 'p-yh-1', 'Imran Pasha'),
-  kabPt(4, 'TACKLE', 'home', 1, 4, 1, 'p-bh-1', 'Faisal Khan'),
-  kabPt(5, 'RAID', 'away', 2, 6, 1, 'p-yh-2', 'Naveen Shetty'),
-  kabPt(6, 'RAID', 'home', 1, 7, 1, 'p-bh-2', 'Rohit Pillai'),
-  kabPt(7, 'TACKLE', 'away', 1, 9, 1, 'p-yh-8', 'Kiran Joshi'),
-  kabPt(8, 'RAID', 'home', 2, 11, 1, 'p-bh-6', 'Karan Mehta'),
-  kabPt(9, 'RAID', 'away', 2, 13, 1, 'p-yh-6', 'Mahesh Naik'),
-  kabPt(10, 'TACKLE', 'home', 1, 15, 1, 'p-bh-3', 'Sameer Das'),
-  kabPt(11, 'RAID', 'away', 1, 17, 1, 'p-yh-1', 'Imran Pasha'),
-  kabPt(12, 'RAID', 'home', 1, 19, 1, 'p-ishaan', 'Ishaan Verma'),
-  { seq: 13, type: 'NEXT_HALF', side: null, payload: {} },
-  { seq: 14, type: 'KICKOFF', side: null, payload: { at: nowMs - 10 * 60000 } },
-  kabPt(15, 'RAID', 'home', 2, 21, 2, 'p-bh-2', 'Rohit Pillai'),
-  kabPt(16, 'RAID', 'away', 2, 22, 2, 'p-yh-2', 'Naveen Shetty'),
-  kabPt(17, 'TACKLE', 'away', 1, 23, 2, 'p-yh-9', 'Asha Rao'),
-  kabPt(18, 'RAID', 'home', 2, 24, 2, 'p-ishaan', 'Ishaan Verma'),
-  kabPt(19, 'TACKLE', 'home', 1, 25, 2, 'p-bh-7', 'Vivek Shenoy'),
-  kabPt(20, 'RAID', 'away', 1, 26, 2, 'p-yh-6', 'Mahesh Naik'),
-  kabPt(21, 'RAID', 'home', 1, 27, 2, 'p-bh-6', 'Karan Mehta'),
-  kabPt(22, 'TACKLE', 'away', 1, 28, 2, 'p-yh-8', 'Kiran Joshi'),
-  kabPt(23, 'TACKLE', 'away', 1, 29, 2, 'p-meera', 'Meera Joshi'),
-];
-// Live volleyball (m10) — Red vs Blue, best of 3. Red took set 1 (25–21); set 2 is
-// live at 19–21, so the per-set player-stats toggle has real data on both sides.
-demo.matchEvents['m10'] = vbEvents([[25, 21], [19, 21]]);
-// Completed volleyball (m5) — Green House beat Red House 3–1 (best of 5). A full
-// event log so the finished match shows the broadcast FINAL board (per-set columns
-// + winner), not just an aggregate card. Sets: 25-20, 23-25, 25-18, 25-22.
-const VB_GREEN: [string, string][] = [['p-diya', 'Diya Rao'], ['p-ananya', 'Ananya Iyer'], ['p-gh-3', 'Sandeep Rao'], ['p-gh-6', 'Girish Naik'], ['p-gh-9', 'Bhavana Rao'], ['p-gh-10', 'Megha Iyer']];
-demo.matchEvents['m5'] = vbEvents([[25, 20], [23, 25], [25, 18], [25, 22]], VB_GREEN, VB_HOME);
-// Live badminton doubles (m11) — Red pair vs Blue pair, best of 3. Red took game 1
-// (21–17); game 2 is live at 14–16, so the per-game player-stats toggle has data.
-demo.matchEvents['m11'] = bmEvents([[21, 17], [14, 16]]);
-// Live tennis singles (m12) — Varun Kamath (Red) vs Sameer Das (Blue), best of 3.
-// Red took set 1 (6–4); set 2 is live at 3–2, 30–15 — so the per-set stats toggle
-// has data across both sets.
-demo.matchEvents['m12'] = tnEvents([[6, 4]], { games: [3, 2], cur: [2, 1] });
-// Cup final (t7): a knockout tie level 1–1 in the 2nd half — ending it goes to
-// a penalty shootout. Seeded end-to-end (shots, corners, fouls, cards, offsides
-// and possession swings) so the live match's Stats/Timeline/Summary are full,
-// not a lone goal apiece. Possession splits ≈ 54–46 via the POSSESSION events.
-demo.matchEvents['kc3'] = [
-  { seq: 1, type: 'KICKOFF', side: null, payload: { at: nowMs - 80 * 60000, possSide: 'home' } },
-  fbStat(2, 'away', 'shot', { onTarget: false, pid: 'p-bpl-sameer', name: 'Sameer Khan', statKey: 'shots', minute: 6 }),
-  fbStat(3, 'home', 'shot', { onTarget: true, pid: 'p-bpl-aditya', name: 'Aditya Shetty', statKey: 'shots', minute: 9 }),
-  { seq: 4, type: 'POSSESSION', side: null, payload: { side: 'away', at: nowMs - 72 * 60000 } },
-  fbStat(5, 'home', 'corner', { minute: 14 }),
-  fbStat(6, 'away', 'foul', { pid: 'p-bpl-sameer', name: 'Sameer Khan', statKey: 'fouls', minute: 16 }),
-  { seq: 7, type: 'GOAL', side: 'home', payload: { minute: 18 }, attribution: { playerId: 'p-bpl-rahul', stat: 'goals', by: 1, playerName: 'Rahul Menon' } },
-  fbStat(8, 'home', 'shot', { onTarget: false, pid: 'p-fal-3', name: 'Dinesh Kamath', statKey: 'shots', minute: 22 }),
-  { seq: 9, type: 'POSSESSION', side: null, payload: { side: 'home', at: nowMs - 60 * 60000 } },
-  fbStat(10, 'away', 'corner', { minute: 26 }),
-  fbStat(11, 'home', 'foul', { pid: 'p-bpl-aditya', name: 'Aditya Shetty', statKey: 'fouls', minute: 29 }),
-  fbStat(12, 'away', 'shot', { onTarget: true, pid: 'p-str-2', name: 'Bharat Singh', statKey: 'shots', minute: 33 }),
-  { seq: 13, type: 'GOAL', side: 'away', payload: { minute: 37 }, attribution: { playerId: 'p-bpl-sameer', stat: 'goals', by: 1, playerName: 'Sameer Khan' } },
-  { seq: 14, type: 'POSSESSION', side: null, payload: { side: 'away', at: nowMs - 48 * 60000 } },
-  { seq: 15, type: 'YELLOW', side: 'away', payload: { minute: 40 }, attribution: { playerId: 'p-str-2', stat: 'yellowCards', by: 1, playerName: 'Bharat Singh' } },
-  fbStat(16, 'home', 'offside', { minute: 43 }),
-  { seq: 17, type: 'NEXT_HALF', side: null, payload: { at: nowMs - 35 * 60000 } },
-  { seq: 18, type: 'KICKOFF', side: null, payload: { at: nowMs - 35 * 60000, possSide: 'home' } },
-  fbStat(19, 'home', 'shot', { onTarget: true, pid: 'p-bpl-rahul', name: 'Rahul Menon', statKey: 'shots', minute: 52 }),
-  fbStat(20, 'away', 'foul', { pid: 'p-str-2', name: 'Bharat Singh', statKey: 'fouls', minute: 55 }),
-  fbStat(21, 'home', 'corner', { minute: 57 }),
-  { seq: 22, type: 'POSSESSION', side: null, payload: { side: 'away', at: nowMs - 22 * 60000 } },
-  fbStat(23, 'away', 'shot', { onTarget: false, pid: 'p-bpl-sameer', name: 'Sameer Khan', statKey: 'shots', minute: 61 }),
-  { seq: 24, type: 'YELLOW', side: 'home', payload: { minute: 63 }, attribution: { playerId: 'p-bpl-aditya', stat: 'yellowCards', by: 1, playerName: 'Aditya Shetty' } },
-  fbStat(25, 'away', 'corner', { minute: 66 }),
-  fbStat(26, 'home', 'foul', { pid: 'p-fal-3', name: 'Dinesh Kamath', statKey: 'fouls', minute: 68 }),
-  { seq: 27, type: 'YELLOW', side: 'away', payload: { minute: 70 }, attribution: { playerId: 'p-bpl-sameer', stat: 'yellowCards', by: 1, playerName: 'Sameer Khan' } },
-  { seq: 28, type: 'POSSESSION', side: null, payload: { side: 'home', at: nowMs - 10 * 60000 } },
-  fbStat(29, 'home', 'shot', { onTarget: true, pid: 'p-bpl-rahul', name: 'Rahul Menon', statKey: 'shots', minute: 74 }),
-  fbStat(30, 'away', 'offside', { minute: 76 }),
-  fbStat(31, 'away', 'shot', { onTarget: false, pid: 'p-str-2', name: 'Bharat Singh', statKey: 'shots', minute: 78 }),
-];
 
-// England vs Croatia — the real World Cup first half (2–2 at HT), seeded so the
-// scorer continues live in the 2nd half. Kane pen (12'), Baturina (36'),
-// Kane header from Rice's corner (42'), Musa (45+'). 2nd half just kicked off.
-const wcGoal = (
-  seq: number, side: 'home' | 'away', minute: number, goalType: 'open' | 'penalty' | 'freekick' | 'header', pid: string, name: string
-): MatchEventRecord => ({
-  seq, type: 'GOAL', side, payload: { minute, goalType },
-  attribution: { playerId: pid, stat: 'goals', by: 1, playerName: name, extra: { shots: 1, shotsOnTarget: 1, [goalType === 'penalty' ? 'penaltyGoals' : goalType === 'freekick' ? 'freekickGoals' : 'openPlayGoals']: 1 } },
-});
-// Seeded end-to-end (shots, corners, fouls, cards, offsides + possession swings)
-// so the flagship WC tie's Stats/Timeline are full, not just the goals. Possession
-// splits ≈ 54–46 via the POSSESSION events (fouls omit possSide — see kc3 note).
-demo.matchEvents['m-eng-cro'] = [
-  { seq: 1, type: 'KICKOFF', side: null, payload: { at: nowMs - 90 * 60000, possSide: 'home' } },
-  fbStat(2, 'home', 'shot', { onTarget: true, pid: 'p-eng-10', name: 'Noni Madueke', statKey: 'shots', minute: 5 }),
-  fbStat(3, 'away', 'shot', { onTarget: false, pid: 'p-cro-10', name: 'Mario Pašalić', statKey: 'shots', minute: 8 }),
-  { seq: 4, type: 'POSSESSION', side: null, payload: { side: 'away', at: nowMs - 82 * 60000 } },
-  fbStat(5, 'away', 'corner', { minute: 10 }),
-  wcGoal(6, 'home', 12, 'penalty', 'p-eng-11', 'Harry Kane'),
-  fbStat(7, 'home', 'shot', { onTarget: false, pid: 'p-eng-8', name: 'Anthony Gordon', statKey: 'shots', minute: 16 }),
-  fbStat(8, 'home', 'foul', { minute: 18 }),
-  { seq: 9, type: 'POSSESSION', side: null, payload: { side: 'home', at: nowMs - 68 * 60000 } },
-  fbStat(10, 'away', 'shot', { onTarget: true, pid: 'p-cro-6', name: 'Luka Modrić', statKey: 'shots', minute: 22 }),
-  fbStat(11, 'away', 'foul', { minute: 25 }),
-  fbStat(12, 'home', 'corner', { minute: 28 }),
-  fbStat(13, 'away', 'shot', { onTarget: false, pid: 'p-cro-5', name: 'Ivan Perišić', statKey: 'shots', minute: 32 }),
-  { seq: 14, type: 'POSSESSION', side: null, payload: { side: 'away', at: nowMs - 55 * 60000 } },
-  wcGoal(15, 'away', 36, 'open', 'p-cro-9', 'Martin Baturina'),
-  fbStat(16, 'home', 'offside', { minute: 38 }),
-  fbStat(17, 'home', 'shot', { onTarget: true, pid: 'p-eng-9', name: 'Jude Bellingham', statKey: 'shots', minute: 40 }),
-  wcGoal(18, 'home', 42, 'header', 'p-eng-11', 'Harry Kane'),
-  { seq: 19, type: 'ASSIST', side: 'home', payload: { minute: 42 }, attribution: { playerId: 'p-eng-6', stat: 'assists', by: 1, playerName: 'Declan Rice' } },
-  fbStat(20, 'home', 'corner', { minute: 44 }),
-  wcGoal(21, 'away', 45, 'open', 'p-cro-11', 'Petar Musa'),
-  { seq: 22, type: 'ASSIST', side: 'away', payload: { minute: 45 }, attribution: { playerId: 'p-cro-5', stat: 'assists', by: 1, playerName: 'Ivan Perišić' } },
-  { seq: 23, type: 'NEXT_HALF', side: null, payload: { at: nowMs - 45 * 60000 } },
-  // 2nd half kicked off ~33 min ago → clock reads ~78'. Bellingham put England 3–2 up.
-  { seq: 24, type: 'KICKOFF', side: null, payload: { at: nowMs - 33 * 60000, possSide: 'home' } },
-  wcGoal(25, 'home', 47, 'open', 'p-eng-9', 'Jude Bellingham'),
-  fbStat(26, 'home', 'shot', { onTarget: false, pid: 'p-eng-11', name: 'Harry Kane', statKey: 'shots', minute: 50 }),
-  fbStat(27, 'away', 'corner', { minute: 53 }),
-  fbStat(28, 'away', 'foul', { pid: 'p-cro-6', name: 'Luka Modrić', statKey: 'fouls', minute: 54 }),
-  { seq: 29, type: 'YELLOW', side: 'away', payload: { minute: 55 }, attribution: { playerId: 'p-cro-6', stat: 'yellowCards', by: 1, playerName: 'Luka Modrić' } },
-  { seq: 30, type: 'POSSESSION', side: null, payload: { side: 'away', at: nowMs - 20 * 60000 } },
-  fbStat(31, 'away', 'shot', { onTarget: true, pid: 'p-cro-11', name: 'Petar Musa', statKey: 'shots', minute: 58 }),
-  fbStat(32, 'home', 'foul', { minute: 60 }),
-  fbStat(33, 'away', 'offside', { minute: 62 }),
-  fbStat(34, 'home', 'corner', { minute: 67 }),
-  fbStat(35, 'home', 'foul', { pid: 'p-eng-6', name: 'Declan Rice', statKey: 'fouls', minute: 69 }),
-  { seq: 36, type: 'YELLOW', side: 'home', payload: { minute: 70 }, attribution: { playerId: 'p-eng-6', stat: 'yellowCards', by: 1, playerName: 'Declan Rice' } },
-  { seq: 37, type: 'POSSESSION', side: null, payload: { side: 'home', at: nowMs - 8 * 60000 } },
-  fbStat(38, 'away', 'foul', { minute: 71 }),
-  fbStat(39, 'away', 'shot', { onTarget: true, pid: 'p-cro-9', name: 'Martin Baturina', statKey: 'shots', minute: 74 }),
-  { seq: 40, type: 'YELLOW', side: 'away', payload: { minute: 76 }, attribution: { playerId: 'p-cro-2', stat: 'yellowCards', by: 1, playerName: 'Joško Gvardiol' } },
-];
+// Seed in-progress event logs so the "live" matches show a real, mid-game
+// score (perf F-25: run when the demo store is first built — see buildDemo).
+function seedLiveLogs(logs: Record<string, MatchEventRecord[]>): void {
+  logs['m1'] = [
+    { seq: 1, type: 'KICKOFF', side: null, payload: { at: nowMs - 32 * 60000, possSide: 'home' } },
+    fbStat(2, 'home', 'shot', { onTarget: true, pid: 'p-aarav', name: 'Aarav Mehta', statKey: 'shots', minute: 11 }),
+    { seq: 3, type: 'GOAL', side: 'home', payload: { minute: 12 }, attribution: { playerId: 'p-aarav', stat: 'goals', by: 1, playerName: 'Aarav Mehta' } },
+    fbStat(4, 'home', 'shot', { onTarget: false, pid: 'p-rohan', name: 'Rohan Nair', statKey: 'shots', minute: 15 }),
+    fbStat(5, 'home', 'corner', { minute: 16 }),
+    { seq: 6, type: 'POSSESSION', side: null, payload: { side: 'away', at: nowMs - 22 * 60000 } },
+    fbStat(7, 'away', 'shot', { onTarget: true, pid: 'p-ishaan', name: 'Ishaan Verma', statKey: 'shots', minute: 22 }),
+    { seq: 8, type: 'GOAL', side: 'away', payload: { minute: 23 }, attribution: { playerId: 'p-ishaan', stat: 'goals', by: 1, playerName: 'Ishaan Verma' } },
+    fbStat(9, 'home', 'foul', { pid: 'p-neil', name: 'Neil Kapoor', statKey: 'fouls', possSide: 'away', minute: 25 }),
+    { seq: 10, type: 'POSSESSION', side: null, payload: { side: 'home', at: nowMs - 12 * 60000 } },
+    fbStat(11, 'home', 'shot', { onTarget: false, pid: 'p-neil', name: 'Neil Kapoor', statKey: 'shots', minute: 31 }),
+    { seq: 12, type: 'GOAL', side: 'home', payload: { minute: 33 }, attribution: { playerId: 'p-rohan', stat: 'goals', by: 1, playerName: 'Rohan Nair' } },
+    fbStat(13, 'away', 'offside', { minute: 28 }),
+    { seq: 14, type: 'YELLOW', side: 'home', payload: { minute: 20 }, attribution: { playerId: 'p-rohan', stat: 'yellowCards', by: 1, playerName: 'Rohan Nair' } },
+    { seq: 15, type: 'YELLOW', side: 'away', payload: { minute: 26 }, attribution: { playerId: 'p-ishaan', stat: 'yellowCards', by: 1, playerName: 'Ishaan Verma' } },
+    { seq: 16, type: 'SUB', side: 'home', payload: { minute: 30, offName: 'Varun Kamath', onName: 'Harsha Bhat' }, attribution: null },
+  ];
+  // Split across two quarters (into Q2 now) so the box score's per-quarter toggle
+  // has real data on both sides. Final unchanged: home 14 · away 11 (Q1 8–7, Q2 6–4);
+  // every player's Overall line is preserved — only the quarter each play lands in changed.
+  logs['cg7'] = [
+    { seq: 1, type: 'KICKOFF', side: null, payload: { at: nowMs - 18 * 60000 } },
+    // — Q1 (8–7) —
+    bbScore(2, 'home', 3, 2, 'p-ind-1', 'Tej Anand', 1),
+    bbScore(3, 'away', 3, 3, 'p-kor-1', 'Vinay Kumar', 1),
+    bbScore(4, 'home', 3, 5, 'p-ind-5', 'Akash Pillai', 1),
+    bbScore(5, 'away', 2, 6, 'p-kor-5', 'Rohit Gowda', 1),
+    bbScore(6, 'home', 2, 8, 'p-ind-3', 'Sahil Verma', 1),
+    bbScore(7, 'away', 2, 9, 'p-kor-3', 'Manoj Pai', 1),
+    bbStat(8, 'home', 'ASSIST', 7, 'p-ind-4', 'Nidhi Rao', 1),
+    bbStat(9, 'away', 'ASSIST', 8, 'p-kor-1', 'Vinay Kumar', 1),
+    bbStat(10, 'home', 'REBOUND', 9, 'p-ind-4', 'Nidhi Rao', 1),
+    bbStat(11, 'away', 'REBOUND', 9, 'p-kor-4', 'Priya Shet', 1),
+    // — Q2 (6–4), clock ~4' in —
+    { seq: 12, type: 'NEXT_QUARTER', side: null, payload: {} },
+    { seq: 13, type: 'KICKOFF', side: null, payload: { at: nowMs - 4 * 60000 } },
+    bbScore(14, 'home', 2, 1, 'p-ind-1', 'Tej Anand', 2),
+    bbScore(15, 'away', 2, 2, 'p-kor-1', 'Vinay Kumar', 2),
+    bbScore(16, 'home', 2, 3, 'p-ind-5', 'Akash Pillai', 2),
+    bbScore(17, 'away', 2, 4, 'p-kor-5', 'Rohit Gowda', 2),
+    bbScore(18, 'home', 2, 5, 'p-ind-3', 'Sahil Verma', 2),
+    bbStat(19, 'home', 'ASSIST', 2, 'p-ind-1', 'Tej Anand', 2),
+    bbStat(20, 'away', 'FOUL', 2, 'p-kor-3', 'Manoj Pai', 2),
+    bbStat(21, 'home', 'REBOUND', 3, 'p-ind-5', 'Akash Pillai', 2),
+    bbStat(22, 'away', 'ASSIST', 3, 'p-kor-4', 'Priya Shet', 2),
+    bbStat(23, 'home', 'REBOUND', 4, 'p-ind-4', 'Nidhi Rao', 2),
+    bbStat(24, 'home', 'FOUL', 4, 'p-ind-3', 'Sahil Verma', 2),
+    bbStat(25, 'away', 'REBOUND', 5, 'p-kor-4', 'Priya Shet', 2),
+    bbStat(26, 'home', 'REBOUND', 5, 'p-ind-1', 'Tej Anand', 2),
+    bbStat(27, 'away', 'REBOUND', 6, 'p-kor-5', 'Rohit Gowda', 2),
+    bbStat(28, 'away', 'FOUL', 6, 'p-kor-5', 'Rohit Gowda', 2),
+  ];
+  // Live kabaddi (m4) — Blue House vs Gold House, into the 2nd half. Raid/tackle
+  // points across both halves so the Player-stats table's per-half toggle has real
+  // data. Final (live): Blue 14 · Gold 13.
+  logs['m4'] = [
+    { seq: 1, type: 'KICKOFF', side: null, payload: { at: nowMs - 30 * 60000 } },
+    kabPt(2, 'RAID', 'home', 2, 2, 1, 'p-ishaan', 'Ishaan Verma'),
+    kabPt(3, 'RAID', 'away', 1, 3, 1, 'p-yh-1', 'Imran Pasha'),
+    kabPt(4, 'TACKLE', 'home', 1, 4, 1, 'p-bh-1', 'Faisal Khan'),
+    kabPt(5, 'RAID', 'away', 2, 6, 1, 'p-yh-2', 'Naveen Shetty'),
+    kabPt(6, 'RAID', 'home', 1, 7, 1, 'p-bh-2', 'Rohit Pillai'),
+    kabPt(7, 'TACKLE', 'away', 1, 9, 1, 'p-yh-8', 'Kiran Joshi'),
+    kabPt(8, 'RAID', 'home', 2, 11, 1, 'p-bh-6', 'Karan Mehta'),
+    kabPt(9, 'RAID', 'away', 2, 13, 1, 'p-yh-6', 'Mahesh Naik'),
+    kabPt(10, 'TACKLE', 'home', 1, 15, 1, 'p-bh-3', 'Sameer Das'),
+    kabPt(11, 'RAID', 'away', 1, 17, 1, 'p-yh-1', 'Imran Pasha'),
+    kabPt(12, 'RAID', 'home', 1, 19, 1, 'p-ishaan', 'Ishaan Verma'),
+    { seq: 13, type: 'NEXT_HALF', side: null, payload: {} },
+    { seq: 14, type: 'KICKOFF', side: null, payload: { at: nowMs - 10 * 60000 } },
+    kabPt(15, 'RAID', 'home', 2, 21, 2, 'p-bh-2', 'Rohit Pillai'),
+    kabPt(16, 'RAID', 'away', 2, 22, 2, 'p-yh-2', 'Naveen Shetty'),
+    kabPt(17, 'TACKLE', 'away', 1, 23, 2, 'p-yh-9', 'Asha Rao'),
+    kabPt(18, 'RAID', 'home', 2, 24, 2, 'p-ishaan', 'Ishaan Verma'),
+    kabPt(19, 'TACKLE', 'home', 1, 25, 2, 'p-bh-7', 'Vivek Shenoy'),
+    kabPt(20, 'RAID', 'away', 1, 26, 2, 'p-yh-6', 'Mahesh Naik'),
+    kabPt(21, 'RAID', 'home', 1, 27, 2, 'p-bh-6', 'Karan Mehta'),
+    kabPt(22, 'TACKLE', 'away', 1, 28, 2, 'p-yh-8', 'Kiran Joshi'),
+    kabPt(23, 'TACKLE', 'away', 1, 29, 2, 'p-meera', 'Meera Joshi'),
+  ];
+  // Live volleyball (m10) — Red vs Blue, best of 3. Red took set 1 (25–21); set 2 is
+  // live at 19–21, so the per-set player-stats toggle has real data on both sides.
+  logs['m10'] = vbEvents([[25, 21], [19, 21]]);
+  // Completed volleyball (m5) — Green House beat Red House 3–1 (best of 5). A full
+  // event log so the finished match shows the broadcast FINAL board (per-set columns
+  // + winner), not just an aggregate card. Sets: 25-20, 23-25, 25-18, 25-22.
+  const VB_GREEN: [string, string][] = [['p-diya', 'Diya Rao'], ['p-ananya', 'Ananya Iyer'], ['p-gh-3', 'Sandeep Rao'], ['p-gh-6', 'Girish Naik'], ['p-gh-9', 'Bhavana Rao'], ['p-gh-10', 'Megha Iyer']];
+  logs['m5'] = vbEvents([[25, 20], [23, 25], [25, 18], [25, 22]], VB_GREEN, VB_HOME);
+  // Live badminton doubles (m11) — Red pair vs Blue pair, best of 3. Red took game 1
+  // (21–17); game 2 is live at 14–16, so the per-game player-stats toggle has data.
+  logs['m11'] = bmEvents([[21, 17], [14, 16]]);
+  // Live tennis singles (m12) — Varun Kamath (Red) vs Sameer Das (Blue), best of 3.
+  // Red took set 1 (6–4); set 2 is live at 3–2, 30–15 — so the per-set stats toggle
+  // has data across both sets.
+  logs['m12'] = tnEvents([[6, 4]], { games: [3, 2], cur: [2, 1] });
+  // Cup final (t7): a knockout tie level 1–1 in the 2nd half — ending it goes to
+  // a penalty shootout. Seeded end-to-end (shots, corners, fouls, cards, offsides
+  // and possession swings) so the live match's Stats/Timeline/Summary are full,
+  // not a lone goal apiece. Possession splits ≈ 54–46 via the POSSESSION events.
+  logs['kc3'] = [
+    { seq: 1, type: 'KICKOFF', side: null, payload: { at: nowMs - 80 * 60000, possSide: 'home' } },
+    fbStat(2, 'away', 'shot', { onTarget: false, pid: 'p-bpl-sameer', name: 'Sameer Khan', statKey: 'shots', minute: 6 }),
+    fbStat(3, 'home', 'shot', { onTarget: true, pid: 'p-bpl-aditya', name: 'Aditya Shetty', statKey: 'shots', minute: 9 }),
+    { seq: 4, type: 'POSSESSION', side: null, payload: { side: 'away', at: nowMs - 72 * 60000 } },
+    fbStat(5, 'home', 'corner', { minute: 14 }),
+    fbStat(6, 'away', 'foul', { pid: 'p-bpl-sameer', name: 'Sameer Khan', statKey: 'fouls', minute: 16 }),
+    { seq: 7, type: 'GOAL', side: 'home', payload: { minute: 18 }, attribution: { playerId: 'p-bpl-rahul', stat: 'goals', by: 1, playerName: 'Rahul Menon' } },
+    fbStat(8, 'home', 'shot', { onTarget: false, pid: 'p-fal-3', name: 'Dinesh Kamath', statKey: 'shots', minute: 22 }),
+    { seq: 9, type: 'POSSESSION', side: null, payload: { side: 'home', at: nowMs - 60 * 60000 } },
+    fbStat(10, 'away', 'corner', { minute: 26 }),
+    fbStat(11, 'home', 'foul', { pid: 'p-bpl-aditya', name: 'Aditya Shetty', statKey: 'fouls', minute: 29 }),
+    fbStat(12, 'away', 'shot', { onTarget: true, pid: 'p-str-2', name: 'Bharat Singh', statKey: 'shots', minute: 33 }),
+    { seq: 13, type: 'GOAL', side: 'away', payload: { minute: 37 }, attribution: { playerId: 'p-bpl-sameer', stat: 'goals', by: 1, playerName: 'Sameer Khan' } },
+    { seq: 14, type: 'POSSESSION', side: null, payload: { side: 'away', at: nowMs - 48 * 60000 } },
+    { seq: 15, type: 'YELLOW', side: 'away', payload: { minute: 40 }, attribution: { playerId: 'p-str-2', stat: 'yellowCards', by: 1, playerName: 'Bharat Singh' } },
+    fbStat(16, 'home', 'offside', { minute: 43 }),
+    { seq: 17, type: 'NEXT_HALF', side: null, payload: { at: nowMs - 35 * 60000 } },
+    { seq: 18, type: 'KICKOFF', side: null, payload: { at: nowMs - 35 * 60000, possSide: 'home' } },
+    fbStat(19, 'home', 'shot', { onTarget: true, pid: 'p-bpl-rahul', name: 'Rahul Menon', statKey: 'shots', minute: 52 }),
+    fbStat(20, 'away', 'foul', { pid: 'p-str-2', name: 'Bharat Singh', statKey: 'fouls', minute: 55 }),
+    fbStat(21, 'home', 'corner', { minute: 57 }),
+    { seq: 22, type: 'POSSESSION', side: null, payload: { side: 'away', at: nowMs - 22 * 60000 } },
+    fbStat(23, 'away', 'shot', { onTarget: false, pid: 'p-bpl-sameer', name: 'Sameer Khan', statKey: 'shots', minute: 61 }),
+    { seq: 24, type: 'YELLOW', side: 'home', payload: { minute: 63 }, attribution: { playerId: 'p-bpl-aditya', stat: 'yellowCards', by: 1, playerName: 'Aditya Shetty' } },
+    fbStat(25, 'away', 'corner', { minute: 66 }),
+    fbStat(26, 'home', 'foul', { pid: 'p-fal-3', name: 'Dinesh Kamath', statKey: 'fouls', minute: 68 }),
+    { seq: 27, type: 'YELLOW', side: 'away', payload: { minute: 70 }, attribution: { playerId: 'p-bpl-sameer', stat: 'yellowCards', by: 1, playerName: 'Sameer Khan' } },
+    { seq: 28, type: 'POSSESSION', side: null, payload: { side: 'home', at: nowMs - 10 * 60000 } },
+    fbStat(29, 'home', 'shot', { onTarget: true, pid: 'p-bpl-rahul', name: 'Rahul Menon', statKey: 'shots', minute: 74 }),
+    fbStat(30, 'away', 'offside', { minute: 76 }),
+    fbStat(31, 'away', 'shot', { onTarget: false, pid: 'p-str-2', name: 'Bharat Singh', statKey: 'shots', minute: 78 }),
+  ];
 
-// Brazil vs Norway (live, m-bra-nor) — ~12' in, Brazil 1–0 up (Vinícius, assist
-// Raphinha) with a few chances each, so the match opens on a real early game.
-demo.matchEvents['m-bra-nor'] = [
-  { seq: 1, type: 'KICKOFF', side: null, payload: { at: nowMs - 12 * 60000, possSide: 'home' } },
-  fbStat(2, 'home', 'shot', { onTarget: true, pid: 'p-bra-9', name: 'Vinícius Júnior', statKey: 'shots', minute: 4 }),
-  fbStat(3, 'home', 'corner', { minute: 5 }),
-  wcGoal(4, 'home', 7, 'open', 'p-bra-9', 'Vinícius Júnior'),
-  { seq: 5, type: 'ASSIST', side: 'home', payload: { minute: 7 }, attribution: { playerId: 'p-bra-7', stat: 'assists', by: 1, playerName: 'Bruno Guimarães' } },
-  { seq: 6, type: 'POSSESSION', side: null, payload: { side: 'away', at: nowMs - 8 * 60000 } },
-  fbStat(7, 'away', 'shot', { onTarget: false, pid: 'p-nor-10', name: 'Erling Haaland', statKey: 'shots', minute: 9 }),
-  fbStat(8, 'away', 'foul', { minute: 10 }),
-  { seq: 9, type: 'POSSESSION', side: null, payload: { side: 'home', at: nowMs - 3 * 60000 } },
-  fbStat(10, 'away', 'shot', { onTarget: true, pid: 'p-nor-11', name: 'Alexander Sørloth', statKey: 'shots', minute: 11 }),
-  fbStat(11, 'home', 'shot', { onTarget: false, pid: 'p-bra-10', name: 'Matheus Cunha', statKey: 'shots', minute: 12 }),
-];
+  // England vs Croatia — the real World Cup first half (2–2 at HT), seeded so the
+  // scorer continues live in the 2nd half. Kane pen (12'), Baturina (36'),
+  // Kane header from Rice's corner (42'), Musa (45+'). 2nd half just kicked off.
+  const wcGoal = (
+    seq: number, side: 'home' | 'away', minute: number, goalType: 'open' | 'penalty' | 'freekick' | 'header', pid: string, name: string
+  ): MatchEventRecord => ({
+    seq, type: 'GOAL', side, payload: { minute, goalType },
+    attribution: { playerId: pid, stat: 'goals', by: 1, playerName: name, extra: { shots: 1, shotsOnTarget: 1, [goalType === 'penalty' ? 'penaltyGoals' : goalType === 'freekick' ? 'freekickGoals' : 'openPlayGoals']: 1 } },
+  });
+  // Seeded end-to-end (shots, corners, fouls, cards, offsides + possession swings)
+  // so the flagship WC tie's Stats/Timeline are full, not just the goals. Possession
+  // splits ≈ 54–46 via the POSSESSION events (fouls omit possSide — see kc3 note).
+  logs['m-eng-cro'] = [
+    { seq: 1, type: 'KICKOFF', side: null, payload: { at: nowMs - 90 * 60000, possSide: 'home' } },
+    fbStat(2, 'home', 'shot', { onTarget: true, pid: 'p-eng-10', name: 'Noni Madueke', statKey: 'shots', minute: 5 }),
+    fbStat(3, 'away', 'shot', { onTarget: false, pid: 'p-cro-10', name: 'Mario Pašalić', statKey: 'shots', minute: 8 }),
+    { seq: 4, type: 'POSSESSION', side: null, payload: { side: 'away', at: nowMs - 82 * 60000 } },
+    fbStat(5, 'away', 'corner', { minute: 10 }),
+    wcGoal(6, 'home', 12, 'penalty', 'p-eng-11', 'Harry Kane'),
+    fbStat(7, 'home', 'shot', { onTarget: false, pid: 'p-eng-8', name: 'Anthony Gordon', statKey: 'shots', minute: 16 }),
+    fbStat(8, 'home', 'foul', { minute: 18 }),
+    { seq: 9, type: 'POSSESSION', side: null, payload: { side: 'home', at: nowMs - 68 * 60000 } },
+    fbStat(10, 'away', 'shot', { onTarget: true, pid: 'p-cro-6', name: 'Luka Modrić', statKey: 'shots', minute: 22 }),
+    fbStat(11, 'away', 'foul', { minute: 25 }),
+    fbStat(12, 'home', 'corner', { minute: 28 }),
+    fbStat(13, 'away', 'shot', { onTarget: false, pid: 'p-cro-5', name: 'Ivan Perišić', statKey: 'shots', minute: 32 }),
+    { seq: 14, type: 'POSSESSION', side: null, payload: { side: 'away', at: nowMs - 55 * 60000 } },
+    wcGoal(15, 'away', 36, 'open', 'p-cro-9', 'Martin Baturina'),
+    fbStat(16, 'home', 'offside', { minute: 38 }),
+    fbStat(17, 'home', 'shot', { onTarget: true, pid: 'p-eng-9', name: 'Jude Bellingham', statKey: 'shots', minute: 40 }),
+    wcGoal(18, 'home', 42, 'header', 'p-eng-11', 'Harry Kane'),
+    { seq: 19, type: 'ASSIST', side: 'home', payload: { minute: 42 }, attribution: { playerId: 'p-eng-6', stat: 'assists', by: 1, playerName: 'Declan Rice' } },
+    fbStat(20, 'home', 'corner', { minute: 44 }),
+    wcGoal(21, 'away', 45, 'open', 'p-cro-11', 'Petar Musa'),
+    { seq: 22, type: 'ASSIST', side: 'away', payload: { minute: 45 }, attribution: { playerId: 'p-cro-5', stat: 'assists', by: 1, playerName: 'Ivan Perišić' } },
+    { seq: 23, type: 'NEXT_HALF', side: null, payload: { at: nowMs - 45 * 60000 } },
+    // 2nd half kicked off ~33 min ago → clock reads ~78'. Bellingham put England 3–2 up.
+    { seq: 24, type: 'KICKOFF', side: null, payload: { at: nowMs - 33 * 60000, possSide: 'home' } },
+    wcGoal(25, 'home', 47, 'open', 'p-eng-9', 'Jude Bellingham'),
+    fbStat(26, 'home', 'shot', { onTarget: false, pid: 'p-eng-11', name: 'Harry Kane', statKey: 'shots', minute: 50 }),
+    fbStat(27, 'away', 'corner', { minute: 53 }),
+    fbStat(28, 'away', 'foul', { pid: 'p-cro-6', name: 'Luka Modrić', statKey: 'fouls', minute: 54 }),
+    { seq: 29, type: 'YELLOW', side: 'away', payload: { minute: 55 }, attribution: { playerId: 'p-cro-6', stat: 'yellowCards', by: 1, playerName: 'Luka Modrić' } },
+    { seq: 30, type: 'POSSESSION', side: null, payload: { side: 'away', at: nowMs - 20 * 60000 } },
+    fbStat(31, 'away', 'shot', { onTarget: true, pid: 'p-cro-11', name: 'Petar Musa', statKey: 'shots', minute: 58 }),
+    fbStat(32, 'home', 'foul', { minute: 60 }),
+    fbStat(33, 'away', 'offside', { minute: 62 }),
+    fbStat(34, 'home', 'corner', { minute: 67 }),
+    fbStat(35, 'home', 'foul', { pid: 'p-eng-6', name: 'Declan Rice', statKey: 'fouls', minute: 69 }),
+    { seq: 36, type: 'YELLOW', side: 'home', payload: { minute: 70 }, attribution: { playerId: 'p-eng-6', stat: 'yellowCards', by: 1, playerName: 'Declan Rice' } },
+    { seq: 37, type: 'POSSESSION', side: null, payload: { side: 'home', at: nowMs - 8 * 60000 } },
+    fbStat(38, 'away', 'foul', { minute: 71 }),
+    fbStat(39, 'away', 'shot', { onTarget: true, pid: 'p-cro-9', name: 'Martin Baturina', statKey: 'shots', minute: 74 }),
+    { seq: 40, type: 'YELLOW', side: 'away', payload: { minute: 76 }, attribution: { playerId: 'p-cro-2', stat: 'yellowCards', by: 1, playerName: 'Joško Gvardiol' } },
+  ];
 
-// Portugal vs Spain (live, m-por-esp) — ~13' in, Portugal 1–0 (Ronaldo, assist
-// Bruno Fernandes), end-to-end.
-demo.matchEvents['m-por-esp'] = [
-  { seq: 1, type: 'KICKOFF', side: null, payload: { at: nowMs - 13 * 60000, possSide: 'home' } },
-  fbStat(2, 'away', 'shot', { onTarget: false, pid: 'p-esp-11', name: 'Lamine Yamal', statKey: 'shots', minute: 3 }),
-  { seq: 3, type: 'POSSESSION', side: null, payload: { side: 'away', at: nowMs - 10 * 60000 } },
-  fbStat(4, 'home', 'shot', { onTarget: true, pid: 'p-por-9', name: 'Bruno Fernandes', statKey: 'shots', minute: 6 }),
-  fbStat(5, 'home', 'corner', { minute: 7 }),
-  wcGoal(6, 'home', 9, 'open', 'p-por-11', 'Cristiano Ronaldo'),
-  { seq: 7, type: 'ASSIST', side: 'home', payload: { minute: 9 }, attribution: { playerId: 'p-por-9', stat: 'assists', by: 1, playerName: 'Bruno Fernandes' } },
-  { seq: 8, type: 'POSSESSION', side: null, payload: { side: 'home', at: nowMs - 4 * 60000 } },
-  fbStat(9, 'away', 'shot', { onTarget: true, pid: 'p-esp-10', name: 'Mikel Oyarzabal', statKey: 'shots', minute: 11 }),
-  fbStat(10, 'home', 'foul', { minute: 12 }),
-];
+  // Brazil vs Norway (live, m-bra-nor) — ~12' in, Brazil 1–0 up (Vinícius, assist
+  // Raphinha) with a few chances each, so the match opens on a real early game.
+  logs['m-bra-nor'] = [
+    { seq: 1, type: 'KICKOFF', side: null, payload: { at: nowMs - 12 * 60000, possSide: 'home' } },
+    fbStat(2, 'home', 'shot', { onTarget: true, pid: 'p-bra-9', name: 'Vinícius Júnior', statKey: 'shots', minute: 4 }),
+    fbStat(3, 'home', 'corner', { minute: 5 }),
+    wcGoal(4, 'home', 7, 'open', 'p-bra-9', 'Vinícius Júnior'),
+    { seq: 5, type: 'ASSIST', side: 'home', payload: { minute: 7 }, attribution: { playerId: 'p-bra-7', stat: 'assists', by: 1, playerName: 'Bruno Guimarães' } },
+    { seq: 6, type: 'POSSESSION', side: null, payload: { side: 'away', at: nowMs - 8 * 60000 } },
+    fbStat(7, 'away', 'shot', { onTarget: false, pid: 'p-nor-10', name: 'Erling Haaland', statKey: 'shots', minute: 9 }),
+    fbStat(8, 'away', 'foul', { minute: 10 }),
+    { seq: 9, type: 'POSSESSION', side: null, payload: { side: 'home', at: nowMs - 3 * 60000 } },
+    fbStat(10, 'away', 'shot', { onTarget: true, pid: 'p-nor-11', name: 'Alexander Sørloth', statKey: 'shots', minute: 11 }),
+    fbStat(11, 'home', 'shot', { onTarget: false, pid: 'p-bra-10', name: 'Matheus Cunha', statKey: 'shots', minute: 12 }),
+  ];
 
-// Argentina vs Egypt (live, m-arg-egy) — ~14' in, 1–1: Messi opens (assist
-// Álvarez), Salah equalises (assist Marmoush). End-to-end opening.
-demo.matchEvents['m-arg-egy'] = [
-  { seq: 1, type: 'KICKOFF', side: null, payload: { at: nowMs - 14 * 60000, possSide: 'home' } },
-  fbStat(2, 'home', 'shot', { onTarget: true, pid: 'p-arg-11', name: 'Lionel Messi', statKey: 'shots', minute: 4 }),
-  fbStat(3, 'home', 'corner', { minute: 6 }),
-  wcGoal(4, 'home', 8, 'open', 'p-arg-11', 'Lionel Messi'),
-  { seq: 5, type: 'ASSIST', side: 'home', payload: { minute: 8 }, attribution: { playerId: 'p-arg-10', stat: 'assists', by: 1, playerName: 'Julián Álvarez' } },
-  { seq: 6, type: 'POSSESSION', side: null, payload: { side: 'away', at: nowMs - 10 * 60000 } },
-  fbStat(7, 'away', 'shot', { onTarget: true, pid: 'p-egy-10', name: 'Mohamed Salah', statKey: 'shots', minute: 10 }),
-  fbStat(8, 'home', 'foul', { minute: 11 }),
-  wcGoal(9, 'away', 12, 'open', 'p-egy-10', 'Mohamed Salah'),
-  { seq: 10, type: 'ASSIST', side: 'away', payload: { minute: 12 }, attribution: { playerId: 'p-egy-9', stat: 'assists', by: 1, playerName: 'Emam Ashour' } },
-  { seq: 11, type: 'POSSESSION', side: null, payload: { side: 'home', at: nowMs - 6 * 60000 } },
-  { seq: 12, type: 'POSSESSION', side: null, payload: { side: 'away', at: nowMs - 2 * 60000 } },
-  fbStat(13, 'home', 'shot', { onTarget: false, pid: 'p-arg-10', name: 'Julián Álvarez', statKey: 'shots', minute: 13 }),
-];
+  // Portugal vs Spain (live, m-por-esp) — ~13' in, Portugal 1–0 (Ronaldo, assist
+  // Bruno Fernandes), end-to-end.
+  logs['m-por-esp'] = [
+    { seq: 1, type: 'KICKOFF', side: null, payload: { at: nowMs - 13 * 60000, possSide: 'home' } },
+    fbStat(2, 'away', 'shot', { onTarget: false, pid: 'p-esp-11', name: 'Lamine Yamal', statKey: 'shots', minute: 3 }),
+    { seq: 3, type: 'POSSESSION', side: null, payload: { side: 'away', at: nowMs - 10 * 60000 } },
+    fbStat(4, 'home', 'shot', { onTarget: true, pid: 'p-por-9', name: 'Bruno Fernandes', statKey: 'shots', minute: 6 }),
+    fbStat(5, 'home', 'corner', { minute: 7 }),
+    wcGoal(6, 'home', 9, 'open', 'p-por-11', 'Cristiano Ronaldo'),
+    { seq: 7, type: 'ASSIST', side: 'home', payload: { minute: 9 }, attribution: { playerId: 'p-por-9', stat: 'assists', by: 1, playerName: 'Bruno Fernandes' } },
+    { seq: 8, type: 'POSSESSION', side: null, payload: { side: 'home', at: nowMs - 4 * 60000 } },
+    fbStat(9, 'away', 'shot', { onTarget: true, pid: 'p-esp-10', name: 'Mikel Oyarzabal', statKey: 'shots', minute: 11 }),
+    fbStat(10, 'home', 'foul', { minute: 12 }),
+  ];
+
+  // Argentina vs Egypt (live, m-arg-egy) — ~14' in, 1–1: Messi opens (assist
+  // Álvarez), Salah equalises (assist Marmoush). End-to-end opening.
+  logs['m-arg-egy'] = [
+    { seq: 1, type: 'KICKOFF', side: null, payload: { at: nowMs - 14 * 60000, possSide: 'home' } },
+    fbStat(2, 'home', 'shot', { onTarget: true, pid: 'p-arg-11', name: 'Lionel Messi', statKey: 'shots', minute: 4 }),
+    fbStat(3, 'home', 'corner', { minute: 6 }),
+    wcGoal(4, 'home', 8, 'open', 'p-arg-11', 'Lionel Messi'),
+    { seq: 5, type: 'ASSIST', side: 'home', payload: { minute: 8 }, attribution: { playerId: 'p-arg-10', stat: 'assists', by: 1, playerName: 'Julián Álvarez' } },
+    { seq: 6, type: 'POSSESSION', side: null, payload: { side: 'away', at: nowMs - 10 * 60000 } },
+    fbStat(7, 'away', 'shot', { onTarget: true, pid: 'p-egy-10', name: 'Mohamed Salah', statKey: 'shots', minute: 10 }),
+    fbStat(8, 'home', 'foul', { minute: 11 }),
+    wcGoal(9, 'away', 12, 'open', 'p-egy-10', 'Mohamed Salah'),
+    { seq: 10, type: 'ASSIST', side: 'away', payload: { minute: 12 }, attribution: { playerId: 'p-egy-9', stat: 'assists', by: 1, playerName: 'Emam Ashour' } },
+    { seq: 11, type: 'POSSESSION', side: null, payload: { side: 'home', at: nowMs - 6 * 60000 } },
+    { seq: 12, type: 'POSSESSION', side: null, payload: { side: 'away', at: nowMs - 2 * 60000 } },
+    fbStat(13, 'home', 'shot', { onTarget: false, pid: 'p-arg-10', name: 'Julián Álvarez', statKey: 'shots', minute: 13 }),
+  ];
+}
 
 export function setTeamLeaders(teamId: string, leaders: TeamLeadership) {
   demo.teamLeaders[teamId] = leaders;

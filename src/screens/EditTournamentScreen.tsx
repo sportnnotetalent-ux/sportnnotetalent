@@ -17,7 +17,7 @@ import { SportSettingsButtons, coarseStructureFrom, migrateFormatsForSettings } 
 import { tournamentDraft } from '../data/tournamentDraft';
 import { defaultsFor } from '../components/FormatEditor';
 import { withNewTournamentPoints } from '../data/standings';
-import { SPORT_LIST, getSport } from '../sports/registry';
+import { SPORT_LIST, getSportMeta } from '../sports/sportMeta';
 import { updateTournament, patchTournamentFormat, formatDiff, deleteTournament, setTournamentLogo, setTournamentBanner, getMyPlayerId, getPlayer } from '../data/repos';
 import { useMatches, useTournamentById } from '../data/hooks';
 import { useAuth } from '../core/auth';
@@ -118,7 +118,7 @@ export default function EditTournamentScreen() {
   const toggleSport = (s: SportId) =>
     setSports((prev) => {
       if (prev.includes(s)) return prev.filter((x) => x !== s);
-      const fields = getSport(s).formatFields ?? [];
+      const fields = getSportMeta(s).formatFields ?? [];
       // A sport added now starts on its international points system (D1).
       const seeded = withNewTournamentPoints(s, fields.length ? defaultsFor(fields, 'tournament') : {});
       setFormats((f) => (f[s] ? f : { ...f, [s]: seeded }));
@@ -229,7 +229,7 @@ export default function EditTournamentScreen() {
             ))}
           </View>
           {removed.length > 0 && (
-            <Text style={st.warn}>Removing {removed.map((sp) => getSport(sp).name).join(', ')} hides it here — games already scheduled in it are kept, not deleted.</Text>
+            <Text style={st.warn}>Removing {removed.map((sp) => getSportMeta(sp).name).join(', ')} hides it here — games already scheduled in it are kept, not deleted.</Text>
           )}
 
           {sports.length > 1 && <MedalScoringEditor sports={sports} value={scoring} onChange={setScoring} />}

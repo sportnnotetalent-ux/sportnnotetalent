@@ -3,10 +3,13 @@
  * are in the first download; every other screen is its own chunk, fetched when
  * opened — and prefetched in the background shortly after start-up, so
  * navigation stays instant. On native everything is in one bundle anyway.
+ * Perf F-15: the sports' plugins are on-demand chunks too; they warm after
+ * the screens, one at a time.
  */
 import React from 'react';
 import { Platform } from 'react-native';
 import { isStaleVersionError, reloadForNewVersion } from '../core/staleVersion';
+import { prefetchSports } from '../sports/registry';
 
 const loaders: Array<() => Promise<unknown>> = [];
 
@@ -38,7 +41,10 @@ export function prefetchScreens(): void {
 
 function warmAll(): void {
   // Metro's dev loader may hand back a bare thenable — normalise to a Promise.
+  const screens: Promise<unknown>[] = [];
   for (const load of loaders) {
-    try { void Promise.resolve(load()).catch(() => undefined); } catch { /* retried on open */ }
+    try { screens.push(Promise.resolve(load()).catch(() => undefined)); } catch { /* retried on open */ }
   }
+  // then the sports (perf F-15), so a match of any sport opens at once later
+  void Promise.all(screens).then(() => prefetchSports());
 }
