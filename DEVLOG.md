@@ -13,6 +13,13 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-23 — Fix: Tournament teams' "manage the squad" invite link landed on an error
+Pre-launch fix. Adding a team with a manager / captain contact made that person a (provisional) player and captain, then sent a link built from the team-claim CODE to the player-invite page (`/i/…`), which expects a player id — so the email / WhatsApp link always failed.
+- The link is now their own invite, `app.sportnnote.in/i/<player id>`: signing up there with that number / email claims the player already made captain, so they manage the squad at once.
+- The `join` function (behind that page) also finds a team the person RUNS (captain / vice-captain / team admin), not only one they're on the roster of, so the page says "You've been added to <team>".
+- The team code stays as a fallback, shown to the organiser: someone who signs up with a different number can still take over via Settings → Join a team with a code.
+- Needs deploy: `join` (public: `--no-verify-jwt`). Verified: tsc + edge-fn check clean; the captain lookup tested read-only on live.
+
 ### 2026-10-23 — Invite a friend: one link for Android and iPhone, they land following you
 Founder: share the app with a friend who's in no team or match yet, by WhatsApp / SMS, not knowing if they're on Android or iPhone.
 - **Send (`InviteFriend` screen):** Profile → Mine → 💌 Invite a friend, or Organize → 💌 Invite a friend. Pick from contacts (phones; the web Contact Picker where the browser has it) or type the number → **WhatsApp** opens straight to that chat with the message written, or **SMS**; "Share invite link…" for anything else; a QR for in person. The message greets them by name and names you (`friendInviteText`).

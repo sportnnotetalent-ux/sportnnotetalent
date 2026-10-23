@@ -41,8 +41,16 @@ Deno.serve(async (req) => {
         svc.from('teams').select('id, name').contains('roster', JSON.stringify([id])).limit(1),
       ]);
       out.claimed = !!p?.profile_id;
-      out.team = (teams?.[0]?.name as string | undefined) ?? (p?.house_name as string | null) ?? '';
-      out.teamId = (teams?.[0]?.id as string | undefined) ?? null;
+      // not on a roster: invited to RUN a team (captain / vice-captain / team admin —
+      // Tournament teams → "manager / captain contact")
+      let team = teams?.[0] as { id: string; name: string } | undefined;
+      if (!team) {
+        const { data: led } = await svc.from('teams').select('id, name')
+          .or(`captain_id.eq.${id},vice_captain_id.eq.${id},admin_ids.cs.{${id}}`).limit(1);
+        team = led?.[0] as { id: string; name: string } | undefined;
+      }
+      out.team = team?.name ?? (p?.house_name as string | null) ?? '';
+      out.teamId = team?.id ?? null;
     } catch { /* generic page */ }
   }
   return new Response(JSON.stringify(out), { headers: { ...CORS, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });

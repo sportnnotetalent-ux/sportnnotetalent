@@ -113,7 +113,7 @@ export default function TournamentTeamsScreen() {
   const [mgrPhone, setMgrPhone] = useState('');
   const [mgrEmail, setMgrEmail] = useState('');
   // Confirmation shown after a team is added (with an optional share-invite CTA).
-  const [added, setAdded] = useState<{ note: string; link?: string; phone?: string; name?: string; context?: string } | null>(null);
+  const [added, setAdded] = useState<{ note: string; link?: string; phone?: string; name?: string; context?: string; code?: string } | null>(null);
   // Quick search over the team chips.
   const [query, setQuery] = useState('');
   const [showAll, setShowAll] = useState(false);
@@ -247,14 +247,19 @@ export default function TournamentTeamsScreen() {
       if (mName || mPhone || mEmail) {
         const { player } = await invitePerson({ name: mName || t.name, phone: mPhone || undefined, email: mEmail || undefined });
         await setTeamLeaders(t.id, { captainId: player.id });
+        // The link is THEIR invite (app.sportnnote.in/i/<player id>): signing up there
+        // with this number / email claims the player just made captain, so they can
+        // manage the squad at once. (It used to carry the team code, which that
+        // page can't read — the email link landed on an error.) The team code stays
+        // a fallback for someone who signs up with a different number.
         const invite = await createInvite(t.id, t.name, 'captain');
-        const link = joinLink(invite.token);
+        const link = joinLink(player.id);
         if (mEmail) {
           const sent = await sendInviteEmail(mEmail, { name: player.fullName, inviterName, link, context, role: 'manage' });
-          setAdded({ note: sent ? `✅ ${t.name} added · invite emailed to ${player.fullName}.` : `✅ ${t.name} added · couldn’t email — share this link with ${player.fullName}: ${link}` });
+          setAdded({ note: sent ? `✅ ${t.name} added · invite emailed to ${player.fullName}.` : `✅ ${t.name} added · couldn’t email — share this link with ${player.fullName}: ${link}`, code: invite.token });
         } else {
           // No email: offer WhatsApp/SMS (opens the app) and show the link to share.
-          setAdded({ note: `✅ ${t.name} added · invite ${player.fullName} to manage the squad:`, link, phone: mPhone || undefined, name: player.fullName, context });
+          setAdded({ note: `✅ ${t.name} added · invite ${player.fullName} to manage the squad:`, link, phone: mPhone || undefined, name: player.fullName, context, code: invite.token });
         }
       } else {
         setAdded({ note: `✅ ${t.name} added.` });
@@ -723,6 +728,11 @@ export default function TournamentTeamsScreen() {
                   ) : null}
                 </View>
               )}
+              {added.code ? (
+                <Text style={textStyles.muted} selectable>
+                  If they sign up with a different number or email, they can still take over the team: in the app, Settings → Join a team with a code → {added.code}
+                </Text>
+              ) : null}
               <Text style={st.link} onPress={() => setAdded(null)}>Dismiss</Text>
             </Card>
           )}
