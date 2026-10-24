@@ -13,6 +13,35 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-24 — Verification fast lanes, Phase 1: faster document review
+Founder asked how age and guardian verification works and wants it smooth and fast. Live finding: 1 submission ever (30 Aug), still pending after 55 days with **no file** — its upload had failed silently but the row still went "pending". 0 approvals, 1 reviewer, and a 7-day link to the (child's) ID document was emailed to Gmail. Founder chose all four fast lanes, trusted reviewers, and organiser-chosen requirements. Design: `docs/verification/fast-lanes.md`.
+- **Migration `20261024170000_verification_review.sql`:**
+  - `verification_reviewers` table and `is_verification_reviewer()` (support/admin, or appointed by support). Reviewers act only through server functions; support's blanket bypass of the player-row guards is not extended to them.
+  - The storage policy lets reviewers open documents.
+  - `pending_verifications()` returns the queue.
+  - `verification_reviewers_list` / `grant_` / `revoke_verification_reviewer` (support-only).
+  - Hourly cron `verification-reminders`, using the same Vault auth as privacy-retention.
+- **Edge functions:**
+  - New `verification-review`: reviewer-only, pending-only, never your own or your ward's. The reviewer's identity comes from the server. It appends history, stamps `reviewedAt` (for retention), guards against two reviewers deciding at once, and pushes the result to the player and their linked parent.
+  - New `verification-reminders`: cron-only. It re-alerts reviewers about anything waiting 12 hours or more, at most once every 12 hours per submission, and is race-safe on re-submission.
+  - `verification-submit`: pushes every reviewer (opens the queue) and emails a note **without the document or any link**.
+  - Shared: `_shared/verification.ts`.
+- **App:**
+  - `submitVerificationDoc` uploads first and throws on failure (10 MB cap), so a profile is never pending without a file.
+  - `getPendingVerifications` uses the RPC (support falls back to the old read before the migration).
+  - `reviewVerification` goes through the edge function and throws the server's message.
+  - New: `amVerificationReviewer`, reviewer list / appoint / remove, and the `useVerificationReviewer` hook.
+  - **Review screen** (rewritten):
+    - Each submission shows the document inline (image, tap for full size; a PDF opens), next to the entered date of birth, age and parent (linked ✓).
+    - It shows how long the item has waited (red past 12 h) and how many times it was sent back before.
+    - Five one-tap reject reasons or a typed one; approve is disabled without a file.
+    - Support sees a Reviewers section (add by mobile or email, remove).
+  - The profile card says "usually within a few hours", shows upload / decision errors, and decides through the server.
+  - "Review verifications" appears in Settings and on the profile for appointed reviewers too.
+  - `verification-review` is pinned to the India region (a database write, then one push).
+- **Verified:** `tests/verification-review.test.mts` (8); edge functions typecheck (tsc with Deno shims); app tsc clean; suite 4468 pass / 0 fail. Demo (the demo user is support): the queue renders, reject with the preset reason works, and the toast confirms; no layout overflow at 375 px after shortening one reason; no console errors.
+- **Needs:** the founder runs the migration; deploy `verification-review`, `verification-reminders` and `verification-submit`; publish the app. The stuck live submission (no file) can then be rejected with "please upload again".
+
 ### 2026-10-24 — Singles / doubles entry names: a child's full name never stored publicly
 IDs-only close-out item, done early because it touches no sport engine. A singles or doubles entry is a one- or two-person team named after its players ("Meera Rao / Asha Kumar"). Team names are public (logged out too) and are copied into every stat line's `opponent`.
 - **Migration `20261024160000_entry_names.sql`:**

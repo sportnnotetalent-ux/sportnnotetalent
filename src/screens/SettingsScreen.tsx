@@ -27,6 +27,7 @@ import { getMyPlayerId } from '../data/repos';
 import { getUnreadThreadCount } from '../data/messages';
 import { useFocusEffect } from '@react-navigation/native';
 import type { RootStackParamList } from '../navigation/types';
+import { useVerificationReviewer } from '../data/useVerificationReviewer';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -72,6 +73,7 @@ function Group({ title, children }: { title: string; children: React.ReactNode }
 export default function SettingsScreen() {
   const nav = useNavigation<Nav>();
   const { profile, demo, signOut } = useAuth();
+  const reviewer = useVerificationReviewer() === true;
   const [playerId, setPlayerId] = useState<string | null>(null);
   const [unread, setUnread] = useState(0);
 
@@ -124,13 +126,18 @@ export default function SettingsScreen() {
           <Row icon="👪" label="Link as a parent/guardian" value="Get messages about your child" onPress={() => nav.navigate('GuardianLink')} />
         </Group>
 
-        {isSupport(profile?.role) && (
+        {isSupport(profile?.role) ? (
           <Group title="Support tools">
             <Row icon="🛡️" label="Review verifications" onPress={() => nav.navigate('VerificationReview')} />
             <View style={st.divider} />
             <Row icon="🚩" label="Message reports" onPress={() => nav.navigate('MessageReports')} />
           </Group>
-        )}
+        ) : reviewer ? (
+          // an appointed verification reviewer (docs/verification/fast-lanes.md)
+          <Group title="Reviewer tools">
+            <Row icon="🛡️" label="Review verifications" onPress={() => nav.navigate('VerificationReview')} />
+          </Group>
+        ) : null}
 
         <Group title="Help">
           <Row icon="💬" label="Help & support" value="Guides · contact us" onPress={() => nav.navigate('Support')} />

@@ -5,7 +5,7 @@ import { isEventSport } from '../sports/eventSports';
 import React, { useEffect, useState } from 'react';
 import { ScrollView, View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
 import { theme } from '../core/theme';
-import { Card, Pill, Button, SelectChip, EmptyState, textStyles, plural } from './ui';
+import { Card, Pill, Button, SelectChip, EmptyState, FormError, textStyles, plural } from './ui';
 import { SectionHeader, SECTION_CAP } from './SectionHeader';
 import { ContactCard } from './ContactCard';
 import { inviteGuardianToLink } from '../data/messages';
@@ -17,6 +17,7 @@ import { pickImage } from '../core/photo';
 import { pickDocument } from '../core/document';
 import { ageFromDob, ageOf, isMinor } from '../core/age';
 import { notify } from '../core/notifications';
+import { useVerificationReviewer } from '../data/useVerificationReviewer';
 import { useAuth } from '../core/auth';
 import { isSupport } from '../core/roles';
 import { TextField } from './ui';
@@ -81,15 +82,17 @@ export function ProfileView({
   const { profile: viewer } = useAuth();
   const ownProfile = !!onEditProfile;
   const viewerIsSupport = isSupport(viewer?.role);
+  // Support + appointed reviewers (docs/verification/fast-lanes.md)
+  const viewerIsReviewer = useVerificationReviewer() === true;
   // Support reviewers get a "pending approvals" entry on their own profile, so the
   // queue is reachable without hunting through notifications.
   const [pendingCount, setPendingCount] = useState<number | null>(null);
   useEffect(() => {
-    if (!(ownProfile && viewerIsSupport)) return;
+    if (!(ownProfile && viewerIsReviewer)) return;
     let on = true;
     getPendingVerifications().then((list) => on && setPendingCount(list.length));
     return () => { on = false; };
-  }, [ownProfile, viewerIsSupport]);
+  }, [ownProfile, viewerIsReviewer]);
   const [scope, setScope] = useState<'all' | 'official' | 'friendly'>('all');
   const [photo, setPhoto] = useState<string | undefined>(undefined);
   // Inline "See all" toggles — each record-list section shows 5, then expands.
@@ -231,11 +234,11 @@ export function ProfileView({
 
       {/* Support reviewer's own profile: a discoverable entry to the approvals
           queue (so notifications aren't the only way in). */}
-      {ownProfile && viewerIsSupport && onOpenVerificationReview && (
+      {ownProfile && viewerIsReviewer && onOpenVerificationReview && (
         <TouchableOpacity accessibilityRole="button" activeOpacity={0.8} onPress={onOpenVerificationReview}>
           <Card style={st.reviewCard}>
             <View style={st.reviewCardRow}>
-              <Text style={textStyles.h3}>🛡️ Verification review</Text>
+              <Text style={textStyles.h3}>🛡️ Review verifications</Text>
               {pendingCount != null && pendingCount > 0 && (
                 <Pill label={`${pendingCount} pending`} color={theme.colors.surfaceAlt} textColor={theme.colors.accent} />
               )}
@@ -243,7 +246,7 @@ export function ProfileView({
             <Text style={textStyles.muted}>
               {pendingCount == null ? 'Age & ID proofs awaiting review.'
                 : pendingCount === 0 ? 'No submissions waiting — you’re all caught up.'
-                : `${pendingCount} age/ID ${pendingCount === 1 ? 'proof is' : 'proofs are'} waiting for your review. Tap to open the queue.`}
+                : `${pendingCount} age/ID ${pendingCount === 1 ? 'proof is' : 'proofs are'} waiting. Tap to review — aim for the same day.`}
             </Text>
           </Card>
         </TouchableOpacity>
@@ -489,54 +492,58 @@ function VerificationCard({ player, owner, reviewer }: { player: Player; owner: 
 
   // Reviewer: approve/reject, record the decision, and notify the submitter so
   // the update lands back on their profile (status + eligibility).
+  // Reviewer: approve/reject. The server records it (reviewer identity from
+  // the server) and notifies the player and their parent/guardian.
+  const [error, setError] = useState<string | null>(null);
   const review = async (decision: 'approved' | 'rejected') => {
-    setBusy(true);
     const reason = decision === 'rejected' ? note.trim() || undefined : undefined;
-    await reviewVerification(player.id, decision, reason, reviewer);
-    const at = Date.now();
-    setV((prev) => ({
-      ...(prev ?? {}),
-      status: decision,
-      note: reason,
-      reviewedAt: at,
-      reviewedById: reviewer?.id,
-      reviewedByName: reviewer?.name,
-      history: [...(prev?.history ?? []), { action: decision, at, byId: reviewer?.id, byName: reviewer?.name, note: reason }],
-    }));
-    const minor = (ageFromDob(player.dob) ?? 99) < 18;
-    const guardianDone = !!(player.guardian?.phoneVerified && player.guardian?.emailVerified);
-    void notify({
-      title: decision === 'approved' ? '☑️ Verification approved' : '✗ Verification needs attention',
-      body: decision === 'approved'
-        ? (minor && !guardianDone
-            ? "Your age & guardian are approved. Next: verify your guardian's mobile & email on your profile — then you can join teams, tournaments & matches."
-            : 'Verified ✓ You can now be added to teams, tournaments and matches.')
-        : `Rejected${reason ? `: ${reason}` : ''}. Please re-submit a clearer proof of date of birth on your profile.`,
-      playerId: player.id,
-    });
-    setNote('');
-    setBusy(false);
+    if (decision === 'rejected' && !reason) { setError('Add a reason, so they know what to fix.'); return; }
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await reviewVerification(player.id, decision, reason, reviewer);
+      setV((prev) => ({
+        ...(prev ?? {}),
+        status: decision,
+        note: reason,
+        reviewedAt: r.reviewedAt,
+        reviewedById: reviewer?.id,
+        reviewedByName: r.reviewedByName ?? reviewer?.name,
+        history: [...(prev?.history ?? []), { action: decision, at: r.reviewedAt, byId: reviewer?.id, byName: r.reviewedByName ?? reviewer?.name, note: reason }],
+      }));
+      setNote('');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Couldn’t save the decision.');
+    } finally {
+      setBusy(false);
+    }
   };
 
   const upload = async () => {
     const doc = await pickDocument();
     if (!doc) return;
     setBusy(true);
-    await submitVerificationDoc(player.id, doc);
-    const at = Date.now();
-    setV((prev) => ({
-      status: 'pending', docName: doc.name, submittedAt: at,
-      history: [...(prev?.history ?? []), { action: 'submitted', at, docName: doc.name }],
-    }));
-    // Confirmation + the follow-up action (esp. the guardian step for minors).
-    void notify({
-      title: '📄 Date-of-birth proof submitted',
-      body: isMinor(player.dob)
-        ? "Sent to our team to review. Next: add your parent/guardian's details and make sure their mobile & email are verified — both are needed before you can join teams or tournaments."
-        : "Sent to our team to review. You'll be notified once your age is approved.",
-      playerId: player.id,
-    });
-    setBusy(false);
+    setError(null);
+    try {
+      // Throws (and marks nothing pending) when the file didn't upload.
+      await submitVerificationDoc(player.id, doc);
+      const at = Date.now();
+      setV((prev) => ({
+        status: 'pending', docName: doc.name, submittedAt: at,
+        history: [...(prev?.history ?? []), { action: 'submitted', at, docName: doc.name }],
+      }));
+      // Confirmation + the follow-up action (esp. the guardian step for minors).
+      void notify({
+        title: '📄 Proof of date of birth sent',
+        body: isMinor(player.dob)
+          ? "A reviewer will check it, usually within a few hours. Meanwhile: add your parent/guardian's details and verify their mobile & email."
+          : "A reviewer will check it, usually within a few hours. You'll get a notification.",
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Couldn’t upload the document — please try again.');
+    } finally {
+      setBusy(false);
+    }
   };
 
   const status = v?.status;
@@ -563,8 +570,9 @@ function VerificationCard({ player, owner, reviewer }: { player: Player; owner: 
         />
       )}
       {status === 'pending' && !reviewer && (
-        <Text style={textStyles.muted}>Submitted — sent to our support team ({SUPPORT_EMAIL}) for review. You&apos;ll be notified once it&apos;s checked.</Text>
+        <Text style={textStyles.muted}>Sent ✓ A SportnNote reviewer will check it — usually within a few hours. You&apos;ll get a notification.</Text>
       )}
+      <FormError message={error} />
 
       {/* Support reviewer, viewing this profile: open the doc + approve/reject. */}
       {reviewer && (
@@ -572,7 +580,7 @@ function VerificationCard({ player, owner, reviewer }: { player: Player; owner: 
           {v?.docPath ? (
             <Button label={opening ? 'Opening…' : '📄 View document'} variant="ghost" onPress={viewDoc} disabled={opening} />
           ) : (
-            <Text style={textStyles.muted}>No document file on record (submitted before uploads were enabled, or in demo) — check the copy emailed to {SUPPORT_EMAIL}.</Text>
+            <Text style={textStyles.muted}>No file was uploaded with this submission — reject it so they can upload again.</Text>
           )}
           {status === 'pending' && (
             <>

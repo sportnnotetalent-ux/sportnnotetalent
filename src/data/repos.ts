@@ -4101,11 +4101,13 @@ export async function verifyGuardianContact(id: string, channel: 'phone' | 'emai
   await updatePlayer(id, { guardian });
 }
 
-/** Submit a document (image/PDF) proving age & guardian relationship for the
- *  support team to review. In live mode the actual file is uploaded to the
- *  private `verification-docs` bucket and a signed link is emailed to
- *  SUPPORT_EMAIL (via the verification-submit edge function); the profile is
- *  marked "pending" either way. In demo mode only the metadata is recorded. */
+/** Submit a document (image/PDF) proving age & guardian relationship for a
+ *  reviewer to check (docs/verification/fast-lanes.md). In live mode the file
+ *  is uploaded to the private `verification-docs` bucket FIRST — if that fails
+ *  this throws and nothing is marked pending (a submission without a file used
+ *  to sit unseen) — then the profile goes "pending" and the
+ *  verification-submit edge function alerts every reviewer (push + an email
+ *  that never carries the document). Demo mode records the metadata only. */
 export async function submitVerificationDoc(id: string, doc: PickedDoc): Promise<void> {
   const p = await getPlayer(id);
   const at = Date.now();
@@ -4114,23 +4116,25 @@ export async function submitVerificationDoc(id: string, doc: PickedDoc): Promise
   // Live mode: upload the real bytes, keyed by the uploader's auth id so Storage
   // RLS only lets them write into their own folder.
   if (isSupabaseConfigured && supabase) {
+    const failed = 'Couldn’t upload the document — check your connection and try again.';
+    const { data: auth } = await supabase.auth.getUser();
+    const uid = auth.user?.id;
+    if (!uid) throw new Error('Please sign in again, then upload the document.');
+    const ext = (doc.name.split('.').pop() || 'bin').toLowerCase().replace(/[^a-z0-9]/g, '') || 'bin';
+    const path = `${uid}/${id}/${at}.${ext}`;
+    let blob: Blob;
     try {
-      const { data: auth } = await supabase.auth.getUser();
-      const uid = auth.user?.id;
-      if (uid) {
-        const ext = (doc.name.split('.').pop() || 'bin').toLowerCase().replace(/[^a-z0-9]/g, '') || 'bin';
-        const path = `${uid}/${id}/${at}.${ext}`;
-        const blob = await (await fetch(doc.uri)).blob();
-        const { error } = await supabase.storage.from('verification-docs').upload(path, blob, {
-          contentType: doc.mimeType || blob.type || 'application/octet-stream',
-          upsert: true,
-        });
-        if (error) console.warn('verification upload failed:', error.message);
-        else docPath = path;
-      }
-    } catch (e) {
-      console.warn('verification upload error:', e);
+      blob = await (await fetch(doc.uri)).blob();
+    } catch {
+      throw new Error('Couldn’t read that file — please pick it again.');
     }
+    if (blob.size > VERIFICATION_DOC_MAX_BYTES) throw new Error('That file is too large (max 10 MB). A photo or a smaller PDF works.');
+    const { error } = await supabase.storage.from('verification-docs').upload(path, blob, {
+      contentType: doc.mimeType || blob.type || 'application/octet-stream',
+      upsert: true,
+    });
+    if (error) throw new Error(failed);
+    docPath = path;
   }
 
   // Fresh pending cycle, but the full history is carried forward (append-only).
@@ -4144,8 +4148,8 @@ export async function submitVerificationDoc(id: string, doc: PickedDoc): Promise
     },
   });
 
-  // Email the reviewer a signed link (best-effort — the row is already pending,
-  // and the in-app review queue works regardless of whether email is wired up).
+  // Alert the reviewers (best-effort: the row is already pending, and the hourly
+  // reminder job re-alerts them after 12 hours anyway).
   if (isSupabaseConfigured && supabase && docPath) {
     try {
       await supabase.functions.invoke(fnPath('verification-submit'), { body: { playerId: id } });
@@ -4155,32 +4159,92 @@ export async function submitVerificationDoc(id: string, doc: PickedDoc): Promise
   }
 }
 
+/** Largest proof document accepted (a phone photo or a scanned PDF). */
+export const VERIFICATION_DOC_MAX_BYTES = 10 * 1024 * 1024;
+
 /** A short-lived (1-hour) signed URL to a submitted verification document, for
- *  the reviewer console to open. Null in demo mode or when no file was stored. */
+ *  the reviewer to open. Null in demo mode or when no file was stored. */
 export async function verificationDocUrl(docPath?: string): Promise<string | null> {
   if (!docPath || !isSupabaseConfigured || !supabase) return null;
   const { data } = await supabase.storage.from('verification-docs').createSignedUrl(docPath, 60 * 60);
   return data?.signedUrl ?? null;
 }
 
-/** Profiles awaiting verification review (support console). */
-export async function getPendingVerifications(): Promise<Player[]> {
-  if (!isSupabaseConfigured || !supabase) {
-    return demo.players.filter((p) => p.verification?.status === 'pending');
-  }
-  const { data } = await readPlayers((cols) => fetchAllPages((from, to) =>
-    supabase!.from(PLAYERS_READ).select(cols).eq('verification->>status', 'pending').order('id').range(from, to)));
-  return (data as PlayerRow[] | null)?.map(toPlayer) ?? [];
+/** One submission in the review queue — what a reviewer needs to decide. */
+export interface PendingVerification {
+  playerId: string;
+  profileId?: string;
+  fullName: string;
+  dob?: string;
+  guardianName?: string;
+  guardianLinked: boolean;
+  docName?: string;
+  docPath?: string;
+  submittedAt?: number;
+  history: NonNullable<Player['verification']>['history'];
 }
 
-/** Support approves or rejects a submitted verification, recording who decided
- *  and when (audit trail). */
+const pendingFromPlayer = (p: Player): PendingVerification => ({
+  playerId: p.id, profileId: p.profileId, fullName: p.fullName, dob: p.dob,
+  guardianName: p.guardian?.name || undefined, guardianLinked: !!p.guardianLinked,
+  docName: p.verification?.docName, docPath: p.verification?.docPath,
+  submittedAt: p.verification?.submittedAt, history: p.verification?.history ?? [],
+});
+
+/** The review queue, oldest first. Reviewers (support + appointed) read it
+ *  through pending_verifications() (migration verification_review); before
+ *  that migration, support reads the players view as before. */
+export async function getPendingVerifications(): Promise<PendingVerification[]> {
+  if (!isSupabaseConfigured || !supabase) {
+    return demo.players.filter((p) => p.verification?.status === 'pending').map(pendingFromPlayer);
+  }
+  const { data, error } = await supabase.rpc('pending_verifications');
+  if (!error) {
+    return ((data ?? []) as {
+      player_id: string; profile_id: string | null; full_name: string | null; dob: string | null;
+      guardian_name: string | null; guardian_linked: boolean | null; doc_name: string | null; doc_path: string | null;
+      submitted_at: number | string | null; history: unknown;
+    }[]).map((r) => ({
+      playerId: r.player_id,
+      profileId: r.profile_id ?? undefined,
+      fullName: r.full_name ?? 'Player',
+      dob: r.dob ?? undefined,
+      guardianName: r.guardian_name ?? undefined,
+      guardianLinked: !!r.guardian_linked,
+      docName: r.doc_name ?? undefined,
+      docPath: r.doc_path ?? undefined,
+      submittedAt: r.submitted_at == null ? undefined : Number(r.submitted_at),
+      history: Array.isArray(r.history) ? (r.history as PendingVerification['history']) : [],
+    }));
+  }
+  if (!isMissingFunction(error)) return [];
+  const { data: rows } = await readPlayers((cols) => fetchAllPages((from, to) =>
+    supabase!.from(PLAYERS_READ).select(cols).eq('verification->>status', 'pending').order('id').range(from, to)));
+  return ((rows as PlayerRow[] | null)?.map(toPlayer) ?? []).map(pendingFromPlayer);
+}
+
+/** A reviewer approves or rejects a submitted verification. Live: the
+ *  verification-review edge function records it (reviewer identity from the
+ *  server) and notifies the player and their parent/guardian. Throws the
+ *  server's message when it refuses. Demo: recorded locally. */
 export async function reviewVerification(
   id: string,
   status: 'approved' | 'rejected',
   note?: string,
   reviewer?: { id?: string; name?: string }
-): Promise<void> {
+): Promise<{ reviewedAt: number; reviewedByName?: string }> {
+  if (isSupabaseConfigured && supabase) {
+    const { data, error } = await supabase.functions.invoke(fnPath('verification-review'), {
+      body: { playerId: id, decision: status, ...(note ? { reason: note } : {}) },
+    });
+    if (error) {
+      const ctx = (error as { context?: Response }).context;
+      const body = ctx && typeof ctx.json === 'function' ? await ctx.json().catch(() => null) : null;
+      throw new Error((body as { error?: string } | null)?.error ?? 'Couldn’t save the decision — check your connection and try again.');
+    }
+    const d = (data ?? {}) as { reviewedAt?: number; reviewedByName?: string };
+    return { reviewedAt: d.reviewedAt ?? Date.now(), reviewedByName: d.reviewedByName };
+  }
   const p = await getPlayer(id);
   const at = Date.now();
   await updatePlayer(id, {
@@ -4194,6 +4258,32 @@ export async function reviewVerification(
       history: [...(p?.verification?.history ?? []), { action: status, at, byId: reviewer?.id, byName: reviewer?.name, note }],
     },
   });
+  return { reviewedAt: at, reviewedByName: reviewer?.name };
+}
+
+/** May this account review verifications? (support, or appointed by support —
+ *  migration verification_review). Before the migration: support only. */
+export async function amVerificationReviewer(role?: Role): Promise<boolean> {
+  if (role === 'support') return true;
+  if (!isSupabaseConfigured || !supabase) return false;
+  const { data, error } = await supabase.rpc('is_verification_reviewer');
+  return !error && data === true;
+}
+
+/** Support: the people appointed to review verifications. */
+export async function getVerificationReviewers(): Promise<{ profileId: string; fullName: string; grantedAt: string }[]> {
+  if (!isSupabaseConfigured || !supabase) return [];
+  const { data, error } = await supabase.rpc('verification_reviewers_list');
+  if (error) return [];
+  return ((data ?? []) as { profile_id: string; full_name: string | null; granted_at: string }[])
+    .map((r) => ({ profileId: r.profile_id, fullName: r.full_name ?? 'Reviewer', grantedAt: r.granted_at }));
+}
+
+/** Support: appoint / remove a reviewer (by their account id). */
+export async function setVerificationReviewer(profileId: string, on: boolean): Promise<void> {
+  if (!isSupabaseConfigured || !supabase) return;
+  const { error } = await supabase.rpc(on ? 'grant_verification_reviewer' : 'revoke_verification_reviewer', { p_profile: profileId });
+  if (error) throw new Error(error.message);
 }
 
 /* ------------------------------ Connect board ------------------------------ */

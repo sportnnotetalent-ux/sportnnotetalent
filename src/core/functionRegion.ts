@@ -32,6 +32,7 @@ const INDIA_ZONES = new Set(['Asia/Kolkata', 'Asia/Calcutta']);
 export const PINNED_FUNCTIONS: ReadonlySet<string> = new Set([
   'phone-login',
   'verification-submit',
+  'verification-review', // a database write, then one push (docs/verification/fast-lanes.md)
   'send-invite',
   'join',
   'report-invite',
