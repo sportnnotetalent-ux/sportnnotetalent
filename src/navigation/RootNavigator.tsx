@@ -72,6 +72,7 @@ const ManageChildScreen = lazyScreen(() => import('../screens/ManageChildScreen'
 const OrgDobsScreen = lazyScreen(() => import('../screens/OrgDobsScreen'));
 const CertificatesScreen = lazyScreen(() => import('../screens/CertificatesScreen'));
 const CertificateScreen = lazyScreen(() => import('../screens/CertificateScreen'));
+const PassportScreen = lazyScreen(() => import('../screens/PassportScreen'));
 const MessageReportsScreen = lazyScreen(() => import('../screens/MessageReportsScreen'));
 const GolfRoundScreen = lazyScreen(() => import('../screens/GolfRoundScreen'));
 const GolfRoundSetupScreen = lazyScreen(() => import('../screens/GolfRoundSetupScreen'));
@@ -181,6 +182,7 @@ const linking: LinkingOptions<RootStackParamList> = {
       // Short share links (core/shareText.ts).
       MatchLink: 'm/:matchId',
       Certificate: 'c/:code',
+      Passport: 'pp/:code?',
       Invite: 'i/:playerId',
       // "Join me on SportnNote" — a friend's personal invite.
       GetApp: 'get/:from?',
@@ -340,6 +342,8 @@ export default function RootNavigator() {
       <Stack.Screen name="MatchLink" component={MatchLinkScreen} options={{ ...stackScreenOpts, title: 'Match' }} />
       {/* QR-verified certificates: anyone checks a certificate, signed in or out */}
       <Stack.Screen name="Certificate" component={CertificateScreen} options={{ ...stackScreenOpts, title: 'Certificate' }} />
+      {/* Career passport: anyone with the link sees a player's verified record */}
+      <Stack.Screen name="Passport" component={PassportScreen} options={{ ...stackScreenOpts, title: 'Career passport' }} />
       <Stack.Screen name="Invite" component={InviteScreen} options={{ ...stackScreenOpts, title: 'Join SportnNote' }} />
       <Stack.Screen name="GetApp" component={GetAppScreen} options={{ ...stackScreenOpts, title: 'Join SportnNote' }} />
       <Stack.Screen

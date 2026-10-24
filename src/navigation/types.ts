@@ -91,6 +91,9 @@ export type RootStackParamList = {
   Certificates: { tournamentId: string };
   /** the public page a certificate's QR opens (app.sportnnote.in/c/CODE) */
   Certificate: { code: string };
+  /** a player's career passport — public by code (app.sportnnote.in/pp/CODE);
+   *  the player / their parent opens it by playerId (makes the code) */
+  Passport: { code?: string; playerId?: string };
   /** Support: reported-message queue (migration 0027). */
   MessageReports: undefined;
   /** Golf (field event) — a round's scorecard + leaderboard, and its setup. */

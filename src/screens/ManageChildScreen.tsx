@@ -158,6 +158,7 @@ export default function ManageChildScreen() {
             </View>
           )}
           <Button label="Open their profile" variant="ghost" onPress={() => nav.navigate('PlayerProfile', { playerId: child.playerId })} />
+          <Button label="🪪 Their career passport" variant="ghost" onPress={() => nav.navigate('Passport', { playerId: child.playerId })} />
         </Card>
 
         <Card style={st.gap}>

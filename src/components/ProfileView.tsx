@@ -20,6 +20,7 @@ import { notify } from '../core/notifications';
 import { useVerificationReviewer } from '../data/useVerificationReviewer';
 import { VerificationChecklist } from './VerificationChecklist';
 import { MyCertificatesCard } from './MyCertificatesCard';
+import { CareerPassportCard } from './CareerPassportCard';
 import { useAuth } from '../core/auth';
 import { isSupport } from '../core/roles';
 import { TextField } from './ui';
@@ -283,6 +284,8 @@ export function ProfileView({
       {onEditProfile && ownProfile ? <VerificationChecklist player={player} onEditProfile={onEditProfile} /> : null}
       {/* QR-verified certificates: yours (and your children's, as a linked parent) */}
       {ownProfile ? <MyCertificatesCard playerId={player.id} /> : null}
+      {/* Career passport: the verified record to share / print */}
+      {ownProfile ? <CareerPassportCard playerId={player.id} /> : null}
       {onEditProfile && (player.phone || player.email) && (
         <ContactCard
           playerId={player.id}

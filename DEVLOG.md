@@ -13,6 +13,32 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-25 — Career passport
+Second "hard to copy" item: a player's verified record on one page (link, QR or print) for selectors, coaches and scholarship panels. It is built from data only SportnNote has: official matches scored live, honours from organiser-issued certificates, and how their age was verified.
+- **Migration `20261025110000_career_passport.sql`:**
+  - **`players.passport_code`:** unique, 10 characters (`new_certificate_code()`). A guard trigger stops clients writing it. It is not in the players column whitelist, so only the functions below read it.
+  - **`passport_code(player)` / `reset_passport_code(player)`:** only the player or their linked parent (`passport_owner_or_raise`). The code is made on first use; reset kills the old link.
+  - **`resolve_passport(code)`** (anon too):
+    - **name:** full for the owner, otherwise `public_person_name` (initials for a possible minor);
+    - **status:** `owner`, `adult`, `ageVerifiedBy` (document / school / parent, the confirmations only while the DOB still matches) and `since`;
+    - **`lines`:** stat lines from **tournament** matches / events only, with result (stored, else W/L once completed) and no opponent names;
+    - **`honours`:** non-revoked, non-participation certificates with their codes and issuer.
+- **App:**
+  - **`core/passport.ts` (pure):** `passportUrl` → `/pp/CODE`, `honourCounts`, `passportHtml` (A4 portrait: name, age badge, since, tiles, record by sport, honours with codes, QR, everything escaped).
+  - **`data/passport.ts`:** code / reset / resolve. `aggregate()` sums the lines, `passportRows` turns them into the per-sport record and highlights (`recordText` / `sportSummary`), and `printPassport` prints it. Demo keeps codes in memory.
+  - **`PassportScreen`** (public `pp/:code?`, signed out too):
+    - header card with tiles (official matches, titles, podiums & medals, awards);
+    - **owner only:** QR + code, Share link, Print / Save as PDF, "Make a new link" (asks first);
+    - record by sport;
+    - honours, each with "✓ Check certificate";
+    - code entry and "not found".
+  - **Entry points:** "🪪 Career passport" card on your own profile; "🪪 Their career passport" on a parent's child page.
+- **Verified:**
+  - `tests/career-passport.test.mts` (9: link, counts, sheet / QR / escaping / empty sections, server rules, routes + entry points); suite 4622 / 0 fail; tsc clean.
+  - Read-only check on live: every referenced table, column and function exists.
+  - Demo (375 px and desktop): the profile card opens the passport; Aarav shows 14 official matches, 12W 0D 2L, and 5 sports with highlights. Print gives one A4 page with the QR. `/pp/<unknown>` shows "No passport with that code". No console errors.
+- **Needs:** the founder runs the migration; publish. Then check a real passport link signed out (a minor shows as initials).
+
 ### 2026-10-25 — QR-verified certificates
 Founder chose the first "hard to copy" item: certificates schools can print in bulk and anyone can check, because the proof lives in SportnNote's database.
 - **Migration `20261025090000_certificates.sql`:**
