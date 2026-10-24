@@ -53,7 +53,9 @@ export function VoiceScorer({
   const describe = (actions: ScoreAction[]): string => {
     const a = actions[actions.length - 1];
     const p = a.payload as Record<string, unknown> | undefined;
-    const who = a.attribution?.playerName;
+    // IDs-only scoring: a credit may carry the id only (cricket) — name it from the rosters
+    const who = a.attribution?.playerName
+      ?? (a.attribution?.playerId ? [...homeRoster, ...awayRoster].find((p) => p.id === a.attribution!.playerId)?.fullName : undefined);
     const sideName = a.side === 'home' ? homeName : a.side === 'away' ? awayName : '';
     const detail = p?.runs != null ? `${p.runs} run${p.runs === 1 ? '' : 's'}`
       : p?.points != null ? `${p.points} pt`

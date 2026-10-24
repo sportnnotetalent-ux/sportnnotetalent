@@ -9,6 +9,11 @@
  *
  * No React Native imports — node tests load this file (note the `.ts`
  * extensions, as in engine.ts).
+ *
+ * IDs-only scoring (docs/privacy/ids-only-scoring.md): every action this
+ * editor writes (an AMEND `replace`, stored in the public event log) carries
+ * player ids only — `stripNames` removes any name an older ball carried, and
+ * a rewritten id never gets a name beside it. Names are looked up when shown.
  */
 import type { MatchEventRecord } from '../../core/types';
 import type { ScoreAction } from '../types';
@@ -19,6 +24,8 @@ import {
   wicketSymbol, wicketAttribution, RUNS_KINDS, WIDE_WICKETS, NOBALL_WICKETS,
   type CricketState, type DismissalKind, type RunsAs,
 } from './engine.ts';
+import { stripNames } from './names.ts';
+import type { NameOf } from '../../core/playerNames.ts';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -37,16 +44,20 @@ export interface EditableBall {
   crease: [string, string];
   /** the ball as recorded (payload `_attr2` lifted into `attribution2`) */
   action: ScoreAction;
+  /** legacy, read-only (pre IDs-only): the striker's stored name, if any —
+   *  show `nameOf(crease[0], strikerName)` */
   strikerName?: string;
 }
 
 export interface EditableOver {
   /** 1-based over number within the innings */
   n: number;
+  /** `name`: the legacy stored name ('' on IDs-only data) — show `nameOf(id, name)` */
   bowler: { id: string; name: string };
   /** seq of the SET_BOWLER that opened this over (absent for logs without one) */
   setBowlerSeq?: number;
-  /** batters who faced a ball in this over, in order of first appearance */
+  /** batters who faced a ball in this over, in order of first appearance
+   *  (`name`: legacy stored name, '' on IDs-only data) */
   batters: { id: string; name: string }[];
   /** chronological (first ball first) */
   balls: EditableBall[];
@@ -66,9 +77,11 @@ export interface BallEdit {
   runs?: number;
   type?: 'bat' | 'bye' | 'legbye';
   strikerId?: string;
+  /** ignored (IDs-only scoring — the id is what's stored) */
   strikerName?: string;
   kind?: string;
   fielderId?: string;
+  /** ignored (IDs-only scoring — the id is what's stored) */
   fielderName?: string;
   batterOut?: 'striker' | 'nonStriker' | string;
   extraKind?: 'wide' | 'noball';
@@ -87,7 +100,7 @@ export interface BallEdit {
  *  credit a stumping when a wicket is changed TO stumped (the live UI reads it
  *  from state.keepers). Without it a new stumping gets no keeper credit. */
 export interface BallEditContext {
-  keeper?: { id: string; name: string };
+  keeper?: { id: string; name?: string };
 }
 
 type Attr = NonNullable<ScoreAction['attribution']>;
@@ -286,10 +299,16 @@ const cleanUndef = (p: Payload): Payload => {
 /** Apply an Edit Ball form to a recorded ball. Spreads the ORIGINAL payload
  *  (later-spec keys like `boundary`, `runsAs`, `end`, `v` survive), keeps the
  *  category, and rebuilds attribution as index.tsx does. Non-ball actions
- *  (SET_RULES, ADJUST, SET_BOWLER, PENALTY, retired…) pass through unchanged. */
+ *  (SET_RULES, ADJUST, SET_BOWLER, PENALTY, retired…) pass through unchanged.
+ *  IDs-only scoring: the rewritten ball carries ids only (`stripNames`). */
 export function editBall(rec: MatchEventRecord, edit: BallEdit, ctx: BallEditContext = {}): ScoreAction | { error: string } {
   const orig = recordToAction(rec);
   if (!isEditableBall(rec)) return orig;
+  const r0 = editBallNamed(orig, edit, ctx);
+  return 'error' in r0 ? r0 : stripNames(r0);
+}
+
+function editBallNamed(orig: ScoreAction, edit: BallEdit, ctx: BallEditContext): ScoreAction | { error: string } {
   const op = orig.payload ?? {};
   const cat = ballCategory(orig);
   const p: Payload = { ...op };
@@ -297,12 +316,10 @@ export function editBall(rec: MatchEventRecord, edit: BallEdit, ctx: BallEditCon
   // Who faced: the striker of the ball (one of the two batters at the crease).
   if (edit.strikerId !== undefined && edit.strikerId !== op.strikerId) {
     p.strikerId = edit.strikerId;
-    p.strikerName = edit.strikerName ?? op.strikerName;
+    delete p.strikerName; // (a legacy name belonged to the old striker)
   }
   const strikerId = p.strikerId as string | undefined;
-  const strikerName = p.strikerName as string | undefined;
   const bowlerId = p.bowlerId as string | undefined;
-  const bowlerName = p.bowlerName as string | undefined;
   const wantsWicket = edit.kind !== undefined || edit.fielderId !== undefined || edit.batterOut !== undefined;
 
   if (cat === 'legal') {
@@ -327,7 +344,7 @@ export function editBall(rec: MatchEventRecord, edit: BallEdit, ctx: BallEditCon
     const type = t === 'bat' ? 'RUNS' : t === 'bye' ? 'BYES' : 'LEGBYES';
     const a: ScoreAction = { type, payload: cleanUndef(p) };
     if (orig.side) a.side = orig.side;
-    if (type === 'RUNS' && strikerId) a.attribution = { playerId: strikerId, stat: 'runs', by: r, playerName: strikerName };
+    if (type === 'RUNS' && strikerId) a.attribution = { playerId: strikerId, stat: 'runs', by: r };
     return a;
   }
 
@@ -341,7 +358,7 @@ export function editBall(rec: MatchEventRecord, edit: BallEdit, ctx: BallEditCon
     if (needsFielder) {
       const keepOld = edit.fielderId === undefined && (op.kind === 'caught' || op.kind === 'runout');
       p.fielderId = edit.fielderId ?? (keepOld ? op.fielderId : undefined);
-      p.fielderName = edit.fielderId !== undefined ? edit.fielderName : keepOld ? op.fielderName : undefined;
+      p.fielderName = edit.fielderId !== undefined ? undefined : keepOld ? op.fielderName : undefined;
       if (kind === 'caught' && !p.fielderId && !p.fielderName) return { error: 'Pick the fielder who took the catch.' };
     } else {
       p.fielderId = undefined;
@@ -366,14 +383,14 @@ export function editBall(rec: MatchEventRecord, edit: BallEdit, ctx: BallEditCon
     const a: ScoreAction = { type: 'WICKET', payload: cleanUndef(p) };
     if (orig.side) a.side = orig.side;
     // Stumped: the keeper from the context, else the one the ball already credited.
-    const keeper = ctx.keeper?.id ? ctx.keeper
-      : op.kind === 'stumped' && orig.attribution2 ? { id: orig.attribution2.playerId, name: orig.attribution2.playerName } : undefined;
+    const keeper = ctx.keeper?.id ? { id: ctx.keeper.id }
+      : op.kind === 'stumped' && orig.attribution2 ? { id: orig.attribution2.playerId } : undefined;
     const credits = wicketAttribution({
       kind,
-      bowler: { id: bowlerId, name: bowlerName },
-      fielder: { id: p.fielderId as string | undefined, name: p.fielderName as string | undefined },
+      bowler: { id: bowlerId },
+      fielder: { id: p.fielderId as string | undefined },
       keeper,
-      striker: { id: strikerId, name: strikerName },
+      striker: { id: strikerId },
       runs: num(p.runs),
       runsAs: p.runsAs as RunsAs | undefined,
     });
@@ -422,19 +439,19 @@ export function editBall(rec: MatchEventRecord, edit: BallEdit, ctx: BallEditCon
       p.batterOut = 'striker';
       if (r !== 0) return { error: 'Only a run out can carry completed runs.' };
     }
-    if (edit.fielderId !== undefined) { p.fielderId = edit.fielderId; p.fielderName = edit.fielderName; }
+    if (edit.fielderId !== undefined) { p.fielderId = edit.fielderId; delete p.fielderName; }
   }
   const a: ScoreAction = { type: 'EXTRA', payload: cleanUndef(p) };
   if (orig.side) a.side = orig.side;
   if (wk) {
-    const keeper = ctx.keeper?.id ? ctx.keeper
-      : wk === 'stumped' && orig.attribution2 ? { id: orig.attribution2.playerId, name: orig.attribution2.playerName } : undefined;
+    const keeper = ctx.keeper?.id ? { id: ctx.keeper.id }
+      : wk === 'stumped' && orig.attribution2 ? { id: orig.attribution2.playerId } : undefined;
     const credits = wicketAttribution({
       kind: wk,
-      bowler: { id: bowlerId, name: bowlerName },
-      fielder: { id: p.fielderId as string | undefined, name: p.fielderName as string | undefined },
+      bowler: { id: bowlerId },
+      fielder: { id: p.fielderId as string | undefined },
       keeper,
-      striker: { id: strikerId, name: strikerName },
+      striker: { id: strikerId },
       runs: r,
       runsAs: p.runsAs as RunsAs | undefined,
       wide: ek === 'wide',
@@ -443,37 +460,38 @@ export function editBall(rec: MatchEventRecord, edit: BallEdit, ctx: BallEditCon
     if (credits.attribution2) a.attribution2 = credits.attribution2;
   } else if (ek === 'noball' && nbAs === 'bat' && r > 0 && strikerId) {
     // Nb+n: the runs off the bat are the striker's (parity #19, as the live keypad)
-    a.attribution = { playerId: strikerId, stat: 'runs', by: r, playerName: strikerName };
+    a.attribution = { playerId: strikerId, stat: 'runs', by: r };
   }
   return a;
 }
 
 // ─── remapPlayer ───────────────────────────────────────────────────────────
 
-const remapAttr = (at: Attr | undefined, fromId: string, toId: string, toName: string): Attr | undefined =>
-  at && at.playerId === fromId ? { ...at, playerId: toId, playerName: toName } : at;
+const remapAttr = (at: Attr | undefined, fromId: string, toId: string): Attr | undefined =>
+  at && at.playerId === fromId ? { ...at, playerId: toId } : at;
 
-/** Rewrite every reference to player `fromId` (payload `*Id`/`id` with its
- *  matching `*Name`/`name`, SET_* payloads, attribution, attribution2 and a
- *  stored `_attr2`) to `toId`/`toName`. All other keys (incl. `v`) are kept. */
-export function remapPlayer(action: ScoreAction, fromId: string, toId: string, toName: string): ScoreAction {
+/** Rewrite every reference to player `fromId` (payload `*Id` / `id`, SET_*
+ *  payloads, attribution, attribution2 and a stored `_attr2`) to `toId`. All
+ *  other keys (incl. `v`) are kept. IDs-only scoring: a rewritten action
+ *  carries ids only — every name an older ball stored goes (`stripNames`); an
+ *  action that doesn't mention `fromId` is returned as it is. `_toName` is
+ *  ignored (kept for callers). */
+export function remapPlayer(action: ScoreAction, fromId: string, toId: string, _toName?: string): ScoreAction {
+  let changed = false;
   const out: ScoreAction = { ...action };
   if (action.payload) {
     const p: Payload = { ...action.payload };
     for (const k of Object.keys(p)) {
       if (p[k] !== fromId) continue;
-      if (k === 'id') { p.id = toId; if ('name' in p || toName) p.name = toName; continue; }
-      if (k.endsWith('Id')) {
-        p[k] = toId;
-        p[`${k.slice(0, -2)}Name`] = toName;
-      }
+      if (k === 'id' || k.endsWith('Id')) { p[k] = toId; changed = true; }
     }
-    if (p._attr2) p._attr2 = remapAttr(p._attr2 as Attr, fromId, toId, toName);
+    const a2 = p._attr2 as Attr | undefined;
+    if (a2 && a2.playerId === fromId) { p._attr2 = remapAttr(a2, fromId, toId); changed = true; }
     out.payload = p;
   }
-  if (action.attribution) out.attribution = remapAttr(action.attribution, fromId, toId, toName);
-  if (action.attribution2) out.attribution2 = remapAttr(action.attribution2, fromId, toId, toName);
-  return out;
+  if (action.attribution?.playerId === fromId) { out.attribution = remapAttr(action.attribution, fromId, toId); changed = true; }
+  if (action.attribution2?.playerId === fromId) { out.attribution2 = remapAttr(action.attribution2, fromId, toId); changed = true; }
+  return changed ? stripNames(out) : action;
 }
 
 // ─── changeBowlerOps / swapBattersOps ──────────────────────────────────────
@@ -553,9 +571,16 @@ const KIND_LABEL: Record<string, string> = {
 };
 
 /** Short human text for one ball: '1 run', '4 runs', '2 byes', 'Leg bye',
- *  'Caught (Dev)', 'Run out (Dev) + 1 run', 'Wide', 'Wide + 2', 'No ball + 4'. */
-export function describeBall(a: Pick<ScoreAction, 'type' | 'payload'>): string {
+ *  'Caught (Dev)', 'Run out (Dev) + 1 run', 'Wide', 'Wide + 2', 'No ball + 4'.
+ *  IDs-only scoring: `nameOf` names the fielders by id; without it only an
+ *  older ball's stored names show. */
+export function describeBall(a: Pick<ScoreAction, 'type' | 'payload'>, nameOf?: NameOf): string {
   const p = a.payload ?? {};
+  const nm = (id: unknown, name: unknown): string | undefined => {
+    const i = typeof id === 'string' && id ? id : undefined;
+    const n = typeof name === 'string' ? name : undefined;
+    return nameOf ? (i || n ? nameOf(i, n) : undefined) : n || undefined;
+  };
   switch (a.type) {
     case 'RUNS': {
       // '4 runs' (boundary) · '4 runs, all run' · '5 runs incl. 4 overthrows'
@@ -569,7 +594,8 @@ export function describeBall(a: Pick<ScoreAction, 'type' | 'payload'>): string {
     case 'LEGBYES': { const r = Math.max(1, num(p.runs, 1)); return r === 1 ? 'Leg bye' : plural(r, 'leg bye'); }
     case 'WICKET': {
       const k = String(p.kind ?? 'bowled');
-      const f = (k === 'caught' || k === 'runout') && p.fielderName ? ` (${[p.fielderName, k === 'runout' ? p.fielder2Name : undefined].filter(Boolean).join('/')})` : '';
+      const f1 = nm(p.fielderId, p.fielderName);
+      const f = (k === 'caught' || k === 'runout') && f1 ? ` (${[f1, k === 'runout' ? nm(p.fielder2Id, p.fielder2Name) : undefined].filter(Boolean).join('/')})` : '';
       const takesRuns = k === 'runout' || k === 'obstruct';
       const out = takesRuns && p.batterOut === 'nonstriker' ? ', non-striker' : '';
       const r = takesRuns ? num(p.runs) : 0;
@@ -588,11 +614,16 @@ export function describeBall(a: Pick<ScoreAction, 'type' | 'payload'>): string {
   }
 }
 
-/** "Ball 2.3: 1 run → 4 runs" (the striker is named on both sides when it changed). */
-export function ballDiffLine(stamp: string, before: Pick<ScoreAction, 'type' | 'payload'>, after: Pick<ScoreAction, 'type' | 'payload'>): string {
-  const who = (x: Pick<ScoreAction, 'payload'>) => (x.payload?.strikerName as string | undefined) ?? (x.payload?.strikerId as string | undefined) ?? '?';
+/** "Ball 2.3: 1 run → 4 runs" (the striker is named on both sides when it
+ *  changed). IDs-only scoring: `nameOf` names the players by id. */
+export function ballDiffLine(stamp: string, before: Pick<ScoreAction, 'type' | 'payload'>, after: Pick<ScoreAction, 'type' | 'payload'>, nameOf?: NameOf): string {
+  const who = (x: Pick<ScoreAction, 'payload'>) => {
+    const id = x.payload?.strikerId as string | undefined;
+    const name = x.payload?.strikerName as string | undefined;
+    return nameOf && (id || name) ? nameOf(id, name) : name ?? id ?? '?';
+  };
   const strikerChanged = before.payload?.strikerId !== after.payload?.strikerId;
-  const d = (x: Pick<ScoreAction, 'type' | 'payload'>) => `${describeBall(x)}${strikerChanged ? ` (${who(x)})` : ''}`;
+  const d = (x: Pick<ScoreAction, 'type' | 'payload'>) => `${describeBall(x, nameOf)}${strikerChanged ? ` (${who(x)})` : ''}`;
   return `Ball ${stamp}: ${d(before)} → ${d(after)}`;
 }
 

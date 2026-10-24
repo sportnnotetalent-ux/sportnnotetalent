@@ -5,19 +5,26 @@
  * for this over or all their overs, tap a batter to swap two batters' records.
  * Edits are staged as #05 AMEND ops — nothing changes until "Update score"
  * (live) or Preview → Publish (after the match).
+ *
+ * IDs-only scoring: the ops carry player ids only (editOvers). The editor
+ * shows names by id (`useMask().nameOf`); the change lines, which are stored
+ * with the AMEND for everyone to read, name players by initials only.
  */
 import React, { useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { theme } from '../../core/theme';
 import { Button, SelectChip, textStyles } from '../../components/ui';
+import { useMask } from '../../core/disputeMask';
+import { nameInitials, type NameOf } from '../../core/playerNames';
 import type { MatchEventRecord, Player } from '../../core/types';
 import type { AmendOp } from '../amend';
 import {
   editableOvers, editBall, changeBowlerOps, swapBattersOps, applyOps, chipLabel, overSymbolTone,
-  ballDiffLine, bowlerDiffLine, swapDiffLine, describeBall, CATEGORY_HINT,
+  ballDiffLine, bowlerDiffLine, swapDiffLine, describeBall, recordToAction, CATEGORY_HINT,
   type EditableBall, type EditableInnings, type EditableOver, type BallEdit,
 } from './editOvers';
 import { DISMISSAL_NAME, isBoundaryHit } from './engine';
+import { stripNames } from './names';
 
 type Staged = { key: string; ops: AmendOp[]; line: string };
 /** Same names (sentence case) as the live wicket panel. */
@@ -43,6 +50,11 @@ export function OverEditor({ log, config, onOps, homeName, awayName, homeRoster,
   const [bowlerPick, setBowlerPick] = useState<{ over: EditableOver; inn: EditableInnings; scope: 'over' | 'all'; to?: Player } | null>(null);
   const [swapPick, setSwapPick] = useState<{ batter: { id: string; name: string }; inn: EditableInnings; to?: Player } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // IDs-only: names by id for this scorer (a legacy stored name as fallback)…
+  const { nameOf } = useMask();
+  const nm = (id: string | undefined, legacy?: string) => nameOf(id, legacy || undefined);
+  // …and initials in the stored change lines (they reach everyone).
+  const lineName: NameOf = (id, legacy) => nameInitials(nameOf(id, legacy));
 
   // Over lists are rebuilt as edits are staged — match overs by innings + number.
   const isOver = (x: { over: EditableOver; inn: EditableInnings } | null, inn: EditableInnings, ov: EditableOver) =>
@@ -73,12 +85,12 @@ export function OverEditor({ log, config, onOps, homeName, awayName, homeRoster,
                 <Text style={st.ovNo}>Ov {ov.n}</Text>
                 <Text style={[st.link, ov.balls.some((b) => touched.has(b.seq)) && st.changed]} accessibilityRole="button"
                   onPress={() => { setError(null); setBowlerPick({ over: ov, inn, scope: 'over' }); setEditing(null); setSwapPick(null); }}>
-                  {ov.bowler.name}
+                  {nm(ov.bowler.id, ov.bowler.name)}
                 </Text>
                 <Text style={textStyles.muted}>to</Text>
                 {ov.batters.map((b) => (
                   <Text key={b.id} style={st.link} accessibilityRole="button"
-                    onPress={() => { setError(null); setSwapPick({ batter: b, inn }); setEditing(null); setBowlerPick(null); }}>{b.name}</Text>
+                    onPress={() => { setError(null); setSwapPick({ batter: b, inn }); setEditing(null); setBowlerPick(null); }}>{nm(b.id, b.name)}</Text>
                 ))}
               </View>
               <View style={st.chips}>
@@ -93,7 +105,7 @@ export function OverEditor({ log, config, onOps, homeName, awayName, homeRoster,
                   );
                 })}
               </View>
-              {isOver(editing, inn, ov) && editing && <BallCard key={editing.ball.seq} ball={editing.ball} log={log} bowlerName={ov.bowler.name}
+              {isOver(editing, inn, ov) && editing && <BallCard key={editing.ball.seq} ball={editing.ball} log={log} bowlerName={nm(ov.bowler.id, ov.bowler.name)} nameOf={nameOf}
                 fielders={rosterOf(other(inn.side))} keeper={undefined}
                 onCancel={() => setEditing(null)}
                 onSave={(edit) => {
@@ -102,15 +114,18 @@ export function OverEditor({ log, config, onOps, homeName, awayName, homeRoster,
                   const action = editBall(rec, edit);
                   if ('error' in action) { setError(action.error); return; }
                   // Nothing actually changed → nothing to stage (drops an earlier edit of it).
-                  if (JSON.stringify({ t: action.type, p: action.payload, a: action.attribution ?? null }) === JSON.stringify({ t: rec.type, p: rec.payload ?? undefined, a: rec.attribution ?? null })) {
+                  // (An older ball's stored names don't count: the edit leaves them out.)
+                  const was = stripNames(recordToAction(rec));
+                  if (JSON.stringify({ t: action.type, p: action.payload, a: action.attribution ?? null, a2: action.attribution2 ?? null })
+                    === JSON.stringify({ t: was.type, p: was.payload ?? undefined, a: was.attribution ?? null, a2: was.attribution2 ?? null })) {
                     stage(`ball:${rec.seq}`, [], ''); setEditing(null); return;
                   }
-                  stage(`ball:${rec.seq}`, [{ op: 'replace', seq: rec.seq, action }], ballDiffLine(editing.ball.stamp, editing.ball.action, action));
+                  stage(`ball:${rec.seq}`, [{ op: 'replace', seq: rec.seq, action }], ballDiffLine(editing.ball.stamp, editing.ball.action, action, lineName));
                   setEditing(null);
                 }} />}
               {isOver(bowlerPick, inn, ov) && bowlerPick && (
                 <View style={st.card}>
-                  <Text style={textStyles.body}>Replace {ov.bowler.name} with…</Text>
+                  <Text style={textStyles.body}>Replace {nm(ov.bowler.id, ov.bowler.name)} with…</Text>
                   <View style={st.chips}>
                     {rosterOf(other(inn.side)).filter((p) => p.id !== ov.bowler.id).map((p) => (
                       <SelectChip key={p.id} label={p.fullName} active={bowlerPick.to?.id === p.id} onPress={() => setBowlerPick({ ...bowlerPick, to: p })} />
@@ -118,16 +133,17 @@ export function OverEditor({ log, config, onOps, homeName, awayName, homeRoster,
                   </View>
                   <View style={st.chips}>
                     <SelectChip label="This over" active={bowlerPick.scope === 'over'} onPress={() => setBowlerPick({ ...bowlerPick, scope: 'over' })} />
-                    <SelectChip label={`All overs by ${ov.bowler.name}`} active={bowlerPick.scope === 'all'} onPress={() => setBowlerPick({ ...bowlerPick, scope: 'all' })} />
+                    <SelectChip label={`All overs by ${nm(ov.bowler.id, ov.bowler.name)}`} active={bowlerPick.scope === 'all'} onPress={() => setBowlerPick({ ...bowlerPick, scope: 'all' })} />
                   </View>
                   {bowlerPick.to ? (
                     <View style={st.row}>
-                      <Button label={`Replace ${ov.bowler.name} with ${bowlerPick.to.fullName}`} style={{ flex: 1 }} onPress={() => {
+                      <Button label={`Replace ${nm(ov.bowler.id, ov.bowler.name)} with ${bowlerPick.to.fullName}`} style={{ flex: 1 }} onPress={() => {
                         const to = bowlerPick.to!;
                         const ops = changeBowlerOps(inn, ov.n, { id: to.id, name: to.fullName }, bowlerPick.scope, log);
                         if ('error' in ops) { setError(ops.error); return; }
                         const overs = bowlerPick.scope === 'all' ? inn.overs.filter((o) => o.bowler.id === ov.bowler.id).map((o) => o.n).reverse() : ov.n;
-                        stage(`bowler:${inn.inningsIx}:${bowlerPick.scope === 'all' ? ov.bowler.id : ov.n}`, ops, bowlerDiffLine(overs, ov.bowler.name, to.fullName));
+                        stage(`bowler:${inn.inningsIx}:${bowlerPick.scope === 'all' ? ov.bowler.id : ov.n}`, ops,
+                          bowlerDiffLine(overs, lineName(ov.bowler.id, ov.bowler.name || undefined), lineName(to.id, to.fullName)));
                         setBowlerPick(null);
                       }} />
                       <Button label="Cancel" variant="ghost" onPress={() => setBowlerPick(null)} />
@@ -137,7 +153,7 @@ export function OverEditor({ log, config, onOps, homeName, awayName, homeRoster,
               )}
               {swapPick && swapPick.inn.inningsIx === inn.inningsIx && swapPick.inn.side === inn.side && ov.n === inn.overs.find((o) => o.batters.some((b) => b.id === swapPick.batter.id))?.n && (
                 <View style={st.card}>
-                  <Text style={textStyles.body}>Swap all records of {swapPick.batter.name} with…</Text>
+                  <Text style={textStyles.body}>Swap all records of {nm(swapPick.batter.id, swapPick.batter.name)} with…</Text>
                   <View style={st.chips}>
                     {rosterOf(inn.side).filter((p) => p.id !== swapPick.batter.id).map((p) => (
                       <SelectChip key={p.id} label={p.fullName} active={swapPick.to?.id === p.id} onPress={() => setSwapPick({ ...swapPick, to: p })} />
@@ -145,9 +161,10 @@ export function OverEditor({ log, config, onOps, homeName, awayName, homeRoster,
                   </View>
                   <View style={st.row}>
                     {swapPick.to ? (
-                      <Button label={`Swap ${swapPick.batter.name} ⇄ ${swapPick.to.fullName}`} style={{ flex: 1 }} onPress={() => {
+                      <Button label={`Swap ${nm(swapPick.batter.id, swapPick.batter.name)} ⇄ ${swapPick.to.fullName}`} style={{ flex: 1 }} onPress={() => {
                         const b = { id: swapPick.to!.id, name: swapPick.to!.fullName };
-                        stage(`swap:${inn.inningsIx}:${[swapPick.batter.id, b.id].sort().join(':')}`, swapBattersOps(log, inn.inningsIx, swapPick.batter, b, config), swapDiffLine(swapPick.batter.name, b.name));
+                        stage(`swap:${inn.inningsIx}:${[swapPick.batter.id, b.id].sort().join(':')}`, swapBattersOps(log, inn.inningsIx, swapPick.batter, b, config),
+                          swapDiffLine(lineName(swapPick.batter.id, swapPick.batter.name || undefined), lineName(b.id, b.name)));
                         setSwapPick(null);
                       }} />
                     ) : null}
@@ -176,8 +193,8 @@ export function OverEditor({ log, config, onOps, homeName, awayName, homeRoster,
 }
 
 /** The inline "Edit ball" card — same category only (legal / wicket / extra). */
-function BallCard({ ball, log, bowlerName, fielders, onSave, onCancel }: {
-  ball: EditableBall; log: MatchEventRecord[]; bowlerName?: string; fielders: Player[]; keeper?: { id: string; name: string };
+function BallCard({ ball, log, bowlerName, nameOf: playerName, fielders, onSave, onCancel }: {
+  ball: EditableBall; log: MatchEventRecord[]; bowlerName?: string; nameOf: NameOf; fielders: Player[]; keeper?: { id: string; name: string };
   onSave: (edit: BallEdit) => void; onCancel: () => void;
 }) {
   const p = (ball.action.payload ?? {}) as Record<string, unknown>;
@@ -201,30 +218,31 @@ function BallCard({ ball, log, bowlerName, fielders, onSave, onCancel }: {
   const recNbAs: 'bat' | 'bye' | 'legbye' = recNbByes ? (p.runsAs === 'legbye' ? 'legbye' : 'bye') : 'bat';
   const [nbAs, setNbAs] = useState<'bat' | 'bye' | 'legbye'>(recNbAs);
   const fourOrSix = runs === 4 || runs === 6;
-  const nameOf = (id: string) => (log.find((r) => (r.payload as Record<string, unknown> | null)?.strikerId === id)?.payload as Record<string, unknown> | undefined)?.strikerName as string | undefined;
+  // IDs-only: a batter by id (an older ball's stored name as the fallback)
+  const nameOf = (id: string) => playerName(id, (log.find((r) => (r.payload as Record<string, unknown> | null)?.strikerId === id)?.payload as Record<string, unknown> | undefined)?.strikerName as string | undefined);
   // Send the boundary flag only when it's a real choice that changed something.
   const boundaryEdit = (offBat: boolean) => (offBat && fourOrSix && (runs !== recRuns || boundary !== recBoundary) ? boundary : undefined);
   const save = () => {
     if (ball.category === 'legal') {
       onSave({
-        runs, type, strikerId: striker, strikerName: nameOf(striker),
+        runs, type, strikerId: striker,
         boundary: boundaryEdit(type === 'bat'),
         ...(recOt > 0 && type === 'bat' ? { overthrows: keepOt && !(fourOrSix && boundary) ? recOt : 0 } : {}),
       });
     }
     else if (ball.category === 'wicket') {
       const f = fielders.find((x) => x.id === fielder);
-      onSave({ kind, fielderId: f?.id, fielderName: f?.fullName, runs: takesRuns(kind) ? runs : undefined, batterOut: takesRuns(kind) ? out : undefined });
+      onSave({ kind, fielderId: f?.id, runs: takesRuns(kind) ? runs : undefined, batterOut: takesRuns(kind) ? out : undefined });
     } else {
       const as = extraKind === 'noball' && !extraWkt ? nbAs : undefined;
       onSave({ extraKind, extraRuns: runs, ...(as ? { extraRunsAs: as } : {}), boundary: boundaryEdit(extraKind === 'noball' && !extraWkt && nbAs === 'bat') });
     }
   };
-  const who = [bowlerName, ball.strikerName ?? nameOf(ball.crease[0])].filter(Boolean);
+  const who = [bowlerName, ball.crease[0] ? playerName(ball.crease[0], ball.strikerName) : ball.strikerName].filter(Boolean);
   return (
     <View style={st.card}>
       {/* "2.3 · Arjun to Ravi · 1 run" — bowler to batter (#06). */}
-      <Text style={textStyles.body}>{ball.stamp} · {who.length === 2 ? `${who[0]} to ${who[1]} · ` : ''}{describeBall(ball.action)}</Text>
+      <Text style={textStyles.body}>{ball.stamp} · {who.length === 2 ? `${who[0]} to ${who[1]} · ` : ''}{describeBall(ball.action, playerName)}</Text>
       {ball.category === 'legal' && (
         <>
           <View style={st.chips}>{[0, 1, 2, 3, 4, 5, 6, 7].map((n) => <SelectChip key={n} label={`${n} run${n === 1 ? '' : 's'}`} active={runs === n} onPress={() => setRuns(n)} />)}</View>
@@ -245,7 +263,7 @@ function BallCard({ ball, log, bowlerName, fielders, onSave, onCancel }: {
             </View>
           )}
           <Text style={textStyles.muted}>Who faced?</Text>
-          <View style={st.chips}>{ball.crease.filter(Boolean).map((id) => <SelectChip key={id} label={nameOf(id) ?? 'Batter'} active={striker === id} onPress={() => setStriker(id)} />)}</View>
+          <View style={st.chips}>{ball.crease.filter(Boolean).map((id) => <SelectChip key={id} label={nameOf(id)} active={striker === id} onPress={() => setStriker(id)} />)}</View>
         </>
       )}
       {ball.category === 'wicket' && (

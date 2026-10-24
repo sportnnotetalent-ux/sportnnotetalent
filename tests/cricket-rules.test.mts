@@ -27,8 +27,8 @@ class Rec {
   private bowlers = ['x', 'y'];
   constructor(cfg: Record<string, unknown> = CFG) {
     this.s = init(cfg);
-    this.push({ type: 'SET_STRIKER', payload: { id: 'a', name: 'A' } });
-    this.push({ type: 'SET_NONSTRIKER', payload: { id: 'b', name: 'B' } });
+    this.push({ type: 'SET_STRIKER', payload: { id: 'a' } });
+    this.push({ type: 'SET_NONSTRIKER', payload: { id: 'b' } });
   }
   push(a: ScoreAction): this {
     const rec: MatchEventRecord = { seq: this.log.length + 1, type: a.type };
@@ -41,12 +41,12 @@ class Rec {
   private bowl() {
     if (!this.s.bowlerId && !this.s.superOver) {
       const id = this.bowlers.find((b) => b !== this.s.lastOverBowlerId)!;
-      this.push({ type: 'SET_BOWLER', payload: { id, name: id.toUpperCase() } });
+      this.push({ type: 'SET_BOWLER', payload: { id } });
     }
   }
   ball(type: string, payload: Record<string, unknown> = {}): this {
     this.bowl();
-    return this.push({ type, side: this.s.battingSide, payload: { ...payload, strikerId: this.s.strikerId, strikerName: this.s.strikerName, bowlerId: this.s.bowlerId, bowlerName: this.s.bowlerName } });
+    return this.push({ type, side: this.s.battingSide, payload: { ...payload, strikerId: this.s.strikerId, bowlerId: this.s.bowlerId } });
   }
   dots(n: number): this { for (let i = 0; i < n; i++) this.ball('RUNS', { runs: 0 }); return this; }
   wide(runs = 0): this { return this.ball('EXTRA', { kind: 'Wide', runs }); }
@@ -224,11 +224,11 @@ describe('byes and run-outs off extras', () => {
     assert.equal(r.s, s);
   });
   test('a run-out off a wide uses the wide penalty', () => {
-    const r = new Rec({ ...CFG, wideRuns: 2 }).ball('EXTRA', { kind: 'Wide', runout: true, runs: 1, batterOut: 'striker', newBatId: 'c', newBatName: 'C' });
+    const r = new Rec({ ...CFG, wideRuns: 2 }).ball('EXTRA', { kind: 'Wide', runout: true, runs: 1, batterOut: 'striker', newBatId: 'c' });
     assert.deepEqual([r.inn.runs, r.inn.wickets, r.inn.balls, r.inn.extras], [3, 1, 0, 3]);
   });
   test('a run-out off a legal no-ball counts the ball', () => {
-    const r = new Rec({ ...CFG, noBallLegal: true, noBallRuns: 2 }).ball('EXTRA', { kind: 'No ball', runout: true, runs: 0, batterOut: 'nonstriker', newBatId: 'c', newBatName: 'C' });
+    const r = new Rec({ ...CFG, noBallLegal: true, noBallRuns: 2 }).ball('EXTRA', { kind: 'No ball', runout: true, runs: 0, batterOut: 'nonstriker', newBatId: 'c' });
     assert.deepEqual([r.inn.runs, r.inn.wickets, r.inn.balls], [2, 1, 1]);
     assert.equal(r.s.freeHit, true);
   });
@@ -270,9 +270,9 @@ describe('live settings Apply (generic card decisions)', () => {
     let s = init(CFG);
     for (const a of [
       { type: 'SET_TOSS', payload: { winner: 'away', decision: 'bat' } },
-      { type: 'SET_CAPTAIN', payload: { side: 'home', id: 'h1', name: 'H' } },
-      { type: 'SET_STRIKER', payload: { id: 'a', name: 'A' } },
-      { type: 'SET_BOWLER', payload: { id: 'x', name: 'X' } },
+      { type: 'SET_CAPTAIN', payload: { side: 'home', id: 'h1' } },
+      { type: 'SET_STRIKER', payload: { id: 'a' } },
+      { type: 'SET_BOWLER', payload: { id: 'x' } },
     ] as ScoreAction[]) s = reducer(s, a);
     assert.equal(cricketBeforeStart(s), true);
     const cur = LS.read(s);

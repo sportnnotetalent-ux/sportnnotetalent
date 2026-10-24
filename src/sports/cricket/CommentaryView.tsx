@@ -127,7 +127,10 @@ export function CricketCommentary({ state, homeName, awayName, matchId, tourname
   /** with a match id, each over block gets "Share over" (cricket round 2) */
   matchId?: string; tournamentName?: string;
 }) {
-  const com = useMemo(() => cricketCommentary(state, { home: homeName, away: awayName }), [state, homeName, awayName]);
+  // IDs-only scoring: players named by id for this viewer (circle: full names,
+  // everyone else: initials, an open dispute: "X").
+  const { nameOf } = useMask();
+  const com = useMemo(() => cricketCommentary(state, { home: homeName, away: awayName }, nameOf), [state, homeName, awayName, nameOf]);
   const [filter, setFilter] = useState<ComFilter>('all');
   // Which innings: the newest by default (the live one); 'so' = the Super Over.
   const [pick, setPick] = useState<string | null>(null);

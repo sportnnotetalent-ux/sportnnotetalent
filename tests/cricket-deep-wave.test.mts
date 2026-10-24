@@ -29,16 +29,20 @@ import { cricketUndoLabel } from '../src/sports/cricket/undo.ts';
 import { CRICKET_LEGACY_LOGS } from './cricketLegacyLogs.mts';
 import type { ScoreAction } from '../src/sports/types.ts';
 import type { StatLine } from '../src/core/types.ts';
+import type { NameOf } from '../src/core/playerNames.ts';
 
 const T0 = Date.UTC(2026, 9, 22, 9, 0, 0);
+/** IDs-only scoring: the builder below sends player ids only (as the scorer
+ *  UI does); a player's name here is their id upper-cased ('h3' → 'H3'). */
+const UP: NameOf = (id, legacy) => (id ? id.toUpperCase() : legacy ?? 'Player');
 
 /** A ball-by-ball builder: names the crease, then scores with the current striker / bowler. */
 function live(cfg: Record<string, unknown> = {}) {
   let s = [
-    { type: 'SET_CAPTAIN', payload: { side: 'home', id: 'h1', name: 'H1' } },
-    { type: 'SET_CAPTAIN', payload: { side: 'away', id: 'a1', name: 'A1' } },
-    { type: 'SET_KEEPER', payload: { side: 'home', id: 'h2', name: 'H2' } },
-    { type: 'SET_KEEPER', payload: { side: 'away', id: 'a2', name: 'A2' } },
+    { type: 'SET_CAPTAIN', payload: { side: 'home', id: 'h1' } },
+    { type: 'SET_CAPTAIN', payload: { side: 'away', id: 'a1' } },
+    { type: 'SET_KEEPER', payload: { side: 'home', id: 'h2' } },
+    { type: 'SET_KEEPER', payload: { side: 'away', id: 'a2' } },
   ].reduce(reducer, init({ overs: 20, ...cfg }));
   let clock = T0;
   const L = () => (s.superOver && !s.superOver.state.ended ? s.superOver.state : s);
@@ -46,18 +50,18 @@ function live(cfg: Record<string, unknown> = {}) {
     get s() { return s; },
     do(a: ScoreAction) { const prev = s; s = reducer(s, a); return { type: a.type, prev, next: s }; },
     crease(st: string, ns: string, bw: string, extra: Record<string, unknown> = {}) {
-      api.do({ type: 'SET_STRIKER', payload: { id: st, name: st.toUpperCase(), v: 2 } });
-      api.do({ type: 'SET_NONSTRIKER', payload: { id: ns, name: ns.toUpperCase(), v: 2 } });
+      api.do({ type: 'SET_STRIKER', payload: { id: st, v: 2 } });
+      api.do({ type: 'SET_NONSTRIKER', payload: { id: ns, v: 2 } });
       api.bowler(bw, extra);
     },
     bowler(bw: string, extra: Record<string, unknown> = {}) {
-      return api.do({ type: 'SET_BOWLER', payload: { id: bw, name: bw.toUpperCase(), v: 2, ...extra } });
+      return api.do({ type: 'SET_BOWLER', payload: { id: bw, v: 2, ...extra } });
     },
     /** a ball, stamped 30 s after the last (`at`, like the live controls) */
     ball(type: string, payload: Record<string, unknown> = {}, stamp = true) {
       const l = L();
       clock += 30_000;
-      return api.do({ type, side: l.battingSide, payload: { strikerId: l.strikerId, strikerName: l.strikerName, bowlerId: l.bowlerId, bowlerName: l.bowlerName, ...(stamp ? { at: clock } : {}), ...payload } });
+      return api.do({ type, side: l.battingSide, payload: { strikerId: l.strikerId, bowlerId: l.bowlerId, ...(stamp ? { at: clock } : {}), ...payload } });
     },
     runs(...rs: number[]) { let last; for (const r of rs) last = api.ball('RUNS', { runs: r, ...(r === 4 || r === 6 ? { boundary: true } : {}) }); return last!; },
     rules(patch: Record<string, unknown>) { return api.do({ type: 'SET_RULES', payload: patch }); },
@@ -75,7 +79,7 @@ function live(cfg: Record<string, unknown> = {}) {
   return api;
 }
 
-const items = (s: CricketState) => cricketCommentary(s, { home: 'Home', away: 'Away' });
+const items = (s: CricketState) => cricketCommentary(s, { home: 'Home', away: 'Away' }, UP);
 const allBalls = (s: CricketState) => items(s).innings.flatMap((i) => i.overs.flatMap((o) => o.items.filter((x): x is ComBall => x.kind === 'ball')));
 const allNotes = (s: CricketState) => items(s).innings.flatMap((i) => [...i.pre, ...i.overs.flatMap((o) => o.items.filter((x): x is ComNote => x.kind === 'note'))]);
 
@@ -308,7 +312,7 @@ describe('commentary', () => {
     const m = live({ wagonWheel: true });
     m.crease('h3', 'h4', 'a5');
     m.runs(4, 1, 6);
-    m.ball('WICKET', { kind: 'caught', fielderId: 'a7', fielderName: 'A7', newBatId: 'h5', newBatName: 'H5' });
+    m.ball('WICKET', { kind: 'caught', fielderId: 'a7', newBatId: 'h5' });
     m.detail({ cz: 8, cdeep: true });
     const balls = allBalls(m.s);
     assert.equal(balls[0].text, 'A5 to H4, OUT! Caught at long-on');
@@ -367,12 +371,12 @@ describe('commentary', () => {
     m.ball('RUNS', { runs: 1, v: 2, pen: { runs: 5, against: 'fielding', reason: 'ball hit helmet' } });
     m.do({ type: 'ADJUST', side: 'home', payload: { side: 'home', runs: 2, reason: 'hit the net' } });
     m.do({ type: 'ADJUST', side: 'away', payload: { side: 'away', runs: -3, reason: 'slow over rate' } });
-    m.do({ type: 'FIELD_NOTE', payload: { kind: 'drop', fielderId: 'a7', fielderName: 'A7' } });
-    m.do({ type: 'SET_KEEPER', payload: { side: 'away', id: 'a8', name: 'A8' } });
+    m.do({ type: 'FIELD_NOTE', payload: { kind: 'drop', fielderId: 'a7' } });
+    m.do({ type: 'SET_KEEPER', payload: { side: 'away', id: 'a8' } });
     m.runs(6, 4);
-    m.ball('WICKET', { kind: 'retired', v: 2, limit: true, newBatId: 'h5', newBatName: 'H5' });
-    m.ball('EXTRA', { kind: 'Wide', wicket: 'stumped', newBatId: 'h6', newBatName: 'H6' });
-    m.ball('WICKET', { kind: 'mankad', newBatId: 'h7', newBatName: 'H7' });
+    m.ball('WICKET', { kind: 'retired', v: 2, limit: true, newBatId: 'h5' });
+    m.ball('EXTRA', { kind: 'Wide', wicket: 'stumped', newBatId: 'h6' });
+    m.ball('WICKET', { kind: 'mankad', newBatId: 'h7' });
     m.ball('PENALTY', { runs: 5, against: 'batting', reason: 'running on the pitch', teamName: 'Home' });
     m.runs(1, 2);
     m.do({ type: 'RAIN_END_INNINGS', payload: { v: 2, chaseOvers: 10 } });
@@ -400,7 +404,7 @@ describe('commentary', () => {
     const m = live();
     m.crease('h3', 'h4', 'a5');
     m.runs(4, 0, 6);
-    m.ball('WICKET', { kind: 'bowled', newBatId: 'h5', newBatName: 'H5' });
+    m.ball('WICKET', { kind: 'bowled', newBatId: 'h5' });
     const over = items(m.s).innings[0].overs[0];
     assert.deepEqual(filterItems(over.items, 'boundaries').map((x) => (x as ComBall).outcome), ['SIX', 'FOUR']);
     assert.deepEqual(filterItems(over.items, 'wickets').map((x) => (x as ComBall).outcome), ['OUT']);
@@ -531,7 +535,7 @@ describe('match stats', () => {
     m.detail({ len: 'good', line: 'off' });
     m.runs(4);
     m.detail({ len: 'short', line: 'leg' });
-    m.ball('WICKET', { kind: 'caught', fielderId: 'a7', fielderName: 'A7', newBatId: 'h5', newBatName: 'H5' });
+    m.ball('WICKET', { kind: 'caught', fielderId: 'a7', newBatId: 'h5' });
     m.detail({ len: 'good', line: 'off' });
     const dots = pitchDots(m.s, 'home');
     assert.deepEqual(dots.map((d) => d.tone), ['dot', 'boundary', 'wicket']);
@@ -567,7 +571,7 @@ describe('career keys — only when tracked', () => {
     m.runs(0);
     m.detail({ ctrl: 'edged', kph: 120 });
     m.runs(2);
-    m.ball('WICKET', { kind: 'bowled', newBatId: 'h5', newBatName: 'H5' });
+    m.ball('WICKET', { kind: 'bowled', newBatId: 'h5' });
     m.detail({ kph: 126 });
     const t = statTotals(m.s);
     assert.deepEqual(

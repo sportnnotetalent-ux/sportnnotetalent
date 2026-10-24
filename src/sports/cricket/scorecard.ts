@@ -8,8 +8,14 @@
  * A persisted snapshot has no `log` (it is rebuilt by replaying the event log),
  * so every selector degrades to an empty result and the UI hides those rows.
  * No React Native imports — node tests load this file (note the `.ts` imports).
+ *
+ * IDs-only scoring: the state keeps player ids; the selectors that name a
+ * player take the viewer's `nameOf` (names.ts `withNames`; default: the stored
+ * legacy names). `statTotals` is keyed by id and needs none.
  */
 import { oversStr, other, NO_BOWLER, type BallRec, type CricketState, type FieldNote } from './engine.ts';
+import { withNames } from './names.ts';
+import { legacyNameOf, type NameOf } from '../../core/playerNames.ts';
 import { detailByRec, isDeliveryRec as isDeliveryRec2, isPace } from './detail.ts';
 import { phasePlan, phaseOf, type Phase } from './phases.ts';
 
@@ -62,8 +68,9 @@ export function extrasText(e: Extras): string {
 export interface FallOfWicket { n: number; runs: number; overs: string; name: string }
 
 /** Each wicket in order: "1-12 (Asha, 2.3 ov)". Retired hurt isn't a wicket. */
-export function fallOfWickets(s: Pick<CricketState, 'log' | 'ballsPerOver'>, side: Side): FallOfWicket[] {
-  return recs(s, side).filter(isWicket).map((r) => ({ n: r.tw, runs: r.tr, overs: oversStr(r.lb6, s.ballsPerOver), name: r.out!.name }));
+export function fallOfWickets(s0: Pick<CricketState, 'log' | 'ballsPerOver'>, side: Side, nameOf: NameOf = legacyNameOf): FallOfWicket[] {
+  const s = withNames(s0, nameOf);
+  return recs(s, side).filter(isWicket).map((r) => ({ n: r.tw, runs: r.tr, overs: oversStr(r.lb6, s.ballsPerOver), name: r.out!.name ?? '' }));
 }
 
 export const fowText = (f: FallOfWicket[]): string => f.map((w) => `${w.n}-${w.runs} (${w.name}, ${w.overs} ov)`).join(', ');
@@ -82,15 +89,16 @@ export interface Partnership {
  *  or when the pair at the crease changes. `runs`/`balls` are the team's
  *  (extras included, legal balls); each batter's share is runs off the bat and
  *  balls faced (a no-ball is faced, a wide is not). */
-export function partnerships(s: Pick<CricketState, 'log' | 'batting'>, side: Side): Partnership[] {
+export function partnerships(s0: Pick<CricketState, 'log' | 'batting'>, side: Side, nameOf: NameOf = legacyNameOf): Partnership[] {
+  const s = withNames(s0, nameOf);
   const out: Partnership[] = [];
-  const nameOf = (id?: string) => (id ? s.batting[id]?.name : undefined) || 'Batter';
+  const cardName = (id?: string) => (id ? s.batting[id]?.name : undefined) || 'Batter';
   let cur: Partnership | null = null;
   let wkts = 0;
   const start = (r: BallRec): Partnership => ({
     wkt: wkts + 1, runs: 0, balls: 0, unbroken: true,
-    a: { id: r.strikerId, name: nameOf(r.strikerId), runs: 0, balls: 0 },
-    b: { id: r.nonStrikerId, name: nameOf(r.nonStrikerId), runs: 0, balls: 0 },
+    a: { id: r.strikerId, name: cardName(r.strikerId), runs: 0, balls: 0 },
+    b: { id: r.nonStrikerId, name: cardName(r.nonStrikerId), runs: 0, balls: 0 },
   });
   const samePair = (p: Partnership, r: BallRec) => {
     const ids = new Set([p.a.id, p.b.id]);
@@ -147,7 +155,8 @@ function overIndexes(list: BallRec[], bpo: number): number[] {
 }
 
 /** Over-by-over history of `side`'s innings. */
-export function overHistory(s: Pick<CricketState, 'log' | 'ballsPerOver'>, side: Side): OverRow[] {
+export function overHistory(s0: Pick<CricketState, 'log' | 'ballsPerOver'>, side: Side, nameOf: NameOf = legacyNameOf): OverRow[] {
+  const s = withNames(s0, nameOf);
   const list = recs(s, side);
   const ix = overIndexes(list, s.ballsPerOver);
   const rows = new Map<number, OverRow & { bowlers: string[] }>();
@@ -366,7 +375,8 @@ export function adjustmentsText(s: Pick<CricketState, 'adj'>, side: Side): strin
 
 /** "Ravi 1 drop · Asha 6 saved · Veer 4 missed" — fielding notes by the side
  *  fielding against `side`'s innings ('' when none). */
-export function fieldingNotesText(s: Pick<CricketState, 'fieldNotes'>, side: Side): string {
+export function fieldingNotesText(s0: Pick<CricketState, 'fieldNotes'>, side: Side, nameOf: NameOf = legacyNameOf): string {
+  const s = withNames(s0, nameOf);
   const by = new Map<string, { name: string; drop: number; saved: number; missed: number }>();
   for (const n of s.fieldNotes ?? []) {
     if (n.side !== other(side)) continue;

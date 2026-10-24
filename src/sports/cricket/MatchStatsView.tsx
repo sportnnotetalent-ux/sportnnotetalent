@@ -20,6 +20,7 @@ import { useMask } from '../../core/disputeMask';
 import { SelectChip } from '../../components/ui';
 import { playerLink } from '../playerLink';
 import type { CricketState } from './engine';
+import { withNames } from './names';
 import {
   compareSections, phasePlan, battingRows, bowlingRows, matchups, worm, pitchDots, pitchGrid, teamBatting, trackedKinds,
   type PhaseFilter, type CompareRow, type Phase,
@@ -30,10 +31,13 @@ import { WagonWheelView } from './WagonWheel';
 type Side = 'home' | 'away';
 type Cat = 'compare' | 'batting' | 'bowling' | 'phases' | 'matchups' | 'graphs' | 'pitch' | 'shots';
 
-export function CricketMatchStats({ state: s, homeName, awayName, homeColor = theme.colors.home, awayColor = theme.colors.away, onPlayer }: {
+export function CricketMatchStats({ state: raw, homeName, awayName, homeColor = theme.colors.home, awayColor = theme.colors.away, onPlayer }: {
   state: CricketState; homeName: string; awayName: string; homeColor?: string; awayColor?: string;
   onPlayer?: (playerId: string) => void;
 }) {
+  // IDs-only scoring: every table names its players by id for this viewer.
+  const { nameOf: playerName } = useMask();
+  const s = useMemo(() => withNames(raw, playerName), [raw, playerName]);
   const kinds = useMemo(() => trackedKinds(s), [s]);
   const [cat, setCat] = useState<Cat>('compare');
   const [phase, setPhase] = useState<PhaseFilter>('all');

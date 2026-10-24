@@ -142,7 +142,8 @@ export function BowlTypeChips({ id, name, current, profileLeft, dispatch }: {
       </View>
     );
   }
-  const set = (t: BowlType | null) => { dispatch({ type: 'SET_BOWL_TYPE', payload: { v: 2, id, name, btype: t } }); setOpen(false); };
+  // IDs-only scoring: the bowler by id only (`name` is for this screen)
+  const set = (t: BowlType | null) => { dispatch({ type: 'SET_BOWL_TYPE', payload: { v: 2, id, btype: t } }); setOpen(false); };
   return (
     <View style={{ gap: theme.spacing(1) }}>
       <Text style={st.muted}>{name}’s bowling type (optional)</Text>

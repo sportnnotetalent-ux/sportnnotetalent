@@ -15,6 +15,13 @@ import { cricketCareer } from '../src/data/cricketCareer.ts';
 import { planStatSync, applyStatWrites, type ExistingStatLine } from '../src/data/statSync.ts';
 import type { MatchEventRecord } from '../src/core/types.ts';
 import type { ScoreAction } from '../src/sports/types.ts';
+import { withNames } from '../src/sports/cricket/names.ts';
+import type { NameOf } from '../src/core/playerNames.ts';
+
+// IDs-only scoring (2026-10-24): actions carry player ids only; here a
+// player's name is their id ('Ravi', 'A'…), so `ID` names them for display.
+const ID: NameOf = (id, legacy) => id ?? legacy ?? 'Player';
+const named = (s: CricketState) => withNames(s, ID);
 
 const CFG = { overs: 5, playersPerSide: 11 };
 
@@ -34,12 +41,12 @@ class Rec {
   }
   ball(type: string, payload: Record<string, unknown> = {}): this {
     const s = this.s;
-    return this.push({ type, side: s.battingSide, payload: { strikerId: s.strikerId, strikerName: s.strikerName, bowlerId: s.bowlerId, bowlerName: s.bowlerName, ...payload } });
+    return this.push({ type, side: s.battingSide, payload: { strikerId: s.strikerId, bowlerId: s.bowlerId, ...payload } });
   }
   runs(r: number) { return this.ball('RUNS', { runs: r }); }
-  bowler(id: string) { return this.push({ type: 'SET_BOWLER', payload: { id, name: id } }); }
+  bowler(id: string) { return this.push({ type: 'SET_BOWLER', payload: { id } }); }
   open(a = 'A', b = 'B') {
-    return this.push({ type: 'SET_STRIKER', payload: { id: a, name: a } }).push({ type: 'SET_NONSTRIKER', payload: { id: b, name: b } });
+    return this.push({ type: 'SET_STRIKER', payload: { id: a } }).push({ type: 'SET_NONSTRIKER', payload: { id: b } });
   }
   replay(n = this.log.length, cfg: Record<string, unknown> = CFG) { return replayCricket(this.log.slice(0, n), cfg); }
 }
@@ -49,7 +56,7 @@ const pen = (runs: number | undefined, against?: 'batting' | 'fielding', extra: 
 const adjust = (side: 'home' | 'away', runs: number, reason?: string): ScoreAction =>
   ({ type: 'ADJUST', side, payload: { side, runs, ...(reason ? { reason } : {}) } });
 const note = (kind: 'drop' | 'saved' | 'missed', fielderId: string, runs?: number): ScoreAction =>
-  ({ type: 'FIELD_NOTE', payload: { kind, fielderId, fielderName: fielderId, ...(runs ? { runs } : {}) }, attribution: { playerId: fielderId, stat: kind === 'drop' ? 'dropped' : kind === 'saved' ? 'runsSaved' : 'runsMissed', by: kind === 'drop' ? 1 : runs ?? 0 } });
+  ({ type: 'FIELD_NOTE', payload: { kind, fielderId, ...(runs ? { runs } : {}) }, attribution: { playerId: fielderId, stat: kind === 'drop' ? 'dropped' : kind === 'saved' ? 'runsSaved' : 'runsMissed', by: kind === 'drop' ? 1 : runs ?? 0 } });
 
 /** Name the next bowler when an over has just ended (X and Y alternate). */
 const keepBowling = (r: Rec) => { if (!r.s.bowlerId) r.bowler(r.s.lastOverBowlerId === 'X' ? 'Y' : 'X'); return r; };
@@ -79,7 +86,7 @@ describe('#20 — PENALTY to either side', () => {
     const r = new Rec().open().bowler('X');
     const ids = ['C', 'D', 'E', 'F', 'G', 'H', 'I'];
     for (const n of [6, 6, 4, 1]) keepBowling(r.runs(n));
-    for (const id of ids) keepBowling(r.ball('WICKET', { kind: 'bowled', newBatId: id, newBatName: id }));
+    for (const id of ids) keepBowling(r.ball('WICKET', { kind: 'bowled', newBatId: id }));
     assert.equal(r.s.scores.home.runs, 17);
     assert.equal(r.s.scores.home.wickets, 7);
     r.push(pen(5, 'batting', { reason: 'Short run', teamName: 'Red House' }));
@@ -187,7 +194,7 @@ describe('#20 — ADJUST (bonus / negative runs)', () => {
 
 describe('#20 — FIELD_NOTE', () => {
   test('drop: score and balls unchanged; batter = last ball\'s striker; `dropped` attributed', () => {
-    const r = new Rec().open().bowler('V').push({ type: 'SET_KEEPER', payload: { side: 'away', id: 'K', name: 'K' } });
+    const r = new Rec().open().bowler('V').push({ type: 'SET_KEEPER', payload: { side: 'away', id: 'K' } });
     r.runs(1); // A faces, now B on strike
     const before = { ...r.s.scores.home };
     r.push(note('drop', 'Ravi'));
@@ -198,7 +205,9 @@ describe('#20 — FIELD_NOTE', () => {
     assert.equal(n.bowlerId, 'V');
     assert.equal(n.side, 'away');
     assert.equal(n.at, '0.1');
-    assert.equal(r.s.events.at(-1)!.label, 'Dropped — Ravi (A off V)');
+    assert.equal(r.s.events.at(-1)!.label, 'Dropped — {@Ravi} ({@A} off {@V})'); // stored by id
+    assert.equal(r.s.events.at(-1)!.playerId, 'Ravi');
+    assert.equal(named(r.s).events.at(-1)!.label, 'Dropped — Ravi (A off V)');
     assert.equal(r.log.at(-1)!.attribution!.stat, 'dropped');
     const t = statTotals(r.s);
     assert.equal(t.Ravi.stats.dropped, 1);
@@ -210,11 +219,11 @@ describe('#20 — FIELD_NOTE', () => {
   test('saved / missed credit the runs; fielding line on the scorecard', () => {
     const r = new Rec().open().bowler('V').runs(0);
     r.push(note('drop', 'Ravi')).push(note('saved', 'Asha', 6)).push(note('missed', 'Veer', 4));
-    assert.equal(r.s.events.at(-2)!.label, '6 runs saved — Asha');
+    assert.equal(named(r.s).events.at(-2)!.label, '6 runs saved — Asha');
     const t = statTotals(r.s);
     assert.equal(t.Asha.stats.runsSaved, 6);
     assert.equal(t.Veer.stats.runsMissed, 4);
-    assert.equal(fieldingNotesText(r.s, 'home'), 'Ravi 1 drop · Asha 6 saved · Veer 4 missed');
+    assert.equal(fieldingNotesText(r.s, 'home', ID), 'Ravi 1 drop · Asha 6 saved · Veer 4 missed');
     assert.equal(fieldingNotesText(r.s, 'away'), '');
     // saved / missed need runs
     assert.equal(reducer(r.s, note('saved', 'Asha')), r.s);
@@ -274,7 +283,7 @@ describe('#20 — #06 editBall / editableOvers pass the new actions through', ()
     for (const rec of [
       { seq: 1, type: 'PENALTY', side: 'away', payload: { runs: 5, against: 'batting', reason: 'Short run' } },
       { seq: 2, type: 'ADJUST', side: 'home', payload: { side: 'home', runs: -5, reason: 'out-of-arena' } },
-      { seq: 3, type: 'FIELD_NOTE', payload: { kind: 'drop', fielderId: 'Ravi', fielderName: 'Ravi' }, attribution: { playerId: 'Ravi', stat: 'dropped', by: 1 } },
+      { seq: 3, type: 'FIELD_NOTE', payload: { kind: 'drop', fielderId: 'Ravi' }, attribution: { playerId: 'Ravi', stat: 'dropped', by: 1 } },
     ] as MatchEventRecord[]) {
       assert.deepEqual(editBall(rec, { runs: 3 }), recordToAction(rec));
     }

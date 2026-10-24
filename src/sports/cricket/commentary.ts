@@ -16,11 +16,17 @@
  * The timeline's non-ball moments are placed by walking `events` alongside the
  * ball log: each logged ball's own timeline entry is recognised by its stamp
  * and kind (`ballEventMatches`), everything in between is a note.
+ *
+ * IDs-only scoring: the state keeps player ids; `cricketCommentary`'s
+ * `nameOf` names them for the viewer (names.ts `withNames`; default: the
+ * stored legacy names).
  */
 import {
   oversStr, runRate, DISMISSAL_NAME, NO_BOWLER, inPowerplay,
   type BallRec, type CricketState, type ShotRec,
 } from './engine.ts';
+import { withNames } from './names.ts';
+import { legacyNameOf, type NameOf } from '../../core/playerNames.ts';
 import { detailByRec, isDeliveryRec, recStamp, pitchPhrase, controlPhrase, fieldPosition, extraWhyPhrase, type BallDetailRec } from './detail.ts';
 import { phasePPBalls } from './phases.ts';
 import type { LiveEvent } from '../liveEvents';
@@ -481,9 +487,11 @@ function build(s: CricketState, names: { home: string; away: string }, prefix: s
   return inns.reverse();
 }
 
-/** The whole match's commentary (newest innings first). */
-export function cricketCommentary(s: CricketState, names: { home: string; away: string }): Commentary {
-  if (!Array.isArray(s.log)) return { innings: [], hasLog: false };
+/** The whole match's commentary (newest innings first). `names`: the teams;
+ *  `nameOf`: the players, by id (IDs-only scoring). */
+export function cricketCommentary(s0: CricketState, names: { home: string; away: string }, nameOf: NameOf = legacyNameOf): Commentary {
+  if (!Array.isArray(s0.log)) return { innings: [], hasLog: false };
+  const s = withNames(s0, nameOf);
   const out: Commentary = { innings: build(s, names, ''), hasLog: true };
   const so = s.superOver;
   if (so && Array.isArray(so.state.log) && so.state.log.length) out.superOver = { round: so.round, innings: build(so.state, names, 'so') };

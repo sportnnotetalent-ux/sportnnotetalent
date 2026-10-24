@@ -10,8 +10,14 @@
  * correction replays, so these are always the corrected figures). Nothing here
  * shows a 0 for something that wasn't tracked: tracked figures come back as
  * `null` when the match didn't capture them. Pure and JSX-free (node tests).
+ *
+ * IDs-only scoring: the state keeps player ids; the tables that name a player
+ * take the viewer's `nameOf` (names.ts `withNames`; default: the stored
+ * legacy names).
  */
 import { oversStr, runRate, other, NO_BOWLER, type BallRec, type CricketState } from './engine.ts';
+import { withNames } from './names.ts';
+import { legacyNameOf, type NameOf } from '../../core/playerNames.ts';
 import { phasePlan, phaseOf, PHASES, type Phase, type PhaseFilter } from './phases.ts';
 import {
   detailByRec, isDeliveryRec, isPace, LENGTHS, LINES, BOWL_TYPE_LABEL, WIDE_WHY, NB_WHY, WIDE_WHY_LABEL, NB_WHY_LABEL, extraWhyOf,
@@ -337,7 +343,8 @@ export interface BatterRow {
 }
 
 /** `side`'s batters in batting order, with the deeper figures. */
-export function battingRows(s: CricketState, side: Side): BatterRow[] {
+export function battingRows(s0: CricketState, side: Side, nameOf: NameOf = legacyNameOf): BatterRow[] {
+  const s = withNames(s0, nameOf);
   const recs = inningsRecs(s, side);
   const types = s.bowlTypes ?? {};
   const typed = Object.keys(types).length > 0;
@@ -382,7 +389,8 @@ export interface BowlerRow {
 }
 
 /** The bowlers who bowled at `side`'s innings. */
-export function bowlingRows(s: CricketState, side: Side): BowlerRow[] {
+export function bowlingRows(s0: CricketState, side: Side, nameOf: NameOf = legacyNameOf): BowlerRow[] {
+  const s = withNames(s0, nameOf);
   const recs = inningsRecs(s, side).filter((j) => isDeliveryRec(j.r) || j.r.out?.kind === 'mankad');
   const bpo = s.ballsPerOver;
   const ids = [...new Set(recs.map((j) => j.r.bowlerId).filter((x): x is string => !!x))];
@@ -453,7 +461,8 @@ export function extrasWhyText(recs: { r: BallRec; d?: BallDetailRec }[]): string
 
 export interface Matchup { bowlerId: string; bowler: string; runs: number; balls: number; outs: number; dots: number; fours: number; sixes: number }
 /** Batter vs bowler in `side`'s innings: batterId → one line per bowler faced. */
-export function matchups(s: CricketState, side: Side): Record<string, Matchup[]> {
+export function matchups(s0: CricketState, side: Side, nameOf: NameOf = legacyNameOf): Record<string, Matchup[]> {
+  const s = withNames(s0, nameOf);
   const out: Record<string, Record<string, Matchup>> = {};
   for (const { r } of inningsRecs(s, side)) {
     if (!isDeliveryRec(r) || !r.strikerId || !r.bowlerId) continue;
@@ -536,7 +545,8 @@ export interface InningsTop {
   bowl: { id: string; name: string; line: string }[];
 }
 /** The top 3 batters (runs, then fewer balls) and bowlers (wickets, then fewer runs) of `side`'s innings. */
-export function inningsTop(s: CricketState, side: Side, n = 3): InningsTop {
+export function inningsTop(s0: CricketState, side: Side, n = 3, nameOf: NameOf = legacyNameOf): InningsTop {
+  const s = withNames(s0, nameOf);
   const bpo = s.ballsPerOver;
   const sc = s.scores[side];
   const bat = Object.entries(s.batting).filter(([, c]) => c.side === side && (c.balls > 0 || c.runs > 0 || c.out))

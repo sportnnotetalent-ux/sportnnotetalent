@@ -10,17 +10,20 @@ import type { CricketState } from '../src/sports/cricket/engine.ts';
 import { editBall, ballSymbol, overSymbolTone, ballRuns as editBallRuns } from '../src/sports/cricket/editOvers.ts';
 import type { ScoreAction } from '../src/sports/types.ts';
 import type { MatchEventRecord } from '../src/core/types.ts';
+import { withNames } from '../src/sports/cricket/names.ts';
+import { makeNameOf } from '../src/core/playerNames.ts';
 
-// Same helpers as tests/cricket.test.mts.
+// Same helpers as tests/cricket.test.mts — IDs-only, as the scorer UI sends them.
 function opened(): CricketState {
   let s = init({ overs: 5, playersPerSide: 11 });
-  s = reducer(s, { type: 'SET_STRIKER', payload: { id: 's1', name: 'A' } });
-  s = reducer(s, { type: 'SET_NONSTRIKER', payload: { id: 's2', name: 'B' } });
-  s = reducer(s, { type: 'SET_BOWLER', payload: { id: 'b1', name: 'Bowler' } });
+  s = reducer(s, { type: 'SET_STRIKER', payload: { id: 's1', v: 2 } });
+  s = reducer(s, { type: 'SET_NONSTRIKER', payload: { id: 's2', v: 2 } });
+  s = reducer(s, { type: 'SET_BOWLER', payload: { id: 'b1', v: 2 } });
   return s;
 }
 const ball = (s: CricketState, type: string, payload: Record<string, unknown> = {}): CricketState =>
-  reducer(s, { type, side: s.battingSide, payload: { ...payload, strikerId: s.strikerId, strikerName: s.strikerName, bowlerId: s.bowlerId, bowlerName: s.bowlerName } } as ScoreAction);
+  reducer(s, { type, side: s.battingSide, payload: { ...payload, strikerId: s.strikerId, bowlerId: s.bowlerId } } as ScoreAction);
+const NM = makeNameOf(new Map([['s1', 'A'], ['s2', 'B'], ['b1', 'Bowler']]));
 const home = (s: CricketState) => s.scores.home;
 const lastEvent = (s: CricketState) => s.events[s.events.length - 1];
 
@@ -58,6 +61,9 @@ describe('#15 — runs off the bat', () => {
     assert.deepEqual(s.thisOver, ['4']);
     assert.equal(lastEvent(s).label, 'FOUR');
     assert.equal(lastEvent(s).tone, 'boundary');
+    // IDs-only: the commentary names the batter by id; shown with the name
+    assert.equal(lastEvent(s).detail, 'FOUR! {@s1} finds the boundary');
+    assert.equal(withNames(s, NM).events.at(-1)!.detail, 'FOUR! A finds the boundary');
     const six = ball(opened(), 'RUNS', { runs: 6 });
     assert.equal(six.batting.s1.sixes, 1);
     assert.equal(lastEvent(six).label, 'SIX');
@@ -206,6 +212,10 @@ describe('#15 — editing a ball keeps the new keys', () => {
     const out = editBall(rec, { runs: 6 }) as ScoreAction;
     assert.ok(!('error' in out));
     assert.equal(out.payload!.runs, 6);
+    // IDs-only: the edited ball drops the names the older ball stored
+    assert.equal(out.payload!.strikerName, undefined);
+    assert.equal(out.payload!.bowlerName, undefined);
+    assert.deepEqual(out.attribution, { playerId: 's1', stat: 'runs', by: 6 });
     assert.equal(out.payload!.boundary, false);
     assert.equal(out.payload!.overthrows, undefined);
     assert.equal(ballSymbol(out), '6r');

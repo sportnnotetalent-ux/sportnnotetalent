@@ -95,7 +95,9 @@ function LiveOverlay({ match, config, params }: { match: Match; config?: Record<
     // Only realtime inserts flash — a load, reconnect or undo never does.
     onRemoteEvent: (prev, next) => {
       if (!params.flash || !plugin.tickerFlash) return;
-      const f = plugin.tickerFlash(prev, next);
+      // IDs-only: the flash names its player by id (`nameOf` below — the
+      // callback runs after render, when it is set)
+      const f = plugin.tickerFlash(prev, next, nameOf);
       if (f) setFlash({ ...f, id: Date.now() });
     },
   });
