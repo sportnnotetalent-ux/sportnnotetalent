@@ -13,6 +13,29 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-24 — IDs-only scoring: kabaddi (C) and baseball, carrom, chess, golf match play (F+G)
+- **Kabaddi** (merge of `665af96`):
+  - **Payloads:** RAID_OUTCOME has `raiderId` / `tacklerId` / `touched[{id}]`; SUB has `offId` / `onId`; TECH_POINT / CARD carry `playerId`.
+  - **Credits:** ids only, reversals included.
+  - **State:** raids, `subbedOff`, revival queue, `unavailable()`, the box tally and the deep box are all keyed by id.
+  - New `kabaddi/actions.ts` (id-only builders) and `kabaddi/names.ts` (display lookups). Readers resolve with `nameOf`. The `undoLabel` generic branch now names an event that has a `playerId` (volleyball attack / block undo shows the player too).
+  - **Legacy:** the 400-log differential and frozen oracle are unchanged.
+  - Guard test: `ids-only-kabaddi`.
+- **Baseball, carrom, chess, golf match play** (merge of `2622a35`):
+  - **Baseball:** line-ups, plays, subs and ejections store `{id}` (`storedWho` / `storedEntry` / `storedMove`), via the new builders `lineupAction` / `subAction` / `ejectAction`. `baseball/names.ts` `withNames` gives a display copy.
+  - **Carrom:** `boardCredit` (ids only); break order and editor credits are `{side, id}`.
+  - **Chess:** credits are ids only. `pastedMovesAction` blanks the PGN `[White]` / `[Black]` / `…NA` tag values.
+  - **Golf match play:** `holeAction` (ids only).
+  - **Legacy:** replays identically.
+  - Guard test: `ids-only-baseball-carrom-chess-golf`.
+- **Merged tree:** tsc clean; suite 4560 pass / 0 fail / 2 todo.
+- **Close-out notes from these groups:**
+  - **Server safety net:** strip the listed name keys, but baseball / carrom `name` only when an `id` sits beside it, and never chess OPENING `payload.name`.
+  - **`EventCorrectionList`:** must stop writing `attribution.playerName`.
+  - **`TournamentRecords` / discipline:** must resolve by id.
+  - **Not scrubbed:** typed baseball EJECT official text, and other chess PGN tags / comments.
+- **Still running:** B (invasion sports) and D (basketball).
+
 ### 2026-10-24 — Verification fast lanes, Phase 3: organiser-chosen requirement + one checklist
 - **Migration `20261024190000_age_requirement.sql`:** `tournaments.age_verification` (`none` default / `confirmed` / `verified`).
 - **Rule (`core/eligibility.ts`):**

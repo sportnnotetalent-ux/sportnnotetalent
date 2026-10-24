@@ -70,6 +70,7 @@ The work goes sport by sport, racket sports and cricket first. Inventory with fi
   - Stage 0 done (`8557c16`);
   - entry names done (`5b235ec`, migration run);
   - **A: racket sports + volleyball merged** (`6eac0f3`);
-  - **E: cricket merged** (`2b3fa11`).
+  - **E: cricket merged** (`2b3fa11`);
+  - **C: kabaddi merged**; **F+G: baseball, carrom, chess, golf merged**.
 - **Next:** a real scoring test on a phone, then B (invasion sports), C (kabaddi), D (basketball), F + G (baseball, chess, golf, carrom), then the close-out.
 - Done before this: children show as initials outside their circle (`players_view` + the `players` policy) and listings by under-18s carry no phone.
