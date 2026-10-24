@@ -17,9 +17,12 @@
  * (REMOVE_EVENT with the reversed credits — a miss's rebound goes with it —
  * then the same flow stamped at the original time, SD-114).
  */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { theme } from '../../core/theme';
+import { useMask } from '../../core/disputeMask';
+import { withNames, nameFor } from '../invasion/names';
+import { subAction } from '../invasion/actions';
 import { ensureContrast } from '../../core/contrast';
 import { Button, SelectChip, TextField } from '../../components/ui';
 import { confirmMatchAction } from '../../components/ConfirmSheet';
@@ -105,6 +108,8 @@ const ScoringControls: SportPlugin<NetballState>['ScoringControls'] = ({
   state: liveState, dispatch: rawDispatch, homeName, awayName, homeColor, awayColor, homeRoster = [], awayRoster = [], homeLineup = [], awayLineup = [],
 }) => {
   const { view: s, dispatch, begin: holdRemoval, cancel: dropHeldRemoval } = usePendingEdit(liveState, rawDispatch, reducer);
+  // IDs-only scoring: the state keeps player ids; names are looked up when shown
+  const { nameOf: playerNameOf } = useMask();
   const [flow, setFlow] = useState<Flow | null>(null);
   const [editAt, setEditAt] = useState<{ sec: number; period: number } | null>(null);
   const [showEdit, setShowEdit] = useState(false);
@@ -130,8 +135,11 @@ const ScoringControls: SportPlugin<NetballState>['ScoringControls'] = ({
   const ink = (sd: Side) => ensureContrast(color(sd), theme.colors.surface);
   const rosterOf = (sd: Side) => (sd === 'home' ? homeRoster : awayRoster);
   const lineupSlots = (sd: Side) => (sd === 'home' ? homeLineup : awayLineup);
+  // IDs-only scoring: a player off the squad is listed by id; an older log's
+  // name-only player with no squad match is not pickable (a made-up
+  // `name:<name>` id would put the name into the public log).
   const byId = (sd: Side, id?: string, nm?: string): Player | undefined =>
-    rosterOf(sd).find((p) => (id && p.id === id) || (!id && nm && p.fullName === nm)) ?? (id || nm ? { id: id ?? `name:${nm}`, fullName: nm ?? 'Player', sports: ['netball'] } as Player : undefined);
+    rosterOf(sd).find((p) => (id && p.id === id) || (!id && nm && p.fullName === nm)) ?? (id ? { id, fullName: nameFor(playerNameOf, id, nm) ?? 'Player', sports: ['netball'] } as Player : undefined);
 
   const fire = (a: ScoreAction) => {
     const at = Date.now();
@@ -140,11 +148,10 @@ const ScoringControls: SportPlugin<NetballState>['ScoringControls'] = ({
 
   /* ---- who plays where ---- */
   const stampOf = (sd: Side) => {
-    const roster = rosterOf(sd);
-    const pos: Partial<Record<Pos, { id: string; name: string }>> = {};
+    const pos: Partial<Record<Pos, { id: string; name?: string }>> = {};
     for (const sl of lineupSlots(sd)) {
       if (!sl.playerId || !isPos(sl.position)) continue;
-      pos[sl.position] = { id: sl.playerId, name: roster.find((p) => p.id === sl.playerId)?.fullName ?? sl.playerName ?? '' };
+      pos[sl.position] = { id: sl.playerId }; // IDs-only scoring: the id only
     }
     return pos;
   };
@@ -179,7 +186,7 @@ const ScoringControls: SportPlugin<NetballState>['ScoringControls'] = ({
   /** court + bench, once each (no line-up yet: both are the roster) */
   const everyone = (sd: Side): Player[] => [...new Map([...onCourt(sd), ...bench(sd)].map((p) => [p.id, p])).values()];
   const tagOf = (sd: Side) => (p: Player) => posOfPlayer(sd, p);
-  const live = netballLiveField(s, now);
+  const live = netballLiveField(s, now, playerNameOf);
 
   /* ---- recorders ---- */
   const credit = (e: Parameters<typeof eventCredits>[0]) => {
@@ -193,15 +200,15 @@ const ScoringControls: SportPlugin<NetballState>['ScoringControls'] = ({
   const goal = (sd: Side, pos: Pos, shooter: Player | null, feeder: Player | null) => {
     const two = superArmed(sd);
     setArmed(null);
-    fire({ type: 'GOAL', side: sd, payload: { pos, ...(two ? { points: 2 } : {}) }, ...credit({ type: 'goal', playerId: shooter?.id, playerName: shooter?.fullName, secondId: feeder?.id, secondName: feeder?.fullName }) });
+    fire({ type: 'GOAL', side: sd, payload: { pos, ...(two ? { points: 2 } : {}) }, ...credit({ type: 'goal', playerId: shooter?.id, secondId: feeder?.id }) });
     setFlow(null);
   };
   const miss = (sd: Side, pos: Pos, shooter: Player | null, feeder: Player | null, rebound?: { side: Side; p: Player } | null) => {
     const id = uid();
     const ss = superArmed(sd);
     setArmed(null);
-    fire({ type: 'MISS', side: sd, payload: { pos, uid: id, ...(ss ? { ss: true } : {}) }, ...credit({ type: 'miss', playerId: shooter?.id, playerName: shooter?.fullName, secondId: feeder?.id, secondName: feeder?.fullName }) });
-    if (rebound) fire({ type: 'STAT', side: rebound.side, payload: { kind: 'rebound', ref: id }, ...credit({ type: 'stat', stat: REBOUND, playerId: rebound.p.id, playerName: rebound.p.fullName }) });
+    fire({ type: 'MISS', side: sd, payload: { pos, uid: id, ...(ss ? { ss: true } : {}) }, ...credit({ type: 'miss', playerId: shooter?.id, secondId: feeder?.id }) });
+    if (rebound) fire({ type: 'STAT', side: rebound.side, payload: { kind: 'rebound', ref: id }, ...credit({ type: 'stat', stat: REBOUND, playerId: rebound.p.id }) });
     setFlow(null);
   };
   /** the one-tap shot: GS / GA from the line-up (detail mode asks for the feed) */
@@ -216,8 +223,8 @@ const ScoringControls: SportPlugin<NetballState>['ScoringControls'] = ({
   };
   const stat = (sd: Side, kind: StatKind, p: Player | null, extra: { gain?: boolean; tt?: TurnoverType } = {}) => {
     // deep wave: a pick-up is a statTotals-only credit, so its player rides in the payload
-    const who = kind === 'pickup' && p ? { playerId: p.id, playerName: p.fullName } : {};
-    fire({ type: 'STAT', side: sd, payload: { kind, ...who, ...(typeof extra.gain === 'boolean' ? { gain: extra.gain } : {}), ...(extra.tt ? { tt: extra.tt } : {}) }, ...credit({ type: 'stat', stat: kind, playerId: p?.id, playerName: p?.fullName }) });
+    const who = kind === 'pickup' && p ? { playerId: p.id } : {};
+    fire({ type: 'STAT', side: sd, payload: { kind, ...who, ...(typeof extra.gain === 'boolean' ? { gain: extra.gain } : {}), ...(extra.tt ? { tt: extra.tt } : {}) }, ...credit({ type: 'stat', stat: kind, playerId: p?.id }) });
     setFlow(null);
   };
   /** after the player: a deflection's outcome / a turnover's type when tracked */
@@ -226,11 +233,11 @@ const ScoringControls: SportPlugin<NetballState>['ScoringControls'] = ({
     else stat(sd, kind, p);
   };
   const penalty = (sd: Side, kind: PenaltyKind, p: Player | null) => {
-    fire({ type: 'PENALTY', side: sd, payload: { penalty: kind }, ...credit({ type: 'penalty', penalty: kind, playerId: p?.id, playerName: p?.fullName }) });
+    fire({ type: 'PENALTY', side: sd, payload: { penalty: kind }, ...credit({ type: 'penalty', penalty: kind, playerId: p?.id }) });
     setFlow(null);
   };
   const sanction = (sd: Side, kind: Sanction, p: Player | null) => {
-    fire({ type: 'SANCTION', side: sd, payload: { sanction: kind, ...(kind === 'suspension' ? { minutes: s.suspensionMinutes } : {}) }, ...credit({ type: 'sanction', sanction: kind, playerId: p?.id, playerName: p?.fullName }) });
+    fire({ type: 'SANCTION', side: sd, payload: { sanction: kind, ...(kind === 'suspension' ? { minutes: s.suspensionMinutes } : {}) }, ...credit({ type: 'sanction', sanction: kind, playerId: p?.id }) });
     setFlow(null);
   };
   const officialSanction = (sd: Side, kind: Sanction) => {
@@ -238,7 +245,7 @@ const ScoringControls: SportPlugin<NetballState>['ScoringControls'] = ({
     setOfficial(''); setFlow(null);
   };
   const sub = (sd: Side, off: Player | null, on: Player, pos?: Pos) => {
-    fire({ type: 'SUB', side: sd, payload: { ...(off ? { offId: off.id, offName: off.fullName } : {}), onId: on.id, onName: on.fullName, ...(pos ? { pos } : {}) } });
+    fire(subAction(sd, off, on, pos ? { pos } : {}));
     setFlow(null);
   };
   const move = (sd: Side, p: Player, pos: Pos) => {
@@ -247,17 +254,17 @@ const ScoringControls: SportPlugin<NetballState>['ScoringControls'] = ({
       // stamp — minutes and quarters per position count from it)
       const cur = lineup(sd);
       const from = POSITIONS.find((x) => cur[x]?.id === p.id);
-      const next: Partial<Record<Pos, { id: string; name: string }>> = {};
-      for (const x of POSITIONS) { const w = cur[x]; if (w && w.id !== p.id) next[x] = { id: w.id, name: w.fullName }; }
+      const next: Partial<Record<Pos, { id: string; name?: string }>> = {};
+      for (const x of POSITIONS) { const w = cur[x]; if (w && w.id !== p.id) next[x] = { id: w.id }; }
       const occupant = next[pos];
       if (occupant && from) next[from] = occupant;
-      next[pos] = { id: p.id, name: p.fullName };
+      next[pos] = { id: p.id };
       dispatch({ type: 'XI', payload: { team: sd, pos: next } });
       setFlow({ mode: 'pos', side: sd, step: 'player' });
       return;
     }
     if (!s.xi?.[sd]) stampXi();
-    fire({ type: 'POS', side: sd, payload: { id: p.id, name: p.fullName, pos } });
+    fire({ type: 'POS', side: sd, payload: { id: p.id, pos } });
     setFlow({ mode: 'pos', side: sd, step: 'player' });
   };
   const hold = (reason: StopReason) => { fire({ type: 'STOP', payload: { reason } }); setFlow(null); };
@@ -466,7 +473,7 @@ const ScoringControls: SportPlugin<NetballState>['ScoringControls'] = ({
             }} onPick={(p) => sanction(sd, k, p)} />
             <Text style={c.small}>Or a team official</Text>
             <View style={c.row}>
-              <View style={c.flex}><TextField label="Official (optional)" value={official} onChange={setOfficial} placeholder="e.g. Coach" autoCapitalize="words" /></View>
+              <View style={c.flex}><TextField label="Official's role (optional)" value={official} onChange={setOfficial} placeholder="e.g. Coach" autoCapitalize="words" /></View>
               <Button label="Record" variant="ghost" onPress={() => officialSanction(sd, k)} />
             </View>
           </View>
@@ -634,7 +641,7 @@ const ScoringControls: SportPlugin<NetballState>['ScoringControls'] = ({
             const p = lineup(cp)[pos];
             return p && !gone(cp, p) ? (
               <SelectChip key={pos} label={`${pos} · ${p.fullName.split(' ')[0]}`} accessibilityLabel={`Centre pass received by ${p.fullName}, ${pos}`} active={false}
-                onPress={() => fire({ type: 'CPR', side: cp, payload: { playerId: p.id, playerName: p.fullName, pos } })} />
+                onPress={() => fire({ type: 'CPR', side: cp, payload: { playerId: p.id, pos } })} />
             ) : null;
           })}
         </View>
@@ -658,9 +665,11 @@ const ScoringControls: SportPlugin<NetballState>['ScoringControls'] = ({
 };
 
 /** The scorer's "Correct the timeline" list: remove a moment, or re-enter it. */
-function EditList({ s, show, setShow, onRemove, onEdit, homeName, awayName }: {
+function EditList({ s: s0, show, setShow, onRemove, onEdit, homeName, awayName }: {
   s: NetballState; show: boolean; setShow: (v: boolean) => void; onRemove: (e: NetballEvent) => void; onEdit?: (e: NetballEvent) => void; homeName: string; awayName: string;
 }) {
+  const { nameOf } = useMask();
+  const s = useMemo(() => withNames(s0, nameOf), [s0, nameOf]); // IDs-only scoring: names by id
   if (!s.events.length) return null;
   return (
     <View style={c.panel}>
@@ -695,7 +704,8 @@ const LiveClock: NonNullable<SportPlugin<NetballState>['LiveClock']> = ({ state 
   const now = Date.now();
   const label = s.ended ? (s.playOn ? 'FT (play-on)' : s.et ? 'FT (AET)' : 'FT')
     : !periodStarted(s) ? (s.period === 1 ? '—' : `${periodName(s, s.period)} next`) : `${periodName(s, s.period)} ${clockFace(s, now)}`;
-  const live = s.ended ? null : netballLiveField(s, now);
+  const { nameOf } = useMask();
+  const live = s.ended ? null : netballLiveField(s, now, nameOf);
   const cp = s.ended ? undefined : centreInfo(s).now;
   return (
     <View style={{ alignItems: 'center', gap: theme.spacing(1), flex: 1, minWidth: 0 }}>
@@ -738,11 +748,14 @@ const NetballScoreboard: NonNullable<SportPlugin<NetballState>['Scoreboard']> = 
 /** Match tabs (2026-10-22): the play-by-play on Commentary; the broadcast
  *  team stats and the players' box on Stats. */
 type TabProps = Parameters<NonNullable<SportPlugin<NetballState>['LiveExtras']>>[0];
-const NetballCommentary = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster, onPlayer }: TabProps) => (
-  <PlayFeed groups={netballFeed(state as NetballState, { home: homeName, away: awayName })} homeColor={homeColor} awayColor={awayColor} homeRoster={homeRoster} awayRoster={awayRoster} onPlayer={onPlayer} allLabel="Match" />
-);
+const NetballCommentary = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster, onPlayer }: TabProps) => {
+  const { nameOf } = useMask();
+  return <PlayFeed groups={netballFeed(state as NetballState, { home: homeName, away: awayName }, nameOf)} homeColor={homeColor} awayColor={awayColor} homeRoster={homeRoster} awayRoster={awayRoster} onPlayer={onPlayer} allLabel="Match" />;
+};
 const NetballStats = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster, onPlayer }: TabProps) => {
-  const s = state as NetballState;
+  // IDs-only scoring: names looked up by id for this viewer
+  const { nameOf } = useMask();
+  const s = useMemo(() => withNames(state as NetballState, nameOf), [state, nameOf]);
   return (
     <SubViews label="Stats view" views={[
       { key: 'team', label: 'Team stats', render: () => (
@@ -777,10 +790,11 @@ export const netballPlugin: SportPlugin<NetballState> = {
   standingsUnits: (s) => ({ points: { home: s.home, away: s.away } }),
   statTotals: netballTotals,
   // SD-115: what Undo removes — "Goal · GS · Asha Rao (12-10)"
-  undoLabel: (step) => {
+  undoLabel: (step, nameOf) => {
     if (!step) return null;
     const prev = step.prev as NetballState | undefined;
-    const next = step.next as NetballState | undefined;
+    // IDs-only scoring: the players by id, for this viewer
+    const next = step.next ? withNames(step.next as NetballState, nameOf) : undefined;
     if (!prev?.events || !next?.events) return null;
     if (step.type === 'FIRST_CENTRE') return 'first-centre pick';
     if (step.type === 'XI') return 'positions';

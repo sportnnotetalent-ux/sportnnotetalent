@@ -6,6 +6,7 @@
 import { baseSkaters, clockFace, penaltyBox, matchSec, periodName, skatersOn, soScore, type IceEvent, type IceHockeyState, type Side } from './engine.ts';
 import { goalTags } from './timeline.ts';
 import { shortName, type TickerDetail, type TickerFlash } from '../ticker.ts';
+import { legacyNameOf, withNames, type NameOf } from '../invasion/names.ts';
 
 /** "Asha R. P1 · Meera J. P3 (PP)" — a side's goals in order (last 3). */
 export function iceHockeyScorers(s: IceHockeyState, side: Side, top = 3): string | undefined {
@@ -25,7 +26,9 @@ export function strengthText(s: IceHockeyState, now = Date.now()): string | unde
   return on.home !== base || on.away !== base ? `${on.home} v ${on.away}` : undefined;
 }
 
-export function iceHockeyTickerDetail(s: IceHockeyState, names: { home: string; away: string }): TickerDetail {
+/** IDs-only scoring: `names.player` names the players by id for this viewer. */
+export function iceHockeyTickerDetail(s0: IceHockeyState, names: { home: string; away: string; player?: NameOf }): TickerDetail {
+  const s = withNames(s0, names.player ?? legacyNameOf);
   const d: TickerDetail = {};
   const h = iceHockeyScorers(s, 'home');
   const a = iceHockeyScorers(s, 'away');
@@ -45,7 +48,8 @@ export function iceHockeyTickerDetail(s: IceHockeyState, names: { home: string; 
 }
 
 /** A new goal → "GOAL! Asha R. P2 12:34" (PP / SH / EN as the second line). */
-export function iceHockeyTickerFlash(prev: IceHockeyState, next: IceHockeyState): TickerFlash | null {
+export function iceHockeyTickerFlash(prev: IceHockeyState, next0: IceHockeyState, nameOf: NameOf = legacyNameOf): TickerFlash | null {
+  const next = withNames(next0, nameOf); // IDs-only scoring: names by id
   const last: IceEvent | undefined = next.events[next.events.length - 1];
   if (!last || last.type !== 'goal' || prev.events.some((e) => e.id === last.id)) return null;
   const who = shortName(last.playerName);

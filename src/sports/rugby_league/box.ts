@@ -14,12 +14,17 @@ import type { BoxRowInput, BoxSideInput, MatchBoxSource } from '../boxScore.ts';
 import { eventCredits, periodName, teamFigures, totalPeriods, trackedDetailKeys, tracked, LIVE_KEYS, type LeagueState, type Side } from './engine.ts';
 import { setFigures } from './sets.ts';
 import { leagueTotals } from './totals.ts';
+import { withNames, type NameOf } from '../invasion/names.ts';
+import { withRosters } from '../racketNames.ts';
 
-export interface LeagueBoxContext { homeRoster?: Player[]; awayRoster?: Player[] }
+/** `nameOf` (IDs-only scoring): the viewer's names by player id. */
+export interface LeagueBoxContext { homeRoster?: Player[]; awayRoster?: Player[]; nameOf?: NameOf }
 
 const CORE_KEYS: string[] = [...LIVE_KEYS];
 
-export function leagueBox(s: LeagueState, ctx: LeagueBoxContext = {}): MatchBoxSource {
+export function leagueBox(s0: LeagueState, ctx: LeagueBoxContext = {}): MatchBoxSource {
+  // IDs-only scoring: rows key by id; names are the viewer's (else the squad's)
+  const s = withNames(s0, withRosters(ctx.nameOf, ctx.homeRoster, ctx.awayRoster));
   const n = Math.min(totalPeriods(s), Math.max(1, s.period));
   const periods = n >= 2 ? Array.from({ length: n }, (_, i) => ({ value: i + 1, label: periodName(s, i + 1) })) : [];
   const detail = trackedDetailKeys(s);

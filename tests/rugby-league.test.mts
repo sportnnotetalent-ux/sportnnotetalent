@@ -60,6 +60,7 @@ import type { ScoreAction, VoiceContext } from '../src/sports/types.ts';
 import { replayLog } from '../src/sports/amend.ts';
 import type { Match, Player, SportId, StatLine } from '../src/core/types.ts';
 import type { StatSheet } from '../src/sports/compareSheet.ts';
+import type { NameOf } from '../src/core/playerNames.ts';
 
 /* ---------------------------------- helpers --------------------------------- */
 
@@ -121,6 +122,8 @@ const NAMES: Record<string, string> = {
   thurston: 'Johnathan Thurston', oneill: "Justin O'Neill", tamou: 'James Tamou', feldt: 'Kyle Feldt', morgan: 'Michael Morgan',
 };
 function nm(id: string): string { return NAMES[id] ?? id.toUpperCase(); }
+/** IDs-only scoring: the state keeps ids; the viewer's names come from a lookup */
+const VIEWER: NameOf = (id, legacy) => (id ? nm(id) : (legacy ?? '').trim() || 'Player');
 const H1LEN = 2430; // the first half ran 30 s past the siren (invented)
 const H2LEN = 2460; // Feldt's try on the siren, then the conversion
 const GF_CONFIG = { preset: 'senior', ...LEAGUE_PRESETS.senior.set, decider: 'gpFinal' };
@@ -178,7 +181,7 @@ describe('replay · 2015 NRL Grand Final (Brisbane 16–17 North Queensland, gol
     assert.equal('tackles' in t.thurston.stats, false, 'detail never tracked: no false 0');
   });
   test('commentary: grouped by half and golden point, the running score, the result line', () => {
-    const g = leagueCommentary(s, { home: 'Broncos', away: 'Cowboys' });
+    const g = leagueCommentary(s, { home: 'Broncos', away: 'Cowboys' }, VIEWER);
     assert.deepEqual(g.map((x) => x.title), ['Golden point · 1st · first score wins', '2nd half', '1st half']);
     assert.equal(g[0].lines[0].text, 'Full time — Cowboys win it in golden point: Broncos 16–17 Cowboys.');
     assert.equal(g[0].lines[1].text, 'FIELD GOAL! Johnathan Thurston slots a one-pointer for Cowboys.');
@@ -206,12 +209,12 @@ describe('replay · 2015 NRL Grand Final (Brisbane 16–17 North Queensland, gol
     for (const it of b.items) assert.ok(types.has(it.type), it.type);
     assert.equal(b.items.find((i) => i.type === 'mostGoals')?.value, 33);
     assert.equal(b.items.find((i) => i.type === 'fastestTry')?.text, "7'");
-    const rows = leagueTimeline(s);
+    const rows = leagueTimeline(s, VIEWER);
     assert.equal(rows.filter((r) => r.label === 'Try').length, 5);
     assert.ok(rows.some((r) => r.stamp === "83'" && r.label === 'Field goal good'));
-    const tk = leagueTickerDetail(s);
+    const tk = leagueTickerDetail(s, { player: VIEWER });
     assert.equal(tk.right![0], '🏉 Justin O. · James T. · Kyle F.');
-    assert.match(leagueTickerFlash(run(GF.slice(0, -1), GF_CONFIG), s)!.text, /^FIELD GOAL! .* 83'$/);
+    assert.match(leagueTickerFlash(run(GF.slice(0, -1), GF_CONFIG), s, VIEWER)!.text, /^FIELD GOAL! .* 83'$/);
   });
 });
 
@@ -319,7 +322,7 @@ describe('replay · Nines: 9 a side, 2 × 9, sin bin 3, unlimited interchange, g
     assert.equal(minuteText(s, 2, 180), "12'");
     assert.equal(minuteText(s, 3, 60), "19'");
     assert.match(periodLong(s, 3), /first try wins/);
-    const g = leagueCommentary(s, { home: 'Lions', away: 'Wolves' });
+    const g = leagueCommentary(s, { home: 'Lions', away: 'Wolves' }, VIEWER);
     assert.equal(g[0].lines[0].text, 'Full time — Wolves win it in golden try: Lions 8–11 Wolves.');
   });
   test('sin bin 3 minutes on the playing clock; interchanges unlimited and a player comes back', () => {
@@ -448,7 +451,7 @@ describe('six-tackle sets', () => {
     const d = leagueBox(s).data('all');
     assert.equal(d.home.team?.stats.penaltiesGivenAway, 1);
     assert.deepEqual([d.home.teamStats?.sets, d.home.teamStats?.completedSets], [3, 1]);
-    const g = leagueCommentary(s, { home: 'Lions', away: 'Wolves' });
+    const g = leagueCommentary(s, { home: 'Lions', away: 'Wolves' }, VIEWER);
     const lines = g.flatMap((x) => x.lines);
     assert.ok(lines.some((l) => l.text === 'Error (A7) — Wolves lose the ball on tackle 2. Lions ball.'));
     assert.ok(lines.some((l) => l.text === 'Lions are tackled on the last — handover to Wolves.'));
@@ -537,7 +540,7 @@ describe('box score', () => {
     const s = run([tryA('home', H1(5), 'h11', 'h7'), kickA('home', H1(6), 'conv', true, 'h7'), A('PENALTY_TRY', 'home', H1(30)), kickA('home', H1(31), 'conv', true, 'h7'),
       kickA('away', H1(35), 'pen', true, 'a7'), ...endAt(2400), tryA('away', H2(60), 'a2'), ...endAt(2400)]);
     assert.ok(matchBoxSource('rugby_league' as SportId, s));
-    const d = leagueBox(s).data('all');
+    const d = leagueBox(s, { nameOf: VIEWER }).data('all');
     const sum = (sd: Side, k: string) => d[sd].rows.reduce((a, r) => a + (r.stats[k] ?? 0), 0) + (d[sd].team?.stats[k] ?? 0);
     assert.deepEqual([sum('home', 'points'), sum('away', 'points')], [s.home, s.away]);
     assert.deepEqual([s.home, s.away], [12, 6]);
@@ -684,7 +687,7 @@ describe('registries, feed tags, safety', () => {
   });
   test('feed filters: key moments, scores, scope labels', () => {
     const s = run(GF, GF_CONFIG);
-    const g = leagueCommentary(s, { home: 'Broncos', away: 'Cowboys' });
+    const g = leagueCommentary(s, { home: 'Broncos', away: 'Cowboys' }, VIEWER);
     assert.deepEqual(feedTags(g, LEAGUE_FEED_TAGS).map((t) => t.key), ['key', 'score']);
     assert.equal(filterFeed(g, { scope: 3 }).length, 1);
     assert.equal(filterFeed(g, { tag: 'score' }).flatMap((x) => x.lines).length, 13);

@@ -23,8 +23,11 @@ import { feedSections } from '../src/sports/invasion/feed.ts';
 import { validateSchema, statDefIn } from '../src/sports/statSchema.ts';
 import { assertContract, toRecords, type TotalsSport } from './statTotalsHarness.mts';
 import type { ScoreAction } from '../src/sports/types.ts';
+import type { NameOf } from '../src/core/playerNames.ts';
 
 const nm = (id: string) => id.toUpperCase();
+/** IDs-only scoring: the state keeps ids; the viewer's names come from a lookup */
+const NAMES: NameOf = (id, legacy) => (id ? nm(id) : (legacy ?? '').trim() || 'Player');
 const names = { home: 'India', away: 'Japan' };
 let u = 0;
 /** As the controls fire it: game second + period + uid, credits from eventCredits. */
@@ -172,7 +175,7 @@ describe('deep wave · hockey shoot-out keepers', () => {
 
 describe('deep wave · hockey commentary + facts', () => {
   const s = run(match(), CFG);
-  const feed = hockeyFeed(s, names);
+  const feed = hockeyFeed(s, names, NAMES);
   test('sentences: the save folds into its shot; PC goal with assist; cards; referral', () => {
     assert.equal(feed.some((i) => i.text.startsWith('Save by')), false);
     assert.ok(feed.some((i) => i.text === 'Shot on goal by H1 (India), saved by AGK.'));
@@ -190,7 +193,7 @@ describe('deep wave · hockey commentary + facts', () => {
     assert.deepEqual(secs.map((x) => [x.label, x.score.home, x.score.away]), [['2nd quarter', 1, 1], ['1st quarter', 1, 0]]);
   });
   test('facts: scorers with minute and type, sendings-off, possession', () => {
-    const f = hockeyFacts(s);
+    const f = hockeyFacts(s, 0, NAMES);
     assert.deepEqual(f.home, ["🏑 H1 9' (PC)", "🟥 H2 21'"]);
     assert.deepEqual(f.away, ["🏑 A1 20'"]);
     assert.deepEqual(f.notes, ['Possession 76% – 24%']);

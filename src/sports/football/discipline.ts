@@ -28,6 +28,7 @@ import type { Match } from '../../core/types';
 import { isEliminationStage } from '../../data/bracket.ts';
 import type { FootballEvent } from './events.ts';
 import type { ConfirmCopy } from '../../core/matchSafety.ts';
+import { legacyNameOf, nameFor, type NameOf } from '../invasion/names.ts';
 
 type Side = 'home' | 'away';
 export type YellowReset = 'never' | 'groups' | 'qf';
@@ -187,12 +188,19 @@ function run(matches: DisciplineMatch[], rule: DisciplineRule) {
   return { fb, players, officials };
 }
 
-/** The tournament's discipline table: most cards first (reds weigh more). */
-export function disciplineTable(matches: DisciplineMatch[], format?: Record<string, unknown> | null): DisciplineTable {
+/** IDs-only scoring: a row's name for this viewer — by id (an older log's
+ *  stored name only as the fallback); a name-only row keeps its name. */
+const rowName = (nameOf: NameOf, id: string | undefined, stored: string): string =>
+  nameFor(nameOf, id, stored === 'Player' ? undefined : stored) ?? stored;
+
+/** The tournament's discipline table: most cards first (reds weigh more).
+ *  `nameOf` names the players by id for this viewer (IDs-only scoring). */
+export function disciplineTable(matches: DisciplineMatch[], format?: Record<string, unknown> | null, nameOf: NameOf = legacyNameOf): DisciplineTable {
   const rule = readDisciplineRule(format);
   const { players, officials } = run(matches, rule);
   const rows = [...players.values()].map((p) => ({
-    ...p.row, banLeft: p.pending, suspended: p.pending > 0, yellowsTowardBan: rule.banYellows > 0 ? p.accum.length : 0,
+    ...p.row, name: rowName(nameOf, p.row.playerId, p.row.name),
+    banLeft: p.pending, suspended: p.pending > 0, yellowsTowardBan: rule.banYellows > 0 ? p.accum.length : 0,
     ...(p.pending > 0 && p.cause ? { banReason: p.cause } : {}),
   }));
   rows.sort((a, b) => Number(b.suspended) - Number(a.suspended) || (b.reds + b.secondYellows) - (a.reds + a.secondYellows) || b.yellows - a.yellows || a.name.localeCompare(b.name));
@@ -216,7 +224,7 @@ export interface Suspension { playerId?: string; name: string; teamId: string; r
  * with a ban still to serve once the team's earlier unplayed fixtures are
  * counted as served. A completed match is never "upcoming" — [].
  */
-export function suspensionsFor(match: DisciplineMatch, matches: DisciplineMatch[], format?: Record<string, unknown> | null): Record<Side, Suspension[]> {
+export function suspensionsFor(match: DisciplineMatch, matches: DisciplineMatch[], format?: Record<string, unknown> | null, nameOf: NameOf = legacyNameOf): Record<Side, Suspension[]> {
   const out: Record<Side, Suspension[]> = { home: [], away: [] };
   if (match.sport !== 'football' || played(match)) return out;
   const rule = readDisciplineRule(format);
@@ -231,7 +239,7 @@ export function suspensionsFor(match: DisciplineMatch, matches: DisciplineMatch[
       && (m.homeTeam.id === team.id || m.awayTeam.id === team.id)).length;
     for (const p of players.values()) {
       if (p.row.teamId !== team.id || p.pending <= gap) continue;
-      out[side].push({ ...(p.row.playerId ? { playerId: p.row.playerId } : {}), name: p.row.name, teamId: team.id, reason: p.cause ?? 'cards' });
+      out[side].push({ ...(p.row.playerId ? { playerId: p.row.playerId } : {}), name: rowName(nameOf, p.row.playerId, p.row.name), teamId: team.id, reason: p.cause ?? 'cards' });
     }
   }
   return out;

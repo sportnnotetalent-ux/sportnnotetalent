@@ -26,9 +26,12 @@
  * (REMOVE_EVENT with the reversed credits, then the same flow stamped at the
  * original time; Cancel keeps the event — SD-114).
  */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { theme } from '../../core/theme';
+import { useMask } from '../../core/disputeMask';
+import { withNames, nameFor } from '../invasion/names';
+import { subAction, xiStamp } from '../invasion/actions';
 import { Button, SelectChip, TextField } from '../../components/ui';
 import { confirmMatchAction } from '../../components/ConfirmSheet';
 import { LineScoreboard } from '../../components/LineScoreboard';
@@ -119,6 +122,8 @@ const ScoringControls: SportPlugin<RugbyState>['ScoringControls'] = ({
 }) => {
   // SD-114: Edit holds the removal until the re-entry commits (Cancel keeps the event).
   const { view: s, dispatch, begin: holdRemoval, cancel: dropHeldRemoval } = usePendingEdit(liveState, rawDispatch, reducer);
+  // IDs-only scoring: the state keeps player ids; names are looked up when shown
+  const { nameOf: playerNameOf } = useMask();
   const [flow, setFlow] = useState<Flow | null>(null);
   const [editAt, setEditAt] = useState<{ sec: number; psec: number; period: number } | null>(null);
   const [showEdit, setShowEdit] = useState(false);
@@ -140,7 +145,7 @@ const ScoringControls: SportPlugin<RugbyState>['ScoringControls'] = ({
   const rosterOf = (sd: Side) => (sd === 'home' ? homeRoster : awayRoster);
   const lineupOf = (sd: Side) => (sd === 'home' ? homeLineup : awayLineup);
   const byId = (sd: Side, id?: string, nm?: string): Player | undefined =>
-    rosterOf(sd).find((p) => (id && p.id === id) || (!id && nm && p.fullName === nm)) ?? (id ? { id, fullName: nm ?? 'Player', sports: ['rugby'] } as Player : undefined);
+    rosterOf(sd).find((p) => (id && p.id === id) || (!id && nm && p.fullName === nm)) ?? (id ? { id, fullName: nameFor(playerNameOf, id, nm) ?? 'Player', sports: ['rugby'] } as Player : undefined);
 
   // stamp every event with its playing time (or the edited moment's)
   const fire = (a: ScoreAction) => {
@@ -152,8 +157,8 @@ const ScoringControls: SportPlugin<RugbyState>['ScoringControls'] = ({
   /* ---- who is on the field ---- */
   const stampXi = () => {
     for (const sd of ['home', 'away'] as const) {
-      const roster = rosterOf(sd);
-      const players = lineupOf(sd).filter((sl) => sl.playerId).map((sl) => ({ id: sl.playerId!, name: roster.find((p) => p.id === sl.playerId)?.fullName ?? sl.playerName ?? '' }));
+      // IDs-only scoring: the stamp carries player ids only (invasion/actions.ts)
+      const players = xiStamp(lineupOf(sd), rosterOf(sd)).players ?? [];
       if (!players.length) continue;
       if (JSON.stringify(players) === JSON.stringify(s.xi?.[sd]?.players ?? [])) continue;
       dispatch({ type: 'XI', payload: { team: sd, players } });
@@ -194,7 +199,7 @@ const ScoringControls: SportPlugin<RugbyState>['ScoringControls'] = ({
     const why = pick ? (kind === 'penalty' ? { infringement: pick } : kind === 'turnover' ? { cause: pick } : {}) : {};
     // round 2: a free kick says the player was asked (named or "Team"), so the match credits free kicks to players
     const asked = kind === 'freeKick' ? { asked: true } : {};
-    fire({ type: 'TALLY', side: sd, payload: { kind, ...why, ...asked }, ...credit({ type: 'tally', tally: kind, playerId: p?.id, playerName: p?.fullName }) });
+    fire({ type: 'TALLY', side: sd, payload: { kind, ...why, ...asked }, ...credit({ type: 'tally', tally: kind, playerId: p?.id }) });
     setFlow(null);
   };
   /** deep wave: possession / territory switch (a tap on the side already set does nothing — round 2: unless the ball is dead) */
@@ -203,14 +208,14 @@ const ScoringControls: SportPlugin<RugbyState>['ScoringControls'] = ({
     fire({ type, side: sd });
   };
   const scoreTry = (sd: Side, scorer: Player | null, assist: Player | null) => {
-    fire({ type: 'TRY', side: sd, ...credit({ type: 'try', playerId: scorer?.id, playerName: scorer?.fullName, secondId: assist?.id, secondName: assist?.fullName }) });
+    fire({ type: 'TRY', side: sd, ...credit({ type: 'try', playerId: scorer?.id, secondId: assist?.id }) });
     // a try in sudden death ends the match (no conversion); else the conversion follows
     // (a re-entered try keeps its own conversion row — no second conversion)
     if (editAt || isSuddenDeath(s, s.period)) setFlow(null);
     else setFlow({ mode: 'conv', side: sd, step: 'result' });
   };
   const kick = (sd: Side, k: KickKind, made: boolean, p: Player | null) => {
-    fire({ type: 'KICK', side: sd, payload: { kick: k, made }, ...credit({ type: 'kick', kick: k, made, playerId: p?.id, playerName: p?.fullName }) });
+    fire({ type: 'KICK', side: sd, payload: { kick: k, made }, ...credit({ type: 'kick', kick: k, made, playerId: p?.id }) });
     setFlow(null);
   };
   const card = (sd: Side, kind: CardKind, p: Player | null, red20?: boolean) => {
@@ -218,7 +223,7 @@ const ScoringControls: SportPlugin<RugbyState>['ScoringControls'] = ({
     const k: CardKind = second ? 'red' : kind;
     // two yellows under the trial = a 20-minute red (World Rugby 2025)
     const r20 = k === 'red' && s.red20 && (second || !!red20);
-    fire({ type: 'CARD', side: sd, payload: { card: k, ...(second ? { second: true } : {}), ...(r20 ? { red20: true } : {}) }, ...credit({ type: 'card', card: k, second, playerId: p?.id, playerName: p?.fullName }) });
+    fire({ type: 'CARD', side: sd, payload: { card: k, ...(second ? { second: true } : {}), ...(r20 ? { red20: true } : {}) }, ...credit({ type: 'card', card: k, second, playerId: p?.id }) });
     setFlow(null);
   };
   const officialCard = (sd: Side, kind: CardKind) => {
@@ -226,11 +231,11 @@ const ScoringControls: SportPlugin<RugbyState>['ScoringControls'] = ({
     setOfficial(''); setFlow(null);
   };
   const sub = (sd: Side, off: Player | null, on: Player, kind: SubKind = 'perm', back = false) => {
-    fire({ type: 'SUB', side: sd, payload: { ...(off ? { offId: off.id, offName: off.fullName } : {}), onId: on.id, onName: on.fullName, ...(kind !== 'perm' ? { temp: kind } : {}), ...(back ? { back: true } : {}) } });
+    fire(subAction(sd, off, on, { ...(kind !== 'perm' ? { temp: kind } : {}), ...(back ? { back: true } : {}) }));
     setFlow(null);
   };
   const detail = (sd: Side, d: DetailKey, p: Player | null) => {
-    fire({ type: 'DETAIL', side: sd, payload: { detail: d }, ...credit({ type: 'detail', detail: d, playerId: p?.id, playerName: p?.fullName }) });
+    fire({ type: 'DETAIL', side: sd, payload: { detail: d }, ...credit({ type: 'detail', detail: d, playerId: p?.id }) });
     setFlow(null);
   };
   const setPiece = (sd: Side, piece: 'lineout' | 'scrum', won: boolean) => fire({ type: 'SET_PIECE', side: sd, payload: { piece, won } });
@@ -317,11 +322,11 @@ const ScoringControls: SportPlugin<RugbyState>['ScoringControls'] = ({
                 {soTaker ? <Text style={c.meta}>Kicker: {soTaker.fullName}</Text> : null}
                 <View style={c.row}>
                   <Button label="✓ Over" accessibilityLabel="Kick successful" color={color(nextSide)} style={c.flex} onPress={() => {
-                    dispatch({ type: 'SO', side: nextSide, payload: { scored: true }, ...(soTaker ? { attribution: { playerId: soTaker.id, stat: 'soTaken', playerName: soTaker.fullName, extra: { soGoals: 1 } } } : {}) });
+                    dispatch({ type: 'SO', side: nextSide, payload: { scored: true }, ...(soTaker ? { attribution: { playerId: soTaker.id, stat: 'soTaken', extra: { soGoals: 1 } } } : {}) });
                     setSoTaker(null);
                   }} />
                   <Button label="✗ Missed" variant="ghost" style={c.flex} onPress={() => {
-                    dispatch({ type: 'SO', side: nextSide, payload: { scored: false }, ...(soTaker ? { attribution: { playerId: soTaker.id, stat: 'soTaken', playerName: soTaker.fullName } } : {}) });
+                    dispatch({ type: 'SO', side: nextSide, payload: { scored: false }, ...(soTaker ? { attribution: { playerId: soTaker.id, stat: 'soTaken' } } : {}) });
                     setSoTaker(null);
                   }} />
                 </View>
@@ -434,7 +439,7 @@ const ScoringControls: SportPlugin<RugbyState>['ScoringControls'] = ({
             {k === 'yellow' ? <Text style={c.meta}>A player already on a yellow gets a red ({s.red20 ? '20-minute red under the trial' : 'second yellow'}).</Text> : null}
             <Text style={c.small}>Or a team official</Text>
             <View style={c.row}>
-              <View style={c.flex}><TextField label="Official (optional)" value={official} onChange={setOfficial} placeholder="e.g. Coach" autoCapitalize="words" /></View>
+              <View style={c.flex}><TextField label="Official's role (optional)" value={official} onChange={setOfficial} placeholder="e.g. Coach" autoCapitalize="words" /></View>
               <Button label="Record" variant="ghost" onPress={() => officialCard(sd, k)} />
             </View>
           </View>
@@ -466,7 +471,7 @@ const ScoringControls: SportPlugin<RugbyState>['ScoringControls'] = ({
           </View>
         );
         if (flow.step === 'off') {
-          const live = rugbyLiveField(s, now);
+          const live = rugbyLiveField(s, now, playerNameOf);
           return (
             <View style={c.panel}>{head(`${flow.kind === 'hia' ? 'HIA' : flow.kind === 'blood' ? 'Blood' : 'Replacement'} — who comes off?`)}
               <PlayerGrid players={onField(sd)} onPick={(p) => setFlow({ ...flow, off: p, step: 'on' })}
@@ -528,7 +533,7 @@ const ScoringControls: SportPlugin<RugbyState>['ScoringControls'] = ({
     }
   })();
 
-  const live = rugbyLiveField(s, now);
+  const live = rugbyLiveField(s, now, playerNameOf);
   /** deep wave: the tallies switched on for this match (the toggle, not just past events) */
   const kindsOn: TallyKind[] = TRACK_FLAGS.filter((f) => s[f] === true).flatMap((f) => TRACK_KINDS[f]);
   const extras = (sd: Side) => (kindsOn.length && periodStarted(s) ? (
@@ -633,9 +638,11 @@ const ScoringControls: SportPlugin<RugbyState>['ScoringControls'] = ({
 };
 
 /** The scorer's "Correct the timeline" list: remove a moment, or re-enter it. */
-function EditList({ s, show, setShow, onRemove, onEdit, homeName, awayName }: {
+function EditList({ s: s0, show, setShow, onRemove, onEdit, homeName, awayName }: {
   s: RugbyState; show: boolean; setShow: (v: boolean) => void; onRemove: (e: RugbyEvent) => void; onEdit?: (e: RugbyEvent) => void; homeName: string; awayName: string;
 }) {
+  const { nameOf } = useMask();
+  const s = useMemo(() => withNames(s0, nameOf), [s0, nameOf]); // IDs-only scoring: names by id
   if (!s.events.length) return null;
   return (
     <View style={c.panel}>
@@ -670,7 +677,8 @@ const LiveClock: NonNullable<SportPlugin<RugbyState>['LiveClock']> = ({ state })
   const so = soScore(s);
   const label = s.ended ? (s.shootout ? `FT · kicks ${so.home}–${so.away}` : s.plan.length > 2 ? 'FT (AET)' : 'FT')
     : !periodStarted(s) ? (s.period === 1 ? '—' : `${periodName(s, s.period)} next`) : `${periodName(s, s.period)} ${clockFace(s, now)}`;
-  const live = s.ended ? null : rugbyLiveField(s, now);
+  const { nameOf } = useMask();
+  const live = s.ended ? null : rugbyLiveField(s, now, nameOf);
   return (
     <View style={{ alignItems: 'center', gap: theme.spacing(1), flex: 1, minWidth: 0 }}>
       <View style={c.clockRow2}>
@@ -723,14 +731,18 @@ const VIEWS = [{ key: 'stats', label: 'Match stats' }, { key: 'box', label: 'Box
  *  score on Stats. */
 type TabProps = Parameters<NonNullable<SportPlugin<RugbyState>['LiveExtras']>>[0];
 const RugbyCommentary = ({ state, homeName, awayName, homeColor, awayColor }: TabProps) => {
-  const s = state as RugbyState;
+  // IDs-only scoring: names looked up by id for this viewer
+  const { nameOf } = useMask();
+  const s = useMemo(() => withNames(state as RugbyState, nameOf), [state, nameOf]);
   return (
     <GroupedFeed groups={rugbyCommentary(s, { home: homeName, away: awayName })} homeColor={homeColor} awayColor={awayColor} tags={RUGBY_FEED_TAGS} scopeLabel={rugbyScopeLabel(s)}
       emptyText="Nothing yet — the commentary fills in from the kick-off." />
   );
 };
 const RugbyStats = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster, onPlayer }: TabProps) => {
-  const s = state as RugbyState;
+  // IDs-only scoring: names looked up by id for this viewer
+  const { nameOf } = useMask();
+  const s = useMemo(() => withNames(state as RugbyState, nameOf), [state, nameOf]);
   const n = Math.min(totalPeriods(s), Math.max(1, s.period));
   const scopes = n >= 2 ? Array.from({ length: n }, (_, i) => ({ value: i + 1, label: periodName(s, i + 1) })) : [];
   return (

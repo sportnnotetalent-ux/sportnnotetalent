@@ -86,9 +86,11 @@ export interface NetballEvent {
   period: number;
   /** shooter / player credited / penalised / sanctioned / sub off / player moved */
   playerId?: string;
+  /** @deprecated legacy, read-only — IDs-only logs (docs/privacy/ids-only-scoring.md) keep the id; the name is looked up when shown (invasion/names.ts) */
   playerName?: string;
   /** feeder (goal, miss) / sub on */
   secondId?: string;
+  /** @deprecated legacy, read-only — IDs-only logs (docs/privacy/ids-only-scoring.md) keep the id; the name is looked up when shown (invasion/names.ts) */
   secondName?: string;
   /** goal / miss: the shooter's position (GS / GA); sub: the position the
    *  player coming on takes; pos: the new position */
@@ -114,7 +116,8 @@ export interface NetballEvent {
   tt?: TurnoverType;
 }
 
-export interface XiStamp { pos: Partial<Record<Pos, { id: string; name: string }>> }
+/** IDs-only scoring: new stamps carry ids only (`name` = an older stamp's, read-only). */
+export interface XiStamp { pos: Partial<Record<Pos, { id: string; name?: string }>> }
 
 export interface NetballState {
   home: number;
@@ -399,7 +402,7 @@ export function creditAttribution(c: Credit | undefined, sign = 1, tracked?: str
   if (!entries.length) return undefined;
   const [[stat, by], ...rest] = entries;
   return {
-    playerId: c.playerId, stat, by: by * sign, ...(c.playerName ? { playerName: c.playerName } : {}),
+    playerId: c.playerId, stat, by: by * sign, // IDs-only scoring: never the name
     ...(rest.length ? { extra: Object.fromEntries(rest.map(([k, v]) => [k, v * sign])) } : {}),
     ...(tracked ? { tracked } : {}),
   };
@@ -509,7 +512,7 @@ export const reducer = (s: NetballState, a: ScoreAction): NetballState => {
       if (team !== 'home' && team !== 'away') return s;
       const raw = (a.payload?.pos ?? {}) as Record<string, { id?: string; name?: string } | undefined>;
       const stamp: XiStamp = { pos: {} };
-      for (const p of POSITIONS) { const w = raw[p]; if (w?.id) stamp.pos[p] = { id: String(w.id), name: String(w.name ?? '') }; }
+      for (const p of POSITIONS) { const w = raw[p]; if (w?.id) stamp.pos[p] = { id: String(w.id), ...(w.name !== undefined ? { name: String(w.name ?? '') } : {}) }; }
       return { ...s, xi: { ...s.xi, [team]: stamp } };
     }
     case 'GOAL': {

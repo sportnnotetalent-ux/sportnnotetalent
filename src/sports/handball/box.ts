@@ -11,15 +11,20 @@ import type { BoxRowInput, BoxSideInput, MatchBoxSource } from '../boxScore.ts';
 import { eventCredits, periodName, teamFigures, totalPeriods, LIVE_KEYS, GOAL_KEY, SHOT_KEY, SHOT_TYPES, type HandballState, type Side } from './engine.ts';
 import { handballTotals } from './totals.ts';
 import { handballDepthFigures, handballUntracked } from './depth.ts';
+import { withNames, type NameOf } from '../invasion/names.ts';
+import { withRosters } from '../racketNames.ts';
 
 /** `now` (round 2): the clock for a goal that is empty right now (default: now). */
-export interface HandballBoxContext { homeRoster?: Player[]; awayRoster?: Player[]; now?: number }
+/** `nameOf` (IDs-only scoring): the viewer's names by player id. */
+export interface HandballBoxContext { homeRoster?: Player[]; awayRoster?: Player[]; now?: number; nameOf?: NameOf }
 
 /** every key a row carries (the comparison sums line keys over the rows) */
 const ROW_KEYS = LIVE_KEYS.filter((k) => k !== 'soTaken' && k !== 'soGoals');
 const TEAM_KEYS = ['goals', 'shots', 'saves', 'blocks', 'technicalFaults', 'steals', 'yellowCards', 'twoMinutes', 'redCards', 'blueCards', 'sevenMGoals', 'sevenMTaken'] as const;
 
-export function handballBox(s: HandballState, ctx: HandballBoxContext = {}): MatchBoxSource {
+export function handballBox(s0: HandballState, ctx: HandballBoxContext = {}): MatchBoxSource {
+  // IDs-only scoring: rows key by id; names are the viewer's (else the squad's)
+  const s = withNames(s0, withRosters(ctx.nameOf, ctx.homeRoster, ctx.awayRoster));
   const n = Math.min(totalPeriods(s), Math.max(1, s.period));
   const periods = n >= 2 ? Array.from({ length: n }, (_, i) => ({ value: i + 1, label: periodName(s, i + 1) })) : [];
   return {

@@ -16,6 +16,7 @@
 import { trackField, suspensionEvent, timeLeft, type FieldEvent, type FieldLog, type FieldResult, type Who } from '../onField.ts';
 import { eventCredits, CARD_MINUTES, keeperAt, matchSec, LIVE_KEYS, type HockeyState, type Side } from './engine.ts';
 import { hockeyShootoutKeepers } from './depth.ts';
+import { legacyNameOf, nameFor, type NameOf } from '../invasion/names.ts';
 
 const stamped = (s: HockeyState, side: Side): boolean => !!s.xi?.[side]?.players?.length;
 
@@ -48,14 +49,15 @@ export const hockeyField = (s: HockeyState, upTo?: number): FieldResult => track
 
 /** For the live banner: who is suspended (time left on the game clock) and,
  *  when a side is short, how many each side has on the field. */
-export function hockeyLiveField(s: HockeyState, nowMs: number): {
+/** IDs-only scoring: `nameOf` names the suspended players by id for this viewer. */
+export function hockeyLiveField(s: HockeyState, nowMs: number, nameOf: NameOf = legacyNameOf): {
   suspended: { side: Side; name: string; left: string; id?: string }[];
   onField: { home: number; away: number };
   short: { home: number; away: number };
 } {
   const now = matchSec(s, nowMs) / 60;
   const r = hockeyField(s, now);
-  const suspended = s.ended ? [] : r.suspended.map((x) => ({ side: x.side, name: x.name ?? 'Player', left: timeLeft(x.until, now), ...(x.id ? { id: x.id } : {}) }));
+  const suspended = s.ended ? [] : r.suspended.map((x) => ({ side: x.side, name: nameFor(nameOf, x.id, x.name) ?? 'Player', left: timeLeft(x.until, now), ...(x.id ? { id: x.id } : {}) }));
   const count = (side: Side) => (stamped(s, side) ? r.onField[side].length : Math.max(0, s.playersPerSide - r.short[side]));
   return { suspended, onField: { home: count('home'), away: count('away') }, short: r.short };
 }

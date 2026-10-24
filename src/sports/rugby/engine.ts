@@ -137,9 +137,11 @@ export interface RugbyEvent {
   period: number;
   /** try scorer / kicker / carded player / sub off / detail player */
   playerId?: string;
+  /** @deprecated legacy, read-only — IDs-only logs (docs/privacy/ids-only-scoring.md) keep the id; the name is looked up when shown (invasion/names.ts) */
   playerName?: string;
   /** try assist / sub on */
   secondId?: string;
+  /** @deprecated legacy, read-only — IDs-only logs (docs/privacy/ids-only-scoring.md) keep the id; the name is looked up when shown (invasion/names.ts) */
   secondName?: string;
   kick?: KickKind;
   made?: boolean;
@@ -170,8 +172,9 @@ export interface RugbyEvent {
   asked?: boolean;
 }
 
-export interface Kick { scored: boolean; playerId?: string; playerName?: string }
-export interface XiStamp { players?: { id: string; name: string }[] }
+export interface Kick { scored: boolean; playerId?: string; /** @deprecated legacy, read-only */ playerName?: string }
+/** IDs-only scoring: new stamps carry ids only (`name` = an older stamp's, read-only). */
+export interface XiStamp { players?: { id: string; name?: string }[] }
 
 export interface RugbyState {
   home: number;
@@ -402,7 +405,7 @@ export function creditAttribution(c: Credit | undefined, sign = 1, tracked?: str
   if (!entries.length) return undefined;
   const [[stat, by], ...rest] = entries;
   return {
-    playerId: c.playerId, stat, by: by * sign, ...(c.playerName ? { playerName: c.playerName } : {}),
+    playerId: c.playerId, stat, by: by * sign, // IDs-only scoring: never the name
     ...(rest.length ? { extra: Object.fromEntries(rest.map(([k, v]) => [k, v * sign])) } : {}),
     ...(tracked ? { tracked } : {}),
   };
@@ -411,7 +414,9 @@ export function creditAttribution(c: Credit | undefined, sign = 1, tracked?: str
 const second = (a: ScoreAction): Attribution | undefined =>
   a.attribution2 ?? (a.payload?._attr2 as Attribution | undefined);
 
-const samePlayer = (e: RugbyEvent, who: Who) => (who.id && e.playerId === who.id) || (!who.id && !!who.name && e.playerName === who.name);
+/** IDs-only scoring: the same player — by id; by name only when one side of
+ *  the comparison has no id (an older log's name-only card). */
+const samePlayer = (e: RugbyEvent, who: Who): boolean => (e.playerId && who.id ? e.playerId === who.id : !!who.name && e.playerName === who.name);
 /** Yellow cards a player has had this match (the next one is a red). */
 export const yellowsOf = (s: RugbyState, side: Side, who: Who): number =>
   s.events.filter((e) => e.type === 'card' && e.card === 'yellow' && e.side === side && !e.official && samePlayer(e, who)).length;
@@ -500,7 +505,7 @@ export const reducer = (s: RugbyState, a: ScoreAction): RugbyState => {
       const team = a.payload?.team;
       if (team !== 'home' && team !== 'away') return s;
       const players = Array.isArray(a.payload?.players)
-        ? (a.payload!.players as { id?: string; name?: string }[]).filter((x) => x?.id).map((x) => ({ id: String(x.id), name: String(x.name ?? '') }))
+        ? (a.payload!.players as { id?: string; name?: string }[]).filter((x) => x?.id).map((x) => ({ id: String(x.id), ...(x.name !== undefined ? { name: String(x.name ?? '') } : {}) }))
         : undefined;
       return { ...s, xi: { ...s.xi, [team]: players ? { players } : {} } };
     }

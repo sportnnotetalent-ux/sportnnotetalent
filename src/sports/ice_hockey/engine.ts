@@ -123,12 +123,15 @@ export interface IceEvent {
   period: number;
   /** scorer / shooter / penalised player / new goalie */
   playerId?: string;
+  /** @deprecated legacy, read-only — IDs-only logs (docs/privacy/ids-only-scoring.md) keep the id; the name is looked up when shown (invasion/names.ts) */
   playerName?: string;
   /** first assist */
   secondId?: string;
+  /** @deprecated legacy, read-only — IDs-only logs (docs/privacy/ids-only-scoring.md) keep the id; the name is looked up when shown (invasion/names.ts) */
   secondName?: string;
   /** second assist (added by ASSIST2) */
   thirdId?: string;
+  /** @deprecated legacy, read-only — IDs-only logs (docs/privacy/ids-only-scoring.md) keep the id; the name is looked up when shown (invasion/names.ts) */
   thirdName?: string;
   /** goal: strength at the moment of the goal, empty net, penalty shot */
   strength?: Strength;
@@ -136,6 +139,7 @@ export interface IceEvent {
   ps?: boolean;
   /** shot (saved): the goalie who saved it (the other side's) */
   gkId?: string;
+  /** @deprecated legacy, read-only — IDs-only logs (docs/privacy/ids-only-scoring.md) keep the id; the name is looked up when shown (invasion/names.ts) */
   gkName?: string;
   /** penalty */
   pen?: PenKind;
@@ -150,11 +154,11 @@ export interface IceEvent {
   zone?: FoZone;
 }
 
-export interface SoShot { scored: boolean; playerId?: string; playerName?: string }
+export interface SoShot { scored: boolean; playerId?: string; /** @deprecated legacy, read-only */ playerName?: string }
 
 export interface XiStamp {
-  players?: { id: string; name: string }[];
-  gk?: { id: string; name: string };
+  players?: { id: string; /** @deprecated legacy, read-only */ name?: string }[];
+  gk?: { id: string; /** @deprecated legacy, read-only */ name?: string };
 }
 
 export interface IceHockeyState {
@@ -383,7 +387,7 @@ export function creditAttribution(c: Credit | undefined, sign = 1, tracked?: str
   if (!entries.length) return undefined;
   const [[stat, by], ...rest] = entries;
   return {
-    playerId: c.playerId, stat, by: by * sign, ...(c.playerName ? { playerName: c.playerName } : {}),
+    playerId: c.playerId, stat, by: by * sign, // IDs-only scoring: never the name
     ...(rest.length ? { extra: Object.fromEntries(rest.map(([k, v]) => [k, v * sign])) } : {}),
     ...(tracked ? { tracked } : {}),
     ...(c.side ? { side: c.side } : {}),
@@ -644,10 +648,10 @@ export const reducer = (s: IceHockeyState, a: ScoreAction): IceHockeyState => {
       const team = a.payload?.team;
       if (team !== 'home' && team !== 'away') return s;
       const players = Array.isArray(a.payload?.players)
-        ? (a.payload!.players as { id?: string; name?: string }[]).filter((x) => x?.id).map((x) => ({ id: String(x.id), name: String(x.name ?? '') }))
+        ? (a.payload!.players as { id?: string; name?: string }[]).filter((x) => x?.id).map((x) => ({ id: String(x.id), ...(x.name !== undefined ? { name: String(x.name ?? '') } : {}) }))
         : undefined;
       const gk = a.payload?.gk as { id?: string; name?: string } | undefined;
-      const stamp: XiStamp = { ...(players ? { players } : {}), ...(gk?.id ? { gk: { id: String(gk.id), name: String(gk.name ?? '') } } : {}) };
+      const stamp: XiStamp = { ...(players ? { players } : {}), ...(gk?.id ? { gk: { id: String(gk.id), ...(gk.name !== undefined ? { name: String(gk.name ?? '') } : {}) } } : {}) };
       return { ...s, xi: { ...s.xi, [team]: stamp } };
     }
     case 'GOAL': {
@@ -696,7 +700,7 @@ export const reducer = (s: IceHockeyState, a: ScoreAction): IceHockeyState => {
     }
     case 'GK': {
       if (!side || !a.payload?.id) return s;
-      return push(s, { type: 'gk', side, playerId: String(a.payload.id), playerName: String(a.payload.name ?? '') });
+      return push(s, { type: 'gk', side, playerId: String(a.payload.id), ...(a.payload.name !== undefined ? { playerName: String(a.payload.name ?? '') } : {}) });
     }
     case 'PULL': return side ? push(s, { type: 'pull', side }) : s;
     case 'BACK': return side ? push(s, { type: 'back', side }) : s;

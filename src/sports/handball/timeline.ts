@@ -3,6 +3,7 @@
 import type { LiveEvent } from '../liveEvents';
 import { shootoutOrderRows } from '../shootoutOrder.ts';
 import { clockText, periodName, FAULT_LABEL, SHOT_LABEL, type HandballEvent, type HandballState } from './engine.ts';
+import { legacyNameOf, withNames, type NameOf } from '../invasion/names.ts';
 
 const CARD_ICON = { yellow: '🟨', twoMin: '⏱', red: '🟥' } as const;
 const MISS_LABEL = { saved: 'saved', missed: 'missed', blocked: 'blocked' } as const;
@@ -64,7 +65,8 @@ export function timelineEvents(s: HandballState): { e: HandballEvent; answer?: s
 }
 
 /** The viewer timeline (LiveTimeline sorts by id: game time). */
-export function handballTimeline(s: HandballState, names?: { home?: string; away?: string }): LiveEvent[] {
+export function handballTimeline(s0: HandballState, names?: { home?: string; away?: string }, nameOf: NameOf = legacyNameOf): LiveEvent[] {
+  const s = withNames(s0, nameOf);
   return [...timelineEvents(s).map(({ e, answer }, i) => {
     const d = describeEvent(e, answer);
     const name = e.type === 'sub' ? e.secondName : e.official ? undefined : e.playerName;

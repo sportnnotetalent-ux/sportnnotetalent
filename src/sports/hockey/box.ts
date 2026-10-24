@@ -10,13 +10,18 @@ import type { BoxRowInput, BoxSideInput, MatchBoxSource } from '../boxScore.ts';
 import { eventCredits, periodName, teamFigures, pcConversion, circlesTracked, type HockeyState, type Side } from './engine.ts';
 import { hockeyTotals } from './totals.ts';
 import { hockeyDepthFigures, hockeyUntracked } from './depth.ts';
+import { withNames, type NameOf } from '../invasion/names.ts';
+import { withRosters } from '../racketNames.ts';
 
-/** `now` (deep wave): the clock for live possession % (default: now). */
-export interface HockeyBoxContext { homeRoster?: Player[]; awayRoster?: Player[]; now?: number }
+/** `now` (deep wave): the clock for live possession % (default: now).
+ *  `nameOf` (IDs-only scoring): the viewer's names by player id. */
+export interface HockeyBoxContext { homeRoster?: Player[]; awayRoster?: Player[]; now?: number; nameOf?: NameOf }
 
 const ROW_KEYS = ['goals', 'assists', 'shots', 'shotsOnGoal', 'pcGoals', 'saves', 'greenCards', 'yellowCards', 'redCards'] as const;
 
-export function hockeyBox(s: HockeyState, ctx: HockeyBoxContext = {}): MatchBoxSource {
+export function hockeyBox(s0: HockeyState, ctx: HockeyBoxContext = {}): MatchBoxSource {
+  // IDs-only scoring: rows key by id; names are the viewer's (else the squad's)
+  const s = withNames(s0, withRosters(ctx.nameOf, ctx.homeRoster, ctx.awayRoster));
   const n = Math.min(s.periods, Math.max(1, s.period));
   const periods = n >= 2 ? Array.from({ length: n }, (_, i) => ({ value: i + 1, label: periodName(s, i + 1) })) : [];
   return {

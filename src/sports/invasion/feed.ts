@@ -39,7 +39,8 @@ export interface FeedItem {
    *  the "Key events" filter keeps only these */
   major?: boolean;
   tone?: 'goal' | 'red' | 'yellow' | 'chance';
-  /** the lead player (tap → profile) */
+  /** the lead player (tap → profile). IDs-only scoring: by id; the name is
+   *  the viewer's (built from a named state, never stored). */
   playerId?: string;
   playerName?: string;
 }
@@ -127,18 +128,20 @@ export interface MatchFacts {
 
 export const emptyFacts = (): MatchFacts => ({ home: [], away: [], notes: [] });
 
-/** "Rahul 23', 67' (pen)" — a scorer's goals, in match order. */
-export function groupByScorer(goals: { side: Side; who: string; stamp: string; tag?: string }[]): Record<Side, string[]> {
+/** "Rahul 23', 67' (pen)" — a scorer's goals, in match order. IDs-only
+ *  scoring: goals group by the scorer's id (`key`; two players shown with the
+ *  same initials stay apart), else by the shown name (older logs). */
+export function groupByScorer(goals: { side: Side; who: string; stamp: string; tag?: string; key?: string }[]): Record<Side, string[]> {
   const out: Record<Side, string[]> = { home: [], away: [] };
   const order: Record<Side, string[]> = { home: [], away: [] };
-  const by = new Map<string, string[]>();
+  const by = new Map<string, { who: string; stamps: string[] }>();
   for (const g of goals) {
-    const k = `${g.side}|${g.who}`;
-    if (!by.has(k)) { by.set(k, []); order[g.side].push(k); }
-    by.get(k)!.push(`${g.stamp}${g.tag ? ` (${g.tag})` : ''}`);
+    const k = `${g.side}|${g.key ? `#${g.key}` : g.who}`;
+    if (!by.has(k)) { by.set(k, { who: g.who, stamps: [] }); order[g.side].push(k); }
+    by.get(k)!.stamps.push(`${g.stamp}${g.tag ? ` (${g.tag})` : ''}`);
   }
   for (const side of ['home', 'away'] as const) {
-    for (const k of order[side]) out[side].push(`${k.slice(side.length + 1)} ${by.get(k)!.join(', ')}`);
+    for (const k of order[side]) { const g = by.get(k)!; out[side].push(`${g.who} ${g.stamps.join(', ')}`); }
   }
   return out;
 }

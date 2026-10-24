@@ -16,9 +16,12 @@
  * (REMOVE_EVENT with the reversed credits — the linked save / block / steal
  * goes with it — then the same flow stamped at the original time, SD-114).
  */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { theme } from '../../core/theme';
+import { useMask } from '../../core/disputeMask';
+import { withNames, nameFor } from '../invasion/names';
+import { subAction, keeperAction, xiStamp } from '../invasion/actions';
 import { Button, TextField, SelectChip } from '../../components/ui';
 import { confirmMatchAction } from '../../components/ConfirmSheet';
 import { LineScoreboard } from '../../components/LineScoreboard';
@@ -93,6 +96,8 @@ const ScoringControls: SportPlugin<HandballState>['ScoringControls'] = ({
   // SD-114: Edit holds the removal until the re-entry commits (Cancel keeps the
   // event); `s` is the view as if it were removed. See usePendingEdit.
   const { view: s, dispatch, begin: holdRemoval, cancel: dropHeldRemoval } = usePendingEdit(liveState, rawDispatch, reducer);
+  // IDs-only scoring: the state keeps player ids; names are looked up when shown
+  const { nameOf: playerNameOf } = useMask();
   const [flow, setFlow] = useState<Flow | null>(null);
   const [editAt, setEditAt] = useState<{ sec: number; period: number } | null>(null);
   const [showEdit, setShowEdit] = useState(false);
@@ -114,7 +119,7 @@ const ScoringControls: SportPlugin<HandballState>['ScoringControls'] = ({
   const rosterOf = (sd: Side) => (sd === 'home' ? homeRoster : awayRoster);
   const lineupOf = (sd: Side) => (sd === 'home' ? homeLineup : awayLineup);
   const byId = (sd: Side, id?: string, nm?: string): Player | undefined =>
-    rosterOf(sd).find((p) => (id && p.id === id) || (!id && nm && p.fullName === nm)) ?? (id ? { id, fullName: nm ?? 'Player', sports: ['handball'] } as Player : undefined);
+    rosterOf(sd).find((p) => (id && p.id === id) || (!id && nm && p.fullName === nm)) ?? (id ? { id, fullName: nameFor(playerNameOf, id, nm) ?? 'Player', sports: ['handball'] } as Player : undefined);
 
   // stamp every event with its game-clock second (or the edited moment's)
   const fire = (a: ScoreAction) => {
@@ -123,15 +128,8 @@ const ScoringControls: SportPlugin<HandballState>['ScoringControls'] = ({
   };
 
   /* ---- who is on court ---- */
-  const stampOf = (sd: Side) => {
-    const roster = rosterOf(sd);
-    const slots = lineupOf(sd).filter((sl) => sl.playerId);
-    const players = slots.map((sl) => ({ id: sl.playerId!, name: roster.find((p) => p.id === sl.playerId)?.fullName ?? sl.playerName ?? '' }));
-    const gkSlot = slots.find((sl) => sl.position === 'GK');
-    const gkP = gkSlot ? players.find((p) => p.id === gkSlot.playerId)
-      : roster.filter((p) => isKeeperPos(p.sportDetails?.handball?.position)).map((p) => ({ id: p.id, name: p.fullName })).find((k) => !players.length || players.some((x) => x.id === k.id));
-    return { ...(players.length ? { players } : {}), ...(gkP ? { gk: gkP } : {}) };
-  };
+  // IDs-only scoring: the stamp carries player ids only (invasion/actions.ts)
+  const stampOf = (sd: Side) => xiStamp(lineupOf(sd), rosterOf(sd), { slot: (sl) => sl.position === 'GK', player: (p) => isKeeperPos(p.sportDetails?.handball?.position) });
   const stampXi = () => {
     for (const sd of ['home', 'away'] as const) {
       const st = stampOf(sd);
@@ -167,30 +165,30 @@ const ScoringControls: SportPlugin<HandballState>['ScoringControls'] = ({
     return { attribution: creditAttribution(cr.first, 1, TRACKED), attribution2: creditAttribution(cr.second, 1, TRACKED) };
   };
   const goal = (sd: Side, shotType: ShotType, scorer: Player | null, assist: Player | null) => {
-    fire({ type: 'GOAL', side: sd, payload: { shotType }, ...credit({ type: 'goal', shotType, playerId: scorer?.id, playerName: scorer?.fullName, secondId: assist?.id, secondName: assist?.fullName }) });
+    fire({ type: 'GOAL', side: sd, payload: { shotType }, ...credit({ type: 'goal', shotType, playerId: scorer?.id, secondId: assist?.id }) });
     setFlow(null);
   };
   // an attempt that didn't score; a save goes to the other side's keeper (its
   // own action on the keeper's side), a block to the blocker
   const miss = (sd: Side, shotType: ShotType, res: MissResult, p: Player | null, blocker?: Player | null) => {
     const id = uid();
-    fire({ type: 'MISS', side: sd, payload: { shotType, result: res, uid: id }, ...credit({ type: 'miss', shotType, playerId: p?.id, playerName: p?.fullName }) });
+    fire({ type: 'MISS', side: sd, payload: { shotType, result: res, uid: id }, ...credit({ type: 'miss', shotType, playerId: p?.id }) });
     if (res === 'saved') {
       const gk = keeper(opp(sd));
-      fire({ type: 'SAVE', side: opp(sd), payload: { ref: id, shotType }, ...credit({ type: 'save', shotType, playerId: gk?.id, playerName: gk?.fullName }) });
+      fire({ type: 'SAVE', side: opp(sd), payload: { ref: id, shotType }, ...credit({ type: 'save', shotType, playerId: gk?.id }) });
     }
-    if (res === 'blocked' && blocker) fire({ type: 'BLOCK', side: opp(sd), payload: { ref: id }, ...credit({ type: 'block', playerId: blocker.id, playerName: blocker.fullName }) });
+    if (res === 'blocked' && blocker) fire({ type: 'BLOCK', side: opp(sd), payload: { ref: id }, ...credit({ type: 'block', playerId: blocker.id }) });
     setFlow(null);
   };
   const turnover = (sd: Side, p: Player | null, stealer?: Player | null, fault?: FaultType) => {
     const id = uid();
-    fire({ type: 'TURNOVER', side: sd, payload: { uid: id, ...(stealer !== undefined ? { stolen: true } : {}), ...(fault ? { fault } : {}) }, ...credit({ type: 'turnover', playerId: p?.id, playerName: p?.fullName }) });
-    if (stealer) fire({ type: 'STEAL', side: opp(sd), payload: { ref: id }, ...credit({ type: 'steal', playerId: stealer.id, playerName: stealer.fullName }) });
+    fire({ type: 'TURNOVER', side: sd, payload: { uid: id, ...(stealer !== undefined ? { stolen: true } : {}), ...(fault ? { fault } : {}) }, ...credit({ type: 'turnover', playerId: p?.id }) });
+    if (stealer) fire({ type: 'STEAL', side: opp(sd), payload: { ref: id }, ...credit({ type: 'steal', playerId: stealer.id }) });
     setFlow(null);
   };
   const card = (sd: Side, kind: Sanction, p: Player | null, blue?: boolean) => {
     const third = kind === 'twoMin' && !!p && suspensionsOf(s, sd, { id: p.id, name: p.fullName }) >= 2;
-    fire({ type: 'CARD', side: sd, payload: { card: kind, ...(third ? { third: true } : {}), ...(blue ? { blue: true } : {}) }, ...credit({ type: 'card', card: kind, third, blue, playerId: p?.id, playerName: p?.fullName }) });
+    fire({ type: 'CARD', side: sd, payload: { card: kind, ...(third ? { third: true } : {}), ...(blue ? { blue: true } : {}) }, ...credit({ type: 'card', card: kind, third, blue, playerId: p?.id }) });
     setFlow(null);
   };
   const officialCard = (sd: Side, kind: Sanction) => {
@@ -198,16 +196,16 @@ const ScoringControls: SportPlugin<HandballState>['ScoringControls'] = ({
     setOfficial(''); setFlow(null);
   };
   const sub = (sd: Side, off: Player | null, on: Player) => {
-    fire({ type: 'SUB', side: sd, payload: { ...(off ? { offId: off.id, offName: off.fullName } : {}), onId: on.id, onName: on.fullName } });
+    fire(subAction(sd, off, on));
     setFlow(null);
   };
   const setKeeper = (sd: Side, p: Player) => {
-    fire({ type: 'GK', side: sd, payload: { id: p.id, name: p.fullName } });
+    fire(keeperAction(sd, p));
     setFlow(null);
   };
   const timeout = (sd: Side) => fire({ type: 'TIMEOUT', side: sd });
   // deep wave: who won a 7-metre throw (when tracked)
-  const drawn = (sd: Side, p: Player) => fire({ type: 'DRAWN', side: sd, ...credit({ type: 'drawn', playerId: p.id, playerName: p.fullName }) });
+  const drawn = (sd: Side, p: Player) => fire({ type: 'DRAWN', side: sd, ...credit({ type: 'drawn', playerId: p.id }) });
   // deep wave (IHF 4:1): the keeper off for a 7th court player, or back
   const emptyGoal = (sd: Side, on: boolean) => fire({ type: 'EMPTY_GOAL', side: sd, payload: { on } });
 
@@ -274,8 +272,8 @@ const ScoringControls: SportPlugin<HandballState>['ScoringControls'] = ({
     const gk = keeper(opp(sd));
     dispatch({
       type: 'SO', side: sd,
-      payload: { scored: outcome === 'scored', outcome, ...(gk ? { keeperId: gk.id, keeperName: gk.fullName } : {}) },
-      ...(soTaker ? { attribution: { playerId: soTaker.id, stat: 'soTaken', playerName: soTaker.fullName, ...(outcome === 'scored' ? { extra: { soGoals: 1 } } : {}) } } : {}),
+      payload: { scored: outcome === 'scored', outcome, ...(gk ? { keeperId: gk.id } : {}) },
+      ...(soTaker ? { attribution: { playerId: soTaker.id, stat: 'soTaken', ...(outcome === 'scored' ? { extra: { soGoals: 1 } } : {}) } } : {}),
     });
     setSoTaker(null);
   };
@@ -494,7 +492,7 @@ const ScoringControls: SportPlugin<HandballState>['ScoringControls'] = ({
             {k === 'yellow' ? <Text style={c.meta}>One warning per player: a player already warned gets 2 minutes instead.</Text> : null}
             <Text style={c.small}>Or a team official</Text>
             <View style={c.row}>
-              <View style={c.flex}><TextField label="Official (optional)" value={official} onChange={setOfficial} placeholder="e.g. Coach" autoCapitalize="words" /></View>
+              <View style={c.flex}><TextField label="Official's role (optional)" value={official} onChange={setOfficial} placeholder="e.g. Coach" autoCapitalize="words" /></View>
               <Button label="Record" variant="ghost" onPress={() => officialCard(sd, k)} />
             </View>
           </View>
@@ -502,7 +500,7 @@ const ScoringControls: SportPlugin<HandballState>['ScoringControls'] = ({
       }
       case 'sub': {
         if (flow.step === 'off') {
-          const live = handballLiveField(s, now);
+          const live = handballLiveField(s, now, playerNameOf);
           return (
             <View style={c.panel}>{head('Sub — who comes off?')}
               <PlayerGrid players={onCourt(sd)} onPick={(p) => setFlow({ ...flow, off: p, step: 'on' })}
@@ -526,7 +524,7 @@ const ScoringControls: SportPlugin<HandballState>['ScoringControls'] = ({
     }
   })();
 
-  const live = handballLiveField(s, now);
+  const live = handballLiveField(s, now, playerNameOf);
   const sideCol = (sd: Side) => {
     const gk = keeper(sd);
     const to = timeoutCheck(s, sd, now);
@@ -612,9 +610,11 @@ const ScoringControls: SportPlugin<HandballState>['ScoringControls'] = ({
 };
 
 /** The scorer's "Correct the timeline" list: remove a moment, or re-enter it. */
-function EditList({ s, show, setShow, onRemove, onEdit, homeName, awayName }: {
+function EditList({ s: s0, show, setShow, onRemove, onEdit, homeName, awayName }: {
   s: HandballState; show: boolean; setShow: (v: boolean) => void; onRemove: (e: HandballEvent) => void; onEdit?: (e: HandballEvent) => void; homeName: string; awayName: string;
 }) {
+  const { nameOf } = useMask();
+  const s = useMemo(() => withNames(s0, nameOf), [s0, nameOf]); // IDs-only scoring: names by id
   if (!s.events.length) return null;
   return (
     <View style={c.panel}>
@@ -649,7 +649,8 @@ const LiveClock: NonNullable<SportPlugin<HandballState>['LiveClock']> = ({ state
   const so = soScore(s);
   const label = s.ended ? (s.shootout ? `FT · 7m ${so.home}–${so.away}` : s.etRounds ? 'FT (AET)' : 'FT')
     : !periodStarted(s) ? (s.period === 1 ? '—' : `${periodName(s, s.period)} next`) : `${periodName(s, s.period)} ${clockFace(s, now)}`;
-  const live = s.ended ? null : handballLiveField(s, now);
+  const { nameOf } = useMask();
+  const live = s.ended ? null : handballLiveField(s, now, nameOf);
   return (
     <View style={{ alignItems: 'center', gap: theme.spacing(1), flex: 1, minWidth: 0 }}>
       <View style={c.clockRow2}>
@@ -698,19 +699,23 @@ const HandballScoreboard: NonNullable<SportPlugin<HandballState>['Scoreboard']> 
  *  side's player box (Stats) — and the match facts with the result (Summary). */
 type TabProps = Parameters<NonNullable<SportPlugin<HandballState>['LiveExtras']>>[0];
 const HandballCommentary = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster, onPlayer }: TabProps) => {
-  const s = state as HandballState;
+  // IDs-only scoring: names looked up by id for this viewer
+  const { nameOf } = useMask();
+  const s = useMemo(() => withNames(state as HandballState, nameOf), [state, nameOf]);
   return (
     <Commentary items={handballFeed(s, { home: homeName, away: awayName })} labelOf={handballPeriodLabel(s)} periods={handballFeedPeriods(s)}
       homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} homeRoster={homeRoster} awayRoster={awayRoster} onPlayer={onPlayer}
       emptyText="No goals or sanctions yet — every moment you log appears here." />
   );
 };
-const HandballStats = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster, onPlayer }: TabProps) => (
-  <MatchCentre sport="handball" source={handballBox(state as HandballState, { homeRoster, awayRoster })} categories={handballCentre} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} onPlayer={onPlayer} />
-);
-const HandballFacts = ({ state, homeName, awayName, homeColor, awayColor }: TabProps) => (
-  <MatchFactsCard facts={resultFacts(handballFacts(state as HandballState))} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} />
-);
+const HandballStats = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster, onPlayer }: TabProps) => {
+  const { nameOf } = useMask();
+  return <MatchCentre sport="handball" source={handballBox(state as HandballState, { homeRoster, awayRoster, nameOf })} categories={handballCentre} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} onPlayer={onPlayer} />;
+};
+const HandballFacts = ({ state, homeName, awayName, homeColor, awayColor }: TabProps) => {
+  const { nameOf } = useMask();
+  return <MatchFactsCard facts={resultFacts(handballFacts(state as HandballState, 3, nameOf))} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} />;
+};
 
 /* --------------------------------- plugin ---------------------------------- */
 

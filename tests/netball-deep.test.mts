@@ -31,11 +31,14 @@ import { gameFlowFor } from '../src/sports/gameFlow.ts';
 import { careerSections } from '../src/data/career.ts';
 import { statSchema } from '../src/sports/statSchemas.ts';
 import { assertContract, toRecords, type TotalsSport } from './statTotalsHarness.mts';
+import type { NameOf } from '../src/core/playerNames.ts';
 
 const POS: Pos[] = ['GS', 'GA', 'WA', 'C', 'WD', 'GD', 'GK'];
 const HOME = ['hgs', 'hga', 'hwa', 'hc', 'hwd', 'hgd', 'hgk'];
 const AWAY = ['ags', 'aga', 'awa', 'ac', 'awd', 'agd', 'agk'];
 const nm = (id: string) => id.toUpperCase();
+/** IDs-only scoring: the state keeps ids; the viewer's names come from a lookup */
+const VIEWER: NameOf = (id, legacy) => (id ? nm(id) : (legacy ?? '').trim() || 'Player');
 const NAMES = { home: 'Sharks', away: 'Kites' };
 let u = 0;
 /** An action as the controls dispatch it: live credits from eventCredits. */
@@ -203,7 +206,7 @@ describe('netball deep · statTotals, box, career', () => {
     assert.equal(netballTotals(s).hga.stats.superShots, 0);
     const flow = gameFlowFor('netball', s)!;
     assert.equal(flow.unit, 'points'); assert.equal(flow.biggestLead.home?.value, 3);
-    assert.equal(netballTickerFlash(run([xi('home')], { superShot: true }), run([xi('home'), goal('home', 850, 1, 'GS', undefined, { points: 2 })], { superShot: true }))?.text, 'SUPER SHOT! HGS (GS)');
+    assert.equal(netballTickerFlash(run([xi('home')], { superShot: true }), run([xi('home'), goal('home', 850, 1, 'GS', undefined, { points: 2 })], { superShot: true }), VIEWER)?.text, 'SUPER SHOT! HGS (GS)');
   });
   test('box: CPR / GN columns when tracked, after the old columns', () => {
     const t = buildBoxTable(netballStats, netballBox(s0()).data('all'), { scope: 'all' });
@@ -237,7 +240,7 @@ describe('netball deep · statTotals, box, career', () => {
 describe('netball deep · commentary and team stats', () => {
   const s = run(MATCH, DEEP);
   test('quarter groups newest first; the toss opens Q1; sentences with positions, feeds, rebounds, gains', () => {
-    const feed = netballFeed(s, NAMES);
+    const feed = netballFeed(s, NAMES, VIEWER);
     assert.deepEqual(feed.map((g) => g.title), ['Q2', 'Q1']);
     assert.deepEqual(feed[1].score, { home: 2, away: 1 });
     const q1 = [...feed[1].rows].reverse().map((r) => r.text);
@@ -260,7 +263,7 @@ describe('netball deep · commentary and team stats', () => {
     const g = run([xi('home'), xi('away'), goal('away', 10, 1), goal('home', 850, 1, 'GS', undefined, { points: 2 }),
       A('SANCTION', 'away', 860, 1, { type: 'sanction', sanction: 'suspension', playerId: 'agd', playerName: 'AGD' }, { sanction: 'suspension', minutes: 2 }),
       A('SUB', 'home', 870, 1, {}, { offId: 'hwa', offName: 'HWA', onId: 'h8', onName: 'H8' })], { superShot: true });
-    const rows = [...netballFeed(g, NAMES)[0].rows].reverse();
+    const rows = [...netballFeed(g, NAMES, VIEWER)[0].rows].reverse();
     assert.equal(rows[1].text, 'HGS (GS) scores a super shot (2 points)');
     assert.equal(rows[1].tag, 'Sharks take the lead');
     assert.equal(rows[2].text, 'AGD (GD) suspended for 2 minutes — Kites play a player short');
@@ -309,7 +312,8 @@ describe('netball deep · scorer UI guards', () => {
     assert.match(src, /key: 'superShotRule', label: '2-point super shots', type: 'choice', default: 'off'/);
   });
   test('CPR is one tap on the centre strip; outcome / type steps follow the player; the views', () => {
-    assert.match(src, /fire\(\{ type: 'CPR', side: cp, payload: \{ playerId: p\.id, playerName: p\.fullName, pos \} \}\)/);
+    // IDs-only scoring: the receiver by id only
+    assert.match(src, /fire\(\{ type: 'CPR', side: cp, payload: \{ playerId: p\.id, pos \} \}\)/);
     assert.match(src, /kind === 'deflection' && s\.trackGains\) \|\| \(kind === 'turnover' && s\.trackTurnovers\)/);
     assert.match(src, /<PlayFeed groups=\{netballFeed\(s/);
     assert.match(src, /<CategoryStatsPanel periods=\{nbPanelPeriods\(s\)\}/);

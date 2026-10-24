@@ -11,6 +11,7 @@ import {
   FO_ZONE_LABEL, PEN_LABEL, type IceEvent, type IceHockeyState, type Side,
 } from './engine.ts';
 import { andList, groupLines, newestFirst, scoreText, type FeedGroup, type FeedLine } from '../feedGroups.ts';
+import { legacyNameOf, withNames, type NameOf } from '../invasion/names.ts';
 
 const other = (s: Side): Side => (s === 'home' ? 'away' : 'home');
 const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
@@ -70,7 +71,8 @@ export function sentence(s: IceHockeyState, e: IceEvent, names: Names, coinciden
 type Entry = { period: number; sec: number; i: number; line: FeedLine };
 
 /** The commentary feed, newest first. */
-export function iceHockeyCommentary(s: IceHockeyState, names: Names): FeedGroup[] {
+export function iceHockeyCommentary(s0: IceHockeyState, names: Names, nameOf: NameOf = legacyNameOf): FeedGroup[] {
+  const s = withNames(s0, nameOf);
   const coincident = new Set(penaltyBox(s).all.filter((p) => p.coincident).map((p) => p.id));
   const ordered = s.events.map((e, i) => ({ e, i })).sort((x, y) => x.e.period - y.e.period || x.e.sec - y.e.sec || x.i - y.i);
   const score = { home: 0, away: 0 };

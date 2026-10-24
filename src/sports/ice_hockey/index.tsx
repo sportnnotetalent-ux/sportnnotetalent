@@ -18,9 +18,12 @@
  * rides on a STAT_ADJUST — then the same flow stamped at the original time,
  * SD-114: Cancel keeps the event).
  */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { theme } from '../../core/theme';
+import { useMask } from '../../core/disputeMask';
+import { withNames, nameFor, legacyNameOf, type NameOf } from '../invasion/names';
+import { keeperAction, xiStamp } from '../invasion/actions';
 import { ensureContrast } from '../../core/contrast';
 import { Button, SelectChip, TextField } from '../../components/ui';
 import { confirmMatchAction } from '../../components/ConfirmSheet';
@@ -113,6 +116,8 @@ const ScoringControls: SportPlugin<IceHockeyState>['ScoringControls'] = ({
   state: liveState, dispatch: rawDispatch, homeName, awayName, homeColor, awayColor, homeRoster = [], awayRoster = [], homeLineup = [], awayLineup = [],
 }) => {
   const { view: s, dispatch, begin: holdRemoval, cancel: dropHeldRemoval } = usePendingEdit(liveState, rawDispatch, reducer);
+  // IDs-only scoring: the state keeps player ids; names are looked up when shown
+  const { nameOf: playerNameOf } = useMask();
   const [flow, setFlow] = useState<Flow | null>(null);
   const [editAt, setEditAt] = useState<{ sec: number; period: number } | null>(null);
   const [showEdit, setShowEdit] = useState(false);
@@ -139,7 +144,7 @@ const ScoringControls: SportPlugin<IceHockeyState>['ScoringControls'] = ({
   const rosterOf = (sd: Side) => (sd === 'home' ? homeRoster : awayRoster);
   const lineupOf = (sd: Side) => (sd === 'home' ? homeLineup : awayLineup);
   const byId = (sd: Side, id?: string, nm?: string): Player | undefined =>
-    rosterOf(sd).find((p) => (id && p.id === id) || (!id && nm && p.fullName === nm)) ?? (id ? { id, fullName: nm ?? 'Player', sports: ['ice_hockey'] } as Player : undefined);
+    rosterOf(sd).find((p) => (id && p.id === id) || (!id && nm && p.fullName === nm)) ?? (id ? { id, fullName: nameFor(playerNameOf, id, nm) ?? 'Player', sports: ['ice_hockey'] } as Player : undefined);
 
   // stamp every event with its game-clock second (or the edited moment's)
   const fire = (a: ScoreAction) => {
@@ -148,15 +153,8 @@ const ScoringControls: SportPlugin<IceHockeyState>['ScoringControls'] = ({
   };
 
   /* ---- who is dressed / in the box ---- */
-  const stampOf = (sd: Side) => {
-    const roster = rosterOf(sd);
-    const slots = lineupOf(sd).filter((sl) => sl.playerId);
-    const players = slots.map((sl) => ({ id: sl.playerId!, name: roster.find((p) => p.id === sl.playerId)?.fullName ?? sl.playerName ?? '' }));
-    const gSlot = slots.find((sl) => isGoaliePos(sl.position));
-    const gkP = gSlot ? players.find((p) => p.id === gSlot.playerId)
-      : roster.filter((p) => isGoaliePos(p.sportDetails?.ice_hockey?.position)).map((p) => ({ id: p.id, name: p.fullName })).find((k) => !players.length || players.some((x) => x.id === k.id));
-    return { ...(players.length ? { players } : {}), ...(gkP ? { gk: gkP } : {}) };
-  };
+  // IDs-only scoring: the stamp carries player ids only (invasion/actions.ts)
+  const stampOf = (sd: Side) => xiStamp(lineupOf(sd), rosterOf(sd), { slot: (sl) => isGoaliePos(sl.position), player: (p) => isGoaliePos(p.sportDetails?.ice_hockey?.position) });
   const stampXi = () => {
     for (const sd of ['home', 'away'] as const) {
       const st = stampOf(sd);
@@ -196,38 +194,38 @@ const ScoringControls: SportPlugin<IceHockeyState>['ScoringControls'] = ({
    *  round 2: with zones tracked, the zone from the winner's view) */
   const tally = (sd: Side, kind: TallyKind, p: Player | null | undefined, loser?: Player | null, zone?: FoZone) => {
     const z = kind === 'faceoff' ? zone : undefined;
-    const cr = credit({ type: 'tally', side: sd, tally: kind, playerId: p?.id, playerName: p?.fullName, ...(kind === 'faceoff' && loser ? { secondId: loser.id, secondName: loser.fullName } : {}), ...(z ? { zone: z } : {}) });
+    const cr = credit({ type: 'tally', side: sd, tally: kind, playerId: p?.id, ...(kind === 'faceoff' && loser ? { secondId: loser.id } : {}), ...(z ? { zone: z } : {}) });
     fire({ type: 'TALLY', side: sd, payload: { kind, ...(z ? { zone: z } : {}) }, attribution: cr.attribution, attribution2: cr.attribution2 });
     setFlow(null);
   };
   const goal = (sd: Side, d: GoalDraft, a2: Player | null, ice?: { home: string[]; away: string[] }) => {
     const id = uid();
-    const cr = credit({ type: 'goal', side: sd, playerId: d.scorer?.id, playerName: d.scorer?.fullName, secondId: d.a1?.id, secondName: d.a1?.fullName, strength: d.strength, en: d.en });
+    const cr = credit({ type: 'goal', side: sd, playerId: d.scorer?.id, secondId: d.a1?.id, strength: d.strength, en: d.en });
     fire({ type: 'GOAL', side: sd, payload: { uid: id, strength: d.strength, ...(d.en ? { en: true } : {}), ...(ice ? { onIce: ice } : {}) }, attribution: cr.attribution, attribution2: cr.attribution2 });
     if (a2) {
-      const c3 = credit({ type: 'goal', side: sd, thirdId: a2.id, thirdName: a2.fullName }).third;
+      const c3 = credit({ type: 'goal', side: sd, thirdId: a2.id }).third;
       fire({ type: 'ASSIST2', side: sd, payload: { ref: id }, attribution: c3 });
     }
     setFlow(null);
   };
   const shot = (sd: Side, p: Player | null, ps = false) => {
     const gk = goalie(opp(sd));
-    const cr = credit({ type: 'shot', side: sd, playerId: p?.id, playerName: p?.fullName, gkId: gk?.id, gkName: gk?.fullName });
+    const cr = credit({ type: 'shot', side: sd, playerId: p?.id, gkId: gk?.id });
     fire({ type: 'SHOT', side: sd, payload: ps ? { ps: true } : {}, attribution: cr.attribution, attribution2: cr.attribution2 });
     setFlow(null);
   };
   const psGoal = (sd: Side, p: Player | null) => {
-    const cr = credit({ type: 'goal', side: sd, playerId: p?.id, playerName: p?.fullName, ps: true, en: netEmpty(s, opp(sd)) });
+    const cr = credit({ type: 'goal', side: sd, playerId: p?.id, ps: true, en: netEmpty(s, opp(sd)) });
     fire({ type: 'GOAL', side: sd, payload: { ps: true, ...(netEmpty(s, opp(sd)) ? { en: true } : {}) }, attribution: cr.attribution });
     setFlow(null);
   };
-  const psMiss = (sd: Side, p: Player | null) => { fire({ type: 'MISS', side: sd, payload: p ? { playerId: p.id, playerName: p.fullName } : {} }); setFlow(null); };
+  const psMiss = (sd: Side, p: Player | null) => { fire({ type: 'MISS', side: sd, payload: p ? { playerId: p.id } : {} }); setFlow(null); };
   const penalty = (sd: Side, pen: PenKind, infraction: string | undefined, p: Player | null) => {
-    const cr = credit({ type: 'pen', side: sd, pen, playerId: p?.id, playerName: p?.fullName });
-    fire({ type: 'PEN', side: sd, payload: { pen, ...(infraction ? { infraction } : {}), ...(!cr.attribution && p ? { playerId: p.id, playerName: p.fullName } : {}) }, attribution: cr.attribution });
+    const cr = credit({ type: 'pen', side: sd, pen, playerId: p?.id });
+    fire({ type: 'PEN', side: sd, payload: { pen, ...(infraction ? { infraction } : {}), ...(!cr.attribution && p ? { playerId: p.id } : {}) }, attribution: cr.attribution });
     setFlow(null);
   };
-  const setGoalie = (sd: Side, p: Player) => { fire({ type: 'GK', side: sd, payload: { id: p.id, name: p.fullName } }); setFlow(null); };
+  const setGoalie = (sd: Side, p: Player) => { fire(keeperAction(sd, p)); setFlow(null); };
 
   const startGoal = (sd: Side) => {
     const f = goalFlagsNow(s, sd, nowSec);
@@ -317,11 +315,11 @@ const ScoringControls: SportPlugin<IceHockeyState>['ScoringControls'] = ({
                 {soTaker ? <Text style={c.meta}>Shooter: {soTaker.fullName}</Text> : null}
                 <View style={c.row}>
                   <Button label="✓ Scored" color={color(nextSide)} style={c.flex} onPress={() => {
-                    dispatch({ type: 'SO', side: nextSide, payload: { scored: true }, ...(soTaker ? { attribution: { playerId: soTaker.id, stat: 'soTaken', playerName: soTaker.fullName, extra: { soGoals: 1 } } } : {}) });
+                    dispatch({ type: 'SO', side: nextSide, payload: { scored: true }, ...(soTaker ? { attribution: { playerId: soTaker.id, stat: 'soTaken', extra: { soGoals: 1 } } } : {}) });
                     setSoTaker(null);
                   }} />
                   <Button label="✗ Saved / missed" variant="ghost" style={c.flex} onPress={() => {
-                    dispatch({ type: 'SO', side: nextSide, payload: { scored: false }, ...(soTaker ? { attribution: { playerId: soTaker.id, stat: 'soTaken', playerName: soTaker.fullName } } : {}) });
+                    dispatch({ type: 'SO', side: nextSide, payload: { scored: false }, ...(soTaker ? { attribution: { playerId: soTaker.id, stat: 'soTaken' } } : {}) });
                     setSoTaker(null);
                   }} />
                 </View>
@@ -568,9 +566,9 @@ const ScoringControls: SportPlugin<IceHockeyState>['ScoringControls'] = ({
   };
 
   const boxRows = (['home', 'away'] as const).flatMap((sd) => [
-    ...box.running[sd].map((p) => ({ sd, text: `${p.who.name ?? 'Bench'} · ${mmss(partEnd(p) - nowSec)}${p.parts.length > 1 ? ` (+${mmss(p.parts.slice(p.part + 1).reduce((a, b) => a + b, 0))})` : ''}` })),
-    ...box.waiting[sd].map((p) => ({ sd, text: `${p.who.name ?? 'Bench'} · waits (${mmss(p.parts.reduce((a, b) => a + b, 0))})` })),
-    ...box.misconduct.filter((m) => m.side === sd).map((m) => ({ sd, text: `${m.who.name ?? 'Player'} · 10′ ${mmss(m.until - nowSec)}` })),
+    ...box.running[sd].map((p) => ({ sd, text: `${nameFor(playerNameOf, p.who.id, p.who.name) ?? 'Bench'} · ${mmss(partEnd(p) - nowSec)}${p.parts.length > 1 ? ` (+${mmss(p.parts.slice(p.part + 1).reduce((a, b) => a + b, 0))})` : ''}` })),
+    ...box.waiting[sd].map((p) => ({ sd, text: `${nameFor(playerNameOf, p.who.id, p.who.name) ?? 'Bench'} · waits (${mmss(p.parts.reduce((a, b) => a + b, 0))})` })),
+    ...box.misconduct.filter((m) => m.side === sd).map((m) => ({ sd, text: `${nameFor(playerNameOf, m.who.id, m.who.name) ?? 'Player'} · 10′ ${mmss(m.until - nowSec)}` })),
   ]);
 
   return (
@@ -631,9 +629,11 @@ const ScoringControls: SportPlugin<IceHockeyState>['ScoringControls'] = ({
 };
 
 /** The scorer's "Correct the timeline" list: remove a moment, or re-enter it. */
-function EditList({ s, show, setShow, onRemove, onEdit, homeName, awayName }: {
+function EditList({ s: s0, show, setShow, onRemove, onEdit, homeName, awayName }: {
   s: IceHockeyState; show: boolean; setShow: (v: boolean) => void; onRemove: (e: IceEvent) => void; onEdit?: (e: IceEvent) => void; homeName: string; awayName: string;
 }) {
+  const { nameOf } = useMask();
+  const s = useMemo(() => withNames(s0, nameOf), [s0, nameOf]); // IDs-only scoring: names by id
   if (!s.events.length) return null;
   return (
     <View style={c.panel}>
@@ -669,12 +669,14 @@ const LiveClock: NonNullable<SportPlugin<IceHockeyState>['LiveClock']> = ({ stat
   const label = s.ended ? (s.shootout ? `Final · SO ${so.home}–${so.away}` : s.otPeriods && !levelAtEnd(s) ? 'Final (OT)' : 'Final')
     : !periodStarted(s) ? (s.period === 1 ? '—' : `${periodName(s, s.period)} next`) : `${periodName(s, s.period)} ${clockFace(s, now)}`;
   let banner: React.ReactNode = null;
+  const { nameOf } = useMask();
   if (!s.ended) {
     const sec = matchSec(s, now);
     const box = penaltyBox(s, sec);
     const on = skatersOn(s, box);
     const base = baseSkaters(s);
-    const suspended = (['home', 'away'] as const).flatMap((sd) => box.running[sd].map((p) => ({ side: sd, name: p.who.name ?? 'Bench', left: mmss(partEnd(p) - sec) })));
+    // IDs-only scoring: the player in the box by id, for this viewer
+    const suspended = (['home', 'away'] as const).flatMap((sd) => box.running[sd].map((p) => ({ side: sd, ...(p.who.id ? { id: p.who.id } : {}), name: nameFor(nameOf, p.who.id, p.who.name) ?? 'Bench', left: mmss(partEnd(p) - sec) })));
     banner = <FieldBanner suspended={suspended} onField={on.home !== base || on.away !== base ? on : null} unit="skaters" />;
   }
   return (
@@ -725,14 +727,18 @@ const VIEWS = [{ key: 'stats', label: 'Match stats' }, { key: 'box', label: 'Box
  *  score on Stats. */
 type TabProps = Parameters<NonNullable<SportPlugin<IceHockeyState>['LiveExtras']>>[0];
 const IceHockeyCommentary = ({ state, homeName, awayName, homeColor, awayColor }: TabProps) => {
-  const s = state as IceHockeyState;
+  // IDs-only scoring: names looked up by id for this viewer
+  const { nameOf } = useMask();
+  const s = useMemo(() => withNames(state as IceHockeyState, nameOf), [state, nameOf]);
   return (
     <GroupedFeed groups={iceHockeyCommentary(s, { home: homeName, away: awayName })} homeColor={homeColor} awayColor={awayColor} tags={ICE_FEED_TAGS} scopeLabel={iceScopeLabel(s)}
       emptyText="No plays yet — the commentary fills in from the first face-off." />
   );
 };
 const IceHockeyStats = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster, onPlayer }: TabProps) => {
-  const s = state as IceHockeyState;
+  // IDs-only scoring: names looked up by id for this viewer
+  const { nameOf } = useMask();
+  const s = useMemo(() => withNames(state as IceHockeyState, nameOf), [state, nameOf]);
   const n = Math.min(totalPeriods(s), Math.max(1, s.period));
   const scopes = n >= 2 ? Array.from({ length: n }, (_, i) => ({ value: i + 1, label: periodName(s, i + 1) })) : [];
   return (
@@ -751,12 +757,13 @@ const IceHockeyStats = ({ state, homeName, awayName, homeColor, awayColor, homeR
 /* ------------------------------- named Undo -------------------------------- */
 
 /** SD-115: "goal (PP) · Rao (2-1)", "minor 2′ tripping · Khan", "shot · Rao". */
-export function iceHockeyUndoLabel(step: { type: string; prev: unknown; next: unknown } | null | undefined): string | null {
+export function iceHockeyUndoLabel(step: { type: string; prev: unknown; next: unknown } | null | undefined, nameOf: NameOf = legacyNameOf): string | null {
   if (!step) return null;
-  const prev = step.prev as IceHockeyState | undefined, next = step.next as IceHockeyState | undefined;
+  // IDs-only scoring: the players by id, for this viewer
+  const prev = step.prev as IceHockeyState | undefined, next = step.next ? withNames(step.next as IceHockeyState, nameOf) : undefined;
   if (!prev?.events || !next?.events) return null;
   if (step.type === 'ASSIST2') {
-    const g = next.events.find((e, i) => e.type === 'goal' && e.thirdName && !prev.events[i]?.thirdName);
+    const g = next.events.find((e, i) => e.type === 'goal' && (e.thirdId || e.thirdName) && !(prev.events[i]?.thirdId || prev.events[i]?.thirdName));
     return g?.thirdName ? `second assist · ${g.thirdName}` : 'second assist';
   }
   if (step.type === 'CLOCK') return 'clock start / stop';

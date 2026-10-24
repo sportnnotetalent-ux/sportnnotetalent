@@ -41,12 +41,15 @@ import { assertContract, assertSameAsClean, amendRecord, toRecords, type TotalsS
 import type { ScoreAction } from '../src/sports/types.ts';
 import { replayLog } from '../src/sports/amend.ts';
 import type { Match, Player, SportId, StatLine } from '../src/core/types.ts';
+import type { NameOf } from '../src/core/playerNames.ts';
 
 /* ---------------------------------- helpers --------------------------------- */
 
 const HOME = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'h7', 'h8', 'h9', 'h10', 'hgk'];
 const AWAY = ['a1', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7', 'a8', 'a9', 'a10', 'agk'];
 const nm = (id: string) => id.toUpperCase();
+/** IDs-only scoring: the state keeps ids; the viewer's names come from a lookup */
+const NAMES: NameOf = (id, legacy) => (id ? nm(id) : (legacy ?? '').trim() || 'Player');
 const P = (id?: string) => (id ? { id, fullName: nm(id) } : null);
 let u = 0;
 /** One action as the controls fire it: game second + period + a stable uid,
@@ -104,7 +107,8 @@ describe('SD-101 · goals by type, penalty corners, strokes, shots', () => {
     assert.equal(s.home, 3); assert.equal(s.away, 2);
     assert.deepEqual(s.events.filter((e) => e.type === 'goal').map((e) => e.goalType), ['field', 'pc', 'stroke', 'pc', 'field']);
     assert.equal(s.events[0].type, 'goal');
-    assert.equal(s.events.find((e) => e.goalType === 'stroke')?.playerName, 'A9');
+    assert.equal(s.events.find((e) => e.goalType === 'stroke')?.playerId, 'a9');
+    assert.equal(s.events.find((e) => e.goalType === 'stroke')?.playerName, undefined, 'IDs-only: no name in the state');
   });
   test('team figures: PCs won and converted, strokes, saves, shots (a goal is a shot on goal)', () => {
     const h = teamFigures(s, 'home'), a = teamFigures(s, 'away');
@@ -336,7 +340,7 @@ describe('SD-101 · statTotals contract (SD-19 harness)', () => {
     const st = run([...base, ...acts]);
     assert.equal(hockeyTotals(st).hgk.side, 'home');
     assert.equal(hockeyTimeline(st).length, 1, 'the save reads on the shot row');
-    assert.match(hockeyTimeline(st)[0].detail ?? '', /save HGK/);
+    assert.match(hockeyTimeline(st, undefined, NAMES)[0].detail ?? '', /save HGK/);
     const rm = st.events.map((e): ScoreAction => {
       const cr = eventCredits(e);
       return { type: 'REMOVE_EVENT', side: e.side, payload: { id: e.id }, attribution: creditAttribution(cr.first, -1) };
@@ -393,11 +397,11 @@ describe('SD-101 · box score, comparison, timeline, ticker', () => {
     assert.equal(rows.find((x) => x.kind === 'sub')!.detail, 'H12 ⬆  H7 ⬇');
   });
   test('ticker: scorers with minutes and type; GOAL! flash once', () => {
-    const d = hockeyTickerDetail(s, { home: 'Blue', away: 'Gold' });
+    const d = hockeyTickerDetail(s, { home: 'Blue', away: 'Gold', player: NAMES });
     assert.equal(d.left?.[0], "🏑 H9 2' · H4 34' (PS) · H12 50' (PC)");
     assert.equal(d.right?.[0], "🏑 A5 19' (PC)");
     const prev = run(MATCH.slice(0, -3));
-    const f = hockeyTickerFlash(prev, run(MATCH.slice(0, -2)));
+    const f = hockeyTickerFlash(prev, run(MATCH.slice(0, -2)), NAMES);
     assert.deepEqual(f, { kind: 'goal', text: "GOAL! H12 50'", sub: 'Penalty corner', side: 'home' });
     assert.equal(hockeyTickerFlash(run(MATCH.slice(0, -2)), run(MATCH.slice(0, -1))), null);
   });

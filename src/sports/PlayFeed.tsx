@@ -11,7 +11,7 @@ import { theme } from '../core/theme';
 import { SelectChip } from '../components/ui';
 import type { Player } from '../core/types';
 import { filterFeed, groupHeading, type FeedGroup } from './feedModel';
-import { playerLink, idByName } from './playerLink';
+import { playerLink, playerIdOf } from './playerLink';
 
 const PAGE = 40;
 
@@ -58,7 +58,8 @@ export function PlayFeed({
           <Text style={st.head} accessibilityRole="header">{groupHeading(g)}</Text>
           {g.rows.map((r) => {
             const color = r.side === 'home' ? homeColor : r.side === 'away' ? awayColor : theme.colors.border;
-            const pid = r.playerId ?? idByName(r.playerName, ...(r.side === 'away' ? [awayRoster] : r.side === 'home' ? [homeRoster] : [homeRoster, awayRoster]));
+            // IDs-only scoring: the row's player by id (an older log's name → the roster)
+            const pid = playerIdOf(r.playerId, r.playerName, ...(r.side === 'away' ? [awayRoster] : r.side === 'home' ? [homeRoster] : [homeRoster, awayRoster]));
             return (
               <View key={r.id} style={st.row} accessible={!(pid && onPlayer)} accessibilityLabel={`${r.clock ?? ''} ${r.text}. ${r.score.home}–${r.score.away}${r.tag ? `. ${r.tag}` : ''}`}>
                 <View style={[st.bar, { backgroundColor: color }]} />

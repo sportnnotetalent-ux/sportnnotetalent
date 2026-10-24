@@ -93,7 +93,8 @@ describe('round 2 · an interception is also a pass defended (NFL) when defence 
     const s = reducer({ ...init(PBP), drive: { off: 'home', down: 1, spot: 30, line: 40 } }, { type: 'PLAY', side: 'home', payload: { play: 'int', pdef: true, ...at(1, 10) }, attribution2: { playerId: 'a8', stat: 'defInt', by: 1 } });
     assert.equal(afTracked(s, 'trackDefence'), true);
     const cr = eventCredits({ type: 'play', play: 'int', playerId: 'h1', secondId: 'a8', secondName: 'A8', pdef: true });
-    assert.deepEqual(creditAttribution(cr.second, -1), { playerId: 'a8', stat: 'defInt', by: -1, playerName: 'A8', extra: { passDef: -1 } });
+    // IDs-only scoring: the reversal names the player by id only
+    assert.deepEqual(creditAttribution(cr.second, -1), { playerId: 'a8', stat: 'defInt', by: -1, extra: { passDef: -1 } });
   });
 });
 

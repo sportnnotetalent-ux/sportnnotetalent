@@ -104,7 +104,7 @@ export function iceHockeyVoice(text: string, ctx: VoiceContext): ScoreAction[] |
     const tracked = [...TRACKED, ...TRACK_FLAGS.filter((f) => tallyTracked(s, f)).flatMap((f) => FLAG_KEYS[f]), ...(zones ? FO_ZONE_KEYS : [])];
     // round 2: a zone said with a faceoff (zones tracked) — "faceoff Rao offensive zone"
     const zone = tally === 'faceoff' && zones ? ZONE_WORDS.find(([, re]) => re.test(q))?.[0] : undefined;
-    const c = eventCredits({ type: 'tally', side, tally, playerId: player?.id, playerName: player?.fullName, ...(zone ? { zone } : {}) }, s.pimScale);
+    const c = eventCredits({ type: 'tally', side, tally, playerId: player?.id, ...(zone ? { zone } : {}) }, s.pimScale);
     const a1 = creditAttribution(c.first, 1, tracked);
     return [{ type: 'TALLY', side, payload: { kind: tally, ...(zone ? { zone } : {}), ...stamp() }, ...(a1 ? { attribution: a1 } : {}) }];
   }
@@ -112,7 +112,7 @@ export function iceHockeyVoice(text: string, ctx: VoiceContext): ScoreAction[] |
   if (pen && !/\bgoal\b/.test(q)) {
     const infraction = INFRACTIONS.find((x) => q.includes(deburr(x)));
     const who = pen === 'bench' ? undefined : player;
-    const e: Partial<IceEvent> = { type: 'pen', side, pen, playerId: who?.id, playerName: who?.fullName };
+    const e: Partial<IceEvent> = { type: 'pen', side, pen, playerId: who?.id };
     return [{ type: 'PEN', side, payload: { pen, ...(infraction ? { infraction } : {}), ...stamp() }, ...voiceCredit(e as IceEvent, s.pimScale) }];
   }
   if (/\bgoal\b|\bscores?\b/.test(q)) {
@@ -121,10 +121,10 @@ export function iceHockeyVoice(text: string, ctx: VoiceContext): ScoreAction[] |
     const strength = /\bpower ?play\b|\bpp\b/.test(q) ? 'pp' : /\bshort ?handed\b|\bshorty\b/.test(q) ? 'sh' : /\beven strength\b/.test(q) ? 'ev' : flags.strength;
     const en = /\bempty ?net\b/.test(q) || flags.en;
     const st = stamp();
-    const cr = voiceCredit({ type: 'goal', side, playerId: scorer?.id, playerName: scorer?.fullName, secondId: assists[0]?.id, secondName: assists[0]?.fullName, strength, en }, s.pimScale);
+    const cr = voiceCredit({ type: 'goal', side, playerId: scorer?.id, secondId: assists[0]?.id, strength, en }, s.pimScale);
     const out: ScoreAction[] = [{ type: 'GOAL', side, payload: { strength, ...(en ? { en: true } : {}), ...st }, attribution: cr.attribution, attribution2: cr.attribution2 }];
     if (assists[1]) {
-      const c3 = voiceCredit({ type: 'goal', side, playerId: undefined, thirdId: assists[1].id, thirdName: assists[1].fullName }, s.pimScale).third;
+      const c3 = voiceCredit({ type: 'goal', side, playerId: undefined, thirdId: assists[1].id }, s.pimScale).third;
       out.push({ type: 'ASSIST2', side, payload: { ref: st.uid, uid: vid(now, 2) }, attribution: c3 });
     }
     return out;
@@ -132,11 +132,11 @@ export function iceHockeyVoice(text: string, ctx: VoiceContext): ScoreAction[] |
   if (/\bsave[sd]?\b/.test(q)) {
     // the named side's goalie saved a shot from the other side
     const gk = goalieAt(s, side);
-    return [{ type: 'SHOT', side: other(side), payload: stamp(), ...voiceCredit({ type: 'shot', side: other(side), gkId: gk?.id, gkName: gk?.name }, s.pimScale) }];
+    return [{ type: 'SHOT', side: other(side), payload: stamp(), ...voiceCredit({ type: 'shot', side: other(side), gkId: gk?.id }, s.pimScale) }];
   }
   if (/\bshot\b|\bshoots?\b/.test(q)) {
     const gk = goalieAt(s, other(side));
-    return [{ type: 'SHOT', side, payload: stamp(), ...voiceCredit({ type: 'shot', side, playerId: player?.id, playerName: player?.fullName, gkId: gk?.id, gkName: gk?.name }, s.pimScale) }];
+    return [{ type: 'SHOT', side, payload: stamp(), ...voiceCredit({ type: 'shot', side, playerId: player?.id, gkId: gk?.id }, s.pimScale) }];
   }
   return null;
 }

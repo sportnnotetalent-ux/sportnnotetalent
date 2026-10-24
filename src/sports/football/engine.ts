@@ -29,7 +29,9 @@ export interface FootballState {
   subType: 'rolling' | 'fixed';
   maxSubs: number;
   subsUsed: { home: number; away: number };
-  /** names already substituted off (for 'fixed', they can't return) */
+  /** players already substituted off (for 'fixed', they can't return): their
+   *  ids (IDs-only scoring); an older log's SUB stored the name instead, so a
+   *  legacy entry is the name (use `isSubbedOff`). */
   subbedOff: { home: string[]; away: string[] };
   /** knockout tie — a level result at full time must be decided (derived: decider !== 'none') */
   knockout: boolean;
@@ -98,18 +100,22 @@ export interface ShootoutKick {
   /** saved by the keeper / missed (wide, post, over); absent on a kick backfilled from the dots */
   outcome?: 'scored' | 'saved' | 'missed';
   takerId?: string;
+  /** @deprecated legacy, read-only — IDs-only logs keep `takerId` only */
   takerName?: string;
   keeperId?: string;
+  /** @deprecated legacy, read-only — IDs-only logs keep `keeperId` only */
   keeperName?: string;
 }
 
 /** A side's starting keeper and players, plus the squad's keepers (so a
- *  keeper coming off the bench is recognised). Ids + names: older sub events
- *  carry names only. */
+ *  keeper coming off the bench is recognised). IDs-only scoring: new stamps
+ *  carry ids only; `name` is legacy (older stamps, read-only) — and filled in
+ *  on the display copy (invasion/names.ts `withNames`). */
+export interface StampWho { id: string; /** @deprecated legacy, read-only */ name?: string }
 export interface XiStamp {
-  gk?: { id: string; name: string };
-  players?: { id: string; name: string }[];
-  keepers?: { id: string; name: string }[];
+  gk?: StampWho;
+  players?: StampWho[];
+  keepers?: StampWho[];
 }
 
 /** Per-match toggle of which stats the scorer captures — set game-wise so a
@@ -336,7 +342,8 @@ export function footballDetailLine(s: FootballState): string | undefined {
   return parts.length ? parts.join(' · ') : undefined;
 }
 
-/** SD-80: a shootout kick as read in the list — "Rahul ✓", "Dev ✗ saved (Kumar)". */
+/** SD-80: a shootout kick as read in the list — "Rahul ✓", "Dev ✗ saved (Kumar)".
+ *  IDs-only scoring: pass a named kick (invasion/names.ts `nameRow`). */
 export const kickText = (k: ShootoutKick): string => {
   const who = k.takerName ?? 'Kick';
   if (k.scored) return `${who} ✓`;
@@ -509,13 +516,16 @@ export const reducer = (s: FootballState, a: ScoreAction): FootballState => {
       // stamp wins (a lineup fixed after kickoff is re-stamped at full time).
       const team = a.payload?.team;
       if (team !== 'home' && team !== 'away') return s;
+      // IDs-only scoring: a new stamp carries ids only; an older one's names
+      // are kept as stored (legacy replay identity).
       const stamp: XiStamp = {};
+      const who = (p: StampWho): StampWho => ({ id: String(p.id), ...(p.name !== undefined ? { name: String(p.name ?? '') } : {}) });
       const gk = a.payload?.gk as XiStamp['gk'];
-      if (gk?.id) stamp.gk = { id: String(gk.id), name: String(gk.name ?? '') };
+      if (gk?.id) stamp.gk = who(gk);
       const players = a.payload?.players as XiStamp['players'];
-      if (Array.isArray(players)) stamp.players = players.filter((p) => p?.id).map((p) => ({ id: String(p.id), name: String(p.name ?? '') }));
+      if (Array.isArray(players)) stamp.players = players.filter((p) => p?.id).map(who);
       const keepers = a.payload?.keepers as XiStamp['keepers'];
-      if (Array.isArray(keepers)) stamp.keepers = keepers.filter((p) => p?.id).map((p) => ({ id: String(p.id), name: String(p.name ?? '') }));
+      if (Array.isArray(keepers)) stamp.keepers = keepers.filter((p) => p?.id).map(who);
       return { ...s, xi: { ...s.xi, [team]: stamp } };
     }
     case 'POSSESSION': {
@@ -532,9 +542,12 @@ export const reducer = (s: FootballState, a: ScoreAction): FootballState => {
         id: s.seq + 1,
         kind,
         side: a.side,
-        playerId: a.attribution?.playerId,
+        // (IDs-only: a stat with no stat-line key carries its player as `pid`)
+        playerId: a.attribution?.playerId ?? pid.playerId,
         playerName: a.attribution?.playerName ?? (a.payload?.playerName as string | undefined),
-        secondName: a.payload?.secondName as string | undefined, // foul: who was fouled
+        secondName: a.payload?.secondName as string | undefined, // foul: who was fouled (legacy: the name)
+        // IDs-only scoring: the fouled player's id (new logs only)
+        ...(typeof a.payload?.secondId === 'string' && a.payload.secondId ? { secondId: a.payload.secondId } : {}),
         minute,
         half: evHalf,
         onTarget: a.payload?.onTarget as boolean | undefined,
@@ -587,7 +600,10 @@ export const reducer = (s: FootballState, a: ScoreAction): FootballState => {
       return push(scored, { minute, half: evHalf, type: 'owngoal', side: a.side, playerName: a.payload?.scorerName as string | undefined, ...pid });
     }
     case 'ASSIST': {
-      if (!a.side || !name) return s;
+      // IDs-only scoring: a new assist names its player by id only (the
+      // attribution's `playerId`); an older one carries the name too.
+      const aid = a.attribution?.playerId ?? pid.playerId;
+      if (!a.side || !(name || aid)) return s;
       // The assist is recorded immediately after its goal, so attach it to the
       // most recent goal of this side (overwriting any prior assister).
       const events = [...s.events];
@@ -595,8 +611,13 @@ export const reducer = (s: FootballState, a: ScoreAction): FootballState => {
         if (events[i].type === 'goal' && events[i].side === a.side) {
           // SD-30: the assister's id rides in `secondId` (a later assist
           // without one drops the earlier id with its name)
-          const { secondId: _old, ...goal } = events[i];
-          events[i] = { ...goal, secondName: name, ...(pid.playerId ? { secondId: pid.playerId } : {}) };
+          if (name) {
+            const { secondId: _old, ...goal } = events[i];
+            events[i] = { ...goal, secondName: name, ...(pid.playerId ? { secondId: pid.playerId } : {}) };
+          } else {
+            const { secondId: _old, secondName: _oldName, ...goal } = events[i];
+            events[i] = { ...goal, secondId: aid! };
+          }
           return { ...s, events };
         }
       }
@@ -629,17 +650,24 @@ export const reducer = (s: FootballState, a: ScoreAction): FootballState => {
       // the substitution count is unlimited — `maxSubs` there is just bench size.
       // Fixed subs cap the number of changes.
       if (!a.side || (s.subType === 'fixed' && s.subsUsed[a.side] >= s.maxSubs)) return s;
-      const offName = String(a.payload?.offName ?? '');
       // SD-09: new logs also carry the two ids (keeper minutes / clean sheets).
       const ids = {
         ...(a.payload?.offId ? { playerId: String(a.payload.offId) } : {}),
         ...(a.payload?.onId ? { secondId: String(a.payload.onId) } : {}),
       };
-      const withEvent = push(s, { minute, half: evHalf, type: 'sub', side: a.side, playerName: offName, secondName: String(a.payload?.onName ?? ''), ...ids });
+      // IDs-only scoring: a new SUB carries the two ids only; an older one (it
+      // carries the names — or nothing at all) replays exactly as before:
+      // names on the event, the name in `subbedOff`.
+      const legacy = a.payload?.offName !== undefined || a.payload?.onName !== undefined || !(ids.playerId || ids.secondId);
+      const offName = String(a.payload?.offName ?? '');
+      const withEvent = legacy
+        ? push(s, { minute, half: evHalf, type: 'sub', side: a.side, playerName: offName, secondName: String(a.payload?.onName ?? ''), ...ids })
+        : push(s, { minute, half: evHalf, type: 'sub', side: a.side, ...ids });
+      const offKey = legacy ? offName : (ids.playerId ?? '');
       return {
         ...withEvent,
         subsUsed: { ...s.subsUsed, [a.side]: s.subsUsed[a.side] + 1 },
-        subbedOff: { ...s.subbedOff, [a.side]: [...s.subbedOff[a.side], offName] },
+        subbedOff: { ...s.subbedOff, [a.side]: [...s.subbedOff[a.side], offKey] },
       };
     }
     case 'UNDO_GOAL': {
@@ -662,7 +690,8 @@ export const reducer = (s: FootballState, a: ScoreAction): FootballState => {
       if (!ev) return s;
       let next: FootballState = { ...s, events: s.events.filter((e) => e.id !== id) };
       if (ev.type === 'goal' || ev.type === 'owngoal') next = { ...next, [ev.side]: Math.max(0, next[ev.side] - 1) } as FootballState;
-      else if (ev.type === 'sub') next = { ...next, subsUsed: { ...next.subsUsed, [ev.side]: Math.max(0, next.subsUsed[ev.side] - 1) }, subbedOff: { ...next.subbedOff, [ev.side]: next.subbedOff[ev.side].filter((n) => n !== ev.playerName) } };
+      // (`subbedOff` holds what the SUB put there: an older one's name, else the id)
+      else if (ev.type === 'sub') next = { ...next, subsUsed: { ...next.subsUsed, [ev.side]: Math.max(0, next.subsUsed[ev.side] - 1) }, subbedOff: { ...next.subbedOff, [ev.side]: next.subbedOff[ev.side].filter((n) => n !== (ev.playerName ?? ev.playerId)) } };
       return next;
     }
     case 'NEXT_HALF': {
@@ -706,6 +735,11 @@ export const reducer = (s: FootballState, a: ScoreAction): FootballState => {
       return s;
   }
 };
+
+/** Has this player been substituted off (fixed subs: can't return)? By id —
+ *  an older log's `subbedOff` holds names, so the name is checked too. */
+export const isSubbedOff = (s: Pick<FootballState, 'subbedOff'>, side: 'home' | 'away', p: { id: string; fullName?: string }): boolean =>
+  s.subbedOff[side].includes(p.id) || (!!p.fullName && s.subbedOff[side].includes(p.fullName));
 
 export const cardCount = (events: FootballEvent[], type: 'yellow' | 'red', side: 'home' | 'away') =>
   events.filter((e) => e.type === type && e.side === side).length;

@@ -45,9 +45,15 @@ export interface FootballEvent {
   minute: number;
   type: FootballEventType;
   side: 'home' | 'away';
-  /** primary player: scorer / carded player / player coming OFF */
+  /** primary player: scorer / carded player / player coming OFF.
+   *  @deprecated legacy, read-only — IDs-only logs (docs/privacy/
+   *  ids-only-scoring.md) keep `playerId` only; the name is looked up when
+   *  shown (invasion/names.ts `withNames`). Still written for a team
+   *  official's card (the typed role, e.g. "Head coach") and a stoppage's
+   *  reason — neither is a player. */
   playerName?: string;
-  /** secondary: assister (goal) / player coming ON (sub) */
+  /** secondary: assister (goal) / player coming ON (sub).
+   *  @deprecated legacy, read-only — IDs-only logs keep `secondId` only */
   secondName?: string;
   /** how a goal was scored (open play / penalty / free kick / header) */
   goalType?: GoalType;
@@ -143,9 +149,13 @@ export interface StatEvent {
   kind: StatKind;
   side: 'home' | 'away';
   playerId?: string;
+  /** @deprecated legacy, read-only — IDs-only logs keep `playerId` only */
   playerName?: string;
-  /** secondary player — for a foul, who was fouled (the victim) */
+  /** secondary player — for a foul, who was fouled (the victim).
+   *  @deprecated legacy, read-only — IDs-only logs keep `secondId` only */
   secondName?: string;
+  /** IDs-only scoring: the fouled player's id (new logs only) */
+  secondId?: string;
   minute: number;
   /** shots: was it on target? (a blocked shot is not — SD-08) */
   onTarget?: boolean;

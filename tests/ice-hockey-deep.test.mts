@@ -32,10 +32,13 @@ import { careerSections } from '../src/data/career.ts';
 import { assertContract, toRecords, type TotalsSport } from './statTotalsHarness.mts';
 import type { ScoreAction } from '../src/sports/types.ts';
 import type { StatLine } from '../src/core/types.ts';
+import type { NameOf } from '../src/core/playerNames.ts';
 
 const HOME = ['hg', 'h2', 'h3', 'h4', 'h5', 'h6'];
 const AWAY = ['ag', 'a2', 'a3', 'a4', 'a5', 'a6'];
 const nm = (id: string) => id.toUpperCase();
+/** IDs-only scoring: the state keeps ids; the viewer's names come from a lookup */
+const VIEWER: NameOf = (id, legacy) => (id ? nm(id) : (legacy ?? '').trim() || 'Player');
 const NAMES = { home: 'Kings', away: 'Wolves' };
 let u = 0;
 function A(type: string, side: Side | undefined, sec: number, period: number, ev: Partial<IceEvent> = {}, payload: Record<string, unknown> = {}): ScoreAction {
@@ -245,7 +248,7 @@ describe('deep wave · commentary grouped by period, newest first', () => {
     endPeriod(), endPeriod(),
   ];
   const s = run(log, { decider: 'so' });
-  const feed = iceHockeyCommentary(s, NAMES);
+  const feed = iceHockeyCommentary(s, NAMES, VIEWER);
   test('groups newest first with the period summary', () => {
     assert.deepEqual(feed.map((g) => g.title), ['3rd period', '2nd period', '1st period']);
     assert.equal(feed[2].sub, 'Goals 1–0 · Shots 2–0');

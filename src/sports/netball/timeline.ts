@@ -2,6 +2,7 @@
  *  scorer's correction list. PURE. */
 import type { LiveEvent } from '../liveEvents';
 import { clockText, periodName, secInPeriod, TURNOVER_LABEL, type NetballEvent, type NetballState } from './engine.ts';
+import { legacyNameOf, withNames, type NameOf } from '../invasion/names.ts';
 
 const STAT_LABEL = { intercept: 'Intercept', deflection: 'Deflection', rebound: 'Rebound', turnover: 'Turnover', pickup: 'Pick-up' } as const;
 const STAT_ICON = { intercept: '🖐', deflection: '☝️', rebound: '⤴️', turnover: '⚠️', pickup: '🤲' } as const;
@@ -59,7 +60,8 @@ export function timelineEvents(s: NetballState): { e: NetballEvent; answer?: str
 export const eventWhen = (s: NetballState, e: NetballEvent): string => `${periodName(s, e.period)} ${clockText(secInPeriod(s, e))}`;
 
 /** The viewer timeline (LiveTimeline sorts by id: game time). */
-export function netballTimeline(s: NetballState, names?: { home?: string; away?: string }): LiveEvent[] {
+export function netballTimeline(s0: NetballState, names?: { home?: string; away?: string }, nameOf: NameOf = legacyNameOf): LiveEvent[] {
+  const s = withNames(s0, nameOf);
   const rows: LiveEvent[] = timelineEvents(s).map(({ e, answer }, i) => {
     const d = describeEvent(e, answer);
     const name = e.type === 'sub' ? e.secondName : e.official ? undefined : e.playerName;

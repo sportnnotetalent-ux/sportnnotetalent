@@ -35,6 +35,7 @@ import { RUGBY_DISCIPLINE } from './rugby/discipline.ts';
 import { RUGBY_LEAGUE_DISCIPLINE } from './rugby_league/discipline.ts';
 import { BASKETBALL_DISCIPLINE } from './basketball/discipline.ts';
 import { KABADDI_DISCIPLINE } from './kabaddi/discipline.ts';
+import { legacyNameOf, nameFor, type NameOf } from './invasion/names.ts';
 
 type Side = 'home' | 'away';
 export type YellowReset = football.YellowReset;
@@ -241,14 +242,21 @@ function run(spec: SportDisciplineSpec, matches: DisciplineMatch[], rule: SportD
   return { players, officials };
 }
 
+/** IDs-only scoring: a row's name for this viewer — by id (an older log's
+ *  stored name only as the fallback); a name-only row keeps its name. */
+const rowName = (nameOf: NameOf, id: string | undefined, stored: string): string =>
+  nameFor(nameOf, id, stored === 'Player' ? undefined : stored) ?? stored;
+
 const sum = (into: Record<string, number>, from: Record<string, number>) => { for (const [k, n] of Object.entries(from)) into[k] = (into[k] ?? 0) + n; };
 const weight = (cols: CardColumn[], counts: Record<string, number>) =>
   cols.reduce((t, c, i) => t + (counts[c.key] ?? 0) * Math.pow(10, i), 0);
 
-/** A tournament's discipline table for one sport (football via SD-70). */
-export function sportDisciplineTable(sport: SportId | string, matches: DisciplineMatch[], format?: Record<string, unknown> | null): SportDisciplineTable | null {
+/** A tournament's discipline table for one sport (football via SD-70).
+ *  IDs-only scoring: `nameOf` names the players by id for this viewer (the
+ *  matches' states keep ids; an older log's stored name is the fallback). */
+export function sportDisciplineTable(sport: SportId | string, matches: DisciplineMatch[], format?: Record<string, unknown> | null, nameOf: NameOf = legacyNameOf): SportDisciplineTable | null {
   if (sport === 'football') {
-    const t = football.disciplineTable(matches, format);
+    const t = football.disciplineTable(matches, format, nameOf);
     const rule = football.readDisciplineRule(format);
     return {
       columns: FOOTBALL_COLUMNS,
@@ -267,7 +275,8 @@ export function sportDisciplineTable(sport: SportId | string, matches: Disciplin
   const rule = readSportRule(spec, format);
   const { players, officials } = run(spec, matches, rule);
   const rows = [...players.values()].map((p) => ({
-    ...p.row, banLeft: p.pending, suspended: p.pending > 0, towardBan: rule.banYellows > 0 ? p.accum.length : 0,
+    ...p.row, name: rowName(nameOf, p.row.playerId, p.row.name),
+    banLeft: p.pending, suspended: p.pending > 0, towardBan: rule.banYellows > 0 ? p.accum.length : 0,
     ...(p.pending > 0 && p.cause ? { banReason: p.cause } : {}),
   }));
   // suspended first, then the heaviest cards (the last column weighs most)
@@ -288,8 +297,8 @@ export function sportDisciplineTable(sport: SportId | string, matches: Disciplin
 }
 
 /** Who is suspended for one upcoming match of any sport with discipline. */
-export function sportSuspensionsFor(match: DisciplineMatch, matches: DisciplineMatch[], format?: Record<string, unknown> | null): Record<Side, Suspension[]> {
-  if (match.sport === 'football') return football.suspensionsFor(match, matches, format);
+export function sportSuspensionsFor(match: DisciplineMatch, matches: DisciplineMatch[], format?: Record<string, unknown> | null, nameOf: NameOf = legacyNameOf): Record<Side, Suspension[]> {
+  if (match.sport === 'football') return football.suspensionsFor(match, matches, format, nameOf);
   const out: Record<Side, Suspension[]> = { home: [], away: [] };
   const spec = DISCIPLINE_SPECS[match.sport];
   if (!spec || played(match)) return out;
@@ -303,7 +312,7 @@ export function sportSuspensionsFor(match: DisciplineMatch, matches: DisciplineM
       && (m.homeTeam.id === team.id || m.awayTeam.id === team.id)).length;
     for (const p of players.values()) {
       if (p.row.teamId !== team.id || p.pending <= gap) continue;
-      out[side].push({ ...(p.row.playerId ? { playerId: p.row.playerId } : {}), name: p.row.name, teamId: team.id, reason: p.cause ?? 'cards' });
+      out[side].push({ ...(p.row.playerId ? { playerId: p.row.playerId } : {}), name: rowName(nameOf, p.row.playerId, p.row.name), teamId: team.id, reason: p.cause ?? 'cards' });
     }
   }
   return out;

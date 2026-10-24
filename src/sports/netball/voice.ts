@@ -65,7 +65,7 @@ export function netballVoice(text: string, ctx: VoiceContext): ScoreAction[] | n
   const pos = said ?? (player ? positionOf(s, side, { id: player.id, name: player.fullName }) : undefined);
   if (pos !== 'GS' && pos !== 'GA') return null; // only GS / GA score
   const shooter = said && l[said] ? { id: l[said]!.id, name: l[said]!.name } : player ? { id: player.id, name: player.fullName } : undefined;
-  const ev = { type: miss ? 'miss' as const : 'goal' as const, playerId: shooter?.id, playerName: shooter?.name };
+  const ev = { type: miss ? 'miss' as const : 'goal' as const, playerId: shooter?.id };
   const cr = eventCredits(ev);
   return [{ type: miss ? 'MISS' : 'GOAL', side, payload: { pos, ...stamp() }, attribution: creditAttribution(cr.first, 1, TRACKED) }];
 }

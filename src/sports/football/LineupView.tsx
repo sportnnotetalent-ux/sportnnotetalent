@@ -15,6 +15,7 @@ import type { LineupSlot, Player } from '../../core/types';
 import type { FootballEvent } from './events';
 import { minuteText, type MinuteFormat } from './engine';
 import { playerLink } from '../playerLink';
+import { nameFor } from '../invasion/names';
 import { useImageUri } from '../../data/useImageUri';
 
 const DEF = new Set(['GK', 'CB', 'LB', 'RB', 'LWB', 'RWB', 'SW']);
@@ -37,26 +38,36 @@ const initials = (name?: string, position?: string) =>
   name ? name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase() : position ?? '';
 
 interface Marks { card?: 'yellow' | 'red' | 'two-yellow'; subOff?: string; goals?: number; }
-/** Map each player (by name) to their card + sub-off markers from the timeline. */
+/** IDs-only scoring: a player's key in the marks — the id; an older log's
+ *  name-only event `n:<name>` (matched to a slot / squad player by name). */
+const markKey = (id?: string, name?: string): string | undefined => id || (name ? `n:${name}` : undefined);
+/** The marks of one player (by id, else an older log's name). */
+const marksOf = <T,>(all: Record<string, T>, id?: string, name?: string): T | undefined =>
+  (id ? all[id] : undefined) ?? (name ? all[`n:${name}`] : undefined);
+/** Map each player (by id) to their card + sub-off markers from the timeline. */
 function deriveMarks(events: FootballEvent[], f: MinuteFormat): Record<string, Marks> {
   const out: Record<string, Marks> = {};
-  const m = (name?: string): Marks | undefined => {
-    if (!name) return undefined;
-    return (out[name] = out[name] ?? {});
+  const m = (id?: string, name?: string): Marks | undefined => {
+    const k = markKey(id, name);
+    if (!k) return undefined;
+    return (out[k] = out[k] ?? {});
   };
   for (const e of events) {
     if (e.official) continue; // SD-117: a team official's card isn't on the lineup
-    if (e.type === 'yellow') { const x = m(e.playerName); if (x) x.card = x.card === 'yellow' ? 'two-yellow' : x.card ?? 'yellow'; }
-    else if (e.type === 'red') { const x = m(e.playerName); if (x) x.card = e.secondYellow ? 'two-yellow' : 'red'; }
-    else if (e.type === 'sub') { const x = m(e.playerName); if (x) x.subOff = minuteText(e.minute, e.half, f); } // playerName = off
-    else if (e.type === 'goal') { const x = m(e.playerName); if (x) x.goals = (x.goals ?? 0) + 1; } // own goals aren't credited to the scorer's badge
+    if (e.type === 'yellow') { const x = m(e.playerId, e.playerName); if (x) x.card = x.card === 'yellow' ? 'two-yellow' : x.card ?? 'yellow'; }
+    else if (e.type === 'red') { const x = m(e.playerId, e.playerName); if (x) x.card = e.secondYellow ? 'two-yellow' : 'red'; }
+    else if (e.type === 'sub') { const x = m(e.playerId, e.playerName); if (x) x.subOff = minuteText(e.minute, e.half, f); } // player = off
+    else if (e.type === 'goal') { const x = m(e.playerId, e.playerName); if (x) x.goals = (x.goals ?? 0) + 1; } // own goals aren't credited to the scorer's badge
   }
   return out;
 }
-/** Subs who came on (name → minute). */
+/** Subs who came on (player key → minute). */
 function subsIn(events: FootballEvent[], f: MinuteFormat): Record<string, string> {
   const out: Record<string, string> = {};
-  for (const e of events) if (e.type === 'sub' && e.secondName) out[e.secondName] = minuteText(e.minute, e.half, f);
+  for (const e of events) {
+    const k = e.type === 'sub' ? markKey(e.secondId, e.secondName) : undefined;
+    if (k) out[k] = minuteText(e.minute, e.half, f);
+  }
   return out;
 }
 
@@ -87,7 +98,9 @@ function PlayerDot({
   slot: LineupSlot; color: string; top: string; left: string; jersey?: number; photoUrl?: string; marks?: Marks;
   onPlayer?: (playerId: string) => void;
 }) {
-  const name = useMask().name(slot.playerName) || undefined;
+  // IDs-only scoring: the viewer's name for the slot's player, by id
+  const mask = useMask();
+  const name = (slot.playerId ? nameFor(mask.nameOf, slot.playerId, slot.playerName) : mask.name(slot.playerName)) || undefined;
   return (
     <View style={[s.dotWrap, { top: top as unknown as number, left: left as unknown as number }]}>
       <View>
@@ -173,8 +186,8 @@ export function LineupView({
           <Text style={[s.benchColTitle, { color }]} numberOfLines={1}>{teamName} · {list.length}</Text>
         </View>
         {list.length === 0 ? <Text style={s.muted}>No bench listed</Text> : list.map((p) => {
-          const onMin = cameOn[p.fullName];
-          const m = marks[p.fullName];
+          const onMin = marksOf(cameOn, p.id, p.fullName);
+          const m = marksOf(marks, p.id, p.fullName);
           return (
             <View key={p.id} style={[s.benchRow, side === 'away' && { flexDirection: 'row-reverse' }]}>
               <Avatar photoUrl={p.photoUrl} label={initials(p.fullName)} color={color} size={28} />
@@ -206,11 +219,11 @@ export function LineupView({
         <View style={[s.penSpot, s.penSpotBottom]} />
         {/* Home occupies the top half (matching its header above); away the bottom. */}
         {homeLineup.map((slot, i) => (
-          <PlayerDot key={`h${i}`} slot={slot} color={homeColor} jersey={jersey(slot.playerId, homeById)} photoUrl={photo(slot.playerId, homeById)} marks={slot.playerName ? marks[slot.playerName] : undefined} onPlayer={onPlayer}
+          <PlayerDot key={`h${i}`} slot={slot} color={homeColor} jersey={jersey(slot.playerId, homeById)} photoUrl={photo(slot.playerId, homeById)} marks={marksOf(marks, slot.playerId, slot.playerName)} onPlayer={onPlayer}
             top={`${(slot.y * 0.46 + 0.05) * 100}%`} left={`${(1 - slot.x) * 100}%`} />
         ))}
         {awayLineup.map((slot, i) => (
-          <PlayerDot key={`a${i}`} slot={slot} color={awayColor} jersey={jersey(slot.playerId, awayById)} photoUrl={photo(slot.playerId, awayById)} marks={slot.playerName ? marks[slot.playerName] : undefined} onPlayer={onPlayer}
+          <PlayerDot key={`a${i}`} slot={slot} color={awayColor} jersey={jersey(slot.playerId, awayById)} photoUrl={photo(slot.playerId, awayById)} marks={marksOf(marks, slot.playerId, slot.playerName)} onPlayer={onPlayer}
             top={`${(1 - (slot.y * 0.46 + 0.05)) * 100}%`} left={`${slot.x * 100}%`} />
         ))}
       </View>

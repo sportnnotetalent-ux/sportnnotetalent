@@ -50,7 +50,7 @@ export function rugbyVoice(text: string, ctx: VoiceContext): ScoreAction[] | nul
     if (!side) return null;
     const made = !/\b(miss(ed)?|wide|no good|short|hit the post)\b/.test(q);
     const kicker = said.player ?? matchPlayer(q, roster(side));
-    return [{ type: 'KICK', side, payload: { kick: 'conv', made, ...stamp() }, ...credit({ type: 'kick', kick: 'conv', made, playerId: kicker?.id, playerName: kicker?.fullName }) }];
+    return [{ type: 'KICK', side, payload: { kick: 'conv', made, ...stamp() }, ...credit({ type: 'kick', kick: 'conv', made, playerId: kicker?.id }) }];
   }
   const side = said.side;
   if (!side) return null;
@@ -58,7 +58,7 @@ export function rugbyVoice(text: string, ctx: VoiceContext): ScoreAction[] | nul
   if (/\bdrop ?(goal|kick)?\b/.test(q) || /\bpenalty (goal|kick)\b/.test(q)) {
     const kick: rg.KickKind = /\bdrop\b/.test(q) ? 'drop' : 'pen';
     const made = !/\b(miss(ed)?|wide|no good|short|hit the post)\b/.test(q);
-    return [{ type: 'KICK', side, payload: { kick, made, ...stamp() }, ...credit({ type: 'kick', kick, made, playerId: player?.id, playerName: player?.fullName }) }];
+    return [{ type: 'KICK', side, payload: { kick, made, ...stamp() }, ...credit({ type: 'kick', kick, made, playerId: player?.id }) }];
   }
   const card = /\byellow\b/.test(q) ? 'yellow' : /\bred\b/.test(q) ? 'red' : null;
   if (card) {
@@ -66,13 +66,13 @@ export function rugbyVoice(text: string, ctx: VoiceContext): ScoreAction[] | nul
     const c: rg.CardKind = second ? 'red' : card;
     const r20 = s.red20 && (second || red20Said);
     return [{ type: 'CARD', side, payload: { card: c, ...(second ? { second: true } : {}), ...(r20 ? { red20: true } : {}), ...stamp() },
-      ...credit({ type: 'card', card: c, second, playerId: player?.id, playerName: player?.fullName }) }];
+      ...credit({ type: 'card', card: c, second, playerId: player?.id }) }];
   }
   if (/\btry\b|\bscores?\b/.test(q)) {
     const m = /\b(assist(?:ed)?(?: by)?|pass from|from)\b(.*)$/.exec(deburr(q));
     const scorer = m ? matchPlayer(q.slice(0, m.index), roster(side)) : player;
     const assist = m ? matchPlayer(m[2], roster(side).filter((p) => p.id !== scorer?.id)) : undefined;
-    return [{ type: 'TRY', side, payload: stamp(), ...credit({ type: 'try', playerId: scorer?.id, playerName: scorer?.fullName, secondId: assist?.id, secondName: assist?.fullName }) }];
+    return [{ type: 'TRY', side, payload: stamp(), ...credit({ type: 'try', playerId: scorer?.id, secondId: assist?.id }) }];
   }
   return null;
 }

@@ -3,6 +3,7 @@
 import type { LiveEvent } from '../liveEvents';
 import { shootoutOrderRows } from '../shootoutOrder.ts';
 import { minuteText, periodName, PC_RESULT_LABEL, type HockeyEvent, type HockeyState } from './engine.ts';
+import { legacyNameOf, withNames, type NameOf } from '../invasion/names.ts';
 
 export const GOAL_LABEL = { field: 'Field goal', pc: 'Penalty-corner goal', stroke: 'Penalty-stroke goal' } as const;
 const CARD_ICON = { green: '🟩', yellow: '🟨', red: '🟥' } as const;
@@ -51,7 +52,8 @@ export function timelineEvents(s: HockeyState): { e: HockeyEvent; saver?: string
 }
 
 /** The viewer timeline: newest first by game time (LiveTimeline sorts by id). */
-export function hockeyTimeline(s: HockeyState, names?: { home?: string; away?: string }): LiveEvent[] {
+export function hockeyTimeline(s0: HockeyState, names?: { home?: string; away?: string }, nameOf: NameOf = legacyNameOf): LiveEvent[] {
+  const s = withNames(s0, nameOf);
   return [...timelineEvents(s).map(({ e, saver }, i) => {
     const d = describeEvent(e, saver);
     const name = e.type === 'sub' ? e.secondName : e.playerName;

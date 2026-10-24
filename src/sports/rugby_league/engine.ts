@@ -96,9 +96,11 @@ export interface LeagueEvent {
   period: number;
   /** try scorer / kicker / sanctioned player / player off / detail player */
   playerId?: string;
+  /** @deprecated legacy, read-only — IDs-only logs (docs/privacy/ids-only-scoring.md) keep the id; the name is looked up when shown (invasion/names.ts) */
   playerName?: string;
   /** try assist / player on */
   secondId?: string;
+  /** @deprecated legacy, read-only — IDs-only logs (docs/privacy/ids-only-scoring.md) keep the id; the name is looked up when shown (invasion/names.ts) */
   secondName?: string;
   kick?: KickKind;
   made?: boolean;
@@ -197,7 +199,8 @@ export const currentSet = (s: Pick<LeagueState, 'setLog' | 'setTackles'>): Leagu
 
 /* --------------------------------- state ----------------------------------- */
 
-export interface XiStamp { players?: { id: string; name: string }[] }
+/** IDs-only scoring: new stamps carry ids only (`name` = an older stamp's, read-only). */
+export interface XiStamp { players?: { id: string; name?: string }[] }
 
 export interface LeagueState {
   home: number;
@@ -402,7 +405,7 @@ export function creditAttribution(c: Credit | undefined, sign = 1, tracked?: str
   if (!entries.length) return undefined;
   const [[stat, by], ...rest] = entries;
   return {
-    playerId: c.playerId, stat, by: by * sign, ...(c.playerName ? { playerName: c.playerName } : {}),
+    playerId: c.playerId, stat, by: by * sign, // IDs-only scoring: never the name
     ...(rest.length ? { extra: Object.fromEntries(rest.map(([k, v]) => [k, v * sign])) } : {}),
     ...(tracked ? { tracked } : {}),
   };
@@ -411,7 +414,9 @@ export function creditAttribution(c: Credit | undefined, sign = 1, tracked?: str
 const second = (a: ScoreAction): Attribution | undefined =>
   a.attribution2 ?? (a.payload?._attr2 as Attribution | undefined);
 
-const samePlayer = (e: LeagueEvent, who: Who) => (who.id && e.playerId === who.id) || (!who.id && !!who.name && e.playerName === who.name);
+/** IDs-only scoring: the same player — by id; by name only when one side of
+ *  the comparison has no id (an older log's name-only sanction). */
+const samePlayer = (e: LeagueEvent, who: Who): boolean => (e.playerId && who.id ? e.playerId === who.id : !!who.name && e.playerName === who.name);
 /** Sin bins a player has had this match (shown on the picker — a second one is the referee's call, not automatic). */
 export const sinBinsOf = (s: LeagueState, side: Side, who: Who): number =>
   s.events.filter((e) => e.type === 'sanction' && e.sanction === 'sinBin' && e.side === side && samePlayer(e, who)).length;
@@ -492,7 +497,7 @@ export const reducer = (s: LeagueState, a: ScoreAction): LeagueState => {
       const team = a.payload?.team;
       if (team !== 'home' && team !== 'away') return s;
       const players = Array.isArray(a.payload?.players)
-        ? (a.payload!.players as { id?: string; name?: string }[]).filter((x) => x?.id).map((x) => ({ id: String(x.id), name: String(x.name ?? '') }))
+        ? (a.payload!.players as { id?: string; name?: string }[]).filter((x) => x?.id).map((x) => ({ id: String(x.id), ...(x.name !== undefined ? { name: String(x.name ?? '') } : {}) }))
         : undefined;
       return { ...s, xi: { ...s.xi, [team]: players ? { players } : {} } };
     }

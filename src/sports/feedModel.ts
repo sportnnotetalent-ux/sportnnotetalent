@@ -25,7 +25,9 @@ export interface FeedRow {
   scoring?: boolean;
   /** a big moment: a lead change, level again, a disqualification */
   tag?: string;
-  /** the player named first (for the profile link) */
+  /** the player named first (for the profile link). IDs-only scoring: by
+   *  `playerId`; `playerName` is the viewer's name (a display copy, never
+   *  stored) or an older log's stored one. */
   playerName?: string;
   playerId?: string;
 }

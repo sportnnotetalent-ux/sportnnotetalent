@@ -14,6 +14,7 @@
 import { trackField, timeLeft, type FieldEvent, type FieldLog, type FieldResult, type Who } from '../onField.ts';
 import { startOffset, halfBase, gcSec, type FootballState } from './engine.ts';
 import { end, keeperTotals, position } from './keepers.ts';
+import { legacyNameOf, nameFor, type NameOf } from '../invasion/names.ts';
 
 type Side = 'home' | 'away';
 type Clock = 'reg' | 'exact';
@@ -45,7 +46,8 @@ export function footballFieldLog(s: FootballState, clock: Clock = 'reg', upTo?: 
     const t = at(e.type === 'sinbin' && typeof e.sec === 'number' ? e.sec / 60 : e.minute, e.half);
     if (scoring) events.push({ kind: 'score', t, side: e.side, points: 1 });
     else if (e.type === 'sub') events.push({ kind: 'sub', t, side: e.side, off: { id: e.playerId, name: e.playerName }, on: { id: e.secondId, name: e.secondName } });
-    else if (e.type === 'red' && e.playerName && !e.official) events.push({ kind: 'off', t, side: e.side, who: { id: e.playerId, name: e.playerName } });
+    // (IDs-only scoring: a red names its player by id; an older one by name)
+    else if (e.type === 'red' && (e.playerName || e.playerId) && !e.official) events.push({ kind: 'off', t, side: e.side, who: { id: e.playerId, name: e.playerName } });
     else if (e.type === 'sinbin' && (e.playerName || e.playerId)) events.push({ kind: 'suspend', t, side: e.side, who: { id: e.playerId, name: e.playerName }, minutes: Number(e.suspendMinutes ?? s.sinBinMinutes ?? 0) });
   }
   const last = events.reduce((m, e) => Math.max(m, e.t), 0);
@@ -87,15 +89,16 @@ export function liveClockMinutes(s: FootballState, nowMs: number): number {
 }
 
 /** For the live banner: players in the sin-bin now (with the time left) and
- *  how many each side has on the pitch. */
-export function footballLiveField(s: FootballState, nowMs: number): {
-  suspended: { side: Side; name: string; left: string }[];
+ *  how many each side has on the pitch. IDs-only scoring: `id` is the
+ *  player; `name` is the viewer's name for them (`nameOf`). */
+export function footballLiveField(s: FootballState, nowMs: number, nameOf: NameOf = legacyNameOf): {
+  suspended: { side: Side; id?: string; name: string; left: string }[];
   onPitch: { home: number; away: number } | null;
   short: { home: number; away: number };
 } {
   const now = position(s, liveClockMinutes(s, nowMs), s.half).exact;
   const r = trackField(footballFieldLog(s, 'exact', now));
-  const suspended = s.ended ? [] : r.suspended.map((x) => ({ side: x.side, name: x.name ?? 'Player', left: timeLeft(x.until, now) }));
+  const suspended = s.ended ? [] : r.suspended.map((x) => ({ side: x.side, ...(x.id ? { id: x.id } : {}), name: nameFor(nameOf, x.id, x.name) ?? 'Player', left: timeLeft(x.until, now) }));
   const both = stamped(s, 'home') && stamped(s, 'away');
   return { suspended, onPitch: both ? { home: r.onField.home.length, away: r.onField.away.length } : null, short: r.short };
 }

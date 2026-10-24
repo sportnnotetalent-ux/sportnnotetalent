@@ -54,6 +54,7 @@ import type { RugbyState } from './rugby/engine.ts';
 import { leagueBox } from './rugby_league/box.ts';
 import type { LeagueState } from './rugby_league/engine.ts';
 import { withRosters, type NameOf } from './racketNames.ts';
+import { withNames as withInvasionNames, nameRow } from './invasion/names.ts';
 
 type Side = 'home' | 'away';
 const other = (s: Side): Side => (s === 'home' ? 'away' : 'home');
@@ -67,8 +68,8 @@ export interface BoxContext {
   homeName?: string;
   awayName?: string;
   /** IDs-only scoring (docs/privacy/ids-only-scoring.md): a player's name for
-   *  this viewer by id. Used by the racket, volleyball and kabaddi boxes
-   *  (their logs keep ids); absent → the stored legacy name / the roster name. */
+   *  this viewer by id. Used by every sport's box (their logs keep ids);
+   *  absent → the stored legacy name / the roster name. */
   nameOf?: NameOf;
 }
 
@@ -373,19 +374,26 @@ const FOOTBALL_TRACK_KEYS: Record<keyof TrackConfig, string[]> = {
 
 export const footballPeriodName = (h: number): string => (h === 1 ? '1st half' : h === 2 ? '2nd half' : h === 3 ? 'ET 1' : 'ET 2');
 
-/** Minutes on the pitch so far, by side + name (only sides with an XI stamp). */
+/** Minutes on the pitch so far, by side + player (its id; an older log's
+ *  name-only player `n:<name>`) — only sides with an XI stamp. */
 function footballMinutes(s: FootballState, now: number): Map<string, number> {
   const out = new Map<string, number>();
   const live = !s.ended && s.startedAt;
   const upTo = live ? position(s, liveClockMinutes(s, now), s.half).reg : undefined;
   for (const p of trackField(footballFieldLog(s, 'reg', upTo)).players) {
-    if (!p.played || !p.name || !s.xi?.[p.side]) continue;
-    out.set(`${p.side}|${p.name}`, Math.round(p.minutes));
+    if (!p.played || !(p.id || p.name) || !s.xi?.[p.side]) continue;
+    out.set(`${p.side}|${p.id ?? `n:${p.name}`}`, Math.round(p.minutes));
   }
   return out;
 }
 
-export function footballBox(s: FootballState, ctx: BoxContext = {}): MatchBoxSource {
+/** IDs-only scoring: the football box keys its rows by player id (an older
+ *  log's name-only player is matched to an id through the stamps / subs /
+ *  squad, else keyed by the name); names are the viewer's (`ctx.nameOf`, the
+ *  stored legacy name / the squad name without one). */
+export function footballBox(s0: FootballState, ctx: BoxContext = {}): MatchBoxSource {
+  const nmOf = withRosters(ctx.nameOf, ctx.homeRoster, ctx.awayRoster);
+  const s = withInvasionNames(s0, nmOf);
   const periods = s.half >= 2 ? Array.from({ length: s.half }, (_, i) => ({ value: i + 1, label: footballPeriodName(i + 1) })) : [];
   const t = s.track;
   const untracked = (Object.keys(FOOTBALL_TRACK_KEYS) as (keyof TrackConfig)[]).filter((k) => t && !t[k]).flatMap((k) => FOOTBALL_TRACK_KEYS[k]);
@@ -399,7 +407,7 @@ export function footballBox(s: FootballState, ctx: BoxContext = {}): MatchBoxSou
       notes: () => (['home', 'away'] as const).map((sd) => {
         const ks = (s.shootout?.kicks ?? []).filter((k) => k.side === sd);
         const name = (sd === 'home' ? ctx.homeName : ctx.awayName) ?? (sd === 'home' ? 'Home' : 'Away');
-        return ks.length ? `Shootout · ${name}: ${ks.map(kickText).join(', ')}` : '';
+        return ks.length ? `Shootout · ${name}: ${ks.map((k) => kickText(nameRow(k, nmOf))).join(', ')}` : '';
       }).filter(Boolean),
     } : null),
     data: (scope) => {
@@ -411,10 +419,22 @@ export function footballBox(s: FootballState, ctx: BoxContext = {}): MatchBoxSou
       const minutes = scope === 'all' ? footballMinutes(s, now) : new Map<string, number>();
       const conceded = new Map<string, number>(); // keeper id → goals let in (whole match)
       if (scope === 'all') for (const [id, k] of Object.entries(keeperTotals(s))) conceded.set(`${k.side}|${id}`, k.stats.goalsConceded);
-      const anyOg = scoped.events.some((e) => e.type === 'owngoal' && !!e.playerName);
+      const anyOg = scoped.events.some((e) => e.type === 'owngoal' && !!(e.playerName || e.playerId));
+      // an older log's name → the id it was seen with (stamps, subs, stats)
+      const known = new Map<string, string>();
+      const note = (id?: string, name?: string) => { if (id && name && !known.has(name)) known.set(name, id); };
+      for (const sd of ['home', 'away'] as const) {
+        const st = s0.xi?.[sd];
+        for (const p of [...(st?.players ?? []), ...(st?.keepers ?? []), ...(st?.gk ? [st.gk] : [])]) note(p.id, p.name);
+      }
+      for (const e of s0.events) { note(e.playerId, e.playerName); note(e.secondId, e.secondName); }
+      for (const e of s0.stats) note(e.playerId, e.playerName);
       const side = (sd: Side): BoxSideInput => {
         const roster = rosterOf(ctx, sd);
         const rows = new Map<string, BoxRowInput>();
+        /** a player's row key: the id, else an older log's name matched to an id, else `n:<name>` */
+        const keyOf = (id: string | undefined, name: string | undefined): string | undefined =>
+          id || (name ? known.get(name) ?? idIn(name, roster) ?? `n:${name}` : undefined);
         const blank = (): Record<string, number> => ({
           goals: 0, assists: 0,
           // SD-80: an OG column only when the match (this scope) had an own goal
@@ -424,34 +444,37 @@ export function footballBox(s: FootballState, ctx: BoxContext = {}): MatchBoxSou
           ...(t?.fouls !== false ? { fouls: 0 } : null),
           ...(t?.cards !== false ? { yellowCards: 0, redCards: 0 } : null),
         });
-        const row = (name: string, id?: string) => {
-          let r = rows.get(name);
-          if (!r) { r = { name, ...(id ? { playerId: id } : null), stats: blank() }; rows.set(name, r); }
-          else if (id && !r.playerId) r.playerId = id;
+        // `name` = the shown name (a named state's); the row's key is the player
+        const row = (name: string | undefined, id?: string): BoxRowInput => {
+          const k = keyOf(id, name) ?? `n:${name ?? ''}`;
+          let r = rows.get(k);
+          const pid = id ?? (k.startsWith('n:') ? undefined : k);
+          if (!r) { r = { name: name || (pid ? nmOf(pid) : 'Player'), ...(pid ? { playerId: pid } : null), stats: blank() }; rows.set(k, r); }
+          else if (pid && !r.playerId) r.playerId = pid;
           return r;
         };
         const bump = (r: BoxRowInput, k: string) => { if (k in r.stats) r.stats[k] += 1; };
         // starters first (the XI stamp), then subs as they came on
         const xi = s.xi?.[sd];
         for (const p of xi?.players ?? (xi?.gk ? [xi.gk] : [])) row(p.name, p.id).starter = true;
-        for (const e of s.events) if (e.side === sd && e.type === 'sub' && e.secondName) row(e.secondName, e.secondId);
+        for (const e of s.events) if (e.side === sd && e.type === 'sub' && (e.secondName || e.secondId)) row(e.secondName, e.secondId);
         for (const e of scoped.events) {
           // SD-80 (FB-13): an own goal counts for the other side; the player who
           // put it in his own net gets OG, never a goal
           if (e.type === 'owngoal') {
-            if (other(e.side) === sd && e.playerName) { const r = row(e.playerName, e.playerId); r.stats.ownGoals = (r.stats.ownGoals ?? 0) + 1; }
+            if (other(e.side) === sd && (e.playerName || e.playerId)) { const r = row(e.playerName, e.playerId); r.stats.ownGoals = (r.stats.ownGoals ?? 0) + 1; }
             continue;
           }
-          if (e.side !== sd || !e.playerName || e.official) continue; // SD-117: an official's card is no player's
+          if (e.side !== sd || !(e.playerName || e.playerId) || e.official) continue; // SD-117: an official's card is no player's
           if (e.type === 'goal') {
-            const r = row(e.playerName);
+            const r = row(e.playerName, e.playerId);
             r.stats.goals += 1; bump(r, 'shots'); bump(r, 'shotsOnTarget'); // a goal is a shot on target
-            if (e.secondName) row(e.secondName).stats.assists += 1;
-          } else if (e.type === 'yellow') bump(row(e.playerName), 'yellowCards');
-          else if (e.type === 'red') bump(row(e.playerName), 'redCards');
+            if (e.secondName || e.secondId) row(e.secondName, e.secondId).stats.assists += 1;
+          } else if (e.type === 'yellow') bump(row(e.playerName, e.playerId), 'yellowCards');
+          else if (e.type === 'red') bump(row(e.playerName, e.playerId), 'redCards');
         }
         for (const e of scoped.stats) {
-          if (e.side !== sd || !e.playerName) continue;
+          if (e.side !== sd || !(e.playerName || e.playerId)) continue;
           if (e.kind === 'shot') { const r = row(e.playerName, e.playerId); bump(r, 'shots'); if (e.onTarget && !e.blocked) bump(r, 'shotsOnTarget'); }
           else if (e.kind === 'save') bump(row(e.playerName, e.playerId), 'saves');
           else if (e.kind === 'foul') bump(row(e.playerName, e.playerId), 'fouls');
@@ -472,15 +495,16 @@ export function footballBox(s: FootballState, ctx: BoxContext = {}): MatchBoxSou
             }
           }
         }
-        for (const r of rows.values()) {
-          const m = minutes.get(`${sd}|${r.name}`);
+        for (const [k, r] of rows) {
+          const m = minutes.get(`${sd}|${k}`);
           if (m !== undefined) r.stats.minutes = m;
           const id = r.playerId ?? idIn(r.name, roster);
           const ga = id ? conceded.get(`${sd}|${id}`) : undefined;
           if (ga !== undefined) r.stats.goalsConceded = ga;
         }
         // the rest of the squad: the bench (listed on request)
-        for (const p of roster) if (!rows.has(p.fullName)) rows.set(p.fullName, { name: p.fullName, playerId: p.id, stats: {}, dnp: true });
+        const listed = new Set([...rows.values()].map((r) => r.playerId).filter(Boolean));
+        for (const p of roster) if (!rows.has(p.id) && !listed.has(p.id)) rows.set(p.id, { name: ctx.nameOf ? ctx.nameOf(p.id, p.fullName) : p.fullName, playerId: p.id, stats: {}, dnp: true });
         const tt = totals[sd];
         return {
           // SD-56: the shirt number, where the squad has one

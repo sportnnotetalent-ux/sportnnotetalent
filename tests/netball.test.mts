@@ -49,6 +49,7 @@ import { assertContract, assertSameAsClean, amendRecord, toRecords, type TotalsS
 import type { ScoreAction } from '../src/sports/types.ts';
 import { replayLog } from '../src/sports/amend.ts';
 import type { Match, Player, SportId, StatLine } from '../src/core/types.ts';
+import type { NameOf } from '../src/core/playerNames.ts';
 
 /* ---------------------------------- helpers --------------------------------- */
 
@@ -56,6 +57,8 @@ const POS: Pos[] = ['GS', 'GA', 'WA', 'C', 'WD', 'GD', 'GK'];
 const HOME = ['hgs', 'hga', 'hwa', 'hc', 'hwd', 'hgd', 'hgk'];
 const AWAY = ['ags', 'aga', 'awa', 'ac', 'awd', 'agd', 'agk'];
 const nm = (id: string) => id.toUpperCase();
+/** IDs-only scoring: the state keeps ids; the viewer's names come from a lookup */
+const VIEWER: NameOf = (id, legacy) => (id ? nm(id) : (legacy ?? '').trim() || 'Player');
 let u = 0;
 function A(type: string, side: Side | undefined, sec: number, period: number, ev: Partial<NetballEvent> = {}, payload: Record<string, unknown> = {}): ScoreAction {
   const cr = eventCredits({ type: ev.type ?? 'timeout', ...ev } as NetballEvent);
@@ -340,17 +343,17 @@ describe('SD-146 · box score, comparison, timeline, ticker, records, game flow'
     assert.equal(c.cpGoals.away + c.gainGoals.away, s.away);
   });
   test('timeline rows: toss, quarter stamps, rebound on the miss row, sanctions', () => {
-    const rows = netballTimeline(s, { home: 'Sharks', away: 'Kites' });
+    const rows = netballTimeline(s, { home: 'Sharks', away: 'Kites' }, VIEWER);
     assert.equal(rows[0].label, 'First centre pass — Sharks');
     assert.equal(rows.find((x) => x.kind === 'goal' && x.half === 2)!.stamp, 'Q2 01:40');
     assert.match(rows.find((x) => x.kind === 'miss')!.detail ?? '', /rebound HGK/);
     assert.equal(rows.find((x) => x.label.startsWith('Suspended'))!.tone, 'wicket');
   });
   test('ticker: shooters with goals / attempts; GOAL! flash once', () => {
-    const d = netballTickerDetail(s, { home: 'Sharks', away: 'Kites' });
+    const d = netballTickerDetail(s, { home: 'Sharks', away: 'Kites', player: VIEWER });
     assert.equal(d.left?.[0], '🥅 HGS 3/4 · HGA 1/1');
     const i = MATCH.findIndex((a) => a.type === 'GOAL' && a.payload?.sec === 1000);
-    const f = netballTickerFlash(run(MATCH.slice(0, i)), run(MATCH.slice(0, i + 1)));
+    const f = netballTickerFlash(run(MATCH.slice(0, i)), run(MATCH.slice(0, i + 1)), VIEWER);
     assert.deepEqual(f, { kind: 'goal', text: 'GOAL! HGA (GA)', sub: '2–1', side: 'home' });
   });
   test('records: team high, biggest win, top shooters, perfect shooting (10+)', () => {

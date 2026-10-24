@@ -63,7 +63,7 @@ export function leagueVoice(text: string, ctx: VoiceContext): ScoreAction[] | nu
     if (!side) return null;
     const made = !MISS.test(q);
     const kicker = said.player ?? matchPlayer(q, roster(side));
-    return [{ type: 'KICK', side, payload: { kick: 'conv', made, ...stamp() }, ...credit({ type: 'kick', kick: 'conv', made, playerId: kicker?.id, playerName: kicker?.fullName }) }];
+    return [{ type: 'KICK', side, payload: { kick: 'conv', made, ...stamp() }, ...credit({ type: 'kick', kick: 'conv', made, playerId: kicker?.id }) }];
   }
   const side = said.side;
   if (!side) return null;
@@ -71,21 +71,21 @@ export function leagueVoice(text: string, ctx: VoiceContext): ScoreAction[] | nu
   if (/\b(field goal|drop ?(goal|kick)|(one|two|1|2) ?-? ?pointer)\b/.test(q)) {
     const made = !MISS.test(q);
     const two = made && s.fg2 && twoSaid;
-    return [{ type: 'KICK', side, payload: { kick: 'fg', made, ...(two ? { two: true } : {}), ...stamp() }, ...credit({ type: 'kick', kick: 'fg', made, two, playerId: player?.id, playerName: player?.fullName }) }];
+    return [{ type: 'KICK', side, payload: { kick: 'fg', made, ...(two ? { two: true } : {}), ...stamp() }, ...credit({ type: 'kick', kick: 'fg', made, two, playerId: player?.id }) }];
   }
   if (/\bpenalty (goal|kick)\b/.test(q)) {
     const made = !MISS.test(q);
-    return [{ type: 'KICK', side, payload: { kick: 'pen', made, ...stamp() }, ...credit({ type: 'kick', kick: 'pen', made, playerId: player?.id, playerName: player?.fullName }) }];
+    return [{ type: 'KICK', side, payload: { kick: 'pen', made, ...stamp() }, ...credit({ type: 'kick', kick: 'pen', made, playerId: player?.id }) }];
   }
   const sanction: lg.Sanction | null = /\bsin ?bin(ned)?\b/.test(q) ? 'sinBin' : /\b(send ?off|sent off)\b/.test(q) ? 'sendOff' : /\bon report\b/.test(q) ? 'report' : null;
   if (sanction) {
-    return [{ type: 'SANCTION', side, payload: { sanction, ...stamp() }, ...credit({ type: 'sanction', sanction, playerId: player?.id, playerName: player?.fullName }) }];
+    return [{ type: 'SANCTION', side, payload: { sanction, ...stamp() }, ...credit({ type: 'sanction', sanction, playerId: player?.id }) }];
   }
   if (/\btry\b|\bscores?\b/.test(q)) {
     const m = /\b(assist(?:ed)?(?: by)?|pass from|from)\b(.*)$/.exec(deburr(q));
     const scorer = m ? matchPlayer(q.slice(0, m.index), roster(side)) : player;
     const assist = m ? matchPlayer(m[2], roster(side).filter((p) => p.id !== scorer?.id)) : undefined;
-    return [{ type: 'TRY', side, payload: stamp(), ...credit({ type: 'try', playerId: scorer?.id, playerName: scorer?.fullName, secondId: assist?.id, secondName: assist?.fullName }) }];
+    return [{ type: 'TRY', side, payload: stamp(), ...credit({ type: 'try', playerId: scorer?.id, secondId: assist?.id }) }];
   }
   return null;
 }

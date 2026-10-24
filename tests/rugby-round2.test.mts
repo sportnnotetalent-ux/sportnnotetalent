@@ -80,7 +80,8 @@ describe('round 2 · free kicks credit a player (optional)', () => {
     assert.deepEqual(eventCredits({ type: 'tally', tally: 'freeKick', playerId: 'a4', playerName: 'A4' }).first?.stats, { freeKicksConceded: 1 });
     assert.equal(eventCredits({ type: 'tally', tally: 'freeKick' }).first, undefined);
     const cr = eventCredits({ type: 'tally', tally: 'freeKick', playerId: 'a4', playerName: 'A4' });
-    assert.deepEqual(creditAttribution(cr.first, -1), { playerId: 'a4', stat: 'freeKicksConceded', by: -1, playerName: 'A4' }, 'undo reverses it');
+    // IDs-only scoring: the reversal names the player by id only
+    assert.deepEqual(creditAttribution(cr.first, -1), { playerId: 'a4', stat: 'freeKicksConceded', by: -1 }, 'undo reverses it');
   });
   test('statTotals = live sums on every prefix; once asked, everyone reads 0', () => {
     const SPORT: TotalsSport<RugbyState> = { name: 'rugby round 2', init, reducer, statTotals: rugbyTotals, partial: false, derived: DERIVED_KEYS, config: PEN };

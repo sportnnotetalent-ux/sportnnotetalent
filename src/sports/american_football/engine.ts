@@ -85,10 +85,12 @@ export interface AFEvent {
   /** TD scorer / try scorer or kicker / FG kicker / safety: the defender /
    *  play: carrier, passer, punter, the player who fumbled / tackler */
   playerId?: string;
+  /** @deprecated legacy, read-only — IDs-only logs (docs/privacy/ids-only-scoring.md) keep the id; the name is looked up when shown (invasion/names.ts) */
   playerName?: string;
   /** TD pass / pass play: the passer (TD) or the receiver (play); int /
    *  fumble / sack: the defender */
   secondId?: string;
+  /** @deprecated legacy, read-only — IDs-only logs (docs/privacy/ids-only-scoring.md) keep the id; the name is looked up when shown (invasion/names.ts) */
   secondName?: string;
   how?: TdHow;
   yards?: number;
@@ -126,7 +128,8 @@ export interface AFEvent {
   pdef?: boolean;
 }
 
-export interface XiStamp { players?: { id: string; name: string }[] }
+/** IDs-only scoring: new stamps carry ids only (`name` = an older stamp's, read-only). */
+export interface XiStamp { players?: { id: string; name?: string }[] }
 
 export interface AFState {
   home: number;
@@ -435,7 +438,7 @@ export function creditAttribution(c: Credit | undefined, sign = 1, tracked?: str
   if (!entries.length) return undefined;
   const [[stat, by], ...rest] = entries;
   return {
-    playerId: c.playerId, stat, by: by * sign, ...(c.playerName ? { playerName: c.playerName } : {}),
+    playerId: c.playerId, stat, by: by * sign, // IDs-only scoring: never the name
     ...(rest.length ? { extra: Object.fromEntries(rest.map(([k, v]) => [k, v * sign])) } : {}),
     ...(tracked ? { tracked } : {}),
   };
@@ -505,7 +508,8 @@ export function buildPlay(s: AFState, side: Side, inp: PlayInput, stamp: Record<
       ...(inp.newSpot !== undefined ? { newSpot: inp.newSpot } : {}), ...(inp.ret !== undefined ? { ret: inp.ret } : {}),
       ...(inp.foul ? { foul: inp.foul } : {}), ...(inp.on ? { on: inp.on } : {}),
       ...(inp.autoFirst ? { autoFirst: true } : {}), ...(inp.lossOfDown ? { lossOfDown: true } : {}),
-      ...(inp.p1 && !inp.p1.id && inp.p1.name ? { p1Name: inp.p1.name } : {}),
+      // IDs-only scoring: a player is credited by id only — an older log's
+      // `p1Name` (a name-only player) is still read by the reducer, never written
     },
     ...credit(ev, side),
   };
@@ -652,7 +656,7 @@ export const reducer = (s: AFState, a: ScoreAction): AFState => {
       const team = a.payload?.team;
       if (team !== 'home' && team !== 'away') return s;
       const players = Array.isArray(a.payload?.players)
-        ? (a.payload!.players as { id?: string; name?: string }[]).filter((x) => x?.id).map((x) => ({ id: String(x.id), name: String(x.name ?? '') }))
+        ? (a.payload!.players as { id?: string; name?: string }[]).filter((x) => x?.id).map((x) => ({ id: String(x.id), ...(x.name !== undefined ? { name: String(x.name ?? '') } : {}) }))
         : undefined;
       return { ...s, xi: { ...s.xi, [team]: players ? { players } : {} } };
     }
@@ -766,6 +770,7 @@ export const reducer = (s: AFState, a: ScoreAction): AFState => {
         ...(newSpot !== undefined ? { newSpot } : {}), ...(typeof a.payload?.ret === 'number' ? { ret: a.payload.ret as number } : {}),
         ...(typeof a.payload?.foul === 'string' ? { foul: a.payload.foul as string } : {}), ...(on ? { on } : {}),
         ...(a.payload?.autoFirst ? { autoFirst: true } : {}), ...(a.payload?.lossOfDown ? { lossOfDown: true } : {}),
+        // legacy (read-only): a name-only player's name from an older log
         ...(!w1.playerName && typeof a.payload?.p1Name === 'string' ? { playerName: a.payload.p1Name as string } : {}),
         ...(a.payload?.tgt === true && (play === 'pass' || play === 'inc') ? { tgt: true } : {}),
         ...(a.payload?.pdef === true && play === 'int' ? { pdef: true } : {}),

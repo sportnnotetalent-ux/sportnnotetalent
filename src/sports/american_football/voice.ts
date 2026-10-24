@@ -53,7 +53,7 @@ export function afVoice(text: string, ctx: VoiceContext): ScoreAction[] | null {
   }
   const said = resolveSide(noNumbers(text), ctx);
   const roster = (sd: Side): Player[] => (sd === 'home' ? ctx.homeRoster : ctx.awayRoster);
-  const who = (p?: Player): af.Who | undefined => (p ? { id: p.id, name: p.fullName } : undefined);
+  const who = (p?: Player): af.Who | undefined => (p ? { id: p.id } : undefined);
   const y = yardsIn(q);
   const lastTd = [...s.events].reverse().find((e) => e.type === 'td');
 
@@ -66,7 +66,7 @@ export function afVoice(text: string, ctx: VoiceContext): ScoreAction[] | null {
     const kind: af.TryKind = /\b(two|2) ?(point|pt)\b/.test(q) ? 'two' : /\b(one|1) ?point\b/.test(q) || s.variant === 'flag' ? 'one' : 'kick';
     const good = !MISS.test(q);
     const p = said.player ?? matchPlayer(noNumbers(q), roster(side));
-    return [{ type: 'TRY', side, payload: { kind, good, ...stamp() }, ...af.credit({ type: 'try', kind, good, playerId: p?.id, playerName: p?.fullName }) }];
+    return [{ type: 'TRY', side, payload: { kind, good, ...stamp() }, ...af.credit({ type: 'try', kind, good, playerId: p?.id }) }];
   }
   if (/\bsafety\b/.test(q)) {
     const side = said.side ?? (s.drive ? af.other(s.drive.off) : undefined);
@@ -78,7 +78,7 @@ export function afVoice(text: string, ctx: VoiceContext): ScoreAction[] | null {
     const good = !MISS.test(q);
     const yards = y ?? (s.drive ? af.fgDistance(s, s.drive.spot) : undefined);
     const p = said.player;
-    return [{ type: 'FG', side, payload: { good, ...(yards ? { yards } : {}), ...stamp() }, ...af.credit({ type: 'fg', good, playerId: p?.id, playerName: p?.fullName }) }];
+    return [{ type: 'FG', side, payload: { good, ...(yards ? { yards } : {}), ...stamp() }, ...af.credit({ type: 'fg', good, playerId: p?.id }) }];
   }
   if (/\btouch ?down\b|\btd\b/.test(q)) {
     const side = said.side ?? s.drive?.off;
@@ -93,7 +93,7 @@ export function afVoice(text: string, ctx: VoiceContext): ScoreAction[] | null {
     const yards = y ?? (pbpTd ? s.field - s.drive!.spot : undefined);
     // deep wave: a touchdown catch recorded with "Targets" on is a target too
     const tgt = s.trackTargets && pbpTd && how === 'pass' ? { tgt: true } : {};
-    const ev = { type: 'td' as const, how, yards, pbp: pbpTd, ...tgt, playerId: scorer?.id, playerName: scorer?.fullName, ...(how === 'pass' && passer ? { secondId: passer.id, secondName: passer.fullName } : {}) };
+    const ev = { type: 'td' as const, how, yards, pbp: pbpTd, ...tgt, playerId: scorer?.id, ...(how === 'pass' && passer ? { secondId: passer.id } : {}) };
     return [{ type: 'TD', side, payload: { how, ...(yards != null ? { yards } : {}), ...(pbpTd ? { pbp: true } : {}), ...tgt, ...stamp() }, ...af.credit(ev) }];
   }
 

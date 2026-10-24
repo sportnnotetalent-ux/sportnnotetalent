@@ -14,11 +14,13 @@ import type { FeedGroup, FeedRow } from '../feedModel.ts';
 import { leadTracker } from '../feedModel.ts';
 import { clockText, goalPoints, periodName, secInPeriod, TURNOVER_LABEL, type NetballEvent, type NetballState, type Side } from './engine.ts';
 import { centreSplit, nbGameOrder, posAt, reboundKind } from './deep.ts';
+import { legacyNameOf, withNames, type NameOf } from '../invasion/names.ts';
 
 const STOP_WORD = { injury: 'injury / illness', blood: 'blood', tactical: 'a tactical change', other: 'a stoppage' } as const;
 
 /** The netball play-by-play: period groups, newest first. */
-export function netballFeed(s: NetballState, names: { home: string; away: string }): FeedGroup[] {
+export function netballFeed(s0: NetballState, names: { home: string; away: string }, nameOf: NameOf = legacyNameOf): FeedGroup[] {
+  const s = withNames(s0, nameOf);
   const order = nbGameOrder(s);
   const split = centreSplit(s);
   const lead = leadTracker(names);

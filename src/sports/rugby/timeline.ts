@@ -5,6 +5,7 @@ import { shootoutOrderRows } from '../shootoutOrder.ts';
 import {
   minuteText, periodName, clockAt, pointsOf, CAUSE_LABEL, DETAIL_LABEL, INFRINGEMENT_LABEL, KICK_LABEL, TALLY_LABEL, type RugbyEvent, type RugbyState,
 } from './engine.ts';
+import { legacyNameOf, withNames, type NameOf } from '../invasion/names.ts';
 
 /** One row's icon + words ("🏉 Try · Asha Rao · assist Meera"). */
 export function describeEvent(e: RugbyEvent): { icon: string; label: string; detail?: string } {
@@ -46,7 +47,8 @@ export function describeEvent(e: RugbyEvent): { icon: string; label: string; det
 /** The viewer timeline (LiveTimeline sorts by id: period, then playing time).
  *  Detail, set-piece and the optional tally rows stay off it (they'd drown
  *  the scores) — they're in the commentary, the stats sheet and the box. */
-export function rugbyTimeline(s: RugbyState, names?: { home?: string; away?: string }): LiveEvent[] {
+export function rugbyTimeline(s0: RugbyState, names?: { home?: string; away?: string }, nameOf: NameOf = legacyNameOf): LiveEvent[] {
+  const s = withNames(s0, nameOf);
   return [...s.events.map((e, i) => ({ e, i })).filter(({ e }) => e.type !== 'detail' && e.type !== 'setpiece' && e.type !== 'tally').map(({ e, i }) => {
     const d = describeEvent(e);
     const name = e.type === 'sub' ? e.secondName : e.official ? undefined : e.playerName;
@@ -70,10 +72,11 @@ export function rugbyTimeline(s: RugbyState, names?: { home?: string; away?: str
 export const eventWhen = (s: RugbyState, e: RugbyEvent): string => `${periodName(s, e.period)} · ${clockAt(s, e.period, e.psec)}`;
 
 /** SD-115 — what Undo removes: "Try · Asha Rao (12-7)", "Conversion good · Meera". */
-export function rugbyUndoLabel(step: { type: string; prev: unknown; next: unknown } | null | undefined): string | null {
+export function rugbyUndoLabel(step: { type: string; prev: unknown; next: unknown } | null | undefined, nameOf: NameOf = legacyNameOf): string | null {
   if (!step) return null;
   const prev = step.prev as RugbyState | null;
-  const next = step.next as RugbyState | null;
+  // IDs-only scoring: the players by id, for this viewer
+  const next = step.next ? withNames(step.next as RugbyState, nameOf) : null;
   if (step.type === 'CLOCK') return 'clock start / stop';
   if (step.type === 'SET_CLOCK') return 'clock set';
   if (step.type === 'END_PERIOD') return 'end of the period';

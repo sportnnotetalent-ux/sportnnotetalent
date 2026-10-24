@@ -3,6 +3,7 @@
 import type { LiveEvent } from '../liveEvents';
 import { shootoutOrderRows } from '../shootoutOrder.ts';
 import { eventWhen, mmss, periodOffset, FO_ZONE_SHORT, PEN_LABEL, STRENGTH_LABEL, TALLY_LABEL, type IceEvent, type IceHockeyState } from './engine.ts';
+import { legacyNameOf, withNames, type NameOf } from '../invasion/names.ts';
 
 const PEN_ICON = { minor: '⏱', bench: '⏱', double: '⏱', major: '🟥', majorGm: '🟥', misconduct: '🕙', gm: '🚫', match: '🚫' } as const;
 
@@ -56,7 +57,8 @@ export function describeEvent(e: IceEvent): { icon: string; label: string; detai
 /** The viewer timeline (LiveTimeline sorts by id: game time). Shots and the
  *  optional tallies are left out (there are dozens) — they're in the box
  *  score, the stats sheet and the commentary. */
-export function iceHockeyTimeline(s: IceHockeyState, names?: { home?: string; away?: string }): LiveEvent[] {
+export function iceHockeyTimeline(s0: IceHockeyState, names?: { home?: string; away?: string }, nameOf: NameOf = legacyNameOf): LiveEvent[] {
+  const s = withNames(s0, nameOf);
   return [...s.events.filter((e) => e.type !== 'shot' && e.type !== 'tally').map((e, i) => {
     const d = describeEvent(e);
     return {

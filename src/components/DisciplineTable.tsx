@@ -10,18 +10,25 @@ import { theme } from '../core/theme';
 import { Card, SelectChip, textStyles } from './ui';
 import { sportDisciplineTable, sportRuleText, DISCIPLINE_SPECS, type DisciplineMatch } from '../sports/discipline';
 import { playerLink } from '../sports/playerLink';
+import { useMask } from '../core/disputeMask';
+import type { NameOf } from '../core/playerNames';
 import type { SportId } from '../core/types';
 
 const CAP = 8;
 
-export function DisciplineTable({ matches, format, onPlayer, sport = 'football' }: {
+export function DisciplineTable({ matches, format, onPlayer, sport = 'football', nameOf: givenNameOf }: {
   matches: DisciplineMatch[];
   format?: Record<string, unknown> | null;
   onPlayer?: (playerId: string) => void;
   /** default football (SD-70) */
   sport?: SportId;
+  /** IDs-only scoring: the viewer's player names by id (players_view); else
+   *  the screen's name lookup (useMask), else the names older logs stored */
+  nameOf?: NameOf;
 }) {
-  const t = useMemo(() => sportDisciplineTable(sport, matches, format), [sport, matches, format]);
+  const { nameOf: maskNameOf } = useMask();
+  const nameOf = givenNameOf ?? maskNameOf;
+  const t = useMemo(() => sportDisciplineTable(sport, matches, format, nameOf), [sport, matches, format, nameOf]);
   const [all, setAll] = useState(false);
   if (!t || (!t.rows.length && !t.officials.length)) return null;
   const rows = all ? t.rows : t.rows.slice(0, CAP);
