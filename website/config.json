@@ -6,5 +6,27 @@
   "homeCountry": "India",
   "supportHours": "Monday to Saturday, 10:00–18:00 India time (UTC+5:30)",
   "supportReply": "We read every message and reply within 7 days.",
-  "pricingLine": "Free while we’re new; a small fee later, announced 30 days in advance."
+  "pricingLine": "Free while we’re new; a small fee later, announced 30 days in advance.",
+  "social": [
+    {
+      "label": "Instagram",
+      "url": "https://instagram.com/sportnnote"
+    },
+    {
+      "label": "LinkedIn",
+      "url": "https://linkedin.com/company/sportnnote"
+    },
+    {
+      "label": "YouTube",
+      "url": "https://youtube.com/@sportnnote"
+    },
+    {
+      "label": "Facebook",
+      "url": "https://facebook.com/sportnnote"
+    },
+    {
+      "label": "X",
+      "url": "https://x.com/sportnnote"
+    }
+  ]
 }

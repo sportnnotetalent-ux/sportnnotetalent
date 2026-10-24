@@ -95,7 +95,11 @@ ${/<main\b/.test(body) ? body.replace(/<main(?![^>]*\bid=)/, '<main id="main"') 
     <a href="/terms/">Terms of Use</a>
     <a href="/delete-account/">Delete account</a>
     <a href="/accessibility/">Accessibility</a>
-  </nav>
+  </nav>${(cfg.social ?? []).length ? `
+  <nav class="social" aria-label="SportnNote on social media">
+    <span>Follow SportnNote</span>
+    ${cfg.social.map((x) => `<a href="${esc(x.url)}" rel="me noopener">${esc(x.label)}</a>`).join('\n    ')}
+  </nav>` : ''}
 </div></footer>
 </body>
 </html>
@@ -381,6 +385,11 @@ const androidSteps = cfg.androidApkUrl
      <a class="btn btn-primary" href="${cfg.appUrl}">Open in Chrome</a>`;
 
 const home = page({
+  // who SportnNote is, and its official profiles (search engines link them)
+  head: ldJson({
+    '@context': 'https://schema.org', '@type': 'Organization', name: 'SportnNote',
+    url: cfg.siteUrl, logo: `${cfg.siteUrl}/icon.png`, sameAs: (cfg.social ?? []).map((x) => x.url),
+  }),
   title: 'SportnNote — score every match, run any tournament',
   description: `Live scoring, tournaments, stats and player profiles for ${SPORTS.length} sports — cricket, football, badminton, golf and more. For schools, clubs and open tournaments anywhere.`,
   path: '/',
