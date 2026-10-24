@@ -13,6 +13,48 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-24 — School & college verification, Phase 1
+The founder wants proof that a school community is created by someone who speaks for the school. Decisions: optional and never blocking; all three authority routes; one verified community per official ID; support-only review (an easy queue for a future support team); existing communities are asked registered or informal. Design and next phases: `docs/verification/org-verification.md`.
+- **Migration `20261025190000_org_verification.sql`:**
+  - **Registration:** `organizations.registered` (null = not stated). `guard_org_verification` now refuses an unregistered School / College, and a change of name, type or registration removes the ✓.
+  - **Official IDs:** `org_official_ids` (country, type, value; `locked` on approval; unique among locked). `norm_official_id` / `valid_official_id` (UDISE+ 11 digits, AISHE C-/U-/S-, CBSE, CISCE, state board, IB, Cambridge, NIOS).
+  - **Requests and codes:** `org_verifications` (document, authority email / letter / head, status, checks, history) and `org_verification_codes` (hashed; email code 30 min / 5 tries; Head link 14 days). All closed to clients.
+  - **Functions:**
+    - `org_verification_state`, `set_org_official_ids` (refuses an ID already verified elsewhere; a change on a verified org unverifies it), `org_id_lookup`;
+    - `save_org_verification` (own upload folder only), `create_org_code` (service role), `verify_org_email_code`, `org_head_preview` / `org_head_decide` (anon), `submit_org_verification` (UDISE+ / AISHE + document + authority);
+    - `org_verification_queue` / `decide_org_verification` (support only; locks the IDs);
+    - an after-trigger unlocks IDs when the ✓ goes;
+    - `pending_org_verifications` / `review_org_verification` are now support only;
+    - `due_org_verification_docs` / `mark_org_docs_deleted`.
+- **Edge functions:**
+  - new **`org-verify`**: the email code, and the Head's confirmation email; it checks the caller is an Owner / Admin with `org_is_admin`, and is limited to 5 emails per hour per community;
+  - `verification-submit`: organisation requests now alert support only (`alertReviewers(…, { supportOnly })`);
+  - `privacy-retention`: deletes school documents 30 days after the decision.
+- **App:**
+  - **`core/orgVerification.ts` (pure):** ID rules, document kinds, authority options, the free-mailbox flag, `verificationProgress`, send-back reasons (short for 375 px), `reviewChecks`, the authorisation letter HTML.
+  - **`data/orgVerification.ts`:** with an in-memory demo (email code 123456; the Head link shows as "Demo: open the Head's page").
+  - **CreateCommunity:** "Is it a registered organisation?" first; types follow the answer; for a School / College, the UDISE+ / AISHE code, with a live check ("already verified → open it" blocks creating; "others entered it" warns).
+  - **OrgVerificationCard:** asks registered / informal; "Get verified" / pending / sent back / verified; refreshes on focus; support sees Remove or "Review it in the queue".
+  - **New screens:** `OrgVerifyScreen` (the three steps, letter template, Head email) and public `OrgConfirmScreen` (`/org-confirm`).
+  - **Review screen:** support's `OrgReview` card (IDs + register links + duplicate warnings, document, authority, three-tick checklist, reasons; Approve locked until all are ticked and the Head has confirmed).
+  - **Edit details:** the type list follows registration.
+  - **Elsewhere:** `org-verify` is pinned in `functionRegion`.
+- **Guides:**
+  - new **`verify-your-school.md`** (116 guides);
+  - `players-age-rule.md` points to it.
+- **Verified:**
+  - `tests/org-verification.test.mts` (18; includes "client ID rules == SQL rules"); suite 4689 / 0 fail; tsc clean; edge functions typecheck.
+  - Demo, end to end:
+    - create "Sunrise Public School" (registered, School, UDISE+) → Get verified → UDISE+ + CBSE → board affiliation letter → official email code → send;
+    - and the Head route: Email the Head → the Head's page shows the requester, school and both codes → "✓ Yes, they're authorised" → "✓ Confirmed by Dr. A. Rao";
+    - support queue card at 375 px → tick 3 → Approve → "✓ Sunrise Public School verified — its admins have been told" → the page shows "Verified · School" and "📋 Confirm members' dates of birth";
+    - no console errors.
+  - Found while testing: long send-back chips overflowed at 375 px; shortened.
+- **Needs:**
+  - the founder runs the migration, before publishing: the app reads the new column and functions;
+  - deploy org-verify, verification-submit and privacy-retention;
+  - publish web + Android.
+
 ### 2026-10-24 — Fixes the guide writers found (7)
 Migration `20261025170000_guide_review_fixes.sql`, guardian-consent function, app.
 1. **Certificates: revoke with a reason, then issue again.**

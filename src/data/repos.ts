@@ -5008,6 +5008,7 @@ const toOrganization = (r: any, members: OrgMember[]): Organization => ({
   market: r.market ?? undefined,
   ...(r.verified_at ? { verifiedAt: r.verified_at as string } : {}),
   ...(r.verification_requested_at ? { verificationRequestedAt: r.verification_requested_at as string } : {}),
+  ...(typeof r.registered === 'boolean' ? { registered: r.registered as boolean } : {}),
 });
 // houses (migration 0022) is optional in the select so reads still work pre-migration.
 const ORG_SELECT = 'id, name, type, logo_url, city, email, phone, bio, academic_years, graduating_standard';
@@ -5018,8 +5019,15 @@ let orgMarketCol = true;
 // Verification fast lanes (migration 20261024180000_verification_lanes): a
 // verified school / club — same once-missing memo.
 let orgVerifyCols = true;
+// School verification Phase 1 (migration 20261025190000_org_verification): registered.
+let orgRegisteredCol = true;
 const isMissingCol = (e: unknown) => ['42703', 'PGRST204'].includes(String((e as { code?: string } | null)?.code ?? ''));
 async function withOrgCols<T>(build: (cols: string) => PromiseLike<{ data: T | null; error: unknown }>): Promise<{ data: T | null; error: unknown }> {
+  if (orgRegisteredCol && orgVerifyCols && orgMarketCol) {
+    const withRegistered = await build(`${ORG_SELECT_FULL}, market, verified_at, verification_requested_at, registered`);
+    if (!withRegistered.error) return withRegistered;
+    orgRegisteredCol = false;
+  }
   if (orgVerifyCols && orgMarketCol) {
     const withVerify = await build(`${ORG_SELECT_FULL}, market, verified_at, verification_requested_at`);
     if (!withVerify.error) return withVerify;
@@ -5100,6 +5108,8 @@ export interface NewOrganization {
   market?: string;
   /** SD-153: asked when a School/College is created, prefilled from the market */
   graduatingStandard?: string;
+  /** a registered organisation or an informal group (migration 20261025190000) */
+  registered?: boolean;
 }
 
 /** Create a community/organization; the creator becomes its first Admin. The
@@ -5117,7 +5127,13 @@ export async function createOrganization(input: NewOrganization, creatorPlayerId
     const row: Record<string, unknown> = { name: input.name, type: input.type ?? null, city: input.city ?? null, email: input.email ?? null, phone: contactPhone(input.phone), members: [] };
     if (input.graduatingStandard) row.graduating_standard = input.graduatingStandard;
     if (input.market) row.market = input.market;
+    if (typeof input.registered === 'boolean' && orgRegisteredCol) row.registered = input.registered;
     let res = await supabase.from('organizations').insert(row).select(ORG_SELECT).single();
+    if (res.error && row.registered !== undefined && isMissingCol(res.error)) {
+      // No registered column yet (migration 20261025190000 not run): create without it.
+      delete row.registered;
+      res = await supabase.from('organizations').insert(row).select(ORG_SELECT).single();
+    }
     if (res.error && row.market !== undefined && isMissingCol(res.error)) {
       // No market column yet (SD-153 migration not run): create without it.
       delete row.market;

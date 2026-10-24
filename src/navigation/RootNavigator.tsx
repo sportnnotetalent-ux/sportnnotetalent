@@ -74,6 +74,8 @@ const CertificatesScreen = lazyScreen(() => import('../screens/CertificatesScree
 const CertificateScreen = lazyScreen(() => import('../screens/CertificateScreen'));
 const PassportScreen = lazyScreen(() => import('../screens/PassportScreen'));
 const HallOfFameScreen = lazyScreen(() => import('../screens/HallOfFameScreen'));
+const OrgVerifyScreen = lazyScreen(() => import('../screens/OrgVerifyScreen'));
+const OrgConfirmScreen = lazyScreen(() => import('../screens/OrgConfirmScreen'));
 const MessageReportsScreen = lazyScreen(() => import('../screens/MessageReportsScreen'));
 const GolfRoundScreen = lazyScreen(() => import('../screens/GolfRoundScreen'));
 const GolfRoundSetupScreen = lazyScreen(() => import('../screens/GolfRoundSetupScreen'));
@@ -138,7 +140,7 @@ const Tab = createBottomTabNavigator<TabParamList>();
 // the Join screen with the code prefilled.
 // Stack screens reachable by URL on web (/GolfRound?eventId=…). Keep in sync with
 // the <Stack.Screen> list below — a screen missing here just opens Home on refresh.
-const STACK_SCREENS = new Set<string>(['Americano', 'AssignScorers', 'AthleticsEventSetup', 'CorrectMatch', 'Bracket', 'Calendar', 'ClubHome', 'ClubSport', 'Clubs', 'MyTournaments', 'CompetitionRules', 'Contingents', 'Conversation', 'CreateClub', 'CreateCommunity', 'CreateListing', 'CreateSeries', 'CreateTournament', 'CricketLineup', 'DeleteAccount', 'DiscoverOrgs', 'EditMatch', 'EditProfile', 'EditTeam', 'EditTournament', 'Feedback', 'Following', 'GenerateFixtures', 'GolfCourseEdit', 'GolfRound', 'GolfRoundSetup', 'GuardianConsent', 'GuardianLink', 'HeadToHead', 'InviteFriend', 'ImportSchedule', 'RosterImport', 'JoinClub', 'JoinTeam', 'JoinTournament', 'Legal', 'LineupEditor', 'LiveScoring', 'ManageChild', 'MatchLink', 'OrgDobs', 'Certificates', 'MatchSquad', 'MeetEntries', 'MeetTimetable', 'MessageReports', 'Messages', 'NotificationPrefs', 'RegionSettings', 'Notifications', 'Organization', 'OrganizerDashboard', 'PlayerProfile', 'Privacy', 'RecordBoard', 'ResultsEvent', 'ResultsLab', 'ScanQR', 'ScheduleMatch', 'Series', 'Settings', 'SportHub', 'SportProfile', 'SportSettings', 'Squad', 'Standings', 'Support', 'SwissRound', 'Team', 'TeamJourney', 'Teams', 'Tournament', 'TournamentTeams', 'TryNewSport', 'VerificationReview']);
+const STACK_SCREENS = new Set<string>(['Americano', 'AssignScorers', 'AthleticsEventSetup', 'CorrectMatch', 'Bracket', 'Calendar', 'ClubHome', 'ClubSport', 'Clubs', 'MyTournaments', 'CompetitionRules', 'Contingents', 'Conversation', 'CreateClub', 'CreateCommunity', 'CreateListing', 'CreateSeries', 'CreateTournament', 'CricketLineup', 'DeleteAccount', 'DiscoverOrgs', 'EditMatch', 'EditProfile', 'EditTeam', 'EditTournament', 'Feedback', 'Following', 'GenerateFixtures', 'GolfCourseEdit', 'GolfRound', 'GolfRoundSetup', 'GuardianConsent', 'GuardianLink', 'HeadToHead', 'InviteFriend', 'ImportSchedule', 'RosterImport', 'JoinClub', 'JoinTeam', 'JoinTournament', 'Legal', 'LineupEditor', 'LiveScoring', 'ManageChild', 'MatchLink', 'OrgDobs', 'OrgVerify', 'Certificates', 'MatchSquad', 'MeetEntries', 'MeetTimetable', 'MessageReports', 'Messages', 'NotificationPrefs', 'RegionSettings', 'Notifications', 'Organization', 'OrganizerDashboard', 'PlayerProfile', 'Privacy', 'RecordBoard', 'ResultsEvent', 'ResultsLab', 'ScanQR', 'ScheduleMatch', 'Series', 'Settings', 'SportHub', 'SportProfile', 'SportSettings', 'Squad', 'Standings', 'Support', 'SwissRound', 'Team', 'TeamJourney', 'Teams', 'Tournament', 'TournamentTeams', 'TryNewSport', 'VerificationReview']);
 
 // Web deep links / refresh. React Navigation 7 only recognises screens listed in
 // `config`, and a URL that resolves to NO state makes it call resetRoot(undefined),
@@ -185,6 +187,8 @@ const linking: LinkingOptions<RootStackParamList> = {
       Certificate: 'c/:code',
       Passport: 'pp/:code?',
       HallOfFame: 'h/:orgId',
+      // school verification: the Head of School's confirmation link (?c=CODE) — public
+      OrgConfirm: 'org-confirm',
       Invite: 'i/:playerId',
       // "Join me on SportnNote" — a friend's personal invite.
       GetApp: 'get/:from?',
@@ -348,6 +352,8 @@ export default function RootNavigator() {
       <Stack.Screen name="Passport" component={PassportScreen} options={{ ...stackScreenOpts, title: 'Career passport' }} />
       {/* School hall of fame: public once the school publishes it */}
       <Stack.Screen name="HallOfFame" component={HallOfFameScreen} options={{ ...stackScreenOpts, title: 'Hall of fame' }} />
+      {/* School verification: the Head confirms who manages the school (no account needed) */}
+      <Stack.Screen name="OrgConfirm" component={OrgConfirmScreen} options={{ ...stackScreenOpts, title: 'Confirm' }} />
       <Stack.Screen name="Invite" component={InviteScreen} options={{ ...stackScreenOpts, title: 'Join SportnNote' }} />
       <Stack.Screen name="GetApp" component={GetAppScreen} options={{ ...stackScreenOpts, title: 'Join SportnNote' }} />
       <Stack.Screen
@@ -638,6 +644,7 @@ export default function RootNavigator() {
             <Stack.Screen name="ManageChild" component={ManageChildScreen} options={{ ...stackScreenOpts, title: 'Manage child’s account' }} />
             <Stack.Screen name="OrgDobs" component={OrgDobsScreen} options={{ ...stackScreenOpts, title: 'Confirm dates of birth' }} />
             <Stack.Screen name="Certificates" component={CertificatesScreen} options={{ ...stackScreenOpts, title: 'Certificates' }} />
+            <Stack.Screen name="OrgVerify" component={OrgVerifyScreen} options={{ ...stackScreenOpts, title: 'Get verified' }} />
             <Stack.Screen name="Privacy" component={PrivacyScreen} options={{ ...stackScreenOpts, title: 'Your data & privacy' }} />
             <Stack.Screen
               name="Following"

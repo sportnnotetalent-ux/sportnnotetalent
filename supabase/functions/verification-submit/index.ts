@@ -75,8 +75,9 @@ Deno.serve(async (req) => {
     if (!o?.verification_requested_at || o.verified_at) return json({ delivered: false, error: 'nothing to review' }, 400);
     const sent = await alertReviewers(
       '🏫 A school or club asks to be verified',
-      `${(o.name ?? 'An organisation').slice(0, 80)} wants to be verified, so it can confirm its members' dates of birth. Check it's genuine, then verify it in the review queue.`,
+      `${(o.name ?? 'An organisation').slice(0, 80)} sent its official ID, a recognition document and proof the person is authorised. Check them against the public register in the review queue.`,
       `org-${orgId}`,
+      { supportOnly: true },
     );
     return json({ delivered: sent.app + sent.web > 0 || sent.email });
   }

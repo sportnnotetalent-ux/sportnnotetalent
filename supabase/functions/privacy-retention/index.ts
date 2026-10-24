@@ -70,11 +70,27 @@ Deno.serve(async (req) => {
     else docsDone++;
   }
 
+  // School / college verification documents (migration 20261025190000): the
+  // recognition document and any authorisation letter, 30 days after support's
+  // decision. Files live under "<uploader>/org-<orgId>/".
+  const { data: orgDocs, error: oErr } = await admin.rpc('due_org_verification_docs', { p_grace_days: GRACE });
+  if (oErr) console.error('due_org_verification_docs', oErr);
+  let orgDocsDone = 0;
+  for (const d of (orgDocs ?? []) as { org_id: string; doc_path: string | null; letter_path: string | null }[]) {
+    const folders = [...new Set([d.doc_path, d.letter_path].map((p) => (p ? docFolder(p) : null)).filter((f): f is string => !!f))];
+    let ok = true;
+    for (const f of folders) if (!(await removePrefix(DOCS_BUCKET, f))) ok = false;
+    if (!ok) continue;
+    const { error } = await admin.rpc('mark_org_docs_deleted', { p_org: d.org_id });
+    if (error) console.error('mark_org_docs_deleted', d.org_id, error);
+    else orgDocsDone++;
+  }
+
   let accountsDone = 0;
   for (const uid of dueAccounts) {
     const res = await deleteAccountFully(uid);
     if (res.ok) accountsDone++;
     else console.error('retention delete', uid, res.stage, res.error);
   }
-  return Response.json({ docs: docsDone, accounts: accountsDone });
+  return Response.json({ docs: docsDone, orgDocs: orgDocsDone, accounts: accountsDone });
 });

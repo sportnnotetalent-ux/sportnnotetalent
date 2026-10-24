@@ -1,6 +1,9 @@
 /** Create a community — a school, company, housing society, hospital chain, etc.
- *  Pick a standard type or enter a custom one. Once created, the community can
- *  host recurring sports events year after year (all tracked under it). */
+ *  First: a registered organisation, or an informal group (friends,
+ *  neighbourhood …) that needs no verification. Then a standard type or a custom
+ *  one; a school / college can add its official ID here (one verified community
+ *  per ID — docs/verification/org-verification.md). Once created, the community
+ *  can host recurring sports events year after year (all tracked under it). */
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { KeyboardAwareScrollView, KeyboardFooterLayout } from '../components/keyboard';
@@ -11,7 +14,11 @@ import { Button, TextField, SelectChip, ScreenTitle, FieldLabel, FormError, text
 import { PhoneField } from '../components/PhoneField';
 import { useAuth } from '../core/auth';
 import { getMyPlayerId, createOrganization } from '../data/repos';
-import { COMMUNITY_TYPES, isAcademicCommunity, suggestedGraduatingStandard } from '../core/org';
+import { isAcademicCommunity, suggestedGraduatingStandard } from '../core/org';
+import {
+  OFFICIAL_ID_RULES, OFFICIAL_ONLY_TYPES, REGISTERED_TYPES, REQUIRED_ID, UNREGISTERED_TYPES, validOfficialId, verifiableType,
+} from '../core/orgVerification';
+import { lookupOfficialId, setOfficialIds } from '../data/orgVerification';
 import { MARKETS, MARKET_ORDER, marketForCountry, type MarketId } from '../core/markets';
 import { useRegion } from '../core/region';
 import type { RootStackParamList } from '../navigation/types';
@@ -29,7 +36,11 @@ export default function CreateCommunityScreen({ navigation }: Props) {
   }, [profile?.id]);
 
   const [name, setName] = useState('');
-  const [typeChoice, setTypeChoice] = useState<string>(COMMUNITY_TYPES[0]);
+  // a registered organisation or an informal group — asked first
+  const [registered, setRegistered] = useState<boolean | null>(null);
+  const [typeChoice, setTypeChoice] = useState<string>('');
+  const [officialId, setOfficialId] = useState('');
+  const [idCheck, setIdCheck] = useState<{ verified?: { orgId: string; name: string } | null; others?: number } | null>(null);
   const [customType, setCustomType] = useState('');
   const [city, setCity] = useState('');
   const [email, setEmail] = useState('');
@@ -47,11 +58,27 @@ export default function CreateCommunityScreen({ navigation }: Props) {
   const pickMarket = (m: MarketId) => { setMarket(m); if (!gradTouched) setGradStd(suggestedGraduatingStandard(m)); };
 
   const resolvedType = typeChoice === CUSTOM ? customType.trim() : typeChoice;
-  const academic = isAcademicCommunity(resolvedType);
+  const academic = registered === true && isAcademicCommunity(resolvedType);
+  const idType = registered && verifiableType(resolvedType) ? REQUIRED_ID[resolvedType] : null;
+  const pickRegistered = (r: boolean) => { setRegistered(r); setTypeChoice(''); setOfficialId(''); setIdCheck(null); };
+
+  // Is this official ID already a verified community?
+  useEffect(() => {
+    setIdCheck(null);
+    if (!idType || !validOfficialId(idType, officialId)) return;
+    let on = true;
+    const t = setTimeout(() => { void lookupOfficialId(idType, officialId).then((r) => on && setIdCheck(r)).catch(() => undefined); }, 400);
+    return () => { on = false; clearTimeout(t); };
+  }, [idType, officialId]);
 
   async function submit() {
     if (!name.trim()) return setError('Give the community a name.');
+    if (registered === null) return setError('Is it a registered organisation or an informal group?');
+    if (!typeChoice) return setError('Pick the type of community.');
     if (typeChoice === CUSTOM && !customType.trim()) return setError('Describe the community type.');
+    if (!registered && OFFICIAL_ONLY_TYPES.includes(resolvedType)) return setError('A school or college is a registered organisation — choose “Registered organisation”.');
+    if (idType && officialId.trim() && !validOfficialId(idType, officialId)) return setError(`That ${OFFICIAL_ID_RULES[idType].label} doesn’t look right — ${OFFICIAL_ID_RULES[idType].hint}`);
+    if (idCheck?.verified) return setError(`${idCheck.verified.name} is already verified on SportnNote — ask its admins to add you.`);
     if (academic && !gradStd.trim()) return setError('Which class do students graduate after? Type it, e.g. Year 13 or Grade 12.');
     setError(null);
     setBusy(true);
@@ -61,9 +88,14 @@ export default function CreateCommunityScreen({ navigation }: Props) {
           name: name.trim(), type: resolvedType || undefined, city: city.trim() || undefined, email: email.trim() || undefined, phone: phone.trim() || undefined,
           market,
           graduatingStandard: academic ? gradStd.trim() : undefined,
+          registered,
         },
         myId ?? undefined
       );
+      // A school / college's official ID (it can also be added when verifying).
+      if (idType && officialId.trim()) {
+        try { await setOfficialIds(org.id, [{ type: idType, value: officialId }]); } catch { /* added later from Get verified */ }
+      }
       // Replace this screen with the new community's page.
       navigation.replace('Organization', { orgId: org.id });
     } catch (e) {
@@ -90,15 +122,45 @@ export default function CreateCommunityScreen({ navigation }: Props) {
 
           <TextField label="Name" value={name} onChange={setName} placeholder="Greenwood High School" />
 
-          <FieldLabel>Type</FieldLabel>
+          <FieldLabel>Is it a registered organisation?</FieldLabel>
           <View style={st.chips}>
-            {COMMUNITY_TYPES.map((t) => (
-              <SelectChip key={t} label={t} active={typeChoice === t} onPress={() => setTypeChoice(t)} />
-            ))}
-            <SelectChip label={CUSTOM} active={typeChoice === CUSTOM} onPress={() => setTypeChoice(CUSTOM)} />
+            <SelectChip label="🏛️ Registered organisation" active={registered === true} onPress={() => pickRegistered(true)} />
+            <SelectChip label="👥 Informal group" active={registered === false} onPress={() => pickRegistered(false)} />
           </View>
+          <Text style={textStyles.muted}>
+            {registered === false
+              ? 'Friends, a neighbourhood or an office team — no verification needed.'
+              : 'A school, college, company, club or society with official registration. It can be verified by SportnNote.'}
+          </Text>
+
+          {registered !== null && (
+            <>
+              <FieldLabel>Type</FieldLabel>
+              <View style={st.chips}>
+                {(registered ? REGISTERED_TYPES : UNREGISTERED_TYPES).map((t) => (
+                  <SelectChip key={t} label={t} active={typeChoice === t} onPress={() => setTypeChoice(t)} />
+                ))}
+                <SelectChip label={CUSTOM} active={typeChoice === CUSTOM} onPress={() => setTypeChoice(CUSTOM)} />
+              </View>
+            </>
+          )}
           {typeChoice === CUSTOM && (
-            <TextField label="Custom type" value={customType} onChange={setCustomType} placeholder="e.g. Alumni association" />
+            <TextField label="Custom type" value={customType} onChange={setCustomType} placeholder={registered ? 'e.g. Sports academy' : 'e.g. Weekend cricket group'} />
+          )}
+
+          {idType && (
+            <>
+              <TextField label={`${OFFICIAL_ID_RULES[idType].label} (recommended)`} value={officialId} onChange={setOfficialId} placeholder={OFFICIAL_ID_RULES[idType].placeholder} autoCapitalize="characters" />
+              <Text style={textStyles.muted}>{OFFICIAL_ID_RULES[idType].hint} Use the name exactly as registered.</Text>
+              {idCheck?.verified ? (
+                <View style={st.warnBox}>
+                  <Text style={textStyles.body}>{idCheck.verified.name} is already verified on SportnNote with this code.</Text>
+                  <Button label={`Open ${idCheck.verified.name}`} variant="ghost" onPress={() => navigation.replace('Organization', { orgId: idCheck.verified!.orgId })} />
+                </View>
+              ) : idCheck?.others ? (
+                <Text style={textStyles.muted}>Another community has entered this code but isn’t verified. Verification decides who represents the school.</Text>
+              ) : null}
+            </>
           )}
 
           {academic && (
@@ -143,4 +205,5 @@ const st = StyleSheet.create({
   wrapRow: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing(3) },
   wrapCell: { flexGrow: 1, flexBasis: 220, minWidth: 0 },
   flex: { flex: 1 },
+  warnBox: { gap: theme.spacing(2), padding: theme.spacing(3), borderRadius: theme.radius.md, backgroundColor: theme.colors.surfaceAlt },
 });

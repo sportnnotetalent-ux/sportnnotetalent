@@ -324,6 +324,9 @@ export interface Organization {
   verifiedAt?: string;
   /** …and when it asked to be verified (pending). */
   verificationRequestedAt?: string;
+  /** A registered organisation (school, company …) or an informal group;
+   *  unset = not stated yet (migration 20261025190000_org_verification). */
+  registered?: boolean | null;
   /** community kind — a standard type (School, Company, …) or a custom label */
   type?: string;
   logoUrl?: string;

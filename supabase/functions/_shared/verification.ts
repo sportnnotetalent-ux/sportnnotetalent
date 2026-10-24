@@ -24,6 +24,12 @@ export async function reviewerProfileIds(): Promise<string[]> {
   ])];
 }
 
+/** SportnNote support / admin accounts only. */
+export async function supportProfileIds(): Promise<string[]> {
+  const { data } = await admin.from('profiles').select('id').in('role', ['support', 'admin']);
+  return ((data ?? []) as { id: string }[]).map((r) => r.id);
+}
+
 /** Is this account a reviewer? (support/admin, or appointed) */
 export async function isReviewer(profileId: string): Promise<{ ok: boolean; name: string }> {
   const { data: prof } = await admin.from('profiles').select('full_name, role').eq('id', profileId).maybeSingle();
@@ -35,8 +41,9 @@ export async function isReviewer(profileId: string): Promise<{ ok: boolean; name
 }
 
 /** Push every reviewer (tap opens the queue) + one email to the support inbox. */
-export async function alertReviewers(title: string, body: string, tag: string): Promise<{ app: number; web: number; email: boolean }> {
-  const ids = await reviewerProfileIds();
+export async function alertReviewers(title: string, body: string, tag: string, opts: { supportOnly?: boolean } = {}): Promise<{ app: number; web: number; email: boolean }> {
+  // Organisations are reviewed by SportnNote support only (2026-10-24).
+  const ids = opts.supportOnly ? await supportProfileIds() : await reviewerProfileIds();
   const [app, web, email] = await Promise.all([
     pushToProfiles(ids, { title, body, data: { url: `sportnnote://${REVIEW_PATH}` } }),
     webPushToProfiles(ids, { title, body, url: `/${REVIEW_PATH}`, tag }),

@@ -40,6 +40,7 @@ import {
   housesOf, currentHouse, assignHouse, houseColorOf, graduationWarning, suggestedGraduatingStandard,
 } from '../core/org';
 import { MARKETS, MARKET_ORDER, isMarket, orgMarket, type MarketId } from '../core/markets';
+import { REGISTERED_TYPES, UNREGISTERED_TYPES } from '../core/orgVerification';
 import { notify } from '../core/notifications';
 import type { Organization, OrgMember, OrgRole, OrgRequest, House, ActivityEvent, Tournament, Team, Player, SportId, AcademicYear } from '../core/types';
 import type { RootStackParamList } from '../navigation/types';
@@ -988,11 +989,13 @@ function DetailsEditor({ org, onCancel, onSaved }: { org: Organization; onCancel
       <TextField label="Name" value={name} onChange={setName} />
       <Text style={textStyles.muted}>Category</Text>
       <View style={st.chips}>
-        {COMMUNITY_TYPES.map((t) => (
+        {/* an informal group can't be a school / college (registered-only types) */}
+        {(org.registered === false ? UNREGISTERED_TYPES : org.registered === true ? REGISTERED_TYPES : COMMUNITY_TYPES).map((t) => (
           <SelectChip key={t} label={t} active={type === t} onPress={() => setType(t)} />
         ))}
       </View>
       <TextField label="Category (custom)" value={type} onChange={setType} placeholder="e.g. Academy" />
+      {org.verifiedAt ? <Text style={textStyles.muted}>Changing the name or category removes the ✓ — it would need verifying again.</Text> : null}
       <TextField label="City" value={city} onChange={setCity} />
       <TextField label="Email" value={email} onChange={setEmail} autoCapitalize="none" />
       <PhoneField label="Phone" value={phone} onChange={setPhone} optional />

@@ -15,11 +15,12 @@ import { theme } from '../core/theme';
 import { Button, Card, Pill, TextField, ScreenTitle, EmptyState, SelectChip, FormError, textStyles } from '../components/ui';
 import { PhoneField } from '../components/PhoneField';
 import {
-  findPlayerByEmail, findPlayerByPhone, getPendingOrgVerifications, getPendingVerifications, getVerificationReviewers,
-  reviewOrgVerification, reviewVerification, setVerificationReviewer, verificationDocUrl,
-  type PendingOrgVerification, type PendingVerification,
+  findPlayerByEmail, findPlayerByPhone, getPendingVerifications, getVerificationReviewers,
+  reviewVerification, setVerificationReviewer, verificationDocUrl,
+  type PendingVerification,
 } from '../data/repos';
-import { formatPhone } from '../core/phone';
+import { decideOrgVerification, getOrgVerificationQueue, type OrgQueueItem } from '../data/orgVerification';
+import { AUTHORITY_OPTIONS, OFFICIAL_ID_RULES, SEND_BACK_REASONS, emailDomain, isFreeMail, reviewChecks } from '../core/orgVerification';
 import { useVerificationReviewer } from '../data/useVerificationReviewer';
 import { ageFromDob } from '../core/age';
 import { isSupport } from '../core/roles';
@@ -30,7 +31,7 @@ export default function VerificationReviewScreen() {
   const { profile } = useAuth();
   const reviewer = useVerificationReviewer();
   const [pending, setPending] = useState<PendingVerification[] | null>(null);
-  const [orgs, setOrgs] = useState<PendingOrgVerification[]>([]);
+  const [orgs, setOrgs] = useState<OrgQueueItem[]>([]);
   const [done, setDone] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
 
@@ -38,7 +39,8 @@ export default function VerificationReviewScreen() {
     if (!reviewer) return;
     setNow(Date.now());
     void getPendingVerifications().then(setPending).catch(() => setPending([]));
-    void getPendingOrgVerifications().then(setOrgs).catch(() => setOrgs([]));
+    // Schools / colleges: SportnNote support only (the queue is empty for others).
+    void getOrgVerificationQueue().then(setOrgs).catch(() => setOrgs([]));
   }, [reviewer]);
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
@@ -62,7 +64,15 @@ export default function VerificationReviewScreen() {
               Open each document and check the name and date of birth match what was entered, then approve or reject. The player and their parent/guardian are told straight away. Documents are deleted 30 days after your decision.
             </Text>
             {done ? <Text style={st.done} accessibilityRole="alert">{done}</Text> : null}
-            {orgs.length > 0 ? <OrgRequests orgs={orgs} onDone={(id, ok) => { setOrgs((l) => l.filter((o) => o.orgId !== id)); setDone(ok ? '✓ Verified — its admins can now confirm members’ dates of birth.' : 'Declined.'); }} /> : null}
+            {orgs.length > 0 ? (
+              <>
+                <Text style={textStyles.h3}>🏫 Schools & colleges · {orgs.length}</Text>
+                <Text style={textStyles.muted}>Oldest first. Check each against the public register — tick all three, then approve. Or send it back with a reason; the school’s admins are told either way.</Text>
+                {orgs.map((o) => (
+                  <OrgReview key={o.orgId} o={o} now={now} onDone={(ok) => { setOrgs((l) => l.filter((x) => x.orgId !== o.orgId)); setDone(ok ? `✓ ${o.name} verified — its admins have been told.` : `${o.name} sent back — its admins have been told.`); }} />
+                ))}
+              </>
+            ) : null}
             {pending.length === 0 ? (
               <Card><EmptyState icon="🎉" title="No documents waiting" hint="You'll get a notification when someone uploads a proof." compact /></Card>
             ) : (
@@ -132,39 +142,96 @@ function Submission({ p, now, onDecided }: { p: PendingVerification; now: number
   );
 }
 
-/** Schools / clubs asking to be verified (fast lanes Phase 2): once verified,
- *  their Owners / Admins confirm members' dates of birth from their records. */
-function OrgRequests({ orgs, onDone }: { orgs: PendingOrgVerification[]; onDone: (orgId: string, ok: boolean) => void }) {
+/** One school / college for support to check (docs/verification/org-verification.md).
+ *  Everything on one card so a future support team can work through the queue
+ *  without hunting: the official IDs with links to the public registers, any
+ *  other community using the same ID, the document, the proof of authority, a
+ *  three-tick checklist (all ticked before Approve), and one-tap reasons. */
+function OrgReview({ o, now, onDone }: { o: OrgQueueItem; now: number; onDone: (approved: boolean) => void }) {
   const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const [busy, setBusy] = useState<string | null>(null);
+  const v = o.verification;
+  const checks = reviewChecks(v?.authority);
+  const [ticked, setTicked] = useState<Record<string, boolean>>({});
+  const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const decide = async (o: PendingOrgVerification, ok: boolean) => {
-    setBusy(o.orgId); setError(null);
-    try { await reviewOrgVerification(o.orgId, ok); onDone(o.orgId, ok); }
-    catch (e) { setError(e instanceof Error ? e.message : 'Couldn’t save that.'); }
-    finally { setBusy(null); }
+  const allTicked = checks.every((c) => ticked[c.key]);
+  const clash = o.ids.find((i) => i.verifiedElsewhere);
+  const waited = o.requestedAt ? new Date(o.requestedAt).getTime() : undefined;
+
+  const decide = async (approve: boolean) => {
+    if (!approve && !reason.trim()) { setError('Pick or type a reason, so they know what to fix.'); return; }
+    setBusy(true); setError(null);
+    try { await decideOrgVerification(o.orgId, approve, approve ? undefined : reason.trim(), ticked); onDone(approve); }
+    catch (e) { setError(e instanceof Error ? e.message : 'Couldn’t save the decision.'); }
+    finally { setBusy(false); }
   };
+
   return (
-    <>
-      <Text style={textStyles.h3}>🏫 Schools & clubs asking to be verified · {orgs.length}</Text>
-      <Text style={textStyles.muted}>Check each is genuine — an official email, phone number or website — before verifying. Its admins will then be able to confirm their members’ dates of birth.</Text>
-      {orgs.map((o) => (
-        <Card key={o.orgId} style={{ gap: theme.spacing(2) }}>
-          <View style={st.head}>
-            <Text style={[textStyles.body, { fontWeight: '800', flex: 1 }]} onPress={() => nav.navigate('Organization', { orgId: o.orgId })}>{o.name} ›</Text>
-            {o.requestedAt ? <Pill label={new Date(o.requestedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })} color={theme.colors.surfaceAlt} textColor={theme.colors.accent} /> : null}
+    <Card style={{ gap: theme.spacing(2) }}>
+      <View style={st.head}>
+        <Text style={[textStyles.body, { fontWeight: '800', flex: 1 }]} onPress={() => nav.navigate('Organization', { orgId: o.orgId })}>{o.name} ›</Text>
+        {waited ? <Pill label={`⏳ ${waitedLabel(waited, now)}`} color={theme.colors.surfaceAlt} textColor={isOverdue(waited, now) ? theme.colors.danger : theme.colors.accent} /> : null}
+      </View>
+      <Row label="Type" value={[o.type, o.city].filter(Boolean).join(' · ') || '—'} />
+      <Row label="Sent by" value={v?.submitterName ?? '—'} />
+      <Row label="Members" value={String(o.members)} />
+      {v?.sentBackBefore ? <Row label="Sent back before" value={`${v.sentBackBefore}×`} /> : null}
+
+      <Text style={st.sub}>1 · Official ID</Text>
+      {o.ids.length ? o.ids.map((i) => {
+        const rule = OFFICIAL_ID_RULES[i.type];
+        return (
+          <View key={i.type} style={{ gap: 2 }}>
+            <Row label={rule?.label ?? i.type} value={i.value} />
+            {rule?.lookup ? <Text style={st.link} accessibilityRole="link" onPress={() => void Linking.openURL(rule.lookup!.url)}>Search it on {rule.lookup.label} ↗</Text> : null}
+            {i.verifiedElsewhere ? <Text style={st.warn}>⚠ Already verified as {i.verifiedElsewhere} — send this back.</Text>
+              : i.sameIdElsewhere ? <Text style={st.warn}>⚠ {i.sameIdElsewhere} other community{i.sameIdElsewhere === 1 ? '' : 'ies'} entered the same code (not verified).</Text> : null}
           </View>
-          <Row label="Type" value={[o.type, o.city].filter(Boolean).join(' · ') || '—'} />
-          <Row label="Contact" value={[o.email, o.phone ? formatPhone(o.phone) : ''].filter(Boolean).join(' · ') || 'none given'} />
-          <Row label="Members" value={String(o.members)} />
-          <View style={st.actions}>
-            <Button label="Decline" variant="ghost" style={st.flex} onPress={() => void decide(o, false)} disabled={busy === o.orgId} />
-            <Button label={busy === o.orgId ? '…' : '✓ Verify'} style={st.flex} onPress={() => void decide(o, true)} disabled={busy === o.orgId} />
-          </View>
-        </Card>
+        );
+      }) : <Text style={st.warn}>No official ID given.</Text>}
+
+      <Text style={st.sub}>2 · Recognition document{v?.docKind ? ` — ${v.docKind}` : ''}</Text>
+      {v?.docPath === 'demo' ? <Text style={textStyles.muted}>📎 {v.docName} (demo)</Text> : <DocPreview docPath={v?.docPath ?? undefined} docName={v?.docName ?? undefined} />}
+
+      <Text style={st.sub}>3 · Authority — {v?.authority ? AUTHORITY_OPTIONS[v.authority].title : 'not given'}</Text>
+      {v?.authority === 'email' ? (
+        <>
+          <Row label="Verified email" value={v.officialEmail ?? '—'} />
+          <Text style={textStyles.muted}>{isFreeMail(v.officialEmail ?? '') ? 'A free mailbox — it must match the address in the register exactly.' : `Domain ${emailDomain(v.officialEmail ?? '')} — compare it with the school’s website / email in the register.`}</Text>
+        </>
+      ) : v?.authority === 'letter' ? (
+        <>
+          {v.letterPath === 'demo' ? <Text style={textStyles.muted}>📎 {v.letterName} (demo)</Text> : <DocPreview docPath={v.letterPath ?? undefined} docName={v.letterName ?? undefined} />}
+          <Text style={textStyles.muted}>Call the school office on the number in the public register (never a number from the applicant) and ask them to confirm the letter.</Text>
+        </>
+      ) : v?.authority === 'head' ? (
+        <>
+          <Row label="Head" value={[v.headName, v.headEmail].filter(Boolean).join(' · ') || '—'} />
+          <Text style={v.headConfirmedAt ? textStyles.body : st.warn}>
+            {v.headConfirmedAt ? `✓ Confirmed by ${v.headConfirmedName ?? v.headName}` : v.headDeclinedAt ? '✗ The Head said they don’t know this person' : '⏳ Waiting for the Head to confirm'}
+          </Text>
+          <Text style={textStyles.muted}>Check the Head’s email is the one in the register.</Text>
+        </>
+      ) : null}
+
+      <Text style={st.sub}>Checklist</Text>
+      {checks.map((c) => (
+        <SelectChip key={c.key} label={`${ticked[c.key] ? '☑️' : '⬜'} ${c.label}`} active={!!ticked[c.key]} onPress={() => setTicked((t) => ({ ...t, [c.key]: !t[c.key] }))} />
       ))}
+
+      <Text style={textStyles.muted}>If sending back, why?</Text>
+      <View style={st.chips}>
+        {SEND_BACK_REASONS.map((r) => <SelectChip key={r} label={r} active={reason === r} onPress={() => setReason(reason === r ? '' : r)} />)}
+      </View>
+      <TextField label="Or type a reason" value={(SEND_BACK_REASONS as readonly string[]).includes(reason) ? '' : reason} onChange={setReason} placeholder="e.g. Please upload the full affiliation letter" />
       <FormError message={error} />
-    </>
+      <View style={st.actions}>
+        <Button label="↩ Send back" variant="danger" style={st.flex} onPress={() => void decide(false)} disabled={busy} />
+        <Button label={busy ? '…' : '✓ Approve'} style={st.flex} onPress={() => void decide(true)} disabled={busy || !allTicked || !!clash || (v?.authority === 'head' && !v.headConfirmedAt)} />
+      </View>
+      {!allTicked ? <Text style={textStyles.muted}>Approve unlocks when all three are ticked{v?.authority === 'head' && !v.headConfirmedAt ? ' and the Head has confirmed' : ''}.</Text> : null}
+    </Card>
   );
 }
 
@@ -268,4 +335,6 @@ const st = StyleSheet.create({
   docHint: { color: theme.colors.textMuted, fontSize: theme.font.tiny, marginTop: theme.spacing(1) },
   warn: { color: theme.colors.danger, fontSize: theme.font.small },
   done: { color: theme.colors.primary, fontSize: theme.font.small, fontWeight: '700' },
+  sub: { color: theme.colors.text, fontWeight: '800', marginTop: theme.spacing(1) },
+  link: { color: theme.colors.primary, fontWeight: '700', fontSize: theme.font.small },
 });

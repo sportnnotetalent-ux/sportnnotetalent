@@ -96,6 +96,10 @@ export type RootStackParamList = {
   Passport: { code?: string; playerId?: string };
   /** a school's / club's hall of fame — public once published (app.sportnnote.in/h/ORG) */
   HallOfFame: { orgId: string };
+  /** get a school / college verified — three steps (Owners / Admins) */
+  OrgVerify: { orgId: string };
+  /** the Head of School confirms who manages it (…/org-confirm?c=CODE) — public */
+  OrgConfirm: { c?: string } | undefined;
   /** Support: reported-message queue (migration 0027). */
   MessageReports: undefined;
   /** Golf (field event) — a round's scorecard + leaderboard, and its setup. */

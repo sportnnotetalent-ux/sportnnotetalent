@@ -43,13 +43,9 @@ Friendly matches that aren't part of a tournament never have the rule.
 The fastest way to get a school's players through the rule is for the school to confirm their dates of birth itself. SportnNote verifies the school once. After that, its Owners and Admins can confirm members from the school's own records.
 
 ### Get your school or club verified
-1. Open your school or club's page and stay on the **Details** tab.
-2. On the **🛡️ Verification** card, tap **Ask SportnNote to verify us**.
-3. A reviewer checks that it's genuine, usually within a day, using its official email, phone or website. The card then reads **✓ Verified by SportnNote**, and "✓ Verified" shows under the name.
+A school or college gets verified in three steps: its official ID, a recognition document, and proof that you're authorised by the school. See [Verify your school on SportnNote](/guides/verify-your-school/). Other registered organisations, such as clubs, tap **Ask SportnNote to verify us** on the **🛡️ Verification** card instead.
 
-> **Tip:** Add the school's official email and phone with **✎ Edit** before you ask. The reviewer uses them to check.
-
-Renaming the school or club removes its verification, so ask again after a rename.
+Renaming the school or club, or changing its type or official ID, removes its verification, so it needs verifying again.
 
 ### Confirm members' dates of birth
 1. On the **Details** tab, tap **📋 Confirm members’ dates of birth**.
