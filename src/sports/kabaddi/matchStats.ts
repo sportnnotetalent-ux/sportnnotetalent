@@ -11,19 +11,23 @@
  * line-outs, technical points / cards, raid and tackle skills (when the match
  * described them), runs and lead changes. A row shows only when the match can
  * give it (D8): an old one-tap match has no raid counts.
+ *
+ * IDs-only scoring: the top raider / defender is found by player id and named
+ * by `nameOf` (this viewer's name; an older log's stored name without one).
  */
 import type { KabaddiState, RaidEntry } from './engine.ts';
 import { extrasOf, isShootoutEvent, perRaidByIndex, replayOf, raidSkillLabel, RAID_SKILLS, TACKLE_TYPES, tackleTypeLabel } from './engine.ts';
 import type { RaidBreakdown } from './rules.ts';
 import { kabaddiMatchCentre, kabaddiTouchedTracked, unsuccessfulTacklers } from './totals.ts';
 import { countRow, pctRow, ratioRow, type CmpCat, type CmpRow, type Side } from '../netraid/feed.ts';
+import { legacyNameOf, type NameOf } from './names.ts';
 
 const other = (s: Side): Side => (s === 'home' ? 'away' : 'home');
 const SCORING = new Set(['raid', 'tackle', 'allout', 'tech', 'lineout']);
 
 export type KbScope = 'all' | number;
 
-export interface KbLeader { name: string; pts: number; note?: string }
+export interface KbLeader { name: string; /** the player's id (absent: an older log's name-only player) */ id?: string; pts: number; note?: string }
 export interface KabaddiMatchStats {
   cats: CmpCat[];
   /** top raider / defender per team in the scope */
@@ -38,7 +42,7 @@ function scoped(s: KabaddiState, scope: KbScope): { r: RaidEntry; b: RaidBreakdo
   return (s.raids ?? []).flatMap((r, i) => (per[i] && !r.hidden && (scope === 'all' || r.half === scope) ? [{ r, b: per[i] }] : []));
 }
 
-export function kabaddiMatchStats(s: KabaddiState, scope: KbScope = 'all'): KabaddiMatchStats {
+export function kabaddiMatchStats(s: KabaddiState, scope: KbScope = 'all', nameOf: NameOf = legacyNameOf): KabaddiMatchStats {
   const c = kabaddiMatchCentre(s, scope);
   const rs = scoped(s, scope);
   const H = (f: (x: Side) => number) => [f('home'), f('away')] as const;
@@ -163,16 +167,26 @@ export function kabaddiMatchStats(s: KabaddiState, scope: KbScope = 'all'): Kaba
 
   /* ------------- team leaders ------------- */
   const leaders: KabaddiMatchStats['leaders'] = { home: {}, away: {} };
+  // keyed by player id (an older log's name-only player: "~Name")
+  const keyOf = (id?: string, name?: string) => id || (name ? `~${name}` : undefined);
   for (const X of ['home', 'away'] as Side[]) {
     const rp = new Map<string, number>(), tp = new Map<string, number>();
+    const legacy = new Map<string, string>();
+    const add = (m: Map<string, number>, id: string | undefined, name: string | undefined, pts: number) => {
+      const k = keyOf(id, name);
+      if (!k) return;
+      m.set(k, (m.get(k) ?? 0) + pts);
+      if (name && !legacy.has(k)) legacy.set(k, name);
+    };
     for (const { r, b } of rs) {
-      if (r.side === X && r.raider && b.raidPts) rp.set(r.raider, (rp.get(r.raider) ?? 0) + b.raidPts);
-      if (r.side === other(X) && r.tackler && b.raiderOut && !b.doOrDieFail && !b.lineOut) tp.set(r.tackler, (tp.get(r.tackler) ?? 0) + b.tacklePts);
+      if (r.side === X && b.raidPts) add(rp, r.raiderId, r.raider, b.raidPts);
+      if (r.side === other(X) && b.raiderOut && !b.doOrDieFail && !b.lineOut) add(tp, r.tacklerId, r.tackler, b.tacklePts);
     }
     const top = (m: Map<string, number>) => [...m.entries()].sort((a, b) => b[1] - a[1])[0];
+    const who = (k: string) => (k.startsWith('~') ? { name: nameOf(undefined, k.slice(1)) } : { name: nameOf(k, legacy.get(k)), id: k });
     const r1 = top(rp), t1 = top(tp);
-    if (r1) leaders[X].raider = { name: r1[0], pts: r1[1], ...(r1[1] >= 10 ? { note: 'Super 10' } : {}) };
-    if (t1) leaders[X].defender = { name: t1[0], pts: t1[1], ...(t1[1] >= 5 ? { note: 'High 5' } : {}) };
+    if (r1) leaders[X].raider = { ...who(r1[0]), pts: r1[1], ...(r1[1] >= 10 ? { note: 'Super 10' } : {}) };
+    if (t1) leaders[X].defender = { ...who(t1[0]), pts: t1[1], ...(t1[1] >= 5 ? { note: 'High 5' } : {}) };
   }
   return { cats, leaders, moments: flow.moments };
 }

@@ -31,6 +31,9 @@ const A = [P('a1', 'Arjun'), P('a2', 'Bhanu'), P('a3', 'Chetan'), P('a4', 'Deepa
 const CFG = { playersPerSide: 7, style: 'sanjeevani', superTackle: true, doOrDie: true, caughtTouches: 'void', substitutes: 2 };
 const CTX: StatTotalsContext = { players: { home: H.map((p) => ({ id: p.id, name: p.fullName })), away: A.map((p) => ({ id: p.id, name: p.fullName })) } };
 const NAMES = { home: 'Patna', away: 'Bengaluru' };
+/** IDs-only scoring: the log keeps ids; the squads name them when shown. */
+const NAMED = { ...NAMES, homeRoster: H, awayRoster: A };
+const squadName = (id?: string | null, legacy?: string | null) => [...H, ...A].find((p) => p.id === id)?.fullName ?? legacy ?? 'Player';
 
 class Scorer {
   s: KabaddiState;
@@ -73,13 +76,13 @@ describe('deep wave · Stats to track', () => {
     m.raid({ side: 'home', raider: H[0], touches: 2, skill: 'running', touched: [A[0], A[1], A[2]] });
     const r = m.s.raids[0];
     assert.equal(r.sk, 'running');
-    assert.deepEqual(r.touched, [{ id: 'a1', name: 'Arjun' }, { id: 'a2', name: 'Bhanu' }]);
+    assert.deepEqual(r.touched, [{ id: 'a1' }, { id: 'a2' }]); // IDs-only scoring
     m.raid({ side: 'away', raider: A[3], skill: 'toe' }); // empty raid: the skill is dropped
     assert.equal(m.s.raids[1].sk, undefined);
     m.raid({ side: 'home', raider: H[1], skill: 'escape' }); // an escape on an empty raid stays
     assert.equal(m.s.raids[2].sk, 'escape');
-    // who is out, by name
-    assert.deepEqual(outPlayers(m.s).away, ['Arjun', 'Bhanu']);
+    // who is out, by id (named when shown)
+    assert.deepEqual(outPlayers(m.s).away, ['a1', 'a2']);
   });
 });
 
@@ -175,7 +178,7 @@ describe('deep wave · commentary', () => {
 
   test('the feed: halves newest first, raids numbered, running score, timeout / technical point, touched + mat detail', () => {
     const m = match();
-    const g = kabaddiCommentary(m.s, NAMES);
+    const g = kabaddiCommentary(m.s, NAMED);
     assert.deepEqual(g.map((x) => x.title), ['2nd Half', '1st Half']);
     const h1 = [...g[1].entries].reverse();
     assert.equal(h1[0].text, 'Raid 1 — Pardeep (Patna): 2 touch points + bonus (running hand touch)');
@@ -211,7 +214,7 @@ describe('deep wave · commentary', () => {
 describe('deep wave · match centre', () => {
   test('points split, raiding, defending (super-tackle chances), skills, leaders; per half', () => {
     const m = match();
-    const st = kabaddiMatchStats(m.s);
+    const st = kabaddiMatchStats(m.s, 'all', squadName);
     const row = (cat: string, key: string) => st.cats.find((c) => c.id === cat)!.rows.find((r) => r.key === key)!;
     assert.deepEqual([row('points', 'bonus').home, row('points', 'bonus').away], ['1', '0']);
     assert.equal(row('points', 'techPts').away, '1');
@@ -223,8 +226,10 @@ describe('deep wave · match centre', () => {
     assert.equal(row('skills', 'sk_running').home, '3');
     assert.equal(row('skills', 'tt_ankle').away, '1');
     assert.equal(st.leaders.home.raider?.name, 'Pardeep');
+    assert.equal(st.leaders.home.raider?.id, 'h1');
     assert.equal(st.leaders.home.raider?.note, 'Super 10');
     assert.equal(st.leaders.away.defender?.name, 'Deepak');
+    assert.equal(st.leaders.away.defender?.id, 'a4');
     // per half
     const h1 = kabaddiMatchStats(m.s, 1);
     assert.equal(h1.cats.find((c) => c.id === 'raiding')!.rows.find((r) => r.key === 'raids')!.home, '2');
@@ -252,12 +257,12 @@ describe('deep wave · match centre', () => {
 describe('deep wave · deep box, schema', () => {
   test('per-player counts by half; the deep box columns', () => {
     const m = match();
-    const c = kabaddiPlayerCounts(m.s);
-    assert.equal(c.get('home|Pardeep')!.raids, 3);
-    assert.equal(c.get('home|Pardeep')!.bonusPoints, 1);
-    assert.equal(c.get('away|Arjun')!.touchedOut, 1);
-    assert.equal(c.get('away|Deepak')!.tackles, 1);
-    assert.equal(kabaddiPlayerCounts(m.s, 1).get('home|Pardeep')!.raids, 1);
+    const c = kabaddiPlayerCounts(m.s); // IDs-only scoring: "side|id"
+    assert.equal(c.get('home|h1')!.raids, 3);
+    assert.equal(c.get('home|h1')!.bonusPoints, 1);
+    assert.equal(c.get('away|a1')!.touchedOut, 1);
+    assert.equal(c.get('away|a4')!.tackles, 1);
+    assert.equal(kabaddiPlayerCounts(m.s, 1).get('home|h1')!.raids, 1);
     const t = buildBoxTable(KABADDI_DEEP_BOX, kabaddiDeepBox(m.s, { homeRoster: H as never, awayRoster: A as never }).data('all'));
     assert.deepEqual(t.columns.map((x) => x.abbr), ['RAID', 'TKL', 'PTS', 'R', 'SUC', 'EMP', 'OUT', 'TCH', 'BNS', 'SPR', 'DDP', 'TKS', 'SPT', 'ROUT', 'UTK']); // round 2: UTK
     const arjun = t.away.rows.find((r) => r.name === 'Arjun')!;

@@ -288,8 +288,8 @@ describe('round 2 · kabaddi unsuccessful tackles (Defenders touched)', () => {
     m.push({ type: 'NEXT_HALF' });
     m.push({ type: 'KICKOFF', payload: { at: 2 } });
     m.raid({ side: 'home', raider: KH[0], touches: 1, touched: [KA[0]] }, 22, 2);
-    assert.equal(kabaddiPlayerCounts(m.s).get('away|Arjun')!.unsuccessfulTackles, 2);
-    assert.equal(kabaddiPlayerCounts(m.s, 2).get('away|Arjun')!.unsuccessfulTackles, 1);
+    assert.equal(kabaddiPlayerCounts(m.s).get('away|a1')!.unsuccessfulTackles, 2); // IDs-only scoring: "side|id"
+    assert.equal(kabaddiPlayerCounts(m.s, 2).get('away|a1')!.unsuccessfulTackles, 1);
     const t = buildBoxTable(KABADDI_DEEP_BOX, kabaddiDeepBox(m.s, { homeRoster: KH as never, awayRoster: KA as never }).data('all'));
     const col = t.columns.findIndex((c) => c.abbr === 'UTK');
     assert.ok(col >= 0);

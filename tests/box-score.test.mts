@@ -116,11 +116,24 @@ function volleyballMatch(outcomes: boolean, named = true): VolleyballState {
 
 const KB_H = [P('kr', 'Ravi'), P('kd', 'Dev'), P('ks', 'Sunil')];
 const KB_A = [P('ka', 'Arjun'), P('kb', 'Bhanu')];
-function kabaddiMatch(): KabaddiState {
+/** IDs-only scoring: the raid form logs ids only; `kbNamed` turns a raid
+ *  into the one an older app wrote (names in the payload and credits). */
+const kbNamed = (a: ScoreAction): ScoreAction => {
+  const nm = (id?: unknown) => [...KB_H, ...KB_A].find((p) => p.id === id)?.fullName;
+  const p = a.payload ?? {};
+  return {
+    ...a,
+    payload: { ...p, ...(p.raiderId ? { raiderName: nm(p.raiderId) } : {}), ...(p.tacklerId ? { tacklerName: nm(p.tacklerId) } : {}) },
+    ...(a.attribution ? { attribution: { ...a.attribution, playerName: nm(a.attribution.playerId) } } : {}),
+    ...(a.attribution2 ? { attribution2: { ...a.attribution2, playerName: nm(a.attribution2.playerId) } } : {}),
+  };
+};
+function kabaddiMatch(named = false): KabaddiState {
   let s = kbInit({ playersPerSide: 7, style: 'sanjeevani', proRules: true });
   const raid = (f: Partial<RaidForm> & { side: Side }, minute: number, half: number) => {
     for (const a of raidActions(s, { touches: 0, bonus: false, tackled: false, ...f })) {
-      s = kbReducer(s, a.type === 'REMOVE_EVENT' ? a : { ...a, payload: { ...a.payload, minute, half } });
+      const b = named ? kbNamed(a) : a;
+      s = kbReducer(s, b.type === 'REMOVE_EVENT' ? b : { ...b, payload: { ...b.payload, minute, half } });
     }
   };
   raid({ side: 'home', raider: KB_H[0], touches: 2 }, 2, 1);
@@ -229,11 +242,16 @@ describe('SD-23 · golden: the shared table equals the old components', () => {
     }
   });
   test('kabaddi (guided raids incl. tackles, bonus, empty, unnamed), every half', () => {
-    const s = kabaddiMatch();
-    const src = kabaddiBox(s, { homeRoster: KB_H, awayRoster: KB_A });
-    for (const sc of scopes(src)) {
-      const t = buildBoxTable(STAT_SCHEMAS.kabaddi, src.data(sc), { scope: sc });
-      for (const sd of SIDES) assertSame(legacyKabaddi(s.events, sd, sc), t, sd, { TCKL: 'TKL' }, `half ${sc}`);
+    // the old component drew an older (named) log; the shared box draws it,
+    // and an IDs-only log of the same match (names from the squads by id), the same
+    const old = kabaddiMatch(true);
+    for (const named of [true, false]) {
+      const s = kabaddiMatch(named);
+      const src = kabaddiBox(s, { homeRoster: KB_H, awayRoster: KB_A });
+      for (const sc of scopes(src)) {
+        const t = buildBoxTable(STAT_SCHEMAS.kabaddi, src.data(sc), { scope: sc });
+        for (const sd of SIDES) assertSame(legacyKabaddi(old.events, sd, sc), t, sd, { TCKL: 'TKL' }, `half ${sc}${named ? '' : ' (ids only)'}`);
+      }
     }
   });
   test('tennis, badminton, table tennis, squash, pickleball, padel: every game / set', () => {

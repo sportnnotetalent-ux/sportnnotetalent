@@ -10,11 +10,16 @@
  *
  * Drawn through MatchBoxScore's `schema` view, so the sport's own `box`
  * (pinned by the shared tests) is unchanged.
+ *
+ * IDs-only scoring: rows by player id (an older log's name-only player is
+ * matched to a squad player by name, else keyed "~Name"); names are this
+ * viewer's (`ctx.nameOf`).
  */
 import type { Player } from '../../core/types';
 import type { SportStatSchema } from '../statSchema.ts';
 import type { BoxRowInput, MatchBoxSource } from '../boxScore.ts';
 import { kabaddiBox, type BoxContext } from '../boxSources.ts';
+import { withRosters } from './names.ts';
 import { kabaddiStats } from './stats.ts';
 import type { KabaddiState } from './engine.ts';
 import { perRaidByIndex, replayOf } from './engine.ts';
@@ -37,19 +42,25 @@ export const KABADDI_DEEP_BOX: SportStatSchema<'kabaddi'> = {
 const RAIDER_KEYS = ['raids', 'successfulRaids', 'emptyRaids', 'raidsOut', 'touchPoints', 'bonusPoints', 'superRaids', 'doOrDiePoints'] as const;
 const DEFENDER_KEYS = ['tackles', 'superTackles'] as const;
 
-/** Per player ("side|name") counts for the scope, from the raid replay. */
-export function kabaddiPlayerCounts(s: KabaddiState, scope: 'all' | number = 'all'): Map<string, Record<string, number>> {
+/** Per player counts for the scope, from the raid replay. IDs-only scoring:
+ *  keyed "side|id" — an older log's name-only player "side|~Name", unless
+ *  `resolve` (the squads) finds his id. */
+export function kabaddiPlayerCounts(s: KabaddiState, scope: 'all' | number = 'all', resolve?: (side: Side, name: string) => string | undefined): Map<string, Record<string, number>> {
   const out = new Map<string, Record<string, number>>();
   if (!s?.raids || !kabaddiCountsTracked(s)) return out;
   const touched = kabaddiTouchedTracked(s);
   const zero = (): Record<string, number> => Object.fromEntries([...RAIDER_KEYS, ...DEFENDER_KEYS, ...(touched ? ['touchedOut', 'unsuccessfulTackles'] : [])].map((k) => [k, 0]));
-  const line = (side: Side, name: string) => out.get(`${side}|${name}`) ?? out.set(`${side}|${name}`, zero()).get(`${side}|${name}`)!;
+  const keyOf = (side: Side, id?: string, name?: string) => id || (name ? resolve?.(side, name) ?? `~${name}` : undefined);
+  const line = (side: Side, id?: string, name?: string): Record<string, number> => {
+    const k = `${side}|${keyOf(side, id, name)}`;
+    return out.get(k) ?? out.set(k, zero()).get(k)!;
+  };
   const per = perRaidByIndex(replayOf(s));
   s.raids.forEach((r, i) => {
     const b = per[i];
     if (!b || r.hidden || (scope !== 'all' && r.half !== scope)) return;
-    if (r.raider) {
-      const l = line(r.side, r.raider);
+    if (r.raiderId || r.raider) {
+      const l = line(r.side, r.raiderId, r.raider);
       l.raids += 1;
       if (b.raidPts > 0) l.successfulRaids += 1;
       if (b.raidPts === 0 && !b.raiderOut) l.emptyRaids += 1;
@@ -59,40 +70,57 @@ export function kabaddiPlayerCounts(s: KabaddiState, scope: 'all' | number = 'al
       if (b.raidPts >= 3) l.superRaids += 1;
       if (b.doOrDie) l.doOrDiePoints += b.raidPts;
     }
-    if (r.tackler && b.raiderOut && r.raiderOut && !b.lineOut && !b.doOrDieFail) {
-      const l = line(other(r.side), r.tackler);
+    if ((r.tacklerId || r.tackler) && b.raiderOut && r.raiderOut && !b.lineOut && !b.doOrDieFail) {
+      const l = line(other(r.side), r.tacklerId, r.tackler);
       l.tackles += 1;
       if (b.superTackle) l.superTackles += 1;
     }
-    if (touched) for (const p of (r.touched ?? []).slice(0, b.touchPts)) line(other(r.side), p.name).touchedOut += 1;
+    if (touched) for (const p of (r.touched ?? []).slice(0, b.touchPts)) if (p.id || p.name) line(other(r.side), p.id, p.name).touchedOut += 1;
     // round 2 — named defenders touched by a raider who got back
-    if (touched) for (const p of unsuccessfulTacklers(r, b)) line(other(r.side), p.name).unsuccessfulTackles += 1;
+    if (touched) for (const p of unsuccessfulTacklers(r, b)) if (p.id || p.name) line(other(r.side), p.id, p.name).unsuccessfulTackles += 1;
   });
   return out;
 }
 
 const idIn = (name: string, roster: Player[]) => roster.find((p) => p.fullName === name)?.id;
 
+/** An older log's stored names by player id (legacy, read-only): the name a
+ *  row falls back to when the viewer's lookup has none. */
+function legacyNames(s: KabaddiState): Map<string, string> {
+  const out = new Map<string, string>();
+  const put = (id?: string, name?: string) => { if (id && name && !out.has(id)) out.set(id, name); };
+  for (const r of s.raids ?? []) {
+    put(r.raiderId, r.raider);
+    put(r.tacklerId, r.tackler);
+    for (const p of r.touched ?? []) put(p.id, p.name);
+  }
+  return out;
+}
+
 /** The deep box source: the shared one + the counts per row. */
 export function kabaddiDeepBox(s: KabaddiState, ctx: BoxContext = {}): MatchBoxSource {
   const base = kabaddiBox(s, ctx);
+  const rosterFor = (sd: Side) => (sd === 'home' ? ctx.homeRoster : ctx.awayRoster) ?? [];
   return {
     ...base,
     data: (scope) => {
       const d = base.data(scope);
-      const counts = kabaddiPlayerCounts(s, scope);
+      const counts = kabaddiPlayerCounts(s, scope, (sd, name) => idIn(name, rosterFor(sd)));
       if (!counts.size) return d;
       const keys = Object.keys(counts.values().next().value ?? {});
+      const legacy = legacyNames(s);
       const side = (sd: Side) => {
-        const roster = (sd === 'home' ? ctx.homeRoster : ctx.awayRoster) ?? [];
+        const nm = withRosters(ctx.nameOf, rosterFor(sd));
         const rows: BoxRowInput[] = d[sd].rows.map((r) => ({ ...r, stats: { ...r.stats } }));
         for (const [k, v] of counts) {
           if (!k.startsWith(`${sd}|`)) continue;
-          const name = k.slice(sd.length + 1);
-          let r = rows.find((x) => x.name === name);
+          const key = k.slice(sd.length + 1);
+          const old = key.startsWith('~') ? key.slice(1) : undefined;
+          let r = old != null ? rows.find((x) => !x.playerId && x.name === nm(undefined, old)) : rows.find((x) => x.playerId === key);
           if (!r) {
-            const id = idIn(name, roster);
-            r = { name, ...(id ? { playerId: id } : {}), stats: { raidPoints: 0, tacklePoints: 0 } };
+            r = old != null
+              ? { name: nm(undefined, old), stats: { raidPoints: 0, tacklePoints: 0 } }
+              : { name: nm(key, legacy.get(key)), playerId: key, stats: { raidPoints: 0, tacklePoints: 0 } };
             rows.push(r);
           }
           Object.assign(r.stats, v);

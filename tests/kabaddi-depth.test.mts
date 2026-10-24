@@ -17,6 +17,7 @@ import {
 import { kabaddiTotals, kabaddiMatchCentre, KABADDI_COUNT_KEYS } from '../src/sports/kabaddi/totals.ts';
 import { readFileSync } from 'node:fs';
 import { kabaddiVoice } from '../src/sports/voiceParsers.ts';
+import { subAction } from '../src/sports/kabaddi/actions.ts';
 import { kabaddiBox } from '../src/sports/boxSources.ts';
 import { comparisonRows } from '../src/sports/boxScore.ts';
 import { STAT_SCHEMAS, statSchema } from '../src/sports/statSchemas.ts';
@@ -71,7 +72,9 @@ function fullMatch(): Scorer {
   m.push({ type: 'NEXT_HALF' });
   m.raid({ side: 'away', raider: A[0], touches: 2 }, 21, 2);
   m.raid({ side: 'home', touches: 1 }, 22, 2); // nobody named
-  m.push({ type: 'SUB', side: 'away', payload: { offName: 'Bhanu', onName: 'Bala', minute: 23, half: 2 } });
+  // IDs-only scoring: the substitution by id (a2 off, "a9" — a squad player
+  // not in this test's three — on)
+  m.push({ ...subAction('away', A[1], { id: 'a9' }), payload: { ...subAction('away', A[1], { id: 'a9' }).payload, minute: 23, half: 2 } });
   // voice: "tackle Ravi" → a tackled away raid, Ravi credited
   const voice = kabaddiVoice('tackle Ravi', { state: m.s, homeName: 'Reds', awayName: 'Blues', homeRoster: H as never, awayRoster: A as never } as never);
   assert.ok(voice?.length);

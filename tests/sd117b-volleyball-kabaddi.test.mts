@@ -16,6 +16,7 @@ import { pointInputs, correctionActions, type PointInput } from '../src/sports/r
 import { pointPressure } from '../src/sports/pointStatus.ts';
 import { trackedIn } from '../src/sports/statSchema.ts';
 import * as kb from '../src/sports/kabaddi/engine.ts';
+import { subAction } from '../src/sports/kabaddi/actions.ts';
 import type { ScoreAction } from '../src/sports/types.ts';
 import { rallySentence } from '../src/sports/volleyball/commentary.ts';
 
@@ -195,21 +196,38 @@ describe('SD-117b kabaddi — team timeouts', () => {
 });
 
 describe('SD-117b kabaddi — a substituted player may return (format flag)', () => {
-  const sub = (off: string, on: string): ScoreAction => ({ type: 'SUB', side: 'home', payload: { offName: off, onName: on } });
+  // IDs-only scoring: the controls substitute by id (subAction); an older
+  // log's substitution by name still replays as it did
+  const sub = (off: string, on: string): ScoreAction => subAction('home', { id: off }, { id: on });
+  const namedSub = (off: string, on: string): ScoreAction => ({ type: 'SUB', side: 'home', payload: { offName: off, onName: on } });
   test('flag on: back on within the limit; can score again; undo sends them back off', () => {
     const cfg = { ...CFG, subReturn: true };
-    let s = kplay([sub('Ravi', 'Dev'), sub('Dev', 'Ravi')], cfg);
-    assert.deepEqual(s.subbedOff.home, ['Dev']);
+    let s = kplay([sub('h1', 'h2'), sub('h2', 'h1')], cfg);
+    assert.deepEqual(s.subbedOff.home, ['h2']);
     assert.equal(s.subsUsed.home, 2);
     assert.match(s.events[1].label, /returns/);
+    assert.equal(s.events[1].ret, 'h1');
+    assert.deepEqual([s.events[1].playerId, s.events[1].secondId, s.events[1].detail], ['h2', 'h1', undefined]);
+    s = kb.reducer(s, { type: 'RAID', side: 'home', attribution: { playerId: 'h1', stat: 'raidPoints' } });
+    assert.equal(s.home, 1);
+    // the player still off can't score
+    assert.equal(kb.reducer(s, { type: 'RAID', side: 'home', attribution: { playerId: 'h2', stat: 'raidPoints' } }), s);
+    const undone = kb.reducer(s, { type: 'REMOVE_EVENT', side: 'home', payload: { id: 2, v: 2 } });
+    assert.deepEqual([...undone.subbedOff.home].sort(), ['h1']);
+  });
+  test('flag off (older formats): takes no further part, as before', () => {
+    const s = kplay([sub('h1', 'h2'), sub('h2', 'h1')]);
+    assert.deepEqual(s.subbedOff.home, ['h1', 'h2']);
+  });
+  test('an older log (subs by name) replays as it did', () => {
+    let s = kplay([namedSub('Ravi', 'Dev'), namedSub('Dev', 'Ravi')], { ...CFG, subReturn: true });
+    assert.deepEqual(s.subbedOff.home, ['Dev']);
+    assert.equal(s.events[1].detail, 'Ravi ⬆  Dev ⬇');
     s = kb.reducer(s, { type: 'RAID', side: 'home', attribution: { playerId: 'h1', stat: 'raidPoints', playerName: 'Ravi' } });
     assert.equal(s.home, 1);
     const undone = kb.reducer(s, { type: 'REMOVE_EVENT', side: 'home', payload: { id: 2, v: 2 } });
     assert.deepEqual([...undone.subbedOff.home].sort(), ['Ravi']);
-  });
-  test('flag off (older formats): takes no further part, as before', () => {
-    const s = kplay([sub('Ravi', 'Dev'), sub('Dev', 'Ravi')]);
-    assert.deepEqual(s.subbedOff.home, ['Ravi', 'Dev']);
+    assert.deepEqual(kplay([namedSub('Ravi', 'Dev'), namedSub('Dev', 'Ravi')]).subbedOff.home, ['Ravi', 'Dev']);
   });
 });
 
@@ -234,7 +252,7 @@ describe('SD-117b kabaddi — tackle type, expected raider, who is out', () => {
   test('a tackled raider is out until revived (first out, first in)', () => {
     let s = kb.init(CFG);
     s = kb.reducer(s, raid('home', { tackled: true, raider: { id: 'h1', fullName: 'Ravi' } }, s));
-    assert.deepEqual(kb.outPlayers(s).home, ['Ravi']);
+    assert.deepEqual(kb.outPlayers(s).home, ['h1']); // IDs-only scoring: by id
     s = kb.reducer(s, raid('home', { touches: 1, raider: { id: 'h2', fullName: 'Dev' } }, s)); // revives Ravi
     assert.deepEqual(kb.outPlayers(s).home, []);
   });

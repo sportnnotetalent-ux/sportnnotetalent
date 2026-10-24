@@ -182,7 +182,8 @@ test('kabaddi: raid-point leaders, Super 10 and High 5 agree with the raid repla
   const b = kabaddiMatchRecords(s);
   const rp = t.h1.stats.raidPoints;
   assert.ok(rp >= 10, `raid points ${rp}`);
-  assert.deepEqual(of(b, 'super10').map((i) => [i.playerId, i.value, i.playerName]), [['h1', rp, 'Ravi']]);
+  // IDs-only scoring: the stored record names its player by id only
+  assert.deepEqual(of(b, 'super10').map((i) => [i.playerId, i.value, i.playerName]), [['h1', rp, undefined]]);
   assert.equal(of(b, 'high5').length, t.h2.stats.tacklePoints >= 5 ? 1 : 0);
   assert.deepEqual(of(b, 'teamHigh').map((i) => i.value), [s.home, s.away]);
 });

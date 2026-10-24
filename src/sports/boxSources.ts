@@ -66,8 +66,8 @@ export interface BoxContext {
   homeName?: string;
   awayName?: string;
   /** IDs-only scoring (docs/privacy/ids-only-scoring.md): a player's name for
-   *  this viewer by id. Used by the racket and volleyball boxes (their logs
-   *  keep ids); absent → the stored legacy name / the roster name. */
+   *  this viewer by id. Used by the racket, volleyball and kabaddi boxes
+   *  (their logs keep ids); absent → the stored legacy name / the roster name. */
   nameOf?: NameOf;
 }
 
@@ -276,6 +276,9 @@ export function volleyballBox(s: VolleyballState, ctx: BoxContext = {}): MatchBo
 
 export const kabaddiPeriodName = (h: number): string => (h === 1 ? '1st half' : h === 2 ? '2nd half' : h === 3 ? 'ET 1' : 'ET 2');
 
+/** IDs-only scoring: the kabaddi box keyed by player id (an older log's
+ *  name-only credit matched to a squad player by name, else keyed by the
+ *  name); names are the viewer's (`ctx.nameOf`). */
 export function kabaddiBox(s: KabaddiState, ctx: BoxContext = {}): MatchBoxSource {
   const periods = Array.from({ length: Math.max(1, s.half) }, (_, i) => ({ value: i + 1, label: kabaddiPeriodName(i + 1) }));
   return {
@@ -301,9 +304,10 @@ export function kabaddiBox(s: KabaddiState, ctx: BoxContext = {}): MatchBoxSourc
       const side = (sd: Side): BoxSideInput => {
         const roster = rosterOf(ctx, sd);
         // raid / tackle points logged without a player
-        const loose = (kind: string) => s.events.filter((e) => e.side === sd && e.kind === kind && !e.playerName && inScope(e)).reduce((a, e) => a + (e.points ?? 0), 0);
+        const loose = (kind: string) => s.events.filter((e) => e.side === sd && e.kind === kind && !e.playerName && !e.playerId && inScope(e)).reduce((a, e) => a + (e.points ?? 0), 0);
+        const lines = kabaddiTally(s.events, sd, scope, { nameOf: withRosters(ctx.nameOf, roster), resolve: (name) => idIn(name, roster) });
         return {
-          rows: kabaddiTally(s.events, sd, scope).map((l) => withId({ name: l.name, stats: { raidPoints: l.raid, tacklePoints: l.tackle } }, roster)),
+          rows: lines.map((l) => ({ name: l.name, ...(l.playerId ? { playerId: l.playerId } : {}), stats: { raidPoints: l.raid, tacklePoints: l.tackle } })),
           team: { label: 'Team', stats: { raidPoints: loose('raid'), tacklePoints: loose('tackle') } },
           teamStats: teamFigures(sd),
         };

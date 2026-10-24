@@ -2,6 +2,10 @@
  * Kabaddi plugin — archetype: raid. Two timed halves with a running clock.
  * Raid and tackle points are attributed to players and logged to the timeline
  * with the match minute.
+ *
+ * IDs-only scoring (docs/privacy/ids-only-scoring.md): every action this
+ * scorer dispatches names players by id only (raidActions, actions.ts); the
+ * screens put names back by id for the viewer (useMask().nameOf, names.ts).
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
@@ -25,11 +29,14 @@ import { courtFormation, makeCourt } from '../courts';
 import { BackfillBar, RowAction, confirmRemove } from '../TimelineControls';
 import { sum, doOrDieOn } from './rules';
 import { kabaddiTotals, kabaddiSuspended } from './totals.ts';
+import { useMask } from '../../core/disputeMask';
+import { subAction, techPointAction, cardAction, pointAction, removeEventAction } from './actions';
+import { kabaddiEventDetail, withRosters } from './names';
 
 import {
-  init, reducer, currentMinute, halfLabel, previewRaid, raidOfEvent, raidReversals, raidActions, isRaidHead, kabaddiWinner, halfPoints, defendersOnMat,
+  init, reducer, currentMinute, halfLabel, previewRaid, raidOfEvent, raidActions, isRaidHead, kabaddiWinner, halfPoints, defendersOnMat,
   expectedRaider, outPlayers, clockPaused, timeoutsUsed, TIMEOUTS_PER_HALF, TACKLE_TYPES,
-  formOutcome, matNow, kabaddiCfg, touchChips, unavailable, cardsOf, suggestedCard, TECH_REASONS, CARD_ICON, RAID_SKILLS,
+  formOutcome, matNow, kabaddiCfg, touchChips, unavailable, unavailableOf, listHas, isSubbedOff, cardsOf, suggestedCard, TECH_REASONS, CARD_ICON, RAID_SKILLS,
   type KabaddiState, type KabaddiEvent, type CardColour,
 } from './engine.ts';
 import { KABADDI_META } from './meta';
@@ -52,9 +59,11 @@ const Row = ({ label, roster, onPick, onTeam }: { label: string; roster: Player[
 
 /** On-mat status (SD-72: suspended / sent-off players aren't on the mat) and
  *  the suspension banner — re-rendered every second while a yellow runs. */
-const MatStatus = ({ state, homeName, awayName }: { state: KabaddiState; homeName: string; awayName: string }) => {
+const MatStatus = ({ state, homeName, awayName, homeRoster, awayRoster }: { state: KabaddiState; homeName: string; awayName: string; homeRoster: Player[]; awayRoster: Player[] }) => {
   const [, tick] = useState(0);
-  const suspended = kabaddiSuspended(state);
+  // IDs-only scoring: a suspended player by id, named for this viewer
+  const { nameOf } = useMask();
+  const suspended = kabaddiSuspended(state, undefined, withRosters(nameOf, homeRoster, awayRoster));
   const running = suspended.length > 0 && !clockPaused(state) && !!state.startedAt;
   useEffect(() => {
     if (!running) return;
@@ -76,6 +85,8 @@ const MatStatus = ({ state, homeName, awayName }: { state: KabaddiState; homeNam
 };
 
 const ScoringControls: SportPlugin<KabaddiState>['ScoringControls'] = ({ state, dispatch, homeName, awayName, homeRoster = [], awayRoster = [] }) => {
+  // IDs-only scoring: the log keeps ids; the scorer sees names by id
+  const { nameOf } = useMask();
   const [sub, setSub] = useState<{ side: 'home' | 'away'; off?: Player } | null>(null);
   // Timeline correction: edit one past moment in place, or backfill a missed one.
   const [showEdit, setShowEdit] = useState(false);
@@ -112,23 +123,12 @@ const ScoringControls: SportPlugin<KabaddiState>['ScoringControls'] = ({ state, 
   const kEmpty = state.emptyRaids ?? { home: 0, away: 0 };
 
   // ----- Correct the timeline: remove / edit one specific past moment -----
-  const STAT_KEY: Record<string, string> = { raid: 'raidPoints', tackle: 'tacklePoints' };
   const allPlayers = [...homeRoster, ...awayRoster];
-  const rosterId = (nm?: string) => allPlayers.find((p) => p.fullName === nm)?.id;
+  // legacy only: an older log's name-only player → his id (the squads)
+  const rosterId = (nm?: string) => (nm ? allPlayers.find((p) => p.fullName === nm)?.id : undefined);
   const byId = (id?: string, nm?: string) => allPlayers.find((p) => (id ? p.id === id : p.fullName === nm));
-  const raidRev = (e: KabaddiEvent) => raidReversals(state, e, rosterId);
-  const removeEvent = (e: KabaddiEvent) => {
-    // A guided raid (any of its lines) goes as a whole — raid, tackle, all-out.
-    if (e.group != null) {
-      dispatch({ type: 'REMOVE_EVENT', side: e.side, payload: { id: e.group, v: 2 }, ...raidRev(e) });
-      return;
-    }
-    const pid = rosterId(e.playerName);
-    const attribution = pid && e.kind && STAT_KEY[e.kind]
-      ? { playerId: pid, stat: STAT_KEY[e.kind], by: -(e.points ?? 1), playerName: e.playerName }
-      : undefined;
-    dispatch({ type: 'REMOVE_EVENT', side: e.side, payload: { id: e.id, v: 2 }, attribution });
-  };
+  // A guided raid (any of its lines) goes as a whole — raid, tackle, all-out.
+  const removeEvent = (e: KabaddiEvent) => dispatch(removeEventAction(state, e, rosterId));
   // SD-114: what a ✕ takes with it — a guided raid goes with its tackle / all-out lines.
   const removeDetail = (e: KabaddiEvent): string | undefined => {
     if (e.group == null) return undefined;
@@ -157,9 +157,9 @@ const ScoringControls: SportPlugin<KabaddiState>['ScoringControls'] = ({ state, 
     setEdit(e);
   };
   const commitEdit = (p: Player) => {
-    if (!edit || !edit.side || !edit.kind) return;
+    if (!edit || !edit.side || (edit.kind !== 'raid' && edit.kind !== 'tackle')) return;
     removeEvent(edit);
-    fire({ type: edit.kind.toUpperCase(), side: edit.side, payload: { points: edit.points ?? 1 }, attribution: { playerId: p.id, stat: STAT_KEY[edit.kind], by: edit.points ?? 1, playerName: p.fullName } });
+    fire(pointAction(edit.kind, edit.side, p, edit.points ?? 1));
     setEdit(null);
   };
   /** Log the guided raid (or its correction) — see raidActions. */
@@ -172,12 +172,11 @@ const ScoringControls: SportPlugin<KabaddiState>['ScoringControls'] = ({ state, 
     setRaidFlow(null);
   };
 
-  // Players subbed off this match take no further part.
-  const offNames = (side: 'home' | 'away') => state.subbedOff[side];
-  const onField = (side: 'home' | 'away', roster: Player[]) => roster.filter((p) => !offNames(side).includes(p.fullName));
+  // Players subbed off this match take no further part (by id; an older log by name).
+  const onField = (side: 'home' | 'away', roster: Player[]) => roster.filter((p) => !isSubbedOff(state, side, p));
   // SD-72: sent off (red) / serving a yellow — can't raid, tackle or be substituted
   const unav = unavailable(state);
-  const unavName = (side: 'home' | 'away', nm: string) => unav[side].find((x) => x.name === nm);
+  const unavOf = (side: 'home' | 'away', p: Player) => unavailableOf(unav[side], p);
   const rosterFor = (side: 'home' | 'away') => (side === 'home' ? homeRoster : awayRoster);
   const subsLeft = (side: 'home' | 'away') => state.maxSubs - state.subsUsed[side];
 
@@ -201,9 +200,9 @@ const ScoringControls: SportPlugin<KabaddiState>['ScoringControls'] = ({ state, 
 
   if (sub) {
     const sideName = sub.side === 'home' ? homeName : awayName;
-    const offOpts = onField(sub.side, rosterFor(sub.side)).filter((p) => !unavName(sub.side, p.fullName));
+    const offOpts = onField(sub.side, rosterFor(sub.side)).filter((p) => !unavOf(sub.side, p));
     // SD-117b (format: subReturn): a player substituted earlier may come back on.
-    const onOpts = rosterFor(sub.side).filter((p) => p.id !== sub.off?.id && !unavName(sub.side, p.fullName) && (state.subReturn || !offNames(sub.side).includes(p.fullName)));
+    const onOpts = rosterFor(sub.side).filter((p) => p.id !== sub.off?.id && !unavOf(sub.side, p) && (state.subReturn || !isSubbedOff(state, sub.side, p)));
     return (
       <View style={{ gap: theme.spacing(3) }}>
       {backfillBar}
@@ -226,7 +225,7 @@ const ScoringControls: SportPlugin<KabaddiState>['ScoringControls'] = ({ state, 
               <View style={ctrl.chips}>
                 {onOpts.map((p) => (
                   <SelectChip key={p.id} label={p.fullName} active={false} onPress={() => {
-                    fire({ type: 'SUB', side: sub.side, payload: { offName: sub.off!.fullName, onName: p.fullName } });
+                    fire(subAction(sub.side, sub.off!, p));
                     setSub(null);
                   }} />
                 ))}
@@ -261,6 +260,7 @@ const ScoringControls: SportPlugin<KabaddiState>['ScoringControls'] = ({ state, 
 
   const tied = state.home === state.away;
   const paused = clockPaused(state);
+  const scorerNames = withRosters(nameOf, homeRoster, awayRoster);
   const expected = expectedRaider(state);
   const outNow = outPlayers(state);
 
@@ -302,7 +302,7 @@ const ScoringControls: SportPlugin<KabaddiState>['ScoringControls'] = ({ state, 
         </View>
       )}
       {/* On-mat status: players in = teamSize − out − carded; suspensions count down. */}
-      <MatStatus state={state} homeName={homeName} awayName={awayName} />
+      <MatStatus state={state} homeName={homeName} awayName={awayName} homeRoster={homeRoster} awayRoster={awayRoster} />
 
       {/* SD-117b: pause the clock for a timeout / injury / review; team timeouts */}
       {!state.goldenRaid && (
@@ -362,8 +362,8 @@ const ScoringControls: SportPlugin<KabaddiState>['ScoringControls'] = ({ state, 
               <View style={ctrl.chips}>
                 {onField(raidFlow.side, raidFlow.side === 'home' ? homeRoster : awayRoster).map((p) => {
                   // SD-117b: tap again to clear; a player who's out can't raid (dimmed)
-                  const un = raidFlow.editOf == null ? unavName(raidFlow.side, p.fullName) : undefined;
-                  const isOut = raidFlow.editOf == null && (outNow[raidFlow.side].includes(p.fullName) || !!un);
+                  const un = raidFlow.editOf == null ? unavOf(raidFlow.side, p) : undefined;
+                  const isOut = raidFlow.editOf == null && (listHas(outNow[raidFlow.side], p) || !!un);
                   const on = raidFlow.raider?.id === p.id;
                   return <SelectChip key={p.id} label={un ? `${p.fullName} · ${un.why === 'red' ? 'sent off' : 'suspended'}` : isOut ? `${p.fullName} · out` : p.fullName} active={on} disabled={isOut && !on}
                     onPress={() => setRaidFlow({ ...raidFlow, raider: on ? undefined : p })} />;
@@ -398,7 +398,7 @@ const ScoringControls: SportPlugin<KabaddiState>['ScoringControls'] = ({ state, 
                 {state.track?.touched && !noTouches && raidFlow.touches > 0 && (() => {
                   const defSide = raidFlow.side === 'home' ? 'away' : 'home';
                   const picked = raidFlow.touched ?? [];
-                  const defenders = onField(defSide, rosterFor(defSide)).filter((p) => raidFlow.editOf != null || (!outNow[defSide].includes(p.fullName) && !unavName(defSide, p.fullName)));
+                  const defenders = onField(defSide, rosterFor(defSide)).filter((p) => raidFlow.editOf != null || (!listHas(outNow[defSide], p) && !unavOf(defSide, p)));
                   if (!defenders.length) return null;
                   const max = Math.min(raidFlow.touches, onMat);
                   return (
@@ -451,8 +451,8 @@ const ScoringControls: SportPlugin<KabaddiState>['ScoringControls'] = ({ state, 
                 <Text style={ctrl.meta}>Who made the tackle? (optional — credits the defender)</Text>
                 <View style={ctrl.chips}>
                   {defenders.map((p) => {
-                    const un = raidFlow.editOf == null ? unavName(defSide, p.fullName) : undefined;
-                    const isOut = raidFlow.editOf == null && (outNow[defSide].includes(p.fullName) || !!un);
+                    const un = raidFlow.editOf == null ? unavOf(defSide, p) : undefined;
+                    const isOut = raidFlow.editOf == null && (listHas(outNow[defSide], p) || !!un);
                     const on = raidFlow.tackler?.id === p.id;
                     return <SelectChip key={p.id} label={un ? `${p.fullName} · ${un.why === 'red' ? 'sent off' : 'suspended'}` : isOut ? `${p.fullName} · out` : p.fullName} active={on} disabled={isOut && !on}
                       onPress={() => setRaidFlow({ ...raidFlow, tackler: on ? undefined : p })} />;
@@ -529,7 +529,7 @@ const ScoringControls: SportPlugin<KabaddiState>['ScoringControls'] = ({ state, 
             <Button label={tech.side ? `✓ +1 to ${tech.side === 'home' ? homeName : awayName}` : 'Pick who gets the point'} disabled={!tech.side}
               onPress={() => {
                 if (!tech.side) return;
-                fire({ type: 'TECH_POINT', side: tech.side, payload: { ...(tech.reason ? { reason: tech.reason } : null), ...(tech.by ? { playerId: tech.by.id, playerName: tech.by.fullName } : null) } });
+                fire(techPointAction(tech.side, { reason: tech.reason, by: tech.by }));
                 setTech(null);
               }} />
           </View>
@@ -539,12 +539,12 @@ const ScoringControls: SportPlugin<KabaddiState>['ScoringControls'] = ({ state, 
         const sd = card.side;
         const nm = (x?: 'home' | 'away') => (x === 'home' ? homeName : awayName);
         const opp = sd === 'home' ? 'away' : 'home';
-        const players = sd ? onField(sd, rosterFor(sd)).filter((p) => unavName(sd, p.fullName)?.why !== 'red') : [];
+        const players = sd ? onField(sd, rosterFor(sd)).filter((p) => unavOf(sd, p)?.why !== 'red') : [];
         const who = card.who;
         const person = typeof who === 'object' ? who : undefined;
-        const counts = sd && person ? cardsOf(state, sd, { id: person.id, name: person.fullName }) : null;
+        const counts = sd && person ? cardsOf(state, sd, person) : null;
         const hint = counts ? suggestedCard(counts) : null;
-        const wasOut = !!(sd && person && outNow[sd].includes(person.fullName));
+        const wasOut = !!(sd && person && listHas(outNow[sd], person));
         const tpDefault = (c?: CardColour) => c === 'red';
         const whoLabel = who === 'official' ? 'the team official' : person ? person.fullName : 'the player';
         const ready = !!sd && !!card.colour && !!who;
@@ -558,15 +558,7 @@ const ScoringControls: SportPlugin<KabaddiState>['ScoringControls'] = ({ state, 
             });
             if (!ok) return;
           }
-          fire({
-            type: 'CARD', side: sd,
-            payload: {
-              card: card.colour,
-              ...(who === 'official' ? { official: true } : person ? { playerId: person.id, playerName: person.fullName } : { player: true }),
-              ...(wasOut ? { wasOut: true } : null),
-              ...(card.tp ? { tp: 1 } : null),
-            },
-          });
+          fire(cardAction(sd, card.colour, who === 'official' ? 'official' : person ?? 'player', { wasOut, tp: card.tp ? 1 : 0 }));
           setCard(null);
         };
         return (
@@ -592,8 +584,8 @@ const ScoringControls: SportPlugin<KabaddiState>['ScoringControls'] = ({ state, 
                 <Text style={ctrl.meta}>Who?</Text>
                 <View style={ctrl.chips}>
                   {players.map((p) => {
-                    const un = unavName(sd, p.fullName);
-                    return <SelectChip key={p.id} label={un ? `${p.fullName} · suspended` : outNow[sd].includes(p.fullName) ? `${p.fullName} · out` : p.fullName} active={person?.id === p.id} onPress={() => setCard({ ...card, who: person?.id === p.id ? undefined : p })} />;
+                    const un = unavOf(sd, p);
+                    return <SelectChip key={p.id} label={un ? `${p.fullName} · suspended` : listHas(outNow[sd], p) ? `${p.fullName} · out` : p.fullName} active={person?.id === p.id} onPress={() => setCard({ ...card, who: person?.id === p.id ? undefined : p })} />;
                   })}
                   {players.length === 0 && <SelectChip label="A player (not named)" active={who === 'player'} onPress={() => setCard({ ...card, who: who === 'player' ? undefined : 'player' })} />}
                   <SelectChip label="Coach / team official" active={who === 'official'} onPress={() => setCard({ ...card, who: who === 'official' ? undefined : 'official' })} />
@@ -663,7 +655,11 @@ const ScoringControls: SportPlugin<KabaddiState>['ScoringControls'] = ({ state, 
               {[...state.events].filter((e) => e.group == null || isRaidHead(e)).sort((a, b) => (b.minute ?? 0) - (a.minute ?? 0) || b.id - a.id).map((e) => (
                 <View key={e.id} style={ctrl.editRow}>
                   <Text style={ctrl.editMin}>{e.stamp}</Text>
-                  <Text style={ctrl.editLabel} numberOfLines={1}>{e.icon} {e.label}{e.detail ? ` — ${e.detail}` : ''}</Text>
+                  {(() => {
+                    // IDs-only scoring: the line's player by id, for this scorer
+                    const who = kabaddiEventDetail(state, e, scorerNames);
+                    return <Text style={ctrl.editLabel} numberOfLines={1}>{e.icon} {e.label}{who ? ` — ${who}` : ''}</Text>;
+                  })()}
                   {(e.kind === 'raid' || e.kind === 'tackle') && <RowAction label="✎ Edit" tone="edit" a11y={`Edit ${e.label}`} onPress={() => editEvent(e)} />}
                   <RowAction label="✕" tone="remove" a11y={`Remove ${e.label}`} onPress={() => void confirmRemove(`${e.label.replace(/ — .*$/, '')} (${e.stamp})`, () => removeEvent(e), removeDetail(e))} />
                 </View>
@@ -731,18 +727,25 @@ const LiveClock: NonNullable<SportPlugin<KabaddiState>['LiveClock']> = ({ state 
  *  running score, tags) on Commentary; the PKL match centre (categories + half
  *  filter + leaders per half) and the player box at PKL depth on Stats. */
 type TabProps = Parameters<NonNullable<SportPlugin<KabaddiState>['LiveExtras']>>[0];
-const KabaddiCommentary = ({ state, homeName, awayName, homeColor, awayColor }: TabProps) => {
+const KabaddiCommentary = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster }: TabProps) => {
   const s = state as KabaddiState;
-  const feed = useMemo(() => kabaddiCommentary(s, { home: homeName, away: awayName }), [s, homeName, awayName]);
+  // IDs-only scoring: players named by id for this viewer
+  const { nameOf } = useMask();
+  const feed = useMemo(
+    () => kabaddiCommentary(s, { home: homeName, away: awayName, nameOf, homeRoster, awayRoster }),
+    [s, homeName, awayName, nameOf, homeRoster, awayRoster],
+  );
   return <FeedView groups={feed} homeColor={homeColor} awayColor={awayColor} emptyText="No raids yet." title="Commentary · raid by raid" />;
 };
 const KabaddiStats = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster, onPlayer }: TabProps) => {
   const s = state as KabaddiState;
+  // IDs-only scoring: box-score names by player id for this viewer
+  const { nameOf } = useMask();
   return (
     <View style={{ gap: theme.spacing(3) }}>
-      <KabaddiStatsPanel state={s} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} />
+      <KabaddiStatsPanel state={s} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} homeRoster={homeRoster} awayRoster={awayRoster} />
       <Text style={ctrl.label}>Player stats</Text>
-      <MatchBoxScore sport="kabaddi" schema={KABADDI_DEEP_BOX} show="box" source={kabaddiDeepBox(s, { homeRoster, awayRoster })} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} onPlayer={onPlayer} />
+      <MatchBoxScore sport="kabaddi" schema={KABADDI_DEEP_BOX} show="box" source={kabaddiDeepBox(s, { homeRoster, awayRoster, nameOf })} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} onPlayer={onPlayer} />
     </View>
   );
 };
