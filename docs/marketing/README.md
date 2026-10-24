@@ -70,7 +70,7 @@ A post marked "only if SDxxx is in the live build" stays unscheduled until that 
 | WhatsApp Channel | — | **Waiting for the company's own number** (WhatsApp Business app on a new SIM, kept separate from the WhatsApp Business API number used for sign-in codes) |
 | TikTok | — | Not available in India; reserve later from an international market |
 
-Confirmed 2026-10-24: Instagram is connected in the Meta business portfolio; a second full-control admin (the founder's own account) holds the Facebook Page, Instagram and both WhatsApp accounts. Still to confirm: YouTube "not made for kids" and phone verification. Brand kit: `docs/marketing/brand-kit/`.
+Confirmed 2026-10-24: Instagram is connected in the Meta business portfolio; a second full-control admin (the founder's own account) holds the Facebook Page, Instagram and both WhatsApp accounts. YouTube is set to "not made for kids" and phone-verified. Brand kit: `docs/marketing/brand-kit/`.
 
 **Company email for the handles: `social@sportnnote.in`** (Cloudflare Email Routing on sportnnote.in, forwarding to the company Gmail; set up 2026-10-24, test mail received). Instagram and X now sign in with this address (switched 2026-10-24), so the inbox behind it can change later without touching each platform. The catch-all stays off (mail to any other address is dropped). The app's own email (Resend, `no-reply@`) is unaffected: it sends from the `send.` subdomain.
 

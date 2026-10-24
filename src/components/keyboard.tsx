@@ -198,8 +198,10 @@ export const KeyboardAwareScrollView = forwardRef<ScrollView, ScrollViewProps>(f
   const own = useMemo(() => createFieldRegistry(), []);
   const defaults = {
     keyboardShouldPersistTaps: props.keyboardShouldPersistTaps ?? ('handled' as const),
-    // dragging the form closes the keyboard, as in the top apps (not a sideways chip row)
-    keyboardDismissMode: props.keyboardDismissMode ?? (props.horizontal ? undefined : Platform.OS === 'ios' ? 'interactive' as const : 'on-drag' as const),
+    // dragging the form closes the keyboard, as in the top apps (not a sideways chip row).
+    // Not on web: react-native-web's "on-drag" closes it on ANY scroll — including the
+    // browser bringing the tapped field into view — so a tap's keyboard shut at once.
+    keyboardDismissMode: props.keyboardDismissMode ?? (props.horizontal || !NATIVE ? undefined : Platform.OS === 'ios' ? 'interactive' as const : 'on-drag' as const),
   };
   const plain = !NATIVE || props.horizontal || nested || sizedByItself(props.style);
   const body = plain

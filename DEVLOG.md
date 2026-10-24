@@ -13,6 +13,12 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-24 — Fix: on the web app, tapping a field after closing the keyboard closed it again
+Founder, iPhone web (New community): after closing the keyboard with ✓, tapping a field opened the keyboard and shut it at once; a second tap was needed.
+- Cause: the keyboard-safe forms (2026-10-22) set "drag the form to close the keyboard" on every form scroll view. On native that is a finger drag; react-native-web's `on-drag` closes the keyboard on ANY scroll event, including the browser scrolling the tapped field into view (and iPhone's visible-area fit), so the field blurred immediately. The second tap worked because the field was already in place.
+- Fix: no drag-to-dismiss on web (`KeyboardAwareScrollView` default in `src/components/keyboard.tsx`); native keeps iOS `interactive` / Android `on-drag`. On web the keyboard closes with Safari's ✓ / Android's back, as browsers do.
+- Verified: reproduced in the browser preview with the old code (real tap on Name → scroll → focus lost), fixed with the new code (Name and Phone stay focused through a scroll; no console errors); guard test in `tests/keyboard-safe-fields.test.mts`; tsc clean; full suite 4444 pass / 0 fail. Web-only change: needs a web publish, no phone OTA.
+
 ### 2026-10-23 — Fix: Tournament teams' "manage the squad" invite link landed on an error
 Pre-launch fix. Adding a team with a manager / captain contact made that person a (provisional) player and captain, then sent a link built from the team-claim CODE to the player-invite page (`/i/…`), which expects a player id — so the email / WhatsApp link always failed.
 - The link is now their own invite, `app.sportnnote.in/i/<player id>`: signing up there with that number / email claims the player already made captain, so they manage the squad at once.

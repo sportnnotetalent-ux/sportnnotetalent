@@ -2,6 +2,7 @@
  *  field above the on-screen keyboard (src/components/keyboardMath.ts). */
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { fieldOrder, keyboardTopOf, revealTarget, sheetPlacement, REVEAL_MARGIN } from '../src/components/keyboardMath.ts';
 
 const ev = (screenY: number, height: number) => ({ endCoordinates: { screenY, height } });
@@ -78,5 +79,16 @@ describe('keyboard "Next" order', () => {
       { id: 'name', x: 16, y: 120 },
     ];
     assert.deepEqual([...fields].sort(fieldOrder).map((f) => f.id), ['name', 'city', 'pin', 'phone']);
+  });
+});
+
+describe('web keeps the keyboard open', () => {
+  test('no drag-to-dismiss on web (react-native-web closes the keyboard on any scroll)', () => {
+    // 2026-10-24, iPhone web: tapping a field after closing the keyboard opened it and
+    // shut it at once — the page scrolling the field into view counted as a "drag".
+    const src = readFileSync(new URL('../src/components/keyboard.tsx', import.meta.url), 'utf8');
+    const line = src.split('\n').find((l) => l.includes('keyboardDismissMode: props.keyboardDismissMode ??'));
+    assert.ok(line, 'the scroll view default is set in keyboard.tsx');
+    assert.match(line!, /!NATIVE \? undefined/);
   });
 });
