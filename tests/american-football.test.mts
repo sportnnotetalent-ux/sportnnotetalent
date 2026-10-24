@@ -47,12 +47,15 @@ import { assertContract, assertSameAsClean, amendRecord, toRecords, type TotalsS
 import type { ScoreAction, VoiceContext } from '../src/sports/types.ts';
 import { replayLog } from '../src/sports/amend.ts';
 import type { Match, Player, SportId, StatLine } from '../src/core/types.ts';
+import type { NameOf } from '../src/core/playerNames.ts';
 
 /* ---------------------------------- helpers --------------------------------- */
 
 const HOME = Array.from({ length: 11 }, (_, i) => `h${i + 1}`);
 const AWAY = Array.from({ length: 11 }, (_, i) => `a${i + 1}`);
 const nm = (id: string) => id.toUpperCase();
+/** IDs-only scoring: the state keeps ids; the viewer's names come from a lookup */
+const VIEWER: NameOf = (id, legacy) => (id ? nm(id) : (legacy ?? '').trim() || 'Player');
 const W = (id?: string): Who | undefined => (id ? { id, name: nm(id) } : undefined);
 let u = 0;
 /** period, seconds elapsed in it (the clock shows the time LEFT) */
@@ -339,7 +342,7 @@ describe('SD-147 · box score, timeline, ticker, undo label', () => {
   });
   test('play-by-play box: passing / rushing / receiving / defence; team comparison and notes', () => {
     const s = run(pbpLog(), { preset: 'nfl', variant: 'tackle', rules: 'nfl', mode: 'pbp', trackTackles: true });
-    const src = afBox(s, { homeName: 'Lions', awayName: 'Bears' });
+    const src = afBox(s, { homeName: 'Lions', awayName: 'Bears', nameOf: VIEWER });
     const d = src.data('all');
     const table = buildBoxTable(americanFootballStats, d, { scope: 'all' });
     const cols = table.columns.map((c) => c.abbr);
@@ -351,16 +354,16 @@ describe('SD-147 · box score, timeline, ticker, undo label', () => {
   });
   test('timeline: scores with the game clock; ticker; TD flash; named Undo', () => {
     const s = run(NFL, SPORT.config);
-    const rows = afTimeline(s);
+    const rows = afTimeline(s, VIEWER);
     assert.equal(rows.filter((r) => r.label === 'Touchdown').length, 4);
     assert.ok(rows.some((r) => r.stamp === 'Q1 11:40' && r.label === 'Touchdown' && /24-yd pass from H1/.test(r.detail ?? '')));
     assert.ok(rows.some((r) => r.label === 'Field goal good · 42 yds'));
     const prev = run(NFL.slice(0, 2), SPORT.config);
     const next = run(NFL.slice(0, 3), SPORT.config);
-    assert.match(afTickerFlash(prev, next)!.text, /^TOUCHDOWN! /);
-    assert.match(afTickerDetail(next, { home: 'Lions', away: 'Bears' }).left![0], /H3/);
-    assert.equal(afUndoLabel({ type: 'TD', prev, next }), 'Touchdown · H3 (6-0)');
-    assert.equal(afUndoLabel({ type: 'TRY', prev: next, next: run(NFL.slice(0, 4), SPORT.config) }), 'Extra point good · H11 (7-0)');
+    assert.match(afTickerFlash(prev, next, VIEWER)!.text, /^TOUCHDOWN! /);
+    assert.match(afTickerDetail(next, { home: 'Lions', away: 'Bears', player: VIEWER }).left![0], /H3/);
+    assert.equal(afUndoLabel({ type: 'TD', prev, next }, VIEWER), 'Touchdown · H3 (6-0)');
+    assert.equal(afUndoLabel({ type: 'TRY', prev: next, next: run(NFL.slice(0, 4), SPORT.config) }, VIEWER), 'Extra point good · H11 (7-0)');
   });
 });
 

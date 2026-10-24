@@ -13,6 +13,7 @@ import {
 } from './engine.ts';
 import { setFigures } from './sets.ts';
 import { groupLines, newestFirst, scoreText, type FeedGroup, type FeedLine } from '../feedGroups.ts';
+import { legacyNameOf, withNames, type NameOf } from '../invasion/names.ts';
 
 const other = (s: Side): Side => (s === 'home' ? 'away' : 'home');
 const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
@@ -106,7 +107,8 @@ function periodEndText(s: LeagueState, p: number, h: number, a: number, names: N
 type Entry = { period: number; sec: number; i: number; line: FeedLine };
 
 /** The commentary feed, newest first. */
-export function leagueCommentary(s: LeagueState, names: Names): FeedGroup[] {
+export function leagueCommentary(s0: LeagueState, names: Names, nameOf: NameOf = legacyNameOf): FeedGroup[] {
+  const s = withNames(s0, nameOf);
   const ordered = s.events.map((e, i) => ({ e, i })).sort((x, y) => x.e.period - y.e.period || x.e.sec - y.e.sec || x.i - y.i);
   const { sets } = walkSets(s);
   const byId = new Map(s.events.map((e) => [e.id, e]));

@@ -26,8 +26,11 @@ import { validateSchema, statDefIn, aggregateValue } from '../src/sports/statSch
 import { assertContract, toRecords, type TotalsSport } from './statTotalsHarness.mts';
 import type { ScoreAction } from '../src/sports/types.ts';
 import type { StatLine } from '../src/core/types.ts';
+import type { NameOf } from '../src/core/playerNames.ts';
 
 const nm = (id: string) => id.toUpperCase();
+/** IDs-only scoring: the state keeps ids; the viewer's names come from a lookup */
+const NAMES: NameOf = (id, legacy) => (id ? nm(id) : (legacy ?? '').trim() || 'Player');
 const names = { home: 'India', away: 'Korea' };
 let u = 0;
 function A(type: string, side: Side | undefined, sec: number, period: number, ev: Partial<HandballEvent> = {}, payload: Record<string, unknown> = {}): ScoreAction {
@@ -160,7 +163,7 @@ describe('deep wave · handball keeper line by position, 7 m won, fault kinds', 
     assert.deepEqual(validateSchema(handballStats), []);
   });
   test('timeline rows for the new events', () => {
-    const rows = handballTimeline(s);
+    const rows = handballTimeline(s, undefined, NAMES);
     assert.ok(rows.some((r) => r.label === 'Empty goal — 7th court player'));
     assert.ok(rows.some((r) => r.label === 'Goalkeeper back in goal'));
     assert.ok(rows.some((r) => r.label === '7 m throw won'));
@@ -192,7 +195,7 @@ describe('deep wave · handball shoot-out keepers', () => {
 
 describe('deep wave · handball commentary + facts', () => {
   const s = run(match(), CFG);
-  const feed = handballFeed(s, names);
+  const feed = handballFeed(s, names, NAMES);
   test('IHF live-text sentences; saves fold into their attempt', () => {
     const texts = feed.map((i) => i.text);
     assert.ok(texts.includes('H1 (India) scores from the wing. Assist: H2.'));
@@ -214,7 +217,7 @@ describe('deep wave · handball commentary + facts', () => {
     assert.deepEqual(secs.map((x) => [x.label, x.score.home, x.score.away, x.goals.away]), [['2nd half', 3, 2, 1], ['1st half', 3, 1, 1]]);
   });
   test('facts: top scorers goals/attempts, HT score', () => {
-    const f = handballFacts(s);
+    const f = handballFacts(s, 3, NAMES);
     assert.deepEqual(f.home, ['🤾 H1 2/2', '🤾 H2 1/1']);
     assert.deepEqual(f.away, ['🤾 A1 2/3']);
     assert.deepEqual(f.notes, ['Half-time 3–1']);

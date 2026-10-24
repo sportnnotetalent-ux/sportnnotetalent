@@ -20,6 +20,7 @@ import { SHOOTOUT_PERIOD, groupByScorer, emptyFacts, scoreText, type FeedItem, t
 import { minuteText, eventHalf, halfTimeText, backfillKicks, penScore, type FootballState, type MinuteFormat } from './engine.ts';
 import { CARD_REASON_PHRASE, NO_GOAL_LABEL, type CardReason, type FootballEvent, type NoGoalReason, type StatEvent } from './events.ts';
 import { footballPossession } from './depth.ts';
+import { legacyNameOf, withNames, type NameOf } from '../invasion/names.ts';
 
 type Side = 'home' | 'away';
 type Names = { home: string; away: string };
@@ -137,8 +138,10 @@ export function footballStatSentence(e: StatEvent, names: Names, extra: { saver?
   }
 }
 
-/** The whole match as commentary items (oldest first; Commentary groups them). */
-export function footballFeed(s: FootballState, names: Names): FeedItem[] {
+/** The whole match as commentary items (oldest first; Commentary groups them).
+ *  IDs-only scoring: players are named by id for this viewer (`nameOf`). */
+export function footballFeed(s0: FootballState, names: Names, nameOf: NameOf = legacyNameOf): FeedItem[] {
+  const s = withNames(s0, nameOf);
   const f: MinuteFormat = { halfMinutes: s.halfMinutes, etMinutes: s.etMinutes };
   const stats = s.stats ?? [];
   const byId = new Map(stats.map((st) => [st.id, st]));
@@ -209,13 +212,14 @@ export const footballFeedPeriods = (s: FootballState): number[] => Array.from({ 
 
 /** Scorers with minutes ("Rahul 23', 67' (pen)"; own goals under the side
  *  they counted for), sendings-off, HT / possession notes. */
-export function footballFacts(s: FootballState, now = 0): MatchFacts {
+export function footballFacts(s0: FootballState, now = 0, nameOf: NameOf = legacyNameOf): MatchFacts {
+  const s = withNames(s0, nameOf);
   const facts = emptyFacts();
   const f: MinuteFormat = { halfMinutes: s.halfMinutes, etMinutes: s.etMinutes };
   const goals = (s.events ?? []).filter((e) => e.type === 'goal' || e.type === 'owngoal')
     .sort((a, b) => eventHalf(a, f) - eventHalf(b, f) || a.minute - b.minute || a.id - b.id)
     .map((e) => ({
-      side: e.side, who: e.playerName || 'Goal', stamp: minuteText(e.minute, e.half, f),
+      side: e.side, who: e.playerName || 'Goal', key: e.playerId, stamp: minuteText(e.minute, e.half, f),
       tag: e.type === 'owngoal' ? 'OG' : e.goalType === 'penalty' ? 'pen' : e.goalType === 'freekick' ? 'FK' : undefined,
     }));
   const by = groupByScorer(goals);

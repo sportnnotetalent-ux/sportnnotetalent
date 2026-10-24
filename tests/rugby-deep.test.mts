@@ -33,12 +33,16 @@ import { assertContract, toRecords, type TotalsSport } from './statTotalsHarness
 import type { ScoreAction } from '../src/sports/types.ts';
 import type { StatLine } from '../src/core/types.ts';
 import type { StatSheet } from '../src/sports/compareSheet.ts';
+import type { NameOf } from '../src/core/playerNames.ts';
+import { nameRow } from '../src/sports/invasion/names.ts';
 
 /* ---------------------------------- helpers --------------------------------- */
 
 const HOME = Array.from({ length: 15 }, (_, i) => `h${i + 1}`);
 const AWAY = Array.from({ length: 15 }, (_, i) => `a${i + 1}`);
 const nm = (id: string) => id.toUpperCase();
+/** IDs-only scoring: the state keeps ids; the viewer's names come from a lookup */
+const VIEWER: NameOf = (id, legacy) => (id ? nm(id) : (legacy ?? '').trim() || 'Player');
 const NAMES = { home: 'Lions', away: 'Wolves' };
 let u = 0;
 function A(type: string, side: Side | undefined, sec: number, period: number, psec: number, ev: Partial<RugbyEvent> = {}, payload: Record<string, unknown> = {}): ScoreAction {
@@ -201,8 +205,8 @@ describe('deep wave · optional tallies (penalties, free kicks, turnovers, 22 en
   test('the key-moments timeline leaves tallies out; correction rows and Undo name them', () => {
     const s = run(log, ALL_ON);
     assert.ok(!rugbyTimeline(s).some((r) => r.kind === 'tally'));
-    assert.deepEqual(describeEvent(s.events[0]), { icon: '⚖', label: 'Penalty conceded', detail: 'A7 · Offside' });
-    assert.equal(rugbyUndoLabel({ type: 'TALLY', prev: run(log.slice(0, 2), ALL_ON), next: run(log.slice(0, 3), ALL_ON) }), 'Penalty conceded · A7');
+    assert.deepEqual(describeEvent(nameRow(s.events[0], VIEWER)), { icon: '⚖', label: 'Penalty conceded', detail: 'A7 · Offside' });
+    assert.equal(rugbyUndoLabel({ type: 'TALLY', prev: run(log.slice(0, 2), ALL_ON), next: run(log.slice(0, 3), ALL_ON) }, VIEWER), 'Penalty conceded · A7');
     assert.equal(rugbyUndoLabel({ type: 'POSSESSION', prev: s, next: s }), 'possession switch');
   });
 });
@@ -314,7 +318,7 @@ describe('deep wave · the broadcast stats sheet', () => {
 
 describe('deep wave · commentary grouped by half, newest first', () => {
   const s = run(MATCH);
-  const feed = rugbyCommentary(s, NAMES);
+  const feed = rugbyCommentary(s, NAMES, VIEWER);
   test('groups newest first with the half summary', () => {
     assert.deepEqual(feed.map((g) => g.title), ['2nd half', '1st half']);
     assert.equal(feed[1].sub, 'Points 7–3 · Tries 1–0');
@@ -353,7 +357,7 @@ describe('deep wave · commentary grouped by half, newest first', () => {
   });
   test('a correction re-derives the feed (removing the try)', () => {
     const id = s.events.find((e) => e.type === 'try')!.id;
-    const f = rugbyCommentary(reducer(s, { type: 'REMOVE_EVENT', payload: { id } }), NAMES);
+    const f = rugbyCommentary(reducer(s, { type: 'REMOVE_EVENT', payload: { id } }), NAMES, VIEWER);
     const h1 = f.find((g) => g.title === '1st half')!.lines;
     assert.equal(h1.find((l) => l.text.startsWith('Conversion'))!.score, '2–0');
     assert.equal(h1[0].text, 'Half-time — Lions 2–3 Wolves.');

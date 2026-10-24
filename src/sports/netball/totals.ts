@@ -17,6 +17,7 @@
 import { trackField, timeLeft, type FieldEvent, type FieldLog, type FieldResult, type Who } from '../onField.ts';
 import { eventCredits, lineupAt, matchSec, periodStarted, LIVE_KEYS, POSITIONS, type NetballState, type Pos, type Side } from './engine.ts';
 import { nbDeepTotals, NB_DEEP_KEYS } from './deep.ts';
+import { legacyNameOf, nameFor, type NameOf } from '../invasion/names.ts';
 
 const stamped = (s: NetballState, side: Side): boolean => !!s.xi?.[side] && Object.keys(s.xi[side]!.pos ?? {}).length > 0;
 
@@ -52,14 +53,15 @@ export const netballField = (s: NetballState, upTo?: number): FieldResult => tra
 
 /** For the live banner: who is suspended (time left on the game clock), how
  *  many players each side has on court and how many short. */
-export function netballLiveField(s: NetballState, nowMs: number): {
+/** IDs-only scoring: `nameOf` names the suspended players by id for this viewer. */
+export function netballLiveField(s: NetballState, nowMs: number, nameOf: NameOf = legacyNameOf): {
   suspended: { side: Side; name: string; left: string; id?: string }[];
   onField: { home: number; away: number };
   short: { home: number; away: number };
 } {
   const now = matchSec(s, nowMs) / 60;
   const r = netballField(s, now);
-  const suspended = s.ended ? [] : r.suspended.map((x) => ({ side: x.side, name: x.name ?? 'Player', left: timeLeft(x.until, now), ...(x.id ? { id: x.id } : {}) }));
+  const suspended = s.ended ? [] : r.suspended.map((x) => ({ side: x.side, name: nameFor(nameOf, x.id, x.name) ?? 'Player', left: timeLeft(x.until, now), ...(x.id ? { id: x.id } : {}) }));
   const short = { home: 0, away: 0 };
   for (const x of r.suspended) short[x.side]++;
   for (const p of r.players) if (p.sentOff) short[p.side]++;

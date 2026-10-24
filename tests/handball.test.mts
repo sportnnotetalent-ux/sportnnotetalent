@@ -43,12 +43,15 @@ import { assertContract, assertSameAsClean, amendRecord, toRecords, type TotalsS
 import type { ScoreAction } from '../src/sports/types.ts';
 import { replayLog } from '../src/sports/amend.ts';
 import type { Match, Player, SportId, StatLine } from '../src/core/types.ts';
+import type { NameOf } from '../src/core/playerNames.ts';
 
 /* ---------------------------------- helpers --------------------------------- */
 
 const HOME = ['hgk', 'h2', 'h3', 'h4', 'h5', 'h6', 'h7'];
 const AWAY = ['agk', 'a2', 'a3', 'a4', 'a5', 'a6', 'a7'];
 const nm = (id: string) => id.toUpperCase();
+/** IDs-only scoring: the state keeps ids; the viewer's names come from a lookup */
+const NAMES: NameOf = (id, legacy) => (id ? nm(id) : (legacy ?? '').trim() || 'Player');
 let u = 0;
 /** One action as the controls fire it: game second + period + a stable uid,
  *  credits from `eventCredits` (exactly what the live stat lines get). */
@@ -203,7 +206,7 @@ describe('SD-102 · sanctions (IHF 16): 2 minutes, 3rd = disqualification, red /
     assert.equal(handballField(s, 42.5).onField.home.length, 6, 'until someone comes on');
     assert.equal(handballField(s, 44).onField.home.length, 7);
     assert.ok(!handballField(s, 44).onField.home.some((p) => p.id === 'h3'));
-    assert.equal(handballTimeline(s).find((r) => r.label.includes('3rd'))?.tone, 'wicket');
+    assert.equal(handballTimeline(s, undefined, NAMES).find((r) => r.label.includes('3rd'))?.tone, 'wicket');
   });
   test('red / blue: disqualified, team short 2 minutes; blue counted separately', () => {
     const s = run([card('away', 1200, 1, 'red', 'a6', { blue: true })], undefined, base);
@@ -334,7 +337,7 @@ describe('SD-102 · statTotals contract (SD-19 harness)', () => {
     assert.equal(acts[1].side, 'home');
     const st = run([...base, ...acts]);
     assert.equal(handballTimeline(st).length, 1, 'the save reads on the attempt row');
-    assert.match(handballTimeline(st)[0].detail ?? '', /save HGK/);
+    assert.match(handballTimeline(st, undefined, NAMES)[0].detail ?? '', /save HGK/);
     const rm = st.events.map((e): ScoreAction => ({ type: 'REMOVE_EVENT', side: e.side, payload: { id: e.id }, attribution: creditAttribution(eventCredits(e).first, -1) }));
     const recs = toRecords([...base, ...acts, ...rm]);
     assertContract(SPORT, recs, { every: 1000, label: 'remove attempt + save' });
@@ -382,17 +385,17 @@ describe('SD-102 · box score, comparison, timeline, ticker', () => {
     assert.equal(r('Shooting %')?.home, '60%'); // 3 goals / 5 attempts
   });
   test('timeline rows: match-clock stamps, types, sanctions', () => {
-    const rows = handballTimeline(s);
+    const rows = handballTimeline(s, undefined, NAMES);
     assert.equal(rows.find((x) => x.kind === 'goal' && x.label === 'Goal · Fast break')!.stamp, '35:00');
     assert.equal(rows.find((x) => x.label === 'Disqualification (red)')!.tone, 'wicket');
     assert.equal(rows.find((x) => x.kind === 'turnover')!.detail, 'H6 · steal A3');
     assert.equal(rows.find((x) => x.kind === 'card' && x.detail === 'Coach (official)')!.label, 'Warning (yellow)');
   });
   test('ticker: top scorers with goal counts; GOAL! flash once', () => {
-    const d = handballTickerDetail(s, { home: 'Blue', away: 'Gold' });
+    const d = handballTickerDetail(s, { home: 'Blue', away: 'Gold', player: NAMES });
     assert.equal(d.left?.[0], '🤾 H4 2 · H8 1');
     const i = MATCH.findIndex((a) => a.type === 'GOAL' && a.attribution?.playerId === 'h8');
-    const f = handballTickerFlash(run(MATCH.slice(0, i)), run(MATCH.slice(0, i + 1)));
+    const f = handballTickerFlash(run(MATCH.slice(0, i)), run(MATCH.slice(0, i + 1)), NAMES);
     assert.deepEqual(f, { kind: 'goal', text: 'GOAL! H8 35:00', sub: 'Fast break', side: 'home' });
     assert.equal(handballTickerFlash(run(MATCH.slice(0, i + 1)), run(MATCH.slice(0, i + 2))), null);
   });

@@ -5,20 +5,26 @@
  */
 import { clockFace, periodName, soScore, SHOT_LABEL, type HandballEvent, type HandballState, type Side } from './engine.ts';
 import { shortName, type TickerDetail, type TickerFlash } from '../ticker.ts';
+import { legacyNameOf, withNames, type NameOf } from '../invasion/names.ts';
 
 /** "Asha R. 7 · Meera J. 5 · Team 1" — a side's scorers, most goals first (top 3). */
 export function handballScorers(s: HandballState, side: Side, top = 3): string | undefined {
   const by = new Map<string, number>();
+  const label = new Map<string, string>();
   for (const e of s.events) {
     if (e.type !== 'goal' || e.side !== side) continue;
     const who = shortName(e.playerName) || 'Team';
-    by.set(who, (by.get(who) ?? 0) + 1);
+    const k = e.playerId ? `id:${e.playerId}` : who; // by id (a shown name may repeat)
+    label.set(k, who);
+    by.set(k, (by.get(k) ?? 0) + 1);
   }
   if (!by.size) return undefined;
-  return [...by].sort((a, b) => b[1] - a[1]).slice(0, top).map(([who, n]) => `${who} ${n}`).join(' · ');
+  return [...by].sort((a, b) => b[1] - a[1]).slice(0, top).map(([k, n]) => [label.get(k)!, n] as const).map(([who, n]) => `${who} ${n}`).join(' · ');
 }
 
-export function handballTickerDetail(s: HandballState, names: { home: string; away: string }): TickerDetail {
+/** IDs-only scoring: `names.player` names the players by id for this viewer. */
+export function handballTickerDetail(s0: HandballState, names: { home: string; away: string; player?: NameOf }): TickerDetail {
+  const s = withNames(s0, names.player ?? legacyNameOf);
   const d: TickerDetail = {};
   const h = handballScorers(s, 'home');
   const a = handballScorers(s, 'away');
@@ -37,7 +43,8 @@ export function handballTickerDetail(s: HandballState, names: { home: string; aw
 }
 
 /** A new goal → "GOAL! Asha R. 41:20" (the shot type as the second line). */
-export function handballTickerFlash(prev: HandballState, next: HandballState): TickerFlash | null {
+export function handballTickerFlash(prev: HandballState, next0: HandballState, nameOf: NameOf = legacyNameOf): TickerFlash | null {
+  const next = withNames(next0, nameOf); // IDs-only scoring: names by id
   const last: HandballEvent | undefined = next.events[next.events.length - 1];
   if (!last || last.type !== 'goal' || prev.events.some((e) => e.id === last.id)) return null;
   const who = shortName(last.playerName);

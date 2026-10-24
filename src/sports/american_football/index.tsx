@@ -19,9 +19,12 @@
  * (REMOVE_EVENT with the reversed credits, then the same flow stamped at the
  * original time; Cancel keeps the event — SD-114).
  */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { theme } from '../../core/theme';
+import { useMask } from '../../core/disputeMask';
+import { withNames, nameFor } from '../invasion/names';
+import { xiStamp } from '../invasion/actions';
 import { ensureContrast } from '../../core/contrast';
 import { Button, SelectChip, TextField } from '../../components/ui';
 import { confirmMatchAction } from '../../components/ConfirmSheet';
@@ -55,7 +58,7 @@ import { AMERICAN_FOOTBALL_META } from './meta';
 import { afMatchRecords } from './records';
 
 const uid = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
-const who = (p?: Player | null): Who | undefined => (p ? { id: p.id, name: p.fullName } : undefined);
+const who = (p?: Player | null): Who | undefined => (p ? { id: p.id } : undefined); // IDs-only scoring: the id, never the name
 
 /* ------------------------------ small pickers ------------------------------ */
 
@@ -122,6 +125,8 @@ const ScoringControls: SportPlugin<AFState>['ScoringControls'] = ({
 }) => {
   // SD-114: Edit holds the removal until the re-entry commits (Cancel keeps the event).
   const { view: s, dispatch, begin: holdRemoval, cancel: dropHeldRemoval } = usePendingEdit(liveState, rawDispatch, reducer);
+  // IDs-only scoring: the state keeps player ids; names are looked up when shown
+  const { nameOf: playerNameOf } = useMask();
   const [flow, setFlow] = useState<Flow | null>(null);
   const [editAt, setEditAt] = useState<{ sec: number; psec: number; period: number } | null>(null);
   const [showEdit, setShowEdit] = useState(false);
@@ -149,7 +154,7 @@ const ScoringControls: SportPlugin<AFState>['ScoringControls'] = ({
   const rosterOf = (sd: Side) => (sd === 'home' ? homeRoster : awayRoster);
   const lineupOf = (sd: Side) => (sd === 'home' ? homeLineup : awayLineup);
   const byId = (sd: Side, id?: string, nm?: string): Player | undefined =>
-    rosterOf(sd).find((p) => (id && p.id === id) || (!id && nm && p.fullName === nm)) ?? (id ? { id, fullName: nm ?? 'Player', sports: ['american_football'] } as Player : undefined);
+    rosterOf(sd).find((p) => (id && p.id === id) || (!id && nm && p.fullName === nm)) ?? (id ? { id, fullName: nameFor(playerNameOf, id, nm) ?? 'Player', sports: ['american_football'] } as Player : undefined);
   const ejected = (sd: Side) => new Set(s.events.filter((e) => e.type === 'eject' && e.side === sd && e.playerId).map((e) => e.playerId!));
   const players = (sd: Side): Player[] => {
     const out = ejected(sd);
@@ -167,8 +172,8 @@ const ScoringControls: SportPlugin<AFState>['ScoringControls'] = ({
   /* ---- who is on the field ---- */
   const stampXi = () => {
     for (const sd of ['home', 'away'] as const) {
-      const roster = rosterOf(sd);
-      const ps = lineupOf(sd).filter((sl) => sl.playerId).map((sl) => ({ id: sl.playerId!, name: roster.find((p) => p.id === sl.playerId)?.fullName ?? sl.playerName ?? '' }));
+      // IDs-only scoring: the stamp carries player ids only (invasion/actions.ts)
+      const ps = xiStamp(lineupOf(sd), rosterOf(sd)).players ?? [];
       if (!ps.length || JSON.stringify(ps) === JSON.stringify(s.xi?.[sd]?.players ?? [])) continue;
       dispatch({ type: 'XI', payload: { team: sd, players: ps } });
     }
@@ -179,16 +184,16 @@ const ScoringControls: SportPlugin<AFState>['ScoringControls'] = ({
     const y = yardsText.trim() ? Math.round(Number(yardsText)) : undefined;
     const yards = y != null && Number.isFinite(y) && y >= 0 ? y : undefined;
     fire({ type: 'TD', side: sd, payload: { how, ...(yards != null ? { yards } : {}) },
-      ...credit({ type: 'td', how, yards, playerId: scorer?.id, playerName: scorer?.fullName, ...(how === 'pass' && passer ? { secondId: passer.id, secondName: passer.fullName } : {}) }) });
+      ...credit({ type: 'td', how, yards, playerId: scorer?.id, ...(how === 'pass' && passer ? { secondId: passer.id } : {}) }) });
     setFlow(null);
   };
   const recordTry = (sd: Side, kind: TryKind, good: boolean, p: Player | null) => {
-    fire({ type: 'TRY', side: sd, payload: { kind, good }, ...credit({ type: 'try', kind, good, playerId: p?.id, playerName: p?.fullName }) });
+    fire({ type: 'TRY', side: sd, payload: { kind, good }, ...credit({ type: 'try', kind, good, playerId: p?.id }) });
     setFlow(null);
   };
   const recordFg = (sd: Side, good: boolean, yardsText: string, p: Player | null) => {
     const y = Math.round(Number(yardsText));
-    fire({ type: 'FG', side: sd, payload: { good, ...(yardsText.trim() && Number.isFinite(y) && y > 0 ? { yards: y } : {}) }, ...credit({ type: 'fg', good, playerId: p?.id, playerName: p?.fullName }) });
+    fire({ type: 'FG', side: sd, payload: { good, ...(yardsText.trim() && Number.isFinite(y) && y > 0 ? { yards: y } : {}) }, ...credit({ type: 'fg', good, playerId: p?.id }) });
     setFlow(null);
   };
   const play = (sd: Side, inp: Parameters<typeof buildPlay>[2]) => {
@@ -311,7 +316,7 @@ const ScoringControls: SportPlugin<AFState>['ScoringControls'] = ({
       }
       case 'defTry': {
         const sd = flow.side;
-        const go = (p: Player | null) => { fire({ type: 'DEF_TRY', side: sd, ...credit({ type: 'defTry', playerId: p?.id, playerName: p?.fullName }) }); setFlow(null); };
+        const go = (p: Player | null) => { fire({ type: 'DEF_TRY', side: sd, ...credit({ type: 'defTry', playerId: p?.id }) }); setFlow(null); };
         return (
           <View style={c.panel}>{head('Defence returns the try (2)', sd)}
             <PlayerGrid players={players(sd)} onPick={go} skip={{ label: 'Skip player', onPress: () => go(null) }} />
@@ -337,7 +342,7 @@ const ScoringControls: SportPlugin<AFState>['ScoringControls'] = ({
       }
       case 'safety': {
         const sd = flow.side;
-        const go = (p: Player | null) => { fire({ type: 'SAFETY', side: sd, ...credit({ type: 'safety', playerId: p?.id, playerName: p?.fullName }) }); setFlow(null); };
+        const go = (p: Player | null) => { fire({ type: 'SAFETY', side: sd, ...credit({ type: 'safety', playerId: p?.id }) }); setFlow(null); };
         return (
           <View style={c.panel}>{head('Safety (2) — made by', sd)}
             <PlayerGrid players={players(sd)} onPick={go} skip={{ label: 'Skip player', onPress: () => go(null) }} />
@@ -348,7 +353,7 @@ const ScoringControls: SportPlugin<AFState>['ScoringControls'] = ({
         const sd = flow.side;
         return (
           <View style={c.panel}>{head('Ejection (disqualified)', sd)}
-            <PlayerGrid players={players(sd)} onPick={(p) => { fire({ type: 'EJECT', side: sd, ...credit({ type: 'eject', playerId: p.id, playerName: p.fullName }) }); setFlow(null); }} />
+            <PlayerGrid players={players(sd)} onPick={(p) => { fire({ type: 'EJECT', side: sd, ...credit({ type: 'eject', playerId: p.id }) }); setFlow(null); }} />
             <Text style={c.meta}>The player takes no further part. Your discipline settings decide any ban.</Text>
           </View>
         );
@@ -359,7 +364,7 @@ const ScoringControls: SportPlugin<AFState>['ScoringControls'] = ({
         return (
           <View style={c.panel}>{head(flag ? (loss ? 'Flag pulled for a loss by' : 'Flag pulled by') : loss ? 'Tackle for loss by' : 'Tackle by', sd)}
             <PlayerGrid players={players(sd)} onPick={(p) => {
-              dispatch({ type: 'TACKLE', side: sd, payload: { ...stamp(), ...(loss ? { tfl: true } : {}) }, ...credit({ type: 'tackle', tfl: loss || undefined, playerId: p.id, playerName: p.fullName }) });
+              dispatch({ type: 'TACKLE', side: sd, payload: { ...stamp(), ...(loss ? { tfl: true } : {}) }, ...credit({ type: 'tackle', tfl: loss || undefined, playerId: p.id }) });
               setFlow(null);
             }} skip={{ label: 'Skip', onPress: () => setFlow(null) }} />
           </View>
@@ -370,7 +375,7 @@ const ScoringControls: SportPlugin<AFState>['ScoringControls'] = ({
         const sd = flow.side;
         return (
           <View style={c.panel}>{head('Pass broken up by', sd)}
-            <PlayerGrid players={players(sd)} onPick={(p) => { dispatch({ type: 'PASS_DEF', side: sd, payload: stamp(), ...credit({ type: 'pd', playerId: p.id, playerName: p.fullName }) }); setFlow(null); }}
+            <PlayerGrid players={players(sd)} onPick={(p) => { dispatch({ type: 'PASS_DEF', side: sd, payload: stamp(), ...credit({ type: 'pd', playerId: p.id }) }); setFlow(null); }}
               skip={{ label: 'Nobody / skip', onPress: () => setFlow(null) }} />
           </View>
         );
@@ -751,9 +756,11 @@ function SpotPad({ s, onPick, chips }: { s: AFState; onPick: (spot: number) => v
 }
 
 /** The scorer's "Correct the timeline" list: remove a moment, or re-enter it. */
-function EditList({ s, show, setShow, onRemove, onEdit, homeName, awayName }: {
+function EditList({ s: s0, show, setShow, onRemove, onEdit, homeName, awayName }: {
   s: AFState; show: boolean; setShow: (v: boolean) => void; onRemove: (e: AFEvent) => void; onEdit?: (e: AFEvent) => void; homeName: string; awayName: string;
 }) {
+  const { nameOf } = useMask();
+  const s = useMemo(() => withNames(s0, nameOf), [s0, nameOf]); // IDs-only scoring: names by id
   if (!s.events.length) return null;
   return (
     <View style={c.panel}>
@@ -832,14 +839,18 @@ const VIEWS = [
  *  stats, drives and the box score on Stats. */
 type TabProps = Parameters<NonNullable<SportPlugin<AFState>['LiveExtras']>>[0];
 const AFCommentary = ({ state, homeName, awayName, homeColor, awayColor }: TabProps) => {
-  const s = state as AFState;
+  // IDs-only scoring: names looked up by id for this viewer
+  const { nameOf } = useMask();
+  const s = useMemo(() => withNames(state as AFState, nameOf), [state, nameOf]);
   return (
     <GroupedFeed groups={afCommentary(s, { home: homeName, away: awayName })} homeColor={homeColor} awayColor={awayColor} tags={AF_FEED_TAGS} scopeLabel={afScopeLabel(s)}
       emptyText="No plays yet — the commentary fills in from the kickoff." />
   );
 };
 const AFStats = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster, onPlayer }: TabProps) => {
-  const s = state as AFState;
+  // IDs-only scoring: names looked up by id for this viewer
+  const { nameOf } = useMask();
+  const s = useMemo(() => withNames(state as AFState, nameOf), [state, nameOf]);
   const hasDrives = afDrives(s).drives.length > 0;
   const n = Math.min(totalPeriods(s), Math.max(1, s.period));
   const scopes = n >= 2 ? Array.from({ length: n }, (_, i) => ({ value: i + 1, label: periodName(s, i + 1) })) : [];

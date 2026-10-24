@@ -26,6 +26,7 @@ const opp = (s: Side): Side => (s === 'home' ? 'away' : 'home');
 
 export interface KeeperSpell {
   id: string;
+  /** an older log's stored name ('' on IDs-only logs — look it up by `id`) */
   name: string;
   /** regulation minutes in goal (whole minutes) */
   minutes: number;
@@ -90,7 +91,7 @@ export function keeperSpells(s: FootballState, side: Side): KeeperSpell[] {
   keeperIds.add(stamp.gk.id);
 
   const spells = new Map<string, KeeperSpell>();
-  let cur: { id: string; name: string; at: Pos } | null = { id: stamp.gk.id, name: stamp.gk.name, at: { reg: 0, exact: 0 } };
+  let cur: { id: string; name: string; at: Pos } | null = { id: stamp.gk.id, name: stamp.gk.name ?? '', at: { reg: 0, exact: 0 } };
   const close = (to: Pos) => {
     if (!cur) return;
     const sp = spells.get(cur.id) ?? { id: cur.id, name: cur.name, minutes: 0, goalsConceded: 0, exact: 0, from: cur.at.exact };
@@ -134,7 +135,8 @@ export function keeperSpells(s: FootballState, side: Side): KeeperSpell[] {
       }
       continue;
     }
-    if (e.type === 'red' && !e.official && isCur(undefined, e.playerName)) {
+    // (IDs-only scoring: by id; an older red carried the name)
+    if (e.type === 'red' && !e.official && (isCur(e.playerId, undefined) || isCur(undefined, e.playerName))) {
       close(at);
       cur = null;
     }

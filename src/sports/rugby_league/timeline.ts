@@ -2,6 +2,7 @@
  *  scorer's correction list and the named Undo. PURE. */
 import type { LiveEvent } from '../liveEvents';
 import { minuteText, periodName, clockAt, pointsOf, DETAIL_LABEL, KICK_LABEL, type LeagueEvent, type LeagueState } from './engine.ts';
+import { legacyNameOf, withNames, type NameOf } from '../invasion/names.ts';
 
 /** One row's icon + words ("🏉 Try · Asha Rao · assist Meera"). */
 export function describeEvent(e: LeagueEvent): { icon: string; label: string; detail?: string } {
@@ -30,7 +31,8 @@ export function describeEvent(e: LeagueEvent): { icon: string; label: string; de
 /** The viewer timeline (LiveTimeline sorts by id: period, then playing time).
  *  Detail rows stay off it (they'd drown the scores) — they're in the
  *  commentary, the stats sheet and the box. */
-export function leagueTimeline(s: LeagueState): LiveEvent[] {
+export function leagueTimeline(s0: LeagueState, nameOf: NameOf = legacyNameOf): LiveEvent[] {
+  const s = withNames(s0, nameOf);
   return s.events.map((e, i) => ({ e, i })).filter(({ e }) => e.type !== 'detail').map(({ e, i }) => {
     const d = describeEvent(e);
     const name = e.type === 'sub' ? e.secondName : e.playerName;
@@ -54,10 +56,11 @@ export function leagueTimeline(s: LeagueState): LiveEvent[] {
 export const eventWhen = (s: LeagueState, e: LeagueEvent): string => `${periodName(s, e.period)} · ${clockAt(s, e.period, e.psec)}`;
 
 /** SD-115 — what Undo removes: "Try · Asha Rao (10-6)", "Conversion good · Meera". */
-export function leagueUndoLabel(step: { type: string; prev: unknown; next: unknown } | null | undefined): string | null {
+export function leagueUndoLabel(step: { type: string; prev: unknown; next: unknown } | null | undefined, nameOf: NameOf = legacyNameOf): string | null {
   if (!step) return null;
   const prev = step.prev as LeagueState | null;
-  const next = step.next as LeagueState | null;
+  // IDs-only scoring: the players by id, for this viewer
+  const next = step.next ? withNames(step.next as LeagueState, nameOf) : null;
   if (step.type === 'CLOCK') return 'clock start / stop';
   if (step.type === 'SET_CLOCK') return 'clock set';
   if (step.type === 'END_PERIOD') return 'end of the period';

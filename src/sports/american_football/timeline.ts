@@ -2,6 +2,7 @@
  *  LiveTimeline), the scorer's correction list and the named Undo. PURE. */
 import type { LiveEvent } from '../liveEvents';
 import { clockAt, eventWhen, periodName, pointsOf, spotText, type AFEvent, type AFState, type Side } from './engine.ts';
+import { legacyNameOf, withNames, type NameOf } from '../invasion/names.ts';
 
 const HOW: Record<string, string> = { run: 'run', pass: 'pass', int: 'interception return', fumble: 'fumble return', punt: 'punt return', kick: 'kickoff return', other: '' };
 const PLAY: Record<string, string> = {
@@ -58,7 +59,8 @@ export function describeEvent(e: AFEvent, s?: Pick<AFState, 'field' | 'variant'>
 
 /** The viewer timeline: scores, misses, timeouts, turnovers and penalties
  *  (ordinary gains stay in the play-by-play list, not here). */
-export function afTimeline(s: AFState): LiveEvent[] {
+export function afTimeline(s0: AFState, nameOf: NameOf = legacyNameOf): LiveEvent[] {
+  const s = withNames(s0, nameOf);
   const shown = (e: AFEvent) => e.type !== 'tackle' && e.type !== 'pd' && e.type !== 'possEnd' && !(e.type === 'play' && !['int', 'fumble', 'downs', 'penalty'].includes(e.play ?? ''));
   return s.events.map((e, i) => ({ e, i })).filter(({ e }) => shown(e)).map(({ e, i }) => {
     const d = describeEvent(e, s);
@@ -80,7 +82,8 @@ export function afTimeline(s: AFState): LiveEvent[] {
 }
 
 /** The play-by-play list (newest first) for the live page. */
-export function afPlays(s: AFState, limit = 30): { id: string; when: string; side: Side; text: string }[] {
+export function afPlays(s0: AFState, limit = 30, nameOf: NameOf = legacyNameOf): { id: string; when: string; side: Side; text: string }[] {
+  const s = withNames(s0, nameOf);
   return [...s.events].reverse().filter((e) => e.type !== 'tackle' && e.type !== 'pd').slice(0, limit).map((e) => {
     const d = describeEvent(e, s);
     return { id: e.id, when: eventWhen(s, e), side: e.side, text: `${d.icon} ${d.label}${d.detail ? ` · ${d.detail}` : ''}` };
@@ -90,10 +93,11 @@ export function afPlays(s: AFState, limit = 30): { id: string; when: string; sid
 export const whenText = (s: AFState, e: AFEvent): string => `${periodName(s, e.period)}${clockAt(s, e.period, e.psec) ? ` · ${clockAt(s, e.period, e.psec)}` : ''}`;
 
 /** SD-115 — what Undo removes: "Touchdown · Asha Rao (13-7)", "Field goal good · 32 yds". */
-export function afUndoLabel(step: { type: string; prev: unknown; next: unknown } | null | undefined): string | null {
+export function afUndoLabel(step: { type: string; prev: unknown; next: unknown } | null | undefined, nameOf: NameOf = legacyNameOf): string | null {
   if (!step) return null;
   const prev = step.prev as AFState | null;
-  const next = step.next as AFState | null;
+  // IDs-only scoring: the players by id, for this viewer
+  const next = step.next ? withNames(step.next as AFState, nameOf) : null;
   if (step.type === 'CLOCK') return 'clock start / stop';
   if (step.type === 'SET_CLOCK') return 'clock set';
   if (step.type === 'TWO_MIN') return 'two-minute warning';

@@ -33,6 +33,10 @@
 import type { Suspension } from './statSchema.ts';
 
 export type Side = 'home' | 'away';
+/** A player in the field log: by id (IDs-only scoring — docs/privacy/
+ *  ids-only-scoring.md: every new log names players by id); `name` only from
+ *  an older log's name-only event, matched to an id where one was seen with
+ *  it. Shown names are looked up by id at display time (`nameOf`). */
 export interface Who { id?: string; name?: string }
 
 export type FieldEvent =

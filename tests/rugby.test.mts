@@ -48,12 +48,15 @@ import { assertContract, assertSameAsClean, amendRecord, toRecords, type TotalsS
 import type { ScoreAction, VoiceContext } from '../src/sports/types.ts';
 import { replayLog } from '../src/sports/amend.ts';
 import type { Match, Player, SportId, StatLine } from '../src/core/types.ts';
+import type { NameOf } from '../src/core/playerNames.ts';
 
 /* ---------------------------------- helpers --------------------------------- */
 
 const HOME = Array.from({ length: 15 }, (_, i) => `h${i + 1}`);
 const AWAY = Array.from({ length: 15 }, (_, i) => `a${i + 1}`);
 const nm = (id: string) => id.toUpperCase();
+/** IDs-only scoring: the state keeps ids; the viewer's names come from a lookup */
+const VIEWER: NameOf = (id, legacy) => (id ? nm(id) : (legacy ?? '').trim() || 'Player');
 let u = 0;
 /** One action as the controls fire it: playing second, period second, period,
  *  a stable uid; credits from `eventCredits`. */
@@ -290,18 +293,18 @@ describe('SD-143 · box score, timeline, ticker, undo label', () => {
   });
   test('timeline rows with rugby minutes; ticker scorers + try flash; named Undo', () => {
     const s = run(MATCH);
-    const rows = rugbyTimeline(s, { home: 'Lions', away: 'Sharks' });
+    const rows = rugbyTimeline(s, { home: 'Lions', away: 'Sharks' }, VIEWER);
     assert.equal(rows.filter((r) => r.label === 'Try').length, 3);
     assert.ok(rows.some((r) => r.stamp === "40+1'" && r.label === 'Drop goal good'));
     const sorted = [...rows].sort((a, b) => Number(a.id) - Number(b.id));
     assert.equal(sorted.findIndex((r) => r.label === 'Drop goal good') < sorted.findIndex((r) => r.label === 'Penalty try (7)'), true, 'time added sits in H1');
-    const t = rugbyTickerDetail(s, { home: 'Lions', away: 'Sharks' });
+    const t = rugbyTickerDetail(s, { home: 'Lions', away: 'Sharks', player: VIEWER });
     assert.match(t.left![0], /H11 2|H11/);
     const prev = run(MATCH.slice(0, 2));
     const next = run(MATCH.slice(0, 3));
-    assert.match(rugbyTickerFlash(prev, next)!.text, /^TRY! .* 5'$/);
-    assert.equal(rugbyUndoLabel({ type: 'TRY', prev, next }), 'Try · H11 (5-0)');
-    assert.equal(rugbyUndoLabel({ type: 'KICK', prev: next, next: run(MATCH.slice(0, 4)) }), 'Conversion good · H10 (7-0)');
+    assert.match(rugbyTickerFlash(prev, next, VIEWER)!.text, /^TRY! .* 5'$/);
+    assert.equal(rugbyUndoLabel({ type: 'TRY', prev, next }, VIEWER), 'Try · H11 (5-0)');
+    assert.equal(rugbyUndoLabel({ type: 'KICK', prev: next, next: run(MATCH.slice(0, 4)) }, VIEWER), 'Conversion good · H10 (7-0)');
   });
 });
 

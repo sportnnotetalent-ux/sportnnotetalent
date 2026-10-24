@@ -48,12 +48,15 @@ import {
 import { assertContract, assertSameAsClean, toRecords, type TotalsSport } from './statTotalsHarness.mts';
 import type { ScoreAction } from '../src/sports/types.ts';
 import type { Match, Player, SportId, StatLine } from '../src/core/types.ts';
+import type { NameOf } from '../src/core/playerNames.ts';
 
 /* ---------------------------------- helpers --------------------------------- */
 
 const HOME = ['hg', 'h2', 'h3', 'h4', 'h5', 'h6'];
 const AWAY = ['ag', 'a2', 'a3', 'a4', 'a5', 'a6'];
 const nm = (id: string) => id.toUpperCase();
+/** IDs-only scoring: the state keeps ids; the viewer's names come from a lookup */
+const VIEWER: NameOf = (id, legacy) => (id ? nm(id) : (legacy ?? '').trim() || 'Player');
 let u = 0;
 function A(type: string, side: Side | undefined, sec: number, period: number, ev: Partial<IceEvent> = {}, payload: Record<string, unknown> = {}): ScoreAction {
   const cr = eventCredits({ type: ev.type ?? 'timeout', side: side ?? 'home', ...ev } as IceEvent);
@@ -357,14 +360,14 @@ describe('SD-145 · box score, timeline, ticker', () => {
     assert.deepEqual(src.data(2).home.rows.find((r) => r.playerId === 'h4')?.stats.goals, 0);
   });
   test('timeline rows: goals with tags and assists, penalties; shots left out', () => {
-    const tl = iceHockeyTimeline(s);
+    const tl = iceHockeyTimeline(s, undefined, VIEWER);
     assert.equal(tl.length, 3);
     assert.match(tl[0].detail!, /H4 · assists H3, H2/);
     assert.match(tl[2].label, /Goal \(PP\)/);
     assert.equal(tl[2].stamp, 'P2 01:40');
   });
   test('ticker: scorers by period, flash on a new goal', () => {
-    const d = iceHockeyTickerDetail(s, { home: 'Hawks', away: 'Wolves' });
+    const d = iceHockeyTickerDetail(s, { home: 'Hawks', away: 'Wolves', player: VIEWER });
     assert.match(d.left![0], /P1/);
     const prev = { ...s, events: s.events.slice(0, -1) };
     assert.equal(iceHockeyTickerFlash(prev, s)?.sub, 'PP');

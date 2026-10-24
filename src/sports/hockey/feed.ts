@@ -12,6 +12,7 @@
 import { SHOOTOUT_PERIOD, groupByScorer, emptyFacts, scoreText, type FeedItem, type MatchFacts, type Score } from '../invasion/feed.ts';
 import { minuteText, periodLong, PC_RESULT_LABEL, soScore, type HockeyEvent, type HockeyState, type Side } from './engine.ts';
 import { hockeyPossession } from './depth.ts';
+import { legacyNameOf, withNames, type NameOf } from '../invasion/names.ts';
 
 type Names = { home: string; away: string };
 const other = (s: Side): Side => (s === 'home' ? 'away' : 'home');
@@ -66,7 +67,8 @@ export function hockeySentence(e: HockeyEvent, names: Names, score: Score, saver
 }
 
 /** The whole match as commentary items (oldest first; Commentary groups them). */
-export function hockeyFeed(s: HockeyState, names: Names): FeedItem[] {
+export function hockeyFeed(s0: HockeyState, names: Names, nameOf: NameOf = legacyNameOf): FeedItem[] {
+  const s = withNames(s0, nameOf);
   const ids = new Set(s.events.map((e) => e.id));
   const saverOf = new Map<string, string>();
   for (const e of s.events) if (e.type === 'save' && e.ref && e.playerName) saverOf.set(e.ref, e.playerName);
@@ -119,10 +121,11 @@ export function hockeyFeed(s: HockeyState, names: Names): FeedItem[] {
 export const hockeyFeedPeriods = (s: HockeyState): number[] => Array.from({ length: Math.min(s.periods, s.period) }, (_, i) => i + 1);
 
 /** Scorers with minutes ("Asha Rao 12', 45' (PC)"), sendings-off, notes. */
-export function hockeyFacts(s: HockeyState, now = 0): MatchFacts {
+export function hockeyFacts(s0: HockeyState, now = 0, nameOf: NameOf = legacyNameOf): MatchFacts {
+  const s = withNames(s0, nameOf);
   const f = emptyFacts();
   const goals = s.events.filter((e) => e.type === 'goal').sort((a, b) => a.sec - b.sec)
-    .map((e) => ({ side: e.side, who: e.playerName ?? 'Team goal', stamp: minuteText(e.sec), tag: e.goalType === 'pc' ? 'PC' : e.goalType === 'stroke' ? 'PS' : undefined }));
+    .map((e) => ({ side: e.side, who: e.playerName ?? 'Team goal', key: e.playerId, stamp: minuteText(e.sec), tag: e.goalType === 'pc' ? 'PC' : e.goalType === 'stroke' ? 'PS' : undefined }));
   const by = groupByScorer(goals);
   f.home.push(...by.home.map((l) => `🏑 ${l}`));
   f.away.push(...by.away.map((l) => `🏑 ${l}`));

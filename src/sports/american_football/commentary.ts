@@ -24,6 +24,7 @@ import {
 } from './engine.ts';
 import { afDrives, downsSpot, driveLine, gameOrder, halfKey, resultText, type AFDrive } from './drives.ts';
 import { groupLines, newestFirst, scoreText, type FeedGroup, type FeedLine } from '../feedGroups.ts';
+import { legacyNameOf, withNames, type NameOf } from '../invasion/names.ts';
 
 export interface Names { home: string; away: string }
 
@@ -179,7 +180,8 @@ type Item = { period: number; sec: number; ord: number; e?: AFEvent; line?: Feed
 type Entry = { gk: string; period: number; idx: number; line: FeedLine; drive?: AFDrive; ret?: AFEvent };
 
 /** The commentary feed, newest first. */
-export function afCommentary(s: AFState, names: Names): FeedGroup[] {
+export function afCommentary(s0: AFState, names: Names, nameOf: NameOf = legacyNameOf): FeedGroup[] {
+  const s = withNames(s0, nameOf);
   const { drives, driveOf } = afDrives(s);
   const items: Item[] = gameOrder(s).map(({ e, i }) => ({ period: e.period, sec: e.sec, ord: i, e, hk: halfKey(s, e.period) }));
   // the two-minute warnings and the period ends (completed periods)

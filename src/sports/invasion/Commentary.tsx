@@ -13,7 +13,7 @@ import { theme } from '../../core/theme';
 import { useMask } from '../../core/disputeMask';
 import { SelectChip } from '../../components/ui';
 import type { Player } from '../../core/types';
-import { playerLink, idByName } from '../playerLink';
+import { playerLink, playerIdOf } from '../playerLink';
 import { feedSections, feedCounts, scoreText, type FeedItem, type MatchFacts } from './feed';
 
 const PAGE = 60;
@@ -72,7 +72,8 @@ export function Commentary({
             {sec.items.map((it) => {
               if (!all && shown >= PAGE) return null;
               shown += 1;
-              const pid = it.playerId ?? idByName(it.playerName, ...(it.side === 'away' ? [awayRoster] : it.side === 'home' ? [homeRoster] : [homeRoster, awayRoster]));
+              // IDs-only scoring: the item's player by id (an older log's name → the roster)
+              const pid = playerIdOf(it.playerId, it.playerName, ...(it.side === 'away' ? [awayRoster] : it.side === 'home' ? [homeRoster] : [homeRoster, awayRoster]));
               const toneColor = it.tone === 'goal' ? theme.colors.primary : it.tone === 'red' ? theme.colors.danger : it.tone === 'yellow' ? theme.colors.accent : undefined;
               const big = it.tone === 'goal';
               return (

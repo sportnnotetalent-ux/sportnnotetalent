@@ -21,6 +21,7 @@ import { trackField, timeLeft, type FieldEvent, type FieldLog, type FieldResult,
 import {
   detailTracked, eventCredits, matchSec, pointsOf, trackedTallyKeys, DETAIL_STATS, type RugbyEvent, type RugbyState, type Side,
 } from './engine.ts';
+import { legacyNameOf, nameFor, type NameOf } from '../invasion/names.ts';
 
 const stamped = (s: RugbyState, side: Side): boolean => !!s.xi?.[side]?.players?.length;
 /** sent off (a red, a second yellow, a 20-minute red) */
@@ -60,14 +61,15 @@ export const rugbyField = (s: RugbyState, upTo?: number): FieldResult => trackFi
 
 /** For the live banner: who is in the sin-bin (time left on the playing
  *  clock) and how many players each side has. */
-export function rugbyLiveField(s: RugbyState, nowMs: number): {
+/** IDs-only scoring: `nameOf` names the suspended players by id for this viewer. */
+export function rugbyLiveField(s: RugbyState, nowMs: number, nameOf: NameOf = legacyNameOf): {
   suspended: { side: Side; name: string; left: string; id?: string }[];
   onField: { home: number; away: number };
   short: { home: number; away: number };
 } {
   const now = matchSec(s, nowMs) / 60;
   const r = rugbyField(s, now);
-  const suspended = s.ended ? [] : r.suspended.map((x) => ({ side: x.side, name: x.name ?? 'Player', left: timeLeft(x.until, now), ...(x.id ? { id: x.id } : {}) }));
+  const suspended = s.ended ? [] : r.suspended.map((x) => ({ side: x.side, name: nameFor(nameOf, x.id, x.name) ?? 'Player', left: timeLeft(x.until, now), ...(x.id ? { id: x.id } : {}) }));
   const count = (side: Side) => {
     const allowed = Math.max(0, s.playersPerSide - r.short[side]);
     return stamped(s, side) ? Math.min(r.onField[side].length, allowed) : allowed;

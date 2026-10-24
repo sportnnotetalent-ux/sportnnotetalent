@@ -34,8 +34,11 @@ import { careerSections } from '../src/data/career.ts';
 import { assertContract, toRecords, type TotalsSport } from './statTotalsHarness.mts';
 import type { ScoreAction } from '../src/sports/types.ts';
 import type { StatLine } from '../src/core/types.ts';
+import type { NameOf } from '../src/core/playerNames.ts';
 
 const nm = (id: string) => id.toUpperCase();
+/** IDs-only scoring: the state keeps ids; the viewer's names come from a lookup */
+const VIEWER: NameOf = (id, legacy) => (id ? nm(id) : (legacy ?? '').trim() || 'Player');
 const W = (id?: string): Who | undefined => (id ? { id, name: nm(id) } : undefined);
 const NAMES = { home: 'Lions', away: 'Bears' };
 let u = 0;
@@ -219,7 +222,7 @@ describe('deep wave · drives from the play-by-play log', () => {
     const d = afDrives(b.s).drives;
     assert.deepEqual(d.map((x) => [x.off, x.start, x.result, x.points]), [['home', 90, 'td', 7], ['away', 90, 'downs', 0]]);
     assert.equal(driveRows(b.s, NAMES)[1].detail, 'Overtime · Opp 10 · 2 plays, 10 yds');
-    const f = afCommentary(b.s, NAMES);
+    const f = afCommentary(b.s, NAMES, VIEWER);
     assert.equal(f[0].title, 'OT · Bears possession');
     assert.equal(f[0].lines[0].text, 'Final (OT) — Lions 14–7 Bears.');
     assert.equal(f[0].lines[1].text, '4th & Goal at Opp 10 — A1 pass incomplete. Turnover on downs.');
@@ -300,7 +303,7 @@ describe('deep wave · team figures and the broadcast sheet', () => {
 
 describe('deep wave · commentary grouped by drive, newest first', () => {
   const s = game().s;
-  const feed = afCommentary(s, NAMES);
+  const feed = afCommentary(s, NAMES, VIEWER);
   test('drive groups with the summary; newest first', () => {
     assert.equal(feed[0].title, 'Q3 · Lions drive');
     assert.equal(feed[0].sub, 'Own 25 · 1 play, 3 yds, 0:40 · In progress');
@@ -350,7 +353,7 @@ describe('deep wave · commentary grouped by drive, newest first', () => {
   });
   test('the two-minute warning line', () => {
     const t = reducer(reducer(init(PBP), endP()), { type: 'TWO_MIN', payload: { at: 0 } });
-    const f = afCommentary(reducer(t, endP()), NAMES);
+    const f = afCommentary(reducer(t, endP()), NAMES, VIEWER);
     const line = f.flatMap((g) => g.lines).find((l) => l.id === 'twomin2')!;
     assert.deepEqual([line.when, line.text], ['2:00', 'Two-minute warning.']);
   });
@@ -360,7 +363,7 @@ describe('deep wave · commentary grouped by drive, newest first', () => {
       fg('away', at(2, 600), true, 42, 'a11'), endP(), endP(),
       td('away', at(3, 100), 'int', 'a9', undefined, 35), tryA('away', at(3, 100), 'two', false), endP(), endP(),
     ].reduce(reducer, init(NFL));
-    const f = afCommentary(t, NAMES);
+    const f = afCommentary(t, NAMES, VIEWER);
     assert.deepEqual(f.map((g) => g.title), ['4th quarter', '3rd quarter', '2nd quarter', '1st quarter']);
     assert.equal(f[3].sub, 'Points 7–0');
     assert.equal(f[3].lines[2].text, 'TOUCHDOWN Lions! H3 24-yd pass from H1.');
@@ -371,7 +374,7 @@ describe('deep wave · commentary grouped by drive, newest first', () => {
   test('a correction re-derives the feed (removing the touchdown)', () => {
     const id = s.events.find((e) => e.type === 'td')!.id;
     const t = reducer(s, { type: 'REMOVE_EVENT', payload: { id } });
-    const f = afCommentary(t, NAMES);
+    const f = afCommentary(t, NAMES, VIEWER);
     assert.equal(f.flatMap((g) => g.lines).find((l) => l.text.includes('field goal is good'))!.score, '4–0', 'the try and the field goal');
   });
   test('sentences: flag sack wording, safety, incompletion with a target, breakups, tackles for loss', () => {
@@ -387,7 +390,7 @@ describe('deep wave · commentary grouped by drive, newest first', () => {
     b.go({ type: 'PASS_DEF', side: 'away', payload: at(1, 10), ...credit({ type: 'pd', playerId: 'a4', playerName: 'A4' }) });
     b.p('home', { play: 'run', yards: -2, p1: W('h2') }, at(1, 30));
     b.go({ type: 'TACKLE', side: 'away', payload: { ...at(1, 30), tfl: true }, ...credit({ type: 'tackle', tfl: true, playerId: 'a5', playerName: 'A5' }) });
-    const lines = afCommentary(b.s, NAMES)[0].lines.map((l) => l.text);
+    const lines = afCommentary(b.s, NAMES, VIEWER)[0].lines.map((l) => l.text);
     assert.deepEqual(lines, [
       '2nd & 10 at Own 30 — H2 runs for a loss of 2 yds. Tackle for loss by A5.',
       '1st & 10 at Own 30 — H1 pass incomplete intended for H4. Broken up by A4.',
@@ -493,7 +496,8 @@ describe('deep wave · optional capture: targets, passes defended, tackles for l
   test('undo of a breakup / tackle for loss reverses exactly its credits', () => {
     const pd = s.events.find((e) => e.type === 'pd')!;
     const cr = eventCredits(pd);
-    assert.deepEqual(creditAttribution(cr.first, -1), { playerId: 'a4', stat: 'passDef', by: -1, playerName: 'A4' });
+    // IDs-only scoring: the reversal names the player by id only
+    assert.deepEqual(creditAttribution(cr.first, -1), { playerId: 'a4', stat: 'passDef', by: -1 });
     const tfl = s.events.find((e) => e.tfl)!;
     assert.deepEqual(creditAttribution(eventCredits(tfl).first, -1)?.extra, { tfl: -1 });
   });

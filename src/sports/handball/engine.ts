@@ -85,9 +85,11 @@ export interface HandballEvent {
   /** scorer / shooter / keeper / blocker / player at fault / stealer /
    *  sanctioned player / sub off / new keeper */
   playerId?: string;
+  /** @deprecated legacy, read-only — IDs-only logs (docs/privacy/ids-only-scoring.md) keep the id; the name is looked up when shown (invasion/names.ts) */
   playerName?: string;
   /** assist (goal) / sub on */
   secondId?: string;
+  /** @deprecated legacy, read-only — IDs-only logs (docs/privacy/ids-only-scoring.md) keep the id; the name is looked up when shown (invasion/names.ts) */
   secondName?: string;
   shotType?: ShotType;
   /** miss: how the attempt ended */
@@ -110,14 +112,14 @@ export interface HandballEvent {
 /** `outcome` / keeper (deep wave, new logs only): saved by the keeper or
  *  missed; older throws carry `scored` only. */
 export interface SoThrow {
-  scored: boolean; playerId?: string; playerName?: string;
+  scored: boolean; playerId?: string; /** @deprecated legacy, read-only */ playerName?: string;
   outcome?: 'scored' | 'saved' | 'missed';
-  keeperId?: string; keeperName?: string;
+  keeperId?: string; /** @deprecated legacy, read-only */ keeperName?: string;
 }
 
 export interface XiStamp {
-  players?: { id: string; name: string }[];
-  gk?: { id: string; name: string };
+  players?: { id: string; /** @deprecated legacy, read-only */ name?: string }[];
+  gk?: { id: string; /** @deprecated legacy, read-only */ name?: string };
 }
 
 export interface HandballState {
@@ -310,7 +312,7 @@ export function creditAttribution(c: Credit | undefined, sign = 1, tracked?: str
   if (!entries.length) return undefined;
   const [[stat, by], ...rest] = entries;
   return {
-    playerId: c.playerId, stat, by: by * sign, ...(c.playerName ? { playerName: c.playerName } : {}),
+    playerId: c.playerId, stat, by: by * sign, // IDs-only scoring: never the name
     ...(rest.length ? { extra: Object.fromEntries(rest.map(([k, v]) => [k, v * sign])) } : {}),
     ...(tracked ? { tracked } : {}),
   };
@@ -319,14 +321,17 @@ export function creditAttribution(c: Credit | undefined, sign = 1, tracked?: str
 const second = (a: ScoreAction): Attribution | undefined =>
   a.attribution2 ?? (a.payload?._attr2 as Attribution | undefined);
 
+/** IDs-only scoring: the same player — by id; by name only when one side of
+ *  the comparison has no id (an older log's name-only card). */
+const samePlayer = (e: HandballEvent, who: Who): boolean =>
+  e.playerId && who.id ? e.playerId === who.id : !!who.name && e.playerName === who.name;
 /** How many 2-minute suspensions a player already has (the next one's number − 1). */
 export function suspensionsOf(s: HandballState, side: Side, who: Who): number {
-  return s.events.filter((e) => e.type === 'card' && e.card === 'twoMin' && e.side === side && !e.official
-    && ((who.id && e.playerId === who.id) || (!who.id && who.name && e.playerName === who.name))).length;
+  return s.events.filter((e) => e.type === 'card' && e.card === 'twoMin' && e.side === side && !e.official && samePlayer(e, who)).length;
 }
 /** Has the player had a warning already (IHF: one yellow per player)? */
 export const hasYellow = (s: HandballState, side: Side, who: Who): boolean =>
-  s.events.some((e) => e.type === 'card' && e.card === 'yellow' && e.side === side && !e.official && ((who.id && e.playerId === who.id) || (!who.id && who.name && e.playerName === who.name)));
+  s.events.some((e) => e.type === 'card' && e.card === 'yellow' && e.side === side && !e.official && samePlayer(e, who));
 /** Warnings a team has had (IHF 16:2 comment: at most 3 for the players, 1 for the officials). */
 export const teamYellows = (s: HandballState, side: Side, officials = false): number =>
   s.events.filter((e) => e.type === 'card' && e.card === 'yellow' && e.side === side && !!e.official === officials).length;
@@ -399,10 +404,10 @@ export const reducer = (s: HandballState, a: ScoreAction): HandballState => {
       const team = a.payload?.team;
       if (team !== 'home' && team !== 'away') return s;
       const players = Array.isArray(a.payload?.players)
-        ? (a.payload!.players as { id?: string; name?: string }[]).filter((x) => x?.id).map((x) => ({ id: String(x.id), name: String(x.name ?? '') }))
+        ? (a.payload!.players as { id?: string; name?: string }[]).filter((x) => x?.id).map((x) => ({ id: String(x.id), ...(x.name !== undefined ? { name: String(x.name ?? '') } : {}) }))
         : undefined;
       const gk = a.payload?.gk as { id?: string; name?: string } | undefined;
-      const stamp: XiStamp = { ...(players ? { players } : {}), ...(gk?.id ? { gk: { id: String(gk.id), name: String(gk.name ?? '') } } : {}) };
+      const stamp: XiStamp = { ...(players ? { players } : {}), ...(gk?.id ? { gk: { id: String(gk.id), ...(gk.name !== undefined ? { name: String(gk.name ?? '') } : {}) } } : {}) };
       return { ...s, xi: { ...s.xi, [team]: stamp } };
     }
     case 'GOAL': {
@@ -482,7 +487,7 @@ export const reducer = (s: HandballState, a: ScoreAction): HandballState => {
     }
     case 'GK': {
       if (!side || !a.payload?.id) return s;
-      return push(s, { type: 'gk', side, playerId: String(a.payload.id), playerName: String(a.payload.name ?? '') });
+      return push(s, { type: 'gk', side, playerId: String(a.payload.id), ...(a.payload.name !== undefined ? { playerName: String(a.payload.name ?? '') } : {}) });
     }
     case 'REMOVE_EVENT': {
       const id = String(a.payload?.id ?? '');

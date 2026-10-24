@@ -19,8 +19,8 @@ import { assertContract, toRecords, type TotalsSport } from './statTotalsHarness
 
 type Side = 'home' | 'away';
 const run = (s: football.FootballState, ...acts: ScoreAction[]) => acts.reduce(football.reducer, s);
-const goal = (side: Side, minute: number, half: 1 | 2 | 3 | 4, who = 'X'): ScoreAction =>
-  ({ type: 'GOAL', side, payload: { minute, half, goalType: 'open', pid: who.toLowerCase() }, attribution: { playerId: who.toLowerCase(), stat: 'goals', playerName: who, extra: { shots: 1, shotsOnTarget: 1, openPlayGoals: 1 } } });
+const goal = (side: Side, minute: number, half: 1 | 2 | 3 | 4, who = 'X', id = who.toLowerCase()): ScoreAction =>
+  ({ type: 'GOAL', side, payload: { minute, half, goalType: 'open', pid: id }, attribution: { playerId: id, stat: 'goals', playerName: who, extra: { shots: 1, shotsOnTarget: 1, openPlayGoals: 1 } } });
 const og = (awardedTo: Side, minute: number, half: 1 | 2, who: string, id = who.toLowerCase()): ScoreAction =>
   ({ type: 'OWN_GOAL', side: awardedTo, payload: { minute, half, scorerName: who, pid: id } });
 const KO = (cfg: Record<string, unknown> = {}) => run(football.init(cfg), { type: 'KICKOFF', payload: { at: 1, ord: true } });
@@ -74,7 +74,7 @@ const xi = (team: Side, gk: Player, players: Player[]): ScoreAction =>
 
 describe('SD-56 · shirt-number column', () => {
   test('rows carry the squad number; the table shows the # column only when some row has one', () => {
-    const s = run(KO(), xi('home', H[0], H), xi('away', A[0], A), goal('home', 10, 1, 'Home Nine'));
+    const s = run(KO(), xi('home', H[0], H), xi('away', A[0], A), goal('home', 10, 1, 'Home Nine', 'h9'));
     const t = buildBoxTable(STAT_SCHEMAS.football, footballBox(s, { homeRoster: H, awayRoster: A, now: 2 }).data('all'));
     assert.equal(t.numbers, true);
     assert.deepEqual(t.home.rows.map((r) => [r.name, r.number]), [['Home Keeper', 1], ['Home Nine', 9], ['Home Four', undefined]]);
@@ -101,7 +101,7 @@ describe('SD-80 · own goals', () => {
     assert.equal(four.cells[og], '1');
     assert.equal(four.cells[t.columns.findIndex((c) => c.abbr === 'G')], '0');
     assert.equal(t.home.totals[og], '1');
-    const clean = buildBoxTable(STAT_SCHEMAS.football, footballBox(run(KO(), xi('home', H[0], H), goal('home', 3, 1, 'Home Nine')), { homeRoster: H, now: 4 }).data('all'));
+    const clean = buildBoxTable(STAT_SCHEMAS.football, footballBox(run(KO(), xi('home', H[0], H), goal('home', 3, 1, 'Home Nine', 'h9')), { homeRoster: H, now: 4 }).data('all'));
     assert.ok(!clean.columns.some((c) => c.abbr === 'OG' || c.abbr === 'SO'));
     assert.ok(!clean.hidden.includes('Own goals')); // occasional: not "untracked"
   });

@@ -19,6 +19,7 @@
 import { trackField, timeLeft, type FieldEvent, type FieldLog, type FieldResult, type Who } from '../onField.ts';
 import { eventCredits, keeperAt, matchSec, LIVE_KEYS, SUSPENSION_MINUTES, type HandballEvent, type HandballState, type Side } from './engine.ts';
 import { FIELD_SHOT_TYPES, KEEPER_CONCEDED_KEY, KEEPER_SAVE_KEY, handballDerivedCredits, sevenMDrawnTracked } from './depth.ts';
+import { legacyNameOf, nameFor, type NameOf } from '../invasion/names.ts';
 
 const stamped = (s: HandballState, side: Side): boolean => !!s.xi?.[side]?.players?.length;
 /** an official's pseudo-person on the field log (never a player) */
@@ -61,14 +62,15 @@ const display = (name?: string) => (isOfficial(name) ? `${name!.slice(9)} (offic
 
 /** For the live banner: who is suspended (time left on the game clock) and
  *  how many court players each side has. */
-export function handballLiveField(s: HandballState, nowMs: number): {
+/** IDs-only scoring: `nameOf` names the suspended players by id for this viewer. */
+export function handballLiveField(s: HandballState, nowMs: number, nameOf: NameOf = legacyNameOf): {
   suspended: { side: Side; name: string; left: string; id?: string }[];
   onField: { home: number; away: number };
   short: { home: number; away: number };
 } {
   const now = matchSec(s, nowMs) / 60;
   const r = handballField(s, now);
-  const suspended = s.ended ? [] : r.suspended.map((x) => ({ side: x.side, name: display(x.name), left: timeLeft(x.until, now), ...(x.id ? { id: x.id } : {}) }));
+  const suspended = s.ended ? [] : r.suspended.map((x) => ({ side: x.side, name: display(isOfficial(x.name) ? x.name : nameFor(nameOf, x.id, x.name)), left: timeLeft(x.until, now), ...(x.id ? { id: x.id } : {}) }));
   // a disqualified player's side is short only 2 minutes, then may refill: the
   // count is the smaller of who is on court and what the rules allow
   const count = (side: Side) => {

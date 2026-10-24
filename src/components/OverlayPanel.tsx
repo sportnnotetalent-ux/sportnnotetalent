@@ -80,9 +80,10 @@ export function OverlayPanel({
     const p = prev.current;
     prev.current = { state, count: eventCount };
     if (!p || syncing || eventCount !== p.count + 1 || !plugin.tickerFlash) return;
-    const f = plugin.tickerFlash(p.state, state);
+    // IDs-only scoring: the flash names the player by id for this viewer
+    const f = plugin.tickerFlash(p.state, state, meta.nameOf);
     if (f) setFlash({ ...f, id: Date.now() });
-  }, [state, eventCount, syncing, plugin]);
+  }, [state, eventCount, syncing, plugin]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const testFlash = () => {
     const f: TickerFlash = plugin.id === 'cricket'

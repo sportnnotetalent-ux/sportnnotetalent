@@ -11,6 +11,7 @@ import {
   DETAIL_LABEL, type Infringement, type RugbyEvent, type RugbyState, type Side, type TurnoverCause,
 } from './engine.ts';
 import { groupLines, newestFirst, scoreText, type FeedGroup, type FeedLine } from '../feedGroups.ts';
+import { legacyNameOf, withNames, type NameOf } from '../invasion/names.ts';
 
 const other = (s: Side): Side => (s === 'home' ? 'away' : 'home');
 const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
@@ -117,7 +118,8 @@ function periodEndText(s: RugbyState, p: number, h: number, a: number, names: Na
 type Entry = { period: number; sec: number; i: number; line: FeedLine };
 
 /** The commentary feed, newest first. */
-export function rugbyCommentary(s: RugbyState, names: Names): FeedGroup[] {
+export function rugbyCommentary(s0: RugbyState, names: Names, nameOf: NameOf = legacyNameOf): FeedGroup[] {
+  const s = withNames(s0, nameOf);
   const ordered = s.events.map((e, i) => ({ e, i })).sort((x, y) => x.e.period - y.e.period || x.e.sec - y.e.sec || x.i - y.i);
   const score = { home: 0, away: 0 };
   const entries: Entry[] = [];

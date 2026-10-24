@@ -17,8 +17,10 @@ export function playerLink(id: string | undefined, label: string, onPlayer: OnPl
   };
 }
 
-/** Resolve a player's id from the name an event recorded (events often carry
- *  names only), searching the given rosters. */
+/** Resolve a player's id from the name an event recorded, searching the given
+ *  rosters — for an OLDER log's name-only event (before IDs-only scoring every
+ *  event carried names; now they carry ids). Prefer `playerIdOf`. Fails for a
+ *  viewer outside the player's circle (their roster shows initials). */
 export function idByName(name: string | undefined, ...rosters: (Player[] | undefined)[]): string | undefined {
   if (!name) return undefined;
   for (const r of rosters) {
@@ -27,3 +29,9 @@ export function idByName(name: string | undefined, ...rosters: (Player[] | undef
   }
   return undefined;
 }
+
+/** IDs-only scoring (docs/privacy/ids-only-scoring.md): the player a row /
+ *  event names — its id (every new log), else an older log's stored name
+ *  matched to the rosters (`idByName`). */
+export const playerIdOf = (id: string | undefined, name: string | undefined, ...rosters: (Player[] | undefined)[]): string | undefined =>
+  id || idByName(name, ...rosters);

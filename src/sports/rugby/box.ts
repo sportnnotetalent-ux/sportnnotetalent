@@ -15,13 +15,18 @@ import {
   detailTracked, eventCredits, periodName, teamFigures, totalPeriods, trackedTallyKeys, LIVE_KEYS, DETAIL_STATS, type RugbyState, type Side,
 } from './engine.ts';
 import { rugbyTotals } from './totals.ts';
+import { withNames, type NameOf } from '../invasion/names.ts';
+import { withRosters } from '../racketNames.ts';
 
-export interface RugbyBoxContext { homeRoster?: Player[]; awayRoster?: Player[] }
+/** `nameOf` (IDs-only scoring): the viewer's names by player id. */
+export interface RugbyBoxContext { homeRoster?: Player[]; awayRoster?: Player[]; nameOf?: NameOf }
 
 const CORE_KEYS: string[] = LIVE_KEYS.filter((k) => k !== 'soTaken' && k !== 'soGoals');
 const TEAM_KEYS = ['points', 'tries', 'conversions', 'conversionAttempts', 'penGoals', 'penGoalAttempts', 'dropGoals', 'dropGoalAttempts', 'yellowCards', 'redCards'] as const;
 
-export function rugbyBox(s: RugbyState, ctx: RugbyBoxContext = {}): MatchBoxSource {
+export function rugbyBox(s0: RugbyState, ctx: RugbyBoxContext = {}): MatchBoxSource {
+  // IDs-only scoring: rows key by id; names are the viewer's (else the squad's)
+  const s = withNames(s0, withRosters(ctx.nameOf, ctx.homeRoster, ctx.awayRoster));
   const n = Math.min(totalPeriods(s), Math.max(1, s.period));
   const periods = n >= 2 ? Array.from({ length: n }, (_, i) => ({ value: i + 1, label: periodName(s, i + 1) })) : [];
   const detail = detailTracked(s);

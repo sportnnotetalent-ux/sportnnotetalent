@@ -240,29 +240,29 @@ export function hockeyVoice(text: string, ctx: VoiceContext): ScoreAction[] | nu
     const goalType: hk.GoalType = /\bstroke\b/.test(q) ? 'stroke' : s.penaltyCorners && /\b(pc|penalty corner|short corner|corner)\b/.test(q) ? 'pc' : 'field';
     const { scorer, assist } = splitAssist(text, ctx, side);
     const helper = goalType === 'stroke' ? undefined : assist;
-    return [{ type: 'GOAL', side, payload: { goalType, ...stamp() }, ...credit({ type: 'goal', goalType, playerId: scorer?.id, playerName: scorer?.fullName, secondId: helper?.id, secondName: helper?.fullName }) }];
+    return [{ type: 'GOAL', side, payload: { goalType, ...stamp() }, ...credit({ type: 'goal', goalType, playerId: scorer?.id, secondId: helper?.id }) }];
   }
   if (/\b(pc|penalty corner|short corner)\b/.test(q)) return s.penaltyCorners ? [{ type: 'PC', side, payload: stamp() }] : null;
   if (/\bcircle\b/.test(q)) return [{ type: 'CIRCLE', side, payload: { at: now, sec: hk.matchSec(s, now), period: s.period } }];
   const card = /\bgreen\b/.test(q) ? 'green' : /\byellow\b/.test(q) ? 'yellow' : /\bred\b/.test(q) ? 'red' : null;
   if (card && /\bcard\b|\bgreen\b|\byellow\b|\bred\b/.test(q)) {
     const minutes = card === 'green' ? 2 : card === 'yellow' ? (/\b(10|ten)\b/.test(q) ? 10 : 5) : undefined;
-    return [{ type: 'CARD', side, payload: { card, ...(minutes ? { minutes } : {}), ...stamp() }, ...credit({ type: 'card', card, playerId: player?.id, playerName: player?.fullName }) }];
+    return [{ type: 'CARD', side, payload: { card, ...(minutes ? { minutes } : {}), ...stamp() }, ...credit({ type: 'card', card, playerId: player?.id }) }];
   }
   const saved = /\b(saved|save|on (goal|target))\b/.test(q);
   const keeperSave = (ref: string): ScoreAction => {
     const gk = hk.currentKeeper(s, other(side));
-    return { type: 'SAVE', side: other(side), payload: { ref, ...stamp(1) }, ...credit({ type: 'save', playerId: gk?.id, playerName: gk?.name }) };
+    return { type: 'SAVE', side: other(side), payload: { ref, ...stamp(1) }, ...credit({ type: 'save', playerId: gk?.id }) };
   };
   if (/\bstroke\b/.test(q)) {
     const result: 'saved' | 'missed' = saved ? 'saved' : 'missed';
     const st = stamp();
-    return [{ type: 'STROKE', side, payload: { outcome: result, ...st }, ...credit({ type: 'stroke', outcome: result, playerId: player?.id, playerName: player?.fullName }) },
+    return [{ type: 'STROKE', side, payload: { outcome: result, ...st }, ...credit({ type: 'stroke', outcome: result, playerId: player?.id }) },
       ...(result === 'saved' ? [keeperSave(st.uid)] : [])];
   }
   if (/\bshot\b|\bshoots?\b/.test(q)) {
     const st = stamp();
-    return [{ type: 'SHOT', side, payload: { onGoal: saved, ...st }, ...credit({ type: 'shot', onGoal: saved, playerId: player?.id, playerName: player?.fullName }) },
+    return [{ type: 'SHOT', side, payload: { onGoal: saved, ...st }, ...credit({ type: 'shot', onGoal: saved, playerId: player?.id }) },
       ...(saved ? [keeperSave(st.uid)] : [])];
   }
   return null;
@@ -315,11 +315,11 @@ export function handballVoice(text: string, ctx: VoiceContext): ScoreAction[] | 
     return { attribution: hb.creditAttribution(cr.first, 1, HANDBALL_TRACKED), attribution2: hb.creditAttribution(cr.second, 1, HANDBALL_TRACKED) };
   };
   if (/\btime ?out\b/.test(q)) return hb.timeoutCheck(s, side, now).ok ? [{ type: 'TIMEOUT', side, payload: stamp() }] : null;
-  if (/\bturn ?over\b|\blost the ball\b/.test(q)) return [{ type: 'TURNOVER', side, payload: stamp(), ...credit({ type: 'turnover', playerId: player?.id, playerName: player?.fullName }) }];
+  if (/\bturn ?over\b|\blost the ball\b/.test(q)) return [{ type: 'TURNOVER', side, payload: stamp(), ...credit({ type: 'turnover', playerId: player?.id }) }];
   const card: hb.Sanction | null = /\b(two|2) ?min(ute)?s?\b|\bsuspension\b|\bsuspended\b/.test(q) ? 'twoMin' : /\byellow\b/.test(q) ? 'yellow' : /\bred\b/.test(q) ? 'red' : null;
   if (card) {
     const third = card === 'twoMin' && !!player && hb.suspensionsOf(s, side, { id: player.id, name: player.fullName }) >= 2;
-    return [{ type: 'CARD', side, payload: { card, ...(third ? { third: true } : {}), ...stamp() }, ...credit({ type: 'card', card, third, playerId: player?.id, playerName: player?.fullName }) }];
+    return [{ type: 'CARD', side, payload: { card, ...(third ? { third: true } : {}), ...stamp() }, ...credit({ type: 'card', card, third, playerId: player?.id }) }];
   }
   const shotType = handballShot(q);
   const miss: hb.MissResult | null = /\b(saved|save)\b/.test(q) ? 'saved' : /\bblocked?\b/.test(q) ? 'blocked' : /\b(miss(ed)?|wide|post|over)\b/.test(q) ? 'missed' : null;
@@ -327,15 +327,15 @@ export function handballVoice(text: string, ctx: VoiceContext): ScoreAction[] | 
     const st = shotType ?? 'nineM';
     const { scorer, assist } = splitAssist(text, ctx, side);
     const helper = st === 'sevenM' ? undefined : assist;
-    return [{ type: 'GOAL', side, payload: { shotType: st, ...stamp() }, ...credit({ type: 'goal', shotType: st, playerId: scorer?.id, playerName: scorer?.fullName, secondId: helper?.id, secondName: helper?.fullName }) }];
+    return [{ type: 'GOAL', side, payload: { shotType: st, ...stamp() }, ...credit({ type: 'goal', shotType: st, playerId: scorer?.id, secondId: helper?.id }) }];
   }
   if (miss && (shotType || /\bshot\b|\bthrow\b/.test(q))) {
     const st = shotType ?? 'nineM';
     const one = stamp();
-    const out: ScoreAction[] = [{ type: 'MISS', side, payload: { shotType: st, result: miss, ...one }, ...credit({ type: 'miss', shotType: st, playerId: player?.id, playerName: player?.fullName }) }];
+    const out: ScoreAction[] = [{ type: 'MISS', side, payload: { shotType: st, result: miss, ...one }, ...credit({ type: 'miss', shotType: st, playerId: player?.id }) }];
     if (miss === 'saved') {
       const gk = hb.currentKeeper(s, other(side));
-      out.push({ type: 'SAVE', side: other(side), payload: { ref: one.uid, shotType: st, ...stamp(1) }, ...credit({ type: 'save', shotType: st, playerId: gk?.id, playerName: gk?.name }) });
+      out.push({ type: 'SAVE', side: other(side), payload: { ref: one.uid, shotType: st, ...stamp(1) }, ...credit({ type: 'save', shotType: st, playerId: gk?.id }) });
     }
     return out;
   }

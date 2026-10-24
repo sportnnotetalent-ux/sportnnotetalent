@@ -12,6 +12,7 @@
 import { SHOOTOUT_PERIOD, emptyFacts, scoreText, type FeedItem, type MatchFacts, type Score } from '../invasion/feed.ts';
 import { clockText, periodLong, soScore, FAULT_LABEL, type HandballEvent, type HandballState, type ShotType, type Side } from './engine.ts';
 import { emptyGoalIndexes } from './depth.ts';
+import { legacyNameOf, withNames, type NameOf } from '../invasion/names.ts';
 
 type Names = { home: string; away: string };
 const other = (s: Side): Side => (s === 'home' ? 'away' : 'home');
@@ -85,7 +86,8 @@ export function handballSentence(e: HandballEvent, names: Names, answer?: string
 }
 
 /** The whole match as commentary items (oldest first). */
-export function handballFeed(s: HandballState, names: Names): FeedItem[] {
+export function handballFeed(s0: HandballState, names: Names, nameOf: NameOf = legacyNameOf): FeedItem[] {
+  const s = withNames(s0, nameOf);
   const ids = new Set(s.events.map((e) => e.id));
   const answerOf = new Map<string, string>();
   for (const e of s.events) if ((e.type === 'save' || e.type === 'block' || e.type === 'steal') && e.ref && e.playerName) answerOf.set(e.ref, e.playerName);
@@ -137,19 +139,22 @@ export const handballFeedPeriods = (s: HandballState): number[] => Array.from({ 
 
 /** Each side's top scorers ("Asha Rao 8/11"), disqualifications, HT score,
  *  the 7-metre shoot-out. */
-export function handballFacts(s: HandballState, top = 3): MatchFacts {
+export function handballFacts(s0: HandballState, top = 3, nameOf: NameOf = legacyNameOf): MatchFacts {
+  const s = withNames(s0, nameOf);
   const f = emptyFacts();
   for (const side of ['home', 'away'] as const) {
-    const by = new Map<string, { goals: number; shots: number; order: number }>();
+    // IDs-only scoring: by the scorer's id (two players shown alike stay apart)
+    const by = new Map<string, { name: string; goals: number; shots: number; order: number }>();
     s.events.forEach((e, i) => {
       if (e.side !== side || (e.type !== 'goal' && e.type !== 'miss') || !e.playerName) return;
-      const r = by.get(e.playerName) ?? { goals: 0, shots: 0, order: i };
+      const k = e.playerId ? `id:${e.playerId}` : e.playerName;
+      const r = by.get(k) ?? { name: e.playerName, goals: 0, shots: 0, order: i };
       r.shots += 1;
       if (e.type === 'goal') r.goals += 1;
-      by.set(e.playerName, r);
+      by.set(k, r);
     });
-    const best = [...by.entries()].filter(([, r]) => r.goals > 0).sort((a, b) => b[1].goals - a[1].goals || a[1].shots - b[1].shots || a[1].order - b[1].order).slice(0, top);
-    f[side].push(...best.map(([n, r]) => `🤾 ${n} ${r.goals}/${r.shots}`));
+    const best = [...by.values()].filter((r) => r.goals > 0).sort((a, b) => b.goals - a.goals || a.shots - b.shots || a.order - b.order).slice(0, top);
+    f[side].push(...best.map((r) => `🤾 ${r.name} ${r.goals}/${r.shots}`));
     for (const e of s.events) {
       if (e.type === 'card' && e.side === side && !e.official && (e.card === 'red' || e.third)) f[side].push(`🟥 ${e.playerName ?? 'Player'} ${clockText(e.sec)}`);
     }

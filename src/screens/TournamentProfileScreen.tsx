@@ -4,6 +4,7 @@
 import { QualifiesToCard } from '../components/FeederCards';
 import { notice } from '../core/confirm';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { makeNameOf, peopleMap } from '../core/playerNames';
 import { View, Text, TouchableOpacity, StyleSheet, Platform, Linking, type ScrollView } from 'react-native';
 import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -113,6 +114,8 @@ export default function TournamentProfileScreen() {
   const { matches, lines, players } = useLeagueData(params.tournamentId);
   const participants = useTournamentTeams(params.tournamentId);
   const allPlayers = usePlayers();
+  // IDs-only scoring: match data keeps player ids; names come from players_view
+  const playerNameOf = useMemo(() => makeNameOf(peopleMap(players, allPlayers)), [players, allPlayers]);
   const orgs = useOrganizations();
   // The banner is read on its own (tolerates a database without the column yet).
   const [banner, setBanner] = useState<string | undefined>(undefined);
@@ -1127,7 +1130,7 @@ export default function TournamentProfileScreen() {
             {activeSport && !isEventSport(activeSport) ? <LeaderMinimums sport={activeSport} mins={mins} canManage={canManageHosts} onSave={saveMins} /> : null}
             {/* SD-70 (FB-12) / SD-126: cards per player / team and who sits out next — every sport with cards */}
             {activeSport && hasDiscipline(activeSport) ? (
-              <DisciplineTable sport={activeSport} matches={matches} format={tournament.formats?.[activeSport] as Record<string, unknown> | undefined}
+              <DisciplineTable sport={activeSport} matches={matches} format={tournament.formats?.[activeSport] as Record<string, unknown> | undefined} nameOf={playerNameOf}
                 onPlayer={(id) => nav.navigate('PlayerProfile', { playerId: id })} />
             ) : null}
             {/* SD-51: tournament records (top 5 per type, from each match's records block) */}

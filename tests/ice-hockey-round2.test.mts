@@ -30,10 +30,13 @@ import { careerSections } from '../src/data/career.ts';
 import { assertContract, toRecords, type TotalsSport } from './statTotalsHarness.mts';
 import type { ScoreAction } from '../src/sports/types.ts';
 import type { Player, StatLine } from '../src/core/types.ts';
+import type { NameOf } from '../src/core/playerNames.ts';
 
 const HOME = ['hg', 'h2', 'h3', 'h4', 'h5'];
 const AWAY = ['ag', 'a2', 'a3', 'a4', 'a5'];
 const nm = (id: string) => id.toUpperCase();
+/** IDs-only scoring: the state keeps ids; the viewer's names come from a lookup */
+const VIEWER: NameOf = (id, legacy) => (id ? nm(id) : (legacy ?? '').trim() || 'Player');
 const NAMES = { home: 'Kings', away: 'Wolves' };
 let u = 0;
 const xi = (team: Side): ScoreAction => ({ type: 'XI', payload: { team, players: (team === 'home' ? HOME : AWAY).map((id) => ({ id, name: nm(id) })), gk: { id: team === 'home' ? 'hg' : 'ag', name: nm(team === 'home' ? 'hg' : 'ag') } } });
@@ -232,7 +235,7 @@ describe('round 2 · the zone in the commentary, timeline and voice', () => {
     assert.equal(sentence(s, e({ playerName: 'Rao', secondName: 'Khan', zone: 'oz' }), NAMES).text, 'Rao (Kings) wins the faceoff against Khan in the offensive zone.');
     assert.equal(sentence(s, e({ zone: 'nz' }), NAMES).text, 'Kings win the faceoff in the neutral zone.');
     assert.equal(sentence(s, e({ playerName: 'Rao', secondName: 'Khan' }), NAMES).text, 'Rao (Kings) wins the faceoff against Khan.');
-    const lines = iceHockeyCommentary(s, NAMES).flatMap((g) => g.lines).filter((l) => l.tags?.includes('faceoff'));
+    const lines = iceHockeyCommentary(s, NAMES, VIEWER).flatMap((g) => g.lines).filter((l) => l.tags?.includes('faceoff'));
     assert.equal(lines.length, 8);
     assert.ok(lines.some((l) => l.text === 'A4 (Wolves) wins the faceoff against H3 in the defensive zone.'));
   });

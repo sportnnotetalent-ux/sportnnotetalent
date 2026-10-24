@@ -11,13 +11,18 @@ import type { BoxRowInput, BoxSideInput, MatchBoxSource } from '../boxScore.ts';
 import { centreInfo, eventCredits, periodName, teamFigures, totalPeriods, LIVE_KEYS, POSITIONS, type NetballState, type Side } from './engine.ts';
 import { netballTotals } from './totals.ts';
 import { nbDeepCredits, nbDeepKeys } from './deep.ts';
+import { withNames, type NameOf } from '../invasion/names.ts';
+import { withRosters } from '../racketNames.ts';
 
-export interface NetballBoxContext { homeRoster?: Player[]; awayRoster?: Player[] }
+/** `nameOf` (IDs-only scoring): the viewer's names by player id. */
+export interface NetballBoxContext { homeRoster?: Player[]; awayRoster?: Player[]; nameOf?: NameOf }
 
 const ROW_KEYS = [...LIVE_KEYS];
 const TEAM_KEYS = ['goals', 'attempts', 'goalAssists', 'feeds', 'intercepts', 'deflections', 'rebounds', 'turnovers', 'penaltiesConceded', 'contacts', 'obstructions', 'warnings', 'suspensions', 'orderedOff'] as const;
 
-export function netballBox(s: NetballState, ctx: NetballBoxContext = {}): MatchBoxSource {
+export function netballBox(s0: NetballState, ctx: NetballBoxContext = {}): MatchBoxSource {
+  // IDs-only scoring: rows key by id; names are the viewer's (else the squad's)
+  const s = withNames(s0, withRosters(ctx.nameOf, ctx.homeRoster, ctx.awayRoster));
   const n = Math.min(totalPeriods(s), Math.max(1, s.period));
   const periods = n >= 2 ? Array.from({ length: n }, (_, i) => ({ value: i + 1, label: periodName(s, i + 1) })) : [];
   return {

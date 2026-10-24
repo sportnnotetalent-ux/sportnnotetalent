@@ -15,9 +15,15 @@
  * The reducer is pure, so it can't read the clock — the controls compute the
  * current minute (via `currentMinute`) and pass it in `payload.minute`.
  */
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { theme } from '../../core/theme';
+import { useMask } from '../../core/disputeMask';
+import { withNames, nameRow } from '../invasion/names';
+import {
+  goalAction, teamGoalAction, undoGoalAction, ownGoalAction, assistAction, cardActions, officialCardActions, sinBinAction,
+  statAction, foulAction, subAction, xiAction, xiOf, penKickAction, eventRemoval, statRemoval as statRemovalAction, type StatDetail,
+} from './actions';
 import { Button, TextField, SelectChip } from '../../components/ui';
 import { askConfirm, confirmMatchAction } from '../../components/ConfirmSheet';
 import { Pitch } from './Pitch';
@@ -25,7 +31,7 @@ import { LineupView } from './LineupView';
 import { emptyFormation } from './formation';
 import { isGoalkeeper } from './keepers';
 import { footballLiveField, liveClockMinutes } from './fieldTime';
-import { footballStatTotals, GOAL_STAT, STAT_KEY } from './totals';
+import { footballStatTotals } from './totals';
 import { FieldBanner } from '../FieldBanner';
 import { footballCentreSource } from './centre';
 import { footballCentre } from './stats';
@@ -53,7 +59,7 @@ import {
   init, reducer, decideShootout, penScore, HALF_NAME, currentMinute, halfBase, startOffset,
   clockLabel, clockTime, possessionPct, cardCount, FOOTBALL_LIVE_SETTINGS,
   minuteText, halfOfMinute, eventHalf, byMatchTimeDesc, fairPlayScore, pairedSecondYellowRed, type XiStamp,
-  footballDetailLine, halfTimeText, kickText,
+  footballDetailLine, halfTimeText, kickText, isSubbedOff,
   needsDecision, footballComplete, footballResult,
   gcSec, gcRunning, gcTimeUp, halfLenSec, futsalTimeout, accumulatedFouls, FUTSAL_FOUL_LIMIT, DEEP_TRACK_FIELDS,
 } from "./engine";
@@ -148,6 +154,11 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
   // the event). `state` is the view as if it were removed; the first dispatch
   // sends the held removal first. See usePendingEdit.
   const { view: state, dispatch, begin: holdRemoval, cancel: dropHeldRemoval } = usePendingEdit(liveState, rawDispatch, reducer);
+  // IDs-only scoring (docs/privacy/ids-only-scoring.md): the state keeps
+  // player ids; `named` is the display copy with the names looked up for this
+  // viewer. Read names from it; never write one into an action.
+  const { nameOf: playerNameOf } = useMask();
+  const named = useMemo(() => withNames(state, playerNameOf), [state, playerNameOf]);
   // Team kit colours for the home/away controls (fall back to the app's accents).
   const hc = homeColor ?? theme.colors.home;
   const ac = awayColor ?? theme.colors.away;
@@ -238,31 +249,21 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
     return keys;
   };
 
-  const attr = (side: 'home' | 'away', type: string, stat: string, p: Player, extra?: Record<string, number>) =>
-    fire({ type, side, payload: { pid: p.id }, attribution: { playerId: p.id, stat, playerName: p.fullName, extra, tracked: trackedKeys() } });
+  // IDs-only scoring: every action is built by ./actions.ts (ids only)
 
   // Record a card. A player's second yellow is also a red (sending off), flagged
   // so it shows as a red badge with a "2".
   // Deep wave: `reason` (card reasons tracked) rides on the card's payload.
   const recordCard = (side: 'home' | 'away', color: 'yellow' | 'red', p: Player, reason?: CardReason) => {
-    const why = reason && deep.cardReasons ? { reason } : {};
-    if (color === 'red') { fire({ type: 'RED', side, payload: { pid: p.id, ...why }, attribution: { playerId: p.id, stat: 'redCards', playerName: p.fullName, tracked: trackedKeys() } }); return; }
-    const secondYellow = state.events.some((e) => e.type === 'yellow' && e.side === side && (e.playerId ? e.playerId === p.id : e.playerName === p.fullName));
-    fire({ type: 'YELLOW', side, payload: { pid: p.id, ...why }, attribution: { playerId: p.id, stat: 'yellowCards', playerName: p.fullName, tracked: trackedKeys() } });
-    if (secondYellow) {
-      fire({ type: 'RED', side, payload: { secondYellow: true, pid: p.id, ...why }, attribution: { playerId: p.id, stat: 'redCards', playerName: p.fullName, tracked: trackedKeys() } });
-    }
+    for (const a of cardActions(state.events, side, color, p, { reason: reason && deep.cardReasons ? reason : undefined, tracked: trackedKeys() })) fire(a);
   };
 
   // SD-117 (F13, Law 12): a card for a team official — no player, no stat line,
   // nobody leaves the pitch. A second yellow is a red, as for a player.
+  // IDs-only scoring: the typed text is the official's ROLE ("Head coach") —
+  // an adult staff label, not a player — so it is stored as typed.
   const recordOfficialCard = (side: 'home' | 'away', color: 'yellow' | 'red', typed: string) => {
-    const nm = typed.trim() || 'Team official';
-    const payload = { official: true, officialName: nm };
-    if (color === 'red') { fire({ type: 'RED', side, payload }); return; }
-    const secondYellow = state.events.some((e) => e.type === 'yellow' && e.side === side && e.official && e.playerName === nm);
-    fire({ type: 'YELLOW', side, payload });
-    if (secondYellow) fire({ type: 'RED', side, payload: { ...payload, secondYellow: true } });
+    for (const a of officialCardActions(state.events, side, color, typed)) fire(a);
   };
 
   // SD-29: a sin-bin (when the format has one) — off for the minutes, the side
@@ -270,7 +271,7 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
   // live countdown; a backfilled one is placed by its minute.
   const recordSinBin = (side: 'home' | 'away', p: Player) => {
     const sec = pastMin == null && state.startedAt ? Math.round(liveClockMinutes(state, Date.now()) * 60) : undefined;
-    fire({ type: 'SUSPEND', side, payload: { minutes: state.sinBinMinutes, ...(sec !== undefined ? { sec } : {}) }, attribution: { playerId: p.id, stat: 'sinBins', playerName: p.fullName, tracked: trackedKeys() } });
+    fire(sinBinAction(side, p, state.sinBinMinutes, { sec, tracked: trackedKeys() }));
   };
 
   // Which side the ball goes to after each kind of action.
@@ -283,19 +284,8 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
   // Deep wave: a shot's zone / big chance / woodwork and a key pass's shot ride
   // in `detail` (the payload); none of them credits a player live — statTotals
   // derives the shot-detail keys at completion.
-  type StatDetail = { onTarget?: boolean; complete?: boolean; blocked?: boolean; zone?: ShotZone; bigChance?: boolean; woodwork?: boolean; ref?: number };
   const recordStat = (kind: StatKind, side: 'home' | 'away', player?: Player, detail?: StatDetail) => {
-    const statKey = STAT_KEY[kind];
-    // a shot on target also bumps shotsOnTarget; a completed pass bumps passesComplete
-    const extra: Record<string, number> | undefined =
-      kind === 'shot' && detail?.onTarget && !detail.blocked ? { shotsOnTarget: 1 }
-      : kind === 'pass' && detail?.complete ? { passesComplete: 1 }
-      : undefined;
-    fire({
-      type: 'STAT', side,
-      payload: { kind, possSide: handover(kind, side), at: Date.now(), ...detail, playerName: player?.fullName },
-      attribution: player && statKey ? { playerId: player.id, stat: statKey, playerName: player.fullName, extra, tracked: trackedKeys() } : undefined,
-    });
+    fire(statAction(kind, side, player, detail, { possSide: handover(kind, side), at: Date.now(), tracked: trackedKeys() }));
     setFlow(null);
   };
   // Deep wave: a shot with the picked detail chips; with key passes tracked,
@@ -315,35 +305,41 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
   const rosterOf = (side: 'home' | 'away') => (side === 'home' ? homeRoster : awayRoster);
   const lineupOf = (side: 'home' | 'away') => (side === 'home' ? homeLineup : awayLineup);
 
+  // An event's player as a squad id: the id (IDs-only / SD-30 logs), else an
+  // older log's stored name matched to the squad.
+  const squadId = (side: 'home' | 'away', id?: string, name?: string): string | undefined =>
+    id || (name ? rosterOf(side).find((p) => p.fullName === name)?.id : undefined);
   // The 11 currently on the pitch: the starting XI from the lineup, with each
-  // substitution applied. Falls back to the full squad if no lineup is set.
+  // substitution applied — by player id. Falls back to the full squad if no
+  // lineup is set.
   const xi = (side: 'home' | 'away'): Player[] => {
     const roster = rosterOf(side);
     const byId = new Map(roster.map((p) => [p.id, p]));
-    const byName = new Map(roster.map((p) => [p.fullName, p]));
-    let names = lineupOf(side)
-      .filter((sl) => sl.playerId)
-      .map((sl) => byId.get(sl.playerId!)?.fullName ?? sl.playerName)
-      .filter((n): n is string => !!n);
-    if (names.length === 0) return roster;
+    let ids = lineupOf(side).filter((sl) => sl.playerId).map((sl) => sl.playerId!);
+    if (ids.length === 0) return roster;
     for (const e of state.events) {
-      if (e.type === 'sub' && e.side === side && e.playerName && e.secondName) {
-        names = names.map((n) => (n === e.playerName ? e.secondName! : n));
-      }
+      if (e.type !== 'sub' || e.side !== side) continue;
+      const off = squadId(side, e.playerId, e.playerName);
+      const on = squadId(side, e.secondId, e.secondName);
+      if (off && on) ids = ids.map((x) => (x === off ? on : x));
     }
     const off = sentOff(side);
-    const binned = new Set(footballLiveField(state, Date.now()).suspended.filter((x) => x.side === side).map((x) => x.name));
-    return names
-      .filter((n) => !off.has(n) && !binned.has(n))
-      .map((n) => byName.get(n))
+    const binned = new Set(footballLiveField(state, Date.now()).suspended.filter((x) => x.side === side).map((x) => x.id ?? squadId(side, undefined, x.name)));
+    return ids
+      .filter((id) => !off.has(id) && !binned.has(id))
+      .map((id) => byId.get(id))
       .filter((p): p is Player => !!p);
   };
-  // Players shown a red card — off the pitch for good (can't score, can't be
-  // subbed on; a sending-off leaves the side a player down).
+  // Players shown a red card (their squad ids) — off the pitch for good
+  // (can't score, can't be subbed on; a sending-off leaves the side a player down).
   const sentOff = (side: 'home' | 'away'): Set<string> => {
-    const names = new Set<string>();
-    for (const e of state.events) if (e.type === 'red' && e.side === side && e.playerName && !e.official) names.add(e.playerName);
-    return names;
+    const ids = new Set<string>();
+    for (const e of state.events) {
+      if (e.type !== 'red' || e.side !== side || e.official) continue;
+      const id = squadId(side, e.playerId, e.playerName);
+      if (id) ids.add(id);
+    }
+    return ids;
   };
   // The bench = squad members not currently on the pitch (and, for fixed subs,
   // not already withdrawn), never a player who's been sent off.
@@ -352,8 +348,8 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
     const off = sentOff(side);
     return rosterOf(side)
       .filter((p) => !onIds.has(p.id))
-      .filter((p) => !off.has(p.fullName))
-      .filter((p) => state.subType !== 'fixed' || !state.subbedOff[side].includes(p.fullName));
+      .filter((p) => !off.has(p.id))
+      .filter((p) => state.subType !== 'fixed' || !isSubbedOff(state, side, p));
   };
 
   // Each goal credits the total (`goals`) and a type-specific tally so a profile
@@ -369,22 +365,22 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
 
   // Deep wave: the picked zone / big chance ride on the goal (shot detail on).
   const recordGoal = (side: 'home' | 'away', scorer: Player, goalType: GoalType, bodyPart?: BodyPart, detail = mods) =>
-    fire({ type: 'GOAL', side, payload: { goalType, bodyPart, pid: scorer.id, ...(deep.shotDetail && detail.zone ? { zone: detail.zone } : {}), ...(deep.shotDetail && detail.big ? { bigChance: true } : {}) }, attribution: { playerId: scorer.id, stat: 'goals', playerName: scorer.fullName, extra: { shots: 1, shotsOnTarget: 1, [GOAL_STAT[goalType]]: 1 }, tracked: trackedKeys() } });
+    fire(goalAction(side, scorer, goalType, { bodyPart, zone: deep.shotDetail ? detail.zone : undefined, bigChance: !!(deep.shotDetail && detail.big), tracked: trackedKeys() }));
   const recordOwnGoal = (side: 'home' | 'away', scorer: Player) => {
     // SD-30: the player's id rides along — `ownGoals` is credited to him by the
     // absolute totals at full time (not live: his line's opponent is this side).
-    fire({ type: 'OWN_GOAL', side, payload: { scorerName: scorer.fullName, pid: scorer.id } });
+    fire(ownGoalAction(side, scorer));
     setFlow(null);
   };
   // Team goal — no named scorer. Keeps the scoreline correct for a friendly whose
   // players aren't on the app yet; who scored can be filled in later via the
   // timeline editor once they register.
   const recordTeamGoal = (side: 'home' | 'away') => {
-    fire({ type: 'GOAL', side, payload: { goalType: 'open' } });
+    fire(teamGoalAction(side));
     setFlow(null);
   };
   const recordAssist = (side: 'home' | 'away', p: Player | null) => {
-    if (p) attr(side, 'ASSIST', 'assists', p);
+    if (p) fire(assistAction(side, p, trackedKeys()));
     setFlow(null);
   };
 
@@ -395,38 +391,21 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
   // SD-114 (F4): removing / editing a yellow also takes the second-yellow red it triggered.
   const pairedRed = (ev: FootballEvent) => pairedSecondYellowRed(state.events, ev);
   const removalActions = (ev: FootballEvent, withPair = true): ScoreAction[] => {
-    // SD-30: the id on the event (new logs) wins over a name lookup
-    const pid = ev.type === 'owngoal' || ev.official ? undefined : ev.playerId ?? rosterId(ev.playerName);
-    let attribution: ScoreAction['attribution'];
-    if (ev.type === 'goal' && pid) attribution = { playerId: pid, stat: 'goals', by: -1, playerName: ev.playerName, extra: { shots: -1, shotsOnTarget: -1, [GOAL_STAT[ev.goalType ?? 'open']]: -1 } };
-    else if (ev.type === 'yellow' && pid) attribution = { playerId: pid, stat: 'yellowCards', by: -1, playerName: ev.playerName };
-    else if (ev.type === 'red' && pid) attribution = { playerId: pid, stat: 'redCards', by: -1, playerName: ev.playerName };
-    else if (ev.type === 'sinbin' && pid) attribution = { playerId: pid, stat: 'sinBins', by: -1, playerName: ev.playerName };
-    const out: ScoreAction[] = [{ type: 'REMOVE_EVENT', payload: { id: ev.id, target: 'event' }, attribution }];
-    // A goal's assist is a separate log entry keyed to the goal's `secondName` —
-    // reverse the assister's tally too so an edit/remove leaves no phantom assist.
-    if (ev.type === 'goal' && ev.secondName) {
-      const aid = ev.secondId ?? rosterId(ev.secondName);
-      if (aid) out.push({ type: 'REMOVE_EVENT', payload: { id: -1, target: 'stat' }, attribution: { playerId: aid, stat: 'assists', by: -1, playerName: ev.secondName } });
-    }
+    // SD-30: the id on the event (new logs) wins over a name lookup; the
+    // reversal names the player by id only (IDs-only scoring)
+    const out = eventRemoval(ev, rosterId);
     const red = withPair ? pairedRed(ev) : undefined;
     if (red) out.push(...removalActions(red, false));
     return out;
   };
   const removeEvent = (ev: FootballEvent) => { for (const a of removalActions(ev)) dispatch(a); };
-  const statRemoval = (st: StatEvent): ScoreAction => {
-    const key = STAT_KEY[st.kind];
-    const extra: Record<string, number> | undefined =
-      st.kind === 'shot' && st.onTarget && !st.blocked ? { shotsOnTarget: -1 } : st.kind === 'pass' && st.complete ? { passesComplete: -1 } : undefined;
-    const attribution = st.playerId && key ? { playerId: st.playerId, stat: key, by: -1, playerName: st.playerName, extra } : undefined;
-    return { type: 'REMOVE_EVENT', payload: { id: st.id, target: 'stat' }, attribution };
-  };
+  const statRemoval = (st: StatEvent): ScoreAction => statRemovalAction(st);
   const removeStat = (st: StatEvent) => dispatch(statRemoval(st));
-  // What else a ✕ takes with it, for the confirm sheet.
+  // What else a ✕ takes with it, for the confirm sheet (`ev`: a named event).
   const removeDetail = (ev: FootballEvent): string | undefined => {
     const bits = [
       ev.type === 'goal' ? `The score goes back to ${ev.side === 'home' ? `${state.home - 1}-${state.away}` : `${state.home}-${state.away - 1}`}` : undefined,
-      ev.type === 'goal' && ev.secondName ? `${ev.secondName}'s assist goes with it` : undefined,
+      ev.type === 'goal' && ev.secondName ? `${ev.secondName}'s assist goes with it` : ev.type === 'goal' && ev.secondId ? 'the assist goes with it' : undefined,
       pairedRed(ev) ? 'the second-yellow red goes with it (he is back to one yellow)' : undefined,
     ].filter(Boolean);
     return bits.length ? `${bits.join('; ')}. Player stats re-adjust.` : undefined;
@@ -465,11 +444,8 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
       const n = accumulatedFouls(state, side) + 1;
       setAfAlert(n > FUTSAL_FOUL_LIMIT ? { side, n, half: state.half } : null);
     }
-    fire({
-      type: 'STAT', side,
-      payload: { kind: 'foul', possSide: opp(side), at: Date.now(), playerName: fouler.fullName, ...(victim ? { secondName: victim.fullName } : {}) },
-      attribution: { playerId: fouler.id, stat: 'fouls', playerName: fouler.fullName, tracked: trackedKeys() },
-    });
+    // IDs-only scoring: the fouled player by id (`secondId`)
+    fire(foulAction(side, fouler, victim, { at: Date.now(), tracked: trackedKeys() }));
     setFlow(t.cards ? { mode: 'foul', step: 'card', side, fouler } : null);
   };
 
@@ -489,25 +465,16 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
   // SD-09: who started for a side — the lineup's starters and keeper (the GK
   // slot, else a starter listed as a GK), or with no lineup the squad's keeper —
   // plus every squad keeper, so one coming off the bench is recognised.
-  const xiStamp = (side: 'home' | 'away'): XiStamp => {
-    const roster = rosterOf(side);
-    const byId = new Map(roster.map((p) => [p.id, p]));
-    const slots = lineupOf(side).filter((sl) => sl.playerId);
-    const players = slots.map((sl) => ({ id: sl.playerId!, name: byId.get(sl.playerId!)?.fullName ?? sl.playerName ?? '' }));
-    const keepers = roster.filter((p) => isGoalkeeper(p.sportDetails?.football?.position)).map((p) => ({ id: p.id, name: p.fullName }));
-    const gkSlot = slots.find((sl) => sl.position === 'GK');
-    const gk = gkSlot ? players.find((p) => p.id === gkSlot.playerId)
-      : players.length ? players.find((p) => keepers.some((k) => k.id === p.id))
-      : keepers[0];
-    return { ...(gk ? { gk } : {}), players, keepers };
-  };
+  // IDs-only scoring: the stamp carries player ids only (./actions.ts).
+  const xiStamp = (side: 'home' | 'away'): XiStamp =>
+    xiOf(lineupOf(side), rosterOf(side).filter((p) => isGoalkeeper(p.sportDetails?.football?.position)).map((p) => p.id));
   // Log the stamp when it's new or the lineup changed since (latest wins).
   const stampXi = () => {
     for (const side of ['home', 'away'] as const) {
       const stamp = xiStamp(side);
       if (!stamp.gk && !stamp.players?.length) continue;
       if (JSON.stringify(stamp) === JSON.stringify(state.xi?.[side])) continue;
-      dispatch({ type: 'XI', payload: { team: side, ...stamp } });
+      dispatch(xiAction(side, stamp));
     }
   };
   // Kickoff: the opening one turns on FIFA ordinal minutes (SD-08) and stamps the XIs.
@@ -735,7 +702,7 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
           {sub.off && (
             <>
               <Text style={ctrl.meta}>Player ON (from the bench){state.subType === 'fixed' ? ' — withdrawn players unavailable' : ''}:</Text>
-              <PlayerTable players={benchOf(sub.side)} onPick={(p) => { fire({ type: 'SUB', side: sub.side, payload: { offName: sub.off!.fullName, onName: p.fullName, offId: sub.off!.id, onId: p.id } }); setSub(null); }} />
+              <PlayerTable players={benchOf(sub.side)} onPick={(p) => { fire(subAction(sub.side, sub.off!, p)); setSub(null); }} />
             </>
           )}
         </View>
@@ -892,7 +859,7 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
         const refine = (nextType: GoalType, nextBody?: BodyPart) => {
           // (SD-30: the undone goal's credits are reversed, as a removal does)
           if (nextType === gt && nextBody === bp) return;
-          if (flow.logged) { dispatch({ type: 'UNDO_GOAL', side: flow.side, attribution: { playerId: flow.scorer.id, stat: 'goals', by: -1, playerName: flow.scorer.fullName, extra: { shots: -1, shotsOnTarget: -1, [GOAL_STAT[flow.goalType ?? 'open']]: -1 } } }); recordGoal(flow.side, flow.scorer, nextType, nextBody); }
+          if (flow.logged) { dispatch(undoGoalAction(flow.side, flow.scorer, flow.goalType ?? 'open')); recordGoal(flow.side, flow.scorer, nextType, nextBody); }
           setFlow({ mode: 'goal', side: flow.side, step: 'assist', scorer: flow.scorer, goalType: nextType, bodyPart: nextBody, logged: flow.logged });
         };
         const typeChips: { label: string; t: GoalType; b?: BodyPart }[] = [
@@ -1059,7 +1026,7 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
     if (flow.step === 'official') {
       const { side } = flow;
       const sideName = side === 'home' ? homeName : awayName;
-      return panel(`👔 Card — ${sideName} team official`, 'Name (optional), then the card. Not a player: no stat line, nobody leaves the pitch.', (
+      return panel(`👔 Card — ${sideName} team official`, 'Their role (optional, e.g. Head coach — public, so not a name), then the card. Not a player: no stat line, nobody leaves the pitch.', (
         <View style={{ gap: theme.spacing(2) }}>
           <TextField label="" value={officialName} onChange={setOfficialName} placeholder="e.g. Head coach" />
           <View style={ctrl.row}>
@@ -1280,8 +1247,8 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
         </View>
         {showEdit && (() => {
           const items = [
-            ...state.events.map((e) => ({ key: `e${e.id}`, minute: e.minute, half: eventHalf(e, fmt), order: e.id, label: `${EVENT_META[e.type].icon} ${EVENT_META[e.type].label}${e.type === 'sub' ? ` — ${e.secondName ?? ''} for ${e.playerName ?? ''}` : e.type === 'timeout' || e.type === 'nogoal' ? ` — ${nameOf(e.side)}` : e.playerName ? ` — ${e.playerName}` : ''}${e.official ? ' (team official)' : ''}`, onRemove: () => removeEvent(e), detail: removeDetail(e), onEdit: e.type === 'timeout' || e.type === 'nogoal' || e.type === 'stoppage' ? undefined : () => editEvent(e) })),
-            ...state.stats.map((st) => ({ key: `s${st.id}`, minute: st.minute, half: eventHalf(st, fmt), order: st.id, label: `${STAT_META[st.kind].icon} ${STAT_META[st.kind].label}${st.playerName ? ` — ${st.playerName}` : ''}`, onRemove: () => removeStat(st), detail: undefined as string | undefined, onEdit: () => editStat(st) })),
+            ...named.events.map((e) => ({ key: `e${e.id}`, minute: e.minute, half: eventHalf(e, fmt), order: e.id, label: `${EVENT_META[e.type].icon} ${EVENT_META[e.type].label}${e.type === 'sub' ? ` — ${e.secondName ?? ''} for ${e.playerName ?? ''}` : e.type === 'timeout' || e.type === 'nogoal' ? ` — ${nameOf(e.side)}` : e.playerName ? ` — ${e.playerName}` : ''}${e.official ? ' (team official)' : ''}`, onRemove: () => removeEvent(e), detail: removeDetail(e), onEdit: e.type === 'timeout' || e.type === 'nogoal' || e.type === 'stoppage' ? undefined : () => editEvent(e) })),
+            ...named.stats.map((st) => ({ key: `s${st.id}`, minute: st.minute, half: eventHalf(st, fmt), order: st.id, label: `${STAT_META[st.kind].icon} ${STAT_META[st.kind].label}${st.playerName ? ` — ${st.playerName}` : ''}`, onRemove: () => removeStat(st), detail: undefined as string | undefined, onEdit: () => editStat(st) })),
           ].sort(byMatchTimeDesc);
           if (items.length === 0) return <Text style={ctrl.meta}>Nothing logged yet.</Text>;
           return (
@@ -1481,6 +1448,7 @@ function ShootoutControls({
 }) {
   const [taker, setTaker] = useState<Player | null>(null);
   const [keeper, setKeeper] = useState<Player | null>(null);
+  const { nameOf: playerNameOf } = useMask();
   const [pickKeeper, setPickKeeper] = useState(false);
   const kicksSoFar = (state.shootout?.home.length ?? 0) + (state.shootout?.away.length ?? 0);
   // a new kick starts with nobody picked
@@ -1515,15 +1483,9 @@ function ShootoutControls({
   const minTaken = Math.min(...takers[nextSide].map((p) => taken.get(p.id) ?? 0), Infinity);
   const takerList = [...takers[nextSide]].sort((a, b) => (taken.get(a.id) ?? 0) - (taken.get(b.id) ?? 0));
   const facing = keeper ?? keepers[otherSide] ?? null;
-  const kick = (outcome: 'scored' | 'saved' | 'missed') => dispatch({
-    type: 'PEN', side: nextSide,
-    payload: {
-      scored: outcome === 'scored', outcome,
-      ...(taker ? { takerId: taker.id, takerName: taker.fullName } : {}),
-      ...(facing ? { keeperId: facing.id, keeperName: facing.fullName } : {}),
-    },
-  });
-  const list = (side: 'home' | 'away') => kicks.filter((k) => k.side === side).map(kickText).join(' · ');
+  // IDs-only scoring: the taker and keeper by id (./actions.ts)
+  const kick = (outcome: 'scored' | 'saved' | 'missed') => dispatch(penKickAction(nextSide, outcome, taker, facing));
+  const list = (side: 'home' | 'away') => kicks.filter((k) => k.side === side).map((k) => kickText(nameRow(k, playerNameOf))).join(' · ');
   return (
     <View style={{ gap: theme.spacing(3) }}>
       <Text style={ctrl.label}>🥅 Penalty shootout — {pens.home} : {pens.away}</Text>
@@ -1586,7 +1548,8 @@ const LiveClock: NonNullable<SportPlugin<FootballState>['LiveClock']> = ({ state
   const running = s.gc ? gcRun && !!s.startedAt && !gcTimeUp(s, Date.now()) : !!s.startedAt && !s.ended;
   const label = s.ended ? 'FT' : !s.startedAt ? (s.half === 2 ? 'HT' : '—') : clockTime(s);
   // SD-29: sin-bins running now + players on the pitch when a side is short.
-  const live = s.ended ? null : footballLiveField(s, Date.now());
+  const { nameOf } = useMask();
+  const live = s.ended ? null : footballLiveField(s, Date.now(), nameOf);
   return (
     <View style={{ alignItems: 'center', gap: theme.spacing(1) }}>
       <View style={ctrl.clockRow}>
@@ -1621,7 +1584,8 @@ const FootballLineups = ({ state, homeName, awayName, homeColor, awayColor, home
 /** Commentary: minute-by-minute by half with the running score ("Key events"
  *  keeps goals, cards, subs, penalties). */
 const FootballCommentary = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster, onPlayer }: TabProps) => {
-  const s = state as FootballState;
+  const { nameOf } = useMask();
+  const s = useMemo(() => withNames(state as FootballState, nameOf), [state, nameOf]);
   return (
     <Commentary items={footballFeed(s, { home: homeName, away: awayName })} labelOf={FOOTBALL_PERIOD_LABEL} periods={footballFeedPeriods(s)}
       homeName={homeName} awayName={awayName} homeColor={homeColor ?? theme.colors.home} awayColor={awayColor ?? theme.colors.away}
@@ -1634,15 +1598,19 @@ const FootballCommentary = ({ state, homeName, awayName, homeColor, awayColor, h
  *  side's player box score (SD-23 / FB-09). */
 const FootballStats = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster, onPlayer }: TabProps) => {
   const s = state as FootballState;
-  return <MatchCentre sport="football" source={footballCentreSource(s, { homeRoster, awayRoster, homeName, awayName })} categories={footballCentre} homeName={homeName} awayName={awayName} homeColor={homeColor ?? theme.colors.home} awayColor={awayColor ?? theme.colors.away} onPlayer={onPlayer} />;
+  const { nameOf } = useMask();
+  return <MatchCentre sport="football" source={footballCentreSource(s, { homeRoster, awayRoster, homeName, awayName, nameOf })} categories={footballCentre} homeName={homeName} awayName={awayName} homeColor={homeColor ?? theme.colors.home} awayColor={awayColor ?? theme.colors.away} onPlayer={onPlayer} />;
 };
 
 /** Summary: the scorers, sendings-off, half-time and shoot-out lines
  *  (possession is a stat — it stays on Stats). */
-const FootballFacts = ({ state, homeName, awayName, homeColor, awayColor }: TabProps) => (
-  <MatchFactsCard facts={resultFacts(footballFacts(state as FootballState, Date.now()))}
-    homeName={homeName} awayName={awayName} homeColor={homeColor ?? theme.colors.home} awayColor={awayColor ?? theme.colors.away} />
-);
+const FootballFacts = ({ state, homeName, awayName, homeColor, awayColor }: TabProps) => {
+  const { nameOf } = useMask();
+  return (
+    <MatchFactsCard facts={resultFacts(footballFacts(state as FootballState, Date.now(), nameOf))}
+      homeName={homeName} awayName={awayName} homeColor={homeColor ?? theme.colors.home} awayColor={awayColor ?? theme.colors.away} />
+  );
+};
 
 /** Football's pitch as the generic Court (positions mirrored per side). */
 const Court: NonNullable<SportPlugin<FootballState>['Court']> = ({ homeLineup, awayLineup, homeColor, awayColor }) => (

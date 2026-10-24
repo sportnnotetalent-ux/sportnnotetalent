@@ -56,9 +56,11 @@ export interface HockeyEvent {
   /** scorer / shooter / stroke taker / keeper who saved / carded player /
    *  sub off / new keeper */
   playerId?: string;
+  /** @deprecated legacy, read-only — IDs-only logs (docs/privacy/ids-only-scoring.md) keep the id; the name is looked up when shown (invasion/names.ts) */
   playerName?: string;
   /** assist (goal) / sub on */
   secondId?: string;
+  /** @deprecated legacy, read-only — IDs-only logs (docs/privacy/ids-only-scoring.md) keep the id; the name is looked up when shown (invasion/names.ts) */
   secondName?: string;
   goalType?: GoalType;
   /** shot: on goal (the keeper saved it) — false = off target / blocked */
@@ -99,14 +101,14 @@ export interface CircleEntry { side: Side; sec: number; period: number }
 /** `outcome` / keeper (deep wave, new logs only): a miss saved by the keeper
  *  or missed (wide / foul / out of time); older kicks carry `scored` only. */
 export interface SoKick {
-  scored: boolean; playerId?: string; playerName?: string;
+  scored: boolean; playerId?: string; /** @deprecated legacy, read-only */ playerName?: string;
   outcome?: 'scored' | 'saved' | 'missed';
-  keeperId?: string; keeperName?: string;
+  keeperId?: string; /** @deprecated legacy, read-only */ keeperName?: string;
 }
 
 export interface XiStamp {
-  players?: { id: string; name: string }[];
-  gk?: { id: string; name: string };
+  players?: { id: string; /** @deprecated legacy, read-only */ name?: string }[];
+  gk?: { id: string; /** @deprecated legacy, read-only */ name?: string };
 }
 
 export interface HockeyState {
@@ -269,7 +271,7 @@ export function creditAttribution(c: Credit | undefined, sign = 1, tracked?: str
   if (!entries.length) return undefined;
   const [[stat, by], ...rest] = entries;
   return {
-    playerId: c.playerId, stat, by: by * sign, ...(c.playerName ? { playerName: c.playerName } : {}),
+    playerId: c.playerId, stat, by: by * sign, // IDs-only scoring: never the name
     ...(rest.length ? { extra: Object.fromEntries(rest.map(([k, v]) => [k, v * sign])) } : {}),
     ...(tracked ? { tracked } : {}),
   };
@@ -355,10 +357,10 @@ export const reducer = (s: HockeyState, a: ScoreAction): HockeyState => {
       const team = a.payload?.team;
       if (team !== 'home' && team !== 'away') return s;
       const players = Array.isArray(a.payload?.players)
-        ? (a.payload!.players as { id?: string; name?: string }[]).filter((x) => x?.id).map((x) => ({ id: String(x.id), name: String(x.name ?? '') }))
+        ? (a.payload!.players as { id?: string; name?: string }[]).filter((x) => x?.id).map((x) => ({ id: String(x.id), ...(x.name !== undefined ? { name: String(x.name ?? '') } : {}) }))
         : undefined;
       const gk = a.payload?.gk as { id?: string; name?: string } | undefined;
-      const stamp: XiStamp = { ...(players ? { players } : {}), ...(gk?.id ? { gk: { id: String(gk.id), name: String(gk.name ?? '') } } : {}) };
+      const stamp: XiStamp = { ...(players ? { players } : {}), ...(gk?.id ? { gk: { id: String(gk.id), ...(gk.name !== undefined ? { name: String(gk.name ?? '') } : {}) } } : {}) };
       return { ...s, xi: { ...s.xi, [team]: stamp } };
     }
     case 'GOAL': {
@@ -441,7 +443,7 @@ export const reducer = (s: HockeyState, a: ScoreAction): HockeyState => {
     case 'GK': {
       // a new goalkeeper for the side (id + name in the payload)
       if (!side || !a.payload?.id) return s;
-      return push(s, { type: 'gk', side, playerId: String(a.payload.id), playerName: String(a.payload.name ?? '') });
+      return push(s, { type: 'gk', side, playerId: String(a.payload.id), ...(a.payload.name !== undefined ? { playerName: String(a.payload.name ?? '') } : {}) });
     }
     case 'REMOVE_EVENT': {
       const id = String(a.payload?.id ?? '');

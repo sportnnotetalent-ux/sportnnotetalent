@@ -17,6 +17,7 @@
  */
 import { trackField, timeLeft, type FieldEvent, type FieldLog, type FieldResult, type Who } from '../onField.ts';
 import { eventCredits, matchSec, pointsOf, trackedDetailKeys, LIVE_KEYS, type LeagueState, type Side } from './engine.ts';
+import { legacyNameOf, nameFor, type NameOf } from '../invasion/names.ts';
 
 const stamped = (s: LeagueState, side: Side): boolean => !!s.xi?.[side]?.players?.length;
 
@@ -52,14 +53,15 @@ export const leagueField = (s: LeagueState, upTo?: number): FieldResult => track
 
 /** For the live banner: who is in the sin bin (time left on the playing
  *  clock) and how many players each side has. */
-export function leagueLiveField(s: LeagueState, nowMs: number): {
+/** IDs-only scoring: `nameOf` names the suspended players by id for this viewer. */
+export function leagueLiveField(s: LeagueState, nowMs: number, nameOf: NameOf = legacyNameOf): {
   suspended: { side: Side; name: string; left: string; id?: string }[];
   onField: { home: number; away: number };
   short: { home: number; away: number };
 } {
   const now = matchSec(s, nowMs) / 60;
   const r = leagueField(s, now);
-  const suspended = s.ended ? [] : r.suspended.map((x) => ({ side: x.side, name: x.name ?? 'Player', left: timeLeft(x.until, now), ...(x.id ? { id: x.id } : {}) }));
+  const suspended = s.ended ? [] : r.suspended.map((x) => ({ side: x.side, name: nameFor(nameOf, x.id, x.name) ?? 'Player', left: timeLeft(x.until, now), ...(x.id ? { id: x.id } : {}) }));
   const count = (side: Side) => {
     const allowed = Math.max(0, s.playersPerSide - r.short[side]);
     return stamped(s, side) ? Math.min(r.onField[side].length, allowed) : allowed;

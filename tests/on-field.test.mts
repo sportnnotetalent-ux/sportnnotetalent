@@ -334,7 +334,7 @@ describe('SD-29 · football sin-bin (optional format)', () => {
     const t0 = s.startedAt!;
     s = run(s, sin('home', 21, 1, 'h1', 20 * 60 + 30)); // 20:30
     const live = footballLiveField(s, t0 + (25 * 60 + 6) * 1000); // 25:06
-    assert.deepEqual(live.suspended, [{ side: 'home', name: 'H1', left: '5:24' }]);
+    assert.deepEqual(live.suspended, [{ side: 'home', id: 'h1', name: 'H1', left: '5:24' }]);
     assert.deepEqual(live.onPitch, { home: 2, away: 3 });
     assert.deepEqual(live.short, { home: 1, away: 0 });
     const back = footballLiveField(s, t0 + (30 * 60 + 31) * 1000);
@@ -469,7 +469,7 @@ describe('SD-29 · football sin-bin without a lineup', () => {
     let s = run(fbInit({ sinBinMinutes: 10 }), KO);
     s = run(s, { type: 'SUSPEND', side: 'home', payload: { minute: 1, half: 1, sec: 20 }, attribution: { playerId: 'h1', stat: 'sinBins', playerName: 'H1' } });
     const live = footballLiveField(s, s.startedAt! + 60_000);
-    assert.deepEqual(live.suspended, [{ side: 'home', name: 'H1', left: '9:20' }]);
+    assert.deepEqual(live.suspended, [{ side: 'home', id: 'h1', name: 'H1', left: '9:20' }]);
     assert.equal(live.onPitch, null);
     assert.deepEqual(footballTotals(run(s, HT, END)), {});
   });
