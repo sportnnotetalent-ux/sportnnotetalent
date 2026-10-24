@@ -10,22 +10,41 @@
  * technical points / cards and the plain timeline lines — so a raid edited or
  * removed re-derives the whole feed. Older logs read as they were scored
  * (no skill / touched names, never invented ones).
+ *
+ * IDs-only scoring (docs/privacy/ids-only-scoring.md): the log names players
+ * by id; `names.nameOf` gives this viewer's name (the squads fill in when no
+ * lookup is given; an older log's stored name is the fallback, and without a
+ * lookup its text reads as before).
  */
 import type { KabaddiState, KabaddiEvent, RaidEntry, ExtraEntry } from './engine.ts';
 import { extrasOf, isShootoutEvent, perRaidByIndex, replayOf, raidSkillLabel, tackleTypeLabel, techReasonLabel, halfLabel } from './engine.ts';
 import { YELLOW_MINUTES, type RaidBreakdown } from './rules.ts';
 import { joinNames, plural, type FeedEntry, type FeedGroup, type Side } from '../netraid/feed.ts';
+import { extraName, raiderName, subPlayers, tacklerName, touchedName, whoName, withRosters, type NameOf, type RosterLike } from './names.ts';
 
 const other = (s: Side): Side => (s === 'home' ? 'away' : 'home');
 const SCORING = new Set(['raid', 'tackle', 'allout', 'tech', 'lineout']);
 
-export interface KbNames { home: string; away: string }
+export interface KbNames {
+  home: string;
+  away: string;
+  /** IDs-only scoring: a player's name for this viewer by id */
+  nameOf?: NameOf;
+  /** the squads (names by id when no `nameOf` is given) */
+  homeRoster?: RosterLike[];
+  awayRoster?: RosterLike[];
+}
+
+/** The viewer's lookup, with the squads behind it. */
+const lookup = (names: KbNames): NameOf => withRosters(names.nameOf, names.homeRoster, names.awayRoster);
 
 /** The sentence + tags for one guided raid (pure, unit-tested). */
 export function raidSentence(r: RaidEntry, b: RaidBreakdown, n: number, names: KbNames): { text: string; tags: string[] } {
   const T = names[r.side];
   const O = names[other(r.side)];
-  const who = r.raider ? `${r.raider} (${T})` : `${T} raider`;
+  const nm = lookup(names);
+  const raider = raiderName(nm, r);
+  const who = raider ? `${raider} (${T})` : `${T} raider`;
   const tags: string[] = [];
   if (r.gr) tags.push('GOLDEN RAID');
   if (b.doOrDie) tags.push('DO-OR-DIE');
@@ -44,7 +63,8 @@ export function raidSentence(r: RaidEntry, b: RaidBreakdown, n: number, names: K
     if (b.defOutPts) parts.push(`${plural(b.defOutPts, 'defender')} stepped out (+${b.defOutPts})`);
     if (b.raiderOut) {
       const how = r.tt ? ` with ${(tackleTypeLabel(r.tt) ?? r.tt).toLowerCase()}` : '';
-      const by = r.tackler ? `${r.tackler} (${O})` : O;
+      const tackler = tacklerName(nm, r);
+      const by = tackler ? `${tackler} (${O})` : O;
       parts.push(b.superTackle ? `SUPER TACKLE by ${by}${how} (+2)` : `tackled by ${by}${how}`);
       if (b.superTackle) tags.push('SUPER TACKLE');
     }
@@ -58,11 +78,12 @@ export function raidSentence(r: RaidEntry, b: RaidBreakdown, n: number, names: K
 function extraSentence(x: ExtraEntry, pts: number, names: KbNames): string {
   const T = names[x.side];
   const O = names[other(x.side)];
+  const p = extraName(lookup(names), x);
   if (x.x === 'tech') {
     const r = x.reason ? ` — ${(techReasonLabel(x.reason) ?? x.reason).toLowerCase()}` : '';
-    return `Technical point to ${T} (+${pts})${r}${x.playerName ? `; ${x.playerName} (${O}) at fault` : ''}`;
+    return `Technical point to ${T} (+${pts})${r}${p ? `; ${p} (${O}) at fault` : ''}`;
   }
-  const who = x.official ? `${T} team official` : x.playerName ? `${x.playerName} (${T})` : `a ${T} player`;
+  const who = x.official ? `${T} team official` : p ? `${p} (${T})` : `a ${T} player`;
   const c = x.card ?? 'green';
   const what = c === 'green' ? 'warning' : c === 'yellow' ? `${YELLOW_MINUTES}-minute suspension` : 'sent off for the match';
   return `${c[0].toUpperCase()}${c.slice(1)} card — ${who}: ${what}${pts ? `; technical point to ${O}` : ''}`;
@@ -71,6 +92,9 @@ function extraSentence(x: ExtraEntry, pts: number, names: KbNames): string {
 /** The commentary, newest group first; inside a group, newest moment first. */
 export function kabaddiCommentary(s: KabaddiState, names: KbNames): FeedGroup[] {
   if (!s || !Array.isArray(s.events)) return [];
+  // IDs-only scoring: every player by id (an older log's stored name as the fallback)
+  const nm = lookup(names);
+  const named: KbNames = { ...names, nameOf: nm, homeRoster: undefined, awayRoster: undefined };
   const raids = s.raids ?? [];
   const per = perRaidByIndex(replayOf(s));
   const raidAt = new Map<number, number>();
@@ -112,21 +136,23 @@ export function kabaddiCommentary(s: KabaddiState, names: KbNames): FeedGroup[] 
       const b = per[ri];
       if (!b || raid.hidden) continue;
       raidNo += 1;
-      const { text, tags } = raidSentence(raid, b, raidNo, names);
+      const { text, tags } = raidSentence(raid, b, raidNo, named);
       // milestones: a raider's 10th raid point / a defender's 5th tackle point
       const rk = `${raid.side}|${raid.raiderId ?? raid.raider ?? ''}`;
-      if (raid.raider && b.raidPts) {
+      if ((raid.raiderId || raid.raider) && b.raidPts) {
         const before = raidPts.get(rk) ?? 0;
         raidPts.set(rk, before + b.raidPts);
-        if (before < 10 && before + b.raidPts >= 10) tags.push(`SUPER 10 — ${raid.raider.toUpperCase()}`);
+        const who = raiderName(nm, raid);
+        if (before < 10 && before + b.raidPts >= 10) tags.push(who ? `SUPER 10 — ${who.toUpperCase()}` : 'SUPER 10');
       }
-      if (raid.tackler && b.raiderOut && !b.doOrDieFail && !b.lineOut && b.tacklePts) {
+      if ((raid.tacklerId || raid.tackler) && b.raiderOut && !b.doOrDieFail && !b.lineOut && b.tacklePts) {
         const tk = `${other(raid.side)}|${raid.tacklerId ?? raid.tackler}`;
         const before = tklPts.get(tk) ?? 0;
         tklPts.set(tk, before + b.tacklePts);
-        if (before < 5 && before + b.tacklePts >= 5) tags.push(`HIGH 5 — ${raid.tackler.toUpperCase()}`);
+        const who = tacklerName(nm, raid);
+        if (before < 5 && before + b.tacklePts >= 5) tags.push(who ? `HIGH 5 — ${who.toUpperCase()}` : 'HIGH 5');
       }
-      const touched = (raid.touched ?? []).slice(0, b.touchPts).map((p) => p.name);
+      const touched = (raid.touched ?? []).slice(0, b.touchPts).map((p) => touchedName(nm, p) ?? '');
       const mat = b.matAfter && s.style !== 'amar' ? `On the mat: ${names.home} ${b.matAfter.home} · ${names.away} ${b.matAfter.away}` : null;
       const chance = b.stChance && !b.superTackle && !b.doOrDieFail ? `Super tackle on (${plural(b.defBefore ?? 0, 'defender')})` : null;
       const detail = [touched.length ? `Touched: ${joinNames(touched)}` : null, chance, mat].filter(Boolean).join(' · ');
@@ -139,22 +165,23 @@ export function kabaddiCommentary(s: KabaddiState, names: KbNames): FeedGroup[] 
     const x = head.group != null ? extras.get(m.key) : undefined;
     if (x) {
       const pts = m.lines.reduce((t, e) => t + (e.kind === 'tech' ? e.points ?? 0 : 0), 0);
-      g.entries.push({ id: `x${x.eid}`, stamp, icon: head.icon, side: x.side, score: sc, text: extraSentence(x, pts, names), ...(x.x === 'card' && x.card !== 'green' ? { key: true, tags: [`${x.card!.toUpperCase()} CARD`] } : {}) });
+      g.entries.push({ id: `x${x.eid}`, stamp, icon: head.icon, side: x.side, score: sc, text: extraSentence(x, pts, named), ...(x.x === 'card' && x.card !== 'green' ? { key: true, tags: [`${x.card!.toUpperCase()} CARD`] } : {}) });
       continue;
     }
     if (!head.side) continue;
     const T = names[head.side];
+    const credited = whoName(nm, head.playerId, head.playerName);
     if (shoot) {
-      g.entries.push({ id: `so${head.id}`, stamp, icon: '🎯', side: head.side, score: sc, key: true, text: `Shootout raid — ${head.playerName ? `${head.playerName} (${T})` : T}: ${head.points ? `+${head.points}` : 'no point'}` });
+      g.entries.push({ id: `so${head.id}`, stamp, icon: '🎯', side: head.side, score: sc, key: true, text: `Shootout raid — ${credited ? `${credited} (${T})` : T}: ${head.points ? `+${head.points}` : 'no point'}` });
     } else if (head.kind === 'timeout') {
       g.entries.push({ id: `t${head.id}`, stamp, icon: '⏱️', side: head.side, score: sc, text: `Timeout ${T}` });
     } else if (head.kind === 'sub') {
-      const mm = /^(.*?)\s*⬆\s+(.*?)\s*⬇$/.exec(head.detail ?? '');
-      g.entries.push({ id: `s${head.id}`, stamp, icon: '🔄', side: head.side, score: sc, text: mm ? `Substitution ${T}: ${mm[1]} in for ${mm[2]}${head.ret ? ' (returns)' : ''}` : `Substitution ${T}` });
+      const sp = subPlayers(head, nm);
+      g.entries.push({ id: `s${head.id}`, stamp, icon: '🔄', side: head.side, score: sc, text: sp ? `Substitution ${T}: ${sp.on} in for ${sp.off}${head.ret ? ' (returns)' : ''}` : `Substitution ${T}` });
     } else if (head.kind === 'raid' || head.kind === 'tackle') {
       // an old one-tap point, or a legacy line kept on the timeline
       const what = head.kind === 'raid' ? 'Raid point' : 'Tackle point';
-      g.entries.push({ id: `l${head.id}`, stamp, icon: head.icon, side: head.side, score: sc, text: `${what}${head.points && head.points > 1 ? `s (+${head.points})` : ''} ${T}${head.playerName ? ` — ${head.playerName}` : ''}` });
+      g.entries.push({ id: `l${head.id}`, stamp, icon: head.icon, side: head.side, score: sc, text: `${what}${head.points && head.points > 1 ? `s (+${head.points})` : ''} ${T}${credited ? ` — ${credited}` : ''}` });
     }
   }
   return [...groups.entries()]

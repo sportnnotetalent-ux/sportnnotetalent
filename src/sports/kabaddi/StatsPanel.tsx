@@ -1,7 +1,8 @@
 /**
  * Deep wave (volleyball-kabaddi) — kabaddi's match centre card (PKL depth):
  * Match / 1st half / 2nd half (/ extra time) filter, category chips, team-vs-
- * team rows (matchStats.ts), then each team's top raider and top defender.
+ * team rows (matchStats.ts), then each team's top raider and top defender
+ * (IDs-only scoring: named by id for this viewer — useMask().nameOf).
  */
 import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
@@ -9,16 +10,23 @@ import { theme } from '../../core/theme';
 import { CompareCard } from '../netraid/CompareCard';
 import { kabaddiMatchStats, type KbScope } from './matchStats';
 import type { KabaddiState } from './engine';
+import { useMask } from '../../core/disputeMask';
+import { withRosters, type RosterLike } from './names';
 
 const PERIOD = (h: number) => (h === 1 ? '1st half' : h === 2 ? '2nd half' : h === 3 ? 'ET 1' : 'ET 2');
 
-export function KabaddiStatsPanel({ state, homeName, awayName, homeColor = theme.colors.home, awayColor = theme.colors.away }: {
+export function KabaddiStatsPanel({ state, homeName, awayName, homeColor = theme.colors.home, awayColor = theme.colors.away, homeRoster, awayRoster }: {
   state: KabaddiState; homeName: string; awayName: string; homeColor?: string; awayColor?: string;
+  /** the squads (names by id behind the viewer's lookup) */
+  homeRoster?: RosterLike[]; awayRoster?: RosterLike[];
 }) {
   const [scope, setScope] = useState<KbScope>('all');
   const halves = Math.max(1, state.half ?? 1);
   const active: KbScope = scope !== 'all' && scope > halves ? 'all' : scope;
-  const st0 = useMemo(() => kabaddiMatchStats(state, active), [state, active]);
+  // IDs-only scoring: the top performers by id, named for this viewer
+  const { nameOf } = useMask();
+  const nm = useMemo(() => withRosters(nameOf, homeRoster, awayRoster), [nameOf, homeRoster, awayRoster]);
+  const st0 = useMemo(() => kabaddiMatchStats(state, active, nm), [state, active, nm]);
   if (st0.moments === 0 && active === 'all') return null;
   const scopes = [{ value: 'all' as const, label: 'Match' }, ...Array.from({ length: halves }, (_, i) => ({ value: i + 1, label: PERIOD(i + 1) }))];
   const leaderLine = (side: 'home' | 'away') => {

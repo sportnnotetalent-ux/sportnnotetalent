@@ -16,9 +16,18 @@
  * logged REMOVE_EVENT ids still point at the same moment). Its tackle / all-out
  * lines take fractional ids just above it (id + 0.1, + 0.2 …) and carry
  * `group` = the raid's id.
+ *
+ * IDs-only scoring (docs/privacy/ids-only-scoring.md): match state and events
+ * are public, so a new log names players by ID only — raider / tackler /
+ * touched defenders, the player at fault or carded, both players of a
+ * substitution, and every list that tracks players (subbed off, the revival
+ * queue, who is unavailable). Names are looked up when shown (names.ts). An
+ * older log's names are still read (legacy, read-only), so it replays and
+ * reads exactly as it was scored.
  */
 import type { LiveEvent } from '../liveEvents';
 import type { ScoreAction } from '../types';
+import { legacyNameOf, type NameOf } from '../../core/playerNames.ts';
 import { replayRaids, decideRaidShootout, YELLOW_MINUTES, type RaidOutcome, type ExtraOutcome, type KabaddiDerived, type KabaddiStyle, type KabaddiCfg, type RaidBreakdown, type Side } from './rules.ts';
 
 /** A raid in `raids[]`: the engine input plus who / when, for the timeline. */
@@ -29,8 +38,12 @@ export interface RaidEntry extends RaidOutcome {
   half?: number;
   /** logged as a Golden Raid (sudden death) */
   gr?: boolean;
+  /** @deprecated legacy, read-only (pre IDs-only scoring): the raider's name
+   *  as an older log stored it. New raids keep `raiderId` only. */
   raider?: string;
   raiderId?: string;
+  /** @deprecated legacy, read-only (pre IDs-only scoring): the tackler's name
+   *  as an older log stored it. New raids keep `tacklerId` only. */
   tackler?: string;
   tacklerId?: string;
   /** the single line value the pre-SD-03 reducer showed for this raid (frozen at
@@ -44,8 +57,17 @@ export interface RaidEntry extends RaidOutcome {
    *  skill" tracking — RAID_SKILLS key) */
   sk?: string;
   /** deep wave — the defenders touched, named (optional, "Defenders touched"
-   *  tracking): who went out — named revival order, a defender's times out */
-  touched?: { id?: string; name: string }[];
+   *  tracking): who went out — named revival order, a defender's times out.
+   *  IDs-only: `{ id }`; an older log's entry may carry the `name` (legacy,
+   *  read-only) — or only the name. */
+  touched?: TouchedRef[];
+}
+
+/** A defender touched on a raid: by id (an older log: `name`, legacy). */
+export interface TouchedRef {
+  id?: string;
+  /** @deprecated legacy, read-only (pre IDs-only scoring) */
+  name?: string;
 }
 
 /** SD-59 / SD-72 — a technical point or a card in `extras[]` (log order by
@@ -57,8 +79,11 @@ export interface ExtraEntry extends ExtraOutcome {
   half?: number;
   /** tech: TECH_REASONS key */
   reason?: string;
-  /** the player at fault (tech) / carded (card) */
+  /** @deprecated legacy, read-only (pre IDs-only scoring): the name of the
+   *  player at fault / carded as an older log stored it. New entries keep
+   *  `playerId` only. */
   playerName?: string;
+  /** the player at fault (tech) / carded (card) */
   playerId?: string;
   /** card: given to a coach / team official (no change on the mat) */
   official?: boolean;
@@ -110,8 +135,11 @@ export interface KabaddiTrack { skills?: true; touched?: true }
 export const TIMEOUTS_PER_HALF = 2;
 
 /** A timeline line; `group` ties a guided raid's lines together. `ret` (SD-117b)
- *  = a substitution that brought a previously substituted player back on. */
-export type KabaddiEvent = LiveEvent & { group?: number; ret?: string; card?: CardColour };
+ *  = a substitution that brought a previously substituted player back on (his
+ *  id; an older log: his name). IDs-only scoring: a new substitution names
+ *  the player coming off by `playerId` and the one coming on by `secondId`
+ *  (football's field, so appearances find him) — no names, no `detail`. */
+export type KabaddiEvent = LiveEvent & { group?: number; ret?: string; card?: CardColour; secondId?: string };
 
 export interface KabaddiState {
   home: number;
@@ -141,7 +169,8 @@ export interface KabaddiState {
   /** substitutions allowed per side (format: substitutes) */
   maxSubs: number;
   subsUsed: { home: number; away: number };
-  /** names taken off — they can't be credited points once subbed out */
+  /** players taken off — they can't be credited points once subbed out. IDs-
+   *  only scoring: player ids; an older log's entries are names (legacy). */
   subbedOff: { home: string[]; away: string[] };
   /** Pro-Kabaddi raid model (guided outcomes replayed for out-counts & revival). */
   style: KabaddiStyle;
@@ -214,16 +243,30 @@ function setTrack(s: KabaddiState, p: Record<string, unknown> | undefined): Kaba
   return { ...s, track: { ...(skills ? { skills: true as const } : null), ...(touched ? { touched: true as const } : null) } };
 }
 
-/** The touched defenders a raid form names (cleaned; at most `n`). */
+/** The touched defenders a raid form names (cleaned; at most `n`). IDs-only
+ *  scoring: a new raid names them by id; an older log's name is kept as it
+ *  was logged (legacy, read-only). */
 function touchedList(v: unknown, n: number): RaidEntry['touched'] | undefined {
   if (!Array.isArray(v) || n <= 0) return undefined;
   const out = v
     .map((x) => x as { id?: unknown; name?: unknown })
-    .filter((x) => x && typeof x.name === 'string' && x.name)
-    .map((x) => ({ ...(typeof x.id === 'string' && x.id ? { id: x.id } : null), name: String(x.name) }))
+    .filter((x) => x && ((typeof x.id === 'string' && x.id) || (typeof x.name === 'string' && x.name)))
+    .map((x) => ({ ...(typeof x.id === 'string' && x.id ? { id: x.id } : null), ...(typeof x.name === 'string' && x.name ? { name: x.name } : null) }))
     .slice(0, n);
   return out.length ? out : undefined;
 }
+
+/** A player's key in the lists that track players (subbed off, the revival
+ *  queue, unavailable): the id, else an older log's stored name. */
+export const playerKey = (id?: string | null, legacyName?: string | null): string | undefined => (id || undefined) ?? (legacyName || undefined);
+
+/** Is this player in a tracked list (an id, or an older log's name)? */
+export const listHas = (list: readonly (string | null | undefined)[] | undefined, p: { id?: string | null; fullName?: string | null; name?: string | null }): boolean =>
+  !!list && ((!!p.id && list.includes(p.id)) || (!!(p.fullName ?? p.name) && list.includes((p.fullName ?? p.name)!)));
+
+/** SD-117b — is this player off (substituted out) for `side`? */
+export const isSubbedOff = (s: KabaddiState, side: Side, p: { id?: string | null; fullName?: string | null; name?: string | null }): boolean =>
+  listHas(s.subbedOff?.[side], p);
 
 /** SD-117b — drop the pause mark (the clock stops / restarts). A state without
  *  one is returned as is, so older logs replay to exactly the same shape. */
@@ -304,19 +347,22 @@ export function expectedRaider(s: KabaddiState): Side | null {
   return prev.length ? other(prev[0].side) : null;
 }
 
-/** SD-117b — names of the players currently out, per side, as far as the log
- *  knows them. Defenders touched are anonymous places in the queue unless the
+/** SD-117b — the players currently out, per side, as far as the log knows
+ *  them. Defenders touched are anonymous places in the queue unless the
  *  match names them (deep wave "Defenders touched", KB-10); revival is first
  *  out, first in (the rules), and an all-out brings everyone back. Display
- *  only (the Raider chip dims them). */
+ *  only (the Raider chip dims them). IDs-only scoring: player ids (an older
+ *  log's name-only player by that name) — match with `listHas`. */
 export function outPlayers(s: KabaddiState): Record<Side, string[]> {
   const cfg = kabaddiCfg(s);
-  const q: Record<Side, (string | null)[]> = { home: [], away: [] };
+  type Ref = { id?: string; name?: string } | null;
+  const q: Record<Side, Ref[]> = { home: [], away: [] };
   if (cfg.style === 'amar') return { home: [], away: [] };
   const raids = raidsOf(s);
   const extras = extrasOf(s);
   const d = replayOf(s);
   const per = d.perRaid;
+  const ref = (id?: string, name?: string): Ref => (id || name ? { ...(id ? { id } : null), ...(name ? { name } : null) } : null);
   // perRaid holds only the raids replayed (in merged order)
   let ri = 0;
   for (const [kind, idx] of d.order) {
@@ -324,7 +370,9 @@ export function outPlayers(s: KabaddiState): Record<Side, string[]> {
       // SD-72: a player sent off while out leaves the revival queue
       const e = extras[idx];
       if (e?.x === 'card' && e.card === 'red' && e.player && e.wasOut) {
-        const at = e.playerName ? q[e.side].indexOf(e.playerName) : -1;
+        const at = e.playerId || e.playerName
+          ? q[e.side].findIndex((k) => !!k && ((!!e.playerId && k.id === e.playerId) || (!!e.playerName && k.name === e.playerName)))
+          : -1;
         q[e.side].splice(at >= 0 ? at : q[e.side].indexOf(null), at >= 0 || q[e.side].includes(null) ? 1 : 0);
       }
       continue;
@@ -335,16 +383,17 @@ export function outPlayers(s: KabaddiState): Record<Side, string[]> {
     const opp = other(r.side);
     const sent = b.touchPts + (b.defOutPts ?? 0);
     // deep wave: defenders touched by name (when tracked) join the queue named
-    for (let k = 0; k < sent; k++) q[opp].push(k < b.touchPts ? r.touched?.[k]?.name ?? null : null);
+    for (let k = 0; k < sent; k++) q[opp].push(k < b.touchPts ? ref(r.touched?.[k]?.id, r.touched?.[k]?.name) : null);
     if (cfg.style === 'sanjeevani') q[r.side].splice(0, sent);
     if (b.raiderOut) {
-      q[r.side].push(r.raider ?? null);
+      q[r.side].push(ref(r.raiderId, r.raider));
       if (cfg.style === 'sanjeevani') q[opp].splice(0, 1);
     }
     for (const side of ['home', 'away'] as const) if (q[side].length > cfg.teamSize) q[side] = q[side].slice(-cfg.teamSize);
     for (const t of b.allOuts) q[other(t)] = [];
   }
-  return { home: q.home.filter((n): n is string => !!n), away: q.away.filter((n): n is string => !!n) };
+  const keys = (xs: Ref[]) => xs.map((x) => (x ? playerKey(x.id, x.name) : undefined)).filter((k): k is string => !!k);
+  return { home: keys(q.home), away: keys(q.away) };
 }
 
 /** SD-72 — live on-mat figures (suspensions run on the clock `now`). */
@@ -356,12 +405,14 @@ export function matNow(s: KabaddiState, now: number = clockNow(s)): { onMat: Rec
   return { onMat: { home: onMat('home'), away: onMat('away') }, out: d.out, short: d.short, sentOff: d.sentOff };
 }
 
-/** SD-72 — a player's cards so far (by id or name). */
-export function cardsOf(s: KabaddiState, side: Side, who: { id?: string; name?: string }): Record<CardColour, number> {
+/** SD-72 — a player's cards so far (by id; an older log's card by name —
+ *  `fullName` / `name`, a squad player fits). */
+export function cardsOf(s: KabaddiState, side: Side, who: { id?: string; name?: string; fullName?: string }): Record<CardColour, number> {
   const c = { green: 0, yellow: 0, red: 0 };
+  const name = who.fullName ?? who.name;
   for (const e of extrasOf(s)) {
     if (e.x !== 'card' || e.side !== side || !e.card || e.official) continue;
-    if ((who.id && e.playerId === who.id) || (who.name && e.playerName === who.name)) c[e.card] += 1;
+    if ((who.id && e.playerId === who.id) || (name && e.playerName === name)) c[e.card] += 1;
   }
   return c;
 }
@@ -375,25 +426,44 @@ export function suggestedCard(c: Record<CardColour, number>): CardColour | null 
   return null;
 }
 
+/** SD-72 — who can't play now (`unavailable`): the player by id (an older
+ *  log's name-only player: `name`), keyed by `key` = id, else that name. */
+export interface Unavailable {
+  key: string;
+  id?: string;
+  /** @deprecated legacy, read-only: an older log's stored name */
+  name?: string;
+  why: 'red' | 'yellow';
+  until?: number;
+}
+
 /** SD-72 — players who can't play now: sent off (red) or serving a yellow
- *  (running, or waiting for their revival). Names, per side. */
-export function unavailable(s: KabaddiState, now: number = clockNow(s)): Record<Side, { name: string; why: 'red' | 'yellow'; until?: number }[]> {
-  const out: Record<Side, { name: string; why: 'red' | 'yellow'; until?: number }[]> = { home: [], away: [] };
+ *  (running, or waiting for their revival), per side. IDs-only scoring: by
+ *  player id (an older log's name as the fallback key) — match with
+ *  `unavailableOf`. */
+export function unavailable(s: KabaddiState, now: number = clockNow(s)): Record<Side, Unavailable[]> {
+  const out: Record<Side, Unavailable[]> = { home: [], away: [] };
   const extras = extrasOf(s);
   const per = replayOf(s).perExtra;
-  const reds = new Set(extras.filter((e) => e.x === 'card' && e.card === 'red' && e.player && e.playerName).map((e) => `${e.side}|${e.playerName}`));
+  const keyOf = (e: ExtraEntry) => playerKey(e.playerId, e.playerName);
+  const who = (e: ExtraEntry, key: string) => ({ key, ...(e.playerId ? { id: e.playerId } : null), ...(e.playerName ? { name: e.playerName } : null) });
+  const reds = new Set(extras.filter((e) => e.x === 'card' && e.card === 'red' && e.player && keyOf(e)).map((e) => `${e.side}|${keyOf(e)}`));
   extras.forEach((e, j) => {
-    if (e.x !== 'card' || !e.player || !e.playerName) return;
-    const key = `${e.side}|${e.playerName}`;
-    if (e.card === 'red') { if (!out[e.side].some((x) => x.name === e.playerName && x.why === 'red')) out[e.side].push({ name: e.playerName, why: 'red' }); return; }
-    if (e.card !== 'yellow' || reds.has(key) || s.ended) return;
+    const k = keyOf(e);
+    if (e.x !== 'card' || !e.player || !k) return;
+    if (e.card === 'red') { if (!out[e.side].some((x) => x.key === k && x.why === 'red')) out[e.side].push({ ...who(e, k), why: 'red' }); return; }
+    if (e.card !== 'yellow' || reds.has(`${e.side}|${k}`) || s.ended) return;
     const b = per[j];
     if (!b) return;
-    if (b.suspFrom == null) out[e.side].push({ name: e.playerName, why: 'yellow' }); // waits for revival
-    else if (b.suspUntil != null && now < b.suspUntil) out[e.side].push({ name: e.playerName, why: 'yellow', until: b.suspUntil });
+    if (b.suspFrom == null) out[e.side].push({ ...who(e, k), why: 'yellow' }); // waits for revival
+    else if (b.suspUntil != null && now < b.suspUntil) out[e.side].push({ ...who(e, k), why: 'yellow', until: b.suspUntil });
   });
   return out;
 }
+
+/** This player's entry in an `unavailable()` list (by id, or an older log's name). */
+export const unavailableOf = (list: readonly Unavailable[] | undefined, p: { id?: string | null; fullName?: string | null }): Unavailable | undefined =>
+  list?.find((x) => (!!p.id && x.id === p.id) || (!!p.fullName && x.name === p.fullName));
 
 /** What a raid would score if logged now (or in place of raid `replaces`) — the
  *  UI uses it to credit the raider / tackler exactly what the engine will score. */
@@ -431,7 +501,8 @@ export function defendersOnMat(s: KabaddiState, side: Side, replaces?: number): 
   return matNow(s).onMat[opp];
 }
 
-type Who = { id: string; fullName: string };
+/** A picked player (a roster `Player` fits) — only the id is logged. */
+type Who = { id: string };
 /** The guided-raid form's answers. `editOf` = the id of a past raid being re-entered. */
 export interface RaidForm {
   side: Side; touches: number; bonus: boolean; tackled: boolean; raider?: Who; tackler?: Who; editOf?: number; tackleType?: string;
@@ -452,7 +523,9 @@ export function formOutcome(f: Pick<RaidForm, 'side' | 'touches' | 'bonus' | 'ta
 }
 
 /** Stat reversals for a guided raid (head or child line): the raider's raid
- *  points and the tackler's tackle points as the engine scores them now. */
+ *  points and the tackler's tackle points as the engine scores them now.
+ *  IDs-only scoring: the credits name the players by id only; `idOf` maps an
+ *  older log's name-only raider / tackler to an id (the squads). */
 export function raidReversals(s: KabaddiState, e: KabaddiEvent, idOf: (name?: string) => string | undefined = () => undefined): Pick<ScoreAction, 'attribution' | 'attribution2'> {
   const r = raidOfEvent(s, e);
   if (!r?.breakdown) return {};
@@ -460,8 +533,8 @@ export function raidReversals(s: KabaddiState, e: KabaddiEvent, idOf: (name?: st
   const raiderId = raid.raiderId ?? idOf(raid.raider);
   const tacklerId = raid.tacklerId ?? idOf(raid.tackler);
   return {
-    attribution: raiderId && b.raidPts ? { playerId: raiderId, stat: 'raidPoints', by: -b.raidPts, playerName: raid.raider } : undefined,
-    attribution2: tacklerId && b.raiderOut && b.tacklePts ? { playerId: tacklerId, stat: 'tacklePoints', by: -b.tacklePts, playerName: raid.tackler } : undefined,
+    attribution: raiderId && b.raidPts ? { playerId: raiderId, stat: 'raidPoints', by: -b.raidPts } : undefined,
+    attribution2: tacklerId && b.raiderOut && b.tacklePts ? { playerId: tacklerId, stat: 'tacklePoints', by: -b.tacklePts } : undefined,
   };
 }
 
@@ -469,7 +542,8 @@ export function raidReversals(s: KabaddiState, e: KabaddiEvent, idOf: (name?: st
  *  caller). The raider is credited exactly the raid points the engine scores —
  *  nothing on an empty or failed raid — and the tackler the tackle points (2 for
  *  a super tackle). An edit first reverses the old credits (REMOVE_EVENT id -1
- *  matches no line: a stat carrier only), then replaces the raid in place. */
+ *  matches no line: a stat carrier only), then replaces the raid in place.
+ *  IDs-only scoring: credits and payload name every player by id only. */
 export function raidActions(s: KabaddiState, f: RaidForm, idOf?: (name?: string) => string | undefined): ScoreAction[] {
   const out: ScoreAction[] = [];
   // SD-114: the form logs v2 raids — touches capped at the defenders on the mat.
@@ -485,18 +559,18 @@ export function raidActions(s: KabaddiState, f: RaidForm, idOf?: (name?: string)
   const tacklePts = b?.raiderOut ? b.tacklePts : 0;
   out.push({
     type: 'RAID_OUTCOME', side: f.side,
-    attribution: f.raider && raidPts ? { playerId: f.raider.id, stat: 'raidPoints', by: raidPts, playerName: f.raider.fullName } : undefined,
+    attribution: f.raider && raidPts ? { playerId: f.raider.id, stat: 'raidPoints', by: raidPts } : undefined,
     // SD-119: the tackler defends — the side that is NOT raiding
-    attribution2: tackler && tacklePts ? { playerId: tackler.id, stat: 'tacklePoints', by: tacklePts, playerName: tackler.fullName, side: f.side === 'home' ? 'away' : 'home' } : undefined,
+    attribution2: tackler && tacklePts ? { playerId: tackler.id, stat: 'tacklePoints', by: tacklePts, side: f.side === 'home' ? 'away' : 'home' } : undefined,
     payload: {
       ...outcome,
-      ...(f.raider ? { raiderId: f.raider.id, raiderName: f.raider.fullName } : null),
-      ...(tackler ? { tacklerId: tackler.id, tacklerName: tackler.fullName } : null),
+      ...(f.raider ? { raiderId: f.raider.id } : null),
+      ...(tackler ? { tacklerId: tackler.id } : null),
       // SD-117b: optional, only on a tackled raid
       ...(f.tackled && !f.lineOut && f.tackleType ? { tackleType: f.tackleType } : null),
       // deep wave: optional, only on a raid that scored / touched
       ...(f.skill && (raidPts > 0 || f.skill === 'escape') ? { skill: f.skill } : null),
-      ...(f.touched?.length && !f.lineOut && outcome.touches > 0 ? { touched: f.touched.slice(0, outcome.touches).map((p) => ({ id: p.id, name: p.fullName })) } : null),
+      ...(f.touched?.length && !f.lineOut && outcome.touches > 0 ? { touched: f.touched.slice(0, outcome.touches).map((p) => ({ id: p.id })) } : null),
       ...(f.editOf != null ? { replaces: f.editOf } : null),
     },
   });
@@ -525,7 +599,10 @@ export { perRaidByIndex };
 
 const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? '' : w.endsWith('h') ? 'es' : 's'}`;
 
-/** The timeline lines of every guided raid, derived from the replay. */
+/** The timeline lines of every guided raid, derived from the replay.
+ *  IDs-only scoring: the raid / tackle line names its player by `playerId`;
+ *  only an older log's raid still carries the stored name (`detail`,
+ *  `playerName`). Names are put back when shown (names.ts). */
 export function raidEvents(raids: RaidEntry[], orphans: RaidEntry[], cfg: KabaddiCfg, extras: ExtraEntry[] = []): KabaddiEvent[] {
   const per = perRaidByIndex(replayRaids(raids, cfg, extras));
   const out: KabaddiEvent[] = [];
@@ -544,7 +621,7 @@ export function raidEvents(raids: RaidEntry[], orphans: RaidEntry[], cfg: Kabadd
     ].filter(Boolean).join(' · ');
     const name = b.raidPts >= 3 ? 'Super raid' : b.raidPts === 0 && !b.raiderOut ? 'Empty raid' : 'Raid';
     const head = `${b.doOrDie ? 'Do-or-die · ' : ''}${name}${b.raidPts ? ` +${b.raidPts}` : ''}${parts ? ` — ${parts}` : ''}`;
-    out.push({ ...base, id: eid, icon: r.gr ? '⚡' : '🤼', label: r.gr ? `Golden Raid — ${head}` : head, detail: r.raider, side: r.side, kind: 'raid', points: b.raidPts, playerName: r.raider });
+    out.push({ ...base, id: eid, icon: r.gr ? '⚡' : '🤼', label: r.gr ? `Golden Raid — ${head}` : head, detail: r.raider, side: r.side, kind: 'raid', points: b.raidPts, playerName: r.raider, ...(r.raiderId ? { playerId: r.raiderId } : null) });
     let k = 1;
     // SD-59: line-outs — 1 point per player who stepped out, to the other side
     if (b.defOutPts) {
@@ -558,7 +635,7 @@ export function raidEvents(raids: RaidEntry[], orphans: RaidEntry[], cfg: Kabadd
       const tl = b.superTackle ? 'Super tackle' : b.doOrDieFail ? 'Do-or-die stop' : 'Tackle';
       // SD-117b: "(ankle hold)" only on a raid logged with a tackle type
       const how = r.tt && r.raiderOut ? ` (${tackleTypeLabel(r.tt)!.toLowerCase()})` : '';
-      out.push({ ...base, id: eid + k / 10, icon: '🛡️', label: `${tl} +${b.tacklePts}${how}`, detail: r.tackler, side: other(r.side), kind: 'tackle', points: b.tacklePts, playerName: r.tackler, ...(how ? { tackleType: r.tt } : null) });
+      out.push({ ...base, id: eid + k / 10, icon: '🛡️', label: `${tl} +${b.tacklePts}${how}`, detail: r.tackler, side: other(r.side), kind: 'tackle', points: b.tacklePts, playerName: r.tackler, ...(r.tacklerId ? { playerId: r.tacklerId } : null), ...(how ? { tackleType: r.tt } : null) });
       k += 1;
     }
     for (const side of b.allOuts) {
@@ -569,13 +646,16 @@ export function raidEvents(raids: RaidEntry[], orphans: RaidEntry[], cfg: Kabadd
   // Legacy-only: a raid taken out of play whose line stayed (frozen value).
   for (const r of orphans) {
     if (r.eid == null) continue;
-    out.push({ id: r.eid, group: r.eid, stamp: r.gr ? 'GR' : `${r.minute ?? 0}'`, minute: r.minute, half: r.half, icon: '🤼', label: 'Raid', detail: r.raider, side: r.side, kind: 'raid', points: r.lp ?? 0, playerName: r.raider });
+    out.push({ id: r.eid, group: r.eid, stamp: r.gr ? 'GR' : `${r.minute ?? 0}'`, minute: r.minute, half: r.half, icon: '🤼', label: 'Raid', detail: r.raider, side: r.side, kind: 'raid', points: r.lp ?? 0, playerName: r.raider, ...(r.raiderId ? { playerId: r.raiderId } : null) });
   }
   return out;
 }
 
 /** SD-59 / SD-72 — the timeline lines of technical points and cards. A
- *  card's technical point is its own line (group = the card). */
+ *  card's technical point is its own line (group = the card). IDs-only
+ *  scoring: a card line names the player by `playerId`; the player at fault
+ *  for a technical point is looked up from its entry when shown (names.ts).
+ *  Only an older log's entry still carries the stored name. */
 export function extraEvents(raids: RaidEntry[], extras: ExtraEntry[], cfg: KabaddiCfg): KabaddiEvent[] {
   if (!extras.length) return [];
   const per = replayRaids(raids, cfg, extras).perExtra;
@@ -641,12 +721,16 @@ export const reducer = (s: KabaddiState, a: ScoreAction): KabaddiState => {
   if (s.ended && a.type !== 'END') return s;
   const minute = Number(a.payload?.minute ?? currentMinute(s));
   const hf = Number(a.payload?.half ?? s.half);
+  /** legacy, read-only: the credited name an older log's action carried
+   *  (IDs-only actions carry the id only) */
   const who = a.attribution?.playerName;
+  const whoId = a.attribution?.playerId;
   const pts = Number(a.payload?.points ?? 1);
   const pushPt = (type: 'RAID' | 'TACKLE'): KabaddiState => {
     if (!a.side) return s;
-    // a player who's been subbed off takes no further part
-    if (who && s.subbedOff[a.side].includes(who)) return s;
+    // a player who's been subbed off takes no further part (by id; an older
+    // log by name)
+    if (listHas(s.subbedOff[a.side], { id: whoId, name: who })) return s;
     const gr = s.goldenRaid; // sudden death: this point decides the match
     const kind = type === 'RAID' ? 'raid' : 'tackle';
     const scored = { ...s, [a.side]: s[a.side] + pts } as KabaddiState;
@@ -694,9 +778,11 @@ export const reducer = (s: KabaddiState, a: ScoreAction): KabaddiState => {
       if (!a.side) return s;
       const p = a.payload ?? {};
       const attr2 = (a.attribution2 ?? (p._attr2 as ScoreAction['attribution2'])) || undefined;
+      // legacy, read-only: an older log's names (IDs-only raids carry ids only)
       const raider = str(p.raiderName) ?? who;
+      const raiderId = str(p.raiderId) ?? whoId;
       // (a correction of a past raid may name a player subbed off since)
-      if (raider && p.replaces == null && s.subbedOff[a.side].includes(raider)) return s;
+      if (p.replaces == null && listHas(s.subbedOff[a.side], { id: raiderId, name: raider })) return s;
       const outcome: RaidOutcome = {
         side: a.side,
         touches: Math.max(0, Math.floor(Number(p.touches ?? 0))),
@@ -720,7 +806,7 @@ export const reducer = (s: KabaddiState, a: ScoreAction): KabaddiState => {
         eid: replaces >= 0 ? prev[replaces].eid : s.seq + 1,
         minute, half: hf, ...(gr ? { gr: true } : null),
         ...(raider ? { raider } : null),
-        ...(str(p.raiderId) ?? a.attribution?.playerId ? { raiderId: str(p.raiderId) ?? a.attribution?.playerId } : null),
+        ...(raiderId ? { raiderId } : null),
         ...(str(p.tacklerName) ?? attr2?.playerName ? { tackler: str(p.tacklerName) ?? attr2?.playerName } : null),
         ...(str(p.tacklerId) ?? attr2?.playerId ? { tacklerId: str(p.tacklerId) ?? attr2?.playerId } : null),
         ...(outcome.raiderOut && str(p.tackleType) ? { tt: str(p.tackleType) } : null),
@@ -757,6 +843,7 @@ export const reducer = (s: KabaddiState, a: ScoreAction): KabaddiState => {
       const entry: ExtraEntry = {
         x: 'tech', side: a.side, eid: s.seq + 1, minute, half: hf, ...(n !== 1 ? { n } : null),
         ...(str(p.reason) ? { reason: str(p.reason) } : null),
+        // legacy, read-only: an older log's name (IDs-only: the id only)
         ...(str(p.playerName) ? { playerName: str(p.playerName) } : null),
         ...(str(p.playerId) ? { playerId: str(p.playerId) } : null),
       };
@@ -774,6 +861,7 @@ export const reducer = (s: KabaddiState, a: ScoreAction): KabaddiState => {
       const card = p.card === 'green' || p.card === 'yellow' || p.card === 'red' ? p.card : null;
       if (!card) return s;
       const official = p.official === true;
+      // legacy, read-only: an older log's name (IDs-only cards: the id only)
       const name = official ? undefined : str(p.playerName);
       const id = official ? undefined : str(p.playerId);
       const tp = Math.max(0, Math.floor(Number(p.tp ?? 0)) || 0);
@@ -790,19 +878,29 @@ export const reducer = (s: KabaddiState, a: ScoreAction): KabaddiState => {
     }
     case 'SUB': {
       if (!a.side || s.subsUsed[a.side] >= s.maxSubs) return s;
-      const offName = String(a.payload?.offName ?? '');
-      const onName = String(a.payload?.onName ?? '');
-      if (!offName || !onName) return s;
+      // IDs-only scoring: { offId, onId }; an older log: { offName, onName }
+      // (legacy, read-only — replayed exactly as it was scored).
+      const offId = str(a.payload?.offId);
+      const onId = str(a.payload?.onId);
+      const byId = !!(offId || onId);
+      const offName = byId ? '' : String(a.payload?.offName ?? '');
+      const onName = byId ? '' : String(a.payload?.onName ?? '');
+      const offKey = byId ? offId : offName;
+      const onKey = byId ? onId : onName;
+      if (!offKey || !onKey) return s;
       // SD-117b (format: subReturn): a substituted player may come back on —
       // they leave the "subbed off" list (the sub still counts to the limit).
-      const back = s.subReturn && s.subbedOff[a.side].includes(onName) ? onName : undefined;
+      const back = s.subReturn && s.subbedOff[a.side].includes(onKey) ? onKey : undefined;
       const off = back ? s.subbedOff[a.side].filter((n) => n !== back) : s.subbedOff[a.side];
+      const who = byId
+        ? { playerId: offKey, secondId: onKey }
+        : { detail: `${onName} ⬆  ${offName} ⬇`, playerName: offName };
       return {
         ...s,
         seq: s.seq + 1,
-        events: [...s.events, { id: s.seq + 1, stamp: `${minute}'`, icon: '🔄', label: back ? 'Substitution (returns)' : 'Substitution', detail: `${onName} ⬆  ${offName} ⬇`, side: a.side, kind: 'sub', playerName: offName, minute, half: hf, ...(back ? { ret: back } : null) }],
+        events: [...s.events, { id: s.seq + 1, stamp: `${minute}'`, icon: '🔄', label: back ? 'Substitution (returns)' : 'Substitution', ...who, side: a.side, kind: 'sub', minute, half: hf, ...(back ? { ret: back } : null) }],
         subsUsed: { ...s.subsUsed, [a.side]: s.subsUsed[a.side] + 1 },
-        subbedOff: { ...s.subbedOff, [a.side]: [...off, offName] },
+        subbedOff: { ...s.subbedOff, [a.side]: [...off, offKey] },
       };
     }
     case 'REMOVE_EVENT':
@@ -835,7 +933,7 @@ export const reducer = (s: KabaddiState, a: ScoreAction): KabaddiState => {
         ended: winner != null,
         startedAt: undefined,
         seq: s.seq + 1,
-        events: [...s.events, { id: s.seq + 1, stamp: 'SO', icon: '🎯', label: `Shootout raid +${p}`, detail: who, side: a.side, kind: 'raid', points: p, playerName: who, minute, half: hf }],
+        events: [...s.events, { id: s.seq + 1, stamp: 'SO', icon: '🎯', label: `Shootout raid +${p}`, detail: who, side: a.side, kind: 'raid', points: p, playerName: who, ...(whoId ? { playerId: whoId } : null), minute, half: hf }],
       };
     }
     case 'END':
@@ -885,9 +983,11 @@ function removePlain(s: KabaddiState, ev: KabaddiEvent, events: KabaddiEvent[], 
   if (!ev.side) return s;
   let next = { ...s, events } as KabaddiState;
   if (ev.kind === 'raid' || ev.kind === 'tackle') next = { ...next, [ev.side]: Math.max(0, next[ev.side] - points) } as KabaddiState;
-  else if (ev.kind === 'sub' && ev.playerName) {
+  else if (ev.kind === 'sub' && (ev.playerId || ev.playerName)) {
     // SD-117b: undoing a "returns" sub sends the returning player back off
-    const off = next.subbedOff[ev.side].filter((n) => n !== ev.playerName);
+    // (IDs-only: the player who came off by id; an older log by name)
+    const offKey = ev.playerId ?? ev.playerName;
+    const off = next.subbedOff[ev.side].filter((n) => n !== offKey);
     next = { ...next, subsUsed: { ...next.subsUsed, [ev.side]: Math.max(0, next.subsUsed[ev.side] - 1) }, subbedOff: { ...next.subbedOff, [ev.side]: ev.ret && !off.includes(ev.ret) ? [...off, ev.ret] : off } };
   }
   return next;
@@ -944,24 +1044,46 @@ export function halfPoints(s: KabaddiState, side: Side, half: number): number {
     .reduce((x, e) => x + (e.points ?? 0), 0);
 }
 
-export interface Line { name: string; raid: number; tackle: number }
+/** A box-score line. IDs-only scoring: `key` = the player id (an older log's
+ *  name-only credit: "~Name"); `name` = the viewer's name for it. */
+export interface Line { name: string; key: string; playerId?: string; raid: number; tackle: number }
+
+/** IDs-only scoring — the key a credited line counts under: its player id;
+ *  an older log's name-only credit is matched to an id by `resolve` (the
+ *  squads) or by another line that named the same player with an id, else
+ *  keyed by the name ("~Name"). */
+export function kbCreditKeyer(events: LiveEvent[], resolve?: (name: string) => string | undefined): (c?: { playerId?: string; playerName?: string }) => string | undefined {
+  const seen = new Map<string, string>();
+  for (const e of events ?? []) if (e.playerId && e.playerName && !seen.has(e.playerName)) seen.set(e.playerName, e.playerId);
+  return (c) => c?.playerId || (c?.playerName ? resolve?.(c.playerName) ?? seen.get(c.playerName) ?? `~${c.playerName}` : undefined);
+}
 
 /** Box score: raid / tackle points per player for one side; `scope` limits to one
  *  half. A guided raid's tackle line sits on the DEFENDING side under the tackler,
  *  so RAID and TCKL each land in the right team's table (SD-03). Shootout raids
- *  stay out of player stats (PKL). */
-export function tally(events: LiveEvent[], side: Side, scope: 'all' | number = 'all'): Line[] {
-  const byName = new Map<string, Line>();
-  const ensure = (name: string) => {
-    if (!byName.has(name)) byName.set(name, { name, raid: 0, tackle: 0 });
-    return byName.get(name)!;
-  };
+ *  stay out of player stats (PKL). IDs-only scoring: keyed by player id
+ *  (`kbCreditKeyer`), named for the viewer by `nameOf` (an older log's stored
+ *  name without one). */
+export function tally(events: LiveEvent[], side: Side, scope: 'all' | number = 'all', opts: { nameOf?: NameOf; resolve?: (name: string) => string | undefined } = {}): Line[] {
+  const keyOf = kbCreditKeyer(events, opts.resolve);
+  const lines = new Map<string, Line & { legacy?: string }>();
   for (const e of events) {
-    if (e.side !== side || !e.playerName || !e.points || isShootoutEvent(e)) continue;
+    if (e.side !== side || !e.points || isShootoutEvent(e)) continue;
+    if (e.kind !== 'raid' && e.kind !== 'tackle') continue;
+    const key = keyOf(e);
+    if (!key) continue;
     if (scope !== 'all' && e.half !== scope) continue;
-    const l = ensure(e.playerName);
+    let l = lines.get(key);
+    if (!l) {
+      l = { name: '', key, ...(key.startsWith('~') ? {} : { playerId: key }), raid: 0, tackle: 0, ...(e.playerName ? { legacy: e.playerName } : {}) };
+      lines.set(key, l);
+    }
+    if (!l.legacy && e.playerName) l.legacy = e.playerName;
     if (e.kind === 'raid') l.raid += e.points;
-    else if (e.kind === 'tackle') l.tackle += e.points;
+    else l.tackle += e.points;
   }
-  return [...byName.values()].sort((a, b) => (b.raid + b.tackle) - (a.raid + a.tackle));
+  const nameOf = opts.nameOf ?? legacyNameOf;
+  return [...lines.values()]
+    .map(({ legacy, ...l }) => ({ ...l, name: l.playerId ? nameOf(l.playerId, legacy) : nameOf(undefined, l.key.slice(1)) }))
+    .sort((a, b) => (b.raid + b.tackle) - (a.raid + a.tackle));
 }

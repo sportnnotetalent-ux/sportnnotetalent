@@ -11,6 +11,8 @@ import assert from 'node:assert/strict';
 import { replayRaids, type RaidOutcome, type ExtraOutcome, type KabaddiCfg } from '../src/sports/kabaddi/rules.ts';
 import * as kb from '../src/sports/kabaddi/engine.ts';
 import { kabaddiTotals, kabaddiMatchCentre, kabaddiSuspended, kabaddiFieldLog } from '../src/sports/kabaddi/totals.ts';
+import { cardAction, techPointAction } from '../src/sports/kabaddi/actions.ts';
+import { kabaddiEventDetail } from '../src/sports/kabaddi/names.ts';
 import { kabaddiStats } from '../src/sports/kabaddi/stats.ts';
 import { trackedIn } from '../src/sports/statSchema.ts';
 import type { ScoreAction } from '../src/sports/types.ts';
@@ -28,10 +30,22 @@ const raid = (side: Side, f: Partial<kb.RaidForm> = {}, at?: number): ScoreActio
 const T0 = 1_000_000;
 const KO: ScoreAction = { type: 'KICKOFF', payload: { at: T0 } };
 const min = (m: number) => T0 + m * 60000;
-const card = (side: Side, c: 'green' | 'yellow' | 'red', who?: string, at?: number, extra: Record<string, unknown> = {}): ScoreAction =>
-  ({ type: 'CARD', side, payload: { card: c, ...(who ? { playerName: who, playerId: who.toLowerCase() } : null), minute: 1, half: 1, ...(at != null ? { at } : null), ...extra } });
-const tech = (side: Side, reason = 'cant', by?: string): ScoreAction =>
-  ({ type: 'TECH_POINT', side, payload: { reason, ...(by ? { playerName: by, playerId: by.toLowerCase() } : null), minute: 2, half: 1 } });
+/** IDs-only scoring: cards and technical points as the controls build them
+ *  (the player by id — here the name lower-cased); `NM` names them when shown. */
+const card = (side: Side, c: 'green' | 'yellow' | 'red', who?: string, at?: number, extra: Record<string, unknown> = {}): ScoreAction => {
+  const a = cardAction(side, c, who ? { id: who.toLowerCase() } : 'player');
+  const p = { ...a.payload, minute: 1, half: 1, ...(at != null ? { at } : null), ...extra };
+  if (p.official) delete p.player;
+  return { ...a, payload: p };
+};
+const tech = (side: Side, reason = 'cant', by?: string): ScoreAction => {
+  const a = techPointAction(side, { reason, by: by ? { id: by.toLowerCase() } : undefined });
+  return { ...a, payload: { ...a.payload, minute: 2, half: 1 } };
+};
+/** An older log's card (before IDs-only scoring): the name beside the id. */
+const namedCard = (side: Side, c: 'green' | 'yellow' | 'red', who: string, at?: number): ScoreAction =>
+  ({ type: 'CARD', side, payload: { card: c, playerName: who, playerId: who.toLowerCase(), minute: 1, half: 1, ...(at != null ? { at } : null) } });
+const NM = (id?: string | null, legacy?: string | null) => ({ ravi: 'Ravi', bela: 'Bela', dev: 'Dev' } as Record<string, string>)[id ?? ''] ?? legacy ?? 'Player';
 
 describe('SD-59 line-outs (rules)', () => {
   test('a defender steps out: out, +1 to the raiders (not a raid point), the raiding side revives', () => {
@@ -102,7 +116,9 @@ describe('SD-59 technical points', () => {
     assert.deepEqual([s.home, s.away, s.out.home, s.out.away], [0, 1, 0, 0]);
     const line = s.events.find((e) => e.kind === 'tech')!;
     assert.match(line.label, /Technical point \+1 — cant late/i);
-    assert.equal(line.detail, 'Ravi');
+    assert.equal(line.detail, undefined); // IDs-only scoring: no name stored
+    assert.equal(s.extras?.[0].playerId, 'ravi');
+    assert.equal(kabaddiEventDetail(s, line, NM), 'Ravi'); // named when shown
     assert.equal(kb.halfPoints(s, 'away', 1), 1);
     const back = kb.reducer(s, { type: 'REMOVE_EVENT', side: 'away', payload: { id: line.id, v: 2 } });
     assert.deepEqual([back.home, back.away, back.events.length], [0, 0, 0]);
@@ -130,9 +146,13 @@ describe('SD-72 cards', () => {
     assert.equal(kb.matNow(s, 4).onMat.home, 6);
     assert.equal(kb.matNow(s, 4).short.home, 1);
     assert.equal(kb.matNow(s, 5).onMat.home, 7);
-    assert.deepEqual(kb.unavailable(s, 4).home.map((x) => [x.name, x.why]), [['Ravi', 'yellow']]);
+    assert.deepEqual(kb.unavailable(s, 4).home.map((x) => [x.id, x.why]), [['ravi', 'yellow']]);
     assert.deepEqual(kb.unavailable(s, 5.1).home, []);
-    assert.deepEqual(kabaddiSuspended(s, 4), [{ side: 'home', name: 'Ravi', left: '1:00' }]);
+    assert.deepEqual(kabaddiSuspended(s, 4, NM), [{ side: 'home', id: 'ravi', name: 'Ravi', left: '1:00' }]);
+    // an older log's card (name beside the id) reads as before with no lookup
+    const old = play([KO, namedCard('home', 'yellow', 'Ravi', min(3))]);
+    assert.deepEqual(kabaddiSuspended(old, 4), [{ side: 'home', id: 'ravi', name: 'Ravi', left: '1:00' }]);
+    assert.deepEqual(kb.unavailable(old, 4).home, [{ key: 'ravi', id: 'ravi', name: 'Ravi', why: 'yellow', until: 5 }]);
   });
   test('a suspension lowers the defenders on the mat: bonus line needs 6, super tackle at 3', () => {
     // away has 1 out + 1 suspended → 5 on the mat: the bonus is void
@@ -167,7 +187,8 @@ describe('SD-72 cards', () => {
     assert.deepEqual([s.home, s.away], [0, 1]);
     assert.equal(kb.matNow(s, 30).onMat.home, 6);
     assert.equal(kb.matNow(s, 30).sentOff.home, 1);
-    assert.deepEqual(kb.unavailable(s, 30).home, [{ name: 'Ravi', why: 'red' }]);
+    assert.deepEqual(kb.unavailable(s, 30).home, [{ key: 'ravi', id: 'ravi', why: 'red' }]);
+    assert.equal(kb.unavailableOf(kb.unavailable(s, 30).home, { id: 'ravi', fullName: 'Ravi' })?.why, 'red');
     assert.ok(s.events.some((e) => e.kind === 'tech' && e.side === 'away' && /red card/.test(e.label)));
     const head = s.events.find((e) => e.kind === 'card')!;
     const back = kb.reducer(s, { type: 'REMOVE_EVENT', side: 'home', payload: { id: head.id, v: 2 } });
@@ -189,7 +210,9 @@ describe('SD-72 cards', () => {
     assert.equal(kb.suggestedCard({ green: 0, yellow: 2, red: 0 }), 'red');
     assert.equal(kb.suggestedCard({ green: 1, yellow: 0, red: 0 }), null);
     const s = play([card('home', 'green', 'Ravi'), card('home', 'green', 'Ravi')]);
-    assert.deepEqual(kb.cardsOf(s, 'home', { name: 'Ravi' }), { green: 2, yellow: 0, red: 0 });
+    assert.deepEqual(kb.cardsOf(s, 'home', { id: 'ravi', name: 'Ravi' }), { green: 2, yellow: 0, red: 0 });
+    // an older log's cards still count by name
+    assert.deepEqual(kb.cardsOf(play([namedCard('home', 'green', 'Ravi')]), 'home', { name: 'Ravi' }), { green: 1, yellow: 0, red: 0 });
   });
   test('a red card goes to the on-field tracker as a sending-off; a yellow as a 2-minute suspension', () => {
     const s = play([KO, card('home', 'yellow', 'Ravi', min(2)), card('away', 'red', 'Bela', min(3))]);

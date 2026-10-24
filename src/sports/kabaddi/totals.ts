@@ -23,10 +23,16 @@
  * player (not 0) and the panel marks them untracked. A credited raider or
  * tackler we can't name an id for (an old snapshot) drops the raid / tackle
  * point keys from the totals, so their live lines are left as they are.
+ *
+ * IDs-only scoring: every player is counted by the id the log keeps; only an
+ * older log's name-only player is matched by name to `ctx.players` (the
+ * viewer's names — which fails for someone outside the circle, so those keys
+ * are left to the live lines, as above).
  */
 import type { StatTotalsContext, StatTotalsEntry } from '../types';
 import { YELLOW_MINUTES, type RaidBreakdown, type Side } from './rules.ts';
-import { isShootoutEvent, replayOf, perRaidByIndex, extrasOf, clockNow, type KabaddiState, type RaidEntry } from './engine.ts';
+import { isShootoutEvent, replayOf, perRaidByIndex, extrasOf, clockNow, type KabaddiState, type RaidEntry, type TouchedRef } from './engine.ts';
+import { legacyNameOf, type NameOf } from '../../core/playerNames.ts';
 import { trackField, timeLeft, suspensionEvent, FIELD_RULES, type FieldEvent, type FieldLog, type FieldResult } from '../onField.ts';
 
 /** Keys credited live (attribution): raider / tackler points. */
@@ -85,12 +91,13 @@ export const KABADDI_UNSUCCESSFUL_TACKLE_KEY = 'unsuccessfulTackles';
  * who went for the raider without being touched can't be seen from this
  * capture — neither is counted.
  */
-export function unsuccessfulTacklers(r: Pick<RaidEntry, 'touched'>, b: Pick<RaidBreakdown, 'raiderOut' | 'touchPts'>): { id?: string; name: string }[] {
+export function unsuccessfulTacklers(r: Pick<RaidEntry, 'touched'>, b: Pick<RaidBreakdown, 'raiderOut' | 'touchPts'>): TouchedRef[] {
   if (b.raiderOut || !(b.touchPts > 0)) return [];
   return (r.touched ?? []).slice(0, b.touchPts);
 }
 
 export function kabaddiTotals(s: KabaddiState, ctx?: StatTotalsContext): Record<string, StatTotalsEntry> {
+  // legacy only: an older log's name-only player, matched by name
   const byName = (side: Side, name?: string) =>
     name ? ctx?.players?.[side].find((p) => p.name && p.name.trim().toLowerCase() === name.trim().toLowerCase())?.id : undefined;
   const idOf = (side: Side, id?: string, name?: string) => id ?? byName(side, name);
@@ -314,10 +321,12 @@ export function kabaddiFieldLog(s: KabaddiState, now: number = clockNow(s)): Fie
 
 export const kabaddiField = (s: KabaddiState, now?: number): FieldResult => trackField(kabaddiFieldLog(s, now));
 
-/** For the live banner: who is serving a yellow and the time left. */
-export function kabaddiSuspended(s: KabaddiState, now: number = clockNow(s)): { side: Side; name: string; left: string }[] {
+/** For the live banner: who is serving a yellow and the time left.
+ *  IDs-only scoring: the player by id, named for this viewer by `nameOf`
+ *  (an older log's stored name without one). */
+export function kabaddiSuspended(s: KabaddiState, now: number = clockNow(s), nameOf: NameOf = legacyNameOf): { side: Side; id?: string; name: string; left: string }[] {
   if (s.ended) return [];
-  return kabaddiField(s, now).suspended.map((x) => ({ side: x.side, name: x.name ?? 'Player', left: timeLeft(x.until, now) }));
+  return kabaddiField(s, now).suspended.map((x) => ({ side: x.side, ...(x.id ? { id: x.id } : null), name: nameOf(x.id, x.name), left: timeLeft(x.until, now) }));
 }
 
 export { YELLOW_MINUTES };

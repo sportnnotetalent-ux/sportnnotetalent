@@ -5,7 +5,8 @@
 import type { ScoreAction } from './types';
 import type { VoiceContext } from './types';
 import { deburr, resolveSide, attribution, idAttribution, sided, numberFromText, numbersFromText, matchPlayer, withoutTeams } from './voiceMatch.ts';
-import { previewRaid, outPlayers, type KabaddiState } from './kabaddi/engine.ts';
+import { previewRaid, outPlayers, listHas, type KabaddiState } from './kabaddi/engine.ts';
+import { cardAction } from './kabaddi/actions.ts';
 import { outcomeAction } from './volleyball/engine.ts';
 import { creditAttribution, ftCredits, makeCredits, missCredits } from './basketball/credits.ts';
 import type { Player } from '../core/types';
@@ -104,7 +105,8 @@ export function volleyballVoice(text: string, ctx: VoiceContext): ScoreAction[] 
  *  tackled the opponent's raider. Both route through the RAID_OUTCOME engine (so
  *  they advance the out-count / all-out / do-or-die state), not the simple +1
  *  actions that only moved the score. Credits match what the engine scores: a
- *  tackle on a raider facing ≤3 defenders is a super tackle (2). */
+ *  tackle on a raider facing ≤3 defenders is a super tackle (2). IDs-only
+ *  scoring: the raider / tackler by id only (credit and payload). */
 export function kabaddiVoice(text: string, ctx: VoiceContext): ScoreAction[] | null {
   const q = deburr(text);
   const { side, player } = resolveSide(text, ctx);
@@ -115,12 +117,12 @@ export function kabaddiVoice(text: string, ctx: VoiceContext): ScoreAction[] | n
   if (/\btackle\b/.test(q)) {
     const outcome = { side: opp, touches: 0, bonus: false, raiderOut: true } as const;
     const pts = preview(outcome)?.tacklePts ?? 1;
-    return [{ type: 'RAID_OUTCOME', side: opp, payload: { ...outcome, ...(player ? { tacklerId: player.id, tacklerName: player.fullName } : null) }, attribution2: sided(attribution(player, 'tacklePoints', pts), side) }];
+    return [{ type: 'RAID_OUTCOME', side: opp, payload: { ...outcome, ...(player ? { tacklerId: player.id } : null) }, attribution2: sided(idAttribution(player, 'tacklePoints', pts), side) }];
   }
   if (/\braid\b/.test(q)) {
     const outcome = { side, touches: 1, bonus: false, raiderOut: false } as const;
     const pts = preview(outcome)?.raidPts ?? 1;
-    return [{ type: 'RAID_OUTCOME', side, payload: { ...outcome, ...(player ? { raiderId: player.id, raiderName: player.fullName } : null) }, attribution: pts ? attribution(player, 'raidPoints', pts) : undefined }];
+    return [{ type: 'RAID_OUTCOME', side, payload: { ...outcome, ...(player ? { raiderId: player.id } : null) }, attribution: pts ? idAttribution(player, 'raidPoints', pts) : undefined }];
   }
   return kabaddiExtrasVoice(text, ctx); // SD-137a — cards / technical points
 }
@@ -451,7 +453,7 @@ export function golfMatchVoice(text: string, ctx: VoiceContext): ScoreAction[] |
 
 /** Kabaddi cards and technical points by voice: "green / yellow card Rao",
  *  "technical point home". A red card stays on the button (it asks first and
- *  sets the technical point). */
+ *  sets the technical point). IDs-only scoring: the carded player by id. */
 export function kabaddiExtrasVoice(text: string, ctx: VoiceContext): ScoreAction[] | null {
   const q = withoutTeams(text, ctx);
   const { side, player } = resolveSide(text, ctx);
@@ -461,8 +463,8 @@ export function kabaddiExtrasVoice(text: string, ctx: VoiceContext): ScoreAction
   if (card && /\bcard\b|\bgreen\b|\byellow\b/.test(q)) {
     // as the button: a player carded while out serves it from his revival
     const st = ctx.state as KabaddiState | undefined;
-    const wasOut = !!(player && st && outPlayers(st)[side]?.includes(player.fullName));
-    return [{ type: 'CARD', side, payload: { card, ...(player ? { playerId: player.id, playerName: player.fullName } : { player: true }), ...(wasOut ? { wasOut: true } : {}) } }];
+    const wasOut = !!(player && st && listHas(outPlayers(st)[side], player));
+    return [cardAction(side, card, player ?? 'player', { wasOut })];
   }
   return null;
 }

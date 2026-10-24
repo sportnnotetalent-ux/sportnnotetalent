@@ -21,6 +21,10 @@ const RAIDER2 = P('p-r2', 'Rahul Raider');
 const DEF = P('p-d', 'Dev Defender');
 const DEF2 = P('p-d2', 'Dinesh Defender');
 
+/** IDs-only scoring: the log keeps ids; names come from the squads by id. */
+const SQUAD = [RAIDER, RAIDER2, DEF, DEF2];
+const nameOf = (id?: string | null, legacy?: string | null) => SQUAD.find((p) => p.id === id)?.fullName ?? legacy ?? 'Player';
+const tallied = (s: KabaddiState, side: 'home' | 'away') => tallyLines(s.events, side, 'all', { nameOf }).map(({ name, raid, tackle }) => ({ name, raid, tackle }));
 const fresh = (cfg: Record<string, unknown> = {}) => init({ playersPerSide: 7, style: 'sanjeevani', proRules: true, ...cfg });
 const stamp = (a: ScoreAction, minute = 3, half = 1): ScoreAction => ({ ...a, payload: { ...a.payload, minute, half } });
 /** Run the guided raid form like the UI does; returns the new state and the actions. */
@@ -35,17 +39,19 @@ describe('SD-03 — raider credit = raid points actually scored', () => {
   test('empty raid: no raider credit, a 0-point raid line, no score', () => {
     const { s, outcome } = raid(fresh(), { side: 'home', raider: RAIDER });
     assert.equal(outcome.attribution, undefined); // was +1 before SD-03
-    assert.equal(outcome.payload?.raiderName, RAIDER.fullName); // the raider is still named
+    assert.equal(outcome.payload?.raiderId, RAIDER.id); // the raider is still named (by id)
+    assert.equal(outcome.payload?.raiderName, undefined); // IDs-only scoring
     assert.equal(s.home + s.away, 0);
     const [h] = heads(s);
     assert.equal(h.points, 0);
     assert.equal(h.label, 'Empty raid');
-    assert.equal(h.playerName, RAIDER.fullName);
+    assert.equal(h.playerId, RAIDER.id);
+    assert.equal(h.playerName, undefined);
   });
 
   test('touch points: 2 touches → raider +2, line +2 on the raiding side', () => {
     const { s, outcome } = raid(fresh(), { side: 'home', raider: RAIDER, touches: 2 });
-    assert.deepEqual(outcome.attribution, { playerId: RAIDER.id, stat: 'raidPoints', by: 2, playerName: RAIDER.fullName });
+    assert.deepEqual(outcome.attribution, { playerId: RAIDER.id, stat: 'raidPoints', by: 2 });
     assert.equal(s.home, 2);
     assert.equal(heads(s)[0].points, 2);
     assert.equal(heads(s)[0].side, 'home');
@@ -77,19 +83,20 @@ describe('SD-03 — tackle point on the defending side, credited to the tackler'
     const { s, outcome } = raid(fresh(), { side: 'home', raider: RAIDER, tackled: true, tackler: DEF });
     assert.equal(outcome.attribution, undefined);
     // SD-119: the tackler's own (defending) side rides on the credit
-    assert.deepEqual(outcome.attribution2, { playerId: DEF.id, stat: 'tacklePoints', by: 1, playerName: DEF.fullName, side: 'away' });
+    assert.deepEqual(outcome.attribution2, { playerId: DEF.id, stat: 'tacklePoints', by: 1, side: 'away' });
     assert.equal(s.home, 0);
     assert.equal(s.away, 1);
     const tackle = s.events.find((e) => e.kind === 'tackle')!;
     assert.equal(tackle.side, 'away');
     assert.equal(tackle.points, 1);
-    assert.equal(tackle.playerName, DEF.fullName);
+    assert.equal(tackle.playerId, DEF.id);
     assert.equal(tackle.group, heads(s)[0].id); // tied to its raid
     // Per-half board: the point is in the DEFENDING team's column.
     assert.equal(halfPoints(s, 'home', 1), 0);
     assert.equal(halfPoints(s, 'away', 1), 1);
     // Box score: TCKL 1 for the tackler, no RAID point for the raider.
-    assert.deepEqual(tallyLines(s.events, 'away'), [{ name: DEF.fullName, raid: 0, tackle: 1 }]);
+    assert.deepEqual(tallied(s, 'away'), [{ name: DEF.fullName, raid: 0, tackle: 1 }]);
+    assert.deepEqual(tallyLines(s.events, 'away'), [{ name: 'Player', key: DEF.id, playerId: DEF.id, raid: 0, tackle: 1 }]); // keyed by id; no lookup, no name
     assert.deepEqual(tallyLines(s.events, 'home'), []);
   });
 
@@ -128,7 +135,7 @@ describe('SD-03 — all-outs and the per-half board', () => {
     assert.equal(ao[0].side, 'home');
     assert.equal(ao[0].points, 2);
     // the raider is credited the 3 raid points, not the all-out
-    assert.deepEqual(tallyLines(s.events, 'home'), [{ name: RAIDER.fullName, raid: 3, tackle: 0 }]);
+    assert.deepEqual(tallied(s, 'home'), [{ name: RAIDER.fullName, raid: 3, tackle: 0 }]);
   });
 
   test('half columns add up to the total (raids, tackles, all-outs, both halves)', () => {
@@ -178,14 +185,14 @@ describe('SD-03 — remove / edit', () => {
     const r = raid(s, { side: 'home', touches: 3, raider: RAIDER2, editOf: first.id }, 99);
     // reversal of the old +1, then the new +3
     assert.equal(r.actions[0].type, 'REMOVE_EVENT');
-    assert.deepEqual(r.actions[0].attribution, { playerId: RAIDER.id, stat: 'raidPoints', by: -1, playerName: RAIDER.fullName });
+    assert.deepEqual(r.actions[0].attribution, { playerId: RAIDER.id, stat: 'raidPoints', by: -1 });
     assert.equal(r.outcome.payload?.replaces, first.id);
     assert.equal(r.outcome.attribution?.by, 3);
     s = r.s;
     assert.equal(s.raids.length, 2);
     assert.equal(s.raids[0].touches, 3);
     assert.equal(heads(s)[0].id, first.id);
-    assert.equal(heads(s)[0].playerName, RAIDER2.fullName);
+    assert.equal(heads(s)[0].playerId, RAIDER2.id);
     assert.equal(s.home, 3);
     assert.equal(s.away, 1);
   });
@@ -213,7 +220,8 @@ describe('SD-03 — voice', () => {
     assert.equal(acts[0].attribution2?.by, 2);
     s = reducer(s, stamp(acts[0]));
     assert.equal(s.away, 2);
-    assert.equal(s.events.find((e) => e.kind === 'tackle')?.playerName, DEF2.fullName);
+    assert.equal(s.events.find((e) => e.kind === 'tackle')?.playerId, DEF2.id);
+    assert.equal(acts[0].payload?.tacklerName, undefined); // IDs-only scoring
   });
   test('"tackle <name>" with a full defence credits 1; "raid <name>" credits 1', () => {
     const ctx = { state: fresh(), homeName: 'Home', awayName: 'Away', homeRoster: roster(RAIDER), awayRoster: roster(DEF) };

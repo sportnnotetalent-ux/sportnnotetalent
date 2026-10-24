@@ -67,7 +67,9 @@ export function undoLabel(
     // "undefined"; with nothing to name, fall back to the plain "Undo").
     const what = typeof p.label === 'string' && p.label.trim() ? p.label.trim() : null;
     if (!what) return null;
-    const who = p.playerName || (p.side ? name(p.side) : '');
+    // IDs-only scoring: an event that names its player by id only (kabaddi)
+    // is named for this viewer; an older event's stored name reads as before
+    const who = p.playerName || (p.playerId ? whoName(nameOf, p.playerId) : undefined) || (p.side ? name(p.side) : '');
     head = who ? `${what} · ${who}` : what;
   }
   const bad = (t: string) => /\bundefined\b|\bnull\b|\bNaN\b/.test(t);

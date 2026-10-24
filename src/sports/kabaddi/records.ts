@@ -17,6 +17,9 @@ export function kabaddiMatchRecords(s: KabaddiState): MatchRecordsBlock | null {
   const items = scoreItems(s.home, s.away, { teamHigh: true, biggestWin: true });
   let totals: ReturnType<typeof kabaddiTotals> = {};
   try { totals = kabaddiTotals(s); } catch { totals = {}; }
+  // IDs-only scoring: the block is stored in the public `matches.state`, so a
+  // record names its player by id; only an older log's stored name (legacy,
+  // pre IDs-only) still rides along as `playerName` — never a new one.
   const names = new Map<string, string>();
   for (const r of s.raids ?? []) {
     if (r.raiderId && r.raider) names.set(r.raiderId, r.raider);
