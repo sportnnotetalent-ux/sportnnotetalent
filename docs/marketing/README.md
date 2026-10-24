@@ -65,7 +65,7 @@ A post marked "only if SDxxx is in the live build" stays unscheduled until that 
 
 | Platform | What to create | Handle / URL (first choice) | Notes |
 |---|---|---|---|
-| Instagram | Professional account → Business, category "App page" | @sportnnote | Turn on the "AI info" label workflow before the first AI-voiced Reel. Link a Facebook Page so posts can be scheduled from Meta Business Suite. |
+| Instagram | Professional account → Business, category "Software" (Instagram doesn't offer "App page"; fallback "Internet company", then "Product/service" — not a sports category, which reads as a club or team) | @sportnnote | Turn on the "AI info" label workflow before the first AI-voiced Reel. Link a Facebook Page so posts can be scheduled from Meta Business Suite. |
 | Facebook | Page (needed by Instagram's business tools; light posting) | facebook.com/sportnnote | Owned by a Meta Business portfolio in the company's name, not a personal profile. |
 | LinkedIn | Company page (the founder's own profile is the admin and posts the founder pieces) | linkedin.com/company/sportnnote | Add a second admin when there is one. Company pages reshare the founder's posts (7 Apr, 14/21/28 Apr). |
 | YouTube | Channel on a Brand Account (so ownership can be shared or transferred) | @sportnnote | Verify the channel (phone) for custom thumbnails and videos over 15 minutes. "Altered or synthetic content" is set per video. |
@@ -80,7 +80,7 @@ A post marked "only if SDxxx is in the live build" stays unscheduled until that 
   - LinkedIn About (first line): `SportnNote helps schools, clubs and organisers score every sport the way its federation does, and keeps every result, record and career page in one place.`
   - YouTube description: `How-tos for scoring 29 sports and running sports days, leagues and tournaments on SportnNote. Some videos use an AI presenter and voice; we always say so in the description. Guides: sportnnote.in/guides`
 - **Account hygiene:** sign up with a company address (e.g. a shared social@ mailbox on the company domain), not a personal one; two-factor authentication on every account; record who holds admin access in the company's own password manager (never in this repo or in chat).
-- **Category and contact:** "Software" / "App page"; contact button = the support email on sportnnote.in/support/. No phone number on public profiles.
+- **Category and contact:** "Software" everywhere (Instagram has no "App page"); contact button = the support email on sportnnote.in/support/. No phone number on public profiles.
 - **Before the first post:** the handles are reserved and the profiles complete, but nothing is posted until a post is Approved (see Approval flow). Update "@sportnnote (handles not created yet)" at the top of this README and in the calendar once they exist.
 
 ### Paid promotion: points for the discussion
