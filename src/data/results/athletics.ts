@@ -693,6 +693,31 @@ export function meetFieldResults(events: MeetEvent[], cfg: PointsSettings = {}, 
   return out;
 }
 
+/** QR-verified certificates: each finished final's medallists as player ids —
+ *  the athlete, or every member of a relay / crew. Combined events credit the
+ *  athlete the award row stands for. */
+export function meetMedalists(events: MeetEvent[], cfg: PointsSettings = {}): { event: string; medal: 'gold' | 'silver' | 'bronze'; sport: string; teamName?: string; playerIds: string[] }[] {
+  const out: { event: string; medal: 'gold' | 'silver' | 'bronze'; sport: string; teamName?: string; playerIds: string[] }[] = [];
+  const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  for (const e of events) {
+    const r = finalAwards(e, cfg);
+    const def = disciplineOf(e.discipline);
+    if (!r || !def) continue;
+    const cat = categoryLabel(e.category);
+    const title = cat && !e.title.includes(cat) ? `${e.title} ${cat}` : e.title;
+    const entries = e.phases.flatMap((p) => p.entries);
+    for (const a of r.awards) {
+      if (!a.medal) continue;
+      const entry = entries.find((x) => x.id === a.entryId);
+      const ids = entry
+        ? (entry.athleteId ? [entry.athleteId] : (entry.result.members ?? []).map((m) => m.playerId).filter((x): x is string => !!x))
+        : (UUID.test(a.entryId) ? [a.entryId] : []);
+      if (ids.length) out.push({ event: title, medal: a.medal, sport: def.sport, teamName: a.team?.name, playerIds: [...new Set(ids)] });
+    }
+  }
+  return out;
+}
+
 export interface EventLeader { eventKey: string; title: string; category: string; discipline: string; name: string; team?: string; athleteId?: string; mark: number; text: string; legal: boolean; flags: string[] }
 
 /** The best mark of each event over all its rounds (fastest time; SD-91: the

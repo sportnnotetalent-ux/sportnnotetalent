@@ -21,12 +21,12 @@ function expoPrint(): PrintApi | null {
 
 export const canPrint = (): boolean => !!expoPrint();
 
-export async function printSheet(html: string, opts: { autoPrint?: boolean; fallbackText?: string } = {}): Promise<PrintOutcome> {
+export async function printSheet(html: string, opts: { autoPrint?: boolean; fallbackText?: string; landscape?: boolean } = {}): Promise<PrintOutcome> {
   const p = expoPrint();
   if (p) {
     try {
-      // A4 at 72 PPI (595 × 842 pt); the sheet's own CSS sets the margins.
-      await p.printAsync({ html: html.replace(/<div class="bar">[\s\S]*?<\/div>/, ''), width: 595, height: 842 });
+      // A4 at 72 PPI (595 × 842 pt, turned for landscape — certificates); the sheet's own CSS sets the margins.
+      await p.printAsync({ html: html.replace(/<div class="bar">[\s\S]*?<\/div>/, ''), width: opts.landscape ? 842 : 595, height: opts.landscape ? 595 : 842 });
       return 'printed';
     } catch (e) {
       // closing the dialog isn't a failure

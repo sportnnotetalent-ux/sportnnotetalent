@@ -13,6 +13,36 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-25 — QR-verified certificates
+Founder chose the first "hard to copy" item: certificates schools can print in bulk and anyone can check, because the proof lives in SportnNote's database.
+- **Migration `20261025090000_certificates.sql`:**
+  - **`certificates` table:** stores the player id, kind (`champion` / `runner_up` / `third` / `award` / `medal` / `participation`), title, detail, sport, team, date, issuer and revocation. It holds **no names**. A 10-character code (no O/0, I/1; ~50 bits). One per achievement (a unique index).
+  - **Writes:** only through `issue_certificates(tournament, items)` (the tournament's managers; up to 2,000 at a time; a singles entry's name is masked for a possible minor) and `revoke_certificate`.
+  - **Reads:** RLS lets the holder, their linked parent, the tournament's managers and support see them. `my_certificates()` returns your own and your children's.
+  - **`verify_certificate(code)`** (anon too) returns: holder by `public_person_name` (an adult by name, a possible minor by initials), achievement, event, team, date, issuer (+ verified school ✓), and revoked + reason.
+- **App:**
+  - **`core/certificates.ts` (pure):** item builders (placements → every squad member; published awards; meet medals → every relay member; participation once per player; dedupe), `formatCode`, `certificateUrl`, and `certificatesHtml`: A4 landscape, one per page, name / achievement / event / team / date / issuer / QR + code, "REVOKED" overlay, everything escaped.
+  - **`core/qrSvg.ts`:** QR as SVG via `qrcode`.
+  - **`data/certificatePlaces.ts`:** champion / runner-up / third from the knockout final (two legs) and the third-place match.
+  - **`results/athletics.ts`:** new `meetMedalists`.
+  - **`data/certificates.ts`:** issue / list / mine / verify / revoke / print (organisers and holders print full names: they're in the circle). Demo keeps them in memory.
+  - **Print:** `printSheet` takes `landscape` (phone: 842×595).
+  - **Screens:**
+    - **Certificates** (organisers; Tournament → organiser hub → 📜 Certificates):
+      - places per sport, pre-filled from the knockout and changeable, with squad sizes;
+      - Awards / Meet medals / Participation toggles;
+      - "Issue N certificates";
+      - Print all, or by kind;
+      - each certificate with its code + Revoke.
+      - Teams include every team that played; squads fall back to the match screens' roster read (school houses).
+    - **Certificate:** public `c/:code` (signed out too): ✓ genuine / ⚠ revoked / ✗ not found, plus code entry.
+    - **Profile:** "📜 Certificates" (yours + your children's), with Print and Share check link.
+- **Verified:**
+  - `tests/certificates.test.mts` (7: codes, item builders, knockout places, sheet with 2 pages / 2 QRs / escaping / revoked, server rules); suite 4611 pass / 0 fail; tsc clean.
+  - Demo, Karnataka State Cup: champion Falcons FC + runner-up City Strikers gave "28 new certificates", then Issue gave "28 issued", then Print all produced 28 landscape pages each with a QR (looked at one: name, Champions, event, team, date, issuer, QR + `U754-W3Y8-JR`).
+  - `/c/<code>` opens signed out; an unknown code gets a clear "not found". No console errors.
+- **Needs:** the founder runs the migration; publish. A real certificate's "genuine" page is then checked on live.
+
 ### 2026-10-24 — IDs-only scoring: invasion sports (B) merged — every sport is IDs-only; line-ups; privacy check
 - **Group B** (football, hockey, handball, ice hockey, netball, rugby, rugby league, American football; merge `2382ec0`):
   - **Credits and stamps:** `creditAttribution` writes no names. XI / GK / position stamps are `{id}`; SUB is `offId` / `onId`; shoot-out kicks are ids.

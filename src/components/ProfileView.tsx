@@ -19,6 +19,7 @@ import { ageFromDob, ageOf, isMinor } from '../core/age';
 import { notify } from '../core/notifications';
 import { useVerificationReviewer } from '../data/useVerificationReviewer';
 import { VerificationChecklist } from './VerificationChecklist';
+import { MyCertificatesCard } from './MyCertificatesCard';
 import { useAuth } from '../core/auth';
 import { isSupport } from '../core/roles';
 import { TextField } from './ui';
@@ -280,6 +281,8 @@ export function ProfileView({
 
       {/* Fast lanes Phase 3: one checklist — what's done and the next step. */}
       {onEditProfile && ownProfile ? <VerificationChecklist player={player} onEditProfile={onEditProfile} /> : null}
+      {/* QR-verified certificates: yours (and your children's, as a linked parent) */}
+      {ownProfile ? <MyCertificatesCard playerId={player.id} /> : null}
       {onEditProfile && (player.phone || player.email) && (
         <ContactCard
           playerId={player.id}

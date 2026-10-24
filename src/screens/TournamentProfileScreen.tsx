@@ -816,6 +816,7 @@ export default function TournamentProfileScreen() {
               );
             })}
             <HubRow icon="🏆" title="Points table" status="Adjust points, view groups" onPress={() => nav.navigate('Standings', { tournamentId: tournament.id })} />
+            <HubRow icon="📜" title="Certificates" status="Champions, awards, medals — printable, with a QR anyone can check" onPress={() => nav.navigate('Certificates', { tournamentId: tournament.id })} />
 
             <SectionHeader title="Teams" />
             <HubRow icon="👥" title="Participating teams" status={participants.length ? `${participants.length} team${participants.length === 1 ? '' : 's'}` : 'None yet — add them'} onPress={() => nav.navigate('TournamentTeams', { tournamentId: tournament.id })} />

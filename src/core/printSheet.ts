@@ -4,7 +4,7 @@
  *  from a hidden frame on this page. */
 export type PrintOutcome = 'opened' | 'printed' | 'shared' | 'failed';
 
-export async function printSheet(html: string, opts: { autoPrint?: boolean; fallbackText?: string } = {}): Promise<PrintOutcome> {
+export async function printSheet(html: string, opts: { autoPrint?: boolean; fallbackText?: string; landscape?: boolean } = {}): Promise<PrintOutcome> {
   if (typeof window === 'undefined') return 'failed';
   const w = window.open('', '_blank');
   if (w) {

@@ -87,6 +87,10 @@ export type RootStackParamList = {
   ManageChild: { playerId: string };
   /** Verification fast lanes: a verified school / club confirms members' dates of birth */
   OrgDobs: { orgId: string };
+  /** QR-verified certificates: a tournament's organisers issue + print them */
+  Certificates: { tournamentId: string };
+  /** the public page a certificate's QR opens (app.sportnnote.in/c/CODE) */
+  Certificate: { code: string };
   /** Support: reported-message queue (migration 0027). */
   MessageReports: undefined;
   /** Golf (field event) — a round's scorecard + leaderboard, and its setup. */
