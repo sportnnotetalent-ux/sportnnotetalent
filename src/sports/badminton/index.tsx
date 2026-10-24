@@ -13,6 +13,8 @@ import { courtFormation, makeCourt } from '../courts';
 import { pointVoice } from '../voiceParsers';
 import { MatchBoxScore } from '../../components/BoxScore';
 import { badmintonBox } from '../boxSources';
+import { useMask } from '../../core/disputeMask';
+import { pointAction } from '../racketActions';
 import { SetLineBoard } from '../SetLineBoard';
 import { RallyPointEditor } from '../RallyPointEditor';
 import { MatchStatsPanel } from '../MatchStatsPanel';
@@ -39,7 +41,8 @@ const ScoringControls: SportPlugin<BadmintonState>['ScoringControls'] = ({ state
   // SD-54 — scoring steps carry the scorer's clock (match / game durations)
   const dispatch = stampDispatch(rawDispatch);
   const point = (side: 'home' | 'away', p?: Player) =>
-    dispatch({ type: 'POINT', side, attribution: p ? { playerId: p.id, stat: 'points', playerName: p.fullName } : undefined });
+    // IDs-only scoring: the credit carries the player's id, never the name
+    dispatch(pointAction(side, p));
   // Serve: chosen first server before any point, then the rally winner serves.
   const sv = serve(s);
   const serverSideName = sv.side === 'home' ? homeName : awayName;
@@ -107,6 +110,8 @@ const BadmintonCommentary = ({ state, homeName, awayName, homeColor, awayColor, 
 );
 const BadmintonStats = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster, onPlayer }: TabProps) => {
   const s = state as BadmintonState;
+  // IDs-only scoring: box-score names by player id for this viewer
+  const { nameOf } = useMask();
   return (
     <View style={{ gap: theme.spacing(3) }}>
       {/* SD-22 / deep wave: key stats, serve, shots, rally length — replayed from the point log, per game */}
@@ -114,7 +119,7 @@ const BadmintonStats = ({ state, homeName, awayName, homeColor, awayColor, homeR
       {/* SD-54 — match and game durations (from the scorer's tap times) */}
       {durationLine(s.events, 'G') ? <Text style={textStyles.muted}>{durationLine(s.events, 'G')}</Text> : null}
       <Text style={ctrl.label}>Player stats</Text>
-      <MatchBoxScore sport="badminton" source={badmintonBox(s, { homeRoster, awayRoster })} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} onPlayer={onPlayer} />
+      <MatchBoxScore sport="badminton" source={badmintonBox(s, { homeRoster, awayRoster, nameOf })} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} onPlayer={onPlayer} />
     </View>
   );
 };

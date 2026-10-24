@@ -45,6 +45,12 @@ export interface Attribution {
   playerId: string;
   stat: string;
   by?: number;
+  /** @deprecated legacy, read-only (pre IDs-only scoring —
+   *  docs/privacy/ids-only-scoring.md). Match events are public, so new
+   *  actions carry `playerId` only and names are looked up when shown
+   *  (`NameOf`, core/playerNames). Racket sports + volleyball no longer
+   *  write it; the other sports still do until their stage converts them.
+   *  Reducers still read it so old logs replay identically. */
   playerName?: string;
   /** extra stat increments credited in the same action, e.g. a shot on target
    *  is {shotsOnTarget: 1} on top of stat:'shots'. */

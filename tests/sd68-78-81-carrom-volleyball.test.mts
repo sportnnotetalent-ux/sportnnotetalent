@@ -183,18 +183,18 @@ function detailedMatch() {
 describe('SD-81 · attack tally + efficiency', () => {
   test('kills / errors / blocked / in play per attacker (only rallies with detail on)', () => {
     const s = detailedMatch();
-    const t = vd.detailTally(s);
-    const asha = t.get('home|Asha')!;
+    const t = vd.detailTally(s); // IDs-only scoring: keyed "side|player id"
+    const asha = t.get('home|h1')!;
     assert.deepEqual([asha.attackAttempts, asha.attackKills, asha.attackErrors, asha.attacksBlocked], [7, 3, 1, 1]);
     assert.equal(vd.attackEfficiency(asha), (3 - 1 - 1) / 7);
-    const dia = t.get('away|Dia')!;
+    const dia = t.get('away|a2')!;
     assert.deepEqual([dia.attackAttempts, dia.attackKills], [2, 1]);
-    const chitra = t.get('home|Chitra')!;
+    const chitra = t.get('home|h2')!;
     assert.deepEqual([chitra.receptions, chitra.receptionsPerfect, chitra.receptionsPositive], [3, 1, 2]);
   });
   test('switching off stops counting', () => {
     const s = vplay([ON, kill('home', H[0]), OFF, kill('home', H[0])]);
-    assert.equal(vd.detailTally(s).get('home|Asha')!.attackKills, 1);
+    assert.equal(vd.detailTally(s).get('home|h1')!.attackKills, 1);
     assert.equal(vd.detailOn(s), false);
     assert.equal(vd.detailTracked(s), true);
   });

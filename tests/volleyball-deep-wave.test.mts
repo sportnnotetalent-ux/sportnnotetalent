@@ -44,6 +44,9 @@ const lineup: ScoreAction[] = [
 const det = (kind: string, side: Side, p: { id: string; fullName: string }, q?: string): ScoreAction =>
   ({ type: 'VB_DETAIL', side, payload: { kind, player: { playerId: p.id, playerName: p.fullName }, ...(q ? { q } : {}) } });
 const NAMES = { home: 'Italy', away: 'Poland' };
+/** IDs-only scoring: the scorer's actions carry ids; the commentary names
+ *  players from the squads by id (the live screen passes the viewer's `nameOf`). */
+const SQUADS = { ...NAMES, homeRoster: H, awayRoster: A };
 
 describe('deep wave · Stats to track categories', () => {
   test('format keys: none → nothing stamped; legacy detail → SD-81 shape; categories → cats', () => {
@@ -128,15 +131,15 @@ describe('deep wave · new detail entries', () => {
     s = vb.reducer(s, vb.outcomeAction('ace', 'home', H[0]));
     s = vb.reducer(s, det('aced', 'away', A[0]));
     s = vb.reducer(s, det('dig', 'home', H[5]));
-    const t = detailTally(s);
-    const uma = t.get('away|Uma')!;
+    const t = detailTally(s); // IDs-only scoring: keyed "side|player id"
+    const uma = t.get('away|a1')!;
     assert.equal(uma.receptions, 2);
     assert.equal(uma.receptionsPerfect, 1);
     assert.equal(uma.receptionErrors, 1);
     assert.equal(receptionEfficiency(uma), 0);
-    assert.equal(t.get('away|Wren')!.setAssists, 1);
-    assert.equal(t.get('home|Fara')!.digs, 1);
-    assert.equal(t.get('away|Vani')!.attackKills, 1); // attack was on for that rally
+    assert.equal(t.get('away|a3')!.setAssists, 1);
+    assert.equal(t.get('home|h6')!.digs, 1);
+    assert.equal(t.get('away|a2')!.attackKills, 1); // attack was on for that rally
   });
 });
 
@@ -261,7 +264,7 @@ describe('deep wave · commentary', () => {
     acts.push(vb.outcomeAction('opperror', 'home', undefined, { err: 'net', by: A[0] }));
     acts.push(vb.outcomeAction('serveerror', 'away'));
     const s = play(acts, { setsToWin: 2 });
-    const g = volleyballCommentary(s, NAMES);
+    const g = volleyballCommentary(s, SQUADS);
     assert.deepEqual(g.map((x) => x.title), ['Set 2', 'Set 1']);
     assert.equal(g[1].sub, 'Italy won 25-1');
     const set1 = g[1].entries;
@@ -294,7 +297,7 @@ describe('deep wave · commentary', () => {
     s = vb.reducer(s, vb.stampAction(vb.outcomeAction('attack', 'home', H[0]), t0));
     s = vb.reducer(s, det('assist', 'home', H[1]));
     s = vb.reducer(s, vb.stampAction(vb.outcomeAction('ace', 'home', H[0]), t0 + 3 * 60_000));
-    const g = volleyballCommentary(s, NAMES);
+    const g = volleyballCommentary(s, SQUADS);
     const kill = g[0].entries.find((e) => e.text.includes('kill'))!;
     assert.equal(kill.text, 'Point Italy — kill by Asha (set by Bela)');
     assert.equal(kill.detail, '🏐 Uma serving · reception # Diya · dig Zoya');

@@ -17,6 +17,7 @@ import { pointPressure } from '../src/sports/pointStatus.ts';
 import { trackedIn } from '../src/sports/statSchema.ts';
 import * as kb from '../src/sports/kabaddi/engine.ts';
 import type { ScoreAction } from '../src/sports/types.ts';
+import { rallySentence } from '../src/sports/volleyball/commentary.ts';
 
 type Side = 'home' | 'away';
 const A = { id: 'h1', fullName: 'Asha' };
@@ -75,14 +76,18 @@ describe('SD-117b volleyball — "Opp. fault" detail', () => {
   test('type + erring opponent ride on the event; the opponent is charged one error', () => {
     const a = vb.outcomeAction('opperror', 'home', undefined, { err: 'net', by: B });
     assert.deepEqual(a.payload, { err: 'net' });
-    assert.deepEqual(a.attribution2, { playerId: 'a1', stat: 'errors', playerName: 'Bela', side: 'away' }); // SD-119: the erring player's side
+    // IDs-only scoring: the erring opponent by id (match events are public)
+    assert.deepEqual(a.attribution2, { playerId: 'a1', stat: 'errors', side: 'away' }); // SD-119: the erring player's side
     assert.equal(a.attribution, undefined);
     const s = vplay([a]);
     const e = s.events[0];
     assert.equal(e.kind, 'opperror');
-    assert.deepEqual(e.oe, { type: 'net', playerName: 'Bela', playerId: 'a1' });
+    assert.deepEqual(e.oe, { type: 'net', playerId: 'a1' });
     assert.equal(e.playerName, undefined); // nobody on the scoring side is credited
-    assert.match(e.detail ?? '', /Net touch · Bela/);
+    assert.equal(e.detail, '1-0 · Net touch'); // no name stored
+    // the name is put back when shown, by id
+    const names = { home: 'Lions', away: 'Tigers', nameOf: (id?: string | null) => (id === 'a1' ? 'Bela' : 'Player') };
+    assert.equal(rallySentence(e, names), 'Point Lions — net touch by Bela (Tigers)');
   });
   test('a plain fault (no detail) logs exactly as before', () => {
     const s = vplay([vb.outcomeAction('opperror', 'home')]);
@@ -111,12 +116,12 @@ describe('SD-117b volleyball — "Opp. fault" detail', () => {
   test('a timeline correction keeps the fault detail and reconciles errors', () => {
     const s = vplay([vb.outcomeAction('opperror', 'home', undefined, { err: 'rotation', by: B }), ...pts('away', 2)]);
     const list = pointInputs(s.events);
-    assert.deepEqual(list[0].oe, { type: 'rotation', playerName: 'Bela', playerId: 'a1' });
+    assert.deepEqual(list[0].oe, { type: 'rotation', playerId: 'a1' });
     // remove one of the away points: the fault survives the replay
     const edited: PointInput[] = [list[0], list[1]];
     const [edit, ...adj] = correctionActions(list, edited, () => undefined, vb.volleyballCredits);
     const r = vb.reducer(s, edit);
-    assert.deepEqual(r.events[0].oe, { type: 'rotation', playerName: 'Bela', playerId: 'a1' });
+    assert.deepEqual(r.events[0].oe, { type: 'rotation', playerId: 'a1' });
     assert.deepEqual(adj, []);
     // drop the fault: Bela's error is taken back
     const [, ...adj2] = correctionActions(list, [list[1], list[2]], () => undefined, vb.volleyballCredits);

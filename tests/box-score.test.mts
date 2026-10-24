@@ -91,7 +91,17 @@ function basketballGame(withFive: boolean): BasketballState {
 const VB_H = [P('va', 'Asha'), P('vb', 'Bina'), P('vc', 'Chitra')];
 const VB_A = [P('vx', 'Xena'), P('vy', 'Yami')];
 const vbPlay = (acts: ScoreAction[], cfg = {}) => acts.reduce(vbReducer, vbInit(cfg));
-function volleyballMatch(outcomes: boolean): VolleyballState {
+/** IDs-only scoring: the scorer's actions carry ids only; `named` turns them
+ *  into the log an older app wrote (the credited player's name alongside). */
+const vbNamed = (a: ScoreAction): ScoreAction => {
+  const nm = (id?: string) => [...VB_H, ...VB_A].find((p) => p.id === id)?.fullName;
+  return {
+    ...a,
+    ...(a.attribution ? { attribution: { ...a.attribution, playerName: a.attribution.playerName ?? nm(a.attribution.playerId) } } : {}),
+    ...(a.attribution2 ? { attribution2: { ...a.attribution2, playerName: a.attribution2.playerName ?? nm(a.attribution2.playerId) } } : {}),
+  };
+};
+function volleyballMatch(outcomes: boolean, named = true): VolleyballState {
   const [a, b, c] = VB_H; const [x, y] = VB_A;
   const acts: ScoreAction[] = [];
   // set 1 to 25-20, set 2 to 18-25, set 3 partial — kinds rotate
@@ -101,7 +111,7 @@ function volleyballMatch(outcomes: boolean): VolleyballState {
     : [{ type: 'POINT', side: 'away', attribution: { playerId: x.id, stat: 'points', playerName: x.fullName } }] as ScoreAction[];
   const set = (h: number, w: number) => { for (let i = 0; i < Math.max(h, w); i++) { if (i < h) acts.push(home[(acts.length + i) % home.length]); if (i < w) acts.push(away[(acts.length + i) % away.length]); } };
   set(25, 20); set(18, 25); set(7, 4);
-  return vbPlay(acts, { setsToWin: 3 });
+  return vbPlay(named ? acts.map(vbNamed) : acts, { setsToWin: 3 });
 }
 
 const KB_H = [P('kr', 'Ravi'), P('kd', 'Dev'), P('ks', 'Sunil')];
@@ -202,13 +212,19 @@ describe('SD-23 · golden: the shared table equals the old components', () => {
   });
   test('volleyball, outcomes logged and legacy "Point"-only, every set', () => {
     for (const outcomes of [true, false]) {
-      const s = volleyballMatch(outcomes);
-      const src = volleyballBox(s, { homeRoster: VB_H, awayRoster: VB_A });
-      assert.equal(src.periods.length, 3);
-      for (const sc of scopes(src)) {
-        const t = buildBoxTable(STAT_SCHEMAS.volleyball, src.data(sc), { scope: sc });
-        for (const sd of SIDES) assertSame(legacyVolleyball(s.events, sd, sc), t, sd, {}, `set ${sc}`);
-        assert.equal(abbrs(t).includes('ATK'), outcomes, 'ATK only when outcomes were logged (D8)');
+      // the old components drew an older (named) log …
+      const old = volleyballMatch(outcomes, true);
+      // … the shared box draws it, and an IDs-only log of the same match
+      // (names from the squads by id), exactly the same
+      for (const named of [true, false]) {
+        const s = volleyballMatch(outcomes, named);
+        const src = volleyballBox(s, { homeRoster: VB_H, awayRoster: VB_A });
+        assert.equal(src.periods.length, 3);
+        for (const sc of scopes(src)) {
+          const t = buildBoxTable(STAT_SCHEMAS.volleyball, src.data(sc), { scope: sc });
+          for (const sd of SIDES) assertSame(legacyVolleyball(old.events, sd, sc), t, sd, {}, `set ${sc}${named ? '' : ' (ids only)'}`);
+          assert.equal(abbrs(t).includes('ATK'), outcomes, 'ATK only when outcomes were logged (D8)');
+        }
       }
     }
   });

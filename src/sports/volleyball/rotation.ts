@@ -7,6 +7,9 @@
  * REVIEW Decision 8). They are STATE STAMPS, not timeline events, so a
  * timeline correction (EDIT_LOG) keeps them:
  *   SET_SERVE     payload { side, set? }         first server of a set (the toss)
+ * IDs-only scoring (docs/privacy/ids-only-scoring.md): the players in these
+ * payloads are `{ id }` only — an older log's `{ id, name }` keeps its name
+ * (legacy, read-only); readers show `nameOf(id, name)`.
  *   SET_ROTATION  payload { team, players, set?, liberos? }
  *                 the starting rotation, positions I–VI in order (I = server),
  *                 plus up to 2 liberos (FIVB 19.1.1)
@@ -28,6 +31,7 @@
 import type { CourtPlayer, VolleyballState } from './engine.ts';
 import { barredPlayers } from './sanctions.ts';
 import type { ScoreAction } from '../types';
+import type { NameOf } from '../../core/playerNames';
 
 type Side = 'home' | 'away';
 const flip = (s: Side): Side => (s === 'home' ? 'away' : 'home');
@@ -65,7 +69,8 @@ const scoredIn = (s: VolleyballState, n: number) =>
 
 const cleanPlayer = (p: unknown): CourtPlayer | null => {
   const x = p as { id?: unknown; name?: unknown } | null;
-  return x && x.id ? { id: String(x.id), name: String(x.name ?? '') } : null;
+  // IDs-only scoring: an id only; an older payload's name is kept as it was
+  return x && x.id ? (x.name != null ? { id: String(x.id), name: String(x.name) } : { id: String(x.id) }) : null;
 };
 const cleanList = (v: unknown): CourtPlayer[] | null =>
   Array.isArray(v) ? v.map(cleanPlayer).filter((p): p is CourtPlayer => !!p) : null;
@@ -134,7 +139,10 @@ export function rotationFor(s: VolleyballState, n: number, side: Side): { player
 export const liberosOf = (s: VolleyballState, side: Side): CourtPlayer[] => s.liberos?.[side] ?? [];
 
 export interface RallyServe {
-  set: number; side: Side | null; serverId?: string; serverName?: string; /** SD-136: a penalty point (no rally served) */ pen?: true;
+  set: number; side: Side | null; serverId?: string;
+  /** legacy, read-only: the name an older rotation stamp stored — show `nameOf(serverId, serverName)` */
+  serverName?: string;
+  /** SD-136: a penalty point (no rally served) */ pen?: true;
   /** deep wave — the player at position I of each side whose rotation is
    *  known (the "rotation" the side played the rally in — rotation analysis) */
   atI?: { home?: CourtPlayer; away?: CourtPlayer };
@@ -226,7 +234,7 @@ export function trackCourt(s: VolleyballState): VbTrack {
       const hI = ord.home ? c.home?.[0] : undefined;
       const aI = ord.away ? c.away?.[0] : undefined;
       out[order.get(pts[i])!] = {
-        set: n, side: S, ...(srv ? { serverId: srv.id, serverName: srv.name } : {}), ...(e.pen ? { pen: true as const } : {}),
+        set: n, side: S, ...(srv ? { serverId: srv.id, ...(srv.name ? { serverName: srv.name } : {}) } : {}), ...(e.pen ? { pen: true as const } : {}),
         ...(hI || aI ? { atI: { ...(hI ? { home: { ...hI } } : {}), ...(aI ? { away: { ...aI } } : {}) } } : {}),
       };
       // side-out: the team that wins the serve back rotates one place (FIVB 7.6.2)
@@ -271,7 +279,7 @@ export interface SubCheck {
  * blocks — the scorer confirms (the referee decides; an exceptional sub or a
  * sanction may make it legal).
  */
-export function checkSub(s: VolleyballState, side: Side, off: CourtPlayer, on: CourtPlayer, want?: SubKind): SubCheck {
+export function checkSub(s: VolleyballState, side: Side, off: CourtPlayer, on: CourtPlayer, want?: SubKind, nameOf?: NameOf): SubCheck {
   const n = setNoOf(s);
   const subs = (s.subs ?? []).filter((x) => x.set === n && x.side === side);
   const regular = subs.filter((x) => x.kind === 'regular');
@@ -279,7 +287,8 @@ export function checkSub(s: VolleyballState, side: Side, off: CourtPlayer, on: C
   const t = trackCourt(s);
   const issues: string[] = [];
   const at = scoredIn(s, n).length;
-  const nm = (p: CourtPlayer) => p.name || 'player';
+  // IDs-only scoring: names for the scorer by id (a legacy stamp's name as the fallback)
+  const nm = (p: CourtPlayer) => (nameOf ? nameOf(p.id, p.name) : p.name || 'player');
   // SD-136: an expelled (this set) or disqualified player can't come on (FIVB 21.3.2 / 21.3.3)
   const barred = barredPlayers(s.events, side, n).find((b) => b.id === on.id);
   if (barred) issues.push(`${nm(on)} was ${barred.why === 'expulsion' ? 'expelled for this set (FIVB 21.3.2)' : 'disqualified for the match (FIVB 21.3.3)'}`);
@@ -322,17 +331,18 @@ export function checkSub(s: VolleyballState, side: Side, off: CourtPlayer, on: C
 
 /** A libero standing where FIVB doesn't allow one (front row, or at I when
  *  the team serves — FIVB 19.3.1.2 / 19.3.1.3). Null = fine / not known. */
-export function liberoCue(s: VolleyballState, side: Side, t: VbTrack = trackCourt(s)): string | null {
+export function liberoCue(s: VolleyballState, side: Side, t: VbTrack = trackCourt(s), nameOf?: NameOf): string | null {
   const court = t.court[side];
   if (!court || !t.ordered[side] || !sixCourt(s)) return null;
   const libs = new Set(liberosOf(s, side).map((p) => p.id));
   if (!libs.size) return null;
   const i = court.findIndex((p) => libs.has(p.id));
   if (i < 0) return null;
-  const who = court[i].name;
+  const nm = (p: CourtPlayer) => (nameOf ? nameOf(p.id, p.name) : p.name ?? '');
+  const who = nm(court[i]);
   const n = setNoOf(s);
   const lastIn = [...(s.subs ?? [])].reverse().find((x) => x.set === n && x.side === side && x.kind === 'libero' && x.on.id === court[i].id);
-  const back = lastIn ? ` — bring ${lastIn.off.name} back` : '';
+  const back = lastIn ? ` — bring ${nm(lastIn.off)} back` : '';
   if (FRONT_ROW.has(i)) return `Libero ${who} is in the front row (${POSITIONS[i]})${back}`;
   if (i === 0 && t.serving === side) return `Libero ${who} can't serve${back}`;
   return null;

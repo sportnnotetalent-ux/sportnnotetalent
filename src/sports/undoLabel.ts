@@ -6,6 +6,7 @@
  * the bar falls back to a plain "Undo".
  */
 import type { LiveEvent } from './liveEvents';
+import { eventWho, markDetail, whoName, type NameOf } from './racketNames.ts';
 
 type Side = 'home' | 'away';
 
@@ -32,7 +33,9 @@ const eventsOf = (s: unknown): LiveEvent[] | null => {
 
 export function undoLabel(
   step: { type: string; prev: unknown; next: unknown } | null | undefined,
-  names: { home: string; away: string },
+  /** `player` (IDs-only scoring): a player's name by id — the racket and
+   *  volleyball logs keep ids; absent → an older log's stored name */
+  names: { home: string; away: string; player?: NameOf },
   /** "30-15" — the live score after the step (plugin summary) */
   scoreOf?: (s: unknown) => string | null,
 ): string | null {
@@ -47,14 +50,18 @@ export function undoLabel(
   const name = (s?: Side) => (s === 'home' ? names.home : s === 'away' ? names.away : '');
   let head: string;
   // SD-53 / SD-54 / SD-63 — "code violation · point penalty · Nadal", "timeout · Home", "let"
+  // IDs-only scoring: the player by id (an older log's stored name as the fallback)
+  const nameOf: NameOf = names.player ?? ((_id, legacy) => (legacy ?? '').trim() || 'Player');
+  const credited = eventWho(p, nameOf);
   if (p.pen || p.kind === 'conduct' || p.kind === 'timeout' || p.kind === 'let') {
     const what = (p.label ?? '').trim().replace(/^./, (c) => c.toLowerCase());
-    const who = p.pen ? p.pen.playerName ?? name(p.pen.by) : p.playerName ?? (p.detail && p.kind === 'timeout' ? p.detail : name(p.side));
+    const who = p.pen ? whoName(nameOf, p.pen.playerId, p.pen.playerName) ?? name(p.pen.by)
+      : credited ?? (p.kind === 'timeout' ? markDetail(p, nameOf) || name(p.side) : name(p.side));
     head = who && p.kind !== 'let' ? `${what} · ${who}` : what;
   } else if (p.kind === 'rally') head = `rally to ${name(p.wonBy)}${p.label ? ` · ${p.label.toLowerCase()}` : ''}`;
   else if (p.df) head = `double fault → point to ${name(p.side)}`;
-  else if (p.kind === 'ace' || (p.kind === 'point' && p.pd?.how === 'ace')) head = `ace · ${p.playerName ?? name(p.side)}`;
-  else if (p.kind === 'point') head = `point to ${p.playerName ?? name(p.side)}`;
+  else if (p.kind === 'ace' || (p.kind === 'point' && p.pd?.how === 'ace')) head = `ace · ${credited ?? name(p.side)}`;
+  else if (p.kind === 'point') head = `point to ${credited ?? name(p.side)}`;
   else {
     // Other sports: the timeline label (some events carry none — never print
     // "undefined"; with nothing to name, fall back to the plain "Undo").

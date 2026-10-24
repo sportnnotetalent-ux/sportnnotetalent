@@ -37,6 +37,7 @@ import { cricketCareer, bestBowling, highestScore } from '../src/data/cricketCar
 import { volleyballCredits } from '../src/sports/volleyball/engine.ts';
 import { eventCredits } from '../src/sports/basketball/credits.ts';
 import { defaultCredits } from '../src/sports/rallyEdit.ts';
+import { doubleFaultAction, pointAction } from '../src/sports/racketActions.ts';
 import { roundStats } from '../src/sports/golf/engine.ts';
 import { FIELD_NOTE_STAT } from '../src/sports/cricket/scorecard.ts';
 import { chessResultCredit } from '../src/sports/chess/stats.ts';
@@ -147,6 +148,12 @@ describe('SD-15 — every stat key a plugin writes is declared', () => {
     [{ points: 3, fga: true as const, made: true, reboundType: 'off' as const }, { points: 2, reboundType: 'def' as const }]
       .flatMap((x) => Object.keys(eventCredits({ id: 1, quarter: 1, minute: 0, side: 'home', type, ...x }, false)))));
   for (const sp of RALLY_SPORTS) add(sp, ['point', 'rally'].flatMap((k) => Object.keys(defaultCredits(k as never))));
+  // IDs-only scoring: the racket controls build their credits with the pure
+  // builders (racketActions.ts) — run them for real, per sport that calls them
+  const p = { id: 'p' };
+  for (const sp of ['badminton', 'tennis', 'padel', 'pickleball', 'squash', 'tabletennis'] as SportId[]) add(sp, [pointAction('home', p).attribution!.stat]);
+  add('tennis', [pointAction('home', p, { type: 'ACE' }).attribution!.stat]);
+  for (const sp of ['tennis', 'padel'] as SportId[]) add(sp, [doubleFaultAction('home', p).attribution2!.stat]);
   add('golf', Object.keys(roundStats({ strokes: [3, 4, 5, 6, 2], putts: [1, 2, 2, 1, 1], gir: [true, false, true, true, true], fir: [true, false, null, true, null], penalties: [0, 1, 0, 0, 0] } as never,
     [3, 4, 4, 5, 4].map((par, i) => ({ number: i + 1, par, strokeIndex: i + 1 })) as never, [0, 0, 0, 0, 0])));
   add('cricket', Object.values(FIELD_NOTE_STAT));

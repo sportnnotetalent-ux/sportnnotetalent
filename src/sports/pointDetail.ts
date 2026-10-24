@@ -66,6 +66,7 @@
  * PURE (no React Native): engines, statTotals, the panel and tests import it.
  */
 import type { LiveEvent } from './liveEvents';
+import { legacyNameOf, whoName, type NameOf } from './racketNames.ts';
 
 export type DetailSport = 'tennis' | 'badminton' | 'tabletennis' | 'squash' | 'padel' | 'pickleball';
 type Side = 'home' | 'away';
@@ -87,7 +88,9 @@ export interface PointDetail {
   /** tennis, before SD-157: the point winner won it at the net (read as the
    *  winner's side at the net; new points use the event's `atNet`) */
   net?: true;
-  /** the erring / conceding player (errors, service faults, no-lets) */
+  /** the erring / conceding player (errors, service faults, no-lets).
+   *  IDs-only scoring: new details carry `playerId` only; `playerName` is
+   *  legacy, read-only (an older log stored it). */
   err?: { playerId?: string; playerName?: string };
 }
 
@@ -567,8 +570,9 @@ export const SERVE_DETAIL_KEYS = ['srv1Pts', 'srv1In', 'srv1Won', 'srv2Pts', 'sr
  *  `sport` (deep wave) reads the sport's own shot names and keeps an error's
  *  type beside its shot: "Unforced error (forehand drive, into the net)".
  *  Without it a tennis wing / shot reads as SD-157 did, another sport's shot
- *  by its generic name. */
-export function pdText(pd: PointDetail | undefined | null, names = true, sport?: DetailSport): string {
+ *  by its generic name. IDs-only scoring: `nameOf` names the erring player
+ *  by id for the viewer (without it, only an older log's stored name). */
+export function pdText(pd: PointDetail | undefined | null, names = true, sport?: DetailSport, nameOf: NameOf = legacyNameOf): string {
   if (!pd || !pd.how) return '';
   let st: string | undefined;
   if (sport && sport !== 'tennis') {
@@ -597,7 +601,8 @@ export function pdText(pd: PointDetail | undefined | null, names = true, sport?:
     case 'nolet': t = 'No let'; break;
     default: t = '';
   }
-  if (names && pd.err?.playerName && (pd.how === 'ue' || pd.how === 'fe' || pd.how === 'sf' || pd.how === 'nolet')) t += ` · ${pd.err.playerName}`;
+  const errBy = names && pd.err ? whoName(nameOf, pd.err.playerId, pd.err.playerName) : undefined;
+  if (errBy && (pd.how === 'ue' || pd.how === 'fe' || pd.how === 'sf' || pd.how === 'nolet')) t += ` · ${errBy}`;
   if (pd.net) t += ' · at net';
   return t;
 }

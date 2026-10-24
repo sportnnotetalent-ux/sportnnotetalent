@@ -4,7 +4,7 @@
  *  score. Football ships its own richer, stateful grammar separately. */
 import type { ScoreAction } from './types';
 import type { VoiceContext } from './types';
-import { deburr, resolveSide, attribution, sided, numberFromText, numbersFromText, matchPlayer, withoutTeams } from './voiceMatch.ts';
+import { deburr, resolveSide, attribution, idAttribution, sided, numberFromText, numbersFromText, matchPlayer, withoutTeams } from './voiceMatch.ts';
 import { previewRaid, outPlayers, type KabaddiState } from './kabaddi/engine.ts';
 import { outcomeAction } from './volleyball/engine.ts';
 import { creditAttribution, ftCredits, makeCredits, missCredits } from './basketball/credits.ts';
@@ -29,7 +29,8 @@ export function pointVoice(text: string, ctx: VoiceContext): ScoreAction[] | nul
   if (!side) return null;
   // Fire only with a scoring keyword OR a named player, so a bare "home" is ignored.
   if (!scoreWord && !player) return null;
-  return [{ type: 'POINT', side, attribution: attribution(player, 'points') }];
+  // IDs-only scoring: the credit carries the player's id only
+  return [{ type: 'POINT', side, attribution: idAttribution(player, 'points') }];
 }
 
 /** Basketball: "two/three [player]", "free throw [player]", "rebound/assist/steal/
@@ -81,8 +82,9 @@ export function tennisVoice(text: string, ctx: VoiceContext): ScoreAction[] | nu
   const { side, player } = resolveSide(text, ctx);
   if (!side) return null;
   // Double fault: the opponent wins the point; the faulting server gets the DF stat.
-  if (/double ?fault|\bdf\b/.test(q)) return [{ type: 'POINT', side: side === 'home' ? 'away' : 'home', payload: { df: true }, attribution2: sided(attribution(player, 'doubleFaults'), side) }];
-  if (/\bace\b/.test(q)) return [{ type: 'ACE', side, attribution: attribution(player, 'aces') }];
+  // IDs-only scoring: credits carry the player's id only
+  if (/double ?fault|\bdf\b/.test(q)) return [{ type: 'POINT', side: side === 'home' ? 'away' : 'home', payload: { df: true }, attribution2: sided(idAttribution(player, 'doubleFaults'), side) }];
+  if (/\bace\b/.test(q)) return [{ type: 'ACE', side, attribution: idAttribution(player, 'aces') }];
   return pointVoice(text, ctx);
 }
 

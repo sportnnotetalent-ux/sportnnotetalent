@@ -81,9 +81,16 @@ export function resolveSide(text: string, ctx: VoiceContext): { side?: 'home' | 
   return { side, player };
 }
 
-/** Build a stat-line attribution for a matched player (or none). */
+/** Build a stat-line attribution for a matched player (or none). Still
+ *  carries the name for the sports not yet on IDs-only scoring (basketball,
+ *  kabaddi); the racket sports and volleyball use `idAttribution`. */
 export const attribution = (player: Player | undefined, stat: string, by?: number) =>
   player ? { playerId: player.id, stat, playerName: player.fullName, ...(by ? { by } : {}) } : undefined;
+
+/** IDs-only scoring (docs/privacy/ids-only-scoring.md) — the attribution with
+ *  the player's id only (match events are public; names are looked up when shown). */
+export const idAttribution = (player: Player | undefined, stat: string, by?: number) =>
+  player ? { playerId: player.id, stat, ...(by ? { by } : {}) } : undefined;
 
 /** SD-119 — stamp the credited player's own side (when it isn't the action's). */
 export const sided = <A extends object>(a: A | undefined, side: 'home' | 'away'): (A & { side: 'home' | 'away' }) | undefined =>

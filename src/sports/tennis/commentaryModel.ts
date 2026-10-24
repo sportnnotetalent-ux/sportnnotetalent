@@ -23,12 +23,16 @@
  *   - last: "<server> is serving game N" (the time of its first point).
  * Names: the credited / named player when known, else the server by roster
  * slot (doubles) or the side's only player (singles), else the side's name.
+ * IDs-only scoring (docs/privacy/ids-only-scoring.md): the log names players
+ * by id; `names.nameOf` gives this viewer's name (the rosters' names, then an
+ * older log's stored name, without one).
  */
 import type { LiveEvent } from '../liveEvents';
 import { pointRows, replayPoints, type PointInput } from '../rallyEdit.ts';
 import { isMark } from '../conduct.ts';
 import { RALLY_LABEL, speedText, speedUnitOf, strokeOf, strokePhrase, netSides } from '../pointDetail.ts';
 import { inTiebreak, reducer, serveInfo, tennisCue, tiebreakInfo, type TennisState } from './engine.ts';
+import { legacyNameOf, markDetail, whoName, withRosters, type NameOf } from '../racketNames.ts';
 
 type Side = 'home' | 'away';
 const opp = (s: Side): Side => (s === 'home' ? 'away' : 'home');
@@ -39,6 +43,9 @@ export interface CommentaryNames {
   /** the players per side in roster order (doubles slot 0 / 1), names shown */
   homeRoster?: Array<{ id: string; name: string }>;
   awayRoster?: Array<{ id: string; name: string }>;
+  /** IDs-only scoring: a player's name for this viewer by id (players_view +
+   *  the dispute mask); absent → the rosters' names / an older log's name */
+  nameOf?: NameOf;
 }
 
 export type CommentaryRow =
@@ -81,16 +88,17 @@ export function elapsed(at: number | undefined, t0: number | undefined): string 
 
 const article = (x: string) => (/^[aeiou]/i.test(x) ? `an ${x}` : `a ${x}`);
 
-/** The sentence a described point reads with (undefined = no detail). */
-export function pointSentence(p: PointInput, who: { winner: string; loser: string; server: string }): string | undefined {
+/** The sentence a described point reads with (undefined = no detail).
+ *  `nameOf` names a double-faulting / erring player by id (IDs-only). */
+export function pointSentence(p: PointInput, who: { winner: string; loser: string; server: string }, nameOf: NameOf = legacyNameOf): string | undefined {
   if (p.pen) return undefined;
-  if (p.df) return `${p.df.playerName || who.server} double faults`;
+  if (p.df) return `${whoName(nameOf, p.df.playerId, p.df.playerName) || who.server} double faults`;
   if (p.kind === 'ace' || p.pd?.how === 'ace') return `${who.winner} wins the point with an Ace`;
   const pd = p.pd;
   if (!pd) return undefined;
   const phrase = strokePhrase(strokeOf(pd), true);
   const what = (s: string) => article(phrase ? `${phrase} ${s}` : s);
-  const loser = pd.err?.playerName || who.loser;
+  const loser = (pd.err && whoName(nameOf, pd.err.playerId, pd.err.playerName)) || who.loser;
   switch (pd.how) {
     case 'sw': return `${who.winner} wins the point with a Service Winner`;
     case 'winner': return `${who.winner} wins the point with ${what('Winner')}`;
@@ -116,12 +124,15 @@ export function tennisCommentary(state: TennisState | null | undefined, names: C
   const t0 = typeof first?.at === 'number' ? first.at : undefined;
   const roster = (side: Side) => (side === 'home' ? names.homeRoster : names.awayRoster) ?? [];
   const sideName = (side: Side) => (side === 'home' ? names.homeName : names.awayName);
-  const solo = (side: Side) => (!state.doubles && roster(side).length === 1 ? roster(side)[0].name : undefined);
+  // IDs-only scoring: every player by id (the viewer's name, else the roster / an older log's)
+  const nm = withRosters(names.nameOf, roster('home'), roster('away'));
+  const rosterName = (p?: { id: string; name: string }) => (p ? nm(p.id, p.name) : undefined);
+  const solo = (side: Side) => (!state.doubles && roster(side).length === 1 ? rosterName(roster(side)[0]) : undefined);
   const playerOf = (side: Side) => solo(side) ?? sideName(side);
   const serverName = (s: TennisState) => {
     const { side, slot } = serveInfo(s);
     const r = roster(side);
-    return (state.doubles ? r[slot]?.name : solo(side)) || sideName(side);
+    return (state.doubles ? rosterName(r[slot]) : solo(side)) || sideName(side);
   };
 
   // a clean slate with the match's format, first server and serving order;
@@ -163,12 +174,13 @@ export function tennisCommentary(state: TennisState | null | undefined, names: C
       const score = tb
         ? (() => { const a = { ...b.pts, [W]: b.pts[W] + 1 }; return `${a[S]} - ${a[opp(S)]}`; })()
         : gameOver ? 'Game' : gameScore(next.pts, S, b.noAd);
-      const winner = (p.kind !== 'rally' && p.playerName) || playerOf(W);
+      const credited = p.kind !== 'rally' ? whoName(nm, p.playerId, p.playerName) : undefined;
+      const winner = credited || playerOf(W);
       const loser = playerOf(L);
       const server = serverName(b);
       const text = p.pen
-        ? [e.label, e.detail].filter(Boolean).join(' · ')
-        : pointSentence(p, { winner: p.kind === 'ace' ? (p.playerName || server) : winner, loser, server });
+        ? [e.label, markDetail(e, nm)].filter(Boolean).join(' · ')
+        : pointSentence(p, { winner: p.kind === 'ace' ? (credited || server) : winner, loser, server }, nm);
       const net = netSides(p, W);
       const meta = [
         p.serve === 2 && !p.df ? '2nd serve' : '',
@@ -201,7 +213,8 @@ export function tennisCommentary(state: TennisState | null | undefined, names: C
     if (isMark(e)) {
       const d = draftFor(cur, e.at);
       const time = elapsed(e.at, t0);
-      d.chrono.push({ kind: 'mark', id: e.id, ...(e.side ? { side: e.side } : {}), icon: e.icon, text: e.label, ...(e.detail ? { detail: e.detail } : {}), ...(time ? { time } : {}) });
+      const detail = markDetail(e, nm);
+      d.chrono.push({ kind: 'mark', id: e.id, ...(e.side ? { side: e.side } : {}), icon: e.icon, text: e.label, ...(detail ? { detail } : {}), ...(time ? { time } : {}) });
     }
   }
   // the game in play, even before its first point (who is serving)

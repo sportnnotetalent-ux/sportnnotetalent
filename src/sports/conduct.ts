@@ -7,7 +7,10 @@
  * follow) and every older log replays identically (REVIEW Decision 8 — none of
  * these actions existed before):
  *
- *   CONDUCT  {side = the OFFENDER, payload {level, track?, reason?, playerId?, playerName?}}
+ *   CONDUCT  {side = the OFFENDER, payload {level, track?, reason?, playerId?}}
+ *            (IDs-only scoring: an older payload may also carry `playerName`,
+ *            kept on replay; new ones never do — the name is put back when
+ *            shown, racketNames.markDetail)
  *     warning / fault / referee → a timeline record, no score effect
  *     point   → a penalty point to the opponent (the sport's own point path)
  *     point2  → two penalty points (table tennis, ITTF 3.5.2.2)
@@ -18,7 +21,7 @@
  *   PENALTY_POINT {side = who it is awarded to, payload {pen}} — how a penalty
  *     point replays after a timeline correction (EDIT_LOG); never dispatched by
  *     a button.
- *   TIMEOUT  {side, payload {t: 'timeout' | 'medical' | 'toilet', playerId?, playerName?}}
+ *   TIMEOUT  {side, payload {t: 'timeout' | 'medical' | 'toilet', playerId?}} (older: + playerName)
  *     a marker; the sport's allowance is enforced (a timeout over it is ignored)
  *   LET      {side?} — squash: the rally is replayed, no point (WSF Rule 8)
  *
@@ -62,6 +65,7 @@ export interface PenMark {
   /** the offending side */
   by: Side;
   playerId?: string;
+  /** legacy, read-only (pre IDs-only scoring): the name an older record stored */
   playerName?: string;
   reason?: string;
   /** the offender's violation number on this track (1st, 2nd …) */

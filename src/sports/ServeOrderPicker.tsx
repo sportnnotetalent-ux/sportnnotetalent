@@ -15,6 +15,7 @@ import { theme } from '../core/theme';
 import { SelectChip } from '../components/ui';
 import type { Player } from '../core/types';
 import type { ScoreAction } from './types';
+import { serveOrderAction } from './racketActions';
 import { serveOrderOpen, setFirstSlot, deuceReceiverSlot, type ServeState } from './serve';
 
 export function ServeOrderPicker({
@@ -44,7 +45,7 @@ export function ServeOrderPicker({
             <Text style={[st.meta, st.team]}>{t === 'home' ? homeName : awayName}:</Text>
             {roster.map((p, slot) => (
               <SelectChip key={p.id} label={p.fullName} active={cur === slot}
-                onPress={() => dispatch({ type: 'SET_SERVE_ORDER', payload: { side: t, slot, playerId: p.id, playerName: p.fullName } })} />
+                onPress={() => dispatch(serveOrderAction(t, slot, p))} />
             ))}
           </View>
         );

@@ -28,6 +28,9 @@ import {
   type How, type PointDetail, type Shot, type SpeedUnit, type Wing,
 } from '../pointDetail';
 import { TENNIS_TRACK_FIELDS } from '../pointDetailSettings';
+import { useMask } from '../../core/disputeMask';
+import { whoName, withRosters } from '../racketNames';
+import { errOf } from '../racketActions';
 import type { TennisState } from './engine';
 
 type Side = 'home' | 'away';
@@ -60,6 +63,8 @@ export function TennisPointDetail({
     [n, on.pointDetail]);
 
   const nameOf = (side: Side) => (side === 'home' ? homeName : awayName);
+  // IDs-only scoring: the point's player by id for this viewer
+  const mask = useMask();
   const tracking = TENNIS_TRACK_FIELDS.filter((f) => on[f.key]).map((f) => f.label);
   const options = (
     <View style={st.optRow}>
@@ -92,7 +97,8 @@ export function TennisPointDetail({
   const stroke = strokeOf(pd);
   const send = (payload: Record<string, unknown>) => dispatch({ type: 'POINT_DETAIL', payload });
   // singles: the erring player is the opponent; doubles: pick (optional)
-  const soloErr = loserRoster.length === 1 ? { playerId: loserRoster[0].id, playerName: loserRoster[0].fullName } : undefined;
+  // IDs-only scoring: the erring player by id (match state is public)
+  const soloErr = loserRoster.length === 1 ? errOf(loserRoster[0]) : undefined;
   const pick = (how: How) => {
     if (pd?.how === how) return send({ pd: null });
     const d = howDef('tennis', how);
@@ -115,9 +121,10 @@ export function TennisPointDetail({
   if (!hows.length && !pd && !serve2 && !on.netDetail && !on.rallyDetail && !on.speedDetail) {
     return <View style={st.bare}>{options}{chooser}</View>;
   }
-  const who = (e.kind !== 'rally' && e.playerName) || (winnerRoster.length === 1 ? winnerRoster[0].fullName : nameOf(W));
+  const credited = e.kind !== 'rally' ? whoName(withRosters(mask.nameOf, homeRoster, awayRoster), e.playerId, e.playerName) : undefined;
+  const who = credited || (winnerRoster.length === 1 ? winnerRoster[0].fullName : nameOf(W));
   const summary = [
-    pd ? pdText(pd) : isAce ? 'Ace' : '',
+    pd ? pdText(pd, true, undefined, withRosters(mask.nameOf, homeRoster, awayRoster)) : isAce ? 'Ace' : '',
     e.serve === 2 ? '2nd serve' : '',
     e.atNet === 'home' || e.atNet === 'away' ? `at the net: ${nameOf(e.atNet)}` : e.atNet === 'both' ? 'at the net: both' : '',
     e.rallyLen ? RALLY_LABEL[e.rallyLen] : '',
@@ -156,7 +163,7 @@ export function TennisPointDetail({
           <Text style={[st.meta, st.rowLabel]}>By:</Text>
           {loserRoster.map((p) => (
             <SelectChip key={p.id} label={p.fullName} active={pd.err?.playerId === p.id}
-              onPress={() => send({ pd: { ...pd, err: pd.err?.playerId === p.id ? undefined : { playerId: p.id, playerName: p.fullName } } })} />
+              onPress={() => send({ pd: { ...pd, err: pd.err?.playerId === p.id ? undefined : errOf(p) } })} />
           ))}
         </View>
       )}

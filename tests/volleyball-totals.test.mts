@@ -52,6 +52,17 @@ function set(h: number, a: number): ScoreAction[] {
   return out;
 }
 const match = (...sets: Array<[number, number]>) => { k = 0; return [...LINEUP, ...sets.flatMap(([h, a]) => set(h, a))]; };
+/** IDs-only scoring: today's controls credit by id only. An OLDER app also
+ *  wrote the player's name on every credit (and on the court stamp) — this
+ *  turns a log into that older form, for the legacy tests. */
+const named = (acts: ScoreAction[]): ScoreAction[] => acts.map((a) => {
+  if (a.type === 'LINEUP') {
+    const ps = (a.payload?.players as Array<{ id: string }>).map((p) => ({ id: p.id, name: NAMES[p.id] }));
+    return { ...a, payload: { ...a.payload, players: ps } };
+  }
+  const nm = (x: ScoreAction['attribution']) => (x ? { ...x, playerName: x.playerName ?? NAMES[x.playerId] ?? (x.playerId === 'x9' ? 'Guest' : undefined) } : x);
+  return { ...a, ...(a.attribution ? { attribution: nm(a.attribution) } : {}), ...(a.attribution2 ? { attribution2: nm(a.attribution2) } : {}) };
+});
 /** A legacy point (pre-SD-04 dispatch: no `extra`, POINT / ACE / BLOCK only). */
 const legacyPt = (type: 'POINT' | 'ACE' | 'BLOCK', side: Side, id: string): ScoreAction =>
   ({ type, side, attribution: { playerId: id, stat: type === 'ACE' ? 'aces' : type === 'BLOCK' ? 'blocks' : 'points', playerName: NAMES[id] } });
@@ -107,52 +118,58 @@ describe('SD-32 · clean logs and undo', () => {
 
 describe('SD-32 · corrections (rally editor)', () => {
   const rosterId = (name?: string) => Object.keys(NAMES).find((id) => NAMES[id] === name);
-  /** Apply `edit` to the point list as the editor does: EDIT_LOG + STAT_ADJUSTs. */
+  /** Apply `edit` to the point list as the editor does: EDIT_LOG + STAT_ADJUSTs.
+   *  IDs-only scoring: the EDIT_LOG names players by id only. */
   function corrected(acts: ScoreAction[], edit: (p: PointInput[]) => PointInput[]): { corrected: ScoreAction[]; clean: ScoreAction[] } {
     const s = acts.reduce(vb.reducer, vb.init());
     const old = pointInputs(s.events);
     const fix = correctionActions(old, edit(old.map((p) => ({ ...p }))), rosterId, vb.volleyballCredits);
     const edited = (fix[0].payload!.points as PointInput[]);
+    assert.ok(!JSON.stringify(fix).includes('playerName'), 'the correction names players by id only');
     const ACTION: Record<string, vb.VbOutcome | 'point'> = { attack: 'attack', block: 'block', ace: 'ace', opperror: 'opperror', serveerror: 'serveerror', point: 'point' };
     const clean = [...LINEUP, ...edited.map((p) => p.kind === 'point'
-      ? ({ type: 'POINT', side: p.side, attribution: p.playerName ? vb.outcomeAttribution('point', { id: rosterId(p.playerName)!, fullName: p.playerName }) : undefined } as ScoreAction)
-      : vb.outcomeAction(ACTION[p.kind] as vb.VbOutcome, p.side, p.playerName ? { id: rosterId(p.playerName)!, fullName: p.playerName } : undefined))];
+      ? ({ type: 'POINT', side: p.side, attribution: p.playerId ? vb.outcomeAttribution('point', P(p.playerId)) : undefined } as ScoreAction)
+      : vb.outcomeAction(ACTION[p.kind] as vb.VbOutcome, p.side, p.playerId ? P(p.playerId) : undefined))];
     return { corrected: [...acts, ...fix], clean };
   }
 
-  test('re-credit a kill to a team-mate, change an outcome, delete and insert points', () => {
-    const acts = match([25, 20], [20, 25], [10, 5]);
-    const { corrected: c, clean } = corrected(acts, (list) => {
-      const i = list.findIndex((p) => p.kind === 'attack' && p.playerName === 'Asha');
-      list[i] = { ...list[i], playerName: 'Bela', playerId: 'h2' };
-      const j = list.findIndex((p) => p.kind === 'block');
-      list[j] = { ...list[j], kind: 'ace' };
-      const e = list.findIndex((p) => p.kind === 'opperror');
-      list[e] = { ...list[e], kind: 'attack', playerName: list[e].side === 'home' ? 'Asha' : 'Cara' };
-      list.splice(3, 1);
-      list.splice(10, 0, { side: 'away', kind: 'block', playerName: 'Dina' });
-      return list;
+  // today's log (ids only) and an older one (names alongside) correct the same way
+  for (const older of [false, true]) {
+    const label = older ? ' (an older, named log)' : '';
+    test(`re-credit a kill to a team-mate, change an outcome, delete and insert points${label}`, () => {
+      const acts = older ? named(match([25, 20], [20, 25], [10, 5])) : match([25, 20], [20, 25], [10, 5]);
+      const { corrected: c, clean } = corrected(acts, (list) => {
+        const i = list.findIndex((p) => p.kind === 'attack' && p.playerId === 'h1');
+        list[i] = { ...list[i], playerName: undefined, playerId: 'h2' };
+        const j = list.findIndex((p) => p.kind === 'block');
+        list[j] = { ...list[j], kind: 'ace' };
+        const e = list.findIndex((p) => p.kind === 'opperror');
+        list[e] = { ...list[e], kind: 'attack', playerId: list[e].side === 'home' ? 'h1' : 'a1' };
+        list.splice(3, 1);
+        list.splice(10, 0, { side: 'away', kind: 'block', playerId: 'a2' });
+        return list;
+      });
+      const recs = toRecords(c);
+      assertSameAsClean(sp(ctxOf()), recs, toRecords(clean));
+      // undo before the correction batch still holds
+      assertContract(sp(ctxOf()), toRecords(acts), { every: 7 });
     });
-    const recs = toRecords(c);
-    assertSameAsClean(sp(ctxOf()), recs, toRecords(clean));
-    // undo before the correction batch still holds
-    assertContract(sp(ctxOf()), toRecords(acts), { every: 7 });
-  });
 
-  test('remove a credit (point → "No player") zeroes it absolutely', () => {
-    const acts = match([25, 20]);
-    const { corrected: c, clean } = corrected(acts, (list) => list.map((p) => (p.playerName === 'Dina' ? { side: p.side, kind: p.kind } : p)));
-    const recs = toRecords(c);
-    assertSameAsClean(sp(ctxOf()), recs, toRecords(clean));
-    const t = volleyballStatTotals(replay(sp(), recs), ctxOf());
-    assert.deepEqual(VOLLEYBALL_BOX_KEYS.map((key) => t.a2.stats[key] ?? 0), [0, 0, 0, 0]);
-    assert.equal(liveSums(recs).a2?.points ?? 0, 0);
-  });
+    test(`remove a credit (point → "No player") zeroes it absolutely${label}`, () => {
+      const acts = older ? named(match([25, 20])) : match([25, 20]);
+      const { corrected: c, clean } = corrected(acts, (list) => list.map((p) => (p.playerId === 'a2' ? { side: p.side, kind: p.kind } : p)));
+      const recs = toRecords(c);
+      assertSameAsClean(sp(ctxOf()), recs, toRecords(clean));
+      const t = volleyballStatTotals(replay(sp(), recs), ctxOf());
+      assert.deepEqual(VOLLEYBALL_BOX_KEYS.map((key) => t.a2.stats[key] ?? 0), [0, 0, 0, 0]);
+      assert.equal(liveSums(recs).a2?.points ?? 0, 0);
+    });
+  }
 });
 
 describe('SD-32 · older logs: names → ids, the safeguard, the heal', () => {
   test('no court stamp (pre-SD-29): names resolve through ctx and equal the live sums', () => {
-    const acts = match([25, 18], [25, 21]).slice(2); // drop LINEUP → no ids on events
+    const acts = named(match([25, 18], [25, 21]).slice(2)); // an older app's log; drop LINEUP → no ids on events
     const recs = toRecords(acts);
     const s = replay(sp(), recs);
     assert.ok(s.events.every((e) => !e.playerId));
@@ -162,7 +179,7 @@ describe('SD-32 · older logs: names → ids, the safeguard, the heal', () => {
   });
 
   test('an unresolved name leaves every box key out (set record stays)', () => {
-    const acts = [...match([25, 20], [20, 25]).slice(2), vb.outcomeAction('attack', 'home', { id: 'x9', fullName: 'Guest' })];
+    const acts = named([...match([25, 20], [20, 25]).slice(2), vb.outcomeAction('attack', 'home', { id: 'x9', fullName: 'Guest' })]);
     const s = replay(sp(), toRecords(acts));
     assert.deepEqual(volleyballBoxTotals(s, ctxOf()), {});
     const t = volleyballStatTotals(s, ctxOf());
@@ -173,7 +190,7 @@ describe('SD-32 · older logs: names → ids, the safeguard, the heal', () => {
   });
 
   test('a name used by two ids on one side is ambiguous → unresolved', () => {
-    const acts = match([25, 20]).slice(2);
+    const acts = named(match([25, 20]).slice(2));
     const ctx = ctxOf();
     ctx.players!.home.push({ id: 'h3', name: 'Asha' });
     assert.deepEqual(volleyballBoxTotals(replay(sp(), toRecords(acts)), ctx), {});

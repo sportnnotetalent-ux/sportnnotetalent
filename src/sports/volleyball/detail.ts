@@ -79,7 +79,9 @@ export interface VbDetailEntry {
    *  after it) */
   at: number;
   playerId?: string;
-  playerName: string;
+  /** legacy, read-only (pre IDs-only scoring): the name an older entry stored.
+   *  New entries carry `playerId` only; readers show `nameOf(playerId, playerName)`. */
+  playerName?: string;
   /** reception grade */
   q?: ReceptionGrade;
 }
@@ -189,11 +191,12 @@ export function detailReducer(s: VolleyballState, a: ScoreAction): VolleyballSta
   const kind = a.payload?.kind as VbDetailKind;
   const side = a.side;
   // the player rides in the payload (not an attribution: no live stat credit —
-  // the keys are set absolutely by statTotals at completion)
+  // the keys are set absolutely by statTotals at completion). IDs-only
+  // scoring: the id only; an older payload also carried the name.
   const who = a.payload?.player as { playerId?: string; playerName?: string } | undefined;
   const anchor = ANCHORED[kind];
   if (s.ended && !anchor) return s;
-  if ((side !== 'home' && side !== 'away') || !who?.playerName || !Object.prototype.hasOwnProperty.call(CAT_OF_KIND, kind)) return s;
+  if ((side !== 'home' && side !== 'away') || (!who?.playerName && !who?.playerId) || !Object.prototype.hasOwnProperty.call(CAT_OF_KIND, kind)) return s;
   const q = a.payload?.q as ReceptionGrade | undefined;
   if (kind === 'reception' && !RECEPTION_GRADES.some((g) => g.key === q)) return s;
   // a blocked attacker / the setter / the receiver aced annotates the last
@@ -206,7 +209,7 @@ export function detailReducer(s: VolleyballState, a: ScoreAction): VolleyballSta
   // one entry per annotated point: a second tap replaces it
   const rest = (s.vd ?? []).filter((x) => !(anchor && x.kind === kind && x.set === n && x.at === at));
   const entry: VbDetailEntry = {
-    kind, side, set: n, at, playerName: who.playerName,
+    kind, side, set: n, at, ...(who.playerName ? { playerName: who.playerName } : {}),
     ...(who.playerId ? { playerId: who.playerId } : {}), ...(kind === 'reception' ? { q } : {}),
   };
   return { ...s, vd: [...rest, entry] };
@@ -242,6 +245,8 @@ export const blockedFor = (s: VolleyballState, b: { set: number; at: number }) =
 
 export interface VbAttackLine {
   side: Side;
+  /** legacy, read-only: the name an older log stored ('' for an IDs-only
+   *  line) — show `nameOf(playerId, name)` */
   name: string;
   playerId?: string;
   attackAttempts: number;
@@ -279,7 +284,9 @@ export const digTracked = (s: VolleyballState | null | undefined): boolean => ca
 export const assistTracked = (s: VolleyballState | null | undefined): boolean => catTracked(s, 'assist');
 
 /**
- * Per player ("side|name"), for the whole match or one set: attack attempts
+ * Per player ("side|id" — IDs-only scoring; an older log's name-only entry
+ * "side|~name", merged into the id the same name carries elsewhere in the
+ * log), for the whole match or one set: attack attempts
  * by result and receptions by grade — only rallies played with detail on
  * count kills and attack errors (an Attack point before the switch was
  * turned on isn't an attempt we saw the rest of).
@@ -287,14 +294,26 @@ export const assistTracked = (s: VolleyballState | null | undefined): boolean =>
 export function detailTally(s: VolleyballState, scope: 'all' | number = 'all'): Map<string, VbAttackLine> {
   const out = new Map<string, VbAttackLine>();
   if (!s) return out;
-  const line = (side: Side, name: string, playerId?: string): VbAttackLine => {
-    const k = `${side}|${name}`;
+  // a legacy name → the id it carries elsewhere in the log (events + entries)
+  const idOf = new Map<string, string>();
+  const note = (side: Side, id?: string, name?: string) => { if (id && name && !idOf.has(`${side}|${name}`)) idOf.set(`${side}|${name}`, id); };
+  for (const e of s.events ?? []) {
+    if (e.side !== 'home' && e.side !== 'away') continue;
+    note(e.side, e.playerId, e.playerName);
+    note(e.side === 'home' ? 'away' : 'home', e.oe?.playerId, e.oe?.playerName);
+  }
+  for (const x of s.vd ?? []) note(x.side, x.playerId, x.playerName);
+  const line = (side: Side, name: string | undefined, playerId?: string): VbAttackLine | null => {
+    const id = playerId || (name ? idOf.get(`${side}|${name}`) : undefined);
+    if (!id && !name) return null;
+    const k = `${side}|${id ?? `~${name}`}`;
     let l = out.get(k);
     if (!l) {
-      l = { side, name, attackAttempts: 0, attackKills: 0, attackErrors: 0, attacksBlocked: 0, receptions: 0, receptionsPerfect: 0, receptionsPositive: 0, receptionErrors: 0, digs: 0, setAssists: 0 };
+      l = { side, name: name ?? '', attackAttempts: 0, attackKills: 0, attackErrors: 0, attacksBlocked: 0, receptions: 0, receptionsPerfect: 0, receptionsPositive: 0, receptionErrors: 0, digs: 0, setAssists: 0 };
       out.set(k, l);
     }
-    if (playerId && !l.playerId) l.playerId = playerId;
+    if (id && !l.playerId) l.playerId = id;
+    if (name && !l.name) l.name = name;
     return l;
   };
   const count = new Map<number, number>();
@@ -305,17 +324,18 @@ export function detailTally(s: VolleyballState, scope: 'all' | number = 'all'): 
     count.set(set, idx + 1);
     if (scope !== 'all' && set !== scope) continue;
     if (!catCoveredAt(s, 'attack', set, idx)) continue;
-    if (e.kind === 'attack' && e.playerName) {
+    if (e.kind === 'attack') {
       const l = line(e.side, e.playerName, e.playerId);
-      l.attackKills += 1; l.attackAttempts += 1;
-    } else if (e.kind === 'opperror' && e.oe?.type === 'attackout' && e.oe.playerName) {
+      if (l) { l.attackKills += 1; l.attackAttempts += 1; }
+    } else if (e.kind === 'opperror' && e.oe?.type === 'attackout') {
       const l = line(e.side === 'home' ? 'away' : 'home', e.oe.playerName, e.oe.playerId);
-      l.attackErrors += 1; l.attackAttempts += 1;
+      if (l) { l.attackErrors += 1; l.attackAttempts += 1; }
     }
   }
   for (const x of s.vd ?? []) {
     if (scope !== 'all' && x.set !== scope) continue;
     const l = line(x.side, x.playerName, x.playerId);
+    if (!l) continue;
     if (x.kind === 'inplay') l.attackAttempts += 1;
     else if (x.kind === 'blocked') { l.attacksBlocked += 1; l.attackAttempts += 1; }
     else if (x.kind === 'reception') {

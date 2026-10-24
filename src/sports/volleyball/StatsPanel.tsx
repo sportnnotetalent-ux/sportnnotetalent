@@ -11,6 +11,7 @@ import { theme } from '../../core/theme';
 import { CompareCard } from '../netraid/CompareCard';
 import { volleyballMatchStats, type VbScope, type VbRotationRow } from './matchStats';
 import type { VolleyballState } from './engine';
+import { useMask } from '../../core/disputeMask';
 
 const pct = (n: number, d: number) => (d > 0 ? `${Math.round((100 * n) / d)}%` : '–');
 
@@ -21,6 +22,8 @@ export function VolleyballStatsPanel({ state, homeName, awayName, homeColor = th
   const sets = state.ended ? state.sets.length : state.setsWon.home + state.setsWon.away + 1;
   const active: VbScope = scope !== 'all' && scope > sets ? 'all' : scope;
   const st0 = useMemo(() => volleyballMatchStats(state, active), [state, active]);
+  // IDs-only scoring: players by id for this viewer (an older stamp's name as the fallback)
+  const { nameOf } = useMask();
   if (st0.rallies === 0 && active === 'all') return null;
   const scopes = [{ value: 'all' as const, label: 'Match' }, ...Array.from({ length: sets }, (_, i) => ({ value: i + 1, label: `Set ${i + 1}` }))];
   const rot = (side: 'home' | 'away', rows: VbRotationRow[]) => (
@@ -31,8 +34,8 @@ export function VolleyballStatsPanel({ state, homeName, awayName, homeColor = th
         <Text style={s.rotCol}>W-L</Text><Text style={s.rotCol}>Break</Text><Text style={s.rotCol}>Side-out</Text>
       </View>
       {rows.map((r) => (
-        <View key={r.id} style={s.rotRow} accessible accessibilityLabel={`${r.name} at position one: won ${r.won} of ${r.played}; on serve ${r.srvWon} of ${r.srvPlayed}; on receive ${r.rcvWon} of ${r.rcvPlayed}`}>
-          <Text style={s.rotName} numberOfLines={1}>{r.name || '—'} at I</Text>
+        <View key={r.id} style={s.rotRow} accessible accessibilityLabel={`${nameOf(r.id, r.name)} at position one: won ${r.won} of ${r.played}; on serve ${r.srvWon} of ${r.srvPlayed}; on receive ${r.rcvWon} of ${r.rcvPlayed}`}>
+          <Text style={s.rotName} numberOfLines={1}>{nameOf(r.id, r.name)} at I</Text>
           <Text style={s.rotCol}>{r.won}-{r.played - r.won}</Text>
           <Text style={s.rotCol}>{pct(r.srvWon, r.srvPlayed)}</Text>
           <Text style={s.rotCol}>{pct(r.rcvWon, r.rcvPlayed)}</Text>
@@ -59,7 +62,7 @@ export function VolleyballStatsPanel({ state, homeName, awayName, homeColor = th
           {st0.servers.map((x) => (
             <View key={x.id} style={s.rotRow}>
               <View style={[s.dot, { backgroundColor: x.side === 'home' ? homeColor : awayColor }]} />
-              <Text style={s.rotName} numberOfLines={1}>{x.name}</Text>
+              <Text style={s.rotName} numberOfLines={1}>{nameOf(x.id, x.name)}</Text>
               <Text style={s.srvVal}>{x.serves} · {x.won} ({pct(x.won, x.serves)}) · {x.aces} A · {x.errors} SE</Text>
             </View>
           ))}

@@ -18,6 +18,8 @@ import { theme } from '../../core/theme';
 import { textStyles } from '../../components/ui';
 import { MatchBoxScore } from '../../components/BoxScore';
 import { padelBox } from '../boxSources';
+import { useMask } from '../../core/disputeMask';
+import { doubleFaultAction, pointAction } from '../racketActions';
 import { RallyPointEditor } from '../RallyPointEditor';
 import { MatchStatsPanel } from '../MatchStatsPanel';
 import { ServeOrderPicker } from '../ServeOrderPicker';
@@ -48,7 +50,8 @@ const ScoringControls: SportPlugin<PadelState>['ScoringControls'] = ({ state, di
   // SD-54 — scoring steps carry the scorer's clock (match / set durations)
   const dispatch = stampDispatch(rawDispatch);
   const act = (side: 'home' | 'away', p?: Player) =>
-    dispatch({ type: 'POINT', side, attribution: p ? { playerId: p.id, stat: 'points', playerName: p.fullName } : undefined });
+    // IDs-only scoring: the credit carries the player's id, never the name
+    dispatch(pointAction(side, p));
   const deucePoint = s.goldenPoint && !inTiebreak(s) && s.pts.home >= 3 && s.pts.away >= 3;
   // SD-64 — Star Point: which deuce we're at, and the deciding point at the 3rd
   const starDeuce = s.starPoint && !s.ended ? deuceNo(s) : 0;
@@ -70,8 +73,8 @@ const ScoringControls: SportPlugin<PadelState>['ScoringControls'] = ({ state, di
   const serverP: Player | undefined = s.doubles ? serverRoster[serve.slot] : serverRoster[0];
   const by = serverP ? serverP.fullName : serverSideName;
   const receiverSideName = serve.side === 'home' ? awayName : homeName;
-  const ace = () => dispatch({ type: 'POINT', side: serve.side, payload: { pd: { how: 'ace' } }, attribution: serverP ? { playerId: serverP.id, stat: 'points', playerName: serverP.fullName } : undefined });
-  const doubleFault = () => dispatch({ type: 'POINT', side: other(serve.side), payload: { df: true }, attribution2: serverP ? { playerId: serverP.id, stat: 'doubleFaults', playerName: serverP.fullName, side: serve.side } : undefined });
+  const ace = () => dispatch(pointAction(serve.side, serverP, { payload: { pd: { how: 'ace' } } }));
+  const doubleFault = () => dispatch(doubleFaultAction(serve.side, serverP));
   return (
     <View style={{ gap: theme.spacing(4) }}>
       {/* SD-117c — derived "Change ends" cue (FIP, as tennis) */}
@@ -126,6 +129,8 @@ const PadelCommentary = ({ state, homeName, awayName, homeColor, awayColor, home
 );
 const PadelStats = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster, onPlayer }: TabProps) => {
   const s = state as PadelState;
+  // IDs-only scoring: box-score names by player id for this viewer
+  const { nameOf } = useMask();
   return (
     <View style={{ gap: theme.spacing(3) }}>
       {/* SD-22 / deep wave: key stats, serve, shots, rally length — replayed from the point log, per set */}
@@ -133,7 +138,7 @@ const PadelStats = ({ state, homeName, awayName, homeColor, awayColor, homeRoste
       {/* SD-54 — match and set durations (from the scorer's tap times) */}
       {durationLine(s.events, 'S') ? <Text style={textStyles.muted}>{durationLine(s.events, 'S')}</Text> : null}
       <Text style={ctrl.label}>Box score</Text>
-      <MatchBoxScore sport="padel" source={padelBox(s, { homeRoster, awayRoster })} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} onPlayer={onPlayer} />
+      <MatchBoxScore sport="padel" source={padelBox(s, { homeRoster, awayRoster, nameOf })} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} onPlayer={onPlayer} />
     </View>
   );
 };

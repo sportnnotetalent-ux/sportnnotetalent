@@ -22,6 +22,7 @@ import { SelectChip } from '../../components/ui';
 import type { Player } from '../../core/types';
 import type { ScoreAction } from '../types';
 import type { VolleyballState } from './engine';
+import { detailAction } from './actions';
 import { detailCats, detailOn, entryFor, lastPoint, RECEPTION_GRADES, type ReceptionGrade, type VbDetailCat, type VbDetailKind } from './detail';
 
 type Side = 'home' | 'away';
@@ -44,7 +45,8 @@ export function VolleyballDetailRow({ state: s, dispatch, home, away }: {
   const info = (sd: Side) => (sd === 'home' ? home : away);
   const TOAST: Record<VbDetailKind, string> = { inplay: 'Attack in play', reception: 'Reception', blocked: 'Blocked', dig: 'Dig', assist: 'Set by', aced: 'Aced' };
   const send = (kind: VbDetailKind, side: Side, p: Player, q?: ReceptionGrade) => {
-    dispatch({ type: 'VB_DETAIL', side, payload: { kind, player: { playerId: p.id, playerName: p.fullName }, ...(q ? { q } : {}) } });
+    // IDs-only scoring: the player by id (match state is public)
+    dispatch(detailAction(kind, side, p, q));
     setOpen(null);
     const sign = q ? ` ${RECEPTION_GRADES.find((g) => g.key === q)?.sign ?? ''}` : '';
     setToast({ text: `✓ ${TOAST[kind]}${sign} · ${p.fullName}`, n: s.events.length });

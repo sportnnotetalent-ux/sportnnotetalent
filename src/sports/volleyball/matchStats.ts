@@ -31,9 +31,11 @@ const other = (s: Side): Side => (s === 'home' ? 'away' : 'home');
 
 export type VbScope = 'all' | number;
 
-/** One rotation of a side: the rallies played with `name` at position I. */
+/** One rotation of a side: the rallies played with player `id` at position I. */
 export interface VbRotationRow {
   id: string;
+  /** legacy, read-only: the name an older stamp stored ('' for an IDs-only
+   *  one) — show `nameOf(id, name)` */
   name: string;
   played: number;
   won: number;
@@ -45,7 +47,8 @@ export interface VbRotationRow {
   rcvWon: number;
 }
 
-/** One server's line: rallies served, won, aces, serve errors. */
+/** One server's line: rallies served, won, aces, serve errors. `name` is
+ *  legacy, read-only ('' when IDs-only) — show `nameOf(id, name)`. */
 export interface VbServerLine { id: string; side: Side; name: string; serves: number; won: number; aces: number; errors: number }
 
 export interface VbMatchStats {
@@ -221,7 +224,7 @@ export function volleyballMatchStats(s: VolleyballState, scope: VbScope = 'all')
       const p = x.r?.atI?.[X];
       if (!p) continue;
       known += 1;
-      const row = rows.get(p.id) ?? rows.set(p.id, { id: p.id, name: p.name, played: 0, won: 0, srvPlayed: 0, srvWon: 0, rcvPlayed: 0, rcvWon: 0 }).get(p.id)!;
+      const row = rows.get(p.id) ?? rows.set(p.id, { id: p.id, name: p.name ?? '', played: 0, won: 0, srvPlayed: 0, srvWon: 0, rcvPlayed: 0, rcvWon: 0 }).get(p.id)!;
       const won = x.e.side === X;
       row.played += 1; if (won) row.won += 1;
       if (x.r!.side === X) { row.srvPlayed += 1; if (won) row.srvWon += 1; } else { row.rcvPlayed += 1; if (won) row.rcvWon += 1; }

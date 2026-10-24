@@ -34,6 +34,12 @@ const playPadel = (cfg: Record<string, unknown>, log: ScoreAction[]) => log.redu
 const edit = <S,>(reducer: (s: S, a: ScoreAction) => S, s: S, pts: PointInput[]) => reducer(s, { type: 'EDIT_LOG', payload: { points: pts } });
 /** The rally list as if scored that way live: one POINT per rally for its winner. */
 const asLog = (pts: PointInput[]): ScoreAction[] => pts.map((p) => P(p.side, p.playerName));
+/** IDs-only scoring — the same, as today's scorer dispatches it (the player's
+ *  id, never the name). A correction's EDIT_LOG names players by id the same way. */
+const asIdLog = (pts: PointInput[]): ScoreAction[] => pts.map((p) => {
+  const id = p.playerId ?? (p.playerName ? `id-${p.playerName}` : undefined);
+  return { type: 'POINT', side: p.side, attribution: id ? { playerId: id, stat: 'points' } : undefined };
+});
 const DERIVED: Array<keyof RallyState> = ['current', 'games', 'gamesWon', 'ended', 'serving', 'serverNo', 'srvStarter', 'opening'];
 const view = (s: RallyState) => ({
   ...Object.fromEntries(DERIVED.map((k) => [k, s[k]])),
@@ -54,8 +60,13 @@ const ins = (pts: PointInput[], after: number, side: Side, playerName?: string) 
   return n;
 };
 const byName = (n?: string) => (n ? `id-${n}` : undefined);
-const adjusts = (acts: ScoreAction[]) =>
-  acts.filter((a) => a.type === 'STAT_ADJUST').map((a) => [a.attribution!.playerName, a.attribution!.stat, a.attribution!.by]).sort();
+/** The STAT_ADJUST deltas as [player, stat, by] — IDs-only scoring: they name
+ *  the player by id only (never a name), so the test's "id-<name>" ids read back. */
+const adjusts = (acts: ScoreAction[]) => {
+  const adj = acts.filter((a) => a.type === 'STAT_ADJUST');
+  assert.ok(adj.every((a) => a.attribution!.playerName === undefined), 'STAT_ADJUST carries ids only');
+  return adj.map((a) => [a.attribution!.playerId.replace(/^id-/, ''), a.attribution!.stat, a.attribution!.by]).sort();
+};
 
 // ------------------------------------------------------------ table tennis --
 
@@ -279,7 +290,10 @@ describe('SD-21 pickleball', () => {
     const flipped = flip(old, 1);
     const acts = correctionActions(old, flipped, byName, undefined, normalize);
     const replay = edit(PICKLE.reducer, m, acts[0].payload!.points as PointInput[]);
-    assert.deepEqual(view(replay), view(play(PICKLE, CFG, asLog(flipped))));
+    // IDs-only scoring: the stored list keeps ids (no names) — it replays as
+    // the corrected match scored live by today's scorer
+    assert.ok(!JSON.stringify(acts[0].payload).includes('playerName'), 'the EDIT_LOG names nobody');
+    assert.deepEqual(view(replay), view(play(PICKLE, CFG, asIdLog(flipped))));
     assert.deepEqual(adjusts(acts), [['Ben', 'points', -1]]);
     // A credited insert while the receiver is serving becomes a side-out → no credit.
     const ins1 = ins(old, 4, 'home', 'Ben'); // away serving at 2-2 → home wins = side-out

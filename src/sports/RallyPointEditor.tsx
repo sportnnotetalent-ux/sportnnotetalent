@@ -21,6 +21,9 @@ import {
   type DetailSport, type How, type PointDetail, type Shot, type Wing,
 } from './pointDetail';
 import { RowAction, confirmRemove } from './TimelineControls';
+import { useMask } from '../core/disputeMask';
+import { eventWho, whoName, withRosters } from './racketNames';
+import { errOf } from './racketActions';
 
 /** One choosable point type in the editor. `credited: false` = nobody on the
  *  scoring side gets credit (an opponent's error) → no player picker. */
@@ -38,7 +41,10 @@ interface Draft {
   /** 'df' (SD-104, tennis) = the opponent's double fault; the player is the faulting server */
   kind: PointKind | 'df';
   playerId?: string;
-  playerName?: string;
+  /** IDs-only scoring: an older point's stored name, kept only while no
+   *  player is picked and its name can't be resolved to a roster id (the
+   *  credit would be lost otherwise). Never set for a new pick. */
+  legacyName?: string;
   /** SD-107 — how the point was won (optional) */
   pd?: PointDetail;
 }
@@ -100,6 +106,8 @@ export function RallyPointEditor({
 }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<Draft | null>(null);
+  // IDs-only scoring: the log keeps ids; names for the scorer by id
+  const mask = useMask();
 
   const choices: EditorKind[] = [
     ...(kinds ?? (hasAce
@@ -110,7 +118,9 @@ export function RallyPointEditor({
   const isCredited = (k: PointKind | 'df') => choices.find((c) => c.kind === k)?.credited ?? true;
   const rows = rowsOf(events);
   const list = rows.map((r) => r.p); // forward order; index i ↔ rows[i]
-  const rosterId = (nm?: string) => [...homeRoster, ...awayRoster].find((p) => p.fullName === nm)?.id;
+  // an older name-only point → the roster player of that name (legacy only)
+  const rosterId = (nm?: string) => (nm ? [...homeRoster, ...awayRoster].find((p) => p.fullName === nm)?.id : undefined);
+  const viewer = withRosters(mask.nameOf, homeRoster, awayRoster);
   const rosterFor = (side: 'home' | 'away') => (side === 'home' ? homeRoster : awayRoster);
 
   // Commit a rewritten point list: replay it (EDIT_LOG) and reconcile profiles.
@@ -128,11 +138,12 @@ export function RallyPointEditor({
     const credited = isCredited(draft.kind);
     const item: PointInput = draft.kind === 'df' ? {
       // the receiver wins the point; the named player is the faulting server
-      side, kind: 'point', df: { ...(draft.playerId ? { playerId: draft.playerId } : {}), ...(draft.playerName ? { playerName: draft.playerName } : {}) },
+      // IDs-only scoring: the player by id (an unresolved older name stays as it was)
+      side, kind: 'point', df: draft.playerId ? { playerId: draft.playerId } : draft.legacyName ? { playerName: draft.legacyName } : {},
     } : {
       // no type choice → a plain "won the rally" point (the engine re-derives side-outs)
       side, kind: choices.length && draft.kind !== 'rally' ? draft.kind : 'point',
-      playerName: credited ? draft.playerName : undefined, playerId: credited ? draft.playerId : undefined,
+      ...(credited && draft.playerId ? { playerId: draft.playerId } : credited && draft.legacyName ? { playerName: draft.legacyName } : {}),
       ...(draft.pd ? { pd: draft.pd } : {}),
     };
     // SD-107 — an edited point keeps its 1st / 2nd serve (it was served the same way);
@@ -157,11 +168,15 @@ export function RallyPointEditor({
 
   const beginEdit = (index: number) => {
     const p = list[index];
-    if (p.df) setDraft({ mode: 'edit', index, side: p.side, kind: 'df', playerName: p.df.playerName, playerId: p.df.playerId ?? rosterId(p.df.playerName) });
-    else setDraft({ mode: 'edit', index, side: p.side, kind: p.kind, playerName: p.playerName, playerId: rosterId(p.playerName), ...(p.pd ? { pd: p.pd } : {}) });
+    const pick = (w: { playerId?: string; playerName?: string }) => {
+      const id = w.playerId ?? rosterId(w.playerName);
+      return id ? { playerId: id } : w.playerName ? { legacyName: w.playerName } : {};
+    };
+    if (p.df) setDraft({ mode: 'edit', index, side: p.side, kind: 'df', ...pick(p.df) });
+    else setDraft({ mode: 'edit', index, side: p.side, kind: p.kind, ...pick(p), ...(p.pd ? { pd: p.pd } : {}) });
   };
   const beginInsert = (afterIndex: number) =>
-    setDraft({ mode: 'insert', index: afterIndex, side: undefined, kind: defaultKind, playerName: undefined, playerId: undefined });
+    setDraft({ mode: 'insert', index: afterIndex, side: undefined, kind: defaultKind });
 
   if (rows.length === 0) return null;
 
@@ -182,8 +197,8 @@ export function RallyPointEditor({
               <Text style={st.meta}>Who won the rally?</Text>
               {normalize && <Text style={st.meta}>Serve and side-outs are worked out again from the rallies.</Text>}
               <View style={st.chips}>
-                <SelectChip label={homeName} active={draft.side === 'home'} onPress={() => setDraft({ ...draft, side: 'home', playerId: undefined, playerName: undefined, pd: undefined })} />
-                <SelectChip label={awayName} active={draft.side === 'away'} onPress={() => setDraft({ ...draft, side: 'away', playerId: undefined, playerName: undefined, pd: undefined })} />
+                <SelectChip label={homeName} active={draft.side === 'home'} onPress={() => setDraft({ ...draft, side: 'home', playerId: undefined, legacyName: undefined, pd: undefined })} />
+                <SelectChip label={awayName} active={draft.side === 'away'} onPress={() => setDraft({ ...draft, side: 'away', playerId: undefined, legacyName: undefined, pd: undefined })} />
               </View>
               {choices.length > 0 && (
                 <>
@@ -194,7 +209,7 @@ export function RallyPointEditor({
                       <SelectChip label={`${pointIcon} Point`} active onPress={() => undefined} />
                     )}
                     {choices.map((c) => (
-                      <SelectChip key={c.kind} label={c.label} active={draft.kind === c.kind} onPress={() => setDraft({ ...draft, kind: c.kind, ...((c.kind === 'df') !== (draft.kind === 'df') ? { playerId: undefined, playerName: undefined } : {}) })} />
+                      <SelectChip key={c.kind} label={c.label} active={draft.kind === c.kind} onPress={() => setDraft({ ...draft, kind: c.kind, ...((c.kind === 'df') !== (draft.kind === 'df') ? { playerId: undefined, legacyName: undefined } : {}) })} />
                     ))}
                   </View>
                 </>
@@ -207,9 +222,9 @@ export function RallyPointEditor({
                   <View style={st.chips}>
                     {rosterFor(draft.kind === 'df' ? (draft.side === 'home' ? 'away' : 'home') : draft.side).map((p) => (
                       <SelectChip key={p.id} label={p.fullName} active={draft.playerId === p.id}
-                        onPress={() => setDraft({ ...draft, playerId: draft.playerId === p.id ? undefined : p.id, playerName: draft.playerId === p.id ? undefined : p.fullName })} />
+                        onPress={() => setDraft({ ...draft, playerId: draft.playerId === p.id ? undefined : p.id, legacyName: undefined })} />
                     ))}
-                    <SelectChip label="Team (no player)" active={!draft.playerId} onPress={() => setDraft({ ...draft, playerId: undefined, playerName: undefined })} />
+                    <SelectChip label="Team (no player)" active={!draft.playerId && !draft.legacyName} onPress={() => setDraft({ ...draft, playerId: undefined, legacyName: undefined })} />
                   </View>
                 </>
               ) : (
@@ -224,7 +239,8 @@ export function RallyPointEditor({
                 const pick = (how: How) => {
                   if (pd?.how === how) return setPd(undefined);
                   const d = howDef(detailSport, how);
-                  setPd({ how, ...(d?.credit === 'loser' && loser.length === 1 ? { err: { playerId: loser[0].id, playerName: loser[0].fullName } } : {}) });
+                  // IDs-only scoring: the erring player by id
+                  setPd({ how, ...(d?.credit === 'loser' && loser.length === 1 ? { err: errOf(loser[0]) } : {}) });
                 };
                 return (
                   <>
@@ -290,7 +306,7 @@ export function RallyPointEditor({
                       <View style={st.chips}>
                         {loser.map((p) => (
                           <SelectChip key={p.id} label={`By ${p.fullName}`} active={pd.err?.playerId === p.id}
-                            onPress={() => setPd({ ...pd, err: pd.err?.playerId === p.id ? undefined : { playerId: p.id, playerName: p.fullName } })} />
+                            onPress={() => setPd({ ...pd, err: pd.err?.playerId === p.id ? undefined : errOf(p) })} />
                         ))}
                       </View>
                     )}
@@ -312,14 +328,17 @@ export function RallyPointEditor({
             .map(({ e, p, i }) => {
               const side = p.side; // who won the rally (a legacy 2nd-server event's own `side` is the loser)
               const rally = p.kind === 'rally';
+              // IDs-only scoring: names by id for the scorer (an older log's stored name as the fallback)
+              const who = rally ? undefined : eventWho(e, viewer);
+              const dfBy = p.df ? whoName(viewer, p.df.playerId, p.df.playerName) : undefined;
               return (
                 <View key={e.id} style={st.editRow}>
                   <View style={[st.dot, { backgroundColor: side === 'home' ? homeColor : awayColor }]} />
                   <Text style={st.period}>{periodLabel(e)}</Text>
                   <Text style={st.rowLabel} numberOfLines={1}>
                     {p.df
-                      ? `⚠️ Double fault${p.df.playerName ? ` by ${p.df.playerName}` : ''} → point ${side === 'home' ? homeName : awayName}`
-                      : `${ROW_ICON[p.kind] ?? pointIcon} ${side === 'home' ? homeName : awayName}${rally ? ` won rally · ${e.label}` : e.playerName ? ` · ${e.playerName}` : e.kind === 'opperror' || e.kind === 'serveerror' ? ` · ${e.label}` : ''}${p.pd ? ` · ${pdText(p.pd, false, detailSport)}` : ''}`}
+                      ? `⚠️ Double fault${dfBy ? ` by ${dfBy}` : ''} → point ${side === 'home' ? homeName : awayName}`
+                      : `${ROW_ICON[p.kind] ?? pointIcon} ${side === 'home' ? homeName : awayName}${rally ? ` won rally · ${e.label}` : who ? ` · ${who}` : e.kind === 'opperror' || e.kind === 'serveerror' ? ` · ${e.label}` : ''}${p.pd ? ` · ${pdText(p.pd, false, detailSport)}` : ''}`}
                   </Text>
                   {!draft && (
                     // SD-114: ≥44pt targets, spaced; ✕ asks first

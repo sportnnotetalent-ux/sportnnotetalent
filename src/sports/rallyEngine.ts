@@ -236,6 +236,9 @@ export function makeRallyEngine(opts: RallyEngineOpts) {
     }
 
     const scorer = s.sideOut ? s.serving : a.side; // side-out: only the server scores
+    // IDs-only scoring (docs/privacy/ids-only-scoring.md): today's controls send
+    // the player's id only, so `who` is set only by an older log (or an older
+    // app) that sent the name — kept so those logs replay exactly as before.
     const who = a.attribution?.playerName;
     // SD-19: keep the credited player's id on the point (absolute statTotals).
     const pid = a.attribution?.playerId ? { playerId: a.attribution.playerId } : {};
