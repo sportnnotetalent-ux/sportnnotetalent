@@ -13,6 +13,22 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-24 — Singles / doubles entry names: a child's full name never stored publicly
+IDs-only close-out item, done early because it touches no sport engine. A singles or doubles entry is a one- or two-person team named after its players ("Meera Rao / Asha Kumar"). Team names are public (logged out too) and are copied into every stat line's `opponent`.
+- **Migration `20261024160000_entry_names.sql`:**
+  - **`mask_minor_names(label, player ids)`:** each possible minor's full name becomes initials (`name_initials`).
+  - **`teams.entry_ids`:** set by the `teams_entry_names` trigger when the name IS the roster's 1–2 players' names (either order, full or already masked). The stored name is then masked. A team with its own name is left alone.
+  - **`stat_lines.opponent`:** masked with both sides' entry players.
+  - **`home_feed`:** returns `entry_ids`.
+  - **Backfills existing data.** Live check (read-only): 12 one- or two-player teams; 3 are entries, all adults (unchanged); 9 have their own names.
+- **App (`repos.ts`):**
+  - `Team.entryIds` comes in on the existing level-variant selects (same pre-migration fallback). Covered: matches, the home feed, my teams, all teams, organisation teams and tournament entries.
+  - `revealEntryNames` rebuilds each entry's name from its players through `players_view`: the circle gets full names, everyone else the stored initials. It does one read for all entries on screen, and names are kept for a minute.
+  - `createTeam` keeps the creator's own entry name.
+  - New pure helper: `participantEntry.entryNameFromPlayers`.
+- **Verified:** `tests/entry-names.test.mts` (4); tsc clean; suite 4460 pass / 0 fail.
+- **Needs:** the founder runs the migration before the next app release.
+
 ### 2026-10-24 — IDs-only scoring, Stage 0: one name lookup
 Founder decision: scoring data stores player IDs only; names are looked up when shown, through `players_view`. Plan: `docs/privacy/ids-only-scoring.md`. Inventory with file:line references: `docs/privacy/ids-only-scoring-inventory.md`. Why: `matches.state` and `match_events` are public (logged out too), and the scorer — inside the child's circle — copies full names into them on every tap.
 - **`core/playerNames.ts` (pure):**

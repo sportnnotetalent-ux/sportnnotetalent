@@ -29,6 +29,7 @@ import { myPlayerIdMemo } from './myPlayerIdMemo';
 import { readCache } from './readCache';
 // Reads past PostgREST's 1,000-row cap: page with a stable order, chunk long `.in()` lists.
 import { fetchAllPages, fetchAllChunked, chunk, ID_CHUNK } from './paging';
+import { entryNameFromPlayers } from './participantEntry';
 import {
   orSafe, parseVsQuery, rankByName, filterByName, capIds, collapseTeams, liveOnly, selectMatchHits, matchNames, narrowBySports,
   isSearchable, SEARCH_LIMIT, SEARCH_ID_CAP, type TeamHit, type SearchResults, type SearchKind,
@@ -146,6 +147,8 @@ interface TeamRow {
   adhoc?: boolean | null;
   /** SD-154: team level (Varsity / JV / A / B / U13 …) — migration 20261021120000 */
   level?: string | null;
+  /** singles / doubles entry's players (migration 20261024160000 entry_names) */
+  entry_ids?: string[] | null;
 }
 interface MatchRow {
   /** manual result (migration 0040) — absent on older databases */
@@ -175,6 +178,33 @@ interface MatchRow {
 
 const one = <T,>(v: T | T[] | null): T | null => (Array.isArray(v) ? v[0] ?? null : v);
 
+/** Singles / doubles entries (migration entry_names): the stored team name masks
+ *  a child's full name, so rebuild each entry's name from its players as THIS
+ *  viewer may see them (players_view — the circle gets full names, everyone
+ *  else initials). One read for every entry on screen; names kept a minute. */
+const entryPlayerNames = new Map<string, { name: string; at: number }>();
+const ENTRY_NAME_TTL = 60_000;
+async function revealEntryNames(teams: readonly (Team | null | undefined)[]): Promise<void> {
+  if (!isSupabaseConfigured || !supabase) return;
+  const entries = teams.filter((t): t is Team => !!t?.entryIds?.length);
+  if (!entries.length) return;
+  const now = Date.now();
+  const need = [...new Set(entries.flatMap((t) => t.entryIds!))]
+    .filter((id) => { const c = entryPlayerNames.get(id); return !c || now - c.at > ENTRY_NAME_TTL; });
+  if (need.length) {
+    const { data } = await fetchAllChunked(need, (part, from, to) =>
+      supabase!.from(PLAYERS_READ).select('id, full_name').in('id', part).order('id').range(from, to));
+    for (const r of (data ?? []) as { id: string; full_name: string | null }[]) {
+      if (r.full_name) entryPlayerNames.set(r.id, { name: r.full_name, at: now });
+    }
+  }
+  for (const t of entries) {
+    const name = entryNameFromPlayers(t.entryIds!, (id) => entryPlayerNames.get(id)?.name);
+    if (name) t.name = name;
+  }
+}
+const revealMatchEntries = (ms: readonly Match[]) => revealEntryNames(ms.flatMap((m) => [m.homeTeam, m.awayTeam]));
+
 const toTeam = (r: TeamRow): Team => ({
   id: r.id,
   name: r.name,
@@ -186,6 +216,7 @@ const toTeam = (r: TeamRow): Team => ({
   roster: r.roster ?? undefined,
   adhoc: r.adhoc ?? undefined,
   ...(r.level ? { level: r.level } : {}),
+  ...(r.entry_ids?.length ? { entryIds: r.entry_ids } : {}),
 });
 
 /** Perf F-15 — sport plugins load on demand, and reading a match needs its
@@ -251,10 +282,11 @@ const MATCH_SELECT_BASE =
   ' home_team:teams!matches_home_team_id_fkey(id,name,short_name,sport,color_hex),' +
   ' away_team:teams!matches_away_team_id_fkey(id,name,short_name,sport,color_hex)';
 const MATCH_SELECT = MATCH_SELECT_BASE + ', result';
-/** SD-154: plus each team's level (Varsity / JV / A / B) — migration 20261021120000. */
+/** SD-154: plus each team's level (Varsity / JV / A / B) — migration 20261021120000 —
+ *  and an entry's players (entry_names, 20261024160000; on the same fallback). */
 const MATCH_SELECT_LEVEL = MATCH_SELECT
-  .replace('home_team:teams!matches_home_team_id_fkey(id,name,short_name,sport,color_hex)', 'home_team:teams!matches_home_team_id_fkey(id,name,short_name,sport,color_hex,level)')
-  .replace('away_team:teams!matches_away_team_id_fkey(id,name,short_name,sport,color_hex)', 'away_team:teams!matches_away_team_id_fkey(id,name,short_name,sport,color_hex,level)');
+  .replace('home_team:teams!matches_home_team_id_fkey(id,name,short_name,sport,color_hex)', 'home_team:teams!matches_home_team_id_fkey(id,name,short_name,sport,color_hex,level,entry_ids)')
+  .replace('away_team:teams!matches_away_team_id_fkey(id,name,short_name,sport,color_hex)', 'away_team:teams!matches_away_team_id_fkey(id,name,short_name,sport,color_hex,level,entry_ids)');
 /** Remembered once a read shows `teams.level` isn't there yet (no retry per read). */
 let teamLevelMissing = false;
 
@@ -610,7 +642,9 @@ async function readMatches(opts: { sport?: SportId; after?: number }): Promise<M
     : await load().then((r) => (r === NOT_CACHED ? null : r));
   if (!res) return [];
   await loadMatchSports(res.rows);
-  return res.rows.map(toMatch).filter(visibleAfterDelete(new Set(res.deleted)));
+  const ms = res.rows.map(toMatch).filter(visibleAfterDelete(new Set(res.deleted)));
+  await revealMatchEntries(ms);
+  return ms;
 }
 
 export async function getMatch(id: string): Promise<Match | null> {
@@ -622,7 +656,9 @@ export async function getMatch(id: string): Promise<Match | null> {
   const { data, error } = await withMatchCols<unknown>((cols) => supabase!.from('matches').select(cols).eq('id', id).single());
   if (error || !data) return null;
   await loadMatchSports([data as unknown as MatchRow]);
-  return toMatch(data as unknown as MatchRow);
+  const m = toMatch(data as unknown as MatchRow);
+  await revealMatchEntries([m]);
+  return m;
 }
 
 /** Player rosters for a set of teams (teamId → player ids), merging the explicit
@@ -680,11 +716,13 @@ async function getMatchesForScope(scope: MyScope): Promise<Match[]> {
   }
   // (Wave 3) the sports of these matches load before Match objects are handed out
   await loadMatchSports(out);
-  if (slices <= 1) return out.map(toMatch);
+  if (slices <= 1) { const ms = out.map(toMatch); await revealMatchEntries(ms); return ms; }
   // Slices can overlap (a hosted tournament's match of one of their teams): once each, kickoff order.
   const byId = new Map(out.map((r) => [r.id, r] as const));
   const at = (r: MatchRow) => new Date(r.starts_at).getTime();
-  return [...byId.values()].sort((a, b) => at(a) - at(b) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)).map(toMatch);
+  const ms = [...byId.values()].sort((a, b) => at(a) - at(b) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)).map(toMatch);
+  await revealMatchEntries(ms);
+  return ms;
 }
 
 /** Split all matches into the signed-in user's two views:
@@ -708,6 +746,7 @@ export async function getScopedMatches(profileId?: string): Promise<{ mine: Matc
   if (homeFeed) {
     const deleted = new Set(homeFeed.tournaments.filter((t) => t.deleted_at).map((t) => t.id as string));
     const feed = homeFeed.matches.map(toMatch).filter(visibleAfterDelete(deleted));
+    await revealMatchEntries(feed);
     // home_feed's server rule predates getMyScope: add what it misses.
     const extra = (await getMatchesForScope(scope)).filter(visibleAfterDelete(deleted));
     const seen = new Set(feed.map((m) => m.id));
@@ -794,11 +833,13 @@ export async function getTeams(sport?: SportId): Promise<Team[]> {
     if (sport) q = q.eq('sport', sport);
     return q.order('name').order('id').range(from, to);
   });
-  let res = teamLevelMissing ? null : await run('id,name,short_name,sport,color_hex,org_id,club_id,roster,level');
+  let res = teamLevelMissing ? null : await run('id,name,short_name,sport,color_hex,org_id,club_id,roster,level,entry_ids');
   if (!res || res.error) { if (res) teamLevelMissing = true; res = await run('id,name,short_name,sport,color_hex,org_id,roster'); }
   const { data, error } = res;
   if (error || !data) return [];
-  return (data as unknown as TeamRow[]).map(toTeam);
+  const teams = (data as unknown as TeamRow[]).map(toTeam);
+  await revealEntryNames(teams);
+  return teams;
 }
 
 /** `in()` lists are chunked so a long id list never makes an oversized URL (data/paging.ts). */
@@ -817,10 +858,11 @@ export async function getMyTeams(profileId?: string, opts: { managedOnly?: boole
   const out: Team[] = [];
   for (const part of chunked([...ids])) {
     const run = (cols: string) => { let q = supabase!.from('teams').select(cols).in('id', part); if (opts.sport) q = q.eq('sport', opts.sport); return q; };
-    let res = teamLevelMissing ? null : await run('id,name,short_name,sport,color_hex,org_id,club_id,roster,level,adhoc');
+    let res = teamLevelMissing ? null : await run('id,name,short_name,sport,color_hex,org_id,club_id,roster,level,adhoc,entry_ids');
     if (!res || res.error) { if (res) teamLevelMissing = true; res = await run('id,name,short_name,sport,color_hex,org_id,club_id,roster,adhoc'); }
     if (!res.error && res.data) out.push(...(res.data as unknown as TeamRow[]).map(toTeam));
   }
+  await revealEntryNames(out);
   return out.sort((a, b) => a.name.localeCompare(b.name));
 }
 
@@ -1346,6 +1388,7 @@ export async function searchMatches(q: string, limit = SEARCH_LIMIT): Promise<Ma
     if (error) throw new Error('Couldn’t search matches just now.');
     await loadMatchSports((data ?? []) as unknown as MatchRow[]);
     pool = ((data ?? []) as unknown as MatchRow[]).map(toMatch);
+    await revealMatchEntries(pool);
   }
   const hits = selectMatchHits(pool, { a: aIds, b: bIds, tournamentIds: tIds, deletedTournamentIds: deleted });
   const found = rankByName(hits, a, matchNames).slice(0, limit);
@@ -3371,7 +3414,9 @@ export async function getTieRubbers(seriesId: string): Promise<Match[]> {
   const { data, error } = await withMatchCols<unknown[]>((cols) => supabase!.from('matches').select(cols).eq('format->>__seriesId', seriesId));
   if (error || !data) return [];
   await loadMatchSports(data as unknown as MatchRow[]);
-  return (data as unknown as MatchRow[]).map(toMatch);
+  const ms = (data as unknown as MatchRow[]).map(toMatch);
+  await revealMatchEntries(ms);
+  return ms;
 }
 
 /** A lineup save the server refused (not that side's captain / admin / the
@@ -5194,19 +5239,31 @@ export async function createTeam(input: NewTeam): Promise<Team> {
   if (isMissingSchema(error) && level) throw new NeedsDbUpdateError();
   if (error || !data) throw new Error(error?.message ?? 'Could not create team');
   // club_id / level aren't in the select (kept narrow for pre-migration safety) — merge them back.
-  return { ...toTeam(data as TeamRow), clubId: input.clubId ?? undefined, ...(level ? { level } : {}) };
+  const team = toTeam(data as TeamRow);
+  // entry_names: the server masked a child's full name in a singles / doubles
+  // entry's stored name; the creator (in the child's circle) keeps the name they made.
+  if (team.name !== input.name && input.roster?.length && input.roster.length <= 2) {
+    team.name = input.name;
+    team.entryIds = [...input.roster];
+  }
+  return { ...team, clubId: input.clubId ?? undefined, ...(level ? { level } : {}) };
 }
 
 /** Teams owned by a community. */
 export async function getTeamsForOrg(orgId: string): Promise<Team[]> {
   if (!isSupabaseConfigured || !supabase) return demo.teams.filter((t) => t.orgId === orgId);
-  const { data, error } = await fetchAllPages((from, to) => supabase!
+  const read = (cols: string) => fetchAllPages((from, to) => supabase!
     .from('teams')
-    .select('id,name,short_name,sport,color_hex,org_id,roster')
+    .select(cols)
     .eq('org_id', orgId)
     .order('name').order('id').range(from, to));
+  // entry_ids (entry_names migration) when the column is there
+  let { data, error } = await read('id,name,short_name,sport,color_hex,org_id,roster,entry_ids');
+  if (error) ({ data, error } = await read('id,name,short_name,sport,color_hex,org_id,roster'));
   if (error || !data) return [];
-  return (data as TeamRow[]).map(toTeam);
+  const teams = (data as unknown as TeamRow[]).map(toTeam);
+  await revealEntryNames(teams);
+  return teams;
 }
 
 /** Replace a team's explicit roster (player ids). */
@@ -5482,7 +5539,7 @@ export async function getClubTeams(clubId: string): Promise<Team[]> {
   if (!isSupabaseConfigured || !supabase) return demo.teams.filter((t) => t.clubId === clubId);
   // SD-154: with each squad's level when the column is there
   const run = (cols: string) => supabase!.from('teams').select(cols).eq('club_id', clubId);
-  let res = teamLevelMissing ? null : await run('id,name,short_name,sport,color_hex,org_id,club_id,roster,adhoc,level');
+  let res = teamLevelMissing ? null : await run('id,name,short_name,sport,color_hex,org_id,club_id,roster,adhoc,level,entry_ids');
   if (!res || res.error) { if (res) teamLevelMissing = true; res = await run('id,name,short_name,sport,color_hex,org_id,club_id,roster,adhoc'); }
   const { data, error } = res;
   if (error || !data) return [];
@@ -5592,7 +5649,7 @@ export async function getTournamentEntries(tournamentId: string, sport?: SportId
   // (missing category ⇒ no division; missing status ⇒ treated as confirmed).
   const TEAM_COLS = 'teams(id,name,short_name,sport,color_hex,org_id,roster)';
   // SD-154: each team's level (Varsity / JV / A / B) when the column is there
-  const LEVEL_COLS = 'teams(id,name,short_name,sport,color_hex,org_id,roster,level)';
+  const LEVEL_COLS = 'teams(id,name,short_name,sport,color_hex,org_id,roster,level,entry_ids)';
   const attempts = [
     ...(teamLevelMissing ? [] : [`status, category_id, checked_in_at, qualified_from, ${LEVEL_COLS}`]),
     `status, category_id, checked_in_at, ${TEAM_COLS}`, `status, category_id, ${TEAM_COLS}`, `status, ${TEAM_COLS}`, TEAM_COLS,
@@ -5603,7 +5660,7 @@ export async function getTournamentEntries(tournamentId: string, sport?: SportId
     res = await fetchAllPages((from, to) =>
       supabase!.from('tournament_teams').select(cols).eq('tournament_id', tournamentId).order('team_id').range(from, to));
     if (!res.error) break;
-    if (cols.includes(',level)')) teamLevelMissing = true;
+    if (cols.includes(LEVEL_COLS)) teamLevelMissing = true;
   }
   const { data, error } = res;
   if (error || !data) return [];
@@ -5613,6 +5670,7 @@ export async function getTournamentEntries(tournamentId: string, sport?: SportId
     .map((r) => ({ team: Array.isArray(r.teams) ? r.teams[0] : r.teams, status: (r.status ?? 'confirmed') as TournamentEntryStatus, categoryId: r.category_id ?? undefined, checkedInAt: r.checked_in_at ?? undefined, qualifiedFrom: r.qualified_from ?? undefined }))
     .filter((e) => !!e.team)
     .map((e) => ({ team: toTeam(e.team as TeamRow), status: e.status, categoryId: e.categoryId, checkedInAt: e.checkedInAt, ...(e.qualifiedFrom ? { qualifiedFrom: e.qualifiedFrom } : {}) }));
+  await revealEntryNames(entries.map((e) => e.team));
   return sport ? entries.filter((e) => e.team.sport === sport) : entries;
 }
 

@@ -35,6 +35,16 @@ export function entryName(names: string[]): string {
   return names.map(tidy).filter(Boolean).join(' / ');
 }
 
+/** entry_names (migration 20261024160000): an entry's stored name masks a
+ *  child's full name, so the app rebuilds it from the entry's players as the
+ *  viewer may see them (players_view). Undefined while any player is unknown —
+ *  then the stored (masked) name stays. */
+export function entryNameFromPlayers(ids: readonly string[], nameOf: (id: string) => string | undefined): string | undefined {
+  if (!ids.length) return undefined;
+  const names = ids.map((id) => nameOf(id));
+  return names.every((n): n is string => !!n && !!n.trim()) ? entryName(names) : undefined;
+}
+
 /** A short code (2–4 characters) for the side: initials of a singles player
  *  ("Asha Rao" → "AR"), each partner's first initial + surname initial for a
  *  pair ("Asha Rao / Ben Lee" → "ARBL"), else the name's own letters. */

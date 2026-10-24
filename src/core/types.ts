@@ -405,6 +405,11 @@ export interface Team {
   adhoc?: boolean;
   /** team logo (migration 0042) — absent before it / when unset */
   logoUrl?: string;
+  /** A singles / doubles ENTRY (migration entry_names): the players it is named
+   *  after. The stored name masks a child's full name ("M. R."); the app shows
+   *  the name rebuilt from these ids through players_view, so the child's
+   *  circle sees full names and everyone else initials. */
+  entryIds?: UUID[];
   /** home city / town (migration 0042) */
   city?: string;
   /** SD-154: a school squad's level — "Varsity", "JV", "A", "B", "U13 A" —
