@@ -13,6 +13,31 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-24 — Website guides for the "hard to copy" features + reviewer button fix
+Five new guides on sportnnote.in/guides/, written by four writer sub-agents in parallel against the shipped code (every bold label grep-verified, file:line in their reports), then reviewed:
+- **`certificates.md`** "Issue certificates anyone can check" (Tournaments): issue, print, find and share on your profile, check by QR or code, revoke.
+- **`career-passport.md`** "Share your career passport" (Teams & players): share, print, the parent route, what it shows and leaves out, making a new link.
+- **`school-hall-of-fame.md`** "Publish your school's hall of fame" (Teams & players): add a past honour, publish, print the honours board, how verified honours appear.
+- **`verify-your-age.md`** "Get your age verified" (Teams & players): the Ready to play checklist, three ways (parent / school / document), the send-back reasons.
+- **`players-age-rule.md`** "Require checked ages for a tournament" (Tournaments, organisers): the Players' age setting and where it's enforced (squad, cricket line-up, scoring lists; not meet entries or golf), school verification and bulk DOB confirmation.
+- **Edits:**
+  - `parent-guardian-consent.md`: the DOB question on the consent page; initials for people outside the child's teams; "confirm their date of birth" in Manage.
+  - One cross-link line each in `tournament-awards.md`, `filter-career-stats.md` and `set-up-a-school-and-graduation.md`.
+- **Fix (`ProfileView`):** a support / reviewer account with no player profile only saw "Set up your profile", so the review queue was unreachable except through notifications; the founder hit this. That page now shows **🛡️ Review verifications** to reviewers. Test added in `tests/verification-review.test.mts`. The interim way in on the web is `app.sportnnote.in/VerificationReview` (stack-screen URL fallback).
+- **App issues the writers found:**
+  - (a) A revoked certificate can't be reissued: the unique index counts revoked rows, and Revoke asks for no reason.
+  - (b) Reprinting from Profile prints the tournament name as the issuer (`MyCertificatesCard`).
+  - (c) The in-app QR scanner doesn't recognise `/c/`, `/pp/` or `/h/` links.
+  - (d) Print fails silently on builds without expo-print (profile card, passport, hall).
+  - (e) The checklist's "Send my parent the link" fails when consent was self-declared or already confirmed.
+  - (f) The consent page's "Who sees it" and the consent email predate initials-for-signed-in-strangers.
+  - (g) Only one school / club DOB confirmation is stored per player.
+  - None of these is fixed yet; they're offered to the founder.
+- **Verified:**
+  - `npm run website:build` → 115 guides, no warnings for the new files; the 5 pages render (hall of fame checked at 375 px).
+  - Suite 4659 / 0 fail.
+- **Live** once `main` is pushed (Cloudflare rebuilds sportnnote.in). The reviewer fix ships with the next web / OTA publish.
+
 ### 2026-10-25 — Anti-scraping hardening
 Last "hard to copy" item. It follows audit `docs/security/api-exposure-audit-2026-10-24.md` (items 3–5); the runbook is `docs/security/anti-scraping.md`.
 - **Constraint found:** PostgREST runs GET requests in read-only transactions, so the database can't count reads per visitor for rate limits. Live viewers use realtime on `match_events` (which needs read access), and ball-by-ball events rebuild the scorecard. So hiding old events or moving them behind a per-match function would break guest scorecards or live viewing. Not done.
@@ -41,10 +66,13 @@ Last "hard to copy" item. It follows audit `docs/security/api-exposure-audit-202
     - the traffic report is service-role only, and a dry run doesn't save.
   - Edge function typecheck clean; suite 4658 / 0 fail.
   - **Read-only check on live:** the report's core query returns real numbers — since 22 Sep, 469 logged-out and 29,289 signed-in requests; top logged-out tables players_view, matches, teams.
-- **Needs:**
-  - the founder runs the migration;
-  - deploy weekly-report;
-  - then verify with curl that a python-requests User-Agent gets 403, a browser User-Agent gets 200, and `api_whoami` works.
+- **Live 2026-10-25:**
+  - **Migration run.** Checked: the pre-request is set (`pgrst.db_pre_request=public.api_gate`), 8 agent rules, gate on, 4 trap records, and the blocklist and report are closed to anon.
+  - **weekly-report deployed:** without the secret it answers 403 "forbidden", so it boots.
+  - **curl against live:** `api_whoami` returns IP / agent / role. A python-requests agent gets 403 PT403 with the Terms message; the default curl agent gets 403. An iPhone Safari agent gets 200 and okhttp (Android) gets 200. The API root gets 401, which is Supabase's own rule, not the gate.
+  - A public tournament page on sportnnote.expo.app loads its live data with the gate on.
+  - `api_traffic_report(false)` on live returns numbers and saves no snapshot.
+  - **No app change**, so there was no web or OTA publish.
 
 ### 2026-10-25 — NDA and IP-assignment templates
 Fourth "hard to copy" item: the paper side of protecting SportnNote. These are templates drafted for Indian law and marked "not legal advice"; a lawyer reviews the pack once before first use.

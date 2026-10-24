@@ -34,6 +34,8 @@ Each winner gets an alert, "You won" plus the award name. The Awards tab now sho
 1. Open the **Awards** tab after publishing.
 2. Tap **📤 Share awards** to send the list on WhatsApp or anywhere else.
 
+To print certificates for the winners, see [Issue certificates anyone can check](/guides/certificates/).
+
 ## Step by step: edit published awards
 1. On the **Awards** tab, tap **✏️ Edit awards**.
 2. Change, clear or add awards as before.

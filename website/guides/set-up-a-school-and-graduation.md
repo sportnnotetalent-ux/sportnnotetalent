@@ -47,6 +47,8 @@ Every school names its classes differently: Grade 10, Year 13, Secondary 4, JC2.
 
 Graduating students leave the school, and any Admin or Organizer rights they had end.
 
+Honours they won while at your school stay on its [hall of fame](/guides/school-hall-of-fame/).
+
 > **Important:** If no graduating class is set, or no student is in it, **Promote year** says so in red. Fix the class under **✎ Edit** before you apply, or nobody will graduate.
 
 ## Common questions

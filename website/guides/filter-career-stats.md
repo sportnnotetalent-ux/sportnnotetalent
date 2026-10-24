@@ -24,6 +24,8 @@ A player's sport page shows their career in that sport: the record, then section
 
 > **Tip:** **All / Official / Friendly** still works with the chips. Official means tournament matches.
 
+To send your official record to a selector or coach, see [Share your career passport](/guides/career-passport/).
+
 ## What the career shows
 - **The record**: **Apps** (matches played), the result record and **Win %**. Sports that can't end in a draw (tennis, badminton, table tennis, squash, padel, pickleball, volleyball, basketball) show **W-L**; the others show **W-D-L**. Win % counts only matches with a result.
 - Under it, when they apply: **Starts**, **Ties**, **No result**, **Best win run** (most wins in a row), and **Titles** and **Finals** (knockout finals the player's side won and reached).

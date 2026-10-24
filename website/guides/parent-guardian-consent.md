@@ -5,7 +5,7 @@ category: Getting started
 audience: Parents & fans, Players
 sports: all
 order: 85
-updated: 2026-10-20
+updated: 2026-10-24
 ---
 
 Every SportnNote account for someone under 18 needs a parent or guardian. In India, the parent ticks the consent box at sign-up, as before. In other countries, the parent confirms from their own email. Once linked, a parent can manage the child's data from their own account.
@@ -19,13 +19,15 @@ Every SportnNote account for someone under 18 needs a parent or guardian. In Ind
 1. The child signs up and gives your email in **Guardian email**.
 2. When they first sign in, SportnNote emails you. The subject reads, for example, "Please confirm Aisha's SportnNote account".
 3. Open the link in the email. It works for 7 days. You can also open the guardian consent page and type the code from the email.
-4. Read what SportnNote keeps and who can see it, then tap **I agree** or **I don't agree**.
+4. Read what SportnNote keeps and who can see it. If it asks whether your child's date of birth is right, tap **✓ Yes, that’s right** or **No, it’s wrong**. Then tap **I agree** or **I don't agree**.
 5. If you're signed in to your own account when you agree, it is linked as the child's parent/guardian straight away.
 
 Until you confirm, the child's account is limited:
 - nobody can follow them;
 - nobody can send messages about them;
 - only their own teams and tournaments see their full profile.
+
+Even after you confirm, people outside your child's teams, clubs and tournaments see only their initials, not their full name or age.
 
 If you tap **I don't agree**, the account is locked and deleted after 30 days, unless you confirm later from a new link.
 
@@ -41,8 +43,11 @@ The **Manage** page has:
 - **👁️ View**, a summary of what we keep;
 - **⬇️ Download**, the full file (JSON);
 - **✅ Confirm consent**, which turns a waiting or locked account fully on;
+- **✓ Yes, confirm their date of birth**, under **Date of birth**, so your child doesn't need to upload a document;
 - **Withdraw consent**, which locks the account straight away;
 - **Delete their data**: type DELETE, then confirm.
+
+Confirming the date of birth is the fastest way to get your child's age verified for tournaments: see [Get your age verified](/guides/verify-your-age/).
 
 ## Common questions
 ### What does a locked account mean?

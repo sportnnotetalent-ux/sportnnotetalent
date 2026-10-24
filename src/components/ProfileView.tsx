@@ -144,6 +144,11 @@ export function ProfileView({
           {onCreateProfile && (
             <Button label={creating ? 'Setting up…' : '✎ Set up your profile'} onPress={onCreateProfile} disabled={creating} />
           )}
+          {/* A support / reviewer account often has no player profile — keep
+              the approvals queue reachable from here too. */}
+          {owner && viewerIsReviewer && onOpenVerificationReview && (
+            <Button label="🛡️ Review verifications" variant="ghost" onPress={onOpenVerificationReview} />
+          )}
           {owner && onOpenSettings && <Button label="⚙  Settings" variant="ghost" onPress={onOpenSettings} />}
           {onSignOut && <Button label="Sign out" variant="ghost" onPress={onSignOut} />}
         </View>
