@@ -13,6 +13,12 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-24 — Fix: "Are you sure?" sheet logged a nested-button error on the web
+Every confirm sheet (`askConfirm`, e.g. the Hall of fame "Publish" confirm) logged "In HTML, <button> cannot be a descendant of <button>" in the browser console.
+- Cause: in `src/components/ConfirmSheet.tsx` the tap-outside backdrop (a `Pressable` with role button) wrapped the sheet, so the No / Yes buttons sat inside it. react-native-web renders both as `<button>`.
+- Fix: the backdrop is now an absolutely-filled sibling layer behind the sheet, not its parent. The sheet is a plain `View`, so the old `stopPropagation` is gone. Unchanged: tap outside = NO, NO focused by default on web, slide / reduced-motion, the backdrop's "… — close" name (SD-155), `accessibilityViewIsModal` + alert role on the sheet.
+- Verified in the web demo (`/h/org-greenwood`, Publish confirm): no nested `<button>` in the DOM and no console error. Tap outside cancels and tapping the sheet body doesn't close it. Enter on the default-focused NO cancels; No / Yes clicks work (Yes publishes). tsc clean; full suite 4632 pass / 0 fail (2 todo). Web-visible fix; native layout unchanged. One native side effect: on iOS, `accessibilityViewIsModal` now hides the backdrop (a sibling) from VoiceOver, so NO is the way out there.
+
 ### 2026-10-25 — School hall of fame
 Third "hard to copy" item: each school or club gets a permanent honours page. Its history accumulates on SportnNote season after season, and schools share the link on their websites and WhatsApp groups. It is fed by certificates, so it gives organisers a reason to issue them.
 - **Migration `20261025130000_hall_of_fame.sql`:**
