@@ -13,6 +13,43 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-25 — School hall of fame
+Third "hard to copy" item: each school or club gets a permanent honours page. Its history accumulates on SportnNote season after season, and schools share the link on their websites and WhatsApp groups. It is fed by certificates, so it gives organisers a reason to issue them.
+- **Migration `20261025130000_hall_of_fame.sql`:**
+  - **`organizations.hall_public`** (default false): **private until an Owner / Admin publishes it** (`set_hall_public`). Members, admins and support always see it; anyone else gets the header only.
+  - **`org_honours`:** honours the school records itself (past years, outside events). Fields: year, kind (champion / runner_up / third / medal / award / other), title, sport, level (school → international), team label, `player_ids` (≤60), note.
+    - Writes only through `save_org_honour` / `delete_org_honour`, and only by the school's Owners / Admins. The table is closed to clients.
+    - Linked students must be the school's members.
+    - A possible minor's full name typed into the text is replaced with initials (`mask_minor_names` over the school's members).
+  - **`org_hall_of_fame(org)`** (anon too): org header + flags.
+    - **certs:** non-revoked, non-participation certificates its students earned **while members** (membership `since` / `until` around the event date). "School event" when the school hosted it. Deleted events are left out.
+    - **manual:** the honours the school added.
+    - **hosted:** its tournaments.
+    - **No names in the response:** people are player ids, and the app reads names through `players_view` (initials for a possible minor to the public).
+- **App:**
+  - **`core/hallOfFame.ts` (pure):**
+    - `certEntries`: a team title or relay medal is one honour with all its players;
+    - `hallEntries` (newest year first; titles → podiums → medals → awards), `hallYears`, `hallCounts`, `hallSports` / `filterBySport`;
+    - `honourIcon` (🥇🥈🥉 by medal colour), `peopleLine`, `entryMeta`, `hallUrl` → `/h/ORG`;
+    - `hallHtml`: printable A4 honours board with a QR.
+  - **`data/hallOfFame.ts`:** get / publish / save / delete / print. Demo builds it from the demo org, certificates and tournaments.
+  - **`HallOfFameScreen`** (public `h/:orgId`):
+    - header with tiles (titles, runners-up & third, medals, awards, events hosted);
+    - **admin card:** Publish (asks first) / Share link / Print honours board / Add an honour / Make private;
+    - sport chips; year sections (✓ Verified certificate or "Added by the school", See event, ✎ Edit);
+    - events hosted;
+    - "not published" and "no such school" states.
+    - **Honour editor:** year, kind, title, sport, level, team, students picked from members (search), note, Remove (asks first).
+  - **Entry:** "🏆 Hall of fame" card on the school's page (Details tab).
+- **Verified:**
+  - `tests/hall-of-fame.test.mts` (12: grouping, ordering, counts, filter, icons, people line, meta, link, board / escaping, server rules, routes); suite 4632 / 0 fail; tsc clean.
+  - Read-only check on live: every referenced table, column and function exists.
+  - Demo (Greenwood, Aarav as Admin):
+    - Added "District Football Champions 2019 · U17 Boys · District level" with Meera linked.
+    - Issued tennis champion / runner-up and kabaddi champion certificates at the school's own meet. They appear as ✓ verified "School event" honours, and only Greenwood members are listed (Gold House's 6 → Meera).
+    - Publish → confirm → "Published" with Share. Sport chips filter. Print gives an A4 board with a QR. `/h/<unknown>` shows "No school or club here". 375 px is fine.
+- **Needs:** the founder runs the migration; publish.
+
 ### 2026-10-25 — Career passport
 Second "hard to copy" item: a player's verified record on one page (link, QR or print) for selectors, coaches and scholarship panels. It is built from data only SportnNote has: official matches scored live, honours from organiser-issued certificates, and how their age was verified.
 - **Migration `20261025110000_career_passport.sql`:**
@@ -37,7 +74,7 @@ Second "hard to copy" item: a player's verified record on one page (link, QR or 
   - `tests/career-passport.test.mts` (9: link, counts, sheet / QR / escaping / empty sections, server rules, routes + entry points); suite 4622 / 0 fail; tsc clean.
   - Read-only check on live: every referenced table, column and function exists.
   - Demo (375 px and desktop): the profile card opens the passport; Aarav shows 14 official matches, 12W 0D 2L, and 5 sports with highlights. Print gives one A4 page with the QR. `/pp/<unknown>` shows "No passport with that code". No console errors.
-- **Needs:** the founder runs the migration; publish. Then check a real passport link signed out (a minor shows as initials).
+- **Live 2026-10-25:** migration run (checked: 5 functions, column, guard trigger; anon may resolve but not make a code; the column isn't client-readable). Web published (sportnnote.expo.app, same bundle as the build). Android OTA update group `57236cfa`. Signed out, `/pp/<unknown>` on live gives "No passport with that code". Still to check: the founder's own passport link, signed out.
 
 ### 2026-10-25 — QR-verified certificates
 Founder chose the first "hard to copy" item: certificates schools can print in bulk and anyone can check, because the proof lives in SportnNote's database.

@@ -73,6 +73,7 @@ const OrgDobsScreen = lazyScreen(() => import('../screens/OrgDobsScreen'));
 const CertificatesScreen = lazyScreen(() => import('../screens/CertificatesScreen'));
 const CertificateScreen = lazyScreen(() => import('../screens/CertificateScreen'));
 const PassportScreen = lazyScreen(() => import('../screens/PassportScreen'));
+const HallOfFameScreen = lazyScreen(() => import('../screens/HallOfFameScreen'));
 const MessageReportsScreen = lazyScreen(() => import('../screens/MessageReportsScreen'));
 const GolfRoundScreen = lazyScreen(() => import('../screens/GolfRoundScreen'));
 const GolfRoundSetupScreen = lazyScreen(() => import('../screens/GolfRoundSetupScreen'));
@@ -183,6 +184,7 @@ const linking: LinkingOptions<RootStackParamList> = {
       MatchLink: 'm/:matchId',
       Certificate: 'c/:code',
       Passport: 'pp/:code?',
+      HallOfFame: 'h/:orgId',
       Invite: 'i/:playerId',
       // "Join me on SportnNote" — a friend's personal invite.
       GetApp: 'get/:from?',
@@ -344,6 +346,8 @@ export default function RootNavigator() {
       <Stack.Screen name="Certificate" component={CertificateScreen} options={{ ...stackScreenOpts, title: 'Certificate' }} />
       {/* Career passport: anyone with the link sees a player's verified record */}
       <Stack.Screen name="Passport" component={PassportScreen} options={{ ...stackScreenOpts, title: 'Career passport' }} />
+      {/* School hall of fame: public once the school publishes it */}
+      <Stack.Screen name="HallOfFame" component={HallOfFameScreen} options={{ ...stackScreenOpts, title: 'Hall of fame' }} />
       <Stack.Screen name="Invite" component={InviteScreen} options={{ ...stackScreenOpts, title: 'Join SportnNote' }} />
       <Stack.Screen name="GetApp" component={GetAppScreen} options={{ ...stackScreenOpts, title: 'Join SportnNote' }} />
       <Stack.Screen

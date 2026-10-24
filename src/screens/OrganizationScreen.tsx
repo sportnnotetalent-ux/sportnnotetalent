@@ -444,6 +444,12 @@ export default function OrganizationScreen() {
               )}
               {org.bio ? <Text style={textStyles.muted}>{org.bio}</Text> : null}
               <OrgVerificationCard org={org} canManage={canManage} onChanged={loadOrg} onConfirmDobs={() => nav.navigate('OrgDobs', { orgId: org.id })} />
+              {/* School hall of fame: honours year by year (public once published) */}
+              <Card style={{ gap: theme.spacing(1) }}>
+                <Text style={textStyles.h3}>🏆 Hall of fame</Text>
+                <Text style={textStyles.muted}>{canManage ? 'Your titles, medals and awards, year by year — verified ones fill in from certificates. Add past honours and publish it.' : 'Titles, medals and awards, year by year.'}</Text>
+                <Button label="Open hall of fame" variant="ghost" onPress={() => nav.navigate('HallOfFame', { orgId: org.id })} />
+              </Card>
               {(org.email || org.phone) && (
                 <Card style={{ gap: theme.spacing(1) }}>
                   <Text style={textStyles.muted}>Contact</Text>
