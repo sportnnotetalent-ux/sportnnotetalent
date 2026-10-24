@@ -13,6 +13,38 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-24 — IDs-only scoring: racket sports + volleyball (group A) and cricket (group E)
+Two worktree agents built on Stage 0 (`8557c16`). Both were merged; the only conflicts were the undo label and the voice-confirm line, where each group had threaded the name lookup.
+- **Group A** (badminton, tennis, padel, pickleball, squash, table tennis, volleyball; merge `6eac0f3`):
+  - **Events:** carry `playerId` only, and the `detail` text no longer has names (racket points are "21-18", not "21-18 · Name").
+  - **Ids only, no names:**
+    - double-fault / point-detail / conduct / timeout records;
+    - the `SET_START_RIGHT` / `SET_SERVE_ORDER` / `CONDUCT` / `TIMEOUT` / `EDIT_LOG` / `STAT_ADJUST` payloads;
+    - volleyball line-ups / rotation / liberos / subs / detail / sanctions.
+  - **Keyed by id now:** box scores, totals and the editor.
+  - **New pure action builders:** `racketActions.ts`, `volleyball/actions.ts` (the UI and tests use the same ones), and `racketNames.ts`.
+  - **Readers** resolve with `nameOf(id, legacyName)`: commentary, box scores, undo label, `pdText`, editor rows, stats / serve / rotation panels.
+  - **Legacy:** reducers still copy names from old logs; the frozen-oracle and `racketLogs` fingerprints are unchanged.
+  - **New guard tests:** `ids-only-racket`, `ids-only-volleyball`.
+- **Group E** (cricket; merge `2b3fa11`):
+  - **Payloads and credits carry ids only.** The ball editor strips names (`stripNames`).
+  - **State:** cards are keyed by id with no name.
+  - **Stored text** uses id tokens (`c {@p7} b {@p2}`, `FOUR! {@p3} …`), resolved at display by `withNames(state, nameOf)`.
+  - **POTM** is stored as `potmId`; match records keep ids.
+  - **Legacy:** actions with name keys (`carriesNames`) replay exactly as before; `cricketLegacyLogs` fingerprints unchanged.
+  - **Hooks:** `undoLabel`, `autoPotm` and `tickerFlash` take an optional `nameOf`.
+  - **New guard test:** `ids-only-cricket` (with an ids → initials lookup, every builder shows initials).
+- **Verified:** merged tree tsc clean; suite 4509 pass / 0 fail / 2 todo. Demo checks:
+  - cricket commentary of a legacy log shows names with no raw tokens;
+  - badminton scores a point, and the undo label and commentary are right;
+  - no console errors.
+- **Close-out items the groups reported:**
+  - `TournamentRecords` and the AMEND correction list must resolve by id: new cricket and racket records/events carry no names.
+  - The server safety net's key list is `cricket/names.ts NAME_KEYS` plus the racket/volleyball keys.
+  - Data clean-up recipes: cricket uses `stripNames` + re-snapshot; racket/volleyball strip the listed name fields.
+  - Old app versions write names until they update.
+- **Needs:** a real scoring session on the founder's phone (racket + cricket) once published.
+
 ### 2026-10-24 — Verification fast lanes, Phase 1: faster document review
 Founder asked how age and guardian verification works and wants it smooth and fast. Live finding: 1 submission ever (30 Aug), still pending after 55 days with **no file** — its upload had failed silently but the row still went "pending". 0 approvals, 1 reviewer, and a 7-day link to the (child's) ID document was emailed to Gmail. Founder chose all four fast lanes, trusted reviewers, and organiser-chosen requirements. Design: `docs/verification/fast-lanes.md`.
 - **Migration `20261024170000_verification_review.sql`:**
