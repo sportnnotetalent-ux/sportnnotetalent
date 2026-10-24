@@ -567,7 +567,9 @@ export interface SportPlugin<S = unknown> {
   matchRecords?: (state: S) => import('./matchRecords').MatchRecordsBlock | null;
   /** Parity #25 — richer score-ticker cells (batters, bowler, this over…),
    *  merged over the summary by `buildTicker`. `names` = the short team names. */
-  tickerDetail?: (state: S, names: { home: string; away: string }) => import('./ticker').TickerDetail;
+  /** IDs-only scoring: `names.player(id, legacyName)` gives a player's name for
+   *  the viewer (state keeps ids; docs/privacy/ids-only-scoring.md). */
+  tickerDetail?: (state: S, names: { home: string; away: string; player: import('../core/playerNames').NameOf }) => import('./ticker').TickerDetail;
   /** Parity #25 — the overlay's big-moment banner for the newest event (a
    *  wicket, a four, a goal), or null. Only called on a realtime INSERT. */
   tickerFlash?: (prev: S, next: S) => import('./ticker').TickerFlash | null;

@@ -13,6 +13,17 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-24 — IDs-only scoring, Stage 0: one name lookup
+Founder decision: scoring data stores player IDs only; names are looked up when shown, through `players_view`. Plan: `docs/privacy/ids-only-scoring.md`. Inventory with file:line references: `docs/privacy/ids-only-scoring-inventory.md`. Why: `matches.state` and `match_events` are public (logged out too), and the scorer — inside the child's circle — copies full names into them on every tap.
+- **`core/playerNames.ts` (pure):**
+  - `NameOf(id, legacyName?)` and `makeNameOf(people, mask)`, which resolves in this order: open dispute → "X", the viewer's name for the id, the legacy stored name, "Player".
+  - `peopleMap(...lists)`, `legacyNameOf`, `nameInitials` (the same as SQL `name_initials`), and `publicName` (adults by name, a possible minor by initials).
+- **`core/disputeMask.tsx`:** the provider now also carries `people` (id → the name this viewer may see). `useMask().nameOf` / `usePlayerNames()` are new. `byId(id, name)` now resolves by id, so the 11 surfaces already using it show initials to viewers outside a child's circle even before the engines change.
+- **Live match screen:** `people` comes from both squads, invited / extra people and every player (all through `players_view`). `useLiveMatch` takes `nameOf` for the scorer's own follow alerts (attributions will carry ids only).
+- **Ticker / overlay contract:** `tickerDetail(state, { home, away, player })`, and `TickerMeta.nameOf`. The public OBS overlay `/o/<id>` loads both squads through `players_view` (a stream is public, so children show as initials).
+- **Verified:** `tests/player-names.test.mts` (8); tsc clean; suite 4456 pass / 0 fail; demo live match (football) renders and its commentary names resolve, with no console errors.
+- **Next:** the sport groups convert their engines and readers (racket + volleyball and cricket first), then the close-out (server safety net, data clean-up, entries / line-ups / awards / disputes / results-sport names).
+
 ### 2026-10-24 — Listings: a child's name and phone are never public
 Found during the children's-names work: a Connect listing ("looking for a team / player / opponent / ground") is readable by anyone, logged out included. `stamp_listing()` wrote the author's real full name onto it, and the form prefills their own WhatsApp number, so a child who posted one published both.
 - **Migration `20261024150000_listings_minor_contact.sql`:** when the author is a possible minor (under 18, or no date of birth — the `players_view` rule), the listing gets their initials, no contact number and no verified badge. Existing listings get the same treatment. Adults are unchanged.

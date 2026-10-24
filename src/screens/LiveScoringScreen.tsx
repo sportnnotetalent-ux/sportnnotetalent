@@ -60,6 +60,7 @@ import type { TickerMeta } from '../sports/ticker';
 import { slotsFor, isCommentarySlot, type MatchOfficial } from '../data/matchOfficials';
 import { LiveStream } from '../components/LiveStream';
 import { DisputeMaskProvider } from '../core/disputeMask';
+import { makeNameOf, peopleMap } from '../core/playerNames';
 import { SelectChip, TextField, Button } from '../components/ui';
 import { DateTimeField } from '../components/DateTimeField';
 import { VenueField } from '../components/VenueField';
@@ -270,6 +271,8 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
   const [homeFull, setHomeFull] = useState<Player[]>([]);
   const [awayFull, setAwayFull] = useState<Player[]>([]);
   const sideRosters = useMemo(() => ({ home: homeFull.map((p) => p.id), away: awayFull.map((p) => p.id) }), [homeFull, awayFull]);
+  // IDs-only scoring: the scorer's own alerts name players by id from the squads.
+  const rosterNameOf = useMemo(() => makeNameOf(peopleMap(homeFull, awayFull)), [homeFull, awayFull]);
   // SD-48 — a rubber of a team tie (its spec rides on the format)
   const tieRubberMeta = useMemo(() => {
     if (!tieSpecFromFormat(rawFormat)) return undefined;
@@ -283,6 +286,7 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
     homeTeamName,
     awayTeamName,
     rosters: sideRosters,
+    nameOf: rosterNameOf,
     homeTeamId: meta.homeTeamId,
     awayTeamId: meta.awayTeamId,
     tournamentId: meta.tournamentId,
@@ -348,10 +352,15 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
   const disputedOpenIds = useMemo(() => new Set(openDisputes.map((d) => d.playerId)), [openDisputes]);
   // Already flagged (open OR reported) → don't offer object/report again.
   const flaggedIds = useMemo(() => new Set([...openDisputes, ...reportedDisputes].map((d) => d.playerId)), [openDisputes, reportedDisputes]);
-  // What to hide as "X" on this match's live surfaces (only active/open disputes).
+  // IDs-only scoring (docs/privacy/ids-only-scoring.md): every player id on this
+  // match → the name THIS viewer may see (players_view: full names for the
+  // child's circle, initials for everyone else). The match's own squads first.
+  const people = useMemo(() => peopleMap(homeFull, awayFull, extraPeople, allPlayers), [homeFull, awayFull, extraPeople, allPlayers]);
+  // What to hide as "X" on this match's live surfaces (only active/open disputes),
+  // and the names every surface shows by id.
   const maskValue = useMemo(
-    () => ({ ids: disputedOpenIds, names: new Set(openDisputes.map((d) => d.playerName)) }),
-    [disputedOpenIds, openDisputes]
+    () => ({ ids: disputedOpenIds, names: new Set(openDisputes.map((d) => d.playerName)), people }),
+    [disputedOpenIds, openDisputes, people]
   );
 
   // The scoring roster = the matchday squad (starters then subs) if one is set,

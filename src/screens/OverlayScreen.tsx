@@ -8,7 +8,7 @@
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Text, View, useWindowDimensions } from 'react-native';
-import { getMatch, getTournaments } from '../data/repos';
+import { getMatch, getRoster, getTournaments } from '../data/repos';
 import { useLiveMatch } from '../data/useLiveMatch';
 import { getSport } from '../sports/registry';
 import { buildTicker, type TickerMeta } from '../sports/ticker';
@@ -18,7 +18,8 @@ import { breakLabel, readBreak, type MatchBreak } from '../data/matchHousekeepin
 import { formatTime } from '../core/time';
 import { parseOverlayParams, type OverlayParams } from '../core/overlayParams';
 import { ScoreOverlay, CANVAS_W, CANVAS_H, type OverlayFlash } from '../components/overlay/ScoreOverlay';
-import type { Match } from '../core/types';
+import type { Match, Player } from '../core/types';
+import { makeNameOf, peopleMap } from '../core/playerNames';
 
 const META_REFRESH_MS = 120_000;
 
@@ -100,6 +101,19 @@ function LiveOverlay({ match, config, params }: { match: Match; config?: Record<
   });
   const { width, height } = useWindowDimensions();
   const scale = Math.min(width / CANVAS_W, height / CANVAS_H) || 1;
+  // IDs-only scoring: player names come from the two squads as THIS viewer may
+  // see them (players_view — a stream is public, so children show as initials).
+  const [squads, setSquads] = useState<{ home: Player[]; away: Player[] }>({ home: [], away: [] });
+  useEffect(() => {
+    let on = true;
+    const h = match.homeTeam, a = match.awayTeam;
+    void Promise.all([
+      getRoster(h.name, match.sport, h.id).catch(() => [] as Player[]),
+      getRoster(a.name, match.sport, a.id).catch(() => [] as Player[]),
+    ]).then(([home, away]) => { if (on) setSquads({ home, away }); });
+    return () => { on = false; };
+  }, [match]);
+  const nameOf = useMemo(() => makeNameOf(peopleMap(squads.home, squads.away)), [squads]);
 
   const meta: TickerMeta = useMemo(() => {
     const brk = (match.onBreak as MatchBreak | undefined) ?? readBreak(match.format as Record<string, unknown> | undefined);
@@ -112,8 +126,9 @@ function LiveOverlay({ match, config, params }: { match: Match; config?: Record<
       result: match.result ?? null,
       status: match.status,
       breakLabel: brk && match.status !== 'completed' ? breakLabel(brk) : undefined,
+      nameOf,
     };
-  }, [match]);
+  }, [match, nameOf]);
   const model = buildTicker(plugin, state, meta, eventCount);
 
   return (

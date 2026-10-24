@@ -37,6 +37,7 @@ import { createResultHold, type ResultHold } from './resultHold';
 import { pendingResults, flushPendingResults } from './pendingResults';
 import { tapFeedback, undoFeedback } from '../core/haptics';
 import { withMatchRecords } from '../sports/matchRecords'; // SD-51
+import { legacyNameOf, type NameOf } from '../core/playerNames'; // IDs-only scoring
 
 export interface UseLiveMatch {
   state: unknown;
@@ -83,6 +84,9 @@ export function useLiveMatch(params: {
   /** SD-119 — player ids on each side (roster / squad): which side a credited
    *  player is on, so their line's `opponent` names the OTHER team */
   rosters?: SideRosters;
+  /** IDs-only scoring (docs/privacy/ids-only-scoring.md): player id → name, for
+   *  the scorer's own alerts (attributions carry ids, not names). */
+  nameOf?: NameOf;
   /** ids for team/tournament-follow notifications */
   homeTeamId?: string;
   awayTeamId?: string;
@@ -115,6 +119,8 @@ export function useLiveMatch(params: {
   // SD-119: latest rosters, read at credit time (they load after the screen mounts)
   const rostersRef = useRef(params.rosters);
   rostersRef.current = params.rosters;
+  const nameOfRef = useRef<NameOf>(params.nameOf ?? legacyNameOf);
+  nameOfRef.current = params.nameOf ?? legacyNameOf;
   /** The opponent label for a credited player: the side they played for — the
    *  credit's own `side`, else roster membership, else the action's side. */
   const opponentFor = (credit: { playerId: string; side?: 'home' | 'away' }, actionSide?: 'home' | 'away') =>
@@ -329,7 +335,7 @@ export function useLiveMatch(params: {
           // push this to the goal scorer instead of showing it to the follower
           // on this device. The tap opens the match (matchId) either way.
           void notify({
-            title: `${playerName ?? 'A player you follow'} ${verb}!`,
+            title: `${playerName || playerId ? nameOfRef.current(playerId, playerName) : 'A player you follow'} ${verb}!`,
             body: opponent ? `${getSport(sport).name} vs ${opponent}` : getSport(sport).name,
             matchId,
           });

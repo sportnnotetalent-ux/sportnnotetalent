@@ -10,6 +10,7 @@
  */
 import type { SportPlugin } from './types';
 import { finalBoard, type ResultLike } from './scoreline.ts';
+import { legacyNameOf, type NameOf } from '../core/playerNames.ts';
 
 export type TickerTone = 'wicket' | 'boundary' | 'extra';
 export interface TickerChip { text: string; tone?: TickerTone }
@@ -85,6 +86,9 @@ export interface TickerMeta {
   status?: 'scheduled' | 'live' | 'completed' | string;
   /** play paused (#13), e.g. "Rain break" */
   breakLabel?: string;
+  /** IDs-only scoring: player id → name for this viewer (players_view); the
+   *  stored legacy name when absent */
+  nameOf?: NameOf;
 }
 
 type TickerPlugin = Pick<SportPlugin<any>, 'summary' | 'isComplete' | 'tickerDetail'> & Partial<Pick<SportPlugin<any>, 'scoreLine' | 'lineScore' | 'retireTerms'>>;
@@ -99,7 +103,7 @@ export function buildTicker(plugin: TickerPlugin, state: unknown, meta: TickerMe
   const pre = !done && eventCount === 0 && meta.status !== 'live';
   const homeShort = meta.home.short || meta.home.name;
   const awayShort = meta.away.short || meta.away.name;
-  const d: TickerDetail = pre ? {} : plugin.tickerDetail?.(state as never, { home: homeShort, away: awayShort }) ?? {};
+  const d: TickerDetail = pre ? {} : plugin.tickerDetail?.(state as never, { home: homeShort, away: awayShort, player: meta.nameOf ?? legacyNameOf }) ?? {};
   // SD-20: closed by hand mid-set → the final board (sets won + "6-4, 3-2 ret.").
   const fb = done && !complete && meta.result ? finalBoard(plugin, state, { result: meta.result }) : null;
 
