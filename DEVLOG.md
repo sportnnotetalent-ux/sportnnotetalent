@@ -13,6 +13,20 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-24 — IDs-only scoring: basketball (D)
+- **Merge of `d1435db`.** A play stores `payload.pid` / `attribution.playerId` only.
+- **SUB:** `{offId, onId}`; the event carries `pid` + `secondId`, so `appearances` picks subs up unchanged.
+- **Fouls:** a foul drawn stores `drawnPid` only.
+- **Starting five:** `SET_LINEUP {side, payload: {pids}}` → `state.court` (ids); `state.ids` (a public name → id map) is no longer written. Foul-out, ejection and DQ are checked by id.
+- **Code:** new `basketball/actions.ts` (id-only builders) and `basketball/names.ts` (lookups + legacy name-key lists `BB_PAYLOAD_NAME_KEYS` / `BB_EVENT_NAME_KEYS`).
+- **Readers:** commentary rows arrive at `PlayFeed` already resolved; the box score is keyed by id (MIN, +/-); `gameFlow` works by id.
+- **Legacy logs** replay byte-identically. A match continued after the update links old name-only plays through that log's `ids` map.
+- Guard test: `ids-only-basketball`. Merged tree: tsc clean; suite 4579 pass / 0 fail / 2 todo.
+- **Close-out notes:**
+  - The `EventCorrectionList` replace op must set the new `payload.pid` and drop names.
+  - The safety net strips `offName` / `onName` / `drawn` / `ids`, and on basketball `SET_LINEUP` only, `home` / `away` string arrays.
+  - `GameFlowCard` still uses `match_lineups` slot names for old name-only plays (`match_lineups` is a close-out item).
+
 ### 2026-10-24 — IDs-only scoring: kabaddi (C) and baseball, carrom, chess, golf match play (F+G)
 - **Kabaddi** (merge of `665af96`):
   - **Payloads:** RAID_OUTCOME has `raiderId` / `tacklerId` / `touched[{id}]`; SUB has `offId` / `onId`; TECH_POINT / CARD carry `playerId`.
