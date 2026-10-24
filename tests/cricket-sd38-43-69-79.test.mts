@@ -22,25 +22,25 @@ import type { ScoreAction } from '../src/sports/types.ts';
 function opened(): CricketState {
   let s = init({ overs: 5, playersPerSide: 11 });
   for (const a of [
-    { type: 'SET_CAPTAIN', payload: { side: 'home', id: 's1', name: 'A' } },
-    { type: 'SET_CAPTAIN', payload: { side: 'away', id: 'cA', name: 'Away capt' } },
-    { type: 'SET_KEEPER', payload: { side: 'away', id: 'k1', name: 'Keeper' } },
-    { type: 'SET_STRIKER', payload: { id: 's1', name: 'A' } },
-    { type: 'SET_NONSTRIKER', payload: { id: 's2', name: 'B' } },
-    { type: 'SET_BOWLER', payload: { id: 'b1', name: 'Bowler' } },
+    { type: 'SET_CAPTAIN', payload: { side: 'home', id: 's1' } },
+    { type: 'SET_CAPTAIN', payload: { side: 'away', id: 'cA' } },
+    { type: 'SET_KEEPER', payload: { side: 'away', id: 'k1' } },
+    { type: 'SET_STRIKER', payload: { id: 's1' } },
+    { type: 'SET_NONSTRIKER', payload: { id: 's2' } },
+    { type: 'SET_BOWLER', payload: { id: 'b1' } },
   ] as ScoreAction[]) s = reducer(s, a);
   return s;
 }
 const ball = (s: CricketState, type: string, payload: Record<string, unknown> = {}): CricketState =>
-  reducer(s, { type, side: s.battingSide, payload: { strikerId: s.strikerId, strikerName: s.strikerName, bowlerId: s.bowlerId, bowlerName: s.bowlerName, ...payload } } as ScoreAction);
+  reducer(s, { type, side: s.battingSide, payload: { strikerId: s.strikerId, bowlerId: s.bowlerId, ...payload } } as ScoreAction);
 
 describe('SD-69 — captain / keeper flags in statTotals', () => {
   test('capt / wk / wkCatches from SET_CAPTAIN / SET_KEEPER; a fielder catch is not the keeper\'s', () => {
     let s = opened();
     s = ball(s, 'RUNS', { runs: 4, boundary: true });
-    s = ball(s, 'WICKET', { kind: 'caught', fielderId: 'k1', fielderName: 'Keeper', newBatId: 'n1', newBatName: 'N1' }); // s1 c †Keeper
-    s = ball(s, 'WICKET', { kind: 'caught', fielderId: 'f9', fielderName: 'Slip', newBatId: 'n2', newBatName: 'N2' });
-    s = ball(s, 'EXTRA', { kind: 'Wide', wicket: 'stumped', newBatId: 'n3', newBatName: 'N3' });
+    s = ball(s, 'WICKET', { kind: 'caught', fielderId: 'k1', newBatId: 'n1' }); // s1 c †Keeper
+    s = ball(s, 'WICKET', { kind: 'caught', fielderId: 'f9', newBatId: 'n2' });
+    s = ball(s, 'EXTRA', { kind: 'Wide', wicket: 'stumped', newBatId: 'n3' });
     const t = statTotals(s);
     assert.equal(t.s1.stats.capt, 1);
     assert.equal(t.s1.side, 'home');
@@ -57,9 +57,9 @@ describe('SD-69 — captain / keeper flags in statTotals', () => {
   test('a match with no captain / keeper set writes no flags (old matches unchanged)', () => {
     let s = init({ overs: 5, playersPerSide: 11 });
     for (const a of [
-      { type: 'SET_STRIKER', payload: { id: 's1', name: 'A' } },
-      { type: 'SET_NONSTRIKER', payload: { id: 's2', name: 'B' } },
-      { type: 'SET_BOWLER', payload: { id: 'b1', name: 'Bowler' } },
+      { type: 'SET_STRIKER', payload: { id: 's1' } },
+      { type: 'SET_NONSTRIKER', payload: { id: 's2' } },
+      { type: 'SET_BOWLER', payload: { id: 'b1' } },
     ] as ScoreAction[]) s = reducer(s, a);
     s = ball(s, 'RUNS', { runs: 1 });
     const keys = new Set(Object.values(statTotals(s)).flatMap((e) => Object.keys(e.stats)));
@@ -68,8 +68,8 @@ describe('SD-69 — captain / keeper flags in statTotals', () => {
 
   test('ducks: out for 0 is a duck (incl. a 0-ball run out); retired hurt on 0 is not', () => {
     let s = opened();
-    s = ball(s, 'WICKET', { kind: 'bowled', newBatId: 'n1', newBatName: 'N1' }); // s1 b, 0 (1)
-    s = ball(s, 'WICKET', { kind: 'retired', batterOut: 'striker', newBatId: 'n2', newBatName: 'N2' }); // n1 retired hurt 0
+    s = ball(s, 'WICKET', { kind: 'bowled', newBatId: 'n1' }); // s1 b, 0 (1)
+    s = ball(s, 'WICKET', { kind: 'retired', batterOut: 'striker', newBatId: 'n2' }); // n1 retired hurt 0
     const t = statTotals(s);
     const line = (id: string): StatLine => ({ id, matchId: 'm', playerId: id, sport: 'cricket', stats: t[id].stats, won: false });
     const v = (id: string) => aggregateStat(cricketStats, statDefIn(cricketStats, 'ducks')!, [line(id)]);

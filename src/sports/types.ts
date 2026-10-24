@@ -423,8 +423,9 @@ export interface SportPlugin<S = unknown> {
   manualEnd?: { drawLabel: string; nrrToggle?: boolean };
   /** SD-133 — the sport's own name for what Undo removes (cricket: "FOUR —
    *  Rohit (4.3)"), from useLiveMatch's `lastStep`. Absent = the shared
-   *  `undoLabel` (SD-115). Null = plain "Undo". */
-  undoLabel?: (step: { type: string; prev: unknown; next: unknown } | null | undefined) => string | null;
+   *  `undoLabel` (SD-115). Null = plain "Undo". IDs-only scoring: `nameOf`
+   *  names the players by id (the state keeps ids); optional. */
+  undoLabel?: (step: { type: string; prev: unknown; next: unknown } | null | undefined, nameOf?: import('../core/playerNames').NameOf) => string | null;
   /** Can a finished match be corrected with the generic list (parity #05)? false
    *  hides "Correct this match" — cricket until #06 ships its own editor, since
    *  re-crediting `attribution` alone would split its scorecard from its stats. */
@@ -474,8 +475,9 @@ export interface SportPlugin<S = unknown> {
   Summary?: React.FC<SummaryProps>;
   /** With a Summary: the Player of the Match it shows when there is no stored
    *  override (legacy name, then its computed MVP) — the "old" side of the
-   *  change-POTM confirm (parity #21). */
-  autoPotm?: (state: S) => { id?: string; name: string } | undefined;
+   *  change-POTM confirm (parity #21). IDs-only scoring: `nameOf` gives the
+   *  name by id (optional). */
+  autoPotm?: (state: S, nameOf?: import('../core/playerNames').NameOf) => { id?: string; name: string } | undefined;
   /** Organizer-configurable format options for this sport. */
   formatFields?: FormatField[];
   /** Settings changeable on a live match (parity #14); see LiveSettings. */
@@ -577,8 +579,9 @@ export interface SportPlugin<S = unknown> {
    *  the viewer (state keeps ids; docs/privacy/ids-only-scoring.md). */
   tickerDetail?: (state: S, names: { home: string; away: string; player: import('../core/playerNames').NameOf }) => import('./ticker').TickerDetail;
   /** Parity #25 — the overlay's big-moment banner for the newest event (a
-   *  wicket, a four, a goal), or null. Only called on a realtime INSERT. */
-  tickerFlash?: (prev: S, next: S) => import('./ticker').TickerFlash | null;
+   *  wicket, a four, a goal), or null. Only called on a realtime INSERT.
+   *  IDs-only scoring: `nameOf` names the players by id (optional). */
+  tickerFlash?: (prev: S, next: S, nameOf?: import('../core/playerNames').NameOf) => import('./ticker').TickerFlash | null;
 }
 
 /** Perf F-15 — the LIGHT part of a plugin: what lists, pickers and format forms

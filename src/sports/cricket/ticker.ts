@@ -1,9 +1,13 @@
 /**
  * Cricket's score-ticker cells and flashes (parity #25). Pure — reads the state
  * only; while a Super Over is live its own innings state drives the cells.
+ * IDs-only scoring: the state keeps ids; players are named through the
+ * viewer's `NameOf` (the public overlay: initials for children) — names.ts.
  */
 import { oversStr, runRate, symbolTone, outcome, type CricketState } from './engine.ts';
 import { shortName, type TickerChip, type TickerDetail, type TickerFlash } from '../ticker.ts';
+import { withNames } from './names.ts';
+import { legacyNameOf, type NameOf } from '../../core/playerNames.ts';
 
 /** The innings the ticker follows: the Super Over's while one is in play. */
 const active = (s: CricketState): CricketState => (s.superOver && !s.ended ? s.superOver.state : s);
@@ -15,7 +19,8 @@ const lowerFirst = (t: string) => (t ? t[0].toLowerCase() + t.slice(1) : t);
 const hasBatted = (x: CricketState, side: 'home' | 'away') =>
   side === x.battingSide || x.innings === 2 || x.scores[side].balls > 0 || x.scores[side].runs > 0;
 
-export function cricketTickerDetail(s: CricketState, names: { home: string; away: string }): TickerDetail {
+export function cricketTickerDetail(s0: CricketState, names: { home: string; away: string; player?: NameOf }): TickerDetail {
+  const s = withNames(s0, names.player ?? legacyNameOf);
   const x = active(s);
   const inSO = x !== s;
   const bpo = x.ballsPerOver;
@@ -94,7 +99,9 @@ function newest(s: CricketState): { key: string; ev?: CricketState['events'][num
 /** A wicket → WICKET!, a real boundary → FOUR / SIX. Penalties, adjustments,
  *  an all-run 4 and overthrows (no 'boundary' tone) never flash; retired hurt
  *  isn't a wicket. */
-export function cricketTickerFlash(prev: CricketState, next: CricketState): TickerFlash | null {
+export function cricketTickerFlash(prev0: CricketState, next0: CricketState, nameOf: NameOf = legacyNameOf): TickerFlash | null {
+  const prev = withNames(prev0, nameOf);
+  const next = withNames(next0, nameOf);
   const a = newest(prev);
   const b = newest(next);
   if (!b.ev || b.key === a.key) return null;

@@ -128,12 +128,13 @@ export function kabaddiVoice(text: string, ctx: VoiceContext): ScoreAction[] | n
 /** Cricket: ball-by-ball outcomes. No side-matching (one side bats at a time) —
  *  instead each action carries the current innings' side + striker/bowler pulled
  *  from state, mirroring the plugin's own `ball()` wrapper. Extras/wickets are
- *  checked before generic runs so "no ball" / "leg bye" aren't read as runs. */
+ *  checked before generic runs so "no ball" / "leg bye" aren't read as runs.
+ *  IDs-only scoring: players by id only (no names in the payload or credit). */
 export function cricketVoice(text: string, ctx: VoiceContext): ScoreAction[] | null {
   const q = deburr(text);
-  const s = ctx.state as { battingSide?: 'home' | 'away'; strikerId?: string; strikerName?: string; bowlerId?: string; bowlerName?: string };
+  const s = ctx.state as { battingSide?: 'home' | 'away'; strikerId?: string; bowlerId?: string };
   const wrap = (type: string, payload: Record<string, unknown> = {}): ScoreAction => ({
-    type, side: s.battingSide, payload: { ...payload, strikerId: s.strikerId, strikerName: s.strikerName, bowlerId: s.bowlerId, bowlerName: s.bowlerName },
+    type, side: s.battingSide, payload: { ...payload, strikerId: s.strikerId, bowlerId: s.bowlerId },
   });
   const n = numberFromText(q);
   const runsOffText = n != null && n <= 7 ? n : undefined;
@@ -144,7 +145,7 @@ export function cricketVoice(text: string, ctx: VoiceContext): ScoreAction[] | n
     // a 4/6 off the no-ball is a boundary unless "all run" was said (parity #15)
     const allRun = /\ball run\b|\bran\b/.test(q);
     // runs off the bat are the striker's (parity #19, as the tap flow)
-    return [{ ...wrap('EXTRA', { kind: 'No ball', runs: nb, ...(nb === 4 || nb === 6 ? { boundary: !allRun } : {}) }), attribution: nb > 0 && s.strikerId ? { playerId: s.strikerId, stat: 'runs', by: nb, playerName: s.strikerName } : undefined }];
+    return [{ ...wrap('EXTRA', { kind: 'No ball', runs: nb, ...(nb === 4 || nb === 6 ? { boundary: !allRun } : {}) }), attribution: nb > 0 && s.strikerId ? { playerId: s.strikerId, stat: 'runs', by: nb } : undefined }];
   }
   if (/\bwide\b/.test(q)) return [wrap('EXTRA', { kind: 'Wide' })];
   if (/\bleg ?bye/.test(q)) return [wrap('LEGBYES', { runs: runsOffText ?? 1 })];
@@ -160,7 +161,7 @@ export function cricketVoice(text: string, ctx: VoiceContext): ScoreAction[] | n
       : 'bowled';
     // Credit the bowler for a bowler's wicket (not a run out) — parity with the
     // plugin's tap flow, so voice-scored wickets count toward player stats too.
-    return [{ ...wrap('WICKET', { kind }), attribution: s.bowlerId && kind !== 'runout' ? { playerId: s.bowlerId, stat: 'wickets', by: 1, playerName: s.bowlerName, side: s.battingSide === 'home' ? 'away' : 'home' } : undefined }];
+    return [{ ...wrap('WICKET', { kind }), attribution: s.bowlerId && kind !== 'runout' ? { playerId: s.bowlerId, stat: 'wickets', by: 1, side: s.battingSide === 'home' ? 'away' : 'home' } : undefined }];
   }
 
   // Runs — a run word or a bare 0-7 (parity #15: "five", "seven"; "all run" /
@@ -177,7 +178,7 @@ export function cricketVoice(text: string, ctx: VoiceContext): ScoreAction[] | n
   const runWord = /\b(dot|no run|nothing|zero|four|boundary|six|maximum|single|couple|double|run|runs|ran|scored?)\b/.test(q);
   if (r != null && r >= 0 && r <= 7 && (runWord || /^\d$/.test(q.trim()) || /^(five|seven)$/.test(q.trim()))) {
     const boundaryFlag = r === 4 || r === 6 ? { boundary: !allRun } : allRun ? { boundary: false } : {};
-    return [{ ...wrap('RUNS', { runs: r, ...boundaryFlag }), attribution: s.strikerId ? { playerId: s.strikerId, stat: 'runs', by: r, playerName: s.strikerName } : undefined }];
+    return [{ ...wrap('RUNS', { runs: r, ...boundaryFlag }), attribution: s.strikerId ? { playerId: s.strikerId, stat: 'runs', by: r } : undefined }];
   }
   return null;
 }

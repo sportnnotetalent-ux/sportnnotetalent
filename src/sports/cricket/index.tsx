@@ -59,6 +59,9 @@ import {
 } from './rules';
 import { CRICKET_META } from './meta';
 import { cricketMatchRecords } from './records';
+// IDs-only scoring: actions carry player ids only; names are put in for display.
+import { withNames } from './names';
+import { legacyNameOf, type NameOf } from '../../core/playerNames';
 
 /* ------------------------------- Controls ---------------------------------- */
 
@@ -155,7 +158,7 @@ function SetupPanel({
       ([sd, kid, roster]) => {
         if (!kid || state.keepers[sd]) return;
         const p = roster.find((x) => x.id === kid);
-        if (p) dispatch({ type: 'SET_KEEPER', payload: { side: sd, id: p.id, name: p.fullName } });
+        if (p) dispatch({ type: 'SET_KEEPER', payload: { side: sd, id: p.id } });
       }
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -164,7 +167,8 @@ function SetupPanel({
     (state.captains[key]?.id === id ? ' (c)' : '') + (state.keepers[key]?.id === id ? ' †' : '');
   const assign = (role: 'SET_CAPTAIN' | 'SET_KEEPER') => {
     if (!pick) return;
-    dispatch({ type: role, payload: { side: pick.side, id: pick.id, name: pick.name } });
+    // IDs-only: the id is stored; the name is looked up when shown.
+    dispatch({ type: role, payload: { side: pick.side, id: pick.id } });
     setPick(null);
   };
 
@@ -666,9 +670,9 @@ function MoreRunsPanel({
   const by = fKind === 'drop' ? 1 : fRuns ?? 0;
   const action: ScoreAction | null = !fielder || (fKind !== 'drop' && !fRuns) ? null : {
     type: 'FIELD_NOTE', side: other(bat),
-    payload: { kind: fKind, fielderId: fielder.id, fielderName: fielder.fullName, ...(fRuns ? { runs: fRuns } : {}) },
+    payload: { kind: fKind, fielderId: fielder.id, ...(fRuns ? { runs: fRuns } : {}) },
     // A Super Over isn't counted in careers (statTotals skips it) — no stat there.
-    ...(inSuperOver ? {} : { attribution: { playerId: fielder.id, stat, by, playerName: fielder.fullName } }),
+    ...(inSuperOver ? {} : { attribution: { playerId: fielder.id, stat, by } }),
   };
   const ordered = keeperId ? [...fielders.filter((p) => p.id === keeperId), ...fielders.filter((p) => p.id !== keeperId)] : fielders;
   return (
@@ -706,9 +710,13 @@ const stampBall = (a: ScoreAction): ScoreAction =>
   (STAMPED.has(a.type) && a.payload?.at == null ? { ...a, payload: { ...a.payload, at: Date.now() } } : a);
 
 const ScoringControls: SportPlugin<CricketState>['ScoringControls'] = ({
-  state: rootState, dispatch: dispatchRaw, homeName, awayName, homeColor, awayColor, homeRoster = [], awayRoster = [], homeKeeperId, awayKeeperId,
+  state: rawRoot, dispatch: dispatchRaw, homeName, awayName, homeColor, awayColor, homeRoster = [], awayRoster = [], homeKeeperId, awayKeeperId,
   knockout, onEndMatch,
 }) => {
+  // IDs-only scoring: the state keeps ids; this display copy has the names
+  // (as this scorer may see them). Actions below send ids only.
+  const { nameOf } = useMask();
+  const rootState = useMemo(() => withNames(rawRoot, nameOf), [rawRoot, nameOf]);
   const dispatch = (a: ScoreAction) => dispatchRaw(stampBall(a));
   const [wf, setWf] = useState<{
     kind?: DismissalKind; fielder?: Player; batterOut?: 'striker' | 'nonstriker'; runs?: number;
@@ -803,8 +811,8 @@ const ScoringControls: SportPlugin<CricketState>['ScoringControls'] = ({
   const pickBat = (p: Player) => {
     if (isOut(p.id) || atCrease(p.id) || isUnavailable(p.id) || soBarred(p.id)) return;
     // v: 2 — the engine then also refuses a Super Over-barred batter.
-    if (!strikerId) dispatch({ type: 'SET_STRIKER', payload: { id: p.id, name: p.fullName, v: 2 } });
-    else if (!nonStrikerId) dispatch({ type: 'SET_NONSTRIKER', payload: { id: p.id, name: p.fullName, v: 2 } });
+    if (!strikerId) dispatch({ type: 'SET_STRIKER', payload: { id: p.id, v: 2 } });
+    else if (!nonStrikerId) dispatch({ type: 'SET_NONSTRIKER', payload: { id: p.id, v: 2 } });
   };
 
   // SD-113 (R2): an armed penalty rides on the next delivery (v: 2), then disarms.
@@ -813,21 +821,23 @@ const ScoringControls: SportPlugin<CricketState>['ScoringControls'] = ({
     setBallPen(null);
     return { v: 2, pen: { runs: ballPen.runs, against: ballPen.against, reason: ballPen.reason, teamName: ballPen.teamName } };
   };
+  // Every ball carries the striker and bowler it was bowled with — by id only
+  // (IDs-only scoring: the event log is public).
   const ball = (extra: Partial<ScoreAction> & { type: string }) =>
     dispatch({
       ...extra,
       side: state.battingSide,
-      payload: { ...extra.payload, strikerId, strikerName, bowlerId, bowlerName, ...penPayload() },
+      payload: { ...extra.payload, strikerId, bowlerId, ...penPayload() },
     } as ScoreAction);
 
   // `boundary`: 4/6 keys send true; all-run / overthrow / typed runs send false
   // (parity #15). A missing flag (old clients, voice) is read as a legacy event.
   const runs = (r: number, extra: { boundary?: boolean; overthrows?: number } = {}) =>
-    ball({ type: 'RUNS', payload: { runs: r, ...extra }, attribution: strikerId ? { playerId: strikerId, stat: 'runs', by: r, playerName: strikerName } : undefined });
+    ball({ type: 'RUNS', payload: { runs: r, ...extra }, attribution: strikerId ? { playerId: strikerId, stat: 'runs', by: r } : undefined });
   // Runs off the bat on a no-ball are the striker's (parity #19 — they used to
   // reach the scorecard but never the profile).
   const nbRuns = (n: number): ScoreAction['attribution'] =>
-    (n > 0 && strikerId ? { playerId: strikerId, stat: 'runs', by: n, playerName: strikerName } : undefined);
+    (n > 0 && strikerId ? { playerId: strikerId, stat: 'runs', by: n } : undefined);
   const closeMore = () => { setExtraMode(null); setOtRan(0); setOtOver(null); };
 
   // ----- wicket flow ----- (retired hurt isn't a wicket, so it never "all out")
@@ -851,13 +861,15 @@ const ScoringControls: SportPlugin<CricketState>['ScoringControls'] = ({
     const runsN = takesRuns ? (wf.runs ?? 0) : 0;
     const runsAs: RunsAs = takesRuns ? (wf.runsAs === 'bye' || wf.runsAs === 'legbye' ? wf.runsAs : onExtra === 'noball' ? (wf.nbRunsAs ?? 'bat') : 'bat') : 'bat';
     const batterOut = kind === 'mankad' ? 'nonstriker' : kind === 'hittwice' || kind === 'stumped' || kind === 'hitwicket' ? 'striker' : (wf.batterOut ?? 'striker');
+    // IDs-only: who was involved, by id — the scorecard text ("c X b Y") is
+    // built from them when shown.
     const payload: Record<string, unknown> = {
-      strikerId, strikerName, bowlerId, bowlerName,
-      fielderId: wf.fielder?.id, fielderName: wf.fielder?.fullName,
+      strikerId, bowlerId,
+      fielderId: wf.fielder?.id,
       batterOut, runs: runsN,
-      newBatId: newBat?.id, newBatName: newBat?.fullName,
+      newBatId: newBat?.id,
     };
-    if (kind === 'runout' && wf.fielder2) { payload.fielder2Id = wf.fielder2.id; payload.fielder2Name = wf.fielder2.fullName; }
+    if (kind === 'runout' && wf.fielder2) payload.fielder2Id = wf.fielder2.id;
     // Round 2 — a direct hit (career key for the fielder); score-neutral
     if (kind === 'runout' && wf.direct && wf.fielder) payload.direct = true;
     // SD-113 (A3/R1): no batter left to come in — the innings closes on this wicket.
@@ -869,10 +881,10 @@ const ScoringControls: SportPlugin<CricketState>['ScoringControls'] = ({
     // One credit rule for the live UI and the ball editor (engine `wicketAttribution`).
     const credits = wicketAttribution({
       kind,
-      bowler: { id: bowlerId, name: bowlerName },
-      fielder: { id: wf.fielder?.id, name: wf.fielder?.fullName },
-      keeper,
-      striker: { id: strikerId, name: strikerName },
+      bowler: { id: bowlerId },
+      fielder: { id: wf.fielder?.id },
+      keeper: keeper ? { id: keeper.id } : undefined,
+      striker: { id: strikerId },
       runs: runsN, runsAs, wide: onExtra === 'wide',
       battingSide: state.battingSide,
     });
@@ -1120,8 +1132,8 @@ const ScoringControls: SportPlugin<CricketState>['ScoringControls'] = ({
     const runsNow = state.batting[id!]?.runs ?? 0;
     const send = () => {
       dispatch({ type: 'WICKET', side: state.battingSide, payload: {
-        strikerId, strikerName, bowlerId, bowlerName, kind: 'retired', batterOut: who, v: 2, limit: true,
-        ...(retireIn ? { newBatId: retireIn.id, newBatName: retireIn.fullName } : {}),
+        strikerId, bowlerId, kind: 'retired', batterOut: who, v: 2, limit: true,
+        ...(retireIn ? { newBatId: retireIn.id } : {}),
       } });
       setRetireIn(undefined);
     };
@@ -1330,7 +1342,7 @@ const ScoringControls: SportPlugin<CricketState>['ScoringControls'] = ({
         const pick = (p: Player, c: { ok: boolean; reason?: string }, reason?: 'injury' | 'suspended' | 'other') => {
           // Deep wave — the bowler's type rides along free when the profile has it.
           const btype = !state.bowlTypes?.[p.id] ? bowlTypeFromProfile(p.sportDetails?.cricket?.sides) : null;
-          dispatch({ type: 'SET_BOWLER', payload: { id: p.id, name: p.fullName, v: 2, ...(reason ? { reason } : {}), ...(!c.ok && c.reason === 'quota' ? { force: true } : {}), ...(btype ? { btype } : {}) } });
+          dispatch({ type: 'SET_BOWLER', payload: { id: p.id, v: 2, ...(reason ? { reason } : {}), ...(!c.ok && c.reason === 'quota' ? { force: true } : {}), ...(btype ? { btype } : {}) } });
           setForceQuota(false);
           setBowlRepl(null);
           setShowBowlers(false);
@@ -1641,12 +1653,14 @@ const nameInitials = (name?: string): string =>
  *  • Fielding: catch +8, run out +8 (incl. a Mankad, to the bowler), stumping +10.
  * Returns players sorted by total, plus the MVP / best bat / best bowl.
  */
-export function matchRatings(s: CricketState): {
+export function matchRatings(s0: CricketState, nameOf: NameOf = legacyNameOf): {
   players: PlayerRating[]; mvp?: PlayerRating; bestBat?: PlayerRating; bestBowl?: PlayerRating;
 } {
+  // IDs-only: names by id for this viewer (a state already named is kept).
+  const s = withNames(s0, nameOf);
   const reg = new Map<string, { name: string; side: 'home' | 'away' }>();
-  for (const [id, b] of Object.entries(s.batting)) reg.set(id, { name: b.name, side: b.side });
-  for (const [id, w] of Object.entries(s.bowling)) if (!reg.has(id)) reg.set(id, { name: w.name, side: w.side });
+  for (const [id, b] of Object.entries(s.batting)) reg.set(id, { name: b.name ?? '', side: b.side });
+  for (const [id, w] of Object.entries(s.bowling)) if (!reg.has(id)) reg.set(id, { name: w.name ?? '', side: w.side });
   for (const d of s.dismissals) {
     if (d.fielderId && d.fielderName && !reg.has(d.fielderId)) {
       const outSide = d.outId ? s.batting[d.outId]?.side : undefined;
@@ -1654,8 +1668,8 @@ export function matchRatings(s: CricketState): {
     }
   }
   (['home', 'away'] as const).forEach((sd) => {
-    const k = s.keepers[sd]; if (k && !reg.has(k.id)) reg.set(k.id, { name: k.name, side: sd });
-    const c = s.captains[sd]; if (c && !reg.has(c.id)) reg.set(c.id, { name: c.name, side: sd });
+    const k = s.keepers[sd]; if (k && !reg.has(k.id)) reg.set(k.id, { name: k.name ?? '', side: sd });
+    const c = s.captains[sd]; if (c && !reg.has(c.id)) reg.set(c.id, { name: c.name ?? '', side: sd });
   });
 
   // Batting order = insertion order within a side.
@@ -1714,10 +1728,12 @@ export function matchRatings(s: CricketState): {
   return { players, mvp, bestBat, bestBowl };
 }
 
-/** The Player of the Match shown before any stored override: the legacy
- *  chip-picked name (old event logs), then the computed MVP (parity #21). */
+/** The Player of the Match shown before any stored override: the in-log pick
+ *  (an older log's by name; IDs-only: by id), then the computed MVP (parity
+ *  #21). `s` is a named state (withNames), so `s.potm` is the shown name. */
 function cricketAutoPotm(s: CricketState, players: PlayerRating[], mvp?: PlayerRating): ResolvedPotm | undefined {
-  const legacy = s.potm ? { id: players.find((p) => p.name === s.potm)?.id, name: s.potm } : undefined;
+  const legacy = s.potmId ? { id: s.potmId, name: s.potm ?? players.find((p) => p.id === s.potmId)?.name ?? '' }
+    : s.potm ? { id: players.find((p) => p.name === s.potm)?.id, name: s.potm } : undefined;
   return resolvePotm(undefined, legacy, mvp);
 }
 
@@ -1771,8 +1787,9 @@ function InningsSummary({ s, homeName, awayName, homeColor, awayColor, onPlayer 
 }
 
 const CricketSummary: NonNullable<SportPlugin<CricketState>['Summary']> = ({ state, homeName, awayName, homeColor = theme.colors.home, awayColor = theme.colors.away, onPlayer, manualResultLine, potm }) => {
-  const s = state as CricketState;
   const mask = useMask();
+  // IDs-only: names by id for this viewer.
+  const s = useMemo(() => withNames(state as CricketState, mask.nameOf), [state, mask.nameOf]);
   const { players, mvp, bestBat, bestBowl } = matchRatings(s);
   const teamName = (side: 'home' | 'away') => (side === 'home' ? homeName : awayName);
   const teamColor = (side: 'home' | 'away') => (side === 'home' ? homeColor : awayColor);
@@ -2264,8 +2281,8 @@ const CricketCommentaryTab = ({ state, homeName, awayName, matchId, tournamentNa
 /** Summary, under the result and ratings: the WhatsApp card — end of the 1st
  *  innings, then the result (cricket round 2, the founder's yes). */
 const CricketShareTab = ({ state, homeName, awayName, matchId, tournamentName, potmName, resultLine }: TabProps) => {
-  const s = state as CricketState;
   const mask = useMask();
+  const s = useMemo(() => withNames(state as CricketState, mask.nameOf), [state, mask.nameOf]);
   // the same Player of the Match as the Summary above: the stored pick, else
   // the legacy / computed one (cricketAutoPotm)
   const auto = useMemo(() => {
@@ -2276,7 +2293,7 @@ const CricketShareTab = ({ state, homeName, awayName, matchId, tournamentName, p
   const potm = potmName ?? (auto ? mask.byId(auto.id, auto.name) : undefined);
   return (
     <CricketShareCard
-      state={state} homeName={homeName} awayName={awayName} matchId={matchId}
+      state={s} homeName={homeName} awayName={awayName} matchId={matchId}
       tournamentName={tournamentName} potmName={potm} resultLine={resultLine}
     />
   );
@@ -2284,7 +2301,9 @@ const CricketShareTab = ({ state, homeName, awayName, matchId, tournamentName, p
 
 /** Stats, first view — both innings (tap a team to open / close its card). */
 function CricketScorecard({ state, homeName, awayName, homeColor, awayColor, homeRoster = [], awayRoster = [], onPlayer }: TabProps) {
-  const s = state as CricketState;
+  // IDs-only: the batting / bowling cards, dismissals, partnerships… by id.
+  const { nameOf } = useMask();
+  const s = useMemo(() => withNames(state as CricketState, nameOf), [state, nameOf]);
   // Default the open innings to whoever is batting (or the chase, post-match).
   const [open, setOpen] = useState<'home' | 'away' | null>(s.battingSide);
   const toggle = (side: 'home' | 'away') => setOpen((o) => (o === side ? null : side));
@@ -2318,7 +2337,8 @@ const CricketStatsTab = (p: TabProps) => (
  *  SD-113 (A1): 🚑 Concussion sub and ⚡ Impact Player live here (not in the
  *  scoring column), and end in a "X off → Y on. Confirm?" recap. */
 function CricketQuickOptions({ state, dispatch, homeRoster, awayRoster, homeName, awayName, onDone }: QuickOptionsProps) {
-  const root = state as CricketState;
+  const { nameOf: playerName } = useMask();
+  const root = useMemo(() => withNames(state as CricketState, playerName), [state, playerName]);
   // A Super Over is played by the nested mini-match; subs and keepers act on it.
   const s = root.superOver && !root.superOver.state.ended ? root.superOver.state : root;
   const [open, setOpen] = useState<null | 'keeper' | 'concussion' | 'impact'>(null);
@@ -2351,7 +2371,8 @@ function CricketQuickOptions({ state, dispatch, homeRoster, awayRoster, homeName
     dispatch({
       type: kind === 'concussion' ? 'CONCUSSION_SUB' : 'IMPACT_SUB',
       side,
-      payload: { side, outId: out.id, outName: out.fullName, inId: inP.id, inName: inP.fullName },
+      // IDs-only: who went off / came on, by id
+      payload: { side, outId: out.id, inId: inP.id },
     });
   };
 
@@ -2411,7 +2432,7 @@ function CricketQuickOptions({ state, dispatch, homeRoster, awayRoster, homeName
             {roster.filter((p) => !unavailable.has(p.id)).map((p) => (
               <SelectChip key={p.id} label={`${p.fullName}${cur?.id === p.id ? ' †' : ''}`} active={cur?.id === p.id}
                 onPress={() => {
-                  if (cur?.id !== p.id) dispatch({ type: 'SET_KEEPER', payload: { side: fielding, id: p.id, name: p.fullName } });
+                  if (cur?.id !== p.id) dispatch({ type: 'SET_KEEPER', payload: { side: fielding, id: p.id } });
                   onDone(`${p.fullName} is now keeping`);
                 }} />
             ))}
@@ -2448,8 +2469,8 @@ export const cricketPlugin: SportPlugin<CricketState> = {
   manualRate: (s) => manualNrrOvers(s),
   standingsScore: (s) => (s.ended ? nrrRuns(s) : null),
   manualEnd: { drawLabel: 'Tie', nrrToggle: true },
-  // SD-133 — named Undo: "FOUR — Rohit (4.3)".
-  undoLabel: cricketUndoLabel,
+  // SD-133 — named Undo: "FOUR — Rohit (4.3)" (IDs-only: names by id).
+  undoLabel: (step, nameOf) => cricketUndoLabel(step, nameOf),
   // Its own correction editor (parity #06): ball chips → Edit ball, bowler, batters.
   correctable: true,
   CorrectionEditor: OverEditor,
@@ -2481,7 +2502,12 @@ export const cricketPlugin: SportPlugin<CricketState> = {
   // scorecard, which used to stand in for it, is the first view of Stats).
   matchTabs: { Situation: CricketSituation, Commentary: CricketCommentaryTab, Stats: CricketStatsTab, SummaryExtras: CricketShareTab },
   Summary: CricketSummary,
-  autoPotm: (st) => { const { players, mvp } = matchRatings(st); const a = cricketAutoPotm(st, players, mvp); return a ? { id: a.id, name: a.name } : undefined; },
+  autoPotm: (st, nameOf) => {
+    const s = withNames(st, nameOf);
+    const { players, mvp } = matchRatings(s);
+    const a = cricketAutoPotm(s, players, mvp);
+    return a ? { id: a.id, name: a.name } : undefined;
+  },
   voice: { hints: ['four', 'six', 'dot', 'wicket', 'wide', 'two runs', 'five', 'all run four'], parse: cricketVoice },
   liveSettings: CRICKET_LIVE_SETTINGS,
 };

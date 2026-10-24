@@ -793,7 +793,8 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
   // The POTM shown right now, before any override: a sport's own (cricket:
   // legacy pick, then its MVP), else the generic stat-line MVP.
   const autoPotmNow = (): { id?: string; name: string } | undefined => {
-    if (plugin.Summary) return plugin.autoPotm?.(state);
+    // IDs-only scoring: a sport whose state keeps ids (cricket) names its pick by id.
+    if (plugin.Summary) return plugin.autoPotm?.(state, rosterNameOf);
     const m = genericRatings(matchStats, sport, homeRoster, awayRoster).mvp;
     return m ? { id: m.id, name: m.name } : undefined;
   };
@@ -958,10 +959,10 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
 
   // SD-115 — name what Undo removes ("point to Federer (30-15)"), from the newest
   // logged step and the timeline events it added. A sport may name it its own
-  // way (SD-133: cricket "FOUR — Rohit (4.3)").
-  // IDs-only scoring: the step's player by id (racket / volleyball logs keep ids)
+  // way (SD-133: cricket "FOUR — Rohit (4.3)"). IDs-only scoring: the step's
+  // player by id, as this viewer may see them (logs keep ids, not names).
   const undoNameOf = useMemo(() => makeNameOf(maskValue.people ?? new Map(), maskValue), [maskValue]);
-  const undoWhat = useMemo(() => (plugin.undoLabel ? plugin.undoLabel(lastStep) : undoLabel(lastStep, { home: homeName, away: awayName, player: undoNameOf }, (s) => {
+  const undoWhat = useMemo(() => (plugin.undoLabel ? plugin.undoLabel(lastStep, undoNameOf) : undoLabel(lastStep, { home: homeName, away: awayName, player: undoNameOf }, (s) => {
     try { const m = plugin.summary(s as never); return m.homeScore != null && m.awayScore != null ? `${m.homeScore}-${m.awayScore}` : null; } catch { return null; }
   })), [plugin, lastStep, homeName, awayName, undoNameOf]);
   // SD-110 — keep the phone awake while this scorer is on a match in progress.

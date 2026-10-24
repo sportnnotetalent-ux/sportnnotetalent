@@ -17,9 +17,18 @@ import { partnerships, hasLog } from './scorecard.ts';
  * individual innings and bowling figures per side (they link to the match's
  * stat lines), and the margin of victory (runs or wickets). A Super Over is
  * never part of a record; a match a Super Over decided has no margin.
+ *
+ * IDs-only scoring: the block is stored in the public `matches.state`, so a
+ * record names its player by id (`playerId` / `partnerId`). Only an older
+ * log's stored name (legacy, pre IDs-only) still rides along as `playerName`.
  */
 export function cricketMatchRecords(s: CricketState): MatchRecordsBlock | null {
   if (!s || !s.scores || !s.ended) return null;
+  /** the legacy name to keep beside an id (none on IDs-only data) */
+  const legacyBat = (id: string | undefined, shown: string): string | undefined => {
+    const c = id ? s.batting?.[id] : undefined;
+    return c && c.name === undefined ? undefined : shown;
+  };
   const bpo = s.ballsPerOver || 6;
   const items: MatchRecordItem[] = [];
   const chase: Side = s.innings === 2 ? s.battingSide : otherSide(s.battingSide);
@@ -44,7 +53,7 @@ export function cricketMatchRecords(s: CricketState): MatchRecordsBlock | null {
       for (const { p } of topN(ps, 3)) {
         items.push({
           type: 'partnership', value: p.runs, text: `${p.runs}${p.unbroken ? '*' : ''} (${p.balls})`, side,
-          playerId: p.a.id, playerName: p.a.name, partnerId: p.b.id, partnerName: p.b.name, note: `${ordinal(p.wkt)} wkt`,
+          playerId: p.a.id, playerName: legacyBat(p.a.id, p.a.name), partnerId: p.b.id, partnerName: legacyBat(p.b.id, p.b.name), note: `${ordinal(p.wkt)} wkt`,
         });
       }
     }

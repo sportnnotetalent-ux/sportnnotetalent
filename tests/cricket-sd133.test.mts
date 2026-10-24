@@ -27,26 +27,26 @@ const run = (s: CricketState, acts: ScoreAction[]) => acts.reduce(reducer, s);
 /** A ball-by-ball builder: names the crease, then scores with the current striker / bowler. */
 function live(cfg: Record<string, unknown> = {}) {
   let s = run(init({ overs: 20, ...cfg }), [
-    { type: 'SET_CAPTAIN', payload: { side: 'home', id: 'h1', name: 'H1' } },
-    { type: 'SET_CAPTAIN', payload: { side: 'away', id: 'a1', name: 'A1' } },
-    { type: 'SET_KEEPER', payload: { side: 'home', id: 'h2', name: 'H2' } },
-    { type: 'SET_KEEPER', payload: { side: 'away', id: 'a2', name: 'A2' } },
+    { type: 'SET_CAPTAIN', payload: { side: 'home', id: 'h1' } },
+    { type: 'SET_CAPTAIN', payload: { side: 'away', id: 'a1' } },
+    { type: 'SET_KEEPER', payload: { side: 'home', id: 'h2' } },
+    { type: 'SET_KEEPER', payload: { side: 'away', id: 'a2' } },
   ]);
   const L = () => (s.superOver && !s.superOver.state.ended ? s.superOver.state : s);
   const api = {
     get s() { return s; },
     do(a: ScoreAction) { const prev = s; s = reducer(s, a); return { type: a.type, prev, next: s }; },
     crease(st: string, ns: string, bw: string, v2 = false) {
-      api.do({ type: 'SET_STRIKER', payload: { id: st, name: st.toUpperCase(), ...(v2 ? { v: 2 } : {}) } });
-      api.do({ type: 'SET_NONSTRIKER', payload: { id: ns, name: ns.toUpperCase(), ...(v2 ? { v: 2 } : {}) } });
+      api.do({ type: 'SET_STRIKER', payload: { id: st, ...(v2 ? { v: 2 } : {}) } });
+      api.do({ type: 'SET_NONSTRIKER', payload: { id: ns, ...(v2 ? { v: 2 } : {}) } });
       api.bowler(bw, v2);
     },
     bowler(bw: string, v2 = false, extra: Record<string, unknown> = {}) {
-      return api.do({ type: 'SET_BOWLER', payload: { id: bw, name: bw.toUpperCase(), ...(v2 ? { v: 2 } : {}), ...extra } });
+      return api.do({ type: 'SET_BOWLER', payload: { id: bw, ...(v2 ? { v: 2 } : {}), ...extra } });
     },
     ball(type: string, payload: Record<string, unknown> = {}) {
       const l = L();
-      return api.do({ type, side: l.battingSide, payload: { strikerId: l.strikerId, strikerName: l.strikerName, bowlerId: l.bowlerId, bowlerName: l.bowlerName, ...payload } });
+      return api.do({ type, side: l.battingSide, payload: { strikerId: l.strikerId, bowlerId: l.bowlerId, ...payload } });
     },
     runs(...rs: number[]) { let last; for (const r of rs) last = api.ball('RUNS', { runs: r, ...(r === 4 || r === 6 ? { boundary: true } : {}) }); return last!; },
   };
@@ -227,7 +227,7 @@ describe('(5) retire at N runs (local rule)', () => {
     const m = live({ retireAt: 6, playersPerSide: 3 });
     m.crease('h3', 'h4', 'a5');
     m.runs(6);
-    m.ball('WICKET', { kind: 'retired', batterOut: 'striker', v: 2, limit: true, newBatId: 'h5', newBatName: 'H5' });
+    m.ball('WICKET', { kind: 'retired', batterOut: 'striker', v: 2, limit: true, newBatId: 'h5' });
     const c = m.s.batting.h3;
     assert.equal(c.retired, true);
     assert.equal(c.retLimit, true);
@@ -237,7 +237,7 @@ describe('(5) retire at N runs (local rule)', () => {
     assert.equal(m.s.strikerId, 'h5');
     // a retired-at-limit batter doesn't use up the order (they may return)
     assert.equal(noBatterLeft(m.s, 'home'), false);
-    m.ball('WICKET', { kind: 'bowled', newBatId: 'h3', newBatName: 'H3' });
+    m.ball('WICKET', { kind: 'bowled', newBatId: 'h3' });
     const back = m.s.batting.h3;
     assert.equal(back.retired, false);
     assert.equal(back.retLimit, undefined);
@@ -248,7 +248,7 @@ describe('(5) retire at N runs (local rule)', () => {
   test('without v:2 / limit it is plain retired hurt (legacy)', () => {
     const m = live();
     m.crease('h3', 'h4', 'a5');
-    m.ball('WICKET', { kind: 'retired', batterOut: 'striker', limit: true, newBatId: 'h5', newBatName: 'H5' });
+    m.ball('WICKET', { kind: 'retired', batterOut: 'striker', limit: true, newBatId: 'h5' });
     assert.equal(m.s.batting.h3.dismissal, 'retired hurt');
     assert.equal(m.s.batting.h3.retLimit, undefined);
   });
@@ -263,7 +263,7 @@ describe('(6) Super Over eligibility (ICC)', () => {
     m.runs(1, 1, 1, 1, 1, 1);
     m.do({ type: 'START_SUPER_OVER', payload: { v: 2 } });
     m.crease('a3', 'a4', 'h6', true);
-    m.ball('WICKET', { kind: 'bowled', newBatId: 'a6', newBatName: 'A6' });
+    m.ball('WICKET', { kind: 'bowled', newBatId: 'a6' });
     m.runs(4, 1, 1, 0, 0); // away 6/1
     m.crease('h3', 'h4', 'a7', true);
     m.runs(1, 1, 1, 1, 1, 1); // home 6 → tied again
@@ -297,9 +297,9 @@ describe('(6) Super Over eligibility (ICC)', () => {
     // away bat second: a3 refused as striker (v:2)
     const st = m.s.superOver!.state;
     const fake = { ...m.s, superOver: { ...m.s.superOver!, state: { ...st, battingSide: 'away' as const, strikerId: undefined } } };
-    assert.equal(reducer(fake, { type: 'SET_STRIKER', payload: { id: 'a3', name: 'A3', v: 2 } }).superOver!.state.strikerId, undefined);
-    assert.equal(reducer(fake, { type: 'SET_STRIKER', payload: { id: 'a3', name: 'A3' } }).superOver!.state.strikerId, 'a3', 'legacy payload: accepted');
-    assert.equal(reducer(fake, { type: 'SET_STRIKER', payload: { id: 'a6', name: 'A6', v: 2 } }).superOver!.state.strikerId, 'a6');
+    assert.equal(reducer(fake, { type: 'SET_STRIKER', payload: { id: 'a3', v: 2 } }).superOver!.state.strikerId, undefined);
+    assert.equal(reducer(fake, { type: 'SET_STRIKER', payload: { id: 'a3' } }).superOver!.state.strikerId, 'a3', 'legacy payload: accepted');
+    assert.equal(reducer(fake, { type: 'SET_STRIKER', payload: { id: 'a6', v: 2 } }).superOver!.state.strikerId, 'a6');
   });
 
   test('a legacy start (no v) bans nobody — old logs replay as before', () => {
@@ -353,15 +353,17 @@ describe('(7) The Hundred', () => {
 });
 
 describe('(8) named Undo for cricket', () => {
+  // IDs-only: the label names players by id ('h3' → 'H3' here)
+  const undo = (step: Parameters<typeof cricketUndoLabel>[0]) => cricketUndoLabel(step, (id, legacy) => (id ? id.toUpperCase() : legacy ?? 'Player'));
   test('a four, a wicket, an extra, a quiet pick, a Super Over ball', () => {
     const m = live();
     m.crease('h3', 'h4', 'a5');
-    assert.equal(cricketUndoLabel(m.bowler('a6')), 'bowler pick');
-    assert.equal(cricketUndoLabel(m.runs(4)), 'FOUR — H3 (0.1)');
-    assert.equal(cricketUndoLabel(m.runs(1)), '1 run — H3 (0.2)');
-    assert.equal(cricketUndoLabel(m.ball('EXTRA', { kind: 'Wide', runs: 1 })), 'Wide + 1 (0.3)');
-    assert.equal(cricketUndoLabel(m.ball('WICKET', { kind: 'caught', fielderId: 'a2', fielderName: 'A2', newBatId: 'h5', newBatName: 'H5' })), 'CAUGHT — H3 (0.3)');
-    assert.equal(cricketUndoLabel(m.do({ type: 'SHOT', payload: { v: 2, inn: 1, side: 'home', at: '0.1', batterId: 'h3', runs: 4, zone: 1 } })), 'wagon-wheel tag');
+    assert.equal(undo(m.bowler('a6')), 'bowler pick');
+    assert.equal(undo(m.runs(4)), 'FOUR — H3 (0.1)');
+    assert.equal(undo(m.runs(1)), '1 run — H3 (0.2)');
+    assert.equal(undo(m.ball('EXTRA', { kind: 'Wide', runs: 1 })), 'Wide + 1 (0.3)');
+    assert.equal(undo(m.ball('WICKET', { kind: 'caught', fielderId: 'a2', newBatId: 'h5' })), 'CAUGHT — H3 (0.3)');
+    assert.equal(undo(m.do({ type: 'SHOT', payload: { v: 2, inn: 1, side: 'home', at: '0.1', batterId: 'h3', runs: 4, zone: 1 } })), 'wagon-wheel tag');
     assert.equal(cricketUndoLabel(null), null);
   });
   test('inside a live Super Over', () => {
@@ -370,9 +372,9 @@ describe('(8) named Undo for cricket', () => {
     m.runs(0, 0, 0, 0, 0, 0);
     m.crease('a3', 'a4', 'h5');
     m.runs(0, 0, 0, 0, 0, 0);
-    assert.equal(cricketUndoLabel(m.do({ type: 'START_SUPER_OVER', payload: { v: 2 } })), 'Super Over start');
+    assert.equal(undo(m.do({ type: 'START_SUPER_OVER', payload: { v: 2 } })), 'Super Over start');
     m.crease('a3', 'a4', 'h6');
-    assert.equal(cricketUndoLabel(m.runs(6)), 'SIX — A3 (0.1)');
+    assert.equal(undo(m.runs(6)), 'SIX — A3 (0.1)');
   });
 });
 

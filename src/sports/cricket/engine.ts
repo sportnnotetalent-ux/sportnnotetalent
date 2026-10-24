@@ -14,6 +14,9 @@ import type { LiveEvent } from '../liveEvents';
 import { resourcePct, resourcePctV1, revisedTarget } from './dls.ts';
 import { rulesFromConfig, rulesOf, effectiveRules, patchRules, describeRulesChange, type CricketRules } from './rules.ts';
 import { applyDetailPatch, asBowlType, trackingOf, type BallDetailRec, type BowlType, type Tracking } from './detail.ts';
+// IDs-only scoring (docs/privacy/ids-only-scoring.md): the state and the
+// timeline keep player ids; text names a player by an id token (names.ts).
+import { carriesNames, pidTok } from './names.ts';
 
 interface Innings {
   runs: number;
@@ -22,7 +25,9 @@ interface Innings {
   extras: number;
 }
 interface BatCard {
-  name: string;
+  /** legacy, read-only (pre IDs-only): the name an older log stored. New
+   *  cards have none — the card is keyed by the player's id (names.ts). */
+  name?: string;
   side: 'home' | 'away';
   runs: number;
   balls: number;
@@ -31,13 +36,16 @@ interface BatCard {
   out: boolean;
   /** left the field injured (not out — may resume later) */
   retired?: boolean;
-  /** how they got out, e.g. "b Varun"; or "retired hurt"; undefined while batting */
+  /** how they got out, e.g. "b Varun"; or "retired hurt"; undefined while batting.
+   *  IDs-only: players appear as id tokens ("c {@p7} b {@p2}") — names.ts
+   *  `withNames` / `fillNames` put the names in when shown. */
   dismissal?: string;
   /** SD-133 — retired not out at the local "retire at N runs" limit (v:2 only) */
   retLimit?: true;
 }
 interface BowlCard {
-  name: string;
+  /** legacy, read-only (pre IDs-only): the name an older log stored. */
+  name?: string;
   side: 'home' | 'away';
   runs: number;
   balls: number;
@@ -56,9 +64,11 @@ interface DismissalRecord {
   outId?: string;
   bowlerId?: string;
   fielderId?: string;
+  /** legacy, read-only (pre IDs-only) */
   fielderName?: string;
   /** a run-out's 2nd fielder (parity #16) — scorecard text & record only, no stat */
   fielder2Id?: string;
+  /** legacy, read-only (pre IDs-only) */
   fielder2Name?: string;
   /** Round 2 — a run out by a DIRECT HIT from `fielderId` (an optional chip in
    *  the run-out flow, payload `direct: true`). Absent on older logs. */
@@ -80,7 +90,10 @@ export interface CricketState {
   bowling: Record<string, BowlCard>;
   thisOver: string[];
   ballsInOver: number;
-  /** the two batsmen currently at the crease (auto-rotated on odd runs / over end) */
+  /** the two batsmen currently at the crease (auto-rotated on odd runs / over end).
+   *  The `*Name` fields are legacy, read-only (pre IDs-only): an older log's
+   *  names; IDs-only actions leave them unset (names.ts `withNames` fills them
+   *  for display). */
   strikerId?: string;
   strikerName?: string;
   nonStrikerId?: string;
@@ -102,9 +115,10 @@ export interface CricketState {
   bowlerQuotaAuto?: boolean;
   /** the next legal delivery is a free hit (set by a no-ball) */
   freeHit: boolean;
-  /** captain & wicket-keeper per side, assigned before the game starts */
-  captains: Partial<Record<'home' | 'away', { id: string; name: string }>>;
-  keepers: Partial<Record<'home' | 'away', { id: string; name: string }>>;
+  /** captain & wicket-keeper per side, assigned before the game starts
+   *  (`name`: legacy, read-only — pre IDs-only) */
+  captains: Partial<Record<'home' | 'away', { id: string; name?: string }>>;
+  keepers: Partial<Record<'home' | 'away', { id: string; name?: string }>>;
   /** the toss: who won it and what they chose. Drives who bats first (innings 1).
    *  Settable only before the first delivery; unset = home bats first by default. */
   toss?: { winner: 'home' | 'away'; decision: 'bat' | 'bowl' };
@@ -112,8 +126,9 @@ export interface CricketState {
   dismissals: DismissalRecord[];
   /** IPL-style Impact Player is allowed this match (format toggle) */
   impactEnabled: boolean;
-  /** the one Impact substitution each side may use; records who came in for whom */
-  impactUsed: Partial<Record<'home' | 'away', { inId: string; inName: string; outId: string; outName: string }>>;
+  /** the one Impact substitution each side may use; records who came in for whom
+   *  (`inName` / `outName`: legacy, read-only — pre IDs-only) */
+  impactUsed: Partial<Record<'home' | 'away', { inId: string; inName?: string; outId: string; outName?: string }>>;
   /** players who can take no further part (subbed out by an Impact Player) */
   unavailable: string[];
   /** powerplay length in overs (0 = none) — fielding restrictions apply within it */
@@ -145,7 +160,12 @@ export interface CricketState {
   events: LiveEvent[];
   seq: number;
   ended: boolean;
+  /** legacy, read-only (pre IDs-only): a Player of the Match picked by NAME on
+   *  an older log (POTM `{ name }`). */
   potm?: string;
+  /** IDs-only: a Player of the Match picked by id (POTM `{ id }`). The stored
+   *  override is matches.potm (parity #21); this is the in-log one. */
+  potmId?: string;
   /** regulation ended level — awaiting the scorer's call (Super Over or accept the tie). */
   pendingTie?: boolean;
   /** marks a nested Super-Over mini-innings, so a level SO ends outright (parent decides). */
@@ -241,6 +261,7 @@ export type FieldNoteKind = 'drop' | 'saved' | 'missed';
 export interface FieldNote {
   kind: FieldNoteKind;
   fielderId: string;
+  /** legacy, read-only (pre IDs-only) */
   fielderName?: string;
   /** runs saved / missed (a drop's optional "runs it cost") */
   runs?: number;
@@ -283,8 +304,10 @@ export interface BallRec {
   strikerId?: string;
   nonStrikerId?: string;
   bowlerId?: string;
+  /** DERIVED (never persisted): the name a legacy action / state carried. */
   bowlerName?: string;
-  out?: { id: string; name: string; kind: DismissalKind };
+  /** `name`: DERIVED from the batter's card — a legacy name; none on IDs-only data */
+  out?: { id: string; name?: string; kind: DismissalKind };
   /** the over-strip chip (absent for a penalty / retired / timed out) */
   sym?: string;
   /** a wide / no-ball delivery (counted even when its penalty is 0) */
@@ -544,7 +567,9 @@ type Attr = NonNullable<ScoreAction['attribution']>;
  *  fielder 1's run-out, or the bowler's run-out for a Mankad. `attribution2`:
  *  the catch / stumping, or — the ONLY owner of it (REVIEW Decision 6) — the
  *  striker's completed runs off the bat on a run-out / obstruction. Fielder 2
- *  gets no stat. */
+ *  gets no stat. IDs-only scoring: a credit carries the player's id only
+ *  (never `playerName` — the stored attribution is public); a `name` passed
+ *  in is ignored. */
 export function wicketAttribution(o: {
   kind: DismissalKind;
   bowler?: { id?: string; name?: string };
@@ -563,7 +588,7 @@ export function wicketAttribution(o: {
   const { kind, bowler, fielder, keeper, striker, battingSide } = o;
   const fieldingSide = battingSide ? (battingSide === 'home' ? 'away' : 'home') : undefined;
   const credit = (p: { id?: string; name?: string } | undefined, stat: string, by?: number): Attr | undefined =>
-    p?.id ? { playerId: p.id, stat, ...(by !== undefined ? { by } : {}), playerName: p.name,
+    p?.id ? { playerId: p.id, stat, ...(by !== undefined ? { by } : {}),
       ...(battingSide ? { side: p === striker ? battingSide : fieldingSide } : {}) } : undefined;
   const runs = o.runs ?? 0;
   const strikerRuns = RUNS_KINDS.includes(kind) && !o.wide && (o.runsAs ?? 'bat') === 'bat' && runs > 0
@@ -709,10 +734,15 @@ const other = (s: 'home' | 'away') => (s === 'home' ? 'away' : 'home');
 
 /** Make sure a batsman sent to the crease has a (0*) card so they show as
  *  batting (not "yet to bat"). A retired-hurt batsman resuming keeps their runs
- *  but is no longer marked retired. */
-const ensureCard = (batting: Record<string, BatCard>, id: string, name: string, side: 'home' | 'away'): Record<string, BatCard> => {
+ *  but is no longer marked retired. `name`: a legacy action's only — an
+ *  IDs-only card has none. */
+const ensureCard = (batting: Record<string, BatCard>, id: string, name: string | undefined, side: 'home' | 'away'): Record<string, BatCard> => {
   const prev = batting[id];
-  if (!prev) return { ...batting, [id]: { name, side, runs: 0, balls: 0, fours: 0, sixes: 0, out: false } };
+  if (!prev) {
+    return { ...batting, [id]: name !== undefined
+      ? { name, side, runs: 0, balls: 0, fours: 0, sixes: 0, out: false }
+      : { side, runs: 0, balls: 0, fours: 0, sixes: 0, out: false } };
+  }
   if (prev.retired) {
     const { retLimit: _r, ...rest } = prev;
     return { ...batting, [id]: { ...rest, retired: false, dismissal: undefined } };
@@ -1144,12 +1174,23 @@ const step = (s: CricketState, a: ScoreAction): CricketState => {
     if (aligned !== s) return reducer(aligned, a);
   }
 
+  // IDs-only scoring (names.ts): an action recorded before IDs-only carries
+  // names in its payload and replays exactly as it always did (names copied
+  // into the state and the text). An IDs-only action carries ids only: no name
+  // is read from it, none is copied from the state, and text names a player by
+  // an id token (`who`), filled in when shown.
+  const L = carriesNames(a.payload);
+  /** a name read from the STATE — legacy actions only */
+  const sn = (name: string | undefined) => (L ? name : undefined);
+  /** a player in event / dismissal text: the legacy name, else the id token */
+  const who = (id: string | undefined, name: string | undefined) => (L ? name : id ? pidTok(id) : undefined);
+
   const bat = s.battingSide;
   const cur = s.scores[bat];
   let seq = s.seq;
   // Who faced this delivery: the recorded striker (payload), else the crease.
   const strikerId = info.strikerId ?? s.strikerId;
-  const strikerName = info.strikerId ? (info.strikerName ?? s.strikerName) : s.strikerName;
+  const strikerName = info.strikerId ? (info.strikerName ?? sn(s.strikerName)) : sn(s.strikerName);
 
   // Start of a fresh over? (a legal ball arrives after 6 were bowled)
   const newOver = s.ballsInOver >= s.ballsPerOver;
@@ -1197,12 +1238,15 @@ const step = (s: CricketState, a: ScoreAction): CricketState => {
     delta: { runs?: number; balls?: number; fours?: number; sixes?: number; out?: boolean; dismissal?: string; retired?: boolean }
   ): Record<string, BatCard> => {
     if (!id) return batting;
-    const prev: BatCard = batting[id] ?? { name: name ?? '', side: bat, runs: 0, balls: 0, fours: 0, sixes: 0, out: false };
+    const prev: BatCard = batting[id] ?? (L
+      ? { name: name ?? '', side: bat, runs: 0, balls: 0, fours: 0, sixes: 0, out: false }
+      : { side: bat, runs: 0, balls: 0, fours: 0, sixes: 0, out: false });
     return {
       ...batting,
       [id]: {
         ...prev,
-        name: prev.name || name || '',
+        // legacy only — an IDs-only card never gets a name
+        ...(L ? { name: prev.name || name || '' } : {}),
         side: prev.side ?? bat,
         runs: prev.runs + (delta.runs ?? 0),
         balls: prev.balls + (delta.balls ?? 0),
@@ -1218,10 +1262,12 @@ const step = (s: CricketState, a: ScoreAction): CricketState => {
     applyBat(s.batting, info.strikerId, info.strikerName, delta);
   const bumpBowl = (delta: { runs?: number; balls?: number; wickets?: number; extras?: number }): Record<string, BowlCard> => {
     if (!info.bowlerId) return s.bowling;
-    const prev: BowlCard = s.bowling[info.bowlerId] ?? { name: info.bowlerName ?? '', side: other(bat), runs: 0, balls: 0, wickets: 0, dots: 0, extras: 0 };
+    const prev: BowlCard = s.bowling[info.bowlerId] ?? (L
+      ? { name: info.bowlerName ?? '', side: other(bat), runs: 0, balls: 0, wickets: 0, dots: 0, extras: 0 }
+      : { side: other(bat), runs: 0, balls: 0, wickets: 0, dots: 0, extras: 0 });
     // a dot ball = a legal delivery the bowler conceded no runs off
     const dot = (delta.balls ?? 0) > 0 && (delta.runs ?? 0) === 0 ? 1 : 0;
-    return { ...s.bowling, [info.bowlerId]: { ...prev, name: prev.name || info.bowlerName || '', side: prev.side ?? other(bat), runs: prev.runs + (delta.runs ?? 0), balls: prev.balls + (delta.balls ?? 0), wickets: prev.wickets + (delta.wickets ?? 0), dots: prev.dots + dot, extras: prev.extras + (delta.extras ?? 0) } };
+    return { ...s.bowling, [info.bowlerId]: { ...prev, ...(L ? { name: prev.name || info.bowlerName || '' } : {}), side: prev.side ?? other(bat), runs: prev.runs + (delta.runs ?? 0), balls: prev.balls + (delta.balls ?? 0), wickets: prev.wickets + (delta.wickets ?? 0), dots: prev.dots + dot, extras: prev.extras + (delta.extras ?? 0) } };
   };
 
   // Parity #17 — every delivery (legal or not) records that its bowler bowled
@@ -1280,7 +1326,7 @@ const step = (s: CricketState, a: ScoreAction): CricketState => {
         bowling: bumpBowl({ runs: r, balls: 1 }),
         thisOver: [...baseOver, runSymbol(r, isBoundary, ot)],
         ballsInOver: baseBalls + 1,
-        events: [...s.events, { id: seq, stamp: ballStamp(balls, s.ballsPerOver), icon: '🏏', label, detail: commentary('runs', r, info.strikerName, info.bowlerName, isBoundary, ot, a.payload?.boundary === false && r >= 4), side: bat, tone: isBoundary ? 'boundary' : undefined }],
+        events: [...s.events, { id: seq, stamp: ballStamp(balls, s.ballsPerOver), icon: '🏏', label, detail: commentary('runs', r, who(info.strikerId, info.strikerName), who(info.bowlerId, info.bowlerName), isBoundary, ot, a.payload?.boundary === false && r >= 4), side: bat, tone: isBoundary ? 'boundary' : undefined }],
         seq,
       });
       // Strike rotation: odd runs swap ends, and the end of an over swaps ends.
@@ -1317,12 +1363,16 @@ const step = (s: CricketState, a: ScoreAction): CricketState => {
       const batterOut: 'striker' | 'nonstriker' = kind === 'mankad' ? 'nonstriker'
         : kind === 'hittwice' ? 'striker'
         : a.payload?.batterOut === 'nonstriker' ? 'nonstriker' : 'striker';
-      const keeper = s.keepers[other(bat)]?.name;
+      const keeperP = s.keepers[other(bat)];
+      const keeper = sn(keeperP?.name);
       const fielder2Id = kind === 'runout' ? (a.payload?.fielder2Id as string | undefined) : undefined;
       const fielder2Name = kind === 'runout' ? (a.payload?.fielder2Name as string | undefined) : undefined;
-      const dismissal = composeDismissal(kind, info.bowlerName, a.payload?.fielderName as string | undefined, keeper, fielder2Name);
+      const dismissal = composeDismissal(kind, who(info.bowlerId, info.bowlerName),
+        who(a.payload?.fielderId as string | undefined, a.payload?.fielderName as string | undefined),
+        who(keeperP?.id, keeper), who(fielder2Id, fielder2Name));
       const outId = batterOut === 'nonstriker' ? s.nonStrikerId : strikerId;
-      const outName = batterOut === 'nonstriker' ? s.nonStrikerName : strikerName;
+      const outName = batterOut === 'nonstriker' ? sn(s.nonStrikerName) : strikerName;
+      const outWho = who(outId, outName);
       const newBatId = a.payload?.newBatId as string | undefined;
       const newBatName = a.payload?.newBatName as string | undefined;
       // The new batsman fills whichever end the departing batsman vacated.
@@ -1341,9 +1391,9 @@ const step = (s: CricketState, a: ScoreAction): CricketState => {
           ...s,
           scores: { ...s.scores, [bat]: { ...cur, wickets: cur.wickets + 1 } },
           batting,
-          dismissals: [...s.dismissals, { kind, outId, bowlerId: info.bowlerId, fielderId: info.bowlerId, fielderName: info.bowlerName }],
+          dismissals: [...s.dismissals, { kind, outId, bowlerId: info.bowlerId, fielderId: info.bowlerId, ...(L ? { fielderName: info.bowlerName } : {}) }],
           thisOver: [...overReset, 'W'],
-          events: [...s.events, { id: seq, stamp: oversStr(cur.balls, s.ballsPerOver), icon: '🎯', label: WICKET_LABEL[kind], detail: `${outName ?? 'Batter'} ${dismissal} — left the crease early`, side: other(bat), tone: 'wicket' }],
+          events: [...s.events, { id: seq, stamp: oversStr(cur.balls, s.ballsPerOver), icon: '🎯', label: WICKET_LABEL[kind], detail: `${outWho ?? 'Batter'} ${dismissal} — left the crease early`, side: other(bat), tone: 'wicket' }],
           seq,
           ...creaseFor(newBatId, newBatName),
         });
@@ -1365,8 +1415,8 @@ const step = (s: CricketState, a: ScoreAction): CricketState => {
           batting,
           dismissals: isWicket ? [...s.dismissals, { kind, outId }] : s.dismissals,
           events: [...s.events, atLimit
-            ? { id: seq, stamp: oversStr(cur.balls, s.ballsPerOver), icon: '🏁', label: 'RETIRED', detail: `${outName ?? 'Batter'} retired not out on ${batting[outId ?? '']?.runs ?? 0} (run limit)`, side: bat }
-            : { id: seq, stamp: oversStr(cur.balls, s.ballsPerOver), icon: kind === 'retiredout' ? '🚶' : '🚑', label: WICKET_LABEL[kind], detail: `${outName ?? 'Batter'} ${dismissal}`, side: other(bat), tone: 'wicket' }],
+            ? { id: seq, stamp: oversStr(cur.balls, s.ballsPerOver), icon: '🏁', label: 'RETIRED', detail: `${outWho ?? 'Batter'} retired not out on ${batting[outId ?? '']?.runs ?? 0} (run limit)`, side: bat }
+            : { id: seq, stamp: oversStr(cur.balls, s.ballsPerOver), icon: kind === 'retiredout' ? '🚶' : '🚑', label: WICKET_LABEL[kind], detail: `${outWho ?? 'Batter'} ${dismissal}`, side: other(bat), tone: 'wicket' }],
           seq,
           ...creaseFor(newBatId, newBatName),
         };
@@ -1391,10 +1441,11 @@ const step = (s: CricketState, a: ScoreAction): CricketState => {
       if (newBatId) batting = applyBat(batting, newBatId, newBatName, { retired: false }); batting = resumeLimit(batting, newBatId);
 
       // A stumping is credited to the keeper; otherwise to the named fielder.
-      const fielderId = kind === 'stumped' ? s.keepers[other(bat)]?.id : (a.payload?.fielderId as string | undefined);
+      const fielderId = kind === 'stumped' ? keeperP?.id : (a.payload?.fielderId as string | undefined);
       const fielderName = kind === 'stumped' ? keeper : (a.payload?.fielderName as string | undefined);
-      const record: DismissalRecord = { kind, outId, bowlerId: info.bowlerId, fielderId, fielderName };
-      if (fielder2Id || fielder2Name) { record.fielder2Id = fielder2Id; record.fielder2Name = fielder2Name; }
+      // (a name rides along only on a legacy action)
+      const record: DismissalRecord = { kind, outId, bowlerId: info.bowlerId, fielderId, ...(L ? { fielderName } : {}) };
+      if (fielder2Id || fielder2Name) { record.fielder2Id = fielder2Id; if (L) record.fielder2Name = fielder2Name; }
       if (directHit(kind, a.payload, fielderId)) record.direct = true;
 
       const next: CricketState = touchBowler({
@@ -1406,13 +1457,13 @@ const step = (s: CricketState, a: ScoreAction): CricketState => {
         dismissals: [...s.dismissals, record],
         thisOver: [...baseOver, wicketSymbol(completed, runsAs)],
         ballsInOver: baseBalls + 1,
-        events: [...s.events, { id: seq, stamp: ballStamp(balls, s.ballsPerOver), icon: '🎯', label: WICKET_LABEL[kind], detail: `${outName ?? 'Batter'} ${dismissal}${completed > 0 ? ` (${runsText(completed, runsAs)})` : ''}`, side: other(bat), tone: 'wicket' }],
+        events: [...s.events, { id: seq, stamp: ballStamp(balls, s.ballsPerOver), icon: '🎯', label: WICKET_LABEL[kind], detail: `${outWho ?? 'Batter'} ${dismissal}${completed > 0 ? ` (${runsText(completed, runsAs)})` : ''}`, side: other(bat), tone: 'wicket' }],
         seq,
         ...creaseFor(newBatId, newBatName),
       });
       // Where the wicket was broken settles who faces next (parity #16).
       if (end) {
-        const crease = creaseAfterWicket({ strikerId, strikerName, nonStrikerId: s.nonStrikerId, nonStrikerName: s.nonStrikerName }, batterOut, end, { id: newBatId, name: newBatName }, overEnd);
+        const crease = creaseAfterWicket({ strikerId, strikerName, nonStrikerId: s.nonStrikerId, nonStrikerName: sn(s.nonStrikerName) }, batterOut, end, { id: newBatId, name: newBatName }, overEnd);
         return afterLegalBall({ ...next, ...crease }, false);
       }
       // Legacy: completed-run parity and over-end both swap strike (run-out crossing approximated).
@@ -1492,9 +1543,9 @@ const step = (s: CricketState, a: ScoreAction): CricketState => {
         side: ref ? other(ref.side) : other(bat),
         at: ref ? ref.at : oversStr(cur.balls, s.ballsPerOver),
       };
-      const batterName = ref ? ref.batterName : s.strikerName;
-      const bowlerName = ref ? ref.bowlerName : s.bowlerName;
-      const who = fielderName ?? 'Fielder';
+      const batterName = who(note.batterId, sn(ref ? ref.batterName : s.strikerName));
+      const bowlerName = who(note.bowlerId, sn(ref ? ref.bowlerName : s.bowlerName));
+      const fielder = (L ? fielderName : pidTok(fielderId)) ?? 'Fielder';
       const runsTxt = `${runs} run${runs === 1 ? '' : 's'}`;
       seq += 1;
       return {
@@ -1503,10 +1554,11 @@ const step = (s: CricketState, a: ScoreAction): CricketState => {
         events: [...s.events, {
           id: seq, stamp: note.at, icon: '🧤',
           label: kind === 'drop'
-            ? `Dropped — ${who}${batterName ? ` (${batterName}${bowlerName ? ` off ${bowlerName}` : ''})` : ''}`
-            : `${runsTxt} ${kind === 'saved' ? 'saved' : 'missed'} — ${who}`,
+            ? `Dropped — ${fielder}${batterName ? ` (${batterName}${bowlerName ? ` off ${bowlerName}` : ''})` : ''}`
+            : `${runsTxt} ${kind === 'saved' ? 'saved' : 'missed'} — ${fielder}`,
           detail: kind === 'drop' && runs > 0 ? `Cost ${runsTxt}` : undefined,
-          side: note.side, playerName: fielderName,
+          // the fielder: by name on a legacy log, by id (IDs-only)
+          side: note.side, ...(L ? { playerName: fielderName } : { playerId: fielderId }),
         }],
         seq,
       };
@@ -1544,15 +1596,17 @@ const step = (s: CricketState, a: ScoreAction): CricketState => {
         const batterOut: 'striker' | 'nonstriker' = wk === 'stumped' || wk === 'hitwicket' || wk === 'hittwice' ? 'striker'
           : a.payload?.batterOut === 'nonstriker' ? 'nonstriker' : 'striker';
         const outId = batterOut === 'nonstriker' ? s.nonStrikerId : strikerId;
-        const outName = batterOut === 'nonstriker' ? s.nonStrikerName : strikerName;
+        const outName = batterOut === 'nonstriker' ? sn(s.nonStrikerName) : strikerName;
         const newBatId = a.payload?.newBatId as string | undefined;
         const newBatName = a.payload?.newBatName as string | undefined;
         const keeper = s.keepers[other(bat)];
+        const keeperName = sn(keeper?.name);
         const fielderId = wk === 'stumped' ? keeper?.id : (a.payload?.fielderId as string | undefined);
-        const fielderName = wk === 'stumped' ? keeper?.name : (a.payload?.fielderName as string | undefined);
+        const fielderName = wk === 'stumped' ? keeperName : (a.payload?.fielderName as string | undefined);
         const fielder2Id = wk === 'runout' ? (a.payload?.fielder2Id as string | undefined) : undefined;
         const fielder2Name = wk === 'runout' ? (a.payload?.fielder2Name as string | undefined) : undefined;
-        const dismissal = legacy ? composeDismissal('runout', undefined, fielderName) : composeDismissal(wk, info.bowlerName, fielderName, keeper?.name, fielder2Name);
+        const dismissal = legacy ? composeDismissal('runout', undefined, who(fielderId, fielderName))
+          : composeDismissal(wk, who(info.bowlerId, info.bowlerName), who(fielderId, fielderName), who(keeper?.id, keeperName), who(fielder2Id, fielder2Name));
         const bowlersWicket = !NO_BOWLER.includes(wk);
         let batting = s.batting;
         if (isNoBall) batting = applyBat(batting, strikerId, strikerName, { runs: offBat, balls: 1 });
@@ -1560,17 +1614,18 @@ const step = (s: CricketState, a: ScoreAction): CricketState => {
         if (newBatId) batting = applyBat(batting, newBatId, newBatName, { retired: false }); batting = resumeLimit(batting, newBatId);
         const end = RUNS_KINDS.includes(wk) ? asEnd(a.payload?.end) : undefined;
         const crease = end
-          ? creaseAfterWicket({ strikerId, strikerName, nonStrikerId: s.nonStrikerId, nonStrikerName: s.nonStrikerName }, batterOut, end, { id: newBatId, name: newBatName }, legal && overEnd)
+          ? creaseAfterWicket({ strikerId, strikerName, nonStrikerId: s.nonStrikerId, nonStrikerName: sn(s.nonStrikerName) }, batterOut, end, { id: newBatId, name: newBatName }, legal && overEnd)
           : batterOut === 'nonstriker'
             ? { nonStrikerId: newBatId, nonStrikerName: newBatName }
             : { strikerId: newBatId, strikerName: newBatName };
         const sym = `${completed > 0 ? completed : ''}${isNoBall ? 'nb' : 'wd'}+W`;
         // extras: the penalty + wides run (wide) or byes / leg byes (no-ball)
         const extras = pen + completed - offBat;
+        const named = L ? { fielderName } : {};
         const record: DismissalRecord = legacy
-          ? { kind: 'runout', outId, fielderId, fielderName }
-          : { kind: wk, outId, bowlerId: info.bowlerId, fielderId, fielderName };
-        if (fielder2Id || fielder2Name) { record.fielder2Id = fielder2Id; record.fielder2Name = fielder2Name; }
+          ? { kind: 'runout', outId, fielderId, ...named }
+          : { kind: wk, outId, bowlerId: info.bowlerId, fielderId, ...named };
+        if (fielder2Id || fielder2Name) { record.fielder2Id = fielder2Id; if (L) record.fielder2Name = fielder2Name; }
         if (!legacy && directHit(wk, a.payload, fielderId)) record.direct = true;
         const tail = completed > 0 ? ` (${runsText(completed, isNoBall ? runsAs : 'bat')})` : '';
         let next: CricketState = legalBits(touchBowler({
@@ -1581,7 +1636,7 @@ const step = (s: CricketState, a: ScoreAction): CricketState => {
           bowling: bumpBowl({ runs: pen + (isNoBall ? offBat : completed), extras: isNoBall ? pen : pen + completed, ...(bowlersWicket ? { wickets: 1 } : {}), ...(legal ? { balls: 1 } : {}) }),
           dismissals: [...s.dismissals, record],
           thisOver: [...overReset, sym],
-          events: [...s.events, { id: seq, stamp: ballStamp(cur.balls + 1, s.ballsPerOver), icon: '🎯', label: `${isNoBall ? 'No ball' : 'Wide'}${penTag} — ${WICKET_LABEL[wk]}`, detail: `${outName ?? 'Batter'} ${dismissal}${tail}`, side: other(bat), tone: 'wicket' }],
+          events: [...s.events, { id: seq, stamp: ballStamp(cur.balls + 1, s.ballsPerOver), icon: '🎯', label: `${isNoBall ? 'No ball' : 'Wide'}${penTag} — ${WICKET_LABEL[wk]}`, detail: `${who(outId, outName) ?? 'Batter'} ${dismissal}${tail}`, side: other(bat), tone: 'wicket' }],
           seq,
           freeHit: fhAfter,
           ...crease,
@@ -1647,14 +1702,14 @@ const step = (s: CricketState, a: ScoreAction): CricketState => {
     }
     case 'SET_STRIKER': {
       const id = String(a.payload?.id ?? '');
-      const name = String(a.payload?.name ?? '');
+      const name = L ? String(a.payload?.name ?? '') : undefined;
       if (!id || s.unavailable.includes(id)) return s;
       if (a.payload?.v === 2 && (s.soBarBat ?? []).includes(id)) return s; // SD-133 — out in an earlier Super Over
       return { ...s, strikerId: id, strikerName: name, batting: ensureCard(s.batting, id, name, bat) };
     }
     case 'SET_NONSTRIKER': {
       const id = String(a.payload?.id ?? '');
-      const name = String(a.payload?.name ?? '');
+      const name = L ? String(a.payload?.name ?? '') : undefined;
       if (!id || s.unavailable.includes(id)) return s;
       if (a.payload?.v === 2 && (s.soBarBat ?? []).includes(id)) return s;
       return { ...s, nonStrikerId: id, nonStrikerName: name, batting: ensureCard(s.batting, id, name, bat) };
@@ -1672,9 +1727,9 @@ const step = (s: CricketState, a: ScoreAction): CricketState => {
       seq += 1;
       return {
         ...s,
-        impactUsed: { ...s.impactUsed, [side]: { inId, inName, outId, outName } },
+        impactUsed: { ...s.impactUsed, [side]: L ? { inId, inName, outId, outName } : { inId, outId } },
         unavailable: [...s.unavailable, outId],
-        events: [...s.events, { id: seq, stamp: oversStr(cur.balls, s.ballsPerOver), icon: '⚡', label: 'IMPACT PLAYER', detail: `${inName} in for ${outName}`, side }],
+        events: [...s.events, { id: seq, stamp: oversStr(cur.balls, s.ballsPerOver), icon: '⚡', label: 'IMPACT PLAYER', detail: `${who(inId, inName)} in for ${who(outId, outName)}`, side }],
         seq,
       };
     }
@@ -1683,6 +1738,7 @@ const step = (s: CricketState, a: ScoreAction): CricketState => {
       // not format-gated, allowed any time; the injured player takes no further
       // part and the replacement can bat/bowl (their card is created when they do).
       const side = a.payload?.side as 'home' | 'away';
+      const inId = textOf(a.payload?.inId);
       const inName = String(a.payload?.inName ?? '');
       const outId = String(a.payload?.outId ?? '');
       const outName = String(a.payload?.outName ?? '');
@@ -1691,7 +1747,7 @@ const step = (s: CricketState, a: ScoreAction): CricketState => {
       return {
         ...s,
         unavailable: [...s.unavailable, outId],
-        events: [...s.events, { id: seq, stamp: oversStr(cur.balls, s.ballsPerOver), icon: '🚑', label: 'CONCUSSION SUB', detail: `${inName} replaces ${outName} (injury)`, side }],
+        events: [...s.events, { id: seq, stamp: oversStr(cur.balls, s.ballsPerOver), icon: '🚑', label: 'CONCUSSION SUB', detail: `${who(inId, inName) ?? 'A substitute'} replaces ${who(outId, outName)} (injury)`, side }],
         seq,
       };
     }
@@ -1699,7 +1755,7 @@ const step = (s: CricketState, a: ScoreAction): CricketState => {
       return swapStrike(s);
     case 'SET_BOWLER': {
       const id = String(a.payload?.id ?? '');
-      const name = String(a.payload?.name ?? '');
+      const name = L ? String(a.payload?.name ?? '') : undefined;
       if (!id || id === s.lastOverBowlerId || s.unavailable.includes(id)) return s; // no bowling two in a row, no subbed-out players
       // Parity #17 (REVIEW Decision 8): the quota / this-over / whole-last-over /
       // suspended checks REJECT only a `v: 2` payload (the live UI). A legacy one
@@ -1707,7 +1763,9 @@ const step = (s: CricketState, a: ScoreAction): CricketState => {
       const check = canBowl(s, id);
       const forced = a.payload?.v === 2 && !check.ok && check.reason === 'quota' && a.payload?.force === true;
       if (a.payload?.v === 2 && !check.ok && !forced) return s;
-      const card: BowlCard = { name, side: other(bat), runs: 0, balls: 0, wickets: 0, dots: 0, extras: 0 };
+      const card: BowlCard = name !== undefined
+        ? { name, side: other(bat), runs: 0, balls: 0, wickets: 0, dots: 0, extras: 0 }
+        : { side: other(bat), runs: 0, balls: 0, wickets: 0, dots: 0, extras: 0 };
       const bowling = s.bowling[id] ? s.bowling : { ...s.bowling, [id]: card };
       let next: CricketState = { ...s, bowlerId: id, bowlerName: name, bowling };
       // Deep wave — the bowler's type riding on the pick (from the profile);
@@ -1719,7 +1777,7 @@ const step = (s: CricketState, a: ScoreAction): CricketState => {
       if (forced) {
         seq += 1;
         const q = s.bowlerQuota ?? 0;
-        events.push({ id: seq, stamp, icon: '⚠️', label: 'Quota override', detail: `${name} bowls beyond the ${q}-over quota`, side: other(bat) });
+        events.push({ id: seq, stamp, icon: '⚠️', label: 'Quota override', detail: `${who(id, name)} bowls beyond the ${q}-over quota`, side: other(bat) });
       }
       // A mid-over replacement (injury / suspension): the balls so far stay with
       // the old bowler; the new one finishes the over. Both sit out the next.
@@ -1727,8 +1785,8 @@ const step = (s: CricketState, a: ScoreAction): CricketState => {
       const oldId = s.bowlerId;
       if (midOver(s) && oldId && oldId !== id && (reason === 'injury' || reason === 'suspended' || reason === 'other')) {
         seq += 1;
-        const oldName = s.bowlerName ?? s.bowling[oldId]?.name ?? 'the bowler';
-        events.push({ id: seq, stamp, icon: '🚑', label: 'BOWLER REPLACED', detail: `${name} completes ${oldName}'s over (${reason})`, side: other(bat) });
+        const oldName = L ? s.bowlerName ?? s.bowling[oldId]?.name ?? 'the bowler' : pidTok(oldId);
+        events.push({ id: seq, stamp, icon: '🚑', label: 'BOWLER REPLACED', detail: `${who(id, name)} completes ${oldName}'s over (${reason})`, side: other(bat) });
         if (reason === 'suspended') next = { ...next, barredBowlers: [...(s.barredBowlers ?? []), oldId] };
       }
       return seq === s.seq ? next : { ...next, events, seq };
@@ -1748,29 +1806,35 @@ const step = (s: CricketState, a: ScoreAction): CricketState => {
       const side = a.payload?.side as 'home' | 'away';
       const id = String(a.payload?.id ?? '');
       if (!side || !id) return s;
-      return { ...s, captains: { ...s.captains, [side]: { id, name: String(a.payload?.name ?? '') } } };
+      return { ...s, captains: { ...s.captains, [side]: L ? { id, name: String(a.payload?.name ?? '') } : { id } } };
     }
     case 'SET_KEEPER': {
       const side = a.payload?.side as 'home' | 'away';
       const id = String(a.payload?.id ?? '');
       if (!side || !id) return s;
-      const name = String(a.payload?.name ?? '');
-      const keepers = { ...s.keepers, [side]: { id, name } };
+      const name = L ? String(a.payload?.name ?? '') : undefined;
+      const keepers = { ...s.keepers, [side]: name !== undefined ? { id, name } : { id } };
       // A mid-match change (parity #13) is logged once a ball has been bowled;
       // pre-match picks stay silent. Display-only (the event shifts ids, not maths).
       const started = s.scores.home.balls + s.scores.away.balls > 0 || s.thisOver.length > 0 || s.innings > 1;
       const prev = s.keepers[side];
       if (!started || prev?.id === id) return { ...s, keepers };
+      const prevWho = L ? prev?.name : prev?.id ? pidTok(prev.id) : undefined;
       seq += 1;
       return {
         ...s,
         keepers,
-        events: [...s.events, { id: seq, stamp: oversStr(cur.balls, s.ballsPerOver), icon: '🧤', label: 'NEW KEEPER', detail: prev?.name ? `${name} takes the gloves from ${prev.name}` : `${name} keeps wicket`, side }],
+        events: [...s.events, { id: seq, stamp: oversStr(cur.balls, s.ballsPerOver), icon: '🧤', label: 'NEW KEEPER', detail: prevWho ? `${who(id, name)} takes the gloves from ${prevWho}` : `${who(id, name)} keeps wicket`, side }],
         seq,
       };
     }
-    case 'POTM':
-      return { ...s, potm: String(a.payload?.name ?? '') };
+    case 'POTM': {
+      // Legacy: by name (`{ name }`). IDs-only: by id (`{ id }`).
+      const id = textOf(a.payload?.id);
+      if (L || !id) return { ...s, potm: String(a.payload?.name ?? '') };
+      const { potm: _legacy, ...rest } = s;
+      return { ...rest, potmId: id };
+    }
     case 'END_INNINGS':
       if (s.innings === 1) return { ...s, innings: 2, battingSide: other(bat), ...chaseStart(s, cur.runs), thisOver: [], ballsInOver: 0, ...clearCrease };
       return { ...s, ended: true };
@@ -1865,9 +1929,11 @@ function ballRec(s: CricketState, a: ScoreAction, next: CricketState): BallRec {
   }
   const info = ballInfo(a);
   let out: BallRec['out'];
+  // the batter's legacy name (an IDs-only card has none — the id is enough)
+  const cardName = (id: string) => { const c = next.batting[id]; return c ? c.name : ''; };
   if (next.dismissals.length > s.dismissals.length) {
     const d = next.dismissals[next.dismissals.length - 1];
-    if (d.outId) out = { id: d.outId, name: next.batting[d.outId]?.name ?? '', kind: d.kind };
+    if (d.outId) out = { id: d.outId, name: cardName(d.outId), kind: d.kind };
   } else {
     const id = Object.keys(next.batting).find((k) => next.batting[k].retired && !s.batting[k]?.retired);
     if (id) out = { id, name: next.batting[id].name, kind: 'retired' };
@@ -1941,7 +2007,9 @@ function withBallPenalty(s: CricketState, a: ScoreAction, pen: BallPenalty): Cri
  *  Deep wave: the per-delivery `detail` is left out too (up to one record a
  *  ball; replay rebuilds it from the BALL_DETAIL events, and everything that
  *  reads it needs the replayed log anyway). Absent on older states → their
- *  snapshot is unchanged. */
+ *  snapshot is unchanged. IDs-only scoring: a state built from IDs-only
+ *  actions holds no player name (names.ts); an older log's stored names are
+ *  legacy data the clean-up script rewrites. */
 export function snapshotState(s: CricketState): CricketState {
   const { log: _log, detail: _detail, ...rest } = s;
   if (!rest.superOver) return rest;

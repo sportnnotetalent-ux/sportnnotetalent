@@ -16,17 +16,22 @@ import { planStatSync, applyStatWrites, type ExistingStatLine } from '../src/dat
 import { followDisputes } from '../src/data/eventLog.ts';
 import { CRICKET_MATCH_EVENTS, CRICKET_SEED_EXPECT, CRICKET_LIVE_EVENTS } from '../src/data/cricketSeed.ts';
 import type { ScoreAction } from '../src/sports/types.ts';
+import type { NameOf } from '../src/core/playerNames.ts';
 
+// IDs-only scoring (2026-10-24): actions as the scorer UI sends them — player
+// ids only. Here every player's name is their id ('A', 'X'…), so `NM` names
+// them for the selectors that show a name.
+const NM: NameOf = (id, legacy) => id ?? legacy ?? 'Player';
 function opened(config: Record<string, unknown> = {}): CricketState {
   let s = init({ overs: 5, playersPerSide: 11, ...config });
-  s = reducer(s, { type: 'SET_KEEPER', payload: { side: 'away', id: 'k', name: 'K' } });
-  s = reducer(s, { type: 'SET_STRIKER', payload: { id: 'A', name: 'A' } });
-  s = reducer(s, { type: 'SET_NONSTRIKER', payload: { id: 'B', name: 'B' } });
+  s = reducer(s, { type: 'SET_KEEPER', payload: { side: 'away', id: 'k' } });
+  s = reducer(s, { type: 'SET_STRIKER', payload: { id: 'A' } });
+  s = reducer(s, { type: 'SET_NONSTRIKER', payload: { id: 'B' } });
   return s;
 }
-const bowl = (s: CricketState, id: string): CricketState => reducer(s, { type: 'SET_BOWLER', payload: { id, name: id } });
+const bowl = (s: CricketState, id: string): CricketState => reducer(s, { type: 'SET_BOWLER', payload: { id } });
 const ball = (s: CricketState, type: string, payload: Record<string, unknown> = {}): CricketState =>
-  reducer(s, { type, side: s.battingSide, payload: { strikerId: s.strikerId, strikerName: s.strikerName, bowlerId: s.bowlerId, bowlerName: s.bowlerName, ...payload } } as ScoreAction);
+  reducer(s, { type, side: s.battingSide, payload: { strikerId: s.strikerId, bowlerId: s.bowlerId, ...payload } } as ScoreAction);
 const runs = (s: CricketState, r: number, extra: Record<string, unknown> = {}) => ball(s, 'RUNS', { runs: r, ...extra });
 const dots = (s: CricketState, n: number) => { for (let i = 0; i < n; i++) s = runs(s, 0); return s; };
 
@@ -39,7 +44,7 @@ function script(): { s1: CricketState; s: CricketState } {
   s = ball(s, 'EXTRA', { kind: 'Wide' });
   s = ball(s, 'EXTRA', { kind: 'No ball', runs: 2, boundary: false });
   s = ball(s, 'LEGBYES', { runs: 1 });
-  s = ball(s, 'WICKET', { kind: 'bowled', newBatId: 'C', newBatName: 'C' });
+  s = ball(s, 'WICKET', { kind: 'bowled', newBatId: 'C' });
   s = dots(s, 2);
   const s1 = s;
   s = dots(bowl(s, 'Y'), 6);
@@ -61,8 +66,9 @@ describe('#19 — ball log & selectors (acceptance script)', () => {
     assert.equal(s1.bowling.X.runs, 9);
     assert.equal(s1.bowling.X.wickets, 1);
     assert.equal(bowlerSplits(s1, 'home').X?.maidens ?? 0, 0);
-    assert.equal(fowText(fallOfWickets(s1, 'home')), '1-10 (A, 0.4 ov)');
-    const p = partnerships(s1, 'home');
+    assert.equal(fowText(fallOfWickets(s1, 'home', NM)), '1-10 (A, 0.4 ov)');
+    assert.equal(fowText(fallOfWickets(s1, 'home')), '1-10 (Player, 0.4 ov)'); // no lookup: ids only
+    const p = partnerships(s1, 'home', NM);
     assert.equal(p[0].runs, 10);
     assert.equal(p[0].a.name, 'A'); assert.equal(p[0].a.runs, 1);
     assert.equal(p[0].b.name, 'B'); assert.equal(p[0].b.runs, 6);
@@ -84,7 +90,7 @@ describe('#19 — ball log & selectors (acceptance script)', () => {
     assert.deepEqual(ov.map((o) => o.cum), [10, 10, 11]);
     assert.deepEqual(ov.map((o) => o.runs), [10, 0, 1]);
     assert.deepEqual(ov.map((o) => o.wkts), [1, 0, 0]);
-    assert.deepEqual(ov.map((o) => o.bowlerName), ['X', 'Y', 'X']);
+    assert.deepEqual(overHistory(s, 'home', NM).map((o) => o.bowlerName), ['X', 'Y', 'X']);
     assert.deepEqual(ov[0].syms, ['1', '4', 'wd', '2nb', 'lb', 'W', '0', '0']);
     // the log's chips are the live strip's
     assert.deepEqual(ov[2].syms, s.thisOver);
@@ -112,19 +118,19 @@ describe('#19 — ball log & selectors (acceptance script)', () => {
 describe('#19 — statTotals edge cases', () => {
   test('a run-out with 1 completed run credits the striker (runsAs bat); as byes it does not', () => {
     const base = bowl(opened(), 'X');
-    const bat = ball(base, 'WICKET', { kind: 'runout', runs: 1, fielderId: 'F', fielderName: 'F', batterOut: 'nonstriker', newBatId: 'C', newBatName: 'C' });
+    const bat = ball(base, 'WICKET', { kind: 'runout', runs: 1, fielderId: 'F', batterOut: 'nonstriker', newBatId: 'C' });
     assert.equal(statTotals(bat).A.stats.runs, 1);
     assert.equal(statTotals(bat).F.stats.runouts, 1);
     assert.equal(statTotals(bat).F.side, 'away');
-    const bye = ball(base, 'WICKET', { kind: 'runout', runs: 1, runsAs: 'bye', fielderId: 'F', fielderName: 'F', batterOut: 'nonstriker', newBatId: 'C', newBatName: 'C' });
+    const bye = ball(base, 'WICKET', { kind: 'runout', runs: 1, runsAs: 'bye', fielderId: 'F', batterOut: 'nonstriker', newBatId: 'C' });
     assert.equal(statTotals(bye).A.stats.runs, 0);
     assert.deepEqual(extrasBreakdown(bye, 'home'), { b: 1, lb: 0, wd: 0, nb: 0, pen: 0 });
   });
 
   test('catches and stumpings go to the fielder / keeper', () => {
     let s = bowl(opened(), 'X');
-    s = ball(s, 'WICKET', { kind: 'caught', fielderId: 'F', fielderName: 'F', newBatId: 'C', newBatName: 'C' });
-    s = ball(s, 'WICKET', { kind: 'stumped', newBatId: 'D', newBatName: 'D' });
+    s = ball(s, 'WICKET', { kind: 'caught', fielderId: 'F', newBatId: 'C' });
+    s = ball(s, 'WICKET', { kind: 'stumped', newBatId: 'D' });
     const t = statTotals(s);
     assert.equal(t.F.stats.catches, 1);
     assert.equal(t.k.stats.stumpings, 1);
@@ -135,7 +141,7 @@ describe('#19 — statTotals edge cases', () => {
     let s = bowl(opened(), 'X');
     s = runs(s, 2);
     s = ball(s, 'PENALTY', { runs: 5 });
-    s = ball(s, 'WICKET', { kind: 'retired', newBatId: 'C', newBatName: 'C' });
+    s = ball(s, 'WICKET', { kind: 'retired', newBatId: 'C' });
     s = runs(s, 1);
     assert.equal(extrasBreakdown(s, 'home').pen, 5);
     assert.equal(s.bowling.X.runs, 3);
@@ -162,23 +168,23 @@ describe('#19 — statTotals edge cases', () => {
   test('an over shared after a mid-over replacement is no maiden for either bowler', () => {
     let s = bowl(opened(), 'X');
     s = dots(s, 3);
-    s = reducer(s, { type: 'SET_BOWLER', payload: { id: 'Z', name: 'Z', reason: 'injury', v: 2 } });
+    s = reducer(s, { type: 'SET_BOWLER', payload: { id: 'Z', reason: 'injury', v: 2 } });
     s = dots(s, 3);
     assert.equal(s.scores.home.balls, 6);
     const sp = bowlerSplits(s, 'home');
     assert.equal(sp.X?.maidens ?? 0, 0);
     assert.equal(sp.Z?.maidens ?? 0, 0);
-    assert.equal(overHistory(s, 'home')[0].bowlerName, 'X / Z');
+    assert.equal(overHistory(s, 'home', NM)[0].bowlerName, 'X / Z');
   });
 
   test('a Mankad is no delivery, a wicket for nobody, and a run-out for the bowler', () => {
     let s = bowl(opened(), 'X');
-    s = ball(s, 'WICKET', { kind: 'mankad', newBatId: 'C', newBatName: 'C' });
+    s = ball(s, 'WICKET', { kind: 'mankad', newBatId: 'C' });
     const r = s.log![0];
     assert.equal(r.legal, false);
     assert.equal(r.out?.id, 'B');
     assert.equal(statTotals(s).X.stats.runouts, 1);
-    assert.equal(fowText(fallOfWickets(s, 'home')), '1-0 (B, 0.0 ov)');
+    assert.equal(fowText(fallOfWickets(s, 'home', NM)), '1-0 (B, 0.0 ov)');
   });
 });
 

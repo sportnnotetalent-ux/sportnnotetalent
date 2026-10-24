@@ -4,8 +4,12 @@
  * Pure: from the newest logged step (useLiveMatch `lastStep`) — the state just
  * before and after it — using the timeline event the step added (a live Super
  * Over's own timeline included). Null = unknown → the bar says plain "Undo".
+ * IDs-only scoring: the states keep ids — `nameOf` names the players
+ * (names.ts `withNames`; default: the stored legacy names).
  */
 import type { CricketState } from './engine.ts';
+import { withNames } from './names.ts';
+import { legacyNameOf, type NameOf } from '../../core/playerNames.ts';
 
 /** Steps that add no timeline event — named by what they set. */
 const QUIET: Record<string, string> = {
@@ -34,11 +38,13 @@ const asState = (x: unknown): CricketState | null =>
 /** The innings being played: a live Super Over's nested state, else the match. */
 const live = (s: CricketState): CricketState => (s.superOver && !s.superOver.state.ended ? s.superOver.state : s);
 
-export function cricketUndoLabel(step: { type: string; prev: unknown; next: unknown } | null | undefined): string | null {
+export function cricketUndoLabel(step: { type: string; prev: unknown; next: unknown } | null | undefined, nameOf: NameOf = legacyNameOf): string | null {
   if (!step) return null;
-  const prev = asState(step.prev);
-  const next = asState(step.next);
-  if (!prev || !next) return QUIET[step.type] ?? null;
+  const rawPrev = asState(step.prev);
+  const rawNext = asState(step.next);
+  if (!rawPrev || !rawNext) return QUIET[step.type] ?? null;
+  const prev = withNames(rawPrev, nameOf);
+  const next = withNames(rawNext, nameOf);
   // The timeline that grew: the match's, or the Super Over's (which may have
   // just ended inside this step — compare the nested states directly).
   const pairs: [CricketState, CricketState][] = [[prev, next]];

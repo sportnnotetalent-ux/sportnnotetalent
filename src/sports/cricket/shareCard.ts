@@ -9,12 +9,17 @@
  *
  * DERIVED ONLY from the replayed state (the ball log for the over card).
  * Pure and JSX-free (node tests — note the `.ts` imports).
+ *
+ * IDs-only scoring: the state keeps player ids; `nameOf` names them as the
+ * sharer may see them (names.ts `withNames`; default: stored legacy names).
  */
 import { outcome, other, oversStr, runRate, type CricketState } from './engine.ts';
 import { inningsTop } from './matchStats.ts';
 import { cricketCommentary, overHeadline, type ComBall } from './commentary.ts';
 import { matchLink } from '../../core/shareText.ts';
 import { SITE_HOST } from '../../core/hosts.ts';
+import { withNames } from './names.ts';
+import { legacyNameOf, type NameOf } from '../../core/playerNames.ts';
 
 type Side = 'home' | 'away';
 
@@ -30,8 +35,9 @@ export interface ShareCardOpts {
   potmName?: string;
   /** a match closed by hand ("Match abandoned — Rain") replaces the result line */
   resultLine?: string;
-  /** names as the reader may see them (a disputed participation is masked) */
-  nameOf?: (playerId: string, name: string) => string;
+  /** players' names by id, as the reader may see them (IDs-only scoring; a
+   *  disputed participation is masked). Default: the stored legacy names. */
+  nameOf?: NameOf;
   /** top N batters / bowlers per innings (default 3) */
   top?: number;
 }
@@ -62,21 +68,23 @@ const link = (o: ShareCardOpts, live: boolean) =>
 
 /** "Asha 72* (45) · Ravi 40 (30)" / "Veer 3/24 (4.0)" — one innings' top performers. */
 function topLines(s: CricketState, side: Side, o: ShareCardOpts): { total: string; bat: string; bowl: string } {
-  const t = inningsTop(s, side, o.top ?? 3);
-  const nm = (id: string, name: string) => clean(o.nameOf ? o.nameOf(id, name) : name);
+  const t = inningsTop(s, side, o.top ?? 3, o.nameOf);
   return {
     total: t.total,
-    bat: t.bat.map((b) => `${nm(b.id, b.name)} ${b.line}`).join(' · '),
-    bowl: t.bowl.map((b) => `${nm(b.id, b.name)} ${b.line}`).join(' · '),
+    bat: t.bat.map((b) => `${clean(b.name)} ${b.line}`).join(' · '),
+    bowl: t.bowl.map((b) => `${clean(b.name)} ${b.line}`).join(' · '),
   };
 }
+/** The state with its players named for this card (IDs-only scoring). */
+const named = (s: CricketState, o: ShareCardOpts) => withNames(s, o.nameOf ?? legacyNameOf);
 
 const teamOf = (o: ShareCardOpts, side: Side) => clean(side === 'home' ? o.homeName : o.awayName);
 const head = (word: string, o: ShareCardOpts) => `🏏 ${word}${o.tournamentName ? ` · ${clean(o.tournamentName)}` : ''}`;
 
 /** End of the first innings: the total and run rate, the top batters, the
  *  bowling side's top bowlers, and what the chase needs. */
-export function inningsShareText(s: CricketState, o: ShareCardOpts): string {
+export function inningsShareText(s0: CricketState, o: ShareCardOpts): string {
+  const s = named(s0, o);
   const side = firstBatting(s);
   const sc = s.scores[side];
   const t = topLines(s, side, o);
@@ -103,7 +111,8 @@ export function resultText(s: CricketState, o: ShareCardOpts): string {
 
 /** End of the match: both totals, the result, each innings' top batters and
  *  the opposition's top bowlers, the Player of the Match. */
-export function resultShareText(s: CricketState, o: ShareCardOpts): string {
+export function resultShareText(s0: CricketState, o: ShareCardOpts): string {
+  const s = named(s0, o);
   const first = firstBatting(s);
   const order: Side[] = [first, other(first)];
   const lines = [head('RESULT', o)];
@@ -143,7 +152,7 @@ export interface OverRef { inn: 1 | 2; side: Side; over: number; superOver?: boo
  * and, in a chase, what's needed. Null when that over isn't in the log.
  */
 export function overShareText(s: CricketState, ref: OverRef, o: ShareCardOpts): string | null {
-  const com = cricketCommentary(s, { home: o.homeName, away: o.awayName });
+  const com = cricketCommentary(s, { home: o.homeName, away: o.awayName }, o.nameOf);
   const inns = ref.superOver ? com.superOver?.innings ?? [] : com.innings;
   const inn = inns.find((i) => i.inn === ref.inn && i.side === ref.side);
   const ov = inn?.overs.find((x) => x.over === ref.over);

@@ -294,10 +294,10 @@ describe('#06 editBall passes overs / target records through unchanged', () => {
     let s = init(cfg);
     const log: MatchEventRecord[] = [];
     const push = (a: ScoreAction) => { log.push({ seq: log.length + 1, type: a.type, ...(a.payload ? { payload: a.payload } : {}) }); s = reducer(s, a); };
-    push({ type: 'SET_STRIKER', payload: { id: 'a', name: 'A' } });
-    push({ type: 'SET_NONSTRIKER', payload: { id: 'b', name: 'B' } });
-    push({ type: 'SET_BOWLER', payload: { id: 'x', name: 'X', v: 2 } });
-    for (let i = 0; i < 6; i++) push({ type: 'RUNS', payload: { runs: 2, strikerId: s.strikerId, strikerName: s.strikerName, bowlerId: s.bowlerId, bowlerName: s.bowlerName } });
+    push({ type: 'SET_STRIKER', payload: { id: 'a' } });
+    push({ type: 'SET_NONSTRIKER', payload: { id: 'b' } });
+    push({ type: 'SET_BOWLER', payload: { id: 'x', v: 2 } });
+    for (let i = 0; i < 6; i++) push({ type: 'RUNS', payload: { runs: 2, strikerId: s.strikerId, bowlerId: s.bowlerId } });
     push(setOvers(15));
     push(rain(12));
     assert.deepEqual(replayCricket(log, cfg), s);

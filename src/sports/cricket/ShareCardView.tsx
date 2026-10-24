@@ -36,7 +36,8 @@ export function CricketShareCard({ state, homeName, awayName, matchId, tournamen
   const stages = shareStages(s);
   if (!stages.length) return null;
   const stage = pick && stages.includes(pick) ? pick : stages[stages.length - 1];
-  const opts: ShareCardOpts = { homeName, awayName, matchId, tournamentName, potmName, resultLine, nameOf: (id, name) => mask.byId(id, name) };
+  // IDs-only scoring: players named by id as this sharer may see them.
+  const opts: ShareCardOpts = { homeName, awayName, matchId, tournamentName, potmName, resultLine, nameOf: mask.nameOf };
   const text = shareCardText(s, stage, opts);
   return (
     <View style={st.card} accessibilityLabel="Share card">
@@ -66,8 +67,8 @@ export function ShareOverButton({ state, over, homeName, awayName, matchId, tour
   const s = state as CricketState;
   const mask = useMask();
   const share = () => {
-    const text = overShareText(s, over, { homeName, awayName, matchId, tournamentName });
-    // (the over block names players by name — a disputed one is masked)
+    const text = overShareText(s, over, { homeName, awayName, matchId, tournamentName, nameOf: mask.nameOf });
+    // (players by id through `nameOf`; a legacy log's stored names — a disputed one is masked)
     if (text) void shareMessage(mask.text(text), 'match');
   };
   return <Button label="Share over" variant="ghost" style={st.btn} accessibilityLabel={`Share over ${over.over}`} onPress={share} />;

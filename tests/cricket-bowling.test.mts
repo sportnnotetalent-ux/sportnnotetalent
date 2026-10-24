@@ -12,10 +12,14 @@ import { editableOvers, editBall, changeBowlerOps, applyOps, replayCricket } fro
 import type { MatchEventRecord } from '../src/core/types.ts';
 import type { ScoreAction } from '../src/sports/types.ts';
 import type { AmendOp } from '../src/sports/amend.ts';
+import { withNames } from '../src/sports/cricket/names.ts';
+import { makeNameOf } from '../src/core/playerNames.ts';
 
 const B = (id: string) => ({ id, name: id.toUpperCase() });
 
-/** Records a log as the live screen would (each ball stamps striker + bowler). */
+/** Records a log as the live screen would (each ball stamps striker + bowler).
+ *  IDs-only scoring: the live screen sends player ids only; `legacy()` is an
+ *  older log's pick (with the name it stored). */
 class Rec {
   log: MatchEventRecord[] = [];
   s: CricketState;
@@ -23,8 +27,8 @@ class Rec {
   constructor(cfg: Record<string, unknown> = { overs: 8, playersPerSide: 11 }) {
     this.cfg = cfg;
     this.s = init(cfg);
-    this.push({ type: 'SET_STRIKER', payload: { id: 'x1', name: 'X1' } });
-    this.push({ type: 'SET_NONSTRIKER', payload: { id: 'x2', name: 'X2' } });
+    this.push({ type: 'SET_STRIKER', payload: { id: 'x1', v: 2 } });
+    this.push({ type: 'SET_NONSTRIKER', payload: { id: 'x2', v: 2 } });
   }
   push(a: ScoreAction): this {
     const rec: MatchEventRecord = { seq: this.log.length + 1, type: a.type };
@@ -35,12 +39,12 @@ class Rec {
     return this;
   }
   /** the new UI's pick (v: 2) */
-  bowl(id: string, extra: Record<string, unknown> = {}): this { return this.push({ type: 'SET_BOWLER', payload: { ...B(id), v: 2, ...extra } }); }
+  bowl(id: string, extra: Record<string, unknown> = {}): this { return this.push({ type: 'SET_BOWLER', payload: { id, v: 2, ...extra } }); }
   /** a legacy pick (no v) */
   legacy(id: string): this { return this.push({ type: 'SET_BOWLER', payload: B(id) }); }
   ball(type: string, payload: Record<string, unknown> = {}): this {
     const s = this.s;
-    return this.push({ type, side: s.battingSide, payload: { ...payload, strikerId: s.strikerId, strikerName: s.strikerName, bowlerId: s.bowlerId, bowlerName: s.bowlerName } });
+    return this.push({ type, side: s.battingSide, payload: { ...payload, strikerId: s.strikerId, bowlerId: s.bowlerId } });
   }
   dots(n: number): this { for (let i = 0; i < n; i++) this.ball('RUNS', { runs: 0 }); return this; }
   over(id: string, pick: 'v2' | 'legacy' = 'v2'): this { return (pick === 'v2' ? this.bowl(id) : this.legacy(id)).dots(6); }
@@ -114,7 +118,9 @@ describe('mid-over replacement', () => {
     assert.ok(r.s.bowling.c.overs!.includes(1));
     const ev = r.s.events.find((e) => e.icon === '🚑')!;
     assert.ok(ev, 'replacement logged');
-    assert.equal(ev.detail, "C completes B's over (injury)");
+    assert.equal(ev.detail, "{@c} completes {@b}'s over (injury)"); // stored by id
+    const nm = makeNameOf(new Map([['b', 'B'], ['c', 'C']]));
+    assert.equal(withNames(r.s, nm).events.find((e) => e.icon === '🚑')!.detail, "C completes B's over (injury)");
     assert.equal(ev.stamp, '1.2');
     assert.equal(r.s.scores.home.balls, 12);
   });
@@ -189,7 +195,7 @@ describe('mid-over replacement', () => {
 
   test('a Mankad / retired out is no delivery — it does not start the over', () => {
     const r = new Rec().over('a').bowl('b');
-    r.ball('WICKET', { kind: 'mankad', newBatId: 'x3', newBatName: 'X3' });
+    r.ball('WICKET', { kind: 'mankad', newBatId: 'x3' });
     assert.equal(midOver(r.s), false);
     r.bowl('c');
     assert.equal(r.s.bowlerId, 'c');
@@ -235,7 +241,8 @@ describe('legacy replay (REVIEW Decision 8)', () => {
     const ops = changeBowlerOps(inn, 5, B('a'), 'over', r.log) as AmendOp[];
     assert.ok(Array.isArray(ops));
     const sb = ops.find((o) => o.op === 'replace' && o.action.type === 'SET_BOWLER') as Extract<AmendOp, { op: 'replace' }>;
-    assert.deepEqual(sb.action.payload, { id: 'a', name: 'A' });
+    // (IDs-only: the rewrite carries the id only — the old name is dropped)
+    assert.deepEqual(sb.action.payload, { id: 'a' });
     const after = replayCricket(applyOps(r.log, ops), r.cfg);
     assert.equal(after.bowling.a.balls, 18);
     assert.equal(after.bowling.c?.balls ?? 0, 0);

@@ -29,11 +29,11 @@ class Rec {
   }
   ball(type: string, payload: Record<string, unknown> = {}): this {
     const s = this.s;
-    return this.push({ type, side: s.battingSide, payload: { strikerId: s.strikerId, strikerName: s.strikerName, bowlerId: s.bowlerId, bowlerName: s.bowlerName, ...payload } });
+    return this.push({ type, side: s.battingSide, payload: { strikerId: s.strikerId, bowlerId: s.bowlerId, ...payload } });
   }
-  bowler(id: string) { return this.push({ type: 'SET_BOWLER', payload: { id, name: id } }); }
+  bowler(id: string) { return this.push({ type: 'SET_BOWLER', payload: { id } }); }
   open(a = 'A', b = 'B') {
-    return this.push({ type: 'SET_STRIKER', payload: { id: a, name: a } }).push({ type: 'SET_NONSTRIKER', payload: { id: b, name: b } });
+    return this.push({ type: 'SET_STRIKER', payload: { id: a } }).push({ type: 'SET_NONSTRIKER', payload: { id: b } });
   }
   keep() { if (!this.s.bowlerId) this.bowler(this.s.lastOverBowlerId === 'X' ? 'Y' : 'X'); return this; }
 }
@@ -73,7 +73,7 @@ describe('SD-113 A3/R1 — no batter left closes the innings', () => {
     const r = new Rec().open().bowler('X').ball('RUNS', { runs: 6 });
     r.push({ type: 'END_INNINGS' });
     r.open('P', 'Q').bowler('M').ball('RUNS', { runs: 2 });
-    r.ball('WICKET', { kind: 'caught', fielderId: 'A', fielderName: 'A', v: 2, noBatterLeft: true });
+    r.ball('WICKET', { kind: 'caught', fielderId: 'A', v: 2, noBatterLeft: true });
     assert.equal(r.s.ended, true);
     assert.equal(r.s.closedNoBatter?.away, true);
   });

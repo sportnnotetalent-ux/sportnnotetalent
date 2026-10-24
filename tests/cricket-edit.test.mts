@@ -3,6 +3,10 @@
  * Logs are recorded the way the live UI records them (ball() stamps the current
  * striker/bowler), then edited via AMEND ops and replayed through the real
  * reducer with #05's effectiveLog.
+ *
+ * IDs-only scoring (2026-10-24): the live UI records player ids only, and an
+ * edit writes ids only (an older ball's stored names are dropped). Names are
+ * asserted on the display copy `named(s)` (names.ts `withNames`).
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
@@ -15,6 +19,8 @@ import {
 } from '../src/sports/cricket/editOvers.ts';
 import type { MatchEventRecord } from '../src/core/types.ts';
 import type { ScoreAction } from '../src/sports/types.ts';
+import { withNames, stripNames } from '../src/sports/cricket/names.ts';
+import { makeNameOf } from '../src/core/playerNames.ts';
 
 const CFG = { overs: 5, playersPerSide: 11 };
 const P = {
@@ -22,6 +28,11 @@ const P = {
   arjun: { id: 'arjun', name: 'Arjun' }, kabir: { id: 'kabir', name: 'Kabir' }, mo: { id: 'mo', name: 'Mo' },
   fin: { id: 'fin', name: 'Fin' },
 };
+/** The viewer's names, by id (players_view). */
+const NM = makeNameOf(new Map(Object.values(P).map((p) => [p.id, p.name])));
+const named = (s: CricketState) => withNames(s, NM);
+/** A SET_STRIKER / SET_NONSTRIKER / SET_BOWLER payload as the UI sends it: the id only. */
+const pid = (p: { id: string }) => ({ id: p.id });
 
 /** Records a log exactly as the live screen would (state-stamped payloads). */
 class Recorder {
@@ -40,18 +51,18 @@ class Recorder {
   }
   setup(): this {
     return this
-      .push({ type: 'SET_CAPTAIN', payload: { side: 'home', id: 'ravi', name: 'Ravi' } })
-      .push({ type: 'SET_KEEPER', payload: { side: 'away', id: 'fin', name: 'Fin' } })
-      .push({ type: 'SET_STRIKER', payload: P.ravi })
-      .push({ type: 'SET_NONSTRIKER', payload: P.dev })
-      .push({ type: 'SET_BOWLER', payload: P.arjun });
+      .push({ type: 'SET_CAPTAIN', payload: { side: 'home', id: 'ravi' } })
+      .push({ type: 'SET_KEEPER', payload: { side: 'away', id: 'fin' } })
+      .push({ type: 'SET_STRIKER', payload: pid(P.ravi) })
+      .push({ type: 'SET_NONSTRIKER', payload: pid(P.dev) })
+      .push({ type: 'SET_BOWLER', payload: pid(P.arjun) });
   }
   stamp(extra: Record<string, unknown> = {}) {
     const s = this.s;
-    return { ...extra, strikerId: s.strikerId, strikerName: s.strikerName, bowlerId: s.bowlerId, bowlerName: s.bowlerName };
+    return { ...extra, strikerId: s.strikerId, bowlerId: s.bowlerId };
   }
   runs(r: number, extra: Record<string, unknown> = {}): this {
-    return this.push({ type: 'RUNS', side: this.s.battingSide, payload: this.stamp({ runs: r, ...extra }), attribution: { playerId: this.s.strikerId!, stat: 'runs', by: r, playerName: this.s.strikerName } });
+    return this.push({ type: 'RUNS', side: this.s.battingSide, payload: this.stamp({ runs: r, ...extra }), attribution: { playerId: this.s.strikerId!, stat: 'runs', by: r } });
   }
   bye(r: number, leg = false): this {
     return this.push({ type: leg ? 'LEGBYES' : 'BYES', side: this.s.battingSide, payload: this.stamp({ runs: r }) });
@@ -63,12 +74,12 @@ class Recorder {
     const s = this.s;
     return this.push({
       type: 'WICKET', side: s.battingSide,
-      payload: this.stamp({ kind: 'caught', fielderId: fielder.id, fielderName: fielder.name, batterOut: 'striker', runs: 0, newBatId: newBat.id, newBatName: newBat.name }),
-      attribution: { playerId: s.bowlerId!, stat: 'wickets', by: 1, playerName: s.bowlerName },
-      attribution2: { playerId: fielder.id, stat: 'catches', playerName: fielder.name },
+      payload: this.stamp({ kind: 'caught', fielderId: fielder.id, batterOut: 'striker', runs: 0, newBatId: newBat.id }),
+      attribution: { playerId: s.bowlerId!, stat: 'wickets', by: 1 },
+      attribution2: { playerId: fielder.id, stat: 'catches' },
     });
   }
-  bowler(b: { id: string; name: string }): this { return this.push({ type: 'SET_BOWLER', payload: b }); }
+  bowler(b: { id: string; name: string }): this { return this.push({ type: 'SET_BOWLER', payload: pid(b) }); }
 }
 
 const recAt = (log: MatchEventRecord[], seq: number) => log.find((e) => e.seq === seq)!;
@@ -111,13 +122,16 @@ describe('editBall — no-ball byes / leg byes (guide-writer feedback)', () => {
   });
   test('saving an Nb+2b unchanged is a no-op (no doubled runs)', () => {
     const a = editBall(nbByes, { extraKind: 'noball', extraRuns: 2, extraRunsAs: 'bye' }) as ScoreAction;
-    assert.deepEqual(a, recordToAction(nbByes));
+    // the same ball — IDs-only: without the names the older ball stored
+    assert.deepEqual(a, stripNames(recordToAction(nbByes)));
   });
   test('Nb+2b → off the bat moves the runs to the batter', () => {
     const a = editBall(nbByes, { extraKind: 'noball', extraRuns: 2, extraRunsAs: 'bat' }) as ScoreAction;
     assert.equal(a.payload!.runs, 2);
     assert.equal(a.payload!.byes, undefined);
-    assert.deepEqual(a.attribution, { playerId: 'ravi', stat: 'runs', by: 2, playerName: 'Ravi' });
+    assert.deepEqual(a.attribution, { playerId: 'ravi', stat: 'runs', by: 2 });
+    assert.equal(a.payload!.strikerName, undefined);
+    assert.equal(a.payload!.bowlerName, undefined);
   });
   test('describeBall says who-neutral run detail: all run, overthrows', () => {
     assert.equal(describeBall({ type: 'RUNS', payload: { runs: 4, boundary: false } }), '4 runs, all run');
@@ -135,7 +149,7 @@ describe('editBall — payload & pass-through', () => {
     assert.equal(a.payload!.boundary, true);
     assert.equal(a.payload!.runsAs, 'overthrow');
     assert.equal(a.payload!.v, 2);
-    assert.deepEqual(a.attribution, { playerId: 'ravi', stat: 'runs', by: 6, playerName: 'Ravi' });
+    assert.deepEqual(a.attribution, { playerId: 'ravi', stat: 'runs', by: 6 });
     const w: MatchEventRecord = { seq: 10, type: 'WICKET', payload: { kind: 'bowled', v: 2, end: 'pavilion', strikerId: 'ravi', bowlerId: 'arjun', bowlerName: 'Arjun' } };
     const wa = editBall(w, { kind: 'lbw' }) as ScoreAction;
     assert.equal(wa.payload!.v, 2);
@@ -245,26 +259,30 @@ describe('wickets', () => {
     const a = editBall(recAt(log, wseq), { kind: 'bowled' }) as ScoreAction;
     assert.equal(a.payload!.fielderId, undefined);
     assert.equal(a.attribution2, undefined);
-    assert.deepEqual(a.attribution, { playerId: 'arjun', stat: 'wickets', by: 1, playerName: 'Arjun' });
+    assert.deepEqual(a.attribution, { playerId: 'arjun', stat: 'wickets', by: 1 });
     assert.equal(a.payload!.newBatId, 'sam'); // kept from the original
     const eff = applyOps(log, [replace(wseq, a)]);
     assert.deepEqual(statDeltas(log, eff), [{ playerId: 'mo', stat: 'catches', by: -1 }]);
     const s = replayCricket(eff, CFG);
-    assert.equal(s.batting.ravi.dismissal, 'b Arjun');
+    assert.equal(s.batting.ravi.dismissal, 'b {@arjun}'); // stored by id
+    assert.equal(named(s).batting.ravi.dismissal, 'b Arjun');
     assert.equal(s.bowling.arjun.wickets, 1);
   });
 
   test('Bowled → Caught credits the new fielder; Stumped uses the keeper context', () => {
     const c = editBall(recAt(log, wseq), { fielderId: 'kabir', fielderName: 'Kabir' }) as ScoreAction;
-    assert.deepEqual(c.attribution2, { playerId: 'kabir', stat: 'catches', playerName: 'Kabir' });
+    assert.deepEqual(c.attribution2, { playerId: 'kabir', stat: 'catches' });
+    assert.equal(c.payload!.fielderName, undefined); // a name passed in isn't stored
     const st = editBall(recAt(log, wseq), { kind: 'stumped' }, { keeper: P.fin }) as ScoreAction;
-    assert.deepEqual(st.attribution2, { playerId: 'fin', stat: 'stumpings', playerName: 'Fin' });
+    assert.deepEqual(st.attribution2, { playerId: 'fin', stat: 'stumpings' });
     const ro = editBall(recAt(log, wseq), { kind: 'runout', fielderId: 'kabir', fielderName: 'Kabir', runs: 1, batterOut: 'nonStriker' }) as ScoreAction;
     assert.equal(ro.payload!.batterOut, 'nonstriker');
-    assert.deepEqual(ro.attribution, { playerId: 'kabir', stat: 'runouts', playerName: 'Kabir' });
+    assert.deepEqual(ro.attribution, { playerId: 'kabir', stat: 'runouts' });
     // Parity #16 (REVIEW Decision 6): a run-out's completed runs off the bat are
     // credited to the striker as the 2nd attribution (was: none).
-    assert.deepEqual(ro.attribution2, { playerId: 'ravi', stat: 'runs', by: 1, playerName: 'Ravi' });
+    assert.deepEqual(ro.attribution2, { playerId: 'ravi', stat: 'runs', by: 1 });
+    const s = replayCricket(applyOps(log, [replace(wseq, c)]), CFG);
+    assert.equal(named(s).batting.ravi.dismissal, 'c Kabir b Arjun');
   });
 });
 
@@ -287,8 +305,9 @@ describe('editableOvers', () => {
     assert.deepEqual(o2.balls.map((b) => b.stamp), ['1.1', '1.2', '1.2']);
     assert.deepEqual(o1.balls.map((b) => b.category), ['legal', 'wide', 'legal', 'legal', 'wide', 'legal', 'legal', 'legal']);
     assert.equal(o2.balls[1].category, 'noball');
-    assert.deepEqual(o1.bowler, P.arjun);
-    assert.deepEqual(o2.bowler, P.kabir);
+    // IDs-only: the over's bowler by id (no stored name — '' — the editor shows nameOf(id))
+    assert.deepEqual(o1.bowler, { id: 'arjun', name: '' });
+    assert.deepEqual(o2.bowler, { id: 'kabir', name: '' });
     assert.equal(recAt(log, o2.setBowlerSeq!).type, 'SET_BOWLER');
     assert.equal(recAt(log, o1.setBowlerSeq!).payload!.id, 'arjun');
     assert.deepEqual(o1.balls[0].crease, ['ravi', 'dev']);
@@ -310,12 +329,12 @@ describe('editableOvers', () => {
   test('second innings listed first; PENALTY and Super Over balls skipped', () => {
     const r = new Recorder({ overs: 1, playersPerSide: 11 }).setup().runs(1).runs(1).runs(1).runs(1).runs(1).runs(1);
     // innings 2
-    r.push({ type: 'SET_STRIKER', payload: P.mo }).push({ type: 'SET_NONSTRIKER', payload: P.kabir }).push({ type: 'SET_BOWLER', payload: P.ravi });
+    r.push({ type: 'SET_STRIKER', payload: pid(P.mo) }).push({ type: 'SET_NONSTRIKER', payload: pid(P.kabir) }).push({ type: 'SET_BOWLER', payload: pid(P.ravi) });
     r.push({ type: 'PENALTY', side: 'away', payload: { runs: 5 } });
     r.runs(0).runs(0).runs(0).runs(0).runs(0).runs(1); // 6 — tied → pendingTie
     assert.equal(r.s.pendingTie, true);
     r.push({ type: 'START_SUPER_OVER' })
-      .push({ type: 'SET_STRIKER', payload: P.mo }).push({ type: 'SET_NONSTRIKER', payload: P.kabir }).push({ type: 'SET_BOWLER', payload: P.ravi });
+      .push({ type: 'SET_STRIKER', payload: pid(P.mo) }).push({ type: 'SET_NONSTRIKER', payload: pid(P.kabir) }).push({ type: 'SET_BOWLER', payload: pid(P.ravi) });
     r.runs(6);
     const inns = editableOvers(r.log, { overs: 1, playersPerSide: 11 });
     assert.deepEqual(inns.map((i) => i.inningsIx), [1, 0]);
@@ -360,9 +379,9 @@ describe('changeBowlerOps', () => {
     const s2 = replayCricket(applyOps(log, all), CFG);
     assert.equal(s2.bowling.arjun?.balls ?? 0, 0);
     assert.equal(s2.bowling.sam.balls, 12);
-    // a legacy SET_BOWLER keeps its keys (no v added)
+    // a legacy SET_BOWLER keeps its keys (no v added) — and IDs-only, no name
     const sb = all.find((o) => o.op === 'replace' && o.action.type === 'SET_BOWLER') as Extract<AmendOp, { op: 'replace' }>;
-    assert.deepEqual(sb.action.payload, { id: 'sam', name: 'Sam' });
+    assert.deepEqual(sb.action.payload, { id: 'sam' });
     assert.equal(bowlerDiffLine([3, 1], 'Arjun', 'Sam'), 'Overs 1, 3 bowler: Arjun → Sam');
     assert.equal(bowlerDiffLine(3, 'Arjun', 'Kabir'), 'Over 3 bowler: Arjun → Kabir');
   });
@@ -373,7 +392,7 @@ describe('changeBowlerOps', () => {
     const eff = applyOps(w.log, ops);
     const s = replayCricket(eff, CFG);
     assert.equal(s.bowling.kabir.wickets, 1);
-    assert.equal(s.batting.ravi.dismissal, 'c Mo b Kabir');
+    assert.equal(named(s).batting.ravi.dismissal, 'c Mo b Kabir');
     assert.deepEqual(statDeltas(w.log, eff), [
       { playerId: 'arjun', stat: 'wickets', by: -1 },
       { playerId: 'kabir', stat: 'wickets', by: 1 },
@@ -394,13 +413,15 @@ describe('swapBattersOps', () => {
       assert.deepEqual(after.batting.dev[k], before.batting.ravi[k], `dev.${k}`);
     }
     assert.equal(after.scores.home.runs, before.scores.home.runs);
-    assert.equal(after.batting.ravi.name, 'Ravi');
+    assert.equal(after.batting.ravi.name, undefined); // IDs-only: a card keeps no name…
+    assert.equal(named(after).batting.ravi.name, 'Ravi'); // …it's looked up by id
     assert.equal(swapDiffLine('Ravi', 'Dev'), 'Swapped records: Ravi ⇄ Dev');
   });
 });
 
 describe('remapPlayer & diff lines', () => {
-  test('rewrites ids/names, attribution and _attr2; keeps v', () => {
+  test('rewrites ids, attribution and _attr2; keeps v; drops every stored name (IDs-only)', () => {
+    // an older (legacy) ball, with names
     const a: ScoreAction = {
       type: 'WICKET', payload: { kind: 'caught', strikerId: 'ravi', strikerName: 'Ravi', bowlerId: 'arjun', bowlerName: 'Arjun', fielderId: 'arjun', fielderName: 'Arjun', v: 2, _attr2: { playerId: 'arjun', stat: 'catches', playerName: 'Arjun' } },
       attribution: { playerId: 'arjun', stat: 'wickets', by: 1, playerName: 'Arjun' },
@@ -408,20 +429,29 @@ describe('remapPlayer & diff lines', () => {
     };
     const b = remapPlayer(a, 'arjun', 'kabir', 'Kabir');
     assert.equal(b.payload!.bowlerId, 'kabir');
-    assert.equal(b.payload!.bowlerName, 'Kabir');
     assert.equal(b.payload!.fielderId, 'kabir');
     assert.equal(b.payload!.strikerId, 'ravi');
     assert.equal(b.payload!.v, 2);
-    assert.equal((b.payload!._attr2 as { playerId: string }).playerId, 'kabir');
-    assert.equal(b.attribution!.playerId, 'kabir');
-    assert.equal(b.attribution2!.playerName, 'Kabir');
+    assert.deepEqual(b.payload!._attr2, { playerId: 'kabir', stat: 'catches' });
+    assert.deepEqual(b.attribution, { playerId: 'kabir', stat: 'wickets', by: 1 });
+    assert.deepEqual(b.attribution2, { playerId: 'kabir', stat: 'catches' });
+    for (const k of ['bowlerName', 'fielderName', 'strikerName']) assert.equal(b.payload![k], undefined, k);
     const sb = remapPlayer({ type: 'SET_BOWLER', payload: { id: 'arjun', name: 'Arjun', v: 2 } }, 'arjun', 'kabir', 'Kabir');
-    assert.deepEqual(sb.payload, { id: 'kabir', name: 'Kabir', v: 2 });
+    assert.deepEqual(sb.payload, { id: 'kabir', v: 2 });
+    // an action that doesn't mention the player is left exactly as it was
+    const other = { type: 'RUNS', payload: { runs: 1, strikerId: 'ravi', strikerName: 'Ravi' } };
+    assert.equal(remapPlayer(other, 'arjun', 'kabir'), other);
   });
   test('ball line', () => {
     assert.equal(ballDiffLine('2.3', { type: 'RUNS', payload: { runs: 1 } }, { type: 'RUNS', payload: { runs: 4 } }), 'Ball 2.3: 1 run → 4 runs');
     assert.equal(ballDiffLine('0.4', { type: 'RUNS', payload: { runs: 4 } }, { type: 'BYES', payload: { runs: 4 } }), 'Ball 0.4: 4 runs → 4 byes');
     assert.equal(ballDiffLine('1.1', { type: 'WICKET', payload: { kind: 'caught', fielderName: 'Mo' } }, { type: 'WICKET', payload: { kind: 'bowled' } }), 'Ball 1.1: Caught (Mo) → Bowled');
     assert.equal(ballDiffLine('1.2', { type: 'RUNS', payload: { runs: 1, strikerId: 'a', strikerName: 'Ravi' } }, { type: 'RUNS', payload: { runs: 1, strikerId: 'b', strikerName: 'Dev' } }), 'Ball 1.2: 1 run (Ravi) → 1 run (Dev)');
+  });
+  test('IDs-only balls: the line names players through nameOf (the editor passes initials)', () => {
+    const initials = makeNameOf(new Map([['mo', 'M. O.'], ['ravi', 'R. K.'], ['dev', 'D. S.']]));
+    assert.equal(ballDiffLine('1.1', { type: 'WICKET', payload: { kind: 'caught', fielderId: 'mo' } }, { type: 'WICKET', payload: { kind: 'bowled' } }, initials), 'Ball 1.1: Caught (M. O.) → Bowled');
+    assert.equal(ballDiffLine('1.2', { type: 'RUNS', payload: { runs: 1, strikerId: 'ravi' } }, { type: 'RUNS', payload: { runs: 1, strikerId: 'dev' } }, initials), 'Ball 1.2: 1 run (R. K.) → 1 run (D. S.)');
+    assert.equal(describeBall({ type: 'WICKET', payload: { kind: 'runout', fielderId: 'mo', fielder2Id: 'dev' } }, initials), 'Run out (M. O./D. S.)');
   });
 });

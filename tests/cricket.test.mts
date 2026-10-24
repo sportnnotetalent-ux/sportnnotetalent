@@ -8,21 +8,28 @@ import assert from 'node:assert/strict';
 import { init, reducer } from '../src/sports/cricket/engine.ts';
 import type { CricketState } from '../src/sports/cricket/engine.ts';
 import type { ScoreAction } from '../src/sports/types.ts';
+import { withNames } from '../src/sports/cricket/names.ts';
+import { makeNameOf } from '../src/core/playerNames.ts';
+
+// IDs-only scoring (2026-10-24): actions as the scorer UI sends them — player
+// ids only; names are asserted on the display copy (names.ts withNames).
+const NM = makeNameOf(new Map([['s1', 'A'], ['s2', 'B'], ['s3', 'D'], ['b1', 'Bowler'], ['k1', 'Keeper One'], ['k2', 'Keeper Two'], ['x9', 'Sub']]));
+const named = (s: CricketState) => withNames(s, NM);
 
 // A fresh innings with a striker, non-striker and bowler set.
 function opened(): CricketState {
   let s = init({ overs: 5, playersPerSide: 11 });
-  s = reducer(s, { type: 'SET_STRIKER', payload: { id: 's1', name: 'A' } });
-  s = reducer(s, { type: 'SET_NONSTRIKER', payload: { id: 's2', name: 'B' } });
-  s = reducer(s, { type: 'SET_BOWLER', payload: { id: 'b1', name: 'Bowler' } });
+  s = reducer(s, { type: 'SET_STRIKER', payload: { id: 's1', v: 2 } });
+  s = reducer(s, { type: 'SET_NONSTRIKER', payload: { id: 's2', v: 2 } });
+  s = reducer(s, { type: 'SET_BOWLER', payload: { id: 'b1', v: 2 } });
   return s;
 }
 // Mimic the ball() wrapper: stamp the current striker/bowler onto the delivery.
 const ext = (s: CricketState, payload: Record<string, unknown>): CricketState =>
-  reducer(s, { type: 'EXTRA', payload: { ...payload, strikerId: s.strikerId, strikerName: s.strikerName, bowlerId: s.bowlerId, bowlerName: s.bowlerName } } as ScoreAction);
+  reducer(s, { type: 'EXTRA', payload: { ...payload, strikerId: s.strikerId, bowlerId: s.bowlerId } } as ScoreAction);
 /** Any delivery, stamped with the live striker/bowler (as the on-screen ball() does). */
 const ball = (s: CricketState, type: string, payload: Record<string, unknown> = {}): CricketState =>
-  reducer(s, { type, side: s.battingSide, payload: { ...payload, strikerId: s.strikerId, strikerName: s.strikerName, bowlerId: s.bowlerId, bowlerName: s.bowlerName } } as ScoreAction);
+  reducer(s, { type, side: s.battingSide, payload: { ...payload, strikerId: s.strikerId, bowlerId: s.bowlerId } } as ScoreAction);
 const home = (s: CricketState) => s.scores.home;
 
 describe('cricket — wides', () => {
@@ -88,7 +95,7 @@ describe('cricket — penalty runs & run-outs off an extra', () => {
   });
 
   test('run-out off a wide: +1 + completed runs as extras, a wicket, no over progress', () => {
-    const s = ext(opened(), { kind: 'Wide', runout: true, runs: 1, batterOut: 'striker', fielderName: 'F', newBatId: 's3', newBatName: 'C' });
+    const s = ext(opened(), { kind: 'Wide', runout: true, runs: 1, batterOut: 'striker', fielderId: 'f1', newBatId: 's3' });
     assert.equal(home(s).runs, 2); // 1 wide + 1 completed
     assert.equal(home(s).extras, 2);
     assert.equal(home(s).wickets, 1);
@@ -98,7 +105,7 @@ describe('cricket — penalty runs & run-outs off an extra', () => {
   });
 
   test('run-out off a no-ball: +1, a free hit, the non-striker run out, no over progress', () => {
-    const s = ext(opened(), { kind: 'No ball', runout: true, runs: 0, batterOut: 'nonstriker', fielderName: 'F', newBatId: 's3', newBatName: 'C' });
+    const s = ext(opened(), { kind: 'No ball', runout: true, runs: 0, batterOut: 'nonstriker', fielderId: 'f1', newBatId: 's3' });
     assert.equal(home(s).runs, 1);
     assert.equal(home(s).wickets, 1);
     assert.equal(home(s).balls, 0);
@@ -124,7 +131,7 @@ describe('cricket — a full over replayed ball-by-ball (scorecard reproduction)
     s = ball(s, 'EXTRA', { kind: 'Wide' });
     s = ball(s, 'RUNS', { runs: 6 });
     s = ball(s, 'BYES', { runs: 1 });
-    s = ball(s, 'WICKET', { kind: 'bowled', newBatId: 's3', newBatName: 'D' });
+    s = ball(s, 'WICKET', { kind: 'bowled', newBatId: 's3' });
     s = ball(s, 'RUNS', { runs: 2 });
     return s;
   })();
@@ -138,7 +145,9 @@ describe('cricket — a full over replayed ball-by-ball (scorecard reproduction)
 
   test('the over completed — bowler cleared, strike rotated', () => {
     assert.equal(played.bowlerId, undefined); // new bowler needed next over
-    assert.equal(played.strikerName, 'B'); // strike rotated on the last ball of the over
+    assert.equal(played.strikerId, 's2'); // strike rotated on the last ball of the over
+    assert.equal(played.strikerName, undefined); // IDs-only: no name in the state…
+    assert.equal(named(played).strikerName, 'B'); // …the display copy names B
   });
 
   test('batting card splits runs & balls correctly per batter', () => {
@@ -158,10 +167,12 @@ describe('cricket — a full over replayed ball-by-ball (scorecard reproduction)
 
 describe('cricket — concussion substitute (Tier-1 gap fix)', () => {
   test('a concussion sub removes the injured player and logs the replacement', () => {
-    const s = reducer(opened(), { type: 'CONCUSSION_SUB', payload: { side: 'home', outId: 's2', outName: 'B', inId: 'x9', inName: 'Sub' } });
+    const s = reducer(opened(), { type: 'CONCUSSION_SUB', payload: { side: 'home', outId: 's2', inId: 'x9' } });
     assert.equal(s.unavailable.includes('s2'), true); // injured player out
     const ev = s.events.find((e) => e.label === 'CONCUSSION SUB');
-    assert.ok(ev && /Sub replaces B/.test(ev.detail ?? ''));
+    assert.equal(ev?.detail, '{@x9} replaces {@s2} (injury)'); // stored by id
+    const shown = named(s).events.find((e) => e.label === 'CONCUSSION SUB');
+    assert.ok(shown && /Sub replaces B/.test(shown.detail ?? ''));
   });
 })
 
@@ -195,37 +206,40 @@ describe('cricket — change keeper mid-match (parity #13)', () => {
   test('no event when the keeper is set before ball 1', () => {
     let s = opened();
     const before = s.events.length;
-    s = reducer(s, { type: 'SET_KEEPER', payload: { side: 'away', id: 'k1', name: 'Keeper One' } });
+    s = reducer(s, { type: 'SET_KEEPER', payload: { side: 'away', id: 'k1' } });
     assert.equal(s.keepers.away?.id, 'k1');
     assert.equal(s.events.length, before);
   });
 
   test('a change after a ball logs NEW KEEPER and a later stumping credits the new keeper', () => {
-    let s = reducer(opened(), { type: 'SET_KEEPER', payload: { side: 'away', id: 'k1', name: 'Keeper One' } });
+    let s = reducer(opened(), { type: 'SET_KEEPER', payload: { side: 'away', id: 'k1' } });
     s = ball(s, 'RUNS', { runs: 1 });
-    s = reducer(s, { type: 'SET_KEEPER', payload: { side: 'away', id: 'k2', name: 'Keeper Two' } });
+    s = reducer(s, { type: 'SET_KEEPER', payload: { side: 'away', id: 'k2' } });
     const last = s.events[s.events.length - 1];
     assert.equal(last.label, 'NEW KEEPER');
     assert.equal(last.icon, '🧤');
-    assert.match(String(last.detail), /Keeper Two/);
+    assert.equal(last.detail, '{@k2} takes the gloves from {@k1}');
+    assert.equal(named(s).events.at(-1)!.detail, 'Keeper Two takes the gloves from Keeper One');
     // same keeper again → no duplicate event
     const n = s.events.length;
-    s = reducer(s, { type: 'SET_KEEPER', payload: { side: 'away', id: 'k2', name: 'Keeper Two' } });
+    s = reducer(s, { type: 'SET_KEEPER', payload: { side: 'away', id: 'k2' } });
     assert.equal(s.events.length, n);
-    s = ball(s, 'WICKET', { kind: 'stumped', newBatId: 's3', newBatName: 'C' });
+    s = ball(s, 'WICKET', { kind: 'stumped', newBatId: 's3' });
     const d = s.dismissals[s.dismissals.length - 1];
     assert.equal(d.kind, 'stumped');
     assert.equal(d.fielderId, 'k2');
-    assert.equal(d.fielderName, 'Keeper Two');
+    assert.equal(d.fielderName, undefined);
+    assert.equal(named(s).dismissals.at(-1)!.fielderName, 'Keeper Two');
+    assert.equal(named(s).batting.s2.dismissal, 'st Keeper Two b Bowler');
   });
 });
 
 describe('cricket — involvedPlayerIds (squad lock, parity #13)', () => {
   test('batters, bowler and the stumping keeper are involved; the bench is not', async () => {
     const { involvedPlayerIds } = await import('../src/sports/cricket/engine.ts');
-    let s = reducer(opened(), { type: 'SET_KEEPER', payload: { side: 'away', id: 'k1', name: 'K' } });
+    let s = reducer(opened(), { type: 'SET_KEEPER', payload: { side: 'away', id: 'k1' } });
     assert.deepEqual(involvedPlayerIds(s).sort(), ['b1', 's1', 's2']);
-    s = ball(s, 'WICKET', { kind: 'stumped', newBatId: 's3', newBatName: 'C' });
+    s = ball(s, 'WICKET', { kind: 'stumped', newBatId: 's3' });
     const ids = involvedPlayerIds(s);
     for (const id of ['s1', 's2', 's3', 'b1', 'k1']) assert.ok(ids.includes(id), id);
     assert.ok(!ids.includes('s9'));

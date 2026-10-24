@@ -4,6 +4,11 @@
  * 2nd fielder, byes / leg byes (`runsAs`) and the end the wicket was broken at
  * (`end`). New kinds and new optional keys only (REVIEW Decision 8), so legacy
  * logs replay exactly as before (tests/cricket*.test.mts, replay-wave1).
+ *
+ * IDs-only scoring (2026-10-24): the actions here are built the way the scorer
+ * UI sends them — player ids only. The state keeps ids (text names players by
+ * an id token); names are asserted on the display copy `named(s)` (names.ts
+ * `withNames` with a NameOf for this roster).
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
@@ -14,20 +19,26 @@ import type { CricketState } from '../src/sports/cricket/engine.ts';
 import { editBall, ballSymbol, editableOvers, isEditableBall } from '../src/sports/cricket/editOvers.ts';
 import type { ScoreAction } from '../src/sports/types.ts';
 import type { MatchEventRecord } from '../src/core/types.ts';
+import { withNames } from '../src/sports/cricket/names.ts';
+import { makeNameOf } from '../src/core/playerNames.ts';
+
+/** The players' names, by id — as the viewer's players_view gives them. */
+const NM = makeNameOf(new Map([['k1', 'Keeper'], ['s1', 'A'], ['s2', 'B'], ['b1', 'Bowler'], ['n1', 'New'], ['f1', 'F1'], ['f2', 'F2']]));
+const named = (s: CricketState) => withNames(s, NM);
 
 // Same helpers as tests/cricket-runs.test.mts: s1 on strike, s2 non-striker, b1 bowling.
 function opened(config: Record<string, unknown> = {}): CricketState {
   let s = init({ overs: 5, playersPerSide: 11, ...config });
-  s = reducer(s, { type: 'SET_KEEPER', payload: { side: 'away', id: 'k1', name: 'Keeper' } });
-  s = reducer(s, { type: 'SET_STRIKER', payload: { id: 's1', name: 'A' } });
-  s = reducer(s, { type: 'SET_NONSTRIKER', payload: { id: 's2', name: 'B' } });
-  s = reducer(s, { type: 'SET_BOWLER', payload: { id: 'b1', name: 'Bowler' } });
+  s = reducer(s, { type: 'SET_KEEPER', payload: { side: 'away', id: 'k1' } });
+  s = reducer(s, { type: 'SET_STRIKER', payload: { id: 's1', v: 2 } });
+  s = reducer(s, { type: 'SET_NONSTRIKER', payload: { id: 's2', v: 2 } });
+  s = reducer(s, { type: 'SET_BOWLER', payload: { id: 'b1', v: 2 } });
   return s;
 }
 const ball = (s: CricketState, type: string, payload: Record<string, unknown> = {}): CricketState =>
-  reducer(s, { type, side: s.battingSide, payload: { strikerId: s.strikerId, strikerName: s.strikerName, bowlerId: s.bowlerId, bowlerName: s.bowlerName, ...payload } } as ScoreAction);
-const wicket = (s: CricketState, payload: Record<string, unknown>) => ball(s, 'WICKET', { newBatId: 'n1', newBatName: 'New', ...payload });
-const extra = (s: CricketState, payload: Record<string, unknown>) => ball(s, 'EXTRA', { newBatId: 'n1', newBatName: 'New', ...payload });
+  reducer(s, { type, side: s.battingSide, payload: { strikerId: s.strikerId, bowlerId: s.bowlerId, ...payload } } as ScoreAction);
+const wicket = (s: CricketState, payload: Record<string, unknown>) => ball(s, 'WICKET', { newBatId: 'n1', ...payload });
+const extra = (s: CricketState, payload: Record<string, unknown>) => ball(s, 'EXTRA', { newBatId: 'n1', ...payload });
 const home = (s: CricketState) => s.scores.home;
 const lastEvent = (s: CricketState) => s.events[s.events.length - 1];
 const lastDismissal = (s: CricketState) => s.dismissals[s.dismissals.length - 1];
@@ -40,13 +51,13 @@ describe('#16 — retired out', () => {
     assert.equal(home(s).balls, home(s0).balls);
     assert.equal(s.ballsInOver, s0.ballsInOver);
     assert.equal(s.bowling.b1.wickets, 0);
-    assert.equal(s.batting.s1.dismissal, 'retired out'); // s1 was at the non-striker's end after the single
+    assert.equal(named(s).batting.s1.dismissal, 'retired out'); // s1 was at the non-striker's end after the single
     assert.equal(s.batting.s1.out, true);
     assert.notEqual(s.batting.s1.retired, true);
     assert.equal(s.nonStrikerId, 'n1');
     assert.equal(lastEvent(s).label, 'RETIRED OUT');
     // can't come back: re-sending them to the crease keeps the card out
-    const back = reducer(s, { type: 'SET_NONSTRIKER', payload: { id: 's1', name: 'A' } });
+    const back = reducer(s, { type: 'SET_NONSTRIKER', payload: { id: 's1' } });
     assert.equal(back.batting.s1.out, true);
   });
 
@@ -56,7 +67,7 @@ describe('#16 — retired out', () => {
     assert.equal(s.batting.s1.retired, true);
     assert.equal(s.batting.s1.out, false);
     assert.equal(s.dismissals.length, 0);
-    const back = reducer(s, { type: 'SET_NONSTRIKER', payload: { id: 's1', name: 'A' } });
+    const back = reducer(s, { type: 'SET_NONSTRIKER', payload: { id: 's1' } });
     assert.equal(back.batting.s1.retired, false);
   });
 });
@@ -69,7 +80,8 @@ describe('#16 — Mankad', () => {
     const s = wicket(s0, { kind: 'mankad', batterOut: 'striker' });
     assert.equal(s.batting.s2.out, true);
     assert.equal(s.batting.s1.out, false);
-    assert.equal(s.batting.s2.dismissal, 'run out (Bowler)');
+    assert.equal(s.batting.s2.dismissal, 'run out ({@b1})'); // stored: the bowler by id
+    assert.equal(named(s).batting.s2.dismissal, 'run out (Bowler)');
     assert.equal(home(s).wickets, 1);
     assert.equal(home(s).balls, home(s0).balls);
     assert.equal(s.ballsInOver, s0.ballsInOver);
@@ -79,7 +91,7 @@ describe('#16 — Mankad', () => {
     assert.equal(s.bowling.b1.balls, 0);
     assert.equal(s.strikerId, 's1');
     assert.equal(s.nonStrikerId, 'n1');
-    assert.deepEqual(lastDismissal(s), { kind: 'mankad', outId: 's2', bowlerId: 'b1', fielderId: 'b1', fielderName: 'Bowler' });
+    assert.deepEqual(lastDismissal(s), { kind: 'mankad', outId: 's2', bowlerId: 'b1', fielderId: 'b1' });
   });
 
   test('composeDismissal shows a Mankad as a run-out by the bowler', () => {
@@ -88,7 +100,7 @@ describe('#16 — Mankad', () => {
 
   test('credit: the bowler\'s run-out, never a wicket', () => {
     const c = wicketAttribution({ kind: 'mankad', bowler: { id: 'b1', name: 'Bowler' } });
-    assert.deepEqual(c, { attribution: { playerId: 'b1', stat: 'runouts', playerName: 'Bowler' } });
+    assert.deepEqual(c, { attribution: { playerId: 'b1', stat: 'runouts' } }); // IDs-only: no name in a credit
   });
 });
 
@@ -98,7 +110,7 @@ describe('#16 — hit the ball twice', () => {
     assert.equal(home(s).balls, 1);
     assert.equal(s.ballsInOver, 1);
     assert.equal(s.batting.s1.out, true);
-    assert.equal(s.batting.s1.dismissal, 'hit the ball twice');
+    assert.equal(named(s).batting.s1.dismissal, 'hit the ball twice');
     assert.equal(s.batting.s2.out, false);
     assert.equal(s.bowling.b1.wickets, 0);
     assert.equal(s.bowling.b1.balls, 1);
@@ -128,7 +140,7 @@ describe('#16 — obstructing the field', () => {
     const s = wicket(opened(), { kind: 'obstruct', batterOut: 'nonstriker', runs: 2 });
     assert.equal(s.batting.s1.runs, 2);
     assert.equal(s.batting.s2.out, true);
-    assert.equal(s.batting.s2.dismissal, 'obstructing the field');
+    assert.equal(named(s).batting.s2.dismissal, 'obstructing the field');
     assert.equal(home(s).runs, 2);
     assert.equal(s.bowling.b1.wickets, 0);
     assert.equal(s.bowling.b1.runs, 2);
@@ -157,13 +169,15 @@ describe('#16 — stumped / hit wicket off a wide', () => {
     assert.equal(s.bowling.b1.runs, 1);
     assert.equal(s.bowling.b1.balls, 0);
     assert.equal(s.batting.s1.out, true); // always the striker
-    assert.equal(s.batting.s1.dismissal, 'st Keeper b Bowler');
-    assert.deepEqual(lastDismissal(s), { kind: 'stumped', outId: 's1', bowlerId: 'b1', fielderId: 'k1', fielderName: 'Keeper' });
+    assert.equal(s.batting.s1.dismissal, 'st {@k1} b {@b1}');
+    assert.equal(named(s).batting.s1.dismissal, 'st Keeper b Bowler');
+    assert.deepEqual(lastDismissal(s), { kind: 'stumped', outId: 's1', bowlerId: 'b1', fielderId: 'k1' });
     assert.deepEqual(s.thisOver, ['wd+W']);
     assert.equal(lastEvent(s).label, 'Wide — STUMPED');
+    assert.equal(named(s).events.at(-1)!.detail, 'A st Keeper b Bowler');
     const c = wicketAttribution({ kind: 'stumped', bowler: { id: 'b1', name: 'Bowler' }, keeper: { id: 'k1', name: 'Keeper' }, wide: true });
-    assert.deepEqual(c.attribution, { playerId: 'b1', stat: 'wickets', by: 1, playerName: 'Bowler' });
-    assert.deepEqual(c.attribution2, { playerId: 'k1', stat: 'stumpings', playerName: 'Keeper' });
+    assert.deepEqual(c.attribution, { playerId: 'b1', stat: 'wickets', by: 1 });
+    assert.deepEqual(c.attribution2, { playerId: 'k1', stat: 'stumpings' });
   });
 
   test('hit wicket: +1, 0 balls, bowler +1 wicket', () => {
@@ -171,7 +185,7 @@ describe('#16 — stumped / hit wicket off a wide', () => {
     assert.equal(home(s).runs, 1);
     assert.equal(home(s).balls, 0);
     assert.equal(s.bowling.b1.wickets, 1);
-    assert.equal(s.batting.s1.dismissal, 'hit wkt b Bowler');
+    assert.equal(named(s).batting.s1.dismissal, 'hit wkt b Bowler');
   });
 
   test('the wide value in force (local rules) is used, not a literal +1', () => {
@@ -191,7 +205,7 @@ describe('#16 — stumped / hit wicket off a wide', () => {
 
 describe('#16 — run-outs: runsAs, 2nd fielder', () => {
   test('{runs: 1, runsAs: "bye"}: extras +1, striker 0 runs +1 ball, bowler 0 runs', () => {
-    const s = wicket(opened(), { kind: 'runout', runs: 1, runsAs: 'bye', batterOut: 'striker', fielderId: 'f1', fielderName: 'F1' });
+    const s = wicket(opened(), { kind: 'runout', runs: 1, runsAs: 'bye', batterOut: 'striker', fielderId: 'f1' });
     assert.equal(home(s).runs, 1);
     assert.equal(home(s).extras, 1);
     assert.equal(home(s).balls, 1);
@@ -230,34 +244,38 @@ describe('#16 — run-outs: runsAs, 2nd fielder', () => {
 
   test('legacy `runout: true` still maps to a run-out — same maths as `wicket: "runout"`', () => {
     for (const kind of ['Wide', 'No ball']) {
-      const a = extra(opened(), { kind, runout: true, runs: 1, batterOut: 'nonstriker', fielderId: 'f1', fielderName: 'F1' });
-      const b = extra(opened(), { kind, wicket: 'runout', runs: 1, batterOut: 'nonstriker', fielderId: 'f1', fielderName: 'F1' });
+      const a = extra(opened(), { kind, runout: true, runs: 1, batterOut: 'nonstriker', fielderId: 'f1' });
+      const b = extra(opened(), { kind, wicket: 'runout', runs: 1, batterOut: 'nonstriker', fielderId: 'f1' });
       assert.deepEqual(a.scores, b.scores);
       assert.deepEqual(a.batting, b.batting);
       assert.deepEqual(a.thisOver, b.thisOver);
       assert.equal(a.strikerId, b.strikerId);
-      assert.deepEqual(a.dismissals[0], { kind: 'runout', outId: 's2', fielderId: 'f1', fielderName: 'F1' }); // legacy record shape
+      assert.deepEqual(a.dismissals[0], { kind: 'runout', outId: 's2', fielderId: 'f1' }); // legacy record shape (no bowlerId)
+      assert.equal(named(a).batting.s2.dismissal, 'run out (F1)');
     }
   });
 
   test('composeDismissal with a 2nd fielder → run out (A/B); recorded, no stat', () => {
     assert.equal(composeDismissal('runout', 'b', 'A', 'k', 'B'), 'run out (A/B)');
     assert.equal(composeDismissal('runout', 'b', 'A'), 'run out (A)');
-    const s = wicket(opened(), { kind: 'runout', fielderId: 'f1', fielderName: 'A', fielder2Id: 'k1', fielder2Name: 'Keeper' });
-    assert.equal(s.batting.s1.dismissal, 'run out (A/Keeper)');
+    const s = wicket(opened(), { kind: 'runout', fielderId: 'f1', fielder2Id: 'k1' });
+    assert.equal(s.batting.s1.dismissal, 'run out ({@f1}/{@k1})');
+    assert.equal(named(s).batting.s1.dismissal, 'run out (F1/Keeper)');
     assert.equal(lastDismissal(s).fielder2Id, 'k1');
+    assert.equal(lastDismissal(s).fielder2Name, undefined);
+    assert.equal(named(s).dismissals.at(-1)!.fielder2Name, 'Keeper');
     assert.ok(involvedPlayerIds(s).includes('k1'));
     const c = wicketAttribution({ kind: 'runout', fielder: { id: 'f1', name: 'A' }, striker: { id: 's1', name: 'A' } });
-    assert.deepEqual(c.attribution, { playerId: 'f1', stat: 'runouts', playerName: 'A' });
+    assert.deepEqual(c.attribution, { playerId: 'f1', stat: 'runouts' });
     assert.equal(c.attribution2, undefined); // no runs → no striker credit; fielder 2 never credited
   });
 
   test('striker credit (attribution2) only for runs off the bat — this spec owns it', () => {
     const base = { kind: 'runout' as const, fielder: { id: 'f1', name: 'F' }, striker: { id: 's1', name: 'A' } };
-    assert.deepEqual(wicketAttribution({ ...base, runs: 2 }).attribution2, { playerId: 's1', stat: 'runs', by: 2, playerName: 'A' });
+    assert.deepEqual(wicketAttribution({ ...base, runs: 2 }).attribution2, { playerId: 's1', stat: 'runs', by: 2 });
     assert.equal(wicketAttribution({ ...base, runs: 2, runsAs: 'bye' }).attribution2, undefined);
     assert.equal(wicketAttribution({ ...base, runs: 2, wide: true }).attribution2, undefined);
-    assert.deepEqual(wicketAttribution({ ...base, kind: 'obstruct', runs: 1 }), { attribution2: { playerId: 's1', stat: 'runs', by: 1, playerName: 'A' } });
+    assert.deepEqual(wicketAttribution({ ...base, kind: 'obstruct', runs: 1 }), { attribution2: { playerId: 's1', stat: 'runs', by: 1 } });
     assert.deepEqual(wicketAttribution({ kind: 'hittwice', bowler: { id: 'b1' } }), {});
     assert.deepEqual(wicketAttribution({ kind: 'retiredout', bowler: { id: 'b1' } }), {});
   });
@@ -323,6 +341,7 @@ describe('#16 — `end`: who faces next', () => {
 });
 
 describe('#16 — over editor (#06) agreement', () => {
+  // An older (legacy) ball, recorded with names: an edit rewrites it IDs-only.
   const rec = (seq: number, type: string, payload: Record<string, unknown>): MatchEventRecord =>
     ({ seq, type, side: 'home', payload: { strikerId: 's1', strikerName: 'A', bowlerId: 'b1', bowlerName: 'Bowler', ...payload } });
 
@@ -332,8 +351,9 @@ describe('#16 — over editor (#06) agreement', () => {
     assert.equal(a.payload!.runsAs, 'bye');
     assert.equal(a.payload!.end, 'bowler');
     assert.equal(a.payload!.fielder2Id, 'k1');
-    assert.equal(a.payload!.fielder2Name, 'Keeper');
     assert.equal(a.payload!.fielderId, 'f2');
+    // IDs-only: the rewritten ball carries no name (the old ones are dropped)
+    for (const k of ['fielderName', 'fielder2Name', 'strikerName', 'bowlerName']) assert.equal(a.payload![k], undefined, k);
     assert.equal(a.attribution2, undefined); // byes → no striker credit
   });
 
@@ -341,8 +361,8 @@ describe('#16 — over editor (#06) agreement', () => {
     const st = rec(10, 'EXTRA', { kind: 'Wide', wicket: 'stumped', runs: 0 });
     const a = editBall(st, { extraRuns: 0 }, { keeper: { id: 'k1', name: 'Keeper' } }) as ScoreAction;
     assert.equal(a.payload!.wicket, 'stumped');
-    assert.deepEqual(a.attribution, { playerId: 'b1', stat: 'wickets', by: 1, playerName: 'Bowler' });
-    assert.deepEqual(a.attribution2, { playerId: 'k1', stat: 'stumpings', playerName: 'Keeper' });
+    assert.deepEqual(a.attribution, { playerId: 'b1', stat: 'wickets', by: 1 });
+    assert.deepEqual(a.attribution2, { playerId: 'k1', stat: 'stumpings' });
     // a stumping can't move to a no-ball
     assert.ok('error' in editBall(st, { extraKind: 'noball' }));
     const ro = rec(11, 'EXTRA', { kind: 'No ball', wicket: 'runout', runs: 1, runsAs: 'legbye', end: 'striker' });
