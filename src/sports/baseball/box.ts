@@ -15,9 +15,17 @@ import type { BoxRowInput, BoxSideInput, MatchBoxSource } from '../boxScore.ts';
 import { batterStats, whoKey, PITCH_TYPE_CHIP, isPitchType, type BaseballState, type Side } from './engine.ts';
 import { baseballTotals, teamFigures } from './totals.ts';
 import { batterFigures, mixText, pitcherFigures, teamSplit } from './situational.ts';
+import { withNames } from './names.ts';
+import { withRosters, type NameOf } from '../racketNames.ts';
 
-/** `names` (deep wave): the team names the box notes use ("RISP: Owls 2-for-9") */
-export interface BaseballBoxContext { homeRoster?: Player[]; awayRoster?: Player[]; names?: { home: string; away: string } }
+/** `names` (deep wave): the team names the box notes use ("RISP: Owls 2-for-9").
+ *  `nameOf` (IDs-only scoring): a player's name for this viewer by id — the
+ *  log keeps ids only; absent → an older log's stored name, else the roster's. */
+export interface BaseballBoxContext { homeRoster?: Player[]; awayRoster?: Player[]; names?: { home: string; away: string }; nameOf?: NameOf }
+
+/** The state with its players named for this viewer (names.ts), the rosters as the fallback. */
+const named = (s: BaseballState, ctx: BaseballBoxContext): BaseballState =>
+  withNames(s, withRosters(ctx.nameOf, ctx.homeRoster ?? [], ctx.awayRoster ?? []));
 
 const teamName = (ctx: BaseballBoxContext, sd: Side) => ctx.names?.[sd] ?? (sd === 'home' ? 'Home' : 'Visitors');
 /** "A 2 · B 1" — non-empty parts joined */
@@ -25,7 +33,8 @@ const joinParts = (xs: (string | false | undefined | null)[]) => xs.filter(Boole
 
 /** Deep wave — the batting box notes (MLB / WBSC box-score style): team RISP
  *  "2-for-9", two-out RBI by batter, double plays turned. */
-export function battingNotes(s: BaseballState, ctx: BaseballBoxContext = {}): string[] {
+export function battingNotes(state: BaseballState, ctx: BaseballBoxContext = {}): string[] {
+  const s = named(state, ctx);
   const out: string[] = [];
   const sides: Side[] = ['away', 'home'];
   const t = { away: teamSplit(s, 'away'), home: teamSplit(s, 'home') };
@@ -39,7 +48,8 @@ export function battingNotes(s: BaseballState, ctx: BaseballBoxContext = {}): st
 /** Deep wave — the pitching box notes: first-pitch strikes–batters faced
  *  (pitch by pitch), ground outs–fly outs, batters faced, inherited runners–
  *  scored, the pitch mix (when pitch types are tracked). */
-export function pitchingNotes(s: BaseballState, ctx: BaseballBoxContext = {}): string[] {
+export function pitchingNotes(state: BaseballState, ctx: BaseballBoxContext = {}): string[] {
+  const s = named(state, ctx);
   const ps = pitcherFigures(s).filter((p) => p.bf > 0 || p.pitches > 0);
   if (!ps.length) return [];
   const nm = (p: (typeof ps)[number]) => nameIn(p.side === 'home' ? ctx.homeRoster : ctx.awayRoster, p.id, p.name);
@@ -78,7 +88,8 @@ function battingLines(s: BaseballState): Map<string, Record<string, number>> {
 }
 
 /** The batting box (the shared one — the match Summary tab reads it too). */
-export function baseballBox(s: BaseballState, ctx: BaseballBoxContext = {}): MatchBoxSource {
+export function baseballBox(state: BaseballState, ctx: BaseballBoxContext = {}): MatchBoxSource {
+  const s = named(state, ctx);
   return {
     periods: [],
     emptyText: 'No batters yet.',
@@ -113,7 +124,8 @@ export function baseballBox(s: BaseballState, ctx: BaseballBoxContext = {}): Mat
 }
 
 /** The pitching box: one row per pitcher who appeared, in order. */
-export function baseballPitchingBox(s: BaseballState, ctx: BaseballBoxContext = {}): MatchBoxSource {
+export function baseballPitchingBox(state: BaseballState, ctx: BaseballBoxContext = {}): MatchBoxSource {
+  const s = named(state, ctx);
   return {
     periods: [],
     emptyText: 'No pitchers yet.',

@@ -15,14 +15,26 @@ import { askConfirm } from '../../components/ConfirmSheet';
 import { confirmCopy } from '../../core/matchSafety';
 import type { SportPlugin } from '../types';
 import { concededLine, holeWinner, type HoleWinner } from './engine';
-import { initGolfMatch, golfMatchReducer, golfMatchStateOf, type GolfMatchState } from './match';
-import { matchHole, holeNumber, scoreStatKey, strokesLine } from './matchStrokes';
+import { initGolfMatch, golfMatchReducer, golfMatchStateOf, holeAction, type GolfMatchState } from './match';
+import { matchHole, holeNumber, strokesLine } from './matchStrokes';
 import { MatchStrokesSetup } from './MatchStrokesSetup';
 import { golfMatchVoice } from '../voiceParsers';
 import { golfMatchFeed } from './feed';
 import { CommentaryFeed } from '../gcc/CommentaryFeed';
 import { GOLF_META } from './meta';
 import { golfMatchRecords } from './records';
+import { useMask } from '../../core/disputeMask';
+import type { NameOf } from '../../core/playerNames';
+import type { Player } from '../../core/types';
+
+/** IDs-only scoring (docs/privacy/ids-only-scoring.md): a match names each
+ *  side by its player, looked up for this viewer by id (players_view: the
+ *  circle sees the full name, others initials, an open dispute "X"); a side
+ *  with no player falls back to the entry's name. */
+const sideName = (who: NameOf, roster: Player[], team: string): string => {
+  const p = roster[0];
+  return p ? who(p.id, p.fullName) : team;
+};
 
 // The state + reducer live in ./match (pure, unit-tested); SD-87 adds the
 // handicap strokes and per-hole gross strokes as optional keys.
@@ -38,7 +50,8 @@ const ScoringControls: SportPlugin<GolfMatchState>['ScoringControls'] = ({ state
   const [setup, setSetup] = useState(false);
   // SD-87 — this hole's gross strokes (null = start at par), reset per hole
   const [gross, setGross] = useState<{ hole: number; home: number | null; away: number | null }>({ hole: -1, home: null, away: null });
-  const nm = (side: 'home' | 'away') => (side === 'home' ? homeRoster : awayRoster)[0]?.fullName ?? (side === 'home' ? homeName : awayName);
+  const { nameOf: who } = useMask();
+  const nm = (side: 'home' | 'away') => sideName(who, side === 'home' ? homeRoster : awayRoster, side === 'home' ? homeName : awayName);
   // SD-117c — a conceded match keeps its hole state ("conceded, 3 down thru 12")
   if (s.ended) return <Text style={textStyles.muted}>Match over{s.conceded ? ` · ${nm(s.conceded)} ${concededLine(s.holes, s.conceded, s.regulation, s.extraHoles)}` : ''}.</Text>;
   const concede = async (side: 'home' | 'away') => {
@@ -54,27 +67,11 @@ const ScoringControls: SportPlugin<GolfMatchState>['ScoringControls'] = ({ state
   const leaderName = m.leader ? nm(m.leader) : null;
   const ms = s.strokes;
   const here = ms ? matchHole(ms, m.played) : null;
-  const hole = (winner: HoleWinner, strokes?: { home: number; away: number }) => {
-    const side = winner === 'halved' ? undefined : winner;
-    const p = side ? (side === 'home' ? homeRoster : awayRoster)[0] : undefined;
-    if (!strokes || !here) {
-      // deep wave — `at` (the scorer's clock) for the commentary
-      dispatch({ type: 'HOLE', side, payload: { winner, at: Date.now() }, attribution: p ? { playerId: p.id, playerName: p.fullName, stat: 'holesWon', by: 1, side } : undefined });
-      return;
-    }
-    // SD-87 — strokes entered: each player's score on the hole (birdie, par …)
-    // is credited too, beside the hole won
-    const credit = (who: 'home' | 'away') => {
-      const pl = (who === 'home' ? homeRoster : awayRoster)[0];
-      if (!pl) return undefined;
-      const key = scoreStatKey(strokes[who], here.hole.par);
-      // SD-119: `side` — each player's line names the OTHER player
-      return winner === who
-        ? { playerId: pl.id, playerName: pl.fullName, stat: 'holesWon', by: 1, extra: { [key]: 1 }, side: who }
-        : { playerId: pl.id, playerName: pl.fullName, stat: key, by: 1, side: who };
-    };
-    dispatch({ type: 'HOLE', side, payload: { winner, home: strokes.home, away: strokes.away, at: Date.now() }, attribution: credit('home'), attribution2: credit('away') });
-  };
+  // the hole (credits by player id only — match events are public); deep
+  // wave — `at` (the scorer's clock) for the commentary; SD-87 — with strokes
+  // entered, each player's score on the hole is credited too
+  const hole = (winner: HoleWinner, strokes?: { home: number; away: number }) =>
+    dispatch(holeAction(winner, { home: homeRoster[0], away: awayRoster[0] }, { ...(strokes && here ? { strokes, par: here.hole.par } : {}), at: Date.now() }));
   const cur = gross.hole === m.played ? gross : { hole: m.played, home: null, away: null };
   const par = here?.hole.par ?? 4;
   const val = (side: 'home' | 'away') => cur[side] ?? par;
@@ -158,18 +155,20 @@ const ScoringControls: SportPlugin<GolfMatchState>['ScoringControls'] = ({ state
 /** Match tabs (2026-10-22): the handicap strokes on Info (a match-setup fact),
  *  the hole-by-hole commentary on Commentary. Match play has no Stats tab. */
 type TabProps = Parameters<NonNullable<SportPlugin<GolfMatchState>['LiveExtras']>>[0];
-// a player's own name (a 1-v-1 match), else the side's
-const golfName = ({ homeName, awayName, homeRoster = [], awayRoster = [] }: TabProps) =>
-  (side: 'home' | 'away') => (side === 'home' ? homeRoster : awayRoster)[0]?.fullName ?? (side === 'home' ? homeName : awayName);
+// a player's own name (a 1-v-1 match, by id for this viewer), else the side's
+function useGolfName({ homeName, awayName, homeRoster = [], awayRoster = [] }: TabProps): (side: 'home' | 'away') => string {
+  const { nameOf: who } = useMask();
+  return (side: 'home' | 'away') => sideName(who, side === 'home' ? homeRoster : awayRoster, side === 'home' ? homeName : awayName);
+}
 const GolfStrokes = (p: TabProps) => {
   const s = p.state as GolfMatchState;
-  const nm = golfName(p);
+  const nm = useGolfName(p);
   return s.strokes ? <Text style={textStyles.muted}>⛳ {strokesLine(s.strokes, nm('home'), nm('away'))}</Text> : null;
 };
 // Deep wave — hole-by-hole commentary, newest first by nine, with the match
 // state after each hole and the time it was recorded (golf/feed.ts)
 const GolfCommentary = (p: TabProps) => {
-  const nm = golfName(p);
+  const nm = useGolfName(p);
   return <CommentaryFeed title="🎙 Hole by hole" groups={golfMatchFeed(p.state as GolfMatchState, { home: nm('home'), away: nm('away') })} homeColor={p.homeColor} awayColor={p.awayColor} empty="No holes played yet." />;
 };
 

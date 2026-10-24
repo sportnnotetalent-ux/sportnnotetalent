@@ -10,7 +10,7 @@
  *                   (the scorer's screen works it out with `holeWinner`).
  */
 import { matchState, type HoleWinner } from './engine.ts';
-import type { MatchStrokes } from './matchStrokes.ts';
+import { scoreStatKey, type MatchStrokes } from './matchStrokes.ts';
 
 export interface GolfMatchState {
   /** holes in the match (18 or 9) */
@@ -91,3 +91,40 @@ export const golfMatchReducer = (s: GolfMatchState, a: { type: string; side?: 'h
 };
 
 export const golfMatchStateOf = (s: GolfMatchState) => matchState(s.holes, s.regulation, s.extraHoles, s.firstHole ?? 1);
+
+type Side = 'home' | 'away';
+/** A hole's profile credit (SD-119: `side` — each player's line names the OTHER player). */
+export interface HoleCredit { playerId: string; stat: string; by: number; extra?: Record<string, number>; side: Side }
+
+/**
+ * The HOLE action the scorer's buttons (and voice) dispatch — one pure
+ * builder, so the controls and the tests build it the same way. IDs-only
+ * scoring (docs/privacy/ids-only-scoring.md): match events are public, so
+ * each credit names its player by id only (names are looked up when shown).
+ *   • no strokes: the hole's winner is credited a hole won;
+ *   • SD-87 strokes entered (`strokes` + the hole's `par`): each player's
+ *     score on the hole (birdie, par …) is credited too, beside the hole won.
+ */
+export function holeAction(
+  winner: HoleWinner,
+  players: { home?: { id: string }; away?: { id: string } },
+  o: { strokes?: { home: number; away: number }; par?: number; at?: number } = {},
+): { type: 'HOLE'; side?: Side; payload: Record<string, unknown>; attribution?: HoleCredit; attribution2?: HoleCredit } {
+  const side = winner === 'halved' ? undefined : winner;
+  const at = o.at ? { at: o.at } : {};
+  if (!o.strokes || o.par == null) {
+    const p = side ? players[side] : undefined;
+    return { type: 'HOLE', ...(side ? { side } : {}), payload: { winner, ...at }, ...(p && side ? { attribution: { playerId: p.id, stat: 'holesWon', by: 1, side } } : {}) };
+  }
+  const strokes = o.strokes;
+  const par = o.par;
+  const credit = (who: Side): HoleCredit | undefined => {
+    const pl = players[who];
+    if (!pl) return undefined;
+    const key = scoreStatKey(strokes[who], par);
+    return winner === who
+      ? { playerId: pl.id, stat: 'holesWon', by: 1, extra: { [key]: 1 }, side: who }
+      : { playerId: pl.id, stat: key, by: 1, side: who };
+  };
+  return { type: 'HOLE', ...(side ? { side } : {}), payload: { winner, home: strokes.home, away: strokes.away, ...at }, attribution: credit('home'), attribution2: credit('away') };
+}

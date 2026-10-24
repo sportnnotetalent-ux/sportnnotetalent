@@ -42,11 +42,16 @@ import type { Player } from '../../core/types';
 import type { ScoreAction, SportPlugin } from '../types';
 import {
   init, reducer, isComplete, result, cardLine, statusText, situation, defaultMoves, defaultRunnerMoves, withStays, buildPitch, buildPlay, buildRunner,
+  lineupAction, subAction, ejectAction,
   stateAfter, eventCredits, creditAttribution, halfLong, halfShort, inningOf, whoKey, mercyText, newUid, defaultRbi, pitchTypesFor, battedBallOfPlay,
   BASEBALL_PRESETS, BASEBALL_LIVE_SETTINGS, OUTCOME_LABEL, RUNNER_LABEL, POSITIONS, TRACK_FIELDS, ZONES, ZONE_LABEL, IN_PLAY, PITCH_TYPE_LABEL, PITCH_TYPE_CHIP,
   BATTED_BALLS, BATTED_BALL_LABEL, BATTED_BALL_CHIP,
-  type BaseballEvent, type BaseballState, type BattedBall, type Dest, type LineupEntry, type Move, type Outcome, type PitchType, type RunnerKind, type Side, type Who, type Zone,
+  type BaseballEvent, type BaseballState, type BattedBall, type Dest, type LineupEntry, type Move, type Outcome, type PitchType, type RunnerKind, type Side, type SubKind, type Who, type Zone,
 } from './engine';
+import { withNames, whoText } from './names';
+import { useMask } from '../../core/disputeMask';
+import { legacyNameOf, type NameOf } from '../../core/playerNames';
+import { withRosters } from '../racketNames';
 import { baseballCommentary, baseballScopeLabel, BASEBALL_FEED_TAGS } from './commentary';
 import { baseballSheet, inningScopes } from './sheet';
 import { baseballTotals } from './totals';
@@ -70,6 +75,15 @@ const SHORT: Partial<Record<Outcome, string>> = { '1B': 'Single', '2B': 'Double'
 /** outcomes that ask for the fielders when "Ask for fielders" is on */
 const FIELDED: Outcome[] = ['GO', 'FO', 'LO', 'DP', 'SF', 'SH', 'FC'];
 const isPos = (p?: string | null) => !!p && ([...POSITIONS, 'DH', 'EF'] as string[]).includes(p);
+
+/** IDs-only scoring (docs/privacy/ids-only-scoring.md): the state and the
+ *  events keep player ids only — a player is named for THIS viewer by id
+ *  (players_view: the circle sees full names, others initials, an open
+ *  dispute "X"), the match's rosters as the fallback. */
+function useBaseballNames(homeRoster: Player[] = [], awayRoster: Player[] = []): NameOf {
+  const { nameOf } = useMask();
+  return useMemo(() => withRosters(nameOf, homeRoster, awayRoster), [nameOf, homeRoster, awayRoster]);
+}
 
 /* ------------------------------ player picker ------------------------------ */
 
@@ -125,6 +139,13 @@ const ScoringControls: SportPlugin<BaseballState>['ScoringControls'] = ({
   useEffect(() => { if (flow === null) { setZone(null); setBtype(null); } }, [flow]);
   const s = useMemo(() => (editAfter !== null ? stateAfter(view, editAfter) : view), [view, editAfter]);
   const g = s.g;
+  // IDs-only scoring: actions are built from `s` (ids only); what the screen
+  // SHOWS reads the display copy, players named for this viewer by id
+  const pn = useBaseballNames(homeRoster, awayRoster);
+  const shown = useMemo(() => withNames(s, pn), [s, pn]);
+  const sg = shown.g;
+  /** a stored player / slot / move's name for this viewer */
+  const label = (w?: { id?: string; name?: string } | null) => whoText(w, pn);
 
   const name = (sd: Side) => (sd === 'home' ? homeName : awayName);
   const color = (sd: Side) => (sd === 'home' ? homeColor ?? theme.colors.home : awayColor ?? theme.colors.away);
@@ -134,7 +155,8 @@ const ScoringControls: SportPlugin<BaseballState>['ScoringControls'] = ({
   const slotsOf = (sd: Side) => (sd === 'home' ? homeLineup : awayLineup);
   const asPlayer = (sd: Side, w?: Who | LineupEntry): Player | undefined =>
     !w ? undefined : rosterOf(sd).find((p) => (w.id && p.id === w.id) || (!w.id && p.fullName === w.name)) ?? ({ id: w.id ?? `name:${w.name}`, fullName: w.name ?? 'Player', sports: ['baseball'] } as unknown as Player);
-  const who = (p: Player): Who => (p.id.startsWith('name:') ? { name: p.fullName } : { id: p.id, name: p.fullName });
+  /** a picked player as the log stores it: the id only (IDs-only scoring) */
+  const who = (p: Player): Who => (p.id.startsWith('name:') ? { name: p.fullName } : { id: p.id });
 
   /* ---- line-ups ---- */
   const posOfSlot = (sd: Side, id: string) => slotsOf(sd).find((x) => x.playerId === id)?.position;
@@ -146,12 +168,12 @@ const ScoringControls: SportPlugin<BaseballState>['ScoringControls'] = ({
     const placed = slotsOf(sd).filter((x) => x.playerId && isPos(x.position)).map((x) => x.playerId!);
     let pool = placed.length ? roster.filter((p) => placed.includes(p.id)) : roster;
     if (s.cfg.dh && pSlot) pool = pool.filter((p) => p.id !== pSlot.playerId);
-    const named = pool.slice(0, s.cfg.lineupSize).map((p) => ({ id: p.id, name: p.fullName, ...(posOfSlot(sd, p.id) ? { pos: posOfSlot(sd, p.id) } : {}) }));
+    const named = pool.slice(0, s.cfg.lineupSize).map((p) => ({ id: p.id, ...(posOfSlot(sd, p.id) ? { pos: posOfSlot(sd, p.id) } : {}) }));
     // a short roster: the rest of the order bats as numbered slots
     const order: LineupEntry[] = [...named, ...Array.from({ length: Math.max(0, s.cfg.lineupSize - named.length) }, (_, i) => ({ name: `Batter ${named.length + i + 1}` }))];
     const pid = pSlot?.playerId ?? roster.find((p) => !order.some((o) => o.id === p.id))?.id ?? (s.cfg.dh ? undefined : named[named.length - 1]?.id);
     const pp = roster.find((p) => p.id === pid);
-    return { order, ...(pp ? { pitcher: { id: pp.id, name: pp.fullName } } : {}) };
+    return { order, ...(pp ? { pitcher: { id: pp.id } } : {}) };
   };
   const started = s.events.some((e) => e.type === 'pitch' || e.type === 'pa' || e.type === 'runner');
   const stampLineups = () => {
@@ -159,7 +181,7 @@ const ScoringControls: SportPlugin<BaseballState>['ScoringControls'] = ({
     for (const sd of ['home', 'away'] as const) {
       if (s.lineup[sd] || s.starters[sd]) continue;
       const d = defaults(sd);
-      if (d.order.length || d.pitcher) dispatch({ type: 'LINEUP', payload: { team: sd, order: d.order, ...(d.pitcher ? { pitcher: d.pitcher } : {}) } });
+      if (d.order.length || d.pitcher) dispatch(lineupAction(sd, d.order, d.pitcher));
     }
   };
 
@@ -176,6 +198,8 @@ const ScoringControls: SportPlugin<BaseballState>['ScoringControls'] = ({
   const extra = (): Record<string, unknown> => (editAfter !== null ? { after: editAfter, edit: true } : {});
 
   const sit = situation(s);
+  /** the situation as shown (players named) */
+  const nsit = situation(shown);
   const bat = sit.bat;
   const field = sit.field;
   const orderOf = (sd: Side) => g.order[sd];
@@ -207,7 +231,7 @@ const ScoringControls: SportPlugin<BaseballState>['ScoringControls'] = ({
   };
 
   /* ---- subs ---- */
-  const sub = (payload: Record<string, unknown>, sd: Side) => fire({ type: 'SUB', side: sd, payload: { ...payload, ...extra(), uid: newUid() } });
+  const sub = (sd: Side, kind: SubKind, o: Omit<Parameters<typeof subAction>[2], 'extra' | 'uid'>) => fire(subAction(sd, kind, { ...o, extra: extra() }));
 
   /* ---- corrections ---- */
   const removalActions = (e: BaseballEvent): ScoreAction[] => {
@@ -244,7 +268,7 @@ const ScoringControls: SportPlugin<BaseballState>['ScoringControls'] = ({
           <Text style={c.h}>{statusText(view)} · {name('home')} {view.g.score.home} – {view.g.score.away} {name('away')}</Text>
           <Text style={c.meta}>{r ? (r.winner === 'draw' ? 'Tied game.' : `${name(r.winner)} win.`) : ''} Use “Correct the plays” below to fix a play.</Text>
         </View>
-        <EditList s={view} show={showEdit} setShow={setShowEdit} onRemove={remove} onEarned={toggleEarned} homeName={homeName} awayName={awayName} />
+        <EditList s={view} names={pn} show={showEdit} setShow={setShowEdit} onRemove={remove} onEarned={toggleEarned} homeName={homeName} awayName={awayName} />
       </View>
     );
   }
@@ -291,7 +315,7 @@ const ScoringControls: SportPlugin<BaseballState>['ScoringControls'] = ({
     switch (flow.mode) {
       case 'inplay':
         return (
-          <View style={c.panel}>{head(`In play · ${sit.batter.name}`, bat)}
+          <View style={c.panel}>{head(`In play · ${nsit.batter.name ?? 'Batter'}`, bat)}
             {zoneRow}
             {btypeRow()}
             <Text style={c.small}>Hit</Text>
@@ -318,12 +342,12 @@ const ScoringControls: SportPlugin<BaseballState>['ScoringControls'] = ({
           <View style={c.panel}>{head(f.outcome ? OUTCOME_LABEL[f.outcome] : RUNNER_LABEL[f.rk!], bat)}
             {f.moves.map((m) => (
               <View key={m.from} style={c.moveRow}>
-                <Text style={c.moveWho} numberOfLines={1}>{m.from === 0 ? `Batter · ${m.name ?? ''}` : `${BASE_NAME[m.from]} · ${m.name ?? 'Runner'}`}</Text>
+                <Text style={c.moveWho} numberOfLines={1}>{m.from === 0 ? `Batter · ${label(m) ?? ''}` : `${BASE_NAME[m.from]} · ${label(m) ?? 'Runner'}`}</Text>
                 <View style={c.moveChips}>
                   {DESTS.filter((d) => d.to === -1 || d.to === 4 || d.to >= Math.max(1, m.from)).map((d) => {
                     const on = m.to === d.to || (d.to === m.from && m.to === m.from);
                     return (
-                      <TouchableOpacity key={d.to} accessibilityRole="button" accessibilityLabel={`${m.name ?? BASE_NAME[m.from]}: ${d.label}`} accessibilityState={{ selected: on }}
+                      <TouchableOpacity key={d.to} accessibilityRole="button" accessibilityLabel={`${label(m) ?? BASE_NAME[m.from]}: ${d.label}`} accessibilityState={{ selected: on }}
                         style={[c.dest, on && c.destOn]} onPress={() => setTo(m.from, d.to)}>
                         <Text style={[c.destTxt, on && c.destTxtOn]}>{d.label}</Text>
                       </TouchableOpacity>
@@ -376,7 +400,7 @@ const ScoringControls: SportPlugin<BaseballState>['ScoringControls'] = ({
         return (
           <View style={c.panel}>{head(`${RUNNER_LABEL[flow.rk]} — which runner?`, bat)}
             <View style={c.grid}>
-              {runners.map((b) => <Button key={b} label={`${BASE_NAME[b]} · ${g.bases[b - 1]?.name ?? 'Runner'}`} variant="ghost" style={c.half} onPress={() => runnerPlay(flow.rk, b)} />)}
+              {runners.map((b) => <Button key={b} label={`${BASE_NAME[b]} · ${sg.bases[b - 1]?.name ?? 'Runner'}`} variant="ghost" style={c.half} onPress={() => runnerPlay(flow.rk, b)} />)}
             </View>
           </View>
         );
@@ -393,31 +417,31 @@ const ScoringControls: SportPlugin<BaseballState>['ScoringControls'] = ({
         );
       case 'ph':
         return (
-          <View style={c.panel}>{head(`Pinch hitter for ${sit.batter.name}`, bat)}
-            <PlayerGrid players={bench(bat)} onPick={(p) => sub({ kind: 'ph', slot: sit.batter.slot, on: who(p), off: { ...(sit.batter.id ? { id: sit.batter.id } : {}), name: sit.batter.name } }, bat)} />
+          <View style={c.panel}>{head(`Pinch hitter for ${nsit.batter.name ?? 'the batter'}`, bat)}
+            <PlayerGrid players={bench(bat)} onPick={(p) => sub(bat, 'ph', { slot: sit.batter.slot, on: who(p), off: sit.batter })} />
           </View>
         );
       case 'pr': {
         if (!flow.base) return (
           <View style={c.panel}>{head('Pinch runner — for which runner?', bat)}
-            <View style={c.grid}>{runners.map((b) => <Button key={b} label={`${BASE_NAME[b]} · ${g.bases[b - 1]?.name ?? 'Runner'}`} variant="ghost" style={c.half} onPress={() => setFlow({ mode: 'pr', base: b })} />)}</View>
+            <View style={c.grid}>{runners.map((b) => <Button key={b} label={`${BASE_NAME[b]} · ${sg.bases[b - 1]?.name ?? 'Runner'}`} variant="ghost" style={c.half} onPress={() => setFlow({ mode: 'pr', base: b })} />)}</View>
           </View>
         );
         const r = g.bases[flow.base - 1];
         return (
-          <View style={c.panel}>{head(`Pinch runner on ${BASE_NAME[flow.base]} for ${r?.name ?? 'the runner'}`, bat)}
-            <PlayerGrid players={bench(bat)} onPick={(p) => sub({ kind: 'pr', base: flow.base, ...(typeof r?.slot === 'number' ? { slot: r.slot } : {}), on: who(p), ...(r?.name ? { off: { ...(r.id ? { id: r.id } : {}), name: r.name } } : {}) }, bat)} />
+          <View style={c.panel}>{head(`Pinch runner on ${BASE_NAME[flow.base]} for ${sg.bases[flow.base - 1]?.name ?? 'the runner'}`, bat)}
+            <PlayerGrid players={bench(bat)} onPick={(p) => sub(bat, 'pr', { base: flow.base, ...(typeof r?.slot === 'number' ? { slot: r.slot } : {}), on: who(p), off: r })} />
           </View>
         );
       }
       case 'def': {
         if (flow.slot === undefined) return (
           <View style={c.panel}>{head('Defensive change — who comes out?', field)}
-            <View style={c.grid}>{orderOf(field).map((e, i) => <Button key={i} label={`${i + 1}. ${e.name}${e.pos ? ` (${e.pos})` : ''}`} variant="ghost" style={c.half} onPress={() => setFlow({ mode: 'def', slot: i })} />)}</View>
+            <View style={c.grid}>{sg.order[field].map((e, i) => <Button key={i} label={`${i + 1}. ${e.name ?? 'Player'}${e.pos ? ` (${e.pos})` : ''}`} variant="ghost" style={c.half} onPress={() => setFlow({ mode: 'def', slot: i })} />)}</View>
           </View>
         );
         if (!flow.on) return (
-          <View style={c.panel}>{head(`In for ${orderOf(field)[flow.slot]?.name}`, field)}
+          <View style={c.panel}>{head(`In for ${sg.order[field][flow.slot]?.name ?? 'the player'}`, field)}
             <PlayerGrid players={bench(field)} onPick={(p) => setFlow({ ...flow, on: p })} />
           </View>
         );
@@ -425,7 +449,7 @@ const ScoringControls: SportPlugin<BaseballState>['ScoringControls'] = ({
           <View style={c.panel}>{head(`${flow.on.fullName} plays…`, field)}
             <View style={c.grid}>
               {[...POSITIONS, 'DH'].map((pos) => <Button key={pos} label={pos} variant="ghost" style={c.quarter}
-                onPress={() => sub({ kind: 'def', slot: flow.slot, on: who(flow.on!), pos, off: { ...(orderOf(field)[flow.slot!]?.id ? { id: orderOf(field)[flow.slot!].id } : {}), name: orderOf(field)[flow.slot!]?.name } }, field)} />)}
+                onPress={() => sub(field, 'def', { slot: flow.slot, on: who(flow.on!), pos, off: orderOf(field)[flow.slot!] })} />)}
             </View>
           </View>
         );
@@ -435,9 +459,9 @@ const ScoringControls: SportPlugin<BaseballState>['ScoringControls'] = ({
         const cur = g.pitcher[sd];
         const slot = !s.cfg.dh && cur ? orderOf(sd).findIndex((e) => (cur.id && e.id === cur.id) || (!cur.id && e.name === cur.name)) : -1;
         return (
-          <View style={c.panel}>{head(cur ? `New pitcher for ${cur.name}` : 'Who is pitching?', sd)}
+          <View style={c.panel}>{head(cur ? `New pitcher for ${sg.pitcher[sd]?.name ?? 'the pitcher'}` : 'Who is pitching?', sd)}
             <PlayerGrid players={rosterOf(sd).filter((p) => p.id !== cur?.id)} tag={(p) => (p.id === cur?.id ? 'P' : undefined)}
-              onPick={(p) => (started || cur ? sub({ kind: 'p', on: who(p), ...(cur ? { off: cur } : {}), ...(slot >= 0 ? { slot } : {}) }, sd) : (dispatch({ type: 'LINEUP', payload: { team: sd, order: s.lineup[sd] ?? defaults(sd).order, pitcher: who(p) } }), setFlow(null)))} />
+              onPick={(p) => (started || cur ? sub(sd, 'p', { on: who(p), off: cur, ...(slot >= 0 ? { slot } : {}) }) : (dispatch(lineupAction(sd, s.lineup[sd] ?? defaults(sd).order, who(p))), setFlow(null)))} />
           </View>
         );
       }
@@ -450,11 +474,11 @@ const ScoringControls: SportPlugin<BaseballState>['ScoringControls'] = ({
         const sd = flow.side;
         return (
           <View style={c.panel}>{head('🟥 Ejected', sd)}
-            <PlayerGrid players={rosterOf(sd)} onPick={(p) => { dispatch({ type: 'EJECT', side: sd, payload: { player: who(p), uid: newUid() } }); setFlow(null); }} />
+            <PlayerGrid players={rosterOf(sd)} onPick={(p) => { dispatch(ejectAction(sd, { player: who(p) })); setFlow(null); }} />
             <Text style={c.small}>Or a coach / manager</Text>
             <View style={c.row}>
               <View style={c.flex}><TextField label="Official (optional)" value={official} onChange={setOfficial} placeholder="e.g. Manager" autoCapitalize="words" /></View>
-              <Button label="Record" variant="ghost" onPress={() => { dispatch({ type: 'EJECT', side: sd, payload: { official: official.trim() || 'Team official', uid: newUid() } }); setOfficial(''); setFlow(null); }} />
+              <Button label="Record" variant="ghost" onPress={() => { dispatch(ejectAction(sd, { official })); setOfficial(''); setFlow(null); }} />
             </View>
             <Text style={c.meta}>An ejected player can’t come back — make the substitution from “Changes”.</Text>
           </View>
@@ -476,9 +500,9 @@ const ScoringControls: SportPlugin<BaseballState>['ScoringControls'] = ({
           </View>
         );
         const done = (p?: Player) => {
-          const picked: LineupEntry[] = flow.picks.map((x) => ({ id: x.id, name: x.fullName, ...(posOfSlot(sd, x.id) ? { pos: posOfSlot(sd, x.id) } : {}) }));
+          const picked: LineupEntry[] = flow.picks.map((x) => ({ id: x.id, ...(posOfSlot(sd, x.id) ? { pos: posOfSlot(sd, x.id) } : {}) }));
           const order = [...picked, ...Array.from({ length: Math.max(0, s.cfg.lineupSize - picked.length) }, (_, i) => ({ name: `Batter ${picked.length + i + 1}` }))];
-          dispatch({ type: 'LINEUP', payload: { team: sd, order, ...(p ? { pitcher: who(p) } : {}) } });
+          dispatch(lineupAction(sd, order, p ? who(p) : undefined));
           setFlow(null);
         };
         return (
@@ -520,8 +544,8 @@ const ScoringControls: SportPlugin<BaseballState>['ScoringControls'] = ({
         return (
           <View key={sd} style={c.setupSide}>
             <Text style={[c.team, { color: ink(sd), textAlign: 'left' }]}>{name(sd)} {sd === 'away' ? '(bats first)' : ''}</Text>
-            <Text style={c.meta} numberOfLines={3}>{order.length ? order.map((e, i) => `${i + 1}. ${e.name}${e.pos ? ` ${e.pos}` : ''}`).join(' · ') : 'No roster — batters are numbered 1–' + s.cfg.lineupSize + '.'}</Text>
-            <Text style={c.meta}>Pitcher: {p?.name ?? '—'}</Text>
+            <Text style={c.meta} numberOfLines={3}>{order.length ? order.map((e, i) => `${i + 1}. ${label(e) ?? 'Player'}${e.pos ? ` ${e.pos}` : ''}`).join(' · ') : 'No roster — batters are numbered 1–' + s.cfg.lineupSize + '.'}</Text>
+            <Text style={c.meta}>Pitcher: {label(p) ?? '—'}</Text>
             {rosterOf(sd).length ? (
               <View style={c.row}>
                 <Button label="Set batting order" variant="ghost" style={c.flex} onPress={() => setFlow({ mode: 'lineup', side: sd, picks: [], step: 'order' })} />
@@ -548,8 +572,8 @@ const ScoringControls: SportPlugin<BaseballState>['ScoringControls'] = ({
             <Text style={[c.small, { color: ink(bat) }]} numberOfLines={1}>{name(bat)} batting</Text>
           </View>
         </View>
-        <Text style={c.bat} numberOfLines={1}>🏏 {shownBatter.slot + 1}. {shownBatter.name}{shownBatter.pos ? ` (${shownBatter.pos})` : ''}{today ? ` · ${today}` : ''}</Text>
-        <Text style={c.meta} numberOfLines={1}>⚾ {shownPitcher?.name ?? 'Pitcher'} · {pitches} pitch{pitches === 1 ? '' : 'es'}{onDeck ? ` · on deck ${onDeck.name}` : ''}</Text>
+        <Text style={c.bat} numberOfLines={1}>🏏 {shownBatter.slot + 1}. {label(shownBatter) ?? 'Batter'}{shownBatter.pos ? ` (${shownBatter.pos})` : ''}{today ? ` · ${today}` : ''}</Text>
+        <Text style={c.meta} numberOfLines={1}>⚾ {label(shownPitcher) ?? 'Pitcher'} · {pitches} pitch{pitches === 1 ? '' : 'es'}{onDeck ? ` · on deck ${label(onDeck) ?? 'Player'}` : ''}</Text>
       </View>
 
       {flowPanel ?? (
@@ -588,7 +612,7 @@ const ScoringControls: SportPlugin<BaseballState>['ScoringControls'] = ({
         </>
       )}
 
-      <EditList s={view} show={showEdit} setShow={setShowEdit} onRemove={remove} onEdit={edit} onEarned={toggleEarned} homeName={homeName} awayName={awayName} />
+      <EditList s={view} names={pn} show={showEdit} setShow={setShowEdit} onRemove={remove} onEdit={edit} onEarned={toggleEarned} homeName={homeName} awayName={awayName} />
       {/* SD-106: the only hand-made end — a called game — sits at the bottom and asks first */}
       {editAfter === null ? <Button label="🏁 Call game (time / weather)" variant="danger" disabled={g.half < 2} onPress={() => void callGame()} /> : null}
       {editAfter === null && g.half < 2 ? <Text style={c.note}>Outs, innings, walk-offs and the run rule end the game by themselves. Call a game only for a time limit or the weather (after the 1st inning).</Text> : null}
@@ -597,14 +621,16 @@ const ScoringControls: SportPlugin<BaseballState>['ScoringControls'] = ({
 };
 
 /** The scorer's "Correct the plays" list: remove, re-enter, earned / unearned. */
-function EditList({ s, show, setShow, onRemove, onEdit, onEarned, homeName, awayName }: {
-  s: BaseballState; show: boolean; setShow: (v: boolean) => void; onRemove: (e: BaseballEvent) => void; onEdit?: (e: BaseballEvent) => void; onEarned: (e: BaseballEvent) => void; homeName: string; awayName: string;
+function EditList({ s, names, show, setShow, onRemove, onEdit, onEarned, homeName, awayName }: {
+  s: BaseballState; names: NameOf; show: boolean; setShow: (v: boolean) => void; onRemove: (e: BaseballEvent) => void; onEdit?: (e: BaseballEvent) => void; onEarned: (e: BaseballEvent) => void; homeName: string; awayName: string;
 }) {
   if (!s.events.length) return null;
+  // the rows name players for this viewer (the callbacks use the event's id only)
+  const ns = withNames(s, names);
   return (
     <View style={c.panel}>
       <Text style={c.link} accessibilityRole="button" onPress={() => setShow(!show)}>{show ? 'Hide' : '✎ Correct the plays'}</Text>
-      {show ? [...timelineEvents(s)].reverse().slice(0, 40).map((e) => {
+      {show ? [...timelineEvents(ns)].reverse().slice(0, 40).map((e) => {
         const d = describeEvent(e);
         const runs = s.g.runs.filter((r) => r.event === e.id);
         const editable = e.type === 'pa' || e.type === 'runner' || e.type === 'pitch';
@@ -684,18 +710,20 @@ const VIEWS = [{ key: 'stats', label: 'Match stats' }, { key: 'box', label: 'Box
  *  "Key moments" chip replaces the old separate Key-moments view); match stats
  *  and the box scores on Stats. */
 type TabProps = Parameters<NonNullable<SportPlugin<BaseballState>['LiveExtras']>>[0];
-const BaseballCommentary = ({ state, homeName, awayName, homeColor, awayColor }: TabProps) => {
+const BaseballCommentary = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster }: TabProps) => {
   const s = state as BaseballState;
+  const pn = useBaseballNames(homeRoster, awayRoster);
   if (!s?.g) return null;
   return (
-    <GroupedFeed groups={baseballCommentary(s, { home: homeName, away: awayName })} homeColor={homeColor} awayColor={awayColor} tags={BASEBALL_FEED_TAGS} scopeLabel={baseballScopeLabel}
+    <GroupedFeed groups={baseballCommentary(s, { home: homeName, away: awayName }, pn)} homeColor={homeColor} awayColor={awayColor} tags={BASEBALL_FEED_TAGS} scopeLabel={baseballScopeLabel}
       emptyText="No plays yet — the play-by-play fills in from the first pitch." />
   );
 };
 const BaseballStats = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster, onPlayer }: TabProps) => {
   const s = state as BaseballState;
+  const pn = useBaseballNames(homeRoster, awayRoster);
   if (!s?.g) return null;
-  const ctx = { homeRoster, awayRoster, names: { home: homeName, away: awayName } };
+  const ctx = { homeRoster, awayRoster, names: { home: homeName, away: awayName }, nameOf: pn };
   return (
     <SubViews label="Stats view" views={VIEWS.map((v) => ({
       ...v,
@@ -731,16 +759,18 @@ export const baseballPlugin: SportPlugin<BaseballState> = {
     detailLine: `H ${s.g.hits.home}-${s.g.hits.away} · E ${s.g.errors.home}-${s.g.errors.away}`,
   }),
   statTotals: baseballTotals,
-  // SD-115: what Undo removes — "Single · Rao (2-1)"
-  undoLabel: (step) => {
+  // SD-115: what Undo removes — "Single · Rao (2-1)" (the batter named by id
+  // for this viewer — IDs-only scoring)
+  undoLabel: (step, nameOf) => {
     if (!step) return null;
     const prev = step.prev as BaseballState | undefined;
     const next = step.next as BaseballState | undefined;
     if (!prev?.events || !next?.events) return null;
     if (step.type === 'LINEUP') return 'line-up';
     if (next.events.length <= prev.events.length) return step.type === 'REMOVE_EVENT' ? 'play correction' : step.type === 'END' ? 'called game' : null;
-    const e = next.events.find((x) => !prev.events.some((y) => y.id === x.id));
-    if (!e) return null;
+    const e0 = next.events.find((x) => !prev.events.some((y) => y.id === x.id));
+    if (!e0) return null;
+    const e = withNames(next, nameOf ?? legacyNameOf).events.find((x) => x.id === e0.id) ?? e0;
     const d = describeEvent(e);
     return `${d.label}${e.type === 'pa' && e.batter?.name ? ` · ${e.batter.name}` : ''} (${next.g.score.home}-${next.g.score.away})`;
   },

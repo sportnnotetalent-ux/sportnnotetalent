@@ -5,6 +5,8 @@ import {
   BATTED_BALL_LABEL, OUTCOME_LABEL, RUNNER_LABEL, halfShort, inningOf, isTop,
   type BaseballEvent, type BaseballState, type Move, type Outcome, type RunnerKind,
 } from './engine.ts';
+import { withNames } from './names.ts';
+import { legacyNameOf, type NameOf } from '../../core/playerNames.ts';
 
 const ICON: Partial<Record<Outcome, string>> = { '1B': '⚾', '2B': '⚾', '3B': '⚾', HR: '💥', BB: '🚶', IBB: '🚶', HBP: '🤕', K: 'K', E: '⚠️', DP: '✌️' };
 const PITCH_LABEL = { ball: 'Ball', called: 'Called strike', swinging: 'Swinging strike', foul: 'Foul', inplay: 'In play', hbp: 'Hit by pitch' } as const;
@@ -64,15 +66,18 @@ export function eventWhen(s: BaseballState, e: BaseballEvent): string {
 /** The scorer's correction rows (pitches included), newest last. */
 export const timelineEvents = (s: BaseballState): BaseballEvent[] => s.events.filter((e) => e.type !== 'er');
 
-/** The viewer timeline: plate appearances, runner plays, changes. */
-export function baseballTimeline(s: BaseballState): LiveEvent[] {
+/** The viewer timeline: plate appearances, runner plays, changes. IDs-only
+ *  scoring: players named by id for this viewer (`nameOf`, names.ts). */
+export function baseballTimeline(state: BaseballState, nameOf: NameOf = legacyNameOf): LiveEvent[] {
+  const s = withNames(state, nameOf);
   const rows: LiveEvent[] = [];
   s.events.forEach((e, i) => {
     if (e.type === 'pitch' || e.type === 'er') return;
     const a = s.g.ann[e.id];
     if (!a || a.ignored) return;
     const d = describeEvent(e);
-    const name = e.type === 'pa' ? e.batter?.name : e.type === 'sub' || e.type === 'eject' ? e.on?.name : e.moves?.[0]?.name;
+    const who = e.type === 'pa' ? e.batter : e.type === 'sub' || e.type === 'eject' ? e.on : e.moves?.[0];
+    const name = who?.name;
     rows.push({
       id: i,
       stamp: halfShort(a.half),
@@ -81,6 +86,7 @@ export function baseballTimeline(s: BaseballState): LiveEvent[] {
       ...(d.detail ? { detail: d.detail } : {}),
       ...(e.side ? { side: e.side } : {}),
       kind: e.type,
+      ...(who?.id ? { playerId: who.id } : {}),
       ...(name ? { playerName: name } : {}),
       half: inningOf(a.half),
       ...(e.type === 'pa' && e.outcome === 'HR' ? { tone: 'boundary' as const }

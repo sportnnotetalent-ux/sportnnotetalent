@@ -9,6 +9,7 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { theme } from '../../core/theme';
 import { scoreSheet, type CarromState, type SheetRow, type Side } from './engine';
+import { legacyNameOf, whoName, type NameOf } from '../racketNames';
 
 /** A short tag for a side in a narrow column ("Asha" from "Asha Rao"). */
 const tagOf = (name: string) => {
@@ -23,8 +24,10 @@ function queenText(r: SheetRow): string {
   return '–';
 }
 
-export function ScoreSheet({ state, homeName, awayName, homeColor, awayColor }: {
+export function ScoreSheet({ state, homeName, awayName, homeColor, awayColor, nameOf = legacyNameOf }: {
   state: CarromState; homeName: string; awayName: string; homeColor?: string; awayColor?: string;
+  /** IDs-only scoring: a doubles breaker's name for this viewer, by id */
+  nameOf?: NameOf;
 }) {
   const games = scoreSheet(state);
   const hc = homeColor ?? theme.colors.home;
@@ -53,7 +56,7 @@ export function ScoreSheet({ state, homeName, awayName, homeColor, awayColor }: 
             <View key={r.n} style={[st.row, r.penalty && st.penRow]}
               accessibilityLabel={`Board ${r.n}: ${name(r.winner)} ${r.penalty ? 'penalty' : ''} +${r.pts}, ${r.total.home}-${r.total.away}`}>
               <Text style={[st.cell, st.n]}>{r.n}{r.tieBreak ? '*' : ''}</Text>
-              {toss && <Text style={[st.cell, st.who]} numberOfLines={1}>{r.breakerBy?.name ? tagOf(r.breakerBy.name) : r.breaker ? tagOf(name(r.breaker)) : '–'}</Text>}
+              {toss && <Text style={[st.cell, st.who]} numberOfLines={1}>{(() => { const by = r.breakerBy ? whoName(nameOf, r.breakerBy.id, r.breakerBy.name) : undefined; return by ? tagOf(by) : r.breaker ? tagOf(name(r.breaker)) : '–'; })()}</Text>}
               <Text style={[st.cell, st.who, { color: color(r.winner), fontWeight: '800' }]} numberOfLines={1}>{tagOf(name(r.winner))}</Text>
               <Text style={[st.cell, st.num]}>{r.penalty ? 'PEN' : r.coins}</Text>
               {anyQueen && <Text style={[st.cell, st.q]}>{queenText(r)}</Text>}

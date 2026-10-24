@@ -64,6 +64,25 @@ export function readPgn(text: string): PgnRead {
   return { tags, tokens, clocks: tokens.map((_, k) => clocks[k] ?? null), ...(result ? { result } : {}) };
 }
 
+/** IDs-only scoring (docs/privacy/ids-only-scoring.md) — the PGN tags that
+ *  name a player (the players' names, and their network addresses — an
+ *  e-mail). A pasted game is stored in the public event log (MOVES `pgn`),
+ *  so these values are blanked to "?" (the PGN standard's "unknown") before
+ *  it is stored; the moves and every other tag (ECO, Opening, FEN …) stay. */
+export const PLAYER_TAGS: readonly string[] = ['White', 'Black', 'WhiteNA', 'BlackNA'];
+
+/** The pasted text with each player tag's value blanked: `[White "Asha Rao"]`
+ *  → `[White "?"]`. The game reads exactly the same (readMoveList). */
+export function withoutPlayerTags(text: string): string {
+  return text.replace(/\[\s*(\w+)\s+"((?:[^"\\]|\\.)*)"\s*\]/g, (m, k: string) => (PLAYER_TAGS.includes(k) ? `[${k} "?"]` : m));
+}
+
+/** The MOVES action a pasted game (or typed list) is saved with — the whole
+ *  game replaces the moves; the player tags are blanked first. `koGame` = a
+ *  knockout game already recorded (round 2). */
+export const pastedMovesAction = (text: string, o: { at?: number; koGame?: number } = {}): { type: 'MOVES'; payload: Record<string, unknown> } =>
+  ({ type: 'MOVES', payload: { pgn: withoutPlayerTags(text), ...(o.at ? { at: o.at } : {}), ...(o.koGame != null ? { koGame: o.koGame } : {}) } });
+
 export interface MoveList {
   /** normalised SAN of the legal moves (up to the first that isn't) */
   san: string[];

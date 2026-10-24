@@ -34,13 +34,15 @@ export function winMethodKey(method?: string | null): typeof WIN_METHOD_KEYS[num
  *  so their line's opponent is the OTHER player whoever won (a draw included). */
 export function chessResultCredit(
   side: 'home' | 'away',
-  p: { id: string; fullName: string } | undefined,
+  p: { id: string } | undefined,
   winner: 'home' | 'away' | 'draw',
   method: string | null | undefined,
   dff: boolean,
-): { playerId: string; playerName: string; stat: string; by: number; extra?: Record<string, number>; side: 'home' | 'away' } | undefined {
+): { playerId: string; stat: string; by: number; extra?: Record<string, number>; side: 'home' | 'away' } | undefined {
   if (!p) return undefined;
-  const base = { playerId: p.id, playerName: p.fullName, by: 1, side };
+  // IDs-only scoring (docs/privacy/ids-only-scoring.md): match events are
+  // public, so the credit names the player by id only (no name)
+  const base = { playerId: p.id, by: 1, side };
   if (dff) return { ...base, stat: 'forfeitLosses' };
   if (method === 'forfeit' && winner !== 'draw') return { ...base, stat: winner === side ? 'forfeitWins' : 'forfeitLosses' };
   const outcome = winner === 'draw' ? 'draws' : winner === side ? 'wins' : 'losses';

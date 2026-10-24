@@ -27,6 +27,18 @@ import { CommentaryFeed } from '../gcc/CommentaryFeed';
 import { CompareTable } from '../gcc/CompareTable';
 import { CHESS_META } from './meta';
 import { chessMatchRecords } from './records';
+import { useMask } from '../../core/disputeMask';
+import type { NameOf } from '../../core/playerNames';
+import type { Player } from '../../core/types';
+
+/** IDs-only scoring (docs/privacy/ids-only-scoring.md): a 1-v-1 game names
+ *  each side by its player, looked up for this viewer by id (players_view:
+ *  the circle sees the full name, others initials, an open dispute "X");
+ *  a side with no player falls back to the entry's name. */
+const sideName = (who: NameOf, roster: Player[], team: string): string => {
+  const p = roster[0];
+  return p ? who(p.id, p.fullName) : team;
+};
 
 const half = (n: number) => String(n).replace('.5', '½').replace(/^0½$/, '½');
 
@@ -69,8 +81,9 @@ const ScoringControls: SportPlugin<ChessState>['ScoringControls'] = ({ state, di
   const [clockB, setClockB] = useState('');
   const [busy, setBusy] = useState(false);
   // Round 2 — a knockout game already recorded whose moves are being pasted
-  // A person's full name reads better than a team code ("AM") in a 1-v-1 game.
-  const nameOf = (side: Side) => (side === 'home' ? homeRoster : awayRoster)[0]?.fullName ?? (side === 'home' ? homeName : awayName);
+  // A person's name reads better than a team code ("AM") in a 1-v-1 game.
+  const { nameOf: who } = useMask();
+  const nameOf = (side: Side) => sideName(who, side === 'home' ? homeRoster : awayRoster, side === 'home' ? homeName : awayName);
   // Round 2 — mate / stalemate on the entered moves pre-selects the result
   // (and its method); the arbiter still confirms with Record. Taking the move
   // back clears a pre-selection the scorer didn't change.
@@ -320,12 +333,15 @@ export const chessPlugin: SportPlugin<ChessState> = {
  *  Black; whole game or a phase) on Stats; attaching the moves after the game
  *  on Scoring (scorers). */
 type TabProps = Parameters<NonNullable<SportPlugin<ChessState>['LiveExtras']>>[0];
-const chessNameOf = ({ homeName, awayName, homeRoster = [], awayRoster = [] }: TabProps) =>
-  (side: Side) => (side === 'home' ? homeRoster : awayRoster)[0]?.fullName ?? (side === 'home' ? homeName : awayName);
+/** Each side's player by id for this viewer (a hook: the dispute mask / name lookup). */
+function useChessNames({ homeName, awayName, homeRoster = [], awayRoster = [] }: TabProps): (side: Side) => string {
+  const { nameOf: who } = useMask();
+  return (side: Side) => sideName(who, side === 'home' ? homeRoster : awayRoster, side === 'home' ? homeName : awayName);
+}
 
 function ChessCommentary(p: TabProps) {
   const s = p.state as ChessState;
-  const nameOf = chessNameOf(p);
+  const nameOf = useChessNames(p);
   return (
     <CommentaryFeed title={null} groups={chessFeed(s, { home: nameOf('home'), away: nameOf('away') })}
       homeColor={p.homeColor} awayColor={p.awayColor} empty="No moves yet." />
@@ -336,7 +352,7 @@ function ChessStats(p: TabProps) {
   const s = p.state as ChessState;
   const { homeColor, awayColor } = p;
   const [phase, setPhase] = useState<Phase | 'all'>('all');
-  const nameOf = chessNameOf(p);
+  const nameOf = useChessNames(p);
   const black: Side = s.white === 'home' ? 'away' : 'home';
   const hasMoves = !!s.game?.san.length && !s.ko;
   const op = openingOf(s);
@@ -381,10 +397,11 @@ function KoMovesPaste({ s, dispatch, nameOf }: { s: ChessState; dispatch: (a: { 
  *  and the opening — in a knockout match, each game's. */
 function ChessAfterMatch(p: TabProps) {
   const s = p.state as ChessState;
+  const nameOf = useChessNames(p);
   if (!s.ended || !p.canScore || !p.dispatch) return null;
-  if (s.ko) return <KoMovesPaste s={s} dispatch={p.dispatch} nameOf={chessNameOf(p)} />;
+  if (s.ko) return <KoMovesPaste s={s} dispatch={p.dispatch} nameOf={nameOf} />;
   if (isDoubleForfeit(s.method) || isForfeit(s.method)) return null;
-  return <MovesPanel state={s} dispatch={p.dispatch} nameOf={chessNameOf(p)} after />;
+  return <MovesPanel state={s} dispatch={p.dispatch} nameOf={nameOf} after />;
 }
 
 /** "♔ {name} has White" — the generic summary only knows home / away. */

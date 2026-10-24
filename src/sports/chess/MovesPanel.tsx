@@ -15,7 +15,7 @@ import { Button, SelectChip } from '../../components/ui';
 import { askConfirm } from '../../components/ConfirmSheet';
 import type { ScoreAction } from '../types';
 import { parseClock, openingOf, type ChessState, type Side } from './engine';
-import { readMoveList, movetext } from './pgn';
+import { readMoveList, movetext, pastedMovesAction } from './pgn';
 import { ecoCode, nameForEco } from './openings';
 import { parseFen, START_FEN } from './board';
 
@@ -55,7 +55,9 @@ export function MovesPanel({ state: s, dispatch, nameOf, after = false, koGame }
     if (!read || !read.san.length) return;
     if (paste) {
       if (n && !(await askConfirm({ title: 'Replace the moves?', message: `The ${n} moves recorded so far are replaced by the ${read.san.length} you pasted.`, yesLabel: 'Yes, replace', noLabel: 'No, keep them', tone: 'caution' }))) return;
-      dispatch({ type: 'MOVES', payload: { pgn: text, at: Date.now(), ...target } });
+      // IDs-only scoring: the event log is public — the PGN's player tags
+      // ([White "…"] / [Black "…"]) are blanked before it is stored
+      dispatch(pastedMovesAction(text, { at: Date.now(), ...target }));
     } else {
       dispatch({ type: 'MOVES', payload: { add: read.san, at: Date.now(), ...(clkSecs != null ? { clk: clkSecs } : {}), ...target } });
     }

@@ -13,11 +13,11 @@ import type { VoiceEnding } from './types';
 import * as hk from './hockey/engine.ts';
 import * as hb from './handball/engine.ts';
 import { rugbyVoice, rugbyVoiceEnds } from './rugby/voice.ts';
-import { boardCloses, boardValue, nextBreaker, slamFor, type CarromState } from './carrom/engine.ts';
+import { boardCloses, boardCredit, boardValue, nextBreaker, slamFor, type CarromState } from './carrom/engine.ts';
 import { creditedPlayers } from './carrom/totals.ts';
 import { holeWinner } from './golf/engine.ts';
-import { matchHole, scoreStatKey } from './golf/matchStrokes.ts';
-import { golfMatchStateOf, type GolfMatchState } from './golf/match.ts';
+import { matchHole } from './golf/matchStrokes.ts';
+import { golfMatchStateOf, holeAction, type GolfMatchState } from './golf/match.ts';
 
 /** Rally/set-point sports (badminton, tennis, volleyball, padel, pickleball,
  *  squash): "point home", "point away", "<team> point", "<player> scores".
@@ -387,7 +387,8 @@ export function carromVoice(text: string, ctx: VoiceContext): ScoreAction[] | nu
   // round 2 — the board's value under the match's rules (ICF foul penalties)
   const value = boardValue(s, s.current[side], { coins: coins ?? 0, queen, penalty });
   const credit = Math.min(value, Math.max(0, s.target - s.current[side]));
-  const attr = (p: Player) => ({ playerId: p.id, playerName: p.fullName, stat: 'points', by: credit, ...(penalty ? {} : { extra: { boards: 1, ...(queen ? { queens: 1 } : {}) } }) });
+  // IDs-only scoring: the credit names the player by id only (as the buttons do)
+  const attr = (p: Player) => boardCredit(p, credit, { penalty, queen });
   return [{
     type: 'BOARD', side,
     payload: penalty ? { coins: 0, queen: false, penalty: true } : { coins, queen, ...(queen ? { queenBy: 'winner' } : {}), ...(slam ? { slam } : {}) },
@@ -430,21 +431,13 @@ export function golfMatchVoice(text: string, ctx: VoiceContext): ScoreAction[] |
     const [a, b] = nums;
     const strokes = first === 'away' ? { home: b, away: a } : { home: a, away: b };
     const winner = holeWinner(strokes.home, strokes.away, here.home, here.away);
-    const credit = (who: Side) => {
-      const pl = p1(who);
-      if (!pl) return undefined;
-      const key = scoreStatKey(strokes[who], here.hole.par);
-      return winner === who
-        ? { playerId: pl.id, playerName: pl.fullName, stat: 'holesWon', by: 1, extra: { [key]: 1 }, side: who }
-        : { playerId: pl.id, playerName: pl.fullName, stat: key, by: 1, side: who };
-    };
-    return [{ type: 'HOLE', side: winner === 'halved' ? undefined : winner, payload: { winner, home: strokes.home, away: strokes.away }, attribution: credit('home'), attribution2: credit('away') }];
+    // the buttons' builder: credits by player id only (IDs-only scoring)
+    return [holeAction(winner, { home: p1('home'), away: p1('away') }, { strokes, par: here.hole.par })];
   }
-  if (/\bhalved?\b|\bhalves\b|\bshared\b|\bhalf\b|\ball square\b/.test(q)) return [{ type: 'HOLE', payload: { winner: 'halved' } }];
+  if (/\bhalved?\b|\bhalves\b|\bshared\b|\bhalf\b|\ball square\b/.test(q)) return [holeAction('halved', {})];
   const { side } = resolveSide(text, ctx);
   if (!side || !/\bhole\b|\bwins?\b|\bwon\b/.test(q)) return null;
-  const pl = p1(side);
-  return [{ type: 'HOLE', side, payload: { winner: side }, attribution: pl ? { playerId: pl.id, playerName: pl.fullName, stat: 'holesWon', by: 1, side } : undefined }];
+  return [holeAction(side, { [side]: p1(side) })];
 }
 
 /* ------------------------------ kabaddi extras ------------------------------ */

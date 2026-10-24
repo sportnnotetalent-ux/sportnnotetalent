@@ -8,6 +8,7 @@
  */
 import { scoreSheet, FOUL_TYPES, FOUL_LABEL, type BoardDetail, type CarromState, type Side } from './engine.ts';
 import type { FeedGroup, FeedItem } from '../gcc/model.ts';
+import { legacyNameOf, whoName, type NameOf } from '../racketNames.ts';
 
 const other = (s: Side): Side => (s === 'home' ? 'away' : 'home');
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
@@ -27,8 +28,10 @@ export function foulText(det: BoardDetail | undefined, name: (s: Side) => string
   return parts.length ? `Fouls — ${parts.join(' · ')}` : 'No fouls';
 }
 
-/** The commentary groups (newest game first, newest board first). */
-export function carromFeed(s: CarromState, names: { home: string; away: string }): FeedGroup[] {
+/** The commentary groups (newest game first, newest board first). IDs-only
+ *  scoring: a doubles breaker is named by id for this viewer (`nameOf`; an
+ *  older log's stored name is the fallback — unchanged with no lookup). */
+export function carromFeed(s: CarromState, names: { home: string; away: string }, nameOf: NameOf = legacyNameOf): FeedGroup[] {
   const name = (sd: Side) => (sd === 'home' ? names.home : names.away);
   const sheet = scoreSheet(s);
   const boards = s?.boards ?? [];
@@ -72,7 +75,7 @@ export function carromFeed(s: CarromState, names: { home: string; away: string }
       }
       // the optional detail
       const sub: string[] = [];
-      const brName = r.breakerBy?.name ?? (r.breaker ? name(r.breaker) : null);
+      const brName = (r.breakerBy ? whoName(nameOf, r.breakerBy.id, r.breakerBy.name) : undefined) ?? (r.breaker ? name(r.breaker) : null);
       if (brName) sub.push(`${brName} broke${det?.brk != null ? ` · ${det.brk} pocketed on the break` : ''}`);
       else if (det?.brk != null) sub.push(`${det.brk} pocketed on the break`);
       const f = foulText(det, name);
