@@ -1,6 +1,6 @@
 # docs/marketing: social content for LinkedIn, Instagram and YouTube
 
-Ready-to-post drafts for SportnNote's social channels (@sportnnote, handles not created yet). The repo files are the source of truth. The Claude Doc "SportnNote social launch roadmap" (https://claude.ai/code/artifact/0ddd65b3-bb12-4401-8a6c-db30e8638b54) holds the strategy and a summary of this calendar.
+Ready-to-post drafts for SportnNote's social channels (@sportnnote — created 2026-10-24 on Instagram, Facebook, LinkedIn, YouTube, X and Threads; see "Handles" below). The repo files are the source of truth. The Claude Doc "SportnNote social launch roadmap" (https://claude.ai/code/artifact/0ddd65b3-bb12-4401-8a6c-db30e8638b54) holds the strategy and a summary of this calendar.
 
 **Nothing here has been posted.** Every file is a draft until the founder approves it.
 
@@ -57,7 +57,22 @@ A post marked "only if SDxxx is in the live build" stays unscheduled until that 
 - **Never record the dev seed's FIFA World Cup replay data:** it uses real footballers' names.
 - **On screen:** a small "Demo data" label for the whole clip. Do Not Disturb on, and demo phone numbers only.
 
-## Up next: handles, then paid promotion
+## Handles (created 2026-10-24)
+
+| Platform | Handle / URL | Set up |
+|---|---|---|
+| Instagram | instagram.com/sportnnote | Business account, category Software, logo, bio, link sportnnote.in; no address or phone shown |
+| Facebook | facebook.com/sportnnote | Page in the existing **SportnNote** Meta business portfolio (the one that owns the WhatsApp Business accounts), category Software, logo + cover, 93-character bio; data sharing off |
+| LinkedIn | linkedin.com/company/sportnnote | Company page: logo, cover, tagline, Overview, Software Development, 2–10 |
+| YouTube | youtube.com/@sportnnote | Brand Account channel: picture, banner, description, links to the other four, country India |
+| X | x.com/sportnnote | Professional (Business), category Software; picture, header, bio, link; reserve only |
+| Threads | threads.net/@sportnnote | From the Instagram account; public; reserve only |
+| WhatsApp Channel | — | **Waiting for the company's own number** (WhatsApp Business app on a new SIM, kept separate from the WhatsApp Business API number used for sign-in codes) |
+| TikTok | — | Not available in India; reserve later from an international market |
+
+Still to confirm by the founder: Instagram connected in the Meta business portfolio; the founder's own profile is a full-control admin of the Facebook Page and the portfolio; YouTube "not made for kids" and phone verification. Brand kit: `docs/marketing/brand-kit/`.
+
+## Up next: paid promotion (handles done)
 
 **Founder, 13 Oct 2026:** the next session starts with **creating the social handles** (the priority task), followed by a **discussion on paid promotion** for the international posts. The content agent doesn't create accounts; the founder does, from the company's own email. This checklist is ready so that session can start fast.
 
@@ -81,7 +96,7 @@ A post marked "only if SDxxx is in the live build" stays unscheduled until that 
   - YouTube description: `How-tos for scoring 29 sports and running sports days, leagues and tournaments on SportnNote. Some videos use an AI presenter and voice; we always say so in the description. Guides: sportnnote.in/guides`
 - **Account hygiene:** sign up with a company address (e.g. a shared social@ mailbox on the company domain), not a personal one; two-factor authentication on every account; record who holds admin access in the company's own password manager (never in this repo or in chat).
 - **Category and contact:** "Software" everywhere (Instagram has no "App page"); contact button = the support email on sportnnote.in/support/. No phone number on public profiles.
-- **Before the first post:** the handles are reserved and the profiles complete, but nothing is posted until a post is Approved (see Approval flow). Update "@sportnnote (handles not created yet)" at the top of this README and in the calendar once they exist.
+- **Before the first post:** the handles are reserved and the profiles complete (2026-10-24, see "Handles"), but nothing is posted until a post is Approved (see Approval flow).
 
 ### Paid promotion: points for the discussion
 - Which posts: the international how-tos and trust posts are the evergreen candidates; launch-week India posts are organic.
