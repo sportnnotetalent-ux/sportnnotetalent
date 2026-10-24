@@ -14,7 +14,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { theme } from '../core/theme';
-import { Button, Card, FormError, LoadingState, ScreenTitle, TextField, textStyles } from '../components/ui';
+import { Button, Card, FormError, LoadingState, ScreenTitle, SelectChip, TextField, textStyles } from '../components/ui';
+import { readableDob } from '../core/verificationReview';
 import { useAuth } from '../core/auth';
 import { decideGuardianConsent, previewGuardianConsent, type ConsentPreview } from '../data/privacy';
 import type { RootStackParamList } from '../navigation/types';
@@ -32,7 +33,9 @@ export default function GuardianConsentScreen() {
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState<{ status: string; linked: boolean } | null>(null);
+  const [done, setDone] = useState<{ status: string; linked: boolean; dobConfirmed?: boolean } | null>(null);
+  // Verification fast lanes: the parent confirms the child's date of birth here too.
+  const [dobOk, setDobOk] = useState<boolean | null>(null);
 
   const check = async (c: string) => {
     setChecking(true); setError(null);
@@ -44,7 +47,7 @@ export default function GuardianConsentScreen() {
 
   const decide = async (approve: boolean) => {
     setBusy(true); setError(null);
-    try { setDone(await decideGuardianConsent(code, approve, name.trim() || undefined)); }
+    try { setDone(await decideGuardianConsent(code, approve, name.trim() || undefined, preview?.dob && dobOk !== null ? dobOk : undefined)); }
     catch (e) { setError(e instanceof Error ? e.message : 'Something went wrong — try again.'); }
     finally { setBusy(false); }
   };
@@ -64,6 +67,11 @@ export default function GuardianConsentScreen() {
                 ? 'They can now use SportnNote fully. Messages from coaches or organisers about them come to you, not to them.'
                 : 'Their profile is hidden and following and messages are off. The account and its data will be deleted in 30 days unless you change your mind (ask them to send a new link).'}
             </Text>
+            {done.status === 'confirmed' && done.dobConfirmed ? (
+              <Text style={textStyles.body}>☑️ Date of birth confirmed — {child} can take part in events that need a parent-confirmed age.</Text>
+            ) : done.status === 'confirmed' && dobOk === false ? (
+              <Text style={textStyles.body}>Ask {child} to correct their date of birth in Edit profile. You can then confirm it from Settings → Link as a parent/guardian → Manage.</Text>
+            ) : null}
             {done.linked
               ? <Text style={textStyles.muted}>Your account is now linked as their parent/guardian. Manage their data any time in Settings → Link as a parent/guardian.</Text>
               : <Text style={textStyles.muted}>To view, download or delete their data later, sign in with your own SportnNote account and link it under Settings → Link as a parent/guardian.</Text>}
@@ -86,6 +94,16 @@ export default function GuardianConsentScreen() {
               <Text style={textStyles.muted}>Data is stored in India (Mumbai). You can view, download or delete it, or withdraw consent, at any time.</Text>
               <Button label="🔒 Read the Privacy Policy" variant="ghost" onPress={() => nav.navigate('Legal', { doc: 'privacy' })} />
             </Card>
+            {preview.dob ? (
+              <Card style={st.gap}>
+                <Text style={[textStyles.body, { fontWeight: '700' }]}>Is {child}’s date of birth {readableDob(preview.dob)}?</Text>
+                <Text style={textStyles.muted}>It decides which age groups they can play in. Confirming it here means they don’t need to upload a document.</Text>
+                <View style={st.chips}>
+                  <SelectChip label="✓ Yes, that’s right" active={dobOk === true} onPress={() => setDobOk(dobOk === true ? null : true)} />
+                  <SelectChip label="No, it’s wrong" active={dobOk === false} onPress={() => setDobOk(dobOk === false ? null : false)} />
+                </View>
+              </Card>
+            ) : null}
             <TextField label="Your name (optional)" value={name} onChange={setName} placeholder="e.g. Meera Kapoor" />
             {signedIn && (
               <Text style={textStyles.muted}>You’re signed in as {profile?.fullName}. If you agree, this account is linked as {child}’s parent/guardian so you can manage their data.</Text>
@@ -115,5 +133,6 @@ const st = StyleSheet.create({
   content: { padding: theme.spacing(4), gap: theme.spacing(3), paddingBottom: theme.spacing(10), maxWidth: 720, width: '100%', alignSelf: 'center' },
   gap: { gap: theme.spacing(2) },
   row: { flexDirection: 'row', gap: theme.spacing(2) },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing(2) },
   flex: { flex: 1 },
 });

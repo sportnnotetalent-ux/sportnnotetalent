@@ -1069,6 +1069,7 @@ interface PlayerRow {
   guardian_linked?: boolean | null;
   /** players_view (migration protect_minors): reduced card of a possible minor */
   restricted?: boolean | null;
+  age_verified_by?: 'document' | 'school' | 'parent' | null;
 }
 const toPlayer = (r: PlayerRow): Player => ({
   id: r.id,
@@ -1097,6 +1098,7 @@ const toPlayer = (r: PlayerRow): Player => ({
   findableByContact: r.findable_by_contact ?? undefined,
   guardianLinked: r.guardian_linked ?? undefined,
   restricted: r.restricted ? true : undefined,
+  ...(r.age_verified_by ? { ageVerifiedBy: r.age_verified_by } : {}),
 });
 
 /** Live player reads go through `players_view` (migration 0026): phone / email /
@@ -1111,12 +1113,24 @@ const PLAYER_SELECT_BASE = 'id, profile_id, full_name, jersey_no, sports, house_
  *  reduced card. False once the view says the column doesn't exist yet — reads
  *  then run without it (and every card counts as full, as before). */
 let viewHasRestricted = true;
-const playerSelect = () => (viewHasRestricted ? `${PLAYER_SELECT_BASE}, restricted` : PLAYER_SELECT_BASE);
+/** `age_verified_by` (migration verification_lanes): how the age was verified —
+ *  dropped first (same memo) when an older view doesn't have it yet. */
+let viewHasAgeLevel = true;
+const playerSelect = () => (viewHasRestricted
+  ? `${PLAYER_SELECT_BASE}, restricted${viewHasAgeLevel ? ', age_verified_by' : ''}`
+  : PLAYER_SELECT_BASE);
 const isMissingRestricted = (err: { code?: string; message?: string } | null | undefined): boolean =>
   !!err && (['42703', 'PGRST204'].includes(err.code ?? '') || /restricted/i.test(err.message ?? ''));
-/** Run a players_view read with `restricted`, retrying once without it before the migration. */
+const isMissingAgeLevel = (err: { code?: string; message?: string } | null | undefined): boolean =>
+  !!err && (['42703', 'PGRST204'].includes(err.code ?? '') || /age_verified_by/i.test(err.message ?? ''));
+/** Run a players_view read with the newest columns, retrying without them on a
+ *  database that hasn't run their migration yet. */
 async function readPlayers(run: (cols: string) => PromiseLike<{ data: unknown; error: { code?: string; message?: string } | null }>): Promise<{ data: unknown; error: { code?: string; message?: string } | null }> {
-  const res = await run(playerSelect());
+  let res = await run(playerSelect());
+  if (viewHasRestricted && viewHasAgeLevel && isMissingAgeLevel(res.error)) {
+    viewHasAgeLevel = false;
+    res = await run(playerSelect());
+  }
   if (viewHasRestricted && isMissingRestricted(res.error)) {
     viewHasRestricted = false;
     return run(playerSelect());
@@ -4286,6 +4300,90 @@ export async function setVerificationReviewer(profileId: string, on: boolean): P
   if (error) throw new Error(error.message);
 }
 
+/* ------------- Verification fast lanes, Phase 2 (parent / school) -------------
+ * docs/verification/fast-lanes.md — migration 20261024180000_verification_lanes.
+ * Every write is a server function; confirmations count only for the date of
+ * birth they confirmed. */
+
+const rpcMessage = (e: { message?: string } | null | undefined, fallback: string) => e?.message?.replace(/^.*?:\s*/, '') || fallback;
+
+/** Linked parent: the child's date of birth to confirm, and whether it is. */
+export async function guardianChildDob(playerId: string): Promise<{ dob?: string; confirmed: boolean; verifiedBy?: Player['ageVerifiedBy'] } | null> {
+  if (!isSupabaseConfigured || !supabase) {
+    const p = demo.players.find((x) => x.id === playerId);
+    return p ? { dob: p.dob, confirmed: false } : null;
+  }
+  const { data, error } = await supabase.rpc('guardian_child_dob', { p_player: playerId });
+  if (error || !data) return null;
+  const d = data as { dob?: string | null; confirmed?: boolean; verifiedBy?: Player['ageVerifiedBy'] | null };
+  return { dob: d.dob ?? undefined, confirmed: !!d.confirmed, verifiedBy: d.verifiedBy ?? undefined };
+}
+
+/** Linked parent confirms the child's date of birth. */
+export async function guardianConfirmDob(playerId: string): Promise<void> {
+  if (!isSupabaseConfigured || !supabase) return;
+  const { error } = await supabase.rpc('guardian_confirm_dob', { p_player: playerId });
+  if (error) throw new Error(rpcMessage(error, 'Couldn’t confirm the date of birth — try again.'));
+}
+
+/** Owner / Admin asks SportnNote to verify their school or club; reviewers are alerted. */
+export async function requestOrgVerification(orgId: string): Promise<void> {
+  if (!isSupabaseConfigured || !supabase) return;
+  const { error } = await supabase.rpc('request_org_verification', { p_org: orgId });
+  if (error) throw new Error(rpcMessage(error, 'Couldn’t send the request — try again.'));
+  try {
+    await supabase.functions.invoke(fnPath('verification-submit'), { body: { orgId } });
+  } catch { /* best-effort: the hourly reminder picks it up */ }
+}
+
+export interface PendingOrgVerification {
+  orgId: string; name: string; type?: string; city?: string; email?: string; phone?: string; requestedAt?: string; members: number;
+}
+
+/** Reviewers: schools / clubs waiting to be verified. */
+export async function getPendingOrgVerifications(): Promise<PendingOrgVerification[]> {
+  if (!isSupabaseConfigured || !supabase) return [];
+  const { data, error } = await supabase.rpc('pending_org_verifications');
+  if (error) return [];
+  return ((data ?? []) as { org_id: string; name: string; type: string | null; city: string | null; email: string | null; phone: string | null; requested_at: string | null; members: number | string | null }[])
+    .map((r) => ({ orgId: r.org_id, name: r.name, type: r.type ?? undefined, city: r.city ?? undefined, email: r.email ?? undefined, phone: r.phone ?? undefined, requestedAt: r.requested_at ?? undefined, members: Number(r.members ?? 0) }));
+}
+
+/** Reviewers: verify (or decline / remove) a school or club. */
+export async function reviewOrgVerification(orgId: string, approve: boolean): Promise<void> {
+  if (!isSupabaseConfigured || !supabase) return;
+  const { error } = await supabase.rpc('review_org_verification', { p_org: orgId, p_approve: approve });
+  if (error) throw new Error(rpcMessage(error, 'Couldn’t save that — try again.'));
+}
+
+export interface OrgMemberDob {
+  playerId: string; fullName: string; dob?: string; age?: number;
+  /** confirmed by THIS organisation for the current date of birth */
+  confirmed: boolean;
+  verifiedBy?: Player['ageVerifiedBy'];
+}
+
+/** Owner / Admin of a verified school or club: members' dates of birth. */
+export async function getOrgMemberDobs(orgId: string): Promise<OrgMemberDob[]> {
+  if (!isSupabaseConfigured || !supabase) {
+    return demo.players.slice(0, 8).map((p) => ({ playerId: p.id, fullName: p.fullName, dob: p.dob, age: ageOf(p), confirmed: false }));
+  }
+  const { data, error } = await supabase.rpc('org_member_dobs', { p_org: orgId });
+  if (error) throw new Error(rpcMessage(error, 'Couldn’t load the members — try again.'));
+  return ((data ?? []) as { player_id: string; full_name: string; dob: string | null; age: number | null; confirmed: boolean; verified_by: Player['ageVerifiedBy'] | null }[])
+    .map((r) => ({ playerId: r.player_id, fullName: r.full_name, dob: r.dob ?? undefined, age: r.age ?? undefined, confirmed: !!r.confirmed, verifiedBy: r.verified_by ?? undefined }));
+}
+
+/** Owner / Admin of a verified school or club confirms members' dates of birth
+ *  against its records. Returns how many were confirmed. */
+export async function confirmOrgDobs(orgId: string, playerIds: string[]): Promise<number> {
+  if (!playerIds.length) return 0;
+  if (!isSupabaseConfigured || !supabase) return playerIds.length;
+  const { data, error } = await supabase.rpc('org_confirm_dobs', { p_org: orgId, p_players: playerIds });
+  if (error) throw new Error(rpcMessage(error, 'Couldn’t confirm those — try again.'));
+  return Number(data ?? 0);
+}
+
 /* ------------------------------ Connect board ------------------------------ */
 
 const toListing = (r: any): Listing => ({
@@ -4879,6 +4977,8 @@ const toOrganization = (r: any, members: OrgMember[]): Organization => ({
   academicYears: r.academic_years ?? undefined,
   graduatingStandard: r.graduating_standard ?? undefined,
   market: r.market ?? undefined,
+  ...(r.verified_at ? { verifiedAt: r.verified_at as string } : {}),
+  ...(r.verification_requested_at ? { verificationRequestedAt: r.verification_requested_at as string } : {}),
 });
 // houses (migration 0022) is optional in the select so reads still work pre-migration.
 const ORG_SELECT = 'id, name, type, logo_url, city, email, phone, bio, academic_years, graduating_standard';
@@ -4886,8 +4986,16 @@ const ORG_SELECT_FULL = `${ORG_SELECT}, houses`;
 // SD-153: organizations.market (migration 20261020160000_market_presets) —
 // remembered once missing so pre-migration databases don't pay a failed read each time.
 let orgMarketCol = true;
+// Verification fast lanes (migration 20261024180000_verification_lanes): a
+// verified school / club — same once-missing memo.
+let orgVerifyCols = true;
 const isMissingCol = (e: unknown) => ['42703', 'PGRST204'].includes(String((e as { code?: string } | null)?.code ?? ''));
 async function withOrgCols<T>(build: (cols: string) => PromiseLike<{ data: T | null; error: unknown }>): Promise<{ data: T | null; error: unknown }> {
+  if (orgVerifyCols && orgMarketCol) {
+    const withVerify = await build(`${ORG_SELECT_FULL}, market, verified_at, verification_requested_at`);
+    if (!withVerify.error) return withVerify;
+    orgVerifyCols = false;
+  }
   if (orgMarketCol) {
     const withMarket = await build(`${ORG_SELECT_FULL}, market`);
     if (!withMarket.error) return withMarket;

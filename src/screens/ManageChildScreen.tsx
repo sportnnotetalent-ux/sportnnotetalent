@@ -19,6 +19,8 @@ import {
   type DataExport, type GuardianChild,
 } from '../data/privacy';
 import type { RootStackParamList } from '../navigation/types';
+import { guardianChildDob, guardianConfirmDob } from '../data/repos';
+import { readableDob } from '../core/verificationReview';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -43,6 +45,10 @@ export default function ManageChildScreen() {
     .then((list) => setChild(list.find((c) => c.playerId === params.playerId) ?? null))
     .catch(() => setChild(null)), [params.playerId]);
   useEffect(() => { void load(); }, [load]);
+  // Verification fast lanes: the linked parent confirms the date of birth.
+  const [dob, setDob] = useState<Awaited<ReturnType<typeof guardianChildDob>>>(null);
+  const loadDob = useCallback(() => { void guardianChildDob(params.playerId).then(setDob); }, [params.playerId]);
+  useEffect(loadDob, [loadDob]);
 
   const run = async (key: string, fn: () => Promise<string | void>) => {
     setBusy(key); setError(null); setNote(null);
@@ -82,6 +88,11 @@ export default function ManageChildScreen() {
     await load();
     return confirm ? 'Confirmed — their account is fully on.' : 'Withdrawn — their account is locked.';
   });
+  const confirmDob = () => run('dob', async () => {
+    await guardianConfirmDob(child.playerId);
+    loadDob();
+    return 'Date of birth confirmed ✓';
+  });
   const remove = () => run('delete', async () => {
     const ok = await askConfirm({
       title: `Delete ${child.fullName}’s data?`,
@@ -110,6 +121,23 @@ export default function ManageChildScreen() {
           )}
           {child.hasAccount && (child.consent === 'confirmed' || child.consent === 'self_declared') && (
             <Button label={busy === 'withdraw' ? 'Saving…' : 'Withdraw consent'} variant="ghost" onPress={() => void setConsent(false)} disabled={!!busy} />
+          )}
+        </Card>
+
+        <Card style={st.gap}>
+          <Text style={textStyles.h3}>Date of birth</Text>
+          {!dob?.dob ? (
+            <Text style={textStyles.muted}>No date of birth yet — ask {child.fullName.split(' ')[0]} to add it in Edit profile.</Text>
+          ) : dob.confirmed || dob.verifiedBy ? (
+            <Text style={textStyles.body}>
+              {readableDob(dob.dob)} · ☑️ {dob.verifiedBy === 'document' ? 'verified by document' : dob.verifiedBy === 'school' ? 'confirmed by their school / club' : 'confirmed by you'}
+            </Text>
+          ) : (
+            <>
+              <Text style={textStyles.body}>Is it {readableDob(dob.dob)}?</Text>
+              <Text style={textStyles.muted}>It decides which age groups they can play in. Confirming it means they don’t need to upload a document. If it’s wrong, ask them to fix it in Edit profile first.</Text>
+              <Button label={busy === 'dob' ? 'Saving…' : '✓ Yes, confirm their date of birth'} onPress={() => void confirmDob()} disabled={!!busy} />
+            </>
           )}
         </Card>
 

@@ -125,11 +125,15 @@ export async function requestGuardianConsent(): Promise<{ sent: boolean; reason?
   return data as { sent: boolean; reason?: string; email?: string };
 }
 
-export interface ConsentPreview { childFirstName: string; ageBand: string | null; status: GuardianConsent; expiresAt: string }
+export interface ConsentPreview {
+  childFirstName: string; ageBand: string | null; status: GuardianConsent; expiresAt: string;
+  /** the child's date of birth, for the parent to confirm (verification fast lanes) */
+  dob?: string | null;
+}
 
 export async function previewGuardianConsent(code: string): Promise<ConsentPreview> {
   if (!live()) {
-    if (code.replace(/[^A-Za-z0-9]/g, '').toUpperCase() === 'DEMO') return { childFirstName: 'Aarav', ageBand: '13 to 17', status: 'pending', expiresAt: new Date(Date.now() + 7 * 864e5).toISOString() };
+    if (code.replace(/[^A-Za-z0-9]/g, '').toUpperCase() === 'DEMO') return { childFirstName: 'Aarav', ageBand: '13 to 17', status: 'pending', dob: '2011-06-14', expiresAt: new Date(Date.now() + 7 * 864e5).toISOString() };
     throw new Error('That link or code isn’t valid or has expired. (Demo: use the code DEMO.)');
   }
   const { data, error } = await supabase!.rpc('guardian_consent_preview', { p_code: code });
@@ -137,11 +141,16 @@ export async function previewGuardianConsent(code: string): Promise<ConsentPrevi
   return data as ConsentPreview;
 }
 
-export async function decideGuardianConsent(code: string, approve: boolean, guardianName?: string): Promise<{ status: string; linked: boolean }> {
-  if (!live()) return { status: approve ? 'confirmed' : 'withdrawn', linked: false };
-  const { data, error } = await supabase!.rpc('guardian_consent_decide', { p_code: code, p_approve: approve, p_guardian_name: guardianName ?? null });
+/** The parent's decision. `dobConfirmed`: they also confirmed the child's date
+ *  of birth (verification fast lanes — migration verification_lanes). */
+export async function decideGuardianConsent(code: string, approve: boolean, guardianName?: string, dobConfirmed?: boolean): Promise<{ status: string; linked: boolean; dobConfirmed?: boolean }> {
+  if (!live()) return { status: approve ? 'confirmed' : 'withdrawn', linked: false, dobConfirmed: approve && !!dobConfirmed };
+  const { data, error } = await supabase!.rpc('guardian_consent_decide', {
+    p_code: code, p_approve: approve, p_guardian_name: guardianName ?? null,
+    ...(dobConfirmed !== undefined ? { p_dob_confirmed: dobConfirmed } : {}),
+  });
   if (error) throw new Error(await rpcError(error));
-  return data as { status: string; linked: boolean };
+  return data as { status: string; linked: boolean; dobConfirmed?: boolean };
 }
 
 /* ------------------------- linked guardian controls ------------------------ */

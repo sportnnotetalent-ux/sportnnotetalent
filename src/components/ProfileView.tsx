@@ -179,7 +179,7 @@ export function ProfileView({
         <View style={{ flex: 1 }}>
           <Text style={textStyles.h2}>
             {player.fullName}
-            {player.verification?.status === 'approved' ? <Text style={st.verifiedTick}>  ☑️</Text> : null}
+            {player.verification?.status === 'approved' || player.ageVerifiedBy ? <Text style={st.verifiedTick} accessibilityLabel="Age verified">  ☑️</Text> : null}
           </Text>
           <Text style={textStyles.muted}>
             {player.houseName ?? 'Independent'}
@@ -547,8 +547,11 @@ function VerificationCard({ player, owner, reviewer }: { player: Player; owner: 
   };
 
   const status = v?.status;
+  // Fast lanes: a school / club or a parent may already have confirmed the age.
+  const confirmedBy = status !== 'approved' && (player.ageVerifiedBy === 'school' || player.ageVerifiedBy === 'parent') ? player.ageVerifiedBy : undefined;
   const badge =
     status === 'approved' ? { label: '☑️ Verified', color: theme.colors.primary }
+    : confirmedBy ? { label: '☑️ Age confirmed', color: theme.colors.primary }
     : status === 'pending' ? { label: '⏳ Pending review', color: theme.colors.accent }
     : status === 'rejected' ? { label: '✗ Rejected', color: theme.colors.danger }
     : { label: 'Not submitted', color: theme.colors.textMuted };
@@ -562,7 +565,12 @@ function VerificationCard({ player, owner, reviewer }: { player: Player; owner: 
       <Text style={textStyles.muted}>
         Verify the player&apos;s date of birth by uploading a proof ID (image or PDF) — e.g. a birth certificate, school ID or passport. For under-18 players this also confirms the parent/guardian. Our support team reviews and approves it.
       </Text>
-      {owner && status !== 'approved' && (
+      {confirmedBy ? (
+        <Text style={textStyles.body}>
+          {confirmedBy === 'school' ? 'Your school / club has confirmed your date of birth from its records' : 'Your parent/guardian has confirmed your date of birth'} — no document needed.
+        </Text>
+      ) : null}
+      {owner && status !== 'approved' && !confirmedBy && (
         <Button
           label={busy ? 'Uploading…' : status === 'pending' || status === 'rejected' ? '📎 Re-submit proof (image / PDF)' : '📎 Upload proof of DOB (image / PDF)'}
           variant="ghost"

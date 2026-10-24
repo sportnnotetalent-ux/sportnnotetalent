@@ -34,12 +34,24 @@ Deno.serve(async (req) => {
     return Response.json({ error: 'read failed' }, { status: 500 });
   }
   const rows = (data ?? []) as { id: string; verification: { submittedAt?: number; remindedAt?: number } & Record<string, unknown> }[];
+  // Schools / clubs waiting to be verified: re-alert every 12 hours of waiting
+  // (this runs hourly, so each 12th hour comes round once).
+  const { data: orgRows } = await admin.from('organizations').select('id, verification_requested_at')
+    .not('verification_requested_at', 'is', null).is('verified_at', null);
+  const orgsDue = ((orgRows ?? []) as { verification_requested_at: string }[]).filter((o) => {
+    const h = Math.floor((now - Date.parse(o.verification_requested_at)) / 3_600_000);
+    return h >= 12 && h % 12 === 0;
+  }).length;
+  if (orgsDue && !dry) {
+    await alertReviewers(`🏫 ${orgsDue} school${orgsDue === 1 ? '' : 's'} / club${orgsDue === 1 ? '' : 's'} waiting to be verified`,
+      'Please check and verify them in the review queue today.', 'org-verification-reminder');
+  }
   const due = rows.filter((r) => {
     const sub = Number(r.verification?.submittedAt ?? 0);
     const last = Number(r.verification?.remindedAt ?? 0);
     return sub > 0 && now - sub >= WAIT_MS && now - last >= WAIT_MS;
   });
-  if (!due.length) return Response.json({ pending: rows.length, reminded: 0 });
+  if (!due.length) return Response.json({ pending: rows.length, reminded: 0, orgsDue });
 
   const oldest = Math.min(...due.map((r) => Number(r.verification.submittedAt)));
   const title = `⏳ ${due.length} verification${due.length === 1 ? '' : 's'} waiting`;

@@ -15,8 +15,9 @@
  * the submission still stands (the row is already `pending`), and the hourly
  * verification-reminders job alerts reviewers again after 12 hours.
  *
- * Contract (matches data/repos.ts → submitVerificationDoc):
- *   POST { playerId }
+ * Contract (data/repos.ts → submitVerificationDoc / requestOrgVerification):
+ *   POST { playerId }  — a proof of date of birth was uploaded
+ *   POST { orgId }     — a school / club asked to be verified (Owner / Admin only)
  *     → 200 { delivered: boolean }
  *
  * Abuse guards (migration 0025): signed-in callers only, and only for a player
@@ -46,19 +47,42 @@ Deno.serve(async (req) => {
   if (caller instanceof Response) return caller;
   if (!(await rateLimit('verification-submit', caller.user.id, 10, 86400))) return tooMany();
 
-  let body: { playerId?: unknown };
+  let body: { playerId?: unknown; orgId?: unknown };
   try {
     body = await req.json();
   } catch {
     return json({ error: 'invalid JSON' }, 400);
   }
-  const playerId = typeof body.playerId === 'string' ? body.playerId : '';
-  if (!playerId) return json({ error: 'playerId is required' }, 400);
-
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
   );
+
+  // A school / club asks to be verified (request_org_verification already
+  // recorded it) — only its Owners / Admins may trigger the alert.
+  const orgId = typeof body.orgId === 'string' ? body.orgId : '';
+  if (orgId) {
+    const { data: mine } = await supabase.from('players').select('id').eq('profile_id', caller.user.id);
+    const ids = ((mine ?? []) as { id: string }[]).map((r) => r.id);
+    const today = new Date().toISOString().slice(0, 10);
+    const { data: roles } = ids.length
+      ? await supabase.from('org_members').select('role, until').eq('org_id', orgId).in('player_id', ids).in('role', ['Owner', 'Admin'])
+      : { data: [] };
+    const admin = ((roles ?? []) as { until: string | null }[]).some((r) => !r.until || r.until >= today);
+    if (!admin) return json({ delivered: false, error: 'not an owner or admin' }, 403);
+    const { data: org } = await supabase.from('organizations').select('name, verification_requested_at, verified_at').eq('id', orgId).maybeSingle();
+    const o = org as { name?: string; verification_requested_at?: string | null; verified_at?: string | null } | null;
+    if (!o?.verification_requested_at || o.verified_at) return json({ delivered: false, error: 'nothing to review' }, 400);
+    const sent = await alertReviewers(
+      '🏫 A school or club asks to be verified',
+      `${(o.name ?? 'An organisation').slice(0, 80)} wants to be verified, so it can confirm its members' dates of birth. Check it's genuine, then verify it in the review queue.`,
+      `org-${orgId}`,
+    );
+    return json({ delivered: sent.app + sent.web > 0 || sent.email });
+  }
+
+  const playerId = typeof body.playerId === 'string' ? body.playerId : '';
+  if (!playerId) return json({ error: 'playerId is required' }, 400);
 
   // Read the player + their pending verification (service role bypasses RLS).
   const { data: player, error } = await supabase

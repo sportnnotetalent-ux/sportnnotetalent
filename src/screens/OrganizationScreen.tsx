@@ -18,6 +18,7 @@ import type { RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { theme } from '../core/theme';
 import { EmptyState, Button, Card, Pill, SelectChip, TextField, ScreenTitle, textStyles } from '../components/ui';
+import { OrgVerificationCard } from '../components/OrgVerificationCard';
 import { SectionHeader, SECTION_CAP } from '../components/SectionHeader';
 import { LogoPicker } from '../components/LogoPicker';
 import { DateField } from '../components/DateTimeField';
@@ -418,7 +419,7 @@ export default function OrganizationScreen() {
       <View style={st.header}>
         <LogoPicker logoUrl={org.logoUrl} canManage={canManage} onPick={saveLogo} kind="org-logo" size={60} placeholder="🏛️" />
         <View style={{ flex: 1 }}>
-          <ScreenTitle title={org.name} subtitle={[org.type, org.city ? `📍 ${org.city}` : ''].filter(Boolean).join(' · ') || 'Community'} />
+          <ScreenTitle title={org.name} subtitle={[org.verifiedAt ? '✓ Verified' : '', org.type, org.city ? `📍 ${org.city}` : ''].filter(Boolean).join(' · ') || 'Community'} />
         </View>
       </View>
       <View style={st.tabs}>
@@ -442,6 +443,7 @@ export default function OrganizationScreen() {
                 <Text style={[st.link, { alignSelf: 'flex-end' }]} onPress={() => setEditing(true)}>✎ Edit</Text>
               )}
               {org.bio ? <Text style={textStyles.muted}>{org.bio}</Text> : null}
+              <OrgVerificationCard org={org} canManage={canManage} onChanged={loadOrg} onConfirmDobs={() => nav.navigate('OrgDobs', { orgId: org.id })} />
               {(org.email || org.phone) && (
                 <Card style={{ gap: theme.spacing(1) }}>
                   <Text style={textStyles.muted}>Contact</Text>

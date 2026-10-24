@@ -33,7 +33,7 @@ Under-18s also had three separate parent steps: parent mobile code, parent email
 
 A changed date of birth (or guardian identity) voids every level, as it voids document approval today.
 
-## Phase 1: faster document review (this release)
+## Phase 1: faster document review (live 2026-10-24)
 
 - **Upload:** a failed upload shows an error and nothing is marked pending without a file.
 - **Reviewers:**
@@ -49,7 +49,7 @@ A changed date of birth (or guardian identity) voids every level, as it voids do
 - **Review screen:** the document shown inline (image) or opened (PDF), next to the entered name, date of birth, age and parent; preset reject reasons; one-tap approve. Support sees a Reviewers section.
 - **Entry points:** Settings and the profile show "Review verifications (N waiting)" to every reviewer.
 
-## Phase 2: new lanes
+## Phase 2: new lanes (built 2026-10-24; migration 20261024180000_verification_lanes)
 
 - `organizations.verified_at` / `verified_by`, set by reviewers (SportnNote verifies a school once).
 - `players.dob_confirmations` (`{ parent?, org? }`), written only by server functions:

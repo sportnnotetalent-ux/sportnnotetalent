@@ -13,6 +13,35 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-24 — Verification fast lanes, Phase 2: parent confirms, school / club confirms
+Two faster ways to verify a date of birth, besides an uploaded document (design: `docs/verification/fast-lanes.md`).
+- **Migration `20261024180000_verification_lanes.sql`:**
+  - `players.dob_confirmations` (`{ parent?, org? }`, each storing the date of birth it confirmed). Only server functions write it; the `players_dob_confirmations_guard` trigger blocks client writes.
+  - **Parent:** `guardian_consent_preview` now returns the child's date of birth. `guardian_consent_decide(…, p_dob_confirmed)` records the confirmation when consent is approved (the old 3-argument function is dropped; old apps still work through the default). `guardian_child_dob` / `guardian_confirm_dob` let a linked parent confirm at any time.
+  - **School / club:**
+    - `organizations.verified_at` / `verified_by` / `verification_requested_at`. Clients can't set them, and renaming the organisation clears verification.
+    - `request_org_verification` (Owner / Admin).
+    - `pending_org_verifications` / `review_org_verification` (reviewers).
+    - `org_member_dobs` / `org_confirm_dobs`: Owner / Admin of a VERIFIED organisation, active members only.
+  - **`players_view.age_verified_by`:** `document` / `school` / `parent`, a level only. A confirmation counts only while the date of birth still matches.
+- **Edge functions:**
+  - `verification-submit` also takes `{ orgId }`: a school's request alerts reviewers (Owner / Admin only).
+  - `verification-reminders` re-alerts reviewers every 12 hours a school has waited.
+- **App:**
+  - **Consent page:** asks "Is <child>'s date of birth <date>?" (yes / no). The done card says it's confirmed, or how to fix it.
+  - **Manage child:** a "Date of birth" card (confirm, or shows who verified it).
+  - **Organisation page:** new `OrgVerificationCard`.
+    - "✓ Verified" shows in the header.
+    - An Owner / Admin can ask to be verified, then confirm members' dates of birth.
+    - Reviewers can Verify / Decline / Remove there.
+  - **New `OrgDobs` screen:** tick or Select all, then Confirm N, plus no-date-of-birth and confirmed lists. Route `OrgDobs`.
+  - **Review queue:** a "Schools & clubs asking to be verified" section.
+  - **Profile:** a ☑️ tick and "Age confirmed — no document needed" when a school or parent confirmed. `Player.ageVerifiedBy` and `Organization.verifiedAt` are read with pre-migration fallbacks.
+- **Verified:**
+  - `tests/verification-lanes.test.mts` (9); suite 4518 pass / 0 fail; app and edge tsc clean.
+  - Demo: the consent page (code DEMO) asks for the date of birth, and "Yes" + "I agree" shows "Date of birth confirmed". The org page shows the verification card (Ask / Verify). OrgDobs: Select all, then Confirm 8, gives "8 dates of birth confirmed". No console errors.
+- **Needs:** the founder runs the migration; redeploy `verification-submit` and `verification-reminders`; publish the app. Phase 3 (one checklist card, organiser-chosen requirement) is next.
+
 ### 2026-10-24 — IDs-only scoring: racket sports + volleyball (group A) and cricket (group E)
 Two worktree agents built on Stage 0 (`8557c16`). Both were merged; the only conflicts were the undo label and the voice-confirm line, where each group had threaded the name lookup.
 - **Group A** (badminton, tennis, padel, pickleball, squash, table tennis, volleyball; merge `6eac0f3`):

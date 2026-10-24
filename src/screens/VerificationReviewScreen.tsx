@@ -8,14 +8,18 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Linking, Image, Pressable } from 'react-native';
 import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RootStackParamList } from '../navigation/types';
 import { theme } from '../core/theme';
 import { Button, Card, Pill, TextField, ScreenTitle, EmptyState, SelectChip, FormError, textStyles } from '../components/ui';
 import { PhoneField } from '../components/PhoneField';
 import {
-  findPlayerByEmail, findPlayerByPhone, getPendingVerifications, getVerificationReviewers, reviewVerification,
-  setVerificationReviewer, verificationDocUrl, type PendingVerification,
+  findPlayerByEmail, findPlayerByPhone, getPendingOrgVerifications, getPendingVerifications, getVerificationReviewers,
+  reviewOrgVerification, reviewVerification, setVerificationReviewer, verificationDocUrl,
+  type PendingOrgVerification, type PendingVerification,
 } from '../data/repos';
+import { formatPhone } from '../core/phone';
 import { useVerificationReviewer } from '../data/useVerificationReviewer';
 import { ageFromDob } from '../core/age';
 import { isSupport } from '../core/roles';
@@ -26,6 +30,7 @@ export default function VerificationReviewScreen() {
   const { profile } = useAuth();
   const reviewer = useVerificationReviewer();
   const [pending, setPending] = useState<PendingVerification[] | null>(null);
+  const [orgs, setOrgs] = useState<PendingOrgVerification[]>([]);
   const [done, setDone] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
 
@@ -33,6 +38,7 @@ export default function VerificationReviewScreen() {
     if (!reviewer) return;
     setNow(Date.now());
     void getPendingVerifications().then(setPending).catch(() => setPending([]));
+    void getPendingOrgVerifications().then(setOrgs).catch(() => setOrgs([]));
   }, [reviewer]);
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
@@ -56,8 +62,9 @@ export default function VerificationReviewScreen() {
               Open each document and check the name and date of birth match what was entered, then approve or reject. The player and their parent/guardian are told straight away. Documents are deleted 30 days after your decision.
             </Text>
             {done ? <Text style={st.done} accessibilityRole="alert">{done}</Text> : null}
+            {orgs.length > 0 ? <OrgRequests orgs={orgs} onDone={(id, ok) => { setOrgs((l) => l.filter((o) => o.orgId !== id)); setDone(ok ? '✓ Verified — its admins can now confirm members’ dates of birth.' : 'Declined.'); }} /> : null}
             {pending.length === 0 ? (
-              <Card><EmptyState icon="🎉" title="Nothing waiting" hint="You'll get a notification when someone uploads a proof." compact /></Card>
+              <Card><EmptyState icon="🎉" title="No documents waiting" hint="You'll get a notification when someone uploads a proof." compact /></Card>
             ) : (
               pending.map((p) => <Submission key={p.playerId} p={p} now={now} onDecided={(s) => decided(p, s)} />)
             )}
@@ -122,6 +129,42 @@ function Submission({ p, now, onDecided }: { p: PendingVerification; now: number
         <Button label={busy ? '…' : '☑️ Approve'} style={st.flex} onPress={() => decide('approved')} disabled={busy || !p.docPath} />
       </View>
     </Card>
+  );
+}
+
+/** Schools / clubs asking to be verified (fast lanes Phase 2): once verified,
+ *  their Owners / Admins confirm members' dates of birth from their records. */
+function OrgRequests({ orgs, onDone }: { orgs: PendingOrgVerification[]; onDone: (orgId: string, ok: boolean) => void }) {
+  const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const decide = async (o: PendingOrgVerification, ok: boolean) => {
+    setBusy(o.orgId); setError(null);
+    try { await reviewOrgVerification(o.orgId, ok); onDone(o.orgId, ok); }
+    catch (e) { setError(e instanceof Error ? e.message : 'Couldn’t save that.'); }
+    finally { setBusy(null); }
+  };
+  return (
+    <>
+      <Text style={textStyles.h3}>🏫 Schools & clubs asking to be verified · {orgs.length}</Text>
+      <Text style={textStyles.muted}>Check each is genuine — an official email, phone number or website — before verifying. Its admins will then be able to confirm their members’ dates of birth.</Text>
+      {orgs.map((o) => (
+        <Card key={o.orgId} style={{ gap: theme.spacing(2) }}>
+          <View style={st.head}>
+            <Text style={[textStyles.body, { fontWeight: '800', flex: 1 }]} onPress={() => nav.navigate('Organization', { orgId: o.orgId })}>{o.name} ›</Text>
+            {o.requestedAt ? <Pill label={new Date(o.requestedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })} color={theme.colors.surfaceAlt} textColor={theme.colors.accent} /> : null}
+          </View>
+          <Row label="Type" value={[o.type, o.city].filter(Boolean).join(' · ') || '—'} />
+          <Row label="Contact" value={[o.email, o.phone ? formatPhone(o.phone) : ''].filter(Boolean).join(' · ') || 'none given'} />
+          <Row label="Members" value={String(o.members)} />
+          <View style={st.actions}>
+            <Button label="Decline" variant="ghost" style={st.flex} onPress={() => void decide(o, false)} disabled={busy === o.orgId} />
+            <Button label={busy === o.orgId ? '…' : '✓ Verify'} style={st.flex} onPress={() => void decide(o, true)} disabled={busy === o.orgId} />
+          </View>
+        </Card>
+      ))}
+      <FormError message={error} />
+    </>
   );
 }
 

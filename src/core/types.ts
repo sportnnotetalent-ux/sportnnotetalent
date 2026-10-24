@@ -135,6 +135,10 @@ export interface Player {
    *  REDUCED card of a possible minor — no photo, city, school or bio (and only
    *  initials when logged out). See core/minorPrivacy.ts. */
   restricted?: boolean;
+  /** Verification fast lanes: how this player's date of birth was verified —
+   *  an approved document, their verified school / club, or their parent.
+   *  Absent = not verified (players_view.age_verified_by). */
+  ageVerifiedBy?: 'document' | 'school' | 'parent';
 }
 
 /** Parent/guardian contact for a young player. Phone & email are verified the
@@ -315,6 +319,11 @@ export interface HouseStint {
 export interface Organization {
   id: UUID;
   name: string;
+  /** Verification fast lanes: SportnNote verified this school / club (its
+   *  Owners / Admins may then confirm members' dates of birth). */
+  verifiedAt?: string;
+  /** …and when it asked to be verified (pending). */
+  verificationRequestedAt?: string;
   /** community kind — a standard type (School, Company, …) or a custom label */
   type?: string;
   logoUrl?: string;

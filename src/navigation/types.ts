@@ -85,6 +85,8 @@ export type RootStackParamList = {
   GuardianConsent: { c?: string } | undefined;
   /** SD-152: a linked guardian manages their child's account. */
   ManageChild: { playerId: string };
+  /** Verification fast lanes: a verified school / club confirms members' dates of birth */
+  OrgDobs: { orgId: string };
   /** Support: reported-message queue (migration 0027). */
   MessageReports: undefined;
   /** Golf (field event) — a round's scorecard + leaderboard, and its setup. */
