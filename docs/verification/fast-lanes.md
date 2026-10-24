@@ -55,7 +55,7 @@ A changed date of birth (or guardian identity) voids every level, as it voids do
 - `players.dob_confirmations` (`{ parent?, org? }`), written only by server functions:
   - `guardian_consent_decide` (+ DOB confirmation) and `guardian_confirm_dob`
   - `org_member_dobs` / `org_confirm_dobs` (Owner/Admin of a verified org)
-  - roster import by a verified org's admin
+  - roster import: imported dates of birth show up on the bulk-confirm screen (`OrgDobs`), where Select all then Confirm takes two taps
 - `players_view` exposes `age_verified_by` (`document` / `school` / `parent` / null): non-sensitive, for organisers' eligibility checks.
 
 ## Phase 3: together
