@@ -1,20 +1,26 @@
 /** Basketball play-by-play, newest first, stamped with quarter + minute. Shares
  *  the rail-and-nodes look of the other sports' timelines (team-coloured spine,
- *  a ring + LATEST tag on the newest play, "+N earlier" when it's capped). */
+ *  a ring + LATEST tag on the newest play, "+N earlier" when it's capped).
+ *  IDs-only scoring: plays name players by id — the viewer's names
+ *  (useMask().nameOf, the squads' as the fallback) and profile links by id. */
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { theme } from '../../core/theme';
 import type { Player } from '../../core/types';
 import { BB_META, DQ_LABEL, FOUL_LABEL, type BBEvent } from './events';
-import { playerLink, idByName } from '../playerLink';
+import { playerLink } from '../playerLink';
 import { eventClock, type BasketballState } from './engine';
+import { onPlayerOf, playId, playerOf, type NameOf } from './names';
+import { useMask } from '../../core/disputeMask';
+import { withRosters } from '../racketNames';
 
-function describe(e: BBEvent): string {
-  const who = e.playerName ?? 'Team';
+function describe(e: BBEvent, ids: Pick<BasketballState, 'ids'>, nameOf: NameOf): string {
+  const who = playerOf(ids, e, nameOf) ?? 'Team';
+  const on = onPlayerOf(ids, e, nameOf);
   if (e.type === 'score') return `+${e.points ?? 0}  ${who}`;
   if (e.type === 'miss') return `${e.points === 3 ? '3PT' : `${e.points ?? 2}PT`} miss  ${who}`;
   if (e.type === 'freethrow') return `${e.made ? '✅ made' : '❌ miss'}  ${who}`;
-  if (e.type === 'sub' && e.onName) return `${who} ▸ ${e.onName}`;
+  if (e.type === 'sub' && on) return `${who} ▸ ${on}`;
   if (e.type === 'foul' && e.foulType) return `${FOUL_LABEL[e.foulType]} · ${who}`;
   if (e.type === 'eject' && e.reason) return `${who} · ${DQ_LABEL[e.reason]}`;
   if (e.type === 'rebound' && e.reboundType) return `${e.reboundType === 'off' ? 'Off.' : 'Def.'} · ${who}`;
@@ -30,8 +36,11 @@ export function Timeline({
   awayRoster,
   onPlayer,
   clock,
+  ids,
 }: {
   events: BBEvent[];
+  /** an older log's name → id map (its plays carried names) */
+  ids?: BasketballState['ids'];
   /** SD-132: period lengths, so plays on the game clock read "Q2 07:32" */
   clock?: Pick<BasketballState, 'regPeriods' | 'periodMinutes' | 'overtimeMinutes'>;
   homeColor?: string;
@@ -39,9 +48,12 @@ export function Timeline({
   max?: number;
   homeRoster?: Player[];
   awayRoster?: Player[];
-  /** tap a play's player → their profile (plays store names; resolved via the side's roster) */
+  /** tap a play's player → their profile (by the play's player id) */
   onPlayer?: (playerId: string) => void;
 }) {
+  const { nameOf } = useMask();
+  const who = withRosters(nameOf, homeRoster, awayRoster);
+  const known = { ids };
   if (events.length === 0) {
     return <Text style={st.empty}>No plays yet — updates appear here as the game unfolds.</Text>;
   }
@@ -67,7 +79,7 @@ export function Timeline({
             <Text style={st.icon}>{meta.icon}</Text>
             <View style={{ flex: 1 }}>
               <Text style={st.label}>{meta.label}</Text>
-              <Text style={st.detail} {...playerLink(idByName(e.playerName, e.side === 'home' ? homeRoster : awayRoster), describe(e), onPlayer)}>{describe(e)}</Text>
+              <Text style={st.detail} {...playerLink(playId(known, e), describe(e, known, who), onPlayer)}>{describe(e, known, who)}</Text>
             </View>
             {latest ? <Text style={st.latestTag}>LATEST</Text> : null}
           </View>

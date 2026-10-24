@@ -48,12 +48,18 @@ export interface BasketballState {
   shotClock: number;
   /** timeouts each team gets (0 = untracked / unlimited) */
   timeouts: number;
-  /** who is currently on court per side, once the scorer sets a starting five.
-   *  Undefined until set — subs are still recordable without it. */
+  /** IDs-only scoring: the players the scorer set on court per side, BY ID
+   *  (the starting five, or an edited five); subs apply on top of it
+   *  (`onCourtRefs`). Undefined until set — subs are still recordable
+   *  without it. A side set here wins over `onCourt`. */
+  court?: { home?: string[]; away?: string[] };
+  /** @deprecated legacy, read-only — an older log's on-court five, by NAME
+   *  (before IDs-only scoring; new logs keep `court`). */
   onCourt?: { home: string[]; away: string[] };
-  /** SD-29: player ids by name, from the SET_LINEUP / SUB payloads of newer
-   *  logs (events carry names only) — so minutes and +/- reach the right stat
-   *  line. Absent on older logs. */
+  /** @deprecated legacy, read-only — SD-29 / SD-40: player ids by name, from
+   *  the SET_LINEUP / SUB payloads and `pid`s of older logs whose events
+   *  carried names. The map itself is public, so IDs-only logs never write
+   *  it (their events carry the ids). */
   ids?: Record<string, string>;
   /** SD-31 (BK-03): "Track missed shots" (format key `trackMisses`) — the
    *  scorer logs Miss 2 / Miss 3, so FGA / FG% / missed FG in EFF are known.
@@ -194,23 +200,31 @@ export const periodLabel = (q: number, regPeriods = 4): string =>
  *  teams — what the reducer still uses for actions logged before `v: 2`, so old
  *  logs replay to exactly the same state. */
 export interface PlayerRef { side?: 'home' | 'away'; pid?: string }
-const isPlayersEvent = (e: BBEvent, name: string, who?: PlayerRef): boolean => {
-  if (!who?.side) return e.playerName === name;
+/* IDs-only: a query may name no player at all, only `who.pid` (the reducer
+ * on an IDs-only action); an older play with no id is then matched through
+ * that log's name → id map. The `name` the scorer UI passes is the roster
+ * name, read only to match an older log's name-only plays — never stored. */
+const isPlayersEvent = (s: BasketballState, e: BBEvent, name: string | undefined, who?: PlayerRef): boolean => {
+  if (!who?.side) return !!name && e.playerName === name;
   if (e.side !== who.side) return false;
-  return e.pid && who.pid ? e.pid === who.pid : e.playerName === name;
+  if (e.pid && who.pid) return e.pid === who.pid;
+  if (name) return e.playerName === name;
+  return !!who.pid && !!e.playerName && s.ids?.[e.playerName] === who.pid;
 };
+/** Is anyone named by this query (a name, or an id)? */
+const named = (name?: string, who?: PlayerRef): boolean => !!name || !!who?.pid;
 
 /** Fouls a player has committed so far — drives the foul-out rule. Pass `who`
  *  (side, and id where known) so a same-named opponent's fouls don't count. */
 export const foulCount = (s: BasketballState, name?: string, who?: PlayerRef): number =>
-  name ? s.events.filter((e) => e.type === 'foul' && isPlayersEvent(e, name, who)).length : 0;
+  named(name, who) ? s.events.filter((e) => e.type === 'foul' && isPlayersEvent(s, e, name, who)).length : 0;
 /** A player is fouled out once they reach the limit. */
 export const isFouledOut = (s: BasketballState, name?: string, who?: PlayerRef): boolean =>
   s.foulOutLimit > 0 && foulCount(s, name, who) >= s.foulOutLimit;
 /** A player was ejected (removed for the rest of the game — e.g. 2 technicals or
  *  a flagrant-2), independent of the personal-foul limit. */
 export const isEjected = (s: BasketballState, name?: string, who?: PlayerRef): boolean =>
-  !!name && s.events.some((e) => e.type === 'eject' && isPlayersEvent(e, name, who));
+  named(name, who) && s.events.some((e) => e.type === 'eject' && isPlayersEvent(s, e, name, who));
 /** A player takes no further part — fouled out OR ejected. */
 export const isPlayerOut = (s: BasketballState, name?: string, who?: PlayerRef): boolean =>
   isFouledOut(s, name, who) || isEjected(s, name, who);
@@ -295,19 +309,61 @@ export function timeoutStatus(
   return { left: s.timeouts > 0 ? Math.max(0, s.timeouts - used) : null, allowance: s.timeouts, used, window: 'game', late: false };
 }
 
+/** A player on court: by id (IDs-only), and/or by the name an older log
+ *  stored (its `ids` map gives the id where it knows one). */
+export interface CourtRef { id?: string; name?: string }
+/** The same player: older entries by the name they stored (exactly as the
+ *  court always matched them), IDs-only entries by id. */
+const sameRef = (a: CourtRef, b: CourtRef): boolean =>
+  (a.name && b.name ? a.name === b.name : !!a.id && a.id === b.id);
+const ref = (s: BasketballState, id: string | undefined, name: string | undefined): CourtRef => {
+  const pid = id || (name ? s.ids?.[name] : undefined);
+  return { ...(pid ? { id: pid } : {}), ...(name ? { name } : {}) };
+};
+/** The players set on court for a side (before any substitution): the
+ *  IDs-only `court`, else an older log's `onCourt` names. */
+export function courtStart(s: BasketballState, side: 'home' | 'away'): CourtRef[] {
+  const ids = s.court?.[side];
+  if (ids) return ids.map((id) => ({ id }));
+  return (s.onCourt?.[side] ?? []).map((name) => ref(s, undefined, name));
+}
+/** Has the scorer set who is on court for this side (by id, or — an older
+ *  log — by name)? */
+export const courtSet = (s: BasketballState, side: 'home' | 'away'): boolean => courtStart(s, side).length > 0;
 /** Who is on court for a side right now, given the set starting five and every
  *  substitution since (each sub swaps the player off for the one coming on). */
-export const onCourtNames = (s: BasketballState, side: 'home' | 'away'): string[] => {
-  if (!s.onCourt) return [];
-  const court = [...s.onCourt[side]];
+export function onCourtRefs(s: BasketballState, side: 'home' | 'away'): CourtRef[] {
+  if (!s.court && !s.onCourt) return [];
+  const court = courtStart(s, side);
   for (const e of s.events) {
-    if (e.type !== 'sub' || e.side !== side || !e.playerName || !e.onName) continue;
-    const i = court.indexOf(e.playerName);
-    if (i >= 0) court[i] = e.onName;
-    else court.push(e.onName);
+    if (e.type !== 'sub' || e.side !== side) continue;
+    const off = ref(s, e.pid, e.playerName);
+    const on = ref(s, e.secondId, e.onName);
+    if (!(off.id || off.name) || !(on.id || on.name)) continue;
+    const i = court.findIndex((c) => sameRef(c, off));
+    if (i >= 0) court[i] = on;
+    else court.push(on);
   }
   return court;
-};
+}
+/** The ids on court for a side right now (an older log's entry that can't be
+ *  resolved to an id is left out). */
+export const onCourtIds = (s: BasketballState, side: 'home' | 'away'): string[] =>
+  onCourtRefs(s, side).map((r) => r.id).filter((x): x is string => !!x);
+/** The starters of a side as ids (and an older log's names): the five set
+ *  on court, else `fallback` (the match lineup). Undefined = not known. */
+export function startersOf(s: BasketballState, side: 'home' | 'away', fallback?: { ids?: string[]; names?: string[] }): { ids?: string[]; names?: string[] } | undefined {
+  const five = courtStart(s, side);
+  if (!five.length) return fallback;
+  return {
+    names: five.map((r) => r.name).filter((x): x is string => !!x),
+    ids: five.map((r) => r.id).filter((x): x is string => !!x),
+  };
+}
+/** @deprecated legacy — an older log's on-court NAMES (IDs-only logs: use
+ *  `onCourtRefs` / `onCourtIds`). */
+export const onCourtNames = (s: BasketballState, side: 'home' | 'away'): string[] =>
+  (s.onCourt ? onCourtRefs(s, side).map((r) => r.name ?? r.id ?? '') : []);
 const isDqReason = (r: unknown): r is DqReason => r === 'D' || r === '2T' || r === '2U' || r === 'T+U';
 
 /** SD-117 (B12) — does this foul disqualify its player (FIBA Art. 36.2.3,
@@ -315,10 +371,10 @@ const isDqReason = (r: unknown): r is DqReason => r === 'D' || r === '2T' || r =
  *  unsportsmanlike, or a technical + an unsportsmanlike. Counts the player's
  *  fouls already logged plus this one. */
 export function disqualifyingFoul(s: BasketballState, name: string | undefined, type: FoulType, who?: PlayerRef): DqReason | undefined {
-  if (!name) return undefined;
+  if (!named(name, who)) return undefined;
   if (type === 'disqualifying') return 'D';
   if (type !== 'technical' && type !== 'unsportsmanlike') return undefined;
-  const mine = s.events.filter((e) => e.type === 'foul' && isPlayersEvent(e, name, who));
+  const mine = s.events.filter((e) => e.type === 'foul' && isPlayersEvent(s, e, name, who));
   const t = mine.filter((e) => e.foulType === 'technical').length + (type === 'technical' ? 1 : 0);
   const u = mine.filter((e) => e.foulType === 'unsportsmanlike').length + (type === 'unsportsmanlike' ? 1 : 0);
   if (type === 'technical' && t >= 2) return '2T';
@@ -370,7 +426,8 @@ const pushEv = (s: BasketballState, e: Omit<BBEvent, 'id' | 'quarter'>, quarter:
 
 /** SD-40: newer controls put the credited player's id in `payload.pid` (events
  *  carry names only), so `statTotals` can key every line by id. Merged only
- *  when the play was logged — an older log (no pid) keeps its exact state. */
+ *  when the play was logged — an older log (no pid) keeps its exact state.
+ *  IDs-only actions carry no name, so they never add to the (public) map. */
 export const reducer = (s: BasketballState, a: ScoreAction): BasketballState => {
   const next = reduce(s, a);
   const pid = a.payload?.pid;
@@ -384,18 +441,27 @@ const reduce = (s: BasketballState, a: ScoreAction): BasketballState => {
   if (s.ended && a.type !== 'END' && a.type !== 'TAG') return s;
   const minute = Number(a.payload?.minute ?? currentMinute(s));
   const quarter = Number(a.payload?.quarter ?? s.quarter);
+  // An older log credits the player by NAME (attribution.playerName); the
+  // reducer replays it exactly as it always did.
   const name = a.attribution?.playerName;
+  const pidIn = typeof a.payload?.pid === 'string' && a.payload.pid ? a.payload.pid : undefined;
+  // IDs-only scoring (docs/privacy/ids-only-scoring.md): the player by id
+  // only — the play stores `pid`, never a name.
+  const idOnly = !name && !!pidIn;
   // SD-122: a `v: 2` action (the live UI since SD-122) checks foul-out /
   // ejection for ITS side (and id) only, and its event keeps the player id in
   // `pid`. Older actions keep the legacy name match, so old logs replay alike.
-  const v2 = a.payload?.v === 2 && !!a.side;
-  const pidIn = typeof a.payload?.pid === 'string' && a.payload.pid ? a.payload.pid : undefined;
+  // An IDs-only action is always side-aware.
+  const v2 = (a.payload?.v === 2 || idOnly) && !!a.side;
   const who: PlayerRef | undefined = v2 ? { side: a.side as 'home' | 'away', ...(pidIn ? { pid: pidIn } : {}) } : undefined;
+  // the credited player as the play stores it: the id (IDs-only), else the
+  // older log's name (its key kept even when empty, as it always was)
+  const by: Pick<BBEvent, 'pid' | 'playerName'> = idOnly ? { pid: pidIn } : { playerName: name };
   // SD-132: the game-clock second rides on the play (new logs only)
   const secIn = typeof a.payload?.sec === 'number' && a.payload.sec >= 0 ? Math.floor(a.payload.sec) : undefined;
   const at = Number(a.payload?.at ?? 0);
   const push = (st: BasketballState, e: Omit<BBEvent, 'id' | 'quarter'>, q: number) =>
-    pushEv(st, { ...(v2 && pidIn && e.playerName ? { ...e, pid: pidIn } : e), ...(secIn !== undefined ? { sec: secIn } : {}) }, q);
+    pushEv(st, { ...(!idOnly && v2 && pidIn && e.playerName ? { ...e, pid: pidIn } : e), ...(secIn !== undefined ? { sec: secIn } : {}) }, q);
   // SD-132: the whistle stops the game clock (fouls, time-outs, and a field
   // goal in the last 2 minutes of Q4 / overtime — FIBA Art. 49.2.3).
   const whistle = (st: BasketballState): BasketballState => (st.gc?.since && at ? { ...st, gc: stopGc(st, at) } : st);
@@ -446,14 +512,14 @@ const reduce = (s: BasketballState, a: ScoreAction): BasketballState => {
       const pts = Number(a.payload?.points ?? 0);
       // First-to-N games (3×3 to 21, streetball) end the moment the target is
       // reached with the required margin.
-      return scorePoints(a.side, pts, { minute, type: 'score', side: a.side, playerName: name, points: pts, ...(a.payload?.fga === true ? { fga: true as const } : {}), ...shotDetail() });
+      return scorePoints(a.side, pts, { minute, type: 'score', side: a.side, ...by, points: pts, ...(a.payload?.fga === true ? { fga: true as const } : {}), ...shotDetail() });
     }
     case 'MISS': {
       // SD-31: a missed field goal (2 or 3; 3×3: 1 or 2) — logged for FGA /
       // FG% / EFF only; the score doesn't move.
       if (!a.side || isPlayerOut(s, name, who)) return s;
       const pts = Number(a.payload?.points ?? 2);
-      return push(s, { minute, type: 'miss', side: a.side, playerName: name, points: pts, ...(isShotZone(a.payload?.zone) ? { zone: a.payload.zone } : {}) }, quarter);
+      return push(s, { minute, type: 'miss', side: a.side, ...by, points: pts, ...(isShotZone(a.payload?.zone) ? { zone: a.payload.zone } : {}) }, quarter);
     }
     case 'TAG': {
       // Deep wave: tag (or untag) a made basket as a fast break after it went
@@ -474,28 +540,29 @@ const reduce = (s: BasketballState, a: ScoreAction): BasketballState => {
       // attempt count. A shooting/technical foul awards these to the OTHER team.
       if (!a.side || isPlayerOut(s, name, who)) return s;
       const made = a.payload?.made === true;
-      return scorePoints(a.side, made ? 1 : 0, { minute, type: 'freethrow', side: a.side, playerName: name, made, points: made ? 1 : 0 });
+      return scorePoints(a.side, made ? 1 : 0, { minute, type: 'freethrow', side: a.side, ...by, made, points: made ? 1 : 0 });
     }
     case 'REBOUND':
       return a.side && !isPlayerOut(s, name, who)
-        ? push(s, { minute, type: 'rebound', side: a.side, playerName: name, reboundType: a.payload?.reboundType as ReboundType | undefined }, quarter)
+        ? push(s, { minute, type: 'rebound', side: a.side, ...by, reboundType: a.payload?.reboundType as ReboundType | undefined }, quarter)
         : s;
     case 'ASSIST':
-      return a.side && !isPlayerOut(s, name, who) ? push(s, { minute, type: 'assist', side: a.side, playerName: name }, quarter) : s;
+      return a.side && !isPlayerOut(s, name, who) ? push(s, { minute, type: 'assist', side: a.side, ...by }, quarter) : s;
     case 'STEAL':
-      return a.side && !isPlayerOut(s, name, who) ? push(s, { minute, type: 'steal', side: a.side, playerName: name }, quarter) : s;
+      return a.side && !isPlayerOut(s, name, who) ? push(s, { minute, type: 'steal', side: a.side, ...by }, quarter) : s;
     case 'BLOCK':
-      return a.side && !isPlayerOut(s, name, who) ? push(s, { minute, type: 'block', side: a.side, playerName: name }, quarter) : s;
+      return a.side && !isPlayerOut(s, name, who) ? push(s, { minute, type: 'block', side: a.side, ...by }, quarter) : s;
     case 'TURNOVER':
-      return a.side && !isPlayerOut(s, name, who) ? push(s, { minute, type: 'turnover', side: a.side, playerName: name }, quarter) : s;
+      return a.side && !isPlayerOut(s, name, who) ? push(s, { minute, type: 'turnover', side: a.side, ...by }, quarter) : s;
     case 'FOUL':
       // count the foul, but never beyond the limit (already fouled out)
       return a.side && !isPlayerOut(s, name, who)
         ? whistle(push(s, {
-          minute, type: 'foul', side: a.side, playerName: name, foulType: (a.payload?.foulType as FoulType | undefined) ?? 'personal',
-          // Deep wave: "Fouls drawn" — who was fouled (new logs only)
+          minute, type: 'foul', side: a.side, ...by, foulType: (a.payload?.foulType as FoulType | undefined) ?? 'personal',
+          // Deep wave: "Fouls drawn" — who was fouled (new logs only; by id —
+          // an older log's name only on its own actions)
           ...(a.payload?.fdt === true ? { fdt: true as const } : {}),
-          ...(typeof a.payload?.drawn === 'string' && a.payload.drawn ? { drawn: a.payload.drawn } : {}),
+          ...(!idOnly && typeof a.payload?.drawn === 'string' && a.payload.drawn ? { drawn: a.payload.drawn } : {}),
           ...(typeof a.payload?.drawnPid === 'string' && a.payload.drawnPid ? { drawnPid: a.payload.drawnPid } : {}),
         }, quarter))
         : s;
@@ -505,10 +572,17 @@ const reduce = (s: BasketballState, a: ScoreAction): BasketballState => {
       // Remove a player for the rest of the game (2 technicals / flagrant-2 /
       // fighting) — independent of the personal-foul limit. Blocks further credit.
       // SD-117 (B12): a rule-forced ejection carries its reason (new logs only).
-      return a.side && name && !isEjected(s, name, who)
-        ? push(s, { minute, type: 'eject', side: a.side, playerName: name, ...(isDqReason(a.payload?.reason) ? { reason: a.payload.reason } : {}) }, quarter)
+      return a.side && (name || idOnly) && !isEjected(s, name, who)
+        ? push(s, { minute, type: 'eject', side: a.side, ...by, ...(isDqReason(a.payload?.reason) ? { reason: a.payload.reason } : {}) }, quarter)
         : s;
     case 'SET_LINEUP': {
+      // IDs-only: one side's five, by id (`side` + `payload.pids`)
+      if (Array.isArray(a.payload?.pids)) {
+        if (a.side !== 'home' && a.side !== 'away') return s;
+        const pids = (a.payload.pids as unknown[]).filter((x): x is string => typeof x === 'string' && !!x);
+        return { ...s, court: { ...s.court, [a.side]: pids } };
+      }
+      // an older log: name arrays per side (+ the name → id map)
       const home = (a.payload?.home as string[] | undefined) ?? s.onCourt?.home ?? [];
       const away = (a.payload?.away as string[] | undefined) ?? s.onCourt?.away ?? [];
       const ids = a.payload?.ids as Record<string, string> | undefined;
@@ -516,10 +590,17 @@ const reduce = (s: BasketballState, a: ScoreAction): BasketballState => {
     }
     case 'SUB': {
       // Record a substitution (off → on). If a starting five is set, keep the
-      // on-court list in sync via onCourtNames (derived, not stored per-sub).
+      // on-court list in sync via onCourtRefs (derived, not stored per-sub).
       const offName = String(a.payload?.offName ?? '');
       const onName = String(a.payload?.onName ?? '');
-      if (!a.side || !offName || !onName) return s;
+      if (!a.side) return s;
+      if (!offName && !onName) {
+        // IDs-only: off / on by id (`pid` = off, `secondId` = on)
+        const offId = typeof a.payload?.offId === 'string' ? a.payload.offId : '';
+        const onId = typeof a.payload?.onId === 'string' ? a.payload.onId : '';
+        return offId && onId ? push(s, { minute, type: 'sub', side: a.side, pid: offId, secondId: onId }, quarter) : s;
+      }
+      if (!offName || !onName) return s;
       return withIds(push(s, { minute, type: 'sub', side: a.side, playerName: offName, onName }, quarter), [[offName, a.payload?.offId], [onName, a.payload?.onId]]);
     }
     case 'REMOVE_EVENT': {

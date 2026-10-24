@@ -9,11 +9,12 @@
  *    retried upload can't double a line.
  *  - MIN and +/- come from SD-29's on-court tracker (fieldTime.ts), merged in.
  *
- * Ids: events carry names; newer controls send `payload.pid` (engine `ids`),
- * the starting five / subs carry theirs (SD-29). If ANY credited name can't be
- * resolved (an older log), the box keys are left out entirely and those lines
- * keep moving by live increments, as before — the sync zeroes owned keys for
- * players missing from the totals, so a partial guess would wipe real stats.
+ * Ids: IDs-only plays carry the player's id (`pid`); an older log's plays
+ * carried names, resolved through its `ids` map (SD-29 / SD-40). If ANY
+ * credited play can't be resolved to an id (an older log), the box keys are
+ * left out entirely and those lines keep moving by live increments, as
+ * before — the sync zeroes owned keys for players missing from the totals,
+ * so a partial guess would wipe real stats.
  *
  * FGA / 3PA are owned only when the match tracked missed shots (its config,
  * any miss, or a make logged with `fga`): an untracked game never gets a false
@@ -27,6 +28,7 @@ import type { BasketballState } from './engine.ts';
 import { eventCredits } from './credits.ts';
 import { basketballTotals } from './fieldTime.ts';
 import { bbDeepTotals } from './deep.ts';
+import { hasPlayer, playId } from './names.ts';
 
 /** Every box key the totals own (FGA / 3PA only on a tracked game). */
 export const BASKETBALL_BOX_KEYS = [
@@ -50,10 +52,10 @@ export function basketballBoxTotals(s: BasketballState): Record<string, StatTota
   const keys = [...BASKETBALL_BOX_KEYS, ...(tracked ? BASKETBALL_ATTEMPT_KEYS : []), ...deep.keys];
   const out: Record<string, StatTotalsEntry> = {};
   for (const e of s.events) {
-    if (!e.playerName) continue;
+    if (!hasPlayer(e)) continue;
     const c = eventCredits(e, halfCourt, tracked);
     if (!Object.keys(c).length) continue; // a sub / timeout credits nobody
-    const id = s.ids?.[e.playerName];
+    const id = playId(s, e);
     if (!id) return {};
     const line = out[id] ?? (out[id] = { side: e.side, stats: Object.fromEntries(keys.map((k) => [k, 0])) });
     for (const [k, v] of Object.entries(c)) line.stats[k] = (line.stats[k] ?? 0) + v;

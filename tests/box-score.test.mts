@@ -26,6 +26,7 @@ import {
 } from '../src/sports/boxSources.ts';
 import { init as bkInit, reducer as bkReducer, type BasketballState } from '../src/sports/basketball/engine.ts';
 import { boxFieldByName } from '../src/sports/basketball/fieldTime.ts';
+import { lineupAction, subAction } from '../src/sports/basketball/actions.ts';
 import { init as vbInit, reducer as vbReducer, outcomeAction, type VolleyballState } from '../src/sports/volleyball/engine.ts';
 import { init as kbInit, reducer as kbReducer, raidActions, type KabaddiState, type RaidForm } from '../src/sports/kabaddi/engine.ts';
 import { init as fbInit, reducer as fbReducer, footballStats, type FootballState } from '../src/sports/football/engine.ts';
@@ -72,8 +73,24 @@ const five = (side: Side, names: string[]): ScoreAction =>
   ({ type: 'SET_LINEUP', payload: { [side]: names, ids: Object.fromEntries(names.map((n) => [n, n.toLowerCase()])) } });
 const BK_H = roster('H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'H7');
 const BK_A = roster('A1', 'A2', 'A3', 'A4', 'A5', 'A6');
-function basketballGame(withFive: boolean): BasketballState {
-  return bk(bkInit({ periodMinutes: 10, regPeriods: 4 }),
+/** `ids` = the same game as the controls now send it (IDs-only scoring: every
+ *  player by id — the five, the sub, each credit — and no name anywhere). */
+function basketballGame(withFive: boolean, ids = false): BasketballState {
+  const toIds = (a: ScoreAction): ScoreAction => {
+    if (!ids) return a;
+    if (a.type === 'SUB') {
+      const sub = subAction(a.side!, { id: String(a.payload!.offId) }, { id: String(a.payload!.onId) });
+      return { ...sub, payload: { ...sub.payload, quarter: a.payload!.quarter, minute: a.payload!.minute } };
+    }
+    if (a.type === 'SET_LINEUP') {
+      const side = a.payload!.home ? 'home' : 'away';
+      return lineupAction(side, (a.payload![side] as string[]).map((n) => ({ id: n.toLowerCase() })));
+    }
+    if (!a.attribution) return a;
+    const { playerName: _n, ...credit } = a.attribution;
+    return { ...a, payload: { ...a.payload, pid: credit.playerId }, attribution: credit };
+  };
+  return bk(bkInit({ periodMinutes: 10, regPeriods: 4 }), ...[
     ...(withFive ? [five('home', ['H1', 'H2', 'H3', 'H4', 'H5']), five('away', ['A1', 'A2', 'A3', 'A4', 'A5'])] : []),
     act('SCORE', 'home', 'H1', 1, 1, { points: 2 }), act('ASSIST', 'home', 'H2', 1, 1),
     act('SCORE', 'away', 'A1', 1, 2, { points: 3 }), act('REBOUND', 'home', 'H3', 1, 2, { reboundType: 'def' }),
@@ -85,7 +102,7 @@ function basketballGame(withFive: boolean): BasketballState {
     act('SCORE', 'away', 'A1', 2, 1, { points: 2 }), act('BLOCK', 'home', 'H4', 2, 2), act('SCORE', 'home', undefined, 2, 3, { points: 2 }),
     act('REBOUND', 'away', undefined, 2, 4), act('FREE_THROW', 'away', 'A1', 2, 5, { made: true }), act('FOUL', 'home', 'H1', 2, 5),
     { type: 'NEXT_QUARTER' }, act('SCORE', 'home', 'H7', 3, 2, { points: 2 }),
-  );
+  ].map(toIds));
 }
 
 const VB_H = [P('va', 'Asha'), P('vb', 'Bina'), P('vc', 'Chitra')];
@@ -213,6 +230,18 @@ describe('SD-23 · golden: the shared table equals the old components', () => {
     assert.deepEqual(abbrs(all), ['MIN', 'PTS', 'FTM-A', 'FT%', 'OREB', 'DREB', 'REB', 'AST', 'STL', 'BLK', 'TO', 'PF', '+/-', 'EFF']);
     assert.equal(cell(all, 'home', 'H6', '+/-'), '+4'); // on from Q1 5': +3 +2 −2 −1 +2
     assert.equal(cell(all, 'home', 'H7', 'MIN'), '–'); // never on court
+  });
+  test('basketball scored by id (IDs-only): the same table as the named log, names from the squads', () => {
+    for (const withFive of [true, false]) {
+      const named = basketballGame(withFive);
+      const byId = basketballGame(withFive, true);
+      assert.ok(!JSON.stringify(byId).match(/"(H|A)\d"/), 'no name in the id-only state');
+      const a = basketballBox(named, { homeRoster: BK_H, awayRoster: BK_A });
+      const b = basketballBox(byId, { homeRoster: BK_H, awayRoster: BK_A });
+      for (const sc of scopes(a)) {
+        assert.deepEqual(buildBoxTable(STAT_SCHEMAS.basketball, b.data(sc), { scope: sc }), buildBoxTable(STAT_SCHEMAS.basketball, a.data(sc), { scope: sc }), `five ${withFive} · ${sc}`);
+      }
+    }
   });
   test('basketball without a five: no MIN / +/- (as before)', () => {
     const s = basketballGame(false);

@@ -15,7 +15,8 @@ import { readFileSync } from 'node:fs';
 import type { Player, StatLine } from '../src/core/types.ts';
 import type { ScoreAction } from '../src/sports/types.ts';
 import { init, reducer, type BasketballState } from '../src/sports/basketball/engine.ts';
-import { creditAttribution, ftCredits, makeCredits, missCredits, reboundCredits } from '../src/sports/basketball/credits.ts';
+import { freeThrowAction, foulAction, lineupAction, missAction, reboundAction, scoreAction, statAction, type StatPlay } from '../src/sports/basketball/actions.ts';
+import { withRosters } from '../src/sports/racketNames.ts';
 import { zoneLabel, zoneBehindArc, isShotZone } from '../src/sports/basketball/events.ts';
 import {
   bbCoverage, bbDeepKeys, bbDeepRows, bbDeepTotals, bbTeamFigures, benchPoints, gameOrder, possessionTags, timeLeading, mmss,
@@ -37,27 +38,26 @@ const ARJUN = P('p-arjun', 'Arjun'), BEN = P('p-ben', 'Ben'), CHEN = P('p-chen',
 const XAVI = P('p-xavi', 'Xavi'), YUSUF = P('p-yusuf', 'Yusuf');
 const HOME = [ARJUN, BEN, CHEN], AWAY = [XAVI, YUSUF];
 const NAMES = { home: 'Reds', away: 'Blues' };
+/** IDs-only scoring: the commentary names players by id — here, the squads' names */
+const SQUADS = withRosters(undefined, HOME, AWAY);
 
-const at = (q: number, sec: number) => ({ quarter: q, minute: Math.floor(sec / 60), sec, v: 2 });
+/* the actions the controls dispatch (actions.ts — the player by id), stamped like `fire` */
+const at = (a: ScoreAction, q: number, sec: number, extra: Record<string, unknown> = {}): ScoreAction =>
+  ({ ...a, payload: { ...a.payload, quarter: q, minute: Math.floor(sec / 60), sec, v: 2, ...extra } });
 const make = (side: Side, p: Player | undefined, pts: number, q: number, sec: number, extra: Record<string, unknown> = {}): ScoreAction =>
-  ({ type: 'SCORE', side, payload: { points: pts, fga: true, ...(p ? { pid: p.id } : {}), ...at(q, sec), ...extra }, attribution: p ? creditAttribution(p.id, p.fullName, makeCredits(pts, false, true)) : undefined });
+  at(scoreAction(side, pts, p, { fga: true }), q, sec, extra);
 const miss = (side: Side, p: Player | undefined, pts: number, q: number, sec: number, extra: Record<string, unknown> = {}): ScoreAction =>
-  ({ type: 'MISS', side, payload: { points: pts, ...(p ? { pid: p.id } : {}), ...at(q, sec), ...extra }, attribution: p ? creditAttribution(p.id, p.fullName, missCredits(pts)) : undefined });
-const ft = (side: Side, p: Player, made: boolean, q: number, sec: number): ScoreAction =>
-  ({ type: 'FREE_THROW', side, payload: { made, pid: p.id, ...at(q, sec) }, attribution: creditAttribution(p.id, p.fullName, ftCredits(made)) });
-const reb = (side: Side, p: Player, rt: 'off' | 'def' | undefined, q: number, sec: number): ScoreAction =>
-  ({ type: 'REBOUND', side, payload: { ...(rt ? { reboundType: rt } : {}), pid: p.id, ...at(q, sec) }, attribution: creditAttribution(p.id, p.fullName, reboundCredits(rt)) });
-const simple = (type: string, stat: string) => (side: Side, p: Player, q: number, sec: number): ScoreAction =>
-  ({ type, side, payload: { pid: p.id, ...at(q, sec) }, attribution: { playerId: p.id, stat, playerName: p.fullName } });
-const ast = simple('ASSIST', 'assists'), stl = simple('STEAL', 'steals'), tov = simple('TURNOVER', 'turnovers');
-const foul = (side: Side, p: Player, q: number, sec: number, foulType = 'personal', extra: Record<string, unknown> = {}): ScoreAction =>
-  ({ type: 'FOUL', side, payload: { foulType, pid: p.id, ...at(q, sec), ...extra }, attribution: { playerId: p.id, stat: 'fouls', playerName: p.fullName } });
+  at(missAction(side, pts, p), q, sec, extra);
+const ft = (side: Side, p: Player, made: boolean, q: number, sec: number): ScoreAction => at(freeThrowAction(side, made, p), q, sec);
+const reb = (side: Side, p: Player, rt: 'off' | 'def' | undefined, q: number, sec: number): ScoreAction => at(reboundAction(side, p, rt), q, sec);
+const simple = (type: StatPlay) => (side: Side, p: Player, q: number, sec: number): ScoreAction => at(statAction(side, type, p), q, sec);
+const ast = simple('ASSIST'), stl = simple('STEAL'), tov = simple('TURNOVER');
+const foul = (side: Side, p: Player, q: number, sec: number, foulType: 'personal' | 'shooting' | 'offensive' = 'personal', o: { fdt?: boolean; drawnBy?: Player } = {}): ScoreAction =>
+  at(foulAction(side, p, foulType, o), q, sec);
 const run = (s: BasketballState, ...as: ScoreAction[]) => as.reduce(reducer, s);
 
 const DEEP = { periodMinutes: 10, regPeriods: 4, trackMisses: true, foulsForBonus: 4, techIsTeamFoul: true, gameClock: true, trackZones: true, trackFastBreak: true, trackFoulsDrawn: true };
-const FIVE: ScoreAction[] = [
-  { type: 'SET_LINEUP', payload: { home: ['Arjun', 'Ben'], away: ['Xavi'], ids: { Arjun: 'p-arjun', Ben: 'p-ben', Xavi: 'p-xavi' } } },
-];
+const FIVE: ScoreAction[] = [lineupAction('home', [ARJUN, BEN]), lineupAction('away', [XAVI])];
 
 /** A charted game: zones on every shot, a fast break, fouls drawn. */
 function deepGame(): ScoreAction[] {
@@ -70,7 +70,7 @@ function deepGame(): ScoreAction[] {
     { type: 'TAG', side: 'away', payload: { fb: true } },
     miss('home', ARJUN, 2, 1, 90, { zone: 'paint' }), reb('home', BEN, 'off', 1, 92),
     make('home', BEN, 2, 1, 94, { zone: 'paint', fbt: true }), // 5-2 second chance
-    foul('away', XAVI, 1, 95, 'shooting', { fdt: true, drawn: 'Ben', drawnPid: 'p-ben' }), ft('home', BEN, true, 1, 95), // and-one 6-2
+    foul('away', XAVI, 1, 95, 'shooting', { fdt: true, drawnBy: BEN }), ft('home', BEN, true, 1, 95), // and-one 6-2
     tov('home', CHEN, 1, 120), make('away', XAVI, 3, 1, 125, { zone: 'ab3', fbt: true }), // 6-5 off a turnover
     { type: 'NEXT_QUARTER' },
     { type: 'CLOCK', payload: { run: true, at: 1000 } },
@@ -116,10 +116,13 @@ describe('deep wave · capture stays one tap; old logs replay identically', () =
     assert.equal(s.events[1].fb, true);
     assert.equal(reducer(s, { type: 'SCORE', side: 'home', payload: { points: 2 } }), s, 'nothing else changes a finished game');
   });
-  test('a foul keeps who drew it; without the flag the foul is exactly as before', () => {
-    const s = run(init(DEEP), { type: 'KICKOFF', payload: { at: 1 } }, foul('away', XAVI, 1, 10, 'shooting', { fdt: true, drawn: 'Ben', drawnPid: 'p-ben' }), foul('home', ARJUN, 1, 20));
-    assert.deepEqual([s.events[0].fdt, s.events[0].drawn, s.events[0].drawnPid], [true, 'Ben', 'p-ben']);
+  test('a foul keeps who drew it (by id); without the flag the foul is exactly as before', () => {
+    const s = run(init(DEEP), { type: 'KICKOFF', payload: { at: 1 } }, foul('away', XAVI, 1, 10, 'shooting', { fdt: true, drawnBy: BEN }), foul('home', ARJUN, 1, 20));
+    assert.deepEqual([s.events[0].fdt, s.events[0].drawn, s.events[0].drawnPid], [true, undefined, 'p-ben']);
     assert.equal('fdt' in s.events[1] || 'drawn' in s.events[1], false);
+    // an older log stored the name beside the id; it replays as it was
+    const old = reducer(init(DEEP), { type: 'FOUL', side: 'away', payload: { foulType: 'shooting', pid: 'p-xavi', fdt: true, drawn: 'Ben', drawnPid: 'p-ben' }, attribution: { playerId: 'p-xavi', stat: 'fouls', playerName: 'Xavi' } });
+    assert.deepEqual([old.events[0].drawn, old.events[0].drawnPid], ['Ben', 'p-ben']);
   });
   test('zone helpers', () => {
     assert.equal(zoneLabel('c3'), 'Corner 3'); assert.equal(zoneLabel('ab3', true), 'Above-the-break 2');
@@ -147,7 +150,7 @@ describe('deep wave · derived figures', () => {
     assert.deepEqual(tags.get(andOne.id), { second: true }, 'the and-one free throw belongs to the possession');
     assert.deepEqual(tags.get(s.events.find((e) => e.type === 'score' && e.side === 'away' && e.points === 2)!.id), { offTo: true });
     assert.deepEqual(tags.get(s.events.find((e) => e.type === 'score' && e.side === 'away' && e.points === 3)!.id), { offTo: true });
-    assert.equal(tags.has(s.events.find((e) => e.playerName === 'Chen' && e.type === 'score')!.id), false, 'a new period closes every window');
+    assert.equal(tags.has(s.events.find((e) => e.pid === 'p-chen' && e.type === 'score')!.id), false, 'a new period closes every window');
   });
   test('an offensive foul is a turnover; the other side\'s play closes the window', () => {
     const g = run(init({}), { type: 'KICKOFF', payload: { at: 1 } }, foul('home', ARJUN, 1, 10, 'offensive'), miss('away', XAVI, 2, 1, 12), reb('away', YUSUF, 'off', 1, 13),
@@ -173,7 +176,8 @@ describe('deep wave · derived figures', () => {
     assert.equal(benchPoints(s, 'away', 'all'), 2); // Yusuf's 2
     const noFive = run(init({}), make('home', ARJUN, 2, 1, 10));
     assert.equal(benchPoints(noFive, 'home', 'all'), null);
-    assert.equal(benchPoints(noFive, 'home', 'all', { names: ['Ben'] }), 2);
+    assert.equal(benchPoints(noFive, 'home', 'all', { ids: ['p-ben'] }), 2);
+    assert.equal(benchPoints(noFive, 'home', 'all', { ids: ['p-arjun'] }), 0);
   });
   test('time leading from the game clock (all scoring plays stamped); null without a clock', () => {
     const tl = timeLeading(s)!;
@@ -213,11 +217,12 @@ describe('deep wave · statTotals, box score, career', () => {
     assert.equal(t['p-arjun'].stats.twosMade, 1);
   });
   test('half-court (3×3): no 2P / zone keys (their 1s and 2s aren\'t 5×5 shots)', () => {
-    const g = run(init({ targetPoints: 21, regPeriods: 1, trackZones: true }), { type: 'KICKOFF', payload: { at: 1 } }, { type: 'SCORE', side: 'home', payload: { points: 2, zone: 'ab3', pid: 'p-arjun' }, attribution: creditAttribution('p-arjun', 'Arjun', makeCredits(2, true)) });
+    const g = run(init({ targetPoints: 21, regPeriods: 1, trackZones: true }), { type: 'KICKOFF', payload: { at: 1 } }, scoreAction('home', 2, ARJUN, { halfCourt: true, zone: 'ab3' }));
     assert.deepEqual(bbDeepKeys(g), []);
   });
   test('a credit without a resolvable id is skipped, never voiding the rest', () => {
-    const g = run(init(DEEP), ...FIVE, foul('away', XAVI, 1, 10, 'personal', { fdt: true, drawn: 'Stranger' }));
+    // an older log: the fouled player stored by a name nobody knows
+    const g = run(init(DEEP), ...FIVE, { type: 'FOUL', side: 'away', payload: { foulType: 'personal', pid: 'p-xavi', fdt: true, drawn: 'Stranger' }, attribution: { playerId: 'p-xavi', stat: 'fouls', playerName: 'Xavi' } });
     assert.deepEqual(bbDeepTotals(g).lines, {});
     assert.ok(basketballStatTotals(g)['p-xavi'], 'the fouler\'s line is still there');
   });
@@ -263,7 +268,7 @@ describe('deep wave · statTotals, box score, career', () => {
 
 describe('deep wave · play-by-play commentary', () => {
   const s = run(init(DEEP), ...deepGame());
-  const feed = basketballFeed(s, NAMES);
+  const feed = basketballFeed(s, NAMES, SQUADS);
   test('period groups, newest first, with the score at the end of each', () => {
     assert.deepEqual(feed.map((g) => g.title), ['Q2', 'Q1']);
     assert.deepEqual(feed[1].score, { home: 6, away: 5 });
@@ -288,17 +293,22 @@ describe('deep wave · play-by-play commentary', () => {
   });
   test('lead notes: a lead change and level scores; scoring rows marked', () => {
     const g = run(init({}), make('home', ARJUN, 2, 1, 10), make('away', XAVI, 2, 1, 20), make('away', XAVI, 3, 1, 30), make('home', ARJUN, 3, 1, 40));
-    const rows = [...basketballFeed(g, NAMES)[0].rows].reverse();
+    const rows = [...basketballFeed(g, NAMES, SQUADS)[0].rows].reverse();
     assert.deepEqual(rows.map((r) => r.tag), [undefined, 'Level at 2–2', 'Blues take the lead', 'Level at 5–5']);
     const g2 = run(g, make('home', BEN, 2, 1, 50), make('away', XAVI, 3, 1, 60));
-    assert.equal(basketballFeed(g2, NAMES)[0].rows[0].tag, 'Blues take the lead');
+    assert.equal(basketballFeed(g2, NAMES, SQUADS)[0].rows[0].tag, 'Blues take the lead');
     assert.ok(rows.every((r) => r.scoring));
   });
   test('free-throw trips are numbered; team plays read as the team; fouls count team fouls', () => {
     const g = run(init({ foulsForBonus: 1 }), foul('away', XAVI, 1, 5), foul('away', YUSUF, 1, 10, 'shooting'), ft('home', ARJUN, true, 1, 10), ft('home', ARJUN, false, 1, 10),
       { type: 'SCORE', side: 'away', payload: { points: 3, quarter: 1, minute: 1 } });
-    const rows = [...basketballFeed(g, NAMES)[0].rows].reverse().map((r) => r.text);
+    const rows = [...basketballFeed(g, NAMES, SQUADS)[0].rows].reverse().map((r) => r.text);
     assert.deepEqual(rows, ['Personal foul on Xavi · team foul 1', 'Shooting foul on Yusuf · team foul 2, free throws', 'Arjun makes free throw 1 of 2', 'Arjun misses free throw 2 of 2', 'Blues score a 3-pointer']);
+  });
+  test('rows link the player by id; no lookup → an IDs-only play reads "Player", never a name', () => {
+    const q1 = feed[1].rows;
+    assert.ok(q1.filter((r) => r.playerName).every((r) => r.playerId?.startsWith('p-')));
+    assert.ok(basketballFeed(s, NAMES).flatMap((g) => g.rows).every((r) => !/Arjun|Ben|Chen|Xavi|Yusuf/.test(r.text)));
   });
   test('describePlay / shotPhrase for the rest', () => {
     const e = (x: Record<string, unknown>) => ({ id: 1, quarter: 1, minute: 0, side: 'home', ...x }) as never;
@@ -376,7 +386,8 @@ describe('deep wave · scorer UI guards', () => {
     assert.match(src, /score\(side, zoneValue\(b\.zone\), selected, tracking, \{ zone: b\.zone \}\)/);
     assert.match(src, /miss\(side, zoneValue\(b\.zone\), selected, b\.zone\)/);
     assert.match(src, /dispatch\(\{ type: 'TAG', side: assistFor\.side, payload: \{ fb: !assistFor\.fb \} \}\)/);
-    assert.match(src, /fdt: true, \.\.\.\(drawnBy \? \{ drawn: drawnBy\.fullName, drawnPid: drawnBy\.id \} : \{\}\)/);
+    assert.match(src, /const drawn = state\.trackFoulsDrawn \? \{ fdt: true, drawnBy \} : \{\};\s*fire\(foulAction\(side, fouler, type, drawn\)\)/);
+    assert.doesNotMatch(src, /drawn: drawnBy\.fullName/, 'IDs-only: who drew it by id, never the name');
   });
   test('the live view: play-by-play, team stats (+ shot chart), box score', () => {
     assert.match(src, /<PlayFeed groups=\{basketballFeed\(s/);

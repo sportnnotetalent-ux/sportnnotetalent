@@ -9,21 +9,23 @@ import { topN } from '../recordHelpers.ts';
 import type { BasketballState } from './engine.ts';
 import { eventCredits } from './credits.ts';
 import { shotsTracked } from './totals.ts';
+import { hasPlayer, playId } from './names.ts';
 
 /** Basketball: team high, biggest win, each side's top 2 scorers, 30-point
  *  games (40+ marked), triple-doubles (10+ in three of PTS / REB / AST / STL /
- *  BLK — only what the scorer logged). Players by id where the log names one. */
+ *  BLK — only what the scorer logged). Players by id (IDs-only scoring: an
+ *  older log's stored name rides along only where it had one). */
 export function basketballMatchRecords(s: BasketballState): MatchRecordsBlock | null {
   if (!s || !s.ended) return null;
   const items = scoreItems(s.home, s.away, { teamHigh: true, biggestWin: true });
   const halfCourt = s.targetPoints > 0;
   const tracked = shotsTracked(s);
-  const lines = new Map<string, { side: Side; name: string; id?: string; st: Record<string, number> }>();
+  const lines = new Map<string, { side: Side; name?: string; id?: string; st: Record<string, number> }>();
   for (const e of s.events ?? []) {
-    if (!e.playerName) continue;
+    if (!hasPlayer(e)) continue;
     const c = eventCredits(e, halfCourt, tracked);
     if (!Object.keys(c).length) continue;
-    const id = s.ids?.[e.playerName];
+    const id = playId(s, e);
     const k = `${e.side}|${id ?? `n:${e.playerName}`}`;
     const l = lines.get(k) ?? { side: e.side, name: e.playerName, id, st: {} };
     for (const [key, v] of Object.entries(c)) l.st[key] = (l.st[key] ?? 0) + v;

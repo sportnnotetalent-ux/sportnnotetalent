@@ -10,10 +10,14 @@
  * is placed at that minute. SD-132: plays logged on the stoppable game clock
  * carry the clock second (`sec`), so MIN and +/- follow the real clock. A
  * first-to-N game (3×3 to 21) gets +/- only.
+ *
+ * IDs-only scoring: the five, subs and plays name players by id; an older
+ * log's names (its `onCourt`, its `ids` map) still replay as they did.
  */
-import { trackField, type FieldEvent, type FieldLog, type FieldResult, type Side } from '../onField.ts';
-import { currentMinute, gameSec, type BasketballState } from './engine.ts';
+import { trackField, type FieldEvent, type FieldLog, type FieldResult, type Side, type Who } from '../onField.ts';
+import { courtSet, courtStart, currentMinute, gameSec, type BasketballState } from './engine.ts';
 import { pointsOf } from './events.ts';
+import { hasPlayer, onId, playId } from './names.ts';
 
 /** Minutes before period `q` starts (regulation periods, then overtime). */
 const periodStart = (s: BasketballState, q: number): number =>
@@ -21,18 +25,21 @@ const periodStart = (s: BasketballState, q: number): number =>
 const periodLen = (s: BasketballState, q: number): number => (q <= s.regPeriods ? s.periodMinutes : s.overtimeMinutes);
 
 /** Has this side's five been set? (+/- and MIN only then — BK-10.) */
-export const fiveSet = (s: BasketballState, side: Side): boolean => !!s.onCourt?.[side]?.length;
+export const fiveSet = (s: BasketballState, side: Side): boolean => courtSet(s, side);
 
 /** The basketball field log; `live` = up to the current minute of play. */
 export function basketballFieldLog(s: BasketballState, live = false): FieldLog | null {
-  if (!s.onCourt || (!fiveSet(s, 'home') && !fiveSet(s, 'away'))) return null;
+  if (!fiveSet(s, 'home') && !fiveSet(s, 'away')) return null;
   const ids = s.ids ?? {};
-  const who = (name?: string) => ({ ...(name && ids[name] ? { id: ids[name] } : {}), ...(name ? { name } : {}) });
+  const who = (id: string | undefined, name?: string): Who => ({ ...(id ? { id } : {}), ...(name ? { name } : {}) });
+  /** One key per player for the foul-out count: an older play's stored name
+   *  (exactly as it always counted), an IDs-only play's id. */
+  const foulKey = (pid: string | undefined, name: string | undefined) => (name ? `n:${name}` : `id:${pid}`);
   const at = (q: number, minute: number, sec?: number) =>
     periodStart(s, q) + Math.min(Math.max(0, typeof sec === 'number' ? sec / 60 : minute ?? 0), periodLen(s, q));
   const starters = {
-    home: fiveSet(s, 'home') ? s.onCourt.home.map(who) : [],
-    away: fiveSet(s, 'away') ? s.onCourt.away.map(who) : [],
+    home: fiveSet(s, 'home') ? courtStart(s, 'home').map((r) => who(r.id, r.name)) : [],
+    away: fiveSet(s, 'away') ? courtStart(s, 'away').map((r) => who(r.id, r.name)) : [],
   };
   const events: FieldEvent[] = [];
   const fouls = new Map<string, number>();
@@ -43,12 +50,13 @@ export function basketballFieldLog(s: BasketballState, live = false): FieldLog |
     const pts = pointsOf(e);
     if (pts > 0) events.push({ kind: 'score', t, side: e.side, points: pts });
     if (!fiveSet(s, e.side)) continue;
-    if (e.type === 'sub') events.push({ kind: 'sub', t, side: e.side, off: who(e.playerName), on: who(e.onName) });
-    else if (e.type === 'eject' && e.playerName) events.push({ kind: 'off', t, side: e.side, who: who(e.playerName), shortFor: 0 });
-    else if (e.type === 'foul' && e.playerName) {
-      const n = (fouls.get(e.playerName) ?? 0) + 1;
-      fouls.set(e.playerName, n);
-      if (s.foulOutLimit > 0 && n === s.foulOutLimit) events.push({ kind: 'off', t, side: e.side, who: who(e.playerName), shortFor: 0 });
+    if (e.type === 'sub') events.push({ kind: 'sub', t, side: e.side, off: who(playId(s, e), e.playerName), on: who(onId(s, e), e.onName) });
+    else if (e.type === 'eject' && hasPlayer(e)) events.push({ kind: 'off', t, side: e.side, who: who(playId(s, e), e.playerName), shortFor: 0 });
+    else if (e.type === 'foul' && hasPlayer(e)) {
+      const k = foulKey(e.pid, e.playerName);
+      const n = (fouls.get(k) ?? 0) + 1;
+      fouls.set(k, n);
+      if (s.foulOutLimit > 0 && n === s.foulOutLimit) events.push({ kind: 'off', t, side: e.side, who: who(playId(s, e), e.playerName), shortFor: 0 });
     }
   }
   const now = live && !s.ended
@@ -66,7 +74,23 @@ export function basketballField(s: BasketballState, live = false): FieldResult |
 /** Minutes are meaningful only on a timed game (not first-to-N). */
 export const timedGame = (s: BasketballState): boolean => !(s.targetPoints > 0);
 
-/** Per player name: MIN (rounded), +/- and on court now — the box score's columns. */
+/** The box score's MIN (rounded), +/- and on court now, per player: keyed
+ *  by the tracker's key — the id, or `name:<name>` for an older log's
+ *  player it can't resolve to one. */
+export function boxField(s: BasketballState): Map<string, { min?: number; pm: number; on: boolean }> {
+  const out = new Map<string, { min?: number; pm: number; on: boolean }>();
+  const r = basketballField(s, true);
+  if (!r) return out;
+  const onNow = new Set([...r.onField.home, ...r.onField.away].map((p) => p.key));
+  for (const p of r.players) {
+    if (!p.played || !fiveSet(s, p.side)) continue;
+    out.set(p.key, { ...(timedGame(s) ? { min: Math.round(p.minutes) } : {}), pm: p.plusMinus, on: !s.ended && onNow.has(p.key) });
+  }
+  return out;
+}
+
+/** @deprecated legacy — per player NAME (an older log's names; IDs-only
+ *  logs: `boxField`): MIN (rounded), +/- and on court now. */
 export function boxFieldByName(s: BasketballState): Map<string, { min?: number; pm: number; on: boolean }> {
   const out = new Map<string, { min?: number; pm: number; on: boolean }>();
   const r = basketballField(s, true);

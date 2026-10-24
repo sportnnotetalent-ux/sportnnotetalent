@@ -26,6 +26,7 @@ import * as football from '../src/sports/football/engine.ts';
 import * as hockey from '../src/sports/hockey/engine.ts';
 import * as handball from '../src/sports/handball/engine.ts';
 import * as basketball from '../src/sports/basketball/engine.ts';
+import { reboundAction, scoreAction, statAction } from '../src/sports/basketball/actions.ts';
 import * as kabaddi from '../src/sports/kabaddi/engine.ts';
 import { kabaddiTotals } from '../src/sports/kabaddi/totals.ts';
 import * as chess from '../src/sports/chess/engine.ts';
@@ -144,8 +145,9 @@ describe('football / hockey / handball — replayed logs', () => {
 /* ------------------------------------------------------------ basketball -- */
 
 test('basketball: team high, margin, top scorers, a 40-point game, a triple-double', () => {
-  const sc = (side: Side, who: string, points: number): ScoreAction => ({ type: 'SCORE', side, payload: { points, pid: who }, attribution: { playerId: who, stat: 'points', by: points, playerName: who.toUpperCase() } });
-  const ev = (type: string, side: Side, who: string): ScoreAction => ({ type, side, payload: { pid: who }, attribution: { playerId: who, stat: type.toLowerCase(), playerName: who.toUpperCase() } });
+  // IDs-only scoring: the controls' actions (the player by id)
+  const sc = (side: Side, who: string, points: number): ScoreAction => scoreAction(side, points, { id: who });
+  const ev = (type: 'REBOUND' | 'ASSIST', side: Side, who: string): ScoreAction => (type === 'REBOUND' ? reboundAction(side, { id: who }) : statAction(side, type, { id: who }));
   const acts: ScoreAction[] = [{ type: 'KICKOFF', payload: { at: 1 } }];
   for (let i = 0; i < 14; i++) acts.push(sc('home', 'h23', 3)); // 42
   for (let i = 0; i < 6; i++) acts.push(sc('home', 'h3', 2)); // 12
@@ -159,6 +161,7 @@ test('basketball: team high, margin, top scorers, a 40-point game, a triple-doub
   assert.deepEqual(of(b, 'bigGame').map((i) => [i.playerId, i.text]), [['h23', '42 pts · 40+'], ['a1', '40 pts · 40+']]);
   assert.deepEqual(of(b, 'tripleDouble').map((i) => [i.playerId, i.text]), [['h3', '12 pts · 10 reb · 10 ast']]);
   assert.deepEqual(of(b, 'playerHigh').filter((i) => i.side === 'home').map((i) => i.playerId), ['h23', 'h3']);
+  assert.ok(b!.items.every((i) => i.playerName === undefined), 'IDs-only: records keep the id, no name');
 });
 
 /* --------------------------------------------------------------- kabaddi -- */

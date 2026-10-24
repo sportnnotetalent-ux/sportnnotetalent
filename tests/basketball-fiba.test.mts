@@ -17,15 +17,20 @@ import {
   teamStandings, standingsConfigFromFormat, newTournamentFormats, withNewTournamentPoints, standingsPresets,
 } from '../src/data/standings.ts';
 import { basketballVoice } from '../src/sports/voiceParsers.ts';
+import { foulAction, freeThrowAction, scoreAction } from '../src/sports/basketball/actions.ts';
+import type { FoulType } from '../src/sports/basketball/events.ts';
 import type { ScoreAction } from '../src/sports/types.ts';
 import type { Match, Player } from '../src/core/types.ts';
 
 type Side = 'home' | 'away';
 const run = (s: BasketballState, ...as: ScoreAction[]) => as.reduce(reducer, s);
-const foul = (side: Side, who: string, foulType = 'personal'): ScoreAction =>
-  ({ type: 'FOUL', side, payload: { foulType }, attribution: { playerId: who, stat: 'fouls', playerName: who } });
-const fouls = (side: Side, n: number, foulType = 'personal') =>
+// IDs-only scoring: the foul as the controls send it (the player by id)
+const foul = (side: Side, who: string, foulType: FoulType = 'personal'): ScoreAction => foulAction(side, { id: who }, foulType);
+const fouls = (side: Side, n: number, foulType: FoulType = 'personal') =>
   Array.from({ length: n }, (_, i) => foul(side, `P${i % 5}`, foulType));
+/** what an older app sent: the player by name (the legacy replay logs below) */
+const oldFoul = (side: Side, who: string, foulType = 'personal'): ScoreAction =>
+  ({ type: 'FOUL', side, payload: { foulType }, attribution: { playerId: who, stat: 'fouls', playerName: who } });
 
 // The format fields the presets in src/sports/basketball/index.tsx write (that
 // file imports React Native, so the preset values are checked as text below).
@@ -153,12 +158,12 @@ describe('SD-05 — standings: FIBA 2-1 for new tournaments only', () => {
 describe('SD-05 — full-court "+1" is a free throw', () => {
   const asha = { id: 'p-asha', fullName: 'Asha Rao' } as Player;
   const ctx = (s: BasketballState) => ({ state: s, homeName: 'Home', awayName: 'Away', homeRoster: [asha], awayRoster: [] });
-  // What the "+1 FT" button / the FT panel's "Made" dispatch for a shooter.
-  const madeFT: ScoreAction = { type: 'FREE_THROW', side: 'home', payload: { made: true },
-    attribution: { playerId: asha.id, stat: 'points', by: 1, playerName: asha.fullName, extra: { freeThrowsMade: 1, freeThrowsAtt: 1 } } };
+  // What the "+1 FT" button / the FT panel's "Made" dispatch for a shooter (by id).
+  const madeFT: ScoreAction = freeThrowAction('home', true, asha);
 
   test('and-one: the basket + the free throw = 3, logged as a FG and a made FT', () => {
-    const s = run(init(FIBA), { type: 'SCORE', side: 'home', payload: { points: 2 }, attribution: { playerId: asha.id, stat: 'points', by: 2, playerName: asha.fullName } }, madeFT);
+    assert.deepEqual(madeFT.attribution, { playerId: asha.id, stat: 'points', by: 1, extra: { freeThrowsMade: 1, freeThrowsAtt: 1 } });
+    const s = run(init(FIBA), scoreAction('home', 2, asha), madeFT);
     assert.equal(s.home, 3);
     assert.deepEqual(s.events.map((e) => [e.type, e.points]), [['score', 2], ['freethrow', 1]]);
   });
@@ -207,9 +212,9 @@ describe('SD-05 — legacy replay identity (frozen pre-SD-05 engine)', () => {
     const pre = out.reduce(legacyReducer, legacyInit(cfg));
     if (pre.home !== pre.away) out.push({ type: 'SCORE', side: pre.home < pre.away ? 'home' : 'away', payload: { points: Math.abs(pre.home - pre.away) } });
     out.push({ type: 'START_OVERTIME' });
-    for (let i = 0; i < 6; i++) out.push(foul(rnd(2) ? 'home' : 'away', `x${rnd(9)}`, types[rnd(5)]));
+    for (let i = 0; i < 6; i++) out.push(oldFoul(rnd(2) ? 'home' : 'away', `x${rnd(9)}`, types[rnd(5)]));
     out.push({ type: 'START_OVERTIME' });
-    for (let i = 0; i < 12; i++) out.push(foul(rnd(2) ? 'home' : 'away', `x${rnd(9)}`, types[rnd(5)]));
+    for (let i = 0; i < 12; i++) out.push(oldFoul(rnd(2) ? 'home' : 'away', `x${rnd(9)}`, types[rnd(5)]));
     return out;
   }
   // Configs old matches actually stored: the old FIBA / NBA / NCAA / 3×3 / School

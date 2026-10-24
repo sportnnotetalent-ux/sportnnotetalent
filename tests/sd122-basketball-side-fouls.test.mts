@@ -11,12 +11,15 @@ import {
   type BasketballState,
 } from '../src/sports/basketball/engine.ts';
 import { legacyInit, legacyReducer } from './basketballLegacyReducer.mts';
+import { ejectAction, foulAction, scoreAction } from '../src/sports/basketball/actions.ts';
+import type { FoulType } from '../src/sports/basketball/events.ts';
 import type { ScoreAction } from '../src/sports/types.ts';
 
 type Side = 'home' | 'away';
 const run = (s: BasketballState, ...as: ScoreAction[]) => as.reduce(reducer, s);
 const RAHUL = 'Rahul Sharma';
-// What the live UI sends since SD-122: the player's id in `pid`, plus `v: 2`.
+// What the live UI sent from SD-122 until IDs-only scoring: the player's id in
+// `pid`, plus `v: 2` — and the name beside it (an older log now).
 const foul2 = (side: Side, pid: string, name = RAHUL, foulType = 'personal'): ScoreAction =>
   ({ type: 'FOUL', side, payload: { foulType, pid, v: 2 }, attribution: { playerId: pid, stat: 'fouls', playerName: name } });
 const score2 = (side: Side, pid: string, points = 2, name = RAHUL): ScoreAction =>
@@ -75,6 +78,43 @@ describe('SD-122 — two "Rahul Sharma"s on opposite teams', () => {
     const s = run(init({ foulsToFoulOut: 1 }), foul2('home', 'h-rahul'));
     assert.equal(isFouledOut(s, RAHUL), true);
     assert.equal(foulCount(s, RAHUL), 1);
+  });
+});
+
+describe('IDs-only — the same rules by id (the live UI now: no name anywhere)', () => {
+  // `fire` stamps `v: 2`; the play carries the player's id only
+  const v2 = (a: ScoreAction): ScoreAction => ({ ...a, payload: { ...a.payload, v: 2 } });
+  const foul3 = (side: Side, pid: string, foulType: FoulType = 'personal') => v2(foulAction(side, { id: pid }, foulType));
+  const score3 = (side: Side, pid: string, points = 2) => v2(scoreAction(side, points, { id: pid }));
+  const eject3 = (side: Side, pid: string) => v2(ejectAction(side, { id: pid }));
+  test('one Rahul fouls out; the other (a different id) plays on', () => {
+    let s = init({ foulsToFoulOut: 5, foulsForBonus: 4 });
+    for (let i = 0; i < 5; i++) s = reducer(s, foul3('home', 'h-rahul'));
+    assert.equal(isFouledOut(s, undefined, { side: 'home', pid: 'h-rahul' }), true);
+    assert.equal(isPlayerOut(s, undefined, { side: 'away', pid: 'a-rahul' }), false);
+    assert.equal(reducer(s, score3('home', 'h-rahul')), s, 'the fouled-out player is refused');
+    s = run(s, score3('away', 'a-rahul', 3));
+    assert.equal(s.away, 3);
+    assert.equal(s.events.at(-1)?.pid, 'a-rahul');
+    assert.equal('playerName' in s.events.at(-1)!, false);
+  });
+  test('ejection and the disqualifying-foul count, by side and id', () => {
+    const s = run(init(), eject3('home', 'h-rahul'), foul3('away', 'a-rahul', 'technical'));
+    assert.equal(isEjected(s, undefined, { side: 'home', pid: 'h-rahul' }), true);
+    assert.equal(isEjected(s, undefined, { side: 'away', pid: 'a-rahul' }), false);
+    assert.equal(disqualifyingFoul(s, undefined, 'technical', { side: 'away', pid: 'a-rahul' }), '2T');
+    assert.equal(disqualifyingFoul(s, undefined, 'technical', { side: 'home', pid: 'h-rahul' }), undefined);
+    assert.equal(foulCount(s, undefined, { side: 'away', pid: 'a-rahul' }), 1);
+    assert.equal(foulCount(s, undefined, undefined), 0, 'nobody named: no count');
+  });
+  test('a match begun on an older app (SD-40: name + id, no v: 2): its fouls still count against the id', () => {
+    const sd40 = (side: Side): ScoreAction =>
+      ({ type: 'FOUL', side, payload: { foulType: 'personal', pid: 'h-rahul' }, attribution: { playerId: 'h-rahul', stat: 'fouls', playerName: RAHUL } });
+    let s = init({ foulsToFoulOut: 2 });
+    s = run(s, sd40('home'), sd40('home'));
+    assert.equal(s.events[0].pid, undefined, 'the old play keeps its old shape');
+    assert.equal(reducer(s, score3('home', 'h-rahul')), s, 'refused through the old log\'s name → id map');
+    assert.equal(reducer(s, score3('away', 'h-rahul')).away, 2, 'the other side is never matched');
   });
 });
 
