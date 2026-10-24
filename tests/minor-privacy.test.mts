@@ -7,7 +7,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { isReducedCard, guestSeesMembersOnly, canFollowCard, reducedCardNote, avatarInitials, displayNameOf } from '../src/core/minorPrivacy.ts';
+import { isReducedCard, guestSeesMembersOnly, canFollowCard, reducedCardNote, avatarInitials, displayNameOf, listingContactRule, listingContactNote } from '../src/core/minorPrivacy.ts';
 import { displayableImage, isPrivateImageRef, privateImageRef, parsePrivateImageRef, isPrivateImageKind, PLAYER_PHOTO_BUCKET } from '../src/core/imageUrl.ts';
 import { createSignedImageCache } from '../src/core/signedImageCache.ts';
 import { allowedPlayerFollows, keepAllowedFollows } from '../supabase/functions/_shared/minorFollows.ts';
@@ -182,5 +182,25 @@ describe('children: signed-in strangers get the reduced card too (minor_names_si
     assert.doesNotMatch(policy.slice(0, 200), /using \(true\)/);
     assert.match(policy, /my_player_circle\(\)/);
     assert.match(policy, /my_claimable_player\(\)/); // the sign-up claim must still see its row
+  });
+});
+
+describe('listings: a possible minor posts no phone, initials only (listings_minor_contact)', () => {
+  test('the rule follows the server: under 18 or no date of birth = no number', () => {
+    assert.equal(listingContactRule(30), 'ok');
+    assert.equal(listingContactRule(18), 'ok');
+    assert.equal(listingContactRule(17), 'minor');
+    assert.equal(listingContactRule(undefined), 'no_dob');
+    assert.equal(listingContactNote('ok'), undefined);
+    assert.match(listingContactNote('minor')!, /initials and no phone number/);
+    assert.match(listingContactNote('no_dob')!, /date of birth/);
+  });
+  test('the newest stamp_listing strips a possible minor\'s phone and full name', () => {
+    const dir = join(import.meta.dirname, '..', 'supabase', 'migrations');
+    const f = readdirSync(dir).filter((x) => x.endsWith('.sql')).sort().reverse()
+      .find((x) => /create or replace function stamp_listing\(\)/.test(readFileSync(join(dir, x), 'utf8')))!;
+    const sql = readFileSync(join(dir, f), 'utf8');
+    assert.match(sql, /not player_is_known_adult\(p\.dob, p\.profile_id\)[\s\S]{0,200}new\.contact_phone := null/);
+    assert.match(sql, /new\.author_name := name_initials\(p\.full_name\)/);
   });
 });

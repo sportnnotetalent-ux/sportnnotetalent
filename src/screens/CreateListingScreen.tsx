@@ -9,6 +9,8 @@ import { theme } from '../core/theme';
 import { Button, TextField, SelectChip, ScreenTitle, FieldLabel, FormError, textStyles } from '../components/ui';
 import { PhoneField } from '../components/PhoneField';
 import { samePhone } from '../core/phone';
+import { ageFromDob, ageOf } from '../core/age';
+import { listingContactNote, listingContactRule, type ListingContactRule } from '../core/minorPrivacy';
 import { SPORT_LIST, getSportMeta } from '../sports/sportMeta';
 import { useAuth } from '../core/auth';
 import { getMyPlayerId, getPlayer, createListing } from '../data/repos';
@@ -38,6 +40,8 @@ export default function CreateListingScreen({ navigation }: Props) {
   const [myId, setMyId] = useState<string | null>(null);
   const [myName, setMyName] = useState('');
   const [verifiedPhone, setVerifiedPhone] = useState<string | null>(null);
+  // A possible minor's listing has no phone and shows initials (enforced by the server).
+  const [contactRule, setContactRule] = useState<ListingContactRule>('ok');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -50,7 +54,10 @@ export default function CreateListingScreen({ navigation }: Props) {
       const p = await getPlayer(id);
       if (!on || !p) return;
       setMyName(p.fullName);
-      setPhone((cur) => cur || p.phone || '');
+      // the server reads the player's date of birth, else the account's (player_is_known_adult)
+      const rule = listingContactRule(ageOf(p) ?? ageFromDob(profile?.dob));
+      setContactRule(rule);
+      if (rule === 'ok') setPhone((cur) => cur || p.phone || '');
       setCity((cur) => cur || p.city || '');
       if (p.phoneVerified && p.phone) setVerifiedPhone(p.phone);
     });
@@ -79,8 +86,8 @@ export default function CreateListingScreen({ navigation }: Props) {
         preferredDate: wantsSchedule(kind) && preferredDate.trim() ? preferredDate.trim() : undefined,
         level: wantsLevel(kind) && level ? level : undefined,
         details: details.trim(),
-        contactPhone: phone.trim() || undefined,
-        contactVerified,
+        contactPhone: contactRule === 'ok' ? phone.trim() || undefined : undefined,
+        contactVerified: contactRule === 'ok' && contactVerified,
       });
       navigation.goBack();
     } catch (e) {
@@ -154,15 +161,21 @@ export default function CreateListingScreen({ navigation }: Props) {
             placeholder={`What ${getSportMeta(sport).name.toLowerCase()} ${isTeamKind(kind) ? 'your team needs' : 'you’re looking for'} — availability, level, timing…`}
             multiline
           />
-          <PhoneField label="Contact number (WhatsApp)" value={phone} onChange={setPhone} optional />
-          <Text style={textStyles.muted}>
-            Shared on the post so interested people can reach you.
-            {phone.trim()
-              ? contactVerified
-                ? ' ✓ This is your verified number.'
-                : ' This number isn’t verified — verify it in your profile to show a verified badge.'
-              : ''}
-          </Text>
+          {contactRule === 'ok' ? (
+            <>
+              <PhoneField label="Contact number (WhatsApp)" value={phone} onChange={setPhone} optional />
+              <Text style={textStyles.muted}>
+                Shared on the post so interested people can reach you.
+                {phone.trim()
+                  ? contactVerified
+                    ? ' ✓ This is your verified number.'
+                    : ' This number isn’t verified — verify it in your profile to show a verified badge.'
+                  : ''}
+              </Text>
+            </>
+          ) : (
+            <Text style={textStyles.muted}>{listingContactNote(contactRule)}</Text>
+          )}
         </KeyboardAwareScrollView>
       </KeyboardFooterLayout>
     </SafeAreaView>

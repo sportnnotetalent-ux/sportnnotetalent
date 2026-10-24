@@ -13,6 +13,13 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-24 — Listings: a child's name and phone are never public
+Found during the children's-names work: a Connect listing ("looking for a team / player / opponent / ground") is readable by anyone, logged out included. `stamp_listing()` wrote the author's real full name onto it, and the form prefills their own WhatsApp number, so a child who posted one published both.
+- **Migration `20261024150000_listings_minor_contact.sql`:** when the author is a possible minor (under 18, or no date of birth — the `players_view` rule), the listing gets their initials, no contact number and no verified badge. Existing listings get the same treatment. Adults are unchanged.
+- **App (`CreateListingScreen`, `core/minorPrivacy.ts` `listingContactRule` / `listingContactNote`):** for a possible minor the number field is replaced by a note. Under 18: "initials and no phone number … ask a parent, coach or your team captain to post it". No date of birth: "Add your date of birth in Edit profile to share a contact number". Age comes from the player's date of birth, else the account's (as the server reads it).
+- **Verified:** tests (rule and note; the newest `stamp_listing` strips phone and name); tsc clean; demo preview (the demo "me" is a school student) shows the note and no number field, with no console errors. Live has no listings today.
+- **Decision recorded:** children's names in public scoring data (`match_events.attribution.playerName`, racket-sport `matches.state`) will be removed by making scoring store player IDs only and resolving names through `players_view`, sport by sport (racket sports and cricket first). The entry-team-name masking is folded into that work.
+
 ### 2026-10-24 — Children's full name and age: only their circle, signed in or not
 Founder decision, from the API audit: anyone can sign up in a minute, and a signed-in stranger got every child's full name, age, gender and sport details (only logged-out visitors got initials).
 - **Migration `20261024120000_minor_names_signed_in.sql`:**

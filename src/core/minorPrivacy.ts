@@ -59,3 +59,20 @@ export function displayNameOf(p: Pick<Player, 'fullName'> | null | undefined, fa
   const n = (p?.fullName ?? '').trim();
   return n || fallback;
 }
+
+/** A Connect listing is public (logged out too), so a possible minor's listing
+ *  carries no phone number and shows their initials — the server enforces it
+ *  (stamp_listing, migration listings_minor_contact). `undefined` age = no date
+ *  of birth on file, which the server treats as a possible minor. */
+export type ListingContactRule = 'ok' | 'minor' | 'no_dob';
+export function listingContactRule(age: number | undefined): ListingContactRule {
+  if (age === undefined) return 'no_dob';
+  return age >= 18 ? 'ok' : 'minor';
+}
+
+/** The line shown instead of the contact number field. */
+export function listingContactNote(rule: ListingContactRule): string | undefined {
+  if (rule === 'minor') return 'Under 18: your listing shows your initials and no phone number, to keep you safe. If people need to reach you, ask a parent, coach or your team captain to post it.';
+  if (rule === 'no_dob') return 'Add your date of birth in Edit profile to share a contact number. Until then the listing shows your initials and no number.';
+  return undefined;
+}
