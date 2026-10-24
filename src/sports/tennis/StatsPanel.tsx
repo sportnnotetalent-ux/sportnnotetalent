@@ -13,6 +13,7 @@ import { theme } from '../../core/theme';
 import { SelectChip } from '../../components/ui';
 import type { Player } from '../../core/types';
 import { playerServeLine, type ServeRow } from '../serveStats';
+import { useMask } from '../../core/disputeMask';
 import {
   RALLY_CATS, blockOf, keyStats, rallyLengthRows, rallyRows, serveFilters, serveReturnRows, strokeSummary, tennisView,
   type RallyCat, type Scope, type ServeFilter,
@@ -42,6 +43,8 @@ export function TennisStatsPanel({
   const [tab, setTab] = useState<Tab>('key');
   const [filter, setFilter] = useState<ServeFilter>('all');
   const [cat, setCat] = useState<RallyCat>('fhW');
+  // IDs-only scoring: servers by id for this viewer (the squad's name as the fallback)
+  const mask = useMask();
   if (!v || v.st.match.rallies === 0) return null;
   const periods = v.st.periods.length;
   const active: Scope = scope !== 'all' && scope > periods ? 'all' : scope;
@@ -55,7 +58,7 @@ export function TennisStatsPanel({
   const cur: Tab = tabs.some((t) => t.key === tab) ? tab : 'key';
   const filters = serveFilters(v);
   const f: ServeFilter = filters.includes(filter) ? filter : 'all';
-  const nameOf = (id: string) => [...homeRoster, ...awayRoster].find((p) => p.id === id)?.fullName ?? id;
+  const nameOf = (id: string) => mask.nameOf(id, [...homeRoster, ...awayRoster].find((p) => p.id === id)?.fullName);
   const players = block ? Object.entries(block.players).filter(([, p]) => p.srvPlayed > 0)
     .sort(([, x], [, y]) => (x.side === y.side ? 0 : x.side === 'home' ? -1 : 1)) : [];
   const bar = (r: ServeRow) => <StatBar key={r.key} r={r} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} />;

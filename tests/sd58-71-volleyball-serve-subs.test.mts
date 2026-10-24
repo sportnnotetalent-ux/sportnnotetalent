@@ -114,11 +114,12 @@ describe('SD-58 / SD-81 — ace and serve error credited to the server', () => {
     const opp = trackCourt(s).server!;
     assert.equal(opp.name, 'Arjun');
     const a = vb.outcomeAction('serveerror', 'home', undefined, { by: fp(opp) });
-    assert.deepEqual(a.attribution2, { playerId: 'a2', stat: 'serveErrors', playerName: 'Arjun', side: 'away' }); // SD-119: the server's side
+    // IDs-only scoring: the server by id (match events are public)
+    assert.deepEqual(a.attribution2, { playerId: 'a2', stat: 'serveErrors', side: 'away' }); // SD-119: the server's side
     s = vb.reducer(s, a);
     const e = s.events[s.events.length - 1];
     assert.equal(e.kind, 'serveerror');
-    assert.deepEqual(e.oe, { playerName: 'Arjun', playerId: 'a2' });
+    assert.deepEqual(e.oe, { playerId: 'a2' });
     const t = volleyballStatTotals(s);
     assert.equal(t.a2.stats.serveErrors, 1);
     assert.equal(t.h1.stats.serveErrors, 0); // every line of a match that tracked it

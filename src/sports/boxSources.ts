@@ -21,7 +21,7 @@ import { eventCredits } from './basketball/credits.ts';
 import { shotsTracked } from './basketball/totals.ts';
 import { boxFieldByName } from './basketball/fieldTime.ts';
 import { bbDeepRows } from './basketball/deep.ts';
-import { tally as volleyballTally, type VolleyballState } from './volleyball/engine.ts';
+import { tally as volleyballTally, vbCreditKeyer, type VolleyballState } from './volleyball/engine.ts';
 import { detailTally as vbDetailTally, detailTracked as vbDetailTracked } from './volleyball/detail.ts';
 import { tally as kabaddiTally, isShootoutEvent, type KabaddiState } from './kabaddi/engine.ts';
 import { kabaddiMatchCentre, KABADDI_COUNT_KEYS } from './kabaddi/totals.ts';
@@ -52,6 +52,7 @@ import { rugbyBox } from './rugby/box.ts';
 import type { RugbyState } from './rugby/engine.ts';
 import { leagueBox } from './rugby_league/box.ts';
 import type { LeagueState } from './rugby_league/engine.ts';
+import { withRosters, type NameOf } from './racketNames.ts';
 
 type Side = 'home' | 'away';
 const other = (s: Side): Side => (s === 'home' ? 'away' : 'home');
@@ -64,6 +65,10 @@ export interface BoxContext {
   /** team names, for footnotes (basketball team fouls) */
   homeName?: string;
   awayName?: string;
+  /** IDs-only scoring (docs/privacy/ids-only-scoring.md): a player's name for
+   *  this viewer by id. Used by the racket and volleyball boxes (their logs
+   *  keep ids); absent → the stored legacy name / the roster name. */
+  nameOf?: NameOf;
 }
 
 const rosterOf = (ctx: BoxContext, side: Side): Player[] => (side === 'home' ? ctx.homeRoster : ctx.awayRoster) ?? [];
@@ -171,6 +176,9 @@ export function basketballBox(s: BasketballState, ctx: BoxContext = {}): MatchBo
 
 const VB_OUTCOME_KINDS = new Set(['attack', 'opperror', 'serveerror']);
 
+/** IDs-only scoring: a volleyball box keyed by player id. An older log's
+ *  name-only credit is matched to a roster player by name, else keyed by the
+ *  name ("~Name"); names are the viewer's (`ctx.nameOf`). */
 export function volleyballBox(s: VolleyballState, ctx: BoxContext = {}): MatchBoxSource {
   const currentSet = s.setsWon.home + s.setsWon.away + 1;
   const periods = numbered(s.ended ? s.sets.length : currentSet, 'Set');
@@ -178,55 +186,71 @@ export function volleyballBox(s: VolleyballState, ctx: BoxContext = {}): MatchBo
   // older "Point"-only log hides the ATK column instead of showing zeros.
   const outcomes = s.events.some((e) => VB_OUTCOME_KINDS.has(e.kind ?? ''));
   // SD-81 — keyed: a column shows only when the match captured it
-  const namedSE = s.events.some((e) => e.kind === 'serveerror' && e.oe?.playerName);
-  const namedErr = s.events.some((e) => e.kind === 'opperror' && e.oe?.playerName);
+  const named = (e: LiveEvent) => !!(e.oe?.playerName || e.oe?.playerId);
+  const namedSE = s.events.some((e) => e.kind === 'serveerror' && named(e));
+  const namedErr = s.events.some((e) => e.kind === 'opperror' && named(e));
   return {
     periods,
     emptyText: 'No points yet.',
     data: (scope) => {
       const inScope = (e: LiveEvent) => scope === 'all' || e.set === scope;
       const vbDetail = vbDetailTracked(s) ? vbDetailTally(s, scope) : null;
-      const count = (sd: Side, kind: string, name?: string) =>
-        s.events.filter((e) => e.side === sd && e.kind === kind && inScope(e) && (name === undefined || e.playerName === name)).length;
+      const count = (sd: Side, kind: string) => s.events.filter((e) => e.side === sd && e.kind === kind && inScope(e)).length;
       const side = (sd: Side): BoxSideInput => {
         const roster = rosterOf(ctx, sd);
-        const rows = volleyballTally(s.events, sd, scope).map((l) => withId({
-          name: l.name,
-          stats: { points: l.points, aces: l.aces, blocks: l.blocks, ...(outcomes ? { attackPoints: count(sd, 'attack', l.name) } : null) },
-        }, roster));
+        const resolve = (name: string) => idIn(name, roster);
+        const keyOf = vbCreditKeyer(s.events, resolve);
+        const nm = withRosters(ctx.nameOf, roster);
+        const byKey = new Map<string, BoxRowInput>();
+        for (const l of volleyballTally(s.events, sd, scope, { nameOf: nm, resolve })) {
+          byKey.set(l.key, {
+            name: l.name, ...(l.playerId ? { playerId: l.playerId } : {}),
+            stats: { points: l.points, aces: l.aces, blocks: l.blocks, ...(outcomes ? { attackPoints: l.attackPoints } : null) },
+          });
+        }
         // SD-81 — per-player ATT / EFF (detail mode), SE / ERR (named faults):
         // only on a match that captured them, so older matches hide the columns
-        const extra = new Map<string, Record<string, number>>();
-        const add = (name: string, k: string, n = 1) => {
-          const m = extra.get(name) ?? extra.set(name, {}).get(name)!;
-          m[k] = (m[k] ?? 0) + n;
+        const extra = new Map<string, { legacy?: string; stats: Record<string, number> }>();
+        const add = (key: string, legacy: string | undefined, k: string, n = 1) => {
+          const m = extra.get(key) ?? extra.set(key, { ...(legacy ? { legacy } : {}), stats: {} }).get(key)!;
+          m.stats[k] = (m.stats[k] ?? 0) + n;
         };
         if (vbDetail) {
           for (const l of vbDetail.values()) {
             if (l.side !== sd) continue;
-            for (const k of ['attackAttempts', 'attackKills', 'attackErrors', 'attacksBlocked'] as const) add(l.name, k, l[k]);
+            const key = keyOf({ playerId: l.playerId, playerName: l.name || undefined });
+            if (!key) continue;
+            for (const k of ['attackAttempts', 'attackKills', 'attackErrors', 'attacksBlocked'] as const) add(key, l.name || undefined, k, l[k]);
           }
         }
         for (const [kind, key, on] of [['serveerror', 'serveErrors', namedSE], ['opperror', 'errors', namedErr]] as const) {
           if (!on) continue;
-          for (const e of s.events) if (e.kind === kind && e.side === other(sd) && inScope(e) && e.oe?.playerName) add(e.oe.playerName, key);
+          for (const e of s.events) {
+            if (e.kind !== kind || e.side !== other(sd) || !inScope(e) || !named(e)) continue;
+            const k = keyOf(e.oe);
+            if (k) add(k, e.oe?.playerName, key);
+          }
         }
         const zero: Record<string, number> = {
           ...(vbDetail ? { attackAttempts: 0, attackKills: 0, attackErrors: 0, attacksBlocked: 0 } : null),
           ...(namedSE ? { serveErrors: 0 } : null), ...(namedErr ? { errors: 0 } : null),
         };
         if (Object.keys(zero).length) {
-          for (const name of extra.keys()) {
-            if (!rows.some((r) => r.name === name)) rows.push(withId({ name, stats: { points: 0, aces: 0, blocks: 0, ...(outcomes ? { attackPoints: 0 } : null) } }, roster));
+          for (const [key, x] of extra) {
+            if (byKey.has(key)) continue;
+            byKey.set(key, key.startsWith('~')
+              ? { name: nm(undefined, key.slice(1)), stats: { points: 0, aces: 0, blocks: 0, ...(outcomes ? { attackPoints: 0 } : null) } }
+              : { name: nm(key, x.legacy), playerId: key, stats: { points: 0, aces: 0, blocks: 0, ...(outcomes ? { attackPoints: 0 } : null) } });
           }
-          for (const r of rows) Object.assign(r.stats, zero, extra.get(r.name) ?? {});
+          for (const [key, r] of byKey) Object.assign(r.stats, zero, extra.get(key)?.stats ?? {});
         }
+        const rows = [...byKey.values()];
         const oppErrors = count(sd, 'opperror') + count(sd, 'serveerror');
         const scoredKinds = ['point', 'attack', 'ace', 'block'];
         const scored = s.events.filter((e) => e.side === sd && inScope(e) && scoredKinds.includes(e.kind ?? '')).length;
         // the side's points no player earned: the opponent's errors (VB-07),
         // plus any point logged without a player
-        const loose = s.events.filter((e) => e.side === sd && inScope(e) && !e.playerName && scoredKinds.includes(e.kind ?? ''));
+        const loose = s.events.filter((e) => e.side === sd && inScope(e) && !e.playerName && !e.playerId && scoredKinds.includes(e.kind ?? ''));
         const looseOf = (k: string) => loose.filter((e) => e.kind === k).length;
         return {
           rows,
@@ -445,23 +469,40 @@ export function footballBox(s: FootballState, ctx: BoxContext = {}): MatchBoxSou
 
 /* ------------------------------ racket sports ------------------------------ */
 
-/** Points (and tennis aces) per player from a point log; `periodOf` reads an
- *  event's game / set; `kinds` = the scoring kinds; `roster` players listed
- *  at 0 (the old PointBoxScore did, tennis / badminton didn't). */
+/** IDs-only scoring — who a racket credit is: the player's id; an older event
+ *  that stored only a name is matched to a roster player by that name (else
+ *  it is keyed by the name itself, "~Name"). */
+type Credit = { playerId?: string; playerName?: string } | undefined;
+const creditKey = (c: Credit, roster: Player[]): string | undefined =>
+  c?.playerId || (c?.playerName ? idIn(c.playerName, roster) ?? `~${c.playerName}` : undefined);
+
+/** Points (and tennis aces) per player from a point log, keyed by player id
+ *  (IDs-only scoring); `periodOf` reads an event's game / set; `kinds` = the
+ *  scoring kinds; `list` = the roster players listed at 0 (the old
+ *  PointBoxScore did, tennis / badminton didn't). Names are the viewer's
+ *  (`nameOf`), the stored legacy name / the roster name without one. */
 export function pointTally(events: LiveEvent[], side: Side, opts: {
-  scope?: BoxScope; periodOf: (e: LiveEvent) => number | undefined; kinds: string[]; roster?: Player[]; aces?: boolean;
-}): { name: string; points: number; aces: number }[] {
-  const byName = new Map<string, { name: string; points: number; aces: number }>();
-  const ensure = (name: string) => (byName.get(name) ?? byName.set(name, { name, points: 0, aces: 0 }).get(name)!);
-  (opts.roster ?? []).forEach((p) => ensure(p.fullName));
+  scope?: BoxScope; periodOf: (e: LiveEvent) => number | undefined; kinds: string[]; roster?: Player[]; list?: boolean; aces?: boolean; nameOf?: NameOf;
+}): { key: string; playerId?: string; name: string; points: number; aces: number }[] {
+  const roster = opts.roster ?? [];
+  const lines = new Map<string, { key: string; playerId?: string; name: string; points: number; aces: number }>();
+  const legacy = new Map<string, string>();
+  const ensure = (key: string) => lines.get(key)
+    ?? lines.set(key, { key, ...(key.startsWith('~') ? {} : { playerId: key }), name: '', points: 0, aces: 0 }).get(key)!;
+  if (opts.list) roster.forEach((p) => ensure(p.id));
   for (const e of events) {
-    if (e.side !== side || !e.playerName || !opts.kinds.includes(e.kind ?? '')) continue;
+    if (e.side !== side || !opts.kinds.includes(e.kind ?? '')) continue;
+    const key = creditKey(e, roster);
+    if (!key) continue;
     if (opts.scope !== undefined && opts.scope !== 'all' && opts.periodOf(e) !== opts.scope) continue;
-    const l = ensure(e.playerName);
+    if (e.playerName && !legacy.has(key)) legacy.set(key, e.playerName);
+    const l = ensure(key);
     l.points += 1;
     if (e.kind === 'ace') l.aces += 1;
   }
-  return [...byName.values()].sort((a, b) => b.points - a.points || (opts.aces ? b.aces - a.aces : 0));
+  const nm = withRosters(opts.nameOf, roster);
+  for (const l of lines.values()) l.name = l.playerId ? nm(l.playerId, legacy.get(l.key)) : nm(undefined, l.key.slice(1));
+  return [...lines.values()].sort((a, b) => b.points - a.points || (opts.aces ? b.aces - a.aces : 0));
 }
 
 function pointBox(events: LiveEvent[], ctx: BoxContext, periods: { value: number; label: string }[], o: {
@@ -478,63 +519,81 @@ function pointBox(events: LiveEvent[], ctx: BoxContext, periods: { value: number
     periods,
     emptyText: 'No points yet.',
     data: (scope) => {
-      // SD-107 — winners / UE / FE per player (by name) in scope; a credit no
+      // SD-107 — winners / UE / FE per player (by id) in scope; a credit no
       // player can take (doubles, nobody named) stays off the table.
-      const detail = o.detail ? detailByName(o.detail, events.filter((e) => scope === 'all' || o.periodOf(e) === scope), ctx) : null;
+      const detail = o.detail ? detailByPlayer(o.detail, events.filter((e) => scope === 'all' || o.periodOf(e) === scope), ctx) : null;
       const side = (sd: Side): BoxSideInput => {
         const roster = rosterOf(ctx, sd);
-        const rows = pointTally(events, sd, { scope, periodOf: o.periodOf, kinds: o.kinds, roster: o.listRoster ? roster : undefined, aces: o.aces })
-          .map((l) => withId({ name: l.name, stats: { points: l.points, ...(o.aces ? { aces: l.aces } : null) } }, roster));
+        const nm = withRosters(ctx.nameOf, roster);
+        // IDs-only scoring: rows keyed by player id (an older name-only credit by "~name")
+        const byKey = new Map<string, BoxRowInput>();
+        const blank = (): Record<string, number> => ({ points: 0, ...(o.aces ? { aces: 0 } : null) });
+        const add = (key: string, legacyName?: string) => {
+          if (byKey.has(key)) return byKey.get(key)!;
+          const row: BoxRowInput = key.startsWith('~')
+            ? { name: nm(undefined, key.slice(1)), stats: blank() }
+            : { name: nm(key, legacyName), playerId: key, stats: blank() };
+          byKey.set(key, row);
+          return row;
+        };
+        for (const l of pointTally(events, sd, { scope, periodOf: o.periodOf, kinds: o.kinds, roster, list: o.listRoster, aces: o.aces, nameOf: ctx.nameOf })) {
+          byKey.set(l.key, { name: l.name, ...(l.playerId ? { playerId: l.playerId } : {}), stats: { points: l.points, ...(o.aces ? { aces: l.aces } : null) } });
+        }
         if (detail) {
           // a player credited only with an error still gets a row
-          for (const key of detail.keys()) {
-            const [dSide, name] = key.split('|');
-            if (dSide !== sd || rows.some((r) => r.name === name)) continue;
-            rows.push(withId({ name, stats: { points: 0, ...(o.aces ? { aces: 0 } : null) } }, roster));
-          }
-          for (const r of rows) {
-            const mine = detail.get(`${sd}|${r.name}`) ?? {};
+          for (const v of detail.values()) if (v.side === sd) add(v.key, v.legacy);
+          for (const [key, r] of byKey) {
+            const mine = detail.get(`${sd}|${key}`)?.stats ?? {};
             Object.assign(r.stats, Object.fromEntries(DETAIL_BOX_KEYS.map((k) => [k, mine[k] ?? 0])));
           }
         }
         if (dfOn) {
           // a df point is the receiver's: the faulting server is on the other side
-          const faults = new Map<string, number>();
+          const faults = new Map<string, { n: number; legacy?: string }>();
           for (const e of events) {
             if (!e.df || e.side === sd || (e.side !== 'home' && e.side !== 'away')) continue;
             if (scope !== 'all' && o.periodOf(e) !== scope) continue;
-            const name = e.df.playerName ?? (e.df.playerId ? roster.find((p) => p.id === e.df!.playerId)?.fullName : undefined) ?? (roster.length === 1 ? roster[0].fullName : undefined);
-            if (name) faults.set(name, (faults.get(name) ?? 0) + 1);
+            const key = creditKey(e.df, roster) ?? (roster.length === 1 ? roster[0].id : undefined);
+            if (!key) continue;
+            const f = faults.get(key) ?? { n: 0, ...(e.df.playerName ? { legacy: e.df.playerName } : {}) };
+            f.n += 1;
+            faults.set(key, f);
           }
-          for (const name of faults.keys()) {
-            if (!rows.some((r) => r.name === name)) rows.push(withId({ name, stats: { points: 0, ...(o.aces ? { aces: 0 } : null) } }, roster));
-          }
-          for (const r of rows) r.stats.doubleFaults = faults.get(r.name) ?? 0;
+          for (const [key, f] of faults) add(key, f.legacy);
+          for (const [key, r] of byKey) r.stats.doubleFaults = faults.get(key)?.n ?? 0;
         }
-        return { rows };
+        return { rows: [...byKey.values()] };
       };
       return { home: side('home'), away: side('away') };
     },
   };
 }
 
-/** SD-107 — point-detail credits per "side|player name" (singles: the side's
- *  one player when the point names nobody). */
-function detailByName(sport: DetailSport, events: LiveEvent[], ctx: BoxContext): Map<string, Record<string, number>> {
+/** SD-107 — point-detail credits per "side|player key" (IDs-only scoring:
+ *  the player's id; singles: the side's one player when the point names
+ *  nobody). */
+function detailByPlayer(sport: DetailSport, events: LiveEvent[], ctx: BoxContext): Map<string, { side: Side; key: string; legacy?: string; stats: Record<string, number> }> {
   const solo = (sd: Side): string | undefined => {
     const r = rosterOf(ctx, sd);
-    if (r.length === 1) return r[0].fullName;
-    const named = new Set(events.filter((e) => e.side === sd && e.playerName && (e.kind === 'point' || e.kind === 'ace')).map((e) => e.playerName!));
+    if (r.length === 1) return r[0].id;
+    const named = new Set(events.filter((e) => e.side === sd && (e.playerId || e.playerName) && (e.kind === 'point' || e.kind === 'ace')).map((e) => creditKey(e, r)!));
     return r.length === 0 && named.size === 1 ? [...named][0] : undefined;
   };
+  const legacy = new Map<string, string>();
   const credits = detailPlayerCredits(sport, events, (sd, p) => {
-    const name = p?.playerName ?? (p?.playerId ? rosterOf(ctx, sd).find((x) => x.id === p.playerId)?.fullName : undefined) ?? solo(sd);
-    return name ? `${sd}|${name}` : undefined;
+    const key = creditKey(p, rosterOf(ctx, sd)) ?? solo(sd);
+    if (key && p?.playerName && !legacy.has(`${sd}|${key}`)) legacy.set(`${sd}|${key}`, p.playerName);
+    return key ? `${sd}|${key}` : undefined;
   });
-  return credits;
+  const out = new Map<string, { side: Side; key: string; legacy?: string; stats: Record<string, number> }>();
+  for (const [k, stats] of credits) {
+    const i = k.indexOf('|');
+    const side = k.slice(0, i) as Side;
+    out.set(k, { side, key: k.slice(i + 1), ...(legacy.has(k) ? { legacy: legacy.get(k) } : {}), stats });
+  }
+  return out;
 }
 
-/** Table tennis / squash / pickleball (the rally engine): per game. */
 /** Table tennis / squash / pickleball (the rally engine): per game. `sport`
  *  names the point-detail options (SD-107; the rally state doesn't know it). */
 export const rallyBox = (s: RallyState, ctx: BoxContext = {}, sport?: 'tabletennis' | 'squash' | 'pickleball'): MatchBoxSource =>

@@ -23,6 +23,7 @@ import { keepMarks, withStamps } from '../conduct.ts';
 import { isPointKind } from '../rallyEdit.ts';
 import { fromPen, isSanctionLevel, oppSide, sanctionDef, sanctionLabel, toPen, type VbSanction } from './sanctions.ts';
 import type { PenMark } from '../conduct';
+import { legacyNameOf, type NameOf } from '../../core/playerNames.ts';
 
 const TARGET = 25;
 const DECIDER_TARGET = 15; // the final set is a shorter race to 15 (real-world rule)
@@ -79,7 +80,10 @@ export interface VolleyballState {
   vd?: VbDetailEntry[];
 }
 
-export interface CourtPlayer { id: string; name: string }
+/** A player on court (lineup / rotation / liberos / subs). IDs-only scoring:
+ *  new stamps carry the id only; `name` is legacy, read-only (an older stamp
+ *  stored it) — readers show `nameOf(id, name)`. */
+export interface CourtPlayer { id: string; name?: string }
 
 export const init = (config?: Record<string, unknown>): VolleyballState => ({
   current: { home: 0, away: 0 },
@@ -206,7 +210,7 @@ export const VB_TRACKED = ['points', 'attackPoints', 'aces', 'blocks'];
 /** The attribution a credited outcome carries: primary stat + `extra` for the
  *  rest of `volleyballCredits`, so forward recording, undo (statReversals) and the
  *  editor's reconciliation all agree. */
-export function outcomeAttribution(kind: VbOutcome | 'point', player?: { id: string; fullName: string }): Attribution | undefined {
+export function outcomeAttribution(kind: VbOutcome | 'point', player?: { id: string; fullName?: string }): Attribution | undefined {
   if (!player) return undefined;
   const credits = volleyballCredits(kind);
   const keys = Object.keys(credits);
@@ -214,8 +218,9 @@ export function outcomeAttribution(kind: VbOutcome | 'point', player?: { id: str
   // primary = the outcome's own stat (aces / blocks), else points
   const stat = kind === 'ace' ? 'aces' : kind === 'block' ? 'blocks' : 'points';
   const extra = Object.fromEntries(keys.filter((k) => k !== stat).map((k) => [k, credits[k]]));
+  // IDs-only scoring: the id only (match events are public)
   return {
-    playerId: player.id, stat, playerName: player.fullName,
+    playerId: player.id, stat,
     ...(Object.keys(extra).length ? { extra } : {}),
     tracked: VB_TRACKED,
   };
@@ -227,17 +232,17 @@ export function outcomeAttribution(kind: VbOutcome | 'point', player?: { id: str
  *  and who erred — an OPPONENT, charged one `errors` (attribution2: a stat
  *  line only, no follower alert). Both are new optional keys. */
 export const outcomeAction = (
-  kind: VbOutcome, side: 'home' | 'away', player?: { id: string; fullName: string },
-  fault?: { err?: string; by?: { id: string; fullName: string } },
+  kind: VbOutcome, side: 'home' | 'away', player?: { id: string; fullName?: string },
+  fault?: { err?: string; by?: { id: string; fullName?: string } },
 ): ScoreAction => {
   const def = VB_OUTCOMES.find((o) => o.kind === kind)!;
   const a: ScoreAction = { type: def.type, side, attribution: def.credited ? outcomeAttribution(kind, player) : undefined };
   if (kind === 'opperror' && fault?.err) a.payload = { err: fault.err };
   // SD-119: the erring player is on the OTHER side from the point's winner
   const errSide = side === 'home' ? 'away' : 'home';
-  if (kind === 'opperror' && fault?.by) a.attribution2 = { playerId: fault.by.id, stat: VB_ERROR_STAT, playerName: fault.by.fullName, side: errSide };
+  if (kind === 'opperror' && fault?.by) a.attribution2 = { playerId: fault.by.id, stat: VB_ERROR_STAT, side: errSide };
   // SD-58 / SD-81: the opponent's server who missed (pre-filled from the rotation)
-  if (kind === 'serveerror' && fault?.by) a.attribution2 = { playerId: fault.by.id, stat: VB_SERVE_ERROR_STAT, playerName: fault.by.fullName, side: errSide };
+  if (kind === 'serveerror' && fault?.by) a.attribution2 = { playerId: fault.by.id, stat: VB_SERVE_ERROR_STAT, side: errSide };
   return a;
 };
 
@@ -336,14 +341,17 @@ const core = (s: VolleyballState, a: ScoreAction): VolleyballState => {
     const team = a.payload?.team;
     const players = a.payload?.players as CourtPlayer[] | undefined;
     if ((team !== 'home' && team !== 'away') || !Array.isArray(players)) return s;
-    const list = players.filter((p) => p?.id).map((p) => ({ id: String(p.id), name: String(p.name ?? '') }));
+    // IDs-only scoring: ids only; an older stamp's names are kept as they were
+    const list = players.filter((p) => p?.id).map((p): CourtPlayer => (p.name != null ? { id: String(p.id), name: String(p.name) } : { id: String(p.id) }));
     return { ...s, lineup: { ...s.lineup, [team]: list } };
   }
   const def = KIND_OF[a.type];
   if (s.ended || !a.side || !def) return s;
   const { kind, icon, label } = def;
   // An opponent's error is nobody's point on the scoring side.
-  const who = kind === 'opperror' || kind === 'serveerror' ? undefined : a.attribution?.playerName;
+  const credit = kind === 'opperror' || kind === 'serveerror' ? undefined : a.attribution;
+  // legacy, read-only: an older log's attribution named the player
+  const who = credit?.playerName;
   const current = { ...s.current, [a.side]: s.current[a.side] + 1 };
   const setNo = s.setsWon.home + s.setsWon.away + 1;
   const tgt = setTarget(s); // 15 in the decider, else the set target
@@ -351,9 +359,10 @@ const core = (s: VolleyballState, a: ScoreAction): VolleyballState => {
   const events = [...s.events];
   // Structured fields (kind/playerName/set/points) let the per-set box score
   // aggregate points/aces/blocks per player, filtered by set — the timeline ignores them.
-  // SD-29: the player's id rides on the point only once a court is stamped
-  // (older logs replay to exactly their old state).
-  const pid = who && s.lineup && a.attribution?.playerId ? { playerId: a.attribution.playerId } : {};
+  // SD-29: an older (named) credit's id rides on the point only once a court
+  // is stamped (older logs replay to exactly their old state). IDs-only
+  // scoring: a credit that carries no name always keeps its id.
+  const pid = credit?.playerId && (who ? s.lineup : true) ? { playerId: credit.playerId } : {};
   // SD-117b: an "Opp. fault" may carry what went wrong + the erring opponent
   // (new optional keys — older OPP_ERRORs carry neither and replay unchanged).
   // SD-58: a missed serve may name the opponent's server (charged `serveErrors`)
@@ -430,33 +439,70 @@ function sanctionStep(s: VolleyballState, a: ScoreAction): VolleyballState {
 function faultOf(a: ScoreAction): VbFault | undefined {
   const type = typeof a.payload?.err === 'string' && a.payload.err ? a.payload.err : undefined;
   const by = (a.attribution2 ?? (a.payload?._attr2 as ScoreAction['attribution2'])) || undefined;
-  if (!type && !by?.playerName) return undefined;
-  return { ...(type ? { type } : {}), ...(by?.playerName ? { playerName: by.playerName, ...(by.playerId ? { playerId: by.playerId } : {}) } : {}) };
+  // IDs-only scoring: the erring player by id (an older log's by name + id)
+  if (!type && !by?.playerName && !by?.playerId) return undefined;
+  return {
+    ...(type ? { type } : {}),
+    ...(by?.playerName ? { playerName: by.playerName, ...(by.playerId ? { playerId: by.playerId } : {}) } : by?.playerId ? { playerId: by.playerId } : {}),
+  };
 }
-export interface VbFault { type?: string; playerId?: string; playerName?: string }
+export interface VbFault { type?: string; playerId?: string; /** legacy, read-only */ playerName?: string }
 
-export interface BoxLine { name: string; points: number; aces: number; blocks: number }
+export interface BoxLine {
+  /** the viewer's name (IDs-only scoring: `nameOf(playerId, legacy name)`) */
+  name: string;
+  /** IDs-only scoring — the row's key: the player's id, or "~Name" for an
+   *  older log's credit that carried only a name */
+  key: string;
+  playerId?: string;
+  points: number; aces: number; blocks: number;
+  /** kills (Attack points) */
+  attackPoints: number;
+}
+
+const BOX_KINDS = new Set(['point', 'attack', 'ace', 'block']);
+
+/** IDs-only scoring — a volleyball credit's row key: the player's id; an
+ *  older log's name-only credit resolves through `resolve` (a roster), else
+ *  through the id the same name carries elsewhere in the log, else "~Name". */
+export function vbCreditKeyer(events: LiveEvent[], resolve?: (name: string) => string | undefined): (c?: { playerId?: string; playerName?: string }) => string | undefined {
+  const seen = new Map<string, string>();
+  for (const e of events ?? []) {
+    for (const c of [e, e.oe]) if (c?.playerId && c.playerName && !seen.has(c.playerName)) seen.set(c.playerName, c.playerId);
+  }
+  return (c) => c?.playerId || (c?.playerName ? resolve?.(c.playerName) ?? seen.get(c.playerName) ?? `~${c.playerName}` : undefined);
+}
 
 /** Box score: points, aces & blocks per player for one side (`scope` = one set).
  *  An ace or block is also a point, so it counts in both columns — the same credit
- *  the player's profile gets (`volleyballCredits`). */
-export function tally(events: LiveEvent[], side: 'home' | 'away', scope: 'all' | number = 'all'): BoxLine[] {
-  const byName = new Map<string, BoxLine>();
-  const ensure = (name: string) => {
-    if (!byName.has(name)) byName.set(name, { name, points: 0, aces: 0, blocks: 0 });
-    return byName.get(name)!;
-  };
+ *  the player's profile gets (`volleyballCredits`). IDs-only scoring: keyed by
+ *  player id (`vbCreditKeyer`), named for the viewer by `nameOf` (the stored
+ *  legacy name without one). */
+export function tally(events: LiveEvent[], side: 'home' | 'away', scope: 'all' | number = 'all', opts: { nameOf?: NameOf; resolve?: (name: string) => string | undefined } = {}): BoxLine[] {
+  const keyOf = vbCreditKeyer(events, opts.resolve);
+  const lines = new Map<string, BoxLine & { legacy?: string }>();
   for (const e of events) {
     // Player-credited kinds only — an opponent's error (opperror/serveerror) is
     // the side's point but nobody's stat.
-    if (e.side !== side || !e.playerName || (e.kind !== 'point' && e.kind !== 'attack' && e.kind !== 'ace' && e.kind !== 'block')) continue;
+    if (e.side !== side || !BOX_KINDS.has(e.kind ?? '')) continue;
+    const key = keyOf(e);
+    if (!key) continue;
     if (scope !== 'all' && e.set !== scope) continue;
-    const l = ensure(e.playerName);
+    let l = lines.get(key);
+    if (!l) {
+      l = { name: '', key, ...(key.startsWith('~') ? {} : { playerId: key }), points: 0, aces: 0, blocks: 0, attackPoints: 0, ...(e.playerName ? { legacy: e.playerName } : {}) };
+      lines.set(key, l);
+    }
+    if (!l.legacy && e.playerName) l.legacy = e.playerName;
     l.points += 1;            // every scored point counts…
     if (e.kind === 'ace') l.aces += 1; // …an ace also lands in the ace column
     if (e.kind === 'block') l.blocks += 1; // …a winning block in the block column
+    if (e.kind === 'attack') l.attackPoints += 1;
   }
-  return [...byName.values()].sort((a, b) => b.points - a.points || b.aces - a.aces);
+  const nameOf = opts.nameOf ?? legacyNameOf;
+  return [...lines.values()]
+    .map(({ legacy, ...l }) => ({ ...l, name: l.playerId ? nameOf(l.playerId, legacy) : nameOf(undefined, l.key.slice(1)) }))
+    .sort((a, b) => b.points - a.points || b.aces - a.aces);
 }
 
 

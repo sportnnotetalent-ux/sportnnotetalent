@@ -16,6 +16,7 @@ import { askConfirm } from '../../components/ConfirmSheet';
 import type { Player } from '../../core/types';
 import type { QuickOptionsProps } from '../types';
 import { stampAction, type VolleyballState } from './engine';
+import { sanctionAction } from './actions';
 import {
   VB_MISCONDUCT_REASONS, VB_SANCTIONS, oppSide, sanctionDef, sanctionEffect, sanctionsOf, suggestSanction,
   type VbSanctionLevel, type VbSanctionTrack,
@@ -47,7 +48,8 @@ export function VolleyballQuickOptions({ state, dispatch, homeRoster, awayRoster
     const so = side ? sanctionsOf(events).filter((x) => x.by === side && sanctionDef(x.level)?.track === track).length : 0;
     const apply = async () => {
       if (!side || !chosen || !def || (needsPlayer && !player)) return;
-      const payload = { vb: chosen, ...(reason ? { reason } : {}), ...(player ? { playerId: player.id, playerName: player.fullName } : {}) };
+      // IDs-only scoring: the offender by id (match events are public)
+      const action = sanctionAction(side, chosen, { reason, player });
       // close the sheet first so the confirm isn't stacked on it (iOS)
       onDone();
       await new Promise((r) => setTimeout(r, 350));
@@ -58,7 +60,7 @@ export function VolleyballQuickOptions({ state, dispatch, homeRoster, awayRoster
         tone: def.effect === 'none' ? 'caution' : 'danger',
       });
       if (!ok) return;
-      dispatch(stampAction({ type: 'CONDUCT', side, payload }));
+      dispatch(stampAction(action));
     };
     return (
       <View style={st.panel}>

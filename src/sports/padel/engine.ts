@@ -227,6 +227,8 @@ const core = (s: PadelState, a: ScoreAction): PadelState => {
     return scorePoint(s, a.side, undefined, undefined, { ...(f?.playerId ? { playerId: f.playerId } : {}), ...(f?.playerName ? { playerName: f.playerName } : {}) }, serve);
   }
   if (a.type === 'POINT') {
+    // IDs-only scoring: the controls send the id only; a name comes only from
+    // an older log / app (legacy, read-only — replayed exactly as before)
     const next = scorePoint(s, a.side, a.attribution?.playerName, a.attribution?.playerId || undefined, undefined, serve);
     if (a.payload?.pd == null) return next;
     const ev = applyPointDetail(next.events, { pd: a.payload.pd }, 'padel');

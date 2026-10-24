@@ -57,7 +57,12 @@ describe('SD-04 — who a point credits', () => {
     assert.deepEqual(statLines([a]), { 'p-a': { points: 1, attackPoints: 1 } });
     const s = play([a]);
     assert.equal(s.events[0].kind, 'attack');
-    assert.deepEqual(tally(s.events, 'home'), [{ name: 'Asha', points: 1, aces: 0, blocks: 0 }]);
+    // IDs-only scoring: the point keeps the player's id (no name); the box is
+    // keyed by id and named for the viewer
+    assert.equal(s.events[0].playerId, 'p-a');
+    assert.equal(s.events[0].playerName, undefined);
+    const nameOf = (id?: string | null) => (id === 'p-a' ? 'Asha' : 'Player');
+    assert.deepEqual(tally(s.events, 'home', 'all', { nameOf }), [{ name: 'Asha', key: 'p-a', playerId: 'p-a', points: 1, aces: 0, blocks: 0, attackPoints: 1 }]);
   });
 
   test('ace and block count as points too (profile = box score)', () => {

@@ -7,6 +7,10 @@
  * timeout / let records, change-ends / interval cues and who served the game.
  * Renders the pure blocks of tennis/commentaryModel.ts and
  * racketCommentaryModel.ts; masks names where the viewer may not see them.
+ * IDs-only scoring (docs/privacy/ids-only-scoring.md): the rows arrive with
+ * names already resolved by player id for this viewer (the models take the
+ * screen's `useMask().nameOf`, dispute mask included); `mask.text` still
+ * masks a disputed name an older log stored in its text.
  */
 import React, { useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';

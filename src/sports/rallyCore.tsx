@@ -17,6 +17,8 @@ import { theme } from '../core/theme';
 import { SelectChip, textStyles } from '../components/ui';
 import { MatchBoxScore } from '../components/BoxScore';
 import { rallyBox } from './boxSources';
+import { useMask } from '../core/disputeMask';
+import { pointAction, startRightAction } from './racketActions';
 import { RallyPointEditor } from './RallyPointEditor';
 import { MatchStatsPanel } from './MatchStatsPanel';
 import { PointDetailRow } from './PointDetailRow';
@@ -109,7 +111,8 @@ export function makeRallyPlugin(opts: RallyOpts): SportPlugin<RallyState> {
       // English scoring only when they're serving — a hand-out credits nobody)
       const solo = (side === 'home' ? homeRoster : awayRoster);
       const p = solo.length === 1 && (!s.sideOut || side === s.serving) ? solo[0] : undefined;
-      dispatch({ type: 'POINT', side, payload: { pd: { how } }, ...(p ? { attribution: { playerId: p.id, stat: 'points', playerName: p.fullName } } : {}) });
+      // IDs-only scoring: the credit carries the player's id, never the name
+      dispatch(pointAction(side, p, { payload: { pd: { how } } }));
     };
     const letRow = opts.id === 'squash' && !s.ended && (s.serverPicked || s.events.length > 0) ? (
       <View style={{ gap: theme.spacing(2) }}>
@@ -130,7 +133,7 @@ export function makeRallyPlugin(opts: RallyOpts): SportPlugin<RallyState> {
     ) : null;
     const rosterOf = (t: 'home' | 'away') => (t === 'home' ? homeRoster : awayRoster);
     const point = (side: 'home' | 'away', p?: Player) =>
-      dispatch({ type: 'POINT', side, attribution: p ? { playerId: p.id, stat: 'points', playerName: p.fullName } : undefined });
+      dispatch(pointAction(side, p));
 
     // SD-06 — court positions (pickleball): the server is the player in the
     // right-hand court, derived from one pre-serve pick + the score.
@@ -156,7 +159,7 @@ export function makeRallyPlugin(opts: RallyOpts): SportPlugin<RallyState> {
           <Text style={[ctrl.meta, { alignSelf: 'center' }]}>{t === 'home' ? homeName : awayName}:</Text>
           {roster.map((p) => (
             <SelectChip key={p.id} label={p.fullName} active={cur === p.id}
-              onPress={() => dispatch({ type: 'SET_START_RIGHT', payload: { side: t, playerId: p.id, playerName: p.fullName, ...(fix ? { v: 2 } : {}) } })} />
+              onPress={() => dispatch(startRightAction(t, p, fix))} />
           ))}
         </View>
       );
@@ -312,6 +315,8 @@ export function makeRallyPlugin(opts: RallyOpts): SportPlugin<RallyState> {
   );
   const Stats = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster, onPlayer }: TabProps) => {
     const s = state as RallyState;
+    // IDs-only scoring: box-score names by player id for this viewer
+    const { nameOf } = useMask();
     return (
       <View style={{ gap: theme.spacing(3) }}>
         {/* SD-22 / deep wave: key stats, serve, shots, rally length — replayed from the point log, per game */}
@@ -319,7 +324,7 @@ export function makeRallyPlugin(opts: RallyOpts): SportPlugin<RallyState> {
         {/* SD-54 — match and game durations (from the scorer's tap times) */}
         {durationLine(s.events, 'G') ? <Text style={textStyles.muted}>{durationLine(s.events, 'G')}</Text> : null}
         <Text style={ctrl.label}>Box score</Text>
-        <MatchBoxScore sport={opts.id} source={rallyBox(s, { homeRoster, awayRoster }, opts.id)} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} onPlayer={onPlayer} />
+        <MatchBoxScore sport={opts.id} source={rallyBox(s, { homeRoster, awayRoster, nameOf }, opts.id)} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} onPlayer={onPlayer} />
       </View>
     );
   };

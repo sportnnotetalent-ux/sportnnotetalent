@@ -32,6 +32,9 @@
  *     "<name> is serving game N").
  * Names: the credited / named player when known, else the serving player
  * serveStats names (doubles), the side's only player (singles), the side.
+ * IDs-only scoring (docs/privacy/ids-only-scoring.md): the log names players
+ * by id; `names.nameOf` gives this viewer's name (the rosters' names, then an
+ * older log's stored name, without one).
  */
 import type { LiveEvent } from './liveEvents';
 import { pointRows, replayPoints, type EditRow, type PointInput } from './rallyEdit.ts';
@@ -46,6 +49,8 @@ import {
   NET_WORDS, STROKES, THIRD_LABEL, TT_PHASE_LABEL, RALLY_LABEL, errTypeOf, netSides, shotOf, shotPhrase, type DepthSport,
 } from './pointDetail.ts';
 import { elapsed, gameScore, type CommentaryBlock, type CommentaryNames, type CommentaryRow } from './tennis/commentaryModel.ts';
+import { FALLBACK_NAME } from '../core/playerNames.ts';
+import { legacyNameOf, markDetail, whoName, withRosters, type NameOf } from './racketNames.ts';
 
 export type { CommentaryBlock, CommentaryNames, CommentaryRow } from './tennis/commentaryModel.ts';
 
@@ -55,10 +60,11 @@ const opp = (s: Side): Side => (s === 'home' ? 'away' : 'home');
 const article = (x: string) => (/^[aeiou]/i.test(x) ? `an ${x}` : `a ${x}`);
 
 /** The sentence a described rally reads with (undefined = no detail).
- *  `unit` = 'rally' for a side-out rally that won only the serve. */
-export function racketSentence(sport: DepthSport, p: PointInput, who: { winner: string; loser: string; server: string }, unit: 'point' | 'rally' = 'point'): string | undefined {
+ *  `unit` = 'rally' for a side-out rally that won only the serve. `nameOf`
+ *  names a double-faulting / erring player by id (IDs-only scoring). */
+export function racketSentence(sport: DepthSport, p: PointInput, who: { winner: string; loser: string; server: string }, unit: 'point' | 'rally' = 'point', nameOf: NameOf = legacyNameOf): string | undefined {
   if (p.pen) return undefined;
-  if (p.df) return `${p.df.playerName || who.server} double faults`;
+  if (p.df) return `${whoName(nameOf, p.df.playerId, p.df.playerName) || who.server} double faults`;
   if (p.kind === 'ace' || p.pd?.how === 'ace') return `${who.winner} wins the ${unit} with an Ace`;
   const pd = p.pd;
   if (!pd) return undefined;
@@ -66,7 +72,7 @@ export function racketSentence(sport: DepthSport, p: PointInput, who: { winner: 
   const what = (s: string) => article(phrase ? `${phrase} ${s}` : s);
   const et = errTypeOf(sport, pd);
   const type = et && STROKES[et] ? ` (${STROKES[et].label.toLowerCase()})` : '';
-  const loser = pd.err?.playerName || who.loser;
+  const loser = (pd.err && whoName(nameOf, pd.err.playerId, pd.err.playerName)) || who.loser;
   switch (pd.how) {
     case 'sw': return `${who.winner} wins the ${unit} with a Service Winner`;
     case 'winner': return `${who.winner} wins the ${unit} with ${what('Winner')}`;
@@ -108,9 +114,11 @@ export function racketCommentary(sport: DepthSport, state: unknown, names: Comme
   const roster = (side: Side) => (side === 'home' ? names.homeRoster : names.awayRoster) ?? [];
   const sideName = (side: Side) => (side === 'home' ? names.homeName : names.awayName);
   const doubles = !!(s0 as { doubles?: boolean }).doubles;
-  const solo = (side: Side) => (!doubles && roster(side).length === 1 ? roster(side)[0].name : undefined);
+  // IDs-only scoring: every player by id (the viewer's name, else the roster / an older log's)
+  const nm = withRosters(names.nameOf, roster('home'), roster('away'));
+  const solo = (side: Side) => (!doubles && roster(side).length === 1 ? nm(roster(side)[0].id, roster(side)[0].name) : undefined);
   const playerOf = (side: Side) => solo(side) ?? sideName(side);
-  const nameOfId = (id?: string) => (id ? [...roster('home'), ...roster('away')].find((p) => p.id === id)?.name : undefined);
+  const nameOfId = (id?: string) => { if (!id) return undefined; const n = nm(id); return n === FALLBACK_NAME ? undefined : n; };
   // who served each rally (SD-22 replay; doubles named where the sport knows)
   const st = serveStats(sport, s0, { home: roster('home').map((p) => p.id), away: roster('away').map((p) => p.id) });
   const traceOf = new Map<number, RallyTrace>((st?.trace ?? []).map((t) => [t.i, t]));
@@ -123,7 +131,7 @@ export function racketCommentary(sport: DepthSport, state: unknown, names: Comme
     const time = elapsed(e.at, t0);
     const side = e.side === 'home' || e.side === 'away' ? e.side : undefined;
     // a squash let: who appealed, when the scorer named it
-    const detail = e.kind === 'let' && side ? `Appeal by ${playerOf(side)} · rally replayed` : e.detail;
+    const detail = e.kind === 'let' && side ? `Appeal by ${playerOf(side)} · rally replayed` : markDetail(e, nm);
     return { kind: 'mark', id: e.id, ...(side ? { side } : {}), icon: e.icon, text: e.label, ...(detail ? { detail } : {}), ...(time ? { time } : {}) };
   };
   const finish = () => drafts.map((d) => ({
@@ -136,7 +144,8 @@ export function racketCommentary(sport: DepthSport, state: unknown, names: Comme
     const ps = s0 as padel.PadelState;
     const serverName = (s: padel.PadelState) => {
       const { side, slot } = padel.serveInfo(s);
-      return (ps.doubles ? roster(side)[slot]?.name : solo(side)) || sideName(side);
+      const p = roster(side)[slot];
+      return (ps.doubles ? (p ? nm(p.id, p.name) : undefined) : solo(side)) || sideName(side);
     };
     const gamesDone = (s: padel.PadelState) => (s.sets ?? []).reduce((n, g) => n + g[0] + g[1], 0) + (s.games?.home ?? 0) + (s.games?.away ?? 0);
     let cur: padel.PadelState = { ...ps, serveDetail: undefined, pts: { home: 0, away: 0 }, games: { home: 0, away: 0 }, sets: [], setsWon: { home: 0, away: 0 }, tb: [], events: [], seq: 0, ended: false };
@@ -171,9 +180,9 @@ export function racketCommentary(sport: DepthSport, state: unknown, names: Comme
         const score = tb
           ? (() => { const a = { ...b.pts, [W]: b.pts[W] + 1 }; return `${a[S]} - ${a[opp(S)]}`; })()
           : gameOver ? 'Game' : gameScore(next.pts, S, b.goldenPoint);
-        const winner = (p.kind !== 'rally' && p.playerName) || playerOf(W);
+        const winner = (p.kind !== 'rally' && whoName(nm, p.playerId, p.playerName)) || playerOf(W);
         const server = serverName(b);
-        const text = p.pen ? [e.label, e.detail].filter(Boolean).join(' · ') : racketSentence('padel', p, { winner, loser: playerOf(L), server });
+        const text = p.pen ? [e.label, markDetail(e, nm)].filter(Boolean).join(' · ') : racketSentence('padel', p, { winner, loser: playerOf(L), server }, 'point', nm);
         const meta = [
           deciding === 'golden' ? 'Golden point' : deciding === 'star' ? 'Star point' : '',
           p.serve === 2 && !p.df ? '2nd serve' : '',
@@ -251,9 +260,9 @@ export function racketCommentary(sport: DepthSport, state: unknown, names: Comme
       const gameOver = next.games.length > b.games.length || (next.ended && !b.ended);
       const scored = total(next) > total(b);
       const unit: 'point' | 'rally' = scored || p.pen ? 'point' : 'rally';
-      const winner = (p.kind !== 'rally' && p.playerName) || playerOf(W);
+      const winner = (p.kind !== 'rally' && whoName(nm, p.playerId, p.playerName)) || playerOf(W);
       const server = serverNameOf(S, tr?.serverId);
-      const text = p.pen ? [e.label, e.detail].filter(Boolean).join(' · ') : racketSentence(sport, p, { winner, loser: playerOf(L), server }, unit);
+      const text = p.pen ? [e.label, markDetail(e, nm)].filter(Boolean).join(' · ') : racketSentence(sport, p, { winner, loser: playerOf(L), server }, unit, nm);
       let score: string;
       let call = '';
       if (gameOver) {

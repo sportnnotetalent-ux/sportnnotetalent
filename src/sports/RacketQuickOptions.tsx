@@ -21,6 +21,7 @@ import { askConfirm } from '../components/ConfirmSheet';
 import type { Player } from '../core/types';
 import type { LiveEvent } from './liveEvents';
 import type { QuickOptionsProps } from './types';
+import { conductAction, timeoutAction } from './racketActions';
 import {
   CONDUCT_RULES, TIME_VIOLATION, TIMEOUT_ICON, TIMEOUT_LABEL, TIMEOUT_RULES,
   conductCount, conductLabel, levelDef, suggestLevel, suggestionText, timeoutsLeft,
@@ -94,11 +95,8 @@ export function makeRacketQuickOptions(sport: RacketSport, h: RacketQuickHelpers
 
       const apply = async () => {
         if (!side || !chosen || !def) return;
-        const payload = {
-          level: chosen, ...(track === 'time' ? { track } : {}),
-          ...(reason ? { reason } : {}), ...(player ? { playerId: player.id, playerName: player.fullName } : {}),
-          at: Date.now(),
-        };
+        // IDs-only scoring: the offender by id (match events are public)
+        const action = conductAction(side, { level: chosen, track, reason: reason ?? undefined }, player);
         const label = conductLabel(sport, { level: chosen, track });
         if (def.effect === 'default') {
           // Close the sheet first so the confirm isn't stacked on it (iOS).
@@ -110,11 +108,11 @@ export function makeRacketQuickOptions(sport: RacketSport, h: RacketQuickHelpers
             yesLabel: 'Yes, end the match', noLabel: 'No, keep playing', tone: 'danger',
           });
           if (!ok) return;
-          dispatch({ type: 'CONDUCT', side, payload });
+          dispatch(action);
           onEndMatch?.({ kind: 'awarded', winner: opp(side), reason: `${label}${reason ? ` — ${reason}` : ''}` });
           return;
         }
-        dispatch({ type: 'CONDUCT', side, payload });
+        dispatch(action);
         onDone(`${label} · ${offender}`);
       };
 
@@ -156,7 +154,7 @@ export function makeRacketQuickOptions(sport: RacketSport, h: RacketQuickHelpers
       const leftText = (x: Side) => { const l = left(x); return l == null ? '' : l === 0 ? ' · none left' : ` · ${l} left`; };
       const start = () => {
         if (!side || left(side) === 0) return;
-        dispatch({ type: 'TIMEOUT', side, payload: { t: kind, ...(player ? { playerId: player.id, playerName: player.fullName } : {}), at: Date.now() } });
+        dispatch(timeoutAction(side, kind, player));
         onDone(`${TIMEOUT_ICON[kind]} ${TIMEOUT_LABEL[kind]} · ${player?.fullName ?? nameOf(side)}`);
       };
       return (

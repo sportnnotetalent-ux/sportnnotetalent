@@ -20,7 +20,9 @@
  *
  * One action, applied through volleyball's reducer (none of this existed
  * before, so every older log replays identically — REVIEW Decision 8):
- *   CONDUCT {side = the OFFENDER, payload {vb: level, reason?, playerId?, playerName?}}
+ *   CONDUCT {side = the OFFENDER, payload {vb: level, reason?, playerId?}}
+ *     (IDs-only scoring: an older payload may also carry `playerName`, kept
+ *     on replay; new ones never do — readers show nameOf(playerId, name))
  *     a point-bearing level scores a point for the opponent through the normal
  *     point path (sets / match follow; the rotation treats it as a rally won),
  *     marked `pen` so a timeline correction replays it as a PENALTY_POINT;
@@ -64,6 +66,7 @@ export interface VbSanction {
   level: VbSanctionLevel;
   by: Side;
   playerId?: string;
+  /** legacy, read-only (pre IDs-only scoring) */
   playerName?: string;
   reason?: string;
   /** the set it was given in */

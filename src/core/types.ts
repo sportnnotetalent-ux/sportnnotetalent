@@ -847,6 +847,9 @@ export interface MatchEventRecord {
   type: string;
   side?: 'home' | 'away' | null;
   payload?: Record<string, unknown> | null;
+  /** `playerName` is @deprecated legacy, read-only (pre IDs-only scoring —
+   *  docs/privacy/ids-only-scoring.md): new taps carry the id only; old rows
+   *  may still hold a name, which readers use only as a fallback. */
   attribution?: { playerId: string; stat: string; by?: number; playerName?: string; extra?: Record<string, number>; tracked?: string[] } | null;
   /** server insert time; present when read back (used to find kickoff). */
   created_at?: string;

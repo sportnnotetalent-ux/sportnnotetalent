@@ -36,6 +36,9 @@ import {
   type DepthSport, type How, type PointDetail, type Wing,
 } from './pointDetail';
 import { trackFields } from './pointDetailSettings';
+import { useMask } from '../core/disputeMask';
+import { whoName, withRosters } from './racketNames';
+import { errOf } from './racketActions';
 
 type Side = 'home' | 'away';
 type Flags = { pointDetail?: boolean; serveDetail?: boolean; netDetail?: boolean; rallyDetail?: boolean; thirdDetail?: boolean; rallyBuckets?: string };
@@ -68,6 +71,8 @@ export function PointDetailRow({
     [sport, n, on.pointDetail]);
 
   const nameOf = (side: Side) => (side === 'home' ? homeName : awayName);
+  // IDs-only scoring: the rally's player by id for this viewer
+  const mask = useMask();
   const tracking = fields.filter((f) => on[f.key]).map((f) => f.label);
   const options = (
     <View style={st.optRow}>
@@ -100,7 +105,8 @@ export function PointDetailRow({
   const et = errTypeOf(sport, pd);
   const send = (payload: Record<string, unknown>) => dispatch({ type: 'POINT_DETAIL', payload });
   // singles: the erring player is the opponent; doubles: pick (optional)
-  const soloErr = loserRoster.length === 1 ? { playerId: loserRoster[0].id, playerName: loserRoster[0].fullName } : undefined;
+  // IDs-only scoring: the erring player by id (match state is public)
+  const soloErr = loserRoster.length === 1 ? errOf(loserRoster[0]) : undefined;
   const pick = (how: How) => {
     if (pd?.how === how) return send({ pd: null });
     const d = howDef(sport, how);
@@ -129,10 +135,12 @@ export function PointDetailRow({
   if (!hows.length && !pd && !serve2 && !(nw && on.netDetail) && !on.rallyDetail && !third) {
     return <View style={st.bare}>{options}{chooser}</View>;
   }
-  const who = (e.kind !== 'rally' && e.playerName) || (winnerRoster.length === 1 ? winnerRoster[0].fullName : nameOf(W));
+  const viewer = withRosters(mask.nameOf, homeRoster, awayRoster);
+  const credited = e.kind !== 'rally' ? whoName(viewer, e.playerId, e.playerName) : undefined;
+  const who = credited || (winnerRoster.length === 1 ? winnerRoster[0].fullName : nameOf(W));
   const bucketText = (b: keyof typeof RALLY_LABEL) => (sport === 'tabletennis' ? TT_PHASE_LABEL[b] ?? RALLY_LABEL[b] : RALLY_LABEL[b]);
   const summary = [
-    pd ? pdText(pd, true, sport) : '',
+    pd ? pdText(pd, true, sport, viewer) : '',
     e.serve === 2 ? '2nd serve' : '',
     !nw || !e.atNet ? '' : e.atNet === 'none' ? `nobody ${nw.at.toLowerCase()}`
       : `${nw.at.toLowerCase()}: ${e.atNet === 'both' ? 'both' : nameOf(e.atNet)}`,
@@ -180,7 +188,7 @@ export function PointDetailRow({
           <Text style={[st.meta, st.rowLabel]}>By:</Text>
           {loserRoster.map((p) => (
             <SelectChip key={p.id} label={p.fullName} active={pd.err?.playerId === p.id}
-              onPress={() => send({ pd: { ...pd, err: pd.err?.playerId === p.id ? undefined : { playerId: p.id, playerName: p.fullName } } })} />
+              onPress={() => send({ pd: { ...pd, err: pd.err?.playerId === p.id ? undefined : errOf(p) } })} />
           ))}
         </View>
       )}

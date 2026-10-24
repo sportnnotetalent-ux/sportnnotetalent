@@ -76,14 +76,15 @@ export function volleyballField(s: VolleyballState): FieldResult | null {
   if (!log) return null;
   const r = trackField(log);
   const byKey = new Map(r.players.map((p) => [p.key, p]));
-  const keyOf = (id?: string, name?: string) => id ?? log.people?.find((w) => w.name === name)?.id ?? (name ? `name:${name}` : undefined);
+  // IDs-only scoring: by id; an older log's name-only credit by its name
+  const keyOf = (id?: string, name?: string) => id ?? (name ? log.people?.find((w) => w.name === name)?.id : undefined) ?? (name ? `name:${name}` : undefined);
   for (const e of s.events) {
-    if (!e.side || !e.playerName || !CREDITED.has(e.kind ?? '') || !log.starters[e.side].length) continue;
+    if (!e.side || (!e.playerName && !e.playerId) || !CREDITED.has(e.kind ?? '') || !log.starters[e.side].length) continue;
     const key = keyOf(e.playerId, e.playerName);
     if (!key) continue;
     let p = byKey.get(key);
     if (!p) {
-      p = { key, ...(key.startsWith('name:') ? {} : { id: key }), name: e.playerName, side: e.side, started: false, played: true, minutes: 0, plusMinus: 0, periods: [], spells: [], sentOff: false, suspensions: 0, suspendedMinutes: 0 };
+      p = { key, ...(key.startsWith('name:') ? {} : { id: key }), name: e.playerName ?? '', side: e.side, started: false, played: true, minutes: 0, plusMinus: 0, periods: [], spells: [], sentOff: false, suspensions: 0, suspendedMinutes: 0 };
       byKey.set(key, p);
       r.players.push(p);
     }

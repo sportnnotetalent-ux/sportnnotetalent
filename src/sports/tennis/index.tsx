@@ -13,6 +13,8 @@ import { tennisVoice } from '../voiceParsers';
 import { courtFormation, makeCourt } from '../courts';
 import { MatchBoxScore } from '../../components/BoxScore';
 import { tennisBox } from '../boxSources';
+import { useMask } from '../../core/disputeMask';
+import { doubleFaultAction, pointAction } from '../racketActions';
 import { SetLineBoard } from '../SetLineBoard';
 import { RallyPointEditor } from '../RallyPointEditor';
 import { ServeOrderPicker } from '../ServeOrderPicker';
@@ -39,13 +41,14 @@ const ScoringControls: SportPlugin<TennisState>['ScoringControls'] = ({ state, d
   // SD-54 — scoring steps carry the scorer's clock (match / set durations)
   const dispatch = stampDispatch(rawDispatch);
   const act = (type: string, side: 'home' | 'away', stat: string, p?: Player) =>
-    dispatch({ type, side, attribution: p ? { playerId: p.id, stat, playerName: p.fullName } : undefined });
+    // IDs-only scoring: the credit carries the player's id, never the name
+    dispatch(pointAction(side, p, { type: type as 'POINT' | 'ACE', stat }));
   // A double fault: the OPPONENT wins the point (a normal POINT, so the score &
   // replay stay correct); the faulting server is credited a doubleFault via the
   // 2nd-attribution channel (reversed on undo). SD-104: `payload.df` marks the
   // point in the log, so a later correction moves the doubleFaults with it.
   const doubleFault = (server: 'home' | 'away', p?: Player) =>
-    dispatch({ type: 'POINT', side: other(server), payload: { df: true }, attribution2: p ? { playerId: p.id, stat: 'doubleFaults', playerName: p.fullName, side: server } : undefined });
+    dispatch(doubleFaultAction(server, p));
 
   // Serve tracking. Who serves first is set before the first point; from there
   // serve alternates each game (and, in doubles, rotates through the pair in the
@@ -113,6 +116,8 @@ const TennisCommentaryTab = ({ state, homeName, awayName, homeColor, awayColor, 
 );
 const TennisStats = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster, onPlayer }: TabProps) => {
   const s = state as TennisState;
+  // IDs-only scoring: box-score names by player id for this viewer
+  const { nameOf } = useMask();
   return (
     <View style={{ gap: theme.spacing(3) }}>
       {/* SD-22 / SD-157: key stats, serve & return, rally — replayed from the point log, per set */}
@@ -120,7 +125,7 @@ const TennisStats = ({ state, homeName, awayName, homeColor, awayColor, homeRost
       {/* SD-54 — match and set durations (from the scorer's tap times) */}
       {durationLine(s.events, 'S') ? <Text style={textStyles.muted}>{durationLine(s.events, 'S')}</Text> : null}
       <Text style={ctrl.label}>Player stats</Text>
-      <MatchBoxScore sport="tennis" source={tennisBox(s, { homeRoster, awayRoster })} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} onPlayer={onPlayer} />
+      <MatchBoxScore sport="tennis" source={tennisBox(s, { homeRoster, awayRoster, nameOf })} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} onPlayer={onPlayer} />
     </View>
   );
 };

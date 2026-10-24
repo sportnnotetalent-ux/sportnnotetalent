@@ -15,6 +15,7 @@ import { SelectChip, textStyles } from '../components/ui';
 import type { LineupSlot, Player } from '../core/types';
 import type { CourtProps } from '../components/CourtMap';
 import type { ScoreAction } from './types';
+import { useMask } from '../core/disputeMask';
 import { halfName, spotXY, type ServeCourtView, type CourtPlayer } from './serveCourt';
 
 const firstName = (n?: string) => (n ? n.split(' ')[0] : undefined);
@@ -33,9 +34,14 @@ export function ServeCourtPanel({
   canScore?: boolean;
   dispatch?: (a: ScoreAction) => void;
 }) {
+  // IDs-only scoring: players by id for this viewer (the squad's name as the fallback)
+  const mask = useMask();
   if (!view) return null;
   const roster = (side: 'home' | 'away') => (side === 'home' ? homeRoster : awayRoster);
-  const nameOf = (id?: string) => (id ? [...homeRoster, ...awayRoster].find((p) => p.id === id)?.fullName : undefined);
+  const nameOf = (id?: string) => {
+    const p = id ? [...homeRoster, ...awayRoster].find((x) => x.id === id) : undefined;
+    return p ? mask.nameOf(p.id, p.fullName) : undefined;
+  };
   const teamOf = (side: 'home' | 'away') => (side === 'home' ? homeName : awayName);
   const slot = (p: CourtPlayer): LineupSlot => {
     const { x, y } = spotXY(view.sport, p);

@@ -12,6 +12,7 @@ import { theme } from '../core/theme';
 import { SelectChip } from '../components/ui';
 import type { Player } from '../core/types';
 import type { ScoreAction } from './types';
+import { doublesOrderAction } from './racketActions';
 
 type Side = 'home' | 'away';
 
@@ -44,7 +45,6 @@ export function DoublesOrderPicker({
   if (!atGameStart && !fix) {
     return <Text style={st.link} onPress={() => setFix(true)} accessibilityRole="button">Fix serving order (game {gameNo})</Text>;
   }
-  const v2 = atGameStart ? {} : { v: 2 };
   const recvSide: Side = servingSide === 'home' ? 'away' : 'home';
   const rosterOf = (s: Side) => (s === 'home' ? H : A);
   const nameOf = (s: Side) => (s === 'home' ? homeName : awayName);
@@ -53,7 +53,7 @@ export function DoublesOrderPicker({
       <Text style={[st.meta, st.team]}>{nameOf(side)} {verb}:</Text>
       {rosterOf(side).map((p) => (
         <SelectChip key={p.id} label={p.fullName} active={cur === p.id}
-          onPress={() => { if (cur !== p.id) dispatch({ type: 'SET_SERVE_ORDER', payload: { [key]: p.id, playerName: p.fullName, ...v2 } }); }} />
+          onPress={() => { if (cur !== p.id) dispatch(doublesOrderAction(key, p, !atGameStart)); }} />
       ))}
     </View>
   );

@@ -18,14 +18,21 @@ import { askConfirm } from '../../components/ConfirmSheet';
 import type { LineupSlot, Player } from '../../core/types';
 import type { ScoreAction } from '../types';
 import type { CourtPlayer, VolleyballState } from './engine';
+import { useMask } from '../../core/disputeMask';
+import { courtPlayer, rotationAction, subAction } from './actions';
+import type { NameOf } from '../../core/playerNames';
 import {
   checkSub, firstServer, liberosOf, rotationFor, serveTracked, setNoOf, POSITIONS, courtSize, sixCourt, subLimitOf,
   type SubKind, type VbTrack,
 } from './rotation';
 
 type Side = 'home' | 'away';
-const cp = (p: Player): CourtPlayer => ({ id: p.id, name: p.fullName });
-export const asPlayer = (c: CourtPlayer, roster: Player[]): Player => roster.find((p) => p.id === c.id) ?? ({ id: c.id, fullName: c.name } as Player);
+// IDs-only scoring: SET_ROTATION / SUB payloads carry the player's id only (./actions.ts)
+const cp = (p: Player): CourtPlayer => courtPlayer(p);
+/** The roster player for a court stamp; one not in the roster is shown by id
+ *  (`nameOf`, an older stamp's stored name as the fallback). */
+export const asPlayer = (c: CourtPlayer, roster: Player[], nameOf?: NameOf): Player =>
+  roster.find((p) => p.id === c.id) ?? ({ id: c.id, fullName: nameOf ? nameOf(c.id, c.name) : c.name ?? '' } as Player);
 const first = (name: string) => name.split(' ')[0] || name;
 const ordinal = (n: number) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] ?? 'th'}`;
 
@@ -48,6 +55,7 @@ export function ServePanel({ s, track, dispatch, home, away }: {
 }) {
   const [toss, setToss] = useState(false);
   const [open, setOpen] = useState<{ kind: 'rotation' | 'sub'; side: Side } | null>(null);
+  const { nameOf } = useMask();
   if (s.ended) return null;
   const setNo = setNoOf(s);
   const tracked = serveTracked(s);
@@ -78,7 +86,7 @@ export function ServePanel({ s, track, dispatch, home, away }: {
       ) : tracked ? (
         <View style={css.row}>
           <Text style={[css.serving, { flex: 1 }]} accessibilityLiveRegion="polite">
-            {serving ? `🏐 ${srv ? `${srv.name} serves · ${info(serving).name}` : `${info(serving).name} serves`}` : '🏐 Server not known'}
+            {serving ? `🏐 ${srv ? `${nameOf(srv.id, srv.name)} serves · ${info(serving).name}` : `${info(serving).name} serves`}` : '🏐 Server not known'}
           </Text>
           <SelectChip label={playedInSet ? 'Fix first server' : 'Change'} active={false} onPress={() => setToss(true)} />
         </View>
@@ -98,7 +106,7 @@ export function ServePanel({ s, track, dispatch, home, away }: {
         if (open?.side === sd && open.kind === 'rotation') {
           return <RotationPicker key={sd} info={x} size={courtSize(s)} six={six} setNo={setNo} midSet={playedInSet}
             current={ordered ?? (rot?.from === setNo ? rot.players : null)} carried={rot?.players ?? null} liberos={liberosOf(s, sd)}
-            onSave={(players, liberos) => { dispatch({ type: 'SET_ROTATION', payload: { team: sd, set: setNo, players, liberos } }); setOpen(null); }}
+            onSave={(players, liberos) => { dispatch(rotationAction(sd, setNo, players, liberos)); setOpen(null); }}
             onCancel={() => setOpen(null)} />;
         }
         if (open?.side === sd && open.kind === 'sub' && x.court) {
@@ -107,7 +115,7 @@ export function ServePanel({ s, track, dispatch, home, away }: {
         return (
           <View key={sd} style={[css.side, { borderLeftColor: x.color }]}>
             <Text style={css.label}>{x.name}{rot ? ` · ${six ? 'rotation' : 'serving order'}${rot.from < setNo ? ` (from Set ${rot.from})` : ''}` : ''}{limit > 0 ? ` · subs ${used}/${limit}` : ' · no subs'}</Text>
-            {ordered && <MiniCourt players={ordered} libs={libs} serving={serving === sd} color={x.color} />}
+            {ordered && <MiniCourt players={ordered} libs={libs} serving={serving === sd} color={x.color} nameOf={nameOf} />}
             <View style={css.row}>
               <SelectChip label={rot ? (six ? '↻ Rotation…' : '↻ Serving order…') : six ? '↻ Set rotation (I–VI)' : `↻ Set serving order (1–${courtSize(s)})`} active={false} onPress={() => setOpen({ kind: 'rotation', side: sd })} />
               {canSub && <SelectChip label="🔁 Sub" active={false} onPress={() => setOpen({ kind: 'sub', side: sd })} />}
@@ -121,17 +129,19 @@ export function ServePanel({ s, track, dispatch, home, away }: {
 
 /** Positions as seen from behind the team's own court: net on top,
  *  IV · III · II in front, V · VI · I behind (I serves). */
-function MiniCourt({ players, libs, serving, color }: { players: CourtPlayer[]; libs: Set<string>; serving: boolean; color: string }) {
+function MiniCourt({ players, libs, serving, color, nameOf }: { players: CourtPlayer[]; libs: Set<string>; serving: boolean; color: string; nameOf: NameOf }) {
+  // IDs-only scoring: the stamp keeps ids; names for this viewer
+  const nm = (p: CourtPlayer) => nameOf(p.id, p.name);
   if (players.length !== 6) {
-    return <Text style={css.hint}>{players.map((p, i) => `${players.length === 6 ? POSITIONS[i] : i + 1} ${first(p.name)}${i === 0 && serving ? ' 🏐' : ''}`).join(' · ')}</Text>;
+    return <Text style={css.hint}>{players.map((p, i) => `${players.length === 6 ? POSITIONS[i] : i + 1} ${first(nm(p))}${i === 0 && serving ? ' 🏐' : ''}`).join(' · ')}</Text>;
   }
   const cell = (i: number) => {
     const p = players[i];
     const srv = i === 0 && serving;
     return (
-      <View key={i} style={[css.cell, srv && { backgroundColor: color + '33', borderColor: color }]} accessibilityLabel={`Position ${POSITIONS[i]}: ${p.name}${libs.has(p.id) ? ', libero' : ''}${srv ? ', serving' : ''}`}>
+      <View key={i} style={[css.cell, srv && { backgroundColor: color + '33', borderColor: color }]} accessibilityLabel={`Position ${POSITIONS[i]}: ${nm(p)}${libs.has(p.id) ? ', libero' : ''}${srv ? ', serving' : ''}`}>
         <Text style={css.pos}>{POSITIONS[i]}{libs.has(p.id) ? ' · L' : ''}{srv ? ' 🏐' : ''}</Text>
-        <Text style={css.pname} numberOfLines={1}>{first(p.name)}</Text>
+        <Text style={css.pname} numberOfLines={1}>{first(nm(p))}</Text>
       </View>
     );
   };
@@ -200,12 +210,13 @@ function SubPicker({ s, info, court, libs, dispatch, onDone }: {
 }) {
   const [off, setOff] = useState<Player | null>(null);
   const [injury, setInjury] = useState(false);
+  const { nameOf } = useMask();
   const on = new Set(court.map((p) => p.id));
   const bench = info.roster.filter((p) => !on.has(p.id));
   const record = async (inP: Player) => {
     if (!off) return;
     const want: SubKind | undefined = injury ? 'exceptional' : undefined;
-    const c = checkSub(s, info.side, cp(off), cp(inP), want);
+    const c = checkSub(s, info.side, cp(off), cp(inP), want, nameOf);
     let kind = c.kind;
     if (c.overLimit && kind === 'regular') {
       const ok = await askConfirm({
@@ -223,7 +234,7 @@ function SubPicker({ s, info, court, libs, dispatch, onDone }: {
       });
       if (!ok) return;
     }
-    dispatch({ type: 'SUB', side: info.side, payload: { off: cp(off), on: cp(inP), kind } });
+    dispatch(subAction(info.side, off, inP, kind));
     onDone();
   };
   return (

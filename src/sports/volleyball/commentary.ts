@@ -11,6 +11,10 @@
  * receptions, digs, attacks kept in play) — so an undo or a timeline
  * correction re-derives it, and an old log reads exactly as it was scored
  * (fewer details, never invented ones).
+ *
+ * IDs-only scoring (docs/privacy/ids-only-scoring.md): the log names players
+ * by id; `names.nameOf` gives this viewer's name (an older log's stored name
+ * is the fallback, and without a lookup the text reads as before).
  */
 import type { LiveEvent } from '../liveEvents';
 import type { VolleyballState } from './engine.ts';
@@ -20,6 +24,7 @@ import { RECEPTION_GRADES, type VbDetailEntry } from './detail.ts';
 import { fromPen, sanctionDef, type VbSanction } from './sanctions.ts';
 import { durations, fmtDuration } from '../conduct.ts';
 import { elapsedStamp, type FeedEntry, type FeedGroup, type Side } from '../netraid/feed.ts';
+import { whoName, withRosters, type NameOf, type RosterLike } from '../racketNames.ts';
 
 const SCORED = new Set(['point', 'attack', 'block', 'ace', 'opperror', 'serveerror']);
 const other = (s: Side): Side => (s === 'home' ? 'away' : 'home');
@@ -29,18 +34,28 @@ const FAULT_TEXT: Record<string, string> = {
   net: 'net touch', foot: 'foot fault', rotation: 'rotation fault', hits: 'double contact / four hits', attackout: 'attack out', blockout: 'block out',
 };
 
-export interface VbNames { home: string; away: string }
+export interface VbNames {
+  home: string;
+  away: string;
+  /** IDs-only scoring: a player's name for this viewer by id */
+  nameOf?: NameOf;
+  /** the squads (names by id when no `nameOf` is given) */
+  homeRoster?: RosterLike[];
+  awayRoster?: RosterLike[];
+}
 
 /** The sentence for one scored rally (pure, unit-tested). */
 export function rallySentence(e: LiveEvent, names: VbNames, ctx: { server?: string; blocked?: string; setter?: string; aced?: string } = {}): string {
   const side = e.side as Side;
   const T = names[side];
   const O = names[other(side)];
-  const P = e.playerName;
+  const nm = withRosters(names.nameOf, names.homeRoster, names.awayRoster);
+  const P = whoName(nm, e.playerId, e.playerName);
   if (e.pen) {
     const x: VbSanction = fromPen(e.pen, e.set ?? 1);
     const what = (sanctionDef(x.level)?.label ?? 'Penalty').toLowerCase();
-    return `Point ${T} — ${what} against ${names[x.by]}${x.playerName ? ` (${x.playerName})` : ''}${x.reason ? `: ${x.reason.toLowerCase()}` : ''}`;
+    const who = whoName(nm, x.playerId, x.playerName);
+    return `Point ${T} — ${what} against ${names[x.by]}${who ? ` (${who})` : ''}${x.reason ? `: ${x.reason.toLowerCase()}` : ''}`;
   }
   switch (e.kind) {
     case 'attack':
@@ -53,12 +68,12 @@ export function rallySentence(e: LiveEvent, names: VbNames, ctx: { server?: stri
     }
     case 'opperror': {
       const t = e.oe?.type ? FAULT_TEXT[e.oe.type] ?? errorTypeLabel(e.oe.type)?.toLowerCase() : undefined;
-      const by = e.oe?.playerName;
+      const by = whoName(nm, e.oe?.playerId, e.oe?.playerName);
       if (t) return `Point ${T} — ${t} by ${by ?? O}${by ? ` (${O})` : ''}`;
       return `Point ${T} — ${O} error${by ? ` by ${by}` : ''}`;
     }
     case 'serveerror': {
-      const by = e.oe?.playerName ?? ctx.server;
+      const by = whoName(nm, e.oe?.playerId, e.oe?.playerName) ?? ctx.server;
       return `Point ${T} — service error by ${by ? `${by} (${O})` : O}`;
     }
     default:
@@ -78,10 +93,10 @@ function pressure(s: VolleyballState, n: number, h: number, a: number, won: { ho
   return null;
 }
 
-const RALLY_KINDS: Record<string, (x: VbDetailEntry) => string> = {
-  reception: (x) => `reception ${RECEPTION_GRADES.find((g) => g.key === x.q)?.sign ?? ''} ${x.playerName}`.replace(/\s+/g, ' '),
-  dig: (x) => `dig ${x.playerName}`,
-  inplay: (x) => `attack kept in play ${x.playerName}`,
+const RALLY_KINDS: Record<string, (x: VbDetailEntry, who: string) => string> = {
+  reception: (x, who) => `reception ${RECEPTION_GRADES.find((g) => g.key === x.q)?.sign ?? ''} ${who}`.replace(/\s+/g, ' '),
+  dig: (_x, who) => `dig ${who}`,
+  inplay: (_x, who) => `attack kept in play ${who}`,
 };
 
 /**
@@ -94,6 +109,10 @@ const RALLY_KINDS: Record<string, (x: VbDetailEntry) => string> = {
 export function volleyballCommentary(s: VolleyballState, names: VbNames): FeedGroup[] {
   if (!s || !Array.isArray(s.events)) return [];
   const ev = s.events;
+  // IDs-only scoring: every player by id (an older log's stored name as the fallback)
+  const nm = withRosters(names.nameOf, names.homeRoster, names.awayRoster);
+  const who = (p?: { id?: string; playerId?: string; name?: string; playerName?: string }) =>
+    (p ? whoName(nm, p.playerId ?? p.id, p.playerName ?? p.name) : undefined) ?? '';
   const t0 = ev.reduce<number | null>((m, e) => (typeof e.at === 'number' ? (m == null ? e.at : Math.min(m, e.at)) : m), null);
   const rallies: RallyServe[] = trackCourt(s).rallies;
   const vd = s.vd ?? [];
@@ -116,7 +135,7 @@ export function volleyballCommentary(s: VolleyballState, names: VbNames): FeedGr
       subDone.add(i);
       const sc = score.get(set) ?? { h: 0, a: 0 };
       const how = x.kind === 'libero' ? 'Libero replacement' : x.kind === 'exceptional' ? 'Exceptional substitution' : 'Substitution';
-      add(set, { id: `sub${i}`, icon: '🔁', side: x.side, score: `${sc.h}-${sc.a}`, text: `${how} ${names[x.side]}: ${x.on.name} in for ${x.off.name}` });
+      add(set, { id: `sub${i}`, icon: '🔁', side: x.side, score: `${sc.h}-${sc.a}`, text: `${how} ${names[x.side]}: ${who(x.on)} in for ${who(x.off)}` });
     });
   };
 
@@ -134,13 +153,14 @@ export function volleyballCommentary(s: VolleyballState, names: VbNames): FeedGr
       if (run.set !== set || run.side !== e.side) { run.side = e.side; run.n = 0; run.set = set; }
       run.n += 1;
       const r = rallies[ri++];
-      const server = r?.serverName;
+      const server = r?.serverId || r?.serverName ? whoName(nm, r.serverId, r.serverName) : undefined;
       const of = (kind: string, at: number) => vd.find((x) => x.kind === kind && x.set === set && x.at === at);
-      const blocked = e.kind === 'block' ? of('blocked', n)?.playerName : undefined;
-      const setter = e.kind === 'attack' ? of('assist', n)?.playerName : undefined;
-      const aced = e.kind === 'ace' ? of('aced', n)?.playerName : undefined;
-      const text = rallySentence(e, names, { server, blocked, setter, aced });
-      const rally = vd.filter((x) => x.set === set && x.at === n - 1 && RALLY_KINDS[x.kind]).map((x) => RALLY_KINDS[x.kind](x));
+      const named = (x?: VbDetailEntry) => (x ? who(x) || undefined : undefined);
+      const blocked = e.kind === 'block' ? named(of('blocked', n)) : undefined;
+      const setter = e.kind === 'attack' ? named(of('assist', n)) : undefined;
+      const aced = e.kind === 'ace' ? named(of('aced', n)) : undefined;
+      const text = rallySentence(e, { ...names, nameOf: nm }, { server, blocked, setter, aced });
+      const rally = vd.filter((x) => x.set === set && x.at === n - 1 && RALLY_KINDS[x.kind]).map((x) => RALLY_KINDS[x.kind](x, who(x)));
       const detail = [server && !e.pen ? `🏐 ${server} serving` : null, rally.length ? rally.join(' · ') : null].filter(Boolean).join(' · ');
       const tags: string[] = [];
       const after = pressure(s, set, next.h, next.a, won);
@@ -166,7 +186,7 @@ export function volleyballCommentary(s: VolleyballState, names: VbNames): FeedGr
       const d = sanctionDef(e.vs.level);
       add(set, {
         id: `c${e.id}`, stamp: elapsedStamp(e.at, t0), icon: e.icon, side: e.vs.by, score: `${sc.h}-${sc.a}`, key: true,
-        text: `${d?.label ?? 'Sanction'} — ${e.vs.playerName ? `${e.vs.playerName} (${names[e.vs.by]})` : names[e.vs.by]}${e.vs.reason ? `: ${e.vs.reason.toLowerCase()}` : ''}`,
+        text: `${d?.label ?? 'Sanction'} — ${who(e.vs) ? `${who(e.vs)} (${names[e.vs.by]})` : names[e.vs.by]}${e.vs.reason ? `: ${e.vs.reason.toLowerCase()}` : ''}`,
       });
       continue;
     }

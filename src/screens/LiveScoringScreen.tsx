@@ -959,9 +959,11 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
   // SD-115 — name what Undo removes ("point to Federer (30-15)"), from the newest
   // logged step and the timeline events it added. A sport may name it its own
   // way (SD-133: cricket "FOUR — Rohit (4.3)").
-  const undoWhat = useMemo(() => (plugin.undoLabel ? plugin.undoLabel(lastStep) : undoLabel(lastStep, { home: homeName, away: awayName }, (s) => {
+  // IDs-only scoring: the step's player by id (racket / volleyball logs keep ids)
+  const undoNameOf = useMemo(() => makeNameOf(maskValue.people ?? new Map(), maskValue), [maskValue]);
+  const undoWhat = useMemo(() => (plugin.undoLabel ? plugin.undoLabel(lastStep) : undoLabel(lastStep, { home: homeName, away: awayName, player: undoNameOf }, (s) => {
     try { const m = plugin.summary(s as never); return m.homeScore != null && m.awayScore != null ? `${m.homeScore}-${m.awayScore}` : null; } catch { return null; }
-  })), [plugin, lastStep, homeName, awayName]);
+  })), [plugin, lastStep, homeName, awayName, undoNameOf]);
   // SD-110 — keep the phone awake while this scorer is on a match in progress.
   const focused = useIsFocused();
   useKeepAwakeWhile(focused && canScore && started && !complete && !retiredLocally);

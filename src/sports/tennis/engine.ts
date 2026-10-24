@@ -268,6 +268,8 @@ const core = (s: TennisState, a: ScoreAction): TennisState => {
     const f = a.attribution2 ?? (a.payload?._attr2 as ScoreAction['attribution2']);
     return scorePoint(s, a.side, undefined, false, undefined, { ...(f?.playerId ? { playerId: f.playerId } : {}), ...(f?.playerName ? { playerName: f.playerName } : {}) }, serve);
   }
+  // IDs-only scoring: the controls send the id only; a name comes only from an
+  // older log / app (legacy, read-only — replayed exactly as before)
   if (a.type === 'POINT') return scorePoint(s, a.side, a.attribution?.playerName, false, a.attribution?.playerId || undefined, undefined, serve);
   if (a.type === 'ACE') return scorePoint(s, a.side, a.attribution?.playerName, true, a.attribution?.playerId || undefined, undefined, serve);
   return s;

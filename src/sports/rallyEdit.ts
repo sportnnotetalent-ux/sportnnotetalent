@@ -35,14 +35,18 @@ const KINDS: readonly string[] = ['point', 'ace', 'block', 'attack', 'opperror',
 export interface PointInput {
   side: 'home' | 'away';
   kind: PointKind;
+  /** legacy, read-only (pre IDs-only scoring — docs/privacy/ids-only-scoring.md):
+   *  the name an older log's point carried. A correction's EDIT_LOG keeps ids
+   *  only (`idOnlyPoints`); a name stays only on an old point whose player
+   *  can't be resolved to an id. */
   playerName?: string;
-  /** resolved when the scorer picks a player in the editor; reconstructed events
-   *  only carry the name, so profile reconciliation resolves the id by name. */
+  /** the credited player. Very old events (before SD-19) carry only the name,
+   *  so profile reconciliation resolves the id by name for those. */
   playerId?: string;
   /** SD-104 — tennis: the point was the opponent's double fault (the faulting
    *  server, if named). Replays as a double fault, so a correction that keeps,
    *  changes or drops it moves the server's `doubleFaults` with it. */
-  df?: { playerId?: string; playerName?: string };
+  df?: { playerId?: string; /** legacy, read-only */ playerName?: string };
   /** SD-107 — how the point was won (optional point detail); replayed as a
    *  POINT_DETAIL right after the point. */
   pd?: PointDetail;
@@ -59,7 +63,7 @@ export interface PointInput {
   third?: ThirdShot;
   /** SD-117b — volleyball: an "Opp. fault" point's optional detail (error
    *  type + the erring opponent). Replayed with the fault; charges `errors`. */
-  oe?: { type?: string; playerId?: string; playerName?: string };
+  oe?: { type?: string; playerId?: string; /** legacy, read-only */ playerName?: string };
   /** SD-53 — a racket penalty point (conduct): replays as PENALTY_POINT, so a
    *  correction keeps it a penalty (no rally, no serve change in side-out). */
   pen?: import('./conduct').PenMark;
@@ -144,7 +148,7 @@ function replayActionOf(p: PointInput): ScoreAction {
   if (p.df) {
     return {
       type: 'POINT', side: p.side, payload: { df: true, ...(p.serve ? { serve: p.serve } : {}) },
-      attribution2: p.df.playerName ? { playerId: p.df.playerId ?? '', stat: DOUBLE_FAULT_STAT, playerName: p.df.playerName } : undefined,
+      attribution2: credit(p.df, DOUBLE_FAULT_STAT),
     };
   }
   // SD-117b — a volleyball fault keeps its type and erring opponent
@@ -152,12 +156,12 @@ function replayActionOf(p: PointInput): ScoreAction {
     return {
       type: 'OPP_ERROR', side: p.side,
       ...(p.oe.type ? { payload: { err: p.oe.type } } : {}),
-      attribution2: p.oe.playerName ? { playerId: p.oe.playerId ?? '', stat: FAULT_STAT, playerName: p.oe.playerName } : undefined,
+      attribution2: credit(p.oe, FAULT_STAT),
     };
   }
   // SD-58 — a missed serve keeps the opponent's server who missed it
-  if (p.kind === 'serveerror' && p.oe?.playerName) {
-    return { type: 'SERVE_ERROR', side: p.side, attribution2: { playerId: p.oe.playerId ?? '', stat: SERVE_FAULT_STAT, playerName: p.oe.playerName } };
+  if (p.kind === 'serveerror' && p.oe && (p.oe.playerName || p.oe.playerId)) {
+    return { type: 'SERVE_ERROR', side: p.side, attribution2: credit(p.oe, SERVE_FAULT_STAT) };
   }
   return {
     type: ACTION_OF[p.kind],
@@ -165,10 +169,40 @@ function replayActionOf(p: PointInput): ScoreAction {
     // SD-107 — a tracked point keeps its 1st / 2nd serve (only such points carry it)
     ...(p.serve ? { payload: { serve: p.serve } } : {}),
     // Only a creditable kind carries a player (an opponent's error never does).
-    attribution: p.playerName && p.kind !== 'opperror' && p.kind !== 'serveerror' && p.kind !== 'rally'
-      ? { playerId: p.playerId ?? '', stat: statOf(p.kind), playerName: p.playerName }
-      : undefined,
+    attribution: p.kind !== 'opperror' && p.kind !== 'serveerror' && p.kind !== 'rally' ? credit(p, statOf(p.kind)) : undefined,
   };
+}
+
+/** The attribution a replayed point carries: the player's id (IDs-only
+ *  scoring); an older point's stored name rides along only so the old log
+ *  replays to exactly its old state. None when nobody is credited. */
+function credit(w: { playerId?: string; playerName?: string }, key: string): ScoreAction['attribution'] {
+  if (!w.playerName && !w.playerId) return undefined;
+  return { playerId: w.playerId ?? '', stat: key, ...(w.playerName ? { playerName: w.playerName } : {}) };
+}
+
+/**
+ * IDs-only scoring — the corrected point list as an EDIT_LOG stores it (match
+ * events are public): every credited player by id, never by name. An older
+ * point that only carried a name is resolved to an id (`resolveId`, the
+ * scorer's rosters); one that can't be resolved keeps its legacy name — the
+ * credit would be lost otherwise (the close-out clean-up maps those).
+ */
+export function idOnlyPoints(points: PointInput[], resolveId: (name?: string) => string | undefined = () => undefined): PointInput[] {
+  const who = <T extends { playerId?: string; playerName?: string }>(x: T): T => {
+    const { playerName, ...rest } = x;
+    const id = x.playerId || (playerName ? resolveId(playerName) : undefined);
+    if (id) return { ...rest, playerId: id } as T;
+    return (playerName ? { ...rest, playerName } : rest) as T;
+  };
+  return points.map((p) => {
+    let q: PointInput = who(p);
+    if (p.df) q = { ...q, df: who(p.df) };
+    if (p.oe) q = { ...q, oe: who(p.oe) };
+    if (p.pen) q = { ...q, pen: who(p.pen) };
+    if (p.pd?.err) q = { ...q, pd: { ...p.pd, err: who(p.pd.err) } };
+    return q;
+  });
 }
 
 /** The primary stat a point credits to a player profile, mirroring how it was
@@ -191,36 +225,38 @@ export function reconcileStatActions(
   creditsOf: PointCredits = defaultCredits,
 ): ScoreAction[] {
   const tally = (pts: PointInput[]) => {
-    const m = new Map<string, { playerId: string; stat: string; name: string; n: number }>();
+    // IDs-only scoring: keyed by player id (an older name-only point resolves by name)
+    const m = new Map<string, { playerId: string; stat: string; n: number }>();
     for (const p of pts) {
+      if (!p.playerId && !p.playerName) continue;
       const id = p.playerId ?? resolveId(p.playerName);
-      if (!id || !p.playerName) continue;
+      if (!id) continue;
       for (const [stat, by] of Object.entries(creditsOf(p.kind))) {
         const key = `${id}|${stat}`;
-        const cur = m.get(key) ?? { playerId: id, stat, name: p.playerName, n: 0 };
+        const cur = m.get(key) ?? { playerId: id, stat, n: 0 };
         cur.n += by;
         m.set(key, cur);
       }
     }
     // SD-104 — a double-fault point debits the faulting server's doubleFaults.
     for (const p of pts) {
-      if (!p.df?.playerName) continue;
+      if (!p.df?.playerName && !p.df?.playerId) continue;
       const id = p.df.playerId || resolveId(p.df.playerName);
       if (!id) continue;
       const key = `${id}|${DOUBLE_FAULT_STAT}`;
-      const cur = m.get(key) ?? { playerId: id, stat: DOUBLE_FAULT_STAT, name: p.df.playerName, n: 0 };
+      const cur = m.get(key) ?? { playerId: id, stat: DOUBLE_FAULT_STAT, n: 0 };
       cur.n += 1;
       m.set(key, cur);
     }
     // SD-117b — a volleyball fault charges the erring opponent's errors;
     // SD-58 — a missed serve the opponent's server's serveErrors.
     for (const p of pts) {
-      if ((p.kind !== 'opperror' && p.kind !== 'serveerror') || !p.oe?.playerName) continue;
+      if ((p.kind !== 'opperror' && p.kind !== 'serveerror') || (!p.oe?.playerName && !p.oe?.playerId)) continue;
       const id = p.oe.playerId || resolveId(p.oe.playerName);
       if (!id) continue;
       const stat = faultStatOf(p.kind);
       const key = `${id}|${stat}`;
-      const cur = m.get(key) ?? { playerId: id, stat, name: p.oe.playerName, n: 0 };
+      const cur = m.get(key) ?? { playerId: id, stat, n: 0 };
       cur.n += 1;
       m.set(key, cur);
     }
@@ -235,7 +271,8 @@ export function reconcileStatActions(
     const delta = (a?.n ?? 0) - (b?.n ?? 0);
     if (delta === 0) continue;
     const meta = (a ?? b)!;
-    actions.push({ type: 'STAT_ADJUST', attribution: { playerId: meta.playerId, stat: meta.stat, by: delta, playerName: meta.name } });
+    // IDs-only scoring: the id only (match events are public)
+    actions.push({ type: 'STAT_ADJUST', attribution: { playerId: meta.playerId, stat: meta.stat, by: delta } });
   }
   return actions;
 }
@@ -252,6 +289,7 @@ export function correctionActions(
   creditsOf: PointCredits = defaultCredits,
   normalize?: (points: PointInput[]) => PointInput[],
 ): ScoreAction[] {
-  const next = normalize ? normalize(edited) : edited;
+  // IDs-only scoring: the stored list names players by id only
+  const next = idOnlyPoints(normalize ? normalize(edited) : edited, resolveId);
   return [{ type: 'EDIT_LOG', payload: { points: next } }, ...reconcileStatActions(oldPts, next, resolveId, creditsOf)];
 }

@@ -35,6 +35,9 @@ import { FeedView } from '../netraid/FeedView';
 import { VOLLEYBALL_LIVE_SETTINGS } from './settings';
 import { VOLLEYBALL_META } from './meta';
 import { volleyballMatchRecords } from './records';
+import { useMask } from '../../core/disputeMask';
+import { lineupAction } from './actions';
+import type { NameOf } from '../../core/playerNames';
 
 export { isDecider, setTarget } from './engine';
 export type { VolleyballState } from './engine';
@@ -151,13 +154,15 @@ function splitCourt(roster: Player[], lineup: { playerId?: string }[], stamped?:
 export function makeSetScoringControls(opts: { icon: string; blocks: boolean; timeoutsPerSet?: number; serve?: boolean; detail?: boolean }): SportPlugin<VolleyballState>['ScoringControls'] {
   const Controls: SportPlugin<VolleyballState>['ScoringControls'] = ({ state, dispatch: rawDispatch, homeName, awayName, homeColor, awayColor, homeRoster = [], awayRoster = [], homeLineup = [], awayLineup = [] }) => {
     const s = state as VolleyballState;
+    // IDs-only scoring: court stamps keep ids; names for the scorer by id
+    const { nameOf } = useMask();
     // SD-29: before the first point, stamp who is on court (the lineup's court
     // players, else the matchday squad) — the base for sets played.
     const dispatch = (a: ScoreAction) => {
       if (!s.lineup && !s.events.length && a.type !== 'TIMEOUT') {
         for (const [side, roster, lineup] of [['home', homeRoster, homeLineup], ['away', awayRoster, awayLineup]] as const) {
           const players = courtPlayers(roster, lineup);
-          if (players.length) rawDispatch({ type: 'LINEUP', payload: { team: side, players } });
+          if (players.length) rawDispatch(lineupAction(side, players));
         }
       }
       // deep wave — scoring steps carry the scorer's clock (commentary minute, set durations)
@@ -170,18 +175,18 @@ export function makeSetScoringControls(opts: { icon: string; blocks: boolean; ti
     const ac = awayColor ?? theme.colors.away;
     // SD-58 / SD-71: the six on court now (rotation + subs) when tracked
     const track = trackCourt(s);
-    const home = trackedCourt(track, 'home', homeRoster, s) ?? splitCourt(homeRoster, homeLineup, s.lineup?.home);
-    const away = trackedCourt(track, 'away', awayRoster, s) ?? splitCourt(awayRoster, awayLineup, s.lineup?.away);
+    const home = trackedCourt(track, 'home', homeRoster, s, nameOf) ?? splitCourt(homeRoster, homeLineup, s.lineup?.home);
+    const away = trackedCourt(track, 'away', awayRoster, s, nameOf) ?? splitCourt(awayRoster, awayLineup, s.lineup?.away);
     const server = servingSide(s);
     const servingOf = (side: 'home' | 'away') => (server ? server === side : null);
-    const srvPlayer = track.server && track.serving ? asPlayer(track.server, track.serving === 'home' ? homeRoster : awayRoster) : null;
+    const srvPlayer = track.server && track.serving ? asPlayer(track.server, track.serving === 'home' ? homeRoster : awayRoster, nameOf) : null;
     const serverOf = (side: 'home' | 'away') => (srvPlayer && track.serving === side ? srvPlayer : null);
-    const libCues = (['home', 'away'] as const).map((sd) => liberoCue(s, sd, track)).filter((x): x is string => !!x);
+    const libCues = (['home', 'away'] as const).map((sd) => liberoCue(s, sd, track, nameOf)).filter((x): x is string => !!x);
     // SD-136: an expelled / disqualified player still on court must be substituted (FIVB 15.8)
     for (const [sd, c] of [['home', home.court], ['away', away.court]] as const) {
       const on = new Set(c.map((p) => p.id));
       for (const b of barredPlayers(s.events, sd, setNoOf(s))) {
-        if (on.has(b.id) && c.length < (sd === 'home' ? homeRoster : awayRoster).length) libCues.push(`${b.name} was ${b.why === 'expulsion' ? 'expelled for this set' : 'disqualified'} — substitute them (FIVB 15.8)`);
+        if (on.has(b.id) && c.length < (sd === 'home' ? homeRoster : awayRoster).length) libCues.push(`${nameOf(b.id, b.name)} was ${b.why === 'expulsion' ? 'expelled for this set' : 'disqualified'} — substitute them (FIVB 15.8)`);
       }
     }
     const perSet = s.timeoutsPerSet ?? opts.timeoutsPerSet ?? timeoutsPerSet(s);
@@ -198,8 +203,8 @@ export function makeSetScoringControls(opts: { icon: string; blocks: boolean; ti
         )}
         {opts.serve && (homeRoster.length > 0 || awayRoster.length > 0 || s.serve) && (
           <ServePanel s={s} track={track} dispatch={dispatch}
-            home={{ side: 'home', name: homeName, color: hc, roster: homeRoster, lineup: homeLineup, court: subCourt(track, 'home', homeRoster, home.court, homeRoster.length) }}
-            away={{ side: 'away', name: awayName, color: ac, roster: awayRoster, lineup: awayLineup, court: subCourt(track, 'away', awayRoster, away.court, awayRoster.length) }} />
+            home={{ side: 'home', name: homeName, color: hc, roster: homeRoster, lineup: homeLineup, court: subCourt(track, 'home', homeRoster, home.court, homeRoster.length, nameOf) }}
+            away={{ side: 'away', name: awayName, color: ac, roster: awayRoster, lineup: awayLineup, court: subCourt(track, 'away', awayRoster, away.court, awayRoster.length, nameOf) }} />
         )}
         <SidePoints side="home" name={homeName} color={hc} court={home.court} bench={home.bench} opponents={away.court.length ? away.court : awayRoster} oppColor={ac} serving={servingOf('home')} server={serverOf('home')} oppServer={serverOf('away')} icon={opts.icon} blocks={opts.blocks} dispatch={dispatch} />
         <SidePoints side="away" name={awayName} color={ac} court={away.court} bench={away.bench} opponents={home.court.length ? home.court : homeRoster} oppColor={hc} serving={servingOf('away')} server={serverOf('away')} oppServer={serverOf('home')} icon={opts.icon} blocks={opts.blocks} dispatch={dispatch} />
@@ -235,30 +240,30 @@ export function makeSetScoringControls(opts: { icon: string; blocks: boolean; ti
 
 /** SD-58 / SD-71: the court from the tracker — when a rotation is stamped or a
  *  sub was made for this side (else null: the SD-117b split stands). */
-function trackedCourt(t: VbTrack, side: 'home' | 'away', roster: Player[], s: VolleyballState): { court: Player[]; bench: Player[] } | null {
+function trackedCourt(t: VbTrack, side: 'home' | 'away', roster: Player[], s: VolleyballState, nameOf?: NameOf): { court: Player[]; bench: Player[] } | null {
   const c = t.court[side];
   if (!c || !c.length || !(t.ordered[side] || s.subs?.some((x) => x.side === side && x.set === setNoOf(s)))) return null;
-  const court = c.map((p) => asPlayer(p, roster));
+  const court = c.map((p) => asPlayer(p, roster, nameOf));
   const on = new Set(court.map((p) => p.id));
   return { court, bench: roster.filter((p) => !on.has(p.id)) };
 }
 
 /** Who can be substituted: the tracked court, else the lineup's court when
  *  it's smaller than the squad (a real six). Null = not known. */
-function subCourt(t: VbTrack, side: 'home' | 'away', roster: Player[], court: Player[], squad: number): Player[] | null {
+function subCourt(t: VbTrack, side: 'home' | 'away', roster: Player[], court: Player[], squad: number, nameOf?: NameOf): Player[] | null {
   if (t.court[side]?.length) {
-    const list = t.court[side]!.map((p) => asPlayer(p, roster));
+    const list = t.court[side]!.map((p) => asPlayer(p, roster, nameOf));
     return list.length < squad ? list : null;
   }
   return court.length && court.length < squad ? court : null;
 }
 
-/** SD-29: the court at the start — lineup slots with a player, else the squad. */
-function courtPlayers(roster: Player[], lineup: { playerId?: string; playerName?: string }[]): { id: string; name: string }[] {
-  const byId = new Map(roster.map((p) => [p.id, p]));
+/** SD-29: the court at the start — lineup slots with a player, else the
+ *  squad. IDs-only scoring: the LINEUP stamp carries ids only. */
+function courtPlayers(roster: Player[], lineup: { playerId?: string }[]): { id: string }[] {
   const slots = lineup.filter((sl) => sl.playerId);
-  if (slots.length) return slots.map((sl) => ({ id: sl.playerId!, name: byId.get(sl.playerId!)?.fullName ?? sl.playerName ?? '' }));
-  return roster.map((p) => ({ id: p.id, name: p.fullName }));
+  if (slots.length) return slots.map((sl) => ({ id: sl.playerId! }));
+  return roster.map((p) => ({ id: p.id }));
 }
 
 // Timeouts per set come from the format (2 indoor, 1 beach — SD-117b).
@@ -270,18 +275,25 @@ const ScoringControls = makeSetScoringControls({ icon: '🏐', blocks: true, ser
  *  analysis, by server) and the player box at VIS depth on Stats. The set
  *  scores are on the scoreboard header above every tab. */
 type TabProps = Parameters<NonNullable<SportPlugin<VolleyballState>['LiveExtras']>>[0];
-const VolleyballCommentary = ({ state, homeName, awayName, homeColor, awayColor }: TabProps) => {
+const VolleyballCommentary = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster }: TabProps) => {
   const s = state as VolleyballState;
-  const feed = useMemo(() => volleyballCommentary(s, { home: homeName, away: awayName }), [s, homeName, awayName]);
+  // IDs-only scoring: players named by id for this viewer
+  const { nameOf } = useMask();
+  const feed = useMemo(
+    () => volleyballCommentary(s, { home: homeName, away: awayName, nameOf, homeRoster, awayRoster }),
+    [s, homeName, awayName, nameOf, homeRoster, awayRoster],
+  );
   return <FeedView groups={feed} homeColor={homeColor} awayColor={awayColor} emptyText="No points yet." title="Commentary · rally by rally" />;
 };
 const VolleyballStats = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster, onPlayer }: TabProps) => {
   const s = state as VolleyballState;
+  // IDs-only scoring: box-score names by player id for this viewer
+  const { nameOf } = useMask();
   return (
     <View style={{ gap: theme.spacing(3) }}>
       <VolleyballStatsPanel state={s} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} />
       <Text style={ctrl.label}>Player stats</Text>
-      <MatchBoxScore sport="volleyball" schema={VOLLEYBALL_DEEP_BOX} show="box" source={volleyballDeepBox(s, { homeRoster, awayRoster })} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} onPlayer={onPlayer} />
+      <MatchBoxScore sport="volleyball" schema={VOLLEYBALL_DEEP_BOX} show="box" source={volleyballDeepBox(s, { homeRoster, awayRoster, nameOf })} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} onPlayer={onPlayer} />
     </View>
   );
 };

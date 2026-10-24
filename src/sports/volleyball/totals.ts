@@ -15,8 +15,9 @@
  *  - `setsPlayed` (SD-29, fieldTime.ts) and `setsWon` / `setsLost` (SD-19,
  *    racketTotals.ts) are merged in.
  *
- * Ids: once a court is stamped (SD-29, `LINEUP`) each credited point carries
- * its `playerId`. Older logs carry names only — they resolve per side through
+ * Ids: IDs-only scoring (docs/privacy/ids-only-scoring.md) — every credited
+ * point carries its `playerId` (before it, once a court was stamped, SD-29,
+ * `LINEUP`). Older logs carry names only — they resolve per side through
  * the stamped court and the matchday squads (`ctx`). If ANY credited name
  * can't be resolved (or is ambiguous), the box keys are left out entirely and
  * the lines keep moving by live increments, as before — the sync zeroes owned
@@ -66,8 +67,8 @@ export function volleyballBoxTotals(s: VolleyballState, ctx?: StatTotalsContext)
   if (!s?.events) return out;
   const idx = nameIndex(s, ctx);
   for (const e of s.events) {
-    if (!CREDITED.has(e.kind ?? '') || !e.playerName || (e.side !== 'home' && e.side !== 'away')) continue;
-    const id = e.playerId || idx[e.side].get(e.playerName) || undefined;
+    if (!CREDITED.has(e.kind ?? '') || (!e.playerName && !e.playerId) || (e.side !== 'home' && e.side !== 'away')) continue;
+    const id = e.playerId || (e.playerName ? idx[e.side].get(e.playerName) : undefined) || undefined;
     if (!id) return {}; // the safeguard: leave the whole group out
     const line = out[id] ?? (out[id] = { side: e.side, stats: Object.fromEntries(VOLLEYBALL_BOX_KEYS.map((k) => [k, 0])) });
     for (const [k, v] of Object.entries(volleyballCredits(e.kind as PointKind))) line.stats[k] = (line.stats[k] ?? 0) + v;
@@ -82,13 +83,13 @@ export function volleyballBoxTotals(s: VolleyballState, ctx?: StatTotalsContext)
  *  never 0) — then on every line of the match, 0 for the rest. Left out whole
  *  when a named player can't be resolved (the same safeguard as the box keys). */
 function chargedTotals(kind: 'opperror' | 'serveerror', key: string, s: VolleyballState, ctx: StatTotalsContext | undefined, lines: Record<string, StatTotalsEntry>): Record<string, StatTotalsEntry> {
-  const faults = (s?.events ?? []).filter((e) => e.kind === kind && e.oe?.playerName && (e.side === 'home' || e.side === 'away'));
+  const faults = (s?.events ?? []).filter((e) => e.kind === kind && (e.oe?.playerName || e.oe?.playerId) && (e.side === 'home' || e.side === 'away'));
   if (!faults.length) return {};
   const idx = nameIndex(s, ctx);
   const count = new Map<string, { side: Side; n: number }>();
   for (const e of faults) {
     const side: Side = e.side === 'home' ? 'away' : 'home'; // the erring side
-    const id = e.oe!.playerId || idx[side].get(e.oe!.playerName!) || undefined;
+    const id = e.oe!.playerId || (e.oe!.playerName ? idx[side].get(e.oe!.playerName) : undefined) || undefined;
     if (!id) return {};
     const c = count.get(id) ?? { side, n: 0 };
     c.n += 1;
@@ -126,12 +127,12 @@ export function volleyballDetailTotals(s: VolleyballState, ctx: StatTotalsContex
     ...(aced ? [VB_RECEPTION_ERROR_KEY] : []), ...(dig ? [VB_DIG_KEY] : []), ...(assist ? [VB_ASSIST_KEY] : []),
   ];
   const idx = nameIndex(s, ctx);
-  for (const x of s.vd ?? []) if (x.playerId) idx[x.side].set(x.playerName, idx[x.side].get(x.playerName) ?? x.playerId);
+  for (const x of s.vd ?? []) if (x.playerId && x.playerName) idx[x.side].set(x.playerName, idx[x.side].get(x.playerName) ?? x.playerId);
   const zero = () => Object.fromEntries(keys.map((k) => [k, 0]));
   const out: Record<string, StatTotalsEntry> = {};
   for (const [id, e] of Object.entries(lines)) out[id] = { side: e.side, stats: zero() };
   for (const l of detailTally(s).values()) {
-    const id = l.playerId || idx[l.side].get(l.name) || undefined;
+    const id = l.playerId || (l.name ? idx[l.side].get(l.name) : undefined) || undefined;
     if (!id) return {};
     const line = out[id] ?? (out[id] = { side: l.side, stats: zero() });
     for (const k of keys) line.stats[k] = (line.stats[k] ?? 0) + (l[k as keyof typeof l] as number);

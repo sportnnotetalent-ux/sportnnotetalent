@@ -48,6 +48,9 @@
  * fault recorded with `payload.df` is marked on its point (`event.df`), so an
  * EDIT_LOG carries it and the correction's STAT_ADJUST moves `doubleFaults`;
  * older double faults carry no marker and are left as they were.
+ * IDs-only scoring (docs/privacy/ids-only-scoring.md): credits are keyed by
+ * the event's player id; a name is matched (through ctx) only for an older
+ * event that carries no id.
  */
 import type { LiveEvent } from './liveEvents';
 import type { StatTotalsContext, StatTotalsEntry } from './types';

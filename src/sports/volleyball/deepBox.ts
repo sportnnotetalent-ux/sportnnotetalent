@@ -14,7 +14,8 @@ import type { SportStatSchema } from '../statSchema.ts';
 import type { BoxRowInput, BoxScope, MatchBoxSource } from '../boxScore.ts';
 import { volleyballBox, type BoxContext } from '../boxSources.ts';
 import { volleyballStats } from './stats.ts';
-import type { VolleyballState } from './engine.ts';
+import { vbCreditKeyer, type VolleyballState } from './engine.ts';
+import { withRosters } from '../racketNames.ts';
 import { acedTracked, assistTracked, detailTally, digTracked, receptionTracked } from './detail.ts';
 import { rallyServers, serveTracked } from './rotation.ts';
 
@@ -33,17 +34,20 @@ export const VOLLEYBALL_DEEP_BOX: SportStatSchema<'volleyball'> = {
   }],
 };
 
-/** Per player ("side|name"): serve attempts in the scope — only when every
- *  served rally of the MATCH names its server (the totals' rule). */
-function serves(s: VolleyballState, scope: BoxScope): Map<string, number> | null {
+/** Per player ("side|id" — IDs-only scoring): serve attempts in the scope,
+ *  and an older rotation stamp's stored name — only when every served rally
+ *  of the MATCH names its server (the totals' rule). */
+function serves(s: VolleyballState, scope: BoxScope): Map<string, { n: number; legacy?: string }> | null {
   if (!serveTracked(s)) return null;
   const all = rallyServers(s);
   if (!all.length || all.some((r) => !r.serverId || !r.side)) return null;
-  const out = new Map<string, number>();
+  const out = new Map<string, { n: number; legacy?: string }>();
   for (const r of all) {
     if (scope !== 'all' && r.set !== scope) continue;
-    const k = `${r.side}|${r.serverName ?? ''}`;
-    out.set(k, (out.get(k) ?? 0) + 1);
+    const k = `${r.side}|${r.serverId}`;
+    const cur = out.get(k) ?? { n: 0, ...(r.serverName ? { legacy: r.serverName } : {}) };
+    cur.n += 1;
+    out.set(k, cur);
   }
   return out;
 }
@@ -67,11 +71,16 @@ export function volleyballDeepBox(s: VolleyballState, ctx: BoxContext = {}): Mat
       const side = (sd: Side) => {
         const roster = (sd === 'home' ? ctx.homeRoster : ctx.awayRoster) ?? [];
         const rows: BoxRowInput[] = d[sd].rows.map((r) => ({ ...r, stats: { ...r.stats } }));
-        const rowOf = (name: string): BoxRowInput => {
-          let r = rows.find((x) => x.name === name);
+        // IDs-only scoring: rows by player id (an older name-only credit by "~name")
+        const keyOf = vbCreditKeyer(s.events, (name) => idIn(name, roster));
+        const nm = withRosters(ctx.nameOf, roster);
+        const rowOf = (key: string, legacy?: string): BoxRowInput => {
+          const byName = (n: string) => rows.find((x) => !x.playerId && x.name === nm(undefined, n));
+          let r = key.startsWith('~') ? byName(key.slice(1)) : rows.find((x) => x.playerId === key) ?? (legacy ? byName(legacy) : undefined);
           if (!r) {
-            const id = idIn(name, roster);
-            r = { name, ...(id ? { playerId: id } : {}), stats: { points: 0, aces: 0, blocks: 0 } };
+            r = key.startsWith('~')
+              ? { name: nm(undefined, key.slice(1)), stats: { points: 0, aces: 0, blocks: 0 } }
+              : { name: nm(key, legacy), playerId: key, stats: { points: 0, aces: 0, blocks: 0 } };
             rows.push(r);
           }
           return r;
@@ -82,13 +91,15 @@ export function volleyballDeepBox(s: VolleyballState, ctx: BoxContext = {}): Mat
         ];
         for (const l of tally.values()) {
           if (l.side !== sd) continue;
-          const r = rowOf(l.name);
+          const key = keyOf({ playerId: l.playerId, playerName: l.name || undefined });
+          if (!key) continue;
+          const r = rowOf(key, l.name || undefined);
           if (recv) { r.stats.receptions = l.receptions; r.stats.receptionsPositive = l.receptionsPositive; }
           if (aced) r.stats.receptionErrors = l.receptionErrors;
           if (dig) r.stats.digs = l.digs;
           if (assist) r.stats.setAssists = l.setAssists;
         }
-        if (srv) for (const [k, v] of srv) if (k.startsWith(`${sd}|`) && k.length > sd.length + 1) rowOf(k.slice(sd.length + 1)).stats.serveAttempts = v;
+        if (srv) for (const [k, v] of srv) if (k.startsWith(`${sd}|`) && k.length > sd.length + 1) rowOf(k.slice(sd.length + 1), v.legacy).stats.serveAttempts = v.n;
         for (const r of rows) for (const k of keys) if (typeof r.stats[k] !== 'number') r.stats[k] = 0;
         return { ...d[sd], rows };
       };

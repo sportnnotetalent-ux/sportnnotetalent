@@ -27,6 +27,7 @@ import { SelectChip } from '../components/ui';
 import type { Player } from '../core/types';
 import { playerServeLine, type ServeRow } from './serveStats';
 import type { DepthSport } from './pointDetail';
+import { useMask } from '../core/disputeMask';
 import {
   HOW_SELS, WING_SELS, blockOf, errorTypeRows, keyStats, phaseRows, racketView, rallyLengthRows, serveTabRows, shotRows, strokeSummary, thirdShotRows,
   type HowSel, type Scope, type WingSel,
@@ -58,6 +59,8 @@ export function MatchStatsPanel({
   const [tab, setTab] = useState<Tab>('key');
   const [how, setHow] = useState<HowSel>('winner');
   const [wing, setWing] = useState<WingSel>('all');
+  // IDs-only scoring: servers by id for this viewer (the squad's name as the fallback)
+  const mask = useMask();
   if (!v || v.st.match.rallies === 0) return null;
   const periods = v.st.periods.length;
   const active: Scope = scope !== 'all' && scope > periods ? 'all' : scope;
@@ -71,7 +74,7 @@ export function MatchStatsPanel({
     ...(v.cov.third ? [{ key: 'third' as const, label: '3rd shot' }] : []),
   ];
   const cur: Tab = tabs.some((t) => t.key === tab) ? tab : 'key';
-  const nameOf = (id: string) => [...homeRoster, ...awayRoster].find((p) => p.id === id)?.fullName ?? id;
+  const nameOf = (id: string) => mask.nameOf(id, [...homeRoster, ...awayRoster].find((p) => p.id === id)?.fullName);
   const players = block ? Object.entries(block.players).filter(([, p]) => p.srvPlayed > 0)
     .sort(([, x], [, y]) => (x.side === y.side ? 0 : x.side === 'home' ? -1 : 1)) : [];
   const bar = (r: ServeRow) => <StatBar key={r.key} r={r} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} />;

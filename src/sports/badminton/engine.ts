@@ -132,6 +132,9 @@ const core = (s: BadmintonState, a: ScoreAction): BadmintonState => {
   if (a.type === 'SET_DETAIL') { const f = detailFlags(a.payload, s); return f ? { ...s, ...f } : s; }
   if (a.type === 'POINT_DETAIL') { const ev = applyPointDetail(s.events, a.payload, 'badminton'); return ev ? { ...s, events: ev } : s; }
   if (a.type !== 'POINT' || !a.side || s.ended) return s;
+  // IDs-only scoring (docs/privacy/ids-only-scoring.md): today's controls send
+  // the player's id only, so `who` is set only by an older log (or an older
+  // app) that sent the name — kept so those logs replay exactly as before.
   const who = a.attribution?.playerName;
   // SD-19: keep the credited player's id on the point (absolute statTotals).
   const pid = a.attribution?.playerId ? { playerId: a.attribution.playerId } : {};

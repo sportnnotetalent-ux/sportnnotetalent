@@ -116,15 +116,17 @@ describe('rallyEdit: profile reconciliation adds up', () => {
     const after = [P('home', 'Asha'), P('away', 'Ravi')]; // dropped one Asha point
     const acts = reconcileStatActions(before, after, id);
     assert.equal(acts.length, 1);
-    assert.deepEqual(acts[0].attribution, { playerId: 'Asha', stat: 'points', by: -1, playerName: 'Asha' });
+    // IDs-only scoring: the STAT_ADJUST names the player by id only (match events are public)
+    assert.deepEqual(acts[0].attribution, { playerId: 'Asha', stat: 'points', by: -1 });
   });
 
   test('re-attributing a point moves +1/-1 between the two players', () => {
     const before = [P('home', 'Asha')];
     const after = [P('home', 'Bina')];
-    const acts = reconcileStatActions(before, after, id).sort((a, b) => (a.attribution!.playerName! < b.attribution!.playerName! ? -1 : 1));
+    const acts = reconcileStatActions(before, after, id).sort((a, b) => (a.attribution!.playerId < b.attribution!.playerId ? -1 : 1));
     assert.equal(acts.length, 2);
-    assert.deepEqual(acts.map((a) => [a.attribution!.playerName, a.attribution!.by]), [ ['Asha', -1], ['Bina', 1] ]);
+    assert.deepEqual(acts.map((a) => [a.attribution!.playerId, a.attribution!.by]), [ ['Asha', -1], ['Bina', 1] ]);
+    assert.ok(acts.every((a) => a.attribution!.playerName === undefined), 'ids only');
   });
 
   test('point↔ace change moves the credit between stats, not players', () => {
