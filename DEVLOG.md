@@ -13,6 +13,29 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-24 — IDs-only close-out: records, corrections, POTM, awards, disputes, activity log, relay members
+- **Records:** `TournamentRecords` resolves record player ids through `players_view` (new `usePlayerNameOf` hook + `getPlayerNamesById`).
+- **Post-match corrections:**
+  - Re-credit by id only (`sports/amendCredit.ts recreditAction`: drops stored names, sets basketball `pid`, keeps a chess opening's name).
+  - Names show from the squads.
+  - The stored change lines and the corrector's name (AMEND `lines` / `byName`) use `publicName`: initials for a possible minor.
+- **Migration `20261024200000_minor_names_misc.sql`:** `public_person_name(id, name)` plus triggers that store a possible minor's name as initials in:
+  - `matches.potm` (+ `auto`) and `matches.result.byName`;
+  - `tournaments.awards.items[].playerName` / `teamName`;
+  - `match_disputes` names + history `byName` / notes;
+  - `activity_log.by_name` / detail;
+  - `field_entries.result.members[].name`.
+  - It backfills existing rows.
+  - Checked read-only on live: a child's name becomes initials (inside "Name / Partner" too), and an adult's is kept. The other triggers on these tables (status notify / scoring lock) don't react to the backfill.
+- **App:** POTM and awards show this viewer's name by id (`viewerNameOf`, `usePlayerNameOf`).
+- **Verified:** `tests/ids-only-closeout.test.mts` (7); suite 4586 pass / 0 fail; tsc clean.
+- **Needs:** the founder runs the migration.
+- **Still to do:**
+  - merge group B (invasion sports);
+  - the server safety net in `append_match_event`;
+  - the data clean-up script for existing logs;
+  - `match_lineups` slot names.
+
 ### 2026-10-24 — IDs-only scoring: basketball (D)
 - **Merge of `d1435db`.** A play stores `payload.pid` / `attribution.playerId` only.
 - **SUB:** `{offId, onId}`; the event carries `pid` + `secondId`, so `appearances` picks subs up unchanged.

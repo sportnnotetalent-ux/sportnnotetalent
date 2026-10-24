@@ -2,7 +2,7 @@
  *  surfaces outside the sport engines. */
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { recreditAction } from '../src/sports/amendCredit.ts';
 
@@ -41,5 +41,29 @@ describe('tournament records resolve players by id', () => {
     const src = read('src/components/TournamentRecords.tsx');
     assert.match(src, /usePlayerNameOf\(recordIds\)/);
     assert.match(src, /nameOf\(it\.playerId, it\.playerName\)/);
+  });
+});
+
+describe('the remaining public name copies are masked on write (minor_names_misc)', () => {
+  const dir = join(root, 'supabase', 'migrations');
+  const f = readdirSync(dir).find((x) => x.includes('minor_names_misc'))!;
+  const sql = readFileSync(join(dir, f), 'utf8');
+  test('a trigger on every copy', () => {
+    for (const t of [
+      'create trigger matches_mask_minor_names before insert or update of potm, result on matches',
+      'create trigger tournaments_mask_award_names before insert or update of awards on tournaments',
+      'create trigger match_disputes_mask_names before insert or update on match_disputes',
+      'create trigger activity_log_mask_names before insert or update on activity_log',
+      'create trigger field_entries_mask_member_names before insert or update of result on field_entries',
+    ]) assert.ok(sql.includes(t), t);
+  });
+  test('a possible minor (players_view rule) → initials; adults untouched', () => {
+    assert.match(sql, /not player_is_known_adult\(p\.dob, p\.profile_id\)\)\s+then coalesce\(\(select name_initials\(p\.full_name\)/);
+  });
+  test('the app shows the viewer\'s name by id for POTM and awards', () => {
+    assert.match(read('src/screens/LiveScoringScreen.tsx'), /name: viewerNameOf\(storedPotm\.playerId, storedPotm\.name\)/);
+    const awards = read('src/components/TournamentAwardsTab.tsx');
+    assert.match(awards, /usePlayerNameOf\(/);
+    assert.doesNotMatch(awards, /\{i\.playerName\}|\{item\.playerName\}/);
   });
 });

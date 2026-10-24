@@ -4,6 +4,7 @@
  *  else sees the award cards once published. Rendered in place of the profile's
  *  scroll area so the Publish button can sit in a sticky footer. */
 import React, { useMemo, useState } from 'react';
+import { usePlayerNameOf } from '../data/usePlayerNameOf';
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { theme } from '../core/theme';
 import { Button, Card, EmptyState, Pill, SelectChip, TextField, textStyles } from './ui';
@@ -186,6 +187,9 @@ export function TournamentAwardsTab({
   ) : null;
 
   const colorOf = (pid: string) => players.find((p) => p.id === pid)?.houseColor ?? theme.colors.surfaceAlt;
+  // IDs-only close-out: an award stores a child's name as initials (migration
+  // minor_names_misc) — show this viewer's name for the player id (players_view).
+  const awardNameOf = usePlayerNameOf((awards?.items ?? []).map((i) => i.playerId));
 
   // ------------------------------ Published view ------------------------------
   if (!canManage || (published && !editing)) {
@@ -196,15 +200,15 @@ export function TournamentAwardsTab({
         {items.length === 0 ? (
           <EmptyState icon="🏆" title="Awards" hint={published ? 'No awards in this sport.' : 'Awards appear here once the organiser publishes them.'} />
         ) : items.map((i) => (
-          <TouchableOpacity key={i.id} accessibilityRole="button" accessibilityLabel={`${i.label}: ${i.playerName}`} activeOpacity={0.85} onPress={() => onPlayer(i.playerId)}>
+          <TouchableOpacity key={i.id} accessibilityRole="button" accessibilityLabel={`${i.label}: ${awardNameOf(i.playerId, i.playerName)}`} activeOpacity={0.85} onPress={() => onPlayer(i.playerId)}>
             <Card style={st.awardCard}>
               <View style={[st.avatar, { backgroundColor: colorOf(i.playerId) }]}>
-                <Text style={st.avatarText}>{initials(i.playerName)}</Text>
+                <Text style={st.avatarText}>{initials(awardNameOf(i.playerId, i.playerName))}</Text>
                 <Text style={st.badge}>{awardIcon(i.sport, i.slot)}</Text>
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={st.label} numberOfLines={1}>{i.label}</Text>
-                <Text style={st.name} numberOfLines={1}>{i.playerName}</Text>
+                <Text style={st.name} numberOfLines={1}>{awardNameOf(i.playerId, i.playerName)}</Text>
                 <Text style={st.detail} numberOfLines={2}>{[i.teamName, i.detail].filter(Boolean).join(' · ')}</Text>
               </View>
               <Text style={st.chevron}>›</Text>
@@ -237,10 +241,10 @@ export function TournamentAwardsTab({
       {item ? (
         <View style={st.awardCardRow}>
           <View style={[st.avatar, { backgroundColor: colorOf(item.playerId) }]}>
-            <Text style={st.avatarText}>{initials(item.playerName)}</Text>
+            <Text style={st.avatarText}>{initials(awardNameOf(item.playerId, item.playerName))}</Text>
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={st.name} numberOfLines={1}>{item.playerName}</Text>
+            <Text style={st.name} numberOfLines={1}>{awardNameOf(item.playerId, item.playerName)}</Text>
             <Text style={st.detail} numberOfLines={2}>{[item.teamName, item.detail].filter(Boolean).join(' · ')}</Text>
           </View>
           {onChange ? <Text style={st.link} accessibilityRole="button" accessibilityLabel={`Change ${label}`} onPress={onChange}>Change</Text> : null}

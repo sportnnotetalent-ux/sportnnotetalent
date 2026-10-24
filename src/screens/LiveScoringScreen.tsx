@@ -358,6 +358,7 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
   // match → the name THIS viewer may see (players_view: full names for the
   // child's circle, initials for everyone else). The match's own squads first.
   const people = useMemo(() => peopleMap(homeFull, awayFull, extraPeople, allPlayers), [homeFull, awayFull, extraPeople, allPlayers]);
+  const viewerNameOf = useMemo(() => makeNameOf(people), [people]);
   // What to hide as "X" on this match's live surfaces (only active/open disputes),
   // and the names every surface shows by id.
   const maskValue = useMemo(
@@ -792,7 +793,8 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
     else setStoredPotm(undefined);
     return () => { on = false; };
   }, [matchId, reloadTick]);
-  const potmProp: PotmProp | undefined = storedPotm ? { id: storedPotm.playerId, name: storedPotm.name, changed: !!storedPotm.by } : undefined;
+  // the stored name is initials for a child (minor_names_misc) — show this viewer's name by id
+  const potmProp: PotmProp | undefined = storedPotm ? { id: storedPotm.playerId, name: viewerNameOf(storedPotm.playerId, storedPotm.name), changed: !!storedPotm.by } : undefined;
   const canChangePotm = hasMatch && complete && (canScore || isHost) && !storedPotm?.by;
   // The POTM shown right now, before any override: a sport's own (cricket:
   // legacy pick, then its MVP), else the generic stat-line MVP.
