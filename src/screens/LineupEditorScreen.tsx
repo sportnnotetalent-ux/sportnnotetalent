@@ -4,7 +4,7 @@
  *  list. On save it writes the positional lineup AND the matchday squad (starters
  *  + subs) that feeds the scoring roster — so they never diverge. Only football
  *  has selectable formations; every other sport uses its fixed position set. */
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -60,6 +60,16 @@ export default function LineupEditorScreen() {
       };
     }, [matchId, homeTeamName, awayTeamName, sport])
   );
+
+  // IDs-only close-out: a saved slot stores a child's name as initials (migration
+  // lineup_names) — the editor shows the squad's name for each slot's player id.
+  useEffect(() => {
+    if (!lineup || (!homeRoster.length && !awayRoster.length)) return;
+    const byId = new Map([...homeRoster, ...awayRoster].map((p) => [p.id, p.fullName]));
+    const fix = (list: LineupSlot[]) => list.map((sl) => (sl.playerId && byId.has(sl.playerId) && byId.get(sl.playerId) !== sl.playerName ? { ...sl, playerName: byId.get(sl.playerId) } : sl));
+    const home = fix(lineup.home), away = fix(lineup.away);
+    if (home.some((x, i) => x !== lineup.home[i]) || away.some((x, i) => x !== lineup.away[i])) setLocal({ ...lineup, home, away });
+  }, [lineup, homeRoster, awayRoster]);
 
   if (!lineup) {
     return (

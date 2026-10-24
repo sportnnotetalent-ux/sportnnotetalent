@@ -13,6 +13,24 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-24 — IDs-only scoring: invasion sports (B) merged — every sport is IDs-only; line-ups; privacy check
+- **Group B** (football, hockey, handball, ice hockey, netball, rugby, rugby league, American football; merge `2382ec0`):
+  - **Credits and stamps:** `creditAttribution` writes no names. XI / GK / position stamps are `{id}`; SUB is `offId` / `onId`; shoot-out kicks are ids.
+  - **Football fouls:** the fouled player is stored as `secondId`.
+  - **Identity by id:** `subbedOff`, the on-pitch XI, card counting (`samePlayer`), LineupView marks, box rows and minutes, and every ticker's scorer grouping.
+  - **New code:** `invasion/names.ts` (`withNames`, `NAME_KEYS`, `carriesNames`), `invasion/actions.ts` and `football/actions.ts` (id-only builders the controls call).
+  - **Readers:** `DisciplineTable` takes `nameOf`.
+  - **Fixed in passing:** a football ASSIST with only an id used to be dropped.
+  - **Kept as typed text:** typed team-official roles. The football voice LLM normaliser still receives squad names (not stored; flagged for the founder).
+  - The only merge conflict was a comment in `boxSources.ts`. Suite 4603 pass / 0 fail / 2 todo.
+- **Line-ups:**
+  - **Migration `20261024210000_lineup_names.sql`** (needs `minor_names_misc` first): `match_lineups` slots store a possible minor's `playerName` as initials.
+  - **The line-up editor** re-reads each slot's name from the squad by id.
+- **`scripts/check-minor-names.sql`:** a read-only check counting PUBLIC rows that still hold a possible minor's full name, across 10 stores.
+  - Live now: 0 everywhere except `match_lineups` 1 (masked once `lineup_names` runs) and teams 1. That team is a custom-named team matching a player record with no date of birth (not an entry, not on its roster), probably a provisional "player" named after a team, for the founder to look at.
+- **Server safety net (decided):** stripping names from events sent by older app versions could break replay of matches those versions score, because their logs depend on the names. So: monitor with the check above until no new event carries name keys (the Android OTA reaches every APK within two opens; web is instant). Then switch `append_match_event` to refuse name keys.
+- **Clean-up of existing data:** live scoring data holds adults' names only (check above), so there is no privacy need to rewrite old logs. Legacy readers keep showing them.
+
 ### 2026-10-24 — IDs-only close-out: records, corrections, POTM, awards, disputes, activity log, relay members
 - **Records:** `TournamentRecords` resolves record player ids through `players_view` (new `usePlayerNameOf` hook + `getPlayerNamesById`).
 - **Post-match corrections:**

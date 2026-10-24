@@ -67,3 +67,13 @@ describe('the remaining public name copies are masked on write (minor_names_misc
     assert.doesNotMatch(awards, /\{i\.playerName\}|\{item\.playerName\}/);
   });
 });
+
+describe('line-ups (lineup_names)', () => {
+  test('public slots mask a possible minor; the editor re-reads names from the squad', () => {
+    const dir = join(root, 'supabase', 'migrations');
+    const sql = readFileSync(join(dir, readdirSync(dir).find((x) => x.includes('lineup_names'))!), 'utf8');
+    assert.match(sql, /create trigger match_lineups_mask_names before insert or update on match_lineups/);
+    assert.match(sql, /public_person_name\(json_uuid\(sl->>'playerId'\), sl->>'playerName'\)/);
+    assert.match(read('src/screens/LineupEditorScreen.tsx'), /byId\.get\(sl\.playerId\) !== sl\.playerName/);
+  });
+});
