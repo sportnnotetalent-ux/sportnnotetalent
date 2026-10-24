@@ -30,9 +30,11 @@ export const BASKETBALL_DISCIPLINE: SportDisciplineSpec = {
     const ev = (m.state as { events?: unknown } | null | undefined)?.events;
     if (!Array.isArray(ev)) return [];
     const out: CardMark[] = [];
+    // IDs-only scoring: the player by id (an older log's stored name only
+    // where it had one — its marks read exactly as before)
     const whoOf = (e: BBEvent) => ({ ...(e.pid ? { playerId: e.pid } : {}), ...(e.playerName ? { playerName: e.playerName } : {}) });
     for (const e of ev as BBEvent[]) {
-      if (!e || (e.side !== 'home' && e.side !== 'away') || !e.playerName) continue;
+      if (!e || (e.side !== 'home' && e.side !== 'away') || !(e.pid || e.playerName)) continue;
       if (e.type === 'eject') {
         const rule = e.reason === '2T' || e.reason === '2U' || e.reason === 'T+U';
         out.push({ side: e.side, ...whoOf(e), col: 'DQ', off: rule ? 'banEject' : 'banRed' });

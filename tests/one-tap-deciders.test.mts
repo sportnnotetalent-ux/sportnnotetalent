@@ -131,6 +131,6 @@ describe('golf / hockey / basketball wiring', () => {
     const b = src('sports/basketball/index.tsx');
     assert.ok(/confirmMatchAction\('eject'/.test(b));
     assert.ok(!/onPress=\{\(\) => \{ fire\(\{ type: 'EJECT'/.test(b));
-    assert.ok(/clearSel\(side\);\n    fire\(\{\n      type: 'SCORE'/.test(b));
+    assert.ok(/clearSel\(side\);\n    fire\(scoreAction\(side, pts, p,/.test(b)); // IDs-only: the builder (actions.ts)
   });
 });

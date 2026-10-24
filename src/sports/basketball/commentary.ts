@@ -9,6 +9,10 @@
  * team foul 5", "Chen makes free throw 2 of 2". An assist logged right after
  * the basket it set up reads on that basket's row. Lead changes and ties are
  * tagged. Corrections re-derive it, so it always matches the score.
+ *
+ * IDs-only scoring: plays name their players by id; the sentences put in the
+ * viewer's names (`nameOf` — players_view: the circle full names, everyone
+ * else initials, a dispute "X"; an older log's stored name is the fallback).
  */
 import type { FeedGroup, FeedRow } from '../feedModel.ts';
 import { leadTracker } from '../feedModel.ts';
@@ -16,6 +20,7 @@ import { eventClock, periodLabel, teamFoulsThisQuarter, type BasketballState } f
 import { BB_META, DQ_LABEL, FOUL_LABEL, pointsOf, type BBEvent, type ShotZone } from './events.ts';
 import { isFieldGoal } from './credits.ts';
 import { gameOrder, possessionTags } from './deep.ts';
+import { drawnByOf, hasPlayer, legacyNameOf, onId, onPlayerOf, playId, playerOf, samePlayer, type NameOf } from './names.ts';
 
 type Side = 'home' | 'away';
 
@@ -36,14 +41,16 @@ const FOUL_WORD: Record<string, string> = {
 };
 
 /** The sentence for one play (`assist` = a passer merged into a make;
- *  `ft` = this free throw's number in the trip). */
+ *  `ft` = this free throw's number in the trip). Players by id through
+ *  `nameOf` (default: an older log's stored names, as before). */
 export function describePlay(
   s: BasketballState, e: BBEvent, team: string,
   ctx: { assist?: string; ft?: { k: number; n: number }; teamFoul?: number; second?: boolean; offTo?: boolean } = {},
+  nameOf: NameOf = legacyNameOf,
 ): string {
   const halfCourt = s.targetPoints > 0;
-  const named = !!e.playerName;
-  const who = e.playerName ?? team;
+  const named = hasPlayer(e);
+  const who = playerOf(s, e, nameOf) ?? team;
   switch (e.type) {
     case 'score': {
       const p = e.points ?? 0;
@@ -65,19 +72,36 @@ export function describePlay(
     case 'turnover': return `Turnover — ${who}`;
     case 'foul': {
       const kind = FOUL_WORD[e.foulType ?? 'personal'] ?? FOUL_LABEL[e.foulType ?? 'personal'];
-      const drawn = e.drawn ? ` (drawn by ${e.drawn})` : '';
+      const by = drawnByOf(s, e, nameOf);
+      const drawn = by ? ` (drawn by ${by})` : '';
       const tf = ctx.teamFoul ? ` · team foul ${ctx.teamFoul}${s.foulsForBonus > 0 && ctx.teamFoul > s.foulsForBonus ? ', free throws' : ''}` : '';
       return `${kind} foul on ${who}${drawn}${tf}`;
     }
     case 'timeout': return `Timeout — ${team}`;
-    case 'sub': return `${e.onName ?? '?'} checks in for ${e.playerName ?? '?'}`;
+    case 'sub': return `${onPlayerOf(s, e, nameOf) ?? '?'} checks in for ${playerOf(s, e, nameOf) ?? '?'}`;
     case 'eject': return e.reason ? `${who} is disqualified (${DQ_LABEL[e.reason]})` : `${who} is ejected`;
     default: return BB_META[(e as BBEvent).type]?.label ?? 'Play';
   }
 }
 
-/** The basketball play-by-play: period groups, newest first. */
-export function basketballFeed(s: BasketballState, names: { home: string; away: string }): FeedGroup[] {
+/** The player a feed row links to: the sub coming on, else the credited
+ *  player — by id where the log has one (an older name-only play keeps its
+ *  stored name, which the feed may still match to a squad). */
+function rowPlayer(s: BasketballState, e: BBEvent, nameOf: NameOf): Pick<FeedRow, 'playerName' | 'playerId'> {
+  if (e.type === 'sub') {
+    const name = onPlayerOf(s, e, nameOf);
+    const id = onId(s, e);
+    return name ? { playerName: name, ...(id ? { playerId: id } : {}) } : {};
+  }
+  const name = playerOf(s, e, nameOf);
+  const id = playId(s, e);
+  return name ? { playerName: name, ...(id ? { playerId: id } : {}) } : {};
+}
+
+/** The basketball play-by-play: period groups, newest first. Each row's
+ *  player is resolved here (`playerId` + the viewer's name), so the feed
+ *  never looks a player up by name. */
+export function basketballFeed(s: BasketballState, names: { home: string; away: string }, nameOf: NameOf = legacyNameOf): FeedGroup[] {
   const ev = gameOrder(s.events);
   const tags = possessionTags(s);
   const lead = leadTracker(names);
@@ -90,7 +114,7 @@ export function basketballFeed(s: BasketballState, names: { home: string; away: 
     const e = ev[i];
     if (e.type !== 'freethrow') { i++; continue; }
     let j = i;
-    while (j + 1 < ev.length && ev[j + 1].type === 'freethrow' && ev[j + 1].side === e.side && ev[j + 1].playerName === e.playerName && ev[j + 1].quarter === e.quarter) j++;
+    while (j + 1 < ev.length && ev[j + 1].type === 'freethrow' && ev[j + 1].side === e.side && samePlayer(ev[j + 1], e) && ev[j + 1].quarter === e.quarter) j++;
     for (let k = i; k <= j; k++) trip.set(ev[k].id, { k: k - i + 1, n: j - i + 1 });
     i = j + 1;
   }
@@ -100,8 +124,8 @@ export function basketballFeed(s: BasketballState, names: { home: string; away: 
     let assist: string | undefined;
     if (e.type === 'score' && isFieldGoal(e.points ?? 0, s.targetPoints > 0)) {
       const next = ev[i + 1];
-      if (next && next.type === 'assist' && next.side === e.side && next.quarter === e.quarter && next.playerName !== e.playerName) {
-        assist = next.playerName ?? names[e.side];
+      if (next && next.type === 'assist' && next.side === e.side && next.quarter === e.quarter && !samePlayer(next, e)) {
+        assist = playerOf(s, next, nameOf) ?? names[e.side];
         merged.add(next.id);
       }
     }
@@ -115,10 +139,10 @@ export function basketballFeed(s: BasketballState, names: { home: string; away: 
       ...(typeof e.sec === 'number' ? { clock: eventClock(s, e) } : { clock: `${e.minute}'` }),
       side: e.side,
       icon: BB_META[e.type]?.icon ?? '•',
-      text: describePlay(s, e, names[e.side as Side], { assist, ft: trip.get(e.id), teamFoul, second: tag?.second, offTo: tag?.offTo }),
+      text: describePlay(s, e, names[e.side as Side], { assist, ft: trip.get(e.id), teamFoul, second: tag?.second, offTo: tag?.offTo }, nameOf),
       score: { home: h, away: a },
       ...(pts > 0 ? { scoring: true } : {}),
-      ...(e.type === 'sub' ? (e.onName ? { playerName: e.onName } : {}) : e.playerName ? { playerName: e.playerName, ...(e.pid ?? s.ids?.[e.playerName] ? { playerId: e.pid ?? s.ids?.[e.playerName] } : {}) } : {}),
+      ...rowPlayer(s, e, nameOf),
     };
     const note = pts > 0 ? lead(h, a) : e.type === 'eject' ? 'Disqualified' : undefined;
     if (note) row.tag = note;

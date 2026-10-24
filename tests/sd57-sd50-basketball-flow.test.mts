@@ -12,6 +12,7 @@ import { readFileSync } from 'node:fs';
 import { init, reducer, timeoutStatus, type BasketballState } from '../src/sports/basketball/engine.ts';
 import { legacyInit, legacyReducer } from './basketballLegacyReducer.mts';
 import { computeGameFlow, gameFlowFor } from '../src/sports/gameFlow.ts';
+import { freeThrowAction, lineupAction, scoreAction } from '../src/sports/basketball/actions.ts';
 import type { ScoreAction } from '../src/sports/types.ts';
 
 type Side = 'home' | 'away';
@@ -137,17 +138,27 @@ describe('SD-50 — game flow core', () => {
 });
 
 describe('SD-50 — sport adapters', () => {
-  test('basketball: from the log, starters from the five on court', () => {
-    const score = (side: Side, points: number, name: string, quarter = 1, minute = 1): ScoreAction =>
-      ({ type: 'SCORE', side, payload: { points, quarter, minute }, attribution: { playerId: name, stat: 'points', playerName: name } });
-    const s = run(init({}),
-      { type: 'SET_LINEUP', payload: { home: ['A', 'B', 'C', 'D', 'E'], away: ['V', 'W', 'X', 'Y', 'Z'] } },
-      score('home', 3, 'A'), score('away', 2, 'V', 1, 2),
-      { type: 'FREE_THROW', side: 'away', payload: { made: true, quarter: 1, minute: 3 }, attribution: { playerId: 'Q', stat: 'ftm', playerName: 'Q' } },
-      { type: 'FREE_THROW', side: 'away', payload: { made: false, quarter: 1, minute: 3 } },
-      score('home', 2, 'F', 2, 1), score('home', 2, 'F', 2, 4),
-    );
-    const f = gameFlowFor('basketball', s)!;
+  // IDs-only scoring: the five and the scorers by id (actions.ts); an older
+  // log (names, the five by name) gives the same flow
+  const at = (a: ScoreAction, quarter = 1, minute = 1): ScoreAction => ({ ...a, payload: { ...a.payload, quarter, minute } });
+  const ids = (...xs: string[]) => xs.map((id) => ({ id }));
+  const named = (side: Side, points: number, name: string, quarter = 1, minute = 1): ScoreAction =>
+    ({ type: 'SCORE', side, payload: { points, quarter, minute }, attribution: { playerId: name, stat: 'points', playerName: name } });
+  const byId = (side: Side, points: number, id: string, quarter = 1, minute = 1): ScoreAction => at(scoreAction(side, points, { id }), quarter, minute);
+  const game = (score: typeof named, fives: ScoreAction[], q: ScoreAction) => run(init({}),
+    ...fives,
+    score('home', 3, 'A'), score('away', 2, 'V', 1, 2),
+    q,
+    { type: 'FREE_THROW', side: 'away', payload: { made: false, quarter: 1, minute: 3 } },
+    score('home', 2, 'F', 2, 1), score('home', 2, 'F', 2, 4),
+  );
+  const idGame = game(byId, [lineupAction('home', ids('A', 'B', 'C', 'D', 'E')), lineupAction('away', ids('V', 'W', 'X', 'Y', 'Z'))], at(freeThrowAction('away', true, { id: 'Q' }), 1, 3));
+  const oldGame = game(named, [{ type: 'SET_LINEUP', payload: { home: ['A', 'B', 'C', 'D', 'E'], away: ['V', 'W', 'X', 'Y', 'Z'] } }],
+    { type: 'FREE_THROW', side: 'away', payload: { made: true, quarter: 1, minute: 3 }, attribution: { playerId: 'Q', stat: 'ftm', playerName: 'Q' } });
+  test('basketball: from the log, starters from the five on court (by id; an older log by name)', () => {
+    assert.equal(idGame.events.some((e) => e.playerName), false);
+    assert.deepEqual(gameFlowFor('basketball', idGame), gameFlowFor('basketball', oldGame));
+    const f = gameFlowFor('basketball', idGame)!;
     assert.equal(f.unit, 'points');
     assert.equal(f.timesTied, 1, '3-3 after the made free throw');
     assert.equal(f.leadChanges, 0);
@@ -157,10 +168,14 @@ describe('SD-50 — sport adapters', () => {
     assert.deepEqual(f.bench, { home: 4, away: 1 });
   });
   test('basketball: lineup starters when no five was set; none scored = null', () => {
-    const s = run(init({}), { type: 'SCORE', side: 'home', payload: { points: 2 }, attribution: { playerId: 'p9', stat: 'points', playerName: 'Nine' } });
-    assert.deepEqual(gameFlowFor('basketball', s, { home: { ids: ['p1'], names: ['One'] } })!.bench, { home: 2 });
+    const s = run(init({}), scoreAction('home', 2, { id: 'p9' }), scoreAction('home', 3, { id: 'p1' }));
+    assert.deepEqual(gameFlowFor('basketball', s, { home: { ids: ['p1'] } })!.bench, { home: 2 });
     assert.equal(gameFlowFor('basketball', s)!.bench, undefined);
     assert.equal(gameFlowFor('basketball', init({})), null);
+    // an older log's name-only play still matches a starter by name
+    const old = run(init({}), { type: 'SCORE', side: 'home', payload: { points: 2 }, attribution: { playerId: 'p9', stat: 'points', playerName: 'Nine' } });
+    assert.deepEqual(gameFlowFor('basketball', old, { home: { ids: ['p1'], names: ['One'] } })!.bench, { home: 2 });
+    assert.deepEqual(gameFlowFor('basketball', old, { home: { ids: ['p1'], names: ['Nine'] } })!.bench, { home: 0 });
   });
   test('football: goals + own goals in half / minute order; fewer than 2 goals = null', () => {
     const st = { events: [

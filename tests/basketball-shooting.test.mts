@@ -10,7 +10,9 @@ import assert from 'node:assert/strict';
 import type { Match, Player, SportId, StatLine, Team } from '../src/core/types.ts';
 import type { ScoreAction } from '../src/sports/types.ts';
 import { init, reducer, teamFoulsByPeriod, type BasketballState } from '../src/sports/basketball/engine.ts';
-import { creditAttribution, eventCredits, ftCredits, makeCredits, missCredits, reboundCredits } from '../src/sports/basketball/credits.ts';
+import { ftCredits, makeCredits, missCredits, reboundCredits } from '../src/sports/basketball/credits.ts';
+import { freeThrowAction, foulAction, lineupAction, missAction, reboundAction, removeAction, scoreAction, statAction, type StatPlay } from '../src/sports/basketball/actions.ts';
+import { playId } from '../src/sports/basketball/names.ts';
 import { basketballBoxTotals, basketballStatTotals, shotsTracked } from '../src/sports/basketball/totals.ts';
 import { basketballTotals } from '../src/sports/basketball/fieldTime.ts';
 import { basketballBox } from '../src/sports/boxSources.ts';
@@ -31,26 +33,21 @@ const ARJUN = P('p-arjun', 'Arjun'), BEN = P('p-ben', 'Ben'), CHEN = P('p-chen',
 const XAVI = P('p-xavi', 'Xavi'), YUSUF = P('p-yusuf', 'Yusuf');
 const HOME = [ARJUN, BEN, CHEN], AWAY = [XAVI, YUSUF];
 
-/* ---- the actions the controls dispatch (index.tsx), with credits.ts ---- */
-const stamp = (q: number, m: number) => ({ quarter: q, minute: m });
+/* ---- the actions the controls dispatch (index.tsx → actions.ts: the player
+ *      by id only), stamped with their moment ---- */
+const stamp = (a: ScoreAction, q: number, m: number): ScoreAction => ({ ...a, payload: { ...a.payload, quarter: q, minute: m } });
 const make = (side: Side, p: Player | undefined, pts: number, q = 1, m = 0, fga = true, halfCourt = false): ScoreAction =>
-  ({ type: 'SCORE', side, payload: { points: pts, ...(fga ? { fga: true } : {}), ...(p ? { pid: p.id } : {}), ...stamp(q, m) }, attribution: p ? creditAttribution(p.id, p.fullName, makeCredits(pts, halfCourt, fga)) : undefined });
-const miss = (side: Side, p: Player | undefined, pts: number, q = 1, m = 0): ScoreAction =>
-  ({ type: 'MISS', side, payload: { points: pts, ...(p ? { pid: p.id } : {}), ...stamp(q, m) }, attribution: p ? creditAttribution(p.id, p.fullName, missCredits(pts)) : undefined });
-const ft = (side: Side, p: Player, made: boolean, q = 1): ScoreAction =>
-  ({ type: 'FREE_THROW', side, payload: { made, pid: p.id, ...stamp(q, 0) }, attribution: creditAttribution(p.id, p.fullName, ftCredits(made)) });
-const reb = (side: Side, p: Player, rt?: 'off' | 'def', q = 1): ScoreAction =>
-  ({ type: 'REBOUND', side, payload: { ...(rt ? { reboundType: rt } : {}), pid: p.id, ...stamp(q, 0) }, attribution: creditAttribution(p.id, p.fullName, reboundCredits(rt)) });
-const simple = (type: string, stat: string) => (side: Side, p: Player, q = 1): ScoreAction =>
-  ({ type, side, payload: { pid: p.id, ...stamp(q, 0) }, attribution: { playerId: p.id, stat, playerName: p.fullName } });
-const ast = simple('ASSIST', 'assists'), stl = simple('STEAL', 'steals'), blk = simple('BLOCK', 'blocks'), tov = simple('TURNOVER', 'turnovers');
-const foul = (side: Side, p: Player, q = 1, foulType = 'personal'): ScoreAction =>
-  ({ type: 'FOUL', side, payload: { foulType, pid: p.id, ...stamp(q, 0) }, attribution: { playerId: p.id, stat: 'fouls', playerName: p.fullName } });
-/** The timeline's Remove: reverse exactly what the play credited. */
+  stamp(scoreAction(side, pts, p, { fga, halfCourt }), q, m);
+const miss = (side: Side, p: Player | undefined, pts: number, q = 1, m = 0): ScoreAction => stamp(missAction(side, pts, p), q, m);
+const ft = (side: Side, p: Player, made: boolean, q = 1): ScoreAction => stamp(freeThrowAction(side, made, p), q, 0);
+const reb = (side: Side, p: Player, rt?: 'off' | 'def', q = 1): ScoreAction => stamp(reboundAction(side, p, rt), q, 0);
+const simple = (type: StatPlay) => (side: Side, p: Player, q = 1): ScoreAction => stamp(statAction(side, type, p), q, 0);
+const ast = simple('ASSIST'), stl = simple('STEAL'), blk = simple('BLOCK'), tov = simple('TURNOVER');
+const foul = (side: Side, p: Player, q = 1, foulType: 'personal' | 'shooting' | 'technical' = 'personal'): ScoreAction => stamp(foulAction(side, p, foulType), q, 0);
+/** The timeline's Remove: reverse exactly what the play credited (by id). */
 const remove = (s: BasketballState, id: number): ScoreAction => {
   const e = s.events.find((x) => x.id === id)!;
-  const pid = e.playerName ? s.ids?.[e.playerName] : undefined;
-  return { type: 'REMOVE_EVENT', side: e.side, payload: { id }, attribution: pid ? creditAttribution(pid, e.playerName, eventCredits(e, s.targetPoints > 0, shotsTracked(s)), -1) : undefined };
+  return removeAction(e, playId(s, e), { halfCourt: s.targetPoints > 0, tracked: shotsTracked(s) });
 };
 const run = (s: BasketballState, ...as: ScoreAction[]) => as.reduce(reducer, s);
 const TRACK = { periodMinutes: 10, regPeriods: 4, trackMisses: true, foulsForBonus: 4, techIsTeamFoul: true };
@@ -94,9 +91,18 @@ describe('SD-31 · missed field goals', () => {
     assert.deepEqual(reboundCredits('off'), { rebounds: 1, oreb: 1 });
     assert.deepEqual(reboundCredits(), { rebounds: 1 });
   });
-  test('the player id rides in pid → state ids (newer logs only)', () => {
+  test('IDs-only: the play keeps the player id (pid) — no name, no public name → id map', () => {
     const s = run(init(TRACK), { type: 'KICKOFF', payload: { at: 1 } }, make('home', ARJUN, 2));
+    assert.equal(s.events[0].pid, 'p-arjun');
+    assert.equal('playerName' in s.events[0], false);
+    assert.equal(s.ids, undefined);
+    assert.deepEqual(make('home', ARJUN, 2).attribution, { playerId: 'p-arjun', stat: 'points', by: 2, extra: { fgMade: 1, fgAtt: 1 } });
+  });
+  test('an older (SD-40) log: the name + pid still build the state ids, as before', () => {
+    const named: ScoreAction = { ...make('home', ARJUN, 2), attribution: { ...make('home', ARJUN, 2).attribution!, playerName: 'Arjun' } };
+    const s = run(init(TRACK), { type: 'KICKOFF', payload: { at: 1 } }, named);
     assert.deepEqual(s.ids, { Arjun: 'p-arjun' });
+    assert.equal(s.events[0].playerName, 'Arjun');
   });
   test('coverage: a match tracks misses by its config, or by any miss / fga play', () => {
     assert.equal(shotsTracked(init({})), false);
@@ -192,10 +198,7 @@ describe('SD-40 · basketball statTotals (SD-19 contract)', () => {
     assert.equal(t['p-yusuf'].side, 'away');
   });
   test('with the five set: MIN / +/- merged in (mergeTotals)', () => {
-    const five: ScoreAction[] = [
-      { type: 'SET_LINEUP', payload: { home: ['Arjun', 'Ben', 'Chen'], ids: { Arjun: 'p-arjun', Ben: 'p-ben', Chen: 'p-chen' } } },
-      { type: 'SET_LINEUP', payload: { away: ['Xavi', 'Yusuf'], ids: { Xavi: 'p-xavi', Yusuf: 'p-yusuf' } } },
-    ];
+    const five: ScoreAction[] = [lineupAction('home', [ARJUN, BEN, CHEN]), lineupAction('away', [XAVI, YUSUF])];
     const recs = toRecords([...five, ...trackedGame(), { type: 'END' }]);
     const t = assertContract(SP, recs, { every: 4 });
     assert.equal(typeof t['p-arjun'].stats.minutes, 'number');
@@ -295,7 +298,7 @@ describe('SD-31 · voice', () => {
     const [a] = basketballVoice('miss three Arjun', ctx(init(TRACK)))!;
     assert.equal(a.type, 'MISS');
     assert.deepEqual(a.payload, { points: 3, pid: 'p-arjun', v: 2 });
-    assert.deepEqual(a.attribution, { playerId: 'p-arjun', stat: 'fgMissed', by: 1, playerName: 'Arjun', extra: { fgAtt: 1, threesAtt: 1 } });
+    assert.deepEqual(a.attribution, { playerId: 'p-arjun', stat: 'fgMissed', by: 1, extra: { fgAtt: 1, threesAtt: 1 } }); // IDs-only: no name
     assert.equal(basketballVoice('missed two Xavi', ctx(init(TRACK)))![0].payload?.points, 2);
   });
   test('misses only while tracking; a missed free throw always', () => {

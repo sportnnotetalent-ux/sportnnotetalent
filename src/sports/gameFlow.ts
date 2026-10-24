@@ -16,8 +16,9 @@
  * - bench points: points by players who did not start (unattributed points
  *   count for nobody).
  */
-import { periodLabel, type BasketballState } from './basketball/engine.ts';
+import { periodLabel, startersOf as bbStarters, type BasketballState } from './basketball/engine.ts';
 import { pointsOf } from './basketball/events.ts';
+import { playId as bbPlayId } from './basketball/names.ts';
 import { pointsOf as afPointsOf, eventWhen as afWhen, type AFState } from './american_football/engine.ts';
 import { halfShort as bbHalf, type BaseballState } from './baseball/engine.ts';
 import { pointsOf as rugbyPointsOf, minuteText as rugbyMinute, type RugbyState } from './rugby/engine.ts';
@@ -109,12 +110,14 @@ const byKeys = <T>(xs: T[], ...keys: ((x: T) => number)[]) =>
     return a.i - b.i;
   }).map(({ x }) => x);
 
-/** Basketball: made field goals + made free throws, in period / minute / log order. */
+/** Basketball: made field goals + made free throws, in period / minute / log
+ *  order. The scorer by id (IDs-only scoring); an older log's stored name
+ *  rides along only where it had one. */
 function basketballPlays(s: BasketballState): FlowScore[] {
   const evs = byKeys(s.events.filter((e) => pointsOf(e) > 0), (e) => num(e.quarter, 1), (e) => num(e.minute), (e) => num(e.id));
   return evs.map((e) => ({
     side: e.side, points: pointsOf(e), at: `${periodLabel(e.quarter, s.regPeriods)} ${e.minute}'`,
-    playerName: e.playerName, playerId: e.playerName ? s.ids?.[e.playerName] : undefined,
+    playerName: e.playerName, playerId: bbPlayId(s, e),
   }));
 }
 
@@ -137,12 +140,9 @@ export function gameFlowFor(sport: string, state: unknown, starters?: Starters):
       unit = 'points';
       const bb = state as BasketballState;
       plays = basketballPlays(bb);
-      // starters: the five set on court (SET_LINEUP), else the caller's lineup
-      const five: Starters = bb.onCourt
-        ? Object.fromEntries((['home', 'away'] as const).filter((sd) => bb.onCourt![sd]?.length).map((sd) => [sd, {
-          names: bb.onCourt![sd], ids: bb.onCourt![sd].map((n) => bb.ids?.[n]).filter((x): x is string => !!x),
-        }])) : {};
-      const st: Starters = { home: five.home ?? starters?.home, away: five.away ?? starters?.away };
+      // starters: the five set on court (SET_LINEUP — by id; an older log's
+      // by name), else the caller's lineup
+      const st: Starters = { home: bbStarters(bb, 'home', starters?.home), away: bbStarters(bb, 'away', starters?.away) };
       const flow = computeGameFlow(plays, unit, st);
       return flow.scores > 0 ? flow : null;
     }

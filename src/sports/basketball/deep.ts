@@ -20,9 +20,10 @@
  *    the match typed one; points off turnovers once a turnover / steal exists.
  */
 import type { StatTotalsEntry } from '../types';
-import { gameSec, periodSeconds, type BasketballState } from './engine.ts';
+import { gameSec, periodSeconds, startersOf, type BasketballState } from './engine.ts';
 import { isFieldGoal } from './credits.ts';
 import { pointsOf, SHOT_ZONES, type BBEvent, type ShotZone } from './events.ts';
+import { hasPlayer, playId, samePlayer } from './names.ts';
 
 type Side = 'home' | 'away';
 export type BbScope = 'all' | number;
@@ -90,7 +91,7 @@ const sameBasketPossession = (e: BBEvent, side: Side): boolean =>
 /** Two plays by the same player — by id where both carry one, else by name.
  *  A play with no player (team-credited) is compatible with anyone. */
 const sameShooter = (a: BBEvent, b: BBEvent): boolean =>
-  !a.playerName || !b.playerName || (a.pid && b.pid ? a.pid === b.pid : a.playerName === b.playerName);
+  !hasPlayer(a) || !hasPlayer(b) || (a.pid && b.pid ? a.pid === b.pid : a.playerName === b.playerName);
 
 /**
  * Court-team round 2 — the and-one free throw of each made field goal,
@@ -113,7 +114,7 @@ export function andOneFreeThrows(s: BasketballState): Map<number, BBEvent> {
     if (basket && e.quarter !== basket.quarter) basket = null;
     if (basket && e.type === 'freethrow' && e.side === basket.side && sameShooter(basket, e)) {
       const next = ev[i + 1];
-      const trip = !!next && next.type === 'freethrow' && next.side === e.side && next.quarter === e.quarter && next.playerName === e.playerName;
+      const trip = !!next && next.type === 'freethrow' && next.side === e.side && next.quarter === e.quarter && samePlayer(next, e);
       if (!trip) out.set(basket.id, e);
       basket = null;
       continue;
@@ -336,17 +337,17 @@ export function bbTeamFigures(s: BasketballState, side: Side, scope: BbScope = '
 /** Bench points of a side over a scope: points by players who did not start
  *  (the five set on court, else the caller's lineup). null = starters unknown. */
 export function benchPoints(s: BasketballState, side: Side, scope: BbScope, starters?: { ids?: string[]; names?: string[] }): number | null {
-  const five = s.onCourt?.[side]?.length ? { names: s.onCourt[side], ids: s.onCourt[side].map((n) => s.ids?.[n]).filter((x): x is string => !!x) } : starters;
+  const five = startersOf(s, side, starters);
   if (!five || (!five.ids?.length && !five.names?.length)) return null;
   const ids = new Set(five.ids ?? []);
   const names = new Set(five.names ?? []);
   let n = 0;
   for (const e of s.events) {
-    if (e.side !== side || !inScope(e, scope) || !e.playerName) continue;
+    if (e.side !== side || !inScope(e, scope) || !hasPlayer(e)) continue;
     const pts = pointsOf(e);
     if (!pts) continue;
-    const id = e.pid ?? s.ids?.[e.playerName];
-    if ((id && ids.has(id)) || names.has(e.playerName)) continue;
+    const id = playId(s, e);
+    if ((id && ids.has(id)) || (e.playerName && names.has(e.playerName))) continue;
     n += pts;
   }
   return n;
@@ -425,10 +426,16 @@ export function bbDeepTotals(s: BasketballState): { keys: string[]; lines: Recor
   return { keys, lines };
 }
 
-/** The deep keys per player NAME for the box score rows, over a scope:
- *  `zero` fills every row (a tracked 0, never "–"), `team` = plays logged
- *  with no player (so the totals row adds up). */
-export function bbDeepRows(s: BasketballState, scope: BbScope = 'all'): {
+/** A player's key in the box (boxSources): the id, else an older log's name. */
+export type BbKeyOf = (pid: string | undefined, name: string | undefined) => string | undefined;
+const defaultKey = (s: BasketballState): BbKeyOf => (pid, name) =>
+  pid || (name ? s.ids?.[name] ?? `~${name}` : undefined);
+
+/** The deep keys per player (by `keyOf` — the box score's key: the id, else
+ *  an older log's name) for the box score rows, over a scope: `zero` fills
+ *  every row (a tracked 0, never "–"), `team` = plays logged with no player
+ *  (so the totals row adds up). */
+export function bbDeepRows(s: BasketballState, scope: BbScope = 'all', keyOf: BbKeyOf = defaultKey(s)): {
   zero: Record<string, number>;
   home: { rows: Map<string, Record<string, number>>; team: Record<string, number> };
   away: { rows: Map<string, Record<string, number>>; team: Record<string, number> };
@@ -442,7 +449,8 @@ export function bbDeepRows(s: BasketballState, scope: BbScope = 'all'): {
   for (const e of s.events) {
     if (!inScope(e, scope)) continue;
     for (const c of deepCredits(s, e, set, fbp)) {
-      const bucket = c.name ? (out[c.side].rows.get(c.name) ?? out[c.side].rows.set(c.name, {}).get(c.name)!) : out[c.side].team;
+      const key = c.pid || c.name ? keyOf(c.pid, c.name) : undefined;
+      const bucket = key ? (out[c.side].rows.get(key) ?? out[c.side].rows.set(key, {}).get(key)!) : out[c.side].team;
       for (const [k, v] of Object.entries(c.stats)) bucket[k] = (bucket[k] ?? 0) + v;
     }
   }

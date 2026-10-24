@@ -192,14 +192,16 @@ describe('SD-19 · contract: the sports that had totals before', () => {
       name: 'basketball', init: basketball.init, reducer: basketball.reducer, partial: true, config: { trackMisses: true },
       statTotals: basketballStatTotals, derived: ['minutes', 'plusMinus', 'twosMade', 'twosAtt'], signed: ['plusMinus'], // deep wave: 2PM / 2PA are statTotals-only
     };
-    const pl = (id: string, name: string, type: string, payload: Record<string, unknown>, c: Record<string, number>): ScoreAction =>
-      ({ type, side: id.startsWith('h') ? 'home' : 'away', payload: { ...payload, pid: id, quarter: 1, minute: 1 }, attribution: bbCredit(id, name, c) });
+    // IDs-only scoring: the credit and the five by id (no name)
+    const pl = (id: string, _name: string, type: string, payload: Record<string, unknown>, c: Record<string, number>): ScoreAction =>
+      ({ type, side: id.startsWith('h') ? 'home' : 'away', payload: { ...payload, pid: id, quarter: 1, minute: 1 }, attribution: bbCredit(id, undefined, c) });
     const acts: ScoreAction[] = [
-      { type: 'SET_LINEUP', payload: { home: ['H1'], away: ['A1'], ids: { H1: 'h1', A1: 'a1' } } },
+      { type: 'SET_LINEUP', side: 'home', payload: { pids: ['h1'] } },
+      { type: 'SET_LINEUP', side: 'away', payload: { pids: ['a1'] } },
       { type: 'KICKOFF', payload: { at: 1 } },
       pl('h1', 'H1', 'SCORE', { points: 3, fga: true }, bbMake(3, false, true)), pl('h1', 'H1', 'MISS', { points: 2 }, bbMiss(2)),
       pl('a1', 'A1', 'REBOUND', { reboundType: 'def' }, bbReb('def')), pl('a1', 'A1', 'FREE_THROW', { made: true }, bbFt(true)),
-      { type: 'REMOVE_EVENT', side: 'home', payload: { id: 2 }, attribution: bbCredit('h1', 'H1', bbMiss(2), -1) },
+      { type: 'REMOVE_EVENT', side: 'home', payload: { id: 2 }, attribution: bbCredit('h1', undefined, bbMiss(2), -1) },
       { type: 'END' },
     ];
     const t = assertContract(sp, toRecords(acts), { every: 1 });

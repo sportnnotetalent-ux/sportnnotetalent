@@ -16,6 +16,7 @@ import type { Player } from '../src/core/types.ts';
 import type { ScoreAction } from '../src/sports/types.ts';
 import { init, reducer, BB_TRACK_DEFAULTS, scoringLayout, type BasketballState } from '../src/sports/basketball/engine.ts';
 import { creditAttribution, ftCredits, makeCredits } from '../src/sports/basketball/credits.ts';
+import { foulAction, freeThrowAction, scoreAction, statAction, type StatPlay } from '../src/sports/basketball/actions.ts';
 import { andOneFreeThrows, bbDeepKeys, bbDeepRows, bbTeamFigures, fastBreakPlays, possessionTags } from '../src/sports/basketball/deep.ts';
 import { basketballPanel } from '../src/sports/basketball/panel.ts';
 import { basketballStatTotals } from '../src/sports/basketball/totals.ts';
@@ -32,15 +33,14 @@ const P = (id: string, fullName: string): Player => ({ id, fullName, sports: [] 
 const ARJUN = P('p-arjun', 'Arjun'), BEN = P('p-ben', 'Ben'), CHEN = P('p-chen', 'Chen');
 const XAVI = P('p-xavi', 'Xavi'), YUSUF = P('p-yusuf', 'Yusuf');
 const at = (q: number, sec: number) => ({ quarter: q, minute: Math.floor(sec / 60), sec, v: 2 });
+// IDs-only scoring: the actions the controls send (actions.ts — the player by id), stamped like `fire`
+const stamp = (a: ScoreAction, q: number, sec: number, extra: Record<string, unknown> = {}): ScoreAction => ({ ...a, payload: { ...a.payload, ...at(q, sec), ...extra } });
 const make = (side: Side, p: Player | undefined, pts: number, q: number, sec: number, extra: Record<string, unknown> = {}): ScoreAction =>
-  ({ type: 'SCORE', side, payload: { points: pts, ...(p ? { pid: p.id } : {}), ...at(q, sec), ...extra }, attribution: p ? creditAttribution(p.id, p.fullName, makeCredits(pts, false, false)) : undefined });
-const ft = (side: Side, p: Player | undefined, made: boolean, q: number, sec: number): ScoreAction =>
-  ({ type: 'FREE_THROW', side, payload: { made, ...(p ? { pid: p.id } : {}), ...at(q, sec) }, attribution: p ? creditAttribution(p.id, p.fullName, ftCredits(made)) : undefined });
-const foul = (side: Side, p: Player, q: number, sec: number, foulType = 'shooting'): ScoreAction =>
-  ({ type: 'FOUL', side, payload: { foulType, pid: p.id, ...at(q, sec) }, attribution: { playerId: p.id, stat: 'fouls', playerName: p.fullName } });
-const simple = (type: string, stat: string) => (side: Side, p: Player, q: number, sec: number): ScoreAction =>
-  ({ type, side, payload: { pid: p.id, ...at(q, sec) }, attribution: { playerId: p.id, stat, playerName: p.fullName } });
-const ast = simple('ASSIST', 'assists'), stl = simple('STEAL', 'steals');
+  stamp(scoreAction(side, pts, p), q, sec, extra);
+const ft = (side: Side, p: Player | undefined, made: boolean, q: number, sec: number): ScoreAction => stamp(freeThrowAction(side, made, p), q, sec);
+const foul = (side: Side, p: Player, q: number, sec: number, foulType: 'shooting' | 'personal' = 'shooting'): ScoreAction => stamp(foulAction(side, p, foulType), q, sec);
+const simple = (type: StatPlay) => (side: Side, p: Player, q: number, sec: number): ScoreAction => stamp(statAction(side, type, p), q, sec);
+const ast = simple('ASSIST'), stl = simple('STEAL');
 const tag = (id: number, fb = true): ScoreAction => ({ type: 'TAG', payload: { id, fb } });
 const run = (s: BasketballState, ...as: ScoreAction[]) => as.reduce(reducer, s);
 const KO: ScoreAction = { type: 'KICKOFF', payload: { at: 1 } };

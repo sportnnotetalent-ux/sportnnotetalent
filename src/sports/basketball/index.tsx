@@ -16,7 +16,11 @@ import { SubViews } from '../SubViews';
 import { MatchBoxScore } from '../../components/BoxScore';
 import { basketballBox } from '../boxSources';
 import { basketballStatTotals, shotsTracked } from './totals';
-import { creditAttribution, eventCredits, ftCredits, isFieldGoal, makeCredits, missCredits, reboundCredits } from './credits';
+import { isFieldGoal } from './credits';
+import { ejectAction, foulAction, freeThrowAction, lineupAction, missAction, reboundAction, removeAction, scoreAction, statAction, subAction, type StatPlay } from './actions';
+import { hasPlayer, onPlayerOf, playId, playerOf } from './names';
+import { useMask } from '../../core/disputeMask';
+import { withRosters } from '../racketNames';
 import { BB_META, DQ_LABEL, FOUL_LABEL, pointsOf, zoneBehindArc, type BBEvent, type DqReason, type FoulType, type ReboundType, type ShotZone } from './events';
 import { PlayFeed } from '../PlayFeed';
 import { CategoryStatsPanel } from '../CategoryStatsPanel';
@@ -34,7 +38,7 @@ import { BackfillBar, RowAction, confirmRemove } from '../TimelineControls';
 
 import {
   type BasketballState, init, reducer, periodLabel, currentMinute,
-  isFouledOut, isPlayerOut, isEjected, inBonus, timeoutStatus, onCourtNames, teamFoulsThisQuarter,
+  isFouledOut, isPlayerOut, isEjected, inBonus, timeoutStatus, onCourtRefs, courtSet, teamFoulsThisQuarter,
   disqualifyingFoul, freeThrowsFor,
   gameSec, clockLeft, clockRunning, timedPeriod, timeUp, clockText, possessionAfterFoul,
   BB_TRACK_DEFAULTS, scoringLayout,
@@ -71,7 +75,8 @@ type Flow =
   // Deep wave: with "Fouls drawn" on, the type is kept while the fouled player is picked
   | { kind: 'foul'; side: 'home' | 'away'; fouler?: Player; type?: FoulType }
   | { kind: 'rebound'; side: 'home' | 'away'; player: Player }
-  | { kind: 'sub'; side: 'home' | 'away'; off?: string }
+  | { kind: 'sub'; side: 'home' | 'away'; off?: Player }
+  // IDs-only scoring: the five by player id
   | { kind: 'setFive'; side: 'home' | 'away'; picked: string[] }
   | null;
 
@@ -99,6 +104,10 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
   // Deep wave: the same box offers "⚡ Fast break" (tags the basket) and, with
   // Shot zones on, "🔗 And-one" (the bonus free throw).
   const [assistFor, setAssistFor] = useState<{ side: 'home' | 'away'; scorer?: Player; points: number; fb?: boolean } | null>(null);
+  // IDs-only scoring: the log names players by id; this viewer's names (the
+  // squads' as the fallback) are put in when shown.
+  const { nameOf: viewerNameOf } = useMask();
+  const pName = withRosters(viewerNameOf, homeRoster, awayRoster);
 
   // Half-court small-sided ball (3×3 / 2v2 / 1v1 — all first-to-N) scores 1s and
   // 2s only: a made shot is 1, from behind the arc it's 2. Full-court games keep
@@ -126,30 +135,21 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
   // SD-31: "Track missed shots" (live settings) — Miss buttons, and every make
   // counts as an attempt (`fga`) so FGA / FG% / EFF are complete.
   const tracking = state.trackMisses === true;
-  // SD-40: the credited player's id rides in `pid` so statTotals keys by id.
-  const pidOf = (p?: Player) => (p ? { pid: p.id } : {});
   // SD-116 (B1): the picked scorer is for ONE shot — cleared after each make /
   // miss, so the next basket isn't silently credited to the previous player.
   const clearSel = (side: 'home' | 'away') => setSel((cur) => (cur[side] ? { ...cur, [side]: undefined } : cur));
   // Deep wave: `zone` (Shot zones on), `fbt` (fast breaks being tagged —
   // an edit keeps the original's), `fb` (an edit keeps the original's tag).
   const score = (side: 'home' | 'away', pts: number, p: Player | undefined = sel[side], fga = tracking, opts: { zone?: ShotZone; fbt?: boolean; fb?: boolean } = {}) => {
+    // IDs-only scoring: the player by id (actions.ts) — never a name
     clearSel(side);
-    fire({
-      type: 'SCORE',
-      side,
-      payload: {
-        points: pts, ...(fga ? { fga: true } : {}), ...pidOf(p),
-        ...(opts.zone ? { zone: opts.zone } : {}), ...((opts.fbt ?? state.trackFastBreak === true) ? { fbt: true } : {}), ...(opts.fb ? { fb: true } : {}),
-      },
-      attribution: p ? creditAttribution(p.id, p.fullName, makeCredits(pts, halfCourt, fga)) : undefined,
-    });
+    fire(scoreAction(side, pts, p, { halfCourt, fga, zone: opts.zone, fbt: opts.fbt ?? state.trackFastBreak === true, fb: opts.fb }));
     // SD-117 (B6): a made field goal asks "Assist?" (live plays only, not an edit)
     if (!edit && isFieldGoal(pts, halfCourt)) setAssistFor({ side, scorer: p, points: pts });
   };
   const miss = (side: 'home' | 'away', pts: number, p: Player | undefined = sel[side], zone?: ShotZone) => {
     clearSel(side);
-    fire({ type: 'MISS', side, payload: { points: pts, ...pidOf(p), ...(zone ? { zone } : {}) }, attribution: p ? creditAttribution(p.id, p.fullName, missCredits(pts)) : undefined });
+    fire(missAction(side, pts, p, zone));
   };
   // Deep wave — "Shot zones": a made / missed shot from a zone is one tap
   // (inside the arc 2, behind it 3; half-court 1 and 2).
@@ -158,22 +158,20 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
     { zone: 'paint', short: 'Paint', long: 'in the paint' }, { zone: 'mid', short: 'Mid', long: 'mid-range' },
     { zone: 'c3', short: 'Corner', long: 'from the corner' }, { zone: 'ab3', short: 'Top', long: 'above the break' },
   ];
-  const stat = (side: 'home' | 'away', type: string, key: string, p: Player) =>
-    fire({ type, side, payload: pidOf(p), attribution: { playerId: p.id, stat: key, playerName: p.fullName } });
+  const stat = (side: 'home' | 'away', type: StatPlay, p: Player) => fire(statAction(side, type, p));
 
   // ----- Correct the timeline: remove / edit one specific past play -----
   const STAT_KEY: Record<string, string> = { rebound: 'rebounds', assist: 'assists', foul: 'fouls', steal: 'steals', block: 'blocks', turnover: 'turnovers' };
   // Which plays can be re-entered in place (single-player stat plays). Free
   // throws (made/miss), timeouts and subs are remove-only.
-  const canEdit = (e: BBEvent) => !!e.playerName && (e.type === 'score' || !!STAT_KEY[e.type]);
-  const rosterId = (nm?: string) => (nm ? state.ids?.[nm] : undefined) ?? [...homeRoster, ...awayRoster].find((p) => p.fullName === nm)?.id;
-  const removal = (e: BBEvent): ScoreAction => {
-    // Reverse exactly what the play credited (credits.ts — FG / 3P / misses /
-    // OREB-DREB included), so the lines match the log again.
-    const pid = e.pid ?? rosterId(e.playerName);
-    const attribution = pid ? creditAttribution(pid, e.playerName, eventCredits(e, halfCourt, shotsTracked(state)), -1) : undefined;
-    return { type: 'REMOVE_EVENT', side: e.side, payload: { id: e.id }, attribution };
-  };
+  const canEdit = (e: BBEvent) => hasPlayer(e) && (e.type === 'score' || !!STAT_KEY[e.type]);
+  // An older log's name-only play: its id from that log's map, else the
+  // squads (read on this device only — the action carries the id).
+  const rosterId = (nm?: string) => (nm ? [...homeRoster, ...awayRoster].find((p) => p.fullName === nm)?.id : undefined);
+  const idOfPlay = (e: BBEvent) => playId(state, e) ?? rosterId(e.playerName);
+  // Reverse exactly what the play credited (credits.ts — FG / 3P / misses /
+  // OREB-DREB included), so the lines match the log again.
+  const removal = (e: BBEvent): ScoreAction => removeAction(e, idOfPlay(e), { halfCourt, tracked: shotsTracked(state) });
   const removeEvent = (e: BBEvent) => dispatch(removal(e));
   // Edit = remove the old play, then re-enter it stamped at the same moment so
   // the score and every player tally re-adjust to match. SD-114: the removal is
@@ -186,32 +184,36 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
       // Deep wave: the re-entered basket keeps its zone (same value) and fast-break detail
       const keepZone = edit.zone && zoneValue(edit.zone) === points ? edit.zone : undefined;
       score(edit.side, points ?? 0, p, shotsTracked(state), { zone: zoneFor ?? keepZone, fbt: edit.fbt === true, fb: edit.fb === true });
-    } else if (edit.type === 'rebound') fire({ type: 'REBOUND', side: edit.side, payload: { ...(edit.reboundType ? { reboundType: edit.reboundType } : {}), ...pidOf(p) }, attribution: creditAttribution(p.id, p.fullName, reboundCredits(edit.reboundType)) });
-    else if (edit.type === 'foul') fire({ type: 'FOUL', side: edit.side, payload: { foulType: edit.foulType ?? 'personal', ...pidOf(p), ...(edit.fdt ? { fdt: true } : {}), ...(edit.drawn ? { drawn: edit.drawn } : {}), ...(edit.drawnPid ? { drawnPid: edit.drawnPid } : {}) }, attribution: { playerId: p.id, stat: 'fouls', playerName: p.fullName } });
-    else stat(edit.side, edit.type.toUpperCase(), STAT_KEY[edit.type], p);
+    } else if (edit.type === 'rebound') fire(reboundAction(edit.side, p, edit.reboundType));
+    else if (edit.type === 'foul') {
+      // the re-entered foul keeps who drew it — by id (an older log's name is resolved, never copied)
+      const drawnId = edit.drawnPid ?? (edit.drawn ? state.ids?.[edit.drawn] ?? rosterId(edit.drawn) : undefined);
+      fire(foulAction(edit.side, p, edit.foulType ?? 'personal', { fdt: edit.fdt === true, drawnBy: drawnId ? { id: drawnId } : undefined }));
+    } else stat(edit.side, edit.type.toUpperCase() as StatPlay, p);
     setEdit(null); setEditSel(null);
   };
 
   // ----- Multi-step captures -----
   const opp = (side: 'home' | 'away') => (side === 'home' ? 'away' : 'home');
-  const nameOf = (side: 'home' | 'away') => (side === 'home' ? homeName : awayName);
+  const teamOf = (side: 'home' | 'away') => (side === 'home' ? homeName : awayName);
   const rosterOf = (side: 'home' | 'away') => (side === 'home' ? homeRoster : awayRoster);
+  // The squad players on court now (by id; an older log's five by name), or
+  // null while the side's five isn't set.
+  const onCourtPlayers = (side: 'home' | 'away'): Player[] | null => {
+    if (!courtSet(state, side)) return null;
+    const refs = onCourtRefs(state, side);
+    return rosterOf(side).filter((p) => refs.some((r) => (r.id ? r.id === p.id : r.name === p.fullName)));
+  };
   // SD-117 (B9): once the on-court five is tracked, player rows list just them
   // (the bench can't score, rebound or foul) — no long scroll past the squad.
   const courtOf = (side: 'home' | 'away'): Player[] => {
     const roster = rosterOf(side);
-    const five = state.onCourt ? onCourtNames(state, side) : [];
-    if (!five.length) return roster;
-    const on = roster.filter((p) => five.includes(p.fullName));
-    return on.length ? on : roster;
+    const on = onCourtPlayers(side);
+    return on?.length ? on : roster;
   };
 
   // Free throw — one attempt; the panel stays open so 2- and 3-shot trips are quick.
-  const freeThrow = (side: 'home' | 'away', made: boolean, shooter?: Player) =>
-    fire({
-      type: 'FREE_THROW', side, payload: { made, ...pidOf(shooter) },
-      attribution: shooter ? creditAttribution(shooter.id, shooter.fullName, ftCredits(made)) : undefined,
-    });
+  const freeThrow = (side: 'home' | 'away', made: boolean, shooter?: Player) => fire(freeThrowAction(side, made, shooter));
 
   // SD-116 (B2): ejection asks first (ConfirmSheet), then logs EJECT.
   const eject = async (side: 'home' | 'away', p: Player) => {
@@ -219,8 +221,7 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
     fireEject(side, p);
     setFlow(null);
   };
-  const fireEject = (side: 'home' | 'away', p: Player, reason?: DqReason) =>
-    fire({ type: 'EJECT', side, payload: { ...pidOf(p), ...(reason ? { reason } : {}) }, attribution: { playerId: p.id, stat: 'ejections', playerName: p.fullName } });
+  const fireEject = (side: 'home' | 'away', p: Player, reason?: DqReason) => fire(ejectAction(side, p, reason));
 
   // Foul — logged with its type. SD-117: it flows straight into the other
   // side's free throws with the count prefilled (B11: technical 1, shooting /
@@ -237,39 +238,36 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
     // SD-132 (FIBA 3×3 Art. 15): team foul 10+ → 2 free throws AND the ball
     const ball = possessionAfterFoul(state, side, type);
     const bonus = shots > 0 && (type === 'personal');
-    // Deep wave: "Fouls drawn" — the foul says it was tracked, and who drew it
-    const drawn = state.trackFoulsDrawn ? { fdt: true, ...(drawnBy ? { drawn: drawnBy.fullName, drawnPid: drawnBy.id } : {}) } : {};
-    fire({ type: 'FOUL', side, payload: { foulType: type, ...pidOf(fouler), ...drawn }, attribution: { playerId: fouler.id, stat: 'fouls', playerName: fouler.fullName } });
+    // Deep wave: "Fouls drawn" — the foul says it was tracked, and who drew it (by id)
+    const drawn = state.trackFoulsDrawn ? { fdt: true, drawnBy } : {};
+    fire(foulAction(side, fouler, type, drawn));
     if (dq) fireEject(side, fouler, dq);
     if (shots > 0) {
-      const why = bonus ? `Bonus — ${nameOf(side)} are over the team-foul limit` : `${FOUL_LABEL[type]} foul on ${fouler.fullName}`;
-      setFlow({ kind: 'ft', side: opp(side), ...(drawnBy && type !== 'technical' ? { shooter: drawnBy } : {}), remaining: shots, total: shots, reason: `${why}${dq ? ` · ${fouler.fullName} disqualified` : ''} — ${shots} free throw${shots > 1 ? 's' : ''} for ${nameOf(opp(side))}${ball ? `, then ${nameOf(opp(side))} keep the ball (team foul ${teamFoulsThisQuarter(state, side) + 1})` : ''}` });
+      const why = bonus ? `Bonus — ${teamOf(side)} are over the team-foul limit` : `${FOUL_LABEL[type]} foul on ${fouler.fullName}`;
+      setFlow({ kind: 'ft', side: opp(side), ...(drawnBy && type !== 'technical' ? { shooter: drawnBy } : {}), remaining: shots, total: shots, reason: `${why}${dq ? ` · ${fouler.fullName} disqualified` : ''} — ${shots} free throw${shots > 1 ? 's' : ''} for ${teamOf(opp(side))}${ball ? `, then ${teamOf(opp(side))} keep the ball (team foul ${teamFoulsThisQuarter(state, side) + 1})` : ''}` });
     } else setFlow(null);
   };
 
   const recordRebound = (side: 'home' | 'away', player: Player, rt: ReboundType) => {
-    fire({ type: 'REBOUND', side, payload: { reboundType: rt, ...pidOf(player) }, attribution: creditAttribution(player.id, player.fullName, reboundCredits(rt)) });
+    fire(reboundAction(side, player, rt));
     setFlow(null);
   };
 
-  const recordSub = (side: 'home' | 'away', offName: string, onName: string) => {
-    // SD-29: the ids ride along so minutes / +/- reach the right stat lines.
-    const offId = rosterOf(side).find((p) => p.fullName === offName)?.id;
-    const onId = rosterOf(side).find((p) => p.fullName === onName)?.id;
-    fire({ type: 'SUB', side, payload: { offName, onName, ...(offId ? { offId } : {}), ...(onId ? { onId } : {}) } });
+  // SD-29: by id, so minutes / +/- reach the right stat lines (IDs-only: no names)
+  const recordSub = (side: 'home' | 'away', off: Player, on: Player) => {
+    fire(subAction(side, off, on));
     setFlow(null);
   };
 
   const confirmFive = (side: 'home' | 'away', picked: string[]) => {
-    const ids = Object.fromEntries(rosterOf(side).filter((p) => picked.includes(p.fullName)).map((p) => [p.fullName, p.id]));
-    dispatch({ type: 'SET_LINEUP', payload: { [side]: picked, ...(Object.keys(ids).length ? { ids } : {}) } });
+    dispatch(lineupAction(side, picked.map((id) => ({ id }))));
     setFlow(null);
   };
 
   // The active-flow panel (free throws / foul type / rebound off-def / sub / five).
   const renderFlow = () => {
     if (!flow) return null;
-    const nm = nameOf(flow.side);
+    const nm = teamOf(flow.side);
     const cancel = <Button label="Cancel" variant="ghost" onPress={() => setFlow(null)} />;
     if (flow.kind === 'ft') {
       const roster = courtOf(flow.side);
@@ -354,7 +352,7 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
             // Deep wave — "Fouls drawn": who was fouled (optional; a shooting
             // foul's free throws then open with that shooter picked)
             <>
-              <Text style={ctrl.meta}>{FOUL_LABEL[flow.type]} foul on {flow.fouler.fullName} — who was fouled? ({nameOf(opp(flow.side))})</Text>
+              <Text style={ctrl.meta}>{FOUL_LABEL[flow.type]} foul on {flow.fouler.fullName} — who was fouled? ({teamOf(opp(flow.side))})</Text>
               <View style={ctrl.chips}>
                 {courtOf(opp(flow.side)).map((p) => (
                   <SelectChip key={p.id} label={p.fullName} active={false} disabled={fouledOut(p)} onPress={() => void recordFoul(flow.side, flow.fouler!, flow.type!, p)} />
@@ -387,7 +385,7 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
     if (flow.kind === 'act') {
       // SD-117 (B3): the player is already picked — one labelled tap logs the stat.
       const { side, player } = flow;
-      const one = (type: string, key: string) => { stat(side, type, key, player); setFlow(null); };
+      const one = (type: StatPlay) => { stat(side, type, player); setFlow(null); };
       return (
         <View style={ctrl.editPanel}>
           <View style={ctrl.editHead}><Text style={ctrl.label} numberOfLines={1}>📋 {player.fullName} — {nm}</Text>{cancel}</View>
@@ -396,12 +394,12 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
             <Button label="🔁 Off. rebound" variant="ghost" style={ctrl.flex} onPress={() => recordRebound(side, player, 'off')} />
           </View>
           <View style={ctrl.row}>
-            <Button label="🅰️ Assist" variant="ghost" style={ctrl.flex} onPress={() => one('ASSIST', 'assists')} />
-            <Button label="✋ Steal" variant="ghost" style={ctrl.flex} onPress={() => one('STEAL', 'steals')} />
+            <Button label="🅰️ Assist" variant="ghost" style={ctrl.flex} onPress={() => one('ASSIST')} />
+            <Button label="✋ Steal" variant="ghost" style={ctrl.flex} onPress={() => one('STEAL')} />
           </View>
           <View style={ctrl.row}>
-            <Button label="🛡️ Block" variant="ghost" style={ctrl.flex} onPress={() => one('BLOCK', 'blocks')} />
-            <Button label="🔄 Turnover" variant="ghost" style={ctrl.flex} onPress={() => one('TURNOVER', 'turnovers')} />
+            <Button label="🛡️ Block" variant="ghost" style={ctrl.flex} onPress={() => one('BLOCK')} />
+            <Button label="🔄 Turnover" variant="ghost" style={ctrl.flex} onPress={() => one('TURNOVER')} />
           </View>
           <Button label="🟨 Foul…" variant="ghost" onPress={() => setFlow({ kind: 'foul', side, fouler: player })} />
         </View>
@@ -420,9 +418,10 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
     }
     if (flow.kind === 'sub') {
       const roster = rosterOf(flow.side);
-      const five = state.onCourt ? onCourtNames(state, flow.side) : null;
-      const offOptions = five ?? roster.map((p) => p.fullName);
-      const benchNames = five ? roster.map((p) => p.fullName).filter((n) => !five.includes(n)) : roster.map((p) => p.fullName).filter((n) => n !== flow.off);
+      // IDs-only scoring: the players by id (the chips show the squad's names)
+      const five = onCourtPlayers(flow.side);
+      const offOptions = five ?? roster;
+      const bench = five ? roster.filter((p) => !five.some((x) => x.id === p.id)) : roster.filter((p) => p.id !== flow.off?.id);
       return (
         <View style={ctrl.editPanel}>
           <View style={ctrl.editHead}><Text style={ctrl.label}>🔀 Substitution — {nm}</Text>{cancel}</View>
@@ -430,17 +429,17 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
             <>
               <Text style={ctrl.meta}>Who comes off?</Text>
               <View style={ctrl.chips}>
-                {offOptions.map((n) => (
-                  <SelectChip key={n} label={n} active={false} onPress={() => setFlow({ ...flow, off: n })} />
+                {offOptions.map((p) => (
+                  <SelectChip key={p.id} label={p.fullName} active={false} onPress={() => setFlow({ ...flow, off: p })} />
                 ))}
               </View>
             </>
           ) : (
             <>
-              <Text style={ctrl.meta}>Who comes on for {flow.off}?</Text>
+              <Text style={ctrl.meta}>Who comes on for {flow.off.fullName}?</Text>
               <View style={ctrl.chips}>
-                {benchNames.length > 0 ? benchNames.map((n) => (
-                  <SelectChip key={n} label={n} active={false} onPress={() => recordSub(flow.side, flow.off!, n)} />
+                {bench.length > 0 ? bench.map((p) => (
+                  <SelectChip key={p.id} label={p.fullName} active={false} onPress={() => recordSub(flow.side, flow.off!, p)} />
                 )) : <Text style={ctrl.meta}>No bench players available.</Text>}
               </View>
             </>
@@ -448,16 +447,16 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
         </View>
       );
     }
-    // setFive — pick who starts on court
+    // setFive — pick who starts on court (by id)
     const roster = rosterOf(flow.side);
-    const toggle = (n: string) => setFlow({ ...flow, picked: flow.picked.includes(n) ? flow.picked.filter((x) => x !== n) : [...flow.picked, n] });
+    const toggle = (id: string) => setFlow({ ...flow, picked: flow.picked.includes(id) ? flow.picked.filter((x) => x !== id) : [...flow.picked, id] });
     return (
       <View style={ctrl.editPanel}>
         <View style={ctrl.editHead}><Text style={ctrl.label}>🏀 On court — {nm}</Text>{cancel}</View>
         <Text style={ctrl.meta}>Tap the {state.regPeriods === 1 ? '' : 'five '}players starting on court.</Text>
         <View style={ctrl.chips}>
           {roster.map((p) => (
-            <SelectChip key={p.id} label={p.fullName} active={flow.picked.includes(p.fullName)} onPress={() => toggle(p.fullName)} />
+            <SelectChip key={p.id} label={p.fullName} active={flow.picked.includes(p.id)} onPress={() => toggle(p.id)} />
           ))}
         </View>
         <Button label={`Confirm (${flow.picked.length})`} disabled={flow.picked.length === 0} onPress={() => confirmFive(flow.side, flow.picked)} />
@@ -553,7 +552,7 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
   const toStatus = (side: 'home' | 'away') => timeoutStatus(state, side, stampFor());
   const timeoutLabel = (side: 'home' | 'away') => {
     const left = toStatus(side).left;
-    return left == null ? `⏱️ Timeout — ${nameOf(side)}` : `⏱️ Timeout — ${nameOf(side)} (${left})`;
+    return left == null ? `⏱️ Timeout — ${teamOf(side)}` : `⏱️ Timeout — ${teamOf(side)} (${left})`;
   };
   // Over the allowance: asked first (the clock is the scorer's, so it's a
   // warning, not a block) — "No" keeps scoring.
@@ -561,10 +560,10 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
     const t = toStatus(side);
     if (t.left != null && t.left <= 0) {
       const why = t.late
-        ? `${nameOf(side)} have used the most allowed in the last minutes of ${periodLabel(state.regPeriods, state.regPeriods)}.`
+        ? `${teamOf(side)} have used the most allowed in the last minutes of ${periodLabel(state.regPeriods, state.regPeriods)}.`
         : t.window === 'game'
-          ? `${nameOf(side)} have used all ${t.allowance} timeout${t.allowance === 1 ? '' : 's'}.`
-          : `${nameOf(side)} have used their ${t.allowance} for the ${t.window} — unused timeouts don't carry over.`;
+          ? `${teamOf(side)} have used all ${t.allowance} timeout${t.allowance === 1 ? '' : 's'}.`
+          : `${teamOf(side)} have used their ${t.allowance} for the ${t.window} — unused timeouts don't carry over.`;
       if (!(await askConfirm({ title: 'No timeouts left', message: `${why} Log one anyway?`, yesLabel: 'Log anyway', noLabel: 'No, keep scoring', tone: 'caution' }))) return;
     }
     fire({ type: 'TIMEOUT', side });
@@ -657,7 +656,7 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
     if (await confirmMatchAction('endPeriod', { period: periodLabel(state.quarter, state.regPeriods), score: `${state.home}-${state.away}` })) dispatch({ type: 'NEXT_QUARTER' });
   };
   const clockPanel = timedPeriod(state) && backfillQ == null
-    ? <GameClockPanel state={state} dispatch={dispatch} nameOf={nameOf} onEndQuarter={() => void endQuarter()} /> : null;
+    ? <GameClockPanel state={state} dispatch={dispatch} teamOf={teamOf} onEndQuarter={() => void endQuarter()} /> : null;
 
   return (
     <View style={{ gap: theme.spacing(4) }}>
@@ -680,7 +679,7 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
             {mates.length > 0 && (
               <View style={ctrl.chips}>
                 {mates.map((p) => (
-                  <SelectChip key={p.id} label={p.fullName} active={false} onPress={() => stat(assistFor.side, 'ASSIST', 'assists', p)} />
+                  <SelectChip key={p.id} label={p.fullName} active={false} onPress={() => stat(assistFor.side, 'ASSIST', p)} />
                 ))}
               </View>
             )}
@@ -724,7 +723,7 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
       {/* SD-117 (B3): one row per side — tap the player, then the action
           (rebound / assist / steal / block / turnover / foul) in a labelled panel. */}
       {(['home', 'away'] as const).map((side) => (
-        <Row key={side} label={`📋 Rebound · assist · steal · block · TO · foul — ${nameOf(side)}`} roster={courtOf(side)}
+        <Row key={side} label={`📋 Rebound · assist · steal · block · TO · foul — ${teamOf(side)}`} roster={courtOf(side)}
           onPick={(p) => setFlow({ kind: 'act', side, player: p })} disabledFor={fouledOut} />
       ))}
       <Text style={ctrl.meta}>Tap the player first, then pick what they did.</Text>
@@ -748,16 +747,16 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
           <Button label={showSubs ? 'Done' : 'Manage'} variant="ghost" onPress={() => setShowSubs((v) => !v)} />
         </View>
         {showSubs && (['home', 'away'] as const).map((side) => {
-          const five = state.onCourt ? onCourtNames(state, side) : null;
+          const five = onCourtPlayers(side);
           return (
             <View key={side} style={ctrl.addedBox}>
-              <Text style={ctrl.label}>{nameOf(side)}</Text>
+              <Text style={ctrl.label}>{teamOf(side)}</Text>
               {five ? (
                 <>
-                  <Text style={ctrl.meta}>On court: {five.join(', ') || '—'}</Text>
+                  <Text style={ctrl.meta}>On court: {five.map((p) => p.fullName).join(', ') || '—'}</Text>
                   <View style={ctrl.row}>
                     <Button label="🔀 Substitute" variant="ghost" style={ctrl.flex} onPress={() => setFlow({ kind: 'sub', side })} />
-                    <Button label="Edit five" variant="ghost" style={ctrl.flex} onPress={() => setFlow({ kind: 'setFive', side, picked: five })} />
+                    <Button label="Edit five" variant="ghost" style={ctrl.flex} onPress={() => setFlow({ kind: 'setFive', side, picked: five.map((p) => p.id) })} />
                   </View>
                 </>
               ) : (
@@ -808,10 +807,10 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
               {[...state.events].sort((a, b) => b.quarter - a.quarter || b.minute - a.minute || b.id - a.id).map((e) => (
                 <View key={e.id} style={ctrl.editRow}>
                   <Text style={ctrl.editMin}>{periodLabel(e.quarter, state.regPeriods)}</Text>
-                  <Text style={ctrl.editLabel} numberOfLines={1}>{BB_META[e.type].icon} {BB_META[e.type].label}{e.type === 'score' ? ` +${e.points}` : e.type === 'miss' ? ` ${e.points}` : ''}{e.type === 'freethrow' ? (e.made ? ' ✅' : ' ❌') : ''}{e.playerName ? ` — ${e.playerName}` : ''}{e.type === 'sub' && e.onName ? ` ▸ ${e.onName}` : ''}</Text>
+                  <Text style={ctrl.editLabel} numberOfLines={1}>{BB_META[e.type].icon} {BB_META[e.type].label}{e.type === 'score' ? ` +${e.points}` : e.type === 'miss' ? ` ${e.points}` : ''}{e.type === 'freethrow' ? (e.made ? ' ✅' : ' ❌') : ''}{hasPlayer(e) ? ` — ${playerOf(state, e, pName)}` : ''}{e.type === 'sub' && onPlayerOf(state, e) ? ` ▸ ${onPlayerOf(state, e, pName)}` : ''}</Text>
                   {canEdit(e) && <RowAction label="✎ Edit" tone="edit" a11y={`Edit ${BB_META[e.type].label}`} onPress={() => editEvent(e)} />}
                   <RowAction label="✕" tone="remove" a11y={`Remove ${BB_META[e.type].label}`}
-                    onPress={() => void confirmRemove(`${BB_META[e.type].label}${e.type === 'score' ? ` +${e.points}` : ''}${e.playerName ? ` — ${e.playerName}` : ''} (${periodLabel(e.quarter, state.regPeriods)})`, () => removeEvent(e))} />
+                    onPress={() => void confirmRemove(`${BB_META[e.type].label}${e.type === 'score' ? ` +${e.points}` : ''}${hasPlayer(e) ? ` — ${playerOf(state, e, pName)}` : ''} (${periodLabel(e.quarter, state.regPeriods)})`, () => removeEvent(e))} />
                 </View>
               ))}
             </View>
@@ -853,8 +852,8 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
 /** SD-132 — the basketball game clock panel: the count-down face, ▶ Start /
  *  ⏸ Stop, "Clock stopped" after a whistle, ⏱ Set clock (time left) and the
  *  0:00 end-of-period prompt. Ticks on its own each second. */
-function GameClockPanel({ state, dispatch, nameOf, onEndQuarter }: {
-  state: BasketballState; dispatch: (a: ScoreAction) => void; nameOf: (side: 'home' | 'away') => string; onEndQuarter: () => void;
+function GameClockPanel({ state, dispatch, teamOf, onEndQuarter }: {
+  state: BasketballState; dispatch: (a: ScoreAction) => void; teamOf: (side: 'home' | 'away') => string; onEndQuarter: () => void;
 }) {
   const [, tick] = useState(0);
   const run = clockRunning(state);
@@ -875,7 +874,7 @@ function GameClockPanel({ state, dispatch, nameOf, onEndQuarter }: {
   const up = timeUp(state, nowMs);
   const lastWhistle = (() => {
     const e = [...state.events].reverse().find((x) => x.quarter === state.quarter);
-    return e?.type === 'foul' ? ' (foul)' : e?.type === 'timeout' ? ` (time-out, ${nameOf(e.side)})` : '';
+    return e?.type === 'foul' ? ' (foul)' : e?.type === 'timeout' ? ` (time-out, ${teamOf(e.side)})` : '';
   })();
   const per = periodLabel(state.quarter, state.regPeriods);
   return (
@@ -935,11 +934,16 @@ const LiveClock: NonNullable<SportPlugin<BasketballState>['LiveClock']> = ({ sta
  *  team stats (with the shot chart) and the FIBA box score on Stats. The
  *  screen adds Game flow (SD-50) under Stats. */
 type TabProps = Parameters<NonNullable<SportPlugin<BasketballState>['LiveExtras']>>[0];
-const BasketballCommentary = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster, onPlayer }: TabProps) => (
-  <PlayFeed groups={basketballFeed(state as BasketballState, { home: homeName, away: awayName })} homeColor={homeColor} awayColor={awayColor} homeRoster={homeRoster} awayRoster={awayRoster} onPlayer={onPlayer} allLabel="Game" />
-);
+// IDs-only scoring: players by id → this viewer's names (useMask), the squads' as the fallback
+const BasketballCommentary = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster, onPlayer }: TabProps) => {
+  const { nameOf } = useMask();
+  return (
+    <PlayFeed groups={basketballFeed(state as BasketballState, { home: homeName, away: awayName }, withRosters(nameOf, homeRoster, awayRoster))} homeColor={homeColor} awayColor={awayColor} homeRoster={homeRoster} awayRoster={awayRoster} onPlayer={onPlayer} allLabel="Game" />
+  );
+};
 const BasketballStats = ({ state, homeName, awayName, homeColor, awayColor, homeRoster, awayRoster, homeLineup, awayLineup, onPlayer }: TabProps) => {
   const s = state as BasketballState;
+  const { nameOf } = useMask();
   const starters = { home: startersOf(homeLineup), away: startersOf(awayLineup) };
   return (
     <SubViews label="Stats view" views={[
@@ -950,7 +954,7 @@ const BasketballStats = ({ state, homeName, awayName, homeColor, awayColor, home
         </CategoryStatsPanel>
       ) },
       { key: 'box', label: 'Box score', render: () => (
-        <MatchBoxScore sport="basketball" show="box" source={basketballBox(s, { homeRoster, awayRoster, homeName, awayName })} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} onPlayer={onPlayer} />
+        <MatchBoxScore sport="basketball" show="box" source={basketballBox(s, { homeRoster, awayRoster, homeName, awayName, nameOf })} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} onPlayer={onPlayer} />
       ) },
     ]} />
   );

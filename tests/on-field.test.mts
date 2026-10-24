@@ -27,7 +27,8 @@ import { keeperTotals } from '../src/sports/football/keepers.ts';
 import { footballTotals, footballLiveField, footballField } from '../src/sports/football/fieldTime.ts';
 import { init as fbLegacyInit, reducer as fbLegacyReducer } from './footballLegacyEngine.mts';
 import { init as bkInit, reducer as bkReducer, type BasketballState } from '../src/sports/basketball/engine.ts';
-import { basketballTotals, boxFieldByName } from '../src/sports/basketball/fieldTime.ts';
+import { basketballTotals, boxField, boxFieldByName } from '../src/sports/basketball/fieldTime.ts';
+import { lineupAction, scoreAction, subAction } from '../src/sports/basketball/actions.ts';
 import { legacyInit as bkLegacyInit, legacyReducer as bkLegacyReducer } from './basketballLegacyReducer.mts';
 import { init as vbInit, reducer as vbReducer, type VolleyballState } from '../src/sports/volleyball/engine.ts';
 import { volleyballTotals } from '../src/sports/volleyball/fieldTime.ts';
@@ -401,6 +402,21 @@ describe('SD-29 · basketball MIN and +/- (BK-10)', () => {
   test('first-to-21 (3×3): +/- only, no minutes', () => {
     const s = bk(bkInit({ targetPoints: 21 }), five('home', ['H1']), five('away', ['A1']), pts('home', 1, 0, 2));
     assert.deepEqual(basketballTotals(s).h1.stats, { plusMinus: 2 });
+  });
+  test('IDs-only: the five, the sub and the plays by id give the same MIN / +/- (keyed by id)', () => {
+    const ids = (xs: string[]) => xs.map((n) => ({ id: n.toLowerCase() }));
+    const at = (a: ScoreAction, quarter: number, minute: number): ScoreAction => ({ ...a, payload: { ...a.payload, quarter, minute } });
+    const sc = (side: Side, quarter: number, minute: number, points: number, id = side === 'home' ? 'h1' : 'a1') => at(scoreAction(side, points, { id }), quarter, minute);
+    const s = bk(bkInit(cfg), lineupAction('home', ids(H)), lineupAction('away', ids(A)),
+      sc('home', 1, 2, 2), sc('away', 1, 3, 3),
+      at(subAction('home', { id: 'h5' }, { id: 'h6' }), 1, 5),
+      sc('home', 1, 6, 3, 'h6'),
+      { type: 'NEXT_QUARTER' }, sc('away', 2, 1, 2),
+      { type: 'NEXT_QUARTER' }, { type: 'NEXT_QUARTER' }, { type: 'END' });
+    assert.equal(s.ids, undefined);
+    assert.deepEqual(basketballTotals(s), basketballTotals(game()));
+    const f = boxField(bk(bkInit(cfg), lineupAction('home', ids(H)), lineupAction('away', ids(A)), at(subAction('home', { id: 'h5' }, { id: 'h6' }), 1, 5), sc('home', 1, 6, 2, 'h6')));
+    assert.deepEqual([f.get('h6')?.on, f.get('h5')?.on, f.get('h6')?.pm], [true, false, 2]);
   });
   test('no five set → nothing (old logs and quick subs)', () => {
     const s = bk(bkInit(cfg), pts('home', 1, 2, 2), { type: 'SUB', side: 'home', payload: { offName: 'H1', onName: 'H6' } }, { type: 'END' });

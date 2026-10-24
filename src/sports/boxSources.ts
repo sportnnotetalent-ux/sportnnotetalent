@@ -19,8 +19,9 @@ import { periodLabel, teamFoulsByPeriod, type BasketballState } from './basketba
 import type { BBEvent } from './basketball/events.ts';
 import { eventCredits } from './basketball/credits.ts';
 import { shotsTracked } from './basketball/totals.ts';
-import { boxFieldByName } from './basketball/fieldTime.ts';
-import { bbDeepRows } from './basketball/deep.ts';
+import { boxField } from './basketball/fieldTime.ts';
+import { bbDeepRows, type BbKeyOf } from './basketball/deep.ts';
+import { hasPlayer } from './basketball/names.ts';
 import { tally as volleyballTally, vbCreditKeyer, type VolleyballState } from './volleyball/engine.ts';
 import { detailTally as vbDetailTally, detailTracked as vbDetailTracked } from './volleyball/detail.ts';
 import { tally as kabaddiTally, isShootoutEvent, type KabaddiState } from './kabaddi/engine.ts';
@@ -87,31 +88,51 @@ const numbered = (n: number, word: string) => Array.from({ length: n }, (_, i) =
 /* -------------------------------- basketball -------------------------------- */
 
 export interface BasketballLine {
-  name: string;
+  /** the row's key: the player id, or "~Name" for an older log's player no
+   *  id is known for */
+  key: string;
+  /** the player's id, when known */
+  playerId?: string;
+  /** the names an older log / the squad knew this player by (the squad's
+   *  first) — legacy lookups only: the minutes of a log that kept names */
+  names: string[];
   pts: number; reb: number; ast: number; stl: number; blk: number; to: number; pf: number;
   ftm: number; fta: number;
   /** SD-40: field goals / threes made, attempts (tracked games), misses, OREB / DREB */
   fgm: number; fga: number; tpm: number; tpa: number; fgx: number; oreb: number; dreb: number;
 }
 
-const blankLine = (name: string): BasketballLine =>
-  ({ name, pts: 0, reb: 0, ast: 0, stl: 0, blk: 0, to: 0, pf: 0, ftm: 0, fta: 0, fgm: 0, fga: 0, tpm: 0, tpa: 0, fgx: 0, oreb: 0, dreb: 0 });
+const blankLine = (key: string, playerId?: string): BasketballLine =>
+  ({ key, ...(playerId ? { playerId } : {}), names: [], pts: 0, reb: 0, ast: 0, stl: 0, blk: 0, to: 0, pf: 0, ftm: 0, fta: 0, fgm: 0, fga: 0, tpm: 0, tpa: 0, fgx: 0, oreb: 0, dreb: 0 });
+
+/** IDs-only scoring: a basketball player's box key — the id (a play's
+ *  `pid`; an older log's name through its `ids` map, else matched to the
+ *  squad by name), else "~Name". */
+export const basketballKeyer = (s: Pick<BasketballState, 'ids'>, roster: Player[]): BbKeyOf => (pid, name) => {
+  if (pid) return pid;
+  if (!name) return undefined;
+  return s.ids?.[name] ?? idIn(name, roster) ?? `~${name}`;
+};
 
 /** A side's players from the play-by-play (every roster player listed, as the
- *  old table did); `scope` = one period. Sorted by points. */
-export function basketballTally(events: BBEvent[], side: Side, roster: Player[], scope: BoxScope = 'all', halfCourt = false, tracked?: boolean): BasketballLine[] {
-  const byName = new Map<string, BasketballLine>();
-  const ensure = (name: string) => {
-    if (!byName.has(name)) byName.set(name, blankLine(name));
-    return byName.get(name)!;
+ *  old table did), keyed by player id; `scope` = one period. Sorted by points. */
+export function basketballTally(s: BasketballState, side: Side, roster: Player[], scope: BoxScope = 'all', tracked?: boolean, keyOf: BbKeyOf = basketballKeyer(s, roster)): BasketballLine[] {
+  const halfCourt = s.targetPoints > 0;
+  const byKey = new Map<string, BasketballLine>();
+  const ensure = (key: string, name?: string) => {
+    let l = byKey.get(key);
+    if (!l) byKey.set(key, (l = blankLine(key, key.startsWith('~') ? undefined : key)));
+    if (name && !l.names.includes(name)) l.names.push(name);
+    return l;
   };
-  roster.forEach((p) => ensure(p.fullName));
-  for (const e of events) {
-    if (e.side !== side || !e.playerName) continue;
+  roster.forEach((p) => ensure(p.id, p.fullName));
+  for (const e of s.events) {
+    if (e.side !== side || !hasPlayer(e)) continue;
     if (scope !== 'all' && e.quarter !== scope) continue;
-    add(ensure(e.playerName), e, halfCourt, tracked);
+    const key = keyOf(e.pid, e.playerName);
+    if (key) add(ensure(key, e.playerName), e, halfCourt, tracked);
   }
-  return [...byName.values()].sort((a, b) => b.pts - a.pts);
+  return [...byKey.values()].sort((a, b) => b.pts - a.pts);
 }
 
 /** One play onto a line — the same credits the controls send (credits.ts). */
@@ -133,6 +154,9 @@ const bbStats = (l: BasketballLine, cov: { shots: boolean; split: boolean }): Re
   ...(cov.split ? { oreb: l.oreb, dreb: l.dreb } : null),
 });
 
+/** IDs-only scoring: rows keyed by player id; names are the viewer's
+ *  (`ctx.nameOf`; without one the squad's), an older log's stored name only
+ *  the fallback for a player outside the squad. */
 export function basketballBox(s: BasketballState, ctx: BoxContext = {}): MatchBoxSource {
   const periods = Array.from({ length: Math.max(1, s.quarter) }, (_, i) => ({ value: i + 1, label: periodLabel(i + 1, s.regPeriods) }));
   const halfCourt = s.targetPoints > 0;
@@ -149,22 +173,29 @@ export function basketballBox(s: BasketballState, ctx: BoxContext = {}): MatchBo
       return [`Team fouls${who}: ${h.map((n, i) => `${periodLabel(i + 1, s.regPeriods)} ${n}–${a[i] ?? 0}`).join(' · ')}`];
     },
     data: (scope) => {
-      // SD-29 MIN / +/- / on court: whole-game figures, the Overall view only.
-      const field = scope === 'all' ? boxFieldByName(s) : undefined;
-      // Deep wave: 2PM-A, fouls drawn… (each only when the match tracked it)
-      const deep = bbDeepRows(s, scope);
+      // SD-29 MIN / +/- / on court: whole-game figures, the Overall view only
+      // (keyed by id; an older log's player it couldn't resolve, by name).
+      const field = scope === 'all' ? boxField(s) : undefined;
+      const fieldOf = (l: BasketballLine) =>
+        (l.playerId ? field?.get(l.playerId) : undefined) ?? l.names.map((n) => field?.get(`name:${n}`)).find(Boolean);
       const side = (sd: Side): BoxSideInput => {
         const roster = rosterOf(ctx, sd);
-        const rows = basketballTally(s.events, sd, roster, scope, halfCourt, cov.shots).map((l) => {
-          const f = field?.get(l.name);
-          const stats = { ...bbStats(l, cov), ...deep.zero, ...deep[sd].rows.get(l.name) };
+        const keyOf = basketballKeyer(s, roster);
+        const nm = withRosters(ctx.nameOf, roster);
+        // Deep wave: 2PM-A, fouls drawn… (each only when the match tracked it)
+        const deep = bbDeepRows(s, scope, keyOf);
+        const rows = basketballTally(s, sd, roster, scope, cov.shots, keyOf).map((l) => {
+          const f = fieldOf(l);
+          const stats = { ...bbStats(l, cov), ...deep.zero, ...deep[sd].rows.get(l.key) };
           if (f?.min !== undefined) stats.minutes = f.min;
           if (f) stats.plusMinus = f.pm;
-          return withId({ name: l.name, stats, ...(f?.on ? { on: true } : null) }, roster);
+          const inSquad = !!l.playerId && roster.some((p) => p.id === l.playerId);
+          const name = l.playerId ? nm(l.playerId, inSquad ? undefined : l.names[0]) : nm(undefined, l.key.slice(1));
+          return { name, ...(l.playerId ? { playerId: l.playerId } : null), stats, ...(f?.on ? { on: true } : null) };
         });
         // points / rebounds … logged with no player: the side's "Team" row
         const team = blankLine('Team');
-        for (const e of s.events) if (e.side === sd && !e.playerName && (scope === 'all' || e.quarter === scope)) add(team, e, halfCourt, cov.shots);
+        for (const e of s.events) if (e.side === sd && !hasPlayer(e) && (scope === 'all' || e.quarter === scope)) add(team, e, halfCourt, cov.shots);
         return { rows, team: { label: 'Team', stats: { ...bbStats(team, cov), ...deep.zero, ...deep[sd].team } } };
       };
       return { home: side('home'), away: side('away'), ...(cov.shots ? null : { untracked: ['fgPct', 'threePct'] }) };

@@ -31,6 +31,8 @@ export interface BBEvent {
   minute: number;
   type: BBEventType;
   side: 'home' | 'away';
+  /** @deprecated legacy, read-only — an older log's credited player name
+   *  (IDs-only scoring keeps `pid` only; names are looked up when shown). */
   playerName?: string;
   /** points for a 'score' event (1/2/3); for a 'miss', the shot's value */
   points?: number;
@@ -43,13 +45,18 @@ export interface BBEvent {
   foulType?: FoulType;
   /** offensive or defensive rebound (box-score detail) */
   reboundType?: ReboundType;
-  /** substitution: the player coming ON (playerName = the player going off) */
+  /** @deprecated legacy, read-only — substitution: the name of the player
+   *  coming ON in an older log (playerName = the player going off). */
   onName?: string;
+  /** IDs-only substitution: the player coming ON, by id (`pid` = the player
+   *  going off). Named as football's sub event names it, so the shared
+   *  readers (appearances' players who came on) see it. */
+  secondId?: string;
   /** SD-117 (B12): an ejection the foul rules forced (absent: the scorer's own call) */
   reason?: DqReason;
-  /** SD-122: the credited player's id, on plays logged by a `v: 2` action —
-   *  keeps two same-named players apart for foul-out / ejection. Absent on
-   *  older logs. */
+  /** The credited player's id. IDs-only plays carry only this; SD-122
+   *  (`v: 2`) plays of older logs carry it beside the name. Absent on the
+   *  oldest logs. */
   pid?: string;
   /** SD-132: the game-clock second (played in its period) on plays logged
    *  with the stoppable clock. Absent on older logs. */
@@ -62,8 +69,9 @@ export interface BBEvent {
   fbt?: true;
   fb?: true;
   /** Deep wave — a foul logged while "Fouls drawn" was tracked (`fdt`), and
-   *  the player who drew it (name + id), when the scorer picked one. */
+   *  the player who drew it by id, when the scorer picked one. */
   fdt?: true;
+  /** @deprecated legacy, read-only — the fouled player's name (older logs). */
   drawn?: string;
   drawnPid?: string;
 }

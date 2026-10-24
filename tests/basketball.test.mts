@@ -2,22 +2,27 @@
  * Basketball scoring engine — the ground-ready capture set (go-live sport audit).
  * Free throws (made/miss/and-one), shooting-foul flow, foul types & team-foul
  * bonus, steals/blocks/turnovers, timeouts, on-court subs, and remove-reversal.
+ * IDs-only scoring: plays are scored the way the controls send them
+ * (basketball/actions.ts — the player by id) and checked by id.
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  init, reducer, teamFoulsThisQuarter, inBonus, timeoutsUsed, onCourtNames, isFouledOut, foulCount,
+  init, reducer, teamFoulsThisQuarter, inBonus, timeoutsUsed, onCourtIds, onCourtNames, isFouledOut, foulCount,
   type BasketballState,
 } from '../src/sports/basketball/engine.ts';
+import { ejectAction, foulAction, freeThrowAction, lineupAction, reboundAction, scoreAction, statAction, subAction, timeoutAction } from '../src/sports/basketball/actions.ts';
+import type { FoulType } from '../src/sports/basketball/events.ts';
 import type { ScoreAction } from '../src/sports/types.ts';
 
+type Side = 'home' | 'away';
 const run = (s: BasketballState, ...as: ScoreAction[]) => as.reduce(reducer, s);
-const scoreAct = (side: 'home' | 'away', points: number, who?: string): ScoreAction =>
-  ({ type: 'SCORE', side, payload: { points }, attribution: who ? { playerId: who, stat: 'points', by: points, playerName: who } : undefined });
-const ft = (side: 'home' | 'away', made: boolean, who?: string): ScoreAction =>
-  ({ type: 'FREE_THROW', side, payload: { made }, attribution: who ? { playerId: who, stat: made ? 'points' : 'freeThrowsAtt', by: 1, playerName: who } : undefined });
-const foul = (side: 'home' | 'away', who: string, foulType = 'personal'): ScoreAction =>
-  ({ type: 'FOUL', side, payload: { foulType }, attribution: { playerId: who, stat: 'fouls', playerName: who } });
+const who = (id?: string) => (id ? { id } : undefined);
+const scoreAct = (side: Side, points: number, id?: string): ScoreAction => scoreAction(side, points, who(id));
+const ft = (side: Side, made: boolean, id?: string): ScoreAction => freeThrowAction(side, made, who(id));
+const foul = (side: Side, id: string, foulType: FoulType = 'personal'): ScoreAction => foulAction(side, { id }, foulType);
+/** a player, by side and id (foul-out / ejection are per side and id) */
+const of = (side: Side, pid: string) => ({ side, pid });
 
 describe('basketball — scoring & free throws', () => {
   test('field goals add 1/2/3', () => {
@@ -32,6 +37,7 @@ describe('basketball — scoring & free throws', () => {
     const fts = s.events.filter((e) => e.type === 'freethrow');
     assert.equal(fts.length, 2);
     assert.deepEqual(fts.map((e) => e.made), [true, false]);
+    assert.deepEqual(fts.map((e) => e.pid), ['A', 'A']);
   });
 
   test('and-one: basket + one made free throw = 3', () => {
@@ -63,7 +69,7 @@ describe('basketball — fouls & bonus', () => {
 
   test('a fouled-out player cannot score further', () => {
     const s0 = run(init({ foulsToFoulOut: 2 }), foul('home', 'A'), foul('home', 'A'));
-    assert.equal(isFouledOut(s0, 'A'), true);
+    assert.equal(isFouledOut(s0, undefined, of('home', 'A')), true);
     const s1 = run(s0, scoreAct('home', 2, 'A'));
     assert.equal(s1.home, 0); // blocked
   });
@@ -71,20 +77,25 @@ describe('basketball — fouls & bonus', () => {
 
 describe('basketball — stats, timeouts, subs', () => {
   test('steal / block / turnover are logged', () => {
-    const s = run(init(),
-      { type: 'STEAL', side: 'home', attribution: { playerId: 'A', stat: 'steals', playerName: 'A' } },
-      { type: 'BLOCK', side: 'home', attribution: { playerId: 'B', stat: 'blocks', playerName: 'B' } },
-      { type: 'TURNOVER', side: 'away', attribution: { playerId: 'C', stat: 'turnovers', playerName: 'C' } });
-    assert.equal(s.events.filter((e) => ['steal', 'block', 'turnover'].includes(e.type)).length, 3);
+    const s = run(init(), statAction('home', 'STEAL', { id: 'A' }), statAction('home', 'BLOCK', { id: 'B' }), statAction('away', 'TURNOVER', { id: 'C' }));
+    assert.deepEqual(s.events.filter((e) => ['steal', 'block', 'turnover'].includes(e.type)).map((e) => e.pid), ['A', 'B', 'C']);
   });
 
   test('timeouts are counted per side', () => {
-    const s = run(init(), { type: 'TIMEOUT', side: 'home' }, { type: 'TIMEOUT', side: 'home' }, { type: 'TIMEOUT', side: 'away' });
+    const s = run(init(), timeoutAction('home'), timeoutAction('home'), timeoutAction('away'));
     assert.equal(timeoutsUsed(s, 'home'), 2);
     assert.equal(timeoutsUsed(s, 'away'), 1);
   });
 
-  test('on-court list follows the starting five and substitutions', () => {
+  test('on-court list follows the starting five and substitutions (by id)', () => {
+    const s = run(init(),
+      lineupAction('home', ['A', 'B', 'C', 'D', 'E'].map((id) => ({ id }))),
+      subAction('home', { id: 'A' }, { id: 'F' }));
+    assert.deepEqual(onCourtIds(s, 'home'), ['F', 'B', 'C', 'D', 'E']);
+    assert.deepEqual(s.court, { home: ['A', 'B', 'C', 'D', 'E'] });
+  });
+
+  test('an older log: the five and the subs by name, replayed as they were', () => {
     const s = run(init(),
       { type: 'SET_LINEUP', payload: { home: ['A', 'B', 'C', 'D', 'E'] } },
       { type: 'SUB', side: 'home', payload: { offName: 'A', onName: 'F' } });
@@ -125,28 +136,21 @@ describe('basketball — a real-game-style sequence replayed play-by-play', () =
   //   H1 hits a 3 → 3-0 · A1 hits a 2 → 3-2 · shooting foul on H3, A1 makes both
   //   free throws → 3-4 · H2 defensive rebound · H1 assist · A2 steal · home timeout
   //   · H1 hits a 2 → 5-4 · end of Q1
-  const sc = (side: 'home' | 'away', pts: number, who: string): ScoreAction =>
-    ({ type: 'SCORE', side, payload: { points: pts }, attribution: { playerId: who, stat: 'points', by: pts, playerName: who } });
-  const ft = (side: 'home' | 'away', who: string): ScoreAction =>
-    ({ type: 'FREE_THROW', side, payload: { made: true }, attribution: { playerId: who, stat: 'points', by: 1, playerName: who } });
-  const stat = (type: string, side: 'home' | 'away', s: string, who: string): ScoreAction =>
-    ({ type, side, attribution: { playerId: who, stat: s, playerName: who } });
-
   const g = run(init(),
     { type: 'KICKOFF', payload: { at: 1 } },
-    sc('home', 3, 'H1'),
-    sc('away', 2, 'A1'),
-    { type: 'FOUL', side: 'home', payload: { foulType: 'shooting' }, attribution: { playerId: 'H3', stat: 'fouls', playerName: 'H3' } },
-    ft('away', 'A1'), ft('away', 'A1'),
-    stat('REBOUND', 'home', 'rebounds', 'H2'),
-    stat('ASSIST', 'home', 'assists', 'H1'),
-    stat('STEAL', 'away', 'steals', 'A2'),
-    { type: 'TIMEOUT', side: 'home' },
-    sc('home', 2, 'H1'),
+    scoreAct('home', 3, 'H1'),
+    scoreAct('away', 2, 'A1'),
+    foul('home', 'H3', 'shooting'),
+    ft('away', true, 'A1'), ft('away', true, 'A1'),
+    reboundAction('home', { id: 'H2' }, 'def'),
+    statAction('home', 'ASSIST', { id: 'H1' }),
+    statAction('away', 'STEAL', { id: 'A2' }),
+    timeoutAction('home'),
+    scoreAct('home', 2, 'H1'),
     { type: 'NEXT_QUARTER' },
   );
 
-  const pts = (who: string) => g.events.filter((e) => e.playerName === who).reduce((n, e) => n + pointsOf(e), 0);
+  const pts = (id: string) => g.events.filter((e) => e.pid === id).reduce((n, e) => n + pointsOf(e), 0);
 
   test('the line score is right and the game advanced to Q2', () => {
     assert.deepEqual([g.home, g.away], [5, 4]);
@@ -162,7 +166,7 @@ describe('basketball — a real-game-style sequence replayed play-by-play', () =
     assert.equal(g.events.filter((e) => e.type === 'rebound').length, 1);
     assert.equal(g.events.filter((e) => e.type === 'assist').length, 1);
     assert.equal(g.events.filter((e) => e.type === 'steal').length, 1);
-    assert.equal(foulCount(g, 'H3'), 1);
+    assert.equal(foulCount(g, undefined, of('home', 'H3')), 1);
     assert.equal(timeoutsUsed(g, 'home'), 1);
   });
 })
@@ -171,17 +175,17 @@ import { isEjected, isPlayerOut } from '../src/sports/basketball/engine.ts';
 
 describe('basketball — player ejection (Tier-1 gap fix)', () => {
   test('an ejected player is out for the game and cannot score, even under the foul limit', () => {
-    let s = run(init(), foul('home', 'E'), { type: 'EJECT', side: 'home', attribution: { playerId: 'E', stat: 'ejections', playerName: 'E' } });
-    assert.equal(isEjected(s, 'E'), true);
-    assert.equal(isPlayerOut(s, 'E'), true); // out, though only 1 personal foul
+    let s = run(init(), foul('home', 'E'), ejectAction('home', { id: 'E' }));
+    assert.equal(isEjected(s, undefined, of('home', 'E')), true);
+    assert.equal(isPlayerOut(s, undefined, of('home', 'E')), true); // out, though only 1 personal foul
     s = run(s, scoreAct('home', 2, 'E'));
     assert.equal(s.home, 0); // blocked — ejected
   });
 
   test('removing the eject event reinstates the player', () => {
-    let s = run(init(), { type: 'EJECT', side: 'away', attribution: { playerId: 'F', stat: 'ejections', playerName: 'F' } });
+    let s = run(init(), ejectAction('away', { id: 'F' }));
     const id = s.events.find((e) => e.type === 'eject')!.id;
     s = reducer(s, { type: 'REMOVE_EVENT', side: 'away', payload: { id } });
-    assert.equal(isEjected(s, 'F'), false);
+    assert.equal(isEjected(s, undefined, of('away', 'F')), false);
   });
 })
