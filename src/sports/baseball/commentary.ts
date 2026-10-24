@@ -19,6 +19,8 @@ import {
   type Ann, type BaseballEvent, type BaseballState, type BattedBall, type Move, type Side, type Zone,
 } from './engine.ts';
 import { andList, groupLines, newestFirst, nth, plural, scoreText, type FeedGroup, type FeedLine } from '../feedGroups.ts';
+import { withNames } from './names.ts';
+import { legacyNameOf, type NameOf } from '../../core/playerNames.ts';
 
 export interface Names { home: string; away: string }
 
@@ -134,9 +136,11 @@ const scoreWords = (names: Names, sc: { home: number; away: number }) => `${name
 /** the running score after a run: "2–1" (visitors–home) */
 const scoreChip = (sc: { home: number; away: number }) => scoreText(sc.away, sc.home);
 
-/** The commentary feed, newest first. */
-export function baseballCommentary(state: BaseballState, names: Names): FeedGroup[] {
-  const s = withAnn(state);
+/** The commentary feed, newest first. IDs-only scoring: the players are
+ *  named by id for this viewer (`nameOf` — names.ts `withNames`; with no
+ *  lookup an older log reads exactly as before). */
+export function baseballCommentary(state: BaseballState, names: Names, nameOf: NameOf = legacyNameOf): FeedGroup[] {
+  const s = withNames(withAnn(state), nameOf);
   const g = s.g;
   const entries: Entry[] = [];
   const team = (sd?: Side) => (sd ? names[sd] : '');

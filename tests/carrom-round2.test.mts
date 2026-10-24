@@ -52,7 +52,8 @@ function play(list: B[], players = SINGLES, config: Record<string, unknown> = {}
     const queen = !!b.queen;
     const value = carrom.boardValue(s, s.current[b.side], { coins: b.coins ?? 0, queen, penalty: b.penalty, endFoul: s.foulScore ? b.endFoul : undefined });
     const credit = Math.min(value, Math.max(0, s.target - s.current[b.side]));
-    const attr = (id: string) => ({ playerId: id, playerName: id.toUpperCase(), stat: 'points', by: credit, ...(b.penalty ? {} : { extra: { boards: 1, ...(queen ? { queens: 1 } : {}) } }) });
+    // IDs-only scoring: as the controls (carrom.boardCredit) — the player by id only
+    const attr = (id: string) => carrom.boardCredit({ id }, credit, { penalty: b.penalty, queen });
     const who = creditedPlayers(players[b.side].map((id) => ({ id })), s.perSide ?? 1);
     const a: ScoreAction = {
       type: 'BOARD', side: b.side,

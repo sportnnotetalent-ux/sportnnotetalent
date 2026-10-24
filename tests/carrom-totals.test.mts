@@ -41,7 +41,8 @@ function play(list: Board[], players = SINGLES, config: Record<string, unknown> 
   const out: ScoreAction[] = [];
   for (const [side, coins, queen, slam] of list) {
     const credit = carrom.creditPoints(coins, queen, s.current[side], s);
-    const attr = (id: string) => ({ playerId: id, playerName: NAME(id), stat: 'points', by: credit, extra: { boards: 1, ...(queen ? { queens: 1 } : {}) } });
+    // IDs-only scoring: as the controls (carrom.boardCredit) — the player by id only
+    const attr = (id: string) => carrom.boardCredit({ id }, credit, { queen });
     const who = creditedPlayers(players[side].map((id) => ({ id })), s.perSide ?? 1);
     const a: ScoreAction = {
       type: 'BOARD', side, payload: { coins, queen, ...(slam ? { slam } : {}) },

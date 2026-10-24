@@ -9,6 +9,9 @@ import { block, scoreItems, type MatchRecordItem, type MatchRecordsBlock } from 
 import { lastInning, other, type BaseballState, type Side } from './engine.ts';
 import { baseballTotals, reachedBase } from './totals.ts';
 
+/** IDs-only scoring (docs/privacy/ids-only-scoring.md): an item names its
+ *  player by id; only an older log's stored name rides along (an IDs-only
+ *  log has none — the records screens look names up by id). */
 export function baseballMatchRecords(s: BaseballState): MatchRecordsBlock | null {
   if (!s?.g?.ended) return null;
   const items: MatchRecordItem[] = scoreItems(s.g.score.home, s.g.score.away, { teamHigh: true, biggestWin: true });
@@ -33,9 +36,9 @@ export function baseballMatchRecords(s: BaseballState): MatchRecordsBlock | null
       r.set.add(e.outcome);
       hits.set(e.batter.id, r);
     }
-    if (e.outcome === 'HR' && (s.g.ann[e.id]?.runs ?? 0) >= 4) items.push({ type: 'grandSlam', value: 4, text: 'Grand slam', side: e.side, playerId: e.batter.id, playerName: e.batter.name });
+    if (e.outcome === 'HR' && (s.g.ann[e.id]?.runs ?? 0) >= 4) items.push({ type: 'grandSlam', value: 4, text: 'Grand slam', side: e.side, playerId: e.batter.id, ...(e.batter.name ? { playerName: e.batter.name } : {}) });
   }
-  for (const [id, r] of hits) if (r.set.size === 4) items.push({ type: 'cycle', value: 1, text: 'Hit for the cycle', side: r.side, playerId: id, playerName: r.name });
+  for (const [id, r] of hits) if (r.set.size === 4) items.push({ type: 'cycle', value: 1, text: 'Hit for the cycle', side: r.side, playerId: id, ...(r.name ? { playerName: r.name } : {}) });
   const t = baseballTotals(s);
   const k = Object.entries(t).filter(([, x]) => (x.stats.kPitched ?? 0) > 0).sort((a, b) => b[1].stats.kPitched - a[1].stats.kPitched)[0];
   if (k) {

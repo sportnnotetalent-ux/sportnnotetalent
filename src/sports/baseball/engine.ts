@@ -41,8 +41,22 @@ export { BASEBALL_PRESETS, TRACK_FIELDS };
 export type Side = 'home' | 'away';
 export const other = (s: Side): Side => (s === 'home' ? 'away' : 'home');
 
+/**
+ * IDs-only scoring (docs/privacy/ids-only-scoring.md, founder 2026-10-24): the
+ * state (`matches.state`) and the event log (`match_events`) are public, so a
+ * player is stored by `id` only; names are looked up when shown (./names.ts
+ * `withNames(state, nameOf)`). `name` is kept for:
+ *  - a player with NO id — a numbered "Batter n" slot (no roster), or a
+ *    name-only player from an older log: the label is its only identity
+ *    (`whoKey` "name:…"); new data never types a person's name in;
+ *  - an older log (pre IDs-only), whose payloads carried names next to the
+ *    ids: @deprecated legacy, read-only — it replays exactly as before and the
+ *    stored name is only the display fallback.
+ */
 export interface Who { id?: string; name?: string }
-export interface LineupEntry { id?: string; name: string; pos?: string }
+/** A batting-order slot: `{ id, pos? }`; `name` only for a slot with no id
+ *  (a numbered "Batter n" slot) or from an older log (see `Who`). */
+export interface LineupEntry { id?: string; name?: string; pos?: string }
 
 export type PitchKind = 'ball' | 'called' | 'swinging' | 'foul';
 /** how a plate appearance ended */
@@ -57,6 +71,7 @@ export type SubKind = 'ph' | 'pr' | 'def' | 'p';
 export type Base = 0 | 1 | 2 | 3;
 /** 4 = scored, -1 = out */
 export type Dest = 1 | 2 | 3 | 4 | -1;
+/** A runner move: the runner by `id` (`name` only without one — see `Who`). */
 export interface Move { from: Base; to: Dest; id?: string; name?: string }
 
 export const HITS: Outcome[] = ['1B', '2B', '3B', 'HR'];
@@ -303,7 +318,10 @@ const mercyLead = (cfg: BaseballConfig, inning: number): number | undefined => {
 /* ---------------------------------- state ---------------------------------- */
 
 /** `ir` (deep wave): the reliever who inherited this runner (OBR 9.16(g) — the
- *  run stays charged to `resp`; `ir` only feeds inherited runners scored) */
+ *  run stays charged to `resp`; `ir` only feeds inherited runners scored).
+ *  `name` / `respName` / `runnerName` (and a spell's `name`) come from the
+ *  log's names: absent on an IDs-only log (see `Who`); `resp` is the
+ *  responsible pitcher's key (`whoKey`: the id). */
 export interface Runner { id?: string; name?: string; slot?: number; resp?: string; respName?: string; ue: boolean; ir?: string }
 export interface RunCredit { event: string; side: Side; runnerId?: string; runnerName?: string; resp?: string; respName?: string; earned: boolean; ir?: string }
 /** per event: the situation BEFORE it (for stamps, edits) and what it did.
@@ -361,6 +379,20 @@ export interface BaseballState {
 }
 
 export const whoKey = (w?: Who | null): string | undefined => (w?.id ? w.id : w?.name ? `name:${w.name}` : undefined);
+
+/** IDs-only scoring — a player as NEW scoring data stores it: the id only; a
+ *  player with no id keeps the label it is known by (a "Batter n" slot, an
+ *  older log's name-only player) — its only identity. */
+export function storedWho(w: Who | null | undefined): Who | undefined {
+  if (!w) return undefined;
+  if (w.id) return { id: w.id };
+  return w.name ? { name: w.name } : undefined;
+}
+/** A batting-order slot as new data stores it (`{ id, pos }`; see `storedWho`). */
+export const storedEntry = (e: LineupEntry): LineupEntry =>
+  ({ ...(e.id ? { id: e.id } : { name: e.name ?? 'Player' }), ...(e.pos ? { pos: e.pos } : {}) });
+/** A runner move as new data stores it (the runner by id; see `storedWho`). */
+export const storedMove = (m: Move): Move => ({ from: m.from, to: m.to, ...(m.id ? { id: m.id } : m.name ? { name: m.name } : {}) });
 export const inningOf = (half: number): number => Math.floor(half / 2) + 1;
 export const isTop = (half: number): boolean => half % 2 === 0;
 export const battingSide = (half: number): Side => (isTop(half) ? 'away' : 'home');
@@ -517,7 +549,8 @@ export function derive(cfg: BaseballConfig, s: Pick<BaseballState, 'lineup' | 's
     if (e.type === 'sub') {
       const side = e.side;
       if (!side || !e.on) continue;
-      const on: LineupEntry = { ...(e.on.id ? { id: e.on.id } : {}), name: e.on.name ?? 'Player' };
+      // IDs-only: a player by id carries no name (an older log's name is kept)
+      const on: LineupEntry = { ...(e.on.id ? { id: e.on.id } : {}), ...(e.on.name || !e.on.id ? { name: e.on.name ?? 'Player' } : {}) };
       const slotOk = typeof e.slot === 'number' && e.slot >= 0 && e.slot < g.order[side].length;
       if (e.kind === 'p') {
         // deep wave: a reliever coming in mid-inning inherits the runners on base
@@ -628,7 +661,9 @@ export const init = (config?: Record<string, unknown>): BaseballState => {
 
 /* --------------------------------- credits --------------------------------- */
 
-type Credit = { playerId: string; playerName?: string; stats: Record<string, number> };
+/** A stat-line credit — by player id only (IDs-only scoring: the action's
+ *  attribution is public). */
+type Credit = { playerId: string; stats: Record<string, number> };
 
 /** Every key a live baseball action credits (statTotals owns all of them). */
 export const LIVE_KEYS = [
@@ -669,11 +704,11 @@ export function pitcherStats(o: Outcome, outs = 0): Record<string, number> {
 /** The stat-line credits one event writes: [primary player, second player]. */
 export function eventCredits(e: Pick<BaseballEvent, 'type' | 'outcome' | 'kind' | 'batter' | 'pitcher' | 'moves' | 'outs' | 'rbi'>): { first?: Credit; second?: Credit } {
   const who = (w: Who | undefined, stats: Record<string, number>): Credit | undefined =>
-    (w?.id && Object.keys(stats).length ? { playerId: w.id, ...(w.name ? { playerName: w.name } : {}), stats } : undefined);
+    (w?.id && Object.keys(stats).length ? { playerId: w.id, stats } : undefined);
   if (e.type === 'pa' && e.outcome) return { first: who(e.batter, batterStats(e.outcome, e.rbi ?? 0)), second: who(e.pitcher, pitcherStats(e.outcome, e.outs ?? 0)) };
   if (e.type === 'runner') {
     const m = e.moves?.[0];
-    const runner = m ? { id: m.id, name: m.name } : undefined;
+    const runner = m ? { id: m.id } : undefined;
     const outs = e.outs ?? 0;
     const pitcher = who(e.pitcher, outs > 0 ? { outsPitched: outs } : {});
     if (e.kind === 'SB') return { first: who(runner, { stolenBases: 1 }) };
@@ -690,7 +725,7 @@ export function creditAttribution(c: Credit | undefined, sign = 1, tracked?: str
   if (!entries.length) return undefined;
   const [[stat, by], ...rest] = entries;
   return {
-    playerId: c.playerId, stat, by: by * sign, ...(c.playerName ? { playerName: c.playerName } : {}),
+    playerId: c.playerId, stat, by: by * sign,
     ...(rest.length ? { extra: Object.fromEntries(rest.map(([k, v]) => [k, v * sign])) } : {}),
     ...(tracked ? { tracked } : {}),
   };
@@ -750,8 +785,12 @@ export const reducer = (s: BaseballState, a: ScoreAction): BaseballState => {
       const order = (Array.isArray(p.order) ? p.order : []).flatMap((x) => {
         const o = x as Record<string, unknown>;
         const name = typeof o?.name === 'string' ? o.name : '';
-        if (!name && !o?.id) return [];
-        return [{ ...(typeof o.id === 'string' && o.id ? { id: o.id } : {}), name: name || 'Player', ...(typeof o.pos === 'string' && o.pos ? { pos: o.pos } : {}) }];
+        const id = typeof o?.id === 'string' && o.id ? o.id : '';
+        if (!name && !id) return [];
+        // IDs-only: a slot by id carries no name; an older log's slot (a
+        // `name` key) reads exactly as before
+        const named = typeof o?.name === 'string' || !id;
+        return [{ ...(id ? { id } : {}), ...(named ? { name: name || 'Player' } : {}), ...(typeof o.pos === 'string' && o.pos ? { pos: o.pos } : {}) }];
       });
       const pitcher = whoIn(p.pitcher);
       return commit({ ...s, lineup: { ...s.lineup, [team]: order.length ? order : undefined }, starters: { ...s.starters, [team]: pitcher } });
@@ -921,13 +960,15 @@ export const defaultRbi = (o: Outcome, runs: number): number => (o === 'E' || o 
 export function buildPlay(s: BaseballState, o: Outcome, opts: PlayOpts = {}): ScoreAction {
   const sit = situation(s);
   const uid = opts.uid ?? newUid();
-  const moves = (opts.moves ?? defaultMoves(s, o)).filter((m) => !(m.from !== 0 && m.from === m.to));
+  // IDs-only scoring: players by id only (a "Batter n" slot keeps its label)
+  const moves = (opts.moves ?? defaultMoves(s, o)).filter((m) => !(m.from !== 0 && m.from === m.to)).map(storedMove);
   const pitch = opts.pitch ?? (o === 'IBB' ? undefined : o === 'HBP' ? 'hbp' : o === 'BB' ? 'ball' : o === 'K' ? 'swinging' : 'inplay');
-  const batter = { ...(sit.batter.id ? { id: sit.batter.id } : {}), name: sit.batter.name, slot: sit.batter.slot };
+  const batter = { ...storedWho(sit.batter), slot: sit.batter.slot };
+  const pitcher = storedWho(sit.pitcher);
   const base: ScoreAction = {
     type: 'PLAY', side: sit.bat,
     payload: {
-      ...(opts.extra ?? {}), uid, outcome: o, ...(pitch ? { pitch } : {}), batter, ...(sit.pitcher ? { pitcher: sit.pitcher } : {}), moves, ...(opts.fielders ? { fielders: opts.fielders } : {}),
+      ...(opts.extra ?? {}), uid, outcome: o, ...(pitch ? { pitch } : {}), batter, ...(pitcher ? { pitcher } : {}), moves, ...(opts.fielders ? { fielders: opts.fielders } : {}),
       ...(opts.zone && IN_PLAY.includes(o) ? { zone: opts.zone } : {}), ...(opts.ptype && pitch ? { ptype: opts.ptype } : {}),
       ...(opts.btype && IN_PLAY.includes(o) ? { btype: opts.btype } : {}),
     },
@@ -935,7 +976,7 @@ export function buildPlay(s: BaseballState, o: Outcome, opts: PlayOpts = {}): Sc
   const pv = preview(s, base);
   const rbi = opts.rbi ?? defaultRbi(o, pv.runs);
   const payload = { ...base.payload, outs: pv.outs, rbi };
-  return withCredits({ ...base, payload }, { type: 'pa', outcome: o, batter, pitcher: sit.pitcher, outs: pv.outs, rbi });
+  return withCredits({ ...base, payload }, { type: 'pa', outcome: o, batter, pitcher, outs: pv.outs, rbi });
 }
 
 /** One pitch. Ball four / strike three (and a slow-pitch 2-strike foul) close
@@ -946,7 +987,8 @@ export function buildPitch(s: BaseballState, kind: PitchKind, extra: Record<stri
   if ((kind === 'called' || kind === 'swinging') && g.strikes >= 2) return buildPlay(s, 'K', { pitch: kind, extra });
   if (kind === 'foul' && g.strikes >= 2 && s.cfg.foulOut) return buildPlay(s, 'K', { pitch: 'foul', extra });
   const sit = situation(s);
-  return { type: 'PITCH', side: sit.bat, payload: { ...extra, uid: (extra.uid as string | undefined) ?? newUid(), kind, ...(sit.pitcher ? { pitcher: sit.pitcher } : {}) } };
+  const pitcher = storedWho(sit.pitcher);
+  return { type: 'PITCH', side: sit.bat, payload: { ...extra, uid: (extra.uid as string | undefined) ?? newUid(), kind, ...(pitcher ? { pitcher } : {}) } };
 }
 
 /** A runner play (steal, caught stealing, wild pitch, passed ball, balk,
@@ -965,10 +1007,44 @@ export function defaultRunnerMoves(s: BaseballState, kind: RunnerKind, base?: 1 
 export function buildRunner(s: BaseballState, kind: RunnerKind, moves?: Move[], extra: Record<string, unknown> = {}): ScoreAction {
   const sit = situation(s);
   const uid = (extra.uid as string | undefined) ?? newUid();
-  const mv = (moves ?? defaultRunnerMoves(s, kind)).filter((m) => m.from !== m.to);
-  const base: ScoreAction = { type: 'RUNNER', side: sit.bat, payload: { ...extra, uid, kind, moves: mv, ...(sit.pitcher ? { pitcher: sit.pitcher } : {}) } };
+  const mv = (moves ?? defaultRunnerMoves(s, kind)).filter((m) => m.from !== m.to).map(storedMove);
+  const pitcher = storedWho(sit.pitcher);
+  const base: ScoreAction = { type: 'RUNNER', side: sit.bat, payload: { ...extra, uid, kind, moves: mv, ...(pitcher ? { pitcher } : {}) } };
   const pv = preview(s, base);
-  return withCredits({ ...base, payload: { ...base.payload, outs: pv.outs } }, { type: 'runner', kind, moves: mv, pitcher: sit.pitcher, outs: pv.outs });
+  return withCredits({ ...base, payload: { ...base.payload, outs: pv.outs } }, { type: 'runner', kind, moves: mv, pitcher, outs: pv.outs });
+}
+
+/* The other actions the scorer's controls dispatch, as pure builders (the
+ * controls and the tests build them the same way). IDs-only scoring: every
+ * player by id (`storedWho`) — never a name in the public log. */
+
+/** A team's line-up before the first pitch: the batting order and the pitcher. */
+export function lineupAction(team: Side, order: LineupEntry[], pitcher?: Who | null): ScoreAction {
+  const p = storedWho(pitcher);
+  return { type: 'LINEUP', payload: { team, order: order.map(storedEntry), ...(p ? { pitcher: p } : {}) } };
+}
+
+/** A substitution: pinch hitter (`slot`), pinch runner (`base`, `slot`),
+ *  defensive change (`slot`, `pos`) or pitching change (`slot` without the DH). */
+export function subAction(side: Side, kind: SubKind, o: {
+  on: Who; off?: Who | null; slot?: number; base?: 1 | 2 | 3; pos?: string; extra?: Record<string, unknown>; uid?: string;
+}): ScoreAction {
+  const on = storedWho(o.on);
+  const off = storedWho(o.off);
+  return {
+    type: 'SUB', side,
+    payload: {
+      kind, ...(o.slot !== undefined ? { slot: o.slot } : {}), ...(o.base ? { base: o.base } : {}), ...(on ? { on } : {}), ...(off ? { off } : {}),
+      ...(o.pos ? { pos: o.pos } : {}), ...(o.extra ?? {}), uid: o.uid ?? newUid(),
+    },
+  };
+}
+
+/** An ejection (OBR 8.01(d)): a player (by id), or a team official — the
+ *  role the scorer typed ("Manager"), never linked to a player. */
+export function ejectAction(side: Side, o: { player?: Who | null; official?: string }, uid: string = newUid()): ScoreAction {
+  const player = storedWho(o.player);
+  return { type: 'EJECT', side, payload: { ...(player ? { player } : { official: o.official?.trim() || 'Team official' }), uid } };
 }
 
 /** The state as it stood just after event `after` ('' = before the first) —

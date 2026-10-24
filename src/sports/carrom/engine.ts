@@ -193,8 +193,28 @@ export const MAX_BOARD_POINTS = 12;
 /** SD-117c — the three-way Queen chip. */
 export type QueenBy = 'winner' | 'loser' | 'none';
 
-/** SD-37 — a player the log credited (the scorer's attribution on a BOARD). */
-export interface CarromCredit { side: Side; id?: string; name?: string }
+/** SD-37 — a player the log credited (the scorer's attribution on a BOARD).
+ *  IDs-only scoring (docs/privacy/ids-only-scoring.md): the state is public,
+ *  so a credit keeps the player's `id` only; names are looked up when shown
+ *  (`nameOf(id, name)`). */
+export interface CarromCredit {
+  side: Side; id?: string;
+  /** @deprecated legacy, read-only — an older log's `playerName` (or a
+   *  break-order name), kept so it replays identically; a name-only credit
+   *  (no id) is identified by it. New actions never carry one. */
+  name?: string;
+}
+
+/** IDs-only scoring — a credit as new data stores it: the id only (a legacy
+ *  credit with no id keeps its name: it is the only identity it has). */
+export const idCredit = (c: CarromCredit): CarromCredit => (c.id ? { side: c.side, id: c.id } : c);
+
+/** The profile credit a recorded board gives each of the winning side's
+ *  players — by id only (match events are public). SD-37: `by` = the board's
+ *  capped points; SD-68: a penalty board credits its points, never a board
+ *  won or a Queen. The scorer's buttons and voice build it the same way. */
+export const boardCredit = (p: { id: string }, by: number, o: { penalty?: boolean; queen?: boolean } = {}) =>
+  ({ playerId: p.id, stat: 'points', by, ...(o.penalty ? {} : { extra: { boards: 1, ...(o.queen ? { queens: 1 } : {}) } }) });
 
 export interface CarromState {
   current: { home: number; away: number };
@@ -513,7 +533,8 @@ export function breakerPlayers(s: CarromState): Array<CarromCredit | null> {
   });
 }
 
-/** SD-134 — who breaks the next board, by name (doubles with an order). */
+/** SD-134 — who breaks the next board (doubles with an order): the player's
+ *  credit (by id; a legacy order may also carry a name). */
 export function nextBreakerPlayer(s: CarromState): CarromCredit | null {
   const side = nextBreaker(s);
   if (!side) return null;
@@ -592,19 +613,24 @@ export function liveCredits(s: CarromState): Map<string, { name?: string; points
 
 /** Everything one board-editor correction dispatches: the EDIT_LOG with the
  *  corrected list, then STAT_ADJUST deltas so the live profile lines match
- *  what the corrected boards credit (capped points move with the game). */
-export function boardCorrection(s: CarromState, edited: BoardInput[]): Array<{ type: string; payload?: Record<string, unknown>; attribution?: { playerId: string; stat: string; by: number; playerName?: string } }> {
-  const next = replayBoards(s, edited);
+ *  what the corrected boards credit (capped points move with the game).
+ *  IDs-only scoring: both are public match events, so the corrected boards'
+ *  credits keep their ids only (an older board's stored names are dropped —
+ *  a name-only legacy credit keeps its name, its only identity) and each
+ *  STAT_ADJUST names the player by id. */
+export function boardCorrection(s: CarromState, edited: BoardInput[]): Array<{ type: string; payload?: Record<string, unknown>; attribution?: { playerId: string; stat: string; by: number } }> {
+  const boards = edited.map((b) => (b.by ? { ...b, by: b.by.map(idCredit) } : b));
+  const next = replayBoards(s, boards);
   const before = liveCredits(s);
   const after = liveCredits(next);
-  const out: Array<{ type: string; payload?: Record<string, unknown>; attribution?: { playerId: string; stat: string; by: number; playerName?: string } }> = [
-    { type: 'EDIT_LOG', payload: { boards: edited } },
+  const out: Array<{ type: string; payload?: Record<string, unknown>; attribution?: { playerId: string; stat: string; by: number } }> = [
+    { type: 'EDIT_LOG', payload: { boards } },
   ];
   for (const id of new Set([...before.keys(), ...after.keys()])) {
     const b = before.get(id); const a = after.get(id);
     for (const stat of ['points', 'boards', 'queens'] as const) {
       const d = (a?.[stat] ?? 0) - (b?.[stat] ?? 0);
-      if (d) out.push({ type: 'STAT_ADJUST', attribution: { playerId: id, stat, by: d, playerName: a?.name ?? b?.name } });
+      if (d) out.push({ type: 'STAT_ADJUST', attribution: { playerId: id, stat, by: d } });
     }
   }
   return out;

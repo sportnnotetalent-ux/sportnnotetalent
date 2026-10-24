@@ -16,9 +16,9 @@ import { SetLineBoard } from '../SetLineBoard';
 import { MatchBoxScore } from '../../components/BoxScore';
 import { carromBox } from '../boxSources';
 import {
-  init, reducer, result, boardValue, boardCloses, creditedPoints, summary, scoreLine, lineScore, standingsUnits,
+  init, reducer, result, boardValue, boardCloses, boardCredit, creditedPoints, summary, scoreLine, lineScore, standingsUnits,
   nextBreaker, nextBreakerPlayer, boardBreakers, breakerPlayers, slamFor, boardInputs, boardCorrection, FOUL_TYPES, FOUL_CHIPS, FOUL_LABEL,
-  type BoardDetail, type BoardInput, type CarromState, type EndFoul, type FoulType, type PlayerFouls, type QueenBy, type Side, type Slam,
+  type BoardDetail, type BoardInput, type CarromCredit, type CarromState, type EndFoul, type FoulType, type PlayerFouls, type QueenBy, type Side, type Slam,
 } from './engine';
 import { carromFeed } from './feed';
 import { carromGames, carromMatchStats } from './matchStats';
@@ -29,15 +29,31 @@ import { ScoreSheet } from './ScoreSheet';
 import { carromVoice, carromVoiceEnds } from '../voiceParsers';
 import { CARROM_META } from './meta';
 import { carromMatchRecords } from './records';
+import { useMask } from '../../core/disputeMask';
+import { withRosters, whoName } from '../racketNames';
+import type { NameOf } from '../../core/playerNames';
+
+/** IDs-only scoring (docs/privacy/ids-only-scoring.md): the match state and
+ *  events keep player ids only; a player is named for this viewer by id
+ *  (players_view: the circle sees full names, others initials, an open
+ *  dispute "X"). A singles side reads as its player, else the entry's name. */
+const sideName = (who: NameOf, roster: Player[], team: string): string =>
+  (roster.length === 1 ? who(roster[0].id, roster[0].fullName) : team);
+/** A credited player's name (a breaker, …) — undefined when nobody resolves it. */
+const creditName = (who: NameOf, c: CarromCredit | null | undefined): string | undefined =>
+  (c ? whoName(who, c.id, c.name) : undefined);
+/** The viewer's lookup, falling back to the match's rosters. */
+function useCarromNames(homeRoster: Player[], awayRoster: Player[]): NameOf {
+  const { nameOf } = useMask();
+  return withRosters(nameOf, homeRoster, awayRoster);
+}
 
 const ScoringControls: SportPlugin<CarromState>['ScoringControls'] = ({ state, dispatch, homeName, awayName, homeRoster = [], awayRoster = [] }) => {
   const s = state as CarromState;
   const perSide = s.perSide ?? 1;
   // Singles: a person's name reads better than a team code ("AM").
-  const nameOf = (side: Side) => {
-    const r = side === 'home' ? homeRoster : awayRoster;
-    return r.length === 1 ? r[0].fullName : side === 'home' ? homeName : awayName;
-  };
+  const pname = useCarromNames(homeRoster, awayRoster);
+  const nameOf = (side: Side) => sideName(pname, side === 'home' ? homeRoster : awayRoster, side === 'home' ? homeName : awayName);
   const [winner, setWinner] = useState<Side | null>(null);
   const [coins, setCoins] = useState<number | null>(null); // SD-116: no default — the scorer picks
   // SD-117c — the three-way Queen chip (optional): winner / loser / not covered
@@ -69,6 +85,7 @@ const ScoringControls: SportPlugin<CarromState>['ScoringControls'] = ({ state, d
   // SD-117c (CR-04) — who breaks this board (toss, then alternating)
   const breaker = nextBreaker(s);
   const breakerP = nextBreakerPlayer(s);
+  const breakerName = creditName(pname, breakerP);
   // SD-134 — a doubles break order needs both players of a side
   const pairOf = (side: Side) => creditedPlayers(side === 'home' ? homeRoster : awayRoster, 2, picked[side]);
   const doublesOrder = perSide === 2 && pairOf('home').length === 2 && pairOf('away').length === 2;
@@ -108,8 +125,9 @@ const ScoringControls: SportPlugin<CarromState>['ScoringControls'] = ({ state, d
   };
   const record = () => {
     if (!winner || !ready) return;
-    // SD-68 — a penalty board credits its points, never a board won / Queen
-    const attr = (p: Player) => ({ playerId: p.id, playerName: p.fullName, stat: 'points', by: credit, ...(penalty ? {} : { extra: { boards: 1, ...(queen ? { queens: 1 } : {}) } }) });
+    // SD-68 — a penalty board credits its points, never a board won / Queen;
+    // IDs-only scoring: by player id only (match events are public)
+    const attr = (p: Player) => boardCredit(p, credit, { penalty, queen });
     const det = detail();
     dispatch({
       type: 'BOARD', side: winner,
@@ -160,7 +178,8 @@ const ScoringControls: SportPlugin<CarromState>['ScoringControls'] = ({ state, d
   const orderOf = (side: Side) => {
     const pair = pairOf(side);
     const first = pair.find((p) => p.id === firstOf[side]) ?? pair.find((p) => p.id === s.breakOrder?.[side]?.[0]?.id) ?? pair[0];
-    return [first, ...pair.filter((p) => p.id !== first.id)].map((p) => ({ id: p.id, name: p.fullName }));
+    // IDs-only scoring: the break order keeps the players' ids only
+    return [first, ...pair.filter((p) => p.id !== first.id)].map((p) => ({ id: p.id }));
   };
   const toss = (side: Side) => {
     dispatch({ type: 'FIRST_BREAK', payload: { side, ...(doublesOrder ? { order: { home: orderOf('home'), away: orderOf('away') } } : {}) } });
@@ -196,7 +215,7 @@ const ScoringControls: SportPlugin<CarromState>['ScoringControls'] = ({ state, d
       {/* SD-117c (CR-04) — the toss before board 1, then "{name} to break" */}
       {(!s.firstBreak && s.boards.length === 0) || fixToss ? tossPicker : breaker ? (
         <Text style={ctrl.breakLine}>
-          ⚪ {breakerP?.name ? `${breakerP.name} (${nameOf(breaker)})` : nameOf(breaker)} to break{'  '}<Text style={ctrl.link} accessibilityRole="button" onPress={() => setFixToss(true)}>Fix the toss</Text>
+          ⚪ {breakerName ? `${breakerName} (${nameOf(breaker)})` : nameOf(breaker)} to break{'  '}<Text style={ctrl.link} accessibilityRole="button" onPress={() => setFixToss(true)}>Fix the toss</Text>
         </Text>
       ) : (
         <Text style={ctrl.link} accessibilityRole="button" onPress={() => setFixToss(true)}>Record who broke the first board</Text>
@@ -261,7 +280,7 @@ const ScoringControls: SportPlugin<CarromState>['ScoringControls'] = ({ state, d
           {track.brk ? (
             breaker ? (
               <View style={{ gap: theme.spacing(2) }}>
-                <Text style={ctrl.label}>Break: coins {breakerP?.name ?? nameOf(breaker)} pocketed <Text style={ctrl.meta}>(optional)</Text></Text>
+                <Text style={ctrl.label}>Break: coins {breakerName ?? nameOf(breaker)} pocketed <Text style={ctrl.meta}>(optional)</Text></Text>
                 <View style={ctrl.chips}>
                   {[0, 1, 2, 3, 4, 5].map((n) => <SelectChip key={n} label={n === 5 ? '5+' : String(n)} active={brk === n} onPress={() => setBrk(brk === n ? null : n)} />)}
                 </View>
@@ -332,7 +351,7 @@ const ScoringControls: SportPlugin<CarromState>['ScoringControls'] = ({ state, d
         </>
       )}
       {/* SD-117c — fix or remove any past board (the boards replay: EDIT_LOG) */}
-      <BoardEditor state={s} dispatch={dispatch} nameOf={nameOf} homeRoster={homeRoster} awayRoster={awayRoster} />
+      <BoardEditor state={s} dispatch={dispatch} nameOf={nameOf} who={pname} homeRoster={homeRoster} awayRoster={awayRoster} />
     </View>
   );
 };
@@ -341,10 +360,12 @@ const ScoringControls: SportPlugin<CarromState>['ScoringControls'] = ({ state, d
  *  (winner / coins / Queen / slam) and ✕ (asks first). A change replays the
  *  corrected list (EDIT_LOG) so games, totals and the result re-derive, plus
  *  STAT_ADJUST deltas so the players' live lines follow. */
-function BoardEditor({ state: s, dispatch, nameOf, homeRoster, awayRoster }: {
+function BoardEditor({ state: s, dispatch, nameOf, who, homeRoster, awayRoster }: {
   state: CarromState;
   dispatch: (a: ScoreAction) => void;
   nameOf: (side: Side) => string;
+  /** a player's name for this viewer by id */
+  who: NameOf;
   homeRoster: Player[];
   awayRoster: Player[];
 }) {
@@ -364,7 +385,7 @@ function BoardEditor({ state: s, dispatch, nameOf, homeRoster, awayRoster }: {
   const creditFor = (side: Side, prev?: BoardInput) => {
     if (prev?.side === side && prev.by?.length) return prev.by;
     const roster = side === 'home' ? homeRoster : awayRoster;
-    return creditedPlayers(roster, perSide).map((p) => ({ side, id: p.id, name: p.fullName }));
+    return creditedPlayers(roster, perSide).map((p) => ({ side, id: p.id }));
   };
   const save = async () => {
     if (!draft) return;
@@ -379,7 +400,7 @@ function BoardEditor({ state: s, dispatch, nameOf, homeRoster, awayRoster }: {
     if (ok) commit(list.map((x, i) => (i === draft.index ? b : x)));
   };
   const label = (b: BoardInput, i: number) =>
-    `G${s.boards[i].game} · ${nameOf(b.side)} +${capped[i]} ${b.penalty ? '(⚠️ penalty)' : `(${b.coins} coin${b.coins === 1 ? '' : 's'}${b.queen ? ' + 👑' : ''})`}${breakBy[i]?.name ? ` · ${breakBy[i]!.name} broke` : breakers[i] ? ` · ${nameOf(breakers[i]!)} broke` : ''}`;
+    `G${s.boards[i].game} · ${nameOf(b.side)} +${capped[i]} ${b.penalty ? '(⚠️ penalty)' : `(${b.coins} coin${b.coins === 1 ? '' : 's'}${b.queen ? ' + 👑' : ''})`}${creditName(who, breakBy[i]) ? ` · ${creditName(who, breakBy[i])} broke` : breakers[i] ? ` · ${nameOf(breakers[i]!)} broke` : ''}`;
 
   return (
     <View style={{ gap: theme.spacing(2) }}>
@@ -445,21 +466,20 @@ function BoardEditor({ state: s, dispatch, nameOf, homeRoster, awayRoster }: {
  *  scoring, Queen, break, fouls), the box score and the ICF score sheet on
  *  Stats. The games are on the scoreboard header above every tab. */
 type TabProps = Parameters<NonNullable<SportPlugin<CarromState>['LiveExtras']>>[0];
-/** A singles player's own name, else the side's. */
-const carromNames = ({ homeName, awayName, homeRoster = [], awayRoster = [] }: TabProps) => {
-  const nm = (side: Side) => {
-    const r = side === 'home' ? homeRoster : awayRoster;
-    return r.length === 1 ? r[0].fullName : side === 'home' ? homeName : awayName;
-  };
-  return { home: nm('home'), away: nm('away') };
+/** A singles player's own name (by id for this viewer), else the side's —
+ *  plus the lookup for a credited player (a doubles breaker). */
+function useTabNames({ homeName, awayName, homeRoster = [], awayRoster = [] }: TabProps): { names: { home: string; away: string }; who: NameOf } {
+  const who = useCarromNames(homeRoster, awayRoster);
+  return { names: { home: sideName(who, homeRoster, homeName), away: sideName(who, awayRoster, awayName) }, who };
+}
+const CarromCommentary = (p: TabProps) => {
+  const { names, who } = useTabNames(p);
+  return <CommentaryFeed title={null} groups={carromFeed(p.state as CarromState, names, who)} homeColor={p.homeColor} awayColor={p.awayColor} empty="No boards yet." />;
 };
-const CarromCommentary = (p: TabProps) => (
-  <CommentaryFeed title={null} groups={carromFeed(p.state as CarromState, carromNames(p))} homeColor={p.homeColor} awayColor={p.awayColor} empty="No boards yet." />
-);
 function CarromStats(p: TabProps) {
   const s = p.state as CarromState;
   const { homeName, awayName, homeColor, awayColor } = p;
-  const names = carromNames(p);
+  const { names, who } = useTabNames(p);
   const [unit, setUnit] = useState('all');
   if (s.boards.length === 0) return <Text style={textStyles.muted}>No boards yet.</Text>;
   const games = carromGames(s);
@@ -474,7 +494,7 @@ function CarromStats(p: TabProps) {
       <MatchBoxScore sport="carrom" source={carromBox(s)} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} />
       {/* SD-68 (CR-03) — the ICF score sheet: board · breaker · winner · coins · Queen · running total */}
       <Text style={ctrl.label}>Score sheet</Text>
-      <ScoreSheet state={s} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} />
+      <ScoreSheet state={s} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} nameOf={who} />
     </View>
   );
 }

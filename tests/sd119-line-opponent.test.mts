@@ -65,8 +65,9 @@ describe('SD-119 chess — each player\'s line names the OTHER player', () => {
       ['kabir', 'games', 1], ['kabir', 'wins', 1], ['kabir', 'winsMate', 1],
       ['meera', 'games', 1], ['meera', 'losses', 1],
     ]);
-    assert.deepEqual(chessResultCredit('home', kabir, 'draw', null, true), { playerId: 'kabir', playerName: 'Kabir Rao', by: 1, side: 'home', stat: 'forfeitLosses' });
-    assert.deepEqual(chessResultCredit('away', meera, 'home', 'forfeit', false), { playerId: 'meera', playerName: 'Meera Iyer', by: 1, side: 'away', stat: 'forfeitLosses' });
+    // IDs-only scoring: the credit (a public match event) names the player by id only
+    assert.deepEqual(chessResultCredit('home', kabir, 'draw', null, true), { playerId: 'kabir', by: 1, side: 'home', stat: 'forfeitLosses' });
+    assert.deepEqual(chessResultCredit('away', meera, 'home', 'forfeit', false), { playerId: 'meera', by: 1, side: 'away', stat: 'forfeitLosses' });
   });
 });
 

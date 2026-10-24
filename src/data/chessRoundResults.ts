@@ -21,12 +21,13 @@ const toAction = (e: MatchEventRecord) => ({ type: e.type, side: e.side ?? undef
 const newId = () =>
   'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => { const r = (Math.random() * 16) | 0; return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16); });
 
-/** Each side's player (a one-player entrant's roster). */
-function sidePlayer(m: Match, side: 'home' | 'away', players: Map<string, Player>): { id: string; fullName: string } | undefined {
+/** Each side's player (a one-player entrant's roster) — by id only: the
+ *  RESULT event is public (IDs-only scoring, docs/privacy/ids-only-scoring.md). */
+function sidePlayer(m: Match, side: 'home' | 'away', players: Map<string, Player>): { id: string } | undefined {
   const t = side === 'home' ? m.homeTeam : m.awayTeam;
   const id = t.roster?.length === 1 ? t.roster[0] : undefined;
   const p = id ? players.get(id) : undefined;
-  return p ? { id: p.id, fullName: p.fullName } : undefined;
+  return p ? { id: p.id } : undefined;
 }
 
 export async function recordRoundResults(writes: BoardWrite[], players: Map<string, Player>): Promise<RoundWriteResult> {

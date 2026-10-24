@@ -135,7 +135,8 @@ export function pickOutcome(pick: BoardPick, white: Side): { winner: Side | 'dra
  *  read the same as a result recorded on the game screen. */
 export function boardResultAction(
   pick: BoardPick, white: Side,
-  players: { home?: { id: string; fullName: string }; away?: { id: string; fullName: string } } = {},
+  // IDs-only scoring: each side's player by id (the credit carries no name)
+  players: { home?: { id: string }; away?: { id: string } } = {},
 ): BoardResultAction {
   const { winner, method } = pickOutcome(pick, white);
   const dff = method === 'double-forfeit';
