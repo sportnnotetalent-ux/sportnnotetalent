@@ -2488,6 +2488,13 @@ export async function syncMatchAppearances(matchId: string, stateArg?: unknown):
   }
 }
 
+/** IDs-only scoring: names for these player ids as THIS viewer may see them
+ *  (players_view — the circle gets full names, everyone else initials). */
+export async function getPlayerNamesById(ids: string[]): Promise<Map<string, string>> {
+  const uniq = [...new Set(ids.filter(Boolean))];
+  return new Map((await getPlayersByIds(uniq)).map((p) => [p.id, p.fullName]));
+}
+
 async function getPlayersByIds(ids: string[]): Promise<{ id: string; fullName: string }[]> {
   if (!ids.length) return [];
   if (!isSupabaseConfigured || !supabase) return demo.players.filter((p) => ids.includes(p.id));

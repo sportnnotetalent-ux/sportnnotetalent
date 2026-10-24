@@ -11,6 +11,9 @@ import { Card, Pill, SelectChip, textStyles } from './ui';
 import type { MatchEventRecord, Player } from '../core/types';
 import type { AmendOp } from '../sports/amend';
 import type { ScoreAction } from '../sports/types';
+import { makeNameOf, nameInitials, peopleMap, publicName } from '../core/playerNames';
+import { ageOf } from '../core/age';
+import { recreditAction } from '../sports/amendCredit';
 
 const humanize = (t: string) => t.replace(/[_-]+/g, ' ').toLowerCase().replace(/^\w/, (c) => c.toUpperCase());
 
@@ -35,8 +38,22 @@ export function EventCorrectionList({ log, ops, onOps, homeName, awayName, homeR
   const [picking, setPicking] = useState<number | null>(null);
   const rows = log.filter((r) => r.side === 'home' || r.side === 'away').reverse();
   const team = (r: MatchEventRecord) => (r.side === 'home' ? homeName : awayName);
-  const describe = (r: MatchEventRecord) =>
-    `${humanize(r.type)} · ${team(r)}${r.attribution?.playerName ? ` · ${r.attribution.playerName}` : ''}`;
+  // IDs-only scoring: the player by id from the squads (an older log's stored
+  // name as the fallback).
+  const nameOf = makeNameOf(peopleMap(homeRoster, awayRoster));
+  const who = (r: MatchEventRecord) => (r.attribution?.playerId || r.attribution?.playerName ? nameOf(r.attribution?.playerId, r.attribution?.playerName) : '');
+  const describe = (r: MatchEventRecord) => `${humanize(r.type)} · ${team(r)}${who(r) ? ` · ${who(r)}` : ''}`;
+  // The change lines are stored in the match's public log: an adult by name, a
+  // possible minor (under 18 / no date of birth) by initials.
+  const byId = new Map([...homeRoster, ...awayRoster].map((p) => [p.id, p]));
+  const publicWho = (id?: string, legacy?: string) => {
+    const p = id ? byId.get(id) : undefined;
+    return p ? publicName({ fullName: p.fullName, age: ageOf(p) }) : legacy ? nameInitials(legacy) : '';
+  };
+  const publicDescribe = (r: MatchEventRecord) => {
+    const w = publicWho(r.attribution?.playerId, r.attribution?.playerName);
+    return `${humanize(r.type)} · ${team(r)}${w ? ` · ${w}` : ''}`;
+  };
   const opFor = (seq: number) => ops.find((o) => o.seq === seq);
 
   const setOp = (seq: number, op: AmendOp | null) => {
@@ -47,8 +64,8 @@ export function EventCorrectionList({ log, ops, onOps, homeName, awayName, homeR
       const r = log.find((x) => x.seq === o.seq);
       if (!r) return '';
       return o.op === 'void'
-        ? `Removed: ${describe(r)}`
-        : `Changed: ${describe(r)} → ${o.action.attribution?.playerName ?? 'someone else'}`;
+        ? `Removed: ${publicDescribe(r)}`
+        : `Changed: ${publicDescribe(r)} → ${publicWho(o.action.attribution?.playerId) || 'someone else'}`;
     }).filter(Boolean);
     onOps(next, lines);
   };
@@ -61,7 +78,7 @@ export function EventCorrectionList({ log, ops, onOps, homeName, awayName, homeR
         const op = opFor(r.seq);
         const roster = r.side === 'home' ? homeRoster : awayRoster;
         const removed = op?.op === 'void';
-        const changedTo = op?.op === 'replace' ? op.action.attribution?.playerName : null;
+        const changedTo = op?.op === 'replace' && op.action.attribution?.playerId ? nameOf(op.action.attribution.playerId) : null;
         return (
           <Card key={r.seq} style={{ gap: theme.spacing(2), opacity: removed ? 0.55 : 1 }}>
             <View style={st.row}>
@@ -86,12 +103,8 @@ export function EventCorrectionList({ log, ops, onOps, homeName, awayName, homeR
                 {roster.filter((p) => p.id !== r.attribution!.playerId).map((p) => (
                   <SelectChip key={p.id} label={p.fullName} active={op?.op === 'replace' && op.action.attribution?.playerId === p.id}
                     onPress={() => {
-                      const base = recordAction(r);
-                      const payload = { ...(base.payload ?? {}) } as Record<string, unknown>;
-                      if ('playerName' in payload) payload.playerName = p.fullName;
-                      if ('name' in payload) payload.name = p.fullName;
-                      if ('playerId' in payload) payload.playerId = p.id;
-                      setOp(r.seq, { op: 'replace', seq: r.seq, action: { ...base, payload, attribution: { ...r.attribution!, playerId: p.id, playerName: p.fullName } } });
+                      // IDs-only: the new player by id; any stored name goes
+                      setOp(r.seq, { op: 'replace', seq: r.seq, action: recreditAction(recordAction(r), p.id) });
                       setPicking(null);
                     }} />
                 ))}

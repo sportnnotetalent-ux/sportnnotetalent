@@ -10,6 +10,7 @@ import type { Match, SportId } from '../core/types';
 import { getSport } from '../sports/registry';
 import { getSportMeta } from '../sports/sportMeta';
 import { tournamentRecords, type RecordRow } from '../data/tournamentRecords';
+import { usePlayerNameOf } from '../data/usePlayerNameOf';
 
 export function TournamentRecords({ sport, matches, onMatch }: {
   sport: SportId;
@@ -23,13 +24,18 @@ export function TournamentRecords({ sport, matches, onMatch }: {
     return tournamentRecords(sport, matches, { derive: (m) => getSport(m.sport)?.matchRecords?.(m.state as never) ?? null });
   }, [sport, matches]);
   const [pick, setPick] = useState<string | null>(null);
+  // IDs-only scoring: newer records carry player ids, not names — look them up
+  // for this viewer (players_view: the circle sees full names, others initials).
+  const recordIds = useMemo(() => sections.flatMap((s) => s.rows.flatMap((r) => [r.item.playerId, r.item.partnerId])), [sections]);
+  const nameOf = usePlayerNameOf(recordIds);
   if (!sections.length) return null;
   const cur = sections.find((s) => s.type.key === pick) ?? sections[0];
   const byId = new Map(matches.map((m) => [m.id, m]));
   const who = (r: RecordRow): { main: string; sub: string } => {
     const it = r.item;
-    if (cur.type.who === 'player' && it.playerName) {
-      const pair = it.partnerName ? `${it.playerName} & ${it.partnerName}` : it.playerName;
+    if (cur.type.who === 'player' && (it.playerId || it.playerName)) {
+      const one = nameOf(it.playerId, it.playerName);
+      const pair = it.partnerId || it.partnerName ? `${one} & ${nameOf(it.partnerId, it.partnerName)}` : one;
       return { main: pair, sub: [r.teamName, r.context, it.note].filter(Boolean).join(' · ') };
     }
     if (cur.type.who === 'match' || !r.teamName) return { main: r.context, sub: [it.note, r.date.slice(0, 10)].filter(Boolean).join(' · ') };

@@ -14,6 +14,8 @@ import { Button, Card, FormError, ScreenTitle, textStyles } from '../components/
 import { EventCorrectionList } from '../components/EventCorrectionList';
 import { notice } from '../core/confirm';
 import { useAuth } from '../core/auth';
+import { publicName } from '../core/playerNames';
+import { ageFromDob } from '../core/age';
 import { getSport } from '../sports/registry';
 import { effectiveLog, replayLog, type AmendOp } from '../sports/amend';
 import { planAmendment, publishAmendment } from '../data/amendments';
@@ -32,6 +34,8 @@ export default function CorrectMatchScreen() {
   const { matchId, sport } = params;
   const plugin = getSport(sport);
   const { profile } = useAuth();
+  // stored in the match's public log: initials for a scorer under 18 / with no date of birth
+  const byName = publicName({ fullName: profile?.fullName || 'A scorer', age: ageFromDob(profile?.dob) });
   const [match, setMatch] = useState<Match | null>(null);
   const [config, setConfig] = useState<Record<string, unknown> | undefined>(undefined);
   const [events, setEvents] = useState<MatchEventRecord[]>([]);
@@ -85,14 +89,14 @@ export default function CorrectMatchScreen() {
 
   const preview = async () => {
     setBusy(true);
-    try { setPlan(await planAmendment(matchId, sport, config, ops, lines, profile?.fullName ?? 'A scorer')); }
+    try { setPlan(await planAmendment(matchId, sport, config, ops, lines, byName)); }
     catch (e) { notice('Couldn’t preview', e instanceof Error ? e.message : 'Please try again.'); }
     finally { setBusy(false); }
   };
   const publish = async () => {
     setBusy(true);
     try {
-      await publishAmendment(matchId, sport, config, ops, lines, profile?.fullName ?? 'A scorer');
+      await publishAmendment(matchId, sport, config, ops, lines, byName);
       notice('Corrections published', 'The score, stats and table now reflect your changes. They’re listed under Info → Score edits.');
       nav.goBack();
     } catch (e) {

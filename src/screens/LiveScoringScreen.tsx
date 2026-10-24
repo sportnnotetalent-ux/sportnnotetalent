@@ -60,7 +60,8 @@ import type { TickerMeta } from '../sports/ticker';
 import { slotsFor, isCommentarySlot, type MatchOfficial } from '../data/matchOfficials';
 import { LiveStream } from '../components/LiveStream';
 import { DisputeMaskProvider } from '../core/disputeMask';
-import { makeNameOf, peopleMap } from '../core/playerNames';
+import { makeNameOf, peopleMap, publicName } from '../core/playerNames';
+import { ageFromDob } from '../core/age';
 import { SelectChip, TextField, Button } from '../components/ui';
 import { DateTimeField } from '../components/DateTimeField';
 import { VenueField } from '../components/VenueField';
@@ -1210,7 +1211,8 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
   };
   const updateScore = async () => {
     const before = crease(state)?.ids[0];
-    await amend(liveOps.ops, liveOps.lines, profile?.fullName ?? 'Scorer');
+    // stored in the match's public log: initials for a scorer under 18 / with no date of birth
+    await amend(liveOps.ops, liveOps.lines, publicName({ fullName: profile?.fullName || 'Scorer', age: ageFromDob(profile?.dob) }));
     setLiveEditOpen(false);
     setLiveOps({ ops: [], lines: [] });
     // The rebuilt crease may differ (who faced changed) — ask who's on strike.
