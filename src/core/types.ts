@@ -662,6 +662,9 @@ export interface ActivityEvent {
 }
 
 export interface Tournament {
+  /** Verification fast lanes, Phase 3: what the organiser requires of every
+   *  player's age (tournaments.age_verification). Absent = 'none'. */
+  ageVerification?: 'none' | 'confirmed' | 'verified';
   id: UUID;
   name: string;
   hostName: string; // display name of the host (a person or an organization)

@@ -72,6 +72,7 @@ import { seriesMetaFromFormat } from '../data/series';
 import { tieSpecFromFormat, TIE_KEYS } from '../data/teamTie';
 import { announceTieResult } from '../data/tieAlerts';
 import { canFieldPlayer } from '../core/eligibility';
+import { useAgeRequirement } from '../data/useAgeRequirement';
 import { useAuth } from '../core/auth';
 import { openVenue } from '../core/venue';
 import { formatDateTime, formatTime, useUserTimeZone } from '../core/time';
@@ -381,8 +382,10 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
   // Only verified players can take part in scoring (under-18 → verified guardian;
   // 18+ → own verified mobile & email). Ineligible players are kept out of the
   // scoring roster & lineups so they can't be fielded or credited stats.
-  const homeScoreRoster = useMemo(() => homeRoster.filter((p) => canFieldPlayer(p)), [homeRoster]);
-  const awayScoreRoster = useMemo(() => awayRoster.filter((p) => canFieldPlayer(p)), [awayRoster]);
+  // Fast lanes Phase 3: the tournament's own age requirement (always enforced).
+  const ageReq = useAgeRequirement({ tournamentId: meta.tournamentId });
+  const homeScoreRoster = useMemo(() => homeRoster.filter((p) => canFieldPlayer(p, ageReq)), [homeRoster, ageReq]);
+  const awayScoreRoster = useMemo(() => awayRoster.filter((p) => canFieldPlayer(p, ageReq)), [awayRoster, ageReq]);
   const excludedCount = (homeRoster.length - homeScoreRoster.length) + (awayRoster.length - awayScoreRoster.length);
 
   // Lineup (for LiveExtras + clean sheets). Refetch on focus so edits show up.
@@ -1401,7 +1404,9 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
         <View style={{ gap: theme.spacing(3) }}>
           {excludedCount > 0 && (
             <Text style={st.eligNote}>
-              🔒 {excludedCount} unverified player{excludedCount === 1 ? '' : 's'} hidden — only verified players can be scored (under-18 needs a verified guardian; 18+ needs verified mobile &amp; email).
+              🔒 {excludedCount} player{excludedCount === 1 ? '' : 's'} hidden — {ageReq !== 'none'
+                ? `this tournament needs every player's age ${ageReq === 'verified' ? 'verified by their school / club or a document' : 'confirmed by a parent, their school / club, or a document'}.`
+                : 'only verified players can be scored (under-18 needs a verified guardian; 18+ needs verified mobile & email).'}
             </Text>
           )}
           {scoringControlsEl}

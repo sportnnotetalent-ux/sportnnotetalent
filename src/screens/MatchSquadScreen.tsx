@@ -17,7 +17,8 @@ import { EmptyState, Button, ScreenTitle, textStyles, plural } from '../componen
 import { getSport } from '../sports/registry';
 import { getRoster, getMatchSquads, setMatchSquad, getLineup, setLineup, getLastSquadForTeam, removePlayerFromTeam } from '../data/repos';
 import { AddInvitePlayer } from '../components/AddInvitePlayer';
-import { matchEligibility, canFieldPlayer, TESTING_ALLOW_UNVERIFIED } from '../core/eligibility';
+import { matchEligibility, canFieldPlayer, TESTING_ALLOW_UNVERIFIED, ageRequirementReason } from '../core/eligibility';
+import { useAgeRequirement } from '../data/useAgeRequirement';
 import type { LineupSlot, MatchLineup, Player } from '../core/types';
 import type { RootStackParamList } from '../navigation/types';
 import { RemindInstall } from '../components/RemindInstall';
@@ -68,7 +69,9 @@ export default function MatchSquadScreen() {
   const [taken, setTaken] = useState<Set<string>>(new Set());
   const otherSide = side === 'home' ? 'away' : 'home';
   const otherName = (side === 'home' ? awayTeamName : homeTeamName) ?? 'the other team';
-  const pickable = (p: Player) => canFieldPlayer(p) && !taken.has(p.id);
+  // Fast lanes Phase 3: the tournament's own age requirement (always enforced).
+  const ageReq = useAgeRequirement({ matchId });
+  const pickable = (p: Player) => canFieldPlayer(p, ageReq) && !taken.has(p.id);
   const [lineup, setLineupState] = useState<MatchLineup | null>(null);
   const [lastSquad, setLastSquad] = useState<{ starters: string[]; subs: string[] } | null>(null);
   const [rosterNonce, setRosterNonce] = useState(0); // bumped after adding/inviting a player
@@ -250,7 +253,8 @@ export default function MatchSquadScreen() {
               const role = roles[p.id] ?? 'out';
               const elig = matchEligibility(p);
               const elsewhere = taken.has(p.id);
-              const canField = canFieldPlayer(p) && !elsewhere; // eligible (or testing override) and not on the other side today
+              const canField = canFieldPlayer(p, ageReq) && !elsewhere; // eligible (or testing override), meets the tournament's age rule, not on the other side today
+              const ageWhy = ageRequirementReason(p, ageReq);
               const overridden = !elig.ok && canField; // fieldable only because of the override
               const played = locked.has(p.id) && role !== 'out';
               const disableStart = !canField || (role !== 'start' && xiFull);
@@ -265,6 +269,8 @@ export default function MatchSquadScreen() {
                     {ban ? <Text style={st.lockReason}>🟥 Suspended for this match · {ban.reason}</Text> : null}
                     {elsewhere ? (
                       <Text style={st.lockReason}>Playing for {otherName} in this match</Text>
+                    ) : ageWhy ? (
+                      <Text style={st.lockReason}>🔒 {ageWhy}</Text>
                     ) : !elig.ok ? (
                       <Text style={overridden ? st.overrideReason : st.lockReason}>
                         {overridden ? '⚠️' : '🔒'} {elig.reason}{overridden ? ' · allowed (testing)' : ''}

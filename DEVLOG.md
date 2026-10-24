@@ -13,6 +13,24 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-24 — Verification fast lanes, Phase 3: organiser-chosen requirement + one checklist
+- **Migration `20261024190000_age_requirement.sql`:** `tournaments.age_verification` (`none` default / `confirmed` / `verified`).
+- **Rule (`core/eligibility.ts`):**
+  - `meetsAgeRequirement` / `ageRequirementReason` / `AGE_REQUIREMENT_LABEL`.
+  - `canFieldPlayer(p, req)` always enforces a tournament's own requirement, even while the testing override (Option A) relaxes the global rule.
+  - `confirmed` = parent, school / club or document; `verified` = school / club or document.
+- **Enforced at all three pick-points** for that tournament's matches, via the `useAgeRequirement` hook:
+  - **MatchSquad:** 🔒 shows the reason per player.
+  - **Cricket line-up.**
+  - **Live scoring roster:** the hidden-players note explains the tournament's rule.
+- **Organiser:** Edit tournament → "Players' age": Not required / Confirmed / Verified. It saves on tap (`setTournamentAgeVerification`) and `Tournament.ageVerification` is read with a pre-migration fallback.
+- **One checklist ("✅ Ready to play")** on your own profile (`core/verificationChecklist.ts` pure + `components/VerificationChecklist.tsx`):
+  - **Under 18:** date of birth, parent added, parent's consent, parent's mobile, parent's email, age verified (by whom).
+  - **18+:** date of birth, own mobile and email, age verified.
+  - "N of M done", plus the one next step, which skips what's waiting on someone else. The step is a button: Edit profile, or "Send my parent the link" (consent + date of birth in one go), or a pointer to the card below.
+- **Verified:** `tests/verification-requirement.test.mts` (8); `eligibility.ts` now imports with `.ts` extensions so node tests load it; suite 4526 pass / 0 fail; tsc clean. Demo: the profile shows "Ready to play · 3 of 6 done" with "Send my parent the link"; no console errors.
+- **Needs:** the founder runs the migration; publish.
+
 ### 2026-10-24 — Verification fast lanes, Phase 2: parent confirms, school / club confirms
 Two faster ways to verify a date of birth, besides an uploaded document (design: `docs/verification/fast-lanes.md`).
 - **Migration `20261024180000_verification_lanes.sql`:**

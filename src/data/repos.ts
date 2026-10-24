@@ -345,6 +345,7 @@ const toTournament = (data: any): Tournament => ({
   deletedAt: data.deleted_at ?? undefined,
   timeZone: data.time_zone ?? undefined,
   ...(readQualifiesTo(data.qualifies_to) ? { qualifiesTo: readQualifiesTo(data.qualifies_to) } : {}),
+  ...(data.age_verification && data.age_verification !== 'none' ? { ageVerification: data.age_verification } : {}),
 });
 
 // The registration columns (registration_deadline / min_teams / max_teams) need
@@ -362,7 +363,15 @@ const TOURNAMENT_PROFILE_COLS = 'banner_url, city, grounds, event_category, abou
 let tournamentZoneCol = true;
 // SD-154: feeder links (migration 20261021120000_team_levels_feeders), remembered once missing.
 let tournamentFeederCol = true;
+// Verification fast lanes Phase 3: the organiser's age requirement (migration
+// 20261024190000_age_requirement), remembered once missing.
+let tournamentAgeCol = true;
 async function withTournamentCols<T>(build: (cols: string) => PromiseLike<{ data: T | null; error: unknown }>): Promise<{ data: T | null; error: unknown }> {
+  if (tournamentZoneCol && tournamentFeederCol && tournamentAgeCol) {
+    const withAge = await build(`${TOURNAMENT_SELECT}, ${TOURNAMENT_PROFILE_COLS}, time_zone, qualifies_to, age_verification`);
+    if (!withAge.error) return withAge;
+    tournamentAgeCol = false;
+  }
   if (tournamentZoneCol && tournamentFeederCol) {
     const withFeeder = await build(`${TOURNAMENT_SELECT}, ${TOURNAMENT_PROFILE_COLS}, time_zone, qualifies_to`);
     if (!withFeeder.error) return withFeeder;
@@ -4921,6 +4930,19 @@ export async function updateTournament(id: string, patch: TournamentPatch): Prom
     }
   }
   return { profileSaved };
+}
+
+/** Verification fast lanes Phase 3: the organiser sets what every player's age
+ *  needs for this tournament (RLS: its organisers / hosts). */
+export async function setTournamentAgeVerification(id: string, req: NonNullable<Tournament['ageVerification']>): Promise<void> {
+  if (!isSupabaseConfigured || !supabase) {
+    const t = demo.tournaments.find((x) => x.id === id);
+    if (t) t.ageVerification = req;
+    return;
+  }
+  const res = await supabase.from('tournaments').update({ age_verification: req }).eq('id', id).select('id');
+  if (res.error) throw new Error(isMissingSchema(res.error) ? 'This needs a database update first (age requirement).' : res.error.message);
+  if (!res.data?.length) throw new Error('You can’t change this tournament.');
 }
 
 /** The keys `after` changes relative to `before` (removed keys → undefined), so a

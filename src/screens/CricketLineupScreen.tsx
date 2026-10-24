@@ -17,6 +17,7 @@ import { theme } from '../core/theme';
 import { EmptyState, Button, SelectChip, ScreenTitle, textStyles } from '../components/ui';
 import { getRoster, getMatchSquads, setMatchSquad, getMatch } from '../data/repos';
 import { canFieldPlayer } from '../core/eligibility';
+import { useAgeRequirement } from '../data/useAgeRequirement';
 import { splitBattingOrder } from '../sports/cricket/lineup';
 import type { Player } from '../core/types';
 import type { RootStackParamList } from '../navigation/types';
@@ -71,11 +72,13 @@ export default function CricketLineupScreen() {
   // Tap a player: append to the order if new, else remove (the rest renumber
   // automatically since position IS array index). Eligibility only gates ADDING —
   // a picked player can always be removed (e.g. the Remove link passes a bare id).
+  // Fast lanes Phase 3: the tournament's own age requirement (always enforced).
+  const ageReq = useAgeRequirement({ matchId });
   const toggle = (id: string, player?: Player) => {
     const isPicked = picked.includes(id);
     if (isPicked && locked.has(id)) return; // already played — keeps their place
     if (!isPicked && otherPicked.has(id)) return; // one side per match
-    if (!isPicked && player && !canFieldPlayer(player)) return; // can't add an unverified player (unless the testing override is on)
+    if (!isPicked && player && !canFieldPlayer(player, ageReq)) return; // can't add an unverified player (unless the testing override is on), or one the tournament's age rule bars
     setOrder((o) => {
       const cur = o[side];
       return { ...o, [side]: isPicked ? cur.filter((x) => x !== id) : [...cur, id] };
@@ -151,7 +154,7 @@ export default function CricketLineupScreen() {
           {roster.length === 0 && <EmptyState icon="👥" title="No squad for this team yet" compact />}
           {roster.map((p) => {
             const elsewhere = otherPicked.has(p.id) && battingNo(p.id) < 0;
-            const canField = canFieldPlayer(p) && !elsewhere;
+            const canField = canFieldPlayer(p, ageReq) && !elsewhere;
             const no = battingNo(p.id);
             const label = no >= 0 ? `${no < playersPerSide ? no + 1 : 'S'}. ${p.fullName}` : p.fullName;
             return (

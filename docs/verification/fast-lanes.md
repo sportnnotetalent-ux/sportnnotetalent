@@ -58,7 +58,7 @@ A changed date of birth (or guardian identity) voids every level, as it voids do
   - roster import: imported dates of birth show up on the bulk-confirm screen (`OrgDobs`), where Select all then Confirm takes two taps
 - `players_view` exposes `age_verified_by` (`document` / `school` / `parent` / null): non-sensitive, for organisers' eligibility checks.
 
-## Phase 3: together
+## Phase 3: together (built 2026-10-24; migration 20261024190000_age_requirement)
 
 - One checklist card on the profile: date of birth, parent consent, parent mobile, parent email, age verified via …, each with its next step.
-- `tournaments.age_verification` (`none` / `parent` / `verified`): enforced at squad, line-up and live-scoring roster in that tournament's matches. Friendlies stay `none`.
+- `tournaments.age_verification` (`none` / `confirmed` / `verified`): enforced at squad, line-up and live-scoring roster in that tournament's matches. Friendlies stay `none`.

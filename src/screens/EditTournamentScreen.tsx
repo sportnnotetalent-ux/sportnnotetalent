@@ -13,6 +13,7 @@ import { Button, TextField, SelectChip, ScreenTitle, FieldLabel, FormError, Load
 import { DateField, DateTimeField } from '../components/DateTimeField';
 import { MedalScoringEditor } from '../components/MedalScoringEditor';
 import { WalkoverSetupCard } from '../components/DisciplineSettings';
+import { AgeRequirementSetting } from '../components/AgeRequirementSetting';
 import { SportSettingsButtons, coarseStructureFrom, migrateFormatsForSettings } from '../components/SportSettingsButtons';
 import { tournamentDraft } from '../data/tournamentDraft';
 import { defaultsFor } from '../components/FormatEditor';
@@ -272,6 +273,8 @@ export default function EditTournamentScreen() {
               <Text style={textStyles.muted}>Below the minimum is just a heads-up; the maximum caps public sign-ups (you can still add teams yourself).</Text>
             </View>
           )}
+
+          <AgeRequirementSetting tournamentId={tournament.id} value={tournament.ageVerification} />
 
           <FormError message={error} />
         </KeyboardAwareScrollView>
