@@ -13,6 +13,41 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-25 — NDA and IP-assignment templates
+Fourth "hard to copy" item: the paper side of protecting SportnNote. These are templates drafted for Indian law and marked "not legal advice"; a lawyer reviews the pack once before first use.
+- **`docs/legal/templates/` (Markdown source), `docs/legal/docx/` (Word copies to fill in):**
+  - **01 One-way NDA:** for freelancers before engagement, candidates, advisors, testers and pilot partners who see non-public material.
+  - **02 Mutual NDA:** for partners, integrations, sponsors and federations.
+  - **03 Contractor agreement:** services, fees, independent status, full IP assignment, Background IP licence, open-source and AI-tool rules, confidentiality, DPDP Data Processor and security terms, warranties, indemnity, optional during-term restriction and 12-month non-solicit, hand-over.
+  - **04 Employee / intern agreement:** section 17(c) ownership plus assignment, Excluded Work carve-out and prior-works schedule, outside activities during employment only, non-solicit, exit steps.
+  - **05 Founder → company IP assignment deed:**
+    - Schedule 1 lists the code (repo, in.sportnnote.app), brand, domains and handles, content, designs, data and the accounts to transfer (GitHub, Expo, Supabase, Play, Cloudflare, Resend, Firebase, Meta).
+    - Recital B covers the employer; clause 2.4 covers AI-assisted work; clause 2.5 makes the company the Data Fiduciary; consideration is cash or shares.
+    - Schedule 2 lists contributors.
+  - **06 Confirmatory assignment:** for past contributors.
+- **Indian-law points built in:**
+  - Copyright Act sections 17–19: freelancers keep copyright unless they assign it in writing. Every assignment is a present assignment, including future works (section 18), worldwide, for the full term, with no lapse under 19(4) and no 5-year / India-only defaults (19(5), 19(6)).
+  - Section 57 moral rights: an agreement not to assert them.
+  - Contract Act section 27: restrictions apply only during the engagement.
+  - DPDP Act: Data Processor terms and children's data.
+  - Specific Relief Act sections 15(h) / 19(e): the founder can sign as promoter before incorporation.
+  - **The AI-tools clause in every template** — no SportnNote code or documents in unapproved AI tools, or in tools that train on inputs.
+- **`docs/legal/README.md`:**
+  - which document when, and when not to use an NDA (users, investors);
+  - filling in, including the pre-incorporation acceptance email;
+  - Telangana stamping and e-sign (a power of attorney can't be e-signed, so 03–06 are wet ink with witnesses);
+  - the board resolution for 05 (related parties);
+  - a records register and "signature first, access second";
+  - a "do now" checklist and 10 questions for the lawyer.
+- **Found:** Git has one commit by someone other than the founder, **likhithareddy39**: bec3655, 12 June 2026, the initial Expo scaffold. The README asks for a 06 confirmatory assignment from them, and from sredutech if it is a business that paid for or did any of the work.
+- **`scripts/legal-docx.py`:** standard-library Markdown → .docx (A4, headings, note box, "(a)" hanging items, bordered signature tables, "Page X of Y" footer). Output is deterministic, so a rebuild without edits changes nothing.
+- **`COMPANY_SETUP.md` Step 4** links the founder deed.
+- **Verified:**
+  - `tests/legal-templates.test.mts` (14: six templates each with a Word copy and the disclaimer; section 18 and 19(4)–(6) and moral-rights wording in 03–06; the AI-tools, children and anti-scraping clauses; no post-exit non-compete; pre-incorporation wording).
+  - Suite 4646 / 0 fail.
+  - The Word files' XML is valid. macOS reads them back, and a Quick Look render of page 1 looks right. The founder deed's three tables come out correctly.
+- Commit a2f13bd.
+
 ### 2026-10-24 — Fix: "Are you sure?" sheet logged a nested-button error on the web
 Every confirm sheet (`askConfirm`, e.g. the Hall of fame "Publish" confirm) logged "In HTML, <button> cannot be a descendant of <button>" in the browser console.
 - Cause: in `src/components/ConfirmSheet.tsx` the tap-outside backdrop (a `Pressable` with role button) wrapped the sheet, so the No / Yes buttons sat inside it. react-native-web renders both as `<button>`.
