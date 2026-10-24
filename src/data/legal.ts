@@ -11,7 +11,7 @@
  * (docs/company/COMPANY_SETUP.md).
  */
 
-export const LEGAL_VERSION = '2026-10-13';
+export const LEGAL_VERSION = '2026-10-24';
 export const LEGAL_CONTACT = 'sportnnote@gmail.com';
 
 export const PRIVACY_POLICY = `## Privacy Policy
@@ -136,6 +136,18 @@ You agree not to:
 
 We may remove content, limit messaging, or suspend accounts that break these rules.
 
+## Our app and its data
+
+The SportnNote app, website, software and design, and the SportnNote name and logo, belong to us. Your own scores, photos and messages stay yours (see "Your content").
+
+Unless we agree in writing, you agree not to:
+- copy, scrape or bulk-download players, results, records or other data from SportnNote, whether with bots, scripts or by hand, or reach our servers other than through the app or website;
+- reverse engineer, decompile or take apart the app, or try to get its source code, except where the law allows this and it can't be excluded;
+- use SportnNote, its data, design or content to build, improve or train a similar or competing service, including AI models;
+- use our name or logo, or suggest that we endorse you, without our permission.
+
+Sharing matches, profiles and tournaments with the share buttons, and downloading your own data, is always fine. If you break these rules, we may block your access and take legal action.
+
 ## Scores and results
 
 Scores are entered by users, so we can't guarantee they are correct. Organisers are responsible for their own tournaments and for deciding disputes. SportnNote isn't an official governing body.
@@ -169,7 +181,7 @@ These terms are governed by the laws of India. Courts in Hyderabad, Telangana ha
  * This file must stay import-free: scripts/build-website.mjs imports it.
  */
 
-export const INTL_LEGAL_VERSION = '2026-10-20-intl-draft';
+export const INTL_LEGAL_VERSION = '2026-10-24-intl-draft';
 
 /** Which version a sign-up agrees to (recorded in auth metadata legal_accepted). */
 export const legalVersionFor = (country: string): string => (country.toUpperCase() === 'IN' ? LEGAL_VERSION : INTL_LEGAL_VERSION);
@@ -358,6 +370,18 @@ You agree not to:
 - try to break, overload or get around the app's security.
 
 We may remove content, limit messaging, or suspend accounts that break these rules. You can report content in the app.
+
+## Our app and its data
+
+The SportnNote app, website, software and design, and the SportnNote name and logo, belong to us. Your own scores, photos and messages stay yours (see "Your content").
+
+Unless we agree in writing, you agree not to:
+- copy, scrape or bulk-download players, results, records or other data from SportnNote, whether with bots, scripts or by hand, or reach our servers other than through the app or website;
+- reverse engineer, decompile or take apart the app, or try to get its source code, except where the law allows this and it can't be excluded;
+- use SportnNote, its data, design or content to build, improve or train a similar or competing service, including AI models;
+- use our name or logo, or suggest that we endorse you, without our permission.
+
+Sharing matches, profiles and tournaments with the share buttons, and downloading your own data, is always fine. If you break these rules, we may block your access and take legal action.
 
 ## Scores and results
 

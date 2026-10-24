@@ -13,6 +13,21 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-24 — Terms: "Our app and its data" (no scraping, no reverse engineering, no copying to compete); public API exposure audit
+Founder priority: make SportnNote hard to replicate.
+- **Terms of Use** (India + the overseas draft, `src/data/legal.ts`; the app and sportnnote.in/terms share the text): new section "Our app and its data".
+  - The app, website, software, design, name and logo belong to SportnNote. Users' own content stays theirs.
+  - No scraping or bulk download, and no reaching the servers except through the app or website.
+  - No reverse engineering, except where the law allows it and that can't be excluded (the Indian, UK and EU interoperability exceptions).
+  - No using SportnNote, its data, design or content to build, improve or train a competing service (AI models included).
+  - No using the name or logo without permission.
+  - Share buttons and "Download my data" are always fine.
+  - Effective dates moved: `LEGAL_VERSION` 2026-10-24, `INTL_LEGAL_VERSION` 2026-10-24-intl-draft, so new sign-ups record this version. Approved by the founder; still to be reviewed by a lawyer when the company is formed.
+- **API exposure audit** (read-only on live): `docs/security/api-exposure-audit-2026-10-24.md`.
+  - Well protected: RLS on every table; private player columns locked behind `players_view`; messages, analytics and ID documents private; consent codes unguessable; no secrets public.
+  - Bulk-downloadable: anyone, with the app's public key, can get all public sports data. Anyone signed in can get every player's full name and age, children included. The founder chose to restrict the children part (next entry).
+- Verified: privacy tests pass; website build renders the section at /terms.
+
 ### 2026-10-24 — Repo made private; proprietary licence replaces the template MIT file
 Founder priority (before paid promotion): stop the app from being easy to replicate.
 - Found: the GitHub repo `sportnnote-lgtm/sportnnote` had been **public since it was created (2026-10-06)**, and its `LICENSE` was the MIT file from Expo's project template (copyright Expo). GitHub therefore showed the whole repo as MIT, a licence that lets anyone reuse it. It had 0 forks and 0 stars. No server secrets were ever committed: the only key in history is the public anon key the app ships with. Nothing live depended on it being public.
