@@ -54,7 +54,11 @@ Third "hard to copy" item: each school or club gets a permanent honours page. It
     - Added "District Football Champions 2019 · U17 Boys · District level" with Meera linked.
     - Issued tennis champion / runner-up and kabaddi champion certificates at the school's own meet. They appear as ✓ verified "School event" honours, and only Greenwood members are listed (Gold House's 6 → Meera).
     - Publish → confirm → "Published" with Share. Sport chips filter. Print gives an A4 board with a QR. `/h/<unknown>` shows "No school or club here". 375 px is fine.
-- **Needs:** the founder runs the migration; publish.
+- **Live 2026-10-25:**
+  - Migration run. Checked: 5 functions, the column, `org_honours` with RLS and closed to clients; anon may read but not save; 0 published.
+  - Web published (live bundle = build); Android OTA update group `533ba500`.
+  - Signed out on live: an unpublished school shows the header + "Not published yet" (no honours / names); an unknown id shows "No school or club here".
+  - Still to check: the founder publishes a school and opens its link signed out.
 
 ### 2026-10-25 — Career passport
 Second "hard to copy" item: a player's verified record on one page (link, QR or print) for selectors, coaches and scholarship panels. It is built from data only SportnNote has: official matches scored live, honours from organiser-issued certificates, and how their age was verified.

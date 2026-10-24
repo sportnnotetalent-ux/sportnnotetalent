@@ -153,7 +153,7 @@ post-incorporation compliance.
 | **Appoint the first auditor** (a CA firm) | Within 30 days | Board resolution. |
 | **Issue share certificates** | Within 60 days | |
 | **INC-20A**: declaration of commencement of business | Within 180 days | After the capital is deposited. |
-| **IP assignment deed: you → company** | Week 1–2 | Assigns all existing code, designs, the brand, docs and content. Also transfer the domain `sportnnote.in` and the GitHub repo/org to the company, and record that the work was done on personal time and equipment. **This is the document investors and app stores rely on.** |
+| **IP assignment deed: you → company** | Week 1–2 | Assigns all existing code, designs, the brand, docs and content. Also transfer the domain `sportnnote.in` and the GitHub repo/org to the company, and record that the work was done on personal time and equipment. **This is the document investors and app stores rely on.** Template: `docs/legal/templates/05-founder-ip-assignment-deed.md` (Word copy in `docs/legal/docx/`); signing, stamping and board-resolution steps in `docs/legal/README.md`. |
 | Founders'/shareholders' agreement (simple, family) | Week 2–4 | Covers transfers, vesting if a co-founder joins later, and decision rights. |
 | Board meetings and minutes | Ongoing | Small-company rules: at least one meeting each half-year. |
 
