@@ -48,8 +48,11 @@ export function ConfirmSheetHost() {
   const yesBg = c?.tone === 'caution' ? theme.colors.accent : theme.colors.danger;
   return (
     <Modal visible={!!ask} transparent animationType={still ? 'none' : 'slide'} onRequestClose={() => done(false)}>
-      <Pressable style={st.backdrop} onPress={() => done(false)} accessibilityRole="button" accessibilityLabel={c ? `${c.noLabel} — close` : 'Close'}>
-        <Pressable style={st.sheet} onPress={(e) => e.stopPropagation()} accessibilityViewIsModal accessibilityRole="alert" tabIndex={-1}>
+      <View style={st.root}>
+        {/* tap outside = NO. A sibling layer behind the sheet, not its parent: on web
+            both render as <button>, and a button inside a button is invalid HTML. */}
+        <Pressable style={[StyleSheet.absoluteFill, st.backdrop]} onPress={() => done(false)} accessibilityRole="button" accessibilityLabel={c ? `${c.noLabel} — close` : 'Close'} />
+        <View style={st.sheet} accessibilityViewIsModal accessibilityRole="alert">
           <View style={st.grab} />
           <Text style={st.title} accessibilityRole="header">{c?.title}</Text>
           <Text style={st.message}>{c?.message}</Text>
@@ -63,14 +66,15 @@ export function ConfirmSheetHost() {
               <Text style={[st.btnText, { color: '#06120D' }]}>{c?.yesLabel}</Text>
             </TouchableOpacity>
           </View>
-        </Pressable>
-      </Pressable>
+        </View>
+      </View>
     </Modal>
   );
 }
 
 const st = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: '#000000AA', justifyContent: 'flex-end' },
+  root: { flex: 1, justifyContent: 'flex-end' },
+  backdrop: { backgroundColor: '#000000AA' },
   sheet: {
     backgroundColor: theme.colors.surface, borderTopLeftRadius: theme.radius.lg, borderTopRightRadius: theme.radius.lg,
     borderWidth: 1, borderColor: theme.colors.border, padding: theme.spacing(5), paddingBottom: theme.spacing(8),
