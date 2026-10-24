@@ -13,6 +13,20 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-24 — Children's full name and age: only their circle, signed in or not
+Founder decision, from the API audit: anyone can sign up in a minute, and a signed-in stranger got every child's full name, age, gender and sport details (only logged-out visitors got initials).
+- **Migration `20261024120000_minor_names_signed_in.sql`:**
+  - **`players_view`:** a possible minor (under 18, or no date of birth) outside the viewer's circle now shows the same reduced card to signed-in strangers as to logged-out visitors: initials, number, sports, house. Age, gender, sport details, created-by, guardian and verification summaries are hidden. The circle is `player_circle_of`: shared teams and clubs; tournaments they run, officiate, score in or play in (every team in them); field-event entries; organisations; wards; players they added. The guardian and support also see everything. Adults are unchanged.
+  - **The `players` table's signed-in SELECT** was `true`, which also exposed `full_name`, `gender` and `sport_details` of every child to a direct table read. It now allows adults, own rows, wards, provisional players you added, support, your circle, and the one provisional player you can claim (`my_claimable_player`), because the sign-up claim UPDATE has to see that row.
+- **App:** the reduced-card note now says "only initials are shown" for signed-in users too (`core/minorPrivacy.ts`). Name search no longer finds a child outside your circle; searching their exact phone or email still does, and once they're on your team you see their full name.
+- **Verified read-only on live:**
+  - For all 7 accounts × 23 players, the new table rule equals `player_full_visible_to` exactly (0 mismatches either way).
+  - Ran the migration's view and policy SQL as the most-affected account (claims set in a transaction). Its 19 child records go from full names to initials, with 0 leaky columns. Its full-visibility rows are unchanged. Its one extra table row is its own claimable record.
+  - Caught and fixed `= any((select …))` (Postgres reads it as a subquery).
+  - Guard tests in `tests/minor-privacy.test.mts`; tsc clean; suite 4446 pass / 0 fail.
+- **Found, not fixed yet:** singles and doubles entries are stored as a team named after the player(s), and team names are public, even logged out. A child who plays singles therefore shows by full name on fixtures and scoreboards. None on live today. Denormalised names in `activity_log.by_name`, `listings.author_name` and `match_disputes.*_name` are smaller versions of the same issue. A proposed fix is with the founder.
+- **Needs:** the founder runs the migration in the SQL editor. The wording ships with the next app update.
+
 ### 2026-10-24 — Terms: "Our app and its data" (no scraping, no reverse engineering, no copying to compete); public API exposure audit
 Founder priority: make SportnNote hard to replicate.
 - **Terms of Use** (India + the overseas draft, `src/data/legal.ts`; the app and sportnnote.in/terms share the text): new section "Our app and its data".

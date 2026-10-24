@@ -5,6 +5,8 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { isReducedCard, guestSeesMembersOnly, canFollowCard, reducedCardNote, avatarInitials, displayNameOf } from '../src/core/minorPrivacy.ts';
 import { displayableImage, isPrivateImageRef, privateImageRef, parsePrivateImageRef, isPrivateImageKind, PLAYER_PHOTO_BUCKET } from '../src/core/imageUrl.ts';
 import { createSignedImageCache } from '../src/core/signedImageCache.ts';
@@ -39,6 +41,7 @@ describe('reduced card', () => {
   test('note explains who can see more', () => {
     assert.equal(reducedCardNote({ age: 30 }, false), undefined);
     assert.match(reducedCardNote({ restricted: true }, false)!, /teammates, coaches, tournament organisers and parent\/guardian/);
+    assert.match(reducedCardNote({ restricted: true }, false)!, /only initials/); // signed-in strangers too (minor_names_signed_in)
     assert.match(reducedCardNote({ restricted: true }, true)!, /initials/);
   });
 
@@ -156,5 +159,28 @@ describe('alert senders: follows of minors', () => {
     const got = await allowedPlayerFollows({ rpc: () => q }, ['star']);
     assert.equal(got!.length, 2500);
     assert.deepEqual(ranges, [[0, 999], [1000, 1999], [2000, 2999]]);
+  });
+});
+
+describe('children: signed-in strangers get the reduced card too (minor_names_signed_in)', () => {
+  // 2026-10-24: anyone can sign up, so outside a child's circle a signed-in
+  // viewer must get what a logged-out visitor gets. Guards the NEWEST migration
+  // that (re)defines players_view or the signed-in "read players" policy.
+  const dir = join(import.meta.dirname, '..', 'supabase', 'migrations');
+  const files = readdirSync(dir).filter((f) => f.endsWith('.sql')).sort();
+  const newest = (re: RegExp) => [...files].reverse().find((f) => re.test(readFileSync(join(dir, f), 'utf8')))!;
+  test('players_view: name, age, gender, sport details only with full visibility', () => {
+    const sql = readFileSync(join(dir, newest(/create or replace view players_view/)), 'utf8').replace(/--.*$/gm, '');
+    assert.doesNotMatch(sql, /or not me\.anon/);
+    assert.match(sql, /case when v\.full then p\.full_name else name_initials\(p\.full_name\) end as full_name/);
+    assert.match(sql, /case when v\.full then a\.age end as age/);
+  });
+  test('players table: signed-in reads are not open to everyone', () => {
+    const f = newest(/create policy "read players" on players/);
+    const sql = readFileSync(join(dir, f), 'utf8');
+    const policy = sql.slice(sql.indexOf('create policy "read players" on players'));
+    assert.doesNotMatch(policy.slice(0, 200), /using \(true\)/);
+    assert.match(policy, /my_player_circle\(\)/);
+    assert.match(policy, /my_claimable_player\(\)/); // the sign-up claim must still see its row
   });
 });

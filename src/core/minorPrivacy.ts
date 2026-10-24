@@ -2,9 +2,11 @@
  * Under-18 privacy on the client (pure — node tests load it). The server decides
  * what a viewer gets (players_view, migration protect_minors): a possible minor
  * (under 18, or no date of birth on file) shows a REDUCED card to anyone outside
- * their circle — signed-in strangers see name, number, sports, house/team, age;
- * logged-out visitors see initials, number, sports and house only. No photo,
- * city, school or bio either way. `restricted` says the card came back reduced.
+ * their circle (teammates, coaches, tournament organisers, parent/guardian):
+ * initials, number, sports and house only — signed in or not (2026-10-24,
+ * migration minor_names_signed_in; before that, signed-in strangers also got the
+ * full name and age). No photo, city, school or bio. `restricted` says the card
+ * came back reduced.
  * These helpers only make the screens say so instead of looking broken.
  */
 import { ageOf } from './age.ts';
@@ -37,7 +39,7 @@ export function reducedCardNote(p: CardLike, guest: boolean): string | undefined
   if (!isReducedCard(p)) return undefined;
   return guest
     ? 'Under-18 or age not confirmed: only initials are public. Sign in to see more.'
-    : 'Under-18 profile: their photo, city, school and bio are visible only to their teammates, coaches, tournament organisers and parent/guardian. Only they can follow this player.';
+    : 'Under-18 or age not confirmed: only initials are shown. Their full profile is visible only to their teammates, coaches, tournament organisers and parent/guardian, and only they can follow this player.';
 }
 
 /** Avatar letters: "Meera Rao" → "MR", the logged-out "M. R." → "MR", "" → "?". */
