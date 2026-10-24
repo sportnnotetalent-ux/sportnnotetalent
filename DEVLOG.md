@@ -13,6 +13,39 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-25 — Anti-scraping hardening
+Last "hard to copy" item. It follows audit `docs/security/api-exposure-audit-2026-10-24.md` (items 3–5); the runbook is `docs/security/anti-scraping.md`.
+- **Constraint found:** PostgREST runs GET requests in read-only transactions, so the database can't count reads per visitor for rate limits. Live viewers use realtime on `match_events` (which needs read access), and ball-by-ball events rebuild the scorecard. So hiding old events or moving them behind a per-match function would break guest scorecards or live viewing. Not done.
+- **Migration `20261025150000_anti_scraping.sql`:**
+  - **API gate:** `api_gate()` runs as PostgREST's pre-request on every REST / RPC call (`alter role authenticator set pgrst.db_pre_request`). It refuses with **HTTP 403 (PT403)** anyone in `api_blocklist`: an `ip`, a `user` (auth id) or an `agent` regex on the User-Agent, with optional expiry.
+    - **Seeded tools:** python-requests / urllib / httpx, aiohttp, scrapy, curl, wget, libwww-perl. Never blocked: browsers, okhttp (Android app), Deno (edge functions), Node, Go, Java, Googlebot.
+    - **Exempt:** `service_role` and the API root.
+    - **Fails open:** every check is inside an exception block, so an error lets the request through.
+    - **Off switch:** `api_gate_settings.enabled`. A broken regex is refused on insert.
+    - **Instant undo:** `alter role authenticator reset pgrst.db_pre_request; notify pgrst, 'reload config';`.
+  - **`api_whoami()`:** anyone sees the IP / User-Agent / role the API sees for them (to verify the gate and avoid blocking yourself).
+  - **Trap records:** three adult players (Ojasvin Talluri #47, Ruthvel Kandregula #8, Sahasra Pennada #23) and the team Kondapur Kestrels FC (KKF). They have no contact details or matches, are dated 21 June 2026, and are listed in the private `canary_records`.
+  - **`api_traffic_report(p_save)`** (service_role): requests by role since the last snapshot (PostgREST's per-request `set_config` statement in `pg_stat_statements`), the previous period, and the top 6 tables per role. Snapshots are kept 120 days; `p_save = false` only looks.
+- **weekly-report:** a new **API TRAFFIC** section (logged-out / signed-in requests vs previous, most-read tables, pointer to the runbook). A dry run doesn't save the snapshot. Needs deploying.
+- **Runbook (`anti-scraping.md`):**
+  - layers and limits; signs of scraping; a Logs Explorer query for the busiest IPs;
+  - block / unblock / pause / remove SQL;
+  - evidence steps if the data turns up elsewhere;
+  - at-scale options (Pro logs and drains, sign-up CAPTCHA, cached browse endpoints, attestation).
+- **The audit doc** has a status section.
+- **Verified:**
+  - `tests/anti-scraping.test.mts` (12):
+    - the gate fails open, exempts service_role / root / switched-off, blocks ip / user / agent with expiry and is granted to every API role;
+    - the seeded regexes catch 8 tool User-Agents and none of 10 legitimate ones (iOS Safari, Android Chrome, okhttp, CFNetwork, Deno, node, undici, Go, Java, Googlebot);
+    - trap records are adults, idempotent, registered and have no contact details;
+    - the traffic report is service-role only, and a dry run doesn't save.
+  - Edge function typecheck clean; suite 4658 / 0 fail.
+  - **Read-only check on live:** the report's core query returns real numbers — since 22 Sep, 469 logged-out and 29,289 signed-in requests; top logged-out tables players_view, matches, teams.
+- **Needs:**
+  - the founder runs the migration;
+  - deploy weekly-report;
+  - then verify with curl that a python-requests User-Agent gets 403, a browser User-Agent gets 200, and `api_whoami` works.
+
 ### 2026-10-25 — NDA and IP-assignment templates
 Fourth "hard to copy" item: the paper side of protecting SportnNote. These are templates drafted for Indian law and marked "not legal advice"; a lawyer reviews the pack once before first use.
 - **`docs/legal/templates/` (Markdown source), `docs/legal/docx/` (Word copies to fill in):**

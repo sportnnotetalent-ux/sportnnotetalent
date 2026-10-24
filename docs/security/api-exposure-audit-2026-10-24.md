@@ -39,3 +39,14 @@ This is mostly public-by-design: shared match links, spectators, and public prof
    - Consider a custom API domain with firewall rate limits.
    - Not worth it at today's size, and it trades off against open sharing.
 5. **Optional "trap" records:** a few harmless unique entries (as map makers do) that prove a copied dataset came from SportnNote.
+
+## Status — 2026-10-25
+
+- **1. Terms clause:** done; live since 2026-10-24.
+- **2. Children for signed-in strangers:** done (migrations 20261024120000 → 20261024210000). IDs-only scoring as well.
+- **3. Detect bulk reads:** the weekly email now has an API TRAFFIC section (requests by role, most-read tables). The runbook has a Logs Explorer query to find the caller.
+- **4. Make bulk listing harder:** an API gate with a blocklist (IP / account / tool User-Agent). Rate limits aren't possible in the database for read requests; the remaining at-scale steps are listed in the runbook.
+- **5. Trap records:** done, with three players and one team.
+
+See `anti-scraping.md` (migration `20261025150000_anti_scraping.sql`).
+

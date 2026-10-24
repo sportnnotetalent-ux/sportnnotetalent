@@ -62,7 +62,37 @@ const addDays = (d: string, n: number) => {
   return x.toISOString().slice(0, 10);
 };
 
-async function build(): Promise<{ subject: string; text: string }> {
+/** API TRAFFIC — requests by logged-out / signed-in callers since the last
+ *  report, and the most-read tables (migration 20261025150000_anti_scraping,
+ *  docs/security/anti-scraping.md). `save` = false (a dry run) only looks. */
+async function trafficLines(save: boolean): Promise<string[]> {
+  const { data, error } = await admin.rpc('api_traffic_report', { p_save: save });
+  if (error || !data) return ['API TRAFFIC', '  Not available yet (run migration 20261025150000_anti_scraping).'];
+  const t = data as {
+    since?: string; reset?: boolean;
+    requests?: Record<string, { thisPeriod?: number; previousPeriod?: number | null }>;
+    topTables?: Record<string, { table: string; reads: number }[]> | null;
+  };
+  const req = (role: string, label: string) => {
+    const r = t.requests?.[role] ?? {};
+    const prev = r.previousPeriod;
+    return `  ${label.padEnd(24)} ${num(r.thisPeriod).toLocaleString('en-IN')}${prev == null ? '' : `  (previous ${num(prev).toLocaleString('en-IN')})`}`;
+  };
+  const top = (role: string, label: string) => {
+    const items = t.topTables?.[role] ?? [];
+    return `  ${label.padEnd(24)} ${items.length ? items.map((i) => `${i.table} ${num(i.reads).toLocaleString('en-IN')}`).join(' · ') : '—'}`;
+  };
+  return [
+    `API TRAFFIC (since ${String(t.since ?? '').slice(0, 10) || 'the start'}${t.reset ? '; statistics were reset' : ''})`,
+    req('anon', 'Logged-out requests'),
+    req('authenticated', 'Signed-in requests'),
+    top('anon', 'Most read, logged out'),
+    top('authenticated', 'Most read, signed in'),
+    '  A big jump with no matching growth can mean scraping: docs/security/anti-scraping.md',
+  ];
+}
+
+async function build(saveTraffic = true): Promise<{ subject: string; text: string }> {
   const week = lastWeekStart();
   const prev = addDays(week, -7);
   const end = addDays(week, 7);
@@ -70,7 +100,7 @@ async function build(): Promise<{ subject: string; text: string }> {
   const fromUtc = new Date(`${week}T00:00:00+05:30`).toISOString();
   const toUtc = new Date(`${end}T00:00:00+05:30`).toISOString();
 
-  const [weekly, sports, activation, retention, crash, errors, cases] = await Promise.all([
+  const [weekly, sports, activation, retention, crash, errors, cases, traffic] = await Promise.all([
     admin.from('kpi_weekly').select('*').in('week', [week, prev]),
     admin.from('kpi_sport_weekly').select('*').eq('week', week),
     admin.from('kpi_activation').select('*').order('signup_week', { ascending: false }).limit(4),
@@ -79,6 +109,7 @@ async function build(): Promise<{ subject: string; text: string }> {
     admin.from('errors_top').select('message, occurrences, users, any_fatal, last_screen, platforms').limit(5),
     fetchAllPages((from, to) => admin.from('support_cases').select('question, tried, handle, app_version, created_at')
       .gte('created_at', fromUtc).lt('created_at', toUtc).order('created_at').order('id').range(from, to)),
+    trafficLines(saveTraffic).catch(() => ['API TRAFFIC', '  Not available this week.']),
   ]);
 
   const w = (weekly.data ?? []).find((r: Row) => r.week === week) ?? {};
@@ -125,6 +156,8 @@ async function build(): Promise<{ subject: string; text: string }> {
     ...(feedback.length
       ? feedback.map((c) => `  • ${String(c.question).slice(0, 300)}${c.handle ? ` — @${c.handle}` : ''}${c.tried ? `\n    ${String(c.tried).slice(0, 160)}` : ''}`)
       : ['  None this week.']),
+    '',
+    ...traffic,
     '',
     'Details: Supabase → SQL editor → select * from kpi_weekly; (see docs/analytics.md)',
   ];
@@ -184,7 +217,8 @@ Deno.serve(async (req) => {
   if (!authorised(req)) return json({ error: 'forbidden' }, 403);
   const body = await req.json().catch(() => ({})) as { dry?: boolean; period?: string };
   try {
-    const { subject, text } = body.period === 'day' ? await buildDaily() : await build();
+    // A dry run doesn't save the API-traffic snapshot (next week's numbers stay right).
+    const { subject, text } = body.period === 'day' ? await buildDaily() : await build(!body.dry);
     if (body.dry) return json({ sent: false, subject, text });
     const r = await send(subject, text);
     return json({ ...r, subject, text });
