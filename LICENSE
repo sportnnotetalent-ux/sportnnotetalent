@@ -1,21 +1,23 @@
-The MIT License (MIT)
+Copyright (c) 2026 SportnNote (sportnnote.in). All rights reserved.
 
-Copyright (c) 2015-present 650 Industries, Inc. (aka Expo)
+PROPRIETARY AND CONFIDENTIAL
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+This repository and everything in it, including the source code, database
+design, documentation, designs, data and written content (together, "the
+Software"), is the proprietary and confidential property of SportnNote.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+No licence is granted. Without prior written permission from SportnNote, you
+may not copy, modify, merge, publish, distribute, sublicense or sell the
+Software, in whole or in part; reverse engineer it; create derivative works
+from it; or use it, or any information in it, to build or improve a similar or
+competing product or service.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+Having access to this repository gives you no rights in the Software. If you
+received any part of it without SportnNote's permission, delete every copy and
+let SportnNote know through sportnnote.in.
+
+Third-party open-source components used by the Software remain under their own
+licences.
+
+On incorporation, all rights in the Software are to be assigned to the
+SportnNote company (see docs/company/COMPANY_SETUP.md, "IP assignment deed").

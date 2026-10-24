@@ -13,6 +13,13 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-24 — Repo made private; proprietary licence replaces the template MIT file
+Founder priority (before paid promotion): stop the app from being easy to replicate.
+- Found: the GitHub repo `sportnnote-lgtm/sportnnote` had been **public since it was created (2026-10-06)**, and its `LICENSE` was the MIT file from Expo's project template (copyright Expo). GitHub therefore showed the whole repo as MIT, a licence that lets anyone reuse it. It had 0 forks and 0 stars. No server secrets were ever committed: the only key in history is the public anon key the app ships with. Nothing live depended on it being public.
+- The founder made the repo **private** (GitHub API now returns 404 to outsiders).
+- `LICENSE` is now an "All rights reserved, proprietary and confidential" notice: no copying, reverse engineering or use to build a competing product without written permission. It is to be assigned to the company on incorporation (docs/company/COMPANY_SETUP.md → IP assignment deed). `package.json` has `"license": "UNLICENSED"`.
+- Follow-ups: Terms of Service anti-scraping / anti-reverse-engineering clauses; audit what the public API lets anyone bulk-read; trademark filing (COMPANY_SETUP Step 6). Check that the next push still deploys sportnnote.in from the now-private repo.
+
 ### 2026-10-24 — Fix: on the web app, tapping a field after closing the keyboard closed it again
 Founder, iPhone web (New community): after closing the keyboard with ✓, tapping a field opened the keyboard and shut it at once; a second tap was needed.
 - Cause: the keyboard-safe forms (2026-10-22) set "drag the form to close the keyboard" on every form scroll view. On native that is a finger drag; react-native-web's `on-drag` closes the keyboard on ANY scroll event, including the browser scrolling the tapped field into view (and iPhone's visible-area fit), so the field blurred immediately. The second tap worked because the field was already in place.
