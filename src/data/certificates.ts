@@ -25,7 +25,8 @@ const fromRow = (r: Row): IssuedCertificate => ({
 export async function issueCertificates(tournamentId: string, items: CertificateItem[]): Promise<IssuedCertificate[]> {
   if (!live()) {
     for (const i of items) {
-      if (demoCerts.some((c) => c.tournamentId === tournamentId && c.playerId === i.playerId && c.kind === i.kind && c.title === i.title && (c.detail ?? '') === (i.detail ?? ''))) continue;
+      // one live certificate per achievement (a revoked one can be issued again)
+      if (demoCerts.some((c) => !c.revokedAt && c.tournamentId === tournamentId && c.playerId === i.playerId && c.kind === i.kind && c.title === i.title && (c.detail ?? '') === (i.detail ?? ''))) continue;
       demoCerts.push({ ...i, tournamentId, code: demoCode(), issuedAt: new Date().toISOString() });
     }
     return demoCerts.filter((c) => c.tournamentId === tournamentId);

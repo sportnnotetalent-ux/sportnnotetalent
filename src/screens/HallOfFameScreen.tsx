@@ -71,7 +71,10 @@ export default function HallOfFameScreen() {
   };
   const print = async () => {
     setBusy('print');
-    try { await printHall(hall, shown); } finally { setBusy(null); }
+    try {
+      const r = await printHall(hall, shown);
+      if (r === 'failed') setError('Printing isn’t available here — update the app, or open app.sportnnote.in on a computer to print.');
+    } finally { setBusy(null); }
   };
   const share = () => void shareMessage(`${org.name} — hall of fame on SportnNote: our titles, medals and awards. ${link}`, 'results');
 

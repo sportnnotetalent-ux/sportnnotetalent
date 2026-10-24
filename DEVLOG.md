@@ -13,6 +13,29 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-24 — Fixes the guide writers found (7)
+Migration `20261025170000_guide_review_fixes.sql`, guardian-consent function, app.
+1. **Certificates: revoke with a reason, then issue again.**
+   - The "one per player per achievement" index now covers live certificates only (`certificates_unique_live_achievement … where revoked_at is null`). `issue_certificates`' targetless `on conflict do nothing` honours it.
+   - The organiser screen counts only live certificates as issued, so a revoked one shows as "ready to issue".
+   - **Revoke** opens an inline panel: reason chips ("Issued to the wrong player", "Wrong team or place", "The result was changed", "Issued by mistake") or typed text. A reason is required; it shows on the check page.
+   - Demo issuing follows the same rule.
+2. **Reprint from Profile names the real issuer:** `MyCertificatesCard` takes it from the certificate's check record (`verifyCertificate(code).issuer`), not the tournament name.
+3. **QR scanner opens SportnNote pages:** new pure `core/appLinks.ts` `parseAppLink(raw, prefixes)` handles `/c/` `/pp/` `/h/` `/m/` `/t/` `/p/` `/g/` `/r/` on our own hosts only (`linkPrefixes()` + sportnnote.expo.app; look-alike hosts refused). `ScanQRScreen` checks it before join codes.
+4. **Printing that can't happen says so:** a failed print (an old APK without expo-print) now shows "Printing isn't available here…" on the profile certificates card, the passport and the hall of fame.
+5. **Checklist vs consent:**
+   - Once consent is confirmed, the checklist no longer offers "Send my parent the link", which the server refuses. The age step points to the parent's Manage page, the school, or a document, and the parent-email item is dropped.
+   - Self-declared (sign-up) consent can now send the link: `create_guardian_consent_code` and the guardian-consent function accept `self_declared`, and the parent's answer upgrades it to confirmed and can confirm the date of birth.
+6. **Privacy wording:** the consent page's "Who sees it" and the consent email now say everyone outside the child's teams, clubs and tournaments sees initials, signed in or not. The email has a variant for self-declared accounts.
+7. **Every school's DOB confirmation is kept:**
+   - `org_confirm_dobs` writes `dob_confirmations.orgs.<orgId>` as well as `org` (the latest, still read by players_view / passport / badges).
+   - `org_member_dobs` "confirmed" checks its own entry, or the legacy single entry.
+- **Guides:** `certificates.md` covers the revoke reason and issuing again; `verify-your-age.md` replaces the "doesn't need" question with "My parent already gave consent…".
+- **Verified:**
+  - `tests/guide-review-fixes.test.mts` (12); suite 4671 / 0 fail; tsc clean; the guardian-consent function typechecks.
+  - Demo: issue 4 → **Revoke** opens the reason panel → "Issued to the wrong player" → revoked with the note "…pick the right one above and issue it again" → "1 new certificate ready to issue" → issue → 4 live. No console errors.
+  - Read-only on live: the old index name matches; 0 certificates; no consent statuses set yet.
+
 ### 2026-10-24 — Website guides for the "hard to copy" features + reviewer button fix
 Five new guides on sportnnote.in/guides/, written by four writer sub-agents in parallel against the shipped code (every bold label grep-verified, file:line in their reports), then reviewed:
 - **`certificates.md`** "Issue certificates anyone can check" (Tournaments): issue, print, find and share on your profile, check by QR or code, revoke.

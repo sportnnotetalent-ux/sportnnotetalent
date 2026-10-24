@@ -54,7 +54,10 @@ export default function PassportScreen() {
   const print = async () => {
     if (!pp) return;
     setBusy('print');
-    try { await printPassport(pp, code); } finally { setBusy(null); }
+    try {
+      const r = await printPassport(pp, code);
+      if (r === 'failed') setError('Printing isn’t available here — update the app, or open app.sportnnote.in on a computer to print.');
+    } finally { setBusy(null); }
   };
   const reset = async () => {
     if (!pp?.playerId) return;

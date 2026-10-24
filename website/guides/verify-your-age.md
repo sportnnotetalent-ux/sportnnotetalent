@@ -67,8 +67,8 @@ Fix the problem, then tap **📎 Re-submit proof (image / PDF)**. If the date of
 ### Who can see my document?
 Only you and SportnNote's reviewers. Other people see only a ☑️ next to your name.
 
-### "Your account doesn't need a parent or guardian to confirm it." What now?
-You see this when consent was already given, for example at sign-up, so no new email is sent. Your parent can still confirm your date of birth from their own account, as described under "A parent confirms it".
+### My parent already gave consent. How do they confirm my date of birth?
+If your parent confirmed your account before, the checklist doesn't send a new link. Your parent can confirm your date of birth from their own account instead: **Settings → Link as a parent/guardian**, then **Manage** next to your name. Your school or club can confirm it too, or you can upload a document.
 
 ### My parent tapped "No, it's wrong". What now?
 Fix your date of birth in **✎ Edit profile**. Your parent can then confirm it from **Manage** in their own account.

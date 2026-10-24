@@ -48,7 +48,11 @@ export function checklistItems(i: ChecklistInput): ChecklistItem[] {
       action: g?.added ? 'send_consent' : 'edit_profile', waiting: i.consent === 'pending',
     });
     out.push({ key: 'g_phone', label: 'Parent’s mobile verified', done: !!g?.phoneVerified, hint: 'Verify it with a code below.', action: 'verify_below' });
-    out.push({ key: 'g_email', label: 'Parent’s email verified', done: !!g?.emailVerified, hint: 'Done when your parent opens the consent link.', action: g?.added ? 'send_consent' : 'edit_profile' });
+    // The consent link verifies the parent's email; once the parent has
+    // confirmed (by link or from their own account) there's nothing to send.
+    if (i.consent !== 'confirmed') {
+      out.push({ key: 'g_email', label: 'Parent’s email verified', done: !!g?.emailVerified, hint: 'Done when your parent opens the consent link.', action: g?.added ? 'send_consent' : 'edit_profile' });
+    }
   } else if (!minor) {
     out.push({ key: 'phone', label: 'Your mobile verified', done: !!i.phoneVerified, hint: 'Verify it with a code below.', action: 'verify_below' });
     out.push({ key: 'email', label: 'Your email verified', done: !!i.emailVerified, hint: 'Verify it with a code below.', action: 'verify_below' });
@@ -58,10 +62,13 @@ export function checklistItems(i: ChecklistInput): ChecklistItem[] {
     key: 'age', label: i.ageVerifiedBy ? `Age verified ${VIA[i.ageVerifiedBy]}` : 'Age verified', done: !!i.ageVerifiedBy,
     hint: docWaiting
       ? 'Your document is with a reviewer — usually within a few hours.'
-      : minor
-        ? 'Fastest: your parent confirms it with the consent link, or your school confirms it. Or upload a document.'
-        : 'Your school / club can confirm it, or upload a document.',
-    action: docWaiting ? undefined : minor ? 'send_consent' : 'upload_document',
+      : minor && i.consent === 'confirmed'
+        // Consent is already given, so no new consent link can be sent.
+        ? 'Your parent can confirm it from their own account (Settings → Link as a parent/guardian → Manage), or your school can. Or upload a document.'
+        : minor
+          ? 'Fastest: your parent confirms it with the consent link, or your school confirms it. Or upload a document.'
+          : 'Your school / club can confirm it, or upload a document.',
+    action: docWaiting ? undefined : minor && i.consent !== 'confirmed' && i.guardian?.added ? 'send_consent' : 'upload_document',
     waiting: docWaiting,
   });
   return out;

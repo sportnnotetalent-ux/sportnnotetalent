@@ -7,7 +7,8 @@ import { theme } from '../core/theme';
 import { Card, textStyles } from './ui';
 import { APP_URL } from '../core/hosts';
 import { certificateUrl, formatCode, type IssuedCertificate } from '../core/certificates';
-import { getMyCertificates, printCertificates } from '../data/certificates';
+import { getMyCertificates, printCertificates, verifyCertificate } from '../data/certificates';
+import { notice } from '../core/confirm';
 import { shareMessage } from '../core/share';
 
 export function MyCertificatesCard({ playerId }: { playerId: string }) {
@@ -22,7 +23,13 @@ export function MyCertificatesCard({ playerId }: { playerId: string }) {
 
   const print = async (c: IssuedCertificate) => {
     setBusy(c.code);
-    try { await printCertificates([c], { issuer: c.tournament ?? 'SportnNote', title: c.title }); } finally { setBusy(null); }
+    try {
+      // The issuer is the host school / club / organiser (as on the original),
+      // which the certificate's own check record knows — not the tournament.
+      const issuer = await verifyCertificate(c.code).then((v) => v.issuer).catch(() => undefined);
+      const r = await printCertificates([c], { issuer: issuer ?? 'The organisers', title: c.title });
+      if (r === 'failed') notice('Printing isn’t available here', 'Update the app, or open app.sportnnote.in on a computer and print from your profile there.');
+    } finally { setBusy(null); }
   };
   const share = (c: IssuedCertificate) => void shareMessage(`${c.title}${c.tournament ? ` — ${c.tournament}` : ''}. Check it's genuine: ${certificateUrl(c.code, APP_URL)}`, 'results');
 

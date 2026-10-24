@@ -12,6 +12,8 @@ import { theme } from '../core/theme';
 import { Button, ScreenTitle, textStyles } from '../components/ui';
 import { parseClubToken } from '../core/invite';
 import { parseTournamentToken } from '../core/tournamentInvite';
+import { parseAppLink } from '../core/appLinks';
+import { linkPrefixes } from '../core/hosts';
 import type { RootStackParamList } from '../navigation/types';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -24,11 +26,15 @@ export default function ScanQRScreen() {
 
   const onScan = ({ data }: { data: string }) => {
     if (handled) return;
+    // A SportnNote page — a certificate, career passport, hall of fame, match,
+    // tournament or profile QR — opens that page.
+    const page = parseAppLink(data, [...linkPrefixes(), 'https://sportnnote.expo.app']);
+    if (page) { setHandled(true); (nav.replace as (screen: string, params: object) => void)(page.screen, page.params); return; }
     // A tournament join QR (…/join-tournament/T-XXXXXX) → enter-a-tournament.
     const tour = /join-tournament/i.test(data) ? parseTournamentToken(data) : null;
     if (tour) { setHandled(true); nav.replace('JoinTournament', { token: tour }); return; }
     const token = parseClubToken(data);
-    if (!token) { setError('That QR isn’t a SportnNote team invite. Try another.'); return; }
+    if (!token) { setError('That QR isn’t a SportnNote code. Try another.'); return; }
     setHandled(true);
     // Replace so Back doesn't return to the camera.
     nav.replace('JoinClub', { token });

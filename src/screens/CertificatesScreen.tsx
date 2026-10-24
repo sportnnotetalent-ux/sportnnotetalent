@@ -10,8 +10,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRoute, type RouteProp } from '@react-navigation/native';
 import { KeyboardAwareScrollView, KeyboardFooterLayout } from '../components/keyboard';
 import { theme } from '../core/theme';
-import { Button, Card, EmptyState, FormError, LoadingState, Pill, ScreenTitle, SelectChip, textStyles } from '../components/ui';
-import { askConfirm } from '../components/ConfirmSheet';
+import { Button, Card, EmptyState, FormError, LoadingState, Pill, ScreenTitle, SelectChip, TextField, textStyles } from '../components/ui';
 import { useAuth } from '../core/auth';
 import { canManageTournament } from '../core/org';
 import { useMatches, useOrganizations, useTournamentById } from '../data/hooks';
@@ -28,6 +27,9 @@ import { getTournamentCertificates, issueCertificates, printCertificates, revoke
 import type { Match, SportId, Team, TournamentAwards } from '../core/types';
 import type { RootStackParamList } from '../navigation/types';
 
+/** Common reasons to revoke a certificate (any text is fine too). */
+const REVOKE_REASONS = ['Issued to the wrong player', 'Wrong team or place', 'The result was changed', 'Issued by mistake'] as const;
+
 type Places = TournamentPlaces;
 
 export default function CertificatesScreen() {
@@ -42,6 +44,9 @@ export default function CertificatesScreen() {
   const [awards, setAwards] = useState<TournamentAwards | undefined>(undefined);
   const [medals, setMedals] = useState<ReturnType<typeof meetMedalists>>([]);
   const [issued, setIssued] = useState<IssuedCertificate[]>([]);
+  // the certificate being revoked (its code) and why
+  const [revoking, setRevoking] = useState<string | null>(null);
+  const [revokeReason, setRevokeReason] = useState('');
   const [names, setNames] = useState<Map<string, string>>(new Map());
   const [places, setPlaces] = useState<Record<string, Places>>({});
   const [withAwards, setWithAwards] = useState(true);
@@ -106,7 +111,8 @@ export default function CertificatesScreen() {
   }, [teams, sports, places, rosters, teamName, withParticipation, withAwards, awards, withMedals, medals, tName, date]);
 
   const key = (c: { playerId: string; kind: string; title: string; detail?: string }) => `${c.playerId}|${c.kind}|${c.title}|${c.detail ?? ''}`;
-  const issuedKeys = useMemo(() => new Set(issued.map(key)), [issued]);
+  // Only live certificates count as issued: a revoked one can be issued again.
+  const issuedKeys = useMemo(() => new Set(issued.filter((c) => !c.revokedAt).map(key)), [issued]);
   const fresh = items.filter((i) => !issuedKeys.has(key(i)));
 
   useEffect(() => {
@@ -133,11 +139,17 @@ export default function CertificatesScreen() {
       if (r === 'failed') setError('Printing isn’t available here — open SportnNote on a computer (app.sportnnote.in) to print.');
     } finally { setBusy(null); }
   };
+  const startRevoke = (c: IssuedCertificate) => { setRevoking(c.code); setRevokeReason(''); setError(null); };
   const revoke = async (c: IssuedCertificate) => {
-    const ok = await askConfirm({ title: `Revoke ${formatCode(c.code)}?`, message: `${names.get(c.playerId) ?? 'This player'} · ${c.title}. Scanning it will then show it was revoked.`, yesLabel: 'Revoke', noLabel: 'Keep it', tone: 'danger' });
-    if (!ok) return;
-    try { await revokeCertificate(c.code); setIssued(await getTournamentCertificates(tid)); }
-    catch (e) { setError(e instanceof Error ? e.message : 'Couldn’t revoke it.'); }
+    if (!revokeReason.trim()) { setError('Say why it’s being revoked — it shows when the certificate is checked.'); return; }
+    setBusy(`revoke:${c.code}`);
+    try {
+      await revokeCertificate(c.code, revokeReason.trim());
+      setIssued(await getTournamentCertificates(tid));
+      setRevoking(null);
+      setNote(`${formatCode(c.code)} revoked. If it went to the wrong player or team, pick the right one above and issue it again.`);
+    } catch (e) { setError(e instanceof Error ? e.message : 'Couldn’t revoke it.'); }
+    finally { setBusy(null); }
   };
 
   if (!tournament || teams === null) return <SafeAreaView style={st.safe}><LoadingState label="Loading results…" /></SafeAreaView>;
@@ -217,9 +229,25 @@ export default function CertificatesScreen() {
                     <Text style={[textStyles.body, c.revokedAt && st.struck]}>{names.get(c.playerId) ?? 'Player'} · {c.title}</Text>
                     <Text style={textStyles.muted}>{formatCode(c.code)}{c.teamName ? ` · ${c.teamName}` : ''}</Text>
                   </View>
-                  {c.revokedAt ? <Pill label="revoked" /> : <Text style={st.revoke} onPress={() => void revoke(c)}>Revoke</Text>}
+                  {c.revokedAt ? <Pill label="revoked" /> : revoking === c.code ? null : <Text style={st.revoke} accessibilityRole="button" onPress={() => startRevoke(c)}>Revoke</Text>}
                 </View>
-              ))}
+              )).flatMap((row, i) => {
+                const c = issued[i];
+                if (revoking !== c.code) return [row];
+                return [row, (
+                  <View key={`${c.code}-revoke`} style={st.revokeBox}>
+                    <Text style={textStyles.muted}>Why revoke {formatCode(c.code)}? Scanning it will show “revoked” and this reason.</Text>
+                    <View style={st.chips}>
+                      {REVOKE_REASONS.map((r) => <SelectChip key={r} label={r} active={revokeReason === r} onPress={() => setRevokeReason(revokeReason === r ? '' : r)} />)}
+                    </View>
+                    <TextField label="Or type a reason" value={(REVOKE_REASONS as readonly string[]).includes(revokeReason) ? '' : revokeReason} onChange={setRevokeReason} placeholder="e.g. Wrong age group" />
+                    <View style={st.row}>
+                      <Button label="Keep it" variant="ghost" style={st.flex} onPress={() => setRevoking(null)} disabled={!!busy} />
+                      <Button label={busy === `revoke:${c.code}` ? 'Revoking…' : 'Revoke'} variant="danger" style={st.flex} onPress={() => void revoke(c)} disabled={!!busy} />
+                    </View>
+                  </View>
+                )];
+              })}
             </Card>
           )}
           {error && !fresh.length ? <FormError message={error} /> : null}
@@ -237,5 +265,8 @@ const st = StyleSheet.create({
   link: { color: theme.colors.primary, fontWeight: '700', fontSize: theme.font.small },
   certRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(2), paddingVertical: theme.spacing(1), borderTopWidth: 1, borderTopColor: theme.colors.border },
   revoke: { color: theme.colors.danger, fontWeight: '700', fontSize: theme.font.small },
+  revokeBox: { gap: theme.spacing(2), paddingVertical: theme.spacing(2), paddingHorizontal: theme.spacing(2), borderRadius: theme.radius.md, backgroundColor: theme.colors.surfaceAlt },
+  row: { flexDirection: 'row', gap: theme.spacing(2) },
+  flex: { flex: 1 },
   struck: { textDecorationLine: 'line-through' },
 });

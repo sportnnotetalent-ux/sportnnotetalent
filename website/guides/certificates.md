@@ -61,12 +61,12 @@ To protect children. A player under 18, or one whose date of birth isn't known, 
 Yes. The name comes from the player's details each time you print. Correct it (see [Fix a player's name, shirt number or photo](/guides/fix-a-players-details/)), then print again. The code stays the same.
 
 ### I gave certificates to the wrong team. What now?
-Pick the right team on the sport's card and issue the new certificates. Then tap **Show each certificate (codes, revoke)**, tap **Revoke** next to each wrong one, and confirm with **Revoke**. Scanning it then shows it was revoked, the player's profile shows "Revoked by the organisers", and **🖨 Print all** leaves it out.
+Tap **Show each certificate (codes, revoke)** and tap **Revoke** next to each wrong one. Pick a reason, such as "Wrong team or place", or type your own, and tap **Revoke**. Scanning it then shows it was revoked, with your reason, the player's profile shows "Revoked by the organisers", and **🖨 Print all** leaves it out. Then pick the right team on the sport's card and issue the new certificates.
 
-> **Important:** Revoking can't be undone in the app, and that player can't be given the same certificate again. Check before you tap **Revoke**.
+> **Note:** You can issue a revoked certificate again. It gets a new code.
 
 ### Can a player get the same certificate twice?
-No. It's one certificate per player per achievement, so issuing again never makes copies.
+No. It's one live certificate per player per achievement, so issuing again never makes copies.
 
 ### Can certificates be faked?
 Someone can photocopy the paper, but not the record in SportnNote. A made-up code shows "✗ No certificate with that code", and an edited certificate won't match the check page. Codes have 10 random characters, so guessing one is practically impossible.

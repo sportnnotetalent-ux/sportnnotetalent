@@ -3,7 +3,9 @@
  * ------------------------------------------------------------------------
  * Emails a minor's parent/guardian the link to confirm the child's account.
  * Called by the CHILD's app (Home card / Settings → Your data & privacy) while
- * their account is 'pending' (under 18, outside India) or 'withdrawn'.
+ * their account is 'pending' (under 18, outside India) or 'withdrawn' — or
+ * 'self_declared' (sign-up consent, e.g. India): the parent's answer then
+ * upgrades it to parent-confirmed and can confirm the date of birth.
  *
  * The guardian opens  <APP_URL>/guardian-consent?c=<CODE>  (or types the code
  * there) — no account needed. The page calls guardian_consent_preview /
@@ -32,7 +34,7 @@ Deno.serve(async (req) => {
 
   const { data: prof } = await admin.from('profiles').select('guardian_consent').eq('id', uid).single();
   const status = (prof as { guardian_consent?: string } | null)?.guardian_consent;
-  if (status !== 'pending' && status !== 'withdrawn') {
+  if (status !== 'pending' && status !== 'withdrawn' && status !== 'self_declared') {
     return json({ sent: false, reason: 'Your account doesn’t need a parent or guardian to confirm it.' }, 400);
   }
   if (!(await rateLimit('guardian-consent', uid, 3, 86400))) {
@@ -44,7 +46,7 @@ Deno.serve(async (req) => {
     const msg = error?.message ?? '';
     return json({ sent: false, reason: /guardian/i.test(msg) ? 'Add your parent or guardian’s email in Edit profile first.' : 'Couldn’t create the link — try again.' }, 400);
   }
-  const { code, email, childName } = data as { code: string; email: string; childName: string };
+  const { code, email, childName, selfDeclared } = data as { code: string; email: string; childName: string; selfDeclared?: boolean };
   const first = clip(childName, 60).split(/\s+/)[0] || 'Your child';
   const link = `${APP_URL}/guardian-consent?c=${encodeURIComponent(code)}`;
 
@@ -52,7 +54,10 @@ Deno.serve(async (req) => {
     email,
     `Please confirm ${first}’s SportnNote account`,
     `Hello,\n\n${first} has signed up to SportnNote, an app for school and club sports scores and profiles, and gave this address as their parent or guardian.\n\n` +
-    `Because they are under 18, their account stays limited until you confirm it: nobody can follow them or message about them, and only their own teams can see their profile.\n\n` +
+    (selfDeclared
+      ? `They are under 18. Please confirm their account and their date of birth, so they can take part in events that need a parent-confirmed age. `
+      : `Because they are under 18, their account stays limited until you confirm it: nobody can follow them or message about them. `) +
+    `Only you and people on their teams, clubs and tournaments see their full name; everyone else sees their initials.\n\n` +
     `To agree or say no, open this link (it works for 7 days):\n${link}\n\n` +
     `Or open ${APP_URL}/guardian-consent and enter the code: ${grouped(code)}\n\n` +
     `What we keep and why: ${SITE_URL}/privacy/\n` +

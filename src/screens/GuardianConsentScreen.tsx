@@ -88,7 +88,7 @@ export default function GuardianConsentScreen() {
               <Text style={textStyles.muted}>• Name, date of birth, mobile or email, and your contact details as their guardian</Text>
               <Text style={textStyles.muted}>• Their sports profile, matches, scores and stats</Text>
               <Text style={[textStyles.body, { fontWeight: '700' }]}>Who sees it</Text>
-              <Text style={textStyles.muted}>• Their full profile only to people on their teams and in their tournaments; others see a reduced card, and logged-out visitors only initials</Text>
+              <Text style={textStyles.muted}>• Their full name and profile only to you and to people on their teams, clubs and tournaments; everyone else — signed in or not — sees only their initials</Text>
               <Text style={textStyles.muted}>• Coaches and scouts can’t message them — messages about them come to you</Text>
               <Text style={textStyles.muted}>• No ads, no selling of data, and their activity is never linked to analytics</Text>
               <Text style={textStyles.muted}>Data is stored in India (Mumbai). You can view, download or delete it, or withdraw consent, at any time.</Text>
