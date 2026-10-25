@@ -39,7 +39,7 @@ Everything the founder does by hand before or at go-live, in one place. Code wor
 
 ## Low-cost go-live setup (added 2026-10-25)
 
-All free, except SMS, which is already pay-as-you-go. Do them in this order. Steps 1 and 2 must be done **before** installing APK 40.
+All free, except SMS, which is already pay-as-you-go. Do them in this order. Steps 1 and 2 must be done **before** installing APK 41 (build 41; the failed attempt used 40).
 
 - [ ] **1. Android phone sign-in (Firebase).** Add the APK's SHA-1 and SHA-256 fingerprints and enable the Play Integrity API. Exact steps: `docs/firebase-phone-setup.md` → "Android app". Without this, the mobile + code option on Android stops at "SMS sign-in isn’t set up".
 - [ ] **2. One-tap app links** (a shared app.sportnnote.in link opens in the app). Android checks `https://app.sportnnote.in/.well-known/assetlinks.json` and won't follow a redirect, but app.sportnnote.in redirects everything to sportnnote.expo.app today. So:
@@ -54,7 +54,7 @@ All free, except SMS, which is already pay-as-you-go. Do them in this order. Ste
   2. **Workers & Pages** → **sportnnote** (the website) → **Settings** → **Domains & Routes** → **Add** → **Route**: `app.sportnnote.in/.well-known/*`, zone `sportnnote.in`.
   3. After the next push to `main`, this should show a short JSON with `in.sportnnote.app` (status 200, no redirect):
      `curl -i https://app.sportnnote.in/.well-known/assetlinks.json`
-  4. Install APK 40. Then Android **Settings → Apps → SportnNote → Open by default**: app.sportnnote.in should be listed as a verified link. Tap a match link in WhatsApp: it opens in the app.
+  4. Install APK 41. Then Android **Settings → Apps → SportnNote → Open by default**: app.sportnnote.in should be listed as a verified link. Tap a match link in WhatsApp: it opens in the app.
 - [ ] **3. Nightly database backup.** Add the two GitHub secrets and run it once by hand: `docs/ops/backups.md` → "Set it up". The Supabase free plan has no backups of its own.
 - [ ] **4. Password-reset emails for everyone (custom SMTP through Resend).** Supabase's built-in mailer only delivers to the project team's own addresses, a few an hour. So "Forgot password" and email-code sign-in don't reach real users until this is set:
   1. resend.com → **API Keys** → **Create**: name "Supabase Auth", permission **Sending access**, domain `sportnnote.in`. Copy the key.

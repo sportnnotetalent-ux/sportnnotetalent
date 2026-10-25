@@ -4,7 +4,7 @@ Why: Indian OTP SMS needs TRAI DLT registration (a registered business + ₹5,90
 Firebase sends the SMS under Google's registration, so phone numbers can be verified
 now. Cost ≈ **$0.07 (≈₹6) per SMS** on the pay-as-you-go **Blaze** plan. Firebase is
 only the SMS courier — our login stays Supabase. Works in the **web app** (iPhone
-pilot) and, from APK 40, in the **Android app** (React Native Firebase — see below).
+pilot) and, from APK 41, in the **Android app** (React Native Firebase — see below).
 
 ## Steps (Firebase console — https://console.firebase.google.com)
 1. **Create a project** (or reuse the one planned for push notifications), e.g. "SportnNote".
@@ -39,14 +39,14 @@ user enters the code → app gets Firebase's signed ID token → `verify-phone-f
 Google's signature, freshness (≤10 min) and that the number matches the profile → sets
 `phone_verified` (or the guardian's `phoneVerified`). The app can never set these itself.
 
-## Android app (APK 40 onwards, 2026-10-25)
+## Android app (APK 41 onwards, 2026-10-25)
 
 The APK uses React Native Firebase (`@react-native-firebase/auth`), so the mobile + code
 option shows on Android too (`src/core/firebasePhone.native.ts`). Older APKs don't have
 the native module; the option stays hidden there and email sign-in works as before, so
 the over-the-air update is safe for everyone.
 
-Founder steps (once, about 5 minutes), **before** testing APK 40:
+Founder steps (once, about 5 minutes), **before** testing APK 41:
 1. Firebase console → project **sportnnote-5c5e7** → ⚙ **Project settings** → **General** →
    **Your apps** → the Android app **in.sportnnote.app** → **Add fingerprint**. Add both:
    - SHA-1 `A0:F3:C4:03:D9:88:B7:7D:AB:0A:F3:30:C3:ED:84:9D:D8:94:65:AD`

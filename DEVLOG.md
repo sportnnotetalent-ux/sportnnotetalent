@@ -49,9 +49,9 @@ The founder asked why Android shows only email sign-in: the mobile + code option
 - **iOS note:** the React Native Firebase plugin stops an iOS prebuild until `GoogleService-Info.plist` exists. That is fine for now, since iOS waits for the Apple account.
 - **Needs:**
   - **Founder:** the checklist steps (1–2 before installing the APK);
-  - an EAS APK 40 build;
+  - ~~an EAS APK build~~ **APK 41 built** (versionCode 41, commit c66af0a; the failed first attempt used 40): https://expo.dev/accounts/sportnnote.in/projects/sportnnote/builds/3c8f4ed7-3b43-4160-8844-6f39b8c67db9. Checked: signed with the EAS key (SHA-1 / SHA-256 match assetlinks.json and the Firebase step);
   - an OTA + web publish;
-  - a push to `main`, which deploys the website with assetlinks.json and activates the backup schedule.
+  - ~~a push to `main`~~ pushed 2026-10-25 (the founder's token needed the `workflow` scope). `https://sportnnote.in/.well-known/assetlinks.json` is live (200, application/json). The app host waits for the Cloudflare step.
 
 ### 2026-10-24 — School & college verification, Phase 1
 The founder wants proof that a school community is created by someone who speaks for the school. Decisions: optional and never blocking; all three authority routes; one verified community per official ID; support-only review (an easy queue for a future support team); existing communities are asked registered or informal. Design and next phases: `docs/verification/org-verification.md`.
