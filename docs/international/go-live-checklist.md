@@ -55,7 +55,7 @@ All free, except SMS, which is already pay-as-you-go. Do them in this order. Ste
   3. After the next push to `main`, this should show a short JSON with `in.sportnnote.app` (status 200, no redirect):
      `curl -i https://app.sportnnote.in/.well-known/assetlinks.json`
   4. Install APK 41. Then Android **Settings → Apps → SportnNote → Open by default**: app.sportnnote.in should be listed as a verified link. Tap a match link in WhatsApp: it opens in the app.
-- [ ] **3. Nightly database backup.** Add the two GitHub secrets and run it once by hand: `docs/ops/backups.md` → "Set it up". The Supabase free plan has no backups of its own.
+- [x] **3. Nightly database backup.** *Done 2026-10-26: secrets added, first run green (the first try failed on `[ ]` left around the password; the workflow now says so plainly).* Add the two GitHub secrets and run it once by hand: `docs/ops/backups.md` → "Set it up". The Supabase free plan has no backups of its own.
 - [ ] **4. Password-reset emails for everyone (custom SMTP through Resend).** Supabase's built-in mailer only delivers to the project team's own addresses, a few an hour. So "Forgot password" and email-code sign-in don't reach real users until this is set:
   1. resend.com → **API Keys** → **Create**: name "Supabase Auth", permission **Sending access**, domain `sportnnote.in`. Copy the key.
   2. Supabase → **Authentication → Emails → SMTP Settings** → **Enable custom SMTP**:

@@ -111,6 +111,13 @@ describe('Android App Links', () => {
 describe('nightly database backup', () => {
   const wf = read('.github/workflows/db-backup.yml');
   const runbook = read('docs/ops/backups.md');
+  test('current, Node 24 actions on a pinned runner; a pasted secret is tidied and checked', () => {
+    assert.match(wf, /runs-on: ubuntu-24\.04/);
+    assert.match(wf, /supabase\/setup-cli@v3/);
+    assert.match(wf, /actions\/upload-artifact@v7/);
+    assert.match(wf, /DB_URL="\$\(printf '%s' "\$DB_URL" \| tr -d '\[:space:\]'\)"/);
+    assert.match(wf, /still contains \[ \]/);
+  });
   test('runs nightly and on demand, read-only on the repo', () => {
     assert.match(wf, /- cron: '30 20 \* \* \*'/);
     assert.match(wf, /workflow_dispatch:/);

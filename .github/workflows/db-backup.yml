@@ -21,10 +21,11 @@ concurrency:
 
 jobs:
   backup:
-    runs-on: ubuntu-latest
+    # Pinned (not ubuntu-latest) so a runner-image move can't change the backup unannounced.
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      - uses: supabase/setup-cli@v1
+      - uses: supabase/setup-cli@v3
         with:
           version: 2.122.0
 
@@ -33,7 +34,10 @@ jobs:
           DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
           set -euo pipefail
+          # Stray spaces / line breaks from pasting the secret would break the URL.
+          DB_URL="$(printf '%s' "$DB_URL" | tr -d '[:space:]')"
           if [ -z "$DB_URL" ]; then echo "::error::Add the SUPABASE_DB_URL secret — docs/ops/backups.md"; exit 1; fi
+          case "$DB_URL" in *'['*|*']'*) echo "::error::SUPABASE_DB_URL still contains [ ] — put the password in place of [YOUR-PASSWORD], brackets removed"; exit 1;; esac
           mkdir -p out
           supabase db dump --db-url "$DB_URL" -f out/roles.sql --role-only
           supabase db dump --db-url "$DB_URL" -f out/schema.sql
@@ -70,7 +74,7 @@ jobs:
           echo "DAYS=$days" >> "$GITHUB_ENV"
           ls -l "$name.tar.gz.enc"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ${{ env.NAME }}
           path: ${{ env.NAME }}.tar.gz.enc
