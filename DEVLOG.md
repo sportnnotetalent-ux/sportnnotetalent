@@ -13,6 +13,20 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-26 — Published the go-live setup; web screen warm-up made gentle
+- **Published** (founder approved): web (live bundle `index-6298ae99…` = build) and Android OTA `2b3eb977` from `2c932f5`. APK 39 gets the empty-upload fix; the new sign-in and PDF options stay hidden there, as designed.
+- **Found on the live check:** about 2.5 s after start the web app warmed every lazy screen at once (~120 chunk requests, plus shared chunks). EAS Hosting answered 10 of 120 with **429 Too Many Requests**.
+  - Expo's loader forgets a failed chunk, so opening that screen later fetches it again.
+  - A 429 is not a "new version" error, though, so a screen opened during the burst could land on the error screen.
+- **Fix (`src/navigation/lazyScreens.ts`):**
+  - Screens now warm 4 at a time (`WARM_AT_ONCE`).
+  - No warm-up at all with data saver on or on a 2G-class connection (screens load when opened).
+  - Sports still follow one at a time.
+- **Verified:**
+  - Locally, 87 screen chunks with at most 4 in flight and no console errors.
+  - Tests in `tests/go-live-setup.test.mts`; full suite 4,710 pass.
+- **Needs:** a web publish (web-only; phones are unaffected).
+
 ### 2026-10-25 — Low-cost go-live setup: Android phone sign-in, PDF picking, App Links, nightly backups
 The founder asked why Android shows only email sign-in: the mobile + code option needed the browser reCAPTCHA, so it was web-only. Then the brief: set up everything that gets us go-live ready without real spending.
 - **Android phone sign-in:** `src/core/firebasePhone.native.ts` now uses React Native Firebase (`@react-native-firebase/app` + `/auth` 26.4, config plugins in `app.json`).

@@ -151,3 +151,19 @@ describe('nightly database backup', () => {
     assert.ok(existsSync(join(root, '.github/workflows/db-backup.yml')));
   });
 });
+
+describe('web: background screen warm-up is gentle', () => {
+  const s = read('src/navigation/lazyScreens.ts');
+  test('at most WARM_AT_ONCE screens download together (all at once drew 429s from EAS Hosting)', () => {
+    assert.match(s, /export const WARM_AT_ONCE = 4;/);
+    assert.match(s, /Array\.from\(\{ length: Math\.min\(WARM_AT_ONCE, loaders\.length\) \}, \(\) => worker\(\)\)/);
+    assert.match(s, /while \(next < loaders\.length\) \{\s*const load = loaders\[next\+\+\];/);
+    assert.doesNotMatch(s, /for \(const load of loaders\) \{\s*try \{ screens\.push/);
+  });
+  test('no warm-up on data saver or 2G; sports still follow, one at a time', () => {
+    assert.match(s, /if \(lowData\(\)\) return;/);
+    assert.match(s, /c\.saveData === true \|\| \/\(\^\|-\)2g\$\/\.test/);
+    assert.match(s, /Promise\.all\(workers\)\.then\(\(\) => prefetchSports\(\)\)/);
+    assert.match(read('src/sports/registry.ts'), /chain\.then\(\(\) => loadSport\(id\)/);
+  });
+});

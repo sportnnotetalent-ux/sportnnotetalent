@@ -32,6 +32,7 @@ let prefetched = false;
 export function prefetchScreens(): void {
   if (prefetched || Platform.OS !== 'web') return;
   prefetched = true;
+  if (lowData()) return; // data saver / 2G: fetch each screen only when it's opened
   const ric = typeof globalThis !== 'undefined'
     ? (globalThis as { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => unknown }).requestIdleCallback
     : undefined;
@@ -39,12 +40,27 @@ export function prefetchScreens(): void {
   else warmAll();
 }
 
+/** Screens warmed at the same time. All ~80 at once (≈240 files with their
+ *  shared chunks) made EAS Hosting answer some with 429 Too Many Requests
+ *  (seen 2026-10-26); a screen opened during that burst could fail to load. */
+export const WARM_AT_ONCE = 4;
+
+/** The browser says the person is saving data or on a 2G-class connection. */
+function lowData(): boolean {
+  const c = (globalThis as { navigator?: { connection?: { saveData?: boolean; effectiveType?: string } } }).navigator?.connection;
+  return !!c && (c.saveData === true || /(^|-)2g$/.test(c.effectiveType ?? ''));
+}
+
 function warmAll(): void {
-  // Metro's dev loader may hand back a bare thenable — normalise to a Promise.
-  const screens: Promise<unknown>[] = [];
-  for (const load of loaders) {
-    try { screens.push(Promise.resolve(load()).catch(() => undefined)); } catch { /* retried on open */ }
-  }
+  let next = 0;
+  const worker = async (): Promise<void> => {
+    while (next < loaders.length) {
+      const load = loaders[next++];
+      // Metro's dev loader may hand back a bare thenable — normalise to a Promise.
+      try { await Promise.resolve(load()); } catch { /* retried on open */ }
+    }
+  };
+  const workers = Array.from({ length: Math.min(WARM_AT_ONCE, loaders.length) }, () => worker());
   // then the sports (perf F-15), so a match of any sport opens at once later
-  void Promise.all(screens).then(() => prefetchSports());
+  void Promise.all(workers).then(() => prefetchSports());
 }
