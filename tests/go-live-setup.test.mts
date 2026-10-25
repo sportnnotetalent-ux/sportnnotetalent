@@ -167,3 +167,22 @@ describe('web: background screen warm-up is gentle', () => {
     assert.match(read('src/sports/registry.ts'), /chain\.then\(\(\) => loadSport\(id\)/);
   });
 });
+
+describe('sign-in emails: say what went wrong', () => {
+  const src = read('src/core/auth.tsx');
+  const body = src.slice(src.indexOf('export function friendlyAuthError'), src.indexOf('/** Is this error the'));
+  // eslint-disable-next-line @typescript-eslint/no-implied-eval
+  const friendly = new Function(body.replace('export function friendlyAuthError(raw?: string): string', 'return function(raw)'))() as (m?: string) => string;
+  test('Supabase failing to send the email (SMTP) is not "Something went wrong"', () => {
+    assert.match(friendly('Error sending recovery email'), /couldn’t send the email just now/);
+    assert.match(friendly('Error sending confirmation email'), /couldn’t send the email/);
+  });
+  test('asking again too soon says to wait', () => {
+    assert.equal(friendly('For security purposes, you can only request this after 47 seconds.'), 'Please wait a minute before asking for another code.');
+  });
+  test('the existing messages are unchanged', () => {
+    assert.equal(friendly('Invalid login credentials'), 'Wrong email or password. Try again, or reset your password.');
+    assert.equal(friendly('Email rate limit exceeded'), 'Too many attempts. Please wait a minute and try again.');
+    assert.equal(friendly(''), 'Something went wrong. Please try again.');
+  });
+});

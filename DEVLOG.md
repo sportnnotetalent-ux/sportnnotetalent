@@ -25,7 +25,8 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 - **Verified:**
   - Locally, 87 screen chunks with at most 4 in flight and no console errors.
   - Tests in `tests/go-live-setup.test.mts`; full suite 4,710 pass.
-- **Needs:** a web publish (web-only; phones are unaffected).
+- **Needs:** ~~a web publish~~ published 2026-10-26 (`index-2ed9c253…`; the plain `/` URL followed after the host's short edge cache).
+- **Password-reset test after setting up Resend SMTP:** the founder got "Something went wrong" on the reset-code screen. Live DB: the account exists and `recovery_sent_at` is still null, so Supabase failed to hand the email over (SMTP). The exact reason is in Supabase Auth logs (founder to check). Separately, `friendlyAuthError` had no case for "Error sending … email" or "For security purposes, you can only request this after N seconds", so both showed the generic message. Now they read "We couldn't send the email just now…" and "Please wait a minute before asking for another code." (tests in `tests/go-live-setup.test.mts`). Needs web publish + OTA.
 
 ### 2026-10-25 — Low-cost go-live setup: Android phone sign-in, PDF picking, App Links, nightly backups
 The founder asked why Android shows only email sign-in: the mobile + code option needed the browser reCAPTCHA, so it was web-only. Then the brief: set up everything that gets us go-live ready without real spending.
