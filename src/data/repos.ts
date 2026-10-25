@@ -9,7 +9,7 @@ import { firebasePhoneAvailable, sendPhoneCode, confirmPhoneCode } from '../core
 import { serializePrefs, type FollowPrefs } from './followPrefs';
 import { supabase, isSupabaseConfigured } from '../core/supabase';
 import { fnPath } from '../core/functionPath';
-import type { PickedDoc } from '../core/document';
+import { readDocBytes, type PickedDoc } from '../core/document';
 import type { PickedImage } from '../core/photo';
 import { isLocalImageUri, mediaPath, extForMime, isPrivateImageKind, privateImageRef, PLAYER_PHOTO_BUCKET, type ImageKind } from '../core/imageUrl';
 import { samePhone, isValidPhone, toE164 } from '../core/phone';
@@ -4152,15 +4152,16 @@ export async function submitVerificationDoc(id: string, doc: PickedDoc): Promise
     if (!uid) throw new Error('Please sign in again, then upload the document.');
     const ext = (doc.name.split('.').pop() || 'bin').toLowerCase().replace(/[^a-z0-9]/g, '') || 'bin';
     const path = `${uid}/${id}/${at}.${ext}`;
-    let blob: Blob;
+    let file: Awaited<ReturnType<typeof readDocBytes>>;
     try {
-      blob = await (await fetch(doc.uri)).blob();
+      file = await readDocBytes(doc);
     } catch {
       throw new Error('Couldn’t read that file — please pick it again.');
     }
-    if (blob.size > VERIFICATION_DOC_MAX_BYTES) throw new Error('That file is too large (max 10 MB). A photo or a smaller PDF works.');
-    const { error } = await supabase.storage.from('verification-docs').upload(path, blob, {
-      contentType: doc.mimeType || blob.type || 'application/octet-stream',
+    if (file.bytes.byteLength === 0) throw new Error('Couldn’t read that file — please pick it again.');
+    if (file.bytes.byteLength > VERIFICATION_DOC_MAX_BYTES) throw new Error('That file is too large (max 10 MB). A photo or a smaller PDF works.');
+    const { error } = await supabase.storage.from('verification-docs').upload(path, file.bytes, {
+      contentType: file.contentType,
       upsert: true,
     });
     if (error) throw new Error(failed);

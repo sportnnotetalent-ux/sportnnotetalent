@@ -6,7 +6,7 @@
 import { isSupabaseConfigured, supabase } from '../core/supabase';
 import { fnPath } from '../core/functionPath';
 import { printSheet, type PrintOutcome } from '../core/printSheet';
-import type { PickedDoc } from '../core/document';
+import { readDocBytes, type PickedDoc } from '../core/document';
 import { notify } from '../core/notifications';
 import {
   authorisationLetterHtml, normOfficialId, validOfficialId,
@@ -91,11 +91,12 @@ export async function uploadOrgFile(orgId: string, doc: PickedDoc, kind: 'doc' |
   if (!uid) throw new Error('Please sign in again, then upload it.');
   const ext = (doc.name.split('.').pop() || 'bin').toLowerCase().replace(/[^a-z0-9]/g, '') || 'bin';
   const path = `${uid}/org-${orgId}/${kind}-${Date.now()}.${ext}`;
-  let blob: Blob;
-  try { blob = await (await fetch(doc.uri)).blob(); } catch { throw new Error('Couldn’t read that file — please pick it again.'); }
-  if (blob.size > VERIFICATION_DOC_MAX_BYTES) throw new Error('That file is too large (max 10 MB). A photo or a smaller PDF works.');
-  const { error } = await supabase!.storage.from('verification-docs').upload(path, blob, {
-    contentType: doc.mimeType || blob.type || 'application/octet-stream', upsert: true,
+  let file: Awaited<ReturnType<typeof readDocBytes>>;
+  try { file = await readDocBytes(doc); } catch { throw new Error('Couldn’t read that file — please pick it again.'); }
+  if (file.bytes.byteLength === 0) throw new Error('Couldn’t read that file — please pick it again.');
+  if (file.bytes.byteLength > VERIFICATION_DOC_MAX_BYTES) throw new Error('That file is too large (max 10 MB). A photo or a smaller PDF works.');
+  const { error } = await supabase!.storage.from('verification-docs').upload(path, file.bytes, {
+    contentType: file.contentType, upsert: true,
   });
   if (error) throw new Error('Couldn’t upload it — check your connection and try again.');
   return path;

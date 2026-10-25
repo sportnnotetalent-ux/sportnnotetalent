@@ -32,6 +32,93 @@
       "googleServicesFile": "./google-services.json",
       "blockedPermissions": [
         "android.permission.WRITE_CONTACTS"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "app.sportnnote.in",
+              "pathPrefix": "/m/"
+            },
+            {
+              "scheme": "https",
+              "host": "app.sportnnote.in",
+              "pathPrefix": "/t/"
+            },
+            {
+              "scheme": "https",
+              "host": "app.sportnnote.in",
+              "pathPrefix": "/p/"
+            },
+            {
+              "scheme": "https",
+              "host": "app.sportnnote.in",
+              "pathPrefix": "/g/"
+            },
+            {
+              "scheme": "https",
+              "host": "app.sportnnote.in",
+              "pathPrefix": "/r/"
+            },
+            {
+              "scheme": "https",
+              "host": "app.sportnnote.in",
+              "pathPrefix": "/c/"
+            },
+            {
+              "scheme": "https",
+              "host": "app.sportnnote.in",
+              "pathPrefix": "/pp"
+            },
+            {
+              "scheme": "https",
+              "host": "app.sportnnote.in",
+              "pathPrefix": "/h/"
+            },
+            {
+              "scheme": "https",
+              "host": "app.sportnnote.in",
+              "pathPrefix": "/i/"
+            },
+            {
+              "scheme": "https",
+              "host": "app.sportnnote.in",
+              "pathPrefix": "/get"
+            },
+            {
+              "scheme": "https",
+              "host": "app.sportnnote.in",
+              "pathPrefix": "/join/"
+            },
+            {
+              "scheme": "https",
+              "host": "app.sportnnote.in",
+              "pathPrefix": "/join-club/"
+            },
+            {
+              "scheme": "https",
+              "host": "app.sportnnote.in",
+              "pathPrefix": "/join-tournament/"
+            },
+            {
+              "scheme": "https",
+              "host": "app.sportnnote.in",
+              "pathPrefix": "/guardian-consent"
+            },
+            {
+              "scheme": "https",
+              "host": "app.sportnnote.in",
+              "pathPrefix": "/org-confirm"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
       ]
     },
     "web": {
@@ -67,9 +154,15 @@
         {
           "microphonePermission": "SportnNote uses the microphone for hands-free voice scoring. Audio isn’t recorded or uploaded by SportnNote — only the recognized words are used.",
           "speechRecognitionPermission": "SportnNote uses speech recognition to turn your spoken calls (like “goal Rao”) into score entries.",
-          "androidSpeechServicePackages": ["com.google.android.googlequicksearchbox", "com.google.android.tts", "com.google.android.as"]
+          "androidSpeechServicePackages": [
+            "com.google.android.googlequicksearchbox",
+            "com.google.android.tts",
+            "com.google.android.as"
+          ]
         }
-      ]
+      ],
+      "@react-native-firebase/app",
+      "@react-native-firebase/auth"
     ],
     "extra": {
       "eas": {

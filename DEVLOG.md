@@ -13,6 +13,41 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-25 — Low-cost go-live setup: Android phone sign-in, PDF picking, App Links, nightly backups
+The founder asked why Android shows only email sign-in: the mobile + code option needed the browser reCAPTCHA, so it was web-only. Then the brief: set up everything that gets us go-live ready without real spending.
+- **Android phone sign-in:** `src/core/firebasePhone.native.ts` now uses React Native Firebase (`@react-native-firebase/app` + `/auth` 27.1, config plugins in `app.json`).
+  - It sends the SMS, confirms the code (or uses Android's own auto-read sign-in), returns the Firebase ID token to the same `phone-login` function, and signs out of Firebase.
+  - Phone verification in Profile uses it too (`repos.ts` checks `firebasePhoneAvailable`).
+  - **Old-APK safe:** it checks `TurboModuleRegistry` for `NativeRNFBTurboApp` / `NativeRNFBTurboAuth` before requiring the library, which throws while loading without its native side. APK 39 and older keep email only, so the OTA is safe for everyone.
+- **PDFs on phones:** `src/core/document.ts` opens the system file picker (`expo-document-picker`, guarded with `requireOptionalNativeModule('ExpoDocumentPicker')`). Older APKs still fall back to the photo library.
+- **Fix — empty verification uploads on Android:** age-check and school documents were uploaded as a `Blob` from `fetch()`, which uploads 0 bytes on Android (the photo upload already avoided this). New `readDocBytes()` sends an ArrayBuffer with the right type and refuses an empty file. Live had no stored files yet, so nothing was lost; the earlier stuck request with "no file" fits this bug.
+- **Android App Links:** `src/core/androidAppLinks.ts` holds the package, the EAS key's SHA-256 and the 15 share-link paths.
+  - `app.json` gets one `autoVerify` intent filter for app.sportnnote.in with exactly those paths. Sign-in links and the home page stay in the browser.
+  - The website build writes `/.well-known/assetlinks.json`.
+  - Cloudflare must serve it on app.sportnnote.in without the redirect: a Worker route plus a redirect exception (founder steps in the checklist).
+- **Nightly encrypted DB backup (free):** `.github/workflows/db-backup.yml`.
+  - Supabase CLI `db dump` (roles, schema, data) at 02:00 IST, checked non-empty and checked to contain players.
+  - AES-256 (openssl PBKDF2, which the Mac decrypts with nothing installed); a decrypt check runs before the copy is kept.
+  - Kept as artifacts: 35 days nightly, 90 days for Saturday's.
+  - Runbook, restore steps and what isn't covered (Vault root key, files, function secrets): `docs/ops/backups.md`.
+- **Support address:** `OrgConfirmScreen` uses `SUPPORT_EMAIL` instead of a hard-coded support@sportnnote.in.
+- **Docs:**
+  - `docs/international/go-live-checklist.md` → "Low-cost go-live setup", 8 founder steps: Firebase fingerprints + Play Integrity, Cloudflare App Links, backup secrets, Supabase Auth custom SMTP through Resend, support@ routing, UptimeRobot, Search Console, SMS budget alert. Plus the cheap paid decisions.
+  - `docs/firebase-phone-setup.md` → "Android app".
+- **Found while checking:**
+  - Supabase's built-in mailer only reaches the project team, so "Forgot password" and email-code sign-in need custom SMTP (step 4).
+  - The API gate blocks uptime robots on `/rest/v1`, so the uptime monitor uses `/auth/v1/health?apikey=` (200).
+- **Verified:**
+  - `tests/go-live-setup.test.mts` (17), full suite 4,706 pass, tsc clean;
+  - web + Android bundles export;
+  - a scratch `expo prebuild --platform android` produces the autoVerify filter (15 paths) and applies google-services.
+- **iOS note:** the React Native Firebase plugin stops an iOS prebuild until `GoogleService-Info.plist` exists. That is fine for now, since iOS waits for the Apple account.
+- **Needs:**
+  - **Founder:** the checklist steps (1–2 before installing the APK);
+  - an EAS APK 40 build;
+  - an OTA + web publish;
+  - a push to `main`, which deploys the website with assetlinks.json and activates the backup schedule.
+
 ### 2026-10-24 — School & college verification, Phase 1
 The founder wants proof that a school community is created by someone who speaks for the school. Decisions: optional and never blocking; all three authority routes; one verified community per official ID; support-only review (an easy queue for a future support team); existing communities are asked registered or informal. Design and next phases: `docs/verification/org-verification.md`.
 - **Migration `20261025190000_org_verification.sql`:**
@@ -50,10 +85,11 @@ The founder wants proof that a school community is created by someone who speaks
     - support queue card at 375 px → tick 3 → Approve → "✓ Sunrise Public School verified — its admins have been told" → the page shows "Verified · School" and "📋 Confirm members' dates of birth";
     - no console errors.
   - Found while testing: long send-back chips overflowed at 375 px; shortened.
-- **Needs:**
-  - the founder runs the migration, before publishing: the app reads the new column and functions;
-  - deploy org-verify, verification-submit and privacy-retention;
-  - publish web + Android.
+- **Live 2026-10-24:**
+  - **Migration run.** Checked: 16 functions, the `registered` column, 3 tables, the lock index, the after-trigger; anon may call `org_head_decide` but not `create_org_code`; the tables are closed; `review_org_verification` is support only.
+  - **Deployed:** org-verify, verification-submit and privacy-retention. All three boot and refuse anonymous calls.
+  - **Published:** web (live bundle = build) and Android OTA `81f77410`.
+  - **Live checks:** `/org-confirm?c=<bad>` shows "That link isn't valid or has expired…"; `/guides/verify-your-school/` is live.
 
 ### 2026-10-24 — Fixes the guide writers found (7)
 Migration `20261025170000_guide_review_fixes.sql`, guardian-consent function, app.

@@ -1,16 +1,29 @@
 /**
  * Pick a verification document — an image OR a PDF. On web (and the preview) this
- * uses a native file input that accepts both. On a device it falls back to the
- * photo library (a scan/photo of the document); adding `expo-document-picker`
- * would enable picking a PDF file directly on native too.
+ * uses a native file input that accepts both. On a phone it opens the system file
+ * picker (`expo-document-picker`, APKs built from 2026-10-25); an older APK
+ * without that native module falls back to the photo library (a scan/photo of
+ * the document).
  */
 import { Platform } from 'react-native';
+import { requireOptionalNativeModule } from 'expo';
 import { pickPhoto } from './photo';
+
+type DocPickerApi = typeof import('expo-document-picker');
+let picker: DocPickerApi | null | undefined;
+function docPicker(): DocPickerApi | null {
+  if (picker !== undefined) return picker;
+  picker = null;
+  try {
+    if (requireOptionalNativeModule('ExpoDocumentPicker')) picker = require('expo-document-picker') as DocPickerApi;
+  } catch { picker = null; }
+  return picker;
+}
 
 export interface PickedDoc {
   name: string;
   uri: string;
-  /** MIME type when known (web file input); undefined for a native photo pick. */
+  /** MIME type when known (file input / file picker); undefined for a photo pick. */
   mimeType?: string;
 }
 
@@ -34,7 +47,13 @@ export async function pickDocument(): Promise<PickedDoc | null> {
       setTimeout(() => input.isConnected && input.remove(), 120000);
     });
   }
-  // Native fallback: a photo/scan of the document.
+  const dp = docPicker();
+  if (dp) {
+    const res = await dp.getDocumentAsync({ type: ['image/*', 'application/pdf'], copyToCacheDirectory: true, multiple: false });
+    const a = res.canceled ? null : res.assets?.[0];
+    return a ? { name: a.name || a.uri.split('/').pop() || 'document', uri: a.uri, mimeType: a.mimeType ?? undefined } : null;
+  }
+  // Older APK: a photo/scan of the document.
   const uri = await pickPhoto();
   return uri ? { name: uri.split('/').pop() ?? 'document', uri } : null;
 }
@@ -69,4 +88,20 @@ export async function pickTextFile(accept = '.csv,.tsv,.txt,text/csv'): Promise<
     input.click();
     setTimeout(() => input.isConnected && input.remove(), 120000);
   });
+}
+
+const MIME_BY_EXT: Record<string, string> = {
+  pdf: 'application/pdf', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
+  heic: 'image/heic', heif: 'image/heif', webp: 'image/webp',
+};
+
+/** The picked file's bytes for a Storage upload, and its type. An ArrayBuffer,
+ *  not a Blob: a Blob from fetch() uploads 0 bytes on Android. */
+export async function readDocBytes(doc: PickedDoc): Promise<{ bytes: ArrayBuffer; contentType: string }> {
+  const res = await fetch(doc.uri);
+  const type = res.headers?.get?.('content-type') ?? '';
+  const bytes = await res.arrayBuffer();
+  const ext = (doc.name.split('.').pop() || '').toLowerCase();
+  const contentType = doc.mimeType || MIME_BY_EXT[ext] || (type && !type.startsWith('text/') ? type.split(';')[0] : '') || 'application/octet-stream';
+  return { bytes, contentType };
 }

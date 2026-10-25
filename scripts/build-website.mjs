@@ -655,6 +655,12 @@ copyFileSync(join(ROOT, 'assets/favicon.png'), join(OUT, 'favicon.png'));
 // Versioned copy (browsers cache favicons by URL) + /favicon.ico for browsers that ask for it.
 copyFileSync(join(ROOT, 'assets/favicon.png'), join(OUT, 'favicon-v2.png'));
 copyFileSync(join(ROOT, 'assets/favicon.png'), join(OUT, 'favicon.ico'));
+// Android App Links (src/core/androidAppLinks.ts): which APK may open
+// app.sportnnote.in share links. Served here and, through a Worker route, on
+// app.sportnnote.in/.well-known/* (docs/international/go-live-checklist.md).
+const appLinks = await import(join(ROOT, 'src/core/androidAppLinks.ts'));
+mkdirSync(join(OUT, '.well-known'), { recursive: true });
+writeFileSync(join(OUT, '.well-known/assetlinks.json'), JSON.stringify(appLinks.assetLinks(), null, 2) + '\n');
 writeFileSync(join(OUT, 'robots.txt'), `User-agent: *\nAllow: /\nSitemap: ${cfg.siteUrl}/sitemap.xml\n`);
 writeFileSync(join(OUT, 'sitemap.xml'), `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">

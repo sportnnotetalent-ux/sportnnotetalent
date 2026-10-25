@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRoute, type RouteProp } from '@react-navigation/native';
 import { KeyboardAwareScrollView } from '../components/keyboard';
 import { theme } from '../core/theme';
+import { SUPPORT_EMAIL } from '../core/hosts';
 import { Button, Card, FormError, LoadingState, ScreenTitle, TextField, textStyles } from '../components/ui';
 import { OFFICIAL_ID_RULES } from '../core/orgVerification';
 import { decideHeadConfirm, previewHeadConfirm, type HeadPreview } from '../data/orgVerification';
@@ -49,7 +50,7 @@ export default function OrgConfirmScreen() {
             <Text style={textStyles.muted}>
               {done
                 ? `SportnNote support will finish checking ${preview?.orgName ?? 'the school'} and let the person know.`
-                : `SportnNote won’t verify ${preview?.orgName ?? 'the school'} on their word. If you think someone is pretending to be the school, write to support@sportnnote.in.`}
+                : `SportnNote won’t verify ${preview?.orgName ?? 'the school'} on their word. If you think someone is pretending to be the school, write to ${SUPPORT_EMAIL}.`}
             </Text>
           </Card>
         ) : preview ? (

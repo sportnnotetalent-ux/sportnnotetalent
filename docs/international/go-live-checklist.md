@@ -37,6 +37,56 @@ Everything the founder does by hand before or at go-live, in one place. Code wor
   4. To check: on sportnnote.in, right-click → **View page source**, press Ctrl/Cmd+F and search for `cloudflareinsights`. "Found" means it is on.
   - Never turn on anything in Cloudflare that sets cookies or tracks visitors; the policy promises it doesn't.
 
+## Low-cost go-live setup (added 2026-10-25)
+
+All free, except SMS, which is already pay-as-you-go. Do them in this order. Steps 1 and 2 must be done **before** installing APK 40.
+
+- [ ] **1. Android phone sign-in (Firebase).** Add the APK's SHA-1 and SHA-256 fingerprints and enable the Play Integrity API. Exact steps: `docs/firebase-phone-setup.md` → "Android app". Without this, the mobile + code option on Android stops at "SMS sign-in isn’t set up".
+- [ ] **2. One-tap app links** (a shared app.sportnnote.in link opens in the app). Android checks `https://app.sportnnote.in/.well-known/assetlinks.json` and won't follow a redirect, but app.sportnnote.in redirects everything to sportnnote.expo.app today. So:
+  1. dash.cloudflare.com → **sportnnote.in** → **Rules**. Find the rule that sends app.sportnnote.in to sportnnote.expo.app and edit its filter (expression) to:
+     `(http.host eq "app.sportnnote.in" and not starts_with(http.request.uri.path, "/.well-known/"))`
+     If it is an old **Page Rule** (`app.sportnnote.in/*`), Page Rules can't make exceptions. Replace it with a **Redirect Rule**:
+     - the expression above;
+     - **Dynamic** target `concat("https://sportnnote.expo.app", http.request.uri.path)`;
+     - 301;
+     - **Preserve query string** ticked.
+     Then delete the Page Rule.
+  2. **Workers & Pages** → **sportnnote** (the website) → **Settings** → **Domains & Routes** → **Add** → **Route**: `app.sportnnote.in/.well-known/*`, zone `sportnnote.in`.
+  3. After the next push to `main`, this should show a short JSON with `in.sportnnote.app` (status 200, no redirect):
+     `curl -i https://app.sportnnote.in/.well-known/assetlinks.json`
+  4. Install APK 40. Then Android **Settings → Apps → SportnNote → Open by default**: app.sportnnote.in should be listed as a verified link. Tap a match link in WhatsApp: it opens in the app.
+- [ ] **3. Nightly database backup.** Add the two GitHub secrets and run it once by hand: `docs/ops/backups.md` → "Set it up". The Supabase free plan has no backups of its own.
+- [ ] **4. Password-reset emails for everyone (custom SMTP through Resend).** Supabase's built-in mailer only delivers to the project team's own addresses, a few an hour. So "Forgot password" and email-code sign-in don't reach real users until this is set:
+  1. resend.com → **API Keys** → **Create**: name "Supabase Auth", permission **Sending access**, domain `sportnnote.in`. Copy the key.
+  2. Supabase → **Authentication → Emails → SMTP Settings** → **Enable custom SMTP**:
+     - sender `no-reply@sportnnote.in`, name `SportnNote`;
+     - host `smtp.resend.com`, port `465`;
+     - username `resend`, password = the key.
+
+     Save.
+  3. **Authentication → Rate Limits** → emails sent per hour: **100**.
+  4. Test "Forgot password" on the web app with an address that isn't on the Supabase team.
+
+  Resend's free plan covers 3,000 emails a month (100 a day).
+- [ ] **5. support@sportnnote.in must reach you.** The app and the API's "automated access" message tell people to write there. Cloudflare → **sportnnote.in → Email → Email Routing → Routing rules**: check `support@sportnnote.in` exists and forwards to your inbox. Send it a test email from another account. Once it works, the app can use it everywhere: set `EXPO_PUBLIC_SUPPORT_EMAIL=support@sportnnote.in` in `.env.local.bak`, set `contactEmail` in `website/config.json`, and tell me; it reaches people with the next publish.
+- [ ] **6. Uptime alerts (UptimeRobot, free).** uptimerobot.com → free account → **New monitor**, type HTTP(s), every 5 minutes, alert by email. Three monitors:
+  - `https://sportnnote.in`
+  - `https://app.sportnnote.in`
+  - Supabase: `https://mpgbvbylmkwasjgupsbq.supabase.co/auth/v1/health?apikey=<the anon key>`. Use the public anon key from `.env.local.bak` (`EXPO_PUBLIC_SUPABASE_…KEY`); it is the same key every browser already gets.
+
+  Don't add a monitor on `/rest/v1/…`: the anti-scraping gate rightly blocks robots there.
+- [ ] **7. Google Search Console (free).** search.google.com/search-console → **Add property** → **Domain** `sportnnote.in` → add the TXT record it shows in Cloudflare DNS → **Verify** → **Sitemaps** → submit `https://sportnnote.in/sitemap.xml`. The guides then show up in Google search sooner.
+- [ ] **8. Firebase SMS budget alert:** the item above. With Android sign-in on, SMS use will grow.
+
+**Cheap paid items** (decide when ready):
+
+| Item | Cost | Why |
+|---|---|---|
+| Supabase Pro | $25/month | Backups with one-click restore. No pausing. Higher limits. Needed before real school data at scale. |
+| Google Play developer account | $25 once | Play Store listing, Play Integrity (no robot check), automatic updates. |
+| sportnnote.com | about ₹1,000/year | `docs/international/domain-move-com.md` |
+| Trademark (India, class 9 + 41) | ₹4,500 per class as a startup/individual | Protects the name before marketing spend. |
+
 ## Before opening to other countries
 
 - [ ] **Company and store accounts** (planned before December):
@@ -57,8 +107,7 @@ Everything the founder does by hand before or at go-live, in one place. Code wor
 - [ ] **Store listings** (draft answers are in `docs/international/audit/distribution.md`):
   - Play: mixed audience including children, data-safety form, account-deletion URL (`/delete-account/`);
   - App Store: privacy labels, age rating.
-- [ ] **One-tap app links:** the SD-108 steps (assetlinks.json on a host with no redirect, intent filters, new APK).
-- [ ] **Native phone sign-in and iPhone push:** need the store accounts (APNs key).
+- [ ] **iPhone app:** phone sign-in and push need the Apple Developer account (APNs key) and a `GoogleService-Info.plist`. The React Native Firebase plugin stops an iOS build without it. Android sign-in and app links are in the low-cost section above.
 - [ ] **Rules marked "verify":** confirm with organisers in each market. The app lets organisers change all of them:
   - walkover scores, ban lengths and tie-breaks for the new sports;
   - school age cut-offs (BSME/ESAA 31 Aug, Singapore A/B/C, US 1 Sep);
