@@ -86,7 +86,7 @@ psql --single-transaction --variable ON_ERROR_STOP=1 --file backup/roles.sql --f
 
 A backup you have never restored is a hope, not a backup. Once a quarter, restore the latest copy into a throwaway project. Check that the player, match and tournament counts match live, then delete the project. Note the date here:
 
-- *(no restore drill yet)*
+- 2026-10-26: decrypt test passed. The founder downloaded the first backup, decrypted it on the Mac with the saved passphrase, and listed all four files. This is not yet a full restore into a scratch project.
 
 ## When to move to Supabase Pro
 
