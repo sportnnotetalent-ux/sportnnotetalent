@@ -37,6 +37,19 @@ describe('Android phone sign-in (React Native Firebase)', () => {
     assert.ok(appJson.plugins.includes('@react-native-firebase/auth'));
     assert.equal(appJson.android.googleServicesFile, './google-services.json');
   });
+  test('Firebase Android stays readable by React Native 0.85’s Kotlin 2.1 (APK 40 first build failed on BoM 35)', () => {
+    // RNFB 27 = Firebase Android BoM 35 (firebase-auth 25, Kotlin 2.4 metadata) → "incompatible version of Kotlin".
+    const pkg = JSON.parse(read('package.json'));
+    assert.match(pkg.dependencies['@react-native-firebase/app'], /^~26\./);
+    assert.match(pkg.dependencies['@react-native-firebase/auth'], /^~26\./);
+    // …and the BoM is pinned to 34.12.0 (firebase-auth 24.0.1 / common 22.0.1, Kotlin ≤ 2.1).
+    assert.ok(appJson.plugins.some((p: unknown) => Array.isArray(p) && p[0] === './plugins/withFirebaseAndroidBom' && p[1]?.bom === '34.12.0'));
+    const plugin = read('plugins/withFirebaseAndroidBom.js');
+    assert.match(plugin, /withProjectBuildGradle/);
+    assert.match(plugin, /set\('react-native', \[\s*versions: \[\s*firebase: \[\s*bom: "\$\{bom\}",/);
+    const rn = JSON.parse(read('node_modules/react-native/package.json')).version as string;
+    assert.match(rn, /^0\.85\./, 'React Native moved: re-check its Kotlin version before changing the Firebase pin');
+  });
 });
 
 describe('documents on phones', () => {

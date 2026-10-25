@@ -15,7 +15,11 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ### 2026-10-25 — Low-cost go-live setup: Android phone sign-in, PDF picking, App Links, nightly backups
 The founder asked why Android shows only email sign-in: the mobile + code option needed the browser reCAPTCHA, so it was web-only. Then the brief: set up everything that gets us go-live ready without real spending.
-- **Android phone sign-in:** `src/core/firebasePhone.native.ts` now uses React Native Firebase (`@react-native-firebase/app` + `/auth` 27.1, config plugins in `app.json`).
+- **Android phone sign-in:** `src/core/firebasePhone.native.ts` now uses React Native Firebase (`@react-native-firebase/app` + `/auth` 26.4, config plugins in `app.json`).
+  - **Kotlin pin:** the first APK 40 build (27.1) failed with "Module was compiled with an incompatible version of Kotlin. The binary version of its metadata is 2.4.0, expected version is 2.1.0". RNFB 27 brings Firebase Android BoM 35 (firebase-auth 25 = Kotlin 2.4), and React Native 0.85 compiles Kotlin 2.1, which reads at most 2.2.
+    - Checked each library's metadata from Google's Maven: firebase-auth 24.1.0+ is already Kotlin 2.3; BoM 34.12.0 (firebase-auth 24.0.1, firebase-common 22.0.1, and every firebase-auth dependency) is ≤ 2.1.
+    - So RNFB is on 26.4 (the Firebase Android 34 line), and `plugins/withFirebaseAndroidBom.js` pins BoM 34.12.0 through RNFB's documented `project.ext['react-native'].versions.firebase.bom`.
+    - A test stops RNFB 27 / React Native changes until Kotlin is upgraded too.
   - It sends the SMS, confirms the code (or uses Android's own auto-read sign-in), returns the Firebase ID token to the same `phone-login` function, and signs out of Firebase.
   - Phone verification in Profile uses it too (`repos.ts` checks `firebasePhoneAvailable`).
   - **Old-APK safe:** it checks `TurboModuleRegistry` for `NativeRNFBTurboApp` / `NativeRNFBTurboAuth` before requiring the library, which throws while loading without its native side. APK 39 and older keep email only, so the OTA is safe for everyone.
@@ -41,6 +45,7 @@ The founder asked why Android shows only email sign-in: the mobile + code option
   - `tests/go-live-setup.test.mts` (17), full suite 4,706 pass, tsc clean;
   - web + Android bundles export;
   - a scratch `expo prebuild --platform android` produces the autoVerify filter (15 paths) and applies google-services.
+- **Seen in the EAS log (pre-existing, not from this change):** `expo doctor` flags a known Hermes V1 memory regression in expo 56.0.11 / React Native 0.85.3, fixed only in SDK 57 (React Native 0.86.2+). It also lists a few patch-version mismatches. That is a separate upgrade decision.
 - **iOS note:** the React Native Firebase plugin stops an iOS prebuild until `GoogleService-Info.plist` exists. That is fine for now, since iOS waits for the Apple account.
 - **Needs:**
   - **Founder:** the checklist steps (1–2 before installing the APK);
