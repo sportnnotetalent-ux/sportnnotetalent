@@ -12,7 +12,7 @@
  */
 
 export const LEGAL_VERSION = '2026-10-24';
-export const LEGAL_CONTACT = 'sportnnote@gmail.com';
+export const LEGAL_CONTACT = 'support@sportnnote.in';
 
 export const PRIVACY_POLICY = `## Privacy Policy
 

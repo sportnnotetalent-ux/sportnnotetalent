@@ -28,7 +28,7 @@ import { admin, clip, CORS, json, rateLimit, requireUser, stripLinks, SUPABASE_U
 
 const FROM = Deno.env.get('INVITE_FROM') ?? Deno.env.get('SUPPORT_FROM') ?? 'SportnNote <onboarding@resend.dev>';
 // Replies to an invite should reach the SportnNote inbox, not the no-reply sender.
-const REPLY_TO = Deno.env.get('SUPPORT_EMAIL') ?? 'sportnnote@gmail.com';
+const REPLY_TO = Deno.env.get('SUPPORT_EMAIL') ?? 'support@sportnnote.in';
 // A single, reasonable email address — we email arbitrary recipients, so guard it.
 const isEmail = (s: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s) && s.length <= 254;
 // Only SportnNote links may appear in an invite.

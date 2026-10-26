@@ -83,7 +83,7 @@ export async function sendEmail(to: string, subject: string, text: string): Prom
   const key = Deno.env.get('RESEND_API_KEY');
   if (!key) return false;
   const from = Deno.env.get('INVITE_FROM') ?? Deno.env.get('SUPPORT_FROM') ?? 'SportnNote <onboarding@resend.dev>';
-  const replyTo = Deno.env.get('SUPPORT_EMAIL') ?? 'sportnnote@gmail.com';
+  const replyTo = Deno.env.get('SUPPORT_EMAIL') ?? 'support@sportnnote.in';
   try {
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',

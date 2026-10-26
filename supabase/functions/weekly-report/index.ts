@@ -16,7 +16,7 @@ import { admin, CORS, json, safeEqual, SERVICE_KEY } from '../_shared/guard.ts';
 import { fetchAllPages } from '../_shared/paging.ts';
 
 const CRON_SECRET = Deno.env.get('CRON_SECRET') ?? '';
-const TO = Deno.env.get('SUPPORT_EMAIL') ?? 'sportnnote@gmail.com';
+const TO = Deno.env.get('SUPPORT_EMAIL') ?? 'support@sportnnote.in';
 
 /** Send via Resend, returning Resend's error text on failure (only this
  *  authorised endpoint sees it — useful when the sender domain isn't verified). */

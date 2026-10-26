@@ -48,7 +48,7 @@ export async function alertReviewers(title: string, body: string, tag: string, o
     pushToProfiles(ids, { title, body, data: { url: `sportnnote://${REVIEW_PATH}` } }),
     webPushToProfiles(ids, { title, body, url: `/${REVIEW_PATH}`, tag }),
     sendEmail(
-      Deno.env.get('SUPPORT_EMAIL') ?? 'sportnnote@gmail.com',
+      Deno.env.get('SUPPORT_EMAIL') ?? 'support@sportnnote.in',
       title,
       `${body}\n\nOpen SportnNote → Settings → Review verifications to see the document and decide.\nThe document is only shown inside the app.`,
     ),

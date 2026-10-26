@@ -13,6 +13,15 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-26 — Support address: support@sportnnote.in
+The founder created the Cloudflare Email Routing rule `support@sportnnote.in → sportnnote@gmail.com`. Before that only `social@` existed and the catch-all was off, so mail to support@ bounced, although the API gate and the school-confirmation page already pointed people there.
+- **App:** the `SUPPORT_EMAIL` default (`src/core/hosts.ts`) is now support@sportnnote.in. It shows in Help, Contact support, Send feedback, the support answers and account deletion.
+- **Legal:** `LEGAL_CONTACT` is the same address in the privacy policy and terms. A contact change is not material, so `LEGAL_VERSION` is not bumped.
+- **Website:** `contactEmail` in `website/config.json` is the same address.
+- **Edge functions:** the `SUPPORT_EMAIL` fallbacks change too. The live secret `SUPPORT_EMAIL` still holds the Gmail address (checked by comparing its digest), so switching it is a separate, approved step.
+- **Unchanged:** `VAPID_SUBJECT` (a technical contact for push services).
+- **Verified:** tsc clean; 4,713 tests pass; the website build shows the new address on the home, privacy and support pages.
+
 ### 2026-10-26 — Published the go-live setup; web screen warm-up made gentle
 - **Published** (founder approved): web (live bundle `index-6298ae99…` = build) and Android OTA `2b3eb977` from `2c932f5`. APK 39 gets the empty-upload fix; the new sign-in and PDF options stay hidden there, as designed.
 - **Found on the live check:** about 2.5 s after start the web app warmed every lazy screen at once (~120 chunk requests, plus shared chunks). EAS Hosting answered 10 of 120 with **429 Too Many Requests**.

@@ -83,9 +83,10 @@ const cleanEmail = (v: string | undefined): string | undefined => {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s) ? s : undefined;
 };
 
-/** Where support email goes. Today's inbox until the company mailbox
- *  (support@<domain>) exists — then set EXPO_PUBLIC_SUPPORT_EMAIL. */
-export const SUPPORT_EMAIL = cleanEmail(process.env.EXPO_PUBLIC_SUPPORT_EMAIL) ?? 'sportnnote@gmail.com';
+/** Where support email goes: support@sportnnote.in (Cloudflare Email Routing →
+ *  the team inbox, set up 2026-10-26). EXPO_PUBLIC_SUPPORT_EMAIL overrides it
+ *  (e.g. support@<.com> after the domain move). */
+export const SUPPORT_EMAIL = cleanEmail(process.env.EXPO_PUBLIC_SUPPORT_EMAIL) ?? 'support@sportnnote.in';
 /** Published support hours, always with the time zone spelled out (users are
  *  in several countries). Mirrors website/config.json → supportHours. */
 export const SUPPORT_HOURS = 'Monday to Saturday, 10:00–18:00 India time (UTC+5:30)';

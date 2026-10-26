@@ -17,7 +17,7 @@
  *
  * Deploy:  supabase functions deploy support-escalate
  * Secrets: supabase secrets set RESEND_API_KEY=re_...
- *          supabase secrets set SUPPORT_EMAIL=sportnnote@gmail.com
+ *          supabase secrets set SUPPORT_EMAIL=support@sportnnote.in
  *          supabase secrets set SUPPORT_FROM="SportnNote <onboarding@resend.dev>"
  *   (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY are injected automatically.)
  */
@@ -33,7 +33,7 @@ const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...CORS, 'Content-Type': 'application/json' } });
 
 // Keep in sync with SUPPORT_EMAIL in src/data/repos.ts (the client's mailto fallback).
-const SUPPORT_EMAIL = Deno.env.get('SUPPORT_EMAIL') ?? 'sportnnote@gmail.com';
+const SUPPORT_EMAIL = Deno.env.get('SUPPORT_EMAIL') ?? 'support@sportnnote.in';
 // Resend requires a verified sender; its shared sandbox address works for testing.
 const SUPPORT_FROM = Deno.env.get('SUPPORT_FROM') ?? 'SportnNote Support <onboarding@resend.dev>';
 

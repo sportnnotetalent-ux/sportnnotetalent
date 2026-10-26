@@ -35,7 +35,7 @@ const CORS = {
 };
 const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { ...CORS, 'Content-Type': 'application/json' } });
 const FROM = Deno.env.get('OTP_FROM') ?? Deno.env.get('SUPPORT_FROM') ?? 'SportnNote <onboarding@resend.dev>';
-const REPLY_TO = Deno.env.get('SUPPORT_EMAIL') ?? 'sportnnote@gmail.com';
+const REPLY_TO = Deno.env.get('SUPPORT_EMAIL') ?? 'support@sportnnote.in';
 const URL = Deno.env.get('SUPABASE_URL')!;
 
 async function sha256(s: string): Promise<string> {
