@@ -30,7 +30,11 @@ A friend on Android forgot their password and used **Sign in with a code**. The 
 - **New `scripts/auth-smoke.mjs`:** run before every publish. It checks the live Auth settings the app relies on and maps every real error through `friendlyAuthError`; it fails on a generic or wrong message. Passing today (11 checks).
 - **`docs/testing/sign-in-test-script.md`:** the 10-step human checklist for inbox and SMS steps.
 - **Verified:** `tests/sign-in-codes.test.mts` (14); full suite 4,740 pass; tsc clean.
-- **Needs:** web + Android OTA. The founder may also check Supabase → Authentication → Email: OTP expiry 3600 s (the app accepts any code length).
+- **Live 2026-10-26:**
+  - `auth-smoke` passed before publishing.
+  - Web `index-09fa4f1f…` and Android OTA `50b82bf1` published from `416bbec`.
+  - Checked on the live sign-in page, signed out: **Sign in with a code** with a made-up email shows "There's no account with this email — check the spelling, or tap Create account."
+  - The founder may still check Supabase → Authentication → Email: OTP expiry 3600 s.
 
 ### 2026-10-26 — Shared-phone privacy, verification privacy, cut-off labels, file names
 From the founder's verification test (`docs/testing/verification-test-script.md`). The founder signed in on an Android phone as a friend, uploaded a proof, signed out, signed in as support and rejected it.
