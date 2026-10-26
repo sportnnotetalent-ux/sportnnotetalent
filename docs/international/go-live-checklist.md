@@ -78,7 +78,7 @@ All free, except SMS, which is already pay-as-you-go. Do them in this order. Ste
   - Supabase: `https://mpgbvbylmkwasjgupsbq.supabase.co/auth/v1/health?apikey=<the anon key>`. Use the public anon key from `.env.local.bak` (`EXPO_PUBLIC_SUPABASE_…KEY`); it is the same key every browser already gets.
 
   Don't add a monitor on `/rest/v1/…`: the anti-scraping gate rightly blocks robots there.
-- [ ] **7. Google Search Console (free).** search.google.com/search-console → **Add property** → **Domain** `sportnnote.in` → add the TXT record it shows in Cloudflare DNS → **Verify** → **Sitemaps** → submit `https://sportnnote.in/sitemap.xml`. The guides then show up in Google search sooner.
+- [x] **7. Google Search Console (free).** *Done 2026-10-26: Domain property verified (TXT record), sitemap submitted as the full URL `https://sportnnote.in/sitemap.xml` (a Domain property won't take just `sitemap.xml`); Google has discovered the guides.* search.google.com/search-console → **Add property** → **Domain** `sportnnote.in` → add the TXT record it shows in Cloudflare DNS → **Verify** → **Sitemaps** → submit `https://sportnnote.in/sitemap.xml`. The guides then show up in Google search sooner.
 - [ ] **8. Firebase SMS budget alert:** the item above. With Android sign-in on, SMS use will grow.
 
 **Cheap paid items** (decide when ready):
