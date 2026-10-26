@@ -65,7 +65,10 @@ All free, except SMS, which is already pay-as-you-go. Do them in this order. Ste
 
      Save.
   3. **Authentication → Rate Limits** → emails sent per hour: **100**.
-  4. Test "Forgot password" on the web app with an address that isn't on the Supabase team.
+  4. **Templates:** the Reset Password and Magic link templates must show the 6-digit code (`{{ .Token }}`). Supabase's defaults only send a link. The ready-to-paste templates are in `docs/auth-email-templates.md`.
+  5. Test "Forgot password" on the web app with an address that isn't on the Supabase team.
+
+  *2026-10-26: SMTP set and the first reset email sent. On the wrong port every request timed out (504 "Context deadline exceeded"); port 465 fixed it. The friend's email held a link, not a code, so the templates were updated. Final check: a code-based reset end to end.*
 
   Resend's free plan covers 3,000 emails a month (100 a day).
 - [ ] **5. support@sportnnote.in must reach you.** The app and the API's "automated access" message tell people to write there. Cloudflare → **sportnnote.in → Email → Email Routing → Routing rules**: check `support@sportnnote.in` exists and forwards to your inbox. Send it a test email from another account. Once it works, the app can use it everywhere: set `EXPO_PUBLIC_SUPPORT_EMAIL=support@sportnnote.in` in `.env.local.bak`, set `contactEmail` in `website/config.json`, and tell me; it reaches people with the next publish.
