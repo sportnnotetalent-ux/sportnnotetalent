@@ -187,6 +187,12 @@ function safeString(v: unknown): string {
 }
 
 /** Install global error handlers, record app_open, start batching. Call once at startup. */
+/** Metro's "the file for this module isn't loaded yet" signal (see startTelemetry). */
+export function isUnknownModuleProbe(e: unknown): boolean {
+  const msg = e instanceof Error ? e.message : String(e ?? '');
+  return /^Requiring unknown module "\d+"\.?$/.test(msg.trim());
+}
+
 export function startTelemetry(): void {
   if (!enabled || started) return;
   started = true;
@@ -196,7 +202,13 @@ export function startTelemetry(): void {
   if (EU) {
     const previous = EU.getGlobalHandler();
     EU.setGlobalHandler((e, fatal) => {
-      reportError(e, { fatal: !!fatal });
+      // Web: Metro's on-demand loader first tries a module whose file isn't
+      // downloaded yet. The "Requiring unknown module" it raises comes through
+      // here, the previous handler re-throws it, and the loader then fetches
+      // the file — the app carries on. It's not a crash (it was ~1 per session
+      // and made "crash-free sessions" read 38%). A file that really fails to
+      // load surfaces as a different error, which is still reported.
+      if (!(Platform.OS === 'web' && isUnknownModuleProbe(e))) reportError(e, { fatal: !!fatal });
       previous(e, fatal);
     });
   }

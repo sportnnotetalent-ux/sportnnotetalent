@@ -154,17 +154,40 @@ describe('nightly database backup', () => {
 
 describe('web: background screen warm-up is gentle', () => {
   const s = read('src/navigation/lazyScreens.ts');
-  test('at most WARM_AT_ONCE screens download together (all at once drew 429s from EAS Hosting)', () => {
-    assert.match(s, /export const WARM_AT_ONCE = 4;/);
+  const reg = read('src/sports/registry.ts');
+  test('two screens at a time with a pause (EAS Hosting refuses ~100 files in a few seconds)', () => {
+    assert.match(s, /export const WARM_AT_ONCE = 2;/);
+    assert.match(s, /export const WARM_GAP_MS = 250;/);
     assert.match(s, /Array\.from\(\{ length: Math\.min\(WARM_AT_ONCE, loaders\.length\) \}, \(\) => worker\(\)\)/);
-    assert.match(s, /while \(next < loaders\.length\) \{\s*const load = loaders\[next\+\+\];/);
-    assert.doesNotMatch(s, /for \(const load of loaders\) \{\s*try \{ screens\.push/);
+    assert.match(s, /await pause\(WARM_GAP_MS\);/);
   });
-  test('no warm-up on data saver or 2G; sports still follow, one at a time', () => {
+  test('the first refusal stops the warm-up (screens and sports load when opened)', () => {
+    assert.match(s, /while \(!backedOff && next < loaders\.length\)/);
+    assert.match(s, /catch \{ backedOff = true; \/\* retried on open \*\/ \}/);
+    assert.match(s, /if \(!backedOff\) void prefetchSports\(WARM_GAP_MS\)/);
+    assert.match(reg, /try \{ await loadSport\(id\); \} catch \{ return; \}/);
+    assert.match(reg, /if \(gapMs > 0\) await new Promise<void>/);
+  });
+  test('no warm-up on data saver or 2G', () => {
     assert.match(s, /if \(lowData\(\)\) return;/);
     assert.match(s, /c\.saveData === true \|\| \/\(\^\|-\)2g\$\/\.test/);
-    assert.match(s, /Promise\.all\(workers\)\.then\(\(\) => prefetchSports\(\)\)/);
-    assert.match(read('src/sports/registry.ts'), /chain\.then\(\(\) => loadSport\(id\)/);
+  });
+});
+
+describe('web: Metro\'s "not downloaded yet" step is not a crash', () => {
+  const src = read('src/core/telemetry.ts');
+  const body = src.slice(src.indexOf('export function isUnknownModuleProbe'), src.indexOf('export function startTelemetry'));
+  // eslint-disable-next-line @typescript-eslint/no-implied-eval
+  const probe = new Function(body.replace('export function isUnknownModuleProbe(e: unknown): boolean', 'return function(e)').replace('e instanceof Error', '(e instanceof Error)'))() as (e: unknown) => boolean;
+  test('the exact Metro message is recognised; anything else still counts', () => {
+    assert.equal(probe(new Error('Requiring unknown module "1026".')), true);
+    assert.equal(probe(new Error('Requiring unknown module "989"')), true);
+    assert.equal(probe(new Error('Loading module /_expo/static/js/web/index-abc.js failed.')), false);
+    assert.equal(probe(new Error("Unexpected token '<'")), false);
+    assert.equal(probe(new TypeError("Cannot read properties of undefined (reading 'footballPlugin')")), false);
+  });
+  test('only skipped on the web, and the previous handler still runs (so loading carries on)', () => {
+    assert.match(src, /if \(!\(Platform\.OS === 'web' && isUnknownModuleProbe\(e\)\)\) reportError\(e, \{ fatal: !!fatal \}\);\s*previous\(e, fatal\);/);
   });
 });
 

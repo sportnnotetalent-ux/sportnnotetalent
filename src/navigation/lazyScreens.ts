@@ -40,10 +40,16 @@ export function prefetchScreens(): void {
   else warmAll();
 }
 
-/** Screens warmed at the same time. All ~80 at once (≈240 files with their
- *  shared chunks) made EAS Hosting answer some with 429 Too Many Requests
- *  (seen 2026-10-26); a screen opened during that burst could fail to load. */
-export const WARM_AT_ONCE = 4;
+/** Screens warmed at the same time, with a pause after each. EAS Hosting
+ *  answers 429 Too Many Requests after roughly 100 files in a few seconds
+ *  (measured 2026-10-26: all at once, and even 4 at a time, hit it). Two at a
+ *  time with a pause is about 7 files a second, so ~90 screens take ~15 s in
+ *  the background. */
+export const WARM_AT_ONCE = 2;
+export const WARM_GAP_MS = 250;
+/** The host refused a file: stop warming — everything else loads when opened. */
+let backedOff = false;
+const pause = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 /** The browser says the person is saving data or on a 2G-class connection. */
 function lowData(): boolean {
@@ -54,13 +60,14 @@ function lowData(): boolean {
 function warmAll(): void {
   let next = 0;
   const worker = async (): Promise<void> => {
-    while (next < loaders.length) {
+    while (!backedOff && next < loaders.length) {
       const load = loaders[next++];
       // Metro's dev loader may hand back a bare thenable — normalise to a Promise.
-      try { await Promise.resolve(load()); } catch { /* retried on open */ }
+      try { await Promise.resolve(load()); } catch { backedOff = true; /* retried on open */ }
+      await pause(WARM_GAP_MS);
     }
   };
   const workers = Array.from({ length: Math.min(WARM_AT_ONCE, loaders.length) }, () => worker());
   // then the sports (perf F-15), so a match of any sport opens at once later
-  void Promise.all(workers).then(() => prefetchSports());
+  void Promise.all(workers).then(() => { if (!backedOff) void prefetchSports(WARM_GAP_MS); });
 }

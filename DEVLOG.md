@@ -13,6 +13,20 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-26 — Web "crashes" were mostly false alarms; the warm-up now backs off
+The weekly email showed **crash-free sessions 38% of 60**. The top errors were "Requiring unknown module …": 49× by 11 users and 18× by 7 users in 14 days, plus 18 in the last day. All of them were on the web.
+- **Root cause (Metro + our telemetry):**
+  - Metro's on-demand loader first tries `importAll(id)` directly. When the chunk isn't downloaded yet, that throws "Requiring unknown module", which is how it knows to fetch the file.
+  - Metro's require guard passes the throw to `ErrorUtils.reportFatalError`. Our telemetry handler reported it as a **fatal crash**, then called the previous handler, which re-throws, so the loader carried on and the app worked.
+  - Result: about 1 false "crash" per session, the first time anything loads on demand. Reproduced on live: a clean session logged "unknown module 1026" (the Firebase web SDK, pre-warmed by the sign-in card), yet `__r(1026)` worked afterwards.
+- **Fix (`src/core/telemetry.ts`):** on the web, the global handler no longer reports an exact `Requiring unknown module "N"` (`isUnknownModuleProbe`). It still calls the previous handler, so loading is unchanged. A chunk that really fails still shows up as a load error ("Loading module … failed" / "Unexpected token '<'"). Native is unchanged.
+- **Also real: 429s.** On a clean live load (after the 4-at-a-time change), EAS Hosting refused 31 of 122 files: about 20–25 files a second, and after roughly 100 files it answers 429. The refused ones were mostly the sport chunks, which then load when opened.
+  - **Fix (`lazyScreens.ts`, `sports/registry.ts`):** 2 at a time with a 250 ms pause (about 7 files a second); sports one at a time with the same pause; the **first refusal stops the warm-up**, and the rest load when opened.
+- **Verified:**
+  - Locally: 87 screens + 30 sports, at most 2 in flight and at most 6 files a second, no console errors.
+  - Tests in `tests/go-live-setup.test.mts`; full suite 4,716 pass.
+- **Needs:** a web publish (phones unaffected). The crash-free figure will read honestly from the next sessions; past weeks are inflated by the false reports.
+
 ### 2026-10-26 — Low-cost go-live setup: all 8 founder steps done
 Checklist: `docs/international/go-live-checklist.md` → "Low-cost go-live setup". All were done with the founder over 2026-10-25/26 and checked live where possible:
 1. **Firebase:** Android fingerprints and Play Integrity. APK 41 mobile sign-in was tested on a phone.

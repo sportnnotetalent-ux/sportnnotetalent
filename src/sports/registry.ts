@@ -131,13 +131,15 @@ export function rethrowIfLoading(e: unknown): void {
 
 let prefetched = false;
 /** Web: warm every sport's chunk in the background (after the screens — see
- *  lazyScreens.ts), one at a time, so opening a match of any sport later is
- *  instant. The phone app has them in its bundle already. */
-export function prefetchSports(): Promise<void> {
-  if (prefetched || LOADS_SYNC) return Promise.resolve();
+ *  lazyScreens.ts), one at a time with `gapMs` between them, so opening a
+ *  match of any sport later is instant. Stops at the first failure (e.g. the
+ *  host saying "too many requests"); those sports load when opened. The phone
+ *  app has them in its bundle already. */
+export async function prefetchSports(gapMs = 0): Promise<void> {
+  if (prefetched || LOADS_SYNC) return;
   prefetched = true;
-  return (Object.keys(SPORT_META) as SportId[]).reduce<Promise<void>>(
-    (chain, id) => chain.then(() => loadSport(id).then(() => undefined, () => undefined)),
-    Promise.resolve(),
-  );
+  for (const id of Object.keys(SPORT_META) as SportId[]) {
+    try { await loadSport(id); } catch { return; }
+    if (gapMs > 0) await new Promise<void>((resolve) => setTimeout(resolve, gapMs));
+  }
 }
