@@ -81,6 +81,8 @@ All free, except SMS, which is already pay-as-you-go. Do them in this order. Ste
 - [x] **7. Google Search Console (free).** *Done 2026-10-26: Domain property verified (TXT record), sitemap submitted as the full URL `https://sportnnote.in/sitemap.xml` (a Domain property won't take just `sitemap.xml`); Google has discovered the guides.* search.google.com/search-console → **Add property** → **Domain** `sportnnote.in` → add the TXT record it shows in Cloudflare DNS → **Verify** → **Sitemaps** → submit `https://sportnnote.in/sitemap.xml`. The guides then show up in Google search sooner.
 - [x] **8. Firebase SMS budget alert.** *Done 2026-10-26: "Alerts only" budget (the founder chose the amount), not "Spend cap enforcement", which would pause sign-in when hit. Protection against SMS abuse is the India-only SMS region policy.*
 
+- [ ] **Expo SDK 57 upgrade: with the next new APK, not on its own.** Decided 2026-10-26. The Hermes memory regression `expo doctor` warns about affects only apps using reanimated/worklets, and we use neither. The upgrade needs a new APK and a version bump to 1.1.0 (runtime `appVersion`), after which older APKs stop getting updates. Bundle it with the Play Store release so users reinstall once. See DEVLOG 2026-10-25.
+
 **Cheap paid items** (decide when ready):
 
 | Item | Cost | Why |

@@ -89,6 +89,7 @@ The founder asked why Android shows only email sign-in: the mobile + code option
   - web + Android bundles export;
   - a scratch `expo prebuild --platform android` produces the autoVerify filter (15 paths) and applies google-services.
 - **Seen in the EAS log (pre-existing, not from this change):** `expo doctor` flags a known Hermes V1 memory regression in expo 56.0.11 / React Native 0.85.3, fixed only in SDK 57 (React Native 0.86.2+). It also lists a few patch-version mismatches. That is a separate upgrade decision.
+  - **Decided 2026-10-26: hold.** Expo's SDK 57 notes say the Hermes regression affects only apps using `react-native-reanimated` / `react-native-worklets`; SportnNote uses neither. An SDK upgrade changes native code, so it needs a new APK and a version bump (runtimeVersion policy `appVersion` is 1.0.0; an SDK 57 OTA on APK 41 would crash), and APK 41 users would stop getting OTAs until they reinstall. SDK 57 (expo ≥ 57.0.17, React Native 0.86.3) will ship with the next change that needs a new APK anyway, such as the Play Store release. Then: bump `version` to 1.1.0, re-check React Native's Kotlin version against the Firebase BoM pin (`tests/go-live-setup.test.mts` fails on React Native ≠ 0.85 on purpose), and rebuild.
 - **iOS note:** the React Native Firebase plugin stops an iOS prebuild until `GoogleService-Info.plist` exists. That is fine for now, since iOS waits for the Apple account.
 - **Needs:**
   - **Founder:** the checklist steps (1–2 before installing the APK);
