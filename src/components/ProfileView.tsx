@@ -5,6 +5,7 @@ import { isEventSport } from '../sports/eventSports';
 import React, { useEffect, useState } from 'react';
 import { ScrollView, View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
 import { theme } from '../core/theme';
+import { docKindLabel } from '../core/verificationReview';
 import { Card, Pill, Button, SelectChip, EmptyState, FormError, textStyles, plural } from './ui';
 import { SectionHeader, SECTION_CAP } from './SectionHeader';
 import { ContactCard } from './ContactCard';
@@ -246,7 +247,7 @@ export function ProfileView({
         <TouchableOpacity accessibilityRole="button" activeOpacity={0.8} onPress={onOpenVerificationReview}>
           <Card style={st.reviewCard}>
             <View style={st.reviewCardRow}>
-              <Text style={textStyles.h3}>🛡️ Review verifications</Text>
+              <Text style={[textStyles.h3, st.headTitle]}>🛡️ Review verifications</Text>
               {pendingCount != null && pendingCount > 0 && (
                 <Pill label={`${pendingCount} pending`} color={theme.colors.surfaceAlt} textColor={theme.colors.accent} />
               )}
@@ -573,7 +574,7 @@ function VerificationCard({ player, owner, reviewer }: { player: Player; owner: 
   return (
     <Card style={{ gap: theme.spacing(2) }}>
       <View style={st.verifyHead}>
-        <Text style={textStyles.h3}>🛡️ Age & guardian verification</Text>
+        <Text style={[textStyles.h3, st.headTitle]}>🛡️ Age & guardian verification</Text>
         <Pill label={badge.label} color={theme.colors.surfaceAlt} textColor={badge.color} />
       </View>
       <Text style={textStyles.muted}>
@@ -630,7 +631,7 @@ function VerificationCard({ player, owner, reviewer }: { player: Player; owner: 
               </Text>
               <View style={{ flex: 1 }}>
                 <Text style={st.historyLine}>
-                  {e.action === 'submitted' ? `Submitted${e.docName ? ` · ${e.docName}` : ''}` : e.action === 'approved' ? `Approved by ${e.byName ?? 'support'}` : `Rejected by ${e.byName ?? 'support'}`}
+                  {e.action === 'submitted' ? `${e.docName ? docKindLabel(e.docName) : 'Proof'} submitted` : e.action === 'approved' ? `Approved by ${e.byName ?? 'support'}` : `Rejected by ${e.byName ?? 'support'}`}
                 </Text>
                 {e.action === 'rejected' && e.note ? <Text style={st.historyNote}>{e.note}</Text> : null}
               </View>
@@ -650,11 +651,13 @@ const st = StyleSheet.create({
   emptyBlock: { gap: theme.spacing(3), paddingVertical: theme.spacing(8) },
   headerRow: { flexDirection: 'row', gap: theme.spacing(3), alignItems: 'center' },
   verifiedTick: { fontSize: theme.font.body },
-  verifyHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: theme.spacing(2) },
+  // Wraps: on a narrow phone the status drops under the title instead of being cut off.
+  verifyHead: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: theme.spacing(2) },
+  headTitle: { flexShrink: 1 },
   reviewRow: { flexDirection: 'row', gap: theme.spacing(3), marginTop: theme.spacing(1) },
   reviewBtn: { flex: 1 },
   reviewCard: { gap: theme.spacing(2), borderColor: theme.colors.accent },
-  reviewCardRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: theme.spacing(2) },
+  reviewCardRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: theme.spacing(2) },
   rejectNote: { color: theme.colors.danger, fontSize: theme.font.small },
   historyBox: { marginTop: theme.spacing(1), paddingTop: theme.spacing(2), borderTopWidth: 1, borderTopColor: theme.colors.border, gap: theme.spacing(1) },
   historyTitle: { color: theme.colors.textMuted, fontSize: theme.font.tiny, fontWeight: '800', letterSpacing: 0.5, textTransform: 'uppercase' },

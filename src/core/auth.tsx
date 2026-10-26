@@ -15,6 +15,7 @@ import { analyticsChoice } from './analyticsConsent';
 import { planAuthEvent, profileFromSession, confirmedLoginEmail } from './authEvents';
 import { clearMyPlayerIdCache } from '../data/myPlayerIdMemo';
 import { clearReadCache } from '../data/readCache';
+import { releaseDeviceForSignOut } from './deviceSignOut';
 import type { GuardianContact, Profile, Role } from './types';
 
 /** Turn a raw Supabase/network error into a plain, actionable message. Users
@@ -308,6 +309,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     },
     signOut: async () => {
+      // Before the session ends: this phone/browser stops getting the account's
+      // pushes, reminders and in-app alerts (core/deviceSignOut.ts).
+      await releaseDeviceForSignOut();
       clearMyPlayerIdCache();
       clearReadCache(); // F-19: nothing read as one account is served to the next
       if (supabase) await supabase.auth.signOut();

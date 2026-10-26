@@ -3748,7 +3748,20 @@ export async function setFollowPrefs(
 
 export async function savePushToken(token: string, profileId?: string): Promise<void> {
   if (!isSupabaseConfigured || !supabase || !profileId) return;
-  await supabase.from('push_tokens').upsert({ profile_id: profileId, token });
+  // One phone, one account: claim_push_token (migration 20261026120000) moves the
+  // token here from whoever signed in on this phone before. Before that runs,
+  // fall back to the old add-only save.
+  const { error } = await supabase.rpc('claim_push_token', { p_token: token });
+  if (error) await supabase.from('push_tokens').upsert({ profile_id: profileId, token });
+}
+
+/** Signing out: this phone stops receiving the account's pushes. Must run while
+ *  the session still exists (the row is the user's own). */
+export async function releasePushToken(token: string): Promise<void> {
+  if (!isSupabaseConfigured || !supabase) return;
+  const { data } = await supabase.auth.getUser();
+  if (!data.user) return;
+  await supabase.from('push_tokens').delete().eq('profile_id', data.user.id).eq('token', token);
 }
 
 /** Deliver a REMOTE push to other users (by player id) so it lands even when their

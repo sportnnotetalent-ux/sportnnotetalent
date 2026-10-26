@@ -13,6 +13,7 @@ import { useFocusEffect, useNavigation, useRoute, type RouteProp } from '@react-
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { KeyboardAwareScrollView } from '../components/keyboard';
 import { theme } from '../core/theme';
+import { docKindLabel } from '../core/verificationReview';
 import { Button, Card, EmptyState, FormError, LoadingState, ScreenTitle, SelectChip, TextField, textStyles } from '../components/ui';
 import { useAuth } from '../core/auth';
 import { pickDocument } from '../core/document';
@@ -161,7 +162,7 @@ export default function OrgVerifyScreen() {
               <SelectChip key={k} label={k} active={v?.docKind === k} onPress={() => { if (!locked) void run('kind', () => saveOrgVerification(orgId, { docKind: k })); }} />
             ))}
           </View>
-          {v?.hasDoc ? <Text style={textStyles.body}>📎 {v.docName ?? 'Document'}</Text> : null}
+          {v?.hasDoc ? <Text style={textStyles.body}>📎 {v.docKind ?? 'Document'} uploaded · {docKindLabel(v.docName ?? undefined)}</Text> : null}
           {!locked ? <Button label={busy === 'doc' ? 'Uploading…' : v?.hasDoc ? '📎 Replace the document' : '📎 Upload the document (image / PDF)'} variant="ghost" onPress={() => void upload('doc')} disabled={!!busy || !v?.docKind} /> : null}
           {!v?.docKind && !locked ? <Text style={textStyles.muted}>Pick the kind of document first.</Text> : null}
         </Card>
@@ -203,7 +204,7 @@ export default function OrgVerifyScreen() {
                 <>
                   <Button label="📄 Print the letter template" variant="ghost" onPress={() => void printAuthorisationLetter(orgId, profile?.fullName ?? 'Your name', state.ids)} />
                   <Text style={textStyles.muted}>Print it on school letterhead, get it signed and stamped by the Principal or Head, then upload a photo or scan.</Text>
-                  {v?.hasLetter ? <Text style={textStyles.body}>📎 {v.letterName ?? 'Signed letter'}</Text> : null}
+                  {v?.hasLetter ? <Text style={textStyles.body}>📎 Signed letter uploaded · {docKindLabel(v.letterName ?? undefined)}</Text> : null}
                   {!locked ? <Button label={busy === 'letter' ? 'Uploading…' : v?.hasLetter ? '📎 Replace the signed letter' : '📎 Upload the signed letter'} variant="ghost" onPress={() => void upload('letter')} disabled={!!busy} /> : null}
                 </>
               ) : null}

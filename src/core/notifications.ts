@@ -136,6 +136,19 @@ export async function listenForNotificationTaps(open: (url: string) => void): Pr
   N.addNotificationResponseReceivedListener(go);
 }
 
+/** This phone's push token, once registerForPush has run this session. */
+let deviceToken: string | null = null;
+export const currentPushToken = (): string | null => deviceToken;
+
+/** Signing out: this device stops acting for the account — its in-app alerts,
+ *  its scheduled reminders and "who am I" go. (Its push token is released by
+ *  the caller, while the session still exists.) */
+export async function forgetAccountOnDevice(): Promise<void> {
+  notifyStore.clear();
+  currentPlayerId = null;
+  await syncScheduledLocal([]); // cancels the reminders we scheduled; leaves others
+}
+
 export async function registerForPush(): Promise<string | null> {
   const N = await getNotif();
   if (!N) return null;
@@ -159,6 +172,7 @@ export async function registerForPush(): Promise<string | null> {
     // standalone (APK / store) builds.
     const projectId = (Constants.expoConfig?.extra as { eas?: { projectId?: string } } | undefined)?.eas?.projectId ?? Constants.easConfig?.projectId;
     const token = await N.getExpoPushTokenAsync(projectId ? { projectId } : undefined);
+    deviceToken = token.data;
     return token.data;
   } catch {
     return null;

@@ -18,6 +18,10 @@ export const notifyStore = {
     items = [{ ...n, id: `n-${counter++}`, read: false }, ...items].slice(0, 100);
     emit();
   },
+  /** Signing out: the next person on this device mustn't see these. */
+  clear() {
+    if (items.length) { items = []; emit(); }
+  },
   markAllRead() {
     if (items.some((i) => !i.read)) {
       items = items.map((i) => (i.read ? i : { ...i, read: true }));

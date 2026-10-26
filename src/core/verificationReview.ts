@@ -31,6 +31,13 @@ export function isImageDoc(name: string | undefined): boolean {
   return /\.(jpe?g|png|webp|gif|heic|heif)$/i.test(name ?? '');
 }
 
+/** What kind of file it is, for display — never the file's own name (names can
+ *  be long, odd, or say something personal). */
+export function docKindLabel(name: string | undefined): 'PDF' | 'Photo' | 'File' {
+  if (/\.pdf$/i.test(name ?? '')) return 'PDF';
+  return isImageDoc(name) ? 'Photo' : 'File';
+}
+
 /** "2012-03-05" → "5 Mar 2012" (the reviewer compares it with the document). */
 export function readableDob(dob: string | undefined): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(dob ?? '');

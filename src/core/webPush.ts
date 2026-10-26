@@ -71,6 +71,20 @@ export async function enableWebPush(): Promise<WebPushStatus> {
   return 'on';
 }
 
+/** Signed in on a browser that already has notifications on: make sure they're
+ *  this account's (the subscription follows whoever is signed in). */
+export async function resaveWebPushIfOn(): Promise<void> {
+  if (!supported() || Notification.permission !== 'granted') return;
+  const reg = await navigator.serviceWorker.getRegistration();
+  const sub = await reg?.pushManager.getSubscription();
+  if (!sub) return;
+  const json = sub.toJSON() as { endpoint?: string; keys?: { p256dh?: string; auth?: string } };
+  await supabase!.rpc('save_web_push_subscription', {
+    p_endpoint: json.endpoint, p_p256dh: json.keys?.p256dh, p_auth: json.keys?.auth,
+    p_user_agent: navigator.userAgent.slice(0, 200),
+  }).then(() => undefined, () => undefined);
+}
+
 export async function disableWebPush(): Promise<void> {
   if (!supported()) return;
   const reg = await navigator.serviceWorker.getRegistration();

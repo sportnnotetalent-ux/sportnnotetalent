@@ -13,6 +13,29 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-26 — Shared-phone privacy, verification privacy, cut-off labels, file names
+From the founder's verification test (`docs/testing/verification-test-script.md`). The founder signed in on an Android phone as a friend, uploaded a proof, signed out, signed in as support and rejected it.
+- **Bug: a friend's notifications followed the phone to the next account.**
+  - The friend's "Proof of date of birth sent" stayed in the in-app list, which was in memory and never cleared on sign-out.
+  - The friend's "rejected" push popped up on the support account. `push_tokens` was keyed `(profile_id, token)`, sign-out never removed the token, and on live **one phone token belonged to 3 accounts**.
+  - Fix:
+    - Sign-out runs `releaseDeviceForSignOut()` (`src/core/deviceSignOut.ts`) before the session ends: the phone deletes its own token row; the browser unsubscribes web push; the in-app alerts are cleared (`notifyStore.clear`); scheduled reminders are cancelled; "who am I" is reset. It gives up after 3 s if offline.
+    - Sign-in claims the token through `claim_push_token`, which moves it to this account; the old save remains as a fallback until the migration runs.
+    - Web sign-in re-saves an existing browser subscription for the current account.
+    - The migration dedupes tokens and adds a unique index on `token`.
+- **Privacy: others now see only "verified".**
+  - `players_view` used to give non-private viewers `{status}`, so pending and rejected could be read through the API, although the app never showed them. Now others get `{"status":"approved"}` or nothing.
+  - The person and support still get everything. The card is already shown only to the owner and support. A parent's screens never show the child's status.
+  - Every other-player check compares to 'approved', so nothing else changes.
+- **Cut-off status labels:** the "Age & guardian verification" and "Review verifications" headers (and the live-scoring header) now wrap, with the title shrinking, so the label drops under the title on a narrow phone. Checked at 375 px.
+- **No raw file names:** `docKindLabel()` gives "Photo" / "PDF" / "File":
+  - profile history: "Photo submitted";
+  - reviewer card: "📄 Open the PDF", and "Tap to open full size";
+  - school screen: "📎 Board affiliation letter uploaded · PDF".
+- **Migration** `20261026120000_device_account_and_verification_privacy.sql` (founder runs). The view is identical to `20261024180000` apart from `verification` (diffed).
+- **Verified:** `tests/shared-device-and-verification-privacy.test.mts` (10); full suite 4,726 pass; tsc clean; 375 px preview check.
+- **Needs:** the founder runs the migration; web + Android OTA (JS only).
+
 ### 2026-10-26 — Web "crashes" were mostly false alarms; the warm-up now backs off
 The weekly email showed **crash-free sessions 38% of 60**. The top errors were "Requiring unknown module …": 49× by 11 users and 18× by 7 users in 14 days, plus 18 in the last day. All of them were on the web.
 - **Root cause (Metro + our telemetry):**

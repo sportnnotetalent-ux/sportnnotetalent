@@ -25,7 +25,7 @@ import { useVerificationReviewer } from '../data/useVerificationReviewer';
 import { ageFromDob } from '../core/age';
 import { isSupport } from '../core/roles';
 import { useAuth } from '../core/auth';
-import { REJECT_REASONS, isImageDoc, isOverdue, priorRejections, readableDob, waitedLabel } from '../core/verificationReview';
+import { REJECT_REASONS, isImageDoc, isOverdue, priorRejections, readableDob, waitedLabel, docKindLabel } from '../core/verificationReview';
 
 export default function VerificationReviewScreen() {
   const { profile } = useAuth();
@@ -192,7 +192,7 @@ function OrgReview({ o, now, onDone }: { o: OrgQueueItem; now: number; onDone: (
       }) : <Text style={st.warn}>No official ID given.</Text>}
 
       <Text style={st.sub}>2 · Recognition document{v?.docKind ? ` — ${v.docKind}` : ''}</Text>
-      {v?.docPath === 'demo' ? <Text style={textStyles.muted}>📎 {v.docName} (demo)</Text> : <DocPreview docPath={v?.docPath ?? undefined} docName={v?.docName ?? undefined} />}
+      {v?.docPath === 'demo' ? <Text style={textStyles.muted}>📎 {docKindLabel(v.docName ?? undefined)} (demo)</Text> : <DocPreview docPath={v?.docPath ?? undefined} docName={v?.docName ?? undefined} />}
 
       <Text style={st.sub}>3 · Authority — {v?.authority ? AUTHORITY_OPTIONS[v.authority].title : 'not given'}</Text>
       {v?.authority === 'email' ? (
@@ -202,7 +202,7 @@ function OrgReview({ o, now, onDone }: { o: OrgQueueItem; now: number; onDone: (
         </>
       ) : v?.authority === 'letter' ? (
         <>
-          {v.letterPath === 'demo' ? <Text style={textStyles.muted}>📎 {v.letterName} (demo)</Text> : <DocPreview docPath={v.letterPath ?? undefined} docName={v.letterName ?? undefined} />}
+          {v.letterPath === 'demo' ? <Text style={textStyles.muted}>📎 {docKindLabel(v.letterName ?? undefined)} (demo)</Text> : <DocPreview docPath={v.letterPath ?? undefined} docName={v.letterName ?? undefined} />}
           <Text style={textStyles.muted}>Call the school office on the number in the public register (never a number from the applicant) and ask them to confirm the letter.</Text>
         </>
       ) : v?.authority === 'head' ? (
@@ -255,13 +255,13 @@ function DocPreview({ docPath, docName }: { docPath?: string; docName?: string }
   if (!url) return <Text style={textStyles.muted}>Loading document…</Text>;
   if (image) {
     return (
-      <Pressable onPress={() => void Linking.openURL(url)} accessibilityRole="imagebutton" accessibilityLabel={`Document ${docName ?? ''}. Open full size`}>
+      <Pressable onPress={() => void Linking.openURL(url)} accessibilityRole="imagebutton" accessibilityLabel="Document photo. Open full size">
         <Image source={{ uri: url }} style={st.doc} resizeMode="contain" />
-        <Text style={st.docHint}>Tap to open full size · {docName}</Text>
+        <Text style={st.docHint}>Tap to open full size</Text>
       </Pressable>
     );
   }
-  return <Button label={`📄 Open ${docName ?? 'document'}`} variant="ghost" onPress={() => void Linking.openURL(url)} />;
+  return <Button label={docKindLabel(docName) === 'PDF' ? '📄 Open the PDF' : '📄 Open the file'} variant="ghost" onPress={() => void Linking.openURL(url)} />;
 }
 
 /** Support: who else can review. Added by their mobile or email (they need a

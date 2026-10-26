@@ -292,8 +292,10 @@ export default function RootNavigator() {
     // SD-111: a match result held when the app was closed goes out now.
     void flushPendingResults().catch(() => 0);
     registerForPush().then((token) => {
-      if (token) void savePushToken(token, profile?.id);
+      if (token) void savePushToken(token, profile?.id); // claims this phone for this account only
     });
+    // Web: a browser that already has notifications on now delivers this account's.
+    if (Platform.OS === 'web') void import('../core/webPush').then((m) => m.resaveWebPushIfOn()).catch(() => undefined);
   }, [authed, profile?.id]);
 
   // Signed in from a guest page → take them back to that page.
