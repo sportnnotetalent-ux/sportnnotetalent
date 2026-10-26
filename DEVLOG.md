@@ -21,6 +21,11 @@ The founder created the Cloudflare Email Routing rule `support@sportnnote.in →
 - **Edge functions:** the `SUPPORT_EMAIL` fallbacks change too. The live secret `SUPPORT_EMAIL` still holds the Gmail address (checked by comparing its digest), so switching it is a separate, approved step.
 - **Unchanged:** `VAPID_SUBJECT` (a technical contact for push services).
 - **Verified:** tsc clean; 4,713 tests pass; the website build shows the new address on the home, privacy and support pages.
+- **Live 2026-10-26 (founder approved):**
+  - The founder's test email arrived.
+  - Server secret `SUPPORT_EMAIL` set; its digest matches support@sportnnote.in.
+  - Web published (`index-6249b5b9…`); Android OTA `05f9c106`.
+  - sportnnote.in home, privacy, support and terms show support@ with no Gmail left.
 
 ### 2026-10-26 — Published the go-live setup; web screen warm-up made gentle
 - **Published** (founder approved): web (live bundle `index-6298ae99…` = build) and Android OTA `2b3eb977` from `2c932f5`. APK 39 gets the empty-upload fix; the new sign-in and PDF options stay hidden there, as designed.
