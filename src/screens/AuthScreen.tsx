@@ -53,6 +53,16 @@ export default function AuthScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [code, setCode] = useState('');
+  // When the last code went out: Supabase refuses another for the same address
+  // within 60 s, so "Resend code" counts down instead of failing.
+  const [sentAt, setSentAt] = useState(0);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!sentAt) return;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [sentAt]);
+  const resendIn = sentAt ? Math.max(0, RESEND_WAIT_S - Math.floor((now - sentAt) / 1000)) : 0;
   const [newPassword, setNewPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [mobile, setMobile] = useState('');
@@ -77,7 +87,7 @@ export default function AuthScreen() {
   const usUnder13 = usUnder13Blocked(country, age);
   const guardianMustConfirm = minor && guardianConfirmRequired(country);
 
-  const clearFlow = () => { setSent(false); setCode(''); setNewPassword(''); setNote(null); setError(null); setOtpChannel('email'); setShowResend(false); };
+  const clearFlow = () => { setSent(false); setSentAt(0); setCode(''); setNewPassword(''); setNote(null); setError(null); setOtpChannel('email'); setShowResend(false); };
   const switchMode = (m: Mode) => { setMode(m); setFlow('password'); clearFlow(); };
   const switchFlow = (f: Flow) => { setFlow(f); clearFlow(); };
 
@@ -149,29 +159,31 @@ export default function AuthScreen() {
   const otpRequest = () => {
     if (otpChannel === 'phone') {
       if (!isValidPhone(mobile)) return setError('Enter your mobile number (check the country code) to get an SMS code.');
-      return void run(() => sendPhoneOtp(mobile.trim()), `We texted a 6-digit code to ${formatPhone(mobile)}.`, () => setSent(true));
+      return void run(() => sendPhoneOtp(mobile.trim()), `We texted a sign-in code to ${formatPhone(mobile)}.`, () => { setSent(true); setSentAt(Date.now()); });
     }
     if (!email.trim()) return setError('Enter your email to get a code.');
-    void run(() => sendSignInOtp(email.trim()), `We emailed a 6-digit code to ${email.trim()}.`, () => setSent(true));
+    void run(() => sendSignInOtp(email.trim()), codeSentNote('a sign-in code', email.trim()), () => { setSent(true); setSentAt(Date.now()); setCode(''); });
   };
   const otpVerify = () => {
-    if (!code.trim()) return setError('Enter the code we sent you.');
+    const c = cleanCode(code);
+    if (!c) return setError('Enter the code we sent you.');
     void run(() =>
       otpChannel === 'phone'
-        ? verifyPhoneOtp(mobile.trim(), code.trim())
-        : verifySignInOtp(email.trim(), code.trim())
+        ? verifyPhoneOtp(mobile.trim(), c)
+        : verifySignInOtp(email.trim(), c)
     ); // success → onAuthStateChange signs you in
   };
 
   // Password reset (recovery code flow).
   const resetRequest = () => {
     if (!email.trim()) return setError('Enter your account email.');
-    void run(() => sendPasswordReset(email.trim()), `We emailed a reset code to ${email.trim()}.`, () => setSent(true));
+    void run(() => sendPasswordReset(email.trim()), codeSentNote('a reset code', email.trim()), () => { setSent(true); setSentAt(Date.now()); setCode(''); });
   };
   const resetConfirm = () => {
-    if (!code.trim()) return setError('Enter the reset code from your email.');
+    const c = cleanCode(code);
+    if (!c) return setError('Enter the reset code from your email.');
     if (newPassword.length < 6) return setError('Choose a new password (at least 6 characters).');
-    void run(() => confirmPasswordReset(email.trim(), code.trim(), newPassword)); // success → signed in
+    void run(() => confirmPasswordReset(email.trim(), c, newPassword)); // success → signed in
   };
 
   const showPassword = mode === 'up' || (mode === 'in' && flow === 'password');
@@ -192,7 +204,7 @@ export default function AuthScreen() {
         {/* Web: mobile number + SMS code is the main way in; email below. */}
         {phoneLoginAvailable() && (
           <>
-            <PhoneLoginCard onUseEmail={() => switchMode('in')} />
+            <PhoneLoginCard onUseEmail={() => switchMode('in')} onUseEmailCode={() => { setMode('in'); switchFlow('otp'); }} />
             <View style={st.orRow}>
               <View style={st.orLine} />
               <Text style={textStyles.muted}>or use email</Text>
@@ -244,8 +256,9 @@ export default function AuthScreen() {
             />
           )}
 
-          {/* OTP / reset: the 6-digit code, plus a new password for reset. */}
-          {codeFlow && sent && <Field label="6-digit code" value={code} onChange={setCode} placeholder="123456" keyboardType="number-pad" autoComplete="one-time-code" />}
+          {/* OTP / reset: the code from the email (Supabase sets its length — any
+              length works here), plus a new password for reset. */}
+          {codeFlow && sent && <Field label={otpChannel === 'phone' ? 'Code from the SMS' : 'Code from the email'} value={code} onChange={setCode} placeholder="Type every digit" keyboardType="number-pad" autoComplete="one-time-code" />}
           {mode === 'in' && flow === 'reset' && sent && <Field label="New password" value={newPassword} onChange={setNewPassword} placeholder="••••••••" secure autoComplete="new-password" />}
 
           {mode === 'up' && minor && (
@@ -326,7 +339,7 @@ export default function AuthScreen() {
             <>
               <Button label={busy ? 'Please wait…' : sent ? 'Verify & sign in' : otpChannel === 'phone' ? 'Text me a code' : 'Email me a code'} onPress={sent ? otpVerify : otpRequest} disabled={busy} />
               <View style={st.linkRow}>
-                {sent && <Text style={st.link} accessibilityRole="button" onPress={otpRequest}>Resend code</Text>}
+                {sent && <ResendLink waitS={resendIn} onPress={otpRequest} />}
                 <Text style={st.link} accessibilityRole="button" onPress={() => switchFlow('password')}>Use password instead</Text>
               </View>
             </>
@@ -336,7 +349,7 @@ export default function AuthScreen() {
             <>
               <Button label={busy ? 'Please wait…' : sent ? 'Reset password & sign in' : 'Send reset code'} onPress={sent ? resetConfirm : resetRequest} disabled={busy} />
               <View style={st.linkRow}>
-                {sent && <Text style={st.link} accessibilityRole="button" onPress={resetRequest}>Resend code</Text>}
+                {sent && <ResendLink waitS={resendIn} onPress={resetRequest} />}
                 <Text style={st.link} accessibilityRole="button" onPress={() => switchFlow('password')}>Back to sign in</Text>
               </View>
             </>
@@ -345,6 +358,24 @@ export default function AuthScreen() {
       </KeyboardAwareScrollView>
     </SafeAreaView>
   );
+}
+
+/** Supabase refuses a second code for the same address within this many seconds. */
+const RESEND_WAIT_S = 60;
+
+/** A typed or pasted code: digits only ("1234 5678", "1234-5678" → "12345678"). */
+export function cleanCode(raw: string): string {
+  return raw.replace(/\D/g, '');
+}
+
+/** What to say once a code is on its way. */
+export function codeSentNote(what: string, email: string): string {
+  return `We emailed ${what} to ${email}. It can take a minute — check spam too. Type every digit; a new code replaces the last one.`;
+}
+
+function ResendLink({ waitS, onPress }: { waitS: number; onPress: () => void }) {
+  if (waitS > 0) return <Text style={[st.link, { opacity: 0.5 }]}>Resend code in {waitS}s</Text>;
+  return <Text style={st.link} accessibilityRole="button" onPress={onPress}>Resend code</Text>;
 }
 
 function Field({

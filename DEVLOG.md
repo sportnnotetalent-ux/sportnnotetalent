@@ -13,6 +13,25 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-26 — Sign-in codes: 8 digits, clear messages, and a pre-release sign-in check
+A friend on Android forgot their password and used **Sign in with a code**. The email had an **8-digit** code (Supabase's OTP length on this project), but the app said "6-digit code" with the placeholder "123456". He typed 6 digits and got "That code is incorrect or has expired", so it looked as if codes expired at once. The founder asked for the whole sign-up / sign-in area to be checked properly rather than issue by issue.
+- **Probed the live Auth API with a made-up address** (no account created, no email sent) and compared every real error with what the app shows. Found:
+  - **No account for that email** came back as *"Sign-ups are currently disabled. Please contact support."*, which is wrong and alarming. Now: "There's no account with this email — check the spelling, or tap Create account." The rule sits before the code rule, because the message contains "otp".
+  - **Wrong / short code**: "Token has expired or is invalid" now reads "That code didn't work. Type every digit from the newest email (a new code replaces the last one), or tap Resend code."
+  - Wrong password, short password, bad email, already registered, too soon and send failure were already clear. A reset for an unknown email returns 200, so there's no account leak.
+  - Supabase's own SMS sign-in is off (`phone: false`), and the app's SMS-code option is already hidden (`SMS_LOGIN_ENABLED = false`). Mobile sign-in is Firebase.
+- **AuthScreen:**
+  - the code box says "Code from the email" / "Type every digit" (no length);
+  - spaces and dashes in a pasted code are ignored (`cleanCode`);
+  - after sending, the note says "It can take a minute — check spam too…";
+  - **Resend code counts down 60 s** (Supabase's limit) instead of failing.
+- **PhoneLoginCard:** a number that isn't verified yet now offers **"Forgot the password? Email me a sign-in code"** (it opens the code flow), so there's no dead end.
+- **Checked as correct:** the app's own codes (contact verification, school email code) really are 6 digits; Firebase SMS codes are 6.
+- **New `scripts/auth-smoke.mjs`:** run before every publish. It checks the live Auth settings the app relies on and maps every real error through `friendlyAuthError`; it fails on a generic or wrong message. Passing today (11 checks).
+- **`docs/testing/sign-in-test-script.md`:** the 10-step human checklist for inbox and SMS steps.
+- **Verified:** `tests/sign-in-codes.test.mts` (14); full suite 4,740 pass; tsc clean.
+- **Needs:** web + Android OTA. The founder may also check Supabase → Authentication → Email: OTP expiry 3600 s (the app accepts any code length).
+
 ### 2026-10-26 — Shared-phone privacy, verification privacy, cut-off labels, file names
 From the founder's verification test (`docs/testing/verification-test-script.md`). The founder signed in on an Android phone as a friend, uploaded a proof, signed out, signed in as support and rejected it.
 - **Bug: a friend's notifications followed the phone to the next account.**

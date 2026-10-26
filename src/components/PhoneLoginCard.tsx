@@ -21,7 +21,7 @@ const ROLES: Role[] = ['player', 'parent', 'scorer', 'organizer', 'fan'];
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 type Step = 'phone' | 'code' | 'details' | 'unverified';
 
-export function PhoneLoginCard({ onUseEmail }: { onUseEmail?: () => void }) {
+export function PhoneLoginCard({ onUseEmail, onUseEmailCode }: { onUseEmail?: () => void; onUseEmailCode?: () => void }) {
   const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [step, setStep] = useState<Step>('phone');
   const [phone, setPhone] = useState('');
@@ -164,6 +164,8 @@ export function PhoneLoginCard({ onUseEmail }: { onUseEmail?: () => void }) {
         <>
           <Text style={textStyles.body}>{note}</Text>
           {onUseEmail && <Button label="Sign in with email" variant="ghost" onPress={onUseEmail} />}
+          {/* Forgotten password: a code to the account's email needs none. */}
+          {onUseEmailCode && <Button label="Forgot the password? Email me a sign-in code" variant="ghost" onPress={onUseEmailCode} />}
           <Text style={st.link} accessibilityRole="button" onPress={() => { setStep('phone'); setNote(null); }}>Use a different number</Text>
         </>
       )}

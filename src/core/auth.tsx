@@ -27,6 +27,8 @@ export function friendlyAuthError(raw?: string): string {
     return "Can't reach the server. Check your internet connection and try again.";
   if (m.includes('email not confirmed')) return 'Please confirm your email first — open the link we sent to your inbox (check spam), then sign in.';
   if (/(invalid login|invalid credentials|invalid password)/.test(m)) return 'Wrong email or password. Try again, or reset your password.';
+  // "Sign in with a code" for an email that has no account (Supabase: otp_disabled).
+  if (m.includes('signups not allowed for otp')) return 'There’s no account with this email — check the spelling, or tap Create account.';
   if (/(already registered|already exists|user already)/.test(m)) return 'An account with this email already exists — try signing in instead.';
   if (/(rate limit|too many|429)/.test(m)) return 'Too many attempts. Please wait a minute and try again.';
   // Supabase: "For security purposes, you can only request this after 47 seconds."
@@ -34,7 +36,9 @@ export function friendlyAuthError(raw?: string): string {
   // Supabase couldn't hand the email to the mail service (e.g. "Error sending recovery email").
   if (/(error sending|sending .*email|smtp)/.test(m)) return 'We couldn’t send the email just now. Please try again in a few minutes — if it keeps happening, contact support.';
   if (m.includes('password') && (m.includes('6') || m.includes('short') || m.includes('at least'))) return 'Password must be at least 6 characters.';
-  if (/(expired|invalid token|otp|incorrect code|token has)/.test(m)) return 'That code is incorrect or has expired. Request a new one.';
+  // Supabase says "Token has expired or is invalid" for a WRONG code too — most
+  // often a code typed short, or one replaced by a newer email.
+  if (/(expired|invalid token|otp|incorrect code|token has)/.test(m)) return 'That code didn’t work. Type every digit from the newest email (a new code replaces the last one), or tap Resend code.';
   if (/(invalid email|unable to validate email|valid email)/.test(m)) return 'Enter a valid email address.';
   if (m.includes('signups not allowed') || m.includes('signup is disabled')) return 'Sign-ups are currently disabled. Please contact support.';
   return 'Something went wrong. Please try again.';
