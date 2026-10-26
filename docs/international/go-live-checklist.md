@@ -72,7 +72,7 @@ All free, except SMS, which is already pay-as-you-go. Do them in this order. Ste
 
   Resend's free plan covers 3,000 emails a month (100 a day).
 - [x] **5. support@sportnnote.in must reach you.** *Done 2026-10-26: Cloudflare rule support@ → sportnnote@gmail.com, test email arrived. The app, website, privacy policy and terms, and the server `SUPPORT_EMAIL` setting all use it now (web + OTA `05f9c106` from `e0c8527`).* The app and the API's "automated access" message tell people to write there. Cloudflare → **sportnnote.in → Email → Email Routing → Routing rules**: check `support@sportnnote.in` exists and forwards to your inbox. Send it a test email from another account. Once it works, the app can use it everywhere: set `EXPO_PUBLIC_SUPPORT_EMAIL=support@sportnnote.in` in `.env.local.bak`, set `contactEmail` in `website/config.json`, and tell me; it reaches people with the next publish.
-- [ ] **6. Uptime alerts (UptimeRobot, free).** uptimerobot.com → free account → **New monitor**, type HTTP(s), every 5 minutes, alert by email. Three monitors:
+- [x] **6. Uptime alerts (UptimeRobot, free).** *Done 2026-10-26: three monitors (website, app, server auth health), all green.* uptimerobot.com → free account → **New monitor**, type HTTP(s), every 5 minutes, alert by email. Three monitors:
   - `https://sportnnote.in`
   - `https://app.sportnnote.in`
   - Supabase: `https://mpgbvbylmkwasjgupsbq.supabase.co/auth/v1/health?apikey=<the anon key>`. Use the public anon key from `.env.local.bak` (`EXPO_PUBLIC_SUPABASE_…KEY`); it is the same key every browser already gets.
