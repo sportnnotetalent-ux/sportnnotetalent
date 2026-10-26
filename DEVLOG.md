@@ -13,6 +13,17 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-26 — Low-cost go-live setup: all 8 founder steps done
+Checklist: `docs/international/go-live-checklist.md` → "Low-cost go-live setup". All were done with the founder over 2026-10-25/26 and checked live where possible:
+1. **Firebase:** Android fingerprints and Play Integrity. APK 41 mobile sign-in was tested on a phone.
+2. **App links:** a Cloudflare redirect exception and a Worker route. Google's Digital Asset Links check returns `linked: true`, and a WhatsApp link opened in the app.
+3. **Nightly encrypted DB backup:** green, with 27 players matching live, and the founder decrypted it on the Mac.
+4. **Supabase Auth SMTP through Resend:** port 465, and the templates now show the code. A code-based reset worked end to end.
+5. **support@sportnnote.in:** forwards to the team inbox and is used everywhere.
+6. **UptimeRobot:** website, app and server auth health are green.
+7. **Search Console:** Domain property verified and the sitemap submitted.
+8. **Firebase budget:** an alerts-only budget.
+
 ### 2026-10-26 — Support address: support@sportnnote.in
 The founder created the Cloudflare Email Routing rule `support@sportnnote.in → sportnnote@gmail.com`. Before that only `social@` existed and the catch-all was off, so mail to support@ bounced, although the API gate and the school-confirmation page already pointed people there.
 - **App:** the `SUPPORT_EMAIL` default (`src/core/hosts.ts`) is now support@sportnnote.in. It shows in Help, Contact support, Send feedback, the support answers and account deletion.

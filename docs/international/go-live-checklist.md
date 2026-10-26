@@ -21,8 +21,8 @@ Everything the founder does by hand before or at go-live, in one place. Code wor
          body := '{}'::jsonb) $$
   );
   ```
-- [ ] **Firebase SMS budget alert.** Google Cloud console → **Billing** → **Budgets & alerts** → **Create budget** for the Firebase project. Set alerts at 50%, 90% and 100%.
-- [ ] **Test APK 38 on a phone:**
+- [x] **Firebase SMS budget alert.** Done 2026-10-26 (see step 8 below).
+- [ ] **Test these on APK 41** (everything since APK 38; APK 41 already passed app links, mobile sign-in and PDF picking):
   - spoken voice scoring;
   - PDF printing;
   - Settings → Region with Dubai, London and Sydney;
@@ -79,7 +79,7 @@ All free, except SMS, which is already pay-as-you-go. Do them in this order. Ste
 
   Don't add a monitor on `/rest/v1/…`: the anti-scraping gate rightly blocks robots there.
 - [x] **7. Google Search Console (free).** *Done 2026-10-26: Domain property verified (TXT record), sitemap submitted as the full URL `https://sportnnote.in/sitemap.xml` (a Domain property won't take just `sitemap.xml`); Google has discovered the guides.* search.google.com/search-console → **Add property** → **Domain** `sportnnote.in` → add the TXT record it shows in Cloudflare DNS → **Verify** → **Sitemaps** → submit `https://sportnnote.in/sitemap.xml`. The guides then show up in Google search sooner.
-- [ ] **8. Firebase SMS budget alert:** the item above. With Android sign-in on, SMS use will grow.
+- [x] **8. Firebase SMS budget alert.** *Done 2026-10-26: "Alerts only" budget (the founder chose the amount), not "Spend cap enforcement", which would pause sign-in when hit. Protection against SMS abuse is the India-only SMS region policy.*
 
 **Cheap paid items** (decide when ready):
 
