@@ -25,7 +25,7 @@ The weekly email showed **crash-free sessions 38% of 60**. The top errors were "
 - **Verified:**
   - Locally: 87 screens + 30 sports, at most 2 in flight and at most 6 files a second, no console errors.
   - Tests in `tests/go-live-setup.test.mts`; full suite 4,716 pass.
-- **Needs:** a web publish (phones unaffected). The crash-free figure will read honestly from the next sessions; past weeks are inflated by the false reports.
+- **Published 2026-10-26** (`index-3d61aede…`, live including plain `/`). On a clean live visit afterwards: 122 of 122 files 200 (no 429), at most 8 files a second, football plugin loaded, telemetry still recording events, and **no error logged**. The same clean visit before the fix logged "unknown module 1026" every time. The crash-free figure reads honestly from now on; past weeks are inflated by the false reports.
 
 ### 2026-10-26 — Low-cost go-live setup: all 8 founder steps done
 Checklist: `docs/international/go-live-checklist.md` → "Low-cost go-live setup". All were done with the founder over 2026-10-25/26 and checked live where possible:
