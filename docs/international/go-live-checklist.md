@@ -56,7 +56,7 @@ All free, except SMS, which is already pay-as-you-go. Do them in this order. Ste
      `curl -i https://app.sportnnote.in/.well-known/assetlinks.json`
   4. Install APK 41. Then Android **Settings → Apps → SportnNote → Open by default**: app.sportnnote.in should be listed as a verified link. Tap a match link in WhatsApp: it opens in the app.
 - [x] **3. Nightly database backup.** *Done 2026-10-26: secrets added, first run green (the first try failed on `[ ]` left around the password; the workflow now says so plainly).* Add the two GitHub secrets and run it once by hand: `docs/ops/backups.md` → "Set it up". The Supabase free plan has no backups of its own.
-- [ ] **4. Password-reset emails for everyone (custom SMTP through Resend).** Supabase's built-in mailer only delivers to the project team's own addresses, a few an hour. So "Forgot password" and email-code sign-in don't reach real users until this is set:
+- [x] **4. Password-reset emails for everyone (custom SMTP through Resend).** *Done 2026-10-26: code-based reset tested end to end by the founder.* Supabase's built-in mailer only delivers to the project team's own addresses, a few an hour. So "Forgot password" and email-code sign-in don't reach real users until this is set:
   1. resend.com → **API Keys** → **Create**: name "Supabase Auth", permission **Sending access**, domain `sportnnote.in`. Copy the key.
   2. Supabase → **Authentication → Emails → SMTP Settings** → **Enable custom SMTP**:
      - sender `no-reply@sportnnote.in`, name `SportnNote`;
@@ -68,7 +68,7 @@ All free, except SMS, which is already pay-as-you-go. Do them in this order. Ste
   4. **Templates:** the Reset Password and Magic link templates must show the 6-digit code (`{{ .Token }}`). Supabase's defaults only send a link. The ready-to-paste templates are in `docs/auth-email-templates.md`.
   5. Test "Forgot password" on the web app with an address that isn't on the Supabase team.
 
-  *2026-10-26: SMTP set and the first reset email sent. On the wrong port every request timed out (504 "Context deadline exceeded"); port 465 fixed it. The friend's email held a link, not a code, so the templates were updated. Final check: a code-based reset end to end.*
+  *2026-10-26: SMTP set and the first reset email sent. On the wrong port every request timed out (504 "Context deadline exceeded"); port 465 fixed it. The friend's email held a link, not a code, so the templates were updated. Code-based reset then worked end to end.*
 
   Resend's free plan covers 3,000 emails a month (100 a day).
 - [ ] **5. support@sportnnote.in must reach you.** The app and the API's "automated access" message tell people to write there. Cloudflare → **sportnnote.in → Email → Email Routing → Routing rules**: check `support@sportnnote.in` exists and forwards to your inbox. Send it a test email from another account. Once it works, the app can use it everywhere: set `EXPO_PUBLIC_SUPPORT_EMAIL=support@sportnnote.in` in `.env.local.bak`, set `contactEmail` in `website/config.json`, and tell me; it reaches people with the next publish.
