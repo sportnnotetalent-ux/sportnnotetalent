@@ -34,7 +34,9 @@ From the founder's verification test (`docs/testing/verification-test-script.md`
   - school screen: "📎 Board affiliation letter uploaded · PDF".
 - **Migration** `20261026120000_device_account_and_verification_privacy.sql` (founder runs). The view is identical to `20261024180000` apart from `verification` (diffed).
 - **Verified:** `tests/shared-device-and-verification-privacy.test.mts` (10); full suite 4,726 pass; tsc clean; 375 px preview check.
-- **Needs:** the founder runs the migration; web + Android OTA (JS only).
+- **Live 2026-10-26:**
+  - The founder ran the migration. Checked read-only: 0 shared tokens (the duplicates collapsed to 2 rows); `claim_push_token` and the unique index exist; the live view returns `{"status": "approved"}` or null for others.
+  - Web `index-3c654682…` and Android OTA `73bc9e58` published from `68dfdbb`.
 
 ### 2026-10-26 — Web "crashes" were mostly false alarms; the warm-up now backs off
 The weekly email showed **crash-free sessions 38% of 60**. The top errors were "Requiring unknown module …": 49× by 11 users and 18× by 7 users in 14 days, plus 18 in the last day. All of them were on the web.
