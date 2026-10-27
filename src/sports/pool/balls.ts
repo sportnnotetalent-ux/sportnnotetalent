@@ -1,0 +1,60 @@
+/**
+ * Pool — the ball sets of each game and the payload readers the engine uses.
+ * PURE. WPA Rules of Play (effective 2026-10-21): 8-ball uses fifteen object
+ * balls (4, preamble), 9-ball nine (5), 10-ball ten (6).
+ */
+
+export type Side = 'home' | 'away';
+export type PoolGame = 'eight' | 'nine' | 'ten';
+
+export const isSide = (v: unknown): v is Side => v === 'home' || v === 'away';
+export const other = (s: Side): Side => (s === 'home' ? 'away' : 'home');
+
+/** The highest-numbered object ball of each game. */
+export const TOP: Record<PoolGame, number> = { eight: 15, nine: 9, ten: 10 };
+/** The ball that decides the rack (the 8, the 9, the 10). */
+export const MONEY: Record<PoolGame, number> = { eight: 8, nine: 9, ten: 10 };
+export const GAME_LABEL: Record<PoolGame, string> = { eight: '8-Ball', nine: '9-Ball', ten: '10-Ball' };
+
+const range = (a: number, b: number): number[] => Array.from({ length: b - a + 1 }, (_, i) => a + i);
+/** 8-ball groups (WPA 4, preamble): solids 1–7, stripes 9–15. */
+export const SOLIDS: readonly number[] = range(1, 7);
+export const STRIPES: readonly number[] = range(9, 15);
+
+/** A full rack of object balls, ascending. */
+export const fullRack = (g: PoolGame): number[] => range(1, TOP[g]);
+
+/**
+ * A list of ball numbers from a payload, in the order tapped. Absent → [].
+ * Every entry must be a whole number from 1 to `top`, each at most once;
+ * anything else → null, and the caller ignores the whole tap (a tap is never
+ * applied in part).
+ */
+export function readBalls(v: unknown, top: number): number[] | null {
+  if (v === undefined) return [];
+  if (!Array.isArray(v)) return null;
+  const out: number[] = [];
+  for (const b of v) {
+    if (typeof b !== 'number' || !Number.isInteger(b) || b < 1 || b > top || out.includes(b)) return null;
+    out.push(b);
+  }
+  return out;
+}
+
+/** A whole number option: a number or numeric text, clamped; else the default. */
+export function readInt(v: unknown, def: number, min: number, max: number): number {
+  const n = typeof v === 'number' ? v : typeof v === 'string' && v.trim() !== '' ? Number(v) : NaN;
+  if (!Number.isFinite(n)) return def;
+  return Math.min(max, Math.max(min, Math.floor(n)));
+}
+
+/** A boolean option: only true / false count; anything else is the default. */
+export const readBool = (v: unknown, def: boolean): boolean => (v === true ? true : v === false ? false : def);
+
+/** The game option, from the spellings an organiser or an older format may use. */
+export function readGame(v: unknown): PoolGame {
+  const t = String(v ?? '').toLowerCase().replace(/[\s_-]+/g, '').replace(/ball$/, '');
+  if (t === '9' || t === 'nine') return 'nine';
+  if (t === '10' || t === 'ten') return 'ten';
+  return 'eight';
+}
