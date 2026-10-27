@@ -35,6 +35,11 @@ Founder: "go ahead with the other event sports' pre-fill". Part 1 pre-filled onl
     - shooting: 10 m Air Pistol, School Boys, 40 shots, by series, no final;
     - archery: Recurve 30 m School Girls, outdoor;
     - a cross-country 2.5 km U16 Girls with "first 3 score, up to 6", created, copied, then set up from the copy.
+- **Live 2026-10-27:**
+  - No migration needed; `auth-smoke` passed.
+  - Web `index-1dd270da…` and Android OTA `ae032995` (runtime 1.0.0) from `8d00c79`. Both web addresses served only the new bundle (10/10) right away.
+  - A live tournament page loads clean on the new bundle.
+  - The guide's "What Set up fills in" section is live on sportnnote.in.
 
 ### 2026-10-27 — Web header: long titles no longer run under the header buttons
 Spotted while testing Run it again at 375 px: a tournament's name ran underneath "⚙ Manage" and "Share" in the top bar. A long match title ("Green House vs Red House · Match Details") did the same under "Share".
