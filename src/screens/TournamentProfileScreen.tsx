@@ -69,6 +69,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { setupChecklist, firstSportWithoutFormat, type SetupStep } from '../data/setupChecklist';
 import { SetupChecklist } from '../components/SetupChecklist';
 import { EditionsCard, RunAgainFooter, nextEditionOf, useEditions } from '../components/TournamentEditions';
+import { previousEditionOf } from '../data/tournamentCopyPlan';
 import { Markdown } from '../components/Markdown';
 import { EVENT_CATEGORIES, inlineFieldKeys } from '../data/tournamentForm';
 import { assignableMatches } from '../data/scorerAssign';
@@ -136,6 +137,7 @@ export default function TournamentProfileScreen() {
   // Run it again: the series this tournament belongs to (2025 · 2026 · 2027).
   const editions = useEditions(tournament);
   const nextEdition = tournament ? nextEditionOf(editions, tournament.id) : undefined;
+  const prevEdition = tournament ? previousEditionOf(editions, tournament.id) : undefined;
 
   // Individual-host list (managed in-place); org-hosted tournaments manage hosts
   // through the organization instead.
@@ -809,6 +811,12 @@ export default function TournamentProfileScreen() {
               onPress={() => (nextEdition ? nav.push('Tournament', { tournamentId: nextEdition.id }) : nav.navigate('CopyTournament', { tournamentId: tournament.id, mode: 'next' }))}
             />
             <HubRow icon="📋" title="Copy this setup" status="A separate tournament with the same set-up" onPress={() => nav.navigate('CopyTournament', { tournamentId: tournament.id, mode: 'clone' })} />
+            {/* Link an earlier edition: last year's tournament, run before Run it again existed */}
+            <HubRow
+              icon="🔗" title={prevEdition ? 'Earlier edition' : 'Link an earlier edition'}
+              status={prevEdition ? prevEdition.name : 'Last time’s tournament, run before Run it again'}
+              onPress={() => nav.navigate('LinkEdition', { tournamentId: tournament.id })}
+            />
             {/* SD-154: a feeder round — its top teams qualify into another tournament */}
             <QualifiesToCard tournament={tournament} />
             {tournament.sports.map((sp) => {

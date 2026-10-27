@@ -1,7 +1,8 @@
 /** Run it again (2026-10-27): a tournament's editions on its page — "📅 Every
  *  edition: 2025 · 2026 · 2027" — and the ways to run it again or copy its
  *  set-up (screens/CopyTournamentScreen.tsx). */
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { theme } from '../core/theme';
 import { Button, Card, Pill, textStyles } from './ui';
@@ -14,12 +15,13 @@ export type Edition = EditionRow & { label: string };
 /** The series this tournament belongs to (empty for a one-off). */
 export function useEditions(t: Tournament | null | undefined): Edition[] {
   const [list, setList] = useState<Edition[]>([]);
-  useEffect(() => {
+  // re-read on focus: back from "Link an earlier edition" or a new edition
+  useFocusEffect(useCallback(() => {
     let on = true;
-    if (!t) { setList([]); return; }
+    if (!t) { setList([]); return undefined; }
     void getEditions(t).then((l) => on && setList(l)).catch(() => on && setList([]));
     return () => { on = false; };
-  }, [t?.id, t?.firstEditionId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [t?.id])); // eslint-disable-line react-hooks/exhaustive-deps
   return list;
 }
 

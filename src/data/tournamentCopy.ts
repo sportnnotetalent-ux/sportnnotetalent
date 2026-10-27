@@ -8,7 +8,8 @@ import { notify } from '../core/notifications';
 import type { Tournament, TournamentEntry } from '../core/types';
 import { demo } from './demoStore';
 import {
-  addTournamentTeams, createTournament, getTeamLeaders, getTournamentCategories, getTournamentEntries, getTournaments, setTournamentAgeVerification,
+  addTournamentTeams, createTournament, getTeamLeaders, getTournamentCategories, getTournamentEntries, getTournaments, logActivity, setTournamentAgeVerification,
+  NeedsDbUpdateError,
 } from './repos';
 import { getResultsPhases } from './resultsStore';
 import { copyFormats, editionList, shiftProgrammeDays, type CopyPlan, type CopySource, type EditionRow } from './tournamentCopyPlan';
@@ -108,7 +109,8 @@ async function inviteTeams(tournamentId: string, name: string, src: CopySource &
  *  Empty before the editions migration, or when it's a one-off. */
 export async function getEditions(t: Pick<Tournament, 'id' | 'name' | 'startDate' | 'deletedAt' | 'previousEditionId' | 'firstEditionId'>): Promise<(EditionRow & { label: string })[]> {
   if (!live()) {
-    const root = t.firstEditionId ?? t.id;
+    const cur = demo.tournaments.find((x) => x.id === t.id) ?? t; // the current record (links change in place)
+    const root = cur.firstEditionId ?? cur.id;
     const rows = demo.tournaments.filter((x) => x.id === root || x.firstEditionId === root);
     return rows.length > 1 ? editionList(rows) : [];
   }
@@ -127,3 +129,56 @@ export async function getEditions(t: Pick<Tournament, 'id' | 'name' | 'startDate
   const rows = (data as Row[]).map((r) => ({ id: r.id, name: r.name, startDate: r.start_date, deletedAt: r.deleted_at ?? null }));
   return rows.length > 1 ? editionList(rows) : [];
 }
+
+/* ------------------------- link an earlier edition ------------------------- */
+
+const missing = (code?: string) => ['PGRST202', '42883', '42703', 'PGRST204', '42P01', 'PGRST205'].includes(code ?? '');
+
+/** Tournaments already followed by a live next edition (they can't be linked
+ *  after again — a series is a single line). Empty before the migrations. */
+export async function followedTournamentIds(): Promise<Set<string>> {
+  if (!live()) return new Set(demo.tournaments.filter((t) => t.previousEditionId && !t.deletedAt).map((t) => t.previousEditionId!));
+  const { data, error } = await supabase!.from('tournaments').select('previous_edition_id').not('previous_edition_id', 'is', null).is('deleted_at', null);
+  if (error || !data) return new Set();
+  return new Set((data as { previous_edition_id: string }[]).map((r) => r.previous_edition_id));
+}
+
+/** Link this tournament after an earlier one, or unlink it (`previousId` null).
+ *  The server checks the caller runs both, the order, branches and loops
+ *  (link_tournament_edition, migration 20261027160000_link_editions). */
+export async function linkEdition(tournamentId: string, previousId: string | null, by: { playerId?: string; name?: string; previousName?: string } = {}): Promise<void> {
+  if (!live()) linkEditionDemo(tournamentId, previousId);
+  else {
+    const { error } = await supabase!.rpc('link_tournament_edition', { p_tournament: tournamentId, p_previous: previousId });
+    if (error && missing(error.code)) throw new NeedsDbUpdateError();
+    if (error) throw new Error(error.message);
+  }
+  await logActivity({
+    scope: 'tournament', refId: tournamentId, action: previousId ? 'edition.linked' : 'edition.unlinked',
+    detail: previousId ? `Linked after ${by.previousName ?? 'an earlier edition'}` : 'Unlinked from its earlier edition', byPlayerId: by.playerId, byName: by.name,
+  }).catch(() => {});
+}
+
+/** Demo mode: the same rules as the server. */
+function linkEditionDemo(tournamentId: string, previousId: string | null): void {
+  const t = demo.tournaments.find((x) => x.id === tournamentId && !x.deletedAt);
+  if (!t) throw new Error('Tournament not found');
+  const laterOf = (id: string): string[] => demo.tournaments.filter((x) => x.previousEditionId === id).flatMap((x) => [x.id, ...laterOf(x.id)]);
+  const later = laterOf(t.id);
+  let root = t.id;
+  if (previousId) {
+    const prev = demo.tournaments.find((x) => x.id === previousId && !x.deletedAt);
+    if (!prev) throw new Error('The earlier edition wasn’t found');
+    if (prev.startDate >= t.startDate) throw new Error('The earlier edition has to start before this one');
+    if (demo.tournaments.some((x) => x.previousEditionId === prev.id && x.id !== t.id && !x.deletedAt)) throw new Error('That tournament already has a next edition');
+    if (later.includes(prev.id)) throw new Error('That tournament is one of this one’s later editions');
+    root = prev.firstEditionId ?? prev.id;
+    t.previousEditionId = prev.id;
+    t.firstEditionId = root;
+  } else {
+    delete t.previousEditionId;
+    delete t.firstEditionId;
+  }
+  for (const x of demo.tournaments) if (later.includes(x.id)) x.firstEditionId = root;
+}
+

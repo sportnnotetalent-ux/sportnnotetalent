@@ -430,3 +430,41 @@ export function editionList(rows: EditionRow[]): (EditionRow & { label: string }
     return { ...r, label: (perYear.get(y) ?? 0) > 1 ? `${MONTHS[Number(r.startDate.slice(5, 7)) - 1] ?? ''} ${y}`.trim() : y };
   });
 }
+
+/* ---------------------------- link an earlier edition ---------------------------- */
+
+/** A tournament's name without its year or season, "(copy)" or punctuation —
+ *  "Annual Sports Meet 2025" and "annual sports meet – 2026" read the same. */
+export function baseName(name: string): string {
+  return name.toLowerCase()
+    .replace(YEAR_RE, ' ')
+    .replace(/\(copy\)/g, ' ')
+    .replace(/[^a-z0-9ऀ-෿]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export interface EditionCandidate<T> { t: T; sameName: boolean }
+
+/** The tournaments this one can be linked after: ones the organiser also runs
+ *  (`canManage`), not deleted, starting before it, not already in its series and
+ *  not already followed by another edition. The same event by name first, then
+ *  the most recent. */
+export function editionCandidates<T extends Pick<Tournament, 'id' | 'name' | 'startDate' | 'deletedAt'>>(
+  current: Pick<Tournament, 'id' | 'name' | 'startDate'>,
+  all: T[],
+  opts: { canManage: (t: T) => boolean; inSeries: ReadonlySet<string>; followed: ReadonlySet<string> },
+): EditionCandidate<T>[] {
+  const base = baseName(current.name);
+  return all
+    .filter((t) => t.id !== current.id && !t.deletedAt && t.startDate < current.startDate
+      && !opts.inSeries.has(t.id) && !opts.followed.has(t.id) && opts.canManage(t))
+    .map((t) => ({ t, sameName: !!base && baseName(t.name) === base }))
+    .sort((a, b) => Number(b.sameName) - Number(a.sameName) || b.t.startDate.localeCompare(a.t.startDate) || a.t.name.localeCompare(b.t.name));
+}
+
+/** The edition before this one in its series, if any. */
+export function previousEditionOf<E extends { id: string }>(editions: E[], id: string): E | undefined {
+  const i = editions.findIndex((e) => e.id === id);
+  return i > 0 ? editions[i - 1] : undefined;
+}

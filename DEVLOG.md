@@ -13,6 +13,29 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-27 — Link an earlier edition (tournaments run before Run it again)
+Founder: "go ahead with linking earlier editions". Schools that ran last year's meet before Run it again existed can now link it, so both pages show 📅 Every edition.
+- **Where:** Manage › **🔗 Link an earlier edition** (`LinkEditionScreen`).
+  - It lists tournaments you also organise, that started before this one, aren't deleted, aren't already in the series and aren't already followed by another edition.
+  - The same event by name comes first, marked "Looks like the same event" (`baseName` ignores the year, season, "(copy)" and punctuation), then the newest.
+  - Every link and unlink asks for confirmation and is recorded in the activity log.
+  - Once linked, the Manage row reads "Earlier edition: …" and offers Open it / Unlink.
+- **Migration `20261027160000_link_editions.sql`:**
+  - **`link_tournament_edition(p_tournament, p_previous)`** (null = unlink), a trusted function and the only way to change a link after creation. Its rules:
+    - the caller organises both tournaments;
+    - the earlier edition starts first;
+    - no branch (the earlier one isn't already followed by a live edition);
+    - no loop (it isn't one of this one's later editions).
+    - This tournament's later editions move into the series with it, or become their own series on unlink.
+  - **`guard_tournament_edition`:** Run it again now also refuses a second next edition of the same tournament (the app already opens the existing one).
+- **Also:** the series card re-reads on focus, and demo mode follows the same rules.
+- **Guide:** the "We ran last year's meet without Run it again" question now explains how to link.
+- **Verified:**
+  - `tests/link-editions.test.mts` (9); full suite 4,813 pass; tsc clean; Postgres's parser accepts the migration.
+  - Demo at 375 px: on Greenwood's Annual Sports Meet 2026, "Annual Sports Meet 2025" was suggested first.
+    - Linking it showed "2025 › · 2026 · this one" on 2026's page and "2025 · this one · 2026 ›" on 2025's; Manage read "Earlier edition: Annual Sports Meet 2025".
+    - Unlinking removed the card. No console errors.
+
 ### 2026-10-27 — Run it again, part 2: every event sport's setup pre-fills from last time
 Founder: "go ahead with the other event sports' pre-fill". Part 1 pre-filled only athletics track / field and swimming. Now **Set up ›** on "🔁 Events from last time", or on a carried column in the entries desk, opens every event sport's setup as last edition left it. A "🔁 Filled in from last time: …" line sits at the top, and the organiser just picks the athletes.
 - **Every sport:** the event, age group and gender, plus the timetable slot and venue area (`ScheduleCard preset`).

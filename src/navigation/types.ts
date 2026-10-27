@@ -166,6 +166,8 @@ export type RootStackParamList = {
   EditTournament: { tournamentId: string };
   /** Run it again (mode 'next', the organisers) / copy anyone's set-up ('clone'). */
   CopyTournament: { tournamentId: string; mode?: 'next' | 'clone' };
+  /** Link a tournament run before "Run it again" as this one's earlier edition. */
+  LinkEdition: { tournamentId: string };
   Organization: { orgId: string };
   Notifications: undefined;
   Calendar: undefined;

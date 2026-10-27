@@ -70,7 +70,9 @@ Every sport keeps the event, age group and gender, and the timetable slot and ve
 Yes. Everything is yours to edit: **Manage › Edit details** for the name, dates, sports and registration, and each sport's settings as usual.
 
 ### We ran last year's meet without "Run it again". Can I link the two?
-Not yet. Editions are linked when the next one is created with **Run it again**.
+Yes. Open this year's tournament, tap **Manage**, then **🔗 Link an earlier edition**. The same event by name is suggested first ("Looks like the same event"); tap **🔗 Link as the earlier edition** and confirm. Both pages then show **📅 Every edition**.
+- You can link a tournament you also organise, that started before this one and isn't already followed by another edition.
+- To undo it, open **🔗 Earlier edition** on the same tab and tap **Unlink**.
 
 ### Does the original organiser see that I copied their tournament?
 No. A copy is a separate tournament of your own, and nothing about it shows on the original.
