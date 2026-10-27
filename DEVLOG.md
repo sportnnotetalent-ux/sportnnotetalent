@@ -31,11 +31,12 @@ Founder: "there are other educational institutions apart from schools like colle
   - `tests/education-types.test.mts` (9); the Phase 2 tests now read the newest SQL definitions; full suite 4,768 pass; tsc + edge typecheck clean.
   - Demo at 375 px: the type list shows the new types; University asks for its AISHE code up front and suggests "Final year"; Get verified shows ✅ Official ID, university documents and VC / Registrar wording. No console errors.
 - **Hosting year on year:** a verified (or unverified) institution can already host any number of tournaments. There's no "run last year's tournament again" yet; it's proposed as the next piece.
-- **Needs:**
-  - the founder runs the migration;
-  - deploy `org-verify` + `verification-submit`;
-  - web + Android OTA;
-  - push.
+- **Live 2026-10-27:**
+  - The founder ran the migration. Checked read-only: the ITI code validates; University / ITI / Junior college step-1 options are right; the guard, DOB rule and ID constraint include the new types.
+  - `org-verify` and `verification-submit` deployed (anonymous calls get 401).
+  - `auth-smoke` passed.
+  - Web `index-1f6d1fd9…` and Android OTA `6015b605` from `6969ed8`.
+  - The school guide's code table (with ITI) is live on sportnnote.in.
 
 ### 2026-10-27 — Organisation verification, Phase 2: every registered type
 Founder: "go ahead with organisation verification Phase 2". Every registered community type now gets the three steps schools and colleges have: an official ID, one document, and proof the person is authorised. Design: `docs/verification/org-verification.md` → Phase 2.
