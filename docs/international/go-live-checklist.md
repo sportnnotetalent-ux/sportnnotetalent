@@ -82,6 +82,17 @@ All free, except SMS, which is already pay-as-you-go. Do them in this order. Ste
 - [x] **8. Firebase SMS budget alert.** *Done 2026-10-26: "Alerts only" budget (the founder chose the amount), not "Spend cap enforcement", which would pause sign-in when hit. Protection against SMS abuse is the India-only SMS region policy.*
 
 - [ ] **Expo SDK 57 upgrade: with the next new APK, not on its own.** Decided 2026-10-26. The Hermes memory regression `expo doctor` warns about affects only apps using reanimated/worklets, and we use neither. The upgrade needs a new APK and a version bump to 1.1.0 (runtime `appVersion`), after which older APKs stop getting updates. Bundle it with the Play Store release so users reinstall once. See DEVLOG 2026-10-25.
+  - **Ready on branch `sdk57` (3f07fc2, 2026-10-27):**
+    - Expo 57.0.31, React Native 0.86.3, version 1.1.0;
+    - Kotlin is still 2.1.20, so the Firebase pin holds;
+    - expo-doctor 21/21; full suite green; the web demo build runs.
+  - **Ship it with the next APK:**
+    1. Merge `sdk57` into `feat/sport-formats-and-scoring` and `main`.
+    2. `eas build -p android --profile preview`.
+    3. Check sign-in (email + phone), scoring and push on a phone.
+    4. Put the new APK on the website download.
+    5. Publish OTAs as usual — they reach 1.1.0 APKs only; tell pilot users to reinstall.
+  - **Until then:** keep publishing OTAs from the main branches (runtime 1.0.0) — **never from `sdk57`**.
 
 **Cheap paid items** (decide when ready):
 

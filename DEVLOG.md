@@ -13,6 +13,22 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-27 — Expo SDK 57 ready on its own branch (for the next APK)
+Backlog run, item 6 of 6. The 2026-10-26 decision stands: SDK 57 ships with the next APK, because version 1.1.0 stops older APKs getting updates. So it's prepared on branch **`sdk57`** (`3f07fc2`) and is not on the update line.
+- **What changed:**
+  - Expo 57.0.31 (from 56.0.11) and React Native 0.86.3 (from 0.85.3);
+  - every `expo-*` module on 57, react-native-screens 4.26;
+  - the `expo-status-bar` config plugin;
+  - `version` 1.1.0 in app.json and package.json (runtime `appVersion`).
+- **The APK 40 lesson checked:** React Native 0.86 still builds with Kotlin **2.1.20**, so the Firebase BoM 34.12.0 pin holds. `tests/go-live-setup.test.mts` now reads React Native's Kotlin version itself and fails if it leaves 2.1.
+- **Verified on the branch:**
+  - `expo-doctor` 21/21; the Hermes memory warning that started this is gone;
+  - full suite 4,865 pass; tsc clean;
+  - a web demo build (http-server) at 375 px: Home, a tournament, Run it again, the Support console, a finished match, and live football scoring (a goal: 2–1 → 3–1). No app errors.
+- **Not verified:** an Android build. That's the EAS build when the founder approves (steps in `docs/international/go-live-checklist.md`).
+- **Also seen:** Expo's "latest" is now SDK 58 (58.0.19). That's a separate decision; 57 is what was agreed.
+- **Also fixed on the main branches:** `register-lookup` (item 2) joins the functions pinned to Mumbai, which the perf-wave2 test caught (`054622f`).
+
 ### 2026-10-27 — SMS spend cap
 Backlog run, item 5 of 6. Every phone code is a paid SMS (Firebase, about $0.07).
 - **What already limits spending** (written up in `docs/ops/sms-spend-cap.md`):
