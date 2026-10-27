@@ -19,7 +19,7 @@ import type { ScoreSummary } from '../types';
 import { scoreLine as lineOf, finalSummary, pointsLineScore, type LineScore } from '../scoreline.ts';
 import {
   type PoolGame, type Side, isSide, other, TOP, MONEY, GAME_LABEL, SOLIDS, STRIPES, fullRack,
-  readBalls, readInt, readBool, readGame,
+  readBalls, readInt, readBool, readGame, own, ownRecord,
 } from './balls.ts';
 
 export type { PoolGame, Side } from './balls.ts';
@@ -199,7 +199,7 @@ function newRack(n: number, breaker: Side | null, game: PoolGame): LiveRack {
 
 /** A fresh match. Options (POOL_DESIGN §6) are read once and frozen into the state. */
 export function createInitialState(config?: Record<string, unknown>): PoolState {
-  const c = config && typeof config === 'object' ? config : {};
+  const c = ownRecord(config); // own keys only (breaks #5)
   const game = readGame(c.game);
   const bf = c.breakFormat;
   return {
@@ -356,23 +356,23 @@ function endRack(d: PoolState, winner: Side, how: RackEnd, quick?: QuickRack) {
 
 // ---------------------------------------------------------- reducer ----
 
-const payloadOf = (a: PoolAction): Record<string, unknown> =>
-  (a.payload && typeof a.payload === 'object' ? a.payload : {}) as Record<string, unknown>;
-
 export function reducer(s: PoolState, a: PoolAction): PoolState {
   if (!s || typeof s !== 'object' || s.ended || !s.rack) return s;
-  if (!a || typeof a !== 'object' || typeof a.type !== 'string') return s;
-  const p = payloadOf(a);
-  switch (a.type) {
-    case 'LAG': return lag(s, a.side, p);
-    case 'BREAK': return breakShot(s, a.side, p);
-    case 'POT': return pot(s, a.side, p);
-    case 'MISS': return miss(s, a.side);
-    case 'SAFETY': return safety(s, a.side, p);
-    case 'FOUL': return foul(s, a.side, p);
-    case 'PUSH': return pushOut(s, a.side, p);
+  // own properties only — an inherited type / side / payload field never counts (breaks #5)
+  const type = own(a, 'type');
+  if (typeof type !== 'string') return s;
+  const side = own(a, 'side');
+  const p = ownRecord(own(a, 'payload'));
+  switch (type) {
+    case 'LAG': return lag(s, side, p);
+    case 'BREAK': return breakShot(s, side, p);
+    case 'POT': return pot(s, side, p);
+    case 'MISS': return miss(s, side);
+    case 'SAFETY': return safety(s, side, p);
+    case 'FOUL': return foul(s, side, p);
+    case 'PUSH': return pushOut(s, side, p);
     case 'CHOOSE': return choose(s, p);
-    case 'RACK': return quickRack(s, a.side, p);
+    case 'RACK': return quickRack(s, side, p);
     case 'STALEMATE': return stalemate(s);
     default: return s; // STAT_ADJUST, UNDO, unknown: no effect on the match
   }

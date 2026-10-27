@@ -850,3 +850,26 @@ describe('replay, undo and robustness', () => {
     assert.equal(JSON.stringify(s).includes('p1'), false, 'no player ids either: sides only');
   });
 });
+
+describe('breaks (docs/security/breaks/pool-engine.md)', () => {
+  const NINE_BROKEN = () => pool.replay(NINE, [LAG('home'), BREAK({ pots: [1] })]);
+  const proto = Object.prototype as Record<string, unknown>;
+
+  test('#5: payload, action and config fields are read as own properties only (no prototype chain, no pollution)', () => {
+    const s = NINE_BROKEN();
+    assert.equal(pool.reducer(s, { type: 'POT', payload: Object.create({ pots: [2] }) }), s, 'an inherited "pots"');
+    const t10 = pool.replay(TEN, [LAG('home'), BREAK({ pots: [1] })]);
+    const lit = Object.assign(Object.create({ called: false }), { pots: [2] });
+    assert.equal(pool.reducer(t10, { type: 'POT', payload: lit }).rack!.pending, null, 'an inherited "called: false"');
+    const action = Object.create({ type: 'RACK', side: 'away' });
+    assert.equal(pool.reducer(s, action as ScoreAction), s, 'an inherited action type / side');
+    try {
+      proto.illegal = true; proto.raceTo = 1; proto.game = 'ten';
+      const e = pool.replay(EIGHT, [LAG('home'), BREAK({})]);
+      assert.equal(e.rack!.pending, null, 'Object.prototype.illegal');
+      const f = pool.createInitialState({});
+      assert.equal(f.raceTo, 5, 'Object.prototype.raceTo');
+      assert.equal(f.game, 'eight', 'Object.prototype.game');
+    } finally { delete proto.illegal; delete proto.raceTo; delete proto.game; }
+  });
+});

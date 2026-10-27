@@ -8,6 +8,20 @@ export type Side = 'home' | 'away';
 export type PoolGame = 'eight' | 'nine' | 'ten';
 
 export const isSide = (v: unknown): v is Side => v === 'home' || v === 'away';
+
+/** An object's OWN property (never the prototype chain: a polluted
+ *  Object.prototype or an inherited field can't reach the engine). */
+export const own = (o: unknown, k: string): unknown =>
+  o && typeof o === 'object' && Object.prototype.hasOwnProperty.call(o, k) ? (o as Record<string, unknown>)[k] : undefined;
+
+/** A record of an object's own keys, with no prototype: every later read is an
+ *  own read. Not an object → empty. (breaks #5) */
+export function ownRecord(o: unknown): Record<string, unknown> {
+  const out: Record<string, unknown> = Object.create(null);
+  if (!o || typeof o !== 'object' || Array.isArray(o)) return out;
+  for (const k of Object.keys(o)) out[k] = (o as Record<string, unknown>)[k];
+  return out;
+}
 export const other = (s: Side): Side => (s === 'home' ? 'away' : 'home');
 
 /** The highest-numbered object ball of each game. */
