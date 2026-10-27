@@ -429,10 +429,11 @@ function lag(s: PoolState, side: unknown, p: Record<string, unknown>): PoolState
   return d;
 }
 
-/** The shooter this action is for: the side at the table; a different side → null (ignored). */
+/** The shooter a shot is for. The side is REQUIRED and must be the side at the
+ *  table (breaks #13): a duplicate of a shot from a second phone carries the
+ *  side that has since left the table, so it can never pass the turn twice. */
 function shooterOf(r: LiveRack, side: unknown): Side | null {
   if (r.phase !== 'play' || r.pending || !r.shooter) return null;
-  if (side === undefined) return r.shooter;
   return side === r.shooter ? r.shooter : null;
 }
 
@@ -669,12 +670,9 @@ function foul(s: PoolState, side: unknown, p: Record<string, unknown>): PoolStat
   const r = s.rack!;
   if (r.phase !== 'play' || r.pending || !r.shooter) return s;
   const kind0 = readKind(p.kind);
-  let fouler: Side;
-  if (side === undefined) fouler = r.shooter;
-  else if (!isSide(side)) return s;
-  else if (side === r.shooter) fouler = side;
-  else if (kind0 === 'outOfTurn') fouler = side; // 3.12: the athlete who played out of turn
-  else return s;
+  // the side is required (breaks #13): the shooter, or — 3.12 — the athlete who played out of turn
+  if (!isSide(side) || (side !== r.shooter && kind0 !== 'outOfTurn')) return s;
+  const fouler: Side = side;
   const top = TOP[s.game];
   const pots = readBalls(p.pots, top);
   const off = readBalls(p.off, top);

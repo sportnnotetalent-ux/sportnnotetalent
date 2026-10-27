@@ -113,11 +113,11 @@ enums and booleans only**: never a name, never a player id (the player credit ri
 |---|---|---|---|---|
 | `LAG` | lag winner | `{breaks?: 'home'\|'away'}` | 1–2 | before the first break of the match |
 | `BREAK` | breaker (needed only when unknown) | `{pots?: number[], off?: number[], foul?: kind, illegal?: true, short?: true}` | balls that fell + ✓ (or Dry / Foul ▸) | the rack is waiting for its break |
-| `POT` | shooter (optional) | `{pots: number[], called?: false, calledBall?: number}` | tap the ball(s) → ✓ | a shot with no foul that pocketed balls |
-| `MISS` | shooter (optional) | — | 1 | nothing pocketed, no foul |
-| `SAFETY` | shooter (optional) | `{pots?: number[]}` | 1 (+ balls) | a declared safety |
-| `FOUL` | shooter; another side only with `outOfTurn` | `{kind?, pots?, off?}` | Foul ▸ kind (+ balls) | |
-| `PUSH` | shooter (optional) | `{pots?, off?, foul?}` | 1 | 9/10-ball, the shot after a break with no foul |
+| `POT` | shooter (**required**) | `{pots: number[], called?: false, calledBall?: number}` | tap the ball(s) → ✓ | a shot with no foul that pocketed balls |
+| `MISS` | shooter (**required**) | — | 1 | nothing pocketed, no foul |
+| `SAFETY` | shooter (**required**) | `{pots?: number[]}` | 1 (+ balls) | a declared safety |
+| `FOUL` | shooter (**required**); another side only with `outOfTurn` | `{kind?, pots?, off?}` | Foul ▸ kind (+ balls) | |
+| `PUSH` | shooter (**required**) | `{pots?, off?, foul?}` | 1 | 9/10-ball, the shot after a break with no foul |
 | `CHOOSE` | — | `{choice: 'play'\|'pass'\|'rerack', breaker?}` | 1 | the engine waits for a choice (`state.rack.pending`) |
 | `RACK` | rack winner | `{rack: number, breaker?, bnr?: true, golden?: true, runOut?: true}` | 1 (+ flags) | **quick mode**: a rack with no detail yet. On a rack with detail it **awards** the rack (scorer gave up on detail, a conduct penalty 3.16). `rack` (the number of the rack in play) is **required**: a double tap can't award two racks. |
 | `STALEMATE` | — | — | 1 | 1.13: the rack is replayed, same breaker |
@@ -128,8 +128,9 @@ is ignored. A later number still applies (a correction that voided a rack end sh
 
 A typical 9-ball run-out from the break is about ten taps (break + one tap per ball).
 A scorer who wants only results taps `RACK` once per rack; a match can mix the two modes rack
-by rack. A side on a shot action that is not the player at the table makes the action a no-op
-(two phones out of step can't score for the wrong player).
+by rack. A shot must name the side at the table (the controls fill it in — no extra tap); a shot with
+no side, or with the side that is not at the table, is a no-op, so two phones out of step can't score
+for the wrong player and a duplicated shot can't pass the turn twice.
 
 **Undo** follows every other sport: the app replays the event log without its newest event
 (`deriveLog` in `src/data/eventLog.ts`). The reducer has no UNDO action; `replay(config,

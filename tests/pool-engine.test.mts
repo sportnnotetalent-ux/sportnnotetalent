@@ -27,12 +27,17 @@ const FOUL = (kind: string, extra: P = {}, side?: Side) => A('FOUL', side, { kin
 const PUSH = (payload: P = {}, side?: Side) => A('PUSH', side, payload);
 const CHOOSE = (choice: string, breaker?: Side) => A('CHOOSE', undefined, { choice, ...(breaker ? { breaker } : {}) });
 const RACK = (side: Side, flags: P = {}) => A('RACK', side, flags);
+const SHOTS = new Set(['POT', 'MISS', 'SAFETY', 'FOUL', 'PUSH']);
 /** What the scorer's controls send with a tap: the number of the rack in play
- *  on a quick RACK (breaks #12). Tests that check the raw reducer call it directly. */
+ *  on a quick RACK (breaks #12), and on a shot the side at the table
+ *  (breaks #13). Tests that check the raw reducer call it directly. */
 function stamp(s: pool.PoolState, a: ScoreAction): ScoreAction {
   const r = s.rack;
-  if (!r || a.type !== 'RACK' || a.payload?.rack !== undefined) return a;
-  return { ...a, payload: { ...(a.payload ?? {}), rack: r.n } };
+  if (!r) return a;
+  let out = a;
+  if (a.type === 'RACK' && a.payload?.rack === undefined) out = { ...out, payload: { ...(out.payload ?? {}), rack: r.n } };
+  if (SHOTS.has(a.type) && !a.side && r.shooter) out = { ...out, side: r.shooter };
+  return out;
 }
 /** One tap through the controls. */
 const step = (s: pool.PoolState, a: ScoreAction) => pool.reducer(s, stamp(s, a));
@@ -186,7 +191,7 @@ describe('8-ball (WPA section 4)', () => {
 
   test('while a choice is pending, shots are ignored', () => {
     const s = start(BREAK({ illegal: true }));
-    for (const a of [POT([3]), MISS(), SAFE(), FOUL('scratch'), BREAK({ pots: [] })]) assert.equal(pool.reducer(s, a), s, a.type);
+    for (const a of [POT([3]), MISS(), SAFE(), FOUL('scratch'), BREAK({ pots: [] })]) assert.equal(step(s, a), s, a.type);
   });
 
   test('4.3(e): the 8 on a legal break is not a win — the breaker spots it and continues, or re-breaks', () => {
@@ -328,8 +333,8 @@ describe('8-ball (WPA section 4)', () => {
 
   test('three fouls do not lose at 8-ball by default; an organiser can switch the rule on', () => {
     const acts = [LAG('home'), BREAK({ pots: [] }), FOUL('scratch'), SAFE(), FOUL('scratch'), SAFE(), FOUL('scratch')];
-    assert.equal(pool.replay(EIGHT, acts).racks.length, 0);
-    const on = pool.replay({ ...EIGHT, threeFoul: true }, acts);
+    assert.equal(pool.replay(EIGHT, stampLog(EIGHT, acts)).racks.length, 0);
+    const on = pool.replay({ ...EIGHT, threeFoul: true }, stampLog({ ...EIGHT, threeFoul: true }, acts));
     assert.equal(on.racks[0].winner, 'home');
     assert.equal(on.racks[0].how, 'threeFoul');
   });
@@ -341,9 +346,9 @@ describe('8-ball (WPA section 4)', () => {
 
   test('balls not in the game, already down or tapped twice: the whole tap is ignored', () => {
     const s = start(BREAK({ pots: [1] }));
-    for (const pots of [[16], [0], [-1], [1], [3, 3], [2.5], [NaN], [Infinity]]) assert.equal(pool.reducer(s, POT(pots)), s, JSON.stringify(pots));
-    assert.equal(pool.reducer(s, POT([])), s, 'a pot of nothing is not a pot');
-    assert.equal(pool.reducer(s, FOUL('scratch', { pots: [2], off: [2] })), s, 'one ball both pocketed and off the table');
+    for (const pots of [[16], [0], [-1], [1], [3, 3], [2.5], [NaN], [Infinity]]) assert.equal(step(s, POT(pots)), s, JSON.stringify(pots));
+    assert.equal(step(s, POT([])), s, 'a pot of nothing is not a pot');
+    assert.equal(step(s, FOUL('scratch', { pots: [2], off: [2] })), s, 'one ball both pocketed and off the table');
   });
 });
 
@@ -367,7 +372,7 @@ describe('9-ball (WPA section 5)', () => {
     assert.equal(s.rack!.shooter, 'away');
     assert.equal(s.rack!.bih, true);
     assert.equal(s.rack!.push, false, '5.4: a push-out only after a break with no foul');
-    assert.equal(pool.reducer(s, PUSH()), s);
+    assert.equal(step(s, PUSH()), s);
   });
 
   test('5.3(b): nothing pocketed and fewer than four balls to a rail is a foul', () => {
@@ -390,7 +395,7 @@ describe('9-ball (WPA section 5)', () => {
     const pass = pool.reducer(s, CHOOSE('pass'));
     assert.equal(pass.rack!.shooter, 'away');
     assert.equal(pass.rack!.inn.away, 1, '2.8: a passed push-out continues the inning');
-    assert.equal(pool.reducer(pass, PUSH()), pass, 'only one push-out');
+    assert.equal(step(pass, PUSH()), pass, 'only one push-out');
     assert.equal(pool.reducer(s, CHOOSE('rerack')), s, 're-rack is not an option after a push-out');
   });
 
@@ -401,7 +406,7 @@ describe('9-ball (WPA section 5)', () => {
 
   test('5.4: no push-out on the third shot', () => {
     const s = start(BREAK({ pots: [] }), MISS());
-    assert.equal(pool.reducer(s, PUSH()), s);
+    assert.equal(step(s, PUSH()), s);
   });
 
   test('5.6: the 9 pocketed on a push-out is spotted; other balls stay down', () => {
@@ -423,7 +428,7 @@ describe('9-ball (WPA section 5)', () => {
   test('5.5: a ball legally pocketed keeps the shooter at the table; the 9 legally pocketed on any shot wins', () => {
     const s = start(BREAK({ pots: [1] }), POT([2]));
     assert.equal(s.rack!.shooter, 'home');
-    const combo = pool.reducer(s, POT([3, 9]));
+    const combo = step(s, POT([3, 9]));
     assert.equal(combo.racks[0].winner, 'home');
     assert.equal(combo.racks[0].how, 'money');
     assert.equal(combo.racks[0].bnr, true);
@@ -441,7 +446,7 @@ describe('9-ball (WPA section 5)', () => {
   test('9-ball has no safety call: a "safety" that pockets a ball keeps the shooter at the table', () => {
     const s = start(BREAK({ pots: [1] }), SAFE([2]));
     assert.equal(s.rack!.shooter, 'home');
-    assert.equal(pool.reducer(start(BREAK({ pots: [1] })), SAFE([9])).racks[0].winner, 'home');
+    assert.equal(step(start(BREAK({ pots: [1] })), SAFE([9])).racks[0].winner, 'home');
   });
 
   test('3.13 / 5.8: three consecutive fouls lose the rack; the warning shows on two', () => {
@@ -449,7 +454,7 @@ describe('9-ball (WPA section 5)', () => {
     assert.equal(s.rack!.shooter, 'home');
     assert.equal(s.rack!.fouls.home, 2);
     assert.equal(pool.onTwoFouls(s), 'home');
-    s = pool.reducer(s, FOUL('noRail'));
+    s = step(s, FOUL('noRail'));
     assert.equal(s.racks[0].winner, 'away');
     assert.equal(s.racks[0].how, 'threeFoul');
     assert.equal(s.tally.home.threeFoulLosses, 1);
@@ -465,7 +470,7 @@ describe('9-ball (WPA section 5)', () => {
     // home breaks dry; away fouls; home fouls; … alternating fouls
     const s = start(BREAK({ pots: [] }), FOUL('scratch'), FOUL('scratch'), FOUL('scratch'), FOUL('scratch'));
     assert.deepEqual(s.rack!.fouls, { home: 2, away: 2 });
-    const t = pool.reducer(s, FOUL('scratch'));
+    const t = step(s, FOUL('scratch'));
     assert.equal(t.racks[0].winner, 'home', 'away fouled three times');
   });
 
@@ -499,8 +504,8 @@ describe('9-ball (WPA section 5)', () => {
 
   test('balls outside 1–9 are not in the game', () => {
     const s = start(BREAK({ pots: [] }));
-    assert.equal(pool.reducer(s, POT([10])), s);
-    assert.equal(pool.reducer(s, POT([15])), s);
+    assert.equal(step(s, POT([10])), s);
+    assert.equal(step(s, POT([15])), s);
   });
 });
 
@@ -532,9 +537,9 @@ describe('10-ball (WPA section 6)', () => {
 
   test('tenEarly (older practice): a called 10 pocketed early wins; an uncalled one is still spotted', () => {
     const cfg = { ...TEN, tenEarly: true };
-    const s = pool.replay(cfg, [LAG('home'), BREAK({ pots: [1] }), POT([2, 10], { calledBall: 10 })]);
+    const s = pool.replay(cfg, stampLog(cfg, [LAG('home'), BREAK({ pots: [1] }), POT([2, 10], { calledBall: 10 })]));
     assert.equal(s.racks[0].winner, 'home');
-    const t = pool.replay(cfg, [LAG('home'), BREAK({ pots: [1] }), POT([2, 10], { calledBall: 2 })]);
+    const t = pool.replay(cfg, stampLog(cfg, [LAG('home'), BREAK({ pots: [1] }), POT([2, 10], { calledBall: 2 })]));
     assert.equal(t.racks.length, 0);
     assert.ok(t.rack!.table.includes(10));
   });
@@ -578,7 +583,7 @@ describe('10-ball (WPA section 6)', () => {
 
   test('balls outside 1–10 are not in the game', () => {
     const s = start(BREAK({ pots: [] }));
-    assert.equal(pool.reducer(s, POT([11])), s);
+    assert.equal(step(s, POT([11])), s);
   });
 });
 
@@ -837,14 +842,14 @@ describe('replay, undo and robustness', () => {
   test('malformed and unknown actions are ignored (same state back)', () => {
     const s = pool.replay(NINE, [LAG('home'), BREAK({ pots: [1] })]);
     const bad: unknown[] = [null, undefined, 42, 'POT', {}, { type: 7 }, { type: 'UNDO' }, { type: 'STAT_ADJUST' }, { type: 'NOPE' },
-      { type: 'POT', payload: 'x' }, { type: 'POT', payload: { pots: '3' } }, { type: 'POT', payload: { pots: ['3'] } },
-      { type: 'POT', payload: { pots: [null] } }, { type: 'CHOOSE', payload: { choice: 'play' } }, { type: 'POT', side: 'both', payload: { pots: [2] } },
+      { type: 'POT', side: 'home', payload: 'x' }, { type: 'POT', side: 'home', payload: { pots: '3' } }, { type: 'POT', side: 'home', payload: { pots: ['3'] } },
+      { type: 'POT', side: 'home', payload: { pots: [null] } }, { type: 'CHOOSE', payload: { choice: 'play' } }, { type: 'POT', side: 'both', payload: { pots: [2] } },
       { type: '__proto__' }, { type: 'constructor' }, { type: 'toString' }];
     for (const a of bad) assert.equal(pool.reducer(s, a as ScoreAction), s, JSON.stringify(a));
   });
 
   test('a foul kind named like an Object property is just "other"', () => {
-    const s = pool.replay(NINE, [LAG('home'), BREAK({ pots: [1] }), FOUL('constructor'), FOUL('__proto__'), FOUL('toString')]);
+    const s = pool.replay(NINE, stampLog(NINE, [LAG('home'), BREAK({ pots: [1] }), FOUL('constructor'), FOUL('__proto__'), FOUL('toString')]));
     assert.equal(s.tally.home.foulsBy.other, 2, 'home: "constructor" and "toString"');
     assert.equal(s.tally.away.foulsBy.other, 1);
     assert.equal(Object.getPrototypeOf(s.tally.home.foulsBy), Object.prototype);
@@ -871,10 +876,10 @@ describe('breaks (docs/security/breaks/pool-engine.md)', () => {
 
   test('#5: payload, action and config fields are read as own properties only (no prototype chain, no pollution)', () => {
     const s = NINE_BROKEN();
-    assert.equal(pool.reducer(s, { type: 'POT', payload: Object.create({ pots: [2] }) }), s, 'an inherited "pots"');
+    assert.equal(pool.reducer(s, { type: 'POT', side: 'home', payload: Object.create({ pots: [2] }) }), s, 'an inherited "pots"');
     const t10 = pool.replay(TEN, [LAG('home'), BREAK({ pots: [1] })]);
     const lit = Object.assign(Object.create({ called: false }), { pots: [2] });
-    assert.equal(pool.reducer(t10, { type: 'POT', payload: lit }).rack!.pending, null, 'an inherited "called: false"');
+    assert.equal(pool.reducer(t10, { type: 'POT', side: 'home', payload: lit }).rack!.pending, null, 'an inherited "called: false"');
     const action = Object.create({ type: 'RACK', side: 'away' });
     assert.equal(pool.reducer(s, action as ScoreAction), s, 'an inherited action type / side');
     try {
@@ -908,10 +913,10 @@ describe('breaks (docs/security/breaks/pool-engine.md)', () => {
     const s = NINE_BROKEN();
     const boom = () => { throw new Error('boom'); };
     const hostile: unknown[] = [
-      { type: 'POT', payload: { get pots() { return boom(); } } },
-      { type: 'POT', payload: { pots: new Proxy([2], { get: boom }) } },
-      { type: 'POT', payload: new Proxy({}, { ownKeys: boom }) },
-      { type: 'FOUL', payload: { kind: 'scratch', get off() { return boom(); } } },
+      { type: 'POT', side: 'home', payload: { get pots() { return boom(); } } },
+      { type: 'POT', side: 'home', payload: { pots: new Proxy([2], { get: boom }) } },
+      { type: 'POT', side: 'home', payload: new Proxy({}, { ownKeys: boom }) },
+      { type: 'FOUL', side: 'home', payload: { kind: 'scratch', get off() { return boom(); } } },
       new Proxy({}, { get: boom, getOwnPropertyDescriptor: boom, has: boom }),
       { get type() { return boom(); } },
     ];
@@ -973,10 +978,10 @@ describe('breaks (docs/security/breaks/pool-engine.md)', () => {
   });
 
   test('#10: an "illegal break" foul exists only on a break — during play it is recorded as "other"', () => {
-    const s = pool.reducer(NINE_BROKEN(), FOUL('illegalBreak'));
+    const s = step(NINE_BROKEN(), FOUL('illegalBreak'));
     assert.equal(s.tally.home.foulsBy.illegalBreak, undefined);
     assert.equal(s.tally.home.foulsBy.other, 1);
-    const p = pool.reducer(pool.replay(NINE, [LAG('home'), BREAK({ pots: [] })]), PUSH({ foul: 'illegalBreak' }));
+    const p = step(pool.replay(NINE, [LAG('home'), BREAK({ pots: [] })]), PUSH({ foul: 'illegalBreak' }));
     assert.equal(p.tally.away.foulsBy.illegalBreak, undefined, 'nor on a push-out');
     assert.equal(pool.replay(NINE, [LAG('home'), BREAK({ foul: 'illegalBreak' })]).tally.home.foulsBy.illegalBreak, 1, 'on the break it stays');
   });
@@ -994,5 +999,15 @@ describe('breaks (docs/security/breaks/pool-engine.md)', () => {
     assert.notEqual(pool.reducer(two, A('MISS', 'home', { rack: 2 })), two);
     // a correction voided a rack end: the later taps name a later rack and still apply
     assert.equal(pool.reducer(one, RACK('away', { rack: 3 })).racks.length, 2);
+  });
+
+  test('#13: a shot names the side at the table — a side-less shot is ignored, so a duplicate can never pass the turn twice', () => {
+    const s = pool.replay(NINE, [LAG('home'), BREAK({ pots: [] })]);
+    for (const a of [POT([1]), MISS(), SAFE(), FOUL('scratch'), PUSH()]) assert.equal(pool.reducer(s, a), s, `${a.type} with no side`);
+    const once = pool.reducer(s, MISS('away'));
+    assert.equal(once.rack!.shooter, 'home');
+    assert.equal(pool.reducer(once, MISS('away')), once, 'the duplicate from a second phone');
+    const f = pool.reducer(s, FOUL('scratch', {}, 'away'));
+    assert.equal(pool.reducer(f, FOUL('scratch', {}, 'away')), f, 'a duplicated foul');
   });
 });
