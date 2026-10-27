@@ -394,6 +394,14 @@ function reduce(s: PoolState, a: PoolAction): PoolState {
   const side = own(a, 'side');
   const p = ownRecord(own(a, 'payload'));
   if (!p) return s; // a payload that can't be read voids the action (breaks #6)
+  // breaks #12 — the rack an action was tapped for (`rack`, the number of the
+  // rack in play; required on RACK): a duplicate or a straggler for an earlier
+  // rack is ignored. A later number still applies — a correction that voided a
+  // rack end shifts the taps after it (AMEND has no insert, so never earlier).
+  if (p.rack !== undefined) {
+    const n = p.rack;
+    if (typeof n !== 'number' || !Number.isSafeInteger(n) || n < 1 || n < s.rack!.n) return s;
+  } else if (type === 'RACK') return s;
   switch (type) {
     case 'LAG': return lag(s, side, p);
     case 'BREAK': return breakShot(s, side, p);

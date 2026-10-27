@@ -119,8 +119,12 @@ enums and booleans only**: never a name, never a player id (the player credit ri
 | `FOUL` | shooter; another side only with `outOfTurn` | `{kind?, pots?, off?}` | Foul ▸ kind (+ balls) | |
 | `PUSH` | shooter (optional) | `{pots?, off?, foul?}` | 1 | 9/10-ball, the shot after a break with no foul |
 | `CHOOSE` | — | `{choice: 'play'\|'pass'\|'rerack', breaker?}` | 1 | the engine waits for a choice (`state.rack.pending`) |
-| `RACK` | rack winner | `{breaker?, bnr?: true, golden?: true, runOut?: true}` | 1 (+ flags) | **quick mode**: a rack with no detail yet. On a rack with detail it **awards** the rack (scorer gave up on detail, a conduct penalty 3.16). |
+| `RACK` | rack winner | `{rack: number, breaker?, bnr?: true, golden?: true, runOut?: true}` | 1 (+ flags) | **quick mode**: a rack with no detail yet. On a rack with detail it **awards** the rack (scorer gave up on detail, a conduct penalty 3.16). `rack` (the number of the rack in play) is **required**: a double tap can't award two racks. |
 | `STALEMATE` | — | — | 1 | 1.13: the rack is replayed, same breaker |
+
+**Every action may carry `rack`** (the number of the rack in play when it was tapped; the controls
+always send it). An action for an earlier rack — a duplicate from a second phone, a retry, a straggler —
+is ignored. A later number still applies (a correction that voided a rack end shifts the taps after it).
 
 A typical 9-ball run-out from the break is about ten taps (break + one tap per ball).
 A scorer who wants only results taps `RACK` once per rack; a match can mix the two modes rack

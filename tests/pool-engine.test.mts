@@ -27,7 +27,21 @@ const FOUL = (kind: string, extra: P = {}, side?: Side) => A('FOUL', side, { kin
 const PUSH = (payload: P = {}, side?: Side) => A('PUSH', side, payload);
 const CHOOSE = (choice: string, breaker?: Side) => A('CHOOSE', undefined, { choice, ...(breaker ? { breaker } : {}) });
 const RACK = (side: Side, flags: P = {}) => A('RACK', side, flags);
-const run = (config: P, ...acts: ScoreAction[]) => pool.replay(config, acts);
+/** What the scorer's controls send with a tap: the number of the rack in play
+ *  on a quick RACK (breaks #12). Tests that check the raw reducer call it directly. */
+function stamp(s: pool.PoolState, a: ScoreAction): ScoreAction {
+  const r = s.rack;
+  if (!r || a.type !== 'RACK' || a.payload?.rack !== undefined) return a;
+  return { ...a, payload: { ...(a.payload ?? {}), rack: r.n } };
+}
+/** One tap through the controls. */
+const step = (s: pool.PoolState, a: ScoreAction) => pool.reducer(s, stamp(s, a));
+/** The log the controls would store for these taps. */
+function stampLog(config: P, acts: ScoreAction[]): ScoreAction[] {
+  let s = pool.createInitialState(config);
+  return acts.map((a) => { const b = stamp(s, a); s = pool.reducer(s, b); return b; });
+}
+const run = (config: P, ...acts: ScoreAction[]) => pool.replay(config, stampLog(config, acts));
 const EIGHT = { game: 'eight' };
 const NINE = { game: 'nine' };
 const TEN = { game: 'ten' };
@@ -110,18 +124,18 @@ describe('the lag and the break order (WPA 1.2, 1.3)', () => {
   test('alternate break (default): the break alternates rack by rack', () => {
     let s = run({ ...NINE, raceTo: 5 }, LAG('home'));
     const breakers: Side[] = [];
-    for (const w of ['home', 'home', 'away', 'home'] as Side[]) { breakers.push(s.rack!.breaker!); s = pool.reducer(s, RACK(w)); }
+    for (const w of ['home', 'home', 'away', 'home'] as Side[]) { breakers.push(s.rack!.breaker!); s = step(s, RACK(w)); }
     assert.deepEqual(breakers, ['home', 'away', 'home', 'away']);
   });
 
   test('winner breaks / loser breaks', () => {
     let s = run({ ...NINE, breakFormat: 'winner' }, LAG('home'), RACK('away'));
     assert.equal(s.rack!.breaker, 'away');
-    s = pool.reducer(s, RACK('home'));
+    s = step(s, RACK('home'));
     assert.equal(s.rack!.breaker, 'home');
     s = run({ ...NINE, breakFormat: 'loser' }, LAG('home'), RACK('away'));
     assert.equal(s.rack!.breaker, 'home');
-    s = pool.reducer(s, RACK('home'));
+    s = step(s, RACK('home'));
     assert.equal(s.rack!.breaker, 'away');
   });
 
@@ -605,7 +619,7 @@ describe('the match: race, sets, the end', () => {
     assert.deepEqual(s.setsWon, { home: 1, away: 0 });
     assert.deepEqual(s.current, { home: 0, away: 0 });
     assert.match(pool.summary(s).detailLine ?? '', /Sets 1–0/);
-    s = [RACK('away'), RACK('home'), RACK('away'), RACK('home'), RACK('home')].reduce(pool.reducer, s);
+    s = [RACK('away'), RACK('home'), RACK('away'), RACK('home'), RACK('home')].reduce(step, s);
     assert.equal(s.ended, true);
     assert.deepEqual(s.sets, [[2, 0], [1, 2], [2, 0]]);
     assert.equal(pool.scoreLine(s), '2-0, 1-2, 2-0');
@@ -632,7 +646,7 @@ describe('the match: race, sets, the end', () => {
 
   test('the racks won never pass the race', () => {
     let s = run({ ...NINE, raceTo: 2, setsToWin: 3 }, LAG('home'));
-    for (let i = 0; i < 40; i++) s = pool.reducer(s, RACK(i % 3 ? 'home' : 'away'));
+    for (let i = 0; i < 40; i++) s = step(s, RACK(i % 3 ? 'home' : 'away'));
     for (const [h, a] of s.sets) assert.ok(Math.max(h, a) === 2 && Math.min(h, a) < 2);
     assert.ok(s.setsWon.home <= 3 && s.setsWon.away <= 3);
     assert.equal(s.racks.length, s.sets.reduce((n, [h, a]) => n + h + a, 0));
@@ -795,8 +809,8 @@ describe('stats (POOL_DESIGN §5)', () => {
 });
 
 describe('replay, undo and robustness', () => {
-  const LOG: ScoreAction[] = [LAG('home'), BREAK({ pots: [1] }), POT([2]), MISS(), FOUL('scratch'), POT([3, 4]), SAFE(), PUSH(),
-    POT([5]), MISS(), POT([5]), POT([9]), BREAK({ pots: [] }), PUSH(), CHOOSE('pass'), POT([1, 2]), MISS(), FOUL('wrongBall', { pots: [9] }), RACK('home')];
+  const LOG: ScoreAction[] = stampLog(NINE, [LAG('home'), BREAK({ pots: [1] }), POT([2]), MISS(), FOUL('scratch'), POT([3, 4]), SAFE(), PUSH(),
+    POT([5]), MISS(), POT([5]), POT([9]), BREAK({ pots: [] }), PUSH(), CHOOSE('pass'), POT([1, 2]), MISS(), FOUL('wrongBall', { pots: [9] }), RACK('home'), RACK('away')]);
 
   test('the same log always gives the same state, also through JSON (the stored event log)', () => {
     const a = pool.replay(NINE, LOG);
@@ -845,7 +859,7 @@ describe('replay, undo and robustness', () => {
       { type: 'FOUL', payload: { kind: 'Asha Rao' } },
       { type: 'RACK', side: 'away', payload: { breaker: 'Asha Rao', winnerName: 'Asha Rao' } },
     ];
-    const s = pool.replay(NINE, named);
+    const s = pool.replay(NINE, stampLog(NINE, named));
     assert.equal(JSON.stringify(s).includes('Asha'), false);
     assert.equal(JSON.stringify(s).includes('p1'), false, 'no player ids either: sides only');
   });
@@ -965,5 +979,20 @@ describe('breaks (docs/security/breaks/pool-engine.md)', () => {
     const p = pool.reducer(pool.replay(NINE, [LAG('home'), BREAK({ pots: [] })]), PUSH({ foul: 'illegalBreak' }));
     assert.equal(p.tally.away.foulsBy.illegalBreak, undefined, 'nor on a push-out');
     assert.equal(pool.replay(NINE, [LAG('home'), BREAK({ foul: 'illegalBreak' })]).tally.home.foulsBy.illegalBreak, 1, 'on the break it stays');
+  });
+
+  test('#12: a quick RACK names its rack; a duplicate (double tap, two phones) or any action for an earlier rack is ignored', () => {
+    const s = pool.replay({ ...NINE, raceTo: 5 }, [LAG('home')]);
+    assert.equal(pool.reducer(s, RACK('home')), s, 'no rack number: ignored');
+    for (const bad of ['1', 0, -1, 1.5, NaN, null, Infinity]) assert.equal(pool.reducer(s, RACK('home', { rack: bad })), s, String(bad));
+    const one = pool.reducer(s, RACK('home', { rack: 1 }));
+    assert.equal(one.racks.length, 1);
+    assert.equal(pool.reducer(one, RACK('home', { rack: 1 })), one, 'the duplicate of rack 1');
+    const two = pool.reducer(one, BREAK({ pots: [] }, undefined));
+    assert.equal(two.rack!.shooter, 'home', 'rack 2: away broke dry');
+    assert.equal(pool.reducer(two, A('MISS', 'home', { rack: 1 })), two, 'a straggler from rack 1');
+    assert.notEqual(pool.reducer(two, A('MISS', 'home', { rack: 2 })), two);
+    // a correction voided a rack end: the later taps name a later rack and still apply
+    assert.equal(pool.reducer(one, RACK('away', { rack: 3 })).racks.length, 2);
   });
 });
