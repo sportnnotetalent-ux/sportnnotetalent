@@ -29,7 +29,11 @@ import {
   type Category, type RoadKind, type RoadFormat, type TeamBasis,
 } from '../data/results';
 import { sportRule } from '../data/results/competitionRules';
-import type { Player } from '../core/types';
+import type { Player, Tournament } from '../core/types';
+import type { ProgrammeEvent } from '../data/tournamentCopyPlan';
+import { roadSeed } from '../data/carriedSetup';
+import { useEffectAfterSeed } from '../data/useCarriedEvent';
+import { CarriedNote } from '../components/results/CarriedNote';
 import { useRegion } from '../core/region';
 import { distanceUnitsOf, formatMiles } from '../core/units';
 
@@ -44,9 +48,12 @@ const KIND_NOTE: Record<RoadKind, string> = {
 const BASIS_LABEL: Record<TeamBasis, string> = { teams: 'Complete teams only (displace)', overall: 'Overall places', scorers: 'Scorers only' };
 const kmLabel = (m: number) => (m === HALF ? 'Half marathon' : m === MARATHON ? 'Marathon' : m >= 1000 ? `${m / 1000} km` : `${m} m`);
 
-export function RoadEventSetup({ tournamentId }: { tournamentId?: string }) {
+export function RoadEventSetup({ tournamentId, preloaded, carried }: { tournamentId?: string; preloaded?: Tournament; carried?: ProgrammeEvent }) {
   const nav = useNavigation<Nav>();
-  const tournament = useTournamentById(tournamentId);
+  const tournament = useTournamentById(tournamentId) ?? preloaded ?? null;
+  // Run it again: opened from "Events from last time" → last edition's choices
+  const [seed] = useState(() => (carried ? roadSeed(carried) : null));
+  const seeded = !!seed;
   const players = usePlayers();
   const [officials, setOfficials] = useState<string[]>([]); // SD-130: event officials (host_ids)
   // SD-130: age groups on the meet's cut-off day (31 Dec by default), not today
@@ -55,18 +62,18 @@ export function RoadEventSetup({ tournamentId }: { tournamentId?: string }) {
   // SD-154: miles alongside kilometres (a US meet, or a US viewer when the meet doesn't say)
   const region = useRegion();
   const miles = distanceUnitsOf(tournament?.formats?.athletics as Record<string, unknown> | undefined, region.units) === 'mi';
-  const [kind, setKind] = useState<RoadKind>('xc');
-  const [age, setAge] = useState<string>('U14');
-  const [gender, setGender] = useState<'M' | 'F' | 'X'>('M');
+  const [kind, setKind] = useState<RoadKind>(seed?.kind ?? 'xc');
+  const [age, setAge] = useState<string>(seed && (AGE_GROUPS as readonly string[]).includes(seed.age) ? seed.age : 'U14');
+  const [gender, setGender] = useState<'M' | 'F' | 'X'>(seed?.gender ?? 'M');
   const cat: Category = { age, gender };
-  const [metres, setMetres] = useState<number>(xcDistance('U14', 'M'));
-  const [custom, setCustom] = useState('');
-  const [trackWalk, setTrackWalk] = useState(true);
-  const [certified, setCertified] = useState(false);
-  const [timing, setTiming] = useState<'gun' | 'chip'>('gun');
-  const [penaltyZone, setPenaltyZone] = useState(false);
+  const [metres, setMetres] = useState<number>(seed?.metres ?? xcDistance('U14', 'M'));
+  const [custom, setCustom] = useState(seed?.custom ?? '');
+  const [trackWalk, setTrackWalk] = useState(seed?.trackWalk ?? true);
+  const [certified, setCertified] = useState(seed?.certified ?? false);
+  const [timing, setTiming] = useState<'gun' | 'chip'>(seed?.timing ?? 'gun');
+  const [penaltyZone, setPenaltyZone] = useState(seed?.penaltyZone ?? false);
   // a new kind / age: the usual distance (XC by age group)
-  useEffect(() => {
+  useEffectAfterSeed(seeded, () => {
     setCustom('');
     if (kind === 'xc') setMetres(xcDistance(age, gender));
     else if (kind === 'road') setMetres((m) => (ROAD_METRES.includes(m) ? m : 5000));
@@ -78,18 +85,18 @@ export function RoadEventSetup({ tournamentId }: { tournamentId?: string }) {
   const ev = roadEventOf(key);
 
   // team scoring: on for cross-country, off for the road (a house choice)
-  const [teamOn, setTeamOn] = useState(true);
-  useEffect(() => { setTeamOn(kind === 'xc'); }, [kind]);
-  const [scorers, setScorers] = useState(defaultTeamScoring('U14').scorers);
-  const [size, setSize] = useState<number | null>(6);
-  const [basis, setBasis] = useState<TeamBasis>('teams');
-  const [teamPts, setTeamPts] = useState(true);
+  const [teamOn, setTeamOn] = useState(seed ? seed.team.on : true);
+  useEffectAfterSeed(seeded, () => { setTeamOn(kind === 'xc'); }, [kind]);
+  const [scorers, setScorers] = useState(seed?.team.scorers ?? defaultTeamScoring('U14').scorers);
+  const [size, setSize] = useState<number | null>(seed?.team.on ? seed.team.size ?? null : 6);
+  const [basis, setBasis] = useState<TeamBasis>(seed?.team.basis ?? 'teams');
+  const [teamPts, setTeamPts] = useState(seed?.team.points ?? true);
   // SD-141: the meet's team-scoring rules (Competition rules) are the starting point
   const rf = tournament?.formats?.athletics as Record<string, unknown> | undefined;
   const ruleScorers = sportRule(rf, 'xcScorers');
   const tieBreak = sportRule(rf, 'xcTieBreak') === 'next' ? 'next' as const : undefined;
-  useEffect(() => { setScorers(ruleScorers === 'auto' ? defaultTeamScoring(age).scorers : Number(ruleScorers)); }, [age, ruleScorers]);
-  useEffect(() => {
+  useEffectAfterSeed(seeded, () => { setScorers(ruleScorers === 'auto' ? defaultTeamScoring(age).scorers : Number(ruleScorers)); }, [age, ruleScorers]);
+  useEffectAfterSeed(seeded, () => {
     if (!tournament) return;
     const sz = Number(sportRule(rf, 'xcSize'));
     setSize(sz > 0 ? sz : null);
@@ -195,6 +202,7 @@ export function RoadEventSetup({ tournamentId }: { tournamentId?: string }) {
       >
         <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
           <ScreenTitle title="🏃 New road / cross-country race" subtitle={tournament?.name} />
+          <CarriedNote title={seeded ? carried?.title : undefined} who="runners" />
           {/* SD-141: the meet's competition rules, checked before the meet starts */}
           <CompetitionRulesCard tournament={tournament} sport={'athletics'} />
 
@@ -301,7 +309,7 @@ export function RoadEventSetup({ tournamentId }: { tournamentId?: string }) {
             )}
           </Card>
 
-          <ScheduleCard state={schedule} tournamentId={tournamentId} discipline={ev?.key ?? 'ath.xc'} athleteIds={picks} />
+          <ScheduleCard state={schedule} tournamentId={tournamentId} discipline={ev?.key ?? 'ath.xc'} athleteIds={picks} preset={seeded ? carried?.sched : undefined} />
           <EventOfficials tournament={tournament} value={officials} onChange={setOfficials} />
         </KeyboardAwareScrollView>
       </KeyboardFooterLayout>

@@ -45,8 +45,19 @@ The new edition opens on its **Manage** tab, ready for teams. Registration start
 An athletics, swimming, shooting or other meet's events can't be created without their start lists, so they come across as the meet's programme:
 - The sport's page shows **🔁 Events from last time**, each with **Set up ›**.
 - The entries desk shows them as columns, so you can tick athletes in before the events are set up.
-- For athletics and swimming, **Set up ›** fills in the rounds, the timetable slot and venue area, the bar heights, implements and timing from last time. You just pick the athletes.
+- **Set up ›** opens the event as it was last time, with the line **🔁 Filled in from last time** at the top. You just pick the athletes, and can still change anything.
 - Tap **✕** on an event you're not running this time.
+
+### What Set up fills in
+Every sport keeps the event, age group and gender, and the timetable slot and venue area. On top of that:
+- **Athletics and swimming:** the rounds, bar heights, implements, take-off board, wind gauge and pool length.
+- **Road, race walk and cross-country:** the distance, timing, certified course and team scoring (how many score, team size).
+- **Combined events:** the events in order, day 2 and the throws' implements.
+- **Shooting:** the match length, scoring by series or shot by shot, and the final.
+- **Archery:** the bow, round and the match-play bracket.
+- **Rowing and canoe:** the boat, distance, lightweight class, lanes, splits and the rounds.
+- **Cycling:** the race, distance, laps and sprints, start gap and stages.
+- **Weightlifting:** the bodyweight category.
 
 ## Copy this setup (any tournament)
 1. Open the tournament and scroll to the bottom of its **Info** tab.

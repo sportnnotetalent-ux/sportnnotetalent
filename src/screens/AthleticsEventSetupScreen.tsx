@@ -39,7 +39,10 @@ import {
 import { getEntriesDoc } from '../data/meetEntriesStore';
 import { tickedFor, slotKey, matchTeam, type MeetEntriesDoc } from '../data/results';
 import { ScheduleCard, useSchedule } from '../components/results/ScheduleCard';
-import { barSettings, programmeEventFor, readProgramme } from '../data/tournamentCopyPlan';
+import { barSettings, programmeEventFor, programmeSlot, readProgramme } from '../data/tournamentCopyPlan';
+import { useCarriedEvent } from '../data/useCarriedEvent';
+import { CarriedNote } from '../components/results/CarriedNote';
+import { LoadingState } from '../components/ui';
 import { WeightliftingEventSetup } from './WeightliftingEventSetup';
 import { ShootingEventSetup } from './ShootingEventSetup';
 import { ArcheryEventSetup } from './ArcheryEventSetup';
@@ -77,13 +80,20 @@ const trackFor = (t: TrackOverrides | undefined, def: Parameters<typeof trackOpt
 /** SD-97: weightlifting has its own setup (bodyweight categories, lifters, lots). */
 export default function AthleticsEventSetupScreen() {
   const { params } = useRoute<RouteProp<RootStackParamList, 'AthleticsEventSetup'>>();
-  if (params?.sport === 'shooting') return <ShootingEventSetup tournamentId={params.tournamentId} />; // SD-96
-  if (params?.sport === 'archery') return <ArcheryEventSetup tournamentId={params.tournamentId} />; // SD-95
-  if (params?.sport === 'rowing' || params?.sport === 'canoe') return <CrewEventSetup tournamentId={params.tournamentId} sport={params.sport} />; // SD-99 / SD-100
-  if (params?.sport === 'cycling') return <CyclingEventSetup tournamentId={params.tournamentId} />; // SD-98
-  if (params?.mode === 'road' && (params.sport ?? 'athletics') === 'athletics') return <RoadEventSetup tournamentId={params.tournamentId} />; // SD-92
-  if (params?.mode === 'combined' && (params.sport ?? 'athletics') === 'athletics') return <CombinedEventSetup tournamentId={params.tournamentId} />; // SD-93
-  return params?.sport === 'weightlifting' ? <WeightliftingEventSetup tournamentId={params.tournamentId} /> : <TrackSwimEventSetup />;
+  // Run it again: opened from "Events from last time" → read that event first,
+  // so the screen starts as last edition left it (data/carriedSetup.ts)
+  // (track / field and swimming fill in place — TrackSwimEventSetup below)
+  const ownSetup = !!params?.mode || (!!params?.sport && params.sport !== 'athletics' && params.sport !== 'swimming');
+  const pre = useCarriedEvent(params?.tournamentId, params?.sport ?? 'athletics', ownSetup ? params?.slot : undefined);
+  if (pre.loading) return <LoadingState />;
+  const seed = { preloaded: pre.tournament, carried: pre.carried };
+  if (params?.sport === 'shooting') return <ShootingEventSetup tournamentId={params.tournamentId} {...seed} />; // SD-96
+  if (params?.sport === 'archery') return <ArcheryEventSetup tournamentId={params.tournamentId} {...seed} />; // SD-95
+  if (params?.sport === 'rowing' || params?.sport === 'canoe') return <CrewEventSetup tournamentId={params.tournamentId} sport={params.sport} {...seed} />; // SD-99 / SD-100
+  if (params?.sport === 'cycling') return <CyclingEventSetup tournamentId={params.tournamentId} {...seed} />; // SD-98
+  if (params?.mode === 'road' && (params.sport ?? 'athletics') === 'athletics') return <RoadEventSetup tournamentId={params.tournamentId} {...seed} />; // SD-92
+  if (params?.mode === 'combined' && (params.sport ?? 'athletics') === 'athletics') return <CombinedEventSetup tournamentId={params.tournamentId} {...seed} />; // SD-93
+  return params?.sport === 'weightlifting' ? <WeightliftingEventSetup tournamentId={params.tournamentId} {...seed} /> : <TrackSwimEventSetup />;
 }
 
 function TrackSwimEventSetup() {
@@ -157,8 +167,12 @@ function TrackSwimEventSetup() {
   // Run it again: this event as it was set up last edition (the meet's carried
   // programme) — its field settings, stats and timetable slots fill in once.
   const carried = useMemo(
-    () => (params?.discipline ? programmeEventFor(readProgramme(tournament?.formats?.[sport] as Record<string, unknown> | undefined, sport), params.discipline, { age: params.age, gender: params.gender }) : undefined),
-    [tournament?.formats, sport, params?.discipline, params?.age, params?.gender],
+    () => {
+      const list = readProgramme(tournament?.formats?.[sport] as Record<string, unknown> | undefined, sport);
+      return (params?.slot ? list.find((e) => programmeSlot(e) === params.slot) : undefined)
+        ?? (params?.discipline ? programmeEventFor(list, params.discipline, { age: params.age, gender: params.gender }) : undefined);
+    },
+    [tournament?.formats, sport, params?.discipline, params?.age, params?.gender, params?.slot],
   );
   const prefilled = useRef(false);
   useEffect(() => {
@@ -341,6 +355,7 @@ function TrackSwimEventSetup() {
       >
         <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
           <ScreenTitle title={swim ? '🏊 New swimming event' : '🏃 New event'} subtitle={tournament?.name} />
+          <CarriedNote title={carried?.discipline === discipline ? carried.title : undefined} who={relay ? 'relay teams' : 'athletes'} />
           {/* SD-141: the meet's competition rules, checked before the meet starts */}
           <CompetitionRulesCard tournament={tournament} sport={sport} />
           {/* SD-92: road races, race walks and cross-country have their own setup */}

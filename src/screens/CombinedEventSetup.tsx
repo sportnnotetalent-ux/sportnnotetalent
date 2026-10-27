@@ -27,30 +27,36 @@ import {
   AGE_GROUPS, categoryLabel, eligibleFor, meetSettings, COMBINED_PRESETS, SCORABLE, shortName, combinedKey, disciplineOf, implementSpec, hurdleHeight,
   type Category, type CombinedKind, type CombinedTable,
 } from '../data/results';
-import type { Player } from '../core/types';
+import type { Player, Tournament } from '../core/types';
+import type { ProgrammeEvent } from '../data/tournamentCopyPlan';
+import { combinedSeed } from '../data/carriedSetup';
+import { useEffectAfterSeed } from '../data/useCarriedEvent';
+import { CarriedNote } from '../components/results/CarriedNote';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 interface Source { key: string; name: string; colorHex?: string; teamId?: string; playerIds: string[] }
 const THROWS = ['ath.sp', 'ath.dt', 'ath.jt'];
 
-export function CombinedEventSetup({ tournamentId }: { tournamentId?: string }) {
+export function CombinedEventSetup({ tournamentId, preloaded, carried }: { tournamentId?: string; preloaded?: Tournament; carried?: ProgrammeEvent }) {
   const nav = useNavigation<Nav>();
-  const tournament = useTournamentById(tournamentId);
+  const tournament = useTournamentById(tournamentId) ?? preloaded ?? null;
+  // Run it again: opened from "Events from last time" → last edition's list, order and implements
+  const [seed] = useState(() => (carried ? combinedSeed(carried) : null));
   const players = usePlayers();
   const [officials, setOfficials] = useState<string[]>([]); // SD-130: event officials (host_ids)
   // SD-130: age groups on the meet's cut-off day (31 Dec by default), not today
   const ages = useMeetAges(tournament, 'athletics', players);
   const meet = meetSettings(tournament?.formats?.athletics as Record<string, unknown> | undefined);
-  const [age, setAge] = useState<string>('U16');
-  const [gender, setGender] = useState<CombinedTable>('F');
+  const [age, setAge] = useState<string>(seed && (AGE_GROUPS as readonly string[]).includes(seed.age) ? seed.age : 'U16');
+  const [gender, setGender] = useState<CombinedTable>(seed?.gender ?? 'F');
   const cat: Category = { age, gender };
   const presets = COMBINED_PRESETS.filter((p) => !!p.events[gender]);
-  const [kind, setKind] = useState<CombinedKind | 'x'>('pen');
+  const [kind, setKind] = useState<CombinedKind | 'x'>(seed?.kind ?? 'pen');
   const preset = kind === 'x' ? undefined : presets.find((p) => p.kind === kind);
-  const [events, setEvents] = useState<string[]>([]);
-  const [day2, setDay2] = useState<number | null>(null);
+  const [events, setEvents] = useState<string[]>(seed?.events ?? []);
+  const [day2, setDay2] = useState<number | null>(seed?.day2 ?? null);
   // a new gender / preset: its event list and day split (a preset not offered for this gender → the first that is)
-  useEffect(() => {
+  useEffectAfterSeed(!!seed, () => {
     if (kind !== 'x' && !presets.some((p) => p.kind === kind)) { setKind(presets[0]?.kind ?? 'x'); return; }
     if (kind === 'x') { setEvents((ev) => ev.filter((d) => SCORABLE[gender].includes(d))); setDay2(null); return; }
     const p = presets.find((x) => x.kind === kind)!;
@@ -65,13 +71,13 @@ export function CombinedEventSetup({ tournamentId }: { tournamentId?: string }) 
   const label = key ? disciplineOf(key)?.label ?? 'Combined event' : 'Combined event';
 
   // the throws' implements (World Athletics from U18; school / federation practice below — editable)
-  const [impl, setImpl] = useState<Record<string, string>>({});
-  useEffect(() => {
+  const [impl, setImpl] = useState<Record<string, string>>(() => (seed ? Object.fromEntries(THROWS.map((d) => [d, seed.implements[d] ?? implementSpec(d, { age: seed.age, gender: seed.gender })?.text ?? ''])) : {}));
+  useEffectAfterSeed(!!seed, () => {
     setImpl(Object.fromEntries(THROWS.map((d) => [d, implementSpec(d, cat)?.text ?? ''])));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [age, gender]);
-  const [handTimed, setHandTimed] = useState(meet.handTimed);
-  const [noGauge, setNoGauge] = useState(false);
+  const [handTimed, setHandTimed] = useState(seed?.handTimed ?? meet.handTimed);
+  const [noGauge, setNoGauge] = useState(seed?.noGauge ?? false);
 
   // Teams / houses (as the other event setups)
   const [sources, setSources] = useState<Source[]>([]);
@@ -154,6 +160,7 @@ export function CombinedEventSetup({ tournamentId }: { tournamentId?: string }) 
       >
         <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
           <ScreenTitle title="🏅 New combined event" subtitle={tournament?.name} />
+          <CarriedNote title={seed ? carried?.title : undefined} who="athletes" />
           {/* SD-141: the meet's competition rules, checked before the meet starts */}
           <CompetitionRulesCard tournament={tournament} sport={'athletics'} />
 
@@ -230,7 +237,7 @@ export function CombinedEventSetup({ tournamentId }: { tournamentId?: string }) 
             </View>
           </Card>
 
-          <ScheduleCard state={schedule} tournamentId={tournamentId} discipline={events[0] ?? 'ath.100m'} combined={events.length >= 2 ? { events, ...(day2 != null && day2 > 0 && day2 < events.length ? { day2 } : {}) } : undefined} athleteIds={picks} />
+          <ScheduleCard state={schedule} tournamentId={tournamentId} discipline={events[0] ?? 'ath.100m'} combined={events.length >= 2 ? { events, ...(day2 != null && day2 > 0 && day2 < events.length ? { day2 } : {}) } : undefined} athleteIds={picks} preset={seed ? carried?.sched : undefined} />
           <EventOfficials tournament={tournament} value={officials} onChange={setOfficials} />
           <Text style={textStyles.muted}>{events.length ? `${label} ${categoryLabel(cat)}: ${events.map(shortName).join(', ')}.` : ''} Each event is entered on the usual track / field screen; the running total and places update after every event.</Text>
         </KeyboardAwareScrollView>

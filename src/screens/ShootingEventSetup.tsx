@@ -30,26 +30,32 @@ import {
 import { TeamBuilder, newTeamDraft, type TeamDraft } from '../components/results/TeamBuilder';
 import { sportRule } from '../data/results/competitionRules';
 import { ageOf } from '../core/age';
-import type { Player } from '../core/types';
+import type { Player, Tournament } from '../core/types';
+import type { ProgrammeEvent } from '../data/tournamentCopyPlan';
+import { shootingSeed } from '../data/carriedSetup';
+import { useEffectAfterSeed } from '../data/useCarriedEvent';
+import { CarriedNote } from '../components/results/CarriedNote';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 interface Source { key: string; name: string; colorHex?: string; teamId?: string; playerIds: string[] }
 
-export function ShootingEventSetup({ tournamentId }: { tournamentId?: string }) {
+export function ShootingEventSetup({ tournamentId, preloaded, carried }: { tournamentId?: string; preloaded?: Tournament; carried?: ProgrammeEvent }) {
   const nav = useNavigation<Nav>();
-  const tournament = useTournamentById(tournamentId);
+  const tournament = useTournamentById(tournamentId) ?? preloaded ?? null;
+  // Run it again: opened from "Events from last time" → last edition's choices
+  const [seed] = useState(() => (carried ? shootingSeed(carried) : null));
   const players = usePlayers();
   const [officials, setOfficials] = useState<string[]>([]); // SD-130: event officials (host_ids)
-  const [evKey, setEvKey] = useState(SHOOT_EVENTS[0].key);
+  const [evKey, setEvKey] = useState(seed?.evKey ?? SHOOT_EVENTS[0].key);
   const ev = SHOOT_EVENTS.find((e) => e.key === evKey)!;
   const team = !!ev.teamSize;
   // SD-137b: a team of 3 on an individual event (the members' match scores added)
-  const [of3, setOf3] = useState(false);
+  const [of3, setOf3] = useState(seed?.of3 ?? false);
   const team3 = of3 && !team;
-  const [age, setAge] = useState<ShootAge>('Junior');
-  const [gender, setGender] = useState<'M' | 'F'>('M');
-  const [shots, setShots] = useState<number>(defaultShots(ev, 'Junior'));
-  useEffect(() => { setShots(defaultShots(ev, age)); }, [evKey, age]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [age, setAge] = useState<ShootAge>(SHOOT_AGES.some((a) => a.key === seed?.age) ? seed!.age as ShootAge : 'Junior');
+  const [gender, setGender] = useState<'M' | 'F'>(seed?.gender ?? 'M');
+  const [shots, setShots] = useState<number>(seed?.shots ?? defaultShots(ev, 'Junior'));
+  useEffectAfterSeed(!!seed, () => { setShots(defaultShots(ev, age)); }, [evKey, age]);
   const adult = age === 'Senior' || age === 'Junior';
   const cat: Category = { age, gender: team ? 'X' : gender, ...(shots !== ev.shots ? { shots } : {}) };
   const discipline = team3 ? shootTeamKey(ev.key) : ev.key;
@@ -131,11 +137,11 @@ export function ShootingEventSetup({ tournamentId }: { tournamentId?: string }) 
   useEffect(() => { setTeams([]); }, [team3, gender, evKey]);
   const entrants = team3 ? teams.length : team ? pairs.length : picks.length;
   // SD-137b: ISSF mixed team medal matches (the best 4 teams; the meet may rank on the total instead)
-  const [matchesPick, setMatchesPick] = useState<boolean | null>(null);
+  const [matchesPick, setMatchesPick] = useState<boolean | null>(seed?.matches ?? null);
   const medalMatches = team && entrants >= SHOOT_MATCH_TEAMS && (matchesPick ?? sportRule(shootFmt, 'shootMixedFinal') === 'matches');
 
-  const [mode, setMode] = useState<'series' | 'shot'>('series');
-  const [finalists, setFinalists] = useState<number | null>(null);
+  const [mode, setMode] = useState<'series' | 'shot'>(seed?.mode ?? 'series');
+  const [finalists, setFinalists] = useState<number | null>(seed?.finalists ?? null);
   // SD-141: the meet's final size (Competition rules) when it fits, else by entries
   const ruleFin = sportRule(tournament?.formats?.shooting as Record<string, unknown> | undefined, 'shootFinal');
   const ruleDefault = ruleFin === 'auto' ? defaultFinalists(ev, entrants) : Number(ruleFin) === 0 ? 0 : Number(ruleFin) < entrants ? Number(ruleFin) : defaultFinalists(ev, entrants);
@@ -202,6 +208,7 @@ export function ShootingEventSetup({ tournamentId }: { tournamentId?: string }) 
       >
         <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
           <ScreenTitle title="🎯 New shooting event" subtitle={tournament?.name} />
+          <CarriedNote title={seed ? carried?.title : undefined} who="shooters" />
           {/* SD-141: the meet's competition rules, checked before the meet starts */}
           <CompetitionRulesCard tournament={tournament} sport={'shooting'} />
 
@@ -305,7 +312,7 @@ export function ShootingEventSetup({ tournamentId }: { tournamentId?: string }) 
             <Text style={textStyles.muted}>Ties (ISSF): {ev.scoring === 'integer' ? 'more inner tens, then ' : ''}{ev.positions ? 'standing, kneeling, prone totals, then ' : ''}the higher last {ev.scoring === 'hits' ? 'round' : '10-shot series'}, back series by series{ev.scoring !== 'hits' ? ', then shot by shot when shots are entered' : ''}.</Text>
           </Card>
 
-          <ScheduleCard state={schedule} tournamentId={tournamentId} discipline={discipline} plan={(!!ev.final && !team && !team3 && finalOk) || medalMatches ? [{ phase: 'qualification', heats: 1 }, { phase: 'final', heats: 1 }] : undefined} athleteIds={team3 ? teams.flatMap((t) => t.seats.filter((x): x is string => !!x)) : picks} />
+          <ScheduleCard state={schedule} tournamentId={tournamentId} discipline={discipline} plan={(!!ev.final && !team && !team3 && finalOk) || medalMatches ? [{ phase: 'qualification', heats: 1 }, { phase: 'final', heats: 1 }] : undefined} athleteIds={team3 ? teams.flatMap((t) => t.seats.filter((x): x is string => !!x)) : picks} preset={seed ? carried?.sched : undefined} />
           <EventOfficials tournament={tournament} value={officials} onChange={setOfficials} />
         </KeyboardAwareScrollView>
       </KeyboardFooterLayout>

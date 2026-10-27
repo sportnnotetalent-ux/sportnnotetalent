@@ -28,7 +28,11 @@ import {
 } from '../data/results';
 import { sportRule } from '../data/results/competitionRules';
 import { TeamBuilder, type TeamDraft } from '../components/results/TeamBuilder';
-import type { Player } from '../core/types';
+import type { Player, Tournament } from '../core/types';
+import type { ProgrammeEvent } from '../data/tournamentCopyPlan';
+import { cyclingSeed } from '../data/carriedSetup';
+import { useEffectAfterSeed } from '../data/useCarriedEvent';
+import { CarriedNote } from '../components/results/CarriedNote';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 interface Source { key: string; name: string; colorHex?: string; teamId?: string; playerIds: string[] }
@@ -63,25 +67,27 @@ const KIND_NOTE: Record<CycKind, string> = {
   ts: 'Teams of 3, three laps: each rider leads one lap and pulls off; the time is taken on the last rider. Qualifying on time, then finals for gold and bronze.',
 };
 
-export function CyclingEventSetup({ tournamentId }: { tournamentId?: string }) {
+export function CyclingEventSetup({ tournamentId, preloaded, carried }: { tournamentId?: string; preloaded?: Tournament; carried?: ProgrammeEvent }) {
   const nav = useNavigation<Nav>();
-  const tournament = useTournamentById(tournamentId);
+  const tournament = useTournamentById(tournamentId) ?? preloaded ?? null;
+  // Run it again: opened from "Events from last time" → last edition's choices
+  const [seed] = useState(() => (carried ? cyclingSeed(carried) : null));
   const players = usePlayers();
   const [officials, setOfficials] = useState<string[]>([]); // SD-130: event officials (host_ids)
   // SD-130: age groups on the meet's cut-off day (31 Dec by default), not today
   const ages = useMeetAges(tournament, 'cycling', players);
-  const [setting, setSetting] = useState<'road' | 'track'>('road');
-  const [kind, setKind] = useState<CycKind>('itt');
-  useEffect(() => { setKind(setting === 'road' ? 'itt' : 'ip'); }, [setting]);
-  const [dist, setDist] = useState<Record<string, number>>({ itt: 10, ip: 3000, tt: 1000 });
-  const [km, setKm] = useState('');
-  const [laps, setLaps] = useState('');
-  const [every, setEvery] = useState('');
-  const [interval, setStartGap] = useState(60);
-  const [stages, setStages] = useState<('road' | 'itt')[]>(['road', 'itt', 'road']);
-  const [bo, setBo] = useState<1 | 3>(3);
-  const [age, setAge] = useState('U16');
-  const [gender, setGender] = useState<'M' | 'F' | 'X'>('M');
+  const [setting, setSetting] = useState<'road' | 'track'>(seed?.setting ?? 'road');
+  const [kind, setKind] = useState<CycKind>(seed?.kind ?? 'itt');
+  useEffectAfterSeed(!!seed, () => { setKind(setting === 'road' ? 'itt' : 'ip'); }, [setting]);
+  const [dist, setDist] = useState<Record<string, number>>(seed?.dist ?? { itt: 10, ip: 3000, tt: 1000 });
+  const [km, setKm] = useState(seed?.km ?? '');
+  const [laps, setLaps] = useState(seed?.laps ?? '');
+  const [every, setEvery] = useState(seed?.every ?? '');
+  const [interval, setStartGap] = useState(seed?.interval ?? 60);
+  const [stages, setStages] = useState<('road' | 'itt')[]>(seed?.stages ?? ['road', 'itt', 'road']);
+  const [bo, setBo] = useState<1 | 3>(seed?.bo ?? 3);
+  const [age, setAge] = useState(AGES.some((a) => a.key === seed?.age) ? seed!.age : 'U16');
+  const [gender, setGender] = useState<'M' | 'F' | 'X'>(seed?.gender ?? 'M');
   const cat: Category = { age, gender };
   const adult = ['Junior', 'U23', 'Senior', 'Masters'].includes(age);
 
@@ -202,6 +208,7 @@ export function CyclingEventSetup({ tournamentId }: { tournamentId?: string }) {
       >
         <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
           <ScreenTitle title="🚴 New cycling race" subtitle={tournament?.name} />
+          <CarriedNote title={seed ? carried?.title : undefined} who={teamKind ? 'teams' : 'riders'} />
           {/* SD-141: the meet's competition rules, checked before the meet starts */}
           <CompetitionRulesCard tournament={tournament} sport={'cycling'} />
 
@@ -325,7 +332,7 @@ export function CyclingEventSetup({ tournamentId }: { tournamentId?: string }) {
             {handTimed ? <Text style={textStyles.muted}>Hand timing is on for this meet (Points & timing).</Text> : null}
           </Card>
 
-          <ScheduleCard state={schedule} tournamentId={tournamentId} discipline={ev.key} plan={plan} stage={kind === 'stage'} athleteIds={teamKind ? teams.flatMap((t) => t.seats.filter((x): x is string => !!x)) : picks} />
+          <ScheduleCard state={schedule} tournamentId={tournamentId} discipline={ev.key} plan={plan} stage={kind === 'stage'} athleteIds={teamKind ? teams.flatMap((t) => t.seats.filter((x): x is string => !!x)) : picks} preset={seed ? carried?.sched : undefined} />
           <EventOfficials tournament={tournament} value={officials} onChange={setOfficials} />
         </KeyboardAwareScrollView>
       </KeyboardFooterLayout>

@@ -27,7 +27,10 @@ import {
 } from '../data/results';
 import { phaseRules } from '../data/results/competitionRules';
 import { ageOf } from '../core/age';
-import type { Player } from '../core/types';
+import type { Player, Tournament } from '../core/types';
+import type { ProgrammeEvent } from '../data/tournamentCopyPlan';
+import { liftingSeed } from '../data/carriedSetup';
+import { CarriedNote } from '../components/results/CarriedNote';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 interface Source { key: string; name: string; colorHex?: string; teamId?: string; playerIds: string[] }
@@ -35,18 +38,20 @@ interface Pick { playerId: string; sn: string; cj: string }
 
 const kgOf = (t: string): number | undefined => { const v = Number(t.trim().replace(',', '.')); return t.trim() && Number.isFinite(v) ? v : undefined; };
 
-export function WeightliftingEventSetup({ tournamentId }: { tournamentId?: string }) {
+export function WeightliftingEventSetup({ tournamentId, preloaded, carried }: { tournamentId?: string; preloaded?: Tournament; carried?: ProgrammeEvent }) {
   const nav = useNavigation<Nav>();
-  const tournament = useTournamentById(tournamentId);
+  const tournament = useTournamentById(tournamentId) ?? preloaded ?? null;
+  // Run it again: opened from "Events from last time" → last edition's category
+  const [seed] = useState(() => (carried ? liftingSeed(carried) : null));
   const players = usePlayers();
   const [officials, setOfficials] = useState<string[]>([]); // SD-130: event officials (host_ids)
   const settings = wlMeetSettings(tournament?.formats?.weightlifting as Record<string, unknown> | undefined);
-  const [age, setAge] = useState<WlAge>('Senior');
-  const [gender, setGender] = useState<'M' | 'F'>('M');
+  const [age, setAge] = useState<WlAge>(WL_AGES.some((a) => a.key === seed?.age) ? seed!.age as WlAge : 'Senior');
+  const [gender, setGender] = useState<'M' | 'F'>(seed?.gender ?? 'M');
   // SD-141: the meet's category list (Competition rules)
   const wlRules = useMemo(() => phaseRules('weightlifting', tournament?.formats?.weightlifting as Record<string, unknown> | undefined), [tournament]);
   const classes = useMemo(() => weightClasses(age, gender, wlRules), [age, gender, wlRules]);
-  const [cls, setCls] = useState<string>(classes[3]);
+  const [cls, setCls] = useState<string>(seed?.cls && classes.includes(seed.cls) ? seed.cls : classes[3]);
   useEffect(() => { if (!classes.includes(cls)) setCls(classes[Math.min(3, classes.length - 1)]); }, [classes, cls]);
   const cat: Category = { age, gender, weightClass: cls };
   const adult = age === 'Senior' || age === 'Junior';
@@ -143,6 +148,7 @@ export function WeightliftingEventSetup({ tournamentId }: { tournamentId?: strin
       >
         <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
           <ScreenTitle title="🏋️ New weightlifting event" subtitle={tournament?.name} />
+          <CarriedNote title={seed ? carried?.title : undefined} who="lifters" />
           {/* SD-141: the meet's competition rules, checked before the meet starts */}
           <CompetitionRulesCard tournament={tournament} sport={'weightlifting'} />
 
@@ -206,7 +212,7 @@ export function WeightliftingEventSetup({ tournamentId }: { tournamentId?: strin
             </Text>
           </Card>
 
-          <ScheduleCard state={schedule} tournamentId={tournamentId} discipline="wl.total" athleteIds={picks.map((p) => p.playerId)} />
+          <ScheduleCard state={schedule} tournamentId={tournamentId} discipline="wl.total" athleteIds={picks.map((p) => p.playerId)} preset={seed ? carried?.sched : undefined} />
           <EventOfficials tournament={tournament} value={officials} onChange={setOfficials} />
         </KeyboardAwareScrollView>
       </KeyboardFooterLayout>

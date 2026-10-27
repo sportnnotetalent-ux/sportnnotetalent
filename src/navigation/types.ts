@@ -113,7 +113,9 @@ export type RootStackParamList = {
   /** SD-90 / SD-91: add a track or field event (category, entrants, rounds, lanes / order, bar heights) to a meet. */
   AthleticsEventSetup: { tournamentId?: string; sport?: 'athletics' | 'swimming' | 'weightlifting' | 'shooting' | 'archery' | 'rowing' | 'canoe' | 'cycling'; mode?: 'road' | 'combined';
     /** SD-128: set up this event of the entries matrix (pre-filled from its ticks) */
-    discipline?: string; age?: string; gender?: 'M' | 'F' | 'X' } | undefined;
+    discipline?: string; age?: string; gender?: 'M' | 'F' | 'X';
+    /** Run it again: the carried programme event to start from ("ath.100m@U14-M") */
+    slot?: string } | undefined;
   /** SD-128: a meet's entries — athletes × events matrix per age group / gender, event caps, bulk add. */
   MeetEntries: { tournamentId: string; sport?: string };
   /** SD-141: the competition rules an organiser picks for an event sport before the meet starts (read-only once results exist). */

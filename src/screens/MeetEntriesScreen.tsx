@@ -162,7 +162,7 @@ export default function MeetEntriesScreen() {
   const setCaps = (c: EntryCaps) => void saveDoc((d) => ({ ...d, caps: c.individual == null && c.relay == null ? undefined : c }));
   const setUp = (ev: EntryEvent) => {
     const mode = carried.find((c) => c.discipline === ev.discipline)?.mode; // a carried road race / combined event
-    nav.navigate('AthleticsEventSetup', { tournamentId, ...(sport !== 'athletics' ? { sport: sport as 'swimming' } : {}), ...(mode ? { mode } : {}), discipline: ev.discipline, age: ev.category?.age, gender: ev.category?.gender });
+    nav.navigate('AthleticsEventSetup', { tournamentId, ...(sport !== 'athletics' ? { sport: sport as 'swimming' } : {}), ...(mode ? { mode } : {}), discipline: ev.discipline, age: ev.category?.age, gender: ev.category?.gender, slot: ev.slot });
   };
   const planned = cols.filter((c) => !c.eventKey && tickedFor(doc, c.slot).length);
   const setupable = sport === 'athletics' || sport === 'swimming';

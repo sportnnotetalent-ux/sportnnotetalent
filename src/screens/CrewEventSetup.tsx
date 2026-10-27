@@ -5,7 +5,7 @@
  *  scullers / paddlers — the progression (World Rowing / ICF presets by the
  *  number of crews, or a custom rule) and the lanes. Heats and lanes are
  *  drawn. Rendered by AthleticsEventSetupScreen for sport 'rowing' / 'canoe'. */
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, TextInput, StyleSheet } from 'react-native';
 import { KeyboardAwareScrollView, KeyboardFooterLayout } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -27,7 +27,10 @@ import {
 } from '../data/results';
 import { sportRule } from '../data/results/competitionRules';
 import { ageOf } from '../core/age';
-import type { Player } from '../core/types';
+import type { Player, Tournament } from '../core/types';
+import type { ProgrammeEvent } from '../data/tournamentCopyPlan';
+import { crewSeed } from '../data/carriedSetup';
+import { CarriedNote } from '../components/results/CarriedNote';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 interface Source { key: string; name: string; colorHex?: string; teamId?: string; playerIds: string[] }
@@ -40,19 +43,21 @@ const AGES = [
 const ROW_CLASSES = ['Open', 'Lightweight', 'PR1', 'PR2', 'PR3'];
 let seq = 0;
 
-export function CrewEventSetup({ tournamentId, sport }: { tournamentId?: string; sport: CrewSport }) {
+export function CrewEventSetup({ tournamentId, sport, preloaded, carried }: { tournamentId?: string; sport: CrewSport; preloaded?: Tournament; carried?: ProgrammeEvent }) {
   const nav = useNavigation<Nav>();
-  const tournament = useTournamentById(tournamentId);
+  const tournament = useTournamentById(tournamentId) ?? preloaded ?? null;
+  // Run it again: opened from "Events from last time" → last edition's choices
+  const [seed] = useState(() => (carried ? crewSeed(carried) : null));
   const players = usePlayers();
   const [officials, setOfficials] = useState<string[]>([]); // SD-130: event officials (host_ids)
   const rowing = sport === 'rowing';
   const meet = crewMeetSettings(sport, tournament?.formats?.[sport] as Record<string, unknown> | undefined);
   const boats = rowing ? ROW_BOATS : CANOE_BOATS;
-  const [boat, setBoat] = useState(boats[0].code);
-  const [distance, setDistance] = useState(rowing ? 2000 : 500);
-  const [age, setAge] = useState('Senior');
-  const [gender, setGender] = useState<'M' | 'F' | 'X'>('M');
-  const [cls, setCls] = useState('Open');
+  const [boat, setBoat] = useState(seed?.boat ?? boats[0].code);
+  const [distance, setDistance] = useState(seed?.distance ?? (rowing ? 2000 : 500));
+  const [age, setAge] = useState(AGES.some((a) => a.key === seed?.age) ? seed!.age : 'Senior');
+  const [gender, setGender] = useState<'M' | 'F' | 'X'>(seed?.gender ?? 'M');
+  const [cls, setCls] = useState(seed?.cls && ROW_CLASSES.includes(seed.cls) ? seed.cls : 'Open');
   const ev = crewEventOf(crewKey(sport, boat, distance))!;
   const seats = seatNames(ev);
   const single = seats.length === 1;
@@ -152,16 +157,23 @@ export function CrewEventSetup({ tournamentId, sport }: { tournamentId?: string;
   const entrants = single ? picks.length : crews.length;
 
   /* ---------------------------- progression ---------------------------- */
-  const [lanes, setLanes] = useState(meet.lanes);
+  const [lanes, setLanes] = useState(seed?.lanes ?? meet.lanes);
   const presets = useMemo(() => crewRoundPresets(sport, entrants, lanes), [sport, entrants, lanes]);
   const [presetKey, setPresetKey] = useState<string | null>(null);
   const [custom, setCustom] = useState({ heats: 2, direct: 1, repechage: true, finalB: true });
   // SD-141: the meet's progression table (Competition rules) is offered first
   const rulePreset = sportRule(tournament?.formats?.[sport] as Record<string, unknown> | undefined, 'crewProgression') === 'ab' ? presets.find((p) => p.key === 'ab') : undefined;
   const preset = presets.find((p) => p.key === presetKey) ?? rulePreset ?? presets[0];
+  // Run it again: the same rounds as last time (heats → repechage → final …), until the organiser picks
+  const pickedRounds = useRef(false);
+  useEffect(() => {
+    if (pickedRounds.current || !seed || !carried?.rounds?.length) return;
+    const same = presets.find((p) => p.plan.map((r) => r.phase).join() === carried.rounds!.join());
+    if (same && same.key !== presetKey) setPresetKey(same.key);
+  }, [presets]); // eslint-disable-line react-hooks/exhaustive-deps
   const plan: PlannedPhase[] = presetKey === 'custom' ? customCrewPlan(entrants, lanes, custom) : preset?.plan ?? [{ phase: 'final', heats: 1 }];
   const overfull = plan[0] && Math.ceil(entrants / Math.max(1, plan[0].heats)) > lanes;
-  const [splits, setSplits] = useState(meet.splits);
+  const [splits, setSplits] = useState(seed?.splits ?? meet.splits);
 
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -212,6 +224,7 @@ export function CrewEventSetup({ tournamentId, sport }: { tournamentId?: string;
       >
         <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
           <ScreenTitle title={rowing ? '🚣 New rowing race' : '🛶 New canoe sprint race'} subtitle={tournament?.name} />
+          <CarriedNote title={seed ? carried?.title : undefined} who={single ? 'athletes' : 'crews'} />
           {/* SD-141: the meet's competition rules, checked before the meet starts */}
           <CompetitionRulesCard tournament={tournament} sport={sport} />
 
@@ -302,8 +315,8 @@ export function CrewEventSetup({ tournamentId, sport }: { tournamentId?: string;
             {entrants > 0 ? (
               <>
                 <View style={st.wrap}>
-                  {presets.map((p) => <SelectChip key={p.key} label={p.label} active={presetKey !== 'custom' && preset?.key === p.key} onPress={() => setPresetKey(p.key)} />)}
-                  {entrants > lanes && <SelectChip label="Custom rule" active={presetKey === 'custom'} onPress={() => setPresetKey('custom')} />}
+                  {presets.map((p) => <SelectChip key={p.key} label={p.label} active={presetKey !== 'custom' && preset?.key === p.key} onPress={() => { pickedRounds.current = true; setPresetKey(p.key); }} />)}
+                  {entrants > lanes && <SelectChip label="Custom rule" active={presetKey === 'custom'} onPress={() => { pickedRounds.current = true; setPresetKey('custom'); }} />}
                 </View>
                 {presetKey === 'custom' && (
                   <View style={{ gap: theme.spacing(2) }}>
@@ -335,7 +348,7 @@ export function CrewEventSetup({ tournamentId, sport }: { tournamentId?: string;
             <Text style={textStyles.muted}>{meet.handTimed ? 'Hand timing (regatta setting): times to 1/100.' : 'Photo finish: type thousandths with the “.000” chip — they decide the order; the official time shows to 1/100.'}</Text>
           </Card>
 
-          <ScheduleCard state={schedule} tournamentId={tournamentId} discipline={ev.key} plan={plan} athleteIds={single ? picks : crews.flatMap((c) => c.seats.filter((x): x is string => !!x))} />
+          <ScheduleCard state={schedule} tournamentId={tournamentId} discipline={ev.key} plan={plan} athleteIds={single ? picks : crews.flatMap((c) => c.seats.filter((x): x is string => !!x))} preset={seed ? carried?.sched : undefined} />
           <EventOfficials tournament={tournament} value={officials} onChange={setOfficials} />
         </KeyboardAwareScrollView>
       </KeyboardFooterLayout>

@@ -16,7 +16,7 @@ import { CompetitionRulesCard } from '../results/CompetitionRulesCard';
 import { MeetCommentaryCard } from '../results/RaceDepth';
 import { useMeet } from '../../data/useAthletics';
 import { patchTournamentFormat } from '../../data/repos';
-import { PROGRAMME_KEY, pendingProgramme, readProgramme, type ProgrammeEvent } from '../../data/tournamentCopyPlan';
+import { PROGRAMME_KEY, pendingProgramme, programmeSlot, readProgramme, type ProgrammeEvent } from '../../data/tournamentCopyPlan';
 import { medalStandings } from '../../data/medalStandings';
 import {
   categoryKey, categoryLabel, disciplineOf, eventLeaders, eventStatus, formatMark, meetFieldResults, meetSettings, topAthletes,
@@ -313,7 +313,7 @@ function CarriedProgramme({ tournament, sport, events }: { tournament: Tournamen
   if (!pending.length) return null;
   const setUp = (e: ProgrammeEvent) => nav.navigate('AthleticsEventSetup', {
     tournamentId: tournament.id, ...(sport !== 'athletics' ? { sport } : {}), ...(e.mode ? { mode: e.mode } : {}),
-    discipline: e.discipline, age: e.category?.age, gender: e.category?.gender,
+    discipline: e.discipline, age: e.category?.age, gender: e.category?.gender, slot: programmeSlot(e),
   });
   const drop = async (e: ProgrammeEvent) => {
     setDropped((d) => [...d, id(e)]);
@@ -324,9 +324,7 @@ function CarriedProgramme({ tournament, sport, events }: { tournament: Tournamen
     <Card style={{ gap: theme.spacing(2) }}>
       <Text style={textStyles.h3}>🔁 Events from last time ({pending.length})</Text>
       <Text style={textStyles.muted}>
-        {sport === 'athletics' || sport === 'swimming'
-          ? 'Set each one up once its entries are in — the rounds, timetable slot and settings are filled in from last time.'
-          : 'Set each one up once its entries are in.'}
+        Set each one up once its entries are in — the event, age group, timetable slot and settings are filled in from last time.
       </Text>
       {pending.map((e) => (
         <View key={id(e)} style={st.carriedRow}>

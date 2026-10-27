@@ -13,6 +13,29 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-27 — Run it again, part 2: every event sport's setup pre-fills from last time
+Founder: "go ahead with the other event sports' pre-fill". Part 1 pre-filled only athletics track / field and swimming. Now **Set up ›** on "🔁 Events from last time", or on a carried column in the entries desk, opens every event sport's setup as last edition left it. A "🔁 Filled in from last time: …" line sits at the top, and the organiser just picks the athletes.
+- **Every sport:** the event, age group and gender, plus the timetable slot and venue area (`ScheduleCard preset`).
+- **Shooting:** event (or "team of 3"), match length, series / shot-by-shot, the final (last time's size, or none), mixed-team medal matches.
+- **Archery:** bow, indoor / outdoor, round, individual / team / mixed, and the match-play bracket (or ranking round only).
+- **Rowing and canoe:** boat, distance, lightweight / para class, the venue's lanes, splits, and the same rounds preset.
+- **Cycling:** road / track, race, distance, laps, sprint interval, start gap, stages, km, best-of.
+- **Weightlifting:** the bodyweight category.
+- **Road, race walk and cross-country:** kind, distance (an odd one goes in "other distance"), track / road walk, certified course, gun / chip, penalty zone, team scoring (scorers, team size, basis, points).
+- **Combined events:** preset or house list, the events in order, day 2, the throws' implements, hand timing, wind gauge.
+- **How:**
+  - `src/data/carriedSetup.ts` (pure) turns a carried event back into each screen's choices.
+  - The route takes `slot` (the entries-desk slot key). `useCarriedEvent` reads the tournament and that event before the screen starts, so its state begins as last time's.
+  - `useEffectAfterSeed` skips each "reset to defaults" effect's first run when pre-filled; later changes run it as usual (switching to U18 moves the archery round to 60 m).
+  - The programme now also keeps `fieldSize` (last time's final or bracket size).
+- **Guide:** "Run a tournament again" lists what Set up fills in, per sport.
+- **Verified:**
+  - `tests/carried-setup.test.mts` (12): each sport's event format through the copy and back gives the same choices; source checks on all 7 screens. Full suite 4,804 pass; tsc clean.
+  - Demo at 375 px, all opened pre-filled with no console errors:
+    - shooting: 10 m Air Pistol, School Boys, 40 shots, by series, no final;
+    - archery: Recurve 30 m School Girls, outdoor;
+    - a cross-country 2.5 km U16 Girls with "first 3 score, up to 6", created, copied, then set up from the copy.
+
 ### 2026-10-27 — Web header: long titles no longer run under the header buttons
 Spotted while testing Run it again at 375 px: a tournament's name ran underneath "⚙ Manage" and "Share" in the top bar. A long match title ("Green House vs Red House · Match Details") did the same under "Share".
 - **Cause:** on the web, React Navigation draws the header in JS.

@@ -29,25 +29,31 @@ import { TeamBuilder, newTeamDraft, type TeamDraft } from '../components/results
 import { matchRuleText } from '../components/results/ArcheryPanel';
 import { sportRule } from '../data/results/competitionRules';
 import { ageOf } from '../core/age';
-import type { Player } from '../core/types';
+import type { Player, Tournament } from '../core/types';
+import type { ProgrammeEvent } from '../data/tournamentCopyPlan';
+import { archerySeed } from '../data/carriedSetup';
+import { useEffectAfterSeed } from '../data/useCarriedEvent';
+import { CarriedNote } from '../components/results/CarriedNote';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 interface Source { key: string; name: string; colorHex?: string; teamId?: string; playerIds: string[] }
 
-export function ArcheryEventSetup({ tournamentId }: { tournamentId?: string }) {
+export function ArcheryEventSetup({ tournamentId, preloaded, carried }: { tournamentId?: string; preloaded?: Tournament; carried?: ProgrammeEvent }) {
   const nav = useNavigation<Nav>();
-  const tournament = useTournamentById(tournamentId);
+  const tournament = useTournamentById(tournamentId) ?? preloaded ?? null;
+  // Run it again: opened from "Events from last time" → last edition's choices
+  const [seed] = useState(() => (carried ? archerySeed(carried) : null));
   const players = usePlayers();
   const [officials, setOfficials] = useState<string[]>([]); // SD-130: event officials (host_ids)
-  const [bow, setBow] = useState<Bow>('R');
-  const [indoor, setIndoor] = useState(false);
-  const [age, setAge] = useState<ArchAge>('U18');
-  const [gender, setGender] = useState<'M' | 'F'>('M');
+  const [bow, setBow] = useState<Bow>(seed?.bow ?? 'R');
+  const [indoor, setIndoor] = useState(seed?.indoor ?? false);
+  const [age, setAge] = useState<ArchAge>(ARCH_AGES.some((a) => a.key === seed?.age) ? seed!.age as ArchAge : 'U18');
+  const [gender, setGender] = useState<'M' | 'F'>(seed?.gender ?? 'M');
   // SD-137b: an individual event, a team of 3 or a mixed team (a man and a woman)
-  const [mode, setMode] = useState<'ind' | 'team' | 'mixed'>('ind');
+  const [mode, setMode] = useState<'ind' | 'team' | 'mixed'>(seed?.mode ?? 'ind');
   const teamMode = mode !== 'ind';
-  const [roundKey, setRoundKey] = useState(defaultRound('R', 'U18', false).key);
-  useEffect(() => { setRoundKey(defaultRound(bow, age, indoor).key); }, [bow, age, indoor]);
+  const [roundKey, setRoundKey] = useState(seed?.roundKey ?? defaultRound('R', 'U18', false).key);
+  useEffectAfterSeed(!!seed, () => { setRoundKey(defaultRound(bow, age, indoor).key); }, [bow, age, indoor]);
   const round = ARCH_ROUNDS.find((r) => r.key === roundKey) ?? defaultRound(bow, age, indoor);
   const adult = age === 'Senior' || age === 'Junior';
   const cat: Category = { age, gender: mode === 'mixed' ? 'X' : gender };
@@ -131,7 +137,7 @@ export function ArcheryEventSetup({ tournamentId }: { tournamentId?: string }) {
   useEffect(() => { setTeams([]); }, [mode, gender]);
   const entrants = teamMode ? teams.length : picks.length;
 
-  const [bracketN, setBracketN] = useState<number | null>(null);
+  const [bracketN, setBracketN] = useState<number | null>(seed ? seed.bracket : null);
   // SD-141: the meet's bracket size (Competition rules), else the biggest that fits
   const ruleN = sportRule(archFmt, teamMode ? 'archTeamBracket' : 'archBracket');
   const field = Math.min(bracketN ?? (ruleN === 'auto' ? Math.min(defaultBracket(entrants), teamMode ? 16 : 32) : Number(ruleN) || 0), entrants);
@@ -188,6 +194,7 @@ export function ArcheryEventSetup({ tournamentId }: { tournamentId?: string }) {
       >
         <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
           <ScreenTitle title="🏹 New archery event" subtitle={tournament?.name} />
+          <CarriedNote title={seed ? carried?.title : undefined} who={mode === 'ind' ? 'archers' : 'teams'} />
           {/* SD-141: the meet's competition rules, checked before the meet starts */}
           <CompetitionRulesCard tournament={tournament} sport={'archery'} />
 
@@ -269,7 +276,7 @@ export function ArcheryEventSetup({ tournamentId }: { tournamentId?: string }) {
             <Text style={textStyles.muted}>Ranking ties (WA): the higher score, then more 10s (X included), then more X. Level for the last match-play place: a shoot-off; other equal ranks: a coin toss for the seed.</Text>
           </Card>
 
-          <ScheduleCard state={schedule} tournamentId={tournamentId} discipline={discipline} plan={withMatches ? [{ phase: 'qualification', heats: 1 }, { phase: 'final', heats: 1 }] : undefined} athleteIds={teamMode ? teams.flatMap((t) => t.seats.filter((x): x is string => !!x)) : picks} />
+          <ScheduleCard state={schedule} tournamentId={tournamentId} discipline={discipline} plan={withMatches ? [{ phase: 'qualification', heats: 1 }, { phase: 'final', heats: 1 }] : undefined} athleteIds={teamMode ? teams.flatMap((t) => t.seats.filter((x): x is string => !!x)) : picks} preset={seed ? carried?.sched : undefined} />
           <EventOfficials tournament={tournament} value={officials} onChange={setOfficials} />
         </KeyboardAwareScrollView>
       </KeyboardFooterLayout>

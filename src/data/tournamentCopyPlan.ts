@@ -139,6 +139,8 @@ export interface ProgrammeEvent {
   mode?: 'road' | 'combined';
   /** the rounds last time; the new heats come from the new entries */
   rounds?: PhaseKind[];
+  /** how many went through from the first round (a shooting final's 8, an archery bracket of 16) */
+  fieldSize?: number;
   settings?: ProgrammeSettings;
   /** the timetable slots, moved on with the dates */
   sched?: PhaseSched;
@@ -193,6 +195,7 @@ export function programmeFrom(
       title: f.eventTitle ?? f.discipline,
       ...(f.road ? { mode: 'road' as const } : cf ? { mode: 'combined' as const } : {}),
       ...(f.plan?.length && !cf ? { rounds: f.plan.map((r) => r.phase) } : {}),
+      ...(f.plan && f.plan.length > 1 && f.plan[0].progression?.fillTo ? { fieldSize: f.plan[0].progression.fillTo } : {}),
       ...(Object.keys(settings).length ? { settings } : {}),
       ...(f.sched?.rounds.length ? { sched: shiftSched(f.sched, years) } : {}),
       ...(cf ? { combined: { table: cf.table, events: cf.events, ...(cf.day2 != null ? { day2: cf.day2 } : {}), ...(cf.implements ? { implements: cf.implements } : {}) } } : {}),
@@ -247,6 +250,10 @@ export function barSettings(bar: number[]): { start: number; step: number; chang
   }
   return { start, step, changeAt: bar[bar.length - 1] ?? start, step2: step };
 }
+
+/** The programme slot a set-up screen opens for — the same key as the entries
+ *  desk's columns (data/results slotKey): "sh.10ar@U16-F-40sh". */
+export const programmeSlot = (e: Pick<ProgrammeEvent, 'discipline' | 'category'>): string => `${e.discipline}@${categoryKey(e.category)}`;
 
 /** The programme event a set-up screen opened for (discipline + category). */
 export function programmeEventFor(programme: ProgrammeEvent[], discipline: string, category?: Category): ProgrammeEvent | undefined {
