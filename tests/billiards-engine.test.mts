@@ -448,4 +448,11 @@ describe('billiards · break list', () => {
     assert.equal(B.reducer(s0, { type: 'AWARD_FRAME', side: 'home', payload: { side: 'Asha Rao', frame: 1 } }), s0);
     assert.equal(B.reducer(s0, { type: 'CONCEDE', payload: { side: 'away', frame: 1 } }).frames[0].conceded, 'away');
   });
+
+  test('B-18 a frame ended with nothing recorded is neither a shot-by-shot nor a quick frame', () => {
+    const s = run([{ type: 'AWARD_FRAME', payload: { side: 'home' } }, PR, MISS]);
+    const st = B.billiardsStats(s);
+    assert.equal(st.home.detailedFrames, 1, 'only frame 2 had strokes');
+    assert.equal(st.home.quickFrames, 0);
+  });
 });

@@ -528,9 +528,14 @@ const goodFoul = (x: unknown): x is FoulRecord => isObj(x) && isSide(x.by) && nu
 const knownKind = (k: unknown): k is FoulKind => (FOUL_KINDS as readonly unknown[]).includes(k);
 const goodList = <T,>(v: unknown, ok: (x: unknown) => x is T): T[] => (Array.isArray(v) ? v.filter(ok) : []);
 function framesForStats(s: BilliardsState): StatFrame[] {
-  const out: StatFrame[] = goodFrames(s).map((f) => ({
-    n: num(f.n) ?? 0, quick: f.quick === true, untouched: false, score: f.score, visits: goodList(f.visits, goodVisit), fouls: goodList(f.fouls, goodFoul),
-  }));
+  const out: StatFrame[] = goodFrames(s).map((f) => {
+    const visits = goodList(f.visits, goodVisit);
+    const fouls = goodList(f.fouls, goodFoul);
+    // B-18 — a frame ended with nothing recorded (conceded / awarded before a
+    // stroke) is "not tracked": neither shot-by-shot nor quick
+    const untouched = f.quick !== true && visits.length === 0 && fouls.length === 0;
+    return { n: num(f.n) ?? 0, quick: f.quick === true, untouched, score: f.score, visits, fouls };
+  });
   const fr = liveFrame(s);
   if (fr) {
     out.push({
