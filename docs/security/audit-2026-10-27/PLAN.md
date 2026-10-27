@@ -3,10 +3,10 @@
 **Sources:**
 - `database.md`: 24 findings, of which 4 are Critical and 2 High.
 - `edge-functions.md`: 22 findings, of which 1 is Critical and 4 High.
-- `client.md`: still running.
+- `client.md`: 30 findings, of which 4 are High (CL-01 to CL-04).
 - `../breaks/student-lists.md`: SL-19.
 
-The critical findings were re-checked in the code before planning: DB-02, DB-03, and EF-01 / DB-04.
+The critical findings were re-checked in the code before planning: DB-02, DB-03, EF-01 / DB-04 and DB-09 / CL-02.
 
 **Process:** quality mandate steps 5–6. Fix the points one by one, each with a failing test first. Integration tests are needed for SQL, so the PGlite harness comes first if the founder approves it.
 
@@ -38,6 +38,10 @@ Findings that come from this: DB-01, DB-04, DB-05, DB-14, EF-02, EF-03, SL-19.
 4. **Series hijack (DB-06):** a series is bound to one tournament the caller manages, and `__seriesId` is server-assigned.
 5. **Guardian mail bombing (EF-05):** one rate limit per destination email across `guardian-consent`, `guardian-link` and `message-notify`.
 6. **Phishing relay (EF-04):** invite links must match exact shapes (`/i/<uuid>`, `/get/<handle>`, `/join-club/<code>`…).
+7. **Lookups return full names (DB-09 / CL-02):** the phone and email lookups return a possible minor's name as initials (`public_person_name`).
+8. **Private data cached on shared devices (CL-08):** the web service worker never caches signed-in API responses.
+9. **Developer screen live (CL-13):** the Results lab is hidden outside demo and development builds.
+10. **Unsafe links (CL-11 / CL-12):** links opened from user data allow only `https:` and our own app links (no `intent:`, `upi:` or `javascript:`).
 
 ## Wave 2: the consent model (needs the founder's decision; changes some flows)
 A relationship counts (circle, roster rights, admin rights, pushes) only when the other side confirmed it:
@@ -48,15 +52,21 @@ A relationship counts (circle, roster rights, admin rights, pushes) only when th
 
 This fixes DB-01, DB-04, DB-05, DB-14, EF-02, EF-03 and SL-19.
 
+Also in this wave, because the founder already has open decisions on them:
+- **CL-01:** the child-safety fielding gate (`TESTING_ALLOW_UNVERIFIED`) is off, and it only exists on the client. That's the eligibility-gate decision; the fix moves the rule to the server.
+- **CL-03 / CL-04:** how parental consent is proven (the link holder, the country the client sends).
+
 ## Wave 3: Medium findings
 - **Database:** DB-07 to DB-16.
 - **Edge functions:** EF-06 to EF-12.
+- **Client:** CL-05 to CL-18 (the four above excepted): offline sign-out, offline queues bound to an account, child data in the session token, Android backups, guardian flags, upload limits, photo GPS, server-side result locks, re-authentication before deleting an account.
 
 Order: anything touching children's data first (DB-07, DB-09, DB-10, DB-11, DB-15), then integrity (DB-12, DB-13), then cost and leaks.
 
 ## Wave 4: Low findings
 - **Database:** DB-17 to DB-24.
 - **Edge functions:** EF-13 to EF-22.
+- **Client:** CL-19 to CL-30.
 
 ## Tests these waves add
 - **Characterisation tests** for every function touched, before it changes.
