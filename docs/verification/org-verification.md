@@ -74,7 +74,10 @@ For a support team (built 2026-10-27 — **Support console**, Settings › Suppo
 update profiles set role = 'support' where id = (select id from auth.users where email = 'their.email@example.com');
 ```
 
-Still to do: **automation** — pre-fill the register lookup with the school's name and city from UDISE+ / SARAS where those sites allow it. Today support searches by hand.
+**Register lookup** (built 2026-10-27, edge function `register-lookup`):
+- **CBSE affiliation number:** the review card reads the school's CBSE SARAS record on its own and shows the registered name ("✓ Same name" / "≈ Close — check it" / "⚠ Different name"), district and state, the principal (compared with the Head who confirmed) and the affiliation period ("⚠ Affiliation ended …"). It also has "Open the record on CBSE SARAS ↗". One record per request, support only, 120 an hour.
+- **UDISE+ (Know Your School):** every search needs a CAPTCHA, so it can't be read automatically. Support taps **⧉ Copy** (web) and pastes the code into the site's search. MCA, GST, Udyam and NGO Darpan are the same.
+- **Every official ID:** the number is selectable, and on the web has a **⧉ Copy** button.
 
 ## Phase 2: every registered type (built 2026-10-27)
 

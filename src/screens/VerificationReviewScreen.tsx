@@ -5,7 +5,7 @@
  *  their linked parent) is notified by the server straight away. New
  *  submissions push every reviewer; anything waiting 12 hours is re-alerted. */
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Linking, Image, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Linking, Image, Pressable, Platform } from 'react-native';
 import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -22,6 +22,8 @@ import {
 import { decideOrgVerification, getOrgVerificationQueue, type OrgQueueItem } from '../data/orgVerification';
 import { LOCAL_ID_TYPES, OFFICIAL_ID_RULES, ORG_VERIFY, SEND_BACK_REASONS, authorityOptions, emailDomain, isEducation, isFreeMail, reviewChecks, verifiableType } from '../core/orgVerification';
 import { useVerificationReviewer } from '../data/useVerificationReviewer';
+import { canLookUp } from '../data/registerLookup';
+import { RegisterCheck } from '../components/support/RegisterCheck';
 import { ageFromDob } from '../core/age';
 import { isSupport } from '../core/roles';
 import { useAuth } from '../core/auth';
@@ -188,8 +190,14 @@ export function OrgReview({ o, now, onDone }: { o: OrgQueueItem; now: number; on
         const rule = OFFICIAL_ID_RULES[i.type];
         return (
           <View key={i.type} style={{ gap: 2 }}>
-            <Row label={rule?.label ?? i.type} value={i.value} />
-            {rule?.lookup ? <Text style={st.link} accessibilityRole="link" onPress={() => void Linking.openURL(rule.lookup!.url)}>Search it on {rule.lookup.label} ↗</Text> : null}
+            <Row label={rule?.label ?? i.type} value={i.value} selectable />
+            {/* register lookup: the exact record where the register allows it, else its search (copy the number first) */}
+            <View style={st.linkRow}>
+              {rule?.record ? <Text style={st.link} accessibilityRole="link" onPress={() => void Linking.openURL(rule.record!(i.value))}>Open the record on {rule.lookup?.label ?? 'the register'} ↗</Text>
+                : rule?.lookup ? <Text style={st.link} accessibilityRole="link" onPress={() => void Linking.openURL(rule.lookup!.url)}>Search it on {rule.lookup.label} ↗</Text> : null}
+              {Platform.OS === 'web' ? <CopyText value={i.value} /> : null}
+            </View>
+            {canLookUp(i.type) ? <RegisterCheck value={i.value} orgName={o.name} head={v?.headConfirmedName ?? v?.headName} /> : null}
             {!rule?.lookup ? <Text style={textStyles.muted}>No public search for this register — compare the number, name and place with the certificate.</Text> : null}
             {i.verifiedElsewhere && LOCAL_ID_TYPES.includes(i.type) ? <Text style={st.warn}>⚠ {i.verifiedElsewhere} (verified) has the same number — check it’s a different registrar or state.</Text>
               : i.verifiedElsewhere ? <Text style={st.warn}>⚠ Already verified as {i.verifiedElsewhere} — send this back.</Text>
@@ -321,13 +329,23 @@ function Reviewers() {
   );
 }
 
-function Row({ label, value }: { label: string; value: string }) {
+function Row({ label, value, selectable }: { label: string; value: string; selectable?: boolean }) {
   return (
     <View style={st.row}>
       <Text style={textStyles.muted}>{label}</Text>
-      <Text style={[textStyles.body, { flex: 1, textAlign: 'right' }]}>{value}</Text>
+      <Text selectable={selectable} style={[textStyles.body, { flex: 1, textAlign: 'right' }]}>{value}</Text>
     </View>
   );
+}
+
+/** Web: copy a number to paste into a register's search box. */
+function CopyText({ value }: { value: string }) {
+  const [copied, setCopied] = useState(false);
+  const copy = () => {
+    const nav = (globalThis as { navigator?: { clipboard?: { writeText?: (t: string) => Promise<void> } } }).navigator;
+    void nav?.clipboard?.writeText?.(value).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }).catch(() => {});
+  };
+  return <Text style={st.link} accessibilityRole="button" accessibilityLabel={`Copy ${value}`} onPress={copy}>{copied ? '✓ Copied' : '⧉ Copy'}</Text>;
 }
 
 const st = StyleSheet.create({
@@ -344,4 +362,5 @@ const st = StyleSheet.create({
   done: { color: theme.colors.primary, fontSize: theme.font.small, fontWeight: '700' },
   sub: { color: theme.colors.text, fontWeight: '800', marginTop: theme.spacing(1) },
   link: { color: theme.colors.primary, fontWeight: '700', fontSize: theme.font.small },
+  linkRow: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing(3) },
 });

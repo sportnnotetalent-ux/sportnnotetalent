@@ -26,6 +26,8 @@ export interface OfficialIdRule {
   pattern: RegExp;
   /** a public register the reviewer searches */
   lookup?: { label: string; url: string };
+  /** the register's page for this exact number, where the register allows it */
+  record?: (value: string) => string;
 }
 
 export const OFFICIAL_ID_RULES: Record<OfficialIdType, OfficialIdRule> = {
@@ -38,6 +40,7 @@ export const OFFICIAL_ID_RULES: Record<OfficialIdType, OfficialIdRule> = {
     label: 'CBSE affiliation number', placeholder: 'e.g. 1930123', pattern: /^\d{4,8}$/,
     hint: 'On the CBSE affiliation letter.',
     lookup: { label: 'CBSE SARAS', url: 'https://saras.cbse.gov.in/' },
+    record: (v) => `https://saras.cbse.gov.in/SARAS/AffiliatedList/AfflicationDetails/${encodeURIComponent(v)}`,
   },
   cisce: {
     label: 'CISCE school code', placeholder: 'e.g. KA071', pattern: /^[A-Z0-9]{3,10}$/,

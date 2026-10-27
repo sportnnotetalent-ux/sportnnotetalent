@@ -13,6 +13,22 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-27 — Register lookup: a school's CBSE record on its review card
+Backlog run, item 2 of 6. This is the "automation" step from `docs/verification/org-verification.md`.
+- **CBSE SARAS** opens a school by affiliation number with no CAPTCHA (probed live).
+  - The new support-only edge function **`register-lookup`** reads that one record on demand (120 an hour per person, 12 s timeout) and parses it (`_shared/saras.ts`): name, state, district, address, PIN, principal, status, school type, trust, affiliation period.
+- **On the review card** (Support console and Review verifications):
+  - "From the CBSE SARAS register": the registered name compared with the community's (`compareNames`: case, punctuation and filler words like Sr. Sec. / Public / School ignored → ✓ Same name / ≈ Close / ⚠ Different name);
+  - place and status;
+  - principal vs the Head who confirmed (`compareHeads`: titles and initials ignored);
+  - "Affiliated until …" or "⚠ Affiliation ended …";
+  - "Open the record ↗".
+- **Every ID:** CBSE links to the exact record (`OFFICIAL_ID_RULES.cbse.record`). The number is selectable, with **⧉ Copy** on the web.
+- **Not possible:** UDISE+ "Know Your School" sends a CAPTCHA with every search (seen in its own code), so support copies and searches. MCA, GST and Udyam also need a CAPTCHA.
+- **Verified:**
+  - `tests/register-lookup.test.mts` (7). The parser was also run on a real SARAS page and every field came back right. Edge typecheck and tsc clean.
+  - Demo at 1280 px: a test school with CBSE 1930001 sent for review showed the register panel with "✓ Same name", "Principal: Dr. Vikram Rao · ≈ Like the Head" (the Head entered as "Dr. V. Rao") and the affiliation dates. Copy and record links sat beside each number.
+
 ### 2026-10-27 — Anti-scraping at scale: the sign-up guard
 Backlog run, item 1 of 6 (founder: "go ahead with your entire backlog"). Scraping at scale needs many accounts, so new accounts are now hard to make in bulk. There's no CAPTCHA for real people and no app change, so APK 41 keeps working.
 - **Migration `20261027180000_signup_guard.sql`:** a Supabase Auth **Before User Created** Postgres hook, `hook_before_user_created`.
