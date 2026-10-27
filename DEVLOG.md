@@ -34,6 +34,16 @@ Founder: "…and then support console". These are the "when there is a support t
     - two panes; J selected the first age proof and C claimed it ("✋ You're checking this · just now", row "✋ You");
     - Reject showed "✗ Sent back — Aarav Mehta has been notified", the tile went 2 → 1, and it moved to the next.
   - At 375 px: it opened on age proofs with the card inline and no sideways scroll. No console errors.
+- **Live 2026-10-27, with "Link an earlier edition" below:**
+  - The founder ran both migrations. Checked read-only:
+    - `link_tournament_edition` exists and the edition guard is updated;
+    - `support_claims` exists, with RLS on and no policies;
+    - all 5 console functions and the `guard_org_decision_claim` trigger exist;
+    - anonymous users can execute neither the link nor the overview function.
+  - `auth-smoke` passed. `verification-review` deployed (anonymous POST → 401).
+  - Web `index-1f2f5ffe…` (both addresses 10/10 right away) and Android OTA `1a6f6065` (runtime 1.0.0) from `07254c8`.
+  - A live tournament page loads clean on the new bundle.
+  - The guide's "Link an earlier edition" answer is live on sportnnote.in.
 
 ### 2026-10-27 — Link an earlier edition (tournaments run before Run it again)
 Founder: "go ahead with linking earlier editions". Schools that ran last year's meet before Run it again existed can now link it, so both pages show 📅 Every edition.
