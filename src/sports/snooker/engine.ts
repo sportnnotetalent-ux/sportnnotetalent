@@ -259,7 +259,11 @@ export function reducer(s: SnookerState, a: SnookerAction): SnookerState {
     case 'SAFETY': return striking ? endVisit(s, fr, a.type === 'MISS' ? 'miss' : 'safety') : s;
     case 'FOUL': {
       if (a.side !== undefined && !isSide(a.side)) return s;
-      return foul(s, fr, a.side ?? fr.striker, p);
+      // B-03 — a non-striker penalty (S3 R3(k)) says so and names the
+      // non-striker; any other FOUL naming a side must name the striker (a
+      // repeated tap arrives after the turn has passed: stale, ignored)
+      if (own(p, 'penalty') === true) return a.side === other(fr.striker) ? foul(s, fr, a.side, p) : s;
+      return striking ? foul(s, fr, fr.striker, p) : s;
     }
     case 'FREE_BALL': {
       if (!fr.pending || fr.freeBall || !freeBallPossible(fr)) return s;

@@ -228,7 +228,7 @@ describe('snooker · fouls (S3 R10–R11)', () => {
   });
 
   test('a penalty by the non-striker (S3 R3(k)): points to the striker, the turn goes on', () => {
-    let s = run([pot('red'), { type: 'FOUL', side: 'away', payload: { value: 4 } }]);
+    let s = run([pot('red'), { type: 'FOUL', side: 'away', payload: { value: 4, penalty: true } }]);
     assert.deepEqual(f(s).score, { home: 5, away: 0 });
     assert.equal(f(s).striker, 'home');
     assert.equal(f(s).on, 'colour', 'the striker\'s turn is unaffected');
@@ -714,5 +714,20 @@ describe('snooker · break list', () => {
     assert.equal(S.reducer(s0, pot('red', { frame: 2 })), s0);
     assert.equal(S.reducer(s0, pot('red', { frame: '1' })), s0);
     assert.notEqual(S.reducer(s0, pot('red', { frame: 1 })), s0);
+  });
+
+  test('B-03 a stale FOUL naming the player who just left the table is ignored, not turned into a penalty', () => {
+    const f1 = { type: 'FOUL', side: 'home', payload: { value: 4 } } as A;
+    const s = run([f1]);
+    assert.equal(S.reducer(s, f1), s, 'the double tap');
+    assert.deepEqual(f(s).score, { home: 0, away: 4 });
+    // a non-striker penalty must say so, and name the non-striker
+    const pen = S.reducer(s, { type: 'FOUL', side: 'home', payload: { value: 4, penalty: true } });
+    assert.deepEqual(f(pen).fouls[1], { by: 'home', value: 4, penalty: true });
+    assert.equal(S.reducer(s, { type: 'FOUL', side: 'away', payload: { value: 4, penalty: true } }), s, 'the striker is not a non-striker');
+    assert.equal(S.reducer(s, { type: 'FOUL', payload: { value: 4, penalty: true } }), s, 'a penalty names its offender');
+    // shots with a side: the double tap of MISS is refused too
+    const m = run([{ type: 'MISS', side: 'home' }]);
+    assert.equal(S.reducer(m, { type: 'MISS', side: 'home' }), m);
   });
 });
