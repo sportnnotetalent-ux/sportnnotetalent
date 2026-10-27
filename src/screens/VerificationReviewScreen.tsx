@@ -20,7 +20,7 @@ import {
   type PendingVerification,
 } from '../data/repos';
 import { decideOrgVerification, getOrgVerificationQueue, type OrgQueueItem } from '../data/orgVerification';
-import { LOCAL_ID_TYPES, OFFICIAL_ID_RULES, ORG_VERIFY, SEND_BACK_REASONS, authorityOptions, emailDomain, isFreeMail, reviewChecks, verifiableType } from '../core/orgVerification';
+import { LOCAL_ID_TYPES, OFFICIAL_ID_RULES, ORG_VERIFY, SEND_BACK_REASONS, authorityOptions, emailDomain, isEducation, isFreeMail, reviewChecks, verifiableType } from '../core/orgVerification';
 import { useVerificationReviewer } from '../data/useVerificationReviewer';
 import { ageFromDob } from '../core/age';
 import { isSupport } from '../core/roles';
@@ -151,7 +151,7 @@ function OrgReview({ o, now, onDone }: { o: OrgQueueItem; now: number; onDone: (
   const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const v = o.verification;
   const cfg = ORG_VERIFY[verifiableType(o.type) ? o.type : 'School'];
-  const academic = o.type === 'School' || o.type === 'College';
+  const academic = isEducation(o.type);
   const head = academic ? 'Head' : cfg.head;
   const checks = reviewChecks(v?.authority, { type: o.type, idTypes: o.ids.map((i) => i.type) });
   const [ticked, setTicked] = useState<Record<string, boolean>>({});

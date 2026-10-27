@@ -99,6 +99,26 @@ Migration `20261027100000_org_verification_phase2.sql`. The same three steps, wi
   - the send-back reason "School already verified here" is now "Already verified here".
 - **Custom types** (e.g. "Gymkhana") keep the simple "Ask SportnNote to verify us" until they pick a standard type.
 
+## More educational institutions (2026-10-27)
+
+Founder: "there are other educational institutions apart from schools … who should also be able to set up communities, verify themselves, and host sports tournaments year on year." Migration `20261027120000_more_education_types.sql`.
+
+| Type | Official code | Documents | Signs / confirms |
+|---|---|---|---|
+| Junior / PU college | UDISE+ (+ state board code) | Intermediate / PU board affiliation, state recognition | Principal / Head |
+| University | AISHE (U-…) | UGC recognition, establishing Act / notification | Vice-Chancellor / Registrar |
+| Polytechnic / institute | AISHE (S-… or C-…) | AICTE / regulator approval (NCTE, INC …), state board / university affiliation | Principal / Director |
+| ITI | ITI code from NCVT MIS: two letters, the two-digit state code and six digits (`GU29000014`) | DGT / NCVT or SCVT affiliation | Principal |
+
+- **Treated like schools and colleges everywhere** (`EDUCATION_TYPES` in `core/org.ts`):
+  - registered-only (`guard_org_verification`, `OFFICIAL_ONLY_TYPES`);
+  - class / year timelines, academic years and graduation (`isAcademicCommunity`);
+  - the official code is asked for when the community is created;
+  - members' dates of birth can be confirmed once verified.
+- **Graduating class suggestion** (`suggestedGraduatingStandard(market, type)`):
+  - junior colleges get the market's final school year (Grade 12, JC2, Upper 6 …);
+  - colleges, universities, polytechnics and ITIs get "Final year".
+
 ## Later phases
 
 - **Phase 3 — international IDs,** with each market: UK DfE URN / Charity Commission / Companies House, UAE KHDA / ADEK / trade licence, US NCES ID / EIN, IB / Cambridge directories. The model already stores country + ID type + value.

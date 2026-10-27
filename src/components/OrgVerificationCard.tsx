@@ -12,7 +12,7 @@ import { theme } from '../core/theme';
 import { Button, Card, FormError, textStyles } from './ui';
 import { requestOrgVerification, reviewOrgVerification } from '../data/repos';
 import { getOrgVerificationState, setOrgRegistered } from '../data/orgVerification';
-import { ORG_VERIFY, canConfirmDobs, verifiableType, verificationProgress, type OrgVerificationState } from '../core/orgVerification';
+import { ORG_VERIFY, canConfirmDobs, isEducation, verifiableType, verificationProgress, type OrgVerificationState } from '../core/orgVerification';
 import { useAuth } from '../core/auth';
 import { isSupport } from '../core/roles';
 import type { Organization } from '../core/types';
@@ -54,7 +54,7 @@ export function OrgVerificationCard({ org, canManage, onChanged, onConfirmDobs }
   const v = state?.verification;
   const progress = state ? verificationProgress(state) : null;
   const kind = verifiableType(org.type) ? ORG_VERIFY[org.type].noun : (org.type?.toLowerCase() || 'organisation');
-  const academic = org.type === 'School' || org.type === 'College';
+  const academic = isEducation(org.type);
 
   return (
     <Card style={{ gap: theme.spacing(2) }}>
@@ -74,7 +74,7 @@ export function OrgVerificationCard({ org, canManage, onChanged, onConfirmDobs }
       ) : canManage ? (
         registered === null ? (
           <>
-            <Text style={textStyles.muted}>Is {org.name} a registered organisation (a school, college, club, academy, association, company, NGO or society), or an informal group like friends or a neighbourhood?</Text>
+            <Text style={textStyles.muted}>Is {org.name} a registered organisation (a school, college, university, institute, club, academy, association, company, NGO or society), or an informal group like friends or a neighbourhood?</Text>
             <View style={{ flexDirection: 'row', gap: theme.spacing(2), flexWrap: 'wrap' }}>
               <Button label="🏛️ Registered" style={{ flexGrow: 1 }} onPress={() => void act(() => setOrgRegistered(org.id, true))} disabled={busy} />
               <Button label="👥 Informal group" variant="ghost" style={{ flexGrow: 1 }} onPress={() => void act(() => setOrgRegistered(org.id, false))} disabled={busy} />

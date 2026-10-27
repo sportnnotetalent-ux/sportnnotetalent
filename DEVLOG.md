@@ -13,6 +13,30 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-27 — More educational institutions: junior / PU colleges, universities, polytechnics, ITIs
+Founder: "there are other educational institutions apart from schools like colleges etc who should also be able to set up communities, verify themselves, and in turn host various sports tournaments year on year."
+- **Four new community types:** **Junior / PU college** (UDISE+), **University** (AISHE U-), **Polytechnic / institute** (AISHE S- / C-; covers diploma, nursing, teacher training …) and **ITI**.
+  - ITI is a new `iti` ID: the NCVT MIS code, two letters + two-digit state + six digits (e.g. `GU29000014`), linked to NCVT MIS. The format is checked against DGT lists.
+- **Educational everywhere,** from one list (`EDUCATION_TYPES` in `core/org.ts`, `EDUCATION_VERIFY_TYPES`):
+  - registered-only (`OFFICIAL_ONLY_TYPES`, `guard_org_verification`);
+  - class / year timelines, academic years and graduation (`isAcademicCommunity`);
+  - official code at creation;
+  - "recognition" documents and Principal / Head-style wording (VC / Registrar for universities);
+  - date-of-birth confirmation once verified (`DOB_CONFIRM_TYPES`, `org_dob_access_or_raise`).
+- **Graduating class:** `suggestedGraduatingStandard(market, type)` suggests the final school year for junior colleges (Grade 12 / JC2 / Upper 6 / Year 13) and "Final year" after school. The create and edit forms and the warning follow the type.
+- **Support alert title:** now "🏛️ Verification request — <type>". `org-verify` has email words for the new types.
+- **Migration `20261027120000_more_education_types.sql`:** generated from the current definitions with only the lists changed. The live guard was checked to match the copy; Postgres's parser accepts it.
+- **Guide:** "Verify your school, college or institute" adds the code table for every institution type.
+- **Verified:**
+  - `tests/education-types.test.mts` (9); the Phase 2 tests now read the newest SQL definitions; full suite 4,768 pass; tsc + edge typecheck clean.
+  - Demo at 375 px: the type list shows the new types; University asks for its AISHE code up front and suggests "Final year"; Get verified shows ✅ Official ID, university documents and VC / Registrar wording. No console errors.
+- **Hosting year on year:** a verified (or unverified) institution can already host any number of tournaments. There's no "run last year's tournament again" yet; it's proposed as the next piece.
+- **Needs:**
+  - the founder runs the migration;
+  - deploy `org-verify` + `verification-submit`;
+  - web + Android OTA;
+  - push.
+
 ### 2026-10-27 — Organisation verification, Phase 2: every registered type
 Founder: "go ahead with organisation verification Phase 2". Every registered community type now gets the three steps schools and colleges have: an official ID, one document, and proof the person is authorised. Design: `docs/verification/org-verification.md` → Phase 2.
 - **Types:**

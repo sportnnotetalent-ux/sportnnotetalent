@@ -16,6 +16,12 @@ const read = (p: string) => readFileSync(join(root, p), 'utf8');
 const dir = join(root, 'supabase', 'migrations');
 const sql = readFileSync(join(dir, readdirSync(dir).find((f) => f.includes('_org_verification_phase2'))!), 'utf8');
 const fn = (name: string) => sql.slice(sql.indexOf(`create or replace function ${name}(`), sql.indexOf('$$;', sql.indexOf(`create or replace function ${name}(`)));
+/** The newest definition of a function across all migrations (later ones extend the lists). */
+const latest = (name: string) => {
+  const src = readdirSync(dir).sort().reverse().map((f) => readFileSync(join(dir, f), 'utf8')).find((t) => t.includes(`create or replace function ${name}(`))!;
+  const i = src.indexOf(`create or replace function ${name}(`);
+  return src.slice(i, src.indexOf('$$;', i));
+};
 const arr = (s: string) => [...s.matchAll(/'(\w+)'/g)].map((m) => m[1]);
 
 describe('the new official IDs', () => {
@@ -44,7 +50,7 @@ describe('the new official IDs', () => {
     assert.equal(validOfficialId('society_reg', 'ab'), false);
   });
   test('the server has the same formats and the same clean-up', () => {
-    const v = fn('valid_official_id');
+    const v = latest('valid_official_id');
     for (const [type, rule] of Object.entries(OFFICIAL_ID_RULES) as [OfficialIdType, { pattern: RegExp }][]) {
       const m = new RegExp(`when '${type}' then p_value ~ '([^']+)'`).exec(v);
       assert.ok(m, `server rule for ${type}`);
@@ -67,7 +73,7 @@ describe('what each type needs', () => {
     assert.equal(verifiableType('Gymkhana'), false); // a custom type keeps the simple request
   });
   test('step 1 options match org_required_id_types()', () => {
-    const body = fn('org_required_id_types');
+    const body = latest('org_required_id_types');
     for (const t of REGISTERED_TYPES) {
       const m = new RegExp(`when '${t}' then array\\[([^\\]]+)\\]`).exec(body);
       assert.ok(m, `server options for ${t}`);
@@ -107,10 +113,11 @@ describe('local registrars’ numbers never block another community', () => {
   });
 });
 
-describe('dates of birth: schools, colleges and sports bodies only', () => {
+describe('dates of birth: educational institutions and sports bodies only', () => {
   test('the same list on both sides', () => {
-    assert.deepEqual([...DOB_CONFIRM_TYPES], ['School', 'College', 'Sports club', 'Sports academy', 'Sports association']);
-    assert.match(fn('org_dob_access_or_raise'), /type in \('School', 'College', 'Sports club', 'Sports academy', 'Sports association'\)/);
+    assert.deepEqual([...DOB_CONFIRM_TYPES], ['School', 'Junior / PU college', 'College', 'University', 'Polytechnic / institute', 'ITI', 'Sports club', 'Sports academy', 'Sports association']);
+    const dob = latest('org_dob_access_or_raise');
+    for (const t of DOB_CONFIRM_TYPES) assert.ok(dob.includes(`'${t}'`), t);
     assert.equal(canConfirmDobs('Company'), false);
     assert.equal(canConfirmDobs('Sports academy'), true);
     assert.match(read('src/components/OrgVerificationCard.tsx'), /canManage && canConfirmDobs\(org\.type\) \?/);

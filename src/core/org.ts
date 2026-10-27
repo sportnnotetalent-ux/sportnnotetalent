@@ -18,8 +18,14 @@ export const ORG_ROLE_BLURB: Record<OrgRole, string> = {
 
 /** Communities where members are students who progress through classes/standards
  *  year on year — these get the class-timeline features. */
+/** Educational institutions: members have class / year timelines, academic
+ *  years, graduation, and the institution can confirm their dates of birth.
+ *  (2026-10-27: + junior / PU colleges, universities, polytechnics / institutes, ITIs.) */
+export const EDUCATION_TYPES = ['School', 'Junior / PU college', 'College', 'University', 'Polytechnic / institute', 'ITI'] as const;
 export const isAcademicCommunity = (type?: string): boolean =>
-  type === 'School' || type === 'College';
+  (EDUCATION_TYPES as readonly string[]).includes(type ?? '');
+/** After school: students leave after their final year, not "Grade 12". */
+export const TERTIARY_TYPES: readonly string[] = ['College', 'University', 'Polytechnic / institute', 'ITI'];
 
 /** The class/standard a member was in on a given date (defaults to today/"now").
  *  Stints are half-open [since, until); the open stint is the current class. */
@@ -49,9 +55,15 @@ type GradeStintLike = { since: string; until?: string };
 export const DEFAULT_GRADUATING_STANDARD = 'Grade 10';
 
 /** The graduating-class suggestion for a new school in a market ("Year 13",
- *  "Grade 12", "Secondary 4" …) — the organiser confirms or changes it. */
-export const suggestedGraduatingStandard = (market: MarketId | string | null | undefined): string =>
-  marketFor(market).graduating[0];
+ *  "Grade 12", "Secondary 4" …) — the organiser confirms or changes it. A
+ *  junior / PU college takes the market's last school year; colleges,
+ *  universities, polytechnics and ITIs "Final year". */
+export const suggestedGraduatingStandard = (market: MarketId | string | null | undefined, type?: string): string => {
+  if (TERTIARY_TYPES.includes(type ?? '')) return 'Final year';
+  const g = marketFor(market).graduating;
+  // a junior college ends with the market's final school year (Grade 12, JC2, Upper 6, Year 13 …)
+  return type === 'Junior / PU college' ? g.find((x) => /^(Grade 12|Year 13|Year 12|JC2|Upper 6)$/.test(x)) ?? g[0] : g[0];
+};
 
 /** The class after which students of this community graduate. Indian schools
  *  default to Grade 10; schools in other markets and other academic communities
@@ -185,7 +197,11 @@ export const membersOnDate = (org: Organization, date: string): OrgMember[] =>
 /** Standard community kinds offered when creating one (plus a custom option). */
 export const COMMUNITY_TYPES = [
   'School',
+  'Junior / PU college',
   'College',
+  'University',
+  'Polytechnic / institute',
+  'ITI',
   'Sports club',
   'Sports academy',
   'Sports association',

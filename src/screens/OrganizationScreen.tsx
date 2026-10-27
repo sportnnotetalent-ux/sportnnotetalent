@@ -841,7 +841,7 @@ function YearRollover({
             Each student moves up a class; those in {gradStd ?? 'the final class'} graduate. Override any one — repeat the same class, clear to skip, or turn off Graduate to keep a student on.
           </Text>
           {gradWarn === 'unset' ? (
-            <Text style={st.warnStrong}>⚠ No graduating class is set, so nobody graduates. Set it under ✎ Edit (for example {suggestedGraduatingStandard(market)}).</Text>
+            <Text style={st.warnStrong}>⚠ No graduating class is set, so nobody graduates. Set it under ✎ Edit (for example {suggestedGraduatingStandard(market, org.type)}).</Text>
           ) : gradWarn === 'unknown' ? (
             <Text style={st.warnStrong}>⚠ No student is in {gradStd}, the graduating class, so nobody graduates this year. Check the class name under ✎ Edit.</Text>
           ) : null}
@@ -1027,7 +1027,7 @@ function DetailsEditor({ org, onCancel, onSaved }: { org: Organization; onCancel
             ))}
           </View>
           <Text style={textStyles.muted}>Sets class names at rollover, age groups and the age cut-off for new events.</Text>
-          <TextField label="Graduating class (students leave after this)" value={gradStd} onChange={setGradStd} placeholder={suggestedGraduatingStandard(market)} autoCapitalize="words" />
+          <TextField label="Graduating class (students leave after this)" value={gradStd} onChange={setGradStd} placeholder={suggestedGraduatingStandard(market, type)} autoCapitalize="words" />
           <View style={st.chips}>
             {MARKETS[market].graduating.map((g) => (
               <SelectChip key={g} label={g} active={gradStd.trim() === g} onPress={() => setGradStd(g)} />

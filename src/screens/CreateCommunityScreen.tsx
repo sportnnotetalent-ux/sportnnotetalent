@@ -16,7 +16,7 @@ import { useAuth } from '../core/auth';
 import { getMyPlayerId, createOrganization } from '../data/repos';
 import { isAcademicCommunity, suggestedGraduatingStandard } from '../core/org';
 import {
-  OFFICIAL_ID_RULES, OFFICIAL_ONLY_TYPES, REGISTERED_TYPES, REQUIRED_ID, UNREGISTERED_TYPES, validOfficialId,
+  OFFICIAL_ID_RULES, OFFICIAL_ONLY_TYPES, ORG_VERIFY, REGISTERED_TYPES, UNREGISTERED_TYPES, isEducation, validOfficialId, verifiableType,
 } from '../core/orgVerification';
 import { lookupOfficialId, setOfficialIds } from '../data/orgVerification';
 import { MARKETS, MARKET_ORDER, marketForCountry, type MarketId } from '../core/markets';
@@ -55,13 +55,14 @@ export default function CreateCommunityScreen({ navigation }: Props) {
   const [gradStd, setGradStd] = useState(() => suggestedGraduatingStandard(marketForCountry(region.country)));
   const [gradTouched, setGradTouched] = useState(false);
   const [showMarkets, setShowMarkets] = useState(false);
-  const pickMarket = (m: MarketId) => { setMarket(m); if (!gradTouched) setGradStd(suggestedGraduatingStandard(m)); };
-
   const resolvedType = typeChoice === CUSTOM ? customType.trim() : typeChoice;
+  const pickMarket = (m: MarketId) => { setMarket(m); if (!gradTouched) setGradStd(suggestedGraduatingStandard(m, resolvedType)); };
+  // the suggestion follows the type: "Grade 12" for a junior college, "Final year" for a university …
+  useEffect(() => { if (!gradTouched) setGradStd(suggestedGraduatingStandard(market, resolvedType)); }, [resolvedType]); // eslint-disable-line react-hooks/exhaustive-deps
   const academic = registered === true && isAcademicCommunity(resolvedType);
-  // Schools / colleges give their official code here (catches a verified duplicate
-  // early); other registered types add theirs in "Get verified".
-  const idType = registered && (resolvedType === 'School' || resolvedType === 'College') ? REQUIRED_ID[resolvedType] : null;
+  // Educational institutions give their official code here (catches a verified
+  // duplicate early); other registered types add theirs in "Get verified".
+  const idType = registered && isEducation(resolvedType) && verifiableType(resolvedType) ? ORG_VERIFY[resolvedType].requiredAnyOf[0] : null;
   const pickRegistered = (r: boolean) => { setRegistered(r); setTypeChoice(''); setOfficialId(''); setIdCheck(null); };
 
   // Is this official ID already a verified community?
@@ -78,7 +79,7 @@ export default function CreateCommunityScreen({ navigation }: Props) {
     if (registered === null) return setError('Is it a registered organisation or an informal group?');
     if (!typeChoice) return setError('Pick the type of community.');
     if (typeChoice === CUSTOM && !customType.trim()) return setError('Describe the community type.');
-    if (!registered && OFFICIAL_ONLY_TYPES.includes(resolvedType)) return setError('A school or college is a registered organisation — choose “Registered organisation”.');
+    if (!registered && OFFICIAL_ONLY_TYPES.includes(resolvedType)) return setError('A school, college or other educational institution is a registered organisation — choose “Registered organisation”.');
     if (idType && officialId.trim() && !validOfficialId(idType, officialId)) return setError(`That ${OFFICIAL_ID_RULES[idType].label} doesn’t look right — ${OFFICIAL_ID_RULES[idType].hint}`);
     if (idCheck?.verified) return setError(`${idCheck.verified.name} is already verified on SportnNote — ask its admins to add you.`);
     if (academic && !gradStd.trim()) return setError('Which class do students graduate after? Type it, e.g. Year 13 or Grade 12.');
@@ -175,7 +176,7 @@ export default function CreateCommunityScreen({ navigation }: Props) {
                 {!showMarkets && <SelectChip label="Change…" active={false} onPress={() => setShowMarkets(true)} />}
               </View>
               <Text style={textStyles.muted}>Sets class names, age groups and the age cut-off for your events. You can change it later.</Text>
-              <TextField label="Graduating class (students leave after this)" value={gradStd} onChange={(v) => { setGradTouched(true); setGradStd(v); }} placeholder={suggestedGraduatingStandard(market)} autoCapitalize="words" />
+              <TextField label="Graduating class (students leave after this)" value={gradStd} onChange={(v) => { setGradTouched(true); setGradStd(v); }} placeholder={suggestedGraduatingStandard(market, resolvedType)} autoCapitalize="words" />
               {MARKETS[market].graduating.length > 1 && (
                 <View style={st.chips}>
                   {MARKETS[market].graduating.map((g) => (

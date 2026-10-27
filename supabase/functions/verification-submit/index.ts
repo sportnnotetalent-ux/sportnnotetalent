@@ -74,7 +74,7 @@ Deno.serve(async (req) => {
     const o = org as { name?: string; type?: string | null; verification_requested_at?: string | null; verified_at?: string | null } | null;
     if (!o?.verification_requested_at || o.verified_at) return json({ delivered: false, error: 'nothing to review' }, 400);
     const sent = await alertReviewers(
-      `🏛️ ${o.type === 'School' ? 'A school' : o.type === 'College' ? 'A college' : 'An organisation'} asks to be verified`,
+      `🏛️ Verification request — ${o.type ? String(o.type).slice(0, 30) : 'organisation'}`,
       `${(o.name ?? 'An organisation').slice(0, 80)}${o.type ? ` (${String(o.type).slice(0, 30)})` : ''} sent its official ID, a document and proof the person is authorised. Check them against the public register in the review queue.`,
       `org-${orgId}`,
       { supportOnly: true },

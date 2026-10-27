@@ -26,7 +26,11 @@ const grouped = (code: string) => code.replace(/(.{4})(?=.)/g, '$1-');
 /** noun + who signs for it, per community type (mirrors ORG_VERIFY in src/core/orgVerification.ts). */
 const WORDS: Record<string, { noun: string; head: string }> = {
   School: { noun: 'school', head: 'Principal / Head' },
+  'Junior / PU college': { noun: 'college', head: 'Principal / Head' },
   College: { noun: 'college', head: 'Principal / Head' },
+  University: { noun: 'university', head: 'Vice-Chancellor / Registrar' },
+  'Polytechnic / institute': { noun: 'institute', head: 'Principal / Director' },
+  ITI: { noun: 'ITI', head: 'Principal' },
   'Sports club': { noun: 'club', head: 'President / Secretary' },
   'Sports academy': { noun: 'academy', head: 'Director / Owner' },
   'Sports association': { noun: 'association', head: 'President / Secretary' },

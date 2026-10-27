@@ -1,6 +1,6 @@
 ---
-title: Verify your school on SportnNote
-description: Get the ✓ for your school or college in three steps — official ID, a recognition document, and proof you're authorised. Usually checked within a day.
+title: Verify your school, college or institute on SportnNote
+description: Get the ✓ for a school, junior college, college, university, polytechnic or ITI in three steps — official code, a recognition document, and proof you're authorised. Usually checked within a day.
 category: Teams & players
 audience: Organisers
 sports: all
@@ -12,12 +12,23 @@ A verified school shows **✓ Verified by SportnNote** on its page and on the ce
 
 ## Before you start
 - You need to be an Owner or Admin of the school's community on SportnNote.
-- Have the school's official code ready: the **UDISE+ code** (11 digits) for a school, or the **AISHE code** (for example C-12345) for a college.
+- Have the institution's official code ready:
+
+| Institution | Official code |
+|---|---|
+| School, or junior / PU college | **UDISE+ code** (11 digits) |
+| College | **AISHE code** starting C- (for example C-12345) |
+| University | **AISHE code** starting U- (for example U-0306) |
+| Polytechnic or other institute (nursing, teacher training …) | **AISHE code**, usually starting S- (for example S-797) |
+| ITI | **ITI code** from NCVT MIS (for example GU29000014) |
+
 - Have a photo or PDF of one recognition document, such as the board affiliation letter.
 - Verification never stops you running events. Without it, everything still works.
 
 ## Registered or informal
-When you create a community, the app asks **Is it a registered organisation?** Choose **🏛️ Registered organisation** for a school, college, company, club or society, or **👥 Informal group** for friends, a neighbourhood or an office team. An informal group needs no verification, and can't be a school or college.
+When you create a community, the app asks **Is it a registered organisation?** Choose **🏛️ Registered organisation** for a school, college, university, institute, company, club or society, or **👥 Informal group** for friends, a neighbourhood or an office team. An informal group needs no verification, and can't be an educational institution.
+
+Pick the type that fits: **School**, **Junior / PU college**, **College**, **University**, **Polytechnic / institute** or **ITI**. Each one keeps class or year groups for its members, so students move up a year and graduate after the class you set (for example **Grade 12** for a junior college, **Final year** for a university).
 
 ## Step by step
 1. Open your school's page, stay on the **Details** tab, and on the **🛡️ Verification** card tap **🛡️ Get verified**.

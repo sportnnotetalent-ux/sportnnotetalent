@@ -18,7 +18,7 @@ import { Button, Card, EmptyState, FormError, LoadingState, ScreenTitle, SelectC
 import { useAuth } from '../core/auth';
 import { pickDocument } from '../core/document';
 import {
-  BOARD_LABEL, ID_SHORT, ORG_VERIFY, OFFICIAL_ID_RULES, authorityOptions, isFreeMail, validOfficialId,
+  BOARD_LABEL, ID_SHORT, ORG_VERIFY, OFFICIAL_ID_RULES, authorityOptions, isEducation, isFreeMail, validOfficialId,
   verifiableType, verificationProgress, type Authority, type OfficialIdType, type OrgVerificationState,
 } from '../core/orgVerification';
 import {
@@ -96,7 +96,7 @@ export default function OrgVerifyScreen() {
   const progress = verificationProgress(state);
   const locked = v?.status === 'pending' || state.verified;
   const cfg = ORG_VERIFY[type];
-  const academic = type === 'School' || type === 'College';
+  const academic = isEducation(type);
   const reqType: OfficialIdType = mainType ?? cfg.requiredAnyOf[0];
   const authority = v?.authority ?? null;
   const options = authorityOptions(type);
@@ -156,7 +156,7 @@ export default function OrgVerifyScreen() {
           <Text style={textStyles.muted}>{OFFICIAL_ID_RULES[reqType].hint}</Text>
           {cfg.optional.length > 0 ? (
             <>
-              <Text style={textStyles.muted}>{type === 'School' ? 'Board (optional, helps support check faster)' : 'Also add (optional, helps support check faster)'}</Text>
+              <Text style={textStyles.muted}>{cfg.optional.every((t) => t in BOARD_LABEL) ? 'Board (optional, helps support check faster)' : 'Also add (optional, helps support check faster)'}</Text>
               <View style={st.chips}>
                 {cfg.optional.map((b) => <SelectChip key={b} label={BOARD_LABEL[b] ?? ID_SHORT[b]} active={board === b} onPress={() => setBoard(board === b ? null : b)} />)}
               </View>

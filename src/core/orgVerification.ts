@@ -15,7 +15,9 @@
 export type OfficialIdType =
   | 'udise' | 'cbse' | 'cisce' | 'state_board' | 'ib' | 'cambridge' | 'nios' | 'aishe'
   // Phase 2
-  | 'cin' | 'llpin' | 'gstin' | 'udyam' | 'ngo_darpan' | 'society_reg' | 'trust_reg' | 'coop_reg';
+  | 'cin' | 'llpin' | 'gstin' | 'udyam' | 'ngo_darpan' | 'society_reg' | 'trust_reg' | 'coop_reg'
+  // more educational institutions (2026-10-27)
+  | 'iti';
 
 export interface OfficialIdRule {
   label: string;
@@ -62,8 +64,13 @@ export const OFFICIAL_ID_RULES: Record<OfficialIdType, OfficialIdRule> = {
   },
   aishe: {
     label: 'AISHE code', placeholder: 'e.g. C-12345', pattern: /^[CUS]-\d{3,6}$/,
-    hint: 'C- for a college, U- for a university, S- for a standalone institution.',
+    hint: 'C- for a college, U- for a university, S- for a standalone institution (polytechnic, nursing, teacher training …).',
     lookup: { label: 'AISHE', url: 'https://aishe.gov.in/' },
+  },
+  iti: {
+    label: 'ITI code (NCVT MIS)', placeholder: 'e.g. GU29000014', pattern: /^[A-Z]{2}\d{8}$/,
+    hint: '10 characters, as shown on the NCVT MIS portal and on trainees’ results.',
+    lookup: { label: 'NCVT MIS', url: 'https://www.ncvtmis.gov.in/' },
   },
   // ---- Phase 2 ----
   cin: {
@@ -128,7 +135,7 @@ export const validOfficialId = (type: OfficialIdType, value: string): boolean =>
 export const ID_SHORT: Record<OfficialIdType, string> = {
   udise: 'UDISE+', cbse: 'CBSE', cisce: 'CISCE (ICSE / ISC)', state_board: 'State board', ib: 'IB', cambridge: 'Cambridge',
   nios: 'NIOS', aishe: 'AISHE', cin: 'Company (CIN)', llpin: 'LLP', gstin: 'GST', udyam: 'Udyam', ngo_darpan: 'NGO Darpan',
-  society_reg: 'Society', trust_reg: 'Trust', coop_reg: 'Co-operative',
+  society_reg: 'Society', trust_reg: 'Trust', coop_reg: 'Co-operative', iti: 'ITI code',
 };
 
 /** The board codes a school can add next to its UDISE+ code. */
@@ -139,7 +146,8 @@ export const BOARD_LABEL: Partial<Record<OfficialIdType, string>> = {
 
 /** Community types: a registered organisation, or an informal group (no verification). */
 export const REGISTERED_TYPES = [
-  'School', 'College', 'Sports club', 'Sports academy', 'Sports association', 'Company', 'Hospital chain', 'NGO', 'Housing society',
+  'School', 'Junior / PU college', 'College', 'University', 'Polytechnic / institute', 'ITI',
+  'Sports club', 'Sports academy', 'Sports association', 'Company', 'Hospital chain', 'NGO', 'Housing society',
 ] as const;
 export type VerifiableType = typeof REGISTERED_TYPES[number];
 export const verifiableType = (type?: string): type is VerifiableType => (REGISTERED_TYPES as readonly string[]).includes(type ?? '');
@@ -166,10 +174,30 @@ export const ORG_VERIFY: Record<VerifiableType, OrgVerifyConfig> = {
     docKinds: ['Board affiliation letter', 'State recognition (RTE) certificate', 'Government sanction order', 'Other official recognition'],
     head: 'Principal / Head', emailExample: 'principal@school.edu.in',
   },
+  'Junior / PU college': {
+    noun: 'college', requiredAnyOf: ['udise'], optional: ['state_board'],
+    docKinds: ['Intermediate / PU board affiliation letter', 'State recognition certificate', 'Other official recognition'],
+    head: 'Principal / Head', emailExample: 'principal@college.edu.in',
+  },
   College: {
     noun: 'college', requiredAnyOf: ['aishe'], optional: [],
     docKinds: ['University affiliation letter', 'Recognition letter (UGC, AICTE or state)', 'Other official recognition'],
     head: 'Principal / Head', emailExample: 'principal@college.ac.in',
+  },
+  University: {
+    noun: 'university', requiredAnyOf: ['aishe'], optional: [],
+    docKinds: ['UGC recognition letter', 'Act / government notification establishing it', 'Other official recognition'],
+    head: 'Vice-Chancellor / Registrar', emailExample: 'registrar@university.ac.in',
+  },
+  'Polytechnic / institute': {
+    noun: 'institute', requiredAnyOf: ['aishe'], optional: [],
+    docKinds: ['AICTE / regulator approval letter (NCTE, INC …)', 'State board / university affiliation letter', 'Other official recognition'],
+    head: 'Principal / Director', emailExample: 'principal@institute.ac.in',
+  },
+  ITI: {
+    noun: 'ITI', requiredAnyOf: ['iti'], optional: [],
+    docKinds: ['DGT / NCVT affiliation letter', 'State (SCVT) affiliation letter', 'Other official recognition'],
+    head: 'Principal', emailExample: 'principal@iti.gov.in',
   },
   'Sports club': {
     noun: 'club', requiredAnyOf: ['society_reg', 'trust_reg', 'cin', 'llpin', 'gstin', 'udyam'], optional: [],
@@ -208,6 +236,12 @@ export const ORG_VERIFY: Record<VerifiableType, OrgVerifyConfig> = {
   },
 };
 
+/** Educational institutions: "recognition" documents, a Principal / Head-style
+ *  signatory, and member dates of birth from student records. Mirrors
+ *  EDUCATION_TYPES in core/org.ts and the SQL lists. */
+export const EDUCATION_VERIFY_TYPES: readonly VerifiableType[] = ['School', 'Junior / PU college', 'College', 'University', 'Polytechnic / institute', 'ITI'];
+export const isEducation = (type?: string): boolean => (EDUCATION_VERIFY_TYPES as readonly string[]).includes(type ?? '');
+
 /** Phase 1 names, kept for older callers. */
 export const REQUIRED_ID: Pick<Record<VerifiableType, OfficialIdType>, 'School' | 'College'> = { School: 'udise', College: 'aishe' };
 export const DOC_KINDS: Record<VerifiableType, readonly string[]> = Object.fromEntries(
@@ -216,11 +250,11 @@ export const DOC_KINDS: Record<VerifiableType, readonly string[]> = Object.fromE
 
 /** Verified organisations of these types may confirm members' dates of birth
  *  (they keep members' records for sport). Mirrors org_dob_access_or_raise(). */
-export const DOB_CONFIRM_TYPES: readonly VerifiableType[] = ['School', 'College', 'Sports club', 'Sports academy', 'Sports association'];
+export const DOB_CONFIRM_TYPES: readonly VerifiableType[] = [...EDUCATION_VERIFY_TYPES, 'Sports club', 'Sports academy', 'Sports association'];
 export const canConfirmDobs = (type?: string): boolean => (DOB_CONFIRM_TYPES as readonly string[]).includes(type ?? '');
 export const UNREGISTERED_TYPES = ['Friends group', 'Neighbourhood group', 'Office team', 'Alumni group'] as const;
 /** Types only a registered organisation may use (server rule in guard_org_verification). */
-export const OFFICIAL_ONLY_TYPES: readonly string[] = ['School', 'College'];
+export const OFFICIAL_ONLY_TYPES: readonly string[] = ['School', 'Junior / PU college', 'College', 'University', 'Polytechnic / institute', 'ITI'];
 
 export type Authority = 'email' | 'letter' | 'head';
 /** The three ways to show you're authorised, worded for the organisation type. */
@@ -304,7 +338,7 @@ export function verificationProgress(s: OrgVerificationState): {
     || (v.authority === 'head' && !!v.headRequestedAt && !v.headDeclinedAt));
   const todo: string[] = [];
   if (!ids && cfg) todo.push(cfg.requiredAnyOf.length === 1 ? `Add the ${OFFICIAL_ID_RULES[cfg.requiredAnyOf[0]].label}` : 'Add a registration number');
-  if (!doc) todo.push(cfg && type !== 'School' && type !== 'College' ? 'Upload a registration document' : 'Upload a recognition document');
+  if (!doc) todo.push(cfg && !isEducation(type) ? 'Upload a registration document' : 'Upload a recognition document');
   if (!authority) todo.push(`Show you’re authorised by the ${cfg?.noun ?? 'organisation'}`);
   return { ids, doc, authority, ready: ids && doc && authority, todo };
 }
@@ -328,7 +362,7 @@ export function reviewChecks(
   const type = verifiableType(opts.type) ? opts.type : 'School';
   const { noun, head } = ORG_VERIFY[type];
   const searchable = !opts.idTypes || opts.idTypes.some((t) => !!OFFICIAL_ID_RULES[t]?.lookup);
-  const headName = type === 'School' || type === 'College' ? 'The Head' : `The ${head}`;
+  const headName = isEducation(type) ? 'The Head' : `The ${head}`;
   return [
     {
       key: 'id',
@@ -336,7 +370,7 @@ export function reviewChecks(
         ? 'Found the official ID in the public register — the name and city match'
         : 'The registration number, name and place match the certificate (this register has no public search)',
     },
-    { key: 'doc', label: `The document is a genuine ${type === 'School' || type === 'College' ? 'recognition' : 'registration'} document for this ${noun}, with the same name` },
+    { key: 'doc', label: `The document is a genuine ${isEducation(type) ? 'recognition' : 'registration'} document for this ${noun}, with the same name` },
     {
       key: 'authority',
       label: authority === 'email'
