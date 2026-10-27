@@ -13,6 +13,20 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-27 — Web header: long titles no longer run under the header buttons
+Spotted while testing Run it again at 375 px: a tournament's name ran underneath "⚙ Manage" and "Share" in the top bar. A long match title ("Green House vs Red House · Match Details") did the same under "Share".
+- **Cause:** on the web, React Navigation draws the header in JS.
+  - It caps the title for one ~52 px icon on the right, and lets the right side shrink to zero width (`flexBasis: 0`).
+  - Our text buttons are wider, so they spilled left over the title.
+  - Native (Android / iOS) headers lay this out themselves and weren't affected.
+- **Fix:** `webHeaderFit` in `src/navigation/RootNavigator.tsx`, the stack's `screenOptions`, web only.
+  - The right side keeps its own width (`flexBasis: 'auto'`, no shrink), and the title shrinks to what's left, ending in "…".
+  - This covers every stack screen, including the tournament, live-scoring and golf-round pages.
+- **Verified:**
+  - Demo at 375 px: the tournament title ends at "⚙ Manage" (title 56–228 px, Manage 228–315, Share 315–375), and the match title ends before "Share".
+  - Screens without buttons are unchanged, and on desktop the full title shows. No console errors.
+  - `tests/header-fit.test.mts` (3) also re-checks that React Navigation still applies these styles after an upgrade; full suite 4,792 pass; tsc clean.
+
 ### 2026-10-27 — Run it again (next edition) and Copy this setup (any tournament)
 Founder: "go ahead with Run it again next year. Also, for each tournament organized by others as well, create a clone option … so they can easily retrieve aspects like the same sports, format, rules, events and venues."
 - **🔁 Run it again** (organisers only), from **Manage › Run it again** or the "🏁 That's a wrap" card on a finished tournament's Info tab.

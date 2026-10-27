@@ -4,7 +4,7 @@ import { NavigationContainer, DefaultTheme, getStateFromPath, type LinkingOption
 import { navRef } from './navRef';
 import { promptSignIn, takePendingRoute } from '../core/guest';
 import { GuestBar } from '../components/GuestBar';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { createNativeStackNavigator, type NativeStackNavigationOptions } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { theme } from '../core/theme';
 import { useAuth } from '../core/auth';
@@ -262,6 +262,16 @@ function Tabs() {
   );
 }
 
+// On the web the stack header is drawn by React Navigation's JS Header, which
+// sizes the title for one ~52 px icon on the right. Our text buttons ("⚙ Manage
+// Share" on a tournament, "Share" on a match or golf round) are wider, so a long
+// title ran underneath them on a phone. The right side keeps its own width and
+// the title shrinks to what's left (it ends in "…"). Native headers lay this
+// out themselves, so this is web-only.
+export const webHeaderFit = (Platform.OS === 'web'
+  ? { headerTitleContainerStyle: { flexShrink: 1, minWidth: 0 }, headerRightContainerStyle: { flexBasis: 'auto', flexShrink: 0 } }
+  : {}) as NativeStackNavigationOptions;
+
 const stackScreenOpts = {
   headerShown: true,
   headerStyle: { backgroundColor: theme.colors.surface },
@@ -446,6 +456,7 @@ export default function RootNavigator() {
       onUnhandledAction={() => { if (!authed) promptSignIn(); }}
     >
       <Stack.Navigator
+        screenOptions={webHeaderFit}
         // Lazy screens (lazyScreens.ts) show a spinner for the moment their chunk loads.
         screenLayout={({ children, route }) => (
           <Suspense fallback={<View style={{ flex: 1, backgroundColor: theme.colors.bg, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color={theme.colors.primary} /></View>}>
