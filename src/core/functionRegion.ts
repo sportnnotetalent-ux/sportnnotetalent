@@ -34,6 +34,7 @@ export const PINNED_FUNCTIONS: ReadonlySet<string> = new Set([
   'verification-submit',
   'verification-review', // a database write, then one push (docs/verification/fast-lanes.md)
   'org-verify', // school verification: a code, then one email (docs/verification/org-verification.md)
+  'register-lookup', // support: one CBSE SARAS record (an Indian register) + a rate-limit write
   'send-invite',
   'join',
   'report-invite',
