@@ -28,6 +28,15 @@
 --     can, in the app as before, and the details are applied then too.
 --  Students who left (2A) are marked by the school's admins in the app, from
 --  the preview, with the existing membership rules (until = today).
+--
+--  Hardened by the "break it" pass (docs/security/breaks/student-lists.md):
+--  children elsewhere only for VERIFIED schools (SL-01); a parent who said no
+--  isn't asked again for 180 days (SL-02); at most 100 requests a call and 500
+--  a school a day (SL-03); a child can neither accept nor decline (SL-04);
+--  anonymous tries limited per network address (SL-05); the parent's address
+--  cleared once answered, old codes purged (SL-06); first names indexed
+--  (SL-07); an admission number on another name is a check (SL-14); names cut
+--  to 200 characters (SL-17).
 -- ============================================================================
 
 -- ---------- 1. Admission numbers -------------------------------------------------
@@ -64,6 +73,17 @@ create or replace function roster_email_key(p text)
   select nullif(lower(btrim(coalesce(p, ''))), '');
 $$;
 create index if not exists players_roster_key_idx on players (roster_name_key(full_name), dob);
+create index if not exists players_roster_first_idx on players (split_part(coalesce(roster_name_key(full_name), ''), ' ', 1));
+
+-- SL-05: who an anonymous caller is, for rate limits — their network address
+-- (PostgREST passes the request headers), else the signed-in user.
+create or replace function request_subject()
+  returns text language sql stable set search_path = public as $$
+  select coalesce(auth.uid()::text,
+    'ip:' || coalesce(nullif(btrim(split_part(
+      (nullif(current_setting('request.headers', true), '')::json)->>'x-forwarded-for', ',', 1)), ''), 'unknown'));
+$$;
+revoke all on function request_subject() from public, anon, authenticated;
 
 -- Every email / phone that reaches a player's family: the parent on the
 -- profile, the child's own, the sign-up copy, the linked parent account.
@@ -100,9 +120,37 @@ $$;
 revoke all on function roster_request_email(uuid) from public, anon, authenticated;
 
 -- ---------- 3. Matching ------------------------------------------------------------
+-- A child elsewhere on SportnNote (not at this school): the same name, the same
+-- date of birth AND a parent's (or their own) email or phone.
+create or replace function roster_outside_match(p_org uuid, k text, d date, em text, ph text)
+  returns uuid language sql stable security definer set search_path = public as $$
+  select p.id from players p
+   where k is not null and d is not null and (em is not null or ph is not null)
+     and roster_name_key(p.full_name) = k and p.dob = d
+     and not exists (select 1 from org_members m where m.org_id = p_org and m.player_id = p.id)
+     and exists (select 1 from player_contact_keys(p.id) c where (em is not null and c.email = em) or (ph is not null and c.phone = ph))
+   order by p.created_at limit 1;
+$$;
+revoke all on function roster_outside_match(uuid, text, date, text, text) from public, anon, authenticated;
+
+-- What to do about a child elsewhere: asked already / declined (SL-02: a parent
+-- who said no isn't asked again for 180 days) / ask the parent / nobody to ask.
+create or replace function roster_outside_kind(p_org uuid, p_player uuid)
+  returns text language sql stable security definer set search_path = public as $$
+  select case
+    when exists (select 1 from org_requests q where q.org_id = p_org and q.player_id = p_player
+                   and q.direction = 'invite' and q.status = 'pending') then 'invited'
+    when exists (select 1 from org_requests q where q.org_id = p_org and q.player_id = p_player and q.direction = 'invite'
+                   and q.status = 'rejected' and q.decided_at > now() - interval '180 days') then 'declined'
+    when roster_request_email(p_player) ~ '^[^\s@]+@[^\s@]+\.[^\s@]+$' then 'parent'
+    else 'unreachable' end;
+$$;
+revoke all on function roster_outside_kind(uuid, uuid) from public, anon, authenticated;
+
 -- Internal: one result per row. kind = member (with player_id) | check (a member
--- with the same name but another date of birth, or several) | parent | unreachable
--- (a child elsewhere; nobody to email) | invited (already asked) | new.
+-- with the same name but another date of birth, or several, or an admission
+-- number on another name) | parent | unreachable (a child elsewhere; nobody to
+-- email) | invited (already asked) | declined (the parent said no, < 180 days) | new.
 create or replace function org_roster_match_rows(p_org uuid, p_rows jsonb)
   returns table(i int, kind text, player_id uuid, why text, left_school boolean)
   language plpgsql stable security definer set search_path = public as $$
@@ -115,26 +163,46 @@ declare
   ph text;
   hit record;
   n int;
+  verified boolean;
+  outside uuid;
 begin
+  -- SL-01: only a school SportnNote has verified may reach children elsewhere
+  verified := exists (select 1 from organizations o where o.id = p_org and o.verified_at is not null);
   for r in
     select x.i as ri, x.name as rname, x.dob as rdob, x.adm as radm, x.email as remail, x.phone as rphone
       from jsonb_to_recordset(coalesce(p_rows, '[]'::jsonb)) as x(i int, name text, dob text, adm text, email text, phone text)
   loop
     i := r.ri; player_id := null; why := null; left_school := false;
-    k := roster_name_key(r.rname);
+    k := roster_name_key(left(r.rname, 200));
     fname := split_part(coalesce(k, ''), ' ', 1);
     d := case when r.rdob ~ '^\d{4}-\d{2}-\d{2}$' then r.rdob::date end;
     em := roster_email_key(r.remail);
     ph := roster_phone_key(r.rphone);
+    -- SL-25: a child elsewhere identified by name + date of birth + parent contact
+    -- wins over a weaker "maybe" here (an admission number on another name, or a
+    -- student with this name but another date of birth) — never a duplicate.
+    outside := case when verified then roster_outside_match(p_org, k, d, em, ph) end;
 
     -- a) the admission number at this school
     if nullif(btrim(coalesce(r.radm, '')), '') is not null then
-      select a.player_id as pid, m.until into hit
+      select a.player_id as pid, m.until, roster_name_key(p.full_name) as pk into hit
         from org_member_ids a join org_members m on m.org_id = a.org_id and m.player_id = a.player_id
-       where a.org_id = p_org and upper(btrim(a.admission_no)) = upper(btrim(r.radm))
+        join players p on p.id = a.player_id
+       where a.org_id = p_org and upper(btrim(a.admission_no)) = upper(btrim(left(r.radm, 40)))
        limit 1;
       if found then
-        kind := 'member'; player_id := hit.pid; why := 'admission'; left_school := hit.until is not null;
+        -- SL-14: the number on a name that shares no word with the student's is a check
+        if k is not null and not exists (
+             select 1 from unnest(string_to_array(k, ' ')) w
+              where length(w) >= 2 and w = any(string_to_array(coalesce(hit.pk, ''), ' '))) then
+          if outside is not null then
+            kind := roster_outside_kind(p_org, outside); player_id := outside; why := 'elsewhere';
+          else
+            kind := 'check'; why := 'admission_name'; player_id := hit.pid; left_school := hit.until is not null;
+          end if;
+        else
+          kind := 'member'; why := 'admission'; player_id := hit.pid; left_school := hit.until is not null;
+        end if;
         return next; continue;
       end if;
     end if;
@@ -161,7 +229,11 @@ begin
      where m.org_id = p_org and roster_name_key(p.full_name) = k
      order by (m.until is null) desc limit 1;
     if found then
-      kind := 'check'; player_id := hit.pid; why := 'dob_differs'; left_school := hit.until is not null;
+      if outside is not null then
+        kind := roster_outside_kind(p_org, outside); player_id := outside; why := 'elsewhere';
+      else
+        kind := 'check'; player_id := hit.pid; why := 'dob_differs'; left_school := hit.until is not null;
+      end if;
       return next; continue;
     end if;
 
@@ -178,24 +250,10 @@ begin
       end if;
     end if;
 
-    -- d) a child elsewhere on SportnNote: same name, same date of birth, same parent contact
-    if d is not null and (em is not null or ph is not null) then
-      select p.id as pid into hit
-        from players p
-       where roster_name_key(p.full_name) = k and p.dob = d
-         and not exists (select 1 from org_members m where m.org_id = p_org and m.player_id = p.id)
-         and exists (select 1 from player_contact_keys(p.id) c where (em is not null and c.email = em) or (ph is not null and c.phone = ph))
-       order by p.created_at limit 1;
-      if found then
-        player_id := hit.pid;
-        kind := case
-          when exists (select 1 from org_requests q where q.org_id = p_org and q.player_id = hit.pid
-                         and q.direction = 'invite' and q.status = 'pending') then 'invited'
-          when roster_request_email(hit.pid) ~ '^[^\s@]+@[^\s@]+\.[^\s@]+$' then 'parent'
-          else 'unreachable' end;
-        why := 'elsewhere';
-        return next; continue;
-      end if;
+    -- d) a child elsewhere on SportnNote
+    if outside is not null then
+      kind := roster_outside_kind(p_org, outside); player_id := outside; why := 'elsewhere';
+      return next; continue;
     end if;
 
     kind := 'new';
@@ -234,7 +292,7 @@ alter table org_requests add column if not exists details jsonb;
 create table if not exists org_parent_requests (
   request_id   uuid primary key references org_requests(id) on delete cascade,
   code_hash    text not null unique,
-  target_email text not null,
+  target_email text,
   expires_at   timestamptz not null,
   created_at   timestamptz not null default now()
 );
@@ -259,6 +317,8 @@ declare
   j int;
   email text;
   res jsonb := '[]'::jsonb;
+  sent_now int := 0;
+  today_count int;
 begin
   select m.player_id into by_player
     from org_members m join players p on p.id = m.player_id
@@ -266,8 +326,17 @@ begin
    limit 1;
   if by_player is null then raise exception 'Only the school''s owners and admins can do this' using errcode = '42501'; end if;
   select * into org from organizations where id = p_org;
+  -- SL-03: at most 500 parents asked by a school a day (and 100 a call, below)
+  select count(*) into today_count from org_requests q
+   where q.org_id = p_org and q.direction = 'invite' and q.details->>'source' = 'student_list'
+     and q.created_at > now() - interval '1 day';
+  if today_count >= 500 then
+    raise exception 'This school has asked 500 parents today — try again tomorrow' using errcode = '54000';
+  end if;
   perform set_config('app.trusted_rpc', 'on', true);
   for x in select * from org_roster_match_rows(p_org, p_rows) where kind = 'parent' loop
+    continue when sent_now >= 100;
+    exit when today_count + sent_now >= 500;
     select e into rw from jsonb_array_elements(p_rows) as e where (e->>'i')::int = x.i limit 1;
     insert into org_requests (org_id, player_id, direction, role, status, created_by, message, details)
     values (p_org, x.player_id, 'invite', 'Member', 'pending', by_player,
@@ -292,6 +361,7 @@ begin
       'standard', nullif(btrim(rw->>'standard'), ''),
       'adult', (select player_is_known_adult(p.dob, p.profile_id) from players p where p.id = x.player_id));
     req := null;
+    sent_now := sent_now + 1;
   end loop;
   perform set_config('app.trusted_rpc', 'off', true);
   return res;
@@ -313,12 +383,16 @@ declare
   pr org_parent_requests;
   q org_requests;
 begin
-  if not rate_limit_hit('school-request', coalesce(auth.uid()::text, 'anon:' || left(p_code, 4)), 60, 3600) then
+  if not rate_limit_hit('school-request', request_subject(), 60, 3600) then
     raise exception 'Too many tries — wait an hour' using errcode = '54000';
   end if;
   pr := school_request_lookup(p_code);
   if pr.request_id is null then raise exception 'That link or code isn''t valid. Check the email, or ask the school to send it again.'; end if;
   select * into q from org_requests where id = pr.request_id;
+  -- SL-06: codes 30 days past their end go (now and then — keeps the table small)
+  if random() < 0.05 then
+    delete from org_parent_requests where expires_at < now() - interval '30 days';
+  end if;
   return jsonb_build_object(
     'school', (select name from organizations where id = q.org_id),
     'schoolVerified', (select verified_at is not null from organizations where id = q.org_id),
@@ -340,7 +414,7 @@ declare
   q org_requests;
   today date := current_date;
 begin
-  if not rate_limit_hit('school-request', coalesce(auth.uid()::text, 'anon:' || left(p_code, 4)), 60, 3600) then
+  if not rate_limit_hit('school-request', request_subject(), 60, 3600) then
     raise exception 'Too many tries — wait an hour' using errcode = '54000';
   end if;
   pr := school_request_lookup(p_code);
@@ -372,6 +446,8 @@ begin
   else
     update org_requests set status = 'rejected', decided_at = now() where id = q.id;
   end if;
+  -- SL-06: the parent's address isn't needed once they've answered
+  update org_parent_requests set target_email = null where request_id = q.id;
   perform set_config('app.trusted_rpc', 'off', true);
   return case when p_approve then 'accepted' else 'rejected' end;
 end $$;
@@ -424,11 +500,12 @@ drop trigger if exists apply_roster_invite_admission on org_members;
 create trigger apply_roster_invite_admission after insert on org_members
   for each row execute function apply_roster_invite_admission();
 
--- A child can't move the school's invite to "accepted" themselves.
+-- A child can't answer the school's invite themselves — accept or decline (SL-04).
 create or replace function guard_roster_invite_answer()
   returns trigger language plpgsql security definer set search_path = public as $$
 begin
-  if is_client_request() and old.direction = 'invite' and old.status = 'pending' and new.status = 'accepted'
+  if is_client_request() and old.direction = 'invite' and old.status = 'pending'
+     and new.status in ('accepted', 'rejected')
      and old.details->>'source' = 'student_list'
      and not exists (select 1 from players p where p.id = old.player_id and player_is_known_adult(p.dob, p.profile_id)) then
     raise exception 'A parent or guardian approves this — the school''s request was emailed to them' using errcode = '42501';

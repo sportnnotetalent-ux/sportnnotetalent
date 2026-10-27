@@ -12,16 +12,18 @@
  * (migration 20261028100000_student_lists.sql). An adult student is asked
  * themselves.
  *
- * Guards: signed-in caller who is an Owner / Admin of the school (checked again
- * in org_roster_invite); 20 calls per user an hour; up to 3,000 rows a call;
- * one pending request per child per school (re-imports don't re-email).
+ * Guards: signed-in caller who is an Owner / Admin of a VERIFIED school (checked
+ * in org_roster_invite); 20 calls per user an hour; up to 100 requests a call
+ * and 500 a school a day; one pending request per child per school (re-imports
+ * don't re-email) and none for 180 days after a parent says no; links stripped
+ * from the school's text (docs/security/breaks/student-lists.md).
  *
  * Contract: POST { orgId, rows: [{ i, name, dob?, adm?, email?, phone?, standard?, house? }] }
  *        → 200 { invited, emailed }
  * Deploy:   supabase functions deploy school-parent-request
  * Secrets:  RESEND_API_KEY (shared), optional APP_URL (_shared/hosts.ts).
  */
-import { admin, clip, CORS, json, rateLimit, requireUser, sendEmail } from '../_shared/guard.ts';
+import { admin, clip, CORS, json, rateLimit, requireUser, sendEmail, stripLinks } from '../_shared/guard.ts';
 import { APP_URL, SITE_URL } from '../_shared/hosts.ts';
 
 const grouped = (code: string) => code.replace(/(.{4})(?=.)/g, '$1-');
@@ -55,9 +57,10 @@ Deno.serve(async (req) => {
 
   let emailed = 0;
   for (const inv of invites) {
-    const school = clip(inv.school, 80);
+    // SL-12: the school's own text never carries a link into an email that looks like ours
+    const school = stripLinks(clip(inv.school, 80));
     const first = clip(inv.childFirstName, 40) || (inv.adult ? 'you' : 'your child');
-    const cls = inv.standard ? ` (${clip(inv.standard, 40)})` : '';
+    const cls = inv.standard ? ` (${stripLinks(clip(inv.standard, 40))})` : '';
     const link = `${APP_URL}/school-request?c=${encodeURIComponent(inv.code)}`;
     const subject = inv.adult ? `${school} would like to add you to its students on SportnNote` : `${school} would like to add ${first} to its students on SportnNote`;
     const body = inv.adult

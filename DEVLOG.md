@@ -13,6 +13,50 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-27 — Quality and security mandate; student lists hardened before go-live
+**The founder's standing mandate**, for every feature and the whole existing app (`docs/engineering/quality-mandate.md`, also in `AGENTS.md`):
+1. Tests first (TDD).
+2. Unit tests.
+3. Integration tests.
+4. Break it as a security tester: list the points first, without fixing them.
+5. Fix them one by one, each with a failing test first.
+6. Simulate 500+ users.
+7. Only then publish.
+
+**Student lists** were put through steps 4–6 before going live (`docs/security/breaks/student-lists.md`): 25 points.
+- **High, fixed:**
+  - SL-01: a fake school could phish parents, so outside matches are for verified schools only.
+  - SL-08: saving could delete a member another admin had just added, so the import now only upserts.
+  - SL-25: a child elsewhere could be duplicated when a classmate shared their name.
+- **Medium and low, fixed:**
+  - re-asking a parent who said no (SL-02);
+  - email caps (SL-03);
+  - a child declining for their parent (SL-04);
+  - rate-limit key (SL-05);
+  - retention (SL-06);
+  - big-list timeouts (SL-07);
+  - partial-failure duplicates (SL-09);
+  - zip bomb and row caps (SL-10, SL-11);
+  - links in emails (SL-12);
+  - mass leaver confirmation (SL-13);
+  - an admission number on another name (SL-14);
+  - Excel 1904 dates (SL-15);
+  - a name-only match outside the expected class (SL-16);
+  - length limits (SL-17);
+  - email batches (SL-18);
+  - admission number swaps (SL-20);
+  - in-file duplicates of two same-name children (SL-24).
+- **Accepted:** SL-21, SL-22, SL-23.
+- **Deferred to the founder:** SL-19, a hole that already existed: any community admin can add any player, a child included, directly.
+
+**Tests:** `tests/student-lists-breaks.test.mts` (30, written before each fix).
+
+**Simulation:** `tests/sim-student-lists.test.mts` runs 500 schools over two years (103,016 rows). It found SL-24 and SL-25. Full suite 4,938 pass, 0 fail.
+
+**Also started under the mandate (background agents):**
+- **Cue-sports engines, test-first:** snooker (15-red and 6-red) plus English billiards, and pool (8-, 9- and 10-ball).
+- **Break-it audits of the existing app** (findings only, in `docs/security/audit-2026-10-27/`): the database, the edge functions, and the app and web client.
+
 ### 2026-10-27 — Student lists: bulk upload by class, section or the whole school, no duplicates
 Founder: schools need to upload students class-wise, section-wise or new students across all classes, with existing students recognised and no duplicates.
 Decisions:

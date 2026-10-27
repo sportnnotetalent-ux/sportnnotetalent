@@ -5246,6 +5246,29 @@ export async function setOrgMembers(orgId: string, members: Organization['member
   }
 }
 
+/** Student lists (breaks SL-08 / SL-09): write these members' rows and nothing
+ *  else — never deletes, so a member another admin added a moment ago can't be
+ *  lost, and each new student can be saved the moment they're created. */
+export async function upsertOrgMembers(orgId: string, members: Organization['members']): Promise<void> {
+  if (!members.length) return;
+  if (!isSupabaseConfigured || !supabase) {
+    const o = (await getOrganization(orgId));
+    if (!o) return;
+    const by = new Map(o.members.map((m) => [m.playerId, m] as const));
+    for (const m of members) by.set(m.playerId, m);
+    demoSetOrgMembers(orgId, [...by.values()]);
+    return;
+  }
+  const rows = members.map((m) => ({
+    org_id: orgId, player_id: m.playerId, role: m.role,
+    since: m.since ?? null, until: m.until ?? null, grades: m.grades ?? [], houses: m.houses ?? [],
+  }));
+  for (const part of chunked(rows)) {
+    const { error } = await supabase.from('org_members').upsert(part, { onConflict: 'org_id,player_id' });
+    if (error) throw new Error(error.message);
+  }
+}
+
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
 /** Add (or re-activate) a player in a community, enforcing the rule that a

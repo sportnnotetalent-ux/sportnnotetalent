@@ -109,8 +109,20 @@ export function rowClasses(rows: Pick<RosterRow, 'line' | 'standard' | 'section'
 
 /* ---------------------------------- match --------------------------------- */
 
-/** What the server (org_roster_match) — or the demo — says about one row. */
-export type MatchKind = 'member' | 'check' | 'parent' | 'unreachable' | 'invited' | 'new';
+/** What the server (org_roster_match) — or the demo — says about one row.
+ *  'declined' = a child elsewhere whose parent said no to this school within
+ *  180 days (breaks SL-02: never asked again). */
+export type MatchKind = 'member' | 'check' | 'parent' | 'unreachable' | 'invited' | 'declined' | 'new';
+
+/** Rows per org_roster_match call (SL-07: a 3,000-row call could time out). */
+export const MATCH_CHUNK = 500;
+/** Children found elsewhere per school-parent-request call (SL-18: the emails
+ *  must finish inside the function's time limit). */
+export const PARENT_CHUNK = 100;
+
+/** SL-13: marking this many as left asks first (20+, or a quarter of the students). */
+export const needsLeaverConfirm = (leavers: number, students: number): boolean =>
+  leavers >= 20 || (students > 0 && leavers / students >= 0.25);
 export interface RowMatch { i: number; kind: MatchKind; playerId?: string; why?: string; left?: boolean }
 
 /** One row as the server is asked about it (`i` = the file line). */
@@ -135,21 +147,39 @@ export interface LocalPerson { id: string; fullName: string; dob?: string; conta
 
 /** The demo's (and the tests') copy of org_roster_match: the same order of
  *  checks. `members` = this school's (current and past); `others` = everyone else. */
-export function matchLocally(rows: MatchInput[], members: (LocalPerson & { left: boolean })[], others: LocalPerson[], admission: Record<string, string>): RowMatch[] {
+/** Does a row's name look like the student an admission number belongs to?
+ *  (a shared word: "Tara M." is Tara Menon; "Rahul Shah" isn't — SL-14) */
+export function namesOverlap(a: string, b: string): boolean {
+  const words = (x: string) => nameKey(x).split(' ').filter((w) => w.length >= 2);
+  const wb = new Set(words(b));
+  return words(a).some((w) => wb.has(w));
+}
+
+export function matchLocally(rows: MatchInput[], members: (LocalPerson & { left: boolean })[], others: LocalPerson[], admission: Record<string, string>, opts: { verified?: boolean } = {}): RowMatch[] {
+  const verified = opts.verified ?? true;
   const byAdm = new Map(Object.entries(admission).map(([pid, a]) => [a.trim().toUpperCase(), pid]));
   const contact = (p: LocalPerson, r: MatchInput) =>
     p.contacts.some((c) => (r.email && c === r.email.toLowerCase()) || (r.phone && c.replace(/\D/g, '').slice(-10) === r.phone.replace(/\D/g, '').slice(-10)));
   return rows.map((r): RowMatch => {
+    const k = nameKey(r.name);
+    // SL-01: only a verified school reaches parents of children elsewhere.
+    // SL-25: such a child (name + date of birth + parent contact) wins over a
+    // weaker "maybe" here — an admission number on another name, or a student
+    // with this name but another date of birth — so it's never duplicated.
+    const outside = verified && !!r.dob && !!(r.email || r.phone) && others.some((p) => nameKey(p.fullName) === k && p.dob === r.dob && contact(p, r));
     const adm = r.adm?.trim().toUpperCase();
     const pid = adm ? byAdm.get(adm) : undefined;
     const am = pid ? members.find((m) => m.id === pid) : undefined;
-    if (am) return { i: r.i, kind: 'member', playerId: am.id, why: 'admission', left: am.left };
-    const k = nameKey(r.name);
+    if (am) return namesOverlap(r.name, am.fullName)
+      ? { i: r.i, kind: 'member', playerId: am.id, why: 'admission', left: am.left }
+      : outside ? { i: r.i, kind: 'parent', why: 'elsewhere' }
+        : { i: r.i, kind: 'check', playerId: am.id, why: 'admission_name', left: am.left };
     const named = members.filter((m) => nameKey(m.fullName) === k);
     const fit = named.filter((m) => !r.dob || !m.dob || m.dob === r.dob);
     if (fit.length === 1) return { i: r.i, kind: 'member', playerId: fit[0].id, why: r.dob && fit[0].dob === r.dob ? 'name_dob' : 'name', left: fit[0].left };
     if (fit.length > 1) return { i: r.i, kind: 'check', why: 'several' };
     if (named.length) {
+      if (outside) return { i: r.i, kind: 'parent', why: 'elsewhere' };
       const m = [...named].sort((a, b) => Number(a.left) - Number(b.left))[0];
       return { i: r.i, kind: 'check', playerId: m.id, why: 'dob_differs', left: m.left };
     }
@@ -157,8 +187,8 @@ export function matchLocally(rows: MatchInput[], members: (LocalPerson & { left:
     if (r.email || r.phone) {
       const c = members.filter((m) => nameKey(m.fullName).split(' ')[0] === first && contact(m, r)).sort((a, b) => Number(a.left) - Number(b.left))[0];
       if (c) return { i: r.i, kind: 'member', playerId: c.id, why: 'contact', left: c.left };
-      if (r.dob && others.some((p) => nameKey(p.fullName) === k && p.dob === r.dob && contact(p, r))) return { i: r.i, kind: 'parent', why: 'elsewhere' };
     }
+    if (outside) return { i: r.i, kind: 'parent', why: 'elsewhere' };
     return { i: r.i, kind: 'new' };
   });
 }
@@ -199,6 +229,8 @@ export interface StudentPlan {
 
 const CHECK_NOTE: Record<string, string> = {
   dob_differs: 'A student with this name is already here with another date of birth: the same student, or a new one?',
+  admission_name: 'This admission number belongs to a student with another name: the same student, or a new one?',
+  name_class: 'A student with this name is already here, in another class, and neither has a date of birth: the same student, or a new one?',
   several: 'Several students here have this name: add as a new student, or skip it.',
   unreachable: 'Already on SportnNote outside your school, but we have no email to ask their parent: add as a new student, or skip it.',
 };
@@ -238,9 +270,24 @@ export function planStudents(input: {
       const admChanges = !!row.admissionNo && row.admissionNo.trim().toUpperCase() !== (input.admission[pid] ?? '').trim().toUpperCase();
       return { ...base, ...extra, action: moves ? 'move' : houseChanges || admChanges ? 'update' : 'same' };
     };
+    // SL-16: a name alone (no date of birth on either side) is the same student
+    // only in the class they're in or the next one up; elsewhere, the school decides.
+    const nameOnlyFits = (pid: string) => {
+      const cur = memberOf.get(pid);
+      const from = cur ? currentStandard(cur) : undefined;
+      if (!standard || !from) return false;
+      const a = classKey(splitClassSection(from).cls), b = classKey(splitClassSection(standard).cls);
+      return !!a && !!b && (a.family === b.family || !a.family || !b.family) && (b.n === a.n || b.n === a.n + 1);
+    };
     switch (m.kind) {
       case 'member':
-        return m.playerId ? asMember(m.playerId, m.left) : { ...base, action: 'new' };
+        if (!m.playerId) return { ...base, action: 'new' };
+        if (m.why === 'name' && !nameOnlyFits(m.playerId) && choice !== 'same') {
+          if (choice === 'new') return { ...base, action: 'new' };
+          if (choice === 'skip') return { ...base, action: 'skip', note: 'Skipped' };
+          return { ...base, action: 'check', note: CHECK_NOTE.name_class, canBeSame: true, playerId: m.playerId };
+        }
+        return asMember(m.playerId, m.left);
       case 'check':
       case 'unreachable': {
         const why = m.kind === 'unreachable' ? 'unreachable' : m.why ?? 'several';
@@ -254,6 +301,8 @@ export function planStudents(input: {
         return { ...base, action: 'parent' };
       case 'invited':
         return { ...base, action: 'invited', note: 'Their parent was asked already' };
+      case 'declined':
+        return { ...base, action: 'invited', note: 'Their parent said no to an earlier request, so they won’t be asked again for 180 days' };
       default:
         return { ...base, action: 'new' };
     }

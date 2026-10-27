@@ -19,7 +19,7 @@ import { Button, Card, ScreenTitle, SelectChip, TextField, FormError, LoadingSta
 import { getOrganization, getPlayers } from '../data/repos';
 import { parseRoster, ageOn } from '../data/rosterImport';
 import {
-  classLabelsOf, matchInputs, planStudents, sortClasses, splitClassSection, STUDENT_TEMPLATE,
+  classLabelsOf, matchInputs, needsLeaverConfirm, planStudents, sortClasses, splitClassSection, STUDENT_TEMPLATE,
   type CheckChoice, type ListScope, type PlannedStudent, type RowMatch, type StudentAction,
 } from '../data/studentList';
 import { applyStudentList, getAdmissionNos, matchStudents, type ApplyResult } from '../data/studentListStore';
@@ -28,7 +28,7 @@ import { defaultPhoneCountry } from '../core/phone';
 import { pickSheetFile } from '../core/document';
 import { downloadText } from '../core/download';
 import { todayIn } from '../core/time';
-import { notice } from '../core/confirm';
+import { confirmAction, notice } from '../core/confirm';
 import type { RootStackParamList } from '../navigation/types';
 import type { Organization, Player } from '../core/types';
 
@@ -113,6 +113,14 @@ export default function StudentImportScreen() {
 
   async function save() {
     if (!org || !plan || busy) return;
+    // SL-13: one tick mustn't end a whole school's memberships unnoticed
+    const students = members.filter((m) => !m.until && m.role === 'Member' && (m.grades ?? []).some((g) => !g.until)).length;
+    if (markLeft && needsLeaverConfirm(plan.leavers.length, students)) {
+      const ok = await confirmAction(`Mark ${plan.leavers.length} students as left?`,
+        `That’s ${Math.round((plan.leavers.length / Math.max(1, students)) * 100)}% of your students. If this list is only part of the school, untick it — or use “One class or section”.`,
+        `Mark ${plan.leavers.length} as left`, true);
+      if (!ok) return;
+    }
     setBusy(true); setError(null);
     try {
       const res = await applyStudentList(org, plan, inputs, { today: todayIn(), markLeft });

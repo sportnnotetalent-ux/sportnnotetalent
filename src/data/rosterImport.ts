@@ -121,8 +121,17 @@ export interface RosterRow {
 
 export interface ExistingPerson { id: string; fullName: string; dob?: string; phone?: string; guardianEmail?: string }
 
+/** The most rows one list may have (the screen asks to split a bigger file) —
+ *  student lists break SL-10: a 100,000-row paste froze the tab. */
+export const MAX_ROSTER_ROWS = 5000;
+/** SL-17: a name longer than this isn't a name; other free text is cut to TEXT_MAX. */
+const NAME_MAX = 120;
+const TEXT_MAX = 60;
+
 export interface RosterParse {
   rows: RosterRow[];
+  /** more than MAX_ROSTER_ROWS rows: nothing was read */
+  tooMany?: boolean;
   /** the date order used, and whether the file couldn't tell (all dates ≤ 12/12) */
   dateOrder: DateOrder;
   ambiguousDates: boolean;
@@ -156,7 +165,11 @@ export function parseRoster(text: string, opts: { order?: DateOrder; country?: C
   // no header: name, dob, gender, class, house (the order of the hint text)
   const mapped: Partial<Record<RosterField, number>> = header ? mapHeaders(header) : { name: 0, dob: 1, gender: 2, standard: 3, house: 4 };
   const body = header ? all.slice(1) : all;
-  const cell = (r: string[], f: RosterField) => (mapped[f] != null ? (r[mapped[f]!] ?? '').trim() : '');
+  if (body.length > MAX_ROSTER_ROWS) {
+    return { rows: [], dateOrder: opts.forceOrder ?? opts.order ?? 'DMY', ambiguousDates: false, mapped, missingName: false, tooMany: true };
+  }
+  const cell = (r: string[], f: RosterField) => (mapped[f] != null ? (r[mapped[f]!] ?? '').trim().slice(0, 500) : '');
+  const cut = (x: string) => x.slice(0, TEXT_MAX).trim();
   const dobTexts = body.map((r) => cell(r, 'dob'));
   const found = dateOrderOf(dobTexts);
   const regionOrder = opts.order ?? 'DMY';
@@ -166,6 +179,7 @@ export function parseRoster(text: string, opts: { order?: DateOrder; country?: C
     const errors: string[] = [], warnings: string[] = [];
     const fullName = (cell(r, 'name') || [cell(r, 'first'), cell(r, 'last')].filter(Boolean).join(' ')).replace(/\s+/g, ' ').trim();
     if (!fullName) errors.push('No name');
+    else if (fullName.length > NAME_MAX) errors.push(`Name is too long (over ${NAME_MAX} characters)`);
     const dobText = cell(r, 'dob');
     let dob: string | undefined;
     if (dobText) {
@@ -180,7 +194,7 @@ export function parseRoster(text: string, opts: { order?: DateOrder; country?: C
     const jText = cell(r, 'jersey');
     let jersey: number | undefined;
     if (jText) { const n = Number(jText.replace(/^#/, '')); if (Number.isInteger(n) && n >= 0 && n <= 999) jersey = n; else warnings.push(`Jersey "${jText}" left blank`); }
-    const gName = cell(r, 'guardianName');
+    const gName = cut(cell(r, 'guardianName'));
     const gEmail = cell(r, 'guardianEmail').toLowerCase();
     const gPhoneText = cell(r, 'guardianPhone');
     let gPhone: string | undefined;
@@ -192,20 +206,25 @@ export function parseRoster(text: string, opts: { order?: DateOrder; country?: C
     }
     const guardian = gName || gEmail || gPhone ? { name: gName || 'Parent / guardian', ...(gEmail && EMAIL.test(gEmail) ? { email: gEmail } : {}), ...(gPhone ? { phone: gPhone } : {}) } : undefined;
     if (dob && ageOn(dob, today) < 18 && !guardian) warnings.push('Under 18 with no guardian contact');
-    const standard = cell(r, 'standard') || undefined;
+    const standard = cut(cell(r, 'standard')) || undefined;
     const section = cell(r, 'section').replace(/\s+/g, ' ').slice(0, 12) || undefined;
     const admissionNo = cell(r, 'admissionNo').replace(/\s+/g, ' ').slice(0, 40) || undefined;
-    const house = cell(r, 'house') || undefined;
-    const team = cell(r, 'team') || undefined;
+    const house = cut(cell(r, 'house')) || undefined;
+    const team = cut(cell(r, 'team')) || undefined;
     return { line, fullName, ...(dob ? { dob } : {}), ...(gender ? { gender } : {}), ...(standard ? { standard } : {}),
       ...(section ? { section } : {}), ...(admissionNo ? { admissionNo } : {}), ...(house ? { house } : {}), ...(team ? { team } : {}), ...(jersey != null ? { jersey } : {}), ...(guardian ? { guardian } : {}), errors, warnings };
   });
-  // duplicates: in the file (the same admission number, else name + date of
-  // birth), then against the people already there
+  // duplicates: in the file — the same admission number, or the same name +
+  // date of birth; a name alone only when a row has neither (student lists
+  // SL-24: two "Asha Singh"s with their own admission numbers are two children)
+  // — then against the people already there
   const seen = new Map<string, number>();
   for (const row of out) {
     if (!row.fullName) continue;
-    const ks = [`${key(row.fullName)}|${row.dob ?? ''}`, ...(row.admissionNo ? [`adm|${row.admissionNo.toUpperCase()}`] : [])];
+    const ks = [
+      ...(row.admissionNo ? [`adm|${row.admissionNo.toUpperCase()}`] : []),
+      ...(row.dob ? [`${key(row.fullName)}|${row.dob}`] : !row.admissionNo ? [`${key(row.fullName)}|`] : []),
+    ];
     const hit = ks.map((k) => seen.get(k)).find((x) => x != null);
     if (hit != null) row.dupInFile = hit;
     else for (const k of ks) seen.set(k, row.line);

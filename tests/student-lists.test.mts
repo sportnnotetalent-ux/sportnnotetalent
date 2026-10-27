@@ -255,7 +255,7 @@ describe('the database', () => {
     assert.match(sql, /'playerId', case when x\.kind in \('member', 'check'\) then x\.player_id end/);
     assert.match(sql, /grant execute on function org_roster_match\(uuid, jsonb\) to authenticated;/);
     // the outside match needs the same name, date of birth AND a parent contact
-    assert.match(sql, /where roster_name_key\(p\.full_name\) = k and p\.dob = d\s+and not exists \(select 1 from org_members m where m\.org_id = p_org and m\.player_id = p\.id\)\s+and exists \(select 1 from player_contact_keys\(p\.id\)/);
+    assert.match(sql, /and roster_name_key\(p\.full_name\) = k and p\.dob = d\s+and not exists \(select 1 from org_members m where m\.org_id = p_org and m\.player_id = p\.id\)\s+and exists \(select 1 from player_contact_keys\(p\.id\)/);
   });
   test('the email goes to the parent ON FILE (or the adult student) — never an address the school typed', () => {
     assert.match(sql, /email := lower\(roster_request_email\(x\.player_id\)\);/);

@@ -9,6 +9,11 @@
  * Only the old binary .xls, .ods and Numbers files still need saving as CSV.
  */
 
+/** Student lists breaks SL-10 / SL-11: a file, an unzipped part and a sheet
+ *  can't be bigger than this (a zip bomb stops here instead of freezing the tab). */
+export const XLSX_LIMITS = { fileBytes: 15 * 1024 * 1024, entryBytes: 40 * 1024 * 1024, rows: 5002 };
+const TOO_BIG = 'This Excel file is too big — split the list (up to 5,000 students at a time), or save it as CSV.';
+
 /* ----------------------------------- zip ----------------------------------- */
 
 interface ZipEntry { name: string; method: number; size: number; offset: number }
@@ -38,8 +43,21 @@ function zipEntries(buf: Uint8Array): ZipEntry[] {
 async function inflateRaw(data: Uint8Array): Promise<Uint8Array> {
   const DS = (globalThis as { DecompressionStream?: new (f: string) => TransformStream<Uint8Array, Uint8Array> }).DecompressionStream;
   if (!DS) throw new Error('This browser can’t open Excel files — save it as CSV, or copy the cells and paste them.');
-  const stream = new Blob([data as BlobPart]).stream().pipeThrough(new DS('deflate-raw'));
-  return new Uint8Array(await new Response(stream).arrayBuffer());
+  const reader = new Blob([data as BlobPart]).stream().pipeThrough(new DS('deflate-raw')).getReader();
+  // Read in pieces and stop at the limit — the size in the zip can lie (SL-10).
+  const parts: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.length;
+    if (total > XLSX_LIMITS.entryBytes) { await reader.cancel().catch(() => {}); throw new Error(TOO_BIG); }
+    parts.push(value);
+  }
+  const out = new Uint8Array(total);
+  let p = 0;
+  for (const x of parts) { out.set(x, p); p += x.length; }
+  return out;
 }
 
 async function readEntry(buf: Uint8Array, e: ZipEntry): Promise<string> {
@@ -47,6 +65,7 @@ async function readEntry(buf: Uint8Array, e: ZipEntry): Promise<string> {
   if (dv.getUint32(e.offset, true) !== 0x04034b50) throw new Error('The Excel file looks damaged.');
   const start = e.offset + 30 + dv.getUint16(e.offset + 26, true) + dv.getUint16(e.offset + 28, true);
   const raw = buf.subarray(start, start + e.size);
+  if (e.method === 0 && raw.length > XLSX_LIMITS.entryBytes) throw new Error(TOO_BIG);
   const bytes = e.method === 0 ? raw : e.method === 8 ? await inflateRaw(raw) : null;
   if (!bytes) throw new Error('The Excel file uses a format we can’t read — save it as CSV.');
   return new TextDecoder().decode(bytes);
@@ -102,9 +121,10 @@ const colIndex = (ref: string): number => {
   return n - 1;
 };
 
-/** An Excel date serial (1900 system) → YYYY-MM-DD. */
-export function excelDate(serial: number): string {
-  const ms = Math.round((serial - 25569) * 86_400_000); // 25569 = 1970-01-01
+/** An Excel date serial → YYYY-MM-DD. `date1904`: the workbook counts from
+ *  1904 (older Mac Excel), 1,462 days later than the usual 1900 system (SL-15). */
+export function excelDate(serial: number, date1904 = false): string {
+  const ms = Math.round((serial + (date1904 ? 1462 : 0) - 25569) * 86_400_000); // 25569 = 1970-01-01
   return new Date(ms).toISOString().slice(0, 10);
 }
 
@@ -114,20 +134,33 @@ const plainNumber = (v: string): string => {
   return Number.isInteger(n) && Math.abs(n) < 1e16 ? n.toFixed(0) : String(n);
 };
 
-/** A worksheet's rows of text. */
-export function parseSheet(xml: string, shared: string[], dateStyles: Set<number> = new Set()): string[][] {
+/** A worksheet's rows of text. Split, not regex-scanned, so a malformed
+ *  sheet (unclosed cells, one giant row) stays linear (SL-11). */
+export function parseSheet(xml: string, shared: string[], dateStyles: Set<number> = new Set(), opts: { date1904?: boolean } = {}): string[][] {
   const rows: string[][] = [];
-  for (const rm of xml.matchAll(/<row\b[^>]*>([\s\S]*?)<\/row>/g)) {
+  const at0 = xml.indexOf('<sheetData');
+  for (const piece of (at0 >= 0 ? xml.slice(at0) : xml).split('</row>')) {
+    if (rows.length >= XLSX_LIMITS.rows) break;
+    const start = piece.lastIndexOf('<row');
+    const open = start < 0 ? -1 : piece.indexOf('>', start);
+    if (open < 0) continue;
+    const rowXml = piece.slice(open + 1);
+    if (rowXml.length > 2_000_000) continue;
     const row: string[] = [];
-    for (const cm of rm[1].matchAll(/<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)) {
-      const head = cm[1], body = cm[2] ?? '';
+    for (const part of rowXml.split(/<c(?=[\s>/])/).slice(1)) {
+      const gt = part.indexOf('>');
+      if (gt < 0) continue;
+      const selfClosing = part[gt - 1] === '/';
+      const head = part.slice(0, selfClosing ? gt - 1 : gt);
+      const end = part.indexOf('</c>', gt);
+      const body = selfClosing ? '' : part.slice(gt + 1, end < 0 ? undefined : end);
       const ref = attr(head, 'r'), t = attr(head, 't'), s = Number(attr(head, 's') ?? -1);
       const v = /<v>([\s\S]*?)<\/v>/.exec(body)?.[1];
       let text = '';
       if (t === 's' && v != null) text = shared[Number(v)] ?? '';
       else if (t === 'inlineStr') text = xmlText([...body.matchAll(/<t\b[^>]*>([\s\S]*?)<\/t>/g)].map((m) => m[1]).join(''));
       else if (t === 'b') text = v === '1' ? 'TRUE' : v === '0' ? 'FALSE' : '';
-      else if (v != null) text = t === 'str' || t === 'e' ? xmlText(v) : dateStyles.has(s) && Number(v) > 0 && Number(v) < 2958466 ? excelDate(Number(v)) : plainNumber(v);
+      else if (v != null) text = t === 'str' || t === 'e' ? xmlText(v) : dateStyles.has(s) && Number(v) > 0 && Number(v) < 2958466 ? excelDate(Number(v), opts.date1904) : plainNumber(v);
       const at = ref ? colIndex(ref) : row.length;
       while (row.length < at) row.push('');
       row[at] = text.trim();
@@ -144,6 +177,7 @@ export const rowsToTsv = (rows: string[][]): string =>
 /** The workbook's first sheet (in the workbook's own order). */
 export async function readXlsx(data: ArrayBuffer | Uint8Array): Promise<string[][]> {
   const buf = data instanceof Uint8Array ? data : new Uint8Array(data);
+  if (buf.length > XLSX_LIMITS.fileBytes) throw new Error(TOO_BIG);
   const entries = zipEntries(buf);
   const get = async (name: string) => { const e = entries.find((x) => x.name === name); return e ? readEntry(buf, e) : undefined; };
   const wb = (await get('xl/workbook.xml')) ?? '';
@@ -157,5 +191,6 @@ export async function readXlsx(data: ArrayBuffer | Uint8Array): Promise<string[]
     : entries.map((e) => e.name).filter((n) => /^xl\/worksheets\/sheet\d+\.xml$/.test(n)).sort((a, b) => Number(/\d+/.exec(a)![0]) - Number(/\d+/.exec(b)![0]))[0];
   if (!sheetName) throw new Error('No sheet found in the Excel file.');
   const [sheet, sst, styles] = await Promise.all([get(sheetName), get('xl/sharedStrings.xml'), get('xl/styles.xml')]);
-  return parseSheet(sheet ?? '', sst ? parseSharedStrings(sst) : [], styles ? parseDateStyles(styles) : new Set());
+  const date1904 = /<workbookPr\b[^>]*\sdate1904="(1|true)"/i.test(wb);
+  return parseSheet(sheet ?? '', sst ? parseSharedStrings(sst) : [], styles ? parseDateStyles(styles) : new Set(), { date1904 });
 }
