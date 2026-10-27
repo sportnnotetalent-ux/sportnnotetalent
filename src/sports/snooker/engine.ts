@@ -150,6 +150,12 @@ const emptyVisit = (side: Side): Visit => ({ side, pts: 0, pots: 0, shots: 0 });
 export const maxBreak = (reds: number): number => reds * 8 + 27;
 /** The highest score a frame record may hold in quick mode. */
 export const MAX_FRAME_SCORE = 999;
+/** B-04 — the most visits + fouls one frame keeps (a long professional
+ *  frame has ~150). Each record copies the frame's lists, so an unbounded
+ *  frame made every replay quadratic; past the cap the turn can't pass
+ *  (pots and the frame-ending actions still work). */
+export const MAX_FRAME_RECORDS = 5000;
+const full = (fr: LiveFrame): boolean => fr.visits.length + fr.fouls.length >= MAX_FRAME_RECORDS;
 
 function readBestOf(v: unknown, dflt: number): number {
   const n = num(v);
@@ -390,6 +396,7 @@ function pot(s: SnookerState, fr: LiveFrame, p: Record<string, unknown> | undefi
 }
 
 function endVisit(s: SnookerState, fr: LiveFrame, end: 'miss' | 'safety'): SnookerState {
+  if (full(fr)) return s;
   const striker = other(fr.striker);
   return {
     ...s,
@@ -402,6 +409,7 @@ function endVisit(s: SnookerState, fr: LiveFrame, end: 'miss' | 'safety'): Snook
 }
 
 function foul(s: SnookerState, fr: LiveFrame, by: Side, p: Record<string, unknown> | undefined): SnookerState {
+  if (full(fr)) return s;
   const min = minFoul(fr);
   const v = num(own(p, 'value'));
   const value = v === undefined ? min : clamp(Math.round(v), min, 7);

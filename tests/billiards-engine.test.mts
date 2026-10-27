@@ -384,4 +384,17 @@ describe('billiards · break list', () => {
     assert.equal(B.reducer(s0, sc({ potRed: true, frame: 2 })), s0);
     assert.notEqual(B.reducer(s0, sc({ potRed: true, frame: 1 })), s0);
   });
+
+  test('B-04 a frame holds at most MAX_FRAME_RECORDS visits and fouls: 40,000 junk events replay fast', () => {
+    const t0 = performance.now();
+    const s = run(Array.from({ length: 40000 }, (_, i) => (i % 2 ? MISS : FOUL())), { format: 'timed' });
+    const ms = performance.now() - t0;
+    assert.ok(ms < 1000, `replayed in ${Math.round(ms)} ms`);
+    assert.equal(f(s).visits.length + f(s).fouls.length, B.MAX_FRAME_RECORDS);
+    assert.equal(B.reducer(s, MISS), s);
+    assert.equal(B.reducer(s, FOUL()), s);
+    const scored = B.reducer(s, PR);
+    assert.notEqual(scored, s, 'scoring strokes still count');
+    assert.equal(step(scored, { type: 'TIME' }).ended, true, 'and the game can still end');
+  });
 });

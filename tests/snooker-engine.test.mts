@@ -730,4 +730,19 @@ describe('snooker · break list', () => {
     const m = run([{ type: 'MISS', side: 'home' }]);
     assert.equal(S.reducer(m, { type: 'MISS', side: 'home' }), m);
   });
+
+  test('B-04 a frame holds at most MAX_FRAME_RECORDS visits and fouls: 40,000 junk events replay fast', () => {
+    const t0 = performance.now();
+    const s = run(Array.from({ length: 40000 }, (_, i) => (i % 2 ? SAFE : foul(4))));
+    const ms = performance.now() - t0;
+    assert.ok(ms < 1000, `replayed in ${Math.round(ms)} ms`);
+    assert.equal(f(s).visits.length + f(s).fouls.length, S.MAX_FRAME_RECORDS);
+    assert.equal(S.reducer(s, SAFE), s, 'no more records in this frame');
+    // pots and the frame-ending actions still work
+    const p = step(s, pot('red'));
+    assert.notEqual(p, s);
+    const next = step(p, { type: 'CONCEDE', side: 'away' });
+    assert.equal(next.frames.length, 1);
+    assert.notEqual(S.reducer(next, SAFE), next, 'a new frame takes records again');
+  });
 });

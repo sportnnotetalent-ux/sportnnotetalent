@@ -115,6 +115,12 @@ const emptyVisit = (side: Side): Visit => ({ side, pts: 0, shots: 0, potRed: 0, 
 
 /** The highest frame score quick mode accepts. */
 export const MAX_FRAME_SCORE = 99999;
+/** B-04 — the most visits + fouls one frame keeps. Each record copies the
+ *  frame's lists, so an unbounded frame made every replay quadratic; past
+ *  the cap the turn can't pass (scoring strokes and TIME / CONCEDE / AWARD
+ *  still work). */
+export const MAX_FRAME_RECORDS = 5000;
+const full = (fr: LiveFrame): boolean => fr.visits.length + fr.fouls.length >= MAX_FRAME_RECORDS;
 
 function readBestOf(v: unknown, dflt: number): number {
   const n = num(v);
@@ -251,7 +257,7 @@ export function reducer(s: BilliardsState, a: BilliardsAction): BilliardsState {
     }
     case 'MISS':
     case 'SAFETY': {
-      if (!striking) return s;
+      if (!striking || full(fr)) return s;
       const striker = other(fr.striker);
       return {
         ...s,
@@ -313,6 +319,7 @@ export function reducer(s: BilliardsState, a: BilliardsAction): BilliardsState {
 /** S3 R16(b)–(c) — the striker's foul: points before it count, none in it;
  *  `foulPoints` (2) to the opponent; the turn passes. */
 function foul(s: BilliardsState, fr: LiveFrame, kind: FoulKind | undefined): BilliardsState {
+  if (full(fr)) return s;
   const by = fr.striker;
   const opp = other(by);
   const score = { ...fr.score, [opp]: fr.score[opp] + s.foulPoints };
