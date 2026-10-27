@@ -781,4 +781,20 @@ describe('snooker · break list', () => {
     const frozen = deepFreeze(JSON.parse(JSON.stringify(live))) as S.SnookerState;
     assert.deepEqual(S.reducer(frozen, pot('red')), S.reducer(live, pot('red')));
   });
+
+  test('B-08 the free-ball mark goes on the foul that gave it, even with a penalty in between', () => {
+    const pen = { type: 'FOUL', side: 'home', payload: { value: 4, penalty: true } } as A;
+    // the free ball is voided by PLAY_AGAIN / REPLACE (S3 R12(f))
+    let s = run([foul(4, { freeBall: true }), pen, { type: 'PLAY_AGAIN' }]);
+    assert.equal(f(s).fouls[0].fb, undefined);
+    assert.equal(f(s).fouls[1].fb, undefined);
+    assert.equal(S.snookerStats(s).away.freeBalls, 0);
+    s = run([foul(4, { freeBall: true, miss: true }), pen, { type: 'REPLACE' }]);
+    assert.equal(S.snookerStats(s).away.freeBalls, 0);
+    // FREE_BALL after a penalty marks the foul, not the penalty
+    s = run([foul(4), pen, { type: 'FREE_BALL' }]);
+    assert.equal(f(s).fouls[0].fb, true);
+    assert.equal(f(s).fouls[1].fb, undefined);
+    assert.equal(S.snookerStats(s).away.freeBalls, 1);
+  });
 });

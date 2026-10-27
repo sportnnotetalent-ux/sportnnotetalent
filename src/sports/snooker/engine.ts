@@ -59,7 +59,11 @@ export interface FoulRecord {
 }
 
 /** The fouled player's options, open until the next stroke (S3 R10(h), R13, R14(b)). */
-export interface PendingFoul { by: Side; miss: boolean; before: { redsLeft: number; on: On } }
+export interface PendingFoul {
+  by: Side; miss: boolean; before: { redsLeft: number; on: On };
+  /** B-08 — the foul's index in `fouls` (a penalty may come after it) */
+  at: number;
+}
 
 /** Consecutive fouls-and-misses by one player with the balls replaced (S3 R14(d), R19). */
 export interface MissRun { by: Side; count: number; replaced: boolean; warned: boolean }
@@ -309,7 +313,7 @@ function reduce(s: SnookerState, a: SnookerAction): SnookerState {
     }
     case 'FREE_BALL': {
       if (!fr.pending || fr.freeBall || !freeBallPossible(fr)) return s;
-      return { ...s, frame: { ...fr, freeBall: true, fouls: markLastFoul(fr.fouls, true) }, seq: s.seq + 1 };
+      return { ...s, frame: { ...fr, freeBall: true, fouls: markFoul(fr.fouls, fr.pending.at, true) }, seq: s.seq + 1 };
     }
     case 'PLAY_AGAIN': {
       // S3 R10(h)(ii), R13 — from where the balls lie; the free ball is void (R12(f))
@@ -317,7 +321,7 @@ function reduce(s: SnookerState, a: SnookerAction): SnookerState {
       if (!fr.pending) return s;
       const by = fr.pending.by;
       const { freeBall: _f, pending: _p, missRun: _m, ...rest } = fr;
-      return { ...s, frame: { ...rest, striker: by, visit: emptyVisit(by), fouls: markLastFoul(fr.fouls, false) }, seq: s.seq + 1 };
+      return { ...s, frame: { ...rest, striker: by, visit: emptyVisit(by), fouls: markFoul(fr.fouls, fr.pending.at, false) }, seq: s.seq + 1 };
     }
     case 'REPLACE': {
       // S3 R14(b) — every ball back, the same ball on as before the stroke
@@ -330,7 +334,7 @@ function reduce(s: SnookerState, a: SnookerAction): SnookerState {
       const missRun = run ? { ...run, replaced: true, warned: run.warned || run.count >= warnAt } : undefined;
       return {
         ...s,
-        frame: { ...rest, striker: by, visit: emptyVisit(by), redsLeft: fr.pending.before.redsLeft, on: fr.pending.before.on, fouls: markLastFoul(fr.fouls, false), ...(missRun ? { missRun } : {}) },
+        frame: { ...rest, striker: by, visit: emptyVisit(by), redsLeft: fr.pending.before.redsLeft, on: fr.pending.before.on, fouls: markFoul(fr.fouls, fr.pending.at, false), ...(missRun ? { missRun } : {}) },
         seq: s.seq + 1,
       };
     }
@@ -370,12 +374,15 @@ function reduce(s: SnookerState, a: SnookerAction): SnookerState {
   }
 }
 
-/** Set (or clear) the free-ball mark on the latest foul. */
-function markLastFoul(fouls: FoulRecord[], fb: boolean): FoulRecord[] {
-  const last = fouls[fouls.length - 1];
-  if (!last || !!last.fb === fb) return fouls;
-  const { fb: _x, ...rest } = last;
-  return [...fouls.slice(0, -1), fb ? { ...rest, fb: true } : rest];
+/** Set (or clear) the free-ball mark on the foul at `at` (B-08: the open
+ *  foul, not whatever came last — a non-striker penalty may follow it). */
+function markFoul(fouls: FoulRecord[], at: number, fb: boolean): FoulRecord[] {
+  const rec = fouls[at];
+  if (!rec || rec.penalty || !!rec.fb === fb) return fouls;
+  const { fb: _x, ...rest } = rec;
+  const out = fouls.slice();
+  out[at] = fb ? { ...rest, fb: true } : rest;
+  return out;
 }
 
 function pot(s: SnookerState, fr: LiveFrame, p: Record<string, unknown> | undefined): SnookerState {
@@ -484,7 +491,7 @@ function foul(s: SnookerState, fr: LiveFrame, by: Side, p: Record<string, unknow
     : undefined;
   return {
     ...s,
-    frame: { ...base, pending: { by, miss, before: { redsLeft: fr.redsLeft, on: fr.on } }, ...(fbGiven ? { freeBall: true as const } : {}), ...(missRun ? { missRun } : {}) },
+    frame: { ...base, pending: { by, miss, before: { redsLeft: fr.redsLeft, on: fr.on }, at: fr.fouls.length }, ...(fbGiven ? { freeBall: true as const } : {}), ...(missRun ? { missRun } : {}) },
     seq: s.seq + 1,
   };
 }
