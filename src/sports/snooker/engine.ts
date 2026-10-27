@@ -295,8 +295,12 @@ function reduce(s: SnookerState, a: SnookerAction): SnookerState {
   if (stampedFrame === undefined && FRAME_ENDERS.has(a.type)) return s;
   // a shot belongs to the striker: a tap naming the other side is stale
   const striking = a.side === undefined || a.side === fr.striker;
+  // B-16 — the side an action names: the payload's and the action's must
+  // agree when both are given; a junk one refuses the action
   const named = (): Side | undefined => {
-    const v = own(p, 'side') ?? a.side;
+    const ps = own(p, 'side');
+    if (ps !== undefined && a.side !== undefined && ps !== a.side) return undefined;
+    const v = ps !== undefined ? ps : a.side;
     return isSide(v) ? v : undefined;
   };
 
@@ -341,12 +345,15 @@ function reduce(s: SnookerState, a: SnookerAction): SnookerState {
     }
     case 'RESPOT_TURN': {
       const side = named();
-      if (!side || !fr.respot || (fr.respotShots ?? 0) > 0) return s;
+      // B-15 — naming the player already to play changes nothing
+      if (!side || !fr.respot || (fr.respotShots ?? 0) > 0 || side === fr.striker) return s;
       return { ...s, frame: { ...fr, striker: side, visit: emptyVisit(side) }, seq: s.seq + 1 };
     }
     case 'BREAK_OFF': {
       const side = named();
       if (!side || fr.shots > 0 || fr.fouls.length > 0 || fr.respot) return s;
+      // B-15 — naming the player already breaking changes nothing
+      if (side === fr.breaker && side === fr.striker && (fr.n !== 1 || side === s.firstBreak)) return s;
       return {
         ...s, ...(fr.n === 1 ? { firstBreak: side } : {}),
         frame: { ...fr, breaker: side, striker: side, visit: emptyVisit(side) }, seq: s.seq + 1,

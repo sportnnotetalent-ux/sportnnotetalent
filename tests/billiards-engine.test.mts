@@ -436,4 +436,16 @@ describe('billiards · break list', () => {
     const d = run([{ type: 'FRAME_SCORE', payload: { home: -0, away: 0 } }], { format: 'timed', timedTie: 'draw' });
     assert.deepStrictEqual(JSON.parse(JSON.stringify(d)), d);
   });
+
+  test('B-15 an action that changes nothing returns the same state', () => {
+    const s0 = B.createInitialState();
+    assert.equal(B.reducer(s0, { type: 'BREAK_OFF', side: 'home' }), s0);
+  });
+
+  test('B-16 a payload side that disagrees with the action side (or is junk) refuses the action', () => {
+    const s0 = B.createInitialState();
+    assert.equal(B.reducer(s0, { type: 'CONCEDE', side: 'home', payload: { side: 'away', frame: 1 } }), s0);
+    assert.equal(B.reducer(s0, { type: 'AWARD_FRAME', side: 'home', payload: { side: 'Asha Rao', frame: 1 } }), s0);
+    assert.equal(B.reducer(s0, { type: 'CONCEDE', payload: { side: 'away', frame: 1 } }).frames[0].conceded, 'away');
+  });
 });

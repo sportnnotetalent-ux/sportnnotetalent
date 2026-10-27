@@ -812,4 +812,21 @@ describe('snooker · break list', () => {
     assert.ok(Object.is(s.frames[0].score[0], 0));
     assert.deepStrictEqual(JSON.parse(JSON.stringify(s)), s);
   });
+
+  test('B-15 an action that changes nothing returns the same state (not seq + 1)', () => {
+    const s0 = S.createInitialState();
+    assert.equal(S.reducer(s0, { type: 'BREAK_OFF', side: 'home' }), s0, 'home already breaks');
+    const r = run([SAFE, foul(5), ...pairs(8), MISS, ...pairs(7), ...clearance().slice(0, 5), MISS, pot('black')]);
+    assert.equal(f(r).respot, true);
+    assert.equal(S.reducer(r, { type: 'RESPOT_TURN', side: f(r).striker }), r);
+  });
+
+  test('B-16 a payload side that disagrees with the action side (or is junk) refuses the action', () => {
+    const s0 = S.createInitialState();
+    assert.equal(S.reducer(s0, { type: 'CONCEDE', side: 'home', payload: { side: 'away', frame: 1 } }), s0);
+    assert.equal(S.reducer(s0, { type: 'CONCEDE', side: 'home', payload: { side: 'Asha Rao', frame: 1 } }), s0);
+    assert.equal(S.reducer(s0, { type: 'CONCEDE', payload: { side: 'Asha Rao', frame: 1 } }), s0);
+    assert.equal(S.reducer(s0, { type: 'CONCEDE', side: 'home', payload: { side: 'home', frame: 1 } }).frames[0].conceded, 'home');
+    assert.equal(S.reducer(s0, { type: 'CONCEDE', payload: { side: 'away', frame: 1 } }).frames[0].conceded, 'away');
+  });
 });
