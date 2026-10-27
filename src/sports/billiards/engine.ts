@@ -398,13 +398,20 @@ export const isComplete = (s: BilliardsState): boolean => safe(() => isObj(s) &&
 export const winner = (s: BilliardsState): Side | 'draw' | null =>
   safe(() => (isObj(s) && s.ended === true && (isSide(s.winner) || s.winner === 'draw') ? s.winner : null), null);
 
-/** A single game reports its points to the standings (150–87); a best-of
- *  match its frames won (3–1). */
+/** B-07 — a single game decided on the table (not conceded or awarded):
+ *  its points are the result; otherwise the frames won. */
+const playedOutGame = (s: BilliardsState): FrameRecord | null => {
+  const first = goodFrames(s)[0];
+  return s.bestOf === 1 && first && first.how !== 'concede' && first.how !== 'award' ? first : null;
+};
+
+/** A single game played out reports its points to the standings (150–87); a
+ *  best-of match, or a game conceded or awarded (B-07), its frames won. */
 export function result(s: BilliardsState): { winner: Side | 'draw'; home: number; away: number } | null {
   const w = winner(s);
   if (!w) return null;
-  const first = goodFrames(s)[0];
-  if (s.bestOf === 1 && first) return { winner: w, home: first.score[0], away: first.score[1] };
+  const first = safe(() => playedOutGame(s), null);
+  if (first) return { winner: w, home: first.score[0], away: first.score[1] };
   const won = wonOf(s);
   return { winner: w, home: won.home, away: won.away };
 }
@@ -449,8 +456,8 @@ export function summary(s: BilliardsState): ScoreSummary {
   return safe(() => {
     if (!isObj(s)) return NO_SUMMARY;
     if (isComplete(s)) {
-      const first = goodFrames(s)[0];
-      if (s.bestOf === 1 && first) {
+      const first = playedOutGame(s);
+      if (first) {
         const [h, a] = first.score;
         return { homeScore: String(h), awayScore: String(a), statusLine: s.winner === 'draw' ? 'Match Over · Draw' : 'Match Over', detailLine: s.format === 'timed' ? 'Timed game' : `${s.target}-up` };
       }

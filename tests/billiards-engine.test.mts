@@ -455,4 +455,16 @@ describe('billiards · break list', () => {
     assert.equal(st.home.detailedFrames, 1, 'only frame 2 had strokes');
     assert.equal(st.home.quickFrames, 0);
   });
+
+  test('B-07 a single game decided off the table reports frames won, never the loser ahead on points', () => {
+    const c = run([PR, PR, MISS, { type: 'CONCEDE', side: 'home' }], { bestOf: 1 });
+    assert.deepEqual(B.result(c), { winner: 'away', home: 0, away: 1 });
+    assert.equal(B.summary(c).homeScore, '0');
+    assert.equal(B.summary(c).awayScore, '1');
+    assert.equal(B.summary(c).detailLine, '6-0', 'the points as they stood');
+    const aw = run([{ type: 'AWARD_FRAME', payload: { side: 'home' } }], { bestOf: 1 });
+    assert.deepEqual(B.result(aw), { winner: 'home', home: 1, away: 0 });
+    // a game played out still reports its points
+    assert.deepEqual(B.result(run([PR, MISS, ...times(4, PR)], { target: 10, bestOf: 1 })), { winner: 'away', home: 3, away: 10 });
+  });
 });
