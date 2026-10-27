@@ -128,6 +128,8 @@ export default function SettingsScreen() {
 
         {isSupport(profile?.role) ? (
           <Group title="Support tools">
+            <Row icon="🧑‍💼" label="Support console" value="Every queue · claims · this week" onPress={() => nav.navigate('SupportConsole')} />
+            <View style={st.divider} />
             <Row icon="🛡️" label="Review verifications" onPress={() => nav.navigate('VerificationReview')} />
             <View style={st.divider} />
             <Row icon="🚩" label="Message reports" onPress={() => nav.navigate('MessageReports')} />

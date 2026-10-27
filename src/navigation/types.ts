@@ -136,6 +136,8 @@ export type RootStackParamList = {
    *  On web it may come back from the URL as the string 'true'. */
   EditProfile: { playerId: string; asAdmin?: boolean };
   VerificationReview: undefined;
+  /** SportnNote support: every queue on one screen (claims, filters, this week). */
+  SupportConsole: undefined;
   CreateListing: undefined;
   Following: undefined;
   Standings: { sport?: SportId; tournamentId?: string } | undefined;

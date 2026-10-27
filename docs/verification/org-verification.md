@@ -61,11 +61,20 @@ The founder asked for a way support staff (not just the founder) can work throug
 - **One-tap reasons,** the same wording the school reads.
 - **History:** every step is recorded (`org_verifications.history`: email verified, Head asked or confirmed, submitted, approved / sent back, unverified).
 
-Next, when there is a support team:
-- **Accounts:** give each person a support role (profiles.role = 'support'), so everyone works in the same queue in the app.
-- **A web console** (a desktop page listing pending schools with filters such as waiting time, type and state, and keyboard shortcuts) built on the same `org_verification_queue` / `decide_org_verification` functions.
-- **Assignment:** a "claim" so two people don't review the same school; a weekly count of reviews per person.
-- **Automation:** pre-fill the register lookup with the school's name and city from UDISE+ / SARAS where those sites allow it. Today support searches by hand.
+For a support team (built 2026-10-27 — **Support console**, Settings › Support tools; migration `20261027170000_support_console.sql`):
+- **One screen for every queue:** tiles for organisations, age proofs and message reports (waiting, oldest, how many over a day); the queue oldest first; on a desktop browser the review card sits beside the list.
+- **Filters:** all / over a day; schools & colleges, clubs & sports bodies, other; not claimed / mine; search by name, city or official ID.
+- **Claims:** "✋ I'll check this" marks an item as yours for 2 hours, so two people don't check the same one. A colleague sees "Being checked by …" and can take it over on purpose. The server enforces it: an organisation decision is refused while someone else's claim is fresh, or within 10 minutes of a colleague's decision (two people pressing at once); the verification-review function does the same for age proofs. A decision releases the claim.
+- **Keyboard (desktop browser):** J / K next / previous, C claim, Esc close.
+- **This week:** decisions per person over the last 7 days (organisations, age proofs, message reports).
+
+**Adding a support person** (the founder, in the SQL editor — they need a SportnNote account first):
+
+```sql
+update profiles set role = 'support' where id = (select id from auth.users where email = 'their.email@example.com');
+```
+
+Still to do: **automation** — pre-fill the register lookup with the school's name and city from UDISE+ / SARAS where those sites allow it. Today support searches by hand.
 
 ## Phase 2: every registered type (built 2026-10-27)
 

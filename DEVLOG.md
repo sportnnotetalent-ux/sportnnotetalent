@@ -13,6 +13,28 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-27 — Support console: every queue on one screen, with claims
+Founder: "…and then support console". These are the "when there is a support team" items from `docs/verification/org-verification.md`, now built, so several people can share the review work.
+- **Where:** Settings › Support tools › **🧑‍💼 Support console** (`SupportConsoleScreen`), support only.
+  - **Tiles:** organisations, age proofs and message reports, each showing waiting, oldest and "⚠ n over a day". The console opens on the first queue that has something waiting.
+  - **The queue:** oldest first. Filters: all / over a day; schools & colleges, clubs & sports bodies, other; not claimed / mine; search by name, city or official ID.
+  - **Reviewing:** it reuses the existing review cards (`OrgReview`, `Submission`). On a desktop browser the card sits beside the list (two panes from 960 px); on a phone it opens under the selected row. A decision removes the item and moves to the next one.
+  - **Claims:** "✋ I'll check this" (2 hours). A colleague sees "Being checked by … · 12 min ago" and can "Take over" (confirmed). The row shows "✋ You" or the colleague's name.
+  - **Keyboard (desktop browser):** J / K next / previous, C claim, Esc close. Arrow keys still scroll.
+  - **This week (7 days):** decisions per person across organisations, age proofs and reports. The view refreshes every minute while open.
+- **Migration `20261027170000_support_console.sql`:**
+  - `support_claims`, closed to the app; `claim_support_item` / `release_support_item`. Organisations are support only; age proofs also allow appointed reviewers.
+  - Trigger `guard_org_decision_claim`: the server refuses an organisation decision while a colleague's claim is fresh, or within 10 minutes of a colleague's decision, and releases the claim on decision.
+  - `support_overview()`: its casts are guarded so one odd old value can't break the console. Its selects were dry-run read-only on live data and return correctly.
+- **`verification-review` edge function:** checks the same claim for age proofs ("Being checked by … — take it over first") and releases it after the decision. It already refused a second decision.
+- **Doc:** `org-verification.md` now describes the console and how to add a support person (one SQL line).
+- **Verified:**
+  - `tests/support-console.test.mts` (12); full suite 4,825 pass; tsc + edge typecheck clean; Postgres's parser accepts the migration.
+  - Demo at 1280 px:
+    - two panes; J selected the first age proof and C claimed it ("✋ You're checking this · just now", row "✋ You");
+    - Reject showed "✗ Sent back — Aarav Mehta has been notified", the tile went 2 → 1, and it moved to the next.
+  - At 375 px: it opened on age proofs with the card inline and no sideways scroll. No console errors.
+
 ### 2026-10-27 — Link an earlier edition (tournaments run before Run it again)
 Founder: "go ahead with linking earlier editions". Schools that ran last year's meet before Run it again existed can now link it, so both pages show 📅 Every edition.
 - **Where:** Manage › **🔗 Link an earlier edition** (`LinkEditionScreen`).

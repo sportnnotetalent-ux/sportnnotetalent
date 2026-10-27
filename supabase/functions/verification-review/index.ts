@@ -27,6 +27,9 @@ interface Verification {
   [k: string]: unknown;
 }
 
+/** A support-console claim holds for 2 hours (support_claims, migration 20261027170000). */
+const CLAIM_MS = 2 * 3_600_000;
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
   if (req.method !== 'POST') return json({ error: 'POST only' }, 405);
@@ -55,6 +58,16 @@ Deno.serve(async (req) => {
   if (p.profile_id === caller.user.id || p.guardian_profile_id === caller.user.id) {
     return json({ error: 'You can\'t review your own (or your child\'s) verification' }, 403);
   }
+  // Support console: a colleague has claimed this one (support_claims, fresh for
+  // 2 hours) — they take it over first. Before that migration there's no table.
+  const { data: claimRow } = await admin.from('support_claims').select('claimed_by, claimed_at')
+    .eq('kind', 'age').eq('ref_id', p.id).maybeSingle();
+  const claim = claimRow as { claimed_by: string; claimed_at: string } | null;
+  if (claim && claim.claimed_by !== caller.user.id && Date.parse(claim.claimed_at) > Date.now() - CLAIM_MS) {
+    const { data: who } = await admin.from('players').select('full_name').eq('profile_id', claim.claimed_by).limit(1);
+    const name = clip((who?.[0] as { full_name?: string } | undefined)?.full_name || 'another reviewer', 80);
+    return json({ error: `Being checked by ${name} — take it over first` }, 409);
+  }
 
   // The reviewer's own player row (history names players, as before).
   const { data: mine } = await admin.from('players').select('id').eq('profile_id', caller.user.id)
@@ -80,6 +93,8 @@ Deno.serve(async (req) => {
     console.error('verification-review update', error);
     return json({ error: 'Could not save the decision' }, 500);
   }
+  // decided: the claim (if any) is done
+  await admin.from('support_claims').delete().eq('kind', 'age').eq('ref_id', p.id);
 
   // Tell the player (and their linked parent/guardian) with the next step.
   const minor = (ageOn(p.dob, new Date()) ?? 99) < 18;

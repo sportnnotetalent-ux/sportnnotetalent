@@ -86,7 +86,8 @@ export default function VerificationReviewScreen() {
   );
 }
 
-function Submission({ p, now, onDecided }: { p: PendingVerification; now: number; onDecided: (s: 'approved' | 'rejected') => void }) {
+/** One age / guardian proof (also on the support console). */
+export function Submission({ p, now, onDecided }: { p: PendingVerification; now: number; onDecided: (s: 'approved' | 'rejected') => void }) {
   const [reason, setReason] = useState(p.docPath ? '' : REJECT_REASONS[4]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -147,7 +148,7 @@ function Submission({ p, now, onDecided }: { p: PendingVerification; now: number
  *  without hunting: the official IDs with links to the public registers, any
  *  other community using the same ID, the document, the proof of authority, a
  *  three-tick checklist (all ticked before Approve), and one-tap reasons. */
-function OrgReview({ o, now, onDone }: { o: OrgQueueItem; now: number; onDone: (approved: boolean) => void }) {
+export function OrgReview({ o, now, onDone }: { o: OrgQueueItem; now: number; onDone: (approved: boolean) => void }) {
   const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const v = o.verification;
   const cfg = ORG_VERIFY[verifiableType(o.type) ? o.type : 'School'];
