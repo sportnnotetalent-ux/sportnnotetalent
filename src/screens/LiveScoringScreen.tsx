@@ -38,6 +38,7 @@ import { useFocusEffect, useIsFocused } from '@react-navigation/native';
 import { useKeepAwakeWhile } from '../core/keepAwake';
 import { ResultHoldNote } from '../components/ResultHoldNote';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { safeWebUrl } from '../core/safeUrl';
 import { theme } from '../core/theme';
 import { getSport } from '../sports/registry';
 import { VoiceScorer } from '../sports/VoiceScorer';
@@ -2081,7 +2082,7 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
               autoCapitalize="none"
             />
             <View style={{ flexDirection: 'row', gap: theme.spacing(2) }}>
-              <Button label="Save stream" style={{ flex: 1 }} onPress={() => { saveStream(streamInput.trim() || null); setEditingStream(false); }} />
+              <Button label="Save stream" style={{ flex: 1 }} onPress={() => { saveStream(safeWebUrl(streamInput)); setEditingStream(false); }} />
               {streamUrl && editingStream && <Button label="Cancel" variant="ghost" onPress={() => { setStreamInput(streamUrl); setEditingStream(false); }} />}
             </View>
           </>

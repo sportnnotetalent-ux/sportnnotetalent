@@ -19,7 +19,7 @@
  * Deploy:   supabase functions deploy guardian-consent
  * Secrets:  RESEND_API_KEY (shared), optional APP_URL (_shared/hosts.ts).
  */
-import { admin, clip, CORS, json, rateLimit, requireUser, sendEmail } from '../_shared/guard.ts';
+import { admin, clip, CORS, json, rateLimit, rateLimitTo, requireUser, sendEmail } from '../_shared/guard.ts';
 import { APP_URL, SITE_URL } from '../_shared/hosts.ts';
 
 const mask = (e: string) => e.replace(/^(.)[^@]*/, '$1***');
@@ -48,6 +48,7 @@ Deno.serve(async (req) => {
   }
   const { code, email, childName, selfDeclared } = data as { code: string; email: string; childName: string; selfDeclared?: boolean };
   const first = clip(childName, 60).split(/\s+/)[0] || 'Your child';
+  if (!(await rateLimitTo(email))) return json({ sent: false, reason: 'This address had enough emails from us today — try tomorrow.' }, 429);
   const link = `${APP_URL}/guardian-consent?c=${encodeURIComponent(code)}`;
 
   const sent = await sendEmail(

@@ -9,6 +9,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { safeWebUrl } from '../core/safeUrl';
 import { theme } from '../core/theme';
 import { EmptyState, Button, TextField, SelectChip, ScreenTitle, FieldLabel, FormError, textStyles } from '../components/ui';
 import { eventZone, useUserTimeZone } from '../core/time';
@@ -303,7 +304,7 @@ export default function ScheduleMatchScreen() {
         // SD-120: a tournament match's decider is stage-aware (league / group:
         // the draw stands; knockout: always settled).
         format: !isFriendly && tournamentId ? stageAwareFormat(format, sport, isKoStage(phase)) : format,
-        streamUrl: stream.trim() || undefined,
+        streamUrl: safeWebUrl(stream) ?? undefined,
       });
       // For a friendly, the creator is the scorer by default — whether they score
       // it now or scheduled it for later. Without this, a scheduled friendly opened

@@ -87,6 +87,9 @@ const GolfRoundSetupScreen = lazyScreen(() => import('../screens/GolfRoundSetupS
 const GolfCourseEditScreen = lazyScreen(() => import('../screens/GolfCourseEditScreen'));
 const ResultsEventScreen = lazyScreen(() => import('../screens/ResultsEventScreen'));
 const ResultsLabScreen = lazyScreen(() => import('../screens/ResultsLabScreen'));
+/** Security W1-9 (CL-13): developer-only screens (the Results lab enrols real
+ *  people in sample events) exist only in the demo and development builds. */
+const SHOW_DEV_SCREENS = !isSupabaseConfigured || __DEV__;
 const AthleticsEventSetupScreen = lazyScreen(() => import('../screens/AthleticsEventSetupScreen'));
 const RecordBoardScreen = lazyScreen(() => import('../screens/RecordBoardScreen'));
 const MeetTimetableScreen = lazyScreen(() => import('../screens/MeetTimetableScreen'));
@@ -626,11 +629,13 @@ export default function RootNavigator() {
               component={ConversationScreen}
               options={{ ...stackScreenOpts, title: 'Message' }}
             />
-            <Stack.Screen
-              name="ResultsLab"
-              component={ResultsLabScreen}
-              options={{ ...stackScreenOpts, title: 'Results lab' }}
-            />
+            {SHOW_DEV_SCREENS ? (
+              <Stack.Screen
+                name="ResultsLab"
+                component={ResultsLabScreen}
+                options={{ ...stackScreenOpts, title: 'Results lab' }}
+              />
+            ) : null}
             <Stack.Screen
               name="AthleticsEventSetup"
               component={AthleticsEventSetupScreen}

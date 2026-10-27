@@ -13,6 +13,53 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-28 — Security Wave 1, and a real database in the tests (PGlite)
+Founder: **1A** (the consent model, which is Wave 2), **PGlite approved**, go ahead with Wave 1.
+
+**Integration harness:** `tests/helpers/pgdb.mts`.
+- Uses PGlite `0.5.9`, a pinned dev dependency. It's Postgres running inside `npm test`.
+- Supabase stand-ins: the roles with Supabase's default privileges, `auth.users` and `auth.uid()`, plus storage, vault, pg_net and pg_cron recorded only.
+- It applies `schema.sql` and all 90 migrations in about 1.2 s. Tests run SQL as a signed-in user, anonymous, or the service role, with RLS on.
+- `skip:` leaves a migration out, to show a test is red without its fix.
+- The repo had no tests that ran SQL until now.
+
+**Wave 1:** migration `20261028120000_security_wave1`, plus edge-function and client changes, each test-first.
+- **W1-1 (EF-01 / DB-04):** a co-manager can't change an unclaimed child's guardian, guardian link or date of birth. This closes the guardian-takeover chain.
+- **W1-2 (DB-02):** a profile is claimed only with an SMS-verified sign-in phone (`auth.users.phone_confirmed_at`) or a confirmed email, never the typed profile phone. Sign-up no longer fails when that number sits on a coach-added profile.
+- **W1-3 (DB-03):** `meet_ages()` only for the meet's entrants (`tournament_entrant_ids`), with at most 6 cut-off dates per person a day (`meet_age_reads`).
+- **W1-4 (DB-06):** `guard_match_series`: nobody joins someone else's team-tie series.
+- **W1-5 (EF-05):** `rateLimitTo(email)`, one hashed cap per destination address across guardian-consent, guardian-link, message-notify and school-parent-request.
+- **W1-6 (EF-04):** `isInviteLink`: invite emails carry only `/i/<id>` (or the older join link).
+- **W1-7 (DB-09 / CL-02):** phone and email lookups return a possible minor as initials.
+- **W1-8 (CL-08):** the service worker caches only logged-out reads. Its cache is renamed to `sn-api-v2`, so old copies are deleted.
+- **W1-9 (CL-13):** the Results lab exists only in demo and development builds.
+- **W1-10 (CL-11 / CL-12):** links from other people's data are https only.
+  - In the app: `safeWebUrl`.
+  - In the database, for every app version: the `safe_web_url` trigger on stream and map links.
+  - "Open in the app" builds an intent only from a clean path.
+
+**Tests:**
+- `db-wave1` (9): red without the migration, green with it.
+- `security-wave1` (11).
+- `sim-security-wave1`: 100 coaches, 100 assistants, 300 children and 200 strangers. 900 break attempts and 200 lookups were all blocked, and 34 legitimate edits went through. It fails without the migration.
+
+**The fixes' own break list:** `docs/security/breaks/security-wave1.md` (10 points; side effects accepted with reasons). Follow-up W1-2b: verify your number to link a coach-added profile.
+
+**Student lists:** the functions in `20261028100000_student_lists` were run for the first time, in `tests/db-student-lists.test.mts`, and all 9 pass:
+- matching;
+- verified-only outside matches with no id;
+- invites going only to the parent address on file;
+- the parent's anonymous page;
+- children can't accept or decline;
+- admission numbers private.
+
+Full suite 4,968 pass, 0 fail.
+
+**Founder, to go live, in order:**
+1. Run `20261028100000_student_lists.sql`, then `20261028120000_security_wave1.sql`.
+2. Deploy the edge functions: `send-invite`, `guardian-consent`, `guardian-link`, `message-notify`, `school-parent-request`.
+3. Publish web and the Android update.
+
 ### 2026-10-27 — Quality and security mandate; student lists hardened before go-live
 **The founder's standing mandate**, for every feature and the whole existing app (`docs/engineering/quality-mandate.md`, also in `AGENTS.md`):
 1. Tests first (TDD).

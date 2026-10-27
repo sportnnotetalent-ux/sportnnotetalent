@@ -5,6 +5,7 @@
 import React from 'react';
 import { Platform, View, Text, TouchableOpacity, Linking, StyleSheet } from 'react-native';
 import { theme } from '../core/theme';
+import { safeWebUrl } from '../core/safeUrl';
 
 const YT = /(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|live\/|embed\/|shorts\/|v\/))([\w-]{11})/;
 const TWITCH = /twitch\.tv\/([A-Za-z0-9_]+)/;
@@ -28,8 +29,11 @@ function embedSrc(url: string): string | null {
   return null;
 }
 
-export function LiveStream({ url, live }: { url?: string; live?: boolean }) {
-  if (!url || !url.trim()) return null;
+export function LiveStream({ url: raw, live }: { url?: string; live?: boolean }) {
+  // Security W1-10 (CL-12): only a web page — never upi:, intent: or javascript: links
+  const safe = safeWebUrl(raw);
+  if (!safe) return null;
+  const url = safe;
   const provider = streamProvider(url);
   const tag = live ? '🔴 LIVE' : '▶ Stream';
 

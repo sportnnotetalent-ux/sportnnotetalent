@@ -7,11 +7,14 @@
  *      – app code (/_expo/static/, /assets/ — hashed, never change): saved on first
  *        use, then served from the phone;
  *      – data reads (Supabase REST GETs): network first, else the last copy we saw,
- *        so a match still shows its latest score when the signal drops.
+ *        so a match still shows its latest score when the signal drops — PUBLIC
+ *        (logged-out) reads only: a signed-in read is never stored on the device
+ *        (security W1-8 / CL-08: shared school and family computers).
  *    Online, the newest version always wins — nobody gets stuck on an old app.
  *    Signing out sends 'clear-data' and the saved data is wiped. */
 const SHELL = 'sn-shell-v1';
-const API = 'sn-api-v1';
+// v2 (security W1-8): the old copy could hold signed-in data — activate deletes it.
+const API = 'sn-api-v2';
 const MAX_API_ENTRIES = 300;
 /** How long a page load waits for the network before opening the saved app. */
 const NAV_TIMEOUT_MS = 3000;
@@ -52,6 +55,13 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('message', (event) => {
   if (event.data === 'clear-data') { apiGen++; event.waitUntil(caches.delete(API)); }
 });
+
+/** A logged-out read: no user token, only the public key (security W1-8). */
+const isPublicRead = (req) => {
+  const auth = req.headers.get('Authorization') || '';
+  const key = req.headers.get('apikey') || '';
+  return !auth || (!!key && auth === 'Bearer ' + key);
+};
 
 async function trim(cacheName, max) {
   const c = await caches.open(cacheName);
@@ -109,6 +119,7 @@ self.addEventListener('fetch', (event) => {
   // Supabase data reads: network first, last copy as a fallback. Never auth,
   // functions or storage.
   if (url.hostname.endsWith('.supabase.co') && url.pathname.startsWith('/rest/v1/')) {
+    if (!isPublicRead(req)) return;
     event.respondWith((async () => {
       try {
         const res = await fetch(req);

@@ -22,7 +22,12 @@ The app then treats that as a real relationship. The person sees the child's ful
 
 Findings that come from this: DB-01, DB-04, DB-05, DB-14, EF-02, EF-03, SL-19.
 
-## Wave 1: urgent, small, no change to how the app is used
+## Wave 1: urgent, small, no change to how the app is used — BUILT 2026-10-28
+**Built:** migration `20261028120000_security_wave1`, edge functions, client.
+**Tests:** `tests/db-wave1.test.mts`, `tests/security-wave1.test.mts`, `tests/sim-security-wave1.test.mts`.
+**The fixes' own break list:** `../breaks/security-wave1.md`.
+**Follow-up W1-2b:** "Verify your number to bring your history" (a Firebase SMS code, then the server links the coach-added profile), for email sign-ups.
+
 1. **Guardian takeover (EF-01 / DB-04, part):** in the non-creator admin branch of `guard_player_write`, lock `guardian`, `dob` and `guardian_profile_id`. Only the owner, the profile's creator, the guardian or support can change them.
 2. **Claiming with an unverified phone (DB-02):**
    - the claim and `my_claimable_player()` use a VERIFIED phone (`auth.users.phone_confirmed_at`, or the contact OTP record), never `profiles.phone` text;

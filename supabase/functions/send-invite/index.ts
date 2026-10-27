@@ -24,6 +24,7 @@
  * Secrets: reuses RESEND_API_KEY (+ optional INVITE_FROM, else SUPPORT_FROM).
  */
 import { inviteLinkPrefixes, SITE_URL } from '../_shared/hosts.ts';
+import { isInviteLink } from '../_shared/inviteLinks.ts';
 import { admin, clip, CORS, json, rateLimit, requireUser, stripLinks, SUPABASE_URL, tooMany } from '../_shared/guard.ts';
 
 const FROM = Deno.env.get('INVITE_FROM') ?? Deno.env.get('SUPPORT_FROM') ?? 'SportnNote <onboarding@resend.dev>';
@@ -35,7 +36,7 @@ const isEmail = (s: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s) && s.length 
 // SD-151: every .in host (incl. app.sportnnote.in, where invite links point) plus the
 // configured APP_URL / SITE_URL / EXTRA_LINK_ORIGINS (the .com hosts) — _shared/hosts.ts.
 const LINK_PREFIXES = inviteLinkPrefixes(SUPABASE_URL);
-const isOurLink = (s: string) => LINK_PREFIXES.some((p) => s.startsWith(p)) && !/\s/.test(s);
+// Security W1-6 (EF-04): only the exact invite link shapes (isInviteLink), never any URL under our hosts.
 
 type Role = 'co-host' | 'manage';
 
@@ -85,7 +86,7 @@ Deno.serve(async (req) => {
   const context = stripLinks(clip(body.context, 120));
   const role: Role = body.role === 'manage' ? 'manage' : 'co-host';
   if (!isEmail(to)) return json({ error: 'a valid recipient email is required' }, 400);
-  if (!isOurLink(link)) return json({ error: 'a SportnNote invite link is required' }, 400);
+  if (!isInviteLink(link, LINK_PREFIXES)) return json({ error: 'a SportnNote invite link is required' }, 400);
 
   if (!(await rateLimit('send-invite', caller.user.id, 20, 86400))) return tooMany();
 

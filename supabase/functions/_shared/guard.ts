@@ -58,6 +58,19 @@ export async function rateLimit(bucket: string, subject: string, max: number, wi
 
 export const tooMany = () => json({ error: 'Too many requests — please try again later.' }, 429);
 
+/** SHA-256 of a string, as hex. */
+export async function sha256Hex(s: string): Promise<string> {
+  const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
+  return [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/** Security W1-5 (EF-05): one shared cap per DESTINATION address across every
+ *  function that emails a parent or guardian — however many children, or which
+ *  function, triggers it. The address is hashed (no emails in the ledger). */
+export async function rateLimitTo(email: string, max = 6, windowSeconds = 86400): Promise<boolean> {
+  return rateLimit('parent-mail-to', await sha256Hex(email.trim().toLowerCase()), max, windowSeconds);
+}
+
 /** Remove links from text we relay to someone else (anti-phishing). */
 export const stripLinks = (s: string) =>
   s.replace(/\b(?:https?:\/\/|www\.)\S+/gi, '').replace(/[ \t]{2,}/g, ' ').trim();

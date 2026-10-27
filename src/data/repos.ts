@@ -4560,11 +4560,15 @@ export async function createMyPlayer(profileId: string): Promise<string> {
     }
   }
 
-  const { data, error } = await supabase
-    .from('players')
-    .insert({ profile_id: profileId, full_name: prof?.full_name ?? 'Player', sports: [], phone: (prof?.phone && (toE164(prof.phone) || prof.phone)) || null, dob: prof?.dob ?? null, guardian: prof?.guardian ?? null, email: authEmail, email_verified: emailVerified })
-    .select('id')
-    .single();
+  const row = { profile_id: profileId, full_name: prof?.full_name ?? 'Player', sports: [], phone: (prof?.phone && (toE164(prof.phone) || prof.phone)) || null, dob: prof?.dob ?? null, guardian: prof?.guardian ?? null, email: authEmail, email_verified: emailVerified };
+  let { data, error } = await supabase.from('players').insert(row).select('id').single();
+  // Security W1-2: a profile is claimed only with a VERIFIED number now, so the
+  // number typed at sign-up may already sit on a coach-added profile
+  // (uq_players_phone). Create theirs without it rather than failing sign-up;
+  // linking that profile is done by proving the number (plan item W1-2b).
+  if (error && /uq_players_phone/.test(error.message ?? '')) {
+    ({ data, error } = await supabase.from('players').insert({ ...row, phone: null }).select('id').single());
+  }
   if (error || !data) throw new Error(error?.message ?? 'Could not create your profile');
   myPlayerIdMemo.set(profileId, data.id as string);
   return data.id as string;

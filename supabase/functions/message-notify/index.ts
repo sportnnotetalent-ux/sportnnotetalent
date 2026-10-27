@@ -19,7 +19,7 @@
  * Deploy:   supabase functions deploy message-notify
  * Secrets:  RESEND_API_KEY, SUPPORT_EMAIL, INVITE_FROM/SUPPORT_FROM (shared).
  */
-import { admin, clip, CORS, guardianLinkSteps, json, pushToProfiles, rateLimit, requireUser, sendEmail, stripLinks } from '../_shared/guard.ts';
+import { admin, clip, CORS, guardianLinkSteps, json, pushToProfiles, rateLimit, rateLimitTo, requireUser, sendEmail, stripLinks } from '../_shared/guard.ts';
 import { webPushToProfiles } from '../_shared/webpush.ts';
 
 Deno.serve(async (req) => {
@@ -64,6 +64,7 @@ Deno.serve(async (req) => {
   const email = (child?.guardian as { email?: string } | null)?.email ?? '';
   if (!thread.via_guardian || !email) return json({ delivered: 'none' });
   if (!(await rateLimit('guardian-email', thread.subject_player_id, 3, 86400))) return json({ delivered: 'none', reason: 'email cap' });
+  if (!(await rateLimitTo(email))) return json({ delivered: 'none', reason: 'address cap' });
   const { data: code, error } = await admin.rpc('create_guardian_link_code', { p_player: thread.subject_player_id });
   if (error || !code) return json({ delivered: 'none', reason: 'no code' });
   const childName = child?.full_name ?? 'your child';

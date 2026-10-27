@@ -23,7 +23,7 @@
  * Deploy:   supabase functions deploy school-parent-request
  * Secrets:  RESEND_API_KEY (shared), optional APP_URL (_shared/hosts.ts).
  */
-import { admin, clip, CORS, json, rateLimit, requireUser, sendEmail, stripLinks } from '../_shared/guard.ts';
+import { admin, clip, CORS, json, rateLimit, rateLimitTo, requireUser, sendEmail, stripLinks } from '../_shared/guard.ts';
 import { APP_URL, SITE_URL } from '../_shared/hosts.ts';
 
 const grouped = (code: string) => code.replace(/(.{4})(?=.)/g, '$1-');
@@ -57,6 +57,7 @@ Deno.serve(async (req) => {
 
   let emailed = 0;
   for (const inv of invites) {
+    if (!(await rateLimitTo(inv.email))) continue; // W1-5: the address had enough from us today
     // SL-12: the school's own text never carries a link into an email that looks like ours
     const school = stripLinks(clip(inv.school, 80));
     const first = clip(inv.childFirstName, 40) || (inv.adult ? 'you' : 'your child');

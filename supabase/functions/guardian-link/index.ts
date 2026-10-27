@@ -15,7 +15,7 @@
  * Deploy:   supabase functions deploy guardian-link
  * Secrets:  RESEND_API_KEY, SUPPORT_EMAIL, INVITE_FROM/SUPPORT_FROM (shared).
  */
-import { admin, clip, CORS, guardianLinkSteps, json, rateLimit, requireUser, sendEmail } from '../_shared/guard.ts';
+import { admin, clip, CORS, guardianLinkSteps, json, rateLimit, rateLimitTo, requireUser, sendEmail } from '../_shared/guard.ts';
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
@@ -30,6 +30,7 @@ Deno.serve(async (req) => {
   if (!g.email) return json({ sent: false, reason: 'Add your parent/guardian\'s email first.' }, 400);
   if (!(await rateLimit('guardian-link', playerId, 3, 86400))) return json({ sent: false, reason: 'Already sent 3 today — try tomorrow.' }, 429);
 
+  if (!(await rateLimitTo(g.email))) return json({ sent: false, reason: 'This address had enough emails from us today — try tomorrow.' }, 429);
   const { data: code, error } = await admin.rpc('create_guardian_link_code', { p_player: playerId });
   if (error || !code) return json({ sent: false, reason: 'Could not create a code.' }, 500);
   const childName = clip(child.full_name, 60) || 'Your child';
