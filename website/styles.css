@@ -138,6 +138,12 @@ h2 { font-size: clamp(26px, 4vw, 36px); margin: 0 0 10px; letter-spacing: -0.01e
 .prose figure { margin: 24px 0; }
 .prose img { border-radius: 12px; border: 1px solid var(--border); height: auto; }
 .prose blockquote { margin: 20px 0; padding: 4px 16px; border-left: 3px solid var(--border); color: var(--muted); }
+.table-wrap { margin: 20px 0; overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; }
+.prose table { width: 100%; border-collapse: collapse; font-size: 15px; line-height: 1.5; }
+.prose th, .prose td { padding: 10px 12px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--border); color: #D6DCE4; }
+.prose th { background: var(--surface-alt); color: var(--text); font-weight: 700; }
+@media (max-width: 520px) { .prose th, .prose td { padding: 8px; font-size: 14px; } .prose td:first-child { min-width: 8.5em; } }
+.prose tbody tr:last-child td { border-bottom: 0; }
 .step-list { list-style: none; counter-reset: st; padding: 0 !important; margin: 20px 0; display: grid; gap: 12px; }
 .step-list li { counter-increment: st; display: flex; gap: 14px; align-items: flex-start; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin: 0 !important; scroll-margin-top: 76px; }
 .step-list li::before { content: counter(st); flex: none; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: var(--primary); color: var(--primary-ink); font-weight: 800; font-size: 16px; }
@@ -183,6 +189,8 @@ h2 { font-size: clamp(26px, 4vw, 36px); margin: 0 0 10px; letter-spacing: -0.01e
   .prose p, .prose li { color: #000; }
   .article-grid { display: block; }
   .step-list li, .callout { break-inside: avoid; background: #fff; }
+  .prose th, .prose td { color: #000; }
+  .table-wrap { overflow: visible; }
   .prose a[href^="http"]::after { content: " (" attr(href) ")"; font-size: .85em; }
 }
 

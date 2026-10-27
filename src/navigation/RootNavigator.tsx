@@ -38,6 +38,7 @@ import AuthScreen from '../screens/AuthScreen';
 import OrganizeScreen from '../screens/OrganizeScreen';
 const CreateTournamentScreen = lazyScreen(() => import('../screens/CreateTournamentScreen'));
 const EditTournamentScreen = lazyScreen(() => import('../screens/EditTournamentScreen'));
+const CopyTournamentScreen = lazyScreen(() => import('../screens/CopyTournamentScreen'));
 const TeamsScreen = lazyScreen(() => import('../screens/TeamsScreen'));
 const ScheduleMatchScreen = lazyScreen(() => import('../screens/ScheduleMatchScreen'));
 const CreateSeriesScreen = lazyScreen(() => import('../screens/CreateSeriesScreen'));
@@ -140,7 +141,7 @@ const Tab = createBottomTabNavigator<TabParamList>();
 // the Join screen with the code prefilled.
 // Stack screens reachable by URL on web (/GolfRound?eventId=…). Keep in sync with
 // the <Stack.Screen> list below — a screen missing here just opens Home on refresh.
-const STACK_SCREENS = new Set<string>(['Americano', 'AssignScorers', 'AthleticsEventSetup', 'CorrectMatch', 'Bracket', 'Calendar', 'ClubHome', 'ClubSport', 'Clubs', 'MyTournaments', 'CompetitionRules', 'Contingents', 'Conversation', 'CreateClub', 'CreateCommunity', 'CreateListing', 'CreateSeries', 'CreateTournament', 'CricketLineup', 'DeleteAccount', 'DiscoverOrgs', 'EditMatch', 'EditProfile', 'EditTeam', 'EditTournament', 'Feedback', 'Following', 'GenerateFixtures', 'GolfCourseEdit', 'GolfRound', 'GolfRoundSetup', 'GuardianConsent', 'GuardianLink', 'HeadToHead', 'InviteFriend', 'ImportSchedule', 'RosterImport', 'JoinClub', 'JoinTeam', 'JoinTournament', 'Legal', 'LineupEditor', 'LiveScoring', 'ManageChild', 'MatchLink', 'OrgDobs', 'OrgVerify', 'Certificates', 'MatchSquad', 'MeetEntries', 'MeetTimetable', 'MessageReports', 'Messages', 'NotificationPrefs', 'RegionSettings', 'Notifications', 'Organization', 'OrganizerDashboard', 'PlayerProfile', 'Privacy', 'RecordBoard', 'ResultsEvent', 'ResultsLab', 'ScanQR', 'ScheduleMatch', 'Series', 'Settings', 'SportHub', 'SportProfile', 'SportSettings', 'Squad', 'Standings', 'Support', 'SwissRound', 'Team', 'TeamJourney', 'Teams', 'Tournament', 'TournamentTeams', 'TryNewSport', 'VerificationReview']);
+const STACK_SCREENS = new Set<string>(['Americano', 'AssignScorers', 'AthleticsEventSetup', 'CorrectMatch', 'Bracket', 'Calendar', 'ClubHome', 'ClubSport', 'Clubs', 'MyTournaments', 'CompetitionRules', 'Contingents', 'Conversation', 'CreateClub', 'CreateCommunity', 'CreateListing', 'CreateSeries', 'CopyTournament', 'CreateTournament', 'CricketLineup', 'DeleteAccount', 'DiscoverOrgs', 'EditMatch', 'EditProfile', 'EditTeam', 'EditTournament', 'Feedback', 'Following', 'GenerateFixtures', 'GolfCourseEdit', 'GolfRound', 'GolfRoundSetup', 'GuardianConsent', 'GuardianLink', 'HeadToHead', 'InviteFriend', 'ImportSchedule', 'RosterImport', 'JoinClub', 'JoinTeam', 'JoinTournament', 'Legal', 'LineupEditor', 'LiveScoring', 'ManageChild', 'MatchLink', 'OrgDobs', 'OrgVerify', 'Certificates', 'MatchSquad', 'MeetEntries', 'MeetTimetable', 'MessageReports', 'Messages', 'NotificationPrefs', 'RegionSettings', 'Notifications', 'Organization', 'OrganizerDashboard', 'PlayerProfile', 'Privacy', 'RecordBoard', 'ResultsEvent', 'ResultsLab', 'ScanQR', 'ScheduleMatch', 'Series', 'Settings', 'SportHub', 'SportProfile', 'SportSettings', 'Squad', 'Standings', 'Support', 'SwissRound', 'Team', 'TeamJourney', 'Teams', 'Tournament', 'TournamentTeams', 'TryNewSport', 'VerificationReview']);
 
 // Web deep links / refresh. React Navigation 7 only recognises screens listed in
 // `config`, and a URL that resolves to NO state makes it call resetRoot(undefined),
@@ -717,6 +718,11 @@ export default function RootNavigator() {
               name="EditTournament"
               component={EditTournamentScreen}
               options={{ ...stackScreenOpts, title: 'Edit Tournament' }}
+            />
+            <Stack.Screen
+              name="CopyTournament"
+              component={CopyTournamentScreen}
+              options={({ route }) => ({ ...stackScreenOpts, title: route.params?.mode === 'next' ? 'Run it again' : 'Copy this setup' })}
             />
             <Stack.Screen
               name="Organization"

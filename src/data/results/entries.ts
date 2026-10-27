@@ -497,6 +497,8 @@ export function entryEvents(
   sport: string,
   meet: { eventKey: string; title: string; discipline: string; category?: Category; phases: { id: string; status: string; format: Pick<PhaseFormat, 'phaseNo'>; entries: ResultEntry[] }[] }[],
   group: { age?: string; gender?: 'M' | 'F' | 'X'; course?: Category['course'] },
+  /** Run it again: events carried from the last edition, not set up yet */
+  carried: { discipline: string; category?: Category; title: string }[] = [],
 ): EntryEvent[] {
   const same = (c?: Category) => (c?.age ?? 'Open') === (group.age ?? 'Open') && (c?.gender ?? 'X') === (group.gender ?? 'X');
   const out: EntryEvent[] = [];
@@ -518,6 +520,12 @@ export function entryEvents(
     if (out.some((o) => o.slot === slot || (o.discipline === k && same(o.category)))) continue;
     const d = disciplineOf(k);
     out.push({ slot, discipline: k, category: cat, label: d?.label ?? k, relay: !!d?.teamSize });
+  }
+  for (const c of carried) {
+    if (!same(c.category)) continue;
+    const slot = slotKey(c.discipline, c.category);
+    if (out.some((o) => o.slot === slot || (o.discipline === c.discipline && same(o.category)))) continue;
+    out.push({ slot, discipline: c.discipline, category: c.category, label: c.title, relay: !!disciplineOf(c.discipline)?.teamSize });
   }
   return out;
 }

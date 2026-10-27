@@ -3,7 +3,7 @@
  *  best mark per event (fastest / longest / highest — SD-91 field events), the best athletes by points, and the meet / school
  *  record books. Organisers add events from here. SD-94: the same hub runs a
  *  swim meet (`sport="swimming"`: pool length and lanes, records per course). */
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -15,6 +15,8 @@ import { ChampionsCard } from '../results/ChampionsCard';
 import { CompetitionRulesCard } from '../results/CompetitionRulesCard';
 import { MeetCommentaryCard } from '../results/RaceDepth';
 import { useMeet } from '../../data/useAthletics';
+import { patchTournamentFormat } from '../../data/repos';
+import { PROGRAMME_KEY, pendingProgramme, readProgramme, type ProgrammeEvent } from '../../data/tournamentCopyPlan';
 import { medalStandings } from '../../data/medalStandings';
 import {
   categoryKey, categoryLabel, disciplineOf, eventLeaders, eventStatus, formatMark, meetFieldResults, meetSettings, topAthletes,
@@ -107,6 +109,8 @@ export function AthleticsHub({ tournament, canOrganize, sport = 'athletics' }: {
           <Button label={`📋 Entries (${words.athletes} × events)`} variant="ghost" onPress={() => nav.navigate('MeetEntries', { tournamentId: tournament.id, ...(sport !== 'athletics' ? { sport } : {}) })} />
         </View>
       )}
+      {/* Run it again: the events carried from the last edition, set up one by one */}
+      {canOrganize && <CarriedProgramme tournament={tournament} sport={sport} events={events} />}
       {/* SD-129: the meet timetable (every event sport) and the printable sheets */}
       <Button label="🗓 Timetable & print sheets" variant="ghost" onPress={() => nav.navigate('MeetTimetable', { tournamentId: tournament.id })} />
       {/* deep wave (timed races): the meet's live results commentary, newest first */}
@@ -296,6 +300,45 @@ function RecordBook({ title, list, empty, prefix }: { title: string; list: Recor
   );
 }
 
+/** Run it again: events carried from the last edition (formats[sport].programme)
+ *  that aren't set up yet — "Set up" opens each one pre-filled; "Not this
+ *  time" drops it from the list. */
+function CarriedProgramme({ tournament, sport, events }: { tournament: Tournament; sport: EventSport; events: MeetEvent[] }) {
+  const nav = useNavigation<Nav>();
+  const fmt = tournament.formats?.[sport] as Record<string, unknown> | undefined;
+  const [dropped, setDropped] = useState<string[]>([]);
+  const all = useMemo(() => readProgramme(fmt, sport), [fmt?.[PROGRAMME_KEY], sport]); // eslint-disable-line react-hooks/exhaustive-deps
+  const id = (e: ProgrammeEvent) => `${e.discipline}|${categoryKey(e.category)}`;
+  const pending = pendingProgramme(all, events).filter((e) => !dropped.includes(id(e)));
+  if (!pending.length) return null;
+  const setUp = (e: ProgrammeEvent) => nav.navigate('AthleticsEventSetup', {
+    tournamentId: tournament.id, ...(sport !== 'athletics' ? { sport } : {}), ...(e.mode ? { mode: e.mode } : {}),
+    discipline: e.discipline, age: e.category?.age, gender: e.category?.gender,
+  });
+  const drop = async (e: ProgrammeEvent) => {
+    setDropped((d) => [...d, id(e)]);
+    const keep = all.filter((x) => id(x) !== id(e) && !dropped.includes(id(x)));
+    await patchTournamentFormat(tournament.id, sport, { [PROGRAMME_KEY]: keep.length ? JSON.stringify(keep.map(({ sport: _s, ...rest }) => rest)) : undefined }).catch(() => {});
+  };
+  return (
+    <Card style={{ gap: theme.spacing(2) }}>
+      <Text style={textStyles.h3}>🔁 Events from last time ({pending.length})</Text>
+      <Text style={textStyles.muted}>
+        {sport === 'athletics' || sport === 'swimming'
+          ? 'Set each one up once its entries are in — the rounds, timetable slot and settings are filled in from last time.'
+          : 'Set each one up once its entries are in.'}
+      </Text>
+      {pending.map((e) => (
+        <View key={id(e)} style={st.carriedRow}>
+          <Text style={[textStyles.body, { flex: 1 }]} numberOfLines={2}>{e.title}</Text>
+          <Text style={st.carriedLink} accessibilityRole="button" accessibilityLabel={`Set up ${e.title}`} onPress={() => setUp(e)}>Set up ›</Text>
+          <Text style={st.carriedDrop} accessibilityRole="button" accessibilityLabel={`Not this time: ${e.title}`} onPress={() => void drop(e)}>✕</Text>
+        </View>
+      ))}
+    </Card>
+  );
+}
+
 const st = StyleSheet.create({
   cat: { color: theme.colors.textMuted, fontSize: theme.font.small, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
   row: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(2), backgroundColor: theme.colors.surface, borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.colors.border, padding: theme.spacing(3) },
@@ -303,4 +346,7 @@ const st = StyleSheet.create({
   lead: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(2) },
   mark: { color: theme.colors.text, fontWeight: '800', fontVariant: ['tabular-nums'], minWidth: 48, textAlign: 'right' },
   rank: { width: 18, color: theme.colors.textMuted, fontWeight: '800' },
+  carriedRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(3), paddingVertical: theme.spacing(1) },
+  carriedLink: { color: theme.colors.primary, fontWeight: '800', fontSize: theme.font.body },
+  carriedDrop: { color: theme.colors.textMuted, fontWeight: '800', fontSize: theme.font.body, paddingHorizontal: theme.spacing(1) },
 });

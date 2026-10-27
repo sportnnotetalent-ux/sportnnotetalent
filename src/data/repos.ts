@@ -346,6 +346,8 @@ const toTournament = (data: any): Tournament => ({
   timeZone: data.time_zone ?? undefined,
   ...(readQualifiesTo(data.qualifies_to) ? { qualifiesTo: readQualifiesTo(data.qualifies_to) } : {}),
   ...(data.age_verification && data.age_verification !== 'none' ? { ageVerification: data.age_verification } : {}),
+  ...(data.previous_edition_id ? { previousEditionId: data.previous_edition_id } : {}),
+  ...(data.first_edition_id ? { firstEditionId: data.first_edition_id } : {}),
 });
 
 // The registration columns (registration_deadline / min_teams / max_teams) need
@@ -4666,9 +4668,12 @@ export interface NewTournament extends TournamentDetails {
   coHostIds?: string[];
   /** divisions (age × gender) to create for this tournament, if any */
   categories?: NewTournamentCategory[];
+  /** Run it again: the edition this one follows (its organisers only — the
+   *  server checks; migration 20261027140000_tournament_editions) */
+  previousEditionId?: string;
 }
 
-export async function createTournament(input: NewTournament): Promise<Tournament & { profileSaved?: boolean }> {
+export async function createTournament(input: NewTournament): Promise<Tournament & { profileSaved?: boolean; editionLinked?: boolean }> {
   // D1: a new tournament stores each sport's international points system
   // (basketball FIBA win 2 / loss 1) unless the organiser already chose points.
   input = { ...input, formats: newTournamentFormats(input.sports, input.formats) };
@@ -4676,18 +4681,24 @@ export async function createTournament(input: NewTournament): Promise<Tournament
   // Org-hosted → no individual hostIds (the org's members are the hosts);
   // otherwise the creator is the sole individual host.
   if (!isSupabaseConfigured || !supabase) {
-    const t = addTournament({ ...(input as Omit<NewTournament, keyof TournamentDetails>), ...(Object.fromEntries(Object.entries(pickDetails(input)).map(([k, v]) => [k, v ?? undefined])) as Partial<Tournament>), isOpen: input.isOpen, createdBy: me, hostIds: [...new Set([...(input.hostOrgId ? [] : me ? [me] : []), ...(input.coHostIds ?? [])])] });
+    const prev = input.previousEditionId ? demo.tournaments.find((x) => x.id === input.previousEditionId) : undefined;
+    const t = addTournament({
+      ...(input as Omit<NewTournament, keyof TournamentDetails>), ...(Object.fromEntries(Object.entries(pickDetails(input)).map(([k, v]) => [k, v ?? undefined])) as Partial<Tournament>), isOpen: input.isOpen, createdBy: me, hostIds: [...new Set([...(input.hostOrgId ? [] : me ? [me] : []), ...(input.coHostIds ?? [])])],
+      ...(prev ? { previousEditionId: prev.id, firstEditionId: prev.firstEditionId ?? prev.id } : {}),
+    });
     if (input.categories?.length) addTournamentCategoriesDemo(t.id, input.categories);
     await recordOwnershipCreated(t, me);
-    return t;
+    return { ...t, editionLinked: !!prev };
   }
   const { data: auth } = await supabase.auth.getUser();
   // Hosts are tracked by player id (what the host UI checks), so the creator's
   // player id — not the auth/profile id — becomes the first host.
   const myPlayerId = auth.user?.id ? await getMyPlayerId(auth.user.id) : null;
-  const { data, error } = await supabase
+  const insertRow = (withEdition: boolean) => supabase!
     .from('tournaments')
     .insert({
+      // Run it again: the server checks the creator runs the earlier edition.
+      ...(withEdition && input.previousEditionId ? { previous_edition_id: input.previousEditionId } : {}),
       name: input.name,
       host_name: input.hostName,
       host_org_id: input.hostOrgId ?? null,
@@ -4712,9 +4723,16 @@ export async function createTournament(input: NewTournament): Promise<Tournament
     })
     .select(TOURNAMENT_COLS_BASE) // reg columns (0014) aren't set at creation
     .single();
+  let { data, error } = await insertRow(true);
+  // Before the editions migration: create it unlinked (the copy still works).
+  let editionLinked = !!input.previousEditionId;
+  if (error && input.previousEditionId && isMissingSchema(error)) {
+    ({ data, error } = await insertRow(false));
+    editionLinked = false;
+  }
   if (error || !data) throw new Error(error?.message ?? 'Could not create tournament');
   // created_by isn't in the base select (kept narrow for pre-0021 safety) — merge it.
-  const tournament = { ...toTournament(data), createdBy: myPlayerId ?? undefined };
+  const tournament = { ...toTournament(data), createdBy: myPlayerId ?? undefined, ...(editionLinked ? { previousEditionId: input.previousEditionId } : {}) };
   // Attach divisions, if any (best-effort — needs migration 0008; a tournament
   // without categories is valid, so don't fail creation if this can't be stored).
   if (input.categories?.length) {
@@ -4724,7 +4742,7 @@ export async function createTournament(input: NewTournament): Promise<Tournament
   // Details (banner, city, grounds, contact…) — migration 0041; degrade if absent.
   const details = pickDetails(input);
   const profileSaved = Object.keys(details).length ? await saveTournamentDetails(tournament.id, details) : true;
-  return { ...tournament, ...details, profileSaved } as Tournament & { profileSaved: boolean };
+  return { ...tournament, ...details, profileSaved, editionLinked } as Tournament & { profileSaved: boolean; editionLinked: boolean };
 }
 
 const DETAIL_KEYS = ['logoUrl', 'bannerUrl', 'city', 'grounds', 'eventCategory', 'about', 'organiserPhone', 'organiserEmail', 'timeZone'] as const;

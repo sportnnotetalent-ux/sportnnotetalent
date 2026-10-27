@@ -190,6 +190,7 @@ function renderGuide(src) {
   let heading = '';
   let para = [];
   let lst = null; // { tag, items: [[lines]], steps }
+  let rows = null; // a table's lines: | a | b |, then |---|---|, then rows
   const uniqueId = (text) => { let id = slugify(plain(text)); let n = 2; while (ids.has(id)) id = `${slugify(plain(text))}-${n++}`; ids.add(id); return id; };
   const flushPara = () => { if (para.length) { out.push(`<p>${guideInline(para.join(' '))}</p>`); para = []; } };
   const flushList = () => {
@@ -203,12 +204,24 @@ function renderGuide(src) {
     }
     lst = null;
   };
-  const flush = () => { flushPara(); flushList(); };
+  // Tables (GFM pipe tables): a header row, a |---| separator, then rows. Wrapped
+  // so a wide table scrolls sideways on a phone instead of widening the page.
+  const cells = (l) => l.replace(/^\s*\|/, '').replace(/\|\s*$/, '').split('|').map((c) => c.trim());
+  const flushTable = () => {
+    if (!rows) return;
+    const [head, sep, ...body] = rows;
+    rows = null;
+    if (!sep || !/^\s*\|?\s*:?-{3,}/.test(sep)) { para.push(...[head, sep, ...body].filter(Boolean)); flushPara(); return; }
+    out.push(`<div class="table-wrap"><table>\n<thead><tr>${cells(head).map((c) => `<th scope="col">${guideInline(c)}</th>`).join('')}</tr></thead>\n<tbody>\n${body.map((r) => `<tr>${cells(r).map((c) => `<td>${guideInline(c)}</td>`).join('')}</tr>`).join('\n')}\n</tbody>\n</table></div>`);
+  };
+  const flush = () => { flushPara(); flushList(); flushTable(); };
   const CALLOUT = /^\*\*(Tip|Note|Important):\*\*\s*(.*)$/;
   for (const raw of src.replace(/\r\n?/g, '\n').split('\n')) {
     const line = raw.trimEnd();
     let m;
     if (!line.trim()) { flush(); continue; }
+    if (/^\s*\|/.test(line)) { flushPara(); flushList(); (rows ??= []).push(line); continue; }
+    flushTable();
     if ((m = line.match(/^(##|###) +(.+)$/))) {
       flush();
       const level = m[1].length;

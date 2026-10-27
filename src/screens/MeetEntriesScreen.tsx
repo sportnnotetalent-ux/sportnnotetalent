@@ -33,6 +33,7 @@ import {
   type EntryEvent, type MeetEvent, type MeetEntriesDoc, type EntryCaps, type BulkRow, type DupMatch, type Category,
 } from '../data/results';
 import { isEventSport, eventWords, type EventSport } from '../sports/eventSports';
+import { readProgramme } from '../data/tournamentCopyPlan';
 import type { SportId } from '../core/types';
 import { useRegion, dateOrderOf, dateOrderWords, exampleDate, spelledDate } from '../core/region';
 
@@ -68,14 +69,16 @@ export default function MeetEntriesScreen() {
   const [gender, setGender] = useState<G>('M');
   const course = sport === 'swimming' ? swimMeetSettings(tournament?.formats?.swimming as Record<string, unknown> | undefined).course : undefined;
   const group = { age, gender, course };
-  const cols = useMemo(() => entryEvents(sport, meet, group), [sport, meet, age, gender, course]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Run it again: the last edition's events show before they're set up
+  const carried = useMemo(() => readProgramme(tournament?.formats?.[sport] as Record<string, unknown> | undefined, sport), [tournament?.formats, sport]);
+  const cols = useMemo(() => entryEvents(sport, meet, group, carried), [sport, meet, age, gender, course, carried]); // eslint-disable-line react-hooks/exhaustive-deps
   // every column of every group the meet uses — the caps count the whole meet
   const allCols = useMemo(() => {
     const out: EntryEvent[] = [];
     const groups = new Set(meet.map((e) => `${e.category?.age ?? 'Open'}|${e.category?.gender ?? 'X'}`));
     for (const ticks of Object.values(doc.ticks ?? {})) for (const s of ticks) { const [a, g] = (s.split('@')[1] ?? '').split('-'); if (a && g) groups.add(`${a === 'open' ? 'Open' : a}|${g}`); }
     groups.add(`${age}|${gender}`);
-    for (const k of groups) { const [a, g] = k.split('|'); out.push(...entryEvents(sport, meet, { age: a, gender: g as G, course })); }
+    for (const k of groups) { const [a, g] = k.split('|'); out.push(...entryEvents(sport, meet, { age: a, gender: g as G, course }, carried)); }
     return out;
   }, [sport, meet, doc.ticks, age, gender, course]);
 
@@ -157,7 +160,10 @@ export default function MeetEntriesScreen() {
   };
 
   const setCaps = (c: EntryCaps) => void saveDoc((d) => ({ ...d, caps: c.individual == null && c.relay == null ? undefined : c }));
-  const setUp = (ev: EntryEvent) => nav.navigate('AthleticsEventSetup', { tournamentId, ...(sport !== 'athletics' ? { sport: sport as 'swimming' } : {}), discipline: ev.discipline, age: ev.category?.age, gender: ev.category?.gender });
+  const setUp = (ev: EntryEvent) => {
+    const mode = carried.find((c) => c.discipline === ev.discipline)?.mode; // a carried road race / combined event
+    nav.navigate('AthleticsEventSetup', { tournamentId, ...(sport !== 'athletics' ? { sport: sport as 'swimming' } : {}), ...(mode ? { mode } : {}), discipline: ev.discipline, age: ev.category?.age, gender: ev.category?.gender });
+  };
   const planned = cols.filter((c) => !c.eventKey && tickedFor(doc, c.slot).length);
   const setupable = sport === 'athletics' || sport === 'swimming';
 

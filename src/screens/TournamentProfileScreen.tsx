@@ -68,6 +68,7 @@ import { tournamentRoleInviteText } from '../core/inviteText';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { setupChecklist, firstSportWithoutFormat, type SetupStep } from '../data/setupChecklist';
 import { SetupChecklist } from '../components/SetupChecklist';
+import { EditionsCard, RunAgainFooter, nextEditionOf, useEditions } from '../components/TournamentEditions';
 import { Markdown } from '../components/Markdown';
 import { EVENT_CATEGORIES, inlineFieldKeys } from '../data/tournamentForm';
 import { assignableMatches } from '../data/scorerAssign';
@@ -131,6 +132,10 @@ export default function TournamentProfileScreen() {
     void getTournamentAwards(params.tournamentId).then((a) => on && setAwards(a));
     return () => { on = false; };
   }, [params.tournamentId]);
+
+  // Run it again: the series this tournament belongs to (2025 · 2026 · 2027).
+  const editions = useEditions(tournament);
+  const nextEdition = tournament ? nextEditionOf(editions, tournament.id) : undefined;
 
   // Individual-host list (managed in-place); org-hosted tournaments manage hosts
   // through the organization instead.
@@ -653,6 +658,7 @@ export default function TournamentProfileScreen() {
             <Text style={textStyles.muted}>
               Organized by {currentOwnerLabel}{creatorName ? ` · Created by ${creatorName}` : ''}
             </Text>
+            <EditionsCard editions={editions} currentId={tournament.id} onOpen={(id) => nav.push('Tournament', { tournamentId: id })} />
             {tournament.participation && tournament.participation !== 'open' && (
               <Text style={textStyles.muted}>Contested by: {tournament.participation === 'inter_house' ? `🏠 ${term(viewerMarket, 'interHouse')} (Houses compete)` : PARTICIPATION_LABEL[tournament.participation]}</Text>
             )}
@@ -778,6 +784,13 @@ export default function TournamentProfileScreen() {
                 ))}
               </Card>
             )}
+
+            <RunAgainFooter
+              tournament={tournament} canManage={canManageHosts} next={nextEdition}
+              onRunAgain={() => nav.navigate('CopyTournament', { tournamentId: tournament.id, mode: 'next' })}
+              onCopy={() => nav.navigate('CopyTournament', { tournamentId: tournament.id, mode: 'clone' })}
+              onOpen={(id) => nav.push('Tournament', { tournamentId: id })}
+            />
           </>
         )}
 
@@ -789,6 +802,13 @@ export default function TournamentProfileScreen() {
 
             <SectionHeader title="Tournament" />
             <HubRow icon="✎" title="Edit details" status="Name, dates, sports, registration" onPress={() => nav.navigate('EditTournament', { tournamentId: tournament.id })} />
+            {/* Run it again: the next edition (linked), or this set-up for another tournament */}
+            <HubRow
+              icon="🔁" title="Run it again"
+              status={nextEdition ? `Next edition: ${nextEdition.name}` : 'Next edition — same sports, rules, age groups, venues, events'}
+              onPress={() => (nextEdition ? nav.push('Tournament', { tournamentId: nextEdition.id }) : nav.navigate('CopyTournament', { tournamentId: tournament.id, mode: 'next' }))}
+            />
+            <HubRow icon="📋" title="Copy this setup" status="A separate tournament with the same set-up" onPress={() => nav.navigate('CopyTournament', { tournamentId: tournament.id, mode: 'clone' })} />
             {/* SD-154: a feeder round — its top teams qualify into another tournament */}
             <QualifiesToCard tournament={tournament} />
             {tournament.sports.map((sp) => {

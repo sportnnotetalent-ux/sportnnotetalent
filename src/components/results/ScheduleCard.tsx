@@ -29,8 +29,11 @@ export function useSchedule(): ScheduleState {
 
 interface Row { day: string; time: string }
 
-export function ScheduleCard({ state, tournamentId, discipline, plan, combined, stage, athleteIds }: {
+export function ScheduleCard({ state, tournamentId, discipline, plan, combined, stage, athleteIds, preset }: {
   state: ScheduleState;
+  /** Run it again: the event's slots carried from the last edition (the
+   *  programme) — used instead of the suggestions until the organiser edits */
+  preset?: PhaseSched;
   tournamentId?: string;
   discipline: string;
   plan?: { phase: PhaseKind; heats: number }[];
@@ -55,10 +58,11 @@ export function ScheduleCard({ state, tournamentId, discipline, plan, combined, 
   }, [items, tournament, mz.zone]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [on, setOn] = useState(true);
-  const [area, setArea] = useState(defaultArea(def));
+  const presetArea = preset?.rounds.find((r) => r.phaseNo === 1)?.area;
+  const [area, setArea] = useState(presetArea ?? defaultArea(def));
   const [rows, setRows] = useState<Row[]>([]);
   const [touched, setTouched] = useState(false);
-  useEffect(() => { if (!touched) setArea(defaultArea(def)); }, [def?.key]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (!touched) setArea(presetArea ?? defaultArea(def)); }, [def?.key, presetArea]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Suggested slots (until the organiser edits one).
   const shape = `${n}|${(plan ?? []).map((p) => p.phase).join(',')}|${combined?.day2 ?? ''}|${stage ? 1 : 0}`;
@@ -71,8 +75,10 @@ export function ScheduleCard({ state, tournamentId, discipline, plan, combined, 
       combined, stage, minutes: (plan ?? []).map((p) => estMinutes(def, p.heats)),
     });
     while (ats.length < n) ats.push(ats[ats.length - 1]);
-    setRows(ats.slice(0, n).map((a) => ({ day: dayKey(a), time: hhmm(a) })));
-  }, [shape, loading, tournamentId, area, items.length, days.join()]); // eslint-disable-line react-hooks/exhaustive-deps
+    // Run it again: last edition's slot for each round it had
+    const carried = (i: number) => preset?.rounds.find((r) => r.phaseNo === i + 1)?.at;
+    setRows(ats.slice(0, n).map((a, i) => { const at = carried(i) ?? a; return { day: dayKey(at), time: hhmm(at) }; }));
+  }, [shape, loading, tournamentId, area, items.length, days.join(), preset?.rounds.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const ats = rows.map((r) => atOf(r.day, r.time));
   useEffect(() => {

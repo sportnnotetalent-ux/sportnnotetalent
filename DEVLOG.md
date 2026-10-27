@@ -13,6 +13,55 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-27 — Run it again (next edition) and Copy this setup (any tournament)
+Founder: "go ahead with Run it again next year. Also, for each tournament organized by others as well, create a clone option … so they can easily retrieve aspects like the same sports, format, rules, events and venues."
+- **🔁 Run it again** (organisers only), from **Manage › Run it again** or the "🏁 That's a wrap" card on a finished tournament's Info tab.
+  - Makes the next edition with the same set-up. The dates move on a year, or more so it starts from today.
+  - The name's year moves on ("2026" → "2027", "2025-26" → "2026-27"); a name with no year gets one added.
+  - The host stays the same community when you can still organise for it; a personally hosted tournament keeps its co-hosts.
+  - It is linked as an edition: both pages show **📅 Every edition** ("2025 · 2026 · 2027"), and Manage shows "Next edition: …" once it exists.
+- **📋 Copy this setup** (anyone signed in, any tournament), from the foot of the Info tab or **Manage › Copy this setup**.
+  - Makes a separate tournament of your own, not linked as an edition.
+  - Someone else's tournament comes without its logo, banner, contact details and records. Its About & rules text comes only if you tap **＋ Also copy the About & rules text**, and you type your own name for it.
+- **What comes across:**
+  - every sport's format, points, rules, tie-breaks, stats to track and leader minimums;
+  - the structure and knockout format, participation and medal scoring;
+  - age groups, venues, city and time zone;
+  - registration limits, and the deadline moved with the dates;
+  - the players' age rule and reminder times;
+  - the meet's events.
+  - Meet records come across only for the next edition, because a record stands until it's broken.
+- **What doesn't:** teams, players, fixtures, entries, results, and this edition's data inside the formats: the entries desk, hand-kept standings, an Americano field, points deductions, Swiss withdrawals and byes (the ½-point-bye limit stays), and prize hand edits.
+  - Registration always starts closed, and a feeder link isn't copied.
+- **Invite last time's teams** (next edition, optional): each confirmed team is invited into the age group with the same name, and every captain gets the usual "📨 You're invited" notification.
+- **A meet's events become its programme** (`formats[sport].programme`), because a results-engine event can't exist without a start list.
+  - The hub shows **🔁 Events from last time** with **Set up ›** and **✕ Not this time**.
+  - The entries desk shows them as columns before they're set up.
+  - Athletics and swimming setup pre-fill from last time: the rounds preset, the timetable slot and area, bar heights, implement, take-off board, wind gauge, stats to track and pool length.
+  - Other event sports list the carried events, but their setups don't pre-fill yet.
+- **Files:**
+  - `src/data/tournamentCopyPlan.ts` (pure: dates, names, format cleaning, programme, plan, editions);
+  - `src/data/tournamentCopy.ts` (load, create, invite, `getEditions`);
+  - `src/screens/CopyTournamentScreen.tsx`, `src/components/TournamentEditions.tsx`;
+  - the hub card in `AthleticsHub.tsx`; `ScheduleCard` `preset`; the setup pre-fill in `AthleticsEventSetupScreen.tsx`; `entryEvents(…, carried)`;
+  - `createTournament({ previousEditionId })`, which retries unlinked before the migration.
+- **Migration `20261027140000_tournament_editions.sql`:** adds `previous_edition_id` and `first_edition_id`, with trigger `guard_tournament_edition`.
+  - Only the earlier edition's organisers can link a new tournament after it, so nobody can add their event to a famous tournament's history.
+  - The next edition must start later.
+  - The link is set only at creation. Clients can't change it later, which also rules out loops.
+  - Before the migration runs, "Run it again" still creates the tournament, unlinked, with a notice.
+- **Guides:**
+  - New guide: "Run a tournament again, or copy one's setup" (`website/guides/run-it-again.md`).
+  - The guide builder now renders tables, with wrapping headers and sideways scroll on phones.
+  - Fixes the two verification guides published earlier today, whose code tables were showing as raw "|" text on sportnnote.in.
+- **Verified:**
+  - `tests/run-it-again.test.mts` (21, including a site build check that the three guides' tables render); full suite 4,789 pass; tsc clean; Postgres's parser accepts the migration.
+  - Demo at 375 px:
+    - Run it again on a football/basketball/cricket tournament made "… 2027" with the dates a year on, and both pages showed "2026 › · 2027 · this one".
+    - On a target meet it carried 4 events and invited its 4 houses (Invited · 4).
+    - Copy this setup carried a high jump whose setup opened with the 1.15 m opening height, "Jumps pit B" and 14:45 from the original.
+    - No console errors.
+
 ### 2026-10-27 — More educational institutions: junior / PU colleges, universities, polytechnics, ITIs
 Founder: "there are other educational institutions apart from schools like colleges etc who should also be able to set up communities, verify themselves, and in turn host various sports tournaments year on year."
 - **Four new community types:** **Junior / PU college** (UDISE+), **University** (AISHE U-), **Polytechnic / institute** (AISHE S- / C-; covers diploma, nursing, teacher training …) and **ITI**.

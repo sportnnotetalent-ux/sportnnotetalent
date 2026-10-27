@@ -1,6 +1,6 @@
 ---
 title: Verify your school, college or institute on SportnNote
-description: Get the ✓ for a school, junior college, college, university, polytechnic or ITI in three steps — official code, a recognition document, and proof you're authorised. Usually checked within a day.
+description: Get the ✓ for a school, college, university, polytechnic or ITI with its official code, a recognition document and proof you're authorised.
 category: Teams & players
 audience: Organisers
 sports: all

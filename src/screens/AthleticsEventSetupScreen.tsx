@@ -9,7 +9,7 @@
  *  SD-94: the same screen sets up a swimming event (`sport: 'swimming'`): the
  *  pool length, events by stroke, medley-relay legs, World Aquatics seeding
  *  (SW 3.1 — no lane draw) and the timed-final / heats → final presets. */
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
 import { KeyboardAwareScrollView, KeyboardFooterLayout } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -39,6 +39,7 @@ import {
 import { getEntriesDoc } from '../data/meetEntriesStore';
 import { tickedFor, slotKey, matchTeam, type MeetEntriesDoc } from '../data/results';
 import { ScheduleCard, useSchedule } from '../components/results/ScheduleCard';
+import { barSettings, programmeEventFor, readProgramme } from '../data/tournamentCopyPlan';
 import { WeightliftingEventSetup } from './WeightliftingEventSetup';
 import { ShootingEventSetup } from './ShootingEventSetup';
 import { ArcheryEventSetup } from './ArcheryEventSetup';
@@ -153,6 +154,28 @@ function TrackSwimEventSetup() {
   const stepChoices = def.key === 'ath.pv' ? [0.2, 0.15, 0.1, 0.05] : [0.1, 0.05, 0.04, 0.03, 0.02];
   useEffect(() => { if (!events.some((e) => e.discipline === discipline)) setDiscipline(events[0].discipline); }, [events, discipline]);
 
+  // Run it again: this event as it was set up last edition (the meet's carried
+  // programme) — its field settings, stats and timetable slots fill in once.
+  const carried = useMemo(
+    () => (params?.discipline ? programmeEventFor(readProgramme(tournament?.formats?.[sport] as Record<string, unknown> | undefined, sport), params.discipline, { age: params.age, gender: params.gender }) : undefined),
+    [tournament?.formats, sport, params?.discipline, params?.age, params?.gender],
+  );
+  const prefilled = useRef(false);
+  useEffect(() => {
+    if (!carried || prefilled.current || discipline !== carried.discipline) return;
+    prefilled.current = true;
+    const set = carried.settings ?? {};
+    if (set.implement) setImplement(set.implement);
+    if (set.board) setBoard(set.board);
+    if (set.noWindGauge) setGauge(false);
+    if (set.bar?.length) {
+      const b = barSettings(set.bar);
+      setBarStart(b.start.toFixed(2)); setBarStep(b.step); setBarChange(b.changeAt.toFixed(2)); setBarStep2(b.step2);
+    }
+    if (set.track) setTrack(set.track);
+    if (swim && carried.category?.course) setCourse(carried.category.course);
+  }, [carried, discipline]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Teams / houses: the tournament's participating teams (with their rosters);
   // before any are added, the houses from players' house names.
   const [sources, setSources] = useState<Source[]>([]);
@@ -256,6 +279,13 @@ function TrackSwimEventSetup() {
   const presets: RoundsPreset[] = useMemo(() => (n ? roundPresets(def, n) : []), [def, n]);
   const [presetKey, setPresetKey] = useState<RoundsPreset['key']>('wa');
   const preset = presets.find((p) => p.key === presetKey) ?? presets[0];
+  // Run it again: the same rounds as last time (heats → final, or a straight final), until the organiser picks
+  const pickedRounds = useRef(false);
+  useEffect(() => {
+    if (pickedRounds.current || !carried?.rounds?.length) return;
+    const same = presets.find((p) => p.plan.map((r) => r.phase).join() === carried.rounds!.join());
+    if (same && same.key !== presetKey) setPresetKey(same.key);
+  }, [presets, carried]); // eslint-disable-line react-hooks/exhaustive-deps
   const [lanes, setLanes] = useState<'draw' | 'seeded'>('draw');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -443,7 +473,7 @@ function TrackSwimEventSetup() {
           {n > 0 && (
             <Card style={st.card}>
               <Text style={textStyles.h3}>4 · Rounds</Text>
-              <View style={st.wrap}>{presets.map((p) => <SelectChip key={p.key} label={p.label} active={preset?.key === p.key} onPress={() => setPresetKey(p.key)} />)}</View>
+              <View style={st.wrap}>{presets.map((p) => <SelectChip key={p.key} label={p.label} active={preset?.key === p.key} onPress={() => { pickedRounds.current = true; setPresetKey(p.key); }} />)}</View>
               {preset && <Text style={textStyles.body}>{describePlan(preset.plan)}</Text>}
               {field && preset?.plan.some((p) => p.phase === 'qualification') && (
                 <View style={st.pickRow}>
@@ -545,7 +575,7 @@ function TrackSwimEventSetup() {
           {!swim && meet.handTimed ? <Text style={textStyles.muted}>This meet is hand-timed (Athletics settings): times are read to the tenth and count for meet records.</Text> : null}
           {swim && sw.manual ? <Text style={textStyles.muted}>Manual timing (Swimming settings): times to 1/100 from the lane's watches (SW 11.3) count for meet records.</Text> : null}
           <EventTrackCard def={def} f={{ reaction: swim ? sw.reaction : meet.reaction, splits: swim ? sw.splits : undefined, track }} meet={tournament?.formats?.[sport] as Record<string, unknown> | undefined} onChange={setTrack} />
-          {n > 0 ? <ScheduleCard state={schedule} tournamentId={tournamentId} discipline={def.key} plan={preset?.plan} athleteIds={relay ? relays.flatMap((r) => r.members) : picks.map((p) => p.playerId)} /> : null}
+          {n > 0 ? <ScheduleCard state={schedule} tournamentId={tournamentId} discipline={def.key} plan={preset?.plan} athleteIds={relay ? relays.flatMap((r) => r.members) : picks.map((p) => p.playerId)} preset={carried?.discipline === discipline ? carried.sched : undefined} /> : null}
           <EventOfficials tournament={tournament} value={officials} onChange={setOfficials} />
         </KeyboardAwareScrollView>
       </KeyboardFooterLayout>

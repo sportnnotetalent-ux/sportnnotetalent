@@ -703,6 +703,10 @@ export interface Tournament {
   /** SD-154: a feeder — its top N go through to another tournament (county →
    *  national, zonal → national, state playoffs). See data/feeders.ts. */
   qualifiesTo?: { tournamentId: UUID; tournamentName?: string; topN: number; per: 'group' | 'overall'; sport?: SportId };
+  /** Run it again: the edition before this one, and the series' first edition
+   *  (migration 20261027140000_tournament_editions; data/tournamentCopy.ts). */
+  previousEditionId?: UUID;
+  firstEditionId?: UUID;
   /** soft-deleted by the organiser (hidden from lists; stats survive) */
   deletedAt?: string;
   /** The people who run this tournament (player ids). Any host can manage it and

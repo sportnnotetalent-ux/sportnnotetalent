@@ -53,7 +53,8 @@ Use nothing else:
 - Paragraphs.
 - `-` bullets and `1.` numbered steps; **no nested lists** (an indented line joins the item above). A numbered list under a heading containing "step" (any case, even "Next steps") renders as big step cards.
 - Front matter is single-line `key: value`; category and audience must match the lists above exactly or the build fails.
-- Not supported: `#` headings, tables, italics, raw HTML.
+- Tables: a `| a | b |` header row, a `|---|---|` separator, then one row per line (no line breaks inside a cell). Keep them to a few short columns: they scroll sideways on a phone.
+- Not supported: `#` headings, italics, raw HTML.
 - `**bold**` for exact button and tab names, as they appear in the app (e.g. **Take over**, **⚙ Manage**).
 - `` `code` `` for things you type (e.g. a join code).
 - `[text](url)`: links to other guides use `/guides/<slug>/`; links to the app use `https://app.sportnnote.in`.

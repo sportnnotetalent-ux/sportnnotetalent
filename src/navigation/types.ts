@@ -162,6 +162,8 @@ export type RootStackParamList = {
   /** tab: open on a tab (e.g. 'Settings' right after creating it) */
   Tournament: { tournamentId: string; tab?: string };
   EditTournament: { tournamentId: string };
+  /** Run it again (mode 'next', the organisers) / copy anyone's set-up ('clone'). */
+  CopyTournament: { tournamentId: string; mode?: 'next' | 'clone' };
   Organization: { orgId: string };
   Notifications: undefined;
   Calendar: undefined;
