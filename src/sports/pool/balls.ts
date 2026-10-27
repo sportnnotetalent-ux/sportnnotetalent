@@ -36,6 +36,12 @@ export const TOP: Record<PoolGame, number> = { eight: 15, nine: 9, ten: 10 };
 export const MONEY: Record<PoolGame, number> = { eight: 8, nine: 9, ten: 10 };
 export const GAME_LABEL: Record<PoolGame, string> = { eight: '8-Ball', nine: '9-Ball', ten: '10-Ball' };
 
+/** A known game, or null — a stored value is never used as a raw object key
+ *  ("__proto__" would return Object.prototype — breaks #9). */
+export const knownGame = (v: unknown): PoolGame | null => (v === 'eight' || v === 'nine' || v === 'ten' ? v : null);
+/** "8-Ball", or "Pool" for a value that isn't a game. */
+export const gameLabel = (v: unknown): string => { const g = knownGame(v); return g ? GAME_LABEL[g] : 'Pool'; };
+
 const range = (a: number, b: number): number[] => Array.from({ length: b - a + 1 }, (_, i) => a + i);
 /** 8-ball groups (WPA 4, preamble): solids 1–7, stripes 9–15. */
 export const SOLIDS: readonly number[] = range(1, 7);

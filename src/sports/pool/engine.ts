@@ -18,7 +18,7 @@
 import type { ScoreSummary } from '../types';
 import { scoreLine as lineOf, finalSummary, pointsLineScore, type LineScore } from '../scoreline.ts';
 import {
-  type PoolGame, type Side, isSide, other, TOP, MONEY, GAME_LABEL, SOLIDS, STRIPES, fullRack,
+  type PoolGame, type Side, isSide, other, TOP, MONEY, gameLabel, knownGame, SOLIDS, STRIPES, fullRack,
   readBalls, readInt, readBool, readGame, own, ownRecord,
 } from './balls.ts';
 
@@ -365,7 +365,7 @@ const isTally = (v: unknown): boolean => isObj(v) && isObj(v.foulsBy);
  *  its shape. Anything else (a corrupted or foreign snapshot) is never played
  *  on — the reducer hands it back unchanged (breaks #24). */
 function playable(s: PoolState): boolean {
-  if (!isObj(s) || s.v !== 1 || !Object.prototype.hasOwnProperty.call(TOP, s.game)) return false;
+  if (!isObj(s) || s.v !== 1 || !knownGame(s.game)) return false;
   if (!Array.isArray(s.racks) || !Array.isArray(s.sets) || !isPair(s.current) || !isPair(s.setsWon)) return false;
   if (!isObj(s.tally) || !isTally(s.tally.home) || !isTally(s.tally.away)) return false;
   const r = s.rack;
@@ -825,7 +825,7 @@ export function lineScore(s: PoolState): LineScore | null {
 /** The scoreboard: racks in the set in play; once over, sets (or racks) won. */
 export function summary(s: PoolState): ScoreSummary {
   if (!isState(s)) return { homeScore: '0', awayScore: '0', statusLine: 'Pool' };
-  const label = GAME_LABEL[s.game] ?? 'Pool';
+  const label = gameLabel(s.game); // never a raw lookup by a stored value (breaks #9)
   if (s.ended) return setMode(s) ? finalSummary(s.setsWon, scoreLine(s)) : finalSummary(raceRacks(s), '');
   const line = scoreLine(s);
   const rackNo = s.rack?.n ?? s.racks.length + 1;

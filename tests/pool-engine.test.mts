@@ -917,4 +917,12 @@ describe('breaks (docs/security/breaks/pool-engine.md)', () => {
       assert.ok(st!.rack);
     }
   });
+
+  test('#9: a state value is never used as a raw object key ("__proto__" game → "Pool", not "[object Object]")', () => {
+    const s = pool.createInitialState(NINE);
+    for (const game of ['__proto__', 'constructor', 'toString', 'snooker']) {
+      const line = pool.summary({ ...s, game } as unknown as pool.PoolState).statusLine;
+      assert.equal(line, 'Pool · Rack 1', game);
+    }
+  });
 });
