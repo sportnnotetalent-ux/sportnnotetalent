@@ -79,6 +79,10 @@ export interface LiveFrame {
   respot?: true;
   /** strokes played on the re-spotted black (the lots can be recorded before the first) */
   respotShots?: number;
+  /** who made the re-spotted black's opening stroke (a re-rack keeps them, S3 R17(d)) */
+  respotFirst?: Side;
+  /** B-19 — stalemate re-racks of this frame (S3 R17) */
+  reracks?: number;
   visit: Visit;
   visits: VisitRecord[];
   fouls: FoulRecord[];
@@ -106,6 +110,8 @@ export interface FrameRecord {
   fouls?: FoulRecord[];
   conceded?: Side;
   reason?: AwardReason;
+  /** B-19 — the frame was re-racked after a stalemate (S3 R17) */
+  reracks?: number;
 }
 
 export interface SnookerState {
@@ -228,6 +234,7 @@ function endFrame(s: SnookerState, fr: LiveFrame, winner: Side, how: FrameHow, e
   const rec: FrameRecord = {
     n: fr.n, breaker: fr.breaker, score: [fr.score.home, fr.score.away], winner, how,
     ...(how === 'quick' ? { quick: true as const } : { visits, fouls: fr.fouls }),
+    ...(fr.reracks ? { reracks: fr.reracks } : {}),
     ...extra,
   };
   const framesWon = { ...s.framesWon, [winner]: s.framesWon[winner] + 1 };
@@ -245,13 +252,14 @@ function blackDecides(s: SnookerState, fr: LiveFrame, how: FrameHow, last: Side)
   const { home, away } = fr.score;
   if (home !== away) return endFrame(s, fr, home > away ? 'home' : 'away', how);
   const striker = other(last);
-  return { ...s, frame: { ...fr, on: 'black', respot: true, respotShots: 0, striker, visit: emptyVisit(striker) }, seq: s.seq + 1 };
+  return { ...s, frame: { ...fr, on: 'black', respot: true, respotShots: 0, respotFirst: striker, striker, visit: emptyVisit(striker) }, seq: s.seq + 1 };
 }
 
 // ------------------------------------------------------------ reducer --
 
-/** B-02 — the actions that end a frame; each must carry `payload.frame`. */
-export const FRAME_ENDERS: ReadonlySet<string> = new Set(['CONCEDE', 'AWARD_FRAME', 'FRAME_SCORE']);
+/** B-02 — the actions that end (or, B-19, restart) a frame; each must carry
+ *  `payload.frame`. */
+export const FRAME_ENDERS: ReadonlySet<string> = new Set(['CONCEDE', 'AWARD_FRAME', 'FRAME_SCORE', 'RERACK']);
 
 const isScore = (v: unknown): v is { home: number; away: number } => isObj(v) && num(v.home) !== undefined && num(v.away) !== undefined;
 const isPair = (v: unknown): v is [number, number] => Array.isArray(v) && v.length === 2 && num(v[0]) !== undefined && num(v[1]) !== undefined;
@@ -347,7 +355,20 @@ function reduce(s: SnookerState, a: SnookerAction): SnookerState {
       const side = named();
       // B-15 — naming the player already to play changes nothing
       if (!side || !fr.respot || (fr.respotShots ?? 0) > 0 || side === fr.striker) return s;
-      return { ...s, frame: { ...fr, striker: side, visit: emptyVisit(side) }, seq: s.seq + 1 };
+      return { ...s, frame: { ...fr, striker: side, respotFirst: side, visit: emptyVisit(side) }, seq: s.seq + 1 };
+    }
+    case 'RERACK': {
+      // B-19 — S3 R17 stalemate: every score of the frame nullified and the
+      // balls re-set, the same player breaks again (R17(b)–(c)); on the
+      // re-spotted black only the black is re-spotted, the same player to
+      // start (R17(d))
+      const reracks = (fr.reracks ?? 0) + 1;
+      if (fr.respot) {
+        const first = isSide(fr.respotFirst) ? fr.respotFirst : fr.striker;
+        const { freeBall: _f, pending: _p, missRun: _m, ...rest } = fr;
+        return { ...s, frame: { ...rest, striker: first, visit: emptyVisit(first), respotShots: 0, reracks }, seq: s.seq + 1 };
+      }
+      return { ...s, frame: { ...newFrame(fr.n, fr.breaker, s.reds), reracks }, seq: s.seq + 1 };
     }
     case 'BREAK_OFF': {
       const side = named();

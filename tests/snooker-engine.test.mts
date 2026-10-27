@@ -20,7 +20,7 @@ const SAFE: A = { type: 'SAFETY' };
 const foul = (value: unknown, extra: Record<string, unknown> = {}): A => ({ type: 'FOUL', payload: { value, ...extra } });
 /** B-02 — what the scorer's controls do: a frame-ending action carries the
  *  number of the frame it was tapped in. */
-const ENDERS = new Set(['CONCEDE', 'AWARD_FRAME', 'FRAME_SCORE']);
+const ENDERS = new Set(['CONCEDE', 'AWARD_FRAME', 'FRAME_SCORE', 'RERACK']);
 const stamp = (s: S.SnookerState, a: A): A =>
   (ENDERS.has(a?.type) && s?.frame && a.payload?.frame === undefined ? { ...a, payload: { ...(a.payload ?? {}), frame: s.frame.n } } : a);
 const ui = (s: S.SnookerState, a: A) => S.reducer(s, stamp(s, a));
@@ -836,5 +836,34 @@ describe('snooker · break list', () => {
     assert.equal(st.home.detailedFrames, 1, 'only frame 2 had strokes');
     assert.equal(st.home.quickFrames, 0);
     assert.equal(st.home.framesWon, 1);
+  });
+
+  test('B-19 a stalemate re-rack (S3 R17): scores nullified, the same player breaks again', () => {
+    const s = run([{ type: 'BREAK_OFF', side: 'away' }, pot('red'), pot('black'), MISS, SAFE, SAFE, SAFE]);
+    assert.equal(S.reducer(s, { type: 'RERACK' }), s, 'the frame number is required');
+    const r = step(s, { type: 'RERACK' });
+    assert.equal(f(r).n, 1);
+    assert.deepEqual(f(r).score, { home: 0, away: 0 });
+    assert.equal(f(r).redsLeft, 15);
+    assert.equal(f(r).on, 'red');
+    assert.equal(f(r).striker, 'away', 'the same player makes the opening stroke (R17(c))');
+    assert.deepEqual(f(r).visits, []);
+    assert.deepEqual(f(r).fouls, []);
+    assert.equal(f(r).reracks, 1);
+    assert.equal(S.snookerStats(r).away.highestBreak, 0, 'the nullified frame\'s breaks are gone');
+    const done = step(r, { type: 'CONCEDE', side: 'home' });
+    assert.equal(done.frames[0].reracks, 1);
+  });
+
+  test('B-19 a stalemate on the re-spotted black: only the black is re-spotted, the same player starts (R17(d))', () => {
+    let s = run([SAFE, foul(5), ...pairs(8), MISS, ...pairs(7), ...clearance().slice(0, 5), MISS, pot('black'), { type: 'RESPOT_TURN', side: 'home' }, SAFE, SAFE]);
+    assert.equal(f(s).striker, 'home');
+    s = step(s, SAFE);
+    assert.equal(f(s).striker, 'away');
+    s = step(s, { type: 'RERACK' });
+    assert.equal(f(s).respot, true);
+    assert.deepEqual(f(s).score, { home: 76, away: 76 }, 'the scores stand');
+    assert.equal(f(s).striker, 'home', 'the player who opened the re-spotted black');
+    assert.equal(f(s).respotShots, 0);
   });
 });
