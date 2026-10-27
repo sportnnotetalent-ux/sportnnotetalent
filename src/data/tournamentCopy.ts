@@ -12,21 +12,31 @@ import {
   NeedsDbUpdateError,
 } from './repos';
 import { getResultsPhases } from './resultsStore';
-import { copyFormats, editionList, shiftProgrammeDays, type CopyPlan, type CopySource, type EditionRow } from './tournamentCopyPlan';
+import { getFieldEntries, getFieldEvents } from './golf';
+import { copyFormats, editionList, shiftGolfRoundDays, shiftProgrammeDays, type CopyPlan, type CopySource, type EditionRow } from './tournamentCopyPlan';
 
 const live = () => isSupabaseConfigured && !!supabase;
 
-/** Everything the copy reads from the source: the tournament, its age groups
- *  and its meet events (the entries are read only for "invite last year's teams"). */
+/** Everything the copy reads from the source: the tournament, its age groups,
+ *  its meet events and golf rounds (the entries are read only for "invite last
+ *  year's teams", the golfers only for how the groups went off). */
 export async function loadCopySource(tournamentId: string): Promise<CopySource & { entries: TournamentEntry[] }> {
   const tournament = (await getTournaments({ includeDeleted: true })).find((t) => t.id === tournamentId);
   if (!tournament) throw new Error('Tournament not found.');
-  const [categories, phases, entries] = await Promise.all([
+  const [categories, phases, entries, golf] = await Promise.all([
     getTournamentCategories(tournamentId).catch(() => []),
     getResultsPhases({ tournamentId }).catch(() => []),
     getTournamentEntries(tournamentId).catch(() => [] as TournamentEntry[]),
+    tournament.sports.includes('golf') ? loadGolfRounds(tournamentId) : Promise.resolve(undefined),
   ]);
-  return { tournament, categories, phases, entries };
+  return { tournament, categories, phases, entries, ...(golf ? { golf } : {}) };
+}
+
+async function loadGolfRounds(tournamentId: string): Promise<CopySource['golf']> {
+  const rounds = await getFieldEvents({ tournamentId, sport: 'golf' }).catch(() => []);
+  if (!rounds.length) return undefined;
+  const entries = await getFieldEntries(rounds.map((r) => r.id)).catch(() => []);
+  return { rounds, entries };
 }
 
 export interface CopyResult {
@@ -58,8 +68,10 @@ export async function copyTournament(src: CopySource & { entries?: TournamentEnt
   const deadline = plan.fields.registrationDeadline && shiftDays
     ? new Date(Date.parse(plan.fields.registrationDeadline) + shiftDays * 86_400_000).toISOString()
     : plan.fields.registrationDeadline;
-  // …and the events' timetable slots.
-  const formats = shiftDays ? copyFormats(prev.formats, { records: next, programme: shiftProgrammeDays(plan.programme, shiftDays) }) : plan.fields.formats;
+  // …and the events' timetable slots and golf tee times.
+  const formats = shiftDays
+    ? copyFormats(prev.formats, { records: next, programme: shiftProgrammeDays(plan.programme, shiftDays), golfRounds: shiftGolfRoundDays(plan.golfRounds, shiftDays) })
+    : plan.fields.formats;
   const created = await createTournament({
     ...plan.fields,
     formats,

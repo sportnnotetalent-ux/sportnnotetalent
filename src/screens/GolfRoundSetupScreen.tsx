@@ -1,8 +1,9 @@
 /** Set up a golf round (stroke play / Stableford): course (pick or quick-create
  *  from the scorecard), format, players + their Handicap Index, and automatic
  *  groups/tee times. With `nextOf`, sets up the NEXT round of a tournament —
- *  same course/format, players carried over through an optional cut. */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+ *  same course/format, players carried over through an optional cut. On a
+ *  Run it again edition, each round opens as last time set it up. */
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
 import { KeyboardAwareScrollView, KeyboardFooterLayout } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -29,6 +30,8 @@ import { getSportMeta } from '../sports/sportMeta';
 import { holesFor, makesCut, type CutRule } from '../sports/golf/engine';
 import type { GolfCourse, Team } from '../core/types';
 import { golfTeamFormatOf, type GolfTeamFormat } from '../data/golfTeams';
+import { readGolfRounds } from '../data/tournamentCopyPlan';
+import { CarriedNote } from '../components/results/CarriedNote';
 import type { RootStackParamList } from '../navigation/types';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -44,7 +47,8 @@ export default function GolfRoundSetupScreen() {
   const { profile } = useAuth();
   const allPlayers = usePlayers();
   const tournamentId = params?.tournamentId;
-  const tournamentName = useTournamentById(tournamentId)?.name;
+  const tournament = useTournamentById(tournamentId);
+  const tournamentName = tournament?.name;
 
   const [title, setTitle] = useState(tournamentId ? 'Round 1' : 'Round with friends');
   const [roundNo, setRoundNo] = useState(1);
@@ -79,7 +83,8 @@ export default function GolfRoundSetupScreen() {
   // Quick-create course (SD-122: the same editor as "Edit course")
   const [newCourse, setNewCourse] = useState(false);
 
-  useEffect(() => { getGolfCourses().then((cs) => { setCourses(cs); if (cs.length && !courseId) setCourseId(cs[0].id); }); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // the first course unless a round already picked one (last round's / last time's)
+  useEffect(() => { getGolfCourses().then((cs) => { setCourses(cs); if (cs.length) setCourseId((cur) => cur ?? cs[0].id); }); }, []);
   // SD-122 — back from "Edit course": pick up new tees / pars
   useFocusEffect(useCallback(() => { getGolfCourses().then(setCourses).catch(() => {}); }, []));
 
@@ -118,6 +123,37 @@ export default function GolfRoundSetupScreen() {
       }
     })();
   }, [params?.nextOf, tournamentId, allPlayers.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Run it again: this round as last edition set it up (formats.golf.roundPlan) —
+  // its name, tee time and groups, and the cut; round 1 also its course, tees,
+  // format and team rule (later rounds take those from this year's last round).
+  const planned = useMemo(
+    () => readGolfRounds(tournament?.formats?.golf as Record<string, unknown> | undefined).find((r) => r.roundNo === roundNo),
+    [tournament?.formats, roundNo],
+  );
+  const appliedPlan = useRef<number | null>(null);
+  const [carriedTitle, setCarriedTitle] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    if (!planned || appliedPlan.current === planned.roundNo) return;
+    if (params?.nextOf && !prev) return; // this year's last round first
+    appliedPlan.current = planned.roundNo;
+    setCarriedTitle(planned.title);
+    setTitle(planned.title);
+    const t = Date.parse(planned.startsAt);
+    if (!Number.isNaN(t)) setWhen(new Date(t));
+    if (planned.groupSize) setGroupSize(planned.groupSize);
+    if (planned.interval) setIntervalMin(planned.interval);
+    const cut = planned.format.cut as { type?: string; n?: number } | undefined;
+    if (cut?.type === 'top' && typeof cut.n === 'number' && cut.n > 0) setCutN(String(cut.n));
+    if (params?.nextOf) return;
+    if (typeof planned.format.courseId === 'string' && planned.format.courseId) setCourseId(planned.format.courseId);
+    setTee(typeof planned.format.tee === 'string' ? planned.format.tee : undefined);
+    setFormat((v) => ({ ...v, ...(planned.format as Record<string, FormatVal>) }));
+    const tr = golfTeamFormatOf({ format: planned.format });
+    if (tr) { setTeamOn(true); setTeamRule(tr); }
+  }, [planned, prev, params?.nextOf]);
+  const plannedCourseGone = !!planned && !params?.nextOf && typeof planned.format.courseId === 'string'
+    && courses.length > 0 && !courses.some((c) => c.id === planned.format.courseId) && courseId === planned.format.courseId;
 
   const course = courses.find((c) => c.id === courseId);
   const competition = String(format.competition ?? 'stroke');
@@ -259,6 +295,7 @@ export default function GolfRoundSetupScreen() {
       >
         <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
           <ScreenTitle title={params?.nextOf ? `⛳ Round ${roundNo}` : '⛳ New golf round'} subtitle="Stroke play or Stableford — everyone on one leaderboard" />
+          <CarriedNote title={carriedTitle} who="players" />
           <TextField label="Round name" value={title} onChange={setTitle} placeholder="e.g. Sunday medal" />
 
           <FieldLabel>Course</FieldLabel>
@@ -266,6 +303,7 @@ export default function GolfRoundSetupScreen() {
             {courses.map((c) => <SelectChip key={c.id} label={`${c.name}${c.city ? ` · ${c.city}` : ''}`} active={c.id === courseId} onPress={() => { setCourseId(c.id); setTee(undefined); }} />)}
             <SelectChip label="＋ New course" active={newCourse} onPress={() => setNewCourse(!newCourse)} />
           </View>
+          {plannedCourseGone && <Text style={st.warn}>Last time’s course isn’t on SportnNote any more. Pick the course, or add it.</Text>}
           {newCourse && <GolfCourseEditor onSave={saveCourse} onCancel={() => setNewCourse(false)} />}
           {course && !newCourse && mayEditCourse && (
             <Text style={st.link} accessibilityRole="button" onPress={() => nav.navigate('GolfCourseEdit', { courseId: course.id })}>

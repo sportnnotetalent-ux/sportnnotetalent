@@ -15,11 +15,12 @@
  * Neither copies teams, players, fixtures, entries or results. A meet's events
  * can't exist without a start list, so they come across as the meet's
  * programme (formats[sport].programme): the hub lists them and "Set up" opens
- * each one pre-filled, once its entries are in.
+ * each one pre-filled, once its entries are in. Golf rounds come across the
+ * same way, as the round plan (formats.golf.roundPlan).
  *
  * PURE (no React Native) — node tests load it.
  */
-import type { FieldEvent, NewTournamentCategory, SportId, Tournament, TournamentCategory } from '../core/types';
+import type { FieldEntry, FieldEvent, NewTournamentCategory, SportId, Tournament, TournamentCategory } from '../core/types';
 import { categoryKey, type Category, type PhaseFormat, type PhaseKind, type PhaseSched } from './results/model.ts';
 
 export type CopyMode = 'next' | 'clone';
@@ -87,7 +88,7 @@ const asObject = (v: unknown): Record<string, unknown> | null => {
  *  it's broken); the programme is replaced by `programme`. */
 export function copyFormats(
   formats: Tournament['formats'] | undefined,
-  opts: { records: boolean; programme?: Partial<Record<string, ProgrammeEvent[]>> },
+  opts: { records: boolean; programme?: Partial<Record<string, ProgrammeEvent[]>>; golfRounds?: GolfRoundPlan[] },
 ): NonNullable<Tournament['formats']> {
   const out: Record<string, Record<string, unknown>> = {};
   for (const [sport, raw] of Object.entries(formats ?? {})) {
@@ -95,6 +96,7 @@ export function copyFormats(
     const f: Record<string, unknown> = { ...(raw as Record<string, unknown>) };
     for (const k of EDITION_KEYS) delete f[k];
     delete f[PROGRAMME_KEY];
+    delete f[GOLF_ROUNDS_KEY];
     if (!opts.records) delete f.records;
     // Swiss: the ½-point-bye limit is a rule; withdrawals, byes and late entries are this edition's.
     if (f.swissOps !== undefined) {
@@ -115,6 +117,7 @@ export function copyFormats(
   for (const [sport, list] of Object.entries(opts.programme ?? {})) {
     if (list?.length) out[sport] = { ...(out[sport] ?? {}), [PROGRAMME_KEY]: JSON.stringify(list) };
   }
+  if (opts.golfRounds?.length) out.golf = { ...(out.golf ?? {}), [GOLF_ROUNDS_KEY]: JSON.stringify(opts.golfRounds) };
   return out as NonNullable<Tournament['formats']>;
 }
 
@@ -163,7 +166,7 @@ function pickSettings(f: PhaseFormat): ProgrammeSettings {
 const eventId = (e: Pick<ProgrammeEvent, 'sport' | 'discipline' | 'category'>) => `${e.sport}|${e.discipline}|${categoryKey(e.category)}`;
 
 /** The meet's programme for the copy: every results-engine event (its first
- *  round — golf rounds and other field events aren't part of it), then the
+ *  round — golf rounds aren't part of it: they're the round plan), then the
  *  events carried here earlier and never set up. Times move on `years`. */
 export function programmeFrom(
   phases: Pick<FieldEvent, 'sport' | 'format'>[],
@@ -262,12 +265,104 @@ export function programmeEventFor(programme: ProgrammeEvent[], discipline: strin
     ?? programme.find((e) => e.discipline === discipline && (e.category?.age ?? 'Open') === (category?.age ?? 'Open') && (e.category?.gender ?? 'X') === (category?.gender ?? 'X'));
 }
 
+/* ------------------------------- golf rounds ------------------------------ */
+
+/** A golf tournament's rounds carried from an earlier edition (formats.golf.roundPlan). */
+export const GOLF_ROUNDS_KEY = 'roundPlan';
+
+/** A round's own data inside its format — never carried: each player's tee,
+ *  the playoff winner, the course as it was played, the result alert and
+ *  highlights, and which round the cut came after (the new round works it out). */
+export const GOLF_ROUND_EDITION_KEYS = ['entryTees', 'playoffWinner', 'courseSnap', 'alert', 'highlights', 'cutAfterRound'] as const;
+
+/** One golf round as last edition set it up, before this year's players are in. */
+export interface GolfRoundPlan {
+  roundNo: number;
+  /** "Round 1", "Sunday medal" */
+  title: string;
+  /** the first tee time, moved on with the dates */
+  startsAt: string;
+  /** the course and tees, competition, holes, allowance, net, tie-break,
+   *  prizes, the team rule, the cut and the stats to track */
+  format: Record<string, unknown>;
+  /** how the groups went off: 2-, 3- or 4-ball … */
+  groupSize?: number;
+  /** … every 8, 10 or 12 minutes */
+  interval?: number;
+}
+
+/** How a round's groups went off — the largest group (2–4) and the gap between
+ *  groups' tee times (8, 10 or 12 minutes: the set-up screen's choices). */
+export function golfGroupsOf(entries: Pick<FieldEntry, 'groupNo' | 'teeTime'>[]): Pick<GolfRoundPlan, 'groupSize' | 'interval'> {
+  const sizes = new Map<number, number>();
+  const tees = new Map<number, number>();
+  for (const e of entries) {
+    sizes.set(e.groupNo, (sizes.get(e.groupNo) ?? 0) + 1);
+    const t = e.teeTime ? Date.parse(e.teeTime) : NaN;
+    if (!Number.isNaN(t) && !tees.has(e.groupNo)) tees.set(e.groupNo, t);
+  }
+  const size = Math.max(0, ...sizes.values());
+  const times = [...new Set(tees.values())].sort((a, b) => a - b);
+  const gaps = times.slice(1).map((t, i) => Math.round((t - times[i]) / 60_000)).filter((g) => g > 0);
+  const gap = gaps.length ? Math.min(...gaps) : 0;
+  return { ...([2, 3, 4].includes(size) ? { groupSize: size } : {}), ...([8, 10, 12].includes(gap) ? { interval: gap } : {}) };
+}
+
+/** The round plan for the copy: every round of last edition (by round number),
+ *  then the rounds carried there earlier and never set up. Tee times move on `years`. */
+export function golfRoundsFrom(
+  rounds: Pick<FieldEvent, 'id' | 'roundNo' | 'title' | 'startsAt' | 'format'>[],
+  entries: Pick<FieldEntry, 'eventId' | 'groupNo' | 'teeTime'>[],
+  years: number,
+  carried: GolfRoundPlan[] = [],
+): GolfRoundPlan[] {
+  const out = new Map<number, GolfRoundPlan>();
+  for (const r of [...rounds].sort((a, b) => a.roundNo - b.roundNo || a.startsAt.localeCompare(b.startsAt))) {
+    if (out.has(r.roundNo) || String(r.format?.competition ?? '') === 'match') continue;
+    const format: Record<string, unknown> = { ...(r.format ?? {}) };
+    for (const k of GOLF_ROUND_EDITION_KEYS) delete format[k];
+    out.set(r.roundNo, {
+      roundNo: r.roundNo, title: r.title, startsAt: addYears(r.startsAt, years), format,
+      ...golfGroupsOf(entries.filter((e) => e.eventId === r.id)),
+    });
+  }
+  for (const c of carried) if (!out.has(c.roundNo)) out.set(c.roundNo, { ...c, startsAt: addYears(c.startsAt, years) });
+  return [...out.values()].sort((a, b) => a.roundNo - b.roundNo);
+}
+
+/** The carried round plan (a JSON string or a list); bad items dropped. */
+export function readGolfRounds(fmt: Record<string, unknown> | null | undefined): GolfRoundPlan[] {
+  const raw = fmt?.[GOLF_ROUNDS_KEY];
+  let list: unknown = raw;
+  if (typeof raw === 'string') { try { list = JSON.parse(raw); } catch { return []; } }
+  if (!Array.isArray(list)) return [];
+  return list
+    .filter((r): r is GolfRoundPlan => !!r && typeof r === 'object' && Number.isInteger((r as GolfRoundPlan).roundNo) && (r as GolfRoundPlan).roundNo > 0
+      && typeof (r as GolfRoundPlan).title === 'string' && typeof (r as GolfRoundPlan).startsAt === 'string'
+      && !!(r as GolfRoundPlan).format && typeof (r as GolfRoundPlan).format === 'object')
+    .sort((a, b) => a.roundNo - b.roundNo);
+}
+
+/** Planned rounds not set up yet (no round with the same number). */
+export function pendingGolfRounds(plan: GolfRoundPlan[], setUp: Pick<FieldEvent, 'roundNo'>[]): GolfRoundPlan[] {
+  const done = new Set(setUp.map((r) => r.roundNo));
+  return plan.filter((r) => !done.has(r.roundNo));
+}
+
+/** The round plan's tee times moved by `days` (the organiser picked other dates). */
+export function shiftGolfRoundDays(plan: GolfRoundPlan[], days: number): GolfRoundPlan[] {
+  if (!days) return plan;
+  return plan.map((r) => { const t = Date.parse(r.startsAt); return Number.isNaN(t) ? r : { ...r, startsAt: new Date(t + days * 86_400_000).toISOString() }; });
+}
+
 /* ---------------------------------- plan ---------------------------------- */
 
 export interface CopySource {
   tournament: Tournament;
   categories: TournamentCategory[];
   phases: Pick<FieldEvent, 'sport' | 'format'>[];
+  /** golf stroke play / Stableford: the rounds and how their groups went off */
+  golf?: { rounds: Pick<FieldEvent, 'id' | 'roundNo' | 'title' | 'startsAt' | 'format'>[]; entries: Pick<FieldEntry, 'eventId' | 'groupNo' | 'teeTime'>[] };
 }
 
 export interface CopyPlan {
@@ -301,12 +396,14 @@ export interface CopyPlan {
   categories: NewTournamentCategory[];
   ageVerification?: Tournament['ageVerification'];
   programme: Partial<Record<string, ProgrammeEvent[]>>;
+  golfRounds: GolfRoundPlan[];
   /** what the screen lists under "Comes across" */
   summary: {
     sports: SportId[];
     rules: boolean;
     categories: number;
     events: number;
+    golfRounds: number;
     venues: number;
     records: number;
     registration: boolean;
@@ -345,7 +442,10 @@ export function planCopy(src: CopySource, opts: { mode: CopyMode; own: boolean; 
     if (list.length) carried[sp] = list;
   }
   const programme = programmeFrom(src.phases, years, carried);
-  const formats = copyFormats(t.formats, { records: next, programme });
+  const golfRounds = t.sports.includes('golf')
+    ? golfRoundsFrom(src.golf?.rounds ?? [], src.golf?.entries ?? [], years, readGolfRounds(t.formats?.golf as Record<string, unknown> | undefined))
+    : [];
+  const formats = copyFormats(t.formats, { records: next, programme, golfRounds });
   const about = mine || opts.withAbout ? t.about?.trim() || undefined : undefined;
   const grounds = (t.grounds ?? []).filter((g) => g.trim());
   const registration = t.registrationDeadline != null || t.minTeams != null || t.maxTeams != null;
@@ -387,11 +487,13 @@ export function planCopy(src: CopySource, opts: { mode: CopyMode; own: boolean; 
     categories,
     ...(ageRule ? { ageVerification: ageRule } : {}),
     programme,
+    golfRounds,
     summary: {
       sports: [...t.sports],
       rules: Object.keys(formats).length > 0 || !!t.structure,
       categories: categories.length,
       events: Object.values(programme).reduce((n, l) => n + (l?.length ?? 0), 0),
+      golfRounds: golfRounds.length,
       venues: grounds.length,
       records: next ? countRecords(t.formats) : 0,
       registration,

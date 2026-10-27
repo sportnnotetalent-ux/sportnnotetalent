@@ -1,6 +1,7 @@
 /** Golf inside a tournament (stroke play / Stableford): its rounds and the
- *  cumulative leaderboard across them, plus "set up a round". Match-play golf
- *  tournaments use the normal matches/bracket hub instead. */
+ *  cumulative leaderboard across them, plus "set up a round" (and, on a
+ *  Run it again edition, last time's rounds). Match-play golf tournaments use
+ *  the normal matches/bracket hub instead. */
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -14,7 +15,7 @@ import { golfTeamFormatOf } from '../../data/golfTeams';
 import { useGolfRounds } from '../../data/useGolf';
 import { buildLeaderboard, golfFormatOf, roundCells, roundContext, cardOf } from '../../data/golf';
 import type { RootStackParamList } from '../../navigation/types';
-import type { StatLine } from '../../core/types';
+import type { FieldEvent, GolfCourse, StatLine } from '../../core/types';
 import { StatLeaderRail } from '../StatLeaderRail';
 import { getAllStatLines } from '../../data/repos';
 import { categoryLeaders } from '../../data/standings';
@@ -24,6 +25,7 @@ import { patchTournamentFormat } from '../../data/repos';
 import { prizeSetupOf, prizeSetupPatch, prizeCutoff, type PrizeSetup, type PrizeContext } from '../../data/prizeCategories';
 import { PrizeCategoryBar, PrizeList, useCategoryRows } from '../PrizeCategories';
 import { toParLabel, distUnitOf } from '../../sports/golf/engine';
+import { GOLF_ROUNDS_KEY, pendingGolfRounds, readGolfRounds, type GolfRoundPlan } from '../../data/tournamentCopyPlan';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -92,6 +94,7 @@ export function GolfTournamentHub({ tournamentId, format, canOrganize }: { tourn
           ? <Button label={`＋ Set up round ${last.roundNo + 1}`} variant="ghost" onPress={() => nav.navigate('GolfRoundSetup', { tournamentId, nextOf: last.id })} />
           : !last && <Button label="⛳ Set up round 1" onPress={() => nav.navigate('GolfRoundSetup', { tournamentId, competition: String(format?.competition ?? 'stroke'), holes: String(format?.holes ?? '18') })} />
       )}
+      {canOrganize && !loading && <CarriedRounds tournamentId={tournamentId} format={format} events={events} courses={courses} />}
 
       <SectionHeader title="⛳ Rounds" count={events.length} />
       {loading ? <Text style={textStyles.muted}>Loading…</Text> : events.length === 0 ? (
@@ -148,7 +151,51 @@ export function GolfTournamentHub({ tournamentId, format, canOrganize }: { tourn
   );
 }
 
+/** Run it again: the rounds carried from the last edition (formats.golf.roundPlan)
+ *  that aren't set up yet. "Set up round N" fills each in from last time;
+ *  "Not this time" drops it. */
+function CarriedRounds({ tournamentId, format, events, courses }: { tournamentId: string; format?: Record<string, unknown>; events: FieldEvent[]; courses: GolfCourse[] }) {
+  const [dropped, setDropped] = useState<number[]>([]);
+  const all = useMemo(() => readGolfRounds(format), [format?.[GOLF_ROUNDS_KEY]]); // eslint-disable-line react-hooks/exhaustive-deps
+  const pending = pendingGolfRounds(all, events).filter((r) => !dropped.includes(r.roundNo));
+  if (!pending.length) return null;
+  const drop = async (r: GolfRoundPlan) => {
+    setDropped((d) => [...d, r.roundNo]);
+    const keep = all.filter((x) => x.roundNo !== r.roundNo && !dropped.includes(x.roundNo));
+    await patchTournamentFormat(tournamentId, 'golf', { [GOLF_ROUNDS_KEY]: keep.length ? JSON.stringify(keep) : undefined }).catch(() => {});
+  };
+  const lineOf = (r: GolfRoundPlan) => {
+    const t = Date.parse(r.startsAt);
+    const course = courses.find((c) => c.id === r.format.courseId)?.name;
+    return [
+      Number.isNaN(t) ? '' : new Date(t).toLocaleString([], { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }),
+      course ? `${course}${typeof r.format.tee === 'string' ? ` (${r.format.tee})` : ''}` : '',
+      r.format.competition === 'stableford' ? 'Stableford' : 'Stroke play',
+    ].filter(Boolean).join(' · ');
+  };
+  return (
+    <View style={st.carried}>
+      <Text style={textStyles.h3}>🔁 Rounds from last time ({pending.length})</Text>
+      <Text style={textStyles.muted}>
+        Set each round up once the players are in. The course, tees, format, cut, tee time and groups are filled in from last time.
+      </Text>
+      {pending.map((r) => (
+        <View key={r.roundNo} style={st.carriedRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={[textStyles.body, st.bold]} numberOfLines={1}>{r.title}</Text>
+            <Text style={textStyles.muted} numberOfLines={2}>{lineOf(r)}</Text>
+          </View>
+          <Text style={st.carriedDrop} accessibilityRole="button" accessibilityLabel={`Not this time: ${r.title}`} onPress={() => void drop(r)}>✕</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
 const st = StyleSheet.create({
+  carried: { gap: theme.spacing(2), padding: theme.spacing(3), borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.colors.primary + '55', backgroundColor: theme.colors.surface },
+  carriedRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(3), paddingVertical: theme.spacing(1) },
+  carriedDrop: { color: theme.colors.textMuted, fontWeight: '800', fontSize: theme.font.body, paddingHorizontal: theme.spacing(1) },
   round: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(2), backgroundColor: theme.colors.surface, borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.colors.border, padding: theme.spacing(3) },
   bold: { fontWeight: '800' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing(2), alignItems: 'center' },

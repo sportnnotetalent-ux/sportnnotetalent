@@ -83,7 +83,7 @@ export default function SportHubScreen() {
   // SD-90: athletics is a programme of timed events (heats → final), not matches.
   const orgs = useOrganizations();
   const [me, setMe] = useState<string | null>(null);
-  useEffect(() => { if (isEventSport(sport)) void getMyPlayerId(profile?.id).then(setMe).catch(() => {}); }, [sport, profile?.id]);
+  useEffect(() => { if (isEventSport(sport) || sport === 'golf') void getMyPlayerId(profile?.id).then(setMe).catch(() => {}); }, [sport, profile?.id]);
   // SD-94: swimming is the same kind of meet.
   if (isEventSport(sport)) {
     return (
@@ -105,7 +105,8 @@ export default function SportHubScreen() {
       <SafeAreaView style={st.safe} edges={['bottom']}>
         <KeyboardAwareScrollView contentContainerStyle={st.content}>
           <ScreenTitle title={`${plugin.icon} ${plugin.name}`} subtitle={tournamentName} />
-          <GolfTournamentHub tournamentId={tournamentId} format={golfFmt} canOrganize={canOrganize(profile?.role)} />
+          <GolfTournamentHub tournamentId={tournamentId} format={golfFmt}
+            canOrganize={canOrganize(profile?.role) || (!!tournament && canManageTournament(tournament, orgs, me, profile?.id))} />
         </KeyboardAwareScrollView>
       </SafeAreaView>
     );

@@ -1,6 +1,6 @@
 ---
 title: Run a tournament again, or copy one's setup
-description: Make next year's edition in one step, with the same sports, formats, rules, age groups, venues and events. Or copy any tournament's setup to run your own.
+description: Make next year's edition in one step, with the same sports, formats, rules, age groups, venues, events and golf rounds. Or copy any tournament's setup to run your own.
 category: Tournaments
 audience: Organisers
 sports: all
@@ -8,7 +8,7 @@ order: 11
 updated: 2026-10-27
 ---
 
-Schools and clubs run the same meet every year. Setting it up from scratch each time means re-typing the sports, the formats, the points, the age groups, the venues and every event. **Run it again** makes next year's edition from this year's in one step. **Copy this setup** does the same for any tournament on SportnNote, including one somebody else organised, so you can run your own event the way theirs was run.
+Schools and clubs run the same meet every year. Setting it up from scratch each time means re-typing the sports, the formats, the points, the age groups, the venues, every event and every golf round. **Run it again** makes next year's edition from this year's in one step. **Copy this setup** does the same for any tournament on SportnNote, including one somebody else organised, so you can run your own event the way theirs was run.
 
 ## Before you start
 - To **run it again**, you need to be an organiser of the tournament (a host, or an Owner, Admin or Organizer of the community that hosts it).
@@ -34,6 +34,7 @@ The new edition opens on its **Manage** tab, ready for teams. Registration start
 | Age groups (divisions) | ✓ | ✓ | ✓ |
 | Venues, city and time zone | ✓ | ✓ | ✓ |
 | A meet's events, with their timetable slots | ✓ | ✓ | ✓ |
+| Golf rounds: course, tees, format and tee times | ✓ | ✓ | ✓ |
 | Registration settings (team limits, deadline) | ✓ | ✓ | ✓ |
 | Players' age rule | ✓ | ✓ | ✓ |
 | About & rules text | ✓ | ✓ | Only if you tap **＋ Also copy the About & rules text** |
@@ -58,6 +59,20 @@ Every sport keeps the event, age group and gender, and the timetable slot and ve
 - **Rowing and canoe:** the boat, distance, lightweight class, lanes, splits and the rounds.
 - **Cycling:** the race, distance, laps and sprints, start gap and stages.
 - **Weightlifting:** the bodyweight category.
+
+## A golf tournament's rounds
+Golf stroke play and Stableford rounds can't be created without their players, so they come across as the tournament's round plan:
+- The golf page shows **🔁 Rounds from last time**, with each round's date, course and tees, and the format.
+- When the players are in, tap **⛳ Set up round 1** as usual. It opens as last time with **🔁 Filled in from last time** at the top. You just add the players, and can still change anything.
+- Round 1 fills in:
+  - The course and tees.
+  - Stroke play or Stableford, the holes, the handicap allowance, gross or net, the tie-break and the prizes.
+  - The team competition rule (how many scores count). You pick this year's teams.
+  - The stats to track.
+  - The round's name, the first tee time, and the group size and gap (for example 4-ball every 10 min).
+- **＋ Set up round 2** (and later rounds) keeps this year's round 1 course and format and its players. It adds last time's tee time, groups and cut (for example top 40 and ties).
+- Tap **✕** on a round you're not playing this time, for example when the championship drops from three rounds to two.
+- If last time's course has been removed from SportnNote, the round asks you to pick the course or add it.
 
 ## Copy this setup (any tournament)
 1. Open the tournament and scroll to the bottom of its **Info** tab.

@@ -13,6 +13,28 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-27 — Run it again, part 3: golf rounds come across
+Golf was the one sport whose setup didn't carry: its rounds are field events with players, so the copy left them behind.
+- **The round plan:** the copy now keeps each round as `formats.golf.roundPlan`, written by `golfRoundsFrom` in `src/data/tournamentCopyPlan.ts`.
+  - **Carried:** the round's name, its first tee time (moved on with the dates), the course and tees, and the format: competition, holes, allowance, net, tie-break, prizes, team rule, cut and stats to track.
+  - **Also carried:** how the groups went off (`golfGroupsOf`: 2–4-ball, every 8/10/12 min).
+  - **Never carried** (`GOLF_ROUND_EDITION_KEYS`): each player's tee, the playoff winner, the course snapshot, alerts and highlights, and `cutAfterRound`. Players, cards and team picks stay behind too.
+  - Match-play rounds are skipped.
+  - Rounds carried last time and never set up come along again. Other dates move the tee times (`shiftGolfRoundDays`).
+- **Screens:**
+  - The copy screen lists "⛳ N golf rounds".
+  - The golf hub shows **🔁 Rounds from last time**, with ✕ to drop one.
+  - **Set up round 1** opens filled in, with the "Filled in from last time" note.
+  - Round 2 and later keep this year's round 1 course, format and players, and add last time's name, tee time, groups and cut.
+  - If last time's course is gone, the screen asks you to pick or add one.
+- **Fixes on the way:**
+  - The golf hub showed "Set up round" only to accounts with the organiser role. A tournament's own hosts can now set rounds up too (the server already allowed it: `can_manage_tournament`).
+  - The course list no longer overwrites a course that was already picked (`setCourseId((cur) => cur ?? …)`).
+- **Guide:** `run-it-again` has a "What comes across" row and a "A golf tournament's rounds" section.
+- **Tests:** `tests/run-it-again-golf.test.mts` (13). Full suite 4,878 pass, 0 fail (2 known squash todos).
+- **Verified in the offline demo:** seeded "Hillview Junior Golf Day", ran it again, and the 2027 edition's hub listed Round 1. Set up opened on Hillview Golf Club, 18 holes stroke play, 07:00 on 27 Oct 2027 and 4-ball. No console errors.
+- No database change.
+
 ### 2026-10-27 — Backlog run live (items 1–5)
 - **Founder:** pushed all three branches (`sdk57` too) and ran both migrations.
 - **Checked read-only:**

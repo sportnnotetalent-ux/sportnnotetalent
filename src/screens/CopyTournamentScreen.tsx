@@ -1,8 +1,9 @@
 /** Run it again / copy a tournament (2026-10-27): "🔁 Run it again" makes the
  *  next edition of your tournament (linked, so every edition's page shows the
  *  series); "📋 Copy this setup" makes anyone's set-up into a new tournament of
- *  your own. Sports, formats, rules, age groups, venues and the events
- *  programme come across; teams, fixtures, entries and results don't. The
+ *  your own. Sports, formats, rules, age groups, venues, the events
+ *  programme and golf rounds come across; teams, fixtures, entries and
+ *  results don't. The
  *  plan is pure: data/tournamentCopyPlan.ts. */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
@@ -106,6 +107,7 @@ export default function CopyTournamentScreen() {
     ...(s.rules ? ['📏 Formats, points and rules for each sport'] : []),
     ...(s.categories ? [`👥 ${s.categories} age group${s.categories === 1 ? '' : 's'}`] : []),
     ...(s.events ? [`🏃 ${s.events} event${s.events === 1 ? '' : 's'} — set each one up when its entries are in`] : []),
+    ...(s.golfRounds ? [`⛳ ${s.golfRounds} golf round${s.golfRounds === 1 ? '' : 's'} — course, tees, format and tee times; set each up when the players are in`] : []),
     ...(s.venues || plan.fields.city ? [`📍 ${s.venues ? `${s.venues} venue${s.venues === 1 ? '' : 's'}` : 'Venue'}${plan.fields.city ? ` in ${plan.fields.city}` : ''}`] : []),
     ...(s.registration ? ['📝 Registration settings (team limits and deadline)'] : []),
     ...(s.records ? [`🏆 ${s.records} meet record${s.records === 1 ? '' : 's'} — they stand until broken`] : []),
