@@ -925,4 +925,36 @@ describe('breaks (docs/security/breaks/pool-engine.md)', () => {
       assert.equal(line, 'Pool · Rack 1', game);
     }
   });
+
+  test('#25: the readers turn a hostile snapshot into clean numbers and text — never NaN, Infinity, "undefined" or a throw', () => {
+    const hostile: unknown[] = [
+      { sets: [], current: { home: NaN, away: Infinity }, game: '__proto__', racks: [], setsToWin: 1, raceTo: 'x' },
+      { sets: [[1]], current: {}, ended: true, winner: 'home', setsToWin: 1 },
+      { sets: ['a', null, [2, 'b']], current: { home: 1, away: 0 }, setsToWin: 3, setsWon: { home: NaN } },
+      { sets: [[2, 1], [-1, 1e309]], current: { home: -1, away: 1.5 }, setsWon: { home: 'x', away: 2 }, ended: true, winner: 'away', setsToWin: 2 },
+      { sets: [], current: { home: 0, away: 0 }, tally: { home: { racks: NaN, innings: 'x', detailRacks: Infinity, racksBroken: -2, foulsBy: { scratch: NaN, __proto__: 3, bogus: 2 } }, away: null } },
+      { sets: {}, current: [], rack: 'x' },
+    ];
+    const dirty = /NaN|Infinity|undefined|null|\[object/;
+    for (const h of hostile) {
+      const st = h as pool.PoolState;
+      const label = JSON.stringify(h).slice(0, 60);
+      const sum = pool.summary(st);
+      assert.match(sum.homeScore, /^\d+$/, label);
+      assert.match(sum.awayScore, /^\d+$/, label);
+      assert.doesNotMatch(`${sum.statusLine} ${sum.detailLine ?? ''}`, dirty, label);
+      assert.match(pool.scoreLine(st), /^(\d+-\d+(, \d+-\d+)*)?$/, label);
+      const ls = pool.lineScore(st);
+      if (ls) for (const n of [ls.won.home, ls.won.away, ls.toWin, ...ls.done.flatMap((c) => [c.home, c.away]), ...(ls.current ? [ls.current.home, ls.current.away] : [])]) assert.ok(Number.isInteger(n) && n >= 0, `${label} lineScore ${n}`);
+      const r = pool.result(st);
+      if (r) assert.ok(Number.isInteger(r.home) && Number.isInteger(r.away) && r.home >= 0 && r.away >= 0, `${label} result`);
+      const ps = poolStats(st);
+      for (const sd of ['home', 'away'] as const) {
+        for (const [k, v] of Object.entries(ps[sd])) {
+          if (k === 'foulsBy') { for (const [fk, fv] of Object.entries(v as object)) { assert.ok(pool.FOUL_KINDS.includes(fk as pool.FoulKind), `${label} foul kind ${fk}`); assert.ok(Number.isInteger(fv) && fv >= 0); } continue; }
+          if (v !== undefined) assert.ok(Number.isFinite(v) && (v as number) >= 0, `${label} ${sd}.${k}=${v}`);
+        }
+      }
+    }
+  });
 });

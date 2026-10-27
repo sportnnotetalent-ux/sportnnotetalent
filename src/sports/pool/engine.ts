@@ -788,54 +788,86 @@ function stalemate(s: PoolState): PoolState {
 
 // ---------------------------------------------------------- readers ----
 
-const isState = (s: unknown): s is PoolState =>
-  !!s && typeof s === 'object' && Array.isArray((s as PoolState).sets) && !!(s as PoolState).current;
+// The readers take any stored snapshot (`matches.state`, an older engine's, a
+// corrupted one): every value is checked before it is shown or returned — a
+// count is a whole number ≥ 0, a set score a pair of them (breaks #25).
+
+/** A count from a stored value: a whole number from 0 up, else 0. */
+export const cnt = (v: unknown): number =>
+  (typeof v === 'number' && Number.isSafeInteger(v) && v >= 0 ? v : 0);
+const pairOf = (v: unknown): PerSide<number> => (isObj(v) ? { home: cnt(v.home), away: cnt(v.away) } : zero());
+const isCount = (n: unknown) => typeof n === 'number' && Number.isSafeInteger(n) && n >= 0;
+
+/** A clean view of a stored snapshot (null = not an object at all). */
+interface View {
+  sets: Array<[number, number]>; current: PerSide<number>; setsWon: PerSide<number>;
+  ended: boolean; winner: Side | null; setsMode: boolean; setsToWin: number; raceTo: number;
+  label: string; rackNo: number; breakFormat: string;
+}
+function view(s: unknown): View | null {
+  if (!isObj(s)) return null;
+  const sets = (Array.isArray(s.sets) ? s.sets : [])
+    .filter((x): x is [number, number] => Array.isArray(x) && x.length === 2 && isCount(x[0]) && isCount(x[1]))
+    .map(([h, a]) => [h, a] as [number, number]);
+  const setsToWin = cnt(s.setsToWin);
+  const rack = isObj(s.rack) ? s.rack : null;
+  return {
+    sets, current: pairOf(s.current), setsWon: pairOf(s.setsWon),
+    ended: s.ended === true, winner: isSide(s.winner) ? s.winner : null,
+    setsMode: setsToWin > 1, setsToWin, raceTo: cnt(s.raceTo),
+    label: gameLabel(s.game), // never a raw lookup by a stored value (breaks #9)
+    rackNo: (rack && cnt(rack.n)) || (Array.isArray(s.racks) ? s.racks.length : 0) + 1,
+    breakFormat: typeof s.breakFormat === 'string' ? s.breakFormat : 'alternate',
+  };
+}
 
 export const isComplete = (s: PoolState): boolean => !!s && typeof s === 'object' && s.ended === true;
 export const winner = (s: PoolState): Side | null => (isComplete(s) && isSide(s.winner) ? s.winner : null);
 
-const setMode = (s: PoolState) => Number(s.setsToWin) > 1;
-
-/** Racks won in a race without sets (the final once it is over). */
-function raceRacks(s: PoolState): PerSide<number> {
-  const f = s.ended ? s.sets[0] : null;
-  return f ? { home: f[0], away: f[1] } : { home: s.current?.home ?? 0, away: s.current?.away ?? 0 };
-}
+/** Racks won in a race without sets: the final once it is over (null = no valid final). */
+const raceRacks = (v: View): PerSide<number> | null => {
+  if (!v.ended) return v.current;
+  const f = v.sets[0];
+  return f ? { home: f[0], away: f[1] } : null;
+};
 
 /** The result for standings: sets won (with sets) or racks won (a race). */
 export function result(s: PoolState): { winner: Side; home: number; away: number } | null {
-  if (!isState(s) || !isComplete(s) || !isSide(s.winner)) return null;
-  const sc = setMode(s) ? s.setsWon : raceRacks(s);
-  return { winner: s.winner, home: sc.home, away: sc.away };
+  const v = view(s);
+  if (!v || !v.ended || !v.winner) return null;
+  const sc = v.setsMode ? v.setsWon : raceRacks(v);
+  return sc ? { winner: v.winner, home: sc.home, away: sc.away } : null;
 }
 
 /** SD-01: the completed sets ("5-3, 2-5, 5-4"), or a finished race ("5-3"); '' before. */
 export function scoreLine(s: PoolState, perspective?: Side): string {
-  if (!isState(s)) return '';
-  return lineOf(s.sets, { perspective });
+  const v = view(s);
+  return v ? lineOf(v.sets, { perspective }) : '';
 }
 
 /** SD-20: the line score — sets (with sets) or the race as one column. */
 export function lineScore(s: PoolState): LineScore | null {
-  if (!isState(s)) return null;
-  if (setMode(s)) return pointsLineScore('set', { games: s.sets, current: s.current, won: s.setsWon, ended: s.ended, toWin: s.setsToWin });
-  return pointsLineScore('game', { games: s.sets, current: s.current, won: raceRacks(s), ended: s.ended, toWin: s.raceTo });
+  const v = view(s);
+  if (!v) return null;
+  if (v.setsMode) return pointsLineScore('set', { games: v.sets, current: v.current, won: v.setsWon, ended: v.ended, toWin: v.setsToWin });
+  return pointsLineScore('game', { games: v.sets, current: v.current, won: raceRacks(v) ?? zero(), ended: v.ended, toWin: v.raceTo });
 }
 
 /** The scoreboard: racks in the set in play; once over, sets (or racks) won. */
 export function summary(s: PoolState): ScoreSummary {
-  if (!isState(s)) return { homeScore: '0', awayScore: '0', statusLine: 'Pool' };
-  const label = gameLabel(s.game); // never a raw lookup by a stored value (breaks #9)
-  if (s.ended) return setMode(s) ? finalSummary(s.setsWon, scoreLine(s)) : finalSummary(raceRacks(s), '');
-  const line = scoreLine(s);
-  const rackNo = s.rack?.n ?? s.racks.length + 1;
+  const v = view(s);
+  if (!v) return { homeScore: '0', awayScore: '0', statusLine: 'Pool' };
+  const line = lineOf(v.sets);
+  if (v.ended) return v.setsMode ? finalSummary(v.setsWon, line) : finalSummary(raceRacks(v) ?? zero(), '');
+  const race = v.raceTo ? `race to ${v.raceTo}` : '';
+  const fmt = v.breakFormat === 'winner' ? 'winner breaks' : v.breakFormat === 'loser' ? 'loser breaks' : '';
   return {
-    homeScore: String(s.current.home),
-    awayScore: String(s.current.away),
-    statusLine: `${label} · ${setMode(s) ? `Set ${s.sets.length + 1} · ` : ''}Rack ${rackNo}`,
-    detailLine: setMode(s)
-      ? `Sets ${s.setsWon.home}–${s.setsWon.away}${line ? ` (${line})` : ''} · race to ${s.raceTo}`
-      : `race to ${s.raceTo}${s.breakFormat === 'winner' ? ' · winner breaks' : s.breakFormat === 'loser' ? ' · loser breaks' : ''}`,
+    homeScore: String(v.current.home),
+    awayScore: String(v.current.away),
+    statusLine: `${v.label} · ${v.setsMode ? `Set ${v.sets.length + 1} · ` : ''}Rack ${v.rackNo}`,
+    detailLine: v.setsMode
+      ? [`Sets ${v.setsWon.home}–${v.setsWon.away}${line ? ` (${line})` : ''}`, race].filter(Boolean).join(' · ')
+      : [race, fmt].filter(Boolean).join(' · '),
   };
 }
 
