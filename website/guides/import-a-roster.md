@@ -5,7 +5,7 @@ category: Teams & players
 audience: Organisers, Captains
 sports: all
 order: 35
-updated: 2026-10-12
+updated: 2026-10-27
 ---
 
 Typing in a whole year group one by one takes too long. Export the list from your school system (SIMS, Arbor, iSAMS, PowerSchool or any other) or a spreadsheet as CSV. Then paste it in or pick the file, check the preview, and import.
@@ -15,7 +15,7 @@ Typing in a whole year group one by one takes too long. Export the list from you
 - A club team's squad is picked from the club's members, so import the students into the school first.
 
 ## Step by step
-1. School: open the community → **Members** tab → **📥 Import CSV**. Team: open the team's squad → **📥 Import squad from CSV**.
+1. School or college: open the community → **Members** tab → **📥 Add students**. That screen adds a whole school, one class or one section, and recognises students you already have; see [Add your students in bulk](/guides/add-your-students/). Other communities: **Members** tab → **📥 Import CSV**. Team: open the team's squad → **📥 Import squad from CSV**.
 2. On the web, tap **Choose CSV file**, or paste the rows, including the header row. Tap **Template** for a ready-made example.
 3. Columns can be in any order: Name (or First name and Last name), Date of birth, Gender, Class or Year, House, Team, Jersey, Guardian name, Guardian email and Guardian phone. Common school-system headers such as "Legal Surname", "Reg Group" or "Primary Contact Email" are recognised.
 4. Check the **Preview**. Each row shows what will happen: **New**, **Already here — skipped**, or why it can't be read, such as an impossible date or a bad email.

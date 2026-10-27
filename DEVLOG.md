@@ -13,6 +13,60 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-27 — Student lists: bulk upload by class, section or the whole school, no duplicates
+Founder: schools need to upload students class-wise, section-wise or new students across all classes, with existing students recognised and no duplicates.
+Decisions:
+- **1A:** a child already on SportnNote elsewhere means their parent approves.
+- **2A:** leavers are marked only when the school ticks it.
+- **3A:** admission number only, no government IDs.
+
+**Screen: "Add students"** (`StudentImportScreen`; a school's or college's Members tab → **📥 Add students**; other communities keep **Import CSV**):
+- **Scope:** whole school (class and section from the list), or one class / one section picked on the screen (a list of names is enough).
+- **File:** CSV, Excel `.xlsx` (web; `core/xlsx.ts` reads the zip with `DecompressionStream`, no library; date cells come out as dates), or pasted rows.
+- **Check:** shows what happens to every row: new / moving class / back at the school / House or admission number updated / unchanged / parent asked / need a look (Same student · New student · Skip) / not added.
+- **Leavers:** a whole-school list offers "Mark these as left today" for current students with a class who aren't on it. It's off until ticked.
+
+**Classes:** the app's one label per class and section stays ("Class 7-B").
+- The list's class and section are joined in the school's own wording: "7" at a "Class 7-A" school becomes "Class 7".
+- "VIII" and "8B" in one list share the first wording (`rowClasses`).
+
+**Recognising students** (server `org_roster_match`, demo `matchLocally`), in order:
+1. Admission number.
+2. Name, with the date of birth agreeing.
+3. First name plus a parent's email or phone, among the school's current and past students.
+4. A child elsewhere with the same name, date of birth **and** parent contact. That one comes back with no id; the school sees nothing of them.
+
+**Parent approval:**
+- The edge function `school-parent-request` calls `org_roster_invite` with the service role. That creates the invite (`org_requests.details`: class, House, admission number) and a hashed 30-day code.
+- It emails the parent **on file** (or an adult student), never an address from the list.
+- The parent answers on the public page `/school-request?c=` (`SchoolRequestScreen`, via `school_request_preview` / `_decide`); no account is needed. On "yes" the child joins in that class and House.
+- A child can't accept for themselves: there's a trigger on the membership insert and one on the request update.
+
+**Admission numbers:** `org_member_ids`, private to the school's Owners and Admins, one student per number per school.
+
+**Files:**
+- `src/data/rosterImport.ts` (Section and Admission no columns; a repeated number in a file counts once)
+- `src/data/studentList.ts` (pure plan), `src/data/studentListStore.ts`
+- `src/core/xlsx.ts`, `src/core/document.ts` `pickSheetFile`
+- `supabase/migrations/20261028100000_student_lists.sql`
+- `supabase/functions/school-parent-request/`
+- app links: `app.json` / `androidAppLinks.ts` `/school-request` (opens the app from the 1.1.0 APK; the web page works today)
+- `functionRegion` pinned
+- demo store `orgAdmissionNos`
+
+**Guides:** new `add-your-students`; `import-a-roster` points schools to it.
+
+**Tests:** `tests/student-lists.test.mts` (24: parsing, class/section, matching order, the plan, leavers, the member list after saving, Excel incl. a zipped compressed workbook, SQL guards, wiring). Full suite 4,907 pass, 0 fail.
+
+**Verified in the offline demo**, The Lawrence School, page reloaded between lists:
+- **First list:** 4 new students; a repeated admission number counted once; the impossible date skipped.
+- **One section (7-A):** an admission number added to an existing student, plus 1 new.
+- **Next year's whole-school list:** "Tara M." recognised by admission number (no duplicate); everyone moved to Class VIII / 9; the missing student was marked as left only once ticked.
+- **Parent's page** (code DEMO) checked at phone width. No console errors.
+- **Not runnable here:** the SQL bodies (no local Postgres). They were reviewed by hand and the outer statements parsed (43).
+
+**Founder:** run the migration, deploy `school-parent-request`, then publish.
+
 ### 2026-10-27 — Release: golf in Run it again + the scoring safety net live
 - **Founder:** ran `20261027200000_match_names_safety_net` and pushed both branches (`main` = `feat` = `1c71159`).
 - **Checked read-only:**

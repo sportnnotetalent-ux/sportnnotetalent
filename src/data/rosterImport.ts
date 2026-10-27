@@ -4,8 +4,9 @@
  * or picked as a file.
  *
  * Columns (any order, header names are forgiving): name (or first + last name),
- * date of birth, gender, class / year / grade, house, team, jersey / shirt
- * number, guardian name, guardian email, guardian phone. Dates read in the
+ * date of birth, gender, class / year / grade, section, admission number,
+ * house, team, jersey / shirt number, guardian name, guardian email, guardian
+ * phone. Dates read in the
  * region's order (US month-first) and an all-ambiguous file is flagged; phones
  * become full international numbers (E.164) via core/phone.ts.
  *
@@ -18,7 +19,7 @@
 import { parseTypedDate, dateOrderOf, type DateOrder } from '../core/region.ts';
 import { normalizePhone, type CountryCode } from '../core/phone.ts';
 
-export type RosterField = 'name' | 'first' | 'last' | 'dob' | 'gender' | 'standard' | 'house' | 'team' | 'jersey'
+export type RosterField = 'name' | 'first' | 'last' | 'dob' | 'gender' | 'standard' | 'section' | 'admissionNo' | 'house' | 'team' | 'jersey'
   | 'guardianName' | 'guardianEmail' | 'guardianPhone';
 
 /** Header aliases (lower-case, punctuation stripped). */
@@ -28,7 +29,12 @@ const ALIASES: Record<RosterField, string[]> = {
   last: ['last name', 'lastname', 'surname', 'family name', 'legal surname', 'last'],
   dob: ['dob', 'date of birth', 'birth date', 'birthdate', 'birthday', 'born', 'd o b'],
   gender: ['gender', 'sex', 'boy girl', 'm f'],
-  standard: ['class', 'year', 'year group', 'grade', 'form', 'standard', 'reg group', 'registration group', 'tutor group', 'homeroom', 'class section', 'level'],
+  standard: ['class', 'year', 'year group', 'grade', 'form', 'standard', 'std', 'reg group', 'registration group', 'tutor group', 'homeroom', 'class section', 'level'],
+  // student lists (2026-10-27): the section on its own, and the school's own admission number
+  section: ['section', 'sec', 'division', 'div', 'class division'],
+  // (not "admission" alone — "Admission date" isn't the number; no government IDs: founder 3A)
+  admissionNo: ['admission no', 'admission number', 'adm no', 'admn no', 'adm number', 'enrolment no', 'enrollment no', 'enrolment number', 'enrollment number',
+    'student id', 'pupil id', 'sr no', 'scholar no', 'scholar number', 'gr no', 'reg no', 'register no'],
   house: ['house', 'house name'],
   team: ['team', 'squad', 'side'],
   jersey: ['jersey', 'jersey no', 'jersey number', 'shirt', 'shirt no', 'shirt number', 'number', 'no', 'bib'],
@@ -95,6 +101,10 @@ export interface RosterRow {
   dob?: string;
   gender?: 'Male' | 'Female';
   standard?: string;
+  /** the section on its own column ("B") — student lists */
+  section?: string;
+  /** the school's admission number — student lists (private to its admins) */
+  admissionNo?: string;
   house?: string;
   team?: string;
   jersey?: number;
@@ -183,17 +193,22 @@ export function parseRoster(text: string, opts: { order?: DateOrder; country?: C
     const guardian = gName || gEmail || gPhone ? { name: gName || 'Parent / guardian', ...(gEmail && EMAIL.test(gEmail) ? { email: gEmail } : {}), ...(gPhone ? { phone: gPhone } : {}) } : undefined;
     if (dob && ageOn(dob, today) < 18 && !guardian) warnings.push('Under 18 with no guardian contact');
     const standard = cell(r, 'standard') || undefined;
+    const section = cell(r, 'section').replace(/\s+/g, ' ').slice(0, 12) || undefined;
+    const admissionNo = cell(r, 'admissionNo').replace(/\s+/g, ' ').slice(0, 40) || undefined;
     const house = cell(r, 'house') || undefined;
     const team = cell(r, 'team') || undefined;
-    return { line, fullName, ...(dob ? { dob } : {}), ...(gender ? { gender } : {}), ...(standard ? { standard } : {}), ...(house ? { house } : {}), ...(team ? { team } : {}), ...(jersey != null ? { jersey } : {}), ...(guardian ? { guardian } : {}), errors, warnings };
+    return { line, fullName, ...(dob ? { dob } : {}), ...(gender ? { gender } : {}), ...(standard ? { standard } : {}),
+      ...(section ? { section } : {}), ...(admissionNo ? { admissionNo } : {}), ...(house ? { house } : {}), ...(team ? { team } : {}), ...(jersey != null ? { jersey } : {}), ...(guardian ? { guardian } : {}), errors, warnings };
   });
-  // duplicates: in the file, then against the people already there
+  // duplicates: in the file (the same admission number, else name + date of
+  // birth), then against the people already there
   const seen = new Map<string, number>();
   for (const row of out) {
     if (!row.fullName) continue;
-    const k = `${key(row.fullName)}|${row.dob ?? ''}`;
-    if (seen.has(k)) row.dupInFile = seen.get(k);
-    else seen.set(k, row.line);
+    const ks = [`${key(row.fullName)}|${row.dob ?? ''}`, ...(row.admissionNo ? [`adm|${row.admissionNo.toUpperCase()}`] : [])];
+    const hit = ks.map((k) => seen.get(k)).find((x) => x != null);
+    if (hit != null) row.dupInFile = hit;
+    else for (const k of ks) seen.set(k, row.line);
   }
   const ex = opts.existing ?? [];
   for (const row of out) {

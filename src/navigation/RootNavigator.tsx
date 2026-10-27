@@ -49,6 +49,8 @@ const GenerateFixturesScreen = lazyScreen(() => import('../screens/GenerateFixtu
 const SwissRoundScreen = lazyScreen(() => import('../screens/SwissRoundScreen'));
 const ImportScheduleScreen = lazyScreen(() => import('../screens/ImportScheduleScreen'));
 const RosterImportScreen = lazyScreen(() => import('../screens/RosterImportScreen'));
+const StudentImportScreen = lazyScreen(() => import('../screens/StudentImportScreen'));
+const SchoolRequestScreen = lazyScreen(() => import('../screens/SchoolRequestScreen'));
 const AssignScorersScreen = lazyScreen(() => import('../screens/AssignScorersScreen'));
 const TournamentTeamsScreen = lazyScreen(() => import('../screens/TournamentTeamsScreen'));
 const ContingentsScreen = lazyScreen(() => import('../screens/ContingentsScreen'));
@@ -143,7 +145,7 @@ const Tab = createBottomTabNavigator<TabParamList>();
 // the Join screen with the code prefilled.
 // Stack screens reachable by URL on web (/GolfRound?eventId=…). Keep in sync with
 // the <Stack.Screen> list below — a screen missing here just opens Home on refresh.
-const STACK_SCREENS = new Set<string>(['Americano', 'AssignScorers', 'AthleticsEventSetup', 'CorrectMatch', 'Bracket', 'Calendar', 'ClubHome', 'ClubSport', 'Clubs', 'MyTournaments', 'CompetitionRules', 'Contingents', 'Conversation', 'CreateClub', 'CreateCommunity', 'CreateListing', 'CreateSeries', 'CopyTournament', 'CreateTournament', 'CricketLineup', 'DeleteAccount', 'DiscoverOrgs', 'EditMatch', 'EditProfile', 'EditTeam', 'EditTournament', 'Feedback', 'Following', 'GenerateFixtures', 'GolfCourseEdit', 'GolfRound', 'GolfRoundSetup', 'GuardianConsent', 'GuardianLink', 'HeadToHead', 'InviteFriend', 'ImportSchedule', 'RosterImport', 'JoinClub', 'JoinTeam', 'JoinTournament', 'Legal', 'LineupEditor', 'LinkEdition', 'LiveScoring', 'ManageChild', 'MatchLink', 'OrgDobs', 'OrgVerify', 'Certificates', 'MatchSquad', 'MeetEntries', 'MeetTimetable', 'MessageReports', 'Messages', 'NotificationPrefs', 'RegionSettings', 'Notifications', 'Organization', 'OrganizerDashboard', 'PlayerProfile', 'Privacy', 'RecordBoard', 'ResultsEvent', 'ResultsLab', 'ScanQR', 'ScheduleMatch', 'Series', 'Settings', 'SportHub', 'SportProfile', 'SportSettings', 'Squad', 'Standings', 'Support', 'SupportConsole', 'SwissRound', 'Team', 'TeamJourney', 'Teams', 'Tournament', 'TournamentTeams', 'TryNewSport', 'VerificationReview']);
+const STACK_SCREENS = new Set<string>(['Americano', 'AssignScorers', 'AthleticsEventSetup', 'CorrectMatch', 'Bracket', 'Calendar', 'ClubHome', 'ClubSport', 'Clubs', 'MyTournaments', 'CompetitionRules', 'Contingents', 'Conversation', 'CreateClub', 'CreateCommunity', 'CreateListing', 'CreateSeries', 'CopyTournament', 'CreateTournament', 'CricketLineup', 'DeleteAccount', 'DiscoverOrgs', 'EditMatch', 'EditProfile', 'EditTeam', 'EditTournament', 'Feedback', 'Following', 'GenerateFixtures', 'GolfCourseEdit', 'GolfRound', 'GolfRoundSetup', 'GuardianConsent', 'GuardianLink', 'HeadToHead', 'InviteFriend', 'ImportSchedule', 'RosterImport', 'StudentImport', 'SchoolRequest', 'JoinClub', 'JoinTeam', 'JoinTournament', 'Legal', 'LineupEditor', 'LinkEdition', 'LiveScoring', 'ManageChild', 'MatchLink', 'OrgDobs', 'OrgVerify', 'Certificates', 'MatchSquad', 'MeetEntries', 'MeetTimetable', 'MessageReports', 'Messages', 'NotificationPrefs', 'RegionSettings', 'Notifications', 'Organization', 'OrganizerDashboard', 'PlayerProfile', 'Privacy', 'RecordBoard', 'ResultsEvent', 'ResultsLab', 'ScanQR', 'ScheduleMatch', 'Series', 'Settings', 'SportHub', 'SportProfile', 'SportSettings', 'Squad', 'Standings', 'Support', 'SupportConsole', 'SwissRound', 'Team', 'TeamJourney', 'Teams', 'Tournament', 'TournamentTeams', 'TryNewSport', 'VerificationReview']);
 
 // Web deep links / refresh. React Navigation 7 only recognises screens listed in
 // `config`, and a URL that resolves to NO state makes it call resetRoot(undefined),
@@ -203,6 +205,8 @@ const linking: LinkingOptions<RootStackParamList> = {
       JoinTournament: 'join-tournament/:token',
       // SD-152: the parent/guardian confirmation link (?c=CODE) — public.
       GuardianConsent: 'guardian-consent',
+      // Student lists: the parent's answer to a school's request (?c=CODE) — public.
+      SchoolRequest: 'school-request',
     },
   },
   getStateFromPath: (path, options) => {
@@ -528,6 +532,16 @@ export default function RootNavigator() {
               name="RosterImport"
               component={RosterImportScreen}
               options={{ ...stackScreenOpts, title: 'Import a roster' }}
+            />
+            <Stack.Screen
+              name="StudentImport"
+              component={StudentImportScreen}
+              options={{ ...stackScreenOpts, title: 'Add students' }}
+            />
+            <Stack.Screen
+              name="SchoolRequest"
+              component={SchoolRequestScreen}
+              options={{ ...stackScreenOpts, title: 'A school’s request' }}
             />
             <Stack.Screen
               name="AssignScorers"

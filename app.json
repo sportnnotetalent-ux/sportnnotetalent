@@ -111,6 +111,11 @@
             {
               "scheme": "https",
               "host": "app.sportnnote.in",
+              "pathPrefix": "/school-request"
+            },
+            {
+              "scheme": "https",
+              "host": "app.sportnnote.in",
               "pathPrefix": "/org-confirm"
             }
           ],

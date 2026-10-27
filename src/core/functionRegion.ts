@@ -42,6 +42,7 @@ export const PINNED_FUNCTIONS: ReadonlySet<string> = new Set([
   'support-assistant',
   'support-escalate',
   'guardian-consent',
+  'school-parent-request', // student lists: matching rows + one email per parent
   'guardian-link',
   'send-contact-otp',
   'verify-contact-otp',

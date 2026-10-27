@@ -50,6 +50,10 @@ export type RootStackParamList = {
   ImportSchedule: { tournamentId: string };
   /** SD-154: CSV roster import into a school (org) and/or a team's squad */
   RosterImport: { orgId?: string; teamId?: string };
+  /** Student lists (2026-10-27): a school's bulk upload — whole school, one class or section. */
+  StudentImport: { orgId: string };
+  /** Student lists: the parent's page from the school's email (public: /school-request?c=CODE). */
+  SchoolRequest: { c?: string } | undefined;
   AssignScorers: { tournamentId: string };
   TournamentTeams: { tournamentId: string; sport?: SportId };
   Contingents: { tournamentId: string };

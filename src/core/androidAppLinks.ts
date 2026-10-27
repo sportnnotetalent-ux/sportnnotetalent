@@ -25,7 +25,7 @@ export const ANDROID_CERT_SHA256 = [
  *  the home page) stays in the browser. */
 export const APP_LINK_PATHS = [
   '/m/', '/t/', '/p/', '/g/', '/r/', '/c/', '/pp', '/h/', '/i/', '/get',
-  '/join/', '/join-club/', '/join-tournament/', '/guardian-consent', '/org-confirm',
+  '/join/', '/join-club/', '/join-tournament/', '/guardian-consent', '/school-request', '/org-confirm',
 ] as const;
 
 export function assetLinks(): unknown[] {

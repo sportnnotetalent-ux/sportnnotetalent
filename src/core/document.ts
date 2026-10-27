@@ -61,6 +61,8 @@ export async function pickDocument(): Promise<PickedDoc | null> {
 export interface PickedText {
   name: string;
   text: string;
+  /** why a picked file couldn't be read (pickSheetFile) */
+  error?: string;
 }
 
 /** Pick a text file (CSV / TSV) and read it — web only (a file input +
@@ -83,6 +85,41 @@ export async function pickTextFile(accept = '.csv,.tsv,.txt,text/csv'): Promise<
       // Don't decode a binary workbook as text — the name is enough to explain.
       if (/\.(xlsx?|xlsm|ods|numbers)$/i.test(file.name)) { resolve({ name: file.name, text: '' }); return; }
       try { resolve({ name: file.name, text: await file.text() }); } catch { resolve(null); }
+    };
+    doc.body.appendChild(input);
+    input.click();
+    setTimeout(() => input.isConnected && input.remove(), 120000);
+  });
+}
+
+/** Student lists (2026-10-27): a CSV / TSV — or an Excel .xlsx workbook, whose
+ *  first sheet is read as text (core/xlsx) — picked on the web. Old .xls, .ods
+ *  and Numbers files come back with no text (the screen asks for CSV). */
+export async function pickSheetFile(): Promise<PickedText | null> {
+  if (Platform.OS !== 'web') return null;
+  const doc = (globalThis as { document?: Document }).document;
+  if (!doc) return null;
+  return new Promise<PickedText | null>((resolve) => {
+    const input = doc.createElement('input');
+    input.type = 'file';
+    input.accept = '.csv,.tsv,.txt,.xlsx,text/csv,text/tab-separated-values,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.xls,.ods';
+    input.style.display = 'none';
+    input.onchange = async () => {
+      const file = input.files && input.files[0];
+      input.remove();
+      if (!file) { resolve(null); return; }
+      try {
+        if (/\.xlsx$/i.test(file.name)) {
+          const { readXlsx, rowsToTsv } = await import('./xlsx');
+          resolve({ name: file.name, text: rowsToTsv(await readXlsx(await file.arrayBuffer())) });
+        } else if (/\.(xls|xlsm|ods|numbers)$/i.test(file.name)) {
+          resolve({ name: file.name, text: '' });
+        } else {
+          resolve({ name: file.name, text: await file.text() });
+        }
+      } catch (e) {
+        resolve({ name: file.name, text: '', error: e instanceof Error ? e.message : 'Couldn’t read that file.' });
+      }
     };
     doc.body.appendChild(input);
     input.click();

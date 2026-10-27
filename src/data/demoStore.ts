@@ -814,6 +814,8 @@ function buildDemo() {
     organizations: withSeedOwners(SEED_ORGS),
     /** org membership requests — invites + join-requests (see migration 0020). */
     orgRequests: [] as OrgRequest[],
+    /** student lists: each school's admission numbers by player id — mirrors org_member_ids. */
+    orgAdmissionNos: {} as Record<string, Record<string, string>>,
     /** tournament ownership audit trail — created / transferred (see migration 0021). */
     ownershipEvents: [] as OwnershipEvent[],
     /** per-tournament scorer/referee assignments (see migration 0024). */
@@ -900,7 +902,7 @@ function buildDemo() {
   return d;
 }
 export type DemoData = ReturnType<typeof buildDemo>;
-const DEMO_KEYS = ['tournaments', 'organizations', 'orgRequests', 'ownershipEvents', 'tournamentOfficials', 'activityLog', 'awards', 'potm', 'matches', 'teams', 'players', 'statLines', 'lineups', 'matchEvents', 'matchSquads', 'disputes', 'invites', 'tournamentTeams', 'tournamentCategories', 'clubs', 'clubMembers', 'teamPlayerRoles', 'clubInvites', 'fieldEvents', 'fieldEntries', 'resultRecords', 'golfCourses', 'captainTeams', 'footballProfiles', 'listings', 'teamLeaders'] as const satisfies readonly (keyof DemoData)[];
+const DEMO_KEYS = ['tournaments', 'organizations', 'orgRequests', 'orgAdmissionNos', 'ownershipEvents', 'tournamentOfficials', 'activityLog', 'awards', 'potm', 'matches', 'teams', 'players', 'statLines', 'lineups', 'matchEvents', 'matchSquads', 'disputes', 'invites', 'tournamentTeams', 'tournamentCategories', 'clubs', 'clubMembers', 'teamPlayerRoles', 'clubInvites', 'fieldEvents', 'fieldEntries', 'resultRecords', 'golfCourses', 'captainTeams', 'footballProfiles', 'listings', 'teamLeaders'] as const satisfies readonly (keyof DemoData)[];
 // every key of the store is listed (checked at compile time)
 const everyDemoKey: [Exclude<keyof DemoData, (typeof DEMO_KEYS)[number]>] extends [never] ? true : false = true;
 void everyDemoKey;

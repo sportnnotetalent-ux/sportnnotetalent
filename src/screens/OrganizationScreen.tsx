@@ -538,9 +538,12 @@ export default function OrganizationScreen() {
               {canManage && addable.length > 0 && (
                 <Text style={st.link} onPress={() => setAdding((v) => !v)}>{adding ? 'Close' : '+ Add member'}</Text>
               )}
-              {/* SD-154: CSV roster import (students with class, House, guardian contact) */}
+              {/* SD-154: CSV roster import; schools and colleges get student lists
+                  (whole school / class / section, existing students recognised) */}
               {canManage && org && (
-                <Text style={st.link} onPress={() => nav.navigate('RosterImport', { orgId: org.id })}>📥 Import CSV</Text>
+                <Text style={st.link} onPress={() => (academic ? nav.navigate('StudentImport', { orgId: org.id }) : nav.navigate('RosterImport', { orgId: org.id }))}>
+                  {academic ? '📥 Add students' : '📥 Import CSV'}
+                </Text>
               )}
             </View>
             {actionError ? (
