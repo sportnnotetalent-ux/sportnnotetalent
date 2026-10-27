@@ -255,10 +255,13 @@ const without = (table: number[], balls: number[]) => table.filter((b) => !balls
 const spot = (table: number[], ball: number) => (table.includes(ball) ? table : [...table, ball].sort((a, b) => a - b));
 
 /** A foul kind from a payload: a known kind, else 'other' for any other value
- *  that says "foul" (text, true); null when no foul is given. */
-function readKind(v: unknown): FoulKind | null {
+ *  that says "foul" (text, true); null when no foul is given. An illegal break
+ *  (5.3(b) / 6.3(b)) exists only on a break shot — elsewhere it is 'other'
+ *  (breaks #10). */
+function readKind(v: unknown, onBreak = false): FoulKind | null {
   if (v === undefined || v === null || v === false) return null;
-  return typeof v === 'string' && KIND_SET.has(v) ? (v as FoulKind) : 'other';
+  if (typeof v !== 'string' || !KIND_SET.has(v)) return 'other';
+  return v === 'illegalBreak' && !onBreak ? 'other' : (v as FoulKind);
 }
 
 /** The table passes to `side`: a new inning (2.8). */
@@ -436,7 +439,7 @@ function breakShot(s: PoolState, side: unknown, p: Record<string, unknown>): Poo
   const pots = readBalls(p.pots, top);
   const off = readBalls(p.off, top);
   if (!pots || !off || pots.some((b) => off.includes(b))) return s;
-  let kind = readKind(p.foul);
+  let kind = readKind(p.foul, true);
   if (!kind && off.length) kind = 'offTable'; // 3.5: a ball off the table is a foul
   const illegal = p.illegal === true && pots.length === 0;
   // 5.3(c) / Reg 16(1): fewer than three balls pocketed or across the head string

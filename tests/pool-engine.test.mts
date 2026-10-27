@@ -957,4 +957,13 @@ describe('breaks (docs/security/breaks/pool-engine.md)', () => {
       }
     }
   });
+
+  test('#10: an "illegal break" foul exists only on a break — during play it is recorded as "other"', () => {
+    const s = pool.reducer(NINE_BROKEN(), FOUL('illegalBreak'));
+    assert.equal(s.tally.home.foulsBy.illegalBreak, undefined);
+    assert.equal(s.tally.home.foulsBy.other, 1);
+    const p = pool.reducer(pool.replay(NINE, [LAG('home'), BREAK({ pots: [] })]), PUSH({ foul: 'illegalBreak' }));
+    assert.equal(p.tally.away.foulsBy.illegalBreak, undefined, 'nor on a push-out');
+    assert.equal(pool.replay(NINE, [LAG('home'), BREAK({ foul: 'illegalBreak' })]).tally.home.foulsBy.illegalBreak, 1, 'on the break it stays');
+  });
 });
