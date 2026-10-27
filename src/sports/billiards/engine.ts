@@ -203,11 +203,19 @@ function decided(s: BilliardsState, fr: LiveFrame, side: Side): BilliardsState {
 
 // ------------------------------------------------------------ reducer --
 
+/** B-02 — the actions that end a frame; each must carry `payload.frame`. */
+export const FRAME_ENDERS: ReadonlySet<string> = new Set(['CONCEDE', 'AWARD_FRAME', 'FRAME_SCORE']);
+
 export function reducer(s: BilliardsState, a: BilliardsAction): BilliardsState {
   if (!s || typeof s !== 'object' || !isObj(a) || typeof a.type !== 'string') return s;
   const fr = s.frame;
   if (s.ended || !fr) return s;
   const p = isObj(a.payload) ? a.payload : undefined;
+  // B-02 — an action stamped with a frame number applies to that frame only,
+  // and the ones that end a frame must carry it
+  const stampedFrame = own(p, 'frame');
+  if (stampedFrame !== undefined && stampedFrame !== fr.n) return s;
+  if (stampedFrame === undefined && FRAME_ENDERS.has(a.type)) return s;
   const striking = a.side === undefined || a.side === fr.striker;
   const named = (): Side | undefined => {
     const v = own(p, 'side') ?? a.side;

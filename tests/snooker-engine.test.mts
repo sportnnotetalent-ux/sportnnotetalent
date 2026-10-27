@@ -18,8 +18,14 @@ const pot = (ball: string, extra: Record<string, unknown> = {}): A => ({ type: '
 const MISS: A = { type: 'MISS' };
 const SAFE: A = { type: 'SAFETY' };
 const foul = (value: unknown, extra: Record<string, unknown> = {}): A => ({ type: 'FOUL', payload: { value, ...extra } });
-const run = (acts: A[], cfg: Record<string, unknown> = {}) => S.replay(cfg, acts);
-const step = (s: S.SnookerState, ...acts: A[]) => acts.reduce((st, a) => S.reducer(st, a), s);
+/** B-02 — what the scorer's controls do: a frame-ending action carries the
+ *  number of the frame it was tapped in. */
+const ENDERS = new Set(['CONCEDE', 'AWARD_FRAME', 'FRAME_SCORE']);
+const stamp = (s: S.SnookerState, a: A): A =>
+  (ENDERS.has(a?.type) && s?.frame && a.payload?.frame === undefined ? { ...a, payload: { ...(a.payload ?? {}), frame: s.frame.n } } : a);
+const ui = (s: S.SnookerState, a: A) => S.reducer(s, stamp(s, a));
+const run = (acts: A[], cfg: Record<string, unknown> = {}) => acts.reduce(ui, S.createInitialState(cfg));
+const step = (s: S.SnookerState, ...acts: A[]) => acts.reduce(ui, s);
 const pairs = (n: number, colour = 'black'): A[] => Array.from({ length: n }, () => [pot('red'), pot(colour)]).flat();
 const COLOURS = ['yellow', 'green', 'brown', 'blue', 'pink', 'black'];
 const clearance = (from = 'yellow'): A[] => COLOURS.slice(COLOURS.indexOf(from)).map((c) => pot(c));
@@ -439,7 +445,7 @@ describe('snooker · concession and award (S4 R2, S3 R14(d))', () => {
     const s0 = S.createInitialState();
     assert.equal(S.reducer(s0, { type: 'CONCEDE' }), s0);
     assert.equal(S.reducer(s0, { type: 'AWARD_FRAME', payload: { side: 'x' } }), s0);
-    const s = S.reducer(s0, { type: 'AWARD_FRAME', payload: { side: 'home', reason: 'conduct' } });
+    const s = ui(s0, { type: 'AWARD_FRAME', payload: { side: 'home', reason: 'conduct' } });
     assert.equal(s.frames[0].winner, 'home');
     assert.equal(s.frames[0].reason, 'conduct');
   });
@@ -517,13 +523,13 @@ describe('snooker · quick mode and mixed frames', () => {
   test('a level, negative, fractional, non-number or absurd score is refused', () => {
     const s0 = S.createInitialState();
     for (const [h, a] of [[50, 50], [-1, 50], [50.5, 3], ['72', 35], [null, 3], [Number.POSITIVE_INFINITY, 0], [100000, 0]]) {
-      assert.equal(S.reducer(s0, FS(h, a)), s0, `${h}-${a}`);
+      assert.equal(ui(s0, FS(h, a)), s0, `${h}-${a}`);
     }
   });
 
   test('only on a frame with no stroke yet', () => {
     const s = run([pot('red')]);
-    assert.equal(S.reducer(s, FS(72, 35)), s);
+    assert.equal(ui(s, FS(72, 35)), s);
   });
 
   test('a match may mix quick and shot-by-shot frames; breaks come only from shot-by-shot frames', () => {
@@ -659,7 +665,7 @@ describe('snooker · malformed input and replay', () => {
     assert.deepEqual(run(acts), run(acts));
     for (let i = 0; i <= acts.length; i++) {
       const prefix = run(acts.slice(0, i));
-      assert.deepEqual(i < acts.length ? S.reducer(prefix, acts[i]) : prefix, run(acts.slice(0, i + 1)));
+      assert.deepEqual(i < acts.length ? ui(prefix, acts[i]) : prefix, run(acts.slice(0, i + 1)));
     }
   });
 });
@@ -685,5 +691,28 @@ describe('snooker · break list', () => {
     assert.equal(st.home.visits, 1, 'only the real visit counts');
     assert.equal(st.home.fouls, 1);
     assert.deepEqual(S.breaks(s), [{ side: 'home', frame: 1, pts: 8 }]);
+  });
+
+  test('B-02 a frame-ending action carries its frame number; a repeat cannot end the next frame', () => {
+    const s0 = S.createInitialState({ bestOf: 3 });
+    const concede = { type: 'CONCEDE', payload: { side: 'away', frame: 1 } };
+    let s = step(s0, pairs(1)[0], pairs(1)[1], concede);
+    assert.equal(s.frames.length, 1);
+    assert.equal(S.reducer(s, concede), s, 'the same tap again: frame 2 is in play');
+    const fs = { type: 'FRAME_SCORE', payload: { home: 70, away: 30, frame: 2 } };
+    s = S.reducer(s, fs);
+    assert.equal(s.ended, true, 'frame 2 recorded');
+    const t = S.reducer(s0, { type: 'FRAME_SCORE', payload: { home: 70, away: 30, frame: 1 } });
+    assert.equal(S.reducer(t, { type: 'FRAME_SCORE', payload: { home: 70, away: 30, frame: 1 } }), t);
+    const aw = S.reducer(s0, { type: 'AWARD_FRAME', payload: { side: 'home', frame: 1 } });
+    assert.equal(S.reducer(aw, { type: 'AWARD_FRAME', payload: { side: 'home', frame: 1 } }), aw);
+    // without the frame number they are refused
+    for (const a of [{ type: 'CONCEDE', side: 'away' }, { type: 'AWARD_FRAME', payload: { side: 'home' } }, { type: 'FRAME_SCORE', payload: { home: 70, away: 30 } }]) {
+      assert.equal(S.reducer(s0, a as A), s0, a.type);
+    }
+    // any action stamped with another frame (or a non-number) is stale
+    assert.equal(S.reducer(s0, pot('red', { frame: 2 })), s0);
+    assert.equal(S.reducer(s0, pot('red', { frame: '1' })), s0);
+    assert.notEqual(S.reducer(s0, pot('red', { frame: 1 })), s0);
   });
 });

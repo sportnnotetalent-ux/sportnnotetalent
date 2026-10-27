@@ -26,8 +26,14 @@ const MISS: A = { type: 'MISS' };
 const SAFE: A = { type: 'SAFETY' };
 const FOUL = (kind?: string): A => ({ type: 'FOUL', payload: kind ? { kind } : {} });
 const times = (n: number, a: A): A[] => Array.from({ length: n }, () => a);
-const run = (acts: A[], cfg: Record<string, unknown> = {}) => B.replay(cfg, acts);
-const step = (s: B.BilliardsState, ...acts: A[]) => acts.reduce((st, a) => B.reducer(st, a), s);
+/** B-02 — what the scorer's controls do: a frame-ending action carries the
+ *  number of the frame it was tapped in. */
+const ENDERS = new Set(['CONCEDE', 'AWARD_FRAME', 'FRAME_SCORE']);
+const stamp = (s: B.BilliardsState, a: A): A =>
+  (ENDERS.has(a?.type) && s?.frame && a.payload?.frame === undefined ? { ...a, payload: { ...(a.payload ?? {}), frame: s.frame.n } } : a);
+const ui = (s: B.BilliardsState, a: A) => B.reducer(s, stamp(s, a));
+const run = (acts: A[], cfg: Record<string, unknown> = {}) => acts.reduce(ui, B.createInitialState(cfg));
+const step = (s: B.BilliardsState, ...acts: A[]) => acts.reduce(ui, s);
 const f = (s: B.BilliardsState) => s.frame!;
 const LONG = { target: 1000, bestOf: 1 };
 
@@ -254,12 +260,12 @@ describe('billiards · concession, award, quick mode', () => {
     assert.equal(s.frames[0].quick, true);
     const s0 = B.createInitialState();
     for (const [h, a] of [[149, 87], [150, 150], [150, 151], [-1, 150], ['150', 3], [150, 2.5], [1e6, 0]]) {
-      assert.equal(B.reducer(s0, FS(h, a)), s0, `${h}-${a}`);
+      assert.equal(ui(s0, FS(h, a)), s0, `${h}-${a}`);
     }
-    assert.equal(B.reducer(run([PR]), FS(150, 0)).frames.length, 0, 'not once a stroke is played');
+    assert.equal(ui(run([PR]), FS(150, 0)).frames.length, 0, 'not once a stroke is played');
     const timed = run([FS(310, 250)], { format: 'timed' });
     assert.equal(timed.winner, 'home');
-    assert.equal(B.reducer(B.createInitialState({ format: 'timed' }), FS(300, 300)).ended, false, 'level: sudden death has no quick result');
+    assert.equal(ui(B.createInitialState({ format: 'timed' }), FS(300, 300)).ended, false, 'level: sudden death has no quick result');
     assert.equal(run([FS(300, 300)], { format: 'timed', timedTie: 'draw' }).winner, 'draw');
   });
 });
@@ -333,7 +339,7 @@ describe('billiards · malformed input and replay', () => {
     for (let i = 0; i < acts.length; i++) {
       const prefix = run(acts.slice(0, i));
       const snap = JSON.stringify(prefix);
-      assert.deepEqual(B.reducer(prefix, acts[i]), run(acts.slice(0, i + 1)));
+      assert.deepEqual(ui(prefix, acts[i]), run(acts.slice(0, i + 1)));
       assert.equal(JSON.stringify(prefix), snap);
     }
   });
@@ -359,5 +365,23 @@ describe('billiards · break list', () => {
     assert.equal(st.home.visits, 1);
     assert.equal(st.home.fouls, 1);
     assert.deepEqual(B.breaks(s), [{ side: 'home', frame: 1, pts: 3 }]);
+  });
+
+  test('B-02 a frame-ending action carries its frame number; a repeat cannot end the next frame', () => {
+    const s0 = B.createInitialState({ bestOf: 3 });
+    const award = { type: 'AWARD_FRAME', payload: { side: 'home', frame: 1 } };
+    const s = B.reducer(s0, award);
+    assert.equal(s.frames.length, 1);
+    assert.equal(B.reducer(s, award), s, 'the same tap again: frame 2 is in play');
+    const fs = { type: 'FRAME_SCORE', payload: { home: 150, away: 30, frame: 1 } };
+    const t = B.reducer(s0, fs);
+    assert.equal(B.reducer(t, fs), t);
+    const c = B.reducer(s0, { type: 'CONCEDE', payload: { side: 'away', frame: 1 } });
+    assert.equal(B.reducer(c, { type: 'CONCEDE', payload: { side: 'away', frame: 1 } }), c);
+    for (const a of [{ type: 'CONCEDE', side: 'away' }, { type: 'AWARD_FRAME', payload: { side: 'home' } }, { type: 'FRAME_SCORE', payload: { home: 150, away: 30 } }]) {
+      assert.equal(B.reducer(s0, a as A), s0, a.type);
+    }
+    assert.equal(B.reducer(s0, sc({ potRed: true, frame: 2 })), s0);
+    assert.notEqual(B.reducer(s0, sc({ potRed: true, frame: 1 })), s0);
   });
 });
