@@ -50,11 +50,12 @@ Founder: "go ahead with organisation verification Phase 2". Every registered com
 - **Verified:**
   - `tests/org-verification-phase2.test.mts` (32), plus the Phase 1 format-sync test now reading the newest SQL; full suite 4,761 pass; tsc + edge-function typecheck clean.
   - Demo walkthrough at 375 px, end to end: Sports club → GST chip, lowercase GSTIN tidied to `29ABCDE1234F1Z5` → document shows "…uploaded · PDF" → club email code → sent → support card (GST search link, club checklist) → sent back → club page "Sent back: Name doesn't match the register". No console errors.
-- **Needs:**
-  - the founder runs the migration;
-  - deploy `org-verify` + `verification-submit`;
-  - web + Android OTA;
-  - push (`main` publishes the guide).
+- **Live 2026-10-27:**
+  - The founder ran the migration. Checked read-only: `norm_official_id` / `valid_official_id` give the same results as the app (Udyam, CIN, Darpan); the club's options and the local-ID list match; the constraint, the unique-index predicate, the DOB rule and submit are updated.
+  - Deployed `org-verify` and `verification-submit` (anonymous calls get 401).
+  - `auth-smoke` passed.
+  - Web `index-f2a8d10a…` and Android OTA `27651d64` from `ab17b4e`.
+  - `sportnnote.in/guides/verify-your-organisation/` is live, and the school guide links to it.
 
 ### 2026-10-26 — Sign-in codes: 8 digits, clear messages, and a pre-release sign-in check
 A friend on Android forgot their password and used **Sign in with a code**. The email had an **8-digit** code (Supabase's OTP length on this project), but the app said "6-digit code" with the placeholder "123456". He typed 6 digits and got "That code is incorrect or has expired", so it looked as if codes expired at once. The founder asked for the whole sign-up / sign-in area to be checked properly rather than issue by issue.
