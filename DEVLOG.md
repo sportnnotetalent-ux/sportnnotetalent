@@ -75,6 +75,13 @@ Founder: "go ahead with Run it again next year. Also, for each tournament organi
     - On a target meet it carried 4 events and invited its 4 houses (Invited · 4).
     - Copy this setup carried a high jump whose setup opened with the 1.15 m opening height, "Jumps pit B" and 14:45 from the original.
     - No console errors.
+- **Live 2026-10-27:**
+  - The founder ran the migration. Checked read-only: both columns, the `guard_tournament_edition` trigger (it checks the organisers) and both indexes are live; no editions linked yet.
+  - `auth-smoke` passed.
+  - Web `index-2ec447fc…` and Android OTA `f7192141` (runtime 1.0.0) from `5609bd5`, which includes the header fix below.
+    - Expo's hosting served old and new pages for about 6 minutes after promotion; by 06:38 UTC both addresses served only the new one (10/10 each).
+  - On the live build at 375 px, a real tournament shows "📋 Copy this setup" to guests, and its long name ends before "Share". No console errors.
+  - The guides on sportnnote.in now render tables: run-it-again, verify-your-school and verify-your-organisation, with no raw "|" left.
 
 ### 2026-10-27 — More educational institutions: junior / PU colleges, universities, polytechnics, ITIs
 Founder: "there are other educational institutions apart from schools like colleges etc who should also be able to set up communities, verify themselves, and in turn host various sports tournaments year on year."
