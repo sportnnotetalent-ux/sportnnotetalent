@@ -13,6 +13,20 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-27 — Anti-scraping at scale: the sign-up guard
+Backlog run, item 1 of 6 (founder: "go ahead with your entire backlog"). Scraping at scale needs many accounts, so new accounts are now hard to make in bulk. There's no CAPTCHA for real people and no app change, so APK 41 keeps working.
+- **Migration `20261027180000_signup_guard.sql`:** a Supabase Auth **Before User Created** Postgres hook, `hook_before_user_created`.
+  - **Refused:** temporary-inbox services (about 45 domains, in a list support can edit), and more than 100 new accounts a day from one IP (`signup_guard_settings.per_ip_per_day`, which support can raise for a school's sign-up drive).
+  - **Never limited:** our own phone sign-in, whose accounts have a confirmed phone plus the placeholder `@phone.sportnnote.in` address. Apps can't make those, because Supabase phone sign-up is off. Nobody else can use the placeholder domain.
+  - It fails open: if the check errors, the sign-up goes through.
+  - The founder switches it on in Authentication → Auth Hooks.
+- **App:** the guard's two refusals show in its own words, not as "too many attempts".
+- **Considered and not done:**
+  - **Supabase CAPTCHA** also covers every sign-in and code request, and the Android app needs a WebView to show it. Not possible on APK 41; the runbook keeps it for later.
+  - **Cached public browse lists:** logged-out visitors can't browse lists in the app. The real step (no logged-out list reads of raw tables) is a large rework, left until the weekly API TRAFFIC numbers show it's needed.
+- **Runbook:** `docs/security/anti-scraping.md` has a Sign-up guard section: switch on, raise the cap, add a domain, today's counts by IP, pause.
+- **Verified:** `tests/signup-guard.test.mts` (6); tsc clean; Postgres's parser accepts the migration.
+
 ### 2026-10-27 — Support console: every queue on one screen, with claims
 Founder: "…and then support console". These are the "when there is a support team" items from `docs/verification/org-verification.md`, now built, so several people can share the review work.
 - **Where:** Settings › Support tools › **🧑‍💼 Support console** (`SupportConsoleScreen`), support only.

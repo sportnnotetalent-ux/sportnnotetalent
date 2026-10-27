@@ -30,6 +30,9 @@ export function friendlyAuthError(raw?: string): string {
   // "Sign in with a code" for an email that has no account (Supabase: otp_disabled).
   if (m.includes('signups not allowed for otp')) return 'There’s no account with this email — check the spelling, or tap Create account.';
   if (/(already registered|already exists|user already)/.test(m)) return 'An account with this email already exists — try signing in instead.';
+  // The sign-up guard (migration 20261027180000_signup_guard): its own words.
+  if (m.includes('temporary inbox')) return 'Please use your own email address — a temporary inbox can’t be used for SportnNote.';
+  if (m.includes('new accounts from this network')) return 'Too many new accounts from this network today. Please try again tomorrow, or contact support.';
   if (/(rate limit|too many|429)/.test(m)) return 'Too many attempts. Please wait a minute and try again.';
   // Supabase: "For security purposes, you can only request this after 47 seconds."
   if (/(security purposes|only request this after)/.test(m)) return 'Please wait a minute before asking for another code.';

@@ -13,6 +13,7 @@
 | **API gate** (new) | Every REST and RPC request is checked against a blocklist (IP, account, User-Agent) and refused with HTTP 403 if listed. It is seeded with common scraping tools. | `api_gate()`, `api_blocklist` |
 | **Trap records** (new) | Three made-up adult players and one made-up team. If they ever appear in someone else's app or dataset, it was copied from SportnNote. | `canary_records` |
 | **Weekly numbers** (new) | Monday's email shows API requests (logged out / signed in) and the most-read tables, against the previous week. | `api_traffic_report()`, weekly-report |
+| **Sign-up guard** (2026-10-27) | Scraping at scale needs many accounts. New accounts are capped per network (IP) per day (100 by default), and temporary-inbox services can't sign up. No CAPTCHA for real people, no app change. Fails open. | `hook_before_user_created`, `signup_guard_settings` (migration `20261027180000_signup_guard.sql`) |
 
 **What this can't do:**
 - **No automatic rate limits.** Supabase serves reads in read-only transactions, so the database can't count requests per visitor. The gate blocks who you list; it doesn't throttle automatically.
@@ -86,6 +87,32 @@ notify pgrst, 'reload config';
 - **Never blocked:** browsers, the Android app (`okhttp`), edge functions (`Deno`), Node, Go and Java clients, `service_role`, and the API root.
 - **Fail-safe:** the gate fails open. If the check itself hits an error, the request goes through, so the gate can't take the app down. A bad regex is refused when you add it.
 
+## Sign-up guard
+
+**Switch it on (once, after running the migration):** Supabase → **Authentication → Auth Hooks** → **Before User Created** → **Postgres** → schema `public`, function `hook_before_user_created` → enable.
+
+- **What it refuses:**
+  - a temporary-inbox address ("Please use your own email address — a temporary inbox can't be used for SportnNote");
+  - more than the daily number of new accounts from one IP ("Too many new accounts from this network today …").
+- **Never limited:** sign-ups through the app's mobile-number sign-in (our server makes those accounts).
+- **Fails open:** if the check errors, the sign-up goes through.
+
+```sql
+-- A school's sign-up drive on one Wi-Fi hit the limit: raise it (default 100 a day per IP)
+update signup_guard_settings set per_ip_per_day = 300;
+
+-- Add a temporary-inbox domain
+update signup_guard_settings set blocked_domains = array_append(blocked_domains, 'example-temp.com');
+
+-- Today's new-account counts by IP (the busiest first)
+select subject as ip, hits from rate_limit_hits
+ where bucket = 'signup-ip' and window_start >= date_trunc('day', now()) order by hits desc limit 20;
+
+-- Pause / resume (or switch the hook off in the dashboard)
+update signup_guard_settings set enabled = false;
+update signup_guard_settings set enabled = true;
+```
+
 ## If you find your data elsewhere
 
 1. **Collect evidence:** screenshots with dates and URLs, and copies of the pages (a web archive link helps). Search for the trap names, and note any exact matches of our match data (scores, dates, venues).
@@ -98,6 +125,6 @@ notify pgrst, 'reload config';
 ## Later, at scale
 
 - Supabase **Pro plan**: longer log retention, and log drains for automatic daily alerts on the busiest IPs.
-- **CAPTCHA on sign-up** (Supabase Auth, Turnstile / hCaptcha), so scraping accounts can't be created in bulk.
-- **Cached public "browse" endpoints** for logged-out lists instead of raw tables, and fewer raw-table reads for logged-out visitors.
+- **CAPTCHA** (Supabase Auth, Turnstile / hCaptcha) if bulk sign-ups get past the guard. Supabase's CAPTCHA covers every sign-in and code request too, and the Android app needs a WebView to show it. So it can only be switched on once almost everyone is on an APK that includes one — not APK 41.
+- **Cached public "browse" endpoints.** Logged-out visitors can't browse lists in the app (only shared pages), so this only slows down direct API use. The real step is to stop logged-out list reads of raw tables and serve public pages through id-based functions. That's a large rework, worth it once the weekly API TRAFFIC numbers show logged-out bulk reads.
 - **App attestation** (Play Integrity / App Attest) behind an API proxy, once a proxy that can't be bypassed is possible.
