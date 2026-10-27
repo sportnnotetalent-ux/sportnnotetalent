@@ -7,6 +7,7 @@ import { supabase } from './supabase';
 import { fnPath } from './functionPath';
 import { firebasePhoneAvailable, sendPhoneCode as sendFirebaseCode, confirmPhoneCode, prewarmPhoneSdk, prewarmPhoneCode, releasePrewarmedPhoneCode } from './firebasePhone';
 import { LEGAL_VERSION } from '../data/legal';
+import { takeSms } from './smsBudget';
 import type { GuardianContact, Role } from './types';
 
 export const phoneLoginAvailable = (): boolean => !!supabase && firebasePhoneAvailable();
@@ -26,6 +27,7 @@ export function warmPhoneLogin(): void {
 
 /** Step 1: text the code to `phone` (Firebase), then warm up the sign-in function. */
 export async function sendPhoneCode(phone: string): Promise<void> {
+  await takeSms(phone); // SMS spend cap: this device's daily limits
   await sendFirebaseCode(phone);
   warmPhoneLogin();
 }

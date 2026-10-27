@@ -1,0 +1,11 @@
+{
+  "name": "sms-billing-cap",
+  "private": true,
+  "description": "Detaches billing from the Firebase project when its budget is used up (docs/ops/sms-spend-cap.md)",
+  "main": "index.js",
+  "engines": { "node": ">=20" },
+  "dependencies": {
+    "@google-cloud/billing": "^4.0.0",
+    "@google-cloud/functions-framework": "^3.4.0"
+  }
+}

@@ -6,6 +6,7 @@
 import { readQualifiesTo, type QualifiesTo } from './feeders';
 import { ageOf } from '../core/age';
 import { firebasePhoneAvailable, sendPhoneCode, confirmPhoneCode } from '../core/firebasePhone';
+import { takeSms } from '../core/smsBudget';
 import { serializePrefs, type FollowPrefs } from './followPrefs';
 import { supabase, isSupabaseConfigured } from '../core/supabase';
 import { fnPath } from '../core/functionPath';
@@ -4086,6 +4087,7 @@ export async function beginContactVerification(playerId: string, channel: OtpCha
     const number = channel === 'guardian_phone' ? p?.guardian?.phone : p?.phone;
     if (!number) return { sent: false, reason: 'Add the mobile number first.' };
     try {
+      await takeSms(number, 'verify by email instead'); // SMS spend cap
       await sendPhoneCode(number);
       firebasePending = { playerId, channel };
       return { sent: true, via: 'sms' };

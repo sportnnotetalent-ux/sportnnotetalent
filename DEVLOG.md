@@ -13,6 +13,23 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-27 — SMS spend cap
+Backlog run, item 5 of 6. Every phone code is a paid SMS (Firebase, about $0.07).
+- **What already limits spending** (written up in `docs/ops/sms-spend-cap.md`):
+  - Firebase's own limits: 3,000 SMS a day on plain Firebase Auth (worst case ≈ $210 a day), plus per-IP and per-number limits;
+  - the SMS region policy;
+  - reCAPTCHA / Play Integrity;
+  - the budget alert, which warns but doesn't stop spending.
+- **New in the app** (`src/core/smsLimit.ts` pure + `smsBudget.ts`): one device asks for at most **5 text codes a day**, and **3 for the same number** (however it's written).
+  - Past a limit the app says why and points to email ("…or sign in with your email instead" / "…verify by email instead").
+  - Checked at both send points: phone sign-in, and verifying a contact number.
+  - If device storage fails, the code is still sent.
+- **Optional hard stop** (`ops/gcp/sms-billing-cap/`, the founder deploys it once in Cloud Shell): a budget's Pub/Sub notice → a Cloud Function that detaches billing from the Firebase project when the month's cost passes the budget.
+  - Text-code sign-in pauses; email sign-in, push (FCM is free) and Supabase keep working.
+  - Steps, the test and how to turn SMS back on are in the doc.
+- **Later, with the next APK:** Firebase App Check (Play Integrity) on the Identity Toolkit API.
+- **Verified:** `tests/sms-spend-cap.test.mts` (5); tsc clean.
+
 ### 2026-10-27 — Cricket DLS v3: the full official Standard Edition table
 Backlog run, item 4 of 6. The 2026-10-10 DLS decision was to "source the full official Standard Edition table and drop it in behind a new version flag", and that's done.
 - **Source:** the ICC's own "Table of resource percentages remaining — over by over" (D/L Standard Edition), linked from the ICC's DLS rules page.
