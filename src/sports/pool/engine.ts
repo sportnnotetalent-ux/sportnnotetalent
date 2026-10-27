@@ -356,8 +356,23 @@ function endRack(d: PoolState, winner: Side, how: RackEnd, quick?: QuickRack) {
 
 // ---------------------------------------------------------- reducer ----
 
+const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
+const isPair = (v: unknown): boolean => isObj(v) && typeof v.home === 'number' && typeof v.away === 'number';
+const isTally = (v: unknown): boolean => isObj(v) && isObj(v.foulsBy);
+
+/** A state this engine made and can play on: every field an event touches has
+ *  its shape. Anything else (a corrupted or foreign snapshot) is never played
+ *  on — the reducer hands it back unchanged (breaks #24). */
+function playable(s: PoolState): boolean {
+  if (!isObj(s) || s.v !== 1 || !Object.prototype.hasOwnProperty.call(TOP, s.game)) return false;
+  if (!Array.isArray(s.racks) || !Array.isArray(s.sets) || !isPair(s.current) || !isPair(s.setsWon)) return false;
+  if (!isObj(s.tally) || !isTally(s.tally.home) || !isTally(s.tally.away)) return false;
+  const r = s.rack;
+  return isObj(r) && Array.isArray(r.table) && isPair(r.fouls) && isPair(r.inn);
+}
+
 export function reducer(s: PoolState, a: PoolAction): PoolState {
-  if (!s || typeof s !== 'object' || s.ended || !s.rack) return s;
+  if (!s || typeof s !== 'object' || s.ended || !s.rack || !playable(s)) return s;
   // own properties only — an inherited type / side / payload field never counts (breaks #5)
   const type = own(a, 'type');
   if (typeof type !== 'string') return s;

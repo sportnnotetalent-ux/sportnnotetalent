@@ -872,4 +872,21 @@ describe('breaks (docs/security/breaks/pool-engine.md)', () => {
       assert.equal(f.game, 'eight', 'Object.prototype.game');
     } finally { delete proto.illegal; delete proto.raceTo; delete proto.game; }
   });
+
+  test('#24: a corrupted or foreign state given to the reducer comes back unchanged — no throw', () => {
+    const s = NINE_BROKEN();
+    const r = s.rack!;
+    const bad: unknown[] = [
+      { ...s, tally: undefined }, { ...s, tally: { home: s.tally.home } }, { ...s, racks: null }, { ...s, sets: 'x' },
+      { ...s, current: undefined }, { ...s, setsWon: null }, { ...s, game: 'snooker' }, { ...s, v: undefined },
+      { ...s, rack: { ...r, table: 'x' } }, { ...s, rack: { ...r, fouls: undefined } }, { ...s, rack: { ...r, inn: null } },
+      { ...s, tally: { ...s.tally, home: { ...s.tally.home, foulsBy: null } } }, [], 'state',
+    ];
+    const acts: ScoreAction[] = [POT([2]), FOUL('scratch'), MISS(), SAFE(), RACK('home'), A('STALEMATE'), PUSH(), BREAK({ pots: [] }, 'home')];
+    for (const st of bad) for (const a of acts) {
+      let out: unknown;
+      assert.doesNotThrow(() => { out = pool.reducer(st as pool.PoolState, a); }, `${a.type} on ${JSON.stringify(st)?.slice(0, 50)}`);
+      assert.equal(out, st);
+    }
+  });
 });
