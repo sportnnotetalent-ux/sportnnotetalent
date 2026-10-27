@@ -15,7 +15,7 @@ export function lookupRegister(type: 'cbse', value: string, demoName?: string): 
   const key = `${type}:${value}`;
   const cached = seen.get(key);
   if (cached) return cached;
-  const url = OFFICIAL_ID_RULES.cbse.record!(value);
+  const url = OFFICIAL_ID_RULES.cbse.record?.(value) ?? 'https://saras.cbse.gov.in/';
   const p: Promise<RegisterResult> = !isSupabaseConfigured || !supabase
     ? Promise.resolve({
       found: true, source: 'CBSE SARAS (demo)', url,

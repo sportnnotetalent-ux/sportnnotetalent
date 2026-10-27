@@ -11,6 +11,7 @@ import { notify } from '../core/notifications';
 import {
   authorisationLetterHtml, normOfficialId, validOfficialId,
   type Authority, type OfficialIdEntry, type OfficialIdType, type OrgVerificationState,
+  idCountry,
 } from '../core/orgVerification';
 import { getOrganization, VERIFICATION_DOC_MAX_BYTES } from './repos';
 
@@ -42,7 +43,7 @@ export async function getOrgVerificationState(orgId: string): Promise<OrgVerific
 }
 
 /** While creating: is this ID already a verified community (and how many others claim it)? */
-export async function lookupOfficialId(type: OfficialIdType, value: string): Promise<{ valid: boolean; verified?: { orgId: string; name: string } | null; others?: number }> {
+export async function lookupOfficialId(type: OfficialIdType, value: string, market?: string | null): Promise<{ valid: boolean; verified?: { orgId: string; name: string } | null; others?: number }> {
   if (!validOfficialId(type, value)) return { valid: false };
   if (!live()) {
     const v = normOfficialId(type, value);
@@ -51,7 +52,7 @@ export async function lookupOfficialId(type: OfficialIdType, value: string): Pro
     }
     return { valid: true, verified: null, others: 0 };
   }
-  const { data } = await supabase!.rpc('org_id_lookup', { p_type: type, p_value: value });
+  const { data } = await supabase!.rpc('org_id_lookup', { p_type: type, p_value: value, p_country: idCountry(market) });
   return (data ?? { valid: true }) as { valid: boolean; verified?: { orgId: string; name: string } | null; others?: number };
 }
 
@@ -68,16 +69,18 @@ export async function setOrgRegistered(orgId: string, registered: boolean): Prom
   if (error) throw new Error(msg(error, 'Couldn’t save that — try again.'));
 }
 
-export async function setOfficialIds(orgId: string, ids: { type: OfficialIdType; value: string }[]): Promise<OrgVerificationState> {
+/** Phase 3: the IDs are recorded under the community's market's country (idCountry). */
+export async function setOfficialIds(orgId: string, ids: { type: OfficialIdType; value: string }[], market?: string | null): Promise<OrgVerificationState> {
+  const country = idCountry(market);
   const clean = ids.map((i) => ({ type: i.type, value: normOfficialId(i.type, i.value) })).filter((i) => i.value);
   const bad = clean.find((i) => !validOfficialId(i.type, i.value));
   if (bad) throw new Error('One of the codes doesn’t look right — check it and try again.');
   if (!live()) {
     const s = await demoGet(orgId);
-    demoState.set(orgId, { ...s, ids: clean.map((i): OfficialIdEntry => ({ ...i, country: 'IN', locked: false })) });
+    demoState.set(orgId, { ...s, ids: clean.map((i): OfficialIdEntry => ({ ...i, country, locked: false })) });
     return demoGet(orgId);
   }
-  const { data, error } = await supabase!.rpc('set_org_official_ids', { p_org: orgId, p_ids: clean.map((i) => ({ ...i, country: 'IN' })) });
+  const { data, error } = await supabase!.rpc('set_org_official_ids', { p_org: orgId, p_ids: clean.map((i) => ({ ...i, country })) });
   if (error || !data) throw new Error(msg(error, 'Couldn’t save the codes — try again.'));
   return data as OrgVerificationState;
 }

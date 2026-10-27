@@ -13,6 +13,32 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-27 — Organisation verification Phase 3: other countries' official IDs
+Backlog run, item 3 of 6. A community's market (the school system it picked) now decides which official IDs it gives at step 1. India is unchanged.
+- **New ID types** (`core/orgVerification.ts`; the formats mirror SQL):
+  - **UK:** school URN, Scotland / Wales / NI school reference, UKPRN, Companies House number (leading zeros added back), registered charity number (E&W / SC / NIC).
+  - **US:** NCES ID (public 12 digits / private PSS), IPEDS unit ID, EIN (dash added back), state entity number.
+  - **Singapore:** UEN, MOE school code. **Malaysia:** SSM, MOE school code, ROS.
+  - **Australia:** ABN with its checksum (`abnOk` / SQL `abn_ok`), ACARA ID, TEQSA PRV, incorporated association number.
+  - **Gulf:** education regulator licence, trade licence.
+  - **Everywhere:** "Registration number" as the catch-all.
+- **Per-market rules:**
+  - `MARKET_IDS` + `orgVerifyConfig(type, market)` give each market's IDs, documents ("DfE / Ofsted / ISI registration", "IRS EIN or 501(c)(3) letter" …) and email examples.
+  - Gulf Indian-curriculum schools can give CBSE.
+  - IDs are stored under the market's country (`idCountry`: GB / US / SG / MY / AU / AE).
+  - **Record links** where a register has a page per number: GIAS, Companies House, Charity Commission / OSCR, NCES, College Navigator, ABN Lookup, My School.
+- **Screens:** Get verified and New community (its "recommended" code) follow the community's market: a UK school is asked for its School URN. The duplicate check also uses the market's country.
+- **Migration `20261027190000_org_verification_international.sql`:**
+  - the new types in the check constraint, `norm_official_id`, `valid_official_id` and `abn_ok`;
+  - local numbers extended in `org_local_id_types()` **and** in the one-verified-per-ID unique index (found by the older tests — otherwise two verified communities could clash on a catch-all number);
+  - `org_id_requirements` (91 rows generated from the app's rules) with `org_required_id_types_for(type, market)`;
+  - `submit_org_verification` now checks by market.
+- **Guide:** "Verify your school" has "Our school isn't in India".
+- **Verified:**
+  - `tests/org-verification-international.test.mts` (14), including the SQL table matching the app for every market × type and the index list. Older verification tests updated for the ABN checksum, the newest local list and the new calls. tsc clean; Postgres's parser accepts the migration.
+  - The ABN checksum and normalising expressions were dry-run read-only on live (51 824 753 556 ✓, …557 ✗).
+  - Demo: New community → School → United Kingdom asks for "School URN (recommended)" with the GIAS hint; India still asks for UDISE+.
+
 ### 2026-10-27 — Register lookup: a school's CBSE record on its review card
 Backlog run, item 2 of 6. This is the "automation" step from `docs/verification/org-verification.md`.
 - **CBSE SARAS** opens a school by affiliation number with no CAPTCHA (probed live).

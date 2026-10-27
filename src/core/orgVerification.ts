@@ -17,7 +17,15 @@ export type OfficialIdType =
   // Phase 2
   | 'cin' | 'llpin' | 'gstin' | 'udyam' | 'ngo_darpan' | 'society_reg' | 'trust_reg' | 'coop_reg'
   // more educational institutions (2026-10-27)
-  | 'iti';
+  | 'iti'
+  // Phase 3 — other markets (2026-10-27): UK, US, Singapore, Malaysia, Australia, the Gulf
+  | 'urn' | 'uk_school_ref' | 'ukprn' | 'companies_house' | 'uk_charity'
+  | 'nces' | 'ipeds' | 'ein' | 'us_state_entity'
+  | 'uen' | 'sg_moe'
+  | 'ssm' | 'my_moe' | 'my_ros'
+  | 'abn' | 'acara' | 'teqsa' | 'au_assoc'
+  | 'gulf_school' | 'trade_licence'
+  | 'other_reg';
 
 export interface OfficialIdRule {
   label: string;
@@ -27,7 +35,7 @@ export interface OfficialIdRule {
   /** a public register the reviewer searches */
   lookup?: { label: string; url: string };
   /** the register's page for this exact number, where the register allows it */
-  record?: (value: string) => string;
+  record?: (value: string) => string | undefined;
 }
 
 export const OFFICIAL_ID_RULES: Record<OfficialIdType, OfficialIdRule> = {
@@ -113,32 +121,164 @@ export const OFFICIAL_ID_RULES: Record<OfficialIdType, OfficialIdRule> = {
     label: 'Co-operative society registration number', placeholder: 'As on the registration certificate', pattern: /^[A-Z0-9/().&-]{3,40}$/,
     hint: 'From the co-operative (housing) society’s registration certificate.',
   },
+  // ---- Phase 3: other markets ----
+  urn: {
+    label: 'School URN', placeholder: 'e.g. 100000', pattern: /^\d{6}$/,
+    hint: '6 digits — the Unique Reference Number on Get Information about Schools (England).',
+    lookup: { label: 'Get Information about Schools', url: 'https://get-information-schools.service.gov.uk/' },
+    record: (v) => `https://get-information-schools.service.gov.uk/Establishments/Establishment/Details/${encodeURIComponent(v)}`,
+  },
+  uk_school_ref: {
+    label: 'School reference number', placeholder: 'e.g. 5244439', pattern: /^[A-Z0-9/-]{4,12}$/,
+    hint: 'Scotland: the SEED code. Wales: the LA / establishment number. Northern Ireland: the DE reference number.',
+  },
+  ukprn: {
+    label: 'UKPRN', placeholder: 'e.g. 10007783', pattern: /^1\d{7}$/,
+    hint: '8 digits starting with 1 — the UK Provider Reference Number for colleges and universities.',
+    lookup: { label: 'UK Register of Learning Providers', url: 'https://www.ukrlp.co.uk/' },
+  },
+  companies_house: {
+    label: 'Companies House number', placeholder: 'e.g. 01234567 or SC123456', pattern: /^(\d{8}|[A-Z]{2}\d{6})$/,
+    hint: '8 characters, on the certificate of incorporation (England & Wales numbers start with 0; Scotland SC, Northern Ireland NI, LLPs OC).',
+    lookup: { label: 'Companies House', url: 'https://find-and-update.company-information.service.gov.uk/' },
+    record: (v) => `https://find-and-update.company-information.service.gov.uk/company/${encodeURIComponent(v)}`,
+  },
+  uk_charity: {
+    label: 'Registered charity number', placeholder: 'e.g. 1123456 or SC012345', pattern: /^(\d{6,7}|SC\d{6}|NIC\d{6})$/,
+    hint: 'England & Wales: 6–7 digits. Scotland (OSCR): SC + 6 digits. Northern Ireland: NIC + 6 digits.',
+    lookup: { label: 'the charity register', url: 'https://register-of-charities.charitycommission.gov.uk/' },
+    record: (v) => (/^\d{6,7}$/.test(v) ? `https://register-of-charities.charitycommission.gov.uk/charity-search/-/charity-details/${v}`
+      : /^SC\d{6}$/.test(v) ? `https://www.oscr.org.uk/about-charities/search-the-register/charity-details?number=${v}` : undefined),
+  },
+  nces: {
+    label: 'NCES school ID', placeholder: 'e.g. 062271003230', pattern: /^(\d{12}|[A-Z0-9]{8})$/,
+    hint: 'Public schools: the 12-digit NCES ID. Private schools: the 8-character PSS ID.',
+    lookup: { label: 'NCES school search', url: 'https://nces.ed.gov/ccd/schoolsearch/' },
+    record: (v) => (/^\d{12}$/.test(v) ? `https://nces.ed.gov/ccd/schoolsearch/school_detail.asp?ID=${v}`
+      : `https://nces.ed.gov/surveys/pss/privateschoolsearch/school_detail.asp?ID=${encodeURIComponent(v)}`),
+  },
+  ipeds: {
+    label: 'IPEDS unit ID', placeholder: 'e.g. 166027', pattern: /^\d{6}$/,
+    hint: '6 digits — the college’s ID on College Navigator (IPEDS).',
+    lookup: { label: 'College Navigator', url: 'https://nces.ed.gov/collegenavigator/' },
+    record: (v) => `https://nces.ed.gov/collegenavigator/?id=${v}`,
+  },
+  ein: {
+    label: 'EIN', placeholder: 'e.g. 12-3456789', pattern: /^\d{2}-\d{7}$/,
+    hint: '9 digits — the Employer Identification Number on the IRS letter (or the 501(c)(3) letter).',
+    lookup: { label: 'IRS Tax Exempt Organization Search', url: 'https://apps.irs.gov/app/eos/' },
+  },
+  us_state_entity: {
+    label: 'State entity number', placeholder: 'As on the state’s register', pattern: /^[A-Z0-9-]{3,20}$/,
+    hint: 'The business or non-profit entity number from your Secretary of State.',
+  },
+  uen: {
+    label: 'UEN', placeholder: 'e.g. 201912345K or T08SS0001A', pattern: /^(\d{8}[A-Z]|\d{9}[A-Z]|[TSR]\d{2}[A-Z]{2}\d{4}[A-Z])$/,
+    hint: 'The Unique Entity Number — on the ACRA BizFile, or the Registry of Societies certificate.',
+    lookup: { label: 'UEN search', url: 'https://www.uen.gov.sg/' },
+  },
+  sg_moe: {
+    label: 'MOE school code', placeholder: 'e.g. 7001', pattern: /^\d{4}$/,
+    hint: '4 digits — the school’s code with the Ministry of Education.',
+    lookup: { label: 'MOE SchoolFinder', url: 'https://www.moe.gov.sg/schoolfinder' },
+  },
+  ssm: {
+    label: 'SSM registration number', placeholder: 'e.g. 201901012345', pattern: /^(\d{12}|\d{1,7}-?[A-Z])$/,
+    hint: 'The 12-digit SSM number (or the older one like 123456-A) on the registration certificate.',
+    lookup: { label: 'SSM e-Info', url: 'https://www.ssm-einfo.my/' },
+  },
+  my_moe: {
+    label: 'MOE school code', placeholder: 'e.g. WBA0001', pattern: /^[A-Z]{3}\d{4}$/,
+    hint: '3 letters + 4 digits — the school’s Kementerian Pendidikan code.',
+    lookup: { label: 'Kementerian Pendidikan Malaysia', url: 'https://www.moe.gov.my/' },
+  },
+  my_ros: {
+    label: 'ROS registration number', placeholder: 'e.g. PPM-001-10-01011980', pattern: /^[A-Z0-9/-]{4,30}$/,
+    hint: 'From the Registry of Societies (Jabatan Pendaftaran Pertubuhan) certificate.',
+    lookup: { label: 'Registry of Societies', url: 'https://www.ros.gov.my/' },
+  },
+  abn: {
+    label: 'ABN', placeholder: 'e.g. 51 824 753 556', pattern: /^\d{11}$/,
+    hint: '11 digits — the Australian Business Number.',
+    lookup: { label: 'ABN Lookup', url: 'https://abr.business.gov.au/' },
+    record: (v) => `https://abr.business.gov.au/ABN/View?abn=${v}`,
+  },
+  acara: {
+    label: 'ACARA school ID', placeholder: 'e.g. 45678', pattern: /^\d{5,6}$/,
+    hint: 'The school’s ID on My School (ACARA).',
+    lookup: { label: 'My School', url: 'https://www.myschool.edu.au/' },
+    record: (v) => `https://www.myschool.edu.au/school/${v}`,
+  },
+  teqsa: {
+    label: 'TEQSA provider ID', placeholder: 'e.g. PRV12345', pattern: /^PRV\d{5}$/,
+    hint: 'PRV + 5 digits — on the National Register of higher education providers.',
+    lookup: { label: 'TEQSA National Register', url: 'https://www.teqsa.gov.au/national-register' },
+  },
+  au_assoc: {
+    label: 'Incorporated association number', placeholder: 'e.g. A0012345B', pattern: /^[A-Z0-9/-]{3,20}$/,
+    hint: 'From your state’s register of incorporated associations.',
+  },
+  gulf_school: {
+    label: 'Education regulator licence / school ID', placeholder: 'As on the licence', pattern: /^[A-Z0-9/.-]{3,30}$/,
+    hint: 'From KHDA, ADEK, SPEA, the Ministry of Education (MOE / MOEHE) or the CAA.',
+  },
+  trade_licence: {
+    label: 'Trade / commercial licence number', placeholder: 'As on the licence', pattern: /^[A-Z0-9/.-]{3,30}$/,
+    hint: 'From the commercial or trade licence (e.g. the Department of Economy & Tourism, a free zone, or the Ministry of Commerce).',
+  },
+  other_reg: {
+    label: 'Registration number', placeholder: 'As on the certificate', pattern: /^[A-Z0-9/().&-]{3,40}$/,
+    hint: 'If none of the others fits: the number from the official register that lists you. Support checks it against your document.',
+  },
 };
 
 /** Numbers issued by a local registrar: the same number can exist in another
  *  state or district, so they never block another community from verifying
  *  (support still sees a match). Mirrors org_local_id_types() in SQL. */
-export const LOCAL_ID_TYPES: readonly OfficialIdType[] = ['state_board', 'society_reg', 'trust_reg', 'coop_reg'];
+export const LOCAL_ID_TYPES: readonly OfficialIdType[] = [
+  'state_board', 'society_reg', 'trust_reg', 'coop_reg',
+  // Phase 3: numbers a state, emirate or local register issues, and the catch-all
+  'uk_school_ref', 'us_state_entity', 'my_ros', 'au_assoc', 'gulf_school', 'trade_licence', 'other_reg',
+];
 
 /** Same as norm_official_id() in SQL: UDISE+ keeps digits only; others upper-cased
  *  with no spaces, and the usual separators put back (LLPIN, Udyam, NGO Darpan). */
 export function normOfficialId(type: OfficialIdType, value: string): string {
-  if (type === 'udise') return (value ?? '').replace(/\D/g, '');
+  if (type === 'udise' || type === 'urn' || type === 'ukprn' || type === 'ipeds' || type === 'abn' || type === 'acara' || type === 'sg_moe') return (value ?? '').replace(/\D/g, '');
+  if (type === 'ein') return (value ?? '').replace(/\D/g, '').replace(/^(\d{2})(\d{7})$/, '$1-$2');
   const v = (value ?? '').trim().replace(/\s+/g, '').toUpperCase();
   if (type === 'llpin') return v.replace(/^([A-Z]{3})-?(\d{4})$/, '$1-$2');
   if (type === 'udyam') return v.replace(/^UDYAM-?([A-Z]{2})-?(\d{2})-?(\d{7})$/, 'UDYAM-$1-$2-$3');
   if (type === 'ngo_darpan') return v.replace(/^([A-Z]{2})[/-](\d{4})[/-](\d{7})$/, '$1/$2/$3');
+  // a Companies House number typed without its leading zeros
+  if (type === 'companies_house') return /^\d{1,7}$/.test(v) ? v.padStart(8, '0') : v;
   return v;
 }
 
-export const validOfficialId = (type: OfficialIdType, value: string): boolean =>
-  OFFICIAL_ID_RULES[type].pattern.test(normOfficialId(type, value));
+/** Australian Business Number checksum: subtract 1 from the first digit, weight
+ *  10, 1, 3, 5 … 19, and the sum is a multiple of 89. Mirrors abn_ok() in SQL. */
+export function abnOk(abn: string): boolean {
+  if (!/^\d{11}$/.test(abn)) return false;
+  const w = [10, 1, 3, 5, 7, 9, 11, 13, 15, 17, 19];
+  const sum = [...abn].reduce((n, d, i) => n + (Number(d) - (i === 0 ? 1 : 0)) * w[i], 0);
+  return sum % 89 === 0;
+}
+
+export const validOfficialId = (type: OfficialIdType, value: string): boolean => {
+  const v = normOfficialId(type, value);
+  return OFFICIAL_ID_RULES[type].pattern.test(v) && (type !== 'abn' || abnOk(v));
+};
 
 /** Short names for choosing which ID you have (chips on a narrow phone). */
 export const ID_SHORT: Record<OfficialIdType, string> = {
   udise: 'UDISE+', cbse: 'CBSE', cisce: 'CISCE (ICSE / ISC)', state_board: 'State board', ib: 'IB', cambridge: 'Cambridge',
   nios: 'NIOS', aishe: 'AISHE', cin: 'Company (CIN)', llpin: 'LLP', gstin: 'GST', udyam: 'Udyam', ngo_darpan: 'NGO Darpan',
   society_reg: 'Society', trust_reg: 'Trust', coop_reg: 'Co-operative', iti: 'ITI code',
+  urn: 'URN', uk_school_ref: 'Scotland / Wales / NI', ukprn: 'UKPRN', companies_house: 'Companies House', uk_charity: 'Charity',
+  nces: 'NCES', ipeds: 'IPEDS', ein: 'EIN', us_state_entity: 'State entity',
+  uen: 'UEN', sg_moe: 'MOE code', ssm: 'SSM', my_moe: 'MOE code', my_ros: 'ROS',
+  abn: 'ABN', acara: 'ACARA', teqsa: 'TEQSA', au_assoc: 'Inc. association',
+  gulf_school: 'Regulator licence', trade_licence: 'Trade licence', other_reg: 'Other register',
 };
 
 /** The board codes a school can add next to its UDISE+ code. */
@@ -238,6 +378,126 @@ export const ORG_VERIFY: Record<VerifiableType, OrgVerifyConfig> = {
     head: 'Chairman / Secretary', emailExample: 'secretary@yoursociety.in',
   },
 };
+
+/* ---------------------- Phase 3: other markets (2026-10-27) ---------------------- */
+
+/** The school systems we support outside India (core/markets.ts MarketId). */
+export type IntlMarket = 'gulf-british' | 'gulf-indian' | 'uk' | 'sg' | 'my' | 'au' | 'us';
+export const INTL_MARKETS: readonly IntlMarket[] = ['gulf-british', 'gulf-indian', 'uk', 'sg', 'my', 'au', 'us'];
+
+/** What a market accepts for each kind of organisation — every list ends with
+ *  the catch-all register number where a type may have none of the others. */
+interface MarketIds {
+  edu: OfficialIdType[]; eduOptional: OfficialIdType[]; higher: OfficialIdType[];
+  bodies: OfficialIdType[]; company: OfficialIdType[]; hospital: OfficialIdType[]; ngo: OfficialIdType[]; housing: OfficialIdType[];
+  docs: { edu: string[]; higher: string[]; org: string[] };
+}
+const GULF_DOCS = {
+  edu: ['KHDA / ADEK / SPEA / Ministry of Education licence', 'Board affiliation letter (CBSE, Cambridge, IB …)', 'Other official recognition'],
+  higher: ['CAA / Ministry licence', 'Other official recognition'],
+  org: ['Trade / commercial licence', 'Other official registration'],
+};
+const GULF_ORGS = {
+  higher: ['gulf_school', 'trade_licence', 'other_reg'] as OfficialIdType[], bodies: ['trade_licence', 'other_reg'] as OfficialIdType[],
+  company: ['trade_licence', 'other_reg'] as OfficialIdType[], hospital: ['trade_licence', 'other_reg'] as OfficialIdType[],
+  ngo: ['trade_licence', 'other_reg'] as OfficialIdType[], housing: ['other_reg'] as OfficialIdType[],
+};
+export const MARKET_IDS: Record<IntlMarket, MarketIds> = {
+  uk: {
+    edu: ['urn', 'uk_school_ref', 'other_reg'], eduOptional: ['ib', 'cambridge'], higher: ['ukprn', 'other_reg'],
+    bodies: ['companies_house', 'uk_charity', 'other_reg'], company: ['companies_house'], hospital: ['companies_house', 'uk_charity'],
+    ngo: ['uk_charity', 'companies_house', 'other_reg'], housing: ['companies_house', 'other_reg'],
+    docs: {
+      edu: ['DfE / Ofsted / ISI registration (or the Scottish, Welsh or NI equivalent)', 'Exam board centre letter (Cambridge, IB …)', 'Other official recognition'],
+      higher: ['OfS / UKRLP registration', 'Other official recognition'],
+      org: ['Companies House certificate', 'Charity registration', 'Other official registration'],
+    },
+  },
+  us: {
+    edu: ['nces', 'other_reg'], eduOptional: ['ib', 'cambridge'], higher: ['ipeds', 'other_reg'],
+    bodies: ['ein', 'us_state_entity', 'other_reg'], company: ['ein', 'us_state_entity'], hospital: ['ein', 'us_state_entity'],
+    ngo: ['ein', 'us_state_entity'], housing: ['us_state_entity', 'ein', 'other_reg'],
+    docs: {
+      edu: ['State licence or registration', 'Accreditation letter (e.g. Cognia, WASC)', 'Other official recognition'],
+      higher: ['Accreditation letter', 'State authorization', 'Other official recognition'],
+      org: ['Certificate of incorporation / formation', 'IRS EIN or 501(c)(3) letter', 'Other official registration'],
+    },
+  },
+  sg: {
+    edu: ['sg_moe', 'uen', 'other_reg'], eduOptional: ['ib', 'cambridge'], higher: ['uen', 'other_reg'],
+    bodies: ['uen', 'other_reg'], company: ['uen'], hospital: ['uen'], ngo: ['uen', 'other_reg'], housing: ['uen', 'other_reg'],
+    docs: {
+      edu: ['MOE registration letter', 'ACRA / UEN registration', 'Other official recognition'],
+      higher: ['CPE / MOE registration', 'Other official recognition'],
+      org: ['ACRA BizFile / UEN certificate', 'Registry of Societies certificate', 'Other official registration'],
+    },
+  },
+  my: {
+    edu: ['my_moe', 'ssm', 'other_reg'], eduOptional: ['ib', 'cambridge'], higher: ['ssm', 'other_reg'],
+    bodies: ['my_ros', 'ssm', 'other_reg'], company: ['ssm'], hospital: ['ssm'], ngo: ['my_ros', 'ssm', 'other_reg'], housing: ['my_ros', 'other_reg'],
+    docs: {
+      edu: ['MOE registration certificate', 'SSM registration', 'Other official recognition'],
+      higher: ['MOHE / MQA registration', 'Other official recognition'],
+      org: ['SSM certificate', 'Registry of Societies certificate', 'Other official registration'],
+    },
+  },
+  au: {
+    edu: ['acara', 'abn', 'other_reg'], eduOptional: ['ib', 'cambridge'], higher: ['teqsa', 'abn', 'other_reg'],
+    bodies: ['abn', 'au_assoc', 'other_reg'], company: ['abn'], hospital: ['abn'], ngo: ['abn', 'au_assoc'], housing: ['au_assoc', 'abn', 'other_reg'],
+    docs: {
+      edu: ['State registration / accreditation letter', 'ABN registration', 'Other official recognition'],
+      higher: ['TEQSA / ASQA registration', 'Other official recognition'],
+      org: ['ABN registration', 'Incorporated association certificate', 'Other official registration'],
+    },
+  },
+  'gulf-indian': { edu: ['cbse', 'gulf_school', 'other_reg'], eduOptional: ['cambridge', 'ib'], ...GULF_ORGS, docs: GULF_DOCS },
+  'gulf-british': { edu: ['gulf_school', 'other_reg'], eduOptional: ['cambridge', 'ib'], ...GULF_ORGS, docs: GULF_DOCS },
+};
+
+const isIntl = (m?: string | null): m is IntlMarket => (INTL_MARKETS as readonly string[]).includes(m ?? '');
+
+/** Which group of a market's IDs an organisation type takes. */
+function marketGroup(type: VerifiableType): 'edu' | 'higher' | 'bodies' | 'company' | 'hospital' | 'ngo' | 'housing' {
+  switch (type) {
+    case 'School': case 'Junior / PU college': return 'edu';
+    case 'College': case 'University': case 'Polytechnic / institute': case 'ITI': return 'higher';
+    case 'Sports club': case 'Sports academy': case 'Sports association': return 'bodies';
+    case 'Company': return 'company';
+    case 'Hospital chain': return 'hospital';
+    case 'NGO': return 'ngo';
+    default: return 'housing';
+  }
+}
+
+/** The verification set-up for a type in its community's market (India: ORG_VERIFY).
+ *  Mirrors org_required_id_types_for() / org_id_requirements in SQL. */
+export function orgVerifyConfig(type: VerifiableType, market?: string | null): OrgVerifyConfig {
+  const base = ORG_VERIFY[type];
+  if (!isIntl(market)) return base;
+  const m = MARKET_IDS[market];
+  const g = marketGroup(type);
+  const docs = g === 'edu' ? m.docs.edu : g === 'higher' ? m.docs.higher : m.docs.org;
+  return {
+    ...base,
+    requiredAnyOf: m[g],
+    optional: g === 'edu' ? m.eduOptional : [],
+    docKinds: docs,
+    emailExample: g === 'edu' || g === 'higher' ? 'office@yourschool.org' : g === 'company' || g === 'hospital' ? 'admin@yourcompany.com' : 'secretary@yourclub.org',
+  };
+}
+
+/** The country an organisation's IDs are recorded under (org_official_ids.country). */
+export function idCountry(market?: string | null): string {
+  switch (market) {
+    case 'uk': return 'GB';
+    case 'us': return 'US';
+    case 'sg': return 'SG';
+    case 'my': return 'MY';
+    case 'au': return 'AU';
+    case 'gulf-british': case 'gulf-indian': return 'AE';
+    default: return 'IN';
+  }
+}
 
 /** Educational institutions: "recognition" documents, a Principal / Head-style
  *  signatory, and member dates of birth from student records. Mirrors

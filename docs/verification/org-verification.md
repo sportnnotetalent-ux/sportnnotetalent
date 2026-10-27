@@ -133,4 +133,20 @@ Founder: "there are other educational institutions apart from schools … who sh
 
 ## Later phases
 
-- **Phase 3 — international IDs,** with each market: UK DfE URN / Charity Commission / Companies House, UAE KHDA / ADEK / trade licence, US NCES ID / EIN, IB / Cambridge directories. The model already stores country + ID type + value.
+- **Phase 3 — international IDs (built 2026-10-27,** migration `20261027190000_org_verification_international.sql`). The community's market (the school system it picked) decides step 1 (`orgVerifyConfig(type, market)`, SQL `org_id_requirements` / `org_required_id_types_for`):
+
+  | Market | Schools | Colleges / universities | Clubs, academies, associations | Companies | NGOs |
+  |---|---|---|---|---|---|
+  | UK | URN (GIAS), or the Scotland / Wales / NI reference | UKPRN | Companies House, charity number | Companies House | charity number, Companies House |
+  | US | NCES ID (public 12 digits / private PSS) | IPEDS unit ID | EIN, state entity number | EIN, state entity number | EIN, state entity number |
+  | Singapore | MOE school code, UEN | UEN | UEN | UEN | UEN |
+  | Malaysia | MOE school code, SSM | SSM | ROS, SSM | SSM | ROS, SSM |
+  | Australia | ACARA ID, ABN (checksum) | TEQSA provider ID, ABN | ABN, incorporated association | ABN | ABN, incorporated association |
+  | Gulf | regulator licence (KHDA, ADEK, SPEA, MOE …); Indian-curriculum schools also CBSE | regulator licence, trade licence | trade licence | trade licence | trade licence |
+
+  - **Catch-all:** every international list (except companies in some markets) also accepts **Registration number** (any official register), so nobody is stuck at step 1.
+  - **Local numbers** (state, emirate or local registers, and the catch-all) never block another community.
+  - IDs are stored under the market's country (GB, US, SG, MY, AU; AE for the Gulf).
+  - **Record links:** where a register has a page per number, the review card links it (GIAS, Companies House, Charity Commission / OSCR, NCES, College Navigator, ABN Lookup, My School).
+  - **Document kinds** follow the market (e.g. "DfE / Ofsted / ISI registration", "IRS EIN or 501(c)(3) letter").
+  - Still to come with each market: the authority letter template's wording, and support's local knowledge.

@@ -52,6 +52,7 @@ describe('the new official IDs', () => {
   test('the server has the same formats and the same clean-up', () => {
     const v = latest('valid_official_id');
     for (const [type, rule] of Object.entries(OFFICIAL_ID_RULES) as [OfficialIdType, { pattern: RegExp }][]) {
+      if (type === 'abn') { assert.match(v, /when 'abn' then abn_ok\(p_value\)/); continue; } // Phase 3: a checksum, not a pattern
       const m = new RegExp(`when '${type}' then p_value ~ '([^']+)'`).exec(v);
       assert.ok(m, `server rule for ${type}`);
       assert.equal(m![1], rule.pattern.source, type);
@@ -99,7 +100,7 @@ describe('what each type needs', () => {
 
 describe('local registrars’ numbers never block another community', () => {
   test('the same list in the app, the index and the functions', () => {
-    assert.deepEqual(arr(fn('org_local_id_types')), [...LOCAL_ID_TYPES]);
+    assert.deepEqual(arr(latest('org_local_id_types')), [...LOCAL_ID_TYPES]); // Phase 3 extends the list
     assert.match(sql, /where locked and id_type not in \('state_board', 'society_reg', 'trust_reg', 'coop_reg'\);/);
     assert.match(fn('set_org_official_ids'), /if not \(t = any\(org_local_id_types\(\)\)\) then/);
     assert.match(fn('org_id_lookup'), /if not \(p_type = any\(org_local_id_types\(\)\)\) then/);

@@ -76,7 +76,7 @@ describe('the server function and the card', () => {
   });
   test('the review card: the record link, copy on the web, the register panel for CBSE', () => {
     const card = read('src/screens/VerificationReviewScreen.tsx');
-    assert.match(card, /rule\?\.record \? <Text style=\{st\.link\}/);
+    assert.match(card, /recordUrl \? <Text style=\{st\.link\}/);
     assert.match(card, /Platform\.OS === 'web' \? <CopyText value=\{i\.value\} \/>/);
     assert.match(card, /canLookUp\(i\.type\) \? <RegisterCheck value=\{i\.value\} orgName=\{o\.name\}/);
   });

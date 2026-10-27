@@ -62,7 +62,7 @@ describe('graduating year follows the type', () => {
     assert.match(read('src/screens/CreateCommunityScreen.tsx'), /setGradStd\(suggestedGraduatingStandard\(market, resolvedType\)\)/);
   });
   test('educational institutions give their code when creating the community', () => {
-    assert.match(read('src/screens/CreateCommunityScreen.tsx'), /registered && isEducation\(resolvedType\) && verifiableType\(resolvedType\) \? ORG_VERIFY\[resolvedType\]\.requiredAnyOf\[0\] : null/);
+    assert.match(read('src/screens/CreateCommunityScreen.tsx'), /registered && isEducation\(resolvedType\) && verifiableType\(resolvedType\) \? orgVerifyConfig\(resolvedType, market\)\.requiredAnyOf\[0\] : null/);
   });
 });
 

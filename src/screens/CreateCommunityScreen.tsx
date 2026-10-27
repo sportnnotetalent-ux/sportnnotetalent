@@ -16,7 +16,7 @@ import { useAuth } from '../core/auth';
 import { getMyPlayerId, createOrganization } from '../data/repos';
 import { isAcademicCommunity, suggestedGraduatingStandard } from '../core/org';
 import {
-  OFFICIAL_ID_RULES, OFFICIAL_ONLY_TYPES, ORG_VERIFY, REGISTERED_TYPES, UNREGISTERED_TYPES, isEducation, validOfficialId, verifiableType,
+  OFFICIAL_ID_RULES, OFFICIAL_ONLY_TYPES, REGISTERED_TYPES, UNREGISTERED_TYPES, isEducation, orgVerifyConfig, validOfficialId, verifiableType,
 } from '../core/orgVerification';
 import { lookupOfficialId, setOfficialIds } from '../data/orgVerification';
 import { MARKETS, MARKET_ORDER, marketForCountry, type MarketId } from '../core/markets';
@@ -62,7 +62,8 @@ export default function CreateCommunityScreen({ navigation }: Props) {
   const academic = registered === true && isAcademicCommunity(resolvedType);
   // Educational institutions give their official code here (catches a verified
   // duplicate early); other registered types add theirs in "Get verified".
-  const idType = registered && isEducation(resolvedType) && verifiableType(resolvedType) ? ORG_VERIFY[resolvedType].requiredAnyOf[0] : null;
+  // Phase 3: the code the school system (market) uses — a UK school's URN, a US school's NCES ID …
+  const idType = registered && isEducation(resolvedType) && verifiableType(resolvedType) ? orgVerifyConfig(resolvedType, market).requiredAnyOf[0] : null;
   const pickRegistered = (r: boolean) => { setRegistered(r); setTypeChoice(''); setOfficialId(''); setIdCheck(null); };
 
   // Is this official ID already a verified community?
@@ -70,9 +71,9 @@ export default function CreateCommunityScreen({ navigation }: Props) {
     setIdCheck(null);
     if (!idType || !validOfficialId(idType, officialId)) return;
     let on = true;
-    const t = setTimeout(() => { void lookupOfficialId(idType, officialId).then((r) => on && setIdCheck(r)).catch(() => undefined); }, 400);
+    const t = setTimeout(() => { void lookupOfficialId(idType, officialId, market).then((r) => on && setIdCheck(r)).catch(() => undefined); }, 400);
     return () => { on = false; clearTimeout(t); };
-  }, [idType, officialId]);
+  }, [idType, officialId, market]);
 
   async function submit() {
     if (!name.trim()) return setError('Give the community a name.');
@@ -97,7 +98,7 @@ export default function CreateCommunityScreen({ navigation }: Props) {
       );
       // A school / college's official ID (it can also be added when verifying).
       if (idType && officialId.trim()) {
-        try { await setOfficialIds(org.id, [{ type: idType, value: officialId }]); } catch { /* added later from Get verified */ }
+        try { await setOfficialIds(org.id, [{ type: idType, value: officialId }], market); } catch { /* added later from Get verified */ }
       }
       // Replace this screen with the new community's page.
       navigation.replace('Organization', { orgId: org.id });

@@ -18,7 +18,7 @@ import { Button, Card, EmptyState, FormError, LoadingState, ScreenTitle, SelectC
 import { useAuth } from '../core/auth';
 import { pickDocument } from '../core/document';
 import {
-  BOARD_LABEL, ID_SHORT, ORG_VERIFY, OFFICIAL_ID_RULES, authorityOptions, isEducation, isFreeMail, validOfficialId,
+  BOARD_LABEL, ID_SHORT, OFFICIAL_ID_RULES, authorityOptions, isEducation, isFreeMail, orgVerifyConfig, validOfficialId,
   verifiableType, verificationProgress, type Authority, type OfficialIdType, type OrgVerificationState,
 } from '../core/orgVerification';
 import {
@@ -59,7 +59,7 @@ export default function OrgVerifyScreen() {
       setOrg(o); setState(s);
       const type = verifiableType(s.type) ? s.type : undefined;
       if (type) {
-        const cfg = ORG_VERIFY[type];
+        const cfg = orgVerifyConfig(type, o?.market); // Phase 3: the community's market's IDs
         const m = s.ids.find((i) => cfg.requiredAnyOf.includes(i.type));
         setMainType((cur) => cur ?? m?.type ?? cfg.requiredAnyOf[0]);
         setMainId((cur) => cur || m?.value || '');
@@ -95,7 +95,7 @@ export default function OrgVerifyScreen() {
   const v = state.verification;
   const progress = verificationProgress(state);
   const locked = v?.status === 'pending' || state.verified;
-  const cfg = ORG_VERIFY[type];
+  const cfg = orgVerifyConfig(type, org.market);
   const academic = isEducation(type);
   const reqType: OfficialIdType = mainType ?? cfg.requiredAnyOf[0];
   const authority = v?.authority ?? null;
@@ -106,7 +106,7 @@ export default function OrgVerifyScreen() {
     if (board && boardId.trim()) ids.push({ type: board, value: boardId });
     if (!validOfficialId(reqType, mainId)) throw new Error(`That ${OFFICIAL_ID_RULES[reqType].label} doesn’t look right — ${OFFICIAL_ID_RULES[reqType].hint}`);
     if (board && boardId.trim() && !validOfficialId(board, boardId)) throw new Error(`That ${OFFICIAL_ID_RULES[board].label} doesn’t look right.`);
-    return setOfficialIds(orgId, ids);
+    return setOfficialIds(orgId, ids, org.market);
   }, '✓ Saved');
 
   const upload = (kind: 'doc' | 'letter', docKind?: string) => run(kind, async () => {

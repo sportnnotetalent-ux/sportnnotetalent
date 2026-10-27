@@ -188,12 +188,13 @@ export function OrgReview({ o, now, onDone }: { o: OrgQueueItem; now: number; on
       <Text style={st.sub}>1 · Official ID</Text>
       {o.ids.length ? o.ids.map((i) => {
         const rule = OFFICIAL_ID_RULES[i.type];
+        const recordUrl = rule?.record?.(i.value);
         return (
           <View key={i.type} style={{ gap: 2 }}>
             <Row label={rule?.label ?? i.type} value={i.value} selectable />
             {/* register lookup: the exact record where the register allows it, else its search (copy the number first) */}
             <View style={st.linkRow}>
-              {rule?.record ? <Text style={st.link} accessibilityRole="link" onPress={() => void Linking.openURL(rule.record!(i.value))}>Open the record on {rule.lookup?.label ?? 'the register'} ↗</Text>
+              {recordUrl ? <Text style={st.link} accessibilityRole="link" onPress={() => void Linking.openURL(recordUrl)}>Open the record on {rule?.lookup?.label ?? 'the register'} ↗</Text>
                 : rule?.lookup ? <Text style={st.link} accessibilityRole="link" onPress={() => void Linking.openURL(rule.lookup!.url)}>Search it on {rule.lookup.label} ↗</Text> : null}
               {Platform.OS === 'web' ? <CopyText value={i.value} /> : null}
             </View>

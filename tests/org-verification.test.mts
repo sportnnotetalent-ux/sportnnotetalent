@@ -32,6 +32,7 @@ describe('official IDs', () => {
     const latest = readdirSync(dir).sort().reverse().map((f) => readFileSync(join(dir, f), 'utf8')).find((t) => t.includes('create or replace function valid_official_id('))!;
     const body = latest.slice(latest.indexOf('create or replace function valid_official_id('), latest.indexOf('$$;', latest.indexOf('create or replace function valid_official_id(')));
     for (const [type, rule] of Object.entries(OFFICIAL_ID_RULES) as [OfficialIdType, { pattern: RegExp }][]) {
+      if (type === 'abn') { assert.match(body, /when 'abn' then abn_ok\(p_value\)/); continue; } // Phase 3: a checksum, not a pattern
       const m = new RegExp(`when '${type}' then p_value ~ '([^']+)'`).exec(body);
       assert.ok(m, `server rule for ${type}`);
       assert.equal(m![1], rule.pattern.source, type);
@@ -123,7 +124,7 @@ describe('the app', () => {
     const s = read('src/screens/CreateCommunityScreen.tsx');
     assert.match(s, /Is it a registered organisation\?/);
     assert.match(s, /\(registered \? REGISTERED_TYPES : UNREGISTERED_TYPES\)/);
-    assert.match(s, /lookupOfficialId\(idType, officialId\)/);
+    assert.match(s, /lookupOfficialId\(idType, officialId, market\)/);
     assert.match(s, /is already verified on SportnNote — ask its admins to add you/);
   });
   test('routes: the three steps for admins, the Head’s page public', () => {

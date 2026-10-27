@@ -61,5 +61,16 @@ Only SportnNote support. They're deleted 30 days after the decision.
 ### Someone else already created our school. What now?
 If it's verified, the app says so when you type the code. Ask its admins to add you. If it isn't verified, verification decides who represents the school.
 
+### Our school isn't in India.
+Pick your school system when you create the community (or change it on the community page). The code it asks for follows the system:
+- **UK:** the school URN (England), or the Scotland, Wales or Northern Ireland reference number.
+- **US:** the NCES school ID (public schools: 12 digits; private schools: the 8-character PSS ID).
+- **Singapore:** the MOE school code or the UEN.
+- **Malaysia:** the MOE school code or the SSM number.
+- **Australia:** the ACARA school ID (from My School) or the ABN.
+- **Gulf:** the education regulator's licence (KHDA, ADEK, SPEA, MOE …); Indian-curriculum schools can give their CBSE affiliation number instead.
+
+If none fits, choose **Other register** and type the number from the register that lists your school.
+
 ### What about clubs and other organisations?
 Clubs, academies, associations, companies, NGOs, hospitals and housing societies verify in the same three steps with their own registration number. See [Verify your club, academy or organisation](/guides/verify-your-organisation/).
