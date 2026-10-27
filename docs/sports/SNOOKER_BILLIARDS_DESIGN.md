@@ -1,6 +1,6 @@
 # Snooker and English billiards: engine design (v1)
 
-*Status: engine stage only (2026-10-27). Pure reducers, tests, break list and simulation. No screens, no registration yet: see "What integration needs" at the end.*
+*Status: engine stage only (2026-10-28). Pure reducers, tests, break list (20 points: 16 fixed, 5 accepted) and a 2,000-match simulation. No screens, no registration yet: see "What integration needs" at the end.*
 
 **Where things are:**
 - Snooker (15-red, 10-red, 6-red): `src/sports/snooker/engine.ts`.
@@ -45,11 +45,12 @@ Pool is a separate engine, built in parallel. Nothing here is shared with it.
 | S3 R10(g) | Several fouls in one stroke: the highest penalty. | One `FOUL` per stroke with the highest value. |
 | S3 R10(h)(ii), R13 | The offender must play again if the next player asks; the request can't be withdrawn. | `PLAY_AGAIN`, only straight after the foul. |
 | S3 R11 | Fouls are 4 points, or the value of the ball on / ball concerned if higher (R11(a)–(c)); 7 for the R11(d) list. | Value clamped to **[min for the ball on, 7]** (4; the colour's value in the clearance; 7 on the re-spotted black). |
-| S3 R11(e)–(g) | A penalty by the non-striker (S3 R3(k)) gives points to the striker; the turn is unaffected. | `FOUL` with `side` = the non-striker. |
+| S3 R11(e)–(g) | A penalty by the non-striker (S3 R3(k)) gives points to the striker; the turn is unaffected. | `FOUL {penalty:true}` with `side` = the non-striker. A penalty is not a foul (S2 R15): it ends the re-spotted black (R4(b)(iv): "infringement"), not the last black (R4(a): "foul"). |
 | S2 R13, S3 R12 | After a foul that snookers the next player: free ball. Any ball may be nominated; it takes the value of the ball on and is re-spotted. Free ball and ball on potted together: only the ball on scores, unless it was a red (each scores). The free ball is void if the offender is asked to play again or the balls are replaced (R12(f)). | `FOUL {freeBall:true}` or `FREE_BALL`; `POT {ball:'free'}`; `POT {ball:'red', free:true}`. |
 | S3 R14(a)–(c) | Foul and a miss: the next player may have the offender play again from the position left, or from the original position with every ball replaced, on the same ball on as before. | `FOUL {miss:true}`, then `REPLACE` (restores reds and ball on) or `PLAY_AGAIN`. |
 | S3 R14(d) | Clear ball on: after the second failure from the original position the offender is warned; a third failure awards the frame. Playing from the position left ends the sequence. | The engine counts the run and exposes `missStatus` (warned, awardable). The award itself is the referee's call: `AWARD_FRAME {reason:'miss'}`. Geometry ("clear path") is not modelled. |
 | S3 R19(a)–(c) (six reds) | No more than five consecutive misses with balls replaced; warning after the fourth; after the fifth the non-offender has three options (play, make the opponent play, cue ball anywhere). | 6-red: warning at 4; `REPLACE` refused after the fifth. |
+| S3 R17 | Stalemate: the referee may re-rack. Every score is nullified, the balls re-set, and the same player breaks; on the re-spotted black only the black is re-spotted, the same player to start. | `RERACK`. The frame keeps its number; its breaks are discarded with its scores. |
 | S4 R2 | A player may concede. They shouldn't unless penalty points are needed, but a concession still stands. | `CONCEDE {side}` at any score, level included. |
 | S2 R8 | A break is the pots in successive strokes in one turn. | A visit = one turn; its points = the break. Penalty points are never part of a break. |
 
@@ -83,7 +84,14 @@ Pool is a separate engine, built in parallel. Nothing here is shared with it.
 
 ## 4. Action vocabulary (what the scorer taps)
 
-The scorer's phone is the referee's voice. A shot is one tap; a visit ends with one more. The engine knows who is at the table (`striker`), so shot actions don't need a side. If a `side` is sent and it isn't the striker, the action is ignored: a stale or double tap can never credit the wrong player.
+The scorer's phone is the referee's voice. A shot is one tap; a visit ends with one more. The engine knows who is at the table (`striker`), so the scorer never picks a side for a shot.
+
+**Guards against stale and double taps** (break list B-02, B-03, B-16):
+- **The controls send `side`** (the striker at the moment of the tap) on every shot. A shot naming a side that isn't at the table is ignored, so a double tap can't pass the turn twice. A shot with no side is accepted, for tools and tests.
+- **The controls send `payload.frame`** (the frame in play) on the frame-level actions `CONCEDE`, `AWARD_FRAME`, `FRAME_SCORE` and `RERACK`, which are refused without it. Any action stamped with a different frame is ignored, so a repeated tap can't end the next frame.
+- When an action carries both `side` and `payload.side`, they must agree.
+
+Malformed input is ignored, never thrown. An action the engine refuses returns the same state object.
 
 ### Snooker
 
@@ -93,14 +101,16 @@ The scorer's phone is the referee's voice. A shot is one tap; a visit ends with 
 | `POT` | `{ball, reds?, free?}` | the ball must be on | `ball`: `'red'` (with `reds`: how many in the stroke, default 1), a colour name, or `'free'` (the nominated free ball). `free:true` with reds = the free ball nominated as a red went down too. |
 | `MISS` | — | in play | Missed pot: the visit ends, the turn passes. |
 | `SAFETY` | — | in play | Safety: the visit ends, the turn passes. |
-| `FOUL` | `{value, kind?, miss?, freeBall?, reds?}` | in play | Penalty to the opponent; the visit ends; the turn passes. `side` = the non-striker records an S3 R3(k) penalty (turn unchanged). |
+| `FOUL` | `{value, kind?, miss?, freeBall?, reds?}` | in play | Penalty to the opponent; the visit ends; the turn passes. `value` is clamped to [the minimum for the ball on, 7]. `reds` (reds down in the foul) must be a whole number of the reds on the table. |
+| `FOUL` (penalty) | `{value, penalty:true}`, `side` = the non-striker | in play | An S3 R3(k) penalty: points to the striker, turn unchanged. |
 | `FREE_BALL` | — | straight after a foul | The incoming player has a free ball (if not given on the `FOUL`). |
 | `PLAY_AGAIN` | — | straight after a foul | The offender plays again from where the balls lie. |
 | `REPLACE` | — | straight after a foul and a miss | Balls replaced; the offender plays again from the original position. |
 | `RESPOT_TURN` | `{side}` | re-spotted black, before its first stroke | Who plays (lots). |
-| `CONCEDE` | `{side}` | frame in play | That side concedes the frame. |
-| `AWARD_FRAME` | `{side, reason?}` | frame in play | The referee awards the frame (`reason`: `'miss'`, `'conduct'`, `'time'`). |
-| `FRAME_SCORE` | `{home, away}` | frame not started | Quick mode: the frame's final score (not level). |
+| `CONCEDE` | `{side, frame}` | frame in play | That side concedes the frame. |
+| `AWARD_FRAME` | `{side, frame, reason?}` | frame in play | The referee awards the frame (`reason`: `'miss'`, `'conduct'`, `'time'`). |
+| `FRAME_SCORE` | `{home, away, frame}` | frame not started | Quick mode: the frame's final score (whole numbers 0–999, not level). |
+| `RERACK` | `{frame}` | frame in play | Stalemate re-rack (S3 R17). |
 
 Foul `kind` (optional, for stats): `inOff`, `noContact`, `wrongBall`, `pottedWrong`, `push`, `jump`, `touch`, `offTable`, `other`.
 
@@ -115,14 +125,16 @@ Foul `kind` (optional, for stats): `inOff`, `noContact`, `wrongBall`, `pottedWro
 | `MISS` / `SAFETY` | — | in play | The visit ends. |
 | `FOUL` | `{kind?}` | in play | `foulPoints` (2) to the opponent; the visit ends. Kinds: `miss`, `coup`, `inHand`, `push`, `jump`, `touch`, `offTable`, `hazards`, `cannons`, `baulkLine`, `other`. |
 | `TIME` | — | timed format | Time called. |
-| `CONCEDE` / `AWARD_FRAME` | `{side}` | frame in play | As in snooker. |
-| `FRAME_SCORE` | `{home, away}` | frame not started | Quick mode. Points format: the winner is recorded at the target. |
+| `CONCEDE` / `AWARD_FRAME` | `{side, frame}` | frame in play | As in snooker. |
+| `FRAME_SCORE` | `{home, away, frame}` | frame not started | Quick mode. Points format: the winner reached the target (recorded at it) and the loser didn't. Timed: any score; level only with `timedTie: 'draw'`. |
 
 **Screen sketch:** four big buttons for the usual strokes ([Pot red 3] [In-off red 3] [Cannon 2] [Pot white 2]) and a [Combo…] sheet; then [Missed] [Safety] [Foul]. A "10 hazards" / "70 cannons" warning shows from the engine's run counters.
 
 ### Undo and corrections
 
 Undo works as in every other sport: the live layer drops the last event and replays the log (`src/data/useLiveMatch.ts`). The reducers have no UNDO action. `replay(config, actions)` is exported for tests and tools. Corrections (AMEND) replay the edited log the same way.
+
+**Limits (break list B-04):** a frame keeps at most 5,000 visits + fouls (`MAX_FRAME_RECORDS`), about 30 times a long professional frame. Past the cap the turn can't pass, but pots and scoring strokes still count and the frame can still end. This keeps every replay linear.
 
 ---
 
@@ -137,6 +149,10 @@ Both engines keep the same outline:
 The frame in play holds the score, the striker, the current visit (a break in progress), the completed visits and the fouls. Snooker adds the balls (`redsLeft`, the ball on `on`, `respot`), the free ball, the open foul options (`pending`) and the miss run. Billiards adds the hazard and cannon runs and the timed tie-break flag.
 
 **IDs only** (`docs/privacy/ids-only-scoring.md`): the state holds **sides and numbers only**, never a player id or a name. Payloads are read field by field from a fixed list; any other key (a name, `__proto__`, free text) is never copied. Attribution is a side channel the reducers don't read; the live layer credits the striker's player id from it.
+
+**Robustness (break list B-01, B-05, B-13, B-14):**
+- The reducer only advances a state with its own shape (`isSnookerState` / `isBilliardsState`). The other engine's state and truncated snapshots are returned unchanged.
+- Every projection reads only well-formed frame records and never throws. A record whose side isn't home / away is skipped, so a crafted snapshot can't pollute `Object.prototype`.
 
 ---
 
@@ -181,11 +197,11 @@ Quick frames count for frames and points only. Their breaks are "not tracked", n
 | Option | Values | Default |
 |---|---|---|
 | `format` | `'points'` (N-up), `'timed'` | points |
-| `target` | 50–5000 | 150 (IBSF short format) |
+| `target` | 10–5000 (a number outside is clamped) | 150 (IBSF short format) |
 | `bestOf` | odd, 1–35 (timed: always 1) | 5 (IBSF short-format early rounds) |
 | `timedTie` | `'sudden'` / `'draw'` | sudden |
 | `foulPoints` | 1–7 | 2 (S3 R16(c)) |
-| `hazardLimit` / `cannonLimit` | 0 (off) – 999 | 15 / 75 |
+| `hazardLimit` / `cannonLimit` | a whole number 0 (off) – 999; anything else gives the standard | 15 / 75 |
 | `firstBreak`, `scoringMode` | as snooker | home / shot |
 
 Suggested presets for the format form: **Short format** (150-up, best of 5) · **Single game 150-up** · **Single game 100-up** · **Long-up 1000** · **Timed**.
@@ -200,18 +216,23 @@ Suggested presets for the format form: **Short format** (150-up, best of 5) · *
 4. **Aggregate-points snooker** (S3 R4(c)) is not supported in v1.
 5. **Re-spotted black first player:** defaults to the player who did not pot (or foul) the last black, until `RESPOT_TURN` records the lots.
 6. **Billiards timed game level at time:** the next score or foul wins (`timedTie: 'sudden'`), unless the organiser picks a draw.
-7. **Billiards result score:** a single game (`bestOf: 1`) reports its points (150–87) to the standings; a best-of match reports frames won (3–1).
+7. **Billiards result score:** a single game played out (`bestOf: 1`) reports its points (150–87) to the standings. A best-of match, or a single game conceded or awarded, reports frames won (3–1, 0–1), so a points table never credits the loser (B-07).
 8. **Billiards default:** 150-up, best of 5 (IBSF short format). A school may prefer a single 100-up game (a preset).
 9. **The 16th hazard / 76th cannon** tapped as a scoring shot is turned into the foul (S3 R15(k)–(l)) rather than refused.
 10. **Numbers in payloads** must be real numbers; a string `"7"` is treated as missing.
 11. **Four-handed snooker / billiards** (doubles) is not modelled: the state is per side.
-12. **Non-striker penalty in billiards** isn't modelled (a `FOUL` with the non-striker's side is ignored); in snooker it is (S3 R3(k)).
+12. **Non-striker penalty in billiards** isn't modelled (a `FOUL` with the non-striker's side is ignored); in snooker it is (S3 R3(k), `penalty: true`).
+13. **A snooker frame conceded by the side ahead** keeps its real score in the line ("80-0", won by the other side); the record says `how: 'concede'`. The result counts frames, so standings are right.
+14. **A re-racked frame's breaks** are discarded with its scores (S3 R17: "nullify all scores"); the frame record counts the re-racks.
+15. **Non-striker penalty on the last black** doesn't end the frame; on the re-spotted black it does (the rules' "foul" vs "infringement", S2 R15).
+16. **Junk in a sub-field refuses the action:** for example `FOUL {reds: 1.5}` or a side that doesn't match. The scorer's controls never send these.
 
 ---
 
 ## 9. What integration needs (next stage)
 
 - `SportId` additions `'snooker'` and `'billiards'` (`src/core/types.ts`), meta files with the format fields above, registry and loader entries.
+- **The controls must stamp** `side` (the striker) on every shot, and `payload.frame` on `CONCEDE` / `AWARD_FRAME` / `FRAME_SCORE` / `RERACK` (section 4). Without the frame number these four are refused.
 - `LineScore.unit` only allows `'set' | 'game'`; the engines return `'game'`. A `'frame'` unit would read better.
 - `statTotals`: the state is per side, so the plugin needs `statTotalsNeedsPlayers` (singles: the side's one player) like the racket sports.
 - A stat schema (`statSchemas.ts`) from section 6, and career sections.
