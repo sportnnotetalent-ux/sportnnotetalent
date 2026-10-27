@@ -13,6 +13,45 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-28 — Cue sports engines: snooker, English billiards, pool (merged; not in the app yet)
+Founder: a cue sports group with all three, scored shot by shot plus a quick mode. Two agents built the pure engines under the quality mandate, each in its own worktree. Merged as `4831623` (pool) and `109f7f4` (snooker + billiards).
+
+**Snooker** (WPBSA Official Rules, May 2022; S3 R19 for six-red):
+- **Variants:** 15-red, 10-red and six-red.
+- **Taps:** pots, misses, safeties and fouls (4 points minimum, up to the value of the ball involved), free ball, miss calls, re-spotted black, concessions, the stalemate re-rack, and quick frame scores.
+- **Stats:** breaks, 50+ breaks, centuries, the highest break, points remaining, and snookers required.
+- **Tests:** 70 engine tests.
+- **Break list:** `docs/security/breaks/snooker-billiards-engine.md`, 16 fixed and 5 accepted.
+
+**English billiards:**
+- **Scoring:** pots, in-offs and cannons at 2 or 3 points, with fouls worth 2 (S3 R16(c)).
+- **Limits:** 15 hazards and 75 cannons in a row.
+- **Formats:** N-up and timed (sudden death or a draw), with best of N frames as well.
+- **Tests:** 37.
+
+**Pool** (WPA Rules of Play, 2026 edition, effective 2026-10-21):
+- **8-ball:** open table, groups, the 8 on the break, call-pocket.
+- **9-ball:** lowest ball first, push-out, three fouls, golden break.
+- **10-ball:** call shot, and the 10 wins only as the last ball, as the new rule says. The option `tenEarly` gives the older practice.
+- **Match options:** race to N, sets, and alternate, winner or loser break.
+- **Quick mode:** the rack winner only.
+- **Tests:** 98.
+- **Break list:** `docs/security/breaks/pool-engine.md`, 8 fixed, 18 held, 5 accepted.
+
+**Simulations:**
+- **Cue sports:** 2,000 matches, 173,000 actions, in about 1 s.
+- **Pool:** 2,100 matches, 261,000 events, in about 1.5 s.
+- **Checked after every event:** the invariants hold, a replay matches the live state, and undo/redo returns the same state.
+
+**Rule defaults for the founder to review:** listed in `docs/sports/SNOOKER_BILLIARDS_DESIGN.md` §7 and `docs/sports/POOL_DESIGN.md` §7.
+
+**Next, integration:**
+- `SportId` entries, meta and format fields, registry and loaders, stat schemas;
+- scorer controls (`side` stamped on every shot, `payload.frame` / `rack` on frame actions);
+- the stats tab, records (highest break, centuries, maximums), guides and the demo seed.
+
+Full suite after the merge: 5,181 pass, 0 fail.
+
 ### 2026-10-28 — Security Wave 1, and a real database in the tests (PGlite)
 Founder: **1A** (the consent model, which is Wave 2), **PGlite approved**, go ahead with Wave 1.
 
