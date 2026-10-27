@@ -199,7 +199,8 @@ function newRack(n: number, breaker: Side | null, game: PoolGame): LiveRack {
 
 /** A fresh match. Options (POOL_DESIGN §6) are read once and frozen into the state. */
 export function createInitialState(config?: Record<string, unknown>): PoolState {
-  const c = ownRecord(config); // own keys only (breaks #5)
+  // own keys only (breaks #5); an unreadable config → every default (breaks #6)
+  const c = ownRecord(config) ?? (Object.create(null) as Record<string, unknown>);
   const game = readGame(c.game);
   const bf = c.breakFormat;
   return {
@@ -372,12 +373,24 @@ function playable(s: PoolState): boolean {
 }
 
 export function reducer(s: PoolState, a: PoolAction): PoolState {
+  // Never throws (breaks #6): an action whose fields throw when read (a getter,
+  // a Proxy) is ignored. Safe because every change is made on a draft — the
+  // input state is never written, so handing it back is exact.
+  try {
+    return reduce(s, a);
+  } catch {
+    return s;
+  }
+}
+
+function reduce(s: PoolState, a: PoolAction): PoolState {
   if (!s || typeof s !== 'object' || s.ended || !s.rack || !playable(s)) return s;
   // own properties only — an inherited type / side / payload field never counts (breaks #5)
   const type = own(a, 'type');
   if (typeof type !== 'string') return s;
   const side = own(a, 'side');
   const p = ownRecord(own(a, 'payload'));
+  if (!p) return s; // a payload that can't be read voids the action (breaks #6)
   switch (type) {
     case 'LAG': return lag(s, side, p);
     case 'BREAK': return breakShot(s, side, p);

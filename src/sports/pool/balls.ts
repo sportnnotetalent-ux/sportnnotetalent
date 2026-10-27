@@ -15,11 +15,17 @@ export const own = (o: unknown, k: string): unknown =>
   o && typeof o === 'object' && Object.prototype.hasOwnProperty.call(o, k) ? (o as Record<string, unknown>)[k] : undefined;
 
 /** A record of an object's own keys, with no prototype: every later read is an
- *  own read. Not an object → empty. (breaks #5) */
-export function ownRecord(o: unknown): Record<string, unknown> {
+ *  own read. Not an object → empty (breaks #5). An object whose keys or values
+ *  throw when read (a getter, a Proxy) → null: unreadable, so the caller
+ *  ignores the action / uses the defaults (breaks #6). */
+export function ownRecord(o: unknown): Record<string, unknown> | null {
   const out: Record<string, unknown> = Object.create(null);
   if (!o || typeof o !== 'object' || Array.isArray(o)) return out;
-  for (const k of Object.keys(o)) out[k] = (o as Record<string, unknown>)[k];
+  try {
+    for (const k of Object.keys(o)) out[k] = (o as Record<string, unknown>)[k];
+  } catch {
+    return null;
+  }
   return out;
 }
 export const other = (s: Side): Side => (s === 'home' ? 'away' : 'home');
@@ -67,7 +73,9 @@ export const readBool = (v: unknown, def: boolean): boolean => (v === true ? tru
 
 /** The game option, from the spellings an organiser or an older format may use. */
 export function readGame(v: unknown): PoolGame {
-  const t = String(v ?? '').toLowerCase().replace(/[\s_-]+/g, '').replace(/ball$/, '');
+  // text or a number only: never String() an object (its toString may throw — breaks #6)
+  if (typeof v !== 'string' && typeof v !== 'number') return 'eight';
+  const t = String(v).toLowerCase().replace(/[\s_-]+/g, '').replace(/ball$/, '');
   if (t === '9' || t === 'nine') return 'nine';
   if (t === '10' || t === 'ten') return 'ten';
   return 'eight';

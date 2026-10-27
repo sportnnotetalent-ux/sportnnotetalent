@@ -889,4 +889,32 @@ describe('breaks (docs/security/breaks/pool-engine.md)', () => {
       assert.equal(out, st);
     }
   });
+
+  test('#6: a payload, action or config whose property access throws never makes the engine throw', () => {
+    const s = NINE_BROKEN();
+    const boom = () => { throw new Error('boom'); };
+    const hostile: unknown[] = [
+      { type: 'POT', payload: { get pots() { return boom(); } } },
+      { type: 'POT', payload: { pots: new Proxy([2], { get: boom }) } },
+      { type: 'POT', payload: new Proxy({}, { ownKeys: boom }) },
+      { type: 'FOUL', payload: { kind: 'scratch', get off() { return boom(); } } },
+      new Proxy({}, { get: boom, getOwnPropertyDescriptor: boom, has: boom }),
+      { get type() { return boom(); } },
+    ];
+    for (const a of hostile) {
+      let out: unknown;
+      assert.doesNotThrow(() => { out = pool.reducer(s, a as ScoreAction); });
+      assert.equal(out, s);
+    }
+    const cfgs: unknown[] = [
+      { game: { toString: boom } }, { raceTo: { valueOf: boom } }, { get game() { return boom(); } },
+      new Proxy({}, { ownKeys: boom }), { game: Symbol('x') },
+    ];
+    for (const c of cfgs) {
+      let st: pool.PoolState | undefined;
+      assert.doesNotThrow(() => { st = pool.createInitialState(c as Record<string, unknown>); });
+      assert.equal(st!.v, 1);
+      assert.ok(st!.rack);
+    }
+  });
 });
