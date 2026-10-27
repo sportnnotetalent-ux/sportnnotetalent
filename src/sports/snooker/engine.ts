@@ -171,16 +171,23 @@ function newFrame(n: number, breaker: Side, reds: number): LiveFrame {
   return { n, breaker, striker: breaker, score: { home: 0, away: 0 }, redsLeft: reds, on: 'red', visit: emptyVisit(breaker), visits: [], fouls: [], shots: 0 };
 }
 
+/** B-05 / B-14 — the last net under "never throw": a hostile object (a
+ *  getter or Proxy that throws) gives the fallback instead. */
+function safe<T>(f: () => T, fallback: T): T {
+  try { return f(); } catch { return fallback; }
+}
+
 export function createInitialState(config?: Record<string, unknown>): SnookerState {
-  const c = isObj(config) ? config : undefined;
-  const r = own(c, 'reds');
+  const c = safe(() => (isObj(config) ? config : undefined), undefined);
+  const read = (k: string): unknown => safe(() => own(c, k), undefined);
+  const r = read('reds');
   const reds: 6 | 10 | 15 = r === 6 || r === 10 || r === 15 ? r : 15;
-  const bestOf = readBestOf(own(c, 'bestOf'), reds === 6 ? 7 : 5);
-  const fb = own(c, 'firstBreak');
+  const bestOf = readBestOf(read('bestOf'), reds === 6 ? 7 : 5);
+  const fb = read('firstBreak');
   const firstBreak: Side = isSide(fb) ? fb : 'home';
   return {
     sport: 'snooker', reds, bestOf, framesToWin: (bestOf + 1) / 2, firstBreak,
-    scoringMode: own(c, 'scoringMode') === 'quick' ? 'quick' : 'shot',
+    scoringMode: read('scoringMode') === 'quick' ? 'quick' : 'shot',
     frames: [], framesWon: { home: 0, away: 0 }, frame: newFrame(1, firstBreak, reds), ended: false, winner: null, seq: 0,
   };
 }
@@ -241,8 +248,37 @@ function blackDecides(s: SnookerState, fr: LiveFrame, how: FrameHow, last: Side)
 /** B-02 — the actions that end a frame; each must carry `payload.frame`. */
 export const FRAME_ENDERS: ReadonlySet<string> = new Set(['CONCEDE', 'AWARD_FRAME', 'FRAME_SCORE']);
 
+const isScore = (v: unknown): v is { home: number; away: number } => isObj(v) && num(v.home) !== undefined && num(v.away) !== undefined;
+const isPair = (v: unknown): v is [number, number] => Array.isArray(v) && v.length === 2 && num(v[0]) !== undefined && num(v[1]) !== undefined;
+const ON_VALUES: readonly unknown[] = ['red', 'colour', ...COLOURS];
+
+/** B-05 / B-13 — the reducer only advances a state with this engine's shape
+ *  (a truncated snapshot or the billiards engine's state is left as it is). */
+function validFrame(fr: unknown, reds: number): fr is LiveFrame {
+  if (!isObj(fr) || !isObj(fr.visit)) return false;
+  const v = fr.visit;
+  return intIn(fr.n, 1, 99) !== undefined && isSide(fr.breaker) && isSide(fr.striker) && isScore(fr.score)
+    && intIn(fr.redsLeft, 0, reds) !== undefined && ON_VALUES.includes(fr.on) && num(fr.shots) !== undefined
+    && isSide(v.side) && num(v.pts) !== undefined && num(v.pots) !== undefined && num(v.shots) !== undefined
+    && Array.isArray(fr.visits) && Array.isArray(fr.fouls);
+}
+export function isSnookerState(s: unknown): s is SnookerState {
+  if (!isObj(s) || s.sport !== 'snooker' || !(s.reds === 6 || s.reds === 10 || s.reds === 15)) return false;
+  if (intIn(s.framesToWin, 1, 18) === undefined || !Array.isArray(s.frames) || !isScore(s.framesWon) || !isSide(s.firstBreak) || num(s.seq) === undefined) return false;
+  return s.frame === null ? s.ended === true : s.ended === false && validFrame(s.frame, s.reds);
+}
+
 export function reducer(s: SnookerState, a: SnookerAction): SnookerState {
-  if (!s || typeof s !== 'object' || !isObj(a) || typeof a.type !== 'string') return s;
+  // B-05 / B-14 — never throw: a hostile action or payload leaves the state as it is
+  try {
+    return isSnookerState(s) ? reduce(s, a) : s;
+  } catch {
+    return s;
+  }
+}
+
+function reduce(s: SnookerState, a: SnookerAction): SnookerState {
+  if (!isObj(a) || typeof a.type !== 'string') return s;
   const fr = s.frame;
   if (s.ended || !fr) return s;
   const p = isObj(a.payload) ? a.payload : undefined;
@@ -460,58 +496,80 @@ export function replay(config: Record<string, unknown> | undefined, actions: Rea
 }
 
 // ---------------------------------------------------- match projections --
+// B-05 — the projections run on stored snapshots (public, maybe old or cut
+// short): they read only well-formed parts, and never throw.
 
-export const isComplete = (s: SnookerState): boolean => !!s?.ended;
-export const winner = (s: SnookerState): Side | null => (s?.ended ? s.winner : null);
+/** Completed frames whose score is a pair of numbers. */
+const goodFrames = (s: SnookerState): FrameRecord[] =>
+  safe(() => (isObj(s) && Array.isArray(s.frames) ? s.frames.filter((f) => isObj(f) && isPair(f.score)) : []), []);
+const wonOf = (s: SnookerState): { home: number; away: number } =>
+  safe(() => (isObj(s) && isScore(s.framesWon) ? { home: s.framesWon.home, away: s.framesWon.away } : { home: 0, away: 0 }), { home: 0, away: 0 });
+/** The frame in play, when the state is this engine's. */
+const liveFrame = (s: SnookerState): LiveFrame | null => safe(() => (isSnookerState(s) ? s.frame : null), null);
+
+export const isComplete = (s: SnookerState): boolean => safe(() => isObj(s) && s.ended === true, false);
+export const winner = (s: SnookerState): Side | null => safe(() => (isObj(s) && s.ended === true && isSide(s.winner) ? s.winner : null), null);
 
 export function result(s: SnookerState): { winner: Side; home: number; away: number } | null {
-  if (!s?.ended || !s.winner) return null;
-  return { winner: s.winner, home: s.framesWon.home, away: s.framesWon.away };
+  const w = winner(s);
+  if (!w) return null;
+  const won = wonOf(s);
+  return { winner: w, home: won.home, away: won.away };
 }
 
-const frameScores = (s: SnookerState): Array<[number, number]> => (Array.isArray(s?.frames) ? s.frames.map((f) => f.score) : []);
+const frameScores = (s: SnookerState): Array<[number, number]> => goodFrames(s).map((f) => [f.score[0], f.score[1]]);
 
 /** The completed frames, "72-35, 12-80". */
 export function scoreLine(s: SnookerState, perspective?: Side): string {
-  return lineOf(frameScores(s), { perspective });
+  return safe(() => lineOf(frameScores(s), { perspective: perspective === 'away' ? 'away' : undefined }), '');
 }
 
 /** The line score: every frame + the one in play (unit 'game' until the
  *  shared LineScore type has a 'frame' unit). */
-export const lineScore = (s: SnookerState): LineScore | null =>
-  pointsLineScore('game', s && { games: frameScores(s), current: s.frame?.score, won: s.framesWon, ended: s.ended, toWin: s.framesToWin });
+export const lineScore = (s: SnookerState): LineScore | null => safe(() => {
+  if (!isObj(s)) return null;
+  const fr = liveFrame(s);
+  return pointsLineScore('game', { games: frameScores(s), current: fr?.score, won: wonOf(s), ended: isComplete(s), toWin: intIn(s.framesToWin, 1, 18) ?? 1 });
+}, null);
 
 /** Frame points won by each side over every frame (+ the one in play). */
 export function standingsUnits(s: SnookerState): { points: { home: number; away: number } } | null {
-  if (!s || !Array.isArray(s.frames)) return null;
-  const points = s.frames.reduce((t, f) => ({ home: t.home + f.score[0], away: t.away + f.score[1] }), { home: s.frame?.score.home ?? 0, away: s.frame?.score.away ?? 0 });
-  return { points };
+  return safe(() => {
+    if (!isObj(s) || !Array.isArray(s.frames)) return null;
+    const fr = liveFrame(s);
+    const points = frameScores(s).reduce((t, [h, a]) => ({ home: t.home + h, away: t.away + a }), { home: fr?.score.home ?? 0, away: fr?.score.away ?? 0 });
+    return { points };
+  }, null);
 }
 
-/** Points left on the table (free balls aside). */
-export function pointsRemaining(s: SnookerState): number {
-  const fr = s?.frame;
-  if (!fr) return 0;
+function remainingOf(fr: LiveFrame): number {
   if (fr.respot) return 7;
   if (fr.on === 'red') return fr.redsLeft * 8 + 27;
   if (fr.on === 'colour') return 7 + fr.redsLeft * 8 + 27;
   return COLOURS.slice(COLOURS.indexOf(fr.on)).reduce((t, c) => t + ballValue(c), 0);
 }
 
+/** Points left on the table (free balls aside). */
+export function pointsRemaining(s: SnookerState): number {
+  const fr = liveFrame(s);
+  return fr ? safe(() => remainingOf(fr), 0) : 0;
+}
+
 /** How many snookers `side` needs to tie or win: the deficit beyond the points
  *  remaining, in penalties of the ball on (4, or the colour on's value). */
 export function snookersRequired(s: SnookerState, side: Side): number {
-  const fr = s?.frame;
+  const fr = liveFrame(s);
   if (!fr || !isSide(side)) return 0;
-  const deficit = fr.score[other(side)] - fr.score[side];
-  const left = pointsRemaining(s);
-  if (deficit <= left) return 0;
-  return Math.ceil((deficit - left) / minFoul(fr));
+  return safe(() => {
+    const deficit = fr.score[other(side)] - fr.score[side];
+    const left = remainingOf(fr);
+    return deficit <= left ? 0 : Math.ceil((deficit - left) / minFoul(fr));
+  }, 0);
 }
 
 /** What the scorer can tap now. */
 export function ballOn(s: SnookerState): { on: On; redsLeft: number; freeBall: boolean; respot: boolean; allowed: Array<Ball | 'free'> } | null {
-  const fr = s?.frame;
+  const fr = liveFrame(s);
   if (!fr) return null;
   const free = fr.freeBall && freeBallPossible(fr) ? ['free' as const] : [];
   const allowed: Array<Ball | 'free'> = fr.respot ? ['black'] : fr.on === 'colour' ? [...COLOURS] : [fr.on, ...free];
@@ -521,32 +579,38 @@ export function ballOn(s: SnookerState): { on: On; redsLeft: number; freeBall: b
 /** The foul-and-a-miss sequence (S3 R14(d), six reds R19): the warning, a
  *  frame the referee may now award (15 / 10 reds), cue ball anywhere (6 reds). */
 export function missStatus(s: SnookerState): { by: Side; count: number; warned: boolean; awardable: boolean; ballInHand: boolean } | null {
-  const r = s?.frame?.missRun;
-  if (!r) return null;
+  const r = liveFrame(s)?.missRun;
+  if (!isObj(r) || !isSide(r.by) || num(r.count) === undefined) return null;
   const six = s.reds === 6;
   return {
-    by: r.by, count: r.count, warned: r.warned,
-    awardable: !six && r.warned && !r.replaced && r.count > 2,
+    by: r.by, count: r.count, warned: r.warned === true,
+    awardable: !six && r.warned === true && !r.replaced && r.count > 2,
     ballInHand: six && !r.replaced && r.count >= 5,
   };
 }
 
+const NO_SUMMARY: ScoreSummary = { homeScore: '0', awayScore: '0', statusLine: '' };
+
 /** Scoreboard: live = this frame's points; once ended = frames won + the line. */
 export function summary(s: SnookerState): ScoreSummary {
-  if (!s || !Array.isArray(s.frames)) return { homeScore: '0', awayScore: '0', statusLine: '' };
-  if (s.ended || !s.frame) return finalSummary(s.framesWon, scoreLine(s));
-  const fr = s.frame;
-  const line = scoreLine(s);
-  const parts = [`Frames ${s.framesWon.home}–${s.framesWon.away}${line ? ` (${line})` : ''}`, `best of ${s.bestOf}`];
-  if (fr.visit.pts > 0) parts.push(`break ${fr.visit.pts}`);
-  parts.push(`${pointsRemaining(s)} left`);
-  if (snookersRequired(s, 'home') > 0 || snookersRequired(s, 'away') > 0) parts.push('snookers required');
-  return {
-    homeScore: String(fr.score.home),
-    awayScore: String(fr.score.away),
-    statusLine: `Frame ${fr.n}${fr.respot ? ' · re-spotted black' : ''}`,
-    detailLine: parts.join(' · '),
-  };
+  return safe(() => {
+    if (!isObj(s)) return NO_SUMMARY;
+    if (isComplete(s)) return finalSummary(wonOf(s), scoreLine(s));
+    const fr = liveFrame(s);
+    if (!fr) return NO_SUMMARY;
+    const won = wonOf(s);
+    const line = scoreLine(s);
+    const parts = [`Frames ${won.home}–${won.away}${line ? ` (${line})` : ''}`, `best of ${s.bestOf}`];
+    if (fr.visit.pts > 0) parts.push(`break ${fr.visit.pts}`);
+    parts.push(`${remainingOf(fr)} left`);
+    if (snookersRequired(s, 'home') > 0 || snookersRequired(s, 'away') > 0) parts.push('snookers required');
+    return {
+      homeScore: String(fr.score.home),
+      awayScore: String(fr.score.away),
+      statusLine: `Frame ${fr.n}${fr.respot ? ' · re-spotted black' : ''}`,
+      detailLine: parts.join(' · '),
+    };
+  }, NO_SUMMARY);
 }
 
 // ------------------------------------------------------------ statistics --
@@ -590,40 +654,45 @@ const zeroStats = (): SnookerSideStats => ({
 /** Every frame as stats read it: completed ones, then the one in play (its
  *  break in progress counted as a visit once it has a stroke). */
 type StatVisit = Visit & { end?: VisitEnd };
-interface StatFrame { n: number; quick: boolean; score: [number, number]; visits: StatVisit[]; fouls: FoulRecord[] }
+interface StatFrame { n: number; quick: boolean; untouched: boolean; score: [number, number]; visits: StatVisit[]; fouls: FoulRecord[] }
 /** B-01 — records from a stored (public) snapshot are read only when they
- *  are well formed: a real side, finite numbers, a known foul kind. A side of
- *  "__proto__" or "constructor" can never index the stats objects. */
+ *  are well formed: a real side and finite numbers. A side of "__proto__" or
+ *  "constructor" can never index the stats objects; an unknown foul kind is
+ *  dropped (the foul still counts). */
 const goodVisit = (v: unknown): v is StatVisit =>
   isObj(v) && isSide(v.side) && num(v.pts) !== undefined && num(v.shots) !== undefined && num(v.pots) !== undefined;
 const goodFoul = (x: unknown): x is FoulRecord => isObj(x) && isSide(x.by) && num(x.value) !== undefined;
 const knownKind = (k: unknown): k is FoulKind => (FOUL_KINDS as readonly unknown[]).includes(k);
 const goodList = <T,>(v: unknown, ok: (x: unknown) => x is T): T[] => (Array.isArray(v) ? v.filter(ok) : []);
 function framesForStats(s: SnookerState): StatFrame[] {
-  const out: StatFrame[] = (s?.frames ?? []).map((f) => ({ n: f.n, quick: !!f.quick, score: f.score, visits: goodList(f.visits, goodVisit), fouls: goodList(f.fouls, goodFoul) }));
-  const fr = s?.frame;
-  if (fr && (fr.shots > 0 || fr.fouls.length > 0 || fr.visit.shots > 0)) {
-    out.push({ n: fr.n, quick: false, score: [fr.score.home, fr.score.away], visits: goodList([...fr.visits, ...(fr.visit.shots > 0 ? [fr.visit] : [])], goodVisit), fouls: goodList(fr.fouls, goodFoul) });
-  } else if (fr) {
-    out.push({ n: fr.n, quick: true, score: [fr.score.home, fr.score.away], visits: [], fouls: [] });
+  const out: StatFrame[] = goodFrames(s).map((f) => ({
+    n: num(f.n) ?? 0, quick: f.quick === true, untouched: false, score: f.score, visits: goodList(f.visits, goodVisit), fouls: goodList(f.fouls, goodFoul),
+  }));
+  const fr = liveFrame(s);
+  if (fr) {
+    const touched = fr.shots > 0 || fr.fouls.length > 0 || fr.visit.shots > 0;
+    out.push({
+      n: fr.n, quick: false, untouched: !touched, score: [fr.score.home, fr.score.away],
+      visits: goodList([...fr.visits, ...(fr.visit.shots > 0 ? [fr.visit] : [])], goodVisit), fouls: goodList(fr.fouls, goodFoul),
+    });
   }
   return out;
 }
 
 export function snookerStats(s: SnookerState): { home: SnookerSideStats; away: SnookerSideStats } {
+  return safe(() => statsOf(s), { home: zeroStats(), away: zeroStats() });
+}
+
+function statsOf(s: SnookerState): { home: SnookerSideStats; away: SnookerSideStats } {
   const out = { home: zeroStats(), away: zeroStats() };
-  if (!s || !Array.isArray(s.frames)) return out;
-  const max = maxBreak(s.reds);
-  const frames = framesForStats(s);
-  const liveUntouched = !!s.frame && !(s.frame.shots > 0 || s.frame.fouls.length > 0 || s.frame.visit.shots > 0);
-  frames.forEach((f, i) => {
-    const isLiveEmpty = liveUntouched && i === frames.length - 1;
+  if (!isObj(s)) return out;
+  const max = maxBreak(s.reds === 6 || s.reds === 10 ? s.reds : 15);
+  for (const f of framesForStats(s)) {
     for (const side of ['home', 'away'] as const) {
       const t = out[side];
       t.points += f.score[side === 'home' ? 0 : 1];
-      if (isLiveEmpty) continue;
-      if (f.quick) { t.quickFrames++; continue; }
-      t.detailedFrames++;
+      if (f.untouched) continue;
+      if (f.quick) t.quickFrames++; else t.detailedFrames++;
     }
     for (const v of f.visits) {
       const t = out[v.side];
@@ -648,10 +717,11 @@ export function snookerStats(s: SnookerState): { home: SnookerSideStats; away: S
       if (x.fb) o.freeBalls++;
       if (knownKind(x.kind)) t.foulsByKind[x.kind] = (t.foulsByKind[x.kind] ?? 0) + 1;
     }
-  });
+  }
+  const won = wonOf(s);
   for (const side of ['home', 'away'] as const) {
     const t = out[side];
-    t.framesWon = s.framesWon?.[side] ?? 0;
+    t.framesWon = won[side];
     const tries = t.potStrokes + t.missedPots;
     t.potSuccess = tries > 0 ? t.potStrokes / tries : null;
   }
@@ -660,7 +730,10 @@ export function snookerStats(s: SnookerState): { home: SnookerSideStats; away: S
 
 /** Every break of at least `min` (default 1): side, frame number, points. */
 export function breaks(s: SnookerState, min = 1): Array<{ side: Side; frame: number; pts: number }> {
-  const out: Array<{ side: Side; frame: number; pts: number }> = [];
-  for (const f of framesForStats(s)) for (const v of f.visits) if (v.pts >= min && v.pts > 0) out.push({ side: v.side, frame: f.n, pts: v.pts });
-  return out;
+  const m = num(min) ?? 1;
+  return safe(() => {
+    const out: Array<{ side: Side; frame: number; pts: number }> = [];
+    for (const f of framesForStats(s)) for (const v of f.visits) if (v.pts >= m && v.pts > 0) out.push({ side: v.side, frame: f.n, pts: v.pts });
+    return out;
+  }, []);
 }

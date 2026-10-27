@@ -136,23 +136,30 @@ function newFrame(n: number, breaker: Side): LiveFrame {
   return { n, breaker, striker: breaker, score: { home: 0, away: 0 }, visit: emptyVisit(breaker), visits: [], fouls: [], hazardRun: 0, cannonRun: 0, shots: 0 };
 }
 
+/** B-05 / B-14 — the last net under "never throw": a hostile object (a
+ *  getter or Proxy that throws) gives the fallback instead. */
+function safe<T>(f: () => T, fallback: T): T {
+  try { return f(); } catch { return fallback; }
+}
+
 export function createInitialState(config?: Record<string, unknown>): BilliardsState {
-  const c = isObj(config) ? config : undefined;
-  const format = own(c, 'format') === 'timed' ? 'timed' : 'points';
-  const t = num(own(c, 'target'));
+  const c = safe(() => (isObj(config) ? config : undefined), undefined);
+  const read = (k: string): unknown => safe(() => own(c, k), undefined);
+  const format = read('format') === 'timed' ? 'timed' : 'points';
+  const t = num(read('target'));
   const target = t === undefined ? 150 : clamp(Math.round(t), 10, 5000);
-  const bestOf = format === 'timed' ? 1 : readBestOf(own(c, 'bestOf'), 5);
-  const fp = num(own(c, 'foulPoints'));
-  const fb = own(c, 'firstBreak');
+  const bestOf = format === 'timed' ? 1 : readBestOf(read('bestOf'), 5);
+  const fp = num(read('foulPoints'));
+  const fb = read('firstBreak');
   const firstBreak: Side = isSide(fb) ? fb : 'home';
   return {
     sport: 'billiards', format, target, bestOf, framesToWin: (bestOf + 1) / 2,
     foulPoints: fp === undefined ? 2 : clamp(Math.round(fp), 1, 7),
-    hazardLimit: intIn(own(c, 'hazardLimit'), 0, 999) ?? 15,
-    cannonLimit: intIn(own(c, 'cannonLimit'), 0, 999) ?? 75,
-    timedTie: own(c, 'timedTie') === 'draw' ? 'draw' : 'sudden',
+    hazardLimit: intIn(read('hazardLimit'), 0, 999) ?? 15,
+    cannonLimit: intIn(read('cannonLimit'), 0, 999) ?? 75,
+    timedTie: read('timedTie') === 'draw' ? 'draw' : 'sudden',
     firstBreak,
-    scoringMode: own(c, 'scoringMode') === 'quick' ? 'quick' : 'shot',
+    scoringMode: read('scoringMode') === 'quick' ? 'quick' : 'shot',
     frames: [], framesWon: { home: 0, away: 0 }, frame: newFrame(1, firstBreak), ended: false, winner: null, seq: 0,
   };
 }
@@ -175,8 +182,10 @@ export function readStroke(p: Record<string, unknown> | undefined): Record<Part,
 
 /** What a stroke scores (S3 R4); 0 when it isn't a valid stroke. */
 export function strokeValue(p: Record<string, unknown>): number {
-  const parts = readStroke(isObj(p) ? p : undefined);
-  return parts ? PARTS.reduce((t, k) => t + parts[k] * PART_VALUE[k], 0) : 0;
+  return safe(() => {
+    const parts = readStroke(isObj(p) ? p : undefined);
+    return parts ? PARTS.reduce((t, k) => t + parts[k] * PART_VALUE[k], 0) : 0;
+  }, 0);
 }
 
 /** Close the frame: record it, count it, start the next or end the match. */
@@ -212,8 +221,38 @@ function decided(s: BilliardsState, fr: LiveFrame, side: Side): BilliardsState {
 /** B-02 — the actions that end a frame; each must carry `payload.frame`. */
 export const FRAME_ENDERS: ReadonlySet<string> = new Set(['CONCEDE', 'AWARD_FRAME', 'FRAME_SCORE']);
 
+const isScore = (v: unknown): v is { home: number; away: number } => isObj(v) && num(v.home) !== undefined && num(v.away) !== undefined;
+const isPair = (v: unknown): v is [number, number] => Array.isArray(v) && v.length === 2 && num(v[0]) !== undefined && num(v[1]) !== undefined;
+
+/** B-05 / B-13 — the reducer only advances a state with this engine's shape
+ *  (a truncated snapshot or the snooker engine's state is left as it is). */
+function validFrame(fr: unknown): fr is LiveFrame {
+  if (!isObj(fr) || !isObj(fr.visit)) return false;
+  const v = fr.visit;
+  return intIn(fr.n, 1, 99) !== undefined && isSide(fr.breaker) && isSide(fr.striker) && isScore(fr.score)
+    && num(fr.hazardRun) !== undefined && num(fr.cannonRun) !== undefined && num(fr.shots) !== undefined
+    && isSide(v.side) && ['pts', 'shots', ...PARTS].every((k) => num(v[k]) !== undefined)
+    && Array.isArray(fr.visits) && Array.isArray(fr.fouls);
+}
+export function isBilliardsState(s: unknown): s is BilliardsState {
+  if (!isObj(s) || s.sport !== 'billiards' || (s.format !== 'points' && s.format !== 'timed')) return false;
+  if (intIn(s.framesToWin, 1, 18) === undefined || intIn(s.target, 10, 5000) === undefined || num(s.foulPoints) === undefined
+    || num(s.hazardLimit) === undefined || num(s.cannonLimit) === undefined || !Array.isArray(s.frames) || !isScore(s.framesWon)
+    || !isSide(s.firstBreak) || num(s.seq) === undefined) return false;
+  return s.frame === null ? s.ended === true : s.ended === false && validFrame(s.frame);
+}
+
 export function reducer(s: BilliardsState, a: BilliardsAction): BilliardsState {
-  if (!s || typeof s !== 'object' || !isObj(a) || typeof a.type !== 'string') return s;
+  // B-05 / B-14 — never throw: a hostile action or payload leaves the state as it is
+  try {
+    return isBilliardsState(s) ? reduce(s, a) : s;
+  } catch {
+    return s;
+  }
+}
+
+function reduce(s: BilliardsState, a: BilliardsAction): BilliardsState {
+  if (!isObj(a) || typeof a.type !== 'string') return s;
   const fr = s.frame;
   if (s.ended || !fr) return s;
   const p = isObj(a.payload) ? a.payload : undefined;
@@ -337,71 +376,98 @@ export function replay(config: Record<string, unknown> | undefined, actions: Rea
 }
 
 // ---------------------------------------------------- match projections --
+// B-05 — the projections run on stored snapshots (public, maybe old or cut
+// short): they read only well-formed parts, and never throw.
 
-export const isComplete = (s: BilliardsState): boolean => !!s?.ended;
-export const winner = (s: BilliardsState): Side | 'draw' | null => (s?.ended ? s.winner : null);
+/** Completed frames whose score is a pair of numbers. */
+const goodFrames = (s: BilliardsState): FrameRecord[] =>
+  safe(() => (isObj(s) && Array.isArray(s.frames) ? s.frames.filter((f) => isObj(f) && isPair(f.score)) : []), []);
+const wonOf = (s: BilliardsState): { home: number; away: number } =>
+  safe(() => (isObj(s) && isScore(s.framesWon) ? { home: s.framesWon.home, away: s.framesWon.away } : { home: 0, away: 0 }), { home: 0, away: 0 });
+/** The frame in play, when the state is this engine's. */
+const liveFrame = (s: BilliardsState): LiveFrame | null => safe(() => (isBilliardsState(s) ? s.frame : null), null);
+
+export const isComplete = (s: BilliardsState): boolean => safe(() => isObj(s) && s.ended === true, false);
+export const winner = (s: BilliardsState): Side | 'draw' | null =>
+  safe(() => (isObj(s) && s.ended === true && (isSide(s.winner) || s.winner === 'draw') ? s.winner : null), null);
 
 /** A single game reports its points to the standings (150–87); a best-of
  *  match its frames won (3–1). */
 export function result(s: BilliardsState): { winner: Side | 'draw'; home: number; away: number } | null {
-  if (!s?.ended || !s.winner) return null;
-  if (s.bestOf === 1 && s.frames[0]) return { winner: s.winner, home: s.frames[0].score[0], away: s.frames[0].score[1] };
-  return { winner: s.winner, home: s.framesWon.home, away: s.framesWon.away };
+  const w = winner(s);
+  if (!w) return null;
+  const first = goodFrames(s)[0];
+  if (s.bestOf === 1 && first) return { winner: w, home: first.score[0], away: first.score[1] };
+  const won = wonOf(s);
+  return { winner: w, home: won.home, away: won.away };
 }
 
-const frameScores = (s: BilliardsState): Array<[number, number]> => (Array.isArray(s?.frames) ? s.frames.map((f) => f.score) : []);
+const frameScores = (s: BilliardsState): Array<[number, number]> => goodFrames(s).map((f) => [f.score[0], f.score[1]]);
 
 export function scoreLine(s: BilliardsState, perspective?: Side): string {
-  return lineOf(frameScores(s), { perspective });
+  return safe(() => lineOf(frameScores(s), { perspective: perspective === 'away' ? 'away' : undefined }), '');
 }
 
-export const lineScore = (s: BilliardsState): LineScore | null =>
-  pointsLineScore('game', s && { games: frameScores(s), current: s.frame?.score, won: s.framesWon, ended: s.ended, toWin: s.framesToWin });
+export const lineScore = (s: BilliardsState): LineScore | null => safe(() => {
+  if (!isObj(s)) return null;
+  const fr = liveFrame(s);
+  return pointsLineScore('game', { games: frameScores(s), current: fr?.score, won: wonOf(s), ended: isComplete(s), toWin: intIn(s.framesToWin, 1, 18) ?? 1 });
+}, null);
 
 export function standingsUnits(s: BilliardsState): { points: { home: number; away: number } } | null {
-  if (!s || !Array.isArray(s.frames)) return null;
-  const points = s.frames.reduce((t, f) => ({ home: t.home + f.score[0], away: t.away + f.score[1] }), { home: s.frame?.score.home ?? 0, away: s.frame?.score.away ?? 0 });
-  return { points };
+  return safe(() => {
+    if (!isObj(s) || !Array.isArray(s.frames)) return null;
+    const fr = liveFrame(s);
+    const points = frameScores(s).reduce((t, [h, a]) => ({ home: t.home + h, away: t.away + a }), { home: fr?.score.home ?? 0, away: fr?.score.away ?? 0 });
+    return { points };
+  }, null);
 }
 
 /** The consecutive-stroke counts and the referee's calls (TEN HAZARDS /
  *  SEVENTY CANNONS = 5 strokes before the limit). */
 export function limits(s: BilliardsState): { hazards: number; cannons: number; tenHazards: boolean; seventyCannons: boolean } {
-  const fr = s?.frame;
-  const hazards = fr?.hazardRun ?? 0;
-  const cannons = fr?.cannonRun ?? 0;
-  return {
-    hazards, cannons,
-    tenHazards: s?.hazardLimit > 0 && hazards >= Math.max(1, s.hazardLimit - 5),
-    seventyCannons: s?.cannonLimit > 0 && cannons >= Math.max(1, s.cannonLimit - 5),
-  };
+  const none = { hazards: 0, cannons: 0, tenHazards: false, seventyCannons: false };
+  const fr = liveFrame(s);
+  if (!fr) return none;
+  return safe(() => ({
+    hazards: fr.hazardRun, cannons: fr.cannonRun,
+    tenHazards: s.hazardLimit > 0 && fr.hazardRun >= Math.max(1, s.hazardLimit - 5),
+    seventyCannons: s.cannonLimit > 0 && fr.cannonRun >= Math.max(1, s.cannonLimit - 5),
+  }), none);
 }
 
+const NO_SUMMARY: ScoreSummary = { homeScore: '0', awayScore: '0', statusLine: '' };
+
 export function summary(s: BilliardsState): ScoreSummary {
-  if (!s || !Array.isArray(s.frames)) return { homeScore: '0', awayScore: '0', statusLine: '' };
-  if (s.ended || !s.frame) {
-    if (s.bestOf === 1 && s.frames[0]) {
-      const [h, a] = s.frames[0].score;
-      return { homeScore: String(h), awayScore: String(a), statusLine: s.winner === 'draw' ? 'Match Over · Draw' : 'Match Over', detailLine: s.format === 'timed' ? 'Timed game' : `${s.target}-up` };
+  return safe(() => {
+    if (!isObj(s)) return NO_SUMMARY;
+    if (isComplete(s)) {
+      const first = goodFrames(s)[0];
+      if (s.bestOf === 1 && first) {
+        const [h, a] = first.score;
+        return { homeScore: String(h), awayScore: String(a), statusLine: s.winner === 'draw' ? 'Match Over · Draw' : 'Match Over', detailLine: s.format === 'timed' ? 'Timed game' : `${s.target}-up` };
+      }
+      return finalSummary(wonOf(s), scoreLine(s));
     }
-    return finalSummary(s.framesWon, scoreLine(s));
-  }
-  const fr = s.frame;
-  const line = scoreLine(s);
-  const parts: string[] = [];
-  if (s.bestOf > 1) parts.push(`Frames ${s.framesWon.home}–${s.framesWon.away}${line ? ` (${line})` : ''}`, `best of ${s.bestOf}`);
-  parts.push(s.format === 'timed' ? 'timed' : `${s.target}-up`);
-  if (fr.visit.pts > 0) parts.push(`break ${fr.visit.pts}`);
-  const lim = limits(s);
-  if (lim.tenHazards) parts.push(`${lim.hazards} hazards`);
-  if (lim.seventyCannons) parts.push(`${lim.cannons} cannons`);
-  const status = s.bestOf > 1 ? `Frame ${fr.n}` : s.format === 'timed' ? 'Timed game' : 'Game';
-  return {
-    homeScore: String(fr.score.home),
-    awayScore: String(fr.score.away),
-    statusLine: fr.sudden ? `${status} · sudden death` : status,
-    detailLine: parts.join(' · '),
-  };
+    const fr = liveFrame(s);
+    if (!fr) return NO_SUMMARY;
+    const won = wonOf(s);
+    const line = scoreLine(s);
+    const parts: string[] = [];
+    if (s.bestOf > 1) parts.push(`Frames ${won.home}–${won.away}${line ? ` (${line})` : ''}`, `best of ${s.bestOf}`);
+    parts.push(s.format === 'timed' ? 'timed' : `${s.target}-up`);
+    if (fr.visit.pts > 0) parts.push(`break ${fr.visit.pts}`);
+    const lim = limits(s);
+    if (lim.tenHazards) parts.push(`${lim.hazards} hazards`);
+    if (lim.seventyCannons) parts.push(`${lim.cannons} cannons`);
+    const status = s.bestOf > 1 ? `Frame ${fr.n}` : s.format === 'timed' ? 'Timed game' : 'Game';
+    return {
+      homeScore: String(fr.score.home),
+      awayScore: String(fr.score.away),
+      statusLine: fr.sudden ? `${status} · sudden death` : status,
+      detailLine: parts.join(' · '),
+    };
+  }, NO_SUMMARY);
 }
 
 // ------------------------------------------------------------ statistics --
@@ -444,7 +510,7 @@ const zeroStats = (): BilliardsSideStats => ({
 });
 
 type StatVisit = Visit & { end?: VisitEnd };
-interface StatFrame { n: number; quick: boolean; live: boolean; score: [number, number]; visits: StatVisit[]; fouls: FoulRecord[] }
+interface StatFrame { n: number; quick: boolean; untouched: boolean; score: [number, number]; visits: StatVisit[]; fouls: FoulRecord[] }
 /** B-01 — records from a stored (public) snapshot are read only when they
  *  are well formed: a real side and finite numbers. A side of "__proto__" or
  *  "constructor" can never index the stats objects; an unknown foul kind is
@@ -455,20 +521,30 @@ const goodFoul = (x: unknown): x is FoulRecord => isObj(x) && isSide(x.by) && nu
 const knownKind = (k: unknown): k is FoulKind => (FOUL_KINDS as readonly unknown[]).includes(k);
 const goodList = <T,>(v: unknown, ok: (x: unknown) => x is T): T[] => (Array.isArray(v) ? v.filter(ok) : []);
 function framesForStats(s: BilliardsState): StatFrame[] {
-  const out: StatFrame[] = (s?.frames ?? []).map((f) => ({ n: f.n, quick: !!f.quick, live: false, score: f.score, visits: goodList(f.visits, goodVisit), fouls: goodList(f.fouls, goodFoul) }));
-  const fr = s?.frame;
-  if (fr) out.push({ n: fr.n, quick: false, live: true, score: [fr.score.home, fr.score.away], visits: goodList([...fr.visits, ...(fr.visit.shots > 0 ? [fr.visit] : [])], goodVisit), fouls: goodList(fr.fouls, goodFoul) });
+  const out: StatFrame[] = goodFrames(s).map((f) => ({
+    n: num(f.n) ?? 0, quick: f.quick === true, untouched: false, score: f.score, visits: goodList(f.visits, goodVisit), fouls: goodList(f.fouls, goodFoul),
+  }));
+  const fr = liveFrame(s);
+  if (fr) {
+    out.push({
+      n: fr.n, quick: false, untouched: !(fr.shots > 0), score: [fr.score.home, fr.score.away],
+      visits: goodList([...fr.visits, ...(fr.visit.shots > 0 ? [fr.visit] : [])], goodVisit), fouls: goodList(fr.fouls, goodFoul),
+    });
+  }
   return out;
 }
 
 export function billiardsStats(s: BilliardsState): { home: BilliardsSideStats; away: BilliardsSideStats } {
+  return safe(() => statsOf(s), { home: zeroStats(), away: zeroStats() });
+}
+
+function statsOf(s: BilliardsState): { home: BilliardsSideStats; away: BilliardsSideStats } {
   const out = { home: zeroStats(), away: zeroStats() };
-  if (!s || !Array.isArray(s.frames)) return out;
+  if (!isObj(s)) return out;
   for (const f of framesForStats(s)) {
-    const played = !f.live || (s.frame?.shots ?? 0) > 0;
     for (const side of ['home', 'away'] as const) {
       out[side].points += f.score[side === 'home' ? 0 : 1];
-      if (!played) continue;
+      if (f.untouched) continue;
       if (f.quick) out[side].quickFrames++; else out[side].detailedFrames++;
     }
     for (const v of f.visits) {
@@ -493,16 +569,20 @@ export function billiardsStats(s: BilliardsState): { home: BilliardsSideStats; a
       if (knownKind(x.kind)) t.foulsByKind[x.kind] = (t.foulsByKind[x.kind] ?? 0) + 1;
     }
   }
+  const won = wonOf(s);
   for (const side of ['home', 'away'] as const) {
     const t = out[side];
-    t.framesWon = s.framesWon?.[side] ?? 0;
+    t.framesWon = won[side];
     t.average = t.visits > 0 ? Math.round((t.scored / t.visits) * 10) / 10 : null;
   }
   return out;
 }
 
 export function breaks(s: BilliardsState, min = 1): Array<{ side: Side; frame: number; pts: number }> {
-  const out: Array<{ side: Side; frame: number; pts: number }> = [];
-  for (const f of framesForStats(s)) for (const v of f.visits) if (v.pts >= min && v.pts > 0) out.push({ side: v.side, frame: f.n, pts: v.pts });
-  return out;
+  const m = num(min) ?? 1;
+  return safe(() => {
+    const out: Array<{ side: Side; frame: number; pts: number }> = [];
+    for (const f of framesForStats(s)) for (const v of f.visits) if (v.pts >= m && v.pts > 0) out.push({ side: v.side, frame: f.n, pts: v.pts });
+    return out;
+  }, []);
 }

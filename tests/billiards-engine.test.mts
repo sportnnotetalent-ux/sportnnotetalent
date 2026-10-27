@@ -397,4 +397,35 @@ describe('billiards · break list', () => {
     assert.notEqual(scored, s, 'scoring strokes still count');
     assert.equal(step(scored, { type: 'TIME' }).ended, true, 'and the game can still end');
   });
+
+  test('B-05 / B-13 / B-14 truncated, foreign or hostile states and objects never throw and are never advanced', () => {
+    const live = run([PR, C, MISS]);
+    const done = run([{ type: 'CONCEDE', side: 'away' }], { bestOf: 1 });
+    const hostile = new Proxy({}, { get() { throw new Error('boom'); }, has() { throw new Error('boom'); }, ownKeys() { throw new Error('boom'); } });
+    const snooker = { sport: 'snooker', reds: 15, bestOf: 5, framesToWin: 3, firstBreak: 'home', frames: [], framesWon: { home: 0, away: 0 }, frame: { n: 1, breaker: 'home', striker: 'home', score: { home: 0, away: 0 }, redsLeft: 15, on: 'red', visit: { side: 'home', pts: 0, pots: 0, shots: 0 }, visits: [], fouls: [], shots: 0 }, ended: false, winner: null, seq: 0 };
+    const bad: unknown[] = [
+      undefined, null, {}, [], 42, 'x', hostile, snooker,
+      { frames: [] }, { frames: [{}] }, { frames: [null] }, { frames: [{ score: null }] },
+      { ...live, frame: {} }, { ...live, frame: { ...live.frame, score: null } }, { ...live, frame: { ...live.frame, visits: null } },
+      { ...live, frame: { ...live.frame, striker: '__proto__' } }, { ...live, frames: null }, { ...live, framesWon: null },
+      { ...done, framesWon: undefined }, { ...done, frames: [{ ...done.frames[0], score: 'x' }] }, { ...done, frames: [] },
+    ];
+    const acts: A[] = [PR, C, MISS, SAFE, FOUL(), { type: 'TIME' }, { type: 'BREAK_OFF', side: 'away' },
+      { type: 'CONCEDE', payload: { side: 'away', frame: 1 } }, { type: 'AWARD_FRAME', payload: { side: 'home', frame: 1 } }, { type: 'FRAME_SCORE', payload: { home: 150, away: 3, frame: 1 } }];
+    for (const st of bad) {
+      const s = st as B.BilliardsState;
+      const label = (() => { try { return String(JSON.stringify(st)).slice(0, 60); } catch { return 'a hostile Proxy'; } })();
+      for (const a of acts) assert.equal(B.reducer(s, a), s, `${a.type} on ${label}`);
+      for (const fn of [B.summary, B.scoreLine, B.lineScore, B.standingsUnits, B.result, B.winner, B.isComplete, B.limits, B.billiardsStats, B.breaks]) {
+        assert.doesNotThrow(() => (fn as (x: unknown) => unknown)(s), `${fn.name} on ${label}`);
+      }
+    }
+    assert.equal(B.reducer(live, hostile as never), live);
+    assert.equal(B.reducer(live, { type: 'SCORE', get payload(): Record<string, unknown> { throw new Error('boom'); } }), live);
+    assert.equal(B.reducer(live, { type: 'SCORE', payload: hostile as Record<string, unknown> }), live);
+    assert.equal(B.createInitialState({ get target(): number { throw new Error('boom'); } }).target, 150);
+    assert.equal(B.createInitialState(hostile as Record<string, unknown>).target, 150);
+    assert.doesNotThrow(() => B.breaks(live, { valueOf() { throw new Error('boom'); } } as unknown as number));
+    assert.equal(B.strokeValue(hostile as Record<string, unknown>), 0);
+  });
 });

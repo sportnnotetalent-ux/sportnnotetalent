@@ -745,4 +745,40 @@ describe('snooker · break list', () => {
     assert.equal(next.frames.length, 1);
     assert.notEqual(S.reducer(next, SAFE), next, 'a new frame takes records again');
   });
+
+  test('B-05 / B-13 / B-14 truncated, foreign or hostile states and objects never throw and are never advanced', () => {
+    const live = run([pot('red'), pot('black'), MISS]);
+    const done = run([{ type: 'CONCEDE', side: 'away' }], { bestOf: 1 });
+    const hostile = new Proxy({}, { get() { throw new Error('boom'); }, has() { throw new Error('boom'); }, ownKeys() { throw new Error('boom'); } });
+    const bad: unknown[] = [
+      undefined, null, {}, [], 42, 'x', hostile,
+      { frames: [] }, { frames: [{}] }, { frames: [null] }, { frames: [{ score: null }] },
+      { ...live, frame: {} }, { ...live, frame: { ...live.frame, score: null } }, { ...live, frame: { ...live.frame, visits: null } },
+      { ...live, frame: { ...live.frame, striker: '__proto__' } }, { ...live, frames: null }, { ...live, framesWon: null },
+      { ...done, framesWon: undefined }, { ...done, frames: [{ ...done.frames[0], score: 'x' }] },
+      { sport: 'billiards', format: 'points', target: 150, bestOf: 1, framesToWin: 1, frames: [], framesWon: { home: 0, away: 0 }, frame: { n: 1, striker: 'home', score: { home: 0, away: 0 }, visit: { side: 'home', pts: 0, shots: 0 }, visits: [], fouls: [], hazardRun: 0, cannonRun: 0, shots: 0 }, ended: false, winner: null, seq: 0 },
+    ];
+    const acts: A[] = [pot('red'), MISS, SAFE, foul(4), { type: 'FREE_BALL' }, { type: 'PLAY_AGAIN' }, { type: 'REPLACE' }, { type: 'BREAK_OFF', side: 'away' }, { type: 'RESPOT_TURN', side: 'away' },
+      { type: 'CONCEDE', payload: { side: 'away', frame: 1 } }, { type: 'AWARD_FRAME', payload: { side: 'home', frame: 1 } }, { type: 'FRAME_SCORE', payload: { home: 50, away: 3, frame: 1 } }];
+    for (const st of bad) {
+      const s = st as S.SnookerState;
+      const label = (() => { try { return String(JSON.stringify(st)).slice(0, 60); } catch { return 'a hostile Proxy'; } })();
+      for (const a of acts) assert.equal(S.reducer(s, a), s, `${a.type} on ${label}`);
+      for (const fn of [S.summary, S.scoreLine, S.lineScore, S.standingsUnits, S.result, S.winner, S.isComplete, S.pointsRemaining, S.ballOn, S.missStatus, S.snookerStats, S.breaks]) {
+        assert.doesNotThrow(() => (fn as (x: unknown) => unknown)(s), `${fn.name}`);
+      }
+      assert.doesNotThrow(() => S.snookersRequired(s, 'home'));
+    }
+    // a hostile action, payload, config or argument
+    assert.equal(S.reducer(live, hostile as never), live);
+    assert.equal(S.reducer(live, { type: 'POT', get payload(): Record<string, unknown> { throw new Error('boom'); } }), live);
+    assert.equal(S.reducer(live, { type: 'POT', payload: hostile as Record<string, unknown> }), live);
+    assert.equal(S.createInitialState({ get reds(): number { throw new Error('boom'); } }).reds, 15);
+    assert.equal(S.createInitialState(hostile as Record<string, unknown>).reds, 15);
+    assert.doesNotThrow(() => S.breaks(live, { valueOf() { throw new Error('boom'); } } as unknown as number));
+    // a frozen state reduces like any other
+    const deepFreeze = (o: unknown): unknown => { if (o && typeof o === 'object') { Object.values(o).forEach(deepFreeze); Object.freeze(o); } return o; };
+    const frozen = deepFreeze(JSON.parse(JSON.stringify(live))) as S.SnookerState;
+    assert.deepEqual(S.reducer(frozen, pot('red')), S.reducer(live, pot('red')));
+  });
 });
