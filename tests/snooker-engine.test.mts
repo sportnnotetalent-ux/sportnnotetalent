@@ -663,3 +663,27 @@ describe('snooker · malformed input and replay', () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// Break list (docs/security/breaks/snooker-billiards-engine.md): each point's
+// test was written first and failed before its fix.
+describe('snooker · break list', () => {
+  const clone = <T,>(x: T): T => JSON.parse(JSON.stringify(x));
+
+  test('B-01 a crafted stored state cannot pollute Object.prototype through the stats', () => {
+    const s = clone(run([pot('red'), pot('black'), MISS, { type: 'CONCEDE', side: 'away' }])) as S.SnookerState;
+    const fr = s.frames[0] as unknown as { visits: unknown[]; fouls: unknown[] };
+    fr.visits.push(JSON.parse('{"side":"__proto__","pts":5,"pots":1,"shots":1,"end":"miss"}'), { side: 'constructor', pts: 5, pots: 1, shots: 1, end: 'miss' });
+    fr.fouls.push(JSON.parse('{"by":"__proto__","value":4,"miss":true}'), { by: 'home', value: 4, kind: 'constructor' });
+    const st = S.snookerStats(s);
+    const probe = {} as Record<string, unknown>;
+    assert.equal(probe.visits, undefined);
+    assert.equal(probe.highestBreak, undefined);
+    assert.equal(probe.missesCalled, undefined);
+    assert.equal((Object as unknown as Record<string, unknown>).visits, undefined);
+    assert.equal(Object.prototype.hasOwnProperty.call(st.home.foulsByKind, 'constructor'), false);
+    assert.equal(st.home.visits, 1, 'only the real visit counts');
+    assert.equal(st.home.fouls, 1);
+    assert.deepEqual(S.breaks(s), [{ side: 'home', frame: 1, pts: 8 }]);
+  });
+});

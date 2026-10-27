@@ -430,10 +430,19 @@ const zeroStats = (): BilliardsSideStats => ({
 
 type StatVisit = Visit & { end?: VisitEnd };
 interface StatFrame { n: number; quick: boolean; live: boolean; score: [number, number]; visits: StatVisit[]; fouls: FoulRecord[] }
+/** B-01 — records from a stored (public) snapshot are read only when they
+ *  are well formed: a real side and finite numbers. A side of "__proto__" or
+ *  "constructor" can never index the stats objects; an unknown foul kind is
+ *  dropped (the foul still counts). */
+const goodVisit = (v: unknown): v is StatVisit =>
+  isObj(v) && isSide(v.side) && ['pts', 'shots', ...PARTS].every((k) => num(v[k]) !== undefined);
+const goodFoul = (x: unknown): x is FoulRecord => isObj(x) && isSide(x.by) && num(x.value) !== undefined;
+const knownKind = (k: unknown): k is FoulKind => (FOUL_KINDS as readonly unknown[]).includes(k);
+const goodList = <T,>(v: unknown, ok: (x: unknown) => x is T): T[] => (Array.isArray(v) ? v.filter(ok) : []);
 function framesForStats(s: BilliardsState): StatFrame[] {
-  const out: StatFrame[] = (s?.frames ?? []).map((f) => ({ n: f.n, quick: !!f.quick, live: false, score: f.score, visits: f.visits ?? [], fouls: f.fouls ?? [] }));
+  const out: StatFrame[] = (s?.frames ?? []).map((f) => ({ n: f.n, quick: !!f.quick, live: false, score: f.score, visits: goodList(f.visits, goodVisit), fouls: goodList(f.fouls, goodFoul) }));
   const fr = s?.frame;
-  if (fr) out.push({ n: fr.n, quick: false, live: true, score: [fr.score.home, fr.score.away], visits: [...fr.visits, ...(fr.visit.shots > 0 ? [fr.visit] : [])], fouls: fr.fouls });
+  if (fr) out.push({ n: fr.n, quick: false, live: true, score: [fr.score.home, fr.score.away], visits: goodList([...fr.visits, ...(fr.visit.shots > 0 ? [fr.visit] : [])], goodVisit), fouls: goodList(fr.fouls, goodFoul) });
   return out;
 }
 
@@ -466,7 +475,7 @@ export function billiardsStats(s: BilliardsState): { home: BilliardsSideStats; a
       t.fouls++;
       t.penaltyConceded += x.value;
       out[other(x.by)].penaltyReceived += x.value;
-      if (x.kind) t.foulsByKind[x.kind] = (t.foulsByKind[x.kind] ?? 0) + 1;
+      if (knownKind(x.kind)) t.foulsByKind[x.kind] = (t.foulsByKind[x.kind] ?? 0) + 1;
     }
   }
   for (const side of ['home', 'away'] as const) {

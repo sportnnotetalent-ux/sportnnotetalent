@@ -570,11 +570,19 @@ const zeroStats = (): SnookerSideStats => ({
  *  break in progress counted as a visit once it has a stroke). */
 type StatVisit = Visit & { end?: VisitEnd };
 interface StatFrame { n: number; quick: boolean; score: [number, number]; visits: StatVisit[]; fouls: FoulRecord[] }
+/** B-01 — records from a stored (public) snapshot are read only when they
+ *  are well formed: a real side, finite numbers, a known foul kind. A side of
+ *  "__proto__" or "constructor" can never index the stats objects. */
+const goodVisit = (v: unknown): v is StatVisit =>
+  isObj(v) && isSide(v.side) && num(v.pts) !== undefined && num(v.shots) !== undefined && num(v.pots) !== undefined;
+const goodFoul = (x: unknown): x is FoulRecord => isObj(x) && isSide(x.by) && num(x.value) !== undefined;
+const knownKind = (k: unknown): k is FoulKind => (FOUL_KINDS as readonly unknown[]).includes(k);
+const goodList = <T,>(v: unknown, ok: (x: unknown) => x is T): T[] => (Array.isArray(v) ? v.filter(ok) : []);
 function framesForStats(s: SnookerState): StatFrame[] {
-  const out: StatFrame[] = (s?.frames ?? []).map((f) => ({ n: f.n, quick: !!f.quick, score: f.score, visits: f.visits ?? [], fouls: f.fouls ?? [] }));
+  const out: StatFrame[] = (s?.frames ?? []).map((f) => ({ n: f.n, quick: !!f.quick, score: f.score, visits: goodList(f.visits, goodVisit), fouls: goodList(f.fouls, goodFoul) }));
   const fr = s?.frame;
   if (fr && (fr.shots > 0 || fr.fouls.length > 0 || fr.visit.shots > 0)) {
-    out.push({ n: fr.n, quick: false, score: [fr.score.home, fr.score.away], visits: [...fr.visits, ...(fr.visit.shots > 0 ? [fr.visit] : [])], fouls: fr.fouls });
+    out.push({ n: fr.n, quick: false, score: [fr.score.home, fr.score.away], visits: goodList([...fr.visits, ...(fr.visit.shots > 0 ? [fr.visit] : [])], goodVisit), fouls: goodList(fr.fouls, goodFoul) });
   } else if (fr) {
     out.push({ n: fr.n, quick: true, score: [fr.score.home, fr.score.away], visits: [], fouls: [] });
   }
@@ -617,7 +625,7 @@ export function snookerStats(s: SnookerState): { home: SnookerSideStats; away: S
       o.penaltyReceived += x.value;
       if (x.miss) t.missesCalled++;
       if (x.fb) o.freeBalls++;
-      if (x.kind) t.foulsByKind[x.kind] = (t.foulsByKind[x.kind] ?? 0) + 1;
+      if (knownKind(x.kind)) t.foulsByKind[x.kind] = (t.foulsByKind[x.kind] ?? 0) + 1;
     }
   });
   for (const side of ['home', 'away'] as const) {
