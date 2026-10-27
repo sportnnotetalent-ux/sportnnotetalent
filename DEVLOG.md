@@ -13,6 +13,15 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-27 — Release: golf in Run it again + the scoring safety net live
+- **Founder:** ran `20261027200000_match_names_safety_net` and pushed both branches (`main` = `feat` = `1c71159`).
+- **Checked read-only:**
+  - both triggers exist, and anon and signed-in users can't call the helpers;
+  - the live `mask_minor_names_json` masks a child's name in a value and inside text, and keeps a key and an adult's name. Checked with booleans only, so no names were printed.
+- **Release:**
+  - `auth-smoke` passed.
+  - From a clean worktree at `1c71159`: web `index-2274b587…` (both addresses 10/10 on the first round) and Android OTA `3a66dc4f` (runtime 1.0.0).
+
 ### 2026-10-27 — Scoring safety net: no child's name in new match data, from any app version
 Founder decisions: **1A** (verified schools and colleges plus sports clubs, academies and associations confirm members' dates of birth; as built) and **2A** (strip names now; don't refuse).
 - **Why:** since 24 Oct the app saves player ids only. A phone still on an older version, until its next restart picks up the update, would still save full names into public match data.
