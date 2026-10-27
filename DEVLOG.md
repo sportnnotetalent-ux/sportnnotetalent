@@ -13,6 +13,21 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-27 — Backlog run live (items 1–5)
+- **Founder:** pushed all three branches (`sdk57` too) and ran both migrations.
+- **Checked read-only:**
+  - `hook_before_user_created` exists, callable by `supabase_auth_admin` and not by anon; `signup_guard_settings` is seeded;
+  - `org_id_requirements` has 91 rows; `abn_ok` / `org_required_id_types_for` live (UK School → urn, uk_school_ref, other_reg; India → udise);
+  - submit checks by market; the unique index exempts the new local numbers;
+  - ABN 51 824 753 556 valid; Companies House 1234567 → 01234567.
+- **Not checkable from here:** whether the Auth hook is switched on. That's a dashboard setting; the CLI's login is in the keychain.
+- **Release:**
+  - `auth-smoke` passed.
+  - `register-lookup` deployed (anonymous POST → 401).
+  - Web `index-554fcf47…` (both addresses 10/10 right away) and Android OTA `16f9b0a6` (runtime 1.0.0) from `037abb9`, the main line, not `sdk57`.
+  - The guides ("Our school isn't in India", DLS wording) are live on sportnnote.in.
+- **Live page check:** all 91 resources of a live tournament page loaded. One 429 in the console was from my own back-to-back bundle checks just before.
+
 ### 2026-10-27 — Expo SDK 57 ready on its own branch (for the next APK)
 Backlog run, item 6 of 6. The 2026-10-26 decision stands: SDK 57 ships with the next APK, because version 1.1.0 stops older APKs getting updates. So it's prepared on branch **`sdk57`** (`3f07fc2`) and is not on the update line.
 - **What changed:**
