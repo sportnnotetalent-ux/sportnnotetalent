@@ -13,6 +13,24 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-27 — Scoring safety net: no child's name in new match data, from any app version
+Founder decisions: **1A** (verified schools and colleges plus sports clubs, academies and associations confirm members' dates of birth; as built) and **2A** (strip names now; don't refuse).
+- **Why:** since 24 Oct the app saves player ids only. A phone still on an older version, until its next restart picks up the update, would still save full names into public match data.
+- **What's built:** migration `20261027200000_match_names_safety_net`.
+  - Triggers on `match_events` (payload, attribution) and `matches.state` store every possible minor's full name as initials ("A. R."). This is the same rule as the entry, POTM, awards and dispute triggers (players_view: under 18, or no date of birth).
+  - A child counts when they're linked to the match: both squads (`team_members`, `teams.roster`), singles and doubles entries (`entry_ids`), and every player id in the data being saved.
+  - The match is on whole names only, in any case and spacing. JSON keys never change; adults' names are unchanged.
+  - Nothing is refused, and any surprise saves the data as sent. Today's app sends ids only, so its data passes unchanged.
+- **Masking instead of dropping keys:** the app still writes some name-like keys legitimately (`AMEND byName`, already initials for a minor), and old names also sit inside text ("c X b Y").
+- **Checked on the live database (read-only SELECTs, nothing created):**
+  - The regex: "Ram Kumar" is not caught inside "Shriram Kumar", and keys like "program" are untouched. Names with punctuation ("Neil D'Souza (Jr.)") and Devanagari names ("आशा राव" → "आ. र.") work.
+  - The linked-players query runs on real matches.
+  - No match has been scored since 24 Oct; the 142 older events carrying names predate 12 Oct.
+- **Not done here:** rows saved before; they're the clean-up script's job.
+- **Tests:** `tests/match-names-safety-net.test.mts` (5).
+- **Docs:** `docs/privacy/ids-only-scoring.md` (safety net); `docs/verification/org-verification.md` (DOB types confirmed).
+- **Founder:** run the migration in the SQL Editor. No app release is needed for it.
+
 ### 2026-10-27 — Run it again, part 3: golf rounds come across
 Golf was the one sport whose setup didn't carry: its rounds are field events with players, so the copy left them behind.
 - **The round plan:** the copy now keeps each round as `formats.golf.roundPlan`, written by `golfRoundsFrom` in `src/data/tournamentCopyPlan.ts`.

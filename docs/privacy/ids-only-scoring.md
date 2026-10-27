@@ -43,7 +43,7 @@ The work goes sport by sport, racket sports and cricket first. Inventory with fi
 **F. Baseball, plus G: chess, golf match play, carrom.** Baseball supports name-only players. Chess also needs the pasted PGN's `[White]` / `[Black]` tags removed.
 
 **Z. Close-out.**
-- **Server safety net:** `append_match_event` drops name keys from `attribution` and `payload`.
+- **Server safety net:** new match data never keeps a child's name. Built as masking triggers rather than dropping keys, because the app still writes some name-like keys legitimately (`AMEND byName` is already initials for a minor) and names also sit inside text.
 - **Data clean-up script:** map old name-only events to ids, then scrub `match_events`, `matches.state`, `match_lineups`, `potm`, `result.byName` and tournament awards. It is run by the founder, because live writes go through them.
 - **The other public name stores:**
   - singles / doubles entry `teams.name`: a trigger masks children and stores `entry_ids`, and the app shows full names to the circle. This also fixes `homeName` / `awayName` and `stat_lines.opponent`.
@@ -73,6 +73,6 @@ The work goes sport by sport, racket sports and cricket first. Inventory with fi
   - **E: cricket merged** (`2b3fa11`);
   - **C: kabaddi merged**; **F+G: baseball, carrom, chess, golf merged**; **D: basketball merged**; **B: invasion sports merged**, so **every sport is IDs-only**;
   - close-out: records, corrections, POTM / awards / disputes / activity / relay members and line-ups masked; `scripts/check-minor-names.sql` monitors.
-- **Safety net:** once the check shows no new name keys from old app versions, `append_match_event` refuses them.
+- **Safety net (2026-10-27, founder "strip, don't refuse"; migration `20261027200000_match_names_safety_net`):** triggers on `match_events` (payload, attribution) and `matches.state` store every possible minor's full name as initials, whatever app version saves it. The minors counted are those linked to the match: both squads, rosters and entries, plus every player id in the data. Nothing is refused and nothing fails (fails open). Today's app sends ids only, so its data passes unchanged. Rows saved before stay for the clean-up script.
 - **Next:** one release, then a real scoring test on a phone across the sports.
 - Done before this: children show as initials outside their circle (`players_view` + the `players` policy) and listings by under-18s carry no phone.
