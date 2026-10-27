@@ -428,4 +428,12 @@ describe('billiards · break list', () => {
     assert.doesNotThrow(() => B.breaks(live, { valueOf() { throw new Error('boom'); } } as unknown as number));
     assert.equal(B.strokeValue(hostile as Record<string, unknown>), 0);
   });
+
+  test('B-11 -0 is stored as 0 (a JSON round trip stays deep-equal)', () => {
+    const s = run([{ type: 'FRAME_SCORE', payload: { home: -0, away: 150 } }]);
+    assert.ok(Object.is(s.frames[0].score[0], 0));
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(s)), s);
+    const d = run([{ type: 'FRAME_SCORE', payload: { home: -0, away: 0 } }], { format: 'timed', timedTie: 'draw' });
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(d)), d);
+  });
 });

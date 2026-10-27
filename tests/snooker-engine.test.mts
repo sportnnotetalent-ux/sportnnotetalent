@@ -216,7 +216,7 @@ describe('snooker · fouls (S3 R10–R11)', () => {
     const s = run([foul(4, { reds: 2 })]);
     assert.equal(f(s).redsLeft, 13);
     assert.equal(f(s).fouls[0].reds, 2);
-    assert.equal(f(run([foul(4, { reds: 99 })])).redsLeft, 0, 'clamped to the reds on the table');
+    assert.equal(f(run([foul(4, { reds: 99 })])).redsLeft, 15, 'more reds than are on the table: refused (B-10)');
   });
 
   test('the last red down in a foul: the next player is on the yellow', () => {
@@ -796,5 +796,20 @@ describe('snooker · break list', () => {
     assert.equal(f(s).fouls[0].fb, true);
     assert.equal(f(s).fouls[1].fb, undefined);
     assert.equal(S.snookerStats(s).away.freeBalls, 1);
+  });
+
+  test('B-10 FOUL.reds must be a whole number of reds on the table, like POT.reds', () => {
+    const s0 = S.createInitialState();
+    for (const reds of [0.5, 1.5, 16, 1e9, -1, '2', Number.NaN, true]) assert.equal(S.reducer(s0, foul(4, { reds })), s0, String(reds));
+    assert.equal(f(S.reducer(s0, foul(4, { reds: 2 }))).redsLeft, 13);
+    assert.equal(f(S.reducer(s0, foul(4, { reds: 0 }))).redsLeft, 15);
+    const clearing = run(pairs(15));
+    assert.equal(S.reducer(clearing, foul(4, { reds: 1 })), clearing, 'no reds left');
+  });
+
+  test('B-11 -0 is stored as 0 (a JSON round trip stays deep-equal)', () => {
+    const s = run([{ type: 'FRAME_SCORE', payload: { home: -0, away: 5 } }]);
+    assert.ok(Object.is(s.frames[0].score[0], 0));
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(s)), s);
   });
 });

@@ -108,7 +108,8 @@ const own = (o: Record<string, unknown> | undefined, k: string): unknown =>
 const num = (v: unknown): number | undefined => (typeof v === 'number' && Number.isFinite(v) ? v : undefined);
 const intIn = (v: unknown, min: number, max: number): number | undefined => {
   const n = num(v);
-  return n !== undefined && Number.isInteger(n) && n >= min && n <= max ? n : undefined;
+  // B-11 — `+ 0` stores -0 as 0, so a JSON round trip stays deep-equal
+  return n !== undefined && Number.isInteger(n) && n >= min && n <= max ? n + 0 : undefined;
 };
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
 const emptyVisit = (side: Side): Visit => ({ side, pts: 0, shots: 0, potRed: 0, potWhite: 0, inOffRed: 0, inOffWhite: 0, cannon: 0 });

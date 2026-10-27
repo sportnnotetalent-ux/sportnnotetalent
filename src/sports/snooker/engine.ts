@@ -143,7 +143,8 @@ const num = (v: unknown): number | undefined => (typeof v === 'number' && Number
 /** An integer in [min, max], else undefined. */
 const intIn = (v: unknown, min: number, max: number): number | undefined => {
   const n = num(v);
-  return n !== undefined && Number.isInteger(n) && n >= min && n <= max ? n : undefined;
+  // B-11 — `+ 0` stores -0 as 0, so a JSON round trip stays deep-equal
+  return n !== undefined && Number.isInteger(n) && n >= min && n <= max ? n + 0 : undefined;
 };
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
 const isColour = (v: unknown): v is Colour => typeof v === 'string' && (COLOURS as readonly string[]).includes(v);
@@ -469,7 +470,11 @@ function foul(s: SnookerState, fr: LiveFrame, by: Side, p: Record<string, unknow
   }
 
   const opp = other(by);
-  const redsDown = fr.redsLeft > 0 ? clamp(Math.round(num(own(p, 'reds')) ?? 0), 0, fr.redsLeft) : 0;
+  // B-10 — the reds down in the foul: a whole number of the reds on the
+  // table, like POT.reds (anything else refuses the FOUL)
+  const rawReds = own(p, 'reds');
+  const redsDown = rawReds === undefined ? 0 : intIn(rawReds, 0, fr.redsLeft);
+  if (redsDown === undefined) return s;
   const miss = own(p, 'miss') === true;
   const redsLeft = fr.redsLeft - redsDown;
   const on = nextTurnOn(fr.on, redsLeft);
