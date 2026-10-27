@@ -26,18 +26,18 @@ Status key: **BREAKS** (found broken; to fix), **HOLDS** (attacked, already safe
 5. **Payload and config fields read through the prototype chain.** An inherited `pots` is applied as a
    pot; an inherited `called: false` turns a pot into a wrongful pot; `Object.prototype.illegal = true`
    (a prototype pollution anywhere else in the app) makes every 8-ball break illegal, and
-   `Object.prototype.raceTo = 1` shortens every new match. **BREAKS**.
+   `Object.prototype.raceTo = 1` shortens every new match. **BREAKS → FIXED** in `f250a6d`: payloads and the format are copied into null-prototype records (own keys only); type, side and payload are own reads.
 6. **A payload or config whose property access throws** — a getter, a Proxy, a `toString` that throws:
    the reducer / `createInitialState` throws, which would take down the live scoring screen.
-   **BREAKS** (in-process only: stored events are JSON).
+   **BREAKS → FIXED** in `f8fd06a` (in-process only: stored events are JSON): an unreadable payload voids the action, an unreadable config gives the defaults, the game option reads only text or numbers, and the reducer hands the state back on any throw (exact, since only a draft is ever written).
 7. **A stored payload with a JSON `"__proto__"` key.** **HOLDS**: an own key, never read.
 8. **Action types and foul kinds named like Object properties** (`__proto__`, `constructor`,
    `toString`, `hasOwnProperty`). **HOLDS**: types fall to the default branch, kinds are checked against a
    Set and recorded as `other`.
 9. **Lookup by a state value**: a snapshot whose `game` is `__proto__` makes `GAME_LABEL[game]` return
-   `Object.prototype`, so the status line reads "[object Object] · Rack 1". **BREAKS**.
+   `Object.prototype`, so the status line reads "[object Object] · Rack 1". **BREAKS → FIXED** in `2b9fce7`: game values are checked against the three games before any lookup ("Pool" otherwise).
 10. **`FOUL {kind: 'illegalBreak'}` during play** is accepted, so the stats show an illegal break that
-    never happened. **BREAKS**.
+    never happened. **BREAKS → FIXED** in `b2b4e91`: outside a break shot it is recorded as `other`.
 11. **Names smuggled into payloads** — `breaks`, `breaker`, `kind`, `by`, `note`, `shooter`,
     `attribution.playerName`. **HOLDS**: only sides, ball numbers, enums and counters are copied into the
     state; no player id either.
@@ -45,10 +45,10 @@ Status key: **BREAKS** (found broken; to fix), **HOLDS** (attacked, already safe
 ## Timing, replays, retries
 
 12. **A duplicated quick `RACK`** (a double tap, two phones, or a retry under a new client id) awards the
-    *next* rack as well. The engine has nothing to tell a duplicate from a second rack. **BREAKS**.
+    *next* rack as well. The engine has nothing to tell a duplicate from a second rack. **BREAKS → FIXED** in `4306e3a`: `RACK` requires `rack` (the number of the rack in play); any action naming an earlier rack is ignored. A later number still applies, so a correction that voids a rack end shifts the taps after it (AMEND can only replace or void, never insert).
 13. **A duplicated side-less `MISS` / `SAFETY` / `FOUL`** (two phones scoring the same shot) passes the
     turn twice, back to the wrong player. With the action's `side` it already holds (the duplicate's side
-    is no longer the shooter), but the side is optional. **BREAKS**.
+    is no longer the shooter), but the side is optional. **BREAKS → FIXED** in `e841544`: POT, MISS, SAFETY, FOUL and PUSH require the side. Left over: a duplicated *out-of-turn* foul (3.12, the only shot by the side not at the table) still counts twice — ACCEPTED, rare, and Undo removes it.
 14. **Actions after the match ended.** **HOLDS**: the same state object comes back.
 15. **Replaying 10,000 events in one rack** (5 ms; the state stays 1.2 KB) and **100,000 events over the
     longest match allowed** (7 ms). **HOLDS**: each event copies a few fixed-size objects; the rack list
@@ -70,11 +70,12 @@ Status key: **BREAKS** (found broken; to fix), **HOLDS** (attacked, already safe
 22. **Three-foul counting** across innings, across players, across a re-rack or a new rack. **HOLDS**.
 23. **`RACK` or `STALEMATE` while a choice is pending.** **HOLDS**: the award / the replay clears it.
 24. **The reducer on a corrupted or foreign state** (`tally` missing, `racks` not an array): it throws.
-    **BREAKS** (reachable only by a caller that feeds a stored snapshot to the reducer).
+    **BREAKS → FIXED** in `dfad525` (reachable only by a caller that feeds a stored snapshot to the reducer): a shape check runs before any event; such a state comes back unchanged.
 25. **The readers on a hostile snapshot** — `summary`, `scoreLine`, `lineScore`, `result`, `poolStats`:
     a score of "NaN" / "Infinity" / "undefined", "1-undefined" as a line, a result with no away score, or a
     throw when `sets` holds a null. Every result surface reads stored snapshots (`matches.state`).
-    **BREAKS**.
+    **BREAKS → FIXED** in `43c6402`: every stored value is read as a whole count from 0 up, set scores
+    only as valid pairs, foul kinds only from the known list; a race with no valid final has no result.
 26. **The organiser edits the format mid-match** (8-ball → 9-ball, a shorter race): the next replay
     re-scores the whole log under the new format, silently. **ACCEPTED for the engine** (it can't know
     which format a stored log was scored under); integration requirement: lock `game` once the match has
@@ -96,3 +97,28 @@ Status key: **BREAKS** (found broken; to fix), **HOLDS** (attacked, already safe
 
 31 points: **8 BREAKS** (5, 6, 9, 10, 12, 13, 24, 25), **18 HOLDS**, **5 ACCEPTED** (17, 18, 26, 27, 29;
 26 with an integration requirement).
+
+## After the fixes (2026-10-28)
+
+All 8 breaks **FIXED**, one commit each, each starting with a failing test in
+`tests/pool-engine.test.mts` (`describe('breaks …')`, named `#5` … `#25`):
+
+| # | Break | Commit |
+|---|---|---|
+| 24 | corrupted / foreign state into the reducer | `dfad525` |
+| 5 | prototype-chain reads, prototype pollution | `f250a6d` |
+| 6 | throwing getters, Proxies, `toString` | `f8fd06a` |
+| 9 | lookup by a raw stored value | `2b9fce7` |
+| 25 | readers on a hostile snapshot | `43c6402` |
+| 10 | illegal-break foul outside a break | `b2b4e91` |
+| 12 | duplicated quick RACK | `4306e3a` |
+| 13 | duplicated side-less shot | `e841544` |
+
+Two of the fixes change what the controls must send (`docs/sports/POOL_DESIGN.md` §3): the **side** on
+every shot and the **rack number** on `RACK` (and, recommended, on every action). Accepted, with the
+reason above: 17, 18, 26 (integration: lock `game` once the match has an event), 27, 29, and the
+duplicated out-of-turn foul left over from 13.
+
+The seeded simulation (`tests/sim-pool.test.mts`, step 6) replays 700 matches per game (500 realistic,
+200 adversarial) and checks the invariants behind 1–4, 11–16, 19–25 and 28 after every event; a
+mutation check (the race closed one rack late; the 9 / 10 not spotted after a foul) makes it fail.

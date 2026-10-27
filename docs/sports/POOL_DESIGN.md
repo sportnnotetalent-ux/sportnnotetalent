@@ -1,13 +1,16 @@
 # Pool (8-ball, 9-ball, 10-ball): engine design (v1)
 
-*Status: **engine stage built 2026-10-27** (pure engine only: no plugin, no screens, no
-registration). One sport, `pool`, with a game option: 8-ball, 9-ball or 10-ball.*
+*Status: **engine stage built 2026-10-27, hardened 2026-10-28** (pure engine only: no plugin,
+no screens, no registration). One sport, `pool`, with a game option: 8-ball, 9-ball or
+10-ball. 98 unit tests + a seeded simulation (2,100 matches, ~260,000 events); 31 break
+points (8 found and fixed, 5 accepted).*
 
 **Where things are:**
 - Engine: `src/sports/pool/engine.ts` (rules + state), `src/sports/pool/stats.ts` (per-side
   stat derivations), `src/sports/pool/balls.ts` (ball sets and payload readers).
-- Tests: `tests/pool-engine.test.mts` (rules, written first) and `tests/sim-pool.test.mts`
-  (seeded simulation, 500+ matches per game).
+- Tests: `tests/pool-engine.test.mts` (rules, written first, plus one test per break fixed)
+  and `tests/sim-pool.test.mts` (seeded simulation: 500 realistic + 200 adversarial matches
+  per game).
 - Breaks: `docs/security/breaks/pool-engine.md`.
 
 ---
@@ -214,8 +217,8 @@ clamped to their range.
    (rack 1, 3, 5… the first breaker), not who actually broke the replayed rack.
 10. **Sets**: the break format carries on across sets (no special rule for the first rack of
     a set).
-11. **Break-and-run includes golden breaks**; **run-out** = won in a single visit by a
-    player who did not break (or broke in an earlier, replayed attempt).
+11. **Break-and-run includes golden breaks**; **run-out** = the rack won in a single visit by
+    the player who did not break it (after a re-rack, the breaker of the replayed rack).
 12. **A quick `RACK` on a rack that already has detail** awards the rack (how = `awarded`);
     its flags are ignored (the detail decides them).
 13. **Out-of-turn foul (3.12)**: the player whose turn it was keeps the table with ball in
@@ -235,3 +238,12 @@ clamped to their range.
 - `statTotals` per player (doubles: who shot, from `attribution`), feed / commentary, undo
   label, records (break-and-runs, golden breaks), ticker.
 - Demo seed, guides page (sportnnote.in/guides/), DEVLOG entry.
+
+**Requirements from the break list** (`docs/security/breaks/pool-engine.md`):
+- The controls send the **side at the table on every shot** (POT, MISS, SAFETY, FOUL, PUSH)
+  and **`rack: state.rack.n` on every action** (required on `RACK`). Without them the engine
+  ignores the tap, by design (breaks #12, #13).
+- **Lock `game` once the match has an event**, and warn before a race / sets change that the
+  replay will re-score the match (break #26).
+- Read stored snapshots only through this engine's readers (`summary`, `scoreLine`,
+  `lineScore`, `result`, `poolStats`): they clean hostile values (break #25).
