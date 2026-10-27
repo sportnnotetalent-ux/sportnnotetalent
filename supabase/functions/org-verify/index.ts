@@ -1,5 +1,6 @@
 /**
- * Edge Function: org-verify  (school & college verification, Phase 1 —
+ * Edge Function: org-verify  (organisation verification — Phase 1 schools /
+ * colleges, Phase 2 every registered type —
  * docs/verification/org-verification.md, migration 20261025190000)
  * ------------------------------------------------------------------------
  * Emails for step 3 ("show you're authorised by the school"):
@@ -21,6 +22,19 @@ import { APP_URL } from '../_shared/hosts.ts';
 
 const mask = (e: string) => e.replace(/^(.)[^@]*/, '$1***');
 const grouped = (code: string) => code.replace(/(.{4})(?=.)/g, '$1-');
+
+/** noun + who signs for it, per community type (mirrors ORG_VERIFY in src/core/orgVerification.ts). */
+const WORDS: Record<string, { noun: string; head: string }> = {
+  School: { noun: 'school', head: 'Principal / Head' },
+  College: { noun: 'college', head: 'Principal / Head' },
+  'Sports club': { noun: 'club', head: 'President / Secretary' },
+  'Sports academy': { noun: 'academy', head: 'Director / Owner' },
+  'Sports association': { noun: 'association', head: 'President / Secretary' },
+  Company: { noun: 'company', head: 'Director / authorised signatory' },
+  'Hospital chain': { noun: 'hospital', head: 'Director / authorised signatory' },
+  NGO: { noun: 'NGO', head: 'President / Secretary' },
+  'Housing society': { noun: 'society', head: 'Chairman / Secretary' },
+};
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
@@ -45,7 +59,7 @@ Deno.serve(async (req) => {
   } else {
     const { data: v } = await admin.from('org_verifications').select('head_email').eq('org_id', orgId).maybeSingle();
     email = String((v as { head_email?: string | null } | null)?.head_email ?? '');
-    if (!email) return json({ sent: false, reason: 'Add the Head’s name and official email first.' }, 400);
+    if (!email) return json({ sent: false, reason: 'Add their name and official email first.' }, 400);
   }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ sent: false, reason: 'That email doesn’t look right.' }, 400);
 
@@ -54,24 +68,27 @@ Deno.serve(async (req) => {
   });
   if (error || !data) return json({ sent: false, reason: 'Couldn’t create the code — try again.' }, 400);
   const { code, orgName, requesterName } = data as { code: string; orgName: string; requesterName: string | null };
-  const org = clip(orgName, 100) || 'your school';
+  const org = clip(orgName, 100) || 'your organisation';
   const who = clip(requesterName ?? '', 80) || 'Someone';
+  // The organisation's own words (Phase 2: every registered type) — mirrors ORG_VERIFY in src/core/orgVerification.ts.
+  const { data: o } = await admin.from('organizations').select('type').eq('id', orgId).maybeSingle();
+  const { noun, head } = WORDS[String((o as { type?: string } | null)?.type ?? '')] ?? { noun: 'organisation', head: 'head' };
 
   const sent = action === 'email_code'
     ? await sendEmail(
       email,
       `Your SportnNote code for ${org}: ${code}`,
-      `Hello,\n\n${who} is verifying ${org} on SportnNote, a school and club sports app, and entered this address as an official school email.\n\n` +
-      `The code is: ${code}\n\nIt works for 30 minutes. Type it into SportnNote to confirm this address belongs to the school.\n\n` +
+      `Hello,\n\n${who} is verifying ${org} on SportnNote, a school and club sports app, and entered this address as an official ${noun} email.\n\n` +
+      `The code is: ${code}\n\nIt works for 30 minutes. Type it into SportnNote to confirm this address belongs to the ${noun}.\n\n` +
       `Didn't expect this? You can ignore it — nothing happens without the code.`,
     )
     : await sendEmail(
       email,
       `Please confirm who manages ${org} on SportnNote`,
-      `Hello,\n\n${who} has asked to manage ${org}'s community on SportnNote, a school and club sports app for scores, results and records, and gave your address as the Head of the school.\n\n` +
-      `Please confirm whether they are authorised to manage it for the school:\n${APP_URL}/org-confirm?c=${encodeURIComponent(code)}\n\n` +
+      `Hello,\n\n${who} has asked to manage ${org}'s community on SportnNote, a school and club sports app for scores, results and records, and gave your address as the ${head} of the ${noun}.\n\n` +
+      `Please confirm whether they are authorised to manage it for the ${noun}:\n${APP_URL}/org-confirm?c=${encodeURIComponent(code)}\n\n` +
       `Or open ${APP_URL}/org-confirm and enter the code: ${grouped(code)}\n\nThe link works for 14 days.\n\n` +
-      `If you don't know this person, choose "No, I don't" — SportnNote won't verify the school without the school's approval.`,
+      `If you don't know this person, choose "No, I don't" — SportnNote won't verify the ${noun} without its approval.`,
     );
   return json({ sent, email: mask(email), ...(sent ? {} : { reason: 'The email couldn’t be sent just now — try again later.' }) });
 });

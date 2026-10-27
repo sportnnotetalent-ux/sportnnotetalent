@@ -1,4 +1,4 @@
-/** School & college verification, Phase 1 — data (migration
+/** Organisation verification (Phase 1 schools / colleges, Phase 2 every registered type) — data (migration
  *  20261025190000_org_verification; docs/verification/org-verification.md).
  *  Owners / Admins fill the three steps; SportnNote support decides. Demo mode
  *  keeps everything in memory (the email code is 123456). Pure rules:
@@ -141,7 +141,7 @@ export async function verifyOrgEmailCode(orgId: string, code: string, email?: st
   if (!live()) {
     if (code.replace(/\D/g, '') !== '123456') throw new Error('That code isn’t right — check the email and try again.');
     const v = demoVerification(orgId);
-    v.officialEmail = email ?? 'office@school.example'; v.emailVerified = true; v.authority = v.authority ?? 'email';
+    v.officialEmail = email ?? 'office@example.org'; v.emailVerified = true; v.authority = v.authority ?? 'email';
     return demoGet(orgId);
   }
   const { data, error } = await supabase!.rpc('verify_org_email_code', { p_org: orgId, p_code: code });
@@ -182,7 +182,7 @@ export async function submitOrgVerification(orgId: string): Promise<OrgVerificat
 /** The authorisation letter template, to print on letterhead. */
 export async function printAuthorisationLetter(orgId: string, personName: string, ids: readonly OfficialIdEntry[]): Promise<PrintOutcome> {
   const org = await getOrganization(orgId);
-  return printSheet(authorisationLetterHtml({ orgName: org?.name ?? 'the school', personName, ids }), { autoPrint: false });
+  return printSheet(authorisationLetterHtml({ orgName: org?.name ?? 'the organisation', personName, ids, type: org?.type }), { autoPrint: false });
 }
 
 /* ------------------------------ the Head's page ----------------------------- */
@@ -194,7 +194,7 @@ export async function previewHeadConfirm(code: string): Promise<HeadPreview> {
     const orgId = demoHead.get(c);
     if (!orgId) throw new Error('That link isn’t valid or has expired. Ask the person to send a new one.');
     const s = await demoGet(orgId);
-    return { orgName: (await getOrganization(orgId))?.name ?? 'The school', type: s.type, ids: s.ids, requesterName: 'Demo admin', headName: s.verification?.headName };
+    return { orgName: (await getOrganization(orgId))?.name ?? 'The organisation', type: s.type, ids: s.ids, requesterName: 'Demo admin', headName: s.verification?.headName };
   }
   const { data, error } = await supabase!.rpc('org_head_preview', { p_code: c });
   if (error || !data) throw new Error(msg(error, 'That link isn’t valid or has expired.'));
@@ -232,7 +232,7 @@ export interface OrgQueueItem {
   };
 }
 
-/** Support: schools / colleges waiting, oldest first. */
+/** Support: organisations waiting, oldest first. */
 export async function getOrgVerificationQueue(): Promise<OrgQueueItem[]> {
   if (!live()) {
     const out: OrgQueueItem[] = [];
@@ -241,7 +241,7 @@ export async function getOrgVerificationQueue(): Promise<OrgQueueItem[]> {
       const org = await getOrganization(orgId);
       const v = s.verification;
       out.push({
-        orgId, name: org?.name ?? 'School', type: org?.type, city: org?.city, email: org?.email, phone: org?.phone,
+        orgId, name: org?.name ?? 'Organisation', type: org?.type, city: org?.city, email: org?.email, phone: org?.phone,
         registered: true, requestedAt: v.submittedAt ?? undefined, members: org?.members.length ?? 0,
         ids: s.ids.map((i) => ({ type: i.type, value: i.value, country: 'IN', sameIdElsewhere: 0 })),
         verification: { ...v, status: v.status, docPath: v.hasDoc ? 'demo' : null, letterPath: v.hasLetter ? 'demo' : null, submitterName: 'Demo admin', sentBackBefore: 0 },
@@ -273,7 +273,7 @@ export async function decideOrgVerification(orgId: string, approve: boolean, rea
   for (const m of admins) {
     void notify({
       playerId: m.playerId,
-      title: approve ? `✓ ${org?.name ?? 'Your school'} is verified` : `${org?.name ?? 'Your school'}’s verification was sent back`,
+      title: approve ? `✓ ${org?.name ?? 'Your organisation'} is verified` : `${org?.name ?? 'Your organisation'}’s verification was sent back`,
       body: approve
         ? 'SportnNote checked it. The ✓ shows on your community, and you can now confirm members’ dates of birth.'
         : `Reason: ${reason ?? 'see the community page'}. Fix it and send it again from the community page.`,

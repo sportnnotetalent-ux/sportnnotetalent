@@ -1,11 +1,11 @@
-/** Get a school / college verified — three steps, then SportnNote support
- *  checks it (docs/verification/org-verification.md, migration
- *  20261025190000_org_verification):
- *   1. official ID (UDISE+ / AISHE, plus the board's code),
- *   2. one recognition document,
+/** Get a registered organisation verified — three steps, then SportnNote
+ *  support checks it (docs/verification/org-verification.md; Phase 1 schools /
+ *  colleges, Phase 2 every registered type — core/orgVerification ORG_VERIFY):
+ *   1. official ID (UDISE+ / AISHE / CIN / NGO Darpan / registration number …),
+ *   2. one registration or recognition document,
  *   3. proof the person is authorised: official email code, a letter signed by
- *      the Head (support calls the school's published number), or the Head
- *      confirming by email. */
+ *      the head (support calls the published number), or the head confirming
+ *      by email. */
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -18,7 +18,7 @@ import { Button, Card, EmptyState, FormError, LoadingState, ScreenTitle, SelectC
 import { useAuth } from '../core/auth';
 import { pickDocument } from '../core/document';
 import {
-  AUTHORITY_OPTIONS, BOARD_ID_TYPES, BOARD_LABEL, DOC_KINDS, OFFICIAL_ID_RULES, REQUIRED_ID, isFreeMail, validOfficialId,
+  BOARD_LABEL, ID_SHORT, ORG_VERIFY, OFFICIAL_ID_RULES, authorityOptions, isFreeMail, validOfficialId,
   verifiableType, verificationProgress, type Authority, type OfficialIdType, type OrgVerificationState,
 } from '../core/orgVerification';
 import {
@@ -40,7 +40,8 @@ export default function OrgVerifyScreen() {
   const [busy, setBusy] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
 
-  // step 1
+  // step 1: the required ID (one of the type's options) + an optional extra
+  const [mainType, setMainType] = useState<OfficialIdType | null>(null);
   const [mainId, setMainId] = useState('');
   const [board, setBoard] = useState<OfficialIdType | null>(null);
   const [boardId, setBoardId] = useState('');
@@ -58,9 +59,11 @@ export default function OrgVerifyScreen() {
       setOrg(o); setState(s);
       const type = verifiableType(s.type) ? s.type : undefined;
       if (type) {
-        const m = s.ids.find((i) => i.type === REQUIRED_ID[type]);
+        const cfg = ORG_VERIFY[type];
+        const m = s.ids.find((i) => cfg.requiredAnyOf.includes(i.type));
+        setMainType((cur) => cur ?? m?.type ?? cfg.requiredAnyOf[0]);
         setMainId((cur) => cur || m?.value || '');
-        const b = s.ids.find((i) => BOARD_ID_TYPES.includes(i.type));
+        const b = s.ids.find((i) => cfg.optional.includes(i.type));
         if (b) { setBoard((cur) => cur ?? b.type); setBoardId((cur) => cur || b.value); }
       }
       setHeadName((cur) => cur || s.verification?.headName || '');
@@ -84,7 +87,7 @@ export default function OrgVerifyScreen() {
   if (!type || state.registered !== true) {
     return (
       <SafeAreaView style={st.safe} edges={['bottom']}>
-        <View style={st.content}><EmptyState icon="🏛️" title="Schools and colleges first" hint="This verification is for registered schools and colleges. Other registered organisations can ask from their community page." /></View>
+        <View style={st.content}><EmptyState icon="🏛️" title="Pick a standard type first" hint="Verification is for registered organisations — a school, college, club, academy, association, company, hospital, NGO or housing society. Choose one on the community page (Details → type), then come back." /></View>
       </SafeAreaView>
     );
   }
@@ -92,8 +95,11 @@ export default function OrgVerifyScreen() {
   const v = state.verification;
   const progress = verificationProgress(state);
   const locked = v?.status === 'pending' || state.verified;
-  const reqType = REQUIRED_ID[type];
+  const cfg = ORG_VERIFY[type];
+  const academic = type === 'School' || type === 'College';
+  const reqType: OfficialIdType = mainType ?? cfg.requiredAnyOf[0];
   const authority = v?.authority ?? null;
+  const options = authorityOptions(type);
 
   const saveIds = () => run('ids', async () => {
     const ids: { type: OfficialIdType; value: string }[] = [{ type: reqType, value: mainId }];
@@ -108,7 +114,7 @@ export default function OrgVerifyScreen() {
     if (!doc) return;
     const path = await uploadOrgFile(orgId, doc, kind);
     return saveOrgVerification(orgId, kind === 'doc'
-      ? { docKind: docKind ?? v?.docKind ?? DOC_KINDS[type][0], docPath: path, docName: doc.name }
+      ? { docKind: docKind ?? v?.docKind ?? cfg.docKinds[0], docPath: path, docName: doc.name }
       : { authority: 'letter', letterPath: path, letterName: doc.name });
   }, kind === 'doc' ? '✓ Document uploaded' : '✓ Letter uploaded');
 
@@ -138,13 +144,21 @@ export default function OrgVerifyScreen() {
         {/* Step 1 */}
         <Card style={{ gap: theme.spacing(2) }}>
           <Text style={textStyles.h3}>{progress.ids ? '✅' : '1.'} Official ID</Text>
+          {cfg.requiredAnyOf.length > 1 ? (
+            <>
+              <Text style={textStyles.muted}>Which registration does the {cfg.noun} have? Pick one.</Text>
+              <View style={st.chips}>
+                {cfg.requiredAnyOf.map((t) => <SelectChip key={t} label={ID_SHORT[t]} active={reqType === t} onPress={() => { if (!locked && t !== reqType) { setMainType(t); setMainId(''); } }} />)}
+              </View>
+            </>
+          ) : null}
           <TextField label={OFFICIAL_ID_RULES[reqType].label} value={mainId} onChange={setMainId} placeholder={OFFICIAL_ID_RULES[reqType].placeholder} autoCapitalize="characters" />
           <Text style={textStyles.muted}>{OFFICIAL_ID_RULES[reqType].hint}</Text>
-          {type === 'School' ? (
+          {cfg.optional.length > 0 ? (
             <>
-              <Text style={textStyles.muted}>Board (optional, helps support check faster)</Text>
+              <Text style={textStyles.muted}>{type === 'School' ? 'Board (optional, helps support check faster)' : 'Also add (optional, helps support check faster)'}</Text>
               <View style={st.chips}>
-                {BOARD_ID_TYPES.map((b) => <SelectChip key={b} label={BOARD_LABEL[b]!} active={board === b} onPress={() => setBoard(board === b ? null : b)} />)}
+                {cfg.optional.map((b) => <SelectChip key={b} label={BOARD_LABEL[b] ?? ID_SHORT[b]} active={board === b} onPress={() => setBoard(board === b ? null : b)} />)}
               </View>
               {board ? <TextField label={OFFICIAL_ID_RULES[board].label} value={boardId} onChange={setBoardId} placeholder={OFFICIAL_ID_RULES[board].placeholder} autoCapitalize="characters" /> : null}
             </>
@@ -155,10 +169,10 @@ export default function OrgVerifyScreen() {
 
         {/* Step 2 */}
         <Card style={{ gap: theme.spacing(2) }}>
-          <Text style={textStyles.h3}>{progress.doc ? '✅' : '2.'} Recognition document</Text>
-          <Text style={textStyles.muted}>A photo or PDF of one of these, showing the {type.toLowerCase()}’s name:</Text>
+          <Text style={textStyles.h3}>{progress.doc ? '✅' : '2.'} {academic ? 'Recognition document' : 'Registration document'}</Text>
+          <Text style={textStyles.muted}>A photo or PDF of one of these, showing the {cfg.noun}’s name:</Text>
           <View style={st.chips}>
-            {DOC_KINDS[type].map((k) => (
+            {cfg.docKinds.map((k) => (
               <SelectChip key={k} label={k} active={v?.docKind === k} onPress={() => { if (!locked) void run('kind', () => saveOrgVerification(orgId, { docKind: k })); }} />
             ))}
           </View>
@@ -169,20 +183,20 @@ export default function OrgVerifyScreen() {
 
         {/* Step 3 */}
         <Card style={{ gap: theme.spacing(2) }}>
-          <Text style={textStyles.h3}>{progress.authority ? '✅' : '3.'} Show you’re authorised by the {type.toLowerCase()}</Text>
-          <Text style={textStyles.muted}>Documents prove the {type.toLowerCase()} exists; this proves you speak for it. Choose one.</Text>
-          {(Object.keys(AUTHORITY_OPTIONS) as Authority[]).map((a) => (
+          <Text style={textStyles.h3}>{progress.authority ? '✅' : '3.'} Show you’re authorised by the {cfg.noun}</Text>
+          <Text style={textStyles.muted}>Documents prove the {cfg.noun} exists; this proves you speak for it. Choose one.</Text>
+          {(Object.keys(options) as Authority[]).map((a) => (
             <View key={a} style={[st.option, authority === a && st.optionOn]}>
-              <SelectChip label={AUTHORITY_OPTIONS[a].title} active={authority === a} onPress={() => { if (!locked) void chooseAuthority(a); }} />
-              <Text style={textStyles.muted}>{AUTHORITY_OPTIONS[a].blurb}</Text>
+              <SelectChip label={options[a].title} active={authority === a} onPress={() => { if (!locked) void chooseAuthority(a); }} />
+              <Text style={textStyles.muted}>{options[a].blurb}</Text>
 
               {authority === a && a === 'email' ? (
                 v?.emailVerified ? (
                   <Text style={textStyles.body}>✓ {v.officialEmail} confirmed</Text>
                 ) : !locked ? (
                   <>
-                    <TextField label="Official school email" value={email} onChange={setEmail} placeholder="principal@school.edu.in" autoCapitalize="none" />
-                    {isFreeMail(email) ? <Text style={textStyles.muted}>This is a free email address. That’s fine if it’s the one the school lists publicly — support will check it matches exactly.</Text> : null}
+                    <TextField label={`Official ${cfg.noun} email`} value={email} onChange={setEmail} placeholder={cfg.emailExample} autoCapitalize="none" />
+                    {isFreeMail(email) ? <Text style={textStyles.muted}>This is a free email address. That’s fine if it’s the one the {cfg.noun} lists publicly — support will check it matches exactly.</Text> : null}
                     <Button label={busy === 'send' ? 'Sending…' : codeSent ? 'Send a new code' : 'Email me a code'} variant="ghost" disabled={!!busy || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())}
                       onPress={() => void run('send', async () => {
                         const r = await sendOrgEmailCode(orgId, email);
@@ -203,7 +217,7 @@ export default function OrgVerifyScreen() {
               {authority === a && a === 'letter' ? (
                 <>
                   <Button label="📄 Print the letter template" variant="ghost" onPress={() => void printAuthorisationLetter(orgId, profile?.fullName ?? 'Your name', state.ids)} />
-                  <Text style={textStyles.muted}>Print it on school letterhead, get it signed and stamped by the Principal or Head, then upload a photo or scan.</Text>
+                  <Text style={textStyles.muted}>Print it on the {cfg.noun}’s letterhead, get it signed (and stamped, if it has a seal) by the {cfg.head}, then upload a photo or scan.</Text>
                   {v?.hasLetter ? <Text style={textStyles.body}>📎 Signed letter uploaded · {docKindLabel(v.letterName ?? undefined)}</Text> : null}
                   {!locked ? <Button label={busy === 'letter' ? 'Uploading…' : v?.hasLetter ? '📎 Replace the signed letter' : '📎 Upload the signed letter'} variant="ghost" onPress={() => void upload('letter')} disabled={!!busy} /> : null}
                 </>
@@ -213,23 +227,23 @@ export default function OrgVerifyScreen() {
                 <>
                   {!locked ? (
                     <>
-                      <TextField label="Principal / Head’s name" value={headName} onChange={setHeadName} placeholder="e.g. Dr. A. Rao" autoCapitalize="words" />
-                      <TextField label="Their official email" value={headEmail} onChange={setHeadEmail} placeholder="principal@school.edu.in" autoCapitalize="none" />
-                      <Text style={textStyles.muted}>Use the address in the school’s public listing — support checks it.</Text>
-                      <Button label={busy === 'head' ? 'Sending…' : v?.headRequestedAt ? 'Email the Head again' : 'Email the Head'} variant="ghost" disabled={!!busy || !headName.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(headEmail.trim())}
+                      <TextField label={`${cfg.head}’s name`} value={headName} onChange={setHeadName} placeholder="e.g. Dr. A. Rao" autoCapitalize="words" />
+                      <TextField label="Their official email" value={headEmail} onChange={setHeadEmail} placeholder={cfg.emailExample} autoCapitalize="none" />
+                      <Text style={textStyles.muted}>Use the address in the {cfg.noun}’s public listing or website — support checks it.</Text>
+                      <Button label={busy === 'head' ? 'Sending…' : v?.headRequestedAt ? 'Email them again' : 'Email them'} variant="ghost" disabled={!!busy || !headName.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(headEmail.trim())}
                         onPress={() => void run('head', async () => {
                           await saveOrgVerification(orgId, { authority: 'head', headName: headName.trim(), headEmail: headEmail.trim() });
                           const r = await askHeadToConfirm(orgId);
                           if (!r.sent) throw new Error(r.reason ?? 'Couldn’t send the email.');
                           if (r.demoCode) setDemoHeadCode(r.demoCode);
                           return getOrgVerificationState(orgId);
-                        }, `Sent to ${headEmail.trim()}. You can send it to support now — they’ll wait for the Head’s answer.`)} />
+                        }, `Sent to ${headEmail.trim()}. You can send it to support now — they’ll wait for the answer.`)} />
                     </>
                   ) : null}
                   {v?.headConfirmedAt ? <Text style={textStyles.body}>✓ Confirmed by {v.headConfirmedName ?? v.headName}</Text>
-                    : v?.headDeclinedAt ? <Text style={[textStyles.body, { color: theme.colors.danger }]}>The Head said they don’t know you. Choose another way.</Text>
-                      : v?.headRequestedAt ? <Text style={textStyles.muted}>⏳ Waiting for {v.headName ?? 'the Head'} to confirm ({v.headEmail}).</Text> : null}
-                  {demoHeadCode ? <Text style={st.link} onPress={() => nav.navigate('OrgConfirm', { c: demoHeadCode })}>Demo: open the Head’s page ›</Text> : null}
+                    : v?.headDeclinedAt ? <Text style={[textStyles.body, { color: theme.colors.danger }]}>{v.headName ?? 'They'} said they don’t know you. Choose another way.</Text>
+                      : v?.headRequestedAt ? <Text style={textStyles.muted}>⏳ Waiting for {v.headName ?? 'them'} to confirm ({v.headEmail}).</Text> : null}
+                  {demoHeadCode ? <Text style={st.link} onPress={() => nav.navigate('OrgConfirm', { c: demoHeadCode })}>Demo: open their confirmation page ›</Text> : null}
                 </>
               ) : null}
             </View>

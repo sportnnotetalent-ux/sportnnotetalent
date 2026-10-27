@@ -16,7 +16,7 @@ import { useAuth } from '../core/auth';
 import { getMyPlayerId, createOrganization } from '../data/repos';
 import { isAcademicCommunity, suggestedGraduatingStandard } from '../core/org';
 import {
-  OFFICIAL_ID_RULES, OFFICIAL_ONLY_TYPES, REGISTERED_TYPES, REQUIRED_ID, UNREGISTERED_TYPES, validOfficialId, verifiableType,
+  OFFICIAL_ID_RULES, OFFICIAL_ONLY_TYPES, REGISTERED_TYPES, REQUIRED_ID, UNREGISTERED_TYPES, validOfficialId,
 } from '../core/orgVerification';
 import { lookupOfficialId, setOfficialIds } from '../data/orgVerification';
 import { MARKETS, MARKET_ORDER, marketForCountry, type MarketId } from '../core/markets';
@@ -59,7 +59,9 @@ export default function CreateCommunityScreen({ navigation }: Props) {
 
   const resolvedType = typeChoice === CUSTOM ? customType.trim() : typeChoice;
   const academic = registered === true && isAcademicCommunity(resolvedType);
-  const idType = registered && verifiableType(resolvedType) ? REQUIRED_ID[resolvedType] : null;
+  // Schools / colleges give their official code here (catches a verified duplicate
+  // early); other registered types add theirs in "Get verified".
+  const idType = registered && (resolvedType === 'School' || resolvedType === 'College') ? REQUIRED_ID[resolvedType] : null;
   const pickRegistered = (r: boolean) => { setRegistered(r); setTypeChoice(''); setOfficialId(''); setIdCheck(null); };
 
   // Is this official ID already a verified community?
@@ -145,7 +147,7 @@ export default function CreateCommunityScreen({ navigation }: Props) {
             </>
           )}
           {typeChoice === CUSTOM && (
-            <TextField label="Custom type" value={customType} onChange={setCustomType} placeholder={registered ? 'e.g. Sports academy' : 'e.g. Weekend cricket group'} />
+            <TextField label="Custom type" value={customType} onChange={setCustomType} placeholder={registered ? 'e.g. Gymkhana' : 'e.g. Weekend cricket group'} />
           )}
 
           {idType && (

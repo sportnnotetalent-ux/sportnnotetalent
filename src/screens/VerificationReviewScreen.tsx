@@ -20,7 +20,7 @@ import {
   type PendingVerification,
 } from '../data/repos';
 import { decideOrgVerification, getOrgVerificationQueue, type OrgQueueItem } from '../data/orgVerification';
-import { AUTHORITY_OPTIONS, OFFICIAL_ID_RULES, SEND_BACK_REASONS, emailDomain, isFreeMail, reviewChecks } from '../core/orgVerification';
+import { LOCAL_ID_TYPES, OFFICIAL_ID_RULES, ORG_VERIFY, SEND_BACK_REASONS, authorityOptions, emailDomain, isFreeMail, reviewChecks, verifiableType } from '../core/orgVerification';
 import { useVerificationReviewer } from '../data/useVerificationReviewer';
 import { ageFromDob } from '../core/age';
 import { isSupport } from '../core/roles';
@@ -66,8 +66,8 @@ export default function VerificationReviewScreen() {
             {done ? <Text style={st.done} accessibilityRole="alert">{done}</Text> : null}
             {orgs.length > 0 ? (
               <>
-                <Text style={textStyles.h3}>🏫 Schools & colleges · {orgs.length}</Text>
-                <Text style={textStyles.muted}>Oldest first. Check each against the public register — tick all three, then approve. Or send it back with a reason; the school’s admins are told either way.</Text>
+                <Text style={textStyles.h3}>🏛️ Organisations · {orgs.length}</Text>
+                <Text style={textStyles.muted}>Oldest first. Check each against the public register — tick all three, then approve. Or send it back with a reason; its admins are told either way.</Text>
                 {orgs.map((o) => (
                   <OrgReview key={o.orgId} o={o} now={now} onDone={(ok) => { setOrgs((l) => l.filter((x) => x.orgId !== o.orgId)); setDone(ok ? `✓ ${o.name} verified — its admins have been told.` : `${o.name} sent back — its admins have been told.`); }} />
                 ))}
@@ -142,7 +142,7 @@ function Submission({ p, now, onDecided }: { p: PendingVerification; now: number
   );
 }
 
-/** One school / college for support to check (docs/verification/org-verification.md).
+/** One organisation for support to check (docs/verification/org-verification.md).
  *  Everything on one card so a future support team can work through the queue
  *  without hunting: the official IDs with links to the public registers, any
  *  other community using the same ID, the document, the proof of authority, a
@@ -150,13 +150,17 @@ function Submission({ p, now, onDecided }: { p: PendingVerification; now: number
 function OrgReview({ o, now, onDone }: { o: OrgQueueItem; now: number; onDone: (approved: boolean) => void }) {
   const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const v = o.verification;
-  const checks = reviewChecks(v?.authority);
+  const cfg = ORG_VERIFY[verifiableType(o.type) ? o.type : 'School'];
+  const academic = o.type === 'School' || o.type === 'College';
+  const head = academic ? 'Head' : cfg.head;
+  const checks = reviewChecks(v?.authority, { type: o.type, idTypes: o.ids.map((i) => i.type) });
   const [ticked, setTicked] = useState<Record<string, boolean>>({});
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const allTicked = checks.every((c) => ticked[c.key]);
-  const clash = o.ids.find((i) => i.verifiedElsewhere);
+  // a local registrar's number can repeat in another state: a match there is a hint, not a block
+  const clash = o.ids.find((i) => i.verifiedElsewhere && !LOCAL_ID_TYPES.includes(i.type));
   const waited = o.requestedAt ? new Date(o.requestedAt).getTime() : undefined;
 
   const decide = async (approve: boolean) => {
@@ -185,33 +189,35 @@ function OrgReview({ o, now, onDone }: { o: OrgQueueItem; now: number; onDone: (
           <View key={i.type} style={{ gap: 2 }}>
             <Row label={rule?.label ?? i.type} value={i.value} />
             {rule?.lookup ? <Text style={st.link} accessibilityRole="link" onPress={() => void Linking.openURL(rule.lookup!.url)}>Search it on {rule.lookup.label} ↗</Text> : null}
-            {i.verifiedElsewhere ? <Text style={st.warn}>⚠ Already verified as {i.verifiedElsewhere} — send this back.</Text>
+            {!rule?.lookup ? <Text style={textStyles.muted}>No public search for this register — compare the number, name and place with the certificate.</Text> : null}
+            {i.verifiedElsewhere && LOCAL_ID_TYPES.includes(i.type) ? <Text style={st.warn}>⚠ {i.verifiedElsewhere} (verified) has the same number — check it’s a different registrar or state.</Text>
+              : i.verifiedElsewhere ? <Text style={st.warn}>⚠ Already verified as {i.verifiedElsewhere} — send this back.</Text>
               : i.sameIdElsewhere ? <Text style={st.warn}>⚠ {i.sameIdElsewhere} other community{i.sameIdElsewhere === 1 ? '' : 'ies'} entered the same code (not verified).</Text> : null}
           </View>
         );
       }) : <Text style={st.warn}>No official ID given.</Text>}
 
-      <Text style={st.sub}>2 · Recognition document{v?.docKind ? ` — ${v.docKind}` : ''}</Text>
+      <Text style={st.sub}>2 · {academic ? 'Recognition' : 'Registration'} document{v?.docKind ? ` — ${v.docKind}` : ''}</Text>
       {v?.docPath === 'demo' ? <Text style={textStyles.muted}>📎 {docKindLabel(v.docName ?? undefined)} (demo)</Text> : <DocPreview docPath={v?.docPath ?? undefined} docName={v?.docName ?? undefined} />}
 
-      <Text style={st.sub}>3 · Authority — {v?.authority ? AUTHORITY_OPTIONS[v.authority].title : 'not given'}</Text>
+      <Text style={st.sub}>3 · Authority — {v?.authority ? authorityOptions(o.type)[v.authority].title : 'not given'}</Text>
       {v?.authority === 'email' ? (
         <>
           <Row label="Verified email" value={v.officialEmail ?? '—'} />
-          <Text style={textStyles.muted}>{isFreeMail(v.officialEmail ?? '') ? 'A free mailbox — it must match the address in the register exactly.' : `Domain ${emailDomain(v.officialEmail ?? '')} — compare it with the school’s website / email in the register.`}</Text>
+          <Text style={textStyles.muted}>{isFreeMail(v.officialEmail ?? '') ? 'A free mailbox — it must match the address in the register exactly.' : `Domain ${emailDomain(v.officialEmail ?? '')} — compare it with the ${cfg.noun}’s website / email in the register.`}</Text>
         </>
       ) : v?.authority === 'letter' ? (
         <>
           {v.letterPath === 'demo' ? <Text style={textStyles.muted}>📎 {docKindLabel(v.letterName ?? undefined)} (demo)</Text> : <DocPreview docPath={v.letterPath ?? undefined} docName={v.letterName ?? undefined} />}
-          <Text style={textStyles.muted}>Call the school office on the number in the public register (never a number from the applicant) and ask them to confirm the letter.</Text>
+          <Text style={textStyles.muted}>Call the {cfg.noun}’s office on the number in the public register or its official website (never a number from the applicant) and ask them to confirm the letter.</Text>
         </>
       ) : v?.authority === 'head' ? (
         <>
-          <Row label="Head" value={[v.headName, v.headEmail].filter(Boolean).join(' · ') || '—'} />
+          <Row label={head} value={[v.headName, v.headEmail].filter(Boolean).join(' · ') || '—'} />
           <Text style={v.headConfirmedAt ? textStyles.body : st.warn}>
-            {v.headConfirmedAt ? `✓ Confirmed by ${v.headConfirmedName ?? v.headName}` : v.headDeclinedAt ? '✗ The Head said they don’t know this person' : '⏳ Waiting for the Head to confirm'}
+            {v.headConfirmedAt ? `✓ Confirmed by ${v.headConfirmedName ?? v.headName}` : v.headDeclinedAt ? `✗ ${v.headName ?? 'They'} said they don’t know this person` : `⏳ Waiting for ${v.headName ?? 'them'} to confirm`}
           </Text>
-          <Text style={textStyles.muted}>Check the Head’s email is the one in the register.</Text>
+          <Text style={textStyles.muted}>Check their email is the one in the register or on the {cfg.noun}’s official website.</Text>
         </>
       ) : null}
 
@@ -224,13 +230,13 @@ function OrgReview({ o, now, onDone }: { o: OrgQueueItem; now: number; onDone: (
       <View style={st.chips}>
         {SEND_BACK_REASONS.map((r) => <SelectChip key={r} label={r} active={reason === r} onPress={() => setReason(reason === r ? '' : r)} />)}
       </View>
-      <TextField label="Or type a reason" value={(SEND_BACK_REASONS as readonly string[]).includes(reason) ? '' : reason} onChange={setReason} placeholder="e.g. Please upload the full affiliation letter" />
+      <TextField label="Or type a reason" value={(SEND_BACK_REASONS as readonly string[]).includes(reason) ? '' : reason} onChange={setReason} placeholder="e.g. Please upload the full registration certificate" />
       <FormError message={error} />
       <View style={st.actions}>
         <Button label="↩ Send back" variant="danger" style={st.flex} onPress={() => void decide(false)} disabled={busy} />
         <Button label={busy ? '…' : '✓ Approve'} style={st.flex} onPress={() => void decide(true)} disabled={busy || !allTicked || !!clash || (v?.authority === 'head' && !v.headConfirmedAt)} />
       </View>
-      {!allTicked ? <Text style={textStyles.muted}>Approve unlocks when all three are ticked{v?.authority === 'head' && !v.headConfirmedAt ? ' and the Head has confirmed' : ''}.</Text> : null}
+      {!allTicked ? <Text style={textStyles.muted}>Approve unlocks when all three are ticked{v?.authority === 'head' && !v.headConfirmedAt ? ` and ${v.headName ?? 'they'} ha${v.headName ? 's' : 've'} confirmed` : ''}.</Text> : null}
     </Card>
   );
 }

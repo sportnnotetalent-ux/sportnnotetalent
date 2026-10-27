@@ -5,7 +5,7 @@ category: Tournaments
 audience: Organisers
 sports: all
 order: 32
-updated: 2026-10-24
+updated: 2026-10-27
 ---
 
 An under-14 event only works if every player really is under 14. Each tournament has a **Players’ age** setting: leave it off, or ask for every player's age to be checked before they can be picked for a match. Schools and clubs that SportnNote has verified can confirm their own members' dates of birth in one go, so players don't have to upload documents.
@@ -43,7 +43,7 @@ Friendly matches that aren't part of a tournament never have the rule.
 The fastest way to get a school's players through the rule is for the school to confirm their dates of birth itself. SportnNote verifies the school once. After that, its Owners and Admins can confirm members from the school's own records.
 
 ### Get your school or club verified
-A school or college gets verified in three steps: its official ID, a recognition document, and proof that you're authorised by the school. See [Verify your school on SportnNote](/guides/verify-your-school/). Other registered organisations, such as clubs, tap **Ask SportnNote to verify us** on the **🛡️ Verification** card instead.
+A school or college gets verified in three steps: its official ID, a recognition document, and proof that you're authorised by the school. See [Verify your school on SportnNote](/guides/verify-your-school/). Sports clubs, academies and associations follow the same three steps with their registration number: see [Verify your club, academy or organisation](/guides/verify-your-organisation/). Only schools, colleges and sports clubs, academies and associations can confirm members' dates of birth.
 
 Renaming the school or club, or changing its type or official ID, removes its verification, so it needs verifying again.
 

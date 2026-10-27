@@ -1,6 +1,6 @@
 # Organisation verification
 
-*Founder decisions, 2026-10-24. Phase 1 (schools and colleges, India) is built. Migration `20261025190000_org_verification.sql`.*
+*Founder decisions, 2026-10-24. Phase 1 (schools and colleges, India) built 2026-10-24, migration `20261025190000_org_verification.sql`. Phase 2 (every registered type) built 2026-10-27, migration `20261027100000_org_verification_phase2.sql`.*
 
 ## The rules (decided)
 
@@ -67,12 +67,38 @@ Next, when there is a support team:
 - **Assignment:** a "claim" so two people don't review the same school; a weekly count of reviews per person.
 - **Automation:** pre-fill the register lookup with the school's name and city from UDISE+ / SARAS where those sites allow it. Today support searches by hand.
 
+## Phase 2: every registered type (built 2026-10-27)
+
+Migration `20261027100000_org_verification_phase2.sql`. The same three steps, with the right IDs, documents and words for each type (`ORG_VERIFY` in `src/core/orgVerification.ts`; `org_required_id_types()` in SQL).
+
+| Type | Step 1: any one of | Extra (optional) | Who signs / confirms |
+|---|---|---|---|
+| Sports club | Society · Trust · CIN · LLPIN · GSTIN · Udyam | — | President / Secretary |
+| Sports academy | Society · Trust · CIN · LLPIN · GSTIN · Udyam | — | Director / Owner |
+| Sports association | Society · Trust · CIN | — | President / Secretary |
+| Company | CIN · LLPIN | GSTIN | Director / authorised signatory |
+| Hospital chain | CIN · LLPIN · Trust · Society | GSTIN | Director / authorised signatory |
+| NGO | NGO Darpan · Society · Trust · CIN (Section 8) | — | President / Secretary |
+| Housing society | Co-operative registration · Society | — | Chairman / Secretary |
+
+- **ID formats and public searches:**
+  - CIN, 21 characters: MCA master data.
+  - LLPIN (`AAB-1234`): MCA master data.
+  - GSTIN, 15 characters: GST taxpayer search.
+  - Udyam (`UDYAM-KA-03-0012345`): Udyam verification.
+  - NGO Darpan (`KA/2019/0123456`): ngodarpan.gov.in.
+  - Society, trust and co-operative registrations have no national format or public search. The reviewer compares the number, name and place with the certificate, and the checklist line says so.
+  - Typed IDs are tidied: upper-cased, spaces removed, and the LLPIN / Udyam / Darpan separators put back.
+- **Local registrars' numbers** (society, trust and co-operative registrations, and state board school codes) can repeat in another state or district. They never block another community from verifying (`org_local_id_types()`). Support still sees "another verified community has the same number — check it's a different registrar".
+- **Members' dates of birth:** only a verified school, college, sports club, academy or association may confirm them, because these keep members' records for sport. A verified company, hospital, NGO or housing society gets the ✓ but no age confirmations (`org_dob_access_or_raise`, `DOB_CONFIRM_TYPES`). *Founder to confirm.*
+- **New community types:** Sports academy and Sports association.
+- **Wording:**
+  - the head's confirmation page and emails (`org-verify`) use the type's noun and title;
+  - the support alert names the type;
+  - the review queue heading is "🏛️ Organisations";
+  - the send-back reason "School already verified here" is now "Already verified here".
+- **Custom types** (e.g. "Gymkhana") keep the simple "Ask SportnNote to verify us" until they pick a standard type.
+
 ## Later phases
 
-- **Phase 2 — other registered types:**
-  - Clubs and academies: registration number + certificate, and association affiliation.
-  - Companies: CIN / LLPIN on MCA; a work email covers authority.
-  - NGOs: NGO Darpan ID.
-  - Housing societies: society registration + office-bearer resolution.
-  - Until then they keep the simple "Ask SportnNote to verify us".
-- **Phase 3 — international IDs,** with each market: UK DfE URN, UAE KHDA / ADEK, US NCES ID, IB / Cambridge directories. The model already stores country + ID type + value.
+- **Phase 3 — international IDs,** with each market: UK DfE URN / Charity Commission / Companies House, UAE KHDA / ADEK / trade licence, US NCES ID / EIN, IB / Cambridge directories. The model already stores country + ID type + value.

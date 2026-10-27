@@ -70,12 +70,12 @@ Deno.serve(async (req) => {
       : { data: [] };
     const admin = ((roles ?? []) as { until: string | null }[]).some((r) => !r.until || r.until >= today);
     if (!admin) return json({ delivered: false, error: 'not an owner or admin' }, 403);
-    const { data: org } = await supabase.from('organizations').select('name, verification_requested_at, verified_at').eq('id', orgId).maybeSingle();
-    const o = org as { name?: string; verification_requested_at?: string | null; verified_at?: string | null } | null;
+    const { data: org } = await supabase.from('organizations').select('name, type, verification_requested_at, verified_at').eq('id', orgId).maybeSingle();
+    const o = org as { name?: string; type?: string | null; verification_requested_at?: string | null; verified_at?: string | null } | null;
     if (!o?.verification_requested_at || o.verified_at) return json({ delivered: false, error: 'nothing to review' }, 400);
     const sent = await alertReviewers(
-      '🏫 A school or club asks to be verified',
-      `${(o.name ?? 'An organisation').slice(0, 80)} sent its official ID, a recognition document and proof the person is authorised. Check them against the public register in the review queue.`,
+      `🏛️ ${o.type === 'School' ? 'A school' : o.type === 'College' ? 'A college' : 'An organisation'} asks to be verified`,
+      `${(o.name ?? 'An organisation').slice(0, 80)}${o.type ? ` (${String(o.type).slice(0, 30)})` : ''} sent its official ID, a document and proof the person is authorised. Check them against the public register in the review queue.`,
       `org-${orgId}`,
       { supportOnly: true },
     );

@@ -1,5 +1,6 @@
-/** The page a Principal / Head opens from the email (…/org-confirm?c=CODE) to
- *  confirm — or deny — that someone may manage their school's community on
+/** The page an organisation's head (Principal, President, Director …) opens
+ *  from the email (…/org-confirm?c=CODE) to confirm — or deny — that someone
+ *  may manage their organisation's community on
  *  SportnNote. Works without an account. Server: org_head_preview /
  *  org_head_decide (migration 20261025190000_org_verification). */
 import React, { useEffect, useState } from 'react';
@@ -10,7 +11,7 @@ import { KeyboardAwareScrollView } from '../components/keyboard';
 import { theme } from '../core/theme';
 import { SUPPORT_EMAIL } from '../core/hosts';
 import { Button, Card, FormError, LoadingState, ScreenTitle, TextField, textStyles } from '../components/ui';
-import { OFFICIAL_ID_RULES } from '../core/orgVerification';
+import { OFFICIAL_ID_RULES, ORG_VERIFY, verifiableType } from '../core/orgVerification';
 import { decideHeadConfirm, previewHeadConfirm, type HeadPreview } from '../data/orgVerification';
 import type { RootStackParamList } from '../navigation/types';
 
@@ -40,31 +41,34 @@ export default function OrgConfirmScreen() {
     finally { setBusy(false); }
   };
 
+  // the organisation's own words: "school" + "Principal / Head", "club" + "President / Secretary" …
+  const cfg = ORG_VERIFY[verifiableType(preview?.type) ? preview!.type as keyof typeof ORG_VERIFY : 'School'];
+  const noun = preview ? cfg.noun : 'organisation';
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
       <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
-        <ScreenTitle title="Confirm who manages your school" subtitle="SportnNote — school and club sports scores" />
+        <ScreenTitle title={`Confirm who manages your ${noun}`} subtitle="SportnNote — school and club sports scores" />
         {checking ? <LoadingState label="Checking the link…" /> : done !== null ? (
           <Card style={{ gap: theme.spacing(2) }}>
             <Text style={textStyles.h3}>{done ? '✓ Thank you — confirmed' : 'Thank you — noted'}</Text>
             <Text style={textStyles.muted}>
               {done
-                ? `SportnNote support will finish checking ${preview?.orgName ?? 'the school'} and let the person know.`
-                : `SportnNote won’t verify ${preview?.orgName ?? 'the school'} on their word. If you think someone is pretending to be the school, write to ${SUPPORT_EMAIL}.`}
+                ? `SportnNote support will finish checking ${preview?.orgName ?? `the ${noun}`} and let the person know.`
+                : `SportnNote won’t verify ${preview?.orgName ?? `the ${noun}`} on their word. If you think someone is pretending to be the ${noun}, write to ${SUPPORT_EMAIL}.`}
             </Text>
           </Card>
         ) : preview ? (
           <Card style={{ gap: theme.spacing(3) }}>
             <Text style={textStyles.body}>
-              <Text style={{ fontWeight: '800' }}>{preview.requesterName}</Text> has asked to manage <Text style={{ fontWeight: '800' }}>{preview.orgName}</Text>’s community on SportnNote — its sports events, results and members — and named you as the Head.
+              <Text style={{ fontWeight: '800' }}>{preview.requesterName}</Text> has asked to manage <Text style={{ fontWeight: '800' }}>{preview.orgName}</Text>’s community on SportnNote — its sports events, results and members — and named you as the {cfg.head}.
             </Text>
             {preview.ids.length ? (
               <View style={{ gap: 2 }}>
                 {preview.ids.map((i) => <Text key={i.type} style={textStyles.muted}>{OFFICIAL_ID_RULES[i.type]?.label ?? i.type}: {i.value}</Text>)}
               </View>
             ) : null}
-            <Text style={textStyles.body}>Is this person authorised by the school to do this?</Text>
-            <TextField label="Your name" value={name} onChange={setName} placeholder="As Principal / Head" autoCapitalize="words" />
+            <Text style={textStyles.body}>Is this person authorised by the {noun} to do this?</Text>
+            <TextField label="Your name" value={name} onChange={setName} placeholder={`As ${cfg.head}`} autoCapitalize="words" />
             <FormError message={error} />
             <Button label={busy ? 'Saving…' : '✓ Yes, they’re authorised'} onPress={() => void decide(true)} disabled={busy} />
             <Button label="No, I don’t know them" variant="ghost" onPress={() => void decide(false)} disabled={busy} />

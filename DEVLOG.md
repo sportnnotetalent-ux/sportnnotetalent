@@ -13,6 +13,49 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-27 — Organisation verification, Phase 2: every registered type
+Founder: "go ahead with organisation verification Phase 2". Every registered community type now gets the three steps schools and colleges have: an official ID, one document, and proof the person is authorised. Design: `docs/verification/org-verification.md` → Phase 2.
+- **Types:**
+  - Sports club, **Sports academy** (new type), **Sports association** (new type);
+  - Company, Hospital chain, NGO, Housing society;
+  - School / College unchanged.
+- **Per-type rules (`ORG_VERIFY` in `src/core/orgVerification.ts`):**
+  - step 1 needs any one of the type's IDs (`org_required_id_types()` in SQL);
+  - optional extras (GSTIN for companies and hospitals; boards for schools);
+  - document kinds;
+  - who signs / confirms (President / Secretary, Director / authorised signatory …);
+  - an email example.
+- **New ID types** (format + clean-up, mirrored in `valid_official_id` / `norm_official_id`):
+  - CIN, LLPIN (`AAB-1234`), GSTIN, Udyam (`UDYAM-KA-03-0012345`), NGO Darpan (`KA/2019/0123456`);
+  - society, trust and co-operative registration numbers (free-form).
+  - Public searches linked on the review card: MCA master data, GST taxpayer search, Udyam verification, NGO Darpan.
+  - Formats were checked against current sources (NGO Darpan's comes from secondary sources: state/year/7 digits).
+- **Local registrars' numbers** (society, trust, co-op, state board) can repeat across states, so they no longer take part in "one verified community per ID":
+  - the unique index, `set_org_official_ids`, `org_id_lookup` and `decide_org_verification` skip them;
+  - the reviewer sees a hint, not a block;
+  - the checklist says "this register has no public search".
+- **Dates of birth:** only verified schools, colleges and sports clubs, academies and associations may confirm members' ages (`org_dob_access_or_raise`, `DOB_CONFIRM_TYPES`). Companies, hospitals, NGOs and housing societies get the ✓ only. Live had 0 verified organisations, so nothing was taken away. *Founder to confirm.*
+- **Screens:**
+  - **Get verified:** a short chooser of the type's ID options, optional extras, "Registration document", and all wording by noun and title.
+  - **Community card:** Get verified for every standard type; the date-of-birth button only for sports and education bodies.
+  - **Head's confirmation page:** by type.
+  - **Support review:** "🏛️ Organisations", per-type checklist, call-back text and local-ID handling; "Already verified here" replaces "School already verified here".
+  - **Authorisation letter:** worded by type.
+  - **Creating a community:** still asks for the code up front only for schools and colleges.
+- **Server functions:** `org-verify` emails by type (`WORDS`, mirrored and tested); the `verification-submit` support alert names the type.
+- **Migration `20261027100000_org_verification_phase2.sql`.** Rewritten functions were diffed against Phase 1 (only the intended lines change). Postgres's parser accepts it. Fixed before shipping: `org_id_lookup` used a record that could stay unassigned.
+- **Guides:**
+  - new `website/guides/verify-your-organisation.md`;
+  - `verify-your-school` and `players-age-rule` now point to it (they used to say "Ask SportnNote to verify us").
+- **Verified:**
+  - `tests/org-verification-phase2.test.mts` (32), plus the Phase 1 format-sync test now reading the newest SQL; full suite 4,761 pass; tsc + edge-function typecheck clean.
+  - Demo walkthrough at 375 px, end to end: Sports club → GST chip, lowercase GSTIN tidied to `29ABCDE1234F1Z5` → document shows "…uploaded · PDF" → club email code → sent → support card (GST search link, club checklist) → sent back → club page "Sent back: Name doesn't match the register". No console errors.
+- **Needs:**
+  - the founder runs the migration;
+  - deploy `org-verify` + `verification-submit`;
+  - web + Android OTA;
+  - push (`main` publishes the guide).
+
 ### 2026-10-26 — Sign-in codes: 8 digits, clear messages, and a pre-release sign-in check
 A friend on Android forgot their password and used **Sign in with a code**. The email had an **8-digit** code (Supabase's OTP length on this project), but the app said "6-digit code" with the placeholder "123456". He typed 6 digits and got "That code is incorrect or has expired", so it looked as if codes expired at once. The founder asked for the whole sign-up / sign-in area to be checked properly rather than issue by issue.
 - **Probed the live Auth API with a made-up address** (no account created, no email sent) and compared every real error with what the app shows. Found:

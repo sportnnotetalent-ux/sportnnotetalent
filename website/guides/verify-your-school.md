@@ -5,7 +5,7 @@ category: Teams & players
 audience: Organisers
 sports: all
 order: 51
-updated: 2026-10-24
+updated: 2026-10-27
 ---
 
 A verified school shows **✓ Verified by SportnNote** on its page and on the certificates it issues, and its admins can confirm students' dates of birth from school records. Verification proves two things: that the school is real and recognised, and that you speak for it. SportnNote support checks each school by hand, usually within a day.
@@ -51,4 +51,4 @@ Only SportnNote support. They're deleted 30 days after the decision.
 If it's verified, the app says so when you type the code. Ask its admins to add you. If it isn't verified, verification decides who represents the school.
 
 ### What about clubs and other organisations?
-For now, registered clubs and other organisations tap **Ask SportnNote to verify us** on the **🛡️ Verification** card. Their own three steps are coming.
+Clubs, academies, associations, companies, NGOs, hospitals and housing societies verify in the same three steps with their own registration number. See [Verify your club, academy or organisation](/guides/verify-your-organisation/).

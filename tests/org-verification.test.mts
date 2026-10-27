@@ -28,7 +28,9 @@ describe('official IDs', () => {
     assert.equal(validOfficialId('cisce', 'ka071'), true);
   });
   test('the client rules match the server’s valid_official_id', () => {
-    const body = fn('valid_official_id');
+    // the newest definition (Phase 2 added types: 20261027100000)
+    const latest = readdirSync(dir).sort().reverse().map((f) => readFileSync(join(dir, f), 'utf8')).find((t) => t.includes('create or replace function valid_official_id('))!;
+    const body = latest.slice(latest.indexOf('create or replace function valid_official_id('), latest.indexOf('$$;', latest.indexOf('create or replace function valid_official_id(')));
     for (const [type, rule] of Object.entries(OFFICIAL_ID_RULES) as [OfficialIdType, { pattern: RegExp }][]) {
       const m = new RegExp(`when '${type}' then p_value ~ '([^']+)'`).exec(body);
       assert.ok(m, `server rule for ${type}`);

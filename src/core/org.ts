@@ -186,10 +186,12 @@ export const membersOnDate = (org: Organization, date: string): OrgMember[] =>
 export const COMMUNITY_TYPES = [
   'School',
   'College',
+  'Sports club',
+  'Sports academy',
+  'Sports association',
   'Company',
   'Housing society',
   'Hospital chain',
-  'Sports club',
   'NGO',
 ];
 
