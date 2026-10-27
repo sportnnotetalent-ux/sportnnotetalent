@@ -38,7 +38,7 @@ Everything the first innings lost counts in the target, including the unfinished
 With DLS on, the chase shows **☔ DLS par now: 58 · Hilltop 4 ahead** under the scoring buttons, and spectators see it at the top of the **Commentary** tab. It updates every ball, so everyone knows who leads if rain stops play.
 
 ## How DLS works, in plain words
-DLS measures what rain took from each side (overs and wickets left) with a standard table and scales the target.
+DLS measures what rain took from each side (overs and wickets left) with the ICC's Standard Edition table, which has a value for every over and every wicket, and scales the target.
 
 Say Riverside score 160 in 20 overs, and rain cuts Hilltop's chase to 10 overs. Hilltop have all 10 wickets for only 10 overs, which the table says is worth about 57% of 20 overs: par 90, so Hilltop need 91.
 

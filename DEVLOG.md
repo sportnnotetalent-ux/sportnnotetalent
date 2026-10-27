@@ -13,6 +13,26 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-27 — Cricket DLS v3: the full official Standard Edition table
+Backlog run, item 4 of 6. The 2026-10-10 DLS decision was to "source the full official Standard Edition table and drop it in behind a new version flag", and that's done.
+- **Source:** the ICC's own "Table of resource percentages remaining — over by over" (D/L Standard Edition), linked from the ICC's DLS rules page.
+  - Parsed from the PDF: all 50 over rows × wickets 0–9; 0 overs is 0.
+  - Its 50-over row equals our v2 anchors. In between, our v2 anchors + interpolation were approximations, and one anchor cell was wrong (10 overs left, 8 down: 10.9 vs the official 11.4).
+- **`dls.ts`:** `TABLE_V3` (51 × 10) and `resourcePctV3`, linear between whole overs.
+- **Engine:** new `dlsT: 3`, fixed by the match's **first** `v: 2` overs / target / rain event when it carries `t: 3`. A match already on v2 or on the legacy maths keeps its own table, so units never mix within a match.
+  - Every resource lookup goes through `resFor(s)`.
+  - Every earlier log has no `t`, so it replays byte for byte. The legacy-replay, DLS and overs tests (73) are unchanged and pass.
+- **App:** the five overs / target / rain events now send `t: 3`.
+  - The "No more play" preview, the live "DLS par now" chip and the chase panel use `withNewDlsTable`, so the par shown is the par a RAIN_STOP applies.
+  - The reducer's own par stays on the match's table, so old RAIN_STOPs replay.
+- **Verified:** `tests/cricket-dls-v3.test.mts` (8):
+  - the official rows and the 10-over / 8-down correction;
+  - monotonic in wickets and overs across the whole table, which also checks the parsing;
+  - a T20 chase at 10.0 ov for 8 down cut to 15: v3 R2 54.6 → 145, v2 55.1 → 147;
+  - the first event fixes the table;
+  - previewed par = applied par.
+  - tsc clean.
+
 ### 2026-10-27 — Organisation verification Phase 3: other countries' official IDs
 Backlog run, item 3 of 6. A community's market (the school system it picked) now decides which official IDs it gives at step 1. India is unchanged.
 - **New ID types** (`core/orgVerification.ts`; the formats mirror SQL):

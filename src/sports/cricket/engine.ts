@@ -11,7 +11,7 @@ import type { LiveEvent } from '../liveEvents';
 // NB: explicit .ts extension — lets Node's test runner load this engine (it does
 // not do extensionless resolution); tsc (bundler resolution) and Metro both
 // accept it too.
-import { resourcePct, resourcePctV1, revisedTarget } from './dls.ts';
+import { resourcePct, resourcePctV1, resourcePctV3, revisedTarget } from './dls.ts';
 import { rulesFromConfig, rulesOf, effectiveRules, patchRules, describeRulesChange, type CricketRules } from './rules.ts';
 import { applyDetailPatch, asBowlType, trackingOf, type BallDetailRec, type BowlType, type Tracking } from './detail.ts';
 // IDs-only scoring (docs/privacy/ids-only-scoring.md): the state and the
@@ -157,6 +157,11 @@ export interface CricketState {
    *  Standard Edition table, ball-accurate losses and par-based margins. Absent =
    *  legacy maths (REVIEW Decision 8), so stored DLS results replay identically. */
   dlsV?: 2;
+  /** DLS v3: 3 = this match uses the full official over-by-over Standard
+   *  Edition table (dls.ts TABLE_V3). Fixed by the match's first `v: 2` overs /
+   *  target / rain event when it carries `t: 3`; absent = the v2 anchors, so
+   *  every earlier log replays unchanged. */
+  dlsT?: 3;
   events: LiveEvent[];
   seq: number;
   ended: boolean;
@@ -718,7 +723,7 @@ export function rainStopPar(s: CricketState): number | null {
     return revisedTarget(team1, r1, r2) - 1;
   }
   const { r1, r2 } = dlsResources(s);
-  const left = resourcePct(uLeft(s.oversLimit, inn.balls, bpo), inn.wickets);
+  const left = resFor(s)(uLeft(s.oversLimit, inn.balls, bpo), inn.wickets);
   return revisedTarget(team1, r1, r6(Math.max(0, r2 - left))) - 1;
 }
 
@@ -872,9 +877,10 @@ const uLeft = (overs: number, balls: number, bpo: number) => Math.max(0, (overs 
  *  scheduled overs' full resources less what interruptions took. */
 export function dlsResources(s: CricketState): { r1: number; r2: number } {
   const bpo = s.ballsPerOver;
+  const res = resFor(s);
   return {
-    r1: r6(resourcePct(((s.inn1Overs ?? s.oversLimit) * bpo) / 6, 0) - s.r1Lost),
-    r2: r6(resourcePct(((s.inn2Overs ?? s.oversLimit) * bpo) / 6, 0) - s.r2Lost),
+    r1: r6(res(((s.inn1Overs ?? s.oversLimit) * bpo) / 6, 0) - s.r1Lost),
+    r2: r6(res(((s.inn2Overs ?? s.oversLimit) * bpo) / 6, 0) - s.r2Lost),
   };
 }
 
@@ -886,7 +892,7 @@ function chaseStart(s: CricketState, runs: number): Pick<CricketState, 'target' 
   if (s.dlsV !== 2) return { inn2Overs, target: revisedTarget(runs, 100 - s.r1Lost, 100) };
   if (!(s.dls && s.r1Lost !== 0)) return { inn2Overs, target: runs + 1 };
   const { r1 } = dlsResources(s);
-  return { inn2Overs, target: revisedTarget(runs, r1, r6(resourcePct((inn2Overs * s.ballsPerOver) / 6, 0))) };
+  return { inn2Overs, target: revisedTarget(runs, r1, r6(resFor(s)((inn2Overs * s.ballsPerOver) / 6, 0))) };
 }
 
 /** Overs / target changes are off while a Super Over (or the call on a tie) is pending. */
@@ -898,6 +904,19 @@ const tieInPlay = (s: CricketState) => !!s.superOver || !!s.pendingTie || !!s.is
  *  SET_OVERS only changes the length). */
 const legacyRainBooked = (s: CricketState) => s.revision === 'dls' && s.dlsV !== 2;
 
+/** DLS v3 — the resource table this match uses (see `dlsT`). */
+const resFor = (s: CricketState) => (s.dlsT === 3 ? resourcePctV3 : resourcePct);
+const DLS_EVENTS = new Set(['SET_OVERS', 'SET_TARGET', 'RAIN', 'RAIN_STOP', 'RAIN_END_INNINGS']);
+/** The state a new overs / target / rain event from today's app scores on: the
+ *  full official table, unless the match is already on v2 or the legacy maths
+ *  (units never mix within a match). Also for the screen's previews and the
+ *  live par chip, so what they show is what an event would apply. */
+export const withNewDlsTable = (s: CricketState): CricketState =>
+  s.dlsV !== 2 && s.dlsT === undefined && !legacyRainBooked(s) ? { ...s, dlsT: 3 } : s;
+/** The match's first `v: 2` overs / target / rain event fixes its table (`t: 3` → v3). */
+const withDlsTable = (s: CricketState, a: ScoreAction): CricketState =>
+  DLS_EVENTS.has(a.type) && a.payload?.v === 2 && a.payload?.t === 3 ? withNewDlsTable(s) : s;
+
 /** A v:2 rain interruption: ball-accurate resources lost on the Standard Edition
  *  table; in the chase the target is revised from both sides' resources. */
 function rainV2(s: CricketState, newOvers: number): CricketState {
@@ -905,7 +924,8 @@ function rainV2(s: CricketState, newOvers: number): CricketState {
   const bpo = s.ballsPerOver;
   const inn = s.scores[s.battingSide];
   if (!(newOvers * bpo > inn.balls && newOvers < s.oversLimit)) return s;
-  const loss = Math.max(0, resourcePct(uLeft(s.oversLimit, inn.balls, bpo), inn.wickets) - resourcePct(uLeft(newOvers, inn.balls, bpo), inn.wickets));
+  const res = resFor(s);
+  const loss = Math.max(0, res(uLeft(s.oversLimit, inn.balls, bpo), inn.wickets) - res(uLeft(newOvers, inn.balls, bpo), inn.wickets));
   let next: CricketState = recomputeQuota({ ...s, oversLimit: newOvers, dlsV: 2, revision: 'dls' }, newOvers);
   if (s.innings === 1) {
     next = { ...next, r1Lost: r6(s.r1Lost + loss) };
@@ -1021,6 +1041,7 @@ const step = (s: CricketState, a: ScoreAction): CricketState => {
   if (a.type === 'BALL_DETAIL') return applyBallDetail(s, a);
   if (a.type === 'SET_BOWL_TYPE') return applyBowlType(s, a);
   if (s.ended && a.type !== 'END' && a.type !== 'POTM') return s;
+  s = withDlsTable(s, a); // DLS v3
 
   // ── Change overs (parity #18) ─────────────────────────────────────────────
   // An agreed new length, up or down, any innings, DLS or not. No resource
@@ -1042,7 +1063,7 @@ const step = (s: CricketState, a: ScoreAction): CricketState => {
     const legacy = legacyRainBooked(s);
     const shift = legacy ? {}
       : lostNow !== 0
-      ? { [s.innings === 1 ? 'r1Lost' : 'r2Lost']: r6(lostNow + resourcePct(uLeft(s.oversLimit, inn.balls, bpo), inn.wickets) - resourcePct(uLeft(n, inn.balls, bpo), inn.wickets)) }
+      ? { [s.innings === 1 ? 'r1Lost' : 'r2Lost']: r6(lostNow + resFor(s)(uLeft(s.oversLimit, inn.balls, bpo), inn.wickets) - resFor(s)(uLeft(n, inn.balls, bpo), inn.wickets)) }
       : s.innings === 1 ? { inn1Overs: n } : { inn2Overs: n };
     const next = recomputeQuota({ ...s, oversLimit: n, ...shift, ...(legacy ? {} : { dlsV: 2 as const }) }, n);
     return {
@@ -1103,7 +1124,7 @@ const step = (s: CricketState, a: ScoreAction): CricketState => {
     const bpo = s.ballsPerOver;
     const asked = Math.floor(Number(a.payload?.chaseOvers ?? s.oversLimit));
     if (!Number.isFinite(asked) || asked < 1 || asked > 999) return s;
-    const loss = Math.max(0, resourcePct(uLeft(s.oversLimit, inn.balls, bpo), inn.wickets));
+    const loss = Math.max(0, resFor(s)(uLeft(s.oversLimit, inn.balls, bpo), inn.wickets));
     const cut: CricketState = recomputeQuota({
       ...s, oversLimit: asked, dlsV: 2, revision: 'dls', r1Lost: r6(s.r1Lost + loss),
       inn1Rain: { balls: inn.balls, wickets: inn.wickets },

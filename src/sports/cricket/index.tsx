@@ -30,7 +30,7 @@ import {
   clampRuns, ballRuns, symbolTone, penalty,
   NO_DELIVERY, RUNS_KINDS, WIDE_WICKETS, NOBALL_WICKETS, creaseAfterWicket, wicketAttribution,
   canBowl, midOver, oversUsed, snapshotState, lastBall,
-  minOversOf, rainStopPar, chaseHasMinOvers,
+  minOversOf, rainStopPar, chaseHasMinOvers, withNewDlsTable,
   powerplaySpan, SHOT_TYPES, ballStamp,
 } from './engine';
 import type { ShotType } from './engine';
@@ -331,12 +331,14 @@ function OversTargetCard({ s, dispatch, battingName, bowlingName, knockout, onEn
 
   const n = parseInt(ov, 10);
   const runsN = parseInt(tRuns, 10);
+  // `t: 3` (DLS v3): a match whose first such event this is uses the full
+  // official over-by-over Standard Edition table (engine `dlsT`).
   const action: ScoreAction | null = ov === '' || isNaN(n) ? null
-    : m === 'overs' ? { type: 'SET_OVERS', payload: { overs: n, v: 2 } }
-    : m === 'rain' ? { type: 'RAIN', payload: { overs: n, v: 2 } }
-    : m === 'rainEnd' ? { type: 'RAIN_END_INNINGS', payload: { v: 2, chaseOvers: n } }
+    : m === 'overs' ? { type: 'SET_OVERS', payload: { overs: n, v: 2, t: 3 } }
+    : m === 'rain' ? { type: 'RAIN', payload: { overs: n, v: 2, t: 3 } }
+    : m === 'rainEnd' ? { type: 'RAIN_END_INNINGS', payload: { v: 2, t: 3, chaseOvers: n } }
     : tRuns === '' || isNaN(runsN) ? null
-    : { type: 'SET_TARGET', payload: { runs: runsN, overs: n, v: 2 } };
+    : { type: 'SET_TARGET', payload: { runs: runsN, overs: n, v: 2, t: 3 } };
   const next = action ? reducer(s, action) : null;
   const ok = !!next && next !== s;
   const ballsLeft = (lim: number) => Math.max(0, lim * bpo - cur.balls);
@@ -442,10 +444,10 @@ function RainStopPanel({ s, dispatch, battingName, bowlingName, knockout, onEndM
   const minOk = Number.isFinite(minN) && minN >= 1;
   const chase = s.innings === 2 && s.target !== undefined;
   const reached = chase && minOk && chaseHasMinOvers(s, minN);
-  const autoPar = rainStopPar(s);
+  const autoPar = rainStopPar(withNewDlsTable(s)); // DLS v3: the table the event will use
   const parN = s.dlsLocked ? parseInt(parTyped, 10) : autoPar;
   const action: ScoreAction | null = reached && parN != null && Number.isFinite(parN)
-    ? { type: 'RAIN_STOP', payload: { v: 2, minOvers: minN, ...(s.dlsLocked ? { par: parN } : {}) } } : null;
+    ? { type: 'RAIN_STOP', payload: { v: 2, t: 3, minOvers: minN, ...(s.dlsLocked ? { par: parN } : {}) } } : null;
   const next = action ? reducer(s, action) : null;
   const ok = !!next && next !== s;
   const bpo = s.ballsPerOver;
@@ -1157,7 +1159,7 @@ const ScoringControls: SportPlugin<CricketState>['ScoringControls'] = ({
   // SD-133 — live DLS par in the chase (DLS on): the score that ties if play
   // stopped now — updated every ball (ICC: par tables go to the umpires).
   const parNow = !soActive && rootState.innings === 2 && rootState.dls && !rootState.dlsLocked && !rootState.ended && !rootState.pendingTie
-    ? rainStopPar(rootState) : null;
+    ? rainStopPar(withNewDlsTable(rootState)) : null;
 
   // SD-133 (CK-11) — wagon wheel: after a scoring shot off the bat (rule on),
   // an optional tap on the field + shot type for THAT ball. Below the pad so
@@ -2246,7 +2248,7 @@ const CricketSituation = ({ state }: TabProps) => {
   const runsNeeded = Math.max(0, (s.target ?? 0) - inn.runs);
   const ballsLeft = Math.max(0, s.oversLimit * s.ballsPerOver - inn.balls);
   const rrr = ballsLeft > 0 ? (runsNeeded / (ballsLeft / s.ballsPerOver)).toFixed(2) : '—';
-  const par = inChase && s.dls && !s.dlsLocked ? rainStopPar(s) : null;
+  const par = inChase && s.dls && !s.dlsLocked ? rainStopPar(withNewDlsTable(s)) : null;
   return (
     <View style={{ gap: theme.spacing(2) }}>
       <View style={ctrl.overRow} accessibilityLabel="This over">
