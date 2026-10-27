@@ -30,6 +30,7 @@ const pairs = (n: number, colour = 'black'): A[] => Array.from({ length: n }, ()
 const COLOURS = ['yellow', 'green', 'brown', 'blue', 'pink', 'black'];
 const clearance = (from = 'yellow'): A[] => COLOURS.slice(COLOURS.indexOf(from)).map((c) => pot(c));
 const f = (s: S.SnookerState) => s.frame!;
+const other = (s: Side): Side => (s === 'home' ? 'away' : 'home');
 
 describe('snooker · format', () => {
   test('defaults: 15 reds, best of 5, home breaks frame 1, a red is on', () => {
@@ -865,5 +866,19 @@ describe('snooker · break list', () => {
     assert.deepEqual(f(s).score, { home: 76, away: 76 }, 'the scores stand');
     assert.equal(f(s).striker, 'home', 'the player who opened the re-spotted black');
     assert.equal(f(s).respotShots, 0);
+  });
+
+  test('B-06 (accepted, the rules\' wording) a non-striker penalty ends the re-spotted black, not the last black', () => {
+    // S2 R15: a penalty is not a foul. S3 R4(a): the last black ends on the first
+    // pot or FOUL; R4(b)(iv): the re-spotted black on the first pot or INFRINGEMENT.
+    const pen = { type: 'FOUL', side: 'away', payload: { value: 7, penalty: true } } as A;
+    const last = run([...pairs(15), ...clearance().slice(0, 5), pen]);
+    assert.equal(last.frames.length, 0, 'the last black: play goes on');
+    assert.deepEqual(f(last).score, { home: 147, away: 0 });
+    const level = [SAFE, foul(5), ...pairs(8), MISS, ...pairs(7), ...clearance().slice(0, 5), MISS, pot('black')];
+    const r = run(level);
+    const respot = S.reducer(r, { type: 'FOUL', side: other(f(r).striker), payload: { value: 4, penalty: true } });
+    assert.equal(respot.frames.length, 1, 'the re-spotted black: the infringement ends it');
+    assert.equal(respot.frames[0].winner, f(r).striker);
   });
 });
