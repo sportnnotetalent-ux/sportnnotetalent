@@ -48,7 +48,7 @@ export const BILLIARDS_META: SportMeta = {
       key: 'scoringMode', label: 'Scoring', type: 'choice', default: 'shot',
       options: [
         { value: 'shot', label: 'Shot by shot (breaks and stats)' },
-        { value: 'quick', label: 'Game scores only' },
+        { value: 'quick', label: 'Frame (or game) scores only' },
       ],
     },
   ],

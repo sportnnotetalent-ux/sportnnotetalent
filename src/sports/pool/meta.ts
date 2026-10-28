@@ -53,7 +53,7 @@ export const POOL_META: SportMeta = {
         { value: false, label: 'Off' },
       ],
     },
-    { key: 'threeBallRule', label: '9-ball: three-ball rule on the break', type: 'toggle', default: true, advanced: true, hint: 'an open break must pocket a ball or drive 3 balls to the rail (WPA 5.3(c))' },
+    { key: 'threeBallRule', label: '9-ball: three-ball rule on the break', type: 'toggle', default: true, advanced: true, hint: 'at least three balls must be pocketed or pass the head string on the break (WPA 5.3(c))' },
     { key: 'tenEarly', label: '10-ball: an early called 10 wins', type: 'toggle', default: false, advanced: true, hint: 'the older practice; WPA 2026 spots it, and the 10 wins only as the last ball' },
   ],
 };

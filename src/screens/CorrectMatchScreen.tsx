@@ -114,7 +114,9 @@ export default function CorrectMatchScreen() {
         <ScreenTitle title="Correct match" subtitle={`${home} vs ${away} · ${score(current)} · ${resultText(current)}`} />
         {!plan ? (
           <>
-            <Text style={textStyles.muted}>Remove a mistaken entry or credit the right player. Nothing changes until you preview and publish.</Text>
+            <Text style={textStyles.muted}>{plugin.CorrectionEditor && plugin.correctionLabel
+              ? 'Set the right final score of a finished frame. Nothing changes until you preview and publish.'
+              : 'Remove a mistaken entry or credit the right player. Nothing changes until you preview and publish.'}</Text>
             {plugin.CorrectionEditor ? (
               <plugin.CorrectionEditor log={log} config={config} ops={ops} onOps={(o, l) => { setOps(o); setLines(l); }}
                 homeName={home} awayName={away} homeRoster={rosters.home} awayRoster={rosters.away} />
