@@ -13,6 +13,22 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-28 — Release: student lists + security Wave 1 live
+- **Founder:** pushed both branches (`4ad2d10`), then ran `20261028100000_student_lists.sql` and `20261028120000_security_wave1.sql`.
+- **Checked read-only on live:**
+  - the admission-number and parent-code tables exist, along with `org_roster_match`, the parent page's functions and the 3 roster triggers;
+  - `meet_age_reads` exists, and both Wave 1 triggers are in place;
+  - the claim uses a verified phone, the guardian is locked, lookups are masked, and meet ages are for entrants only;
+  - `safe_web_url` drops `upi:` and repairs bare links;
+  - `org_roster_invite` can't be called by users, while `school_request_preview` is public.
+- **Edge functions deployed:** `school-parent-request` (new), `send-invite`, `guardian-consent`, `guardian-link` and `message-notify`.
+  - `message-notify` was retried once after a JSR fetch timeout on Supabase's side.
+  - An anonymous POST to each returns 401.
+- **App release:**
+  - `auth-smoke` passed.
+  - Built from a clean worktree at `4ad2d10`: web `index-be6be071…` (both addresses 10/10 on the first round) and Android OTA `9347eaac` (runtime 1.0.0).
+  - The served `sw.js` has `isPublicRead` and `sn-api-v2`. `/school-request` returns 200, and there were 0 client errors in the last hour.
+
 ### 2026-10-28 — Cue sports engines: snooker, English billiards, pool (merged; not in the app yet)
 Founder: a cue sports group with all three, scored shot by shot plus a quick mode. Two agents built the pure engines under the quality mandate, each in its own worktree. Merged as `4831623` (pool) and `109f7f4` (snooker + billiards).
 
