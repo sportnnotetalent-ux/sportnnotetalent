@@ -23,15 +23,17 @@ describe('entryNameFromPlayers', () => {
 
 describe('entry_names migration', () => {
   const dir = join(import.meta.dirname, '..', 'supabase', 'migrations');
-  const f = readdirSync(dir).filter((x) => x.endsWith('.sql')).sort().reverse()
-    .find((x) => /create or replace function teams_entry_names\(\)/.test(readFileSync(join(dir, x), 'utf8')))!;
-  const sql = readFileSync(join(dir, f), 'utf8');
+  const files = readdirSync(dir).filter((x) => x.endsWith('.sql')).sort();
+  const sql = readFileSync(join(dir, files.find((x) => x.endsWith('_entry_names.sql'))!), 'utf8');
+  // the newest body of the trigger function (Wave 3 DB-11 decides on masked names)
+  const latest = readFileSync(join(dir, [...files].reverse()
+    .find((x) => /create or replace function teams_entry_names\(\)/.test(readFileSync(join(dir, x), 'utf8')))!), 'utf8');
   test('entries are masked on save and stat-line opponents too', () => {
-    assert.match(sql, /new\.name := mask_minor_names\(new\.name, ids\)/);
+    assert.match(latest, /new\.name := mask_minor_names\(new\.name, ids\)/);
     assert.match(sql, /create trigger teams_entry_names before insert or update of name, roster on teams/);
     assert.match(sql, /new\.opponent := mask_minor_names\(new\.opponent, ids\)/);
     // the possible-minor rule is players_view's
-    assert.match(sql, /not player_is_known_adult\(dob, profile_id\)/);
+    assert.match(latest, /not player_is_known_adult\(dob, profile_id\)/);
   });
   test('home_feed hands the app each side\'s entry players', () => {
     assert.match(sql, /'entry_ids', ht\.entry_ids/);

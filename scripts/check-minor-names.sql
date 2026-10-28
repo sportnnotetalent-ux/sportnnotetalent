@@ -25,4 +25,9 @@ union all select 'activity_log', count(*) from activity_log x
 union all select 'listings', count(*) from listings x
  where exists (select 1 from minors m where coalesce(x.author_name, '') ilike '%' || m.full_name || '%')
 union all select 'field_entries (members)', count(*) from field_entries x
- where exists (select 1 from minors m where coalesce(x.result::text, '') ilike '%' || m.full_name || '%');
+ where exists (select 1 from minors m where coalesce(x.result::text, '') ilike '%' || m.full_name || '%')
+-- Security Wave 3 (DB-15): officials, team managers and ownership transfers
+union all select 'matches (officials, managers)', count(*) from matches x
+ where exists (select 1 from minors m where coalesce(x.officials::text, '') || coalesce(x.managers::text, '') ilike '%' || m.full_name || '%')
+union all select 'tournament_ownership_events', count(*) from tournament_ownership_events x
+ where exists (select 1 from minors m where coalesce(x.by_name, '') || coalesce(x.from_name, '') || coalesce(x.to_name, '') ilike '%' || m.full_name || '%');

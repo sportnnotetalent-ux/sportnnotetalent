@@ -108,7 +108,7 @@ describe('W2 — legitimate links stay visible', () => {
     assert.equal(await sees(head.uid, teen.player), true);
   });
   test('links that existed before the migration still count', async () => {
-    const pre = await bootDb({ strict: true, skip: /security_wave2/ });
+    const pre = await bootDb({ strict: true, skip: /security_wave[23]/ });   // Wave 3 builds on 2b
     const coach = await pre.signUp({ name: 'Old Coach' });
     const [kid] = await pre.as<{ id: string }>(coach, `insert into players (full_name, dob) values ('Old Kid', '2014-01-01') returning id`);
     const other = await pre.signUp({ name: 'Old Teammate Coach' });
@@ -203,7 +203,11 @@ describe('W2 — roster rights, admin rights and pushes', () => {
     const s = await person('Host Stranger');
     const [tour] = await db.as<{ id: string }>(s.uid, `insert into tournaments (name, host_name, organizer_id, host_ids) values ('Trap', 'S', auth.uid(), $1) returning id`, [[s.player, coach.player]]);
     await db.as(s.uid, `insert into tournament_teams (tournament_id, team_id, status) values ($1, $2, 'confirmed')`, [tour.id, t]);
-    const [r] = await db.as<{ ok: boolean }>(s.uid, `select can_admin_player($1) as ok`, [kid]);
+    // can_admin_player is internal since Wave 3 (DB-08): ask it as the database, for this user
+    const r = await db.pg.transaction(async (tx) => {
+      await tx.query(`select set_config('request.jwt.claims', $1, true)`, [JSON.stringify({ sub: s.uid, role: 'authenticated' })]);
+      return (await tx.query<{ ok: boolean }>(`select can_admin_player($1) as ok`, [kid])).rows[0];
+    });
     assert.equal(r.ok, false);
   });
   test('pushes: a stranger\'s self-made team doesn\'t make a child a push target; the coach\'s does', async () => {
