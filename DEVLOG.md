@@ -13,7 +13,31 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
-### 2026-10-29 — Redesign: the light "court" design, and the sweep through every screen (NOT live — preview only)
+### 2026-10-29 — Release: the new design and the new S:N logo are live
+
+The founder approved the redesign ("the UI looks fine") and asked for a new logo, then a
+release everywhere.
+
+- **Logo** (2a15089): the S:N scoreline kept, redrawn on the design tokens — a lime "S:"
+  and a white "N" leaning -8° like the italic headlines, on the pitch green.
+  `scripts/build-icons.mjs` regenerates every icon (app, Android adaptive + themed,
+  web app, website); the favicon is renamed `favicon-v3.png` so browsers drop the cached
+  one. `Logo.tsx` draws the same; the wordmark (Home, sign-in, website header) is in
+  Barlow Condensed ExtraBold Italic. Web app theme colour, Android icon background and
+  notification tint, and the printable pages' toolbars moved to the brand green.
+- **Social kit**: `scripts/build-brand-kit.mjs` redraws the profile picture and the
+  LinkedIn / YouTube / Facebook / X covers (docs/marketing/brand-kit/) — the founder
+  uploads them.
+- **Website**: pool, snooker and billiards added to the sports list (33).
+- **Published**: web index-fdf3a05e (sportnnote--4oufcf8q8t → production), Android OTA
+  update group 3a568083 (runtime 1.0.0 — lucide uses react-native-svg 15.15.4 and
+  expo-font 56.0.6, both already in APK 41, so the update is safe). The website deploys
+  when `main` is pushed. The Android **home-screen icon** changes only with the next APK
+  (1.1.0): an update can't change native resources.
+- **Checks**: tests/logo.test.mts, tests/website-sports.test.mts; full suite 5,549 pass,
+  0 fail; auth-smoke passed; live sign-in screen checked.
+
+### 2026-10-29 — Redesign: the light "court" design, and the sweep through every screen (released — see above)
 
 The founder shared four reference designs and asked for "the most modern" UI, the same on
 Android, iPhone, the web app and the website. Light only for now; dark mode later.
@@ -44,7 +68,7 @@ Android, iPhone, the web app and the website. Light only for now; dark mode late
 - **Tests**: `tests/leading-emoji.test.mts` (splitting, stripping, sport chips, the badge
   stack, `iconBox`, and a scan that no icon-only Text still holds a mapped emoji),
   `tests/kit-ink.test.mts`; `tests/a11y-contrast.test.mts` keeps the tokens at WCAG AA.
-- **Status**: preview link only; ships to the app and site after the founder approves.
+- **Status**: released 2026-10-29 with the new logo (entry above).
 
 ### 2026-10-29 — Release: profiles load again; the claim card only when it applies
 - **Database:** the founder ran `20261029110000_players_view_phone`. Checked on live (read-only, as the founder's account, rolled back): the new function is there, and their own phone reads through the view.
