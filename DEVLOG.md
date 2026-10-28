@@ -13,6 +13,19 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-28 — Release: security Wave 2b live
+- **Database:** the founder ran `20261028160000_security_wave2b.sql`. Checked on live (read-only):
+  - all 9 functions, both tables and the friendly trigger are there;
+  - the 17 friendlies are grandfathered (34 team rows);
+  - anonymous callers can't list requests;
+  - clients can't call `claim_player_by_phone` or touch `match_team_consents` / `member_link_declines`.
+- **Edge function:** `verify-phone-firebase` deployed. Without sign-in it answers 401.
+- **Checks:** sign-in smoke check passed.
+- **Published** from a clean worktree at `0d0ad04`:
+  - web: entry `index-4ee41d3e`, served 10/10 at app.sportnnote.in and sportnnote.expo.app;
+  - Android OTA: update group `9354b884`.
+- **Live site:** loads with no console errors.
+
 ### 2026-10-28 — Security Wave 2b: requests to confirm, friendlies, link by phone
 The app side of the consent model. It closes W2B-11 and W2B-12 (Wave 2a's accepted side effects) and W1B-02.
 
