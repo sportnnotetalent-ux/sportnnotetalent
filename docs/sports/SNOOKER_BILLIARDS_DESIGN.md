@@ -1,6 +1,6 @@
 # Snooker and English billiards: engine design (v1)
 
-*Status: engine stage only (2026-10-28). Pure reducers, tests, break list (20 points: 16 fixed, 5 accepted) and a 2,000-match simulation. No screens, no registration yet: see "What integration needs" at the end.*
+*Status (2026-10-28): engines done (break list: 20 points, 16 fixed, 5 accepted; 2,000-match simulation) and the app plugins built on them (§10: controls, scoreboard, Commentary / Stats tabs, statTotals, schemas, records, corrections; app break list: 10 points, 7 fixed, 3 accepted; 640-scorer simulation). The shared wiring (records registry, box sources, standings preset, schedule minutes, team ties) is listed in §9.*
 
 **Where things are:**
 - Snooker (15-red, 10-red, 6-red): `src/sports/snooker/engine.ts`.
@@ -229,12 +229,37 @@ Suggested presets for the format form: **Short format** (150-up, best of 5) · *
 
 ---
 
-## 9. What integration needs (next stage)
+## 9. Integration
 
-- `SportId` additions `'snooker'` and `'billiards'` (`src/core/types.ts`), meta files with the format fields above, registry and loader entries.
-- **The controls must stamp** `side` (the striker) on every shot, and `payload.frame` on `CONCEDE` / `AWARD_FRAME` / `FRAME_SCORE` / `RERACK` (section 4). Without the frame number these four are refused.
-- `LineScore.unit` only allows `'set' | 'game'`; the engines return `'game'`. A `'frame'` unit would read better.
-- `statTotals`: the state is per side, so the plugin needs `statTotalsNeedsPlayers` (singles: the side's one player) like the racket sports.
-- A stat schema (`statSchemas.ts`) from section 6, and career sections.
-- Scorer controls, a frame-by-frame sheet, and a break list for the Stats tab.
-- `matchRecords`: highest break, centuries, maximums.
+**Done in the plugins** (`src/sports/{snooker,billiards}/`, `src/sports/cue/`):
+- The controls stamp `side` (the striker) on every shot and `payload.frame` on **every** action (not only the four frame enders), so a stale shot from the last frame is refused too.
+- `statTotals` + `statTotalsNeedsPlayers` (one player per side), the stat schemas, `matchRecords`, `undoLabel`, the scoreboard, the Commentary and Stats tabs, a frame-level `CorrectionEditor`.
+- `LineScore.unit` stays `'game'` (shared `scoreline.ts` unchanged); the board says FRAMES while live. Once over, `SetLineBoard` says GAMES: a `'frame'` unit is proposed (app break list A-09).
+
+**Shared wiring, not done here** (the files belong to other work): the records registry (`matchRecordHooks.ts`, `matchRecords.ts` types), `boxSources.ts` (the box sources exist: `snooker/box.ts`, `billiards/box.ts`), the schedule minutes (`data/scheduleConflicts.ts`), the standings preset (`data/standings.ts`, `standingsColumns.ts`: wins, then frame difference, then points difference), team ties (`data/teamTie.ts`), and `statTotalsContext` taking one player per side for an individual sport (app break list A-08).
+
+---
+
+## 10. The app (plugins)
+
+**Pure halves, node-tested.** Every screen decision lives in a module the tests load without React Native:
+- `controls.ts`: the action builders and the panel (what the screen offers now). A builder applies its action to the current state and returns null when the engine would refuse it, so the screen only offers taps that count. No builder takes a name.
+- `cue/ending.ts`: does a tap end a frame or the match? The engine answers (the tap is applied to the state); the controls ask first (askConfirm, NO is the default).
+- `read.ts`, `feed.ts`, `matchStats.ts`, `records.ts`, `undo.ts`, `box.ts`, `totals.ts`.
+
+**Snooker screen:** the ball on lit (the rest dimmed), 2 / 3 reds as chips, the free ball (and free ball + reds); Missed · Safety · Foul…; the foul sheet (value chips from the minimum, kinds, foul and a miss, free ball, reds down, a penalty on the player not at the table); the after-foul banner for the fouled player (Play on · Make them play again · Replace the balls · Free ball); the miss warnings and the award once awardable; the re-spotted black's lots; who breaks off; quick mode; concede / award / re-rack.
+
+**Billiards screen:** Pot red 3 · In-off red 3 · Cannon 2 · Pot white 2 (marked "foul now" past the hazard / cannon limit), Combo…, Missed · Safety · Foul…, the TEN HAZARDS / SEVENTY CANNONS warnings, ⏱ Time called (level: sudden death or a draw), who breaks off, quick mode, concede / award.
+
+**Quick mode:** a two-number form, checked as the engine checks it. Snooker warns (asks, never blocks) past what a frame scores without fouls (147 / 107 / 75). Billiards says a score past the target is recorded at it.
+
+**Stats tab:** the CompareTable for the match or one frame; the break list; the frame-by-frame sheet. The break list starts at **20+ for snooker** (a school or club player's good visit, about five pots with colours) and **25+ for billiards** (about ten scoring strokes: billiards breaks run longer), with chips for 50+ and 100+.
+
+**Career keys** (`totals.ts`, derived only, nothing credited live):
+- record ('present'): `framesWon`, `framesLost`, `points`, `pointsAgainst`;
+- shot by shot ('keyed', written only when the match had a frame scored shot by shot): `shotFrames`, `highestBreak` (a career MAX), `fiftyPlus`, `centuries`, `visits`, `safeties`, `fouls`, `foulPoints`, `penaltyPoints`; snooker adds `maximums`, `potted`, `pots`, `missedPots`, `foulMisses`, `freeBalls`; billiards adds `doubleCenturies`, `scored`, `scoringStrokes`, `potRed`, `potWhite`, `inOffRed`, `inOffWhite`, `cannons`, `misses`;
+- derived: frames W-L and won %, points per frame, fouls per frame, matches won / win % (results), snooker pot success and points per visit, the billiards average.
+
+**Records:** each side's highest break, every century, every maximum (snooker), each frame's winning margin.
+
+**Corrections:** a whole frame becomes its final score at the row that ended it (`cue/corrections.ts`), so later frames replay as played. The generic row list can't be used: one voided row unravelled every later frame (app break list A-01).
