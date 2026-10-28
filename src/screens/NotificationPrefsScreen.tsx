@@ -37,7 +37,7 @@ export default function NotificationPrefsScreen() {
         <WebPushCard />
 
         <Card style={{ gap: theme.spacing(3) }}>
-          <Text style={textStyles.h3}>🔔 Reminder timers</Text>
+          <Text style={textStyles.h3}>Reminder timers</Text>
           <Text style={textStyles.muted}>
             We&apos;ll nudge you before matches you&apos;re playing in or scoring — and before players you follow take the field. You&apos;ll also get one email the day before (or an hour before, for matches set up at short notice). Tap a timer to remove it.
           </Text>
@@ -78,7 +78,7 @@ export default function NotificationPrefsScreen() {
         </Card>
 
         <Card style={{ gap: theme.spacing(2) }}>
-          <Text style={textStyles.h3}>⭐ Alerts for things you follow</Text>
+          <Text style={textStyles.h3}>Alerts for things you follow</Text>
           <Text style={textStyles.muted}>Choose per player, team or tournament with the 🔔 next to Following.</Text>
           <Button label="Open Following" variant="ghost" onPress={() => nav.navigate('Following')} />
         </Card>

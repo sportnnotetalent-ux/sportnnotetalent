@@ -13,6 +13,37 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-29 — Redesign: the light "court" design, and the sweep through every screen (NOT live — preview only)
+
+The founder shared four reference designs and asked for "the most modern" UI, the same on
+Android, iPhone, the web app and the website. Light only for now; dark mode later.
+
+- **Foundation** (0c569ae, 0c7f175): tokens in `core/theme.ts` (cream page, pitch green,
+  lime, white ink on brand fills), Barlow Condensed headlines, lucide line icons, the tab bar,
+  Home hero + quick tiles, the court strip on match cards, the green player card on Profile,
+  the Organize grid, every sport drawn as its court/pitch/table (`components/SportArt.tsx`),
+  and the website in the same tokens and fonts.
+- **Emoji → line icons, without editing 1,900 lines**: `core/leadingEmoji.ts` (pure) splits
+  a label's leading emoji; `components/Icon.tsx` maps ~140 emoji to one lucide icon each.
+  `Button`, `SelectChip`, `Pill`, `EmptyState` swap the emoji as they draw; `ScreenTitle` and
+  `SectionHeader` drop it. `Glyph` turns an icon-only slot into its icon (keeping the slot's
+  layout and colour); `IconText` does it for custom buttons (Discover's segments, Filters,
+  WhatsApp). 70 headings, 41 scorer labels and the football action groups lost their emoji.
+  A sport's own emoji stays where it means the sport: a "⚽ Football" chip becomes its
+  colour dot, and a run of sports ("⚽ 🏏 🏀 …") becomes a stack of small sport badges
+  (`SportLine`) on Calendar, Clubs, communities, team/squad rows, tournaments, Discover, Join.
+- **Cue-sport card strips**: pool / snooker / billiards draw their own thin strip (rails,
+  small pockets, balls) — the tile's middle band had shown giant pockets.
+- **Contrast fixes found on the way**: initials on a team's kit colour (award pickers, MVP,
+  player ratings, tournament awards, box-score leader cells) now take dark or white ink from
+  the kit (`readableOn`) — the redesign had made them all white, unreadable on yellow kits
+  and the pale no-kit chip. The WhatsApp button's words are dark on WhatsApp green (white was
+  about 2:1).
+- **Tests**: `tests/leading-emoji.test.mts` (splitting, stripping, sport chips, the badge
+  stack, `iconBox`, and a scan that no icon-only Text still holds a mapped emoji),
+  `tests/kit-ink.test.mts`; `tests/a11y-contrast.test.mts` keeps the tokens at WCAG AA.
+- **Status**: preview link only; ships to the app and site after the founder approves.
+
 ### 2026-10-29 — Release: profiles load again; the claim card only when it applies
 - **Database:** the founder ran `20261029110000_players_view_phone`. Checked on live (read-only, as the founder's account, rolled back): the new function is there, and their own phone reads through the view.
 - **No edge functions changed** since `7812d83`.

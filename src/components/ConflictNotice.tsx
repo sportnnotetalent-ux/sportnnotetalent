@@ -30,7 +30,7 @@ export function ConflictNotice({ conflicts }: { conflicts: ScheduleConflict[] })
 
   return (
     <View style={st.wrap} accessibilityRole="alert">
-      <Text style={st.title}>⚠️ Scheduling clash</Text>
+      <Text style={st.title}>Scheduling clash</Text>
       {lines.map((l) => (
         <Text key={l} style={st.line}>
           •  {l}

@@ -18,7 +18,7 @@ export interface AthleticsMatchState { ended: boolean }
 
 const ScoringControls: SportPlugin<AthleticsMatchState>['ScoringControls'] = () => (
   <View style={{ gap: theme.spacing(2) }}>
-    <Text style={textStyles.h3}>🏃 Athletics runs as events</Text>
+    <Text style={textStyles.h3}>Athletics runs as events</Text>
     <Text style={textStyles.muted}>Set up each race from the tournament’s Athletics page: add the event, its entrants and rounds, then enter times heat by heat.</Text>
   </View>
 );

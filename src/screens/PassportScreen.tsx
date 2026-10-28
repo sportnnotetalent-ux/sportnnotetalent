@@ -78,7 +78,7 @@ export default function PassportScreen() {
           <ScreenTitle title="Career passport" subtitle="A player’s verified record on SportnNote" />
           {pp && !pp.found ? (
             <Card style={[{ gap: theme.spacing(1) }, st.bad]}>
-              <Text style={[textStyles.h3, { color: theme.colors.danger }]}>✗ No passport with that code</Text>
+              <Text style={[textStyles.h3, { color: theme.colors.danger }]}>No passport with that code</Text>
               <Text style={textStyles.muted}>The link may have been replaced by a newer one — ask the player for their current link.</Text>
             </Card>
           ) : null}

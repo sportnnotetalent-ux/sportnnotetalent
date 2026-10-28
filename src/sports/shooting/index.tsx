@@ -18,7 +18,7 @@ export interface ShootingMatchState { ended: boolean }
 
 const ScoringControls: SportPlugin<ShootingMatchState>['ScoringControls'] = () => (
   <View style={{ gap: theme.spacing(2) }}>
-    <Text style={textStyles.h3}>🎯 Shooting runs as events</Text>
+    <Text style={textStyles.h3}>Shooting runs as events</Text>
     <Text style={textStyles.muted}>Set up each event from the tournament’s Shooting page: add the shooters, enter each series (or shot), then run the final.</Text>
   </View>
 );

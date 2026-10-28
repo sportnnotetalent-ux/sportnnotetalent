@@ -95,7 +95,7 @@ export default function AmericanoScreen() {
         <ScreenTitle title={`${getSportMeta(sport).icon} Americano`} subtitle="Rotate partners each round · individual points" />
 
         {/* Leaderboard first — it's the point of Americano. */}
-        <Text style={textStyles.h3}>🏅 Leaderboard</Text>
+        <Text style={textStyles.h3}>Leaderboard</Text>
         <Card style={{ gap: theme.spacing(1) }}>
           <View style={[st.row, st.head]}>
             <View style={st.posCell}><Text style={st.headText}>#</Text></View>

@@ -46,6 +46,8 @@ import type { Organization, OrgMember, OrgRole, OrgRequest, House, ActivityEvent
 import type { RootStackParamList } from '../navigation/types';
 import { useParamState } from '../navigation/useParamState';
 import { notice } from '../core/confirm';
+import { SportLine } from '../components/SportArt';
+import { Glyph } from '../components/Icon';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -307,7 +309,7 @@ export default function OrganizationScreen() {
       <Card style={st.eventRow}>
         <View style={{ flex: 1 }}>
           <Text style={textStyles.body} numberOfLines={1}>{t.name}</Text>
-          <Text style={textStyles.muted}>{t.sports.map((s) => getSportMeta(s).icon).join(' ')} · {t.startDate} → {t.endDate}</Text>
+          <SportLine sports={t.sports}>{t.startDate} → {t.endDate}</SportLine>
         </View>
         <Text style={st.chevron}>›</Text>
       </Card>
@@ -317,7 +319,7 @@ export default function OrganizationScreen() {
   const renderMember = (m: OrgMember) => (
     <View key={m.playerId} style={{ gap: theme.spacing(2) }}>
       <Card style={[st.memberRow, m.until && st.pastMember]}>
-        <Text style={st.memberIcon}>🧑‍💼</Text>
+        <Glyph emoji="👤" style={st.memberIcon} />
         <TouchableOpacity accessibilityRole="button" style={{ flex: 1 }} activeOpacity={0.85} onPress={() => nav.navigate('PlayerProfile', { playerId: m.playerId })}>
           <Text style={textStyles.body} numberOfLines={1}>{nameOf(m.playerId)}</Text>
           {(m.until || m.since) ? (
@@ -447,7 +449,7 @@ export default function OrganizationScreen() {
               <OrgVerificationCard org={org} canManage={canManage} onChanged={loadOrg} onConfirmDobs={() => nav.navigate('OrgDobs', { orgId: org.id })} />
               {/* School hall of fame: honours year by year (public once published) */}
               <Card style={{ gap: theme.spacing(1) }}>
-                <Text style={textStyles.h3}>🏆 Hall of fame</Text>
+                <Text style={textStyles.h3}>Hall of fame</Text>
                 <Text style={textStyles.muted}>{canManage ? 'Your titles, medals and awards, year by year — verified ones fill in from certificates. Add past honours and publish it.' : 'Titles, medals and awards, year by year.'}</Text>
                 <Button label="Open hall of fame" variant="ghost" onPress={() => nav.navigate('HallOfFame', { orgId: org.id })} />
               </Card>
@@ -835,7 +837,7 @@ function YearRollover({
 
   return (
     <Card style={{ gap: theme.spacing(2) }}>
-      <Text style={textStyles.h3}>🎓 Promote year</Text>
+      <Text style={textStyles.h3}>Promote year</Text>
       {students.length === 0 ? (
         <Text style={textStyles.muted}>No students with a class to promote.</Text>
       ) : (

@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { theme } from '../core/theme';
+import { Glyph } from '../components/Icon';
 import { EmptyState, Card, Pill, ScreenTitle, textStyles } from '../components/ui';
 import { SectionHeader, SECTION_CAP } from '../components/SectionHeader';
 import { useAuth } from '../core/auth';
@@ -45,7 +46,7 @@ function splitLeadingEmoji(title: string): { icon: string; rest: string } {
 function IconBadge({ icon }: { icon: string }) {
   return (
     <View style={st.badge}>
-      <Text style={st.badgeIcon}>{icon}</Text>
+      <Glyph emoji={icon} style={st.badgeIcon} color={theme.colors.primary} />
     </View>
   );
 }

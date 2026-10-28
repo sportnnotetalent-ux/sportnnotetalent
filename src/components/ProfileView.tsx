@@ -6,6 +6,8 @@ import React, { useEffect, useState } from 'react';
 import { ScrollView, View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 import { theme } from '../core/theme';
+import { Glyph } from './Icon';
+import { SportBadge } from './SportArt';
 import { docKindLabel } from '../core/verificationReview';
 import { Card, Pill, Button, SelectChip, EmptyState, LoadingState, FormError, textStyles, plural } from './ui';
 import { profileViewState } from '../data/profileViewState';
@@ -206,7 +208,7 @@ export function ProfileView({
             )}
           </View>
           {onEditProfile && (
-            <View style={st.camBadge}><Text style={st.camIcon}>📷</Text></View>
+            <View style={st.camBadge}><Glyph emoji="📷" style={st.camIcon} color={theme.colors.text} /></View>
           )}
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
@@ -272,7 +274,7 @@ export function ProfileView({
         <TouchableOpacity accessibilityRole="button" activeOpacity={0.8} onPress={onOpenVerificationReview}>
           <Card style={st.reviewCard}>
             <View style={st.reviewCardRow}>
-              <Text style={[textStyles.h3, st.headTitle]}>🛡️ Review verifications</Text>
+              <Text style={[textStyles.h3, st.headTitle]}>Review verifications</Text>
               {pendingCount != null && pendingCount > 0 && (
                 <Pill label={`${pendingCount} pending`} color={theme.colors.surfaceAlt} textColor={theme.colors.accent} />
               )}
@@ -336,7 +338,7 @@ export function ProfileView({
           show them (adults) or you run a team they were invited to (migration 0026). */}
       {!onEditProfile && (player.phone || player.email) && (
         <Card style={{ gap: theme.spacing(1) }}>
-          <Text style={textStyles.h3}>📇 Contact</Text>
+          <Text style={textStyles.h3}>Contact</Text>
           {player.phone ? <Text style={textStyles.body}>📞 {player.phone}{player.phoneVerified ? '  ✓ verified' : ''}</Text> : null}
           {player.email ? <Text style={textStyles.body}>✉️ {player.email}{player.emailVerified ? '  ✓ verified' : ''}</Text> : null}
         </Card>
@@ -391,7 +393,7 @@ export function ProfileView({
         return (
           <TouchableOpacity accessibilityRole="button" key={b.sport} activeOpacity={0.85} onPress={() => onOpenSport?.(b.sport as SportId)}>
             <Card style={st.sportRow}>
-              <Text style={st.sportIcon}>{getSportMeta(b.sport as SportId).icon}</Text>
+              <SportBadge sport={b.sport} size={32} />
               <View style={{ flex: 1 }}>
                 <Text style={textStyles.body}>{getSportMeta(b.sport as SportId).name}</Text>
                 {/* SD-90: a measured sport (athletics) has races, not a W-D-L record */}
@@ -430,7 +432,7 @@ export function ProfileView({
             return (
               <TouchableOpacity accessibilityRole="button" key={o.id} activeOpacity={0.85} onPress={() => onOpenOrg?.(o.id)}>
                 <Card style={st.sportRow}>
-                  <Text style={st.sportIcon}>🏛️</Text>
+                  <Glyph emoji="🏛" style={st.sportIcon} color={theme.colors.primary} />
                   <View style={{ flex: 1 }}>
                     <Text style={textStyles.body}>{o.name}</Text>
                     <Text style={textStyles.muted}>
@@ -454,7 +456,7 @@ export function ProfileView({
             return (
               <TouchableOpacity accessibilityRole="button" key={o.id} activeOpacity={0.85} onPress={() => onOpenOrg?.(o.id)}>
                 <Card style={[st.sportRow, { opacity: 0.65 }]}>
-                  <Text style={st.sportIcon}>🏛️</Text>
+                  <Glyph emoji="🏛" style={st.sportIcon} color={theme.colors.primary} />
                   <View style={{ flex: 1 }}>
                     <Text style={textStyles.body}>{o.name}</Text>
                     <Text style={textStyles.muted}>
@@ -501,7 +503,7 @@ function TeamRow({ team }: { team: TeamAffiliation }) {
     .join(' · ');
   return (
     <Card style={st.sportRow}>
-      <Text style={st.sportIcon}>🛡️</Text>
+      <Glyph emoji="🛡️" style={st.sportIcon} />
       <View style={{ flex: 1 }}>
         <Text style={textStyles.body}>{team.name}</Text>
         {sub ? <Text style={textStyles.muted}>{sub}</Text> : null}
@@ -599,7 +601,7 @@ function VerificationCard({ player, owner, reviewer }: { player: Player; owner: 
   return (
     <Card style={{ gap: theme.spacing(2) }}>
       <View style={st.verifyHead}>
-        <Text style={[textStyles.h3, st.headTitle]}>🛡️ Age & guardian verification</Text>
+        <Text style={[textStyles.h3, st.headTitle]}>Age & guardian verification</Text>
         <Pill label={badge.label} color={theme.colors.surfaceAlt} textColor={badge.color} />
       </View>
       <Text style={textStyles.muted}>
@@ -736,7 +738,7 @@ function GuardianLinkCard({ playerId, linked, hasEmail }: { playerId: string; li
   };
   return (
     <Card style={{ gap: 8 }}>
-      <Text style={textStyles.h3}>👪 Messages go to your parent/guardian</Text>
+      <Text style={textStyles.h3}>Messages go to your parent/guardian</Text>
       {linked ? (
         <Text style={textStyles.muted}>Your parent/guardian has linked their account. Coaches and scouts who message about you reach them.</Text>
       ) : (

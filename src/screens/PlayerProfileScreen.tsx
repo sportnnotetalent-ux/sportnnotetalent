@@ -51,7 +51,7 @@ export default function PlayerProfileScreen() {
       <SafeAreaView style={st.safe} edges={['bottom']}>
         <View style={st.gate}>
           <Card style={{ gap: theme.spacing(3), alignItems: 'center' }}>
-            <Text style={textStyles.h3}>🔒 Members only</Text>
+            <Text style={textStyles.h3}>Members only</Text>
             <Text style={[textStyles.muted, { textAlign: 'center' }]}>This player’s profile is visible to SportnNote members. Join free to see their stats and follow their matches.</Text>
             <Button label="Join free" onPress={() => promptSignIn('up')} />
           </Card>

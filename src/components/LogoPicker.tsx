@@ -10,6 +10,7 @@ import { isSupabaseConfigured } from '../core/supabase';
 import { type ImageKind } from '../core/imageUrl';
 import { useImageUri } from '../data/useImageUri';
 import { uploadImage } from '../data/repos';
+import { Glyph } from './Icon';
 
 export function LogoPicker({
   logoUrl,
@@ -87,7 +88,7 @@ export function LogoPicker({
         )}
         {uploading && <ActivityIndicator color={theme.colors.primary} />}
         {canManage && !uploading && !(banner && !shown) && (
-          <View style={st.cam}><Text style={st.camIcon}>📷</Text></View>
+          <View style={st.cam}><Glyph emoji="📷" style={st.camIcon} /></View>
         )}
       </View>
       {canManage && !shown && !banner && <Text style={st.label}>{label}</Text>}

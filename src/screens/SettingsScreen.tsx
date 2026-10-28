@@ -15,6 +15,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Constants from 'expo-constants';
 import { theme } from '../core/theme';
+import { Glyph } from '../components/Icon';
 import { Card, textStyles } from '../components/ui';
 import { useAuth } from '../core/auth';
 import { isSupport } from '../core/roles';
@@ -53,7 +54,7 @@ function Row({
       onPress={onPress}
       style={st.row}
     >
-      <Text style={st.rowIcon}>{icon}</Text>
+      <Glyph emoji={icon} style={st.rowIcon} color={theme.colors.primary} />
       <Text style={[textStyles.body, st.rowLabel, danger && { color: theme.colors.danger }]}>{label}</Text>
       {value ? <Text style={st.rowValue} numberOfLines={1}>{value}</Text> : null}
       <Text style={st.chevron}>›</Text>

@@ -78,7 +78,7 @@ export default function MessagesScreen() {
 
         {blocks.length > 0 && (
           <Card style={{ gap: theme.spacing(2) }}>
-            <Text style={textStyles.h3}>🚫 Blocked</Text>
+            <Text style={textStyles.h3}>Blocked</Text>
             <Text style={textStyles.muted}>They can&apos;t message you. Unblock to let them reach you again.</Text>
             {blocks.map((b) => (
               <View key={b.id} style={st.top}>

@@ -38,7 +38,7 @@ export function DisciplineTable({ matches, format, onPlayer, sport = 'football',
   const icons = (c: Record<string, number>) => t.columns.filter((col) => c[col.key]).map((col) => `${c[col.key]}${col.icon}`).join(' ');
   return (
     <View style={{ gap: theme.spacing(2) }}>
-      <Text style={[textStyles.h3, st.section]}>🟥 Discipline</Text>
+      <Text style={[textStyles.h3, st.section]}>Discipline</Text>
       <Text style={textStyles.muted}>{sportRuleText(sport, format)}</Text>
       <Card style={{ gap: 0 }}>
         <View style={[st.row, st.head]}>

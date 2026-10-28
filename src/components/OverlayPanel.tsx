@@ -109,7 +109,7 @@ export function OverlayPanel({
   return (
     <View style={st.card}>
       <TouchableOpacity accessibilityRole="button" accessibilityState={{ expanded: open }} onPress={() => setOpen((o) => !o)} style={st.head}>
-        <Text style={[textStyles.h3, { flex: 1 }]}>🎥 Score overlay for OBS</Text>
+        <Text style={[textStyles.h3, { flex: 1 }]}>Score overlay for OBS</Text>
         <Text style={st.caret}>{open ? '⌄' : '›'}</Text>
       </TouchableOpacity>
       {!open ? (

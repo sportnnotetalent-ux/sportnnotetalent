@@ -61,7 +61,7 @@ export function QualifiesToCard({ tournament, onSaved }: { tournament: Tournamen
   if (!open) {
     return (
       <Card style={{ gap: theme.spacing(2) }}>
-        <Text style={textStyles.h3}>🎟 Qualifies to another tournament</Text>
+        <Text style={textStyles.h3}>Qualifies to another tournament</Text>
         <Text style={textStyles.muted}>{link ? `${qualifiesLine(link)}.` : 'Off — use this for a county, zonal or conference round whose top teams go on to the next round (national finals, state playoffs).'}</Text>
         <Button label={link ? 'Change' : 'Set up'} variant="ghost" onPress={() => setOpen(true)} />
       </Card>
@@ -69,7 +69,7 @@ export function QualifiesToCard({ tournament, onSaved }: { tournament: Tournamen
   }
   return (
     <Card style={{ gap: theme.spacing(2) }}>
-      <Text style={textStyles.h3}>🎟 Qualifies to</Text>
+      <Text style={textStyles.h3}>Qualifies to</Text>
       {target ? <Text style={textStyles.body}>→ {target.name}</Text> : null}
       <TextField label="Find the next-round tournament" value={q} onChange={setQ} placeholder="National Finals" autoCapitalize="words" />
       <View style={st.chips}>
@@ -110,7 +110,7 @@ export function QualifiersCard({ tournamentId, sport, entries, feeders, onAdded 
   const inIds = new Set(entries.filter((e) => e.status === 'confirmed' || e.status === 'invited').map((e) => e.team.id));
   return (
     <Card style={{ gap: theme.spacing(3) }}>
-      <Text style={textStyles.h3}>🎟 Qualifiers</Text>
+      <Text style={textStyles.h3}>Qualifiers</Text>
       {relevant.map((f) => {
         const link = f.qualifiesTo!;
         const res = matches ? feederQualifiers(matches.filter((m) => m.tournamentId === f.id), sport, link, standingsConfigFromFormat(sport, f.formats?.[sport] as Record<string, unknown> | undefined)) : null;

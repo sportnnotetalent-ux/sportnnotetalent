@@ -22,7 +22,7 @@ export function CompetitionRulesCard({ tournament, sport }: { tournament: Tourna
   return (
     <Card style={[st.card, !reviewed && st.todo]}>
       <View style={st.row}>
-        <Text style={[st.title, { flex: 1 }]}>📜 Competition rules</Text>
+        <Text style={[st.title, { flex: 1 }]}>Competition rules</Text>
         <Button label={reviewed ? 'View' : 'Check'} variant="ghost" onPress={() => nav.navigate('CompetitionRules', { tournamentId: tournament.id, sport })} />
       </View>
       <Text style={textStyles.muted} numberOfLines={3}>

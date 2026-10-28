@@ -6,6 +6,7 @@
 import React, { useMemo, useState } from 'react';
 import { usePlayerNameOf } from '../data/usePlayerNameOf';
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { readableOn } from '../core/contrast';
 import { theme } from '../core/theme';
 import { Button, Card, EmptyState, Pill, SelectChip, TextField, textStyles } from './ui';
 import { AwardPickerSheet, type PickerRow } from './AwardPickerSheet';
@@ -203,7 +204,7 @@ export function TournamentAwardsTab({
           <TouchableOpacity key={i.id} accessibilityRole="button" accessibilityLabel={`${i.label}: ${awardNameOf(i.playerId, i.playerName)}`} activeOpacity={0.85} onPress={() => onPlayer(i.playerId)}>
             <Card style={st.awardCard}>
               <View style={[st.avatar, { backgroundColor: colorOf(i.playerId) }]}>
-                <Text style={st.avatarText}>{initials(awardNameOf(i.playerId, i.playerName))}</Text>
+                <Text style={[st.avatarText, { color: readableOn(colorOf(i.playerId)) }]}>{initials(awardNameOf(i.playerId, i.playerName))}</Text>
                 <Text style={st.badge}>{awardIcon(i.sport, i.slot)}</Text>
               </View>
               <View style={{ flex: 1 }}>
@@ -241,7 +242,7 @@ export function TournamentAwardsTab({
       {item ? (
         <View style={st.awardCardRow}>
           <View style={[st.avatar, { backgroundColor: colorOf(item.playerId) }]}>
-            <Text style={st.avatarText}>{initials(awardNameOf(item.playerId, item.playerName))}</Text>
+            <Text style={[st.avatarText, { color: readableOn(colorOf(item.playerId)) }]}>{initials(awardNameOf(item.playerId, item.playerName))}</Text>
           </View>
           <View style={{ flex: 1 }}>
             <Text style={st.name} numberOfLines={1}>{awardNameOf(item.playerId, item.playerName)}</Text>

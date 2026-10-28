@@ -12,7 +12,7 @@ export function CareerPassportCard({ playerId }: { playerId: string }) {
   const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   return (
     <Card style={{ gap: theme.spacing(2) }}>
-      <Text style={textStyles.h3}>🪪 Career passport</Text>
+      <Text style={textStyles.h3}>Career passport</Text>
       <Text style={textStyles.muted}>Your official record and honours on one page, with a QR anyone can check — for selectors, coaches and scholarships.</Text>
       <Button label="Open my passport" variant="ghost" onPress={() => nav.navigate('Passport', { playerId })} />
     </Card>

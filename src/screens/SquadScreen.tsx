@@ -28,6 +28,7 @@ import { APP_HOST } from '../core/hosts';
 import { RemindInstall } from '../components/RemindInstall';
 import type { Player, SportId, TeamLeadership, TeamSummary } from '../core/types';
 import type { RootStackParamList } from '../navigation/types';
+import { SportLine } from '../components/SportArt';
 
 export default function SquadScreen() {
   const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -201,7 +202,8 @@ export default function SquadScreen() {
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={textStyles.body}>{p.fullName}{p.jerseyNo ? ` · #${p.jerseyNo}` : ''}{p.invited ? '  ⏳' : ''}</Text>
-                    <Text style={textStyles.muted}>{p.invited ? 'Invited · not registered yet' : p.sports.map((s) => getSportMeta(s).icon).join(' ')}{pRoles.length && !showRoles ? ` · ${pRoles.join(', ')}` : ''}</Text>
+                    {p.invited ? <Text style={textStyles.muted}>Invited · not registered yet{pRoles.length && !showRoles ? ` · ${pRoles.join(', ')}` : ''}</Text>
+                      : <SportLine sports={p.sports}>{pRoles.length && !showRoles ? pRoles.join(', ') : null}</SportLine>}
                     {access[p.id] === 'admin' ? (
                       <Text style={st.link} accessibilityRole="link" onPress={() => nav.navigate('EditProfile', { playerId: p.id, asAdmin: true })}>✎ Edit details</Text>
                     ) : canManage && p.profileId && access[p.id] !== 'self' ? (

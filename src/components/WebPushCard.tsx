@@ -8,6 +8,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { theme } from '../core/theme';
 import { Button, Card, textStyles } from './ui';
 import { disableWebPush, enableWebPush, webPushStatus, type WebPushStatus } from '../core/webPush';
+import { Glyph } from './Icon';
 
 const DISMISS_KEY = 'sn.webpush.nudgeDismissed';
 
@@ -35,8 +36,8 @@ export function WebPushCard({ compact = false }: { compact?: boolean }) {
   return (
     <Card style={{ gap: theme.spacing(2) }}>
       <View style={st.head}>
-        <Text style={[textStyles.h3, { flex: 1 }]}>🔔 {status === 'on' ? 'Notifications are on' : 'Get match alerts on this phone'}</Text>
-        {compact && <TouchableOpacity accessibilityRole="button" accessibilityLabel="Dismiss" onPress={dismiss} hitSlop={10}><Text style={st.x}>✕</Text></TouchableOpacity>}
+        <Text style={[textStyles.h3, { flex: 1 }]}>{status === 'on' ? 'Notifications are on' : 'Get match alerts on this phone'}</Text>
+        {compact && <TouchableOpacity accessibilityRole="button" accessibilityLabel="Dismiss" onPress={dismiss} hitSlop={10}><Glyph emoji="✕" style={st.x} /></TouchableOpacity>}
       </View>
 
       {status === 'needs-install' && (

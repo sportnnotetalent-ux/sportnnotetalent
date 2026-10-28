@@ -17,7 +17,7 @@ export interface RowingMatchState { ended: boolean }
 
 const ScoringControls: SportPlugin<RowingMatchState>['ScoringControls'] = () => (
   <View style={{ gap: theme.spacing(2) }}>
-    <Text style={textStyles.h3}>🚣 Rowing runs as events</Text>
+    <Text style={textStyles.h3}>Rowing runs as events</Text>
     <Text style={textStyles.muted}>Set up each race from the tournament’s Rowing page: add the boat class, the crews (seat by seat, with the cox) and the progression, then enter the finish times race by race.</Text>
   </View>
 );

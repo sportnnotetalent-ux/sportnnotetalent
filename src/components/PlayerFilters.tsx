@@ -8,6 +8,7 @@ import React, { useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, Switch, StyleSheet } from 'react-native';
 import { theme } from '../core/theme';
 import { Card, SelectChip, TextField, textStyles } from './ui';
+import { IconText } from './Icon';
 import { SPORT_LIST, getSportMeta } from '../sports/sportMeta';
 import type { PlayerSearch } from '../data/repos';
 import type { SportId } from '../core/types';
@@ -66,7 +67,7 @@ export function PlayerFilters({ value, onChange, cities, sections = ALL_SECTIONS
     <View style={{ gap: theme.spacing(2) }}>
       <View style={st.bar}>
         <TouchableOpacity accessibilityRole="button" accessibilityState={{ expanded: open }} onPress={() => setOpen((o) => !o)} style={[st.filterBtn, (open || n > 0) && st.filterBtnOn]} activeOpacity={0.8}>
-          <Text style={[st.filterText, (open || n > 0) && st.filterTextOn]}>⚙ Filters{n ? ` · ${n}` : ''} {open ? '▴' : '▾'}</Text>
+          <IconText label={`⚙ Filters${n ? ` · ${n}` : ''} ${open ? '▴' : '▾'}`} style={[st.filterText, (open || n > 0) && st.filterTextOn]} />
         </TouchableOpacity>
         {n > 0 && (
           <TouchableOpacity accessibilityRole="button" onPress={() => onChange({})} hitSlop={8}>

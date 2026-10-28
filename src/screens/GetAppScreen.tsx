@@ -74,7 +74,7 @@ export default function GetAppScreen() {
 
         {authed ? (
           <Card style={{ gap: theme.spacing(3) }}>
-            <Text style={textStyles.h2}>✓ You’re in</Text>
+            <Text style={textStyles.h2}>You’re in</Text>
             <Text style={textStyles.body}>
               {from && (joined || inviter)
                 ? `You now follow ${inviter ?? 'your friend'}: their matches and results show up for you. Next game, score it together.`

@@ -70,7 +70,7 @@ export function WeighInCard({ entries, classes, weightClass, editable, onSave }:
   return (
     <Card style={st.card}>
       <TouchableOpacity accessibilityRole="button" accessibilityState={{ expanded: open }} aria-expanded={open} onPress={() => setOpen(!open)} style={st.headRow}>
-        <Text style={[textStyles.h3, { flex: 1 }]}>⚖️ Weigh-in</Text>
+        <Text style={[textStyles.h3, { flex: 1 }]}>Weigh-in</Text>
         <Text style={textStyles.muted}>{weighed}/{entries.length} weighed {open ? '▲' : '▼'}</Text>
       </TouchableOpacity>
       {open && (
@@ -160,7 +160,7 @@ export function NextLiftCard({ entries, seq, onSave, rules, lb }: { entries: Res
   if (!lift || !cur) {
     return (
       <Card style={st.upCard}>
-        <Text style={textStyles.h3}>✅ All attempts taken</Text>
+        <Text style={textStyles.h3}>All attempts taken</Text>
         <Text style={textStyles.muted}>Check the results below, then Finish & lock.</Text>
         {jury ? <LastDecision entries={entries} onSave={onSave} rules={rules} /> : null}
       </Card>

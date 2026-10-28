@@ -14,6 +14,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { theme } from '../../core/theme';
+import { readableOn } from '../../core/contrast';
 import { useMask } from '../../core/disputeMask';
 import { playerLink, idByName } from '../playerLink';
 import { Button, SelectChip, TextField, textStyles } from '../../components/ui';
@@ -62,6 +63,7 @@ import { cricketMatchRecords } from './records';
 // IDs-only scoring: actions carry player ids only; names are put in for display.
 import { withNames } from './names';
 import { legacyNameOf, type NameOf } from '../../core/playerNames';
+import { Glyph } from '../../components/Icon';
 
 /* ------------------------------- Controls ---------------------------------- */
 
@@ -216,7 +218,7 @@ function SetupPanel({
 
   return (
     <View style={ctrl.wktPanel}>
-      <Text style={ctrl.label}>🪙 Toss</Text>
+      <Text style={ctrl.label}>Toss</Text>
       <Text style={ctrl.meta}>Who won the toss, and what did they choose? This sets who bats first.</Text>
       <View style={ctrl.chips}>
         <SelectChip label={`${homeName} won`} active={toss?.winner === 'home'} onPress={() => setToss('home', toss?.decision ?? 'bat')} />
@@ -234,7 +236,7 @@ function SetupPanel({
         </>
       )}
 
-      <Text style={[ctrl.label, { marginTop: theme.spacing(3) }]}>🧢 Match setup</Text>
+      <Text style={[ctrl.label, { marginTop: theme.spacing(3) }]}>Match setup</Text>
       <Text style={ctrl.meta}>Tap a player to make them captain (c) or wicket-keeper (†). Both are needed per side to begin.</Text>
       {roster0(homeRoster) ? side('home', homeName, homeRoster) : <Text style={ctrl.meta}>No {homeName} squad set.</Text>}
       {roster0(awayRoster) ? side('away', awayName, awayRoster) : <Text style={ctrl.meta}>No {awayName} squad set.</Text>}
@@ -376,7 +378,7 @@ function OversTargetCard({ s, dispatch, battingName, bowlingName, knockout, onEn
   return (
     <View style={ctrl.rainBox}>
       <View style={ctrl.creaseHead}>
-        <Text style={ctrl.label}>⏱ Overs & target</Text>
+        <Text style={ctrl.label}>Overs & target</Text>
         <Button label="Close" variant="ghost" style={ctrl.swapBtn} onPress={close} />
       </View>
       <Text style={ctrl.meta}>
@@ -481,7 +483,7 @@ function RainStopPanel({ s, dispatch, battingName, bowlingName, knockout, onEndM
   return (
     <View style={ctrl.rainBox}>
       <View style={ctrl.creaseHead}>
-        <Text style={ctrl.label}>☔ Rain — no more play</Text>
+        <Text style={ctrl.label}>Rain — no more play</Text>
         <Button label="Back" variant="ghost" style={ctrl.swapBtn} onPress={onBack} />
       </View>
       <Text style={ctrl.meta}>For a match that can’t restart. After the minimum overs in the chase, the result goes to the DLS par score now. Before it, there is no result.</Text>
@@ -969,7 +971,7 @@ const ScoringControls: SportPlugin<CricketState>['ScoringControls'] = ({
     return (
       <View style={ctrl.wktPanel}>
         <View style={ctrl.creaseHead}>
-          <Text style={ctrl.label}>🎯 Wicket{bowlerName ? ` — ${bowlerName}` : ''}</Text>
+          <Text style={ctrl.label}>Wicket{bowlerName ? ` — ${bowlerName}` : ''}</Text>
           <Button label="Cancel" variant="ghost" style={ctrl.swapBtn} onPress={() => setWf(null)} />
         </View>
         {state.freeHit && !wf.offExtra && <Text style={ctrl.freeHit}>🟢 FREE HIT — no bowler's wicket counts</Text>}
@@ -1277,7 +1279,7 @@ const ScoringControls: SportPlugin<CricketState>['ScoringControls'] = ({
       {/* Batsmen at the crease — auto-rotated; dismissed players are grayed out. */}
       <View style={{ gap: theme.spacing(2) }}>
         <View style={ctrl.creaseHead}>
-          <Text style={ctrl.label}>🏏 Batsmen — {battingName}</Text>
+          <Text style={ctrl.label}>Batsmen — {battingName}</Text>
           <Button label="⇄ Swap" variant="ghost" style={ctrl.swapBtn} disabled={!bothSet} onPress={() => dispatch({ type: 'SWAP_STRIKE' })} />
         </View>
         <Text style={ctrl.meta}>
@@ -1367,7 +1369,7 @@ const ScoringControls: SportPlugin<CricketState>['ScoringControls'] = ({
             <View style={{ gap: theme.spacing(1) }}>
             {setOfFive ? <Text style={ctrl.hint}>Set of 5 done — {bowlerName} can bowl 5 more, or change bowler now (free).</Text> : null}
             <View style={ctrl.creaseHead}>
-              <Text style={[ctrl.label, ctrl.flex]} numberOfLines={1}>🎯 Bowling: {bowlerName}{figs}{wk ? `  ·  † ${wk}` : ''}</Text>
+              <Text style={[ctrl.label, ctrl.flex]} numberOfLines={1}>Bowling: {bowlerName}{figs}{wk ? `  ·  † ${wk}` : ''}</Text>
               <Button label="Change" variant="ghost" style={ctrl.swapBtn}
                 accessibilityLabel={locked ? 'Replace the bowler mid-over' : 'Change the bowler'}
                 onPress={() => (locked ? setBowlRepl('injury') : setShowBowlers(true))} />
@@ -1806,7 +1808,7 @@ const CricketSummary: NonNullable<SportPlugin<CricketState>['Summary']> = ({ sta
     return (
       <TouchableOpacity accessibilityRole="button" activeOpacity={0.85} onPress={() => onPlayer?.(p.id)} style={sum.award}>
         <View style={[sum.awardAvatar, { backgroundColor: teamColor(p.side) }]}>
-          <Text style={sum.awardAvatarText}>{nameInitials(nm)}</Text>
+          <Text style={[sum.awardAvatarText, { color: readableOn(teamColor(p.side)) }]}>{nameInitials(nm)}</Text>
           <Text style={sum.awardBadge}>{icon}</Text>
         </View>
         <View style={{ flex: 1 }}>
@@ -1829,8 +1831,8 @@ const CricketSummary: NonNullable<SportPlugin<CricketState>['Summary']> = ({ sta
     return (
       <TouchableOpacity accessibilityRole="button" activeOpacity={0.85} onPress={() => potmPick.id && onPlayer?.(potmPick.id)} style={sum.award}>
         <View style={[sum.awardAvatar, { backgroundColor: theme.colors.surfaceAlt }]}>
-          <Text style={sum.awardAvatarText}>{nameInitials(nm)}</Text>
-          <Text style={sum.awardBadge}>🏅</Text>
+          <Text style={[sum.awardAvatarText, { color: readableOn(theme.colors.surfaceAlt) }]}>{nameInitials(nm)}</Text>
+          <Glyph emoji="🏅" style={sum.awardBadge} />
         </View>
         <View style={{ flex: 1 }}>
           <Text style={sum.awardLabel} numberOfLines={1}>Player of the Match</Text>
@@ -1862,7 +1864,7 @@ const CricketSummary: NonNullable<SportPlugin<CricketState>['Summary']> = ({ sta
         <TouchableOpacity accessibilityRole="button" key={p.id} activeOpacity={onPlayer ? 0.8 : 1} onPress={() => onPlayer?.(p.id)} style={[sum.prow, tier ? { backgroundColor: tier + '14', borderRadius: theme.radius.sm } : i > 0 && sum.divider]}>
           <RankBadge index={i} width={22} />
           <View style={[sum.rateAvatar, { backgroundColor: teamColor(p.side) }]}>
-            <Text style={sum.rateAvatarText}>{nameInitials(dispName)}</Text>
+            <Text style={[sum.rateAvatarText, { color: readableOn(teamColor(p.side)) }]}>{nameInitials(dispName)}</Text>
           </View>
           <View style={{ flex: 1 }}>
             <Text style={textStyles.body} numberOfLines={1}>{dispName}</Text>
@@ -1887,7 +1889,7 @@ const CricketSummary: NonNullable<SportPlugin<CricketState>['Summary']> = ({ sta
     return (
       <View style={{ gap: theme.spacing(3) }}>
         <View style={ctrl.card}>
-          <Text style={ctrl.label}>🏁 Result</Text>
+          <Text style={ctrl.label}>Result</Text>
           <Text style={sum.awardName}>{manualResultLine}</Text>
         </View>
         {potm ? <PotmCard /> : mvp ? <Award icon="👑" label="Most valuable player" p={mvp} detail={mvpDetail(mvp)} /> : null}
@@ -1898,7 +1900,7 @@ const CricketSummary: NonNullable<SportPlugin<CricketState>['Summary']> = ({ sta
     if (players.length === 0) {
       return (
         <View style={ctrl.card}>
-          <Text style={ctrl.label}>🏅 Match summary</Text>
+          <Text style={ctrl.label}>Match summary</Text>
           <Text style={ctrl.meta}>Best performers, the MVP and player ratings appear here once play begins.</Text>
         </View>
       );
@@ -1930,7 +1932,7 @@ const CricketSummary: NonNullable<SportPlugin<CricketState>['Summary']> = ({ sta
       <Text style={[sum.finalTeam, { color: teamColor(side) }]} numberOfLines={1}>{teamName(side)}</Text>
       <Text style={[sum.finalScore, { color: teamColor(side) }]}>{s.scores[side].runs}/{s.scores[side].wickets}</Text>
       <Text style={sum.finalOvers}>({oversStr(s.scores[side].balls, s.ballsPerOver)})</Text>
-      {winnerSide === side ? <Text style={sum.finalCrown}>🏆</Text> : null}
+      {winnerSide === side ? <Glyph emoji="🏆" style={sum.finalCrown} /> : null}
     </View>
   );
 

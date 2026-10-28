@@ -19,7 +19,7 @@ export interface CyclingMatchState { ended: boolean }
 
 const ScoringControls: SportPlugin<CyclingMatchState>['ScoringControls'] = () => (
   <View style={{ gap: theme.spacing(2) }}>
-    <Text style={textStyles.h3}>🚴 Cycling runs as events</Text>
+    <Text style={textStyles.h3}>Cycling runs as events</Text>
     <Text style={textStyles.muted}>Set up each race from the tournament’s Cycling page — a time trial, road race, stage race, pursuit, sprint, keirin, scratch, points or elimination race — then enter times or the order on the line race by race.</Text>
   </View>
 );

@@ -11,6 +11,7 @@ import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/nativ
 import type { RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { theme } from '../core/theme';
+import { SportBadge } from '../components/SportArt';
 import { readableOn } from '../core/contrast';
 import { Card, SelectChip, ScreenTitle, LoadingState, textStyles } from '../components/ui';
 import { PersonPicker } from '../components/PersonPicker';
@@ -27,6 +28,7 @@ import { SHARE_BASE } from '../core/shareText';
 import { InviteQrShare, type InviteQrShareHandle } from '../components/InviteQrShare';
 import type { Club, ClubMemberView, SportId } from '../core/types';
 import type { RootStackParamList } from '../navigation/types';
+import { Glyph } from '../components/Icon';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -173,7 +175,7 @@ export default function ClubHomeScreen() {
               <TouchableOpacity key={s} accessibilityRole="button" accessibilityLabel={`Open ${plugin.name}`}
                 onPress={() => nav.navigate('ClubSport', { clubId, sport: s })}>
                 <Card style={st.sportRow}>
-                  <Text style={st.sportIcon}>{plugin.icon}</Text>
+                  <SportBadge sport={s} size={32} />
                   <Text style={[textStyles.body, { flex: 1 }]}>{plugin.name}</Text>
                   <Text style={st.chev}>›</Text>
                 </Card>
@@ -188,7 +190,7 @@ export default function ClubHomeScreen() {
           {amAdmin && (
             <View style={st.memberActions}>
               <TouchableOpacity onPress={invite} accessibilityRole="button" disabled={busy}>
-                <Text style={st.link}>🔗 Invite</Text>
+                <Text style={st.link}>Invite</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={() => setAddingMember((v) => !v)} accessibilityRole="button">
                 <Text style={st.link}>{addingMember ? 'Close' : '+ Add'}</Text>
@@ -252,7 +254,7 @@ export default function ClubHomeScreen() {
                   <TouchableOpacity onPress={() => setRole(m.playerId, m.role === 'admin' ? 'member' : 'admin')} accessibilityRole="button">
                     <Text style={st.link}>{m.role === 'admin' ? 'Demote' : 'Make admin'}</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={() => setConfirmRemove(m.playerId)} accessibilityRole="button"><Text style={st.danger}>✕</Text></TouchableOpacity>
+                  <TouchableOpacity onPress={() => setConfirmRemove(m.playerId)} accessibilityRole="button" accessibilityLabel="Remove member"><Glyph emoji="✕" style={st.danger} /></TouchableOpacity>
                 </View>
               )
             )}
@@ -271,7 +273,7 @@ const st = StyleSheet.create({
   badgeText: { color: '#fff', fontWeight: '900', fontSize: 18 },
   sectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: theme.spacing(1) },
   link: { color: theme.colors.primary, fontWeight: '700' },
-  danger: { color: '#FF5C5C', fontWeight: '800' },
+  danger: { color: theme.colors.danger, fontWeight: '800' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing(2) },
   sportRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(3) },
   sportIcon: { fontSize: 22 },
@@ -279,7 +281,7 @@ const st = StyleSheet.create({
   memberRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(2) },
   memberActions: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(3) },
   confirmRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(3) },
-  pending: { color: '#FFB454', fontSize: theme.font.small, fontWeight: '600' },
+  pending: { color: theme.colors.accent, fontSize: theme.font.small, fontWeight: '600' },
   code: { color: theme.colors.primary, fontWeight: '900', fontSize: theme.font.h3, letterSpacing: 1 },
   roleTag: { paddingHorizontal: theme.spacing(2), paddingVertical: 2, borderRadius: 10, backgroundColor: theme.colors.surfaceAlt },
   roleTagAdmin: { backgroundColor: theme.colors.primary },

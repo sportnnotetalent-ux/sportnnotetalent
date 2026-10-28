@@ -337,7 +337,7 @@ export function PointsRaceCard({ entries, laps, every, editable, onSave, statuse
   return (
     <Card style={st.card}>
       <View style={st.headRow}>
-        <Text style={[textStyles.h3, { flex: 1 }]}>🚴 Points race</Text>
+        <Text style={[textStyles.h3, { flex: 1 }]}>Points race</Text>
         <Text style={textStyles.muted}>{laps ? `${laps} laps · ` : ''}{S} sprint{S === 1 ? '' : 's'}</Text>
       </View>
       <Text style={textStyles.muted}>A sprint every {every ?? '–'} laps: {table.join('-')} points; {double ? `the final sprint (the finish) scores double, ${table.map((x) => x * 2).join('-')}` : 'the final sprint scores the same'}. Gaining a lap on the bunch +20, losing one −20. Equal points: the order in the final sprint.</Text>
@@ -408,7 +408,7 @@ export function SprintBracketCard({ entries, editable, onSave }: { entries: Resu
   return (
     <Card style={st.card}>
       <View style={st.headRow}>
-        <Text style={[textStyles.h3, { flex: 1 }]}>🚴 Sprint — match play</Text>
+        <Text style={[textStyles.h3, { flex: 1 }]}>Sprint — match play</Text>
         <Text style={textStyles.muted}>{state.done ? 'complete' : `bracket of ${state.size}`}</Text>
       </View>
       <Text style={textStyles.muted}>{bo === 3 ? 'Best of three heats: the first to win two goes through.' : 'One heat per match.'} Seeded by the flying 200 m (1 v {state.size}, 2 v {state.size - 1} …); the semi-final losers race for bronze.</Text>

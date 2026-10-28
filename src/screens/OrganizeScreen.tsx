@@ -22,6 +22,7 @@ import { formatDayShort } from '../core/dates';
 import { eventZone, todayIn } from '../core/time';
 import type { RootStackParamList } from '../navigation/types';
 import type { Tournament } from '../core/types';
+import { Glyph } from '../components/Icon';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -197,7 +198,7 @@ export default function OrganizeScreen() {
         {(showCommunities ? myCommunities : myCommunities.slice(0, SECTION_CAP)).map((o) => (
           <TouchableOpacity accessibilityRole="button" key={o.id} activeOpacity={0.85} onPress={() => nav.navigate('Organization', { orgId: o.id })}>
             <Card style={st.cardHead}>
-              <Text style={st.communityIcon}>🏛️</Text>
+              <Glyph emoji="🏛️" style={st.communityIcon} />
               <View style={{ flex: 1 }}>
                 <Text style={[textStyles.body, { fontWeight: '700' }]} numberOfLines={1}>{o.name}</Text>
                 <Text style={textStyles.muted}>{[o.type, o.city].filter(Boolean).join(' · ')}</Text>

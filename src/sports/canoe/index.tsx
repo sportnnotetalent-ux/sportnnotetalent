@@ -17,7 +17,7 @@ export interface CanoeMatchState { ended: boolean }
 
 const ScoringControls: SportPlugin<CanoeMatchState>['ScoringControls'] = () => (
   <View style={{ gap: theme.spacing(2) }}>
-    <Text style={textStyles.h3}>🛶 Canoe sprint runs as events</Text>
+    <Text style={textStyles.h3}>Canoe sprint runs as events</Text>
     <Text style={textStyles.muted}>Set up each race from the tournament’s Canoe sprint page: add the boat (K1 … C4) and distance, the boats and their paddlers and the progression, then enter the finish times race by race.</Text>
   </View>
 );

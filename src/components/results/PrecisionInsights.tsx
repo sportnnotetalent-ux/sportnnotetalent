@@ -58,7 +58,7 @@ export function FeedCard({ items, initial }: { items: FeedItem[]; initial: numbe
   return (
     <Card style={st.card}>
       <View style={st.headRow}>
-        <Text style={[textStyles.h3, { flex: 1 }]}>📣 Commentary</Text>
+        <Text style={[textStyles.h3, { flex: 1 }]}>Commentary</Text>
         <Text style={textStyles.muted}>newest first</Text>
       </View>
       <View style={{ gap: theme.spacing(1.5) }}>
@@ -97,7 +97,7 @@ function LiftStatsCard({ entries }: { entries: ResultEntry[] }) {
   const detailed = !!(s.lights || s.jury || s.changes);
   return (
     <Card style={st.card}>
-      <Text style={textStyles.h3}>📊 Session stats</Text>
+      <Text style={textStyles.h3}>Session stats</Text>
       {s.winner ? <Text style={[textStyles.body, st.bold]}>{winnerLine(s.winner, done)}</Text> : null}
       <Row label="Lifters" value={String(s.lifters)} />
       <Row label="Snatch" value={liftStatsLine(s.snatch) || '–'} />
@@ -133,7 +133,7 @@ function BestLifterCard({ entries, f, fmt }: { entries: ResultEntry[]; f: PhaseF
   const ref = robiRef(f.category, rules);
   return (
     <Card style={st.card}>
-      <Text style={textStyles.h3}>⚖️ Best-lifter points</Text>
+      <Text style={textStyles.h3}>Best-lifter points</Text>
       <View style={st.tableHead}>
         <Text style={[st.head, { flex: 1 }]}>LIFTER</Text>
         <Text style={[st.head, st.numS]}>TOTAL</Text>
@@ -171,7 +171,7 @@ function ShootSeriesCard({ s, ev, shots }: { s: ShootSeriesStats; ev: ShootEvent
   const int = ev.scoring === 'integer';
   return (
     <Card style={st.card}>
-      <Text style={textStyles.h3}>📊 Match stats</Text>
+      <Text style={textStyles.h3}>Match stats</Text>
       {s.bestSeries ? <Row label="Best series" value={`${s.bestSeries.names.join(', ')} ${sc(s.bestSeries.value)} (${seriesTag(ev, shots, s.bestSeries.index)})`} /> : null}
       {s.perfect ? <Row label="Perfect series" value={String(s.perfect)} /> : null}
       {s.penalties ? <Row label="Penalties" value={`−${s.penalties} points`} bad /> : null}
@@ -210,7 +210,7 @@ function ShootSeriesCard({ s, ev, shots }: { s: ShootSeriesStats; ev: ShootEvent
 function ShootFinalCard({ s }: { s: ShootFinalStats }) {
   return (
     <Card style={st.card}>
-      <Text style={textStyles.h3}>📊 Final stats</Text>
+      <Text style={textStyles.h3}>Final stats</Text>
       {s.bestShot ? <Row label="Best shot" value={`${s.bestShot.names.join(', ')} ${s.bestShot.value.toFixed(1)}`} /> : null}
       {/* round 2: penalties in the final (2 points off a shot) */}
       {s.penalties ? <Row label="Penalties" value={`−${s.penalties} points (${s.finalists.filter((x) => x.pen).map((x) => `${x.name} −${x.pen}`).join(', ')})`} bad /> : null}
@@ -249,7 +249,7 @@ function ArchStatsCard({ entries, def }: { entries: ResultEntry[]; def: Discipli
 function ArchRankingCard({ s }: { s: ArchRoundStats }) {
   return (
     <Card style={st.card}>
-      <Text style={textStyles.h3}>📊 Ranking round stats</Text>
+      <Text style={textStyles.h3}>Ranking round stats</Text>
       {s.bestEnd ? <Row label="Best end" value={`${s.bestEnd.names.join(', ')} ${s.bestEnd.value}`} /> : null}
       {s.mostX && s.mostX.value > 0 ? <Row label="Most X" value={`${s.mostX.names.join(', ')} ${s.mostX.value}`} /> : null}
       <Row label="Lead changes" value={String(s.leadChanges)} />
@@ -279,7 +279,7 @@ function ArchRankingCard({ s }: { s: ArchRoundStats }) {
 function ArchBracketCard({ s }: { s: ArchBracketStats }) {
   return (
     <Card style={st.card}>
-      <Text style={textStyles.h3}>📊 Match play stats</Text>
+      <Text style={textStyles.h3}>Match play stats</Text>
       {s.bestEnd ? <Row label="Best match end" value={`${s.bestEnd.names.join(', ')} ${s.bestEnd.value}`} /> : null}
       <Row label="Shoot-offs" value={String(s.shootOffs)} />
       <View style={st.tableHead}>

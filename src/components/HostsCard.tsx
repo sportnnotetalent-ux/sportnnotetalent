@@ -55,7 +55,7 @@ export function HostsCard({
           return (
             <View key={id} style={st.row}>
               <View style={[st.avatar, me && { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary }]}>
-                <Text style={[st.avatarText, me && { color: '#0B0F14' }]}>{initials(nameOf(id))}</Text>
+                <Text style={[st.avatarText, me && { color: theme.colors.onFill }]}>{initials(nameOf(id))}</Text>
               </View>
               <View style={{ flex: 1, gap: 4 }}>
                 <Text style={textStyles.body} numberOfLines={1}>{nameOf(id) ?? 'Host'}{me ? ' · you' : ''}</Text>

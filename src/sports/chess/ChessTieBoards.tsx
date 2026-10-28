@@ -20,7 +20,7 @@ export function ChessTieBoards({ rubbers, label, name, teamA, teamB }: {
   const ca = colourLine(a), cb = colourLine(b);
   return (
     <View style={st.card}>
-      <Text style={st.title}>♟ Board by board</Text>
+      <Text style={st.title}>Board by board</Text>
       {rows.map((r, i) => (
         <View key={i} style={st.row}>
           <Text style={[st.text, !r.done && st.muted]}>{r.text}</Text>

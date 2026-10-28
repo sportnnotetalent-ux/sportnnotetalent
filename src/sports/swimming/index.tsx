@@ -18,7 +18,7 @@ export interface SwimmingMatchState { ended: boolean }
 
 const ScoringControls: SportPlugin<SwimmingMatchState>['ScoringControls'] = () => (
   <View style={{ gap: theme.spacing(2) }}>
-    <Text style={textStyles.h3}>🏊 Swimming runs as events</Text>
+    <Text style={textStyles.h3}>Swimming runs as events</Text>
     <Text style={textStyles.muted}>Set up each race from the tournament’s Swimming page: add the event, its swimmers and rounds, then enter times heat by heat.</Text>
   </View>
 );

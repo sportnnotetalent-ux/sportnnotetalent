@@ -188,7 +188,7 @@ export function ShootMatchCard({ entries, discipline, editable, onSave }: { entr
   return (
     <Card style={st.card}>
       <View style={st.headRow}>
-        <Text style={[textStyles.h3, { flex: 1 }]}>🎯 Medal matches</Text>
+        <Text style={[textStyles.h3, { flex: 1 }]}>Medal matches</Text>
         <Text style={textStyles.muted}>{state.done ? 'complete' : `first to ${SHOOT_MATCH_WIN}`}</Text>
       </View>
       <Text style={textStyles.muted}>One shot per athlete a series; the higher team total takes 2 points, a tie 1 each; the first team to {SHOOT_MATCH_WIN} wins. 16–16: a shoot-off, one shot each.</Text>

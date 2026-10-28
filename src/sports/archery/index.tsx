@@ -18,7 +18,7 @@ export interface ArcheryMatchState { ended: boolean }
 
 const ScoringControls: SportPlugin<ArcheryMatchState>['ScoringControls'] = () => (
   <View style={{ gap: theme.spacing(2) }}>
-    <Text style={textStyles.h3}>🏹 Archery runs as events</Text>
+    <Text style={textStyles.h3}>Archery runs as events</Text>
     <Text style={textStyles.muted}>Set up each event from the tournament’s Archery page: add the archers, enter each end of the ranking round, then shoot the match-play bracket.</Text>
   </View>
 );

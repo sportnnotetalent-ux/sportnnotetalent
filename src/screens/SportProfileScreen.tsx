@@ -141,7 +141,7 @@ export default function SportProfileScreen() {
     return (
       <SafeAreaView style={st.safe} edges={['bottom']}>
         <View style={{ padding: theme.spacing(4), gap: theme.spacing(3) }}>
-          <Text style={textStyles.h3}>🔒 Members only</Text>
+          <Text style={textStyles.h3}>Members only</Text>
           <Text style={textStyles.muted}>This player’s stats are visible to SportnNote members.</Text>
           <Button label="Join free" onPress={() => promptSignIn('up')} />
         </View>

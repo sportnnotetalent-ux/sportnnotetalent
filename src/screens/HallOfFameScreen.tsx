@@ -23,6 +23,7 @@ import { SPORT_LIST } from '../sports/sportMeta';
 import { deleteHonour, getHallOfFame, printHall, saveHonour, setHallPublic, sportName, type Hall, type HonourDraft } from '../data/hallOfFame';
 import { getOrganization, getPlayerNamesById } from '../data/repos';
 import type { RootStackParamList } from '../navigation/types';
+import { Glyph } from '../components/Icon';
 
 const HOSTED_CAP = 8;
 
@@ -83,7 +84,7 @@ export default function HallOfFameScreen() {
       <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
         <Card style={[{ gap: theme.spacing(2) }, st.gold]}>
           <View style={st.headRow}>
-            {org.logoUrl ? <Image source={{ uri: org.logoUrl }} style={st.logo} /> : <Text style={st.logoEmoji}>🏛️</Text>}
+            {org.logoUrl ? <Image source={{ uri: org.logoUrl }} style={st.logo} /> : <Glyph emoji="🏛️" style={st.logoEmoji} />}
             <View style={{ flex: 1, gap: 2 }}>
               <Text style={st.kicker}>🏆 HALL OF FAME</Text>
               <Text style={textStyles.h1}>{org.name}</Text>
@@ -103,7 +104,7 @@ export default function HallOfFameScreen() {
 
         {!hall.visible ? (
           <Card style={{ gap: theme.spacing(1) }}>
-            <Text style={textStyles.h3}>🔒 Not published yet</Text>
+            <Text style={textStyles.h3}>Not published yet</Text>
             <Text style={textStyles.muted}>{org.name} hasn’t made its hall of fame public. Its members can see it in the app.</Text>
           </Card>
         ) : null}

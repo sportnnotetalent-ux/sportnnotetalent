@@ -9,6 +9,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { theme } from '../core/theme';
+import { Glyph } from '../components/Icon';
 import { EmptyState, Card, ScreenTitle, textStyles } from '../components/ui';
 import { MatchCard } from '../components/MatchCard';
 import { SportTile } from '../components/SportArt';
@@ -143,7 +144,7 @@ function ActionRow({ icon, title, subtitle, onPress }: { icon: string; title: st
   return (
     <TouchableOpacity accessibilityRole="button" activeOpacity={0.85} onPress={onPress}>
       <Card style={st.actionRow}>
-        <Text style={st.actionIcon}>{icon}</Text>
+        <Glyph emoji={icon} style={st.actionIcon} color={theme.colors.primary} />
         <View style={{ flex: 1 }}>
           <Text style={textStyles.body}>{title}</Text>
           <Text style={textStyles.muted}>{subtitle}</Text>

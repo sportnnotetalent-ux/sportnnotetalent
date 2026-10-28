@@ -12,6 +12,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { theme } from '../core/theme';
+import { Glyph } from '../components/Icon';
 import { FollowBell } from '../components/FollowBell';
 import { EmptyState, Card, Pill, Button, SelectChip, ScreenTitle, textStyles } from '../components/ui';
 import { LeagueTable } from '../components/LeagueTable';
@@ -97,6 +98,7 @@ function basicsLine(t: Tournament, sport: SportId): string {
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 import { useViewerMarket } from '../data/useMarket';
 import { term } from '../core/markets';
+import { SportLine } from '../components/SportArt';
 
 const PARTICIPATION_LABEL: Record<string, string> = {
   inter_house: '🏠 Inter-house (Houses compete)',
@@ -728,7 +730,7 @@ export default function TournamentProfileScreen() {
             {hostOrg ? (
               <TouchableOpacity accessibilityRole="button" activeOpacity={0.85} onPress={() => nav.navigate('Organization', { orgId: hostOrg.id })}>
                 <Card style={st.hostOrgRow}>
-                  <Text style={st.hostOrgIcon}>🏛️</Text>
+                  <Glyph emoji="🏛" style={st.hostOrgIcon} color={theme.colors.primary} />
                   <View style={{ flex: 1 }}>
                     <Text style={textStyles.muted}>Hosted by organization</Text>
                     <Text style={textStyles.body}>{hostOrg.name}</Text>
@@ -876,7 +878,7 @@ export default function TournamentProfileScreen() {
             <HubRow icon="🎽" title="Scorers & officials" status={`${assignedIds('scorer').length + assignedIds('referee').length} assigned`} open={panel === 'officials'} onPress={() => setPanel(panel === 'officials' ? '' : 'officials')} />
             {panel === 'officials' && (
             <Card style={{ gap: theme.spacing(3) }}>
-              <Text style={textStyles.h3}>🎽 Scorers & officials</Text>
+              <Text style={textStyles.h3}>Scorers & officials</Text>
               <Text style={textStyles.muted}>
                 {hostOrg ? 'Pick from this organization’s scorers & referees, or add anyone by mobile number or name.' : 'Pick from the tournament’s hosts, or add anyone by mobile number or name.'} Any tournament scorer can take over one of its matches.
               </Text>
@@ -924,7 +926,7 @@ export default function TournamentProfileScreen() {
             <HubRow icon="🔔" title="Player reminders" status={customReminders ? `Custom: ${(reminderMins ?? []).length} reminder${(reminderMins ?? []).length === 1 ? '' : 's'}` : 'Players’ own settings'} open={panel === 'reminders'} onPress={() => setPanel(panel === 'reminders' ? '' : 'reminders')} />
             {panel === 'reminders' && (
             <Card style={{ gap: theme.spacing(2) }}>
-              <Text style={textStyles.h3}>🔔 Player reminders</Text>
+              <Text style={textStyles.h3}>Player reminders</Text>
               <View style={st.tags}>
                 <SelectChip label="Each player's own settings" active={!customReminders} onPress={() => saveReminders(undefined)} />
                 <SelectChip label="Custom for this tournament" active={customReminders} onPress={() => saveReminders(reminderMins ?? [...DEFAULT_LEAD_MINUTES])} />
@@ -954,7 +956,7 @@ export default function TournamentProfileScreen() {
             <HubRow icon="🔑" title="Ownership & history" status={currentOwnerLabel} open={panel === 'ownership'} onPress={() => setPanel(panel === 'ownership' ? '' : 'ownership')} />
             {panel === 'ownership' && (
             <Card style={{ gap: theme.spacing(2) }}>
-              <Text style={textStyles.h3}>🔑 Ownership</Text>
+              <Text style={textStyles.h3}>Ownership</Text>
               <Text style={textStyles.muted}>Organized by <Text style={textStyles.body}>{currentOwnerLabel}</Text>{creatorName ? ` · Created by ${creatorName}` : ''}</Text>
 
               {(transferToIndividual || transferOrgs.length > 0) && (
@@ -1187,7 +1189,7 @@ export default function TournamentProfileScreen() {
                     <View style={[st.dot, { backgroundColor: t.colorHex ?? theme.colors.surfaceAlt }]} />
                     <View style={{ flex: 1 }}>
                       <Text style={textStyles.body}>{t.name}</Text>
-                      <Text style={textStyles.muted}>{t.sports.map((s) => getSportMeta(s).icon).join(' ')}</Text>
+                      <SportLine sports={t.sports} />
                     </View>
                     <Text style={st.chevron}>›</Text>
                   </Card>
@@ -1207,7 +1209,7 @@ function HubRow({ icon, title, status, onPress, open }: { icon: string; title: s
   return (
     <TouchableOpacity accessibilityRole="button" accessibilityLabel={title} activeOpacity={0.85} onPress={onPress}>
       <Card style={st.hubRow}>
-        <Text style={st.hubIcon}>{icon}</Text>
+        <Glyph emoji={icon} style={st.hubIcon} color={theme.colors.primary} />
         <View style={{ flex: 1 }}>
           <Text style={textStyles.body} numberOfLines={1}>{title}</Text>
           {status ? <Text style={textStyles.muted} numberOfLines={1}>{status}</Text> : null}

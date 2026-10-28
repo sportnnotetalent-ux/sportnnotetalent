@@ -97,7 +97,7 @@ describe('status labels wrap instead of being cut off', () => {
     assert.match(pv, /verifyHead: \{ flexDirection: 'row', flexWrap: 'wrap'/);
     assert.match(pv, /reviewCardRow: \{ flexDirection: 'row', flexWrap: 'wrap'/);
     assert.match(pv, /headTitle: \{ flexShrink: 1 \}/);
-    assert.match(pv, /<Text style=\{\[textStyles\.h3, st\.headTitle\]\}>🛡️ Age & guardian verification<\/Text>/);
+    assert.match(pv, /<Text style=\{\[textStyles\.h3, st\.headTitle\]\}>Age & guardian verification<\/Text>/); // 2026-10-29: headings drop their emoji
     const ls = read('src/screens/LiveScoringScreen.tsx');
     assert.match(ls, /header: \{ flexDirection: 'row', flexWrap: 'wrap'/);
     assert.match(ls, /sportName: \{[^}]*flexShrink: 1 \}/);

@@ -7,6 +7,7 @@ import { View, Text, TouchableOpacity, Modal, Pressable, StyleSheet } from 'reac
 import { theme } from '../core/theme';
 import { textStyles } from './ui';
 import { useActiveOrg } from '../core/orgContext';
+import { Glyph } from './Icon';
 
 export function ContextSwitcher() {
   const { activeOrg, myOrgs, setActiveOrgId } = useActiveOrg();
@@ -49,7 +50,7 @@ function Row({ label, hint, active, personal, onPress }: { label: string; hint?:
         <Text style={textStyles.body}>{label}</Text>
         {!!hint && <Text style={textStyles.muted} numberOfLines={1}>{hint}</Text>}
       </View>
-      {active && <Text style={st.check}>✓</Text>}
+      {active && <Glyph emoji="✓" style={st.check} />}
     </TouchableOpacity>
   );
 }

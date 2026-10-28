@@ -103,7 +103,7 @@ export function PhoneLoginCard({ onUseEmail, onUseEmailCode }: { onUseEmail?: ()
 
   return (
     <Card style={st.card}>
-      <Text style={textStyles.h3}>📱 Continue with your mobile number</Text>
+      <Text style={textStyles.h3}>Continue with your mobile number</Text>
 
       {step === 'phone' && (
         <>

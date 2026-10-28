@@ -74,7 +74,7 @@ export default function GolfCourseEditScreen() {
           <>
             {saved && (
               <Card style={{ gap: theme.spacing(2) }}>
-                <Text style={textStyles.h3}>✓ Course saved</Text>
+                <Text style={textStyles.h3}>Course saved</Text>
                 <Text style={textStyles.muted}>
                   {open ? `${open} open round${open === 1 ? '' : 's'} on this course now score${open === 1 ? 's' : ''} with the new pars, stroke indexes and tees.` : 'No open rounds on this course.'}
                   {finished ? ` ${finished} finished round${finished === 1 ? '' : 's'} keep${finished === 1 ? 's' : ''} the scores as recorded.` : ''}

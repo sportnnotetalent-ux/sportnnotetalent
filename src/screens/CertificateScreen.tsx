@@ -56,7 +56,7 @@ export default function CertificateScreen() {
           <>
             {res && !res.found ? (
               <Card style={[{ gap: theme.spacing(1) }, st.bad]}>
-                <Text style={[textStyles.h3, { color: theme.colors.danger }]}>✗ No certificate with that code</Text>
+                <Text style={[textStyles.h3, { color: theme.colors.danger }]}>No certificate with that code</Text>
                 <Text style={textStyles.muted}>Check the code on the certificate (letters and numbers only — no O or I). A certificate that isn’t found here wasn’t issued on SportnNote.</Text>
               </Card>
             ) : null}

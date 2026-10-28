@@ -9,6 +9,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { theme } from '../core/theme';
+import { Glyph, IconText } from '../components/Icon';
+import { SportBadge, SportLine } from '../components/SportArt';
 import { FollowBell } from '../components/FollowBell';
 import { EmptyState, Card, LoadingState, Pill, SelectChip, ScreenTitle, textStyles, plural } from '../components/ui';
 import { MatchCard } from '../components/MatchCard';
@@ -120,14 +122,17 @@ export default function DiscoverScreen() {
             const summary = b ? sportSummary(b) : '';
             if (!b || !summary) return null;
             return (
-              <Text style={st.statLine} numberOfLines={1}>
-                {getSportMeta(b.sport).icon} {summary}{hasPartialCoverage(stats.recent, b) ? ' ☁' : ''}
-              </Text>
+              <View style={st.statRow}>
+                <SportBadge sport={b.sport} size={15} />
+                <Text style={[st.statLine, { flexShrink: 1 }]} numberOfLines={1}>
+                  {summary}{hasPartialCoverage(stats.recent, b) ? ' ☁' : ''}
+                </Text>
+              </View>
             );
           })()}
           <View style={st.sportDots}>
             {player.sports.slice(0, 4).map((s) => (
-              <Text key={s} style={st.sportIcon}>{getSportMeta(s).icon}</Text>
+              <SportBadge key={s} sport={s} size={22} />
             ))}
             {/* Added by an organiser, no account yet — so they can't be messaged or claim stats. */}
             {flagUnclaimed && !player.profileId ? <Pill label="Not on app yet" /> : null}
@@ -153,7 +158,7 @@ export default function DiscoverScreen() {
           <View style={[st.teamDot, { backgroundColor: t.colorHex ?? theme.colors.surfaceAlt }]} />
           <View style={{ flex: 1 }}>
             <Text style={textStyles.body}>{t.name}</Text>
-            <Text style={textStyles.muted}>{t.sports.map((s) => getSportMeta(s).icon).join(' ')}</Text>
+            <SportLine sports={t.sports} />
           </View>
         </TouchableOpacity>
         <TouchableOpacity accessibilityRole="button"
@@ -174,12 +179,10 @@ export default function DiscoverScreen() {
     return (
       <TouchableOpacity accessibilityRole="button" key={t.id} activeOpacity={0.85} onPress={() => nav.navigate('Tournament', { tournamentId: t.id })}>
         <Card style={st.teamRow}>
-          <Text style={st.sportIcon}>🏆</Text>
+          <Glyph emoji="🏆" style={st.sportIcon} color={theme.colors.primary} />
           <View style={{ flex: 1 }}>
             <Text style={textStyles.body} numberOfLines={1}>{t.name}</Text>
-            <Text style={textStyles.muted} numberOfLines={1}>
-              {t.hostName} · {t.sports.map((s) => getSportMeta(s).icon).join(' ')} · {t.startDate}
-            </Text>
+            <SportLine sports={t.sports}>{t.hostName} · {t.startDate}</SportLine>
           </View>
           {status ? <Pill label={status.label} textColor={status.color} /> : <Text style={st.chevron}>›</Text>}
         </Card>
@@ -224,7 +227,7 @@ export default function DiscoverScreen() {
               accessibilityState={{ selected: mode === m.key }}
               onPress={() => setMode(m.key)}
             >
-              <Text style={[st.segText, mode === m.key && st.segTextActive]}>{m.label}</Text>
+              <IconText label={m.label} style={[st.segText, mode === m.key && st.segTextActive]} />
             </TouchableOpacity>
           ))}
         </View>
@@ -234,7 +237,7 @@ export default function DiscoverScreen() {
         ) : (
           <>
         <View style={st.searchBox}>
-          <Text style={st.searchGlyph}>🔍</Text>
+          <Glyph emoji="🔍" style={st.searchGlyph} />
           <TextInput
             ref={inputRef}
             style={st.searchInput}
@@ -252,7 +255,7 @@ export default function DiscoverScreen() {
             <TouchableOpacity accessibilityRole="button" accessibilityLabel="Clear search" style={st.clearBtn}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               onPress={() => { setQuery(''); inputRef.current?.focus(); }}>
-              <Text style={st.clearText}>✕</Text>
+              <Glyph emoji="✕" style={st.clearText} />
             </TouchableOpacity>
           ) : null}
         </View>
@@ -378,6 +381,7 @@ const st = StyleSheet.create({
   avatar: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontWeight: '800' },
   statLine: { color: theme.colors.text, fontSize: theme.font.small, fontWeight: '600', marginTop: 1 },
+  statRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 1 },
   sportDots: { flexDirection: 'row', gap: theme.spacing(1), marginTop: theme.spacing(1) },
   teamsHeader: { marginTop: theme.spacing(3) },
   teamRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(3) },

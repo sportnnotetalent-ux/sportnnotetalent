@@ -19,7 +19,7 @@ export interface WeightliftingMatchState { ended: boolean }
 
 const ScoringControls: SportPlugin<WeightliftingMatchState>['ScoringControls'] = () => (
   <View style={{ gap: theme.spacing(2) }}>
-    <Text style={textStyles.h3}>🏋️ Weightlifting runs as events</Text>
+    <Text style={textStyles.h3}>Weightlifting runs as events</Text>
     <Text style={textStyles.muted}>Set up each bodyweight category from the tournament’s Weightlifting page: add the lifters, weigh them in, then enter each attempt as it is lifted.</Text>
   </View>
 );

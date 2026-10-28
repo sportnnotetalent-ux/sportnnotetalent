@@ -5,10 +5,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, Modal, Pressable, StyleSheet } from 'react-native';
 import { KeyboardAwareScrollView, KeyboardSheetScope, useKeyboardSheet } from './keyboard';
+import { readableOn } from '../core/contrast';
 import { theme } from '../core/theme';
 import { SelectChip, TextField, textStyles } from './ui';
 import { RankBadge } from './Rank';
 import { notice } from '../core/confirm';
+import { Glyph } from './Icon';
 
 export interface PickerRow {
   id: string;
@@ -83,14 +85,14 @@ export function AwardPickerSheet({
                 >
                   {ranked ? <RankBadge index={i} width={22} /> : null}
                   <View style={[st.avatar, { backgroundColor: r.teamColor ?? theme.colors.surfaceAlt }]}>
-                    <Text style={st.avatarText}>{initials(r.name)}</Text>
+                    <Text style={[st.avatarText, { color: readableOn(r.teamColor ?? theme.colors.surfaceAlt) }]}>{initials(r.name)}</Text>
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={textStyles.body} numberOfLines={1}>{r.name}{r.teamName ? <Text style={textStyles.muted}> · {r.teamName}</Text> : null}</Text>
                     {r.detail ? <Text style={st.detail} numberOfLines={1}>{r.detail}</Text> : null}
                   </View>
                   {r.value !== undefined ? <Text style={st.value}>{r.value}</Text> : null}
-                  {selectedId === r.id ? <Text style={st.check}>✓</Text> : null}
+                  {selectedId === r.id ? <Glyph emoji="✓" style={st.check} /> : null}
                 </TouchableOpacity>
               ))}
             </KeyboardAwareScrollView>

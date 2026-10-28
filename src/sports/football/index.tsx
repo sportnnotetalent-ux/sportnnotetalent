@@ -684,8 +684,7 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
     subsCapped ? ` ${state.maxSubs - state.subsUsed[side]}/${state.maxSubs}` : ` ${state.subsUsed[side]} (rolling)`;
   const subSection = (
     <View style={{ gap: theme.spacing(2) }}>
-      <Text style={ctrl.label}>
-        🔄 Substitution · {state.subType} ·{subsTally('home')} {homeName}{atCap('home') ? ' (none left)' : ''},{subsTally('away')} {awayName}{atCap('away') ? ' (none left)' : ''}
+      <Text style={ctrl.label}>Substitution · {state.subType} ·{subsTally('home')} {homeName}{atCap('home') ? ' (none left)' : ''},{subsTally('away')} {awayName}{atCap('away') ? ' (none left)' : ''}
       </Text>
       <View style={ctrl.row}>
         <Button label={atCap('home') ? `${homeName} · no subs left` : `Sub — ${homeName}`} variant="ghost" style={ctrl.flex}
@@ -1127,10 +1126,10 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
     clearance: !!deep.clearances, goalKick: !!deep.setPieces, throwIn: !!deep.setPieces,
   };
   const ACTION_GROUPS: { title: string; kinds: (StatKind | 'card')[] }[] = [
-    { title: '⚡ Attacking', kinds: ['shot', 'cross', 'dribble', 'corner', 'pass', 'attackContribution'] },
-    { title: '🛡️ Defensive', kinds: ['tackle', 'interception', 'clearance', 'save', 'defenceContribution'] },
-    { title: '🟨 Discipline', kinds: ['foul', 'offside', 'handball', 'card'] },
-    { title: '🔁 Restarts', kinds: ['goalKick', 'throwIn'] },
+    { title: 'Attacking', kinds: ['shot', 'cross', 'dribble', 'corner', 'pass', 'attackContribution'] },
+    { title: 'Defensive', kinds: ['tackle', 'interception', 'clearance', 'save', 'defenceContribution'] },
+    { title: 'Discipline', kinds: ['foul', 'offside', 'handball', 'card'] },
+    { title: 'Restarts', kinds: ['goalKick', 'throwIn'] },
   ];
   const startAction = (kind: StatKind | 'card') =>
     setFlow(kind === 'foul' ? { mode: 'foul', step: 'team' } : { mode: 'stat', kind, step: 'team' });
@@ -1167,7 +1166,7 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
 
       {/* Goal — one flow: scorer (or own goal) → goal type → assist. */}
       <View style={{ gap: theme.spacing(2) }}>
-        <Text style={ctrl.label}>⚽ Goal</Text>
+        <Text style={ctrl.label}>Goal</Text>
         <Text style={ctrl.meta}>Pick the scorer (or own goal), the goal type, then the assist.</Text>
         <View style={ctrl.row}>
           <Button label={`Goal — ${homeName}`} variant="home" color={hc} style={ctrl.flex} onPress={() => setFlow({ mode: 'goal', side: 'home', step: 'scorer' })} />
@@ -1177,7 +1176,7 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
 
       {/* Penalty — won by → taken by → scored / saved / missed (credits the GK on a save). */}
       <View style={{ gap: theme.spacing(2) }}>
-        <Text style={ctrl.label}>🥅 Penalty</Text>
+        <Text style={ctrl.label}>Penalty</Text>
         <Text style={ctrl.meta}>Who won it, who took it, and whether it was scored, saved or missed.</Text>
         <Button label="Award a penalty" variant="ghost" onPress={() => setFlow({ mode: 'pen', step: 'team' })} />
         {/* deep wave: a goal ruled out (offside / foul / VAR) — a timeline row, the score never moved.
@@ -1209,7 +1208,7 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
       {/* #6: backfill — catch up on events that happened before scoring started.
           While active, every logged action is stamped at the chosen past minute. */}
       <View style={{ gap: theme.spacing(2) }}>
-        <Text style={ctrl.label}>⏪ Backfill an earlier moment</Text>
+        <Text style={ctrl.label}>Backfill an earlier moment</Text>
         {backfillMin == null ? (
           <>
             <Text style={ctrl.meta}>Started scoring late? Enter a past minute — everything you log is stamped there until you go back to live.</Text>
@@ -1227,7 +1226,7 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
           </>
         ) : (
           <View style={ctrl.addedBox}>
-            <Text style={ctrl.label}>⏪ Backfilling at {minLabel(backfillMin, backfillHalf)}</Text>
+            <Text style={ctrl.label}>Backfilling at {minLabel(backfillMin, backfillHalf)}</Text>
             <Text style={ctrl.meta}>Every action you log now is stamped at {minLabel(backfillMin, backfillHalf)}. Adjust the minute, or go back to live scoring.</Text>
             <View style={ctrl.row}>
               <Button label="−1'" accessibilityLabel={`One minute earlier, now ${backfillMin}`} variant="ghost" style={ctrl.flex} onPress={() => setBackfillMin(Math.max(0, backfillMin - 1))} />
@@ -1242,7 +1241,7 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
           decision at 10') without undoing everything back to it. */}
       <View style={{ gap: theme.spacing(2) }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Text style={ctrl.label}>🗓 Correct the timeline</Text>
+          <Text style={ctrl.label}>Correct the timeline</Text>
           <Button label={showEdit ? 'Done' : 'Edit'} variant="ghost" onPress={() => setShowEdit((v) => !v)} />
         </View>
         {showEdit && (() => {
@@ -1277,7 +1276,7 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
         if ((stop === 0 && min >= base - 2) || (stop > 0 && changeAdded)) {
           return (
             <View style={ctrl.addedBox}>
-              <Text style={ctrl.label}>⏱ Added time</Text>
+              <Text style={ctrl.label}>Added time</Text>
               <Text style={ctrl.meta}>{stop > 0 ? `Now +${stop}′ — pick the new figure the 4th official shows.` : `The ${HALF_NAME[state.half]} is nearly up — enter the minutes of added (injury) time.`}</Text>
               <View style={ctrl.chips}>
                 {[1, 2, 3, 4, 5, 6, 7, 8, ...(stop > 8 ? [stop] : [])].map((m) => (
@@ -1347,7 +1346,7 @@ function PossessionBar({
   const side = state.possession.side;
   return (
     <View style={{ gap: theme.spacing(2) }}>
-      <Text style={ctrl.label}>⚽ Possession — {homeName} {pct.home}% : {pct.away}% {awayName}</Text>
+      <Text style={ctrl.label}>Possession — {homeName} {pct.home}% : {pct.away}% {awayName}</Text>
       <View style={[ctrl.possTrack, { backgroundColor: ac }]}>
         <View style={[ctrl.possFill, { width: `${pct.home}%`, backgroundColor: hc }]} />
       </View>
@@ -1425,7 +1424,7 @@ function FirstKicker({ homeName, awayName, homeColor, awayColor, onPick, onCance
 }) {
   return (
     <View style={{ gap: theme.spacing(2) }}>
-      <Text style={ctrl.label}>🪙 Who kicks first?</Text>
+      <Text style={ctrl.label}>Who kicks first?</Text>
       <Text style={ctrl.meta}>After the referee’s toss (or however they decide) — pick the team going first.</Text>
       <View style={ctrl.row}>
         <Button label={`${homeName} first`} variant="home" color={homeColor} style={ctrl.flex} onPress={() => onPick('home')} />
@@ -1488,7 +1487,7 @@ function ShootoutControls({
   const list = (side: 'home' | 'away') => kicks.filter((k) => k.side === side).map((k) => kickText(nameRow(k, playerNameOf))).join(' · ');
   return (
     <View style={{ gap: theme.spacing(3) }}>
-      <Text style={ctrl.label}>🥅 Penalty shootout — {pens.home} : {pens.away}</Text>
+      <Text style={ctrl.label}>Penalty shootout — {pens.home} : {pens.away}</Text>
       <View style={ctrl.penRow}><Text style={ctrl.penTeam}>{homeName}</Text><View style={ctrl.row}>{state.shootout.home.map(dot)}</View></View>
       {list('home') ? <Text style={ctrl.meta}>{list('home')}</Text> : null}
       <View style={ctrl.penRow}><Text style={ctrl.penTeam}>{awayName}</Text><View style={ctrl.row}>{state.shootout.away.map(dot)}</View></View>

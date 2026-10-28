@@ -22,6 +22,7 @@ import { filterTeams } from '../core/teamSearch';
 import { OpenInAppBanner } from '../components/OpenInAppBanner';
 import type { SportId, Team } from '../core/types';
 import type { RootStackParamList } from '../navigation/types';
+import { SportLine } from '../components/SportArt';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 const PALETTE = ['#FF5C5C', '#4DA3FF', '#3DDC97', '#FFB454', '#B98AFF', '#FF8AC4'];
@@ -157,7 +158,7 @@ export default function JoinTournamentScreen() {
           <Card style={{ gap: theme.spacing(3) }}>
             <View>
               <Text style={textStyles.h3}>{info.name}</Text>
-              <Text style={textStyles.muted}>{info.sports.map((s) => `${getSportMeta(s).icon} ${getSportMeta(s).name}`).join(' · ')}</Text>
+              <SportLine sports={info.sports}>{info.sports.length > 1 ? info.sports.map((s) => getSportMeta(s).name).join(' · ') : null}</SportLine>
             </View>
 
             <Text style={textStyles.h3}>Your teams</Text>

@@ -40,6 +40,7 @@ import { ResultHoldNote } from '../components/ResultHoldNote';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { safeWebUrl } from '../core/safeUrl';
 import { theme } from '../core/theme';
+import { Glyph } from '../components/Icon';
 import { getSport } from '../sports/registry';
 import { VoiceScorer } from '../sports/VoiceScorer';
 import { completesMatch } from '../sports/voiceMatch';
@@ -1351,7 +1352,7 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
       {syncing ? (
         <Text style={[textStyles.muted, { textAlign: 'center' }]}>Syncing live score…</Text>
       ) : complete ? (
-        <Text style={[textStyles.h3, { textAlign: 'center' }]}>✅ Match complete — final score saved</Text>
+        <Text style={[textStyles.h3, { textAlign: 'center' }]}>Match complete — final score saved</Text>
       ) : !canScore ? (
         <View style={{ gap: theme.spacing(2), alignItems: 'center' }}>
           {scorerIds.length > 0 ? (
@@ -1884,7 +1885,7 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
         {/* Current scorers — each removable by a manager. */}
         {scorerIds.length === 0 ? (
           <View style={st.scorerRow}>
-            <View style={st.scorerAvatar}><Text style={st.scorerIcon}>➕</Text></View>
+            <View style={st.scorerAvatar}><Glyph emoji="➕" style={st.scorerIcon} /></View>
             <View style={{ flex: 1 }}>
               <Text style={[textStyles.body, { fontWeight: '700' }]}>No scorer yet</Text>
               <Text style={textStyles.muted} numberOfLines={1}>
@@ -1898,7 +1899,7 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
             return (
               <View key={id} style={st.scorerRow}>
                 <View style={[st.scorerAvatar, mine && { backgroundColor: theme.colors.primary }]}>
-                  <Text style={[st.scorerAvatarText, mine && { color: '#0B0F14' }]}>{scorerInitials(nameOf(id) ?? '')}</Text>
+                  <Text style={[st.scorerAvatarText, mine && { color: theme.colors.onFill }]}>{scorerInitials(nameOf(id) ?? '')}</Text>
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={[textStyles.body, { fontWeight: '700' }]} numberOfLines={1}>{nameOf(id) ?? 'Scorer'}{mine ? ' · you' : ''}</Text>
@@ -1996,7 +1997,7 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
         )}
         {canManage && matchId && meta.status !== 'live' && (
           <TouchableOpacity accessibilityRole="button" accessibilityLabel="Reschedule or postpone this match" onPress={() => navigation.navigate('EditMatch', { matchId })}>
-            <Text style={[st.editLink, { marginTop: theme.spacing(2) }]}>🗓 Reschedule / postpone</Text>
+            <Text style={[st.editLink, { marginTop: theme.spacing(2) }]}>Reschedule / postpone</Text>
           </TouchableOpacity>
         )}
         {/* Walkover — a team didn't turn up / doesn't field this sport, so the
@@ -2004,7 +2005,7 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
         {canManage && matchId && meta.status !== 'live' && meta.status !== 'completed' && (
           !woOpen ? (
             <TouchableOpacity accessibilityRole="button" accessibilityLabel="Record a walkover" onPress={() => setWoOpen(true)}>
-              <Text style={[st.editLink, { marginTop: theme.spacing(2) }]}>🏳 Award a walkover</Text>
+              <Text style={[st.editLink, { marginTop: theme.spacing(2) }]}>Award a walkover</Text>
             </TouchableOpacity>
           ) : (
             <View style={{ gap: theme.spacing(2), marginTop: theme.spacing(2) }}>
@@ -2056,7 +2057,7 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
     const streamSettingsCard = hasMatch && (canScore || canManage) && !complete ? (
       <View style={st.infoCard}>
         <View style={st.streamHead}>
-          <Text style={textStyles.h3}>📺 Live stream</Text>
+          <Text style={textStyles.h3}>Live stream</Text>
           {streamUrl && !editingStream ? <View style={st.streamPill}><View style={st.streamDot} /><Text style={st.streamPillText}>ON</Text></View> : null}
         </View>
         {streamUrl && !editingStream ? (
@@ -2160,7 +2161,7 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
     const disputesCard = disputes.length > 0 ? (
       <View style={st.infoCard}>
         <View style={st.streamHead}>
-          <Text style={textStyles.h3}>🚩 Participation disputes</Text>
+          <Text style={textStyles.h3}>Participation disputes</Text>
           {flaggedCount > 0 ? <View style={st.disputeCount}><Text style={st.disputeCountText}>{flaggedCount} ACTIVE</Text></View> : null}
         </View>
         <Text style={textStyles.muted}>Objections (the player themselves) hide the name as “X” immediately. Reports (from a teammate or opponent) notify the organizer, who decides whether to escalate after a ground-level check. Reassigning moves the scores to whoever actually played, once both captains confirm.</Text>
@@ -2417,7 +2418,7 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
                       />
                     )}
                     {canManage && !complete && matchId && (
-                      <Text style={[st.editLink, { marginTop: theme.spacing(2) }]} accessibilityRole="button" onPress={openEditInfo}>✏️ Edit date, venue &amp; format</Text>
+                      <Text style={[st.editLink, { marginTop: theme.spacing(2) }]} accessibilityRole="button" onPress={openEditInfo}>Edit date, venue &amp; format</Text>
                     )}
                     {meta.startsAt && !started && !complete && (
                       <View style={{ marginTop: theme.spacing(2), gap: theme.spacing(2) }}>
@@ -2635,7 +2636,7 @@ function InfoRow({ icon, label, value, onPress, accessibilityLabel }: {
   return (
     <View style={st.infoRow}>
       <View style={st.infoLabelWrap}>
-        {icon ? <Text style={st.infoIcon}>{icon}</Text> : null}
+        {icon ? <Glyph emoji={icon} style={st.infoIcon} color={theme.colors.primary} /> : null}
         <Text style={textStyles.muted}>{label}</Text>
       </View>
       {onPress ? (
@@ -2692,9 +2693,9 @@ function OfflineSyncBanner({ matchId }: { matchId: string }) {
 /** A coloured status pill for a dispute box header. */
 function DisputeTag({ kind }: { kind: 'reported' | 'open' | 'resolved' | 'dismissed' }) {
   const map = {
-    reported: { label: 'REPORTED', bg: theme.colors.accent, fg: '#0B0F14' },
+    reported: { label: 'REPORTED', bg: theme.colors.accent, fg: theme.colors.onFill },
     open: { label: 'UNDER REVIEW', bg: theme.colors.dangerStrong, fg: '#fff' },
-    resolved: { label: 'RESOLVED', bg: theme.colors.primary, fg: '#0B0F14' },
+    resolved: { label: 'RESOLVED', bg: theme.colors.primary, fg: theme.colors.onFill },
     dismissed: { label: 'DISMISSED', bg: theme.colors.surface, fg: theme.colors.textMuted },
   }[kind];
   return <View style={[st.dtag, { backgroundColor: map.bg }]}><Text style={[st.dtagText, { color: map.fg }]}>{map.label}</Text></View>;
@@ -2820,8 +2821,8 @@ const st = StyleSheet.create({
   scorerLiveText: { color: '#fff', fontSize: theme.font.tiny, fontWeight: '900', letterSpacing: 1 },
   streamHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   streamPill: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(1), paddingVertical: 3, paddingHorizontal: theme.spacing(2), borderRadius: theme.radius.pill, backgroundColor: theme.colors.primary },
-  streamDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: '#0B0F14' },
-  streamPillText: { color: '#0B0F14', fontSize: theme.font.tiny, fontWeight: '900', letterSpacing: 1 },
+  streamDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: theme.colors.onFill },
+  streamPillText: { color: theme.colors.onFill, fontSize: theme.font.tiny, fontWeight: '900', letterSpacing: 1 },
   streamRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(2) },
   streamPlatform: { color: theme.colors.text, fontSize: theme.font.body, fontWeight: '800' },
   officialRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(2), paddingVertical: theme.spacing(1) },
@@ -2853,7 +2854,7 @@ const st = StyleSheet.create({
   roleTag: { minWidth: 18, minHeight: 18, borderRadius: 4, backgroundColor: theme.colors.surfaceAlt, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
   roleCaptain: { backgroundColor: theme.colors.accent },
   roleTagText: { color: theme.colors.text, fontSize: theme.font.tiny, fontWeight: '900' },
-  roleTagTextDark: { color: '#0B0F14' },
+  roleTagTextDark: { color: theme.colors.onFill },
   disputedName: { color: theme.colors.danger, fontWeight: '800', textDecorationLine: 'line-through' },
   objectLink: { color: theme.colors.danger, fontSize: theme.font.small, fontWeight: '700' },
   disputeBox: { gap: theme.spacing(2), backgroundColor: theme.colors.surfaceAlt, borderRadius: theme.radius.md, padding: theme.spacing(3), marginTop: theme.spacing(2) },

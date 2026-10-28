@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { theme } from '../core/theme';
+import { Glyph } from '../components/Icon';
 import { Card, Pill, ScreenTitle, textStyles } from '../components/ui';
 import { SectionHeader, SECTION_CAP } from '../components/SectionHeader';
 import { FollowBell } from '../components/FollowBell';
@@ -58,7 +59,7 @@ export default function FollowingScreen() {
             <SectionHeader title="Tournaments" count={followedTournaments.length} onSeeAll={followedTournaments.length > SECTION_CAP ? () => setShowAllTournaments((v) => !v) : undefined} expanded={showAllTournaments} />
             {(showAllTournaments ? followedTournaments : followedTournaments.slice(0, SECTION_CAP)).map((t) => (
               <Card key={t.id} style={st.row}>
-                <Text style={st.icon}>🏆</Text>
+                <Glyph emoji="🏆" style={st.icon} color={theme.colors.primary} />
                 <View style={{ flex: 1 }}>
                   <Text style={textStyles.body}>{t.name}</Text>
                   <Text style={textStyles.muted}>{t.hostName}</Text>

@@ -41,6 +41,7 @@ import type { SportId, Team } from '../core/types';
 // letter); the rest are knockout stages. Drives the standings/bracket views.
 type Phase = 'league' | 'group' | KoStage;
 import type { RootStackParamList } from '../navigation/types';
+import { Glyph } from '../components/Icon';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type PickTeam = Pick<Team, 'id' | 'name' | 'colorHex'> & { roster?: string[] };
@@ -560,7 +561,7 @@ function SportPicker({ sport, onPick }: { sport: SportId | null; onPick: (s: Spo
               onPress={() => { onPick(s.id); setOpen(false); }}
             >
               <Text style={st.optionText}>{s.icon}  {s.name}</Text>
-              {s.id === sport && <Text style={st.check}>✓</Text>}
+              {s.id === sport && <Glyph emoji="✓" style={st.check} />}
             </TouchableOpacity>
           ))}
         </View>

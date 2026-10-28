@@ -154,7 +154,7 @@ export default function SportHubScreen() {
 
         {(categories.length > 0 || leaderScope.options.length > 0) && (
           <>
-            <Text style={[textStyles.h3, st.section]}>📊 Statistics</Text>
+            <Text style={[textStyles.h3, st.section]}>Statistics</Text>
             <LeaderSplitChips scope={leaderScope} note="Leaders from" />
             {categories.length > 0 ? (
               <>

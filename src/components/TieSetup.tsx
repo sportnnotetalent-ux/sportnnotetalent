@@ -13,6 +13,7 @@ import {
   type TieSpec, type RubberKind, type DeadRule,
 } from '../data/teamTie';
 import type { SportId } from '../core/types';
+import { Glyph } from './Icon';
 
 const KIND_LABEL: Record<RubberKind, string> = { S: 'Singles', D: 'Doubles', XD: 'Mixed' };
 
@@ -78,7 +79,7 @@ export function TieSetup({ sport, value, onChange, teamAName, teamBName, showDra
               {custom.length > 1 ? (
                 <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Remove rubber ${i + 1}`} style={st.icon}
                   onPress={() => pickCustom(custom.filter((_, j) => j !== i))}>
-                  <Text style={st.iconText}>✕</Text>
+                  <Glyph emoji="✕" style={st.iconText} />
                 </TouchableOpacity>
               ) : null}
             </View>

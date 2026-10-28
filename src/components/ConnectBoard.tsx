@@ -9,6 +9,8 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { theme } from '../core/theme';
 import { Card, Pill, Button, EmptyState, textStyles } from './ui';
 import { getSportMeta } from '../sports/sportMeta';
+import { SportBadge } from './SportArt';
+import { IconText } from './Icon';
 import { useListings } from '../data/hooks';
 import { PlayerFilters, activeFilterCount, type PlayerFilterState } from './PlayerFilters';
 import { useAuth } from '../core/auth';
@@ -84,7 +86,7 @@ export function ConnectBoard() {
           <Card key={l.id} style={st.card}>
             <View style={st.cardHead}>
               <Pill label={`${meta.icon} ${meta.short}`} color={theme.colors.surfaceAlt} textColor={theme.colors.accent} />
-              <Text style={st.sportIcon}>{getSportMeta(l.sport).icon}</Text>
+              <SportBadge sport={l.sport} size={22} />
               <View style={{ flex: 1 }} />
               <Text style={textStyles.muted}>{timeAgo(l.createdAt, now)}</Text>
             </View>
@@ -93,7 +95,7 @@ export function ConnectBoard() {
             <Text style={textStyles.muted} numberOfLines={1}>
               {getSportMeta(l.sport).name}
               {l.position ? ` · ${l.position}` : ''}
-              {l.city ? ` · 📍 ${l.city}` : ''}
+              {l.city ? ` · ${l.city}` : ''}
             </Text>
             {tags.length > 0 && (
               <View style={st.tags}>
@@ -107,7 +109,7 @@ export function ConnectBoard() {
             <View style={st.actions}>
               {l.contactPhone ? (
                 <TouchableOpacity accessibilityRole="button" style={st.waBtn} activeOpacity={0.85} onPress={() => reachOut(l)}>
-                  <Text style={st.waText}>💬 WhatsApp</Text>
+                  <IconText label="💬 WhatsApp" style={st.waText} />
                 </TouchableOpacity>
               ) : (
                 <Text style={textStyles.muted}>No contact shared</Text>
@@ -136,12 +138,11 @@ const st = StyleSheet.create({
   chips: { gap: theme.spacing(2), paddingVertical: theme.spacing(1) },
   card: { gap: theme.spacing(2) },
   cardHead: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(2) },
-  sportIcon: { fontSize: 18 },
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing(2) },
   details: { color: theme.colors.text, fontSize: theme.font.small, lineHeight: 20 },
   actions: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(2), marginTop: theme.spacing(1) },
   waBtn: { backgroundColor: '#25D366', borderRadius: theme.radius.pill, paddingVertical: theme.spacing(2), paddingHorizontal: theme.spacing(3) },
-  waText: { color: theme.colors.onFill, fontSize: theme.font.small, fontWeight: '800' },
+  waText: { color: theme.colors.onLime, fontSize: theme.font.small, fontWeight: '800' },
   contactCol: { gap: 1 },
   phone: { color: theme.colors.textMuted, fontSize: theme.font.small },
   verified: { color: theme.colors.primary, fontSize: theme.font.tiny, fontWeight: '700' },

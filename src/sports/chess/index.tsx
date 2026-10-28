@@ -192,7 +192,7 @@ const ScoringControls: SportPlugin<ChessState>['ScoringControls'] = ({ state, di
       ) : null}
       {koAt ? (
         <View style={ctrl.koBox}>
-          <Text style={ctrl.label}>🏆 Knockout · {koPhaseText(koNow, koAt.phase, koAt.game)}</Text>
+          <Text style={ctrl.label}>Knockout · {koPhaseText(koNow, koAt.phase, koAt.game)}</Text>
           <KoGames ko={koNow} nameOf={nameOf} />
           <Text style={ctrl.meta}>
             {armageddon
@@ -202,7 +202,7 @@ const ScoringControls: SportPlugin<ChessState>['ScoringControls'] = ({ state, di
         </View>
       ) : null}
       <View style={{ gap: theme.spacing(2) }}>
-        <Text style={ctrl.label}>♔ White pieces: {nameOf(white)}</Text>
+        <Text style={ctrl.label}>White pieces: {nameOf(white)}</Text>
         {colourLocked ? (
           <Text style={textStyles.muted} accessibilityRole="button" onPress={() => setUnlockColour(true)}>
             ♚ {nameOf(black)} has Black · <Text style={ctrl.link}>Colours wrong? Change…</Text>

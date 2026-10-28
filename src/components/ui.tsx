@@ -15,6 +15,20 @@ import { theme } from '../core/theme';
 import { useFormField, useKeyboardFocus } from './keyboard';
 import { readableOn } from '../core/contrast';
 import { toggleA11y } from '../core/a11y';
+import { splitLeading, stripLeadingEmoji, sportChip } from '../core/leadingEmoji';
+import { EMOJI_ICONS, EMOJI_KEYS, EmojiIcon } from './Icon';
+import { SPORT_COLORS } from './SportArt';
+import { SPORT_LIST } from '../sports/sportMeta';
+
+/** 2026-10-29 redesign: "⚽ Football" on a chip or pill → the sport (drawn as
+ *  its colour dot and name); a mapped leading emoji → its line icon. */
+function chipParts(label: string): { text: string; dot?: string; spec?: (typeof EMOJI_ICONS)[string] } {
+  const sp = sportChip(label, SPORT_LIST);
+  if (sp) return { text: sp.name, dot: SPORT_COLORS[sp.id] };
+  const lead = splitLeading(label, EMOJI_KEYS);
+  const spec = lead ? EMOJI_ICONS[lead.key] : undefined;
+  return spec && lead!.rest ? { text: lead!.rest, spec } : { text: label };
+}
 
 /** Count + correctly-pluralized noun, e.g. plural(1,'match','matches') → "1 match".
  *  Keeps stat lines grammatical ("1 match · 1 win", not "1 matches · 1 wins"). */
@@ -55,7 +69,9 @@ export function EmptyState({
 }) {
   return (
     <View style={[emptyStyles.wrap, compact && emptyStyles.compact]}>
-      {icon ? <Text style={emptyStyles.icon}>{icon}</Text> : null}
+      {icon ? (EMOJI_ICONS[icon.replace('\uFE0F', '')] ? (
+        <View style={emptyStyles.iconCircle}><EmojiIcon spec={EMOJI_ICONS[icon.replace('\uFE0F', '')]} color={theme.colors.primary} size={26} /></View>
+      ) : <Text style={emptyStyles.icon}>{icon}</Text>) : null}
       <Text style={emptyStyles.title}>{title}</Text>
       {hint ? <Text style={emptyStyles.hint}>{hint}</Text> : null}
     </View>
@@ -66,6 +82,7 @@ const emptyStyles = StyleSheet.create({
   wrap: { alignItems: 'center', justifyContent: 'center', gap: theme.spacing(2), paddingVertical: theme.spacing(6), paddingHorizontal: theme.spacing(4) },
   compact: { paddingVertical: theme.spacing(4) },
   icon: { fontSize: 30 },
+  iconCircle: { width: 56, height: 56, borderRadius: 28, backgroundColor: theme.colors.primary + '14', alignItems: 'center', justifyContent: 'center' },
   title: { color: theme.colors.text, fontSize: theme.font.body, fontWeight: '600', textAlign: 'center' },
   hint: { color: theme.colors.textMuted, fontSize: theme.font.small, textAlign: 'center', lineHeight: theme.font.small * 1.4 },
 });
@@ -123,13 +140,17 @@ export function Button({
   const bg = variant === 'ghost' ? 'transparent' : color ?? variantBg;
   // SD-155: a custom kit colour gets whichever ink reads on it (dark kits → white).
   const fg = variant === 'ghost' ? theme.colors.text : color ? readableOn(color) : variant === 'primary' ? theme.colors.onLime : theme.colors.onFill;
+  // a leading emoji → its line icon (the words read alone to a screen reader)
+  const lead = splitLeading(label, EMOJI_KEYS);
+  const spec = lead ? EMOJI_ICONS[lead.key] : undefined;
+  const text = spec ? lead!.rest : label;
   return (
     <TouchableOpacity
       onPress={disabled ? undefined : onPress}
       disabled={disabled}
       activeOpacity={0.85}
       accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel ?? label}
+      accessibilityLabel={accessibilityLabel ?? (spec ? text || spec.name || label : label)}
       accessibilityHint={accessibilityHint}
       {...toggleA11y(selected, disabled)}
       style={[
@@ -142,7 +163,10 @@ export function Button({
         style,
       ]}
     >
-      <Text style={[styles.btnText, { color: fg }]}>{label}</Text>
+      <View style={styles.btnRow}>
+        {spec ? <EmojiIcon spec={spec} color={fg} size={18} /> : null}
+        {text ? <Text style={[styles.btnText, { color: fg }]}>{text}</Text> : null}
+      </View>
     </TouchableOpacity>
   );
 }
@@ -156,9 +180,12 @@ export function Pill({
   color?: string;
   textColor?: string;
 }) {
+  const p = chipParts(label);
   return (
     <View style={[styles.pill, { backgroundColor: color }]}>
-      <Text style={[styles.pillText, { color: textColor }]}>{label}</Text>
+      {p.dot ? <View style={[styles.pillDot, { backgroundColor: p.dot }]} /> : null}
+      {p.spec ? <EmojiIcon spec={p.spec} color={textColor} size={12} /> : null}
+      <Text style={[styles.pillText, { color: textColor }]}>{p.text}</Text>
     </View>
   );
 }
@@ -173,7 +200,7 @@ export function ScreenTitle({
   return (
     <View style={{ marginBottom: theme.spacing(4) }}>
       <Text style={textStyles.h1} accessibilityRole="header">
-        {title}
+        {stripLeadingEmoji(title)}
       </Text>
       {subtitle ? <Text style={textStyles.muted}>{subtitle}</Text> : null}
     </View>
@@ -333,13 +360,16 @@ export function SelectChip({
   /** SD-155: required when the visible label is a symbol ("‹", "✕", "✓"). */
   accessibilityLabel?: string;
 }) {
+  const p = dotColor ? { text: label } : chipParts(label);
+  const dot = dotColor ?? p.dot;
+  const ink = active ? theme.colors.onLime : theme.colors.textMuted;
   return (
     <TouchableOpacity
       onPress={disabled ? undefined : onPress}
       disabled={disabled}
       activeOpacity={0.8}
       accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel ?? label}
+      accessibilityLabel={accessibilityLabel ?? p.text}
       // `selected` is what a screen reader announces as "selected"/"not selected" —
       // without it a chip is indistinguishable from its neighbours by voice.
       {...toggleA11y(active, disabled)}
@@ -347,8 +377,9 @@ export function SelectChip({
       hitSlop={{ top: 4, bottom: 4, left: 2, right: 2 }}
       style={[styles.selChip, active && styles.selChipActive, disabled && styles.selChipDisabled]}
     >
-      {dotColor ? <View style={[styles.selDot, { backgroundColor: dotColor }]} /> : null}
-      <Text style={[styles.selChipText, active && styles.selChipTextActive, disabled && styles.selChipTextDisabled]}>{label}</Text>
+      {dot ? <View style={[styles.selDot, { backgroundColor: dot }]} /> : null}
+      {p.spec ? <EmojiIcon spec={p.spec} color={ink} size={15} /> : null}
+      <Text style={[styles.selChipText, active && styles.selChipTextActive, disabled && styles.selChipTextDisabled]}>{p.text}</Text>
     </TouchableOpacity>
   );
 }
@@ -384,14 +415,17 @@ const styles = StyleSheet.create({
   },
   btnGhost: { borderWidth: 1.5, borderColor: theme.colors.inputBorder },
   btnDisabled: { opacity: 0.4 },
-  btnText: { fontSize: theme.font.body, fontWeight: '800', letterSpacing: 0.2, textAlign: 'center' },
+  btnRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: theme.spacing(2), maxWidth: '100%' },
+  btnText: { fontSize: theme.font.body, fontWeight: '800', letterSpacing: 0.2, textAlign: 'center', flexShrink: 1 },
   pill: {
+    flexDirection: 'row', alignItems: 'center', gap: theme.spacing(1.5),
     paddingVertical: theme.spacing(1),
     paddingHorizontal: theme.spacing(2.5),
     borderRadius: theme.radius.pill,
     alignSelf: 'flex-start',
   },
   pillText: { fontSize: theme.font.tiny, fontWeight: '700' },
+  pillDot: { width: 8, height: 8, borderRadius: 4 },
   input: {
     backgroundColor: theme.colors.surface,
     borderWidth: 1,

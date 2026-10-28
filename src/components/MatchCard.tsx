@@ -86,7 +86,7 @@ export function MatchCard({ match, onPress, onStart, timeZone }: {
     // can't nest inside another button on web.
     <View style={[s.card, live && s.cardLive]}>
     {/* 2026-10-29 redesign: a strip of the sport's court across the top */}
-    <SportArt sport={match.sport} style={s.strip} />
+    <SportArt sport={match.sport} style={s.strip} variant="strip" />
     <TouchableOpacity
       accessibilityRole="button"
       accessibilityLabel={`${sport.name}: ${teamLabel(match.homeTeam)} versus ${teamLabel(match.awayTeam)}${

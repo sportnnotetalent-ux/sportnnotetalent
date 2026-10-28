@@ -35,7 +35,7 @@ export function EditionsCard({ editions, currentId, onOpen }: { editions: Editio
   if (editions.length < 2) return null;
   return (
     <Card style={{ gap: theme.spacing(2) }}>
-      <Text style={textStyles.h3}>📅 Every edition</Text>
+      <Text style={textStyles.h3}>Every edition</Text>
       <View style={st.chips}>
         {editions.map((e) => (e.id === currentId ? (
           <Pill key={e.id} label={`${e.label} · this one`} color={theme.colors.primary + '22'} textColor={theme.colors.primary} />
@@ -67,7 +67,7 @@ export function RunAgainFooter({ tournament, canManage, next, onRunAgain, onCopy
     <View style={{ gap: theme.spacing(2) }}>
       {canManage && over && !next ? (
         <Card style={{ gap: theme.spacing(2) }}>
-          <Text style={textStyles.h3}>🏁 That’s a wrap. Run it again?</Text>
+          <Text style={textStyles.h3}>That’s a wrap. Run it again?</Text>
           <Text style={textStyles.muted}>The next edition keeps the same sports, formats, rules, age groups, venues and events — you just pick the dates.</Text>
           <Button label="🔁 Run it again" onPress={onRunAgain} />
         </Card>

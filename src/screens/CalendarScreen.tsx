@@ -9,6 +9,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { theme } from '../core/theme';
+import { Glyph } from '../components/Icon';
+import { SportBadge, SportLine } from '../components/SportArt';
 import { EmptyState, Card, Pill, SelectChip, textStyles } from '../components/ui';
 import { useMatches, useMyTournaments, useScopedMatches } from '../data/hooks';
 import { getTournaments } from '../data/repos';
@@ -119,7 +121,7 @@ export default function CalendarScreen() {
     return (
       <TouchableOpacity accessibilityRole="button" key={m.id} activeOpacity={0.85} onPress={() => openMatch(m)}>
         <Card style={st.itemRow}>
-          <Text style={st.itemIcon}>{getSportMeta(m.sport).icon}</Text>
+          <SportBadge sport={m.sport} size={28} />
           <View style={{ flex: 1 }}>
             <Text style={textStyles.body} numberOfLines={1}>{m.homeTeam.name} vs {m.awayTeam.name}</Text>
             <Text style={textStyles.muted}>
@@ -146,10 +148,10 @@ export default function CalendarScreen() {
   const tournamentRow = (t: Tournament, note?: string) => (
     <TouchableOpacity accessibilityRole="button" key={t.id} activeOpacity={0.85} onPress={() => nav.navigate('Tournament', { tournamentId: t.id })}>
       <Card style={st.itemRow}>
-        <Text style={st.itemIcon}>🏆</Text>
+        <Glyph emoji="🏆" style={st.itemIcon} color={theme.colors.primary} />
         <View style={{ flex: 1 }}>
           <Text style={textStyles.body} numberOfLines={1}>{t.name}</Text>
-          <Text style={textStyles.muted}>{t.sports.map((s) => getSportMeta(s).icon).join(' ')} · {formatDayShort(t.startDate)} → {formatDayShort(t.endDate)}{note ? ` · ${note}` : ''}</Text>
+          <SportLine sports={t.sports}>{formatDayShort(t.startDate)} → {formatDayShort(t.endDate)}{note ? ` · ${note}` : ''}</SportLine>
         </View>
         <Text style={st.chevron}>›</Text>
       </Card>

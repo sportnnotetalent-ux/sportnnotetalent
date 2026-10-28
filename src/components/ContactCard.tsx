@@ -5,6 +5,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
 import { theme } from '../core/theme';
+import { Glyph } from './Icon';
 import { Card, Pill, textStyles } from './ui';
 import { verifyContact, beginContactVerification, verifyContactOtp, type OtpChannel, type OtpVia } from '../data/repos';
 import { isSupabaseConfigured } from '../core/supabase';
@@ -119,7 +120,7 @@ export function ContactCard({
   const row = (channel: Channel, icon: string, value: string) => (
     <View style={st.block}>
       <View style={st.row}>
-        <Text style={st.icon}>{icon}</Text>
+        <Glyph emoji={icon} style={st.icon} color={theme.colors.primary} />
         <Text style={[textStyles.body, { flex: 1 }]} numberOfLines={1}>{value}</Text>
         {verified[channel] ? (
           <Pill label="✓ Verified" color={theme.colors.surfaceAlt} textColor={theme.colors.primary} />

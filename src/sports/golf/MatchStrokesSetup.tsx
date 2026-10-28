@@ -44,7 +44,7 @@ export function MatchStrokesSetup({
 
   return (
     <View style={st.box}>
-      <Text style={st.title}>⛳ Strokes and handicap shots</Text>
+      <Text style={st.title}>Strokes and handicap shots</Text>
       <Text style={textStyles.muted}>The course gives par and stroke index; with both Handicap Indexes the higher handicap gets the difference (100%, WHS singles match play) as dots on the hardest holes.</Text>
       <View style={st.chips}>
         {courses.map((c) => <SelectChip key={c.id} label={c.name} active={courseId === c.id} onPress={() => { setCourseId(c.id); setTee(undefined); }} />)}

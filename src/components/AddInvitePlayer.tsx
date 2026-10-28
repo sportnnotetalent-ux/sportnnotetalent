@@ -305,7 +305,7 @@ const st = StyleSheet.create({
   inviteTitle: { color: theme.colors.text, fontSize: theme.font.body, fontWeight: '700' },
   headRight: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(2) },
   pendingCount: { paddingVertical: 2, paddingHorizontal: theme.spacing(2), borderRadius: theme.radius.pill, backgroundColor: theme.colors.accent },
-  pendingCountText: { color: '#0B0F14', fontSize: theme.font.tiny, fontWeight: '900' },
+  pendingCountText: { color: theme.colors.onFill, fontSize: theme.font.tiny, fontWeight: '900' },
   caretMuted: { color: theme.colors.textMuted, fontSize: theme.font.body, fontWeight: '800' },
   sideRow: { flexDirection: 'row', gap: theme.spacing(2) },
   sourceRow: { flexDirection: 'row', gap: theme.spacing(3), marginTop: -theme.spacing(1) },
@@ -331,7 +331,7 @@ const st = StyleSheet.create({
   invitedName: { color: theme.colors.text, fontSize: theme.font.small, fontWeight: '700' },
   invitedPhone: { color: theme.colors.textMuted, fontSize: theme.font.tiny },
   pendingTag: { paddingVertical: 2, paddingHorizontal: theme.spacing(2), borderRadius: theme.radius.pill, backgroundColor: theme.colors.accent },
-  pendingTagText: { color: '#0B0F14', fontSize: theme.font.tiny, fontWeight: '900', letterSpacing: 0.5 },
+  pendingTagText: { color: theme.colors.onFill, fontSize: theme.font.tiny, fontWeight: '900', letterSpacing: 0.5 },
   registeredLink: { color: theme.colors.primary, fontSize: theme.font.small, fontWeight: '800' },
   removeLink: { color: theme.colors.danger, fontSize: theme.font.small, fontWeight: '800' },
 });

@@ -6,6 +6,7 @@
  *  match is live the ratings read "Live — provisional". */
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { readableOn } from '../core/contrast';
 import { theme } from '../core/theme';
 import { Card, EmptyState, textStyles } from './ui';
 import { RankBadge, podiumColor } from './Rank';
@@ -95,7 +96,7 @@ export function MatchSummary({
       {mvp && (
         <TouchableOpacity accessibilityRole="button" activeOpacity={0.85} onPress={() => mvp.id && onPlayer?.(mvp.id)} style={st.mvp}>
           <View style={[st.mvpAvatar, { backgroundColor: teamColor(mvp.side) }]}>
-            <Text style={st.mvpAvatarText}>{initials(mask.byId(mvp.id, mvp.name))}</Text>
+            <Text style={[st.mvpAvatarText, { color: readableOn(teamColor(mvp.side)) }]}>{initials(mask.byId(mvp.id, mvp.name))}</Text>
             <Text style={st.mvpBadge}>{complete ? '🏅' : '🔥'}</Text>
           </View>
           <View style={{ flex: 1 }}>
@@ -115,7 +116,7 @@ export function MatchSummary({
             return (
             <TouchableOpacity accessibilityRole="button" key={a.label} activeOpacity={0.85} onPress={() => onPlayer?.(a.player.id)} style={st.award}>
               <View style={[st.awardAvatar, { backgroundColor: teamColor(a.player.side) }]}>
-                <Text style={st.awardAvatarText}>{initials(nm)}</Text>
+                <Text style={[st.awardAvatarText, { color: readableOn(teamColor(a.player.side)) }]}>{initials(nm)}</Text>
                 <Text style={st.awardBadge}>{a.icon}</Text>
               </View>
               <Text style={st.awardLabel} numberOfLines={1}>{a.label}</Text>
@@ -153,7 +154,7 @@ export function MatchSummary({
             <TouchableOpacity accessibilityRole="button" key={p.id} activeOpacity={onPlayer ? 0.8 : 1} onPress={() => onPlayer?.(p.id)} style={[st.row, tier ? { backgroundColor: tier + '14', borderRadius: theme.radius.sm } : i > 0 && st.divider]}>
               <RankBadge index={i} width={22} />
               <View style={[st.rateAvatar, { backgroundColor: teamColor(p.side) }]}>
-                <Text style={st.rateAvatarText}>{initials(dispName)}</Text>
+                <Text style={[st.rateAvatarText, { color: readableOn(teamColor(p.side)) }]}>{initials(dispName)}</Text>
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={textStyles.body} numberOfLines={1}>{dispName}</Text>

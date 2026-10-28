@@ -29,6 +29,7 @@ import { isValidPhone, samePhone } from '../core/phone';
 import { PhoneField } from '../components/PhoneField';
 import type { Player, SportDetail, SportId, TeamStint } from '../core/types';
 import type { RootStackParamList } from '../navigation/types';
+import { Glyph } from '../components/Icon';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'EditProfile'>;
 
@@ -324,7 +325,7 @@ export default function EditProfileScreen({ route, navigation }: Props) {
           ) : null}
           {!asAdmin && (<>
           <Card style={{ gap: theme.spacing(2) }}>
-            <Text style={textStyles.h3}>🔒 Who can see your contact details</Text>
+            <Text style={textStyles.h3}>Who can see your contact details</Text>
             {guardianRequired ? (
               <Text style={textStyles.muted}>
                 Hidden. Players under 18 can&apos;t show their contact details publicly — coaches and scouts reach you through your parent/guardian.
@@ -465,7 +466,7 @@ export default function EditProfileScreen({ route, navigation }: Props) {
                       />
                     </View>
                     <TouchableOpacity accessibilityRole="button" accessibilityLabel="Remove team" onPress={() => removeTeam(s, i)} style={st.removeBtn} activeOpacity={0.7}>
-                      <Text style={st.removeTxt}>✕</Text>
+                      <Glyph emoji="✕" style={st.removeTxt} />
                     </TouchableOpacity>
                   </View>
                 ))}

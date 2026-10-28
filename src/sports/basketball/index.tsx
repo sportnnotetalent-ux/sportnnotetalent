@@ -284,7 +284,7 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
       };
       return (
         <View style={ctrl.editPanel}>
-          <View style={ctrl.editHead}><Text style={ctrl.label}>🎯 Free throws — {nm}</Text>{cancel}</View>
+          <View style={ctrl.editHead}><Text style={ctrl.label}>Free throws — {nm}</Text>{cancel}</View>
           {flow.reason && <Text style={ctrl.editBanner}>{flow.reason}</Text>}
           {roster.length > 0 && (
             <>
@@ -338,7 +338,7 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
       const roster = courtOf(flow.side);
       return (
         <View style={ctrl.editPanel}>
-          <View style={ctrl.editHead}><Text style={ctrl.label}>🟨 Foul — {nm}</Text>{cancel}</View>
+          <View style={ctrl.editHead}><Text style={ctrl.label}>Foul — {nm}</Text>{cancel}</View>
           {!flow.fouler ? (
             <>
               <Text style={ctrl.meta}>Who committed it?</Text>
@@ -408,7 +408,7 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
     if (flow.kind === 'rebound') {
       return (
         <View style={ctrl.editPanel}>
-          <View style={ctrl.editHead}><Text style={ctrl.label}>🔁 Rebound — {flow.player.fullName}</Text>{cancel}</View>
+          <View style={ctrl.editHead}><Text style={ctrl.label}>Rebound — {flow.player.fullName}</Text>{cancel}</View>
           <View style={ctrl.row}>
             <Button label="Defensive" variant={flow.side} style={ctrl.flex} onPress={() => recordRebound(flow.side, flow.player, 'def')} />
             <Button label="Offensive" variant="ghost" style={ctrl.flex} onPress={() => recordRebound(flow.side, flow.player, 'off')} />
@@ -424,7 +424,7 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
       const bench = five ? roster.filter((p) => !five.some((x) => x.id === p.id)) : roster.filter((p) => p.id !== flow.off?.id);
       return (
         <View style={ctrl.editPanel}>
-          <View style={ctrl.editHead}><Text style={ctrl.label}>🔀 Substitution — {nm}</Text>{cancel}</View>
+          <View style={ctrl.editHead}><Text style={ctrl.label}>Substitution — {nm}</Text>{cancel}</View>
           {!flow.off ? (
             <>
               <Text style={ctrl.meta}>Who comes off?</Text>
@@ -452,7 +452,7 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
     const toggle = (id: string) => setFlow({ ...flow, picked: flow.picked.includes(id) ? flow.picked.filter((x) => x !== id) : [...flow.picked, id] });
     return (
       <View style={ctrl.editPanel}>
-        <View style={ctrl.editHead}><Text style={ctrl.label}>🏀 On court — {nm}</Text>{cancel}</View>
+        <View style={ctrl.editHead}><Text style={ctrl.label}>On court — {nm}</Text>{cancel}</View>
         <Text style={ctrl.meta}>Tap the {state.regPeriods === 1 ? '' : 'five '}players starting on court.</Text>
         <View style={ctrl.chips}>
           {roster.map((p) => (
@@ -509,7 +509,7 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
     return (
       <View style={ctrl.editPanel}>
         <View style={ctrl.editHead}>
-          <Text style={ctrl.label}>✎ Re-enter {BB_META[edit.type].label} — {nm}</Text>
+          <Text style={ctrl.label}>Re-enter {BB_META[edit.type].label} — {nm}</Text>
           <Button label="Cancel" variant="ghost" onPress={cancelEdit} />
         </View>
         <Text style={ctrl.editBanner}>Re-entering the Q{edit.quarter} {edit.minute}&apos; moment — your pick replaces the old one.</Text>
@@ -580,7 +580,7 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
     const selected = sel[side];
     return (
       <View style={{ gap: theme.spacing(2) }}>
-        <Text style={ctrl.label}>🏀 Basket — {name}{selected ? ` · for ${selected.fullName}` : ''}</Text>
+        <Text style={ctrl.label}>Basket — {name}{selected ? ` · for ${selected.fullName}` : ''}</Text>
         {roster.length > 0 && !selected ? <Text style={ctrl.meta}>Tap the scorer first — or the basket goes to the team.</Text> : null}
         {roster.length > 0 && (
           <View style={ctrl.chips}>
@@ -743,7 +743,7 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
       {/* Substitutions — optional on-court tracking */}
       <View style={{ gap: theme.spacing(2) }}>
         <View style={ctrl.editHead}>
-          <Text style={ctrl.label}>🔀 Substitutions</Text>
+          <Text style={ctrl.label}>Substitutions</Text>
           <Button label={showSubs ? 'Done' : 'Manage'} variant="ghost" onPress={() => setShowSubs((v) => !v)} />
         </View>
         {showSubs && (['home', 'away'] as const).map((side) => {
@@ -775,7 +775,7 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
 
       {/* ⏪ Backfill a play the scorer missed earlier — stamp it into a past quarter. */}
       <View style={{ gap: theme.spacing(2) }}>
-        <Text style={ctrl.label}>⏪ Backfill a missed play</Text>
+        <Text style={ctrl.label}>Backfill a missed play</Text>
         {backfillQ == null ? (
           <>
             <Text style={ctrl.meta}>Missed a basket or foul earlier? Pick the quarter — everything you log is stamped there until you go back to live.</Text>
@@ -787,7 +787,7 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
           </>
         ) : (
           <View style={ctrl.addedBox}>
-            <Text style={ctrl.label}>⏪ Backfilling into {periodLabel(backfillQ, state.regPeriods)}</Text>
+            <Text style={ctrl.label}>Backfilling into {periodLabel(backfillQ, state.regPeriods)}</Text>
             <Text style={ctrl.meta}>Every play you log now is stamped in {periodLabel(backfillQ, state.regPeriods)}. Log it above, then go back to live.</Text>
             <Button label="Back to live scoring" variant="ghost" onPress={() => setBackfillQ(null)} />
           </View>
@@ -798,7 +798,7 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
       {state.events.length > 0 && (
         <View style={{ gap: theme.spacing(2) }}>
           <View style={ctrl.editHead}>
-            <Text style={ctrl.label}>🗓 Correct the timeline</Text>
+            <Text style={ctrl.label}>Correct the timeline</Text>
             <Button label={showEdit ? 'Done' : 'Edit'} variant="ghost" onPress={() => setShowEdit((v) => !v)} />
           </View>
           {showEdit && (

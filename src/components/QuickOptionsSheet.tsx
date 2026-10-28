@@ -6,6 +6,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, Modal, Pressable, StyleSheet } from 'react-native';
 import { KeyboardAwareScrollView, KeyboardSheetScope, useKeyboardSheet } from './keyboard';
 import { theme } from '../core/theme';
+import { Glyph } from './Icon';
 import { Button, SelectChip, TextField, textStyles } from './ui';
 import { BREAK_KINDS, BREAK_LABELS, type BreakKind } from '../data/matchHousekeeping';
 
@@ -101,7 +102,7 @@ export function QuickOptionsSheet({ visible, onClose, homeName, awayName, onBrea
 export function Tile({ icon, label, hint, onPress, active }: { icon: string; label: string; hint?: string; onPress: () => void; active?: boolean }) {
   return (
     <TouchableOpacity style={[st.tile, active && st.tileActive]} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel={label} onPress={onPress}>
-      <Text style={st.tileIcon}>{icon}</Text>
+      <Glyph emoji={icon} style={st.tileIcon} color={theme.colors.primary} />
       <Text style={st.tileLabel} numberOfLines={1}>{label}</Text>
       {hint ? <Text style={st.tileHint} numberOfLines={1}>{hint}</Text> : null}
     </TouchableOpacity>

@@ -10,6 +10,7 @@ import { getLiveGolfRounds, getFieldEntries, getGolfCourses, buildLeaderboard, g
 import { getPlayers } from '../../data/repos';
 import { toParLabel } from '../../sports/golf/engine';
 import type { RootStackParamList } from '../../navigation/types';
+import { Glyph } from '../Icon';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 interface Row { id: string; title: string; leader?: string; score?: string; players: number }
@@ -44,7 +45,7 @@ export function LiveGolfCards({ tournamentId }: { tournamentId?: string | null }
       {rows.map((r) => (
         <TouchableOpacity key={r.id} accessibilityRole="button" accessibilityLabel={`Golf: ${r.title}, live${r.leader ? `, leader ${r.leader}` : ''}`} activeOpacity={0.85} onPress={() => nav.navigate('GolfRound', { eventId: r.id })}>
           <View style={st.card}>
-            <Text style={st.icon}>⛳</Text>
+            <Glyph emoji="⛳" style={st.icon} />
             <View style={{ flex: 1 }}>
               <Text style={[textStyles.body, st.bold]} numberOfLines={1}>{r.title}</Text>
               <Text style={textStyles.muted} numberOfLines={1}>{r.leader ? `Leader: ${r.leader} · ${r.score}` : `${r.players} players`}</Text>

@@ -248,7 +248,7 @@ export function TeamTable({ rows, scorers, basis, size }: { rows: TeamResult[]; 
   const anyPlaced = rows.some((r) => r.runners.length > 0);
   return (
     <Card style={st.card}>
-      <Text style={textStyles.h3}>🏆 Team score</Text>
+      <Text style={textStyles.h3}>Team score</Text>
       <Text style={st.hint}>{describeTeamScoring({ scorers, basis, size })}</Text>
       {!anyPlaced ? <Text style={textStyles.muted}>No finishers yet.</Text> : rows.map((t) => (
         <View key={t.key} style={st.lineRow} accessibilityLabel={`${t.complete ? `Place ${t.label}` : 'Incomplete'}, ${t.name}, ${t.complete ? `${t.total} points` : `${t.runners.length} finished`}`}>

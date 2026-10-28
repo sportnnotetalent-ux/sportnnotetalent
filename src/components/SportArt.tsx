@@ -9,6 +9,8 @@ import { View, Text, TouchableOpacity, StyleSheet, type StyleProp, type ViewStyl
 import Svg, { Rect, Circle, Line, Path, G, Ellipse } from 'react-native-svg';
 import { theme } from '../core/theme';
 import type { SportId } from '../core/types';
+import { getSportMeta } from '../sports/sportMeta';
+import { sportStack } from '../core/leadingEmoji';
 
 /** Each sport's tile colour (also its accent wherever the sport is shown). */
 export const SPORT_COLORS: Record<string, string> = {
@@ -294,12 +296,43 @@ function draw(sport: string): React.ReactNode {
   }
 }
 
-export function SportArt({ sport, style }: { sport: SportId | string; style?: StyleProp<ViewStyle> }) {
+/** A thin, wide strip (a match card's header) shows only the drawing's middle
+ *  band (y ≈ 44–56). A table cut there is all middle pockets, so the cue
+ *  sports draw a strip of their own: rails, small pockets, the balls. */
+function drawStrip(sport: string): React.ReactNode | null {
+  if (sport !== 'pool' && sport !== 'snooker' && sport !== 'billiards') return null;
+  const balls = sport === 'snooker'
+    ? [[68, 50, '#C62828'], [70, 48.6, '#C62828'], [70, 51.4, '#C62828'], [72, 47.2, '#C62828'], [72, 50, '#C62828'], [72, 52.8, '#C62828'], [60, 50, '#1A1A1A'], [50, 50, '#E86FA5']]
+    : sport === 'pool'
+      ? [[66, 50, '#F2C230'], [68, 48.8, '#1D56C9'], [68, 51.2, '#C62828'], [70, 47.6, '#6B2FA0'], [70, 50, '#1A1A1A'], [70, 52.4, '#E07A3A']]
+      : [[60, 49, '#F2C230'], [72, 51, '#C62828']];
+  return <>
+    <Rect x={0} y={43} width={100} height={2.2} fill="#5A3416" /><Rect x={0} y={54.8} width={100} height={2.2} fill="#5A3416" />
+    {[[3, 45.2], [50, 45.2], [97, 45.2], [3, 54.8], [50, 54.8], [97, 54.8]].map(([x, y], i) => <Circle key={`p${i}`} cx={x} cy={y} r={1.1} fill="#111" />)}
+    <Line x1={22} y1={45.2} x2={22} y2={54.8} stroke={W} strokeOpacity={0.7} strokeWidth={0.3} />
+    {sport !== 'pool' ? <Path d="M22 47 A3 3 0 0 0 22 53" stroke={W} strokeOpacity={0.7} strokeWidth={0.3} fill="none" /> : null}
+    {balls.map(([x, y, c], i) => <Circle key={`b${i}`} cx={Number(x)} cy={Number(y)} r={0.95} fill={String(c)} />)}
+    <Circle cx={20} cy={50} r={0.95} fill="#FFFFFF" />
+  </>;
+}
+
+export function SportArt({ sport, style, variant = 'tile' }: {
+  sport: SportId | string;
+  style?: StyleProp<ViewStyle>;
+  /** 'strip': a thin, wide header (match cards) */
+  variant?: 'tile' | 'strip';
+}) {
+  const art = (variant === 'strip' && drawStrip(sport)) || draw(sport);
   return (
     <View style={[{ backgroundColor: SPORT_COLORS[sport] ?? FALLBACK, overflow: 'hidden' }, style]} accessible={false} importantForAccessibility="no-hide-descendants">
-      <Svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice">{draw(sport)}</Svg>
+      <Svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice">{art}</Svg>
     </View>
   );
+}
+
+/** A sport as a tiny court tile (where an emoji used to stand in a list row). */
+export function SportBadge({ sport, size = 30 }: { sport: SportId | string; size?: number }) {
+  return <SportArt sport={sport} style={{ width: size, height: size, borderRadius: Math.round(size * 0.28) }} />;
 }
 
 /** A sport's tile: the art, with its name on a band at the foot. */
@@ -329,7 +362,45 @@ export function SportTile({ sport, name, icon, onPress, width, height, accessibi
   );
 }
 
+/** A run of sports as small overlapping badges (where "⚽ 🏏 🏀 …" used to
+ *  be), then the line's words. One sport also shows its name. */
+export function SportLine({ sports, children, size = 18, max = 4, style }: {
+  sports: readonly (SportId | string)[];
+  children?: React.ReactNode;
+  size?: number;
+  max?: number;
+  style?: StyleProp<ViewStyle>;
+}) {
+  const { shown, more } = sportStack(sports, max);
+  const names = shown.length === 1 && !more ? getSportMeta(shown[0] as SportId).name : '';
+  const words = [names, children].filter((w) => w !== '' && w != null && w !== false);
+  return (
+    <View style={[st.line, style]}>
+      {shown.length ? (
+        <View style={st.stack} accessible accessibilityLabel={[...new Set(sports)].map((s) => getSportMeta(s as SportId).name).join(', ')}>
+          {shown.map((s, i) => (
+            <View key={s} style={[st.stackItem, { borderRadius: Math.round(size * 0.32), marginLeft: i ? -Math.round(size * 0.3) : 0, zIndex: shown.length - i }]}>
+              <SportBadge sport={s} size={size} />
+            </View>
+          ))}
+          {more ? <Text style={st.more}>+{more}</Text> : null}
+        </View>
+      ) : null}
+      {words.length ? (
+        <Text style={st.lineText} numberOfLines={2}>
+          {words.map((w, i) => <React.Fragment key={i}>{i ? ' · ' : ''}{w}</React.Fragment>)}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
 const st = StyleSheet.create({
+  line: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(1.5), marginTop: 2 },
+  stack: { flexDirection: 'row', alignItems: 'center' },
+  stackItem: { borderWidth: 1.5, borderColor: theme.colors.surface, overflow: 'hidden' },
+  more: { marginLeft: 4, color: theme.colors.textMuted, fontSize: theme.font.small, fontWeight: '700' },
+  lineText: { flexShrink: 1, color: theme.colors.textMuted, fontSize: theme.font.small, lineHeight: theme.font.small * 1.4 },
   tile: { borderRadius: theme.radius.lg - 6, overflow: 'hidden', backgroundColor: theme.colors.primary, ...theme.shadow.card },
   band: {
     position: 'absolute', left: 0, right: 0, bottom: 0, flexDirection: 'row', alignItems: 'center', gap: theme.spacing(1),

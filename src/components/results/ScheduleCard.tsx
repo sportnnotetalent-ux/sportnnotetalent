@@ -97,7 +97,7 @@ export function ScheduleCard({ state, tournamentId, discipline, plan, combined, 
   const edit = (i: number, patch: Partial<Row>) => { setTouched(true); setRows((rs) => rs.map((r, j) => (j === i ? { ...r, ...patch } : r))); };
   return (
     <Card style={{ gap: theme.spacing(2) }}>
-      <Text style={textStyles.h3}>🗓 When & where</Text>
+      <Text style={textStyles.h3}>When & where</Text>
       <SelectChip label={on ? '✓ On the meet timetable' : 'Time not set yet'} active={on} onPress={() => setOn(!on)} />
       {on ? (
         <>

@@ -12,6 +12,7 @@ import { eventWords } from '../sports/eventSports';
 import { medalIcon, type TeamEventSportSummary } from '../data/results';
 import type { TeamGolfSummary } from '../data/teamEventResults';
 import type { SportId } from '../core/types';
+import { Glyph } from './Icon';
 
 const RECORD_WORD: Record<string, string> = { MR: 'Meet record', SR: 'School record' };
 const ordinal = (n: number) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] ?? 'th'}`;
@@ -59,7 +60,7 @@ export function TeamEventResults({ sports, golf, onOpenResult }: {
                 <Text style={textStyles.muted}>Records held</Text>
                 {s.records.slice(0, 6).map((r, i) => (
                   <View key={`${r.event}-${r.scope}-${i}`} style={st.row}>
-                    <Text style={st.place}>⭐</Text>
+                    <Glyph emoji="⭐" style={st.place} />
                     <View style={{ flex: 1 }}>
                       <Text style={textStyles.body} numberOfLines={1}>{r.event}</Text>
                       <Text style={[textStyles.muted, st.small]} numberOfLines={1}>{RECORD_WORD[r.scope] ?? 'Record'} · {r.holder}</Text>

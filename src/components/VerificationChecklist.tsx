@@ -5,6 +5,7 @@
  *  upload happen. */
 import React, { useEffect, useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
+import { SquareCheck, Square, Hourglass } from 'lucide-react-native';
 import { theme } from '../core/theme';
 import { Button, Card, textStyles } from './ui';
 import { ageOf } from '../core/age';
@@ -47,13 +48,17 @@ export function VerificationChecklist({ player, onEditProfile }: { player: Playe
   return (
     <Card style={{ gap: theme.spacing(2) }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Text style={textStyles.h3}>✅ Ready to play</Text>
+        <Text style={textStyles.h3}>Ready to play</Text>
         <Text style={textStyles.muted}>{done} of {items.length} done</Text>
       </View>
       {items.map((x) => (
-        <Text key={x.key} style={[textStyles.body, !x.done && { color: x.waiting ? theme.colors.accent : theme.colors.textMuted }]}>
-          {x.done ? '☑️' : x.waiting ? '⏳' : '⬜'} {x.label}
-        </Text>
+        <View key={x.key} style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing(2) }}
+          accessibilityLabel={`${x.label}: ${x.done ? 'done' : x.waiting ? 'waiting' : 'to do'}`}>
+          {x.done ? <SquareCheck color={theme.colors.primary} size={20} strokeWidth={2.2} />
+            : x.waiting ? <Hourglass color={theme.colors.accent} size={20} strokeWidth={2.2} />
+            : <Square color={theme.colors.inputBorder} size={20} strokeWidth={2} />}
+          <Text style={[textStyles.body, !x.done && { color: x.waiting ? theme.colors.accent : theme.colors.textMuted }]}>{x.label}</Text>
+        </View>
       ))}
       {next ? (
         <View style={{ gap: theme.spacing(1), marginTop: theme.spacing(1) }}>

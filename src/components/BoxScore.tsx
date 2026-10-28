@@ -14,6 +14,7 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
+import { readableOn } from '../core/contrast';
 import { theme } from '../core/theme';
 import { SelectChip } from './ui';
 import type { SportId } from '../core/types';
@@ -196,7 +197,7 @@ export function TeamComparison({ rows, homeName, awayName, homeColor, awayColor,
         const empty = r.h <= 0 && r.a <= 0;
         const Cell = ({ v, side }: { v: string; side: 'home' | 'away' }) => (
           <View style={[sv.cell, lead === side && { backgroundColor: side === 'home' ? homeColor : awayColor }]}>
-            <Text style={[sv.cellText, lead === side && sv.cellTextLead]}>{v}</Text>
+            <Text style={[sv.cellText, lead === side && sv.cellTextLead, lead === side && { color: readableOn(side === 'home' ? homeColor : awayColor) }]}>{v}</Text>
           </View>
         );
         return (

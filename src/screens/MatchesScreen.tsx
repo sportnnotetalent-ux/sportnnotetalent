@@ -25,7 +25,7 @@ import { useParamState } from '../navigation/useParamState';
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 const TABS = [
-  { key: 'live', label: '🔴 Live' },
+  { key: 'live', label: 'Live' },
   { key: 'upcoming', label: 'Upcoming' },
   { key: 'completed', label: 'Completed' },
 ] as const;
@@ -115,6 +115,7 @@ export default function MatchesScreen() {
                 accessibilityLabel={`${t.label}, ${n} ${n === 1 ? 'match' : 'matches'}`}
                 onPress={() => setTab(t.key)}
               >
+                {t.key === 'live' ? <View style={st.liveDot} /> : null}
                 <Text style={[st.segText, on && st.segTextActive]} numberOfLines={1}>
                   {t.label}{n > 0 ? ` ${n}` : ''}
                 </Text>
@@ -152,7 +153,8 @@ const st = StyleSheet.create({
   safe: { flex: 1, backgroundColor: theme.colors.bg },
   content: { padding: theme.spacing(4), gap: theme.spacing(3) },
   segment: { flexDirection: 'row', backgroundColor: theme.colors.surfaceAlt, borderRadius: theme.radius.pill, padding: 3 },
-  segBtn: { flex: 1, paddingVertical: theme.spacing(2), borderRadius: theme.radius.pill, alignItems: 'center' },
+  segBtn: { flex: 1, flexDirection: 'row', justifyContent: 'center', gap: theme.spacing(1.5), paddingVertical: theme.spacing(2), borderRadius: theme.radius.pill, alignItems: 'center' },
+  liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: theme.colors.danger },
   segBtnActive: { backgroundColor: theme.colors.primary },
   segText: { color: theme.colors.textMuted, fontSize: theme.font.small, fontWeight: '700' },
   segTextActive: { color: theme.colors.onFill, fontWeight: '800' },

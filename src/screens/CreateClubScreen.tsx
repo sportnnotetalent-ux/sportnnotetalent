@@ -18,6 +18,7 @@ import { useAuth } from '../core/auth';
 import { createClub, getMyPlayerId } from '../data/repos';
 import type { SportId } from '../core/types';
 import type { RootStackParamList } from '../navigation/types';
+import { Glyph } from '../components/Icon';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -119,7 +120,7 @@ export default function CreateClubScreen() {
           </Card>
 
           <TouchableOpacity accessibilityRole="checkbox" accessibilityState={{ checked: addMe }} onPress={() => setAddMe((v) => !v)} style={st.check}>
-            <View style={[st.box, addMe && st.boxOn]}>{addMe && <Text style={st.tick}>✓</Text>}</View>
+            <View style={[st.box, addMe && st.boxOn]}>{addMe && <Glyph emoji="✓" style={st.tick} />}</View>
             <View style={{ flex: 1 }}>
               <Text style={textStyles.body}>Add myself to this team</Text>
               <Text style={textStyles.muted}>You’ll be the first member — and its admin.</Text>

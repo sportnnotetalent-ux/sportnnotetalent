@@ -208,7 +208,7 @@ const ScoringControls: SportPlugin<KabaddiState>['ScoringControls'] = ({ state, 
       {backfillBar}
       <View style={ctrl.subPanel}>
         <View style={ctrl.subHead}>
-          <Text style={ctrl.label}>🔄 Substitution — {sideName}</Text>
+          <Text style={ctrl.label}>Substitution — {sideName}</Text>
           <Button label="Cancel" variant="ghost" onPress={() => setSub(null)} />
         </View>
         {!sub.off ? (
@@ -246,7 +246,7 @@ const ScoringControls: SportPlugin<KabaddiState>['ScoringControls'] = ({ state, 
     return (
       <View style={ctrl.subPanel}>
         <View style={ctrl.subHead}>
-          <Text style={ctrl.label}>✎ Re-enter {edit.kind === 'tackle' ? 'Tackle' : 'Raid'} point — {nm}</Text>
+          <Text style={ctrl.label}>Re-enter {edit.kind === 'tackle' ? 'Tackle' : 'Raid'} point — {nm}</Text>
           <Button label="Cancel" variant="ghost" onPress={() => setEdit(null)} />
         </View>
         <Text style={ctrl.editBanner}>Re-entering the {edit.minute}&apos; moment — your pick replaces the old one.</Text>
@@ -501,7 +501,7 @@ const ScoringControls: SportPlugin<KabaddiState>['ScoringControls'] = ({ state, 
         return (
           <View style={ctrl.raidPanel}>
             <View style={ctrl.subHead}>
-              <Text style={ctrl.label}>⚖️ Technical point</Text>
+              <Text style={ctrl.label}>Technical point</Text>
               <Button label="Cancel" variant="ghost" onPress={() => setTech(null)} />
             </View>
             <Text style={ctrl.meta}>Point to (nobody goes out — line-outs are logged on the raid)</Text>
@@ -611,7 +611,7 @@ const ScoringControls: SportPlugin<KabaddiState>['ScoringControls'] = ({ state, 
 
       {state.maxSubs > 0 && !state.goldenRaid && (
         <View style={{ gap: theme.spacing(2) }}>
-          <Text style={ctrl.label}>🔄 Substitutions</Text>
+          <Text style={ctrl.label}>Substitutions</Text>
           <View style={ctrl.chips}>
             <Button label={`${homeName} (${subsLeft('home')} left)`} variant="ghost" style={ctrl.flex} disabled={subsLeft('home') <= 0} onPress={() => setSub({ side: 'home' })} />
             <Button label={`${awayName} (${subsLeft('away')} left)`} variant="ghost" style={ctrl.flex} disabled={subsLeft('away') <= 0} onPress={() => setSub({ side: 'away' })} />
@@ -622,7 +622,7 @@ const ScoringControls: SportPlugin<KabaddiState>['ScoringControls'] = ({ state, 
       {/* ⏪ Backfill a point the scorer missed earlier — stamp it at a past minute. */}
       {!state.goldenRaid && (
         <View style={{ gap: theme.spacing(2) }}>
-          <Text style={ctrl.label}>⏪ Backfill an earlier moment</Text>
+          <Text style={ctrl.label}>Backfill an earlier moment</Text>
           {backfillMin == null ? (
             <>
               <Text style={ctrl.meta}>Missed a raid or tackle? Enter a past minute — everything you log is stamped there until you go back to live.</Text>
@@ -633,7 +633,7 @@ const ScoringControls: SportPlugin<KabaddiState>['ScoringControls'] = ({ state, 
             </>
           ) : (
             <View style={ctrl.addedBox}>
-              <Text style={ctrl.label}>⏪ Backfilling at {backfillMin}&apos; ({halfLabel(halfFromMin(backfillMin))})</Text>
+              <Text style={ctrl.label}>Backfilling at {backfillMin}&apos; ({halfLabel(halfFromMin(backfillMin))})</Text>
               <Text style={ctrl.meta}>Every point you log now is stamped at {backfillMin}&apos;. Log it above, then go back to live.</Text>
               <Button label="Back to live scoring" variant="ghost" onPress={backToLive} />
             </View>
@@ -645,7 +645,7 @@ const ScoringControls: SportPlugin<KabaddiState>['ScoringControls'] = ({ state, 
       {!state.goldenRaid && state.events.length > 0 && (
         <View style={{ gap: theme.spacing(2) }}>
           <View style={ctrl.subHead}>
-            <Text style={ctrl.label}>🗓 Correct the timeline</Text>
+            <Text style={ctrl.label}>Correct the timeline</Text>
             <Button label={showEdit ? 'Done' : 'Edit'} variant="ghost" onPress={() => setShowEdit((v) => !v)} />
           </View>
           {showEdit && (

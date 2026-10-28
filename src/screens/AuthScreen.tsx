@@ -381,7 +381,7 @@ export default function AuthScreen() {
             <>
               <Button label={busy ? 'Please wait…' : 'Sign in'} onPress={submitPassword} disabled={busy} />
               {showResend && (
-                <Text style={st.link} accessibilityRole="button" onPress={doResend}>📧 Resend confirmation email</Text>
+                <Text style={st.link} accessibilityRole="button" onPress={doResend}>Resend confirmation email</Text>
               )}
               <View style={st.linkRow}>
                 <Text style={st.link} accessibilityRole="button" onPress={() => switchFlow('otp')}>Sign in with a code</Text>

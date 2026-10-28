@@ -151,7 +151,7 @@ function PathsCard({ paths }: { paths: ReturnType<typeof progressionPaths> }) {
   const shown = all ? paths : paths.slice(0, 10);
   return (
     <Card style={{ gap: theme.spacing(1) }}>
-      <Text style={textStyles.h3}>🪜 Through the rounds</Text>
+      <Text style={textStyles.h3}>Through the rounds</Text>
       {shown.map((p) => (
         <View key={p.key} style={st.splitRow}>
           <Text style={st.name} numberOfLines={1}>{p.name}{p.team && p.team !== p.name ? <Text style={st.detail}>  {p.team}</Text> : null}</Text>

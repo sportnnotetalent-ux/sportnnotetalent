@@ -27,6 +27,7 @@ import {
   type Category, type Course, type RecordMark, type RecordScope,
 } from '../data/results';
 import type { RootStackParamList } from '../navigation/types';
+import { Glyph } from '../components/Icon';
 
 const GENDERS: { key: 'M' | 'F' | 'X'; label: string }[] = [{ key: 'M', label: 'Boys' }, { key: 'F', label: 'Girls' }, { key: 'X', label: 'Mixed' }];
 
@@ -170,7 +171,7 @@ export default function RecordBoardScreen() {
                 <Text style={[textStyles.body, { flex: 1 }]} numberOfLines={2}>{recordLine(r, formatMark)}{r.historic ? '' : ' · set at this meet'}</Text>
                 {canEdit && (
                   <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Remove ${recordLine(r, formatMark)}`} onPress={() => void remove(r)} hitSlop={8}>
-                    <Text style={st.remove}>✕</Text>
+                    <Glyph emoji="✕" style={st.remove} />
                   </TouchableOpacity>
                 )}
               </View>

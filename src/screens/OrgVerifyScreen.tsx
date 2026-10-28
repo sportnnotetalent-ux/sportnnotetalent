@@ -126,10 +126,10 @@ export default function OrgVerifyScreen() {
         <ScreenTitle title={`Verify ${org.name}`} subtitle="Checked by SportnNote support — usually within a day" />
 
         {state.verified ? (
-          <Card style={st.good}><Text style={textStyles.h3}>✓ Verified by SportnNote</Text></Card>
+          <Card style={st.good}><Text style={textStyles.h3}>Verified by SportnNote</Text></Card>
         ) : v?.status === 'pending' ? (
           <Card style={{ gap: theme.spacing(1) }}>
-            <Text style={textStyles.h3}>📨 With SportnNote support</Text>
+            <Text style={textStyles.h3}>With SportnNote support</Text>
             <Text style={textStyles.muted}>Sent{v.submittedAt ? ` on ${new Date(v.submittedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}` : ''}. You’ll get a notification when it’s checked.</Text>
           </Card>
         ) : v?.status === 'rejected' ? (

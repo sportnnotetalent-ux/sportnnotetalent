@@ -405,7 +405,7 @@ function BoardEditor({ state: s, dispatch, nameOf, who, homeRoster, awayRoster }
   return (
     <View style={{ gap: theme.spacing(2) }}>
       <View style={ctrl.head}>
-        <Text style={ctrl.label}>✎ Correct a board</Text>
+        <Text style={ctrl.label}>Correct a board</Text>
         <Button label={open ? 'Done' : 'Edit'} variant="ghost" onPress={() => { setOpen((v) => !v); setDraft(null); }} />
       </View>
       {open && (
@@ -413,7 +413,7 @@ function BoardEditor({ state: s, dispatch, nameOf, who, homeRoster, awayRoster }
           <Text style={ctrl.meta}>Edit who won a board, the coins left or the Queen, or remove it. The games and player points re-adjust.</Text>
           {draft && (
             <View style={ctrl.draftBox}>
-              <Text style={ctrl.label}>✎ Board {draft.index + 1}</Text>
+              <Text style={ctrl.label}>Board {draft.index + 1}</Text>
               <View style={ctrl.row}>
                 {(['home', 'away'] as const).map((side) => (
                   <Button key={side} label={nameOf(side)} variant={draft.b.side === side ? side : 'ghost'} style={ctrl.flex}

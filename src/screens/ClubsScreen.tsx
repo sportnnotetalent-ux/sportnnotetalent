@@ -10,6 +10,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { theme } from '../core/theme';
 import { readableOn } from '../core/contrast';
 import { Card, Button, ScreenTitle, LoadingState, EmptyState, textStyles } from '../components/ui';
+import { SportLine } from '../components/SportArt';
 import { getSportMeta } from '../sports/sportMeta';
 import { getClubsForPlayer, getClubSports, getMyPlayerId, getMyTeams } from '../data/repos';
 import { useAuth } from '../core/auth';
@@ -70,9 +71,8 @@ export default function ClubsScreen() {
                   )}
                   <View style={{ flex: 1 }}>
                     <Text style={textStyles.body}>{c.name}</Text>
-                    <Text style={textStyles.muted}>
-                      {c.city ? `${c.city} · ` : ''}{sports.length ? sports.map((s) => getSportMeta(s).icon).join(' ') : 'No sports yet'}
-                    </Text>
+                    {sports.length ? <SportLine sports={sports}>{c.city || null}</SportLine>
+                      : <Text style={textStyles.muted}>{c.city ? `${c.city} · ` : ''}No sports yet</Text>}
                   </View>
                   <Text style={st.chev}>›</Text>
                 </Card>

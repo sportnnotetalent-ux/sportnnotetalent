@@ -11,6 +11,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { theme } from '../core/theme';
+import { Glyph } from './Icon';
 
 export interface LineCol { label: string; highlight?: boolean }
 export interface LineRow { name: string; color: string; lead: string; cells: string[] }
@@ -71,7 +72,7 @@ export function LineScoreboard({
               <View key={ri} style={[st.row, lost && st.rowLost]}>
                 <View style={st.nameRow}>
                   <Text style={[st.name, { color: r.color }]} numberOfLines={1}>{r.name}</Text>
-                  {won ? <Text style={st.trophy}>🏆</Text> : null}
+                  {won ? <Glyph emoji="🏆" style={st.trophy} /> : null}
                 </View>
                 <View style={[st.leadCell, wide && st.wideLead]}><Text style={st.leadText}>{r.lead}</Text></View>
                 {r.cells.map((cell, ci) => (
@@ -108,7 +109,7 @@ const st = StyleSheet.create({
   colHead: { width: CELL, alignItems: 'center' },
   colHeadText: { color: theme.colors.textMuted, fontSize: theme.font.small, fontWeight: '700' },
   colPill: { minWidth: 22, minHeight: 22, borderRadius: 11, backgroundColor: theme.colors.primary, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
-  colPillText: { color: '#0B0F14', fontSize: theme.font.small, fontWeight: '900' },
+  colPillText: { color: theme.colors.onFill, fontSize: theme.font.small, fontWeight: '900' },
 
   row: { flexDirection: 'row', alignItems: 'center', paddingVertical: theme.spacing(2) },
   rowLost: { opacity: 0.55 },

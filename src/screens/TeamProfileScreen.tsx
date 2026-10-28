@@ -9,6 +9,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { theme } from '../core/theme';
+import { SportBadge, SportLine } from '../components/SportArt';
 import { FollowBell } from '../components/FollowBell';
 import { EmptyState, Card, Pill, Button, LoadingState, ScreenTitle, SelectChip, textStyles } from '../components/ui';
 import { useParamState } from '../navigation/useParamState';
@@ -388,7 +389,7 @@ export default function TeamProfileScreen() {
             <Text style={[textStyles.h3, st.section]}>Record by sport</Text>
             {records.map(({ sport, row }) => (
               <Card key={sport} style={st.recordRow}>
-                <Text style={st.recordIcon}>{getSportMeta(sport).icon}</Text>
+                <SportBadge sport={sport} size={30} />
                 <Text style={[textStyles.body, { flex: 1 }]}>{getSportMeta(sport).name}</Text>
                 <Text style={textStyles.muted}>{recordText(row!.won, row!.drawn, row!.lost, row!.nr, tableLabels(sport))}</Text>
                 <Text style={st.recordPts}>{row!.points} pts</Text>
@@ -423,7 +424,7 @@ export default function TeamProfileScreen() {
                 </View>
                 <View style={{ flex: 1, gap: 4 }}>
                   <Text style={textStyles.body}>{p.fullName}{p.jerseyNo ? ` · #${p.jerseyNo}` : ''}{p.invited ? '  ⏳' : ''}</Text>
-                  <Text style={textStyles.muted}>{p.invited ? 'Invited · hasn’t joined yet' : p.sports.map((s) => getSportMeta(s).icon).join(' ')}</Text>
+                  {p.invited ? <Text style={textStyles.muted}>Invited · hasn’t joined yet</Text> : <SportLine sports={p.sports} />}
                   {waiting.has(p.id) ? <Text style={textStyles.muted}>⏳ Waiting for their side to confirm</Text> : null}
                   {p.invited && p.phone ? <RemindInstall playerId={p.id} name={p.fullName} phone={p.phone} teamName={team.name} /> : null}
                 </View>

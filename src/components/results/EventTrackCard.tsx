@@ -44,7 +44,7 @@ export function EventTrackCard({ def, f, meet, onChange, collapsible = true, bus
   const lapsOn = now.lapSplits;
   return (
     <Card style={{ gap: theme.spacing(2) }}>
-      <Text style={textStyles.h3}>⚙ Stats to track — this event</Text>
+      <Text style={textStyles.h3}>Stats to track — this event</Text>
       <Text style={textStyles.muted}>Optional boxes on the entry screen for this event only. The meet’s choices are in the sport’s settings; pick the meet’s value to follow it again.</Text>
       {opts.map((o) => {
         if (o.key === 'lapPoints') {

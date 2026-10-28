@@ -55,7 +55,7 @@ export function EntriesPanel({ phase, f, def, entries, nameOf, onChanged, onDele
 
   return (
     <Card style={{ gap: theme.spacing(2) }}>
-      <Text style={textStyles.h3}>🗂 Entries</Text>
+      <Text style={textStyles.h3}>Entries</Text>
       <View style={st.wrap}>
         {late.ok && <SelectChip label="＋ Late entry" active={mode === 'add'} onPress={() => { setInfo(null); setMode(mode === 'add' ? null : 'add'); }} />}
         {phase.status !== 'completed' && <SelectChip label="✕ Scratch" active={mode === 'scratch'} onPress={() => { setInfo(null); setMode(mode === 'scratch' ? null : 'scratch'); }} />}

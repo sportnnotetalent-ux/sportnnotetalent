@@ -4,6 +4,7 @@
 import React from 'react';
 import { Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { theme } from '../core/theme';
+import { Glyph } from './Icon';
 import { Card, textStyles } from './ui';
 
 export function MineCard({ onTeams, onTournaments, onMatches, onCalendar, onInvite }: {
@@ -26,7 +27,7 @@ export function MineCard({ onTeams, onTournaments, onMatches, onCalendar, onInvi
       <Text style={textStyles.h3}>Mine</Text>
       {rows.map((r) => (
         <TouchableOpacity key={r.label} accessibilityRole="button" accessibilityLabel={`${r.label}. ${r.hint}`} onPress={r.onPress} style={st.row}>
-          <Text style={st.icon}>{r.icon}</Text>
+          <Glyph emoji={r.icon} style={st.icon} color={theme.colors.primary} />
           <Text style={[textStyles.body, { flex: 1 }]}>{r.label}{'\n'}<Text style={textStyles.muted}>{r.hint}</Text></Text>
           <Text style={st.chev}>›</Text>
         </TouchableOpacity>

@@ -5,6 +5,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { theme } from '../core/theme';
+import { stripLeadingEmoji } from '../core/leadingEmoji';
 
 /** Max records any section renders inline before "See all" takes over. */
 export const SECTION_CAP = 5;
@@ -25,7 +26,7 @@ export function SectionHeader({
 }) {
   return (
     <View style={st.row}>
-      <Text style={st.title} numberOfLines={1} accessibilityRole="header">{title}</Text>
+      <Text style={st.title} numberOfLines={1} accessibilityRole="header">{stripLeadingEmoji(title)}</Text>
       {onSeeAll && (
         <TouchableOpacity accessibilityRole="button" onPress={onSeeAll} activeOpacity={0.7} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Text style={st.seeAll}>{expanded ? 'Show less' : `See all${count != null ? ` (${count})` : ''} ›`}</Text>

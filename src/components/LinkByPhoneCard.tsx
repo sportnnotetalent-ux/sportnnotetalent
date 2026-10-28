@@ -15,6 +15,7 @@ import { Button, Card, textStyles } from './ui';
 import { getMyPlayerId } from '../data/repos';
 import { beginPhoneClaim, confirmPhoneClaim, getClaimNumbers, phoneClaimAvailable } from '../data/requestsStore';
 import { claimOutcomeText, maskPhone, showClaimCard } from '../data/requests';
+import { Glyph } from './Icon';
 
 export function LinkByPhoneCard() {
   const { profile, demo } = useAuth();
@@ -57,10 +58,10 @@ export function LinkByPhoneCard() {
   return (
     <Card style={st.card}>
       <View style={st.head}>
-        <Text style={[textStyles.h3, { flex: 1 }]}>📱 Did a coach add you by phone?</Text>
+        <Text style={[textStyles.h3, { flex: 1 }]}>Did a coach add you by phone?</Text>
         {step !== 'code' && (
           <TouchableOpacity accessibilityRole="button" accessibilityLabel="Dismiss" hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} onPress={() => setHidden(true)}>
-            <Text style={st.close}>✕</Text>
+            <Glyph emoji="✕" style={st.close} />
           </TouchableOpacity>
         )}
       </View>

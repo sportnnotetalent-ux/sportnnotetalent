@@ -365,7 +365,7 @@ export default function GolfRoundSetupScreen() {
           )}
           {prev && (
             <Card style={{ gap: theme.spacing(2) }}>
-              <Text style={textStyles.h3}>✂️ Cut (optional)</Text>
+              <Text style={textStyles.h3}>Cut (optional)</Text>
               <Text style={textStyles.muted}>Keep the top N on the leaderboard so far, plus ties. Leave blank for no cut.</Text>
               <TextField label="Top N (and ties)" value={cutN} onChange={(v) => setCutN(v.replace(/[^0-9]/g, ''))} placeholder="e.g. 50" autoCapitalize="none" />
             </Card>

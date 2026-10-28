@@ -43,6 +43,7 @@ import type { Match, SportId } from '../core/types';
 import type { RootStackParamList } from '../navigation/types';
 import { roundProgress } from '../data/tournamentHistory';
 import { matchDecider, useLiveRefresh } from '../components/TournamentHistory';
+import { Glyph } from '../components/Icon';
 
 /** SD-138 — tap a side's name to open that entrant's tournament journey. */
 const TeamTap = createContext<((teamId: string) => void) | undefined>(undefined);
@@ -55,7 +56,7 @@ function Slot({ slot, state = 'neutral' }: { slot: BracketSlot; state?: SlotStat
     <View style={st.slot}>
       {slot.color ? <View style={[st.dot, { backgroundColor: slot.color }]} /> : <View style={st.dotGap} />}
       <Text style={[st.slotName, dim && st.muted, state === 'won' && st.winnerName]} numberOfLines={1}>{slot.name}</Text>
-      {state === 'won' && <Text style={st.check}>✓</Text>}
+      {state === 'won' && <Glyph emoji="✓" style={st.check} />}
     </View>
   );
 }
@@ -69,7 +70,7 @@ function StagedSide({ name, color, score, state, teamId }: { name: string; color
       <Text style={[st.slotName, state === 'lost' && st.muted, state === 'won' && st.winnerName]} numberOfLines={1}
         {...(onTeam && teamId ? { onPress: () => onTeam(teamId), accessibilityRole: 'link' as const, accessibilityHint: 'Opens their tournament journey' } : {})}>{name}</Text>
       {score != null && <Text style={[st.score, state === 'won' && st.winnerName, state === 'lost' && st.muted]}>{score}</Text>}
-      {state === 'won' && <Text style={st.check}>✓</Text>}
+      {state === 'won' && <Glyph emoji="✓" style={st.check} />}
     </View>
   );
 }
@@ -395,7 +396,7 @@ export default function BracketScreen() {
             })}
             {thirdMatch && (
               <View style={{ gap: theme.spacing(2) }}>
-                <Text style={textStyles.h3}>🥉 Third-place playoff</Text>
+                <Text style={textStyles.h3}>Third-place playoff</Text>
                 <StagedMatchCard m={thirdMatch} />
                 {pickerFor(asPairing(thirdMatch))}
               </View>
@@ -421,7 +422,7 @@ export default function BracketScreen() {
             {/* SD-125 — the plate: a consolation knockout for first-round losers (no medals). */}
             {plateSt && (
               <View style={{ gap: theme.spacing(2) }}>
-                <Text style={textStyles.h3}>🍽️ Plate (first-round losers)</Text>
+                <Text style={textStyles.h3}>Plate (first-round losers)</Text>
                 {plateSt.winnerId && <Text style={st.plateWinner}>🍽️ Plate winner: {nameOf(plateSt.winnerId)}</Text>}
                 <DrawColumns rounds={plateSt.rounds} sideName={sideName} sideColor={sideColor} />
                 {drawPickers(plateSt.rounds)}

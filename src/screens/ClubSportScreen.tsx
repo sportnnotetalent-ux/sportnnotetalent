@@ -27,6 +27,7 @@ import type { Club, ClubMemberView, Team, TeamLeadership, SportId } from '../cor
 import type { RootStackParamList } from '../navigation/types';
 import { useTeamPermission } from '../data/hooks';
 import { notice } from '../core/confirm';
+import { Glyph } from '../components/Icon';
 
 export default function ClubSportScreen() {
   const { params } = useRoute<RouteProp<RootStackParamList, 'ClubSport'>>();
@@ -183,7 +184,7 @@ export default function ClubSportScreen() {
               <Card key={m.playerId} style={{ gap: theme.spacing(2) }}>
                 <View style={st.memberRow}>
                   <TouchableOpacity disabled={!amAdmin || busy} onPress={() => toggleSquad(m.playerId)} accessibilityRole="checkbox" accessibilityState={{ checked: picked }} style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing(2), flex: 1 }}>
-                    <View style={[st.box, picked && st.boxOn]}>{picked && <Text style={st.tick}>✓</Text>}</View>
+                    <View style={[st.box, picked && st.boxOn]}>{picked && <Glyph emoji="✓" style={st.tick} />}</View>
                     <View style={{ flex: 1 }}>
                       <Text style={textStyles.body}>{m.player.fullName}</Text>
                       {picked && (leaders.captainId === m.playerId || leaders.viceCaptainId === m.playerId) && (

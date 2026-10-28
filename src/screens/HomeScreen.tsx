@@ -15,6 +15,7 @@ import { setStatusBarStyle } from 'expo-status-bar';
 import Svg, { Circle, Line, Rect } from 'react-native-svg';
 import { Search, Bell, Menu, Zap, Trophy, Users } from 'lucide-react-native';
 import { SportTile } from '../components/SportArt';
+import { Glyph } from '../components/Icon';
 import { formatDayShort } from '../core/dates';
 import { MatchCard } from '../components/MatchCard';
 import { LiveGolfCards } from '../components/golf/LiveGolfCards';
@@ -222,7 +223,7 @@ export default function HomeScreen() {
                     accessibilityLabel={item.label}
                     onPress={() => { setActionsOpen(false); item.onPress(); }}
                   >
-                    <Text style={st.menuIcon}>{item.icon}</Text>
+                    <Glyph emoji={item.icon} style={st.menuIcon} color={theme.colors.primary} />
                     <Text style={st.menuLabel}>{item.label}</Text>
                   </TouchableOpacity>
                 </React.Fragment>
@@ -241,7 +242,10 @@ export default function HomeScreen() {
 
         {!isSupabaseConfigured && (
           <Card style={st.demo}>
-            <Text style={textStyles.body}>🧪 Demo mode</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Glyph emoji="🧪" style={{ fontSize: 16 }} color={theme.colors.primary} />
+              <Text style={textStyles.body}>Demo mode</Text>
+            </View>
             <Text style={textStyles.muted}>
               Running on local sample data. Tap any match to open the live scorer — it works fully offline.
             </Text>
@@ -254,7 +258,7 @@ export default function HomeScreen() {
               <View style={st.verifyRow}>
                 <Text style={st.verifyTitle}>🔐 Finish setting up your account</Text>
                 <TouchableOpacity accessibilityRole="button" accessibilityLabel="Dismiss" hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} onPress={(e) => { e.stopPropagation?.(); setVerifyDismissed(true); }}>
-                  <Text style={st.verifyClose}>✕</Text>
+                  <Glyph emoji="✕" style={st.verifyClose} />
                 </TouchableOpacity>
               </View>
               <Text style={textStyles.muted}>{verifyPrompt(elig.reason)} Tap to verify →</Text>

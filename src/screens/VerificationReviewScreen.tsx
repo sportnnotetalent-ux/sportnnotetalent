@@ -314,7 +314,7 @@ function Reviewers() {
 
   return (
     <Card style={{ gap: theme.spacing(2) }}>
-      <Text style={textStyles.h3}>👥 Reviewers</Text>
+      <Text style={textStyles.h3}>Reviewers</Text>
       <Text style={textStyles.muted}>People you trust to check documents. They get the alerts and can approve or reject — nothing else.</Text>
       {list.length === 0 ? <Text style={textStyles.muted}>Only support accounts so far.</Text> : list.map((r) => (
         <View key={r.profileId} style={st.head}>
