@@ -1704,6 +1704,13 @@ export async function resetMatch(matchId: string): Promise<void> {
     delete demoLocks[matchId];
     return;
   }
+  // Security W3 (CL-17): one server step, with the same rules as every other
+  // write (a finished match only in its correction window; a tournament match
+  // after its first 30 minutes only by its organisers). The separate writes
+  // below are only for a database without reset_match yet.
+  const { error: rpcErr } = await supabase.rpc('reset_match', { p_match: matchId });
+  if (!rpcErr) return;
+  if (!/reset_match|PGRST202|schema cache|does not exist/i.test(`${rpcErr.code ?? ''} ${rpcErr.message ?? ''}`)) throw new Error(rpcErr.message);
   // Back to not-started FIRST: that clears the scoring lock (migration 0039), so a
   // host who isn't the current scorer can still wipe the log.
   await supabase.from('matches').update({ state: {}, status: 'scheduled', winner: null, updated_at: new Date().toISOString() }).eq('id', matchId);

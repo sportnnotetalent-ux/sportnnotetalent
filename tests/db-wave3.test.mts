@@ -377,3 +377,61 @@ describe('DB-07 — a child can\'t lift the under-18 limits themselves', () => {
     assert.equal(c.c, 'confirmed');
   });
 });
+
+/* ------------------------- 3E — the app's findings, enforced on the server ------------------------- */
+
+describe('CL-14 — the guardian\'s "verified" flags are the server\'s', () => {
+  test('the app can\'t set them; a changed contact loses them; the server can set them', async () => {
+    const kid = await person('Flag Kid', '2012-01-01');
+    await db.as(kid.uid, `update players set guardian = '{"email":"g@x.in","phone":"+919800000001","emailVerified":true,"phoneVerified":true}' where id = $1`, [kid.player]);
+    const flags = async () => (await db.sql<{ g: Record<string, unknown> }>(`select guardian as g from players where id = $1`, [kid.player]))[0].g;
+    assert.equal((await flags()).phoneVerified ?? false, false);
+    assert.equal((await flags()).emailVerified ?? false, false);
+    await db.sql(`update players set guardian = guardian || '{"phoneVerified":true}' where id = $1`, [kid.player]);   // the verification function (server)
+    assert.equal((await flags()).phoneVerified, true);
+    // the app writes the whole object (the column is private: no reading it back)
+    await db.as(kid.uid, `update players set guardian = '{"email":"g@x.in","phone":"+919800000001","name":"Mum","phoneVerified":true}' where id = $1`, [kid.player]);
+    assert.equal((await flags()).phoneVerified, true, 'kept while the number is the same');
+    await db.as(kid.uid, `update players set guardian = '{"email":"g@x.in","phone":"+919800000002","name":"Mum","phoneVerified":true}' where id = $1`, [kid.player]);
+    assert.equal((await flags()).phoneVerified ?? false, false, 'a new number isn\'t verified');
+  });
+});
+
+describe('CL-15 — verification documents: images and PDFs, 10 MB at most', () => {
+  test('the bucket says so', async () => {
+    const [b] = await db.sql<{ l: number; t: string[] }>(`select file_size_limit as l, allowed_mime_types as t from storage.buckets where id = 'verification-docs'`);
+    assert.equal(Number(b.l), 10 * 1024 * 1024);
+    assert.ok(b.t.includes('application/pdf') && b.t.includes('image/jpeg') && !b.t.some((x) => /html|svg|xml/.test(x)));
+  });
+});
+
+describe('CL-17 — reset is one step, with the same rules; Player of the Match changes once', () => {
+  test('reset_match wipes everything at once, and only within the rules', async () => {
+    const org = await person('Reset Organiser');
+    const scorer = await person('Reset Scorer');
+    const [tr] = await db.as<{ id: string }>(org.uid, `insert into tournaments (name, host_name, organizer_id) values ('Reset Cup', 'O', auth.uid()) returning id`);
+    const [k] = await db.as<{ id: string }>(org.uid, `insert into players (full_name, dob) values ('Reset Kid', '2014-01-01') returning id`);
+    const [t] = await db.as<{ id: string }>(org.uid, `insert into teams (name, short_name, sport, roster) values ('R', 'R', 'football', $1) returning id`, [JSON.stringify([k.id])]);
+    const [m] = await db.as<{ id: string }>(org.uid, `insert into matches (sport, tournament_id, home_team_id, status, scorer_ids) values ('football', $1, $2, 'live', $3) returning id`, [tr.id, t.id, [scorer.player]]);
+    await db.as(scorer.uid, `insert into match_events (match_id, seq, type, side, payload) values ($1, 1, 'GOAL', 'home', '{}')`, [m.id]);
+    await db.as(scorer.uid, `insert into stat_lines (match_id, player_id, sport, stats) values ($1, $2, 'football', '{"goals":1}')`, [m.id, k.id]);
+    await db.as(scorer.uid, `select reset_match($1)`, [m.id]);
+    const [row] = await db.sql<{ status: string; n: number; s: Record<string, unknown> }>(`select status, (select count(*)::int from match_events where match_id = $1) as n,
+      (select stats from stat_lines where match_id = $1) as s from matches where id = $1`, [m.id]);
+    assert.deepEqual([row.status, row.n, row.s], ['scheduled', 0, {}]);
+    await db.as(scorer.uid, `update matches set status = 'live' where id = $1`, [m.id]);
+    await db.as(scorer.uid, `insert into match_events (match_id, seq, type, side, payload) values ($1, 1, 'GOAL', 'home', '{}')`, [m.id]);
+    await endedAgo(m.id, 2);
+    assert.match(await errOf(() => db.as(scorer.uid, `select reset_match($1)`, [m.id])) ?? '', /organisers/i);
+    const stranger = await person('Reset Stranger');
+    assert.match(await errOf(() => db.as(stranger.uid, `select reset_match($1)`, [m.id])) ?? '', /not allowed|permission/i);
+    await db.as(org.uid, `select reset_match($1)`, [m.id]);
+  });
+  test('a changed Player of the Match can\'t be changed again, except by the organisers', async () => {
+    const host = await person('Potm Host');
+    const [t] = await db.as<{ id: string }>(host.uid, `insert into teams (name, short_name, sport, roster) values ('P', 'P', 'football', '[]') returning id`);
+    const [m] = await db.as<{ id: string }>(host.uid, `insert into matches (sport, home_team_id, host_ids, status) values ('football', $1, $2, 'completed') returning id`, [t.id, [host.player]]);
+    await db.as(host.uid, `update matches set potm = $2 where id = $1`, [m.id, JSON.stringify({ playerId: host.player, name: 'Potm Host', by: host.player })]);
+    assert.match(await errOf(() => db.as(host.uid, `update matches set potm = $2 where id = $1`, [m.id, JSON.stringify({ playerId: host.player, name: 'X', by: host.player })])) ?? '', /once/i);
+  });
+});
