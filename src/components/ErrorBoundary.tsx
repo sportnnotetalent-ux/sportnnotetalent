@@ -57,5 +57,5 @@ const st = StyleSheet.create({
   title: { color: theme.colors.text, fontSize: theme.font.h2, fontWeight: '800', textAlign: 'center' },
   body: { color: theme.colors.textMuted, fontSize: theme.font.body, textAlign: 'center', maxWidth: 360 },
   btn: { backgroundColor: theme.colors.primary, borderRadius: theme.radius.md, paddingVertical: theme.spacing(3), paddingHorizontal: theme.spacing(8), marginTop: theme.spacing(2) },
-  btnText: { color: '#06120D', fontSize: theme.font.body, fontWeight: '800' },
+  btnText: { color: theme.colors.onFill, fontSize: theme.font.body, fontWeight: '800' },
 });

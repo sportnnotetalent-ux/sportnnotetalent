@@ -1,5 +1,6 @@
 import React, { Suspense, useEffect, useRef } from 'react';
-import { Text, View, ActivityIndicator, Platform, Linking } from 'react-native';
+import { Text, View, ActivityIndicator, Platform, Linking, StyleSheet } from 'react-native';
+import { House, CalendarDays, Trophy, Compass, CircleUserRound } from 'lucide-react-native';
 import { NavigationContainer, DefaultTheme, getStateFromPath, type LinkingOptions } from '@react-navigation/native';
 import { navRef } from './navRef';
 import { promptSignIn, takePendingRoute } from '../core/guest';
@@ -251,8 +252,17 @@ const navTheme = {
   },
 };
 
-const icon = (emoji: string) => ({ color }: { color: string }) =>
-  <Text style={{ fontSize: 20, color }}>{emoji}</Text>;
+// 2026-10-29 redesign: line icons; the active tab sits on a lime pill
+type TabIcon = React.ComponentType<{ color?: string; size?: number; strokeWidth?: number }>;
+const icon = (Icon: TabIcon) => ({ color, focused }: { color: string; focused: boolean }) => (
+  <View style={[tabStyles.iconWrap, focused && tabStyles.iconWrapOn]}>
+    <Icon color={focused ? theme.colors.onLime : color} size={21} strokeWidth={focused ? 2.4 : 2} />
+  </View>
+);
+const tabStyles = StyleSheet.create({
+  iconWrap: { width: 46, height: 28, borderRadius: theme.radius.pill, alignItems: 'center', justifyContent: 'center' },
+  iconWrapOn: { backgroundColor: theme.colors.lime },
+});
 
 function Tabs() {
   // Anyone can host a game or tournament at any time, so Organize is available
@@ -262,16 +272,17 @@ function Tabs() {
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarStyle: { backgroundColor: theme.colors.surface, borderTopColor: theme.colors.border },
-        tabBarActiveTintColor: theme.colors.primary,
+        tabBarStyle: { backgroundColor: theme.colors.surface, borderTopColor: theme.colors.surfaceAlt, height: Platform.OS === 'web' ? 64 : undefined, paddingTop: 6 },
+        tabBarActiveTintColor: theme.colors.text,
         tabBarInactiveTintColor: theme.colors.textMuted,
+        tabBarLabelStyle: { fontSize: 11, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase' },
       }}
     >
-      <Tab.Screen name="Home" component={HomeScreen} options={{ tabBarIcon: icon('🏠') }} />
-      <Tab.Screen name="Matches" component={MatchesScreen} options={{ tabBarIcon: icon('📅') }} />
-      <Tab.Screen name="Organize" component={OrganizeScreen} options={{ tabBarIcon: icon('🎛️') }} />
-      <Tab.Screen name="Discover" component={DiscoverScreen} options={{ tabBarIcon: icon('🔍') }} />
-      <Tab.Screen name="Profile" component={ProfileScreen} options={{ tabBarIcon: icon('👤') }} />
+      <Tab.Screen name="Home" component={HomeScreen} options={{ tabBarIcon: icon(House) }} />
+      <Tab.Screen name="Matches" component={MatchesScreen} options={{ tabBarIcon: icon(CalendarDays) }} />
+      <Tab.Screen name="Organize" component={OrganizeScreen} options={{ tabBarIcon: icon(Trophy) }} />
+      <Tab.Screen name="Discover" component={DiscoverScreen} options={{ tabBarIcon: icon(Compass) }} />
+      <Tab.Screen name="Profile" component={ProfileScreen} options={{ tabBarIcon: icon(CircleUserRound) }} />
     </Tab.Navigator>
   );
 }
@@ -288,8 +299,11 @@ export const webHeaderFit = (Platform.OS === 'web'
 
 const stackScreenOpts = {
   headerShown: true,
-  headerStyle: { backgroundColor: theme.colors.surface },
+  headerStyle: { backgroundColor: theme.colors.bg },
+  headerShadowVisible: false,
   headerTintColor: theme.colors.text,
+  // 2026-10-29 redesign: the condensed heading face, in capitals
+  headerTitleStyle: { fontFamily: theme.fonts.heading, fontSize: 20 },
 } as const;
 
 const legalOpts = ({ route }: { route: { params?: { doc?: string } } }) => ({

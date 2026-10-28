@@ -347,7 +347,7 @@ const st = StyleSheet.create({
   counterPill: { backgroundColor: theme.colors.surfaceAlt, borderRadius: theme.radius.pill, paddingVertical: theme.spacing(1.5), paddingHorizontal: theme.spacing(3), borderWidth: 1, borderColor: theme.colors.border },
   counterPillFull: { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
   counterText: { color: theme.colors.textMuted, fontSize: theme.font.small, fontWeight: '800' },
-  counterTextFull: { color: '#06120D' },
+  counterTextFull: { color: theme.colors.onFill },
   quick: { color: theme.colors.primary, fontSize: theme.font.small, fontWeight: '800', paddingHorizontal: theme.spacing(2), paddingVertical: theme.spacing(1) },
   content: { padding: theme.spacing(4), gap: theme.spacing(2) },
   row: {
@@ -372,7 +372,7 @@ const st = StyleSheet.create({
   },
   toggleDisabled: { opacity: 0.4 },
   toggleText: { color: theme.colors.textMuted, fontSize: theme.font.small, fontWeight: '700' },
-  toggleTextActive: { color: '#06120D' },
+  toggleTextActive: { color: theme.colors.onFill },
   pitchBtn: { marginTop: theme.spacing(3), backgroundColor: theme.colors.surface, borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.colors.border, borderStyle: 'dashed', padding: theme.spacing(3), gap: 2 },
   pitchText: { color: theme.colors.primary, fontSize: theme.font.body, fontWeight: '800' },
   pitchHint: { color: theme.colors.textMuted, fontSize: theme.font.tiny },

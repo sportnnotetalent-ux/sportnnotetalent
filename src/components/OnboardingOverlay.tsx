@@ -162,7 +162,7 @@ const st = StyleSheet.create({
   choiceMain: { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
   choiceIcon: { fontSize: 24 },
   choiceLabel: { color: theme.colors.text, fontSize: theme.font.body, fontWeight: '800' },
-  choiceLabelMain: { color: '#06120D' },
+  choiceLabelMain: { color: theme.colors.onFill },
   choiceHint: { color: theme.colors.textMuted, fontSize: theme.font.small },
   choiceHintMain: { color: '#0B2A1E' },
 });

@@ -3,6 +3,11 @@
  * Every text/background pair the app uses is listed with its minimum:
  * 4.5:1 for body text, 3:1 for large text (≥24px, or ≥18.66px bold) and for UI
  * component edges / focus rings. Change a token → this shows what it breaks.
+ *
+ * 2026-10-29 redesign (light "court" theme): the brand colours are dark enough
+ * to read as text on the cream page, so fills carry WHITE ink (`onFill`); the
+ * lime highlight carries dark ink (`onLime`); the pitch-green hero carries
+ * cream text and lime accents.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -28,6 +33,7 @@ const PAIRS: Pair[] = [
     [`primary (links) on ${s}`, c.primary, c[s], 4.5],
     [`primaryDark on ${s}`, c.primaryDark, c[s], 4.5],
     [`accent on ${s}`, c.accent, c[s], 4.5],
+    [`hot (dates, "View all") on ${s}`, c.hot, c[s], 4.5],
     [`danger (error text) on ${s}`, c.danger, c[s], 4.5],
     [`home on ${s}`, c.home, c[s], 4.5],
     [`away on ${s}`, c.away, c[s], 4.5],
@@ -35,8 +41,13 @@ const PAIRS: Pair[] = [
     [`inputBorder on ${s}`, c.inputBorder, c[s], 3],
     [`focus ring on ${s}`, c.focus, c[s], 3],
   ]),
-  // dark ink on every bright fill (Button, SelectChip on, pads, LIVE pill text…)
-  ...(['primary', 'primaryDark', 'accent', 'danger', 'home', 'away', 'textMuted'] as const).map((s): Pair => [`onFill on ${s}`, c.onFill, c[s], 4.5]),
+  // the fill ink on every brand fill (Button, pads, LIVE pill text…)
+  ...(['primary', 'primaryDark', 'accent', 'danger', 'home', 'away', 'textMuted', 'hot'] as const).map((s): Pair => [`onFill on ${s}`, c.onFill, c[s], 4.5]),
+  // the lime highlight (active chips, call-to-action buttons) and the pitch-green hero
+  ['onLime on lime', c.onLime, c.lime, 4.5],
+  ['heroText on primaryDark', c.heroText, c.primaryDark, 4.5],
+  ['lime on primaryDark (hero accent)', c.lime, c.primaryDark, 4.5],
+  ['heroMuted on primaryDark', c.heroMuted, c.primaryDark, 4.5],
   // white only on the strong red (LIVE / UNDER REVIEW / unread badge)
   ['white on dangerStrong', WHITE, c.dangerStrong, 4.5],
   // tinted pills: coloured text on its own colour at 13% over the card
@@ -54,8 +65,9 @@ test('every theme text/background pair meets WCAG 2.1 AA', () => {
   assert.deepEqual(fails, []);
 });
 
-test('the D20 audit failure is fixed: white text never sits on `danger`', () => {
-  assert.ok(contrastRatio(WHITE, c.danger) < 4.5, 'danger is the bright red — white on it fails (2.8–3.0:1)');
+test('the D20 audit stays fixed: the red that carries white text reads', () => {
+  // light theme: `danger` is dark enough to carry white, and `dangerStrong` too
+  assert.ok(contrastRatio(WHITE, c.danger) >= 4.5);
   assert.ok(contrastRatio(WHITE, c.dangerStrong) >= 4.5);
   assert.ok(contrastRatio(c.onFill, c.danger) >= 4.5);
 });
@@ -79,10 +91,10 @@ test('readableOn picks the higher-contrast ink for any team colour', () => {
   }
 });
 
-test('ensureContrast lifts a dark kit colour used as scoreboard text', () => {
-  const navy = '#1A237E';
-  assert.ok(contrastRatio(navy, c.surface) < 3);
-  const lifted = ensureContrast(navy, c.surface, 3);
-  assert.ok(contrastRatio(lifted, c.surface) >= 3, lifted);
+test('ensureContrast deepens a pale kit colour used as scoreboard text (light cards)', () => {
+  const yellow = '#FFEB3B';
+  assert.ok(contrastRatio(yellow, c.surface) < 3);
+  const deepened = ensureContrast(yellow, c.surface, 3);
+  assert.ok(contrastRatio(deepened, c.surface) >= 3, deepened);
   assert.equal(ensureContrast(c.home, c.surface, 3), c.home); // already fine → unchanged
 });

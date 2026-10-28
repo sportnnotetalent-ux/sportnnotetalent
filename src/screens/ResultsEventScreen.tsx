@@ -1686,7 +1686,7 @@ const st = StyleSheet.create({
   mode: { paddingVertical: theme.spacing(2), paddingHorizontal: theme.spacing(3.5), justifyContent: 'center', borderRadius: theme.radius.pill, borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.surface },
   modeOn: { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
   modeTxt: { color: theme.colors.textMuted, fontSize: theme.font.small, fontWeight: '700' },
-  modeTxtOn: { color: '#06120D' },
+  modeTxtOn: { color: theme.colors.onFill },
   snack: {
     position: 'absolute', left: theme.spacing(4), right: theme.spacing(4), bottom: theme.spacing(4), flexDirection: 'row', alignItems: 'center', gap: theme.spacing(2),
     backgroundColor: theme.colors.surface, borderWidth: 1, borderColor: theme.colors.border, borderRadius: theme.radius.md, paddingLeft: theme.spacing(4), maxWidth: 560, alignSelf: 'center',

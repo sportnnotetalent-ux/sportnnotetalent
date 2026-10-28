@@ -151,7 +151,7 @@ const st = StyleSheet.create({
   mine: { alignSelf: 'flex-end', backgroundColor: theme.colors.primary },
   theirs: { alignSelf: 'flex-start', backgroundColor: theme.colors.surface },
   body: { color: theme.colors.text, fontSize: theme.font.body },
-  mineText: { color: '#06120D' },
+  mineText: { color: theme.colors.onFill },
   time: { color: theme.colors.textMuted, fontSize: theme.font.tiny },
   removed: { backgroundColor: theme.colors.surfaceAlt },
   removedText: { color: theme.colors.textMuted, fontStyle: 'italic' },
@@ -159,5 +159,5 @@ const st = StyleSheet.create({
   composer: { flexDirection: 'row', alignItems: 'flex-end', gap: theme.spacing(2), padding: theme.spacing(3), borderTopWidth: 1, borderTopColor: theme.colors.border, backgroundColor: theme.colors.bg },
   input: { flex: 1, minHeight: 40, maxHeight: 120, borderRadius: 12, paddingHorizontal: theme.spacing(3), paddingVertical: theme.spacing(2), backgroundColor: theme.colors.surface, color: theme.colors.text, fontSize: theme.font.body },
   send: { paddingHorizontal: theme.spacing(4), paddingVertical: theme.spacing(2) + 2, borderRadius: 12, backgroundColor: theme.colors.primary },
-  sendText: { color: '#06120D', fontWeight: '800' },
+  sendText: { color: theme.colors.onFill, fontWeight: '800' },
 });

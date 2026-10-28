@@ -54,5 +54,5 @@ const st = StyleSheet.create({
   },
   barTxt: { flex: 1, color: theme.colors.accent, fontSize: theme.font.small, fontWeight: '800' },
   barBtn: { minHeight: 44, paddingHorizontal: theme.spacing(3), borderRadius: theme.radius.sm, backgroundColor: theme.colors.accent, alignItems: 'center', justifyContent: 'center' },
-  barBtnTxt: { color: '#06120D', fontSize: theme.font.small, fontWeight: '900' },
+  barBtnTxt: { color: theme.colors.onFill, fontSize: theme.font.small, fontWeight: '900' },
 });

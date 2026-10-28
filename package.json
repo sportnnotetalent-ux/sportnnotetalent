@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "main": "index.ts",
   "dependencies": {
+    "@expo-google-fonts/barlow-condensed": "^0.4.1",
     "@expo/metro-runtime": "~56.0.15",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-firebase/app": "~26.4.1",
@@ -16,6 +17,7 @@
     "expo-contacts": "~56.0.14",
     "expo-device": "~56.0.4",
     "expo-document-picker": "~56.0.4",
+    "expo-font": "56.0.6",
     "expo-haptics": "~56.0.3",
     "expo-image-picker": "~56.0.17",
     "expo-keep-awake": "~56.0.3",
@@ -26,6 +28,7 @@
     "expo-updates": "~56.0.25",
     "firebase": "^12.19.0",
     "libphonenumber-js": "1.13.14",
+    "lucide-react-native": "1.56.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-native": "0.85.3",

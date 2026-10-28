@@ -228,7 +228,7 @@ function Tile({ value, label, accent }: { value: string; label: string; accent?:
 /** Sports where a match can end level (a tile for draws / ties even at 0). */
 const CAN_DRAW = new Set<string>(['football', 'hockey', 'handball', 'ice_hockey', 'kabaddi', 'chess', 'cricket', 'rugby', 'netball', 'american_football', 'rugby_league']);
 const short = (name: string) => name.split(' ')[0] || name;
-const COLOR: Record<LineResult, string> = { W: theme.colors.primary, D: theme.colors.textMuted, T: theme.colors.textMuted, NR: theme.colors.border, L: theme.colors.danger };
+const COLOR: Record<LineResult, string> = { W: theme.colors.primary, D: theme.colors.textMuted, T: theme.colors.textMuted, NR: theme.colors.textMuted, L: theme.colors.danger };
 
 const st = StyleSheet.create({
   safe: { flex: 1, backgroundColor: theme.colors.bg },
@@ -241,7 +241,7 @@ const st = StyleSheet.create({
   tile: { flex: 1, alignItems: 'center', gap: theme.spacing(1) },
   tileValue: { color: theme.colors.primary, fontSize: theme.font.h1, fontWeight: '900' },
   dot: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
-  dotText: { color: '#06120D', fontWeight: '900', fontSize: theme.font.small },
+  dotText: { color: theme.colors.onFill, fontWeight: '900', fontSize: theme.font.small },
   meetRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(2), paddingVertical: theme.spacing(1) },
   small: { fontSize: theme.font.small },
   chev: { color: theme.colors.textMuted, fontSize: theme.font.h3, fontWeight: '700' },

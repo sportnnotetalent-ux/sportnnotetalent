@@ -141,7 +141,7 @@ const st = StyleSheet.create({
   details: { color: theme.colors.text, fontSize: theme.font.small, lineHeight: 20 },
   actions: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(2), marginTop: theme.spacing(1) },
   waBtn: { backgroundColor: '#25D366', borderRadius: theme.radius.pill, paddingVertical: theme.spacing(2), paddingHorizontal: theme.spacing(3) },
-  waText: { color: '#06120D', fontSize: theme.font.small, fontWeight: '800' },
+  waText: { color: theme.colors.onFill, fontSize: theme.font.small, fontWeight: '800' },
   contactCol: { gap: 1 },
   phone: { color: theme.colors.textMuted, fontSize: theme.font.small },
   verified: { color: theme.colors.primary, fontSize: theme.font.tiny, fontWeight: '700' },

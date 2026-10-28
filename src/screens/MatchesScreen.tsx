@@ -155,6 +155,6 @@ const st = StyleSheet.create({
   segBtn: { flex: 1, paddingVertical: theme.spacing(2), borderRadius: theme.radius.pill, alignItems: 'center' },
   segBtnActive: { backgroundColor: theme.colors.primary },
   segText: { color: theme.colors.textMuted, fontSize: theme.font.small, fontWeight: '700' },
-  segTextActive: { color: '#06120D', fontWeight: '800' },
+  segTextActive: { color: theme.colors.onFill, fontWeight: '800' },
   filters: { gap: theme.spacing(2), paddingVertical: theme.spacing(1) },
 });

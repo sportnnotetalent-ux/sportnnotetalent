@@ -324,7 +324,7 @@ const st = StyleSheet.create({
   awardCard: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(3) },
   awardCardRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(3) },
   avatar: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { color: '#06120D', fontSize: theme.font.small, fontWeight: '900' },
+  avatarText: { color: theme.colors.onFill, fontSize: theme.font.small, fontWeight: '900' },
   badge: { position: 'absolute', bottom: -5, right: -5, fontSize: 15 },
   label: { color: theme.colors.textMuted, fontSize: theme.font.tiny, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5, flexShrink: 1 },
   name: { color: theme.colors.text, fontSize: theme.font.body, fontWeight: '800' },

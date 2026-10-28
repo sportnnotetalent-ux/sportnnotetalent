@@ -5,7 +5,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { theme } from '../core/theme';
-import { textStyles } from './ui';
 
 /** Max records any section renders inline before "See all" takes over. */
 export const SECTION_CAP = 5;
@@ -26,7 +25,7 @@ export function SectionHeader({
 }) {
   return (
     <View style={st.row}>
-      <Text style={[textStyles.h3, st.title]} numberOfLines={1}>{title}</Text>
+      <Text style={st.title} numberOfLines={1} accessibilityRole="header">{title}</Text>
       {onSeeAll && (
         <TouchableOpacity accessibilityRole="button" onPress={onSeeAll} activeOpacity={0.7} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Text style={st.seeAll}>{expanded ? 'Show less' : `See all${count != null ? ` (${count})` : ''} ›`}</Text>
@@ -38,6 +37,7 @@ export function SectionHeader({
 
 const st = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: theme.spacing(2), marginTop: theme.spacing(3) },
-  title: { flexShrink: 1 },
-  seeAll: { color: theme.colors.primary, fontSize: theme.font.small, fontWeight: '800' },
+  // 2026-10-29 redesign: "UPCOMING MATCH ········ SEE ALL (12) ›"
+  title: { flexShrink: 1, color: theme.colors.text, fontSize: theme.font.small, fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase' },
+  seeAll: { color: theme.colors.hot, fontSize: theme.font.tiny, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase' },
 });

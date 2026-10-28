@@ -63,7 +63,7 @@ export function ConfirmSheetHost() {
             </TouchableOpacity>
             <TouchableOpacity style={[st.btn, { backgroundColor: yesBg, borderColor: yesBg }]} activeOpacity={0.85} accessibilityRole="button"
               accessibilityLabel={c?.yesLabel} accessibilityHint={c?.message} onPress={() => done(true)}>
-              <Text style={[st.btnText, { color: '#06120D' }]}>{c?.yesLabel}</Text>
+              <Text style={[st.btnText, { color: theme.colors.onFill }]}>{c?.yesLabel}</Text>
             </TouchableOpacity>
           </View>
         </View>

@@ -6,7 +6,7 @@ import { textStyles } from './ui';
 import type { LineResult } from '../core/types';
 import type { FormEntry } from '../data/headToHead';
 
-const COLOR: Record<LineResult, string> = { W: theme.colors.primary, D: theme.colors.textMuted, T: theme.colors.textMuted, NR: theme.colors.border, L: theme.colors.danger };
+const COLOR: Record<LineResult, string> = { W: theme.colors.primary, D: theme.colors.textMuted, T: theme.colors.textMuted, NR: theme.colors.textMuted, L: theme.colors.danger };
 const WORD: Record<LineResult, string> = { W: 'Won', D: 'Drew', T: 'Tied', NR: 'No result', L: 'Lost' };
 
 /** The dots alone. */
@@ -40,7 +40,7 @@ const st = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(1) },
   dot: {
     width: 26, height: 26, borderRadius: 13, overflow: 'hidden', textAlign: 'center', lineHeight: 26,
-    color: '#06120D', fontWeight: '900', fontSize: theme.font.small,
+    color: theme.colors.onFill, fontWeight: '900', fontSize: theme.font.small,
   },
   nr: { fontSize: 10 },
 });

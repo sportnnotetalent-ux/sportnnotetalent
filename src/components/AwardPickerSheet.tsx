@@ -116,7 +116,7 @@ const st = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(3), paddingVertical: theme.spacing(2), paddingHorizontal: theme.spacing(1), borderRadius: theme.radius.sm },
   rowActive: { backgroundColor: theme.colors.surfaceAlt },
   avatar: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { color: '#06120D', fontSize: theme.font.small, fontWeight: '900' },
+  avatarText: { color: theme.colors.onFill, fontSize: theme.font.small, fontWeight: '900' },
   detail: { color: theme.colors.textMuted, fontSize: theme.font.tiny, marginTop: 1 },
   value: { color: theme.colors.primary, fontSize: theme.font.body, fontWeight: '900', minWidth: 28, textAlign: 'right' },
   check: { color: theme.colors.primary, fontWeight: '900', fontSize: theme.font.body },

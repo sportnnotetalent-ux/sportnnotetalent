@@ -371,7 +371,7 @@ const st = StyleSheet.create({
   segBtn: { flex: 1, paddingVertical: theme.spacing(2), borderRadius: theme.radius.pill, alignItems: 'center' },
   segBtnActive: { backgroundColor: theme.colors.primary },
   segText: { color: theme.colors.textMuted, fontSize: theme.font.small, fontWeight: '700' },
-  segTextActive: { color: '#06120D', fontWeight: '800' },
+  segTextActive: { color: theme.colors.onFill, fontWeight: '800' },
   chips: { gap: theme.spacing(2), paddingVertical: theme.spacing(1) },
   playerCard: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(3) },
   rank: { color: theme.colors.textMuted, fontSize: theme.font.body, fontWeight: '800', width: 16 },
@@ -389,7 +389,7 @@ const st = StyleSheet.create({
   },
   followBtnOn: { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
   followText: { color: theme.colors.textMuted, fontSize: theme.font.small, fontWeight: '700' },
-  followTextOn: { color: '#06120D' },
+  followTextOn: { color: theme.colors.onFill },
   sportIcon: { fontSize: 14 },
   chevron: { color: theme.colors.textMuted, fontSize: theme.font.h2, fontWeight: '700' },
   searchBox: {

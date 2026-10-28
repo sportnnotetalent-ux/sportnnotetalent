@@ -37,5 +37,5 @@ const st = StyleSheet.create({
   sub: { color: theme.colors.textMuted, fontSize: theme.font.tiny },
   link: { color: theme.colors.text, fontSize: theme.font.small, fontWeight: '700' },
   btn: { backgroundColor: theme.colors.primary, borderRadius: theme.radius.md, paddingVertical: theme.spacing(2), paddingHorizontal: theme.spacing(3) },
-  btnText: { color: '#06120D', fontSize: theme.font.small, fontWeight: '800' },
+  btnText: { color: theme.colors.onFill, fontSize: theme.font.small, fontWeight: '800' },
 });

@@ -16,6 +16,8 @@ import { formatShort, useUserTimeZone, zoneShortName } from '../core/time';
 import type { Match } from '../core/types';
 import { matchLine, resultWords } from '../sports/matchLine';
 import { isTieMatch, fmtPts } from '../data/teamTie';
+import { MapPin } from 'lucide-react-native';
+import { SportArt } from './SportArt';
 
 /** A stored snapshot from an older engine must never break a card. */
 function safeLine(f: () => string): string {
@@ -83,6 +85,8 @@ export function MatchCard({ match, onPress, onStart, timeZone }: {
     // The start button sits beside (not inside) the card's touchable — a button
     // can't nest inside another button on web.
     <View style={[s.card, live && s.cardLive]}>
+    {/* 2026-10-29 redesign: a strip of the sport's court across the top */}
+    <SportArt sport={match.sport} style={s.strip} />
     <TouchableOpacity
       accessibilityRole="button"
       accessibilityLabel={`${sport.name}: ${teamLabel(match.homeTeam)} versus ${teamLabel(match.awayTeam)}${
@@ -93,9 +97,7 @@ export function MatchCard({ match, onPress, onStart, timeZone }: {
       onPress={onPress}
     >
       <View style={s.top}>
-        <Text style={s.sport}>
-          {sport.icon} {sport.name}
-        </Text>
+        <Text style={s.sport} numberOfLines={1}>{sport.name}</Text>
         {onBreak ? (
           <Text style={s.breakTag}>⏸ BREAK</Text>
         ) : live ? (
@@ -144,7 +146,7 @@ export function MatchCard({ match, onPress, onStart, timeZone }: {
         {tie ? (
           `👥 Team tie · ${match.tieRubbers.length} rubbers${done ? '' : live ? ' · in progress' : ` · ${time}`}`
         ) : live ? (
-          <Text style={s.cta}>tap to score ›</Text>
+          <Text style={s.cta}>Tap to score ›</Text>
         ) : done ? (
           match.result ? resultWords({ sport: match.sport, result: match.result }, match.homeTeam.name, match.awayTeam.name) : walkover ? 'Walkover' : 'Full time'
         ) : (
@@ -160,7 +162,7 @@ export function MatchCard({ match, onPress, onStart, timeZone }: {
               onPress={() => openVenue(match.venueName, match.venueMapsUrl)}
               suppressHighlighting
             >
-              📍 <Text style={s.venueText}>{match.venueName}</Text>
+              <MapPin color={theme.colors.textMuted} size={12} strokeWidth={2.2} /> <Text style={s.venueText}>{match.venueName}</Text>
             </Text>
           </>
         ) : null}
@@ -179,49 +181,51 @@ export function MatchCard({ match, onPress, onStart, timeZone }: {
 const s = StyleSheet.create({
   card: {
     backgroundColor: theme.colors.surface,
-    borderRadius: theme.radius.md,
+    borderRadius: theme.radius.lg - 4,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    padding: theme.spacing(4),
+    borderColor: theme.colors.surfaceAlt,
+    paddingBottom: theme.spacing(4),
     gap: theme.spacing(3),
+    overflow: 'hidden',
     ...theme.shadow.card,
   },
-  body: { gap: theme.spacing(3) },
+  strip: { height: 40 },
+  body: { gap: theme.spacing(3), paddingHorizontal: theme.spacing(4) },
   cardLive: {
     borderColor: theme.colors.danger + '66',
     ...theme.shadow.live,
   },
   top: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  sport: { color: theme.colors.textMuted, fontSize: theme.font.small, fontWeight: '700' },
+  sport: { flexShrink: 1, color: theme.colors.textMuted, fontSize: theme.font.tiny, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase' },
 
   liveBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: theme.spacing(1.5),
-    backgroundColor: theme.colors.danger + '22',
+    backgroundColor: theme.colors.dangerStrong,
     paddingVertical: theme.spacing(1),
     paddingHorizontal: theme.spacing(2),
     borderRadius: theme.radius.pill,
   },
-  liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: theme.colors.danger },
-  liveText: { color: theme.colors.danger, fontSize: theme.font.tiny, fontWeight: '800', letterSpacing: 0.5 },
+  liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#FFFFFF' },
+  liveText: { color: '#FFFFFF', fontSize: theme.font.tiny, fontWeight: '800', letterSpacing: 0.8 },
   finalTag: { color: theme.colors.textMuted, fontSize: theme.font.tiny, fontWeight: '800', letterSpacing: 0.5 },
   postponedTag: { color: theme.colors.accent, fontSize: theme.font.tiny, fontWeight: '800', letterSpacing: 0.5 },
   cancelledTag: { color: theme.colors.danger, fontSize: theme.font.tiny, fontWeight: '800', letterSpacing: 0.5 },
   breakTag: { color: theme.colors.accent, backgroundColor: theme.colors.accent + '22', fontSize: theme.font.tiny, fontWeight: '800', letterSpacing: 0.5, paddingVertical: theme.spacing(1), paddingHorizontal: theme.spacing(2), borderRadius: theme.radius.pill, overflow: 'hidden' },
-  startBtn: { backgroundColor: theme.colors.primary + '1F', borderWidth: 1, borderColor: theme.colors.primary + '66', borderRadius: theme.radius.pill, paddingVertical: theme.spacing(2), alignItems: 'center' },
-  startText: { color: theme.colors.primary, fontSize: theme.font.small, fontWeight: '800' },
-  timeTag: { color: theme.colors.accent, fontSize: theme.font.small, fontWeight: '700' },
+  startBtn: { backgroundColor: theme.colors.lime, borderRadius: theme.radius.pill, paddingVertical: theme.spacing(2.5), alignItems: 'center', marginHorizontal: theme.spacing(4) },
+  startText: { color: theme.colors.onLime, fontSize: theme.font.small, fontWeight: '800', letterSpacing: 0.4 },
+  timeTag: { color: theme.colors.hot, fontSize: theme.font.tiny, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase' },
 
   board: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(2) },
   side: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: theme.spacing(2) },
   sideLeft: { justifyContent: 'flex-end' },
   sideRight: { justifyContent: 'flex-start' },
-  team: { color: theme.colors.text, fontSize: theme.font.body, fontWeight: '600', flexShrink: 1 },
+  team: { color: theme.colors.text, fontSize: theme.font.body, fontWeight: '700', flexShrink: 1 },
   dot: { width: 12, height: 12, borderRadius: 6 },
 
   scoreWrap: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(2), paddingHorizontal: theme.spacing(1) },
-  score: { color: theme.colors.text, fontSize: 26, fontWeight: '800', letterSpacing: -0.5, minWidth: 20, textAlign: 'center' },
+  score: { color: theme.colors.text, fontSize: 34, fontFamily: theme.fonts.numeral, minWidth: 20, textAlign: 'center' },
   scoreLive: { color: theme.colors.primary },
   setLine: { color: theme.colors.textMuted, fontSize: theme.font.small, fontWeight: '700', textAlign: 'center', fontVariant: ['tabular-nums'] },
   scoreSep: { color: theme.colors.textMuted, fontSize: theme.font.h3, fontWeight: '700' },
@@ -229,7 +233,7 @@ const s = StyleSheet.create({
   walkover: { color: theme.colors.textMuted, fontSize: theme.font.small, fontWeight: '800', letterSpacing: 0.5, paddingHorizontal: theme.spacing(2) },
 
   foot: { color: theme.colors.textMuted, fontSize: theme.font.small },
-  cta: { color: theme.colors.primary, fontWeight: '700' },
-  venue: { color: theme.colors.primary, fontSize: theme.font.small },
+  cta: { color: theme.colors.primary, fontWeight: '800' },
+  venue: { color: theme.colors.textMuted, fontSize: theme.font.small },
   venueText: { textDecorationLine: 'underline' },
 });

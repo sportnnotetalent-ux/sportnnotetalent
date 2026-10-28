@@ -21,7 +21,7 @@ export function SetupChecklist({ steps, hidden, onHide, onStep }: {
       {steps.map((s, i) => (
         <TouchableOpacity key={s.key} accessibilityRole="button" accessibilityLabel={s.label} activeOpacity={0.8} onPress={() => onStep(s.key)} style={st.row}>
           <View style={[st.badge, s.done && st.badgeDone, s.key === next && st.badgeNext]}>
-            <Text style={[st.badgeText, (s.done || s.key === next) && { color: '#06120D' }]}>{s.done ? '✓' : i + 1}</Text>
+            <Text style={[st.badgeText, (s.done || s.key === next) && { color: theme.colors.onFill }]}>{s.done ? '✓' : i + 1}</Text>
           </View>
           <View style={{ flex: 1 }}>
             <Text style={[textStyles.body, s.key === next && { color: theme.colors.primary, fontWeight: '800' }, s.done && st.doneText]}>{s.label}</Text>

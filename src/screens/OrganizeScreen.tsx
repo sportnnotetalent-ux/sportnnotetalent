@@ -34,8 +34,8 @@ const statusOf = (t: Tournament): Status => {
   return 'live';
 };
 const STATUS_META: Record<Status, { label: string; color: string; text: string }> = {
-  live: { label: '🔴 Live', color: theme.colors.danger, text: '#06120D' },
-  upcoming: { label: '📅 Upcoming', color: theme.colors.accent, text: '#06120D' },
+  live: { label: '🔴 Live', color: theme.colors.danger, text: theme.colors.onFill },
+  upcoming: { label: '📅 Upcoming', color: theme.colors.accent, text: theme.colors.onFill },
   completed: { label: 'Completed', color: theme.colors.surfaceAlt, text: theme.colors.textMuted },
 };
 

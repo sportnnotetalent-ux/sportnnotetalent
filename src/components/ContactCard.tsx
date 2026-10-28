@@ -192,7 +192,7 @@ const st = StyleSheet.create({
     color: theme.colors.text, fontSize: theme.font.body, letterSpacing: 4,
   },
   confirmBtn: { flexShrink: 0, backgroundColor: theme.colors.primary, borderRadius: theme.radius.md, paddingVertical: theme.spacing(2.5), paddingHorizontal: theme.spacing(4) },
-  confirmText: { color: '#06120D', fontSize: theme.font.small, fontWeight: '800' },
+  confirmText: { color: theme.colors.onFill, fontSize: theme.font.small, fontWeight: '800' },
   hint: { color: theme.colors.textMuted, fontSize: theme.font.tiny },
   error: { color: theme.colors.danger, fontSize: theme.font.tiny },
 });

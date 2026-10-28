@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
+import { useFonts, BarlowCondensed_700Bold, BarlowCondensed_800ExtraBold_Italic } from '@expo-google-fonts/barlow-condensed';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from './src/core/auth';
 import { OrgContextProvider } from './src/core/orgContext';
@@ -23,6 +24,15 @@ export default function App() {
   // In demo mode, wait for the persisted store to load before first render (avoids
   // a seed→saved flash), then start autosaving. Live mode skips this entirely.
   const [ready, setReady] = useState(isSupabaseConfigured);
+  // 2026-10-29 redesign: the condensed headline font (theme.fonts). Never wait
+  // on it for long: after 2.5 s (or an error) the platform font is used.
+  const [fontsLoaded, fontError] = useFonts({ BarlowCondensed_700Bold, BarlowCondensed_800ExtraBold_Italic });
+  const [fontWait, setFontWait] = useState(true);
+  useEffect(() => {
+    const t = setTimeout(() => setFontWait(false), 2500);
+    return () => clearTimeout(t);
+  }, []);
+  const fontsReady = fontsLoaded || !!fontError || !fontWait;
   useEffect(() => {
     void hydrateReminderPrefs(); // user reminder timers (both demo + live)
     void hydrateTimeZone(); // viewer's display timezone (first run: the device's zone, else IST)
@@ -41,8 +51,8 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <StatusBar style="light" />
-      {ready && (
+      <StatusBar style="dark" />
+      {ready && fontsReady && (
         <ErrorBoundary>
           <AuthProvider>
             <OrgContextProvider>

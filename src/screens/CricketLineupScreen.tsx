@@ -199,7 +199,7 @@ const st = StyleSheet.create({
   },
   wkBtnActive: { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
   wkText: { color: theme.colors.textMuted, fontSize: theme.font.tiny, fontWeight: '800' },
-  wkTextActive: { color: '#06120D' },
+  wkTextActive: { color: theme.colors.onFill },
   remove: { color: theme.colors.danger, fontSize: theme.font.small, fontWeight: '700' },
   played: { color: theme.colors.primary, fontSize: theme.font.small, fontWeight: '800' },
   countFull: { color: theme.colors.primary },

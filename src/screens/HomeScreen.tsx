@@ -10,7 +10,11 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { theme } from '../core/theme';
-import { EmptyState, Card, LoadingState, Pill, SelectChip, textStyles, plural } from '../components/ui';
+import { EmptyState, Card, LoadingState, Pill, SelectChip, QuickTile, textStyles, plural } from '../components/ui';
+import { setStatusBarStyle } from 'expo-status-bar';
+import Svg, { Circle, Line, Rect } from 'react-native-svg';
+import { Search, Bell, Menu, Zap, Trophy, Users } from 'lucide-react-native';
+import { SportTile } from '../components/SportArt';
 import { formatDayShort } from '../core/dates';
 import { MatchCard } from '../components/MatchCard';
 import { LiveGolfCards } from '../components/golf/LiveGolfCards';
@@ -37,7 +41,15 @@ type Nav = NativeStackNavigationProp<RootStackParamList>;
 export default function HomeScreen() {
   const nav = useNavigation<Nav>();
   // Three header buttons (🔍 🔔 ▾) leave a phone's wordmark ~140px — step it down so it isn't clipped.
-  const narrow = useWindowDimensions().width < 420;
+  const { width } = useWindowDimensions();
+  const narrow = width < 420;
+  // three sport tiles a row on a phone (the content is at most 720 wide)
+  const tileW = Math.floor((Math.min(width, 720) - theme.spacing(8) - theme.spacing(2) * 2) / 3);
+  // 2026-10-29 redesign: light status-bar text over the pitch-green hero
+  useFocusEffect(useCallback(() => {
+    setStatusBarStyle('light');
+    return () => setStatusBarStyle('dark');
+  }, []));
   const { profile } = useAuth();
   const tournaments = useMyTournaments(profile?.id);
   // Home is a personal feed: matches from what you follow (players/teams/
@@ -120,15 +132,22 @@ export default function HomeScreen() {
   };
 
   return (
-    <SafeAreaView style={st.safe} edges={['top']}>
+    <SafeAreaView style={st.safe} edges={[]}>
       <KeyboardAwareScrollView contentContainerStyle={st.content}>
-        {/* Header: wordmark · search · notifications · quick-actions toggle */}
-        <View style={st.header}>
-          <Logo size={40} />
-          <View style={st.brand}>
-            <Text style={[st.wordmark, narrow && st.wordmarkNarrow]} numberOfLines={1}>Sport<Text style={st.wordmarkAccent}>nNote</Text></Text>
-            <Text style={textStyles.muted} numberOfLines={1}>Play a Sport, Make a Note.</Text>
-          </View>
+        {/* 2026-10-29 redesign: the pitch-green hero — wordmark, search,
+            notifications, menu, and the headline */}
+        <View style={[st.hero, { paddingTop: insets.top + theme.spacing(3) }]}>
+          <Svg style={st.heroArt} width={220} height={220} viewBox="0 0 100 100" pointerEvents="none">
+            <Circle cx={70} cy={30} r={26} fill={theme.colors.lime} opacity={0.9} />
+            <Rect x={8} y={8} width={84} height={84} stroke={theme.colors.heroText} strokeOpacity={0.12} strokeWidth={1.2} fill="none" />
+            <Line x1={8} y1={50} x2={92} y2={50} stroke={theme.colors.heroText} strokeOpacity={0.12} strokeWidth={1.2} />
+            <Circle cx={50} cy={50} r={12} stroke={theme.colors.heroText} strokeOpacity={0.12} strokeWidth={1.2} fill="none" />
+          </Svg>
+          <View style={st.header}>
+            <Logo size={38} />
+            <View style={st.brand}>
+              <Text style={[st.wordmark, narrow && st.wordmarkNarrow]} numberOfLines={1}>Sport<Text style={st.wordmarkAccent}>nNote</Text></Text>
+            </View>
           <TouchableOpacity
             style={st.iconBtn}
             activeOpacity={0.8}
@@ -136,7 +155,7 @@ export default function HomeScreen() {
             accessibilityLabel="Search players, teams, matches and tournaments"
             onPress={() => nav.navigate('Tabs', { screen: 'Discover', params: { mode: 'people', focus: true } })}
           >
-            <Text style={st.icon}>🔍</Text>
+            <Search color={theme.colors.heroText} size={20} strokeWidth={2.2} />
           </TouchableOpacity>
           <TouchableOpacity
             style={st.iconBtn}
@@ -145,7 +164,7 @@ export default function HomeScreen() {
             accessibilityLabel={unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'}
             onPress={() => nav.navigate('Notifications')}
           >
-            <Text style={st.icon}>🔔</Text>
+            <Bell color={theme.colors.heroText} size={20} strokeWidth={2.2} />
             {unread > 0 && (
               <View style={st.badge}>
                 <Text style={st.badgeText} maxFontSizeMultiplier={1.5}>{unread > 9 ? '9+' : unread}</Text>
@@ -160,10 +179,29 @@ export default function HomeScreen() {
             accessibilityLabel="Quick actions"
             onPress={() => setActionsOpen((v) => !v)}
           >
-            <Text style={st.toggleGlyph}>{actionsOpen ? '▴' : '▾'}</Text>
+            <Menu color={theme.colors.heroText} size={20} strokeWidth={2.2} />
           </TouchableOpacity>
           {/* Voice panel opens from the menu; the built-in mic trigger is hidden. */}
           <VoiceNav matches={feed} onOpenMatch={openScorer} open={voiceOpen} onOpenChange={setVoiceOpen} hideTrigger />
+          </View>
+          <View style={st.heroCopy}>
+            {profile?.fullName ? <Text style={st.heroHello} numberOfLines={1}>Hi {profile.fullName.split(' ')[0]},</Text> : null}
+            <Text style={st.heroTitle} accessibilityRole="header">Ready to{'\n'}<Text style={st.heroTitleLime}>play?</Text></Text>
+            <Text style={st.heroTag}>Play a Sport, Make a Note.</Text>
+          </View>
+        </View>
+
+        {/* The three big shortcuts */}
+        <View style={st.quickRow}>
+          <QuickTile label="Score a match" color={theme.colors.lime} ink={theme.colors.onLime}
+            icon={<Zap color={theme.colors.onLime} size={26} strokeWidth={2.2} />}
+            onPress={() => (canScore ? nav.navigate('ScheduleMatch', {}) : nav.navigate('Tabs', { screen: 'Matches' }))} />
+          <QuickTile label="Organize" color={theme.colors.home} ink={theme.colors.onFill}
+            icon={<Trophy color={theme.colors.onFill} size={26} strokeWidth={2.2} />}
+            onPress={() => nav.navigate('Tabs', { screen: 'Organize' })} />
+          <QuickTile label="Find players" color={theme.colors.hot} ink={theme.colors.onFill}
+            icon={<Users color={theme.colors.onFill} size={26} strokeWidth={2.2} />}
+            onPress={() => nav.navigate('Tabs', { screen: 'Discover', params: { mode: 'people', focus: true } })} />
         </View>
 
         {/* Quick actions as an anchored dropdown menu. */}
@@ -262,7 +300,7 @@ export default function HomeScreen() {
         )}
 
         {/* Live now — top 5, "See all" opens the full live list */}
-        <SectionHeader title="🔴 Live now" count={live.length} onSeeAll={live.length > SECTION_CAP ? () => seeAll('live') : undefined} />
+        <SectionHeader title="Live now" count={live.length} onSeeAll={live.length > SECTION_CAP ? () => seeAll('live') : undefined} />
         {loading ? (
           <LoadingState label="Loading matches…" />
         ) : live.length ? (
@@ -273,7 +311,7 @@ export default function HomeScreen() {
         <LiveGolfCards tournamentId={selectedId} />
 
         {/* Up next — top 5, "See all" opens the full upcoming list */}
-        <SectionHeader title="📅 Up next" count={upcoming.length} onSeeAll={upcoming.length > SECTION_CAP ? () => seeAll('upcoming') : undefined} />
+        <SectionHeader title="Up next" count={upcoming.length} onSeeAll={upcoming.length > SECTION_CAP ? () => seeAll('upcoming') : undefined} />
         {loading ? (
           <LoadingState label="Loading…" />
         ) : upcoming.length ? (
@@ -284,39 +322,24 @@ export default function HomeScreen() {
 
         {/* Explore a sport — the sports the user has signed up for, plus a path
             into the ones they haven't. */}
-        <SectionHeader title="🎯 Explore a sport" />
-        <Text style={textStyles.muted}>
-          {mySports.length ? 'Your sports — schedule, standings & stats.' : 'Sports you sign up for will show up here.'}
-        </Text>
+        <SectionHeader title="Your sports" />
+        {mySports.length ? null : <Text style={textStyles.muted}>Sports you sign up for will show up here.</Text>}
         <View style={st.sportGrid}>
           {mySports.map((s) => (
-            <TouchableOpacity
-              key={s}
-              activeOpacity={0.85}
-              style={st.sportTile}
-              accessibilityRole="button"
-              accessibilityLabel={`Open ${getSportMeta(s).name}`}
-              onPress={() => openSport(s)}
-            >
-              <Text style={st.sportIcon}>{getSportMeta(s).icon}</Text>
-              <Text style={[textStyles.body, { flex: 1 }]} numberOfLines={1}>{getSportMeta(s).name}</Text>
-              <Text style={st.chevron}>›</Text>
-            </TouchableOpacity>
+            <SportTile key={s} sport={s} name={getSportMeta(s).name} icon={getSportMeta(s).icon} width={tileW} height={Math.round(tileW * 1.15)}
+              onPress={() => openSport(s)} accessibilityHint="Schedule, standings and stats" />
           ))}
         </View>
         {newSports.length > 0 && (
-          <TouchableOpacity accessibilityRole="button"
-            activeOpacity={0.85}
-            style={st.tryTile}
-            onPress={() => nav.navigate('TryNewSport', { sports: newSports })}
-          >
-            <Text style={st.sportIcon}>✨</Text>
-            <View style={{ flex: 1 }}>
-              <Text style={[textStyles.body, { fontWeight: '700' }]}>Try a new sport</Text>
-              <Text style={textStyles.muted}>{newSports.map((s) => getSportMeta(s).icon).join(' ')} · {newSports.length} to explore</Text>
-            </View>
-            <Text style={st.chevron}>›</Text>
-          </TouchableOpacity>
+          <>
+            <SectionHeader title="Try a new sport" count={newSports.length} onSeeAll={() => nav.navigate('TryNewSport', { sports: newSports })} />
+            <KeyboardAwareScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.chips}>
+              {newSports.map((s) => (
+                <SportTile key={s} sport={s} name={getSportMeta(s).name} width={104} height={124}
+                  onPress={() => nav.navigate('TryNewSport', { sports: [s] })} accessibilityHint="See what you can do in this sport" />
+              ))}
+            </KeyboardAwareScrollView>
+          </>
         )}
       </KeyboardAwareScrollView>
     </SafeAreaView>
@@ -325,15 +348,28 @@ export default function HomeScreen() {
 
 const st = StyleSheet.create({
   safe: { flex: 1, backgroundColor: theme.colors.bg },
-  content: { padding: theme.spacing(4), gap: theme.spacing(3) },
-  header: { flexDirection: 'row', alignItems: 'flex-start', gap: theme.spacing(2), marginBottom: theme.spacing(1) },
+  content: { padding: theme.spacing(4), paddingTop: 0, gap: theme.spacing(3) },
+  // the pitch-green hero, edge to edge under the status bar
+  hero: {
+    marginHorizontal: -theme.spacing(4), paddingHorizontal: theme.spacing(4), paddingBottom: theme.spacing(10),
+    backgroundColor: theme.colors.primaryDark, borderBottomLeftRadius: theme.radius.xl, borderBottomRightRadius: theme.radius.xl,
+    overflow: 'hidden', gap: theme.spacing(5),
+  },
+  heroArt: { position: 'absolute', right: -70, top: 70 },
+  heroCopy: { gap: theme.spacing(1) },
+  heroHello: { color: theme.colors.heroMuted, fontSize: theme.font.body, fontWeight: '700' },
+  heroTitle: { color: theme.colors.heroText, fontFamily: theme.fonts.display, fontSize: theme.font.display, lineHeight: theme.font.display * 0.98, textTransform: 'uppercase' },
+  heroTitleLime: { color: theme.colors.lime },
+  heroTag: { color: theme.colors.heroMuted, fontSize: theme.font.body, marginTop: theme.spacing(1) },
+  quickRow: { flexDirection: 'row', gap: theme.spacing(2), marginTop: -theme.spacing(8) },
+  header: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(2) },
   brand: { flex: 1, gap: theme.spacing(1) },
-  wordmark: { color: theme.colors.text, fontSize: theme.font.h1, fontWeight: '900', letterSpacing: -0.5 },
-  wordmarkNarrow: { fontSize: 23 },
-  wordmarkAccent: { color: theme.colors.primary },
+  wordmark: { color: theme.colors.heroText, fontSize: 24, fontWeight: '900', letterSpacing: -0.5 },
+  wordmarkNarrow: { fontSize: 21 },
+  wordmarkAccent: { color: theme.colors.lime },
   iconBtn: {
-    width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: theme.colors.surface, borderWidth: 1, borderColor: theme.colors.border,
+    width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.10)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.16)',
   },
   icon: { fontSize: 20 },
   // The quick-actions toggle is a text glyph (not an emoji), so it needs an
@@ -348,7 +384,7 @@ const st = StyleSheet.create({
   badge: {
     position: 'absolute', top: -2, right: -2, minWidth: 20, minHeight: 20, borderRadius: 10,
     backgroundColor: theme.colors.dangerStrong, alignItems: 'center', justifyContent: 'center',
-    paddingHorizontal: 4, borderWidth: 2, borderColor: theme.colors.bg,
+    paddingHorizontal: 4, borderWidth: 2, borderColor: theme.colors.primaryDark,
   },
   badgeText: { color: '#fff', fontSize: theme.font.tiny, fontWeight: '800' },
   demo: { backgroundColor: theme.colors.surfaceAlt, gap: theme.spacing(1) },

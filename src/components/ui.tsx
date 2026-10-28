@@ -93,7 +93,9 @@ export function Button({
 }: {
   label: string;
   onPress: () => void;
-  variant?: 'primary' | 'ghost' | 'home' | 'away' | 'danger';
+  /** 2026-10-29 redesign: `primary` is the lime call to action (dark ink);
+   *  `brand` the solid pitch green (white ink) for a second strong action. */
+  variant?: 'primary' | 'brand' | 'ghost' | 'home' | 'away' | 'danger';
   /** Override the solid background (e.g. a team's kit colour on a home/away
    *  button). Ignored for the transparent `ghost` variant. */
   color?: string;
@@ -108,6 +110,8 @@ export function Button({
 }) {
   const variantBg =
     variant === 'primary'
+      ? theme.colors.lime
+      : variant === 'brand'
       ? theme.colors.primary
       : variant === 'home'
       ? theme.colors.home
@@ -118,7 +122,7 @@ export function Button({
       : 'transparent';
   const bg = variant === 'ghost' ? 'transparent' : color ?? variantBg;
   // SD-155: a custom kit colour gets whichever ink reads on it (dark kits → white).
-  const fg = variant === 'ghost' ? theme.colors.text : color ? readableOn(color) : theme.colors.onFill;
+  const fg = variant === 'ghost' ? theme.colors.text : color ? readableOn(color) : variant === 'primary' ? theme.colors.onLime : theme.colors.onFill;
   return (
     <TouchableOpacity
       onPress={disabled ? undefined : onPress}
@@ -175,6 +179,33 @@ export function ScreenTitle({
     </View>
   );
 }
+
+/** A big coloured shortcut tile: an icon above a caps label (Home's quick actions). */
+export function QuickTile({ label, icon, color, ink, onPress, accessibilityHint }: {
+  label: string;
+  icon: React.ReactNode;
+  color: string;
+  /** the label colour on `color` */
+  ink: string;
+  onPress: () => void;
+  accessibilityHint?: string;
+}) {
+  return (
+    <TouchableOpacity onPress={onPress} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel={label} accessibilityHint={accessibilityHint}
+      style={[sectionStyles.tile, { backgroundColor: color }]}>
+      {icon}
+      <Text style={[sectionStyles.tileLabel, { color: ink }]} numberOfLines={2}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
+
+const sectionStyles = StyleSheet.create({
+  tile: {
+    flex: 1, minHeight: 108, borderRadius: theme.radius.lg, padding: theme.spacing(3),
+    alignItems: 'center', justifyContent: 'center', gap: theme.spacing(2), ...theme.shadow.card,
+  },
+  tileLabel: { fontSize: theme.font.tiny, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', textAlign: 'center' },
+});
 
 /** A form field-group label — stronger than muted body text so a form reads as a
  *  form (labels stand out from hints/descriptions). Use above a control group
@@ -298,8 +329,10 @@ export function SelectChip({
 export const textStyles: Record<string, TextStyle> = StyleSheet.create({
   // Tighter tracking + generous line-height give headings a more composed,
   // intentional feel than the platform defaults.
-  h1: { color: theme.colors.text, fontSize: theme.font.h1, fontWeight: '800', letterSpacing: -0.5, lineHeight: theme.font.h1 * 1.15 },
-  h2: { color: theme.colors.text, fontSize: theme.font.h2, fontWeight: '700', letterSpacing: -0.3, lineHeight: theme.font.h2 * 1.2 },
+  // 2026-10-29: screen titles in the condensed italic display face, in capitals;
+  // section titles in the condensed upright (no fontWeight: the face is the weight)
+  h1: { color: theme.colors.text, fontSize: theme.font.h1 + 4, fontFamily: theme.fonts.display, textTransform: 'uppercase', letterSpacing: 0.2, lineHeight: (theme.font.h1 + 4) * 1.05 },
+  h2: { color: theme.colors.text, fontSize: theme.font.h2 + 4, fontFamily: theme.fonts.heading, letterSpacing: 0.2, lineHeight: (theme.font.h2 + 4) * 1.1 },
   h3: { color: theme.colors.text, fontSize: theme.font.h3, fontWeight: '700', letterSpacing: -0.2 },
   body: { color: theme.colors.text, fontSize: theme.font.body, lineHeight: theme.font.body * 1.4 },
   muted: { color: theme.colors.textMuted, fontSize: theme.font.small, lineHeight: theme.font.small * 1.4 },
@@ -308,23 +341,23 @@ export const textStyles: Record<string, TextStyle> = StyleSheet.create({
 const styles = StyleSheet.create({
   card: {
     backgroundColor: theme.colors.surface,
-    borderRadius: theme.radius.md,
+    borderRadius: theme.radius.lg - 4,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: theme.colors.surfaceAlt,
     padding: theme.spacing(4),
     ...theme.shadow.card,
   },
   btn: {
     minHeight: 44, // SD-155: ≥44pt target
     paddingVertical: theme.spacing(3),
-    paddingHorizontal: theme.spacing(4),
-    borderRadius: theme.radius.md,
+    paddingHorizontal: theme.spacing(5),
+    borderRadius: theme.radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  btnGhost: { borderWidth: 1, borderColor: theme.colors.border },
+  btnGhost: { borderWidth: 1.5, borderColor: theme.colors.inputBorder },
   btnDisabled: { opacity: 0.4 },
-  btnText: { fontSize: theme.font.body, fontWeight: '700', textAlign: 'center' },
+  btnText: { fontSize: theme.font.body, fontWeight: '800', letterSpacing: 0.2, textAlign: 'center' },
   pill: {
     paddingVertical: theme.spacing(1),
     paddingHorizontal: theme.spacing(2.5),
@@ -357,10 +390,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.border,
   },
-  selChipActive: { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
+  selChipActive: { backgroundColor: theme.colors.lime, borderColor: theme.colors.lime },
   selChipDisabled: { opacity: 0.4, backgroundColor: theme.colors.surfaceAlt },
   selChipText: { color: theme.colors.textMuted, fontSize: theme.font.small, fontWeight: '700' },
-  selChipTextActive: { color: '#06120D' },
+  selChipTextActive: { color: theme.colors.onLime },
   selChipTextDisabled: { textDecorationLine: 'line-through' },
   selDot: { width: 10, height: 10, borderRadius: 5 },
 });

@@ -260,6 +260,6 @@ const sv = StyleSheet.create({
   statLabel: { flex: 1, textAlign: 'center', color: theme.colors.text, fontSize: theme.font.small },
   cell: { minWidth: 48, paddingVertical: 4, paddingHorizontal: 10, borderRadius: theme.radius.pill, alignItems: 'center' },
   cellText: { color: theme.colors.textMuted, fontSize: theme.font.small, fontWeight: '700' },
-  cellTextLead: { color: '#06120D', fontWeight: '900' },
+  cellTextLead: { color: theme.colors.onFill, fontWeight: '900' },
   coverageHint: { color: theme.colors.textMuted, fontSize: theme.font.tiny, fontStyle: 'italic', marginTop: theme.spacing(2), textAlign: 'center' },
 });

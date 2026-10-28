@@ -494,7 +494,7 @@ const st = StyleSheet.create({
   avgLabel: { fontSize: theme.font.small, textAlign: 'center' },
   recRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(2), paddingVertical: theme.spacing(1) },
   formChip: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
-  formText: { color: '#06120D', fontWeight: '900', fontSize: theme.font.body },
+  formText: { color: theme.colors.onFill, fontWeight: '900', fontSize: theme.font.body },
   leaderRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(2), paddingVertical: theme.spacing(1) },
   h2hLast: { fontSize: theme.font.small, fontVariant: ['tabular-nums'] },
   leaderIcon: { fontSize: 18, width: 24 },

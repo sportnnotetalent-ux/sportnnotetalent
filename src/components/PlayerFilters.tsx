@@ -185,5 +185,5 @@ const st = StyleSheet.create({
   label: { color: theme.colors.textMuted, fontSize: theme.font.small, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
   switchRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(2) },
   done: { backgroundColor: theme.colors.primary, borderRadius: theme.radius.md, paddingVertical: theme.spacing(3), alignItems: 'center' },
-  doneText: { color: '#06120D', fontWeight: '800', fontSize: theme.font.body },
+  doneText: { color: theme.colors.onFill, fontWeight: '800', fontSize: theme.font.body },
 });

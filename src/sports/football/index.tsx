@@ -1715,5 +1715,5 @@ const ctrl = StyleSheet.create({
   possFill: { height: 8, borderRadius: 4 },
   extraTabs: { flexDirection: 'row', backgroundColor: theme.colors.surfaceAlt, borderRadius: theme.radius.pill, padding: 3 },
   extraTab: { flex: 1, textAlign: 'center', paddingVertical: theme.spacing(2), borderRadius: theme.radius.pill, color: theme.colors.textMuted, fontSize: theme.font.small, fontWeight: '700', overflow: 'hidden' },
-  extraTabActive: { backgroundColor: theme.colors.primary, color: '#06120D', fontWeight: '800' },
+  extraTabActive: { backgroundColor: theme.colors.primary, color: theme.colors.onFill, fontWeight: '800' },
 });

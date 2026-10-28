@@ -374,7 +374,7 @@ const st = StyleSheet.create({
   pickBtn: { paddingVertical: theme.spacing(3), borderRadius: theme.radius.sm, alignItems: 'center', backgroundColor: theme.colors.surfaceAlt },
   pickBtnSel: { backgroundColor: theme.colors.primary },
   pickTxt: { color: theme.colors.text, fontSize: theme.font.small, fontWeight: '700' },
-  pickTxtSel: { color: '#06120D', fontWeight: '800' },
+  pickTxtSel: { color: theme.colors.onFill, fontWeight: '800' },
   navBtn: {
     width: 36, height: 36, borderRadius: 18,
     alignItems: 'center', justifyContent: 'center',
@@ -388,7 +388,7 @@ const st = StyleSheet.create({
   day: { width: '100%', aspectRatio: 1, borderRadius: theme.radius.sm, alignItems: 'center', justifyContent: 'center' },
   daySel: { backgroundColor: theme.colors.primary },
   dayTxt: { color: theme.colors.text, fontSize: theme.font.body },
-  dayTxtSel: { color: '#06120D', fontWeight: '800' },
+  dayTxtSel: { color: theme.colors.onFill, fontWeight: '800' },
   timeLabel: { marginTop: theme.spacing(2) },
   zoneNote: { fontSize: theme.font.tiny },
   timeControls: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(2) },
@@ -409,7 +409,7 @@ const st = StyleSheet.create({
   },
   ampmSel: { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
   ampmTxt: { color: theme.colors.textMuted, fontSize: theme.font.small, fontWeight: '800' },
-  ampmTxtSel: { color: '#06120D' },
+  ampmTxtSel: { color: theme.colors.onFill },
   done: {
     marginTop: theme.spacing(3),
     backgroundColor: theme.colors.primary,
@@ -417,5 +417,5 @@ const st = StyleSheet.create({
     paddingVertical: theme.spacing(3),
     alignItems: 'center',
   },
-  doneTxt: { color: '#06120D', fontSize: theme.font.body, fontWeight: '800' },
+  doneTxt: { color: theme.colors.onFill, fontSize: theme.font.body, fontWeight: '800' },
 });
