@@ -251,7 +251,7 @@ function playMatch(rng: Rng, idx: number, game: 'eight' | 'nine' | 'ten', T: Tal
         dispatch(a);
         T.valid++;
         // the guard stops a second tap on the same screen…
-        if (rng.chance(0.06)) { assert.equal(guard(history[history.length - 2], a, { now: k * 100 + 50 }), false, `${where(k)}: double tap through the guard`); }
+        if (rng.chance(0.06)) { assert.equal(guard(history[history.length - 2], a, { now: k * 100 + 50 }), false, `${where(k)}: double tap through the guard`); T.guarded++; }
         // … but a double tap from a second phone (no guard) lands in the log
         if (rng.chance(0.04)) { dispatch(a); T.double++; }
       }
@@ -283,6 +283,6 @@ test('pool app: 600 seeded scorers (valid, double, stale, junk taps and undo sto
   assert.equal(T.matches, 600);
   assert.ok(T.ended > 400, `most matches finish (${T.ended})`);
   assert.ok(T.doubles > 150 && T.detail > 1000 && T.quick > 150 && T.golden > 0 && T.bnr > 0, JSON.stringify(T));
-  assert.ok(T.double > 50 && T.stale > 50 && T.junk > 100 && T.undos > 100 && T.guarded >= 0, JSON.stringify(T));
-  console.log(`[sim-pool-app] ${T.matches} scorers (${T.doubles} scotch doubles) · ${T.taps} taps: ${T.valid} valid, ${T.declined} declined at the confirm, ${T.guarded} stopped by the guard, ${T.double} double, ${T.stale} stale, ${T.junk} junk, ${T.undos} undo storms · ${T.ended} matches finished · ${T.racks} racks (${T.detail} shot by shot, ${T.quick} quick, ${T.bnr} break-and-runs, ${T.golden} golden) · every invariant held · ${(ms / 1000).toFixed(1)} s`);
+  assert.ok(T.double > 50 && T.stale > 50 && T.junk > 100 && T.undos > 100 && T.guarded > 50, JSON.stringify(T));
+  console.log(`[sim-pool-app] ${T.matches} scorers (${T.doubles} scotch doubles) · ${T.taps} taps: ${T.valid} valid, ${T.declined} declined at the confirm, ${T.guarded} double taps stopped by the guard, ${T.double} double taps from a second phone, ${T.stale} stale, ${T.junk} junk, ${T.undos} undo storms · ${T.ended} matches finished · ${T.racks} racks (${T.detail} shot by shot, ${T.quick} quick, ${T.bnr} break-and-runs, ${T.golden} golden) · every invariant held · ${(ms / 1000).toFixed(1)} s`);
 });
