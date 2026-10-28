@@ -13,6 +13,18 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-29 — Hotfix: "link by phone" kept only part of the account's profile
+- Found live by the founder. "Did a coach add you by phone?" → **Text me a code** linked their August profile. It also deleted the newer profile on their account, copying only the name, date of birth, guardian and email. The newer profile's sports, photo, bio and other details were lost. The Profile tab then said "Set up your profile".
+- Migration `20261029090000_claim_keeps_details`: `claim_player_by_phone` now:
+  - fills the kept profile with the account's own details (their entries win, sports joined);
+  - moves followers, member consents, link declines, held stats and log references across before the duplicate goes.
+- **The Profile tab:**
+  - "Loading the profile…" while it loads;
+  - "Couldn't load the profile" + **Try again** when a read fails;
+  - "Set up your profile" only when the account really has none (`src/data/profileViewState.ts`).
+- Tests: `tests/db-claim-merge.test.mts` (5), `tests/profile-view-state.test.mts` (7). Break list: `docs/security/breaks/security-wave2b.md` W2bB-19, W2bB-20.
+- The founder's lost details are in the nightly backup of 2026-10-29 02:00 IST (restore by hand).
+
 ### 2026-10-28 — The founder's answers: country from the phone, cue-sport rules, usability
 - Migration `20261028233000_phone_country`. Break list: `docs/security/breaks/founder-answers-2026-10-28.md`.
 - Tests:

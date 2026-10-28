@@ -37,3 +37,11 @@
 - **Friendlies:** 60 hosts set up friendlies (37 accepted), and each opponent was revealed only when accepted.
 - **Linking by phone:** of 100 email sign-ups, 40 were linked, 30 parents' numbers went to support, and 30 numbers nobody had added came back as none.
 - **Time:** about 8 s, including setup.
+
+## Found on live (2026-10-29)
+The founder used "Did a coach add you by phone?" → **Text me a code** on their own account. Afterwards their Profile tab said "Set up your profile".
+
+| # | What broke | Status |
+|---|---|---|
+| W2bB-19 | **Link by phone lost the account's own profile details.** W2bB-07 made sure the replaced profile had no *history* (teams, stats and so on). But the profile's own fields were still dropped: sports, city, photo, bio, house, jersey, privacy choices and sport details. Only the name, date of birth, guardian and email were copied. Rows that aren't history also went with it: followers (no foreign key), member consents, link declines and held stats (cascade). | **Fixed** (migration `20261029090000_claim_keeps_details`, test `tests/db-claim-merge.test.mts`). The account's own details fill the kept profile: their entries win, a detail they never filled keeps the coach's, and sports are joined. Followers, consents, declines, held stats and log references move across first, and a row both profiles already have isn't duplicated. The founder's own old row is in the nightly backup of 2026-10-29 02:00 IST and can be put back by hand. |
+| W2bB-20 | **The Profile tab said "Set up your profile" while loading, and when a read failed.** It had no loading state, and a failed read left it empty. | **Fixed** (test `tests/profile-view-state.test.mts`): "Loading the profile…" while it loads; "Couldn't load the profile" with **Try again** when a read fails (also for your own profile id with nothing back); "Set up" only when the account has no player profile. |

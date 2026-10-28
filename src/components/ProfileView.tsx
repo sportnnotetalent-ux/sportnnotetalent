@@ -6,7 +6,8 @@ import React, { useEffect, useState } from 'react';
 import { ScrollView, View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
 import { theme } from '../core/theme';
 import { docKindLabel } from '../core/verificationReview';
-import { Card, Pill, Button, SelectChip, EmptyState, FormError, textStyles, plural } from './ui';
+import { Card, Pill, Button, SelectChip, EmptyState, LoadingState, FormError, textStyles, plural } from './ui';
+import { profileViewState } from '../data/profileViewState';
 import { SectionHeader, SECTION_CAP } from './SectionHeader';
 import { ContactCard } from './ContactCard';
 import { inviteGuardianToLink } from '../data/messages';
@@ -38,6 +39,8 @@ import { FollowBell } from './FollowBell';
 
 export function ProfileView({
   playerId,
+  lookupFailed,
+  onRetryLookup,
   follow,
   onShare,
   onMessage,
@@ -52,7 +55,11 @@ export function ProfileView({
   onSignOut,
   mine,
 }: {
-  playerId: string | null;
+  /** undefined = the owner's player is still being looked up */
+  playerId: string | null | undefined;
+  /** own profile: looking up the account's player failed */
+  lookupFailed?: boolean;
+  onRetryLookup?: () => void;
   /** `name` labels the 🔔 alert-settings sheet (falls back to the player's name). */
   follow?: { following: boolean; onToggle: () => void; name?: string };
   /** Share this profile (record across sports + link). */
@@ -81,7 +88,7 @@ export function ProfileView({
   /** own profile: the "Mine" card — rendered under Edit profile */
   mine?: React.ReactNode;
 }) {
-  const { player, stats: allStats, official, friendly } = usePlayerProfile(playerId);
+  const { player, stats: allStats, official, friendly, status, retry } = usePlayerProfile(playerId);
   const orgs = useOrganizations();
   const { profile: viewer } = useAuth();
   const ownProfile = !!onEditProfile;
@@ -127,22 +134,33 @@ export function ProfileView({
   // A private player photo is signed per viewer (protect_minors); refused → initials.
   const shownPhoto = useImageUri(photo, !isSupabaseConfigured || photoBusy);
 
-  if (!player || !allStats || !official || !friendly) {
+  // 2026-10-29: "Set up your profile" only when the account has no player
+  // profile — not while it loads, nor when a read failed
+  const view = profileViewState({
+    playerId, status: lookupFailed ? 'failed' : status, hasPlayer: !!player, hasStats: !!(allStats && official && friendly),
+  });
+  if (view === 'loading') return <LoadingState label="Loading the profile…" />;
+  if (view !== 'show' || !player || !allStats || !official || !friendly) {
     // Own account with no player yet (a fresh sign-up): make this actionable —
     // set up the profile, reach Settings, or sign out — instead of a dead-end.
     // Viewing someone else with no profile just shows the neutral empty state.
     const owner = !!(onCreateProfile || onSignOut);
+    // own profile: the account has a player id, so no profile back is a failed read
+    const failed = view === 'failed' || (view === 'missing' && owner);
     return (
       <ScrollView contentContainerStyle={st.content}>
         <View style={st.emptyBlock}>
           <EmptyState
-            icon="🙋"
-            title={owner ? 'Set up your profile' : 'No player profile found'}
-            hint={owner
-              ? 'Add your name, contact, location and the sports you play — so teams and organizers can find you.'
-              : 'This account doesn’t have a player profile yet.'}
+            icon={failed ? '📡' : '🙋'}
+            title={failed ? 'Couldn’t load the profile' : owner ? 'Set up your profile' : 'No player profile found'}
+            hint={failed
+              ? 'Check your connection, then try again. Nothing has been lost.'
+              : owner
+                ? 'Add your name, contact, location and the sports you play — so teams and organizers can find you.'
+                : 'This account doesn’t have a player profile yet.'}
           />
-          {onCreateProfile && (
+          {failed && <Button label="Try again" onPress={() => { if (lookupFailed) onRetryLookup?.(); else retry(); }} />}
+          {!failed && onCreateProfile && (
             <Button label={creating ? 'Setting up…' : '✎ Set up your profile'} onPress={onCreateProfile} disabled={creating} />
           )}
           {/* A support / reviewer account often has no player profile — keep

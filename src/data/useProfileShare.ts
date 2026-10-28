@@ -7,7 +7,7 @@ import { profileShareText } from '../core/shareText';
 import { shareMessage } from '../core/share';
 import type { SportId } from '../core/types';
 
-export function useProfileShare(playerId: string | null) {
+export function useProfileShare(playerId: string | null | undefined) {
   const { player, stats } = usePlayerProfile(playerId);
   return useCallback(() => {
     if (!player || !playerId) return;

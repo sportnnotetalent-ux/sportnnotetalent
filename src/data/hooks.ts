@@ -4,7 +4,8 @@ import { promptSignIn } from '../core/guest';
 import { isSupabaseConfigured } from '../core/supabase';
 import { getFieldEvents } from './golf';
 import { scopeTournamentLines } from './golfLeaders';
-import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import type { ProfileLoadStatus } from './profileViewState';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   getMatches,
@@ -589,18 +590,30 @@ export function usePlayerLite(playerId: string | null) {
 }
 
 /** A player plus their rolled-up stats. */
-export function usePlayerProfile(playerId: string | null) {
+export function usePlayerProfile(playerId: string | null | undefined) {
   const [player, setPlayer] = useState<Player | null>(null);
   // Stats split by whether the match belonged to a tournament: `stats` (all) stays
   // for existing callers; `official`/`friendly` power the profile's scope toggle.
   const [scoped, setScoped] = useState<{ all: PlayerStats; official: PlayerStats; friendly: PlayerStats } | null>(null);
+  // 2026-10-29: a read that fails says so (the screen showed "Set up your
+  // profile"); a refresh on focus keeps what's shown while it loads
+  const [status, setStatus] = useState<ProfileLoadStatus>('loading');
+  const [attempt, setAttempt] = useState(0);
+  const shownFor = useRef<string | null | undefined>(undefined);
   useFocusEffect(
     useCallback(() => {
       let on = true;
       if (!playerId) {
         setPlayer(null);
         setScoped(null);
+        setStatus(playerId === null ? 'ready' : 'loading');
+        shownFor.current = playerId;
         return;
+      }
+      if (shownFor.current !== playerId) {
+        setPlayer(null);
+        setScoped(null);
+        setStatus('loading');
       }
       Promise.all([getPlayer(playerId), getPlayerStatLines(playerId), getMatches(), getFieldEvents()]).then(([p, rawLines, matches, events]) => {
         let lines = rawLines;
@@ -625,13 +638,18 @@ export function usePlayerProfile(playerId: string | null) {
           official: aggregate(lines.filter((l) => !isFriendly(l))),
           friendly: aggregate(lines.filter(isFriendly)),
         });
+        shownFor.current = playerId;
+        setStatus('ready');
+      }).catch(() => {
+        if (on) setStatus('failed');
       });
       return () => {
         on = false;
       };
-    }, [playerId])
+    }, [playerId, attempt])
   );
-  return { player, stats: scoped?.all ?? null, official: scoped?.official ?? null, friendly: scoped?.friendly ?? null };
+  const retry = useCallback(() => setAttempt((a) => a + 1), []);
+  return { player, stats: scoped?.all ?? null, official: scoped?.official ?? null, friendly: scoped?.friendly ?? null, status, retry };
 }
 
 export function useFootballProfile(playerId: string | null) {

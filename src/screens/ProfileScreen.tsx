@@ -16,17 +16,23 @@ type Nav = NativeStackNavigationProp<RootStackParamList>;
 export default function ProfileScreen() {
   const { profile, signOut } = useAuth();
   const nav = useNavigation<Nav>();
-  const [playerId, setPlayerId] = useState<string | null>(null);
+  // undefined = still finding this account's player (not "none": the screen
+  // must not offer "Set up your profile" while it looks — 2026-10-29)
+  const [playerId, setPlayerId] = useState<string | null | undefined>(undefined);
+  const [idFailed, setIdFailed] = useState(false);
+  const [lookup, setLookup] = useState(0);
   const [creating, setCreating] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
       let on = true;
-      getMyPlayerId(profile?.id).then((id) => on && setPlayerId(id));
+      getMyPlayerId(profile?.id)
+        .then((id) => { if (on) { setPlayerId(id); setIdFailed(false); } })
+        .catch(() => { if (on) setIdFailed(true); });
       return () => {
         on = false;
       };
-    }, [profile?.id])
+    }, [profile?.id, lookup])
   );
 
   // First-time setup: create the account's own player profile, then open the
@@ -49,6 +55,8 @@ export default function ProfileScreen() {
     <SafeAreaView style={st.safe} edges={['top']}>
       <ProfileView
         playerId={playerId}
+        lookupFailed={idFailed}
+        onRetryLookup={() => setLookup((n) => n + 1)}
         onShare={playerId ? shareProfile : undefined}
         onOpenSport={playerId ? (sport) => nav.navigate('SportProfile', { playerId, sport }) : undefined}
         onEditProfile={playerId ? () => nav.navigate('EditProfile', { playerId }) : undefined}

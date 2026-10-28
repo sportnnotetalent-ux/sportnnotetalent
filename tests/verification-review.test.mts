@@ -79,7 +79,7 @@ describe('the app', () => {
 describe('reaching the queue', () => {
   test('a reviewer with no player profile still gets the button (support accounts often have none)', () => {
     const v = read('src/components/ProfileView.tsx');
-    const empty = v.slice(v.indexOf("title={owner ? 'Set up your profile'"), v.indexOf('// Stats reflect the chosen scope'));
+    const empty = v.slice(v.indexOf("owner ? 'Set up your profile'"), v.indexOf('// Stats reflect the chosen scope'));
     assert.match(empty, /owner && viewerIsReviewer && onOpenVerificationReview/);
     assert.match(empty, /label="🛡️ Review verifications"/);
   });
