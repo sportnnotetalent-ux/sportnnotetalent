@@ -90,14 +90,16 @@ const ScoringControls: SportPlugin<PoolMatch>['ScoringControls'] = ({ state, dis
    *  or it is a second tap before the screen redrew (the guard). */
   const send = async (a: ScoreAction) => {
     if (busy.current) return;
-    const q = confirmFor(stateRef.current, a, name);
+    const asked = stateRef.current;
+    const q = confirmFor(asked, a, name);
     if (q) {
       busy.current = true;
-      const end = outcomeOf(stateRef.current, a).ends;
+      const end = outcomeOf(asked, a).ends;
       const ok = await askConfirm({ ...q, noLabel: 'No, go back', tone: end?.kind === 'match' ? 'danger' : 'caution' }).finally(() => { busy.current = false; });
       if (!ok) return;
     }
-    if (!guard(stateRef.current, a)) return;
+    // break #3: dropped if the match moved while the sheet was open; #4: never blocks for good
+    if (!guard(stateRef.current, a, { asked, now: Date.now() })) return;
     dispatch(a);
   };
   const toggleBall = (b: number) => setSel((cur) => (cur.includes(b) ? cur.filter((x) => x !== b) : [...cur, b]));

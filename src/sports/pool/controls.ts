@@ -321,19 +321,28 @@ const lastSet = (s: PoolMatch): [number, number] => s.sets[s.sets.length - 1] ??
 
 // ---------------------------------------------------- the tap guard --
 
+/** How long a second tap on an unchanged screen counts as a double tap (ms). */
+export const DOUBLE_TAP_MS = 2000;
+
 /**
- * The double-tap guard. A tap goes through only if the engine would take it
- * (an ignored tap is never sent — no junk event, no confusion) and the state
- * has moved since the last tap that went through (a second tap before the
- * screen redraws is a double tap). States are compared by identity: Undo
- * replays the log into a new object, so taps after an undo go through.
+ * The double-tap guard. A tap goes through only if
+ *   - it answers the state it was asked about (`asked`: a confirm sheet was
+ *     open while another phone scored or an Undo replayed — break #3);
+ *   - the state has moved since the last tap that went through (a second tap
+ *     before the screen redraws is a double tap) — or, with the clock given,
+ *     DOUBLE_TAP_MS have passed, so a screen that never redrew can't block the
+ *     scorer for good (break #4);
+ *   - the engine would take it (an ignored tap is never sent: no junk event).
+ * States are compared by identity: Undo replays the log into a new object,
+ * so taps after an undo go through.
  */
-export function makeTapGuard<S>(reduce: (s: S, a: ScoreAction) => S): (s: S, a: ScoreAction) => boolean {
-  let last: S | null = null;
-  return (s, a) => {
-    if (last !== null && last === s) return false;
+export function makeTapGuard<S>(reduce: (s: S, a: ScoreAction) => S): (s: S, a: ScoreAction, o?: { asked?: S; now?: number }) => boolean {
+  let last: { s: S; now?: number } | null = null;
+  return (s, a, o = {}) => {
+    if (o.asked !== undefined && o.asked !== s) return false;
+    if (last && last.s === s && !(o.now !== undefined && last.now !== undefined && o.now - last.now >= DOUBLE_TAP_MS)) return false;
     if (reduce(s, a) === s) return false;
-    last = s;
+    last = { s, now: o.now };
     return true;
   };
 }

@@ -762,6 +762,29 @@ describe('breaks · hostile and old snapshots (#24, #25, #28)', () => {
     for (const a of log.slice(0, 600)) j = M.poolReducer(JSON.parse(JSON.stringify(j)), a);
     assert.deepEqual(j, log.slice(0, 600).reduce<S>((x, a) => M.poolReducer(x, a), M.poolInit(config)));
   });
+  test('#3 — a confirm answered after the match moved is dropped (the question was about another state)', () => {
+    let s = M.poolInit({ game: 'nine' });
+    s = M.poolReducer(s, C.lagAction(s, 'home'));
+    s = M.poolReducer(s, C.breakAction(s, { pots: [1] }));
+    const asked = s; // "Rack 1 to Home?" is on screen …
+    const tap = C.potAction(asked, [9]);
+    // … meanwhile another phone records a miss, then an undo brings the same position back (a new object)
+    const moved = M.poolReducer(s, C.missAction(s));
+    const back = replay({ game: 'nine' }, [C.lagAction(M.poolInit({ game: 'nine' }), 'home'), C.breakAction(asked, { pots: [1] })]);
+    const guard = C.makeTapGuard(M.poolReducer);
+    assert.equal(guard(moved, tap, { asked }), false, 'the shooter changed: dropped');
+    assert.equal(guard(back, tap, { asked }), false, 'even an identical-looking state is not the one asked about');
+    assert.equal(guard(asked, tap, { asked }), true, 'unchanged: sent');
+  });
+  test('#4 — the guard never blocks for good: a tap on an unchanged screen goes through again after 2 s', () => {
+    let s = M.poolInit({ game: 'nine' });
+    s = M.poolReducer(s, C.lagAction(s, 'home'));
+    const guard = C.makeTapGuard(M.poolReducer);
+    const a = C.breakAction(s, { pots: [] });
+    assert.equal(guard(s, a, { now: 10_000 }), true);
+    assert.equal(guard(s, a, { now: 10_400 }), false, 'a double tap');
+    assert.equal(guard(s, a, { now: 12_100 }), true, 'the screen never moved: the scorer can tap again');
+  });
   test('#28 — an engine-only snapshot (no plugin parts) reads as an empty credit / feed', async () => {
     const engine = await import('../src/sports/pool/engine.ts');
     let e = engine.createInitialState({ game: 'nine', raceTo: 1 });
