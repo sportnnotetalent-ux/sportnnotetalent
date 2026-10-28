@@ -37,7 +37,7 @@ import { useSideNames } from '../cue/useNames';
 import { sendTap } from '../cue/send';
 import { TossRow, FrameScoreForm, FrameOptionsPanel, FrameSheet, BreakList, cue } from '../cue/parts';
 import { FrameCorrections } from '../cue/FrameCorrections';
-import { followHidden, hideBanner, type Hidden } from '../cue/uiState';
+import { followHidden, hideBanner, hasFinishedFrame, tossNote, type Hidden } from '../cue/uiState';
 
 type Act = ScoreAction | null;
 const other = (s: Side): Side => (s === 'home' ? 'away' : 'home');
@@ -89,7 +89,7 @@ const ScoringControls: SportPlugin<SnookerState>['ScoringControls'] = ({ state, 
 
       {/* who breaks off: the toss on frame 1, then "change" (S3 R3(d)) */}
       {p.toss && (p.frame === 1 || tossOpen) ? (
-        <TossRow names={names} breaker={p.breaker} toss={p.toss} first={p.frame === 1} onTap={(a) => { send(a); setTossOpen(false); }} />
+        <TossRow names={names} breaker={p.breaker} toss={p.toss} first={p.frame === 1} recorded={p.tossed} onTap={(a) => { send(a); setTossOpen(false); }} />
       ) : p.toss ? (
         <Text style={st.link} accessibilityRole="button" accessibilityLabel={`${names[p.breaker]} breaks off. Change who breaks off`} onPress={() => setTossOpen(true)}>
           {names[p.breaker]} breaks off · Change
@@ -313,7 +313,7 @@ function SnookerStats(p: TabProps) {
         units={[{ key: 'all', label: 'Match' }, ...frames.map((n) => ({ key: String(n), label: `Frame ${n}` }))]}
         footnote={sheet.some((r) => r.quick) ? 'Frames entered as a final score have no break, potting or foul detail.' : undefined} />
       <BreakList list={breakList(s, min)} chips={BREAK_LIST_CHIPS} min={min} onMin={setMin} names={names} unit="frame" homeColor={p.homeColor} awayColor={p.awayColor} />
-      <FrameSheet rows={sheet} names={names} unit="frame" homeColor={p.homeColor} awayColor={p.awayColor} />
+      <FrameSheet rows={sheet} names={names} unit="frame" homeColor={p.homeColor} awayColor={p.awayColor} note={tossNote(s, names)} />
     </View>
   );
 }
@@ -336,6 +336,8 @@ export const snookerPlugin: SportPlugin<SnookerState> = {
   scoreLine,
   lineScore: frameLineScore,
   correctionLabel: '✎ Correct a finished frame',
+  // the live link waits for a finished frame (a one-game match has none until it ends)
+  liveCorrection: hasFinishedFrame,
   standingsUnits,
   // SD-19 — derived only (nothing is credited live); one player per side
   statTotals: snookerStatTotals,

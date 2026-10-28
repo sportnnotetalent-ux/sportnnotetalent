@@ -195,7 +195,7 @@ function checkMatch(config: Record<string, unknown>, s: S, log: ScoreAction[], r
   for (const e of f) per.set(e.n, (per.get(e.n) ?? 0) + 1);
   for (const v of per.values()) assert.ok(v <= M.FEED_PER_RACK);
   // the screens' readers never print junk
-  const out = JSON.stringify([poolFeed(s, { home: 'H', away: 'A' }, (id) => String(id)), poolCompare(s), C.poolPanel(s), C.breakLine(s, (x) => x), C.formatNote(s), C.bestOfLine(s)]);
+  const out = JSON.stringify([poolFeed(s, { home: 'H', away: 'A' }, (id) => String(id)), poolCompare(s), C.poolPanel(s), C.breakLine(s, (x) => x), C.bestOfLine(s)]);
   assert.ok(!/undefined|NaN|Infinity|\[object/.test(out), `${where}: reader output`);
 }
 

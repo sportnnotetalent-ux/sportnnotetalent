@@ -436,6 +436,9 @@ export interface SportPlugin<S = unknown> {
   creditInPayload?: boolean;
   /** The live correction link's words (cricket "✎ Edit a past ball", the default). */
   correctionLabel?: string;
+  /** Is there anything to correct yet? The live link shows only then (snooker /
+   *  billiards: a finished frame). Absent = once anything is scored. */
+  liveCorrection?: (state: S) => boolean;
   /** A sport's own correction editor (cricket, #06); else the generic list. */
   CorrectionEditor?: React.FC<{
     log: import('../core/types').MatchEventRecord[];

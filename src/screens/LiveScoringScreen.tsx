@@ -1227,7 +1227,7 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
     if (!c || c.ids[0] === strikeAsk.before) { setStrikeAsk(null); return; }
     setStrikeAsk({ before: strikeAsk.before, ...c });
   }, [state, strikeAsk]);
-  const liveEditBar = plugin.CorrectionEditor && matchId && liveCanWrite && !complete && eventCount > 0 ? (
+  const liveEditBar = plugin.CorrectionEditor && matchId && liveCanWrite && !complete && eventCount > 0 && (plugin.liveCorrection?.(state) ?? true) ? (
     !liveEditOpen ? (
       <View>
         <Text style={[st.editLink, pendingTaps > 0 && { color: theme.colors.textMuted }]} accessibilityRole="button"

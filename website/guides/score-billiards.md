@@ -20,7 +20,7 @@ In a one-game match the app says "game" instead of "frame".
 
 ## Step by step
 1. Open the match → **Scoring** tab and tap **▶ Start the match**.
-2. Under **Who breaks off? (the toss · then it alternates)**, tap the player who breaks off. Player 1 is picked until you change it.
+2. Under **Who won the toss? (they break off · then it alternates)**, tap the player who won it. Until you tap, nobody is marked and the note says who breaks off as set up. If nobody taps, the Stats tab says "Toss not recorded".
 3. Tap one button per scoring stroke: **Pot red · 3**, **In-off red · 3**, **Cannon · 2** or **Pot white · 2**. The top shows "Asha at the table · break 17" and what each player needs to win.
 4. Did one stroke score twice, such as a cannon and a pot red? Tap **Combo…**, tap each part (**Pot red 3**, **Cannon 2** …), then **Record stroke · 5 points**. An in-off white is scored here too.
 5. When the visit ends, tap **Missed** or **Safety**. The turn passes.
@@ -44,7 +44,7 @@ With **Frame (or game) scores only**, each frame shows "Frame 1 final score". Ty
 
 ## Fix a mistake
 - Tap **↶ Undo**. It names what it takes back, for example "↶ Undo: pot red + cannon · break 5".
-- A finished frame is wrong? On the **Scoring** tab, tap **✎ Correct a finished frame** → **✎ Change frame 2**, type the score, then **Use this score** and **Update score (1)**. Later frames stay as played.
+- A finished frame is wrong? On the **Scoring** tab, tap **✎ Correct a finished frame** → **✎ Change frame 2**, type the score, then **Use this score** and **Update score (1)**. Later frames stay as played. The link shows once a frame has finished, so a one-game match doesn't show it during play.
 - After the match, use **✏️ Correct this match** on the **Info** tab. See [Correct a match after full time](/guides/correct-a-finished-match/).
 
 ## The commentary and the stats
@@ -55,3 +55,6 @@ With **Frame (or game) scores only**, each frame shows "Frame 1 final score". Ty
 A finished match saves its records: highest breaks, century breaks (100+) and biggest frame wins. See [See a tournament's records](/guides/tournament-records/).
 
 Profiles add frames won, highest break, average, centuries and double centuries (200+); breaks count only from shot-by-shot games.
+
+## In a league
+The table counts points, not frames. The winner is still whoever won more frames. **PF** and **PA** add up every frame's points. Players level on points are split by the points difference (**±**), then by points scored. A match ended by hand counts the points scored up to then.

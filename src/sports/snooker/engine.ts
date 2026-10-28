@@ -121,6 +121,8 @@ export interface SnookerState {
   framesToWin: number;
   /** who broke frame 1 (the toss); the break-off alternates (S3 R3(b)) */
   firstBreak: Side;
+  /** the scorer tapped who won the toss (absent = frame 1 broke off as set up) */
+  tossed?: true;
   /** the organiser's preferred input (a UI hint; both kinds of action always work) */
   scoringMode: 'shot' | 'quick';
   frames: FrameRecord[];
@@ -373,10 +375,11 @@ function reduce(s: SnookerState, a: SnookerAction): SnookerState {
     case 'BREAK_OFF': {
       const side = named();
       if (!side || fr.shots > 0 || fr.fouls.length > 0 || fr.respot) return s;
-      // B-15 — naming the player already breaking changes nothing
-      if (side === fr.breaker && side === fr.striker && (fr.n !== 1 || side === s.firstBreak)) return s;
+      // B-15 — naming the player already breaking changes nothing (frame 1:
+      // once the toss is recorded; the first tap records it, even for them)
+      if (side === fr.breaker && side === fr.striker && (fr.n !== 1 || (side === s.firstBreak && s.tossed === true))) return s;
       return {
-        ...s, ...(fr.n === 1 ? { firstBreak: side } : {}),
+        ...s, ...(fr.n === 1 ? { firstBreak: side, tossed: true as const } : {}),
         frame: { ...fr, breaker: side, striker: side, visit: emptyVisit(side) }, seq: s.seq + 1,
       };
     }
@@ -628,6 +631,9 @@ export function missStatus(s: SnookerState): { by: Side; count: number; warned: 
     ballInHand: six && !r.replaced && r.count >= 5,
   };
 }
+
+/** Did the scorer tap who won the toss? (No: frame 1 broke off as set up.) */
+export const tossRecorded = (s: SnookerState): boolean => isObj(s) && s.tossed === true;
 
 const NO_SUMMARY: ScoreSummary = { homeScore: '0', awayScore: '0', statusLine: '' };
 

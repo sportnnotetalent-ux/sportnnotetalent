@@ -20,6 +20,7 @@ import * as M from '../src/sports/pool/match.ts';
 import * as C from '../src/sports/pool/controls.ts';
 import { poolStatTotals, POOL_RECORD_KEYS, POOL_SHOT_KEYS } from '../src/sports/pool/totals.ts';
 import { lineKeys } from '../src/sports/statSchemas.ts';
+import { POOL_CORE } from '../src/sports/pool/core.ts';
 import type { ScoreAction, StatTotalsContext } from '../src/sports/types.ts';
 
 type Side = 'home' | 'away';
@@ -214,5 +215,34 @@ describe('pool statTotals · breaks (docs/security/breaks/pool-app.md)', () => {
     assert.equal(t.h9.stats.shotsPlayed, 3);
     assert.equal(t.h9.stats.breakShots, 1);
     assert.equal(t.h9.stats.ballsPotted, 2);
+  });
+});
+
+describe('pool statTotals · founder rules (2026-10-28)', () => {
+  test('scotch doubles: a golden break goes to the player who broke, not the partner', () => {
+    const config = { game: 'nine', raceTo: 3, playersPerSide: 2 };
+    let s = M.poolInit(config);
+    s = M.poolReducer(s, C.lagAction(s, 'home'));
+    s = M.poolReducer(s, C.breakAction(s, { pots: [9] }, { pid: 'h2' }));
+    assert.equal((s.racks as { golden?: boolean }[])[0]?.golden, true, 'the rack was a golden break');
+    const t = poolStatTotals(s, L.ctxOf(DOUBLES));
+    assert.equal(t.h2.stats.goldenBreaks, 1);
+    assert.equal(t.h1.stats.goldenBreaks, 0);
+    assert.equal(t.a1.stats.goldenBreaks, 0);
+    assert.equal(t.h1.stats.racksWon, 1, 'the rack itself is still the pair\'s');
+  });
+});
+
+describe('pool · the race and sets lock once the match starts (founder 2026-10-28)', () => {
+  test('a later format change doesn\'t re-score the match; before the first event it applies', () => {
+    let s = M.poolInit({ game: 'eight', raceTo: 3, setsToWin: 1 });
+    const actions: ScoreAction[] = [];
+    const go = (a: ScoreAction) => { actions.push(a); s = M.poolReducer(s, a); };
+    go(C.lagAction(s, 'home'));
+    go(C.breakAction(s, { pots: [1] }));
+    const changed = M.poolReplay({ game: 'eight', raceTo: 1, setsToWin: 2 }, actions);
+    assert.deepEqual([changed.raceTo, changed.setsToWin], [3, 1], 'the replay keeps the race and sets the match started with');
+    assert.equal(M.poolInit({ game: 'eight', raceTo: 1 }).raceTo, 1, 'before any event the format is whatever was set');
+    assert.equal(POOL_CORE.liveSettings, undefined, 'no race / sets settings during play');
   });
 });

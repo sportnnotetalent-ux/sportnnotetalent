@@ -17,22 +17,28 @@ type Side = 'home' | 'away';
 type Act = ScoreAction | null;
 const SIDES: Side[] = ['home', 'away'];
 
-/** Who breaks off: the current breaker is marked; the other dispatches. */
-export function TossRow({ names, breaker, toss, first, onTap }: {
+/** Who breaks off: the current breaker is marked; the other dispatches. On
+ *  frame 1 before the toss is tapped, nobody is marked: the note says who
+ *  breaks off as set up, so an untapped toss never looks recorded. */
+export function TossRow({ names, breaker, toss, first, recorded = true, onTap }: {
   names: { home: string; away: string };
   breaker: Side;
   toss: { home: Act; away: Act };
   /** frame 1: the toss (later frames alternate from it) */
   first: boolean;
+  /** the toss was tapped (frame 1) */
+  recorded?: boolean;
   onTap: (a: Act) => void;
 }) {
+  const open = first && !recorded;
   return (
     <View style={{ gap: theme.spacing(2) }}>
-      <Text style={cue.label}>Who breaks off? <Text style={cue.meta}>{first ? '(the toss · then it alternates)' : '(this frame only)'}</Text></Text>
+      <Text style={cue.label}>{open ? 'Who won the toss?' : 'Who breaks off?'} <Text style={cue.meta}>{first ? '(they break off · then it alternates)' : '(this frame only)'}</Text></Text>
+      {open ? <Text style={cue.meta}>Not recorded yet: {names[breaker]} breaks off unless you tap.</Text> : null}
       <View style={cue.row}>
         {SIDES.map((sd) => (
-          <Button key={sd} label={names[sd]} variant={breaker === sd ? sd : 'ghost'} style={cue.flex} selected={breaker === sd}
-            accessibilityLabel={`${names[sd]} breaks off`} onPress={() => onTap(toss[sd])} />
+          <Button key={sd} label={names[sd]} variant={!open && breaker === sd ? sd : 'ghost'} style={cue.flex} selected={!open && breaker === sd}
+            accessibilityLabel={open ? `${names[sd]} won the toss and breaks off` : `${names[sd]} breaks off`} onPress={() => onTap(toss[sd])} />
         ))}
       </View>
     </View>
@@ -144,18 +150,21 @@ export interface SheetRow {
 }
 
 /** The frame-by-frame sheet: one card row per frame (reads at 375 px). */
-export function FrameSheet({ rows, names, unit, homeColor, awayColor }: {
+export function FrameSheet({ rows, names, unit, homeColor, awayColor, note }: {
   rows: SheetRow[];
   names: { home: string; away: string };
   unit: 'frame' | 'game';
   homeColor?: string;
   awayColor?: string;
+  /** a line under the title (the toss wasn't recorded) */
+  note?: string | null;
 }) {
   const color = (sd: Side) => (sd === 'home' ? homeColor ?? theme.colors.home : awayColor ?? theme.colors.away);
   if (!rows.length) return null;
   return (
     <View style={cue.card}>
       <Text style={cue.cardTitle}>{cap(unit)} by {unit}</Text>
+      {note ? <Text style={cue.meta}>{note}</Text> : null}
       {rows.map((r) => {
         const [h, a] = r.score;
         const won = r.winner === 'draw' ? 'Drawn' : r.winner ? `${names[r.winner]} won` : 'In play';

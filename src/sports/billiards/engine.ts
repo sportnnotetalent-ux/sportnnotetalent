@@ -87,6 +87,8 @@ export interface BilliardsState {
   cannonLimit: number;
   timedTie: 'sudden' | 'draw';
   firstBreak: Side;
+  /** the scorer tapped who won the toss (absent = game 1 broke off as set up) */
+  tossed?: true;
   scoringMode: 'shot' | 'quick';
   frames: FrameRecord[];
   framesWon: { home: number; away: number };
@@ -325,9 +327,10 @@ function reduce(s: BilliardsState, a: BilliardsAction): BilliardsState {
     case 'BREAK_OFF': {
       const side = named();
       if (!side || fr.shots > 0) return s;
-      // B-15 — naming the player already breaking changes nothing
-      if (side === fr.breaker && side === fr.striker && (fr.n !== 1 || side === s.firstBreak)) return s;
-      return { ...s, ...(fr.n === 1 ? { firstBreak: side } : {}), frame: { ...fr, breaker: side, striker: side, visit: emptyVisit(side) }, seq: s.seq + 1 };
+      // B-15 — naming the player already breaking changes nothing (frame 1:
+      // once the toss is recorded; the first tap records it, even for them)
+      if (side === fr.breaker && side === fr.striker && (fr.n !== 1 || (side === s.firstBreak && s.tossed === true))) return s;
+      return { ...s, ...(fr.n === 1 ? { firstBreak: side, tossed: true as const } : {}), frame: { ...fr, breaker: side, striker: side, visit: emptyVisit(side) }, seq: s.seq + 1 };
     }
     case 'CONCEDE': {
       const side = named();
@@ -435,6 +438,17 @@ export function standingsUnits(s: BilliardsState): { points: { home: number; awa
     const points = frameScores(s).reduce((t, [h, a]) => ({ home: t.home + h, away: t.away + a }), { home: fr?.score.home ?? 0, away: fr?.score.away ?? 0 });
     return { points };
   }, null);
+}
+
+/** Did the scorer tap who won the toss? (No: game 1 broke off as set up.) */
+export const tossRecorded = (s: BilliardsState): boolean => isObj(s) && s.tossed === true;
+
+/** The league table counts points (founder 2026-10-28): every frame's points
+ *  (a match ended by hand: the frames so far, the one in play included; null
+ *  on a bad snapshot). The table reads finished matches only, and the winner is
+ *  still whoever won on frames. */
+export function standingsScore(s: BilliardsState): { home: number; away: number } | null {
+  return safe(() => (isObj(s) ? standingsUnits(s)?.points ?? null : null), null);
 }
 
 /** The consecutive-stroke counts and the referee's calls (TEN HAZARDS /

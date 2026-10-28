@@ -20,7 +20,7 @@ import { SetLineBoard } from '../SetLineBoard';
 import { CommentaryFeed } from '../gcc/CommentaryFeed';
 import { CompareTable } from '../gcc/CompareTable';
 import {
-  createInitialState, reducer, isComplete, result, summary, scoreLine, lineScore, standingsUnits, AWARD_REASONS, FOUL_KINDS, PARTS,
+  createInitialState, reducer, isComplete, result, summary, scoreLine, lineScore, standingsUnits, standingsScore, AWARD_REASONS, FOUL_KINDS, PARTS,
   type AwardReason, type BilliardsState, type FoulKind, type Part, type Side,
 } from './engine';
 import { BILLIARDS_META } from './meta';
@@ -38,6 +38,7 @@ import { sendTap } from '../cue/send';
 import { endingOf } from '../cue/ending';
 import { TossRow, FrameScoreForm, FrameOptionsPanel, FrameSheet, BreakList, cue } from '../cue/parts';
 import { FrameCorrections } from '../cue/FrameCorrections';
+import { hasFinishedFrame, tossNote } from '../cue/uiState';
 
 type Act = ScoreAction | null;
 const other = (s: Side): Side => (s === 'home' ? 'away' : 'home');
@@ -87,7 +88,7 @@ const ScoringControls: SportPlugin<BilliardsState>['ScoringControls'] = ({ state
       </View>
 
       {p.toss && (p.frame === 1 || tossOpen) ? (
-        <TossRow names={names} breaker={p.breaker} toss={p.toss} first={p.frame === 1} onTap={(a) => { send(a); setTossOpen(false); }} />
+        <TossRow names={names} breaker={p.breaker} toss={p.toss} first={p.frame === 1} recorded={p.tossed} onTap={(a) => { send(a); setTossOpen(false); }} />
       ) : p.toss ? (
         <Text style={st.link} accessibilityRole="button" accessibilityLabel={`${names[p.breaker]} breaks off. Change who breaks off`} onPress={() => setTossOpen(true)}>
           {names[p.breaker]} breaks off · Change
@@ -232,7 +233,7 @@ function BilliardsStats(p: TabProps) {
         units={frames.length > 1 ? [{ key: 'all', label: 'Match' }, ...frames.map((n) => ({ key: String(n), label: `${cap(unit)} ${n}` }))] : undefined}
         footnote={sheet.some((r) => r.quick) ? `${cap(unit)}s entered as a final score have no break, stroke or foul detail.` : undefined} />
       <BreakList list={breakList(s, min)} chips={BREAK_LIST_CHIPS} min={min} onMin={setMin} names={names} unit={unit} homeColor={p.homeColor} awayColor={p.awayColor} />
-      <FrameSheet rows={sheet} names={names} unit={unit} homeColor={p.homeColor} awayColor={p.awayColor} />
+      <FrameSheet rows={sheet} names={names} unit={unit} homeColor={p.homeColor} awayColor={p.awayColor} note={tossNote(s, names)} />
     </View>
   );
 }
@@ -255,7 +256,11 @@ export const billiardsPlugin: SportPlugin<BilliardsState> = {
   scoreLine,
   lineScore: frameLineScore,
   correctionLabel: '✎ Correct a finished frame',
+  // the live link waits for a finished frame (a one-game match has none until it ends)
+  liveCorrection: hasFinishedFrame,
   standingsUnits,
+  // the league table counts points (founder 2026-10-28)
+  standingsScore,
   // SD-19 — derived only (nothing is credited live); one player per side
   statTotals: billiardsStatTotals,
   statTotalsNeedsPlayers: true,

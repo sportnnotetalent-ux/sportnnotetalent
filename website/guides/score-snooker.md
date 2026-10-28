@@ -17,7 +17,7 @@ Snooker is scored frame by frame, one tap per pot. The app follows the WPBSA rul
 
 ## Step by step
 1. Open the match → **Scoring** tab and tap **▶ Start the match**.
-2. Under **Who breaks off? (the toss · then it alternates)**, tap the player who breaks off. Player 1 is picked until you change it.
+2. Under **Who won the toss? (they break off · then it alternates)**, tap the player who won it. Until you tap, nobody is marked and the note says who breaks off as set up. If nobody taps, the Stats tab says "Toss not recorded".
 3. Tap each ball as it is potted: **Red 1**, then a colour, such as **Black 7**. Two or three reds in one shot? Tap **2 reds** or **3 reds**.
 4. When the visit ends, tap **Missed** (a missed pot) or **Safety**. The turn passes.
 5. The top shows "Asha at the table · break 32" and "43 points left on the table · Ravi needs 1 snooker".

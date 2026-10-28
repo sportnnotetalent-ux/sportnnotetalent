@@ -187,8 +187,8 @@ export function tableColumns(
   } else if (sport === 'pool') {
     // racks (standingsUnits.games): a race's score is racks, a sets match's is sets
     add({ key: 'gamesDiff', label: 'R±', title: 'rack difference', value: gamesDiff });
-  } else if (sport === 'snooker' || sport === 'billiards') {
-    add({ key: 'diff', label: 'F±', title: sport === 'billiards' ? 'frame difference (a one-game match counts its points)' : 'frame difference', value: (t) => signed(t.diff) });
+  } else if (sport === 'snooker') {
+    add({ key: 'diff', label: 'F±', title: 'frame difference', value: (t) => signed(t.diff) });
     add({ key: 'pointsDiff', label: 'P±', title: 'frame points difference', extra: true, value: rallyDiff });
   } else if (unit === 'games') {
     add({ key: 'diff', label: 'G±', title: 'games difference', value: (t) => signed(t.diff) });

@@ -12,7 +12,7 @@
  *     turn twice;
  * and what the app needs:
  *   - on the match's first event, the game / race / sets it is scored under
- *     (the game pin, break #26; the "re-scored" note);
+ *     (the pin, break #26: a later format change can't re-score it);
  *   - `pid`: who shot (scotch doubles; singles: the side's one player) — an
  *     id only, never a name;
  *   - `at`: the scorer's clock, for the commentary.
@@ -260,7 +260,9 @@ export const FOUL_SHORT: Record<FoulKind, string> = {
   placement: 'cue ball placement', slowPlay: 'slow play', outOfTurn: 'out of turn', illegalBreak: 'illegal break', other: 'other',
 };
 /** The foul chips at the table (the break has its own short list). */
-export const PLAY_FOULS: FoulKind[] = ['scratch', 'wrongBall', 'noRail', 'offTable', 'touched', 'doubleHit', 'pushShot', 'jump', 'moving', 'noFoot', 'placement', 'slowPlay', 'outOfTurn', 'other'];
+// (no 'outOfTurn': the chips are fouls by the player at the table; playing out
+// of turn is the other player's, and has its own button)
+export const PLAY_FOULS: FoulKind[] = ['scratch', 'wrongBall', 'noRail', 'offTable', 'touched', 'doubleHit', 'pushShot', 'jump', 'moving', 'noFoot', 'placement', 'slowPlay', 'other'];
 export const BREAK_FOULS: FoulKind[] = ['scratch', 'offTable', 'other'];
 
 // --------------------------------------------- what a tap would end --
@@ -376,17 +378,6 @@ const setsOf = (v: unknown) => { const n = cnt(v); return n >= 1 && n <= 9 ? n :
 export function bestOfLine(s: PoolMatch): string {
   const race = raceOf(isObj(s) ? s.raceTo : undefined);
   return race ? fmtText(race, setsOf(s.setsToWin)) : '';
-}
-
-/** The race or the sets changed after the match started (the log was re-scored). */
-export function formatNote(s: PoolMatch): string | null {
-  const f = isObj(s) && isObj(s.fmt0) ? s.fmt0 : null;
-  if (!f) return null;
-  const race = raceOf(s.raceTo), race0 = raceOf(f.raceTo);
-  if (!race || !race0) return null;
-  const sets = setsOf(s.setsToWin), sets0 = setsOf(f.setsToWin);
-  if (race === race0 && sets === sets0) return null;
-  return `Now ${fmtText(race, sets).replace(' · ', ', ')}: it was ${fmtText(race0, sets0).replace(' · ', ', ')} when the match started. The match was re-scored from rack 1.`;
 }
 
 /** The stats panel's unit chips: the match, then each set (sets matches). */

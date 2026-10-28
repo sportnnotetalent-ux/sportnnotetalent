@@ -318,7 +318,8 @@ export function scoreUnit(sport: SportId | string): ScoreUnit {
     case 'cricket': case 'baseball': return 'runs';
     case 'volleyball': case 'tennis': case 'padel': return 'sets';
     case 'badminton': case 'tabletennis': case 'squash': case 'pickleball': case 'carrom': return 'games';
-    case 'pool': case 'snooker': case 'billiards': return 'games';   // racks / frames
+    case 'pool': case 'snooker': return 'games';   // racks / frames
+    // billiards counts points (founder 2026-10-28): its default below
     default: return 'points';
   }
 }
@@ -443,7 +444,8 @@ const BODY_PRESETS: Record<string, PointsPreset[]> = {
     preset('carrom', 'Carrom league', 'Wins; ties: head-to-head, games difference, board points difference',
       { winPoints: 2, drawPoints: 1, lossPoints: 0, tieBreak: 'h2h,diff,pointsDiff,lots' }),
   ],
-  // Cue sports (2026-10-28): no single federation rule — wins, then racks / frames
+  // Cue sports (2026-10-28): no single federation rule — wins, then racks /
+  // frames (pool, snooker) or points (billiards, founder 2026-10-28)
   pool: [
     preset('pool', 'Pool league', 'Wins; ties: head-to-head, rack difference',
       { winPoints: 2, drawPoints: 1, lossPoints: 0, tieBreak: 'h2h,gamesDiff,lots', tieRestart: true }),
@@ -453,8 +455,8 @@ const BODY_PRESETS: Record<string, PointsPreset[]> = {
       { winPoints: 2, drawPoints: 1, lossPoints: 0, tieBreak: 'diff,pointsDiff,lots' }),
   ],
   billiards: [
-    preset('billiards', 'Billiards league', 'Wins; ties: frame difference, then points difference',
-      { winPoints: 2, drawPoints: 1, lossPoints: 0, tieBreak: 'diff,pointsDiff,lots' }),
+    preset('billiards', 'Billiards league', 'Wins; ties: points difference, then points scored',
+      { winPoints: 2, drawPoints: 1, lossPoints: 0, tieBreak: 'diff,for,lots' }),
   ],
   cricket: [
     preset('icc', 'ICC events', '2 a win, 1 a tie or no result; ties: wins, net run rate, head-to-head',
@@ -698,7 +700,7 @@ export function tieBreakerLabel(tb: TieBreaker, sport?: SportId | string): strin
     case 'h2hRatio': return 'games ratio (among tied)';
     case 'h2hPoints': return 'points ratio (among tied)';
     case 'nrr': return 'net run rate';
-    case 'diff': return sport === 'snooker' || sport === 'billiards' ? 'frame difference' : sport === 'pool' ? 'rack difference' : u === 'points' ? 'points difference' : `${unit} difference`;
+    case 'diff': return sport === 'snooker' ? 'frame difference' : sport === 'pool' ? 'rack difference' : u === 'points' ? 'points difference' : `${unit} difference`;
     case 'for': return scored;
     case 'wins': return 'number of wins';
     case 'played': return 'matches played';
@@ -706,7 +708,7 @@ export function tieBreakerLabel(tb: TieBreaker, sport?: SportId | string): strin
     case 'setRatio': return 'set ratio';
     case 'pointRatio': return sport === 'netball' ? 'goal percentage' : 'point ratio';
     case 'gamesDiff': return sport === 'pool' ? 'rack difference' : 'games difference';
-    case 'pointsDiff': return sport === 'carrom' ? 'board points difference' : sport === 'snooker' || sport === 'billiards' ? 'frame points difference' : 'points difference';
+    case 'pointsDiff': return sport === 'carrom' ? 'board points difference' : sport === 'snooker' ? 'frame points difference' : 'points difference';
     case 'setsPct': return '% of sets won';
     case 'gamesPct': return '% of games won';
     case 'fairPlay': return 'fair play (cards)';
@@ -834,10 +836,19 @@ export function setStandingsScoreProvider(fn: ScoreProvider | null): void { scor
 export const isNoResultMatch = (m: Match): boolean =>
   m.result?.kind === 'no_result' || m.result?.kind === 'abandoned';
 
+/** Sports whose table counts points read from the match state, even for a
+ *  match ended by hand (whose stored score is frames won): billiards (founder
+ *  2026-10-28). */
+const STATE_POINTS_SPORTS = new Set<string>(['billiards']);
+
 /** The score a match counts in the table: a hand-ended result's score, else
  *  the sport's table crediting (SD-13), else the match score. */
 function tableScore(m: Match): { home: number; away: number } | null {
   if (isTieMatch(m)) return m.score ?? null; // SD-48: rubbers won
+  if (m.result && !m.result.forfeit && STATE_POINTS_SPORTS.has(m.sport) && m.state != null) {
+    const pts = scoreProvider?.(m.sport, m.state);
+    if (pts) return pts;
+  }
   // SD-126: a walkover / forfeit counts its federation score (absent on older results)
   return m.result?.forfeit?.score ?? m.result?.score ?? (m.result ? null : scoreProvider?.(m.sport, m.state)) ?? m.score ?? null;
 }

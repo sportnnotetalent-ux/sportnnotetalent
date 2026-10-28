@@ -58,7 +58,9 @@ describe('builders: side and frame stamps', () => {
     assert.equal(playAgainAction(s), null);
     assert.equal(replaceAction(s), null);
     assert.equal(respotTurnAction(s, 'away'), null);
-    assert.equal(breakOffAction(s, 'home'), null); // already breaking (B-15)
+    // the first tap records the toss, even for the player set to break (2026-10-28); once recorded, a repeat is refused (B-15)
+    assert.ok(breakOffAction(s, 'home'));
+    assert.equal(breakOffAction(S.reducer(s, breakOffAction(s, 'home')!), 'home'), null);
     assert.equal(frameScoreAction(s, 50, 50), null); // level
     assert.equal(frameScoreAction(s, 1000, 0), null); // over the quick cap
     const t = apply(s, potAction(s, 'red'));
@@ -132,7 +134,8 @@ describe('the panel: what the screen offers', () => {
     assert.equal(p.foul.min, 4);
     assert.equal(p.foul.maxRedsDown, 15);
     assert.ok(p.toss);
-    assert.equal(p.toss!.home, null); // already breaking
+    assert.ok(p.toss!.home); // nobody tapped the toss yet: both offered
+    assert.equal(p.tossed, false);
     assert.ok(p.toss!.away);
     assert.ok(p.frameScore);
     assert.equal(p.remaining, 147);

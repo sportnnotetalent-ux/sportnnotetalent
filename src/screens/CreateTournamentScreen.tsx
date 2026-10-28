@@ -25,6 +25,7 @@ import { DivisionsEditor } from '../components/DivisionsEditor';
 import type { NewTournamentCategory } from '../core/types';
 import { LEAD_OPTIONS, DEFAULT_LEAD_MINUTES } from '../data/reminderPrefs';
 import { SPORT_LIST, getSportMeta } from '../sports/sportMeta';
+import { structureLabels } from '../sports/structureLabels';
 import { createTournament, getMyPlayerId, getPlayer } from '../data/repos';
 import { useAuth } from '../core/auth';
 import { notice } from '../core/confirm';
@@ -286,8 +287,8 @@ export default function CreateTournamentScreen() {
               <View key={s} style={{ gap: theme.spacing(2) }}>
                 <FieldLabel>{getSportMeta(s).icon} {getSportMeta(s).name} — format</FieldLabel>
                 <View style={st.chips}>
-                  <SelectChip label="👤 Singles" active={pps < 2} onPress={() => setPps(1)} />
-                  <SelectChip label="👥 Doubles (pairs)" active={pps >= 2} onPress={() => setPps(2)} />
+                  <SelectChip label={`👤 ${structureLabels(getSportMeta(s)).one}`} active={pps < 2} onPress={() => setPps(1)} />
+                  <SelectChip label={`👥 ${structureLabels(getSportMeta(s)).two} (pairs)`} active={pps >= 2} onPress={() => setPps(2)} />
                 </View>
               </View>
             );

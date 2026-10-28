@@ -53,7 +53,7 @@ export function shotKeysFor(game: Game): string[] {
 }
 
 /** A completed rack, read defensively. */
-interface Rec { winner: Side; breaker: Side | null; set: number; bnr: boolean; golden: boolean; runOut: boolean; how: string; mode: string; innings: { home: number; away: number } | null }
+interface Rec { n: number; winner: Side; breaker: Side | null; set: number; bnr: boolean; golden: boolean; runOut: boolean; how: string; mode: string; innings: { home: number; away: number } | null }
 function racksOf(s: unknown): Rec[] {
   const list = isObj(s) && Array.isArray(s.racks) ? s.racks : [];
   const out: Rec[] = [];
@@ -61,7 +61,7 @@ function racksOf(s: unknown): Rec[] {
     if (!isObj(r) || !isSide(r.winner)) continue;
     const inn = isObj(r.innings) ? { home: cnt(r.innings.home), away: cnt(r.innings.away) } : null;
     out.push({
-      winner: r.winner, breaker: isSide(r.breaker) ? r.breaker : null, set: cnt(r.set) || 1,
+      n: cnt(r.n), winner: r.winner, breaker: isSide(r.breaker) ? r.breaker : null, set: cnt(r.set) || 1,
       bnr: r.bnr === true, golden: r.golden === true, runOut: r.runOut === true,
       how: typeof r.how === 'string' ? r.how : '', mode: r.mode === 'detail' ? 'detail' : 'quick', innings: inn,
     });
@@ -89,6 +89,19 @@ export function poolSideRecord(s: PoolMatch, side: Side): Counts {
   if (isObj(s) && cnt(s.setsToWin) > 1) {
     out.setsWon = cnt(own(s.setsWon, side));
     out.setsLost = cnt(own(s.setsWon, opp));
+  }
+  return out;
+}
+
+/** Golden breaks per player of one side: the rack's BREAK line names who broke. */
+function goldenBy(s: PoolMatch, side: Side): Map<string, number> {
+  const out = new Map<string, number>();
+  const feed = isObj(s) && Array.isArray(s.feed) ? s.feed : [];
+  for (const r of racksOf(s)) {
+    if (!r.golden || r.winner !== side) continue;
+    let pid: string | null = null;
+    for (const e of feed) if (isObj(e) && e.t === 'BREAK' && cnt(e.n) === r.n && e.s === side && typeof e.p === 'string') pid = validPid(e.p);
+    if (pid) out.set(pid, (out.get(pid) ?? 0) + 1);
   }
   return out;
 }
@@ -150,9 +163,13 @@ export function poolStatTotals(s: PoolMatch, ctx?: StatTotalsContext): Record<st
         if (shooter) shots.set(shooter, fill(keys, sideCounts(s, side)));
       }
     }
+    // Founder 2026-10-28: in scotch doubles a golden break is the breaker's own
+    // (the rack's BREAK line names who broke); the partner's is 0
+    const golden = doubles && 'goldenBreaks' in base ? goldenBy(s, side) : null;
     for (const id of list) {
       const partner = doubles && list.length === 2 ? list.find((x) => x !== id) : undefined;
-      out[id] = { side, stats: { ...base, ...(shots.get(id) ?? {}) }, ...(partner ? { partnerId: partner } : {}) };
+      const mineGolden: Counts = golden ? { goldenBreaks: golden.get(id) ?? 0 } : {};
+      out[id] = { side, stats: { ...base, ...mineGolden, ...(shots.get(id) ?? {}) }, ...(partner ? { partnerId: partner } : {}) };
     }
   }
   return out;

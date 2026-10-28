@@ -31,7 +31,7 @@ import { other, type Side } from './balls';
 import { perSideOf, poolReducer, type PoolMatch } from './match';
 import {
   BREAK_FOULS, FOUL_LABEL, PLAY_FOULS, bestOfLine, boardStatus, breakAction, breakLine, chooseAction, choiceOptions, choiceQuestion,
-  confirmFor, foulAction, formatNote, lagAction, makeTapGuard, missAction, outcomeOf, poolPanel, potAction, pushAction, rackAction,
+  confirmFor, foulAction, lagAction, makeTapGuard, missAction, outcomeOf, poolPanel, potAction, pushAction, rackAction,
   safetyAction, setUnits, shooterPick, stalemateAction, type TapOpts,
 } from './controls';
 import { ballsText, poolFeed } from './feed';
@@ -62,6 +62,8 @@ const ScoringControls: SportPlugin<PoolMatch>['ScoringControls'] = ({ state, dis
   // the screen's own picks, cleared whenever the match moves
   const [sel, setSel] = useState<number[]>([]);
   const [foulOpen, setFoulOpen] = useState(false);
+  // a foul is picked, then recorded with its own button (a stray tap on a chip records nothing)
+  const [foulKind, setFoulKind] = useState<FoulKind | null>(null);
   const [notCalled, setNotCalled] = useState(false);
   const [tenCalled, setTenCalled] = useState(false);
   const [breaker, setBreaker] = useState<Side | null>(null);
@@ -70,7 +72,7 @@ const ScoringControls: SportPlugin<PoolMatch>['ScoringControls'] = ({ state, dis
   const [more, setMore] = useState(false);
   const moved = `${s?.seq}:${s?.rack?.n}:${s?.rack?.reracks}`;
   useEffect(() => {
-    setSel([]); setFoulOpen(false); setNotCalled(false); setTenCalled(false); setShooter({ home: null, away: null });
+    setSel([]); setFoulOpen(false); setFoulKind(null); setNotCalled(false); setTenCalled(false); setShooter({ home: null, away: null });
     setFlags({ bnr: false, golden: false, runOut: false }); setMore(false);
   }, [moved]);
 
@@ -103,8 +105,6 @@ const ScoringControls: SportPlugin<PoolMatch>['ScoringControls'] = ({ state, dis
     dispatch(a);
   };
   const toggleBall = (b: number) => setSel((cur) => (cur.includes(b) ? cur.filter((x) => x !== b) : [...cur, b]));
-  const note = formatNote(s);
-  const noteBanner = note ? <Text style={ctrl.note} accessibilityLiveRegion="polite">ℹ️ {note}</Text> : null;
 
   /** Doubles: who is shooting for `sd` (two chips, the suggestion pre-selected). */
   const shooterChips = (sd: Side, label: string) => {
@@ -159,7 +159,6 @@ const ScoringControls: SportPlugin<PoolMatch>['ScoringControls'] = ({ state, dis
   if (p.kind === 'lag') {
     return (
       <View style={ctrl.wrap}>
-        {noteBanner}
         <Text style={ctrl.label}>Who breaks rack 1? <Text style={ctrl.meta}>(the lag winner chooses)</Text></Text>
         <View style={ctrl.row}>
           <Button label={name('home')} variant="home" color={homeColor} style={ctrl.flex} onPress={() => void send(lagAction(s, 'home', opts(null)))} accessibilityLabel={`${name('home')} breaks rack 1`} />
@@ -177,7 +176,6 @@ const ScoringControls: SportPlugin<PoolMatch>['ScoringControls'] = ({ state, dis
     const o = opts(brk);
     return (
       <View style={ctrl.wrap}>
-        {noteBanner}
         {p.breaker ? <Text style={ctrl.breakLine}>⚪ {breakLine(s, name)}</Text> : (
           <View style={{ gap: theme.spacing(2) }}>
             <Text style={ctrl.label}>Who breaks rack {p.rack}?</Text>
@@ -196,7 +194,7 @@ const ScoringControls: SportPlugin<PoolMatch>['ScoringControls'] = ({ state, dis
             onPress={() => brk && void send(breakAction(s, { pots: sel, side: brk }, o))} />
         </View>
         <View style={ctrl.row}>
-          <Button label={foulOpen ? 'Foul on the break ▾' : 'Foul on the break ▸'} variant="ghost" style={ctrl.flex} disabled={!brk} onPress={() => setFoulOpen((v) => !v)} />
+          <Button label={foulOpen ? 'Foul on the break ▾' : 'Foul on the break ▸'} variant="ghost" style={ctrl.flex} disabled={!brk} onPress={() => { setFoulOpen((v) => !v); setFoulKind(null); }} />
           {dry ? <Button label="Illegal break" variant="ghost" style={ctrl.flex} disabled={!brk} accessibilityHint="Nothing went in and fewer than four balls hit a rail"
             onPress={() => brk && void send(breakAction(s, { illegal: true, side: brk }, o))} /> : null}
         </View>
@@ -205,10 +203,11 @@ const ScoringControls: SportPlugin<PoolMatch>['ScoringControls'] = ({ state, dis
             <Text style={ctrl.meta}>The balls you tapped went in on the foul (for “off the table”: they left the table).</Text>
             <View style={ctrl.chips}>
               {BREAK_FOULS.map((k) => (
-                <SelectChip key={k} label={FOUL_LABEL[k]} active={false}
-                  onPress={() => void send(breakAction(s, k === 'offTable' ? { off: sel, foul: k, side: brk } : { pots: sel, foul: k, side: brk }, o))} />
+                <SelectChip key={k} label={FOUL_LABEL[k]} active={foulKind === k} onPress={() => setFoulKind(foulKind === k ? null : k)} />
               ))}
             </View>
+            <Button label={foulKind ? `Record foul on the break · ${FOUL_LABEL[foulKind]}` : 'Pick the foul'} variant="danger" disabled={!foulKind}
+              onPress={() => foulKind && void send(breakAction(s, foulKind === 'offTable' ? { off: sel, foul: foulKind, side: brk } : { pots: sel, foul: foulKind, side: brk }, o))} />
           </View>
         ) : null}
         {p.shortRule && sel.length < 3 ? (
@@ -225,7 +224,6 @@ const ScoringControls: SportPlugin<PoolMatch>['ScoringControls'] = ({ state, dis
   if (p.kind === 'choice') {
     return (
       <View style={ctrl.wrap}>
-        {noteBanner}
         <Text style={ctrl.label}>{choiceQuestion(s, name)}</Text>
         {choiceOptions(s, name).map((o) => (
           <Button key={`${o.choice}-${o.breaker ?? ''}`} label={o.label} variant={o.choice === 'play' ? p.by : 'ghost'} color={o.choice === 'play' ? (p.by === 'home' ? homeColor : awayColor) : undefined}
@@ -245,7 +243,6 @@ const ScoringControls: SportPlugin<PoolMatch>['ScoringControls'] = ({ state, dis
     : null;
   return (
     <View style={ctrl.wrap}>
-      {noteBanner}
       <Text style={ctrl.breakLine}>{name(sh)} at the table{p.bih ? ' · ball in hand' : ''} <Text style={ctrl.meta}>· rack {p.rack}</Text></Text>
       {groups ? <Text style={ctrl.meta}>{groups}</Text> : null}
       {p.twoFouls ? (
@@ -273,7 +270,7 @@ const ScoringControls: SportPlugin<PoolMatch>['ScoringControls'] = ({ state, dis
         <Button label={picked.length ? `Safety · ${ballsText(picked)} in` : 'Safety'} variant="ghost" style={ctrl.flex}
           accessibilityHint={p.safetyCall ? 'A called safety: the turn passes' : '10-ball has no safety call: a ball that goes in is a wrongly pocketed ball'}
           onPress={() => void send(safetyAction(s, picked, o))} />
-        <Button label={foulOpen ? 'Foul ▾' : 'Foul ▸'} variant="ghost" style={ctrl.flex} onPress={() => setFoulOpen((v) => !v)} accessibilityLabel="Foul: pick what kind" />
+        <Button label={foulOpen ? 'Foul ▾' : 'Foul ▸'} variant="ghost" style={ctrl.flex} onPress={() => { setFoulOpen((v) => !v); setFoulKind(null); }} accessibilityLabel="Foul: pick what kind" />
         {p.push ? <Button label="Push out" variant="ghost" style={ctrl.flex} accessibilityHint="The shot after the break: the other player then chooses who shoots"
           onPress={() => void send(pushAction(s, { pots: picked }, o))} /> : null}
       </View>
@@ -283,10 +280,12 @@ const ScoringControls: SportPlugin<PoolMatch>['ScoringControls'] = ({ state, dis
           <Text style={ctrl.meta}>The balls you tapped went in on the foul (for “object ball off the table”: they left the table).</Text>
           <View style={ctrl.chips}>
             {PLAY_FOULS.map((k: FoulKind) => (
-              <SelectChip key={k} label={FOUL_LABEL[k]} active={false} onPress={() => void send(foulAction(s, k, { balls: picked }, o))}
-                accessibilityLabel={`Foul by ${name(sh)}: ${FOUL_LABEL[k]}`} />
+              <SelectChip key={k} label={FOUL_LABEL[k]} active={foulKind === k} onPress={() => setFoulKind(foulKind === k ? null : k)}
+                accessibilityLabel={`Kind of foul by ${name(sh)}: ${FOUL_LABEL[k]}`} />
             ))}
           </View>
+          <Button label={foulKind ? `Record foul · ${FOUL_LABEL[foulKind]}` : 'Pick the foul'} variant="danger" disabled={!foulKind}
+            onPress={() => foulKind && void send(foulAction(s, foulKind, { balls: picked }, o))} />
           <Button label={`${name(other(sh))} played out of turn`} variant="ghost"
             accessibilityHint={`A foul on ${name(other(sh))}; ${name(sh)} keeps the table with ball in hand`}
             onPress={() => void send(foulAction(s, 'outOfTurn', { by: other(sh) }, opts(other(sh))))} />
@@ -379,7 +378,6 @@ const ctrl = StyleSheet.create({
   meta: { color: theme.colors.textMuted, fontSize: theme.font.small },
   link: { color: theme.colors.primary, fontSize: theme.font.small, fontWeight: '700', paddingVertical: theme.spacing(2) },
   breakLine: { color: theme.colors.text, fontSize: theme.font.body, fontWeight: '800' },
-  note: { color: theme.colors.text, fontSize: theme.font.small, backgroundColor: theme.colors.surfaceAlt, borderRadius: theme.radius.sm, padding: theme.spacing(2) },
   warn: { color: theme.colors.onFill, backgroundColor: theme.colors.accent, fontSize: theme.font.body, fontWeight: '800', borderRadius: theme.radius.sm, padding: theme.spacing(3) },
   box: { gap: theme.spacing(2), backgroundColor: theme.colors.surfaceAlt, borderRadius: theme.radius.md, padding: theme.spacing(3) },
   rackRow: { color: theme.colors.text, fontSize: theme.font.small, borderLeftWidth: 3, paddingLeft: theme.spacing(2), paddingVertical: theme.spacing(1) },

@@ -816,7 +816,10 @@ describe('snooker · break list', () => {
 
   test('B-15 an action that changes nothing returns the same state (not seq + 1)', () => {
     const s0 = S.createInitialState();
-    assert.equal(S.reducer(s0, { type: 'BREAK_OFF', side: 'home' }), s0, 'home already breaks');
+    // the first tap records the toss (usability follow-up 2026-10-28); a repeat changes nothing
+    const tossed = S.reducer(s0, { type: 'BREAK_OFF', side: 'home' });
+    assert.equal(tossed.seq, 1);
+    assert.equal(S.reducer(tossed, { type: 'BREAK_OFF', side: 'home' }), tossed, 'home already breaks');
     const r = run([SAFE, foul(5), ...pairs(8), MISS, ...pairs(7), ...clearance().slice(0, 5), MISS, pot('black')]);
     assert.equal(f(r).respot, true);
     assert.equal(S.reducer(r, { type: 'RESPOT_TURN', side: f(r).striker }), r);

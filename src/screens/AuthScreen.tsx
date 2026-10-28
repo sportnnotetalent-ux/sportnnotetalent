@@ -20,7 +20,7 @@ import { DateField } from '../components/DateTimeField';
 import { useAuth } from '../core/auth';
 import { ageFromDob } from '../core/age';
 import { guardianConfirmRequired, privacyCountry, usUnder13Blocked, US_UNDER_13_MESSAGE } from '../core/privacyRegion';
-import { isValidPhone, normalizePhone, formatPhone } from '../core/phone';
+import { isValidPhone, normalizePhone, formatPhone, phoneCountry } from '../core/phone';
 import { PhoneField } from '../components/PhoneField';
 import { phoneLoginAvailable } from '../core/phoneLogin';
 import { PhoneLoginCard } from '../components/PhoneLoginCard';
@@ -83,7 +83,8 @@ export default function AuthScreen() {
   const age = ageFromDob(dob.trim());
   const minor = age !== undefined && age < 18;
   // SD-152: under-18 rules by country (India unchanged — the checkbox below is the consent).
-  const country = privacyCountry();
+  // CL-04: the mobile's country first, as the server decides it (then the device).
+  const country = phoneCountry(mobile) ?? privacyCountry();
   const usUnder13 = usUnder13Blocked(country, age);
   const guardianMustConfirm = minor && guardianConfirmRequired(country);
 

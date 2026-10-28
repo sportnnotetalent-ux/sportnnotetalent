@@ -14,6 +14,9 @@
  * Channel 'claim' (W1-2b, migration 20261028160000_security_wave2b): someone a
  * coach added by phone, who signed up by email, proves the number; the server
  * links that coach-made profile to them (claim_player_by_phone). No playerId.
+ * CL-04 (migration 20261028233000_phone_country): the caller's own proven
+ * number sets their account's country (apply_verified_phone_country): an
+ * under-18's consent route can only get stricter. A guardian's number doesn't.
  *
  * Contract: POST { playerId, channel: 'phone'|'guardian_phone', idToken }
  *           → 200 { verified: boolean, reason? }
@@ -53,6 +56,7 @@ Deno.serve(async (req) => {
     const { data, error } = await admin.rpc('claim_player_by_phone', { p_profile: caller.user.id, p_phone: phone });
     if (error) return json({ verified: false, reason: 'Couldn’t link just now — try again.' }, 500);
     const outcome = data === 'linked' || data === 'support' ? data : 'none';
+    await recordCountry(caller.user.id, phone);
     return json({ verified: true, outcome });
   }
 
@@ -72,5 +76,17 @@ Deno.serve(async (req) => {
     : { phone_verified: true };
   const { error } = await admin.from('players').update(update).eq('id', playerId);
   if (error) return json({ verified: false, reason: 'Couldn’t save — try again.' }, 500);
+  if (channel === 'phone') await recordCountry(caller.user.id, phone);
   return json({ verified: true });
 });
+
+/** CL-04: the proven number's country on the account (best effort: the number
+ *  is verified either way; a failure leaves the sign-up country as it was). */
+async function recordCountry(profileId: string, phone: string): Promise<void> {
+  try {
+    const { error } = await admin.rpc('apply_verified_phone_country', { p_profile: profileId, p_phone: phone });
+    if (error) console.error('apply_verified_phone_country', error.message);
+  } catch (e) {
+    console.error('apply_verified_phone_country', e instanceof Error ? e.message : String(e));
+  }
+}

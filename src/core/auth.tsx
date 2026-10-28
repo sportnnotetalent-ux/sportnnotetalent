@@ -8,7 +8,7 @@ import React, { createContext, useContext, useEffect, useRef, useState } from 'r
 import type { User } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from './supabase';
 import { setReminderPrefsUser } from '../data/reminderPrefs';
-import { normalizePhone, rememberCountryFromPhone } from './phone';
+import { normalizePhone, phoneCountry, rememberCountryFromPhone } from './phone';
 import { legalVersionFor } from '../data/legal';
 import { privacyCountry, US_UNDER_13_MESSAGE } from './privacyRegion';
 import { analyticsChoice } from './analyticsConsent';
@@ -307,11 +307,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // so it's correct whether or not "Confirm email" is on. (dob is mandatory;
         // phone is the primary identity key; guardian carries under-18 consent.)
         // legal_accepted: which Terms/Privacy version they agreed to, and when (consent record).
-        // SD-152: `country` (device / Settings → Region) drives the server's under-18
-        // rules (migration 20261020120000): India keeps the sign-up checkbox; elsewhere
-        // the guardian confirms by email; US under-13s can't self-sign-up.
+        // SD-152: `country` drives the server's under-18 rules (migration
+        // 20261020120000): India keeps the sign-up checkbox; elsewhere the guardian
+        // confirms by email; US under-13s can't self-sign-up. CL-04: the mobile's
+        // country first (the server reads the number itself and keeps the stricter
+        // one when they disagree), then the device / Settings → Region.
         // `analytics: 'denied'` carries an "Essential only" choice made before sign-up.
-        const country = privacyCountry();
+        const country = phoneCountry(normPhone ?? '') ?? privacyCountry();
         const meta = {
           full_name: fullName, role, dob, phone: normPhone, ...(guardian ? { guardian } : {}), country,
           ...(analyticsChoice() === 'denied' ? { analytics: 'denied' } : {}),

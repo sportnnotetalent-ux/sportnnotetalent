@@ -12,7 +12,7 @@ Pool is scored rack by rack, to WPA rules. Tap every shot for the commentary and
 
 ## Before you start
 - You must be a scorer of the match, or a host of the match or its tournament. See [Scorers and officials](/guides/scorers-and-officials/).
-- For a friendly, tap **🤝 Start a friendly** on **Organize** (or in the **▾** menu on Home). Pick **🎱 Pool**, then **👤 Singles** or **👥 Doubles** (scotch doubles: partners take turns, shot by shot), the players and the rules. Tap **▶ Create & score now**.
+- For a friendly, tap **🤝 Start a friendly** on **Organize** (or in the **▾** menu on Home). Pick **🎱 Pool**, then **👤 Singles** or **👥 Scotch doubles** (partners take turns, shot by shot), the players and the rules. Tap **▶ Create & score now**.
 - Under **🎱 Pool rules** the organiser picks the **Game** (fixed once play starts), **Race to**, **Sets**, **Who breaks** (**Alternate (WPA)**, **Winner breaks** or **Loser breaks**) and **Three fouls in a row lose the rack** (standard: on for 9- and 10-ball, off for 8-ball).
 
 ## Step by step
@@ -28,7 +28,7 @@ The break also has **Foul on the break ▸**, **Illegal break** and, at 9-ball, 
 
 ## Fouls
 1. Tap any balls that went in on the foul.
-2. Tap **Foul ▸**, then the kind, such as **Cue ball pocketed or off the table**. The tap records the foul at once.
+2. Tap **Foul ▸**, then the kind, such as **Cue ball pocketed or off the table**. Then tap the red **Record foul · …** button. Tapping a kind only picks it, so a stray tap records nothing.
 
 The other player then has ball in hand. If the wrong player shot, tap **Foul ▸** → **Ravi played out of turn** (the button names them).
 
@@ -44,7 +44,7 @@ If a rack can't be finished, tap **More: stalemate, award the rack ▸** to re-r
 
 ## Fix a mistake
 - Tap **↶ Undo**. It names what it takes back, for example "↶ Undo: pot 3, 5 · Asha".
-- Wrong race or sets? Change them on the **Info** tab under **🎱 Race and sets**. The match is re-scored from rack 1.
+- The game, race and sets are fixed once the first rack starts, so check them on the match card first. Set up wrong? In the first 5 minutes, tap **↺ Restart match**. See [End a match early or record a walkover](/guides/end-a-match-early/).
 - After the match, you can remove a shot or, in doubles, credit it to the other partner. See [Correct a match after full time](/guides/correct-a-finished-match/).
 
 ## The commentary and the stats

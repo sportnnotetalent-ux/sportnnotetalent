@@ -13,6 +13,39 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-28 — The founder's answers: country from the phone, cue-sport rules, usability
+- Migration `20261028233000_phone_country`. Break list: `docs/security/breaks/founder-answers-2026-10-28.md`.
+- Tests:
+  - `tests/db-phone-country.test.mts` (14), `tests/sim-phone-country.test.mts` (600 sign-ups, 300 verifications);
+  - `tests/billiards-league.test.mts` (9), `tests/sim-billiards-league.test.mts` (500 players, 2,250 matches);
+  - `tests/cue-usability.test.mts` (11), plus updates to the pool, snooker and billiards tests.
+
+**CL-04, the sign-up country comes from the phone:**
+- The mobile's dial code decides, not the time zone. When the number and the device disagree on India, the guardian confirms. An under-18 with no phone waits for a guardian.
+- A number proven by SMS (`verify-phone-firebase`: the caller's own number or a claim) sets the account's country through `apply_verified_phone_country`. An under-18 on the India checkbox moves to "waiting for a guardian" when the number isn't Indian (logged). Nothing gets looser.
+- The app sends the number's country, and the sign-up screen follows it.
+- Open: an unverified Indian number is still a claim, not proof (PC-05). Requiring phone verification, or CL-03's parental proof, closes it.
+
+**Cue-sport rules:**
+- **Pool:**
+  - in scotch doubles, a golden break goes to the partner who broke;
+  - the race and sets lock at the first event, like the game, so the live "Race and sets" setting and the "re-scored" note are gone.
+- **Billiards:**
+  - league tables count points (for, against, difference, then points scored), and the winner is still decided on frames;
+  - a match ended by hand counts its points too;
+  - team ties: rubbers, then points difference.
+
+**Usability:**
+- Match and tournament setup show the sport's own words ("Scotch doubles" for pool).
+- **Pool fouls:**
+  - a chip picks the foul, and the red **Record foul · …** button records it;
+  - "Played out of turn" is no longer a chip under the player at the table (it charged the wrong player); its own button stays.
+- **Snooker and billiards:**
+  - the toss row marks nobody until the toss is tapped, and the first tap records it, even for Player 1;
+  - the Stats tab says "Toss not recorded" when nobody tapped;
+  - the live "Correct a finished frame" link waits for a finished frame.
+- Guides updated: score pool, snooker and billiards (a new "In a league" section for billiards).
+
 ### 2026-10-28 — Security Waves 4A–4B: the low findings
 - Migration `20261028230000_security_wave4a`. Break list: `docs/security/breaks/security-wave4.md`.
 - Tests: `tests/db-wave4.test.mts` (5) and `tests/security-wave4.test.mts` (12).

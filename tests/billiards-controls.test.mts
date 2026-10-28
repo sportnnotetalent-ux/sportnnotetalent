@@ -47,7 +47,9 @@ describe('builders', () => {
     let s = init();
     assert.equal(strokeAction(s, {}), null);
     assert.equal(strokeAction(s, { inOffRed: true, inOffWhite: true }), null); // one cue ball
-    assert.equal(breakOffAction(s, 'home'), null);
+    // the first tap records the toss, even for the player set to break (2026-10-28); once recorded, a repeat is refused (B-15)
+    assert.ok(breakOffAction(s, 'home'));
+    assert.equal(breakOffAction(B.reducer(s, breakOffAction(s, 'home')!), 'home'), null);
     assert.equal(frameScoreAction(s, 100, 87), null); // nobody reached 150
     const miss = missAction(s)!;
     s = apply(s, miss);
@@ -77,7 +79,8 @@ describe('the panel', () => {
     assert.ok(p.strokes.every((x) => x.action && x.foul === null));
     assert.equal(p.unit, 'game'); // a single game
     assert.deepEqual(p.toGo, { home: 100, away: 100 });
-    assert.ok(p.toss && p.toss.away && !p.toss.home);
+    assert.ok(p.toss && p.toss.away && p.toss.home); // nobody tapped the toss yet: both offered
+    assert.equal(p.tossed, false);
     assert.equal(p.frameScore, true);
     assert.equal(p.time, null);
     s = apply(s, p.strokes[0].action);

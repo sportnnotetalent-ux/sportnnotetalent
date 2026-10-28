@@ -110,6 +110,8 @@ export interface BilliardsPanel {
   limits: { hazards: number; cannons: number; hazardLimit: number; cannonLimit: number; tenHazards: boolean; seventyCannons: boolean };
   time: Act | null;
   toss: { home: Act | null; away: Act | null } | null;
+  /** the scorer tapped who won the toss */
+  tossed: boolean;
   frameScore: boolean;
   concede: { home: Act | null; away: Act | null };
 }
@@ -146,6 +148,7 @@ function panelOf(s: Live): BilliardsPanel {
     limits: { hazards: lim.hazards, cannons: lim.cannons, hazardLimit: s.hazardLimit, cannonLimit: s.cannonLimit, tenHazards: lim.tenHazards, seventyCannons: lim.seventyCannons },
     time: timeAction(s),
     toss: fresh ? { home: breakOffAction(s, 'home'), away: breakOffAction(s, 'away') } : null,
+    tossed: s.tossed === true,
     frameScore: fresh && fr.score.home === 0 && fr.score.away === 0,
     concede: { home: concedeAction(s, 'home'), away: concedeAction(s, 'away') },
   };

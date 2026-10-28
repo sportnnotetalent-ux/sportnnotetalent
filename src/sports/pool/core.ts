@@ -3,13 +3,11 @@
  * (adding the screens), and the node tests drive whole matches through the
  * very same functions. No React Native here.
  *
- * Live settings (parity #14, config mode): the race and the sets only. The
- * game is not offered once the match exists — and a log keeps the game it
- * was scored under anyway (match.ts, the pin; break #26). A race or sets
- * change patches the match format and the log is replayed with it: the hint
- * says so before the tap, and the controls say so after (`formatNote`).
+ * No live settings (founder 2026-10-28): the game, the race and the sets are
+ * pinned by the match's first event (match.ts, the pin; break #26), so a later
+ * format change can't re-score a match in play.
  */
-import type { LiveSettings, SportPlugin } from '../types';
+import type { SportPlugin } from '../types';
 import { cnt, isComplete, lineScore, result, scoreLine, summary } from './engine.ts';
 import { creditOf, poolInit, poolReducer, type PoolMatch } from './match.ts';
 import { poolStatTotals } from './totals.ts';
@@ -35,20 +33,6 @@ export function poolInvolved(s: PoolMatch): string[] {
   return [...ids.home, ...ids.away];
 }
 
-export const POOL_LIVE_SETTINGS: LiveSettings<PoolMatch> = {
-  title: '🎱 Race and sets',
-  hint: 'The game (8-, 9- or 10-ball) is fixed once the match has started. Changing the race or the sets re-scores the whole match from rack 1: a set or the match can end, or open again.',
-  mode: 'config',
-  fields: [
-    { key: 'raceTo', label: 'Race to (racks)', type: 'number', default: 5, min: 1, max: 99, step: 1 },
-    {
-      key: 'setsToWin', label: 'Sets', type: 'choice', default: 1,
-      options: [{ value: 1, label: 'One race' }, { value: 2, label: 'Best of 3 sets' }, { value: 3, label: 'Best of 5 sets' }],
-    },
-  ],
-  read: (s) => ({ raceTo: cnt(s?.raceTo) || 5, setsToWin: cnt(s?.setsToWin) || 1 }),
-};
-
 export const POOL_CORE = {
   createInitialState: poolInit,
   reducer: poolReducer as SportPlugin<PoolMatch>['reducer'],
@@ -64,5 +48,6 @@ export const POOL_CORE = {
   involvedPlayerIds: poolInvolved,
   matchRecords: poolMatchRecords,
   undoLabel: poolUndoLabel,
-  liveSettings: POOL_LIVE_SETTINGS,
+  // founder 2026-10-28: the race and sets lock once the match starts (like the
+  // game), so there's nothing to change during play
 } satisfies Partial<SportPlugin<PoolMatch>>;

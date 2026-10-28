@@ -20,6 +20,7 @@ import { VenueField } from '../components/VenueField';
 import { ConflictNotice } from '../components/ConflictNotice';
 import { ClubQuickPick } from '../components/ClubQuickPick';
 import { SPORT_LIST, getSportMeta, participantMode, type ParticipantMode } from '../sports/sportMeta';
+import { structureLabels } from '../sports/structureLabels';
 import { useTeams, useMatches, usePlayers, useTournamentById } from '../data/hooks';
 import { venueOptions } from '../data/tournamentForm';
 import { findScheduleConflicts, knownVenueNames } from '../data/scheduleConflicts';
@@ -445,8 +446,8 @@ export default function ScheduleMatchScreen() {
                 <View style={{ gap: theme.spacing(2) }}>
                   <FieldLabel>Format</FieldLabel>
                   <View style={st.chips}>
-                    <SelectChip label="👤 Singles" active={mode === 'individual'} onPress={() => setStructure(1)} />
-                    <SelectChip label="👥 Doubles" active={mode === 'pairs'} onPress={() => setStructure(2)} />
+                    <SelectChip label={`👤 ${structureLabels(getSportMeta(sport)).one}`} active={mode === 'individual'} onPress={() => setStructure(1)} />
+                    <SelectChip label={`👥 ${structureLabels(getSportMeta(sport)).two}`} active={mode === 'pairs'} onPress={() => setStructure(2)} />
                   </View>
                 </View>
               )}

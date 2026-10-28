@@ -8,7 +8,6 @@
  * What it adds (all optional; an older or hostile snapshot reads as empty):
  *   perSide  1 = singles, 2 = scotch doubles (the format's playersPerSide)
  *   opt      the organiser's raw rule options, so a pinned game rebuilds right
- *   fmt0     the race / sets the match started with (stamped on its first event)
  *   cr       who shot: shot counters per set and side, and per player id in
  *            scotch doubles (`payload.pid`, the id the scorer picked); the ids
  *            seen per side; the scotch-doubles rotation
@@ -87,7 +86,6 @@ export interface PoolCredit {
 export interface PoolMatch extends PoolState {
   perSide?: 1 | 2;
   opt?: { threeFoul?: boolean; threeBallRule?: boolean; tenEarly?: boolean };
-  fmt0?: { raceTo: number; setsToWin: number };
   cr?: PoolCredit;
   feed?: FeedEntry[];
   rat?: number[];
@@ -251,10 +249,10 @@ export function poolInit(config?: Record<string, unknown>): PoolMatch {
 }
 
 /** The match rebuilt as another game (the pin), its other options kept. */
-function asGame(s: PoolMatch, game: PoolGame): PoolMatch {
+function asGame(s: PoolMatch, game: PoolGame, raceTo: number = s.raceTo, setsToWin: number = s.setsToWin): PoolMatch {
   const o = isObj(s.opt) ? s.opt : {};
   return mine({
-    ...engineInit({ game, raceTo: s.raceTo, setsToWin: s.setsToWin, breakFormat: s.breakFormat, ...o }),
+    ...engineInit({ game, raceTo, setsToWin, breakFormat: s.breakFormat, ...o }),
     perSide: perSideOf(s), opt: { ...o }, cr: emptyCredit(), feed: [], rat: [],
   });
 }
@@ -275,10 +273,14 @@ function reduce(s: PoolMatch, a: unknown): PoolMatch {
   if (!isObj(s)) return s;
   const p = ownRecord(own(a, 'payload'));
   let base: PoolMatch = s;
-  // the game pin: only the match's first accepted event, only before any rack
+  // the pin: only the match's first accepted event, only before any rack — the
+  // game, and (founder 2026-10-28) the race and sets the match started with, so
+  // a later format change can't re-score it
   if (p && s.seq === 0 && !s.ended && Array.isArray(s.racks) && !s.racks.length) {
-    const g = knownGame(p.game);
-    if (g && g !== s.game) base = asGame(s, g);
+    const g = knownGame(p.game) ?? s.game;
+    const race = p.race === undefined ? s.raceTo : readInt(p.race, s.raceTo, 1, 99);
+    const sets = p.sets === undefined ? s.setsToWin : readInt(p.sets, s.setsToWin, 1, 9);
+    if (g !== s.game || race !== s.raceTo || sets !== s.setsToWin) base = asGame(s, g, race, sets);
   }
   // break #8: a LAG that names the breaker already chosen (a duplicate from a
   // second phone, a retry under a new id) changes nothing — not even the feed
@@ -389,8 +391,6 @@ function withCredit(base: PoolMatch, next: PoolMatch, a: unknown, p: Record<stri
   const out: PoolMatch = { ...next, perSide, cr, feed };
   const rat = trusted ? base.rat! : rackTimes(base);
   out.rat = ended ? [...rat, at] : rat;
-  if (base.seq === 0) out.fmt0 = { raceTo: readInt(p.race, base.raceTo, 1, 99), setsToWin: readInt(p.sets, base.setsToWin, 1, 9) };
-  else if (isObj(base.fmt0)) out.fmt0 = trusted ? base.fmt0 : { raceTo: readInt(base.fmt0.raceTo, base.raceTo, 1, 99), setsToWin: readInt(base.fmt0.setsToWin, base.setsToWin, 1, 9) };
   return mine(out);
 }
 

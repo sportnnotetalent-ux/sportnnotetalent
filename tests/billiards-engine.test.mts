@@ -439,7 +439,10 @@ describe('billiards · break list', () => {
 
   test('B-15 an action that changes nothing returns the same state', () => {
     const s0 = B.createInitialState();
-    assert.equal(B.reducer(s0, { type: 'BREAK_OFF', side: 'home' }), s0);
+    // the first tap records the toss (usability follow-up 2026-10-28); a repeat changes nothing
+    const tossed = B.reducer(s0, { type: 'BREAK_OFF', side: 'home' });
+    assert.equal(tossed.seq, 1);
+    assert.equal(B.reducer(tossed, { type: 'BREAK_OFF', side: 'home' }), tossed);
   });
 
   test('B-16 a payload side that disagrees with the action side (or is junk) refuses the action', () => {

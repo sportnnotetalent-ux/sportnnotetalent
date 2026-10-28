@@ -155,15 +155,11 @@ describe('match state: the engine state plus what the app adds', () => {
     assert.equal(M.poolReducer(s0, { type: 'MISS', side: 'home', payload: { game: 'eight', rack: 1 } }), s0);
   });
 
-  test('the race / sets the match started with are remembered, so a change can be told', () => {
+  test('the race / sets the match started with are stamped and kept (founder 2026-10-28: they lock like the game)', () => {
     const { log } = play({ game: 'nine', raceTo: 5 }, (x) => C.lagAction(x, 'home'));
     assert.deepEqual(log[0].payload, { breaks: 'home', rack: 1, game: 'nine', race: 5, sets: 1 });
-    const same = replay({ game: 'nine', raceTo: 5 }, log);
-    assert.deepEqual(same.fmt0, { raceTo: 5, setsToWin: 1 });
-    assert.equal(C.formatNote(same), null);
-    const changed = replay({ game: 'nine', raceTo: 7 }, log);
-    assert.equal(changed.raceTo, 7);
-    assert.match(C.formatNote(changed) ?? '', /race to 7.*race to 5.*re-scored/i);
+    const changed = replay({ game: 'nine', raceTo: 7, setsToWin: 2 }, log);
+    assert.deepEqual([changed.raceTo, changed.setsToWin], [5, 1]);
   });
 
   test('the feed keeps the shots of the rack in play and the last 3 racks, at most 120 per rack', () => {
@@ -526,13 +522,8 @@ describe('integration: a 9-ball match (break-and-run, golden break, three fouls)
     assert.deepEqual(POOL_CORE.involvedPlayerIds!(M.poolInit()), []);
     assert.deepEqual(POOL_CORE.involvedPlayerIds!(null as never), []);
   });
-  test('the live settings: race and sets only (the game is locked), with the re-score warning', () => {
-    const ls = POOL_CORE.liveSettings!;
-    assert.equal(ls.mode, 'config');
-    assert.deepEqual(ls.fields.map((f) => f.key), ['raceTo', 'setsToWin']);
-    assert.deepEqual(ls.read(s), { raceTo: 2, setsToWin: 1 });
-    assert.match(ls.hint ?? '', /re-scores/);
-    assert.match(ls.hint ?? '', /game/i);
+  test('no live settings: the game, race and sets are fixed once the match has started', () => {
+    assert.equal((POOL_CORE as { liveSettings?: unknown }).liveSettings, undefined);
   });
   test('replay of the stored log (JSON) is identical, and every prefix is what the scorer saw (undo)', () => {
     assert.deepEqual(replay(NINE2, JSON.parse(JSON.stringify(log))), s);
@@ -718,13 +709,13 @@ function hostileSnapshots(): unknown[] {
 }
 const READERS: Record<string, (s: never) => unknown> = {
   panel: (s) => C.poolPanel(s), choices: (s) => C.choiceOptions(s, name), question: (s) => C.choiceQuestion(s, name),
-  breakLine: (s) => C.breakLine(s, name), note: (s) => C.formatNote(s), units: (s) => C.setUnits(s), bestOf: (s) => C.bestOfLine(s),
+  breakLine: (s) => C.breakLine(s, name), units: (s) => C.setUnits(s), bestOf: (s) => C.bestOfLine(s),
   status: (s) => C.boardStatus(s), feed: (s) => poolFeed(s, NAMES, nameOf), compare: (s) => poolCompare(s), compareSet: (s) => poolCompare(s, 1),
   racks: (s) => poolRackList(s, name), box: (s) => poolBox(s, {}).data('all'), records: (s) => POOL_CORE.matchRecords!(s),
   undo: (s) => POOL_CORE.undoLabel!({ type: 'POT', prev: M.poolInit(), next: s }, nameOf), totals: (s) => POOL_CORE.statTotals!(s, ctx(['h1'], ['a1'])),
   units2: (s) => POOL_CORE.standingsUnits!(s), confirm: (s) => C.confirmFor(s, { type: 'RACK', side: 'home', payload: { rack: 1 } }, name),
   shooter: (s) => C.shooterPick(s, 'home', ['h1', 'h2']), stamp: (s) => C.missAction(s), reducer: (s) => M.poolReducer(s, { type: 'MISS', side: 'home', payload: { rack: 1 } }),
-  live: (s) => POOL_CORE.liveSettings!.read(s), summary: (s) => POOL_CORE.summary(s), lineScore: (s) => POOL_CORE.lineScore!(s),
+  summary: (s) => POOL_CORE.summary(s), lineScore: (s) => POOL_CORE.lineScore!(s),
 };
 
 describe('breaks · hostile and old snapshots (#24, #25, #28)', () => {
@@ -813,12 +804,10 @@ describe('breaks · hostile and old snapshots (#24, #25, #28)', () => {
     assert.ok(cr.unk.home + cr.unk.away > 0);
     assert.ok(cr.by.length <= 2 * M.MAX_IDS_PER_SIDE);
   });
-  test('#20 / #21 — a race lowered then raised back replays to exactly the same match', () => {
+  test('#20 / #21 — a race lowered (or raised) after the start replays to exactly the same match', () => {
     const { s, log } = nineMatch();
-    const lowered = replay({ game: 'nine', raceTo: 1 }, log);
-    assert.equal(lowered.ended, true, 'race to 1: rack 1 ends it');
-    assert.match(C.formatNote(lowered) ?? '', /race to 1.*race to 2/);
-    assert.deepEqual(replay(NINE2, log), s, 'raised back: identical');
+    assert.deepEqual(replay({ game: 'nine', raceTo: 1 }, log), s, 'lowered: the match keeps race to 2');
+    assert.deepEqual(replay({ game: 'nine', raceTo: 9, setsToWin: 3 }, log), s, 'raised: the same');
   });
   test('#22 — players per side changed on a replay: no throw, totals stay valid', () => {
     const { log } = nineMatch();

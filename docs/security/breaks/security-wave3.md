@@ -75,7 +75,7 @@ The change: migration `20261028200000_security_wave3c`.
 | W3B-30 | **A coach fixes a wrong birth year on an unclaimed player; a profile is claimed with the account's own DOB.** | Holds. Unclaimed rows are unaffected (test). |
 | W3B-31 | **A child points the guardian contact at themselves after a guardian confirmed.** | Holds. The account goes back to "waiting for a guardian" (test). |
 | W3B-32 | **A pending child gives their own second email as the guardian's and approves the link themselves.** | **Open: founder decision** (CL-03: how consent is proven). |
-| W3B-33 | **The sign-up country is chosen by the app** (and decides whether a guardian must confirm). | **Open: founder decision** (CL-04). |
+| W3B-33 | **The sign-up country is chosen by the app** (and decides whether a guardian must confirm). | **Fixed** 2026-10-28 (CL-04, founder's answer): the phone number decides. See `founder-answers-2026-10-28.md`. |
 
 **Simulation** (`tests/sim-security-wave3c.test.mts`):
 - **Devices:** 500 logged-out devices on 50 addresses; all 2,000 of their calls were counted.

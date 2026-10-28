@@ -161,6 +161,8 @@ export interface SnookerPanel {
   missWarn: MissWarn | null;
   /** before the first stroke of the frame: who breaks off (null = already) */
   toss: { home: Act | null; away: Act | null } | null;
+  /** the scorer tapped who won the toss */
+  tossed: boolean;
   /** the re-spotted black before its first stroke: who plays (lots) */
   respotLots: { home: Act | null; away: Act | null } | null;
   /** the frame can still be entered as a score (quick) */
@@ -257,6 +259,7 @@ function panelOf(s: Live): SnookerPanel {
     miss: missAction(s), safety: safetyAction(s),
     foul, afterFoul, missWarn,
     toss: fresh ? { home: breakOffAction(s, 'home'), away: breakOffAction(s, 'away') } : null,
+    tossed: s.tossed === true,
     respotLots: respot && (fr.respotShots ?? 0) === 0 ? { home: respotTurnAction(s, 'home'), away: respotTurnAction(s, 'away') } : null,
     frameScore: !!frameScoreAction(s, 1, 0),
     rerack: rerackAction(s),
