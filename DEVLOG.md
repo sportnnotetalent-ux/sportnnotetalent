@@ -13,6 +13,104 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-28 — Security Waves 4A–4B: the low findings
+- Migration `20261028230000_security_wave4a`. Break list: `docs/security/breaks/security-wave4.md`.
+- Tests: `tests/db-wave4.test.mts` (5) and `tests/security-wave4.test.mts` (12).
+
+**Database:**
+- **DB-20:** a child's guardian can be messaged only from the agreed circle, and the refusal no longer reveals whether a guardian email is on file.
+- **DB-24:** a golf course edit leaves other organisers' rounds as they were. The freeze runs as a trusted step; it had broken under Wave 3B (W4B-01, found by the new test).
+- **DB-18:** the ownership audit trail's "from" comes from the server.
+- **DB-22:** size caps on event payloads, match snapshots, support questions, push target lists and record merges.
+- **DB-23:** documents can't be replaced after submitting.
+
+**Edge functions:**
+- **EF-13:** relayed text also loses bare domains.
+- **EF-14:** email and SMS limits fail closed.
+- **EF-16:** POST-only functions refuse other methods.
+- **EF-17:** venue names in reminder emails are cleaned.
+- **EF-19:** verification-submit asks `org_is_admin`.
+
+**App:**
+- **CL-22:** an invite link asks "Follow {name}?" first.
+- **CL-25:** console helpers only in development and the demo; admin tools only for support.
+- **CL-27:** CSV and calendar exports are escaped.
+- **CL-30:** web voice scoring says where the audio goes.
+
+**Accepted, or for the founder:**
+- Accepted: CL-19 and CL-24.
+- Founder (console): CL-20, Firebase SMS region policy and App Check.
+- Founder (build): CL-29, OTA code signing with the 1.1.0 APK.
+- Follow-ups: CL-21, CL-23 and CL-26 (web host headers).
+
+### 2026-10-28 — Security Waves 3A–3F: the medium findings, plus the Wave 2b follow-ups
+- **Migrations:** `20261028180000_security_wave3a`, `…190000_security_wave3b`, `…200000_security_wave3c`, `…210000_security_wave3e`, `…220000_security_wave3f`.
+- **Break list:** `docs/security/breaks/security-wave3.md`. Every point was listed before fixing; each fix started with a failing test.
+- **Tests:**
+  - `tests/db-wave3.test.mts` (32), `tests/security-wave3.test.mts` (7), `tests/security-wave3-client.test.mts` (13), `tests/requests.test.mts` (+3);
+  - simulations `sim-security-wave3` (761 people), `sim-security-wave3b` (730) and `sim-security-wave3c` (500 devices + 200 accounts).
+
+**3A, children's data:**
+- **DB-08:** 12 internal functions revoked. A test now fails for any privileged function the app can call that the app, a policy or a view doesn't use.
+- **DB-10:** a child's community memberships are read only by that community's members, the child's side and support. The FOR ALL write policy, which also allowed every read, was split.
+- **DB-11:** masking by the initials pattern, so a right guess and a wrong guess store the same text.
+- **DB-15:** names the server writes into handovers, transfers, officials and managers are masked. A one-pass pre-check makes masking a 210 KB snapshot 9 ms, down from 15.
+
+**3B, finished results:**
+- **DB-12:** stat lines and certificates only for players who took part. A child's line from an unconfirmed link is kept aside and written when their side confirms; "Not us" removes it.
+- **DB-13 / CL-17:** organisers can change a finished result any time; scorers and hosts for 24 hours after it **first** finished (`completed_at`). Only organisers can take a match out of its tournament, wind it back after 30 minutes, or delete a tournament fixture. Event times can't be in the future.
+
+**3C:**
+- **DB-16:** logged-out analytics and crash reports are limited per address, with an hourly cleanup job.
+- **DB-07:** a child can't age themselves into adulthood, and a changed guardian contact asks for consent again. CL-03 and CL-04 wait for the founder.
+
+**3D, edge functions:**
+- **EF-06:** no provider error text goes back to the app.
+- **EF-07:** no redirects, and pages capped at 2 MB.
+- **EF-08:** an overall budget and a 6 KB context.
+- **EF-11:** limits per address.
+
+**3E:**
+- Server:
+  - **CL-14:** the guardian's verified flags are the server's.
+  - **CL-15:** verification documents: images and PDFs, 10 MB.
+  - **CL-17:** `reset_match` in one step; Player of the Match changes once.
+- App:
+  - **CL-05:** an offline sign-out still leaves the device.
+  - **CL-06:** every route to signed-out cleans the device.
+  - **CL-07:** offline queues belong to their account, and field cards are version-checked.
+  - **CL-09:** DOB, phone and guardian leave the session token.
+  - **CL-10:** `allowBackup: false` (next APK).
+  - **CL-12:** an unknown stream site asks first.
+  - **CL-16:** web photos are re-encoded with no EXIF.
+  - **CL-18:** deleting an account needs a sign-in in the last 10 minutes.
+
+**3F (founder: into Wave 3; push alerts left out):**
+- "⏳ Waiting for their side to confirm" on a team's squad, for its managers.
+- Declined requests, with Undo, in Settings → Your data & privacy.
+- "Report this to SportnNote" on a request, and a Reported requests card in the support console.
+
+Full suite: 5,449 pass, 0 fail.
+
+### 2026-10-28 — Pool, snooker and billiards in the app
+- **Setup:** `src/sports/{pool,snooker,billiards}/meta.ts`.
+  - Pool: 8/9/10-ball, race, sets, break format, three-foul and 9-/10-ball options, singles or scotch doubles.
+  - Snooker: presets for 15/10/6 reds and best of, plus shot-by-shot or frame scores only.
+  - Billiards: short format, 150-up, 100-up, 1000-up or timed, with the limits and foul points.
+- **Built by two agents in worktrees under the full mandate, then merged:**
+  - pool (`d71f1da`…`8ce6383`): 51 + 15 tests, break list `pool-app.md` (35 points, 8 fixed), 600-scorer simulation;
+  - snooker and billiards (`ad36469`…`44d7ac9`): about 78 tests, break list `snooker-billiards-app.md` (10 points), 640-scorer simulation.
+- **Each sport has:** controls that stamp side, rack and frame on every tap; the scoreboard; Commentary and Stats tabs; derived stat totals and full schemas; records; an undo label; box scores.
+- **Shared wiring:**
+  - records, box sources, match lengths, league presets and columns (R±, F±, P±), team ties;
+  - FRAMES / RACKS on the scoreboard; a per-sport correction label;
+  - one-player rosters for individual sports; pool's shooter re-creditable after a match;
+  - demo: `__sportnnoteDemo.seedCueSports()`.
+- **Guides:** `score-pool.md`, `score-snooker.md`, `score-billiards.md`.
+- **Checked in the demo at 375 px:** setup and the first taps of all three sports, with no console errors.
+- **Founder questions:** rule questions in each break list and design doc. Follow-ups from the guide review are in the report to the founder.
+- **Deploy:** `notify-upcoming` needs redeploying (the reminders' list of one-person sides).
+
 ### 2026-10-28 — Release: security Wave 2b live
 - **Database:** the founder ran `20261028160000_security_wave2b.sql`. Checked on live (read-only):
   - all 9 functions, both tables and the friendly trigger are there;
