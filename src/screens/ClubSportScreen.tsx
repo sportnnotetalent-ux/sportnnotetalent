@@ -139,7 +139,7 @@ export default function ClubSportScreen() {
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
       <KeyboardAwareScrollView contentContainerStyle={st.content}>
-        <ScreenTitle title={`${plugin.icon} ${plugin.name}`} subtitle={`${team ? teamLabel(team) : club?.name ?? 'Team'} — ${plugin.name} profile`} />
+        <ScreenTitle title={plugin.name} subtitle={`${team ? teamLabel(team) : club?.name ?? 'Team'} — ${plugin.name} profile`} />
 
         {/* SD-154: squads / levels (Varsity, JV, A, B) — each has its own captain and squad */}
         {(squads.length > 1 || amAdmin) && (

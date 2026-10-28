@@ -412,7 +412,7 @@
   "chess": [],
   "carrom": [
    {
-    "icon": "🎱",
+    "icon": "🟤",
     "label": "Top scorer",
     "stat": "points"
    },
@@ -644,7 +644,7 @@
    {
     "slot": "points",
     "label": "Top scorer",
-    "icon": "🎱",
+    "icon": "🟤",
     "stat": "points"
    },
    {
@@ -1252,7 +1252,7 @@
    "runs": "🏅",
    "wickets": "🏅",
    "wins": "🏅",
-   "points": "🎱",
+   "points": "🟤",
    "cleanSheets": "🏅",
    "x": "🏅"
   },

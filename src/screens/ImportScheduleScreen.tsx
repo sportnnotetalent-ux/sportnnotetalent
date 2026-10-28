@@ -211,7 +211,7 @@ export default function ImportScheduleScreen() {
             <Button label="⬇ Download template (CSV)" variant="ghost" onPress={() => void downloadTemplate()} />
             {tourSportTeams.length ? (
               <View style={st.chips}>
-                {tourSportTeams.map((t) => <Pill key={t.id} label={multiSport ? `${getSportMeta(t.sport).icon} ${t.name}` : t.name} />)}
+                {tourSportTeams.map((t) => <Pill key={t.id} label={multiSport ? `${t.name} · ${getSportMeta(t.sport).name}` : t.name} />)}
               </View>
             ) : (
               <TouchableOpacity onPress={() => nav.navigate('TournamentTeams', { tournamentId: tid })} accessibilityRole="link">
@@ -320,7 +320,7 @@ function RowCard({ row: r, zone, skipped, created, onSkip, onFix, onAddTeams }: 
         )}
       </View>
       <Text style={st.teams} numberOfLines={2}>
-        {d ? `${getSportMeta(d.sport).icon} ` : ''}{home} <Text style={st.vs}>vs</Text> {away}
+        {d ? `${getSportMeta(d.sport).name}: ` : ''}{home} <Text style={st.vs}>vs</Text> {away}
       </Text>
       {meta ? <Text style={textStyles.muted} numberOfLines={1}>{meta}</Text> : null}
       {!skipped && !created && r.issues.map((i, k) => (

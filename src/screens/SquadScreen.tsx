@@ -153,7 +153,7 @@ export default function SquadScreen() {
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
       <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
-        <ScreenTitle title={`${team.name} squad`} subtitle={`${plural(squad.length, 'player')} · ${team.sports.map((s) => getSportMeta(s).icon).join(' ')}`} />
+        <ScreenTitle title={`${team.name} squad`} subtitle={`${plural(squad.length, 'player')} · ${team.sports.map((s) => getSportMeta(s).name).join(', ')}`} />
 
         {captain && <Text style={st.captain}>✓ You’re the captain of {team.name}</Text>}
         {canManage && (

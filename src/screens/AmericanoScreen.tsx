@@ -92,7 +92,7 @@ export default function AmericanoScreen() {
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
       <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
-        <ScreenTitle title={`${getSportMeta(sport).icon} Americano`} subtitle="Rotate partners each round · individual points" />
+        <ScreenTitle title="Americano" subtitle="Rotate partners each round · individual points" />
 
         {/* Leaderboard first — it's the point of Americano. */}
         <Text style={textStyles.h3}>Leaderboard</Text>

@@ -180,7 +180,7 @@ export default function JoinTournamentScreen() {
                       style={[st.radio, on && st.radioOn]}
                       numberOfLines={1}
                     >
-                      {on ? '◉' : '○'}  {t.name}{multiSport ? `  ${getSportMeta(t.sport).icon}` : ''}
+                      {on ? '◉' : '○'}  {t.name}{multiSport ? ` · ${getSportMeta(t.sport).name}` : ''}
                     </Text>
                   );
                 })}

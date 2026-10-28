@@ -285,7 +285,7 @@ export default function CreateTournamentScreen() {
             const setPps = (n: number) => { tournamentDraft.setField(s, 'playersPerSide', n); setFormats(tournamentDraft.all() as FormatMap); };
             return (
               <View key={s} style={{ gap: theme.spacing(2) }}>
-                <FieldLabel>{getSportMeta(s).icon} {getSportMeta(s).name} — format</FieldLabel>
+                <FieldLabel>{getSportMeta(s).name} — format</FieldLabel>
                 <View style={st.chips}>
                   <SelectChip label={`👤 ${structureLabels(getSportMeta(s)).one}`} active={pps < 2} onPress={() => setPps(1)} />
                   <SelectChip label={`👥 ${structureLabels(getSportMeta(s)).two} (pairs)`} active={pps >= 2} onPress={() => setPps(2)} />

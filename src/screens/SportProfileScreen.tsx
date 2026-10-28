@@ -194,7 +194,7 @@ export default function SportProfileScreen() {
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
       <KeyboardAwareScrollView contentContainerStyle={st.content}>
-        <ScreenTitle title={`${plugin.icon} ${plugin.name}`} />
+        <ScreenTitle title={plugin.name} />
 
         {hasSplit && (
           <View style={st.scopeRow}>
@@ -238,7 +238,7 @@ export default function SportProfileScreen() {
 
         {!bySport ? (
           <>
-            <EmptyState icon={plugin.icon} title={emptyMsg} compact />
+            <EmptyState sport={plugin.id} title={emptyMsg} compact />
             {/* SD-84 — the Handicap Index shows before any round */}
             {sport === 'golf' && <GolfHandicapCard index={player.sportDetails?.golf?.handicapIndex} lines={[]} />}
           </>

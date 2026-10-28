@@ -16,6 +16,8 @@ import {
   Repeat, Save, Scale, School, Search, Send, Settings, Share, Shield, Shirt, Shuffle, Siren, SkipForward,
   SlidersHorizontal, Smartphone, Sparkles, Star, Stethoscope, Target, Ticket, Timer, Trash, Trees, TrendingUp, TriangleAlert, Trophy,
   Tv, Undo2, Upload, UserPlus, UserRound, Users, Video, X, Zap, Vibrate, Compass, Headset, UsersRound, Rewind, Puzzle, Swords,
+  LandPlot, FlagOff, FlagTriangleRight, ChevronsRight, HandGrab, Scissors, ChevronsUp, ChevronsDown, CircleOff, Columns2, CircleDot,
+  CircleSlash, RotateCcw, RotateCw, Gift, LogIn, ShieldHalf, Ruler, HandHelping,
 } from 'lucide-react-native';
 import { theme } from '../core/theme';
 import { splitLeading, iconBox } from '../core/leadingEmoji';
@@ -43,7 +45,7 @@ export const EMOJI_ICONS: Record<string, EmojiIconSpec> = {
   '⏳': { Icon: Hourglass }, '🕒': { Icon: Clock }, '🔁': { Icon: Repeat }, '🔄': { Icon: RefreshCw }, '🔀': { Icon: Shuffle }, '⇄': { Icon: ArrowLeftRight },
   '↩': { Icon: Undo2, name: 'Undo' }, '↶': { Icon: Undo2, name: 'Undo' }, '⌫': { Icon: Delete }, '↗': { Icon: ArrowUpRight }, '←': { Icon: ArrowLeft, name: 'Back' },
   // match officials and cards
-  '🟨': card('#E7B416'), '🟥': card('#C62828'), '🟩': card('#2E9D4F'), '🟦': card('#1D56C9'), '🏁': { Icon: Flag }, '🚩': { Icon: Flag }, '🏳': { Icon: Flag },
+  '🟨': card('#E7B416'), '🟥': card('#C62828'), '🟩': card('#2E9D4F'), '🟦': card('#1D56C9'), '🏁': { Icon: Flag }, '🚩': { Icon: FlagTriangleRight }, '🏳': { Icon: FlagOff },
   '⚖': { Icon: Scale }, '🎯': { Icon: Target }, '🛡': { Icon: Shield }, '🧤': { Icon: Hand }, '✋': { Icon: Hand }, '🖐': { Icon: Hand }, '🥅': { Icon: Goal },
   '🩸': { Icon: Droplet }, '🩺': { Icon: Stethoscope }, '🩹': { Icon: Bandage }, '🚨': { Icon: Siren }, '🔥': { Icon: Flame }, '📺': { Icon: Tv },
   '🦶': { Icon: Footprints }, '🧱': { Icon: BrickWall }, '👔': { Icon: Shirt }, '⚡': { Icon: Zap }, '🔗': { Icon: Link }, '📝': { Icon: NotebookPen },
@@ -61,10 +63,14 @@ export const EMOJI_ICONS: Record<string, EmojiIconSpec> = {
   // talking to people
   '✉': { Icon: Mail }, '💌': { Icon: Mail }, '📧': { Icon: Mail }, '💬': { Icon: MessageCircle }, '📞': { Icon: Phone }, '📱': { Icon: Smartphone }, '📲': { Icon: Smartphone },
   '📷': { Icon: Camera }, '📸': { Icon: Camera }, '🎙': { Icon: Mic }, '✎': { Icon: Pencil, name: 'Edit' }, '✏': { Icon: Pencil, name: 'Edit' },
-  '➤': { Icon: Send }, '🎤': { Icon: Mic }, '⛳': { Icon: Flag }, '🏃': { Icon: Footprints }, '🟫': { Icon: Ban }, '🤾': { Icon: Hand },
+  '➤': { Icon: Send }, '🎤': { Icon: Mic }, '⛳': { Icon: LandPlot }, '🏃': { Icon: ChevronsRight }, '🟫': { Icon: Ban }, '🤾': { Icon: HandGrab },
   '⏪': { Icon: Rewind }, '🌍': { Icon: Globe }, '🌎': { Icon: Globe }, '🌏': { Icon: Globe }, '📳': { Icon: Vibrate }, '🧭': { Icon: Compass },
   '👪': { Icon: UsersRound }, '👨‍👩‍👧': { Icon: UsersRound }, '👨‍👩‍👦': { Icon: UsersRound }, '🧑‍💼': { Icon: Headset }, '👨‍💼': { Icon: Headset }, '🔳': { Icon: QrCode }, '👋': { Icon: UserPlus }, '🔽': { Icon: Funnel },
   '🧩': { Icon: Puzzle }, '⚔': { Icon: Swords },
+  // scoring actions that must not share an icon with their neighbours (tests/pad-icons.test.mts)
+  '✂': { Icon: Scissors }, '⏫': { Icon: ChevronsUp }, '⏬': { Icon: ChevronsDown }, '💨': { Icon: CircleOff }, '🪵': { Icon: Columns2 },
+  '⭕': { Icon: CircleDot }, '❎': { Icon: CircleSlash }, '🔃': { Icon: RotateCcw }, '♻': { Icon: RotateCcw }, '🔂': { Icon: RotateCw },
+  '🎁': { Icon: Gift }, '🔙': { Icon: LogIn }, '🔰': { Icon: ShieldHalf }, '🚶': { Icon: LogOut }, '📏': { Icon: Ruler }, '👐': { Icon: HandHelping },
 };
 
 /** The emoji the components look for, longest first. */

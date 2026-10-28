@@ -63,7 +63,7 @@ const isGoaliePos = (p?: string | null) => !!p && /^\s*(g|gk|goalie|goaltender|g
 const BASE_TRACKED: string[] = LIVE_KEYS.filter((k) => k !== 'soTaken' && k !== 'soGoals');
 /** the keys this match tracks (the base set + the optional tallies switched on + round 2's faceoff zones) */
 const trackedKeys = (s: IceHockeyState): string[] => [...BASE_TRACKED, ...TRACK_FLAGS.filter((f) => tallyTracked(s, f)).flatMap((f) => FLAG_KEYS[f]), ...(zonesTracked(s) ? FO_ZONE_KEYS : [])];
-const TALLY_CHIP: Record<TallyKind, string> = { faceoff: '⚪ Faceoff won', hit: '💥 Hit', block: '🛡 Block', takeaway: '🔄 Takeaway', giveaway: '🔄 Giveaway', missed: '↗ Missed shot' };
+const TALLY_CHIP: Record<TallyKind, string> = { faceoff: '⚪ Faceoff won', hit: '💥 Hit', block: '🛡 Block', takeaway: '✂️ Takeaway', giveaway: '🎁 Giveaway', missed: '↗ Missed shot' };
 const PEN_MENU: PenKind[] = ['minor', 'double', 'major', 'majorGm', 'misconduct', 'gm', 'match', 'bench'];
 
 /* ------------------------------ player picker ------------------------------ */
@@ -552,10 +552,10 @@ const ScoringControls: SportPlugin<IceHockeyState>['ScoringControls'] = ({
       <View key={sd} style={c.col}>
         <Text style={[c.team, { color: ink(sd) }]} numberOfLines={1}>{name(sd)}</Text>
         <Button label="🚨 Goal" color={color(sd)} disabled={!periodStarted(s)} onPress={() => startGoal(sd)} />
-        <Button label="🥅 Shot" accessibilityLabel={`Shot on goal by ${name(sd)}`} variant="ghost" disabled={!periodStarted(s)} onPress={() => setFlow({ mode: 'shot', side: sd })} />
+        <Button label="🎯 Shot" accessibilityLabel={`Shot on goal by ${name(sd)}`} variant="ghost" disabled={!periodStarted(s)} onPress={() => setFlow({ mode: 'shot', side: sd })} />
         <Button label="⏱ Penalty" variant="ghost" onPress={() => setFlow({ mode: 'pen', side: sd, step: 'kind' })} />
-        <Button label="🎯 Penalty shot" variant="ghost" disabled={!periodStarted(s)} onPress={() => setFlow({ mode: 'ps', side: sd, step: 'result' })} />
-        <Button label={pulled[sd] ? '🧤 Goalie back' : '🥅 Pull goalie'} accessibilityLabel={pulled[sd] ? `${name(sd)} goalie back in net` : `${name(sd)} pull the goalie for an extra skater`}
+        <Button label="⭕ Penalty shot" variant="ghost" disabled={!periodStarted(s)} onPress={() => setFlow({ mode: 'ps', side: sd, step: 'result' })} />
+        <Button label={pulled[sd] ? '🔙 Goalie back' : '🥅 Pull goalie'} accessibilityLabel={pulled[sd] ? `${name(sd)} goalie back in net` : `${name(sd)} pull the goalie for an extra skater`}
           variant="ghost" onPress={() => fire({ type: pulled[sd] ? 'BACK' : 'PULL', side: sd })} />
         <Button label={`⏸ Time-out · ${toLeft}`} accessibilityLabel={`Team time-out for ${name(sd)}, ${toLeft} left`} variant="ghost" disabled={toLeft === 0 || !periodStarted(s)} onPress={() => fire({ type: 'TIMEOUT', side: sd })} />
         {periodStarted(s) ? extras(sd) : null}

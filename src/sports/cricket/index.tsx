@@ -681,7 +681,7 @@ function MoreRunsPanel({
   const ordered = keeperId ? [...fielders.filter((p) => p.id === keeperId), ...fielders.filter((p) => p.id !== keeperId)] : fielders;
   return (
     <View style={ctrl.wktPanel}>
-      {head('🧤 Fielding')}
+      {head('👐 Fielding')}
       {here && ref ? (
         <Text style={ctrl.meta}>For ball {ref.at} — {ref.batterName ?? 'the batter'} facing {ref.bowlerName ?? 'the bowler'}</Text>
       ) : <Text style={ctrl.hint}>Bowl a ball first — a note attaches to the last ball.</Text>}
@@ -1582,7 +1582,7 @@ const ScoringControls: SportPlugin<CricketState>['ScoringControls'] = ({
           Concussion / Impact subs live in Quick options (SD-113 A1). */}
       <View style={ctrl.row}>
         {/* "± Runs" (not "Bonus / minus"): the longer label wraps at 375 px. */}
-        {([['pen', ballPen ? `⚖️ +${ballPen.runs} ✕` : '⚖️ Penalty', ballPen ? 'Cancel the penalty on the next ball' : 'Penalty runs'], ['adj', '± Runs', 'Bonus or minus runs'], ['field', '🧤 Fielding', 'Fielding: dropped catch, runs saved or missed']] as const).map(([k, l, a11y]) => (
+        {([['pen', ballPen ? `⚖️ +${ballPen.runs} ✕` : '⚖️ Penalty', ballPen ? 'Cancel the penalty on the next ball' : 'Penalty runs'], ['adj', '± Runs', 'Bonus or minus runs'], ['field', '👐 Fielding', 'Fielding: dropped catch, runs saved or missed']] as const).map(([k, l, a11y]) => (
           <Button key={k} label={l} accessibilityLabel={a11y} variant="ghost" style={[ctrl.flex, ctrl.padKey]}
             onPress={() => { if (k === 'pen' && ballPen) { setBallPen(null); return; } setMorePanel((m) => (m === k ? null : k)); }} />
         ))}

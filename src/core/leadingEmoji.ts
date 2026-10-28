@@ -45,13 +45,16 @@ export function stripLeadingEmoji(title: string): string {
   return rest || title;
 }
 
-/** "⚽ Football" → the sport, when the words are exactly a sport's name (a
- *  scoring chip like "🎯 On target" is not the shooting sport). */
-export function sportChip(label: string, sports: readonly { id: string; name: string; icon: string }[]): { id: string; name: string } | null {
+/** "⚽ Football" (or "⚽ Football ›", "⚽ Football: two bronzes") → the sport,
+ *  when the words start with its whole name (a scoring chip like "🎯 On
+ *  target" is not the shooting sport). `text` is the label without the emoji. */
+export function sportChip(label: string, sports: readonly { id: string; name: string; icon: string }[]): { id: string; name: string; text: string } | null {
   if (typeof label !== 'string') return null;
   for (const s of sports) {
     const lead = splitLeading(label, [s.icon.replace(VS16, ''), s.icon]);
-    if (lead && lead.rest === s.name) return { id: s.id, name: s.name };
+    if (!lead || !lead.rest.startsWith(s.name)) continue;
+    const after = lead.rest.charAt(s.name.length);
+    if (after === '' || after === ' ' || after === ':') return { id: s.id, name: s.name, text: lead.rest };
   }
   return null;
 }

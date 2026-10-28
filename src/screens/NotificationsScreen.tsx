@@ -9,6 +9,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { theme } from '../core/theme';
 import { Glyph } from '../components/Icon';
+import { SportBadge } from '../components/SportArt';
 import { EmptyState, Card, Pill, ScreenTitle, textStyles } from '../components/ui';
 import { SectionHeader, SECTION_CAP } from '../components/SectionHeader';
 import { useAuth } from '../core/auth';
@@ -43,10 +44,11 @@ function splitLeadingEmoji(title: string): { icon: string; rest: string } {
 }
 
 /** A round icon chip leading each row, so the inbox reads as a consistent list. */
-function IconBadge({ icon }: { icon: string }) {
+function IconBadge({ icon, sport }: { icon?: string; sport?: string }) {
+  if (sport) return <SportBadge sport={sport} size={40} />;
   return (
     <View style={st.badge}>
-      <Glyph emoji={icon} style={st.badgeIcon} color={theme.colors.primary} />
+      <Glyph emoji={icon ?? ''} style={st.badgeIcon} color={theme.colors.primary} />
     </View>
   );
 }
@@ -154,7 +156,7 @@ export default function NotificationsScreen() {
                 {/* Same results-board language as the SportProfile match history:
                     green left-edge + WON/LOST pill so form is scannable. */}
                 <Card style={[st.row, { borderLeftWidth: 3, borderLeftColor: lineResult(l) === 'W' ? theme.colors.primary : theme.colors.border }]}>
-                  <IconBadge icon={getSportMeta(l.sport).icon} />
+                  <IconBadge sport={l.sport} />
                   <View style={{ flex: 1 }}>
                     <Text style={textStyles.body} numberOfLines={1}>{player.fullName} vs {l.opponent ?? 'TBD'}</Text>
                     <Text style={textStyles.muted} numberOfLines={1}>

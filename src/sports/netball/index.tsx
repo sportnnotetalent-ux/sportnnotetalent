@@ -60,7 +60,7 @@ const TRACKED: string[] = [...LIVE_KEYS];
 const REBOUND: StatKind = 'rebound';
 const isPos = (p?: string | null): p is Pos => !!p && (POSITIONS as readonly string[]).includes(p);
 const STAT_BTN: { kind: StatKind; label: string; a11y: string }[] = [
-  { kind: 'intercept', label: '🖐 Intercept', a11y: 'Intercept' },
+  { kind: 'intercept', label: '✂️ Intercept', a11y: 'Intercept' },
   { kind: 'deflection', label: '☝️ Deflection', a11y: 'Deflection' },
   { kind: 'rebound', label: '⤴️ Rebound', a11y: 'Rebound' },
   { kind: 'turnover', label: '⚠️ Turnover', a11y: 'Turnover (lost the ball)' },

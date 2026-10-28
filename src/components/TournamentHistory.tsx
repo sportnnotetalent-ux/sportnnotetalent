@@ -16,6 +16,7 @@ import { standingsConfigFromFormat } from '../data/standings';
 import { structureFromFormat } from '../data/structureConfig';
 import { bronzeRuleFor } from '../data/medalStandings';
 import type { Match, SportId, Tournament } from '../core/types';
+import { SportBadge } from './SportArt';
 
 /** How a finished match was settled — penalties, shoot-out, 7 m throws, Super
  *  Over, Armageddon, golden raid, overtime — read from the sport's own status
@@ -199,7 +200,7 @@ export function TournamentJourneyList({ entries, matches, onOpen, title = 'Tourn
             accessibilityLabel={`${t?.name ?? 'Tournament'}, ${getSportMeta(e.sport).name}: ${head}. ${j!.summary}. Open the journey`}>
             <Card style={{ gap: 2 }}>
               <View style={st.row}>
-                <Text style={[textStyles.body, { flex: 1, fontWeight: '700' }]} numberOfLines={1}>{getSportMeta(e.sport).icon} {t?.name ?? 'Tournament'}</Text>
+                <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 }}><SportBadge sport={e.sport} size={18} /><Text style={[textStyles.body, { flex: 1, fontWeight: '700' }]} numberOfLines={1}>{t?.name ?? 'Tournament'}</Text></View>
                 <Text style={st.state}>{head}</Text>
                 <Text style={st.chev}>›</Text>
               </View>

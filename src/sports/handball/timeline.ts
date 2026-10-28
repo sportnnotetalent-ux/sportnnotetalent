@@ -8,7 +8,7 @@ import { legacyNameOf, withNames, type NameOf } from '../invasion/names.ts';
 const CARD_ICON = { yellow: '🟨', twoMin: '⏱', red: '🟥' } as const;
 const MISS_LABEL = { saved: 'saved', missed: 'missed', blocked: 'blocked' } as const;
 
-/** One row's icon + words ("🤾 Goal · 9 m · Asha Rao · assist Meera"). `answer`
+/** One row's icon + words ("🥅 Goal · 9 m · Asha Rao · assist Meera"). `answer`
  *  = the keeper / blocker / stealer linked to an attempt or turnover. */
 export function describeEvent(e: HandballEvent, answer?: string): { icon: string; label: string; detail?: string } {
   const type = SHOT_LABEL[e.shotType ?? 'nineM'];
@@ -28,9 +28,9 @@ export function describeEvent(e: HandballEvent, answer?: string): { icon: string
     case 'empty':
       return { icon: '🥅', label: e.on === false ? 'Goalkeeper back in goal' : 'Empty goal — 7th court player' };
     case 'drawn':
-      return { icon: '🎯', label: '7 m throw won', detail: e.playerName };
+      return { icon: '⭕', label: '7 m throw won', detail: e.playerName };
     case 'steal':
-      return { icon: '🖐', label: 'Steal', detail: e.playerName };
+      return { icon: '✂️', label: 'Steal', detail: e.playerName };
     case 'card': {
       const c = e.card ?? 'twoMin';
       const label = c === 'yellow' ? 'Warning (yellow)'

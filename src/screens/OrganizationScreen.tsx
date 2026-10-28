@@ -1090,7 +1090,7 @@ function OrgTeams({
               <View style={[st.swatch, { backgroundColor: t.colorHex ?? theme.colors.primary }]} />
               <View style={{ flex: 1 }}>
                 <Text style={textStyles.body}>{t.name} · {t.shortName}</Text>
-                <Text style={textStyles.muted}>{getSportMeta(t.sport).icon} {getSportMeta(t.sport).name} · {t.roster?.length ?? 0} players</Text>
+                <SportLine sports={[t.sport]}>{t.roster?.length ?? 0} players</SportLine>
               </View>
               {canEdit && (
                 <Text style={st.link} onPress={() => setEditingRoster((v) => (v === t.id ? null : t.id))}>

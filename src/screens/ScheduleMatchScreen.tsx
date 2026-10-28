@@ -42,6 +42,7 @@ import type { SportId, Team } from '../core/types';
 type Phase = 'league' | 'group' | KoStage;
 import type { RootStackParamList } from '../navigation/types';
 import { Glyph } from '../components/Icon';
+import { SportLine } from '../components/SportArt';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type PickTeam = Pick<Team, 'id' | 'name' | 'colorHex'> & { roster?: string[] };
@@ -560,7 +561,7 @@ function SportPicker({ sport, onPick }: { sport: SportId | null; onPick: (s: Spo
               style={[st.option, s.id === sport && st.optionActive]}
               onPress={() => { onPick(s.id); setOpen(false); }}
             >
-              <Text style={st.optionText}>{s.icon}  {s.name}</Text>
+              <SportLine sports={[s.id]} size={24} textStyle={st.optionText} />
               {s.id === sport && <Glyph emoji="✓" style={st.check} />}
             </TouchableOpacity>
           ))}

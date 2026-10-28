@@ -89,7 +89,7 @@ export default function SportHubScreen() {
     return (
       <SafeAreaView style={st.safe} edges={['bottom']}>
         <KeyboardAwareScrollView contentContainerStyle={st.content}>
-          <ScreenTitle title={`${plugin.icon} ${plugin.name}`} subtitle={tournamentName} />
+          <ScreenTitle title={plugin.name} subtitle={tournamentName} />
           {tournament ? (
             <AthleticsHub sport={sport} tournament={tournament} canOrganize={canOrganize(profile?.role) || canManageTournament(tournament, orgs, me, profile?.id)} />
           ) : <Text style={textStyles.muted}>Loading…</Text>}
@@ -104,7 +104,7 @@ export default function SportHubScreen() {
     return (
       <SafeAreaView style={st.safe} edges={['bottom']}>
         <KeyboardAwareScrollView contentContainerStyle={st.content}>
-          <ScreenTitle title={`${plugin.icon} ${plugin.name}`} subtitle={tournamentName} />
+          <ScreenTitle title={plugin.name} subtitle={tournamentName} />
           <GolfTournamentHub tournamentId={tournamentId} format={golfFmt}
             canOrganize={canOrganize(profile?.role) || (!!tournament && canManageTournament(tournament, orgs, me, profile?.id))} />
         </KeyboardAwareScrollView>
@@ -115,7 +115,7 @@ export default function SportHubScreen() {
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
       <KeyboardAwareScrollView contentContainerStyle={st.content}>
-        <ScreenTitle title={`${plugin.icon} ${plugin.name}`} subtitle={tournamentName} />
+        <ScreenTitle title={plugin.name} subtitle={tournamentName} />
 
         <DivisionTabs categories={divisions} activeCat={activeCat} onChange={setActiveCat} />
 

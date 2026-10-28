@@ -9,6 +9,7 @@ import { RankBadge, podiumColor } from './Rank';
 import { getSportMeta } from '../sports/sportMeta';
 import type { MedalRow } from '../data/medalStandings';
 import type { SportId } from '../core/types';
+import { SportBadge } from './SportArt';
 
 const ord = (n?: number): string => {
   if (!n) return '—';
@@ -38,9 +39,10 @@ export function MedalTable({ rows, emptyLabel = 'No results yet.' }: { rows: Med
               {/* SD-123: "=3rd" for a shared place; a singles player's name when
                   they scored for this house. */}
               {r.perSport.map((p, k) => (
-                <Text key={`${p.sport}-${k}`} style={st.chip} numberOfLines={1}>
-                  {getSportMeta(p.sport as SportId).icon} {p.shared ? '=' : ''}{ord(p.position)}{p.entrant ? ` ${p.entrant}` : ''} · {p.points}
-                </Text>
+                <View key={`${p.sport}-${k}`} style={st.chipRow}>
+                  <SportBadge sport={p.sport} size={16} />
+                  <Text style={st.chip} numberOfLines={1}>{p.shared ? '=' : ''}{ord(p.position)}{p.entrant ? ` ${p.entrant}` : ''} · {p.points}</Text>
+                </View>
               ))}
               {/* SD-90: timed / measured events — placings and points per sport. */}
               {[...new Set((r.perEvent ?? []).map((e) => e.sport))].map((sp) => {
@@ -72,5 +74,6 @@ const st = StyleSheet.create({
   pts: { color: theme.colors.primary, fontSize: theme.font.h3, fontWeight: '900' },
   ptsLabel: { color: theme.colors.textMuted, fontSize: 9, fontWeight: '700', letterSpacing: 0.5 },
   sportRow: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing(2), paddingLeft: theme.spacing(6) },
+  chipRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   chip: { color: theme.colors.textMuted, fontSize: theme.font.tiny, fontWeight: '700', backgroundColor: theme.colors.surfaceAlt, borderRadius: theme.radius.pill, paddingHorizontal: theme.spacing(2), paddingVertical: 2 },
 });

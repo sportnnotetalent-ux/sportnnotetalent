@@ -26,7 +26,7 @@ const fontOpts = {
 
 // The same count as the website's headline.
 const site = readFileSync(join(ROOT, 'scripts/build-website.mjs'), 'utf8');
-const SPORT_COUNT = [.../const SPORTS = \[([\s\S]*?)\n\];/.exec(site)[1].matchAll(/\['[^']+', '[^']+'\]/g)].length;
+const SPORT_COUNT = [.../const SPORT_ORDER = \[([\s\S]*?)\];/.exec(site)[1].matchAll(/'[a-z_]+'/g)].length;
 const TAGLINE = 'Live scoring, results and records for school and club sport';
 const SUBLINE = `${SPORT_COUNT} sports · each scored by its own international rules`;
 

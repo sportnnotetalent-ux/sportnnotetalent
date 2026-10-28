@@ -107,8 +107,8 @@ export default function CreateSeriesScreen() {
         <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
           <ScreenTitle title="New series / tie" subtitle="Several matches, one winner" />
 
-          <Dropdown label="Sport" value={sport ? `${getSportMeta(sport).icon}  ${getSportMeta(sport).name}` : null} placeholder="Select a sport"
-            options={SPORT_LIST.map((s) => ({ id: s.id, label: `${s.icon}  ${s.name}` }))} onPick={(id) => pickSport(id as SportId)} />
+          <Dropdown label="Sport" value={sport ? getSportMeta(sport).name : null} placeholder="Select a sport"
+            options={SPORT_LIST.map((s) => ({ id: s.id, label: s.name }))} onPick={(id) => pickSport(id as SportId)} />
 
           {sport && (
             <>

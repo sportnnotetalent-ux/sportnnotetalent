@@ -14,7 +14,6 @@ import { EmptyState, Card, LoadingState, Pill, SelectChip, QuickTile, textStyles
 import { setStatusBarStyle } from 'expo-status-bar';
 import Svg, { Circle, Line, Rect } from 'react-native-svg';
 import { Search, Bell, Menu, Zap, Trophy, Users } from 'lucide-react-native';
-import { SportTile } from '../components/SportArt';
 import { Glyph, IconText } from '../components/Icon';
 import { formatDayShort } from '../core/dates';
 import { MatchCard } from '../components/MatchCard';
@@ -44,8 +43,6 @@ export default function HomeScreen() {
   // Three header buttons (🔍 🔔 ▾) leave a phone's wordmark ~140px — step it down so it isn't clipped.
   const { width } = useWindowDimensions();
   const narrow = width < 420;
-  // three sport tiles a row on a phone (the content is at most 720 wide)
-  const tileW = Math.floor((Math.min(width, 720) - theme.spacing(8) - theme.spacing(2) * 2) / 3);
   // 2026-10-29 redesign: light status-bar text over the pitch-green hero
   useFocusEffect(useCallback(() => {
     setStatusBarStyle('light');
@@ -324,26 +321,44 @@ export default function HomeScreen() {
           <EmptyState icon="📅" title="Nothing scheduled" hint="Upcoming matches will show up here." compact />
         )}
 
-        {/* Explore a sport — the sports the user has signed up for, plus a path
-            into the ones they haven't. */}
+        {/* Your sports — the ones the user signed up for (schedule, standings,
+            stats), plus a path into the ones they haven't. A plain list: the
+            founder found the drawn court tiles too playful here (2026-10-29). */}
         <SectionHeader title="Your sports" />
-        {mySports.length ? null : <Text style={textStyles.muted}>Sports you sign up for will show up here.</Text>}
+        <Text style={textStyles.muted}>
+          {mySports.length ? 'Schedule, standings and stats for each.' : 'Sports you sign up for will show up here.'}
+        </Text>
         <View style={st.sportGrid}>
           {mySports.map((s) => (
-            <SportTile key={s} sport={s} name={getSportMeta(s).name} icon={getSportMeta(s).icon} width={tileW} height={Math.round(tileW * 1.15)}
-              onPress={() => openSport(s)} accessibilityHint="Schedule, standings and stats" />
+            <TouchableOpacity
+              key={s}
+              activeOpacity={0.85}
+              style={st.sportTile}
+              accessibilityRole="button"
+              accessibilityLabel={`Open ${getSportMeta(s).name}`}
+              onPress={() => openSport(s)}
+            >
+              <Text style={st.sportIcon}>{getSportMeta(s).icon}</Text>
+              <Text style={[textStyles.body, { flex: 1 }]} numberOfLines={1}>{getSportMeta(s).name}</Text>
+              <Text style={st.chevron}>›</Text>
+            </TouchableOpacity>
           ))}
         </View>
         {newSports.length > 0 && (
-          <>
-            <SectionHeader title="Try a new sport" count={newSports.length} onSeeAll={() => nav.navigate('TryNewSport', { sports: newSports })} />
-            <KeyboardAwareScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.chips}>
-              {newSports.map((s) => (
-                <SportTile key={s} sport={s} name={getSportMeta(s).name} width={104} height={124}
-                  onPress={() => nav.navigate('TryNewSport', { sports: [s] })} accessibilityHint="See what you can do in this sport" />
-              ))}
-            </KeyboardAwareScrollView>
-          </>
+          <TouchableOpacity accessibilityRole="button"
+            activeOpacity={0.85}
+            style={st.tryTile}
+            onPress={() => nav.navigate('TryNewSport', { sports: newSports })}
+          >
+            <Glyph emoji="✨" style={st.sportIcon} color={theme.colors.primary} />
+            <View style={{ flex: 1 }}>
+              <Text style={[textStyles.body, { fontWeight: '700' }]}>Try a new sport</Text>
+              <Text style={textStyles.muted} numberOfLines={1}>
+                {newSports.slice(0, 3).map((s) => getSportMeta(s).name).join(', ')}{newSports.length > 3 ? ` +${newSports.length - 3} more` : ''}
+              </Text>
+            </View>
+            <Text style={st.chevron}>›</Text>
+          </TouchableOpacity>
         )}
       </KeyboardAwareScrollView>
     </SafeAreaView>

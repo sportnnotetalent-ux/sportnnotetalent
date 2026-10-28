@@ -58,7 +58,7 @@ export function SportSettingsButtons({ sports }: { sports: SportId[] }) {
     <View style={st.wrap}>
       <FieldLabel>Set up each sport</FieldLabel>
       {sports.map((s) => (
-        <Button key={s} label={`⚙️ ${getSportMeta(s).icon} ${getSportMeta(s).name} settings ›`} variant="ghost" onPress={() => nav.navigate('SportSettings', { sport: s })} />
+        <Button key={s} label={`⚙️ ${getSportMeta(s).name} settings ›`} variant="ghost" onPress={() => nav.navigate('SportSettings', { sport: s })} />
       ))}
       <Text style={textStyles.muted}>Structure, format and tie rules per sport — only what applies to each one.</Text>
     </View>

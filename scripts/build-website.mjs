@@ -24,11 +24,17 @@ for (const [key, env] of [['siteUrl', 'SITE_URL'], ['appUrl', 'APP_URL'], ['cont
 // Node 24 runs .ts with type stripping; legal.ts has no imports.
 const legal = await import(join(ROOT, 'src/data/legal.ts'));
 
-const SPORTS = [
-  ['🏏', 'Cricket'], ['⚽', 'Football'], ['🏀', 'Basketball'], ['🏐', 'Volleyball'], ['🤼', 'Kabaddi'],
-  ['🎾', 'Tennis'], ['🏸', 'Badminton'], ['🏓', 'Table tennis'], ['⚫', 'Squash'], ['🟡', 'Padel'],
-  ['🥒', 'Pickleball'], ['⛳', 'Golf'], ['♟️', 'Chess'], ['🎱', 'Carrom'], ['🎱', 'Pool'], ['🔴', 'Snooker'], ['⚪', 'Billiards'], ['🏃', 'Athletics'], ['🏑', 'Hockey'], ['🤾', 'Handball'], ['🏒', 'Ice hockey'], ['🥅', 'Netball'], ['🏊', 'Swimming'], ['🏋️', 'Weightlifting'], ['🎯', 'Shooting'], ['🏹', 'Archery'], ['🚣', 'Rowing'], ['🛶', 'Canoe sprint'], ['🚴', 'Cycling'], ['🏉', 'Rugby'], ['⚾', 'Baseball & softball'], ['🏈', 'American football'], ['🏉', 'Rugby league'],
+// The sports, in the order the site lists them. Each chip's name and symbol come
+// from the app (src/sports/<id>/meta.ts) — nothing typed twice, so the site can't
+// drift from the app (it once missed three sports and showed carrom as pool).
+const SPORT_ORDER = [
+  'cricket', 'football', 'basketball', 'volleyball', 'kabaddi', 'tennis', 'badminton', 'tabletennis', 'squash', 'padel',
+  'pickleball', 'golf', 'chess', 'carrom', 'pool', 'snooker', 'billiards', 'athletics', 'hockey', 'handball', 'ice_hockey',
+  'netball', 'swimming', 'weightlifting', 'shooting', 'archery', 'rowing', 'canoe', 'cycling', 'rugby', 'baseball',
+  'american_football', 'rugby_league',
 ];
+const sportMeta = (id) => readFileSync(join(ROOT, 'src/sports', id, 'meta.ts'), 'utf8');
+const SPORTS = SPORT_ORDER.map((id) => [/^  icon: '([^']+)'/m.exec(sportMeta(id))[1], /^  name: '([^']+)'/m.exec(sportMeta(id))[1]]);
 
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
@@ -444,7 +450,7 @@ const home = page({
     <div class="card"><div class="ico">🏆</div><h3>Any tournament format</h3><p>Leagues, knockouts, groups + knockouts, series, age groups and divisions — fixtures, brackets and standings update themselves.</p></div>
     <div class="card"><div class="ico">📊</div><h3>Stats that follow players</h3><p>Every match builds a career profile across sports, so talent gets noticed and tracked over time.</p></div>
     <div class="card"><div class="ico">👀</div><h3>Follow live</h3><p>Follow players, teams and tournaments — friends and family see the score as it happens.</p></div>
-    <div class="card"><div class="ico">⛳</div><h3>Real golf</h3><p>Stroke play, Stableford and match play with handicaps, multi-round events and cuts, on a live leaderboard.</p></div>
+    <div class="card"><div class="ico">🤝</div><h3>Find a game</h3><p>Need a player, a team, an opponent or a ground? Post it or browse by sport and city, then reach them on WhatsApp in one tap.</p></div>
     <div class="card"><div class="ico">🔒</div><h3>Private by default</h3><p>Phone numbers and emails stay hidden. Under-18s need a guardian’s consent, and messages about them go to the guardian.</p></div>
   </div>
 </div></section>

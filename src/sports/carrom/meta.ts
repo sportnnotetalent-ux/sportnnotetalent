@@ -9,7 +9,7 @@ import type { SportMeta } from '../types';
 export const CARROM_META: SportMeta = {
   id: 'carrom',
   name: 'Carrom',
-  icon: '🎱',
+  icon: '🟤',
   archetype: 'set-game-point',
   participantKind: 'both',
   formatFields: [

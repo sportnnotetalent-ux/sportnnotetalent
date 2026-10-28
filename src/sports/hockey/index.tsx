@@ -537,7 +537,7 @@ const ScoringControls: SportPlugin<HockeyState>['ScoringControls'] = ({
       {/* SD-117 (H7): one tap per circle entry — the FIH attacking-entry stat */}
       {!flow ? (
         <View style={c.circlePanel}>
-          <Text style={c.small}>⭕ Circle entries — tap on each one</Text>
+          <IconText label="⭕ Circle entries — tap on each one" style={c.small} />
           <View style={c.cols}>
             {(['home', 'away'] as const).map((sd) => {
               const n = (s.circles ?? []).filter((x) => x.side === sd).length;
@@ -590,7 +590,7 @@ const ScoringControls: SportPlugin<HockeyState>['ScoringControls'] = ({
             </View>
             <View style={c.row}>
               <Button label="⚪ Stroke awarded" variant="ghost" style={c.flex} onPress={() => { settle('stroke'); setPcOpen(null); setFlow({ mode: 'stroke', side: sd, step: 'result', pc: id }); }} />
-              <Button label="🔁 Re-awarded" variant="ghost" style={c.flex} onPress={() => { const next = uid(); fire({ type: 'PC', side: sd, payload: { uid: next, reawardOf: id } }); setPcOpen({ side: sd, id: next }); }} />
+              <Button label="♻️ Re-awarded" variant="ghost" style={c.flex} onPress={() => { const next = uid(); fire({ type: 'PC', side: sd, payload: { uid: next, reawardOf: id } }); setPcOpen({ side: sd, id: next }); }} />
             </View>
           </View>
         );

@@ -17,7 +17,6 @@ import type { Match } from '../core/types';
 import { matchLine, resultWords } from '../sports/matchLine';
 import { isTieMatch, fmtPts } from '../data/teamTie';
 import { MapPin } from 'lucide-react-native';
-import { SportArt } from './SportArt';
 import { IconText } from './Icon';
 
 /** A stored snapshot from an older engine must never break a card. */
@@ -82,12 +81,15 @@ export function MatchCard({ match, onPress, onStart, timeZone }: {
   const plugin = showScore && !setLine && match.state ? getSport(match.sport) : null;
   const cardLine = plugin?.cardLine ? safeLine(() => plugin.cardLine!(match.state as never)) : '';
 
+  const footMain: React.ReactNode = tie
+    ? `👥 Team tie · ${match.tieRubbers.length} rubbers${done ? '' : live ? ' · in progress' : ''}`
+    : live ? <Text style={s.cta}>Tap to score ›</Text>
+    : done ? (match.result ? resultWords({ sport: match.sport, result: match.result }, match.homeTeam.name, match.awayTeam.name) : walkover ? 'Walkover' : 'Full time')
+    : null;
   return (
     // The start button sits beside (not inside) the card's touchable — a button
     // can't nest inside another button on web.
     <View style={[s.card, live && s.cardLive]}>
-    {/* 2026-10-29 redesign: a strip of the sport's court across the top */}
-    <SportArt sport={match.sport} style={s.strip} variant="strip" />
     <TouchableOpacity
       accessibilityRole="button"
       accessibilityLabel={`${sport.name}: ${teamLabel(match.homeTeam)} versus ${teamLabel(match.awayTeam)}${
@@ -142,20 +144,14 @@ export function MatchCard({ match, onPress, onStart, timeZone }: {
       {setLine ? <Text style={s.setLine} numberOfLines={1}>{setLine}</Text> : null}
       {cardLine ? <Text style={s.setLine} numberOfLines={1}>{cardLine}</Text> : null}
 
-      {/* Footer: call-to-action / kickoff, plus venue */}
+      {/* Footer: call-to-action / result, plus venue. The kick-off time is in
+          the header already, so an upcoming match shows only where. */}
+      {footMain || match.venueName ? (
       <Text style={s.foot}>
-        {tie ? (
-          `👥 Team tie · ${match.tieRubbers.length} rubbers${done ? '' : live ? ' · in progress' : ` · ${time}`}`
-        ) : live ? (
-          <Text style={s.cta}>Tap to score ›</Text>
-        ) : done ? (
-          match.result ? resultWords({ sport: match.sport, result: match.result }, match.homeTeam.name, match.awayTeam.name) : walkover ? 'Walkover' : 'Full time'
-        ) : (
-          time
-        )}
+        {footMain}
         {match.venueName ? (
           <>
-            {'  ·  '}
+            {footMain ? '  ·  ' : ''}
             <Text
               style={s.venue}
               accessibilityRole="link"
@@ -168,6 +164,7 @@ export function MatchCard({ match, onPress, onStart, timeZone }: {
           </>
         ) : null}
       </Text>
+      ) : null}
     </TouchableOpacity>
       {onStart && (live || match.status === 'scheduled') ? (
         <TouchableOpacity style={s.startBtn} activeOpacity={0.85} accessibilityRole="button"
@@ -185,12 +182,12 @@ const s = StyleSheet.create({
     borderRadius: theme.radius.lg - 4,
     borderWidth: 1,
     borderColor: theme.colors.surfaceAlt,
+    paddingTop: theme.spacing(4),
     paddingBottom: theme.spacing(4),
     gap: theme.spacing(3),
     overflow: 'hidden',
     ...theme.shadow.card,
   },
-  strip: { height: 40 },
   body: { gap: theme.spacing(3), paddingHorizontal: theme.spacing(4) },
   cardLive: {
     borderColor: theme.colors.danger + '66',

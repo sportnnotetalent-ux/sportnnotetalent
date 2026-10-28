@@ -239,7 +239,7 @@ export default function TeamProfileScreen() {
 
         {/* ── Stats ── */}
         <View onLayout={(e) => setStatsY(e.nativeEvent.layout.y)} style={{ gap: theme.spacing(3) }}>
-          {!(stats.played === 0 && hasEventResults) && <Text style={[textStyles.h3, st.section]}>Stats{sport && sportsPlayed.length === 1 ? ` · ${getSportMeta(sport).icon} ${getSportMeta(sport).name}` : ''}</Text>}
+          {!(stats.played === 0 && hasEventResults) && <Text style={[textStyles.h3, st.section]}>Stats{sport && sportsPlayed.length === 1 ? ` · ${getSportMeta(sport).name}` : ''}</Text>}
           {sportsPlayed.length > 1 && (
             <View style={st.tags}>
               {sportsPlayed.map((sp) => (

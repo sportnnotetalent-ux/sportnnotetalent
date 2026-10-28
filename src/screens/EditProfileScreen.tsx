@@ -30,6 +30,7 @@ import { PhoneField } from '../components/PhoneField';
 import type { Player, SportDetail, SportId, TeamStint } from '../core/types';
 import type { RootStackParamList } from '../navigation/types';
 import { Glyph, IconText } from '../components/Icon';
+import { SportLine } from '../components/SportArt';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'EditProfile'>;
 
@@ -394,7 +395,7 @@ export default function EditProfileScreen({ route, navigation }: Props) {
             const teams = d.teams ?? [];
             return (
               <Card key={s} style={{ gap: theme.spacing(2) }}>
-                <Text style={textStyles.h3}>{getSportMeta(s).icon} {getSportMeta(s).name}</Text>
+                <SportLine sports={[s]} size={24} textStyle={textStyles.h3} />
                 <TextField
                   label="Position / role"
                   value={d.position ?? ''}

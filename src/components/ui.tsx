@@ -17,14 +17,15 @@ import { readableOn } from '../core/contrast';
 import { toggleA11y } from '../core/a11y';
 import { splitLeading, stripLeadingEmoji, sportChip } from '../core/leadingEmoji';
 import { EMOJI_ICONS, EMOJI_KEYS, EmojiIcon } from './Icon';
-import { SPORT_COLORS } from './SportArt';
+import { SportBadge, SPORT_COLORS } from './SportArt';
 import { SPORT_LIST } from '../sports/sportMeta';
 
 /** 2026-10-29 redesign: "⚽ Football" on a chip or pill → the sport (drawn as
- *  its colour dot and name); a mapped leading emoji → its line icon. */
-function chipParts(label: string): { text: string; dot?: string; spec?: (typeof EMOJI_ICONS)[string] } {
+ *  its colour dot and name; "⚽ Football ›" keeps the "›"); a mapped leading
+ *  emoji → its line icon. */
+function chipParts(label: string): { text: string; sport?: string; spec?: (typeof EMOJI_ICONS)[string] } {
   const sp = sportChip(label, SPORT_LIST);
-  if (sp) return { text: sp.name, dot: SPORT_COLORS[sp.id] };
+  if (sp) return { text: sp.text, sport: sp.id };
   const lead = splitLeading(label, EMOJI_KEYS);
   const spec = lead ? EMOJI_ICONS[lead.key] : undefined;
   return spec && lead!.rest ? { text: lead!.rest, spec } : { text: label };
@@ -58,18 +59,21 @@ const loadingStyles = StyleSheet.create({
  *  `compact` tightens the padding for use inside a card/table. */
 export function EmptyState({
   icon,
+  sport,
   title,
   hint,
   compact = false,
 }: {
   icon?: string;
+  /** a sport's empty page: its drawn badge instead of an icon */
+  sport?: string;
   title: string;
   hint?: string;
   compact?: boolean;
 }) {
   return (
     <View style={[emptyStyles.wrap, compact && emptyStyles.compact]}>
-      {icon ? (EMOJI_ICONS[icon.replace('\uFE0F', '')] ? (
+      {sport ? <SportBadge sport={sport} size={48} /> : icon ? (EMOJI_ICONS[icon.replace('\uFE0F', '')] ? (
         <View style={emptyStyles.iconCircle}><EmojiIcon spec={EMOJI_ICONS[icon.replace('\uFE0F', '')]} color={theme.colors.primary} size={26} /></View>
       ) : <Text style={emptyStyles.icon}>{icon}</Text>) : null}
       <Text style={emptyStyles.title}>{title}</Text>
@@ -183,7 +187,7 @@ export function Pill({
   const p = chipParts(label);
   return (
     <View style={[styles.pill, { backgroundColor: color }]}>
-      {p.dot ? <View style={[styles.pillDot, { backgroundColor: p.dot }]} /> : null}
+      {p.sport ? <View style={[styles.pillDot, { backgroundColor: SPORT_COLORS[p.sport] }]} /> : null}
       {p.spec ? <EmojiIcon spec={p.spec} color={textColor} size={12} /> : null}
       <Text style={[styles.pillText, { color: textColor }]}>{p.text}</Text>
     </View>
@@ -361,7 +365,7 @@ export function SelectChip({
   accessibilityLabel?: string;
 }) {
   const p = dotColor ? { text: label } : chipParts(label);
-  const dot = dotColor ?? p.dot;
+  const dot = dotColor ?? (p.sport ? SPORT_COLORS[p.sport] : undefined);
   const ink = active ? theme.colors.onLime : theme.colors.textMuted;
   return (
     <TouchableOpacity
@@ -425,7 +429,6 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   pillText: { fontSize: theme.font.tiny, fontWeight: '700' },
-  pillDot: { width: 8, height: 8, borderRadius: 4 },
   input: {
     backgroundColor: theme.colors.surface,
     borderWidth: 1,
@@ -457,4 +460,5 @@ const styles = StyleSheet.create({
   selChipTextActive: { color: theme.colors.onLime },
   selChipTextDisabled: { textDecorationLine: 'line-through' },
   selDot: { width: 10, height: 10, borderRadius: 5 },
+  pillDot: { width: 8, height: 8, borderRadius: 4 },
 });

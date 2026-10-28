@@ -1,11 +1,12 @@
 /**
- * 2026-10-29 redesign — every sport's tile: its court, pitch, table or board
- * seen from above, in its own colour, drawn in SVG (sharp at any size, and
- * recoloured in one place). `SportTile` adds the name band: "FOOTBALL ⚽".
- * Decorative: the tile's label carries the meaning for screen readers.
+ * 2026-10-29 redesign — every sport's small badge: its court, pitch, table or
+ * board seen from above, in its own colour, drawn in SVG (sharp at any size,
+ * recoloured in one place). Used small (SportBadge, SportLine); the big court
+ * tiles and match-card strips were removed after the founder found them too
+ * playful. Decorative: the words beside it carry the meaning for screen readers.
  */
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
+import { View, Text, StyleSheet, type StyleProp, type ViewStyle, type TextStyle } from 'react-native';
 import Svg, { Rect, Circle, Line, Path, G, Ellipse } from 'react-native-svg';
 import { theme } from '../core/theme';
 import type { SportId } from '../core/types';
@@ -14,15 +15,16 @@ import { sportStack } from '../core/leadingEmoji';
 
 /** Each sport's tile colour (also its accent wherever the sport is shown). */
 export const SPORT_COLORS: Record<string, string> = {
-  football: '#3F8F3A', cricket: '#5E9E3A', basketball: '#2F5DC9', badminton: '#2F8F57', tennis: '#3E8E4A',
-  volleyball: '#D9902F', kabaddi: '#C2533A', pickleball: '#23807F', padel: '#2E6AAE', squash: '#B98950',
+  football: '#3F8F3A', cricket: '#5E9E3A', basketball: '#2F5DC9', badminton: '#1E6B47', tennis: '#3E8E4A',
+  volleyball: '#D9902F', kabaddi: '#C2533A', pickleball: '#23807F', padel: '#24427A', squash: '#B98950',
   tabletennis: '#4F86D3', chess: '#6E5236', carrom: '#C4904A', pool: '#1E5FA8', snooker: '#1D6B3A',
-  billiards: '#2B7A4B', golf: '#5F9A37', athletics: '#B9432C', hockey: '#2D73BA', swimming: '#2A93C6',
+  billiards: '#7E2638', golf: '#5F9A37', athletics: '#B9432C', hockey: '#2D73BA', swimming: '#2A93C6',
   weightlifting: '#4A4F57', shooting: '#3B4A5C', archery: '#2E7D4F', rowing: '#28749F', canoe: '#1C8494',
-  cycling: '#B8722F', handball: '#2F67B8', ice_hockey: '#8FB3C9', netball: '#3A79BC', american_football: '#3C8C3F',
-  rugby: '#4B9A3E', rugby_league: '#3F8A45', baseball: '#4F9440',
+  cycling: '#B8722F', handball: '#2F67B8', ice_hockey: '#8FB3C9', netball: '#6B4FA8', american_football: '#2E6A34',
+  rugby: '#6A9A2E', rugby_league: '#2B7A62', baseball: '#4F9440',
 };
 const FALLBACK = theme.colors.primary;
+export const SPORT_FALLBACK = FALLBACK;
 
 const W = '#FFFFFF';
 const lines = { stroke: W, strokeWidth: 1.3, fill: 'none', strokeOpacity: 0.9 } as const;
@@ -61,8 +63,15 @@ function draw(sport: string): React.ReactNode {
         <Path d="M22 94 A28 18 0 0 1 78 94 Z" fill="#E07A3A" opacity={0.85} />
         {pitch(<><Path d="M16 6 A34 24 0 0 0 84 6" strokeDasharray="3 3" /><Path d="M16 94 A34 24 0 0 1 84 94" strokeDasharray="3 3" /></>)}
       </>;
-    case 'rugby':
     case 'rugby_league':
+      // League: the 10-metre lines, no dashed lines (union has the 22 and the dashed 10s and 5s).
+      return <>{stripes(10)}<G {...lines}>
+        <Rect x={10} y={6} width={80} height={88} />
+        <Line x1={10} y1={14} x2={90} y2={14} /><Line x1={10} y1={86} x2={90} y2={86} />
+        {[21.2, 28.4, 35.6, 42.8, 50, 57.2, 64.4, 71.6, 78.8].map((y) => <Line key={`l${y}`} x1={10} y1={y} x2={90} y2={y} strokeOpacity={y === 50 ? 0.9 : 0.55} />)}
+        <Path d="M45 14 L45 4 M55 14 L55 4 M45 9 L55 9" /><Path d="M45 86 L45 96 M55 86 L55 96 M45 91 L55 91" />
+      </G></>;
+    case 'rugby':
       return <>{stripes(10)}<G {...lines}>
         <Rect x={10} y={6} width={80} height={88} />
         <Line x1={10} y1={14} x2={90} y2={14} /><Line x1={10} y1={86} x2={90} y2={86} />
@@ -296,33 +305,17 @@ function draw(sport: string): React.ReactNode {
   }
 }
 
-/** A thin, wide strip (a match card's header) shows only the drawing's middle
- *  band (y ≈ 44–56). A table cut there is all middle pockets, so the cue
- *  sports draw a strip of their own: rails, small pockets, the balls. */
-function drawStrip(sport: string): React.ReactNode | null {
-  if (sport !== 'pool' && sport !== 'snooker' && sport !== 'billiards') return null;
-  const balls = sport === 'snooker'
-    ? [[68, 50, '#C62828'], [70, 48.6, '#C62828'], [70, 51.4, '#C62828'], [72, 47.2, '#C62828'], [72, 50, '#C62828'], [72, 52.8, '#C62828'], [60, 50, '#1A1A1A'], [50, 50, '#E86FA5']]
-    : sport === 'pool'
-      ? [[66, 50, '#F2C230'], [68, 48.8, '#1D56C9'], [68, 51.2, '#C62828'], [70, 47.6, '#6B2FA0'], [70, 50, '#1A1A1A'], [70, 52.4, '#E07A3A']]
-      : [[60, 49, '#F2C230'], [72, 51, '#C62828']];
-  return <>
-    <Rect x={0} y={43} width={100} height={2.2} fill="#5A3416" /><Rect x={0} y={54.8} width={100} height={2.2} fill="#5A3416" />
-    {[[3, 45.2], [50, 45.2], [97, 45.2], [3, 54.8], [50, 54.8], [97, 54.8]].map(([x, y], i) => <Circle key={`p${i}`} cx={x} cy={y} r={1.1} fill="#111" />)}
-    <Line x1={22} y1={45.2} x2={22} y2={54.8} stroke={W} strokeOpacity={0.7} strokeWidth={0.3} />
-    {sport !== 'pool' ? <Path d="M22 47 A3 3 0 0 0 22 53" stroke={W} strokeOpacity={0.7} strokeWidth={0.3} fill="none" /> : null}
-    {balls.map(([x, y, c], i) => <Circle key={`b${i}`} cx={Number(x)} cy={Number(y)} r={0.95} fill={String(c)} />)}
-    <Circle cx={20} cy={50} r={0.95} fill="#FFFFFF" />
-  </>;
+/** A sport's drawing (no background) — also turned into the website's SVGs
+ *  (scripts/lib/sportArtSvg.mjs), so the app and the site draw the same. */
+export function sportArtNodes(sport: string): React.ReactNode {
+  return draw(sport);
 }
 
-export function SportArt({ sport, style, variant = 'tile' }: {
+export function SportArt({ sport, style }: {
   sport: SportId | string;
   style?: StyleProp<ViewStyle>;
-  /** 'strip': a thin, wide header (match cards) */
-  variant?: 'tile' | 'strip';
 }) {
-  const art = (variant === 'strip' && drawStrip(sport)) || draw(sport);
+  const art = sportArtNodes(sport);
   return (
     <View style={[{ backgroundColor: SPORT_COLORS[sport] ?? FALLBACK, overflow: 'hidden' }, style]} accessible={false} importantForAccessibility="no-hide-descendants">
       <Svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice">{art}</Svg>
@@ -335,41 +328,17 @@ export function SportBadge({ sport, size = 30 }: { sport: SportId | string; size
   return <SportArt sport={sport} style={{ width: size, height: size, borderRadius: Math.round(size * 0.28) }} />;
 }
 
-/** A sport's tile: the art, with its name on a band at the foot. */
-export function SportTile({ sport, name, icon, onPress, width, height, accessibilityHint }: {
-  sport: SportId | string;
-  name: string;
-  icon?: string;
-  onPress?: () => void;
-  width: number;
-  height: number;
-  accessibilityHint?: string;
-}) {
-  const body = (
-    <View style={[st.tile, { width, height }]}>
-      <SportArt sport={sport} style={StyleSheet.absoluteFill} />
-      <View style={st.band}>
-        <Text style={[st.name, name.length > 12 && width < 140 && st.nameLong]} numberOfLines={2}>{name}</Text>
-        {icon && width >= 140 ? <Text style={st.icon}>{icon}</Text> : null}
-      </View>
-    </View>
-  );
-  if (!onPress) return body;
-  return (
-    <TouchableOpacity onPress={onPress} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel={name} accessibilityHint={accessibilityHint}>
-      {body}
-    </TouchableOpacity>
-  );
-}
-
 /** A run of sports as small overlapping badges (where "⚽ 🏏 🏀 …" used to
  *  be), then the line's words. One sport also shows its name. */
-export function SportLine({ sports, children, size = 18, max = 4, style }: {
+export function SportLine({ sports, children, size = 18, max = 4, style, textStyle, numberOfLines = 2 }: {
   sports: readonly (SportId | string)[];
   children?: React.ReactNode;
   size?: number;
   max?: number;
   style?: StyleProp<ViewStyle>;
+  /** the words' style (a heading, a body line); muted small by default */
+  textStyle?: StyleProp<TextStyle>;
+  numberOfLines?: number;
 }) {
   const { shown, more } = sportStack(sports, max);
   const names = shown.length === 1 && !more ? getSportMeta(shown[0] as SportId).name : '';
@@ -387,7 +356,7 @@ export function SportLine({ sports, children, size = 18, max = 4, style }: {
         </View>
       ) : null}
       {words.length ? (
-        <Text style={st.lineText} numberOfLines={2}>
+        <Text style={[st.lineText, textStyle]} numberOfLines={numberOfLines}>
           {words.map((w, i) => <React.Fragment key={i}>{i ? ' · ' : ''}{w}</React.Fragment>)}
         </Text>
       ) : null}
@@ -401,12 +370,4 @@ const st = StyleSheet.create({
   stackItem: { borderWidth: 1.5, borderColor: theme.colors.surface, overflow: 'hidden' },
   more: { marginLeft: 4, color: theme.colors.textMuted, fontSize: theme.font.small, fontWeight: '700' },
   lineText: { flexShrink: 1, color: theme.colors.textMuted, fontSize: theme.font.small, lineHeight: theme.font.small * 1.4 },
-  tile: { borderRadius: theme.radius.lg - 6, overflow: 'hidden', backgroundColor: theme.colors.primary, ...theme.shadow.card },
-  band: {
-    position: 'absolute', left: 0, right: 0, bottom: 0, flexDirection: 'row', alignItems: 'center', gap: theme.spacing(1),
-    paddingHorizontal: theme.spacing(2.5), paddingVertical: theme.spacing(2), backgroundColor: 'rgba(0,0,0,0.32)',
-  },
-  name: { flex: 1, color: '#FFFFFF', fontFamily: theme.fonts.heading, fontSize: 16, letterSpacing: 0.3, textTransform: 'uppercase' },
-  nameLong: { fontSize: 13, lineHeight: 14 },
-  icon: { fontSize: 14 },
 });

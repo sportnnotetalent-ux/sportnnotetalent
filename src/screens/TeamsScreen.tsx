@@ -19,6 +19,7 @@ import { useAuth } from '../core/auth';
 import { useActiveOrg } from '../core/orgContext';
 import type { SportId, Team } from '../core/types';
 import type { RootStackParamList } from '../navigation/types';
+import { SportLine } from '../components/SportArt';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -112,7 +113,7 @@ export default function TeamsScreen() {
         {Object.entries(grouped).map(([sp, list]) => (
           <View key={sp} style={{ gap: theme.spacing(2) }}>
             <SectionHeader
-              title={`${getSportMeta(sp as SportId).icon} ${getSportMeta(sp as SportId).name}`}
+              title={getSportMeta(sp as SportId).name}
               count={list.length}
               onSeeAll={list.length > SECTION_CAP ? () => setShowTeams((v) => !v) : undefined}
               expanded={showTeams}
@@ -156,7 +157,7 @@ export default function TeamsScreen() {
                 <Card style={st.teamRow}>
                   <View style={[st.dot, { backgroundColor: t.colorHex }]} />
                   <Text style={[textStyles.body, { flex: 1 }]}>{teamLabel(t)}</Text>
-                  <Text style={textStyles.muted}>{getSportMeta(t.sport as SportId).icon} {t.shortName}</Text>
+                  <SportLine sports={[t.sport]}>{t.shortName}</SportLine>
                   <Text style={st.chev}>›</Text>
                 </Card>
               </TouchableOpacity>

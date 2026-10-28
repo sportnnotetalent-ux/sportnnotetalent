@@ -390,8 +390,8 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
         <View style={ctrl.editPanel}>
           <View style={ctrl.editHead}><Text style={ctrl.label} numberOfLines={1}>📋 {player.fullName} — {nm}</Text>{cancel}</View>
           <View style={ctrl.row}>
-            <Button label="🔁 Def. rebound" variant={side} style={ctrl.flex} onPress={() => recordRebound(side, player, 'def')} />
-            <Button label="🔁 Off. rebound" variant="ghost" style={ctrl.flex} onPress={() => recordRebound(side, player, 'off')} />
+            <Button label="⏬ Def. rebound" variant={side} style={ctrl.flex} onPress={() => recordRebound(side, player, 'def')} />
+            <Button label="⏫ Off. rebound" variant="ghost" style={ctrl.flex} onPress={() => recordRebound(side, player, 'off')} />
           </View>
           <View style={ctrl.row}>
             <Button label="🅰️ Assist" variant="ghost" style={ctrl.flex} onPress={() => one('ASSIST')} />

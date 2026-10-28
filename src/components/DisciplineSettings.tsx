@@ -16,6 +16,7 @@ import { recalcWalkovers } from '../data/repos';
 import { tournamentDraft } from '../data/tournamentDraft';
 import { getSportMeta } from '../sports/sportMeta';
 import type { SportId } from '../core/types';
+import { SportLine } from './SportArt';
 
 type Val = number | string | boolean;
 
@@ -106,7 +107,7 @@ export function WalkoverSetupCard({ sports, onChanged }: { sports: SportId[]; on
         const f = tournamentDraft.get(sport) as Record<string, unknown>;
         return (
           <View key={sport} style={{ gap: theme.spacing(1) }}>
-            <Text style={textStyles.body}>{getSportMeta(sport).icon} {getSportMeta(sport).name} · {walkoverRuleText(sport, walkoverRuleFor(sport, f), f)}</Text>
+            <SportLine sports={[sport]} textStyle={textStyles.body}>{walkoverRuleText(sport, walkoverRuleFor(sport, f), f)}</SportLine>
             <WalkoverChips sport={sport} value={f.walkoverScore} onPick={(v) => { tournamentDraft.setField(sport, 'walkoverScore', v); onChanged?.(); }} />
           </View>
         );

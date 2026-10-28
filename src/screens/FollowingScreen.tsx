@@ -16,6 +16,7 @@ import { getTournaments } from '../data/repos';
 import type { Tournament } from '../core/types';
 import { getSportMeta } from '../sports/sportMeta';
 import type { RootStackParamList } from '../navigation/types';
+import { SportLine } from '../components/SportArt';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -79,7 +80,7 @@ export default function FollowingScreen() {
                 <View style={[st.dot, { backgroundColor: t.colorHex ?? theme.colors.surfaceAlt }]} />
                 <View style={{ flex: 1 }}>
                   <Text style={textStyles.body}>{t.name}</Text>
-                  <Text style={textStyles.muted}>{getSportMeta(t.sport).icon} {getSportMeta(t.sport).name}</Text>
+                  <SportLine sports={[t.sport]} />
                 </View>
                 <Unfollow onPress={() => toggle('team', t.id)} />
                 <FollowBell type="team" id={t.id} name={t.name} />

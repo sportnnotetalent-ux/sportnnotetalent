@@ -10,6 +10,7 @@ import { FieldLabel, SelectChip, textStyles } from './ui';
 import { getSportMeta } from '../sports/sportMeta';
 import { isEventSport } from '../sports/eventSports';
 import type { SportId, TournamentScoring } from '../core/types';
+import { SportLine } from './SportArt';
 
 const ordinal = (n: number): string => {
   const s = ['th', 'st', 'nd', 'rd'], v = n % 100;
@@ -110,7 +111,7 @@ export function MedalScoringEditor({ sports, value, onChange }: {
               <Text style={textStyles.muted}>Multiply a sport’s position points — e.g. a marquee sport worth 2×.</Text>
               {sports.map((s) => (
                 <View key={s} style={st.line}>
-                  <Text style={st.label}>{getSportMeta(s).icon} {getSportMeta(s).name}</Text>
+                  <SportLine sports={[s]} style={{ flex: 1 }} textStyle={st.label} />
                   <Counter value={weights[s] ?? 1} min={1} max={5} onChange={(w) => setWeight(s, w)} suffix="×" />
                 </View>
               ))}

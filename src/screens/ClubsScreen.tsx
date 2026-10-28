@@ -94,7 +94,7 @@ export default function ClubsScreen() {
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={textStyles.body}>{t.name}</Text>
-                    <Text style={textStyles.muted}>{getSportMeta(t.sport).icon} {getSportMeta(t.sport).name}</Text>
+                    <SportLine sports={[t.sport]} />
                   </View>
                   <Text style={st.chev}>›</Text>
                 </Card>

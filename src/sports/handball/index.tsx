@@ -395,7 +395,7 @@ const ScoringControls: SportPlugin<HandballState>['ScoringControls'] = ({
           <View style={c.panel}>{head(`Shot · ${SHOT_LABEL[flow.shotType ?? 'nineM']}`)}
             <View style={c.row}>
               <Button label="🧤 Saved" variant="ghost" style={c.flex} onPress={() => setFlow({ ...flow, result: 'saved', step: 'player' })} />
-              <Button label="↗ Missed" variant="ghost" style={c.flex} onPress={() => setFlow({ ...flow, result: 'missed', step: 'player' })} />
+              <Button label="✗ Missed" variant="ghost" style={c.flex} onPress={() => setFlow({ ...flow, result: 'missed', step: 'player' })} />
               <Button label="🛡 Blocked" variant="ghost" style={c.flex} onPress={() => setFlow({ ...flow, result: 'blocked', step: 'player' })} />
             </View>
             {keeper(opp(sd)) ? <Text style={c.meta}>A save goes to {keeper(opp(sd))!.fullName} (keeper).</Text> : null}
@@ -427,7 +427,7 @@ const ScoringControls: SportPlugin<HandballState>['ScoringControls'] = ({
             <View style={c.row}>
               <Button label="✓ Scored" color={color(sd)} style={c.flex} onPress={() => setFlow({ mode: 'goal', side: sd, step: 'scorer', shotType: 'sevenM' })} />
               <Button label="🧤 Saved" variant="ghost" style={c.flex} onPress={() => setFlow({ ...flow, result: 'saved', step: 'player' })} />
-              <Button label="↗ Missed" variant="ghost" style={c.flex} onPress={() => setFlow({ ...flow, result: 'missed', step: 'player' })} />
+              <Button label="✗ Missed" variant="ghost" style={c.flex} onPress={() => setFlow({ ...flow, result: 'missed', step: 'player' })} />
             </View>
             {keeper(opp(sd)) ? <Text style={c.meta}>A save goes to {keeper(opp(sd))!.fullName} (keeper) as a 7 m save.</Text> : null}
           </View>
@@ -442,7 +442,7 @@ const ScoringControls: SportPlugin<HandballState>['ScoringControls'] = ({
           <View style={c.panel}>{head('Turnover')}
             <View style={c.row}>
               <Button label="⚠️ Technical fault" variant="ghost" style={c.flex} onPress={() => setFlow({ ...flow, stolen: false, step: 'player' })} />
-              <Button label="🖐 Ball stolen" variant="ghost" style={c.flex} onPress={() => setFlow({ ...flow, stolen: true, step: 'player' })} />
+              <Button label="✂️ Ball stolen" variant="ghost" style={c.flex} onPress={() => setFlow({ ...flow, stolen: true, step: 'player' })} />
             </View>
             <Text style={c.meta}>Technical faults: steps, double dribble, line violation, offensive foul, passive play, a bad pass… A stolen ball also credits the defender with a steal.</Text>
           </View>
@@ -531,9 +531,9 @@ const ScoringControls: SportPlugin<HandballState>['ScoringControls'] = ({
     return (
       <View key={sd} style={c.col}>
         <Text style={[c.team, { color: color(sd) }]} numberOfLines={1}>{name(sd)}</Text>
-        <Button label="🤾 Goal" color={color(sd)} onPress={() => setFlow({ mode: 'goal', side: sd, step: 'type' })} />
+        <Button label="🥅 Goal" color={color(sd)} onPress={() => setFlow({ mode: 'goal', side: sd, step: 'type' })} />
         <Button label="🎯 7 m" accessibilityLabel="7-metre throw" variant="ghost" onPress={() => setFlow({ mode: 'seven', side: sd, step: s.track?.sevenMDrawn ? 'drawn' : 'result' })} />
-        <Button label="↗ Shot" accessibilityLabel="Shot without a goal" variant="ghost" onPress={() => setFlow({ mode: 'shot', side: sd, step: 'type' })} />
+        <Button label="🎯 Shot" accessibilityLabel="Shot without a goal" variant="ghost" onPress={() => setFlow({ mode: 'shot', side: sd, step: 'type' })} />
         <Button label="⚠️ Turnover" variant="ghost" onPress={() => setFlow({ mode: 'turnover', side: sd, step: 'kind' })} />
         <Button label="🟨 Card" accessibilityLabel="Sanction" variant="ghost" onPress={() => setFlow({ mode: 'card', side: sd, step: 'kind' })} />
         <Button label="🔁 Sub" variant="ghost" onPress={() => setFlow({ mode: 'sub', side: sd, step: 'off' })} />

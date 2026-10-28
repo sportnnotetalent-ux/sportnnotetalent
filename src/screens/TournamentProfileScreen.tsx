@@ -79,7 +79,7 @@ import { openWhatsApp } from '../core/connect';
 import { toE164, formatPhone } from '../core/phone';
 import type { Tournament } from '../core/types';
 
-/** "🏏 T20 · Leather · Turf" — the sport's inline basics (preset + onCreate
+/** "Cricket: T20 · Leather · Turf" — the sport's inline basics (preset + onCreate
  *  fields) that the tournament actually set; empty when none are set. */
 function basicsLine(t: Tournament, sport: SportId): string {
   const plugin = getSportMeta(sport);
@@ -92,13 +92,13 @@ function basicsLine(t: Tournament, sport: SportId): string {
     const label = field.options?.find((o) => o.value === v)?.label;
     return label ? [label.replace(/\s*\(.*\)\s*$/, '')] : [];
   });
-  return parts.length ? `${plugin.icon} ${parts.join(' · ')}` : '';
+  return parts.length ? `${plugin.name}: ${parts.join(' · ')}` : '';
 }
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 import { useViewerMarket } from '../data/useMarket';
 import { term } from '../core/markets';
-import { SportLine } from '../components/SportArt';
+import { SportLine, SportBadge } from '../components/SportArt';
 
 const PARTICIPATION_LABEL: Record<string, string> = {
   inter_house: '🏠 Inter-house (Houses compete)',
@@ -673,7 +673,7 @@ export default function TournamentProfileScreen() {
                   const cfg = structureFromFormat(tournament.formats?.[s]);
                   return (
                     <Text key={s} style={textStyles.muted}>
-                      {sports.length > 1 ? `${getSportMeta(s).icon} ${getSportMeta(s).name}: ` : 'Format: '}
+                      {sports.length > 1 ? `${getSportMeta(s).name}: ` : 'Format: '}
                       {cfg ? describeStructure(cfg) : tournament.structure!.replace('_', ' + ')}
                     </Text>
                   );
@@ -840,7 +840,7 @@ export default function TournamentProfileScreen() {
                 );
               }
               return (
-                <HubRow key={sp} icon={getSportMeta(sp).icon} title={`${getSportMeta(sp).name} — format & points`}
+                <HubRow key={sp} sport={sp} title={`${getSportMeta(sp).name} — format & points`}
                   status={`${cfg ? describeStructure(cfg) : 'Not set yet'} · ${pointsSystemLabel(sp, fmt)}`}
                   onPress={() => nav.navigate('SportSettings', { sport: sp, tournamentId: tournament.id })} />
               );
@@ -1205,11 +1205,11 @@ export default function TournamentProfileScreen() {
 }
 
 /** One admin-hub row: icon, title, a one-line status, › (or ▾ when it opens inline). */
-function HubRow({ icon, title, status, onPress, open }: { icon: string; title: string; status?: string; onPress: () => void; open?: boolean }) {
+function HubRow({ icon, sport, title, status, onPress, open }: { icon?: string; sport?: string; title: string; status?: string; onPress: () => void; open?: boolean }) {
   return (
     <TouchableOpacity accessibilityRole="button" accessibilityLabel={title} activeOpacity={0.85} onPress={onPress}>
       <Card style={st.hubRow}>
-        <Glyph emoji={icon} style={st.hubIcon} color={theme.colors.primary} />
+        {sport ? <View style={st.hubIcon}><SportBadge sport={sport} size={26} /></View> : <Glyph emoji={icon ?? ''} style={st.hubIcon} color={theme.colors.primary} />}
         <View style={{ flex: 1 }}>
           <Text style={textStyles.body} numberOfLines={1}>{title}</Text>
           {status ? <Text style={textStyles.muted} numberOfLines={1}>{status}</Text> : null}

@@ -35,11 +35,11 @@ export function describeEvent(e: IceEvent): { icon: string; label: string; detai
       return { icon: PEN_ICON[k], label: `${PEN_LABEL[k]}${e.infraction ? ` · ${e.infraction.toLowerCase()}` : ''}`, detail: e.playerName ?? (k === 'bench' ? 'Bench' : undefined) };
     }
     case 'gk':
-      return { icon: '🧤', label: 'Goalie in', detail: e.playerName };
+      return { icon: '🔙', label: 'Goalie in', detail: e.playerName };
     case 'pull':
       return { icon: '🥅', label: 'Goalie pulled (empty net)' };
     case 'back':
-      return { icon: '🧤', label: 'Goalie back in net' };
+      return { icon: '🔙', label: 'Goalie back in net' };
     case 'timeout':
       return { icon: '⏸', label: 'Team time-out' };
     case 'tally': {

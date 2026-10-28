@@ -208,7 +208,7 @@ export default function DiscoverScreen() {
 
   const sportNote = fSports.length > 0 && tab !== 'players' ? (
     <Text style={textStyles.muted}>
-      Only {fSports.map((s) => getSportMeta(s).icon).join(' ')} {fSports.length === 1 ? getSportMeta(fSports[0]).name : 'these sports'} ·{' '}
+      Only {fSports.map((s) => getSportMeta(s).name).join(', ')} ·{' '}
       <Text style={st.link} accessibilityRole="button" onPress={() => setFilters({ ...filters, sports: [] })}>show all sports</Text>
     </Text>
   ) : null;

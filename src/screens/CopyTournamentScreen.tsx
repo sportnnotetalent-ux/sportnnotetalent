@@ -25,6 +25,7 @@ import { copyTournament, loadCopySource } from '../data/tournamentCopy';
 import { copyProblem, planCopy } from '../data/tournamentCopyPlan';
 import { getSportMeta } from '../sports/sportMeta';
 import type { RootStackParamList } from '../navigation/types';
+import { IconText } from '../components/Icon';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -103,7 +104,7 @@ export default function CopyTournamentScreen() {
   const next = mode === 'next';
 
   const comes: string[] = [
-    `${s.sports.map((sp) => `${getSportMeta(sp).icon} ${getSportMeta(sp).name}`).join(', ')}`,
+    `🏆 ${s.sports.map((sp) => getSportMeta(sp).name).join(', ')}`,
     ...(s.rules ? ['📏 Formats, points and rules for each sport'] : []),
     ...(s.categories ? [`👥 ${s.categories} age group${s.categories === 1 ? '' : 's'}`] : []),
     ...(s.events ? [`🏃 ${s.events} event${s.events === 1 ? '' : 's'} — set each one up when its entries are in`] : []),
@@ -175,7 +176,7 @@ export default function CopyTournamentScreen() {
 
           <Card style={st.card}>
             <Text style={textStyles.h3}>Comes across</Text>
-            {comes.map((line) => <Text key={line} style={textStyles.body}>{line}</Text>)}
+            {comes.map((line) => <IconText key={line} label={line} style={textStyles.body} />)}
             {!own && t.about ? (
               <View style={st.chips}>
                 <SelectChip label={withAbout ? '✓ About & rules text' : '＋ Also copy the About & rules text'} active={withAbout} onPress={() => setWithAbout((v) => !v)} />

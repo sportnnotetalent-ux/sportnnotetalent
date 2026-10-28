@@ -102,7 +102,7 @@ const PRE_SD27: Record<string, { icon: string; label: string; stat: string }[]> 
   basketball: [{ stat: 'points', icon: '🏀', label: 'Top scorer' }, { stat: 'rebounds', icon: '💪', label: 'Rebounds' }, { stat: 'assists', icon: '🎯', label: 'Playmaker' }],
   kabaddi: [{ stat: 'raidPoints', icon: '🤼', label: 'Top raider' }, { stat: 'tacklePoints', icon: '🛡️', label: 'Top defender' }],
   volleyball: [{ stat: 'points', icon: '🏐', label: 'Top scorer' }, { stat: 'aces', icon: '💥', label: 'Aces' }],
-  carrom: [{ stat: 'points', icon: '🎱', label: 'Top scorer' }, { stat: 'queens', icon: '👑', label: 'Queens' }],
+  carrom: [{ stat: 'points', icon: '🟤', label: 'Top scorer' }, { stat: 'queens', icon: '👑', label: 'Queens' }],
   golf: [{ stat: 'birdies', icon: '🐦', label: 'Most birdies' }],
   cricket: [],
   chess: [],

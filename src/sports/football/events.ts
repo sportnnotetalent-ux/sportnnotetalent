@@ -98,14 +98,14 @@ export const GOAL_TYPE_LABEL: Record<GoalType, string> = {
 
 export const EVENT_META: Record<FootballEventType, { icon: string; label: string }> = {
   goal: { icon: '⚽', label: 'Goal' },
-  owngoal: { icon: '🥅', label: 'Own goal' },
+  owngoal: { icon: '🔃', label: 'Own goal' },
   yellow: { icon: '🟨', label: 'Yellow card' },
   red: { icon: '🟥', label: 'Red card' },
   sub: { icon: '🔄', label: 'Substitution' },
   stoppage: { icon: '⏸️', label: 'Stoppage' },
   sinbin: { icon: '⏱️', label: 'Sin-bin' },
   timeout: { icon: '⏸️', label: 'Time-out' },
-  nogoal: { icon: '🚫', label: 'Goal ruled out' },
+  nogoal: { icon: '❎', label: 'Goal ruled out' },
 };
 
 /**
@@ -181,16 +181,16 @@ export const STAT_META: Record<StatKind, { icon: string; label: string }> = {
   offside: { icon: '🚩', label: 'Offside' },
   corner: { icon: '⛳', label: 'Corner' },
   tackle: { icon: '🛡️', label: 'Tackle' },
-  interception: { icon: '✋', label: 'Interception' },
+  interception: { icon: '✂️', label: 'Interception' },
   save: { icon: '🧤', label: 'Save' },
   pass: { icon: '➡️', label: 'Pass' },
   cross: { icon: '↗️', label: 'Cross' },
   dribble: { icon: '🏃', label: 'Dribble' },
   handball: { icon: '🤾', label: 'Handball' },
   attackContribution: { icon: '⚡', label: 'Attacking play' },
-  defenceContribution: { icon: '🧱', label: 'Defensive play' },
+  defenceContribution: { icon: '🔰', label: 'Defensive play' },
   penaltyWon: { icon: '⚖️', label: 'Penalty won' },
-  penaltyMissed: { icon: '🚫', label: 'Penalty missed' },
+  penaltyMissed: { icon: '✗', label: 'Penalty missed' },
   block: { icon: '🧱', label: 'Block' },
   keyPass: { icon: '🔑', label: 'Key pass' },
   clearance: { icon: '🦶', label: 'Clearance' },

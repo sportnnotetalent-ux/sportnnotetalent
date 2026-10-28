@@ -19,6 +19,7 @@ import { formatDayShort } from '../core/dates';
 import { todayIn, useUserTimeZone } from '../core/time';
 import type { Tournament } from '../core/types';
 import type { RootStackParamList } from '../navigation/types';
+import { SportLine } from '../components/SportArt';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type Role = 'hosting' | 'playing' | 'officiating' | 'following';
@@ -85,9 +86,7 @@ export default function MyTournamentsScreen() {
                 <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Open ${t.name}`} onPress={() => nav.navigate('Tournament', { tournamentId: t.id })}>
                   <Card style={{ gap: theme.spacing(1) }}>
                     <Text style={textStyles.body}>{t.name}</Text>
-                    <Text style={textStyles.muted}>
-                      {t.sports.map((s) => getSportMeta(s).icon).join(' ')} · {formatDayShort(t.startDate)} → {formatDayShort(t.endDate)}
-                    </Text>
+                    <SportLine sports={t.sports}>{formatDayShort(t.startDate)} → {formatDayShort(t.endDate)}</SportLine>
                     <Text style={st.roles}>{roles.map((r) => ROLE_LABEL[r]).join(' · ')}</Text>
                   </Card>
                 </TouchableOpacity>

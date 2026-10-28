@@ -1436,7 +1436,7 @@ const step = (s: CricketState, a: ScoreAction): CricketState => {
           batting,
           dismissals: isWicket ? [...s.dismissals, { kind, outId }] : s.dismissals,
           events: [...s.events, atLimit
-            ? { id: seq, stamp: oversStr(cur.balls, s.ballsPerOver), icon: '🏁', label: 'RETIRED', detail: `${outWho ?? 'Batter'} retired not out on ${batting[outId ?? '']?.runs ?? 0} (run limit)`, side: bat }
+            ? { id: seq, stamp: oversStr(cur.balls, s.ballsPerOver), icon: '🚶', label: 'RETIRED', detail: `${outWho ?? 'Batter'} retired not out on ${batting[outId ?? '']?.runs ?? 0} (run limit)`, side: bat }
             : { id: seq, stamp: oversStr(cur.balls, s.ballsPerOver), icon: kind === 'retiredout' ? '🚶' : '🚑', label: WICKET_LABEL[kind], detail: `${outWho ?? 'Batter'} ${dismissal}`, side: other(bat), tone: 'wicket' }],
           seq,
           ...creaseFor(newBatId, newBatName),

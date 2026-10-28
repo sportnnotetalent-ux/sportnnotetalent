@@ -26,6 +26,7 @@ import type { RootStackParamList } from '../navigation/types';
 import { openMatchViewer } from '../navigation/openMatch';
 import { FormRow } from '../components/FormStrip';
 import { collapseTies } from '../data/teamTie';
+import { SportLine } from '../components/SportArt';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -107,7 +108,7 @@ export default function HeadToHeadScreen() {
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
       <KeyboardAwareScrollView contentContainerStyle={st.content}>
-        <Text style={textStyles.muted}>{plugin.icon} {plugin.name} · {teamMode ? 'team vs team' : 'player vs player'}</Text>
+        <SportLine sports={[plugin.id]}>{teamMode ? 'team vs team' : 'player vs player'}</SportLine>
         <View style={st.vsRow}>
           <TouchableOpacity style={st.side} accessibilityRole="link" onPress={() => openSide('a')}>
             <Text style={st.sideName} numberOfLines={2}>{aName}</Text>

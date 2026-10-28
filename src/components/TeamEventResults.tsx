@@ -13,6 +13,7 @@ import { medalIcon, type TeamEventSportSummary } from '../data/results';
 import type { TeamGolfSummary } from '../data/teamEventResults';
 import type { SportId } from '../core/types';
 import { Glyph } from './Icon';
+import { SportLine } from './SportArt';
 
 const RECORD_WORD: Record<string, string> = { MR: 'Meet record', SR: 'School record' };
 const ordinal = (n: number) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] ?? 'th'}`;
@@ -30,7 +31,7 @@ export function TeamEventResults({ sports, golf, onOpenResult }: {
         const sp = getSportMeta(s.sport as SportId);
         return (
           <Card key={s.sport} style={{ gap: theme.spacing(2) }}>
-            <Text style={textStyles.h3}>{sp.icon} {sp.name}</Text>
+            <SportLine sports={[s.sport]} size={24} textStyle={textStyles.h3} />
             <View style={st.tiles} accessible accessibilityLabel={`${s.golds} gold, ${s.silvers} silver, ${s.bronzes} bronze, ${pts(s.points)} points, ${s.finals} finals`}>
               <Tile value={String(s.golds)} label="🥇 Gold" />
               <Tile value={String(s.silvers)} label="🥈 Silver" />
@@ -78,7 +79,7 @@ export function TeamEventResults({ sports, golf, onOpenResult }: {
       })}
       {golf && (
         <Card style={{ gap: theme.spacing(2) }}>
-          <Text style={textStyles.h3}>{getSportMeta('golf' as SportId).icon} Golf · stroke play</Text>
+          <SportLine sports={['golf']} size={24} textStyle={textStyles.h3}>stroke play</SportLine>
           <View style={st.tiles}>
             <Tile value={String(golf.rounds)} label={golf.rounds === 1 ? 'Round' : 'Rounds'} />
             <Tile value={String(golf.wins)} label="Round wins" />

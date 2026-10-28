@@ -814,12 +814,12 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
             {/* SD-114 (F2): the goal is on the board on the scorer tap; the assist is attached after (Close keeps the goal). */}
             <PlayerTable players={xi(flow.side)} onPick={(p) => { recordGoal(flow.side, p, 'open'); setFlow({ mode: 'goal', side: flow.side, step: 'assist', scorer: p, goalType: 'open', logged: true }); }} />
             <Button label={`⚽ Team goal — no scorer${xi(flow.side).length === 0 ? ' (no players yet)' : ''}`} variant="ghost" onPress={() => recordTeamGoal(flow.side)} />
-            <Button label="🥅 Own goal instead" variant="ghost" onPress={() => setFlow({ mode: 'goal', side: flow.side, step: 'og' })} />
+            <Button label="🔃 Own goal instead" variant="ghost" onPress={() => setFlow({ mode: 'goal', side: flow.side, step: 'og' })} />
           </>
         ));
       }
       if (flow.step === 'og') {
-        return panel(`🥅 Own goal → ${sideName}`, `Which ${flow.side === 'home' ? awayName : homeName} player put it into their own net?`, (
+        return panel(`🔃 Own goal → ${sideName}`, `Which ${flow.side === 'home' ? awayName : homeName} player put it into their own net?`, (
           <PlayerTable players={xi(opp(flow.side))} onPick={(p) => recordOwnGoal(flow.side, p)} />
         ));
       }
@@ -912,10 +912,10 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
     if (flow.mode === 'nogoal') {
       // deep wave: a goal ruled out — a timeline row; the score never moved
       if (flow.step === 'team') {
-        return panel('🚫 Goal ruled out', 'Whose goal was ruled out?', teamButtons((side) => setFlow({ mode: 'nogoal', step: 'reason', side })));
+        return panel('❎ Goal ruled out', 'Whose goal was ruled out?', teamButtons((side) => setFlow({ mode: 'nogoal', step: 'reason', side })));
       }
       const { side } = flow;
-      return panel(`🚫 Goal ruled out — ${side === 'home' ? homeName : awayName}`, 'Why? (one tap logs it)', (
+      return panel(`❎ Goal ruled out — ${side === 'home' ? homeName : awayName}`, 'Why? (one tap logs it)', (
         <View style={{ gap: theme.spacing(2) }}>
           <SelectChip label="📺 After a VAR review" active={noGoalReview} onPress={() => setNoGoalReview(!noGoalReview)} />
           <View style={ctrl.chips}>
@@ -965,11 +965,11 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
 
     if (flow.mode === 'pen') {
       if (flow.step === 'team') {
-        return panel('🥅 Penalty', 'Which team has the penalty?', teamButtons((side) => setFlow({ mode: 'pen', step: 'wonBy', side })));
+        return panel('⭕ Penalty', 'Which team has the penalty?', teamButtons((side) => setFlow({ mode: 'pen', step: 'wonBy', side })));
       }
       const sideName = flow.side === 'home' ? homeName : awayName;
       if (flow.step === 'wonBy') {
-        return panel(`🥅 Penalty — ${sideName}`, 'Who won the penalty?', (
+        return panel(`⭕ Penalty — ${sideName}`, 'Who won the penalty?', (
           <>
             <PlayerTable players={xi(flow.side)} onPick={(p) => setFlow({ mode: 'pen', step: 'takenBy', side: flow.side, wonBy: p })} />
             <Button label="Skip — not recorded" variant="ghost" onPress={() => setFlow({ mode: 'pen', step: 'takenBy', side: flow.side })} />
@@ -977,15 +977,15 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
         ));
       }
       if (flow.step === 'takenBy') {
-        return panel(`🥅 Penalty — ${sideName}`, 'Who is taking it?', (
+        return panel(`⭕ Penalty — ${sideName}`, 'Who is taking it?', (
           <PlayerTable players={xi(flow.side)} onPick={(p) => setFlow({ mode: 'pen', step: 'outcome', side: flow.side, taker: p, wonBy: flow.wonBy })} />
         ));
       }
-      return panel(`🥅 Penalty — ${flow.taker.fullName}`, 'Outcome?', (
+      return panel(`⭕ Penalty — ${flow.taker.fullName}`, 'Outcome?', (
         <View style={ctrl.row}>
           <Button label="⚽ Scored" variant="home" style={ctrl.flex} onPress={() => finishPenalty(flow.side, 'scored', flow.taker, flow.wonBy)} />
           <Button label="🧤 Saved" variant="ghost" style={ctrl.flex} onPress={() => finishPenalty(flow.side, 'saved', flow.taker, flow.wonBy)} />
-          <Button label="🚫 Missed" variant="ghost" style={ctrl.flex} onPress={() => finishPenalty(flow.side, 'missed', flow.taker, flow.wonBy)} />
+          <Button label="✗ Missed" variant="ghost" style={ctrl.flex} onPress={() => finishPenalty(flow.side, 'missed', flow.taker, flow.wonBy)} />
         </View>
       ));
     }
@@ -1050,7 +1050,7 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
       ) : null;
       // On-target shots branch into their outcome; a block is credited to the defender.
       if (flow.step === 'outcome') {
-        return panel(`🎯 On target — ${player.fullName}`, 'What happened?', (
+        return panel(`✅ On target — ${player.fullName}`, 'What happened?', (
           <View style={{ gap: theme.spacing(2) }}>
             {detailChips}
             <View style={ctrl.row}>
@@ -1078,14 +1078,14 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
         <View style={{ gap: theme.spacing(2) }}>
           {detailChips}
           <View style={ctrl.row}>
-            <Button label="🎯 On target" variant="home" style={ctrl.flex} onPress={() => setFlow({ mode: 'stat', kind: 'shot', step: 'outcome', side, player })} />
-            <Button label="↗ Off target" variant="ghost" style={ctrl.flex} onPress={() => recordShot(side, player, { onTarget: false })} />
+            <Button label="✅ On target" variant="home" style={ctrl.flex} onPress={() => setFlow({ mode: 'stat', kind: 'shot', step: 'outcome', side, player })} />
+            <Button label="💨 Off target" variant="ghost" style={ctrl.flex} onPress={() => recordShot(side, player, { onTarget: false })} />
           </View>
           <View style={ctrl.row}>
             <Button label="🧱 Blocked" variant="ghost" style={ctrl.flex}
               onPress={() => { const shotId = recordShot(side, player, { onTarget: false, blocked: true }); setFlow({ mode: 'stat', kind: 'shot', step: 'blocker', side, player, shotId }); }} />
             {/* deep wave: hit the post / bar — an off-target shot (Opta) */}
-            {deep.shotDetail ? <Button label="🥅 Woodwork" accessibilityLabel="Hit the post or the bar" variant="ghost" style={ctrl.flex} onPress={() => recordShot(side, player, { onTarget: false, woodwork: true })} /> : null}
+            {deep.shotDetail ? <Button label="🪵 Woodwork" accessibilityLabel="Hit the post or the bar" variant="ghost" style={ctrl.flex} onPress={() => recordShot(side, player, { onTarget: false, woodwork: true })} /> : null}
           </View>
         </View>
       ));
@@ -1184,7 +1184,7 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
             Round 2: only with the "Goals ruled out" toggle on (school matches have no VAR);
             one already logged stays in the commentary / match centre either way. */}
         {deep.ruledOut ? (
-          <Button label="🚫 Goal ruled out" accessibilityLabel="Log a goal ruled out (offside, foul, handball, VAR)" variant="ghost" onPress={() => setFlow({ mode: 'nogoal', step: 'team' })} />
+          <Button label="❎ Goal ruled out" accessibilityLabel="Log a goal ruled out (offside, foul, handball, VAR)" variant="ghost" onPress={() => setFlow({ mode: 'nogoal', step: 'team' })} />
         ) : null}
       </View>
 

@@ -444,7 +444,7 @@ const ScoringControls: SportPlugin<LeagueState>['ScoringControls'] = ({
       <Text style={[c.team, { color: color(sd) }]} numberOfLines={1}>{name(sd)}</Text>
       <Button label="🏉 Try" color={color(sd)} onPress={() => setFlow({ mode: 'try', side: sd, step: s.bonusTry ? 'zone' : 'scorer' })} />
       <Button label="🎯 Kick at goal" accessibilityLabel="Penalty goal, 2 points" variant="ghost" onPress={() => setFlow({ mode: 'kick', side: sd, kick: 'pen', step: 'result' })} />
-      <Button label="🦶 Field goal" accessibilityLabel={`Field goal (drop goal), ${s.fg2 ? '1 or 2 points' : '1 point'}`} variant="ghost" onPress={() => setFlow({ mode: 'kick', side: sd, kick: 'fg', step: 'result' })} />
+      <Button label="🥅 Field goal" accessibilityLabel={`Field goal (drop goal), ${s.fg2 ? '1 or 2 points' : '1 point'}`} variant="ghost" onPress={() => setFlow({ mode: 'kick', side: sd, kick: 'fg', step: 'result' })} />
       <Button label="🏉 Penalty try" accessibilityLabel="Penalty try, 4 points, then the conversion" variant="ghost" onPress={() => penaltyTry(sd)} />
       <Button label="⏱ Sin bin · off" accessibilityLabel="Sin bin, send-off or on report" variant="ghost" onPress={() => setFlow({ mode: 'sanction', side: sd, step: 'kind' })} />
       <Button label="🔁 Interchange" variant="ghost" onPress={() => setFlow({ mode: 'sub', side: sd, step: 'kind' })} />
@@ -483,7 +483,7 @@ const ScoringControls: SportPlugin<LeagueState>['ScoringControls'] = ({
         <View style={c.row}>
           <Button label="⚖ Penalty against" accessibilityLabel={`Penalty against ${name(sd)}: ${name(other(sd))} ball`} variant="ghost" style={c.flex}
             onPress={() => (errorsOn ? setFlow({ mode: 'setEnd', side: sd, how: 'penalty' }) : setEnd('penalty'))} />
-          <Button label="🔁 Six again" accessibilityLabel={`Six again: a fresh set for ${name(sd)}`} variant="ghost" style={c.flex} onPress={() => setEnd('restart')} />
+          <Button label="🔂 Six again" accessibilityLabel={`Six again: a fresh set for ${name(sd)}`} variant="ghost" style={c.flex} onPress={() => setEnd('restart')} />
         </View>
         <Text style={c.link} accessibilityRole="button" accessibilityLabel={`Ball to ${name(other(sd))} (no ending)`} onPress={() => fire({ type: 'SET_BALL', side: other(sd) })}>↔ Ball to {name(other(sd))}</Text>
         <Text style={c.meta}>Completions {completionText(fh)} – {completionText(fa)}. The {s.setTackles}th tackle hands the ball over by itself; a score ends the set. Six again: a set restart or a penalty to the side with the ball.</Text>

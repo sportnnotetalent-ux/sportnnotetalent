@@ -2,7 +2,7 @@
  *  choose how to get started: organize a game, organize a tournament, or watch
  *  the upcoming games of the teams/tournaments they follow in that sport. */
 import React, { useMemo, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -12,7 +12,6 @@ import { theme } from '../core/theme';
 import { Glyph } from '../components/Icon';
 import { EmptyState, Card, ScreenTitle, textStyles } from '../components/ui';
 import { MatchCard } from '../components/MatchCard';
-import { SportTile } from '../components/SportArt';
 import { SectionHeader, SECTION_CAP } from '../components/SectionHeader';
 import { SPORT_LIST, getSportMeta } from '../sports/sportMeta';
 import { useAuth } from '../core/auth';
@@ -36,9 +35,6 @@ export default function TryNewSportScreen() {
   const [chosen, setChosen] = useState<SportId | null>(null);
   const [showFollowedGames, setShowFollowedGames] = useState(false);
   // 2026-10-29 redesign: three court tiles a row; the chosen sport as a banner
-  const { width } = useWindowDimensions();
-  const contentW = Math.min(width, 720) - theme.spacing(8);
-  const tileW = Math.floor((contentW - theme.spacing(2) * 2) / 3);
 
   const followedTeams = idsOfType('team');
   const followedTours = idsOfType('tournament');
@@ -80,20 +76,26 @@ export default function TryNewSportScreen() {
           subtitle={chosen ? `Get started with ${getSportMeta(chosen).name}` : 'Pick a sport you haven’t played yet'}
         />
 
-        {/* Step 1 — choose the sport (then it stands alone, as a banner) */}
-        {chosen ? (
-          <View style={{ gap: theme.spacing(2) }}>
-            <SportTile sport={chosen} name={getSportMeta(chosen).name} icon={getSportMeta(chosen).icon} width={contentW} height={150} />
-            <Text style={st.change} accessibilityRole="button" onPress={() => setChosen(null)}>‹ Change sport</Text>
-          </View>
-        ) : (
-          <View style={st.grid}>
-            {options.map((s) => (
-              <SportTile key={s} sport={s} name={getSportMeta(s).name} width={tileW} height={Math.round(tileW * 1.15)}
-                onPress={() => setChosen(s)} accessibilityHint="Choose this sport" />
-            ))}
-          </View>
-        )}
+        {/* Step 1 — choose the sport. A plain two-column list (the founder found
+            the drawn court tiles too playful here, 2026-10-29); the chosen one
+            is lit like a selected chip. */}
+        <View style={st.grid}>
+          {options.map((s) => {
+            const active = chosen === s;
+            return (
+              <TouchableOpacity accessibilityRole="button"
+                key={s}
+                activeOpacity={0.85}
+                style={[st.tile, active && st.tileActive]}
+                accessibilityState={{ selected: active }}
+                onPress={() => setChosen(active ? null : s)}
+              >
+                <Text style={st.tileIcon}>{getSportMeta(s).icon}</Text>
+                <Text style={[textStyles.body, { flex: 1 }, active && st.tileTextActive]} numberOfLines={1}>{getSportMeta(s).name}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
 
         {/* Step 2 — what to do with the chosen sport */}
         {chosen && (
@@ -126,7 +128,7 @@ export default function TryNewSportScreen() {
             ) : (
               <Card>
                 <EmptyState
-                  icon={getSportMeta(chosen).icon}
+                 
                   title={`No upcoming ${getSportMeta(chosen).name.toLowerCase()} games yet`}
                   hint="Follow teams or tournaments from Discover to see their fixtures here."
                   compact
@@ -159,7 +161,15 @@ const st = StyleSheet.create({
   safe: { flex: 1, backgroundColor: theme.colors.bg },
   content: { padding: theme.spacing(4), gap: theme.spacing(3) },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing(2) },
-  change: { color: theme.colors.primary, fontSize: theme.font.small, fontWeight: '800' },
+  tile: {
+    flexDirection: 'row', alignItems: 'center', gap: theme.spacing(2),
+    backgroundColor: theme.colors.surface, borderRadius: theme.radius.md,
+    borderWidth: 1, borderColor: theme.colors.border,
+    paddingVertical: theme.spacing(3), paddingHorizontal: theme.spacing(3), width: '48%',
+  },
+  tileActive: { borderColor: theme.colors.lime, backgroundColor: theme.colors.lime },
+  tileIcon: { fontSize: 22 },
+  tileTextActive: { color: theme.colors.onLime, fontWeight: '800' },
   section: { marginTop: theme.spacing(2) },
   actionRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(3) },
   actionIcon: { fontSize: 24 },

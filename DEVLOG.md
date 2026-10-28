@@ -13,6 +13,36 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-29 — Sport identity, scoring-pad icons, plainer cards and sport lists (preview, not live)
+
+Three founder asks after the logo release:
+
+- **"Carrom and pool show the same"** — audit of how sports are identified:
+  - Carrom had pool's 🎱 → its own 🟤; rugby / rugby league keep one ball (same
+    equipment). `tests/sport-identity.test.mts` keeps every sport's emoji unique.
+  - The small drawn badges (SportLine, notifications, hub rows…) no longer look alike:
+    netball purple, padel navy, billiards wine cloth, rugby league its own 10-metre
+    lines; every pair measured at chip size (the test renders them through
+    `tests/helpers/sportArtSvg.mjs`, which runs SportArt.tsx itself).
+  - The website's sport list is built from the app's own sports (ids in order; names
+    and symbols read from each `meta.ts`) — it can't drift again (it had missed three
+    sports and showed carrom as pool). Chips with words after the name ("Pool ›")
+    get the sport's dot too.
+  - Sport emoji drawn on screen in ~30 lines/headings → the badge line or the name.
+- **Scoring pads** (`tests/pad-icons.test.mts`): different actions on one sport's
+  pad never share a line icon. Distinct emoji now map to distinct icons (🏁 end ·
+  🚩 pennant · 🏳 conceded · ⛳ corner/golf flag; 🏃 run/dribble); clashing actions
+  got their own emoji (✂️ interception/steal/takeaway, ⭕ penalty spot, 🪵 woodwork,
+  🔃 own goal, ❎ goal ruled out, ⏫/⏬ off./def. rebound, 🎁 giveaway, 🔙 goalie back,
+  🔂 six again, 🚶 retired, 👐 fielding…). 27 clashes in 15 sports → 0.
+- **"Too kiddish"** (founder, with screenshots): match cards lose the drawn pitch
+  strip and say the kick-off time once (header; the foot shows the venue, "Tap to
+  score" or the result); Home's "Your sports" and the Try-a-new-sport screen are the
+  earlier plain lists (emoji + name cards, the chosen one lime) in the new colours.
+  The big court tiles and strips are removed from SportArt.tsx.
+- **Website**: the "Real golf" feature card (a sport, not a feature) → **Find a game**
+  (post or browse player/team/opponent/ground wanted, by sport and city, WhatsApp in a tap).
+
 ### 2026-10-29 — Release: the new design and the new S:N logo are live
 
 The founder approved the redesign ("the UI looks fine") and asked for a new logo, then a

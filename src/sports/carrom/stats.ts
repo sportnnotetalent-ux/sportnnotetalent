@@ -92,7 +92,7 @@ export const carromStats: SportStatSchema<'carrom'> = {
   leaders: ['points', 'boards', 'queens', 'pointsPerMatch'],
   headline: ['points', 'boards', 'queens'],
   awards: [
-    { stat: 'points', icon: '🎱', label: 'Top scorer' },
+    { stat: 'points', icon: '🟤', label: 'Top scorer' },
     { stat: 'queens', icon: '👑', label: 'Queens' },
   ],
 };

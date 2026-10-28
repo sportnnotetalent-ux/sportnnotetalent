@@ -495,7 +495,7 @@ function Stat({ value, label, narrow }: { value: string; label: string; narrow?:
 /** One club the player has represented, tagging its sport(s), jersey & period. */
 function TeamRow({ team }: { team: TeamAffiliation }) {
   const sub = [
-    team.sports.map((s) => getSportMeta(s).icon).join(' '),
+    team.sports.map((s) => getSportMeta(s).name).join(', '),
     team.jersey != null ? `#${team.jersey}` : '',
     teamPeriod(team),
   ]

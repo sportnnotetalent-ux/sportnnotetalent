@@ -47,9 +47,12 @@ describe('stripLeadingEmoji (section titles)', () => {
 describe('sportChip ("⚽ Football" → the sport, drawn with its colour dot)', () => {
   const SPORTS = [{ id: 'football', name: 'Football', icon: '⚽' }, { id: 'shooting', name: 'Shooting', icon: '🎯' }, { id: 'weightlifting', name: 'Weightlifting', icon: '🏋️' }];
   test('only when the words are exactly the sport\'s name', () => {
-    assert.deepEqual(sportChip('⚽ Football', SPORTS), { id: 'football', name: 'Football' });
-    assert.deepEqual(sportChip('⚽Football', SPORTS), { id: 'football', name: 'Football' });
-    assert.deepEqual(sportChip('🏋️ Weightlifting', SPORTS), { id: 'weightlifting', name: 'Weightlifting' });
+    assert.deepEqual(sportChip('⚽ Football', SPORTS), { id: 'football', name: 'Football', text: 'Football' });
+    assert.deepEqual(sportChip('⚽Football', SPORTS), { id: 'football', name: 'Football', text: 'Football' });
+    assert.deepEqual(sportChip('🏋️ Weightlifting', SPORTS), { id: 'weightlifting', name: 'Weightlifting', text: 'Weightlifting' });
+    assert.deepEqual(sportChip('⚽ Football ›', SPORTS), { id: 'football', name: 'Football', text: 'Football ›' }, 'words after the name stay');
+    assert.deepEqual(sportChip('⚽ Football: two bronzes', SPORTS), { id: 'football', name: 'Football', text: 'Football: two bronzes' });
+    assert.equal(sportChip('⚽ Footballers', SPORTS), null, 'only the whole name');
     assert.equal(sportChip('🎯 On target', SPORTS), null, 'a scoring chip that happens to use a sport\'s emoji');
     assert.equal(sportChip('Football', SPORTS), null);
   });
