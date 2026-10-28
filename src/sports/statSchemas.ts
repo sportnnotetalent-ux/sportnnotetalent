@@ -20,6 +20,9 @@ import { squashStats } from './squash/stats.ts';
 import { tableTennisStats } from './tabletennis/stats.ts';
 import { chessStats } from './chess/stats.ts';
 import { carromStats } from './carrom/stats.ts';
+import { poolStats } from './pool/stats.ts';
+import { snookerStats } from './snooker/stats.ts';
+import { billiardsStats } from './billiards/stats.ts';
 import { golfStats } from './golf/stats.ts';
 import { athleticsStats } from './athletics/stats.ts';
 import { hockeyStats } from './hockey/stats.ts';
@@ -52,6 +55,9 @@ export const STAT_SCHEMAS: { [S in SportId]: SportStatSchema<S> } = {
   tabletennis: tableTennisStats,
   chess: chessStats,
   carrom: carromStats,
+  pool: poolStats,
+  snooker: snookerStats,
+  billiards: billiardsStats,
   golf: golfStats,
   athletics: athleticsStats,
   hockey: hockeyStats,

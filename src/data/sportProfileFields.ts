@@ -52,6 +52,10 @@ export const SPORT_SIDE_FIELDS: Record<SportId, SideField[]> = {
   ],
   chess: [],
   carrom: [{ key: 'hand', label: 'Striking hand', options: ['Right', 'Left'] }],
+  // Cue sports: the cue hand (the bridge hand is the other)
+  pool: [{ key: 'hand', label: 'Cue hand', options: ['Right', 'Left'] }],
+  snooker: [{ key: 'hand', label: 'Cue hand', options: ['Right', 'Left'] }],
+  billiards: [{ key: 'hand', label: 'Cue hand', options: ['Right', 'Left'] }],
   golf: [{ key: 'hand', label: 'Plays', options: ['Right-handed', 'Left-handed'] }],
   // Track: the event group is the "position"; no handedness.
   athletics: [],
@@ -90,6 +94,9 @@ export const POSITION_HINT: Record<SportId, string> = {
   tabletennis: 'e.g. Singles, Doubles',
   chess: 'e.g. Rapid specialist, Board 1',
   carrom: 'e.g. Singles, Doubles',
+  pool: 'e.g. 8-Ball, 9-Ball, Scotch doubles',
+  snooker: 'e.g. 15 reds, 6 reds',
+  billiards: 'e.g. 150-up, Timed',
   golf: 'e.g. Home club, School team', // SD-84: the Handicap Index has its own field
   athletics: 'e.g. Sprints (100 / 200 m), Hurdles, Middle distance',
   hockey: 'e.g. Goalkeeper, Defender, Midfielder, Forward, Drag-flicker',

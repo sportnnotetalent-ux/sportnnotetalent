@@ -27,7 +27,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import * as pool from '../src/sports/pool/engine.ts';
-import { poolStats } from '../src/sports/pool/stats.ts';
+import { poolStats } from '../src/sports/pool/matchStats.ts';
 import { TOP, MONEY, SOLIDS, STRIPES } from '../src/sports/pool/balls.ts';
 import type { ScoreAction } from '../src/sports/types.ts';
 

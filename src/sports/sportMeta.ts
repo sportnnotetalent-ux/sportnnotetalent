@@ -26,6 +26,9 @@ import { SQUASH_META } from './squash/meta';
 import { TABLETENNIS_META } from './tabletennis/meta';
 import { CHESS_META } from './chess/meta';
 import { CARROM_META } from './carrom/meta';
+import { POOL_META } from './pool/meta';
+import { SNOOKER_META } from './snooker/meta';
+import { BILLIARDS_META } from './billiards/meta';
 import { GOLF_META } from './golf/meta';
 import { ATHLETICS_META } from './athletics/meta';
 import { HOCKEY_META } from './hockey/meta';
@@ -75,6 +78,9 @@ const BASE: Record<SportId, SportMeta> = {
   tabletennis: TABLETENNIS_META,
   chess: CHESS_META,
   carrom: CARROM_META,
+  pool: POOL_META,
+  snooker: SNOOKER_META,
+  billiards: BILLIARDS_META,
   golf: GOLF_META,
   athletics: ATHLETICS_META,
   hockey: HOCKEY_META,

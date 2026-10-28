@@ -65,7 +65,7 @@ export const prepAllowed = (leadMinutes: readonly number[] | undefined): boolean
  *  'both' in src/sports) — there's no matchday squad to pick. Unknown sports
  *  count as team sports, like the registry's default. */
 export const NO_SQUAD_SPORTS: readonly string[] = [
-  'tennis', 'badminton', 'padel', 'squash', 'tabletennis', 'pickleball', 'carrom', 'chess', 'golf',
+  'tennis', 'badminton', 'padel', 'squash', 'tabletennis', 'pickleball', 'carrom', 'pool', 'snooker', 'billiards', 'chess', 'golf',
   'athletics', 'swimming', 'weightlifting', 'shooting', 'archery', 'rowing', 'canoe', 'cycling',
 ];
 export const sportHasSquads = (sport: string | null | undefined): boolean => !NO_SQUAD_SPORTS.includes(sport ?? '');
