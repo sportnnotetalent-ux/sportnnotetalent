@@ -62,3 +62,23 @@ The change: migration `20261028190000_security_wave3b`.
 - **Strangers:** 120 strangers wrote no stat lines and issued no certificates for children.
 - **Late answers:** of 60 children entered by other organisers, 40 had their lines come back when their coach confirmed, and 20 "Not us" removed theirs.
 - **Late scorer changes:** all 300, made more than 24 hours after the end, were refused. The 50 organiser corrections went through.
+
+## 3C: consent and abuse limits (DB-07, DB-16)
+The change: migration `20261028200000_security_wave3c`.
+
+| # | Attempt, or what could break | Status |
+|---|---|---|
+| W3B-26 | **A new device id on every call.** | Holds. 300 analytics calls and 60 crash reports an hour per address, plus an overall cap for logged-out callers (test). |
+| W3B-27 | **No address in the headers** (a proxy that drops them). | Accepted. Only the overall cap applies then (20,000 analytics / 3,000 crash reports an hour). |
+| W3B-28 | **One school's Wi-Fi.** Many logged-out visitors share one address. | Accepted. The analytics just stop counting for the hour; the app is unaffected. Signed-in users aren't limited by address. |
+| W3B-29 | **A child moves their date of birth to an adult one, or clears it.** | Holds, for the account and the child's own claimed player (test). |
+| W3B-30 | **A coach fixes a wrong birth year on an unclaimed player; a profile is claimed with the account's own DOB.** | Holds. Unclaimed rows are unaffected (test). |
+| W3B-31 | **A child points the guardian contact at themselves after a guardian confirmed.** | Holds. The account goes back to "waiting for a guardian" (test). |
+| W3B-32 | **A pending child gives their own second email as the guardian's and approves the link themselves.** | **Open: founder decision** (CL-03: how consent is proven). |
+| W3B-33 | **The sign-up country is chosen by the app** (and decides whether a guardian must confirm). | **Open: founder decision** (CL-04). |
+
+**Simulation** (`tests/sim-security-wave3c.test.mts`):
+- **Devices:** 500 logged-out devices on 50 addresses; all 2,000 of their calls were counted.
+- **Abuser:** one address sent 1,000 calls with a new device id each time; 300 were counted.
+- **Children:** 100 children with a confirmed guardian. All 300 date-of-birth tricks were refused, and all 100 guardian-contact changes were asked again.
+- **Coaches:** 100 coaches fixed a wrong birth year on a child they added.

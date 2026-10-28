@@ -311,3 +311,69 @@ describe('DB-13 — finished results are final', () => {
     assert.equal((await db.sql(`select 1 from matches where id = $1`, [m.id])).length, 0);
   });
 });
+
+/* ------------------------- 3C — consent and abuse limits ------------------------- */
+
+/** A logged-out call from an address (the request headers PostgREST passes). */
+const anonFrom = (ip: string, q: string, params: unknown[] = []) => db.pg.transaction(async (tx) => {
+  await tx.query(`select set_config('request.jwt.claims', '{"role":"anon"}', true)`);
+  await tx.query(`select set_config('request.headers', $1, true)`, [JSON.stringify({ 'x-forwarded-for': `${ip}, 10.0.0.1` })]);
+  await tx.query('set local role anon');
+  return (await tx.query<Record<string, unknown>>(q, params)).rows;
+});
+
+describe('DB-16 — logged-out callers can\'t get round the analytics and crash-report limits', () => {
+  test('a new device id on every call from one address is still limited by the address', async () => {
+    const ev = JSON.stringify([{ name: 'app_open' }]);
+    let accepted = 0;
+    for (let i = 0; i < 310; i++) {
+      const [r] = await anonFrom('203.0.113.7', `select track_events($1::jsonb, gen_random_uuid(), gen_random_uuid(), 'web', '1') as n`, [ev]);
+      accepted += Number(r.n);
+    }
+    assert.equal(accepted, 300);
+    const [other] = await anonFrom('198.51.100.9', `select track_events($1::jsonb, gen_random_uuid(), null, 'web', '1') as n`, [ev]);
+    assert.equal(Number(other.n), 1, 'another address is unaffected');
+    let errs = 0;
+    for (let i = 0; i < 70; i++) {
+      const [r] = await anonFrom('203.0.113.8', `select report_client_error('boom', null, false, 'Home', gen_random_uuid(), gen_random_uuid(), 'web', '1') as ok`);
+      if (r.ok) errs++;
+    }
+    assert.equal(errs, 60);
+  });
+  test('the rate-limit ledger is cleaned on a schedule', async () => {
+    const [j] = await db.sql<{ n: number }>(`select count(*)::int as n from cron.job where jobname = 'rate-limit-cleanup' and command ilike '%delete from rate_limit_hits%'`);
+    assert.equal(j.n, 1);
+  });
+});
+
+describe('DB-07 — a child can\'t lift the under-18 limits themselves', () => {
+  let kid: Who;
+  before(async () => {
+    kid = await person('Teen Ager', '2012-05-05');
+    await db.sql(`update profiles set dob = '2012-05-05', guardian_consent = 'confirmed', guardian = '{"email":"mum@x.in"}' where id = $1`, [kid.uid]);
+  });
+  test('the date of birth can\'t be moved to an adult one, or cleared — a younger or same-age one is fine', async () => {
+    assert.match(await errOf(() => db.as(kid.uid, `update profiles set dob = '2000-01-01' where id = auth.uid()`)) ?? '', /support/i);
+    assert.match(await errOf(() => db.as(kid.uid, `update profiles set dob = null where id = auth.uid()`)) ?? '', /support/i);
+    assert.match(await errOf(() => db.as(kid.uid, `update players set dob = '2000-01-01' where id = $1`, [kid.player])) ?? '', /support/i);
+    await db.as(kid.uid, `update profiles set dob = '2012-06-06' where id = auth.uid()`);
+    const coach = await person('Typo Coach');
+    const [p] = await db.as<{ id: string }>(coach.uid, `insert into players (full_name, dob) values ('Typo Kid', '2014-01-01') returning id`);
+    await db.as(coach.uid, `update players set dob = '2004-01-01' where id = $1`, [p.id]);
+  });
+  test('changing the guardian\'s contact asks the new guardian again; the linked parent can change it', async () => {
+    await db.as(kid.uid, `update profiles set guardian = '{"email":"me-again@x.in"}' where id = auth.uid()`);
+    const [a] = await db.sql<{ c: string }>(`select guardian_consent as c from profiles where id = $1`, [kid.uid]);
+    assert.equal(a.c, 'pending');
+    await db.sql(`update profiles set guardian_consent = 'confirmed' where id = $1`, [kid.uid]);
+    await db.as(kid.uid, `update players set guardian = '{"email":"other@x.in"}' where id = $1`, [kid.player]);
+    const [b] = await db.sql<{ c: string }>(`select guardian_consent as c from profiles where id = $1`, [kid.uid]);
+    assert.equal(b.c, 'pending', 'through their own player too');
+    const parent = await db.signUp({ name: 'Real Mum', dob: '1980-01-01' });
+    await db.sql(`update profiles set guardian_consent = 'confirmed' where id = $1`, [kid.uid]);
+    await db.sql(`update players set guardian_profile_id = $1 where id = $2`, [parent, kid.player]);
+    await db.as(parent, `update players set guardian = '{"email":"mum-new@x.in"}' where id = $1`, [kid.player]).catch(() => undefined);
+    const [c] = await db.sql<{ c: string }>(`select guardian_consent as c from profiles where id = $1`, [kid.uid]);
+    assert.equal(c.c, 'confirmed');
+  });
+});
