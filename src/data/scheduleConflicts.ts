@@ -28,6 +28,9 @@ const DURATION_MIN: Partial<Record<SportId, number>> = {
   tabletennis: 45,
   chess: 120, // rapid/blitz rounds are shorter; classical can run 4h+
   carrom: 60,
+  pool: 90, // a race to 7–9 ≈ 60–90 min; sets or long races need longer slots
+  snooker: 150, // best of 5 at club level ≈ 25–30 min a frame (6-red ≈ 10–15) + turnaround
+  billiards: 120, // a 150-up best of 5 (IBSF short format) ≈ 1.5–2 h
   golf: 300, // an 18-hole round + turnaround
   athletics: 240, // a session of track events
   hockey: 105, // 4 × 15 + breaks + turnaround

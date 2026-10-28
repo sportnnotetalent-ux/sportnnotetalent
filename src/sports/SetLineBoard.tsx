@@ -35,7 +35,7 @@ export function SetLineBoard({
   if (!ls) return null;
   const final = ls.ended || !!closed;
   const grid = lineGrid(ls, closed ? { closed: { winner: closed.winner ?? null } } : {});
-  const wonLabel = ls.unit === 'set' ? 'SETS' : 'GAMES';
+  const wonLabel = ls.unit === 'set' ? 'SETS' : ls.unit === 'frame' ? 'FRAMES' : ls.unit === 'rack' ? 'RACKS' : 'GAMES';
   const leadOf = (side: 'home' | 'away') => (final || !lead ? String(ls.won[side]) : lead[side]);
   const name = (side: 'home' | 'away', n: string) => (!final && serving === side ? `${n} ${serveIcon}` : n);
   const mark = closed?.mark ? MARK_WORD[closed.mark] ?? closed.mark : '';

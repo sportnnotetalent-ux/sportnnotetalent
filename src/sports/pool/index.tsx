@@ -364,6 +364,8 @@ export const poolPlugin: SportPlugin<PoolMatch> = {
   Scoreboard: PoolScoreboard,
   ScoringControls,
   matchTabs: { Commentary: PoolCommentary, Stats: PoolStats },
+  // break #14: the shooter is payload.pid — the correction list re-credits it
+  creditInPayload: true,
 };
 
 const ctrl = StyleSheet.create({

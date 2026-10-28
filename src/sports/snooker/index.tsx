@@ -277,7 +277,7 @@ const SnookerScoreboard: NonNullable<SportPlugin<SnookerState>['Scoreboard']> = 
   const b = snookerBoard(s);
   return (
     <SetLineBoard
-      ls={lineScore(s)} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} live={live} closed={closed}
+      ls={frameLineScore(s)} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} live={live} closed={closed}
       status={b.status} bestOf={b.bestOf} leadLabel="FRAMES" alerts={b.alerts} cue={b.cue}
     />
   );
@@ -318,6 +318,12 @@ function SnookerStats(p: TabProps) {
   );
 }
 
+/** The line score, counted in frames (the scoreboard says FRAMES; A-09). */
+const frameLineScore = (s: SnookerState) => {
+  const ls = lineScore(s);
+  return ls ? { ...ls, unit: 'frame' as const } : null;
+};
+
 export const snookerPlugin: SportPlugin<SnookerState> = {
   ...SNOOKER_META,
   // SD-51 — highest breaks, centuries, maximums, biggest frame wins
@@ -328,7 +334,8 @@ export const snookerPlugin: SportPlugin<SnookerState> = {
   result: (s) => result(s),
   summary,
   scoreLine,
-  lineScore,
+  lineScore: frameLineScore,
+  correctionLabel: '✎ Correct a finished frame',
   standingsUnits,
   // SD-19 — derived only (nothing is credited live); one player per side
   statTotals: snookerStatTotals,

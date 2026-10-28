@@ -430,6 +430,12 @@ export interface SportPlugin<S = unknown> {
    *  hides "Correct this match" — cricket until #06 ships its own editor, since
    *  re-crediting `attribution` alone would split its scorecard from its stats. */
   correctable?: boolean;
+  /** The player an event credits is `payload.pid`, with no `attribution` (pool's
+   *  scotch doubles: nothing is credited live). The generic correction list
+   *  then shows and re-credits that player. */
+  creditInPayload?: boolean;
+  /** The live correction link's words (cricket "✎ Edit a past ball", the default). */
+  correctionLabel?: string;
   /** A sport's own correction editor (cricket, #06); else the generic list. */
   CorrectionEditor?: React.FC<{
     log: import('../core/types').MatchEventRecord[];

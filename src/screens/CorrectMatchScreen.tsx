@@ -120,7 +120,7 @@ export default function CorrectMatchScreen() {
                 homeName={home} awayName={away} homeRoster={rosters.home} awayRoster={rosters.away} />
             ) : (
               <EventCorrectionList log={log} ops={ops} onOps={(o, l) => { setOps(o); setLines(l); }}
-                homeName={home} awayName={away} homeRoster={rosters.home} awayRoster={rosters.away} />
+                homeName={home} awayName={away} homeRoster={rosters.home} awayRoster={rosters.away} payloadCredit={!!plugin.creditInPayload} />
             )}
           </>
         ) : (

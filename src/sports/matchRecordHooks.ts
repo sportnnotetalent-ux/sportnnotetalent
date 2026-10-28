@@ -33,11 +33,15 @@ import { padelMatchRecords } from './padel/records.ts';
 import { badmintonMatchRecords } from './badminton/records.ts';
 import { volleyballMatchRecords } from './volleyball/records.ts';
 import { rallyMatchRecords } from './rallyRecords.ts';
+import { poolMatchRecords } from './pool/records.ts';
+import { snookerMatchRecords } from './snooker/records.ts';
+import { billiardsMatchRecords } from './billiards/records.ts';
 
 export {
   cricketMatchRecords, footballMatchRecords, hockeyMatchRecords, handballMatchRecords, rugbyMatchRecords,
   basketballMatchRecords, kabaddiMatchRecords, chessMatchRecords, carromMatchRecords, golfMatchRecords,
   tennisMatchRecords, padelMatchRecords, badmintonMatchRecords, volleyballMatchRecords, rallyMatchRecords,
+  poolMatchRecords, snookerMatchRecords, billiardsMatchRecords,
 };
 
 /** The hook per sport (the registry sets `plugin.matchRecords` from this). */
@@ -64,5 +68,8 @@ export const MATCH_RECORD_HOOKS: Partial<Record<SportId, (state: any) => MatchRe
   squash: rallyMatchRecords,
   pickleball: rallyMatchRecords,
   carrom: carromMatchRecords,
+  pool: poolMatchRecords,
+  snooker: snookerMatchRecords,
+  billiards: billiardsMatchRecords,
   golf: golfMatchRecords,
 };

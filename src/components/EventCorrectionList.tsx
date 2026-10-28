@@ -25,7 +25,15 @@ export const recordAction = (r: MatchEventRecord): ScoreAction => ({
   attribution: r.attribution ?? undefined,
 });
 
-export function EventCorrectionList({ log, ops, onOps, homeName, awayName, homeRoster, awayRoster }: {
+/** Who a record credits: its attribution, or — a sport that keeps the
+ *  player in the payload (pool, `payloadCredit`) — `payload.pid`. */
+export function creditOf(r: Pick<MatchEventRecord, 'attribution' | 'payload'>, payloadCredit = false): { playerId?: string; playerName?: string } | null {
+  if (r.attribution) return r.attribution;
+  const pid = (r.payload as Record<string, unknown> | null | undefined)?.pid;
+  return payloadCredit && typeof pid === 'string' && pid ? { playerId: pid } : null;
+}
+
+export function EventCorrectionList({ log, ops, onOps, homeName, awayName, homeRoster, awayRoster, payloadCredit = false }: {
   /** the effective log (corrections already applied) */
   log: MatchEventRecord[];
   ops: AmendOp[];
@@ -34,14 +42,17 @@ export function EventCorrectionList({ log, ops, onOps, homeName, awayName, homeR
   awayName: string;
   homeRoster: Player[];
   awayRoster: Player[];
+  /** the sport credits players in `payload.pid` (SportPlugin.creditInPayload) */
+  payloadCredit?: boolean;
 }) {
   const [picking, setPicking] = useState<number | null>(null);
+  const credit = (r: Pick<MatchEventRecord, 'attribution' | 'payload'>) => creditOf(r, payloadCredit);
   const rows = log.filter((r) => r.side === 'home' || r.side === 'away').reverse();
   const team = (r: MatchEventRecord) => (r.side === 'home' ? homeName : awayName);
   // IDs-only scoring: the player by id from the squads (an older log's stored
   // name as the fallback).
   const nameOf = makeNameOf(peopleMap(homeRoster, awayRoster));
-  const who = (r: MatchEventRecord) => (r.attribution?.playerId || r.attribution?.playerName ? nameOf(r.attribution?.playerId, r.attribution?.playerName) : '');
+  const who = (r: MatchEventRecord) => { const c = credit(r); return c?.playerId || c?.playerName ? nameOf(c?.playerId, c?.playerName) : ''; };
   const describe = (r: MatchEventRecord) => `${humanize(r.type)} · ${team(r)}${who(r) ? ` · ${who(r)}` : ''}`;
   // The change lines are stored in the match's public log: an adult by name, a
   // possible minor (under 18 / no date of birth) by initials.
@@ -51,7 +62,8 @@ export function EventCorrectionList({ log, ops, onOps, homeName, awayName, homeR
     return p ? publicName({ fullName: p.fullName, age: ageOf(p) }) : legacy ? nameInitials(legacy) : '';
   };
   const publicDescribe = (r: MatchEventRecord) => {
-    const w = publicWho(r.attribution?.playerId, r.attribution?.playerName);
+    const c = credit(r);
+    const w = publicWho(c?.playerId, c?.playerName);
     return `${humanize(r.type)} · ${team(r)}${w ? ` · ${w}` : ''}`;
   };
   const opFor = (seq: number) => ops.find((o) => o.seq === seq);
@@ -65,7 +77,7 @@ export function EventCorrectionList({ log, ops, onOps, homeName, awayName, homeR
       if (!r) return '';
       return o.op === 'void'
         ? `Removed: ${publicDescribe(r)}`
-        : `Changed: ${publicDescribe(r)} → ${publicWho(o.action.attribution?.playerId) || 'someone else'}`;
+        : `Changed: ${publicDescribe(r)} → ${publicWho(credit(o.action as MatchEventRecord)?.playerId) || 'someone else'}`;
     }).filter(Boolean);
     onOps(next, lines);
   };
@@ -78,7 +90,9 @@ export function EventCorrectionList({ log, ops, onOps, homeName, awayName, homeR
         const op = opFor(r.seq);
         const roster = r.side === 'home' ? homeRoster : awayRoster;
         const removed = op?.op === 'void';
-        const changedTo = op?.op === 'replace' && op.action.attribution?.playerId ? nameOf(op.action.attribution.playerId) : null;
+        const changedId = op?.op === 'replace' ? credit(op.action as MatchEventRecord)?.playerId : undefined;
+        const changedTo = changedId ? nameOf(changedId) : null;
+        const cr = credit(r);
         return (
           <Card key={r.seq} style={{ gap: theme.spacing(2), opacity: removed ? 0.55 : 1 }}>
             <View style={st.row}>
@@ -91,17 +105,17 @@ export function EventCorrectionList({ log, ops, onOps, homeName, awayName, homeR
                 onPress={() => setOp(r.seq, removed ? null : { op: 'void', seq: r.seq })}>
                 {removed ? '↺ Keep' : '✕ Remove'}
               </Text>
-              {r.attribution && !removed ? (
+              {cr && !removed ? (
                 <Text style={st.link} accessibilityRole="button" onPress={() => setPicking(picking === r.seq ? null : r.seq)}>
                   {picking === r.seq ? 'Close' : '✎ Player'}
                 </Text>
               ) : null}
               {changedTo ? <Text style={st.undo} accessibilityRole="button" onPress={() => setOp(r.seq, null)}>↺ Undo change</Text> : null}
             </View>
-            {picking === r.seq && r.attribution ? (
+            {picking === r.seq && cr ? (
               <View style={st.chips}>
-                {roster.filter((p) => p.id !== r.attribution!.playerId).map((p) => (
-                  <SelectChip key={p.id} label={p.fullName} active={op?.op === 'replace' && op.action.attribution?.playerId === p.id}
+                {roster.filter((p) => p.id !== cr.playerId).map((p) => (
+                  <SelectChip key={p.id} label={p.fullName} active={changedId === p.id}
                     onPress={() => {
                       // IDs-only: the new player by id; any stored name goes
                       setOp(r.seq, { op: 'replace', seq: r.seq, action: recreditAction(recordAction(r), p.id) });

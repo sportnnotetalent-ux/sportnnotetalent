@@ -197,7 +197,7 @@ const BilliardsScoreboard: NonNullable<SportPlugin<BilliardsState>['Scoreboard']
   const b = billiardsBoard(s);
   return (
     <SetLineBoard
-      ls={lineScore(s)} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} live={live} closed={closed}
+      ls={frameLineScore(s)} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} live={live} closed={closed}
       status={b.status} bestOf={b.bestOf} leadLabel={b.leadLabel} alerts={b.alerts} cue={b.cue}
     />
   );
@@ -237,6 +237,12 @@ function BilliardsStats(p: TabProps) {
   );
 }
 
+/** The line score, counted in frames (the scoreboard says FRAMES; A-09). */
+const frameLineScore = (s: BilliardsState) => {
+  const ls = lineScore(s);
+  return ls ? { ...ls, unit: (s?.bestOf === 1 ? 'game' : 'frame') as 'game' | 'frame' } : null;
+};
+
 export const billiardsPlugin: SportPlugin<BilliardsState> = {
   ...BILLIARDS_META,
   // SD-51 — highest breaks, centuries, biggest frame wins
@@ -247,7 +253,8 @@ export const billiardsPlugin: SportPlugin<BilliardsState> = {
   result: (s) => result(s),
   summary,
   scoreLine,
-  lineScore,
+  lineScore: frameLineScore,
+  correctionLabel: '✎ Correct a finished frame',
   standingsUnits,
   // SD-19 — derived only (nothing is credited live); one player per side
   statTotals: billiardsStatTotals,

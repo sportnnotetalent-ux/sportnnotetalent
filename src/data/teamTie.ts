@@ -137,10 +137,20 @@ export const TIE_PRESETS: TiePreset[] = [
   { id: 'pb-team', sport: 'pickleball', label: 'Team tie · 2 doubles + mixed',
     note: 'Doubles, doubles, mixed doubles; best of 3 rubbers',
     spec: { rubbers: [N('D', '1st doubles'), N('D', '2nd doubles'), N('XD', 'Mixed doubles')], dead: 'stop', half: false, gap: 45 } },
+  // Cue sports (2026-10-28): club and school team matches
+  { id: 'pl-team', sport: 'pool', label: 'Team tie · 4 singles + scotch doubles',
+    note: 'Singles, singles, scotch doubles, singles, singles; stops at 3 wins (check your event’s rules)',
+    spec: { rubbers: [N('S', '1st singles'), N('S', '2nd singles'), N('D', 'Scotch doubles'), N('S', '3rd singles'), N('S', '4th singles')], dead: 'stop', half: false, gap: 60 } },
+  { id: 'sn-team3', sport: 'snooker', label: 'Team match · 3 singles',
+    note: 'No.1 v No.1, No.2 v No.2, No.3 v No.3; best of 3 rubbers (four-handed frames aren’t scored)',
+    spec: { rubbers: [S('1', '1'), S('2', '2'), S('3', '3')], dead: 'stop', half: false, pos: { p: ['1', '2', '3'], q: ['1', '2', '3'] }, gap: 90 } },
+  { id: 'bl-team3', sport: 'billiards', label: 'Team match · 3 singles',
+    note: 'No.1 v No.1, No.2 v No.2, No.3 v No.3; best of 3 rubbers',
+    spec: { rubbers: [S('1', '1'), S('2', '2'), S('3', '3')], dead: 'stop', half: false, pos: { p: ['1', '2', '3'], q: ['1', '2', '3'] }, gap: 90 } },
 ];
 
 /** Sports that can run team ties. */
-export const TIE_SPORTS = new Set<SportId>(['tabletennis', 'badminton', 'tennis', 'squash', 'chess', 'carrom', 'padel', 'pickleball']);
+export const TIE_SPORTS = new Set<SportId>(['tabletennis', 'badminton', 'tennis', 'squash', 'chess', 'carrom', 'padel', 'pickleball', 'pool', 'snooker', 'billiards']);
 export const tiePresetsFor = (sport: SportId): TiePreset[] => TIE_PRESETS.filter((p) => p.sport === sport);
 
 /** A spec from a preset (the ABC side is home until the draw says otherwise). */
@@ -612,6 +622,12 @@ export const TIE_POINTS: Partial<Record<SportId, { id: string; label: string; no
   chess: { id: 'fide-team', label: 'FIDE team (match points)', note: 'Match won 2, drawn 1, lost 0; ties: game points, direct encounter',
     set: { winPoints: 2, drawPoints: 1, lossPoints: 0, tieBreak: 'boardPoints,h2h,lots' } },
   carrom: { id: 'team-tie', label: 'Team ties', note: 'Ties won; 2 level → head-to-head; 3+ → rubbers, games, points difference',
+    set: { winPoints: 1, drawPoints: 0, lossPoints: 0, tieBreak: 'rubbersDiff,gamesDiff,pointsDiff,lots', tieBreak2: 'h2h,lots', tieRestart: true } },
+  pool: { id: 'team-tie', label: 'Team ties', note: 'Ties won; 2 level → head-to-head; 3+ → rubbers, rack difference',
+    set: { winPoints: 1, drawPoints: 0, lossPoints: 0, tieBreak: 'rubbersDiff,gamesDiff,lots', tieBreak2: 'h2h,lots', tieRestart: true } },
+  snooker: { id: 'team-tie', label: 'Team ties', note: 'Ties won; 2 level → head-to-head; 3+ → rubbers, frames, frame points difference',
+    set: { winPoints: 1, drawPoints: 0, lossPoints: 0, tieBreak: 'rubbersDiff,gamesDiff,pointsDiff,lots', tieBreak2: 'h2h,lots', tieRestart: true } },
+  billiards: { id: 'team-tie', label: 'Team ties', note: 'Ties won; 2 level → head-to-head; 3+ → rubbers, frames, frame points difference',
     set: { winPoints: 1, drawPoints: 0, lossPoints: 0, tieBreak: 'rubbersDiff,gamesDiff,pointsDiff,lots', tieBreak2: 'h2h,lots', tieRestart: true } },
   padel: { id: 'team-tie', label: 'Team ties', note: 'Ties won; 2 level → head-to-head; 3+ → rubbers, sets, games difference',
     set: { winPoints: 1, drawPoints: 0, lossPoints: 0, tieBreak: 'rubbersDiff,diff,gamesDiff,lots', tieBreak2: 'h2h,lots', tieRestart: true } },

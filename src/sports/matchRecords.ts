@@ -171,6 +171,25 @@ export const MATCH_RECORD_TYPES: Partial<Record<SportId, MatchRecordType[]>> = {
     { key: 'boardRun', label: 'Most boards in a row', who: 'team' },
     { key: 'slam', label: 'Slams (whole board in one turn)', who: 'team' },
   ],
+  // Cue sports (2026-10-28)
+  pool: [
+    { key: 'biggestWin', label: 'Biggest wins (racks)', who: 'team' },
+    { key: 'breakAndRuns', label: 'Most break-and-runs in a match', who: 'team' },
+    { key: 'runOuts', label: 'Most run-outs in a match', who: 'team' },
+    { key: 'goldenBreak', label: 'Golden breaks', who: 'team' },
+    { key: 'rackRun', label: 'Most racks in a row', who: 'team' },
+  ],
+  snooker: [
+    { key: 'highBreak', label: 'Highest breaks', who: 'team' },
+    { key: 'century', label: 'Century breaks', who: 'team' },
+    { key: 'maximum', label: 'Maximum breaks', who: 'team' },
+    { key: 'biggestFrame', label: 'Biggest frame wins', who: 'team' },
+  ],
+  billiards: [
+    { key: 'highBreak', label: 'Highest breaks', who: 'team' },
+    { key: 'century', label: 'Century breaks (100+)', who: 'team' },
+    { key: 'biggestFrame', label: 'Biggest frame wins', who: 'team' },
+  ],
   // SD-137a — golf MATCH PLAY (stroke play keeps its own records)
   golf: [
     { key: 'biggestMargin', label: 'Biggest match-play wins', who: 'team' },

@@ -1234,7 +1234,7 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
           accessibilityState={{ disabled: pendingTaps > 0 }}
           accessibilityHint={pendingTaps > 0 ? `Waiting for ${pendingTaps} tap${pendingTaps === 1 ? '' : 's'} to upload` : undefined}
           onPress={() => { if (pendingTaps === 0) void openLiveEdit(); }}>
-          ✎ Edit a past ball
+          {plugin.correctionLabel ?? '✎ Edit a past ball'}
         </Text>
         {pendingTaps > 0 ? (
           <Text style={textStyles.muted}>Waiting for {pendingTaps} tap{pendingTaps === 1 ? '' : 's'} to upload… you can edit once they’re saved.</Text>

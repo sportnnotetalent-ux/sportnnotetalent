@@ -177,7 +177,9 @@ describe('F-15 · each sport keeps its light meta next to its plugin', () => {
   });
   test('each sport with a records hook sets it on its own plugin (was the registry)', () => {
     for (const sport of Object.keys(MATCH_RECORD_HOOKS)) {
-      const src = /makeRallyPlugin\(/.test(read(`${sport}/index.tsx`)) ? read('rallyCore.tsx') : read(`${sport}/index.tsx`);
+      // a plugin may keep its pure half in <sport>/core.ts (pool) and spread it
+      const core = existsSync(new URL(`${sport}/core.ts`, ROOT)) ? read(`${sport}/core.ts`) : '';
+      const src = /makeRallyPlugin\(/.test(read(`${sport}/index.tsx`)) ? read('rallyCore.tsx') : read(`${sport}/index.tsx`) + core;
       assert.match(src, /matchRecords: [a-zA-Z]+MatchRecords,/, sport);
     }
   });

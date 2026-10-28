@@ -56,7 +56,8 @@ export const POOL_CORE = {
   result: (s: PoolMatch) => result(s),
   summary: (s: PoolMatch) => summary(s),
   scoreLine: (s: PoolMatch, perspective?: 'home' | 'away') => scoreLine(s, perspective),
-  lineScore: (s: PoolMatch) => lineScore(s),
+  // a race counts racks (RACKS on the scoreboard); a sets match counts sets
+  lineScore: (s: PoolMatch) => { const ls = lineScore(s); return ls && ls.unit === 'game' ? { ...ls, unit: 'rack' as const } : ls; },
   standingsUnits: poolUnits,
   statTotals: poolStatTotals,
   statTotalsNeedsPlayers: true,

@@ -75,7 +75,8 @@ export interface LineCell { home: number; away: number; tb?: Pair | null; matchT
 /** A set/game sport's line score, built by the engine (`plugin.lineScore`). */
 export interface LineScore {
   /** what a column is: tennis/padel/volleyball 'set', the rest 'game' */
-  unit: 'set' | 'game';
+  /** what's counted: sets, games — or frames (snooker, billiards) / racks (pool) */
+  unit: 'set' | 'game' | 'frame' | 'rack';
   /** sets / games won */
   won: { home: number; away: number };
   /** the completed sets/games, in order */

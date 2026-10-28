@@ -33,6 +33,7 @@ export function LineScoreboard({
    *  dims, so the final board reads as a result */
   winner?: 'home' | 'away' | null;
 }) {
+  const wide = leadLabel.length > 5;
   const rows: Array<LineRow & { side: 'home' | 'away' }> = [{ ...home, side: 'home' }, { ...away, side: 'away' }];
   return (
     <View style={st.wrap}>
@@ -50,7 +51,8 @@ export function LineScoreboard({
           {/* Header: name spacer · lead label · period labels */}
           <View style={st.headRow}>
             <View style={st.nameCell} />
-            <Text style={st.leadHead}>{leadLabel}</Text>
+            {/* a longer word (FRAMES, RACKS) gets a wider column, header and cells alike */}
+            <Text style={[st.leadHead, wide && st.wideLead]} numberOfLines={1}>{leadLabel}</Text>
             {columns.map((c, i) => (
               <View key={i} style={st.colHead}>
                 {c.highlight ? (
@@ -71,7 +73,7 @@ export function LineScoreboard({
                   <Text style={[st.name, { color: r.color }]} numberOfLines={1}>{r.name}</Text>
                   {won ? <Text style={st.trophy}>🏆</Text> : null}
                 </View>
-                <View style={st.leadCell}><Text style={st.leadText}>{r.lead}</Text></View>
+                <View style={[st.leadCell, wide && st.wideLead]}><Text style={st.leadText}>{r.lead}</Text></View>
                 {r.cells.map((cell, ci) => (
                   <View key={ci} style={[st.cell, columns[ci]?.highlight && st.cellHi]}>
                     <Text style={[st.cellText, columns[ci]?.highlight && st.cellTextHi]}>{cell}</Text>
@@ -102,6 +104,7 @@ const st = StyleSheet.create({
   headRow: { flexDirection: 'row', alignItems: 'center', marginBottom: theme.spacing(2) },
   nameCell: { width: 120 },
   leadHead: { width: 52, textAlign: 'center', color: theme.colors.textMuted, fontSize: theme.font.tiny, fontWeight: '800', letterSpacing: 0.5 },
+  wideLead: { width: 64 },
   colHead: { width: CELL, alignItems: 'center' },
   colHeadText: { color: theme.colors.textMuted, fontSize: theme.font.small, fontWeight: '700' },
   colPill: { minWidth: 22, minHeight: 22, borderRadius: 11, backgroundColor: theme.colors.primary, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },

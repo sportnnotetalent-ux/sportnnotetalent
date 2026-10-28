@@ -21,7 +21,7 @@ export const POOL_META: SportMeta = {
         { value: 'ten', label: '10-Ball' },
       ],
     },
-    { key: 'raceTo', label: 'Race to (racks)', type: 'number', default: 5, min: 1, max: 99, onCreate: true, hint: 'the first to win this many racks wins (the set)' },
+    { key: 'raceTo', label: 'Race to', type: 'number', default: 5, min: 1, max: 99, onCreate: true, hint: 'racks — the first to win this many wins' },
     {
       key: 'playersPerSide', label: 'Players', type: 'choice', default: 1,
       options: [

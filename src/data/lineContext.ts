@@ -224,7 +224,7 @@ function formatFor(sport: SportId, cfg: Cfg, state: Cfg): SplitValue | undefined
   }
 }
 
-const DISCIPLINE_SPORTS = new Set<SportId>(['tennis', 'badminton', 'tabletennis', 'squash', 'pickleball', 'padel', 'carrom']);
+const DISCIPLINE_SPORTS = new Set<SportId>(['tennis', 'badminton', 'tabletennis', 'squash', 'pickleball', 'padel', 'carrom', 'pool']);
 
 /** Singles / doubles (mixed when the format says so). The engine's own
  *  `doubles` flag wins; else players per side (≥ 2 = doubles). Padel is

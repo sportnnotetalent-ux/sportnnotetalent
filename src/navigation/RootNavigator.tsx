@@ -138,6 +138,7 @@ if (__DEV__) void import('../data/devSeed'); // registers window.__sportfolioSee
 if (!isSupabaseConfigured) {
   void import('../data/teamTieDemoSeed'); // SD-48: __sportnnoteDemo.seedTeamTies() — demo mode (no backend) only
   void import('../data/sd134DemoSeed'); // SD-134: __sportnnoteDemo.seedChessSwiss() / seedGolfDivisions() — demo mode only
+  void import('../data/cueDemoSeed'); // cue sports: __sportnnoteDemo.seedCueSports() — demo mode only
   void import('../data/sd137bDemoSeed'); // SD-137b: __sportnnoteDemo.seedTeamEvents() — demo mode only
 }
 

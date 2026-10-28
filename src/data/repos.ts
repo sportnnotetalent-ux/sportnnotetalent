@@ -75,7 +75,7 @@ import {
 import { emptyFormation, defaultFormationFor } from '../sports/football/formation';
 import { isSoleActiveOwner } from '../core/org';
 import { joinBlockReason } from '../core/registration';
-import { getSport, loadSport, loadSports } from '../sports/registry';
+import { getSport, getSportMeta, loadSport, loadSports } from '../sports/registry';
 import { replayLog } from '../sports/amend';
 import type { StatTotalsContext } from '../sports/types';
 import { mergeMatchConfig } from '../core/matchConfig';
@@ -2257,11 +2257,14 @@ export async function statTotalsContext(matchId: string, match?: Match | null): 
     if (!m) return {};
     const [squads, rosters] = await Promise.all([getMatchSquads(matchId), getTeamRosters([m.homeTeam.id, m.awayTeam.id])]);
     const perSide = Number((m.format as Record<string, unknown> | undefined)?.playersPerSide) || 0;
+    // an individual sport (snooker, billiards…): a side is one person, so only a
+    // one-player roster says who it is (A-08 — never the first of two)
+    const individual = getSportMeta(m.sport)?.participantKind === 'individual';
     const pick = (side: 'home' | 'away', teamId: string): string[] => {
       const starters = squads[side]?.starters ?? [];
       if (starters.length) return starters;
       const roster = rosters.get(teamId) ?? [];
-      return roster.length && roster.length <= Math.max(2, perSide) ? roster : [];
+      return roster.length && roster.length <= (individual ? 1 : Math.max(2, perSide)) ? roster : [];
     };
     const ids = { home: pick('home', m.homeTeam.id), away: pick('away', m.awayTeam.id) };
     const names = new Map((await getPlayersByIds([...ids.home, ...ids.away])).map((p) => [p.id, p.fullName]));

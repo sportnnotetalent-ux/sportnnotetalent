@@ -318,6 +318,7 @@ export function scoreUnit(sport: SportId | string): ScoreUnit {
     case 'cricket': case 'baseball': return 'runs';
     case 'volleyball': case 'tennis': case 'padel': return 'sets';
     case 'badminton': case 'tabletennis': case 'squash': case 'pickleball': case 'carrom': return 'games';
+    case 'pool': case 'snooker': case 'billiards': return 'games';   // racks / frames
     default: return 'points';
   }
 }
@@ -441,6 +442,19 @@ const BODY_PRESETS: Record<string, PointsPreset[]> = {
   carrom: [
     preset('carrom', 'Carrom league', 'Wins; ties: head-to-head, games difference, board points difference',
       { winPoints: 2, drawPoints: 1, lossPoints: 0, tieBreak: 'h2h,diff,pointsDiff,lots' }),
+  ],
+  // Cue sports (2026-10-28): no single federation rule — wins, then racks / frames
+  pool: [
+    preset('pool', 'Pool league', 'Wins; ties: head-to-head, rack difference',
+      { winPoints: 2, drawPoints: 1, lossPoints: 0, tieBreak: 'h2h,gamesDiff,lots', tieRestart: true }),
+  ],
+  snooker: [
+    preset('snooker', 'Snooker league', 'Wins; ties: frame difference, then points difference',
+      { winPoints: 2, drawPoints: 1, lossPoints: 0, tieBreak: 'diff,pointsDiff,lots' }),
+  ],
+  billiards: [
+    preset('billiards', 'Billiards league', 'Wins; ties: frame difference, then points difference',
+      { winPoints: 2, drawPoints: 1, lossPoints: 0, tieBreak: 'diff,pointsDiff,lots' }),
   ],
   cricket: [
     preset('icc', 'ICC events', '2 a win, 1 a tie or no result; ties: wins, net run rate, head-to-head',
@@ -684,15 +698,15 @@ export function tieBreakerLabel(tb: TieBreaker, sport?: SportId | string): strin
     case 'h2hRatio': return 'games ratio (among tied)';
     case 'h2hPoints': return 'points ratio (among tied)';
     case 'nrr': return 'net run rate';
-    case 'diff': return u === 'points' ? 'points difference' : `${unit} difference`;
+    case 'diff': return sport === 'snooker' || sport === 'billiards' ? 'frame difference' : sport === 'pool' ? 'rack difference' : u === 'points' ? 'points difference' : `${unit} difference`;
     case 'for': return scored;
     case 'wins': return 'number of wins';
     case 'played': return 'matches played';
     case 'sb': return 'Sonneborn-Berger';
     case 'setRatio': return 'set ratio';
     case 'pointRatio': return sport === 'netball' ? 'goal percentage' : 'point ratio';
-    case 'gamesDiff': return 'games difference';
-    case 'pointsDiff': return sport === 'carrom' ? 'board points difference' : 'points difference';
+    case 'gamesDiff': return sport === 'pool' ? 'rack difference' : 'games difference';
+    case 'pointsDiff': return sport === 'carrom' ? 'board points difference' : sport === 'snooker' || sport === 'billiards' ? 'frame points difference' : 'points difference';
     case 'setsPct': return '% of sets won';
     case 'gamesPct': return '% of games won';
     case 'fairPlay': return 'fair play (cards)';
