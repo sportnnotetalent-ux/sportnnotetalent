@@ -28,7 +28,9 @@ Android, iPhone, the web app and the website. Light only for now; dark mode late
   `Button`, `SelectChip`, `Pill`, `EmptyState` swap the emoji as they draw; `ScreenTitle` and
   `SectionHeader` drop it. `Glyph` turns an icon-only slot into its icon (keeping the slot's
   layout and colour); `IconText` does it for custom buttons (Discover's segments, Filters,
-  WhatsApp). 70 headings, 41 scorer labels and the football action groups lost their emoji.
+  WhatsApp, Start scoring, warnings, live-scoring cues — 76 lines). 70 headings, 41 scorer
+  labels and the football action groups lost their emoji; the rules card and the scorer's
+  title head with the sport's badge.
   A sport's own emoji stays where it means the sport: a "⚽ Football" chip becomes its
   colour dot, and a run of sports ("⚽ 🏏 🏀 …") becomes a stack of small sport badges
   (`SportLine`) on Calendar, Clubs, communities, team/squad rows, tournaments, Discover, Join.
