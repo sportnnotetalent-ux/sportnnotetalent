@@ -199,7 +199,34 @@ export function QuickTile({ label, icon, color, ink, onPress, accessibilityHint 
   );
 }
 
+/** A white action card for a grid of secondary actions: an icon in a tinted
+ *  circle, a bold label and an optional one-line hint (2026-10-29). */
+export function ActionTile({ label, hint, icon, tint, onPress }: {
+  label: string;
+  hint?: string;
+  icon: React.ReactNode;
+  /** the icon circle's colour */
+  tint: string;
+  onPress: () => void;
+}) {
+  return (
+    <TouchableOpacity onPress={onPress} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel={label} accessibilityHint={hint}
+      style={sectionStyles.action}>
+      <View style={[sectionStyles.actionIcon, { backgroundColor: tint + '1F' }]}>{icon}</View>
+      <Text style={sectionStyles.actionLabel} numberOfLines={2}>{label}</Text>
+      {hint ? <Text style={sectionStyles.actionHint} numberOfLines={2}>{hint}</Text> : null}
+    </TouchableOpacity>
+  );
+}
+
 const sectionStyles = StyleSheet.create({
+  action: {
+    flexGrow: 1, flexBasis: '45%', minHeight: 112, backgroundColor: theme.colors.surface, borderRadius: theme.radius.lg - 4,
+    borderWidth: 1, borderColor: theme.colors.surfaceAlt, padding: theme.spacing(4), gap: theme.spacing(1.5), ...theme.shadow.card,
+  },
+  actionIcon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginBottom: theme.spacing(1) },
+  actionLabel: { color: theme.colors.text, fontSize: theme.font.body, fontWeight: '800' },
+  actionHint: { color: theme.colors.textMuted, fontSize: theme.font.tiny, lineHeight: theme.font.tiny * 1.35 },
   tile: {
     flex: 1, minHeight: 108, borderRadius: theme.radius.lg, padding: theme.spacing(3),
     alignItems: 'center', justifyContent: 'center', gap: theme.spacing(2), ...theme.shadow.card,

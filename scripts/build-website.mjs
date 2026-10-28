@@ -663,6 +663,12 @@ for (const g of guides) {
 }
 if (existsSync(join(GUIDES_DIR, 'img'))) cpSync(join(GUIDES_DIR, 'img'), join(OUT, 'guides/img'), { recursive: true });
 copyFileSync(join(SITE, 'styles.css'), join(OUT, 'styles.css'));
+// 2026-10-29 redesign: the app's headline face, served from the site itself
+// (no third-party font request — visitors' addresses aren't sent to Google)
+mkdirSync(join(OUT, 'fonts'), { recursive: true });
+for (const f of ['700Bold/BarlowCondensed_700Bold.ttf', '800ExtraBold_Italic/BarlowCondensed_800ExtraBold_Italic.ttf']) {
+  copyFileSync(join(ROOT, 'node_modules/@expo-google-fonts/barlow-condensed', f), join(OUT, 'fonts', f.split('/')[1]));
+}
 copyFileSync(join(ROOT, 'assets/icon.png'), join(OUT, 'icon.png'));
 copyFileSync(join(ROOT, 'assets/favicon.png'), join(OUT, 'favicon.png'));
 // Versioned copy (browsers cache favicons by URL) + /favicon.ico for browsers that ask for it.

@@ -4,6 +4,7 @@
 import { isEventSport } from '../sports/eventSports';
 import React, { useEffect, useState } from 'react';
 import { ScrollView, View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
+import Svg, { Circle } from 'react-native-svg';
 import { theme } from '../core/theme';
 import { docKindLabel } from '../core/verificationReview';
 import { Card, Pill, Button, SelectChip, EmptyState, LoadingState, FormError, textStyles, plural } from './ui';
@@ -190,13 +191,18 @@ export function ProfileView({
 
   return (
     <ScrollView contentContainerStyle={st.content}>
+      {/* 2026-10-29 redesign: the player card — pitch green, lime ring */}
+      <View style={st.heroCard}>
+      <Svg style={st.heroArt} width={160} height={160} viewBox="0 0 100 100" pointerEvents="none">
+        <Circle cx={60} cy={40} r={34} fill={theme.colors.lime} opacity={0.85} />
+      </Svg>
       <View style={st.headerRow}>
         <TouchableOpacity accessibilityRole="button" activeOpacity={onEditProfile ? 0.8 : 1} disabled={!onEditProfile} onPress={changePhoto}>
-          <View style={[st.avatar, { backgroundColor: (player.houseColor ?? theme.colors.surfaceAlt) + '33', borderColor: player.houseColor ?? theme.colors.border }]}>
+          <View style={st.avatar}>
             {shownPhoto ? (
               <Image source={{ uri: shownPhoto }} style={[st.avatarImg, photoBusy && { opacity: 0.4 }]} />
             ) : (
-              <Text style={[st.avatarText, { color: player.houseColor ?? theme.colors.primary }]}>{initials}</Text>
+              <Text style={st.avatarText}>{initials}</Text>
             )}
           </View>
           {onEditProfile && (
@@ -204,11 +210,11 @@ export function ProfileView({
           )}
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
-          <Text style={textStyles.h2}>
+          <Text style={st.heroName}>
             {player.fullName}
             {player.verification?.status === 'approved' || player.ageVerifiedBy ? <Text style={st.verifiedTick} accessibilityLabel="Age verified">  ☑️</Text> : null}
           </Text>
-          <Text style={textStyles.muted}>
+          <Text style={st.heroMeta}>
             {player.houseName ?? 'Independent'}
             {ageOf(player) !== undefined ? ` · ${ageOf(player)} yrs` : ''}
             {player.gender ? ` · ${player.gender}` : ''}
@@ -217,10 +223,11 @@ export function ProfileView({
           </Text>
           <View style={st.tagRow}>
             {player.sports.map((s) => (
-              <Pill key={s} label={`${getSportMeta(s).icon} ${getSportMeta(s).name}`} />
+              <Pill key={s} label={`${getSportMeta(s).icon} ${getSportMeta(s).name}`} color="rgba(255,255,255,0.12)" textColor={theme.colors.heroText} />
             ))}
           </View>
         </View>
+      </View>
       </View>
 
       {player.bio ? (
@@ -684,9 +691,16 @@ const st = StyleSheet.create({
   historyLine: { color: theme.colors.text, fontSize: theme.font.small },
   historyNote: { color: theme.colors.textMuted, fontSize: theme.font.tiny },
   historyAt: { color: theme.colors.textMuted, fontSize: theme.font.tiny },
-  avatar: { width: 64, height: 64, borderRadius: 32, borderWidth: 2, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  avatarImg: { width: 64, height: 64 },
-  avatarText: { fontSize: theme.font.h2, fontWeight: '800' },
+  heroCard: { backgroundColor: theme.colors.primaryDark, borderRadius: theme.radius.xl, padding: theme.spacing(5), overflow: 'hidden' },
+  heroArt: { position: 'absolute', right: -78, top: -78 },
+  heroName: { color: theme.colors.heroText, fontFamily: theme.fonts.display, fontSize: 30, lineHeight: 31, textTransform: 'uppercase' },
+  heroMeta: { color: theme.colors.heroMuted, fontSize: theme.font.small, lineHeight: theme.font.small * 1.4, marginTop: theme.spacing(1) },
+  avatar: {
+    width: 72, height: 72, borderRadius: 36, borderWidth: 3, borderColor: theme.colors.lime, alignItems: 'center', justifyContent: 'center',
+    overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.10)',
+  },
+  avatarImg: { width: 72, height: 72 },
+  avatarText: { fontSize: theme.font.h2, fontWeight: '800', color: theme.colors.lime },
   camBadge: {
     position: 'absolute', right: -2, bottom: -2, width: 24, height: 24, borderRadius: 12,
     backgroundColor: theme.colors.surface, borderWidth: 1, borderColor: theme.colors.border,

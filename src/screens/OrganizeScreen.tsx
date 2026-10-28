@@ -7,7 +7,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { theme } from '../core/theme';
-import { Card, Button, Pill, ScreenTitle, EmptyState, textStyles } from '../components/ui';
+import { Card, Button, Pill, ScreenTitle, EmptyState, ActionTile, textStyles } from '../components/ui';
+import { Handshake, Repeat, Send, ChartColumn } from 'lucide-react-native';
 import { SectionHeader, SECTION_CAP } from '../components/SectionHeader';
 import { useAuth } from '../core/auth';
 import { useOrganizations } from '../data/hooks';
@@ -104,18 +105,17 @@ export default function OrganizeScreen() {
 
         {/* Primary create action leads; supporting actions follow. */}
         <Button label="🏆 New tournament" onPress={() => nav.navigate('CreateTournament', activeOrg ? { orgId: activeOrg.id } : undefined)} />
-        <Button
-          label="🤝 Start a friendly"
-          variant="ghost"
-          onPress={() => nav.navigate('ScheduleMatch', {})}
-        />
-        <Button
-          label="🔁 New series / tie"
-          variant="ghost"
-          onPress={() => nav.navigate('CreateSeries', {})}
-        />
-        <Button label="💌 Invite a friend" variant="ghost" onPress={() => nav.navigate('InviteFriend')} />
-        <Button label="📊 Organizer dashboard" variant="ghost" onPress={() => nav.navigate('OrganizerDashboard')} />
+        {/* 2026-10-29 redesign: the supporting actions as a 2 × 2 grid */}
+        <View style={st.actionGrid}>
+          <ActionTile label="Start a friendly" hint="A one-off game" tint={theme.colors.home}
+            icon={<Handshake color={theme.colors.home} size={20} strokeWidth={2.2} />} onPress={() => nav.navigate('ScheduleMatch', {})} />
+          <ActionTile label="New series / tie" hint="Several games, one result" tint={theme.colors.hot}
+            icon={<Repeat color={theme.colors.hot} size={20} strokeWidth={2.2} />} onPress={() => nav.navigate('CreateSeries', {})} />
+          <ActionTile label="Invite a friend" hint="WhatsApp or SMS" tint={theme.colors.primary}
+            icon={<Send color={theme.colors.primary} size={20} strokeWidth={2.2} />} onPress={() => nav.navigate('InviteFriend')} />
+          <ActionTile label="Organizer dashboard" hint="What's left to do" tint={theme.colors.accent}
+            icon={<ChartColumn color={theme.colors.accent} size={20} strokeWidth={2.2} />} onPress={() => nav.navigate('OrganizerDashboard')} />
+        </View>
         <Text style={textStyles.muted}>
           Open a tournament to schedule its matches or auto-generate fixtures. A friendly is a one-off game — no tournament needed.
         </Text>
@@ -212,6 +212,7 @@ export default function OrganizeScreen() {
 }
 
 const st = StyleSheet.create({
+  actionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing(2) },
   inviteRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(3) },
   accept: { color: theme.colors.primary, fontWeight: '800', fontSize: theme.font.small },
   decline: { color: theme.colors.danger, fontWeight: '700', fontSize: theme.font.small },
