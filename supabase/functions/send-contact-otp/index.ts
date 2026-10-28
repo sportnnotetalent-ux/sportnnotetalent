@@ -7,14 +7,14 @@
  * (never trust a client-supplied address), store a HASHED code (10-min expiry,
  * one per player+channel), and deliver it on the requested channel.
  *
- * Returns 200 `{ sent: boolean, reason?, detail? }` for every non-fatal outcome
+ * Returns 200 `{ sent: boolean, reason? }` for every non-fatal outcome
  * so the client can surface WHY delivery didn't happen (reason is a short,
  * non-sensitive tag: unauthorized | forbidden | no-email | no-resend-key |
  * resend-<status>).
  *
  * Contract (src/data/repos.ts → beginContactVerification):
  *   POST { playerId: string, channel: 'email' }   [Authorization: Bearer <jwt>]
- *     → 200 { sent: boolean, reason?: string, detail?: string }
+ *     → 200 { sent: boolean, reason?: string }
  *
  * Deploy:  supabase functions deploy send-contact-otp
  * Secrets: reuses RESEND_API_KEY (+ optional OTP_FROM / SUPPORT_FROM).
@@ -145,8 +145,10 @@ Deno.serve(async (req) => {
   const up = await svc.from('contact_otps').upsert({
     player_id: playerId, channel, code_hash: await sha256(code), target: t, attempts: 0, expires_at: expires,
   }, { onConflict: 'player_id,channel' });
-  if (up.error) { console.error('contact_otps upsert failed', up.error); return json({ sent: false, reason: 'store-failed', detail: up.error.message.slice(0, 200) }); }
+  if (up.error) { console.error('contact_otps upsert failed', up.error); return json({ sent: false, reason: 'store-failed' }); }
 
   const r = channel === 'email' ? await sendEmail(t, code) : await sendWhatsApp(intl, code);
-  return json({ sent: r.ok, reason: r.reason, detail: r.detail });
+  // Security W3 (EF-06): the provider's own error text stays in the logs.
+  if (!r.ok && r.detail) console.error('contact otp not delivered', r.reason, r.detail);
+  return json({ sent: r.ok, reason: r.reason });
 });

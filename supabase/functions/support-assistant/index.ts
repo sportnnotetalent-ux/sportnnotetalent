@@ -70,6 +70,8 @@ Deno.serve(async (req) => {
   const caller = await requireUser(req);
   if (caller instanceof Response) return caller;
   if (!(await rateLimit('support-assistant', caller.user.id, 20, 3600))) return tooMany();
+  // Security W3 (EF-08): an overall budget too, so many accounts can't run up the model bill.
+  if (!(await rateLimit('support-assistant:all', 'all', 400, 3600))) return tooMany();
 
   const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
   if (!apiKey) return json({ error: 'ANTHROPIC_API_KEY not configured' }, 503);
@@ -81,7 +83,7 @@ Deno.serve(async (req) => {
     return json({ error: 'invalid JSON' }, 400);
   }
   const question = typeof body.question === 'string' ? body.question.trim().slice(0, 1000) : '';
-  const context = typeof body.context === 'string' ? body.context.slice(0, 12000) : '';
+  const context = typeof body.context === 'string' ? body.context.slice(0, 6000) : '';
   if (!question) return json({ error: 'question is required' }, 400);
   // Optional, validated hard (they go into the prompt): "GB", "Europe/London".
   const region = typeof body.region === 'string' && /^[A-Z]{2}$/.test(body.region) ? body.region : '';

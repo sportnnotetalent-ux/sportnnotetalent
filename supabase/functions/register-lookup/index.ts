@@ -11,6 +11,7 @@
  * record per request, on demand — never a bulk crawl of the register.
  */
 import { admin, CORS, json, rateLimit, requireUser, tooMany } from '../_shared/guard.ts';
+import { readCapped } from '../_shared/net.ts';
 import { parseSaras, sarasUrl } from '../_shared/saras.ts';
 
 Deno.serve(async (req) => {
@@ -32,12 +33,17 @@ Deno.serve(async (req) => {
   const url = sarasUrl(value);
   let html = '';
   try {
+    // Security W3 (EF-07): never follow a redirect off the register, and read
+    // at most 2 MB of its page.
     const res = await fetch(url, {
       headers: { 'user-agent': 'SportnNote verification (support@sportnnote.in)', accept: 'text/html' },
       signal: AbortSignal.timeout(12_000),
+      redirect: 'manual',
     });
     if (!res.ok) return json({ error: 'The CBSE register didn’t answer — open it directly.', url }, 502);
-    html = await res.text();
+    const page = await readCapped(res, 2_000_000);
+    if (page == null) return json({ error: 'The CBSE register sent an unexpected page — open it directly.', url }, 502);
+    html = page;
   } catch {
     return json({ error: 'The CBSE register didn’t answer — open it directly.', url }, 502);
   }

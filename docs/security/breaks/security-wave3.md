@@ -82,3 +82,17 @@ The change: migration `20261028200000_security_wave3c`.
 - **Abuser:** one address sent 1,000 calls with a new device id each time; 300 were counted.
 - **Children:** 100 children with a confirmed guardian. All 300 date-of-birth tricks were refused, and all 100 guardian-contact changes were asked again.
 - **Coaches:** 100 coaches fixed a wrong birth year on a child they added.
+
+## 3D: edge functions (EF-06 to EF-12)
+The change: `_shared/net.ts` (`clientIp`, `readCapped`), plus `send-contact-otp`, `register-lookup`, `support-assistant`, `report-invite` and `join`. Tests: `tests/security-wave3.test.mts`.
+
+| # | Finding | Status |
+|---|---|---|
+| EF-06 | `send-contact-otp` returned a provider's error text. | **Fixed:** only the short reason goes back; the text stays in the logs. |
+| EF-07 | `register-lookup` followed redirects and read any size of page. | **Fixed:** `redirect: 'manual'`, and at most 2 MB is read. |
+| EF-08 | `support-assistant` had a per-user limit only, and 12 KB of context. | **Fixed:** an overall budget of 400 an hour, and context capped at 6 KB. The app's worst case, its top 5 articles, is 3.4 KB. Prompt injection only affects the caller's own answer: accepted. |
+| EF-09 | `phone-login` says whether a number already has an account. | Accepted. The caller must first prove they hold the number by SMS, and it's limited per address and per number. Hiding it would break the sign-in flow. |
+| EF-10 | `invite-joined` trusts any follow row. | Accepted. The invite is remembered only on the inviter's device, so there's no server record to check. The harm is one "X joined from your invite" per new adult account, with children never named. |
+| EF-11 | `report-invite` and `join` are public with no limit. | **Fixed:** limited per address (20 reports and 120 lookups an hour). |
+| EF-12 | `delete-account` is the sink if guardianship were spoofed. | Accepted. EF-01 (the guardian takeover) was fixed in Wave 1, and `guardian_delete_target` is sound. |
+| W3B-34 | **The new limits break something legitimate.** A school sharing one address could hit `join`'s 120 lookups an hour. | Accepted. Only the team-name preview is skipped; the link still opens the app. |

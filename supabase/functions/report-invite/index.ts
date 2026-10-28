@@ -16,6 +16,8 @@
  */
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { APP_URL } from '../_shared/hosts.ts'; // SD-151: APP_URL secret, default app.sportnnote.in
+import { rateLimit } from '../_shared/guard.ts';
+import { clientIp } from '../_shared/net.ts';
 
 const PROJECT_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -30,6 +32,8 @@ Deno.serve(async (req) => {
     const id = new URL(req.url).searchParams.get('p') ?? '';
     return new Response(null, { status: 302, headers: { ...CORS, Location: UUID.test(id) ? `${APP_URL}/i/${id}?notme=1` : APP_URL, 'Cache-Control': 'no-store' } });
   }
+  // Security W3 (EF-11): public, so limited per address (20 reports an hour).
+  if (!(await rateLimit('report-invite-ip', clientIp(req.headers), 20, 3600))) return json({ ok: false, error: 'too-many' }, 429);
   let id = '';
   try { id = String(((await req.json()) as { p?: unknown }).p ?? ''); } catch { /* bad body */ }
   if (!UUID.test(id)) return json({ ok: false, error: 'invalid' }, 400);
