@@ -62,14 +62,9 @@ Deno.serve(async (req) => {
   // recorded it) — only its Owners / Admins may trigger the alert.
   const orgId = typeof body.orgId === 'string' ? body.orgId : '';
   if (orgId) {
-    const { data: mine } = await supabase.from('players').select('id').eq('profile_id', caller.user.id);
-    const ids = ((mine ?? []) as { id: string }[]).map((r) => r.id);
-    const today = new Date().toISOString().slice(0, 10);
-    const { data: roles } = ids.length
-      ? await supabase.from('org_members').select('role, until').eq('org_id', orgId).in('player_id', ids).in('role', ['Owner', 'Admin'])
-      : { data: [] };
-    const admin = ((roles ?? []) as { until: string | null }[]).some((r) => !r.until || r.until >= today);
-    if (!admin) return json({ delivered: false, error: 'not an owner or admin' }, 403);
+    // Security W4 (EF-19): the database decides, as the caller (org_is_admin)
+    const { data: isAdmin } = await caller.asUser.rpc('org_is_admin', { p_org: orgId });
+    if (isAdmin !== true) return json({ delivered: false, error: 'not an owner or admin' }, 403);
     const { data: org } = await supabase.from('organizations').select('name, type, verification_requested_at, verified_at').eq('id', orgId).maybeSingle();
     const o = org as { name?: string; type?: string | null; verification_requested_at?: string | null; verified_at?: string | null } | null;
     if (!o?.verification_requested_at || o.verified_at) return json({ delivered: false, error: 'nothing to review' }, 400);

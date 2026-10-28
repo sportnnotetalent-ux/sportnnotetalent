@@ -19,6 +19,7 @@ import { releaseDeviceForSignOut } from './deviceSignOut';
 import { signOutSafely, cleanupFor } from './signOutSafely';
 import { setQueueAccount } from './queueAccount';
 import { metadataToClear } from './authMetadata';
+import { allowGlobals } from './devGlobals';
 import type { GuardianContact, Profile, Role } from './types';
 
 /** Turn a raw Supabase/network error into a plain, actionable message. Users
@@ -201,6 +202,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setProf(null);
       setLoading(false);
       void setReminderPrefsUser(null); // stop cross-device sync on sign-out
+      allowGlobals('admin', false);
       stopProfileZoneSync();
       return;
     }
@@ -250,6 +252,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         schoolId: data.school_id ?? undefined,
       });
       void setReminderPrefsUser(data.id); // pull this user's reminder timers across devices
+      allowGlobals('admin', data.role === 'support' || (data.role as string) === 'admin'); // W4 (CL-25): the founder's console tools
       // Security W3 (CL-09): the sign-up DOB, phone and guardian leave the session token
       const clear = metadataToClear(user.user_metadata as Record<string, unknown> | undefined);
       if (clear) void Promise.resolve(supabase.auth.updateUser({ data: clear })).catch(() => { /* next sign-in */ });

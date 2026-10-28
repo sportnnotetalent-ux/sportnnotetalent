@@ -37,7 +37,7 @@ Deno.serve(async (req) => {
   if (status !== 'pending' && status !== 'withdrawn' && status !== 'self_declared') {
     return json({ sent: false, reason: 'Your account doesn’t need a parent or guardian to confirm it.' }, 400);
   }
-  if (!(await rateLimit('guardian-consent', uid, 3, 86400))) {
+  if (!(await rateLimit('guardian-consent', uid, 3, 86400, { failClosed: true }))) {
     return json({ sent: false, reason: 'Already sent 3 today — try again tomorrow.' }, 429);
   }
 

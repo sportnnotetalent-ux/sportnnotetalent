@@ -75,7 +75,8 @@ describe('the app', () => {
   });
   test('a school\'s request alerts reviewers, only from its Owners / Admins', () => {
     const src = read('supabase/functions/verification-submit/index.ts');
-    assert.match(src, /\.in\('role', \['Owner', 'Admin'\]\)/);
-    assert.match(src, /if \(!admin\) return json\(\{ delivered: false, error: 'not an owner or admin' \}, 403\)/);
+    // Security W4 (EF-19): the database decides (org_is_admin, as the caller)
+    assert.match(src, /caller\.asUser\.rpc\('org_is_admin', \{ p_org: orgId \}\)/);
+    assert.match(src, /if \(isAdmin !== true\) return json\(\{ delivered: false, error: 'not an owner or admin' \}, 403\)/);
   });
 });

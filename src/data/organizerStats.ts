@@ -5,6 +5,7 @@
  * a top-line summary. No I/O, so it's deterministic and testable.
  */
 import type { Match, Tournament } from '../core/types';
+import { exposeGlobal } from '../core/devGlobals.ts';
 
 export interface TournamentDash {
   tournament: Tournament;
@@ -60,4 +61,4 @@ export function computeOrganizerDashboard(hosted: Tournament[], allMatches: Matc
 }
 
 // Test/inspection hook (parity with the other engines).
-(globalThis as unknown as Record<string, unknown>).__sportfolioOrganizer = { computeOrganizerDashboard };
+exposeGlobal('__sportfolioOrganizer', { computeOrganizerDashboard });

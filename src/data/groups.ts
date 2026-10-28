@@ -14,6 +14,7 @@ import { teamStandings, defaultStandingsConfig, seedKey, type TeamStanding, type
 import type { GeneratedPairing } from './fixtures.ts';
 import { isEliminationStage, bracketSeedOrder, seedPlayIn, planKnockout, stageForTeams, type KoStage } from './bracket.ts';
 import type { TieBreaker } from './standings.ts';
+import { exposeGlobal } from '../core/devGlobals.ts';
 
 /** One group's ranked table. */
 export interface GroupTable { name: string; rows: TeamStanding[] }
@@ -348,4 +349,4 @@ export function matchesInDivision(matches: Match[], entries: TournamentEntry[], 
 }
 
 // Test/inspection hook (parity with the other engines).
-(globalThis as unknown as Record<string, unknown>).__sportfolioGroups = { groupTables, standingsPhases, advancement, seedKnockout, seedFromGroups, seededRound, advancementBasis, knockoutRoundLabel, qualifiersFromSelection, matchesInDivision };
+exposeGlobal('__sportfolioGroups', { groupTables, standingsPhases, advancement, seedKnockout, seedFromGroups, seededRound, advancementBasis, knockoutRoundLabel, qualifiersFromSelection, matchesInDivision });

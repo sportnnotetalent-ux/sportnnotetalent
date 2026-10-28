@@ -15,6 +15,7 @@ import { appendMatchEvent } from './repos';
 import type { MatchEventRecord } from '../core/types';
 import { isRejection } from './eventLog';
 import { ownsQueue, queueAccount } from '../core/queueAccount';
+import { exposeGlobal } from '../core/devGlobals';
 
 const keyFor = (matchId: string) => `sportfolio.outbox.${matchId}`;
 // Security W3 (CL-07): the account whose taps these are (sent and shown only to it)
@@ -213,10 +214,10 @@ if (typeof setInterval === 'function') {
 
 // Test/inspection hook (parity with __sportfolioReminders): drive the offline
 // simulation and read queue state deterministically from the web preview.
-(globalThis as unknown as Record<string, unknown>).__sportfolioOutbox = {
+exposeGlobal('__sportfolioOutbox', {
   pendingCount: (id: string) => matchOutbox.pendingCount(id),
   isOnline: () => matchOutbox.isOnline(),
   getPending: (id: string) => matchOutbox.getPending(id),
   flushAll: (force?: boolean) => matchOutbox.flushAll(!!force),
   setOnline: (v: boolean) => { online = !!v; emit(); if (v) void matchOutbox.flushAll(); },
-};
+});

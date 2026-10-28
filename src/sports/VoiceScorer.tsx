@@ -134,6 +134,10 @@ export function VoiceScorer({
         Say e.g. {hints.slice(0, 3).map((h) => `“${h}”`).join(', ')}.{' '}
         {autoApply ? 'Confident calls apply automatically.' : 'Each call waits for you to tap Apply.'}
       </Text>
+      {/* Security W4 (CL-30): say where the audio goes */}
+      {Platform.OS === 'web' ? (
+        <Text style={textStyles.muted}>In a browser, your speech may be sent to the browser maker’s speech service (Google in Chrome) to turn it into text.</Text>
+      ) : null}
 
       {/* Proposal awaiting confirmation — the safety step against a mishear. */}
       {pending ? (

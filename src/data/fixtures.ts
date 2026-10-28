@@ -5,6 +5,8 @@
  */
 export interface GeneratedPairing { homeId: string; awayId: string; round: number }
 
+import { exposeGlobal } from '../core/devGlobals.ts';
+
 const BYE = '__bye__';
 
 /**
@@ -77,4 +79,4 @@ export function knockoutFirstRound(teamIds: string[]): GeneratedPairing[] {
 }
 
 // Test/inspection hook (parity with the other engines).
-(globalThis as unknown as Record<string, unknown>).__sportfolioFixtures = { roundRobin, knockoutFirstRound, drawGroups, groupStage };
+exposeGlobal('__sportfolioFixtures', { roundRobin, knockoutFirstRound, drawGroups, groupStage });

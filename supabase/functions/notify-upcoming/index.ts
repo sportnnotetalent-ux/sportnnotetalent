@@ -63,6 +63,7 @@
  */
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { safeEqual, sendEmail } from '../_shared/guard.ts';
+import { clip, stripLinks } from '../_shared/text.ts';
 import { webPushMany } from '../_shared/webpush.ts';
 import { allowedPlayerFollows, keepAllowedFollows } from '../_shared/minorFollows.ts';
 import { APP_URL } from '../_shared/hosts.ts';
@@ -140,6 +141,7 @@ function isCron(req: Request): boolean {
 }
 
 Deno.serve(async (req) => {
+  if (req.method !== 'POST') return new Response(JSON.stringify({ error: 'POST only' }), { status: 405, headers: { 'Content-Type': 'application/json' } }); // W4 (EF-16)
   if (!isCron(req)) return new Response('forbidden', { status: 403 });
   const opts = await req.json().catch(() => ({})) as { dry?: boolean; now?: string };
   const dry = opts.dry === true;
@@ -408,7 +410,8 @@ Deno.serve(async (req) => {
       t.kind === 'scorer' ? `You're the scorer for ${vs}.` : `You're playing in ${vs}.`,
       '',
       `When:  ${when}`,
-      m.venue_name ? `Where: ${m.venue_name}` : '',
+      // Security W4 (EF-17): typed by organisers — no links, a sane length
+      m.venue_name ? `Where: ${stripLinks(clip(m.venue_name, 80))}` : '',
       tour ? `Event: ${tour}` : '',
       '',
       t.kind === 'scorer'

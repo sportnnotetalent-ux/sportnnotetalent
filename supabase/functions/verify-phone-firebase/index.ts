@@ -29,6 +29,7 @@ import { phoneKey } from '../_shared/phone.ts';
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
+  if (req.method !== 'POST') return new Response(JSON.stringify({ error: 'POST only' }), { status: 405, headers: { 'Content-Type': 'application/json' } }); // W4 (EF-16)
   if (!firebaseConfigured()) return json({ verified: false, reason: 'SMS verification isn’t configured yet.' }, 503);
   const caller = await requireUser(req);
   if (caller instanceof Response) return caller;

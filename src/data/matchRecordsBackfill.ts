@@ -23,6 +23,7 @@ import { replayLog } from '../sports/amend';
 import { recordsDiff, stateWithRecords, type MatchRecordsBlock } from '../sports/matchRecords';
 import { getMatch, getMatches, getMatchEvents, getTournaments } from './repos';
 import { demo } from './demoStore';
+import { exposeGlobal } from '../core/devGlobals';
 
 type Source = 'log' | 'snapshot';
 type Skip = 'manual' | 'incomplete' | 'no-state' | 'error';
@@ -94,7 +95,6 @@ export async function backfillMatchRecords(opts: { dryRun?: boolean; sports?: Sp
 }
 
 // SD-51: the founder's console handle (web: devtools), next to SD-19's.
-(globalThis as unknown as Record<string, unknown>).__sportnnoteAdmin = {
-  ...(((globalThis as unknown as Record<string, unknown>).__sportnnoteAdmin as object | undefined) ?? {}),
+exposeGlobal('__sportnnoteAdmin', {
   backfillMatchRecords,
-};
+}, 'admin');

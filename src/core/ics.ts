@@ -6,6 +6,7 @@
  *  directly into a chosen calendar; .ics keeps it cross-platform & verifiable. */
 import { Share } from 'react-native';
 import { downloadText } from './download';
+import { icsText } from './exportCells';
 
 export interface CalEvent {
   uid: string;
@@ -30,7 +31,7 @@ const addDayCompact = (ymd: string) => {
   const dt = new Date(Date.UTC(y, m - 1, d + 1));
   return `${dt.getUTCFullYear()}${pad(dt.getUTCMonth() + 1)}${pad(dt.getUTCDate())}`;
 };
-const esc = (s: string) => s.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
+const esc = icsText;   // W4 (CL-27): a bare CR can't start a new property
 
 function vevent(e: CalEvent, dtstamp: string): string {
   const lines = [`BEGIN:VEVENT`, `UID:${e.uid}`, `DTSTAMP:${dtstamp}`, `SUMMARY:${esc(e.title)}`];

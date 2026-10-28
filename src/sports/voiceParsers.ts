@@ -19,6 +19,7 @@ import { creditedPlayers } from './carrom/totals.ts';
 import { holeWinner } from './golf/engine.ts';
 import { matchHole } from './golf/matchStrokes.ts';
 import { golfMatchStateOf, holeAction, type GolfMatchState } from './golf/match.ts';
+import { exposeGlobal } from '../core/devGlobals.ts';
 
 /** Rally/set-point sports (badminton, tennis, volleyball, padel, pickleball,
  *  squash): "point home", "point away", "<team> point", "<player> scores".
@@ -463,7 +464,7 @@ export function kabaddiExtrasVoice(text: string, ctx: VoiceContext): ScoreAction
 }
 
 // Test/inspection hook (parity with the other __sportfolio* engines).
-(globalThis as unknown as Record<string, unknown>).__sportfolioVoice = { pointVoice, basketballVoice, kabaddiVoice, cricketVoice, tennisVoice, volleyballVoice, hockeyVoice, handballVoice, carromVoice, golfMatchVoice, rugbyVoice };
+exposeGlobal('__sportfolioVoice', { pointVoice, basketballVoice, kabaddiVoice, cricketVoice, tennisVoice, volleyballVoice, hockeyVoice, handballVoice, carromVoice, golfMatchVoice, rugbyVoice });
 /** SD-143 — rugby's grammar lives next to its engine (./rugby/voice.ts). */
 export { rugbyVoice, rugbyVoiceEnds };
 /** Rugby league's grammar lives next to its engine (./rugby_league/voice.ts). */

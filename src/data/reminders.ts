@@ -28,6 +28,7 @@ export {
 } from './reminderRules';
 export type { ReminderWindow, DueReminder, ScheduledReminder } from './reminderRules';
 import { activeWindow, playersInSide, windowsFromMinutes, computeContactReminders, computeDueReminders, computeScheduledReminders } from './reminderRules';
+import { exposeGlobal } from '../core/devGlobals';
 
 // Reminders already delivered this session (keeps each window firing once).
 const sent = new Set<string>();
@@ -85,13 +86,13 @@ export async function syncDeviceReminders(now: number = Date.now(), viewerId?: s
 
 // Dev aid: expose the pure windowing logic so it can be inspected in the web
 // preview / unit-tested deterministically with a fixed `now`.
-(globalThis as unknown as Record<string, unknown>).__sportfolioReminders = {
+exposeGlobal('__sportfolioReminders', {
   computeDueReminders,
   computeScheduledReminders,
   activeWindow,
   windowsFromMinutes,
   playersInSide,
-};
+});
 
 /** First check a few seconds after launch, so Home's own reads go first (F-08b). */
 export const REMINDER_FIRST_DELAY_MS = 10_000;

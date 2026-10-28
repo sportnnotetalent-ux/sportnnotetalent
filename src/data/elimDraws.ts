@@ -28,6 +28,7 @@ import {
   bracketSeedOrder, pairingsInStage, pairingSlot, pairingWinnerId, KO_SLOT_KEY,
   type KnockoutPairing, type KnockoutRound,
 } from './bracket.ts';
+import { exposeGlobal } from '../core/devGlobals.ts';
 
 export const DE_SEEDS_KEY = '__deSeeds';
 export const DE_RESET_KEY = '__deReset';
@@ -288,4 +289,4 @@ export function plateOpeners(entrantIds: string[]): (ReadyPair & { extra: Record
 }
 
 // Test/inspection hook (parity with the other engines).
-(globalThis as unknown as Record<string, unknown>).__sportfolioElimDraws = { doubleElimState, doubleElimOpeners, plateState, plateEntrants, plateOpeners, dropIndex };
+exposeGlobal('__sportfolioElimDraws', { doubleElimState, doubleElimOpeners, plateState, plateEntrants, plateOpeners, dropIndex });

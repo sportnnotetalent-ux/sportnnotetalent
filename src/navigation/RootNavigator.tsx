@@ -130,7 +130,11 @@ import { trackScreen } from '../core/telemetry';
 import { linkPrefixes } from '../core/hosts';
 import { lazyScreen, prefetchScreens } from './lazyScreens';
 import { regionStore } from '../core/region';
+import { allowGlobals } from '../core/devGlobals';
 import { marketForCountry, term } from '../core/markets';
+
+// Security W4 (CL-25): console test hooks only in development and the demo.
+allowGlobals('test', !isSupabaseConfigured || __DEV__);
 
 // Console seeders — perf F-25: loaded only where they do anything (their own
 // chunks on the web), so a live build neither downloads nor runs them.

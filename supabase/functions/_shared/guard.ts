@@ -45,13 +45,14 @@ export async function requireUser(req: Request): Promise<Caller | Response> {
 
 /** Count one hit for `subject` in `bucket`; false once over `max` per window. Fails
  *  OPEN on a ledger error (a missing migration shouldn't take features down). */
-export async function rateLimit(bucket: string, subject: string, max: number, windowSeconds: number): Promise<boolean> {
+export async function rateLimit(bucket: string, subject: string, max: number, windowSeconds: number, opts: { failClosed?: boolean } = {}): Promise<boolean> {
   const { data, error } = await admin.rpc('rate_limit_hit', {
     p_bucket: bucket, p_subject: subject, p_max: max, p_window_seconds: windowSeconds,
   });
   if (error) {
-    console.error('rate_limit_hit failed', error.message);
-    return true;
+    console.error('rate_limit_hit failed', bucket, error.message);
+    // Security W4 (EF-14): a limit that guards money (emails, SMS) fails closed
+    return !opts.failClosed;
   }
   return data === true;
 }
@@ -68,16 +69,11 @@ export async function sha256Hex(s: string): Promise<string> {
  *  function that emails a parent or guardian — however many children, or which
  *  function, triggers it. The address is hashed (no emails in the ledger). */
 export async function rateLimitTo(email: string, max = 6, windowSeconds = 86400): Promise<boolean> {
-  return rateLimit('parent-mail-to', await sha256Hex(email.trim().toLowerCase()), max, windowSeconds);
+  return rateLimit('parent-mail-to', await sha256Hex(email.trim().toLowerCase()), max, windowSeconds, { failClosed: true });
 }
 
-/** Remove links from text we relay to someone else (anti-phishing). */
-export const stripLinks = (s: string) =>
-  s.replace(/\b(?:https?:\/\/|www\.)\S+/gi, '').replace(/[ \t]{2,}/g, ' ').trim();
-
-/** Clamp + tidy a free-text field. */
-export const clip = (v: unknown, max: number): string =>
-  typeof v === 'string' ? v.trim().slice(0, max) : '';
+// Relayed-text helpers live in text.ts (pure, tested); re-exported for callers.
+export { stripLinks, clip } from './text.ts';
 
 /** Constant-time string comparison (for shared secrets). */
 export function safeEqual(a: string, b: string): boolean {

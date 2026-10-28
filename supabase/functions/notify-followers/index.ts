@@ -538,6 +538,7 @@ interface StatLineRecord {
 }
 
 Deno.serve(async (req) => {
+  if (req.method !== 'POST') return new Response(JSON.stringify({ error: 'POST only' }), { status: 405, headers: { 'Content-Type': 'application/json' } }); // W4 (EF-16)
   if (!WEBHOOK_SECRET) return new Response('WEBHOOK_SECRET not configured', { status: 503 });
   if (!safeEqual(req.headers.get('x-webhook-secret') ?? '', WEBHOOK_SECRET)) {
     return new Response('forbidden', { status: 403 });

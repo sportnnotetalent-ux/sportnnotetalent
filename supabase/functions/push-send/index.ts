@@ -23,7 +23,7 @@
  * Deploy:  supabase functions deploy push-send
  * Secrets: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_ANON_KEY injected.
  */
-import { admin, clip, json, rateLimit, requireUser, stripLinks, tooMany } from '../_shared/guard.ts';
+import { CORS, admin, clip, json, rateLimit, requireUser, stripLinks, tooMany } from '../_shared/guard.ts';
 import { webPushToProfiles } from '../_shared/webpush.ts';
 
 const MAX_RECIPIENTS = 50;
@@ -36,6 +36,8 @@ interface Body {
 }
 
 Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
+  if (req.method !== 'POST') return new Response(JSON.stringify({ error: 'POST only' }), { status: 405, headers: { 'Content-Type': 'application/json' } }); // W4 (EF-16)
   // 1) Require an authenticated caller.
   const caller = await requireUser(req);
   if (caller instanceof Response) return caller;

@@ -48,6 +48,7 @@ export const docFolder = (docPath: string): string | null => {
 };
 
 Deno.serve(async (req) => {
+  if (req.method !== 'POST') return new Response(JSON.stringify({ error: 'POST only' }), { status: 405, headers: { 'Content-Type': 'application/json' } }); // W4 (EF-16)
   if (!isCron(req)) return new Response('forbidden', { status: 403 });
   const opts = await req.json().catch(() => ({})) as { dry?: boolean };
   const dry = opts.dry === true;

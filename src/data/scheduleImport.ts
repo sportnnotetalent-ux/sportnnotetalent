@@ -18,6 +18,7 @@ import { findScheduleConflicts, type ConflictCandidate } from './scheduleConflic
 import { nameTier } from './search.ts';
 import { wallTimeToIso, localDay } from '../core/time.ts';
 import { dateOrderOf, exampleDate, type DateOrder } from '../core/region.ts';
+import { csvCell } from '../core/exportCells.ts';   // W4 (CL-27): no formulas
 
 /* --------------------------------- Columns -------------------------------- */
 
@@ -550,7 +551,6 @@ export function importSummary(rows: readonly ImportRow[], skip: ReadonlySet<numb
 
 /* --------------------------------- Template ------------------------------- */
 
-const csvCell = (v: string) => (/[",\n\r]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
 const csvRow = (cells: string[]) => cells.map(csvCell).join(',');
 const typed = (date: string, order: DateOrder) => exampleDate(order, date);
 

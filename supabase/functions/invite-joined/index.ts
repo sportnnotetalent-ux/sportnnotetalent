@@ -36,6 +36,7 @@ function ageOn(dob: string | null | undefined, now: Date): number | null {
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
+  if (req.method !== 'POST') return new Response(JSON.stringify({ error: 'POST only' }), { status: 405, headers: { 'Content-Type': 'application/json' } }); // W4 (EF-16)
   const caller = await requireUser(req);
   if (caller instanceof Response) return caller;
   if (!(await rateLimit('invite-joined', caller.user.id, 5, 3600))) return tooMany();

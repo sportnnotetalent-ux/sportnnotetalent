@@ -18,6 +18,7 @@ import type { MatchEventRecord, SportId } from '../core/types';
 import { parsePending, withPending, withoutPending, type PendingResult } from './resultHold';
 import { withMatchRecords } from '../sports/matchRecords'; // SD-51
 import { ownsQueue, queueAccount } from '../core/queueAccount';
+import { exposeGlobal } from '../core/devGlobals';
 
 const KEY = 'sportfolio.pendingResults';
 
@@ -90,7 +91,7 @@ export async function flushPendingResults(): Promise<number> {
   return sent;
 }
 
-(globalThis as unknown as Record<string, unknown>).__sportfolioPendingResults = {
+exposeGlobal('__sportfolioPendingResults', {
   list: load,
   flush: flushPendingResults,
-};
+});

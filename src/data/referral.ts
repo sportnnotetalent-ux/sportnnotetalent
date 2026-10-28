@@ -10,7 +10,8 @@ import { supabase, isSupabaseConfigured } from '../core/supabase';
 import { track } from '../core/telemetry';
 import { isInviterId, referralToApply, type SavedReferral } from '../core/referralRules';
 import { followStore } from './followStore';
-import { getMyPlayerId, setFollow } from './repos';
+import { getMyPlayerId, getPlayer, setFollow } from './repos';
+import { askConfirm } from '../components/ConfirmSheet';
 
 const KEY = 'sn.referral.pending';
 
@@ -40,6 +41,18 @@ export async function applyPendingReferral(profileId: string): Promise<string | 
     const from = referralToApply(saved, Date.now(), me);
     try { await AsyncStorage.removeItem(KEY); } catch { /* ignore */ }
     if (!from) return null;
+
+    // Security W4 (CL-22): ask first — a shared /get/ link mustn't make anyone
+    // follow (and notify) its sender without saying so
+    if (!followStore.has('player', from)) {
+      const name = (await getPlayer(from).catch(() => null))?.fullName || 'the friend who invited you';
+      const ok = await askConfirm({
+        title: `Follow ${name}?`,
+        message: 'You opened their invite. Following shows their matches and results on your Home, and lets them know you joined.',
+        yesLabel: 'Yes, follow', noLabel: 'Not now', tone: 'caution',
+      });
+      if (!ok) return null;
+    }
 
     if (!followStore.has('player', from)) {
       followStore.toggle('player', from);

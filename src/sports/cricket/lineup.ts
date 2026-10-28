@@ -3,6 +3,8 @@
  *  `starters`), the rest are `subs`. Kept pure + hooked so the split is
  *  deterministically testable without the (touch-flaky) UI. */
 
+import { exposeGlobal } from '../../core/devGlobals.ts';
+
 export function splitBattingOrder(picked: string[], cap: number): { starters: string[]; subs: string[] } {
   const seen = new Set<string>();
   const clean = picked.filter((id) => (seen.has(id) ? false : (seen.add(id), true))); // de-dupe, keep first position
@@ -10,4 +12,4 @@ export function splitBattingOrder(picked: string[], cap: number): { starters: st
 }
 
 // Test/inspection hook (parity with the other __sportfolio* engines).
-(globalThis as unknown as Record<string, unknown>).__sportfolioCricketLineup = { splitBattingOrder };
+exposeGlobal('__sportfolioCricketLineup', { splitBattingOrder });

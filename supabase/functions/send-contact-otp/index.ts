@@ -129,7 +129,7 @@ Deno.serve(async (req) => {
   const svc = createClient(URL, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
   const { data: player } = await svc.from('players').select('id, profile_id, email, phone, guardian').eq('id', playerId).single();
   if (!player || player.profile_id !== user.id) return json({ sent: false, reason: 'forbidden' });
-  if (!(await rateLimit('contact-otp', `${playerId}:${channel}`, 5, 3600))) return json({ sent: false, reason: 'too-many' });
+  if (!(await rateLimit('contact-otp', `${playerId}:${channel}`, 5, 3600, { failClosed: true }))) return json({ sent: false, reason: 'too-many' });
   // Read the target from the player row — never trust a client-supplied address.
   // guardian_phone: the parent/guardian's number on the (minor's) profile.
   const guardianPhone = (player.guardian as { phone?: string } | null)?.phone ?? '';

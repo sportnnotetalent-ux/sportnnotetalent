@@ -76,6 +76,7 @@ import { emptyFormation, defaultFormationFor } from '../sports/football/formatio
 import { isSoleActiveOwner } from '../core/org';
 import { joinBlockReason } from '../core/registration';
 import { getSport, getSportMeta, loadSport, loadSports } from '../sports/registry';
+import { exposeGlobal } from '../core/devGlobals';
 import { replayLog } from '../sports/amend';
 import type { StatTotalsContext } from '../sports/types';
 import { mergeMatchConfig } from '../core/matchConfig';
@@ -2443,12 +2444,11 @@ export async function repairOpponents(opts: { dryRun?: boolean; sports?: SportId
 }
 
 // SD-19: the founder's console handle for the D2 backfill (web: devtools).
-(globalThis as unknown as Record<string, unknown>).__sportnnoteAdmin = {
-  ...(((globalThis as unknown as Record<string, unknown>).__sportnnoteAdmin as object | undefined) ?? {}),
+exposeGlobal('__sportnnoteAdmin', {
   resyncSportLines,
   backfillCricketCaptainKeeper,
   repairOpponents,
-};
+}, 'admin');
 
 /** SD-11 (GEN-01) — at completion: an appearance line for every player who
  *  took part (squad starters + subs who came on, or a 1–2 player entry's
@@ -2989,9 +2989,9 @@ export async function resolveDispute(id: string, actor?: DisputeActor): Promise<
 
 // Test/inspection hook (parity with the other __sportfolio* engines): drive the
 // dispute lifecycle deterministically and read the resulting audit trail.
-(globalThis as unknown as Record<string, unknown>).__sportfolioDisputes = {
+exposeGlobal('__sportfolioDisputes', {
   raiseDispute, escalateDispute, updateDispute, resolveDispute, dismissDispute, getMatchDisputes,
-};
+});
 
 /** Set a team's manager/coach for a match (optional — local games often have none). */
 export async function setMatchManagers(matchId: string, managers: { home?: string; away?: string }): Promise<void> {
