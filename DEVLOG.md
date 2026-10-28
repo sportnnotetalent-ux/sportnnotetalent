@@ -13,6 +13,14 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-29 — Release: profiles load again; the claim card only when it applies
+- **Database:** the founder ran `20261029110000_players_view_phone`. Checked on live (read-only, as the founder's account, rolled back): the new function is there, and their own phone reads through the view.
+- **No edge functions changed** since `7812d83`.
+- **Checks:** sign-in smoke check passed.
+- **Published** from a clean worktree at `6d881f5`:
+  - web: entry `index-da571252`, served at app.sportnnote.in within about 20 s;
+  - Android OTA: update group `3a44dc52`.
+
 ### 2026-10-29 — Hotfix: profile pages couldn't load (since Wave 2); the claim card showed for everyone
 - **Correction to the "link by phone" hotfix entry below:** nothing of the founder's was lost. Their profile in the nightly backup matches live, and the link changed nothing. The merge fix (W2bB-19) stays: it was a real risk, found while looking.
 - **The real cause (W2-L1):**
