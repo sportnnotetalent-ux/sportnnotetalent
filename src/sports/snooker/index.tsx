@@ -10,7 +10,7 @@
  * match asks first (cue/send.ts). IDs-only scoring: nothing here puts a name
  * into an action; names are looked up for this viewer when shown.
  */
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { theme } from '../../core/theme';
 import { Button, SelectChip, textStyles } from '../../components/ui';
@@ -25,7 +25,7 @@ import {
 } from './engine';
 import { SNOOKER_META } from './meta';
 import {
-  snookerPanel, foulAction, frameScoreAction, frameScoreCheck, awardAction, missWarning, situationLine,
+  snookerPanel, snookerBoard, foulAction, frameScoreAction, frameScoreCheck, awardAction, missWarning, situationLine,
   BALL_COLOR, FOUL_KIND_LABEL, AWARD_REASON_LABEL, type BallTap, type SnookerPanel,
 } from './controls';
 import { snookerFeed } from './feed';
@@ -36,6 +36,8 @@ import { snookerUndoLabel } from './undo';
 import { useSideNames } from '../cue/useNames';
 import { sendTap } from '../cue/send';
 import { TossRow, FrameScoreForm, FrameOptionsPanel, FrameSheet, BreakList, cue } from '../cue/parts';
+import { FrameCorrections } from '../cue/FrameCorrections';
+import { followHidden, hideBanner, type Hidden } from '../cue/uiState';
 
 type Act = ScoreAction | null;
 const other = (s: Side): Side => (s === 'home' ? 'away' : 'home');
@@ -48,7 +50,11 @@ const ScoringControls: SportPlugin<SnookerState>['ScoringControls'] = ({ state, 
   const [quickOpen, setQuickOpen] = useState(false);
   const [shotOverride, setShotOverride] = useState<number | null>(null);
   const [tossOpen, setTossOpen] = useState(false);
-  const [hiddenFoul, setHiddenFoul] = useState<string | null>(null);
+  // A-03 — "Play on" hides this foul's banner; an undo (the seq drops) forgets it
+  const [hidden, setHidden] = useState<Hidden | null>(null);
+  const seq = typeof s?.seq === 'number' ? s.seq : 0;
+  const stillHidden = followHidden(hidden, seq);
+  useEffect(() => { if (stillHidden !== hidden) setHidden(stillHidden); }, [stillHidden, hidden]);
   const p = snookerPanel(s);
   if (!p) return <Text style={textStyles.muted}>{s?.ended ? 'Match over.' : 'This match can\'t be scored here.'}</Text>;
 
@@ -105,7 +111,8 @@ const ScoringControls: SportPlugin<SnookerState>['ScoringControls'] = ({ state, 
 
       {quickShown ? (
         <View style={{ gap: theme.spacing(2) }}>
-          <FrameScoreForm
+          {/* A-05 — the form belongs to its frame: a frame saved meanwhile clears it */}
+          <FrameScoreForm key={`frame-${p.frame}`}
             title={`Frame ${p.frame} final score`} names={names} saveLabel={`Save frame ${p.frame}`}
             hint={p.quick ? 'Frames are scored as the final score only (no breaks).' : undefined}
             check={(h, a) => frameScoreCheck(s, h, a)}
@@ -121,8 +128,8 @@ const ScoringControls: SportPlugin<SnookerState>['ScoringControls'] = ({ state, 
 
       {!quickShown ? (
         <>
-          {p.afterFoul && foulKey !== hiddenFoul ? (
-            <AfterFoulBanner p={p} names={names} send={send} onPlayOn={() => setHiddenFoul(foulKey)} />
+          {p.afterFoul && foulKey && stillHidden?.key !== foulKey ? (
+            <AfterFoulBanner p={p} names={names} send={send} onPlayOn={() => setHidden(hideBanner(foulKey, seq))} />
           ) : null}
           {p.missWarn ? (
             <View style={cue.banner} accessibilityLiveRegion="polite">
@@ -265,25 +272,21 @@ function FoulSheet({ s, p, names, send }: { s: SnookerState; p: SnookerPanel; na
  *  in play lit; the break, the snookers needed and the points left. */
 const SnookerScoreboard: NonNullable<SportPlugin<SnookerState>['Scoreboard']> = ({ state, homeName, awayName, homeColor, awayColor, live, closed }) => {
   const s = state as SnookerState;
-  const p = snookerPanel(s);
-  const alerts: Array<{ side: Side; text: string }> = [];
-  if (p) {
-    const needs = (sd: Side) => (p.snookers[sd] > 0 ? `needs ${plural(p.snookers[sd], 'snooker')}` : '');
-    const atTable = [p.breakPts > 0 ? `Break ${p.breakPts}` : 'At the table', needs(p.striker)].filter(Boolean).join(' · ');
-    alerts.push({ side: p.striker, text: atTable });
-    const o = other(p.striker);
-    if (needs(o)) alerts.push({ side: o, text: needs(o).replace(/^n/, 'N') });
-  }
-  const bestOf = typeof s?.bestOf === 'number' ? s.bestOf : 1;
+  // A-07 — the words come from the pure snookerBoard(s), which never throws
+  const b = snookerBoard(s);
   return (
     <SetLineBoard
       ls={lineScore(s)} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} live={live} closed={closed}
-      status={p ? `Frame ${p.frame}${p.respot ? ' · re-spotted black' : ''}` : 'Frame'}
-      bestOf={`${bestOf > 1 ? `best of ${bestOf}` : 'one frame'}${s?.reds ? ` · ${s.reds} reds` : ''}`}
-      leadLabel="FRAMES" alerts={alerts} cue={p ? `${plural(p.remaining, 'point')} left on the table` : null}
+      status={b.status} bestOf={b.bestOf} leadLabel="FRAMES" alerts={b.alerts} cue={b.cue}
     />
   );
 };
+
+/** A-01 — corrections a frame at a time (a single row can't be voided from a
+ *  shot log without unravelling every later frame). */
+const SnookerCorrections: NonNullable<SportPlugin<SnookerState>['CorrectionEditor']> = (props) => (
+  <FrameCorrections {...props} eng={{ createInitialState, reducer: reducer as never }} unit="frame" rule="A frame can't end level." />
+);
 
 /** Match tabs: visit-by-visit commentary (newest first, by frame) on
  *  Commentary; the match stats (whole match or one frame), the break list and
@@ -332,6 +335,8 @@ export const snookerPlugin: SportPlugin<SnookerState> = {
   // SD-133 — "Undo: black · break 8"
   undoLabel: (step) => snookerUndoLabel(step),
   Scoreboard: SnookerScoreboard,
+  // A-01 — "Correct this match": a frame's final score, later frames kept
+  CorrectionEditor: SnookerCorrections,
   ScoringControls,
   matchTabs: { Commentary: SnookerCommentary, Stats: SnookerStats },
 };

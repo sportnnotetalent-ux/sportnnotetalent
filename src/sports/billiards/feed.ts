@@ -7,6 +7,7 @@
 import type { FeedGroup, FeedItem } from '../gcc/model.ts';
 import type { BilliardsState, FoulKind, Part, Side } from './engine.ts';
 import { readFrames, timeline, type RFrame, type RVisit } from './read.ts';
+import { capFeed } from '../cue/uiState.ts';
 
 const other = (s: Side): Side => (s === 'home' ? 'away' : 'home');
 const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
@@ -88,7 +89,8 @@ function feedOf(s: BilliardsState, names: { home: string; away: string }, unit: 
       subtitle: f.live || !f.winner
         ? `In play · ${names.home} ${h}–${a} ${names.away}${f.sudden ? ' · sudden death' : ''}`
         : f.winner === 'draw' ? `Drawn ${h}–${a}` : `${name(f.winner)} won ${f.winner === 'home' ? `${h}–${a}` : `${a}–${h}`}`,
-      items: items.reverse(),
+      // A-04 — a page of the newest lines per frame (a junk-filled frame can't freeze the tab)
+      items: capFeed(items.reverse(), `f${f.n}`),
     });
   }
   return groups.reverse();

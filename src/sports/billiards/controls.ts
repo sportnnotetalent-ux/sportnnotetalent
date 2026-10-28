@@ -199,3 +199,34 @@ export function frameScoreCheck(s: BilliardsState, homeText: string, awayText: s
     ? { ok: true, home, away, warn: `${hi} is past the target: it is recorded as ${s.target}–${lo} (a game stops at ${s.target}).` }
     : { ok: true, home, away };
 }
+
+/* ----------------------------------------------------------- scoreboard -- */
+
+export interface BoardText {
+  status: string;
+  bestOf: string;
+  /** FRAMES for a best-of match; a single game keeps the board's own label */
+  leadLabel?: string;
+  alerts: Array<{ side: Side; text: string }>;
+  cue: string | null;
+}
+
+/** The scoreboard's words (A-07: pure, never throws). */
+export function billiardsBoard(s: BilliardsState): BoardText {
+  try {
+    const p = billiardsPanel(s);
+    const frames = typeof s.bestOf === 'number' && s.bestOf > 1;
+    const timed = s.format === 'timed';
+    const game = timed ? 'timed' : `${typeof s.target === 'number' ? s.target : 150}-up`;
+    const head = frames ? `Frame ${p?.frame ?? ''}`.trim() : timed ? 'Timed game' : 'Game';
+    return {
+      status: `${head}${p?.sudden ? ' · sudden death' : ''}`,
+      bestOf: frames ? `best of ${s.bestOf} · ${game}` : game,
+      ...(frames ? { leadLabel: 'FRAMES' } : {}),
+      alerts: p ? [{ side: p.striker, text: p.breakPts > 0 ? `Break ${p.breakPts}` : 'At the table' }] : [],
+      cue: p ? limitWarnings(p)[0] ?? null : null,
+    };
+  } catch {
+    return { status: 'Game', bestOf: '', alerts: [], cue: null };
+  }
+}

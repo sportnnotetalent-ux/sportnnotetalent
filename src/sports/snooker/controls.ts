@@ -314,3 +314,39 @@ export function frameScoreCheck(s: SnookerState, homeText: string, awayText: str
     ? { ok: true, home, away, warn: `${hi} is more than ${max}, the most a ${s.reds}-red frame scores without fouls. Check the score.` }
     : { ok: true, home, away };
 }
+
+/* ----------------------------------------------------------- scoreboard -- */
+
+export interface BoardText {
+  status: string;
+  bestOf: string;
+  /** one chip per side at most: the break / "needs N snookers" */
+  alerts: Array<{ side: Side; text: string }>;
+  cue: string | null;
+}
+
+/** The scoreboard's words (A-07: a pure function that never throws, so a
+ *  hostile state object can't crash the board). */
+export function snookerBoard(s: SnookerState): BoardText {
+  try {
+    const p = snookerPanel(s);
+    const bestOf = typeof s.bestOf === 'number' ? s.bestOf : 1;
+    const reds = s.reds === 6 || s.reds === 10 || s.reds === 15 ? s.reds : null;
+    const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? '' : 's'}`;
+    const alerts: BoardText['alerts'] = [];
+    if (p) {
+      const needs = (sd: Side) => (p.snookers[sd] > 0 ? `needs ${plural(p.snookers[sd], 'snooker')}` : '');
+      alerts.push({ side: p.striker, text: [p.breakPts > 0 ? `Break ${p.breakPts}` : 'At the table', needs(p.striker)].filter(Boolean).join(' · ') });
+      const o = other(p.striker);
+      if (needs(o)) alerts.push({ side: o, text: `N${needs(o).slice(1)}` });
+    }
+    return {
+      status: p ? `Frame ${p.frame}${p.respot ? ' · re-spotted black' : ''}` : 'Frame',
+      bestOf: `${bestOf > 1 ? `best of ${bestOf}` : 'one frame'}${reds ? ` · ${reds} reds` : ''}`,
+      alerts,
+      cue: p ? `${plural(p.remaining, 'point')} left on the table` : null,
+    };
+  } catch {
+    return { status: 'Frame', bestOf: '', alerts: [], cue: null };
+  }
+}

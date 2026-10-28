@@ -8,6 +8,7 @@
 import type { FeedGroup, FeedItem } from '../gcc/model.ts';
 import { maxBreak, type FoulKind, type Side, type SnookerState } from './engine.ts';
 import { readFrames, timeline, type RFoul, type RFrame } from './read.ts';
+import { capFeed } from '../cue/uiState.ts';
 
 const other = (s: Side): Side => (s === 'home' ? 'away' : 'home');
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
@@ -97,7 +98,8 @@ function feedOf(s: SnookerState, names: { home: string; away: string }): FeedGro
       subtitle: f.live || !f.winner
         ? `In play · ${names.home} ${h}–${a} ${names.away}${f.respot ? ' · re-spotted black' : ''}${rr}`
         : `${name(f.winner)} won ${won}${rr}`,
-      items: items.reverse(),
+      // A-04 — a page of the newest lines per frame (a junk-filled frame can't freeze the tab)
+      items: capFeed(items.reverse(), `f${f.n}`),
     });
   }
   return groups.reverse();

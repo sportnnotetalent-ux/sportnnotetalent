@@ -25,7 +25,7 @@ import {
 } from './engine';
 import { BILLIARDS_META } from './meta';
 import {
-  billiardsPanel, strokeAction, strokeFoul, foulAction, frameScoreAction, frameScoreCheck, awardAction, limitWarnings, comboValue,
+  billiardsPanel, billiardsBoard, strokeAction, strokeFoul, foulAction, frameScoreAction, frameScoreCheck, awardAction, limitWarnings, comboValue,
   PART_LABEL, FOUL_KIND_LABEL, AWARD_REASON_LABEL, type BilliardsPanel, type Parts,
 } from './controls';
 import { billiardsFeed } from './feed';
@@ -37,6 +37,7 @@ import { useSideNames } from '../cue/useNames';
 import { sendTap } from '../cue/send';
 import { endingOf } from '../cue/ending';
 import { TossRow, FrameScoreForm, FrameOptionsPanel, FrameSheet, BreakList, cue } from '../cue/parts';
+import { FrameCorrections } from '../cue/FrameCorrections';
 
 type Act = ScoreAction | null;
 const other = (s: Side): Side => (s === 'home' ? 'away' : 'home');
@@ -95,7 +96,8 @@ const ScoringControls: SportPlugin<BilliardsState>['ScoringControls'] = ({ state
 
       {quickShown ? (
         <View style={{ gap: theme.spacing(2) }}>
-          <FrameScoreForm
+          {/* A-05 — the form belongs to its frame: a frame saved meanwhile clears it */}
+          <FrameScoreForm key={`frame-${p.frame}`}
             title={`${cap(unit)} ${p.frame} final score`} names={names} saveLabel={`Save ${unit} ${p.frame}`}
             hint={p.format === 'points' ? `The winner reaches ${p.target}; a score past it is recorded at ${p.target}.` : 'The score when time was called.'}
             check={(h, a) => frameScoreCheck(s, h, a)}
@@ -191,20 +193,21 @@ function FoulSheet({ s, p, names, send }: { s: BilliardsState; p: BilliardsPanel
 
 const BilliardsScoreboard: NonNullable<SportPlugin<BilliardsState>['Scoreboard']> = ({ state, homeName, awayName, homeColor, awayColor, live, closed }) => {
   const s = state as BilliardsState;
-  const p = billiardsPanel(s);
-  const alerts = p ? [{ side: p.striker, text: p.breakPts > 0 ? `Break ${p.breakPts}` : 'At the table' }] : [];
-  const unit = unitOf(s);
-  const game = s?.format === 'timed' ? 'timed' : `${typeof s?.target === 'number' ? s.target : 150}-up`;
+  // A-07 — the words come from the pure billiardsBoard(s), which never throws
+  const b = billiardsBoard(s);
   return (
     <SetLineBoard
       ls={lineScore(s)} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} live={live} closed={closed}
-      status={p ? `${unit === 'frame' ? `Frame ${p.frame}` : s.format === 'timed' ? 'Timed game' : 'Game'}${p.sudden ? ' · sudden death' : ''}` : cap(unit)}
-      bestOf={unit === 'frame' ? `best of ${s.bestOf} · ${game}` : game}
-      leadLabel={unit === 'frame' ? 'FRAMES' : undefined}
-      alerts={alerts} cue={p ? limitWarnings(p)[0] ?? null : null}
+      status={b.status} bestOf={b.bestOf} leadLabel={b.leadLabel} alerts={b.alerts} cue={b.cue}
     />
   );
 };
+
+/** A-01 — corrections a frame (game) at a time: later frames replay as played. */
+const BilliardsCorrections: NonNullable<SportPlugin<BilliardsState>['CorrectionEditor']> = (props) => (
+  <FrameCorrections {...props} eng={{ createInitialState, reducer: reducer as never }} unit={unitOf(createInitialState(props.config))}
+    rule="A points game: the winner reaches the target and the loser doesn't. A timed game: level only when the organiser allows a draw." />
+);
 
 type TabProps = Parameters<NonNullable<SportPlugin<BilliardsState>['LiveExtras']>>[0];
 const BilliardsCommentary = (p: TabProps) => {
@@ -252,6 +255,8 @@ export const billiardsPlugin: SportPlugin<BilliardsState> = {
   // SD-133 — "Undo: pot red + cannon · break 5"
   undoLabel: (step) => billiardsUndoLabel(step),
   Scoreboard: BilliardsScoreboard,
+  // A-01 — "Correct this match": a frame's final score, later frames kept
+  CorrectionEditor: BilliardsCorrections,
   ScoringControls,
   matchTabs: { Commentary: BilliardsCommentary, Stats: BilliardsStats },
 };

@@ -12,8 +12,12 @@
  * the same order, so they pair up; a penalty by the player not at the table
  * (S3 R3(k)) ends no visit and is placed after the striker's foul before it
  * (its exact moment inside a visit isn't recorded).
+ *
+ * A-02 (app break list): a visit no replay can make — a break over the
+ * maximum (147 / 107 / 75, +8 with a free ball) or a fraction — is a crafted
+ * snapshot and is not read.
  */
-import { isSnookerState, snookerStats, type FoulKind, type Side, type SnookerState, type VisitEnd } from './engine.ts';
+import { isSnookerState, maxBreak, snookerStats, type FoulKind, type Side, type SnookerState, type VisitEnd } from './engine.ts';
 
 export interface RVisit { side: Side; pts: number; pots: number; shots: number; fb: boolean; end: VisitEnd | 'live' }
 export interface RFoul { by: Side; value: number; kind?: FoulKind; miss: boolean; fb: boolean; reds: number; penalty: boolean }
@@ -42,10 +46,11 @@ const nn = (v: unknown): number | null => (typeof v === 'number' && Number.isFin
 const KINDS = new Set(['inOff', 'noContact', 'wrongBall', 'pottedWrong', 'push', 'jump', 'touch', 'offTable', 'other']);
 const ENDS = new Set(['miss', 'safety', 'foul', 'frame', 'respot']);
 
-function readVisit(v: unknown, live = false): RVisit | null {
+function readVisit(v: unknown, max: number, live = false): RVisit | null {
   if (!isObj(v) || !isSide(v.side)) return null;
   const pts = nn(v.pts), pots = nn(v.pots), shots = nn(v.shots);
   if (pts === null || pots === null || shots === null) return null;
+  if (!Number.isInteger(pts) || pts > max) return null;
   const end = live ? 'live' : typeof v.end === 'string' && ENDS.has(v.end) ? (v.end as VisitEnd) : 'miss';
   return { side: v.side, pts, pots, shots, fb: v.fb === 1 || v.fb === true, end };
 }
@@ -64,23 +69,24 @@ const list = <T,>(v: unknown, read: (x: unknown) => T | null): T[] => (Array.isA
 export function readFrames(s: SnookerState): RFrame[] {
   try {
     if (!isObj(s) || !Array.isArray(s.frames)) return [];
+    const max = maxBreak(s.reds === 6 || s.reds === 10 ? s.reds : 15) + 8;
     const out: RFrame[] = [];
     for (const f of s.frames as unknown[]) {
       if (!isObj(f) || !Array.isArray(f.score) || nn(f.score[0]) === null || nn(f.score[1]) === null || !isSide(f.winner)) continue;
       out.push({
         n: nn(f.n) ?? out.length + 1, breaker: isSide(f.breaker) ? f.breaker : null, score: [f.score[0] as number, f.score[1] as number],
         winner: f.winner, how: typeof f.how === 'string' ? f.how : null, quick: f.quick === true, live: false,
-        visits: list(f.visits, (v) => readVisit(v)), fouls: list(f.fouls, readFoul),
+        visits: list(f.visits, (v) => readVisit(v, max)), fouls: list(f.fouls, readFoul),
         ...(isSide(f.conceded) ? { conceded: f.conceded } : {}), ...(typeof f.reason === 'string' ? { reason: f.reason } : {}),
         reracks: nn(f.reracks) ?? 0, respot: false,
       });
     }
     if (isSnookerState(s) && s.frame) {
       const fr = s.frame;
-      const cur = fr.visit.shots > 0 ? readVisit(fr.visit, true) : null;
+      const cur = fr.visit.shots > 0 ? readVisit(fr.visit, max, true) : null;
       out.push({
         n: fr.n, breaker: fr.breaker, score: [fr.score.home, fr.score.away], winner: null, how: null, quick: false, live: true,
-        visits: [...list(fr.visits, (v) => readVisit(v)), ...(cur ? [cur] : [])], fouls: list(fr.fouls, readFoul),
+        visits: [...list(fr.visits, (v) => readVisit(v, max)), ...(cur ? [cur] : [])], fouls: list(fr.fouls, readFoul),
         reracks: nn(fr.reracks) ?? 0, respot: !!fr.respot,
       });
     }
