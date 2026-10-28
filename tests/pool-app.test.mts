@@ -690,3 +690,64 @@ describe('the Scoreboard status and best-of line', () => {
     assert.equal(C.bestOfLine(M.poolInit({ game: 'eight', raceTo: 5 })), 'race to 5');
   });
 });
+
+/* ------------------------------------------------------------------ */
+/*  Breaks (docs/security/breaks/pool-app.md): one test per point     */
+/* ------------------------------------------------------------------ */
+
+/** A real match state and hostile / old snapshots of it. */
+function hostileSnapshots(): unknown[] {
+  let base = M.poolInit({ game: 'nine', raceTo: 2 });
+  base = M.poolReducer(base, C.lagAction(base, 'home'));
+  base = M.poolReducer(base, C.breakAction(base, { pots: [1] }, { pid: 'h1' }));
+  return [
+    null, undefined, 0, 'x', [], {}, { rack: 5 }, { rack: { n: 'x', table: 'y', pending: { kind: 'push', by: 'home' } } },
+    { ...base, rack: { ...base.rack, pending: { kind: 'nope', by: 'x' } } },
+    { ...base, rack: { ...base.rack, table: null, shooter: 'nobody' } },
+    { ...base, fmt0: { raceTo: '__proto__', setsToWin: {} } },
+    { ...base, feed: [{ n: 1, t: 'POT', b: [14, 15] }, null, { n: 1e300, t: 'MISS' }], rat: 'x' },
+    { ...base, racks: [null, { winner: 'home', n: 'x', innings: 5 }, { winner: 'away' }], sets: [[1, 'x']], game: '__proto__' },
+    { ...base, raceTo: Infinity, setsToWin: NaN, current: null, setsWon: 'x' },
+    { ...base, ended: true, racks: [{ winner: 'home', n: 1, how: 7, bnr: true, golden: 'yes' }], sets: [[2, 1], null, 'x'] },
+  ];
+}
+const READERS: Record<string, (s: never) => unknown> = {
+  panel: (s) => C.poolPanel(s), choices: (s) => C.choiceOptions(s, name), question: (s) => C.choiceQuestion(s, name),
+  breakLine: (s) => C.breakLine(s, name), note: (s) => C.formatNote(s), units: (s) => C.setUnits(s), bestOf: (s) => C.bestOfLine(s),
+  status: (s) => C.boardStatus(s), feed: (s) => poolFeed(s, NAMES, nameOf), compare: (s) => poolCompare(s), compareSet: (s) => poolCompare(s, 1),
+  racks: (s) => poolRackList(s, name), box: (s) => poolBox(s, {}).data('all'), records: (s) => POOL_CORE.matchRecords!(s),
+  undo: (s) => POOL_CORE.undoLabel!({ type: 'POT', prev: M.poolInit(), next: s }, nameOf), totals: (s) => POOL_CORE.statTotals!(s, ctx(['h1'], ['a1'])),
+  units2: (s) => POOL_CORE.standingsUnits!(s), confirm: (s) => C.confirmFor(s, { type: 'RACK', side: 'home', payload: { rack: 1 } }, name),
+  shooter: (s) => C.shooterPick(s, 'home', ['h1', 'h2']), stamp: (s) => C.missAction(s), reducer: (s) => M.poolReducer(s, { type: 'MISS', side: 'home', payload: { rack: 1 } }),
+  live: (s) => POOL_CORE.liveSettings!.read(s), summary: (s) => POOL_CORE.summary(s), lineScore: (s) => POOL_CORE.lineScore!(s),
+};
+
+describe('breaks · hostile and old snapshots (#24, #25, #28)', () => {
+  test('#24 — no reader throws on a hostile snapshot', () => {
+    for (const [k, f] of Object.entries(READERS)) {
+      hostileSnapshots().forEach((h, i) => assert.doesNotThrow(() => f(h as never), `${k} on snapshot ${i}`));
+    }
+  });
+  test('#25 — no reader prints undefined / NaN / Infinity / [object …] / __proto__, or a ball the game doesn\'t have', () => {
+    for (const [k, f] of Object.entries(READERS)) {
+      if (k === 'reducer') continue; // hands a refused state back as it is
+      hostileSnapshots().forEach((h, i) => {
+        const out = JSON.stringify(f(h as never)) ?? '';
+        assert.ok(!/undefined|NaN|Infinity|\[object|__proto__/.test(out), `${k} on snapshot ${i}: ${out.slice(0, 200)}`);
+      });
+    }
+    const nine = hostileSnapshots()[11] as S;
+    assert.ok(!/\b1[45]\b/.test(JSON.stringify(poolFeed(nine, NAMES, nameOf))), 'a 9-ball feed never shows the 14 or 15');
+  });
+  test('#28 — an engine-only snapshot (no plugin parts) reads as an empty credit / feed', async () => {
+    const engine = await import('../src/sports/pool/engine.ts');
+    let e = engine.createInitialState({ game: 'nine', raceTo: 1 });
+    e = engine.reducer(e, { type: 'LAG', side: 'home', payload: {} });
+    e = engine.reducer(e, { type: 'BREAK', side: 'home', payload: { pots: [9] } });
+    const s = e as S;
+    assert.deepEqual(M.creditOf(s).ids, { home: [], away: [] });
+    assert.deepEqual(M.feedOf(s), []);
+    assert.equal(poolFeed(s, NAMES, nameOf)[0].items[0].text, 'Rack 1 to Home (golden break)');
+    assert.deepEqual(POOL_CORE.statTotals!(s, ctx(['h1'], ['a1'])).h1.stats.goldenBreaks, 1);
+  });
+});

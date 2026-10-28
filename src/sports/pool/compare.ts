@@ -36,7 +36,7 @@ export function poolCompare(s: PoolMatch, set?: number): CompareCategory[] {
     runOuts: per(sd).filter((r) => r.runOut).length,
     golden: per(sd).filter((r) => r.golden).length,
     threeFoul: racks.filter((r) => r.winner === other(sd) && r.how === 'threeFoul').length,
-    eight: racks.filter((r) => r.winner === other(sd) && r.how.startsWith('eight')).length,
+    eight: racks.filter((r) => r.winner === other(sd) && typeof r.how === 'string' && r.how.startsWith('eight')).length,
     innings: det.reduce((t, r) => t + cnt(r.innings?.[sd]), 0),
   });
   const H = rk('home'), A = rk('away');

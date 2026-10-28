@@ -12,7 +12,7 @@
 import type { FeedGroup, FeedItem } from '../gcc/model.ts';
 import { whoName, type NameOf } from '../racketNames.ts';
 import { cnt, type RackRecord } from './engine.ts';
-import { isSide, MONEY, other, type Side } from './balls.ts';
+import { isSide, knownGame, MONEY, other, type Side } from './balls.ts';
 import { feedOf, rackTimes, type FeedEntry, type PoolMatch } from './match.ts';
 import { FOUL_SHORT } from './controls.ts';
 
@@ -79,7 +79,8 @@ export function poolFeed(s: PoolMatch, names: { home: string; away: string }, na
   const scores = scoresAfter(s, name);
   const times = rackTimes(s);
   const feed = feedOf(s);
-  const money = MONEY[s.game] ?? 8;
+  const g = knownGame(s.game);
+  const money = g ? MONEY[g] : 8;
   const inPlay = isObj(s.rack) ? cnt(s.rack.n) : 0;
   const ns = new Set<number>([...racks.map((r) => cnt(r.n)), ...feed.map((e) => e.n), ...(inPlay ? [inPlay] : [])]);
   const groups: FeedGroup[] = [];

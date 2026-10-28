@@ -20,12 +20,41 @@
  * figure is derived from the replayed state (./totals.ts).
  */
 import type { ScoreAction } from '../types';
-import { onTwoFouls, summary, type FoulKind, type PendingKind, type RackEnd } from './engine.ts';
-import { MONEY, other, type Side } from './balls.ts';
+import { cnt, onTwoFouls, summary, type FoulKind, type PendingKind, type RackEnd } from './engine.ts';
+import { isSide, knownGame, MONEY, other, TOP, type PoolGame, type Side } from './balls.ts';
 import { creditOf, poolReducer, SHOT_TYPES, validPid, type PoolMatch } from './match.ts';
 
 export type { Side };
 type Name = (side: Side) => string;
+
+const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
+const PENDING: ReadonlySet<string> = new Set(['push', 'wrongPot', 'threeBall', 'illegalBreak', 'eightBreak', 'eightFoul']);
+
+/** The rack in play, read defensively (break #24 / #25): a stored snapshot
+ *  may be old or hostile, so every field is checked before the screen uses
+ *  it. null = no live rack (the match is over, or the state can't be read). */
+export interface LiveRackView {
+  game: PoolGame; n: number; phase: 'break' | 'play'; table: number[]; breaker: Side | null; shooter: Side | null;
+  pending: { kind: PendingKind; by: Side } | null; bih: boolean; push: boolean; solids: Side | null; reracks: number;
+}
+export function liveRack(s: unknown): LiveRackView | null {
+  if (!isObj(s) || s.ended === true || !isObj(s.rack)) return null;
+  const game = knownGame(s.game);
+  const r = s.rack;
+  const n = cnt(r.n);
+  if (!game || !n) return null;
+  const top = TOP[game];
+  const table = Array.isArray(r.table)
+    ? [...new Set(r.table.filter((b): b is number => typeof b === 'number' && Number.isInteger(b) && b >= 1 && b <= top))].sort((a, b) => a - b)
+    : [];
+  const p = r.pending;
+  return {
+    game, n, phase: r.phase === 'play' ? 'play' : 'break', table,
+    breaker: isSide(r.breaker) ? r.breaker : null, shooter: isSide(r.shooter) ? r.shooter : null,
+    pending: isObj(p) && typeof p.kind === 'string' && PENDING.has(p.kind) && isSide(p.by) ? { kind: p.kind as PendingKind, by: p.by } : null,
+    bih: r.bih === true, push: r.push === true, solids: isSide(r.solids) ? r.solids : null, reracks: cnt(r.reracks),
+  };
+}
 
 export interface TapOpts {
   /** who shot (player id) */
@@ -36,15 +65,15 @@ export interface TapOpts {
 
 /** Add the rack in play, the side at the table, the first-event format, who shot, the time. */
 export function stamp(s: PoolMatch, a: ScoreAction, o: TapOpts = {}): ScoreAction {
-  const r = s?.rack;
+  const r = liveRack(s);
   const payload: Record<string, unknown> = { ...(a.payload ?? {}) };
   if (r) payload.rack = r.n;
   let side = a.side;
   if (r && !side && SHOT_TYPES.has(a.type) && r.shooter) side = r.shooter;
-  if (s && s.seq === 0 && !s.ended) {
-    payload.game = s.game;
-    payload.race = s.raceTo;
-    payload.sets = s.setsToWin;
+  if (r && s.seq === 0) {
+    payload.game = r.game;
+    payload.race = cnt(s.raceTo) || 1;
+    payload.sets = cnt(s.setsToWin) || 1;
   }
   const pid = validPid(o.pid);
   if (pid) payload.pid = pid;
@@ -130,18 +159,21 @@ export type PoolPanel =
   };
 
 export function poolPanel(s: PoolMatch): PoolPanel {
-  const r = s?.rack;
-  if (!s || s.ended || !r) return { kind: 'over', winner: s?.winner ?? null };
+  const r = liveRack(s);
+  if (!r) return { kind: 'over', winner: isObj(s) && isSide(s.winner) ? s.winner : null };
+  const g = r.game;
   if (r.phase === 'break') {
-    if (r.n === 1 && !r.breaker && !r.reracks && !s.racks.length) return { kind: 'lag', rack: 1 };
-    return { kind: 'break', rack: r.n, breaker: r.breaker, balls: [...r.table], shortRule: s.threeBallRule, illegalFoul: s.game !== 'eight' };
+    if (r.n === 1 && !r.breaker && !r.reracks && !(Array.isArray(s.racks) && s.racks.length)) return { kind: 'lag', rack: 1 };
+    return { kind: 'break', rack: r.n, breaker: r.breaker, balls: r.table, shortRule: s.threeBallRule === true, illegalFoul: g !== 'eight' };
   }
   if (r.pending) return { kind: 'choice', rack: r.n, by: r.pending.by, pending: r.pending.kind };
-  const shooter = r.shooter ?? 'home';
+  // a rack in play with nobody at the table can only be a broken snapshot: nothing to offer
+  if (!r.shooter) return { kind: 'over', winner: null };
+  const shooter = r.shooter;
   return {
-    kind: 'shot', rack: r.n, shooter, table: [...r.table], bih: r.bih, twoFouls: onTwoFouls(s) === shooter,
-    push: r.push && s.game !== 'eight', callShot: s.game !== 'nine', safetyCall: s.game !== 'ten',
-    solids: s.game === 'eight' ? r.solids : null, money: MONEY[s.game], tenCall: s.game === 'ten' && s.tenEarly,
+    kind: 'shot', rack: r.n, shooter, table: r.table, bih: r.bih, twoFouls: onTwoFouls(s) === shooter,
+    push: r.push && g !== 'eight', callShot: g !== 'nine', safetyCall: g !== 'ten',
+    solids: g === 'eight' ? r.solids : null, money: MONEY[g], tenCall: g === 'ten' && s.tenEarly === true,
   };
 }
 
@@ -149,7 +181,7 @@ export interface ChoiceOption { choice: 'play' | 'pass' | 'rerack'; breaker?: Si
 
 /** The options of a pending choice, in plain words. */
 export function choiceOptions(s: PoolMatch, name: Name): ChoiceOption[] {
-  const p = s?.rack?.pending;
+  const p = liveRack(s)?.pending;
   if (!p) return [];
   const by = p.by, them = other(by);
   switch (p.kind) {
@@ -177,7 +209,7 @@ export function choiceOptions(s: PoolMatch, name: Name): ChoiceOption[] {
 
 /** What the choice is about, in one line. */
 export function choiceQuestion(s: PoolMatch, name: Name): string {
-  const p = s?.rack?.pending;
+  const p = liveRack(s)?.pending;
   if (!p) return '';
   const by = name(p.by);
   switch (p.kind) {
@@ -194,10 +226,11 @@ const BREAK_WORD: Record<string, string> = { alternate: 'alternate', winner: 'wi
 
 /** "Rack 4 · Asha to break (alternate)" — who breaks the rack waiting for its break. */
 export function breakLine(s: PoolMatch, name: Name): string {
-  const r = s?.rack;
+  const r = liveRack(s);
   if (!r) return '';
   if (!r.breaker) return `Rack ${r.n} · who breaks?`;
-  return `Rack ${r.n} · ${name(r.breaker)} to break${r.n > 1 ? ` (${BREAK_WORD[s.breakFormat] ?? 'alternate'})` : ''}`;
+  const fmt = s.breakFormat === 'winner' || s.breakFormat === 'loser' ? s.breakFormat : 'alternate';
+  return `Rack ${r.n} · ${name(r.breaker)} to break${r.n > 1 ? ` (${BREAK_WORD[fmt]})` : ''}`;
 }
 
 // ------------------------------------------------------- foul names --
@@ -264,7 +297,7 @@ export function howSentence(how: RackEnd, W: string, L: string, money: number): 
 /** The confirm sheet's words for a rack-, set- or match-ending tap, a stalemate,
  *  or an award; null = no need to ask. */
 export function confirmFor(s: PoolMatch, a: ScoreAction, name: Name): { title: string; message: string; yesLabel: string } | null {
-  const r = s?.rack;
+  const r = liveRack(s);
   if (!r) return null;
   const out = outcomeOf(s, a);
   if (!out.accepted) return null;
@@ -275,10 +308,11 @@ export function confirmFor(s: PoolMatch, a: ScoreAction, name: Name): { title: s
   if (!e) return null;
   const W = name(e.winner), L = name(other(e.winner));
   const next = poolReducer(s, a);
-  const how = howSentence(e.how, W, L, MONEY[s.game]);
+  const how = howSentence(e.how, W, L, MONEY[r.game]);
+  const sets = setsOf(s.setsToWin);
   const score = next.ended || e.kind === 'set'
-    ? (s.setsToWin > 1 ? `Sets ${next.setsWon.home}–${next.setsWon.away} (${name('home')} first)` : `${Math.max(...lastSet(next))}–${Math.min(...lastSet(next))}`)
-    : `${s.setsToWin > 1 ? `Set ${next.sets.length + 1}: ` : ''}${next.current.home}–${next.current.away} (${name('home')} first)`;
+    ? (sets > 1 ? `Sets ${next.setsWon.home}–${next.setsWon.away} (${name('home')} first)` : `${Math.max(...lastSet(next))}–${Math.min(...lastSet(next))}`)
+    : `${sets > 1 ? `Set ${next.sets.length + 1}: ` : ''}${next.current.home}–${next.current.away} (${name('home')} first)`;
   if (e.kind === 'match') return { title: `${W} wins the match?`, message: `${how}. ${score}. The match ends.`, yesLabel: 'Yes, end the match' };
   if (e.kind === 'set') return { title: `${W} wins set ${e.set}?`, message: `${how}. ${score}.`, yesLabel: 'Yes, end the set' };
   return { title: `Rack ${e.rack} to ${W}?`, message: `${how}. ${score}.`, yesLabel: 'Yes, record it' };
@@ -316,7 +350,7 @@ export function shooterPick(s: PoolMatch, side: Side, ids: readonly string[]): {
   const two = [...new Set(ids.map(validPid).filter((x): x is string => !!x))].slice(0, 2);
   if (!two.length) return { ids: [], suggested: null };
   const cr = creditOf(s);
-  const prev = s?.rack?.phase === 'break' ? cr.lastBreak[side] : cr.last[side];
+  const prev = liveRack(s)?.phase === 'break' ? cr.lastBreak[side] : cr.last[side];
   const suggested = prev && two.length > 1 && two.includes(prev) ? two.find((x) => x !== prev)! : two[0];
   return { ids: two, suggested };
 }
@@ -327,19 +361,28 @@ export function shooterPick(s: PoolMatch, side: Side, ids: readonly string[]): {
 export const boardStatus = (s: PoolMatch): string => summary(s).statusLine;
 
 const fmtText = (race: number, sets: number) => (sets > 1 ? `best of ${2 * sets - 1} sets · race to ${race}` : `race to ${race}`);
-/** "best of 3 sets · race to 7" / "race to 5". */
-export const bestOfLine = (s: PoolMatch): string => fmtText(s.raceTo, s.setsToWin);
+const raceOf = (v: unknown) => { const n = cnt(v); return n >= 1 && n <= 99 ? n : 0; };
+const setsOf = (v: unknown) => { const n = cnt(v); return n >= 1 && n <= 9 ? n : 1; };
+/** "best of 3 sets · race to 7" / "race to 5" ('' when the snapshot has no race). */
+export function bestOfLine(s: PoolMatch): string {
+  const race = raceOf(isObj(s) ? s.raceTo : undefined);
+  return race ? fmtText(race, setsOf(s.setsToWin)) : '';
+}
 
 /** The race or the sets changed after the match started (the log was re-scored). */
 export function formatNote(s: PoolMatch): string | null {
-  const f = s?.fmt0;
-  if (!f || (f.raceTo === s.raceTo && f.setsToWin === s.setsToWin)) return null;
-  return `Now ${fmtText(s.raceTo, s.setsToWin).replace(' · ', ', ')}: it was ${fmtText(f.raceTo, f.setsToWin).replace(' · ', ', ')} when the match started. The match was re-scored from rack 1.`;
+  const f = isObj(s) && isObj(s.fmt0) ? s.fmt0 : null;
+  if (!f) return null;
+  const race = raceOf(s.raceTo), race0 = raceOf(f.raceTo);
+  if (!race || !race0) return null;
+  const sets = setsOf(s.setsToWin), sets0 = setsOf(f.setsToWin);
+  if (race === race0 && sets === sets0) return null;
+  return `Now ${fmtText(race, sets).replace(' · ', ', ')}: it was ${fmtText(race0, sets0).replace(' · ', ', ')} when the match started. The match was re-scored from rack 1.`;
 }
 
 /** The stats panel's unit chips: the match, then each set (sets matches). */
 export function setUnits(s: PoolMatch): { key: string; label: string }[] {
-  if (!s || s.setsToWin <= 1) return [{ key: 'all', label: 'Match' }];
-  const n = (s.sets?.length ?? 0) + (s.ended ? 0 : 1);
+  if (!isObj(s) || setsOf(s.setsToWin) <= 1) return [{ key: 'all', label: 'Match' }];
+  const n = Math.min(17, (Array.isArray(s.sets) ? s.sets.length : 0) + (s.ended === true ? 0 : 1));
   return [{ key: 'all', label: 'Match' }, ...Array.from({ length: n }, (_, i) => ({ key: String(i + 1), label: `Set ${i + 1}` }))];
 }

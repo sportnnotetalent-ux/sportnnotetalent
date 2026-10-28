@@ -173,8 +173,8 @@ export function creditOf(s: unknown): PoolCredit {
 const FEED_TYPES: ReadonlySet<string> = new Set(['LAG', 'BREAK', 'POT', 'MISS', 'SAFETY', 'FOUL', 'PUSH', 'CHOOSE', 'RACK', 'STALEMATE']);
 const KIND_SET: ReadonlySet<string> = new Set(FOUL_KINDS);
 const PENDING: ReadonlySet<string> = new Set(['push', 'wrongPot', 'threeBall', 'illegalBreak', 'eightBreak', 'eightFoul']);
-const balls = (v: unknown): number[] | undefined => {
-  const b = readBalls(v, 15);
+const balls = (v: unknown, top: number): number[] | undefined => {
+  const b = readBalls(v, top);
   return b && b.length ? b : undefined;
 };
 
@@ -182,6 +182,8 @@ const balls = (v: unknown): number[] | undefined => {
 export function feedOf(s: unknown): FeedEntry[] {
   const f = isObj(s) ? own(s, 'feed') : undefined;
   if (!Array.isArray(f)) return [];
+  // balls are read against the game's own set (a 9-ball feed never shows a 14)
+  const top = TOP[knownGame(own(s, 'game')) ?? 'eight'];
   const out: FeedEntry[] = [];
   for (const e of f.slice(-(FEED_RACKS + 1) * FEED_PER_RACK)) {
     if (!isObj(e)) continue;
@@ -190,8 +192,8 @@ export function feedOf(s: unknown): FeedEntry[] {
     const x: FeedEntry = { n, t };
     if (isSide(e.s)) x.s = e.s;
     const p = validPid(e.p); if (p) x.p = p;
-    const b = balls(e.b); if (b) x.b = b;
-    const o = balls(e.o); if (o) x.o = o;
+    const b = balls(e.b, top); if (b) x.b = b;
+    const o = balls(e.o, top); if (o) x.o = o;
     if (typeof e.k === 'string' && KIND_SET.has(e.k)) x.k = e.k as FoulKind;
     if (e.c === 'play' || e.c === 'pass' || e.c === 'rerack') x.c = e.c;
     if (typeof e.q === 'string' && PENDING.has(e.q)) x.q = e.q as PendingKind;
