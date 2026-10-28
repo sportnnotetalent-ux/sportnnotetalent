@@ -11,9 +11,14 @@
  *      player's own (channel 'phone') or their guardian's ('guardian_phone');
  *   4. sets phone_verified (or guardian.phoneVerified) with the service role —
  *      the app itself can never set these (migrations 0025/0027).
+ * Channel 'claim' (W1-2b, migration 20261028160000_security_wave2b): someone a
+ * coach added by phone, who signed up by email, proves the number; the server
+ * links that coach-made profile to them (claim_player_by_phone). No playerId.
  *
  * Contract: POST { playerId, channel: 'phone'|'guardian_phone', idToken }
  *           → 200 { verified: boolean, reason? }
+ *           POST { channel: 'claim', idToken }
+ *           → 200 { verified: true, outcome: 'linked'|'none'|'support' }
  * Deploy:   supabase functions deploy verify-phone-firebase
  * Secrets:  FIREBASE_PROJECT_ID (the Firebase project id, e.g. sportnnote-12345)
  */
@@ -31,9 +36,9 @@ Deno.serve(async (req) => {
 
   const body = (await req.json().catch(() => ({}))) as { playerId?: unknown; channel?: unknown; idToken?: unknown };
   const playerId = typeof body.playerId === 'string' ? body.playerId : '';
-  const channel = body.channel === 'guardian_phone' ? 'guardian_phone' : body.channel === 'phone' ? 'phone' : null;
+  const channel = body.channel === 'guardian_phone' ? 'guardian_phone' : body.channel === 'phone' ? 'phone' : body.channel === 'claim' ? 'claim' : null;
   const idToken = typeof body.idToken === 'string' ? body.idToken : '';
-  if (!playerId || !channel || !idToken) return json({ verified: false, reason: 'playerId, channel and idToken are required' }, 400);
+  if (!channel || !idToken || (channel !== 'claim' && !playerId)) return json({ verified: false, reason: 'playerId, channel and idToken are required' }, 400);
 
   // 1. Google's signature + our project + freshness.
   const verified = await verifiedPhoneFromToken(idToken);
@@ -41,6 +46,14 @@ Deno.serve(async (req) => {
   // Full E.164 from Google's token (e.g. +447400123456) — compared whole.
   const phone = verified.startsWith('+') ? phoneKey(verified) : '';
   if (!phone) return json({ verified: false, reason: 'That number couldn’t be read — include the country code.' }, 400);
+
+  // W1-2b: link the profile a coach made under this (now proven) number.
+  if (channel === 'claim') {
+    const { data, error } = await admin.rpc('claim_player_by_phone', { p_profile: caller.user.id, p_phone: phone });
+    if (error) return json({ verified: false, reason: 'Couldn’t link just now — try again.' }, 500);
+    const outcome = data === 'linked' || data === 'support' ? data : 'none';
+    return json({ verified: true, outcome });
+  }
 
   // 2 + 3. The caller's own profile, and the number on it.
   const { data: player } = await admin.from('players').select('id, profile_id, phone, guardian').eq('id', playerId).single();

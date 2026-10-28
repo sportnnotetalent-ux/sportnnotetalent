@@ -13,6 +13,53 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-28 — Security Wave 2b: requests to confirm, friendlies, link by phone
+The app side of the consent model. It closes W2B-11 and W2B-12 (Wave 2a's accepted side effects) and W1B-02.
+
+**Built:**
+- Migration: `20261028160000_security_wave2b`.
+- Edge function: `verify-phone-firebase`, new channel `claim`.
+- App: `data/requests.ts` (pure), `data/requestsStore.ts`, and the Home cards `RequestsCard` and `LinkByPhoneCard`.
+- Guide: `website/guides/requests-to-confirm.md`.
+
+**Requests to confirm.**
+- `my_pending_links()` lists the links someone else made to my side that nobody on my side agreed to: teams (roster, captain, admins, members, roles), clubs, communities and field events. My side is me, my linked child, or an unclaimed player I added.
+- `answer_link(kind, group, player, accept)`: only the player's side can answer.
+  - **Confirm** records the agreement.
+  - **Not us** takes the player off the team, club or community. A field-event entry stays for its results. The group can't ask again (`member_link_declines`). The only-owner of a community goes to support.
+- Home shows **🤝 N requests to confirm** with Confirm / Not us. "Not us" asks first, with **No, keep it** as the default.
+
+**Friendlies.**
+- `match_team_consents`: the friendly's creator agrees for the teams they manage (trigger). The opponent's manager answers through `my_pending_friendlies()` and `answer_friendly()`.
+- `player_circle_of` gained one arm: a friendly I host or score adds each team that accepted. Swapping the opponent needs a new acceptance.
+- The 17 existing friendlies (on live, all between one creator's own teams) were backfilled as `existing`.
+
+**Link by phone (W1-2b).**
+- An email sign-up whose number sits on a coach-made profile sees **📱 Did a coach add you by phone?** They prove the number by Firebase SMS. The server then links the profile (`claim_player_by_phone`, service role only) and replaces the account's own profile only if it's empty.
+- The first name and birth year must match, and the linked parents mustn't disagree. Otherwise support links it by hand.
+
+**Tests:**
+- `tests/db-wave2b.test.mts`: 19. 15 were red without the migration.
+- `tests/requests.test.mts`: 12, on the wording, parsing, errors, phone masking and when the card shows.
+- `tests/sim-security-wave2b.test.mts`: 760 accounts.
+  - 300 links: 213 confirmed and 87 "Not us", each honoured. Re-adding asked nothing.
+  - 100 strangers, all blocked.
+  - 60 friendlies, each revealed only when accepted.
+  - 100 phone claims: 40 linked, 30 parents to support, 30 none.
+  - Lists took 5 ms and 1.4 ms on average.
+
+**Break list:** `docs/security/breaks/security-wave2b.md`. Four real problems were found and fixed, each with a failing test first:
+- W2bB-06: a parent's or a wrong number could take a child's profile that had no birth date. The first name must match now.
+- W2bB-07: "empty profile" missed sport profiles, stats, certificates, messages and 10 more tables. It's now taken from the schema's foreign keys.
+- W2bB-11: club admins weren't asked about friendlies.
+- W2bB-16: the push player id was stale after a link.
+
+Full suite: 5,229 pass, 0 fail. Checked in the demo preview at phone width with temporary sample rows, since reverted: the card, the "Not us" sheet, and the row removed after answering. No console errors.
+
+**Founder:**
+- Run `20261028160000_security_wave2b.sql`.
+- Then: deploy `verify-phone-firebase`, publish the web app and the Android OTA.
+
 ### 2026-10-28 — Security Wave 2a: the consent model (server side)
 Founder **1A**: a relationship with a child counts only when the other side agrees.
 - Design: `docs/security/wave2-consent-design.md`.

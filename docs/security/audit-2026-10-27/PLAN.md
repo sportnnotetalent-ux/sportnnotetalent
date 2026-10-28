@@ -26,7 +26,7 @@ Findings that come from this: DB-01, DB-04, DB-05, DB-14, EF-02, EF-03, SL-19.
 **Built:** migration `20261028120000_security_wave1`, edge functions, client.
 **Tests:** `tests/db-wave1.test.mts`, `tests/security-wave1.test.mts`, `tests/sim-security-wave1.test.mts`.
 **The fixes' own break list:** `../breaks/security-wave1.md`.
-**Follow-up W1-2b:** "Verify your number to bring your history" (a Firebase SMS code, then the server links the coach-added profile), for email sign-ups.
+**Follow-up W1-2b (BUILT 2026-10-28, Wave 2b):** "Verify your number to bring your history" (a Firebase SMS code, then the server links the coach-added profile), for email sign-ups.
 
 1. **Guardian takeover (EF-01 / DB-04, part):** in the non-creator admin branch of `guard_player_write`, lock `guardian`, `dob` and `guardian_profile_id`. Only the owner, the profile's creator, the guardian or support can change them.
 2. **Claiming with an unverified phone (DB-02):**
@@ -54,10 +54,19 @@ Findings that come from this: DB-01, DB-04, DB-05, DB-14, EF-02, EF-03, SL-19.
 **Design:** `../wave2-consent-design.md`.
 **Tests:** `tests/db-wave2.test.mts` and `tests/sim-security-wave2.test.mts`.
 **The change's own break list:** `../breaks/security-wave2.md`.
-**Wave 2b (the app side) is next:**
+**Wave 2b (the app side) BUILT 2026-10-28:**
+- migration `20261028160000_security_wave2b`, plus `verify-phone-firebase` channel `claim`;
 - "Requests to confirm" for a player's side;
 - friendly acceptance;
 - W1-2b, verify your number to link.
+
+Tests: `tests/db-wave2b.test.mts`, `tests/requests.test.mts`, `tests/sim-security-wave2b.test.mts`. Break list: `../breaks/security-wave2b.md`.
+
+Follow-ups, not built:
+- a push to the player's side when a request arrives (pushes to someone else's child are blocked by design, so v1 is the Home card);
+- a "waiting to confirm" hint on rosters;
+- "Declined requests" in Settings;
+- "Report" on a request.
 
 A relationship counts (circle, roster rights, admin rights, pushes) only when the other side confirmed it:
 - adding someone else's player to a team, club, community or field event sends a request. The player accepts, or their parent does for under-18s;

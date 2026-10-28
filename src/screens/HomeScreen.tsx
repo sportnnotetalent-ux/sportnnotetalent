@@ -28,6 +28,8 @@ import type { Match, SportId, Tournament } from '../core/types';
 import type { RootStackParamList } from '../navigation/types';
 import { WebPushCard } from '../components/WebPushCard';
 import { GuardianPendingCard } from '../components/GuardianPendingCard';
+import { RequestsCard } from '../components/RequestsCard';
+import { LinkByPhoneCard } from '../components/LinkByPhoneCard';
 import { Logo } from '../components/Logo';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -195,6 +197,9 @@ export default function HomeScreen() {
         <WebPushCard compact />
         {/* SD-152: under-18 outside India, guardian hasn't confirmed yet. */}
         <GuardianPendingCard />
+        {/* Security Wave 2b: links / friendlies waiting for our answer; W1-2b link by phone. */}
+        <RequestsCard />
+        <LinkByPhoneCard />
 
         {!isSupabaseConfigured && (
           <Card style={st.demo}>

@@ -54,7 +54,12 @@ Groups go through the same check:
   - on `org_requests` becoming accepted: record `accepted`.
 - **`tournament_teams` guard:** the status rules above.
 
-## Wave 2b (the app side, after 2a is live)
+## Wave 2b (the app side, after 2a is live): BUILT 2026-10-28
+Built as `20261028160000_security_wave2b`. See `breaks/security-wave2b.md` and the DEVLOG.
+- Built: the Home card, team managers' friendly answers, and W1-2b.
+- Still follow-ups: the push to the player's side, and the roster's "waiting" hint.
+- Tournament entries already had **Accept invite** on the tournament page.
+
 - **"Requests to confirm":** for a player, a parent, or the coach who looks after an unclaimed player. "Coach X added Asha to Team Y. Confirm or Not us." Plus a push to that side.
 - **Team managers:** confirm "Team Y was entered in Tournament T", and accept or decline a friendly.
 - **The roster screen** says "waiting for Asha's parent to confirm" where it shows initials.
