@@ -38,6 +38,7 @@ import { volleyballMatchRecords } from './records';
 import { useMask } from '../../core/disputeMask';
 import { lineupAction } from './actions';
 import type { NameOf } from '../../core/playerNames';
+import { IconText } from '../../components/Icon';
 
 export { isDecider, setTarget } from './engine';
 export type { VolleyballState } from './engine';
@@ -197,7 +198,7 @@ export function makeSetScoringControls(opts: { icon: string; blocks: boolean; ti
         {(switchCue || tto || libCues.length > 0) && (
           <View style={ctrl.cue} accessibilityLiveRegion="polite">
             {switchCue && <Text style={ctrl.cueText}>↔ {switchCue}</Text>}
-            {tto && <Text style={ctrl.cueText}>⏱️ Technical timeout — 21 points played (sets 1–2)</Text>}
+            {tto && <IconText label={"⏱️ Technical timeout — 21 points played (sets 1–2)"} style={ctrl.cueText} />}
             {libCues.map((c) => <Text key={c} style={ctrl.cueText}>⚠ {c}</Text>)}
           </View>
         )}

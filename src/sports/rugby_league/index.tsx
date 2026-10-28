@@ -60,6 +60,7 @@ import { BackfillBar, RowAction, confirmRemove } from '../TimelineControls';
 import { leagueVoice, leagueVoiceEnds, leagueLast } from './voice';
 import { RUGBY_LEAGUE_META } from './meta';
 import { leagueMatchRecords } from './records';
+import { IconText } from '../../components/Icon';
 
 const uid = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 /** the keys this match tracks (the base set + the detail switched on) */
@@ -518,7 +519,7 @@ const ScoringControls: SportPlugin<LeagueState>['ScoringControls'] = ({
         {ps >= len && running(s) ? <Text style={c.short}>Siren — play goes on until the ball is next dead.</Text> : null}
         {!running(s) && periodStarted(s) ? (
           <View style={c.stopped} accessibilityRole="alert">
-            <Text style={c.stoppedTxt}>⏸ Clock stopped</Text>
+            <IconText label={"⏸ Clock stopped"} style={c.stoppedTxt} />
             <Button label="▶ Resume" onPress={startStop} />
           </View>
         ) : null}

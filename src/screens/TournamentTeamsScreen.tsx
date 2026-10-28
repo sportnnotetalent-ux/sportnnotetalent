@@ -48,6 +48,7 @@ import { shareMessage } from '../core/share';
 import { notify } from '../core/notifications';
 import type { SportId, TournamentEntry } from '../core/types';
 import type { RootStackParamList } from '../navigation/types';
+import { IconText } from '../components/Icon';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 const PALETTE = ['#FF5C5C', '#4DA3FF', '#3DDC97', '#FFB454', '#B98AFF', '#FF8AC4'];
@@ -476,7 +477,7 @@ export default function TournamentTeamsScreen() {
           ) : inviteToken !== undefined && (
             <Card style={{ gap: theme.spacing(2) }}>
               <View style={st.rowBetween}>
-                <Text style={[textStyles.body, st.flex1]}>🔗 Teams can join by link</Text>
+                <IconText label={"🔗 Teams can join by link"} style={[textStyles.body, st.flex1]} />
                 <Switch value={!!inviteToken} onValueChange={(v) => void toggleInvite(v)} disabled={inviteBusy} accessibilityLabel="Teams can join by link" />
               </View>
               {inviteToken ? (

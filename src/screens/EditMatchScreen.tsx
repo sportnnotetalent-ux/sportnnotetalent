@@ -20,6 +20,7 @@ import { findScheduleConflicts, knownVenueNames } from '../data/scheduleConflict
 import { readSeriesMeta } from '../data/series';
 import type { Match } from '../core/types';
 import type { RootStackParamList } from '../navigation/types';
+import { IconText } from '../components/Icon';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -137,7 +138,7 @@ export default function EditMatchScreen() {
           <>
             {match.status !== 'scheduled' && (
               <View style={[st.statusBanner, match.status === 'cancelled' ? st.cancelBg : st.postponeBg]}>
-                <Text style={st.statusText}>{match.status === 'cancelled' ? '🚫 This match is cancelled.' : '⏸️ This match is postponed.'}</Text>
+                <IconText label={match.status === 'cancelled' ? '🚫 This match is cancelled.' : '⏸️ This match is postponed.'} style={st.statusText} />
               </View>
             )}
 

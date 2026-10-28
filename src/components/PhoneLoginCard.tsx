@@ -16,6 +16,7 @@ import { PhoneField } from './PhoneField';
 import { completePhoneSignup, confirmPhoneLogin, sendPhoneCode, prewarmPhoneSdk, prewarmPhoneCode, releasePrewarmedPhoneCode } from '../core/phoneLogin';
 import type { Role } from '../core/types';
 import type { RootStackParamList } from '../navigation/types';
+import { IconText } from './Icon';
 
 const ROLES: Role[] = ['player', 'parent', 'scorer', 'organizer', 'fan'];
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -139,7 +140,7 @@ export function PhoneLoginCard({ onUseEmail, onUseEmailCode }: { onUseEmail?: ()
           </View>
           {minor && (
             <View style={{ gap: theme.spacing(2) }}>
-              <Text style={textStyles.muted}>👪 Parent / Guardian (required for under-18)</Text>
+              <IconText label={"👪 Parent / Guardian (required for under-18)"} style={textStyles.muted} />
               <TextField label="Guardian name" value={gName} onChange={setGName} placeholder="Priya Mehta" autoCapitalize="words" />
               <PhoneField label="Guardian mobile" value={gPhone} onChange={setGPhone} />
               <TextField label="Guardian email" value={gEmail} onChange={setGEmail} placeholder="parent@email.com" autoCapitalize="none" />

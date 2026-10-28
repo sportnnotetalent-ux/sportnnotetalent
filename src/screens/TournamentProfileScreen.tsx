@@ -12,7 +12,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { theme } from '../core/theme';
-import { Glyph } from '../components/Icon';
+import { Glyph, IconText } from '../components/Icon';
 import { FollowBell } from '../components/FollowBell';
 import { EmptyState, Card, Pill, Button, SelectChip, ScreenTitle, textStyles } from '../components/ui';
 import { LeagueTable } from '../components/LeagueTable';
@@ -1093,7 +1093,7 @@ export default function TournamentProfileScreen() {
             )}
 
             {/* Per-sport standings + statistics */}
-            <Text style={[textStyles.h3, st.section]}>{singleSport ? '🏆 Standings' : '📊 By sport'}</Text>
+            <IconText label={singleSport ? '🏆 Standings' : '📊 By sport'} style={[textStyles.h3, st.section]} />
             {!singleSport && (
               <KeyboardAwareScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.chips}>
                 {sports.map((s) => (

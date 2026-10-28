@@ -71,13 +71,14 @@ const TEXT_ONLY = new Set([
 ]);
 
 /** An emoji slot's (flattened) Text style, split for a line icon: the layout
- *  stays on the icon's box, the font size becomes the icon's size and the text
+ *  stays on the icon's box (`text` keeps the rest, for words beside it), the font size becomes the icon's size and the text
  *  colour its colour (an explicit `color` wins; else `fallback`). */
 export function iconBox(style: Record<string, unknown> | null | undefined, fallback = '#14181D', color?: string): {
-  box: Record<string, unknown>; size: number; color: string;
+  box: Record<string, unknown>; text: Record<string, unknown>; size: number; color: string;
 } {
   const flat = style ?? {};
   const box: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(flat)) if (!TEXT_ONLY.has(k)) box[k] = v;
-  return { box, size: Math.round(Number(flat.fontSize ?? 20) * 0.95), color: color ?? (typeof flat.color === 'string' ? flat.color : fallback) };
+  const text: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(flat)) (TEXT_ONLY.has(k) ? text : box)[k] = v;
+  return { box, text, size: Math.round(Number(flat.fontSize ?? 20) * 0.95), color: color ?? (typeof flat.color === 'string' ? flat.color : fallback) };
 }

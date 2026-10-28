@@ -29,6 +29,7 @@ import { RemindInstall } from '../components/RemindInstall';
 import type { Player, SportId, TeamLeadership, TeamSummary } from '../core/types';
 import type { RootStackParamList } from '../navigation/types';
 import { SportLine } from '../components/SportArt';
+import { IconText } from '../components/Icon';
 
 export default function SquadScreen() {
   const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -263,7 +264,7 @@ export default function SquadScreen() {
         )}
 
         {canManage && <Card style={{ gap: theme.spacing(2) }}>
-          <Text style={textStyles.body}>📨 Invite the captain / coach</Text>
+          <IconText label={"📨 Invite the captain / coach"} style={textStyles.body} />
           <Text style={textStyles.muted}>Generate a code/link they redeem under Settings → “Join a team with a code” to manage this squad.</Text>
           <Button
             label={busy && !inviteCode ? 'Generating…' : inviteCode ? 'New invite code' : 'Generate invite link'}

@@ -49,6 +49,7 @@ import { BackfillBar, RowAction, confirmRemove } from '../TimelineControls';
 import { hockeyVoice, hockeyVoiceEnds } from '../voiceParsers';
 import { HOCKEY_META } from './meta';
 import { hockeyMatchRecords } from './records';
+import { IconText } from '../../components/Icon';
 
 const opp = (s: Side): Side => (s === 'home' ? 'away' : 'home');
 const uid = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
@@ -603,7 +604,7 @@ const ScoringControls: SportPlugin<HockeyState>['ScoringControls'] = ({
       {/* SD-137a: ⏪ add a goal / card / shot the scorer missed, at its minute */}
       {periodStarted(s) || s.period > 1 ? (
         <View style={c.panel}>
-          <Text style={c.small}>⏪ Backfill a missed moment</Text>
+          <IconText label={"⏪ Backfill a missed moment"} style={c.small} />
           {backfill ? (
             <Text style={c.meta}>Every tap now is stamped at {periodName(s, backfill.period)} · {Math.max(1, Math.ceil(backfill.sec / 60))}′. Log it above, then ▶ Back to live.</Text>
           ) : (

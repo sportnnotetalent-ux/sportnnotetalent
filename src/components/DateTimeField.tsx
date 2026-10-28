@@ -9,6 +9,7 @@
  *  per the region. 'date' mode is a plain calendar date (no zone). */
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Modal, ScrollView, StyleSheet } from 'react-native';
+import { IconText } from './Icon';
 import { theme } from '../core/theme';
 import { textStyles } from './ui';
 import { KeyboardAwareScrollView, KeyboardSheetScope, useFormField, useKeyboardFocus, useKeyboardSheet } from './keyboard';
@@ -134,9 +135,8 @@ export function DateTimeField({
         accessibilityHint="Opens a picker"
         onPress={show}
       >
-        <Text style={[st.fieldText, !value && st.fieldPlaceholder]}>
-          {value ? `📅 ${stamp(value)}` : placeholder}
-        </Text>
+        {value ? <IconText label={`📅 ${stamp(value)}`} style={st.fieldText} />
+          : <Text style={[st.fieldText, st.fieldPlaceholder]}>{placeholder}</Text>}
       </TouchableOpacity>
 
       <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>

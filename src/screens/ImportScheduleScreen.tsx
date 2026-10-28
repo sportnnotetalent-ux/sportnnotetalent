@@ -27,6 +27,7 @@ import { downloadText } from '../core/download';
 import { notice } from '../core/confirm';
 import { useAuth } from '../core/auth';
 import type { RootStackParamList } from '../navigation/types';
+import { IconText } from '../components/Icon';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type Overrides = Record<number, Partial<Record<ImportField, string>>>;
@@ -311,7 +312,7 @@ function RowCard({ row: r, zone, skipped, created, onSkip, onFix, onAddTeams }: 
         <Text style={st.line}>#{r.line}</Text>
         <Text style={[textStyles.muted, st.flex]} numberOfLines={1}>{when}</Text>
         {created ? (
-          <Text style={st.done}>✓ Created</Text>
+          <IconText label={"✓ Created"} style={st.done} />
         ) : (
           <TouchableOpacity onPress={onSkip} accessibilityRole="button" accessibilityLabel={skipped ? `Restore row ${r.line}` : `Skip row ${r.line}`} hitSlop={8}>
             <Text style={skipped ? st.restore : st.skip}>{skipped ? 'Restore' : '✕'}</Text>

@@ -167,7 +167,7 @@ export default function DiscoverScreen() {
           onPress={() => toggle('team', t.id)}
           activeOpacity={0.8}
         >
-          <Text style={[st.followText, following && st.followTextOn]}>{following ? '★ Following' : '☆ Follow'}</Text>
+          <IconText label={following ? '★ Following' : '☆ Follow'} style={[st.followText, following && st.followTextOn]} />
         </TouchableOpacity>
         <FollowBell type="team" id={t.id} name={t.name} />
       </Card>

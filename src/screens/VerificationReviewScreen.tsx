@@ -28,6 +28,7 @@ import { ageFromDob } from '../core/age';
 import { isSupport } from '../core/roles';
 import { useAuth } from '../core/auth';
 import { REJECT_REASONS, isImageDoc, isOverdue, priorRejections, readableDob, waitedLabel, docKindLabel } from '../core/verificationReview';
+import { IconText } from '../components/Icon';
 
 export default function VerificationReviewScreen() {
   const { profile } = useAuth();
@@ -57,7 +58,7 @@ export default function VerificationReviewScreen() {
         <ScreenTitle title="🛡️ Review verifications" subtitle="Age & guardian proofs · aim for the same day" />
 
         {reviewer === false ? (
-          <Card><Text style={textStyles.body}>🔒 Reviewers only</Text><Text style={textStyles.muted}>Ask SportnNote support to add you as a reviewer.</Text></Card>
+          <Card><IconText label={"🔒 Reviewers only"} style={textStyles.body} /><Text style={textStyles.muted}>Ask SportnNote support to add you as a reviewer.</Text></Card>
         ) : reviewer === null || pending === null ? (
           <Card><Text style={textStyles.muted}>Loading…</Text></Card>
         ) : (

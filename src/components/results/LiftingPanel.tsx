@@ -27,6 +27,7 @@ import {
   type EntryResult, type LiftAttempt, type Lift, type ResultEntry, type CompRules,
 } from '../../data/results';
 import { LiftingClock } from './LiftingClock';
+import { IconText } from '../Icon';
 
 type Save = (entryId: string, next: EntryResult, undoLabel?: string) => void;
 const kgOf = (t: string): number | undefined => { const v = Number(t.trim().replace(',', '.')); return t.trim() && Number.isFinite(v) ? v : undefined; };
@@ -210,8 +211,8 @@ export function NextLiftCard({ entries, seq, onSave, rules, lb }: { entries: Res
         <>
           {!lightsMode ? (
             <View style={st.headRow}>
-              <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Good lift for ${first}`} style={[st.bigBtn, st.bigOk]} onPress={() => decide({ good: true })}><Text style={st.bigTxt}>✓ Good lift</Text></TouchableOpacity>
-              <TouchableOpacity accessibilityRole="button" accessibilityLabel={`No lift for ${first}`} style={[st.bigBtn, st.bigX]} onPress={() => decide({ good: false })}><Text style={st.bigTxt}>✗ No lift</Text></TouchableOpacity>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Good lift for ${first}`} style={[st.bigBtn, st.bigOk]} onPress={() => decide({ good: true })}><IconText label={"✓ Good lift"} style={st.bigTxt} /></TouchableOpacity>
+              <TouchableOpacity accessibilityRole="button" accessibilityLabel={`No lift for ${first}`} style={[st.bigBtn, st.bigX]} onPress={() => decide({ good: false })}><IconText label={"✗ No lift"} style={st.bigTxt} /></TouchableOpacity>
             </View>
           ) : (
             <View style={{ gap: theme.spacing(2) }}>

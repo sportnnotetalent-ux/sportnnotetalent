@@ -29,6 +29,7 @@ import {
 } from '../../data/results';
 import type { FieldEntry, FieldEvent } from '../../core/types';
 import type { RootStackParamList } from '../../navigation/types';
+import { IconText } from '../Icon';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -129,7 +130,7 @@ function RaceAnalysisCard({ def, a, title, rows }: { def: DisciplineDef; a: Heat
               <Text style={st.detail}>
                 {t.legs.map((l) => `${l.leg}. ${l.name?.split(' ')[0] ?? `Leg ${l.leg}`} ${l.time != null ? segFmt(l.time) : '–'}${l.takeover != null ? ` (${takeoverText(l.takeover)}${l.early ? ' ⚠' : ''})` : ''}`).join(' · ')}
               </Text>
-              {t.legs.some((l) => l.early) ? <Text style={st.warn}>⚠ A take-over earlier than −0.03 s on the pads — the take-off judge confirms any disqualification (SW 10.13).</Text> : null}
+              {t.legs.some((l) => l.early) ? <IconText label={"⚠ A take-over earlier than −0.03 s on the pads — the take-off judge confirms any disqualification (SW 10.13)."} style={st.warn} /> : null}
             </View>
           ))}
           {a.fastestLeg ? <Text style={textStyles.muted}>Fastest {a.legs.length > 0 && a.legs[0].legs.length > 1 ? 'flying ' : ''}leg: {a.fastestLeg.name} ({a.fastestLeg.team}, leg {a.fastestLeg.leg}) {segFmt(a.fastestLeg.time)}</Text> : null}
@@ -220,7 +221,7 @@ export function TakeoverField({ r, onSave }: { r: EntryResult; onSave: (takeover
         ))}
       </View>
       {bad ? <Text style={st.warn}>Can’t read a take-over — type seconds like 0.21 or −0.05.</Text> : null}
-      {vals.some((v) => takeoverEarly(v)) ? <Text style={st.warn}>⚠ Earlier than −0.03 s on the pads — ask the take-off judge; disqualify with DQ → SW 10.13 if confirmed.</Text> : null}
+      {vals.some((v) => takeoverEarly(v)) ? <IconText label={"⚠ Earlier than −0.03 s on the pads — ask the take-off judge; disqualify with DQ → SW 10.13 if confirmed."} style={st.warn} /> : null}
     </View>
   );
 }

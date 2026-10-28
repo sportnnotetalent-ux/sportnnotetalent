@@ -91,22 +91,30 @@ export function Glyph({ emoji, style, color }: { emoji: string; style?: StylePro
   );
 }
 
-/** A custom button's label ("🤝 Connect"): its leading emoji as a line icon in
- *  the text's colour, then the words. Plain text when the emoji isn't mapped. */
+/** A label that starts with an emoji ("▶ Start scoring", "⚠ No Name column…"):
+ *  the emoji as a line icon in the text's colour, lined up with the first line,
+ *  then the words. The style's layout (margins, flex, a pill's fill) moves to
+ *  the row; centred text stays centred. Plain text when the emoji isn't mapped. */
 export function IconText({ label, style, numberOfLines }: { label: string; style?: StyleProp<TextStyle>; numberOfLines?: number }) {
   const lead = splitLeading(label, EMOJI_KEYS);
   const spec = lead && lead.rest ? EMOJI_ICONS[lead.key] : undefined;
   if (!lead || !spec) return <Text style={style} numberOfLines={numberOfLines}>{label}</Text>;
-  const flat = StyleSheet.flatten(style) ?? {};
-  const size = Math.round(Number(flat.fontSize ?? 14) * 1.15);
+  const flat = (StyleSheet.flatten(style) ?? {}) as Record<string, unknown>;
+  const { box, text, color } = iconBox(flat, theme.colors.text);
+  const fontSize = Number(flat.fontSize ?? 14);
+  const lineH = Number(flat.lineHeight ?? Math.round(fontSize * 1.35));
   return (
-    <View style={st.iconText}>
-      <EmojiIcon spec={spec} color={String(flat.color ?? theme.colors.text)} size={size} />
-      <Text style={style} numberOfLines={numberOfLines}>{lead.rest}</Text>
+    <View style={[st.iconText, flat.textAlign === 'center' && st.centred, box as ViewStyle]}>
+      <View style={{ height: lineH, justifyContent: 'center' }}>
+        <EmojiIcon spec={spec} color={color} size={Math.round(fontSize * 1.1)} />
+      </View>
+      <Text style={[text as TextStyle, st.words]} numberOfLines={numberOfLines}>{lead.rest}</Text>
     </View>
   );
 }
 
 const st = StyleSheet.create({
-  iconText: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  iconText: { flexDirection: 'row', alignItems: 'flex-start', gap: 6 },
+  centred: { justifyContent: 'center' },
+  words: { flexShrink: 1 },
 });

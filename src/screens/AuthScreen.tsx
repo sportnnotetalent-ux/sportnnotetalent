@@ -26,6 +26,7 @@ import { phoneLoginAvailable, proveSignupPhone, sendPhoneCode } from '../core/ph
 import { PhoneLoginCard } from '../components/PhoneLoginCard';
 import type { Role } from '../core/types';
 import { Logo } from '../components/Logo';
+import { IconText } from '../components/Icon';
 
 const ROLES: Role[] = ['player', 'parent', 'scorer', 'organizer', 'fan'];
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -318,7 +319,7 @@ export default function AuthScreen() {
 
           {mode === 'up' && minor && (
             <View style={{ gap: theme.spacing(2) }}>
-              <Text style={textStyles.muted}>👪 Parent / Guardian (required for under-18)</Text>
+              <IconText label={"👪 Parent / Guardian (required for under-18)"} style={textStyles.muted} />
               <Field label="Guardian name" value={gName} onChange={setGName} placeholder="Priya Mehta" />
               <PhoneField label="Guardian mobile" value={gPhone} onChange={setGPhone} labelStyle={textStyles.muted} />
               <Field label={guardianMustConfirm ? 'Guardian email (we send the confirmation link here)' : 'Guardian email'} value={gEmail} onChange={setGEmail} placeholder="parent@email.com" keyboardType="email-address" />

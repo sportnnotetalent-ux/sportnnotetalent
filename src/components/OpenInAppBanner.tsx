@@ -11,6 +11,7 @@ import { View, Text, StyleSheet, Platform } from 'react-native';
 import { theme } from '../core/theme';
 import { Button, Card, textStyles } from './ui';
 import { androidIntentUrl, webDevice } from '../core/inviteText';
+import { IconText } from './Icon';
 
 export function OpenInAppBanner({ path }: { path: string }) {
   const [hidden, setHidden] = useState(false);
@@ -22,7 +23,7 @@ export function OpenInAppBanner({ path }: { path: string }) {
   if (device === 'ios') {
     return (
       <Card style={st.card}>
-        <Text style={textStyles.body}>📱 You’re on the SportnNote web app — carry on right here.</Text>
+        <IconText label={"📱 You’re on the SportnNote web app — carry on right here."} style={textStyles.body} />
         <Text style={textStyles.muted}>Tip: tap Share → <Text style={st.b}>Add to Home Screen</Text> to keep SportnNote like an app.</Text>
       </Card>
     );

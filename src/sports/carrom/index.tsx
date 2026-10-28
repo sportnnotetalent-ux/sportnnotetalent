@@ -32,6 +32,7 @@ import { carromMatchRecords } from './records';
 import { useMask } from '../../core/disputeMask';
 import { withRosters, whoName } from '../racketNames';
 import type { NameOf } from '../../core/playerNames';
+import { IconText } from '../../components/Icon';
 
 /** IDs-only scoring (docs/privacy/ids-only-scoring.md): the match state and
  *  events keep player ids only; a player is named for this viewer by id
@@ -429,7 +430,7 @@ function BoardEditor({ state: s, dispatch, nameOf, who, homeRoster, awayRoster }
               <View style={ctrl.chips}>
                 {Array.from({ length: 10 }, (_, n) => <SelectChip key={n} label={String(n)} active={draft.b.coins === n} onPress={() => setDraft({ ...draft, b: { ...draft.b, coins: n } })} />)}
               </View>
-              <Text style={ctrl.meta}>👑 Queen covered by</Text>
+              <IconText label={"👑 Queen covered by"} style={ctrl.meta} />
               <View style={ctrl.chips}>
                 {([['winner', 'Winner'], ['loser', 'Loser'], ['none', 'Not covered']] as const).map(([q, l]) => (
                   <SelectChip key={q} label={l} active={(draft.b.queenBy ?? (draft.b.queen ? 'winner' : undefined)) === q}

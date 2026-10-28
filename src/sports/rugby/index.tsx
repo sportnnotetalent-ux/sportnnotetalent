@@ -62,6 +62,7 @@ import { BackfillBar, RowAction, confirmRemove } from '../TimelineControls';
 import { rugbyVoice, rugbyVoiceEnds, rugbyLast } from './voice';
 import { RUGBY_META } from './meta';
 import { rugbyMatchRecords } from './records';
+import { IconText } from '../../components/Icon';
 
 const uid = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 const BASE_TRACKED: string[] = LIVE_KEYS.filter((k) => k !== 'soTaken' && k !== 'soGoals');
@@ -617,7 +618,7 @@ const ScoringControls: SportPlugin<RugbyState>['ScoringControls'] = ({
         {ps >= len && running(s) ? <Text style={c.short}>Time is up — the half ends when the ball is next dead.</Text> : null}
         {!running(s) && periodStarted(s) ? (
           <View style={c.stopped} accessibilityRole="alert">
-            <Text style={c.stoppedTxt}>⏸ Clock stopped</Text>
+            <IconText label={"⏸ Clock stopped"} style={c.stoppedTxt} />
             <Button label="▶ Resume" onPress={startStop} />
           </View>
         ) : null}

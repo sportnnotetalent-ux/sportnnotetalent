@@ -94,9 +94,10 @@ describe('iconBox (an emoji slot\'s Text style → the icon\'s box, size and col
     assert.equal(r.size, 19);
     assert.equal(r.color, '#0D5A3F');
     assert.deepEqual(r.box, { marginRight: 8, width: 28, position: 'absolute', top: 4, backgroundColor: '#FFF', borderRadius: 14, padding: 4 });
+    assert.deepEqual(r.text, { fontSize: 20, color: '#0D5A3F', fontWeight: '800', lineHeight: 24, textAlign: 'center' }, 'the words keep only text props');
   });
   test('no style: a 20pt slot in the fallback colour', () => {
-    assert.deepEqual(iconBox(undefined, '#111'), { size: 19, color: '#111', box: {} });
+    assert.deepEqual(iconBox(undefined, '#111'), { size: 19, color: '#111', box: {}, text: {} });
     assert.equal(iconBox({ color: '#0D5A3F' }, '#111', '#B32525').color, '#B32525', 'an explicit colour wins');
   });
 });
@@ -114,6 +115,39 @@ describe('icon-only Text slots', () => {
       }
     }
     assert.deepEqual(left, []);
+  });
+
+  test('a Text whose words start with a mapped emoji draws it through IconText (two symbol legends excepted)', () => {
+    const icons = read('src/components/Icon.tsx');
+    const keys = [...icons.matchAll(/'([^']+)':\s*(?:\{ Icon|card\()/g)].map((m) => m[1].replace(/\uFE0F/g, '')).sort((a, b) => b.length - a.length);
+    const LEGENDS = ['MeetEntriesScreen.tsx: ✓ on the start list', 'cricket/index.tsx: ⚡ = replaced'];
+    const files = readdirSync(join(import.meta.dirname, '..', 'src'), { recursive: true, encoding: 'utf8' }).filter((f) => f.endsWith('.tsx'));
+    const left: string[] = [];
+    for (const f of files) {
+      const src = read(`src/${f}`);
+      const texts = [
+        ...[...src.matchAll(/<Text style=\{(?:[^{}]*|\[[^\]]*\])\}>([^<>{}]+)<\/Text>/g)].map((m) => m[1]),
+        ...[...src.matchAll(/<Text style=\{(?:[^{}]*|\[[^\]]*\])\}>\{[^{}?]+\? '([^']+)' : '([^']+)'\}<\/Text>/g)].flatMap((m) => [m[1], m[2]]),
+      ];
+      for (const t of texts) {
+        const w = t.replace(/\uFE0F|\uFE0E/g, '');
+        const k = keys.find((key) => w.startsWith(key));
+        if (k && w.slice(k.length).trim() && !LEGENDS.some((l) => `${f}: ${w}`.includes(l.split(': ')[0]) && w.startsWith(l.split(': ')[1]))) left.push(`${f}: ${t.slice(0, 40)}`);
+      }
+    }
+    assert.deepEqual(left, []);
+  });
+});
+
+describe('match setup', () => {
+  test('the rules card heads with the sport\'s badge, and the date field with the calendar icon', () => {
+    const fe = read('src/components/FormatEditor.tsx');
+    assert.match(fe, /<SportBadge sport=\{plugin\.id\}/);
+    assert.doesNotMatch(fe, /\{plugin\.icon\} \{plugin\.name\}/);
+    assert.match(read('src/components/DateTimeField.tsx'), /<IconText label=\{`📅 \$\{stamp\(value\)\}`\}/);
+    const live = read('src/screens/LiveScoringScreen.tsx');
+    assert.match(live, /<SportBadge sport=\{plugin\.id\} size=\{26\} \/>/, 'the scorer\'s title too');
+    assert.doesNotMatch(live, /\{plugin\.icon\} \{plugin\.name\}<\/Text>/);
   });
 });
 

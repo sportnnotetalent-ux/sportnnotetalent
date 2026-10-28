@@ -47,7 +47,7 @@ import type { RootStackParamList } from '../navigation/types';
 import { useParamState } from '../navigation/useParamState';
 import { notice } from '../core/confirm';
 import { SportLine } from '../components/SportArt';
-import { Glyph } from '../components/Icon';
+import { Glyph, IconText } from '../components/Icon';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -645,7 +645,7 @@ export default function OrganizationScreen() {
                   />
                 )}
                 {academic && role === 'Admin' && joinStandard.trim() ? (
-                  <Text style={st.warn}>⚠ Admins are usually staff/management — you're adding a student as admin.</Text>
+                  <IconText label={"⚠ Admins are usually staff/management — you're adding a student as admin."} style={st.warn} />
                 ) : null}
                 <Text style={textStyles.muted}>Tap a player to add</Text>
                 {addable.map((p) => (
@@ -740,7 +740,7 @@ function ClassRequest({ current, onSend }: { current?: string; onSend: (requeste
 
   if (sent) {
     return (
-      <Card><Text style={textStyles.body}>✓ Request sent</Text><Text style={textStyles.muted}>An admin or organizer will review and update your class.</Text></Card>
+      <Card><IconText label={"✓ Request sent"} style={textStyles.body} /><Text style={textStyles.muted}>An admin or organizer will review and update your class.</Text></Card>
     );
   }
   if (!open) {
@@ -889,7 +889,7 @@ function YearRollover({
             </Text>
           )}
           {noAdminAfter && (
-            <Text style={st.warnStrong}>⚠ This would leave the community with no admin. Appoint another admin (ideally staff), or keep one of these students on, before applying.</Text>
+            <IconText label={"⚠ This would leave the community with no admin. Appoint another admin (ideally staff), or keep one of these students on, before applying."} style={st.warnStrong} />
           )}
           <Button label={noAdminAfter ? 'Add an admin first' : label} onPress={apply} disabled={total === 0 || noAdminAfter} />
         </>

@@ -55,6 +55,7 @@ import { usePendingEdit } from '../usePendingEdit';
 import { BackfillBar, RowAction, confirmRemove } from '../TimelineControls';
 import { ICE_HOCKEY_META } from './meta';
 import { iceHockeyMatchRecords } from './records';
+import { IconText } from '../../components/Icon';
 
 const opp = (s: Side): Side => (s === 'home' ? 'away' : 'home');
 const uid = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
@@ -596,7 +597,7 @@ const ScoringControls: SportPlugin<IceHockeyState>['ScoringControls'] = ({
         {periodSec(s, now) >= periodLen(s, s.period) && running(s) ? <Text style={c.short}>0:00 — end of the {periodLong(s, s.period)}.</Text> : null}
         {!running(s) && periodStarted(s) && periodSec(s, now) < periodLen(s, s.period) ? (
           <View style={c.stopped} accessibilityRole="alert">
-            <Text style={c.stoppedTxt}>⏸ Clock stopped (whistle)</Text>
+            <IconText label={"⏸ Clock stopped (whistle)"} style={c.stoppedTxt} />
             <Button label="▶ Resume" onPress={startStop} />
           </View>
         ) : null}

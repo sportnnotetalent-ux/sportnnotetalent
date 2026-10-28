@@ -63,7 +63,7 @@ import { cricketMatchRecords } from './records';
 // IDs-only scoring: actions carry player ids only; names are put in for display.
 import { withNames } from './names';
 import { legacyNameOf, type NameOf } from '../../core/playerNames';
-import { Glyph } from '../../components/Icon';
+import { Glyph, IconText } from '../../components/Icon';
 
 /* ------------------------------- Controls ---------------------------------- */
 
@@ -183,7 +183,7 @@ function SetupPanel({
       <View style={ctrl.setupHead}>
         <Text style={ctrl.label}>{name}</Text>
         {capSet && kprSet
-          ? <View style={ctrl.readyTag}><Text style={ctrl.readyTagText}>✓ Ready</Text></View>
+          ? <View style={ctrl.readyTag}><IconText label={"✓ Ready"} style={ctrl.readyTagText} /></View>
           : <View style={ctrl.needTag}><Text style={ctrl.needTagText}>Need {missing}</Text></View>}
       </View>
       <View style={ctrl.chips}>
@@ -410,7 +410,7 @@ function OversTargetCard({ s, dispatch, battingName, bowlingName, knockout, onEn
           <Button label="＋" variant="ghost" style={ctrl.ovStep} accessibilityLabel="One over more" onPress={() => step(1)} />
         </View>
       )}
-      {m === 'target' ? <Text style={ctrl.ovWarn}>⚠️ Built-in DLS will be switched off for this match.</Text> : null}
+      {m === 'target' ? <IconText label={"⚠️ Built-in DLS will be switched off for this match."} style={ctrl.ovWarn} /> : null}
       {m === 'rainEnd' ? <Text style={ctrl.meta}>{battingName}’s innings ends at this ball ({bowled} ov). The overs it lost — the unfinished over too — count in the DLS target.</Text> : null}
       {error ? <Text style={ctrl.rainErr}>{error}</Text> : preview ? <Text style={ctrl.rainPreview}>→ {preview}</Text> : null}
       <Button label={m === 'rainEnd' ? 'End the innings…' : 'Apply'} disabled={!ok} onPress={async () => {

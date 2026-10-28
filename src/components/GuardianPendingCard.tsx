@@ -13,6 +13,7 @@ import { Button, Card, textStyles } from './ui';
 import { useAuth } from '../core/auth';
 import { getMyPrivacyStatus, requestGuardianConsent, type PrivacyStatus } from '../data/privacy';
 import type { RootStackParamList } from '../navigation/types';
+import { IconText } from './Icon';
 
 export function GuardianPendingCard() {
   const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -42,7 +43,7 @@ export function GuardianPendingCard() {
   return (
     <Card style={st.card}>
       <View style={{ gap: theme.spacing(1) }}>
-        <Text style={textStyles.h3}>{withdrawn ? '🔒 Your account is locked' : '👪 Waiting for your parent or guardian'}</Text>
+        <IconText label={withdrawn ? '🔒 Your account is locked' : '👪 Waiting for your parent or guardian'} style={textStyles.h3} />
         <Text style={textStyles.muted}>
           {withdrawn
             ? 'Your parent or guardian withdrew consent. Ask them to confirm again, or the account is deleted after 30 days.'

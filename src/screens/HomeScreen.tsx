@@ -15,7 +15,7 @@ import { setStatusBarStyle } from 'expo-status-bar';
 import Svg, { Circle, Line, Rect } from 'react-native-svg';
 import { Search, Bell, Menu, Zap, Trophy, Users } from 'lucide-react-native';
 import { SportTile } from '../components/SportArt';
-import { Glyph } from '../components/Icon';
+import { Glyph, IconText } from '../components/Icon';
 import { formatDayShort } from '../core/dates';
 import { MatchCard } from '../components/MatchCard';
 import { LiveGolfCards } from '../components/golf/LiveGolfCards';
@@ -256,7 +256,7 @@ export default function HomeScreen() {
           <TouchableOpacity accessibilityRole="button" activeOpacity={0.85} onPress={() => nav.navigate('Tabs', { screen: 'Profile' })}>
             <Card style={st.verifyCard}>
               <View style={st.verifyRow}>
-                <Text style={st.verifyTitle}>🔐 Finish setting up your account</Text>
+                <IconText label={"🔐 Finish setting up your account"} style={st.verifyTitle} />
                 <TouchableOpacity accessibilityRole="button" accessibilityLabel="Dismiss" hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} onPress={(e) => { e.stopPropagation?.(); setVerifyDismissed(true); }}>
                   <Glyph emoji="✕" style={st.verifyClose} />
                 </TouchableOpacity>

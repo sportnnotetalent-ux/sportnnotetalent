@@ -14,6 +14,7 @@ import { Button, Card, FormError, LoadingState, ScreenTitle, TextField, textStyl
 import { OFFICIAL_ID_RULES, ORG_VERIFY, verifiableType } from '../core/orgVerification';
 import { decideHeadConfirm, previewHeadConfirm, type HeadPreview } from '../data/orgVerification';
 import type { RootStackParamList } from '../navigation/types';
+import { IconText } from '../components/Icon';
 
 export default function OrgConfirmScreen() {
   const { params } = useRoute<RouteProp<RootStackParamList, 'OrgConfirm'>>();
@@ -50,7 +51,7 @@ export default function OrgConfirmScreen() {
         <ScreenTitle title={`Confirm who manages your ${noun}`} subtitle="SportnNote — school and club sports scores" />
         {checking ? <LoadingState label="Checking the link…" /> : done !== null ? (
           <Card style={{ gap: theme.spacing(2) }}>
-            <Text style={textStyles.h3}>{done ? '✓ Thank you — confirmed' : 'Thank you — noted'}</Text>
+            <IconText label={done ? '✓ Thank you — confirmed' : 'Thank you — noted'} style={textStyles.h3} />
             <Text style={textStyles.muted}>
               {done
                 ? `SportnNote support will finish checking ${preview?.orgName ?? `the ${noun}`} and let the person know.`

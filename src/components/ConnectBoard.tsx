@@ -118,9 +118,9 @@ export function ConnectBoard() {
                 <View style={st.contactCol}>
                   <Text style={st.phone}>{l.contactPhone}</Text>
                   {l.contactVerified ? (
-                    <Text style={st.verified}>✓ Verified contact</Text>
+                    <IconText label={"✓ Verified contact"} style={st.verified} />
                   ) : (
-                    <Text style={st.unverified}>⚠︎ Unverified</Text>
+                    <IconText label={"⚠ Unverified"} style={st.unverified} />
                   )}
                 </View>
               ) : null}

@@ -43,7 +43,7 @@ import type { Match, SportId } from '../core/types';
 import type { RootStackParamList } from '../navigation/types';
 import { roundProgress } from '../data/tournamentHistory';
 import { matchDecider, useLiveRefresh } from '../components/TournamentHistory';
-import { Glyph } from '../components/Icon';
+import { Glyph, IconText } from '../components/Icon';
 
 /** SD-138 — tap a side's name to open that entrant's tournament journey. */
 const TeamTap = createContext<((teamId: string) => void) | undefined>(undefined);
@@ -492,10 +492,10 @@ function AdvanceNote({ p, canManage, busy, nameOf, onPick }: {
     );
   }
   if (!pairingNeedsOrganiser(p)) return null;
-  if (!canManage) return <Text style={st.decision}>⏳ No winner from the scoring yet — the organiser will decide who advances.</Text>;
+  if (!canManage) return <IconText label={"⏳ No winner from the scoring yet — the organiser will decide who advances."} style={st.decision} />;
   return (
     <View style={st.pickBox}>
-      <Text style={st.pickHead}>⚖️ No winner from the scoring</Text>
+      <IconText label={"⚖️ No winner from the scoring"} style={st.pickHead} />
       <Text style={textStyles.muted}>Every match here is finished but nobody won it (drawn with no decider, abandoned or called off). Pick who goes through.</Text>
       <View style={st.pickRow}>
         {[p.homeId, p.awayId].map((id) => (

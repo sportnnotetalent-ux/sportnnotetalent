@@ -31,6 +31,7 @@ import { todayIn } from '../core/time';
 import { confirmAction, notice } from '../core/confirm';
 import type { RootStackParamList } from '../navigation/types';
 import type { Organization, Player } from '../core/types';
+import { IconText } from '../components/Icon';
 
 const GROUPS: { action: StudentAction; title: string }[] = [
   { action: 'check', title: '❓ Need a look' },
@@ -219,13 +220,13 @@ export default function StudentImportScreen() {
             {fileNote ? <Text style={textStyles.muted}>{fileNote}</Text> : null}
             <TextField label={Platform.OS === 'web' ? '…or paste the rows (with the header row)' : 'Paste the rows (with the header row)'} value={text} onChange={(v) => { setText(v); setFileNote(null); setDone(null); }} multiline
               placeholder={STUDENT_TEMPLATE(region.dateOrder, scopeKind).trim()} autoCapitalize="none" />
-            <Text style={textStyles.muted}>🔒 Admission numbers and parents’ contacts stay private to the school’s admins. A child never gets their own contact details from a list.</Text>
+            <IconText label={"🔒 Admission numbers and parents’ contacts stay private to the school’s admins. A child never gets their own contact details from a list."} style={textStyles.muted} />
           </Card>
 
-          {parsed?.missingName ? <Text style={st.warn}>⚠ No Name column found — add a header row with “Name” (or “First name” and “Last name”).</Text> : null}
+          {parsed?.missingName ? <IconText label={"⚠ No Name column found — add a header row with “Name” (or “First name” and “Last name”)."} style={st.warn} /> : null}
           {parsed?.ambiguousDates ? (
             <Card style={{ gap: theme.spacing(1) }}>
-              <Text style={st.warn}>⚠ Every date fits both ways — is 04/05/2012 the 4th of May or April 5th?</Text>
+              <IconText label={"⚠ Every date fits both ways — is 04/05/2012 the 4th of May or April 5th?"} style={st.warn} />
               <View style={st.chips}>
                 <SelectChip label="Day first (4 May)" active={(forceOrder ?? parsed.dateOrder) === 'DMY'} onPress={() => setForceOrder('DMY')} />
                 <SelectChip label="Month first (April 5)" active={(forceOrder ?? parsed.dateOrder) === 'MDY'} onPress={() => setForceOrder('MDY')} />

@@ -41,6 +41,7 @@ import {
 } from './engine.ts';
 import { KABADDI_META } from './meta';
 import { kabaddiMatchRecords } from './records';
+import { IconText } from '../../components/Icon';
 
 export { halfLabel, currentMinute };
 export type { KabaddiState };
@@ -282,7 +283,7 @@ const ScoringControls: SportPlugin<KabaddiState>['ScoringControls'] = ({ state, 
     return (
       <View style={{ gap: theme.spacing(4) }}>
         <View style={ctrl.grBanner}>
-          <Text style={ctrl.grTitle}>🎯 5-RAID SHOOTOUT</Text>
+          <IconText label={"🎯 5-RAID SHOOTOUT"} style={ctrl.grTitle} />
           <Text style={ctrl.grMeta}>Level {state.home}–{state.away}. Each side takes five raids — most points wins (then sudden death). Tap the points each raid scores.</Text>
         </View>
         {raidRow('home', homeName)}
@@ -297,7 +298,7 @@ const ScoringControls: SportPlugin<KabaddiState>['ScoringControls'] = ({ state, 
       {backfillBar}
       {state.goldenRaid && (
         <View style={ctrl.grBanner}>
-          <Text style={ctrl.grTitle}>⚡ GOLDEN RAID — SUDDEN DEATH</Text>
+          <IconText label={"⚡ GOLDEN RAID — SUDDEN DEATH"} style={ctrl.grTitle} />
           <Text style={ctrl.grMeta}>Scores level {state.home}–{state.away}. The next point wins it — log the raid or tackle that decides the match.</Text>
         </View>
       )}
@@ -354,7 +355,7 @@ const ScoringControls: SportPlugin<KabaddiState>['ScoringControls'] = ({ state, 
           </View>
           {raidFlow.at && <Text style={ctrl.editBanner}>Editing the {raidFlow.at.minute}&apos; raid — saving replaces it in place.</Text>}
           {raidFlow.editOf == null && doOrDieOn(kabaddiCfg(state)) && kEmpty[raidFlow.side] >= 2 && (
-            <Text style={ctrl.doOrDie}>⚠ DO-OR-DIE raid — the raider is out if this raid scores nothing.</Text>
+            <IconText label={"⚠ DO-OR-DIE raid — the raider is out if this raid scores nothing."} style={ctrl.doOrDie} />
           )}
           {onField(raidFlow.side, raidFlow.side === 'home' ? homeRoster : awayRoster).length > 0 && (
             <>

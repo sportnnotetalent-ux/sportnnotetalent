@@ -18,6 +18,7 @@ import { matchLine, resultWords } from '../sports/matchLine';
 import { isTieMatch, fmtPts } from '../data/teamTie';
 import { MapPin } from 'lucide-react-native';
 import { SportArt } from './SportArt';
+import { IconText } from './Icon';
 
 /** A stored snapshot from an older engine must never break a card. */
 function safeLine(f: () => string): string {
@@ -99,7 +100,7 @@ export function MatchCard({ match, onPress, onStart, timeZone }: {
       <View style={s.top}>
         <Text style={s.sport} numberOfLines={1}>{sport.name}</Text>
         {onBreak ? (
-          <Text style={s.breakTag}>⏸ BREAK</Text>
+          <IconText label={"⏸ BREAK"} style={s.breakTag} />
         ) : live ? (
           <LiveBadge />
         ) : done ? (
@@ -171,7 +172,7 @@ export function MatchCard({ match, onPress, onStart, timeZone }: {
       {onStart && (live || match.status === 'scheduled') ? (
         <TouchableOpacity style={s.startBtn} activeOpacity={0.85} accessibilityRole="button"
           accessibilityLabel={live ? 'Continue scoring' : 'Start scoring'} onPress={onStart}>
-          <Text style={s.startText}>{live ? '▶ Continue scoring' : '▶ Start scoring'}</Text>
+          <IconText label={live ? '▶ Continue scoring' : '▶ Start scoring'} style={s.startText} />
         </TouchableOpacity>
       ) : null}
     </View>

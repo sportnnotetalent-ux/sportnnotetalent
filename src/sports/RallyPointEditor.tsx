@@ -24,6 +24,7 @@ import { RowAction, confirmRemove } from './TimelineControls';
 import { useMask } from '../core/disputeMask';
 import { eventWho, whoName, withRosters } from './racketNames';
 import { errOf } from './racketActions';
+import { IconText } from '../components/Icon';
 
 /** One choosable point type in the editor. `credited: false` = nobody on the
  *  scoring side gets credit (an opponent's error) → no player picker. */
@@ -183,7 +184,7 @@ export function RallyPointEditor({
   return (
     <View style={{ gap: theme.spacing(2) }}>
       <View style={st.head}>
-        <Text style={st.label}>🗓 Correct the timeline</Text>
+        <IconText label={"🗓 Correct the timeline"} style={st.label} />
         <Button label={open ? 'Done' : 'Edit'} variant="ghost" onPress={() => { setOpen((v) => !v); setDraft(null); }} />
       </View>
 
@@ -193,7 +194,7 @@ export function RallyPointEditor({
 
           {draft ? (
             <View style={st.draftBox}>
-              <Text style={st.label}>{draft.mode === 'edit' ? '✎ Edit this point' : '＋ Insert a missed point'}</Text>
+              <IconText label={draft.mode === 'edit' ? '✎ Edit this point' : '＋ Insert a missed point'} style={st.label} />
               <Text style={st.meta}>Who won the rally?</Text>
               {normalize && <Text style={st.meta}>Serve and side-outs are worked out again from the rallies.</Text>}
               <View style={st.chips}>

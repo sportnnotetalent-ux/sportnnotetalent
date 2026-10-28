@@ -29,7 +29,7 @@ import { isValidPhone, samePhone } from '../core/phone';
 import { PhoneField } from '../components/PhoneField';
 import type { Player, SportDetail, SportId, TeamStint } from '../core/types';
 import type { RootStackParamList } from '../navigation/types';
-import { Glyph } from '../components/Icon';
+import { Glyph, IconText } from '../components/Icon';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'EditProfile'>;
 
@@ -485,7 +485,7 @@ function OnFile({ label }: { label: string }) {
   return (
     <View style={{ gap: theme.spacing(1) }}>
       <FieldLabel>{label}</FieldLabel>
-      <Text style={[textStyles.body, st.onFile]}>✓ On file</Text>
+      <IconText label={"✓ On file"} style={[textStyles.body, st.onFile]} />
     </View>
   );
 }

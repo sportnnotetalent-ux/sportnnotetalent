@@ -36,6 +36,7 @@ import { isEventSport, eventWords, type EventSport } from '../sports/eventSports
 import { readProgramme } from '../data/tournamentCopyPlan';
 import type { SportId } from '../core/types';
 import { useRegion, dateOrderOf, dateOrderWords, exampleDate, spelledDate } from '../core/region';
+import { IconText } from '../components/Icon';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type G = 'M' | 'F' | 'X';
@@ -391,7 +392,7 @@ function BulkAdd({ sport, tournamentId, doc, meet, athletes, players, sources, c
   return (
     <Card style={{ gap: theme.spacing(2) }}>
       <TouchableOpacity accessibilityRole="button" onPress={() => setOpen((v) => !v)} style={st.head}>
-        <Text style={[textStyles.body, st.bold, { flex: 1 }]}>📥 Bulk add — paste a list</Text>
+        <IconText label={"📥 Bulk add — paste a list"} style={[textStyles.body, st.bold, { flex: 1 }]} />
         <Text style={textStyles.muted}>{open ? 'Close' : 'Open'}</Text>
       </TouchableOpacity>
       {open && (

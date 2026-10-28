@@ -160,7 +160,7 @@ export function PlayerFilters({ value, onChange, cities, sections = ALL_SECTIONS
 
           {has('verified') && (
           <View style={st.switchRow}>
-            <Text style={[textStyles.body, { flex: 1 }]}>☑️ Verified players only</Text>
+            <IconText label={"☑️ Verified players only"} style={[textStyles.body, { flex: 1 }]} />
             <Switch value={!!value.verifiedOnly} onValueChange={(v) => set({ verifiedOnly: v })} accessibilityLabel="Verified players only" />
           </View>
           )}

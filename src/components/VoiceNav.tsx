@@ -11,6 +11,7 @@ import { Button, TextField } from '../components/ui';
 import { useSpeech } from '../core/speech';
 import { deburr } from '../sports/football/voiceCommands';
 import type { Match } from '../core/types';
+import { IconText } from './Icon';
 
 /** Score a match against the spoken query by how many query tokens appear in
  *  either team's full or short name; live matches win ties (you usually mean the
@@ -76,7 +77,7 @@ export function VoiceNav({
       )}
       {open && (
         <View style={sv.panel}>
-          <Text style={sv.title}>🎙 Voice — find &amp; open a game</Text>
+          <IconText label={"🎙 Voice — find & open a game"} style={sv.title} />
           <View style={{ flexDirection: 'row', gap: theme.spacing(2) }}>
             <Button
               label={speech.listening ? '🛑 Stop' : '🎤 Speak'}

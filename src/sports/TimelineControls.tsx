@@ -12,6 +12,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { theme } from '../core/theme';
 import { confirmMatchAction } from '../components/ConfirmSheet';
+import { IconText } from '../components/Icon';
 
 type Tone = 'edit' | 'remove' | 'insert';
 const TONE: Record<Tone, string> = { edit: theme.colors.accent, remove: theme.colors.danger, insert: theme.colors.primary };
@@ -39,7 +40,7 @@ export function BackfillBar({ at, onLive }: { at: string; onLive: () => void }) 
     <View style={st.bar} accessibilityRole="alert">
       <Text style={st.barTxt} numberOfLines={2}>⏪ Backfilling at {at}{"\n"}Taps are stamped there</Text>
       <TouchableOpacity accessibilityRole="button" accessibilityLabel="Back to live scoring" onPress={onLive} activeOpacity={0.8} style={st.barBtn}>
-        <Text style={st.barBtnTxt}>▶ Back to live</Text>
+        <IconText label={"▶ Back to live"} style={st.barBtnTxt} />
       </TouchableOpacity>
     </View>
   );

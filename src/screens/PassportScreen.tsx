@@ -21,6 +21,7 @@ import { readableDob } from '../core/verificationReview';
 import { recordText } from '../data/stats';
 import { getPassportCode, passportRows, printPassport, resetPassportCode, resolvePassport, type Passport } from '../data/passport';
 import type { RootStackParamList } from '../navigation/types';
+import { IconText } from '../components/Icon';
 
 export default function PassportScreen() {
   const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -96,7 +97,7 @@ export default function PassportScreen() {
     <SafeAreaView style={st.safe} edges={['bottom']}>
       <KeyboardAwareScrollView contentContainerStyle={st.content}>
         <Card style={[{ gap: theme.spacing(2) }, st.good]}>
-          <Text style={textStyles.muted}>🪪 SportnNote career passport</Text>
+          <IconText label={"🪪 SportnNote career passport"} style={textStyles.muted} />
           <Text style={textStyles.h1}>{pp.name}</Text>
           <View style={st.pills}>
             {pp.ageVerifiedBy ? <Pill label={`✓ ${AGE_VERIFIED_TEXT[pp.ageVerifiedBy]}`} /> : null}

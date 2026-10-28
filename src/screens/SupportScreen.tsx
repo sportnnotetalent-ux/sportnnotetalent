@@ -28,6 +28,7 @@ import {
 } from '../data/supportKB';
 import { getGuide } from '../data/supportGuides';
 import { askSupport, enabled as aiEnabled, type SupportAnswer } from '../core/supportAI';
+import { IconText } from '../components/Icon';
 
 /** A tappable article row that expands to show the full body inline. */
 function ArticleCard({ article, defaultOpen }: { article: Article; defaultOpen?: boolean }) {
@@ -63,7 +64,7 @@ function ArticleCard({ article, defaultOpen }: { article: Article; defaultOpen?:
               onPress={() => setShowGuide((g) => !g)}
               style={st.guideToggle}
             >
-              <Text style={st.guideToggleText}>{showGuide ? '▴  Show less' : '📖  Read the full guide'}</Text>
+              <IconText label={showGuide ? '▴  Show less' : '📖  Read the full guide'} style={st.guideToggleText} />
             </TouchableOpacity>
           )}
         </>
@@ -141,7 +142,7 @@ export default function SupportScreen() {
                 <LoadingState label="Asking the assistant…" />
               ) : aiAnswer ? (
                 <Card style={{ gap: theme.spacing(2) }}>
-                  <Text style={st.aiTag}>🤖 Assistant</Text>
+                  <IconText label={"🤖 Assistant"} style={st.aiTag} />
                   <Markdown content={aiAnswer.answer} />
                 </Card>
               ) : !aiAsked ? (

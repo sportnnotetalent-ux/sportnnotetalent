@@ -22,6 +22,7 @@ import { chessRatingsOf, ratingListFor, ratingOn } from '../data/chessRatings';
 import { matchLine } from '../sports/matchLine';
 import { ChessTieBoards } from '../sports/chess/ChessTieBoards';
 import type { Match, Player, Role } from '../core/types';
+import { IconText } from './Icon';
 
 const STATE_TEXT: Record<RubberState, string> = {
   scheduled: '', live: '● LIVE', won: 'FT', drawn: '½–½', unplayed: 'Not played', dead: 'Dead rubber', cancelled: 'Cancelled',
@@ -105,7 +106,7 @@ export function TeamTieView({ initial, canManage, tz, onOpen, me }: {
       </View>
       <Text style={st.summary}>{tie.summary}</Text>
       {winnerName ? <View style={st.champ}><Text style={st.champText}>🏆 {winnerName} win the tie</Text></View> : null}
-      {tie.drawn ? <View style={st.champ}><Text style={st.champText}>🤝 Tie drawn — 1 match point each</Text></View> : null}
+      {tie.drawn ? <View style={st.champ}><IconText label={"🤝 Tie drawn — 1 match point each"} style={st.champText} /></View> : null}
       {!spec.boards ? (
         <Text style={textStyles.muted}>
           {spec.dead === 'play' ? '▶️ Every rubber is played — dead rubbers count for the tie-breaks.' : '⏹ Rubbers after the decision are not played.'}
@@ -137,7 +138,7 @@ export function TeamTieView({ initial, canManage, tz, onOpen, me }: {
           <View key={side} style={st.card}>
             <View style={st.rowBetween}>
               <Text style={st.teamName} numberOfLines={1}>{team.name}{letters.length && !spec.boards && /^[A-Z]$/.test(letters[0]) ? ` · ${letters.join('')}` : ''}</Text>
-              <Text style={[st.pill, inNow ? st.pillOk : null]}>{inNow ? '✓ In' : 'Not entered'}</Text>
+              <IconText label={inNow ? '✓ In' : 'Not entered'} style={[st.pill, inNow ? st.pillOk : null]} />
             </View>
             {l ? (
               <Text style={st.lineText}>

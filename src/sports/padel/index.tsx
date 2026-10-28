@@ -43,6 +43,7 @@ import { ServeCourtPanel } from '../ServeCourtPanel';
 import { setServeCourt } from '../serveCourt';
 import { PADEL_META } from './meta';
 import { padelMatchRecords } from './records';
+import { IconText } from '../../components/Icon';
 export type { PadelState } from './engine';
 
 const ScoringControls: SportPlugin<PadelState>['ScoringControls'] = ({ state, dispatch: rawDispatch, homeName, awayName, homeColor, awayColor, homeRoster = [], awayRoster = [] }) => {
@@ -89,8 +90,8 @@ const ScoringControls: SportPlugin<PadelState>['ScoringControls'] = ({ state, di
         <ServeOrderPicker state={s} homeName={homeName} awayName={awayName} homeRoster={homeRoster} awayRoster={awayRoster} dispatch={dispatch} icon="🟡" />
       )}
       {matchTbActive(s) && <Text style={ctrl.serve}>🟡 Match tiebreak — first to 10 (win by 2).</Text>}
-      {deucePoint && <Text style={ctrl.serve}>⚡ Golden point — next point wins the game.</Text>}
-      {starNow ? <Text style={ctrl.serve}>⭐ Star point — 3rd deuce: the next point wins the game. The receiving pair chooses who receives.</Text>
+      {deucePoint && <IconText label={"⚡ Golden point — next point wins the game."} style={ctrl.serve} />}
+      {starNow ? <IconText label={"⭐ Star point — 3rd deuce: the next point wins the game. The receiving pair chooses who receives."} style={ctrl.serve} />
         : starDeuce > 0 ? <Text style={ctrl.serve}>Deuce {starDeuce} of 3 · Star Point: {starDeuce === 1 ? 'two advantages' : 'one more advantage'} before the deciding point.</Text> : null}
       {/* SD-115 — two big team-coloured point buttons; doubles credit optional */}
       <PointButtons

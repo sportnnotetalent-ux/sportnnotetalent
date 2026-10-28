@@ -25,6 +25,7 @@ import {
   faceOf, ruleOf, perArcherOf, endInArcherOrder,
   type Arrow, type ArchRoundDef, type ArchMatchFormat, type BMatch, type EntryResult, type ResultEntry, type CompRules, type MatchSpec, archMatch,
 } from '../../data/results';
+import { IconText } from '../Icon';
 
 type Save = (entryId: string, next: EntryResult, undoLabel?: string) => void;
 const first = (name: string) => name.split(' ')[0];
@@ -47,7 +48,7 @@ function Keypad({ onKey, onBack, disabled, minRing }: { onKey: (a: Arrow) => voi
         </View>
       ))}
       <TouchableOpacity accessibilityRole="button" accessibilityLabel="Delete the last arrow" disabled={disabled} onPress={onBack} style={[st.key, st.keyBack, disabled && { opacity: 0.4 }]}>
-        <Text style={st.keyTxt}>⌫ Delete last arrow</Text>
+        <IconText label={"⌫ Delete last arrow"} style={st.keyTxt} />
       </TouchableOpacity>
     </View>
   );

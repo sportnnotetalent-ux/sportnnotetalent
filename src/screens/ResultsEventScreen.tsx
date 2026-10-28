@@ -77,6 +77,7 @@ import type { TextInput as TextInputT } from 'react-native';
 import { shareMessage } from '../core/share';
 import { resultsLink } from '../core/shareText';
 import { meetHeaderOf, printDoc, phaseSheet, hasCard, type SheetKind } from '../components/results/printPhase';
+import { IconText } from '../components/Icon';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type Change = (next: EntryResult) => void;
@@ -693,7 +694,7 @@ export default function ResultsEventScreen() {
             {/* timed races round 2: this event's own "Stats to track" (organisers, any time) */}
             {canManage && phase.status !== 'completed' ? <EventTrackCard def={def} f={f} meet={meetTrack} busy={busy} onChange={(t) => void saveTracking(t)} /> : null}
             {comb && (comb.fsWarned ?? []).includes(activeHeat) ? (
-              <Text style={st.badTxt}>⚠ This race has had its false start — a further one disqualifies (TR 39.8.3).</Text>
+              <IconText label={"⚠ This race has had its false start — a further one disqualifies (TR 39.8.3)."} style={st.badTxt} />
             ) : null}
             {!comb && (f.fsWarned ?? []).includes(activeHeat) ? (
               <Text style={st.badTxt}>⚠ This {swim ? 'heat' : 'race'} has had its false start — a further one disqualifies (meet rule).</Text>
@@ -794,7 +795,7 @@ export default function ResultsEventScreen() {
                       <Text style={st.place}>{lifts && row?.status === 'NM' ? '—' : row?.label || ''}</Text>
                       {row ? <Flags flags={row.flags} /> : null}
                       {notes.get(e.id) ? <Text style={textStyles.muted}>{notes.get(e.id)}</Text> : null}
-                      {r.fsWarn && (r.status ?? 'ok') === 'ok' ? <Text style={st.badTxt}>⚠ FS warned</Text> : null}
+                      {r.fsWarn && (r.status ?? 'ok') === 'ok' ? <IconText label={"⚠ FS warned"} style={st.badTxt} /> : null}
                     </View>
                   </View>
                   {teamRank && isTeamRow(re) ? (
@@ -1504,7 +1505,7 @@ function AttemptCard({ def, up, rows, heatRes, phaseKind, onSave }: {
         )}
       </View>
       <View style={st.inline}>
-        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Save mark" onPress={commit} style={[st.bigBtn, st.bigOk]}><Text style={st.bigTxt}>✓ Mark</Text></TouchableOpacity>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Save mark" onPress={commit} style={[st.bigBtn, st.bigOk]}><IconText label={"✓ Mark"} style={st.bigTxt} /></TouchableOpacity>
         <TouchableOpacity accessibilityRole="button" accessibilityLabel="Foul" onPress={() => onSave(up.entry.id, up.round, { foul: true })} style={[st.bigBtn, st.bigX]}><Text style={st.bigTxt}>X foul</Text></TouchableOpacity>
         <TouchableOpacity accessibilityRole="button" accessibilityLabel="Pass" onPress={() => onSave(up.entry.id, up.round, { pass: true })} style={[st.bigBtn, st.bigPass]}><Text style={st.bigTxtDark}>– pass</Text></TouchableOpacity>
       </View>

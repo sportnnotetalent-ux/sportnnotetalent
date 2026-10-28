@@ -31,6 +31,7 @@ import type { Player, Tournament } from '../core/types';
 import type { ProgrammeEvent } from '../data/tournamentCopyPlan';
 import { crewSeed } from '../data/carriedSetup';
 import { CarriedNote } from '../components/results/CarriedNote';
+import { IconText } from '../components/Icon';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 interface Source { key: string; name: string; colorHex?: string; teamId?: string; playerIds: string[] }
@@ -298,7 +299,7 @@ export function CrewEventSetup({ tournamentId, sport, preloaded, carried }: { to
                           </View>
                         </>
                       ) : null}
-                      {err ? <Text style={textStyles.muted}>{err}</Text> : <Text style={textStyles.muted}>✓ Crew complete.</Text>}
+                      {err ? <Text style={textStyles.muted}>{err}</Text> : <IconText label={"✓ Crew complete."} style={textStyles.muted} />}
                     </View>
                   );
                 })}

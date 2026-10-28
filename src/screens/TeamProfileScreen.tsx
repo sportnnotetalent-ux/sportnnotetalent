@@ -34,6 +34,7 @@ import { getTeamEventResults, type TeamEventResults as TeamEventData } from '../
 import { TeamEventResults } from '../components/TeamEventResults';
 import { TournamentJourneyList } from '../components/TournamentHistory';
 import { journeysOf } from '../data/tournamentHistory';
+import { IconText } from '../components/Icon';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -425,7 +426,7 @@ export default function TeamProfileScreen() {
                 <View style={{ flex: 1, gap: 4 }}>
                   <Text style={textStyles.body}>{p.fullName}{p.jerseyNo ? ` · #${p.jerseyNo}` : ''}{p.invited ? '  ⏳' : ''}</Text>
                   {p.invited ? <Text style={textStyles.muted}>Invited · hasn’t joined yet</Text> : <SportLine sports={p.sports} />}
-                  {waiting.has(p.id) ? <Text style={textStyles.muted}>⏳ Waiting for their side to confirm</Text> : null}
+                  {waiting.has(p.id) ? <IconText label={"⏳ Waiting for their side to confirm"} style={textStyles.muted} /> : null}
                   {p.invited && p.phone ? <RemindInstall playerId={p.id} name={p.fullName} phone={p.phone} teamName={team.name} /> : null}
                 </View>
               </Card>

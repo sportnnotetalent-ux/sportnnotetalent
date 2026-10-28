@@ -39,8 +39,9 @@ import { useKeepAwakeWhile } from '../core/keepAwake';
 import { ResultHoldNote } from '../components/ResultHoldNote';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { safeWebUrl } from '../core/safeUrl';
+import { SportBadge } from '../components/SportArt';
 import { theme } from '../core/theme';
-import { Glyph } from '../components/Icon';
+import { Glyph, IconText } from '../components/Icon';
 import { getSport } from '../sports/registry';
 import { VoiceScorer } from '../sports/VoiceScorer';
 import { completesMatch } from '../sports/voiceMatch';
@@ -960,7 +961,10 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
 
   const header = useMemo(() => (
     <View style={st.header}>
-      <Text style={st.sportName}>{plugin.icon} {plugin.name}</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 }}>
+        <SportBadge sport={plugin.id} size={26} />
+        <Text style={st.sportName}>{plugin.name}</Text>
+      </View>
       <Pill label={live ? 'Synced' : 'Demo'} color={live ? theme.colors.primary + '22' : theme.colors.surfaceAlt} textColor={live ? theme.colors.primary : theme.colors.textMuted} />
     </View>
   ), [plugin, live]);
@@ -1109,7 +1113,7 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
   const retireBar = showEndEarly ? (
     !retireOpen ? (
       <TouchableOpacity style={st.matchCtrlBtn} activeOpacity={0.8} accessibilityRole="button" accessibilityLabel="End match early — asks before ending" onPress={() => setRetireOpen(true)}>
-        <Text style={st.matchCtrlText}>🏁 End match…</Text>
+        <IconText label={"🏁 End match…"} style={st.matchCtrlText} />
         <Text style={st.matchCtrlHint}>rain, injury, retired, walkover…</Text>
       </TouchableOpacity>
     ) : (
@@ -1395,7 +1399,7 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
             </View>
           ) : (
             <TouchableOpacity style={st.assignBtn} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel="Start the match" onPress={tryStart}>
-              <Text style={st.assignBtnText}>▶ Start the match</Text>
+              <IconText label={"▶ Start the match"} style={st.assignBtnText} />
             </TouchableOpacity>
           )}
         </View>
@@ -1403,7 +1407,7 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
         <View style={{ gap: theme.spacing(3), alignItems: 'center' }}>
           <Text style={[textStyles.muted, { textAlign: 'center' }]}>Play is paused — {breakLabel(onBreak).toLowerCase()} since {formatTime(onBreak.since, viewerTz)}.</Text>
           <TouchableOpacity style={st.assignBtn} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel="Resume play" onPress={() => void resumePlay()}>
-            <Text style={st.assignBtnText}>▶ Resume play</Text>
+            <IconText label={"▶ Resume play"} style={st.assignBtnText} />
           </TouchableOpacity>
         </View>
       ) : (
@@ -1783,7 +1787,7 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
                       <View style={st.mgrAvatar}><Text style={st.mgrAvatarText}>{scorerInitials(mgr)}</Text></View>
                       <View style={{ flex: 1 }}>
                         <Text style={[textStyles.body, { fontWeight: '700' }]} numberOfLines={1}>{mgr}</Text>
-                        <Text style={textStyles.muted}>🧑‍💼 Manager / coach</Text>
+                        <IconText label={"👤 Manager / coach"} style={textStyles.muted} />
                       </View>
                       {canManage && matchId && (
                         <Text style={st.editLink} accessibilityRole="button" onPress={() => setEditingManager(sd)}>Change</Text>
@@ -1992,7 +1996,7 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
         {/* Postponed / cancelled banner (everyone) + reschedule entry (hosts). */}
         {(meta.status === 'postponed' || meta.status === 'cancelled') && (
           <View style={[st.reschedBanner, { backgroundColor: (meta.status === 'cancelled' ? theme.colors.danger : theme.colors.accent) + '22' }]}>
-            <Text style={st.reschedBannerText}>{meta.status === 'cancelled' ? '🚫 This match has been cancelled.' : '⏸️ This match has been postponed.'}</Text>
+            <IconText label={meta.status === 'cancelled' ? '🚫 This match has been cancelled.' : '⏸️ This match has been postponed.'} style={st.reschedBannerText} />
           </View>
         )}
         {canManage && matchId && meta.status !== 'live' && (
@@ -2300,7 +2304,7 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
               the scorer and opens the controls; the scorer is still changeable in Info. */}
           {canManage && !complete && scorerIds.length === 0 && !!myPlayerId && activeTab !== 'scoring' && (
             <TouchableOpacity style={st.scoreCta} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel="Score this match from this device" onPress={scoreThisMatch}>
-              <Text style={st.scoreCtaText}>▶ Score this match</Text>
+              <IconText label={"▶ Score this match"} style={st.scoreCtaText} />
               <Text style={st.scoreCtaHint}>No scorer assigned yet. Tap to score from this device — you can hand off to someone else anytime from Info.</Text>
             </TouchableOpacity>
           )}

@@ -28,6 +28,7 @@ import { claimItem, getSupportOverview, releaseDemoClaim, releaseItem, type Queu
 import { OrgReview, Submission } from './VerificationReviewScreen';
 import type { RootStackParamList } from '../navigation/types';
 import { LinkReportsCard } from '../components/LinkReportsCard';
+import { IconText } from '../components/Icon';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 const REFRESH_MS = 60_000;
@@ -135,7 +136,7 @@ export default function SupportConsoleScreen() {
       <SafeAreaView style={st.safe} edges={['bottom']}>
         <View style={st.content}>
           <ScreenTitle title="🧑‍💼 Support console" />
-          <Card><Text style={textStyles.body}>🔒 SportnNote support only</Text></Card>
+          <Card><IconText label={"🔒 SportnNote support only"} style={textStyles.body} /></Card>
         </View>
       </SafeAreaView>
     );

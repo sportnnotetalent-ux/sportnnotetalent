@@ -23,7 +23,7 @@ import { SPORT_LIST } from '../sports/sportMeta';
 import { deleteHonour, getHallOfFame, printHall, saveHonour, setHallPublic, sportName, type Hall, type HonourDraft } from '../data/hallOfFame';
 import { getOrganization, getPlayerNamesById } from '../data/repos';
 import type { RootStackParamList } from '../navigation/types';
-import { Glyph } from '../components/Icon';
+import { Glyph, IconText } from '../components/Icon';
 
 const HOSTED_CAP = 8;
 
@@ -86,7 +86,7 @@ export default function HallOfFameScreen() {
           <View style={st.headRow}>
             {org.logoUrl ? <Image source={{ uri: org.logoUrl }} style={st.logo} /> : <Glyph emoji="🏛️" style={st.logoEmoji} />}
             <View style={{ flex: 1, gap: 2 }}>
-              <Text style={st.kicker}>🏆 HALL OF FAME</Text>
+              <IconText label={"🏆 HALL OF FAME"} style={st.kicker} />
               <Text style={textStyles.h1}>{org.name}</Text>
               <Text style={textStyles.muted}>{[org.type, org.city, org.verified ? '✓ Verified school / club' : ''].filter(Boolean).join(' · ')}</Text>
             </View>
@@ -111,7 +111,7 @@ export default function HallOfFameScreen() {
 
         {hall.canEdit ? (
           <Card style={{ gap: theme.spacing(2) }}>
-            <Text style={textStyles.h3}>{hall.public ? '🌐 Published' : '🔒 Private'}</Text>
+            <IconText label={hall.public ? '🌐 Published' : '🔒 Private'} style={textStyles.h3} />
             <Text style={textStyles.muted}>
               {hall.public
                 ? 'Anyone with the link sees it — share it on your website, WhatsApp groups and newsletters.'
@@ -162,7 +162,7 @@ export default function HallOfFameScreen() {
                   {e.playerIds.length ? <Text style={textStyles.body}>{peopleLine(e.playerIds, nameOf)}</Text> : null}
                   {e.note ? <Text style={textStyles.muted}>{e.note}</Text> : null}
                   <View style={st.tagRow}>
-                    <Text style={e.source === 'verified' ? st.verified : st.added}>{e.source === 'verified' ? '✓ Verified certificate' : 'Added by the school'}</Text>
+                    <IconText label={e.source === 'verified' ? '✓ Verified certificate' : 'Added by the school'} style={e.source === 'verified' ? st.verified : st.added} />
                     {e.date ? <Text style={textStyles.muted}>{readableDob(e.date)}</Text> : null}
                     {e.tournamentId ? <Text style={st.link} accessibilityRole="link" onPress={() => nav.navigate('Tournament', { tournamentId: e.tournamentId! })}>See event ›</Text> : null}
                     {hall.canEdit && e.source === 'school' ? <Text style={st.link} accessibilityRole="button" onPress={() => setEditing(e)}>✎ Edit</Text> : null}

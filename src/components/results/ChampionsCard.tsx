@@ -14,6 +14,7 @@ import { Card, SelectChip, textStyles } from '../ui';
 import { SectionHeader } from '../SectionHeader';
 import { categoryChampions, championsText, type ChampTie, type MeetEvent, type PointsSettings } from '../../data/results';
 import type { RootStackParamList } from '../../navigation/types';
+import { IconText } from '../Icon';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -94,7 +95,7 @@ export function ChampionsCard({ events, points, tie, title, athletesWord = 'athl
         )}
         <Text style={textStyles.muted}>Position points from this category’s finals; relays count for the house. {tie === 'share' ? 'Equal points make joint champions.' : 'Equal points: more golds, then silvers, then bronzes.'}</Text>
         <TouchableOpacity accessibilityRole="button" accessibilityLabel="Share the champions of every category" onPress={share}>
-          <Text style={st.link}>↗ Share all champions</Text>
+          <IconText label={"↗ Share all champions"} style={st.link} />
         </TouchableOpacity>
       </Card>
     </>

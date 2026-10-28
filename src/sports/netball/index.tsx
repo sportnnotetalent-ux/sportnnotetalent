@@ -53,6 +53,7 @@ import { BackfillBar, RowAction, confirmRemove } from '../TimelineControls';
 import { netballVoice, netballVoiceEnds, netballLast } from './voice';
 import { NETBALL_META } from './meta';
 import { netballMatchRecords } from './records';
+import { IconText } from '../../components/Icon';
 
 const uid = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 const TRACKED: string[] = [...LIVE_KEYS];
@@ -629,7 +630,7 @@ const ScoringControls: SportPlugin<NetballState>['ScoringControls'] = ({
         <View style={[c.centre, { borderColor: color(cp) }]}>
           <Text style={[c.centreTxt, { color: ink(cp) }]} accessibilityLiveRegion="polite">⚪ Centre pass: {name(cp)}</Text>
           <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Swap the centre pass to ${name(other(cp))}`} onPress={() => fire({ type: 'CENTRE', side: other(cp) })} style={c.swap}>
-            <Text style={c.swapTxt}>⇄ Swap</Text>
+            <IconText label={"⇄ Swap"} style={c.swapTxt} />
           </TouchableOpacity>
         </View>
       ) : null}

@@ -66,6 +66,7 @@ import {
 import { aggregateText } from "../aggregate";
 import { FOOTBALL_META } from './meta';
 import { footballMatchRecords } from './records';
+import { IconText } from '../../components/Icon';
 
 /* ------------------------------- Controls ---------------------------------- */
 
@@ -727,7 +728,7 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
         {state.half >= 2 && subSection}
         {/* #6: joining a match already underway — start the clock at the live minute. */}
         <View style={{ gap: theme.spacing(1) }}>
-          <Text style={ctrl.meta}>⏱ Already underway? Enter the current match minute (optional).</Text>
+          <IconText label={"⏱ Already underway? Enter the current match minute (optional)."} style={ctrl.meta} />
           <TextField label="" value={koMin} onChange={setKoMin} placeholder={`e.g. ${base + 25}`} autoCapitalize="none" />
         </View>
         <Button label={startAt > base ? `▶ ${koLabel} at ${startAt}'` : `▶ ${koLabel}`} onPress={kickoff} />
@@ -1453,7 +1454,7 @@ function ShootoutControls({
   // a new kick starts with nobody picked
   useEffect(() => { setTaker(null); setKeeper(null); setPickKeeper(false); }, [kicksSoFar]);
   if (!needsDecision(state)) {
-    return <Text style={ctrl.meta}>✅ Full time — final score saved.</Text>;
+    return <IconText label={"✅ Full time — final score saved."} style={ctrl.meta} />;
   }
   const pens = penScore(state);
   if (!state.shootout) {

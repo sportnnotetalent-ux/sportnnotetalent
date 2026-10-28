@@ -3,6 +3,7 @@
  *  match scheduling can set the same optional rules. */
 import React, { useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { SportBadge } from './SportArt';
 import { theme } from '../core/theme';
 import { SelectChip, TextField, textStyles } from './ui';
 import { getSportMeta } from '../sports/sportMeta';
@@ -115,7 +116,10 @@ export function SportFormatEditor({
 
   return (
     <View style={fe.card}>
-      <Text style={textStyles.h3}>{plugin.icon} {plugin.name} {heading ?? 'rules'}</Text>
+      <View style={fe.head}>
+        <SportBadge sport={plugin.id} size={24} />
+        <Text style={[textStyles.h3, { flexShrink: 1 }]}>{plugin.name} {heading ?? 'rules'}</Text>
+      </View>
 
       {presetField && (
         <View style={{ gap: theme.spacing(2) }}>
@@ -152,6 +156,7 @@ export function SportFormatEditor({
 }
 
 const fe = StyleSheet.create({
+  head: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing(2) },
   card: {
     gap: theme.spacing(3), backgroundColor: theme.colors.surface,
