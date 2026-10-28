@@ -13,6 +13,26 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-29 — Release: security Waves 3–4, cue sports, phone country, SMS sign-up, the link-by-phone fix
+- **Database:** the founder ran Waves 3A–4A, then `20261028233000_phone_country`, `20261029090000_claim_keeps_details` and `20261029100000_signup_sms`. Checked read-only on live:
+  - the Wave 3–4 objects (14 of 14);
+  - `country_of_phone`, the new claim and the ticket table are there;
+  - `require_phone` is off, as shipped.
+- **Auth hook:** the founder confirmed **Before User Created** is enabled (`hook_before_user_created`).
+- **Edge functions:** all 26 redeployed, because `_shared` changed.
+  - `join`, `join-club` and `report-invite` stay public (`--no-verify-jwt`).
+  - The others answer 401 to anonymous calls.
+  - `phone-login` boots ("idToken is required").
+- **Checks:** sign-in smoke check passed.
+- **Published** from a clean worktree at `7812d83`:
+  - web: entry `index-1867cbe0`, 10/10 at app.sportnnote.in (redirects to sportnnote.expo.app) and sportnnote.expo.app;
+  - Android OTA: update group `57af0b2e`.
+- **Live site:**
+  - **Create account** shows **Text me a code**;
+  - a clean load fetched 85 scripts with none failed;
+  - the only client errors in the last hour were 2 from my own checks, when Expo's hosting rate-limited this machine (429).
+- **Founder, next:** `update signup_guard_settings set require_phone = true;`, then sign-in test step 9a.
+
 ### 2026-10-29 — SMS verification required at sign-up
 - Founder's decision. **Create account** now asks for the mobile first: **Text me a code** → type it → **Verify mobile** → the rest of the form.
 - How the server enforces it:
