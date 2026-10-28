@@ -13,6 +13,17 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-29 — SMS verification required at sign-up
+- Founder's decision. **Create account** now asks for the mobile first: **Text me a code** → type it → **Verify mobile** → the rest of the form.
+- How the server enforces it:
+  - `phone-login` (`purpose: 'signup-ticket'`) turns the SMS proof into a one-time ticket;
+  - the Auth **Before User Created** hook refuses an email sign-up without a live ticket for the same number;
+  - the new profile spends the ticket, and its player starts with the mobile verified.
+- Migration `20261029100000_signup_sms`. Break list: `docs/security/breaks/signup-sms.md`. Closes PC-05.
+- Break-it found that mobile sign-up linked a coach-made profile by number alone: a parent got their child's profile. `phone_login_attach_player` now uses Wave 2b's checks.
+- Tests: `tests/db-signup-sms.test.mts` (16); `tests/sim-signup-sms.test.mts` (600 email + 100 mobile sign-ups). The smoke check confirms the app explains the hook's refusal.
+- Founder: the hook must be on (Auth Hooks → Before User Created → `hook_before_user_created`). Check once with sign-in test step 9a.
+
 ### 2026-10-29 — Hotfix: "link by phone" kept only part of the account's profile
 - Found live by the founder. "Did a coach add you by phone?" → **Text me a code** linked their August profile. It also deleted the newer profile on their account, copying only the name, date of birth, guardian and email. The newer profile's sports, photo, bio and other details were lost. The Profile tab then said "Set up your profile".
 - Migration `20261029090000_claim_keeps_details`: `claim_player_by_phone` now:

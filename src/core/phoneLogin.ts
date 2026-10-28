@@ -81,3 +81,25 @@ export async function completePhoneSignup(signup: PhoneSignup): Promise<PhoneLog
   if (!pendingToken) throw new Error('Your code has expired — send a new one.');
   return callPhoneLogin(pendingToken, signup);
 }
+
+export type SignupPhoneProof =
+  | { status: 'ticket'; ticket: string }   // proven: create the account with it
+  | { status: 'exists' }                   // the number already has an account: sign in
+  | { status: 'unverified'; reason: string };
+
+/** SMS required at sign-up (2026-10-29): the code from `sendPhoneCode` →
+ *  a one-time ticket for the email sign-up (phone-login, purpose
+ *  'signup-ticket'). The Auth hook refuses an email sign-up without one. */
+export async function proveSignupPhone(code: string): Promise<SignupPhoneProof> {
+  const idToken = await confirmPhoneCode(code);
+  const { data, error } = await supabase!.functions.invoke(fnPath('phone-login'), { body: { idToken, purpose: 'signup-ticket' } });
+  if (error) {
+    const ctx = (error as { context?: Response }).context;
+    const body = ctx && typeof ctx.json === 'function' ? await ctx.json().catch(() => null) : null;
+    throw new Error((body as { error?: string } | null)?.error ?? 'Couldn’t verify the number just now — try again.');
+  }
+  if (data?.status === 'ticket' && typeof data.ticket === 'string') return { status: 'ticket', ticket: data.ticket };
+  if (data?.status === 'exists') return { status: 'exists' };
+  if (data?.status === 'unverified') return { status: 'unverified', reason: String(data.reason ?? '') };
+  throw new Error(String(data?.error ?? 'Couldn’t verify the number just now — try again.'));
+}

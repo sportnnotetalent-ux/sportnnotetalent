@@ -13,6 +13,10 @@
  *     placeholder email, never mailed), attach/claim the player, sign in.
  * "Sign in" = a one-time magic-link token hash (nothing is emailed); the app
  * exchanges it with supabase.auth.verifyOtp for a normal session.
+ * `purpose: 'signup-ticket'` (2026-10-29, SMS required at sign-up; migration
+ * 20261029100000): the email sign-up form proves the number first and gets a
+ * one-time ticket for it — the Auth hook refuses an email sign-up without one.
+ *   → { status: 'ticket', ticket } | { status: 'exists' } | { status: 'unverified', reason }
  *
  * Contract: POST { idToken, signup?: { fullName, dob, role, guardian?, legalVersion, agreed } }
  *   → { status: 'ok', tokenHash } | { status: 'new' } | { status: 'unverified', reason } | { error }
@@ -93,7 +97,7 @@ Deno.serve(async (req) => {
   // The answers are checked in the old order (429 before 400 before 401), so
   // every response is what the sequential version returned.
   const ipOk = rateLimit('phone-login-ip', ip, 30, 3600);
-  const body = (await req.json().catch(() => ({}))) as { idToken?: unknown; signup?: Record<string, unknown> };
+  const body = (await req.json().catch(() => ({}))) as { idToken?: unknown; signup?: Record<string, unknown>; purpose?: unknown };
   const idToken = typeof body.idToken === 'string' ? body.idToken : '';
   const verifying = idToken ? verifiedPhoneFromToken(idToken) : null;
   if (!(await ipOk)) return tooMany();
@@ -110,15 +114,23 @@ Deno.serve(async (req) => {
   // limited number still gets 429 and nothing else.
   const [phoneOk, { row, withAccount }] = await Promise.all([rateLimit('phone-login', phone, 10, 3600), lookupOwner(phone)]);
   if (!phoneOk) return tooMany();
+  const unverified = 'This number is on an account that hasn’t verified it yet. Sign in with your email and password, then verify the number in Profile — after that you can sign in with your mobile.';
+
+  // The email sign-up form: a proven number with no account gets a ticket.
+  if (body.purpose === 'signup-ticket') {
+    if (row?.verified) return json({ status: 'exists' });
+    if (row) return json({ status: 'unverified', reason: unverified });
+    const { data: ticket, error: tErr } = await admin.rpc('create_signup_phone_ticket', { p_phone: phone });
+    if (tErr || typeof ticket !== 'string') {
+      console.error('signup ticket', tErr);
+      return json({ error: 'Couldn’t verify the number just now — try again.' }, 500);
+    }
+    return json({ status: 'ticket', ticket });
+  }
 
   // Who owns this number?
   if (row?.verified) return sessionFor(row.profile_id, withAccount ? row : undefined);
-  if (row && !row.verified) {
-    return json({
-      status: 'unverified',
-      reason: 'This number is on an account that hasn’t verified it yet. Sign in with your email and password, then verify the number in Profile — after that you can sign in with your mobile.',
-    });
-  }
+  if (row && !row.verified) return json({ status: 'unverified', reason: unverified });
 
   // New number.
   const s = body.signup;

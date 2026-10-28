@@ -57,6 +57,17 @@ for (const [what, call, want] of probes) {
   const shown = friendly(raw);
   row(r.status >= 400 && shown !== GENERIC && want.test(shown), what, `${r.status} "${raw}" → "${shown}"`);
 }
+// The sign-up hook's own refusals (migrations 20261027180000_signup_guard and
+// 20261029100000_signup_sms): checked offline, so no account is ever made here.
+// Whether the hook is switched on is a dashboard setting: try one sign-up by
+// hand without verifying the mobile (docs/testing/sign-in-test-script.md).
+for (const [what, raw, want] of [
+  ['sign-up without SMS proof', 'Verify your mobile number first — we text you a code, then you can create your account.', /verify your mobile/i],
+  ['sign-up, temporary inbox', 'Please use your own email address — a temporary inbox can’t be used for SportnNote.', /temporary inbox/],
+]) {
+  const shown = friendly(raw);
+  row(shown !== GENERIC && want.test(shown), what, `"${shown}"`);
+}
 // A reset for an unknown address must not reveal that it's unknown.
 const rec = await auth('recover', { method: 'POST', body: JSON.stringify({ email }) });
 row(rec.status === 200, 'reset, unknown email: no account leak', `${rec.status}`);

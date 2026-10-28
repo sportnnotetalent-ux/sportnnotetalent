@@ -16,7 +16,8 @@
 | 6 | **Forgot password** | **Forgot password?** → email → **Send reset code** → code + new password → **Reset password & sign in** | Signed in. Sign out, then sign in with the new password. |
 | 7 | **Mobile sign-in** (APK 41 or web) | **📱 Continue with your mobile number** → **Send code** → SMS → **Continue** | Signed in (a short "I'm not a robot" check is normal on the APK). |
 | 8 | **Mobile, number not verified yet** | A number that's on an account but not verified | The explanation, plus **Forgot the password? Email me a sign-in code**, which opens step 1. |
-| 9 | **New account** | **Create account** with email + password (adult) | Signed in straight away. An under-18 date of birth shows the parent/guardian fields. |
+| 9 | **New account** | **Create account** → mobile → **Text me a code** → type the code → **Verify mobile** → the rest of the form → **Create account** (adult) | "✓ Mobile verified", then signed in straight away. Profile shows the mobile as verified (no second text). An under-18 date of birth shows the parent/guardian fields. |
+| 9a | **New account, no text** (once after the 2026-10-29 change) | **Create account** without tapping **Text me a code** | "Verify your mobile number first — tap “Text me a code”." If an account is made anyway, the **Before User Created** hook is off: Supabase → Authentication → Auth Hooks → turn it on (`public.hook_before_user_created`), and delete that account. |
 | 10 | **Shared phone** | Sign out → sign in as a different person | No notifications or alerts from the previous person. |
 
 Write down anything that differs from the ✅ and take a screenshot.

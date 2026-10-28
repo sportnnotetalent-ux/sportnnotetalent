@@ -37,6 +37,8 @@ export function friendlyAuthError(raw?: string): string {
   // The sign-up guard (migration 20261027180000_signup_guard): its own words.
   if (m.includes('temporary inbox')) return 'Please use your own email address — a temporary inbox can’t be used for SportnNote.';
   if (m.includes('new accounts from this network')) return 'Too many new accounts from this network today. Please try again tomorrow, or contact support.';
+  // SMS required at sign-up (migration 20261029100000_signup_sms): the hook's words
+  if (m.includes('verify your mobile')) return 'Verify your mobile number first — tap “Text me a code”, then create your account.';
   if (/(rate limit|too many|429)/.test(m)) return 'Too many attempts. Please wait a minute and try again.';
   // Supabase: "For security purposes, you can only request this after 47 seconds."
   if (/(security purposes|only request this after)/.test(m)) return 'Please wait a minute before asking for another code.';
@@ -96,7 +98,9 @@ interface AuthState {
     dob: string,
     guardian?: GuardianContact,
     /** the user's mobile — their primary identity key (mandatory at sign-up) */
-    phone?: string
+    phone?: string,
+    /** the one-time ticket from proving `phone` by SMS (required at sign-up) */
+    phoneTicket?: string
     /** needsEmailConfirm: account created but no session yet — user must confirm
      *  their email before signing in (only when "Confirm email" is ON). */
   ) => Promise<{ error?: string; needsEmailConfirm?: boolean }>;
@@ -298,7 +302,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { error: friendlyAuthError(e instanceof Error ? e.message : String(e)) };
       }
     },
-    signUp: async (email, password, fullName, role, dob, guardian, phone) => {
+    signUp: async (email, password, fullName, role, dob, guardian, phone, phoneTicket) => {
       if (!supabase) return {};
       try {
         const normPhone = normalizePhone(phone) || null; // E.164 (+…) — the identity key
@@ -316,6 +320,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const country = phoneCountry(normPhone ?? '') ?? privacyCountry();
         const meta = {
           full_name: fullName, role, dob, phone: normPhone, ...(guardian ? { guardian } : {}), country,
+          ...(phoneTicket ? { phone_ticket: phoneTicket } : {}),
           ...(analyticsChoice() === 'denied' ? { analytics: 'denied' } : {}),
           legal_accepted: { version: legalVersionFor(country), at: new Date().toISOString() },
         };

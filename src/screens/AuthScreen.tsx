@@ -22,7 +22,7 @@ import { ageFromDob } from '../core/age';
 import { guardianConfirmRequired, privacyCountry, usUnder13Blocked, US_UNDER_13_MESSAGE } from '../core/privacyRegion';
 import { isValidPhone, normalizePhone, formatPhone, phoneCountry } from '../core/phone';
 import { PhoneField } from '../components/PhoneField';
-import { phoneLoginAvailable } from '../core/phoneLogin';
+import { phoneLoginAvailable, proveSignupPhone, sendPhoneCode } from '../core/phoneLogin';
 import { PhoneLoginCard } from '../components/PhoneLoginCard';
 import type { Role } from '../core/types';
 import { Logo } from '../components/Logo';
@@ -88,6 +88,40 @@ export default function AuthScreen() {
   const usUnder13 = usUnder13Blocked(country, age);
   const guardianMustConfirm = minor && guardianConfirmRequired(country);
 
+  // SMS required at sign-up (2026-10-29): the mobile is proven by a text
+  // message first; the server swaps the proof for a one-time ticket, and the
+  // account can't be made without it (migration 20261029100000_signup_sms).
+  const canSms = phoneLoginAvailable();
+  const [smsSent, setSmsSent] = useState(false);
+  const [smsCode, setSmsCode] = useState('');
+  const [phoneTicket, setPhoneTicket] = useState<string | null>(null);
+  const [ticketPhone, setTicketPhone] = useState('');
+  useEffect(() => {
+    // a changed number needs its own code
+    if (smsSent && normalizePhone(mobile) !== ticketPhone) { setPhoneTicket(null); setSmsSent(false); setSmsCode(''); }
+  }, [mobile, smsSent, ticketPhone]);
+  const textSignupCode = () => {
+    if (!isValidPhone(mobile)) return setError('Enter your mobile number (check the country code) — we text it a code.');
+    const number = normalizePhone(mobile);
+    void run(async () => {
+      try { await sendPhoneCode(number); return {}; } catch (e) { return { error: e instanceof Error ? e.message : 'Couldn’t send the code — try again.' }; }
+    }, `We texted a code to ${formatPhone(mobile)}.`, () => { setSmsSent(true); setTicketPhone(number); setSmsCode(''); });
+  };
+  const verifySignupCode = () => {
+    const c = smsCode.replace(/\D/g, '');
+    if (c.length < 6) return setError('Type the 6-digit code from the text message.');
+    void run(async () => {
+      try {
+        const r = await proveSignupPhone(c);
+        if (r.status === 'ticket') { setPhoneTicket(r.ticket); return {}; }
+        if (r.status === 'exists') return { error: 'This number already has an account — sign in with it instead (“Continue with your mobile number”).' };
+        return { error: r.reason || 'This number can’t be used for a new account — contact support.' };
+      } catch (e) {
+        return { error: e instanceof Error ? e.message : 'That code didn’t work — try again.' };
+      }
+    }, 'Mobile verified.');
+  };
+
   const clearFlow = () => { setSent(false); setSentAt(0); setCode(''); setNewPassword(''); setNote(null); setError(null); setOtpChannel('email'); setShowResend(false); };
   const switchMode = (m: Mode) => { setMode(m); setFlow('password'); clearFlow(); };
   const switchFlow = (f: Flow) => { setFlow(f); clearFlow(); };
@@ -106,6 +140,7 @@ export default function AuthScreen() {
   function submitPassword() {
     if (mode === 'up') {
       if (!isValidPhone(mobile)) return setError('Enter your mobile number (check the country code) — it’s your SportnNote identity.');
+      if (!phoneTicket) return setError('Verify your mobile number first — tap “Text me a code”.');
       if (!dob.trim() || age === undefined) return setError('Enter a valid date of birth (YYYY-MM-DD).');
       if (usUnder13) return setError(US_UNDER_13_MESSAGE);
       if (guardianMustConfirm && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(gEmail.trim())) {
@@ -133,7 +168,7 @@ export default function AuthScreen() {
     // On sign-up: if email confirmation is on, there's no session yet — tell the
     // user to check their inbox instead of leaving them on a silent screen.
     void run(
-      () => signUp(email.trim(), password, fullName.trim() || 'Player', role, dob.trim(), guardian, mobile.trim()),
+      () => signUp(email.trim(), password, fullName.trim() || 'Player', role, dob.trim(), guardian, mobile.trim(), phoneTicket ?? undefined),
       undefined,
       (res) => {
         if (res.needsEmailConfirm) {
@@ -222,6 +257,25 @@ export default function AuthScreen() {
 
           {mode === 'up' && <Field label="Full name" value={fullName} onChange={setFullName} placeholder="Aarav Mehta" />}
           {mode === 'up' && <PhoneField label="Mobile number" value={mobile} onChange={setMobile} labelStyle={textStyles.muted} />}
+          {mode === 'up' && (
+            <View style={{ gap: theme.spacing(1) }}>
+              {!canSms ? (
+                <Text style={st.ageHint}>Creating an account needs a text message to your mobile. Update SportnNote from sportnnote.in/download, or create your account at sportnnote.in.</Text>
+              ) : phoneTicket ? (
+                <Text style={st.ageHint} accessibilityLiveRegion="polite">✓ Mobile verified</Text>
+              ) : !smsSent ? (
+                <Button label="Text me a code" variant="ghost" onPress={textSignupCode} disabled={busy} accessibilityHint="We text your mobile a code to prove it’s yours" />
+              ) : (
+                <>
+                  <Field label="Code from the text message" value={smsCode} onChange={setSmsCode} placeholder="6 digits" keyboardType="number-pad" autoComplete="one-time-code" />
+                  <View style={st.linkRow}>
+                    <Button label={busy ? 'Checking…' : 'Verify mobile'} onPress={verifySignupCode} disabled={busy} />
+                    <Text style={st.link} accessibilityRole="button" onPress={textSignupCode}>Resend code</Text>
+                  </View>
+                </>
+              )}
+            </View>
+          )}
           {mode === 'up' && (
             <>
               <DateField label="Date of birth" value={dob} onChange={setDob} />
@@ -321,7 +375,7 @@ export default function AuthScreen() {
           <FormError message={error} />
 
           {/* Primary action + flow switches */}
-          {mode === 'up' && <Button label={busy ? 'Please wait…' : 'Create account'} onPress={submitPassword} disabled={busy} />}
+          {mode === 'up' && <Button label={busy ? 'Please wait…' : 'Create account'} onPress={submitPassword} disabled={busy || !canSms} />}
 
           {mode === 'in' && flow === 'password' && (
             <>

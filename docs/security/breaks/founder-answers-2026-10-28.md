@@ -28,7 +28,7 @@
 | PC-02 | **A direct sign-up call says `country: 'IN'` with no phone.** | **Fixed:** no phone means no proven country, so the guardian confirms (test). The app always sends a mobile, so only a hand-made call takes this path. |
 | PC-03 | **A +91 number on a device set to the UK.** | **Fixed:** the stricter route, and the account is stored as GB (test). The app now sends the number's country, so an honest phone never disagrees with itself. |
 | PC-04 | **A US (+1) under-13 sets the device to India.** | **Fixed:** refused whatever the device says (test). |
-| PC-05 | **A child types an Indian number that isn't theirs** and never verifies it. | **Open.** An unverified number is a claim, not proof. Closing this needs phone verification to be required at sign-up (`TESTING_ALLOW_UNVERIFIED` is the founder's switch). Parental proof (CL-03, next) will also cover every under-18. |
+| PC-05 | **A child types an Indian number that isn't theirs** and never verifies it. | **Fixed** 2026-10-29: SMS verification is required at sign-up (`signup-sms.md`), so the number deciding the country is proven. Parental proof (CL-03) will also cover every under-18. |
 | PC-06 | **An Indian child verifies a +44 number.** | **Fixed:** the account becomes GB and waits for a guardian; the change is logged (test). |
 | PC-07 | **A child verifies a +91 number to loosen a waiting account.** | **Holds:** the route never gets looser; a confirmed or withdrawn account is kept as it is (test). |
 | PC-08 | **The child can call the "record my country" function themselves.** | **Holds:** only the server can call it, after the SMS check (test). |
