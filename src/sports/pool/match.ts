@@ -374,12 +374,17 @@ function withCredit(base: PoolMatch, next: PoolMatch, a: unknown, p: Record<stri
   const at = cnt(p.at);
   if (at) e.at = at;
   const cur = r1 ? r1.n : r0.n;
-  let feed = [...(trusted ? base.feed! : feedOf(base)).filter((x) => x.n >= cur - FEED_RACKS), e];
-  const mineN = feed.filter((x) => x.n === e.n).length;
-  if (mineN > FEED_PER_RACK) {
-    const i = feed.findIndex((x) => x.n === e.n);
-    feed = [...feed.slice(0, i), ...feed.slice(i + 1)];
+  const kept = [...(trusted ? base.feed! : feedOf(base)).filter((x) => x.n >= cur - FEED_RACKS), e];
+  // at most FEED_PER_RACK lines per rack, the newest kept (break #27: a stored
+  // feed may already hold more than that for one rack)
+  const perRack = new Map<number, number>();
+  const feed: FeedEntry[] = [];
+  for (let i = kept.length - 1; i >= 0; i--) {
+    const k = (perRack.get(kept[i].n) ?? 0) + 1;
+    perRack.set(kept[i].n, k);
+    if (k <= FEED_PER_RACK) feed.push(kept[i]);
   }
+  feed.reverse();
 
   const out: PoolMatch = { ...next, perSide, cr, feed };
   const rat = trusted ? base.rat! : rackTimes(base);

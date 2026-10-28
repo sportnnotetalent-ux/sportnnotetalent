@@ -796,6 +796,42 @@ describe('breaks · hostile and old snapshots (#24, #25, #28)', () => {
     assert.equal(fixed.rack!.breaker, 'away');
     assert.deepEqual(M.feedOf(fixed).map((e) => [e.t, e.s]), [['LAG', 'home'], ['LAG', 'away']]);
   });
+  test('#12 — at most 4 player ids per side: the rest count as unattributed', () => {
+    let s = M.poolInit({ game: 'nine', raceTo: 9, playersPerSide: 2 });
+    s = M.poolReducer(s, C.lagAction(s, 'home'));
+    s = M.poolReducer(s, C.breakAction(s, { pots: [] }, { pid: 'h0' }));
+    for (let i = 1; i <= 12; i++) {
+      s = M.poolReducer(s, C.safetyAction(s, [], { pid: `${s.rack!.shooter![0]}${i}` }));
+    }
+    const cr = M.creditOf(s);
+    assert.ok(cr.ids.home.length <= M.MAX_IDS_PER_SIDE && cr.ids.away.length <= M.MAX_IDS_PER_SIDE);
+    assert.ok(cr.unk.home + cr.unk.away > 0);
+    assert.ok(cr.by.length <= 2 * M.MAX_IDS_PER_SIDE);
+  });
+  test('#20 / #21 — a race lowered then raised back replays to exactly the same match', () => {
+    const { s, log } = nineMatch();
+    const lowered = replay({ game: 'nine', raceTo: 1 }, log);
+    assert.equal(lowered.ended, true, 'race to 1: rack 1 ends it');
+    assert.match(C.formatNote(lowered) ?? '', /race to 1.*race to 2/);
+    assert.deepEqual(replay(NINE2, log), s, 'raised back: identical');
+  });
+  test('#22 — players per side changed on a replay: no throw, totals stay valid', () => {
+    const { log } = nineMatch();
+    const d = replay({ ...NINE2, playersPerSide: 2 }, log);
+    const t = POOL_CORE.statTotals!(d, ctx(['h1', 'h2'], ['a1', 'a2']));
+    for (const e of Object.values(t)) for (const v of Object.values(e.stats)) assert.ok(Number.isFinite(v) && v >= 0);
+    assert.equal(t.h2.stats.shotsPlayed, 0, 'every shot carried h1');
+  });
+  test('#27 — a huge stored feed is read in part only', () => {
+    let s = M.poolInit({ game: 'nine' });
+    s = M.poolReducer(s, C.lagAction(s, 'home'));
+    const big = { ...s, feed: Array.from({ length: 200_000 }, () => ({ n: 1, t: 'MISS', s: 'home' })) } as S;
+    const t0 = performance.now();
+    assert.ok(M.feedOf(big).length <= (M.FEED_RACKS + 1) * M.FEED_PER_RACK);
+    const next = M.poolReducer(big, C.breakAction(big, { pots: [] }));
+    assert.ok(M.feedOf(next).length <= M.FEED_PER_RACK);
+    assert.ok(performance.now() - t0 < 200);
+  });
   test('#28 — an engine-only snapshot (no plugin parts) reads as an empty credit / feed', async () => {
     const engine = await import('../src/sports/pool/engine.ts');
     let e = engine.createInitialState({ game: 'nine', raceTo: 1 });
