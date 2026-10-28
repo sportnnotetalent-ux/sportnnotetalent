@@ -13,6 +13,46 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-28 — Security Wave 2a: the consent model (server side)
+Founder **1A**: a relationship with a child counts only when the other side agrees.
+- Design: `docs/security/wave2-consent-design.md`.
+- Migration: `20261028140000_security_wave2`.
+- Fixes: DB-01, DB-04, DB-05, DB-14, EF-02, EF-03 and SL-19.
+
+**The rule.** A link between a player and a team, club, community or field event gives the circle only when the **player's side** agreed: their own account, their linked parent, or (for an unclaimed player) the person who added them. The circle covers full name, card, an unclaimed player's number, follows, pushes and admin edits.
+- A team counts in a tournament only once the **team's side** agreed (`confirmed`).
+- Links nobody agreed to still exist (rosters, scoring), but reveal no child and grant nothing. Adults are public, as before.
+
+**How:**
+- `member_consents`: no client access.
+- `member_consented()`: true for a record, or by construction (the group's creator speaks for the player; a school's own staff added the student; an accepted join request or invite).
+- Triggers record agreement whenever the person acting is the player's side: on rosters, captains, admins, team members, roles, clubs, communities and field entries, plus an accepted `org_requests`.
+- Every existing link is backfilled as `existing`. On live, read-only: 0 cross-creator roster links involving minors.
+
+**Changed functions:**
+- `player_circle_of` (each member source filtered; House teams need their school; only confirmed tournament entries; friendlies add no other team);
+- `can_admin_player` (confirmed entries only; the co-host clause dropped);
+- `can_edit_team_roster` and `my_roster_editable_team_ids` (squad rights only in a tournament the team agreed to);
+- `guard_team_write` (no captain-slot filling by non-managers);
+- `push_allowed_targets` (minors only inside the agreed circle);
+- `players_view` (an unclaimed player's number only via an agreed roster);
+- `org_member_dobs` and `org_confirm_dobs` (agreed members only).
+
+**Tournament entries:** an organiser adding a team they don't manage gets `invited`. Approving a team that asked (`pending`) confirms it. The app's bulk upsert never downgrades a confirmed team.
+
+**Tests:**
+- `tests/db-wave2.test.mts`: 15. 9 are red without the migration, and the 6 legitimate cases pass both ways.
+- `tests/sim-security-wave2.test.mts`: 200 strangers × 10 self-made link types. All were blocked from seeing or pushing to the child, and all 920 legitimate views were kept. It fails without the migration.
+
+**Break list:** `docs/security/breaks/security-wave2.md`. One real bug, found and fixed: the upsert downgrade (W2B-09). Side effects accepted until Wave 2b:
+- friendly opponents show as initials;
+- a child created by another coach shows as initials until their side agrees;
+- squad rights and captain slots no longer come from friendlies.
+
+Full suite: 5,197 pass, 0 fail.
+
+**Founder:** run `20261028140000_security_wave2.sql`. It's server-only, with no app release or edge function needed.
+
 ### 2026-10-28 — Release: student lists + security Wave 1 live
 - **Founder:** pushed both branches (`4ad2d10`), then ran `20261028100000_student_lists.sql` and `20261028120000_security_wave1.sql`.
 - **Checked read-only on live:**

@@ -48,7 +48,17 @@ Findings that come from this: DB-01, DB-04, DB-05, DB-14, EF-02, EF-03, SL-19.
 9. **Developer screen live (CL-13):** the Results lab is hidden outside demo and development builds.
 10. **Unsafe links (CL-11 / CL-12):** links opened from user data allow only `https:` and our own app links (no `intent:`, `upi:` or `javascript:`).
 
-## Wave 2: the consent model (needs the founder's decision; changes some flows)
+## Wave 2: the consent model — 2a (server) BUILT 2026-10-28
+**Founder decision:** 1A.
+**Built:** migration `20261028140000_security_wave2`.
+**Design:** `../wave2-consent-design.md`.
+**Tests:** `tests/db-wave2.test.mts` and `tests/sim-security-wave2.test.mts`.
+**The change's own break list:** `../breaks/security-wave2.md`.
+**Wave 2b (the app side) is next:**
+- "Requests to confirm" for a player's side;
+- friendly acceptance;
+- W1-2b, verify your number to link.
+
 A relationship counts (circle, roster rights, admin rights, pushes) only when the other side confirmed it:
 - adding someone else's player to a team, club, community or field event sends a request. The player accepts, or their parent does for under-18s;
 - a friendly against another team, and entering someone else's team in a tournament, need that team's manager to accept;
