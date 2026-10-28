@@ -22,6 +22,7 @@ import { analyticsChoice, analyticsState, setAnalyticsChoice, subscribeAnalytics
 import { analyticsNeedsConsent, privacyCountry } from '../core/privacyRegion';
 import { exportMyData, exportSummary, getMyPrivacyStatus, requestGuardianConsent, saveExport, type DataExport, type PrivacyStatus } from '../data/privacy';
 import type { RootStackParamList } from '../navigation/types';
+import { DeclinedRequestsCard } from '../components/DeclinedRequestsCard';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 const day = (iso?: string | null) => (iso ? new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : '');
@@ -116,6 +117,9 @@ export default function PrivacyScreen() {
             </Text>
           </Card>
         )}
+
+        {/* Security Wave 3F: "Not us" answers, with Undo */}
+        <DeclinedRequestsCard />
 
         <Card style={st.gap}>
           <Text style={textStyles.h3}>Download my data</Text>

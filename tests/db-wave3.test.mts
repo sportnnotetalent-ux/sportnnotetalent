@@ -435,3 +435,48 @@ describe('CL-17 — reset is one step, with the same rules; Player of the Match 
     assert.match(await errOf(() => db.as(host.uid, `update matches set potm = $2 where id = $1`, [m.id, JSON.stringify({ playerId: host.player, name: 'X', by: host.player })])) ?? '', /once/i);
   });
 });
+
+/* ------------------------- 3F — Wave 2b follow-ups ------------------------- */
+
+describe('3F — waiting to confirm, declined requests, reporting a request', () => {
+  let coach: Who, other: Who, kid: string, team: string;
+  before(async () => {
+    coach = await person('Follow Coach');
+    other = await person('Follow Other');
+    const [k] = await db.as<{ id: string }>(coach.uid, `insert into players (full_name, dob) values ('Follow Kid', '2014-01-01') returning id`);
+    kid = k.id;
+    const [t] = await db.as<{ id: string }>(other.uid, `insert into teams (name, short_name, sport, roster) values ('Other XI', 'O', 'football', $1) returning id`, [JSON.stringify([kid, other.player])]);
+    team = t.id;
+  });
+  test('the team\'s managers see who is waiting to confirm; others don\'t', async () => {
+    const [w] = await db.as<{ ids: string[] }>(other.uid, `select team_waiting_player_ids($1) as ids`, [team]);
+    assert.deepEqual(w.ids, [kid]);
+    const stranger = await person('Follow Stranger');
+    assert.match(await errOf(() => db.as(stranger.uid, `select team_waiting_player_ids($1)`, [team])) ?? '', /manager/i);
+  });
+  test('"Not us" is listed under declined requests and can be undone; re-adding then asks again', async () => {
+    await db.as(coach.uid, `select answer_link('team', $1, $2, false)`, [team, kid]);
+    const d = await db.as<{ group_name: string; player_name: string }>(coach.uid, `select * from my_declined_links()`);
+    assert.deepEqual(d.map((x) => [x.group_name, x.player_name]), [['Other XI', 'Follow Kid']]);
+    assert.match(await errOf(() => db.as(other.uid, `select undo_decline('team', $1, $2)`, [team, kid])) ?? '', /only/i);
+    await db.as(coach.uid, `select undo_decline('team', $1, $2)`, [team, kid]);
+    assert.deepEqual(await db.as(coach.uid, `select * from my_declined_links()`), []);
+    await db.as(other.uid, `update teams set roster = $2 where id = $1`, [team, JSON.stringify([kid, other.player])]);
+    assert.equal((await db.as(coach.uid, `select * from my_pending_links()`)).length, 1);
+  });
+  test('reporting a request says "Not us" and tells support; only the player\'s side can report; only support reads reports', async () => {
+    const stranger = await person('Report Stranger');
+    assert.match(await errOf(() => db.as(stranger.uid, `select report_link('team', $1, $2, 'spam')`, [team, kid])) ?? '', /only/i);
+    await db.as(coach.uid, `select report_link('team', $1, $2, 'A stranger keeps adding my player')`, [team, kid]);
+    assert.equal((await db.as(coach.uid, `select * from my_pending_links()`)).length, 0);
+    assert.equal((await db.as(coach.uid, `select * from my_declined_links()`)).length, 1);
+    assert.match(await errOf(() => db.as(coach.uid, `select * from support_link_reports()`)) ?? '', /support/i);
+    assert.ok(await errOf(() => db.as(coach.uid, `select * from link_reports`)), 'the table is closed');
+    const sup = await db.signUp({ name: 'Support Person', dob: '1980-01-01' });
+    await db.sql(`update profiles set role = 'support' where id = $1`, [sup]);
+    const rows = await db.as<{ id: string; group_name: string; reason: string; creator_reports: number }>(sup, `select * from support_link_reports()`);
+    assert.deepEqual(rows.map((r) => [r.group_name, r.reason, r.creator_reports]), [['Other XI', 'A stranger keeps adding my player', 1]]);
+    await db.as(sup, `select support_handle_link_report($1)`, [rows[0].id]);
+    assert.equal((await db.as(sup, `select * from support_link_reports()`)).length, 0);
+  });
+});

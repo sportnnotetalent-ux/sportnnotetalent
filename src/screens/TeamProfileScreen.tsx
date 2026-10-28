@@ -19,6 +19,7 @@ import { useAuth } from '../core/auth';
 import { canScoreByRole } from '../core/roles';
 import { useTeamSummary, useMatches, usePlayers, useFollow, useTeamPermission } from '../data/hooks';
 import { getRoster, getMatchStatLines, getMatchSquads, getTournaments } from '../data/repos';
+import { getWaitingPlayerIds } from '../data/requestsStore';
 import { computeTeamStats, h2hLastText, resultFor, type Result } from '../data/teamStats';
 import { matchLineFor } from '../sports/matchLine';
 import { SPORT_AWARDS, statLabel } from '../data/ratings';
@@ -66,6 +67,16 @@ export default function TeamProfileScreen() {
   }, []);
   const scrollRef = useRef<ScrollView>(null);
   const [statsY, setStatsY] = useState(0);
+
+  // Security Wave 3F: the team's managers see whose side hasn't confirmed yet
+  // (those players show as initials). Others get nothing.
+  const [waiting, setWaiting] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    if (!team) return;
+    let on = true;
+    getWaitingPlayerIds(team.id).then((ids) => on && setWaiting(new Set(ids))).catch(() => {});
+    return () => { on = false; };
+  }, [team?.id]);
 
   // The team's real squad (the same roster the match screens use).
   useEffect(() => {
@@ -413,6 +424,7 @@ export default function TeamProfileScreen() {
                 <View style={{ flex: 1, gap: 4 }}>
                   <Text style={textStyles.body}>{p.fullName}{p.jerseyNo ? ` · #${p.jerseyNo}` : ''}{p.invited ? '  ⏳' : ''}</Text>
                   <Text style={textStyles.muted}>{p.invited ? 'Invited · hasn’t joined yet' : p.sports.map((s) => getSportMeta(s).icon).join(' ')}</Text>
+                  {waiting.has(p.id) ? <Text style={textStyles.muted}>⏳ Waiting for their side to confirm</Text> : null}
                   {p.invited && p.phone ? <RemindInstall playerId={p.id} name={p.fullName} phone={p.phone} teamName={team.name} /> : null}
                 </View>
               </Card>

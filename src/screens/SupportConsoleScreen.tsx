@@ -27,6 +27,7 @@ import { getOrgVerificationQueue, type OrgQueueItem } from '../data/orgVerificat
 import { claimItem, getSupportOverview, releaseDemoClaim, releaseItem, type QueueStat, type SupportOverview } from '../data/supportConsole';
 import { OrgReview, Submission } from './VerificationReviewScreen';
 import type { RootStackParamList } from '../navigation/types';
+import { LinkReportsCard } from '../components/LinkReportsCard';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 const REFRESH_MS = 60_000;
@@ -237,6 +238,8 @@ export default function SupportConsoleScreen() {
           </View>
         ) : rows}
 
+        {/* Security Wave 3F: requests a player's side reported */}
+        <LinkReportsCard />
         {ov?.week ? (
           <Card style={st.card}>
             <Text style={textStyles.h3}>This week (7 days)</Text>

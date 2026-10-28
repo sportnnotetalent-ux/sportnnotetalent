@@ -160,3 +160,48 @@ export function maskPhone(raw: string): string {
 export function showClaimCard(a: { signUpPhone: string | null; profilePhone: string | null; smsAvailable: boolean }): boolean {
   return a.smsAvailable && !!phoneKey(a.signUpPhone ?? '') && !phoneKey(a.profilePhone ?? '');
 }
+
+/* ---------------- Wave 3F: declined requests, reports ---------------- */
+
+export interface DeclinedLink { kind: LinkKind; groupId: string; groupName: string; playerId: string; playerName: string; at?: string }
+
+export function toDeclinedLink(row: unknown): DeclinedLink | null {
+  const r = (row ?? {}) as Record<string, unknown>;
+  const kind = str(r.kind) as LinkKind;
+  if (!KINDS.includes(kind) || !str(r.group_id) || !str(r.player_id)) return null;
+  return {
+    kind, groupId: str(r.group_id), groupName: str(r.group_name) || `a ${NOUN[kind]}`,
+    playerId: str(r.player_id), playerName: str(r.player_name) || 'your player',
+    ...(str(r.at) ? { at: str(r.at) } : {}),
+  };
+}
+
+/** "Asha Rao — Shah U12 (team)". */
+export function declinedLine(d: DeclinedLink, isMe: boolean): string {
+  return `${isMe ? 'You' : d.playerName} — ${d.groupName} (${NOUN[d.kind]})`;
+}
+
+export function reportCopy(l: PendingLink, isMe: boolean): ConfirmCopy {
+  const who = isMe ? 'you' : l.playerName;
+  return {
+    title: 'Report this to SportnNote?',
+    message: `SportnNote support will look at who added ${who} to ${l.groupName}. It also counts as Not us: it takes ${who} off ${l.groupName}.`,
+    yesLabel: 'Yes, report it',
+    noLabel: 'No, go back',
+    tone: 'danger',
+  };
+}
+
+export interface LinkReport { id: string; kind: LinkKind; groupId: string; groupName: string; creatorName: string; creatorReports: number; reason: string; at?: string }
+
+export function toLinkReport(row: unknown): LinkReport | null {
+  const r = (row ?? {}) as Record<string, unknown>;
+  const kind = str(r.kind) as LinkKind;
+  if (!str(r.id) || !KINDS.includes(kind)) return null;
+  const n = Number(r.creator_reports);
+  return {
+    id: str(r.id), kind, groupId: str(r.group_id), groupName: str(r.group_name) || '(deleted)',
+    creatorName: str(r.creator_name) || 'Someone', creatorReports: Number.isFinite(n) ? n : 0,
+    reason: str(r.reason), ...(str(r.at) ? { at: str(r.at) } : {}),
+  };
+}

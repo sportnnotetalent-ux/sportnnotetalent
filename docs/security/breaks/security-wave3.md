@@ -128,3 +128,14 @@ The changes: migration `20261028210000_security_wave3e` (server) plus the app. T
 | W3B-40 | **`allowBackup` only takes effect with a native build.** | **Open:** it ships with the 1.1.0 APK. |
 | W3B-41 | **Native photos rely on the picker re-encoding them** (quality 0.6). | **Open:** check on a device that EXIF is gone, during the APK test. |
 | W3B-42 | **Accounts that sign in by phone.** Re-authentication relies on `last_sign_in_at`, which the phone sign-in must update. | **Open:** check on live after deploy. |
+
+## 3F: Wave 2b follow-ups (founder 2026-10-28; push alerts left out)
+The change: migration `20261028220000_security_wave3f`, plus `DeclinedRequestsCard` (Privacy), the squad note (team profile), Report on a request (Home) and `LinkReportsCard` (support console).
+
+| # | Attempt, or what could break | Status |
+|---|---|---|
+| W3B-43 | **Learn whose side hasn't confirmed, as a stranger.** | Holds. Only the team's managers can ask (test). |
+| W3B-44 | **Undo someone else's "Not us", or report for someone else's child.** | Holds. Only the player's side can (tests). |
+| W3B-45 | **Flood support with reports.** | Holds. 20 reports a day per account. |
+| W3B-46 | **Read the reports.** | Holds. The table is closed; support reads them through `support_link_reports` (test). |
+| W3B-47 | **"Undo" brings the player back.** | By design, no: it only lets the group ask again. The card says so. |

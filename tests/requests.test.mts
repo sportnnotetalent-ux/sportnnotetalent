@@ -97,3 +97,25 @@ describe('errors and the link-by-phone card', () => {
     assert.equal(showClaimCard({ signUpPhone: '12', profilePhone: null, smsAvailable: true }), false, 'not a real number');
   });
 });
+
+describe('Wave 3F — declined requests and reports', async () => {
+  const { toDeclinedLink, declinedLine, reportCopy, toLinkReport } = await import('../src/data/requests.ts');
+  test('a declined row reads back, and says what it was', () => {
+    const d = toDeclinedLink({ kind: 'team', group_id: 'g', group_name: 'Shah U12', player_id: 'p', player_name: 'Asha Rao', at: '2026-10-28T10:00:00Z' })!;
+    assert.equal(declinedLine(d, false), 'Asha Rao — Shah U12 (team)');
+    assert.equal(declinedLine(d, true), 'You — Shah U12 (team)');
+    assert.equal(toDeclinedLink({ kind: 'nope', group_id: 'g', player_id: 'p' }), null);
+  });
+  test('reporting asks first, says it also counts as Not us, and names nobody\'s gender', () => {
+    const c = reportCopy(link(), false);
+    assert.match(c.title, /Report/);
+    assert.match(c.message, /support/);
+    assert.match(c.message, /off Shah U12/);
+    assert.doesNotMatch(c.message, /\b(he|she|him|her|his)\b/i);
+  });
+  test('a support report row reads back', () => {
+    const r = toLinkReport({ id: 'r1', kind: 'club', group_id: 'g', group_name: 'X FC', creator_name: 'Coach Z', creator_reports: '3', reason: null, at: '2026-10-28T10:00:00Z' })!;
+    assert.deepEqual([r.groupName, r.creatorName, r.creatorReports, r.reason], ['X FC', 'Coach Z', 3, '']);
+    assert.equal(toLinkReport({ kind: 'club' }), null);
+  });
+});

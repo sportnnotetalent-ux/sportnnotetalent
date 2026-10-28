@@ -12,7 +12,10 @@ import { takeSms } from '../core/smsBudget';
 import { setCurrentPlayerId } from '../core/notifications';
 import { myPlayerIdMemo } from './myPlayerIdMemo';
 import { getMyPlayerId } from './repos';
-import { answerError, toPendingFriendly, toPendingLink, type ClaimOutcome, type PendingFriendly, type PendingLink } from './requests';
+import {
+  answerError, toDeclinedLink, toLinkReport, toPendingFriendly, toPendingLink,
+  type ClaimOutcome, type DeclinedLink, type LinkReport, type PendingFriendly, type PendingLink,
+} from './requests';
 
 const live = () => isSupabaseConfigured && !!supabase;
 
@@ -80,4 +83,47 @@ export async function confirmPhoneClaim(code: string, profileId: string): Promis
     void getMyPlayerId(profileId).then(setCurrentPlayerId).catch(() => {});
   }
   return outcome;
+}
+
+/* ---------------- Wave 3F: waiting, declined, reports ---------------- */
+
+/** A team's managers: the players whose side hasn't confirmed yet (else []). */
+export async function getWaitingPlayerIds(teamId: string): Promise<string[]> {
+  if (!live()) return [];
+  const { data, error } = await supabase!.rpc('team_waiting_player_ids', { p_team: teamId });
+  return error || !Array.isArray(data) ? [] : (data as string[]);
+}
+
+export async function getDeclinedLinks(): Promise<DeclinedLink[]> {
+  if (!live()) return [];
+  const { data, error } = await supabase!.rpc('my_declined_links');
+  if (error || !Array.isArray(data)) return [];
+  return data.map(toDeclinedLink).filter((x): x is DeclinedLink => !!x);
+}
+
+export async function undoDecline(d: DeclinedLink): Promise<void> {
+  if (!live()) return;
+  const { error } = await supabase!.rpc('undo_decline', { p_kind: d.kind, p_group: d.groupId, p_player: d.playerId });
+  if (error) throw new Error(answerError(error));
+}
+
+/** Report a request to support (it also counts as "Not us"). */
+export async function reportLink(l: PendingLink, reason = ''): Promise<void> {
+  if (!live()) return;
+  const { error } = await supabase!.rpc('report_link', { p_kind: l.kind, p_group: l.groupId, p_player: l.playerId, p_reason: reason });
+  if (error) throw new Error(/too many/i.test(error.message) ? error.message : answerError(error));
+}
+
+/** Support console: open reports. */
+export async function getLinkReports(): Promise<LinkReport[]> {
+  if (!live()) return [];
+  const { data, error } = await supabase!.rpc('support_link_reports');
+  if (error || !Array.isArray(data)) return [];
+  return data.map(toLinkReport).filter((x): x is LinkReport => !!x);
+}
+
+export async function handleLinkReport(id: string): Promise<void> {
+  if (!live()) return;
+  const { error } = await supabase!.rpc('support_handle_link_report', { p_id: id });
+  if (error) throw new Error(error.message);
 }

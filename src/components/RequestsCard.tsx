@@ -13,9 +13,9 @@ import { useAuth } from '../core/auth';
 import { Button, Card, textStyles } from './ui';
 import { askConfirm } from './ConfirmSheet';
 import { getMyPlayerId } from '../data/repos';
-import { answerFriendly, answerLink, getPendingFriendlies, getPendingLinks } from '../data/requestsStore';
+import { answerFriendly, answerLink, getPendingFriendlies, getPendingLinks, reportLink } from '../data/requestsStore';
 import {
-  FRIENDLY_CONSEQUENCE, declineFriendlyCopy, friendlyTitle, linkConsequence, linkTitle, notUsCopy, requestsHeading,
+  FRIENDLY_CONSEQUENCE, declineFriendlyCopy, friendlyTitle, linkConsequence, linkTitle, notUsCopy, reportCopy, requestsHeading,
   type PendingFriendly, type PendingLink,
 } from '../data/requests';
 
@@ -58,13 +58,19 @@ export function RequestsCard() {
     const key = linkKey(l);
     await run(key, () => answerLink(l, accept), () => setLinks((xs) => xs.filter((x) => linkKey(x) !== key)));
   };
+  // Wave 3F: report a request to support (it also counts as "Not us")
+  const onReport = async (l: PendingLink) => {
+    if (!(await askConfirm(reportCopy(l, l.playerId === me)))) return;
+    const key = linkKey(l);
+    await run(key, () => reportLink(l), () => setLinks((xs) => xs.filter((x) => linkKey(x) !== key)));
+  };
   const onFriendly = async (f: PendingFriendly, accept: boolean) => {
     if (!accept && !(await askConfirm(declineFriendlyCopy(f)))) return;
     const key = friendlyKey(f);
     await run(key, () => answerFriendly(f, accept), () => setFriendlies((xs) => xs.filter((x) => friendlyKey(x) !== key)));
   };
 
-  type Row = { key: string; title: string; note: string; yes: string; no: string; onYes: () => void; onNo: () => void };
+  type Row = { key: string; title: string; note: string; yes: string; no: string; onYes: () => void; onNo: () => void; onReport?: () => void };
   const rows: Row[] = [
     ...friendlies.map((f): Row => ({
       key: friendlyKey(f), title: friendlyTitle(f), note: FRIENDLY_CONSEQUENCE, yes: 'Accept', no: 'Decline',
@@ -72,7 +78,7 @@ export function RequestsCard() {
     })),
     ...links.map((l): Row => ({
       key: linkKey(l), title: linkTitle(l, l.playerId === me), note: linkConsequence(l, l.playerId === me), yes: 'Confirm', no: 'Not us',
-      onYes: () => void onLink(l, true), onNo: () => void onLink(l, false),
+      onYes: () => void onLink(l, true), onNo: () => void onLink(l, false), onReport: () => void onReport(l),
     })),
   ];
   const shown = all ? rows : rows.slice(0, SHOWN);
@@ -89,6 +95,11 @@ export function RequestsCard() {
             <Button label={r.yes} onPress={r.onYes} disabled={busy !== null} style={st.btn} />
             <Button label={r.no} variant="ghost" onPress={r.onNo} disabled={busy !== null} style={st.btn} />
           </View>
+          {r.onReport ? (
+            <Text style={st.report} accessibilityRole="button" accessibilityLabel={`Report: ${r.title}`} onPress={busy === null ? r.onReport : undefined}>
+              Report this to SportnNote
+            </Text>
+          ) : null}
         </View>
       ))}
       {rows.length > SHOWN && (
@@ -104,4 +115,5 @@ const st = StyleSheet.create({
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing(2), marginTop: theme.spacing(1) },
   btn: { flexGrow: 1, minWidth: 120 },
   error: { color: theme.colors.danger, fontSize: theme.font.small },
+  report: { color: theme.colors.textMuted, fontSize: theme.font.small, textDecorationLine: 'underline', alignSelf: 'flex-start', paddingVertical: theme.spacing(1) },
 });
