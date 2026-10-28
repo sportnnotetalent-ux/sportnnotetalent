@@ -171,8 +171,8 @@ const CSS = `
 @page { size: A4 portrait; margin: 14mm; }
 * { box-sizing: border-box; }
 html, body { margin: 0; background: #fff; color: #1b1f24; font: 10.5pt/1.4 -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
-.bar { position: sticky; top: 0; display: flex; gap: 12px; align-items: center; padding: 10px 16px; background: #0E1116; color: #fff; }
-.bar button { font: inherit; padding: 8px 14px; border-radius: 8px; border: 0; background: #3DDC97; color: #0E1116; font-weight: 700; cursor: pointer; }
+.bar { position: sticky; top: 0; display: flex; gap: 12px; align-items: center; padding: 10px 16px; background: #0D5A3F; color: #fff; }
+.bar button { font: inherit; padding: 8px 14px; border-radius: 8px; border: 0; background: #C6EE3E; color: #14181D; font-weight: 700; cursor: pointer; }
 @media print { .bar { display: none; } }
 .page { max-width: 182mm; margin: 0 auto; padding: 8px 0; }
 .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; border-bottom: 3px double #8a6d1d; padding-bottom: 10px; }

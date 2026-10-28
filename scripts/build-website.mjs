@@ -27,7 +27,7 @@ const legal = await import(join(ROOT, 'src/data/legal.ts'));
 const SPORTS = [
   ['🏏', 'Cricket'], ['⚽', 'Football'], ['🏀', 'Basketball'], ['🏐', 'Volleyball'], ['🤼', 'Kabaddi'],
   ['🎾', 'Tennis'], ['🏸', 'Badminton'], ['🏓', 'Table tennis'], ['⚫', 'Squash'], ['🟡', 'Padel'],
-  ['🥒', 'Pickleball'], ['⛳', 'Golf'], ['♟️', 'Chess'], ['🎱', 'Carrom'], ['🏃', 'Athletics'], ['🏑', 'Hockey'], ['🤾', 'Handball'], ['🏒', 'Ice hockey'], ['🥅', 'Netball'], ['🏊', 'Swimming'], ['🏋️', 'Weightlifting'], ['🎯', 'Shooting'], ['🏹', 'Archery'], ['🚣', 'Rowing'], ['🛶', 'Canoe sprint'], ['🚴', 'Cycling'], ['🏉', 'Rugby'], ['⚾', 'Baseball & softball'], ['🏈', 'American football'], ['🏉', 'Rugby league'],
+  ['🥒', 'Pickleball'], ['⛳', 'Golf'], ['♟️', 'Chess'], ['🎱', 'Carrom'], ['🎱', 'Pool'], ['🔴', 'Snooker'], ['⚪', 'Billiards'], ['🏃', 'Athletics'], ['🏑', 'Hockey'], ['🤾', 'Handball'], ['🏒', 'Ice hockey'], ['🥅', 'Netball'], ['🏊', 'Swimming'], ['🏋️', 'Weightlifting'], ['🎯', 'Shooting'], ['🏹', 'Archery'], ['🚣', 'Rowing'], ['🛶', 'Canoe sprint'], ['🚴', 'Cycling'], ['🏉', 'Rugby'], ['⚾', 'Baseball & softball'], ['🏈', 'American football'], ['🏉', 'Rugby league'],
 ];
 
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -63,21 +63,21 @@ function page({ title, description, path, body, ogType = 'website', head = '', n
 <title>${esc(title)}</title>
 <meta name="description" content="${esc(description)}">
 <link rel="canonical" href="${url}">${noindex ? '\n<meta name="robots" content="noindex">' : ''}
-<meta name="theme-color" content="#0E1116">
+<meta name="theme-color" content="#0D5A3F">
 <meta property="og:type" content="${ogType}">
 <meta property="og:site_name" content="SportnNote">
 <meta property="og:title" content="${esc(title)}">
 <meta property="og:description" content="${esc(description)}">
 <meta property="og:url" content="${url}">
 <meta property="og:image" content="${cfg.siteUrl}/icon.png">
-<link rel="icon" type="image/png" sizes="48x48" href="/favicon-v2.png">
+<link rel="icon" type="image/png" sizes="48x48" href="/favicon-v3.png">
 <link rel="apple-touch-icon" href="/icon.png">
 <link rel="stylesheet" href="/styles.css">${head}
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
 <header class="top"><div class="wrap">
-  <a class="brand" href="/"><img src="/icon.png" alt="" width="30" height="30">SportnNote</a>
+  <a class="brand" href="/"><img src="/icon.png" alt="" width="30" height="30"><span>Sport<span class="accent">nNote</span></span></a>
   <nav>
     <a class="hide-sm" href="/#features">Features</a>
     <a${path.startsWith('/guides/') ? ' aria-current="page"' : ''} href="/guides/">Guides</a>
@@ -672,7 +672,7 @@ for (const f of ['700Bold/BarlowCondensed_700Bold.ttf', '800ExtraBold_Italic/Bar
 copyFileSync(join(ROOT, 'assets/icon.png'), join(OUT, 'icon.png'));
 copyFileSync(join(ROOT, 'assets/favicon.png'), join(OUT, 'favicon.png'));
 // Versioned copy (browsers cache favicons by URL) + /favicon.ico for browsers that ask for it.
-copyFileSync(join(ROOT, 'assets/favicon.png'), join(OUT, 'favicon-v2.png'));
+copyFileSync(join(ROOT, 'assets/favicon.png'), join(OUT, 'favicon-v3.png'));
 copyFileSync(join(ROOT, 'assets/favicon.png'), join(OUT, 'favicon.ico'));
 // Android App Links (src/core/androidAppLinks.ts): which APK may open
 // app.sportnnote.in share links. Served here and, through a Worker route, on

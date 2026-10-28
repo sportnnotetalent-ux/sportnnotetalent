@@ -491,7 +491,7 @@ const st = StyleSheet.create({
   safe: { flex: 1, backgroundColor: theme.colors.bg },
   content: { padding: theme.spacing(5), gap: theme.spacing(5), flexGrow: 1, justifyContent: 'center' },
   brand: { alignItems: 'center', gap: theme.spacing(1) },
-  logo: { color: theme.colors.text, fontSize: 34, fontWeight: '900', letterSpacing: -0.5 },
+  logo: { color: theme.colors.text, fontSize: 40, fontFamily: theme.fonts.display, letterSpacing: 0.3 },
   logoAccent: { color: theme.colors.primary },
   tagline: { textAlign: 'center' },
   formCard: { gap: theme.spacing(4) },

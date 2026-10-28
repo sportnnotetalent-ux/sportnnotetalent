@@ -149,8 +149,8 @@ const CSS = `
 @page { size: A4 landscape; margin: 0; }
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; background: #fff; color: #1b1f24; font-family: Georgia, "Times New Roman", serif; }
-.bar { position: sticky; top: 0; display: flex; gap: 12px; align-items: center; padding: 10px 16px; background: #0E1116; color: #fff; font: 14px -apple-system, Roboto, Arial, sans-serif; }
-.bar button { font: inherit; padding: 8px 14px; border-radius: 8px; border: 0; background: #3DDC97; color: #0E1116; font-weight: 700; cursor: pointer; }
+.bar { position: sticky; top: 0; display: flex; gap: 12px; align-items: center; padding: 10px 16px; background: #0D5A3F; color: #fff; font: 14px -apple-system, Roboto, Arial, sans-serif; }
+.bar button { font: inherit; padding: 8px 14px; border-radius: 8px; border: 0; background: #C6EE3E; color: #14181D; font-weight: 700; cursor: pointer; }
 @media print { .bar { display: none; } }
 .cert { width: 297mm; height: 210mm; padding: 12mm; page-break-after: always; break-after: page; }
 .cert:last-child { page-break-after: auto; break-after: auto; }

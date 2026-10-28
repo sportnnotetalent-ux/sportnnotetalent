@@ -1,6 +1,6 @@
 # Social brand kit
 
-Made 2026-10-23 from the S:N mark (`assets/brand/sportnnote-icon-square.svg`) for creating the @sportnnote handles (checklist: `docs/marketing/README.md` → "Up next"). The same profile picture goes on every platform.
+Made 2026-10-23 from the S:N mark for creating the @sportnnote handles (checklist: `docs/marketing/README.md` → "Up next"); **redrawn 2026-10-29 for the new design** — upload the new files to replace the old ones. The same profile picture goes on every platform.
 
 | File | Where it goes | Notes |
 |---|---|---|
@@ -11,4 +11,4 @@ Made 2026-10-23 from the S:N mark (`assets/brand/sportnnote-icon-square.svg`) fo
 | `facebook-cover-1640x624.png` | Facebook Page cover | Centred, so phones (which crop the sides) still show it all. |
 | `x-header-1500x500.png` | X header | Centred, clear of the profile picture at bottom left. |
 
-Colours: background `#0E1116`, green `#3DDC97`, amber `#FFB454`, white text. To regenerate, run the render script with `@resvg/resvg-js` (as in `scripts/build-icons.mjs`); the layouts are simple SVG.
+Colours (the app's design tokens): pitch green `#0D5A3F` behind the mark, hero green `#0A3A2B` behind the covers, lime `#C6EE3E` for the "S:" and "nNote", white for the "N", "Sport" and the tagline. The wordmark is Barlow Condensed ExtraBold Italic, like the app's headlines. Regenerate with `npm i --no-save @resvg/resvg-js@2.6.2 && node scripts/build-brand-kit.mjs` (the mark comes from `scripts/build-icons.mjs`; the sport count from the website's list).

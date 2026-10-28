@@ -368,8 +368,10 @@ const st = StyleSheet.create({
   quickRow: { flexDirection: 'row', gap: theme.spacing(2), marginTop: -theme.spacing(8) },
   header: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(2) },
   brand: { flex: 1, gap: theme.spacing(1) },
-  wordmark: { color: theme.colors.heroText, fontSize: 24, fontWeight: '900', letterSpacing: -0.5 },
-  wordmarkNarrow: { fontSize: 21 },
+  // The wordmark in the headline face, leaning like the logo (no fontWeight: Android
+  // would swap a custom family for the system font).
+  wordmark: { color: theme.colors.heroText, fontSize: 28, fontFamily: theme.fonts.display, letterSpacing: 0.2 },
+  wordmarkNarrow: { fontSize: 25 },
   wordmarkAccent: { color: theme.colors.lime },
   iconBtn: {
     width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center',

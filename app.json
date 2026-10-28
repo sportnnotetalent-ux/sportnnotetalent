@@ -19,7 +19,7 @@
     "android": {
       "package": "in.sportnnote.app",
       "adaptiveIcon": {
-        "backgroundColor": "#0E1116",
+        "backgroundColor": "#0D5A3F",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -132,15 +132,15 @@
       "output": "single",
       "name": "SportnNote",
       "shortName": "SportnNote",
-      "themeColor": "#0E1116",
-      "backgroundColor": "#0E1116"
+      "themeColor": "#0D5A3F",
+      "backgroundColor": "#0D5A3F"
     },
     "plugins": [
       [
         "expo-notifications",
         {
           "icon": "./assets/android-icon-monochrome.png",
-          "color": "#3DDC97"
+          "color": "#0D5A3F"
         }
       ],
       [

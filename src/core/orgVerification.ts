@@ -656,7 +656,7 @@ export function authorisationLetterHtml(p: { orgName: string; personName: string
   const noun = cfg.noun; const head = cfg.head;
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Authorisation letter — ${esc(p.orgName)}</title>
 <style>@page{size:A4 portrait;margin:20mm}body{font:12pt/1.6 Georgia,serif;color:#111;max-width:170mm;margin:0 auto;padding:12px}
-.bar{position:sticky;top:0;background:#0E1116;color:#fff;padding:10px 16px;font:14px -apple-system,Arial,sans-serif}.bar button{font:inherit;padding:6px 12px;border:0;border-radius:6px;background:#3DDC97;font-weight:700;cursor:pointer}
+.bar{position:sticky;top:0;background:#0D5A3F;color:#fff;padding:10px 16px;font:14px -apple-system,Arial,sans-serif}.bar button{font:inherit;padding:6px 12px;border:0;border-radius:6px;background:#C6EE3E;color:#14181D;font-weight:700;cursor:pointer}
 @media print{.bar{display:none}}.muted{color:#666;font-size:10pt}.line{border-bottom:1px solid #333;display:inline-block;min-width:60mm}</style></head><body>
 <div class="bar"><button onclick="window.print()">🖨 Print / Save as PDF</button> Print this on your ${esc(noun)}’s letterhead</div>
 <p class="muted">[Print on ${esc(noun)} letterhead]</p>
