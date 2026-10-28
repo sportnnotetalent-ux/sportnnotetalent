@@ -1,9 +1,12 @@
 # Pool (8-ball, 9-ball, 10-ball): engine design (v1)
 
-*Status: **engine stage built 2026-10-27, hardened 2026-10-28** (pure engine only: no plugin,
-no screens, no registration). One sport, `pool`, with a game option: 8-ball, 9-ball or
-10-ball. 98 unit tests + a seeded simulation (2,100 matches, ~260,000 events); 31 break
-points (8 found and fixed, 5 accepted).*
+*Status: **engine stage built 2026-10-27, hardened 2026-10-28; app plugin built 2026-10-28**
+(§9: scorer controls, scoreboard, Commentary and Stats tabs, statTotals, stat schema,
+records, undo label, box; the shared wiring is listed in §9 for the merge). One sport,
+`pool`, with a game option: 8-ball, 9-ball or 10-ball. Engine: 98 unit tests + a seeded
+simulation (2,100 matches, ~260,000 events); 31 break points (8 fixed, 5 accepted).
+Plugin: 65 unit / integration / contract tests + a seeded simulation (600 scorers);
+35 break points (8 fixed, 9 accepted) — `docs/security/breaks/pool-app.md`.*
 
 **Where things are:**
 - Engine: `src/sports/pool/engine.ts` (rules + state), `src/sports/pool/stats.ts` (per-side
@@ -109,8 +112,10 @@ An unknown kind is recorded as `other`; a ball in `off` with no kind is `offTabl
 ## 3. What the scorer taps (action vocabulary)
 
 Every action is a `ScoreAction` (`type`, `side`, `payload`). Payloads hold **ball numbers,
-enums and booleans only**: never a name, never a player id (the player credit rides on
-`attribution`, which the reducer ignores — `docs/privacy/ids-only-scoring.md`).
+enums and booleans** for the engine — never a name. The app plugin adds a few keys the
+engine ignores (§9): `pid` (who shot: a player **id**, never a name), `at` (the scorer's
+clock), and on a match's first event `game` / `race` / `sets`. No action carries an
+`attribution`: nothing is credited live (§9, "Who shot").
 
 | Action | side | payload | Taps | When |
 |---|---|---|---|---|
@@ -247,3 +252,97 @@ clamped to their range.
   replay will re-score the match (break #26).
 - Read stored snapshots only through this engine's readers (`summary`, `scoreLine`,
   `lineScore`, `result`, `poolStats`): they clean hostile values (break #25).
+
+## 9. The app plugin (built 2026-10-28)
+
+Files, all in `src/sports/pool/`. Every pure part is collected in `core.ts`, which `index.tsx`
+spreads (adding the screens) and the node tests drive.
+
+| File | What |
+|---|---|
+| `match.ts` | the plugin's match state: the engine state plus who shot, the game pin, the shot feed, rack times |
+| `controls.ts` | action builders, what the screen offers per state (`poolPanel`), plain words, confirmations, the tap guard, the scotch-doubles rotation |
+| `totals.ts` | `statTotals` (derived only) |
+| `stats.ts` | the stat schema |
+| `records.ts` | `poolMatchRecords` |
+| `undo.ts` | `poolUndoLabel` |
+| `feed.ts` / `compare.ts` / `box.ts` | Commentary feed, Stats panel + rack list, the box score source |
+| `core.ts` | the pure plugin object, `poolUnits` (standings), the live settings |
+| `index.tsx` | ScoringControls, the SetLineBoard scoreboard, the Commentary and Stats tabs |
+
+### The controls (what the scorer sees)
+
+- **Rack 1:** "Who breaks rack 1?" (the lag) — or "Rack result only" to score racks without shots.
+- **The break:** "{name} to break (alternate)"; ball chips for the balls that went in; ✓ Break /
+  Dry break, Foul on the break ▸ (scratch, ball off the table, other), Illegal break, 9-ball
+  Short break (three-ball rule); the quick Rack buttons with Break-and-run / Golden break /
+  Run-out flags.
+- **At the table:** "{name} at the table · ball in hand"; the 8-ball groups line; the
+  **"on two fouls" banner** when the shooter is on two fouls (3.13); scotch doubles: who is
+  shooting (two chips, the rotation pre-selected); ball chips (the first tapped is the called
+  ball); Called / Not called (8- and 10-ball), "The 10 was the called ball" (`tenEarly`);
+  **Pot · Miss · Safety · Foul ▸ · Push out** (when allowed); More ▸ Stalemate and Award the
+  rack.
+- **A pending choice:** the question in one line and each option in plain words ("Ravi hands
+  it back to Asha", "Re-rack: Asha breaks again").
+- **Asks first** (`askConfirm`): every tap that ends a rack, a set or the match, a stalemate and
+  an award — the sheet says how ("Asha pocketed the 9") and the score after.
+- Every action carries `rack` (the rack in play) and every shot the side at the table (engine
+  breaks #12, #13). The tap guard drops a second tap before the screen redraws, a tap the engine
+  would ignore, and a confirmed tap whose match moved while the sheet was open.
+
+### Who shot
+
+Singles: the side's player (the controls send its id when the side has one rostered player).
+Scotch doubles: each shot carries the id of who shot (`payload.pid`); the screen pre-selects the
+partner who did not take the side's last shot (on a break: who did not break the side's last
+break). The engine ignores `pid`; `match.ts` counts each accepted shot for its side, per set, and
+per player id. An id stays on the side it was first seen on (at most 4 per side); a shot with no
+usable id counts for the side only.
+
+**Why `payload.pid` and not `attribution`:** `attribution` is credited live by the app (a stat-line
+read and write per shot, a follower alert, and counts that a double tap from a second phone or a
+retry can push off). Pool's totals are **derived only**: the completion / correction sync sets
+every key from the replayed state, so nothing can drift. (Consequence: the generic post-match
+correction list can't re-credit a pool shot — it re-credits `attribution` only; break #14.)
+
+### The game pin and format changes (engine break #26)
+
+The first event of a match carries `game`, `race` and `sets`. A log whose first event names
+another game than the format (the organiser switched the tournament from 8- to 9-ball mid-match)
+replays as the game it was scored under. The live settings (⚙️, config mode) offer **only the
+race and the sets**, with the warning that a change re-scores the match from rack 1; after a
+change the controls say so ("Now race to 7: it was race to 5 when the match started…").
+
+### statTotals (derived only) and the schema
+
+Per player of a side (ctx players, plus the ids the log carried; a singles side ctx names as one
+person is that person):
+
+- **record** (every line, both doubles partners alike): `racksWon`, `racksLost`, `racksBroken`,
+  `racksWonOnBreak`, `breakAndRuns`, `runOuts`; `goldenBreaks` (9-ball), `eightLosses` (8-ball),
+  `threeFoulLosses` (where the rule is on), `setsWon` / `setsLost` (a sets match);
+- **shot by shot** (only once a rack was scored that way): `detailRacks`, `innings` (the side's),
+  and who shot — `shotsPlayed`, `potShots`, `missShots`, `safetyShots`, `ballsPotted`, `fouls`
+  (+ `foulScratch`, `foulWrongBall`, `foulNoRail`, `foulOffTable`, `foulOther`), `breakShots`,
+  `breakBalls`, `dryBreaks`, `breakFouls`, `illegalBreaks`, `eightBreaks` (8-ball), `pushOuts`
+  (9-/10-ball). A doubles side whose shots can't all be placed writes none of these.
+
+The schema (`stats.ts`) declares them all ('present' for the record, 'keyed' for the rest, so a
+quick-only or older line reads "not tracked") plus career rates: racks won %, own-break win %,
+break-and-run %, pot success % (pots ÷ pots + misses), balls per break, innings per rack, fouls
+per rack, matches won / win % (leaders, MVP). Sections: Match play, The break, At the table,
+Fouls. `leaderSplits: ['discipline']` (singles and scotch doubles rank apart).
+
+### Records (`poolMatchRecords`)
+
+`biggestWin` (each race's margin), `breakAndRuns` and `runOuts` (per side, in the match),
+`goldenBreak` (each, with its rack), `rackRun` (the longest run of racks won in a row, ≥ 2). A
+singles side's one player names its records.
+
+### Still needed at the merge (shared files)
+
+The registrations this stage could not make (they are shared files): the record hook and record
+types, the box source registry, schedule minutes, the singles / doubles split, a league standings
+preset and score unit, and — optional — the per-match rating line and two award slots (each
+needs a shared golden list updated). The exact snippets are in the stage's report.
