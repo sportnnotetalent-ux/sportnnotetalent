@@ -233,21 +233,30 @@ export function playerCounts(s: unknown, id: string): Counts {
 
 // ------------------------------------------------------------- init ----
 
+/**
+ * States this module made (break #29). Their credit, feed and rack times are
+ * clean by construction, so the next event reads them as they are; any other
+ * state (a stored snapshot, JSON, a foreign object) is cleaned on read. Only
+ * the cost differs — the result is the same either way (tested).
+ */
+const ours = new WeakSet<object>();
+const mine = <T extends object>(s: T): T => { ours.add(s); return s; };
+
 /** A fresh match: the engine's state with the plugin's parts. */
 export function poolInit(config?: Record<string, unknown>): PoolMatch {
   const c = ownRecord(config) ?? (Object.create(null) as Record<string, unknown>);
   const opt: NonNullable<PoolMatch['opt']> = {};
   for (const k of ['threeFoul', 'threeBallRule', 'tenEarly'] as const) if (typeof c[k] === 'boolean') opt[k] = c[k] as boolean;
-  return { ...engineInit(config), perSide: readInt(c.playersPerSide, 1, 1, 2) as 1 | 2, opt, cr: emptyCredit(), feed: [], rat: [] };
+  return mine({ ...engineInit(config), perSide: readInt(c.playersPerSide, 1, 1, 2) as 1 | 2, opt, cr: emptyCredit(), feed: [], rat: [] });
 }
 
 /** The match rebuilt as another game (the pin), its other options kept. */
 function asGame(s: PoolMatch, game: PoolGame): PoolMatch {
   const o = isObj(s.opt) ? s.opt : {};
-  return {
+  return mine({
     ...engineInit({ game, raceTo: s.raceTo, setsToWin: s.setsToWin, breakFormat: s.breakFormat, ...o }),
     perSide: perSideOf(s), opt: { ...o }, cr: emptyCredit(), feed: [], rat: [],
-  };
+  });
 }
 
 // ---------------------------------------------------------- reducer ----
@@ -303,7 +312,8 @@ function withCredit(base: PoolMatch, next: PoolMatch, a: unknown, p: Record<stri
   const shot = type === 'BREAK' || SHOT_TYPES.has(type);
   const actor: Side | null = type === 'BREAK' ? (r0.breaker ?? (isSide(side) ? side : null)) : shot && isSide(side) ? side : null;
   const perSide = perSideOf(base);
-  let cr = creditOf(base);
+  const trusted = ours.has(base);
+  let cr = trusted ? base.cr! : creditOf(base);
   const pid = validPid(p.pid);
   let credited: string | null = null;
 
@@ -358,7 +368,7 @@ function withCredit(base: PoolMatch, next: PoolMatch, a: unknown, p: Record<stri
   const at = cnt(p.at);
   if (at) e.at = at;
   const cur = r1 ? r1.n : r0.n;
-  let feed = [...feedOf(base).filter((x) => x.n >= cur - FEED_RACKS), e];
+  let feed = [...(trusted ? base.feed! : feedOf(base)).filter((x) => x.n >= cur - FEED_RACKS), e];
   const mineN = feed.filter((x) => x.n === e.n).length;
   if (mineN > FEED_PER_RACK) {
     const i = feed.findIndex((x) => x.n === e.n);
@@ -366,11 +376,11 @@ function withCredit(base: PoolMatch, next: PoolMatch, a: unknown, p: Record<stri
   }
 
   const out: PoolMatch = { ...next, perSide, cr, feed };
-  if (ended) out.rat = [...rackTimes(base), at];
-  else out.rat = rackTimes(base);
+  const rat = trusted ? base.rat! : rackTimes(base);
+  out.rat = ended ? [...rat, at] : rat;
   if (base.seq === 0) out.fmt0 = { raceTo: readInt(p.race, base.raceTo, 1, 99), setsToWin: readInt(p.sets, base.setsToWin, 1, 9) };
-  else if (isObj(base.fmt0)) out.fmt0 = { raceTo: readInt(base.fmt0.raceTo, base.raceTo, 1, 99), setsToWin: readInt(base.fmt0.setsToWin, base.setsToWin, 1, 9) };
-  return out;
+  else if (isObj(base.fmt0)) out.fmt0 = trusted ? base.fmt0 : { raceTo: readInt(base.fmt0.raceTo, base.raceTo, 1, 99), setsToWin: readInt(base.fmt0.setsToWin, base.setsToWin, 1, 9) };
+  return mine(out);
 }
 
 /** Replay a log from a fresh match (tests and tools; the app uses deriveLog). */

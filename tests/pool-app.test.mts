@@ -739,6 +739,29 @@ describe('breaks · hostile and old snapshots (#24, #25, #28)', () => {
     const nine = hostileSnapshots()[11] as S;
     assert.ok(!/\b1[45]\b/.test(JSON.stringify(poolFeed(nine, NAMES, nameOf))), 'a 9-ball feed never shows the 14 or 15');
   });
+  test('#29 — a 10,000-event log replays fast, and exactly as a replay from stored JSON does', () => {
+    const config = { game: 'nine', raceTo: 99, setsToWin: 9, playersPerSide: 2 };
+    let s = M.poolInit(config);
+    const log: ScoreAction[] = [];
+    while (log.length < 10_000 && !s.ended) {
+      const p = C.poolPanel(s);
+      const pid = { pid: log.length % 2 ? 'h1' : 'h2', at: 1_700_000_000_000 + log.length };
+      const a = p.kind === 'lag' ? C.lagAction(s, 'home') : p.kind === 'break' ? C.breakAction(s, { pots: [] }, pid)
+        : p.kind === 'choice' ? C.chooseAction(s, 'play') : p.kind === 'shot' ? (log.length % 7 === 0 ? C.potAction(s, [p.table[0]], {}, pid) : C.safetyAction(s, [], pid)) : null;
+      if (!a) break;
+      log.push(a);
+      s = M.poolReducer(s, a);
+    }
+    const t0 = performance.now();
+    const again = log.reduce<S>((x, a) => M.poolReducer(x, a), M.poolInit(config));
+    const ms = performance.now() - t0;
+    assert.deepEqual(again, s);
+    assert.ok(ms < 250, `10,000 events took ${ms.toFixed(0)} ms`); // was ~580 ms before the fix
+    // the same steps, each from a JSON copy of the state (a stored snapshot): same result
+    let j = M.poolInit(config);
+    for (const a of log.slice(0, 600)) j = M.poolReducer(JSON.parse(JSON.stringify(j)), a);
+    assert.deepEqual(j, log.slice(0, 600).reduce<S>((x, a) => M.poolReducer(x, a), M.poolInit(config)));
+  });
   test('#28 — an engine-only snapshot (no plugin parts) reads as an empty credit / feed', async () => {
     const engine = await import('../src/sports/pool/engine.ts');
     let e = engine.createInitialState({ game: 'nine', raceTo: 1 });
