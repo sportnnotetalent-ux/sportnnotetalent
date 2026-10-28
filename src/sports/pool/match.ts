@@ -280,6 +280,12 @@ function reduce(s: PoolMatch, a: unknown): PoolMatch {
     const g = knownGame(p.game);
     if (g && g !== s.game) base = asGame(s, g);
   }
+  // break #8: a LAG that names the breaker already chosen (a duplicate from a
+  // second phone, a retry under a new id) changes nothing — not even the feed
+  if (own(a, 'type') === 'LAG' && base.firstBreaker && base.rack && base.rack.phase === 'break') {
+    const side = own(a, 'side');
+    if (isSide(side) && (isSide(p?.breaks) ? p.breaks : side) === base.firstBreaker && base.rack.breaker === base.firstBreaker) return s;
+  }
   const next = engineReducer(base, a as never) as PoolMatch;
   if (next === base) return s;
   return withCredit(base, next, a, p ?? (Object.create(null) as Record<string, unknown>));

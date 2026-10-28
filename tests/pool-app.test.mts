@@ -785,6 +785,17 @@ describe('breaks · hostile and old snapshots (#24, #25, #28)', () => {
     assert.equal(guard(s, a, { now: 10_400 }), false, 'a double tap');
     assert.equal(guard(s, a, { now: 12_100 }), true, 'the screen never moved: the scorer can tap again');
   });
+  test('#8 — a duplicated LAG (same breaker) changes nothing; a LAG that names the other breaker still fixes it', () => {
+    let s = M.poolInit({ game: 'nine' });
+    const lag = C.lagAction(s, 'home');
+    s = M.poolReducer(s, lag);
+    assert.equal(M.poolReducer(s, lag), s, 'the duplicate is ignored');
+    assert.equal(M.poolReducer(s, { ...lag, payload: { ...lag.payload, breaks: 'home' } }), s);
+    const fixed = M.poolReducer(s, C.lagAction(s, 'away'));
+    assert.notEqual(fixed, s);
+    assert.equal(fixed.rack!.breaker, 'away');
+    assert.deepEqual(M.feedOf(fixed).map((e) => [e.t, e.s]), [['LAG', 'home'], ['LAG', 'away']]);
+  });
   test('#28 — an engine-only snapshot (no plugin parts) reads as an empty credit / feed', async () => {
     const engine = await import('../src/sports/pool/engine.ts');
     let e = engine.createInitialState({ game: 'nine', raceTo: 1 });
