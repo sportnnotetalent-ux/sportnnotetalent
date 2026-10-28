@@ -158,3 +158,156 @@ describe('DB-15 — names written by the server into public tables are masked', 
     assert.deepEqual([m.officials[0].name, m.managers.home], ['L. D.', 'L. D.']);
   });
 });
+
+/* ------------------------- 3B — results you can trust ------------------------- */
+
+const line = (uid: string, match: string, player: string, sport = 'football') =>
+  db.as<{ id: string }>(uid, `insert into stat_lines (match_id, player_id, sport, stats) values ($1, $2, $3, '{"goals":3}') returning id`, [match, player, sport]);
+const lines = async (match: string, player: string) =>
+  (await db.sql(`select 1 from stat_lines where match_id = $1 and player_id = $2`, [match, player])).length;
+/** Make a finished match look as if it ended `hours` ago (its events, its manual result). */
+const endedAgo = async (match: string, hours: number) => {
+  await db.sql(`update match_events set created_at = now() - make_interval(hours => $2) where match_id = $1`, [match, hours]);
+  await db.sql(`update matches set completed_at = now() - make_interval(hours => $2) where id = $1 and completed_at is not null`, [match, hours]).catch(() => undefined);
+};
+
+describe('DB-12 — achievements only for players who took part', () => {
+  let stranger: Who, kid: string, ownKid: string, match: string, team: string;
+  before(async () => {
+    const coach = await person('Real Coach');
+    const [k] = await db.as<{ id: string }>(coach.uid, `insert into players (full_name, dob) values ('Real Kid', '2014-01-01') returning id`);
+    kid = k.id;
+    stranger = await person('Fake Stats');
+    const [o] = await db.as<{ id: string }>(stranger.uid, `insert into players (full_name, dob) values ('Own Kid', '2014-01-01') returning id`);
+    ownKid = o.id;
+    const [t] = await db.as<{ id: string }>(stranger.uid, `insert into teams (name, short_name, sport, roster) values ('Fakers', 'F', 'football', $1) returning id`, [JSON.stringify([kid, ownKid])]);
+    team = t.id;
+    const [m] = await db.as<{ id: string }>(stranger.uid, `insert into matches (sport, home_team_id, host_ids, status) values ('football', $1, $2, 'live') returning id`, [team, [stranger.player]]);
+    match = m.id;
+  });
+  test('a child someone else added, with no agreement, gets no stat line; the coach\'s own child does', async () => {
+    await line(stranger.uid, match, kid);
+    await line(stranger.uid, match, ownKid);
+    assert.equal(await lines(match, kid), 0);
+    assert.equal(await lines(match, ownKid), 1);
+  });
+  test('a player with no link to the match gets none either', async () => {
+    const random = await person('Random Adult');
+    await line(stranger.uid, match, random.player);
+    assert.equal(await lines(match, random.player), 0);
+  });
+  test('once the child\'s side confirms, the line is written; "Not us" removes the child\'s lines', async () => {
+    const coachUid = (await db.sql<{ created_by: string }>(`select created_by from players where id = $1`, [kid]))[0].created_by;
+    await db.as(coachUid, `select answer_link('team', $1, $2, true)`, [team, kid]);
+    assert.equal(await lines(match, kid), 1, 'the line kept aside was written (W3B-20)');
+    await db.as(coachUid, `select answer_link('team', $1, $2, false)`, [team, kid]);
+    assert.equal(await lines(match, kid), 0, '"Not us" took the child\'s lines in that team\'s matches');
+  });
+  test('W3B-20: a line skipped while unconfirmed is kept aside and written when the child\'s side confirms', async () => {
+    const coach = await person('Late Coach');
+    const [k] = await db.as<{ id: string }>(coach.uid, `insert into players (full_name, dob) values ('Late Kid', '2014-01-01') returning id`);
+    const host = await person('Late Host');
+    const [t] = await db.as<{ id: string }>(host.uid, `insert into teams (name, short_name, sport, roster) values ('Late XI', 'L', 'football', $1) returning id`, [JSON.stringify([k.id])]);
+    const [m] = await db.as<{ id: string }>(host.uid, `insert into matches (sport, home_team_id, host_ids, status) values ('football', $1, $2, 'live') returning id`, [t.id, [host.player]]);
+    await line(host.uid, m.id, k.id);
+    await db.as(host.uid, `update matches set status = 'completed' where id = $1`, [m.id]);
+    assert.equal(await lines(m.id, k.id), 0);
+    await endedAgo(m.id, 48);
+    await db.as(coach.uid, `select answer_link('team', $1, $2, true)`, [t.id, k.id]);
+    const [l] = await db.sql<{ goals: number }>(`select (stats->>'goals')::int as goals from stat_lines where match_id = $1 and player_id = $2`, [m.id, k.id]);
+    assert.equal(l?.goals, 3, 'the line written at the end of the match came back');
+    assert.deepEqual(await db.sql(`select 1 from parked_stat_lines where player_id = $1`, [k.id]), []);
+  });
+  test('certificates go only to the tournament\'s participants', async () => {
+    const org = await person('Cert Organiser');
+    const [own] = await db.as<{ id: string }>(org.uid, `insert into players (full_name, dob) values ('Cert Kid', '2014-01-01') returning id`);
+    const [t] = await db.as<{ id: string }>(org.uid, `insert into teams (name, short_name, sport, roster) values ('Cert Team', 'C', 'football', $1) returning id`, [JSON.stringify([own.id])]);
+    const [tr] = await db.as<{ id: string }>(org.uid, `insert into tournaments (name, host_name, organizer_id) values ('Cert Cup', 'O', auth.uid()) returning id`);
+    await db.as(org.uid, `insert into tournament_teams (tournament_id, team_id, status) values ($1, $2, 'confirmed')`, [tr.id, t.id]);
+    const got = await db.as<{ player_id: string }>(org.uid, `select player_id from issue_certificates($1, $2)`,
+      [tr.id, JSON.stringify([{ playerId: own.id, kind: 'champion', title: 'Champions' }, { playerId: kid, kind: 'award', title: 'Best player' }])]);
+    assert.deepEqual(got.map((x) => x.player_id), [own.id]);
+  });
+});
+
+describe('DB-13 — finished results are final', () => {
+  let org: Who, scorer: Who, tour: string, match: string, kidA: string;
+  before(async () => {
+    org = await person('Final Organiser');
+    scorer = await person('Final Scorer');
+    const [tr] = await db.as<{ id: string }>(org.uid, `insert into tournaments (name, host_name, organizer_id) values ('Final Cup', 'O', auth.uid()) returning id`);
+    tour = tr.id;
+    const [k] = await db.as<{ id: string }>(org.uid, `insert into players (full_name, dob) values ('Final Kid', '2014-01-01') returning id`);
+    kidA = k.id;
+    const [t] = await db.as<{ id: string }>(org.uid, `insert into teams (name, short_name, sport, roster) values ('Final A', 'A', 'football', $1) returning id`, [JSON.stringify([kidA])]);
+    await db.as(org.uid, `insert into tournament_teams (tournament_id, team_id, status) values ($1, $2, 'confirmed')`, [tour, t.id]);
+    const [m] = await db.as<{ id: string }>(org.uid, `insert into matches (sport, tournament_id, home_team_id, status, scorer_ids) values ('football', $1, $2, 'live', $3) returning id`, [tour, t.id, [scorer.player]]);
+    match = m.id;
+    await db.as(scorer.uid, `insert into match_events (match_id, seq, type, side, payload) values ($1, 1, 'GOAL', 'home', '{}')`, [match]);
+    await db.as(scorer.uid, `update matches set status = 'completed', winner = 'home' where id = $1`, [match]);
+  });
+  test('within 24 hours the scorer can still correct; after that, only the organisers', async () => {
+    await db.as(scorer.uid, `insert into match_events (match_id, seq, type, side, payload) values ($1, 2, 'AMEND', null, '{}')`, [match]);
+    await endedAgo(match, 25);
+    assert.match(await errOf(() => db.as(scorer.uid, `insert into match_events (match_id, seq, type, side, payload) values ($1, 3, 'AMEND', null, '{}')`, [match])) ?? '', /finished/i);
+    assert.match(await errOf(() => db.as(scorer.uid, `delete from match_events where match_id = $1 and seq = 1`, [match])) ?? '', /finished/i);
+    assert.match(await errOf(() => db.as(scorer.uid, `update matches set status = 'live' where id = $1`, [match])) ?? '', /finished/i);
+    assert.match(await errOf(() => line(scorer.uid, match, kidA)) ?? '', /finished/i);
+    await db.as(org.uid, `insert into match_events (match_id, seq, type, side, payload) values ($1, 3, 'AMEND', null, '{}')`, [match]);
+    await line(org.uid, match, kidA);
+    assert.equal(await lines(match, kidA), 1);
+  });
+  test('a scorer can\'t take a match out of its tournament, wind a tournament match back, or delete it', async () => {
+    const [m2] = await db.as<{ id: string }>(org.uid, `insert into matches (sport, tournament_id, status, scorer_ids) values ('football', $1, 'live', $2) returning id`, [tour, [scorer.player]]);
+    assert.match(await errOf(() => db.as(scorer.uid, `update matches set tournament_id = null where id = $1`, [m2.id])) ?? '', /organisers/i);
+    // "Reset match" right after a mistaken start is still the scorer's; an hour in, it's the organisers'
+    await db.as(scorer.uid, `insert into match_events (match_id, seq, type, side, payload) values ($1, 1, 'GOAL', 'home', '{}')`, [m2.id]);
+    await db.as(scorer.uid, `update matches set status = 'scheduled' where id = $1`, [m2.id]);
+    await db.as(scorer.uid, `update matches set status = 'live' where id = $1`, [m2.id]);
+    await endedAgo(m2.id, 1);
+    assert.match(await errOf(() => db.as(scorer.uid, `update matches set status = 'scheduled' where id = $1`, [m2.id])) ?? '', /organisers/i);
+    const [m3] = await db.as<{ id: string }>(org.uid, `insert into matches (sport, tournament_id, status, scorer_ids) values ('football', $1, 'scheduled', $2) returning id`, [tour, [scorer.player]]);
+    await db.as(scorer.uid, `delete from matches where id = $1`, [m3.id]);
+    assert.equal((await db.sql(`select 1 from matches where id = $1`, [m3.id])).length, 1, 'the scorer deleted a tournament fixture');
+    await db.as(org.uid, `delete from matches where id = $1`, [m3.id]);
+    assert.equal((await db.sql(`select 1 from matches where id = $1`, [m3.id])).length, 0);
+  });
+  test('W3B-14: the window runs from the first time it finished — new events or finishing again don\'t extend it', async () => {
+    const [m5] = await db.as<{ id: string }>(org.uid, `insert into matches (sport, tournament_id, status, scorer_ids) values ('football', $1, 'live', $2) returning id`, [tour, [scorer.player]]);
+    await db.as(scorer.uid, `insert into match_events (match_id, seq, type, side, payload) values ($1, 1, 'GOAL', 'home', '{}')`, [m5.id]);
+    await db.as(scorer.uid, `update matches set status = 'completed', completed_at = now() + interval '5 days' where id = $1`, [m5.id]);
+    const [c] = await db.sql<{ ok: boolean }>(`select completed_at <= now() + interval '1 minute' as ok from matches where id = $1`, [m5.id]);
+    assert.equal(c.ok, true, 'the app can\'t set the time');
+    await db.as(scorer.uid, `update matches set status = 'live' where id = $1`, [m5.id]);
+    await db.as(scorer.uid, `insert into match_events (match_id, seq, type, side, payload) values ($1, 2, 'GOAL', 'home', '{}')`, [m5.id]);
+    await db.as(scorer.uid, `update matches set status = 'completed' where id = $1`, [m5.id]);
+    await db.sql(`update matches set completed_at = now() - interval '25 hours' where id = $1`, [m5.id]);   // events stay recent
+    assert.match(await errOf(() => db.as(scorer.uid, `insert into match_events (match_id, seq, type, side, payload) values ($1, 3, 'AMEND', null, '{}')`, [m5.id])) ?? '', /finished/i);
+  });
+  test('an event time can\'t be set in the future (it would keep the window open)', async () => {
+    const [m4] = await db.as<{ id: string }>(org.uid, `insert into matches (sport, tournament_id, status, scorer_ids) values ('football', $1, 'live', $2) returning id`, [tour, [scorer.player]]);
+    const [e] = await db.as<{ late: boolean }>(scorer.uid, `insert into match_events (match_id, seq, type, side, payload, created_at) values ($1, 1, 'GOAL', 'home', '{}', now() + interval '10 years') returning created_at <= now() + interval '1 minute' as late`, [m4.id]);
+    assert.equal(e.late, true);
+  });
+  test('a finished round of a tournament: its host can\'t change it after 24 hours or move it out', async () => {
+    const host = await person('Round Host');
+    const [e] = await db.as<{ id: string }>(org.uid, `insert into field_events (sport, title, tournament_id, host_ids, status) values ('athletics', '100m', $1, $2, 'live') returning id`, [tour, [host.player]]);
+    const [fe] = await db.as<{ id: string }>(host.uid, `insert into field_entries (event_id, player_id) values ($1, $2) returning id`, [e.id, kidA]);
+    await db.as(host.uid, `update field_events set status = 'completed' where id = $1`, [e.id]);
+    await db.sql(`update field_events set completed_at = now() - interval '25 hours' where id = $1`, [e.id]);
+    assert.match(await errOf(() => db.as(host.uid, `update field_entries set result = '{"time": 9.5}' where id = $1`, [fe.id])) ?? '', /finished/i);
+    assert.match(await errOf(() => db.as(host.uid, `update field_events set status = 'live' where id = $1`, [e.id])) ?? '', /finished/i);
+    assert.match(await errOf(() => db.as(host.uid, `update field_events set tournament_id = null where id = $1`, [e.id])) ?? '', /organisers|finished/i);
+    await db.as(org.uid, `update field_entries set result = '{"time": 11.2}' where id = $1`, [fe.id]);
+  });
+  test('a friendly\'s host keeps the 30-minute delete and the 24-hour corrections', async () => {
+    const host = await person('Friendly Host');
+    const [t] = await db.as<{ id: string }>(host.uid, `insert into teams (name, short_name, sport, roster) values ('FH', 'F', 'football', '[]') returning id`);
+    const [m] = await db.as<{ id: string }>(host.uid, `insert into matches (sport, home_team_id, host_ids, status) values ('football', $1, $2, 'live') returning id`, [t.id, [host.player]]);
+    await db.as(host.uid, `insert into match_events (match_id, seq, type, side, payload) values ($1, 1, 'GOAL', 'home', '{}')`, [m.id]);
+    await db.as(host.uid, `update matches set status = 'completed' where id = $1`, [m.id]);
+    await db.as(host.uid, `insert into match_events (match_id, seq, type, side, payload) values ($1, 2, 'AMEND', null, '{}')`, [m.id]);
+    await db.as(host.uid, `delete from matches where id = $1`, [m.id]);
+    assert.equal((await db.sql(`select 1 from matches where id = $1`, [m.id])).length, 0);
+  });
+});
