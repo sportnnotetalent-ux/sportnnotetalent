@@ -81,22 +81,23 @@ export function FrameScoreForm({ title, names, check, onSave, saveLabel, hint }:
 }
 
 /** Concede / award (the referee), with the reasons the engine records. */
-export function FrameOptionsPanel({ names, unit, concede, award, reasons, send, extra }: {
+export function FrameOptionsPanel({ names, unit, concede, award, reasons, send, extra, extraLabel }: {
   names: { home: string; away: string };
   unit: 'frame' | 'game';
   concede: { home: Act; away: Act };
   award: (side: Side, reason?: string) => Act;
   reasons: Array<{ key: string; label: string }>;
   send: (a: Act) => void;
-  /** more buttons (snooker's re-rack, billiards' TIME) */
+  /** more buttons (snooker's re-rack) and what the toggle calls them */
   extra?: React.ReactNode;
+  extraLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [winner, setWinner] = useState<Side | null>(null);
   const [reason, setReason] = useState<string | null>(null);
   return (
     <View style={{ gap: theme.spacing(2) }}>
-      <Button label={open ? `Hide ${unit} options` : `${cap(unit)} options: concede, award${extra ? ', more' : ''}`} variant="ghost" onPress={() => setOpen((v) => !v)} />
+      <Button label={open ? `Hide ${unit} options` : `${cap(unit)} options: concede, award${extra && extraLabel ? `, ${extraLabel}` : ''}`} variant="ghost" onPress={() => setOpen((v) => !v)} />
       {open ? (
         <View style={cue.box}>
           <Text style={cue.label}>Concede the {unit}</Text>

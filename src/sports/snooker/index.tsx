@@ -159,6 +159,7 @@ const ScoringControls: SportPlugin<SnookerState>['ScoringControls'] = ({ state, 
         names={names} unit="frame" concede={p.concede} send={send}
         award={(sd, r) => awardAction(s, sd, r as AwardReason | undefined)}
         reasons={AWARD_REASONS.filter((r) => r !== 'miss').map((r) => ({ key: r, label: AWARD_REASON_LABEL[r] }))}
+        extraLabel="re-rack"
         extra={p.rerack ? <Button label="Re-rack (stalemate)…" variant="ghost" accessibilityLabel={`Re-rack frame ${p.frame} after a stalemate`} onPress={() => void rerack()} /> : null}
       />
     </View>
