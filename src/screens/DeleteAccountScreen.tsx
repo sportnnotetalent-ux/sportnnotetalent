@@ -47,9 +47,13 @@ export default function DeleteAccountScreen() {
           <Text style={[textStyles.body, { fontWeight: '700' }]}>What stays</Text>
           <Text style={textStyles.muted}>Scores of matches you played stay in other people’s histories and standings, shown as “Deleted player” — no longer linked to you.</Text>
         </Card>
-        <Text style={textStyles.muted}>This can’t be undone. Tournaments you organise stay up for their players.</Text>
+        <Text style={textStyles.muted}>This can’t be undone. Tournaments you organise stay up for their players. For your safety, you need to have signed in within the last 10 minutes.</Text>
         <TextField label="Type DELETE to confirm" value={typed} onChange={setTyped} placeholder="DELETE" autoCapitalize="characters" />
         <FormError message={error} />
+        {/* Security W3 (CL-18): the server wants a fresh sign-in first */}
+        {error && /sign in again/i.test(error) ? (
+          <Button label="Sign out to sign in again" variant="ghost" onPress={() => void signOut()} />
+        ) : null}
         <View style={{ opacity: ready ? 1 : 0.5 }}>
           <Button label={busy ? 'Deleting…' : 'Delete my account'} variant="danger" onPress={() => void confirm()} disabled={!ready || busy} />
         </View>

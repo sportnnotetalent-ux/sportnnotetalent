@@ -14,8 +14,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { appendMatchEvent } from './repos';
 import type { MatchEventRecord } from '../core/types';
 import { isRejection } from './eventLog';
+import { ownsQueue, queueAccount } from '../core/queueAccount';
 
 const keyFor = (matchId: string) => `sportfolio.outbox.${matchId}`;
+// Security W3 (CL-07): the account whose taps these are (sent and shown only to it)
+const ownerKeyFor = (matchId: string) => `sportfolio.outbox.owner.${matchId}`;
+const owners = new Map<string, string>();
+const mine = (matchId: string) => ownsQueue(owners.get(matchId), queueAccount());
 
 // Per-match queues of events not yet confirmed by the backend, kept in memory
 // (mirrored to AsyncStorage) so the UI can read counts synchronously.
@@ -49,9 +54,13 @@ function emit() {
 
 async function persist(matchId: string) {
   const q = queues.get(matchId) ?? [];
+  if (!q.length) owners.delete(matchId);
+  const owner = owners.get(matchId);
   try {
     if (q.length) await AsyncStorage.setItem(keyFor(matchId), JSON.stringify(q));
     else await AsyncStorage.removeItem(keyFor(matchId));
+    if (owner) await AsyncStorage.setItem(ownerKeyFor(matchId), owner);
+    else await AsyncStorage.removeItem(ownerKeyFor(matchId));
   } catch {
     // storage unavailable — in-memory queue still protects the current session
   }
@@ -67,10 +76,10 @@ export const matchOutbox = {
   isStuck: (matchId: string) => (failures.get(matchId) ?? 0) >= STUCK_AFTER && deviceOnline(),
   /** The last sync error for a match, for display/support. */
   syncError: (matchId: string) => lastError.get(matchId) ?? null,
-  pendingCount: (matchId: string) => queues.get(matchId)?.length ?? 0,
+  pendingCount: (matchId: string) => (mine(matchId) ? queues.get(matchId)?.length ?? 0 : 0),
   /** The server refused this match's queued taps (scoring moved to another device). */
   isRejected: (matchId: string) => rejected.has(matchId),
-  getPending: (matchId: string) => queues.get(matchId) ?? [],
+  getPending: (matchId: string) => (mine(matchId) ? queues.get(matchId) ?? [] : []),
 
   /** Load a match's persisted queue into memory (once). Returns the pending events. */
   async hydrate(matchId: string): Promise<MatchEventRecord[]> {
@@ -79,6 +88,8 @@ export const matchOutbox = {
       try {
         const raw = await AsyncStorage.getItem(keyFor(matchId));
         if (raw) queues.set(matchId, JSON.parse(raw) as MatchEventRecord[]);
+        const owner = await AsyncStorage.getItem(ownerKeyFor(matchId));
+        if (owner) owners.set(matchId, owner);
       } catch {
         // ignore — start with an empty queue
       }
@@ -90,6 +101,10 @@ export const matchOutbox = {
   /** Durably record an event, then try to sync it. */
   enqueue(matchId: string, rec: MatchEventRecord) {
     const q = queues.get(matchId) ?? [];
+    // a queue left by another account is parked, not added to (CL-07)
+    if (q.length && !mine(matchId)) return;
+    const me = queueAccount();
+    if (!q.length && me) owners.set(matchId, me);
     q.push(rec);
     queues.set(matchId, q);
     void persist(matchId);
@@ -100,7 +115,7 @@ export const matchOutbox = {
   /** Remove and return the last queued event — used to undo an unsynced tap. */
   popLast(matchId: string): MatchEventRecord | null {
     const q = queues.get(matchId);
-    if (!q?.length) return null;
+    if (!q?.length || !mine(matchId)) return null;
     const removed = q.pop()!;
     void persist(matchId);
     emit();
@@ -134,6 +149,8 @@ export const matchOutbox = {
     if (rejected.has(matchId)) return; // the server will never take these — awaiting Discard
     if (force) failures.delete(matchId); // a manual retry gets a clean slate
     if (!online && !force) return; // known offline — wait for reconnect
+    // Security W3 (CL-07): another account's taps wait for that account
+    if (!mine(matchId)) return;
     const q = queues.get(matchId);
     if (!q?.length) return;
     flushing.add(matchId);

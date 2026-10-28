@@ -98,6 +98,8 @@ export interface PendingResult {
   homeTeamName?: string;
   awayTeamName?: string;
   sendsAt: number;
+  /** Security W3 (CL-07): the account that scored it (auth user id) */
+  owner?: string;
 }
 
 /** Add or replace a match's pending record (one per match). */

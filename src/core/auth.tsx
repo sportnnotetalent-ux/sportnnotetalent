@@ -16,6 +16,9 @@ import { planAuthEvent, profileFromSession, confirmedLoginEmail } from './authEv
 import { clearMyPlayerIdCache } from '../data/myPlayerIdMemo';
 import { clearReadCache } from '../data/readCache';
 import { releaseDeviceForSignOut } from './deviceSignOut';
+import { signOutSafely, cleanupFor } from './signOutSafely';
+import { setQueueAccount } from './queueAccount';
+import { metadataToClear } from './authMetadata';
 import type { GuardianContact, Profile, Role } from './types';
 
 /** Turn a raw Supabase/network error into a plain, actionable message. Users
@@ -122,6 +125,24 @@ const DEMO_PROFILE: Profile = {
 
 const AuthContext = createContext<AuthState | undefined>(undefined);
 
+/** Web: wipe the offline copies of data the service worker kept (public/sw.js). */
+function clearServiceWorkerData(): void {
+  try {
+    if (typeof navigator !== 'undefined' && navigator.serviceWorker?.controller) navigator.serviceWorker.controller.postMessage('clear-data');
+  } catch { /* not a browser */ }
+}
+
+/** Security W3 (CL-06): 'full' = as the Sign out button (push, alerts,
+ *  reminders, web push, offline copies); 'local' = this device's alerts,
+ *  reminders and offline copies only (a switch: the new account's push stays). */
+async function cleanDevice(kind: 'full' | 'local'): Promise<void> {
+  try {
+    if (kind === 'full') await releaseDeviceForSignOut();
+    else await import('./notifications').then((n) => n.forgetAccountOnDevice());
+  } catch { /* best effort */ }
+  clearServiceWorkerData();
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<Profile | null>(
@@ -165,6 +186,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       loadingProfile: s.loadingProfile,
     });
     if (plan === 'ignore') return;
+    // Security W3 (CL-06): every way a session ends cleans the device, not only
+    // the Sign out button; a switch to another account cleans what's local.
+    const cleanup = cleanupFor(plan === 'signed-out' || !user ? 'signed-out' : plan, s.userId, user?.id ?? null);
+    if (cleanup !== 'none') void cleanDevice(cleanup);
+    setQueueAccount(plan === 'signed-out' || !user ? null : user.id); // CL-07: the queues follow the account
     if (plan === 'signed-out' || !user) {
       s.userId = null;
       s.loadingProfile = false;
@@ -224,6 +250,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         schoolId: data.school_id ?? undefined,
       });
       void setReminderPrefsUser(data.id); // pull this user's reminder timers across devices
+      // Security W3 (CL-09): the sign-up DOB, phone and guardian leave the session token
+      const clear = metadataToClear(user.user_metadata as Record<string, unknown> | undefined);
+      if (clear) void Promise.resolve(supabase.auth.updateUser({ data: clear })).catch(() => { /* next sign-in */ });
       startProfileZoneSync(data.id, data.time_zone); // SD-150: reminder emails use the app's zone
       const email = confirmedLoginEmail(user);
       if (email && !emailSynced.current.has(`${data.id}|${email}`)) {
@@ -321,11 +350,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await releaseDeviceForSignOut();
       clearMyPlayerIdCache();
       clearReadCache(); // F-19: nothing read as one account is served to the next
-      if (supabase) await supabase.auth.signOut();
-      // Web: wipe the offline copies of data the service worker kept (public/sw.js).
-      try {
-        if (typeof navigator !== 'undefined' && navigator.serviceWorker?.controller) navigator.serviceWorker.controller.postMessage('clear-data');
-      } catch { /* not a browser */ }
+      // Security W3 (CL-05): offline, the session still leaves this device
+      if (supabase) await signOutSafely(supabase.auth);
+      clearServiceWorkerData();
     },
     // Passwordless sign-in via a 6-digit email code (no deep-link redirect needed).
     // shouldCreateUser:false so this only signs in existing accounts — sign-up

@@ -96,3 +96,35 @@ The change: `_shared/net.ts` (`clientIp`, `readCapped`), plus `send-contact-otp`
 | EF-11 | `report-invite` and `join` are public with no limit. | **Fixed:** limited per address (20 reports and 120 lookups an hour). |
 | EF-12 | `delete-account` is the sink if guardianship were spoofed. | Accepted. EF-01 (the guardian takeover) was fixed in Wave 1, and `guardian_delete_target` is sound. |
 | W3B-34 | **The new limits break something legitimate.** A school sharing one address could hit `join`'s 120 lookups an hour. | Accepted. Only the team-name preview is skipped; the link still opens the app. |
+
+## 3E: the app's findings (CL-05 to CL-18)
+The changes: migration `20261028210000_security_wave3e` (server) plus the app. Tests: `tests/security-wave3-client.test.mts` and the CL tests in `tests/db-wave3.test.mts`.
+
+| # | Finding | Status |
+|---|---|---|
+| CL-05 | A sign-out offline kept the session. | **Fixed:** `signOutSafely` falls back to a local sign-out. |
+| CL-06 | Device cleanup only ran from the button. | **Fixed:** every route to signed-out runs it; switching accounts clears local alerts, reminders and offline copies. |
+| CL-07 | Offline queues were replayed under the next account, and field cards were last-write-wins and lost silently. | **Fixed:** match taps, held results and field cards belong to the account that made them. A card is pushed only if nothing newer is on the server, and an update that touches no row is never "synced". |
+| CL-08 | The service worker cached signed-in reads. | Fixed in Wave 1 (W1-8: only signed-out public reads are cached). |
+| CL-09 | DOB, phone and guardian rode in every token. | **Fixed:** they're cleared from the account's metadata once the profile exists. |
+| CL-10 | Android backups held the session. | **Fixed in config:** `allowBackup: false`, from the next APK (1.1.0). SecureStore isn't adopted, since backups no longer include the data. |
+| CL-11 | "Open in the app" could carry another intent. | Fixed in Wave 1 (W1-10). `safeAppPath` is now exported and tested. |
+| CL-12 | Stream links could go anywhere. | `https` only since Wave 1. **Now** a link outside the known stream sites asks first and names the site. |
+| CL-13 | Results lab was open in production. | Fixed in Wave 1 (developer screens only in demo or development builds). |
+| CL-14 | The guardian's verified flags were writable. | **Fixed (server):** only the server sets them, and a changed contact loses them. |
+| CL-15 | Documents had no type or size limit. | **Fixed (server):** images and PDFs up to 10 MB. On live, the bucket's 2 files are both allowed types, so viewing in the browser stays. |
+| CL-16 | Web photos kept EXIF and GPS. | **Fixed (web):** re-encoded through a canvas (at most 2048 px). |
+| CL-17 | Finished-result rules were client-only, and reset wasn't atomic. | **Fixed (server):** Wave 3B's windows; `reset_match` is one step; Player of the Match changes once. Disputes were already guarded (`guard_dispute`). |
+| CL-18 | Deleting an account needed no re-authentication. | **Fixed:** a sign-in in the last 10 minutes, with a "Sign out to sign in again" button. |
+
+### Break-it on the fixes
+| # | Attempt, or what could break | Status |
+|---|---|---|
+| W3B-35 | **Queues saved before this update have no owner.** | Accepted. They behave as before, and the next tap tags the queue. |
+| W3B-36 | **A scorer signs out with taps queued and never signs in on that device again.** | Accepted. The taps stay parked on the device. Before, they were sent as the wrong account. |
+| W3B-37 | **The card version check uses the device clock**, with 2 minutes' leeway. | Accepted. A worse clock gives "stuck" (kept and counted) or, at worst, the old last-write-wins. |
+| W3B-38 | **An expired session releases push on that device.** | Accepted. Signing in again registers it again. |
+| W3B-39 | **Clearing the metadata fails offline.** | Accepted. It's retried at the next sign-in. |
+| W3B-40 | **`allowBackup` only takes effect with a native build.** | **Open:** it ships with the 1.1.0 APK. |
+| W3B-41 | **Native photos rely on the picker re-encoding them** (quality 0.6). | **Open:** check on a device that EXIF is gone, during the APK test. |
+| W3B-42 | **Accounts that sign in by phone.** Re-authentication relies on `last_sign_in_at`, which the phone sign-in must update. | **Open:** check on live after deploy. |

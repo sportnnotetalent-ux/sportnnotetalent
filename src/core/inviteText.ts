@@ -167,11 +167,16 @@ export function friendInviteText(opts: { link: string; inviterName?: string; fri
  *  isn't installed — goes to `fallbackUrl`. Works with the current APK (the scheme
  *  is registered by Expo); no App Links verification needed. */
 export function androidIntentUrl(path: string, fallbackUrl: string = INSTALL_PAGE_URL): string {
-  const p = path.replace(/^\/+/, '');
-  // Security W1-10 (CL-11): only a plain app path ("join-club/JOIN-ABC12") — a
-  // crafted token ("…#Intent;package=…") goes to the install page instead.
-  if (!/^[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*$/.test(p) || p.length > 120) return fallbackUrl;
+  const p = safeAppPath(path);
+  if (!p) return fallbackUrl;
   return `intent://${p}#Intent;scheme=${APP_SCHEME};package=${ANDROID_PACKAGE};S.browser_fallback_url=${encodeURIComponent(fallbackUrl)};end`;
+}
+
+/** Security W1-10 (CL-11): only a plain app path ("join-club/JOIN-ABC12") — a
+ *  crafted token ("…#Intent;package=…", "../", a URL) gives null. */
+export function safeAppPath(path: string): string | null {
+  const p = (path ?? '').replace(/^\/+/, '');
+  return /^[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*$/.test(p) && p.length <= 120 ? p : null;
 }
 
 /* ---------------------------------- QR ---------------------------------- */

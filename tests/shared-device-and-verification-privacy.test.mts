@@ -28,8 +28,10 @@ describe('one phone, one account', () => {
   });
   test('sign-out releases the device before the session ends', () => {
     const auth = read('src/core/auth.tsx');
-    const i = auth.indexOf('await releaseDeviceForSignOut();');
-    const j = auth.indexOf('await supabase.auth.signOut();');
+    const body = auth.slice(auth.indexOf('signOut: async () => {'));
+    const i = body.indexOf('await releaseDeviceForSignOut();');
+    // Security W3 (CL-05): the sign-out falls back to a local one when offline
+    const j = body.indexOf('await signOutSafely(supabase.auth);');
     assert.ok(i > 0 && j > i, 'release runs first');
     const dev = read('src/core/deviceSignOut.ts');
     assert.match(dev, /m\.disableWebPush\(\)/); // browser: unsubscribe

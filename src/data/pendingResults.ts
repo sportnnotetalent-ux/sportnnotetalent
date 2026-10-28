@@ -17,6 +17,7 @@ import { effectiveLog } from '../sports/amend';
 import type { MatchEventRecord, SportId } from '../core/types';
 import { parsePending, withPending, withoutPending, type PendingResult } from './resultHold';
 import { withMatchRecords } from '../sports/matchRecords'; // SD-51
+import { ownsQueue, queueAccount } from '../core/queueAccount';
 
 const KEY = 'sportfolio.pendingResults';
 
@@ -42,7 +43,8 @@ const update = (fn: (l: PendingResult[]) => PendingResult[]) => {
 };
 
 export const pendingResults = {
-  save(rec: PendingResult) { heldHere.add(rec.matchId); return update((l) => withPending(l, rec)); },
+  // Security W3 (CL-07): a held result belongs to the account that scored it
+  save(rec: PendingResult) { heldHere.add(rec.matchId); return update((l) => withPending(l, { ...rec, owner: rec.owner ?? queueAccount() ?? undefined })); },
   remove(matchId: string) { heldHere.delete(matchId); return update((l) => withoutPending(l, matchId)); },
   /** The screen stopped holding (sent, cancelled or unmounted). */
   release(matchId: string) { heldHere.delete(matchId); },
@@ -78,6 +80,7 @@ export async function flushPendingResults(): Promise<number> {
   let sent = 0;
   for (const r of await load()) {
     if (heldHere.has(r.matchId)) continue;
+    if (!ownsQueue(r.owner, queueAccount())) continue;   // CL-07: waits for its own account
     try {
       await finalize(r);
       await update((l) => withoutPending(l, r.matchId));

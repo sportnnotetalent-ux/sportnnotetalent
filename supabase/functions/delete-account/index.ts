@@ -13,11 +13,14 @@
  *
  * Steps (shared with privacy-retention): _shared/deleteAccount.ts.
  *
+ * Security W3 (CL-18): needs a sign-in in the last 10 minutes (else 403 { reason: 'reauth' }).
+ *
  * Contract: → 200 { deleted: true }
  * Deploy:   supabase functions deploy delete-account   (redeploy: _shared changed)
  */
 import { admin, CORS, json, rateLimit, requireUser, tooMany } from '../_shared/guard.ts';
 import { deleteAccountFully } from '../_shared/deleteAccount.ts';
+import { recentSignIn } from '../_shared/reauth.ts';
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
@@ -30,6 +33,11 @@ Deno.serve(async (req) => {
   let body: { confirm?: unknown; childPlayerId?: unknown };
   try { body = await req.json(); } catch { return json({ error: 'invalid JSON' }, 400); }
   if (body.confirm !== 'DELETE') return json({ error: 'Type DELETE to confirm.' }, 400);
+  // Security W3 (CL-18): a fresh sign-in first — someone holding an unlocked
+  // phone can't delete the account (or a guardian's child's) in seconds.
+  if (!recentSignIn(caller.user.last_sign_in_at, Date.now())) {
+    return json({ error: 'For your safety, sign in again first (sign out, then sign back in), then delete within 10 minutes.', reason: 'reauth' }, 403);
+  }
 
   // A guardian deleting their child's data.
   if (body.childPlayerId !== undefined) {

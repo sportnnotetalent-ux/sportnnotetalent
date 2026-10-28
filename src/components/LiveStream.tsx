@@ -4,8 +4,9 @@
  *  Set by the organizer/scorer per match — renders nothing when no URL is set. */
 import React from 'react';
 import { Platform, View, Text, TouchableOpacity, Linking, StyleSheet } from 'react-native';
+import { askConfirm } from './ConfirmSheet';
+import { isKnownStreamHost, safeWebUrl, streamHost } from '../core/safeUrl';
 import { theme } from '../core/theme';
-import { safeWebUrl } from '../core/safeUrl';
 
 const YT = /(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|live\/|embed\/|shorts\/|v\/))([\w-]{11})/;
 const TWITCH = /twitch\.tv\/([A-Za-z0-9_]+)/;
@@ -63,7 +64,7 @@ export function LiveStream({ url: raw, live }: { url?: string; live?: boolean })
 
   // Native, or a link we can't embed → a card that opens the stream externally.
   return (
-    <TouchableOpacity accessibilityRole="button" style={s.card} activeOpacity={0.85} onPress={() => Linking.openURL(url)}>
+    <TouchableOpacity accessibilityRole="button" style={s.card} activeOpacity={0.85} onPress={() => void openStream(url)}>
       <Text style={s.cardIcon}>{live ? '🔴' : '▶'}</Text>
       <View style={{ flex: 1 }}>
         <Text style={s.cardTitle}>{live ? 'Watch live stream' : 'Open stream'}</Text>
@@ -96,3 +97,17 @@ const s = StyleSheet.create({
   cardSub: { color: theme.colors.textMuted, fontSize: theme.font.tiny },
   cardChevron: { color: theme.colors.textMuted, fontSize: theme.font.h3, fontWeight: '700' },
 });
+
+/** Security W3 (CL-12): a stream on a site people don't use for streams opens
+ *  only after the viewer is told where it goes (any https page can be phishing). */
+async function openStream(url: string): Promise<void> {
+  if (!isKnownStreamHost(url)) {
+    const ok = await askConfirm({
+      title: 'Open this link?',
+      message: `It goes to ${streamHost(url) || 'another website'}, a site SportnNote doesn’t know. Only open it if you trust whoever added it.`,
+      yesLabel: 'Yes, open it', noLabel: 'No, stay here', tone: 'caution',
+    });
+    if (!ok) return;
+  }
+  await Linking.openURL(url).catch(() => undefined);
+}

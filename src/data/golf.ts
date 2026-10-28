@@ -17,6 +17,7 @@ import { roundDifferential } from '../sports/golf/handicap';
 import { golfAlert } from './results/alerts';
 // Reads past PostgREST's 1,000-row cap (stable order + .range; long .in() lists chunked).
 import { fetchAllPages, fetchAllChunked } from './paging';
+import { ownsQueue, queueAccount } from '../core/queueAccount';
 
 // Pure leaderboard/format helpers live in golfLeaderboard.ts (testable in node);
 // re-exported so screens keep importing them from here.
@@ -248,7 +249,12 @@ export async function getFieldEntries(eventIds: string[]): Promise<FieldEntry[]>
 const OUTBOX_KEY = 'sportfolio.golfOutbox.v1';
 // The outbox is generic over field results: a golf card, or a results-engine
 // EntryResult (athletics / swimming … — data/resultsStore.ts).
-type Pending = { card: unknown; status?: FieldEntryStatus };
+// Security W3 (CL-07): `owner` = the account that saved it (sent only for it);
+// `at` = when it was saved (a later change on the server wins); `stuck` = the
+// server took no row and nothing newer is there (a permission or a locked
+// round): kept, counted, not retried.
+type Pending = { card: unknown; status?: FieldEntryStatus; owner?: string; at?: number; stuck?: boolean };
+const CLOCK_SKEW_MS = 2 * 60_000;
 const pending = new Map<string, Pending>();
 let hydrated = false;
 let flushTimer: ReturnType<typeof setInterval> | null = null;
@@ -262,28 +268,44 @@ async function hydrate() {
   } catch { /* storage unavailable — in-memory only */ }
 }
 const persist = () => AsyncStorage.setItem(OUTBOX_KEY, JSON.stringify(Object.fromEntries(pending))).catch(() => {});
-const pendingCard = (entryId: string): GolfCard | undefined => pending.get(entryId)?.card as GolfCard | undefined;
-export const pendingCardCount = () => pending.size;
+const pendingCard = (entryId: string): GolfCard | undefined => {
+  const p = pending.get(entryId);
+  return p && ownsQueue(p.owner, queueAccount()) ? (p.card as GolfCard) : undefined;
+};
+export const pendingCardCount = () => [...pending.values()].filter((p) => ownsQueue(p.owner, queueAccount())).length;
+/** Cards the server wouldn't take (CL-07): kept on the device, not retried. */
+export const stuckCardCount = () => [...pending.values()].filter((p) => p.stuck && ownsQueue(p.owner, queueAccount())).length;
 
-async function pushEntry(entryId: string, p: Pending): Promise<boolean> {
+/** 'sent', 'superseded' (the server has a newer change: it wins), 'stuck', or 'retry'. */
+async function pushEntry(entryId: string, p: Pending): Promise<'sent' | 'superseded' | 'stuck' | 'retry'> {
   if (!live()) {
     const e = demo.fieldEntries.find((x) => x.id === entryId);
     if (e) { e.result = p.card; if (p.status) e.status = p.status; e.updatedAt = new Date().toISOString(); }
-    return true;
+    return 'sent';
   }
-  const { error } = await supabase!.from('field_entries')
+  let q = supabase!.from('field_entries')
     .update({ result: p.card, ...(p.status ? { status: p.status } : {}), updated_at: new Date().toISOString() })
     .eq('id', entryId);
-  return !error;
+  if (p.at) q = q.lte('updated_at', new Date(p.at + CLOCK_SKEW_MS).toISOString());
+  const { data, error } = await q.select('id');
+  if (error) return 'retry';
+  if (data && data.length) return 'sent';
+  // No row taken: a newer change on the server, or not allowed any more.
+  const { data: cur } = await supabase!.from('field_entries').select('updated_at').eq('id', entryId).maybeSingle();
+  const updated = Date.parse((cur as { updated_at?: string } | null)?.updated_at ?? '');
+  return p.at && Number.isFinite(updated) && updated > p.at + CLOCK_SKEW_MS ? 'superseded' : 'stuck';
 }
 
 export async function flushGolfOutbox(): Promise<number> {
   await hydrate();
   for (const [id, p] of [...pending]) {
-    if (await pushEntry(id, p)) pending.delete(id);
+    if (p.stuck || !ownsQueue(p.owner, queueAccount())) continue;   // CL-07
+    const r = await pushEntry(id, p);
+    if (r === 'sent' || r === 'superseded') pending.delete(id);
+    else if (r === 'stuck') pending.set(id, { ...p, stuck: true });
   }
   void persist();
-  return pending.size;
+  return pendingCardCount();
 }
 
 /** Save a player's card (and optionally status). Never throws for a network
@@ -296,7 +318,7 @@ export async function saveCard(entryId: string, card: GolfCard, status?: FieldEn
 /** The same offline-safe save for any field entry's result payload. */
 export async function saveFieldResult(entryId: string, card: unknown, status?: FieldEntryStatus): Promise<number> {
   await hydrate();
-  pending.set(entryId, { card, status: status ?? pending.get(entryId)?.status });
+  pending.set(entryId, { card, status: status ?? pending.get(entryId)?.status, owner: queueAccount() ?? undefined, at: Date.now() });
   void persist();
   if (!flushTimer) flushTimer = setInterval(() => { void flushGolfOutbox(); }, 15_000);
   return flushGolfOutbox();
