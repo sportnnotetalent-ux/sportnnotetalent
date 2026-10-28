@@ -521,6 +521,11 @@ describe('integration: a 9-ball match (break-and-run, golden break, three fouls)
       'Rack 3 · Home broke · Home won · three fouls in a row by Away',
     ]);
   });
+  test('involvedPlayerIds: the players the log credited (nothing is credited live, so the default would say nobody)', () => {
+    assert.deepEqual(POOL_CORE.involvedPlayerIds!(s), ['h1', 'a1']);
+    assert.deepEqual(POOL_CORE.involvedPlayerIds!(M.poolInit()), []);
+    assert.deepEqual(POOL_CORE.involvedPlayerIds!(null as never), []);
+  });
   test('the live settings: race and sets only (the game is locked), with the re-score warning', () => {
     const ls = POOL_CORE.liveSettings!;
     assert.equal(ls.mode, 'config');

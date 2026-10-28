@@ -10,9 +10,8 @@
  * says so before the tap, and the controls say so after (`formatNote`).
  */
 import type { LiveSettings, SportPlugin } from '../types';
-import { isComplete, lineScore, result, scoreLine, summary } from './engine.ts';
-import { cnt } from './engine.ts';
-import { poolInit, poolReducer, type PoolMatch } from './match.ts';
+import { cnt, isComplete, lineScore, result, scoreLine, summary } from './engine.ts';
+import { creditOf, poolInit, poolReducer, type PoolMatch } from './match.ts';
 import { poolStatTotals } from './totals.ts';
 import { poolMatchRecords } from './records.ts';
 import { poolUndoLabel } from './undo.ts';
@@ -26,6 +25,14 @@ export function poolUnits(s: PoolMatch): { games: { home: number; away: number }
   const games = { home: 0, away: 0 };
   for (const r of s.racks) if (isObj(r) && (r.winner === 'home' || r.winner === 'away')) games[r.winner] += 1;
   return cnt(s.setsToWin) > 1 ? { games, sets: { home: cnt(s.setsWon?.home), away: cnt(s.setsWon?.away) } } : { games };
+}
+
+/** Parity #13 — the players who have played (they can't be dropped from the
+ *  matchday squad): the ids the log credited. Pool credits no stat live, so
+ *  the default (a non-zero stat line) would say nobody until the match ends. */
+export function poolInvolved(s: PoolMatch): string[] {
+  const ids = creditOf(s).ids;
+  return [...ids.home, ...ids.away];
 }
 
 export const POOL_LIVE_SETTINGS: LiveSettings<PoolMatch> = {
@@ -53,6 +60,7 @@ export const POOL_CORE = {
   standingsUnits: poolUnits,
   statTotals: poolStatTotals,
   statTotalsNeedsPlayers: true,
+  involvedPlayerIds: poolInvolved,
   matchRecords: poolMatchRecords,
   undoLabel: poolUndoLabel,
   liveSettings: POOL_LIVE_SETTINGS,

@@ -5,7 +5,7 @@
 records, undo label, box; the shared wiring is listed in §9 for the merge). One sport,
 `pool`, with a game option: 8-ball, 9-ball or 10-ball. Engine: 98 unit tests + a seeded
 simulation (2,100 matches, ~260,000 events); 31 break points (8 fixed, 5 accepted).
-Plugin: 65 unit / integration / contract tests + a seeded simulation (600 scorers);
+Plugin: 66 unit / integration / contract tests + a seeded simulation (600 scorers);
 35 break points (8 fixed, 9 accepted) — `docs/security/breaks/pool-app.md`.*
 
 **Where things are:**
