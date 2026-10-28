@@ -13,6 +13,16 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-29 — Hotfix: profile pages couldn't load (since Wave 2); the claim card showed for everyone
+- **Correction to the "link by phone" hotfix entry below:** nothing of the founder's was lost. Their profile in the nightly backup matches live, and the link changed nothing. The merge fix (W2bB-19) stays: it was a real risk, found while looking.
+- **The real cause (W2-L1):**
+  - On live, reading `phone` from `players_view` failed for everyone ("permission denied for function member_consented").
+  - Wave 2 called that function inside the view and also locked it away from the app's roles. Postgres checks a view's functions as the reader.
+  - So every profile page and every full player list has failed since 28 Oct, and Profile showed "Set up your profile".
+  - Fix: migration `20261029110000_players_view_phone`. The view calls `editable_team_member_consented()`, which answers only for a team the reader can edit.
+- **The card (W2bB-21):** "Did a coach add you by phone?" read the account's own phone straight from `players`, a private column. The refused read counted as "no number", so nearly everyone saw the card. Now it reads through the view, and a failed read hides the card.
+- **Tests:** `tests/db-view-columns.test.mts` reads every column of every client view as a visitor and a user; it found only this column. `tests/requests.test.mts` covers the card.
+
 ### 2026-10-29 — Release: security Waves 3–4, cue sports, phone country, SMS sign-up, the link-by-phone fix
 - **Database:** the founder ran Waves 3A–4A, then `20261028233000_phone_country`, `20261029090000_claim_keeps_details` and `20261029100000_signup_sms`. Checked read-only on live:
   - the Wave 3–4 objects (14 of 14);

@@ -108,7 +108,7 @@ describe('W2 — legitimate links stay visible', () => {
     assert.equal(await sees(head.uid, teen.player), true);
   });
   test('links that existed before the migration still count', async () => {
-    const pre = await bootDb({ strict: true, skip: /security_wave[23]/ });   // Wave 3 builds on 2b
+    const pre = await bootDb({ strict: true, skip: /security_wave[23]|players_view_phone/ });   // Wave 3 and the view hotfix build on 2b
     const coach = await pre.signUp({ name: 'Old Coach' });
     const [kid] = await pre.as<{ id: string }>(coach, `insert into players (full_name, dob) values ('Old Kid', '2014-01-01') returning id`);
     const other = await pre.signUp({ name: 'Old Teammate Coach' });

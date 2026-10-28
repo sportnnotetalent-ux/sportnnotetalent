@@ -49,14 +49,16 @@ export async function answerFriendly(f: PendingFriendly, accept: boolean): Promi
 }
 
 /** The number typed at sign-up (private to me), and the one on my own profile. */
-export async function getClaimNumbers(myPlayerId: string | null): Promise<{ signUpPhone: string | null; profilePhone: string | null }> {
-  if (!live()) return { signUpPhone: null, profilePhone: null };
+export async function getClaimNumbers(myPlayerId: string | null): Promise<{ signUpPhone: string | null; profilePhone: string | null | undefined }> {
+  if (!live() || !myPlayerId) return { signUpPhone: null, profilePhone: undefined };
+  // W2bB-21: phone is a private column of `players` — the account reads its own
+  // through the view; a refused or failed read is "unknown" (the card stays hidden)
   const [{ data: priv }, own] = await Promise.all([
     supabase!.rpc('my_profile_private'),
-    myPlayerId ? supabase!.from('players').select('phone').eq('id', myPlayerId).maybeSingle() : Promise.resolve({ data: null }),
+    supabase!.from('players_view').select('phone').eq('id', myPlayerId).maybeSingle(),
   ]);
   const signUpPhone = ((priv as { phone: string | null }[] | null)?.[0]?.phone) ?? null;
-  const profilePhone = ((own.data as { phone: string | null } | null)?.phone) ?? null;
+  const profilePhone = own.error || !own.data ? undefined : ((own.data as { phone: string | null }).phone ?? null);
   return { signUpPhone, profilePhone };
 }
 

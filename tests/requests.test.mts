@@ -3,6 +3,8 @@
  * The server side is tests/db-wave2b.test.mts.
  */
 import { describe, test } from 'node:test';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import assert from 'node:assert/strict';
 import {
   toPendingLink, toPendingFriendly, linkTitle, linkConsequence, notUsCopy, friendlyTitle, declineFriendlyCopy,
@@ -95,6 +97,16 @@ describe('errors and the link-by-phone card', () => {
     assert.equal(showClaimCard({ signUpPhone: null, profilePhone: null, smsAvailable: true }), false);
     assert.equal(showClaimCard({ signUpPhone: '+919811100001', profilePhone: null, smsAvailable: false }), false);
     assert.equal(showClaimCard({ signUpPhone: '12', profilePhone: null, smsAvailable: true }), false, 'not a real number');
+  });
+  test('W2bB-21 (live, 2026-10-29): when the profile\'s number can\'t be read, the card stays hidden', () => {
+    // the profile's phone is a private column: reading it straight from `players`
+    // was refused, read as "no number", and the card showed for nearly everyone
+    assert.equal(showClaimCard({ signUpPhone: '+919811100001', profilePhone: undefined, smsAvailable: true }), false);
+    const src = readFileSync(join(import.meta.dirname, '..', 'src/data/requestsStore.ts'), 'utf8');
+    const fn = src.slice(src.indexOf('export async function getClaimNumbers'), src.indexOf('export const phoneClaimAvailable'));
+    assert.match(fn, /from\('players_view'\)\.select\('phone'\)/, 'the own number is read through the view');
+    assert.doesNotMatch(fn, /from\('players'\)/);
+    assert.match(fn, /undefined/, 'an error or no player is "unknown", not "no number"');
   });
 });
 

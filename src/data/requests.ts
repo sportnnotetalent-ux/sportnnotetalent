@@ -157,7 +157,10 @@ export function maskPhone(raw: string): string {
 
 /** W1-2b: the number typed at sign-up isn't on the account's own profile —
  *  a coach-added profile already has it (uq_players_phone). */
-export function showClaimCard(a: { signUpPhone: string | null; profilePhone: string | null; smsAvailable: boolean }): boolean {
+/** `profilePhone` undefined = the profile's number couldn't be read: the card
+ *  stays hidden (W2bB-21 — a refused read showed it to nearly everyone). */
+export function showClaimCard(a: { signUpPhone: string | null; profilePhone: string | null | undefined; smsAvailable: boolean }): boolean {
+  if (a.profilePhone === undefined) return false;
   return a.smsAvailable && !!phoneKey(a.signUpPhone ?? '') && !phoneKey(a.profilePhone ?? '');
 }
 
