@@ -198,3 +198,21 @@ describe('pool statTotals · which keys a line gets', () => {
     }
   });
 });
+
+describe('pool statTotals · breaks (docs/security/breaks/pool-app.md)', () => {
+  test('#17 — a singles player id that changes mid-match (a replaced player): the side\'s one player keeps every shot', () => {
+    const config = { game: 'nine', raceTo: 2 };
+    let s = M.poolInit(config);
+    s = M.poolReducer(s, C.lagAction(s, 'home'));
+    s = M.poolReducer(s, C.breakAction(s, { pots: [1] }, { pid: 'h1' }));
+    s = M.poolReducer(s, C.potAction(s, [2], {}, { pid: 'h1' }));
+    // the roster now names the replacement: the controls send h9 from here on
+    s = M.poolReducer(s, C.potAction(s, [3], {}, { pid: 'h9' }));
+    s = M.poolReducer(s, C.missAction(s, { pid: 'h9' }));
+    const t = poolStatTotals(s, { players: { home: [{ id: 'h9' }], away: [{ id: 'a1' }] } });
+    assert.deepEqual(Object.keys(t).sort(), ['a1', 'h9'], 'one line per side: no second line for the replaced id (the sync would add them up)');
+    assert.equal(t.h9.stats.shotsPlayed, 3);
+    assert.equal(t.h9.stats.breakShots, 1);
+    assert.equal(t.h9.stats.ballsPotted, 2);
+  });
+});

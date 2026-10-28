@@ -16,8 +16,9 @@
  *     potShots, missShots, safetyShots, ballsPotted, fouls (+ scratch /
  *     wrong ball / no rail / off the table / other), breakShots, breakBalls,
  *     dryBreaks, breakFouls, illegalBreaks; eightBreaks (8-ball), pushOuts
- *     (9-/10-ball). Singles: the side's player — the one the log credited,
- *     else the side's only player. Scotch doubles: each partner's own, from
+ *     (9-/10-ball). Singles: the side's player — its one player in ctx
+ *     (whatever id the log carried: a player replaced mid-match), else the
+ *     one id the log credited. Scotch doubles: each partner's own, from
  *     the player id every shot carried. If a side's shots can't all be
  *     placed (a shot with no id, an id outside the side's players), that
  *     side's shot keys are left out — "not tracked", never a guessed split.
@@ -125,7 +126,11 @@ export function poolStatTotals(s: PoolMatch, ctx?: StatTotalsContext): Record<st
     }
   }
   const fromCtx: Record<Side, Set<string>> = { home: new Set(ids.home), away: new Set(ids.away) };
-  for (const side of SIDES) for (const id of cr.ids[side]) if (!seen.has(id)) { seen.add(id); ids[side].push(id); }
+  // break #17: a singles side its players name as ONE person is that person —
+  // an id the log carried for it (a player replaced mid-match) adds no second
+  // line (the sync would add the two lines up on the replacement)
+  const one = (side: Side) => !doubles && fromCtx[side].size === 1;
+  for (const side of SIDES) if (!one(side)) for (const id of cr.ids[side]) if (!seen.has(id)) { seen.add(id); ids[side].push(id); }
   const known = (side: Side, id: string) => (ctx?.players ? fromCtx[side].has(id) : ids[side].includes(id));
 
   for (const side of SIDES) {
@@ -139,8 +144,9 @@ export function poolStatTotals(s: PoolMatch, ctx?: StatTotalsContext): Record<st
         const placed = cr.unk[side] === 0 && cr.by.filter((b) => b.side === side).every((b) => known(side, b.id));
         if (placed) for (const id of list) shots.set(id, fill(keys, cr.by.find((b) => b.id === id && b.side === side)?.c ?? {}));
       } else {
+        // singles: the side's one player; else the one id the log credited (none = nobody is guessed)
         const credited = cr.ids[side].filter((id) => known(side, id));
-        const shooter = cr.ids[side].length === 1 && credited.length === 1 ? credited[0] : cr.ids[side].length === 0 && list.length === 1 ? list[0] : null;
+        const shooter = one(side) ? list[0] : cr.ids[side].length === 1 && credited.length === 1 ? credited[0] : cr.ids[side].length === 0 && list.length === 1 ? list[0] : null;
         if (shooter) shots.set(shooter, fill(keys, sideCounts(s, side)));
       }
     }
