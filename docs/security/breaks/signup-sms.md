@@ -16,7 +16,13 @@
 4. The new profile spends the ticket, and its player starts with the mobile verified.
 5. The mobile route (`phone-login`) needs no ticket: it proves the number itself.
 
-**Founder step:** the hook must be on (Supabase → Authentication → Auth Hooks → **Before User Created** → `public.hook_before_user_created`). Check it once with step 9a of `docs/testing/sign-in-test-script.md`.
+**Founder steps:**
+1. The hook must be on (Supabase → Authentication → Auth Hooks → **Before User Created** → `public.hook_before_user_created`).
+2. The requirement ships **off**, so the app already out there keeps signing people up. After the new app is published, switch it on in the SQL Editor:
+```sql
+update signup_guard_settings set require_phone = true;
+```
+3. Check it once with step 9a of `docs/testing/sign-in-test-script.md`.
 
 | # | Attempt, or what could break | Status |
 |---|---|---|
@@ -33,6 +39,7 @@
 | SS-11 | **A child proves a parent's phone.** SMS proves possession, not identity. | Accepted: parental proof (CL-03) covers every under-18. |
 | SS-12 | **SMS can't reach some countries** (Firebase region policy, CL-20). | Accepted: a founder console item. Those people can't create an account until it's set. |
 | SS-13 | **A number gets an account by the mobile route while its email-form ticket is still live.** | Accepted: the email sign-up then fails on the unique number. Rare. |
+| SS-14 | **Running the SQL before the new app is out** would refuse every sign-up from the current app (it sends no ticket). | **Fixed:** the requirement ships off and is switched on after publishing (test). |
 
 **Simulation** (`tests/sim-signup-sms.test.mts`):
 - 600 email sign-ups through the hook:

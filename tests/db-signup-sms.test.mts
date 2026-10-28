@@ -14,7 +14,11 @@ import { join } from 'node:path';
 import { bootDb, type TestDb } from './helpers/pgdb.mts';
 
 let db: TestDb;
-before(async () => { db = await bootDb({ strict: true }); });
+before(async () => {
+  db = await bootDb({ strict: true });
+  // switched on after the app that sends the ticket is published
+  await db.sql(`update signup_guard_settings set require_phone = true`);
+});
 
 const read = (p: string) => readFileSync(join(import.meta.dirname, '..', p), 'utf8');
 let n = 0;
@@ -138,6 +142,12 @@ describe('the new account redeems the ticket', () => {
     const uid = await db.signUp({ dob: '1990-01-01', meta: { phone: phone() } });
     const rows = await db.sql(`select 1 from profiles where id = $1`, [uid]);
     assert.equal(rows.length, 1);
+  });
+});
+
+describe('the rollout', () => {
+  test('the requirement ships off, so the app already out there keeps signing people up', () => {
+    assert.match(read('supabase/migrations/20261029100000_signup_sms.sql'), /require_phone boolean not null default false/);
   });
 });
 

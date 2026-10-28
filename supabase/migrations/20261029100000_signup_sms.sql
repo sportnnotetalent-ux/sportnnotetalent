@@ -9,8 +9,10 @@
 --  2. The Auth "Before User Created" hook (hook_before_user_created) refuses an
 --     email sign-up unless its metadata carries a live ticket for the same
 --     number. Our own mobile sign-in (phone-login: a confirmed phone and the
---     placeholder address) needs none. Support can switch the requirement off
---     for an SMS outage: update signup_guard_settings set require_phone = false.
+--     placeholder address) needs none. It ships OFF so the app already out
+--     there keeps signing people up: after the new app is published, switch it
+--     on with  update signup_guard_settings set require_phone = true;
+--     (and off the same way for an SMS outage).
 --  3. The new profile redeems the ticket (redeem_signup_phone_ticket, after
 --     insert on profiles): the ticket is spent and the account's player starts
 --     with the mobile verified — no second SMS.
@@ -68,7 +70,8 @@ revoke all on function signup_phone_ticket_ok(text, text) from public, anon, aut
 
 -- ---------- 2. The sign-up hook -------------------------------------------------------
 
-alter table signup_guard_settings add column if not exists require_phone boolean not null default true;
+-- off until the app that sends the ticket is published (see the header)
+alter table signup_guard_settings add column if not exists require_phone boolean not null default false;
 
 create or replace function hook_before_user_created(event jsonb)
   returns jsonb language plpgsql security definer set search_path = public as $$

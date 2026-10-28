@@ -16,7 +16,11 @@ import assert from 'node:assert/strict';
 import { bootDb, type TestDb } from './helpers/pgdb.mts';
 
 let db: TestDb;
-before(async () => { db = await bootDb({ strict: true }); });
+before(async () => {
+  db = await bootDb({ strict: true });
+  // switched on after the app that sends the ticket is published
+  await db.sql(`update signup_guard_settings set require_phone = true`);
+});
 
 let n = 0;
 const phone = () => `+9177${String(10_000_000 + ++n).padStart(8, '0')}`;
