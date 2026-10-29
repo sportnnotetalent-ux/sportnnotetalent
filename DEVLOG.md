@@ -13,7 +13,15 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
-### 2026-10-29 — Sport identity, scoring-pad icons, plainer cards and sport lists (preview, not live)
+### 2026-10-29 — Release: plainer cards and sport lists, one sport symbol everywhere, distinct pad icons
+
+Published from e92d3d7 after the founder checked the preview ("Publish"): web
+index-95918812 (production), Android OTA update group a48f39b4 (runtime 1.0.0 — no
+native change since the logo release). auth-smoke passed; full suite green (the pool
+10,000-event timing test passes alone). The website changes (Find a game, the sport
+list from the app, carrom 🟤) go live when `main` is pushed.
+
+### 2026-10-29 — Sport identity, scoring-pad icons, plainer cards and sport lists (released — see above)
 
 Three founder asks after the logo release:
 
