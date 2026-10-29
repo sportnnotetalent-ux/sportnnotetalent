@@ -13,6 +13,34 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-29 — Daily error tracking: labelled email + morning check (live)
+
+The founder saw "9 errors" in the daily email, all of them already handled. Each error is
+now labelled by `supabase/functions/_shared/errorTriage.ts`:
+- **new**: the live web build or the phone app;
+- **on an older version**: a web build that's been replaced since (its bundle hash ≠ the
+  one app.sportnnote.in serves);
+- **noise**: a bare "Unexpected token '<'" with no build, or "Script error." (its stack is
+  our own reporter's).
+
+The daily email (`weekly-report`, `period: 'day'`) groups errors this way, new first, and
+its subject counts only new ones. On 29 Oct it reads "0 new · 6 on an older version · 3 noise".
+
+`scripts/error-triage.mjs [hours]` runs the same rules on live data (read-only) and prints
+JSON. The scheduled task `sportnnote-morning-errors` runs it at 08:30 IST every day. For up
+to 3 real new bugs, it writes a failing test and a fix in its own worktree, on branch
+`fix/errors-<date>`. It never pushes, deploys or writes the database. Its report goes to
+`~/Desktop/rudy/error-reports/<date>.md`.
+
+Break-it: `docs/security/breaks/error-triage.md` (ET-01…08). Error text is writable by
+anyone, so the task treats it as data. The noise rules were narrowed twice, with tests,
+from live data. `tests/error-triage.test.mts` has 12 tests, including 500 users. The full
+suite has 5,625 passing.
+
+6f45917. Deployed `weekly-report` from a clean worktree. It boots: the public key gets
+"forbidden". auth-smoke passed. The first labelled email is the next daily digest
+(21:00 IST).
+
 ### 2026-10-29 — Release: parental proof is live
 
 The founder ran migration `20261029140000_parental_proof.sql`. Verified read-only on live:
