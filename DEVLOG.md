@@ -13,7 +13,19 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
-### 2026-10-29 — Parental proof for every under-18 (CL-03) — built, not live
+### 2026-10-29 — Release: parental proof is live
+
+The founder ran migration `20261029140000_parental_proof.sql`. Verified read-only on live:
+the table, 9 functions and 5 triggers; the sign-up guard requires a date of birth; the
+link's "approve" asks for documents; reviewers can claim a proof; 0 "self-declared"
+accounts left (the one under-18 is "pending"); 0 read-only functions that write.
+
+Deployed `guardian-proof` (new) and `privacy-retention`. Both run their own code: an
+anonymous call gets "sign in required" or "forbidden". auth-smoke passed. Web
+index-f6dee86e and Android OTA group 14b5597b, from 182166e. The website guide goes
+live when `main` is pushed.
+
+### 2026-10-29 — Parental proof for every under-18 (CL-03) — built (released, see above)
 
 Founder decisions (2026-10-28/29): every under-18 in every country; the parent's photo
 ID + a document showing the relationship; deleted 30 days after the review; the parent
