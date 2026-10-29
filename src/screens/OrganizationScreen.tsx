@@ -46,7 +46,7 @@ import type { Organization, OrgMember, OrgRole, OrgRequest, House, ActivityEvent
 import type { RootStackParamList } from '../navigation/types';
 import { useParamState } from '../navigation/useParamState';
 import { notice } from '../core/confirm';
-import { SportLine } from '../components/SportArt';
+import { SportLine } from '../components/SportSymbol';
 import { Glyph, IconText } from '../components/Icon';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;

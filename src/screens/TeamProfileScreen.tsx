@@ -9,7 +9,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { theme } from '../core/theme';
-import { SportBadge, SportLine } from '../components/SportArt';
+import { SportBadge, SportLine } from '../components/SportSymbol';
 import { FollowBell } from '../components/FollowBell';
 import { EmptyState, Card, Pill, Button, LoadingState, ScreenTitle, SelectChip, textStyles } from '../components/ui';
 import { useParamState } from '../navigation/useParamState';

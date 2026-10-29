@@ -7,7 +7,7 @@ import { ScrollView, View, Text, Image, TouchableOpacity, StyleSheet } from 'rea
 import Svg, { Circle } from 'react-native-svg';
 import { theme } from '../core/theme';
 import { Glyph } from './Icon';
-import { SportBadge } from './SportArt';
+import { SportBadge } from './SportSymbol';
 import { docKindLabel } from '../core/verificationReview';
 import { Card, Pill, Button, SelectChip, EmptyState, LoadingState, FormError, textStyles, plural } from './ui';
 import { profileViewState } from '../data/profileViewState';

@@ -3,7 +3,7 @@
  *  match scheduling can set the same optional rules. */
 import React, { useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { SportBadge } from './SportArt';
+import { SportBadge } from './SportSymbol';
 import { theme } from '../core/theme';
 import { SelectChip, TextField, textStyles } from './ui';
 import { getSportMeta } from '../sports/sportMeta';

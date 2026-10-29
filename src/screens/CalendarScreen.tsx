@@ -10,7 +10,7 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { theme } from '../core/theme';
 import { Glyph } from '../components/Icon';
-import { SportBadge, SportLine } from '../components/SportArt';
+import { SportBadge, SportLine } from '../components/SportSymbol';
 import { EmptyState, Card, Pill, SelectChip, textStyles } from '../components/ui';
 import { useMatches, useMyTournaments, useScopedMatches } from '../data/hooks';
 import { getTournaments } from '../data/repos';

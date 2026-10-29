@@ -8,7 +8,7 @@ import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { splitLeading, stripLeadingEmoji, sportChip, sportStack, iconBox } from '../src/core/leadingEmoji.ts';
+import { splitLeading, stripLeadingEmoji, sportStack, iconBox } from '../src/core/leadingEmoji.ts';
 
 const read = (p: string) => readFileSync(join(import.meta.dirname, '..', p), 'utf8');
 const KEYS = ['🏆', '✓', '✕', '⏱', '🟨', '🛡'];
@@ -41,20 +41,6 @@ describe('stripLeadingEmoji (section titles)', () => {
     assert.equal(stripLeadingEmoji('Up next'), 'Up next');
     assert.equal(stripLeadingEmoji('100m final'), '100m final');
     assert.equal(stripLeadingEmoji('🏆'), '🏆', 'never leaves an empty title');
-  });
-});
-
-describe('sportChip ("⚽ Football" → the sport, drawn with its colour dot)', () => {
-  const SPORTS = [{ id: 'football', name: 'Football', icon: '⚽' }, { id: 'shooting', name: 'Shooting', icon: '🎯' }, { id: 'weightlifting', name: 'Weightlifting', icon: '🏋️' }];
-  test('only when the words are exactly the sport\'s name', () => {
-    assert.deepEqual(sportChip('⚽ Football', SPORTS), { id: 'football', name: 'Football', text: 'Football' });
-    assert.deepEqual(sportChip('⚽Football', SPORTS), { id: 'football', name: 'Football', text: 'Football' });
-    assert.deepEqual(sportChip('🏋️ Weightlifting', SPORTS), { id: 'weightlifting', name: 'Weightlifting', text: 'Weightlifting' });
-    assert.deepEqual(sportChip('⚽ Football ›', SPORTS), { id: 'football', name: 'Football', text: 'Football ›' }, 'words after the name stay');
-    assert.deepEqual(sportChip('⚽ Football: two bronzes', SPORTS), { id: 'football', name: 'Football', text: 'Football: two bronzes' });
-    assert.equal(sportChip('⚽ Footballers', SPORTS), null, 'only the whole name');
-    assert.equal(sportChip('🎯 On target', SPORTS), null, 'a scoring chip that happens to use a sport\'s emoji');
-    assert.equal(sportChip('Football', SPORTS), null);
   });
 });
 
@@ -158,7 +144,6 @@ describe('the wiring', () => {
   test('Button, SelectChip, Pill, SectionHeader, ScreenTitle and EmptyState use it', () => {
     const ui = read('src/components/ui.tsx');
     assert.match(ui, /splitLeading\(label, EMOJI_KEYS\)/);
-    assert.match(ui, /sportChip\(label/);
     assert.match(ui, /stripLeadingEmoji\(title\)/);
     assert.match(read('src/components/SectionHeader.tsx'), /stripLeadingEmoji\(title\)/);
   });

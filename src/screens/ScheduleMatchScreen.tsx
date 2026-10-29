@@ -42,7 +42,7 @@ import type { SportId, Team } from '../core/types';
 type Phase = 'league' | 'group' | KoStage;
 import type { RootStackParamList } from '../navigation/types';
 import { Glyph } from '../components/Icon';
-import { SportLine } from '../components/SportArt';
+import { SportLine } from '../components/SportSymbol';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type PickTeam = Pick<Team, 'id' | 'name' | 'colorHex'> & { roster?: string[] };

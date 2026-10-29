@@ -9,7 +9,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { theme } from '../core/theme';
 import { Card, Pill, Button, EmptyState, textStyles } from './ui';
 import { getSportMeta } from '../sports/sportMeta';
-import { SportBadge } from './SportArt';
+import { SportBadge } from './SportSymbol';
 import { IconText } from './Icon';
 import { useListings } from '../data/hooks';
 import { PlayerFilters, activeFilterCount, type PlayerFilterState } from './PlayerFilters';

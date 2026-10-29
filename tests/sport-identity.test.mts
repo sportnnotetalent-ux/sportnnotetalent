@@ -1,16 +1,15 @@
 /**
- * Every sport looks like itself (founder 2026-10-29: "the logo for carrom and pool
- * shows the same"): each sport has its own emoji (rugby and rugby league share
- * one ball), its small drawn badge (components/SportArt.tsx) never looks like
- * another sport's, and the website lists the sports — names and symbols — from
- * the app itself. Later the same day the founder found the big court tiles and
- * match-card strips too playful: match cards and sport lists stay plain.
+ * Every sport looks like itself, and the same everywhere (founder 2026-10-29:
+ * "carrom and pool show the same"; then "Start a friendly and Explore a sport
+ * should show the same kind of icons"). A sport is shown by its own emoji — one
+ * per sport (rugby and rugby league share the ball) — in every list, chip,
+ * picker and heading; the drawn court badges and tiles are gone ("too kiddish").
+ * The website lists the sports from the app itself.
  */
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { sportArtSvg, sportArtParts } from './helpers/sportArtSvg.mjs';
 
 const ROOT = join(import.meta.dirname, '..');
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8');
@@ -20,18 +19,6 @@ const SPORTS = readdirSync(join(ROOT, 'src/sports'), { withFileTypes: true })
     const s = read(`src/sports/${d.name}/meta.ts`);
     return { id: /\bid: '([^']+)'/.exec(s)![1], icon: /\bicon: '([^']+)'/.exec(s)![1].replace(/️/g, '') };
   });
-
-/** CIE76 colour distance (sRGB → Lab). */
-function deltaE(a: string, b: string): number {
-  const lab = (hex: string) => {
-    const [r, g, bl] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((c) => (c > 0.04045 ? ((c + 0.055) / 1.055) ** 2.4 : c / 12.92));
-    const f = (t: number) => (t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116);
-    const x = f((r * 0.4124 + g * 0.3576 + bl * 0.1805) / 0.95047), y = f(r * 0.2126 + g * 0.7152 + bl * 0.0722), z = f((r * 0.0193 + g * 0.1192 + bl * 0.9505) / 1.08883);
-    return [116 * y - 16, 500 * (x - y), 200 * (y - z)];
-  };
-  const [p, q] = [lab(a), lab(b)];
-  return Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]);
-}
 
 describe('sport symbols (plain text)', () => {
   test('no two sports share an emoji — except rugby and rugby league, which play with the same ball', () => {
@@ -45,27 +32,16 @@ describe('sport symbols (plain text)', () => {
   });
 });
 
-describe('sport drawings (app and website)', () => {
-  test('every sport has its own drawing', async () => {
-    for (const s of SPORTS) assert.match(await sportArtSvg(s.id), /^<svg[\s\S]+<\/svg>$/, s.id);
+describe('one kind of sport symbol everywhere: its emoji', () => {
+  test('SportBadge and SportLine draw the sport\'s emoji — no drawings', () => {
+    const sym = read('src/components/SportSymbol.tsx');
+    assert.match(sym, /getSportMeta\([^)]*\)\.icon/);
+    assert.doesNotMatch(sym, /react-native-svg/);
+    assert.ok(!existsSync(join(ROOT, 'src/components/SportArt.tsx')), 'the court drawings are gone');
   });
-
-  test('no two sports look alike: the same markings need clearly different colours', async () => {
-    const parts = await Promise.all(SPORTS.map(async (s) => ({ id: s.id, ...(await sportArtParts(s.id)) })));
-    for (let i = 0; i < parts.length; i++) {
-      for (let j = i + 1; j < parts.length; j++) {
-        const [a, b] = [parts[i], parts[j]];
-        if (a.markings === b.markings) assert.ok(deltaE(a.color, b.color) >= 25, `${a.id} and ${b.id} are drawn the same and coloured alike (ΔE ${deltaE(a.color, b.color).toFixed(1)})`);
-      }
-    }
-  });
-
-  test('the pairs people mix up are drawn differently', async () => {
-    const m = async (id: string) => (await sportArtParts(id)).markings;
-    assert.notEqual(await m('carrom'), await m('pool'));
-    assert.notEqual(await m('rugby'), await m('rugby_league'), 'league\'s 10-metre lines, not union\'s 22 and dashed lines');
-    const [sn, bi] = [await sportArtParts('snooker'), await sportArtParts('billiards')];
-    assert.ok(deltaE(sn.color, bi.color) >= 25, `snooker and billiards cloth (ΔE ${deltaE(sn.color, bi.color).toFixed(1)})`);
+  test('sport chips show the label\'s emoji, like every other sport list (no colour dot)', () => {
+    const ui = read('src/components/ui.tsx');
+    assert.doesNotMatch(ui, /SPORT_COLORS|sportChip/);
   });
 });
 
@@ -92,9 +68,6 @@ describe('match cards and sport lists stay plain (founder 2026-10-29: "too kiddi
     for (const f of ['src/screens/HomeScreen.tsx', 'src/screens/TryNewSportScreen.tsx']) {
       assert.doesNotMatch(read(f), /SportTile|SportArt/, f);
     }
-    assert.doesNotMatch(read('src/components/SportArt.tsx'), /export function SportTile|drawStrip/, 'the big tiles and strips are gone');
-  });
-  test('sport chips keep the colour dot', () => {
-    assert.match(read('src/components/ui.tsx'), /SPORT_COLORS\[p\.sport\]/);
+
   });
 });

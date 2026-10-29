@@ -16,7 +16,7 @@ import { standingsConfigFromFormat } from '../data/standings';
 import { structureFromFormat } from '../data/structureConfig';
 import { bronzeRuleFor } from '../data/medalStandings';
 import type { Match, SportId, Tournament } from '../core/types';
-import { SportBadge } from './SportArt';
+import { SportBadge } from './SportSymbol';
 
 /** How a finished match was settled — penalties, shoot-out, 7 m throws, Super
  *  Over, Armageddon, golden raid, overtime — read from the sport's own status

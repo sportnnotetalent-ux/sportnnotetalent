@@ -19,7 +19,7 @@ import { formatDayShort } from '../core/dates';
 import { todayIn, useUserTimeZone } from '../core/time';
 import type { Tournament } from '../core/types';
 import type { RootStackParamList } from '../navigation/types';
-import { SportLine } from '../components/SportArt';
+import { SportLine } from '../components/SportSymbol';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type Role = 'hosting' | 'playing' | 'officiating' | 'following';

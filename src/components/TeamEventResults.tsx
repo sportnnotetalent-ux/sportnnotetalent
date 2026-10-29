@@ -13,7 +13,7 @@ import { medalIcon, type TeamEventSportSummary } from '../data/results';
 import type { TeamGolfSummary } from '../data/teamEventResults';
 import type { SportId } from '../core/types';
 import { Glyph } from './Icon';
-import { SportLine } from './SportArt';
+import { SportLine } from './SportSymbol';
 
 const RECORD_WORD: Record<string, string> = { MR: 'Meet record', SR: 'School record' };
 const ordinal = (n: number) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] ?? 'th'}`;

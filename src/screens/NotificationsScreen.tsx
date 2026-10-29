@@ -9,7 +9,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { theme } from '../core/theme';
 import { Glyph } from '../components/Icon';
-import { SportBadge } from '../components/SportArt';
+import { SportBadge } from '../components/SportSymbol';
 import { EmptyState, Card, Pill, ScreenTitle, textStyles } from '../components/ui';
 import { SectionHeader, SECTION_CAP } from '../components/SectionHeader';
 import { useAuth } from '../core/auth';
@@ -45,7 +45,7 @@ function splitLeadingEmoji(title: string): { icon: string; rest: string } {
 
 /** A round icon chip leading each row, so the inbox reads as a consistent list. */
 function IconBadge({ icon, sport }: { icon?: string; sport?: string }) {
-  if (sport) return <SportBadge sport={sport} size={40} />;
+  if (sport) return <View style={st.badge}><SportBadge sport={sport} size={24} /></View>;
   return (
     <View style={st.badge}>
       <Glyph emoji={icon ?? ''} style={st.badgeIcon} color={theme.colors.primary} />

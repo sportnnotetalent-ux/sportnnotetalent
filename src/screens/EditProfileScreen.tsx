@@ -30,7 +30,7 @@ import { PhoneField } from '../components/PhoneField';
 import type { Player, SportDetail, SportId, TeamStint } from '../core/types';
 import type { RootStackParamList } from '../navigation/types';
 import { Glyph, IconText } from '../components/Icon';
-import { SportLine } from '../components/SportArt';
+import { SportLine } from '../components/SportSymbol';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'EditProfile'>;
 

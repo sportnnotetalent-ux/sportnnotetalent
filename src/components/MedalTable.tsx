@@ -9,7 +9,7 @@ import { RankBadge, podiumColor } from './Rank';
 import { getSportMeta } from '../sports/sportMeta';
 import type { MedalRow } from '../data/medalStandings';
 import type { SportId } from '../core/types';
-import { SportBadge } from './SportArt';
+import { SportBadge } from './SportSymbol';
 
 const ord = (n?: number): string => {
   if (!n) return '—';

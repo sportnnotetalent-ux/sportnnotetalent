@@ -26,7 +26,7 @@ import type { RootStackParamList } from '../navigation/types';
 import { openMatchViewer } from '../navigation/openMatch';
 import { FormRow } from '../components/FormStrip';
 import { collapseTies } from '../data/teamTie';
-import { SportLine } from '../components/SportArt';
+import { SportLine } from '../components/SportSymbol';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 

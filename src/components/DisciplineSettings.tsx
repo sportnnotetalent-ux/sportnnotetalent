@@ -16,7 +16,7 @@ import { recalcWalkovers } from '../data/repos';
 import { tournamentDraft } from '../data/tournamentDraft';
 import { getSportMeta } from '../sports/sportMeta';
 import type { SportId } from '../core/types';
-import { SportLine } from './SportArt';
+import { SportLine } from './SportSymbol';
 
 type Val = number | string | boolean;
 

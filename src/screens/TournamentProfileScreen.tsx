@@ -98,7 +98,7 @@ function basicsLine(t: Tournament, sport: SportId): string {
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 import { useViewerMarket } from '../data/useMarket';
 import { term } from '../core/markets';
-import { SportLine, SportBadge } from '../components/SportArt';
+import { SportLine, SportBadge } from '../components/SportSymbol';
 
 const PARTICIPATION_LABEL: Record<string, string> = {
   inter_house: '🏠 Inter-house (Houses compete)',

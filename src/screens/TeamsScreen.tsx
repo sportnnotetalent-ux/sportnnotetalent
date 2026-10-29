@@ -19,7 +19,7 @@ import { useAuth } from '../core/auth';
 import { useActiveOrg } from '../core/orgContext';
 import type { SportId, Team } from '../core/types';
 import type { RootStackParamList } from '../navigation/types';
-import { SportLine } from '../components/SportArt';
+import { SportLine } from '../components/SportSymbol';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 

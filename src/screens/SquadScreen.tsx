@@ -28,7 +28,7 @@ import { APP_HOST } from '../core/hosts';
 import { RemindInstall } from '../components/RemindInstall';
 import type { Player, SportId, TeamLeadership, TeamSummary } from '../core/types';
 import type { RootStackParamList } from '../navigation/types';
-import { SportLine } from '../components/SportArt';
+import { SportLine } from '../components/SportSymbol';
 import { IconText } from '../components/Icon';
 
 export default function SquadScreen() {

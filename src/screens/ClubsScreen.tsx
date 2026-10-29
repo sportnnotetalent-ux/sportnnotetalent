@@ -10,7 +10,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { theme } from '../core/theme';
 import { readableOn } from '../core/contrast';
 import { Card, Button, ScreenTitle, LoadingState, EmptyState, textStyles } from '../components/ui';
-import { SportLine } from '../components/SportArt';
+import { SportLine } from '../components/SportSymbol';
 import { getSportMeta } from '../sports/sportMeta';
 import { getClubsForPlayer, getClubSports, getMyPlayerId, getMyTeams } from '../data/repos';
 import { useAuth } from '../core/auth';

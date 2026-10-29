@@ -10,7 +10,7 @@ import { FieldLabel, SelectChip, textStyles } from './ui';
 import { getSportMeta } from '../sports/sportMeta';
 import { isEventSport } from '../sports/eventSports';
 import type { SportId, TournamentScoring } from '../core/types';
-import { SportLine } from './SportArt';
+import { SportLine } from './SportSymbol';
 
 const ordinal = (n: number): string => {
   const s = ['th', 'st', 'nd', 'rd'], v = n % 100;

@@ -39,7 +39,7 @@ import { useKeepAwakeWhile } from '../core/keepAwake';
 import { ResultHoldNote } from '../components/ResultHoldNote';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { safeWebUrl } from '../core/safeUrl';
-import { SportBadge } from '../components/SportArt';
+import { SportBadge } from '../components/SportSymbol';
 import { theme } from '../core/theme';
 import { Glyph, IconText } from '../components/Icon';
 import { getSport } from '../sports/registry';

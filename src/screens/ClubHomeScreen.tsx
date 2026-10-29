@@ -11,7 +11,7 @@ import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/nativ
 import type { RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { theme } from '../core/theme';
-import { SportBadge } from '../components/SportArt';
+import { SportBadge } from '../components/SportSymbol';
 import { readableOn } from '../core/contrast';
 import { Card, SelectChip, ScreenTitle, LoadingState, textStyles } from '../components/ui';
 import { PersonPicker } from '../components/PersonPicker';

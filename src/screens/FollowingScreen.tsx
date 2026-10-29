@@ -16,7 +16,7 @@ import { getTournaments } from '../data/repos';
 import type { Tournament } from '../core/types';
 import { getSportMeta } from '../sports/sportMeta';
 import type { RootStackParamList } from '../navigation/types';
-import { SportLine } from '../components/SportArt';
+import { SportLine } from '../components/SportSymbol';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 

@@ -40,6 +40,11 @@ Three founder asks after the logo release:
   score" or the result); Home's "Your sports" and the Try-a-new-sport screen are the
   earlier plain lists (emoji + name cards, the chosen one lime) in the new colours.
   The big court tiles and strips are removed from SportArt.tsx.
+- **"Same kind of icons everywhere"** (founder, Start-a-friendly picker vs Explore a
+  sport): a sport is shown by its emoji in every list, chip, picker and heading.
+  `components/SportArt.tsx` (the drawn courts) → `components/SportSymbol.tsx`
+  (SportBadge / SportLine draw the emoji); chips draw the sport's emoji with a gap
+  instead of a colour dot. The court drawings and their test helper are gone.
 - **Website**: the "Real golf" feature card (a sport, not a feature) → **Find a game**
   (post or browse player/team/opponent/ground wanted, by sport and city, WhatsApp in a tap).
 

@@ -15,17 +15,21 @@ import { theme } from '../core/theme';
 import { useFormField, useKeyboardFocus } from './keyboard';
 import { readableOn } from '../core/contrast';
 import { toggleA11y } from '../core/a11y';
-import { splitLeading, stripLeadingEmoji, sportChip } from '../core/leadingEmoji';
+import { splitLeading, stripLeadingEmoji } from '../core/leadingEmoji';
 import { EMOJI_ICONS, EMOJI_KEYS, EmojiIcon } from './Icon';
-import { SportBadge, SPORT_COLORS } from './SportArt';
+import { SportBadge } from './SportSymbol';
 import { SPORT_LIST } from '../sports/sportMeta';
 
-/** 2026-10-29 redesign: "⚽ Football" on a chip or pill → the sport (drawn as
- *  its colour dot and name; "⚽ Football ›" keeps the "›"); a mapped leading
- *  emoji → its line icon. */
-function chipParts(label: string): { text: string; sport?: string; spec?: (typeof EMOJI_ICONS)[string] } {
-  const sp = sportChip(label, SPORT_LIST);
-  if (sp) return { text: sp.text, sport: sp.id };
+/** Every sport's emoji, so a chip like "⚽ Football" draws it apart from the
+ *  words with the same gap as an icon (not glued on: "⚽Football"). */
+const SPORT_EMOJI = SPORT_LIST.map((s) => s.icon.replace(/\uFE0F/g, ''));
+
+/** 2026-10-29 redesign: a chip's mapped leading emoji → its line icon. A
+ *  sport's own emoji ("⚽ Football") stays as it is — the same symbol the sport
+ *  has everywhere else. */
+function chipParts(label: string): { text: string; spec?: (typeof EMOJI_ICONS)[string]; emoji?: string } {
+  const sport = splitLeading(label, SPORT_EMOJI);
+  if (sport && sport.rest) return { text: sport.rest, emoji: sport.key };
   const lead = splitLeading(label, EMOJI_KEYS);
   const spec = lead ? EMOJI_ICONS[lead.key] : undefined;
   return spec && lead!.rest ? { text: lead!.rest, spec } : { text: label };
@@ -187,8 +191,8 @@ export function Pill({
   const p = chipParts(label);
   return (
     <View style={[styles.pill, { backgroundColor: color }]}>
-      {p.sport ? <View style={[styles.pillDot, { backgroundColor: SPORT_COLORS[p.sport] }]} /> : null}
       {p.spec ? <EmojiIcon spec={p.spec} color={textColor} size={12} /> : null}
+      {p.emoji ? <Text style={styles.pillEmoji}>{p.emoji}</Text> : null}
       <Text style={[styles.pillText, { color: textColor }]}>{p.text}</Text>
     </View>
   );
@@ -365,7 +369,7 @@ export function SelectChip({
   accessibilityLabel?: string;
 }) {
   const p = dotColor ? { text: label } : chipParts(label);
-  const dot = dotColor ?? (p.sport ? SPORT_COLORS[p.sport] : undefined);
+  const dot = dotColor;
   const ink = active ? theme.colors.onLime : theme.colors.textMuted;
   return (
     <TouchableOpacity
@@ -383,6 +387,7 @@ export function SelectChip({
     >
       {dot ? <View style={[styles.selDot, { backgroundColor: dot }]} /> : null}
       {p.spec ? <EmojiIcon spec={p.spec} color={ink} size={15} /> : null}
+      {p.emoji ? <Text style={styles.selEmoji}>{p.emoji}</Text> : null}
       <Text style={[styles.selChipText, active && styles.selChipTextActive, disabled && styles.selChipTextDisabled]}>{p.text}</Text>
     </TouchableOpacity>
   );
@@ -460,5 +465,6 @@ const styles = StyleSheet.create({
   selChipTextActive: { color: theme.colors.onLime },
   selChipTextDisabled: { textDecorationLine: 'line-through' },
   selDot: { width: 10, height: 10, borderRadius: 5 },
-  pillDot: { width: 8, height: 8, borderRadius: 4 },
+  selEmoji: { fontSize: 15 },
+  pillEmoji: { fontSize: 12 },
 });

@@ -22,7 +22,7 @@ import { filterTeams } from '../core/teamSearch';
 import { OpenInAppBanner } from '../components/OpenInAppBanner';
 import type { SportId, Team } from '../core/types';
 import type { RootStackParamList } from '../navigation/types';
-import { SportLine } from '../components/SportArt';
+import { SportLine } from '../components/SportSymbol';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 const PALETTE = ['#FF5C5C', '#4DA3FF', '#3DDC97', '#FFB454', '#B98AFF', '#FF8AC4'];

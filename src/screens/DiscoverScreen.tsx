@@ -10,7 +10,7 @@ import { useNavigation, useRoute, type RouteProp } from '@react-navigation/nativ
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { theme } from '../core/theme';
 import { Glyph, IconText } from '../components/Icon';
-import { SportBadge, SportLine } from '../components/SportArt';
+import { SportBadge, SportLine } from '../components/SportSymbol';
 import { FollowBell } from '../components/FollowBell';
 import { EmptyState, Card, LoadingState, Pill, SelectChip, ScreenTitle, textStyles, plural } from '../components/ui';
 import { MatchCard } from '../components/MatchCard';
