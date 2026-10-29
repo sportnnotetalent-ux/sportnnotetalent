@@ -14,6 +14,8 @@
 import { admin, CORS, json, safeEqual, SERVICE_KEY } from '../_shared/guard.ts';
 // PostgREST stops at 1,000 rows without saying so (a bare .limit(5000) got 1,000): page.
 import { fetchAllPages } from '../_shared/paging.ts';
+import { summariseErrors, webBundleOf } from '../_shared/errorTriage.ts';
+import { APP_URL } from '../_shared/hosts.ts';
 
 const CRON_SECRET = Deno.env.get('CRON_SECRET') ?? '';
 const TO = Deno.env.get('SUPPORT_EMAIL') ?? 'support@sportnnote.in';
@@ -164,16 +166,27 @@ async function build(saveTraffic = true): Promise<{ subject: string; text: strin
   return { subject: `SportnNote weekly — ${num(w.matches_completed)} matches, ${num(w.sign_ups)} sign-ups, ${feedback.length} feedback`, text: out.join('\n') };
 }
 
+/** Which web build is live now (its bundle's hash), so errors from replaced
+ *  builds are labelled as such. Null if the page can't be read: nothing is then
+ *  marked older. */
+async function liveWebBundle(): Promise<string | null> {
+  try {
+    const r = await fetch(`${APP_URL}/`, { signal: AbortSignal.timeout(5000) });
+    return r.ok ? webBundleOf(await r.text()) : null;
+  } catch { return null; }
+}
+
 /** Daily pilot digest (first weeks): the last 24 hours — who joined, what was
  *  played, what broke, what people said. POST { period: 'day' }. */
 async function buildDaily(): Promise<{ subject: string; text: string }> {
   const since = new Date(Date.now() - 24 * 3600_000).toISOString();
-  const [events, errors, cases] = await Promise.all([
+  const [events, errors, cases, web] = await Promise.all([
     // Every event of the day — the counts below must be complete.
     fetchAllPages((from, to) => admin.from('analytics_events').select('name, profile_id, props').gte('at', since).order('id').range(from, to)),
-    admin.from('client_errors').select('message, fatal, screen, platform').gte('at', since).limit(500),
+    admin.from('client_errors').select('message, fatal, screen, platform, stack').gte('at', since).limit(500),
     fetchAllPages((from, to) => admin.from('support_cases').select('question, tried, handle').gte('created_at', since)
       .order('created_at').order('id').range(from, to)),
+    liveWebBundle(),
   ]);
   const ev = (events.data ?? []) as Row[];
   const count = (n: string) => ev.filter((e) => e.name === n).length;
@@ -183,13 +196,7 @@ async function buildDaily(): Promise<{ subject: string; text: string }> {
     const sp = String((e.props as Row | null)?.sport ?? '?');
     sports.set(sp, (sports.get(sp) ?? 0) + 1);
   }
-  const errs = (errors.data ?? []) as Row[];
-  const byMsg = new Map<string, { n: number; fatal: boolean; screen?: unknown }>();
-  for (const e of errs) {
-    const k = String(e.message).slice(0, 110);
-    const cur = byMsg.get(k) ?? { n: 0, fatal: false, screen: e.screen };
-    byMsg.set(k, { n: cur.n + 1, fatal: cur.fatal || !!e.fatal, screen: cur.screen });
-  }
+  const errs = summariseErrors((errors.data ?? []) as Row[], { web });
   const fb = (cases.data ?? []) as Row[];
   const lines = [
     'SportnNote — last 24 hours',
@@ -202,13 +209,13 @@ async function buildDaily(): Promise<{ subject: string; text: string }> {
     `  Tournaments created      ${count('tournament_created')}`,
     `  Shares                   ${count('share_link')}`,
     '',
-    `ERRORS (${errs.length})`,
-    ...(byMsg.size ? [...byMsg].sort((a, b) => b[1].n - a[1].n).slice(0, 5).map(([m, v]) => `  • ${v.n}×${v.fatal ? ' [CRASH]' : ''} ${m}${v.screen ? ` (on ${v.screen})` : ''}`) : ['  None 🎉']),
+    `ERRORS: ${errs.headline}`,
+    ...errs.lines,
     '',
     `FEEDBACK (${fb.length})`,
     ...(fb.length ? fb.map((c) => `  • ${String(c.question).slice(0, 300)}${c.handle ? ` — @${c.handle}` : ''}`) : ['  None today.']),
   ];
-  return { subject: `SportnNote daily — ${count('signed_up')} sign-ups, ${count('match_completed')} matches, ${errs.length} errors, ${fb.length} feedback`, text: lines.join('\n') };
+  return { subject: `SportnNote daily — ${count('signed_up')} sign-ups, ${count('match_completed')} matches, ${errs.counts.new} new errors, ${fb.length} feedback`, text: lines.join('\n') };
 }
 
 Deno.serve(async (req) => {
