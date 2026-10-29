@@ -48,8 +48,10 @@ function model(code: string, device: string | undefined, age: number) {
   else if (pc) cc = pc;
   else cc = device ?? null;
   const refused = age < 13 && (cc === 'US' || device === 'US' || nanp);
-  const consent = age >= 18 ? null : pc === 'IN' && (cc === 'IN') && !nanp ? 'self_declared' : 'pending';
-  return { cc, refused, consent };
+  // CL-03 parental proof (2026-10-29): every under-18 waits for a parent — India too.
+  const consent = age >= 18 ? null : 'pending';
+  const indiaKid = age < 18 && pc === 'IN' && cc === 'IN' && !nanp;
+  return { cc, refused, consent, indiaKid };
 }
 
 type Row = { id: string; age: number; dob: string };
@@ -78,7 +80,7 @@ describe('600 sign-ups', () => {
         `select signup_country, guardian_consent from profiles where id = $1`, [id]);
       assert.equal(p.signup_country, want.cc, `#${i} country: ${code} ${device}`);
       assert.equal(p.guardian_consent, want.consent, `#${i} consent: ${code} ${device} ${age}`);
-      if (want.consent === 'self_declared') india++; else if (want.consent === 'pending') waiting++; else adults++;
+      if (want.indiaKid) india++; else if (want.consent === 'pending') waiting++; else adults++;
       accounts.push({ id, age, dob: dobFor(age) });
     }
     // the mix exercised every branch
@@ -87,7 +89,7 @@ describe('600 sign-ups', () => {
 });
 
 describe('300 verifications', () => {
-  test('never looser; India checkboxes with a non-Indian number tighten, each logged', async () => {
+  test('never looser; nothing to tighten any more — every under-18 already waits for a parent', async () => {
     const before = await db.sql<{ n: number }>(`select count(*)::int as n from consent_log where method = 'phone_country'`);
     let tightened = 0;
     for (let i = 0; i < 300; i++) {
@@ -108,6 +110,8 @@ describe('300 verifications', () => {
     }
     const after = await db.sql<{ n: number }>(`select count(*)::int as n from consent_log where method = 'phone_country'`);
     assert.equal(after[0].n - before[0].n, tightened, 'one log row per tightening');
-    assert.ok(tightened > 5, `${tightened} tightened`);
+    assert.equal(tightened, 0, 'no self-declared accounts are left to tighten');
+    const [{ sd }] = await db.sql<{ sd: number }>(`select count(*)::int as sd from profiles where guardian_consent = 'self_declared'`);
+    assert.equal(sd, 0);
   });
 });

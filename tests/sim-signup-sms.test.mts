@@ -27,7 +27,7 @@ const phone = () => `+9177${String(10_000_000 + ++n).padStart(8, '0')}`;
 const ticketFor = async (p: string) => (await db.asService<{ t: string }>(`select create_signup_phone_ticket($1) as t`, [p]))[0].t;
 /** Auth's order: the hook, then the account. Returns the new id, or null when refused. */
 async function signUpViaAuth(name: string, p: string, ticket?: string): Promise<string | null> {
-  const user = { email: `s${++n}@school.in`, phone: '', user_metadata: { phone: p, ...(ticket ? { phone_ticket: ticket } : {}) } };
+  const user = { email: `s${++n}@school.in`, phone: '', user_metadata: { phone: p, dob: '2000-01-01', ...(ticket ? { phone_ticket: ticket } : {}) } };
   const [r] = await db.sql<{ r: { error?: unknown } }>(`select hook_before_user_created($1::jsonb) as r`,
     [JSON.stringify({ metadata: { ip_address: `10.1.${n % 200}.${n % 250}` }, user })]);
   if (r.r.error) return null;

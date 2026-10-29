@@ -29,12 +29,15 @@ import { isSupport } from '../core/roles';
 import { useAuth } from '../core/auth';
 import { REJECT_REASONS, isImageDoc, isOverdue, priorRejections, readableDob, waitedLabel, docKindLabel } from '../core/verificationReview';
 import { IconText } from '../components/Icon';
+import { decideGuardianProof, pendingGuardianProofs, type PendingGuardianProof } from '../data/guardianProof';
+import { REJECT_REASONS as GUARDIAN_REJECT_REASONS, RELATIONSHIPS } from '../core/guardianProof';
 
 export default function VerificationReviewScreen() {
   const { profile } = useAuth();
   const reviewer = useVerificationReviewer();
   const [pending, setPending] = useState<PendingVerification[] | null>(null);
   const [orgs, setOrgs] = useState<OrgQueueItem[]>([]);
+  const [guardians, setGuardians] = useState<PendingGuardianProof[]>([]);
   const [done, setDone] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
 
@@ -44,6 +47,8 @@ export default function VerificationReviewScreen() {
     void getPendingVerifications().then(setPending).catch(() => setPending([]));
     // Schools / colleges: SportnNote support only (the queue is empty for others).
     void getOrgVerificationQueue().then(setOrgs).catch(() => setOrgs([]));
+    // Parental proof (CL-03): a parent's photo ID + relationship document.
+    void pendingGuardianProofs().then(setGuardians).catch(() => setGuardians([]));
   }, [reviewer]);
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
@@ -67,6 +72,18 @@ export default function VerificationReviewScreen() {
               Open each document and check the name and date of birth match what was entered, then approve or reject. The player and their parent/guardian are told straight away. Documents are deleted 30 days after your decision.
             </Text>
             {done ? <Text style={st.done} accessibilityRole="alert">{done}</Text> : null}
+            {guardians.length > 0 ? (
+              <>
+                <IconText label={`👪 Parental proof · ${guardians.length}`} style={textStyles.h3} />
+                <Text style={textStyles.muted}>Oldest first. A parent sent their photo ID and a document showing they’re the parent or legal guardian. Tick all three checks, then approve — or send it back with a reason. The parent and child are told either way.</Text>
+                {guardians.map((g) => (
+                  <GuardianProofReview key={g.id} g={g} now={now} onDone={(ok) => {
+                    setGuardians((l) => l.filter((x) => x.id !== g.id));
+                    setDone(ok ? `✓ Approved — ${g.nameOnId} is now ${g.childName}’s linked parent.` : `Sent back — ${g.nameOnId} has been told what to fix.`);
+                  }} />
+                ))}
+              </>
+            ) : null}
             {orgs.length > 0 ? (
               <>
                 <Text style={textStyles.h3}>🏛️ Organisations · {orgs.length}</Text>
@@ -248,6 +265,66 @@ export function OrgReview({ o, now, onDone }: { o: OrgQueueItem; now: number; on
         <Button label={busy ? '…' : '✓ Approve'} style={st.flex} onPress={() => void decide(true)} disabled={busy || !allTicked || !!clash || (v?.authority === 'head' && !v.headConfirmedAt)} />
       </View>
       {!allTicked ? <Text style={textStyles.muted}>Approve unlocks when all three are ticked{v?.authority === 'head' && !v.headConfirmedAt ? ` and ${v.headName ?? 'they'} ha${v.headName ? 's' : 've'} confirmed` : ''}.</Text> : null}
+    </Card>
+  );
+}
+
+/** One parent's proof (CL-03): both documents beside what they entered, three
+ *  checks, approve or send back with a reason. */
+export function GuardianProofReview({ g, now, onDone }: { g: PendingGuardianProof; now: number; onDone: (approved: boolean) => void }) {
+  const [checks, setChecks] = useState([false, false, false]);
+  const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const age = ageFromDob(g.childDob ?? undefined);
+  const rel = RELATIONSHIPS.find((r) => r.id === g.relationship)?.label ?? g.relationship;
+  const fileName = (path: string | null) => (path ?? '').split('/').pop() ?? '';
+  const CHECKS = [
+    `The photo ID is readable and its name is “${g.nameOnId}”`,
+    `The second document shows ${g.nameOnId} is ${g.childName}’s ${rel.toLowerCase()}`,
+    `Any date of birth on it matches ${readableDob(g.childDob ?? undefined)}`,
+  ];
+
+  const decide = async (approve: boolean) => {
+    if (approve && checks.some((c) => !c)) { setError('Tick all three checks first.'); return; }
+    if (!approve && !reason.trim()) { setError('Pick or type a reason, so the parent knows what to fix.'); return; }
+    setBusy(true); setError(null);
+    try { await decideGuardianProof(g.id, approve, approve ? undefined : reason); onDone(approve); }
+    catch (e) { setError(e instanceof Error ? e.message : 'Couldn’t save the decision.'); }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <Card style={{ gap: theme.spacing(2) }}>
+      <View style={st.head}>
+        <Text style={[textStyles.body, { fontWeight: '800', flex: 1 }]}>{g.childName}</Text>
+        <Pill label={`⏳ ${waitedLabel(Date.parse(g.submittedAt), now)}`} color={theme.colors.surfaceAlt}
+          textColor={isOverdue(Date.parse(g.submittedAt), now) ? theme.colors.danger : theme.colors.accent} />
+      </View>
+      <Row label="Child’s date of birth" value={`${readableDob(g.childDob ?? undefined)}${age !== undefined ? ` · ${age} yrs` : ''}`} />
+      <Row label="Parent says they are" value={`${rel} · “${g.nameOnId}” on the ID`} />
+      <Row label="Sent from the account" value={g.guardianAccountName || '—'} />
+      <Row label="Date of birth confirmed by the parent" value={g.dobConfirmed ? 'Yes' : 'No'} />
+      {g.claimedByName ? <Row label="Being checked by" value={g.claimedByName} /> : null}
+      <Text style={[textStyles.body, { fontWeight: '700' }]}>Photo ID</Text>
+      <DocPreview docPath={g.idPath ?? undefined} docName={fileName(g.idPath)} />
+      <Text style={[textStyles.body, { fontWeight: '700' }]}>Relationship document</Text>
+      <DocPreview docPath={g.relationPath ?? undefined} docName={fileName(g.relationPath)} />
+      <View style={{ gap: theme.spacing(1) }}>
+        {CHECKS.map((c, i) => (
+          <SelectChip key={c} label={`${checks[i] ? '☑' : '☐'} ${c}`} active={checks[i]}
+            onPress={() => setChecks((l) => l.map((v, j) => (j === i ? !v : v)))} />
+        ))}
+      </View>
+      <View style={st.chips}>
+        {GUARDIAN_REJECT_REASONS.map((r) => <SelectChip key={r} label={r} active={reason === r} onPress={() => setReason(reason === r ? '' : r)} />)}
+      </View>
+      <TextField label="Or type a reason (if sending back)" value={reason} onChange={setReason} />
+      <FormError message={error} />
+      <View style={st.head}>
+        <Button label="Send back" variant="ghost" style={{ flex: 1 }} onPress={() => void decide(false)} disabled={busy} />
+        <Button label={busy ? 'Saving…' : 'Approve'} style={{ flex: 1 }} onPress={() => void decide(true)} disabled={busy} />
+      </View>
     </Card>
   );
 }

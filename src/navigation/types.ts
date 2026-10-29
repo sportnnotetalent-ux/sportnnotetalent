@@ -87,6 +87,7 @@ export type RootStackParamList = {
   Privacy: undefined;
   /** SD-152: the guardian's confirmation page from the email (public: /guardian-consent?c=CODE). */
   GuardianConsent: { c?: string } | undefined;
+  GuardianProof: undefined;
   /** SD-152: a linked guardian manages their child's account. */
   ManageChild: { playerId: string };
   /** Verification fast lanes: a verified school / club confirms members' dates of birth */

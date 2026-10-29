@@ -372,6 +372,9 @@ export type LineResult = 'W' | 'D' | 'L' | 'T' | 'NR';
 
 export interface StatLine {
   id: UUID;
+  /** CL-03: the player is an under-18 whose parent isn't approved yet — kept
+   *  off leaderboards (their own stats still show). Set by the data layer. */
+  publicHidden?: boolean;
   /** the match this line came from ('' for a field-event line — see eventId) */
   matchId: UUID;
   /** field events (a golf round…): the event this line came from */

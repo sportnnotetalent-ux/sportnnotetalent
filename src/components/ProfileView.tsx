@@ -46,6 +46,7 @@ export function ProfileView({
   onRetryLookup,
   follow,
   onShare,
+  publicHidden,
   onMessage,
   onOpenSport,
   onEditProfile,
@@ -67,6 +68,8 @@ export function ProfileView({
   follow?: { following: boolean; onToggle: () => void; name?: string };
   /** Share this profile (record across sports + link). */
   onShare?: () => void;
+  /** CL-03: an under-18 whose parent isn't approved yet — no career passport to share */
+  publicHidden?: boolean;
   /** someone else's profile: open a conversation (routed to the guardian for under-18s) */
   onMessage?: () => void;
   /** open the dedicated per-sport profile page */
@@ -318,7 +321,7 @@ export function ProfileView({
       {/* QR-verified certificates: yours (and your children's, as a linked parent) */}
       {ownProfile ? <MyCertificatesCard playerId={player.id} /> : null}
       {/* Career passport: the verified record to share / print */}
-      {ownProfile ? <CareerPassportCard playerId={player.id} /> : null}
+      {ownProfile && !publicHidden ? <CareerPassportCard playerId={player.id} /> : null}
       {onEditProfile && (player.phone || player.email) && (
         <ContactCard
           playerId={player.id}

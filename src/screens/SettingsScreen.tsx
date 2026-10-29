@@ -125,6 +125,8 @@ export default function SettingsScreen() {
           <Row icon="🎟️" label="Join a team with a code" onPress={() => nav.navigate('JoinTeam')} />
           <View style={st.divider} />
           <Row icon="👪" label="Link as a parent/guardian" value="Get messages about your child" onPress={() => nav.navigate('GuardianLink')} />
+          <View style={st.divider} />
+          <Row icon="🪪" label="Parental approvals" value="Documents you sent for your child" onPress={() => nav.navigate('GuardianProof')} />
         </Group>
 
         {isSupport(profile?.role) ? (

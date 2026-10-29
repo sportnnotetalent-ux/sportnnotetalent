@@ -19,7 +19,7 @@ import { Button, Card, SelectChip, FormError, textStyles } from '../components/u
 import { DateField } from '../components/DateTimeField';
 import { useAuth } from '../core/auth';
 import { ageFromDob } from '../core/age';
-import { guardianConfirmRequired, privacyCountry, usUnder13Blocked, US_UNDER_13_MESSAGE } from '../core/privacyRegion';
+import { privacyCountry, usUnder13Blocked, US_UNDER_13_MESSAGE } from '../core/privacyRegion';
 import { isValidPhone, normalizePhone, formatPhone, phoneCountry } from '../core/phone';
 import { PhoneField } from '../components/PhoneField';
 import { phoneLoginAvailable, proveSignupPhone, sendPhoneCode } from '../core/phoneLogin';
@@ -72,7 +72,6 @@ export default function AuthScreen() {
   const [gPhone, setGPhone] = useState('');
   const [gEmail, setGEmail] = useState('');
   const [role, setRole] = useState<Role>('player');
-  const [consent, setConsent] = useState(false);
   const [agreed, setAgreed] = useState(false);
   const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [note, setNote] = useState<string | null>(null);
@@ -83,11 +82,11 @@ export default function AuthScreen() {
 
   const age = ageFromDob(dob.trim());
   const minor = age !== undefined && age < 18;
-  // SD-152: under-18 rules by country (India unchanged — the checkbox below is the consent).
   // CL-04: the mobile's country first, as the server decides it (then the device).
+  // CL-03 (2026-10-29): every under-18 — India too — waits for a parent, who
+  // approves from their own account with a photo ID; the link goes to their email.
   const country = phoneCountry(mobile) ?? privacyCountry();
   const usUnder13 = usUnder13Blocked(country, age);
-  const guardianMustConfirm = minor && guardianConfirmRequired(country);
 
   // SMS required at sign-up (2026-10-29): the mobile is proven by a text
   // message first; the server swaps the proof for a one-time ticket, and the
@@ -144,19 +143,18 @@ export default function AuthScreen() {
       if (!phoneTicket) return setError('Verify your mobile number first — tap “Text me a code”.');
       if (!dob.trim() || age === undefined) return setError('Enter a valid date of birth (YYYY-MM-DD).');
       if (usUnder13) return setError(US_UNDER_13_MESSAGE);
-      if (guardianMustConfirm && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(gEmail.trim())) {
-        return setError("Add your parent/guardian's email — we'll email them a link to confirm your account.");
+      if (minor && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(gEmail.trim())) {
+        return setError("Add your parent/guardian's email — we'll email them a link to approve your account.");
       }
       if (minor) {
         if (!gName.trim()) return setError('A parent/guardian name is required to create an under-18 account.');
         if (!gPhone.trim() && !gEmail.trim()) return setError("Add the guardian's mobile or email — under-18 accounts need a guardian contact.");
         if (gPhone.trim() && !isValidPhone(gPhone)) return setError("The guardian's mobile doesn't look right — check the number and country code.");
-        if (!consent) return setError('Parent/guardian consent is required for an under-18 account.');
       }
       if (!agreed) return setError('Please agree to the Terms of Use and Privacy Policy to create an account.');
     }
     const guardian = minor && gName.trim()
-      ? { name: gName.trim(), phone: normalizePhone(gPhone) || undefined, email: gEmail.trim() || undefined, consentedAt: new Date().toISOString() }
+      ? { name: gName.trim(), phone: normalizePhone(gPhone) || undefined, email: gEmail.trim() || undefined }
       : undefined;
     if (mode === 'in') {
       setShowResend(false);
@@ -282,8 +280,8 @@ export default function AuthScreen() {
               <DateField label="Date of birth" value={dob} onChange={setDob} />
               {age !== undefined && <Text style={st.ageHint}>Age: {age} yrs{minor ? ' — a parent/guardian is required' : ''}</Text>}
               {usUnder13 && <Text style={[st.ageHint, { color: theme.colors.danger }]}>{US_UNDER_13_MESSAGE}</Text>}
-              {guardianMustConfirm && !usUnder13 && (
-                <Text style={st.ageHint}>We’ll email your parent/guardian a link to confirm your account. Until they do, following and messages are off and only your teams see your profile.</Text>
+              {minor && !usUnder13 && (
+                <Text style={st.ageHint}>We’ll email your parent/guardian a link. They approve your account from their own SportnNote account with a photo ID. Until then you can play, but you’re hidden from search and public lists, and following and messages are off.</Text>
               )}
             </>
           )}
@@ -322,19 +320,7 @@ export default function AuthScreen() {
               <IconText label={"👪 Parent / Guardian (required for under-18)"} style={textStyles.muted} />
               <Field label="Guardian name" value={gName} onChange={setGName} placeholder="Priya Mehta" />
               <PhoneField label="Guardian mobile" value={gPhone} onChange={setGPhone} labelStyle={textStyles.muted} />
-              <Field label={guardianMustConfirm ? 'Guardian email (we send the confirmation link here)' : 'Guardian email'} value={gEmail} onChange={setGEmail} placeholder="parent@email.com" keyboardType="email-address" />
-              <TouchableOpacity
-                accessibilityRole="checkbox"
-                accessibilityState={{ checked: consent }} aria-checked={consent}
-                activeOpacity={0.8}
-                onPress={() => setConsent((c) => !c)}
-                style={st.consentRow}
-              >
-                <Text style={[st.checkbox, consent && st.checkboxOn]}>{consent ? '☑' : '☐'}</Text>
-                <Text style={st.consentText}>
-                  I am {gName.trim() ? `${gName.trim()}’s ` : 'the '}parent/guardian and I consent to them creating and using a SportnNote account.
-                </Text>
-              </TouchableOpacity>
+              <Field label="Guardian email (we send the approval link here)" value={gEmail} onChange={setGEmail} placeholder="parent@email.com" keyboardType="email-address" />
             </View>
           )}
 

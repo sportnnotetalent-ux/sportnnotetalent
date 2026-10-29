@@ -80,7 +80,7 @@ describe('the app', () => {
     assert.match(navSrc, /Passport: 'pp\/:code\?'/);
     const pub = navSrc.slice(navSrc.indexOf('const publicScreens'), navSrc.indexOf('</>', navSrc.indexOf('const publicScreens')));
     assert.match(pub, /name="Passport"/);
-    assert.match(read('src/components/ProfileView.tsx'), /ownProfile \? <CareerPassportCard playerId=\{player\.id\} \/> : null/);
+    assert.match(read('src/components/ProfileView.tsx'), /ownProfile && !publicHidden \? <CareerPassportCard playerId=\{player\.id\} \/> : null/);
     assert.match(read('src/screens/ManageChildScreen.tsx'), /nav\.navigate\('Passport', \{ playerId: child\.playerId \}\)/);
   });
   test('owner actions only for the owner; reset asks first', () => {

@@ -13,6 +13,45 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-29 — Parental proof for every under-18 (CL-03) — built, not live
+
+Founder decisions (2026-10-28/29): every under-18 in every country; the parent's photo
+ID + a document showing the relationship; deleted 30 days after the review; the parent
+uses their own account; "limited" = plays and is scored, but hidden publicly; "We'll
+check this within 2 days". Design: `docs/security/cl03-parental-proof-design.md`.
+
+- **Server** (migration `20261029140000_parental_proof.sql`, founder runs it):
+  - `guardian_proofs` and the functions `guardian_proof_child`, `guardian_proof_submit`,
+    `decide_guardian_proof` (reviewers, claims), `pending_guardian_proofs`,
+    `my_guardian_proof_status` and `my_guardian_proofs`;
+  - India's sign-up checkbox ends: a trigger turns "self_declared" into "pending", and
+    the one live account is moved;
+  - the link alone no longer confirms, links a guardian or confirms a date of birth;
+  - `guardian_set_consent` needs an approved proof to confirm;
+  - `claim_guardian_link` needs the verified email it was sent to, and an age;
+  - the sign-up guard requires a date of birth (PP-21);
+  - hidden publicly: `limited_player_ids`, and triggers that skip certificates and
+    Hall of Fame honours, refuse a passport link, and take the link down on withdrawal.
+- **Edge function `guardian-proof`:** alerts reviewers once; tells the parent and the
+  child once. `privacy-retention` deletes the two exact files 30 days after the
+  decision, or at once if the child's account is gone.
+- **App:**
+  - `GuardianConsentScreen`: sign in or create an account, then the form;
+  - `GuardianProofForm`, and `GuardianProofScreen` (Settings → Parental approvals);
+  - the child's Home card states;
+  - the reviewer lane in `VerificationReviewScreen`;
+  - sign-up asks every under-18 for a parent's email (no checkbox);
+  - search, Discover and leaderboards leave hidden children out;
+  - no share button or passport card while limited.
+- **Guide:** `website/guides/parent-guardian-consent.md` rewritten ("Approving your
+  child's account").
+- **Quality:**
+  - tests: db-parental-proof (32), guardian-proof, guardian-proof-fn;
+  - the break-it list `docs/security/breaks/parental-proof.md` (PP-01…23; five fixed,
+    each test-first);
+  - `sim-parental-proof`: 500 families;
+  - full suite 5,613 pass, 0 fail.
+
 ### 2026-10-29 — Fix: "add a player by phone / email" failed on live; a web keyboard error
 
 Found in the live error log while refreshing the outstanding tasks.

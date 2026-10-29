@@ -28,7 +28,7 @@ type Hook = { error?: { http_code: number; message: string } };
 const hook = async (user: Record<string, unknown>, ip = `10.0.${n % 250}.${++n % 250}`) =>
   (await db.sql<{ r: Hook }>(`select hook_before_user_created($1::jsonb) as r`, [JSON.stringify({ metadata: { ip_address: ip }, user })]))[0].r;
 const emailUser = (p: string, ticket?: string, email = `u${++n}@school.in`) =>
-  ({ email, phone: '', user_metadata: { phone: p, ...(ticket ? { phone_ticket: ticket } : {}) } });
+  ({ email, phone: '', user_metadata: { phone: p, dob: '2000-01-01', ...(ticket ? { phone_ticket: ticket } : {}) } });
 
 describe('the ticket', () => {
   test('only the server makes one (after the SMS check); a new one replaces the last for that number', async () => {

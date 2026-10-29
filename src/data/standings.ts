@@ -1570,7 +1570,8 @@ export function leadersByKey(
 ): StatLeader[] {
   const byId = new Map(players.map((p) => [p.id, p] as const));
   const schema = statSchema(sport);
-  const mine = lines.filter((l) => l.sport === sport);
+  // CL-03: a child whose parent isn't approved yet stays off leaderboards.
+  const mine = lines.filter((l) => l.sport === sport && !l.publicHidden);
   const def: StatDef = (schema && statDefIn(schema, key)) || { key, label: key };
   // SD-09: football clean sheets rank goalkeepers only (schema `eligible`) — older clean sheets
   // credited to defenders stay on their lines until the stat backfill.

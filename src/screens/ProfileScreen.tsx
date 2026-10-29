@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -10,6 +10,7 @@ import { useAuth } from '../core/auth';
 import { getMyPlayerId, createMyPlayer } from '../data/repos';
 import type { RootStackParamList } from '../navigation/types';
 import { useProfileShare } from '../data/useProfileShare';
+import { getMyPrivacyStatus } from '../data/privacy';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -50,6 +51,13 @@ export default function ProfileScreen() {
   };
 
   const shareProfile = useProfileShare(playerId);
+  // CL-03: while a parent isn't approved yet, no share link or career passport.
+  const [limited, setLimited] = useState(false);
+  useEffect(() => {
+    let on = true;
+    void getMyPrivacyStatus().then((s) => { if (on) setLimited(!!s?.limited); }).catch(() => {});
+    return () => { on = false; };
+  }, [profile?.id]);
 
   return (
     <SafeAreaView style={st.safe} edges={['top']}>
@@ -57,7 +65,8 @@ export default function ProfileScreen() {
         playerId={playerId}
         lookupFailed={idFailed}
         onRetryLookup={() => setLookup((n) => n + 1)}
-        onShare={playerId ? shareProfile : undefined}
+        onShare={playerId && !limited ? shareProfile : undefined}
+        publicHidden={limited}
         onOpenSport={playerId ? (sport) => nav.navigate('SportProfile', { playerId, sport }) : undefined}
         onEditProfile={playerId ? () => nav.navigate('EditProfile', { playerId }) : undefined}
         onOpenOrg={(orgId) => nav.navigate('Organization', { orgId })}

@@ -57,10 +57,10 @@ describe('sign-up: the phone decides, the stricter route wins', () => {
     const p = await prof(await signUp({ dob: KID, phone: phone('44'), country: 'IN', guardian: GUARDIAN }));
     assert.deepEqual([p.signup_country, p.guardian_consent], ['GB', 'pending']);
   });
-  test('India is unchanged: a +91 number on an Indian device (or an older build that sends no country)', async () => {
+  test('India: a +91 number says IN, and the child waits for a parent too (CL-03 parental proof, 2026-10-29: the sign-up checkbox ended)', async () => {
     for (const country of ['IN', undefined]) {
       const p = await prof(await signUp({ dob: KID, phone: phone('91'), country, guardian: GUARDIAN }));
-      assert.deepEqual([p.signup_country, p.guardian_consent, p.guardian_consent_method], ['IN', 'self_declared', 'signup_checkbox'], String(country));
+      assert.deepEqual([p.signup_country, p.guardian_consent, p.guardian_consent_method], ['IN', 'pending', 'parental_proof_required'], String(country));
     }
   });
   test('a +91 number on a device set elsewhere: the stricter route (the guardian confirms)', async () => {
@@ -98,13 +98,11 @@ describe('a verified phone records its country; the route only gets stricter', (
     assert.ok(await errOf(() => db.as(kid, `select apply_verified_phone_country($1, '+447400123999')`, [kid])), 'the child');
     assert.ok(await errOf(() => db.asAnon(`select apply_verified_phone_country($1, '+447400123999')`, [kid])), 'anyone');
   });
-  test('an Indian sign-up that verifies a +44 number: GB, and the guardian must confirm (logged)', async () => {
+  test('an Indian sign-up that verifies a +44 number: GB, and still waiting for a parent', async () => {
     const kid = await signUp({ dob: KID, phone: phone('91'), country: 'IN', guardian: GUARDIAN });
     await verify(kid, '+447400123998');
     const p = await prof(kid);
-    assert.deepEqual([p.signup_country, p.guardian_consent, p.guardian_consent_method], ['GB', 'pending', 'phone_country']);
-    const log = await db.sql<{ event: string; method: string }>(`select event, method from consent_log where profile_id = $1 order by id desc limit 1`, [kid]);
-    assert.deepEqual(log[0], { event: 'pending', method: 'phone_country' });
+    assert.deepEqual([p.signup_country, p.guardian_consent], ['GB', 'pending']);
   });
   test('verifying a +91 number never loosens a waiting account; a confirmed or withdrawn one is kept', async () => {
     const waiting = await signUp({ dob: KID, phone: phone('44'), country: 'GB', guardian: GUARDIAN });

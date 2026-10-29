@@ -1328,7 +1328,10 @@ export async function searchPlayers(opts: PlayerSearch): Promise<Player[]> {
     return req;
   });
   if (error || !data) return [];
-  return (data as PlayerRow[]).map(toPlayer);
+  // CL-03: an under-18 whose parent isn't approved yet stays out of search and Discover.
+  const found = (data as PlayerRow[]).map(toPlayer);
+  const hidden = await limitedPlayerIds(found.map((p) => p.id));
+  return hidden.size ? found.filter((p) => !hidden.has(p.id)) : found;
 }
 
 /* ------------------------- Global search (parity #22) ------------------------
@@ -1478,6 +1481,28 @@ export async function getCities(): Promise<string[]> {
 }
 
 /** Stat lines for a specific set of players (one query, not all of them). */
+/** CL-03: which of these players are under-18s whose parent isn't approved
+ *  yet — left out of search, Discover and leaderboards (migration
+ *  20261029140000, limited_player_ids). Empty in demo mode; on an error the
+ *  lists show as before rather than break. */
+export async function limitedPlayerIds(ids: string[]): Promise<Set<string>> {
+  const out = new Set<string>();
+  if (!ids.length || !isSupabaseConfigured || !supabase) return out;
+  const unique = [...new Set(ids)];
+  for (let i = 0; i < unique.length; i += 1000) {
+    const { data, error } = await supabase.rpc('limited_player_ids', { p_ids: unique.slice(i, i + 1000) });
+    if (error) return new Set();
+    for (const id of (data ?? []) as string[]) out.add(id);
+  }
+  return out;
+}
+
+/** Marks the lines of hidden players (leaderboards skip them; their own stats still show). */
+async function markPublicHidden(lines: StatLine[]): Promise<StatLine[]> {
+  const hidden = await limitedPlayerIds(lines.map((l) => l.playerId));
+  return hidden.size ? lines.map((l) => (hidden.has(l.playerId) ? { ...l, publicHidden: true } : l)) : lines;
+}
+
 export async function getStatLinesForPlayers(playerIds: string[]): Promise<StatLine[]> {
   if (playerIds.length === 0) return [];
   if (!isSupabaseConfigured || !supabase) {
@@ -1487,7 +1512,7 @@ export async function getStatLinesForPlayers(playerIds: string[]): Promise<StatL
   const { data, error } = await selectStatLines((cols) => fetchAllChunked(playerIds, (part, from, to) =>
     supabase!.from('stat_lines').select(cols).in('player_id', part).order('id').range(from, to)));
   if (error || !data) return [];
-  return (data as StatLineRow[]).map(rowToStatLine);
+  return markPublicHidden((data as StatLineRow[]).map(rowToStatLine));
 }
 
 export async function getAllStatLines(): Promise<StatLine[]> {
@@ -1508,7 +1533,7 @@ export async function getAllStatLines(): Promise<StatLine[]> {
   if (error || !data) return [];
   const openKeys = new Set((dis.data ?? []).map((r: { match_id: string; player_id: string }) => `${r.match_id}:${r.player_id}`));
   const lines = (data as StatLineRow[]).map(rowToStatLine);
-  return heldOut(lines, openKeys);
+  return markPublicHidden(heldOut(lines, openKeys));
 }
 
 /* ----------------------- Team invites & captaincy -------------------------- */

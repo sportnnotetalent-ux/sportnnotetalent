@@ -87,11 +87,29 @@ Deno.serve(async (req) => {
     else orgDocsDone++;
   }
 
+  // Parental proof (CL-03, migration 20261029140000): the parent's photo ID and
+  // relationship document, 30 days after the reviewer's decision. The exact two
+  // files only — the parent's "<parent>/guardian-<child>/" folder may also hold a
+  // newer proof that is still being checked.
+  const { data: gDocs, error: gErr } = await admin.rpc('due_guardian_proof_docs', { p_grace_days: GRACE });
+  if (gErr) console.error('due_guardian_proof_docs', gErr);
+  let guardianDocsDone = 0;
+  for (const d of (gDocs ?? []) as { proof_id: string; id_path: string | null; relation_path: string | null }[]) {
+    const files = [d.id_path, d.relation_path].filter((f): f is string => !!f);
+    if (files.length) {
+      const { error } = await admin.storage.from(DOCS_BUCKET).remove(files);
+      if (error) { console.error('guardian proof files', d.proof_id, error); continue; } // retried tomorrow
+    }
+    const { error } = await admin.rpc('mark_guardian_proof_docs_deleted', { p_proof: d.proof_id });
+    if (error) console.error('mark_guardian_proof_docs_deleted', d.proof_id, error);
+    else guardianDocsDone++;
+  }
+
   let accountsDone = 0;
   for (const uid of dueAccounts) {
     const res = await deleteAccountFully(uid);
     if (res.ok) accountsDone++;
     else console.error('retention delete', uid, res.stage, res.error);
   }
-  return Response.json({ docs: docsDone, orgDocs: orgDocsDone, accounts: accountsDone });
+  return Response.json({ docs: docsDone, orgDocs: orgDocsDone, guardianDocs: guardianDocsDone, accounts: accountsDone });
 });
