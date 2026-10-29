@@ -29,6 +29,9 @@ Found in the live error log while refreshing the outstanding tasks.
   sheet's blur check ran on the web, where react-native-web only has
   currentlyFocusedField. `focusedField()` (keyboardMath.ts) reads either and never
   throws; the check is skipped on the web as the file's header always said.
+- **Live:** the founder ran the migration (verified read-only: both lookups
+  provolatile 'v'; 0 read-only functions reach a write). Web index-9404009f +
+  Android OTA 7a714337 from c952dcd (auth-smoke passed). Push `main` for the repo.
 
 ### 2026-10-29 — Release: plainer cards and sport lists, one sport symbol everywhere, distinct pad icons
 
