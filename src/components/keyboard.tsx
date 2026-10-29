@@ -36,7 +36,7 @@ import {
 } from 'react-native';
 import { initialWindowMetrics, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { theme } from '../core/theme';
-import { fieldOrder, keyboardTopOf, revealTarget, sheetPlacement } from './keyboardMath.ts';
+import { fieldOrder, focusedField, keyboardTopOf, revealTarget, sheetPlacement } from './keyboardMath.ts';
 
 const NATIVE = Platform.OS !== 'web';
 
@@ -67,9 +67,9 @@ function emit(top: number | null) {
   // While the keyboard is up, a focus change (tapping the next field, "Next"
   // on the keyboard) must re-check too — Android sends no event for it.
   if (top != null && !poll) {
-    lastFocused = TextInput.State.currentlyFocusedInput();
+    lastFocused = focusedField(TextInput.State);
     poll = setInterval(() => {
-      const now = TextInput.State.currentlyFocusedInput();
+      const now = focusedField(TextInput.State);
       if (now !== lastFocused) { lastFocused = now; if (now) emit(kbState.top); }
     }, 250);
   } else if (top == null && poll) {
@@ -131,7 +131,8 @@ export function useKeyboardFocus(onFocus?: (e: FocusEvent) => void, onBlur?: (e:
 
 /** Is the focused field inside `container`? (measureLayout fails otherwise.) */
 function focusedInside(container: Measurable | null, then: (inside: boolean, input: Measurable | null) => void) {
-  const input = TextInput.State.currentlyFocusedInput() as unknown as Measurable | null;
+  if (!NATIVE) { then(false, null); return; } // the browser keeps the field in view itself
+  const input = focusedField(TextInput.State) as Measurable | null;
   if (!input || !container) { then(false, null); return; }
   input.measureLayout(container, () => then(true, input), () => then(false, input));
 }

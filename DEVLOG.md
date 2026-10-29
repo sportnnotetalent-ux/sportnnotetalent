@@ -13,6 +13,23 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-29 — Fix: "add a player by phone / email" failed on live; a web keyboard error
+
+Found in the live error log while refreshing the outstanding tasks.
+
+- **Add by phone / email (live, since security Wave 1):** "cannot execute INSERT in
+  a read-only transaction" ×4. PostgREST runs a STABLE rpc read-only;
+  `find_player_by_phone` / `find_player_by_email` record a rate-limit hit. The
+  20261017 fix (VOLATILE) was undone when Wave 1 recreated them from an older body.
+  Migration `20261029130000_readonly_rpc_volatile.sql` (two ALTER FUNCTION lines —
+  the founder runs it). `tests/db-readonly-rpc.test.mts` calls them the way PostgREST
+  does, checks NO read-only function writes (directly or via another function), the
+  rate limit still holds, and 500 users each look someone up.
+- **Web keyboard error** ("currentlyFocusedInput is not a function", ×2): a pop-up
+  sheet's blur check ran on the web, where react-native-web only has
+  currentlyFocusedField. `focusedField()` (keyboardMath.ts) reads either and never
+  throws; the check is skipped on the web as the file's header always said.
+
 ### 2026-10-29 — Release: plainer cards and sport lists, one sport symbol everywhere, distinct pad icons
 
 Published from e92d3d7 after the founder checked the preview ("Publish"): web

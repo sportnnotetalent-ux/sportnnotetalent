@@ -3,7 +3,7 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { fieldOrder, keyboardTopOf, revealTarget, sheetPlacement, REVEAL_MARGIN } from '../src/components/keyboardMath.ts';
+import { fieldOrder, keyboardTopOf, revealTarget, sheetPlacement, REVEAL_MARGIN, focusedField } from '../src/components/keyboardMath.ts';
 
 const ev = (screenY: number, height: number) => ({ endCoordinates: { screenY, height } });
 
@@ -90,5 +90,25 @@ describe('web keeps the keyboard open', () => {
     const line = src.split('\n').find((l) => l.includes('keyboardDismissMode: props.keyboardDismissMode ??'));
     assert.ok(line, 'the scroll view default is set in keyboard.tsx');
     assert.match(line!, /!NATIVE \? undefined/);
+  });
+});
+
+describe('the focused field (2026-10-29: a live web error)', () => {
+  // React Native has TextInput.State.currentlyFocusedInput(); react-native-web
+  // only has currentlyFocusedField(). Calling the first on the web threw
+  // "currentlyFocusedInput is not a function" (twice in the live error log).
+  test('works with either, and never throws', () => {
+    const nativeNode = { id: 'native' };
+    const webNode = { id: 'web' };
+    assert.equal(focusedField({ currentlyFocusedInput: () => nativeNode }), nativeNode);
+    assert.equal(focusedField({ currentlyFocusedField: () => webNode }), webNode);
+    assert.equal(focusedField({}), null);
+    assert.equal(focusedField(undefined), null);
+    assert.equal(focusedField({ currentlyFocusedInput: () => { throw new Error('gone'); } }), null);
+  });
+  test('the keyboard helpers read it through focusedField, and the focus check is skipped on the web', () => {
+    const src = readFileSync(new URL('../src/components/keyboard.tsx', import.meta.url), 'utf8');
+    assert.doesNotMatch(src, /TextInput\.State\.currentlyFocusedInput\(\)/);
+    assert.match(src, /function focusedInside[^{]*\{\s*if \(!NATIVE\) \{ then\(false, null\); return; \}/);
   });
 });

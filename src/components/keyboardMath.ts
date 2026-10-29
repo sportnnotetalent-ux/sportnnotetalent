@@ -58,3 +58,14 @@ export function sheetPlacement({ os, focused, top, winH, safeTop }: { os: string
 export function fieldOrder(a: { x: number; y: number }, b: { x: number; y: number }): number {
   return Math.abs(a.y - b.y) <= 4 ? a.x - b.x : a.y - b.y;
 }
+
+/** The focused text field from TextInput.State: React Native has
+ *  currentlyFocusedInput(), react-native-web only currentlyFocusedField().
+ *  Null when neither exists or it throws (the web once threw here). */
+export function focusedField(state: { currentlyFocusedInput?: () => unknown; currentlyFocusedField?: () => unknown } | undefined): unknown {
+  try {
+    if (typeof state?.currentlyFocusedInput === 'function') return state.currentlyFocusedInput() ?? null;
+    if (typeof state?.currentlyFocusedField === 'function') return state.currentlyFocusedField() ?? null;
+  } catch { /* none */ }
+  return null;
+}
