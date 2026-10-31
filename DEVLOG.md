@@ -13,6 +13,13 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-31 — "Time up" tiebreak is the organiser's option; two test matches; simulation fix
+
+- **Time up, sets level** (founder's choice): a format option in every racket sport with "Time up": most games (points) in the match (default, as before) or in the set (game) in play. Break-it list `docs/security/breaks/mvp-time-up-rule.md`; tests; 500 simulated stops under both rules; demo-checked.
+- **Simulations:** the shared random generator's low bit alternates, so the MVP simulations' "random" points alternated sides. All 12 files now use the high bits; all still pass.
+- **Two old test matches** (Lions vs Tigers, Brazil vs Japan): the founder asked for them to be deleted. The SQL is in `docs/ops/2026-10-31-delete-stale-test-matches.sql` (look first, then delete; refuses unless exactly 2) for the founder's SQL editor.
+Full suite 6,038 tests, 0 failing; tsc clean.
+
 ### 2026-10-31 — Live: the web app on app.sportnnote.in (L8 switched on)
 
 The founder changed the Worker route to `app.sportnnote.in/*` (fail closed) and turned off the redirect rule; `app.sportnnote.in/` and deep links answer 200 from the Worker with the current build (`index-62238f45`). `APP_ORIGIN` set in `wrangler.jsonc`, so the light page's "Full match & stats" opens `/m/<id>?full=1` on our domain.

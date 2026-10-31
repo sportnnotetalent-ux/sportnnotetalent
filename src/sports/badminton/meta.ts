@@ -6,6 +6,7 @@
  */
 import type { SportMeta } from '../types';
 import { trackFormatFields } from '../pointDetailSettings.ts';
+import { timeUpRuleField } from '../../core/timeUp.ts';
 
 export const BADMINTON_META: SportMeta = {
   id: 'badminton',
@@ -53,6 +54,8 @@ export const BADMINTON_META: SportMeta = {
     },
     // deep wave — "Stats to track" defaults for every match of this format
     // (the scorer can still change them per match in ⚙️ Scoring settings)
+    // MVP (founder 2026-10-31): the "Time up" tiebreak is the organiser's
+    timeUpRuleField('game'),
     ...trackFormatFields('badminton'),
   ],
 };

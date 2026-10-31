@@ -6,6 +6,7 @@
  */
 import type { SportMeta } from '../types';
 import { trackFormatFields } from '../pointDetailSettings.ts';
+import { timeUpRuleField } from '../../core/timeUp.ts';
 
 export const TENNIS_META: SportMeta = {
   id: 'tennis',
@@ -99,6 +100,8 @@ export const TENNIS_META: SportMeta = {
     // racket round 2 — "Stats to track", the serve-speed unit (km/h / mph) and
     // the rally-length buckets as advanced format fields (an organiser's
     // default for every match of the format; the scorer can still change them)
+    // MVP (founder 2026-10-31): the "Time up" tiebreak is the organiser's
+    timeUpRuleField('set'),
     ...trackFormatFields('tennis'),
   ],
 };

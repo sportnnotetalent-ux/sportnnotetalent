@@ -16,7 +16,7 @@ import { nameOnlyOk } from '../src/core/contactQuery.ts';
 import type { ScoreAction } from '../src/sports/types.ts';
 
 let seed = 13;
-const rnd = (k: number) => { seed = (seed * 1103515245 + 12345) % 2 ** 31; return seed % k; };
+const rnd = (k: number) => { seed = (seed * 1103515245 + 12345) % 2 ** 31; return Math.floor(seed / 65536) % k; }; // high bits (the low bit alternates)
 const T0 = 1_700_000_000_000;
 
 for (const mode of ['run', 'stop'] as const) {

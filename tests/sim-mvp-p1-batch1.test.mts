@@ -25,7 +25,7 @@ import type { FormatField } from '../src/sports/types.ts';
 import type { ScoreAction } from '../src/sports/types.ts';
 
 let seed = 5;
-const rnd = (k: number) => { seed = (seed * 1103515245 + 12345) % 2 ** 31; return seed % k; };
+const rnd = (k: number) => { seed = (seed * 1103515245 + 12345) % 2 ** 31; return Math.floor(seed / 65536) % k; }; // high bits (the low bit alternates)
 const fld = (fs: FormatField[], k: string) => fs.find((f) => f.key === k)!;
 
 test('500 pickleball friendlies on the default: one game to 11, then the match is over', () => {

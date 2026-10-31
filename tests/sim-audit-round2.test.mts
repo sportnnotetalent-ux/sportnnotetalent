@@ -21,7 +21,7 @@ const english = (n: number) => {
   return `${n}${({ 1: 'st', 2: 'nd', 3: 'rd' } as Record<number, string>)[n % 10] ?? 'th'}`;
 };
 let seed = 3;
-const rnd = (k: number) => { seed = (seed * 1103515245 + 12345) % 2 ** 31; return seed % k; };
+const rnd = (k: number) => { seed = (seed * 1103515245 + 12345) % 2 ** 31; return Math.floor(seed / 65536) % k; }; // high bits (the low bit alternates)
 
 test('places 1–2,000 read as English ordinals', () => {
   for (let n = 1; n <= 2000; n++) {

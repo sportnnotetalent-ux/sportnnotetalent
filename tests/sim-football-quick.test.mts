@@ -16,7 +16,7 @@ const tf = FOOTBALL_META.formatFields!.filter((f) => /^track[A-Z]/.test(f.key) &
 const friendly = Object.fromEntries(tf.map((f) => [f.key, f.default]));
 const tournament = Object.fromEntries(tf.map((f) => [f.key, f.tournamentDefault ?? f.default]));
 let seed = 21;
-const rnd = (k: number) => { seed = (seed * 1103515245 + 12345) % 2 ** 31; return seed % k; };
+const rnd = (k: number) => { seed = (seed * 1103515245 + 12345) % 2 ** 31; return Math.floor(seed / 65536) % k; }; // high bits (the low bit alternates)
 
 const play = (cfg: Record<string, unknown>) => {
   let s = reducer(init(cfg), { type: 'KICKOFF', payload: { at: 1_000 } } as ScoreAction);

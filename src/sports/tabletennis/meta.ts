@@ -6,6 +6,7 @@
  */
 import type { FormatField, SportMeta } from '../types';
 import { trackFormatFields } from '../pointDetailSettings.ts';
+import { timeUpRuleField } from '../../core/timeUp.ts';
 
 /** The sport's own format options (makeRallyPlugin adds the shared "Stats to
  *  track" defaults after them, exactly as `formatFields` below does). */
@@ -62,5 +63,5 @@ export const TABLETENNIS_META: SportMeta = {
   archetype: 'set-game-point',
   participantKind: 'both', // Singles = individual, Doubles = a pair
   retireTerms: true,
-  formatFields: [...TABLETENNIS_FORMAT_FIELDS, ...trackFormatFields('tabletennis')],
+  formatFields: [...TABLETENNIS_FORMAT_FIELDS, timeUpRuleField('game'), ...trackFormatFields('tabletennis')],
 };

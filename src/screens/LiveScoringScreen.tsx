@@ -21,7 +21,7 @@ import { getDeviceId } from '../core/deviceId';
 import { mergeMatchConfig, changedFormatKeys } from '../core/matchConfig';
 import { boardName } from '../core/teamShort';
 import { manualResultLine as baseResultLine, isNoResult } from '../core/matchResult';
-import { timeUpLeader } from '../core/timeUp';
+import { timeUpLeader, timeUpRuleOf } from '../core/timeUp';
 import { matchScoreLine, finalBoard, resultMark } from '../sports/scoreline';
 import { isEliminationStage } from '../data/bracket';
 import { completedAt, effectiveLog, type AmendOp } from '../sports/amend';
@@ -1107,8 +1107,12 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
   const needsWinner = endKind === 'awarded' || endKind === 'conceded';
   // Time up: the winner comes from the score (sets, then games), never a pick.
   const timeUpLs = endKind === 'time_up' ? plugin.lineScore?.(state) ?? null : null;
-  const timeUpWinner = timeUpLeader(timeUpLs);
-  const timeUpOn = !timeUpLs ? '' : timeUpLs.won.home !== timeUpLs.won.away ? `${timeUpLs.unit}s` : timeUpLs.unit === 'set' ? 'games' : 'points';
+  // The organiser's tiebreak when the sets are level (a format option, founder 2026-10-31)
+  const timeUpRule = timeUpRuleOf(meta.config as Record<string, unknown> | undefined);
+  const timeUpWinner = timeUpLeader(timeUpLs, timeUpRule);
+  const timeUpInner = timeUpLs?.unit === 'set' ? 'games' : 'points';
+  const timeUpOn = !timeUpLs ? '' : timeUpLs.won.home !== timeUpLs.won.away ? `${timeUpLs.unit}s`
+    : timeUpRule === 'set' ? `${timeUpInner} in the ${timeUpLs.unit} in play` : timeUpInner;
   const endReady = !!endKind && endReason.trim().length >= 3 && (!needsWinner || !!endWinner)
     && !(endKind === 'time_up' && knockout && !timeUpWinner);
   const draftResult: MatchResult | null = endKind ? {

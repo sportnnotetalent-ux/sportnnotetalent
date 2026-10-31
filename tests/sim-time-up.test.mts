@@ -18,7 +18,7 @@ import type { ScoreAction } from '../src/sports/types.ts';
 import type { LineScore } from '../src/sports/scoreline.ts';
 
 let seed = 29;
-const rnd = (k: number) => { seed = (seed * 1103515245 + 12345) % 2 ** 31; return seed % k; };
+const rnd = (k: number) => { seed = (seed * 1103515245 + 12345) % 2 ** 31; return Math.floor(seed / 65536) % k; }; // high bits (the low bit alternates)
 type Engine = { init: (c?: Record<string, unknown>) => unknown; reducer: (s: never, a: ScoreAction) => unknown; lineScore: (s: never) => LineScore | null };
 const engines: [string, Engine][] = [['padel', padel as unknown as Engine], ['tennis', tennis as unknown as Engine], ['badminton', badminton as unknown as Engine]];
 

@@ -18,7 +18,7 @@ import { init as kInit, reducer as kReducer, timeoutsUsed } from '../src/sports/
 import type { ScoreAction } from '../src/sports/types.ts';
 
 let seed = 17;
-const rnd = (k: number) => { seed = (seed * 1103515245 + 12345) % 2 ** 31; return seed % k; };
+const rnd = (k: number) => { seed = (seed * 1103515245 + 12345) % 2 ** 31; return Math.floor(seed / 65536) % k; }; // high bits (the low bit alternates)
 
 test('500 tennis matches across every preset all finish', () => {
   const presets = TENNIS_META.formatFields!.find((f) => f.key === 'preset')!.options!.filter((o) => o.set);

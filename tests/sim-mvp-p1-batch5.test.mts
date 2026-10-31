@@ -12,7 +12,7 @@ import { goalAction } from '../src/sports/football/actions.ts';
 import type { ScoreAction } from '../src/sports/types.ts';
 
 let seed = 29;
-const rnd = (k: number) => { seed = (seed * 1103515245 + 12345) % 2 ** 31; return seed % k; };
+const rnd = (k: number) => { seed = (seed * 1103515245 + 12345) % 2 ** 31; return Math.floor(seed / 65536) % k; }; // high bits (the low bit alternates)
 
 test('500 single-period games', () => {
   for (let g = 0; g < 500; g++) {

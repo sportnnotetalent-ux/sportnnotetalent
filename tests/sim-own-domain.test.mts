@@ -11,7 +11,7 @@ import worker from '../worker/index.ts';
 
 const ID = '6da23011-61fb-4c24-9a8c-7a29b2924c46';
 let seed = 71;
-const rnd = (k: number) => { seed = (seed * 1103515245 + 12345) % 2 ** 31; return seed % k; };
+const rnd = (k: number) => { seed = (seed * 1103515245 + 12345) % 2 ** 31; return Math.floor(seed / 65536) % k; }; // high bits (the low bit alternates)
 const env = { SUPABASE_URL: 'https://proj.supabase.co', SUPABASE_ANON_KEY: 'k', ASSETS: { fetch: async () => new Response('asset') } };
 let calls: { url: string; init?: RequestInit }[] = [];
 const realFetch = globalThis.fetch;

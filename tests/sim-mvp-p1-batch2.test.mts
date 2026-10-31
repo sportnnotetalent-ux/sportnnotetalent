@@ -19,7 +19,7 @@ import { entryDisplayName } from '../src/data/participantEntry.ts';
 import type { ScoreAction } from '../src/sports/types.ts';
 
 let seed = 9;
-const rnd = (k: number) => { seed = (seed * 1103515245 + 12345) % 2 ** 31; return seed % k; };
+const rnd = (k: number) => { seed = (seed * 1103515245 + 12345) % 2 ** 31; return Math.floor(seed / 65536) % k; }; // high bits (the low bit alternates)
 const nameOf = (id?: string | null, legacy?: string | null) => (id ? `Player ${id}` : (legacy ?? '').trim() || 'Player');
 const clean = (l: string | null) => l === null || !/undefined|null|NaN/.test(l);
 

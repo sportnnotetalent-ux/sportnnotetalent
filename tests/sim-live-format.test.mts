@@ -16,7 +16,7 @@ import * as tennis from '../src/sports/tennis/engine.ts';
 import type { MatchEventRecord } from '../src/core/types.ts';
 
 let seed = 53;
-const rnd = (k: number) => { seed = (seed * 1103515245 + 12345) % 2 ** 31; return seed % k; };
+const rnd = (k: number) => { seed = (seed * 1103515245 + 12345) % 2 ** 31; return Math.floor(seed / 65536) % k; }; // high bits (the low bit alternates)
 type P = { createInitialState: (c?: Record<string, unknown>) => unknown; reducer: never; isComplete: (s: never) => boolean };
 const sports: { name: string; plugin: P; configs: Record<string, unknown>[]; points: (s: never) => number }[] = [
   {
