@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-31 — Release: "Time up" ending live (web, Android OTA)
+
+auth-smoke passed. Published from a clean worktree at 9a11e6c: web (entry `index-d10eb7a5`, confirmed live) and Android OTA group `096d424b` (runtime 1.0.0, channel preview). No migration.
+
 ### 2026-10-31 — MVP PD2: "Time up" ending for racket sports
 
 Break-it list first (`docs/security/breaks/mvp-time-up.md`), then each fix with a failing test. A new hand-ending kind `time_up` on the end sheet for tennis, padel, badminton, pickleball, squash and table tennis: the leader on sets (games), then on all games (points) played, wins ("Asha won on time", "6-4, 3-2 (time)"); level is a draw, and a level knockout must play on. Counts with the real score (never a forfeit). No migration: the server already reads `matches.winner`. Simulation: 500 padel / tennis / badminton matches stopped at random. Demo-checked in padel. Full suite 5,954 tests, 0 failing; tsc clean.
