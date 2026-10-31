@@ -206,6 +206,9 @@ export type RootStackParamList = {
     playersPerSide?: number;
     /** players who've already batted/bowled/fielded — can't be removed (parity #13) */
     lockedIds?: string[];
+    /** Sides the viewer may edit. A captain gets only their own side (no opponent
+     *  tab); omitted/both for match runners. */
+    editableSides?: ('home' | 'away')[];
   };
 };
 

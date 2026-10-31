@@ -142,6 +142,6 @@ describe('the app', () => {
     assert.match(read('supabase/functions/verification-submit/index.ts'), /\{ supportOnly: true \}/);
     const ef = read('supabase/functions/org-verify/index.ts');
     assert.match(ef, /caller\.asUser\.rpc\('org_is_admin'/);
-    assert.match(ef, /rateLimit\('org-verify', orgId, 5, 3600\)/);
+    assert.match(ef, /rateLimit\('org-verify', orgId, 5, 3600, \{ failClosed: true \}\)/);
   });
 });

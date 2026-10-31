@@ -219,7 +219,7 @@ export default function CreateTournamentScreen() {
         footer={(
           <>
             <FormError message={error} />
-            <Button label={busy ? 'Creating…' : 'Create tournament'} onPress={submit} />
+            <Button label={busy ? 'Creating…' : 'Create tournament'} onPress={submit} disabled={busy} />
           </>
         )}
       >

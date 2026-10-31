@@ -19,7 +19,7 @@ import type { Category, ResultEntry } from './model.ts';
 import { categoryLabel, disciplineOf } from './model.ts';
 import { rankEntries } from './rank.ts';
 import { eventAwards } from './medals.ts';
-import { IWF_TEAM_POINTS, LIFT_DISCIPLINE } from './weightlifting.ts';
+import { IWF_TEAM_POINTS, LIFT_DISCIPLINE, ordinal } from './weightlifting.ts';
 import { sharedPositions } from './positions.ts';
 
 /** 28-25-23-22-21-20 … 1 for 1st … 25th. */
@@ -106,4 +106,5 @@ export function wlTeamClassification(
 
 /** "1st ×2, 2nd ×1" — a team's places, for the tie-break line. */
 export const placesText = (places: number[]): string =>
-  places.map((n, i) => (n ? `${i + 1}${['st', 'nd', 'rd'][i] ?? 'th'} ×${n}` : '')).filter(Boolean).slice(0, 3).join(', ');
+  // ordinal: 21st, not 21th
+  places.map((n, i) => (n ? `${ordinal(i + 1)} ×${n}` : '')).filter(Boolean).slice(0, 3).join(', ');

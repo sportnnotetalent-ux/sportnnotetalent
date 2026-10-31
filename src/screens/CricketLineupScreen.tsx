@@ -27,11 +27,13 @@ type Nav = NativeStackNavigationProp<RootStackParamList>;
 export default function CricketLineupScreen() {
   const nav = useNavigation<Nav>();
   const { params } = useRoute<RouteProp<RootStackParamList, 'CricketLineup'>>();
-  const { matchId, sport, homeTeamName, awayTeamName, homeColor, awayColor, playersPerSide = 11 } = params;
+  const { matchId, sport, homeTeamName, awayTeamName, homeColor, awayColor, playersPerSide = 11, editableSides } = params;
+  // A captain sees and saves only their own side (the server refuses the other).
+  const allowedSides: ('home' | 'away')[] = editableSides && editableSides.length ? editableSides : ['home', 'away'];
   // Anyone who has batted, bowled or fielded a dismissal can't be removed (parity #13).
   const locked = new Set<string>(Array.isArray(params.lockedIds) ? params.lockedIds : typeof params.lockedIds === 'string' ? String(params.lockedIds).split(',') : []);
 
-  const [side, setSide] = useState<'home' | 'away'>('home');
+  const [side, setSide] = useState<'home' | 'away'>(allowedSides[0]);
   const [homeRoster, setHomeRoster] = useState<Player[]>([]);
   const [awayRoster, setAwayRoster] = useState<Player[]>([]);
   // Ordered picked ids + designated keeper, per side.
@@ -92,7 +94,7 @@ export default function CricketLineupScreen() {
 
   const save = async () => {
     setBusy(true);
-    for (const sd of ['home', 'away'] as const) {
+    for (const sd of allowedSides) {
       const { starters: st, subs: sb } = splitBattingOrder(order[sd], playersPerSide);
       // Only keep a keeper flag if that player is actually in the XI.
       const kp = keeper[sd] && st.includes(keeper[sd]!) ? keeper[sd] : undefined;
@@ -108,8 +110,12 @@ export default function CricketLineupScreen() {
         <ScreenTitle title="Batting order" subtitle="Tap players in the order they bat" />
 
         <View style={st.tabs}>
-          <SelectChip label={homeTeamName} active={side === 'home'} onPress={() => setSide('home')} dotColor={homeColor} />
-          <SelectChip label={awayTeamName} active={side === 'away'} onPress={() => setSide('away')} dotColor={awayColor} />
+          {allowedSides.includes('home') && (
+            <SelectChip label={homeTeamName} active={side === 'home'} onPress={() => setSide('home')} dotColor={homeColor} />
+          )}
+          {allowedSides.includes('away') && (
+            <SelectChip label={awayTeamName} active={side === 'away'} onPress={() => setSide('away')} dotColor={awayColor} />
+          )}
         </View>
 
         <Text style={textStyles.muted}>

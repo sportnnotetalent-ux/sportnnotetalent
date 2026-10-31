@@ -18,7 +18,7 @@ import { Card, SelectChip, textStyles } from '../ui';
 import { askConfirm } from '../ConfirmSheet';
 import {
   formatMark, placeOnLine, nextFin, parseRoadTime, entryByBib, orderClash, walkCards, dqCards, roadRange, roadEventOf, rangeCheck,
-  teamLine, tieBrokenByLast, describeTeamScoring, penaltyMinutes,
+  teamLine, tieBrokenByLast, describeTeamScoring, penaltyMinutes, ordSuffix,
   type DisciplineDef, type EntryResult, type ResultEntry, type ResultStatus, type RoadFormat, type TeamResult,
 } from '../../data/results';
 
@@ -259,7 +259,7 @@ export function TeamTable({ rows, scorers, basis, size }: { rows: TeamResult[]; 
             <Text style={st.total}>{t.complete ? t.total : 'inc'}</Text>
           </View>
           <Text style={st.sub}>{teamLine(t)}</Text>
-          {broken.has(t.key) ? <Text style={st.hint}>Level on {t.total} — separated by the last scorer ({t.last}{t.last === 1 ? 'st' : t.last === 2 ? 'nd' : t.last === 3 ? 'rd' : 'th'}); the team whose last scorer finished higher wins.</Text> : null}
+          {broken.has(t.key) ? <Text style={st.hint}>Level on {t.total} — separated by the last scorer ({t.last}{ordSuffix(t.last ?? 0)}); the team whose last scorer finished higher wins.</Text> : null}
           {!t.complete ? <Text style={st.hint}>Fewer than {scorers} finishers — not ranked; its runners keep their individual places.</Text> : null}
         </View>
       ))}

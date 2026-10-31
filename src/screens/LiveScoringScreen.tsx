@@ -878,7 +878,7 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
       return navigation.navigate('CricketLineup', {
         matchId: matchId!, sport,
         homeTeamName: homeTeamName ?? homeName, awayTeamName: awayTeamName ?? awayName, homeColor, awayColor,
-        playersPerSide: perSide, ...(lockedIds.length ? { lockedIds } : {}),
+        playersPerSide: perSide, editableSides, ...(lockedIds.length ? { lockedIds } : {}),
       });
     }
     // Every other sport picks who plays first (the simple Start/Bench list). For

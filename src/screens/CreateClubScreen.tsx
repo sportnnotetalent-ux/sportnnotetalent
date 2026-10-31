@@ -76,7 +76,7 @@ export default function CreateClubScreen() {
         footer={(
           <>
             <FormError message={error} />
-            <Button label={busy ? 'Creating…' : 'Create team'} onPress={create} />
+            <Button label={busy ? 'Creating…' : 'Create team'} onPress={create} disabled={busy} />
           </>
         )}
       >

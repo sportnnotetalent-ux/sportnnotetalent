@@ -193,7 +193,8 @@ export function customSpec(sport: SportId, kinds: RubberKind[], dead: DeadRule =
     return { v: 1, preset: 'custom', rubbers: b.map((x) => S(x, x, `Board ${x}`)), dead: 'play', half: true, abc: 'home', pos: { p: b, q: b }, boards: true, gap: 0 };
   }
   let s = 0, d = 0, x = 0;
-  const ord = (n: number) => (n === 1 ? '1st' : n === 2 ? '2nd' : n === 3 ? '3rd' : `${n}th`);
+  // 21st, 22nd, 23rd (not 21th); 11th–13th
+  const ord = (n: number) => `${n}${['th', 'st', 'nd', 'rd'][((n % 100) - 20) % 10] ?? ['th', 'st', 'nd', 'rd'][n % 100] ?? 'th'}`;
   const rubbers = kinds.map((k) => N(k, k === 'S' ? `${ord(++s)} singles` : k === 'D' ? `${ord(++d)} doubles` : `${ord(++x)} mixed`));
   const base: TieSpec = { v: 1, preset: 'custom', rubbers, dead: 'stop', half: false, abc: 'home', gap: 45 };
   return withDeadRule(base, dead);

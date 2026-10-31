@@ -17,3 +17,14 @@
 - **AB-04, records:** a record is about the best mark, not the tie order, so records don't change.
 
 Full suite 5,795 tests, 0 failing; tsc clean. These are app-only changes (no migration, no edge function): they go live with the next web + over-the-air publish.
+
+## Round 2 (2026-10-31)
+
+| # | Bug or failure | Status |
+|---|---|---|
+| AB-05 | **"21th", "22th", "23th"** in team lifting's tie-break line, the road-race team tie-break hint, and a custom team tie with 21+ rubbers of one kind. | **Fixed** with the shared suffix rules (`ordinal`, `ordSuffix`). Test `ordinal-suffix-fixes`; simulation checks places 1–2,000. |
+| AB-06 | **The box score's team comparison lit the side with MORE fouls, cards, turnovers or errors**, unlike the other comparison views. | **Fixed:** a row is lower-is-better when its stat says so or it is a clear count of mistakes or sanctions (`LOWER_BETTER_KEYS` in `sports/boxScore.ts`); ambiguous stats (timeouts, strikeouts, opponent errors) left as they were. Test `box-compare-lower-better`; 1,000 simulated comparisons. |
+| AB-07 | **Five create / join buttons could be tapped twice** while saving (tournament, team, community, listing, join team), making duplicates. | **Fixed:** disabled while busy, as sibling forms do. Test `create-buttons-busy`. |
+| AB-08 | **The cricket batting-order editor showed and saved both teams for a one-side captain.** The server already refused the other side's squad, but silently, so the captain's edits vanished. | **Fixed:** the editor gets `editableSides` like the other line-up editors. Test `lineup-side-guard`. |
+| AB-09 | Found while checking AB-08: **the on-pitch line-up row was checked per side only on update, not on its first insert**, so a captain who saved first could fill in the other team's layout. | **Fixed:** migration `20261031160000_lineup_side_insert.sql` (same guard on insert; update unchanged). Tests on Postgres; 500 simulated writes. |
+| — | Duplicate removal, step 1: **deleted two files nothing imported** (`sports/LiveTimeline.tsx`, `sports/basketball/Timeline.tsx`, 197 lines). | No behaviour change: unimported files aren't in the app. |

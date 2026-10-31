@@ -230,6 +230,8 @@ export interface CompareRow {
   label: string;
   home: string;
   away: string;
+  /** fewer is better (fouls, cards, turnovers…): the lower side leads */
+  lowerBetter?: boolean;
   /** the numbers behind the text, for the bars (NaN-free; 0 when none) */
   h: number;
   a: number;
@@ -272,13 +274,27 @@ export function comparisonRows<S extends string>(schema: SportStatSchema<S>, dat
     const h = sideValue(schema, def, spec.key, data.home);
     const a = sideValue(schema, def, spec.key, data.away);
     if (!h && !a) continue; // nothing on either side: the sport doesn't carry it here
-    rows.push({ key: spec.key, label, home: h?.text ?? DASH, away: a?.text ?? DASH, h: h?.n ?? 0, a: a?.n ?? 0 });
+    const lowerBetter = def?.format?.better === 'lower' || LOWER_BETTER_KEYS.has(spec.key);
+    rows.push({ key: spec.key, label, home: h?.text ?? DASH, away: a?.text ?? DASH, h: h?.n ?? 0, a: a?.n ?? 0, ...(lowerBetter ? { lowerBetter } : {}) });
   }
   return { rows, untracked };
 }
 
-/** Which side leads a comparison row (higher number), or null when level. */
-export const leaderOf = (r: Pick<CompareRow, 'h' | 'a'>): Side | null => (r.h === r.a ? null : r.h > r.a ? 'home' : 'away');
+/** Team comparison rows where fewer is better, beyond stats that already say
+ *  so (`format.better: 'lower'`): clear counts of mistakes and sanctions. Left
+ *  out on purpose where either reading is fair (timeouts, strikeouts, opponent
+ *  errors). Used for the highlight only; the bars still show each side's share. */
+export const LOWER_BETTER_KEYS: ReadonlySet<string> = new Set([
+  'fouls', 'yellowCards', 'redCards', 'greenCards', 'twoMinutes', 'sinBins', 'sendOffs', 'warnings', 'suspensions',
+  'turnovers', 'turnoversConceded', 'giveaways', 'handlingErrors', 'teamErrors', 'serveErrors', 'technicalFaults',
+  'penaltyMinutes', 'penaltyCount', 'penaltyYds', 'penaltiesConceded', 'penaltiesGivenAway', 'freeKicksConceded',
+  'missedTackles', 'sacksAllowed', 'lineoutsLost', 'scrumsLost', 'offsides', 'handballs', 'contacts', 'obstructions',
+  'leftOnBase', 'emptyRaids', 'raidsOut',
+]);
+
+/** Which side leads a comparison row (the better number), or null when level. */
+export const leaderOf = (r: Pick<CompareRow, 'h' | 'a' | 'lowerBetter'>): Side | null =>
+  (r.h === r.a ? null : (r.lowerBetter ? r.h < r.a : r.h > r.a) ? 'home' : 'away');
 
 /** The bar split: each side's share (0–1) of the two values; 0.5 / 0.5 when both are 0. */
 export function barShares(r: Pick<CompareRow, 'h' | 'a'>): { home: number; away: number } {

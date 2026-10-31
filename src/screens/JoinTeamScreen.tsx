@@ -64,14 +64,14 @@ export default function JoinTeamScreen() {
 
         <TextField label="Invite code" value={code} onChange={setCode} placeholder="JOIN-1001" autoCapitalize="characters" />
         <FormError message={error} />
-        <Button label={busy ? 'Checking…' : 'Find team'} onPress={find} />
+        <Button label={busy ? 'Checking…' : 'Find team'} onPress={find} disabled={busy} />
 
         {invite && (
           <Card style={{ gap: theme.spacing(2) }}>
             <Text style={textStyles.muted}>You’ve been invited to join</Text>
             <Text style={textStyles.h2}>{invite.teamName}</Text>
             <Text style={textStyles.muted}>as {invite.role}</Text>
-            <Button label={busy ? 'Claiming…' : `Claim as ${invite.role}`} onPress={claim} />
+            <Button label={busy ? 'Claiming…' : `Claim as ${invite.role}`} onPress={claim} disabled={busy} />
           </Card>
         )}
 

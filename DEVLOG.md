@@ -13,6 +13,18 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-31 — Audit round 2: five small bugs, two email limits, first duplicate removal (not live yet)
+
+Each test-first (`docs/security/breaks/audit-bugs-2026-10-31.md` round 2, `audit-security-2026-10-31.md` AS-06):
+- "21th" → "21st" in team lifting, the road-race hint and custom ties.
+- Box-score team comparison lights the side with fewer fouls / cards / turnovers (`LOWER_BETTER_KEYS`).
+- Five create / join buttons disabled while saving.
+- Cricket batting order: a captain sees and saves only their own side; migration `20261031160000` checks the line-up row's first insert per side too.
+- `send-invite` and `org-verify` limits fail closed, with per-recipient (and per-sender) caps.
+- Deleted two unused files (197 lines).
+- Not changed: phone-login's IP header (needs a platform check first).
+Full suite 5,815 tests, 0 failing; tsc clean. To go live: run the migration, deploy `send-invite` and `org-verify`, publish.
+
 ### 2026-10-31 — Release: four audit bug fixes live (web, Android OTA)
 
 auth-smoke passed. Published from a clean worktree at 090b745: web (entry `index-713af1d9`, confirmed live) and Android OTA group `948bad13` (runtime 1.0.0, channel preview).

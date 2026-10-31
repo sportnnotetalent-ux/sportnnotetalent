@@ -88,7 +88,9 @@ Deno.serve(async (req) => {
   if (!isEmail(to)) return json({ error: 'a valid recipient email is required' }, 400);
   if (!isInviteLink(link, LINK_PREFIXES)) return json({ error: 'a SportnNote invite link is required' }, 400);
 
-  if (!(await rateLimit('send-invite', caller.user.id, 20, 86400))) return tooMany();
+  // AS-06: fail closed (it sends email), and cap each recipient across all senders.
+  if (!(await rateLimit('send-invite', caller.user.id, 20, 86400, { failClosed: true }))) return tooMany();
+  if (!(await rateLimit('send-invite-to', to.toLowerCase(), 5, 86400, { failClosed: true }))) return tooMany();
 
   const { data: prof } = await admin.from('profiles').select('full_name').eq('id', caller.user.id).maybeSingle();
   const inviter = stripLinks(clip(prof?.full_name, 60)) || 'A SportnNote user';

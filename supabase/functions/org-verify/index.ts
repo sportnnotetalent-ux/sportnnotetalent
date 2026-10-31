@@ -13,7 +13,8 @@
  *   → 200 { sent: boolean, email?: "a***@school.edu.in", reason? }
  *
  * Guards: signed-in caller who is an Owner / Admin of the community (checked
- * AS the caller: org_is_admin); 5 emails per community per hour.
+ * AS the caller: org_is_admin); 5 emails per community per hour, 20 per
+ * person and 5 per recipient address a day (all failing closed).
  * Deploy:  supabase functions deploy org-verify
  * Secrets: RESEND_API_KEY (shared), optional APP_URL (_shared/hosts.ts).
  */
@@ -53,8 +54,12 @@ Deno.serve(async (req) => {
 
   const { data: isAdmin } = await caller.asUser.rpc('org_is_admin', { p_org: orgId });
   if (isAdmin !== true) return json({ sent: false, reason: 'Only the community’s owners and admins can do this.' }, 403);
-  if (!(await rateLimit('org-verify', orgId, 5, 3600))) {
+  // AS-06: fail closed (it sends email); a cap per sender too, so many communities don't mean many emails.
+  if (!(await rateLimit('org-verify', orgId, 5, 3600, { failClosed: true }))) {
     return json({ sent: false, reason: 'Already sent 5 emails this hour — try again later.' }, 429);
+  }
+  if (!(await rateLimit('org-verify-by', caller.user.id, 20, 86400, { failClosed: true }))) {
+    return json({ sent: false, reason: 'Too many verification emails today — try again tomorrow.' }, 429);
   }
 
   let email = '';
@@ -66,6 +71,9 @@ Deno.serve(async (req) => {
     if (!email) return json({ sent: false, reason: 'Add their name and official email first.' }, 400);
   }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ sent: false, reason: 'That email doesn’t look right.' }, 400);
+  if (!(await rateLimit('org-verify-to', email.toLowerCase(), 5, 86400, { failClosed: true }))) {
+    return json({ sent: false, reason: 'That address has had enough verification emails today — try again tomorrow.' }, 429);
+  }
 
   const { data, error } = await admin.rpc('create_org_code', {
     p_org: orgId, p_purpose: action === 'email_code' ? 'email' : 'head', p_email: email, p_by: caller.user.id,
