@@ -13,7 +13,11 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
-### 2026-10-31 — MVP P1s, batch 2 (not published yet)
+### 2026-10-31 — Release: MVP P1 batch 2 live (web, Android OTA)
+
+auth-smoke passed. Published from a clean worktree at a8c3966: web (entry `index-6631b3d1`, confirmed live) and Android OTA group `7e0f8f3a` (runtime 1.0.0, channel preview).
+
+### 2026-10-31 — MVP P1s, batch 2
 
 Break-it list first this time (`docs/security/breaks/mvp-p1-batch2.md`), then each fix with a failing test:
 - **Undo says what it removes** in football ("goal · Ravi (2-1)") and basketball ("+3 · Arjun (54-50)", "team foul (personal)").
