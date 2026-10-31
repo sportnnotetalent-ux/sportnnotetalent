@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-31 — Release: live format change live (web, Android OTA)
+
+auth-smoke passed. Published from a clean worktree at 905558c: web (entry `index-0904f283`, confirmed live) and Android OTA group `5fd4f9a8` (runtime 1.0.0, channel preview). No migration.
+
 ### 2026-10-31 — MVP B6 / T9: change a live friendly's format
 
 Break-it list first (`docs/security/breaks/mvp-live-format.md`), then each fix with a failing test. The host of a live friendly (from the device scoring it) can change the format in "Edit date, venue & format": a preview replays every tap under the new format and shows the new score; a change that would end the match or lose taps is refused. Saving writes `matches.format` and a `FORMAT` marker row: viewers reload the format when it arrives; "Undo: format change" restores the old one. The marker is dropped by `effectiveLog`, so no reducer sees it. Not for tournaments or cricket. Simulation: 500 live matches with a random change. Demo-checked (badminton 21 → 11 and back). Full suite 5,983 tests, 0 failing; tsc clean.
