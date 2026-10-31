@@ -1,0 +1,122 @@
+  40 sports/rugby/index.tsx <> sports/rugby_league/index.tsx 
+      e.g. sports/rugby/index.tsx:95  sports/rugby_league/index.tsx:78
+  13 components/results/CrewCareer.tsx <> components/results/CyclingCareer.tsx 
+      e.g. components/results/CrewCareer.tsx:63  components/results/CyclingCareer.tsx:70
+  13 sports/handball/index.tsx <> sports/hockey/index.tsx 
+      e.g. sports/handball/index.tsx:681  sports/hockey/index.tsx:694
+  13 sports/rugby/engine.ts <> sports/rugby_league/engine.ts 
+      e.g. sports/rugby/engine.ts:495  sports/rugby_league/engine.ts:487
+  10 screens/CombinedEventSetup.tsx <> screens/RoadEventSetup.tsx 
+      e.g. screens/CombinedEventSetup.tsx:105  screens/RoadEventSetup.tsx:130
+  10 sports/handball/box.ts <> sports/rugby/box.ts <> sports/rugby_league/box.ts 
+      e.g. sports/handball/box.ts:43  sports/rugby/box.ts:49  sports/rugby_league/box.ts:46
+  10 sports/handball/index.tsx <> sports/hockey/index.tsx <> sports/rugby/index.tsx 
+      e.g. sports/handball/index.tsx:107  sports/hockey/index.tsx:111  sports/rugby/index.tsx:134
+   8 components/athletics/AthleticsCareer.tsx <> components/results/CrewCareer.tsx <> components/results/CyclingCareer.tsx <> components/results/ShootingCareer.tsx 
+      e.g. components/athletics/AthleticsCareer.tsx:85  components/results/CrewCareer.tsx:66  components/results/CyclingCareer.tsx:73  components/results/ShootingCareer.tsx:64
+   8 screens/ArcheryEventSetup.tsx <> screens/AthleticsEventSetupScreen.tsx <> screens/CombinedEventSetup.tsx <> screens/CrewEventSetup.tsx <> screens/CyclingEventSetup.tsx <> screens/RoadEventSetup.tsx <> screens/ShootingEventSetup.tsx <> screens/WeightliftingEventSetup.tsx 
+      e.g. screens/ArcheryEventSetup.tsx:71  screens/AthleticsEventSetupScreen.tsx:202  screens/CombinedEventSetup.tsx:90  screens/CrewEventSetup.tsx:79  screens/CyclingEventSetup.tsx:110  screens/RoadEventSetup.tsx:115  screens/ShootingEventSetup.tsx:72  screens/WeightliftingEventSetup.tsx:68
+   8 screens/ArcheryEventSetup.tsx <> screens/CyclingEventSetup.tsx <> screens/ShootingEventSetup.tsx 
+      e.g. screens/ArcheryEventSetup.tsx:86  screens/CyclingEventSetup.tsx:125  screens/ShootingEventSetup.tsx:87
+   8 sports/handball/engine.ts <> sports/hockey/engine.ts 
+      e.g. sports/handball/engine.ts:477  sports/hockey/engine.ts:432
+   8 sports/rugby/stats.ts <> sports/rugby_league/stats.ts 
+      e.g. sports/rugby/stats.ts:21  sports/rugby_league/stats.ts:26
+   7 screens/ArcheryEventSetup.tsx <> screens/CombinedEventSetup.tsx <> screens/CrewEventSetup.tsx <> screens/CyclingEventSetup.tsx <> screens/RoadEventSetup.tsx <> screens/ShootingEventSetup.tsx <> screens/WeightliftingEventSetup.tsx 
+      e.g. screens/ArcheryEventSetup.tsx:64  screens/CombinedEventSetup.tsx:83  screens/CrewEventSetup.tsx:72  screens/CyclingEventSetup.tsx:103  screens/RoadEventSetup.tsx:108  screens/ShootingEventSetup.tsx:65  screens/WeightliftingEventSetup.tsx:61
+   7 sports/billiards/engine.ts <> sports/snooker/engine.ts 
+      e.g. sports/billiards/engine.ts:105  sports/snooker/engine.ts:143
+   6 components/results/CrewCareer.tsx <> components/results/CyclingCareer.tsx <> components/results/LiftingCareer.tsx 
+      e.g. components/results/CrewCareer.tsx:57  components/results/CyclingCareer.tsx:64  components/results/LiftingCareer.tsx:58
+   6 sports/american_football/index.tsx <> sports/handball/index.tsx <> sports/hockey/index.tsx <> sports/rugby/index.tsx <> sports/rugby_league/index.tsx 
+      e.g. sports/american_football/index.tsx:65  sports/handball/index.tsx:61  sports/hockey/index.tsx:61  sports/rugby/index.tsx:89  sports/rugby_league/index.tsx:72
+   6 sports/handball/engine.ts <> sports/ice_hockey/engine.ts 
+      e.g. sports/handball/engine.ts:394  sports/ice_hockey/engine.ts:638
+   5 components/results/ArcheryCareer.tsx <> components/results/CrewCareer.tsx <> components/results/CyclingCareer.tsx <> components/results/LiftingCareer.tsx <> components/results/ShootingCareer.tsx 
+      e.g. components/results/ArcheryCareer.tsx:90  components/results/CrewCareer.tsx:86  components/results/CyclingCareer.tsx:93  components/results/LiftingCareer.tsx:110  components/results/ShootingCareer.tsx:84
+   5 components/results/CrewCareer.tsx <> components/results/CyclingCareer.tsx <> components/results/LiftingCareer.tsx <> components/results/ShootingCareer.tsx 
+      e.g. components/results/CrewCareer.tsx:97  components/results/CyclingCareer.tsx:104  components/results/LiftingCareer.tsx:121  components/results/ShootingCareer.tsx:95
+   5 screens/RosterImportScreen.tsx <> screens/StudentImportScreen.tsx 
+      e.g. screens/RosterImportScreen.tsx:147  screens/StudentImportScreen.tsx:224
+   5 sports/PointDetailRow.tsx <> sports/tennis/PointCapture.tsx 
+      e.g. sports/PointDetailRow.tsx:184  sports/tennis/PointCapture.tsx:158
+   5 sports/handball/index.tsx <> sports/rugby/index.tsx 
+      e.g. sports/handball/index.tsx:103  sports/rugby/index.tsx:130
+   5 sports/handball/index.tsx <> sports/hockey/index.tsx <> sports/ice_hockey/index.tsx <> sports/rugby/index.tsx 
+      e.g. sports/handball/index.tsx:767  sports/hockey/index.tsx:778  sports/ice_hockey/index.tsx:835  sports/rugby/index.tsx:809
+   5 sports/rugby/totals.ts <> sports/rugby_league/totals.ts 
+      e.g. sports/rugby/totals.ts:34  sports/rugby_league/totals.ts:26
+   4 screens/ArcheryEventSetup.tsx <> screens/CombinedEventSetup.tsx <> screens/CyclingEventSetup.tsx <> screens/RoadEventSetup.tsx <> screens/ShootingEventSetup.tsx <> screens/WeightliftingEventSetup.tsx 
+      e.g. screens/ArcheryEventSetup.tsx:80  screens/CombinedEventSetup.tsx:99  screens/CyclingEventSetup.tsx:119  screens/RoadEventSetup.tsx:124  screens/ShootingEventSetup.tsx:81  screens/WeightliftingEventSetup.tsx:77
+   4 sports/american_football/box.ts <> sports/handball/box.ts <> sports/hockey/box.ts <> sports/ice_hockey/box.ts <> sports/rugby/box.ts <> sports/rugby_league/box.ts 
+      e.g. sports/american_football/box.ts:54  sports/handball/box.ts:37  sports/hockey/box.ts:36  sports/ice_hockey/box.ts:38  sports/rugby/box.ts:43  sports/rugby_league/box.ts:40
+   4 sports/american_football/index.tsx <> sports/rugby_league/index.tsx 
+      e.g. sports/american_football/index.tsx:814  sports/rugby_league/index.tsx:605
+   4 sports/american_football/index.tsx <> sports/netball/index.tsx <> sports/rugby_league/index.tsx 
+      e.g. sports/american_football/index.tsx:914  sports/netball/index.tsx:825  sports/rugby_league/index.tsx:697
+   4 sports/billiards/controls.ts <> sports/snooker/controls.ts 
+      e.g. sports/billiards/controls.ts:25  sports/snooker/controls.ts:31
+   4 sports/handball/index.tsx <> sports/hockey/index.tsx <> sports/rugby/index.tsx <> sports/rugby_league/index.tsx 
+      e.g. sports/handball/index.tsx:108  sports/hockey/index.tsx:112  sports/rugby/index.tsx:135  sports/rugby_league/index.tsx:116
+   4 sports/handball/index.tsx <> sports/hockey/index.tsx <> sports/ice_hockey/index.tsx 
+      e.g. sports/handball/index.tsx:677  sports/hockey/index.tsx:690  sports/ice_hockey/index.tsx:702
+   3 components/athletics/AthleticsCareer.tsx <> components/results/ArcheryCareer.tsx <> components/results/CrewCareer.tsx <> components/results/CyclingCareer.tsx <> components/results/LiftingCareer.tsx <> components/results/ShootingCareer.tsx 
+      e.g. components/athletics/AthleticsCareer.tsx:102  components/results/ArcheryCareer.tsx:87  components/results/CrewCareer.tsx:83  components/results/CyclingCareer.tsx:90  components/results/LiftingCareer.tsx:107  components/results/ShootingCareer.tsx:81
+   3 data/legal.ts 
+      e.g. data/legal.ts:142  data/legal.ts:382
+   3 screens/CreateTournamentScreen.tsx <> screens/EditTournamentScreen.tsx 
+      e.g. screens/CreateTournamentScreen.tsx:336  screens/EditTournamentScreen.tsx:253
+   3 sports/athletics/stats.ts <> sports/swimming/stats.ts 
+      e.g. sports/athletics/stats.ts:116  sports/swimming/stats.ts:41
+   3 sports/handball/engine.ts <> sports/hockey/engine.ts <> sports/ice_hockey/engine.ts 
+      e.g. sports/handball/engine.ts:401  sports/hockey/engine.ts:354  sports/ice_hockey/engine.ts:645
+   3 sports/hockey/index.tsx <> sports/ice_hockey/index.tsx 
+      e.g. sports/hockey/index.tsx:686  sports/ice_hockey/index.tsx:698
+   3 sports/rugby/box.ts <> sports/rugby_league/box.ts 
+      e.g. sports/rugby/box.ts:61  sports/rugby_league/box.ts:58
+   2 components/athletics/AthleticsCareer.tsx <> components/results/ShootingCareer.tsx 
+      e.g. components/athletics/AthleticsCareer.tsx:73  components/results/ShootingCareer.tsx:52
+   2 screens/GuardianConsentScreen.tsx <> screens/SchoolRequestScreen.tsx 
+      e.g. screens/GuardianConsentScreen.tsx:126  screens/SchoolRequestScreen.tsx:106
+   2 sports/american_football/box.ts <> sports/ice_hockey/box.ts 
+      e.g. sports/american_football/box.ts:58  sports/ice_hockey/box.ts:42
+   2 sports/american_football/engine.ts <> sports/handball/engine.ts <> sports/hockey/engine.ts <> sports/ice_hockey/engine.ts <> sports/rugby/engine.ts <> sports/rugby_league/engine.ts 
+      e.g. sports/american_football/engine.ts:429  sports/handball/engine.ts:303  sports/hockey/engine.ts:262  sports/ice_hockey/engine.ts:378  sports/rugby/engine.ts:396  sports/rugby_league/engine.ts:396
+   2 sports/american_football/index.tsx <> sports/netball/index.tsx 
+      e.g. sports/american_football/index.tsx:912  sports/netball/index.tsx:823
+   2 sports/cricket/editOvers.ts <> sports/cricket/engine.ts 
+      e.g. sports/cricket/editOvers.ts:152  sports/cricket/engine.ts:1876
+   2 sports/handball/box.ts <> sports/hockey/box.ts <> sports/rugby/box.ts <> sports/rugby_league/box.ts 
+      e.g. sports/handball/box.ts:41  sports/hockey/box.ts:40  sports/rugby/box.ts:47  sports/rugby_league/box.ts:44
+   2 sports/handball/engine.ts <> sports/hockey/engine.ts <> sports/rugby/engine.ts <> sports/rugby_league/engine.ts 
+      e.g. sports/handball/engine.ts:309  sports/hockey/engine.ts:268  sports/rugby/engine.ts:402  sports/rugby_league/engine.ts:402
+   2 sports/handball/index.tsx <> sports/hockey/index.tsx <> sports/netball/index.tsx 
+      e.g. sports/handball/index.tsx:67  sports/hockey/index.tsx:67  sports/netball/index.tsx:81
+   2 sports/handball/index.tsx <> sports/rugby/index.tsx <> sports/rugby_league/index.tsx 
+      e.g. sports/handball/index.tsx:342  sports/rugby/index.tsx:357  sports/rugby_league/index.tsx:269
+   1 components/athletics/AthleticsCareer.tsx <> components/results/CrewCareer.tsx <> components/results/CyclingCareer.tsx <> components/results/LiftingCareer.tsx <> components/results/ShootingCareer.tsx 
+      e.g. components/athletics/AthleticsCareer.tsx:121  components/results/CrewCareer.tsx:102  components/results/CyclingCareer.tsx:109  components/results/LiftingCareer.tsx:126  components/results/ShootingCareer.tsx:100
+   1 screens/ArcheryEventSetup.tsx <> screens/CombinedEventSetup.tsx <> screens/CyclingEventSetup.tsx <> screens/RoadEventSetup.tsx <> screens/ShootingEventSetup.tsx 
+      e.g. screens/ArcheryEventSetup.tsx:85  screens/CombinedEventSetup.tsx:104  screens/CyclingEventSetup.tsx:124  screens/RoadEventSetup.tsx:129  screens/ShootingEventSetup.tsx:86
+   1 screens/ArcheryEventSetup.tsx <> screens/AthleticsEventSetupScreen.tsx <> screens/CyclingEventSetup.tsx <> screens/ShootingEventSetup.tsx <> screens/WeightliftingEventSetup.tsx 
+      e.g. screens/ArcheryEventSetup.tsx:280  screens/AthleticsEventSetupScreen.tsx:594  screens/CyclingEventSetup.tsx:336  screens/ShootingEventSetup.tsx:316  screens/WeightliftingEventSetup.tsx:216
+   1 screens/CreateCommunityScreen.tsx <> screens/TournamentTeamsScreen.tsx 
+      e.g. screens/CreateCommunityScreen.tsx:197  screens/TournamentTeamsScreen.tsx:740
+   1 sports/MatchStatsPanel.tsx <> sports/tennis/StatsPanel.tsx 
+      e.g. sports/MatchStatsPanel.tsx:97  sports/tennis/StatsPanel.tsx:78
+   1 sports/RacketCommentary.tsx <> sports/tennis/Commentary.tsx 
+      e.g. sports/RacketCommentary.tsx:25  sports/tennis/Commentary.tsx:27
+   1 sports/american_football/box.ts <> sports/handball/box.ts <> sports/hockey/box.ts <> sports/ice_hockey/box.ts <> sports/netball/box.ts <> sports/rugby/box.ts <> sports/rugby_league/box.ts 
+      e.g. sports/american_football/box.ts:53  sports/handball/box.ts:36  sports/hockey/box.ts:35  sports/ice_hockey/box.ts:37  sports/netball/box.ts:38  sports/rugby/box.ts:42  sports/rugby_league/box.ts:39
+   1 sports/american_football/index.tsx <> sports/rugby/index.tsx <> sports/rugby_league/index.tsx 
+      e.g. sports/american_football/index.tsx:817  sports/rugby/index.tsx:712  sports/rugby_league/index.tsx:608
+   1 sports/basketball/index.tsx <> sports/football/index.tsx 
+      e.g. sports/basketball/index.tsx:875  sports/football/index.tsx:1372
+   1 sports/canoe/meta.ts <> sports/rowing/meta.ts 
+      e.g. sports/canoe/meta.ts:22  sports/rowing/meta.ts:22
+   1 sports/handball/totals.ts <> sports/hockey/totals.ts <> sports/rugby/totals.ts <> sports/rugby_league/totals.ts 
+      e.g. sports/handball/totals.ts:32  sports/hockey/totals.ts:25  sports/rugby/totals.ts:33  sports/rugby_league/totals.ts:25
+   1 sports/handball/totals.ts <> sports/hockey/totals.ts 
+      e.g. sports/handball/totals.ts:33  sports/hockey/totals.ts:26
+   1 sports/rugby/ticker.ts <> sports/rugby_league/ticker.ts 
+      e.g. sports/rugby/ticker.ts:11  sports/rugby_league/ticker.ts:11
