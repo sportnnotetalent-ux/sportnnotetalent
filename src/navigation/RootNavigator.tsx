@@ -43,6 +43,7 @@ const CopyTournamentScreen = lazyScreen(() => import('../screens/CopyTournamentS
 const LinkEditionScreen = lazyScreen(() => import('../screens/LinkEditionScreen'));
 const TeamsScreen = lazyScreen(() => import('../screens/TeamsScreen'));
 const ScheduleMatchScreen = lazyScreen(() => import('../screens/ScheduleMatchScreen'));
+const GuestGameScreen = lazyScreen(() => import('../screens/GuestGameScreen'));
 const CreateSeriesScreen = lazyScreen(() => import('../screens/CreateSeriesScreen'));
 const SeriesScreen = lazyScreen(() => import('../screens/SeriesScreen'));
 const EditMatchScreen = lazyScreen(() => import('../screens/EditMatchScreen'));
@@ -157,7 +158,7 @@ const Tab = createBottomTabNavigator<TabParamList>();
 // the Join screen with the code prefilled.
 // Stack screens reachable by URL on web (/GolfRound?eventId=…). Keep in sync with
 // the <Stack.Screen> list below — a screen missing here just opens Home on refresh.
-const STACK_SCREENS = new Set<string>(['Americano', 'AssignScorers', 'AthleticsEventSetup', 'CorrectMatch', 'Bracket', 'Calendar', 'ClubHome', 'ClubSport', 'Clubs', 'MyTournaments', 'CompetitionRules', 'Contingents', 'Conversation', 'CreateClub', 'CreateCommunity', 'CreateListing', 'CreateSeries', 'CopyTournament', 'CreateTournament', 'CricketLineup', 'DeleteAccount', 'DiscoverOrgs', 'EditMatch', 'EditProfile', 'EditTeam', 'EditTournament', 'Feedback', 'Following', 'GenerateFixtures', 'GolfCourseEdit', 'GolfRound', 'GolfRoundSetup', 'GuardianConsent', 'GuardianLink', 'GuardianProof', 'HeadToHead', 'InviteFriend', 'ImportSchedule', 'RosterImport', 'StudentImport', 'SchoolRequest', 'JoinClub', 'JoinTeam', 'JoinTournament', 'Legal', 'LineupEditor', 'LinkEdition', 'LiveScoring', 'ManageChild', 'MatchLink', 'OrgDobs', 'OrgVerify', 'Personalise', 'QuickTournament', 'Certificates', 'MatchSquad', 'MeetEntries', 'MeetTimetable', 'MessageReports', 'Messages', 'NotificationPrefs', 'RegionSettings', 'Notifications', 'Organization', 'OrganizerDashboard', 'PlayerProfile', 'Privacy', 'RecordBoard', 'ResultsEvent', 'ResultsLab', 'ScanQR', 'ScheduleMatch', 'Series', 'Settings', 'SportHub', 'SportProfile', 'SportSettings', 'Squad', 'Standings', 'Support', 'SupportConsole', 'SwissRound', 'Team', 'TeamJourney', 'Teams', 'Tournament', 'TournamentTeams', 'TryNewSport', 'VerificationReview']);
+const STACK_SCREENS = new Set<string>(['Americano', 'AssignScorers', 'AthleticsEventSetup', 'CorrectMatch', 'Bracket', 'Calendar', 'ClubHome', 'ClubSport', 'Clubs', 'MyTournaments', 'CompetitionRules', 'Contingents', 'Conversation', 'CreateClub', 'CreateCommunity', 'CreateListing', 'CreateSeries', 'CopyTournament', 'CreateTournament', 'CricketLineup', 'DeleteAccount', 'DiscoverOrgs', 'EditMatch', 'EditProfile', 'EditTeam', 'EditTournament', 'Feedback', 'Following', 'GenerateFixtures', 'GolfCourseEdit', 'GolfRound', 'GolfRoundSetup', 'GuardianConsent', 'GuestGame', 'GuardianLink', 'GuardianProof', 'HeadToHead', 'InviteFriend', 'ImportSchedule', 'RosterImport', 'StudentImport', 'SchoolRequest', 'JoinClub', 'JoinTeam', 'JoinTournament', 'Legal', 'LineupEditor', 'LinkEdition', 'LiveScoring', 'ManageChild', 'MatchLink', 'OrgDobs', 'OrgVerify', 'Personalise', 'QuickTournament', 'Certificates', 'MatchSquad', 'MeetEntries', 'MeetTimetable', 'MessageReports', 'Messages', 'NotificationPrefs', 'RegionSettings', 'Notifications', 'Organization', 'OrganizerDashboard', 'PlayerProfile', 'Privacy', 'RecordBoard', 'ResultsEvent', 'ResultsLab', 'ScanQR', 'ScheduleMatch', 'Series', 'Settings', 'SportHub', 'SportProfile', 'SportSettings', 'Squad', 'Standings', 'Support', 'SupportConsole', 'SwissRound', 'Team', 'TeamJourney', 'Teams', 'Tournament', 'TournamentTeams', 'TryNewSport', 'VerificationReview']);
 
 // Web deep links / refresh. React Navigation 7 only recognises screens listed in
 // `config`, and a URL that resolves to NO state makes it call resetRoot(undefined),
@@ -400,6 +401,8 @@ export default function RootNavigator() {
       <Stack.Screen name="OrgConfirm" component={OrgConfirmScreen} options={{ ...stackScreenOpts, title: 'Confirm' }} />
       <Stack.Screen name="Invite" component={InviteScreen} options={{ ...stackScreenOpts, title: 'Join SportnNote' }} />
       <Stack.Screen name="GetApp" component={GetAppScreen} options={{ ...stackScreenOpts, title: 'Join SportnNote' }} />
+      {/* Score first, sign up later: a guest's quick game (kept on this device) */}
+      <Stack.Screen name="GuestGame" component={GuestGameScreen} options={{ ...stackScreenOpts, title: 'Score a game' }} />
       <Stack.Screen
       name="LiveScoring"
       component={LiveScoringScreen}

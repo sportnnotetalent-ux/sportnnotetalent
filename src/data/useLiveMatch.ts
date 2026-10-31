@@ -32,6 +32,8 @@ import { mergeLog, eventKey, statReversals, deriveLog, newestEvent, logAction as
 import { undoAmendDeltas, AMEND_TYPE, FORMAT_TYPE, type AmendOp } from '../sports/amend';
 import { planAmendment } from './amendments';
 import { newUuid } from '../core/deviceId';
+import { appendGuestEvent, popGuestEvent, type GuestMatch } from '../core/guestMatch';
+import { guestStore } from './guestStore';
 import { canWriteWith, type LockStatus } from '../core/scoringLock';
 import { AppState } from 'react-native';
 import { createResultHold, type ResultHold } from './resultHold';
@@ -103,6 +105,10 @@ export function useLiveMatch(params: {
   /** MVP B6 — the match's format was changed (a FORMAT row arrived) or the
    *  change was undone (its row left the log): reload the format. */
   onFormatChange?: () => void;
+  /** Guest scoring (docs/security/breaks/guest-scoring.md): with no matchId, the
+   *  taps of this guest match are kept on the device (Undo, resume after a
+   *  close) and nothing goes to the server. */
+  guestId?: string;
   /** a pure viewer (the OBS overlay): never flush this device's outbox */
   readOnly?: boolean;
   /** SD-48 — this match is a rubber of a team tie: team / tournament
@@ -252,6 +258,26 @@ export function useLiveMatch(params: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [matchId, plugin, config]);
 
+  // Guest scoring: the device's copy of this guest match (G2).
+  const guestRef = useRef<GuestMatch | null>(null);
+  const guestChainRef = useRef<Promise<void>>(Promise.resolve());
+  const guestId = params.guestId;
+  const saveGuest = (g: GuestMatch) => {
+    guestRef.current = g;
+    guestChainRef.current = guestChainRef.current.then(() => guestStore.set(g)).catch(() => {});
+  };
+  useEffect(() => {
+    if (matchId || !guestId) return;
+    let on = true;
+    void guestStore.get().then((g) => {
+      if (!on || !g || g.id !== guestId) return;
+      guestRef.current = g;
+      applyLog(g.events, deriveLog(plugin, config, g.events));
+    });
+    return () => { on = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [matchId, guestId, plugin, config]);
+
   useEffect(() => {
     if (!matchId) {
       setSyncing(false);
@@ -328,6 +354,14 @@ export function useLiveMatch(params: {
       setBoth(next);
       if (canScore && !readOnly) tapFeedback(); // SD-110: feel that the tap went in
 
+      // Guest scoring: keep the tap on the device only (no stats, alerts or server).
+      if (!matchId && guestId && guestRef.current && action.type !== FORMAT_TYPE) {
+        setLastStep({ type: action.type, prev: prevState, next });
+        saveGuest(appendGuestEvent(guestRef.current, action, newUuid, Date.now()));
+        rawRef.current = guestRef.current!.events;
+        setEventCount(rawRef.current.length);
+        return;
+      }
       if (!matchId || !canWrite) return;
       setLastStep({ type: action.type, prev: prevState, next });
 
@@ -402,13 +436,20 @@ export function useLiveMatch(params: {
       logVersionRef.current += 1;
       void syncThenPersist(next).catch(() => {});
     },
-    [plugin, matchId, canWrite, canScore, readOnly, sport, homeTeamName, awayTeamName, homeTeamId, awayTeamId, tournamentId, config]
+    [plugin, matchId, guestId, canWrite, canScore, readOnly, sport, homeTeamName, awayTeamName, homeTeamId, awayTeamId, tournamentId, config]
   );
 
   // Undo the last recorded event: drop it from the log, reverse any stat line it
   // credited, then re-derive state by replaying the truncated log. Repeating this
   // walks the match back to any earlier point so the scorer can fix a mistake.
   const undo = useCallback(async () => {
+    if (!matchId && guestId && guestRef.current) {
+      undoFeedback();
+      saveGuest(popGuestEvent(guestRef.current));
+      const ev = guestRef.current!.events;
+      applyLog(ev, deriveLog(plugin, config, ev));
+      return;
+    }
     if (!matchId || !canWrite) return;
     undoFeedback();
     // SD-111: stop a held result's clock while the undo is in flight, so it can't
@@ -469,19 +510,24 @@ export function useLiveMatch(params: {
       await rebuildFromLog().catch(() => undefined);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [matchId, canWrite, plugin, sport, config, rebuildFromLog, homeTeamName, awayTeamName]);
+  }, [matchId, guestId, canWrite, plugin, sport, config, rebuildFromLog, homeTeamName, awayTeamName]);
 
   // Wipe the match back to "not started" — for a game started/scored by mistake.
   // Drops unsynced taps, deletes the backend log + blanks stat lines, then rebuilds
   // to the initial state. The SCREEN gates who may do this and the time window.
   const reset = useCallback(async () => {
+    if (!matchId && guestId && guestRef.current) {
+      saveGuest({ ...guestRef.current, events: [], result: null });
+      applyLog([], deriveLog(plugin, config, []));
+      return;
+    }
     if (!matchId || !canWrite) return;
     hold.cancel();
     void pendingResults.remove(matchId);
     matchOutbox.clear(matchId);
     await resetMatch(matchId);
     await rebuildFromLog();
-  }, [matchId, canWrite, rebuildFromLog]);
+  }, [matchId, guestId, canWrite, rebuildFromLog]);
 
   // Taps the server refused (another device took over): drop them, reverse the
   // stat lines they already credited on dispatch, and show the server's log.

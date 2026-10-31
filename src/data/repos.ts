@@ -6467,6 +6467,37 @@ export async function createMatch(input: NewMatch): Promise<Match> {
   return full;
 }
 
+/** Guest scoring (docs/security/breaks/guest-scoring.md, G3): create a team /
+ *  friendly with an id the client chose, so a retry after a lost reply never
+ *  makes a second one. "Already exists" (Postgres 23505 on the id) counts as
+ *  done; any other error is thrown. The caller owns both (same session). */
+const isDuplicate = (e: { code?: string } | null) => e?.code === '23505';
+export async function ensureTeamWithId(input: NewTeam & { id: string }): Promise<void> {
+  if (!isSupabaseConfigured || !supabase) {
+    if (!demo.teams.some((t) => t.id === input.id)) demo.teams.push({ name: input.name, shortName: input.shortName, sport: input.sport, colorHex: input.colorHex, adhoc: input.adhoc, id: input.id } as Team);
+    return;
+  }
+  const { error } = await supabase.from('teams').insert({
+    id: input.id, name: input.name, short_name: input.shortName, sport: input.sport,
+    color_hex: input.colorHex, org_id: null, roster: null, adhoc: input.adhoc ?? false,
+  });
+  if (error && !isDuplicate(error)) throw new Error(error.message);
+}
+export async function ensureFriendlyWithId(input: { id: string; sport: SportId; homeTeamId: string; awayTeamId: string; startsAt: string; hostIds: string[]; format: SportFormat }): Promise<void> {
+  if (!isSupabaseConfigured || !supabase) {
+    if (demo.matches.some((m) => m.id === input.id)) return;
+    const home = demo.teams.find((t) => t.id === input.homeTeamId)!;
+    const away = demo.teams.find((t) => t.id === input.awayTeamId)!;
+    demo.matches.push({ id: input.id, sport: input.sport, status: 'scheduled', startsAt: input.startsAt, hostIds: input.hostIds, homeTeam: home, awayTeam: away, format: input.format, state: null } as Match);
+    return;
+  }
+  const { error } = await supabase.from('matches').insert({
+    id: input.id, tournament_id: null, sport: input.sport, home_team_id: input.homeTeamId, away_team_id: input.awayTeamId,
+    starts_at: input.startsAt, host_ids: input.hostIds, format: input.format ?? {}, status: 'scheduled',
+  });
+  if (error && !isDuplicate(error)) throw new Error(error.message);
+}
+
 /* -------------------------------- Series / ties --------------------------- */
 
 export interface NewSeries {

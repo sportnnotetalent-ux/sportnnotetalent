@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-31 — Score first, sign up later (growth plan #1)
+
+A signed-out person can score a friendly straight away: "Score a game now, no sign-up" on the sign-in screen → a short setup (the seven MVP sports) → scoring. The game lives only on the phone (Undo, resume after a reload) until "Save & share": sign up, and it's uploaded as a normal match (ids chosen first, taps through the idempotent append, progress saved, so retries never duplicate) and the screen switches to it. Nothing reaches the server before an account owns it. Break-it list `docs/security/breaks/guest-scoring.md`; tests; 500 simulated games over a flaky network (found and fixed: retries re-sent every tap). Demo-checked signed in; the signed-out path to check live after publishing. Full suite 6,062 tests, 0 failing; tsc clean.
+
 ### 2026-10-31 — Two old test matches deleted (founder, SQL editor)
 
 Lions vs Tigers (`72414a2a`, live since 22 Aug) and Brazil 5 fc vs Japan 5 fc (`4ad03965`, live since 26 Sep) deleted by id with their per-match rows (cascade); teams kept. The first, name-based script found only one (the second's teams are "Brazil 5 fc" / "Japan 5 fc") and changed nothing; the founder's look-up gave the ids. Script: `docs/ops/2026-10-31-delete-stale-test-matches.sql`.

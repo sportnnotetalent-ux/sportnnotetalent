@@ -16,6 +16,8 @@ export type RootStackParamList = {
     awayColor?: string;
     /** when present (and Supabase configured), scores persist & broadcast live */
     matchId?: string;
+    /** Score first, sign up later: a guest match kept on this device (no matchId) */
+    guestId?: string;
     /** false for viewers — read-only scoreboard */
     canScore?: boolean;
     /** the open tab / "Add scorer" panel — kept in params so they survive an iPhone
@@ -48,6 +50,8 @@ export type RootStackParamList = {
   GenerateFixtures: { tournamentId: string; sport?: SportId; structure?: 'league' | 'knockout' | 'groups'; groups?: number; day?: 'today' | 'tomorrow' };
   /** MVP 2026-10-31: name, sport, teams, format → the fixtures */
   QuickTournament: { sport?: SportId } | undefined;
+  /** Score first, sign up later: a signed-out person's quick game (on this device) */
+  GuestGame: undefined;
   /** SD-134 — a Swiss round: numbered pairings (share / print) + the round results sheet */
   SwissRound: { tournamentId: string; sport?: SportId; round?: number };
   /** bulk schedule import from a spreadsheet (parity #24) */

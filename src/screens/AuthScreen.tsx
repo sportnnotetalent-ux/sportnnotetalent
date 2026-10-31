@@ -27,6 +27,8 @@ import { PhoneLoginCard } from '../components/PhoneLoginCard';
 import type { Role } from '../core/types';
 import { Logo } from '../components/Logo';
 import { IconText } from '../components/Icon';
+import { guestStore } from '../data/guestStore';
+import type { GuestMatch } from '../core/guestMatch';
 
 const ROLES: Role[] = ['player', 'parent', 'scorer', 'organizer', 'fan'];
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -74,6 +76,15 @@ export default function AuthScreen() {
   const [role, setRole] = useState<Role>('player');
   const [agreed, setAgreed] = useState(false);
   const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  // Score first, sign up later: a game this phone is scoring without an account
+  const [guestGame, setGuestGame] = useState<GuestMatch | null>(null);
+  useEffect(() => {
+    let on = true;
+    const read = () => { void guestStore.get().then((g) => on && setGuestGame(g)); };
+    read();
+    const off = guestStore.subscribe(read);
+    return () => { on = false; off(); };
+  }, []);
   const [note, setNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -234,6 +245,17 @@ export default function AuthScreen() {
           <Logo size={72} />
           <Text style={st.logo}>Sport<Text style={st.logoAccent}>nNote</Text></Text>
           <Text style={[textStyles.muted, st.tagline]}>Play a Sport, Make a Note.</Text>
+        </View>
+
+        {/* Score first, sign up later (growth plan 2026-10-31) */}
+        <View style={st.guestRow}>
+          {guestGame ? (
+            <Button label={`Continue your game: ${guestGame.homeTeamName} vs ${guestGame.awayTeamName}`} onPress={() => nav.navigate('LiveScoring', {
+              guestId: guestGame.id, sport: guestGame.sport, homeName: guestGame.homeName, awayName: guestGame.awayName,
+              homeTeamName: guestGame.homeTeamName, awayTeamName: guestGame.awayTeamName, homeColor: guestGame.homeColor, awayColor: guestGame.awayColor, canScore: true,
+            })} />
+          ) : null}
+          <Button label="Score a game now, no sign-up" variant={guestGame ? 'ghost' : undefined} onPress={() => nav.navigate('GuestGame')} />
         </View>
 
         {/* Web: mobile number + SMS code is the main way in; email below. */}
@@ -472,6 +494,7 @@ function Field({
 }
 
 const st = StyleSheet.create({
+  guestRow: { gap: theme.spacing(2) },
   orRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(3) },
   orLine: { flex: 1, height: 1, backgroundColor: theme.colors.border },
   safe: { flex: 1, backgroundColor: theme.colors.bg },

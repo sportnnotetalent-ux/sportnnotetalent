@@ -90,6 +90,9 @@ import { announceTieResult } from '../data/tieAlerts';
 import { canFieldPlayer } from '../core/eligibility';
 import { useAgeRequirement } from '../data/useAgeRequirement';
 import { useAuth } from '../core/auth';
+import { promptSignIn } from '../core/guest';
+import { guestStore } from '../data/guestStore';
+import { claimThisDevicesGuestMatch } from '../data/guestClaim';
 import { openVenue } from '../core/venue';
 import { formatDateTime, formatTime, useUserTimeZone } from '../core/time';
 import { exportToCalendar } from '../core/ics';
@@ -121,12 +124,17 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
     homeColor: homeColorIn,
     awayColor: awayColorIn,
     matchId,
+    guestId: guestIdParam,
     canScore: routeCanScore = true,
   } = route.params;
+  // Score first, sign up later (docs/security/breaks/guest-scoring.md): a guest
+  // match lives on this device, with no matchId, until its scorer has an account.
+  const guestId = matchId ? undefined : guestIdParam;
+  const guestMode = !!guestId;
   // MVP B5: sides whose colours are too close get a clearly different away colour (this view only)
   const [homeColor, awayColor] = distinctSideColors(homeColorIn, awayColorIn);
   const plugin = getSport(sport);
-  const { profile } = useAuth();
+  const { profile, authed } = useAuth();
 
   // Who am I (this device), and who did the organizer designate to score?
   const [myPlayerId, setMyPlayerId] = useState<string | null>(null);
@@ -320,6 +328,7 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
     awayTeamId: meta.awayTeamId,
     tournamentId: meta.tournamentId,
     config: meta.config,
+    guestId,
     // MVP B6: a live format change (or its undo) — reload the match's format
     onFormatChange: () => setReloadTick((t) => t + 1),
     // SD-48: a team-tie rubber announces the TIE result once, not itself
@@ -536,6 +545,56 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
       })));
     };
   });
+  // ---- Guest scoring: the format from the device, then "Save & share" (G1, G7) ----
+  useEffect(() => {
+    if (!guestId) return;
+    let on = true;
+    void guestStore.get().then((g) => {
+      if (!on || !g || g.id !== guestId) return;
+      setMeta((m) => ({ ...m, config: g.config, ...(g.result ? { status: 'completed' as const, result: g.result } : {}) }));
+    });
+    return () => { on = false; };
+  }, [guestId]);
+  const [guestSaving, setGuestSaving] = useState(false);
+  const saveGuestGame = async () => {
+    const g = await guestStore.get();
+    if (!g || g.id !== guestId || guestSaving) return;
+    // G4: only the person who asked has their sign-up claim it
+    if (!g.claimRequested) await guestStore.set({ ...g, claimRequested: true });
+    if (!authed || !profile?.id) { promptSignIn('up'); return; }
+    setGuestSaving(true);
+    try {
+      const id = await claimThisDevicesGuestMatch(profile.id);
+      if (id) {
+        navigation.replace('LiveScoring', {
+          matchId: id, sport, homeName, awayName, homeTeamName, awayTeamName,
+          homeColor: homeColorIn, awayColor: awayColorIn, canScore: true,
+        });
+      }
+    } catch (e) {
+      notice('Couldn’t save the game yet', `${e instanceof Error ? e.message : 'Check your connection.'} Your game is still on this phone; try again.`);
+    } finally {
+      setGuestSaving(false);
+    }
+  };
+  const guestSaveRef = useRef(saveGuestGame);
+  guestSaveRef.current = saveGuestGame;
+  // Back from sign-up: the game they asked to save is saved straight away (G7).
+  useEffect(() => {
+    if (!guestId || !authed || !profile?.id) return;
+    void guestStore.get().then((g) => { if (g?.id === guestId && g.claimRequested) void guestSaveRef.current(); });
+  }, [guestId, authed, profile?.id]);
+  const guestBar = guestMode ? (
+    <View style={st.guestBar}>
+      <Text style={st.guestText}>
+        {authed
+          ? 'This game is only on this phone. Save it to your account to share a live link.'
+          : 'Not saved yet. Sign up (about a minute) to save this game and share a live link. The score so far is kept.'}
+      </Text>
+      <Button label={guestSaving ? 'Saving…' : authed ? 'Save to my account' : 'Save & share'} disabled={guestSaving} onPress={() => void saveGuestGame()} />
+    </View>
+  ) : null;
+
   const titleHome = homeTeamName ?? homeName;
   const titleAway = awayTeamName ?? awayName;
   useEffect(() => {
@@ -548,12 +607,12 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
         ? 'Live'
         : 'Live Scoring',
       headerRight: () => (
-        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Share this match" onPress={() => shareRef.current()} hitSlop={10} style={{ paddingHorizontal: theme.spacing(2) }}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Share this match" onPress={() => (guestMode ? guestSaveRef.current() : shareRef.current())} hitSlop={10} style={{ paddingHorizontal: theme.spacing(2) }}>
           <Text style={{ color: theme.colors.primary, fontWeight: '800', fontSize: theme.font.body }}>Share</Text>
         </TouchableOpacity>
       ),
     });
-  }, [navigation, complete, meta.status, titleHome, titleAway]);
+  }, [navigation, complete, meta.status, titleHome, titleAway, guestMode]);
 
   // Any host of the match — or of its tournament — manages it: designates the
   // scorer and edits the XI. Per-match ownership, not a global role, and any of
@@ -1175,7 +1234,13 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
       ...(Number.isFinite(h) && Number.isFinite(a) ? { score: { home: h, away: a } } : {}),
       byId: myPlayerId ?? undefined, byName: profile?.fullName ?? undefined, at: new Date().toISOString(),
     };
-    if (!matchId) { setMeta((m) => ({ ...m, status: 'completed', result: r })); closeEnd(); return; }
+    if (!matchId) {
+      setMeta((m) => ({ ...m, status: 'completed', result: r }));
+      // G6: a guest game keeps its hand-ended result for the upload
+      if (guestId) void guestStore.get().then((g) => (g && g.id === guestId ? guestStore.set({ ...g, result: r }) : undefined));
+      closeEnd();
+      return;
+    }
     setEndBusy(true);
     try {
       // SD-133 — the hand-ended match gets the full stat sync from this state.
@@ -2481,6 +2546,7 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
                   duplication. Sports with a broadcast board (tennis/volleyball/
                   badminton/basketball/kabaddi) show the same line-score the viewer
                   sees; football/cricket keep the compact one-row MiniScore. */}
+              {guestBar}
               {started && !complete && scoringBoardNode}
               {resultHoldNote}
               {undoBar}
@@ -2901,6 +2967,8 @@ const st = StyleSheet.create({
   caret: { color: theme.colors.textMuted, fontSize: theme.font.body, fontWeight: '800', width: 18, textAlign: 'center' },
   venueLink: { color: theme.colors.primary, fontSize: theme.font.body, fontWeight: '700', textAlign: 'right', flexShrink: 1 },
   // Same box as undoBtn (same height), greyed: holds Undo's place before the first action.
+  guestBar: { gap: theme.spacing(2), padding: theme.spacing(3), borderRadius: theme.radius.md, backgroundColor: theme.colors.surfaceAlt, borderWidth: 1, borderColor: theme.colors.border },
+  guestText: { color: theme.colors.text, fontSize: theme.font.small },
   formatWarn: { color: theme.colors.danger, fontSize: theme.font.small },
   undoIdle: {
     flexDirection: 'row', alignItems: 'center', gap: theme.spacing(2),
