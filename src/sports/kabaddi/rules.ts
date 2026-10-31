@@ -31,6 +31,10 @@ export interface RaidOutcome {
    *  as they scored then (REVIEW Decision 8). SD-83: with the `caughtVoid`
    *  format a v2 raid whose raider is caught loses its touches. */
   v?: 2;
+  /** MVP K1 rules version: 3 = a failed do-or-die gives the defence 1 point
+   *  and is never a super tackle (AKFI / PKL). Absent on older logs, which
+   *  replay as they scored (+2 against 3 or fewer defenders). */
+  rv?: 3;
   /** SD-59 (new optional key): defenders who stepped out of bounds during the
    *  raid without a struggle (AKFI line-out) — each is out and gives the
    *  RAIDING side 1 point (not a raid point: the raider isn't credited). */
@@ -162,13 +166,15 @@ const other = (s: Side): Side => (s === 'home' ? 'away' : 'home');
 export const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
 /** Winner of a 5-raid shootout (PKL tie-breaker): best-of-5 (clinched early when a
  *  lead can't be caught), then sudden death once both have taken five. null =
- *  undecided. Points-based analogue of a penalty shootout. */
-export function decideRaidShootout(h: number[], a: number[]): 'home' | 'away' | null {
+ *  undecided. Points-based analogue of a penalty shootout. `maxPerRaid` = the
+ *  most one raid can score (MVP K2: teamSize + 1 for a shootout started by the
+ *  fixed screen; 1 = the old rule, kept so saved shootouts replay as they were). */
+export function decideRaidShootout(h: number[], a: number[], maxPerRaid = 1): 'home' | 'away' | null {
   const hs = sum(h), as = sum(a);
   const hRem = Math.max(0, 5 - h.length), aRem = Math.max(0, 5 - a.length);
   if (h.length <= 5 && a.length <= 5) {
-    if (hs > as + aRem) return 'home';
-    if (as > hs + hRem) return 'away';
+    if (hs > as + aRem * maxPerRaid) return 'home';
+    if (as > hs + hRem * maxPerRaid) return 'away';
   }
   if (h.length === a.length && h.length >= 5 && hs !== as) return hs > as ? 'home' : 'away';
   return null;
@@ -305,6 +311,8 @@ export function replayRaids(raids: RaidOutcome[], cfg: KabaddiCfg, extras: Extra
     const isDoOrDie = doOrDieOn(cfg) && emptyRaids[r.side] >= 2;
     let raiderOut = r.raiderOut || lineOut;
     const dodFail = isDoOrDie && raidPts === 0 && defOut === 0 && !raiderOut;
+    // MVP K1 (rv 3): no tackle was made, so a failed do-or-die is +1, never a super tackle.
+    const dodPlain = dodFail && r.rv === 3;
     if (dodFail) raiderOut = true;
 
     // Raid points + defenders sent out (+ raiding side's revival).
@@ -321,7 +329,7 @@ export function replayRaids(raids: RaidOutcome[], cfg: KabaddiCfg, extras: Extra
     let superTackle = false;
     if (raiderOut) {
       const defendersOnMat = amar ? cfg.teamSize : onMat(opp);
-      superTackle = !lineOut && superTackleOn(cfg) && !amar && defendersOnMat <= 3;
+      superTackle = !lineOut && !dodPlain && superTackleOn(cfg) && !amar && defendersOnMat <= 3;
       tacklePts = lineOut ? 0 : superTackle ? 2 : 1;
       score[opp] += lineOut ? 1 : tacklePts;
       if (!amar) {

@@ -689,7 +689,7 @@ const ScoringControls: SportPlugin<KabaddiState>['ScoringControls'] = ({ state, 
             <Button label={`Extra time (2 × ${state.extraTimeMinutes} min)`} variant="ghost" onPress={() => dispatch({ type: 'START_EXTRA_TIME' })} />
           )}
           {state.decider !== 'none' && (
-            <Button label="🎯 5-Raid Shootout" variant="ghost" onPress={() => dispatch({ type: 'START_SHOOTOUT' })} />
+            <Button label="🎯 5-Raid Shootout" variant="ghost" onPress={() => dispatch({ type: 'START_SHOOTOUT', payload: { v: 2 } })} />
           )}
           <Button label="End as a tie" variant="ghost" onPress={async () => { if (await confirmMatchAction('endTie', { drawWord: 'Tie', score: `${state.home}-${state.away}` })) dispatch({ type: 'END' }); }} />
         </View>

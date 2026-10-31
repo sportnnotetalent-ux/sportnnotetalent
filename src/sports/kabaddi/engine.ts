@@ -165,7 +165,7 @@ export interface KabaddiState {
   /** 5-raid shootout tie-breaker (PKL) — points scored per raid per side; the
    *  regulation score stays tied and the shootout totals decide the winner.
    *  Undefined until a shootout starts. */
-  shootout?: { home: number[]; away: number[] };
+  shootout?: { home: number[]; away: number[]; max?: number };
   /** substitutions allowed per side (format: substitutes) */
   maxSubs: number;
   subsUsed: { home: number; away: number };
@@ -516,7 +516,7 @@ export interface RaidForm {
  *  tackle and his touches don't count. */
 export function formOutcome(f: Pick<RaidForm, 'side' | 'touches' | 'bonus' | 'tackled' | 'defOut' | 'lineOut'>): RaidOutcome {
   return {
-    side: f.side, touches: f.lineOut ? 0 : f.touches, bonus: f.bonus, raiderOut: f.tackled && !f.lineOut, v: 2,
+    side: f.side, touches: f.lineOut ? 0 : f.touches, bonus: f.bonus, raiderOut: f.tackled && !f.lineOut, v: 2, rv: 3,
     ...(f.defOut && f.defOut > 0 ? { defOut: Math.floor(f.defOut) } : null),
     ...(f.lineOut ? { lineOut: true } : null),
   };
@@ -791,6 +791,8 @@ export const reducer = (s: KabaddiState, a: ScoreAction): KabaddiState => {
         // SD-114: a v2 raid's touches are capped at the defenders on the mat
         // (in the replay); an un-versioned one replays its raw touches.
         ...(Number(p.v) >= 2 ? { v: 2 as const } : null),
+        // MVP K1: the fixed do-or-die rule (new raids only)
+        ...(Number(p.rv) >= 3 ? { rv: 3 as const } : null),
         // SD-59 (new optional keys): line-outs
         ...(Number(p.defOut) > 0 ? { defOut: Math.floor(Number(p.defOut)) } : null),
         ...(p.lineOut === true ? { lineOut: true } : null),
@@ -919,14 +921,17 @@ export const reducer = (s: KabaddiState, a: ScoreAction): KabaddiState => {
       return s.home === s.away && !s.ended ? unpause({ ...s, goldenRaid: true, startedAt: undefined }) : s;
     case 'START_SHOOTOUT':
       // Level after regulation/extra time → a 5-raid shootout (PKL tie-breaker).
-      return s.home === s.away && !s.ended && !s.shootout ? unpause({ ...s, shootout: { home: [], away: [] }, startedAt: undefined }) : s;
+      // MVP K2: a new shootout (v 2) stores the most one raid can score (every
+      // defender + the bonus), so it never ends early on a 1-point-a-raid guess.
+      return s.home === s.away && !s.ended && !s.shootout
+        ? unpause({ ...s, shootout: { home: [], away: [], ...(Number(a.payload?.v) >= 2 ? { max: (s.teamSize ?? 7) + 1 } : null) }, startedAt: undefined }) : s;
     case 'SHOOTOUT_RAID': {
       // One shootout raid: `points` scored (0 = failed/empty). The regulation
       // score stays tied; the shootout totals decide the winner.
       if (!s.shootout || s.ended || (a.side !== 'home' && a.side !== 'away')) return s;
       const p = Math.max(0, Math.floor(Number(a.payload?.points ?? 0)));
       const sh = { ...s.shootout, [a.side]: [...s.shootout[a.side], p] };
-      const winner = decideRaidShootout(sh.home, sh.away);
+      const winner = decideRaidShootout(sh.home, sh.away, s.shootout.max ?? 1);
       return {
         ...s,
         shootout: sh,

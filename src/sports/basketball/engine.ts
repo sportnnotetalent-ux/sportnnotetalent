@@ -619,6 +619,9 @@ const reduce = (s: BasketballState, a: ScoreAction): BasketballState => {
       // A game level at the end of regulation (or an OT period) plays another
       // overtime period; the running score carries over. Repeats until decided.
       // SD-122: on leg 2 of a two-legged tie, "level" = level on aggregate.
+      // MVP B1: with a game clock, not while time is left. Only actions that
+      // carry `at` (the fixed screen) are checked, so older logs replay as saved.
+      if (a.payload?.at != null && timedPeriod(s) && !timeUp(s, at)) return s;
       return levelForDecider(s) ? { ...s, quarter: s.quarter + 1, startedAt: undefined, ...(s.gc ? { gc: { ms: 0 } } : {}) } : s;
     case 'END':
       return { ...s, ended: true, startedAt: undefined, ...(s.gc ? { gc: stopGc(s, at) } : {}) };

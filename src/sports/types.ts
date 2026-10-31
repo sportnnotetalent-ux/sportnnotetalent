@@ -278,8 +278,9 @@ export interface FormatFieldOption {
    *  golden point, volleyball's cap. Matches `default`'s type. */
   value: number | string | boolean;
   label: string;
-  /** For a `preset` field: the sibling field values this option snaps to (e.g.
-   *  T20 → { overs: 20, ballsPerOver: 6, powerplayOvers: 6 }). Applied on pick. */
+  /** The sibling field values this option snaps to (e.g. a preset's
+   *  T20 → { overs: 20, ballsPerOver: 6, powerplayOvers: 6 }, or tennis
+   *  "Games per set: 4" → { tiebreakAt: 4 }). Applied on pick (formatPick.ts). */
   set?: Record<string, number | string | boolean>;
 }
 

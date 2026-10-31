@@ -13,6 +13,15 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-31 — The four MVP score P0s fixed (tennis T1, basketball B1, kabaddi K1/K2)
+
+Test-first; not published. Break-it: `docs/security/breaks/score-p0s.md`.
+- **Tennis T1:** picking "Games per set" 4 / 6 / 8 moves the tiebreak to 4-4 / 6-6 / 8-8 (to 7, win by 2). A choice option can now snap siblings like a preset (`src/sports/formatPick.ts`, `tennis/meta.ts`, `FormatEditor.tsx`).
+- **Basketball B1:** "Start Overtime" shows only at 0:00 (or with no game clock) and asks first; the reducer refuses it while time is left (`basketball/engine.ts`, `index.tsx`).
+- **Kabaddi K1:** a failed do-or-die is +1 to the defence, never a super tackle (raids `rv: 3`).
+- **Kabaddi K2:** the 5-raid shootout ends early only when the trailer can't catch up at teamSize + 1 a raid (shootouts `v: 2`).
+- All gated: saved matches replay as they were scored. Full suite 5,758 tests, 0 failing; tsc clean.
+
 ### 2026-10-31 — Release: MVP loop items live (web + OTA); Cloudflare follow-ups
 
 The founder ran SQL 20261031130000 (near_places) and 20261031140000 (share_match), then

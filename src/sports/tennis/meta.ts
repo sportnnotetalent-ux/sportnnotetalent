@@ -52,9 +52,10 @@ export const TENNIS_META: SportMeta = {
     {
       key: 'gamesPerSet', label: 'Games per set', type: 'choice', default: 6, advanced: true,
       options: [
-        { value: 6, label: '6 (standard)' },
-        { value: 4, label: '4 (short)' },
-        { value: 8, label: '8 (pro set)' },
+        // MVP T1 — the tiebreak moves with the games: 4-4, 6-6 or 8-8, to 7, win by 2.
+        { value: 6, label: '6 (standard)', set: { tiebreakAt: 6, setWinByTwo: true, tiebreakPoints: 7, tbSuddenDeathAt: 0 } },
+        { value: 4, label: '4 (short)', set: { tiebreakAt: 4, setWinByTwo: true, tiebreakPoints: 7, tbSuddenDeathAt: 0 } },
+        { value: 8, label: '8 (pro set)', set: { tiebreakAt: 8, setWinByTwo: true, tiebreakPoints: 7, tbSuddenDeathAt: 0 } },
       ],
     },
     {

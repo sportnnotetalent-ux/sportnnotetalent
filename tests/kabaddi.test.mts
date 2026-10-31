@@ -43,6 +43,7 @@ describe('kabaddi — 5-raid shootout tie-breaker (Tier-2)', () => {
   test('most points after five raids each wins', () => {
     assert.equal(decideRaidShootout([1, 0, 2, 1, 1], [0, 1, 1, 0, 1]), 'home'); // 5 vs 3
   });
+  // Old shootouts only (no `max`): new ones count multi-point raids (tests/kabaddi-mvp-k1-k2.test.mts).
   test('clinches early when the lead cannot be caught', () => {
     // home 1,2,2,1 = 6 after 4 raids; away 0,0,0 = 0 after 3 → cannot catch up
     assert.equal(decideRaidShootout([1, 2, 2, 1], [0, 0, 0]), 'home');

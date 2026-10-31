@@ -7,6 +7,7 @@ import { SportBadge } from './SportSymbol';
 import { theme } from '../core/theme';
 import { SelectChip, TextField, textStyles } from './ui';
 import { getSportMeta } from '../sports/sportMeta';
+import { fieldChanges } from '../sports/formatPick';
 import type { FormatField, FormatFieldOption } from '../sports/types';
 import type { SportId } from '../core/types';
 
@@ -109,8 +110,7 @@ export function SportFormatEditor({
   // Picking a preset snaps every sibling it names; each onChange composes on the
   // parent's functional setState, so the batch lands together.
   const pickPreset = (o: FormatFieldOption) => {
-    onChange(presetField!.key, o.value);
-    if (o.set) for (const k of Object.keys(o.set)) onChange(k, o.set[k]);
+    for (const [k, v] of fieldChanges(presetField!, o.value)) onChange(k, v);
     if (o.value !== 'custom') setShowAll(false);
   };
 
@@ -140,7 +140,7 @@ export function SportFormatEditor({
             <FormatFieldEditor
               field={field}
               value={value[field.key] ?? field.default}
-              onChange={(v) => onChange(field.key, v)}
+              onChange={(v) => { for (const [k, fv] of fieldChanges(field, v)) onChange(k, fv); }}
             />
           </React.Fragment>
         )

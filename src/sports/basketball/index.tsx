@@ -100,6 +100,15 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
   // Multi-step captures (free throws, foul type, rebound off/def, sub, starting five).
   const [flow, setFlow] = useState<Flow>(null);
   const [showSubs, setShowSubs] = useState(false);
+  // MVP B1: re-render once when the running clock reaches 0:00, so the bottom
+  // button switches to "Start Overtime" (the clock panel ticks on its own).
+  const [, setExpired] = useState(0);
+  const leftMs = state.gc?.since && timedPeriod(state) ? clockLeft(state, Date.now()) * 1000 : 0;
+  useEffect(() => {
+    if (!leftMs) return;
+    const id = setTimeout(() => setExpired((n) => n + 1), leftMs + 250);
+    return () => clearTimeout(id);
+  }, [leftMs]);
   // SD-117 (B6): right after a made basket — "Assist?" for the on-court teammates
   // Deep wave: the same box offers "⚡ Fast break" (tags the basket) and, with
   // Shot zones on, "🔗 And-one" (the bonus free throw).
@@ -820,13 +829,19 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
 
       {state.quarter < state.regPeriods ? (
         <Button label={`End ${periodLabel(state.quarter, state.regPeriods)} →`} onPress={() => void endQuarter()} />
-      ) : levelForDecider(state) ? (
+      ) : levelForDecider(state) && (!timedPeriod(state) || timeUp(state, Date.now())) ? (
         // Level at the end of Q4 or an OT period → play (another) overtime.
         // SD-57: a draw only where the format allows one (league / friendly
         // option); otherwise ending level asks first and offers overtime.
         <View style={{ gap: theme.spacing(2) }}>
           <Text style={ctrl.meta}>{state.agg ? `Level on aggregate (${aggregateText(state)}) at the end of ${periodLabel(state.quarter, state.regPeriods)} — overtime decides the tie.` : `Scores level (${state.home}–${state.away}) at the end of ${periodLabel(state.quarter, state.regPeriods)}${state.allowDraw ? ' — this format allows a draw.' : ' — basketball plays overtime until there is a winner.'}`}</Text>
-          <Button label={`🏀 Start Overtime (${periodLabel(state.quarter + 1, state.regPeriods)})${state.otTarget ? ` · first to ${state.otTarget}` : ''}`} onPress={() => dispatch({ type: 'START_OVERTIME' })} />
+          <Button label={`🏀 Start Overtime (${periodLabel(state.quarter + 1, state.regPeriods)})${state.otTarget ? ` · first to ${state.otTarget}` : ''}`} onPress={async () => {
+            if (await askConfirm({
+              title: 'Start overtime?',
+              message: `It's ${state.home}-${state.away} at the end of ${periodLabel(state.quarter, state.regPeriods)}. Overtime${state.otTarget ? `: the first side to ${state.otTarget} points wins` : ' is played until there is a winner'}.`,
+              yesLabel: 'Start overtime', noLabel: 'Not yet', tone: 'caution',
+            })) dispatch({ type: 'START_OVERTIME', payload: { at: Date.now() } });
+          }} />
           {state.agg ? null : state.allowDraw ? (
             <Button label="End as a draw" variant="ghost" onPress={async () => { if (await confirmMatchAction('endTie', { drawWord: 'Draw', score: `${state.home}-${state.away}` })) dispatch({ type: 'END' }); }} />
           ) : (
