@@ -62,6 +62,15 @@ const ScoringControls: SportPlugin<BadmintonState>['ScoringControls'] = ({ state
   const start = s.doubles ? badmintonDoublesTurn({ ...s, current: { home: 0, away: 0 }, events: [] }, ids) : null;
   return (
     <View style={{ gap: theme.spacing(4) }}>
+      {/* SD-115 (extends SD-61) — two big team-coloured buttons; singles
+          auto-credits, doubles credit is optional (long-press / "credit a player") */}
+      <PointButtons
+        homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor}
+        homeRoster={homeRoster} awayRoster={awayRoster} icon="🏸"
+        serving={needsServer ? null : sv.side}
+        disabled={needsServer} disabledHint="Pick who serves first to start scoring."
+        onPoint={point}
+      />
       {/* SD-117c — derived interval / change-ends cue (BWF) */}
       <CueBanner cue={badmintonCue(s)} />
       {dbl ? (
@@ -79,15 +88,6 @@ const ScoringControls: SportPlugin<BadmintonState>['ScoringControls'] = ({ state
           server={start.server} receiver={start.receiver} dispatch={dispatch}
         />
       ) : null}
-      {/* SD-115 (extends SD-61) — two big team-coloured buttons; singles
-          auto-credits, doubles credit is optional (long-press / "credit a player") */}
-      <PointButtons
-        homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor}
-        homeRoster={homeRoster} awayRoster={awayRoster} icon="🏸"
-        serving={needsServer ? null : sv.side}
-        disabled={needsServer} disabledHint="Pick who serves first to start scoring."
-        onPoint={point}
-      />
       {/* SD-107 / deep wave — optional detail for the last rally: how, forehand /
           backhand + shot, error / service-fault type, rally length */}
       <PointDetailRow sport="badminton" state={s} dispatch={dispatch} homeName={homeName} awayName={awayName} homeRoster={homeRoster} awayRoster={awayRoster} />

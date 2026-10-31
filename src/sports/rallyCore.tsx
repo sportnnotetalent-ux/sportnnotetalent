@@ -216,6 +216,14 @@ export function makeRallyPlugin(opts: RallyOpts): SportPlugin<RallyState> {
       const rallyWon = (team: 'home' | 'away') => point(team, team === s.serving ? serverOf(team) : undefined);
       return (
         <View style={{ gap: theme.spacing(4) }}>
+          {/* SD-115 — the same two big team-coloured buttons as rally scoring; the
+              serving player is credited automatically when the server wins. */}
+          <PointButtons
+            homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor}
+            homeRoster={homeRoster} awayRoster={awayRoster} icon={opts.icon} verb="Rally won" credit={false}
+            serving={blocked ? null : s.serving} disabled={blocked} disabledHint={blockedHint}
+            onPoint={(t) => rallyWon(t)}
+          />
           {cueOf && <CueBanner cue={cueOf(s)} />}
           <View style={ctrl.serveBox}>
             <Text style={ctrl.label}>{opts.serveSystemLabel}</Text>
@@ -235,14 +243,6 @@ export function makeRallyPlugin(opts: RallyOpts): SportPlugin<RallyState> {
           </View>
           {firstPicker}
           {startPicker}
-          {/* SD-115 — the same two big team-coloured buttons as rally scoring; the
-              serving player is credited automatically when the server wins. */}
-          <PointButtons
-            homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor}
-            homeRoster={homeRoster} awayRoster={awayRoster} icon={opts.icon} verb="Rally won" credit={false}
-            serving={blocked ? null : s.serving} disabled={blocked} disabledHint={blockedHint}
-            onPoint={(t) => rallyWon(t)}
-          />
           {letRow}
           {detailRow}
           {editor}
@@ -282,6 +282,14 @@ export function makeRallyPlugin(opts: RallyOpts): SportPlugin<RallyState> {
     ) : null;
     return (
       <View style={{ gap: theme.spacing(4) }}>
+        {/* SD-115 — two big team-coloured point buttons, one layout for every
+            scoring system; singles auto-credits, doubles credit is optional. */}
+        <PointButtons
+          homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor}
+          homeRoster={homeRoster} awayRoster={awayRoster} icon={opts.icon}
+          serving={blocked ? null : serverSide} disabled={blocked} disabledHint={blockedHint}
+          onPoint={point}
+        />
         {cueOf && <CueBanner cue={cueOf(s)} />}
         {firstPicker}
         {ttDbl ? (
@@ -293,14 +301,6 @@ export function makeRallyPlugin(opts: RallyOpts): SportPlugin<RallyState> {
         {!blocked && isTT && !s.ended && <Text style={ctrl.meta}>{ttServeHint(s.current.home, s.current.away, s.target)}</Text>}
         {startPicker}
         {ttPicker}
-        {/* SD-115 — two big team-coloured point buttons, one layout for every
-            scoring system; singles auto-credits, doubles credit is optional. */}
-        <PointButtons
-          homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor}
-          homeRoster={homeRoster} awayRoster={awayRoster} icon={opts.icon}
-          serving={blocked ? null : serverSide} disabled={blocked} disabledHint={blockedHint}
-          onPoint={point}
-        />
         {letRow}
         {detailRow}
         {editor}

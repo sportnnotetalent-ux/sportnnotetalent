@@ -53,13 +53,16 @@ export function SetLineBoard({
   );
   // SD-117c — a neutral cue line under the board (change ends / interval)
   const cueLine = !final && cue ? <Text style={st.cue} accessibilityLiveRegion="polite">{cue}</Text> : null;
-  if (final || (!alerts?.length && !cueLine)) return board;
-  if (!alerts?.length) return <View style={st.wrap}>{board}{cueLine}</View>;
+  if (final) return board;
+  // MVP B1: while live, one fixed-height line under the board holds the game /
+  // set point chips, else the change-ends cue, else nothing — so the board
+  // never grows and pushes the point buttons down.
+  if (!alerts?.length) return <View style={st.wrap}>{board}<View style={st.slot}>{cueLine}</View></View>;
   // SD-115 — the next point decides something: say so in the side's colour.
   return (
     <View style={st.wrap}>
       {board}
-      <View style={st.alerts} accessibilityLiveRegion="polite">
+      <View style={[st.alerts, st.slot]} accessibilityLiveRegion="polite">
         {alerts.map((a) => {
           const bg = (a.side === 'home' ? homeColor ?? theme.colors.home : awayColor ?? theme.colors.away);
           return (
@@ -70,13 +73,13 @@ export function SetLineBoard({
           );
         })}
       </View>
-      {cueLine}
     </View>
   );
 }
 
 const st = StyleSheet.create({
   wrap: { gap: theme.spacing(2) },
+  slot: { minHeight: 30, justifyContent: 'center' },
   alerts: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing(2) },
   chip: {
     flexDirection: 'row', alignItems: 'center', gap: theme.spacing(1), maxWidth: '100%',

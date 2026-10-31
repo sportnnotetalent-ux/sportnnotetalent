@@ -45,7 +45,9 @@ function halves(s: FootballState) {
   const played = ([1, 2, 3, 4] as const).filter((h) => h <= s.half);
   let cum = 0;
   return played.map((h) => {
-    const start = h === 1 ? 0 : h === 2 ? hm : h === 3 ? 2 * hm : 2 * hm + et;
+    // MVP F4: a single-period game's extra time starts after the one period
+    const regulation = s.onePeriod ? hm : 2 * hm;
+    const start = h === 1 ? 0 : h === 2 ? hm : h === 3 ? regulation : regulation + et;
     const reg = h <= 2 ? hm : et;
     const added = Math.max(0, Number(s.stoppage?.[h] ?? 0));
     const out = { h, start, reg, added, cumReg: cum };

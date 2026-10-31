@@ -121,8 +121,9 @@ export function PointButtons({
 
   return (
     <View style={pb.wrap}>
-      {disabled && disabledHint ? <Text style={pb.hint}>☝️ {disabledHint}</Text> : null}
       <View style={pb.row}>{sideOrder(swapped).map(big)}</View>
+      {/* MVP B1: below the buttons, so they don't move when the hint goes */}
+      {disabled && disabledHint ? <Text style={pb.hint}>☝️ {disabledHint}</Text> : null}
       <Text style={[pb.link, pb.swap]} onPress={() => setSwapped((v) => !v)} accessibilityRole="button"
         accessibilityLabel={swapped ? 'Swap sides back: home on the left' : 'Swap sides: away on the left'}>⇄ Swap sides</Text>
       {pick && !disabled ? (

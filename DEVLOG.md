@@ -13,6 +13,14 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-31 — MVP P1s, batch 5
+
+Break-it list first (`docs/security/breaks/mvp-p1-batch5.md`), then each fix with a failing test:
+- **Football single period (F4):** format option "Periods" (2 halves · 1 period); one period ends from its own button, minutes count one period, extra time follows it. Saved matches unchanged (no `periods` key = two halves).
+- **Racket buttons stay put (B1/T4):** point buttons first in badminton, tennis, padel and rallyCore sports; pickers, serve banner and change-ends cue below; the board's alert line has a fixed height; the Undo bar holds its place (greyed, "Nothing to undo yet") from the start.
+- PD2 "Time up" moved to its own batch (needs a migration).
+Simulation: 500 single-period + 500 two-half football games. Demo-checked: tennis buttons at the same height from before the toss into game 2. Full suite 5,940 tests, 0 failing; tsc clean.
+
 ### 2026-10-31 — Release: MVP P1 batch 4 live (web, Android OTA)
 
 auth-smoke passed. Published from a clean worktree at e6483fe: web (entry `index-3317947e`, confirmed live) and Android OTA group `9a9dcf30` (runtime 1.0.0, channel preview).

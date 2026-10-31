@@ -69,6 +69,19 @@ const ScoringControls: SportPlugin<TennisState>['ScoringControls'] = ({ state, d
 
   return (
     <View style={{ gap: theme.spacing(4) }}>
+      {/* SD-115 — two big team-coloured point buttons; singles auto-credits */}
+      <PointButtons
+        homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor}
+        homeRoster={homeRoster} awayRoster={awayRoster} icon="🎾"
+        serving={noPlayYet && !s.serverPicked ? null : serve.side}
+        disabled={needsServer} disabledHint="Pick who serves first to start scoring."
+        onPoint={(side, p) => act('POINT', side, 'points', p)}
+      />
+      {/* Ace / Double fault: secondary (outline, smaller), below the point buttons */}
+      {!needsServer && <View style={[ctrl.row, ctrl.secGap]}>
+        <SecondaryAction label={`🎯 Ace · ${by}`} color={serverColor} onPress={() => act('ACE', serve.side, 'aces', serverP)} />
+        <SecondaryAction label={`⚠️ Double fault · ${by} → point ${receiverSideName}`} onPress={() => doubleFault(serve.side, serverP)} />
+      </View>}
       {/* SD-117c — derived "Change ends" cue and the tiebreak rules */}
       <CueBanner cue={tennisCue(s)} />
       {!noPlayYet && <Text style={ctrl.serveBanner}>🎾 Serving: {serverName}{s.doubles ? `  ·  ${serverSideName}` : ''}</Text>}
@@ -81,19 +94,6 @@ const ScoringControls: SportPlugin<TennisState>['ScoringControls'] = ({ state, d
       {s.doubles && (
         <ServeOrderPicker state={s} homeName={homeName} awayName={awayName} homeRoster={homeRoster} awayRoster={awayRoster} dispatch={dispatch} icon="🎾" />
       )}
-      {/* SD-115 — two big team-coloured point buttons; singles auto-credits */}
-      <PointButtons
-        homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor}
-        homeRoster={homeRoster} awayRoster={awayRoster} icon="🎾"
-        serving={noPlayYet && !s.serverPicked ? null : serve.side}
-        disabled={needsServer} disabledHint="Pick who serves first to start scoring."
-        onPoint={(side, p) => act('POINT', side, 'points', p)}
-      />
-      {/* Ace / Double fault: secondary (outline, smaller), below the point buttons */}
-      {!needsServer && <View style={ctrl.row}>
-        <SecondaryAction label={`🎯 Ace · ${by}`} color={serverColor} onPress={() => act('ACE', serve.side, 'aces', serverP)} />
-        <SecondaryAction label={`⚠️ Double fault · ${by} → point ${receiverSideName}`} onPress={() => doubleFault(serve.side, serverP)} />
-      </View>}
       {/* SD-107 / SD-157 — optional detail for the last point: how, forehand /
           backhand + shot, 2nd serve, net, rally length, serve speed */}
       <TennisPointDetail state={s} dispatch={dispatch} homeName={homeName} awayName={awayName} homeRoster={homeRoster} awayRoster={awayRoster} />
@@ -199,6 +199,8 @@ export const tennisPlugin: SportPlugin<TennisState> = {
 
 const ctrl = StyleSheet.create({
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing(2) },
+  // MVP T4: a gap so a slip below the point buttons can't hit Ace / Double fault
+  secGap: { marginTop: theme.spacing(3) },
   flex: { flexGrow: 1, flexBasis: 140 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing(2) },
   label: { color: theme.colors.text, fontSize: theme.font.body, fontWeight: '700' },

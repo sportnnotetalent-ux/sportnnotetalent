@@ -68,7 +68,15 @@ export const FOOTBALL_META: SportMeta = {
       ],
     },
     { key: 'playersPerSide', label: 'Players per side', type: 'count', default: 11, min: 1, max: 11, advanced: true },
-    { key: 'halfMinutes', label: 'Minutes per half', type: 'number', default: 45, min: 1, max: 60 },
+    { key: 'halfMinutes', label: 'Minutes per half', type: 'number', default: 45, min: 1, max: 60, hint: 'the whole period with 1 period' },
+    // MVP F4: a single-period game (no half-time)
+    {
+      key: 'periods', label: 'Periods', type: 'choice', default: 2,
+      options: [
+        { value: 2, label: '2 halves' },
+        { value: 1, label: '1 period (no half-time)' },
+      ],
+    },
     { key: 'substitutes', label: 'Substitutes per side', type: 'count', default: 5, min: 0, max: 11 },
     {
       key: 'subType', label: 'Substitutions', type: 'choice', default: 'rolling',

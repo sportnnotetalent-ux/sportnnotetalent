@@ -78,6 +78,19 @@ const ScoringControls: SportPlugin<PadelState>['ScoringControls'] = ({ state, di
   const doubleFault = () => dispatch(doubleFaultAction(serve.side, serverP));
   return (
     <View style={{ gap: theme.spacing(4) }}>
+      {/* SD-115 — two big team-coloured point buttons; doubles credit optional */}
+      <PointButtons
+        homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor}
+        homeRoster={homeRoster} awayRoster={awayRoster} icon="🟡"
+        serving={needsServer ? null : serve.side}
+        disabled={needsServer} disabledHint="Pick who serves first to start scoring."
+        onPoint={act}
+      />
+      {/* SD-117c — Ace / Double fault: secondary, below the point buttons, server only */}
+      {!needsServer && <View style={[ctrl.row, ctrl.secGap]}>
+        <SecondaryAction label={`🎯 Ace · ${by}`} color={serve.side === 'home' ? homeColor : awayColor} onPress={ace} />
+        <SecondaryAction label={`⚠️ Double fault · ${by} → point ${receiverSideName}`} onPress={doubleFault} />
+      </View>}
       {/* SD-117c — derived "Change ends" cue (FIP, as tennis) */}
       <CueBanner cue={padelCue(s)} />
       {!noPlayYet && <Text style={ctrl.serve}>🟡 Serving: {serverName}{s.doubles ? `  ·  ${serverSideName}` : ''}</Text>}
@@ -93,19 +106,6 @@ const ScoringControls: SportPlugin<PadelState>['ScoringControls'] = ({ state, di
       {deucePoint && <IconText label={"⚡ Golden point — next point wins the game."} style={ctrl.serve} />}
       {starNow ? <IconText label={"⭐ Star point — 3rd deuce: the next point wins the game. The receiving pair chooses who receives."} style={ctrl.serve} />
         : starDeuce > 0 ? <Text style={ctrl.serve}>Deuce {starDeuce} of 3 · Star Point: {starDeuce === 1 ? 'two advantages' : 'one more advantage'} before the deciding point.</Text> : null}
-      {/* SD-115 — two big team-coloured point buttons; doubles credit optional */}
-      <PointButtons
-        homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor}
-        homeRoster={homeRoster} awayRoster={awayRoster} icon="🟡"
-        serving={needsServer ? null : serve.side}
-        disabled={needsServer} disabledHint="Pick who serves first to start scoring."
-        onPoint={act}
-      />
-      {/* SD-117c — Ace / Double fault: secondary, below the point buttons, server only */}
-      {!needsServer && <View style={ctrl.row}>
-        <SecondaryAction label={`🎯 Ace · ${by}`} color={serve.side === 'home' ? homeColor : awayColor} onPress={ace} />
-        <SecondaryAction label={`⚠️ Double fault · ${by} → point ${receiverSideName}`} onPress={doubleFault} />
-      </View>}
       {/* SD-107 / deep wave — optional detail for the last point: how, forehand /
           backhand + shot, 2nd serve, net points, rally length */}
       <PointDetailRow sport="padel" state={s} dispatch={dispatch} homeName={homeName} awayName={awayName} homeRoster={homeRoster} awayRoster={awayRoster} />
@@ -210,6 +210,8 @@ export const padelPlugin: SportPlugin<PadelState> = {
 const ctrl = StyleSheet.create({
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing(2) },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing(2) },
+  // MVP T4: a gap so a slip below the point buttons can't hit Ace / Double fault
+  secGap: { marginTop: theme.spacing(3) },
   label: { color: theme.colors.text, fontSize: theme.font.body, fontWeight: '700' },
   serve: { color: theme.colors.textMuted, fontSize: theme.font.small, fontWeight: '700' },
   setsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing(2) },

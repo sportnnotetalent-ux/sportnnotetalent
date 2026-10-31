@@ -19,6 +19,9 @@ export interface FootballState {
   away: number;
   /** 1/2 = regulation halves; 3/4 = extra-time halves (knockout only). */
   half: 1 | 2 | 3 | 4;
+  /** MVP F4: a single-period game (format `periods: 1`) — no 2nd half; any extra
+   *  time starts after the one period. Absent = two halves (every saved match). */
+  onePeriod?: true;
   /** ms epoch the current half's clock started; undefined = paused (pre-KO / HT) */
   startedAt?: number;
   events: FootballEvent[];
@@ -222,6 +225,7 @@ export const init = (config?: Record<string, unknown>): FootballState => ({
   })(),
   shootout: null,
   halfMinutes: Number(config?.halfMinutes ?? 45),
+  ...(Number(config?.periods) === 1 ? { onePeriod: true as const } : {}),
   etMinutes: Number(config?.extraTimeMinutes ?? 15),
   etExtraSubs: Number(config?.extraTimeSubs ?? 1),
   stoppage: { 1: 0, 2: 0, 3: 0, 4: 0 },
@@ -353,7 +357,7 @@ export const HALF_NAME: Record<1 | 2 | 3 | 4, string> = { 1: 'first half', 2: 's
 /** Elapsed-minute offset at the START of each half: 0, 45, 90, 105 (halves 1-4). */
 export const startOffset = (s: FootballState): number => {
   const { halfMinutes: hm, etMinutes: et } = s;
-  return s.half === 1 ? 0 : s.half === 2 ? hm : s.half === 3 ? 2 * hm : 2 * hm + et;
+  return s.half === 1 ? 0 : s.half === 2 ? hm : s.half === 3 ? regEnd(s) : regEnd(s) + et;
 };
 
 /** Live match minute, derived from the running clock. Safe to call in UI.
@@ -373,13 +377,15 @@ export function currentMinute(s: FootballState): number {
 }
 
 /** Half lengths, for turning a stored (minute, half) into FIFA notation. */
-export interface MinuteFormat { halfMinutes: number; etMinutes: number }
+export interface MinuteFormat { halfMinutes: number; etMinutes: number; onePeriod?: boolean }
+/** MVP F4 — the minute regulation ends: two halves, or the one period. */
+export const regEnd = (f: { halfMinutes: number; onePeriod?: boolean }): number => (f.onePeriod ? f.halfMinutes : 2 * f.halfMinutes);
 /** The regulation end minute of half `h` (45 / 90 / 105 / 120). */
 export const halfEndOf = (h: 1 | 2 | 3 | 4, f: MinuteFormat): number =>
-  h === 1 ? f.halfMinutes : h === 2 ? 2 * f.halfMinutes : h === 3 ? 2 * f.halfMinutes + f.etMinutes : 2 * f.halfMinutes + 2 * f.etMinutes;
+  h === 1 ? f.halfMinutes : h === 2 ? 2 * f.halfMinutes : h === 3 ? regEnd(f) + f.etMinutes : regEnd(f) + 2 * f.etMinutes;
 /** The half a bare minute falls in (for events stored without `half`). */
 export const halfOfMinute = (m: number, f: MinuteFormat): 1 | 2 | 3 | 4 =>
-  m <= f.halfMinutes ? 1 : m <= 2 * f.halfMinutes ? 2 : m <= 2 * f.halfMinutes + f.etMinutes ? 3 : 4;
+  m <= f.halfMinutes ? 1 : !f.onePeriod && m <= 2 * f.halfMinutes ? 2 : m <= regEnd(f) + f.etMinutes ? 3 : 4;
 /** More "added time" than this is not added time: an event whose stored half
  *  disagrees with its minute by that much (an old backfill stamped with the then
  *  current half) is placed by its minute instead. */
@@ -404,7 +410,7 @@ export const byMatchTimeDesc = (
 /** The regulation end-of-half minute (45 / 90 / 105 / 120). Base for "+x" display. */
 export const halfBase = (s: FootballState): number => {
   const { halfMinutes: hm, etMinutes: et } = s;
-  return s.half === 1 ? hm : s.half === 2 ? 2 * hm : s.half === 3 ? 2 * hm + et : 2 * hm + 2 * et;
+  return s.half === 1 ? hm : s.half === 2 ? 2 * hm : s.half === 3 ? regEnd(s) + et : regEnd(s) + 2 * et;
 };
 
 /** Clock label: "37'" in regulation, "45+2'" once past the half's base minute. */
@@ -697,7 +703,7 @@ export const reducer = (s: FootballState, a: ScoreAction): FootballState => {
     case 'START_EXTRA_TIME':
       // A level tie at full time of the 2nd half, when the decider is extra time →
       // extra time (un-ends the match, moves to ET1, grants the extra ET sub).
-      if (!s.ended || !levelForDecider(s) || s.decider !== 'extra_time' || s.half !== 2 || s.shootout) return s;
+      if (!s.ended || !levelForDecider(s) || s.decider !== 'extra_time' || s.half !== (s.onePeriod ? 1 : 2) || s.shootout) return s;
       return { ...s, ended: false, half: 3, startedAt: undefined, maxSubs: s.maxSubs + s.etExtraSubs, etMinutes: Number(a.payload?.etMinutes ?? s.etMinutes), ...(s.gc ? { gc: { ms: 0 } } : {}) };
     case 'START_SHOOTOUT':
       // only from a level result at full time of a knockout tie (SD-120: level

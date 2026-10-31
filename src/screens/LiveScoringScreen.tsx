@@ -1022,7 +1022,13 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
   const resultHoldNote = canScore && resultSendsAt != null ? (
     <ResultHoldNote sendsAt={resultSendsAt} onUndo={undo} onSendNow={sendResultNow} />
   ) : null;
-  const undoBar = canScore && eventCount > 0 ? (
+  // MVP B1: once the match has started the bar is always there (greyed out before
+  // the first action), so it never appears later and pushes the controls down.
+  const undoBar = canScore && (eventCount > 0 || started) ? eventCount === 0 ? (
+    <View style={st.undoIdle} accessibilityLabel="Nothing to undo yet">
+      <Text style={[st.undoText, { color: theme.colors.textMuted }]} numberOfLines={1}>Nothing to undo yet</Text>
+    </View>
+  ) : (
     <TouchableOpacity style={st.undoBtn} activeOpacity={0.8} accessibilityRole="button" accessibilityLabel={`Undo${undoWhat ? `: ${undoWhat}` : ` last ${sport === 'cricket' ? 'ball' : 'update'}`}`} accessibilityHint="Tap repeatedly to rewind to any earlier point" onPress={undo}>
       <Text style={[st.undoText, { flexShrink: 1 }]} numberOfLines={1}>↶  Undo{undoWhat ? `: ${undoWhat}` : ''}</Text>
       {undoWhat ? null : <Text style={st.undoHint}>rewind step-by-step</Text>}
@@ -2813,6 +2819,13 @@ const st = StyleSheet.create({
   squadHead: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(2) },
   caret: { color: theme.colors.textMuted, fontSize: theme.font.body, fontWeight: '800', width: 18, textAlign: 'center' },
   venueLink: { color: theme.colors.primary, fontSize: theme.font.body, fontWeight: '700', textAlign: 'right', flexShrink: 1 },
+  // Same box as undoBtn (same height), greyed: holds Undo's place before the first action.
+  undoIdle: {
+    flexDirection: 'row', alignItems: 'center', gap: theme.spacing(2),
+    backgroundColor: theme.colors.surfaceAlt, borderRadius: theme.radius.md,
+    borderWidth: 1, borderColor: theme.colors.border,
+    paddingVertical: theme.spacing(2.5), paddingHorizontal: theme.spacing(4), opacity: 0.55,
+  },
   undoBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: theme.spacing(2),
     backgroundColor: theme.colors.surfaceAlt, borderRadius: theme.radius.md,
