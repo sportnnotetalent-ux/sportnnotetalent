@@ -8,9 +8,10 @@
  * corrected matches included.
  */
 import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text } from 'react-native';
 import { theme } from '../../core/theme';
 import { SelectChip } from '../../components/ui';
+import { StatBar, StatsHead, statStyles as st } from '../StatBar';
 import type { Player } from '../../core/types';
 import { playerServeLine, type ServeRow } from '../serveStats';
 import { useMask } from '../../core/disputeMask';
@@ -67,10 +68,7 @@ export function TennisStatsPanel({
     <View style={{ gap: theme.spacing(2) }}>
       <Text style={st.title}>Match stats</Text>
       <View style={st.card} accessibilityLabel="Match stats">
-        <View style={st.head}>
-          <View style={st.side}><View style={[st.dot, { backgroundColor: homeColor }]} /><Text style={st.team} numberOfLines={1}>{homeName}</Text></View>
-          <View style={[st.side, { justifyContent: 'flex-end' }]}><Text style={st.team} numberOfLines={1}>{awayName}</Text><View style={[st.dot, { backgroundColor: awayColor }]} /></View>
-        </View>
+        <StatsHead homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} />
         {periods >= 2 && (
           <View style={st.chips}>
             <SelectChip label="Match" active={active === 'all'} onPress={() => setScope('all')} />
@@ -150,50 +148,3 @@ export function TennisStatsPanel({
     </View>
   );
 }
-
-/** One two-sided row: home value · label · away value, with a share bar. */
-function StatBar({ r, homeName, awayName, homeColor, awayColor }: { r: ServeRow; homeName: string; awayName: string; homeColor: string; awayColor: string }) {
-  const tot = r.hv + r.av;
-  const hw = tot > 0 ? r.hv / tot : 0.5;
-  return (
-    <View style={st.row} accessible accessibilityLabel={`${r.label}: ${homeName} ${r.home}, ${awayName} ${r.away}`}>
-      <View style={st.vals}>
-        <Text style={[st.val, r.hv > r.av && st.lead]}>{r.home}</Text>
-        <Text style={st.label}>{r.label}</Text>
-        <Text style={[st.val, st.right, r.av > r.hv && st.lead]}>{r.away}</Text>
-      </View>
-      <View style={st.bar}>
-        <View style={{ flex: hw, backgroundColor: homeColor, opacity: tot > 0 ? 1 : 0.25 }} />
-        <View style={{ flex: 1 - hw, backgroundColor: awayColor, opacity: tot > 0 ? 1 : 0.25 }} />
-      </View>
-    </View>
-  );
-}
-
-const st = StyleSheet.create({
-  title: { color: theme.colors.text, fontSize: theme.font.body, fontWeight: '700' },
-  card: { backgroundColor: theme.colors.surface, borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.colors.border, padding: theme.spacing(3), gap: theme.spacing(2) },
-  head: { flexDirection: 'row', justifyContent: 'space-between', gap: theme.spacing(2) },
-  side: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(1.5), flex: 1, minWidth: 0 },
-  team: { color: theme.colors.text, fontSize: theme.font.small, fontWeight: '800', flexShrink: 1 },
-  dot: { width: 10, height: 10, borderRadius: 5 },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing(2) },
-  section: { gap: theme.spacing(1), marginTop: theme.spacing(1) },
-  sub: { color: theme.colors.textMuted, fontSize: theme.font.tiny, fontWeight: '800', letterSpacing: 0.5 },
-  row: { gap: 3, paddingVertical: 2 },
-  vals: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(1) },
-  val: { color: theme.colors.text, fontSize: theme.font.small, width: 92, fontVariant: ['tabular-nums'] },
-  right: { textAlign: 'right' },
-  lead: { fontWeight: '800' },
-  label: { flex: 1, color: theme.colors.textMuted, fontSize: theme.font.tiny, textAlign: 'center' },
-  bar: { flexDirection: 'row', height: 3, borderRadius: 2, overflow: 'hidden', backgroundColor: theme.colors.surfaceAlt },
-  pRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(2) },
-  pName: { color: theme.colors.text, fontSize: theme.font.small, flex: 1 },
-  pVal: { color: theme.colors.text, fontSize: theme.font.small, fontVariant: ['tabular-nums'] },
-  table: { borderTopWidth: 1, borderTopColor: theme.colors.border },
-  tRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: theme.spacing(1), borderBottomWidth: 1, borderBottomColor: theme.colors.border },
-  tCell: { flex: 1, color: theme.colors.text, fontSize: theme.font.small, textAlign: 'center', fontVariant: ['tabular-nums'] },
-  tHead: { color: theme.colors.textMuted, fontWeight: '800', fontSize: theme.font.tiny },
-  tLabel: { flex: 1.6, textAlign: 'left', color: theme.colors.textMuted },
-  note: { color: theme.colors.textMuted, fontSize: theme.font.tiny },
-});
