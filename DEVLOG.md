@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-31 — Two old test matches deleted (founder, SQL editor)
+
+Lions vs Tigers (`72414a2a`, live since 22 Aug) and Brazil 5 fc vs Japan 5 fc (`4ad03965`, live since 26 Sep) deleted by id with their per-match rows (cascade); teams kept. The first, name-based script found only one (the second's teams are "Brazil 5 fc" / "Japan 5 fc") and changed nothing; the founder's look-up gave the ids. Script: `docs/ops/2026-10-31-delete-stale-test-matches.sql`.
+
 ### 2026-10-31 — Release: "Time up" tiebreak option live (web, Android OTA)
 
 auth-smoke passed. Published from a clean worktree at c75ef69: web (entry `index-f86b138b`, confirmed live on app.sportnnote.in through the Worker) and Android OTA group `aea95e4f` (runtime 1.0.0, channel preview).
