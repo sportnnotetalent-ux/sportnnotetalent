@@ -13,7 +13,11 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
-### 2026-10-31 — MVP P1s, batch 1 (not published yet)
+### 2026-10-31 — Release: MVP P1 batch 1 live (web, Android OTA)
+
+auth-smoke passed. Published from a clean worktree at 1208939: web (entry `index-830757b5`) and Android OTA group `16075b7c` (runtime 1.0.0, channel preview).
+
+### 2026-10-31 — MVP P1s, batch 1
 
 Each with a failing test first (`docs/security/breaks/mvp-p1-batch1.md`):
 - **Football pickup games (F5):** with no players on a side, the "who?" step is skipped and stats, fouls and penalties are the team's (`afterTeamPick`). Cards still need a person (team official offered).
