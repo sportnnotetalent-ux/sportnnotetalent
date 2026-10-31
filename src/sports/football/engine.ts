@@ -8,7 +8,7 @@ import { isPlayerCard } from "./events.ts";
 import { aggPriorFromConfig, aggregateText, levelForDecider, type AggPrior } from "../aggregate.ts";
 import type { Player } from "../../core/types";
 // Perf F-15 — the format presets / options live in the light meta module.
-import { DEEP_TRACK_KEYS, DEEP_TRACKABLE, trackKey, DEEP_TRACK_FIELDS } from './meta.ts';
+import { DEEP_TRACK_KEYS, DEEP_TRACKABLE, trackKey, DEEP_TRACK_FIELDS, BASE_TRACKABLE } from './meta.ts';
 import type { DeepTrackKey } from './meta.ts';
 export { DEEP_TRACK_KEYS, DEEP_TRACKABLE, DEEP_TRACK_FIELDS };
 export type { DeepTrackKey };
@@ -167,12 +167,8 @@ export function readDeepTrack(config?: Record<string, unknown>): DeepTrack | und
 }
 export const readTrack = (config?: Record<string, unknown>): TrackConfig => {
   const cap = (k: string) => k[0].toUpperCase() + k.slice(1);
-  const def: Record<keyof TrackConfig, boolean> = {
-    shots: true, possession: true, fouls: true, cards: true, offsides: true,
-    corners: true, tackles: true, interceptions: true, saves: true, passes: false, // passes off by default (too fast for one scorer)
-    crosses: true, dribbles: true, handball: true,
-    attackContribution: true, defenceContribution: true,
-  };
+  // A match with no `track*` keys (every saved match) keeps the full set
+  const def = Object.fromEntries(BASE_TRACKABLE.map(([k, , full]) => [k, full])) as Record<keyof TrackConfig, boolean>;
   const out = {} as TrackConfig;
   for (const k of TRACK_KEYS) {
     const v = config?.[`track${cap(k)}`];
@@ -184,13 +180,7 @@ export const readTrack = (config?: Record<string, unknown>): TrackConfig => {
 /** The stats a scorer can switch on/off mid-match (parity #14 live settings —
  *  the old inline "Scoring settings" card's set, in the same order; FB-17
  *  added crosses, dribbles and handballs). */
-const TRACKABLE: [keyof TrackConfig, string][] = [
-  ['shots', 'Shots'], ['possession', 'Possession'], ['passes', 'Passes'], ['fouls', 'Fouls'],
-  ['cards', 'Cards'], ['offsides', 'Offsides'], ['corners', 'Corners'], ['tackles', 'Tackles'],
-  ['interceptions', 'Interceptions'], ['saves', 'Saves'],
-  ['attackContribution', 'Attacking play'], ['defenceContribution', 'Defensive play'],
-  ['crosses', 'Crosses'], ['dribbles', 'Dribbles'], ['handball', 'Handballs'],
-];
+const TRACKABLE = BASE_TRACKABLE.map(([k, label]) => [k, label]) as [keyof TrackConfig, string][];
 
 /** Football's live settings (config mode): each tap patches the match format and
  *  the log replays with it, exactly as the old inline card did. */

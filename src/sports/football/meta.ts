@@ -25,6 +25,26 @@ export const DEEP_TRACKABLE: [DeepTrackKey, string, string][] = [
 
 export const trackKey = (k: string) => `track${k[0].toUpperCase()}${k.slice(1)}`;
 
+/** The stats a scorer can switch on/off (parity #14 live settings, in the old
+ *  card's order; FB-17 added crosses, dribbles and handballs), with each one's
+ *  full-set default (passes off: too fast for one scorer). */
+export const BASE_TRACKABLE: [string, string, boolean][] = [
+  ['shots', 'Shots', true], ['possession', 'Possession', true], ['passes', 'Passes', false], ['fouls', 'Fouls', true],
+  ['cards', 'Cards', true], ['offsides', 'Offsides', true], ['corners', 'Corners', true], ['tackles', 'Tackles', true],
+  ['interceptions', 'Interceptions', true], ['saves', 'Saves', true],
+  ['attackContribution', 'Attacking play', true], ['defenceContribution', 'Defensive play', true],
+  ['crosses', 'Crosses', true], ['dribbles', 'Dribbles', true], ['handball', 'Handballs', true],
+];
+
+/** "Quick" (founder, 2026-10-31; MVP F8): a friendly tracks goals, assists,
+ *  subs (always) and cards; everything else is opt-in. Tournaments keep the
+ *  full set. Stamped on new matches only — a saved match has no `track*` keys
+ *  and keeps the full set (engine `readTrack`). */
+export const TRACK_FIELDS: FormatField[] = BASE_TRACKABLE.map(([k, label, full]) => ({
+  key: trackKey(k), label: `Track ${label.toLowerCase()}`, type: 'toggle', group: 'Stats to track', advanced: true,
+  default: k === 'cards', tournamentDefault: full,
+}));
+
 /** Deep wave — the optional toggles as format fields (live settings group;
  *  also an organiser's advanced format options). */
 export const DEEP_TRACK_FIELDS: FormatField[] = DEEP_TRACKABLE.map(([k, label, hint]) => ({ key: trackKey(k), label, type: 'toggle', default: false, group: 'Deeper stats (optional)', hint }));
@@ -72,6 +92,7 @@ export const FOOTBALL_META: SportMeta = {
     // SD-132: futsal (FIFA Futsal Laws 7, 12, 13)
     { key: 'stoppedClock', label: 'Stopped clock', type: 'toggle', default: false, advanced: true, hint: 'Futsal: stop and restart the clock on every stoppage' },
     { key: 'futsal', label: 'Futsal time-outs and accumulated fouls', type: 'toggle', default: false, advanced: true, hint: '1 time-out a half · 6th foul a half = 10 m free kick' },
+    ...TRACK_FIELDS,
     // deep wave: the optional "Deeper stats" an organiser can switch on for an event
     ...DEEP_TRACK_FIELDS.map((f) => ({ ...f, label: `Track ${f.label.charAt(0).toLowerCase()}${f.label.slice(1)}`, advanced: true })),
   ],

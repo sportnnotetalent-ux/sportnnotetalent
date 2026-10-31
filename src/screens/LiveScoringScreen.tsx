@@ -2486,7 +2486,12 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
                         value={editFmt}
                         onChange={(k, v) => setEditFmt((f) => ({ ...f, [k]: v }))}
                         heading="format"
-                        omitKeys={getSport(sport).participantKind === 'both' ? ['playersPerSide'] : undefined}
+                        // The stat toggles live in ⚙️ Scoring settings (Info tab) — not here, so an
+                        // older match (no track keys) is never shown as tracking less than it does.
+                        omitKeys={[
+                          ...(getSport(sport).participantKind === 'both' ? ['playersPerSide'] : []),
+                          ...(plugin.liveSettings?.fields ?? []).map((f) => f.key).filter((k) => /^track[A-Z]/.test(k)),
+                        ]}
                       />
                     )}
                     {matchLive && (
