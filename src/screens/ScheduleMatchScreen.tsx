@@ -3,6 +3,7 @@
  *  Sport is a compact picklist; teams lead with the ones you've played for and
  *  fall back to a search (type 3+ letters) so the list never sprawls. */
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { uniqueShort } from '../core/teamShort';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { KeyboardAwareScrollView, KeyboardFooterLayout } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -53,11 +54,6 @@ type PickTeam = Pick<Team, 'id' | 'name' | 'colorHex'> & { roster?: string[] };
 // For teams created on the fly (a friendly between two ad-hoc sides): auto-derive a
 // short code from the name and cycle a color so each new team looks distinct.
 const TEAM_PALETTE = ['#FF5C5C', '#4DA3FF', '#4CD964', '#FFD60A', '#BF5AF2', '#FF9F0A', '#5AC8FA', '#FF375F'];
-const shortFrom = (name: string) => {
-  const words = name.trim().split(/\s+/).filter(Boolean);
-  const initials = words.map((w) => w[0]).join('').toUpperCase();
-  return ((initials.length >= 2 ? initials : name.replace(/[^a-zA-Z0-9]/g, '').toUpperCase()) || 'TM').slice(0, 4);
-};
 
 export default function ScheduleMatchScreen() {
   const nav = useNavigation<Nav>();
@@ -217,7 +213,11 @@ export default function ScheduleMatchScreen() {
   const makeCreateHandler = (side: 'home' | 'away') => async (name: string): Promise<boolean> => {
     if (!sport) return false;
     try {
-      const team = await createTeam({ name, shortName: shortFrom(name), sport, colorHex: TEAM_PALETTE[teams.length % TEAM_PALETTE.length], adhoc: true });
+      // MVP F9: a code and a colour the other side doesn't already have
+      const other = teams.find((t) => t.id === (side === 'home' ? away : home));
+      const cycled = [...TEAM_PALETTE.slice(teams.length % TEAM_PALETTE.length), ...TEAM_PALETTE.slice(0, teams.length % TEAM_PALETTE.length)];
+      const colorHex = cycled.find((c) => c.toUpperCase() !== other?.colorHex?.toUpperCase()) ?? cycled[0];
+      const team = await createTeam({ name, shortName: uniqueShort(name, other?.shortName ? [other.shortName] : []), sport, colorHex, adhoc: true });
       setTeamNonce((n) => n + 1); // refetch so it shows in both pickers
       (side === 'home' ? setHome : setAway)(team.id);
       return true;

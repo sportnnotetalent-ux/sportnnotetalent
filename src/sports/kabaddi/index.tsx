@@ -305,32 +305,6 @@ const ScoringControls: SportPlugin<KabaddiState>['ScoringControls'] = ({ state, 
       {/* On-mat status: players in = teamSize − out − carded; suspensions count down. */}
       <MatStatus state={state} homeName={homeName} awayName={awayName} homeRoster={homeRoster} awayRoster={awayRoster} />
 
-      {/* SD-117b: pause the clock for a timeout / injury / review; team timeouts */}
-      {!state.goldenRaid && (
-        <View style={{ gap: theme.spacing(2) }}>
-          {paused && (
-            <Text style={ctrl.pausedBanner} accessibilityLiveRegion="polite">⏸ Clock paused at {currentMinute(state)}′ — resume when play restarts.</Text>
-          )}
-          <View style={ctrl.row}>
-            <Button label={paused ? '▶ Resume clock' : '⏸ Pause clock'} variant={paused ? 'primary' : 'ghost'} style={ctrl.flex}
-              onPress={() => dispatch({ type: paused ? 'RESUME' : 'PAUSE', payload: { at: Date.now() } })} />
-          </View>
-          <View style={ctrl.row}>
-            {(['home', 'away'] as const).map((side) => {
-              const left = Math.max(0, TIMEOUTS_PER_HALF - timeoutsUsed(state, side));
-              return (
-                <Button key={side} label={`⏱️ Timeout — ${side === 'home' ? homeName : awayName} (${left} left)`} variant="ghost" style={ctrl.flex} disabled={left === 0}
-                  onPress={() => {
-                    fire({ type: 'TIMEOUT', side });
-                    // the clock stops for a timeout
-                    if (!paused && backfillMin == null) dispatch({ type: 'PAUSE', payload: { at: Date.now() } });
-                  }} />
-              );
-            })}
-          </View>
-        </View>
-      )}
-
       {!raidFlow ? (
         <View style={ctrl.row}>
           {(['home', 'away'] as const).map((side) => {
@@ -489,6 +463,30 @@ const ScoringControls: SportPlugin<KabaddiState>['ScoringControls'] = ({ state, 
           <Button label={raidFlow.editOf != null ? '✓ Save raid' : '✓ Record raid'} onPress={recordRaid} />
         </View>
       )}
+      {/* SD-117b: pause the clock for a timeout / injury / review; team timeouts.
+          MVP K4: below the raid buttons, so a thumb slip can't cost a timeout. */}
+      {!state.goldenRaid && (
+        <View style={{ gap: theme.spacing(2) }}>
+          {paused && (
+            <Text style={ctrl.pausedBanner} accessibilityLiveRegion="polite">⏸ Clock paused at {currentMinute(state)}′ — resume when play restarts.</Text>
+          )}
+          <View style={ctrl.row}>
+            <Button label={paused ? '▶ Resume clock' : '⏸ Pause clock'} variant={paused ? 'primary' : 'ghost'} style={ctrl.flex}
+              onPress={() => dispatch({ type: paused ? 'RESUME' : 'PAUSE', payload: { at: Date.now() } })} />
+          </View>
+          <View style={ctrl.row}>
+            {(['home', 'away'] as const).map((side) => {
+              const left = Math.max(0, TIMEOUTS_PER_HALF - timeoutsUsed(state, side));
+              return (
+                <Button key={side} label={`⏱️ Timeout — ${side === 'home' ? homeName : awayName} (${left} left)`} variant="ghost" style={ctrl.flex} disabled={left === 0}
+                  // MVP K4: one step — the timeout stops the clock itself (not while backfilling)
+                  onPress={() => fire(backfillMin == null ? { type: 'TIMEOUT', side, payload: { pauseAt: Date.now() } } : { type: 'TIMEOUT', side })} />
+              );
+            })}
+          </View>
+        </View>
+      )}
+
 
       {/* SD-59 technical point · SD-72 cards */}
       {!state.goldenRaid && !raidFlow && !tech && !card && (

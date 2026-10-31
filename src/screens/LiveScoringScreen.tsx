@@ -44,6 +44,7 @@ import { theme } from '../core/theme';
 import { Glyph, IconText } from '../components/Icon';
 import { getSport } from '../sports/registry';
 import { entryDisplayName } from '../data/participantEntry';
+import { distinctSideColors } from '../core/contrast';
 import { VoiceScorer } from '../sports/VoiceScorer';
 import { completesMatch } from '../sports/voiceMatch';
 import { Scoreboard } from '../components/Scoreboard';
@@ -112,11 +113,13 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
     awayName,
     homeTeamName,
     awayTeamName,
-    homeColor,
-    awayColor,
+    homeColor: homeColorIn,
+    awayColor: awayColorIn,
     matchId,
     canScore: routeCanScore = true,
   } = route.params;
+  // MVP B5: sides whose colours are too close get a clearly different away colour (this view only)
+  const [homeColor, awayColor] = distinctSideColors(homeColorIn, awayColorIn);
   const plugin = getSport(sport);
   const { profile } = useAuth();
 
@@ -413,8 +416,10 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
   // Through the dispute mask, so a disputed player's name stays hidden.
   const individualSport = (getSport(sport).participantKind ?? 'team') !== 'team'; // omitted = a team sport
   const shownNameOf = useMemo(() => makeNameOf(people, maskValue), [people, maskValue]);
-  const homeShown = (individualSport ? entryDisplayName(homeScoreRoster.map((p) => shownNameOf(p.id, p.fullName))) : undefined) ?? homeName;
-  const awayShown = (individualSport ? entryDisplayName(awayScoreRoster.map((p) => shownNameOf(p.id, p.fullName))) : undefined) ?? awayName;
+  // MVP F9: two team sides with the same code (both "KF") show their full names
+  const sameCode = !individualSport && homeName === awayName && !!homeTeamName && !!awayTeamName && homeTeamName !== awayTeamName;
+  const homeShown = (individualSport ? entryDisplayName(homeScoreRoster.map((p) => shownNameOf(p.id, p.fullName))) : undefined) ?? (sameCode ? homeTeamName! : homeName);
+  const awayShown = (individualSport ? entryDisplayName(awayScoreRoster.map((p) => shownNameOf(p.id, p.fullName))) : undefined) ?? (sameCode ? awayTeamName! : awayName);
 
   // Lineup (for LiveExtras + clean sheets). Refetch on focus so edits show up.
   const [homeLineup, setHomeLineup] = useState<LineupSlot[]>([]);

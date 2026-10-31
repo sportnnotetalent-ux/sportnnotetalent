@@ -17,6 +17,8 @@ const QUIET: Record<string, string> = {
   SET_SERVE_ORDER: 'serving-order pick',
   FIRST_BREAK: 'break pick', // SD-117c carrom toss
   SET_SERVE: 'serve pick', // SD-58 volleyball toss
+  PAUSE: 'clock pause', // MVP K4 (kabaddi)
+  RESUME: 'clock restart',
   SET_ROTATION: 'rotation', // SD-58
   SET_DETAIL: 'point-detail setting',
   POINT_DETAIL: 'point detail',

@@ -58,3 +58,23 @@ export function ensureContrast(fg: string | undefined | null, bg: string, min = 
   }
   return target === 255 ? WHITE : '#000000';
 }
+
+/** MVP B5 — how far apart two colours look (RGB distance, 0–441); 0 when either
+ *  isn't a hex colour. */
+export function colorGap(a: string | undefined | null, b: string | undefined | null): number {
+  const x = parseHex(a), y = parseHex(b);
+  if (!x || !y) return 0;
+  return Math.hypot(x[0] - y[0], x[1] - y[1], x[2] - y[2]);
+}
+
+const SIDE_FALLBACKS = ['#4DA3FF', '#FF5C5C', '#FFD60A', '#4CD964', '#BF5AF2', '#FF9F0A'];
+const MIN_SIDE_GAP = 120;
+
+/** MVP B5 — the two sides' colours as the scorer sees them: unchanged when they're
+ *  easy to tell apart; otherwise home keeps its colour and away gets the
+ *  fallback farthest from it. Colour is the main guard against wrong-side taps. */
+export function distinctSideColors<T extends string | undefined>(home: T, away: T): [T, T] {
+  if (!parseHex(home) || !parseHex(away) || colorGap(home, away) >= MIN_SIDE_GAP) return [home, away];
+  const best = [...SIDE_FALLBACKS].sort((p, q) => colorGap(home, q) - colorGap(home, p))[0];
+  return [home, best as T];
+}

@@ -760,9 +760,12 @@ export const reducer = (s: KabaddiState, a: ScoreAction): KabaddiState => {
       // SD-117b (new action): a team timeout — a timeline marker, no score.
       // 2 per team per half.
       if (a.side !== 'home' && a.side !== 'away' || timeoutsUsed(s, a.side, hf) >= TIMEOUTS_PER_HALF) return s;
+      // MVP K4 (new logs): `pauseAt` — the timeout also stops the clock, in this one step
+      const pauseAt = typeof a.payload?.pauseAt === 'number' ? a.payload.pauseAt : null;
       return {
         ...s, seq: s.seq + 1,
         events: [...s.events, { id: s.seq + 1, stamp: `${minute}'`, icon: '⏱️', label: 'Timeout', side: a.side, kind: 'timeout', minute, half: hf }],
+        ...(pauseAt != null && s.startedAt && s.pausedAt == null ? { pausedAt: pauseAt } : {}),
       };
     }
     case 'SET_TRACK':

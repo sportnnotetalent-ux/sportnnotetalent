@@ -19,6 +19,7 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { theme } from '../core/theme';
 import { SelectChip } from '../components/ui';
 import { tapGuard } from '../core/tapGuard';
+import { holdFeedback } from '../core/haptics';
 import { sideOrder } from './courtCues';
 import type { Player } from '../core/types';
 import { readableOn } from '../core/contrast';
@@ -91,8 +92,9 @@ export function PointButtons({
       <Pressable
         key={s}
         onPress={() => tap(s)}
-        onLongPress={canCredit(s) && !disabled ? () => setPick(s) : undefined}
-        delayLongPress={350}
+        // MVP B2: a firm press isn't a credit request — the hold is longer, and buzzes
+        onLongPress={canCredit(s) && !disabled ? () => { holdFeedback(); setPick(s); } : undefined}
+        delayLongPress={600}
         disabled={disabled}
         accessibilityRole="button"
         accessibilityLabel={`${verb} to ${nameOf(s)}${serving === s ? ', serving' : ''}`}
@@ -125,6 +127,7 @@ export function PointButtons({
         accessibilityLabel={swapped ? 'Swap sides back: home on the left' : 'Swap sides: away on the left'}>⇄ Swap sides</Text>
       {pick && !disabled ? (
         <View style={pb.creditBox}>
+          <Text style={pb.meta}>Not scored yet — pick who won the rally, or Cancel.</Text>
           {(pick === 'both' ? (['home', 'away'] as const).filter(canCredit) : [pick]).map(creditRow)}
           <Text style={[pb.link, pb.linkPad]} onPress={() => setPick(null)} accessibilityRole="button">Cancel</Text>
         </View>

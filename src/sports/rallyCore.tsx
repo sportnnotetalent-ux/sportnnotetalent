@@ -142,18 +142,19 @@ export function makeRallyPlugin(opts: RallyOpts): SportPlugin<RallyState> {
     const spot = opts.courtPositions ? serveSpot(s) : null;
     const positionedServer = spot ? byId(serverId(s, ids)) : undefined;
     // "Who starts on the right?" — doubles, before the first point of a game.
-    // SD-115: nothing selected until picked (no silent roster-order default),
-    // the point buttons wait for both picks at 0-0 of game 1, and a wrong pick
-    // can be fixed mid-game (`v:2`) — the server is only derived, the score stays.
+    // MVP PB3 (was SD-115's required pick): optional — the roster order until
+    // someone picks; a wrong pick can be fixed mid-game (`v:2`) — the server is
+    // only derived, the score stays.
     const atGameStart = s.current.home === 0 && s.current.away === 0;
     const startTeams = (['home', 'away'] as const).filter((t) => rosterOf(t).length >= 2);
-    const needsStart = !!opts.courtPositions && s.doubles && !s.ended && atGameStart && s.games.length === 0
-      && startTeams.some((t) => !s.startRight?.[t]);
     const [fixStart, setFixStart] = React.useState(false);
+    // MVP PB3: the start-right pick is optional (roster order until picked) — folded away
+    const [showStart, setShowStart] = React.useState(false);
     const startChips = (fix: boolean) => startTeams.map((t) => {
       const roster = rosterOf(t).slice(0, 2);
+      // MVP PB3: unpicked shows the roster-order player the serve actually follows
       const cur = s.startRight?.[t] && roster.some((p) => p.id === s.startRight?.[t]) ? s.startRight[t]
-        : !needsStart ? startPair(s, t, ids[t]).starter : undefined;
+        : startPair(s, t, ids[t]).starter;
       return (
         <View key={t} style={ctrl.chips}>
           <Text style={[ctrl.meta, { alignSelf: 'center' }]}>{t === 'home' ? homeName : awayName}:</Text>
@@ -165,11 +166,14 @@ export function makeRallyPlugin(opts: RallyOpts): SportPlugin<RallyState> {
       );
     });
     const startPicker = !opts.courtPositions || !s.doubles || s.ended || startTeams.length === 0 ? null
-      : atGameStart ? (
+      : atGameStart && !showStart ? (
+        <Text style={ctrl.link} onPress={() => setShowStart(true)} accessibilityRole="button">Who starts on the right? (optional — roster order until you pick)</Text>
+      ) : atGameStart ? (
         <View style={{ gap: theme.spacing(2) }}>
           <Text style={ctrl.label}>Who starts on the right?</Text>
-          <Text style={ctrl.meta}>Each team's player in the right-hand court at 0-0 of this game. The first server serves from the right.</Text>
+          <Text style={ctrl.meta}>Each team's player in the right-hand court at 0-0 of this game. The first server serves from the right. Optional — without a pick, the roster order is used.</Text>
           {startChips(false)}
+          <Text style={ctrl.link} onPress={() => setShowStart(false)} accessibilityRole="button">Done</Text>
         </View>
       ) : fixStart ? (
         <View style={{ gap: theme.spacing(2) }}>
@@ -197,9 +201,9 @@ export function makeRallyPlugin(opts: RallyOpts): SportPlugin<RallyState> {
         onPick={(side, fix) => dispatch({ type: 'SET_FIRST_SERVER', payload: fix ? { side, v: 2 } : { side, ...(opts.id === 'pickleball' ? { alt: true, pos: 2 } : {}) } })}
       />
     ) : null;
-    const blocked = needsServer || needsStart;
-    const blockedHint = needsServer && needsStart ? 'Pick who serves first and who starts on the right to start scoring.'
-      : needsServer ? 'Pick who serves first to start scoring.' : 'Pick who starts on the right to start scoring.';
+    // MVP PB3: only the toss blocks scoring; who starts on the right defaults to the roster order
+    const blocked = needsServer;
+    const blockedHint = 'Pick who serves first to start scoring.';
 
     if (s.sideOut) {
       // The current server's player (for credit + display). With court positions

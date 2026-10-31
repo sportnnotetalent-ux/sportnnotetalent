@@ -13,5 +13,7 @@ function vibrate(pattern: number | number[]) {
 
 /** A scoring tap went in. */
 export const tapFeedback = () => vibrate(12);
+/** MVP B2: a held point button opened the credit chips — nothing scored yet. */
+export const holdFeedback = () => vibrate([30, 40, 30]);
 /** Undo — a different, double pattern so it can be told apart by feel. */
 export const undoFeedback = () => vibrate([18, 60, 18]);

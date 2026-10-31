@@ -13,6 +13,17 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-31 — MVP P1s, batch 4 (not published yet)
+
+Break-it list first (`docs/security/breaks/mvp-p1-batch4.md`), then each fix with a failing test:
+- **Tennis presets** in the order club players need: Best of 3, 2 sets + match tiebreak, One set, Short sets, … Best of 5 and Grand Slam last.
+- **Racket long press** waits 600 ms, buzzes, says "Not scored yet".
+- **Side colours** never too close on the scorer's screen (`distinctSideColors`); new sides avoid the other side's colour.
+- **Team codes** stay distinct (KF / KUK, `core/teamShort.ts`); matching codes show full names.
+- **Kabaddi**: a timeout is one step (pauses the clock too; one Undo); the clock row sits below the raid buttons.
+- **Pickleball doubles**: "who starts on the right" is optional (roster order by default).
+Simulation: 500 tennis matches, 1,000 colour pairs, 1,000 name pairs, 500 kabaddi halves. Demo-checked: tennis list, kabaddi timeout. Full suite 5,923 tests, 0 failing; tsc clean.
+
 ### 2026-10-31 — Release: football "Quick" default live (web, Android OTA)
 
 auth-smoke passed. Published from a clean worktree at 2e3cae9: web (entry `index-bc72e290`, confirmed live) and Android OTA group `30a30797` (runtime 1.0.0, channel preview).

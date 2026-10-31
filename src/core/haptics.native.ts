@@ -22,6 +22,12 @@ export function tapFeedback() {
   const h = haptics();
   if (h) void h.impactAsync(h.ImpactFeedbackStyle.Light).catch(() => {});
 }
+/** MVP B2: a held point button opened the credit chips — nothing scored yet. */
+export function holdFeedback() {
+  if (!hapticsPref.get()) return;
+  const h = haptics();
+  if (h) void h.impactAsync(h.ImpactFeedbackStyle.Medium).catch(() => {});
+}
 /** Undo — a different pattern so it can be told apart by feel. */
 export function undoFeedback() {
   if (!hapticsPref.get()) return;
