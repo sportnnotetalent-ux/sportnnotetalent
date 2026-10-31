@@ -3160,7 +3160,8 @@ export async function endMatchManually(
   // table (result.forfeit; the board score stays in result.score).
   if ((r.kind === 'conceded' || r.kind === 'awarded') && r.winner && r.forfeit === undefined) r = await withForfeit(matchId, r, r.kind);
   const winner: 'home' | 'away' | 'draw' | null =
-    r.kind === 'draw' || r.kind === 'tie' ? 'draw' : r.kind === 'no_result' || r.kind === 'abandoned' ? null : r.winner ?? null;
+    r.kind === 'draw' || r.kind === 'tie' ? 'draw' : r.kind === 'no_result' || r.kind === 'abandoned' ? null
+    : r.kind === 'time_up' ? r.winner ?? 'draw' : r.winner ?? null;
   if (!isSupabaseConfigured || !supabase) {
     const m = demo.matches.find((x) => x.id === matchId);
     if (!m) return 'full';

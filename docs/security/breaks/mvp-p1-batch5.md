@@ -2,7 +2,7 @@
 
 **Process:** quality mandate step 4. Listed after reading the code and **before** any fix. Each fix then gets its own failing test first (step 5).
 
-**Moved out of this batch:** PD2 "Time up" ending. A real result kind reaches 23 files and the server's stat-line stamping (`20261019122800_stat_line_result.sql` reads winners only for awarded / conceded), so it gets its own batch with a migration.
+**Moved out of this batch:** PD2 "Time up" ending. A real result kind reaches 23 files and the server's stat-line stamping (`20261019122800_stat_line_result.sql` reads winners only for awarded / conceded), so it gets its own batch. (On reading the server code it turned out no migration was needed: see `mvp-time-up.md`.)
 
 | # | Failure | Status |
 |---|---|---|

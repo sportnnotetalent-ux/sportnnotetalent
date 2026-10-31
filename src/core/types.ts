@@ -890,10 +890,12 @@ export interface MatchEventRecord {
 export type MatchStatus = 'scheduled' | 'live' | 'completed' | 'postponed' | 'cancelled';
 
 /** How a match ended when it was closed by hand (parity #04, `matches.result`). */
-export type ResultKind = 'awarded' | 'conceded' | 'draw' | 'tie' | 'no_result' | 'abandoned';
+/** `time_up` (MVP PD2): a racket match stopped on time — the leader wins
+ *  (`winner`), level is a draw (no `winner`). */
+export type ResultKind = 'awarded' | 'conceded' | 'draw' | 'tie' | 'no_result' | 'abandoned' | 'time_up';
 export interface MatchResult {
   kind: ResultKind;
-  /** set for awarded / conceded */
+  /** set for awarded / conceded; time_up: the leader (absent = level) */
   winner?: 'home' | 'away';
   /** why — the public record (required) */
   reason: string;

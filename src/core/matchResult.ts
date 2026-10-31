@@ -21,6 +21,9 @@ export function manualResultLine(r: MatchResult, home: string, away: string, opt
     case 'tie': return 'Match tied';
     case 'conceded': return `${winner} won — ${loser} conceded`;
     case 'awarded': return `${winner} awarded the match${reason ? ` — ${reason}` : ''}`;
+    case 'time_up': return winner
+      ? `${winner} won on time${reason && !/^time( up)?$/i.test(reason) ? ` — ${reason}` : ''}`
+      : 'Level when time ran out — match drawn';
   }
 }
 

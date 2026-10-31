@@ -166,6 +166,7 @@ export interface ResultLike { kind: string; winner?: Side; reason?: string }
  *   awarded → "def." (default; "ret." when the reason says retired, the old
  *   retireMatch path), walkover → "w/o", abandoned / no result → "abandoned".
  *   generic (volleyball, carrom): "conceded" / "awarded" / "w/o" / "abandoned" / "no result".
+ *   time up (MVP PD2), either style: "(time)".
  * null for a normal finish, a draw or a tie.
  */
 export function resultMark(o: { result?: ResultLike | null; walkover?: boolean }, style: 'racket' | 'generic' = 'racket'): string | null {
@@ -178,6 +179,7 @@ export function resultMark(o: { result?: ResultLike | null; walkover?: boolean }
     case 'awarded': return racket ? (/retir/i.test(r.reason ?? '') ? 'ret.' : 'def.') : 'awarded';
     case 'abandoned': return 'abandoned';
     case 'no_result': return racket ? 'abandoned' : 'no result';
+    case 'time_up': return '(time)';
     default: return null;
   }
 }

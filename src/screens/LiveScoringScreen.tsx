@@ -20,6 +20,7 @@ import { matchControls, showsControl } from '../core/matchSafety';
 import { getDeviceId } from '../core/deviceId';
 import { mergeMatchConfig, changedFormatKeys } from '../core/matchConfig';
 import { manualResultLine as baseResultLine, isNoResult } from '../core/matchResult';
+import { timeUpLeader } from '../core/timeUp';
 import { matchScoreLine, finalBoard, resultMark } from '../sports/scoreline';
 import { isEliminationStage } from '../data/bracket';
 import { completedAt, effectiveLog, type AmendOp } from '../sports/amend';
@@ -1046,15 +1047,22 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
     ...(plugin.retireTerms
       ? [{ kind: 'conceded' as ResultKind, label: 'Retired' }, { kind: 'awarded' as ResultKind, label: 'Default' }]
       : [{ kind: 'awarded' as ResultKind, label: 'Awarded' }, { kind: 'conceded' as ResultKind, label: 'Conceded' }]),
+    // MVP PD2: a racket match stopped on time — the leader wins, level is a draw.
+    ...(plugin.retireTerms && plugin.lineScore ? [{ kind: 'time_up' as ResultKind, label: 'Time up' }] : []),
     ...(knockout ? [] : [
       { kind: (drawLabel === 'Tie' ? 'tie' : 'draw') as ResultKind, label: drawLabel },
       { kind: 'no_result' as ResultKind, label: 'No result' }, { kind: 'abandoned' as ResultKind, label: 'Abandoned' },
     ]),
   ];
   const needsWinner = endKind === 'awarded' || endKind === 'conceded';
-  const endReady = !!endKind && endReason.trim().length >= 3 && (!needsWinner || !!endWinner);
+  // Time up: the winner comes from the score (sets, then games), never a pick.
+  const timeUpLs = endKind === 'time_up' ? plugin.lineScore?.(state) ?? null : null;
+  const timeUpWinner = timeUpLeader(timeUpLs);
+  const timeUpOn = !timeUpLs ? '' : timeUpLs.won.home !== timeUpLs.won.away ? `${timeUpLs.unit}s` : timeUpLs.unit === 'set' ? 'games' : 'points';
+  const endReady = !!endKind && endReason.trim().length >= 3 && (!needsWinner || !!endWinner)
+    && !(endKind === 'time_up' && knockout && !timeUpWinner);
   const draftResult: MatchResult | null = endKind ? {
-    kind: endKind, ...(needsWinner && endWinner ? { winner: endWinner } : {}), reason: endReason.trim(),
+    kind: endKind, ...(needsWinner && endWinner ? { winner: endWinner } : timeUpWinner ? { winner: timeUpWinner } : {}), reason: endReason.trim(),
     ...(plugin.manualEnd?.nrrToggle && (needsWinner || endKind === 'tie' || endKind === 'draw') ? { countNrr: endNrr } : {}),
     at: new Date().toISOString(),
   } : null;
@@ -1080,7 +1088,7 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
     const nr = noResultPoints(sport, cfg);
     const table = isNoResult(draftResult)
       ? `both teams +${nr} (no result)`
-      : endKind === 'draw' || endKind === 'tie'
+      : endKind === 'draw' || endKind === 'tie' || (endKind === 'time_up' && !draftResult.winner)
       ? `both teams +${cfg.draw}`
       : `${draftResult.winner === 'home' ? fullHome : fullAway} +${cfg.win}`;
     // SD-126: a conceded / awarded match counts the federation forfeit score
@@ -1119,7 +1127,7 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
       // SD-133 — the hand-ended match gets the full stat sync from this state.
       await settleStatWrites().catch(() => undefined);
       const how = await endMatchManually(matchId, r, { state });
-      setMeta((m) => ({ ...m, status: 'completed', result: how === 'full' ? r : undefined, winner: r.winner ?? (r.kind === 'draw' || r.kind === 'tie' ? 'draw' : undefined) }));
+      setMeta((m) => ({ ...m, status: 'completed', result: how === 'full' ? r : undefined, winner: r.winner ?? (r.kind === 'draw' || r.kind === 'tie' || r.kind === 'time_up' ? 'draw' : undefined) }));
       if (how === 'legacy') notice('Match ended', 'Saved without the reason until the database update runs.');
       closeEnd();
     } catch (e) {
@@ -1164,7 +1172,7 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
       <View style={st.retirePanel}>
         <Text style={st.retirePrompt}>How did it end?</Text>
         <View style={st.endChips}>
-          {endKinds.map((k) => <SelectChip key={k.kind} label={k.label} active={endKind === k.kind} onPress={() => { setEndKind(k.kind); setEndWo(false); }} />)}
+          {endKinds.map((k) => <SelectChip key={k.kind} label={k.label} active={endKind === k.kind} onPress={() => { setEndKind(k.kind); setEndWo(false); if (k.kind === 'time_up' && !endReason.trim()) setEndReason('Time up'); }} />)}
           {/* Walkover (hosts): also kept on the Info tab's Match scorers card for before the start. */}
           {canManage && matchId ? <SelectChip label="🏳 Walkover" active={endWo} onPress={() => { setEndWo(true); setEndKind(null); setEndWinner(null); }} /> : null}
         </View>
@@ -1179,6 +1187,13 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
             </View>
           </>
         )}
+        {endKind === 'time_up' ? (
+          <Text style={textStyles.muted}>
+            {timeUpWinner
+              ? `${timeUpWinner === 'home' ? homeName : awayName} leads on ${timeUpOn}, so wins on time.`
+              : knockout ? 'Level — a knockout needs a winner, so play on.' : 'Level — it counts as a draw.'}
+          </Text>
+        ) : null}
         {needsWinner && (
           <>
             <Text style={st.retirePrompt}>{endKind === 'conceded' ? (plugin.retireTerms ? 'Who wins? (the other side retired)' : 'Who wins? (the other side conceded)') : plugin.retireTerms ? 'Who wins by default?' : 'Awarded to?'}</Text>
