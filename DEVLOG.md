@@ -13,7 +13,11 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
-### 2026-10-31 — MVP P1s, batch 3 (not published yet) + a batch 2 fix
+### 2026-10-31 — Release: MVP P1 batch 3 + the team-name fix live (web, Android OTA)
+
+auth-smoke passed. Published from a clean worktree at 1e21a3d: web (entry `index-6d0605de`, confirmed live) and Android OTA group `e57ebfed` (runtime 1.0.0, channel preview). The basketball clock guide deploys with the website on this push.
+
+### 2026-10-31 — MVP P1s, batch 3 + a batch 2 fix
 
 Break-it list first (`docs/security/breaks/mvp-p1-batch3.md`), then each fix with a failing test:
 - **Basketball running clock:** "Clock stops on: Time-outs only" (friendly default) or "Every whistle" (tournament default). Saved matches unchanged. Website guide updated.
