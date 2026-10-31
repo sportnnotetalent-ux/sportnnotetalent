@@ -45,6 +45,21 @@ export function entryNameFromPlayers(ids: readonly string[], nameOf: (id: string
   return names.every((n): n is string => !!n && !!n.trim()) ? entryName(names) : undefined;
 }
 
+/** MVP B3 — what the scorer shows for a singles / doubles side instead of
+ *  its short code: the player's name, or the pair's first names ("Ravi /
+ *  Arjun"; "Ravi K / Ravi S" when the first names match). Undefined for 3+
+ *  players or a blank name — the stored side name stays. */
+export function entryDisplayName(names: string[]): string | undefined {
+  const parts = names.map((n) => tidy(n));
+  if (parts.length === 0 || parts.length > 2 || parts.some((n) => !n)) return undefined;
+  if (parts.length === 1) return parts[0];
+  const w = parts.map((n) => n.split(' '));
+  const first = w.map((x) => x[0]);
+  if (first[0].toLowerCase() !== first[1].toLowerCase()) return `${first[0]} / ${first[1]}`;
+  const withInitial = (x: string[]) => (x.length > 1 ? `${x[0]} ${x[x.length - 1][0].toUpperCase()}` : x[0]);
+  return `${withInitial(w[0])} / ${withInitial(w[1])}`;
+}
+
 /** A short code (2–4 characters) for the side: initials of a singles player
  *  ("Asha Rao" → "AR"), each partner's first initial + surname initial for a
  *  pair ("Asha Rao / Ben Lee" → "ARBL"), else the name's own letters. */

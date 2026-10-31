@@ -546,8 +546,12 @@ const reduce = (s: BasketballState, a: ScoreAction): BasketballState => {
       return a.side && !isPlayerOut(s, name, who)
         ? push(s, { minute, type: 'rebound', side: a.side, ...by, reboundType: a.payload?.reboundType as ReboundType | undefined }, quarter)
         : s;
-    case 'ASSIST':
+    case 'ASSIST': {
+      // MVP B6: a prompt's assist names its basket (`ref`) — gone (Undo) = no assist
+      const ref = typeof a.payload?.ref === 'number' ? a.payload.ref : null;
+      if (ref != null && !s.events.some((e) => e.id === ref && e.type === 'score' && e.side === a.side)) return s;
       return a.side && !isPlayerOut(s, name, who) ? push(s, { minute, type: 'assist', side: a.side, ...by }, quarter) : s;
+    }
     case 'STEAL':
       return a.side && !isPlayerOut(s, name, who) ? push(s, { minute, type: 'steal', side: a.side, ...by }, quarter) : s;
     case 'BLOCK':

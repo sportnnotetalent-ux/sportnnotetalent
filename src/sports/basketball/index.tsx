@@ -44,6 +44,7 @@ import {
   BB_TRACK_DEFAULTS, scoringLayout,
 } from "./engine";
 import { BASKETBALL_META } from './meta';
+import { basketballUndoLabel } from './undoLabel';
 import { basketballMatchRecords } from './records';
 
 /** SD-117 (B12): the foul-type chips, FIBA's U and D included. */
@@ -114,7 +115,17 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
   // SD-117 (B6): right after a made basket — "Assist?" for the on-court teammates
   // Deep wave: the same box offers "⚡ Fast break" (tags the basket) and, with
   // Shot zones on, "🔗 And-one" (the bonus free throw).
-  const [assistFor, setAssistFor] = useState<{ side: 'home' | 'away'; scorer?: Player; points: number; fb?: boolean } | null>(null);
+  // MVP B6: `fromSeq` = the log counter when the basket was made; `ref` = that basket, once on the board
+  const [assistFor, setAssistFor] = useState<{ side: 'home' | 'away'; scorer?: Player; points: number; fb?: boolean; fromSeq?: number; ref?: number } | null>(null);
+  // MVP B6: the prompt finds its basket (the first of that side logged after it
+  // opened) and closes if Undo removes it — no phantom assist.
+  useEffect(() => {
+    if (!assistFor || assistFor.fromSeq == null) return;
+    if (assistFor.ref == null) {
+      const b = state.events.find((e) => e.type === 'score' && e.side === assistFor.side && e.id > assistFor.fromSeq!);
+      if (b) setAssistFor({ ...assistFor, ref: b.id });
+    } else if (assistFor && assistFor.ref != null && !state.events.some((e) => e.id === assistFor.ref)) setAssistFor(null);
+  }, [assistFor, state.events]);
   // IDs-only scoring: the log names players by id; this viewer's names (the
   // squads' as the fallback) are put in when shown.
   const { nameOf: viewerNameOf } = useMask();
@@ -156,7 +167,7 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
     clearSel(side);
     fire(scoreAction(side, pts, p, { halfCourt, fga, zone: opts.zone, fbt: opts.fbt ?? state.trackFastBreak === true, fb: opts.fb }));
     // SD-117 (B6): a made field goal asks "Assist?" (live plays only, not an edit)
-    if (!edit && isFieldGoal(pts, halfCourt)) setAssistFor({ side, scorer: p, points: pts });
+    if (!edit && isFieldGoal(pts, halfCourt)) setAssistFor({ side, scorer: p, points: pts, fromSeq: state.seq });
   };
   const miss = (side: 'home' | 'away', pts: number, p: Player | undefined = sel[side], zone?: ShotZone) => {
     clearSel(side);
@@ -700,7 +711,7 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
             {mates.length > 0 && (
               <View style={ctrl.chips}>
                 {mates.map((p) => (
-                  <SelectChip key={p.id} label={p.fullName} active={false} onPress={() => stat(assistFor.side, 'ASSIST', p)} />
+                  <SelectChip key={p.id} label={p.fullName} active={false} onPress={() => fire(statAction(assistFor.side, 'ASSIST', p, assistFor.ref))} />
                 ))}
               </View>
             )}
@@ -1043,6 +1054,8 @@ const BASKETBALL_LIVE_SETTINGS: LiveSettings<BasketballState> = {
 export const basketballPlugin: SportPlugin<BasketballState> = {
   ...BASKETBALL_META,
   matchRecords: basketballMatchRecords, // SD-51 (set by the registry before perf F-15)
+  // MVP B5: Undo names what it removes ("+3 · Arjun (54-50)")
+  undoLabel: (step, nameOf) => basketballUndoLabel(step, nameOf),
   createInitialState: init,
   reducer,
   isComplete: (s) => s.ended,

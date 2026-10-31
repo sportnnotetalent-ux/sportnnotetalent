@@ -43,6 +43,7 @@ import { SportBadge } from '../components/SportSymbol';
 import { theme } from '../core/theme';
 import { Glyph, IconText } from '../components/Icon';
 import { getSport } from '../sports/registry';
+import { entryDisplayName } from '../data/participantEntry';
 import { VoiceScorer } from '../sports/VoiceScorer';
 import { completesMatch } from '../sports/voiceMatch';
 import { Scoreboard } from '../components/Scoreboard';
@@ -407,6 +408,13 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
   const homeScoreRoster = useMemo(() => homeRoster.filter((p) => canFieldPlayer(p, ageReq)), [homeRoster, ageReq]);
   const awayScoreRoster = useMemo(() => awayRoster.filter((p) => canFieldPlayer(p, ageReq)), [awayRoster, ageReq]);
   const excludedCount = (homeRoster.length - homeScoreRoster.length) + (awayRoster.length - awayScoreRoster.length);
+  // MVP B3: singles / doubles sides show names on the controls and board, not
+  // their short code ("Ravi / Arjun", not "RKAS"); team sports keep theirs.
+  // Through the dispute mask, so a disputed player's name stays hidden.
+  const individualSport = getSport(sport).participantKind !== 'team';
+  const shownNameOf = useMemo(() => makeNameOf(people, maskValue), [people, maskValue]);
+  const homeShown = (individualSport ? entryDisplayName(homeScoreRoster.map((p) => shownNameOf(p.id, p.fullName))) : undefined) ?? homeName;
+  const awayShown = (individualSport ? entryDisplayName(awayScoreRoster.map((p) => shownNameOf(p.id, p.fullName))) : undefined) ?? awayName;
 
   // Lineup (for LiveExtras + clean sheets). Refetch on focus so edits show up.
   const [homeLineup, setHomeLineup] = useState<LineupSlot[]>([]);
@@ -1348,14 +1356,14 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
   const awayKeeperId = squads?.away.keeperId;
   const scoringControlsEl = useMemo(() => (
     <plugin.ScoringControls
-      state={state} dispatch={dispatch} homeName={homeName} awayName={awayName}
+      state={state} dispatch={dispatch} homeName={homeShown} awayName={awayShown}
       homeColor={homeColor} awayColor={awayColor}
       homeRoster={homeScoreRoster} awayRoster={awayScoreRoster} homeLineup={homeLineup} awayLineup={awayLineup}
       homeKeeperId={homeKeeperId} awayKeeperId={awayKeeperId}
       knockout={knockout}
       onEndMatch={controlsOnEnd}
     />
-  ), [plugin, state, dispatch, homeName, awayName, homeColor, awayColor, homeScoreRoster, awayScoreRoster, homeLineup, awayLineup, homeKeeperId, awayKeeperId, knockout, controlsOnEnd]);
+  ), [plugin, state, dispatch, homeShown, awayShown, homeColor, awayColor, homeScoreRoster, awayScoreRoster, homeLineup, awayLineup, homeKeeperId, awayKeeperId, knockout, controlsOnEnd]);
   const wouldComplete = useCallback((acts: Parameters<typeof completesMatch>[2]) => completesMatch(plugin, state, acts), [plugin, state]);
   const voiceEl = useMemo(() => (plugin.voice ? (
     <VoiceScorer
@@ -1473,23 +1481,23 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
   // The top scoreboard — a sport supplies its own, else the universal one. Cricket
   // hides it (its scorecard shows the score).
   const scoreboardNode = useMemo(() => (plugin.hideScoreboard ? null : plugin.Scoreboard ? (
-    <plugin.Scoreboard state={state} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} live={matchLive} closed={closedBoard} />
+    <plugin.Scoreboard state={state} homeName={homeShown} awayName={awayShown} homeColor={homeColor} awayColor={awayColor} live={matchLive} closed={closedBoard} />
   ) : (
     <Scoreboard
       summary={summary} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor}
       live={matchLive} centerNode={plugin.LiveClock ? <plugin.LiveClock state={state} /> : undefined}
     />
-  )), [plugin, state, summary, homeName, awayName, homeColor, awayColor, matchLive, closedBoard]);
+  )), [plugin, state, summary, homeName, awayName, homeShown, awayShown, homeColor, awayColor, matchLive, closedBoard]);
   // The Scoring tab's running score (the board above the tabs is hidden there).
   const scoringBoardNode = useMemo(() => (plugin.Scoreboard ? (
-    <plugin.Scoreboard state={state} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} live={live} />
+    <plugin.Scoreboard state={state} homeName={homeShown} awayName={awayShown} homeColor={homeColor} awayColor={awayColor} live={live} />
   ) : (
     <MiniScore
       summary={summary} homeName={homeName} awayName={awayName}
       homeColor={homeColor} awayColor={awayColor} live={live}
       clockNode={plugin.LiveClock ? <plugin.LiveClock state={state} /> : undefined}
     />
-  )), [plugin, state, summary, homeName, awayName, homeColor, awayColor, live]);
+  )), [plugin, state, summary, homeName, awayName, homeShown, awayShown, homeColor, awayColor, live]);
 
   // Match tabs (2026-10-22): the sport's slots — every one gets the same props
   // (the old LiveExtras props). docs/sport-depth/deep-wave/match-tabs.md

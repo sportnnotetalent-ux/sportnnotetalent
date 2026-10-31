@@ -51,8 +51,10 @@ export const reboundAction = (side: Side, p: Who, rt?: ReboundType): ScoreAction
 });
 
 /** An assist / steal / block / turnover. */
-export const statAction = (side: Side, type: StatPlay, p: Who): ScoreAction => ({
-  type, side, payload: { ...pidOf(p) }, ...(p ? { attribution: { playerId: p.id, stat: STAT_OF[type] } } : {}),
+/** MVP B6: an assist from the "Assist?" prompt carries its basket's id
+ *  (`ref`); the engine drops it if that basket is gone (Undo). */
+export const statAction = (side: Side, type: StatPlay, p: Who, ref?: number): ScoreAction => ({
+  type, side, payload: { ...pidOf(p), ...(ref != null ? { ref } : {}) }, ...(p ? { attribution: { playerId: p.id, stat: STAT_OF[type] } } : {}),
 });
 
 /** A foul with its type. Deep wave — "Fouls drawn": `fdt` (tracked) and who

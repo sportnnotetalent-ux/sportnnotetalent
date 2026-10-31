@@ -606,9 +606,11 @@ export const reducer = (s: FootballState, a: ScoreAction): FootballState => {
       if (!a.side || !(name || aid)) return s;
       // The assist is recorded immediately after its goal, so attach it to the
       // most recent goal of this side (overwriting any prior assister).
+      // MVP F2: with `ref`, only to that goal — gone (Undo) means no assist.
+      const ref = typeof a.payload?.ref === 'number' ? a.payload.ref : null;
       const events = [...s.events];
       for (let i = events.length - 1; i >= 0; i--) {
-        if (events[i].type === 'goal' && events[i].side === a.side) {
+        if (events[i].type === 'goal' && events[i].side === a.side && (ref == null || events[i].id === ref)) {
           // SD-30: the assister's id rides in `secondId` (a later assist
           // without one drops the earlier id with its name)
           if (name) {

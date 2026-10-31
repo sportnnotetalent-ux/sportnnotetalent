@@ -211,3 +211,8 @@ export function cueMarkers<S extends { events: LiveEvent[] }>(
 
 /** The log plus its cue markers, for LiveTimeline. */
 export const withCues = (events: LiveEvent[], markers: LiveEvent[]): LiveEvent[] => (markers.length ? [...events, ...markers] : events);
+
+/** MVP B4 — the left-to-right order of the two point buttons on this device:
+ *  home first, or away first after "⇄ Swap sides" (players changed ends). Only
+ *  the places change — each button still scores for its own side. */
+export const sideOrder = (swapped: boolean): ['home' | 'away', 'home' | 'away'] => (swapped ? ['away', 'home'] : ['home', 'away']);

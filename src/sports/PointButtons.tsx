@@ -19,6 +19,7 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { theme } from '../core/theme';
 import { SelectChip } from '../components/ui';
 import { tapGuard } from '../core/tapGuard';
+import { sideOrder } from './courtCues';
 import type { Player } from '../core/types';
 import { readableOn } from '../core/contrast';
 
@@ -56,6 +57,8 @@ export function PointButtons({
   credit?: boolean;
 }) {
   const [pick, setPick] = useState<Side | 'both' | null>(null);
+  // MVP B4: this device's left/right order (players change ends); never logged
+  const [swapped, setSwapped] = useState(false);
   const rosterOf = (s: Side) => (s === 'home' ? homeRoster : awayRoster);
   const nameOf = (s: Side) => (s === 'home' ? homeName : awayName);
   const colorOf = (s: Side) => (s === 'home' ? homeColor ?? theme.colors.home : awayColor ?? theme.colors.away);
@@ -117,7 +120,9 @@ export function PointButtons({
   return (
     <View style={pb.wrap}>
       {disabled && disabledHint ? <Text style={pb.hint}>☝️ {disabledHint}</Text> : null}
-      <View style={pb.row}>{big('home')}{big('away')}</View>
+      <View style={pb.row}>{sideOrder(swapped).map(big)}</View>
+      <Text style={[pb.link, pb.swap]} onPress={() => setSwapped((v) => !v)} accessibilityRole="button"
+        accessibilityLabel={swapped ? 'Swap sides back: home on the left' : 'Swap sides: away on the left'}>⇄ Swap sides</Text>
       {pick && !disabled ? (
         <View style={pb.creditBox}>
           {(pick === 'both' ? (['home', 'away'] as const).filter(canCredit) : [pick]).map(creditRow)}
@@ -219,6 +224,8 @@ const pb = StyleSheet.create({
   hint: { color: theme.colors.accent, fontSize: theme.font.small, fontWeight: '700' },
   meta: { color: theme.colors.textMuted, fontSize: theme.font.small },
   link: { color: theme.colors.primary, fontSize: theme.font.small, fontWeight: '700' },
+  // MVP B4: a small centred link, with room to tap
+  swap: { alignSelf: 'center', paddingVertical: theme.spacing(2), paddingHorizontal: theme.spacing(3) },
   /** standalone text link → ≥44pt tall target (inline links stay inline) */
   linkPad: { paddingVertical: theme.spacing(3), alignSelf: 'flex-start' },
   creditBox: { gap: theme.spacing(2), backgroundColor: theme.colors.surfaceAlt, borderRadius: theme.radius.md, padding: theme.spacing(3) },

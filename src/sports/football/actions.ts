@@ -43,8 +43,12 @@ export const ownGoalAction = (side: Side, p: Who): ScoreAction => ({ type: 'OWN_
 export const creditAction = (type: string, side: Side, stat: string, p: Who, o: { extra?: Record<string, number>; tracked?: string[] } = {}): ScoreAction =>
   ({ type, side, payload: { pid: p.id }, attribution: { playerId: p.id, stat, extra: o.extra, tracked: o.tracked } });
 
-/** The assist on the side's latest goal. */
-export const assistAction = (side: Side, p: Who, tracked?: string[]): ScoreAction => creditAction('ASSIST', side, 'assists', p, { tracked });
+/** The assist on the side's latest goal — or, with `ref` (MVP F2), on that
+ *  goal only (a goal Undo removed takes no assist). */
+export const assistAction = (side: Side, p: Who, tracked?: string[], ref?: number): ScoreAction => {
+  const a = creditAction('ASSIST', side, 'assists', p, { tracked });
+  return ref == null ? a : { ...a, payload: { ...a.payload, ref } };
+};
 
 /** A card for `p`: a red, or a yellow — plus the red when it is the player's
  *  second (`events` = the match so far; an older yellow may carry a name only). */

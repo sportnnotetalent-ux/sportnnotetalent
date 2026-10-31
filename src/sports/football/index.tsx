@@ -66,6 +66,7 @@ import {
 import { aggregateText } from "../aggregate";
 import { FOOTBALL_META } from './meta';
 import { footballMatchRecords } from './records';
+import { footballUndoLabel } from './undoLabel';
 import { IconText } from '../../components/Icon';
 
 /* ------------------------------- Controls ---------------------------------- */
@@ -114,7 +115,8 @@ type Flow =
   // Consolidated fast panel: open-play is the default; type/header & assist are
   // optional. `logged` = the goal is already on the board (voice path); otherwise
   // it's recorded when the scorer finishes (picks an assister or "no assist").
-  | { mode: 'goal'; side: 'home' | 'away'; step: 'assist'; scorer: Player; goalType?: GoalType; bodyPart?: BodyPart; logged?: boolean }
+  // MVP F2: `fromSeq` = the log counter when the goal was recorded; `goalId` = that goal, once it is on the board
+  | { mode: 'goal'; side: 'home' | 'away'; step: 'assist'; scorer: Player; goalType?: GoalType; bodyPart?: BodyPart; logged?: boolean; fromSeq?: number; goalId?: number }
   | { mode: 'foul'; step: 'team' }
   | { mode: 'foul'; step: 'by'; side: 'home' | 'away' }
   | { mode: 'foul'; step: 'victim'; side: 'home' | 'away'; fouler: Player }
@@ -167,6 +169,16 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
   // Multi-step capture: tap an action → pick the player(s) from a jersey+name
   // table → any follow-up (goal type, assist, on/off target). One tap per step.
   const [flow, setFlow] = useState<Flow | null>(null);
+  // MVP F2: the "Assist?" step finds its goal once it is on the board (the first
+  // goal of that side logged after it opened), and closes if Undo removes it —
+  // so a stale prompt can't move an assist onto an earlier goal.
+  useEffect(() => {
+    if (flow?.mode !== 'goal' || flow.step !== 'assist' || !flow.logged || flow.fromSeq == null) return;
+    if (flow.goalId == null) {
+      const g = state.events.find((e) => e.type === 'goal' && e.side === flow.side && e.id > flow.fromSeq!);
+      if (g) setFlow({ ...flow, goalId: g.id });
+    } else if (!state.events.some((e) => e.id === flow.goalId)) setFlow(null);
+  }, [flow, state.events]);
   // Joining a game already in progress: the minute to kick the clock off at.
   const [koMin, setKoMin] = useState('');
   // Backfill mode: when set, everything logged is stamped at this past minute
@@ -380,8 +392,9 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
     fire(teamGoalAction(side));
     setFlow(null);
   };
-  const recordAssist = (side: 'home' | 'away', p: Player | null) => {
-    if (p) fire(assistAction(side, p, trackedKeys()));
+  // MVP F2: `goalId` = the goal the prompt was opened for (it takes the assist only if still there)
+  const recordAssist = (side: 'home' | 'away', p: Player | null, goalId?: number) => {
+    if (p) fire(assistAction(side, p, trackedKeys(), goalId));
     setFlow(null);
   };
 
@@ -527,7 +540,7 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
           return;
         }
         if (flow.step === 'og') { const p = matchPlayer(text, xi(opp(flow.side))); if (p) { recordOwnGoal(flow.side, p); say(`Own goal by ${p.fullName}.`); } else say("Didn't catch the player."); return; }
-        if (flow.step === 'type') { const gt = parseGoalType(text) ?? 'open'; recordGoal(flow.side, flow.scorer, gt); setFlow({ mode: 'goal', side: flow.side, step: 'assist', scorer: flow.scorer, goalType: gt, logged: true }); say(`${GOAL_TYPE_LABEL[gt]} — who assisted? (or say "no assist")`); return; }
+        if (flow.step === 'type') { const gt = parseGoalType(text) ?? 'open'; recordGoal(flow.side, flow.scorer, gt); setFlow({ mode: 'goal', side: flow.side, step: 'assist', scorer: flow.scorer, goalType: gt, logged: true, fromSeq: state.seq }); say(`${GOAL_TYPE_LABEL[gt]} — who assisted? (or say "no assist")`); return; }
         // assist
         if (isNoAssist(text)) { recordAssist(flow.side, null); say('Goal recorded — no assist.'); return; }
         const a = matchPlayer(text, xi(flow.side).filter((x) => x.id !== flow.scorer.id));
@@ -822,7 +835,7 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
         return panel(`⚽ Goal — ${sideName}`, 'Who scored?', (
           <>
             {/* SD-114 (F2): the goal is on the board on the scorer tap; the assist is attached after (Close keeps the goal). */}
-            <PlayerTable players={xi(flow.side)} onPick={(p) => { recordGoal(flow.side, p, 'open'); setFlow({ mode: 'goal', side: flow.side, step: 'assist', scorer: p, goalType: 'open', logged: true }); }} />
+            <PlayerTable players={xi(flow.side)} onPick={(p) => { recordGoal(flow.side, p, 'open'); setFlow({ mode: 'goal', side: flow.side, step: 'assist', scorer: p, goalType: 'open', logged: true, fromSeq: state.seq }); }} />
             <Button label={`⚽ Team goal — no scorer${xi(flow.side).length === 0 ? ' (no players yet)' : ''}`} variant="ghost" onPress={() => recordTeamGoal(flow.side)} />
             <Button label="🔃 Own goal instead" variant="ghost" onPress={() => setFlow({ mode: 'goal', side: flow.side, step: 'og' })} />
           </>
@@ -848,7 +861,7 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
           <View style={ctrl.chips}>
             {BODY_PARTS.map((b) => (
               <Button key={b} label={BODY_PART_LABEL[b]} variant="ghost" style={ctrl.actionBtn}
-                onPress={() => { recordGoal(flow.side, flow.scorer, flow.goalType, b); setFlow({ mode: 'goal', side: flow.side, step: 'assist', scorer: flow.scorer, goalType: flow.goalType, bodyPart: b, logged: true }); }} />
+                onPress={() => { recordGoal(flow.side, flow.scorer, flow.goalType, b); setFlow({ mode: 'goal', side: flow.side, step: 'assist', scorer: flow.scorer, goalType: flow.goalType, bodyPart: b, logged: true, fromSeq: state.seq }); }} />
             ))}
           </View>
         ));
@@ -862,7 +875,7 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
         const bp = flow.bodyPart;
         const finish = (assister: Player | null) => {
           if (!flow.logged) recordGoal(flow.side, flow.scorer, gt, bp);
-          recordAssist(flow.side, assister); // attaches to the just-scored goal, then closes
+          recordAssist(flow.side, assister, flow.logged ? flow.goalId : undefined); // attaches to the just-scored goal, then closes
         };
         // A goal-type/header refinement after the goal is already logged (voice
         // path) re-logs it with the corrected type so the score stays right.
@@ -870,7 +883,7 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
           // (SD-30: the undone goal's credits are reversed, as a removal does)
           if (nextType === gt && nextBody === bp) return;
           if (flow.logged) { dispatch(undoGoalAction(flow.side, flow.scorer, flow.goalType ?? 'open')); recordGoal(flow.side, flow.scorer, nextType, nextBody); }
-          setFlow({ mode: 'goal', side: flow.side, step: 'assist', scorer: flow.scorer, goalType: nextType, bodyPart: nextBody, logged: flow.logged });
+          setFlow({ mode: 'goal', side: flow.side, step: 'assist', scorer: flow.scorer, goalType: nextType, bodyPart: nextBody, logged: flow.logged, ...(flow.logged ? { fromSeq: state.seq } : {}) });
         };
         const typeChips: { label: string; t: GoalType; b?: BodyPart }[] = [
           { label: 'Open play', t: 'open' }, { label: 'Header', t: 'open', b: 'head' },
@@ -1634,6 +1647,8 @@ const Court: NonNullable<SportPlugin<FootballState>['Court']> = ({ homeLineup, a
 export const footballPlugin: SportPlugin<FootballState> = {
   ...FOOTBALL_META,
   matchRecords: footballMatchRecords, // SD-51 (set by the registry before perf F-15)
+  // MVP F1: Undo names what it removes ("goal · Ravi (2-1)")
+  undoLabel: (step, nameOf) => footballUndoLabel(step, nameOf),
   // Score overlay (parity #25): goal scorers per side; GOAL! flash.
   tickerDetail: footballTickerDetail,
   tickerFlash: footballTickerFlash,

@@ -13,6 +13,15 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-31 — MVP P1s, batch 2 (not published yet)
+
+Break-it list first this time (`docs/security/breaks/mvp-p1-batch2.md`), then each fix with a failing test:
+- **Undo says what it removes** in football ("goal · Ravi (2-1)") and basketball ("+3 · Arjun (54-50)", "team foul (personal)").
+- **An assist after Undo can't land on the wrong goal / basket:** the prompt's assist carries its goal / basket id; the prompt closes if Undo removes it. Old logs replay as before.
+- **Racket sides show names, not initials:** a singles player's name, or a pair's first names ("Ravi / Arjun").
+- **"⇄ Swap sides"** under the racket point buttons (this device only; never logged).
+Simulation: 500 football and 500 basketball games with Undos, 1,000 sides. Checked in the demo app: both undo labels, swap sides. Full suite 5,869 tests, 0 failing; tsc clean.
+
 ### 2026-10-31 — Release: football 5-a-side default live (web, Android OTA)
 
 auth-smoke passed. Published from a clean worktree at 3a91d05: web (entry `index-03f6926a`, confirmed live) and Android OTA group `a400b91b` (runtime 1.0.0, channel preview).
