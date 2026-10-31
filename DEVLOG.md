@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-31 — Release: one-tap start live (web, Android OTA)
+
+auth-smoke passed. Published from a clean worktree at 9e76cf0: web (entry `index-de0fddb0`, confirmed live on app.sportnnote.in) and Android OTA group `a7a4838c` (runtime 1.0.0, channel preview).
+
 ### 2026-10-31 — One-tap start (growth plan #2; MVP B9 / T17 / K5)
 
 "Start the match" now asks the sport's first question itself: racket sports (badminton, tennis, padel, pickleball, squash, table tennis) show "▶ A serves" / "▶ B serves"; kabaddi's start also runs the clock. One tap logs exactly what the two taps did. Football's kick-off and basketball's tip-off are kept (a real second moment). Break-it list `docs/security/breaks/one-tap-start.md`; tests; 500 simulated matches + 500 kabaddi halves; demo-checked. Full suite 6,084 tests, 0 failing; tsc clean.
