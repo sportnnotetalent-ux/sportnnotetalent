@@ -13,7 +13,11 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
-### 2026-10-31 — Audit round 2: five small bugs, two email limits, first duplicate removal (not live yet)
+### 2026-10-31 — Release: audit round 2 app changes live (web, Android OTA)
+
+auth-smoke passed. Published from a clean worktree at edde1a5: web (entry `index-a12c5373`) and Android OTA group `2007601f` (runtime 1.0.0, channel preview). Server parts still to do (founder): migration `20261031160000_lineup_side_insert.sql`, deploy `send-invite` and `org-verify`.
+
+### 2026-10-31 — Audit round 2: five small bugs, two email limits, first duplicate removal
 
 Each test-first (`docs/security/breaks/audit-bugs-2026-10-31.md` round 2, `audit-security-2026-10-31.md` AS-06):
 - "21th" → "21st" in team lifting, the road-race hint and custom ties.
