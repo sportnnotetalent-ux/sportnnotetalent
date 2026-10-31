@@ -13,7 +13,11 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
-### 2026-10-31 — Security fixes from the duplication audit (not live yet)
+### 2026-10-31 — Release: audit security fixes live (server, web, Android OTA)
+
+The founder ran migration `20261031150000_dispute_status_flow.sql` and deployed `verify-contact-otp` and `phone-login` (09:01 UTC; the live `guard_dispute` has the status check). auth-smoke passed. Published from a clean worktree at f7183e8: web (entry `index-cee8d613`, confirmed live with the new sign-up text) and Android OTA group `172cb2fe` (runtime 1.0.0, channel preview). Also ships the racket stats-panel cleanup (574a1b3).
+
+### 2026-10-31 — Security fixes from the duplication audit
 
 The audit (`docs/engineering/duplication-audit/`) compared copies of the same code; four security leads were checked against the server first (`docs/security/breaks/audit-security-2026-10-31.md`):
 - **Fixed — verification codes:** parallel guesses could get past the 5-guess cap. Each guess now claims an attempt atomically; verify calls are capped too (`_shared/otpCheck.ts`, `verify-contact-otp`).
