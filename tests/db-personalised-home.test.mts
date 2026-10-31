@@ -35,14 +35,15 @@ async function tournament(city: string | null, deleted = false) {
     [`Cup ${++n}`, city, deleted ? new Date().toISOString() : null]);
   return t.id;
 }
-async function match(o: { sport?: string; tournament?: string | null; status?: string; startsInH?: number; completedAgoH?: number; maps?: string; hosts?: string[]; scorers?: string[]; views?: number }) {
+async function match(o: { sport?: string; tournament?: string | null; status?: string; startsInH?: number; completedAgoH?: number; maps?: string; hosts?: string[]; scorers?: string[]; views?: number; idleH?: number }) {
   const sport = o.sport ?? 'football';
   const starts = new Date(Date.now() + (o.startsInH ?? -1) * 3600_000).toISOString();
   const completed = o.completedAgoH != null ? new Date(Date.now() - o.completedAgoH * 3600_000).toISOString() : null;
   const [m] = await db.sql<{ id: string }>(
-    `insert into matches (sport, tournament_id, status, starts_at, completed_at, venue_maps_url, home_team_id, away_team_id, host_ids, scorer_ids)
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) returning id`,
-    [sport, o.tournament ?? null, o.status ?? 'live', starts, completed, o.maps ?? null, await team(sport), await team(sport), o.hosts ?? [], o.scorers ?? []]);
+    `insert into matches (sport, tournament_id, status, starts_at, completed_at, venue_maps_url, home_team_id, away_team_id, host_ids, scorer_ids, updated_at)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) returning id`,
+    [sport, o.tournament ?? null, o.status ?? 'live', starts, completed, o.maps ?? null, await team(sport), await team(sport), o.hosts ?? [], o.scorers ?? [],
+     new Date(Date.now() - (o.idleH ?? 0) * 3600_000).toISOString()]);
   if (o.views) await db.sql(`insert into match_view_counts (match_id, views) values ($1, $2)`, [m.id, o.views]);
   return m.id;
 }
@@ -264,5 +265,52 @@ describe('near_matches', () => {
       await tx.query(`set transaction read only`);
       await tx.query(`select near_matches(array['football'], 17.44, 78.35, null, 10)`);
     });
+  });
+});
+
+describe('places from people, and old "live" matches (founder 2026-10-31: his own live match was missing)', () => {
+  type Row = { id: string };
+  type Near = { live: Row[] };
+  const near = (city: string) => cityId(city).then((c) => db.asAnon<{ r: Near }>(`select near_matches(array['football'], null, null, $1, 20) as r`, [c]))
+    .then((x) => x[0].r.live.map((m) => m.id));
+  const answered = async (name: string, city: string, dob = '1990-01-01', playerCity?: string) => {
+    const u = await person(name, dob, playerCity);
+    await db.as(u.uid, `select save_personalisation($1, $2, $3)`, [['score'], await cityId(city), ['football']]);
+    return u;
+  };
+  before(async () => { await db.sql(`update matches set status = 'cancelled'`); });
+
+  test('a match in a tournament with no city is placed at its scorer\'s home city (their answer)', async () => {
+    const s = await answered('Pune Scorer', 'Pune');
+    const m = await match({ tournament: await tournament(null), scorers: [s.player] });
+    assert.ok((await near('Pune')).includes(m));
+  });
+  test('a host\'s answer to "Where are you based?" beats their profile\'s old city', async () => {
+    const h = await answered('Moved Host', 'Bengaluru', '1988-02-02', 'Chennai');
+    const m = await match({ hosts: [h.player] });
+    assert.ok((await near('Bengaluru')).includes(m));
+    assert.ok(!(await near('Chennai')).includes(m));
+  });
+  test('a child\'s home city never places a match', async () => {
+    const kid = await answered('Kid Scorer', 'Jaipur', '2013-03-03');
+    const m = await match({ scorers: [kid.player] });
+    assert.ok(!(await near('Jaipur')).includes(m));
+  });
+  test('last resort: the tournament organiser\'s home city', async () => {
+    const org = await answered('Kochi Organiser', 'Kochi');
+    const [t] = await db.sql<{ id: string }>(`insert into tournaments (name, host_name, organizer_id) values ('No City Cup', 'Org', $1) returning id`, [org.uid]);
+    const m = await match({ tournament: t.id });
+    assert.ok((await near('Kochi')).includes(m));
+  });
+  test('a "live" match nobody has touched for 12 hours isn\'t live near you; scoring keeps it there', async () => {
+    const pin = 'https://maps.google.com/?q=26.9124,75.7873'; // Jaipur
+    const old = await match({ maps: pin, idleH: 20 });
+    const busy = await match({ maps: pin, idleH: 20 });
+    await db.sql(`insert into match_events (match_id, seq, type, payload) values ($1, 1, 'note', '{}')`, [busy]).catch(async () => {
+      await db.sql(`insert into match_events (match_id, type) values ($1, 'note')`, [busy]);
+    });
+    const ids = await near('Jaipur');
+    assert.ok(!ids.includes(old), 'idle since yesterday');
+    assert.ok(ids.includes(busy), 'scored a moment ago');
   });
 });

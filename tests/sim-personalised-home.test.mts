@@ -7,7 +7,8 @@
  * without location. Every rule is checked against a plain recomputation:
  * one view per person/address per match per day, scorers never count,
  * near-you lists only nearby, placeable, non-deleted matches in the right
- * order, their sports first, and (PH-08) the requests stay quick.
+ * order, their sports first, and (PH-08) the requests stay quick. Since
+ * 20261031130000 an unplaced match takes its adult scorer's home city.
  */
 import { test, before } from 'node:test';
 import assert from 'node:assert/strict';
@@ -80,7 +81,8 @@ test('500 users: views and Near you hold for everyone, quickly', { timeout: 900_
     const uid = await db.signUp({ name: `User ${u}`, dob: '1995-01-01' });
     const [p] = await db.as<{ id: string }>(uid, `insert into players (full_name, profile_id, dob) values ($1, $2, '1995-01-01') returning id`, [`User ${u}`, uid]);
     const sports = [pick(SPORTS), pick(SPORTS)].filter((s, i, a) => a.indexOf(s) === i);
-    if (chance(0.15)) await db.as(uid, `select skip_personalisation()`);
+    const skipped = chance(0.15);
+    if (skipped) await db.as(uid, `select skip_personalisation()`);
     else await db.as(uid, `select save_personalisation($1, $2, $3)`, [['play'], c.id, sports]);
 
     // a scorer of one match, who opens it: never counted
@@ -88,6 +90,8 @@ test('500 users: views and Near you hold for everyone, quickly', { timeout: 900_
     if (!scorerOf.has(own.id)) {
       await db.sql(`update matches set scorer_ids = array_append(coalesce(scorer_ids, '{}'), $2::uuid) where id = $1`, [own.id, p.id]);
       scorerOf.set(own.id, p.id);
+      // 20261031130000: an unplaced match is placed at its (adult) scorer's home city
+      if (!own.place && !own.deleted && !skipped) own.place = { lat: c.lat, lng: c.lng };
       await db.as(uid, `select record_match_view($1, null)`, [own.id]);
     }
     for (let v = 0; v < 3; v++) {

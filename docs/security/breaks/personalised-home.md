@@ -34,5 +34,8 @@
 | PH-13 | Running the two migrations in the wrong order. | **Holds:** the main file creates the (empty) city table if it's missing. The big file then fills it. |
 | PH-14 | A match's own scorers inflating its views by reopening it. | **Holds:** scorers and hosts don't count (test). |
 | PH-15 | Someone with database access checks whether a known account viewed a match by hashing its id. | **Accepted.** Only staff can read view rows, and they're deleted within 3 days. Follow-up: add a secret salt. |
+| PH-16 | **(Found live, 2026-10-31) A real match was missing.** The founder's live match in a tournament with no city wasn't in "Live near you": only a pin, a tournament city or a friendly's host could place a match. | **Fixed (`20261031130000_near_places.sql`):** a match is also placed by the home city of the people running it: its hosts, its scorers, then the tournament's hosts (their answer, else their profile's city), then the organiser's answer. Adults only (tests). This places a match roughly at an adult scorer's home city, which is usually their public profile city anyway. |
+| PH-17 | **Abandoned "live" matches.** Test matches left "live" since August would have filled "Live near you". | **Fixed:** a "live" match with no change and no scoring for 12 hours isn't live near you (test). The founder's "Live now" list still shows them until they're ended. |
+| PH-18 | That fix made the query plan rescan the in-between results for every match (about 4.6× slower). | **Fixed:** people are looked up per match through indexes. Same speed as before on the same data (26 ms against 27 ms); the 500-user average stays under the bar (51 ms). |
 
 **500 users** (`tests/sim-personalised-home.test.mts`): see that file.

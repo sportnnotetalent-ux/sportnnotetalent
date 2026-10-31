@@ -13,6 +13,29 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-31 — Near you: place more matches, skip abandoned "live" ones (built)
+
+The founder answered the questions (Hyderabad) and saw "No matches near you" while
+"Live now" listed two live matches. Read-only on live, none of the 3 live matches could be
+placed:
+- Panthers vs Cheetahs: his own, in a tournament with no city;
+- Lions vs Tigers: a test friendly "live" since 22 Aug, no venue, a host with no city;
+- Brazil vs Japan: "live" since 26 Sep, a host with no city.
+
+`20261031130000_near_places.sql` recreates `near_matches` from its latest body:
+- **More matches placed:** after the pin and the tournament's city, a match is placed by the
+  home city of the people running it (match hosts, scorers, tournament hosts: their answer,
+  else their profile city), then the organiser's answer. Adults only.
+- **No abandoned matches:** a "live" match untouched for 12 hours (no change, no scoring)
+  isn't live near you.
+- **Speed kept:** the first version of this was ~4.6× slower because the plan rescanned the
+  in-between results per match, so people are looked up per match through indexes. Same speed
+  as before (26 ms against 27 ms on 600 matches).
+
+Tests first: 4 new in `tests/db-personalised-home.test.mts` (27 in all); the 500-user sim
+learns the scorer rule (passes, 51 ms average). Break-it PH-16…18. Server only: the founder
+runs the migration and nothing needs publishing.
+
 ### 2026-10-31 — Release: personalised Home is live
 
 The founder ran both migrations. The 8,079-row city list went in from the terminal.
