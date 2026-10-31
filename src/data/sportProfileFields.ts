@@ -116,6 +116,46 @@ export const POSITION_HINT: Record<SportId, string> = {
   rugby_league: 'e.g. Fullback, Wing, Centre, Five-eighth / Stand-off, Halfback / Scrum-half, Prop, Hooker, Second row, Lock / Loose forward',
 };
 
+/** Tap-to-pick positions for the first-run questions (founder 2026-10-31). Up
+ *  to three are saved as the profile's position text ("Striker, Winger"), so
+ *  the profile's free-text field still edits them. Empty where a position means
+ *  nothing (golf's details are its handicap; weightlifting's is a weight class). */
+export const SPORT_POSITIONS: Record<SportId, string[]> = {
+  football: ['Goalkeeper', 'Centre-back', 'Full-back', 'Defensive midfielder', 'Central midfielder', 'Attacking midfielder', 'Winger', 'Striker'],
+  cricket: ['Opening batter', 'Middle-order batter', 'Wicket-keeper', 'All-rounder', 'Fast bowler', 'Spin bowler'],
+  basketball: ['Point guard', 'Shooting guard', 'Small forward', 'Power forward', 'Center'],
+  tennis: ['Singles', 'Doubles'],
+  badminton: ['Singles', 'Doubles', 'Mixed doubles'],
+  volleyball: ['Setter', 'Outside hitter', 'Opposite', 'Middle blocker', 'Libero'],
+  kabaddi: ['Raider', 'Left corner', 'Right corner', 'Left cover', 'Right cover', 'All-rounder'],
+  pickleball: ['Singles', 'Doubles'],
+  padel: ['Left side', 'Right side'],
+  squash: ['Singles', 'Doubles'],
+  tabletennis: ['Singles', 'Doubles'],
+  chess: ['Classical', 'Rapid', 'Blitz'],
+  carrom: ['Singles', 'Doubles'],
+  pool: ['8-ball', '9-ball', '10-ball'],
+  snooker: ['15 reds', '6 reds'],
+  billiards: ['150-up', 'Timed'],
+  golf: [],
+  athletics: ['Sprints', 'Hurdles', 'Middle distance', 'Long distance', 'Relays', 'Jumps', 'Throws', 'Combined events', 'Race walking'],
+  hockey: ['Goalkeeper', 'Defender', 'Midfielder', 'Forward', 'Drag-flicker'],
+  swimming: ['Freestyle', 'Backstroke', 'Breaststroke', 'Butterfly', 'Individual medley', 'Open water'],
+  weightlifting: [],
+  shooting: ['10 m Air Rifle', '10 m Air Pistol', '50 m Rifle 3 Positions', '25 m Pistol', 'Trap', 'Skeet'],
+  archery: ['Recurve', 'Compound', 'Barebow'],
+  rowing: ['Sculler', 'Sweep rower', 'Cox'],
+  canoe: ['Kayak', 'Canoe'],
+  cycling: ['Sprinter', 'Climber', 'Time trialist', 'Track sprint', 'Track endurance'],
+  handball: ['Goalkeeper', 'Left wing', 'Left back', 'Centre back', 'Right back', 'Right wing', 'Pivot'],
+  ice_hockey: ['Goalie', 'Defence', 'Centre', 'Left wing', 'Right wing'],
+  baseball: ['Pitcher', 'Catcher', 'First base', 'Second base', 'Third base', 'Shortstop', 'Outfield'],
+  netball: ['GS', 'GA', 'WA', 'C', 'WD', 'GD', 'GK'],
+  american_football: ['Quarterback', 'Running back', 'Wide receiver', 'Tight end', 'Offensive line', 'Defensive line', 'Linebacker', 'Cornerback', 'Safety', 'Kicker'],
+  rugby: ['Prop', 'Hooker', 'Lock', 'Flanker', 'Number 8', 'Scrum-half', 'Fly-half', 'Centre', 'Wing', 'Full-back'],
+  rugby_league: ['Fullback', 'Wing', 'Centre', 'Stand-off', 'Scrum-half', 'Prop', 'Hooker', 'Second row', 'Loose forward'],
+};
+
 /** SD-85 — typed rating fields a sport's profile offers (stored under
  *  `SportDetail.ratings[key]`; no FIDE lookup — the player types them).
  *  Chess: FIDE ID + one rating per FIDE list. */

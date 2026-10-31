@@ -102,6 +102,9 @@ export default function SettingsScreen() {
     <SafeAreaView style={st.safe} edges={['bottom']}>
       <KeyboardAwareScrollView contentContainerStyle={st.content}>
         <Group title="Preferences">
+          {/* Founder 2026-10-31: the first-run questions again, pre-filled. */}
+          <Row icon="🏠" label="Personalise my Home" value="Sports, city, matches near you" onPress={() => nav.navigate('Personalise')} />
+          <View style={st.divider} />
           <Row icon="🔔" label="Match reminders" value={reminderSummary} onPress={() => nav.navigate('NotificationPrefs')} />
           <View style={st.divider} />
           {/* SD-150: country, time zone, date order, clock, week start… */}

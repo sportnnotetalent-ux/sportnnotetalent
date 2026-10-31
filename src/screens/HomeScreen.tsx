@@ -26,6 +26,11 @@ import { isSupabaseConfigured } from '../core/supabase';
 import { matchEligibility } from '../core/eligibility';
 import { useMyTournaments, useScopedMatches, useNotifications, usePlayerLite } from '../data/hooks';
 import { getMyPlayerId } from '../data/repos';
+import { NearYouSection } from '../components/NearYouSection';
+import { getMyPersonalisation, type Personalisation } from '../data/personalise';
+import { locationAllowed, shouldAutoOpen } from '../core/personalise';
+import { markOnboardingSeen } from '../core/onboarding';
+import { onboardingStore } from '../data/onboardingStore';
 import { useAuth } from '../core/auth';
 import { canScoreByRole } from '../core/roles';
 import type { Match, SportId, Tournament } from '../core/types';
@@ -37,6 +42,9 @@ import { LinkByPhoneCard } from '../components/LinkByPhoneCard';
 import { Logo } from '../components/Logo';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
+
+/** The first-run questions open by themselves at most once per app session. */
+let askedThisSession = false;
 
 export default function HomeScreen() {
   const nav = useNavigation<Nav>();
@@ -86,6 +94,27 @@ export default function HomeScreen() {
     }, [profile?.id])
   );
   const { player } = usePlayerLite(playerId); // perf F-09: no stats reads on Home
+  // Personalised Home (founder 2026-10-31): the first-run questions open by
+  // themselves from Home only (never over a match or invite link someone opened
+  // at the ground), once; Skip is remembered. Home then shows "Near you".
+  const [personal, setPersonal] = useState<Personalisation | null>(null);
+  useFocusEffect(
+    useCallback(() => {
+      let on = true;
+      if (!profile?.id) { setPersonal(null); return; }
+      getMyPersonalisation().then((p) => {
+        if (!on) return;
+        setPersonal(p);
+        if (!askedThisSession && shouldAutoOpen({ available: !!p, signedIn: true, done: !!p?.done, skipped: !!p?.skipped, deepLinked: false })) {
+          askedThisSession = true;
+          void markOnboardingSeen();
+          onboardingStore.done();
+          nav.navigate('Personalise');
+        }
+      }).catch(() => undefined);
+      return () => { on = false; };
+    }, [profile?.id, nav])
+  );
   // Post-login nudge: prompt the user to finish verifying so they can be added to
   // matches (the eligibility gate needs a verified mobile + email; guardian for
   // minors). Email auto-verifies from the confirmed login; mobile is the usual
@@ -300,6 +329,10 @@ export default function HomeScreen() {
           </View>
         )}
 
+        {/* Near you (founder 2026-10-31): their sports, around them */}
+        <NearYouSection personal={personal} playerSports={mySports} canLocate={locationAllowed(player)}
+          onOpen={openScorer} onPersonalise={() => nav.navigate('Personalise')} />
+
         {/* Live now — top 5, "See all" opens the full live list */}
         <SectionHeader title="Live now" count={live.length} onSeeAll={live.length > SECTION_CAP ? () => seeAll('live') : undefined} />
         {loading ? (
@@ -307,7 +340,8 @@ export default function HomeScreen() {
         ) : live.length ? (
           live.slice(0, SECTION_CAP).map((m) => <MatchCard key={m.id} match={m} onPress={() => openScorer(m)} />)
         ) : (
-          <EmptyState icon="📡" title="No live matches right now" hint="Live games appear here the moment scoring starts." compact />
+          <EmptyState icon="📡" title={personal ? 'None live from what you follow' : 'No live matches right now'}
+            hint="Your matches and the teams, players and tournaments you follow show here the moment scoring starts." compact />
         )}
         <LiveGolfCards tournamentId={selectedId} />
 

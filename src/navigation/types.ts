@@ -132,6 +132,8 @@ export type RootStackParamList = {
   /** Hidden dev entry point for the results engine (URL /ResultsLab only). */
   ResultsLab: undefined;
   TryNewSport: { sports?: SportId[] } | undefined;
+  /** First-run questions (founder 2026-10-31): uses, sports, positions, city, location. */
+  Personalise: undefined;
   PlayerProfile: { playerId: string };
   SportProfile: { playerId: string; sport: SportId };
   /** SD-47: head-to-head — player `a` vs `b` (no `b` = "Compare with…" picker),

@@ -87,6 +87,12 @@ async function loadAnonId(): Promise<string | null> {
   return anonId;
 }
 
+/** This device's id for counting a signed-out visitor's match view once a day
+ *  (personalised Home). Null unless analytics is allowed, like every other use. */
+export function viewerDeviceId(): Promise<string | null> {
+  return enabled ? loadAnonId() : Promise.resolve(null);
+}
+
 /** Record a client event. Safe to call anywhere; never throws. */
 export function track(name: ClientEvent, props: Props = {}): void {
   if (!enabled || analyticsState() === 'denied') return;

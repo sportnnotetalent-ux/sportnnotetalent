@@ -73,7 +73,8 @@ All of these are store-dependent and are filled in once the accounts exist. They
 - **Purposes:** App functionality, Account management, Analytics, Developer communications (reminders). Not Advertising.
 - **Shared:** No. Supabase, Expo, Firebase, Resend and Meta are service providers, which Play treats as "not shared".
 - **Audio:** not collected. Recognition runs in the OS speech service and only text is used (`app.json:15`). Note in the listing that Google's service may process the audio.
-- **Location:** not collected. City is free text.
+- **Location (2026-10-31, personalised Home):** *Approximate location*, optional, adults only, while the app is in use. It's sent rounded to ~1 km in the request body to sort "Near you" and is never stored, so declare it as collected and **processed ephemerally**. Purpose: App functionality. Not shared. Apple: *Coarse Location*, Data Not Linked to You, not used for tracking. The home city stays user-entered text, under Personal info.
+- **Match views:** a one-way hash per person or address, per match, per day, deleted after 3 days. Declare it under App activity (other actions), App functionality and Analytics.
 - **Encrypted in transit:** Yes.
 - **Deletion:** Yes, in the app plus a web URL (D3).
 - **Content rating (IARC):** "Users can interact" (messaging), "Shares info" (public profiles and stats), no gambling or violence. Expected around Everyone / PEGI 3 with interactive elements (verify).

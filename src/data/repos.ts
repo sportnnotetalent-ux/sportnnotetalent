@@ -432,6 +432,17 @@ async function sharedTournamentsRead(): Promise<Tournament[]> {
   return (rows ?? []).map(toTournament);
 }
 
+/** Match rows read by an RPC with the match read's columns (home_feed,
+ *  near_matches) → Matches, the same way every read does: the sports' plugins
+ *  loaded and children's entry names shown only to those allowed. */
+export async function matchesFromRows(rows: readonly unknown[]): Promise<Match[]> {
+  const rs = rows as MatchRow[];
+  await loadMatchSports(rs);
+  const ms = rs.map(toMatch);
+  await revealMatchEntries(ms);
+  return ms;
+}
+
 /* ---------------- Home in one read (perf F-09(4)) ---------------- */
 
 /** What the `home_feed()` RPC returns (migration 20261023100000): the caller's

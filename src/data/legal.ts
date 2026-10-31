@@ -11,7 +11,7 @@
  * (docs/company/COMPANY_SETUP.md).
  */
 
-export const LEGAL_VERSION = '2026-10-24';
+export const LEGAL_VERSION = '2026-10-31';
 export const LEGAL_CONTACT = 'support@sportnnote.in';
 
 export const PRIVACY_POLICY = `## Privacy Policy
@@ -27,6 +27,9 @@ export const PRIVACY_POLICY = `## Privacy Policy
 - **Age/ID proofs** you upload so an organiser can confirm age eligibility.
 - **Messages** you send and receive in the app, and reports you make about messages.
 - **Device data:** a notification token if you allow notifications.
+- **Your answers to the first questions** (all optional): how you use SportnNote, the sports you play or follow, your position and playing side, and the city you're based in. They fill in your profile and set up your Home.
+- **Your location, only if you allow it:** your approximate location while you're using the app, to show matches near you. It's rounded to about 1 km, used only to sort matches and never stored. Without it, we use the city you told us.
+- **Match views:** when you open a match we count one view a day, kept as a one-way code rather than your name or account, so popular matches can be shown first. These codes are deleted after 3 days.
 - **Usage and error data:** which screens are opened, actions such as "match completed", the app version and platform, and error reports when something breaks. We don't record what you type, and we strip emails and phone numbers out of error reports.
 - **Website visits:** when you visit sportnnote.in we count page visits using Cloudflare Web Analytics: the page, the site you came from, your country and your type of device and browser. It sets no cookies, stores nothing on your device and doesn't track you across sites.
 
@@ -148,6 +151,8 @@ Unless we agree in writing, you agree not to:
 
 Sharing matches, profiles and tournaments with the share buttons, and downloading your own data, is always fine. If you break these rules, we may block your access and take legal action.
 
+City and town names and locations come from GeoNames (geonames.org), used under the Creative Commons Attribution 4.0 licence.
+
 ## Scores and results
 
 Scores are entered by users, so we can't guarantee they are correct. Organisers are responsible for their own tournaments and for deciding disputes. SportnNote isn't an official governing body.
@@ -181,7 +186,7 @@ These terms are governed by the laws of India. Courts in Hyderabad, Telangana ha
  * This file must stay import-free: scripts/build-website.mjs imports it.
  */
 
-export const INTL_LEGAL_VERSION = '2026-10-24-intl-draft';
+export const INTL_LEGAL_VERSION = '2026-10-31-intl-draft';
 
 /** Which version a sign-up agrees to (recorded in auth metadata legal_accepted). */
 export const legalVersionFor = (country: string): string => (country.toUpperCase() === 'IN' ? LEGAL_VERSION : INTL_LEGAL_VERSION);
@@ -212,6 +217,9 @@ When a school or club uses SportnNote to run its own events under a written agre
 - **Messages** you send and receive, and reports you make.
 - **Data an organiser adds about you** (see below).
 - **Device data:** a notification token if you allow notifications, and a random device ID for analytics only if you allow analytics.
+- **Your answers to the first questions** (all optional): how you use SportnNote, the sports you play or follow, your position and playing side, and the city you're based in.
+- **Your approximate location, only if you allow it**, while you're using the app, to show matches near you. It's rounded to about 1 km, used only to sort matches and never stored.
+- **Match views:** one view a day per match, kept as a one-way code (not your name or account) and deleted after 3 days.
 - **Usage and error data:** which screens are opened, actions such as "match completed", the app version, and error reports. We don't record what you type, and we strip emails and phone numbers out of error reports.
 - **Questions you ask the in-app help assistant.**
 
@@ -382,6 +390,8 @@ Unless we agree in writing, you agree not to:
 - use our name or logo, or suggest that we endorse you, without our permission.
 
 Sharing matches, profiles and tournaments with the share buttons, and downloading your own data, is always fine. If you break these rules, we may block your access and take legal action.
+
+City and town names and locations come from GeoNames (geonames.org), used under the Creative Commons Attribution 4.0 licence.
 
 ## Scores and results
 

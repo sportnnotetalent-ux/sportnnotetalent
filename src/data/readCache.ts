@@ -54,8 +54,11 @@ export function createReadCache(ttlMs: number = READ_CACHE_TTL_MS, now: () => nu
   };
 }
 
-/** Requests that only write analytics (telemetry.ts) — they change nothing any cached read returns. */
-const ANALYTICS_ONLY = [/\/rest\/v1\/rpc\/track_events(?:\?|$)/, /\/rest\/v1\/rpc\/report_client_error(?:\?|$)/];
+/** Requests that only write analytics (telemetry.ts) — they change nothing any cached read returns.
+ *  Also personalised Home's POSTs: near_matches is a read sent as a POST so the
+ *  location stays out of request addresses, and record_match_view only counts views. */
+const ANALYTICS_ONLY = [/\/rest\/v1\/rpc\/track_events(?:\?|$)/, /\/rest\/v1\/rpc\/report_client_error(?:\?|$)/,
+  /\/rest\/v1\/rpc\/near_matches(?:\?|$)/, /\/rest\/v1\/rpc\/record_match_view(?:\?|$)/];
 
 /** Does this request (possibly) change data? Everything but GET / HEAD / OPTIONS
  *  counts — erring on the side of emptying the cache — except analytics posts. */

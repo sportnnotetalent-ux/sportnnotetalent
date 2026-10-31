@@ -50,11 +50,13 @@ function LiveBadge() {
 
 /** `onStart` (parity #13): the scorer's one-tap "▶ Start scoring" / "Continue
  *  scoring" straight into the Scoring tab. */
-export function MatchCard({ match, onPress, onStart, timeZone }: {
+export function MatchCard({ match, onPress, onStart, timeZone, note }: {
   match: Match; onPress: () => void; onStart?: () => void;
   /** SD-150: show kickoff in this zone (a tournament's venue zone), labelled
    *  ("Thu, 4:00 pm GST") when it isn't the viewer's own clock. */
   timeZone?: string;
+  /** Home's "Near you": a last line like "3.2 km away  ·  340 views". */
+  note?: string | null;
 }) {
   // Perf F-15: the name and icon come from the light meta; the full plugin is
   // read only for a played match's card line (the data layer loaded it).
@@ -165,6 +167,7 @@ export function MatchCard({ match, onPress, onStart, timeZone }: {
         ) : null}
       </Text>
       ) : null}
+      {note ? <Text style={s.foot}>{note}</Text> : null}
     </TouchableOpacity>
       {onStart && (live || match.status === 'scheduled') ? (
         <TouchableOpacity style={s.startBtn} activeOpacity={0.85} accessibilityRole="button"

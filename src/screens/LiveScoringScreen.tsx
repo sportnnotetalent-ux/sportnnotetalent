@@ -52,6 +52,9 @@ import { undoLabel } from '../sports/undoLabel';
 import { useLiveMatch } from '../data/useLiveMatch';
 import { matchOutbox } from '../data/matchOutbox';
 import { forfeitFor, forfeitNote } from '../data/walkover';
+import { recordMatchView } from '../data/personalise';
+import { viewsLabel } from '../core/personalise';
+import { viewerDeviceId } from '../core/telemetry';
 import { getRoster, getPlayers, getLineup, getMatch, getTournaments, getMatchSquads, getMatchStatLines, getMyPlayerId, setMatchScorers, setMatchHosts, setMatchLogo, setMatchFormat, setMatchStream, setMatchManagers, getOrganizations, getTeamLeaders, getMatchDisputes, raiseDispute, updateDispute, dismissDispute, resolveDispute, escalateDispute, createReplacementPlayer, retireMatch, walkoverMatch, rescheduleMatch, getMatchKickoffAt, getScoringLock, claimScoring, handoverScoring, endMatchManually, getScoreEdits, getMatchEvents, getTournamentOfficials, joinMatchAsScorer, getMatchOfficials, setMatchOfficials, deleteMatch, resetMatch, setMatchBreak, getMatchLastActivityAt, getMatchPotm, setMatchPotm, stampAggregatePrior, AWARDS_DB_MESSAGE } from '../data/repos';
 import { matchRatings as genericRatings, type PotmProp } from '../data/ratings';
 import { AwardPickerSheet, type PickerRow } from '../components/AwardPickerSheet';
@@ -217,6 +220,16 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
   // hosts score by default — core/scoringAccess mirrors can_manage_match). Ad-hoc
   // local games (no matchId) fall back to the caller's role-based capability.
   const hasMatch = !!matchId;
+  // Personalised Home (founder 2026-10-31): count this view (once a day per
+  // person or device; the server skips the match's scorers and hosts). The
+  // count ranks "Near you" and shows here from 25.
+  const [views, setViews] = useState<number | null>(null);
+  useEffect(() => {
+    if (!matchId) return;
+    let on = true;
+    viewerDeviceId().then((d) => recordMatchView(matchId, d)).then((n) => { if (on) setViews(n); }, () => undefined);
+    return () => { on = false; };
+  }, [matchId]);
   const iAmListedScorer = isListedScorer({ myPlayerId, scorerIds });
   const canScore = hasMatch
     ? canScoreMatch({ myPlayerId, scorerIds, hostIds: matchHostIds, tournamentHostIds: meta.tournamentHostIds })
@@ -2413,6 +2426,7 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
                       onPress={meta.venueName ? () => openVenue(meta.venueName, meta.venueMapsUrl) : undefined}
                       accessibilityLabel={meta.venueName ? `Open ${meta.venueName} in maps` : undefined}
                     />
+                    {viewsLabel(views) ? <InfoRow icon="👁" label="Views" value={viewsLabel(views)!} /> : null}
                     {meta.tournamentName && meta.tournamentId && (
                       <InfoRow
                         icon="🏆" label="Tournament"

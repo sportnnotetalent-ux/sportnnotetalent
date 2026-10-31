@@ -11,6 +11,7 @@ import { Button } from './ui';
 import { hasSeenOnboarding, markOnboardingSeen } from '../core/onboarding';
 import { onboardingStore } from '../data/onboardingStore';
 import { track } from '../core/telemetry';
+import { getMyPersonalisation } from '../data/personalise';
 
 /** First-run choices — each goes straight to where that job starts, so a new
  *  user's first minute ends in doing something (activation = first match scored). */
@@ -45,7 +46,17 @@ export function OnboardingOverlay({ onChoose }: { onChoose?: (c: FirstRunChoice)
   const [i, setI] = useState(0);
 
   // Auto-open on first run (with the choice picker); "Replay tour" opens the tour.
-  useEffect(() => { hasSeenOnboarding().then((seen) => { if (!seen) onboardingStore.requestFirstRun(); }); }, []);
+  // Founder 2026-10-31: an account that hasn't answered the first-run questions
+  // gets those instead (Home opens them; they end with the same choices), so
+  // the two never stack. A server without them still gets this picker.
+  useEffect(() => {
+    hasSeenOnboarding().then(async (seen) => {
+      if (seen) return;
+      const p = await getMyPersonalisation().catch(() => null);
+      if (p && !p.done && !p.skipped) return;
+      onboardingStore.requestFirstRun();
+    });
+  }, []);
   // Always start a fresh run from the first step.
   useEffect(() => { if (visible) setI(0); }, [visible]);
 

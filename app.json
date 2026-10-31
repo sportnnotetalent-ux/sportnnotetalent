@@ -31,7 +31,9 @@
       "predictiveBackGestureEnabled": false,
       "googleServicesFile": "./google-services.json",
       "blockedPermissions": [
-        "android.permission.WRITE_CONTACTS"
+        "android.permission.WRITE_CONTACTS",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_BACKGROUND_LOCATION"
       ],
       "intentFilters": [
         {
@@ -165,6 +167,14 @@
             "com.google.android.tts",
             "com.google.android.as"
           ]
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "SportnNote uses your approximate location while you use the app to show live matches near you. It isn’t stored.",
+          "isAndroidBackgroundLocationEnabled": false,
+          "isIosBackgroundLocationEnabled": false
         }
       ],
       "@react-native-firebase/app",
