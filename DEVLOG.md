@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-31 — Release: MVP P2 batch 1 live (web, Android OTA)
+
+auth-smoke passed. Published from a clean worktree at 452655e: web (entry `index-62238f45`, confirmed live; the first deploy hit an EAS "temporary deployment state failure" and the retry went through) and Android OTA group `c44e0e8f` (runtime 1.0.0, channel preview).
+
 ### 2026-10-31 — MVP P2s, batch 1
 
 Break-it list first (`docs/security/breaks/mvp-p2-batch1.md`), then each fix with a failing test:
