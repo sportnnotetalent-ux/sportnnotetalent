@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-31 — Release: score first, sign up later live (web, Android OTA)
+
+auth-smoke passed. Published from a clean worktree at 247d9c9: web (entry `index-1c6e01a7`, confirmed live on app.sportnnote.in) and Android OTA group `eacc8844` (runtime 1.0.0, channel preview). Checked live, signed out: "Score a game now" → badminton 2-1 kept on the phone → "Save & share" opens Create account, with "Continue your game" offered. Not yet checked: the save after a real sign-up (founder).
+
 ### 2026-10-31 — Score first, sign up later (growth plan #1)
 
 A signed-out person can score a friendly straight away: "Score a game now, no sign-up" on the sign-in screen → a short setup (the seven MVP sports) → scoring. The game lives only on the phone (Undo, resume after a reload) until "Save & share": sign up, and it's uploaded as a normal match (ids chosen first, taps through the idempotent append, progress saved, so retries never duplicate) and the screen switches to it. Nothing reaches the server before an account owns it. Break-it list `docs/security/breaks/guest-scoring.md`; tests; 500 simulated games over a flaky network (found and fixed: retries re-sent every tap). Demo-checked signed in; the signed-out path to check live after publishing. Full suite 6,062 tests, 0 failing; tsc clean.
