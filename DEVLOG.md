@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-31 — Live: the web app on app.sportnnote.in (L8 switched on)
+
+The founder changed the Worker route to `app.sportnnote.in/*` (fail closed) and turned off the redirect rule; `app.sportnnote.in/` and deep links answer 200 from the Worker with the current build (`index-62238f45`). `APP_ORIGIN` set in `wrangler.jsonc`, so the light page's "Full match & stats" opens `/m/<id>?full=1` on our domain.
+
 ### 2026-10-31 — MVP L8: the web app on app.sportnnote.in (code ready; founder switches it on)
 
 Founder's choice: serve the full web app on our own domain. Break-it list first (`docs/security/breaks/mvp-l8-own-domain.md`). The website Worker now serves every `app.sportnnote.in` path but the light score page and `/.well-known` from `sportnnote.expo.app` (fixed upstream, cookies dropped, redirects rewritten to our domain); `run_worker_first: true`; the light page's "Full match" link becomes `/m/<id>?full=1` once `APP_ORIGIN` is set. Dormant until the founder widens the Cloudflare route and turns off the redirect rule (`docs/launch/live-link.md`). Checked locally against the live app. Simulation: 1,000 random requests. Full suite 6,024 tests, 0 failing; tsc clean.

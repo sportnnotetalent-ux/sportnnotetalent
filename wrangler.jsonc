@@ -19,6 +19,9 @@
   },
   // Public values, the same ones every visitor's browser gets from the web app.
   "vars": {
+    // MVP L8: the whole app is served here (founder switched the route on
+    // 2026-10-31), so "Full match & stats" stays on our domain.
+    "APP_ORIGIN": "https://app.sportnnote.in",
     "SUPABASE_URL": "https://mpgbvbylmkwasjgupsbq.supabase.co",
     "SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1wZ2J2YnlsbWt3YXNqZ3Vwc2JxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwMjIxNDQsImV4cCI6MjEwMTU5ODE0NH0.NV7ryMBv-qAc7OzHZVPPxXY2J3agtlHRbvS55R6sWXw"
   }

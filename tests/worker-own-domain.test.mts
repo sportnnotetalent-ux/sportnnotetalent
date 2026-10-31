@@ -107,3 +107,8 @@ test('/m/<id>/ (trailing slash) stays the light page on the app host', async () 
   const { body } = await go(`https://app.sportnnote.in/m/${ID}/`);
   assert.match(body, /Full match &amp; stats/);
 });
+
+test('switched on: wrangler.jsonc sets APP_ORIGIN to our domain', () => {
+  const raw = readFileSync(new URL('../wrangler.jsonc', import.meta.url), 'utf8').replace(/^\s*\/\/.*$/gm, '');
+  assert.equal(JSON.parse(raw).vars.APP_ORIGIN, 'https://app.sportnnote.in');
+});
