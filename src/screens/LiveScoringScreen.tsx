@@ -20,6 +20,7 @@ import { matchControls, showsControl } from '../core/matchSafety';
 import { getDeviceId } from '../core/deviceId';
 import { mergeMatchConfig, changedFormatKeys } from '../core/matchConfig';
 import { boardName } from '../core/teamShort';
+import { startStep, startActions } from '../core/startStep';
 import { manualResultLine as baseResultLine, isNoResult } from '../core/matchResult';
 import { timeUpLeader, timeUpRuleOf } from '../core/timeUp';
 import { matchScoreLine, finalBoard, resultMark } from '../sports/scoreline';
@@ -1036,12 +1037,20 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
   ) : null;
   // "Start the match" soft-warns when both squads are set but uneven or short.
   const [unevenAsk, setUnevenAsk] = useState<string | null>(null);
-  const tryStart = () => {
+  // One-tap start (growth plan #2): the start button asks the sport's first
+  // question itself — racket sports who serves, kabaddi runs the clock.
+  const firstStep = startStep(sport);
+  const [unevenSide, setUnevenSide] = useState<'home' | 'away' | undefined>(undefined);
+  const beginMatch = (side?: 'home' | 'away') => {
+    setLocalStarted(true);
+    for (const a of startActions(firstStep, { side, now: Date.now() })) dispatch(a);
+  };
+  const tryStart = (side?: 'home' | 'away') => {
     const h = squads?.home.starters.length ?? 0;
     const a = squads?.away.starters.length ?? 0;
     const need = meta.config?.playersPerSide ? Number(meta.config.playersPerSide) : 0;
-    if (h > 0 && a > 0 && (h !== a || (need > 0 && (h < need || a < need)))) { setUnevenAsk(`${h} v ${a}`); return; }
-    setLocalStarted(true);
+    if (h > 0 && a > 0 && (h !== a || (need > 0 && (h < need || a < need)))) { setUnevenSide(side); setUnevenAsk(`${h} v ${a}`); return; }
+    beginMatch(side);
   };
 
   // Danger zone (parity #13): delete a friendly while live / within 30 min of the
@@ -1567,7 +1576,7 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
             <View style={[st.retirePanel, { alignSelf: 'stretch' }]}>
               <Text style={st.retirePrompt}>Squads look uneven — {unevenAsk}. Start anyway?</Text>
               <View style={st.retireRow}>
-                <Button label="Start anyway" style={{ flex: 1 }} onPress={() => { setUnevenAsk(null); setLocalStarted(true); }} />
+                <Button label="Start anyway" style={{ flex: 1 }} onPress={() => { setUnevenAsk(null); beginMatch(unevenSide); }} />
                 <Button label="Fix squads" variant="ghost" style={{ flex: 1 }} onPress={() => {
                   const h = squads?.home.starters.length ?? 0, a = squads?.away.starters.length ?? 0;
                   setUnevenAsk(null);
@@ -1575,8 +1584,20 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
                 }} />
               </View>
             </View>
+          ) : firstStep === 'serve' ? (
+            <View style={{ gap: theme.spacing(2), alignSelf: 'stretch' }}>
+              <Text style={[st.retirePrompt, { textAlign: 'center' }]}>Who serves first?</Text>
+              <View style={st.retireRow}>
+                {(['home', 'away'] as const).map((side) => (
+                  <TouchableOpacity key={side} style={[st.assignBtn, { flex: 1 }]} activeOpacity={0.85} accessibilityRole="button"
+                    accessibilityLabel={`Start the match: ${side === 'home' ? homeName : awayName} serves first`} onPress={() => tryStart(side)}>
+                    <Text style={st.assignBtnText} numberOfLines={1}>{`▶ ${side === 'home' ? homeName : awayName} serves`}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
           ) : (
-            <TouchableOpacity style={st.assignBtn} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel="Start the match" onPress={tryStart}>
+            <TouchableOpacity style={st.assignBtn} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel="Start the match" onPress={() => tryStart()}>
               <IconText label={"▶ Start the match"} style={st.assignBtnText} />
             </TouchableOpacity>
           )}
