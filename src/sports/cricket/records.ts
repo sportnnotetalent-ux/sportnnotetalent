@@ -81,7 +81,7 @@ export function cricketMatchRecords(s: CricketState): MatchRecordsBlock | null {
       if (m[2] === 'run') {
         items.push({ type: 'marginRuns', value: n, text: `by ${n} run${n === 1 ? '' : 's'}${tag}`, side: o.winner });
       } else {
-        const sched = (s.inn2Overs ?? s.oversLimit) * bpo;
+        const sched = s.oversLimit * bpo; // AB-03: the current length (after any rain cut)
         const left = Math.max(0, sched - s.scores[chase].balls);
         items.push({ type: 'marginWkts', value: n * 1000 + left, text: `by ${n} wkt${n === 1 ? '' : 's'}${left ? ` (${left} ball${left === 1 ? '' : 's'} left)` : ''}${tag}`, side: o.winner });
       }

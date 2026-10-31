@@ -5,7 +5,8 @@
  */
 import type { FieldEntry, FieldEntryStatus, FieldEvent } from '../../core/types.ts';
 import type { DisciplineDef, EntryResult, PhaseFormat, PhaseKind, Progression, ResultEntry, ResultStatus } from './model.ts';
-import { disciplineOf } from './model.ts';
+import { disciplineOf, looseLegal, phaseDiscipline } from './model.ts';
+import { rankEntries } from './rank.ts';
 
 /** The phase format of a field event, or null if it isn't a results-engine phase. */
 export function phaseOf(ev: Pick<FieldEvent, 'format' | 'roundNo'>): PhaseFormat | null {
@@ -67,4 +68,12 @@ export function planRounds(def: DisciplineDef, entrants: number): PlannedPhase[]
     { phase: 'semi', heats: semis, progression: feed(semis, lanes) },
     { phase: 'final', heats: 1 },
   ];
+}
+
+/** AB-04 — a final ranked under the meet's own rules (tie-breaks, shoot-offs,
+ *  cycling GC), exactly as the meet medal table ranks it (athletics.ts). Used
+ *  when a final is locked and when its stat lines are re-synced. */
+export function rankFinal(f: PhaseFormat, base: DisciplineDef, rows: ResultEntry[]) {
+  const def = phaseDiscipline(base, f);
+  return { def, rows: rankEntries(rows, def, { handLegal: looseLegal(f) }) };
 }

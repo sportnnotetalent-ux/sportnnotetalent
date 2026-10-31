@@ -11,4 +11,4 @@ export function csvCell(v: string): string {
 }
 
 export const icsText = (s: string): string =>
-  s.replace(/\\/g, '\\\\').replace(/;/g, '\;').replace(/,/g, '\\,').replace(/\r\n?/g, '\n').replace(/\n/g, '\\n');
+  s.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r\n?/g, '\n').replace(/\n/g, '\\n');

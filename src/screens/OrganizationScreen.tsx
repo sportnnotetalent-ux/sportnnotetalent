@@ -33,7 +33,7 @@ import {
 } from '../data/repos';
 import {
   ORG_ROLES, ORG_ROLE_BLURB, COMMUNITY_TYPES, canManageOrg, canOrganizeEvents, membershipPeriod,
-  isAcademicCommunity, currentStandard, gradePeriod, promoteGrade, nextStandard,
+  isAcademicCommunity, currentStandard, gradePeriod, promoteGrade, nextStandard, classRequestNotices,
   graduatingStandardOf, isGraduatingStandard, memberEntry, isSoleActiveAdmin, isSoleActiveOwner, canManageOwners, activeOwners,
   currentAcademicYear, firstAcademicYear, latestAcademicYear, nextAcademicYearDates,
   academicYearEnded, academicYearLabel, academicYearsOf,
@@ -616,13 +616,8 @@ export default function OrganizationScreen() {
                 current={currentStandard(myMember)}
                 onSend={(requested, note) => {
                   const myName = (myId && nameOf(myId)) || 'A student';
-                  for (const pid of gradeApprovers) {
-                    void notify({
-                      title: `🎓 Class update request — ${org.name}`,
-                      body: `${myName} requests their class be set to “${requested}”${note ? `. Note: ${note}` : ''}.`,
-                      playerId: myId ?? undefined,
-                    });
-                  }
+                  // AB-02: each notice goes to that admin, not to the student
+                  for (const n of classRequestNotices({ orgName: org.name, myName, requested, note, approverIds: gradeApprovers })) void notify(n);
                 }}
               />
             )}

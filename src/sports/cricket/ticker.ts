@@ -72,7 +72,8 @@ export function cricketTickerDetail(s0: CricketState, names: { home: string; awa
       banner = `${so}Innings break · Target ${x.target}${targetTag(x)}`;
     } else {
       const need = Math.max(0, x.target - inn.runs);
-      const left = (x.inn2Overs ?? x.oversLimit) * bpo - inn.balls;
+      // AB-03: the current length — a rain cut in the chase moves oversLimit, not inn2Overs
+      const left = x.oversLimit * bpo - inn.balls;
       banner = x.oversLimit >= 999
         ? `${so}Need ${need}${targetTag(x)}`
         : `${so}Need ${need} off ${Math.max(0, left)}${targetTag(x)} · RRR ${runRate(need, Math.max(0, left), bpo)}`;

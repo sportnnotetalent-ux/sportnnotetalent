@@ -15,7 +15,7 @@ import type { FieldEntry, FieldEvent, SportId } from '../core/types';
 import { saveFieldResult, toEntry, toEvent, getFieldEntries } from './golf';
 import { patchTournamentFormat } from './repos';
 import {
-  disciplineOf, phaseOf, planRounds, seedHeats, fieldStatusFor, toResultEntry, performanceOf, rankByHeat, rankEntries,
+  disciplineOf, phaseOf, planRounds, seedHeats, fieldStatusFor, toResultEntry, performanceOf, rankByHeat, rankEntries, rankFinal,
   qualify, nextRound, updateRecords, categoryKey, categoryLabel, phaseLabel, withQualification, eventAwards, phaseLines,
   groupMeet, deriveRecordBook, meetFieldResults, seedOrder,
   type Category, type DisciplineDef, type EntryResult, type MarkHistory, type PhaseFormat, type PlannedPhase,
@@ -688,8 +688,8 @@ export async function resyncFinalLines(phase: FieldEvent, entries: FieldEntry[],
     // follow-up: a record the total broke (kept on the phase) → mrSet / srSet on the total line
     lines = combinedFinalLines(f, ranked, rows, combinedAwards(rows, points ?? {}));
   } else {
-    const rows = rankEntries(entries.map((e) => toResultEntry(e, nameOf)), def, { handLegal: looseLegal(f) });
-    lines = finalLinesFor(f, def, entries, nameOf, rows, points);
+    const { def: meetDef, rows } = rankFinal(f, def, entries.map((e) => toResultEntry(e, nameOf)));
+    lines = finalLinesFor(f, meetDef, entries, nameOf, rows, points);
   }
   if (!lines) return 0;
   if (!live()) { await writePhaseLines(phase, f, lines); return lines.length; }
@@ -750,7 +750,8 @@ export async function completeFinal(phase: FieldEvent, entries: FieldEntry[], na
   // SD-93: the last event of a combined event — totals, medals, records on the total
   if (f.combined) return completeCombined(phase, f, def, entries, nameOf, scopes, points, opts);
   // A timed final (several heats) ranks across heats — the whole phase at once.
-  const rows = rankEntries(entries.map((e) => toResultEntry(e, nameOf)), def, { handLegal: looseLegal(f) });
+  // AB-04: under the meet's own rules, as the medal table ranks it.
+  const { def: meetDef, rows } = rankFinal(f, def, entries.map((e) => toResultEntry(e, nameOf)));
   const book = await getRecordBook(phase.tournamentId, def.sport);
   const cat = categoryKey(f.category);
   // SD-112: an out-of-range mark nobody confirmed never sets a record.
@@ -775,7 +776,7 @@ export async function completeFinal(phase: FieldEvent, entries: FieldEntry[], na
     : [];
   const fl: PhaseFormat = { ...f, recordsSet: recordsSet.length ? recordsSet : undefined };
   // SD-130: the lines are computed apart, so a failed save can be re-synced later
-  const lines = finalLinesFor(fl, def, entries, nameOf, rows, points);
+  const lines = finalLinesFor(fl, meetDef, entries, nameOf, rows, points);
   if (lines) await writePhaseLines(phase, f, lines);
   // SD-112: keep what the book said before, so "Reopen final" can put it back
   await patchPhaseFormat(phase.id, { recordsBefore: recordDefsFor(def).flatMap((d) => recordsFor(book, d.key, cat)), ...(recordsSet.length || f.recordsSet ? { recordsSet: fl.recordsSet } : {}) });

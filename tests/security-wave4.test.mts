@@ -55,7 +55,7 @@ describe('CL-27 — exported files can\'t carry formulas or extra calendar lines
   });
   test('iCalendar', () => {
     assert.equal(icsText('Venue\r\nATTENDEE:evil'), 'Venue\\nATTENDEE:evil');
-    assert.equal(icsText('a;b,c\\d'), 'a\;b\\,c\\\\d');
+    assert.equal(icsText('a;b,c\\d'), 'a\\;b\\,c\\\\d'); // AB-01: the semicolon is escaped too
   });
   test('the writers use them', () => {
     assert.match(read('src/data/scheduleImport.ts'), /import \{ csvCell \} from '\.\.\/core\/exportCells\.ts'/);

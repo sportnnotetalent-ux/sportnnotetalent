@@ -39,6 +39,15 @@ export const standardAt = (m: OrgMember | undefined, date?: string): string | un
   return d < sorted[0].since ? sorted[0].standard : sorted[sorted.length - 1].standard;
 };
 
+/** AB-02 — the class-change request notices: one per admin, addressed to that
+ *  admin (not to the student who asked). */
+export const classRequestNotices = (r: { orgName: string; myName: string; requested: string; note?: string; approverIds: string[] }) =>
+  r.approverIds.map((playerId) => ({
+    title: `🎓 Class update request — ${r.orgName}`,
+    body: `${r.myName} requests their class be set to “${r.requested}”${r.note ? `. Note: ${r.note}` : ''}.`,
+    playerId,
+  }));
+
 /** The member's current class/standard. */
 export const currentStandard = (m: OrgMember | undefined): string | undefined => standardAt(m, undefined);
 

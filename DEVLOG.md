@@ -13,6 +13,15 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-31 — Four audit bugs fixed (not published yet)
+
+Confirmed in the code, then fixed test-first (`docs/security/breaks/audit-bugs-2026-10-31.md`):
+- **Calendar export:** semicolons are now escaped (`core/exportCells.ts`; the old test asserted the mistake).
+- **Class change requests:** each notice goes to the school's admins, not back to the student (`core/org.ts` `classRequestNotices`, OrganizationScreen).
+- **Cricket rain cut in the chase:** the public overlay and the "balls left" record use the cut length, as the scorer does (`cricket/ticker.ts`, `records.ts`).
+- **Locking a final:** ranked under the meet's own rules, as the medal table is (`results/plan.ts` `rankFinal`, `completeFinal`, `resyncFinalLines`). Finals locked before keep their old lines until re-locked or re-synced.
+Simulation: 1,000 calendar strings, 500 schools, 500 chases, 500 finals. Full suite 5,795 tests, 0 failing; tsc clean. App-only: live with the next publish.
+
 ### 2026-10-31 — Release: audit security fixes live (server, web, Android OTA)
 
 The founder ran migration `20261031150000_dispute_status_flow.sql` and deployed `verify-contact-otp` and `phone-login` (09:01 UTC; the live `guard_dispute` has the status check). auth-smoke passed. Published from a clean worktree at f7183e8: web (entry `index-cee8d613`, confirmed live with the new sign-up text) and Android OTA group `172cb2fe` (runtime 1.0.0, channel preview). Also ships the racket stats-panel cleanup (574a1b3).
