@@ -411,7 +411,7 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
   // MVP B3: singles / doubles sides show names on the controls and board, not
   // their short code ("Ravi / Arjun", not "RKAS"); team sports keep theirs.
   // Through the dispute mask, so a disputed player's name stays hidden.
-  const individualSport = getSport(sport).participantKind !== 'team';
+  const individualSport = (getSport(sport).participantKind ?? 'team') !== 'team'; // omitted = a team sport
   const shownNameOf = useMemo(() => makeNameOf(people, maskValue), [people, maskValue]);
   const homeShown = (individualSport ? entryDisplayName(homeScoreRoster.map((p) => shownNameOf(p.id, p.fullName))) : undefined) ?? homeName;
   const awayShown = (individualSport ? entryDisplayName(awayScoreRoster.map((p) => shownNameOf(p.id, p.fullName))) : undefined) ?? awayName;

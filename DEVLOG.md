@@ -13,6 +13,17 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-31 — MVP P1s, batch 3 (not published yet) + a batch 2 fix
+
+Break-it list first (`docs/security/breaks/mvp-p1-batch3.md`), then each fix with a failing test:
+- **Basketball running clock:** "Clock stops on: Time-outs only" (friendly default) or "Every whistle" (tournament default). Saved matches unchanged. Website guide updated.
+- **Basketball:** the Assist box sits below the pads (they no longer jump); a team basket can be edited to name its scorer.
+- **Football:** subs work with no lineup (everyone but the player going off); Goal comes first on the screen.
+- **Add a friend by name only** mid-match (no number), on the chosen side's squad.
+- **Batch 2 fix:** team sports with 1–2 listed players showed a player's name instead of the team name (an omitted `participantKind` means team). Live until this publish.
+- Waiting on the founder: a "Quick" default stats set for football friendlies.
+Simulation: 1,000 clock games, 500 squads, 1,000 entries. Demo-checked. Full suite 5,889 tests, 0 failing; tsc clean.
+
 ### 2026-10-31 — Release: MVP P1 batch 2 live (web, Android OTA)
 
 auth-smoke passed. Published from a clean worktree at a8c3966: web (entry `index-6631b3d1`, confirmed live) and Android OTA group `7e0f8f3a` (runtime 1.0.0, channel preview).

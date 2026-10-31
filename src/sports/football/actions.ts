@@ -170,3 +170,15 @@ export function statRemoval(st: StatEvent): ScoreAction {
   const attribution = st.playerId && key ? { playerId: st.playerId, stat: key, by: -1, extra } : undefined;
   return { type: 'REMOVE_EVENT', payload: { id: st.id, target: 'stat' }, attribution };
 }
+
+/** Who can come on in a substitution. With a lineup: the squad minus those on
+ *  the pitch. MVP F7 — with no lineup (most friendlies) nobody is known to be
+ *  on the bench, so everyone except the player going off. Never a player sent
+ *  off; fixed subs also exclude players already withdrawn. */
+export function benchFor<P extends { id: string }>(o: {
+  squad: P[]; onIds: Set<string>; hasLineup: boolean; offId?: string; sentOff: Set<string>; withdrawn: Set<string>;
+}): P[] {
+  return o.squad
+    .filter((p) => (o.hasLineup ? !o.onIds.has(p.id) : p.id !== o.offId))
+    .filter((p) => !o.sentOff.has(p.id) && !o.withdrawn.has(p.id));
+}

@@ -87,6 +87,9 @@ export interface BasketballState {
    *  from the real clock. Only on the state when the format sets the key —
    *  absent = the legacy wall-clock minutes from tip-off. */
   gc?: { ms: number; since?: number };
+  /** MVP B2: a running clock (format `clockMode: 'run'`, new matches) — it stops
+   *  only for time-outs and the end of a period, not on fouls or late baskets. */
+  gcRun?: true;
   /** SD-132: 3×3 overtime is first to this many points scored in overtime
    *  (FIBA 3×3 Art. 6.4: 2). Format key `otTarget`; absent = legacy. */
   otTarget?: number;
@@ -133,6 +136,7 @@ export const init = (config?: Record<string, unknown>): BasketballState => ({
   ...((() => { const agg = aggPriorFromConfig(config); return agg ? { agg } : {}; })()),
   // SD-132 — present only when the stored config carries the key.
   ...(config?.gameClock === true ? { gc: { ms: 0 } } : {}),
+  ...(config?.gameClock === true && config?.clockMode === 'run' ? { gcRun: true as const } : {}),
   ...(Number(config?.otTarget) > 0 ? { otTarget: Number(config?.otTarget) } : {}),
   ...(config?.foulLadder === '3x3' ? { ladder3x3: true as const } : {}),
   // Deep wave — present only when the stored config carries the key.
@@ -464,7 +468,8 @@ const reduce = (s: BasketballState, a: ScoreAction): BasketballState => {
     pushEv(st, { ...(!idOnly && v2 && pidIn && e.playerName ? { ...e, pid: pidIn } : e), ...(secIn !== undefined ? { sec: secIn } : {}) }, q);
   // SD-132: the whistle stops the game clock (fouls, time-outs, and a field
   // goal in the last 2 minutes of Q4 / overtime — FIBA Art. 49.2.3).
-  const whistle = (st: BasketballState): BasketballState => (st.gc?.since && at ? { ...st, gc: stopGc(st, at) } : st);
+  // MVP B2: a running clock ignores the whistle — only a time-out (`always`) stops it
+  const whistle = (st: BasketballState, always = false): BasketballState => (st.gc?.since && at && (always || !st.gcRun) ? { ...st, gc: stopGc(st, at) } : st);
   // Put points on the board + log the play; ends a first-to-N game on the clincher.
   const scorePoints = (side: 'home' | 'away', pts: number, ev: Omit<BBEvent, 'id' | 'quarter'>): BasketballState => {
     const scored = { ...s, [side]: s[side] + pts } as BasketballState;
@@ -571,7 +576,7 @@ const reduce = (s: BasketballState, a: ScoreAction): BasketballState => {
         }, quarter))
         : s;
     case 'TIMEOUT':
-      return a.side ? whistle(push(s, { minute, type: 'timeout', side: a.side }, quarter)) : s;
+      return a.side ? whistle(push(s, { minute, type: 'timeout', side: a.side }, quarter), true) : s;
     case 'EJECT':
       // Remove a player for the rest of the game (2 technicals / flagrant-2 /
       // fighting) — independent of the personal-foul limit. Blocks further credit.

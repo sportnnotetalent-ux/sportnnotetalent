@@ -61,7 +61,16 @@ export const BASKETBALL_META: SportMeta = {
     { key: 'trackFastBreak', label: 'Tag fast-break points', type: 'toggle', default: BB_TRACK_DEFAULTS.trackFastBreak, advanced: true, group: 'Stats to track', hint: '⚡ Fast break after a basket (and-one free throw included)' },
     { key: 'trackFoulsDrawn', label: 'Track fouls drawn', type: 'toggle', default: BB_TRACK_DEFAULTS.trackFoulsDrawn, advanced: true, group: 'Stats to track', hint: 'who was fouled (FD in the box score)' },
     // SD-132: the stoppable game clock (start / stop on whistles, set time)
-    { key: 'gameClock', label: 'Stoppable game clock', type: 'toggle', default: true, hint: 'Start / stop it on whistles — exact minutes, +/- and timeout limits' },
+    { key: 'gameClock', label: 'Game clock', type: 'toggle', default: true, hint: 'a countdown each period — exact minutes, +/- and timeout limits' },
+    // MVP B2: a lone scorer forgets to restart a clock that stops on every whistle
+    {
+      key: 'clockMode', label: 'Clock stops on', type: 'choice', default: 'run', tournamentDefault: 'stop',
+      hideWhen: { key: 'gameClock', value: false },
+      options: [
+        { value: 'run', label: 'Time-outs only (running clock)' },
+        { value: 'stop', label: 'Every whistle (fouls, late baskets)' },
+      ],
+    },
     { key: 'otTarget', label: 'Overtime: first to N points', type: 'number', default: 0, min: 0, max: 5, advanced: true, hint: '0 = timed overtime · 3×3: 2' },
     {
       key: 'foulLadder', label: 'Team-foul penalties', type: 'choice', default: 'fiba', advanced: true,

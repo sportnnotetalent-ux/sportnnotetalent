@@ -11,8 +11,8 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { theme } from '../core/theme';
 import { SelectChip, TextField, Button, textStyles } from './ui';
-import { invitePlayer, markPlayerRegistered, findPlayerByPhone, findPlayerByEmail, lookupPeople, getReportedPlayerIds, removePlayerFromTeam } from '../data/repos';
-import { looksLikeContact } from '../core/contactQuery';
+import { invitePlayer, invitePerson, markPlayerRegistered, findPlayerByPhone, findPlayerByEmail, lookupPeople, getReportedPlayerIds, removePlayerFromTeam } from '../data/repos';
+import { looksLikeContact, nameOnlyOk } from '../core/contactQuery';
 import { canPickContact, pickContact, canPaste, pasteText } from '../core/pickContact';
 import { notify } from '../core/notifications';
 import { openWhatsApp, openSms } from '../core/connect';
@@ -183,6 +183,25 @@ export function AddInvitePlayer({
     }
   };
 
+  // MVP F6: a friend with no number to hand — a name-only player on this side's
+  // squad (claimable later, as clubs allow). Nothing is sent to anyone.
+  const addNameOnly = async () => {
+    const typed = phone.trim().replace(/\s+/g, ' ');
+    if (busy || !nameOnlyOk(typed)) return;
+    setBusy(true); setNote(null);
+    try {
+      const { player } = await invitePerson({ name: typed, sport });
+      await invitePlayer({ teamId, teamName, sport, matchId, name: typed, player });
+      setNote(`✓ Added ${typed} to ${teamName} — no number needed. They can claim it when they join.`);
+      setPhone(''); setPeople([]); setMatched(null);
+      onChanged();
+    } catch (e) {
+      setNote(e instanceof Error && e.message ? `⚠ ${e.message}` : 'Could not add the player — try again.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const registered = async (id: string) => { await markPlayerRegistered(id); onChanged(); };
   const waFirst = preferredChat() === 'whatsapp';
 
@@ -223,7 +242,13 @@ export function AddInvitePlayer({
                   <Text style={st.personAdd}>＋ Add</Text>
                 </TouchableOpacity>
               ))}
-              {!searching && people.length === 0 && <Text style={textStyles.muted}>No one on SportnNote by that name. Add them with their mobile number{canPickContact() ? ' or from your contacts' : ''}.</Text>}
+              {!searching && people.length === 0 && <Text style={textStyles.muted}>No one on SportnNote by that name. Add them with their mobile number{canPickContact() ? ' or from your contacts' : ''}, or just by name:</Text>}
+              {!searching && nameOnlyOk(phone) && (
+                <TouchableOpacity accessibilityRole="button" style={st.personRow} activeOpacity={0.8} onPress={() => void addNameOnly()} disabled={busy}>
+                  <Text style={st.personName} numberOfLines={1}>“{phone.trim()}” without a number</Text>
+                  <Text style={st.personAdd}>＋ Add</Text>
+                </TouchableOpacity>
+              )}
             </>
           ) : !valid && !isEmail ? (
             <Text style={textStyles.muted}>{phoneHelp()}</Text>

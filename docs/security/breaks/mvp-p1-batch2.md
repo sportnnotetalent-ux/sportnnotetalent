@@ -22,3 +22,6 @@
 
 ## Results
 Full suite 5,869 tests, 0 failing; tsc clean. Simulation: 500 football and 500 basketball games with random Undos, 1,000 random sides. Found while checking the follow-on list: the first version of the side names read `fullName` directly, which would have shown a disputed player's real name; it now goes through the dispute mask (test). Not done: swap is per screen visit (it resets when the scorer leaves the match), not remembered per device.
+
+## Regression found later (2026-10-31, batch 3)
+The side names treated an omitted `participantKind` as individual; omitted means team. Team sports with 1–2 listed players showed a player's name instead of the team name. Fixed in batch 3 (see `mvp-p1-batch3.md`).

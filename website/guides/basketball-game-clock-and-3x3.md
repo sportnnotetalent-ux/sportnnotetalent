@@ -1,6 +1,6 @@
 ---
 title: Run the basketball game clock (5×5 and 3×3)
-description: Start and stop the game clock on every whistle so minutes, plus/minus and timeout limits are exact. Plus the 3×3 rules and the 3×3 points table.
+description: Run the game clock — a running clock for friendlies, or stopped on every whistle like the table officials — so minutes, plus/minus and timeout limits are exact. Plus the 3×3 rules and the 3×3 points table.
 category: Live scoring
 audience: Scorers, Organisers
 sports: basketball
@@ -12,11 +12,12 @@ A basketball quarter of 10 minutes can take 20 real minutes, because the clock s
 
 ## Before you start
 - You must be a scorer or host of the match. See [Scorers and officials](/guides/scorers-and-officials/).
-- New matches have **Stoppable game clock** switched on in the format (FIBA, NBA, NCAA, School and 3×3). Matches scheduled before it keep the old minute count from tip-off.
+- New matches have the **Game clock** switched on in the format (FIBA, NBA, NCAA, School and 3×3). Matches scheduled before it keep the old minute count from tip-off.
+- **Clock stops on** picks how it runs. A friendly starts on **Time-outs only** (a running clock: it keeps going through fouls, so a scorer on their own can't forget to restart it). A tournament starts on **Every whistle**, the way table officials run it. The organiser can change either.
 
 ## Step by step: run the clock
 1. Open the match → **Scoring** tab and tap "▶ Start Q1" at the tip-off. The clock starts counting down from 10:00.
-2. A foul or a time-out stops the clock by itself. So does a made basket in the last 2 minutes of the 4th quarter and of overtime (FIBA).
+2. A time-out stops the clock by itself. With **Every whistle**, so does a foul, and a made basket in the last 2 minutes of the 4th quarter and of overtime (FIBA).
 3. For any other stoppage (out of bounds, a violation, an injury), tap **⏸ Stop** in the clock panel.
 4. When play restarts, tap **▶ Start**. While it is stopped, the panel says so.
 5. If your clock and the table's drift apart, tap **⏱ Set clock**, type the time left (for example `4:32`) and tap **Set**.
@@ -49,7 +50,7 @@ You can switch it in the points settings like any other system. See [Points tabl
 Tap **▶ Start**, then **⏱ Set clock** to the time the table shows. Plays you logged while it was stopped keep the time they were logged at.
 
 ### Can I still score without the clock?
-Yes. The organiser can switch off **Stoppable game clock** in the match format. Then each play is stamped with the minute since tip-off, as before.
+Yes. The organiser can switch off the **Game clock** in the match format. Then each play is stamped with the minute since tip-off, as before.
 
 ### Does the app run the 12-second shot clock?
 No. The shot clock is for the table officials; the app records the game.

@@ -22,7 +22,8 @@ export const defaultsFor = (fields: FormatField[], ctx?: 'tournament'): Record<s
   const preset = fields.find((f) => f.type === 'preset');
   // A preset may name a different default for tournaments (SD-06: pickleball).
   const presetDefault = ctx === 'tournament' && preset?.tournamentDefault != null ? preset.tournamentDefault : preset?.default;
-  const out: Record<string, FormatVal> = Object.fromEntries(fields.map((f) => [f.key, f === preset ? presetDefault! : f.default]));
+  // A field may name its own tournament default too (MVP B2: basketball's clock mode)
+  const out: Record<string, FormatVal> = Object.fromEntries(fields.map((f) => [f.key, f === preset ? presetDefault! : (ctx === 'tournament' && f.tournamentDefault != null ? f.tournamentDefault : f.default)]));
   const chosen = preset?.options?.find((o) => o.value === presetDefault);
   if (chosen?.set) Object.assign(out, chosen.set);
   return out;

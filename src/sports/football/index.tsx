@@ -21,7 +21,7 @@ import { theme } from '../../core/theme';
 import { useMask } from '../../core/disputeMask';
 import { withNames, nameRow } from '../invasion/names';
 import {
-  goalAction, teamGoalAction, undoGoalAction, ownGoalAction, assistAction, cardActions, officialCardActions, sinBinAction, afterTeamPick,
+  goalAction, teamGoalAction, undoGoalAction, ownGoalAction, assistAction, cardActions, officialCardActions, sinBinAction, afterTeamPick, benchFor,
   statAction, foulAction, subAction, xiAction, xiOf, penKickAction, eventRemoval, statRemoval as statRemovalAction, type StatDetail,
 } from './actions';
 import { Button, TextField, SelectChip } from '../../components/ui';
@@ -356,14 +356,15 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
   };
   // The bench = squad members not currently on the pitch (and, for fixed subs,
   // not already withdrawn), never a player who's been sent off.
-  const benchOf = (side: 'home' | 'away'): Player[] => {
-    const onIds = new Set(xi(side).map((p) => p.id));
-    const off = sentOff(side);
-    return rosterOf(side)
-      .filter((p) => !onIds.has(p.id))
-      .filter((p) => !off.has(p.id))
-      .filter((p) => state.subType !== 'fixed' || !isSubbedOff(state, side, p));
-  };
+  // MVP F7: with no lineup, everyone in the squad except the player going off.
+  const benchOf = (side: 'home' | 'away', offId?: string): Player[] => benchFor({
+    squad: rosterOf(side),
+    onIds: new Set(xi(side).map((p) => p.id)),
+    hasLineup: lineupOf(side).some((sl) => sl.playerId),
+    offId,
+    sentOff: sentOff(side),
+    withdrawn: new Set(state.subType === 'fixed' ? rosterOf(side).filter((p) => isSubbedOff(state, side, p)).map((p) => p.id) : []),
+  });
 
   // Each goal credits the total (`goals`) and a type-specific tally so a profile
   // shows the open-play / penalty / free-kick split alongside the total.
@@ -725,7 +726,7 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
           {sub.off && (
             <>
               <Text style={ctrl.meta}>Player ON (from the bench){state.subType === 'fixed' ? ' — withdrawn players unavailable' : ''}:</Text>
-              <PlayerTable players={benchOf(sub.side)} onPick={(p) => { fire(subAction(sub.side, sub.off!, p)); setSub(null); }} />
+              <PlayerTable players={benchOf(sub.side, sub.off.id)} onPick={(p) => { fire(subAction(sub.side, sub.off!, p)); setSub(null); }} />
             </>
           )}
         </View>
@@ -1183,15 +1184,9 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
   return (
     <View style={{ gap: theme.spacing(4) }}>
       {backfillBar}
-      {voiceBar}
       {clockPanel}
       {afBanner}
-      {t.possession && <PossessionBar state={state} homeName={homeName} awayName={awayName} homeColor={hc} awayColor={ac} onSwitch={setPossession} />}
-
-      {/* In-play stoppage marker (injury / cooling break / VAR check) — a timeline
-          note; distinct from signalling ADDED time (which extends the clock). */}
-      <Button label="⏸️ Stoppage / injury" variant="ghost" onPress={() => dispatch({ type: 'STOPPAGE', side: state.possession.side ?? 'home' })} />
-
+      {/* MVP F8: Goal first — the one action every game needs, above the fold */}
       {/* Goal — one flow: scorer (or own goal) → goal type → assist. */}
       <View style={{ gap: theme.spacing(2) }}>
         <Text style={ctrl.label}>Goal</Text>
@@ -1201,6 +1196,13 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
           <Button label={`Goal — ${awayName}`} variant="away" color={ac} style={ctrl.flex} onPress={() => setFlow({ mode: 'goal', side: 'away', step: 'scorer' })} />
         </View>
       </View>
+
+      {voiceBar}
+      {t.possession && <PossessionBar state={state} homeName={homeName} awayName={awayName} homeColor={hc} awayColor={ac} onSwitch={setPossession} />}
+
+      {/* In-play stoppage marker (injury / cooling break / VAR check) — a timeline
+          note; distinct from signalling ADDED time (which extends the clock). */}
+      <Button label="⏸️ Stoppage / injury" variant="ghost" onPress={() => dispatch({ type: 'STOPPAGE', side: state.possession.side ?? 'home' })} />
 
       {/* Penalty — won by → taken by → scored / saved / missed (credits the GK on a save). */}
       <View style={{ gap: theme.spacing(2) }}>

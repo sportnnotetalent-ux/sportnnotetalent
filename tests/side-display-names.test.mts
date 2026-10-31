@@ -27,7 +27,8 @@ test('nothing usable, or 3+ players: undefined (keep the stored name)', () => {
 test('the scorer screen uses it for individual / pair sports only', () => {
   const src = readFileSync(join(import.meta.dirname, '..', 'src/screens/LiveScoringScreen.tsx'), 'utf8');
   assert.match(src, /entryDisplayName\(/);
-  assert.match(src, /participantKind !== 'team'/);
+  // an omitted participantKind means a team sport (types.ts) — football, basketball, cricket… keep team names
+  assert.match(src, /\(getSport\(sport\)\.participantKind \?\? 'team'\) !== 'team'/);
   // a disputed player's name stays masked: names go through the mask-aware lookup
   assert.match(src, /entryDisplayName\(homeScoreRoster\.map\(\(p\) => shownNameOf\(p\.id, p\.fullName\)\)\)/);
   assert.match(src, /makeNameOf\(people, maskValue\)/);

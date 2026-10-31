@@ -186,7 +186,8 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
   const STAT_KEY: Record<string, string> = { rebound: 'rebounds', assist: 'assists', foul: 'fouls', steal: 'steals', block: 'blocks', turnover: 'turnovers' };
   // Which plays can be re-entered in place (single-player stat plays). Free
   // throws (made/miss), timeouts and subs are remove-only.
-  const canEdit = (e: BBEvent) => hasPlayer(e) && (e.type === 'score' || !!STAT_KEY[e.type]);
+  // MVP B8: a team basket can be edited to name its scorer (points, zone, second kept)
+  const canEdit = (e: BBEvent) => (hasPlayer(e) || e.type === 'score') && (e.type === 'score' || !!STAT_KEY[e.type]);
   // An older log's name-only play: its id from that log's map, else the
   // squads (read on this device only — the action carries the id).
   const rosterId = (nm?: string) => (nm ? [...homeRoster, ...awayRoster].find((p) => p.fullName === nm)?.id : undefined);
@@ -694,6 +695,22 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
     <View style={{ gap: theme.spacing(4) }}>
       {backfillBar}
       {clockPanel}
+      {otBanner}
+      {outNames.length > 0 && (
+        <Text style={ctrl.fouledOut}>🚫 Out: {outNames.join(', ')}</Text>
+      )}
+      {state.foulsForBonus > 0 && (
+        <Text style={ctrl.meta}>Team fouls {foulPeriod} · {homeName} {homeTF} · {awayName} {awayTF}{state.ladder3x3 ? ' · 3×3: fouls 7–9 give 2 free throws, 10+ give 2 free throws and the ball' : ''}</Text>
+      )}
+      {homeBonus && (
+        <Text style={ctrl.bonus}>🎯 BONUS · {homeName} shoots free throws on every foul ({awayName}: {awayTF} team fouls)</Text>
+      )}
+      {awayBonus && (
+        <Text style={ctrl.bonus}>🎯 BONUS · {awayName} shoots free throws on every foul ({homeName}: {homeTF} team fouls)</Text>
+      )}
+      <ScoreSide side="home" name={homeName} variant="home" />
+      <ScoreSide side="away" name={awayName} variant="away" />
+      {/* MVP B4: below the pads, so they never move when it opens or closes */}
       {/* SD-117 (B6): "Assist?" right after a make — the on-court teammates, or Skip */}
       {assistFor && (() => {
         const mates = courtOf(assistFor.side).filter((p) => p.id !== assistFor.scorer?.id && !fouledOut(p));
@@ -730,21 +747,6 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
           </View>
         );
       })()}
-      {otBanner}
-      {outNames.length > 0 && (
-        <Text style={ctrl.fouledOut}>🚫 Out: {outNames.join(', ')}</Text>
-      )}
-      {state.foulsForBonus > 0 && (
-        <Text style={ctrl.meta}>Team fouls {foulPeriod} · {homeName} {homeTF} · {awayName} {awayTF}{state.ladder3x3 ? ' · 3×3: fouls 7–9 give 2 free throws, 10+ give 2 free throws and the ball' : ''}</Text>
-      )}
-      {homeBonus && (
-        <Text style={ctrl.bonus}>🎯 BONUS · {homeName} shoots free throws on every foul ({awayName}: {awayTF} team fouls)</Text>
-      )}
-      {awayBonus && (
-        <Text style={ctrl.bonus}>🎯 BONUS · {awayName} shoots free throws on every foul ({homeName}: {homeTF} team fouls)</Text>
-      )}
-      <ScoreSide side="home" name={homeName} variant="home" />
-      <ScoreSide side="away" name={awayName} variant="away" />
 
       {/* Free throws — always available: shooting foul, and-one, technical, bonus. */}
       <View style={ctrl.row}>
