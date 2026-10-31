@@ -54,6 +54,9 @@ import { Pill, textStyles } from '../components/ui';
 import { undoLabel } from '../sports/undoLabel';
 import { useLiveMatch } from '../data/useLiveMatch';
 import { matchOutbox } from '../data/matchOutbox';
+import { mergeLog, newestEvent } from '../data/eventLog';
+import { formatChangePreview, canChangeLiveFormat, type FormatPreview } from '../data/formatChange';
+import { FORMAT_TYPE } from '../sports/amend';
 import { forfeitFor, forfeitNote } from '../data/walkover';
 import { recordMatchView } from '../data/personalise';
 import { cardModel } from '../core/resultCard';
@@ -316,6 +319,8 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
     awayTeamId: meta.awayTeamId,
     tournamentId: meta.tournamentId,
     config: meta.config,
+    // MVP B6: a live format change (or its undo) — reload the match's format
+    onFormatChange: () => setReloadTick((t) => t + 1),
     // SD-48: a team-tie rubber announces the TIE result once, not itself
     ...(tieRubberMeta ? {
       tieRubber: tieRubberMeta,
@@ -739,6 +744,24 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
   // only keys the host CHANGES from this are saved, so re-saving an older match
   // never stamps it with newer defaults (e.g. basketball shot zones, netball CPR).
   const [editFmtShown, setEditFmtShown] = useState<Record<string, FormatVal>>({});
+  // MVP B6 — the board under the edited format, replayed from this match's log.
+  const [livePreview, setLivePreview] = useState<FormatPreview | null>(null);
+  // Only from the device scoring now: its log row is what tells viewers (and
+  // its own board replays under the new format at once).
+  const scoringHere = canScore && (lockStat === 'mine' || lockStat === 'free' || lockStat === 'unsupported');
+  const liveFormatOk = canChangeLiveFormat({ canManage: canManage && scoringHere, tournamentId: meta.tournamentId, sport, live: matchLive, complete });
+  useEffect(() => {
+    if (!editInfo || !matchLive || !liveFormatOk || !matchId) { setLivePreview(null); return; }
+    const changed = changedFormatKeys(editFmtShown, editFmt);
+    if (!Object.keys(changed).length) { setLivePreview(null); return; }
+    let on = true;
+    void getMatchEvents(matchId).then((server) => {
+      if (!on) return;
+      const raw = mergeLog(server, matchOutbox.getPending(matchId));
+      setLivePreview(formatChangePreview(plugin, { ...((meta.config as Record<string, unknown>) ?? {}), ...changed }, raw));
+    }, () => on && setLivePreview(null));
+    return () => { on = false; };
+  }, [editInfo, matchLive, liveFormatOk, matchId, editFmt, editFmtShown, plugin, meta.config]);
   const openEditInfo = () => {
     setEditWhen(meta.startsAt ? new Date(meta.startsAt) : new Date());
     setEditVenue(meta.venueName ?? '');
@@ -750,9 +773,17 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
   };
   const saveInfo = async () => {
     if (!matchId) return;
-    await rescheduleMatch(matchId, { startsAt: editWhen.toISOString(), venueName: editVenue.trim() || null, venueMapsUrl: editVenueUrl.trim() || null });
     const changed = changedFormatKeys(editFmtShown, editFmt);
-    if (Object.keys(changed).length) await setMatchFormat(matchId, changed as Record<string, number | string | boolean>);
+    const fmtChanged = Object.keys(changed).length > 0;
+    // MVP B6: a live friendly's format — only when the replay keeps the match going.
+    if (fmtChanged && matchLive && !livePreview?.ok) return;
+    await rescheduleMatch(matchId, { startsAt: editWhen.toISOString(), venueName: editVenue.trim() || null, venueMapsUrl: editVenueUrl.trim() || null });
+    if (fmtChanged) await setMatchFormat(matchId, changed as Record<string, number | string | boolean>);
+    if (fmtChanged && matchLive) {
+      // The log marker: viewers reload the format; Undo restores `prev`.
+      const prev = Object.fromEntries(Object.keys(changed).map((k) => [k, editFmtShown[k]]));
+      dispatch({ type: FORMAT_TYPE, payload: { patch: changed, prev } });
+    }
     setMeta((m) => ({ ...m, startsAt: editWhen.toISOString(), venueName: editVenue.trim() || undefined, venueMapsUrl: editVenueUrl.trim() || undefined, config: { ...((m.config as Record<string, unknown>) ?? {}), ...changed } }));
     setEditInfo(false);
   };
@@ -1013,7 +1044,20 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
   // way (SD-133: cricket "FOUR — Rohit (4.3)"). IDs-only scoring: the step's
   // player by id, as this viewer may see them (logs keep ids, not names).
   const undoNameOf = useMemo(() => makeNameOf(maskValue.people ?? new Map(), maskValue), [maskValue]);
-  const undoWhat = useMemo(() => (plugin.undoLabel ? plugin.undoLabel(lastStep, undoNameOf) : undoLabel(lastStep, { home: homeName, away: awayName, player: undoNameOf }, (s) => {
+  // MVP B6: undoing a format change puts the old format back first (viewers
+  // reload it when the row leaves the log), then pops the row.
+  const undoStep = useCallback(async () => {
+    if (lastStep?.type === FORMAT_TYPE && matchId) {
+      const tail = newestEvent(mergeLog(await getMatchEvents(matchId), matchOutbox.getPending(matchId)));
+      const prev = tail?.type === FORMAT_TYPE ? (tail.payload as { prev?: Record<string, number | string | boolean> } | null)?.prev : undefined;
+      if (prev && Object.keys(prev).length) {
+        await setMatchFormat(matchId, prev);
+        setMeta((m) => ({ ...m, config: { ...((m.config as Record<string, unknown>) ?? {}), ...prev } }));
+      }
+    }
+    await undo();
+  }, [lastStep, matchId, undo]);
+  const undoWhat = useMemo(() => (lastStep?.type === FORMAT_TYPE ? 'format change' : plugin.undoLabel ? plugin.undoLabel(lastStep, undoNameOf) : undoLabel(lastStep, { home: homeName, away: awayName, player: undoNameOf }, (s) => {
     try { const m = plugin.summary(s as never); return m.homeScore != null && m.awayScore != null ? `${m.homeScore}-${m.awayScore}` : null; } catch { return null; }
   })), [plugin, lastStep, homeName, awayName, undoNameOf]);
   // SD-110 — keep the phone awake while this scorer is on a match in progress.
@@ -1030,7 +1074,7 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
       <Text style={[st.undoText, { color: theme.colors.textMuted }]} numberOfLines={1}>Nothing to undo yet</Text>
     </View>
   ) : (
-    <TouchableOpacity style={st.undoBtn} activeOpacity={0.8} accessibilityRole="button" accessibilityLabel={`Undo${undoWhat ? `: ${undoWhat}` : ` last ${sport === 'cricket' ? 'ball' : 'update'}`}`} accessibilityHint="Tap repeatedly to rewind to any earlier point" onPress={undo}>
+    <TouchableOpacity style={st.undoBtn} activeOpacity={0.8} accessibilityRole="button" accessibilityLabel={`Undo${undoWhat ? `: ${undoWhat}` : ` last ${sport === 'cricket' ? 'ball' : 'update'}`}`} accessibilityHint="Tap repeatedly to rewind to any earlier point" onPress={() => void undoStep()}>
       <Text style={[st.undoText, { flexShrink: 1 }]} numberOfLines={1}>↶  Undo{undoWhat ? `: ${undoWhat}` : ''}</Text>
       {undoWhat ? null : <Text style={st.undoHint}>rewind step-by-step</Text>}
     </TouchableOpacity>
@@ -1396,10 +1440,10 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
       voice={plugin.voice} state={state} dispatch={dispatch}
       homeName={homeName} awayName={awayName}
       homeRoster={homeScoreRoster} awayRoster={awayScoreRoster}
-      onUndo={undo}
+      onUndo={() => void undoStep()}
       wouldComplete={wouldComplete}
     />
-  ) : null), [plugin, state, dispatch, homeName, awayName, homeScoreRoster, awayScoreRoster, undo, wouldComplete]);
+  ) : null), [plugin, state, dispatch, homeName, awayName, homeScoreRoster, awayScoreRoster, undoStep, wouldComplete]);
   const bumpRoster = useCallback(() => setRosterNonce((n) => n + 1), []);
   const addInviteEl = useMemo(() => (canScore && !retiredLocally && meta.homeTeamId && meta.awayTeamId ? (
     <AddInvitePlayer
@@ -2506,7 +2550,7 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
                   <View style={{ gap: theme.spacing(3), marginTop: theme.spacing(1) }}>
                     <DateTimeField label="Date & time" value={editWhen} onChange={setEditWhen} timeZone={meta.tournamentZone} />
                     <VenueField venue={editVenue} onVenue={setEditVenue} venueUrl={editVenueUrl} onVenueUrl={setEditVenueUrl} knownVenues={[]} />
-                    {(getSport(sport).formatFields ?? []).length > 0 && !matchLive && (
+                    {(getSport(sport).formatFields ?? []).length > 0 && (!matchLive || liveFormatOk) && (
                       <SportFormatEditor
                         sport={sport}
                         value={editFmt}
@@ -2520,9 +2564,21 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
                         ]}
                       />
                     )}
-                    {matchLive && (
+                    {matchLive && liveFormatOk && (() => {
+                      // MVP B6: the new board, from the same taps, before saving.
+                      if (!livePreview) return <Text style={textStyles.muted}>Change the format if it was set wrong: every point so far is replayed under the new format.</Text>;
+                      if (!livePreview.ok) {
+                        return <Text style={st.formatWarn}>{livePreview.dropped > 0
+                          ? `Under this format the match would already be over, and the last ${livePreview.dropped} ${livePreview.dropped === 1 ? 'tap' : 'taps'} would be lost. Pick another format, or end the match.`
+                          : 'Under this format the match would be over now. End the match instead.'}</Text>;
+                      }
+                      const sm = plugin.summary(livePreview.state as never);
+                      const line = plugin.scoreLine ? matchScoreLine(plugin, livePreview.state, {}) : '';
+                      return <Text style={textStyles.muted}>{`New score: ${sm.homeScore}-${sm.awayScore}${line ? ` (${line})` : ''}. Every point so far is kept; Undo puts the old format back.`}</Text>;
+                    })()}
+                    {matchLive && !liveFormatOk && (
                       <Text style={textStyles.muted}>
-                        Format is locked once the match is live{showLiveSettings && ls ? `…local rules can still be changed in ${ls.title.replace(/^[^A-Za-z]+/, '')} below.` : '.'}
+                        {canManage && !meta.tournamentId && sport !== 'cricket' && !scoringHere ? 'Change the format from the device that is scoring this match. ' : ''}Format is locked once the match is live{showLiveSettings && ls ? `…local rules can still be changed in ${ls.title.replace(/^[^A-Za-z]+/, '')} below.` : '.'}
                       </Text>
                     )}
                     <View style={{ flexDirection: 'row', gap: theme.spacing(3) }}>
@@ -2835,6 +2891,7 @@ const st = StyleSheet.create({
   caret: { color: theme.colors.textMuted, fontSize: theme.font.body, fontWeight: '800', width: 18, textAlign: 'center' },
   venueLink: { color: theme.colors.primary, fontSize: theme.font.body, fontWeight: '700', textAlign: 'right', flexShrink: 1 },
   // Same box as undoBtn (same height), greyed: holds Undo's place before the first action.
+  formatWarn: { color: theme.colors.danger, fontSize: theme.font.small },
   undoIdle: {
     flexDirection: 'row', alignItems: 'center', gap: theme.spacing(2),
     backgroundColor: theme.colors.surfaceAlt, borderRadius: theme.radius.md,

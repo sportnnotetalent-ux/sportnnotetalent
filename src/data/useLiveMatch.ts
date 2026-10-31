@@ -29,7 +29,7 @@ import { notify } from '../core/notifications';
 import type { MatchEventRecord, SportId } from '../core/types';
 import type { ScoreAction } from '../sports/types';
 import { mergeLog, eventKey, statReversals, deriveLog, newestEvent, logAction as toAction, type DerivedLog } from './eventLog';
-import { undoAmendDeltas, AMEND_TYPE, type AmendOp } from '../sports/amend';
+import { undoAmendDeltas, AMEND_TYPE, FORMAT_TYPE, type AmendOp } from '../sports/amend';
 import { planAmendment } from './amendments';
 import { newUuid } from '../core/deviceId';
 import { canWriteWith, type LockStatus } from '../core/scoringLock';
@@ -100,6 +100,9 @@ export function useLiveMatch(params: {
    *  over realtime and wasn't applied here yet (the INSERT fast path ONLY):
    *  a load, reconnect, undo or correction rebuild never calls it. */
   onRemoteEvent?: (prev: unknown, next: unknown) => void;
+  /** MVP B6 — the match's format was changed (a FORMAT row arrived) or the
+   *  change was undone (its row left the log): reload the format. */
+  onFormatChange?: () => void;
   /** a pure viewer (the OBS overlay): never flush this device's outbox */
   readOnly?: boolean;
   /** SD-48 — this match is a rubber of a team tie: team / tournament
@@ -113,6 +116,8 @@ export function useLiveMatch(params: {
   const { matchId, sport, canScore = true, homeTeamName, awayTeamName, homeTeamId, awayTeamId, tournamentId, config, lockStatus = 'unsupported', readOnly = false } = params;
   const onRemoteRef = useRef(params.onRemoteEvent);
   onRemoteRef.current = params.onRemoteEvent;
+  const onFormatRef = useRef(params.onFormatChange);
+  onFormatRef.current = params.onFormatChange;
   const tieRef = useRef(params.tieRubber);
   tieRef.current = params.tieRubber;
   const onResultSentRef = useRef(params.onResultSent);
@@ -238,7 +243,11 @@ export function useLiveMatch(params: {
     if (!matchId) return;
     // Published corrections (AMEND rows, parity #05) apply their edits on replay.
     const raw = mergeLog(await getMatchEvents(matchId), matchOutbox.getPending(matchId));
+    // MVP B6: a format change undone upstream (its row left the log) → reload the format.
+    const marks = (l: MatchEventRecord[]) => l.filter((e) => e.type === FORMAT_TYPE).length;
+    const formatUndone = marks(raw) < marks(rawRef.current);
     applyLog(raw, deriveLog(plugin, config, raw));
+    if (formatUndone) { try { onFormatRef.current?.(); } catch { /* never breaks sync */ } }
     logVersionRef.current += 1;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [matchId, plugin, config]);
@@ -276,6 +285,8 @@ export function useLiveMatch(params: {
             const e: MatchEventRecord = { ...row, clientId: row.client_id ?? undefined };
             // A correction rewrites earlier events → replay everything.
             if (e.type === AMEND_TYPE) { void rebuildFromLog(); return; }
+            // MVP B6: the format changed — reload it (the board replays under it).
+            if (e.type === FORMAT_TYPE) { onFormatRef.current?.(); void rebuildFromLog(); return; }
             const key = eventKey(e);
             if (appliedRef.current.has(key)) return; // already applied locally (optimistic)
             appliedRef.current.add(key);
@@ -312,7 +323,8 @@ export function useLiveMatch(params: {
     (action: ScoreAction) => {
       // Optimistic local apply — instant feedback for the scorer.
       const prevState = stateRef.current;
-      const next = plugin.reducer(prevState, action);
+      // MVP B6: a FORMAT marker is never reduced (the format lives in matches.format).
+      const next = action.type === FORMAT_TYPE ? prevState : plugin.reducer(prevState, action);
       setBoth(next);
       if (canScore && !readOnly) tapFeedback(); // SD-110: feel that the tap went in
 

@@ -11,6 +11,10 @@ import type { MatchEventRecord } from '../core/types';
 import type { ScoreAction, SportPlugin } from './types';
 
 export const AMEND_TYPE = 'AMEND';
+/** MVP B6 — a live friendly's format was changed (payload { patch, prev }).
+ *  The format itself lives in `matches.format`; this row tells viewers to
+ *  reload it and lets Undo revert it. Never replayed (effectiveLog drops it). */
+export const FORMAT_TYPE = 'FORMAT';
 
 export type AmendOp = { op: 'replace'; seq: number; action: ScoreAction } | { op: 'void'; seq: number };
 export interface StatDelta { playerId: string; stat: string; by: number }
@@ -18,6 +22,7 @@ export interface AmendPayload { ops: AmendOp[]; lines: string[]; byName: string;
 
 type Attr = NonNullable<MatchEventRecord['attribution']>;
 const isAmend = (e: Pick<MatchEventRecord, 'type'>) => e.type === AMEND_TYPE;
+const isMarker = (e: Pick<MatchEventRecord, 'type'>) => e.type === FORMAT_TYPE;
 
 /** Same mapping useLiveMatch uses to turn a stored row into a reducer action. */
 const toAction = (e: MatchEventRecord): ScoreAction => ({
@@ -28,13 +33,13 @@ const toAction = (e: MatchEventRecord): ScoreAction => ({
 });
 
 /** The log as it should be replayed: AMEND rows dropped, their ops applied in
- *  AMEND seq order (last write wins). A replaced row keeps its original seq,
+ *  AMEND seq order (last write wins); FORMAT marker rows dropped too. A replaced row keeps its original seq,
  *  created_at and clientId; a voided row disappears; ops on a missing seq are
  *  ignored. Output is in seq order. */
 export function effectiveLog(events: MatchEventRecord[]): MatchEventRecord[] {
   const sorted = [...events].sort((a, b) => a.seq - b.seq);
   const base = new Map<number, MatchEventRecord | null>();
-  for (const e of sorted) if (!isAmend(e)) base.set(e.seq, e);
+  for (const e of sorted) if (!isAmend(e) && !isMarker(e)) base.set(e.seq, e);
   for (const am of sorted) {
     if (!isAmend(am)) continue;
     const ops = ((am.payload as Partial<AmendPayload> | null | undefined)?.ops ?? []) as AmendOp[];
