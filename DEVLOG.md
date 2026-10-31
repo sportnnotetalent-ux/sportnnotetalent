@@ -13,7 +13,26 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
-### 2026-10-31 — MVP defined and audited; live link, light page, result card, quick game, quick tournament (built)
+### 2026-10-31 — Release: MVP loop items live (web + OTA); Cloudflare follow-ups
+
+The founder ran SQL 20261031130000 (near_places) and 20261031140000 (share_match), then
+pushed 2c144db. Cloudflare built and deployed the Worker. Checked on `sportnnote.in/m/<id>`:
+- a 4.4 KB page; preview title "⚽ LIVE · Panthers vs Cheetahs";
+- `/m/<id>.json` with `max-age=5`;
+- the share pictures load, and the website is unchanged.
+
+auth-smoke passed. Published from a clean worktree at 2c144db: web index-df1fae98 and
+Android OTA group 0f861a23 (runtime 1.0.0). Scores appear in previews once a match is saved
+by the updated app.
+
+**Cloudflare follow-ups:**
+- **Urgent:** the `.well-known` route was edited to `app.sportnnote.in/.well-known/m/*`, so
+  `/.well-known/assetlinks.json` returns 522 and Android App Links verification breaks. It
+  must go back to `app.sportnnote.in/.well-known/*`.
+- The redirect rule still sends `app.sportnnote.in/m/*` to sportnnote.expo.app. Its `/m/`
+  exception is still to be added.
+
+### 2026-10-31 — MVP defined and audited; live link, light page, result card, quick game, quick tournament (built, released above)
 
 The founder asked for the MVP. It's defined in `docs/product/MVP.md`:
 - **What:** the live score link loop.
