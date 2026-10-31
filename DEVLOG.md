@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-31 — Release: MVP P1 batch 6 live (web, Android OTA)
+
+auth-smoke passed. Published from a clean worktree at f55afad: web (entry `index-26611bfc`, confirmed live) and Android OTA group `409955ad` (runtime 1.0.0, channel preview).
+
 ### 2026-10-31 — MVP P1s, batch 6
 
 Break-it list first (`docs/security/breaks/mvp-p1-batch6.md`), then each fix with a failing test:
