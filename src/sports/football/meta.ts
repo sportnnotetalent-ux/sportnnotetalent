@@ -36,7 +36,8 @@ export const FOOTBALL_META: SportMeta = {
   archetype: 'goal-time',
   formatFields: [
     {
-      key: 'preset', label: 'Format', type: 'preset', default: 'eleven',
+      // MVP F3 (founder, 2026-10-31): friendlies start on 5s turf; tournaments keep 11-a-side
+      key: 'preset', label: 'Format', type: 'preset', default: 'fives', tournamentDefault: 'eleven',
       options: [
         { value: 'eleven', label: '11-a-side', set: { playersPerSide: 11, halfMinutes: 45, substitutes: 5, subType: 'rolling', stoppedClock: false, futsal: false } },
         { value: 'sevens', label: '7-a-side', set: { playersPerSide: 7, halfMinutes: 25, substitutes: 5, subType: 'rolling', stoppedClock: false, futsal: false } },

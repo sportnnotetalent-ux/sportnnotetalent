@@ -729,7 +729,7 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
     setEditWhen(meta.startsAt ? new Date(meta.startsAt) : new Date());
     setEditVenue(meta.venueName ?? '');
     setEditVenueUrl(meta.venueMapsUrl ?? '');
-    const shown = { ...defaultsFor(getSport(sport).formatFields ?? []), ...((meta.config as Record<string, FormatVal>) ?? {}) };
+    const shown = { ...defaultsFor(getSport(sport).formatFields ?? [], meta.tournamentId ? 'tournament' : undefined), ...((meta.config as Record<string, FormatVal>) ?? {}) };
     setEditFmt(shown);
     setEditFmtShown(shown);
     setEditInfo(true);

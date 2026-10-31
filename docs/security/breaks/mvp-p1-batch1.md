@@ -21,5 +21,5 @@
 - **Tap guard and the doubles long-press credit:** the credit chips are deliberate picks and aren't guarded.
 
 ## Not in this batch
-- **F3 football default format** (11-a-side, 45-minute halves): a product decision, 5s or 7s for friendlies. Asked of the founder.
+- **F3 football default format:** founder chose 5-a-side (2026-10-31). Friendlies now start on "5s turf" (5 a side, 20-minute halves); tournaments keep 11-a-side; editing a tournament match fills missing keys with the tournament default. Test `football-friendly-default`; checked in the demo app.
 - The rest of the P1 list (undo labels, swap sides, side names as initials, format locked once live, clock, kabaddi raid form, …).

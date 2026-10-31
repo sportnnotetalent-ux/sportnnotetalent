@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-31 — Football friendlies default to 5-a-side (not published yet)
+
+Founder's choice (MVP F3): a new football friendly starts on "5s turf" (5 a side, 20-minute halves), so turf games get the right minutes played; tournaments keep 11-a-side (`tournamentDefault`). Saved matches keep their format. Test first; checked in the demo app. Full suite 5,843 tests, 0 failing; tsc clean.
+
 ### 2026-10-31 — Release: MVP P1 batch 1 live (web, Android OTA)
 
 auth-smoke passed. Published from a clean worktree at 1208939: web (entry `index-830757b5`) and Android OTA group `16075b7c` (runtime 1.0.0, channel preview).
