@@ -13,7 +13,11 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
-### 2026-10-31 — Football friendlies default to "Quick" stats (not published yet)
+### 2026-10-31 — Release: football "Quick" default live (web, Android OTA)
+
+auth-smoke passed. Published from a clean worktree at 2e3cae9: web (entry `index-bc72e290`, confirmed live) and Android OTA group `30a30797` (runtime 1.0.0, channel preview).
+
+### 2026-10-31 — Football friendlies default to "Quick" stats
 
 Founder's choice (MVP F8): a new football friendly tracks goals, assists, subs and cards; everything else (shots, fouls, possession, …) is opt-in in ⚙️ Scoring settings. Tournaments keep the full set; saved matches unchanged (no `track*` keys → full set). Each stat is now a "Stats to track" format option (`TRACK_FIELDS`, one list `BASE_TRACKABLE`); the match-info editor leaves them to Scoring settings. Break-it first (`docs/security/breaks/mvp-football-quick.md`); tests; 1,500 simulated matches; demo-checked. Full suite 5,898 tests, 0 failing; tsc clean.
 
