@@ -5,6 +5,7 @@
  */
 import { readQualifiesTo, type QualifiesTo } from './feeders';
 import { ageOf } from '../core/age';
+import { canMoveDispute, movesInto } from '../core/disputeFlow';
 import { firebasePhoneAvailable, sendPhoneCode, confirmPhoneCode } from '../core/firebasePhone';
 import { takeSms } from '../core/smsBudget';
 import { serializePrefs, type FollowPrefs } from './followPrefs';
@@ -2652,11 +2653,12 @@ export async function escalateDispute(id: string, actor?: DisputeActor): Promise
   };
   if (!isSupabaseConfigured || !supabase) {
     const d = demo.disputes.find((x) => x.id === id);
-    if (d && d.status === 'reported') { d.status = 'open'; d.history = [...(d.history ?? []), event]; }
+    if (d && canMoveDispute(d.status, 'open')) { d.status = 'open'; d.history = [...(d.history ?? []), event]; }
     return;
   }
-  await supabase.from('match_disputes').update({ status: 'open' }).eq('id', id);
-  await appendDisputeHistory(id, event);
+  // AS-02: only a reported dispute is accepted; a closed one stays closed.
+  const { data } = await supabase.from('match_disputes').update({ status: 'open' }).eq('id', id).in('status', movesInto('open')).select('id');
+  if (data?.length) await appendDisputeHistory(id, event);
 }
 
 /** Create a brand-new player (not already in the system) to reassign a disputed
@@ -2981,11 +2983,11 @@ export async function dismissDispute(id: string, actor?: DisputeActor): Promise<
   const event: DisputeEvent = { action: 'dismissed', at: new Date().toISOString(), byId: actor?.id, byName: actorNameOf(actor) };
   if (!isSupabaseConfigured || !supabase) {
     const d = demo.disputes.find((x) => x.id === id);
-    if (d) { d.status = 'dismissed'; d.history = [...(d.history ?? []), event]; }
+    if (d && canMoveDispute(d.status, 'dismissed')) { d.status = 'dismissed'; d.history = [...(d.history ?? []), event]; }
     return;
   }
-  await supabase.from('match_disputes').update({ status: 'dismissed' }).eq('id', id);
-  await appendDisputeHistory(id, event);
+  const { data } = await supabase.from('match_disputes').update({ status: 'dismissed' }).eq('id', id).in('status', movesInto('dismissed')).select('id');
+  if (data?.length) await appendDisputeHistory(id, event);
 }
 
 /** Apply an agreed reassignment — requires a replacement plus BOTH captains'
@@ -2995,7 +2997,7 @@ export async function resolveDispute(id: string, actor?: DisputeActor): Promise<
   const nameOf = (pid: string) => demo.players.find((p) => p.id === pid)?.fullName;
   if (!isSupabaseConfigured || !supabase) {
     const d = demo.disputes.find((x) => x.id === id);
-    if (!d || d.status !== 'open') return;
+    if (!d || !canMoveDispute(d.status, 'resolved')) return;
     if (!d.replacementId || !d.homeCaptainOk || !d.awayCaptainOk)
       throw new Error('Pick a replacement and get both captains to confirm first.');
     const replId = d.replacementId;
@@ -3017,6 +3019,7 @@ export async function resolveDispute(id: string, actor?: DisputeActor): Promise<
   const { data } = await supabase.from('match_disputes').select('*').eq('id', id).maybeSingle();
   if (!data) return;
   const d = rowToDispute(data);
+  if (!canMoveDispute(d.status, 'resolved')) return; // AS-02: only an open dispute
   if (!d.replacementId || !d.homeCaptainOk || !d.awayCaptainOk) throw new Error('Pick a replacement and get both captains to confirm first.');
   await supabase.from('stat_lines').update({ player_id: d.replacementId }).eq('match_id', d.matchId).eq('player_id', d.playerId);
   const resolvedAt = new Date().toISOString();

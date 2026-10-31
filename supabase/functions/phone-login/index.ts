@@ -29,6 +29,7 @@
 import { admin, clip, CORS, json, rateLimit, tooMany } from '../_shared/guard.ts';
 import { firebaseConfigured, verifiedPhoneFromToken } from '../_shared/firebaseToken.ts';
 import { phoneKey } from '../_shared/phone.ts';
+import { minorSignupProblem } from '../_shared/minorSignup.ts';
 
 const ROLES = ['player', 'parent', 'scorer', 'organizer', 'fan'];
 
@@ -142,15 +143,15 @@ Deno.serve(async (req) => {
   if (!fullName) return json({ error: 'Enter your name.' }, 400);
   if (age === null) return json({ error: 'Enter a valid date of birth.' }, 400);
   if (s.agreed !== true) return json({ error: 'Please agree to the Terms of Use and Privacy Policy.' }, 400);
+  // AS-04: the same as email sign-up — US under-13s told plainly; minors need a guardian email.
+  const minorProblem = minorSignupProblem(age, phone, (s.guardian ?? {}) as Record<string, unknown>);
+  if (minorProblem) return json({ error: minorProblem }, 400);
   let guardian: Record<string, unknown> | undefined;
   if (age < 18) {
     const g = (s.guardian ?? {}) as Record<string, unknown>;
     const gName = clip(g.name, 80).trim();
     const gPhone = clip(g.phone, 20).trim();
     const gEmail = clip(g.email, 120).trim();
-    if (!gName || (!gPhone && !gEmail) || g.consent !== true) {
-      return json({ error: 'Under-18 accounts need a parent/guardian’s name, contact and consent.' }, 400);
-    }
     guardian = { name: gName, phone: (phoneKey(gPhone) || gPhone) || undefined, email: gEmail || undefined, consentedAt: new Date().toISOString() };
   }
 

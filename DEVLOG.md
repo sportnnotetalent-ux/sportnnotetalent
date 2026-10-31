@@ -13,6 +13,16 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-31 — Security fixes from the duplication audit (not live yet)
+
+The audit (`docs/engineering/duplication-audit/`) compared copies of the same code; four security leads were checked against the server first (`docs/security/breaks/audit-security-2026-10-31.md`):
+- **Fixed — verification codes:** parallel guesses could get past the 5-guess cap. Each guess now claims an attempt atomically; verify calls are capped too (`_shared/otpCheck.ts`, `verify-contact-otp`).
+- **Fixed — disputes:** closed disputes could be reopened or re-resolved. Only the four moves the screen offers are allowed, in the app (`core/disputeFlow.ts`) and on the server (migration `20261031150000`).
+- **Fixed — phone sign-up for minors:** the plain US under-13 message and a required guardian email, as on email sign-up (`_shared/minorSignup.ts`, `PhoneLoginCard`, `phone-login`). The database already refused US under-13s and kept minors limited; this was a usability gap.
+- **Not a bug:** a guest seeing a restricted player's per-sport profile (the server already hides them).
+- **Unconfirmed:** phone-login's per-IP limit and the `x-forwarded-for` header.
+Tests first, plus a simulation (500 attackers, 500 disputes, 1,000 sign-ups). Full suite 5,781 tests, 0 failing; tsc clean. To go live: run the migration, deploy the two functions, publish.
+
 ### 2026-10-31 — The four MVP score P0s fixed (tennis T1, basketball B1, kabaddi K1/K2)
 
 Test-first; not published. Break-it: `docs/security/breaks/score-p0s.md`.

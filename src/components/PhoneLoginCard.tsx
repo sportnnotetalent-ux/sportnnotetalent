@@ -11,7 +11,8 @@ import { theme } from '../core/theme';
 import { Button, Card, FormError, SelectChip, TextField, textStyles } from './ui';
 import { DateField } from './DateTimeField';
 import { ageFromDob } from '../core/age';
-import { isValidPhone, normalizePhone, formatPhone } from '../core/phone';
+import { isValidPhone, normalizePhone, formatPhone, phoneCountry } from '../core/phone';
+import { privacyCountry, usUnder13Blocked, US_UNDER_13_MESSAGE } from '../core/privacyRegion';
 import { PhoneField } from './PhoneField';
 import { completePhoneSignup, confirmPhoneLogin, sendPhoneCode, prewarmPhoneSdk, prewarmPhoneCode, releasePrewarmedPhoneCode } from '../core/phoneLogin';
 import type { Role } from '../core/types';
@@ -83,7 +84,12 @@ export function PhoneLoginCard({ onUseEmail, onUseEmailCode }: { onUseEmail?: ()
   const create = () => run(async () => {
     if (!fullName.trim()) throw new Error('Enter your name.');
     if (!dob.trim() || age === undefined) throw new Error('Enter your date of birth.');
-    if (minor && (!gName.trim() || (!gPhone.trim() && !gEmail.trim()) || !consent)) {
+    // AS-04: the same as email sign-up (AuthScreen) — the mobile's country first.
+    if (usUnder13Blocked(phoneCountry(phone) ?? privacyCountry(), age)) throw new Error(US_UNDER_13_MESSAGE);
+    if (minor && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(gEmail.trim())) {
+      throw new Error('Add your parent/guardian’s email — we’ll email them a link to approve your account.');
+    }
+    if (minor && (!gName.trim() || !consent)) {
       throw new Error('Under-18 accounts need a parent/guardian’s name, contact and consent.');
     }
     if (minor && gPhone.trim() && !isValidPhone(gPhone)) throw new Error('The guardian’s mobile doesn’t look right — check the number and country code.');
@@ -143,7 +149,7 @@ export function PhoneLoginCard({ onUseEmail, onUseEmailCode }: { onUseEmail?: ()
               <IconText label={"👪 Parent / Guardian (required for under-18)"} style={textStyles.muted} />
               <TextField label="Guardian name" value={gName} onChange={setGName} placeholder="Priya Mehta" autoCapitalize="words" />
               <PhoneField label="Guardian mobile" value={gPhone} onChange={setGPhone} />
-              <TextField label="Guardian email" value={gEmail} onChange={setGEmail} placeholder="parent@email.com" autoCapitalize="none" />
+              <TextField label="Guardian email (we send the approval link here)" value={gEmail} onChange={setGEmail} placeholder="parent@email.com" autoCapitalize="none" />
               <Check on={consent} onPress={() => setConsent((c) => !c)}>
                 I am {gName.trim() ? `${gName.trim()}’s ` : 'the '}parent/guardian and I consent to them creating and using a SportnNote account.
               </Check>

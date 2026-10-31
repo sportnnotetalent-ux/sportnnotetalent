@@ -4,16 +4,19 @@
  * Checks a 6-digit code the player entered against the hashed code stored by
  * send-contact-otp. On success, flips the player's *_verified flag and clears
  * the code. Authenticated + ownership-checked, same as send-contact-otp. Caps
- * wrong guesses (5) and honours the 10-min expiry.
+ * guesses (5, claimed atomically so parallel requests can't get past it —
+ * _shared/otpCheck.ts), limits verify calls, and honours the 10-min expiry.
  *
  * Contract (src/data/repos.ts → verifyContactOtp):
  *   POST { playerId, channel: 'email', code }   [Authorization: Bearer <jwt>]
- *     → 200 { verified: boolean, reason?: 'expired' | 'too_many' | 'mismatch' | 'none' }
+ *     → 200 { verified: boolean, reason?: 'expired' | 'too_many' | 'mismatch' | 'none' | 'busy' | 'changed' }
  *
  * Deploy:  supabase functions deploy verify-contact-otp
  */
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { phoneKey } from '../_shared/phone.ts';
+import { rateLimit } from '../_shared/guard.ts';
+import { checkOtp } from '../_shared/otpCheck.ts';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -22,7 +25,6 @@ const CORS = {
 };
 const json = (b: unknown, s = 200) => new Response(JSON.stringify(b), { status: s, headers: { ...CORS, 'Content-Type': 'application/json' } });
 const URL = Deno.env.get('SUPABASE_URL')!;
-const MAX_ATTEMPTS = 5;
 
 async function sha256(s: string): Promise<string> {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
@@ -49,18 +51,21 @@ Deno.serve(async (req) => {
   const { data: player } = await svc.from('players').select('id, profile_id, email, phone, guardian').eq('id', playerId).single();
   if (!player || player.profile_id !== user.id) return json({ error: 'forbidden' }, 403);
 
-  const { data: otp } = await svc.from('contact_otps').select('code_hash, attempts, expires_at, target').eq('player_id', playerId).eq('channel', channel).single();
-  if (!otp) return json({ verified: false, reason: 'none' });
-  if (new Date(otp.expires_at).getTime() < Date.now()) {
-    await svc.from('contact_otps').delete().eq('player_id', playerId).eq('channel', channel);
-    return json({ verified: false, reason: 'expired' });
+  // AS-01: a cap on verify calls too (fails closed: it guards account proof).
+  if (!(await rateLimit('contact-otp-verify', `${playerId}:${channel}`, 30, 3600, { failClosed: true }))) {
+    return json({ verified: false, reason: 'too_many' });
   }
-  if ((otp.attempts ?? 0) >= MAX_ATTEMPTS) return json({ verified: false, reason: 'too_many' });
 
-  if (otp.code_hash !== (await sha256(code))) {
-    await svc.from('contact_otps').update({ attempts: (otp.attempts ?? 0) + 1 }).eq('player_id', playerId).eq('channel', channel);
-    return json({ verified: false, reason: 'mismatch' });
-  }
+  const { data: otp } = await svc.from('contact_otps').select('code_hash, attempts, expires_at, target').eq('player_id', playerId).eq('channel', channel).single();
+  // Claim one attempt atomically (n → n+1 only if still n) before comparing.
+  const claim = async (n: number) => {
+    const { data } = await svc.from('contact_otps').update({ attempts: n + 1 })
+      .eq('player_id', playerId).eq('channel', channel).eq('attempts', n).select('player_id');
+    return (data?.length ?? 0) === 1;
+  };
+  const outcome = await checkOtp(otp, await sha256(code), Date.now(), claim);
+  if (outcome === 'expired') await svc.from('contact_otps').delete().eq('player_id', playerId).eq('channel', channel);
+  if (outcome !== 'ok' || !otp) return json({ verified: false, reason: outcome });
 
   // The code proves the address it was SENT to — only verify if that is still the
   // one on the profile (whole international number for phones, not last-10).
