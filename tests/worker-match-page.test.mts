@@ -173,3 +173,14 @@ describe('break-it fixes', () => {
     assert.match(meta((await get(`/m/${ID}`, match({ status: 'postponed', summary: null }))).html, 'og:title') ?? '', /POSTPONED/);
   });
 });
+
+describe('Cloudflare config (found live, 2026-10-31)', () => {
+  test('the Worker answers /m/* first, or a browser opening a link gets the website\'s 404 page', () => {
+    // Cloudflare's static layer answers page navigations itself unless the Worker is asked to run first.
+    const raw = readFileSync(new URL('../wrangler.jsonc', import.meta.url), 'utf8').replace(/^\s*\/\/.*$/gm, '');
+    const cfg = JSON.parse(raw);
+    assert.equal(cfg.main, 'worker/index.ts');
+    assert.equal(cfg.assets.binding, 'ASSETS');
+    assert.ok(Array.isArray(cfg.assets.run_worker_first) && cfg.assets.run_worker_first.includes('/m/*'));
+  });
+});
