@@ -13,7 +13,27 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
-### 2026-10-31 — Personalised Home: first-run questions, matches near you, view counts (built)
+### 2026-10-31 — Release: personalised Home is live
+
+The founder ran both migrations. The 8,079-row city list went in from the terminal.
+Verified read-only on live:
+- 8,079 cities (6,585 Indian); "bangalore" resolves to Bengaluru, Karnataka;
+- all six functions, in their final versions:
+  - views per address (PH-01);
+  - placed once (PH-08);
+  - indexed city lookup;
+- `near_matches` is stable and returns basis "city" for Hyderabad;
+- the views cleanup job is scheduled;
+- the new profile columns aren't readable by other users;
+- 0 read-only functions write.
+
+auth-smoke passed. Published from a clean worktree at ace696f: web build index-a63038dc
+(contains the new screens) and Android OTA group 919078ce (runtime 1.0.0). Command-line
+calls with the public key are turned away by the anti-scraping guard, as designed. Phone
+location comes with the store builds; until then phones use the city, and the web asks in
+the browser.
+
+### 2026-10-31 — Personalised Home: first-run questions, matches near you, view counts (built, released above)
 
 Founder brief: ask new users a few questions (sports, position and handedness per sport,
 where they're based) and save the answers straight to their profile. Give a one-tap skip
