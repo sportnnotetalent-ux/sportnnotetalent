@@ -38,9 +38,9 @@ const match = (o: Record<string, unknown> = {}) => ({
   home: { name: 'Panthers', short_name: 'PAN', color_hex: '#B98AFF' }, away: { name: 'Cheetahs', short_name: 'CHE', color_hex: '#3DDC97' },
   tournament: { id: 't1', name: 'Inter-School Championship' }, views: 340, ...o,
 });
-async function get(path: string, share: Share | 'error' | 'hang') {
+async function get(path: string, share: Share | 'error' | 'hang', host = 'app.sportnnote.in') {
   answer = share; calls = [];
-  const res = await worker.fetch(new Request(`https://app.sportnnote.in${path}`, { headers: { 'user-agent': 'WhatsApp/2.23.20.0' } }), env as never);
+  const res = await worker.fetch(new Request(`https://${host}${path}`, { headers: { 'user-agent': 'WhatsApp/2.23.20.0' } }), env as never);
   return { res, html: await res.text() };
 }
 const meta = (html: string, prop: string) => new RegExp(`<meta (?:property|name)="${prop}" content="([^"]*)"`).exec(html)?.[1];
@@ -128,9 +128,10 @@ describe('never breaks, never leaks', () => {
     assert.equal(slow.res.status, 200);
     assert.ok(Date.now() - t0 < 4000, 'gives up within a few seconds');
   });
-  test('anything that isn\'t a match link is the website as before', async () => {
+  // MVP L8: on app.sportnnote.in everything else is the web app (worker-own-domain.test.mts)
+  test('anything that isn\'t a match link is the website as before (sportnnote.in)', async () => {
     for (const p of ['/', '/guides/', '/privacy/', '/m/not-a-uuid', `/m/${ID}/extra`]) {
-      const { html } = await get(p, match());
+      const { html } = await get(p, match(), 'sportnnote.in');
       assert.equal(html, `asset:${p}`, p);
     }
   });
@@ -181,6 +182,7 @@ describe('Cloudflare config (found live, 2026-10-31)', () => {
     const cfg = JSON.parse(raw);
     assert.equal(cfg.main, 'worker/index.ts');
     assert.equal(cfg.assets.binding, 'ASSETS');
-    assert.ok(Array.isArray(cfg.assets.run_worker_first) && cfg.assets.run_worker_first.includes('/m/*'));
+    // MVP L8: `true` (every path) covers /m/* too
+    assert.ok(cfg.assets.run_worker_first === true || (Array.isArray(cfg.assets.run_worker_first) && cfg.assets.run_worker_first.includes('/m/*')));
   });
 });

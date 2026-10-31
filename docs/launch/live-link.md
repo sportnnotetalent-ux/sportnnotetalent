@@ -33,3 +33,25 @@ Today `app.sportnnote.in` redirects everything to `sportnnote.expo.app`, except 
 ## If something's off
 - **Undo the routing:** delete the route from step 3.1. Links go straight back to the full app.
 - **Previews show no score:** run step 1, then publish the app; older app versions don't save the summary.
+
+---
+
+# The whole app on app.sportnnote.in (MVP L8, founder's choice 2026-10-31)
+
+**What it does:** the Worker serves the full web app on `app.sportnnote.in` (fetched from `sportnnote.expo.app`), so people who open a link never see the hosting address. `/m/<match>` stays the light score page; the app's own copy of a match is `/m/<match>?full=1`. The marketing site `sportnnote.in` is unchanged.
+
+**Already done in code:** the Worker can serve the app (it does nothing new until step 2 below). Tested locally against the live app: home page, scripts and deep links all load.
+
+## Steps (founder, about 5 minutes)
+1. **Push** (done by the assistant): Cloudflare deploys the new Worker as usual. Nothing changes for visitors yet.
+2. **Workers & Pages → sportnnote → Settings → Domains & Routes.** Edit the route `app.sportnnote.in/m/*` to `app.sportnnote.in/*` (zone `sportnnote.in`). If there's a separate `app.sportnnote.in/.well-known/*` route, it can stay or go; `/*` covers it.
+3. **sportnnote.in → Rules → Redirect Rules.** Turn **off** the rule that sends `app.sportnnote.in` to `sportnnote.expo.app` (turn it off rather than delete it, so it's one click to undo).
+4. **Check:** open `https://app.sportnnote.in/` on your phone. The app should load and the address should stay `app.sportnnote.in`. Open a match link: the light page, then "Full match & stats".
+5. **Tell the assistant.** It then switches "Full match & stats" to stay on `app.sportnnote.in` (one setting, `APP_ORIGIN`, in `wrangler.jsonc`) and pushes.
+
+## What changes for people (you accepted this)
+- It's a new site address to the browser: anyone signed in on `sportnnote.expo.app` signs in once more on `app.sportnnote.in`, and switches web alerts on again there. An app already added to a home screen keeps the old address. `sportnnote.expo.app` keeps working.
+- **Cost:** every file the app loads now passes through the Worker. Cloudflare's free plan allows 100,000 Worker requests a day (roughly 2,000 full app visits); past that, Workers Paid is $5 a month for 10 million.
+
+## Undo
+Put the route back to `app.sportnnote.in/m/*` and turn the redirect rule on again. Everything is as before.

@@ -22,6 +22,11 @@ export interface SharedMatch {
 }
 
 export const APP_ORIGIN = 'https://sportnnote.expo.app';
+/** MVP L8 — the full match in the app. Once the app is served on our own
+ *  domain (the Worker's APP_ORIGIN var), `/m/<id>` there is this light page,
+ *  so the app's copy of the match is `/m/<id>?full=1`. */
+export const fullMatchHref = (appOrigin: string, id: string) =>
+  appOrigin === LINK_ORIGIN ? `${appOrigin}/m/${id}?full=1` : `${appOrigin}/m/${id}`;
 export const LINK_ORIGIN = 'https://app.sportnnote.in';
 export const SITE_ORIGIN = 'https://sportnnote.in';
 
@@ -96,7 +101,7 @@ function shell(o: { title: string; description: string; image: string; url: stri
 ${o.body}<p class="foot">Score your own games, free · <a href="${SITE_ORIGIN}/#get">Get SportnNote</a></p>${o.script ?? ''}</body></html>`;
 }
 
-export function renderMatchPage(m: SharedMatch): string {
+export function renderMatchPage(m: SharedMatch, appOrigin: string = APP_ORIGIN): string {
   const sp = sportOf(m.sport);
   const { title, description, badge } = previewText(m);
   const sc = scores(m);
@@ -111,7 +116,7 @@ export function renderMatchPage(m: SharedMatch): string {
 ${side(m.home, 'h', sc?.[0])}${side(m.away, 'a', sc?.[1])}
 <p class="status" id="st">${esc(status ?? '')}</p><p class="detail" id="d">${esc(live ? m.summary?.d ?? '' : '')}</p>
 ${where ? `<p class="where">${where}</p>` : ''}
-<a class="btn primary" href="${APP_ORIGIN}/m/${esc(m.id)}">Full match &amp; stats</a>
+<a class="btn primary" href="${esc(fullMatchHref(appOrigin, m.id))}">Full match &amp; stats</a>
 ${views ? `<p class="views">${esc(views)}</p>` : ''}</main>`;
   // While it's live (or about to start), refresh the score every few seconds when
   // the page is open, from the Worker (LL-01: one cached read per match, however
@@ -128,19 +133,19 @@ t=setInterval(tick,${live ? 5000 : 30000});document.addEventListener("visibility
 }
 
 /** No such match (or its tournament was deleted). */
-export function renderMissingPage(): string {
+export function renderMissingPage(appOrigin: string = APP_ORIGIN): string {
   return shell({
     title: 'Match not found', description: 'This match isn’t on SportnNote any more. Score your own games, free.',
     image: `${SITE_ORIGIN}/share/sportnnote.png`, url: LINK_ORIGIN,
-    body: `<main class="card"><p class="status">This match isn’t here any more.</p><p class="detail">It may have been deleted by its organiser.</p><a class="btn primary" href="${APP_ORIGIN}">Open SportnNote</a></main>`,
+    body: `<main class="card"><p class="status">This match isn’t here any more.</p><p class="detail">It may have been deleted by its organiser.</p><a class="btn primary" href="${esc(appOrigin)}">Open SportnNote</a></main>`,
   });
 }
 
 /** The database didn't answer in time: still a working page, into the full match. */
-export function renderFallbackPage(id: string): string {
+export function renderFallbackPage(id: string, appOrigin: string = APP_ORIGIN): string {
   return shell({
     title: 'Live score on SportnNote', description: 'Follow this match live on SportnNote.',
     image: `${SITE_ORIGIN}/share/sportnnote.png`, url: `${LINK_ORIGIN}/m/${id}`,
-    body: `<main class="card"><p class="status">Live score on SportnNote</p><a class="btn primary" href="${APP_ORIGIN}/m/${esc(id)}">Open the match</a></main>`,
+    body: `<main class="card"><p class="status">Live score on SportnNote</p><a class="btn primary" href="${esc(fullMatchHref(appOrigin, id))}">Open the match</a></main>`,
   });
 }

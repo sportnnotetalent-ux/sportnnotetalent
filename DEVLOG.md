@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-31 — MVP L8: the web app on app.sportnnote.in (code ready; founder switches it on)
+
+Founder's choice: serve the full web app on our own domain. Break-it list first (`docs/security/breaks/mvp-l8-own-domain.md`). The website Worker now serves every `app.sportnnote.in` path but the light score page and `/.well-known` from `sportnnote.expo.app` (fixed upstream, cookies dropped, redirects rewritten to our domain); `run_worker_first: true`; the light page's "Full match" link becomes `/m/<id>?full=1` once `APP_ORIGIN` is set. Dormant until the founder widens the Cloudflare route and turns off the redirect rule (`docs/launch/live-link.md`). Checked locally against the live app. Simulation: 1,000 random requests. Full suite 6,024 tests, 0 failing; tsc clean.
+
 ### 2026-10-31 — Release: MVP P2 batch 1 live (web, Android OTA)
 
 auth-smoke passed. Published from a clean worktree at 452655e: web (entry `index-62238f45`, confirmed live; the first deploy hit an EAS "temporary deployment state failure" and the retry went through) and Android OTA group `c44e0e8f` (runtime 1.0.0, channel preview).

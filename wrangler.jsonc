@@ -11,9 +11,11 @@
     "directory": "./website/dist",
     "binding": "ASSETS",
     "not_found_handling": "404-page",
-    // The match links run the Worker first: otherwise a browser opening one
-    // (a page navigation) is answered by the static site's 404 page.
-    "run_worker_first": ["/m/*"]
+    // The Worker runs first for every path: the match links (else a browser
+    // opening one is answered by the static site's 404 page) and, MVP L8, the
+    // whole app host app.sportnnote.in (else "/" there is the website's home).
+    // On sportnnote.in it hands everything but /m/<id> straight to the assets.
+    "run_worker_first": true
   },
   // Public values, the same ones every visitor's browser gets from the web app.
   "vars": {
