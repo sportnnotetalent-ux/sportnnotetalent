@@ -101,9 +101,9 @@ export default function GenerateFixturesScreen() {
   // Once the organizer edits the selection we stop auto-seeding it from the
   // registered participants (so a background refetch can't clobber their edits).
   const [touchedSel, setTouchedSel] = useState(false);
-  const [structure, setStructure] = useState<Structure>(tournament?.structure === 'knockout' ? 'knockout' : 'league');
+  const [structure, setStructure] = useState<Structure>(params.structure ?? (tournament?.structure === 'knockout' ? 'knockout' : 'league'));
   const [doubleRound, setDoubleRound] = useState(false);
-  const [numGroups, setNumGroups] = useState('4');
+  const [numGroups, setNumGroups] = useState(String(params.groups ?? 4));
   const [topK, setTopK] = useState('2');
   const [bestPlaced, setBestPlaced] = useState('0');
   // Custom-control: override who advances (advance-to-knockout mode).

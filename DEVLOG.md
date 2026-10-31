@@ -13,6 +13,55 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-31 — MVP defined and audited; live link, light page, result card, quick game, quick tournament (built)
+
+The founder asked for the MVP. It's defined in `docs/product/MVP.md`:
+- **What:** the live score link loop.
+- **Who:** community and friends' games.
+- **Sports:** football, basketball, kabaddi, badminton, tennis, pickleball and padel.
+- **Measure:** a 6-point bar and a weekly funnel. Baseline: 34 matches created → 5 completed; 2 ever scored.
+- **Decision:** friendlies are never gated by the eligibility check; tournaments may opt in.
+
+The audit lives in `docs/mvp/`:
+- the shared loop (L1–L11);
+- three parallel per-sport reviews: 4 P0s (tennis custom-set tiebreak, basketball one-tap overtime, kabaddi shootout end, kabaddi failed do-or-die +2) and about 37 P1s. None of these fixed yet.
+
+The founder then picked five of my loop findings to build:
+1. **Link preview:** `app.sportnnote.in/m/<id>` is answered by the website Worker (`worker/`, `wrangler.jsonc` main + ASSETS + vars). Robots get "⚽ LIVE · Panthers 2–1 Cheetahs" with a per-sport 1200×630 picture (`website/share/`, `scripts/build-share-images.mjs`).
+2. **Light spectator page:** people get a ~15 KB live page instead of the 7 MB app. It refreshes from `/m/<id>.json`, which is edge-cached for 5 s (LL-01).
+   - The data comes from `matches.summary`, saved with every snapshot through `liveSummaryOf(plugin, s)`, and from `share_match()` (migration 20261031140000).
+   - A database without the column still saves the match.
+3. **Quick game:**
+   - The sport is pre-picked: last used, else the first answer from the personalisation questions.
+   - An empty side in a friendly starts as Team/Player/Pair A–B.
+   - A doubles friendly went from 12–14 taps plus 3 names to 3 taps; a repeat game is 1.
+4. **Quick tournament** (`QuickTournamentScreen`):
+   - Name, sport, the teams pasted one per line, then a format.
+   - It makes the tournament and its teams, then opens the fixtures screen with everything picked, on top of the tournament page.
+   - 8 teams to fixtures took about 41 s automated, about 2 min by hand.
+   - Organisations keep the full form; "More options" opens it.
+5. **Result card:** on the web, Share sends a 1080×1080 score card picture with the text (`shareMessageWithCard`), falling back to the text share. Phones keep the text share until the store builds.
+
+Break-it is in `docs/security/breaks/mvp-loop.md`. Fixed, each with a test first:
+- **LL-01:** the edge-cached refresh.
+- **LL-05:** cancelled and postponed badges.
+- **QT-01:** if some teams fail to save, the organiser still lands on the tournament.
+- **QT-02:** a fast tap no longer sees "no format" (found in the browser).
+
+Simulation (`tests/sim-live-link.test.mts`): 500 matches with hostile names, plus 500 messy lists. Checked:
+- the Worker bundles (12 KB, via `wrangler --dry-run`) and runs in Cloudflare's local runtime;
+- the share card, quick game and quick tournament in the demo.
+
+Full suite: 5,730 pass.
+
+Founder steps (`docs/launch/live-link.md`):
+1. Run SQL 20261031130000 and 20261031140000.
+2. Push.
+3. Add the Cloudflare route `app.sportnnote.in/m/*` and a redirect exception.
+4. Publish web + OTA.
+
+---
+
 ### 2026-10-31 — Near you: place more matches, skip abandoned "live" ones (built)
 
 The founder answered the questions (Hyderabad) and saw "No matches near you" while

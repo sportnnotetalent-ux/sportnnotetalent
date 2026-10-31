@@ -669,6 +669,9 @@ for (const g of guides) {
 }
 if (existsSync(join(GUIDES_DIR, 'img'))) cpSync(join(GUIDES_DIR, 'img'), join(OUT, 'guides/img'), { recursive: true });
 copyFileSync(join(SITE, 'styles.css'), join(OUT, 'styles.css'));
+// Live score link previews (worker/matchPage.ts): one picture per sport, made by
+// scripts/build-share-images.mjs and kept in the repo.
+if (existsSync(join(SITE, 'share'))) cpSync(join(SITE, 'share'), join(OUT, 'share'), { recursive: true });
 // 2026-10-29 redesign: the app's headline face, served from the site itself
 // (no third-party font request — visitors' addresses aren't sent to Google)
 mkdirSync(join(OUT, 'fonts'), { recursive: true });

@@ -43,7 +43,10 @@ export type RootStackParamList = {
   CreateSeries: { tournamentId?: string; sport?: SportId } | undefined;
   Series: { seriesId: string };
   EditMatch: { matchId: string };
-  GenerateFixtures: { tournamentId: string; sport?: SportId };
+  /** structure / groups: start on this format (Quick tournament, MVP 2026-10-31) */
+  GenerateFixtures: { tournamentId: string; sport?: SportId; structure?: 'league' | 'knockout' | 'groups'; groups?: number };
+  /** MVP 2026-10-31: name, sport, teams, format → the fixtures */
+  QuickTournament: { sport?: SportId } | undefined;
   /** SD-134 — a Swiss round: numbered pairings (share / print) + the round results sheet */
   SwissRound: { tournamentId: string; sport?: SportId; round?: number };
   /** bulk schedule import from a spreadsheet (parity #24) */

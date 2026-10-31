@@ -20,6 +20,9 @@ import { VenueField } from '../components/VenueField';
 import { ConflictNotice } from '../components/ConflictNotice';
 import { ClubQuickPick } from '../components/ClubQuickPick';
 import { SPORT_LIST, getSportMeta, participantMode, type ParticipantMode } from '../sports/sportMeta';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { LAST_SPORT_KEY, quickSideName, quickSideShort, startSport } from '../core/quickGame';
+import { getMyPersonalisation } from '../data/personalise';
 import { structureLabels } from '../sports/structureLabels';
 import { useTeams, useMatches, usePlayers, useTournamentById } from '../data/hooks';
 import { venueOptions } from '../data/tournamentForm';
@@ -124,6 +127,24 @@ export default function ScheduleMatchScreen() {
     })();
     return () => { on = false; };
   }, [cloneOf]);
+
+  // MVP 2026-10-31 (quick game): a new friendly opens on the last sport used on
+  // this device, else the first sport from the first-run questions — unless
+  // the person has already picked one.
+  const sportNow = useRef(sport);
+  sportNow.current = sport;
+  useEffect(() => {
+    if (!isFriendly || route.params?.sport || cloneOf) return;
+    let on = true;
+    (async () => {
+      const last = await AsyncStorage.getItem(LAST_SPORT_KEY).catch(() => null);
+      const mine = last ? [] : ((await getMyPersonalisation().catch(() => null))?.sports ?? []);
+      const s = startSport({ last, mine, known: SPORT_LIST.map((x) => x.id) });
+      if (on && s && !sportNow.current) pickSport(s as SportId);
+    })();
+    return () => { on = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // A friendly kicking off ~now jumps straight into the scorer; one set for later
   // is just filed as scheduled (it shows under Upcoming, like any planned match).
@@ -285,8 +306,20 @@ export default function ScheduleMatchScreen() {
   async function submit() {
     if (!sport) return setError('Pick a sport.');
     const noun = mode === 'individual' ? 'players' : mode === 'pairs' ? 'pairs' : 'teams';
-    if (!home || !away) return setError(`Pick both ${noun}.`);
-    if (home === away) return setError(`The two ${noun} must differ.`);
+    let h = home;
+    let a = away;
+    // Quick game (MVP 2026-10-31): a friendly never waits for names. An empty side
+    // starts as "Team A" / "Player A" / "Pair A"; names and players can come later.
+    if (isFriendly && (!h || !a)) {
+      try {
+        if (!h) h = (await createTeam({ name: quickSideName(mode, 'home'), shortName: quickSideShort('home'), sport, colorHex: TEAM_PALETTE[0], adhoc: true })).id;
+        if (!a) a = (await createTeam({ name: quickSideName(mode, 'away'), shortName: quickSideShort('away'), sport, colorHex: TEAM_PALETTE[1], adhoc: true })).id;
+      } catch {
+        return setError('Could not start the match. Check your connection and try again.');
+      }
+    }
+    if (!h || !a) return setError(`Pick both ${noun}.`);
+    if (h === a) return setError(`The two ${noun} must differ.`);
     setError(null);
     setBusy(true);
     try {
@@ -294,8 +327,8 @@ export default function ScheduleMatchScreen() {
       const created = await createMatch({
         tournamentId,
         sport,
-        homeTeamId: home,
-        awayTeamId: away,
+        homeTeamId: h,
+        awayTeamId: a,
         // Phase tags (tournament matches only): a group game carries its group +
         // stage:'group'; a knockout tie carries its stage; a league game neither.
         group: !isFriendly && phase === 'group' ? groupLabel.trim().toUpperCase() || 'A' : undefined,
@@ -316,6 +349,7 @@ export default function ScheduleMatchScreen() {
       // the Info tab anytime. (Tournament matches are left unassigned — the organizer
       // schedules many they won't personally score.)
       if (isFriendly && myId) await setMatchScorer(created.id, myId);
+      if (isFriendly) void AsyncStorage.setItem(LAST_SPORT_KEY, sport).catch(() => {});
       // A clone copies the source match's matchday squads (each side that has one).
       if (cloneOf) {
         try {
@@ -482,6 +516,12 @@ export default function ScheduleMatchScreen() {
                   <TeamPicker noun="pair" label="Pair 1" teams={teams} selected={home} onSelect={setHome} onClear={() => setHome(null)} onCreate={makeCreateHandler('home')} newEntrant={entrantPicker('home', 2)} />
                   <TeamPicker noun="pair" label="Pair 2" teams={teams} selected={away} onSelect={setAway} onClear={() => setAway(null)} onCreate={makeCreateHandler('away')} newEntrant={entrantPicker('away', 2)} />
                 </>
+              )}
+
+              {isFriendly && (!home || !away) && (
+                <Text style={textStyles.muted}>
+                  In a hurry? Leave {home || away ? 'it' : 'them'} empty and tap Create &amp; score now: {mode === 'team' ? 'Team A and Team B' : mode === 'pairs' ? 'Pair A and Pair B' : 'Player A and Player B'} start straight away. Add names and players any time.
+                </Text>
               )}
 
               <DateTimeField label="Kickoff" value={when} onChange={(d) => { whenTouched.current = true; setWhen(d); }} timeZone={tournament?.timeZone} />

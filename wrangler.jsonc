@@ -1,11 +1,20 @@
-// Cloudflare Workers (static assets) config for the marketing site sportnnote.in.
-// Built by `node scripts/build-website.mjs` → website/dist (see docs/website.md).
+// Cloudflare Workers config for the marketing site sportnnote.in (static assets,
+// built by `node scripts/build-website.mjs` → website/dist; see docs/website.md)
+// and one code route: the live score link app.sportnnote.in/m/<match>
+// (worker/index.ts, MVP 2026-10-31; Cloudflare steps in docs/launch/live-link.md).
 // The app itself is NOT deployed here (it's on EAS Hosting).
 {
   "name": "sportnnote",
   "compatibility_date": "2026-10-01",
+  "main": "worker/index.ts",
   "assets": {
     "directory": "./website/dist",
+    "binding": "ASSETS",
     "not_found_handling": "404-page"
+  },
+  // Public values, the same ones every visitor's browser gets from the web app.
+  "vars": {
+    "SUPABASE_URL": "https://mpgbvbylmkwasjgupsbq.supabase.co",
+    "SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1wZ2J2YnlsbWt3YXNqZ3Vwc2JxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYwMjIxNDQsImV4cCI6MjEwMTU5ODE0NH0.NV7ryMBv-qAc7OzHZVPPxXY2J3agtlHRbvS55R6sWXw"
   }
 }

@@ -18,6 +18,7 @@
  */
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { supabase, isSupabaseConfigured } from '../core/supabase';
+import { liveSummaryOf } from '../core/liveSummary';
 import { getSport } from '../sports/registry';
 import { recordStatLine as writeStatLine, getMatchEvents, popMatchEvent, updateMatchSnapshot, resetMatch, syncMatchStatLines, matchStatTotals } from './repos';
 import { deltasBesideTotals } from './statSync';
@@ -174,7 +175,7 @@ export function useLiveMatch(params: {
   const writeChainRef = useRef<Promise<unknown>>(Promise.resolve());
   const persist = (s: unknown, completed = plugin.isComplete(s as never)) => {
     const id = matchId!;
-    const p = writeChainRef.current.then(() => updateMatchSnapshot(id, withMatchRecords(plugin, s as never, completed), completed));
+    const p = writeChainRef.current.then(() => updateMatchSnapshot(id, withMatchRecords(plugin, s as never, completed), completed, liveSummaryOf(plugin, s as never)));
     writeChainRef.current = p.catch(() => {});
     return p;
   };

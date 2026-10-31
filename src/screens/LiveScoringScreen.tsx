@@ -29,7 +29,7 @@ import { lockStatus, type ScoringLock } from '../core/scoringLock';
 import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native';
 import { KeyboardAwareScrollView } from '../components/keyboard';
-import { shareMessage } from '../core/share';
+import { shareMessage, shareMessageWithCard } from '../core/share';
 import { PersonPicker } from '../components/PersonPicker';
 import { useParamState } from '../navigation/useParamState';
 import { matchShareText, matchLink, SHARE_BASE } from '../core/shareText';
@@ -53,6 +53,8 @@ import { useLiveMatch } from '../data/useLiveMatch';
 import { matchOutbox } from '../data/matchOutbox';
 import { forfeitFor, forfeitNote } from '../data/walkover';
 import { recordMatchView } from '../data/personalise';
+import { cardModel } from '../core/resultCard';
+import { cardPng } from '../core/resultCardImage';
 import { viewsLabel } from '../core/personalise';
 import { viewerDeviceId } from '../core/telemetry';
 import { getRoster, getPlayers, getLineup, getMatch, getTournaments, getMatchSquads, getMatchStatLines, getMyPlayerId, setMatchScorers, setMatchHosts, setMatchLogo, setMatchFormat, setMatchStream, setMatchManagers, getOrganizations, getTeamLeaders, getMatchDisputes, raiseDispute, updateDispute, dismissDispute, resolveDispute, escalateDispute, createReplacementPlayer, retireMatch, walkoverMatch, rescheduleMatch, getMatchKickoffAt, getScoringLock, claimScoring, handoverScoring, endMatchManually, getScoreEdits, getMatchEvents, getTournamentOfficials, joinMatchAsScorer, getMatchOfficials, setMatchOfficials, deleteMatch, resetMatch, setMatchBreak, getMatchLastActivityAt, getMatchPotm, setMatchPotm, stampAggregatePrior, AWARDS_DB_MESSAGE } from '../data/repos';
@@ -481,22 +483,32 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
       // SD-20: a finished set/game match shares sets won + the marked line
       // ("2–0 · 6-4, 6-3", "1–0 · 6-4, 3-2 ret."), never the live points.
       const fb = complete && !final ? finalBoard(plugin, state, resultOpts) : null;
-      void shareMessage(matchShareText({
+      const homeScore = final ? String(meta.score!.home) : fb ? fb.homeScore : summary.homeScore;
+      const awayScore = final ? String(meta.score!.away) : fb ? fb.awayScore : summary.awayScore;
+      const winner = complete ? (meta.winner ?? plugin.result?.(state)?.winner ?? undefined) : undefined;
+      const resultLine = complete && meta.result ? manualResultLine(meta.result, hName, aName) : undefined;
+      const when = meta.startsAt ? formatDateTime(meta.startsAt) : undefined;
+      // MVP 2026-10-31: on the web the same tap shares a score card picture with the text.
+      void shareMessageWithCard(matchShareText({
         sportIcon: plugin.icon,
         status,
         home: hName,
         away: aName,
-        homeScore: final ? String(meta.score!.home) : fb ? fb.homeScore : summary.homeScore,
-        awayScore: final ? String(meta.score!.away) : fb ? fb.awayScore : summary.awayScore,
+        homeScore,
+        awayScore,
         statusLine: final ? undefined : fb ? 'Match Over' : summary.statusLine,
         detailLine: final ? undefined : fb ? fb.line : summary.detailLine,
-        winner: complete ? (meta.winner ?? plugin.result?.(state)?.winner ?? undefined) : undefined,
-        resultLine: complete && meta.result ? manualResultLine(meta.result, hName, aName) : undefined,
+        winner,
+        resultLine,
         tournamentName: meta.tournamentName,
-        when: meta.startsAt ? formatDateTime(meta.startsAt) : undefined,
+        when,
         venue: meta.venueName,
         matchId,
-      }), 'match');
+      }), 'match', () => cardPng(cardModel({
+        sportName: plugin.name, status, home: hName, away: aName, homeScore, awayScore,
+        statusLine: final ? undefined : fb ? 'Match Over' : summary.statusLine,
+        winner, resultLine, tournamentName: meta.tournamentName, venue: meta.venueName, when,
+      })));
     };
   });
   const titleHome = homeTeamName ?? homeName;

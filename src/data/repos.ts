@@ -19,6 +19,7 @@ import { editAccess, type EditAccess } from '../core/playerEditAccess';
 import { parseTournamentToken } from '../core/tournamentInvite';
 import { getDeviceId } from '../core/deviceId';
 import { snapshotOutcome } from '../core/matchResult';
+import type { LiveSummary } from '../core/liveSummary';
 import { followDisputes } from './eventLog';
 import { planStatSync, applyStatWrites, onlyKeys, changedKeys, type MatchTotals } from './statSync';
 import { planAppearances, sideResults, subsCameOn, type AppearanceWrite } from './appearances';
@@ -3041,7 +3042,21 @@ export async function setMatchManagers(matchId: string, managers: { home?: strin
 }
 
 type MatchMeta = { sport: string; home_team_id: string; away_team_id: string };
-export async function updateMatchSnapshot(matchId: string, state: object, completed: boolean): Promise<void> {
+/** Live score link (20261031140000_share_match): false once a database says
+ *  matches.summary isn't there yet, so the match still saves without it. */
+let summaryMissing = false;
+const summaryCol = (summary?: LiveSummary | null) => (summary && !summaryMissing ? { summary } : {});
+/** Update a match row; a database without the summary column gets the row again without it. */
+async function updateMatchRow(matchId: string, row: Record<string, unknown>): Promise<void> {
+  const { error } = await supabase!.from('matches').update(row).eq('id', matchId);
+  if (error && 'summary' in row && /summary/i.test(error.message ?? '')) {
+    summaryMissing = true;
+    const { summary: _drop, ...rest } = row;
+    await supabase!.from('matches').update(rest).eq('id', matchId);
+  }
+}
+
+export async function updateMatchSnapshot(matchId: string, state: object, completed: boolean, summary?: LiveSummary | null): Promise<void> {
   if (!isSupabaseConfigured || !supabase) {
     const m = demo.matches.find((x) => x.id === matchId);
     if (!m) return;
@@ -3073,7 +3088,7 @@ export async function updateMatchSnapshot(matchId: string, state: object, comple
   const { data: manual, error: manualErr } = await supabase.from('matches').select('result').eq('id', matchId).maybeSingle();
   const manualResult = manualErr ? null : (manual as { result?: MatchResult | null } | null)?.result;
   if (manualResult) {
-    await supabase.from('matches').update({ state, status: snapshotOutcome(manualResult, completed).status, updated_at: new Date().toISOString() }).eq('id', matchId);
+    await updateMatchRow(matchId, { state, status: snapshotOutcome(manualResult, completed).status, updated_at: new Date().toISOString(), ...summaryCol(summary) });
     await syncMatchAppearances(matchId, state);
     return;
   }
@@ -3084,10 +3099,7 @@ export async function updateMatchSnapshot(matchId: string, state: object, comple
     meta = (data as MatchMeta | null) ?? null;
     winner = meta ? (deriveResult(meta.sport, state)?.winner ?? null) : null;
   }
-  await supabase
-    .from('matches')
-    .update({ state, status: completed ? 'completed' : 'live', winner, updated_at: new Date().toISOString() })
-    .eq('id', matchId);
+  await updateMatchRow(matchId, { state, status: completed ? 'completed' : 'live', winner, updated_at: new Date().toISOString(), ...summaryCol(summary) });
 
   if (completed && meta) {
     // Reset, then flag the winning side's players (handles draws + re-completion).

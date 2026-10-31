@@ -185,7 +185,7 @@ export default function PersonaliseScreen() {
             <Title title="Your Home is ready" sub={summary(sports, city)} />
             <Text style={[textStyles.h3, { marginTop: theme.spacing(2) }]}>What would you like to do first?</Text>
             {uses.includes('organise') ? (
-              <Button label="🏆 Run a tournament" variant="brand" onPress={() => nav.replace('CreateTournament', undefined)} />
+              <Button label="🏆 Run a tournament" variant="brand" onPress={() => nav.replace('QuickTournament', undefined)} />
             ) : null}
             {plays(uses) || uses.includes('score') ? (
               <Button label="🤝 Score a match now" variant={uses.includes('organise') ? 'ghost' : 'brand'} onPress={() => nav.replace('ScheduleMatch', undefined)} />

@@ -30,6 +30,29 @@ export async function shareFallbackWeb(message: string): Promise<'whatsapp' | 'c
   return 'failed';
 }
 
+/** Share with a picture where the device can (MVP 2026-10-31: the score card
+ *  on the web — WhatsApp status, Instagram); everywhere else, and if anything
+ *  fails, exactly the text share. `card` draws the picture only when needed. */
+export async function shareMessageWithCard(message: string, what: 'match' | 'tournament' | 'golf' | 'profile' | 'results' | 'invite', card: () => Promise<Blob | null>): Promise<void> {
+  const nav = Platform.OS === 'web' && typeof navigator !== 'undefined'
+    ? (navigator as Navigator & { canShare?: (d: { files?: File[] }) => boolean })
+    : null;
+  if (nav && typeof nav.share === 'function' && typeof nav.canShare === 'function' && typeof File !== 'undefined') {
+    const blob = await card().catch(() => null);
+    const file = blob ? new File([blob], 'sportnnote-score.png', { type: 'image/png' }) : null;
+    if (file && nav.canShare({ files: [file] })) {
+      try {
+        await nav.share({ files: [file], text: message });
+        track('share_link', { what, image: true });
+        return;
+      } catch (e) {
+        if ((e as { name?: string })?.name === 'AbortError') return;
+      }
+    }
+  }
+  return shareMessage(message, what);
+}
+
 export async function shareMessage(message: string, what: 'match' | 'tournament' | 'golf' | 'profile' | 'results' | 'invite'): Promise<void> {
   const web = Platform.OS === 'web' && typeof navigator !== 'undefined';
   try {

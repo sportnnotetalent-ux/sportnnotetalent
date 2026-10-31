@@ -112,7 +112,7 @@ export default function TryNewSportScreen() {
               icon="🏆"
               title="Organize a tournament"
               subtitle={`Set up a ${getSportMeta(chosen).name} competition`}
-              onPress={() => nav.navigate('CreateTournament', { sport: chosen })}
+              onPress={() => nav.navigate('QuickTournament', { sport: chosen })}
             />
 
             <SectionHeader
