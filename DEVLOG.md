@@ -13,7 +13,11 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
-### 2026-10-31 — Four audit bugs fixed (not published yet)
+### 2026-10-31 — Release: four audit bug fixes live (web, Android OTA)
+
+auth-smoke passed. Published from a clean worktree at 090b745: web (entry `index-713af1d9`, confirmed live) and Android OTA group `948bad13` (runtime 1.0.0, channel preview).
+
+### 2026-10-31 — Four audit bugs fixed
 
 Confirmed in the code, then fixed test-first (`docs/security/breaks/audit-bugs-2026-10-31.md`):
 - **Calendar export:** semicolons are now escaped (`core/exportCells.ts`; the old test asserted the mistake).
