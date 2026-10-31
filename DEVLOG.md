@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-31 — Release: "Time up" tiebreak option live (web, Android OTA)
+
+auth-smoke passed. Published from a clean worktree at c75ef69: web (entry `index-f86b138b`, confirmed live on app.sportnnote.in through the Worker) and Android OTA group `aea95e4f` (runtime 1.0.0, channel preview).
+
 ### 2026-10-31 — "Time up" tiebreak is the organiser's option; two test matches; simulation fix
 
 - **Time up, sets level** (founder's choice): a format option in every racket sport with "Time up": most games (points) in the match (default, as before) or in the set (game) in play. Break-it list `docs/security/breaks/mvp-time-up-rule.md`; tests; 500 simulated stops under both rules; demo-checked.
