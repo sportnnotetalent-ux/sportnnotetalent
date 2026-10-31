@@ -22,7 +22,7 @@ import { ConflictNotice } from '../components/ConflictNotice';
 import { ClubQuickPick } from '../components/ClubQuickPick';
 import { SPORT_LIST, getSportMeta, participantMode, type ParticipantMode } from '../sports/sportMeta';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { LAST_SPORT_KEY, quickSideName, quickSideShort, startSport } from '../core/quickGame';
+import { LAST_SPORT_KEY, quickSideName, quickSideShort, startSport, isQuickPlaceholder } from '../core/quickGame';
 import { getMyPersonalisation } from '../data/personalise';
 import { structureLabels } from '../sports/structureLabels';
 import { useTeams, useMatches, usePlayers, useTournamentById } from '../data/hooks';
@@ -180,6 +180,9 @@ export default function ScheduleMatchScreen() {
     fix(home, cloneNames.current.home, setHome);
     fix(away, cloneNames.current.away, setAway);
   }, [cloneOf, teams, home, away]);
+  // MVP QG-01: untouched quick-game sides ("Team A", "Player B"…) stay out of
+  // the pickers; one already picked for this match stays visible.
+  const pickTeams = useMemo(() => teams.filter((t) => !isQuickPlaceholder(t) || t.id === home || t.id === away), [teams, home, away]);
   const homeTeam = teams.find((t) => t.id === home);
   const awayTeam = teams.find((t) => t.id === away);
   const conflicts = useMemo(
@@ -502,19 +505,19 @@ export default function ScheduleMatchScreen() {
                       }}
                     />
                   )}
-                  <TeamPicker noun="team" label="Home team" teams={teams} selected={home} onSelect={setHome} onClear={() => setHome(null)} onCreate={makeCreateHandler('home')} />
-                  <TeamPicker noun="team" label="Away team" teams={teams} selected={away} onSelect={setAway} onClear={() => setAway(null)} onCreate={makeCreateHandler('away')} />
+                  <TeamPicker noun="team" label="Home team" teams={pickTeams} selected={home} onSelect={setHome} onClear={() => setHome(null)} onCreate={makeCreateHandler('home')} />
+                  <TeamPicker noun="team" label="Away team" teams={pickTeams} selected={away} onSelect={setAway} onClear={() => setAway(null)} onCreate={makeCreateHandler('away')} />
                 </>
               ) : mode === 'individual' ? (
                 <>
-                  <TeamPicker noun="player" label="Player 1" teams={teams} selected={home} onSelect={setHome} onClear={() => setHome(null)} onCreate={makeCreateHandler('home')} newEntrant={entrantPicker('home', 1)} onPickMe={pickMe('home')} meName={profile?.fullName} people={people} onSelectPerson={pickPerson('home')} />
-                  <TeamPicker noun="player" label="Player 2" teams={teams} selected={away} onSelect={setAway} onClear={() => setAway(null)} onCreate={makeCreateHandler('away')} newEntrant={entrantPicker('away', 1)} people={people} onSelectPerson={pickPerson('away')} />
+                  <TeamPicker noun="player" label="Player 1" teams={pickTeams} selected={home} onSelect={setHome} onClear={() => setHome(null)} onCreate={makeCreateHandler('home')} newEntrant={entrantPicker('home', 1)} onPickMe={pickMe('home')} meName={profile?.fullName} people={people} onSelectPerson={pickPerson('home')} />
+                  <TeamPicker noun="player" label="Player 2" teams={pickTeams} selected={away} onSelect={setAway} onClear={() => setAway(null)} onCreate={makeCreateHandler('away')} newEntrant={entrantPicker('away', 1)} people={people} onSelectPerson={pickPerson('away')} />
                 </>
               ) : (
                 <>
                   <Text style={textStyles.muted}>A doubles side is a pair of two players. Pick an existing pair, or pick both partners — by name or mobile number, so the match lands on each partner’s profile.</Text>
-                  <TeamPicker noun="pair" label="Pair 1" teams={teams} selected={home} onSelect={setHome} onClear={() => setHome(null)} onCreate={makeCreateHandler('home')} newEntrant={entrantPicker('home', 2)} />
-                  <TeamPicker noun="pair" label="Pair 2" teams={teams} selected={away} onSelect={setAway} onClear={() => setAway(null)} onCreate={makeCreateHandler('away')} newEntrant={entrantPicker('away', 2)} />
+                  <TeamPicker noun="pair" label="Pair 1" teams={pickTeams} selected={home} onSelect={setHome} onClear={() => setHome(null)} onCreate={makeCreateHandler('home')} newEntrant={entrantPicker('home', 2)} />
+                  <TeamPicker noun="pair" label="Pair 2" teams={pickTeams} selected={away} onSelect={setAway} onClear={() => setAway(null)} onCreate={makeCreateHandler('away')} newEntrant={entrantPicker('away', 2)} />
                 </>
               )}
 

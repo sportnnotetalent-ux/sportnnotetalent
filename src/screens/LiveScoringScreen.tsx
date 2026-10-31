@@ -19,6 +19,7 @@ import { confirmMatchAction } from '../components/ConfirmSheet';
 import { matchControls, showsControl } from '../core/matchSafety';
 import { getDeviceId } from '../core/deviceId';
 import { mergeMatchConfig, changedFormatKeys } from '../core/matchConfig';
+import { boardName } from '../core/teamShort';
 import { manualResultLine as baseResultLine, isNoResult } from '../core/matchResult';
 import { timeUpLeader } from '../core/timeUp';
 import { matchScoreLine, finalBoard, resultMark } from '../sports/scoreline';
@@ -426,6 +427,11 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
   const sameCode = !individualSport && homeName === awayName && !!homeTeamName && !!awayTeamName && homeTeamName !== awayTeamName;
   const homeShown = (individualSport ? entryDisplayName(homeScoreRoster.map((p) => shownNameOf(p.id, p.fullName))) : undefined) ?? (sameCode ? homeTeamName! : homeName);
   const awayShown = (individualSport ? entryDisplayName(awayScoreRoster.map((p) => shownNameOf(p.id, p.fullName))) : undefined) ?? (sameCode ? awayTeamName! : awayName);
+  // MVP L9: the spectator board shows full team names when they fit the screen
+  // (the Scoring tab keeps the codes, next to the buttons).
+  const { width: boardW } = useWindowDimensions();
+  const homeBoard = individualSport || sameCode ? homeShown : boardName(homeTeamName, homeShown, boardW);
+  const awayBoard = individualSport || sameCode ? awayShown : boardName(awayTeamName, awayShown, boardW);
 
   // Lineup (for LiveExtras + clean sheets). Refetch on focus so edits show up.
   const [homeLineup, setHomeLineup] = useState<LineupSlot[]>([]);
@@ -1551,13 +1557,13 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
   // The top scoreboard — a sport supplies its own, else the universal one. Cricket
   // hides it (its scorecard shows the score).
   const scoreboardNode = useMemo(() => (plugin.hideScoreboard ? null : plugin.Scoreboard ? (
-    <plugin.Scoreboard state={state} homeName={homeShown} awayName={awayShown} homeColor={homeColor} awayColor={awayColor} live={matchLive} closed={closedBoard} />
+    <plugin.Scoreboard state={state} homeName={homeBoard} awayName={awayBoard} homeColor={homeColor} awayColor={awayColor} live={matchLive} closed={closedBoard} />
   ) : (
     <Scoreboard
-      summary={summary} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor}
+      summary={summary} homeName={homeBoard} awayName={awayBoard} homeColor={homeColor} awayColor={awayColor}
       live={matchLive} centerNode={plugin.LiveClock ? <plugin.LiveClock state={state} /> : undefined}
     />
-  )), [plugin, state, summary, homeName, awayName, homeShown, awayShown, homeColor, awayColor, matchLive, closedBoard]);
+  )), [plugin, state, summary, homeBoard, awayBoard, homeColor, awayColor, matchLive, closedBoard]);
   // The Scoring tab's running score (the board above the tabs is hidden there).
   const scoringBoardNode = useMemo(() => (plugin.Scoreboard ? (
     <plugin.Scoreboard state={state} homeName={homeShown} awayName={awayShown} homeColor={homeColor} awayColor={awayColor} live={live} />

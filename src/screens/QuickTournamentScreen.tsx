@@ -128,7 +128,7 @@ export default function QuickTournamentScreen() {
       void AsyncStorage.setItem(LAST_SPORT_KEY, sport).catch(() => {});
       // The tournament page underneath, so making the fixtures lands on it.
       nav.replace('Tournament', { tournamentId: created.id });
-      nav.navigate('GenerateFixtures', { tournamentId: created.id, sport, structure: fmt, groups: fmt === 'groups' ? groupCount(entrants.length) : undefined });
+      nav.navigate('GenerateFixtures', { tournamentId: created.id, sport, structure: fmt, day, groups: fmt === 'groups' ? groupCount(entrants.length) : undefined });
     } catch (e) {
       // QT-01: the tournament exists but not every team saved: open it rather than
       // invite a second try that would make a duplicate tournament.

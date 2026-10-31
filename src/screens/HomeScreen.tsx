@@ -3,6 +3,7 @@
  *  the tournaments the user plays in or follows) filters the live & upcoming
  *  matches below, and a sport row jumps into each sport's section (schedule,
  *  organize, standings & stats). Deep standings/stats live on those pages. */
+import { isStaleLive } from '../core/staleLive';
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal, Pressable, useWindowDimensions } from 'react-native';
 import { KeyboardAwareScrollView } from '../components/keyboard';
@@ -76,7 +77,9 @@ export default function HomeScreen() {
   const selected: Tournament | undefined = tournaments.find((t) => t.id === selectedId);
 
   const scoped = selectedId ? feed.filter((m) => m.tournamentId === selectedId) : feed;
-  const live = scoped.filter((m) => m.status === 'live');
+  // MVP L11: a match left "live" with no activity for 12 hours isn't live
+  const now = Date.now();
+  const live = scoped.filter((m) => m.status === 'live' && !isStaleLive(m, now));
   // Postponed games still appear under "Up next" (badged) so followers learn of
   // the change; a cancelled game drops off the forward-looking feed.
   const upcoming = scoped.filter((m) => m.status === 'scheduled' || m.status === 'postponed');

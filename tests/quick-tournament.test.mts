@@ -55,7 +55,7 @@ describe('the wiring', () => {
     assert.match(screen, /await createTeam\(/);
     assert.match(screen, /await addTournamentTeams\(/);
     assert.match(screen, /replace\('Tournament', \{ tournamentId: created\.id \}\)/, 'lands on the tournament after the fixtures');
-    assert.match(screen, /navigate\('GenerateFixtures', \{ tournamentId: created\.id, sport, structure: fmt, groups: fmt === 'groups' \? groupCount\(entrants\.length\) : undefined \}\)/);
+    assert.match(screen, /navigate\('GenerateFixtures', \{ tournamentId: created\.id, sport, structure: fmt, day, groups: fmt === 'groups' \? groupCount\(entrants\.length\) : undefined \}\)/);
     assert.match(screen, /navigate\('CreateTournament'/, 'More options opens the full form');
   });
   test('the fixtures screen starts on the chosen format', () => {

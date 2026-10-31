@@ -1,6 +1,7 @@
 /** A single sport within a tournament: its schedule, a shortcut to organize a
  *  game, the league table, and the statistics rail. Reached from the Home sport
  *  chips and from a tournament's sport list. */
+import { isStaleLive } from '../core/staleLive';
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { KeyboardAwareScrollView } from '../components/keyboard';
@@ -53,7 +54,9 @@ export default function SportHubScreen() {
   const { categories: divisions, entries, activeCat, setActiveCat } = useDivisions(tournamentId);
   const divMatches = useMemo(() => matchesInDivision(matches, entries, activeCat), [matches, entries, activeCat]);
   const sportMatches = useMemo(() => divMatches.filter((m) => m.sport === sport), [divMatches, sport]);
-  const live = sportMatches.filter((m) => m.status === 'live');
+  // MVP L11: skip a match left "live" with no activity for 12 hours
+  const now = Date.now();
+  const live = sportMatches.filter((m) => m.status === 'live' && !isStaleLive(m, now));
   const upcoming = sportMatches.filter((m) => m.status === 'scheduled' || m.status === 'postponed');
   const results = sportMatches.filter((m) => m.status === 'completed');
   const tournament = useTournamentById(tournamentId);

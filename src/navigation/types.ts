@@ -44,7 +44,8 @@ export type RootStackParamList = {
   Series: { seriesId: string };
   EditMatch: { matchId: string };
   /** structure / groups: start on this format (Quick tournament, MVP 2026-10-31) */
-  GenerateFixtures: { tournamentId: string; sport?: SportId; structure?: 'league' | 'knockout' | 'groups'; groups?: number };
+  /** `day` (MVP QT-04): the quick tournament's Today / Tomorrow → the first kick-off */
+  GenerateFixtures: { tournamentId: string; sport?: SportId; structure?: 'league' | 'knockout' | 'groups'; groups?: number; day?: 'today' | 'tomorrow' };
   /** MVP 2026-10-31: name, sport, teams, format → the fixtures */
   QuickTournament: { sport?: SportId } | undefined;
   /** SD-134 — a Swiss round: numbered pairings (share / print) + the round results sheet */

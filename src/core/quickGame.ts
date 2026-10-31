@@ -20,3 +20,9 @@ export function startSport(o: { last: string | null; mine: readonly string[]; kn
   if (o.last && o.known.includes(o.last)) return o.last;
   return o.mine.find((s) => o.known.includes(s)) ?? null;
 }
+
+/** MVP QG-01 — a side a quick game made and nobody touched since ("Team A",
+ *  "Player B", "Pair A"…): kept out of the team pickers so they don't fill
+ *  with copies. A renamed side or a real team is never hidden. */
+export const isQuickPlaceholder = (t: { name: string; adhoc?: boolean }): boolean =>
+  t.adhoc === true && /^(Team|Player|Pair) [AB]$/.test(t.name.trim());

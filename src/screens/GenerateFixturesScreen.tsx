@@ -15,7 +15,7 @@ import { DateTimeField } from '../components/DateTimeField';
 import { teamLabel } from '../core/teamLevels';
 import { eventZone, useUserTimeZone, zoneShortName } from '../core/time';
 import { useRegion, weekdayOrder, exampleDate } from '../core/region';
-import { defaultKickoff, weeklyTimes, parseSkipDates, readTime, dayText, WEEKDAY_SHORT } from '../data/fixtureSchedule';
+import { defaultKickoff, quickKickoff, weeklyTimes, parseSkipDates, readTime, dayText, WEEKDAY_SHORT } from '../data/fixtureSchedule';
 import { getSportMeta } from '../sports/sportMeta';
 import { useTeams, useTournamentById, useLeagueData, useTournamentTeams, useDivisions } from '../data/hooks';
 import { DivisionTabs } from '../components/DivisionTabs';
@@ -126,9 +126,11 @@ export default function GenerateFixturesScreen() {
   const viewerZone = useUserTimeZone();
   const fixtureZone = eventZone(tournament, viewerZone);
   const region = useRegion();
-  const [start, setStart] = useState<Date>(() => new Date(defaultKickoff(fixtureZone)));
+  // MVP QT-04: a quick tournament's "Today" / "Tomorrow" sets the first kick-off.
+  const firstKickoff = () => new Date(params.day ? quickKickoff(params.day, Date.now(), fixtureZone) : defaultKickoff(fixtureZone));
+  const [start, setStart] = useState<Date>(firstKickoff);
   const startTouched = useRef(false);
-  useEffect(() => { if (!startTouched.current) setStart(new Date(defaultKickoff(fixtureZone))); }, [fixtureZone]);
+  useEffect(() => { if (!startTouched.current) setStart(firstKickoff()); }, [fixtureZone]);
   const [gapMin, setGapMin] = useState('90');
   // SD-154: "Weekly across a term" — match weekday(s), time, term dates, holidays
   const [timing, setTiming] = useState<'apart' | 'weekly'>('apart');

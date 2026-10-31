@@ -925,6 +925,9 @@ export interface Match {
   group?: string;
   /** tournament phase — 'group' or a knockout round id ('r16' | 'qf' | 'sf' | 'final') */
   stage?: string;
+  /** MVP L11 — the row's last write (scoring saves stamp it); live lists skip a
+   *  live match idle for 12 hours (core/staleLive). */
+  updatedAt?: string;
   /** play-in round only: the top-seeded team ids that bye this round (they skip
    *  it and join its winners in the next round). Lets the bracket advance a
    *  play-in → a clean main round without phantom "bye" match records. */

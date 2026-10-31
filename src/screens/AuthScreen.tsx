@@ -297,7 +297,7 @@ export default function AuthScreen() {
           )}
           {!otpPhone && (
             <Field
-              label="Email" value={email} onChange={setEmail} placeholder="you@school.edu" keyboardType="email-address" autoComplete="email"
+              label="Email" value={email} onChange={setEmail} placeholder="you@example.com" keyboardType="email-address" autoComplete="email"
               {...(showPassword ? { returnKeyType: 'next' as const, onSubmitEditing: () => passwordRef.current?.focus() } : {})}
             />
           )}

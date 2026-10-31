@@ -144,3 +144,12 @@ export function defaultKickoff(zone: string, opts: { startDate?: string; time?: 
   if (opts.startDate && /^\d{4}-\d{2}-\d{2}/.test(opts.startDate) && opts.startDate.slice(0, 10) > day) day = opts.startDate.slice(0, 10);
   return wallTimeToIso(day, opts.time ?? '10:00', zone);
 }
+
+/** MVP QT-04 — the first kick-off for a quick tournament: "today" is the next
+ *  half hour at least 15 minutes from now (never in the past); "tomorrow" is
+ *  10:00 tomorrow in the event's zone (as defaultKickoff). */
+export function quickKickoff(day: 'today' | 'tomorrow', now: number, zone: string): string {
+  if (day === 'tomorrow') return defaultKickoff(zone, { now });
+  const half = 30 * 60 * 1000;
+  return new Date(Math.ceil((now + 15 * 60 * 1000) / half) * half).toISOString();
+}

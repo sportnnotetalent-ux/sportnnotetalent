@@ -155,6 +155,8 @@ interface TeamRow {
   entry_ids?: string[] | null;
 }
 interface MatchRow {
+  /** last write (every scoring save stamps it) — MVP L11 */
+  updated_at?: string | null;
   /** manual result (migration 0040) — absent on older databases */
   result?: MatchResult | null;
   id: string;
@@ -278,11 +280,12 @@ function toMatch(r: MatchRow): Match {
     homeTeam: home ? toTeam(home) : (MATCHES[0].homeTeam as Team),
     awayTeam: away ? toTeam(away) : (MATCHES[0].awayTeam as Team),
     state: r.state ?? null,
+    updatedAt: r.updated_at ?? undefined,
   };
 }
 
 const MATCH_SELECT_BASE =
-  'id, tournament_id, group_label, stage, byes, sport, status, starts_at, venue_id, venue_name, venue_maps_url, stream_url, winner, host_ids, logo_url, scorer_id, scorer_ids, format, state,' +
+  'id, updated_at, tournament_id, group_label, stage, byes, sport, status, starts_at, venue_id, venue_name, venue_maps_url, stream_url, winner, host_ids, logo_url, scorer_id, scorer_ids, format, state,' +
   ' home_team:teams!matches_home_team_id_fkey(id,name,short_name,sport,color_hex),' +
   ' away_team:teams!matches_away_team_id_fkey(id,name,short_name,sport,color_hex)';
 const MATCH_SELECT = MATCH_SELECT_BASE + ', result';

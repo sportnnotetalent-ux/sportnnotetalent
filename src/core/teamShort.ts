@@ -22,3 +22,11 @@ export function uniqueShort(name: string, taken: string[]): string {
   }
   return base;
 }
+
+/** MVP L9 — the spectator board shows a side's full name when it fits the
+ *  screen (about 1 character per 22 px of width, half the row each side),
+ *  else its short code. Pure. */
+export function boardName(full: string | undefined, short: string, width: number): string {
+  if (!full || width < 360) return short;
+  return full.length <= Math.floor(width / 22) ? full : short;
+}

@@ -13,6 +13,17 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-31 — MVP P2s, batch 1
+
+Break-it list first (`docs/security/breaks/mvp-p2-batch1.md`), then each fix with a failing test:
+- **L9:** the spectator board shows full team names when they fit; codes on narrow phones.
+- **L10:** sign-up's email example is "you@example.com".
+- **L11:** Home and the sport hub skip a "live" match idle for 12 hours (match reads carry `updated_at`).
+- **QT-04:** a quick tournament's "Today" starts its fixtures today (next half hour); "Tomorrow" stays 10:00.
+- **QG-01:** untouched quick-game sides ("Team A", "Player B"…) stay out of the friendly form's pickers.
+- L8 (stay on app.sportnnote.in) left for its own batch (Worker proxy + deploy).
+Simulation: 1,000 cases each. Demo-checked: board names wide and narrow. Full suite 6,006 tests, 0 failing; tsc clean.
+
 ### 2026-10-31 — Release: live format change live (web, Android OTA)
 
 auth-smoke passed. Published from a clean worktree at 905558c: web (entry `index-0904f283`, confirmed live) and Android OTA group `5fd4f9a8` (runtime 1.0.0, channel preview). No migration.
