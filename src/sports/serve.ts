@@ -74,21 +74,60 @@ export function setFirstSlot(s: ServeState, side: Side): 0 | 1 {
   return slotFor(s, side === opener ? g0 : g0 + 1, side);
 }
 
-/** SD-104 — may the doubles serving order still be chosen for this set? Only
- *  before its first point. */
+/** SD-104 / MVP T3 — may `side` still choose its serving order for this set?
+ *  Until it has served in the set: the opening pair before the set's first
+ *  point, the receiving pair until game 2 starts (it serves game 2). */
+export function serveOrderOpenFor(s: ServeState & { ended?: boolean; doubles?: boolean }, side: Side): boolean {
+  if (!s.doubles || s.ended) return false;
+  const g = s.games.home + s.games.away;
+  const fresh = s.pts.home === 0 && s.pts.away === 0;
+  if (g === 0 && fresh) return true;
+  const g0 = gamesBeforeSet(s);
+  const opener = g0 % 2 === 0 ? s.firstServer : other(s.firstServer);
+  return side !== opener && (g === 0 || (g === 1 && fresh));
+}
+
+/** SD-104 — may either pair still choose its serving order for this set? */
 export const serveOrderOpen = (s: ServeState & { ended?: boolean; doubles?: boolean }) =>
-  !!s.doubles && !s.ended && s.games.home === 0 && s.games.away === 0 && s.pts.home === 0 && s.pts.away === 0;
+  serveOrderOpenFor(s, 'home') || serveOrderOpenFor(s, 'away');
+
+type CreditEvent = { side?: Side; kind?: string; set?: number; playerId?: string; df?: { playerId?: string }; pd?: { how?: string } };
+/** Point details credited to the server (pointDetail.ts: serve 'server'). */
+const SERVER_HOWS = new Set(['ace', 'sw']);
 
 /** SD-104 — apply a SET_SERVE_ORDER payload ({ side, slot }) to a set-sport
- *  state: pre-first-point of the set, doubles only; else unchanged. */
+ *  state: doubles only, while that pair may still choose (serveOrderOpenFor);
+ *  else unchanged. MVP T3: a `v:2` payload FIXES the order mid-set (not after
+ *  the match). The score never moves; the rotation follows the fix, and when
+ *  the payload names the pair (playerId = the chosen server, partnerId) that
+ *  set's aces (service winners) and double faults by the pair move to the
+ *  partner; a rally point's credit (the hitter) never moves. */
 export function withServeOrder<T extends ServeState & { ended?: boolean; doubles?: boolean }>(s: T, payload: Record<string, unknown> | undefined): T {
   const side = payload?.side;
   const slot = payload?.slot;
-  if (!serveOrderOpen(s) || (side !== 'home' && side !== 'away') || (slot !== 0 && slot !== 1)) return s;
+  if ((side !== 'home' && side !== 'away') || (slot !== 0 && slot !== 1)) return s;
+  const fix = payload?.v === 2 && !!s.doubles && !s.ended;
+  if (!serveOrderOpenFor(s, side) && !fix) return s;
+  const was = setFirstSlot(s, side);
   const order: ServeOrder = [...(s.serveOrder ?? [])];
   const i = s.sets.length;
   order[i] = { ...(order[i] ?? {}), [side]: slot };
-  return { ...s, serveOrder: order };
+  const next = { ...s, serveOrder: order };
+  const a = payload?.playerId, b = payload?.partnerId;
+  const events = (s as { events?: CreditEvent[] }).events;
+  if (!fix || was === slot || typeof a !== 'string' || typeof b !== 'string' || !a || !b || a === b || !Array.isArray(events)) return next;
+  const swap = (id?: string) => (id === a ? b : id === b ? a : id);
+  const setNo = i + 1;
+  return {
+    ...next,
+    events: events.map((e) => {
+      if (e.set !== setNo) return e;
+      const served = e.kind === 'ace' || SERVER_HOWS.has(e.pd?.how ?? '');
+      if (served && e.side === side && (e.playerId === a || e.playerId === b)) return { ...e, playerId: swap(e.playerId) };
+      if (e.df && e.side === other(side) && (e.df.playerId === a || e.df.playerId === b)) return { ...e, df: { ...e.df, playerId: swap(e.df.playerId) } };
+      return e;
+    }),
+  };
 }
 
 /** Apply SET_SERVE_ORDER { recvSide, recvSlot } — which of `recvSide`'s pair

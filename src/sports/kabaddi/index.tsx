@@ -36,8 +36,8 @@ import { kabaddiEventDetail, withRosters } from './names';
 import {
   init, reducer, currentMinute, halfLabel, previewRaid, raidOfEvent, raidActions, isRaidHead, kabaddiWinner, halfPoints, defendersOnMat,
   expectedRaider, outPlayers, clockPaused, timeoutsUsed, TIMEOUTS_PER_HALF, TACKLE_TYPES,
-  formOutcome, matNow, kabaddiCfg, touchChips, unavailable, unavailableOf, listHas, isSubbedOff, cardsOf, suggestedCard, TECH_REASONS, CARD_ICON, RAID_SKILLS,
-  type KabaddiState, type KabaddiEvent, type CardColour,
+  formOutcome, quickRaidForm, quickBonusCounts, matNow, kabaddiCfg, touchChips, unavailable, unavailableOf, listHas, isSubbedOff, cardsOf, suggestedCard, TECH_REASONS, CARD_ICON, RAID_SKILLS,
+  type KabaddiState, type KabaddiEvent, type CardColour, type RaidForm,
 } from './engine.ts';
 import { KABADDI_META } from './meta';
 import { kabaddiMatchRecords } from './records';
@@ -164,14 +164,14 @@ const ScoringControls: SportPlugin<KabaddiState>['ScoringControls'] = ({ state, 
     setEdit(null);
   };
   /** Log the guided raid (or its correction) — see raidActions. */
-  const recordRaid = () => {
-    if (!raidFlow) return;
-    for (const action of raidActions(state, raidFlow, rosterId)) {
+  const recordForm = (f: RaidForm) => {
+    for (const action of raidActions(state, f, rosterId)) {
       if (action.type === 'REMOVE_EVENT') dispatch(action);
       else fire(action);
     }
     setRaidFlow(null);
   };
+  const recordRaid = () => { if (raidFlow) recordForm(raidFlow); };
 
   // Players subbed off this match take no further part (by id; an older log by name).
   const onField = (side: 'home' | 'away', roster: Player[]) => roster.filter((p) => !isSubbedOff(state, side, p));
@@ -330,6 +330,20 @@ const ScoringControls: SportPlugin<KabaddiState>['ScoringControls'] = ({ state, 
           {raidFlow.at && <Text style={ctrl.editBanner}>Editing the {raidFlow.at.minute}&apos; raid — saving replaces it in place.</Text>}
           {raidFlow.editOf == null && doOrDieOn(kabaddiCfg(state)) && kEmpty[raidFlow.side] >= 2 && (
             <IconText label={"⚠ DO-OR-DIE raid — the raider is out if this raid scores nothing."} style={ctrl.doOrDie} />
+          )}
+          {/* MVP K3 — the common raids in one tap (nobody else to credit); a
+              raider picked below is still credited. New raids only. */}
+          {raidFlow.editOf == null && (
+            <View style={ctrl.quickRow}>
+              <Text style={ctrl.meta}>One tap — records at once{raidFlow.raider ? ` (raider: ${raidFlow.raider.fullName})` : ''}:</Text>
+              <View style={ctrl.chips}>
+                <Button label="Empty" variant="ghost" onPress={() => recordForm(quickRaidForm(raidFlow.side, 'empty', raidFlow.raider))} />
+                <Button label="+1 touch" variant="ghost" onPress={() => recordForm(quickRaidForm(raidFlow.side, 'touch', raidFlow.raider))} />
+                {quickBonusCounts(state, raidFlow.side) ? <Button label="Bonus" variant="ghost" onPress={() => recordForm(quickRaidForm(raidFlow.side, 'bonus', raidFlow.raider))} /> : null}
+                <Button label="Raider out" variant="ghost" onPress={() => recordForm(quickRaidForm(raidFlow.side, 'out', raidFlow.raider))} />
+              </View>
+              <Text style={ctrl.meta}>Anything else (more touches, line-outs, who tackled): fill in below.</Text>
+            </View>
           )}
           {onField(raidFlow.side, raidFlow.side === 'home' ? homeRoster : awayRoster).length > 0 && (
             <>
@@ -823,6 +837,7 @@ const ctrl = StyleSheet.create({
   label: { color: theme.colors.text, fontSize: theme.font.body, fontWeight: '700' },
   meta: { color: theme.colors.textMuted, fontSize: theme.font.small },
   subPanel: { gap: theme.spacing(3), backgroundColor: theme.colors.surface, borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.colors.border, padding: theme.spacing(4) },
+  quickRow: { gap: theme.spacing(2) },
   raidPanel: { gap: theme.spacing(3), backgroundColor: theme.colors.surface, borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.colors.primary, padding: theme.spacing(4) },
   matRow: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing(2) },
   matChip: { color: theme.colors.textMuted, fontSize: theme.font.small, fontWeight: '700', backgroundColor: theme.colors.surfaceAlt, borderRadius: theme.radius.pill, paddingVertical: theme.spacing(1), paddingHorizontal: theme.spacing(3) },

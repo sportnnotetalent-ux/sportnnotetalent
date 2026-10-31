@@ -512,6 +512,20 @@ export interface RaidForm {
   skill?: string; touched?: Who[];
 }
 
+/** MVP K3 — the one-tap raids (no defender / tackler to credit): the same
+ *  form the full panel builds for those answers, so they record identically. */
+export type QuickRaid = 'empty' | 'touch' | 'bonus' | 'out';
+export function quickRaidForm(side: Side, kind: QuickRaid, raider?: Who): RaidForm {
+  return {
+    side, ...(raider ? { raider } : {}),
+    touches: kind === 'touch' ? 1 : 0, bonus: kind === 'bonus', tackled: kind === 'out',
+  };
+}
+
+/** Would a bonus count on `side`'s next raid (6+ defenders on the mat)? */
+export const quickBonusCounts = (s: KabaddiState, side: Side): boolean =>
+  !!previewRaid(s, formOutcome(quickRaidForm(side, 'bonus')))?.bonusPts;
+
 /** The engine input for a raid form (v2). SD-59: a raider line-out is not a
  *  tackle and his touches don't count. */
 export function formOutcome(f: Pick<RaidForm, 'side' | 'touches' | 'bonus' | 'tackled' | 'defOut' | 'lineOut'>): RaidOutcome {

@@ -38,8 +38,8 @@ export const startRightAction = (side: Side, p: { id: string }, fix = false): Sc
   ({ type: 'SET_START_RIGHT', payload: { side, playerId: p.id, ...(fix ? { v: 2 } : {}) } });
 
 /** SD-104 — tennis / padel doubles: who serves the pair's first game of the set. */
-export const serveOrderAction = (side: Side, slot: number, p: { id: string }): ScoreAction =>
-  ({ type: 'SET_SERVE_ORDER', payload: { side, slot, playerId: p.id } });
+export const serveOrderAction = (side: Side, slot: number, p: { id: string }, partner?: { id: string }): ScoreAction =>
+  ({ type: 'SET_SERVE_ORDER', payload: { side, slot, playerId: p.id, ...(partner ? { partnerId: partner.id, v: 2 } : {}) } });
 
 /** SD-62 / SD-74 — table tennis / badminton doubles: who serves / receives first. */
 export const doublesOrderAction = (key: 'server' | 'receiver', p: { id: string }, fix = false): ScoreAction =>

@@ -13,6 +13,14 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-31 — MVP P1s, batch 6
+
+Break-it list first (`docs/security/breaks/mvp-p1-batch6.md`), then each fix with a failing test:
+- **Tennis / padel doubles serving order (T3):** the receiving pair can pick until game 2; "Fix serving order" (a `v:2` fix) works mid-set: the score stays, the rotation follows, and that set's aces / double faults move to the right partner (`serve.ts`).
+- **Kabaddi one-tap raids (K3):** Empty · +1 touch · Bonus · Raider out at the top of the raid panel, recording exactly what the full form would.
+- B6/T9 (change a live match's format) left for its own batch.
+Simulation: 500 doubles sets with a random fix, 500 kabaddi halves of one-tap raids. Demo-checked: kabaddi. Full suite 5,974 tests, 0 failing; tsc clean.
+
 ### 2026-10-31 — Release: "Time up" ending live (web, Android OTA)
 
 auth-smoke passed. Published from a clean worktree at 9a11e6c: web (entry `index-d10eb7a5`, confirmed live) and Android OTA group `096d424b` (runtime 1.0.0, channel preview). No migration.
