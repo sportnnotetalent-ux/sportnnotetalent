@@ -314,6 +314,7 @@ export function TextField({
   placeholder,
   autoCapitalize = 'sentences',
   multiline = false,
+  onBlur,
 }: {
   label: string;
   value: string;
@@ -321,10 +322,12 @@ export function TextField({
   placeholder?: string;
   autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
   multiline?: boolean;
+  /** when the box is left (e.g. tidy a number) */
+  onBlur?: () => void;
 }) {
   // keeps the field above the keyboard (the scroll view / sheet it sits in);
   // keyboard "Next" moves down the form, "Done" on the last field
-  const kbFocus = useKeyboardFocus();
+  const kbFocus = useKeyboardFocus(undefined, onBlur ? () => onBlur() : undefined);
   const formField = useFormField(multiline);
   return (
     <View style={{ gap: theme.spacing(1) }}>

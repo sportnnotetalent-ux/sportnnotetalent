@@ -93,6 +93,18 @@ export function statAction(kind: StatKind, side: Side, player: Who | null | unde
   };
 }
 
+/** MVP F5 — after the scorer picks the team for a stat, either ask who ('player'),
+ *  go straight to the outcome ('detail': a shot's on/off target, a pass's
+ *  completion), or log it at once ('record'). With no players listed the
+ *  "who?" step is skipped and the stat is the team's. A card still asks: a
+ *  second yellow is per person (the step offers a team official). */
+export function afterTeamPick(kind: StatKind | 'card', hasPlayers: boolean): 'player' | 'detail' | 'record' {
+  const needsPlayer = kind !== 'corner' && kind !== 'goalKick' && kind !== 'throwIn';
+  if (!needsPlayer) return 'record';
+  if (hasPlayers || kind === 'card') return 'player';
+  return kind === 'shot' || kind === 'pass' ? 'detail' : 'record';
+}
+
 /** A foul by `fouler` — and the fouled player (`victim`, optional), by id. */
 export const foulAction = (side: Side, fouler: Who, victim: Who | null | undefined, o: { at?: number; tracked?: string[] } = {}): ScoreAction => ({
   type: 'STAT', side,

@@ -32,7 +32,9 @@ export const BADMINTON_META: SportMeta = {
         { value: 2, label: 'Doubles' },
       ],
     },
-    { key: 'pointsPerGame', label: 'Points per game', type: 'number', default: 21, min: 5, max: 30, advanced: true },
+    // MVP B7: the deuce cap follows the points (21 → 30, 15 → 24); blank / out of range is fixed on leaving the box
+    { key: 'pointsPerGame', label: 'Points per game', type: 'number', default: 21, min: 5, max: 30, advanced: true,
+      derive: (v): Record<string, number> => (Number(v) >= 5 ? { cap: Math.min(40, Number(v) + 9) } : {}) },
     { key: 'cap', label: 'Deuce cap', type: 'number', default: 30, min: 5, max: 40, advanced: true, hint: 'hard ceiling that settles a long deuce' },
     {
       key: 'goldenPoint', label: 'At the cap', type: 'choice', default: true, advanced: true,

@@ -314,6 +314,12 @@ export interface FormatField {
   /** For a 'number' field in the live settings card: render a −step / +step
    *  stepper (clamped to min/max) instead of a text input. */
   step?: number;
+  /** MVP PD1: hide this field while another field has this value (e.g. the
+   *  deciding-set rule while the match is a single set). */
+  hideWhen?: { key: string; value: number | string | boolean };
+  /** MVP B7: sibling values that follow this field's value (badminton: the
+   *  deuce cap follows the points per game). Applied on change (formatPick.ts). */
+  derive?: (v: number | string | boolean) => Record<string, number | string | boolean>;
 }
 
 export type FormatValue = number | string | boolean;

@@ -48,6 +48,8 @@ import { basketballMatchRecords } from './records';
 
 /** SD-117 (B12): the foul-type chips, FIBA's U and D included. */
 const FOUL_TYPES: FoulType[] = ['personal', 'shooting', 'offensive', 'technical', 'unsportsmanlike', 'disqualifying', 'flagrant'];
+// MVP B7: a team foul (no player listed, or not known) — the types that don't eject a person
+const TEAM_FOUL_TYPES: FoulType[] = ['personal', 'shooting', 'offensive', 'technical'];
 
 /* ------------------------------- Controls ---------------------------------- */
 
@@ -73,7 +75,7 @@ type Flow =
   // SD-117 (B3): a player picked first, then the action — no row of look-alike chips to mis-tap
   | { kind: 'act'; side: 'home' | 'away'; player: Player }
   // Deep wave: with "Fouls drawn" on, the type is kept while the fouled player is picked
-  | { kind: 'foul'; side: 'home' | 'away'; fouler?: Player; type?: FoulType }
+  | { kind: 'foul'; side: 'home' | 'away'; fouler?: Player; type?: FoulType; team?: true }
   | { kind: 'rebound'; side: 'home' | 'away'; player: Player }
   | { kind: 'sub'; side: 'home' | 'away'; off?: Player }
   // IDs-only scoring: the five by player id
@@ -237,9 +239,10 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
   // U / D / flagrant 2) — and a personal foul once the fouling side is over the
   // team-foul limit opens the bonus 2 (B8). A D foul, or a 2nd T / 2nd U / T + U,
   // disqualifies (B12): asked first in the ConfirmSheet, then logged + ejected.
-  const recordFoul = async (side: 'home' | 'away', fouler: Player, type: FoulType, drawnBy?: Player | null) => {
-    const dq = disqualifyingFoul(state, fouler.fullName, type, { side, pid: fouler.id });
-    if (dq && !(await confirmMatchAction('eject', {
+  // MVP B7: `fouler` null = a team foul (no player): it counts toward the team-foul limit; no one is ejected.
+  const recordFoul = async (side: 'home' | 'away', fouler: Player | null, type: FoulType, drawnBy?: Player | null) => {
+    const dq = fouler ? disqualifyingFoul(state, fouler.fullName, type, { side, pid: fouler.id }) : null;
+    if (dq && fouler && !(await confirmMatchAction('eject', {
       what: fouler.fullName,
       detail: `${FOUL_LABEL[type]} — that's ${DQ_LABEL[dq]}, so the rules disqualify ${fouler.fullName}. The foul is logged and the player is ejected. Undo can bring it back.`,
     }))) return;
@@ -250,10 +253,10 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
     // Deep wave: "Fouls drawn" — the foul says it was tracked, and who drew it (by id)
     const drawn = state.trackFoulsDrawn ? { fdt: true, drawnBy } : {};
     fire(foulAction(side, fouler, type, drawn));
-    if (dq) fireEject(side, fouler, dq);
+    if (dq && fouler) fireEject(side, fouler, dq);
     if (shots > 0) {
-      const why = bonus ? `Bonus — ${teamOf(side)} are over the team-foul limit` : `${FOUL_LABEL[type]} foul on ${fouler.fullName}`;
-      setFlow({ kind: 'ft', side: opp(side), ...(drawnBy && type !== 'technical' ? { shooter: drawnBy } : {}), remaining: shots, total: shots, reason: `${why}${dq ? ` · ${fouler.fullName} disqualified` : ''} — ${shots} free throw${shots > 1 ? 's' : ''} for ${teamOf(opp(side))}${ball ? `, then ${teamOf(opp(side))} keep the ball (team foul ${teamFoulsThisQuarter(state, side) + 1})` : ''}` });
+      const why = bonus ? `Bonus — ${teamOf(side)} are over the team-foul limit` : `${FOUL_LABEL[type]} foul on ${fouler?.fullName ?? teamOf(side)}`;
+      setFlow({ kind: 'ft', side: opp(side), ...(drawnBy && type !== 'technical' ? { shooter: drawnBy } : {}), remaining: shots, total: shots, reason: `${why}${dq && fouler ? ` · ${fouler.fullName} disqualified` : ''} — ${shots} free throw${shots > 1 ? 's' : ''} for ${teamOf(opp(side))}${ball ? `, then ${teamOf(opp(side))} keep the ball (team foul ${teamFoulsThisQuarter(state, side) + 1})` : ''}` });
     } else setFlow(null);
   };
 
@@ -347,8 +350,17 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
       const roster = courtOf(flow.side);
       return (
         <View style={ctrl.editPanel}>
-          <View style={ctrl.editHead}><Text style={ctrl.label}>Foul — {nm}</Text>{cancel}</View>
-          {!flow.fouler ? (
+          <View style={ctrl.editHead}><Text style={ctrl.label}>{flow.team ? 'Team foul' : 'Foul'} — {nm}</Text>{cancel}</View>
+          {flow.team ? (
+            <>
+              <Text style={ctrl.meta}>What kind of foul? (no player — it counts toward {nm}’s team fouls)</Text>
+              <View style={ctrl.chips}>
+                {TEAM_FOUL_TYPES.map((t) => (
+                  <SelectChip key={t} label={FOUL_LABEL[t]} active={false} onPress={() => void recordFoul(flow.side, null, t, null)} />
+                ))}
+              </View>
+            </>
+          ) : !flow.fouler ? (
             <>
               <Text style={ctrl.meta}>Who committed it?</Text>
               <View style={ctrl.chips}>
@@ -728,6 +740,11 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
         <Button label={`🎯 Free throws — ${homeName}`} variant="home" style={ctrl.flex} onPress={() => setFlow({ kind: 'ft', side: 'home' })} />
         <Button label={`🎯 Free throws — ${awayName}`} variant="away" style={ctrl.flex} onPress={() => setFlow({ kind: 'ft', side: 'away' })} />
       </View>
+      {/* MVP B7: a foul with no player (pickup games, no roster) — team fouls and the bonus still work */}
+      <View style={ctrl.row}>
+        <Button label={`🟨 Team foul — ${homeName}`} variant="ghost" style={ctrl.flex} onPress={() => setFlow({ kind: 'foul', side: 'home', team: true })} />
+        <Button label={`🟨 Team foul — ${awayName}`} variant="ghost" style={ctrl.flex} onPress={() => setFlow({ kind: 'foul', side: 'away', team: true })} />
+      </View>
 
       {/* SD-117 (B3): one row per side — tap the player, then the action
           (rebound / assist / steal / block / turnover / foul) in a labelled panel. */}
@@ -997,7 +1014,7 @@ const BasketballScoreboard: NonNullable<SportPlugin<BasketballState>['Scoreboard
       clock={<LiveClock state={s} />}
       leadLabel="TOTAL"
       columns={columns}
-      winner={s.ended ? (s.home >= s.away ? 'home' : 'away') : undefined}
+      winner={s.ended && s.home !== s.away ? (s.home > s.away ? 'home' : 'away') : undefined}
       home={{ name: homeName, color: homeColor ?? theme.colors.home, lead: String(s.home), cells: columns.map((_, i) => String(pts('home', i + 1))) }}
       away={{ name: awayName, color: awayColor ?? theme.colors.away, lead: String(s.away), cells: columns.map((_, i) => String(pts('away', i + 1))) }}
     />

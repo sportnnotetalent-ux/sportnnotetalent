@@ -13,6 +13,17 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-10-31 — MVP P1s, batch 1 (not published yet)
+
+Each with a failing test first (`docs/security/breaks/mvp-p1-batch1.md`):
+- **Football pickup games (F5):** with no players on a side, the "who?" step is skipped and stats, fouls and penalties are the team's (`afterTeamPick`). Cards still need a person (team official offered).
+- **Basketball (B7, B3):** a "Team foul" button per side (team fouls and the bonus work with no roster); a draw no longer shows a home trophy.
+- **Pickleball (PB1):** "Rec (rally · 1 game to 11)" is the friendly default, plus side-out to 11; best-of-3 presets say so; Match length visible.
+- **Padel / tennis (PD1):** "Single set" resets the deciding set; the deciding-set fields hide for one set (new `hideWhen`).
+- **Badminton (B7):** points per game fixed on leaving the box (blank → 21, 5–30); the deuce cap follows (points + 9) (new `derive`).
+- **All racket sports (PB4/PD4):** a second point tap within 400 ms is ignored; the counted button flashes ✓ (`core/tapGuard.ts`).
+Simulation: 500 pickleball, 500 football, 500 basketball games, 1,000 format edits. Checked in the demo app: football no-player foul / shot → goal, basketball team fouls to the bonus, pickleball default. Full suite 5,841 tests, 0 failing; tsc clean.
+
 ### 2026-10-31 — Release: audit round 2 app changes live (web, Android OTA)
 
 auth-smoke passed. Published from a clean worktree at edde1a5: web (entry `index-a12c5373`) and Android OTA group `2007601f` (runtime 1.0.0, channel preview). Server parts still to do (founder): migration `20261031160000_lineup_side_insert.sql`, deploy `send-invite` and `org-verify`.

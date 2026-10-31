@@ -14,10 +14,11 @@
  * Also here: `ServeFirstPicker` (no default; "Fix who served first" mid-match)
  * and `SecondaryAction` (tennis Ace / Double fault — outline, smaller).
  */
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { theme } from '../core/theme';
 import { SelectChip } from '../components/ui';
+import { tapGuard } from '../core/tapGuard';
 import type { Player } from '../core/types';
 import { readableOn } from '../core/contrast';
 
@@ -61,10 +62,21 @@ export function PointButtons({
   const canCredit = (s: Side) => credit && rosterOf(s).length >= 2;
   const anyCredit = canCredit('home') || canCredit('away');
 
+  // MVP PB4: a second tap on either button within 400 ms is ignored; the one
+  // that counted flashes a tick
+  const guard = useRef(tapGuard()).current;
+  const [flash, setFlash] = useState<Side | null>(null);
+  useEffect(() => {
+    if (!flash) return;
+    const id = setTimeout(() => setFlash(null), 400);
+    return () => clearTimeout(id);
+  }, [flash]);
   const tap = (s: Side) => {
     if (disabled) return;
+    if (!guard()) return;
     const r = rosterOf(s);
     onPoint(s, r.length === 1 ? r[0] : undefined); // singles: auto-credit
+    setFlash(s);
     setPick(null);
   };
 
@@ -86,7 +98,7 @@ export function PointButtons({
         style={({ pressed }) => [pb.big, { backgroundColor: bg }, pressed && pb.pressed, disabled && pb.off]}
       >
         <Text style={[pb.bigName, { color: ink }]} numberOfLines={2}>{solo ?? nameOf(s)}</Text>
-        <Text style={[pb.bigSub, { color: ink }]} numberOfLines={1}>{icon} {verb}</Text>
+        <Text style={[pb.bigSub, { color: ink }]} numberOfLines={1}>{flash === s ? '✓' : icon} {verb}</Text>
         {serving === s ? <Text style={[pb.bigServe, { color: ink, borderColor: ink }]} numberOfLines={1}>SERVING</Text> : null}
       </Pressable>
     );

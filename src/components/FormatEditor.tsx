@@ -7,7 +7,7 @@ import { SportBadge } from './SportSymbol';
 import { theme } from '../core/theme';
 import { SelectChip, TextField, textStyles } from './ui';
 import { getSportMeta } from '../sports/sportMeta';
-import { fieldChanges } from '../sports/formatPick';
+import { clampNumber, fieldChanges, isHidden } from '../sports/formatPick';
 import type { FormatField, FormatFieldOption } from '../sports/types';
 import type { SportId } from '../core/types';
 
@@ -72,6 +72,8 @@ export function FormatFieldEditor({ field, value, onChange, disabled }: { field:
       label={`${field.label}${field.hint ? ` (${field.hint})` : ''}`}
       value={String(value)}
       onChange={(t) => onChange(Number(t.replace(/[^0-9]/g, '')) || 0)}
+      // MVP B7: blank → the default, else kept within min–max, when the box is left
+      onBlur={() => onChange(clampNumber(field, Number(value)))}
       autoCapitalize="none"
     />
   );
@@ -133,7 +135,7 @@ export function SportFormatEditor({
       )}
 
       {rest.map((field, i) =>
-        field.advanced && !revealAdvanced ? null : (
+        (field.advanced && !revealAdvanced) || isHidden(field, value) ? null : (
           <React.Fragment key={field.key}>
             {/* deep wave: a heading over toggles that share a group (event sports' "Stats to track") */}
             {field.group && field.group !== rest[i - 1]?.group ? <Text style={fe.group}>{field.group}</Text> : null}

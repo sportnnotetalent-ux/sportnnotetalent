@@ -46,7 +46,8 @@ export const TENNIS_META: SportMeta = {
       options: [
         { value: 2, label: 'Best of 3' },
         { value: 3, label: 'Best of 5' },
-        { value: 1, label: 'Single set' },
+        // MVP PD1 (tennis too): one set is a set — the deciding-set tiebreaks clear
+        { value: 1, label: 'Single set', set: { finalSetTiebreak: 0, finalSetTBAt: 0 } },
       ],
     },
     {
@@ -76,6 +77,7 @@ export const TENNIS_META: SportMeta = {
     },
     {
       key: 'finalSetTiebreak', label: 'Deciding set', type: 'choice', default: 0, advanced: true,
+      hideWhen: { key: 'setsToWin', value: 1 },
       options: [
         { value: 0, label: 'Full set' },
         { value: 10, label: '10-point match tiebreak' },
@@ -83,6 +85,7 @@ export const TENNIS_META: SportMeta = {
     },
     {
       key: 'finalSetTBAt', label: 'Deciding-set tiebreak', type: 'choice', default: 0, advanced: true,
+      hideWhen: { key: 'setsToWin', value: 1 },
       hint: 'when the deciding set is a full set',
       options: [
         { value: 0, label: 'Same as other sets' },

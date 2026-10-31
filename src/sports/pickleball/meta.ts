@@ -11,7 +11,7 @@ import { trackFormatFields } from '../pointDetailSettings.ts';
  *  track" defaults after them, exactly as `formatFields` below does). */
 export const PICKLEBALL_FORMAT_FIELDS: FormatField[] = [
     {
-      key: 'preset', label: 'Format', type: 'preset', default: 'rec', tournamentDefault: 'traditional',
+      key: 'preset', label: 'Format', type: 'preset', default: 'rec11', tournamentDefault: 'traditional',
       // SD-06 / D4: the old rally "Tournament (best of 5)" preset (value
       // 'tournament') is gone — a stored format keeps its own scoring keys, so
       // matches made with it still play rally. 'traditional' keeps its value
@@ -26,8 +26,11 @@ export const PICKLEBALL_FORMAT_FIELDS: FormatField[] = [
         // and the DreamBreaker rotation aren't tracked yet, so it isn't called
         // "MLP". The value stays 'dreambreaker' (stored formats keep working).
         { value: 'dreambreaker', label: 'Rally to 21 (1 game)', set: { scoring: 'rally', pointsPerGame: 21, winBy: 2, gamesToWin: 1 } },
-        { value: 'rec', label: 'Rec (rally · 11)', set: { scoring: 'rally', pointsPerGame: 11, winBy: 2, gamesToWin: 2 } },
-        { value: 'rec1', label: 'Rec quick (rally · 11 · win by 1)', set: { scoring: 'rally', pointsPerGame: 11, winBy: 1, gamesToWin: 2 } },
+        // MVP PB1: the common rec game — ONE game to 11 — is the friendly default.
+        { value: 'rec11', label: 'Rec (rally · 1 game to 11)', set: { scoring: 'rally', pointsPerGame: 11, winBy: 2, gamesToWin: 1 } },
+        { value: 'sideout11', label: 'Side-out · 1 game to 11', set: { scoring: 'sideout', pointsPerGame: 11, winBy: 2, gamesToWin: 1 } },
+        { value: 'rec', label: 'Rec (rally · best of 3 to 11)', set: { scoring: 'rally', pointsPerGame: 11, winBy: 2, gamesToWin: 2 } },
+        { value: 'rec1', label: 'Rec quick (rally · best of 3 to 11 · win by 1)', set: { scoring: 'rally', pointsPerGame: 11, winBy: 1, gamesToWin: 2 } },
         { value: 'custom', label: 'Custom' },
       ],
     },
@@ -63,7 +66,7 @@ export const PICKLEBALL_FORMAT_FIELDS: FormatField[] = [
       ],
     },
     {
-      key: 'gamesToWin', label: 'Match length', type: 'choice', default: 2, advanced: true,
+      key: 'gamesToWin', label: 'Match length', type: 'choice', default: 2, // MVP PB1: shown without Customize
       options: [
         { value: 2, label: 'Best of 3' },
         { value: 3, label: 'Best of 5' },

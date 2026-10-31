@@ -54,11 +54,13 @@ export const PADEL_META: SportMeta = {
       options: [
         { value: 2, label: 'Best of 3 sets' },
         { value: 3, label: 'Best of 5 sets' },
-        { value: 1, label: 'Single set' },
+        // MVP PD1: one set is a set — never the 10-point match tiebreak
+        { value: 1, label: 'Single set', set: { decider: 'set' } },
       ],
     },
     {
       key: 'decider', label: 'Deciding set', type: 'choice', default: 'set', advanced: true,
+      hideWhen: { key: 'setsToWin', value: 1 },
       hint: 'how the final set is played',
       options: [
         { value: 'set', label: 'Full set' },
