@@ -1,3 +1,7 @@
+# Start here (founder, 2026-10-31)
+
+New session or new account: read [docs/HANDOFF.md](docs/HANDOFF.md) first. It covers what's live, what's next, the founder's working rules, and the previous assistant's notes (in docs/handoff/memory/).
+
 # Expo HAS CHANGED
 
 Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before writing any code.

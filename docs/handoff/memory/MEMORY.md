@@ -1,0 +1,57 @@
+# Memory Index
+- [Sportfolio overview](sportfolio-overview.md) — Expo/RN multi-sport scoring app; school sports meets India; demo mode on port 8091
+- [Sportfolio product mandate](sportfolio-product-mandate.md) — standing role: ongoing PM+SWE, constantly ship UX-simplifying upgrades
+- [Sportfolio live-scoring gaps](sportfolio-live-scoring-gaps.md) — log-only backlog of gaps the user hits while live-scoring (don't act until asked)
+- [Sportfolio DEVLOG](sportfolio-devlog.md) — maintain sportfolio/DEVLOG.md reference doc; keep it updated as work ships
+- [Sportfolio repo](sportfolio-repo.md) — origin = GitHub sportnnote-lgtm/sportnnote (moved 2026-10-07; old repo = remote legacy); user runs git push
+- [Sportfolio launch plan](sportfolio-launch-plan.md) — 45-day go-live goal (target ≈ 2026-08-23 pilot); 3 tracks (product/platform/compliance); demo→live is the big lift
+- [Sportfolio go-live readiness](sportfolio-golive-readiness.md) — 2026-08-24 audit; 7 pilot blockers; results write-back (1&2) shipped, 5 remain
+- [Sportfolio team-entry overhaul](sportfolio-team-entry-overhaul.md) — make "add teams" match real event organizing; 3 sequenced phases (entry+contact → invite/self-register → categories)
+- [Sportfolio tournament vision](sportfolio-tournament-vision.md) — core purpose + litmus test: schedule real international tournaments (FIFA WC 2026, Asia Cup) as-is; organize gaps (participants, custom knockout seeding, Super Four)
+- [Sportfolio sport-coverage audit](sportfolio-sport-coverage-audit.md) — all 14 sports replayed vs real events (wave-1 golf/TT/chess/carrom done 2026-10-07); docs/sport-coverage/
+- [Sportfolio tournament-org audit](sportfolio-tournament-org-audit.md) — can it organize any real tournament format? ALL 6 gaps DONE (reschedule/venue/series/tie-breakers/structure/registration+double-chance); migrations 0012-0014 run
+- [Sportfolio multi-sport medal](sportfolio-multisport-medal.md) — Olympics/sports-day meets: contingents (one team across all sports), position points per sport summed to overall medal table, walkovers; needs migration 0015
+- [Sportfolio push notifications](sportfolio-push-notifications.md) — local vs remote push; notify() routes cross-user → push-send edge fn; FCM set (APK cd76a7b6), web push (0031) live + verified on iPhone 2026-10-07; reminders cron live
+- [Sportfolio scorer model](sportfolio-scorer-model.md) — scorer_id/scorer_ids/host_ids are PLAYER ids; RLS uses auth_player_ids(); multi-scorer; fixed FK-mismatch persistence bug (migration 0017)
+- [Sportfolio sport-aware setup](sportfolio-sport-aware-setup.md) — participantKind (individual/team/both) + Singles/Doubles-first match setup (no "Teams" in singles); verification backends (migration 0016 + verification-submit edge fn) now LIVE; tennis/padel/badminton serve rotation, individual tournament draws done
+- [Sportfolio multi-sport teams](sportfolio-multisport-teams.md) — one Team ("Club") plays many sports, each with own captain/squad/roles; Club layered over per-sport teams (migration 0018); create+manage screens shipped, invite/logo/game-integration TODO
+- [Sportfolio org architecture](sportfolio-org-architecture.md) — individuals/orgs/membership/roles/ownership/schools foundation; M1 shipped (org_members join table migration 0020, Owner+Referee roles, invite/join-request lifecycle); M2 context switcher / M3 ownership transfer / M4 school structure / M5 audit pending; full join-table refactor chosen
+- [Sportfolio WhatsApp OTP](sportfolio-whatsapp-otp.md) — phone verification code-complete + secrets set, BLOCKED: Test WABA can't create the sportnnote_otp template (err 2388185); need a production WABA + real phone number to finish
+- [Status snapshot](sportfolio-status-2026-10-25.md) — outstanding tasks refreshed 2026-10-29 (live checks + 2 real web errors found): founder to-dos, decisions, company-blocked, dates, my backlog
+- [Sportfolio security hardening](sportfolio-security-hardening.md) — migration 0025 (RLS scoping + edge-fn guards) committed 914b2a7, not run live; 0026 private contacts + 0027 messaging (minors→guardian) built, uncommitted — user will commit all at once
+- [Sportfolio master roadmap](sportfolio-master-roadmap.md) — 2026-10-06 company-level roadmap; company formation is the critical path; golf needs a field-competition core; 5 decisions pending
+- [Sportfolio sports policy](sportfolio-sports-policy.md) — only international-level sports (federation + world champs / multi-sport games); throwball removed
+- [Sportfolio analytics](sportfolio-analytics.md) — first-party analytics+crash reporting (0029), KPI views; LIVE 2026-10-07
+- [Sportfolio pilot readiness](sportfolio-pilot-readiness.md) — legal/feedback/account deletion (0030); keep all live tournaments as is (founder)
+- [Sportfolio Resend email](sportfolio-resend-email.md) — Resend key replaced 2026-10-07; sends as no-reply@sportnnote.in; working
+- [App lifecycle expectations](sportfolio-app-lifecycle.md) — minimise keeps place, close starts fresh, no endless spinners; sweep sibling flows
+- [CricHeroes parity queue](sportfolio-cricheroes-parity.md) — docs/cricheroes-parity loop protocol; all 25 DONE 2026-10-09; 0038–0047 run, Vault set, functions deployed, pushed, Android OTA 056ef4d3; web published 2026-10-09; APK 36 built; staging alert check passed 2026-10-10
+- [Feature guides on the site](sportfolio-feature-guides.md) — every feature gets a public step-by-step page at sportnnote.in/guides/ (content + designer sub-agents in parallel)
+- [Live DB access](sportfolio-live-db-access.md) — read live via `npx supabase db query --linked`; writes go through founder's SQL editor; MCP can't reach it
+- [Every sport equal](sportfolio-sport-equality.md) — founder core principle: international-standard scoring + stats depth for all 14 sports; audit/plan in docs/sport-depth/
+- [Social marketing plan](sportfolio-social-marketing.md) — LI/IG/YT roadmap doc; launch 11 Jan 2027, pre-launch from 7 Dec; free-while-new line; AI presenter rules
+- [Parallel agent commits](sportfolio-parallel-agent-commits.md) — explicit file lists only, never commit -a; publish from a clean worktree
+- [Organiser-chosen rules](sportfolio-organiser-rules-principle.md) — rule details are organiser options with standard defaults; walkovers team-only
+- [International expansion](sportfolio-international.md) — markets Gulf→UK→SG/MY→AU→US, one DB, add rugby/baseball-softball/ice hockey/netball/NFL, .com, stores before Dec
+- [Speed waves](sportfolio-speed-waves.md) — perf audit docs/perf/audit.md; Waves 1+2 live 2026-10-13; Wave 3 parked
+- [Social handles](sportfolio-next-session-handles.md) — @sportnnote created 2026-10-24 on IG/FB/LinkedIn/YouTube/X/Threads; WhatsApp Channel waits for new company number; next: paid promotion
+- [Deep stats wave](sportfolio-deep-stats-wave.md) — 2026-10-22: broadcast-depth optional "stats to track" + commentary for every sport; bulk build with recommended defaults, doubts reviewed after
+- [Keyboard-safe fields](sportfolio-keyboard-safe-fields.md) — keyboard must never cover a field; new screens use KeyboardAwareScrollView, sheets useKeyboardSheet
+- [IP protection](sportfolio-ip-protection.md) — 2026-10-24 priority: repo found PUBLIC+MIT — now private + proprietary LICENSE (6aa1e78); next: ToS clauses, API scraping audit, trademark, moat plan
+- [Org verification](sportfolio-org-verification.md) — Phase 1 schools/colleges live; Phase 2 every registered type LIVE 2026-10-27 (ab17b4e, mig 20261027100000); Phase 3 international later
+- [Low-cost go-live setup](sportfolio-golive-lowcost.md) — 2026-10-25: Android phone sign-in, PDF picker, App Links, nightly backup (2df1bce, c66af0a); APK 41 live download; ALL 8 founder steps done 2026-10-26
+- [Web crash noise](sportfolio-web-crash-noise.md) — 'Requiring unknown module' web crashes were false (Metro probe); EAS 429s → paced warm-up (aa0a9e1)
+- [Shared device](sportfolio-shared-device.md) — one phone/browser = one account: sign-out releases push token/alerts/reminders; claim_push_token; others see only 'verified' (68dfdbb, mig 20261026120000)
+- [Auth smoke check](sportfolio-auth-smoke.md) — run scripts/auth-smoke.mjs before every publish; email OTP is 8 digits; founder wants auth issues swept, not one-by-one
+- [Run it again / copy](sportfolio-run-it-again.md) — next edition (linked) + copy any tournament's setup; LIVE 2026-10-27; EDITION_KEYS rule; web header fit; EAS ~6 min propagation
+- [Support console + edition links](sportfolio-support-console.md) — LIVE 2026-10-27 (07254c8/04594e8); add support people via one SQL line
+- [Backlog run 2026-10-27](sportfolio-backlog-run-2026-10-27.md) — items 1–5 LIVE, hook enabled; SDK 57 on branch sdk57 (never OTA from it); 1.1.0 APK near go-live
+- [Student lists](sportfolio-student-lists.md) — bulk student upload (class/section/whole school, no duplicates, parent approves); LIVE 2026-10-28
+- [Cue sports](sportfolio-cue-sports.md) — pool/snooker/billiards LIVE 2026-10-29; billiards tables count points
+- [Quality mandate](sportfolio-quality-mandate.md) — TDD + unit + integration (PGlite) + break-it + 500-user sims; Waves 3–4, CL-04, SMS sign-up LIVE 2026-10-29 (7812d83); require_phone switch + CL-03 next
+- [Design system](sportfolio-design-system.md) — light court theme + leaning S:N logo LIVE; founder: no drawn sport art ("kiddish"), sport symbol = its emoji everywhere (SportSymbol.tsx), plain match cards; LIVE 2026-10-29 (web 95918812, OTA a48f39b4)
+- [Parental proof](sportfolio-parental-proof.md) — CL-03: every under-18 needs parent photo ID + relationship doc, reviewer approves, docs deleted 30d; LIVE 2026-10-29 (182166e, web f6dee86e, OTA 14b5597b)
+- [Error tracking](sportfolio-error-tracking.md) — daily email labels new/older/noise (6f45917, LIVE 2026-10-29); 08:30 scheduled check preps fix branches
+- [Store launch now](sportfolio-store-launch.md) — 2026-10-30: sole proprietorship; Play (personal, 12 testers×14 days) + App Store (individual) with current version; store prep = my top item
+- [Personalised Home](sportfolio-personalised-home.md) — first-run questions + Near you + views; LIVE 2026-10-31 (web a63038dc, OTA 919078ce)
+- [MVP](sportfolio-mvp.md) — 2026-10-31: live-link loop for community games; 7 sports (no cricket first); friendlies ungated; docs/product/MVP.md + docs/mvp/ audit

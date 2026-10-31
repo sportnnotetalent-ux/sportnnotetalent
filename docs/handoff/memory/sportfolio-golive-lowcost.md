@@ -1,0 +1,21 @@
+---
+name: sportfolio-golive-lowcost
+description: "2026-10-25/26 low-cost go-live setup — Android phone sign-in (RNFB), PDF picker, App Links, nightly encrypted DB backup, Resend SMTP, support@, uptime, Search Console, budget — ALL 8 founder steps DONE"
+metadata:
+  node_type: memory
+  type: project
+  originSessionId: dac368ef-8ce3-4d41-b4c5-d2930055ea8a
+  modified: 2026-10-25T17:36:28.234Z
+---
+
+Founder brief 2026-10-25: "every step towards go-live; set up everything that doesn't cost much". Commits 2df1bce + c66af0a + f732487 (docs). APK 41 built (versionCode 41; 40 was the failed attempt), EAS build 3c8f4ed7, signing key verified. Pushed 2026-10-25; sportnnote.in/.well-known/assetlinks.json live; Steps 1-3 DONE 2026-10-26: Cloudflare route+exception live (Google linked:true), founder tested APK 41 (links, phone sign-in, PDF), backup green + decrypt tested. Website/QR now point at APK 41 (2c932f5, needs push). Remaining founder steps 4-8. Published 2026-10-26: web (index-6298ae99) + Android OTA 2b3eb977 from 2c932f5. Then found web warm-up burst → EAS Hosting 429s; fixed de4bdac (4 at a time, none on Save-Data/2G) — published. Step 4 DONE 2026-10-26: Supabase Auth SMTP via Resend (port 465! other port → 504 Context deadline exceeded), Reset Password + Magic link templates show {{ .Token }} (docs/auth-email-templates.md); auth error messages fixed; web index-754021d7 + OTA 9e3d33ea from 72692d4. Step 5 DONE 2026-10-26: Cloudflare routing support@sportnnote.in → sportnnote@gmail.com; app/legal/website/edge SUPPORT_EMAIL all support@ (e0c8527, OTA 05f9c106). Steps 6-8 DONE 2026-10-26 (UptimeRobot 3 monitors; Search Console Domain property + full-URL sitemap; Cloud budget 'Alerts only' — NOT spend cap). ALL 8 low-cost steps complete (727b5e0). expo doctor flags Hermes V1 memory regression (SDK 57 fixes) — founder decided 2026-10-26 to HOLD: it only affects reanimated/worklets apps (we use neither); bundle SDK 57 with next new APK (Play Store). Any SDK/native upgrade MUST bump app version (runtimeVersion policy appVersion=1.0.0) or OTAs crash old APKs.
+
+- Android phone sign-in via @react-native-firebase ~26.4 (NOT 27: Firebase BoM 35 = Kotlin 2.4 metadata, RN 0.85 compiles Kotlin 2.1 → gradle fails; plugins/withFirebaseAndroidBom.js pins BoM 34.12.0, fix commit c66af0a) in src/core/firebasePhone.native.ts, guarded with TurboModuleRegistry ('NativeRNFBTurboApp'/'NativeRNFBTurboAuth') so APK ≤39 keeps email only (OTA-safe). Needs APK 40 + founder adding SHA-1/SHA-256 + Play Integrity API in Firebase (docs/firebase-phone-setup.md).
+- expo-document-picker guarded in src/core/document.ts; verification uploads now ArrayBuffer via readDocBytes (Blob uploaded 0 bytes on Android).
+- App Links: src/core/androidAppLinks.ts (15 paths, EAS SHA-256), app.json intentFilters autoVerify, website build writes /.well-known/assetlinks.json. app.sportnnote.in 301s to sportnnote.expo.app → founder must add a Cloudflare redirect exception + Worker route app.sportnnote.in/.well-known/* → worker "sportnnote".
+- Backup: .github/workflows/db-backup.yml (supabase db dump, openssl AES-256 PBKDF2 600k, artifacts 35/90 days); secrets SUPABASE_DB_URL + BACKUP_PASSPHRASE; runbook docs/ops/backups.md. LIVE 2026-10-26: first run green, artifact present, manifest players=27 matched live; workflow on setup-cli@v3/upload-artifact@v7/ubuntu-24.04 (83280a6). Pushing needs a token with `workflow` scope (founder has no gh CLI; uses a PAT in the macOS keychain — add the scope on github.com).
+- Founder steps list: docs/international/go-live-checklist.md "Low-cost go-live setup" (Firebase, Cloudflare, backup secrets, Supabase Auth SMTP via Resend — built-in mailer only reaches team, support@ routing, UptimeRobot on /auth/v1/health?apikey=, Search Console, SMS budget).
+- iOS prebuild now needs GoogleService-Info.plist (RNFB plugin throws) — fine until the Apple account.
+
+**Why:** pilot/launch readiness without spend; Supabase free plan has no downloadable backups.
+**How to apply:** when the founder reports steps done, verify (curl assetlinks 200, backup run green, test forgot-password) and tick the checklist. Related: [[sportfolio-launch-plan]], [[sportfolio-push-notifications]], [[sportfolio-resend-email]].
