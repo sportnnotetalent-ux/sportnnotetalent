@@ -13,7 +13,11 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
-### 2026-10-31 — MVP P1s, batch 4 (not published yet)
+### 2026-10-31 — Release: MVP P1 batch 4 live (web, Android OTA)
+
+auth-smoke passed. Published from a clean worktree at e6483fe: web (entry `index-3317947e`, confirmed live) and Android OTA group `9a9dcf30` (runtime 1.0.0, channel preview).
+
+### 2026-10-31 — MVP P1s, batch 4
 
 Break-it list first (`docs/security/breaks/mvp-p1-batch4.md`), then each fix with a failing test:
 - **Tennis presets** in the order club players need: Best of 3, 2 sets + match tiebreak, One set, Short sets, … Best of 5 and Grand Slam last.
