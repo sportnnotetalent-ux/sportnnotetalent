@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-01 — Release: Play again + nudge live (web, Android OTA)
+
+auth-smoke passed. Published from a clean worktree at a85b5cf: web (entry `index-c022d383`, confirmed live on app.sportnnote.in) and Android OTA group `3f13e6a4` (runtime 1.0.0, channel preview). The nudge is to be checked on the Android app by the founder.
+
 ### 2026-11-01 — Play again + the 7-day nudge (growth plan #7)
 
 At full time a friendly's scorer gets "Play again (same teams & rules)": one tap creates the next match (same sides, format, venue, squads; never the result, officials, stream link or series keys) as theirs and opens it. Tournament matches don't get it. On the phone app, a friendly's final result also sets one reminder six days later ("Another game this week?"), cancelled when they score again; Settings → Match reminders can switch it off. Break-it list `docs/security/breaks/play-again.md`; tests; 1,000 simulated replays; demo-checked (Play again). Full suite 6,141 tests, 0 failing; tsc clean.
