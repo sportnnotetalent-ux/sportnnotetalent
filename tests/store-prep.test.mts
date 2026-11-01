@@ -46,3 +46,10 @@ test('SP3 / SP4 / SP6 / SP7 / SP8: the founder guide covers the key, Firebase iO
   const kw = g.match(/\*\*Keywords \(App Store, ≤ 100\):\*\* (.*)/)![1];
   assert.ok(kw.length <= 100, `keywords ${kw.length}`);
 });
+
+test('2026-11-01: the guide is for company (organisation) accounts, with the D-U-N-S step first', () => {
+  const g = read('docs/launch/store-launch.md');
+  for (const t of ['## A. Google Play (organisation account)', '## B. App Store (organisation)', '**1.1. D-U-N-S number.**', '## 0. Now, while the company is being registered']) assert.ok(g.includes(t), t);
+  assert.ok(!g.includes('(personal, $25)'), 'no personal-account sign-up left');
+});
+

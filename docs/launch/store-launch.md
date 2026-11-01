@@ -1,19 +1,42 @@
 # Play Store + App Store launch (current app, 1.0.x)
 
-**Plan (founder, 2026-10-30):** go live on both stores now, as a sole proprietorship. Play on a personal account (closed test with at least 12 testers for 14 days in a row, then production); App Store as an individual (seller name = your legal name).
+**Plan (founder, 2026-11-01):** open both store accounts **in the company's name** once the Private Limited company is registered (about 2 weeks), rather than as a person. Why:
+- the stores show the company as the seller, not your legal name;
+- Play **organisation** accounts don't have the personal-account rule of a closed test with 12 testers for 14 days, so the launch date barely moves;
+- no account or app transfer later.
+
+*(This replaces the 2026-10-30 plan: a sole proprietorship with a personal Play account and an individual Apple account. Both stores change their rules from time to time; check the sign-up pages on the day.)*
 
 **Ready in code (2026-11-01):**
 - `eas.json`: the `production` profile builds a Play app bundle (`.aab`) on the `production` update channel.
-- `scripts/publish-android-ota.sh` now also publishes every update to the `production` channel, so Play builds get the same fixes as the APKs (same runtime 1.0.0, same bundle). `SKIP_STORE=1` publishes to the APKs only.
+- `scripts/publish-android-ota.sh` publishes every update to the `production` channel too, so store builds get the same fixes as the APKs (same runtime 1.0.0, same bundle). `SKIP_STORE=1` publishes to the APKs only.
 - `app.json`: iPhone export compliance answered in the build (`usesNonExemptEncryption: false`, HTTPS only); every permission has its reason (camera, contacts, microphone, speech, approximate location).
-- A trial iPhone prebuild showed the one thing missing for an iPhone build: Firebase's `GoogleService-Info.plist` (step B2).
+- A trial iPhone prebuild showed the one thing missing for an iPhone build: Firebase's `GoogleService-Info.plist` (step 0.2).
 - Reviewers can try the app with no account at all ("Score a game now, no sign-up").
 
 ---
 
-## A. Google Play (personal account)
+## 0. Now, while the company is being registered (nothing here needs it)
 
-**A1. Account.** Sign up at play.google.com/console (personal, $25), with identity verification. *(You.)*
+**0.1. Company email.** An address on the domain, e.g. `apps@sportnnote.in`, for both store accounts and the D-U-N-S request (support@sportnnote.in works too). *(You.)*
+
+**0.2. Firebase for iPhone.** Firebase console → project → Add app → **iOS**, bundle id **`in.sportnnote.app`** → download **`GoogleService-Info.plist`** → put it in the project folder next to `google-services.json` (it's configuration, not a secret, like the Android one). Tell me, and I add it to `app.json` and rerun the iPhone prebuild to settle Firebase's iOS linking, so the first iPhone build is ready to go. *(You, then me.)*
+
+**0.3. Test phone number for review.** Firebase console → Authentication → Sign-in method → Phone → **Phone numbers for testing** → add one number with a fixed 6-digit code (it goes in the review notes, section E). *(You.)*
+
+**0.4. Screenshots** (section D) and the **feature graphic** (1024×500). *(You.)*
+
+**0.5. Testers anyway.** Not required for an organisation Play account, but 10–20 people trying the store build before launch is the cheapest feedback there is: line up their Google account emails. *(You.)*
+
+## 1. The day the company is registered
+
+**1.1. D-U-N-S number.** Both stores need it for a company. It's free: request it through Apple's D-U-N-S look-up (developer.apple.com → Enroll → organisation → "check D-U-N-S") or directly from Dun & Bradstreet India, with the company's **legal name exactly as registered**, its registered address and your company email. It can take from a few days to about a month, so request it the same day. *(You.)*
+
+**1.2. Website.** Both stores check that the company has a website; sportnnote.in is live. Add the company's legal name to its footer (I can do that when you tell me the exact name). *(You tell me the name; I update the site.)*
+
+## A. Google Play (organisation account)
+
+**A1. Account.** play.google.com/console → **Organisation** account ($25), with the D-U-N-S number, the company's legal name and address, your company email, and your own ID as the authorised person. Verification can take a few days. *(You.)*
 
 **A2. Create the app.** All apps → Create app: name **SportnNote**, default language **English (India)**, **App**, **Free**. Accept the declarations. *(You.)*
 
@@ -24,21 +47,21 @@
 
 **A4. The app bundle.** Tell me when A3 is done; I build it with `npx eas-cli build -p android --profile production` (on EAS; about 20 minutes) and give you the `.aab` link. *(Me, on your go-ahead: a store build uses EAS build credits.)*
 
-**A5. Closed test (the 14-day clock).** Test and release → Testing → **Closed testing** → Create track → upload the `.aab` → add a testers list (at least **12** Google account emails: friends, players) → share the opt-in link. The clock starts once 12 have opted in; keep them in for **14 days in a row**. *(You.)*
+**A5. Internal test first.** Test and release → Testing → **Internal testing** → upload the `.aab` → add your testers (0.5) → share the link. A few days of real use catches what we missed. *(You.)*
 
-**A6. Store listing.** Paste the texts in section C. Graphics: the icon (`assets/icon.png`, 512×512 export), a feature graphic (1024×500) and 4–8 phone screenshots (section D). *(You, with the texts here.)*
+**A6. Store listing.** Paste the texts in section C. Graphics: the icon (`assets/icon.png`, 512×512 export), the feature graphic and 4–8 phone screenshots (section D). *(You, with the texts here.)*
 
-**A7. App content.** Answer with section E: privacy policy URL, app access (reviewer notes), ads (none), content rating, target audience, data safety, government app (no), financial features (none), health (no). *(You.)*
+**A7. App content.** Answer with section E: privacy policy URL, app access (review notes), ads (none), content rating, target audience, data safety, government app (no), financial features (none), health (no). *(You.)*
 
-**A8. Production.** After the 14 days: apply for production access (Play asks a few questions about the test), then promote the build. *(You.)*
+**A8. Production.** Promote the build to **Production** and send it for review (usually a few days for a new app). *(You.)*
 
-## B. App Store (individual)
+## B. App Store (organisation)
 
-**B1. Account.** Enrol in the Apple Developer Program as an **individual** through the **Apple Developer app** on an iPhone (India: about ₹8,700 a year). *(You.)*
+**B1. Account.** Enrol in the Apple Developer Program as an **organisation** (the Apple Developer app or developer.apple.com/enroll) with the D-U-N-S number, the company's legal name, the website and your company email; Apple may phone you to confirm you can sign for the company. About ₹8,700 a year. *(You.)*
 
-**B2. Firebase for iPhone.** Firebase console → project → Add app → **iOS**, bundle id **`in.sportnnote.app`** → download **`GoogleService-Info.plist`** → put it in the project folder next to `google-services.json` (it's configuration, not a secret, like the Android one). Also add the **APNs key** (Apple Developer → Keys → new key with Apple Push Notifications; upload it in Firebase → Project settings → Cloud Messaging → Apple app) so phone sign-in and pushes work. *(You.)*
+**B2. Push key.** Apple Developer → Keys → new key with **Apple Push Notifications service** → upload it in Firebase → Project settings → Cloud Messaging → your iOS app, so phone sign-in and pushes work on iPhone. *(You.)*
 
-**B3. Tell me.** I add the file to `app.json`, rerun the iPhone prebuild to settle Firebase's linking on iOS, and prepare the build. The first iPhone build needs you at the keyboard once: `npx eas-cli build -p ios --profile production` asks you to sign in to your Apple account (EAS then makes the certificates). *(Me + you.)*
+**B3. The first iPhone build.** It needs you at the keyboard once: `npx eas-cli build -p ios --profile production` asks you to sign in to your Apple account (EAS then makes the certificates). *(Me + you.)*
 
 **B4. App Store Connect.** New app: SportnNote, bundle id `in.sportnnote.app`, SKU `sportnnote-ios`, primary language English (India). Fill it with sections C and E, add iPhone screenshots (6.9" and 6.5"), and submit for review after `eas submit -p ios`. *(You, with me preparing the submit.)*
 
@@ -92,10 +115,10 @@ Built in India for school, college and community sport. Free while we're new.
 
 **App access (Play) / Review notes (Apple):**
 > No account is needed to try SportnNote: on the first screen tap "Score a game now, no sign-up", pick a sport and score.
-> To sign in: use the test phone number **[set in Firebase, step below]** with code **[fixed code]**, or the email option.
+> To sign in: use the test phone number **[the test number from step 0.3]** with code **[fixed code]**, or the email option.
 > Under-18 accounts need a parent's consent and proof; adults are not affected. Messaging for under-18s goes to their guardian.
 
-Set the test number once: Firebase console → Authentication → Sign-in method → Phone → **Phone numbers for testing** → add one number with a fixed 6-digit code, and put both in the note above. *(You.)*
+The test number and code are from step 0.3.
 
 **Ads:** none. **In-app purchases:** none.
 

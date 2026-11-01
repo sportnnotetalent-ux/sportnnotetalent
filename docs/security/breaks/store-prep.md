@@ -2,6 +2,8 @@
 
 **Founder's plan (2026-10-30):** go live on both stores now with the current app (SDK 56), as a sole proprietorship: Play on a personal account (closed test, 12 testers × 14 days, then production) and the App Store as an individual.
 
+**Changed 2026-11-01:** the founder is registering a Private Limited company (~2 weeks); both store accounts will be **organisation** accounts in its name (D-U-N-S needed; Play organisation accounts have no 12-tester × 14-day rule). `docs/launch/store-launch.md` is reworked for that route; the code side is unchanged.
+
 **Process:** quality mandate step 4. Listed after reading the config and scripts and **before** any change.
 
 | # | Failure | Status |
