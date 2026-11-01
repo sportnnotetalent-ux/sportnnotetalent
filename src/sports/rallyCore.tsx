@@ -233,6 +233,8 @@ export function makeRallyPlugin(opts: RallyOpts): SportPlugin<RallyState> {
                   {opts.icon} Serving: {serverP?.fullName ?? servingTeam} ({spot.court}) · {spot.call}
                 </Text>
                 <Text style={ctrl.meta}>{servingTeam}{s.doubles ? ` · server ${s.serverNo}` : ''}</Text>
+                {/* MVP PB9: the three-number call, for newcomers */}
+                <Text style={ctrl.meta}>The call is the serving side’s score, the other side’s score, then server 1 or 2.</Text>
               </>
             ) : (
               <Text style={ctrl.serve}>

@@ -27,11 +27,11 @@ export const KABADDI_META: SportMeta = {
     },
     { key: 'playersPerSide', label: 'Players per side', type: 'count', default: 7, min: 1, max: 11 },
     {
-      key: 'style', label: 'Revival style', type: 'choice', default: 'sanjeevani',
+      key: 'style', label: 'When a player is out', type: 'choice', default: 'sanjeevani',
       options: [
-        { value: 'sanjeevani', label: 'Sanjeevani (revival)' },
-        { value: 'amar', label: 'Amar (points only)' },
-        { value: 'gaminee', label: 'Gaminee (all-out ends)' },
+        { value: 'sanjeevani', label: 'They come back as you score (Sanjeevani)' },
+        { value: 'amar', label: 'No one goes off, points only (Amar)' },
+        { value: 'gaminee', label: 'No revivals until an all out (Gaminee)' },
       ],
     },
     {

@@ -14,7 +14,7 @@ You tap each point; the app handles 15-30-40, deuce, tiebreaks and serve.
 
 ## Before you start
 - You must be a scorer or host of the match or its tournament. See [Scorers and officials](/guides/scorers-and-officials/).
-- **Format**: **Best of 3 sets**, **Best of 5 sets**, **Grand Slam (Bo5, 10-pt TB at 6-6 in set 5)**, **Fast4**, **Pro set (to 8)**, **Doubles (no-ad · match TB to 10 for the 3rd set)**, **Match tiebreak (to 10)** or **Custom**.
+- **Format**: **Best of 3 sets**, **2 sets + match tiebreak (3rd to 10)**, **One set**, **Short sets (to 4, best of 3)**, **Short sets to 4, no deuce (Fast4)**, **One long set to 8 (pro set)**, **Doubles: no deuce, 3rd set is a tiebreak to 10**, **Match tiebreak only (first to 10)**, **Best of 5 sets**, **Best of 5, tiebreak at 6-6 in the 5th (Grand Slam)** or **Custom**.
 - The **Doubles** preset is the standard ITF, ATP and WTA doubles format: no-ad games, two sets with tiebreaks, and a 10-point match tiebreak instead of a third set.
 - **At deuce**: **Advantage (classic)** or **No-ad (deciding point)**.
 - **⚙ Customize this format**: **Deciding set** (full set or **10-point match tiebreak**) and **Deciding-set tiebreak**, e.g. **10-point at 6-6 (Grand Slam)**.

@@ -12,7 +12,7 @@ Padel uses tennis scoring, with advantage, a golden point or the 2026 Star Point
 
 ## Before you start
 - You must be a scorer or host. See [Scorers and officials](/guides/scorers-and-officials/).
-- **Format**: **Golden point (WPT style)**, **Star Point (FIP / Premier Padel 2026)**, **Classic (advantage)**, **Short (to 4, match TB)** or **Custom** (**At deuce**, **Games per set**, **Match length**, **Deciding set**).
+- **Format**: **Golden point (best of 3)**, **Star Point (FIP / Premier Padel 2026)**, **Classic (advantage)**, **Short (to 4, match TB)** or **Custom** (**At deuce**, **Games per set**, **Match length**, **Deciding set**).
 - Under **Players**, **Doubles** is the default. Add both pairs.
 
 ## Step by step: score a point

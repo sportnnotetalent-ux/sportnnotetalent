@@ -78,7 +78,7 @@ export function ServeCourtPanel({
       <Court homeLineup={home} awayLineup={away} homeColor={homeColor} awayColor={awayColor} />
       {pickable && pair.length === 2 ? (
         <View style={st.pick}>
-          <Text style={st.note}>Who receives in the deuce court for {teamOf(recvSide)} this set?</Text>
+          <Text style={st.note}>Who receives in the right-hand (deuce) court for {teamOf(recvSide)} this set?</Text>
           <View style={st.chips}>
             {pair.map((p, i) => (
               <SelectChip key={p.id} label={p.fullName} active={false}

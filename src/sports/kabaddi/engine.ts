@@ -653,7 +653,7 @@ export function raidEvents(raids: RaidEntry[], orphans: RaidEntry[], cfg: Kabadd
       k += 1;
     }
     for (const side of b.allOuts) {
-      out.push({ ...base, id: eid + k / 10, icon: '💥', label: 'All out +2', side, kind: 'allout', points: 2 });
+      out.push({ ...base, id: eid + k / 10, icon: '💥', label: 'All out (Lona) +2', side, kind: 'allout', points: 2 });
       k += 1;
     }
   });

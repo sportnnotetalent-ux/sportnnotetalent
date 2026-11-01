@@ -19,10 +19,10 @@ export const BADMINTON_META: SportMeta = {
     {
       key: 'preset', label: 'Format', type: 'preset', default: 'bwf21',
       options: [
-        { value: 'bwf21', label: 'BWF · 21 rally', set: { pointsPerGame: 21, cap: 30, gamesToWin: 2, goldenPoint: true } },
-        { value: 'g5x11', label: '5×11 (rally, cap 15)', set: { pointsPerGame: 11, cap: 15, gamesToWin: 3, goldenPoint: true } },
-        { value: 'g15', label: '15-point', set: { pointsPerGame: 15, cap: 21, gamesToWin: 2, goldenPoint: true } },
-        { value: 'single', label: 'Single game to 21', set: { pointsPerGame: 21, cap: 30, gamesToWin: 1, goldenPoint: true } },
+        { value: 'bwf21', label: 'Games to 21, best of 3', set: { pointsPerGame: 21, cap: 30, gamesToWin: 2, goldenPoint: true } },
+        { value: 'g5x11', label: 'Games to 11, best of 5', set: { pointsPerGame: 11, cap: 15, gamesToWin: 3, goldenPoint: true } },
+        { value: 'g15', label: 'Games to 15, best of 3', set: { pointsPerGame: 15, cap: 21, gamesToWin: 2, goldenPoint: true } },
+        { value: 'single', label: 'One game to 21', set: { pointsPerGame: 21, cap: 30, gamesToWin: 1, goldenPoint: true } },
         { value: 'custom', label: 'Custom' },
       ],
     },
@@ -36,12 +36,12 @@ export const BADMINTON_META: SportMeta = {
     // MVP B7: the deuce cap follows the points (21 → 30, 15 → 24); blank / out of range is fixed on leaving the box
     { key: 'pointsPerGame', label: 'Points per game', type: 'number', default: 21, min: 5, max: 30, advanced: true,
       derive: (v): Record<string, number> => (Number(v) >= 5 ? { cap: Math.min(40, Number(v) + 9) } : {}) },
-    { key: 'cap', label: 'Deuce cap', type: 'number', default: 30, min: 5, max: 40, advanced: true, hint: 'hard ceiling that settles a long deuce' },
+    { key: 'cap', label: 'Longest a game can go', type: 'number', default: 30, min: 5, max: 40, advanced: true, hint: 'at 20-20 play goes on, but a game ends by this score (30 for games to 21)' },
     {
-      key: 'goldenPoint', label: 'At the cap', type: 'choice', default: true, advanced: true,
+      key: 'goldenPoint', label: 'One short of that score, level', type: 'choice', default: true, advanced: true,
       options: [
-        { value: true, label: 'Golden point (next wins)' },
-        { value: false, label: 'Win by 2 (no golden point)' },
+        { value: true, label: 'Next point wins' },
+        { value: false, label: 'Play on until 2 clear' },
       ],
     },
     {

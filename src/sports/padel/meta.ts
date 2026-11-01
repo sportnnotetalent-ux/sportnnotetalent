@@ -19,7 +19,7 @@ export const PADEL_META: SportMeta = {
     {
       key: 'preset', label: 'Format', type: 'preset', default: 'premier',
       options: [
-        { value: 'premier', label: 'Golden point (WPT style)', set: { deuce: 'golden', gamesPerSet: 6, setsToWin: 2, decider: 'set' } },
+        { value: 'premier', label: 'Golden point (best of 3)', set: { deuce: 'golden', gamesPerSet: 6, setsToWin: 2, decider: 'set' } },
         // SD-64 — FIP / Premier Padel from 2026 (Rules of Padel, Rule 1 option 2)
         { value: 'star', label: 'Star Point (FIP / Premier Padel 2026)', set: { deuce: 'star', gamesPerSet: 6, setsToWin: 2, decider: 'set' } },
         { value: 'classic', label: 'Classic (advantage)', set: { deuce: 'advantage', gamesPerSet: 6, setsToWin: 2, decider: 'set' } },

@@ -34,7 +34,7 @@ One raid can score for both teams. You record each raid once, and the app works 
 - Tackle: a point to the defending team and the tackler.
 - Super raid: a raid worth 3 or more points.
 - Super tackle: a tackle with 3 or fewer defenders on the mat is worth 2.
-- All out: the other team gets 2 extra points, and with Sanjeevani revival the whole team comes back on.
+- All out (Lona): the other team gets 2 extra points, and when players come back as you score (Sanjeevani), the whole team comes back on.
 
 > **Note:** With **Amar (points only)** revival, nobody goes out, so there are no all outs or super tackles.
 

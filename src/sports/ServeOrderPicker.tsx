@@ -81,7 +81,7 @@ export function ServeOrderPicker({
           </View>
         );
       })}
-      <Text style={st.meta}>Optional: who receives in the deuce court this set (names the receiver on the Score tab).</Text>
+      <Text style={st.meta}>Optional: who receives in the right-hand (deuce) court this set (names the receiver on the Score tab).</Text>
       {sides.map((t) => {
         const roster = (t === 'home' ? homeRoster : awayRoster).slice(0, 2);
         const cur = deuceReceiverSlot(state, t);

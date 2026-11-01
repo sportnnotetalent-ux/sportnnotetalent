@@ -14,9 +14,9 @@ Every rally scores, and the rally winner serves next. You tap who won each rally
 
 ## Before you start
 - You must be a scorer or host. See [Scorers and officials](/guides/scorers-and-officials/).
-- **Format**: **BWF · 21 rally**, **5×11 (rally, cap 15)**, **15-point**, **Single game to 21** or **Custom**.
+- **Format**: **Games to 21, best of 3**, **Games to 11, best of 5**, **Games to 15, best of 3**, **One game to 21** or **Custom**.
 - In BWF a game is won at 21 by two. From 20-all play goes on until someone leads by two; at 29-all the next point wins, so no game passes 30.
-- **⚙ Customize this format** changes **Points per game**, **Deuce cap**, **Match length** and **At the cap**.
+- **⚙ Customize this format** changes **Points per game**, **Longest a game can go**, **Match length** and what happens **one short of that score, level** (next point wins, or play on until 2 clear).
 - Under **Players**, pick **Singles** or **Doubles**.
 
 ## Step by step: score a rally

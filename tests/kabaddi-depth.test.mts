@@ -290,7 +290,7 @@ describe('SD-41 — PKL match centre', () => {
     const labels = m.s.events.map((e) => e.label);
     assert.ok(labels.some((l) => /^Super raid/.test(l)));
     assert.ok(labels.some((l) => /^Super tackle \+2/.test(l)));
-    assert.ok(labels.some((l) => /^All out \+2/.test(l)));
+    assert.ok(labels.some((l) => /^All out \(Lona\) \+2/.test(l)));
     assert.ok(fullMatch().s.events.some((e) => /^Do-or-die/.test(e.label)));
   });
 });

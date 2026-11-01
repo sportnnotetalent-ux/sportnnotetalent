@@ -24,7 +24,7 @@ import { TennisStatsPanel } from './StatsPanel';
 import { TennisCommentary } from './Commentary';
 import { PointButtons, SecondaryAction, ServeFirstPicker } from '../PointButtons';
 import { pointPressure, pressureText } from '../pointStatus';
-import { init, reducer, disp, inTiebreak, other, serveInfo, gamesPlayed, summary, scoreLine, lineScore, standingsUnits, tennisCue, tiebreakBanner, type TennisState } from './engine';
+import { init, reducer, disp, inTiebreak, tennisStatus, other, serveInfo, gamesPlayed, summary, scoreLine, lineScore, standingsUnits, tennisCue, tiebreakBanner, type TennisState } from './engine';
 import { CueBanner } from '../CueBanner';
 import { tennisTotals } from '../racketTotals';
 import { cellText } from '../scoreline';
@@ -140,7 +140,7 @@ const TennisScoreboard: NonNullable<SportPlugin<TennisState>['Scoreboard']> = ({
   return (
     <SetLineBoard
       ls={lineScore(s)} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} live={live} closed={closed}
-      status={`Set ${setNo}${inTiebreak(s) ? ' · Tiebreak' : ''}`} bestOf={`best of ${s.setsToWin * 2 - 1}`}
+      status={`Set ${setNo}${inTiebreak(s) ? ' · Tiebreak' : tennisStatus(s) ? ` · ${tennisStatus(s)}` : ''}`} bestOf={s.setsToWin === 1 ? 'single set' : `best of ${s.setsToWin * 2 - 1}`}
       // After the match the current-game POINTS are meaningless (0-0), so the
       // headline becomes SETS won — the result a fan reads off a final board.
       leadLabel="POINTS" lead={{ home: disp(s, 'home'), away: disp(s, 'away') }}

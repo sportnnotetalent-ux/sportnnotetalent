@@ -133,6 +133,16 @@ export const gamesPlayed = (s: TennisState) => gamesPlayedOf(s);
 export const serveInfo = (s: TennisState) => serveInfoOf(s, inTiebreak(s));
 
 /** Tennis point display: 0/15/30/40 with Deuce/Ad, or raw points in a tiebreak. */
+/** MVP T13: the board's word for the game state at 40-40 and after —
+ *  "Deuce", "Advantage", or (no-ad) "Deciding point"; '' otherwise. */
+export function tennisStatus(s: TennisState): string {
+  if (!s || s.ended || inTiebreak(s)) return '';
+  const h = s.pts.home, a = s.pts.away;
+  if (h < 3 || a < 3) return '';
+  if (s.noAd) return 'Deciding point';
+  return h === a ? 'Deuce' : 'Advantage';
+}
+
 export function disp(s: TennisState, side: 'home' | 'away'): string {
   if (inTiebreak(s)) return String(s.pts[side]); // tiebreak: 0,1,2,3…
   const me = s.pts[side];
