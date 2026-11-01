@@ -1,7 +1,10 @@
 /** Notification preferences: the reminder timers before a match. Users keep any
  *  set of lead times — quick presets or a custom "N minutes/hours/days before".
  *  Applies to matches they play in and players they follow (see reminders.ts). */
-import React, { useState, useSyncExternalStore } from 'react';
+import React, { useEffect, useState, useSyncExternalStore } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { NUDGE_OFF_KEY } from '../core/nudge';
+import { cancelNudge } from '../core/notifications';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -35,6 +38,7 @@ export default function NotificationPrefsScreen() {
       <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
         <ScreenTitle title="Match reminders" subtitle="When to remind you before your matches" />
         <WebPushCard />
+        <NudgeCard />
 
         <Card style={{ gap: theme.spacing(3) }}>
           <Text style={textStyles.h3}>Reminder timers</Text>
@@ -99,3 +103,21 @@ const st = StyleSheet.create({
   numField: { width: 90 },
   off: { color: theme.colors.textMuted, fontSize: theme.font.small, fontStyle: 'italic' },
 });
+
+/** Growth plan #7: the weekly "play again" nudge (phone app), on by default. */
+function NudgeCard() {
+  const [off, setOff] = useState(false);
+  useEffect(() => { void AsyncStorage.getItem(NUDGE_OFF_KEY).then((v) => setOff(!!v), () => undefined); }, []);
+  const toggle = () => {
+    const next = !off;
+    setOff(next);
+    void (next ? AsyncStorage.setItem(NUDGE_OFF_KEY, '1').then(() => cancelNudge()) : AsyncStorage.removeItem(NUDGE_OFF_KEY)).catch(() => undefined);
+  };
+  return (
+    <Card style={{ gap: theme.spacing(2) }}>
+      <Text style={textStyles.h3}>Nudge me to score my next game</Text>
+      <Text style={textStyles.muted}>A week after a friendly you scored, if you haven’t scored another, one reminder on this phone. It goes away as soon as you score a match.</Text>
+      <SelectChip label={off ? 'Off' : 'On'} active={!off} onPress={toggle} />
+    </Card>
+  );
+}

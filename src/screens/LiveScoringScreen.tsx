@@ -100,7 +100,9 @@ import { claimThisDevicesGuestMatch } from '../data/guestClaim';
 import { openVenue } from '../core/venue';
 import { formatDateTime, formatTime, useUserTimeZone } from '../core/time';
 import { exportToCalendar } from '../core/ics';
-import { notify } from '../core/notifications';
+import { notify, scheduleNudge, cancelNudge } from '../core/notifications';
+import { replayNudge } from '../core/nudge';
+import { playAgain } from '../data/playAgain';
 import { MatchSummary } from '../components/MatchSummary';
 import { HostsCard } from '../components/HostsCard';
 import { LogoPicker } from '../components/LogoPicker';
@@ -582,6 +584,37 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
     return () => { on = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [matchId, complete, resultSendsAt, canScore, homeFull, awayFull]);
+
+  // ---- Growth plan #7: Play again + the 7-day nudge ----
+  const [playingAgain, setPlayingAgain] = useState(false);
+  const replay = async () => {
+    if (playingAgain) return;
+    if (!matchId || !profile?.id) return;
+    setPlayingAgain(true);
+    try {
+      const next = await playAgain(matchId, profile.id);
+      navigation.replace('LiveScoring', {
+        matchId: next.id, sport: next.sport,
+        homeName: next.homeTeam.shortName, awayName: next.awayTeam.shortName,
+        homeTeamName: next.homeTeam.name, awayTeamName: next.awayTeam.name,
+        homeColor: next.homeTeam.colorHex, awayColor: next.awayTeam.colorHex, canScore: true,
+      });
+    } catch (e) {
+      notice('Couldn’t set up the next game', e instanceof Error ? e.message : 'Please try again.');
+    } finally {
+      setPlayingAgain(false);
+    }
+  };
+  // The nudge: set when a friendly's result is final; gone the moment they score again.
+  useEffect(() => {
+    if (!matchId || !canScore || meta.tournamentId) return;
+    if (complete && resultSendsAt == null) {
+      void scheduleNudge(replayNudge({ matchId, home: homeTeamName ?? homeName, away: awayTeamName ?? awayName, now: Date.now() }));
+    } else if (!complete && eventCount > 0) {
+      void cancelNudge();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [matchId, canScore, complete, resultSendsAt, eventCount > 0, meta.tournamentId]);
 
   // ---- Guest scoring: the format from the device, then "Save & share" (G1, G7) ----
   useEffect(() => {
@@ -1587,6 +1620,10 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
           <TouchableOpacity style={st.assignBtn} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel="Share the result" onPress={() => shareRef.current()}>
             <Text style={st.assignBtnText}>Share the result</Text>
           </TouchableOpacity>
+          {!meta.tournamentId && canScore && matchId ? (
+            <Button label={playingAgain ? 'Setting up…' : 'Play again (same teams & rules)'} variant="ghost" disabled={playingAgain}
+              accessibilityLabel="Play again" onPress={() => void replay()} />
+          ) : null}
           {statsMsgs.length > 0 && (
             <View style={st.statsBox}>
               <Text style={st.retirePrompt}>Send players their stats</Text>

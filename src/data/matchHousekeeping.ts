@@ -37,6 +37,18 @@ export function cloneDraft(
   };
 }
 
+/** Growth plan #7 — "Play again": the next friendly between the same sides,
+ *  with the same rules and venue. A clone, minus the live-stream link (one
+ *  match's) and the series / aggregate keys; null for a tournament match
+ *  (it follows its fixtures). */
+const SERIES_KEYS = ['aggregateLeg', 'aggPriorHome', 'aggPriorAway'];
+export function playAgainDraft(match: Pick<Match, 'sport' | 'homeTeam' | 'awayTeam' | 'venueName' | 'venueMapsUrl' | 'streamUrl' | 'format' | 'tournamentId'>): CloneDraft | null {
+  if (match.tournamentId) return null;
+  const d = cloneDraft(match);
+  const format = d.format ? Object.fromEntries(Object.entries(d.format).filter(([k]) => !SERIES_KEYS.includes(k))) as Format : undefined;
+  return { ...d, streamUrl: undefined, format: format && Object.keys(format).length ? format : undefined };
+}
+
 /* --------------------------------- Breaks --------------------------------- */
 
 export const BREAK_KINDS = ['drinks', 'rain', 'interval', 'bad_light', 'injury', 'stumps', 'other'] as const;

@@ -9,6 +9,8 @@
  * supabase/functions/notify-followers). On web or a simulator it returns null.
  */
 import { Platform } from 'react-native';
+import { NUDGE_OFF_KEY, NUDGE_PREFIX } from './nudge';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { notifyStore } from '../data/notifyStore';
 
@@ -118,6 +120,30 @@ export async function syncScheduledLocal(
   } catch {
     // scheduler unavailable (e.g. simulator without entitlement) — ignore
   }
+}
+
+/** Growth plan #7 — the "play again" nudge (core/nudge.ts): one at a time, under
+ *  its own id (outside OWNED_PREFIXES, so syncScheduledLocal never touches it).
+ *  Phone app only (no-op on web). Respects the "Nudge me" switch. */
+export async function scheduleNudge(n: { id: string; fireAt: number; title: string; body: string; matchId: string }): Promise<void> {
+  const N = await getNotif();
+  if (!N) return;
+  try {
+    if (await AsyncStorage.getItem(NUDGE_OFF_KEY)) return;
+    await ensureAndroidChannel(N);
+    await N.cancelScheduledNotificationAsync(n.id).catch(() => undefined);
+    await N.scheduleNotificationAsync({
+      identifier: n.id,
+      // the tap opens the match (MatchLink 'm/:matchId'), where Play again is
+      content: { title: n.title, body: n.body, data: { matchId: n.matchId, url: `sportnnote://m/${n.matchId}` } },
+      trigger: { type: N.SchedulableTriggerInputTypes.DATE, date: new Date(n.fireAt) },
+    });
+  } catch { /* scheduler unavailable — ignore */ }
+}
+export async function cancelNudge(): Promise<void> {
+  const N = await getNotif();
+  if (!N) return;
+  try { await N.cancelScheduledNotificationAsync(`${NUDGE_PREFIX}replay`); } catch { /* none scheduled */ }
 }
 
 /** A tapped push that carries an in-app link (data.url = sportnnote://…) opens
