@@ -60,6 +60,7 @@ export async function cardPng(m: CardModel): Promise<Blob | null> {
     // what happened, where, and the address
     fit(m.line, 56, 936, false); g.fillStyle = WHITE; g.fillText(m.line, 72, 800);
     if (m.where) { fit(m.where, 38, 936, false); g.fillStyle = SOFT; g.fillText(m.where, 72, 860); }
+    if (m.star) { fit(m.star, 44, 936, false); g.fillStyle = LIME; g.fillText(m.star, 72, 930); }
     font(40, false); g.fillStyle = SOFT; g.fillText(m.footer, 72, 1010);
 
     return await new Promise<Blob | null>((resolve) => c.toBlob((b) => resolve(b), 'image/png'));

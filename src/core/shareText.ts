@@ -50,6 +50,8 @@ export interface MatchShareInput {
   when?: string;
   venue?: string;
   matchId?: string;
+  /** final only: Player of the match, already public-safe (cardStar) */
+  star?: string;
 }
 
 const clean = (s?: string) => (s ?? '').replace(/\s+/g, ' ').trim();
@@ -71,6 +73,7 @@ export function matchShareText(m: MatchShareInput): string {
   } else if (m.status === 'final' && m.winner) {
     lines.push(m.winner === 'draw' ? '🤝 Match drawn' : `🏆 ${clean(m.winner === 'home' ? m.home : m.away)} won`);
   }
+  if (m.status === 'final' && clean(m.star)) lines.push(`🏅 Player of the match: ${clean(m.star)}`);
   const detail = [clean(m.statusLine), clean(m.detailLine)].filter(Boolean).join(' · ');
   if (detail && m.status !== 'upcoming') lines.push(detail);
   if (m.status === 'upcoming') {

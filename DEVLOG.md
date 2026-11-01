@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-01 — The result picture at full time (growth plan #4)
+
+At full time the Scoring tab says "Full time — final score saved" with a big "Share the result" (text + the 1080×1080 score card on the web). Player of the match is on the card and in the message, by its public name: an adult in full, a possible minor by initials, a disputed player not at all (`cardStar`). Phones still share text + link (the picture needs react-native-view-shot in the store build). Break-it list `docs/security/breaks/full-time-share.md`; tests; 1,000 simulated shares; demo-checked. Full suite 6,112 tests, 0 failing; tsc clean.
+
 ### 2026-11-01 — Release: plain words live (web, Android OTA, website guides)
 
 auth-smoke passed. Published from a clean worktree at 8f65a5a: web (entry `index-bd4b8e98`, confirmed live on app.sportnnote.in) and Android OTA group `37418726` (runtime 1.0.0, channel preview); the website guides deploy with the push.

@@ -4,7 +4,24 @@
  * draws it in src/core/resultCardImage.ts.
  */
 
+import { publicName } from './playerNames.ts';
+
 export const CARD_NAME_MAX = 24;
+
+/** Growth plan #4 — Player of the match for a PUBLIC card / message: an adult
+ *  by name, a possible minor (under 18, or age unknown, or not on the rosters)
+ *  by initials, as players_view shows them publicly; a player under an open
+ *  dispute not at all. Undefined when there's no one to name. */
+export function cardStar(
+  potm: { id?: string; name: string } | undefined,
+  players: ReadonlyArray<{ id: string; fullName: string; age?: number }>,
+  disputedIds: ReadonlySet<string>,
+): string | undefined {
+  if (!potm || !potm.name.trim()) return undefined;
+  if (potm.id && disputedIds.has(potm.id)) return undefined;
+  const p = potm.id ? players.find((x) => x.id === potm.id) : undefined;
+  return publicName({ fullName: p?.fullName ?? potm.name, age: p?.age });
+}
 
 export interface CardInput {
   sportName: string;
@@ -19,6 +36,8 @@ export interface CardInput {
   tournamentName?: string;
   venue?: string;
   when?: string;
+  /** Player of the match, already public-safe (cardStar); results only */
+  star?: string;
 }
 
 export interface CardModel {
@@ -30,6 +49,8 @@ export interface CardModel {
   awayScore: string;
   line: string;
   where: string;
+  /** "Player of the match: …" on a result, else '' */
+  star: string;
   footer: string;
 }
 
@@ -53,6 +74,7 @@ export function cardModel(i: CardInput): CardModel {
     awayScore: i.status === 'upcoming' ? '' : (i.awayScore ?? '').trim(),
     line: short(line, 48),
     where: short([i.tournamentName, i.venue].filter(Boolean).join(' · '), 56),
+    star: final && i.star?.trim() ? short(`Player of the match: ${i.star.trim()}`, 48) : '',
     footer: 'sportnnote.in',
   };
 }

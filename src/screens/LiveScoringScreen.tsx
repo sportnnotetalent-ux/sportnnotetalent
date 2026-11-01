@@ -61,7 +61,7 @@ import { formatChangePreview, canChangeLiveFormat, type FormatPreview } from '..
 import { FORMAT_TYPE } from '../sports/amend';
 import { forfeitFor, forfeitNote } from '../data/walkover';
 import { recordMatchView } from '../data/personalise';
-import { cardModel } from '../core/resultCard';
+import { cardModel, cardStar } from '../core/resultCard';
 import { cardPng } from '../core/resultCardImage';
 import { viewsLabel } from '../core/personalise';
 import { viewerDeviceId } from '../core/telemetry';
@@ -523,6 +523,10 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
       const winner = complete ? (meta.winner ?? plugin.result?.(state)?.winner ?? undefined) : undefined;
       const resultLine = complete && meta.result ? manualResultLine(meta.result, hName, aName) : undefined;
       const when = meta.startsAt ? formatDateTime(meta.startsAt) : undefined;
+      // Growth plan #4: Player of the match, by its public name (a possible minor by initials)
+      const star = complete
+        ? cardStar(storedPotm ? { id: storedPotm.playerId, name: storedPotm.name } : autoPotmNow(), [...homeFull, ...awayFull], disputedOpenIds)
+        : undefined;
       // MVP 2026-10-31: on the web the same tap shares a score card picture with the text.
       void shareMessageWithCard(matchShareText({
         sportIcon: plugin.icon,
@@ -539,10 +543,11 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
         when,
         venue: meta.venueName,
         matchId,
+        star,
       }), 'match', () => cardPng(cardModel({
         sportName: plugin.name, status, home: hName, away: aName, homeScore, awayScore,
         statusLine: final ? undefined : fb ? 'Match Over' : summary.statusLine,
-        winner, resultLine, tournamentName: meta.tournamentName, venue: meta.venueName, when,
+        winner, resultLine, tournamentName: meta.tournamentName, venue: meta.venueName, when, star,
       })));
     };
   });
@@ -1542,6 +1547,14 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
     <View style={st.controls}>
       {syncing ? (
         <Text style={[textStyles.muted, { textAlign: 'center' }]}>Syncing live score…</Text>
+      ) : complete && !guestMode ? (
+        // Growth plan #4: the moment to share — the score card picture (web) and the link.
+        <View style={{ gap: theme.spacing(3), alignItems: 'center' }}>
+          <Text style={[textStyles.h3, { textAlign: 'center' }]}>Full time — final score saved</Text>
+          <TouchableOpacity style={st.assignBtn} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel="Share the result" onPress={() => shareRef.current()}>
+            <Text style={st.assignBtnText}>Share the result</Text>
+          </TouchableOpacity>
+        </View>
       ) : complete ? (
         <Text style={[textStyles.h3, { textAlign: 'center' }]}>Match complete — final score saved</Text>
       ) : !canScore ? (
