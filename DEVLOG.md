@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-01 — Release: plain words live (web, Android OTA, website guides)
+
+auth-smoke passed. Published from a clean worktree at 8f65a5a: web (entry `index-bd4b8e98`, confirmed live on app.sportnnote.in) and Android OTA group `37418726` (runtime 1.0.0, channel preview); the website guides deploy with the push.
+
 ### 2026-11-01 — Plain words in the setup and on the board (growth plan #3)
 
 MVP B11, B12, T12, T13, T14, K13, PB9, PD7: badminton presets read "Games to 21, best of 3"…; tennis "Short sets to 4, no deuce (Fast4)", "One long set to 8 (pro set)"…; padel "Golden point (best of 3)"; kabaddi "When a player is out: They come back as you score (Sanjeevani)…" and "All out (Lona) +2"; boards say "single game / single set"; tennis shows "Deuce" / "Advantage" / "Deciding point"; side-out's call is explained. Only words changed (values and rules compared with the last commit: identical). Website guides updated. Break-it list `docs/security/breaks/plain-words.md`; tests; demo-checked. Full suite 6,098 tests, 0 failing; tsc clean.
