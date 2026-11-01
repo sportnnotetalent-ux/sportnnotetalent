@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Push a JS-only update to installed Android APKs (EAS Update, channel "preview").
+# Push a JS-only update to installed Android APKs (EAS Update, channel "preview")
+# and to Play Store builds (channel "production").
 # Phones download it on next open and run it on the open after that.
 #
 # Only for changes WITHOUT new native modules/config — those need a new APK
@@ -39,3 +40,11 @@ echo "✓ bundle contains the live backend URL"
 
 npx eas-cli update --channel preview --environment preview --platform android \
   --skip-bundler --input-dir dist-ota --message "$MSG" --non-interactive
+
+# Store builds (Play, channel "production") take the same JS: same runtime
+# (runtimeVersion = app version), same bundle. Harmless before the first store
+# build exists. Set SKIP_STORE=1 to publish to the APKs only.
+if [ -z "${SKIP_STORE:-}" ]; then
+  npx eas-cli update --channel production --environment production --platform android \
+    --skip-bundler --input-dir dist-ota --message "$MSG" --non-interactive
+fi

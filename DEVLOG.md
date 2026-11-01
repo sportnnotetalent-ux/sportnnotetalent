@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-01 — Store prep (my side)
+
+Play + App Store launch with the current app: `eas.json` production builds a Play `.aab` on the `production` channel; `publish-android-ota.sh` now publishes every update to `preview` and `production` (`SKIP_STORE=1` to skip); iPhone export compliance answered in `app.json`; a trial iPhone prebuild confirmed the only blocker is Firebase's `GoogleService-Info.plist`. The founder guide `docs/launch/store-launch.md` has every step (Play account, keeping the EAS signing key, closed test, Apple individual enrolment, Firebase iOS app, test phone number), the listing text, screenshots list, store answers and review notes. Break-it list `docs/security/breaks/store-prep.md`. Full suite 6,146 tests, 0 failing; tsc clean.
+
 ### 2026-11-01 — Release: Play again + nudge live (web, Android OTA)
 
 auth-smoke passed. Published from a clean worktree at a85b5cf: web (entry `index-c022d383`, confirmed live on app.sportnnote.in) and Android OTA group `3f13e6a4` (runtime 1.0.0, channel preview). The nudge is to be checked on the Android app by the founder.

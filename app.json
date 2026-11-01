@@ -14,6 +14,9 @@
         "NSMicrophoneUsageDescription": "SportnNote uses the microphone for hands-free voice scoring. Audio isn’t recorded or uploaded by SportnNote — only the recognized words are used.",
         "NSSpeechRecognitionUsageDescription": "SportnNote uses speech recognition to turn your spoken calls (like “goal Rao”) into score entries.",
         "NSContactsUsageDescription": "Allow SportnNote to open your contacts so you can pick a player’s mobile number. Only the contact you pick is used."
+      },
+      "config": {
+        "usesNonExemptEncryption": false
       }
     },
     "android": {
