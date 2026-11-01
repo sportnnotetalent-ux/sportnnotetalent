@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-01 — Viewers become scorers (growth plan #6)
+
+The light score page's foot now says "Score your own game, free →" and opens the guest setup on app.sportnnote.in (`?from=match_link`); the app's guest bar has the same link (`from=guest_bar`); a signed-in visitor goes to the normal friendly setup. The steps (open → start → saved, with where they came from) are measured with the existing first-party `onboarding_step` event; weekly look: `docs/ops/viewer-to-scorer-funnel.sql`. The light-page change goes live with the Worker on push. Break-it list `docs/security/breaks/viewer-to-scorer.md`; tests; simulations. Full suite 6,133 tests, 0 failing; tsc clean.
+
 ### 2026-11-01 — Release: player stats live (web, Android OTA)
 
 auth-smoke passed. Published from a clean worktree at c3bbff5: web (entry `index-0e7f06a0`, confirmed live on app.sportnnote.in) and Android OTA group `0699dc9e` (runtime 1.0.0, channel preview).

@@ -10,6 +10,10 @@ import type { MatchEventRecord, MatchResult, SportId } from './types';
 import type { ScoreAction } from '../sports/types';
 
 export const GUEST_PREFIX = 'guest-';
+
+/** Growth plan #6: where a visitor came from, as a short analytics tag
+ *  (lower-case letters and _ only, at most 24) — never anything personal. */
+export const cleanFrom = (v: unknown): string => String(v ?? '').replace(/[^a-z_]/g, '').slice(0, 24) || 'sign_in';
 export const isGuestId = (id: string | undefined | null): boolean => !!id && id.startsWith(GUEST_PREFIX);
 
 export interface GuestMatch {

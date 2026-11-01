@@ -51,7 +51,8 @@ export type RootStackParamList = {
   /** MVP 2026-10-31: name, sport, teams, format → the fixtures */
   QuickTournament: { sport?: SportId } | undefined;
   /** Score first, sign up later: a signed-out person's quick game (on this device) */
-  GuestGame: undefined;
+  /** `from` (growth plan #6): where the visitor came from — measured, never personal */
+  GuestGame: { from?: string } | undefined;
   /** SD-134 — a Swiss round: numbered pairings (share / print) + the round results sheet */
   SwissRound: { tournamentId: string; sport?: SportId; round?: number };
   /** bulk schedule import from a spreadsheet (parity #24) */

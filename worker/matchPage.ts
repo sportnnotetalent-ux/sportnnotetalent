@@ -25,6 +25,10 @@ export const APP_ORIGIN = 'https://sportnnote.expo.app';
 /** MVP L8 — the full match in the app. Once the app is served on our own
  *  domain (the Worker's APP_ORIGIN var), `/m/<id>` there is this light page,
  *  so the app's copy of the match is `/m/<id>?full=1`. */
+/** Growth plan #6 — the light page's call to action: a game of your own, in the
+ *  app's guest setup (no sign-up to start), tagged so the step is measured. */
+export const scoreOwnHref = (appOrigin: string) => `${appOrigin}/GuestGame?from=match_link`;
+
 export const fullMatchHref = (appOrigin: string, id: string) =>
   appOrigin === LINK_ORIGIN ? `${appOrigin}/m/${id}?full=1` : `${appOrigin}/m/${id}`;
 export const LINK_ORIGIN = 'https://app.sportnnote.in';
@@ -89,7 +93,7 @@ const STYLE = `*{box-sizing:border-box}body{margin:0;background:#F3F0E8;color:#1
 .btn.primary{background:#0D5A3F;border-color:#0D5A3F;color:#fff}.views{margin:12px 0 0;text-align:center;color:#59616C;font-size:13px}
 .foot{text-align:center;color:#59616C;font-size:13px;padding:8px 16px 24px}.foot a{color:#0D5A3F;font-weight:700}`;
 
-function shell(o: { title: string; description: string; image: string; url: string; body: string; script?: string }): string {
+function shell(o: { title: string; description: string; image: string; url: string; body: string; script?: string; appOrigin?: string }): string {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(o.title)} | SportnNote</title><meta name="description" content="${esc(o.description)}">
 <meta property="og:type" content="website"><meta property="og:site_name" content="SportnNote">
@@ -98,7 +102,7 @@ function shell(o: { title: string; description: string; image: string; url: stri
 <meta property="og:url" content="${esc(o.url)}"><meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="#0A3A2B"><link rel="icon" href="${SITE_ORIGIN}/favicon.png">
 <style>${STYLE}</style></head><body><header class="top"><a class="brand" href="${SITE_ORIGIN}">S:N Sport<b>nNote</b></a></header>
-${o.body}<p class="foot">Score your own games, free · <a href="${SITE_ORIGIN}/#get">Get SportnNote</a></p>${o.script ?? ''}</body></html>`;
+${o.body}<p class="foot"><a href="${esc(scoreOwnHref(o.appOrigin ?? APP_ORIGIN))}">Score your own game, free →</a> · <a href="${SITE_ORIGIN}/#get">Get SportnNote</a></p>${o.script ?? ''}</body></html>`;
 }
 
 export function renderMatchPage(m: SharedMatch, appOrigin: string = APP_ORIGIN): string {
@@ -129,7 +133,7 @@ if(m.status==="live"){x("h",s.h);x("a",s.a);x("st",s.s);x("d",s.d||"");var b=doc
 else if(m.status==="completed"){x("h",s.h);x("a",s.a);x("st",s.s);x("d","");var c=document.getElementById("b");if(c){c.className="badge done";c.textContent="RESULT"}clearInterval(t)}}).catch(function(){})}
 t=setInterval(tick,${live ? 5000 : 30000});document.addEventListener("visibilitychange",tick)})();</script>`
     : '';
-  return shell({ title, description, image: `${SITE_ORIGIN}/share/${SPORTS[m.sport] ? m.sport : 'sportnnote'}.png`, url: `${LINK_ORIGIN}/m/${m.id}`, body, script });
+  return shell({ title, description, image: `${SITE_ORIGIN}/share/${SPORTS[m.sport] ? m.sport : 'sportnnote'}.png`, url: `${LINK_ORIGIN}/m/${m.id}`, body, script, appOrigin });
 }
 
 /** No such match (or its tournament was deleted). */
@@ -138,6 +142,7 @@ export function renderMissingPage(appOrigin: string = APP_ORIGIN): string {
     title: 'Match not found', description: 'This match isn’t on SportnNote any more. Score your own games, free.',
     image: `${SITE_ORIGIN}/share/sportnnote.png`, url: LINK_ORIGIN,
     body: `<main class="card"><p class="status">This match isn’t here any more.</p><p class="detail">It may have been deleted by its organiser.</p><a class="btn primary" href="${esc(appOrigin)}">Open SportnNote</a></main>`,
+    appOrigin,
   });
 }
 
@@ -147,5 +152,6 @@ export function renderFallbackPage(id: string, appOrigin: string = APP_ORIGIN): 
     title: 'Live score on SportnNote', description: 'Follow this match live on SportnNote.',
     image: `${SITE_ORIGIN}/share/sportnnote.png`, url: `${LINK_ORIGIN}/m/${id}`,
     body: `<main class="card"><p class="status">Live score on SportnNote</p><a class="btn primary" href="${esc(fullMatchHref(appOrigin, id))}">Open the match</a></main>`,
+    appOrigin,
   });
 }

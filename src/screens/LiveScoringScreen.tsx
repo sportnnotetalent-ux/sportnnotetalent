@@ -67,7 +67,7 @@ import { openWhatsApp } from '../core/connect';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { cardPng } from '../core/resultCardImage';
 import { viewsLabel } from '../core/personalise';
-import { viewerDeviceId } from '../core/telemetry';
+import { viewerDeviceId, track } from '../core/telemetry';
 import { getRoster, getPlayers, getLineup, getMatch, getTournaments, getMatchSquads, getMatchStatLines, getMyPlayerId, setMatchScorers, setMatchHosts, setMatchLogo, setMatchFormat, setMatchStream, setMatchManagers, getOrganizations, getTeamLeaders, getMatchDisputes, raiseDispute, updateDispute, dismissDispute, resolveDispute, escalateDispute, createReplacementPlayer, retireMatch, walkoverMatch, rescheduleMatch, getMatchKickoffAt, getScoringLock, claimScoring, handoverScoring, endMatchManually, getScoreEdits, getMatchEvents, getTournamentOfficials, joinMatchAsScorer, getMatchOfficials, setMatchOfficials, deleteMatch, resetMatch, setMatchBreak, getMatchLastActivityAt, getMatchPotm, setMatchPotm, stampAggregatePrior, AWARDS_DB_MESSAGE } from '../data/repos';
 import { matchRatings as genericRatings, type PotmProp } from '../data/ratings';
 import { AwardPickerSheet, type PickerRow } from '../components/AwardPickerSheet';
@@ -604,6 +604,7 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
     try {
       const id = await claimThisDevicesGuestMatch(profile.id);
       if (id) {
+        track('onboarding_step', { step: 'guest_game_saved' });
         navigation.replace('LiveScoring', {
           matchId: id, sport, homeName, awayName, homeTeamName, awayTeamName,
           homeColor: homeColorIn, awayColor: awayColorIn, canScore: true,
