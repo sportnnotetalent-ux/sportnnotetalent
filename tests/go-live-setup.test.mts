@@ -33,7 +33,9 @@ describe('Android phone sign-in (React Native Firebase)', () => {
     assert.match(src, /satisfies WebApi/);
   });
   test('the APK build includes the Firebase plugins', () => {
-    assert.ok(appJson.plugins.includes('@react-native-firebase/app'));
+    // the app plugin carries options since 2026-11-01 (iOS: disableSPM), so accept either form
+    const has = (n: string) => appJson.plugins.some((p: unknown) => p === n || (Array.isArray(p) && p[0] === n));
+    assert.ok(has('@react-native-firebase/app'));
     assert.ok(appJson.plugins.includes('@react-native-firebase/auth'));
     assert.equal(appJson.android.googleServicesFile, './google-services.json');
   });

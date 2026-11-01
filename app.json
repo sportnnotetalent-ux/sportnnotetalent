@@ -9,6 +9,7 @@
     "userInterfaceStyle": "light",
     "ios": {
       "bundleIdentifier": "in.sportnnote.app",
+      "googleServicesFile": "./GoogleService-Info.plist",
       "supportsTablet": true,
       "infoPlist": {
         "NSMicrophoneUsageDescription": "SportnNote uses the microphone for hands-free voice scoring. Audio isn’t recorded or uploaded by SportnNote — only the recognized words are used.",
@@ -180,12 +181,27 @@
           "isIosBackgroundLocationEnabled": false
         }
       ],
-      "@react-native-firebase/app",
+      [
+        "@react-native-firebase/app",
+        {
+          "ios": {
+            "disableSPM": true
+          }
+        }
+      ],
       "@react-native-firebase/auth",
       [
         "./plugins/withFirebaseAndroidBom",
         {
           "bom": "34.12.0"
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "useFrameworks": "static"
+          }
         }
       ]
     ],

@@ -11,7 +11,7 @@
 - `eas.json`: the `production` profile builds a Play app bundle (`.aab`) on the `production` update channel.
 - `scripts/publish-android-ota.sh` publishes every update to the `production` channel too, so store builds get the same fixes as the APKs (same runtime 1.0.0, same bundle). `SKIP_STORE=1` publishes to the APKs only.
 - `app.json`: iPhone export compliance answered in the build (`usesNonExemptEncryption: false`, HTTPS only); every permission has its reason (camera, contacts, microphone, speech, approximate location).
-- A trial iPhone prebuild showed the one thing missing for an iPhone build: Firebase's `GoogleService-Info.plist` (step 0.2).
+- Firebase for iPhone is set up (step 0.2): the trial iPhone prebuild finishes. The first real iPhone build (on EAS, once the Apple account exists) is the final check.
 - Reviewers can try the app with no account at all ("Score a game now, no sign-up").
 
 ---
@@ -20,7 +20,7 @@
 
 **0.1. Company email.** An address on the domain, e.g. `apps@sportnnote.in`, for both store accounts and the D-U-N-S request (support@sportnnote.in works too). *(You.)*
 
-**0.2. Firebase for iPhone.** Firebase console → project → Add app → **iOS**, bundle id **`in.sportnnote.app`** → download **`GoogleService-Info.plist`** → put it in the project folder next to `google-services.json` (it's configuration, not a secret, like the Android one). Tell me, and I add it to `app.json` and rerun the iPhone prebuild to settle Firebase's iOS linking, so the first iPhone build is ready to go. *(You, then me.)*
+**0.2. Firebase for iPhone. ✓ Done 2026-11-01** (the file is in; the trial iPhone prebuild finishes). Firebase console → project → Add app → **iOS**, bundle id **`in.sportnnote.app`** → download **`GoogleService-Info.plist`** → put it in the project folder next to `google-services.json` (it's configuration, not a secret, like the Android one). Tell me, and I add it to `app.json` and rerun the iPhone prebuild to settle Firebase's iOS linking, so the first iPhone build is ready to go. *(You, then me.)*
 
 **0.3. Test phone number for review.** Firebase console → Authentication → Sign-in method → Phone → **Phone numbers for testing** → add one number with a fixed 6-digit code (it goes in the review notes, section E). *(You.)*
 

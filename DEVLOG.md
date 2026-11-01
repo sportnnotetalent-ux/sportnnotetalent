@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-01 — iPhone Firebase set up (store step 0.2)
+
+The founder added the Firebase iOS app; `GoogleService-Info.plist` (bundle `in.sportnnote.app`, project `sportnnote-5c5e7`) is now in `app.json`. Firebase runs in CocoaPods mode (`@react-native-firebase/app` `ios.disableSPM`) with static frameworks (`expo-build-properties` 56.0.27, `ios.useFrameworks: static`), the combination its docs give (Swift Package mode needs dynamic frameworks). A trial iPhone prebuild finishes (the only warning is about Google Sign-In, which the app doesn't use). The first EAS iPhone build, once the Apple account exists, is the real check. No JS change; Android unaffected.
+
 ### 2026-11-01 — Store guide reworked for company accounts
 
 The founder is registering a Private Limited company (~2 weeks), so both stores will be organisation accounts in its name. `docs/launch/store-launch.md` now leads with what can be done now (company email, Firebase iOS app + plist, review test number, screenshots, testers), then the day the company exists (D-U-N-S, website footer), then Play (organisation: no 12-tester × 14-day rule; internal test first) and the App Store (organisation). Code side unchanged.

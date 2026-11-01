@@ -53,3 +53,13 @@ test('2026-11-01: the guide is for company (organisation) accounts, with the D-U
   assert.ok(!g.includes('(personal, $25)'), 'no personal-account sign-up left');
 });
 
+test('SP4: iPhone Firebase — the plist for this app, CocoaPods mode with static frameworks', () => {
+  assert.equal(app.ios.googleServicesFile, './GoogleService-Info.plist');
+  const plist = read('GoogleService-Info.plist');
+  assert.match(plist, /<key>BUNDLE_ID<\/key>\s*<string>in\.sportnnote\.app<\/string>/);
+  assert.match(plist, /<key>PROJECT_ID<\/key>\s*<string>sportnnote-5c5e7<\/string>/);
+  const plugin = (name: string) => app.plugins.find((p: unknown) => Array.isArray(p) && p[0] === name)?.[1];
+  assert.equal(plugin('@react-native-firebase/app').ios.disableSPM, true);
+  assert.equal(plugin('expo-build-properties').ios.useFrameworks, 'static');
+});
+
