@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-01 — "Your stats from today's game" (growth plan #5)
+
+Once a match's result is final: a push to each player with an account ("Your stats from today’s game: 2 goals · 1 assist · Panthers 2–1 Cheetahs"; once per match, never the scorer), and at full time "Send players their stats": one WhatsApp tap per player added by mobile number, from the scorer's phone, ending "Sign up on SportnNote with this number to keep your stats". A known under-18 is reached via their guardian's number or not at all; disputed players are left out. Break-it list `docs/security/breaks/player-stats-links.md`; tests; 1,000 simulated rounds; demo-checked (WhatsApp message). Full suite 6,125 tests, 0 failing; tsc clean.
+
 ### 2026-11-01 — Release: full-time share live (web, Android OTA)
 
 auth-smoke passed. Published from a clean worktree at c306943: web (entry `index-d7796080`, confirmed live on app.sportnnote.in) and Android OTA group `f7a2fed8` (runtime 1.0.0, channel preview).

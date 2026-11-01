@@ -62,6 +62,9 @@ import { FORMAT_TYPE } from '../sports/amend';
 import { forfeitFor, forfeitNote } from '../data/walkover';
 import { recordMatchView } from '../data/personalise';
 import { cardModel, cardStar } from '../core/resultCard';
+import { statsPushes, statsWhatsApps, type StatsMatch } from '../core/playerStatsMessage';
+import { openWhatsApp } from '../core/connect';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { cardPng } from '../core/resultCardImage';
 import { viewsLabel } from '../core/personalise';
 import { viewerDeviceId } from '../core/telemetry';
@@ -114,6 +117,8 @@ import { realName } from '../core/invite';
 import { inviteLabel, matchRoleInviteText, playerInviteText } from '../core/inviteText';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'LiveScoring'>;
+/** once per match on this device: the stats push went out (growth plan #5) */
+const STATS_PUSHED_KEY = 'sn.statsPushed.';
 
 export default function LiveScoringScreen({ route, navigation }: Props) {
   const {
@@ -551,6 +556,33 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
       })));
     };
   });
+  // ---- Growth plan #5: "Your stats from today's game" ----
+  // Once the result is final (not during the ~60 s hold): a push to each player
+  // with an account (once per match on this device), and a ready WhatsApp
+  // message per player added by mobile number, for the scorer to send.
+  const [statsMsgs, setStatsMsgs] = useState<ReturnType<typeof statsWhatsApps>>([]);
+  useEffect(() => {
+    if (!matchId || !complete || resultSendsAt != null || !canScore) return;
+    let on = true;
+    void (async () => {
+      const lines = await getMatchStatLines(matchId).catch(() => [] as StatLine[]);
+      const fb = finalBoard(plugin, state, resultOpts);
+      const sm: StatsMatch = {
+        matchId, sport, sportName: plugin.name, home: homeTeamName ?? homeName, away: awayTeamName ?? awayName,
+        homeScore: fb ? fb.homeScore : String(summary.homeScore), awayScore: fb ? fb.awayScore : String(summary.awayScore),
+      };
+      const players = [...homeFull, ...awayFull];
+      if (!on) return;
+      setStatsMsgs(statsWhatsApps(sm, lines, players, { disputed: disputedOpenIds, link: matchLink(matchId) }));
+      const key = `${STATS_PUSHED_KEY}${matchId}`;
+      if (await AsyncStorage.getItem(key).catch(() => null)) return;
+      await AsyncStorage.setItem(key, '1').catch(() => {});
+      for (const push of statsPushes(sm, lines, players, { me: myPlayerId, disputed: disputedOpenIds })) void notify(push);
+    })();
+    return () => { on = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [matchId, complete, resultSendsAt, canScore, homeFull, awayFull]);
+
   // ---- Guest scoring: the format from the device, then "Save & share" (G1, G7) ----
   useEffect(() => {
     if (!guestId) return;
@@ -1554,6 +1586,18 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
           <TouchableOpacity style={st.assignBtn} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel="Share the result" onPress={() => shareRef.current()}>
             <Text style={st.assignBtnText}>Share the result</Text>
           </TouchableOpacity>
+          {statsMsgs.length > 0 && (
+            <View style={st.statsBox}>
+              <Text style={st.retirePrompt}>Send players their stats</Text>
+              <Text style={textStyles.muted}>From your WhatsApp. Players on SportnNote already got theirs.</Text>
+              {statsMsgs.map((w) => (
+                <View key={w.playerId} style={st.statsRow}>
+                  <Text style={[textStyles.body, { flex: 1 }]} numberOfLines={1}>{w.name}</Text>
+                  <Button label="WhatsApp" variant="ghost" onPress={() => openWhatsApp(w.phone, w.text)} />
+                </View>
+              ))}
+            </View>
+          )}
         </View>
       ) : complete ? (
         <Text style={[textStyles.h3, { textAlign: 'center' }]}>Match complete — final score saved</Text>
@@ -3001,6 +3045,8 @@ const st = StyleSheet.create({
   caret: { color: theme.colors.textMuted, fontSize: theme.font.body, fontWeight: '800', width: 18, textAlign: 'center' },
   venueLink: { color: theme.colors.primary, fontSize: theme.font.body, fontWeight: '700', textAlign: 'right', flexShrink: 1 },
   // Same box as undoBtn (same height), greyed: holds Undo's place before the first action.
+  statsBox: { gap: theme.spacing(2), alignSelf: 'stretch' },
+  statsRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(2) },
   guestBar: { gap: theme.spacing(2), padding: theme.spacing(3), borderRadius: theme.radius.md, backgroundColor: theme.colors.surfaceAlt, borderWidth: 1, borderColor: theme.colors.border },
   guestText: { color: theme.colors.text, fontSize: theme.font.small },
   formatWarn: { color: theme.colors.danger, fontSize: theme.font.small },
