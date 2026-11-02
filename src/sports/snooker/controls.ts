@@ -104,6 +104,15 @@ function minFoul(fr: LiveFrame): number {
   return fr.on === 'red' || fr.on === 'colour' ? 4 : Math.max(4, ballValue(fr.on));
 }
 
+/** Batch 1 (cue-board audit #2) — the foul sheet's "ball involved" chips
+ *  (the ball hit first, potted or forced off). */
+export const FOUL_BALLS: readonly Ball[] = ['red', ...COLOURS];
+/** S3 R11 — a foul is worth the highest of 4, the ball on (`min`, which is
+ *  already max(4, ball on), 7 on the re-spotted black) and the ball involved.
+ *  The payload still carries only `value`, so old fouls replay unchanged. */
+export const foulValue = (min: number, involved?: Ball | null): number =>
+  Math.min(7, Math.max(min, involved ? ballValue(involved) : 0));
+
 export interface BallTap {
   ball: Ball | 'free';
   /** what it scores */

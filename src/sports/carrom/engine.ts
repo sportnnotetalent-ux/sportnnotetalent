@@ -260,6 +260,10 @@ export interface CarromState {
    *  improper stroke (r.102–112); a board is worth 12 at most (r.55). Absent
    *  on every older match — its boards replay exactly as before. */
   foulScore?: true;
+  /** Batch 1 (cue-board audit #1) — the ICF format preset: the Queen is always
+   *  covered before a board can end, so the board form offers Winner / Loser
+   *  only. Display only (no score rule); absent on other formats. */
+  icf?: true;
 }
 
 /** SD-117c — one board as the editor replays it (EDIT_LOG). */
@@ -292,8 +296,21 @@ export function init(config?: Record<string, unknown>): CarromState {
     // Round 2 — ICF foul penalties in the score (the format's default is on;
     // a match created before has no key: its score rules are unchanged)
     ...(config?.foulScore === true ? { foulScore: true as const } : {}),
+    ...(config?.preset === 'icf' ? { icf: true as const } : {}),
   };
 }
+
+/** Batch 1 (cue-board audit #1) — the answers to "Queen covered by" on a
+ *  played-out board: under the ICF format the Queen is always covered (by the
+ *  winner or the loser) before a board ends; other formats keep "Not covered". */
+export const queenChoices = (s: Pick<CarromState, 'icf'>): QueenBy[] =>
+  (s.icf ? ['winner', 'loser'] : ['winner', 'loser', 'none']);
+
+/** Batch 1 — the board form can record: a penalty board, or a played-out board
+ *  with the coins left AND the Queen answered (a skipped Queen used to drop
+ *  the winner's 3 points silently). Old boards are never re-asked. */
+export const boardReady = (s: Pick<CarromState, 'icf'>, b: { penalty: boolean; coins: number | null; queenBy: QueenBy | null }): boolean =>
+  b.penalty || (b.coins != null && b.queenBy != null && queenChoices(s).includes(b.queenBy));
 
 /** Round 2 — a board-ending foul from a payload (unknown keys dropped). */
 export function readEndFoul(v: unknown): EndFoul | undefined {
