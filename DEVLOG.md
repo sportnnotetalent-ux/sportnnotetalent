@@ -13,6 +13,15 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-03 — Batch 3: richer stats on by default for new matches
+
+The tennis TF2 fix ("only what is captured in scoring is seen in stats"), for the other sports. New matches only: old matches keep exactly the switches they were saved with (tests and simulations replay them unchanged), and every newly-on capture stays optional (scoring stays one tap).
+- **Racket:** point detail on in badminton, table tennis, squash, padel, pickleball. Padel's 1st / 2nd serve stays off until its Fault button (Batch 4) — on now it would stamp every point a 1st serve. `defaults-racket.md`.
+- **Football** friendlies: shots and saves on (were cards only). **Rugby union:** penalties conceded on; **league:** errors & penalties on (the settings card's standard follows). `defaults-invasion.md`.
+- **Basketball:** missed shots on (FG%, 3P%). **Volleyball:** "Set by?" on. **Netball:** International preset tracks feeds / rebounds; the centre-pass default now agrees between the form and the card. **Handball:** both stats switches on; "7 m won by" is an optional chip. `defaults-court.md`.
+- **Carrom:** coins on the break and missed Queen covers on (fouls stay off: no false zeros). **Baseball:** "Ask for fielders" stays off — on, it would add a blocking confirm to most outs; it can come on once the fielder pick moves after the play. `defaults-carrom-baseball.md`.
+Full suite 6,461 tests, 0 failing; tsc clean. Demo-checked: a new badminton match asks how the first rally ended; a new basketball match's Info shows "✓ Track missed shots".
+
 ### 2026-11-03 — Release: Batch 2 (Info rules & stats captured) live (web, Android OTA)
 
 auth-smoke passed. Published from a clean worktree at b52a279: web (entry `index-8a2d7e65`, confirmed live on app.sportnnote.in) and Android OTA groups `674f34ac` (preview) and `a4bdad5a` (production), runtime 1.0.0.
