@@ -15,7 +15,9 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { theme } from '../../core/theme';
-import { textStyles } from '../../components/ui';
+import { SelectChip, textStyles } from '../../components/ui';
+import { FAULT_KIND_LABEL, PADEL_FAULT_KINDS } from '../pointDetail';
+import { faultTyping } from '../serveFault';
 import { MatchBoxScore } from '../../components/BoxScore';
 import { padelBox } from '../boxSources';
 import { useMask } from '../../core/disputeMask';
@@ -76,6 +78,9 @@ const ScoringControls: SportPlugin<PadelState>['ScoringControls'] = ({ state, di
   const receiverSideName = serve.side === 'home' ? awayName : homeName;
   const ace = () => dispatch(pointAction(serve.side, serverP, { payload: { pd: { how: 'ace' } } }));
   const doubleFault = () => dispatch(doubleFaultAction(serve.side, serverP));
+  // padel-fault PF2 — the fault's type (the mesh too): the pending 1st-serve
+  // fault, else a double fault that is the last point played (optional)
+  const typing = faultTyping(s);
   return (
     <View style={{ gap: theme.spacing(4) }}>
       {/* SD-115 — two big team-coloured point buttons; doubles credit optional */}
@@ -86,14 +91,29 @@ const ScoringControls: SportPlugin<PadelState>['ScoringControls'] = ({ state, di
         disabled={needsServer} disabledHint="Pick who serves first to start scoring."
         onPoint={act}
       />
-      {/* SD-117c — Ace / Double fault: secondary, below the point buttons, server only */}
+      {/* SD-117c — Ace / Fault / Double fault: secondary, below the point buttons,
+          server only. padel-fault PF1 (as tennis): Fault = the 1st serve missed (no
+          point; the next point is a 2nd-serve point); on the 2nd serve a fault is
+          the double fault. */}
       {!needsServer && <View style={[ctrl.row, ctrl.secGap]}>
         <SecondaryAction label={`🎯 Ace · ${by}`} color={serve.side === 'home' ? homeColor : awayColor} onPress={ace} />
-        <SecondaryAction label={`⚠️ Double fault · ${by} → point ${receiverSideName}`} onPress={doubleFault} />
+        {!s.fault && !s.ended && (
+          <SecondaryAction label={`✋ Fault (1st serve) · ${by}`} onPress={() => dispatch({ type: 'FAULT', side: serve.side })} />
+        )}
+        <SecondaryAction label={s.fault ? `⚠️ Fault again = double fault · ${by}` : `⚠️ Double fault · ${by} → point ${receiverSideName}`} onPress={doubleFault} />
       </View>}
+      {typing && !s.ended && (
+        <View style={ctrl.faultChips}>
+          <Text style={ctrl.chipLead}>{typing.label}</Text>
+          {PADEL_FAULT_KINDS.map((k) => (
+            <SelectChip key={k} label={FAULT_KIND_LABEL[k]} active={typing.cur === k} accessibilityLabel={`${typing.label} ${FAULT_KIND_LABEL[k]}`}
+              onPress={() => dispatch({ type: 'FAULT_TYPE', payload: { kind: typing.cur === k ? null : k } })} />
+          ))}
+        </View>
+      )}
       {/* SD-117c — derived "Change ends" cue (FIP, as tennis) */}
       <CueBanner cue={padelCue(s)} />
-      {!noPlayYet && <Text style={ctrl.serve}>🟡 Serving: {serverName}{s.doubles ? `  ·  ${serverSideName}` : ''}</Text>}
+      {(!noPlayYet || s.fault) && <Text style={ctrl.serve} accessibilityLiveRegion="polite">🟡 Serving: {serverName}{s.doubles ? `  ·  ${serverSideName}` : ''}{s.fault ? '  ·  2nd serve' : ''}</Text>}
       <ServeFirstPicker
         icon="🟡" homeName={homeName} awayName={awayName} started={!noPlayYet}
         picked={s.serverPicked || !noPlayYet ? s.firstServer : null}
@@ -209,6 +229,8 @@ export const padelPlugin: SportPlugin<PadelState> = {
 
 const ctrl = StyleSheet.create({
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing(2) },
+  faultChips: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing(2), alignItems: 'center' },
+  chipLead: { color: theme.colors.textMuted, fontSize: theme.font.small, fontWeight: '700' },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing(2) },
   // MVP T4: a gap so a slip below the point buttons can't hit Ace / Double fault
   secGap: { marginTop: theme.spacing(3) },

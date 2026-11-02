@@ -58,12 +58,12 @@ const RALLY_HINT: Record<Exclude<DetailSport, 'tennis'>, string> = {
 };
 
 /** The "Stats to track" options of `sport`, in card order (off by default; point detail on in every racket
- *  sport, and tennis' 1st / 2nd serve; padel's waits for a Fault button, defaults-racket DR3). */
+ *  sport, and 1st / 2nd serve in tennis and padel — padel's since its Fault button, padel-fault PF7). */
 export function trackFields(sport: DetailSport): TrackField[] {
   if (sport === 'tennis') return [...TENNIS_TRACK_FIELDS];
   // Batch 3 (defaults-racket DR1): point detail on for a new match, as tennis
   const out: TrackField[] = [{ key: 'pointDetail', label: 'Point detail', hint: POINT_HINT[sport], on: true }];
-  if (sport === 'padel') out.push({ key: 'serveDetail', label: '1st / 2nd serve', hint: 'Mark points played on a 2nd serve: 1st serve %, 1st / 2nd serve points won' });
+  if (sport === 'padel') out.push({ key: 'serveDetail', label: '1st / 2nd serve', hint: 'Tap Fault when a 1st serve misses: 1st serve %, 1st / 2nd serve points won', on: true });
   const nw = NET_WORDS[sport];
   if (nw) {
     out.push({

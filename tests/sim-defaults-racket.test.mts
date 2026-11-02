@@ -1,7 +1,7 @@
 /**
  * Quality mandate step 6 for racket defaults (docs/security/breaks/defaults-racket.md):
  * 1,000 random old and new badminton / padel matches. A new match tracks point
- * detail (padel's serve tracking stays off); an old one keeps exactly the
+ * detail (and, since Batch 4a / padel-fault PF7, padel's 1st / 2nd serve); an old one keeps exactly the
  * switches it was saved with; the switch never changes the score.
  */
 import { test } from 'node:test';
@@ -24,7 +24,7 @@ test('1,000 random old and new racket matches', () => {
     for (const k of ['pointDetail', 'serveDetail', 'rallyDetail']) { const r = rnd(3); if (r === 1) old[k] = true; else if (r === 2) old[k] = false; }
     const cfg = isNew ? Object.fromEntries(trackFormatFields(sp).map((f) => [f.key, f.default])) : old;
     const s0 = E.init(cfg);
-    if (isNew) { assert.equal(s0.pointDetail, true); assert.notEqual(s0.serveDetail, true); }
+    if (isNew) { assert.equal(s0.pointDetail, true); assert.equal(s0.serveDetail === true, sp === 'padel'); }
     else for (const k of ['pointDetail', 'serveDetail', 'rallyDetail']) assert.equal(s0[k] === true, old[k] === true, `${sp}.${k}`);
     // the same rallies score the same with or without detail tracking
     const plain = E.init({});

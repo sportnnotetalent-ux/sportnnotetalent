@@ -57,9 +57,9 @@ import { rallyInputs } from './rallyEngine.ts';
 import { serveStats, serveRows, type ServeBlock, type ServeRosters, type ServeRow, type ServeStats, type SideServe } from './serveStats.ts';
 import {
   DETAIL_HOWS, NET_WORDS, RALLY_LABEL, STROKES, THIRD_LABEL, THIRD_SHOTS, TT_PHASE_LABEL, WINGS, WING_LABEL,
-  allRallyBuckets, arrivalTracked, detailCoverage, errTypeOf, hasNobodyMark, howDef, matchRallyBuckets, netSides, netTracked, rallyKey, rallyTracked,
+  PADEL_FAULT_KINDS, allRallyBuckets, arrivalTracked, detailCoverage, errTypeOf, hasNobodyMark, howDef, matchRallyBuckets, netSides, netTracked, rallyKey, rallyTracked,
   shotIdsOf, shotLabel, shotOf, thirdTracked,
-  type DepthSport, type RallyBucket, type ThirdShot, type Wing,
+  type DepthSport, type FaultKind, type RallyBucket, type ThirdShot, type Wing,
 } from './pointDetail.ts';
 import type { LiveEvent } from './liveEvents';
 
@@ -276,6 +276,25 @@ function rowsOf(b: ServeBlock, rows: ServeRow[]): RowAdd {
   };
 }
 
+/** padel-fault PF6 — the Stats-tab rows of each serve-fault type (tennis' keys, + the mesh). */
+const FAULT_ROW: Record<FaultKind, [string, string]> = {
+  net: ['fNet', 'Serve faults into the net'], long: ['fLong', 'Serve faults long'], wide: ['fWide', 'Serve faults wide'],
+  foot: ['fFoot', 'Foot faults'], mesh: ['fMesh', 'Serve faults into the mesh'],
+};
+const zeroFaults = (): Record<FaultKind, number> => ({ net: 0, long: 0, wide: 0, foot: 0, mesh: 0 });
+
+/** padel-fault PF6 — `side`'s serve faults by type (1st serves and double
+ *  faults), in the scope; `playerId` = only the named server's. */
+export function serveFaults(v: RacketView, side: Side, scope: Scope = 'all', playerId?: string): Record<FaultKind, number> {
+  const f = zeroFaults();
+  for (const t of v.points) {
+    if (!inScope(t, scope) || t.server !== side || (playerId !== undefined && t.serverId !== playerId)) continue;
+    if (t.p.sf1) f[t.p.sf1] += 1;
+    if (t.p.df && t.p.sf2) f[t.p.sf2] += 1;
+  }
+  return f;
+}
+
 /** The words a sport's side-out rows read with. */
 const sideOutWords = (sport: DepthSport) => (sport === 'squash'
   ? { so: 'Hand-outs won', rcv: 'Hand-out % (receive rallies won)', srv: 'Rallies won on serve', turns: 'Hand-ins (service turns)' }
@@ -304,6 +323,11 @@ export function keyStats(v: RacketView, scope: Scope = 'all'): StatSection[] {
   }
   if (full && t.home.sw + t.away.sw > 0) s.count('sw', 'Service winners', t.home.sw, t.away.sw);
   if (full && DETAIL_HOWS[sport].some((h) => h.how === 'sf')) s.count('sf', 'Service faults', t.home.sf, t.away.sf);
+  // padel-fault PF6 — serve faults by type (as tennis; rows only for types recorded)
+  if (sport === 'padel') {
+    const f = { home: serveFaults(v, 'home', scope), away: serveFaults(v, 'away', scope) };
+    for (const k of PADEL_FAULT_KINDS) if (f.home[k] + f.away[k] > 0) s.count(FAULT_ROW[k][0], FAULT_ROW[k][1], f.home[k], f.away[k]);
+  }
   if (st.sideOut) {
     const w = sideOutWords(sport);
     s.ratio('srv', w.srv, (x) => x.srvWon, (x) => x.srvPlayed);
@@ -562,6 +586,19 @@ export function racketCareerKeys(v: RacketView | null, side: Side): Record<strin
   return out;
 }
 
+/** padel-fault PF6 — a padel match that typed any serve fault, with the server known. */
+export const faultsTyped = (v: RacketView | null): boolean =>
+  !!v && v.sport === 'padel' && v.st.serverKnown && v.points.some((t) => t.p.sf1 || (t.p.df && t.p.sf2));
+
+/** padel-fault PF6 — the SERVING player's faults by type (named server only,
+ *  as srvPts; tennis' keys + srvFaultMesh), on a match that typed any. */
+export function faultCareerKeys(v: RacketView | null, side: Side, playerId: string): Record<string, number> {
+  if (!faultsTyped(v)) return {};
+  const f = serveFaults(v!, side, 'all', playerId);
+  return { srvFaultNet: f.net, srvFaultLong: f.long, srvFaultWide: f.wide, srvFootFaults: f.foot, srvFaultMesh: f.mesh };
+}
+export const PADEL_FAULT_KEYS = ['srvFaultNet', 'srvFaultLong', 'srvFaultWide', 'srvFootFaults', 'srvFaultMesh'] as const;
+
 /** Round 2 — squash: a let was asked with the side named (the per-side Let
  *  buttons), so "lets asked" can be credited. An older match (one unnamed
  *  Let button) or one without lets writes nothing — never a false 0. */
@@ -582,6 +619,7 @@ export function racketExtraKeys(sport: DepthSport): string[] {
   if (sport === 'pickleball') out.push('thirdDrop', 'thirdDropWon', 'thirdDrive', 'thirdDriveWon', 'thirdLob', 'thirdLobWon');
   if (hasNobodyMark(sport)) out.push(...ARRIVAL_KEYS);
   if (sport === 'squash') out.push(LETS_KEY);
+  if (sport === 'padel') out.push(...PADEL_FAULT_KEYS);
   return out;
 }
 /** Round 2 — pickleball kitchen-arrival keys (arrived overall = kitchenPts). */
