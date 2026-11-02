@@ -18,7 +18,7 @@ import { volleyballStatTotals } from './totals';
 import { SetLineBoard } from '../SetLineBoard';
 import { RallyPointEditor } from '../RallyPointEditor';
 import {
-  init, reducer, isDecider, setTarget, VB_OUTCOMES, VB_ERROR_TYPES, volleyballCredits, outcomeAction, outcomeChip, standingsUnits, lineScore,
+  init, reducer, isDecider, setTarget, VB_OUTCOMES, VB_ERROR_TYPES, VB_BLOCK_HINT, volleyballCredits, outcomeAction, outcomeChip, standingsUnits, lineScore,
   servingSide, switchSidesDue, technicalTimeoutDue, timeoutsPerSet, stampAction, type VolleyballState, type VbOutcome,
 } from './engine';
 import { pointPressure, pressureText } from '../pointStatus';
@@ -101,6 +101,7 @@ function SidePoints({ side, name, color, court, bench, opponents, oppColor, serv
               <View style={ctrl.chips}>
                 {VB_ERROR_TYPES.map((t) => <SelectChip key={t.key} label={t.label} active={err === t.key} onPress={() => setErr(err === t.key ? undefined : t.key)} />)}
               </View>
+              <Text style={ctrl.hint}>{VB_BLOCK_HINT}</Text>
               <Text style={ctrl.hint}>Who erred? (optional — tap to give {name} the point)</Text>
               <View style={ctrl.chips}>
                 {opponents.map((p) => chip(p, oppColor, () => score('opperror', p)))}
