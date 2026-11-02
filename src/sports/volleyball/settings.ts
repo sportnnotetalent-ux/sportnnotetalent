@@ -7,8 +7,10 @@
  * buttons stay one tap. Batch 3 (founder 2026-11-02, only what is captured in
  * scoring reaches the stats): Set assists is on for a NEW match ("Set by?" is
  * a non-blocking row after a kill — no Skip needed); attack attempts,
- * reception grades and digs (a tap every rally) stay off. A format without
- * the keys — every older match — keeps all four off (initDetail). PURE.
+ * reception grades and digs (a tap every rally) stay off. Batch 5: "Who was
+ * aced?" (`vbAced`, a row after an Ace) is its own category, on for a NEW
+ * match. A format without the keys — every older match — keeps them all off
+ * (initDetail). PURE.
  */
 import type { FormatField, LiveSettings } from '../types';
 import { detailCats, VB_CAT_KEY, type VbDetailCat } from './detail.ts';
@@ -19,6 +21,8 @@ const FIELDS: Array<{ cat: VbDetailCat; label: string; hint: string; on?: boolea
   { cat: 'reception', label: 'Reception quality', hint: 'Grade serve receptions (# perfect / + good / − poor) and name who was aced. FIVB reception % / Best Receiver.' },
   { cat: 'dig', label: 'Digs', hint: 'One tap on the player who dug the ball. FIVB Best Digger (digs per set).' },
   { cat: 'assist', label: 'Set assists', hint: 'After a kill, tap who set it. FIVB Best Setter.', on: true },
+  // batch 5: split out of Reception quality — one optional row after an Ace
+  { cat: 'aced', label: 'Who was aced?', hint: 'After an ace, tap who failed to receive it (a reception error). FIVB reception errors.', on: true },
 ];
 
 export const VOLLEYBALL_LIVE_SETTINGS: LiveSettings<VolleyballState> = {

@@ -16,7 +16,7 @@
  * by `nameOf` (this viewer's name; an older log's stored name without one).
  */
 import type { KabaddiState, RaidEntry } from './engine.ts';
-import { extrasOf, isShootoutEvent, perRaidByIndex, replayOf, raidSkillLabel, RAID_SKILLS, ROUT_REASONS, TACKLE_TYPES, tackleTypeLabel } from './engine.ts';
+import { extrasOf, isShootoutEvent, perRaidByIndex, replayOf, raidSkillLabel, RAID_SKILLS, ROUT_REASONS, TACKLE_TYPES, TECH_REASONS, tackleTypeLabel } from './engine.ts';
 import type { RaidBreakdown } from './rules.ts';
 import { kabaddiMatchCentre, kabaddiTouchedTracked, unsuccessfulTacklers } from './totals.ts';
 import { countRow, pctRow, ratioRow, type CmpCat, type CmpRow, type Side } from '../netraid/feed.ts';
@@ -139,6 +139,22 @@ export function kabaddiMatchStats(s: KabaddiState, scope: KbScope = 'all', nameO
     const cards = (x: Side, col: string) => ex.filter((e) => e.x === 'card' && e.side === x && e.card === col).length;
     const techAgainst = H((x) => evs.filter((e) => e.kind === 'tech' && e.side === other(x)).reduce((t, e) => t + (e.points ?? 0), 0));
     const disc: CmpRow[] = [countRow('techAgainst', 'Technical points conceded', techAgainst[0], techAgainst[1], { better: 'lower' })];
+    // batch 5: the same points by reason (a technical point's own line has the
+    // extra's eid as its id; a card's, eid + 0.1). Old `cant` points keep their
+    // row; no reason or an unknown one reads "reason not recorded".
+    const exBy = new Map(extrasOf(s).map((x) => [x.eid, x]));
+    const why = (e: { id: number }): string => {
+      const x = exBy.get(Math.floor(e.id));
+      if (!x || x.x === 'card') return x ? 'card' : 'none';
+      return x.reason && TECH_REASONS.some((r) => r.key === x.reason) ? x.reason : 'none';
+    };
+    const techBy = (x: Side, k: string) => evs.filter((e) => e.kind === 'tech' && e.side === other(x) && why(e) === k).reduce((t, e) => t + (e.points ?? 0), 0);
+    const reasons = [...TECH_REASONS.map((r) => ({ key: r.key, label: `of which ${r.label.toLowerCase()}` })),
+      { key: 'card', label: 'of which with a card' }, { key: 'none', label: 'of which reason not recorded' }];
+    for (const r of reasons) {
+      const v = H((x) => techBy(x, r.key));
+      if (v[0] + v[1]) disc.push(countRow(`tech_${r.key}`, r.label, v[0], v[1], { better: 'lower', sub: true }));
+    }
     for (const col of ['green', 'yellow', 'red'] as const) {
       const v = H((x) => cards(x, col));
       if (v[0] + v[1]) disc.push(countRow(col, `${col[0].toUpperCase()}${col.slice(1)} cards`, v[0], v[1], { better: 'lower' }));

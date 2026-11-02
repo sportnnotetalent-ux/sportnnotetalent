@@ -172,9 +172,14 @@ export const outcomeChip = (o: OutcomeDef) => o.chip ?? `${o.icon} ${o.label}`;
 /** SD-117b — what the opponent did wrong on an "Opp. fault" (optional). */
 export const VB_ERROR_TYPES: Array<{ key: string; label: string }> = [
   { key: 'net', label: 'Net touch' },
-  { key: 'foot', label: 'Foot fault' },
+  // batch 5: the centre line (a serve foot fault is a missed serve); the key
+  // stays `foot`, so older logs keep their meaning
+  { key: 'foot', label: 'Centre line' },
   { key: 'rotation', label: 'Rotation' },
   { key: 'hits', label: 'Double / 4 hits' },
+  // batch 5 (FIVB 9.2.2 / 13.2–13.3 / 19.3): new keys, additive
+  { key: 'handling', label: 'Catch / lift' },
+  { key: 'backrow', label: 'Back-row / libero fault' },
   { key: 'attackout', label: 'Attack out' },
   // court-team batch 1: a BLOCKING fault (net touch while blocking, reaching
   // over, blocking a serve). The key stays `blockout`, so older logs keep their

@@ -96,7 +96,9 @@ function keeperSpells(s: HandballState): Map<string, Spell> {
   const out = new Map<string, Spell>();
   const end = matchSec(s);
   for (const side of ['home', 'away'] as const) {
-    if (!s.xi?.[side]?.gk) continue;
+    // court-team batch 5: or a keeper named by a new app (`spell`) — an older
+    // log's keeper change without a line-up keeper reads as before
+    if (!s.xi?.[side]?.gk && !s.events.some((e) => e.type === 'gk' && e.side === side && e.spell === true)) continue;
     let cur = keeperAt(s, side, 0);
     let since = 0;
     const key = (w?: Who) => (w?.id ? w.id : w?.name ? `name:${w.name}` : '');

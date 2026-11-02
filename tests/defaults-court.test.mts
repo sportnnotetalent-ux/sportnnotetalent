@@ -90,16 +90,17 @@ describe('DC2 · volleyball: "Set by?" on for a new match', () => {
   const fields = VOLLEYBALL_META.formatFields ?? [];
   const ls = VOLLEYBALL_LIVE_SETTINGS;
   test('the format and the Standard: set assists on; attack attempts, reception, digs off', () => {
-    assert.deepEqual(ls.defaults, { vbAttack: false, vbReception: false, vbDig: false, vbAssist: true });
+    // batch 5 (court-team-batch5.md V6): + "Who was aced?" on for new matches
+    assert.deepEqual(ls.defaults, { vbAttack: false, vbReception: false, vbDig: false, vbAssist: true, vbAced: true });
     assert.equal(fields.find((f) => f.key === 'vbAssist')!.default, true);
     assert.equal(fields.find((f) => f.key === 'vbAttack')!.default, false);
   });
   test('a new match captures set assists only (no attack keys); Info lists Set assists On', () => {
     const fmt = defaultsFor(fields);
     const s = vb.init(fmt);
-    assert.deepEqual(detailCats(s), ['assist']);
+    assert.deepEqual(detailCats(s), ['assist', 'aced']); // batch 5: + aced
     assert.equal(detailTracked(s), false, 'attack attempts not tracked');
-    assert.deepEqual(capOf(ls, s, fields, fmt), { vbAttack: false, vbReception: false, vbDig: false, vbAssist: true });
+    assert.deepEqual(capOf(ls, s, fields, fmt), { vbAttack: false, vbReception: false, vbDig: false, vbAssist: true, vbAced: true });
     assert.equal(customCount(ls, ls.read(s)), 0);
   });
   test('DC10 · a kill is still one tap: the setter is optional; tracked → a real 0', () => {

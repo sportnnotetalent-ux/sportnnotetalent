@@ -90,14 +90,15 @@ describe('deep wave · Stats to track categories', () => {
   test('live settings: read / defaults; event mode logs SET_DETAIL after the first point', () => {
     const fresh = vb.init({});
     const ls = VOLLEYBALL_LIVE_SETTINGS;
-    assert.deepEqual(ls.read(fresh), { vbAttack: false, vbReception: false, vbDig: false, vbAssist: false });
+    // batch 5: + the "Who was aced?" category (off on a format without the key)
+    assert.deepEqual(ls.read(fresh), { vbAttack: false, vbReception: false, vbDig: false, vbAssist: false, vbAced: false });
     assert.deepEqual(planLiveApply(ls, fresh, 0, ls.read(fresh), { ...ls.read(fresh), vbDig: true }), { kind: 'format', patch: { vbDig: true } });
     const live = play([vb.outcomeAction('attack', 'home')]);
     const plan = planLiveApply(ls, live, 1, ls.read(live), { ...ls.read(live), vbReception: true });
     assert.deepEqual(plan, { kind: 'event', action: { type: 'SET_DETAIL', payload: { vbReception: true } } });
     const after = vb.reducer(live, (plan as { action: ScoreAction }).action);
-    assert.deepEqual(ls.read(after), { vbAttack: false, vbReception: true, vbDig: false, vbAssist: false });
-    assert.deepEqual(ls.read(vb.init({ detail: true })), { vbAttack: true, vbReception: true, vbDig: false, vbAssist: false });
+    assert.deepEqual(ls.read(after), { vbAttack: false, vbReception: true, vbDig: false, vbAssist: false, vbAced: false });
+    assert.deepEqual(ls.read(vb.init({ detail: true })), { vbAttack: true, vbReception: true, vbDig: false, vbAssist: false, vbAced: false });
   });
 });
 

@@ -107,6 +107,10 @@ export interface HandballEvent {
   fault?: FaultType;
   /** deep wave: `empty` — the goal is now empty (true) / the keeper is back (false) */
   on?: boolean;
+  /** court-team batch 5: a `gk` change logged by a new app (GK payload
+   *  `spell: true`) — the side's keepers get their full line (goals conceded,
+   *  save %) even with no line-up keeper. Absent on every older log. */
+  spell?: boolean;
 }
 
 /** `outcome` / keeper (deep wave, new logs only): saved by the keeper or
@@ -487,7 +491,7 @@ export const reducer = (s: HandballState, a: ScoreAction): HandballState => {
     }
     case 'GK': {
       if (!side || !a.payload?.id) return s;
-      return push(s, { type: 'gk', side, playerId: String(a.payload.id), ...(a.payload.name !== undefined ? { playerName: String(a.payload.name ?? '') } : {}) });
+      return push(s, { type: 'gk', side, playerId: String(a.payload.id), ...(a.payload.name !== undefined ? { playerName: String(a.payload.name ?? '') } : {}), ...(a.payload.spell === true ? { spell: true } : {}) });
     }
     case 'REMOVE_EVENT': {
       const id = String(a.payload?.id ?? '');
