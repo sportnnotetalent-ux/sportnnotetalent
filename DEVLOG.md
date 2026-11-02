@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-02 — Store step 0.3: reviewers' test number works
+
+A landline-format Indian test number (the project's SMS region policy allows India only, which refused a +1 test number with `auth/operation-not-allowed`; a real mobile would lock its owner out) added in Firebase; the founder signed in with it on the Android app. The number and code live only in the stores' review notes.
+
 ### 2026-11-01 — iPhone Firebase set up (store step 0.2)
 
 The founder added the Firebase iOS app; `GoogleService-Info.plist` (bundle `in.sportnnote.app`, project `sportnnote-5c5e7`) is now in `app.json`. Firebase runs in CocoaPods mode (`@react-native-firebase/app` `ios.disableSPM`) with static frameworks (`expo-build-properties` 56.0.27, `ios.useFrameworks: static`), the combination its docs give (Swift Package mode needs dynamic frameworks). A trial iPhone prebuild finishes (the only warning is about Google Sign-In, which the app doesn't use). The first EAS iPhone build, once the Apple account exists, is the real check. No JS change; Android unaffected.

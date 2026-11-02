@@ -22,7 +22,7 @@
 
 **0.2. Firebase for iPhone. ✓ Done 2026-11-01** (the file is in; the trial iPhone prebuild finishes). Firebase console → project → Add app → **iOS**, bundle id **`in.sportnnote.app`** → download **`GoogleService-Info.plist`** → put it in the project folder next to `google-services.json` (it's configuration, not a secret, like the Android one). Tell me, and I add it to `app.json` and rerun the iPhone prebuild to settle Firebase's iOS linking, so the first iPhone build is ready to go. *(You, then me.)*
 
-**0.3. Test phone number for review.** Firebase console → Authentication → Sign-in method → Phone → **Phone numbers for testing** → add one number with a fixed 6-digit code (it goes in the review notes, section E). *(You.)*
+**0.3. Test phone number for review. ✓ Done 2026-11-02:** a landline-format number added in Firebase and checked: it signs in on the Android app. Firebase console → Authentication → Sign-in method → Phone → **Phone numbers for testing** → add one number with a fixed 6-digit code. Use an **Indian** number (the project's SMS region policy allows India only, which also refuses +1 test numbers with `auth/operation-not-allowed`), in **landline format**, e.g. **+91 11 2345 6789** (the app accepts it). India has no reserved fictional range, and a mobile number may belong to someone (who would then be locked out of SMS sign-in); a landline can't receive an SMS, so no real person can ever sign in with it by SMS, whoever owns it. Test numbers never get a real SMS anyway. The number and code go **only** into the stores' review-notes boxes (section E), not into this repo or a chat. Then sign in once with it on your phone to check it works. *(You.)*
 
 **0.4. Screenshots** (section D) and the **feature graphic** (1024×500). *(You.)*
 
