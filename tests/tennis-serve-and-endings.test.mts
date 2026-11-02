@@ -40,9 +40,9 @@ describe('TF2 + TF3: point detail and 1st / 2nd serve are on for new tennis matc
     assert.equal(s.pointDetail, true);
     assert.equal(s.serveDetail, true);
   });
-  test('the other racket sports: point detail on (Batch 3, defaults-racket.md), the rest off', () => {
+  test('the other racket sports: point detail on (Batch 3, defaults-racket.md), padel 1st / 2nd serve (Batch 4a, padel-fault.md), the rest off', () => {
     for (const sp of ['badminton', 'tabletennis', 'squash', 'padel', 'pickleball'] as const) {
-      for (const f of trackFormatFields(sp)) if (f.type === 'toggle') assert.equal(f.default, f.key === 'pointDetail', `${sp} ${f.key}`);
+      for (const f of trackFormatFields(sp)) if (f.type === 'toggle') assert.equal(f.default, f.key === 'pointDetail' || (sp === 'padel' && f.key === 'serveDetail'), `${sp} ${f.key}`);
     }
   });
 });

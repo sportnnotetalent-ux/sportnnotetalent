@@ -15,7 +15,8 @@ describe('DR1 + DR4: new matches', () => {
     test(sp, () => {
       const d = defaults(sp);
       assert.equal(d.pointDetail, true, 'point detail on');
-      for (const [k, v] of Object.entries(d)) if (typeof v === 'boolean' && k !== 'pointDetail') assert.equal(v, false, `${sp}.${k} stays off`);
+      // Batch 4a (padel-fault PF7): padel's 1st / 2nd serve is on too, with its Fault button
+      for (const [k, v] of Object.entries(d)) if (typeof v === 'boolean' && k !== 'pointDetail' && !(sp === 'padel' && k === 'serveDetail')) assert.equal(v, false, `${sp}.${k} stays off`);
       assert.equal(detailLiveSettings(sp).defaults!.pointDetail, true);
     });
   }
@@ -31,9 +32,12 @@ describe('DR2: old matches unchanged', () => {
   });
 });
 
-describe('DR3: padel serve tracking waits for the Fault button', () => {
-  test('off for new padel matches', () => {
-    assert.equal(defaults('padel').serveDetail, false);
-    assert.notEqual(padel.init(defaults('padel')).serveDetail, true);
+// DR3 pinned padel's serve tracking OFF until it had a Fault button; Batch 4a
+// (docs/security/breaks/padel-fault.md PF7) added the button and turned it on.
+describe('DR3: padel serve tracking is on now that it has a Fault button (padel-fault PF7)', () => {
+  test('on for new padel matches; an old match without the key stays off', () => {
+    assert.equal(defaults('padel').serveDetail, true);
+    assert.equal(padel.init(defaults('padel')).serveDetail, true);
+    assert.equal(padel.init({}).serveDetail, undefined);
   });
 });

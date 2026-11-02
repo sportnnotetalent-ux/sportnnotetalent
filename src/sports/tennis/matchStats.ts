@@ -132,7 +132,7 @@ const zeroSide = (): TennisSide => ({
   speed: { all: [], s1: [], s2: [] }, aces: { all: 0, s1: 0, s2: 0 },
   ret: { all: { known: 0, inPlay: 0 }, s1: { known: 0, inPlay: 0 }, s2: { known: 0, inPlay: 0 } },
   ueDir: { net: 0, long: 0, wide: 0 }, feDir: { net: 0, long: 0, wide: 0 }, rule: 0,
-  faults: { net: 0, long: 0, wide: 0, foot: 0 },
+  faults: { net: 0, long: 0, wide: 0, foot: 0, mesh: 0 }, // mesh: padel's (shared FaultKind); never typed in tennis
 });
 type Dir = 'net' | 'long' | 'wide';
 const isDir = (v: unknown): v is Dir => v === 'net' || v === 'long' || v === 'wide';
@@ -236,7 +236,7 @@ export function keyStats(v: TennisView, scope: Scope = 'all'): StatSection[] {
   }
   if (cov.detail && t.home.sw + t.away.sw > 0) s.count('sw', 'Service winners', t.home.sw, t.away.sw);
   // tennis-endings-depth FT1 — serve faults by type (rows only for types recorded)
-  const FAULT_ROW: Record<FaultKind, [string, string]> = { net: ['fNet', 'Serve faults into the net'], long: ['fLong', 'Serve faults long'], wide: ['fWide', 'Serve faults wide'], foot: ['fFoot', 'Foot faults'] };
+  const FAULT_ROW: Record<FaultKind, [string, string]> = { net: ['fNet', 'Serve faults into the net'], long: ['fLong', 'Serve faults long'], wide: ['fWide', 'Serve faults wide'], foot: ['fFoot', 'Foot faults'], mesh: ['fMesh', 'Serve faults into the mesh'] };
   for (const k of FAULT_KINDS) if (t.home.faults[k] + t.away.faults[k] > 0) s.count(FAULT_ROW[k][0], FAULT_ROW[k][1], t.home.faults[k], t.away.faults[k]);
   if (cov.speed) {
     const kmh = (key: string, label: string, f: (x: TennisSide) => number | undefined) => {
@@ -387,7 +387,7 @@ export function tennisCareerKeys(v: TennisView | null, side: Side, playerId: str
   // tennis-endings-depth FT1 — the SERVING player's faults by type (named
   // server only, as srvPts), for a match that typed any fault
   if (v.st.serverKnown && v.points.some((p) => p.p.sf1 || (p.p.df && p.p.sf2))) {
-    const f: Record<FaultKind, number> = { net: 0, long: 0, wide: 0, foot: 0 };
+    const f: Record<FaultKind, number> = { net: 0, long: 0, wide: 0, foot: 0, mesh: 0 };
     for (const p of v.points) {
       if (p.serverId !== playerId || p.server !== side) continue;
       if (p.p.sf1) f[p.p.sf1] += 1;

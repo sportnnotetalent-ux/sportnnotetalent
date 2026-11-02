@@ -188,7 +188,8 @@ describe('deep wave · "Stats to track"', () => {
       const ls = detailLiveSettings(sp);
       const toggles = ls.fields.filter((f) => f.type === 'toggle');
       // Batch 3 (defaults-racket DR1): point detail on for a new match, the rest off
-      assert.ok(toggles.every((f) => f.default === (f.key === 'pointDetail') && f.group === 'Stats to track' && (f.hint ?? '').length > 20), sp);
+      // (Batch 4a, padel-fault PF7: + padel's 1st / 2nd serve, with its Fault button)
+      assert.ok(toggles.every((f) => f.default === (f.key === 'pointDetail' || (sp === 'padel' && f.key === 'serveDetail')) && f.group === 'Stats to track' && (f.hint ?? '').length > 20), sp);
       // round 2: + the rally-length buckets option (a choice, the deep-wave buckets by default)
       assert.deepEqual(ls.fields.filter((f) => f.type !== 'toggle').map((f) => [f.key, f.default]), [['rallyBuckets', 'std']], sp);
       assert.ok(trackFormatFields(sp).every((f) => f.advanced === true), sp);

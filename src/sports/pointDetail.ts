@@ -460,10 +460,13 @@ const T_UE: HowDef = { how: 'ue', label: 'Unforced error', chip: 'Unforced error
 const R_UE = (strokes: string[]): HowDef => ({ ...T_UE, strokes });
 /** Tennis (tennis-endings-depth FT1): a serve fault's type — into the net,
  *  long (past the service line), wide, or a foot fault. */
-export type FaultKind = 'net' | 'long' | 'wide' | 'foot';
+export type FaultKind = 'net' | 'long' | 'wide' | 'foot' | 'mesh';
 export const FAULT_KINDS: readonly FaultKind[] = ['net', 'long', 'wide', 'foot'];
-export const FAULT_KIND_LABEL: Record<FaultKind, string> = { net: 'Net', long: 'Long', wide: 'Wide', foot: 'Foot fault' };
-export const isFaultKind = (v: unknown): v is FaultKind => v === 'net' || v === 'long' || v === 'wide' || v === 'foot';
+/** padel-fault PF2 — padel adds the serve that lands in and then hits the
+ *  wire mesh (metal fence) before its second bounce (FIP). Padel only. */
+export const PADEL_FAULT_KINDS: readonly FaultKind[] = [...FAULT_KINDS, 'mesh'];
+export const FAULT_KIND_LABEL: Record<FaultKind, string> = { net: 'Net', long: 'Long', wide: 'Wide', foot: 'Foot fault', mesh: 'Mesh' };
+export const isFaultKind = (v: unknown, sport?: 'padel'): v is FaultKind => v === 'net' || v === 'long' || v === 'wide' || v === 'foot' || (sport === 'padel' && v === 'mesh');
 /** Tennis (tennis-endings-depth): which way an error went (net / long /
  *  wide; a stat-keeper's error direction), and a point lost by rule (ITF
  *  Rule 24: net touch, hindrance, double bounce, hit by the ball, carry):

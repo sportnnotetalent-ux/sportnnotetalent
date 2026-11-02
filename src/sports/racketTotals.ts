@@ -61,7 +61,7 @@ import { type PadelState, setTiebreaks as padelTiebreaks, standingsUnits as pade
 import { serveStats, serveCareerKeys, type ServeSport } from './serveStats.ts';
 import { detailCoverage, detailKeys, detailPlayerCredits, type DepthSport, type DetailSport } from './pointDetail.ts';
 import { tennisCareerKeys, tennisView } from './tennis/matchStats.ts';
-import { hasRacketExtras, racketCareerKeys, racketView } from './racketMatchStats.ts';
+import { faultCareerKeys, faultsTyped, hasRacketExtras, racketCareerKeys, racketView } from './racketMatchStats.ts';
 
 type Side = 'home' | 'away';
 type PerSide = { home: number; away: number };
@@ -301,10 +301,12 @@ function withTennisExtras(s: TennisState | null | undefined, totals: Record<stri
 function withRacketExtras(sport: DepthSport | undefined, s: { events?: LiveEvent[] } | null | undefined, totals: Record<string, StatTotalsEntry>, ctx?: StatTotalsContext): Record<string, StatTotalsEntry> {
   if (!sport || !s || !Array.isArray(s.events)) return totals;
   const v = racketView(sport, s, serverRosters(totals, ctx));
-  if (!v || !hasRacketExtras(v)) return totals;
+  // padel-fault PF6 — + the serving player's faults by type (padel, once typed)
+  const faults = faultsTyped(v);
+  if (!v || (!hasRacketExtras(v) && !faults)) return totals;
   const bySide = { home: racketCareerKeys(v, 'home'), away: racketCareerKeys(v, 'away') };
   const out: Record<string, StatTotalsEntry> = {};
-  for (const [id, e] of Object.entries(totals)) out[id] = { ...e, stats: { ...e.stats, ...bySide[e.side] } };
+  for (const [id, e] of Object.entries(totals)) out[id] = { ...e, stats: { ...e.stats, ...bySide[e.side], ...(faults ? faultCareerKeys(v, e.side, id) : {}) } };
   return out;
 }
 

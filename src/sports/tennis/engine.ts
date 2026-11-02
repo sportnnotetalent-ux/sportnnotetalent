@@ -13,6 +13,7 @@ import type { ScoreSummary } from '../types';
 import { applyPointDetail, detailFlags, initDetailFlags, isFaultKind, type FaultKind } from '../pointDetail.ts';
 import { setSportCue, type Cue } from '../courtCues.ts';
 import { applyRacketExtras, replayKeepingMarks, withStamps, type ConductOps } from '../conduct.ts';
+import { faultType } from '../serveFault.ts';
 
 export const SETS_TO_WIN = 2;
 
@@ -237,25 +238,6 @@ const canServe = (s: TennisState, side: unknown): boolean => {
   return (started || s.serverPicked === true) && serveInfo(s).side === side;
 };
 const canFault = (s: TennisState, side: unknown): boolean => !s.fault && canServe(s, side);
-
-/** FAULT_TYPE: type (or clear, null) the pending 1st-serve fault, else the
- *  double fault that is the last point played. Anything else: unchanged. */
-function faultType(s: TennisState, kind: unknown): TennisState {
-  if (kind !== null && !isFaultKind(kind)) return s;
-  if (s.fault) {
-    if ((s.faultKind ?? null) === kind) return s;
-    const { faultKind: _k, ...rest } = s;
-    return kind ? { ...rest, faultKind: kind } : rest;
-  }
-  let i = s.events.length - 1;
-  while (i >= 0 && s.events[i].kind !== 'point' && s.events[i].kind !== 'ace') i--;
-  const e = s.events[i];
-  if (!e?.df || (e.sf2 ?? null) === kind) return s;
-  const { sf2: _o, ...plain } = e;
-  const events = [...s.events];
-  events[i] = kind ? { ...plain, sf2: kind } : plain;
-  return { ...s, events };
-}
 
 const core = (s: TennisState, a: ScoreAction): TennisState => {
   // Timeline correction: STAT_ADJUST only reconciles player profiles (no match
