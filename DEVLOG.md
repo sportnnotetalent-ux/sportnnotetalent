@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-02 — Release: Batch 1 scoring fixes live (web, Android OTA)
+
+auth-smoke passed. Published from a clean worktree at 1edb220: web (entry `index-3b1ce275`, confirmed live on app.sportnnote.in) and Android OTA groups `8d588377` (preview) and `2a6e9dac` (production), runtime 1.0.0.
+
 ### 2026-11-02 — Sport-expert audit of every sport, and Batch 1 (wrong results / wrong stats)
 
 Founder ask: go sport by sport as an expert (every way a play ends → how the scorer records it → the gap, like tennis) and keep the chain Info settings → Scoring → Stats + Commentary in sync in every sport. Seven expert audits (`docs/sport-expert/`, 109 fixes, plan in `PLAN.md`). Batch 1, the P0 correctness fixes, built in parallel (one isolated branch per sport family, each with its own break-it list, failing tests, fix and simulation), merged here:
