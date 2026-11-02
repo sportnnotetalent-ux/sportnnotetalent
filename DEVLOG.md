@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-03 — Release: Batch 3 (richer stats by default) live (web, Android OTA)
+
+auth-smoke passed. Published from a clean worktree at b90bd23: web (entry `index-72392f79`, confirmed live on app.sportnnote.in) and Android OTA groups `94f58b63` (preview) and `a5d44f04` (production), runtime 1.0.0.
+
 ### 2026-11-03 — Batch 3: richer stats on by default for new matches
 
 The tennis TF2 fix ("only what is captured in scoring is seen in stats"), for the other sports. New matches only: old matches keep exactly the switches they were saved with (tests and simulations replay them unchanged), and every newly-on capture stays optional (scoring stays one tap).
