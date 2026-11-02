@@ -80,8 +80,9 @@ function PlayerGrid({ players, onPick, skip }: { players: Player[]; onPick: (p: 
 type Flow =
   | { mode: 'goal'; side: Side; step: 'type' | 'scorer' | 'assist'; shotType?: ShotType; scorer?: Player | null }
   | { mode: 'shot'; side: Side; step: 'type' | 'result' | 'player' | 'blocker'; shotType?: ShotType; result?: MissResult; shooter?: Player | null }
-  // `drawn` (deep wave, when tracked): who won the 7-metre throw, first
-  | { mode: 'seven'; side: Side; step: 'drawn' | 'result' | 'player'; result?: 'saved' | 'missed' }
+  // `by` (deep wave, when tracked): who won the 7-metre throw — batch 3: an
+  // optional chip on the result screen (no extra step), logged before the result
+  | { mode: 'seven'; side: Side; step: 'result' | 'player'; result?: 'saved' | 'missed'; by?: Player }
   // `fault` (deep wave, when tracked): the technical fault's kind
   | { mode: 'turnover'; side: Side; step: 'kind' | 'player' | 'stealer'; stolen?: boolean; loser?: Player | null; fault?: FaultType }
   | { mode: 'card'; side: Side; step: 'kind' | 'player'; card?: Sanction; blue?: boolean }
@@ -206,6 +207,12 @@ const ScoringControls: SportPlugin<HandballState>['ScoringControls'] = ({
   const timeout = (sd: Side) => fire({ type: 'TIMEOUT', side: sd });
   // deep wave: who won a 7-metre throw (when tracked)
   const drawn = (sd: Side, p: Player) => fire({ type: 'DRAWN', side: sd, ...credit({ type: 'drawn', playerId: p.id }) });
+  // batch 3: the 7 m result — the "won by" chip (if one was picked) is logged
+  // first, as the old step did, then the flow goes on to the scorer / thrower
+  const sevenResult = (sd: Side, by: Player | undefined, next: Flow) => {
+    if (by) drawn(sd, by);
+    setFlow(next);
+  };
   // deep wave (IHF 4:1): the keeper off for a 7th court player, or back
   const emptyGoal = (sd: Side, on: boolean) => fire({ type: 'EMPTY_GOAL', side: sd, payload: { on } });
 
@@ -414,20 +421,22 @@ const ScoringControls: SportPlugin<HandballState>['ScoringControls'] = ({
           </View>
         );
       case 'seven':
-        // deep wave: who won the throw (optional step, only when tracked)
-        if (flow.step === 'drawn') return (
-          <View style={c.panel}>{head('7-metre throw')}
-            <Text style={c.small}>Who won it?</Text>
-            <PlayerGrid players={onCourt(sd)} onPick={(p) => { drawn(sd, p); setFlow({ ...flow, step: 'result' }); }}
-              skip={{ label: 'Skip', onPress: () => setFlow({ ...flow, step: 'result' }) }} />
-          </View>
-        );
         if (flow.step === 'result') return (
           <View style={c.panel}>{head('7-metre throw')}
+            {/* deep wave: who won the throw — batch 3: an optional chip row here
+                (no extra step); not offered when correcting a logged throw */}
+            {s.track?.sevenMDrawn && !editAt ? (
+              <>
+                <Text style={c.small}>Won by (optional)</Text>
+                <View style={c.grid}>
+                  {onCourt(sd).map((p) => <SelectChip key={p.id} label={`${p.jerseyNo != null ? `${p.jerseyNo} ` : ''}${p.fullName}`} active={flow.by?.id === p.id} onPress={() => setFlow({ ...flow, by: flow.by?.id === p.id ? undefined : p })} />)}
+                </View>
+              </>
+            ) : null}
             <View style={c.row}>
-              <Button label="✓ Scored" color={color(sd)} style={c.flex} onPress={() => setFlow({ mode: 'goal', side: sd, step: 'scorer', shotType: 'sevenM' })} />
-              <Button label="🧤 Saved" variant="ghost" style={c.flex} onPress={() => setFlow({ ...flow, result: 'saved', step: 'player' })} />
-              <Button label="✗ Missed" variant="ghost" style={c.flex} onPress={() => setFlow({ ...flow, result: 'missed', step: 'player' })} />
+              <Button label="✓ Scored" color={color(sd)} style={c.flex} onPress={() => sevenResult(sd, flow.by, { mode: 'goal', side: sd, step: 'scorer', shotType: 'sevenM' })} />
+              <Button label="🧤 Saved" variant="ghost" style={c.flex} onPress={() => sevenResult(sd, flow.by, { ...flow, by: undefined, result: 'saved', step: 'player' })} />
+              <Button label="✗ Missed" variant="ghost" style={c.flex} onPress={() => sevenResult(sd, flow.by, { ...flow, by: undefined, result: 'missed', step: 'player' })} />
             </View>
             {keeper(opp(sd)) ? <Text style={c.meta}>A save goes to {keeper(opp(sd))!.fullName} (keeper) as a 7 m save.</Text> : null}
           </View>
@@ -532,7 +541,7 @@ const ScoringControls: SportPlugin<HandballState>['ScoringControls'] = ({
       <View key={sd} style={c.col}>
         <Text style={[c.team, { color: color(sd) }]} numberOfLines={1}>{name(sd)}</Text>
         <Button label="🥅 Goal" color={color(sd)} onPress={() => setFlow({ mode: 'goal', side: sd, step: 'type' })} />
-        <Button label="🎯 7 m" accessibilityLabel="7-metre throw" variant="ghost" onPress={() => setFlow({ mode: 'seven', side: sd, step: s.track?.sevenMDrawn ? 'drawn' : 'result' })} />
+        <Button label="🎯 7 m" accessibilityLabel="7-metre throw" variant="ghost" onPress={() => setFlow({ mode: 'seven', side: sd, step: 'result' })} />
         <Button label="🎯 Shot" accessibilityLabel="Shot without a goal" variant="ghost" onPress={() => setFlow({ mode: 'shot', side: sd, step: 'type' })} />
         <Button label="⚠️ Turnover" variant="ghost" onPress={() => setFlow({ mode: 'turnover', side: sd, step: 'kind' })} />
         <Button label="🟨 Card" accessibilityLabel="Sanction" variant="ghost" onPress={() => setFlow({ mode: 'card', side: sd, step: 'kind' })} />

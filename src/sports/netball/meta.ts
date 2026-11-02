@@ -8,11 +8,15 @@ import type { SportMeta } from '../types';
 
 /** Court-team round 2 — centre pass receives (CPR) are tracked by default on
  *  the international 4 × 15 preset (founder 2026-10-22; still switchable
- *  off). The other presets set it off, so a preset switch never carries it. */
+ *  off). Batch 3 (founder 2026-11-02, only what is captured in scoring
+ *  reaches the stats): so are feeds & rebounds (`detail`: goal assists,
+ *  feeds, a miss linked to its rebound — each a step with a Skip). The other
+ *  presets set both off, so a preset switch never carries them. A stored
+ *  format without the keys (every older match) keeps both off. */
 export const NETBALL_PRESETS: Record<string, { label: string; set: Record<string, number | string | boolean> }> = {
-  international: { label: 'International 4 × 15', set: { periods: 4, periodMinutes: 15, trackCpr: true } },
-  school: { label: 'School 4 × 10', set: { periods: 4, periodMinutes: 10, trackCpr: false } },
-  halves: { label: 'Halves 2 × 20', set: { periods: 2, periodMinutes: 20, trackCpr: false } },
+  international: { label: 'International 4 × 15', set: { periods: 4, periodMinutes: 15, trackCpr: true, detail: true } },
+  school: { label: 'School 4 × 10', set: { periods: 4, periodMinutes: 10, trackCpr: false, detail: false } },
+  halves: { label: 'Halves 2 × 20', set: { periods: 2, periodMinutes: 20, trackCpr: false, detail: false } },
 };
 
 /** Court-team round 2 — the 2-point super-shot rule, an organiser choice
@@ -71,10 +75,12 @@ export const NETBALL_META: SportMeta = {
     { key: 'periodMinutes', label: 'Minutes per period', type: 'number', default: 15, min: 1, max: 20, advanced: true },
     { key: 'suspensionMinutes', label: 'Suspension (minutes of play)', type: 'number', default: 2, min: 1, max: 10, advanced: true, hint: 'World Netball: 2 — check your competition' },
     { key: 'timeoutsPerHalf', label: 'Team time-outs a half', type: 'count', default: 0, min: 0, max: 3, advanced: true, hint: 'none in the international rules; some leagues allow 2' },
-    { key: 'detail', label: 'Ask for feeds & rebounds', type: 'toggle', default: false, advanced: true, hint: 'goal assists, feeds and rebounds (one more tap a shot)' },
+    // Batch 3: the field defaults agree with the live settings' "Standard" (the
+    // International 4 × 15 preset, the default one): feeds & rebounds and CPR on
+    { key: 'detail', label: 'Ask for feeds & rebounds', type: 'toggle', default: true, advanced: true, hint: 'goal assists, feeds and rebounds (one more tap a shot, or Skip) · on with International 4 × 15' },
     // Deep wave — "Stats to track" (the scorer can switch them in ⚙️ Match settings).
     // Round 2: centre pass receives come on with the International 4 × 15 preset (its `set`).
-    { key: 'trackCpr', label: 'Track centre pass receives', type: 'toggle', default: false, advanced: true, group: 'Stats to track', hint: 'who caught each centre pass (one tap, optional) · on with International 4 × 15' },
+    { key: 'trackCpr', label: 'Track centre pass receives', type: 'toggle', default: true, advanced: true, group: 'Stats to track', hint: 'who caught each centre pass (one tap, optional) · on with International 4 × 15' },
     { key: 'trackGains', label: 'Track gains & pick-ups', type: 'toggle', default: false, advanced: true, group: 'Stats to track', hint: 'deflection with / without gain, pick-ups — gains and gain-to-goal %' },
     { key: 'trackTurnovers', label: 'Track turnover types', type: 'toggle', default: false, advanced: true, group: 'Stats to track', hint: 'bad pass, footwork, held ball, offside…' },
     // Deep wave — the 2-point super shot, an organiser rule, off by default.

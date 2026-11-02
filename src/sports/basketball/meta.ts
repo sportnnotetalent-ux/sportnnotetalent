@@ -10,10 +10,12 @@ import type { SportMeta } from '../types';
  *  format editor's defaults and the live settings' "Standard". The shot-zone
  *  buttons (+2 Paint · +2 Mid · +3 Corner · +3 Top; 3×3: +1 / +2) are the
  *  default scoring layout (founder 2026-10-22); switched off, the plain
- *  +2 / +3 row comes back. Missed shots, fast breaks and fouls drawn stay
- *  opt-in. `init` never applies these: a stored config without the key —
- *  every match made before — keeps the layout it was scored with. */
-export const BB_TRACK_DEFAULTS = { trackMisses: false, trackZones: true, trackFastBreak: false, trackFoulsDrawn: false } as const;
+ *  +2 / +3 row comes back. Batch 3 (founder 2026-11-02, only what is captured
+ *  in scoring reaches the stats): missed shots are on for a new match too
+ *  (FG%, 3P%, EFF; a miss is one tap, like a make). Fast breaks and fouls
+ *  drawn stay opt-in. `init` never applies these: a stored config without
+ *  the key — every match made before — keeps what it was scored with. */
+export const BB_TRACK_DEFAULTS = { trackMisses: true, trackZones: true, trackFastBreak: false, trackFoulsDrawn: false } as const;
 
 export const BASKETBALL_META: SportMeta = {
   id: 'basketball',
