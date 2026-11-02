@@ -52,12 +52,15 @@ const SCORED = new Set(['point', 'attack', 'block', 'ace', 'opperror', 'serveerr
 export interface VbDetailToggle { set: number; at: number; on: boolean; cats?: VbDetailCat[] }
 
 /** The "Stats to track" categories (deep wave). */
-export type VbDetailCat = 'attack' | 'reception' | 'dig' | 'assist';
-export const VB_DETAIL_CATS: VbDetailCat[] = ['attack', 'reception', 'dig', 'assist'];
+export type VbDetailCat = 'attack' | 'reception' | 'dig' | 'assist' | 'aced';
+/** court-team batch 5: 'aced' — "Who was aced?" on its own (split out of
+ *  Reception quality, which also grades every reception): the receiver aced,
+ *  a reception error only. A toggle of an older log never names it. */
+export const VB_DETAIL_CATS: VbDetailCat[] = ['attack', 'reception', 'dig', 'assist', 'aced'];
 /** What a toggle without `cats` captures (SD-81's original mode). */
 export const LEGACY_DETAIL_CATS: VbDetailCat[] = ['attack', 'reception'];
 /** The format / live-settings key of each category. */
-export const VB_CAT_KEY: Record<VbDetailCat, string> = { attack: 'vbAttack', reception: 'vbReception', dig: 'vbDig', assist: 'vbAssist' };
+export const VB_CAT_KEY: Record<VbDetailCat, string> = { attack: 'vbAttack', reception: 'vbReception', dig: 'vbDig', assist: 'vbAssist', aced: 'vbAced' };
 
 /** 'dig' — a dig (the rally goes on); 'assist' — who set the last Attack
  *  point; 'aced' — who failed to receive the last Ace (a reception error). */
@@ -110,11 +113,22 @@ export const detailCats = (s: VolleyballState | null | undefined): VbDetailCat[]
 export const catOn = (s: VolleyballState | null | undefined, cat: VbDetailCat): boolean => detailCats(s).includes(cat);
 /** Did any toggle of this match name its categories (a deep-wave match)? */
 const hasCats = (s: VolleyballState) => (s.detail ?? []).some((t) => !!t.cats);
+/** Batch 5: did any toggle of this match name 'aced' (never on an older log)? */
+const hasAcedCat = (s: VolleyballState) => (s.detail ?? []).some((t) => !!t.cats?.includes('aced'));
+
+/** The category an entry counts towards. Batch 5: on a match that had the
+ *  'aced' category, an aced receiver logged while Reception quality was off
+ *  is 'aced' only (a reception error, not a graded reception). Every older
+ *  log keeps CAT_OF_KIND. */
+export function entryCat(s: VolleyballState, x: VbDetailEntry): VbDetailCat {
+  if (x.kind === 'aced' && hasAcedCat(s) && !catCoveredAt(s, 'reception', x.set, Math.max(0, x.at - 1))) return 'aced';
+  return CAT_OF_KIND[x.kind];
+}
 
 /** Was category `cat` captured at any point of the match (switched on, or an
  *  entry of it logged)? The keyed stats of the category are written then. */
 export const catTracked = (s: VolleyballState | null | undefined, cat: VbDetailCat): boolean =>
-  !!s && ((s.detail ?? []).some((t) => catsOf(t).includes(cat)) || (s.vd ?? []).some((x) => CAT_OF_KIND[x.kind] === cat));
+  !!s && ((s.detail ?? []).some((t) => catsOf(t).includes(cat)) || (s.vd ?? []).some((x) => entryCat(s, x) === cat));
 
 /** Did this match capture attack attempts? (the attack keys are written
  *  then). An older match (no `cats` anywhere) keeps SD-81's rule: any switch
@@ -155,7 +169,7 @@ function patchCats(base: VbDetailCat[], p: Record<string, unknown> | undefined):
 
 /** The format keys a new match may start with detail on: `detail: true`
  *  (SD-81, attack + reception) and / or the deep-wave category keys
- *  (`vbAttack`, `vbReception`, `vbDig`, `vbAssist`). */
+ *  (`vbAttack`, `vbReception`, `vbDig`, `vbAssist`, batch 5 `vbAced`). */
 export function initDetail(config?: Record<string, unknown>): Pick<VolleyballState, 'detail'> {
   const legacy = config?.detail === true;
   const cats = patchCats(legacy ? LEGACY_DETAIL_CATS : [], config);
@@ -276,9 +290,10 @@ export const VB_ASSIST_KEY = 'setAssists';
 export const receptionTracked = (s: VolleyballState | null | undefined): boolean =>
   !!s && (hasCats(s) ? catTracked(s, 'reception') : (s.vd ?? []).some((x) => x.kind === 'reception' || x.kind === 'aced'));
 
-/** Were aced receivers named (reception errors)? An older match never. */
+/** Were aced receivers named (reception errors)? An older match never.
+ *  Batch 5: or the "Who was aced?" category was on. */
 export const acedTracked = (s: VolleyballState | null | undefined): boolean =>
-  !!s && (hasCats(s) ? catTracked(s, 'reception') : (s.vd ?? []).some((x) => x.kind === 'aced'));
+  !!s && (hasCats(s) ? catTracked(s, 'reception') || catTracked(s, 'aced') : (s.vd ?? []).some((x) => x.kind === 'aced'));
 /** Digs / set assists captured on this match? */
 export const digTracked = (s: VolleyballState | null | undefined): boolean => catTracked(s, 'dig');
 export const assistTracked = (s: VolleyballState | null | undefined): boolean => catTracked(s, 'assist');
@@ -342,7 +357,11 @@ export function detailTally(s: VolleyballState, scope: 'all' | number = 'all'): 
       l.receptions += 1;
       if (x.q === 'perfect') l.receptionsPerfect += 1;
       if (x.q === 'perfect' || x.q === 'good') l.receptionsPositive += 1;
-    } else if (x.kind === 'aced') { l.receptions += 1; l.receptionErrors += 1; }
+    } else if (x.kind === 'aced') {
+      // batch 5: an aced-only entry is an error, not a graded reception
+      if (entryCat(s, x) === 'reception') l.receptions += 1;
+      l.receptionErrors += 1;
+    }
     else if (x.kind === 'dig') l.digs += 1;
     else if (x.kind === 'assist') l.setAssists += 1;
   }

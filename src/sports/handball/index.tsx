@@ -21,7 +21,8 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { theme } from '../../core/theme';
 import { useMask } from '../../core/disputeMask';
 import { withNames, nameFor } from '../invasion/names';
-import { subAction, keeperAction, xiStamp } from '../invasion/actions';
+import { subAction, xiStamp } from '../invasion/actions';
+import { askKeeper, namedKeeperAction, savedByActions } from './savePrompt';
 import { Button, TextField, SelectChip } from '../../components/ui';
 import { confirmMatchAction } from '../../components/ConfirmSheet';
 import { LineScoreboard } from '../../components/LineScoreboard';
@@ -79,10 +80,10 @@ function PlayerGrid({ players, onPick, skip }: { players: Player[]; onPick: (p: 
 
 type Flow =
   | { mode: 'goal'; side: Side; step: 'type' | 'scorer' | 'assist'; shotType?: ShotType; scorer?: Player | null }
-  | { mode: 'shot'; side: Side; step: 'type' | 'result' | 'player' | 'blocker'; shotType?: ShotType; result?: MissResult; shooter?: Player | null }
+  | { mode: 'shot'; side: Side; step: 'type' | 'result' | 'player' | 'blocker'; shotType?: ShotType; result?: MissResult; shooter?: Player | null; gk?: Player }
   // `by` (deep wave, when tracked): who won the 7-metre throw — batch 3: an
   // optional chip on the result screen (no extra step), logged before the result
-  | { mode: 'seven'; side: Side; step: 'result' | 'player'; result?: 'saved' | 'missed'; by?: Player }
+  | { mode: 'seven'; side: Side; step: 'result' | 'player'; result?: 'saved' | 'missed'; by?: Player; gk?: Player }
   // `fault` (deep wave, when tracked): the technical fault's kind
   | { mode: 'turnover'; side: Side; step: 'kind' | 'player' | 'stealer'; stolen?: boolean; loser?: Player | null; fault?: FaultType }
   | { mode: 'card'; side: Side; step: 'kind' | 'player'; card?: Sanction; blue?: boolean }
@@ -170,13 +171,15 @@ const ScoringControls: SportPlugin<HandballState>['ScoringControls'] = ({
     setFlow(null);
   };
   // an attempt that didn't score; a save goes to the other side's keeper (its
-  // own action on the keeper's side), a block to the blocker
-  const miss = (sd: Side, shotType: ShotType, res: MissResult, p: Player | null, blocker?: Player | null) => {
+  // own action on the keeper's side), a block to the blocker. Batch 5: with no
+  // keeper set, "Who's in goal?" (optional) logs the keeper first (savePrompt).
+  const miss = (sd: Side, shotType: ShotType, res: MissResult, p: Player | null, blocker?: Player | null, gkPick?: Player) => {
     const id = uid();
+    const saved = res === 'saved' ? savedByActions(s, opp(sd), gkPick) : null;
+    for (const a of saved?.pre ?? []) fire(a);
     fire({ type: 'MISS', side: sd, payload: { shotType, result: res, uid: id }, ...credit({ type: 'miss', shotType, playerId: p?.id }) });
-    if (res === 'saved') {
-      const gk = keeper(opp(sd));
-      fire({ type: 'SAVE', side: opp(sd), payload: { ref: id, shotType }, ...credit({ type: 'save', shotType, playerId: gk?.id }) });
+    if (saved) {
+      fire({ type: 'SAVE', side: opp(sd), payload: { ref: id, shotType }, ...credit({ type: 'save', shotType, playerId: saved.keeperId }) });
     }
     if (res === 'blocked' && blocker) fire({ type: 'BLOCK', side: opp(sd), payload: { ref: id }, ...credit({ type: 'block', playerId: blocker.id }) });
     setFlow(null);
@@ -201,10 +204,24 @@ const ScoringControls: SportPlugin<HandballState>['ScoringControls'] = ({
     setFlow(null);
   };
   const setKeeper = (sd: Side, p: Player) => {
-    fire(keeperAction(sd, p));
+    fire(namedKeeperAction(sd, p));
     setFlow(null);
   };
   const timeout = (sd: Side) => fire({ type: 'TIMEOUT', side: sd });
+  // batch 5: a save with no keeper set — "Who's in goal?" (optional; tap again
+  // to clear). The team keeps the save either way; not offered while correcting.
+  const keeperPick = (sd: Side, picked: Player | undefined, set: (p?: Player) => void) => {
+    const ks = opp(sd);
+    if (!askKeeper(s, ks, !!editAt)) return null;
+    return (
+      <>
+        <Text style={c.small}>🧤 Who's in goal? (optional — sets {name(ks)}'s keeper)</Text>
+        <View style={c.grid}>
+          {[...onCourt(ks), ...bench(ks)].map((p) => <SelectChip key={p.id} label={`${p.jerseyNo != null ? `${p.jerseyNo} ` : ''}${p.fullName}`} dotColor={color(ks)} active={picked?.id === p.id} onPress={() => set(picked?.id === p.id ? undefined : p)} />)}
+        </View>
+      </>
+    );
+  };
   // deep wave: who won a 7-metre throw (when tracked)
   const drawn = (sd: Side, p: Player) => fire({ type: 'DRAWN', side: sd, ...credit({ type: 'drawn', playerId: p.id }) });
   // batch 3: the 7 m result — the "won by" chip (if one was picked) is logged
@@ -410,8 +427,9 @@ const ScoringControls: SportPlugin<HandballState>['ScoringControls'] = ({
         );
         if (flow.step === 'player') return (
           <View style={c.panel}>{head('Who shot?')}
-            <PlayerGrid players={onCourt(sd)} onPick={(p) => (flow.result === 'blocked' ? setFlow({ ...flow, shooter: p, step: 'blocker' }) : miss(sd, flow.shotType ?? 'nineM', flow.result ?? 'missed', p))}
-              skip={{ label: 'Skip player', onPress: () => (flow.result === 'blocked' ? setFlow({ ...flow, shooter: null, step: 'blocker' }) : miss(sd, flow.shotType ?? 'nineM', flow.result ?? 'missed', null)) }} />
+            {flow.result === 'saved' ? keeperPick(sd, flow.gk, (gk) => setFlow({ ...flow, gk })) : null}
+            <PlayerGrid players={onCourt(sd)} onPick={(p) => (flow.result === 'blocked' ? setFlow({ ...flow, shooter: p, step: 'blocker' }) : miss(sd, flow.shotType ?? 'nineM', flow.result ?? 'missed', p, undefined, flow.gk))}
+              skip={{ label: 'Skip player', onPress: () => (flow.result === 'blocked' ? setFlow({ ...flow, shooter: null, step: 'blocker' }) : miss(sd, flow.shotType ?? 'nineM', flow.result ?? 'missed', null, undefined, flow.gk)) }} />
           </View>
         );
         return (
@@ -443,7 +461,8 @@ const ScoringControls: SportPlugin<HandballState>['ScoringControls'] = ({
         );
         return (
           <View style={c.panel}>{head('7 m thrower')}
-            <PlayerGrid players={onCourt(sd)} onPick={(p) => miss(sd, 'sevenM', flow.result ?? 'missed', p)} skip={{ label: 'Skip player', onPress: () => miss(sd, 'sevenM', flow.result ?? 'missed', null) }} />
+            {flow.result === 'saved' ? keeperPick(sd, flow.gk, (gk) => setFlow({ ...flow, gk })) : null}
+            <PlayerGrid players={onCourt(sd)} onPick={(p) => miss(sd, 'sevenM', flow.result ?? 'missed', p, undefined, flow.gk)} skip={{ label: 'Skip player', onPress: () => miss(sd, 'sevenM', flow.result ?? 'missed', null, undefined, flow.gk) }} />
           </View>
         );
       case 'turnover':

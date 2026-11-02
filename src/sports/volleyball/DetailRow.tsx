@@ -9,7 +9,8 @@
  *   reception  after an Ace: "Who was aced?" (a reception error);
  *              "📥 Reception" per side: grade (# / + / −), then the receiver;
  *   dig        "🛡️ Dig" per side → the digger;
- *   assist     after an Attack point: "Set by?" (the setter — a set assist).
+ *   assist     after an Attack point: "Set by?" (the setter — a set assist);
+ *   aced       (batch 5) after an Ace: "Who was aced?" on its own.
  * Every prompt is skippable; a second tap replaces the answer. Kills come from
  * Attack points and attack errors from "Opp. fault › Attack out" with the
  * attacker named, so they need no extra tap. Every entry is a VB_DETAIL (undo
@@ -28,7 +29,7 @@ import { detailCats, detailOn, entryFor, lastPoint, RECEPTION_GRADES, type Recep
 type Side = 'home' | 'away';
 interface SideInfo { side: Side; name: string; color: string; court: Player[] }
 
-const CAT_LABEL: Record<VbDetailCat, string> = { attack: 'Attack', reception: 'Reception', dig: 'Digs', assist: 'Set assists' };
+const CAT_LABEL: Record<VbDetailCat, string> = { attack: 'Attack', reception: 'Reception', dig: 'Digs', assist: 'Set assists', aced: 'Who was aced' };
 
 export function VolleyballDetailRow({ state: s, dispatch, home, away }: {
   state: VolleyballState;
@@ -62,7 +63,7 @@ export function VolleyballDetailRow({ state: s, dispatch, home, away }: {
     return (
       <View style={st.box}>
         {toggle}
-        {!on && <Text style={st.meta}>Choose what to track in ⚙️ Stats to track (attack attempts, reception, digs, set assists).</Text>}
+        {!on && <Text style={st.meta}>Choose what to track in ⚙️ Stats to track (attack attempts, reception, digs, set assists, who was aced).</Text>}
       </View>
     );
   }
@@ -103,7 +104,8 @@ export function VolleyballDetailRow({ state: s, dispatch, home, away }: {
       {has('attack') && <Text style={st.meta}>Kills come from ⚡ Attack points; attack errors from 🚩 Opp. fault › Attack out with the attacker named.</Text>}
       {has('assist') && annotate('assist', 'attack', '🤝 Set by?', (sd) => sd)}
       {has('attack') && annotate('blocked', 'block', '🧱 Who was blocked?', opp)}
-      {has('reception') && annotate('aced', 'ace', '📥 Who was aced?', opp)}
+      {/* batch 5: its own category too (on for new matches), or within Reception */}
+      {(has('aced') || has('reception')) && annotate('aced', 'ace', '📥 Who was aced?', opp)}
       <View style={st.chips}>
         {[home, away].map((x) => (
           <React.Fragment key={x.side}>

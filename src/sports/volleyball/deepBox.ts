@@ -57,7 +57,8 @@ const idIn = (name: string, roster: Player[]) => roster.find((p) => p.fullName =
 /** The deep box source: the shared one + the deep-wave keys per row. */
 export function volleyballDeepBox(s: VolleyballState, ctx: BoxContext = {}): MatchBoxSource {
   const base = volleyballBox(s, ctx);
-  const recv = receptionTracked(s) || acedTracked(s);
+  // batch 5: "Who was aced?" alone writes no reception keys (older: aced ⇒ recv)
+  const recv = receptionTracked(s);
   const aced = acedTracked(s);
   const dig = digTracked(s);
   const assist = assistTracked(s);
@@ -66,7 +67,7 @@ export function volleyballDeepBox(s: VolleyballState, ctx: BoxContext = {}): Mat
     data: (scope) => {
       const d = base.data(scope);
       const srv = serves(s, scope);
-      if (!recv && !dig && !assist && !srv) return d;
+      if (!recv && !aced && !dig && !assist && !srv) return d;
       const tally = detailTally(s, scope);
       const side = (sd: Side) => {
         const roster = (sd === 'home' ? ctx.homeRoster : ctx.awayRoster) ?? [];

@@ -31,7 +31,8 @@ const other = (s: Side): Side => (s === 'home' ? 'away' : 'home');
 
 /** What an "Opp. fault" type reads as in a sentence. */
 const FAULT_TEXT: Record<string, string> = {
-  net: 'net touch', foot: 'foot fault', rotation: 'rotation fault', hits: 'double contact / four hits', attackout: 'attack out', blockout: 'block fault',
+  net: 'net touch', foot: 'centre-line fault', rotation: 'rotation fault', hits: 'double contact / four hits', attackout: 'attack out', blockout: 'block fault',
+  handling: 'catch / lift', backrow: 'back-row / libero fault',
 };
 
 export interface VbNames {

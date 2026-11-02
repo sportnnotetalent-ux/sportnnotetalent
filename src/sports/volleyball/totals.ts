@@ -117,13 +117,15 @@ export function volleyballDetailTotals(s: VolleyballState, ctx: StatTotalsContex
   const attack = detailTracked(s);
   const recv = receptionTracked(s);
   // deep wave — reception errors (aced receivers named), digs, set assists:
-  // each only for a match that captured its category
+  // each only for a match that captured its category. Batch 5: the reception
+  // keys follow Reception quality alone ("Who was aced?" on its own writes
+  // reception errors only; on an older match aced implies recv, as before)
   const aced = acedTracked(s);
   const dig = digTracked(s);
   const assist = assistTracked(s);
   if (!attack && !recv && !aced && !dig && !assist) return {};
   const keys: string[] = [
-    ...(attack ? VB_ATTACK_KEYS : []), ...(recv || aced ? VB_RECEPTION_KEYS : []),
+    ...(attack ? VB_ATTACK_KEYS : []), ...(recv ? VB_RECEPTION_KEYS : []),
     ...(aced ? [VB_RECEPTION_ERROR_KEY] : []), ...(dig ? [VB_DIG_KEY] : []), ...(assist ? [VB_ASSIST_KEY] : []),
   ];
   const idx = nameIndex(s, ctx);

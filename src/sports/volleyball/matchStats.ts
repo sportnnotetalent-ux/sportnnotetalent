@@ -24,6 +24,15 @@ import type { VolleyballState } from './engine.ts';
 import { trackCourt, serveTracked, type RallyServe } from './rotation.ts';
 import { catTracked, detailTally, detailTracked, receptionTracked, acedTracked, type VbAttackLine } from './detail.ts';
 import { countRow, pctRow, ratioRow, type CmpCat, type CmpRow, type Side } from '../netraid/feed.ts';
+import { sanctionsOf, VB_SANCTIONS } from './sanctions.ts';
+
+/** "Opp. fault" types counted as faults (batch 5: + catch / lift, back-row /
+ *  libero; `foot` = the centre line). Unknown types aren't counted here. */
+const VB_FAULT_KEYS = ['net', 'foot', 'rotation', 'hits', 'handling', 'backrow'];
+const DISC_LABEL: Record<string, string> = {
+  warning: 'Warnings', penalty: 'Penalties (a point)', expulsion: 'Expulsions (the set)', disqualification: 'Disqualifications (the match)',
+  delayWarning: 'Delay warnings', delayPenalty: 'Delay penalties (a point)',
+};
 
 const SCORED = new Set(['point', 'attack', 'block', 'ace', 'opperror', 'serveerror']);
 const SIDES: Side[] = ['home', 'away'];
@@ -119,11 +128,11 @@ export function volleyballMatchStats(s: VolleyballState, scope: VbScope = 'all')
     );
     if (typed) {
       const ty = (keys: string[]) => H((x) => oe(x, (e) => e.kind === 'opperror' && !!e.oe?.type && keys.includes(e.oe.type)));
-      const ae = ty(['attackout']), be = ty(['blockout']), fa = ty(['net', 'foot', 'rotation', 'hits']);
+      const ae = ty(['attackout']), be = ty(['blockout']), fa = ty(VB_FAULT_KEYS);
       const un = H((x) => oe(x, (e) => e.kind === 'opperror' && !e.oe?.type));
       scoring.push(countRow('oppAtk', 'of which attack errors', ae[0], ae[1], { sub: true }));
       if (be[0] + be[1]) scoring.push(countRow('oppBlk', 'of which block errors', be[0], be[1], { sub: true }));
-      scoring.push(countRow('oppFault', 'of which faults (net, foot, rotation, contact)', fa[0], fa[1], { sub: true }));
+      scoring.push(countRow('oppFault', 'of which faults (net, centre line, rotation, contact, back row)', fa[0], fa[1], { sub: true }));
       if (un[0] + un[1]) scoring.push(countRow('oppUn', 'of which not described', un[0], un[1], { sub: true }));
     } else scoring.push(countRow('oppOther', 'of which attack errors & faults', oppErr[0], oppErr[1], { sub: true }));
     if (pen[0] + pen[1]) scoring.push(countRow('pen', 'Penalty points (sanctions)', pen[0], pen[1]));
@@ -185,7 +194,10 @@ export function volleyballMatchStats(s: VolleyballState, scope: VbScope = 'all')
     );
   }
   recRows.push(countRow('acedAgainst', 'Reception errors (aces conceded)', ace[1], ace[0], { better: 'lower' }));
-  if (s && (receptionTracked(s) || acedTracked(s)) && dsum.home.receptions + dsum.away.receptions > 0) {
+  // batch 5: "Who was aced?" — the receivers named (a reception error each)
+  if (s && acedTracked(s)) recRows.push(countRow('acedNamed', 'of which receiver named (who was aced)', dsum.home.receptionErrors, dsum.away.receptionErrors, { sub: true, better: 'lower' }));
+  // the graded rows follow Reception quality (older: aced ⇒ reception, as before)
+  if (s && receptionTracked(s) && dsum.home.receptions + dsum.away.receptions > 0) {
     const d = dsum;
     recRows.push(
       countRow('graded', 'Receptions graded', d.home.receptions, d.away.receptions),
@@ -201,6 +213,19 @@ export function volleyballMatchStats(s: VolleyballState, scope: VbScope = 'all')
   if (s && catTracked(s, 'dig')) defRows.push(countRow('digs', 'Digs', dsum.home.digs, dsum.away.digs));
   if (s && catTracked(s, 'assist')) defRows.push(countRow('assists', 'Set assists (sets to a kill)', dsum.home.setAssists, dsum.away.setAssists));
   if (defRows.length) cats.push({ id: 'defence', title: 'Defence & setting', rows: defRows });
+
+  /* -------- discipline (batch 5) -------- */
+  // FIVB 16 / 21 sanctions against each side (the offender), penalty points
+  // included (a corrected log keeps them as `pen` points); only when given
+  const sx = sanctionsOf(s?.events ?? []).filter((x) => scope === 'all' || x.set === scope);
+  if (sx.length) {
+    const discRows: CmpRow[] = [];
+    for (const d of VB_SANCTIONS) {
+      const v = H((x) => sx.filter((y) => y.by === x && y.level === d.level).length);
+      if (v[0] + v[1]) discRows.push(countRow(d.level, DISC_LABEL[d.level], v[0], v[1], { better: 'lower' }));
+    }
+    if (discRows.length) cats.push({ id: 'discipline', title: 'Discipline', rows: discRows });
+  }
 
   /* -------- game flow -------- */
   const flow = gameFlow(rs, s);
