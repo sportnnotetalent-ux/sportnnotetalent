@@ -147,6 +147,23 @@ export function summarizeHeights(heights: HeightAttempt[] | undefined): HeightSu
   return { best, failsAtBest, totalFails, eliminated };
 }
 
+/** Can the athlete still jump at `height`, and how many tries are left there:
+ *  three failures in a row at any heights — carried across a pass — and they
+ *  are out (TR 26.5); a clearance resets the count. Closed once the height is
+ *  finished (cleared, passed, or out). */
+export function heightTries(heights: HeightAttempt[] | undefined, height: number): { open: boolean; left: number } {
+  let run = 0;
+  for (const h of [...(heights ?? [])].sort((a, b) => a.height - b.height)) {
+    if (h.height > height + 1e-9) break;
+    const t = h.tries.toUpperCase();
+    if (Math.abs(h.height - height) >= 1e-9 && t.endsWith('O')) { run = 0; continue; }
+    run += (t.match(/X/g) ?? []).length;
+    if (run >= 3) return { open: false, left: 0 };
+    if (Math.abs(h.height - height) < 1e-9 && (t.endsWith('O') || t.endsWith('-'))) return { open: false, left: 3 - run };
+  }
+  return { open: true, left: 3 - run };
+}
+
 /** Next state of a height's tries after the official taps O, X or – (pass). */
 export function addTry(tries: string, t: 'O' | 'X' | '-'): string {
   if (tries.endsWith('O') || tries.endsWith('-') || tries.length >= 3) return tries;
@@ -207,11 +224,11 @@ export function effectiveStatus(r: EntryResult, def: DisciplineDef): ResultStatu
   if (r.status && r.status !== 'ok') return r.status;
   if (def.capture === 'attempts') {
     const s = summarizeAttempts(r.attempts, def);
-    if (s.best == null && s.taken >= (def.attempts?.count ?? 3)) return 'NM';
+    if (s.best == null && (s.taken >= (def.attempts?.count ?? 3) || r.retired)) return 'NM';
   }
   if (def.capture === 'heights') {
     const h = summarizeHeights(r.heights);
-    if (h.best == null && h.eliminated) return 'NM';
+    if (h.best == null && (h.eliminated || r.retired)) return 'NM';
   }
   if (def.capture === 'lifts') {
     // SD-97: one lift ranked on its own (wl.snatch / wl.cj) — out only if that lift failed

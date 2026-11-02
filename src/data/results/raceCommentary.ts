@@ -53,7 +53,7 @@ export interface CommentaryOptions {
 
 type Phase = MeetEvent['phases'][number];
 
-const SHOWN_FLAGS: ResultFlag[] = ['Q', 'q', 'PB', '=PB', 'SB', '=SB', 'MR', '=MR', 'SR', '=SR', 'w', 'h'];
+const SHOWN_FLAGS: ResultFlag[] = ['Q', 'q', 'PB', '=PB', 'SB', '=SB', 'MR', '=MR', 'SR', '=SR', 'w', 'h', 'r'];
 const flagText = (flags: ResultFlag[]): string => {
   const f = SHOWN_FLAGS.filter((x) => flags.includes(x));
   return f.length ? ` ${f.join(' ')}` : '';
@@ -234,6 +234,8 @@ function attemptItems(title: string, p: Phase, def: DisciplineDef, base: Base): 
           }
           what = `${e.name} ${formatMark(v, def)}${def.wind === 'attempt' && a.wind != null ? ` (${windText(a.wind)})` : ''}${note ? ` — ${note}` : ''}`;
         }
+        // retired ("r"): stopped after this trial, keeping the marks made
+        if (e.result.retired && round === (e.result.retired.afterRound ?? e.result.attempts?.length)) what += ', then retires (r)';
         out.push(base(heat, [round, idx], 'attempt', def.unit === 'height' ? '🦘' : '📏', `${title}${group} · round ${round}: ${what}`, p.status !== 'completed'));
       });
     }
@@ -263,6 +265,7 @@ function heightItems(title: string, p: Phase, def: DisciplineDef, base: Base): C
         else if (tries.endsWith('-')) what = `${xs === 1 ? 'misses once' : 'misses twice'} at ${ht}, passes to the next height (${tries})`;
         else if (sum.eliminated) what = `${xs === 3 ? 'fails three times' : 'fails'} at ${ht} (${tries}) — out, ${sum.best != null ? `best ${formatMark(sum.best, def)}` : 'no height cleared'}`;
         else what = `misses at ${ht} (${tries})`;
+        if (e.result.retired && height === (e.result.retired.atHeight ?? Math.max(...upTo.filter((x) => x.tries).map((x) => x.height)))) what += ', then retires (r)';
         out.push(base(heat, [hi, idx], 'height', '🦘', `${title}: ${e.name} ${what}`, p.status !== 'completed'));
       });
     });

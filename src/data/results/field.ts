@@ -15,7 +15,7 @@
  * World Athletics specs — they follow common Indian (AFI / school) practice and
  * are shown as "check your federation"; the organiser can change them.
  */
-import type { Category, DisciplineDef, JumpOff, PhaseKind, Progression, ResultEntry } from './model.ts';
+import type { Category, DisciplineDef, EntryResult, JumpOff, PhaseKind, Progression, ResultEntry } from './model.ts';
 import { disciplineOf } from './model.ts';
 import { summarizeAttempts, summarizeHeights } from './marks.ts';
 import { attemptOrder, fieldFinalists, firstRoundsDone } from './progression.ts';
@@ -168,6 +168,7 @@ export function attemptNextUp(entries: ResultEntry[], def: DisciplineDef, o: { p
     const finalists = r > count ? fieldFinalists(competing, def) : null;
     for (const e of attemptOrder(competing, def, r)) {
       if (finalists && !finalists.has(e.id)) continue;
+      if (e.result?.retired) continue;
       if (o.phase === 'qualification' && o.standard != null) {
         const best = summarizeAttempts(e.result?.attempts, def).best;
         if (best != null && best >= o.standard - 1e-9) continue;
@@ -176,6 +177,14 @@ export function attemptNextUp(entries: ResultEntry[], def: DisciplineDef, o: { p
     }
   }
   return null;
+}
+
+/** Mark a field athlete retired ("r") where they stopped — after their last
+ *  trial taken, or at the highest bar they jumped at — or, tapped again, undo it. */
+export function toggleRetired(r: EntryResult, def: DisciplineDef): EntryResult {
+  if (r.retired) { const { retired: _drop, ...rest } = r; return rest; }
+  const at = (r.heights ?? []).filter((h) => h.tries).map((h) => h.height);
+  return { ...r, retired: def.capture === 'heights' ? (at.length ? { atHeight: Math.max(...at) } : {}) : { afterRound: taken({ result: r } as ResultEntry) } };
 }
 
 /** Where an athlete stands now and who leads (for the attempt card). */
@@ -254,7 +263,7 @@ export interface VerticalState {
 export function verticalState(entries: ResultEntry[], bar: number[]): VerticalState {
   const hs = [...bar].sort((a, b) => a - b);
   const competing = entries.filter((e) => !out(e)).sort((a, b) => (a.result?.order ?? 999) - (b.result?.order ?? 999));
-  const active = competing.filter((e) => !summarizeHeights(e.result?.heights).eliminated);
+  const active = competing.filter((e) => !e.result?.retired && !summarizeHeights(e.result?.heights).eliminated);
   for (const h of hs) {
     const pending = active.filter((e) => {
       const list = e.result?.heights ?? [];

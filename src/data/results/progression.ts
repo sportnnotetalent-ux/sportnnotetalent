@@ -83,7 +83,7 @@ export function firstRoundsDone(entries: ResultEntry[], def: DisciplineDef): boo
   const n = def.attempts?.count ?? 3;
   return entries
     .filter((e) => !['DNS', 'WD', 'DQ'].includes(e.result?.status ?? 'ok'))
-    .every((e) => (e.result?.attempts ?? []).slice(0, n).filter((x) => x.foul || x.pass || x.mark != null).length >= n);
+    .every((e) => !!e.result?.retired || (e.result?.attempts ?? []).slice(0, n).filter((x) => x.foul || x.pass || x.mark != null).length >= n);
 }
 
 /**

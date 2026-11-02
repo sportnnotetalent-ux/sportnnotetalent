@@ -49,7 +49,7 @@ import {
 } from '../data/resultsStore';
 import {
   disciplineOf, phaseOf, phaseLabel, toResultEntry, rankByHeat, qualify, withQualification, withRecordFlags,
-  fieldFinalists, firstRoundsDone, attemptOrder, formatMark, parseMark, attemptText, summarizeHeights, addTry,
+  fieldFinalists, firstRoundsDone, attemptOrder, formatMark, parseMark, attemptText, summarizeHeights, addTry, heightTries, toggleRetired,
   eventAwards, categoryKey, categoryLabel, usesLanes,
   digitsToTime, handTime as handTimeTenth, handNote, reactionFalseStart, moveLane, startListText, resultsText, hurdleHeight,
   looseLegal, attemptNextUp, trialsFor, verticalState, jumpOffStatus, jumpOffTry, jumpOffStart, trialSeconds, barProgressionError,
@@ -567,6 +567,8 @@ export default function ResultsEventScreen() {
     const r = resultOf(e);
     const list = r.heights ?? [];
     const cur = list.find((h) => Math.abs(h.height - height) < 1e-9)?.tries ?? '';
+    // out on three failures in a row (carried across a pass, TR 26.5), or retired: no more tries
+    if (r.retired || !heightTries(list, height).open) return;
     const next = addTry(cur, t);
     if (next === cur) return;
     offerUndo(id, r, `${t === 'O' ? 'O clear' : t === 'X' ? 'X fail' : '– pass'} · ${toResultEntry(e, nameOf).name.split(' ')[0]} ${formatMark(height, def)}`);
@@ -813,11 +815,15 @@ export default function ResultsEventScreen() {
                       : <MarkField key={`${e.id}:${r.mark ?? ''}:${r.thousandths ?? ''}`} def={def} r={r} editable={editable && (r.status ?? 'ok') === 'ok'} onChange={(n) => void save(e, n)} />
                   ) : null}
                   {def.capture === 'attempts' && (
-                    <AttemptCells def={def} r={r} round={round} editable={editable && (r.status ?? 'ok') === 'ok'} course={course}
+                    <AttemptCells def={def} r={r} round={round} editable={editable && (r.status ?? 'ok') === 'ok' && !r.retired} course={course}
                       extraAllowed={extraOpen && finalists.has(e.id)} onChange={(n) => void save(e, n)}
                       onUndoable={(label) => offerUndo(e.id, r, `${label} · ${re.name.split(' ')[0]} R${round}`)} />
                   )}
-                  {def.capture === 'heights' && <HeightRow def={def} r={r} bar={curBar} editable={editable && (r.status ?? 'ok') === 'ok'} onChange={(n) => void save(e, n)} />}
+                  {def.capture === 'heights' && <HeightRow def={def} r={r} bar={curBar} editable={editable && (r.status ?? 'ok') === 'ok' && !r.retired} onChange={(n) => void save(e, n)} />}
+                  {/* retired ("r"): stops competing, keeps the marks made and the place they earn (WD drops them) */}
+                  {(def.capture === 'attempts' || def.capture === 'heights') && editable && (r.status ?? 'ok') === 'ok' && (
+                    <SelectChip label={r.retired ? 'r Retired — tap to undo' : 'r Retired'} accessibilityLabel={r.retired ? 'Undo retired' : 'Mark retired, keeps the marks made'} active={!!r.retired} onPress={() => void save(e, toggleRetired(r, def))} />
+                  )}
                   {def.capture === 'lifts' && <LiftGrid r={r} editable={editable && (r.status ?? 'ok') === 'ok'} onChange={(n) => void save(e, n)} rules={f.rules} lb={showLb} />}
                   {swim && editable && f.handTimed && (r.status ?? 'ok') === 'ok' && (
                     <WatchesField key={`${e.id}:w:${(r.watches ?? []).join(',')}`} def={def} r={r} course={course}
@@ -1404,7 +1410,8 @@ function HeightRow({ def, r, bar, editable, onChange }: { def: DisciplineDef; r:
   const sum = summarizeHeights(list);
   const at = bar == null ? undefined : list.find((h) => h.height === bar);
   const tries = at?.tries ?? '';
-  const done = tries.endsWith('O') || tries.endsWith('-') || tries.length >= 3;
+  // TR 26.5: three failures in a row at any heights (carried across a pass) and the athlete is out
+  const left = bar == null ? null : heightTries(list, bar);
   const set = (next: string) => {
     const rest = list.filter((h) => h.height !== bar);
     onChange({ ...r, heights: next ? [...rest, { height: bar as number, tries: next }].sort((a, b) => a.height - b.height) : rest });
@@ -1417,8 +1424,9 @@ function HeightRow({ def, r, bar, editable, onChange }: { def: DisciplineDef; r:
         <View style={st.inline}>
           <Text style={st.label}>{formatMark(bar, def)}: {tries || '—'}</Text>
           {(['O', 'X', '-'] as const).map((x) => (
-            <SelectChip key={x} label={x === '-' ? '– pass' : x} active={false} disabled={done || (sum.eliminated && !tries)} onPress={() => set(addTry(tries, x))} />
+            <SelectChip key={x} label={x === '-' ? '– pass' : x} active={false} disabled={!left?.open} onPress={() => set(addTry(tries, x))} />
           ))}
+          {left?.open && left.left < 3 ? <Text style={textStyles.muted}>{left.left} {left.left === 1 ? 'try' : 'tries'} left</Text> : null}
           {tries ? <SelectChip label="Undo" active={false} onPress={() => set(tries.slice(0, -1))} /> : null}
         </View>
       )}
