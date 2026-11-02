@@ -32,7 +32,7 @@ import {
   NO_DELIVERY, RUNS_KINDS, WIDE_WICKETS, NOBALL_WICKETS, creaseAfterWicket, wicketAttribution,
   canBowl, midOver, oversUsed, snapshotState, lastBall,
   minOversOf, rainStopPar, chaseHasMinOvers, withNewDlsTable,
-  powerplaySpan, SHOT_TYPES, ballStamp,
+  powerplaySpan, SHOT_TYPES, ballStamp, chaseAlive, drawWord, endResult,
 } from './engine';
 import type { ShotType } from './engine';
 import { WagonField, WagonWheelView } from './WagonWheel';
@@ -512,6 +512,55 @@ function RainStopPanel({ s, dispatch, battingName, bowlingName, knockout, onEndM
   );
 }
 
+/* ---- End match with the chase unfinished (audit C1) ---- */
+
+/** The chase can still go on, so the margin isn't a result: ask how it ended —
+ *  No result · Draw (a timed game) · Award to a side — as `END { v: 2, how }`. */
+function EndHowPanel({ s, dispatch, homeName, awayName, onBack }: {
+  s: CricketState; dispatch: (a: ScoreAction) => void; homeName: string; awayName: string; onBack: () => void;
+}) {
+  type How = 'nr' | 'draw' | 'home' | 'away';
+  const [how, setHow] = useState<How | null>(null);
+  const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState(false);
+  const picks: [How, string][] = [
+    ['nr', 'No result'],
+    ...(drawWord(s) === 'Draw' ? [['draw', 'Draw'] as [How, string]] : []),
+    ['home', `Award to ${homeName}`], ['away', `Award to ${awayName}`],
+  ];
+  const cur = s.scores[s.battingSide];
+  const record = async () => {
+    if (!how || busy) return;
+    setBusy(true);
+    try {
+      const why = reason.trim();
+      const action: ScoreAction = { type: 'END', payload: {
+        v: 2, ...(how === 'home' || how === 'away' ? { how: 'award', side: how } : { how }), ...(why ? { reason: why } : {}),
+      } };
+      const verdict = outcome(reducer(s, action));
+      const yes = await askConfirm({
+        title: 'End the match here?', tone: 'danger', yesLabel: 'Yes, end it', noLabel: 'No, keep scoring',
+        message: `${cur.runs}/${cur.wickets} (${oversStr(cur.balls, s.ballsPerOver)} ov), chasing ${s.target}. Result: ${verdict.winner ? `${verdict.winner === 'home' ? homeName : awayName} ${verdict.text.charAt(0).toLowerCase()}${verdict.text.slice(1)}` : verdict.text}.`,
+      });
+      if (yes) dispatch(action);
+    } finally { setBusy(false); }
+  };
+  return (
+    <View style={ctrl.rainBox}>
+      <View style={ctrl.creaseHead}>
+        <Text style={ctrl.label}>How did the match end?</Text>
+        <Button label="Back" variant="ghost" style={ctrl.swapBtn} onPress={onBack} />
+      </View>
+      <Text style={ctrl.meta}>The chase isn’t finished (wickets and overs left), so the margin isn’t a result.</Text>
+      <View style={ctrl.chips}>
+        {picks.map(([k, l]) => <SelectChip key={k} label={l} active={how === k} onPress={() => setHow(k)} />)}
+      </View>
+      <TextField label="Reason (optional)" value={reason} onChange={(x) => setReason(x.slice(0, 120))} placeholder="e.g. Bad light" />
+      <Button label="End match…" variant="danger" disabled={!how || busy} onPress={() => void record()} />
+    </View>
+  );
+}
+
 /* ---- Penalty · Bonus / minus · Fielding (parity #20) ---- */
 
 type MorePanel = 'pen' | 'adj' | 'field';
@@ -722,6 +771,7 @@ const ScoringControls: SportPlugin<CricketState>['ScoringControls'] = ({
   const { nameOf } = useMask();
   const rootState = useMemo(() => withNames(rawRoot, nameOf), [rawRoot, nameOf]);
   const dispatch = (a: ScoreAction) => dispatchRaw(stampBall(a));
+  const [endHow, setEndHow] = useState(false); // audit C1 — the "how did it end?" panel
   const [wf, setWf] = useState<{
     kind?: DismissalKind; fielder?: Player; batterOut?: 'striker' | 'nonstriker'; runs?: number;
     /** the extra this wicket fell on (from the extras pad, or the Off a wide / no-ball toggle) */
@@ -1595,13 +1645,18 @@ const ScoringControls: SportPlugin<CricketState>['ScoringControls'] = ({
           onClose={() => setMorePanel(null)} />
       )}
 
+      {endHow && chaseAlive(rootState) && (
+        <EndHowPanel s={rootState} dispatch={dispatch} homeName={homeName} awayName={awayName} onBack={() => setEndHow(false)} />
+      )}
       {/* Ending an innings/match is a big, easy-to-mis-tap action — SD-106: it asks
-          in the ConfirmSheet with the key facts (score, overs, resulting target). */}
+          in the ConfirmSheet with the key facts (score, overs, resulting target).
+          Audit C1: with the chase unfinished it asks how it ended instead. */}
       <Button
         label={state.innings === 1 ? 'End innings →' : 'End match'}
         variant={state.innings === 1 ? 'ghost' : 'danger'}
         onPress={async () => {
           const ov = oversStr(cur.balls, state.ballsPerOver);
+          if (chaseAlive(rootState)) { setEndHow((o) => !o); return; }
           if (state.innings === 1) {
             if (await confirmMatchAction('endInnings', { detail: `${battingName}'s innings closes at ${cur.runs}/${cur.wickets} (${ov} ov). ${bowlingName} will chase ${cur.runs + 1}.` })) dispatch({ type: 'END_INNINGS' });
           } else if (await confirmMatchAction('fullTime', { detail: `${battingName} finish on ${cur.runs}/${cur.wickets} (${ov} ov)${state.target ? `, chasing ${state.target}` : ''}. The result is saved and the match closes.` })) dispatch({ type: 'END' });
@@ -2467,12 +2522,13 @@ export const cricketPlugin: SportPlugin<CricketState> = {
     if (!s.ended) return null;
     const score = { home: s.scores.home.runs, away: s.scores.away.runs };
     // The same decision as the final banner (super over → chase → par margin).
-    return { winner: outcome(s).winner ?? 'draw', ...score };
+    // Audit C1: an early end's no result / draw / award → `kind`.
+    return { winner: outcome(s).winner ?? 'draw', ...score, ...endResult(s) };
   },
   standingsRate: (s) => (s.ended ? nrrOvers(s) : null),
   manualRate: (s) => manualNrrOvers(s),
   standingsScore: (s) => (s.ended ? nrrRuns(s) : null),
-  manualEnd: { drawLabel: 'Tie', nrrToggle: true },
+  manualEnd: { drawLabel: drawWord, nrrToggle: true }, // a timed game is drawn (audit C1)
   // SD-133 — named Undo: "FOUR — Rohit (4.3)" (IDs-only: names by id).
   undoLabel: (step, nameOf) => cricketUndoLabel(step, nameOf),
   // Its own correction editor (parity #06): ball chips → Edit ball, bowler, batters.

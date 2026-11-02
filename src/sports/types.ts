@@ -413,8 +413,10 @@ export interface SportPlugin<S = unknown> {
    *  plus a numeric score per side for standings (goals / points / games / sets /
    *  runs). Returns null while the match is undecided or still in progress. This
    *  is the single source of truth the data layer uses to persist a match result
-   *  (winner + score) and each player's win — never parse the display summary. */
-  result?: (state: S) => { winner: 'home' | 'away' | 'draw'; home: number; away: number } | null;
+   *  (winner + score) and each player's win — never parse the display summary.
+   *  `kind` (cricket, audit C1): the match ended early as a no result / draw /
+   *  award — the data layer reads it like a hand-closed result (`stateResult`). */
+  result?: (state: S) => { winner: 'home' | 'away' | 'draw'; home: number; away: number; kind?: 'no_result' | 'draw' | 'awarded'; reason?: string } | null;
   /** Rate denominators for a rate-based league tie-break — cricket returns the
    *  overs faced by each side (a side bowled out counts its full quota), which
    *  drives Net Run Rate. Sports without a rate omit this. */
@@ -429,8 +431,8 @@ export interface SportPlugin<S = unknown> {
    *  use the score. Not used for a match ended by hand. */
   standingsScore?: (state: S) => { home: number; away: number } | null;
   /** End-match-by-hand dialog (parity #04): what the level result is called
-   *  ("Draw" by default, cricket "Tie") and whether to offer the NRR toggle. */
-  manualEnd?: { drawLabel: string; nrrToggle?: boolean };
+   *  ("Draw" by default, cricket "Tie" — "Draw" in a timed game) and whether to offer the NRR toggle. */
+  manualEnd?: { drawLabel: string | ((state: S) => string); nrrToggle?: boolean };
   /** SD-133 — the sport's own name for what Undo removes (cricket: "FOUR —
    *  Rohit (4.3)"), from useLiveMatch's `lastStep`. Absent = the shared
    *  `undoLabel` (SD-115). Null = plain "Undo". IDs-only scoring: `nameOf`
