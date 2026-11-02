@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-03 — Release: Batch 2 (Info rules & stats captured) live (web, Android OTA)
+
+auth-smoke passed. Published from a clean worktree at b52a279: web (entry `index-8a2d7e65`, confirmed live on app.sportnnote.in) and Android OTA groups `674f34ac` (preview) and `a4bdad5a` (production), runtime 1.0.0.
+
 ### 2026-11-03 — Batch 2: Info shows every rule and every capture, in every sport
 
 The founder's chain, link 1, fixed once for all sports. Info › "Rules & stats captured" (folded under Format) lists every format setting the match is played under (its value, else the standard; fields a choice hides stay hidden) and every stats-to-track switch on or off, for everyone, live and after full time — before, most sports showed "1-a-side" or "—" and the switches were hidden from viewers. Edit format no longer repeats any switch Scoring settings owns (one place each; no more switching a stat on "from the first point" by accident). The settings card speaks the sport's words ("Apply from the next point / ball / board / raid / rally"). Files: `src/sports/matchRules.ts` (new), `src/screens/LiveScoringScreen.tsx`, `src/components/LiveSettingsCard.tsx`. Break-it list `docs/security/breaks/info-chain.md`; tests `tests/info-chain.test.mts` (every sport), `tests/sim-info-chain.test.mts` (1,000 random and hostile formats per sport). Demo-checked: tennis, pool, kabaddi. Known: pool still lists the 9- / 10-ball options in an 8-ball match (a Batch 5 item: options that apply to one game only).
