@@ -45,10 +45,15 @@ export const serveOrderAction = (side: Side, slot: number, p: { id: string }, pa
 export const doublesOrderAction = (key: 'server' | 'receiver', p: { id: string }, fix = false): ScoreAction =>
   ({ type: 'SET_SERVE_ORDER', payload: { [key]: p.id, ...(fix ? { v: 2 } : {}) } });
 
-/** SD-53 — a conduct / time violation by `by` (the offender, by id). */
+/** SD-53 — a conduct / time violation by `by` (the offender, by id).
+ *  racket-batch5 RB1: a time-violation "fault · loss of serve" carries
+ *  `los: true` (padel scores it only then; tennis ignores the key). */
 export const conductAction = (by: Side, o: { level: ConductLevel; track?: ConductTrack; reason?: string }, p?: Who, at = Date.now()): ScoreAction => ({
   type: 'CONDUCT', side: by,
-  payload: { level: o.level, ...(o.track === 'time' ? { track: o.track } : {}), ...(o.reason ? { reason: o.reason } : {}), ...(p ? { playerId: p.id } : {}), at },
+  payload: {
+    level: o.level, ...(o.track === 'time' ? { track: o.track } : {}), ...(o.track === 'time' && o.level === 'fault' ? { los: true } : {}),
+    ...(o.reason ? { reason: o.reason } : {}), ...(p ? { playerId: p.id } : {}), at,
+  },
 });
 
 /** SD-54 — a timeout / medical / toilet marker (the player by id). */

@@ -57,7 +57,7 @@ export function undoLabel(
   // IDs-only scoring: the player by id (an older log's stored name as the fallback)
   const nameOf: NameOf = names.player ?? ((_id, legacy) => (legacy ?? '').trim() || 'Player');
   const credited = eventWho(p, nameOf);
-  if (p.pen || p.kind === 'conduct' || p.kind === 'timeout' || p.kind === 'let') {
+  if (p.pen || p.kind === 'conduct' || p.kind === 'timeout' || p.kind === 'let' || p.kind === 'review') {
     const what = (p.label ?? '').trim().replace(/^./, (c) => c.toLowerCase());
     const who = p.pen ? whoName(nameOf, p.pen.playerId, p.pen.playerName) ?? name(p.pen.by)
       : credited ?? (p.kind === 'timeout' ? markDetail(p, nameOf) || name(p.side) : name(p.side));

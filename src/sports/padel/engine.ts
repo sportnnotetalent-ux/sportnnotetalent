@@ -11,7 +11,7 @@ import type { PointInput } from '../rallyEdit.ts';
 import { applyPointDetail, detailFlags, initDetailFlags, isFaultKind, type FaultKind } from '../pointDetail.ts';
 import { setSportCue, type Cue } from '../courtCues.ts';
 import { applyRacketExtras, replayKeepingMarks, withStamps, type ConductOps } from '../conduct.ts';
-import { faultType } from '../serveFault.ts';
+import { faultType, isTimeFault, lossOfServe } from '../serveFault.ts';
 
 const SETS_TO_WIN = 2;
 
@@ -239,9 +239,17 @@ const core = (s: PadelState, a: ScoreAction): PadelState => {
   // PF2 — the fault's type (the mesh too): the pending 1st-serve fault's, else
   // the double fault just played (its 2nd serve's). null clears it.
   if (a.type === 'FAULT_TYPE') return faultType(s, a.payload?.kind, 'padel');
-  // SD-53 — code violations (warning → point → game)
+  // racket-batch5 RB1 (as tennis TF4) — a server's time-violation "fault ·
+  // loss of serve": a fault on the 1st serve, a double fault on the 2nd. Only
+  // when the Quick options marked it (`los`, additive): padel never offered
+  // time violations before, so an older log's record stays a record (RB2).
+  const los = isTimeFault(a) && a.payload?.los === true && canServe(s, a.side);
+  // SD-53 — code violations (warning → point → game), time violations
   const extra = applyRacketExtras(s, a, conductOps);
-  if (extra) return extra;
+  if (extra) {
+    if (!los) return extra;
+    return lossOfServe(s, extra, (x, df, sf1) => scorePoint(x, other(a.side!), undefined, undefined, df, 2, { sf1 }));
+  }
   if (s.ended || !a.side) return s;
   // SD-19: the credited player's id rides on the point (absolute statTotals).
   // SD-117c — one-tap Double fault / Ace (new optional payload keys, so old logs

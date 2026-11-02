@@ -9,6 +9,7 @@
  * fault, else the double fault that is the last point played.
  */
 import type { LiveEvent } from './liveEvents';
+import type { ScoreAction } from './types';
 import { isFaultKind, type FaultKind } from './pointDetail.ts';
 
 export interface FaultFields { fault?: true; faultKind?: FaultKind; events: LiveEvent[] }
@@ -38,4 +39,25 @@ export function faultType<S extends FaultFields>(s: S, kind: unknown, sport?: 'p
 export function faultTyping(s: FaultFields): { label: string; cur?: FaultKind } | null {
   const lastPt = [...(s.events ?? [])].reverse().find((e) => e.kind === 'point' || e.kind === 'ace');
   return s.fault ? { label: '1st serve was:', cur: s.faultKind } : lastPt?.df ? { label: 'Double fault was:', cur: lastPt.sf2 } : null;
+}
+
+/** A time violation's "fault · loss of serve" (tennis TF4; padel
+ *  racket-batch5 RB1). The serving check is the sport's. */
+export const isTimeFault = (a: ScoreAction): boolean =>
+  a.type === 'CONDUCT' && a.payload?.track === 'time' && a.payload?.level === 'fault';
+
+/**
+ * What a server's time-violation fault does once the conduct step (`extra`)
+ * has recorded it: on the 1st serve a fault (the 2nd serve is next; serve
+ * tracking on from here, so it is counted), on the 2nd serve a double fault —
+ * `doubleFault` scores the receiver's point for the sport (df, serve 2, the
+ * pending fault's type as sf1), charged to the named offender.
+ */
+export function lossOfServe<S extends FaultFields & { serveDetail?: boolean }>(
+  prev: S, extra: S, doubleFault: (s: S, df: { playerId?: string }, sf1?: FaultKind) => S,
+): S {
+  if (extra === prev) return extra;
+  if (!prev.fault) return { ...extra, fault: true, serveDetail: true };
+  const pen = [...extra.events].reverse().find((e) => e.kind === 'conduct')?.pen;
+  return doubleFault(extra, pen?.playerId ? { playerId: pen.playerId } : {}, prev.faultKind);
 }

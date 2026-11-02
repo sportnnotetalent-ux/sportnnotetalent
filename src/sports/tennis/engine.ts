@@ -13,7 +13,7 @@ import type { ScoreSummary } from '../types';
 import { applyPointDetail, detailFlags, initDetailFlags, isFaultKind, type FaultKind } from '../pointDetail.ts';
 import { setSportCue, type Cue } from '../courtCues.ts';
 import { applyRacketExtras, replayKeepingMarks, withStamps, type ConductOps } from '../conduct.ts';
-import { faultType } from '../serveFault.ts';
+import { faultType, isTimeFault, lossOfServe } from '../serveFault.ts';
 
 export const SETS_TO_WIN = 2;
 
@@ -287,14 +287,13 @@ const core = (s: TennisState, a: ScoreAction): TennisState => {
   if (a.type === 'FAULT_TYPE') return faultType(s, a.payload?.kind);
   // TF4: a time violation's "fault · loss of serve" on the server: a fault, or
   // on a 2nd serve a double fault (the point to the receiver)
-  const lossOfServe = a.type === 'CONDUCT' && a.payload?.track === 'time' && a.payload?.level === 'fault' && canServe(s, a.side);
+  // (shared with padel: serveFault.ts lossOfServe)
+  const los = isTimeFault(a) && canServe(s, a.side);
   // SD-53 / SD-54 — code & time violations, medical / toilet markers
   const extra = applyRacketExtras(s, a, conductOps);
   if (extra) {
-    if (!lossOfServe || extra === s) return extra;
-    if (!s.fault) return { ...extra, fault: true, serveDetail: true };
-    const pen = [...extra.events].reverse().find((e) => e.kind === 'conduct')?.pen;
-    return scorePoint(extra, other(a.side!), undefined, false, undefined, pen?.playerId ? { playerId: pen.playerId } : {}, 2, { sf1: s.faultKind });
+    if (!los) return extra;
+    return lossOfServe(s, extra, (x, df, sf1) => scorePoint(x, other(a.side!), undefined, false, undefined, df, 2, { sf1 }));
   }
   if (s.ended || !a.side) return s;
   // SD-19: the credited player's id rides on the point (absolute statTotals).

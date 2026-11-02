@@ -109,8 +109,11 @@ export interface HowDef {
   credit: 'winner' | 'loser';
   /** only offered when the point winner served ('server') / received ('receiver') */
   serve?: 'server' | 'receiver';
-  /** the stroke / error-type chips offered after it */
+  /** the stroke / error-type ids it reads (counted, keyed, shown) */
   strokes?: string[];
+  /** racket-batch5 RB9 — the type chips offered for a new point, when not
+   *  every id in `strokes` (an older type stays readable but isn't offered) */
+  offer?: string[];
   /** SD-157 (tennis): offered with Forehand / Backhand + a shot type */
   wingShot?: true;
   /** racket-depth RD2: a short hint under the chip once picked (the sport's
@@ -182,7 +185,7 @@ export const DEPTH_SPORTS: readonly DepthSport[] = ['badminton', 'tabletennis', 
  *  SD-107 winner strokes keep their id, so their career keys carry on. */
 export type RShot =
   | 'smash' | 'jumpSmash' | 'drop' | 'clear' | 'netShot' | 'netKill' | 'drive' | 'lift' | 'push' | 'serve'
-  | 'receive' | 'flick' | 'chop' | 'loop' | 'block' | 'lob'
+  | 'receive' | 'flick' | 'chop' | 'loop' | 'block' | 'lob' | 'edge'
   | 'boast' | 'volley' | 'kill' | 'nick'
   | 'return' | 'x3' | 'bandeja' | 'vibora' | 'chiquita' | 'bajada' | 'wall'
   | 'dink' | 'reset' | 'overhead' | 'erne' | 'atp';
@@ -199,10 +202,14 @@ export const RACKET_SHOTS: Record<DepthSport, readonly ShotDef[]> = {
   tabletennis: [
     sh('receive', 'Receive'), sh('flick', 'Flick'), sh('push', 'Push'), sh('chop', 'Chop'), sh('loop', 'Loop (topspin)', 'Loop'),
     sh('block', 'Block'), sh('smash', 'Smash'), sh('lob', 'Lob'),
+    // racket-batch5 RB12 (TT-b): a point won off the edge / the net cord
+    sh('edge', 'Edge / net cord', 'Edge / net'),
   ],
   // PSA / WSF
   squash: [
     sh('drive', 'Drive'), sh('drop', 'Drop'), sh('boast', 'Boast'), sh('volley', 'Volley'), sh('lob', 'Lob'), sh('kill', 'Kill'), sh('nick', 'Nick'),
+    // racket-batch5 RB8 (F11): a serve not returned
+    sh('serve', 'Serve'),
   ],
   // Premier Padel / FIP
   padel: [
@@ -214,6 +221,8 @@ export const RACKET_SHOTS: Record<DepthSport, readonly ShotDef[]> = {
   pickleball: [
     sh('return', 'Return'), sh('drive', 'Drive'), sh('drop', 'Third-shot drop', 'Drop'), sh('dink', 'Dink'), sh('volley', 'Volley'),
     sh('reset', 'Reset'), sh('lob', 'Lob'), sh('overhead', 'Overhead'), sh('erne', 'Erne'), sh('atp', 'Around the post (ATP)', 'ATP'),
+    // racket-batch5 RB8 (F11): a serve not returned
+    sh('serve', 'Serve'),
   ],
 };
 /** One label per shot id (a timeline row without its sport). */
@@ -452,13 +461,23 @@ export const STROKES: Record<string, { label: string; chip: string }> = {
   high: { label: 'Above 1.15 m', chip: 'Too high' },
   illegal: { label: 'Illegal serve', chip: 'Illegal' },
   short: { label: 'Short (below the service line)', chip: 'Short' },
+  // racket-batch5 RB9 (F10) — service-fault words per sport (new ids; the old
+  // ones keep their meaning): badminton's serve "fault" (BWF Law 9: missed
+  // the shuttle, balk / feint, undue delay); squash split (WSF Rule 5)
+  balk: { label: 'Missed / balk / delay', chip: 'Missed / balk' },
+  low: { label: 'Below the service line', chip: 'Below the line' },
+  shortLine: { label: 'Short line (first bounce on / in front of it, or the wrong quarter)', chip: 'Short line' },
+  sideWall: { label: 'Side wall first', chip: 'Side wall' },
 };
 
 const FE: HowDef = { how: 'fe', label: 'Forced error', chip: 'Forced error', credit: 'loser' };
 const ACE: HowDef = { how: 'ace', label: 'Ace', chip: 'Ace', credit: 'winner', serve: 'server' };
 const SW: HowDef = { how: 'sw', label: 'Service winner', chip: 'Service winner', credit: 'winner', serve: 'server' };
 /** A service fault, with the sport's fault types (deep wave; optional). */
-const SF = (strokes: string[]): HowDef => ({ how: 'sf', label: 'Service fault', chip: 'Service fault', credit: 'loser', serve: 'receiver', strokes });
+const SF = (strokes: string[], legacy: string[] = []): HowDef => ({
+  how: 'sf', label: 'Service fault', chip: 'Service fault', credit: 'loser', serve: 'receiver',
+  strokes: [...strokes, ...legacy], ...(legacy.length ? { offer: strokes } : {}),
+});
 
 /** SD-157 — tennis: winners and both kinds of error take wing + shot. */
 const T_WINNER: HowDef = { how: 'winner', label: 'Winner', chip: 'Winner', credit: 'winner', wingShot: true };
@@ -499,7 +518,7 @@ export const DETAIL_HOWS: Record<DetailSport, HowDef[]> = {
   // BWF: errors into the net, out, faults; service faults (Law 9.1); faults
   // of Law 13 (incl. the receiver's) as a point lost by rule
   badminton: [
-    T_WINNER, ...R_ERRS(['net', 'out', 'fault']), SF(['high', 'foot', 'net', 'out', 'fault']),
+    T_WINNER, ...R_ERRS(['net', 'out', 'fault']), SF(['high', 'foot', 'net', 'out', 'balk'], ['fault']),
     R_RULE('e.g. net touch, double hit, obstruction, receiver fault (BWF Law 13)'),
   ],
   // ITTF / WTT: the ace and the service fault are the serve's outcomes
@@ -509,15 +528,17 @@ export const DETAIL_HOWS: Record<DetailSport, HowDef[]> = {
   ],
   // WSF: winners incl. the nick; referee decisions (SQ-03): stroke awarded, no let
   squash: [
-    T_WINNER, ...R_ERRS(['tin', 'out']), SF(['short', 'foot', 'out']),
+    T_WINNER, ...R_ERRS(['tin', 'out']), SF(['low', 'shortLine', 'sideWall', 'foot', 'out'], ['short']),
     { how: 'stroke', label: 'Stroke awarded', chip: 'Stroke', credit: 'winner' },
     { how: 'nolet', label: 'No let', chip: 'No let', credit: 'loser' },
     R_RULE('e.g. double hit, carry'),
   ],
   padel: [ACE, SW, T_WINNER, ...R_ERRS(['net', 'out']), R_RULE('e.g. net touch, ball hit before it crossed the net, double hit')],
   pickleball: [
-    T_WINNER, ...R_ERRS(['net', 'out', 'kitchen', 'foot']), SF(['net', 'out', 'kitchen', 'foot']),
-    R_RULE('e.g. two-bounce rule, non-volley-zone momentum, net touch'),
+    // racket-batch5 RB7 (F11): the Ace; RB9: an illegal serve (motion, release, 10 s)
+    ACE, T_WINNER, ...R_ERRS(['net', 'out', 'kitchen', 'foot']), SF(['net', 'out', 'kitchen', 'foot', 'illegal']),
+    // RB10 (F6): the receiver's faults (volleying the serve, wrong receiver) are lost by rule
+    R_RULE('e.g. two-bounce rule (incl. the receiver volleying the serve), wrong receiver, non-volley-zone momentum, net touch'),
   ],
 };
 

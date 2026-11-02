@@ -251,7 +251,8 @@ export function RallyPointEditor({
                     </View>
                     {sel?.strokes && pd && (
                       <View style={st.chips}>
-                        {sel.strokes.map((k) => (
+                        {/* racket-batch5 RB9: the types offered, plus this point's older type */}
+                        {(sel.offer ?? sel.strokes).concat(pd.stroke && sel.offer && !sel.offer.includes(pd.stroke) && sel.strokes.includes(pd.stroke) ? [pd.stroke] : []).map((k) => (
                           <SelectChip key={k} label={STROKES[k]?.chip ?? k} active={pd.stroke === k}
                             onPress={() => setPd({ ...pd, stroke: pd.stroke === k ? undefined : k })} />
                         ))}

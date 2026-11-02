@@ -47,6 +47,8 @@ import {
   type FaultKind, type RallyBucket, type Shot, type SpeedUnit, type Wing,
 } from '../pointDetail.ts';
 import type { TennisState } from './engine.ts';
+import type { LiveEvent } from '../liveEvents';
+import { conductRows, isMark } from '../conduct.ts';
 
 type Side = 'home' | 'away';
 const opp = (s: Side): Side => (s === 'home' ? 'away' : 'home');
@@ -65,6 +67,8 @@ export interface TennisCoverage { detail: boolean; serve: boolean; net: boolean;
 
 export interface TennisView {
   st: ServeStats; points: TPoint[]; cov: TennisCoverage;
+  /** racket-batch5 RB5 — the conduct / timeout records and penalty points */
+  marks: LiveEvent[];
   /** round 2 — the rally-length buckets this match reads with */
   buckets: RallyBucket[];
   /** round 2 — the unit serve speeds show in */
@@ -80,6 +84,7 @@ export function tennisView(state: unknown, rosters: ServeRosters = {}): TennisVi
   const points: TPoint[] = st.trace.map((t) => ({ ...t, p: inputs[t.i] })).filter((t) => !!t.p);
   return {
     st, points,
+    marks: (s.events ?? []).filter((e) => !!e && (isMark(e) || !!e.pen)),
     cov: { detail: detailTracked(s), serve: st.serveTracked, net: netTracked(s), rally: rallyTracked(s), speed: speedTracked(s) },
     buckets: matchRallyBuckets('tennis', s), unit: speedUnitOf(s),
   };
@@ -201,7 +206,7 @@ export function blockOf(v: TennisView, scope: Scope): ServeBlock | null {
   return scope === 'all' ? v.st.match : v.st.periods[scope - 1] ?? null;
 }
 
-export interface StatSection { id: 'service' | 'shots' | 'points' | 'games'; title: string; rows: ServeRow[] }
+export interface StatSection { id: 'service' | 'shots' | 'points' | 'games' | 'conduct'; title: string; rows: ServeRow[] }
 
 type RowAdd = {
   ratio: (key: string, label: string, n: (x: SideServe, side: Side) => number, d: (x: SideServe, side: Side) => number) => void;
@@ -298,6 +303,10 @@ export function keyStats(v: TennisView, scope: Scope = 'all'): StatSection[] {
   g.count('run', 'Most points in a row', b.home.run, b.away.run);
   g.count('lead', 'Biggest lead (games)', b.home.maxLead, b.away.maxLead);
   out.push({ id: 'games', title: 'Games', rows: games });
+
+  // racket-batch5 RB5 (racket.md C7) — code / time violations, penalty points, medical / toilet
+  const conduct = conductRows('tennis', v.marks, scope);
+  if (conduct.length) out.push({ id: 'conduct', title: 'Conduct & timeouts', rows: conduct });
   return out;
 }
 

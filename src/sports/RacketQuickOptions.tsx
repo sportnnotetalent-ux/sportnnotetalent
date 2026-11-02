@@ -23,16 +23,21 @@ import type { LiveEvent } from './liveEvents';
 import type { QuickOptionsProps } from './types';
 import { conductAction, timeoutAction } from './racketActions';
 import {
-  CONDUCT_RULES, TIME_VIOLATION, TIMEOUT_ICON, TIMEOUT_LABEL, TIMEOUT_RULES,
-  conductCount, conductLabel, levelDef, suggestLevel, suggestionText, timeoutsLeft,
+  CONDUCT_RULES, TIME_SPORTS, TIME_VIOLATION, TIMEOUT_ICON, TIMEOUT_LABEL, TIMEOUT_RULES,
+  conductCount, conductLabel, levelDef, reviewsLeft, suggestLevel, suggestionText, timeRule, timeoutsLeft,
   type ConductLevel, type ConductTrack, type RacketSport, type TimeoutKind,
 } from './conduct';
+
+/** racket-batch5 RB12 — the sports whose Let marker is a Quick options tile
+ *  (squash has its Let buttons beside the point buttons). */
+export const LET_TILE_SPORTS: readonly RacketSport[] = ['tabletennis', 'badminton'];
+type Extra = 'let' | 'review';
 
 type Side = 'home' | 'away';
 const opp = (s: Side): Side => (s === 'home' ? 'away' : 'home');
 
 export interface RacketQuickHelpers {
-  /** tennis time violations: who is serving now (server → fault, receiver → point) */
+  /** tennis / padel time violations: who is serving now (server → fault, receiver → point) */
   serverOf?: (state: unknown) => Side | null;
   /** per-game timeout allowances: the game in play and its target */
   gameOf?: (state: unknown) => { game?: number; target?: number };
@@ -45,7 +50,7 @@ export function makeRacketQuickOptions(sport: RacketSport, h: RacketQuickHelpers
   function RacketQuickOptions({ state, dispatch, homeRoster, awayRoster, homeName, awayName, onDone, onEndMatch }: QuickOptionsProps) {
     const s = state as { events?: LiveEvent[]; ended?: boolean };
     const events = s.events ?? [];
-    const [open, setOpen] = useState<null | ConductTrack | TimeoutKind>(null);
+    const [open, setOpen] = useState<null | ConductTrack | TimeoutKind | Extra>(null);
     const [side, setSide] = useState<Side | null>(null);
     const [player, setPlayer] = useState<Player | null>(null);
     const [level, setLevel] = useState<ConductLevel | null>(null);
@@ -54,7 +59,7 @@ export function makeRacketQuickOptions(sport: RacketSport, h: RacketQuickHelpers
 
     const nameOf = (x: Side) => (x === 'home' ? homeName : awayName);
     const rosterOf = (x: Side) => (x === 'home' ? homeRoster : awayRoster);
-    const toggle = (k: ConductTrack | TimeoutKind) => {
+    const toggle = (k: ConductTrack | TimeoutKind | Extra) => {
       setSide(null); setPlayer(null); setLevel(null); setReason(null);
       setOpen((o) => (o === k ? null : k));
     };
@@ -88,7 +93,9 @@ export function makeRacketQuickOptions(sport: RacketSport, h: RacketQuickHelpers
         : def.effect === 'point2' ? `2 points to ${other}.`
         : def.effect === 'game' ? `${other} is awarded the game in play.`
         : def.effect === 'default' ? `The match ends — ${other} wins by default.`
-        : chosen === 'fault' ? 'Loss of serve (a fault). If it was the 2nd serve, record the double fault too.'
+        : chosen === 'fault' ? (side && h.serverOf?.(state) === side
+          ? 'Loss of serve: a fault on the 1st serve; on the 2nd serve a double fault (the point is scored for you).'
+          : 'Only the server loses a serve: for the receiver this is recorded only (pick Point penalty for a point).')
         : chosen === 'referee' ? 'Recorded — the referee decides (may disqualify).'
         : 'Recorded — no change to the score.';
       const n = side ? conductCount(sport, events, side, track, player?.id) : 0;
@@ -118,7 +125,7 @@ export function makeRacketQuickOptions(sport: RacketSport, h: RacketQuickHelpers
 
       return (
         <View style={st.panel}>
-          <Text style={textStyles.muted}>{track === 'time' ? TIME_VIOLATION.rule : rules.rule}. Who?</Text>
+          <Text style={textStyles.muted}>{track === 'time' ? timeRule(sport) : rules.rule}. Who?</Text>
           {sideChips}
           {playerChips}
           {side && (
@@ -171,10 +178,42 @@ export function makeRacketQuickOptions(sport: RacketSport, h: RacketQuickHelpers
       );
     };
 
-    const tiles: Array<{ k: ConductTrack | TimeoutKind; icon: string; label: string; hint: string }> = [
+    // ------------------------------- RB12 / RB14 · let, video review --
+    const letPanel = () => (
+      <View style={st.panel}>
+        <Text style={textStyles.muted}>The rally is replayed: no point. Who asked (optional)?</Text>
+        {sideChips}
+        <Button label="🔁 Record a let" onPress={() => { dispatch({ type: 'LET', ...(side ? { side } : {}) }); onDone(`🔁 Let${side ? ` · ${nameOf(side)}` : ''}`); }} />
+      </View>
+    );
+    const reviewPanel = () => {
+      const review = (upheld: boolean) => {
+        if (!side) return;
+        dispatch({ type: 'REVIEW', side, payload: { upheld, ...(player ? { playerId: player.id } : {}) } });
+        onDone(`📺 Video review ${upheld ? 'upheld' : 'not upheld'} · ${player?.fullName ?? nameOf(side)}`);
+      };
+      const game = h.gameOf?.(state).game;
+      const out = side ? reviewsLeft(events, side, game) === 0 : false;
+      return (
+        <View style={st.panel}>
+          <Text style={textStyles.muted}>PSA: one review per player per game, kept when upheld. Who asked?</Text>
+          {sideChips}
+          {playerChips}
+          {out ? <Text style={st.effect}>Their review for this game is used.</Text> : null}
+          <View style={st.chips}>
+            <Button label="✅ Upheld" disabled={!side} onPress={() => review(true)} />
+            <Button label="❌ Not upheld" disabled={!side || out} onPress={() => review(false)} />
+          </View>
+        </View>
+      );
+    };
+
+    const tiles: Array<{ k: ConductTrack | TimeoutKind | Extra; icon: string; label: string; hint: string }> = [
       { k: 'code', icon: sport === 'tabletennis' || sport === 'badminton' ? '🟨' : '⚠️', label: rules.title === 'Card' ? 'Cards' : rules.title, hint: Array.from(new Set(rules.ladder.map((l) => levelDef(sport, l)?.label.split(' · ')[0]))).join(' → ') },
-      ...(sport === 'tennis' ? [{ k: 'time' as const, icon: '⏱️', label: 'Time violation', hint: 'Warning, then fault / point' }] : []),
+      ...(TIME_SPORTS.includes(sport) ? [{ k: 'time' as const, icon: '⏱️', label: 'Time violation', hint: 'Warning, then fault / point' }] : []),
       ...tmo.kinds.map((k) => ({ k, icon: TIMEOUT_ICON[k], label: TIMEOUT_LABEL[k], hint: k === 'timeout' && tmo.length ? tmo.length.split(' · ')[0] : 'No score change' })),
+      ...(LET_TILE_SPORTS.includes(sport) ? [{ k: 'let' as const, icon: '🔁', label: 'Let', hint: 'Replayed · no point' }] : []),
+      ...(sport === 'squash' ? [{ k: 'review' as const, icon: '📺', label: 'Video review', hint: '1 per game · kept if upheld' }] : []),
     ];
 
     return (
@@ -185,7 +224,9 @@ export function makeRacketQuickOptions(sport: RacketSport, h: RacketQuickHelpers
         {tmo.note && tmo.kinds.length === 0 && sport === 'badminton' ? <Text style={textStyles.muted}>{tmo.note}</Text> : null}
         {open === 'code' && conductPanel('code')}
         {open === 'time' && conductPanel('time')}
-        {open && open !== 'code' && open !== 'time' && timeoutPanel(open)}
+        {open === 'let' && letPanel()}
+        {open === 'review' && reviewPanel()}
+        {open && open !== 'code' && open !== 'time' && open !== 'let' && open !== 'review' && timeoutPanel(open)}
       </View>
     );
   }
