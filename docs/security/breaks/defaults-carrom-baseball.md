@@ -1,0 +1,32 @@
+# Carrom and baseball: richer stats on by default for new matches: break it (2026-11-03)
+
+Founder rule (2026-11-02): only what is captured in scoring is seen in stats, and the chain Info settings → Scoring → Stats + Commentary holds in every sport. Tennis turned point detail on for new matches only (tennis-serve-and-endings.md TF2 / TF6). Batch 3 does the same for carrom and baseball, following the expert audits: docs/sport-expert/cue-board.md (carrom "Defaults", item 9) and docs/sport-expert/us-sports.md (baseball "Default that hides depth", item 13).
+
+**Status: Fixed / Holds** (2026-11-03). Listed after reading the code and **before** any change (quality mandate step 4). Each fix got a failing test first (tests/defaults-carrom-baseball.test.mts), then the simulation (tests/sim-defaults-carrom-baseball.test.mts).
+
+## How each sport decides what's tracked
+
+- **Carrom:** the format keys `trackFouls`, `trackBreak`, `trackQueenMiss` (meta.ts, advanced, group "Stats to track") seed `state.track` in `init` (`readTrack`: a missing key = off). New matches get their format from `defaultsFor(meta.formatFields)`. Live changes are a logged `SET_TRACK` that applies from the next board. The board form shows each row only when tracked; coins on the break is written only when a chip is tapped, missed Queen covers default to none.
+- **Baseball:** `askFielders` (meta.ts, advanced) reads into `cfg.askFielders` (`bool(config.askFielders, false)`). The live settings card is config mode (patches the format). With it on, every fielded out (`FIELDED`) opens the advance sheet with a "Fielders (optional)" pad; the play is only recorded on ✓ Confirm.
+
+## Breaks
+
+| # | Break | Status |
+|---|---|---|
+| DC1 | **Carrom: coins on the break and missed Queen covers are off by default**, so the match stats, commentary and careers never get them on a casual match. | **Fixed:** `trackBreak` and `trackQueenMiss` default on in meta.ts, so every new match and tournament (format from `defaultsFor`) tracks them; the organiser (format) and the scorer (Stats to track card, `SET_TRACK`) can still switch either off. Tests DC1. |
+| DC2 | **Old carrom matches must not change:** a stored format without the keys (or with them off) must read, replay and total exactly as before: no `track`, no `det` on boards, no `brk*` / `qMiss*` career keys (no false zeros). | **Holds:** `readTrack` reads a missing key as off; the career keys come from board detail, which an old board never has. Tested: replay deep-equals the keys stored off, no brk / qMiss / foul keys; simulation (600 matches, about 150 of each kind). |
+| DC3 | **Carrom fouls must stay off:** "no taps = no fouls" would write false zeros when a casual scorer skips the row (audit). | **Holds:** `trackFouls` stays off; a new match writes no foul keys (tested; simulation). An organiser running a refereed event can switch it on. |
+| DC4 | **Two sources of the carrom default:** the format field (meta.ts) and the live settings card (`liveSettings.fields` / `defaults` in index.tsx) can drift, so Info › "Rules & stats captured", the card's "Standard" pill and the new-match form disagree. | **Fixed:** the card moved to the pure engine as `CARROM_LIVE_SETTINGS` (as baseball's), its defaults read from the meta.ts fields (one source); index.tsx uses it. Tests DC4. An old match's card shows "2 custom" (it reads off against the new standard), as tennis' does: accepted, it is the truth about that match. |
+| DC5 | **Every newly-on carrom capture stays optional:** recording a board must not wait on the break or the missed-cover row; an untapped break is "not recorded", never 0. | **Holds:** `boardReady` does not look at the tracked rows; the break count is written only when a chip is tapped (`brk != null`), so `brkTracked` counts only tapped breaks (tested; simulation). Missed Queen covers default to none, which is what an untapped row means on a tracked board (the audit: a missed cover is rare and visible). |
+| DC6 | **Info must show the new defaults on a new match** (`matchCaptures`): Coins on the break and Missed Queen covers On, Fouls & dues Off; an old match shows its own (Off). | **Fixed:** read from the match state (new: On / On / Off; old: all Off). Tests DC6; simulation. |
+| DB1 | **Baseball: "Ask for fielders" is off**, so putouts / assists / errors by fielder stay empty. Can it be on by default without a blocking step on every out? | **Holds (left off, by decision).** With it on, every fielded out (`FIELDED`: groundout, fly out, lineout, DP, SF, SH …) opens the advance sheet *before* the play is recorded (`index.tsx` `outcome`: `askFielders && FIELDED.includes(o)` → `needsSheet`), and the play is saved only on ✓ Confirm. The fielder pad itself is optional, but the extra sheet and Confirm tap is a blocking step on about two of every three plate appearances, bases empty too: that breaks "one scorer, one phone, scoring stays fast". The audit's fix (item 13) needs a different UI: record the out at once, then an optional fielder chip row after the play (Skip, or just keep scoring). Only once that exists can it default on (new matches only; a missing key = off). Errors already ask for the fielder (E6), so errors by fielder stay captured. Tested: off in the format and the card, a new game reads off, the blocking condition is pinned. |
+| DB2 | **Baseball toggles in two places** (audit): Edit format and the Scoring settings card both showed `pitches` / `askFielders` / the stats toggles. | **Holds (already fixed by the info chain):** Edit format leaves out every key Scoring settings owns (`liveOwnedKeys`, LiveScoringScreen), so each switch lives on the card only. Tested. |
+| DB3 | **Old baseball games must not change:** a format without `askFielders` reads off and replays as before. | **Holds:** no baseball default changed; a missing key reads off, a stored true stays on (tested; simulation, 600 formats). |
+
+## Tests
+- `tests/defaults-carrom-baseball.test.mts` (18 tests, written first: 6 failed before the fix).
+- `tests/sim-defaults-carrom-baseball.test.mts`: 600 random carrom matches (old without keys, old with keys off, new defaults, new switched off) and 600 baseball formats.
+- All carrom / baseball tests and every test that greps these plugins (42 files, 841 tests) pass; `tsc --noEmit` clean. No pinned test needed changing.
+
+## Not verified
+- Not checked in the demo preview (the change is a format default plus a moved settings object; the card's UI code is unchanged).
