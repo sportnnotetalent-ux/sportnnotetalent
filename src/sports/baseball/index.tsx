@@ -74,6 +74,8 @@ const REACH_BTNS: Outcome[] = ['FC', 'E'];
 const SHORT: Partial<Record<Outcome, string>> = { '1B': 'Single', '2B': 'Double', '3B': 'Triple', HR: 'Home run', GO: 'Groundout', FO: 'Fly / pop out', LO: 'Lineout', DP: 'Double play', SF: 'Sac fly', SH: 'Sac bunt', FC: "Fielder's choice", E: 'Error' };
 /** outcomes that ask for the fielders when "Ask for fielders" is on */
 const FIELDED: Outcome[] = ['GO', 'FO', 'LO', 'DP', 'SF', 'SH', 'FC'];
+/** US batch 1: a quick-pad strikeout's third strike — called (looking) or swinging */
+type ThirdStrike = 'called' | 'swinging';
 const isPos = (p?: string | null) => !!p && ([...POSITIONS, 'DH', 'EF'] as string[]).includes(p);
 
 /** IDs-only scoring (docs/privacy/ids-only-scoring.md): the state and the
@@ -212,11 +214,12 @@ const ScoringControls: SportPlugin<BaseballState>['ScoringControls'] = ({
   const captured = (o: Outcome): { zone?: Zone; ptype?: PitchType; btype?: BattedBall } =>
     ({ ...(zone && IN_PLAY.includes(o) ? { zone } : {}), ...(ptype ? { ptype } : {}), ...(btype && IN_PLAY.includes(o) ? { btype } : {}) });
   const pitch = (k: 'ball' | 'called' | 'swinging' | 'foul') => fire(buildPitch(s, k, { ...extra(), ...(ptype ? { ptype } : {}) }));
-  const playNow = (o: Outcome, opts: { moves?: Move[]; fielders?: string; rbi?: number } = {}) =>
+  const playNow = (o: Outcome, opts: { moves?: Move[]; fielders?: string; rbi?: number; pitch?: ThirdStrike } = {}) =>
     fire(buildPlay(s, o, { ...opts, ...captured(o), extra: extra() }));
-  const outcome = (o: Outcome) => {
+  /** `k`: a quick-pad strikeout's third strike, looking or swinging (US batch 1) */
+  const outcome = (o: Outcome, k?: ThirdStrike) => {
     const needsSheet = (runners.length > 0 && !['HR', '3B', 'BB', 'IBB', 'HBP', 'K'].includes(o)) || o === 'E' || (askFielders && FIELDED.includes(o));
-    if (!needsSheet) { playNow(o); return; }
+    if (!needsSheet) { playNow(o, k ? { pitch: k } : {}); return; }
     setFlow({ mode: 'advance', outcome: o, moves: withStays(s, defaultMoves(s, o)), fielders: '' });
   };
   const runnerPlay = (rk: RunnerKind, base?: 1 | 2 | 3) => {
@@ -599,8 +602,9 @@ const ScoringControls: SportPlugin<BaseballState>['ScoringControls'] = ({
               <View style={c.grid}>
                 {HIT_BTNS.map((o) => <Button key={o} label={SHORT[o]!} color={color(bat)} style={c.quarter} onPress={() => outcome(o)} />)}
                 <Button label="Walk" variant="ghost" style={c.quarter} onPress={() => outcome('BB')} />
-                <Button label="Strikeout" variant="ghost" style={c.quarter} onPress={() => outcome('K')} />
-                <Button label="Other out / reach →" variant="ghost" style={c.half} onPress={() => setFlow({ mode: 'inplay' })} />
+                <Button label="K swinging" accessibilityLabel="Strikeout swinging" variant="ghost" style={c.quarter} onPress={() => outcome('K', 'swinging')} />
+                <Button label="K looking" accessibilityLabel="Strikeout looking (called third strike)" variant="ghost" style={c.quarter} onPress={() => outcome('K', 'called')} />
+                <Button label="Other →" accessibilityLabel="Other out or reach — pick the outcome" variant="ghost" style={c.quarter} onPress={() => setFlow({ mode: 'inplay' })} />
               </View>
             </View>
           )}

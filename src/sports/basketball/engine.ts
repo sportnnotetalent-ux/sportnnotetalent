@@ -573,6 +573,8 @@ const reduce = (s: BasketballState, a: ScoreAction): BasketballState => {
           ...(a.payload?.fdt === true ? { fdt: true as const } : {}),
           ...(!idOnly && typeof a.payload?.drawn === 'string' && a.payload.drawn ? { drawn: a.payload.drawn } : {}),
           ...(typeof a.payload?.drawnPid === 'string' && a.payload.drawnPid ? { drawnPid: a.payload.drawnPid } : {}),
+          // US batch 1: a new offensive foul is the fouler's turnover too (older logs: no stamp)
+          ...(a.payload?.tov === true && a.payload?.foulType === 'offensive' ? { tov: true as const } : {}),
         }, quarter))
         : s;
     case 'TIMEOUT':

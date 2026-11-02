@@ -74,6 +74,10 @@ export interface BBEvent {
   /** @deprecated legacy, read-only — the fouled player's name (older logs). */
   drawn?: string;
   drawnPid?: string;
+  /** US batch 1: an offensive foul logged since it also counts as the
+   *  fouler's turnover (FIBA / NBA box scores). Absent on older logs, which
+   *  keep their totals. */
+  tov?: true;
 }
 
 /** Deep wave — the broadcast shot-chart zones (NBA / FIBA LiveStats): the
