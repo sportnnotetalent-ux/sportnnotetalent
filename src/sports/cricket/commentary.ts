@@ -238,8 +238,11 @@ function build(s: CricketState, names: { home: string; away: string }, prefix: s
   let noteN = 0;
 
   const note = (icon: string, text: string, tone?: ComNote['tone']): ComNote => ({ kind: 'note', id: `${prefix}n${noteN++}`, icon, text, tone });
-  const eventNote = (e: LiveEvent): ComNote => note(e.icon, [e.label, e.detail].filter(Boolean).join(' — '),
-    e.tone === 'wicket' ? 'wicket' : e.tone === 'boundary' ? 'boundary' : e.tone === 'extra' ? 'extra' : undefined);
+  const eventNote = (e: LiveEvent): ComNote => (e.label === 'DRS REVIEW' && e.side && e.detail
+    // Batch 5 — a DRS review names the side that asked for it
+    ? note(e.icon, `DRS — ${names[e.side]}: ${e.detail}`)
+    : note(e.icon, [e.label, e.detail].filter(Boolean).join(' — '),
+      e.tone === 'wicket' ? 'wicket' : e.tone === 'boundary' ? 'boundary' : e.tone === 'extra' ? 'extra' : undefined));
 
   const closeOver = () => {
     if (!curOver || !curInn) return;
@@ -476,6 +479,17 @@ function build(s: CricketState, names: { home: string; away: string }, prefix: s
   } else if (curOver) flushNotes((curOver as ComOver).items);
   else if (curInn) flushNotes((curInn as ComInnings).pre);
   closeOver();
+  // Batch 5 (C10) — the toss opens the commentary (read from the state: SET_TOSS
+  // logs no event, so older logs replay unchanged). Before ball 1 the innings
+  // about to start carries it.
+  if (prefix === '' && !s.isSuperOver && s.toss && (s.toss.winner === 'home' || s.toss.winner === 'away')) {
+    let first = inns.find((x) => x.inn === 1);
+    if (!first && s.innings === 1 && !s.ended) {
+      first = { id: `${prefix}i1${s.battingSide}`, inn: 1, side: s.battingSide, team: names[s.battingSide], total: '', overs: [], pre: [] };
+      inns.unshift(first);
+    }
+    first?.pre.unshift(note('🪙', `${names[s.toss.winner]} won the toss and elected to ${s.toss.decision === 'bowl' ? 'bowl' : 'bat'}`));
+  }
   // Innings totals, start / end times; newest first everywhere.
   for (const inn of inns) {
     const sc = s.scores[inn.side];

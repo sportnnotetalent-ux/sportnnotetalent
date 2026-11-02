@@ -20,7 +20,7 @@ import { withNames } from './names.ts';
 import { legacyNameOf, type NameOf } from '../../core/playerNames.ts';
 import { phasePlan, phaseOf, PHASES, type Phase, type PhaseFilter } from './phases.ts';
 import {
-  detailByRec, isDeliveryRec, isPace, LENGTHS, LINES, BOWL_TYPE_LABEL, WIDE_WHY, NB_WHY, WIDE_WHY_LABEL, NB_WHY_LABEL, extraWhyOf,
+  detailByRec, isDeliveryRec, recStamp, isPace, LENGTHS, LINES, BOWL_TYPE_LABEL, WIDE_WHY, NB_WHY, WIDE_WHY_LABEL, NB_WHY_LABEL, extraWhyOf,
   type BallDetailRec, type BowlType, type Length, type Line, type WideWhy, type NbWhy,
 } from './detail.ts';
 import { partnerships, overHistory, boundaryOf } from './scorecard.ts';
@@ -568,4 +568,65 @@ export function trackedKinds(s: CricketState): { pitch: boolean; control: boolea
     types: Object.keys(s.bowlTypes ?? {}).length > 0,
     shots: (s.shots ?? []).length > 0,
   };
+}
+
+// ─── Batch 5 — shot types, catches by area, DRS ──────────────────────────────
+
+export interface ShotTypeRow { shot: string; n: number; runs: number; dots: number; outs: number }
+/** Batch 5 (C2) — `side`'s tagged shot types, each JOINED to its logged ball
+ *  (runs off the bat, a dot, the striker out on it), so a tag can't claim runs
+ *  its ball never had and a tag with no ball counts nothing. Most runs first. */
+export function shotTypeStats(s: CricketState, side: Side): ShotTypeRow[] {
+  const bpo = s.ballsPerOver;
+  const byKey = new Map<string, BallRec>();
+  for (const r of s.log ?? []) {
+    if (r.side !== side || !isDeliveryRec(r) || !r.strikerId) continue;
+    byKey.set(`${r.inn}:${recStamp(r, bpo)}:${r.strikerId}:${r.ext === 'nb' ? 'nb' : ''}`, r);
+  }
+  const rows = new Map<string, ShotTypeRow>();
+  for (const x of s.shots ?? []) {
+    if (x.side !== side || !x.shot) continue;
+    const r = byKey.get(`${x.inn}:${x.at}:${x.batterId}:${x.nb ? 'nb' : ''}`);
+    if (!r) continue;
+    const row = rows.get(x.shot) ?? { shot: x.shot, n: 0, runs: 0, dots: 0, outs: 0 };
+    row.n += 1;
+    row.runs += r.bat;
+    if (wicketFor(r) && r.out!.id === x.batterId) row.outs += 1;
+    else if (r.bat === 0 && r.b + r.lb === 0 && r.ext !== 'wd' && r.ext !== 'nb') row.dots += 1;
+    rows.set(x.shot, row);
+  }
+  return [...rows.values()].sort((a, b) => b.runs - a.runs || b.n - a.n || a.shot.localeCompare(b.shot));
+}
+
+export interface CatchAreas { catches: number; tagged: number; ring: { off: number; leg: number }; deep: { off: number; leg: number } }
+/** Batch 5 (C3) — where `side`'s batters were caught (the fielding side's
+ *  catches against them), from the optional catch position: inside the ring /
+ *  in the deep, off side (zones 1–4) / leg side (5–8, right-hander frame).
+ *  Only caught dismissals count; `tagged` = catches with a position. */
+export function catchAreas(s: CricketState, side: Side): CatchAreas {
+  const out: CatchAreas = { catches: 0, tagged: 0, ring: { off: 0, leg: 0 }, deep: { off: 0, leg: 0 } };
+  for (const { r, d } of inningsRecs(s, side)) {
+    if (r.out?.kind !== 'caught') continue;
+    out.catches += 1;
+    if (!d?.cz) continue;
+    out.tagged += 1;
+    const band = d.cdeep ? out.deep : out.ring;
+    if (d.cz <= 4) band.off += 1; else band.leg += 1;
+  }
+  return out;
+}
+
+export interface ReviewLine { used: number; lost: number; overturned: number; upheld: number; umpiresCall: number }
+/** Batch 5 (audit fix 3) — each side's DRS reviews over the match. */
+export function reviewStats(s: Pick<CricketState, 'reviews'>): Record<Side, ReviewLine> {
+  const blank = (): ReviewLine => ({ used: 0, lost: 0, overturned: 0, upheld: 0, umpiresCall: 0 });
+  const out: Record<Side, ReviewLine> = { home: blank(), away: blank() };
+  for (const r of s.reviews ?? []) {
+    const l = out[r.side];
+    if (!l) continue;
+    l.used += 1;
+    if (r.outcome === 'upheld') { l.upheld += 1; l.lost += 1; } else if (r.outcome === 'overturned') l.overturned += 1;
+    else l.umpiresCall += 1;
+  }
+  return out;
 }

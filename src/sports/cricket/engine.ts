@@ -230,6 +230,27 @@ export interface CricketState {
   /** Deep wave — each bowler's type (pace / spin), by player id: from
    *  SET_BOWLER's `btype` (the profile, free) or SET_BOWL_TYPE. Absent until set. */
   bowlTypes?: Record<string, BowlType>;
+  /** Batch 5 (audit fix 3, R9) — DRS reviews (`REVIEW`, v:2), in order. Only
+   *  when the match's rules allow reviews. Absent until the first one. */
+  reviews?: ReviewRec[];
+  /** Batch 5 (C5) — like-for-like concussion replacements made by a `v: 2`
+   *  CONCUSSION_SUB that named the player coming on (scorecard mark).
+   *  Absent until the first one (older logs: none). */
+  concussionSubs?: { side: 'home' | 'away'; inId: string; outId: string }[];
+}
+
+/** Batch 5 — a DRS review's outcome: the on-field decision stands (the review
+ *  is lost), is overturned, or stays on umpire's call (both keep the review). */
+export const REVIEW_OUTCOMES = ['upheld', 'overturned', 'umpires_call'] as const;
+export type ReviewOutcome = typeof REVIEW_OUTCOMES[number];
+/** One DRS review: by `side`, in innings `inn`, at the overs stamp `at`. */
+export interface ReviewRec {
+  inn: 1 | 2;
+  side: 'home' | 'away';
+  at: string;
+  outcome: ReviewOutcome;
+  /** the batter the decision was about (optional) */
+  batterId?: string;
 }
 
 /** SD-133 — fielding zones for the wagon wheel (./zones.ts). */
@@ -1039,6 +1060,44 @@ function applyBowlType(s: CricketState, a: ScoreAction): CricketState {
   return { ...s, bowlTypes: t ? { ...rest, [id]: t } : rest };
 }
 
+/** Batch 5 — DRS reviews `side` has left in the innings being played: the
+ *  rules' count less the reviews it lost (decision upheld) this innings. */
+export function reviewsLeft(s: Pick<CricketState, 'rules' | 'reviews' | 'innings'>, side: 'home' | 'away'): number {
+  const n = rulesOf(s).reviews ?? 0;
+  if (!n) return 0;
+  const lost = (s.reviews ?? []).filter((r) => r.inn === s.innings && r.side === side && r.outcome === 'upheld').length;
+  return Math.max(0, n - lost);
+}
+
+const REVIEW_WORD: Record<ReviewOutcome, string> = {
+  upheld: 'stands — review lost',
+  overturned: 'overturned — review retained',
+  umpires_call: 'stays on umpire’s call — review retained',
+};
+
+/** Batch 5 — REVIEW (v:2): `{ side, outcome, batterId? }`. The batting side
+ *  reviews an out decision, the fielding side a not-out one. Hostile values
+ *  (an unknown side / outcome, reviews off or used up) change nothing. */
+function applyReview(s: CricketState, a: ScoreAction): CricketState {
+  const p = a.payload ?? {};
+  if (p.v !== 2 || s.ended || (s.superOver && !s.superOver.state.ended)) return s;
+  const side = p.side;
+  const outcome = p.outcome as ReviewOutcome;
+  if ((side !== 'home' && side !== 'away') || !(REVIEW_OUTCOMES as readonly string[]).includes(String(outcome))) return s;
+  if (reviewsLeft(s, side) <= 0) return s;
+  const at = oversStr(s.scores[s.battingSide].balls, s.ballsPerOver);
+  const batterId = textOf(p.batterId);
+  const rec: ReviewRec = { inn: s.innings, side, at, outcome, ...(batterId ? { batterId } : {}) };
+  const next: CricketState = { ...s, reviews: [...(s.reviews ?? []), rec] };
+  const left = reviewsLeft(next, side);
+  const seq = s.seq + 1;
+  const what = side === s.battingSide ? 'Out decision' : 'Not-out decision';
+  return {
+    ...next, seq,
+    events: [...s.events, { id: seq, stamp: at, icon: '📺', label: 'DRS REVIEW', detail: `${what} ${REVIEW_WORD[outcome]} · ${left} left`, side }],
+  };
+}
+
 const step = (s: CricketState, a: ScoreAction): CricketState => {
   if (a.type === 'SHOT') return applyShot(s, a);
   // Deep wave — optional detail: score-neutral, allowed after the match ended.
@@ -1166,6 +1225,11 @@ const step = (s: CricketState, a: ScoreAction): CricketState => {
       events: [...s.events, { id: s.seq + 1, stamp: '☔', icon: '☔', label: `Rain — overs cut to ${newOvers}${s.innings === 2 ? ` · target ${next.target}` : ''}`, detail: undefined, side: s.battingSide }],
     };
   }
+
+  // ── DRS review (batch 5, audit fix 3) ─────────────────────────────────────
+  // A new action, score-neutral. Only when the rules allow reviews, never in a
+  // live Super Over, and only while the reviewing side has one left.
+  if (a.type === 'REVIEW') return applyReview(s, a);
 
   // ── Local rules (parity #14) ──────────────────────────────────────────────
   // Handled before Super-Over routing: it changes the PARENT match only (a Super
@@ -1769,15 +1833,32 @@ const step = (s: CricketState, a: ScoreAction): CricketState => {
       const outName = String(a.payload?.outName ?? '');
       if ((side !== 'home' && side !== 'away') || !outId) return s;
       seq += 1;
+      // Batch 5 (C5) — a v:2 sub naming who came on is kept for the scorecard mark.
+      const conc = a.payload?.v === 2 && inId ? { concussionSubs: [...(s.concussionSubs ?? []), { side, inId, outId }] } : {};
       return {
         ...s,
+        ...conc,
         unavailable: [...s.unavailable, outId],
         events: [...s.events, { id: seq, stamp: oversStr(cur.balls, s.ballsPerOver), icon: '🚑', label: 'CONCUSSION SUB', detail: `${who(inId, inName) ?? 'A substitute'} replaces ${who(outId, outName)} (injury)`, side }],
         seq,
       };
     }
-    case 'SWAP_STRIKE':
-      return swapStrike(s);
+    case 'SWAP_STRIKE': {
+      // Legacy (no v): a silent swap, exactly as before. Batch 5 (C4): a `v: 2`
+      // swap needs both ends filled and, once the innings is under way, logs
+      // "STRIKE CHANGED" so the commentary / Undo can say it.
+      if (a.payload?.v !== 2) return swapStrike(s);
+      if (!s.strikerId || !s.nonStrikerId) return s;
+      const swapped = swapStrike(s);
+      const started = cur.balls > 0 || s.thisOver.length > 0 || cur.runs > 0 || cur.wickets > 0;
+      if (!started) return swapped;
+      seq += 1;
+      return {
+        ...swapped,
+        events: [...s.events, { id: seq, stamp: oversStr(cur.balls, s.ballsPerOver), icon: '⇄', label: 'STRIKE CHANGED', detail: `${who(swapped.strikerId, swapped.strikerName) ?? 'The other batter'} on strike`, side: bat }],
+        seq,
+      };
+    }
     case 'SET_BOWLER': {
       const id = String(a.payload?.id ?? '');
       const name = L ? String(a.payload?.name ?? '') : undefined;

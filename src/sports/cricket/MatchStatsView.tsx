@@ -23,13 +23,14 @@ import type { CricketState } from './engine';
 import { withNames } from './names';
 import {
   compareSections, phasePlan, battingRows, bowlingRows, matchups, worm, pitchDots, pitchGrid, teamBatting, trackedKinds,
+  shotTypeStats, catchAreas, reviewStats,
   type PhaseFilter, type CompareRow, type Phase,
 } from './matchStats';
 import { LENGTHS, LINES, LENGTH_LABEL, LINE_LABEL } from './detail';
 import { WagonWheelView } from './WagonWheel';
 
 type Side = 'home' | 'away';
-type Cat = 'compare' | 'batting' | 'bowling' | 'phases' | 'matchups' | 'graphs' | 'pitch' | 'shots';
+type Cat = 'compare' | 'batting' | 'bowling' | 'phases' | 'matchups' | 'graphs' | 'pitch' | 'shots' | 'catches';
 
 export function CricketMatchStats({ state: raw, homeName, awayName, homeColor = theme.colors.home, awayColor = theme.colors.away, onPlayer }: {
   state: CricketState; homeName: string; awayName: string; homeColor?: string; awayColor?: string;
@@ -39,6 +40,8 @@ export function CricketMatchStats({ state: raw, homeName, awayName, homeColor = 
   const { nameOf: playerName } = useMask();
   const s = useMemo(() => withNames(raw, playerName), [raw, playerName]);
   const kinds = useMemo(() => trackedKinds(s), [s]);
+  // Batch 5 (C3) — a catch position was tagged on some catch
+  const catchTagged = useMemo(() => catchAreas(s, 'home').tagged + catchAreas(s, 'away').tagged > 0, [s]);
   const [cat, setCat] = useState<Cat>('compare');
   const [phase, setPhase] = useState<PhaseFilter>('all');
   // the batting side shown by the per-innings views (default: the side batting now / last)
@@ -54,6 +57,7 @@ export function CricketMatchStats({ state: raw, homeName, awayName, homeColor = 
     { key: 'phases', label: 'Phases' }, { key: 'matchups', label: 'Matchups' }, { key: 'graphs', label: 'Graphs' },
     ...(kinds.pitch ? [{ key: 'pitch' as Cat, label: 'Pitch map' }] : []),
     ...(kinds.shots ? [{ key: 'shots' as Cat, label: 'Shots' }] : []),
+    ...(catchTagged ? [{ key: 'catches' as Cat, label: 'Catches' }] : []),
   ];
   const plan = phasePlan(s, 1) ?? phasePlan(s, 2);
   const sidePick = (
@@ -80,6 +84,7 @@ export function CricketMatchStats({ state: raw, homeName, awayName, homeColor = 
           ) : null}
           {phase !== 'all' && plan ? <Text style={st.meta}>{plan.labels[phase as Phase]}</Text> : null}
           <Compare s={s} phase={phase} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} />
+          <Reviews s={s} homeName={homeName} awayName={awayName} />
         </>
       )}
 
@@ -90,6 +95,7 @@ export function CricketMatchStats({ state: raw, homeName, awayName, homeColor = 
       {cat === 'graphs' && <Graphs s={s} sides={sides} nameOf={nameOf} colorOf={colorOf} />}
       {cat === 'pitch' && (<>{sidePick}<PitchMap s={s} side={curSide} bowlingName={nameOf(curSide === 'home' ? 'away' : 'home')} /></>)}
       {cat === 'shots' && (<>{sidePick}<Shots s={s} side={curSide} /></>)}
+      {cat === 'catches' && (<>{sidePick}<Catches s={s} side={curSide} /></>)}
     </View>
   );
 }
@@ -426,24 +432,77 @@ function PitchMap({ s, side, bowlingName }: { s: CricketState; side: Side; bowli
 function Shots({ s, side }: { s: CricketState; side: Side }) {
   const shots = (s.shots ?? []).filter((x) => x.side === side);
   if (!shots.length) return <Text style={st.empty}>No shots tagged in this innings.</Text>;
-  const kinds = new Map<string, { runs: number; n: number }>();
-  for (const x of shots) if (x.shot) { const k = kinds.get(x.shot) ?? { runs: 0, n: 0 }; k.runs += x.runs; k.n += 1; kinds.set(x.shot, k); }
+  // Batch 5 (C2) — each tag joined to its ball: runs, dot balls, dismissals by shot
+  const kinds = shotTypeStats(s, side);
   const scoring = (s.log ?? []).filter((r) => r.side === side && !r.cross && r.bat > 0).length;
   return (
     <View style={{ gap: theme.spacing(2) }}>
-      <WagonWheelView shots={shots} title="Team wagon wheel" note={`${shots.filter((x) => x.zone).length} of ${scoring} scoring shots tagged`} />
-      {kinds.size > 0 ? (
+      <WagonWheelView shots={shots} title="Team wagon wheel" note={`${shots.filter((x) => x.zone && x.runs > 0).length} of ${scoring} scoring shots tagged`} />
+      {kinds.length > 0 ? (
         <View style={st.card}>
           <Text style={st.section}>Shot types</Text>
-          {[...kinds.entries()].sort((a, b) => b[1].runs - a[1].runs).map(([k, v]) => (
-            <View key={k} style={st.rowMain}>
-              <Text style={[st.cName, st.name]}>{k}</Text>
-              <Text style={[st.cNumW, st.bold]}>{v.runs} runs</Text>
-              <Text style={st.cNumW}>{v.n} shot{v.n === 1 ? '' : 's'}</Text>
+          <View style={st.thead}>
+            <Text style={[st.cName, st.th]}>Shot</Text>
+            <Text style={[st.cNumW, st.th]}>Runs</Text>
+            <Text style={[st.cNum, st.th]}>Balls</Text>
+            <Text style={[st.cNum, st.th]}>Dots</Text>
+            <Text style={[st.cNum, st.th]}>Out</Text>
+          </View>
+          {kinds.map((v) => (
+            <View key={v.shot} style={st.rowMain}>
+              <Text style={[st.cName, st.name]}>{v.shot}</Text>
+              <Text style={[st.cNumW, st.bold]}>{v.runs}</Text>
+              <Text style={st.cNum}>{v.n}</Text>
+              <Text style={st.cNum}>{v.dots}</Text>
+              <Text style={st.cNum}>{v.outs}</Text>
             </View>
           ))}
         </View>
       ) : null}
+    </View>
+  );
+}
+
+/* ------------------------------- Catches (batch 5, C3) ------------------------------- */
+
+function Catches({ s, side }: { s: CricketState; side: Side }) {
+  const c = catchAreas(s, side);
+  if (!c.catches) return <Text style={st.empty}>No catches in this innings.</Text>;
+  const rows: [string, number, number][] = [['Inside the ring', c.ring.off, c.ring.leg], ['In the deep', c.deep.off, c.deep.leg]];
+  return (
+    <View style={st.card}>
+      <Text style={st.section}>Catches by area</Text>
+      <View style={st.thead}>
+        <Text style={[st.cName, st.th]}>Where</Text>
+        <Text style={[st.cNumW, st.th]}>Off</Text>
+        <Text style={[st.cNumW, st.th]}>Leg</Text>
+      </View>
+      {rows.map(([k, off, leg]) => (
+        <View key={k} style={st.rowMain}>
+          <Text style={[st.cName, st.name]}>{k}</Text>
+          <Text style={st.cNumW}>{off}</Text>
+          <Text style={st.cNumW}>{leg}</Text>
+        </View>
+      ))}
+      <Text style={st.sub}>{c.tagged} of {c.catches} catch{c.catches === 1 ? '' : 'es'} with a position (right-hander’s off / leg)</Text>
+    </View>
+  );
+}
+
+/* ------------------------------- Reviews (batch 5, DRS) ------------------------------- */
+
+function Reviews({ s, homeName, awayName }: { s: CricketState; homeName: string; awayName: string }) {
+  if (!(s.reviews ?? []).length) return null;
+  const r = reviewStats(s);
+  return (
+    <View style={st.card}>
+      <Text style={st.section}>DRS reviews</Text>
+      {(['home', 'away'] as Side[]).map((sd) => (
+        <View key={sd} style={st.rowMain}>
+          <Text style={[st.cName, st.name]}>{sd === 'home' ? homeName : awayName}</Text>
+          <Text style={st.sub}>{r[sd].used} used · {r[sd].overturned} overturned · {r[sd].umpiresCall} umpire’s call · {r[sd].lost} lost</Text>
+        </View>
+      ))}
     </View>
   );
 }

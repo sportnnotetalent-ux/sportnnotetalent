@@ -51,6 +51,10 @@ export interface CricketRules {
    *  2 — `bouncerLimit`; 0 = no limit). Drives the bouncer warning, which reads
    *  the pitch map's "Bouncer" length. Present only when set. */
   bouncerMax?: number;
+  /** Batch 5 (audit fix 3, R9) — DRS: unsuccessful reviews each side may make
+   *  per innings (ICC T20I 2, ODI 3). A playing condition the organiser opts
+   *  into; absent = off (no Review chip). 1–5; present only when set. */
+  reviews?: number;
 }
 
 /** Deep wave — the optional capture toggles ("Stats to track"), in chip order. */
@@ -92,7 +96,7 @@ export const STANDARD_RULES: CricketRules = {
 
 /** Config (format / SET_RULES payload) keys. Two differ from CricketRules:
  *  byesAllowed ⇄ byes, legByesAllowed ⇄ legByes. The rest are identical. */
-export const RULE_CONFIG_KEYS = ['wideRuns', 'wideLegal', 'noBallRuns', 'noBallLegal', 'freeHit', 'stdLastOvers', 'byesAllowed', 'legByesAllowed', 'wagonWheel', 'retireAt', 'retireBack', ...TRACK_KEYS, ...OPTION_KEYS] as const;
+export const RULE_CONFIG_KEYS = ['wideRuns', 'wideLegal', 'noBallRuns', 'noBallLegal', 'freeHit', 'stdLastOvers', 'byesAllowed', 'legByesAllowed', 'wagonWheel', 'retireAt', 'retireBack', ...TRACK_KEYS, ...OPTION_KEYS, 'reviews'] as const;
 
 const clamp05 = (v: unknown, d: number) => {
   const n = Math.floor(Number(v));
@@ -103,6 +107,13 @@ const bool = (v: unknown, d: boolean) => (v === undefined || v === null ? d : v 
 const retireOf = (v: unknown): number => {
   const n = Math.floor(Number(v));
   return Number.isFinite(n) && n > 0 ? Math.min(500, n) : 0;
+};
+
+/** Batch 5 — DRS reviews per side per innings: a whole number 1–5, else off (0). */
+export const reviewsOf = (v: unknown): number => {
+  if (typeof v !== 'number' && typeof v !== 'string') return 0;
+  const n = Math.floor(Number(v));
+  return Number.isFinite(n) && n > 0 ? Math.min(5, n) : 0;
 };
 
 /** Format / SET_RULES config → rules (missing keys = standard; numbers clamped 0–5). */
@@ -124,6 +135,8 @@ export function rulesFromConfig(config?: Record<string, unknown> | null): Cricke
     ...trackOn((k) => bool(c[k], false)),
     // Round 2 — only when not the default (older states: no keys).
     ...optionsOn((k) => c[k]),
+    // Batch 5 — DRS, only when on (older states: no key).
+    ...(reviewsOf(c.reviews) > 0 ? { reviews: reviewsOf(c.reviews) } : {}),
   };
 }
 
@@ -136,6 +149,7 @@ export function rulesToConfig(r: CricketRules = STANDARD_RULES): Record<string, 
     ...(r.retireAt ? { retireAt: r.retireAt, retireBack: r.retireBack !== false } : {}),
     ...trackOn((k) => r[k]),
     ...optionsOn((k) => r[k]),
+    ...(r.reviews ? { reviews: r.reviews } : {}),
   };
 }
 
@@ -184,6 +198,7 @@ export function rulesChip(r: CricketRules): string {
   if (r.stdLastOvers > 0) parts.push(`normal last ${r.stdLastOvers}`);
   if (r.retireAt) parts.push(`retire at ${r.retireAt}`);
   if (r.bouncerMax !== undefined) parts.push(r.bouncerMax > 0 ? `${r.bouncerMax} bouncer${r.bouncerMax === 1 ? '' : 's'}/over` : 'no bouncer limit');
+  if (r.reviews) parts.push(`DRS ${r.reviews}`);
   return parts.join(' · ');
 }
 
@@ -197,6 +212,10 @@ export const phaseDeathText = (n?: number): string =>
 /** Round 2 — "Bouncers: 2 per over" / "No bouncer limit" / "Bouncer limit: standard". */
 export const bouncerText = (n?: number): string =>
   (n === undefined ? 'Bouncer limit: standard' : n === 0 ? 'No bouncer limit' : `Bouncers: ${n} per over`);
+
+/** Batch 5 — "DRS: 2 reviews per innings" / "No DRS reviews". */
+export const reviewsText = (n?: number): string =>
+  (n ? `DRS: ${n} review${n === 1 ? '' : 's'} per innings` : 'No DRS reviews');
 
 /** Timeline text for a rules change: "Wide 2 runs · counts as a ball". */
 export function describeRulesChange(prev: CricketRules, next: CricketRules): string {
@@ -227,6 +246,7 @@ export function describeRulesChange(prev: CricketRules, next: CricketRules): str
   if (prev.phasePP !== next.phasePP) parts.push(phasePPText(next.phasePP));
   if (prev.phaseDeath !== next.phaseDeath) parts.push(phaseDeathText(next.phaseDeath));
   if (prev.bouncerMax !== next.bouncerMax) parts.push(bouncerText(next.bouncerMax));
+  if ((prev.reviews ?? 0) !== (next.reviews ?? 0)) parts.push(reviewsText(next.reviews));
   return parts.join(' · ');
 }
 
@@ -253,8 +273,9 @@ export const LOCAL_RULE_FIELDS: FormatField[] = [
   // SD-133 — school / sixes cricket: retire at N runs (0 = off)
   { key: 'retireAt', label: 'Batters retire at (runs)', type: 'number', default: 0, min: 0, max: 500, advanced: true, hint: '0 = off · e.g. 25 in school cricket — the batter retires not out' },
   { key: 'retireBack', label: 'Retired batters may bat again', type: 'toggle', default: true, advanced: true, hint: 'once everyone else has batted' },
-  // SD-133 (CK-11) — wagon wheel + shot type after each scoring shot (optional taps)
-  { key: 'wagonWheel', label: 'Wagon wheel (where each shot went)', type: 'toggle', default: false, advanced: true, hint: 'an optional field tap after each scoring shot', group: 'Stats to track' },
+  // SD-133 (CK-11) — wagon wheel + shot type after each scoring shot (optional taps);
+  // batch 5 (C2) — the shot type on a dot ball or a dismissal too
+  { key: 'wagonWheel', label: 'Wagon wheel (where each shot went)', type: 'toggle', default: false, advanced: true, hint: 'an optional field tap after each scoring shot, and the shot type on a dot ball or a wicket', group: 'Stats to track' },
   // Deep wave — optional depth, one chip row ("Stats to track"); every tap is optional
   { key: 'pitchMap', label: 'Pitch map (line & length)', type: 'toggle', default: false, advanced: true, hint: 'optional length + line chips after each ball', group: 'Stats to track' },
   { key: 'shotCtrl', label: 'Shot control (beaten / edged)', type: 'toggle', default: false, advanced: true, hint: 'tap Beaten / Edged / Mistimed on a false shot — untagged balls count as in control', group: 'Stats to track' },
@@ -282,12 +303,17 @@ export const LOCAL_RULE_FIELDS: FormatField[] = [
       { value: 'auto', label: 'Standard (T20 1 · longer 2)' }, { value: 0, label: 'No limit' },
       ...[1, 2, 3].map((n) => ({ value: n, label: String(n) })),
     ] },
+  // Batch 5 (audit fix 3) — DRS: an optional Review chip and "reviews left"
+  { key: 'reviews', label: 'DRS reviews (per side, per innings)', type: 'choice', default: 0, advanced: true,
+    hint: 'off = no Review chip · a struck-down review is lost; overturned or umpire’s call keeps it',
+    options: [{ value: 0, label: 'Off' }, ...[1, 2, 3, 4, 5].map((n) => ({ value: n, label: `${n} per innings` }))] },
 ];
 
 export const LOCAL_RULE_DEFAULTS: Record<string, FormatValue> = {
   ...rulesToConfig(STANDARD_RULES), retireAt: 0, retireBack: true,
   ...Object.fromEntries(TRACK_KEYS.map((k) => [k, false])),
   ...Object.fromEntries(OPTION_KEYS.map((k) => [k, 'auto'])),
+  reviews: 0,
 };
 
 /** Cricket's live settings (event mode): before ball 1 a change patches the
@@ -303,6 +329,7 @@ export const CRICKET_LIVE_SETTINGS: LiveSettings<CricketState> = {
     return {
       ...rulesToConfig(r), retireAt: r.retireAt ?? 0, retireBack: r.retireBack !== false, ...Object.fromEntries(TRACK_KEYS.map((k) => [k, !!r[k]])),
       ...Object.fromEntries(OPTION_KEYS.map((k) => [k, r[k] ?? 'auto'])),
+      reviews: r.reviews ?? 0,
     };
   },
   beforeStart: cricketBeforeStart,
