@@ -670,5 +670,6 @@ export const LEAGUE_LIVE_SETTINGS: LiveSettings<LeagueState> = {
     periodMinutes: s.periodMinutes, sinBinMinutes: s.sinBinMinutes,
     ...Object.fromEntries(TRACK_FLAGS.map((f) => [f, s[f] === true])),
   }),
-  defaults: { periodMinutes: 40, sinBinMinutes: 10, ...Object.fromEntries(TRACK_FLAGS.map((f) => [f, false])) },
+  // Batch 3 (defaults-invasion): the standard = a new match's (errors & penalties on), so Reset agrees
+  defaults: { periodMinutes: 40, sinBinMinutes: 10, ...Object.fromEntries(TRACK_FLAGS.map((f) => [f, f === 'trackErrors'])) },
 };

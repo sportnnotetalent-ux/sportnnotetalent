@@ -783,5 +783,6 @@ export const RUGBY_LIVE_SETTINGS: LiveSettings<RugbyState> = {
     periodMinutes: s.periodMinutes, sinBinMinutes: s.sinBinMinutes, trackDetail: s.trackDetail,
     ...Object.fromEntries(TRACK_FLAGS.map((f) => [f, s[f] === true])),
   }),
-  defaults: { periodMinutes: 40, sinBinMinutes: 10, trackDetail: false, ...Object.fromEntries(TRACK_FLAGS.map((f) => [f, false])) },
+  // Batch 3 (defaults-invasion): the standard = a new match's (penalties on), so Reset agrees with the new-match form
+  defaults: { periodMinutes: 40, sinBinMinutes: 10, trackDetail: false, ...Object.fromEntries(TRACK_FLAGS.map((f) => [f, f === 'trackPenalties'])) },
 };
