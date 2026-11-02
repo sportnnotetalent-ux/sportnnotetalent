@@ -18,7 +18,8 @@ export const RUGBY_PRESETS: Record<string, { label: string; set: Record<string, 
 
 /** Deep wave — the "Stats to track" toggles (live settings + the match format). */
 export const TRACK_FIELDS: FormatField[] = [
-  { key: 'trackPenalties', label: 'Penalties by offence & free kicks', type: 'toggle', default: false, group: 'Stats to track', hint: 'A ⚖ Penalty button: the offence and the player (both optional); a Free kick button: the player (optional)' },
+  // batch 3 (founder, 2026-11-02): on for a new match; a saved match keeps its own (engine init)
+  { key: 'trackPenalties', label: 'Penalties by offence & free kicks', type: 'toggle', default: true, group: 'Stats to track', hint: 'A ⚖ Penalty button: the offence and the player (both optional); a Free kick button: the player (optional)' },
   { key: 'trackTurnovers', label: 'Turnovers conceded', type: 'toggle', default: false, group: 'Stats to track', hint: 'Knock-ons, forward passes, handling errors… the cause and the player (both optional)' },
   { key: 'trackEntries', label: '22 entries', type: 'toggle', default: false, group: 'Stats to track', hint: 'One tap when a team gets into the opposition 22 — points per entry' },
   { key: 'trackPossession', label: 'Possession & territory', type: 'toggle', default: false, group: 'Stats to track', hint: 'Tap who has the ball and which half play is in — % on the playing clock; "Ball dead" pauses both at stoppages' },

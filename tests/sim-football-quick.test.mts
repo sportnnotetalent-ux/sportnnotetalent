@@ -34,7 +34,7 @@ for (const [name, cfg, full] of [['friendlies', friendly, false], ['tournament m
     for (let i = 0; i < 500; i++) {
       const { s, now } = play(cfg);
       const t = readTrack(cfg);
-      for (const k of TRACK_KEYS) assert.equal(t[k], full ? k !== 'passes' : k === 'cards', `${name}: ${k}`);
+      for (const k of TRACK_KEYS) assert.equal(t[k], full ? k !== 'passes' : ['cards', 'shots', 'saves'].includes(k), `${name}: ${k}`); // batch 3: + shots, saves
       if (!full) assert.equal(footballPossession(s, now), undefined, 'no possession figure in a Quick friendly');
       assert.ok(s.home + s.away >= 0);
     }
