@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-02 — Release: tennis Fault button live (web, Android OTA)
+
+auth-smoke passed. Published from a clean worktree at a6f73f6: web (entry `index-48a95905`, confirmed live on app.sportnnote.in) and Android OTA groups `3e79affd` (preview) and `449816c0` (production), runtime 1.0.0.
+
 ### 2026-11-02 — Tennis: Fault button, and point detail on by default
 
 From the founder's singles friendly (Hrudhay vs Likhi). (1) "✋ Fault (1st serve)" beside Ace and Double fault: no point, "Serving: A · 2nd serve", the next point is a 2nd-serve point, and a second fault is the double fault (button relabelled "Fault again = double fault"). A Fault on an older match turns 1st / 2nd serve tracking on from there. (2) New tennis matches start with Point detail and 1st / 2nd serve on, so every point can be described (Service winner / Winner / Forced / Unforced error → Forehand / Backhand → shot) and 1st serve %, 1st / 2nd serve points won fill in; old matches keep their settings. (3) A time violation's "fault · loss of serve" now costs the serve (a double fault on a 2nd serve). Every way a tennis point ends is listed in the break-it doc with what records it. Files: `src/sports/tennis/{engine.ts,index.tsx}`, `src/sports/pointDetailSettings.ts`, `src/sports/undoLabel.ts`. Break-it list `docs/security/breaks/tennis-serve-and-endings.md`; tests `tests/tennis-serve-and-endings.test.mts`, `tests/sim-tennis-serve-and-endings.test.mts` (1,000 simulated matches). Demo-checked on a phone-sized screen.
