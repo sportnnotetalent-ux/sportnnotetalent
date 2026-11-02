@@ -41,6 +41,7 @@ describe('saved matches and live settings', () => {
   });
   test('Q3: the match-info format editor leaves live-setting keys to Scoring settings', () => {
     const src = readFileSync(join(import.meta.dirname, '..', 'src/screens/LiveScoringScreen.tsx'), 'utf8');
-    assert.match(src, /plugin\.liveSettings\?\.fields \?\? \[\]\)\.map\(\(f\) => f\.key\)/);
+    // info-chain IC3: every key Scoring settings owns (liveOwnedKeys), not only `track…` keys
+    assert.match(src, /\.\.\.liveOwnedKeys\(plugin\.liveSettings( as never)?\)/);
   });
 });

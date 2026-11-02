@@ -3,7 +3,7 @@
  *  behind Quick options' ⚙️ tile.
  *   - config mode (football): each tap patches the match format at once.
  *   - event mode (cricket): the scorer edits a draft, then Apply — a format patch
- *     before play, else a logged event that applies from the next ball. */
+ *     before play, else a logged event that applies from the next point / ball. */
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { theme } from '../core/theme';
@@ -24,11 +24,13 @@ export interface LiveSettingsCardProps {
   dispatch: (a: ScoreAction) => void;
   /** after an Apply — e.g. close the sheet / show a toast */
   onApplied?: (message: string) => void;
+  /** info-chain IC4: the sport's word for what new rules apply from (default: point) */
+  unit?: { one: string; many: string; done: string };
 }
 
 type Item = { kind: 'field'; field: FormatField } | { kind: 'group'; name: string; fields: FormatField[] };
 
-export function LiveSettingsCard({ settings: ls, state, eventCount, canScore, canManage, complete, onPatchFormat, dispatch, onApplied }: LiveSettingsCardProps) {
+export function LiveSettingsCard({ settings: ls, state, eventCount, canScore, canManage, complete, onPatchFormat, dispatch, onApplied, unit = { one: 'point', many: 'Points', done: 'played' } }: LiveSettingsCardProps) {
   const current = ls.read(state);
   const curJson = JSON.stringify(current);
   const [draft, setDraft] = useState<Record<string, FormatValue>>(current);
@@ -68,7 +70,7 @@ export function LiveSettingsCard({ settings: ls, state, eventCount, canScore, ca
   const apply = () => {
     const plan = planLiveApply(ls, state, eventCount, current, draft);
     if (plan.kind === 'format') { onPatchFormat(plan.patch); onApplied?.('Match rules saved'); }
-    else if (plan.kind === 'event') { dispatch(plan.action); onApplied?.('New rules apply from the next ball'); }
+    else if (plan.kind === 'event') { dispatch(plan.action); onApplied?.(`New rules apply from the next ${unit.one}`); }
   };
   const resetDraft = () => setDraft((d) => ({ ...d, ...Object.fromEntries(ls.fields.map((f) => [f.key, ls.defaults?.[f.key] ?? f.default])) }));
 
@@ -127,12 +129,12 @@ export function LiveSettingsCard({ settings: ls, state, eventCount, canScore, ca
       {ls.mode === 'event' && access.editable && (
         <View style={st.row}>
           <Button label="Reset to standard" variant="ghost" style={{ flex: 1 }} onPress={resetDraft} />
-          <Button label={before ? 'Apply' : 'Apply from next ball'} style={{ flex: 1 }} disabled={!dirty} onPress={apply} />
+          <Button label={before ? 'Apply' : `Apply from the next ${unit.one}`} style={{ flex: 1 }} disabled={!dirty} onPress={apply} />
         </View>
       )}
       {ls.mode === 'event' && access.editable && (
         <Text style={textStyles.muted}>
-          {before ? 'No balls yet — these become the match’s rules.' : 'Balls already bowled keep the rules they were bowled under.'}
+          {before ? `No ${unit.many.toLowerCase()} yet — these become the match’s rules.` : `${unit.many} already ${unit.done} keep the rules they were ${unit.done} under.`}
         </Text>
       )}
     </View>

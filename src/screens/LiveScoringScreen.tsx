@@ -74,6 +74,7 @@ import { AwardPickerSheet, type PickerRow } from '../components/AwardPickerSheet
 import { deleteVerdict, breakLabel, type BreakKind, type MatchBreak } from '../data/matchHousekeeping';
 import { QuickOptionsSheet } from '../components/QuickOptionsSheet';
 import { LiveSettingsCard } from '../components/LiveSettingsCard';
+import { matchRules, matchCaptures, liveOwnedKeys, settingsUnit, type CaptureLine, type RuleLine } from '../sports/matchRules';
 import { OverlayPanel } from '../components/OverlayPanel';
 import type { TickerMeta } from '../sports/ticker';
 import { slotsFor, isCommentarySlot, type MatchOfficial } from '../data/matchOfficials';
@@ -2341,7 +2342,7 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
       <LiveSettingsCard
         settings={ls} state={state} eventCount={eventCount}
         canScore={canScore} canManage={canManage} complete={complete}
-        onPatchFormat={applyFormat} dispatch={dispatch} onApplied={onApplied}
+        onPatchFormat={applyFormat} dispatch={dispatch} onApplied={onApplied} unit={settingsUnit(sport)}
       />
     ) : null);
 
@@ -2705,6 +2706,13 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
                 {!editInfo ? (
                   <>
                     <InfoRow icon="📋" label="Format" value={formatLine(sport, fmt)} />
+                    {/* info-chain IC1 / IC2: every rule and every capture, for everyone, live and after */}
+                    {(() => {
+                      const formatFields = getSport(sport).formatFields ?? [];
+                      const cap = matchCaptures(plugin.liveSettings as never, state, formatFields, fmt);
+                      const rules = [...matchRules(formatFields, fmt, { omit: liveOwnedKeys(plugin.liveSettings as never) }), ...cap.rules];
+                      return rules.length || cap.captures.length ? <RulesCard rules={rules} captures={cap.captures} /> : null;
+                    })()}
                     <InfoRow icon="📅" label="Date" value={dateStr} />
                     <InfoRow
                       icon="📍" label="Venue"
@@ -2756,7 +2764,8 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
                         // older match (no track keys) is never shown as tracking less than it does.
                         omitKeys={[
                           ...(getSport(sport).participantKind === 'both' ? ['playersPerSide'] : []),
-                          ...(plugin.liveSettings?.fields ?? []).map((f) => f.key).filter((k) => /^track[A-Z]/.test(k)),
+                          // info-chain IC3: every key Scoring settings owns lives there only
+                          ...liveOwnedKeys(plugin.liveSettings as never),
                         ]}
                       />
                     )}
@@ -2969,6 +2978,38 @@ function InfoRow({ icon, label, value, onPress, accessibilityLabel }: {
   );
 }
 
+/** info-chain IC1 / IC2 — the match's rules and what it captures, folded by
+ *  default under the Format row ("Rules & stats captured ▸"). */
+function RulesCard({ rules, captures }: { rules: RuleLine[]; captures: CaptureLine[] }) {
+  const [open, setOpen] = useState(false);
+  const on = captures.filter((c) => c.on);
+  return (
+    <View style={{ gap: theme.spacing(1) }}>
+      <Text style={st.editLink} accessibilityRole="button" accessibilityState={{ expanded: open }} onPress={() => setOpen((v) => !v)}>
+        {`Rules & stats captured${captures.length ? ` · ${on.length} of ${captures.length} stats on` : ''} ${open ? '▾' : '▸'}`}
+      </Text>
+      {open ? (
+        <View style={st.rulesBox}>
+          {rules.map((r) => (
+            <View key={r.key} style={st.ruleRow}>
+              <Text style={[textStyles.muted, st.ruleLabel]}>{r.label}</Text>
+              <Text style={[textStyles.body, st.ruleValue]}>{r.value}</Text>
+            </View>
+          ))}
+          {captures.length ? (
+            <View style={{ gap: theme.spacing(1), marginTop: theme.spacing(2) }}>
+              <Text style={st.rulesHead}>Stats captured</Text>
+              {captures.map((c) => (
+                <Text key={c.key} style={[textStyles.body, !c.on && { color: theme.colors.textMuted }]}>{c.on ? '✓' : '–'} {c.label}{c.on ? '' : ' (off)'}</Text>
+              ))}
+            </View>
+          ) : null}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 /** Reassures the scorer that nothing is lost when the connection drops: shows how
  *  many taps are saved locally and waiting to sync, with a manual retry. Hidden
  *  when online and fully synced. */
@@ -3082,6 +3123,11 @@ const st = StyleSheet.create({
   infoLabelWrap: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(2) },
   infoIcon: { fontSize: 15, width: 18, textAlign: 'center' },
   infoValue: { flexShrink: 1, textAlign: 'right' },
+  rulesBox: { gap: theme.spacing(1), backgroundColor: theme.colors.surfaceAlt, borderRadius: theme.radius.md, padding: theme.spacing(3) },
+  ruleRow: { flexDirection: 'row', justifyContent: 'space-between', gap: theme.spacing(3) },
+  ruleLabel: { flexShrink: 1 },
+  ruleValue: { flexShrink: 1, textAlign: 'right', fontWeight: '700' },
+  rulesHead: { color: theme.colors.text, fontSize: theme.font.small, fontWeight: '800' },
   kickoffHint: { color: theme.colors.accent, fontSize: theme.font.small, fontWeight: '800', textAlign: 'center' },
   squadHead: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(2) },
   caret: { color: theme.colors.textMuted, fontSize: theme.font.body, fontWeight: '800', width: 18, textAlign: 'center' },
