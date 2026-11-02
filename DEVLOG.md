@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-03 — Release: Batch 4 (racket scoring mechanism) live (web, Android OTA)
+
+auth-smoke passed. Published from a clean worktree at 2046864: web (entry `index-a74f21b8`, confirmed live on app.sportnnote.in) and Android OTA groups `28de7e05` (preview) and `e875fd56` (production), runtime 1.0.0.
+
 ### 2026-11-03 — Batch 4: the racket scoring mechanism (padel Fault, error types, lost by rule, doubles credit)
 
 Tennis's depth brought to the other racket sports (racket.md fixes 1, 3, 4, 5), two isolated branches merged here:
