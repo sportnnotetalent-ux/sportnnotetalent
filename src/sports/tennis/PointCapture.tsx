@@ -23,8 +23,8 @@ import type { ScoreAction } from '../types';
 import { pointRows } from '../rallyEdit';
 import { serveStats } from '../serveStats';
 import {
-  DETAIL_HOWS, RALLY_LABEL, SHOTS, SHOT_LABEL, SPEED_UNITS, SPEED_UNIT_LABEL, WINGS, WING_LABEL,
-  howDef, pdText, rallyBucketsOf, speedIn, speedRange, speedText, speedUnitOf, strokeOf, toggleNet, validSpeed, winnerSide,
+  DETAIL_HOWS, RALLY_LABEL, SHOTS, SHOT_LABEL, SPEED_UNITS, SPEED_UNIT_LABEL, STROKES, WINGS, WING_LABEL,
+  errTypeOf, howDef, pdText, rallyBucketsOf, speedIn, speedRange, speedText, speedUnitOf, strokeOf, toggleNet, validSpeed, winnerSide,
   type How, type PointDetail, type Shot, type SpeedUnit, type Wing,
 } from '../pointDetail';
 import { TENNIS_TRACK_FIELDS } from '../pointDetailSettings';
@@ -104,7 +104,10 @@ export function TennisPointDetail({
     const d = howDef('tennis', how);
     // keep the wing / shot already picked when switching between winner / errors
     const keep = d?.wingShot && sel?.wingShot ? { ...(stroke.wing ? { wing: stroke.wing } : {}), ...(stroke.shot ? { shot: stroke.shot } : {}) } : {};
-    send({ pd: { how, ...keep, ...(d?.credit === 'loser' && soloErr ? { err: soloErr } : {}) } });
+    // an error's direction carries over between forced / unforced (tennis-endings-depth ED1)
+    const dir = errTypeOf('tennis', pd);
+    const keepDir = dir && d?.strokes?.includes(dir) ? { stroke: dir } : {};
+    send({ pd: { how, ...keep, ...keepDir, ...(d?.credit === 'loser' && soloErr ? { err: soloErr } : {}) } });
   };
   /** a new wing / shot on the detail (a legacy stroke id is normalised first) */
   const setStroke = (patch: { wing?: Wing | null; shot?: Shot | null }) => {
@@ -112,7 +115,9 @@ export function TennisPointDetail({
     const { stroke: _legacy, wing: _w, shot: _s, ...rest } = pd;
     const wing = patch.wing === undefined ? stroke.wing : patch.wing ?? undefined;
     const shot = patch.shot === undefined ? stroke.shot : patch.shot ?? undefined;
-    const next: PointDetail = { ...rest, ...(wing ? { wing } : {}), ...(shot ? { shot } : {}) };
+    // a direction (net / long / wide) stays; only a legacy shot id is normalised away
+    const dir = errTypeOf('tennis', pd);
+    const next: PointDetail = { ...rest, ...(wing ? { wing } : {}), ...(shot ? { shot } : {}), ...(dir ? { stroke: dir } : {}) };
     send({ pd: next });
   };
   const serve2 = on.serveDetail && (e.serve === 1 || e.serve === 2);
@@ -157,6 +162,19 @@ export function TennisPointDetail({
             ))}
           </View>
         </>
+      )}
+      {sel?.strokes && pd && (
+        <View style={st.chips}>
+          <Text style={[st.meta, st.rowLabel]}>Went:</Text>
+          {sel.strokes.map((k) => (
+            <SelectChip key={k} label={STROKES[k]?.chip ?? k} active={pd.stroke === k}
+              accessibilityLabel={`The error went ${STROKES[k]?.label.toLowerCase() ?? k}`}
+              onPress={() => {
+                const { stroke: _o, ...rest } = pd;
+                send({ pd: pd.stroke === k ? rest : { ...rest, stroke: k } });
+              }} />
+          ))}
+        </View>
       )}
       {sel?.credit === 'loser' && pd && loserRoster.length >= 2 && (
         <View style={st.chips}>

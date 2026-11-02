@@ -181,6 +181,7 @@ const HOW_DEFS: Record<string, StatDef> = {
   strokesWon: shot('strokesWon', 'Strokes won', 'strokes won', 'stroke won'),
   [STROKES_CONCEDED]: shot(STROKES_CONCEDED, 'Strokes conceded', 'strokes conceded', 'stroke conceded', { format: { unit: 'count', better: 'lower' } }),
   noLets: shot('noLets', 'No lets', 'no lets', 'no let', { format: { unit: 'count', better: 'lower' } }),
+  ruleLosses: shot('ruleLosses', 'Points lost by rule', 'points lost by rule', 'point lost by rule', { format: { unit: 'count', better: 'lower' } }),
   [NET_KEY]: shot(NET_KEY, 'Net points won', 'net points won', 'net point won'),
 };
 
@@ -215,7 +216,9 @@ export function pointDetailStats(sport: DetailSport): StatDef[] {
         ? shot(strokeKey('winner', st)!, `${lab} winners`, `${lab.toLowerCase()} winners`, `${lab.toLowerCase()} winner`)
         : h.how === 'sf'
           ? worded('sf', strokeKey('sf', st)!, lab)
-          : shot(strokeKey('ue', st)!, `Unforced errors (${lab.toLowerCase()})`, `unforced errors (${lab.toLowerCase()})`, `unforced error (${lab.toLowerCase()})`, { format: { unit: 'count', better: 'lower' } }));
+          : h.how === 'fe'
+            ? worded('fe', strokeKey('fe', st)!, lab)
+            : shot(strokeKey('ue', st)!, `Unforced errors (${lab.toLowerCase()})`, `unforced errors (${lab.toLowerCase()})`, `unforced error (${lab.toLowerCase()})`, { format: { unit: 'count', better: 'lower' } }));
     }
   }
   if (sport !== 'tennis') {

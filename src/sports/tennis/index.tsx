@@ -6,7 +6,8 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { theme } from '../../core/theme';
-import { textStyles } from '../../components/ui';
+import { SelectChip, textStyles } from '../../components/ui';
+import { FAULT_KINDS, FAULT_KIND_LABEL } from '../pointDetail';
 import type { Player } from '../../core/types';
 import type { SportPlugin } from '../types';
 import { tennisVoice } from '../voiceParsers';
@@ -66,6 +67,10 @@ const ScoringControls: SportPlugin<TennisState>['ScoringControls'] = ({ state, d
   // serving side only, credited to the serving player.
   const by = serverP ? serverP.fullName : serverSideName;
   const serverColor = serve.side === 'home' ? homeColor : awayColor;
+  // tennis-endings-depth FT1 — the fault's type: the pending 1st-serve fault,
+  // else a double fault that is the last point played (optional)
+  const lastPt = [...(s.events ?? [])].reverse().find((e) => e.kind === 'point' || e.kind === 'ace');
+  const typing = s.fault ? { label: '1st serve was:', cur: s.faultKind } : lastPt?.df ? { label: 'Double fault was:', cur: lastPt.sf2 } : null;
 
   return (
     <View style={{ gap: theme.spacing(4) }}>
@@ -87,6 +92,15 @@ const ScoringControls: SportPlugin<TennisState>['ScoringControls'] = ({ state, d
         )}
         <SecondaryAction label={s.fault ? `⚠️ Fault again = double fault · ${by}` : `⚠️ Double fault · ${by} → point ${receiverSideName}`} onPress={() => doubleFault(serve.side, serverP)} />
       </View>}
+      {typing && !s.ended && (
+        <View style={ctrl.chips}>
+          <Text style={ctrl.chipLead}>{typing.label}</Text>
+          {FAULT_KINDS.map((k) => (
+            <SelectChip key={k} label={FAULT_KIND_LABEL[k]} active={typing.cur === k} accessibilityLabel={`${typing.label} ${FAULT_KIND_LABEL[k]}`}
+              onPress={() => dispatch({ type: 'FAULT_TYPE', payload: { kind: typing.cur === k ? null : k } })} />
+          ))}
+        </View>
+      )}
       {/* SD-117c — derived "Change ends" cue and the tiebreak rules */}
       <CueBanner cue={tennisCue(s)} />
       {(!noPlayYet || s.fault) && <Text style={ctrl.serveBanner} accessibilityLiveRegion="polite">🎾 Serving: {serverName}{s.doubles ? `  ·  ${serverSideName}` : ''}{s.fault ? '  ·  2nd serve' : ''}</Text>}
@@ -207,7 +221,8 @@ const ctrl = StyleSheet.create({
   // MVP T4: a gap so a slip below the point buttons can't hit Ace / Double fault
   secGap: { marginTop: theme.spacing(3) },
   flex: { flexGrow: 1, flexBasis: 140 },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing(2) },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing(2), alignItems: 'center' },
+  chipLead: { color: theme.colors.textMuted, fontSize: theme.font.small, fontWeight: '700' },
   label: { color: theme.colors.text, fontSize: theme.font.body, fontWeight: '700' },
   serveBanner: {
     color: theme.colors.text, fontSize: theme.font.small, fontWeight: '800',

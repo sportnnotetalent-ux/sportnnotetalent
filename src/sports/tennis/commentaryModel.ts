@@ -30,7 +30,13 @@
 import type { LiveEvent } from '../liveEvents';
 import { pointRows, replayPoints, type PointInput } from '../rallyEdit.ts';
 import { isMark } from '../conduct.ts';
-import { RALLY_LABEL, speedText, speedUnitOf, strokeOf, strokePhrase, netSides } from '../pointDetail.ts';
+import { RALLY_LABEL, STROKES, errTypeOf, speedText, speedUnitOf, strokeOf, strokePhrase, netSides, type PointDetail } from '../pointDetail.ts';
+
+/** " into the net" / " (long)" — an error's direction, when recorded (tennis-endings-depth ED1). */
+const dirOf = (pd: PointDetail): string => {
+  const d = errTypeOf('tennis', pd);
+  return d === 'net' ? ' into the net' : d ? ` (${STROKES[d].label.toLowerCase()})` : '';
+};
 import { inTiebreak, reducer, serveInfo, tennisCue, tiebreakInfo, type TennisState } from './engine.ts';
 import { legacyNameOf, markDetail, whoName, withRosters, type NameOf } from '../racketNames.ts';
 
@@ -102,8 +108,10 @@ export function pointSentence(p: PointInput, who: { winner: string; loser: strin
   switch (pd.how) {
     case 'sw': return `${who.winner} wins the point with a Service Winner`;
     case 'winner': return `${who.winner} wins the point with ${what('Winner')}`;
-    case 'fe': return `${loser} loses the point with ${what('Forced Error')}`;
-    case 'ue': return `${loser} loses the point with ${what('Unforced Error')}`;
+    case 'fe': return `${loser} loses the point with ${what('Forced Error')}${dirOf(pd)}`;
+    case 'ue': return `${loser} loses the point with ${what('Unforced Error')}${dirOf(pd)}`;
+    // tennis-endings-depth LR1 — net touch, hindrance, double bounce …
+    case 'rule': return `${loser} loses the point by rule`;
     default: return undefined;
   }
 }

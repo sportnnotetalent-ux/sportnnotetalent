@@ -18,7 +18,7 @@
 import type { LiveEvent } from './liveEvents';
 import type { ScoreAction } from './types';
 import { DOUBLE_FAULT_STAT } from './tennis/doubleFault.ts';
-import { annotationsOf, type NetMark, type PointDetail, type RallyBucket, type ThirdShot } from './pointDetail.ts';
+import { annotationsOf, type FaultKind, type NetMark, type PointDetail, type RallyBucket, type ThirdShot } from './pointDetail.ts';
 
 /** Kinds of scored point a rally sport logs — each is a single point for `side`.
  *  'point' = a point whose outcome wasn't recorded (every legacy point). The rest
@@ -52,6 +52,10 @@ export interface PointInput {
   pd?: PointDetail;
   /** SD-107 — tennis: served on the 1st or 2nd serve (serve tracking on). */
   serve?: 1 | 2;
+  /** tennis (tennis-endings-depth FT2): the 1st serve's fault type before this
+   *  point; on a double fault, the 2nd serve's */
+  sf1?: FaultKind;
+  sf2?: FaultKind;
   /** SD-157 — tennis: who came to the net, the rally length, the serve speed
    *  (replayed with the POINT_DETAIL that follows the point). */
   atNet?: NetMark;
@@ -97,7 +101,7 @@ export const pointRows = (events: LiveEvent[]): EditRow[] =>
           ...(e.atNet ? { atNet: e.atNet } : {}), ...(e.rallyLen ? { rallyLen: e.rallyLen } : {}), ...(e.third ? { third: e.third } : {}) }
         // SD-19: the credited player's id rides along when the event has one,
         // so an EDIT_LOG keeps ids (absolute statTotals) instead of names only.
-        : { side: e.side as 'home' | 'away', kind: e.kind as PointKind, playerName: e.playerName, ...(e.playerId ? { playerId: e.playerId } : {}), ...(e.df ? { df: { ...e.df } } : {}), ...(e.pd ? { pd: { ...e.pd } } : {}), ...(e.serve ? { serve: e.serve } : {}), ...(e.oe ? { oe: { ...e.oe } } : {}), ...(e.pen ? { pen: { ...e.pen } } : {}), ...(e.at ? { at: e.at } : {}),
+        : { side: e.side as 'home' | 'away', kind: e.kind as PointKind, playerName: e.playerName, ...(e.playerId ? { playerId: e.playerId } : {}), ...(e.df ? { df: { ...e.df } } : {}), ...(e.pd ? { pd: { ...e.pd } } : {}), ...(e.serve ? { serve: e.serve } : {}), ...(e.sf1 ? { sf1: e.sf1 } : {}), ...(e.sf2 ? { sf2: e.sf2 } : {}), ...(e.oe ? { oe: { ...e.oe } } : {}), ...(e.pen ? { pen: { ...e.pen } } : {}), ...(e.at ? { at: e.at } : {}),
           // SD-157 — tennis net / rally length / serve speed ride along
           ...(e.atNet ? { atNet: e.atNet } : {}), ...(e.rallyLen ? { rallyLen: e.rallyLen } : {}), ...(typeof e.kmh === 'number' ? { kmh: e.kmh } : {}),
           // deep wave — pickleball's 3rd shot
@@ -140,6 +144,9 @@ function replayAction(p: PointInput): ScoreAction {
   return p.at ? { ...a, payload: { ...(a.payload ?? {}), at: p.at } } : a;
 }
 
+/** A point's serve-fault types for its replayed action (tennis). */
+const faultTypes = (p: PointInput) => ({ ...(p.sf1 ? { sf1: p.sf1 } : {}), ...(p.sf2 ? { sf2: p.sf2 } : {}) });
+
 function replayActionOf(p: PointInput): ScoreAction {
   // SD-53 — a penalty point replays as one (never a rally / serve change)
   if (p.pen) return { type: 'PENALTY_POINT', side: p.side, payload: { pen: p.pen } };
@@ -147,7 +154,7 @@ function replayActionOf(p: PointInput): ScoreAction {
   // fault marked on the server); the reducer re-records the marker.
   if (p.df) {
     return {
-      type: 'POINT', side: p.side, payload: { df: true, ...(p.serve ? { serve: p.serve } : {}) },
+      type: 'POINT', side: p.side, payload: { df: true, ...(p.serve ? { serve: p.serve } : {}), ...faultTypes(p) },
       attribution2: credit(p.df, DOUBLE_FAULT_STAT),
     };
   }
@@ -166,8 +173,9 @@ function replayActionOf(p: PointInput): ScoreAction {
   return {
     type: ACTION_OF[p.kind],
     side: p.side,
-    // SD-107 — a tracked point keeps its 1st / 2nd serve (only such points carry it)
-    ...(p.serve ? { payload: { serve: p.serve } } : {}),
+    // SD-107 — a tracked point keeps its 1st / 2nd serve (only such points carry it);
+    // tennis-endings-depth FT2 — and its 1st-serve fault type
+    ...(p.serve || p.sf1 ? { payload: { ...(p.serve ? { serve: p.serve } : {}), ...faultTypes(p) } } : {}),
     // Only a creditable kind carries a player (an opponent's error never does).
     attribution: p.kind !== 'opperror' && p.kind !== 'serveerror' && p.kind !== 'rally' ? credit(p, statOf(p.kind)) : undefined,
   };

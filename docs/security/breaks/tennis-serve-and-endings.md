@@ -38,7 +38,5 @@ Found by the founder scoring a singles friendly (Hrudhay vs Likhi): there is no 
 - **Doubles:** the fault is the serving player's; only the serving side can fault.
 - **The organiser can still switch either default off** (format settings, or Scoring settings on a live match).
 
-## Later (not in this batch)
-- Error direction for errors (into the net / long / wide).
-- The fault's type (net / long / wide / foot fault).
-- "Lost by rule" as its own ending.
+## Later: done 2026-11-02
+Error direction, the fault's type and "Lost by rule": see `tennis-endings-depth.md`.

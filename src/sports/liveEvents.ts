@@ -44,6 +44,10 @@ export interface LiveEvent {
   /** SD-107 — tennis 1st / 2nd serve, on points served while "1st / 2nd
    *  serve" tracking was on (absent = not tracked). A double fault is 2. */
   serve?: 1 | 2;
+  /** tennis (tennis-endings-depth FT1): the type of the 1st serve's fault
+   *  before this point, and (a double fault) of the 2nd serve's */
+  sf1?: import('./pointDetail').FaultKind;
+  sf2?: import('./pointDetail').FaultKind;
   /** SD-157 — tennis "Net points" tracking: who came to the net on this
    *  point (set by POINT_DETAIL). Absent = not marked (an older point, or
    *  nobody came in). A legacy `pd.net` means the point winner was at net. */

@@ -73,7 +73,7 @@ type Side = 'home' | 'away';
 const opp = (s: Side): Side => (s === 'home' ? 'away' : 'home');
 
 /** How a point ended. */
-export type How = 'winner' | 'fe' | 'ue' | 'ace' | 'sw' | 'sf' | 'stroke' | 'nolet';
+export type How = 'winner' | 'fe' | 'ue' | 'ace' | 'sw' | 'sf' | 'stroke' | 'nolet' | 'rule';
 
 /** The detail stored on a point event (`event.pd`) and its PointInput. */
 export interface PointDetail {
@@ -431,6 +431,9 @@ export const STROKES: Record<string, { label: string; chip: string }> = {
   atp: { label: 'Around the post (ATP)', chip: 'ATP' },
   net: { label: 'Into the net', chip: 'Net' },
   out: { label: 'Out', chip: 'Out' },
+  // tennis (founder 2026-11-02, tennis-endings-depth ED1): past the baseline / the sideline
+  long: { label: 'Long', chip: 'Long' },
+  wide: { label: 'Wide', chip: 'Wide' },
   tin: { label: 'Tin', chip: 'Tin' },
   fault: { label: 'Fault (touch / double hit)', chip: 'Fault' },
   // SD-52 — pickleball (PB-05): non-volley-zone ("kitchen") fault, foot fault
@@ -455,6 +458,18 @@ const T_UE: HowDef = { how: 'ue', label: 'Unforced error', chip: 'Unforced error
 /** Deep wave — the other racket sports: the same, with the sport's shots
  *  (RACKET_SHOTS); an unforced error keeps its error types (`strokes`). */
 const R_UE = (strokes: string[]): HowDef => ({ ...T_UE, strokes });
+/** Tennis (tennis-endings-depth FT1): a serve fault's type — into the net,
+ *  long (past the service line), wide, or a foot fault. */
+export type FaultKind = 'net' | 'long' | 'wide' | 'foot';
+export const FAULT_KINDS: readonly FaultKind[] = ['net', 'long', 'wide', 'foot'];
+export const FAULT_KIND_LABEL: Record<FaultKind, string> = { net: 'Net', long: 'Long', wide: 'Wide', foot: 'Foot fault' };
+export const isFaultKind = (v: unknown): v is FaultKind => v === 'net' || v === 'long' || v === 'wide' || v === 'foot';
+/** Tennis (tennis-endings-depth): which way an error went (net / long /
+ *  wide; a stat-keeper's error direction), and a point lost by rule (ITF
+ *  Rule 24: net touch, hindrance, double bounce, hit by the ball, carry):
+ *  neither a winner nor an error, charged to the player who broke it. */
+const T_DIR = ['net', 'long', 'wide'];
+const T_RULE: HowDef = { how: 'rule', label: 'Lost by rule', chip: 'Lost by rule', credit: 'loser' };
 
 /** Each sport's options, in chip order. Tennis aces and double faults keep
  *  their own one-tap buttons (SD-104), so they're not repeated here. Deep
@@ -462,7 +477,7 @@ const R_UE = (strokes: string[]): HowDef => ({ ...T_UE, strokes });
  *  SD-107 winner stroke ids are those shot ids — `shotOf`). */
 export const DETAIL_HOWS: Record<DetailSport, HowDef[]> = {
   // ATP / WTA match-stat conventions (SD-157: wing + shot, see strokeOf)
-  tennis: [SW, T_WINNER, T_FE, T_UE],
+  tennis: [SW, T_WINNER, { ...T_FE, strokes: T_DIR }, { ...T_UE, strokes: T_DIR }, T_RULE],
   // BWF: errors into the net, out, faults; service faults (Law 9.1)
   badminton: [T_WINNER, T_FE, R_UE(['net', 'out', 'fault']), SF(['high', 'foot', 'net', 'out', 'fault'])],
   // ITTF / WTT: the ace and the service fault are the serve's outcomes
@@ -512,7 +527,7 @@ const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 /** The stat key a how credits. */
 export const HOW_KEY: Record<How, string> = {
   winner: 'winners', fe: 'forcedErrors', ue: 'unforcedErrors', ace: 'aces',
-  sw: 'serviceWinners', sf: 'serviceFaults', stroke: 'strokesWon', nolet: 'noLets',
+  sw: 'serviceWinners', sf: 'serviceFaults', stroke: 'strokesWon', nolet: 'noLets', rule: 'ruleLosses',
 };
 /** squash: a stroke awarded is also one conceded by the opponent */
 export const STROKES_CONCEDED = 'strokesConceded';
@@ -520,7 +535,7 @@ export const NET_KEY = 'netPtsWon';
 /** Winners / unforced errors by stroke: winnersFh, ueNet … Deep wave: a
  *  service fault by type: sfHigh, sfFoot, sfNet … */
 export const strokeKey = (how: How, stroke: string): string | undefined =>
-  how === 'winner' ? `winners${cap(stroke)}` : how === 'ue' ? `ue${cap(stroke)}` : how === 'sf' ? `sf${cap(stroke)}` : undefined;
+  how === 'winner' ? `winners${cap(stroke)}` : how === 'ue' ? `ue${cap(stroke)}` : how === 'fe' ? `fe${cap(stroke)}` : how === 'sf' ? `sf${cap(stroke)}` : undefined;
 
 /** SD-157 — tennis key prefixes for wing / shot counts. */
 const WS_PREFIX: Partial<Record<How, string>> = { winner: 'winners', ue: 'ue', fe: 'fe' };
@@ -599,10 +614,11 @@ export function pdText(pd: PointDetail | undefined | null, names = true, sport?:
     case 'sf': t = st && pd.stroke && STROKES[pd.stroke] ? `Service fault (${STROKES[pd.stroke].label.toLowerCase()})` : 'Service fault'; break;
     case 'stroke': t = 'Stroke awarded'; break;
     case 'nolet': t = 'No let'; break;
+    case 'rule': t = 'Lost by rule'; break;
     default: t = '';
   }
   const errBy = names && pd.err ? whoName(nameOf, pd.err.playerId, pd.err.playerName) : undefined;
-  if (errBy && (pd.how === 'ue' || pd.how === 'fe' || pd.how === 'sf' || pd.how === 'nolet')) t += ` · ${errBy}`;
+  if (errBy && (pd.how === 'ue' || pd.how === 'fe' || pd.how === 'sf' || pd.how === 'nolet' || pd.how === 'rule')) t += ` · ${errBy}`;
   if (pd.net) t += ' · at net';
   return t;
 }
@@ -619,11 +635,11 @@ const validPd = (v: unknown, sport?: DetailSport): PointDetail | null | undefine
   if (v === null) return null;
   if (!v || typeof v !== 'object') return undefined;
   const o = v as Record<string, unknown>;
-  if (typeof o.how !== 'string' || !(o.how in HOW_KEY)) return undefined;
+  if (typeof o.how !== 'string' || !Object.hasOwn(HOW_KEY, o.how)) return undefined;
   const err = o.err && typeof o.err === 'object' ? o.err as { playerId?: unknown; playerName?: unknown } : undefined;
   return {
     how: o.how as How,
-    ...(typeof o.stroke === 'string' && o.stroke in STROKES ? { stroke: o.stroke } : {}),
+    ...(typeof o.stroke === 'string' && Object.hasOwn(STROKES, o.stroke) ? { stroke: o.stroke } : {}),
     ...(isWing(o.wing) ? { wing: o.wing } : {}),
     ...(validShot(o.shot, sport) ? { shot: o.shot } : {}),
     ...(o.net === true ? { net: true as const } : {}),
@@ -875,7 +891,7 @@ export interface DetailRow { key: string; label: string; home: string; away: str
 
 const HOW_ROW_LABEL: Record<How, string> = {
   winner: 'Winners', fe: 'Forced errors', ue: 'Unforced errors', ace: 'Aces', sw: 'Service winners',
-  sf: 'Service faults', stroke: 'Strokes awarded', nolet: 'No lets',
+  sf: 'Service faults', stroke: 'Strokes awarded', nolet: 'No lets', rule: 'Points lost by rule',
 };
 
 /** The match-stats panel rows for point detail (empty when nothing is

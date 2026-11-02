@@ -94,6 +94,11 @@ export function tennisDetailStats(): StatDef[] {
     kmhRate('serveKmh', 'Serve average (km/h)', 'srvKmhSum', 'srvKmhN'),
     kmhRate('firstServeKmh', '1st serve average (km/h)', 'srv1KmhSum', 'srv1KmhN'),
     kmhRate('secondServeKmh', '2nd serve average (km/h)', 'srv2KmhSum', 'srv2KmhN'),
+    // tennis-endings-depth FT1 — the serving player's faults by type (1st serves and double faults)
+    keyed('srvFaultNet', 'Serve faults into the net', 'serve faults into the net', 'serve fault into the net', { group: 'serve', ...lower }),
+    keyed('srvFaultLong', 'Serve faults long', 'serve faults long', 'serve fault long', { group: 'serve', ...lower }),
+    keyed('srvFaultWide', 'Serve faults wide', 'serve faults wide', 'serve fault wide', { group: 'serve', ...lower }),
+    keyed('srvFootFaults', 'Foot faults', 'foot faults', 'foot fault', { group: 'serve', ...lower }),
   );
   return out;
 }
@@ -104,7 +109,9 @@ function tennisShotSection(): SectionDef {
   const main = ['winners', 'winnersPerMatch', 'unforcedErrors', 'uePerMatch', 'wueRatio', 'forcedErrors', 'serviceWinners', 'winnersReturn', 'ueReturn', 'netPtsWon', 'netPtsPct'];
   const wings = HOWS.flatMap((how) => WINGS.map((w) => wingKey(how as How, w)!));
   const shots = HOWS.flatMap((how) => SHOTS.map((sh) => shotKey(how as How, sh as Shot)!)).filter((k) => !main.includes(k));
-  return { id: 'shots', title: 'Shot making', rows: [...main.map((stat) => ({ stat })), ...[...wings, ...shots].map((stat) => ({ stat, hideZero: true }))] };
+  // tennis-endings-depth — errors by direction, points lost by rule (shown once a player has one)
+  const depth = ['ueNet', 'ueLong', 'ueWide', 'feNet', 'feLong', 'feWide', 'ruleLosses'];
+  return { id: 'shots', title: 'Shot making', rows: [...main.map((stat) => ({ stat })), ...[...wings, ...shots, ...depth].map((stat) => ({ stat, hideZero: true }))] };
 }
 
 /** The racket sections, with tennis' serve-speed rows first in Serve & return

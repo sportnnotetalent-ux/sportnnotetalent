@@ -43,8 +43,8 @@ import { pointInputs, type PointInput } from '../rallyEdit.ts';
 import { serveStats, type ServeBlock, type ServeRosters, type ServeRow, type ServeStats, type SideServe } from '../serveStats.ts';
 import {
   RALLY_LABEL, SHOTS, SHOT_LABEL, allRallyBuckets, detailTracked, matchRallyBuckets, netSides, netTracked, rallyBucketsOf, rallyKey, rallyTracked,
-  speedText, speedTracked, speedUnitOf, strokeOf,
-  type RallyBucket, type Shot, type SpeedUnit, type Wing,
+  FAULT_KINDS, errTypeOf, speedText, speedTracked, speedUnitOf, strokeOf,
+  type FaultKind, type RallyBucket, type Shot, type SpeedUnit, type Wing,
 } from '../pointDetail.ts';
 import type { TennisState } from './engine.ts';
 
@@ -111,6 +111,12 @@ export interface TennisSide {
   aces: { all: number; s1: number; s2: number };
   /** as the RECEIVER: points with a known ending (double faults left out) and returns in play */
   ret: { all: ReturnTally; s1: ReturnTally; s2: ReturnTally };
+  /** tennis-endings-depth — errors by direction (net / long / wide), points
+   *  lost by rule, and this side's serve faults by type (1st serves and
+   *  double faults) */
+  ueDir: Record<'net' | 'long' | 'wide', number>; feDir: Record<'net' | 'long' | 'wide', number>;
+  rule: number;
+  faults: Record<FaultKind, number>;
 }
 export interface TennisTally {
   home: TennisSide; away: TennisSide;
@@ -125,7 +131,11 @@ const zeroSide = (): TennisSide => ({
   winners: 0, returnWinners: 0, ue: 0, returnUe: 0, fe: 0, sw: 0, cats: zeroCats(), netPlayed: 0, netWon: 0,
   speed: { all: [], s1: [], s2: [] }, aces: { all: 0, s1: 0, s2: 0 },
   ret: { all: { known: 0, inPlay: 0 }, s1: { known: 0, inPlay: 0 }, s2: { known: 0, inPlay: 0 } },
+  ueDir: { net: 0, long: 0, wide: 0 }, feDir: { net: 0, long: 0, wide: 0 }, rule: 0,
+  faults: { net: 0, long: 0, wide: 0, foot: 0 },
 });
+type Dir = 'net' | 'long' | 'wide';
+const isDir = (v: unknown): v is Dir => v === 'net' || v === 'long' || v === 'wide';
 
 /** Per-side detail figures over the match or one set. */
 export function tennisTally(v: TennisView, scope: Scope = 'all'): TennisTally {
@@ -153,7 +163,12 @@ export function tennisTally(v: TennisView, scope: Scope = 'all'): TennisTally {
       else if (pd.how === 'ue') { out[L].ue += 1; if (stroke.shot === 'return') out[L].returnUe += 1; cat(L); }
       else if (pd.how === 'fe') { out[L].fe += 1; cat(L); }
       else if (pd.how === 'sw') out[W].sw += 1;
+      else if (pd.how === 'rule') out[L].rule += 1;
+      const dir = errTypeOf('tennis', pd);
+      if (isDir(dir)) (pd.how === 'ue' ? out[L].ueDir : out[L].feDir)[dir] += 1;
     }
+    if (p.sf1) out[S].faults[p.sf1] += 1;
+    if (p.df && p.sf2) out[S].faults[p.sf2] += 1;
     for (const n of netSides(p, W)) { out[n].netPlayed += 1; if (n === W) out[n].netWon += 1; }
     if (p.rallyLen && out.rally[p.rallyLen]) { const r = out.rally[p.rallyLen]; r.total += 1; r[W] += 1; }
     if (typeof p.kmh === 'number' && !p.df) {
@@ -220,6 +235,9 @@ export function keyStats(v: TennisView, scope: Scope = 'all'): StatSection[] {
     s.ratio('s2won', 'Win 2nd serve', (x) => x.s2Won, (x) => x.s2Pts);
   }
   if (cov.detail && t.home.sw + t.away.sw > 0) s.count('sw', 'Service winners', t.home.sw, t.away.sw);
+  // tennis-endings-depth FT1 — serve faults by type (rows only for types recorded)
+  const FAULT_ROW: Record<FaultKind, [string, string]> = { net: ['fNet', 'Serve faults into the net'], long: ['fLong', 'Serve faults long'], wide: ['fWide', 'Serve faults wide'], foot: ['fFoot', 'Foot faults'] };
+  for (const k of FAULT_KINDS) if (t.home.faults[k] + t.away.faults[k] > 0) s.count(FAULT_ROW[k][0], FAULT_ROW[k][1], t.home.faults[k], t.away.faults[k]);
   if (cov.speed) {
     const kmh = (key: string, label: string, f: (x: TennisSide) => number | undefined) => {
       const h = f(t.home), a = f(t.away);
@@ -241,6 +259,17 @@ export function keyStats(v: TennisView, scope: Scope = 'all'): StatSection[] {
     w.count('ue', 'Unforced errors', t.home.ue, t.away.ue);
     w.count('rtnUe', 'Return unforced errors', t.home.returnUe, t.away.returnUe);
     w.count('fe', 'Forced errors', t.home.fe, t.away.fe);
+    // tennis-endings-depth — errors by direction, points lost by rule (rows only once recorded)
+    const DIR_WORD: Record<Dir, string> = { net: 'into the net', long: 'long', wide: 'wide' };
+    for (const d of ['net', 'long', 'wide'] as const) {
+      const cap = d.charAt(0).toUpperCase() + d.slice(1);
+      if (t.home.ueDir[d] + t.away.ueDir[d] > 0) w.count(`ue${cap}`, `Unforced errors ${DIR_WORD[d]}`, t.home.ueDir[d], t.away.ueDir[d]);
+    }
+    for (const d of ['net', 'long', 'wide'] as const) {
+      const cap = d.charAt(0).toUpperCase() + d.slice(1);
+      if (t.home.feDir[d] + t.away.feDir[d] > 0) w.count(`fe${cap}`, `Forced errors ${DIR_WORD[d]}`, t.home.feDir[d], t.away.feDir[d]);
+    }
+    if (t.home.rule + t.away.rule > 0) w.count('rule', 'Points lost by rule', t.home.rule, t.away.rule);
     const ratio = (x: TennisSide) => (x.ue ? x.winners / x.ue : x.winners ? Infinity : 0);
     const rt = (x: TennisSide) => (x.ue ? (x.winners / x.ue).toFixed(2) : x.winners ? `${x.winners}–0` : '–');
     const rh = ratio(t.home), ra = ratio(t.away);
@@ -355,6 +384,17 @@ export function tennisCareerKeys(v: TennisView | null, side: Side, playerId: str
     }
   }
   if (v.cov.detail) Object.assign(out, { rtnInPlay: me.ret.all.inPlay, rtnInPlayOf: me.ret.all.known });
+  // tennis-endings-depth FT1 — the SERVING player's faults by type (named
+  // server only, as srvPts), for a match that typed any fault
+  if (v.st.serverKnown && v.points.some((p) => p.p.sf1 || (p.p.df && p.p.sf2))) {
+    const f: Record<FaultKind, number> = { net: 0, long: 0, wide: 0, foot: 0 };
+    for (const p of v.points) {
+      if (p.serverId !== playerId || p.server !== side) continue;
+      if (p.p.sf1) f[p.p.sf1] += 1;
+      if (p.p.df && p.p.sf2) f[p.p.sf2] += 1;
+    }
+    Object.assign(out, { srvFaultNet: f.net, srvFaultLong: f.long, srvFaultWide: f.wide, srvFootFaults: f.foot });
+  }
   if (v.cov.speed && v.st.serverKnown) {
     const all: number[] = [], s1: number[] = [], s2: number[] = [];
     for (const p of v.points) {
@@ -378,4 +418,5 @@ export function tennisCareerKeys(v: TennisView | null, side: Side, playerId: str
 export const TENNIS_EXTRA_KEYS: readonly string[] = [
   'netPts', 'netPtsWon', ...allRallyBuckets('tennis').flatMap((b) => [`${rallyKey(b)}Pts`, `${rallyKey(b)}Won`]), 'rtnInPlay', 'rtnInPlayOf',
   'srvKmhSum', 'srvKmhN', 'srv1KmhSum', 'srv1KmhN', 'srv2KmhSum', 'srv2KmhN', 'srvKmhMax',
+  'srvFaultNet', 'srvFaultLong', 'srvFaultWide', 'srvFootFaults',
 ];

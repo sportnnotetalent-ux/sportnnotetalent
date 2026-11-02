@@ -10,7 +10,7 @@ import type { PointInput } from '../rallyEdit.ts';
 import { serveInfo as serveInfoOf, gamesPlayed as gamesPlayedOf, withServeOrder, withRecvOrder, type ServeOrder } from '../serve.ts';
 import { scoreLine as lineOf, finalSummary, type Pair, type LineScore } from '../scoreline.ts';
 import type { ScoreSummary } from '../types';
-import { applyPointDetail, detailFlags, initDetailFlags } from '../pointDetail.ts';
+import { applyPointDetail, detailFlags, initDetailFlags, isFaultKind, type FaultKind } from '../pointDetail.ts';
 import { setSportCue, type Cue } from '../courtCues.ts';
 import { applyRacketExtras, replayKeepingMarks, withStamps, type ConductOps } from '../conduct.ts';
 
@@ -80,6 +80,9 @@ export interface TennisState {
    *  (FAULT, or a time violation's loss of serve): the next point is a 2nd-
    *  serve point. Cleared by every point. */
   fault?: true;
+  /** tennis-endings-depth FT1 — that fault's type (optional); stamped on the
+   *  next point as `sf1` */
+  faultKind?: FaultKind;
   events: LiveEvent[];
   seq: number;
   ended: boolean;
@@ -169,9 +172,9 @@ function winSet(s: TennisState, side: 'home' | 'away', games: { home: number; aw
   return { ...s, pts: { home: 0, away: 0 }, games: { home: 0, away: 0 }, sets, setsWon, tb, events, seq, ended };
 }
 
-function scorePoint(s0: TennisState, side: 'home' | 'away', who: string | undefined, ace: boolean, whoId?: string, df?: { playerId?: string; playerName?: string }, serve?: 1 | 2): TennisState {
-  // every point ends the serve in play: a 1st-serve fault is spent
-  const { fault: _spent, ...s } = s0;
+function scorePoint(s0: TennisState, side: 'home' | 'away', who: string | undefined, ace: boolean, whoId?: string, df?: { playerId?: string; playerName?: string }, serve?: 1 | 2, faults: { sf1?: FaultKind; sf2?: FaultKind } = {}): TennisState {
+  // every point ends the serve in play: a 1st-serve fault (and its type) is spent
+  const { fault: _spent, faultKind: _kind, ...s } = s0;
   let seq = s.seq;
   const events = [...s.events];
   const o = other(side);
@@ -183,7 +186,7 @@ function scorePoint(s0: TennisState, side: 'home' | 'away', who: string | undefi
   // SD-104: a double fault is a plain point for the receiver (so every count of
   // points stays as before) carrying a `df` marker naming the faulting server.
   // SD-107: `serve` only on points served while 1st / 2nd serve tracking was on.
-  const sv = serve ? { serve } : {};
+  const sv = { ...(serve ? { serve } : {}), ...(faults.sf1 ? { sf1: faults.sf1 } : {}), ...(df && faults.sf2 ? { sf2: faults.sf2 } : {}) };
   if (df) events.push({ id: ++seq, stamp: `Set ${setNo}${tb ? ' · TB' : ''}`, icon: '⚠️', label: tb ? `Double fault · ${pts.home}-${pts.away}` : 'Double fault', detail: df.playerName, side, kind: 'point', df, set: setNo, points: 1, ...sv });
   else events.push({ id: ++seq, stamp: `Set ${setNo}${tb ? ' · TB' : ''}`, icon: ace ? '🎯' : '🎾', label: ace ? 'Ace' : tb ? `Tiebreak ${pts.home}-${pts.away}` : 'Point', detail: who, side, kind: ace ? 'ace' : 'point', playerName: who, ...(whoId ? { playerId: whoId } : {}), set: setNo, points: 1, ...sv });
 
@@ -235,6 +238,25 @@ const canServe = (s: TennisState, side: unknown): boolean => {
 };
 const canFault = (s: TennisState, side: unknown): boolean => !s.fault && canServe(s, side);
 
+/** FAULT_TYPE: type (or clear, null) the pending 1st-serve fault, else the
+ *  double fault that is the last point played. Anything else: unchanged. */
+function faultType(s: TennisState, kind: unknown): TennisState {
+  if (kind !== null && !isFaultKind(kind)) return s;
+  if (s.fault) {
+    if ((s.faultKind ?? null) === kind) return s;
+    const { faultKind: _k, ...rest } = s;
+    return kind ? { ...rest, faultKind: kind } : rest;
+  }
+  let i = s.events.length - 1;
+  while (i >= 0 && s.events[i].kind !== 'point' && s.events[i].kind !== 'ace') i--;
+  const e = s.events[i];
+  if (!e?.df || (e.sf2 ?? null) === kind) return s;
+  const { sf2: _o, ...plain } = e;
+  const events = [...s.events];
+  events[i] = kind ? { ...plain, sf2: kind } : plain;
+  return { ...s, events };
+}
+
 const core = (s: TennisState, a: ScoreAction): TennisState => {
   // Timeline correction: STAT_ADJUST only reconciles player profiles (no match
   // effect); EDIT_LOG replays a corrected point list so games/sets re-derive.
@@ -245,9 +267,9 @@ const core = (s: TennisState, a: ScoreAction): TennisState => {
     // untracked), then restore the setting.
     // SD-53: conduct / timeout records are put back after the replay.
     const r = replayKeepingMarks(reducer, clearMatch({ ...s, serveDetail: undefined }), (a.payload?.points as PointInput[]) ?? [], s.events);
-    const { serveDetail: _drop, fault: _f, ...rest } = r;
+    const { serveDetail: _drop, fault: _f, faultKind: _k, ...rest } = r;
     // a 1st-serve fault on the point in play stays (the correction changed earlier points)
-    const kept = s.fault ? { ...rest, fault: true as const } : rest;
+    const kept = s.fault ? { ...rest, fault: true as const, ...(s.faultKind ? { faultKind: s.faultKind } : {}) } : rest;
     return s.serveDetail === undefined ? kept : { ...kept, serveDetail: s.serveDetail };
   }
   // SD-107 — capture settings (from the next point) and a point's detail
@@ -273,7 +295,14 @@ const core = (s: TennisState, a: ScoreAction): TennisState => {
   // founder 2026-11-02 — a 1st-serve fault (only the server; once per point:
   // the 2nd-serve fault is the Double fault button). It turns 1st / 2nd serve
   // tracking on from here, so the 2nd serve is always counted.
-  if (a.type === 'FAULT') return canFault(s, a.side) ? { ...s, fault: true, serveDetail: true } : s;
+  if (a.type === 'FAULT') {
+    if (!canFault(s, a.side)) return s;
+    const kind = a.payload?.kind;
+    return { ...s, fault: true, serveDetail: true, ...(isFaultKind(kind) ? { faultKind: kind } : {}) };
+  }
+  // tennis-endings-depth FT1 — the fault's type: the pending 1st-serve fault's,
+  // else the double fault just played (its 2nd serve's). null clears it.
+  if (a.type === 'FAULT_TYPE') return faultType(s, a.payload?.kind);
   // TF4: a time violation's "fault · loss of serve" on the server: a fault, or
   // on a 2nd serve a double fault (the point to the receiver)
   const lossOfServe = a.type === 'CONDUCT' && a.payload?.track === 'time' && a.payload?.level === 'fault' && canServe(s, a.side);
@@ -283,7 +312,7 @@ const core = (s: TennisState, a: ScoreAction): TennisState => {
     if (!lossOfServe || extra === s) return extra;
     if (!s.fault) return { ...extra, fault: true, serveDetail: true };
     const pen = [...extra.events].reverse().find((e) => e.kind === 'conduct')?.pen;
-    return scorePoint(extra, other(a.side!), undefined, false, undefined, pen?.playerId ? { playerId: pen.playerId } : {}, 2);
+    return scorePoint(extra, other(a.side!), undefined, false, undefined, pen?.playerId ? { playerId: pen.playerId } : {}, 2, { sf1: s.faultKind });
   }
   if (s.ended || !a.side) return s;
   // SD-19: the credited player's id rides on the point (absolute statTotals).
@@ -302,14 +331,19 @@ const core = (s: TennisState, a: ScoreAction): TennisState => {
   const legacyDf = a.type === 'POINT' && a.payload?.df === undefined && !a.attribution && a2?.stat === 'doubleFaults';
   const isDf = a.type === 'POINT' && (a.payload?.df === true || legacyDf);
   const serve: 1 | 2 | undefined = given ?? (s.serveDetail || s.fault ? (isDf || s.fault ? 2 : 1) : undefined);
+  // the serve-fault types: given on a replayed point, else the pending fault's
+  const faults = {
+    sf1: isFaultKind(a.payload?.sf1) ? a.payload.sf1 : given === undefined && s.fault ? s.faultKind : undefined,
+    sf2: isFaultKind(a.payload?.sf2) ? a.payload.sf2 : undefined,
+  };
   if (isDf) {
     const f = a.attribution2 ?? (a.payload?._attr2 as ScoreAction['attribution2']);
-    return scorePoint(s, a.side, undefined, false, undefined, { ...(f?.playerId ? { playerId: f.playerId } : {}), ...(f?.playerName ? { playerName: f.playerName } : {}) }, serve);
+    return scorePoint(s, a.side, undefined, false, undefined, { ...(f?.playerId ? { playerId: f.playerId } : {}), ...(f?.playerName ? { playerName: f.playerName } : {}) }, serve, faults);
   }
   // IDs-only scoring: the controls send the id only; a name comes only from an
   // older log / app (legacy, read-only — replayed exactly as before)
-  if (a.type === 'POINT') return scorePoint(s, a.side, a.attribution?.playerName, false, a.attribution?.playerId || undefined, undefined, serve);
-  if (a.type === 'ACE') return scorePoint(s, a.side, a.attribution?.playerName, true, a.attribution?.playerId || undefined, undefined, serve);
+  if (a.type === 'POINT') return scorePoint(s, a.side, a.attribution?.playerName, false, a.attribution?.playerId || undefined, undefined, serve, faults);
+  if (a.type === 'ACE') return scorePoint(s, a.side, a.attribution?.playerName, true, a.attribution?.playerId || undefined, undefined, serve, faults);
   return s;
 };
 // SD-54 — every new event carries the step's `payload.at` (durations)
