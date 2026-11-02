@@ -10,7 +10,8 @@ import { theme } from '../core/theme';
 import { Button, SelectChip, textStyles } from './ui';
 import { FormatFieldEditor } from './FormatEditor';
 import type { FormatField, FormatValue, LiveSettings, ScoreAction } from '../sports/types';
-import { customCount, isBeforeStart, liveSettingsAccess, planLiveApply } from '../sports/liveSettings';
+import { customCount, isBeforeStart, liveSettingsAccess, planLiveApply, standardOf } from '../sports/liveSettings';
+import { isHidden } from '../sports/formatPick';
 
 export interface LiveSettingsCardProps {
   settings: LiveSettings<any>;
@@ -40,14 +41,16 @@ export function LiveSettingsCard({ settings: ls, state, eventCount, canScore, ca
   const before = isBeforeStart(ls, state, eventCount);
   const access = liveSettingsAccess({ mode: ls.mode, beforeStart: before, canScore, canManage, complete });
   const values = ls.mode === 'event' ? draft : current;
-  const custom = customCount(ls, values);
+  const custom = customCount(ls, values, state);
   const dirty = JSON.stringify(draft) !== curJson;
 
   // Toggles sharing a `group` render as one chip row (at the first one's place).
   const items = useMemo(() => {
     const out: Item[] = [];
     const groups = new Map<string, Extract<Item, { kind: 'group' }>>();
+    // US batch 5: a field that doesn't apply now (hideWhen) is left out
     for (const f of ls.fields) {
+      if (isHidden(f, values as Record<string, FormatValue>)) continue;
       if (f.group && f.type === 'toggle') {
         const g = groups.get(f.group);
         if (g) g.fields.push(f);
@@ -55,7 +58,7 @@ export function LiveSettingsCard({ settings: ls, state, eventCount, canScore, ca
       } else out.push({ kind: 'field', field: f });
     }
     return out;
-  }, [ls.fields]);
+  }, [ls.fields, JSON.stringify(values)]);
 
   const val = (f: FormatField) => values[f.key] ?? f.default;
   const change = (key: string, v: FormatValue) => {
@@ -72,7 +75,7 @@ export function LiveSettingsCard({ settings: ls, state, eventCount, canScore, ca
     if (plan.kind === 'format') { onPatchFormat(plan.patch); onApplied?.('Match rules saved'); }
     else if (plan.kind === 'event') { dispatch(plan.action); onApplied?.(`New rules apply from the next ${unit.one}`); }
   };
-  const resetDraft = () => setDraft((d) => ({ ...d, ...Object.fromEntries(ls.fields.map((f) => [f.key, ls.defaults?.[f.key] ?? f.default])) }));
+  const resetDraft = () => { const std = standardOf(ls, state); setDraft((d) => ({ ...d, ...Object.fromEntries(ls.fields.map((f) => [f.key, std?.[f.key] ?? f.default])) })); };
 
   return (
     <View style={st.card}>

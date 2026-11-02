@@ -40,7 +40,14 @@ export const BATTED_KEY: Record<BattedBall, string> = { GB: 'groundBalls', LD: '
 export const PITCH_BATTED_KEY: Record<BattedBall, string> = { GB: 'pitchGroundBalls', LD: 'pitchLineDrives', FB: 'pitchFlyBalls', PU: 'pitchPopups' };
 export const BATTED_BALL_KEYS = ['groundBalls', 'lineDrives', 'flyBalls', 'popups', 'pitchGroundBalls', 'pitchLineDrives', 'pitchFlyBalls', 'pitchPopups'] as const;
 
+/** US batch 5: runner plays and intentional walks on a stat line (derived
+ *  from the log, so older games gain them too): pitchers' wild pitches,
+ *  balks, pick-offs and intentional walks allowed; the catcher's passed
+ *  balls; batters' intentional walks (also in BB, as before). */
+export const RUNNER_PLAY_KEYS = ['wildPitches', 'balks', 'pickoffs', 'ibbAllowed', 'passedBalls', 'intentionalWalks'] as const;
+
 export const DERIVED_KEYS = [
+  ...RUNNER_PLAY_KEYS,
   'runs', 'pitches', 'runsAllowed', 'earnedRuns', 'erN', 'pitchWins', 'pitchLosses', 'pitchSaves', 'gamesPitched',
   'putouts', 'fieldAssists', 'fieldErrors',
   ...SITUATIONAL_KEYS, ...PITCH_COUNT_KEYS, ...BATTED_BALL_KEYS,
@@ -74,6 +81,19 @@ export function baseballTotals(s: BaseballState): Record<string, Line> {
     const c = eventCredits(e);
     if (c.first) add(c.first.playerId, e.side, c.first.stats);
     if (c.second) add(c.second.playerId, other(e.side), c.second.stats);
+    // US batch 5: wild pitches, balks, pick-offs (the pitcher on the mound);
+    // passed balls (the fielding side's catcher); intentional walks
+    if (e.type === 'runner') {
+      const field = other(e.side);
+      if (e.kind === 'WP') add(e.pitcher?.id, field, { wildPitches: 1 });
+      if (e.kind === 'BK') add(e.pitcher?.id, field, { balks: 1 });
+      if (e.kind === 'PO') add(e.pitcher?.id, field, { pickoffs: 1 });
+      if (e.kind === 'PB') add(fielderAt(s, field, 2)?.id, field, { passedBalls: 1 });
+    }
+    if (e.type === 'pa' && e.outcome === 'IBB') {
+      add(e.batter?.id, e.side, { intentionalWalks: 1 });
+      add(e.pitcher?.id, other(e.side), { ibbAllowed: 1 });
+    }
     // fielding from the notation
     if (e.type === 'pa' && e.fielders) {
       const field = other(e.side);
@@ -97,7 +117,7 @@ export function baseballTotals(s: BaseballState): Record<string, Line> {
     const l = line(k, side).stats;
     l.pitches = s.g.pitches[k] ?? 0;
     l.gamesPitched = 1;
-    for (const x of ['runsAllowed', 'earnedRuns', 'erN', 'outsPitched'] as const) l[x] ??= 0;
+    for (const x of ['runsAllowed', 'earnedRuns', 'erN', 'outsPitched', 'wildPitches', 'balks', 'pickoffs', 'ibbAllowed'] as const) l[x] ??= 0;
     l.pitchWins = s.g.decisions?.w === k ? 1 : 0;
     l.pitchLosses = s.g.decisions?.l === k ? 1 : 0;
     l.pitchSaves = s.g.decisions?.sv === k ? 1 : 0;
@@ -106,7 +126,13 @@ export function baseballTotals(s: BaseballState): Record<string, Line> {
   for (const e of s.events) {
     if (e.type !== 'pa' || !e.side || !e.batter?.id) continue;
     const l = line(e.batter.id, e.side).stats;
-    for (const k of ['plateAppearances', 'atBats', 'hits', 'runs', 'rbi'] as const) l[k] ??= 0;
+    for (const k of ['plateAppearances', 'atBats', 'hits', 'runs', 'rbi', 'intentionalWalks'] as const) l[k] ??= 0;
+  }
+  // US batch 5: each side's catcher who caught a pitch reads passed balls 0, not "not tracked"
+  for (const side of ['home', 'away'] as const) {
+    if (!s.events.some((e) => (e.type === 'pa' || e.type === 'pitch' || e.type === 'runner') && e.side === other(side))) continue;
+    const c = fielderAt(s, side, 2)?.id;
+    if (c && !c.startsWith('name:')) line(c, side).stats.passedBalls ??= 0;
   }
   // deep wave: situational figures — derived from the log, never credited live
   const st = withAnn(s);

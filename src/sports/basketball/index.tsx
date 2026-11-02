@@ -17,11 +17,11 @@ import { MatchBoxScore } from '../../components/BoxScore';
 import { basketballBox } from '../boxSources';
 import { basketballStatTotals, shotsTracked } from './totals';
 import { isFieldGoal } from './credits';
-import { ejectAction, foulAction, freeThrowAction, lineupAction, missAction, reboundAction, removeAction, scoreAction, statAction, subAction, type StatPlay } from './actions';
+import { blockAction, ejectAction, foulAction, freeThrowAction, lineupAction, missAction, reboundAction, removeAction, scoreAction, statAction, stealAction, subAction, teamReboundAction, turnoverAction, type StatPlay } from './actions';
 import { hasPlayer, onPlayerOf, playId, playerOf } from './names';
 import { useMask } from '../../core/disputeMask';
 import { withRosters } from '../racketNames';
-import { BB_META, DQ_LABEL, FOUL_LABEL, pointsOf, zoneBehindArc, type BBEvent, type DqReason, type FoulType, type ReboundType, type ShotZone } from './events';
+import { BB_META, DQ_LABEL, FOUL_LABEL, TO_LABEL, pointsOf, zoneBehindArc, type BBEvent, type DqReason, type FoulType, type ReboundType, type ShotZone, type TurnoverType } from './events';
 import { PlayFeed } from '../PlayFeed';
 import { CategoryStatsPanel } from '../CategoryStatsPanel';
 import { basketballFeed } from './commentary';
@@ -40,7 +40,7 @@ import {
   type BasketballState, init, reducer, periodLabel, currentMinute,
   isFouledOut, isPlayerOut, isEjected, inBonus, timeoutStatus, onCourtRefs, courtSet, teamFoulsThisQuarter,
   disqualifyingFoul, freeThrowsFor,
-  gameSec, clockLeft, clockRunning, timedPeriod, timeUp, clockText, possessionAfterFoul,
+  gameSec, clockLeft, clockRunning, timedPeriod, timeUp, clockText, possessionAfterFoul, ballAfterFoul,
   BB_TRACK_DEFAULTS, scoringLayout,
 } from "./engine";
 import { BASKETBALL_META } from './meta';
@@ -51,6 +51,11 @@ import { basketballMatchRecords } from './records';
 const FOUL_TYPES: FoulType[] = ['personal', 'shooting', 'offensive', 'technical', 'unsportsmanlike', 'disqualifying', 'flagrant'];
 // MVP B7: a team foul (no player listed, or not known) — the types that don't eject a person
 const TEAM_FOUL_TYPES: FoulType[] = ['personal', 'shooting', 'offensive', 'technical'];
+
+/** US batch 5: the turnover kinds offered after a player (optional — the plain
+ *  Turnover button stays one tap) and on the team row (no player). */
+const PLAYER_TO_TYPES: TurnoverType[] = ['badPass', 'lostBall', 'travel', 'double', 'oob', 'backcourt', '3s', 'goaltend'];
+const TEAM_TO_TYPES: TurnoverType[] = ['8s', '5s'];
 
 /* ------------------------------- Controls ---------------------------------- */
 
@@ -126,6 +131,19 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
       if (b) setAssistFor({ ...assistFor, ref: b.id });
     } else if (assistFor && assistFor.ref != null && !state.events.some((e) => e.id === assistFor.ref)) setAssistFor(null);
   }, [assistFor, state.events]);
+  // US batch 5 — optional prompts after a play (any other play closes them):
+  // "Rebound?" after a miss / a missed last free throw; "Who lost it?" after a
+  // steal; "Whose shot?" after a block. `fromSeq` finds the steal / block once
+  // it is on the board (`ref`); Undo removing it closes the prompt.
+  const [reboundFor, setReboundFor] = useState<{ shotSide: 'home' | 'away' } | null>(null);
+  const [stealFor, setStealFor] = useState<{ side: 'home' | 'away'; fromSeq: number; ref?: number } | null>(null);
+  const [blockFor, setBlockFor] = useState<{ side: 'home' | 'away'; fromSeq: number; ref?: number; three?: boolean } | null>(null);
+  useEffect(() => {
+    const find = (type: 'steal' | 'block', p: { side: 'home' | 'away'; fromSeq: number; ref?: number }) =>
+      (p.ref == null ? state.events.find((e) => e.type === type && e.side === p.side && e.id > p.fromSeq)?.id : state.events.some((e) => e.id === p.ref) ? p.ref : -1);
+    if (stealFor) { const r = find('steal', stealFor); if (r === -1) setStealFor(null); else if (r != null && r !== stealFor.ref) setStealFor({ ...stealFor, ref: r }); }
+    if (blockFor) { const r = find('block', blockFor); if (r === -1) setBlockFor(null); else if (r != null && r !== blockFor.ref) setBlockFor({ ...blockFor, ref: r }); }
+  }, [stealFor, blockFor, state.events]);
   // IDs-only scoring: the log names players by id; this viewer's names (the
   // squads' as the fallback) are put in when shown.
   const { nameOf: viewerNameOf } = useMask();
@@ -150,6 +168,7 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
   // Any other play closes the "Assist?" prompt (a make re-opens it after).
   const fire = (action: ScoreAction) => {
     setAssistFor(null);
+    setReboundFor(null); setStealFor(null); setBlockFor(null);
     // SD-122: `v: 2` = foul-out / ejection are checked for this side (and id).
     dispatch({ ...action, payload: { ...action.payload, ...stampFor(), v: 2 } });
   };
@@ -172,6 +191,8 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
   const miss = (side: 'home' | 'away', pts: number, p: Player | undefined = sel[side], zone?: ShotZone) => {
     clearSel(side);
     fire(missAction(side, pts, p, zone));
+    // US batch 5: "Rebound?" — optional, live plays only
+    if (!edit) setReboundFor({ shotSide: side });
   };
   // Deep wave — "Shot zones": a made / missed shot from a zone is one tap
   // (inside the arc 2, behind it 3; half-court 1 and 2).
@@ -212,7 +233,11 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
       // the re-entered foul keeps who drew it — by id (an older log's name is resolved, never copied)
       const drawnId = edit.drawnPid ?? (edit.drawn ? state.ids?.[edit.drawn] ?? rosterId(edit.drawn) : undefined);
       fire(foulAction(edit.side, p, edit.foulType ?? 'personal', { fdt: edit.fdt === true, drawnBy: drawnId ? { id: drawnId } : undefined }));
-    } else stat(edit.side, edit.type.toUpperCase() as StatPlay, p);
+    } else if (edit.type === 'steal') fire(stealAction(edit.side, p, edit.pair === true));
+    else if (edit.type === 'block') fire(blockAction(edit.side, p, edit.pair === true));
+    // US batch 5: a re-entered turnover keeps its kind and its steal
+    else if (edit.type === 'turnover') fire(turnoverAction(edit.side, p, { toType: edit.toType, ref: edit.ref }));
+    else stat(edit.side, edit.type.toUpperCase() as StatPlay, p);
     setEdit(null); setEditSel(null);
   };
 
@@ -261,6 +286,8 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
     const shots = freeThrowsFor(state, side, type);
     // SD-132 (FIBA 3×3 Art. 15): team foul 10+ → 2 free throws AND the ball
     const ball = possessionAfterFoul(state, side, type);
+    // US batch 5 (FIBA Art. 37 / 38): U / D / flagrant — the free throws and then the ball
+    const keep = ballAfterFoul(type);
     const bonus = shots > 0 && (type === 'personal');
     // Deep wave: "Fouls drawn" — the foul says it was tracked, and who drew it (by id)
     const drawn = state.trackFoulsDrawn ? { fdt: true, drawnBy } : {};
@@ -268,7 +295,7 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
     if (dq && fouler) fireEject(side, fouler, dq);
     if (shots > 0) {
       const why = bonus ? `Bonus — ${teamOf(side)} are over the team-foul limit` : `${FOUL_LABEL[type]} foul on ${fouler?.fullName ?? teamOf(side)}`;
-      setFlow({ kind: 'ft', side: opp(side), ...(drawnBy && type !== 'technical' ? { shooter: drawnBy } : {}), remaining: shots, total: shots, reason: `${why}${dq && fouler ? ` · ${fouler.fullName} disqualified` : ''} — ${shots} free throw${shots > 1 ? 's' : ''} for ${teamOf(opp(side))}${ball ? `, then ${teamOf(opp(side))} keep the ball (team foul ${teamFoulsThisQuarter(state, side) + 1})` : ''}` });
+      setFlow({ kind: 'ft', side: opp(side), ...(drawnBy && type !== 'technical' ? { shooter: drawnBy } : {}), remaining: shots, total: shots, reason: `${why}${dq && fouler ? ` · ${fouler.fullName} disqualified` : ''} — ${shots} free throw${shots > 1 ? 's' : ''} for ${teamOf(opp(side))}${ball ? `, then ${teamOf(opp(side))} keep the ball (team foul ${teamFoulsThisQuarter(state, side) + 1})` : keep ? `, then ${teamOf(opp(side))} keep the ball (throw-in)` : ''}` });
     } else setFlow(null);
   };
 
@@ -302,7 +329,7 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
         freeThrow(flow.side, made, flow.shooter);
         if (counted) {
           const left = (flow.remaining ?? 1) - 1;
-          if (left <= 0) setFlow(null);
+          if (left <= 0) { setFlow(null); if (!made && !edit) setReboundFor({ shotSide: flow.side }); } // US batch 5: a missed last FT is live
           else setFlow({ ...flow, remaining: left });
         }
       };
@@ -428,11 +455,20 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
           </View>
           <View style={ctrl.row}>
             <Button label="🅰️ Assist" variant="ghost" style={ctrl.flex} onPress={() => one('ASSIST')} />
-            <Button label="✋ Steal" variant="ghost" style={ctrl.flex} onPress={() => one('STEAL')} />
+            {/* US batch 5: a steal is the other side's turnover; "Who lost it?" follows (optional) */}
+            <Button label="✋ Steal" variant="ghost" style={ctrl.flex} onPress={() => { const from = state.seq; fire(stealAction(side, player)); setFlow(null); setStealFor({ side, fromSeq: from }); }} />
           </View>
           <View style={ctrl.row}>
-            <Button label="🛡️ Block" variant="ghost" style={ctrl.flex} onPress={() => one('BLOCK')} />
+            {/* US batch 5: a block is the other side's missed shot; "Whose shot?" follows (optional, misses tracked) */}
+            <Button label="🛡️ Block" variant="ghost" style={ctrl.flex} onPress={() => { const from = state.seq; fire(blockAction(side, player)); setFlow(null); if (tracking) setBlockFor({ side, fromSeq: from }); }} />
             <Button label="🔄 Turnover" variant="ghost" style={ctrl.flex} onPress={() => one('TURNOVER')} />
+          </View>
+          {/* US batch 5: or the turnover's kind — still one tap */}
+          <View style={ctrl.chips}>
+            <Text style={ctrl.meta}>Turnover:</Text>
+            {PLAYER_TO_TYPES.map((t) => (
+              <SelectChip key={t} label={TO_LABEL[t]} active={false} accessibilityLabel={`Turnover, ${TO_LABEL[t]}`} onPress={() => { fire(turnoverAction(side, player, { toType: t })); setFlow(null); }} />
+            ))}
           </View>
           <Button label="🟨 Foul…" variant="ghost" onPress={() => setFlow({ kind: 'foul', side, fouler: player })} />
         </View>
@@ -748,6 +784,64 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
         );
       })()}
 
+      {/* US batch 5: "Rebound?" after a miss — the defence (or a team rebound), else the offence; Skip keeps scoring */}
+      {reboundFor && (() => {
+        const def = opp(reboundFor.shotSide);
+        const offSide = reboundFor.shotSide;
+        return (
+          <View style={ctrl.assistBox}>
+            <View style={ctrl.editHead}>
+              <Text style={[ctrl.label, ctrl.flex]}>⏬ Rebound?</Text>
+              <Button label="Skip" variant="ghost" onPress={() => setReboundFor(null)} />
+            </View>
+            <View style={ctrl.chips}>
+              <Text style={ctrl.meta}>Def. — {teamOf(def)}:</Text>
+              {courtOf(def).filter((p) => !fouledOut(p)).map((p) => (
+                <SelectChip key={p.id} label={p.fullName} active={false} onPress={() => fire(reboundAction(def, p, 'def'))} />
+              ))}
+              <SelectChip label="Team" accessibilityLabel={`Defensive team rebound, ${teamOf(def)}`} active={false} onPress={() => fire(teamReboundAction(def, 'def'))} />
+            </View>
+            <View style={ctrl.chips}>
+              <Text style={ctrl.meta}>Off. — {teamOf(offSide)}:</Text>
+              {courtOf(offSide).filter((p) => !fouledOut(p)).map((p) => (
+                <SelectChip key={p.id} label={p.fullName} active={false} onPress={() => fire(reboundAction(offSide, p, 'off'))} />
+              ))}
+              <SelectChip label="Team" accessibilityLabel={`Offensive team rebound, ${teamOf(offSide)}`} active={false} onPress={() => fire(teamReboundAction(offSide, 'off'))} />
+            </View>
+          </View>
+        );
+      })()}
+      {/* US batch 5: "Who lost it?" after a steal — names the other side's ball-handler (the turnover already counts) */}
+      {stealFor && stealFor.ref != null && (
+        <View style={ctrl.assistBox}>
+          <View style={ctrl.editHead}>
+            <Text style={[ctrl.label, ctrl.flex]}>✋ Steal — who lost it? ({teamOf(opp(stealFor.side))})</Text>
+            <Button label="Skip" variant="ghost" onPress={() => setStealFor(null)} />
+          </View>
+          <View style={ctrl.chips}>
+            {courtOf(opp(stealFor.side)).filter((p) => !fouledOut(p)).map((p) => (
+              <SelectChip key={p.id} label={p.fullName} active={false} onPress={() => fire(turnoverAction(opp(stealFor.side), p, { ref: stealFor.ref }))} />
+            ))}
+          </View>
+        </View>
+      )}
+      {/* US batch 5: "Whose shot?" after a block — names the shooter (the missed shot already counts) */}
+      {blockFor && blockFor.ref != null && (
+        <View style={ctrl.assistBox}>
+          <View style={ctrl.editHead}>
+            <Text style={[ctrl.label, ctrl.flex]}>🛡️ Block — whose shot? ({teamOf(opp(blockFor.side))})</Text>
+            <Button label="Skip" variant="ghost" onPress={() => setBlockFor(null)} />
+          </View>
+          <View style={ctrl.chips}>
+            {!halfCourt && <SelectChip label="3-pt try" active={blockFor.three === true} onPress={() => setBlockFor({ ...blockFor, three: !blockFor.three })} />}
+            {courtOf(opp(blockFor.side)).filter((p) => !fouledOut(p)).map((p) => (
+              <SelectChip key={p.id} label={p.fullName} active={false}
+                onPress={() => fire(missAction(opp(blockFor.side), blockFor.three ? 3 : halfCourt ? 1 : 2, p, undefined, blockFor.ref))} />
+            ))}
+          </View>
+        </View>
+      )}
+
       {/* Free throws — always available: shooting foul, and-one, technical, bonus. */}
       <View style={ctrl.row}>
         <Button label={`🎯 Free throws — ${homeName}`} variant="home" style={ctrl.flex} onPress={() => setFlow({ kind: 'ft', side: 'home' })} />
@@ -766,6 +860,18 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
           onPick={(p) => setFlow({ kind: 'act', side, player: p })} disabledFor={fouledOut} />
       ))}
       <Text style={ctrl.meta}>Tap the player first, then pick what they did.</Text>
+      {/* US batch 5: plays with no player — FIBA team rebounds, team turnovers (shot clock 24 s, 8 s, 5 s) */}
+      {(['home', 'away'] as const).map((side) => (
+        <View key={`team-${side}`} style={ctrl.chips} accessibilityLabel={`Team plays, ${teamOf(side)}`}>
+          <Text style={ctrl.meta}>Team — {teamOf(side)}:</Text>
+          <SelectChip label="⏬ Team rebound" active={false} onPress={() => fire(teamReboundAction(side))} />
+          <SelectChip label="⏱️ Shot clock" accessibilityLabel={`Shot-clock violation, ${teamOf(side)}`} active={false} onPress={() => fire(turnoverAction(side, null, { toType: '24s' }))} />
+          {TEAM_TO_TYPES.map((t) => (
+            <SelectChip key={t} label={TO_LABEL[t]} accessibilityLabel={`Team turnover, ${TO_LABEL[t]}, ${teamOf(side)}`} active={false} onPress={() => fire(turnoverAction(side, null, { toType: t }))} />
+          ))}
+          <SelectChip label="🔄 Team TO" active={false} onPress={() => fire(turnoverAction(side, null))} />
+        </View>
+      ))}
 
       {/* Timeouts — SD-57: what's left in this half / OT, per team */}
       {toTracked && (

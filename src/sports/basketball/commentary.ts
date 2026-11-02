@@ -16,8 +16,8 @@
  */
 import type { FeedGroup, FeedRow } from '../feedModel.ts';
 import { leadTracker } from '../feedModel.ts';
-import { eventClock, periodLabel, teamFoulsThisQuarter, type BasketballState } from './engine.ts';
-import { BB_META, DQ_LABEL, FOUL_LABEL, pointsOf, type BBEvent, type ShotZone } from './events.ts';
+import { ballAfterFoul, countsAsTeamFoul, eventClock, periodLabel, teamFoulsThisQuarter, type BasketballState } from './engine.ts';
+import { BB_META, DQ_LABEL, FOUL_LABEL, TO_WORDS, pointsOf, type BBEvent, type ShotZone } from './events.ts';
 import { isFieldGoal } from './credits.ts';
 import { gameOrder, possessionTags } from './deep.ts';
 import { drawnByOf, hasPlayer, legacyNameOf, onId, onPlayerOf, playId, playerOf, samePlayer, type NameOf } from './names.ts';
@@ -45,7 +45,7 @@ const FOUL_WORD: Record<string, string> = {
  *  `nameOf` (default: an older log's stored names, as before). */
 export function describePlay(
   s: BasketballState, e: BBEvent, team: string,
-  ctx: { assist?: string; ft?: { k: number; n: number }; teamFoul?: number; second?: boolean; offTo?: boolean } = {},
+  ctx: { assist?: string; ft?: { k: number; n: number }; teamFoul?: number; second?: boolean; offTo?: boolean; linked?: BBEvent; opp?: string } = {},
   nameOf: NameOf = legacyNameOf,
 ): string {
   const halfCourt = s.targetPoints > 0;
@@ -64,18 +64,37 @@ export function describePlay(
       const of = ctx.ft && ctx.ft.n > 1 ? ` ${ctx.ft.k} of ${ctx.ft.n}` : '';
       return `${who} ${e.made ? (named ? 'makes' : 'make') : (named ? 'misses' : 'miss')} free throw${of}`;
     }
-    case 'rebound':
-      return e.reboundType === 'off' ? `Offensive rebound — ${who}` : e.reboundType === 'def' ? `Defensive rebound — ${who}` : `Rebound — ${who}`;
+    case 'rebound': {
+      // US batch 5: a team rebound says so
+      const r = e.team ? 'team rebound' : 'rebound';
+      return e.reboundType === 'off' ? `Offensive ${r} — ${who}` : e.reboundType === 'def' ? `Defensive ${r} — ${who}` : `${e.team ? 'Team rebound' : 'Rebound'} — ${who}`;
+    }
     case 'assist': return `Assist — ${who}`;
-    case 'steal': return `${who} ${named ? 'steals' : 'steal'} the ball`;
-    case 'block': return `${who} ${named ? 'blocks' : 'block'} the shot`;
-    case 'turnover': return `Turnover — ${who}`;
+    case 'steal': {
+      // US batch 5: the ball-handler named (`linked`), else the paired team turnover
+      const from = ctx.linked && hasPlayer(ctx.linked) ? playerOf(s, ctx.linked, nameOf) : undefined;
+      if (from) return `${who} ${named ? 'steals' : 'steal'} the ball from ${from}`;
+      return `${who} ${named ? 'steals' : 'steal'} the ball${e.pair && ctx.opp ? ` · ${ctx.opp} turnover` : ''}`;
+    }
+    case 'block': {
+      const l = ctx.linked;
+      const shooter = l && hasPlayer(l) ? playerOf(s, l, nameOf) : undefined;
+      if (l && shooter) return `${who} ${named ? 'blocks' : 'block'} ${shooter}'s ${shotPhrase(l.points ?? 2, l.zone, halfCourt).replace(/^an? /, '')}`;
+      return `${who} ${named ? 'blocks' : 'block'} the shot`;
+    }
+    case 'turnover': {
+      // US batch 5: the kind; a team shot-clock violation reads as one
+      if (e.team && e.toType === '24s') return `Shot-clock violation — ${who}`;
+      return `Turnover — ${who}${e.toType ? ` (${TO_WORDS[e.toType]})` : ''}`;
+    }
     case 'foul': {
       const kind = FOUL_WORD[e.foulType ?? 'personal'] ?? FOUL_LABEL[e.foulType ?? 'personal'];
       const by = drawnByOf(s, e, nameOf);
       const drawn = by ? ` (drawn by ${by})` : '';
       const tf = ctx.teamFoul ? ` · team foul ${ctx.teamFoul}${s.foulsForBonus > 0 && ctx.teamFoul > s.foulsForBonus ? ', free throws' : ''}` : '';
-      return `${kind} foul on ${who}${drawn}${tf}${e.tov ? ' · turnover' : ''}`;
+      // US batch 5: a U / D / flagrant foul gives the free throws and the ball
+      const ball = e.foulType && ballAfterFoul(e.foulType) ? ' · free throws and the ball' : '';
+      return `${kind} foul on ${who}${drawn}${tf}${e.tov ? ' · turnover' : ''}${ball}`;
     }
     case 'timeout': return `Timeout — ${team}`;
     case 'sub': return `${onPlayerOf(s, e, nameOf) ?? '?'} checks in for ${playerOf(s, e, nameOf) ?? '?'}`;
@@ -118,6 +137,9 @@ export function basketballFeed(s: BasketballState, names: { home: string; away: 
     for (let k = i; k <= j; k++) trip.set(ev[k].id, { k: k - i + 1, n: j - i + 1 });
     i = j + 1;
   }
+  // US batch 5: the ball-handler / shooter of a paired steal / block reads on that play's row
+  const linkOf = new Map<number, BBEvent>();
+  for (const e of ev) if ((e.type === 'turnover' || e.type === 'miss') && typeof e.ref === 'number') { linkOf.set(e.ref, e); merged.add(e.id); }
   for (let i = 0; i < ev.length; i++) {
     const e = ev[i];
     if (merged.has(e.id)) continue;
@@ -131,7 +153,7 @@ export function basketballFeed(s: BasketballState, names: { home: string; away: 
     }
     const pts = pointsOf(e);
     if (pts > 0) { if (e.side === 'home') h += pts; else a += pts; }
-    const teamFoul = e.type === 'foul' && (e.foulType !== 'technical' || s.techIsTeamFoul === true)
+    const teamFoul = e.type === 'foul' && countsAsTeamFoul(s, e)
       ? teamFoulsThisQuarter({ ...s, quarter: e.quarter, events: ev.slice(0, i + 1) }, e.side) : undefined;
     const tag = tags.get(e.id);
     const row: FeedRow = {
@@ -139,7 +161,7 @@ export function basketballFeed(s: BasketballState, names: { home: string; away: 
       ...(typeof e.sec === 'number' ? { clock: eventClock(s, e) } : { clock: `${e.minute}'` }),
       side: e.side,
       icon: BB_META[e.type]?.icon ?? '•',
-      text: describePlay(s, e, names[e.side as Side], { assist, ft: trip.get(e.id), teamFoul, second: tag?.second, offTo: tag?.offTo }, nameOf),
+      text: describePlay(s, e, names[e.side as Side], { assist, ft: trip.get(e.id), teamFoul, second: tag?.second, offTo: tag?.offTo, linked: linkOf.get(e.id), opp: names[e.side === 'home' ? 'away' : 'home'] }, nameOf),
       score: { home: h, away: a },
       ...(pts > 0 ? { scoring: true } : {}),
       ...rowPlayer(s, e, nameOf),

@@ -9,7 +9,7 @@
  */
 import type { ScoreAction } from '../types';
 import { creditAttribution, eventCredits, foulCredits, ftCredits, makeCredits, missCredits, reboundCredits, type Credits } from './credits.ts';
-import type { BBEvent, DqReason, FoulType, ReboundType, ShotZone } from './events.ts';
+import type { BBEvent, DqReason, FoulType, ReboundType, ShotZone, TurnoverType } from './events.ts';
 
 type Side = 'home' | 'away';
 /** A picked player (a roster `Player` fits). */
@@ -35,9 +35,10 @@ export const scoreAction = (side: Side, points: number, p?: Who, o: { halfCourt?
   attribution: creditOf(p, makeCredits(points, o.halfCourt === true, o.fga === true)),
 });
 
-/** SD-31: a missed field goal (2 or 3; 3×3: 1 or 2). */
-export const missAction = (side: Side, points: number, p?: Who, zone?: ShotZone): ScoreAction => ({
-  type: 'MISS', side, payload: { points, ...pidOf(p), ...(zone ? { zone } : {}) }, attribution: creditOf(p, missCredits(points)),
+/** SD-31: a missed field goal (2 or 3; 3×3: 1 or 2). US batch 5: `ref` =
+ *  the paired block this shot was (the "Whose shot?" prompt). */
+export const missAction = (side: Side, points: number, p?: Who, zone?: ShotZone, ref?: number): ScoreAction => ({
+  type: 'MISS', side, payload: { points, ...pidOf(p), ...(zone ? { zone } : {}), ...(ref != null ? { ref } : {}) }, attribution: creditOf(p, missCredits(points)),
 });
 
 /** One free-throw attempt. */
@@ -49,6 +50,32 @@ export const freeThrowAction = (side: Side, made: boolean, p?: Who): ScoreAction
 export const reboundAction = (side: Side, p: Who, rt?: ReboundType): ScoreAction => ({
   type: 'REBOUND', side, payload: { ...(rt ? { reboundType: rt } : {}), ...pidOf(p) }, attribution: creditOf(p, reboundCredits(rt)),
 });
+
+/** US batch 5: a TEAM rebound (FIBA: out of bounds after a miss, a
+ *  dead-ball missed free throw) — no player, nobody credited. */
+export const teamReboundAction = (side: Side, rt?: ReboundType): ScoreAction => ({
+  type: 'REBOUND', side, payload: { team: true, ...(rt ? { reboundType: rt } : {}) },
+});
+
+/** US batch 5: a turnover — a player's, or the TEAM's (`p` null: a
+ *  shot-clock / 8 s / 5 s violation); `toType` = its kind (optional);
+ *  `ref` = the paired steal it was (the "Who lost it?" prompt). */
+export const turnoverAction = (side: Side, p: Who, o: { toType?: TurnoverType; ref?: number } = {}): ScoreAction => ({
+  type: 'TURNOVER', side,
+  payload: { ...(p ? { pid: p.id } : { team: true }), ...(o.toType ? { toType: o.toType } : {}), ...(o.ref != null ? { ref: o.ref } : {}) },
+  ...(p ? { attribution: { playerId: p.id, stat: 'turnovers' } } : {}),
+});
+
+/** US batch 5: a steal / block that pairs the other side's turnover / missed
+ *  shot (`pair`; an edit of an older one passes false and stays as it was). */
+export const stealAction = (side: Side, p: Who, pair = true): ScoreAction => {
+  const a = statAction(side, 'STEAL', p);
+  return pair ? { ...a, payload: { ...a.payload, pair: true } } : a;
+};
+export const blockAction = (side: Side, p: Who, pair = true): ScoreAction => {
+  const a = statAction(side, 'BLOCK', p);
+  return pair ? { ...a, payload: { ...a.payload, pair: true } } : a;
+};
 
 /** An assist / steal / block / turnover. */
 /** MVP B6: an assist from the "Assist?" prompt carries its basket's id

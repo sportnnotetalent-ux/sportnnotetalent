@@ -6,7 +6,7 @@
  */
 import type { ScoreAction } from '../types';
 import { aggPriorFromConfig, levelForDecider, type AggPrior } from '../aggregate.ts';
-import { isShotZone, pointsOf, type BBEvent, type DqReason, type FoulType, type ReboundType } from './events.ts';
+import { isShotZone, isTurnoverType, pointsOf, type BBEvent, type DqReason, type FoulType, type ReboundType } from './events.ts';
 // Perf F-15 — the format presets / options live in the light meta module.
 import { BB_TRACK_DEFAULTS } from './meta.ts';
 export { BB_TRACK_DEFAULTS };
@@ -34,6 +34,10 @@ export interface BasketballState {
    *  regulation period, so they carry over instead of resetting. Format key
    *  `otFoulsCarry`; absent = legacy (each OT period starts from 0). */
   otFoulsCarry?: boolean;
+  /** US batch 5 — NBA: an offensive foul is not a team foul (format key
+   *  `offTeamFoul: false`). Only on the state when the stored config has the
+   *  key; absent = legacy (every non-technical foul counts). */
+  offTeamFoul?: boolean;
   /** overtime period length in minutes (informational — the clock counts up) */
   overtimeMinutes: number;
   /** regulation periods before overtime: 4 quarters (default) or 2 halves */
@@ -129,6 +133,8 @@ export const init = (config?: Record<string, unknown>): BasketballState => ({
   // SD-05 rule flags — present only when the stored config carries them.
   ...(config?.techIsTeamFoul != null ? { techIsTeamFoul: config.techIsTeamFoul === true } : {}),
   ...(config?.otFoulsCarry != null ? { otFoulsCarry: config.otFoulsCarry === true } : {}),
+  // US batch 5 — present only when the stored config carries it
+  ...(config?.offTeamFoul != null ? { offTeamFoul: config.offTeamFoul !== false } : {}),
   ...(config?.trackMisses != null ? { trackMisses: config.trackMisses === true } : {}),
   // SD-57 — present only when the stored config carries the key.
   ...(config?.timeoutRule === 'fiba' || config?.timeoutRule === 'nba' ? { toRule: config.timeoutRule } : {}),
@@ -233,9 +239,15 @@ export const isEjected = (s: BasketballState, name?: string, who?: PlayerRef): b
 export const isPlayerOut = (s: BasketballState, name?: string, who?: PlayerRef): boolean =>
   isFouledOut(s, name, who) || isEjected(s, name, who);
 /** Does this foul count as a team foul? Every foul does, except a technical
- *  when the format says technicals aren't team fouls (NBA, and legacy configs). */
-const isTeamFoul = (s: BasketballState, e: BBEvent): boolean =>
-  e.type === 'foul' && (e.foulType !== 'technical' || s.techIsTeamFoul === true);
+ *  when the format says technicals aren't team fouls (NBA, and legacy configs),
+ *  and (US batch 5) an offensive foul when the format says so (NBA). */
+export const countsAsTeamFoul = (s: Pick<BasketballState, 'techIsTeamFoul' | 'offTeamFoul'>, e: Pick<BBEvent, 'type' | 'foulType'>): boolean =>
+  e.type === 'foul' && (e.foulType !== 'technical' || s.techIsTeamFoul === true) && !(e.foulType === 'offensive' && s.offTeamFoul === false);
+const isTeamFoul = countsAsTeamFoul;
+/** US batch 5 (FIBA Art. 37 / 38, NBA flagrant): an unsportsmanlike,
+ *  disqualifying or flagrant foul gives the free throws AND the ball (a
+ *  throw-in) to the other side. */
+export const ballAfterFoul = (type: FoulType): boolean => type === 'unsportsmanlike' || type === 'disqualifying' || type === 'flagrant';
 /** Is a foul logged in period `q` part of the current team-foul count? The
  *  current period only — except in overtime under FIBA (`otFoulsCarry`), where
  *  every OT period counts together with the last regulation period. */
@@ -428,6 +440,20 @@ const pushEv = (s: BasketballState, e: Omit<BBEvent, 'id' | 'quarter'>, quarter:
   events: [...s.events, { ...e, id: s.seq + 1, quarter }],
 });
 
+/** US batch 5: a play naming the second player of a paired steal / block
+ *  (`payload.ref`): null = no link asked; the id when the referenced play is
+ *  the other side's paired `kind` and nothing links it yet; false = a bad
+ *  link (the action is dropped, like an assist whose basket is gone). */
+function linkRef(s: BasketballState, a: ScoreAction, kind: 'steal' | 'block'): number | null | false {
+  if (a.payload?.ref == null) return null;
+  const ref = a.payload.ref;
+  if (typeof ref !== 'number' || !Number.isInteger(ref)) return false;
+  const target = s.events.find((e) => e.id === ref);
+  if (!target || target.type !== kind || target.pair !== true || target.side === a.side) return false;
+  const linkType = kind === 'steal' ? 'turnover' : 'miss';
+  return s.events.some((e) => e.type === linkType && e.ref === ref) ? false : ref;
+}
+
 /** SD-40: newer controls put the credited player's id in `payload.pid` (events
  *  carry names only), so `statTotals` can key every line by id. Merged only
  *  when the play was logged — an older log (no pid) keeps its exact state.
@@ -461,6 +487,8 @@ const reduce = (s: BasketballState, a: ScoreAction): BasketballState => {
   // the credited player as the play stores it: the id (IDs-only), else the
   // older log's name (its key kept even when empty, as it always was)
   const by: Pick<BBEvent, 'pid' | 'playerName'> = idOnly ? { pid: pidIn } : { playerName: name };
+  // US batch 5: a team play — stamped only when the play names no player
+  const teamOf = (): Partial<BBEvent> => (a.payload?.team === true && !name && !pidIn ? { team: true as const } : {});
   // SD-132: the game-clock second rides on the play (new logs only)
   const secIn = typeof a.payload?.sec === 'number' && a.payload.sec >= 0 ? Math.floor(a.payload.sec) : undefined;
   const at = Number(a.payload?.at ?? 0);
@@ -524,7 +552,11 @@ const reduce = (s: BasketballState, a: ScoreAction): BasketballState => {
       // FG% / EFF only; the score doesn't move.
       if (!a.side || isPlayerOut(s, name, who)) return s;
       const pts = Number(a.payload?.points ?? 2);
-      return push(s, { minute, type: 'miss', side: a.side, ...by, points: pts, ...(isShotZone(a.payload?.zone) ? { zone: a.payload.zone } : {}) }, quarter);
+      // US batch 5: the shooter of a paired block (`ref`) — that block must be
+      // the other side's, paired, and not already named; else nothing
+      const mref = linkRef(s, a, 'block');
+      if (mref === false) return s;
+      return push(s, { minute, type: 'miss', side: a.side, ...by, points: pts, ...(isShotZone(a.payload?.zone) ? { zone: a.payload.zone } : {}), ...(mref != null ? { ref: mref } : {}) }, quarter);
     }
     case 'TAG': {
       // Deep wave: tag (or untag) a made basket as a fast break after it went
@@ -549,7 +581,7 @@ const reduce = (s: BasketballState, a: ScoreAction): BasketballState => {
     }
     case 'REBOUND':
       return a.side && !isPlayerOut(s, name, who)
-        ? push(s, { minute, type: 'rebound', side: a.side, ...by, reboundType: a.payload?.reboundType as ReboundType | undefined }, quarter)
+        ? push(s, { minute, type: 'rebound', side: a.side, ...by, reboundType: a.payload?.reboundType as ReboundType | undefined, ...teamOf() }, quarter)
         : s;
     case 'ASSIST': {
       // MVP B6: a prompt's assist names its basket (`ref`) — gone (Undo) = no assist
@@ -558,11 +590,21 @@ const reduce = (s: BasketballState, a: ScoreAction): BasketballState => {
       return a.side && !isPlayerOut(s, name, who) ? push(s, { minute, type: 'assist', side: a.side, ...by }, quarter) : s;
     }
     case 'STEAL':
-      return a.side && !isPlayerOut(s, name, who) ? push(s, { minute, type: 'steal', side: a.side, ...by }, quarter) : s;
     case 'BLOCK':
-      return a.side && !isPlayerOut(s, name, who) ? push(s, { minute, type: 'block', side: a.side, ...by }, quarter) : s;
-    case 'TURNOVER':
-      return a.side && !isPlayerOut(s, name, who) ? push(s, { minute, type: 'turnover', side: a.side, ...by }, quarter) : s;
+      // US batch 5: a new steal / block pairs the other side's turnover / missed shot
+      return a.side && !isPlayerOut(s, name, who)
+        ? push(s, { minute, type: a.type === 'STEAL' ? 'steal' : 'block', side: a.side, ...by, ...(a.payload?.pair === true ? { pair: true as const } : {}) }, quarter)
+        : s;
+    case 'TURNOVER': {
+      if (!a.side || isPlayerOut(s, name, who)) return s;
+      // US batch 5: the ball-handler of a paired steal (`ref`), the kind, a team turnover
+      const tref = linkRef(s, a, 'steal');
+      if (tref === false) return s;
+      return push(s, {
+        minute, type: 'turnover', side: a.side, ...by, ...teamOf(),
+        ...(isTurnoverType(a.payload?.toType) ? { toType: a.payload.toType } : {}), ...(tref != null ? { ref: tref } : {}),
+      }, quarter);
+    }
     case 'FOUL':
       // count the foul, but never beyond the limit (already fouled out)
       return a.side && !isPlayerOut(s, name, who)

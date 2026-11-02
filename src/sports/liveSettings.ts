@@ -48,7 +48,17 @@ export function liveSettingsAccess(opts: {
   return { editable: opts.canScore || opts.canManage };
 }
 
-/** How many fields differ from the standard values. */
-export function customCount<S>(ls: LiveSettings<S>, values: Record<string, FormatValue>): number {
-  return ls.fields.filter((f) => (values[f.key] ?? f.default) !== (ls.defaults?.[f.key] ?? f.default)).length;
+/** The standard values for this match (US batch 5: `defaultsFor` the match's
+ *  rules, else the sport's `defaults`). */
+export function standardOf<S>(ls: LiveSettings<S>, state?: S): Record<string, FormatValue> | undefined {
+  if (ls.defaultsFor && state !== undefined) {
+    try { return ls.defaultsFor(state); } catch { /* fall back */ }
+  }
+  return ls.defaults;
+}
+
+/** How many fields differ from the standard values (`state`: this match's). */
+export function customCount<S>(ls: LiveSettings<S>, values: Record<string, FormatValue>, state?: S): number {
+  const std = standardOf(ls, state);
+  return ls.fields.filter((f) => (values[f.key] ?? f.default) !== (std?.[f.key] ?? f.default)).length;
 }

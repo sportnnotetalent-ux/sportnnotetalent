@@ -74,6 +74,7 @@ export function baseballSheet(s: BaseballState, scope: Scope = 'all'): StatSheet
       someRow('triples', 'Triples', H.triples, A.triples),
       countRow('hr', 'Home runs', H.homeRuns, A.homeRuns),
       countRow('bb', 'Walks', H.bb, A.bb),
+      someRow('ibb', 'Intentional walks', H.ibb, A.ibb),
       someRow('hbp', 'Hit by pitch', H.hbp, A.hbp),
       countRow('so', 'Strikeouts', H.so, A.so, { lowerBetter: true }),
       someRow('kl', 'Strikeouts looking', H.kl, A.kl, { lowerBetter: true }),
@@ -102,6 +103,7 @@ export function baseballSheet(s: BaseballState, scope: Scope = 'all'): StatSheet
       (H.go + H.ao + A.go + A.ao > 0) && pairRow('goao', 'Ground outs–fly outs', H.go, H.ao, A.go, A.ao, { plain: true }),
       someRow('wp', 'Wild pitches', H.wp, A.wp, { lowerBetter: true }),
       someRow('bk', 'Balks', H.bk, A.bk, { lowerBetter: true }),
+      someRow('pickoffs', 'Pick-offs', H.pickoffs, A.pickoffs),
       (H.ir || A.ir) && pairRow('irs', 'Inherited runners–scored', H.ir, H.irs, A.ir, A.irs, { plain: true }),
     ], counts ? undefined : 'Pitch counts need pitch-by-pitch scoring.'),
     types && mixKeys.length > 0 && section('mix', 'Pitch mix', mixKeys.map((k) => {

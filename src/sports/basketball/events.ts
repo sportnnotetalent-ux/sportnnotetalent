@@ -78,7 +78,36 @@ export interface BBEvent {
    *  fouler's turnover (FIBA / NBA box scores). Absent on older logs, which
    *  keep their totals. */
   tov?: true;
+  /** US batch 5: a rebound / turnover credited to the TEAM (FIBA team
+   *  rebound; a shot-clock / 8 s / 5 s violation). Only on plays with no
+   *  player; absent on older logs (their no-player plays read as before). */
+  team?: true;
+  /** US batch 5: the kind of turnover (optional chip). Unknown values dropped. */
+  toType?: TurnoverType;
+  /** US batch 5: a steal / block logged since it pairs the other side's
+   *  turnover / missed shot (derived — `pairedPlays`, deep.ts). Absent on
+   *  older steals and blocks, which keep their totals. */
+  pair?: true;
+  /** US batch 5: a turnover / miss naming the ball-handler / shooter of a
+   *  paired steal / block (that play's id) — it takes the paired figure's
+   *  place, so the other side's TO / FGA counts once. */
+  ref?: number;
 }
+
+/** US batch 5 — turnover kinds (NBA play-by-play / FIBA LiveStats). */
+export const TO_TYPES = ['badPass', 'lostBall', 'travel', 'double', 'oob', 'backcourt', '3s', '5s', '8s', '24s', 'goaltend'] as const;
+export type TurnoverType = (typeof TO_TYPES)[number];
+export const isTurnoverType = (v: unknown): v is TurnoverType => typeof v === 'string' && (TO_TYPES as readonly string[]).includes(v);
+/** The chip text. */
+export const TO_LABEL: Record<TurnoverType, string> = {
+  badPass: 'Bad pass', lostBall: 'Lost ball', travel: 'Travel', double: 'Double dribble', oob: 'Out of bounds', backcourt: 'Backcourt',
+  '3s': '3 seconds', '5s': '5 seconds', '8s': '8 seconds', '24s': 'Shot clock', goaltend: 'Off. goaltending',
+};
+/** The commentary words. */
+export const TO_WORDS: Record<TurnoverType, string> = {
+  badPass: 'bad pass', lostBall: 'lost ball', travel: 'travelling', double: 'double dribble', oob: 'out of bounds', backcourt: 'backcourt violation',
+  '3s': '3-second violation', '5s': '5-second violation', '8s': '8-second violation', '24s': 'shot-clock violation', goaltend: 'offensive goaltending',
+};
 
 /** Deep wave — the broadcast shot-chart zones (NBA / FIBA LiveStats): the
  *  restricted area / paint, mid-range (inside the arc, outside the paint),

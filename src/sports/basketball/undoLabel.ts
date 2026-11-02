@@ -42,7 +42,7 @@ export function basketballUndoLabel(
     default: {
       const meta = BB_META[e.type];
       if (!meta) return null;
-      label = join(meta.label.toLowerCase(), name);
+      label = join(`${e.team ? 'team ' : ''}${meta.label.toLowerCase()}`, name); // US batch 5: a team rebound / turnover
     }
   }
   return /\bundefined\b|\bnull\b|\bNaN\b/.test(label) ? null : label;

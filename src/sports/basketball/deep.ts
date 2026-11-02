@@ -20,7 +20,7 @@
  *    the match typed one; points off turnovers once a turnover / steal exists.
  */
 import type { StatTotalsEntry } from '../types';
-import { gameSec, periodSeconds, startersOf, type BasketballState } from './engine.ts';
+import { countsAsTeamFoul, gameSec, periodSeconds, startersOf, type BasketballState } from './engine.ts';
 import { isFieldGoal } from './credits.ts';
 import { pointsOf, SHOT_ZONES, type BBEvent, type ShotZone } from './events.ts';
 import { hasPlayer, playId, samePlayer } from './names.ts';
@@ -77,6 +77,31 @@ export function bbCoverage(s: BasketballState): BbCoverage {
 export const zonesOn = (s: BasketballState, c = bbCoverage(s)): boolean => c.zones.charted > 0;
 export const fastBreakOn = (s: BasketballState, c = bbCoverage(s)): boolean => c.fastBreak.tracked > 0 || (s.trackFastBreak === true && c.fastBreak.of === 0);
 export const foulsDrawnOn = (s: BasketballState, c = bbCoverage(s)): boolean => c.foulsDrawn.tracked > 0 || (s.trackFoulsDrawn === true && c.foulsDrawn.of === 0);
+
+/* ------------------------ paired plays (US batch 5) ------------------------- */
+
+/** A figure a paired steal / block gives the OTHER side: its turnover (a
+ *  steal) or its missed field-goal attempt (a block). */
+export interface PairedPlay { id: number; side: Side; kind: 'tov' | 'miss'; quarter: number }
+
+/**
+ * US batch 5 — FIBA / NBA box scores: every steal is the other side's
+ * turnover, every block the other side's missed shot. Only steals / blocks
+ * logged since (`pair`) — older ones keep their totals. When the scorer named
+ * the ball-handler / shooter (a turnover / miss with `ref` = the steal /
+ * block), that play carries the figure and the pairing adds nothing, so it
+ * counts once. DERIVED: removing either play re-derives it.
+ */
+export function pairedPlays(s: BasketballState): PairedPlay[] {
+  const linked = new Set<number>();
+  for (const e of s.events) if ((e.type === 'turnover' || e.type === 'miss') && typeof e.ref === 'number') linked.add(e.ref);
+  const out: PairedPlay[] = [];
+  for (const e of s.events) {
+    if (!e.pair || (e.type !== 'steal' && e.type !== 'block') || linked.has(e.id)) continue;
+    out.push({ id: e.id, side: other(e.side), kind: e.type === 'steal' ? 'tov' : 'miss', quarter: e.quarter });
+  }
+  return out;
+}
 
 /* ------------------------- possessions (derived) ---------------------------- */
 
@@ -260,6 +285,8 @@ export interface BbTeamFigures {
   arcM: number; arcA: number;
   ftm: number; fta: number;
   oreb: number; dreb: number; reb: number;
+  /** US batch 5: team rebounds (no player — FIBA's "team" box line) */
+  teamReb: number;
   ast: number; stl: number; blk: number; tov: number;
   pf: number; teamFouls: number; tech: number; unsport: number; fd: number;
   timeouts: number;
@@ -281,7 +308,7 @@ export function bbTeamFigures(s: BasketballState, side: Side, scope: BbScope = '
   const tracked = bbCoverage(s).shots;
   const f: BbTeamFigures = {
     points: 0, fgm: 0, fga: 0, fgx: 0, tpm: 0, tpa: 0, inM: 0, inA: 0, arcM: 0, arcA: 0, ftm: 0, fta: 0,
-    oreb: 0, dreb: 0, reb: 0, ast: 0, stl: 0, blk: 0, tov: 0, pf: 0, teamFouls: 0, tech: 0, unsport: 0, fd: 0, timeouts: 0,
+    oreb: 0, dreb: 0, reb: 0, teamReb: 0, ast: 0, stl: 0, blk: 0, tov: 0, pf: 0, teamFouls: 0, tech: 0, unsport: 0, fd: 0, timeouts: 0,
     fromFt: 0, fromIn: 0, fromArc: 0, from3: 0, zones: blankZones(), paint: 0, second: 0, fastBreak: 0, offTo: 0, eff: 0,
   };
   for (const e of s.events) {
@@ -315,7 +342,7 @@ export function bbTeamFigures(s: BasketballState, side: Side, scope: BbScope = '
         break;
       }
       case 'freethrow': f.fta++; if (e.made) { f.ftm++; f.fromFt += 1; } break;
-      case 'rebound': f.reb++; if (e.reboundType === 'off') f.oreb++; else if (e.reboundType === 'def') f.dreb++; break;
+      case 'rebound': f.reb++; if (e.reboundType === 'off') f.oreb++; else if (e.reboundType === 'def') f.dreb++; if (e.team) f.teamReb++; break;
       case 'assist': f.ast++; break;
       case 'steal': f.stl++; break;
       case 'block': f.blk++; break;
@@ -323,13 +350,19 @@ export function bbTeamFigures(s: BasketballState, side: Side, scope: BbScope = '
       case 'foul':
         f.pf++;
         if (e.tov) f.tov++; // US batch 1: a new offensive foul is a turnover too
-        if (e.foulType !== 'technical' || s.techIsTeamFoul === true) f.teamFouls++;
+        if (countsAsTeamFoul(s, e)) f.teamFouls++;
         if (e.foulType === 'technical') f.tech++;
         if (e.foulType === 'unsportsmanlike' || e.foulType === 'disqualifying' || e.foulType === 'flagrant') f.unsport++;
         break;
       case 'timeout': f.timeouts++; break;
       default: break;
     }
+  }
+  // US batch 5: the other side's paired steals / blocks (no ball-handler / shooter named)
+  for (const x of pairedPlays(s)) {
+    if (x.side !== side || (scope !== 'all' && x.quarter !== scope)) continue;
+    if (x.kind === 'tov') f.tov++;
+    else { f.fga++; f.fgx++; }
   }
   f.eff = f.points + f.reb + f.ast + f.stl + f.blk - f.tov - (f.fta - f.ftm) - f.fgx; // missed FG as logged (an untracked game has none)
   return f;

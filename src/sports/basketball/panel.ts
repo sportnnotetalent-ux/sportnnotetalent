@@ -97,6 +97,8 @@ export function basketballPanel(s: BasketballState, scope: BbScope = 'all', ctx:
     ball.push(countRow('oreb', 'Offensive rebounds', H.oreb, A.oreb));
     ball.push(countRow('dreb', 'Defensive rebounds', H.dreb, A.dreb));
   }
+  // US batch 5: FIBA's team-rebound line, once the match logged one
+  if (s.events.some((e) => e.type === 'rebound' && e.team)) ball.push(countRow('teamReb', 'Team rebounds', H.teamReb, A.teamReb));
   ball.push(countRow('ast', 'Assists', H.ast, A.ast));
   ball.push(countRow('stl', 'Steals', H.stl, A.stl));
   ball.push(countRow('blk', 'Blocks', H.blk, A.blk));

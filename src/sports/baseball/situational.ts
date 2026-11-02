@@ -175,6 +175,8 @@ export interface TeamSplit {
   bb: number; hbp: number; so: number; /** US batch 1: strikeouts looking */ kl: number; sf: number; sh: number; rbi: number;
   rispAb: number; rispHits: number; twoOutRbi: number; lob: number; gidp: number;
   sb: number; cs: number; pickedOff: number;
+  /** US batch 5: intentional walks drawn (at bat) / pick-offs made (in the field) */
+  ibb: number; pickoffs: number;
   // in the field (this side's pitchers / fielders)
   pitches: number; strikes: number; firstPitches: number; firstStrikes: number; bf: number; kPitched: number; bbAllowed: number;
   go: number; ao: number; wp: number; bk: number; pb: number; ir: number; irs: number;
@@ -191,7 +193,7 @@ export function teamSplit(state: BaseballState, side: Side, scope: Scope = 'all'
   const s = withAnn(state);
   const t: TeamSplit = {
     runs: 0, pa: 0, ab: 0, hits: 0, doubles: 0, triples: 0, homeRuns: 0, bb: 0, hbp: 0, so: 0, kl: 0, sf: 0, sh: 0, rbi: 0,
-    rispAb: 0, rispHits: 0, twoOutRbi: 0, lob: 0, gidp: 0, sb: 0, cs: 0, pickedOff: 0,
+    rispAb: 0, rispHits: 0, twoOutRbi: 0, lob: 0, gidp: 0, sb: 0, cs: 0, pickedOff: 0, ibb: 0, pickoffs: 0,
     pitches: 0, strikes: 0, firstPitches: 0, firstStrikes: 0, bf: 0, kPitched: 0, bbAllowed: 0, go: 0, ao: 0, wp: 0, bk: 0, pb: 0, ir: 0, irs: 0,
     errors: 0, dp: 0, putouts: 0, assists: 0, mix: {}, zones: {}, batted: noBatted(), untyped: 0,
   };
@@ -218,6 +220,7 @@ export function teamSplit(state: BaseballState, side: Side, scope: Scope = 'all'
       } else {
         if (e.kind === 'WP') t.wp++;
         if (e.kind === 'BK') t.bk++;
+        if (e.kind === 'PO') t.pickoffs++;
         if (e.kind === 'PB') t.pb++;
       }
       continue;
@@ -232,6 +235,7 @@ export function teamSplit(state: BaseballState, side: Side, scope: Scope = 'all'
       if (o === '3B') t.triples++;
       if (o === 'HR') t.homeRuns++;
       if (o === 'BB' || o === 'IBB') t.bb++;
+      if (o === 'IBB') t.ibb++;
       if (o === 'HBP') t.hbp++;
       if (o === 'K') t.so++;
       if (o === 'K' && e.pitch === 'called') t.kl++;
