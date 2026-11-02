@@ -14,7 +14,7 @@ const QUIET: Record<string, string> = {
   POSSESSION: 'possession switch', CLOCK: 'clock start / stop', SET_CLOCK: 'clock set',
   XI: 'line-up', SET_STOPPAGE: 'added time', START_EXTRA_TIME: 'start of extra time',
   START_SHOOTOUT: 'start of the shoot-out', PEN: 'shoot-out kick', GOAL_DETAIL: 'goal detail',
-  REMOVE_EVENT: 'timeline correction', UNDO_GOAL: 'goal removal',
+  REMOVE_EVENT: 'timeline correction', UNDO_GOAL: 'goal removal', STOPPAGE_REASON: 'stoppage reason',
 };
 
 const EVENT_WORD: Record<FootballEvent['type'], string> = {

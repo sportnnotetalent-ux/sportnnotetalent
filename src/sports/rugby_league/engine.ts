@@ -123,15 +123,19 @@ export interface LeagueEvent {
  *  error, a penalty against the side with the ball, a handover on the last
  *  tackle. Not counted either way: an untagged change of possession ('other')
  *  and a set still running at the end of a half ('period'). */
-export type SetEnd = 'kick' | 'error' | 'penalty' | 'sixth' | 'restart' | 'score' | 'goal' | 'other' | 'period';
-export const COMPLETE_ENDS: SetEnd[] = ['kick', 'restart', 'score', 'goal'];
+/*  Invasion batch 5 (audit fix 10): 'penWon' — a penalty to the side with the
+ *  ball (against the defence): a completed set, a fresh set for the side with
+ *  the ball, a penalty conceded by the defence. New logs only; "Six again"
+ *  ('restart') stays for set restarts. */
+export type SetEnd = 'kick' | 'error' | 'penalty' | 'sixth' | 'restart' | 'penWon' | 'score' | 'goal' | 'other' | 'period';
+export const COMPLETE_ENDS: SetEnd[] = ['kick', 'restart', 'penWon', 'score', 'goal'];
 export const INCOMPLETE_ENDS: SetEnd[] = ['error', 'penalty', 'sixth'];
 export const SET_END_LABEL: Record<SetEnd, string> = {
-  kick: 'Kick', error: 'Error', penalty: 'Penalty against', sixth: 'Handover on the last tackle', restart: 'Six again',
+  kick: 'Kick', error: 'Error', penalty: 'Penalty against', sixth: 'Handover on the last tackle', restart: 'Six again', penWon: 'Penalty to the side with the ball',
   score: 'Score', goal: 'Kick at goal', other: 'Ball changed hands', period: 'End of the half',
 };
 /** the endings the scorer taps (the rest come from scores, the tackle count and the clock) */
-export const TAP_ENDS: SetEnd[] = ['kick', 'error', 'penalty', 'restart'];
+export const TAP_ENDS: SetEnd[] = ['kick', 'error', 'penalty', 'restart', 'penWon'];
 
 /** One mark in the set log (in the order the scorer tapped them). */
 export interface SetMark {
@@ -189,7 +193,7 @@ export function walkSets(s: Pick<LeagueState, 'setLog' | 'setTackles'>): { sets:
       close(how, m.sec, m.det);
       if (m.ref) continue; // a score / kick at goal: the restart follows (the scorer taps who has the ball)
       if (how === 'kick' || how === 'error' || how === 'penalty') start(other(o.side), m);
-      else if (how === 'restart') start(o.side, m);
+      else if (how === 'restart' || how === 'penWon') start(o.side, m);
     }
   }
   return { sets, open: open as LeagueSet | null };
@@ -561,10 +565,11 @@ export const reducer = (s: LeagueState, a: ScoreAction): LeagueState => {
       const open = s.setLog ? currentSet(s) : null;
       if (!open || !TAP_ENDS.includes(how)) return s;
       // with "Errors & penalties" tracked, the same tap credits the player (or the team)
+      // — a penalty to the side with the ball is the defence's (invasion batch 5)
       const d = a.payload?.detail;
-      if ((how === 'error' && d === 'error') || (how === 'penalty' && d === 'penalty')) {
+      if ((how === 'error' && d === 'error') || ((how === 'penalty' || how === 'penWon') && d === 'penalty')) {
         const ended = mark(s, { k: 'end', how, det: uid });
-        return { ...ended, seq: ended.seq + 1, events: [...ended.events, { id: uid, sec, psec, period, type: 'detail', side: open.side, detail: d, ...who1 } as LeagueEvent] };
+        return { ...ended, seq: ended.seq + 1, events: [...ended.events, { id: uid, sec, psec, period, type: 'detail', side: how === 'penWon' ? other(open.side) : open.side, detail: d, ...who1 } as LeagueEvent] };
       }
       return mark(s, { k: 'end', how });
     }

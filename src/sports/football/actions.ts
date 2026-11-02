@@ -10,7 +10,9 @@
  * staff label, not a player. PURE.
  */
 import type { ScoreAction } from '../types';
-import type { FootballEvent, GoalType, BodyPart, ShotZone, StatEvent, StatKind, CardReason } from './events.ts';
+import type { FootballEvent, GoalType, BodyPart, ShotZone, StatEvent, StatKind, CardReason, StoppageReason } from './events.ts';
+import { isStoppageReason } from './events.ts';
+export { STOPPAGE_REASONS, STOPPAGE_LABEL } from './events.ts';
 import type { XiStamp } from './engine.ts';
 import { GOAL_STAT, STAT_KEY } from './totals.ts';
 
@@ -139,12 +141,68 @@ export function gridSaveActions(side: Side, keeper: Who | null | undefined, shoo
 export const cardChoices = (cardsTracked: boolean): { icon: string; label: string; colours: ('yellow' | 'red')[] } =>
   (cardsTracked ? { icon: '🟨', label: 'Card', colours: ['yellow', 'red'] } : { icon: '🟥', label: 'Red card', colours: ['red'] });
 
-/** A foul by `fouler` — and the fouled player (`victim`, optional), by id. */
-export const foulAction = (side: Side, fouler: Who, victim: Who | null | undefined, o: { at?: number; tracked?: string[] } = {}): ScoreAction => ({
+/** A foul by `fouler` — and the fouled player (`victim`, optional), by id.
+ *  `pen` (invasion batch 5): the foul gave away a penalty (new logs only). */
+export const foulAction = (side: Side, fouler: Who, victim: Who | null | undefined, o: { at?: number; tracked?: string[]; pen?: boolean } = {}): ScoreAction => ({
   type: 'STAT', side,
-  payload: { kind: 'foul', possSide: opp(side), at: o.at ?? Date.now(), ...(victim ? { secondId: victim.id } : {}) },
+  payload: { kind: 'foul', possSide: opp(side), at: o.at ?? Date.now(), ...(victim ? { secondId: victim.id } : {}), ...(o.pen ? { pen: true } : {}) },
   attribution: { playerId: fouler.id, stat: 'fouls', tracked: o.tracked },
 });
+
+/** Invasion batch 5 (audit fix 5): the "Stoppage" tap — the reason is
+ *  optional (an unknown one is dropped). */
+export const stoppageAction = (side: Side, reason?: StoppageReason): ScoreAction =>
+  ({ type: 'STOPPAGE', side, payload: isStoppageReason(reason) ? { reason } : {} });
+
+/** Invasion batch 5: the reason picked after the stoppage was logged (`ref` = its event id). */
+export const stoppageReasonAction = (ref: number, reason: StoppageReason): ScoreAction =>
+  ({ type: 'STOPPAGE_REASON', payload: { ref, reason } });
+
+/** Invasion batch 5 (audit fix 6): "Who gave it away?" in the penalty flow.
+ *  `side` = the side awarded the penalty; `conceder` = the defender. Logs who
+ *  won it (when named; then not again at the outcome) and, when fouls are
+ *  tracked, the defender's foul flagged `pen` (the fouled player = who won it).
+ *  The card step follows in the controls (a red is always recordable). */
+export function penaltyConcededActions(side: Side, conceder: Who, wonBy: Who | null | undefined, o: { fouls: boolean; at?: number; tracked?: string[] }): ScoreAction[] {
+  return [
+    ...(wonBy ? [statAction('penaltyWon', side, wonBy, {}, { at: o.at, tracked: o.tracked })] : []),
+    ...(o.fouls ? [foulAction(opp(side), conceder, wonBy, { at: o.at, tracked: o.tracked, pen: true })] : []),
+  ];
+}
+
+/** Invasion batch 5: the penalty flow's next step. Won by (the side lists
+ *  players) → who gave it away (the other side lists players) → taken by →
+ *  the outcome. Every pick is optional; a step with nobody to pick is skipped. */
+export function penaltyStepAfter(step: 'team' | 'wonBy' | 'concededBy', has: { attackers: boolean; defenders: boolean }): 'wonBy' | 'concededBy' | 'takenBy' | 'outcome' {
+  if (step === 'team' && has.attackers) return 'wonBy';
+  if (step !== 'concededBy' && has.defenders) return 'concededBy';
+  return has.attackers ? 'takenBy' : 'outcome';
+}
+
+/** The player-attributed stat keys a match tracks — stamped on each stat line
+ *  so a profile can show "this total spans N of M games". Invasion batch 5
+ *  (Batch 1 side note): crosses, dribbles, offsides and handballs follow their
+ *  toggles; penalties won / missed are always captured. */
+type TrackFlags = { shots?: boolean; fouls?: boolean; tackles?: boolean; interceptions?: boolean; saves?: boolean; passes?: boolean;
+  attackContribution?: boolean; defenceContribution?: boolean; crosses?: boolean; dribbles?: boolean; offsides?: boolean; handball?: boolean };
+export function footballTrackedKeys(t: TrackFlags, deep: { keyPasses?: boolean; clearances?: boolean } = {}): string[] {
+  const keys = ['goals', 'openPlayGoals', 'penaltyGoals', 'freekickGoals', 'assists', 'yellowCards', 'redCards', 'cleanSheets', 'penaltiesWon', 'penaltiesMissed'];
+  if (t.shots) keys.push('shots', 'shotsOnTarget', 'blocks');
+  if (t.fouls) keys.push('fouls');
+  if (t.tackles) keys.push('tackles');
+  if (t.interceptions) keys.push('interceptions');
+  if (t.saves) keys.push('saves');
+  if (t.passes) keys.push('passes', 'passesComplete');
+  if (t.attackContribution) keys.push('attackingContributions');
+  if (t.defenceContribution) keys.push('defensiveContributions');
+  if (t.crosses) keys.push('crosses');
+  if (t.dribbles) keys.push('dribbles');
+  if (t.offsides) keys.push('offsides');
+  if (t.handball) keys.push('handballs');
+  if (deep.keyPasses) keys.push('keyPasses');
+  if (deep.clearances) keys.push('clearances');
+  return keys;
+}
 
 /** A substitution: who goes off / comes on, by id. */
 export const subAction = (side: Side, off: Who, on: Who): ScoreAction => ({ type: 'SUB', side, payload: { offId: off.id, onId: on.id } });

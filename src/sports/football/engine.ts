@@ -4,7 +4,7 @@
  *  cricket / kabaddi engines. */
 import type { ScoreAction, LiveSettings, FormatField } from "../types";
 import type { FootballEvent, GoalType, BodyPart, StatEvent, StatKind, ShotZone } from "./events";
-import { isPlayerCard } from "./events.ts";
+import { isPlayerCard, isStoppageReason } from "./events.ts";
 import { aggPriorFromConfig, aggregateText, levelForDecider, type AggPrior } from "../aggregate.ts";
 import type { Player } from "../../core/types";
 // Perf F-15 — the format presets / options live in the light meta module.
@@ -625,10 +625,25 @@ export const reducer = (s: FootballState, a: ScoreAction): FootballState => {
     }
     case 'SET_STOPPAGE':
       return { ...s, stoppage: { ...s.stoppage, [s.half]: Math.max(0, Number(a.payload?.minutes ?? 0)) } };
-    case 'STOPPAGE':
+    case 'STOPPAGE': {
       // An in-play pause (injury / cooling break / VAR check) — a timeline marker,
       // no scoring effect. `reason` (injury / var / cooling / other) is optional.
-      return push(s, { minute, half: evHalf, type: 'stoppage', side: a.side ?? 'home', playerName: a.payload?.reason as string | undefined });
+      // Invasion batch 5: only a known reason is kept (a hostile value is dropped).
+      const r = a.payload?.reason;
+      return push(s, { minute, half: evHalf, type: 'stoppage', side: a.side ?? 'home', playerName: isStoppageReason(r) ? r : undefined });
+    }
+    case 'STOPPAGE_REASON': {
+      // Invasion batch 5: the reason picked after the stoppage was logged (the
+      // tap stays one tap). Only a stoppage row, only a known reason.
+      const ref = a.payload?.ref;
+      const r = a.payload?.reason;
+      if (typeof ref !== 'number' || !isStoppageReason(r)) return s;
+      const i = s.events.findIndex((e) => e.id === ref && e.type === 'stoppage');
+      if (i < 0) return s;
+      const events = [...s.events];
+      events[i] = { ...events[i], playerName: r };
+      return { ...s, events };
+    }
     case 'YELLOW':
       return a.side ? push(s, { minute, half: evHalf, type: 'yellow', side: a.side, playerName: name ?? (a.payload?.officialName as string | undefined), ...pid, ...official, ...reason }) : s;
     case 'RED':

@@ -54,6 +54,8 @@ export function hockeySentence(e: HockeyEvent, names: Names, score: Score, saver
       return { icon: '🧤', text: `Save by ${e.playerName ?? `the ${team} keeper`}.` };
     case 'card': {
       const c = e.card ?? 'green';
+      // invasion batch 5: a team official's card (no player, nobody short)
+      if (e.official) return { icon: c === 'red' ? '🟥' : c === 'green' ? '🟩' : '🟨', text: `${cap(c)} card to ${e.official} (${team} official).`, major: true, tone: c === 'red' ? 'red' : 'yellow' };
       if (c === 'red') return { icon: '🟥', text: `Red card! ${who(e.playerName)} is sent off — ${team} play a player short.`, major: true, tone: 'red' };
       return { icon: c === 'green' ? '🟩' : '🟨', text: `${cap(c)} card for ${who(e.playerName)}${e.minutes ? ` — ${e.minutes} minutes` : ''}.`, major: true, tone: 'yellow' };
     }
@@ -129,7 +131,7 @@ export function hockeyFacts(s0: HockeyState, now = 0, nameOf: NameOf = legacyNam
   const by = groupByScorer(goals);
   f.home.push(...by.home.map((l) => `🏑 ${l}`));
   f.away.push(...by.away.map((l) => `🏑 ${l}`));
-  for (const e of s.events) if (e.type === 'card' && e.card === 'red') f[e.side].push(`🟥 ${e.playerName ?? 'Player'} ${minuteText(e.sec)}`);
+  for (const e of s.events) if (e.type === 'card' && e.card === 'red' && !e.official) f[e.side].push(`🟥 ${e.playerName ?? 'Player'} ${minuteText(e.sec)}`);
   if (s.shootout) { const so = soScore(s); f.notes.push(`Shoot-out ${so.home}–${so.away}`); }
   const poss = hockeyPossession(s, 'all', now);
   if (poss) f.notes.push(`Possession ${poss.home}% – ${poss.away}%`);

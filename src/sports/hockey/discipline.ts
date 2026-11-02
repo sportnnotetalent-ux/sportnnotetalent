@@ -6,7 +6,7 @@
  * card costs AFTER the match is the tournament's regulations: FIH events
  * suspend a red-carded player for at least the next match (default 1 — verify
  * against your regulations). Yellow cards don't add up by default (organiser
- * option). Hockey logs no team-official cards.
+ * option). A team official's card (invasion batch 5) is listed, never suspends.
  */
 import type { SportDisciplineSpec, CardMark } from '../discipline';
 import type { HockeyEvent } from './engine';
@@ -28,6 +28,8 @@ export const HOCKEY_DISCIPLINE: SportDisciplineSpec = {
     for (const e of ev as HockeyEvent[]) {
       if (e?.type !== 'card' || (e.side !== 'home' && e.side !== 'away')) continue;
       const col = e.card === 'yellow' || e.card === 'red' ? e.card : 'green';
+      // invasion batch 5: an official's card is listed, never suspends
+      if (e.official) { out.push({ side: e.side, official: e.official, col }); continue; }
       out.push({
         side: e.side, ...(e.playerId ? { playerId: e.playerId } : {}), ...(e.playerName ? { playerName: e.playerName } : {}), col,
         ...(col === 'red' ? { off: 'banRed' } : {}), ...(col === 'yellow' ? { caution: true } : {}),

@@ -31,7 +31,7 @@ import type { ScoreAction, SportPlugin } from '../types';
 import {
   init, reducer, isComplete, result, levelAtEnd, aggLine, matchSec, periodSec, clockFace, periodName, periodLong, periodStarted, running,
   eventCredits, creditAttribution, currentKeeper, soScore, nextShooter, needsSdPick, hockeyScoreLine, HOCKEY_PRESETS, HOCKEY_LIVE_SETTINGS,
-  HOCKEY_TRACK_FIELDS, openPc, strokeAction,
+  HOCKEY_TRACK_FIELDS, openPc, strokeAction, cardWarnIds, cardWarning,
   type CardColour, type GoalType, type HockeyEvent, type HockeyState, type Side,
 } from './engine';
 import { hockeyPossession } from './depth';
@@ -109,6 +109,8 @@ const ScoringControls: SportPlugin<HockeyState>['ScoringControls'] = ({
   const [clockText, setClockText] = useState('');
   const [setting, setSetting] = useState(false);
   const [soTaker, setSoTaker] = useState<Player | null>(null);
+  // invasion batch 5: a team official's role for a card (typed, optional)
+  const [official, setOfficial] = useState('');
   const [, tick] = useState(0);
   useEffect(() => {
     if (!running(s)) return;
@@ -195,6 +197,11 @@ const ScoringControls: SportPlugin<HockeyState>['ScoringControls'] = ({
   const card = (sd: Side, colour: CardColour, minutes: number | undefined, p: Player | null) => {
     fire({ type: 'CARD', side: sd, payload: { card: colour, ...(minutes ? { minutes } : {}) }, ...credit({ type: 'card', card: colour, playerId: p?.id }) });
     setFlow(null);
+  };
+  /** invasion batch 5 (FIH): a card for a team official — no player, nobody short */
+  const officialCard = (sd: Side, colour: CardColour) => {
+    fire({ type: 'CARD', side: sd, payload: { card: colour, official: official.trim() || 'Team official' } });
+    setOfficial(''); setFlow(null);
   };
   const sub = (sd: Side, off: Player, on: Player) => {
     fire(subAction(sd, off, on));
@@ -422,11 +429,23 @@ const ScoringControls: SportPlugin<HockeyState>['ScoringControls'] = ({
             <Text style={c.meta}>Green and yellow: the player sits out that much playing time, then is back by himself. Red: off for good — the team plays a player short.</Text>
           </View>
         );
-        return (
-          <View style={c.panel}>{head(`${flow.card === 'green' ? 'Green' : flow.card === 'yellow' ? 'Yellow' : 'Red'} card`)}
-            <PlayerGrid players={onField(sd)} onPick={(p) => card(sd, flow.card ?? 'green', flow.minutes, p)} />
-          </View>
-        );
+        {
+          // invasion batch 5 (FIH): warn on a player's second green / second
+          // yellow (warn only — record what the umpire shows)
+          const col = flow.card ?? 'green';
+          const warned = cardWarnIds(s, sd, col).map((id) => byId(sd, id, id)?.fullName ?? id);
+          return (
+            <View style={c.panel}>{head(`${col === 'green' ? 'Green' : col === 'yellow' ? 'Yellow' : 'Red'} card`)}
+              {warned.length ? <Text style={c.short}>{warned.join(', ')}: {cardWarning(col)}</Text> : null}
+              <PlayerGrid players={onField(sd)} onPick={(p) => card(sd, col, flow.minutes, p)} />
+              <Text style={c.meta}>Or a team official</Text>
+              <View style={c.row}>
+                <View style={c.flex}><TextField label="Official's role (optional)" value={official} onChange={setOfficial} placeholder="e.g. Coach" autoCapitalize="words" /></View>
+                <Button label="Record" variant="ghost" onPress={() => officialCard(sd, col)} />
+              </View>
+            </View>
+          );
+        }
       case 'sub':
         if (flow.step === 'off') return (
           <View style={c.panel}>{head('Sub — who comes off?')}
@@ -751,8 +770,8 @@ export const hockeyPlugin: SportPlugin<HockeyState> = {
         : !periodStarted(s) && s.period > 1 ? `End of ${periodName(s, s.period - 1)}`
         : periodLong(s, s.period)[0].toUpperCase() + periodLong(s, s.period).slice(1),
       detailLine: [aggLine(s), s.shootout ? `Shoot-out · ${so.home}–${so.away}` : ''].filter(Boolean).join(' · ') || undefined,
-      homeReds: s.events.filter((e) => e.type === 'card' && e.card === 'red' && e.side === 'home').length,
-      awayReds: s.events.filter((e) => e.type === 'card' && e.card === 'red' && e.side === 'away').length,
+      homeReds: s.events.filter((e) => e.type === 'card' && e.card === 'red' && !e.official && e.side === 'home').length,
+      awayReds: s.events.filter((e) => e.type === 'card' && e.card === 'red' && !e.official && e.side === 'away').length,
     };
   },
   // the shoot-out result under the score ("SO 4–3"); '' for every other match
