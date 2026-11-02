@@ -322,6 +322,7 @@ export function bbTeamFigures(s: BasketballState, side: Side, scope: BbScope = '
       case 'turnover': f.tov++; break;
       case 'foul':
         f.pf++;
+        if (e.tov) f.tov++; // US batch 1: a new offensive foul is a turnover too
         if (e.foulType !== 'technical' || s.techIsTeamFoul === true) f.teamFouls++;
         if (e.foulType === 'technical') f.tech++;
         if (e.foulType === 'unsportsmanlike' || e.foulType === 'disqualifying' || e.foulType === 'flagrant') f.unsport++;

@@ -75,7 +75,7 @@ export function describePlay(
       const by = drawnByOf(s, e, nameOf);
       const drawn = by ? ` (drawn by ${by})` : '';
       const tf = ctx.teamFoul ? ` · team foul ${ctx.teamFoul}${s.foulsForBonus > 0 && ctx.teamFoul > s.foulsForBonus ? ', free throws' : ''}` : '';
-      return `${kind} foul on ${who}${drawn}${tf}`;
+      return `${kind} foul on ${who}${drawn}${tf}${e.tov ? ' · turnover' : ''}`;
     }
     case 'timeout': return `Timeout — ${team}`;
     case 'sub': return `${onPlayerOf(s, e, nameOf) ?? '?'} checks in for ${playerOf(s, e, nameOf) ?? '?'}`;

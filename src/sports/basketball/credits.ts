@@ -7,7 +7,8 @@
  *
  * Keys (BK-03 / BK-05):
  *   points, freeThrowsMade / freeThrowsAtt, rebounds (+ oreb / dreb when the
- *   rebound was typed), assists, steals, blocks, turnovers, fouls, ejections;
+ *   rebound was typed), assists, steals, blocks, turnovers, fouls, ejections
+ *   (an offensive foul stamped `tov` is a foul AND a turnover — US batch 1);
  *   fgMade (every made field goal) and threesMade (made 3s); and only when
  *   "Track missed shots" is on (D8): fgAtt / threesAtt (a make logged with
  *   `fga`, and every miss) and fgMissed (every miss — FIBA EFF subtracts it).
@@ -48,6 +49,9 @@ export const ftCredits = (made: boolean): Credits => (made ? { points: 1, freeTh
 export const reboundCredits = (type?: 'off' | 'def'): Credits =>
   type === 'off' ? { rebounds: 1, oreb: 1 } : type === 'def' ? { rebounds: 1, dreb: 1 } : { rebounds: 1 };
 
+/** A foul; an offensive foul (`tov`, new logs) is also the fouler's turnover. */
+export const foulCredits = (tov = false): Credits => (tov ? { fouls: 1, turnovers: 1 } : { fouls: 1 });
+
 const SIMPLE: Partial<Record<BBEvent['type'], string>> = {
   assist: 'assists', steal: 'steals', block: 'blocks', turnover: 'turnovers', foul: 'fouls', eject: 'ejections',
 };
@@ -62,6 +66,7 @@ export function eventCredits(e: BBEvent, halfCourt: boolean, tracked = e.fga ===
     case 'miss': return missCredits(e.points ?? 2);
     case 'freethrow': return ftCredits(e.made === true);
     case 'rebound': return reboundCredits(e.reboundType);
+    case 'foul': return foulCredits(e.tov === true);
     default: {
       const k = SIMPLE[e.type];
       return k ? { [k]: 1 } : {};

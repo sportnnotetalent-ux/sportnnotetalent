@@ -8,7 +8,7 @@
  * clock second) and `v: 2`. PURE.
  */
 import type { ScoreAction } from '../types';
-import { creditAttribution, eventCredits, ftCredits, makeCredits, missCredits, reboundCredits, type Credits } from './credits.ts';
+import { creditAttribution, eventCredits, foulCredits, ftCredits, makeCredits, missCredits, reboundCredits, type Credits } from './credits.ts';
 import type { BBEvent, DqReason, FoulType, ReboundType, ShotZone } from './events.ts';
 
 type Side = 'home' | 'away';
@@ -58,12 +58,16 @@ export const statAction = (side: Side, type: StatPlay, p: Who, ref?: number): Sc
 });
 
 /** A foul with its type. Deep wave — "Fouls drawn": `fdt` (tracked) and who
- *  was fouled (`drawnBy`, by id). */
-export const foulAction = (side: Side, p: Who, foulType: FoulType = 'personal', o: { fdt?: boolean; drawnBy?: Who } = {}): ScoreAction => ({
-  type: 'FOUL', side,
-  payload: { foulType, ...pidOf(p), ...(o.fdt ? { fdt: true } : {}), ...(o.drawnBy ? { drawnPid: o.drawnBy.id } : {}) },
-  ...(p ? { attribution: { playerId: p.id, stat: 'fouls' } } : {}),
-});
+ *  was fouled (`drawnBy`, by id). US batch 1: an offensive foul is stamped
+ *  `tov` — it is the fouler's turnover too. */
+export const foulAction = (side: Side, p: Who, foulType: FoulType = 'personal', o: { fdt?: boolean; drawnBy?: Who } = {}): ScoreAction => {
+  const tov = foulType === 'offensive';
+  return {
+    type: 'FOUL', side,
+    payload: { foulType, ...pidOf(p), ...(o.fdt ? { fdt: true } : {}), ...(o.drawnBy ? { drawnPid: o.drawnBy.id } : {}), ...(tov ? { tov: true } : {}) },
+    ...(p ? { attribution: tov ? creditOf(p, foulCredits(true)) : { playerId: p.id, stat: 'fouls' } } : {}),
+  };
+};
 
 /** An ejection (SD-117 B12: `reason` when the foul rules forced it). */
 export const ejectAction = (side: Side, p: { id: string }, reason?: DqReason): ScoreAction => ({

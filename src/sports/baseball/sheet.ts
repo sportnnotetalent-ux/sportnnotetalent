@@ -76,6 +76,7 @@ export function baseballSheet(s: BaseballState, scope: Scope = 'all'): StatSheet
       countRow('bb', 'Walks', H.bb, A.bb),
       someRow('hbp', 'Hit by pitch', H.hbp, A.hbp),
       countRow('so', 'Strikeouts', H.so, A.so, { lowerBetter: true }),
+      someRow('kl', 'Strikeouts looking', H.kl, A.kl, { lowerBetter: true }),
       avgRow('avg', 'Batting average', H.hits, H.ab, A.hits, A.ab),
       avgRow('obp', 'On-base percentage', ho.n, ho.d, ao.n, ao.d),
     ]),

@@ -81,6 +81,8 @@ export const baseballStats: SportStatSchema<'baseball'> = {
     { key: 'baseOnBalls', label: 'Walks (BB)', short: 'walks', one: 'walk', abbr: 'BB', group: 'batting', weight: 1 },
     { key: 'hitByPitch', label: 'Hit by pitch', short: 'hit by pitch', abbr: 'HBP', group: 'batting', weight: 1 },
     { key: 'strikeouts', label: 'Strikeouts (batting)', short: 'strikeouts', one: 'strikeout', abbr: 'SO', group: 'batting', format: { unit: 'count', better: 'lower' }, weight: -0.5 },
+    // US batch 1: of those, called third strikes (a strikeout logged before it as "swinging" stays one)
+    { key: 'kLooking', label: 'Strikeouts looking', short: 'strikeouts looking', one: 'strikeout looking', abbr: 'KL', group: 'batting', format: { unit: 'count', better: 'lower' } },
     { key: 'sacFlies', label: 'Sacrifice flies', short: 'sacrifice flies', one: 'sacrifice fly', abbr: 'SF', group: 'batting', weight: 0.5 },
     { key: 'sacBunts', label: 'Sacrifice bunts', short: 'sacrifice bunts', one: 'sacrifice bunt', abbr: 'SH', group: 'batting', weight: 0.5 },
     { key: 'gidp', label: 'Grounded into double plays', short: 'GDP', abbr: 'GDP', group: 'batting', format: { unit: 'count', better: 'lower' }, weight: -1 },
@@ -167,7 +169,7 @@ export const baseballStats: SportStatSchema<'baseball'> = {
   sections: [
     { id: 'batting', title: 'Batting', rows: [
       { stat: 'plateAppearances' }, { stat: 'atBats' }, { stat: 'runs' }, { stat: 'hits' }, { stat: 'twoB', hideZero: true }, { stat: 'threeB', hideZero: true },
-      { stat: 'homeRuns' }, { stat: 'rbi' }, { stat: 'baseOnBalls' }, { stat: 'hitByPitch', hideZero: true }, { stat: 'strikeouts' },
+      { stat: 'homeRuns' }, { stat: 'rbi' }, { stat: 'baseOnBalls' }, { stat: 'hitByPitch', hideZero: true }, { stat: 'strikeouts' }, { stat: 'kLooking', hideZero: true },
       { stat: 'sacFlies', hideZero: true }, { stat: 'sacBunts', hideZero: true }, { stat: 'gidp', hideZero: true },
       { stat: 'battingAvg', label: 'AVG' }, { stat: 'obp', label: 'OBP' }, { stat: 'slg', label: 'SLG' }, { stat: 'ops', label: 'OPS' }, { stat: 'totalBases' },
     ] },

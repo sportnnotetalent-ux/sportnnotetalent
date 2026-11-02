@@ -667,13 +667,14 @@ type Credit = { playerId: string; stats: Record<string, number> };
 
 /** Every key a live baseball action credits (statTotals owns all of them). */
 export const LIVE_KEYS = [
-  'plateAppearances', 'atBats', 'hits', 'twoB', 'threeB', 'homeRuns', 'rbi', 'baseOnBalls', 'hitByPitch', 'strikeouts', 'sacFlies', 'sacBunts', 'gidp',
+  'plateAppearances', 'atBats', 'hits', 'twoB', 'threeB', 'homeRuns', 'rbi', 'baseOnBalls', 'hitByPitch', 'strikeouts', 'kLooking', 'sacFlies', 'sacBunts', 'gidp',
   'stolenBases', 'caughtStealing',
   'battersFaced', 'hitsAllowed', 'bbAllowed', 'hbpAllowed', 'kPitched', 'hrAllowed', 'outsPitched',
 ] as const;
 
-/** The batter's line for one plate appearance. */
-export function batterStats(o: Outcome, rbi = 0): Record<string, number> {
+/** The batter's line for one plate appearance. US batch 1: a strikeout on a
+ *  called third strike (`pitch: 'called'`) is a strikeout looking too. */
+export function batterStats(o: Outcome, rbi = 0, pitch?: BaseballEvent['pitch']): Record<string, number> {
   const b: Record<string, number> = { plateAppearances: 1 };
   if (!NO_AB.includes(o)) b.atBats = 1;
   if (HITS.includes(o)) b.hits = 1;
@@ -684,6 +685,7 @@ export function batterStats(o: Outcome, rbi = 0): Record<string, number> {
   if (o === 'BB' || o === 'IBB') b.baseOnBalls = 1;
   if (o === 'HBP') b.hitByPitch = 1;
   if (o === 'K') b.strikeouts = 1;
+  if (o === 'K' && pitch === 'called') b.kLooking = 1;
   if (o === 'SF') b.sacFlies = 1;
   if (o === 'SH') b.sacBunts = 1;
   if (o === 'DP') b.gidp = 1;
@@ -702,10 +704,10 @@ export function pitcherStats(o: Outcome, outs = 0): Record<string, number> {
 }
 
 /** The stat-line credits one event writes: [primary player, second player]. */
-export function eventCredits(e: Pick<BaseballEvent, 'type' | 'outcome' | 'kind' | 'batter' | 'pitcher' | 'moves' | 'outs' | 'rbi'>): { first?: Credit; second?: Credit } {
+export function eventCredits(e: Pick<BaseballEvent, 'type' | 'outcome' | 'kind' | 'batter' | 'pitcher' | 'moves' | 'outs' | 'rbi' | 'pitch'>): { first?: Credit; second?: Credit } {
   const who = (w: Who | undefined, stats: Record<string, number>): Credit | undefined =>
     (w?.id && Object.keys(stats).length ? { playerId: w.id, stats } : undefined);
-  if (e.type === 'pa' && e.outcome) return { first: who(e.batter, batterStats(e.outcome, e.rbi ?? 0)), second: who(e.pitcher, pitcherStats(e.outcome, e.outs ?? 0)) };
+  if (e.type === 'pa' && e.outcome) return { first: who(e.batter, batterStats(e.outcome, e.rbi ?? 0, e.pitch)), second: who(e.pitcher, pitcherStats(e.outcome, e.outs ?? 0)) };
   if (e.type === 'runner') {
     const m = e.moves?.[0];
     const runner = m ? { id: m.id } : undefined;
@@ -976,7 +978,7 @@ export function buildPlay(s: BaseballState, o: Outcome, opts: PlayOpts = {}): Sc
   const pv = preview(s, base);
   const rbi = opts.rbi ?? defaultRbi(o, pv.runs);
   const payload = { ...base.payload, outs: pv.outs, rbi };
-  return withCredits({ ...base, payload }, { type: 'pa', outcome: o, batter, pitcher, outs: pv.outs, rbi });
+  return withCredits({ ...base, payload }, { type: 'pa', outcome: o, pitch, batter, pitcher, outs: pv.outs, rbi });
 }
 
 /** One pitch. Ball four / strike three (and a slow-pitch 2-strike foul) close
