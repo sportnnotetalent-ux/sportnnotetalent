@@ -4,6 +4,7 @@
  * under 22); game to 25 or after 8 boards; best of 3 games (or a single game).
  * Scoring a board = pick the winner, tap coins left, toggle the Queen.
  */
+import { entryDisplayName } from '../../data/participantEntry';
 import React, { useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { theme } from '../../core/theme';
@@ -38,8 +39,10 @@ import { IconText } from '../../components/Icon';
  *  events keep player ids only; a player is named for this viewer by id
  *  (players_view: the circle sees full names, others initials, an open
  *  dispute "X"). A singles side reads as its player, else the entry's name. */
+// a pair reads "Aarav / Rohan" as on the board, never its initials code (pool polish PP1)
 const sideName = (who: NameOf, roster: Player[], team: string): string =>
-  (roster.length === 1 ? who(roster[0].id, roster[0].fullName) : team);
+  (roster.length === 1 ? who(roster[0].id, roster[0].fullName)
+    : roster.length === 2 ? entryDisplayName(roster.map((p) => who(p.id, p.fullName))) ?? team : team);
 /** A credited player's name (a breaker, …) — undefined when nobody resolves it. */
 const creditName = (who: NameOf, c: CarromCredit | null | undefined): string | undefined =>
   (c ? whoName(who, c.id, c.name) : undefined);

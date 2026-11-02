@@ -25,6 +25,7 @@ import { CommentaryFeed } from '../gcc/CommentaryFeed';
 import { CompareTable } from '../gcc/CompareTable';
 import { useMask } from '../../core/disputeMask';
 import { withRosters } from '../racketNames';
+import { entryDisplayName } from '../../data/participantEntry';
 import type { NameOf } from '../../core/playerNames';
 import type { FoulKind } from './engine';
 import { other, type Side } from './balls';
@@ -41,8 +42,10 @@ import { POOL_CORE } from './core';
 import { POOL_META } from './meta';
 
 /** A singles side reads as its player (by id, for this viewer), else the entry's name. */
+// a pair reads "Aarav / Rohan" as on the board, never its initials code (pool polish PP1)
 const sideLabel = (who: NameOf, roster: Player[], team: string): string =>
-  (roster.length === 1 ? who(roster[0].id, roster[0].fullName) : team);
+  (roster.length === 1 ? who(roster[0].id, roster[0].fullName)
+    : roster.length === 2 ? entryDisplayName(roster.map((p) => who(p.id, p.fullName))) ?? team : team);
 function usePoolNames(homeRoster: Player[], awayRoster: Player[]): NameOf {
   const { nameOf } = useMask();
   return withRosters(nameOf, homeRoster, awayRoster);
@@ -362,6 +365,7 @@ export const poolPlugin: SportPlugin<PoolMatch> = {
   ...POOL_CORE,
   Scoreboard: PoolScoreboard,
   ScoringControls,
+  startAction: (state, side) => lagAction(state as PoolMatch, side, { at: Date.now() }),
   matchTabs: { Commentary: PoolCommentary, Stats: PoolStats },
   // break #14: the shooter is payload.pid — the correction list re-credits it
   creditInPayload: true,

@@ -48,7 +48,7 @@ describe('the same events as the two taps', () => {
 test('the screen: one tap starts and answers (also after "Start anyway")', () => {
   const src = readFileSync(join(import.meta.dirname, '..', 'src/screens/LiveScoringScreen.tsx'), 'utf8');
   assert.match(src, /const firstStep = startStep\(sport\)/);
-  assert.match(src, /accessibilityLabel=\{`Start the match: \$\{side === 'home' \? homeName : awayName\} serves first`\}/);
+  assert.match(src, /accessibilityLabel=\{`Start the match: \$\{side === 'home' \? homeShown : awayShown\} \$\{firstStep === 'breaks' \? 'breaks' : 'serves'\} first`\}/);
   assert.match(src, /const beginMatch = \(side\?: 'home' \| 'away'\) => \{/);
   assert.match(src, /onPress=\{\(\) => \{ setUnevenAsk\(null\); beginMatch\(unevenSide\); \}\}/);
 });

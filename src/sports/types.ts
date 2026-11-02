@@ -404,6 +404,9 @@ export interface SportPlugin<S = unknown> {
    *  = Conceded), "def." (default = Awarded), "w/o", "abandoned"; and label the
    *  End-match chips Retired / Default. Racket sports. */
   retireTerms?: boolean;
+  /** One-tap start (core/startStep 'breaks'): the sport's own first action for
+   *  the side picked on the start button (pool: who breaks rack 1, stamped). */
+  startAction?: (state: S, side: 'home' | 'away') => ScoreAction;
   /** Has the match reached its end condition? */
   isComplete: (state: S) => boolean;
   /** The decided outcome once the match is complete: the winning side (or 'draw')

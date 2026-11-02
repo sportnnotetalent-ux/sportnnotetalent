@@ -6,11 +6,13 @@
 import type { SportId } from './types';
 import type { ScoreAction } from '../sports/types';
 
-export type StartStep = 'serve' | 'clock' | 'plain';
+export type StartStep = 'serve' | 'breaks' | 'clock' | 'plain';
 const SERVE: ReadonlySet<string> = new Set(['badminton', 'tennis', 'padel', 'pickleball', 'squash', 'tabletennis']);
 const CLOCK: ReadonlySet<string> = new Set(['kabaddi']);
+/** pool: who breaks rack 1 — the sport's own stamped action (plugin.startAction) */
+const BREAKS: ReadonlySet<string> = new Set(['pool']);
 
-export const startStep = (sport: SportId): StartStep => (SERVE.has(sport) ? 'serve' : CLOCK.has(sport) ? 'clock' : 'plain');
+export const startStep = (sport: SportId): StartStep => (SERVE.has(sport) ? 'serve' : BREAKS.has(sport) ? 'breaks' : CLOCK.has(sport) ? 'clock' : 'plain');
 
 /** Exactly what the sport's own second tap logged. */
 export function startActions(step: StartStep, o: { side?: 'home' | 'away'; now: number }): ScoreAction[] {

@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-02 — Pool scotch doubles: names, headers, key, one-tap start
+
+Found while taking the founder's scotch-doubles screenshots. (1) The Stats tab labelled the pairs with initials ("AMRN"); a two-player side now reads "Aarav / Rohan" everywhere, masked like the board (pool and carrom). (2) Pool's per-player table had no short headers and cut off on phones: now RW · BP · POT · MISS · SAF · FLS. (3) The key printed a label twice when a column had no short header ("Racks won Racks won"); `boxLegend` fixes it for every sport. (4) Pool needed two taps to start; now one ("Who breaks rack 1?"), logging the same lag action. Files: `src/sports/pool/{index.tsx,stats.ts}`, `src/sports/carrom/index.tsx`, `src/sports/boxScore.ts`, `src/components/BoxScore.tsx`, `src/core/startStep.ts`, `src/sports/types.ts`, `src/screens/LiveScoringScreen.tsx`. Break-it list `docs/security/breaks/pool-doubles-polish.md`; tests `tests/pool-doubles-polish.test.mts`, `tests/sim-pool-doubles-polish.test.mts` (1,000 simulated starts). Demo-checked on a phone-sized screen.
+
 ### 2026-11-02 — Fixed: web phone sign-in on app.sportnnote.in
 
 A tester couldn't sign in with his mobile on the website: "Couldn't confirm you're not a robot". Cause: Firebase allows web phone sign-in only on its authorized domains (localhost, its own two, sportnnote.expo.app), and the L8 move of the web app to app.sportnnote.in (2026-11-01) didn't add it, so every web phone sign-in there failed Firebase's robot check since then (Android app unaffected). Read from Firebase's public getProjectConfig. The founder added app.sportnnote.in. Guard: `scripts/auth-smoke.mjs` (run before every publish) now checks Firebase lists every web host (app.sportnnote.in, sportnnote.expo.app); it failed before the fix and passes now.

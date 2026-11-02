@@ -20,7 +20,7 @@ import { SelectChip } from './ui';
 import type { SportId } from '../core/types';
 import { statSchema } from '../sports/statSchemas';
 import {
-  barShares, boxLayout, buildBoxTable, comparisonRows, leaderOf, rowLabel,
+  barShares, boxLayout, boxLegend, buildBoxTable, comparisonRows, leaderOf, rowLabel,
   type BoxScope, type BoxTable, type BoxTableRow, type CompareRow, type MatchBoxSource,
 } from '../sports/boxScore';
 import { playerLink } from '../sports/playerLink';
@@ -84,7 +84,7 @@ export function MatchBoxScore({
           <TeamTable title={homeName} color={homeColor} table={table} side="home" emptyText={source.emptyText} onPlayer={onPlayer} />
           <TeamTable title={awayName} color={awayColor} table={table} side="away" emptyText={source.emptyText} onPlayer={onPlayer} />
           <Text style={st.legend}>
-            {table.numbers ? '# shirt number · ' : ''}{table.columns.map((c) => `${c.abbr} ${c.label}`).join(' · ')}{starters ? ' · * starter' : ''}
+            {table.numbers ? '# shirt number · ' : ''}{boxLegend(table.columns)}{starters ? ' · * starter' : ''}
           </Text>
           {(source.notes?.() ?? []).map((n) => <Text key={n} style={st.legend}>{n}</Text>)}
           {hasBench && (

@@ -80,6 +80,11 @@ export interface MatchBoxSource {
   notes?: () => string[];
 }
 
+/** The key under a box: "RW Racks won · FLS Fouls"; a column with no short
+ *  header is named once, never "Pots Pots" (pool polish PP3). */
+export const boxLegend = (cols: readonly { abbr: string; label: string }[]): string =>
+  cols.map((c) => (c.abbr === c.label ? c.label : `${c.abbr} ${c.label}`)).join(' · ');
+
 /* --------------------------------- columns --------------------------------- */
 
 export interface BoxColumn {

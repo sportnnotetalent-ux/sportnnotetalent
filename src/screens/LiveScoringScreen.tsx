@@ -1114,6 +1114,8 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
   const [unevenSide, setUnevenSide] = useState<'home' | 'away' | undefined>(undefined);
   const beginMatch = (side?: 'home' | 'away') => {
     setLocalStarted(true);
+    // pool: who breaks rack 1, through the sport's own stamped action
+    if (firstStep === 'breaks' && side && plugin.startAction) { dispatch(plugin.startAction(state, side)); return; }
     for (const a of startActions(firstStep, { side, now: Date.now() })) dispatch(a);
   };
   const tryStart = (side?: 'home' | 'away') => {
@@ -1679,14 +1681,14 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
                 }} />
               </View>
             </View>
-          ) : firstStep === 'serve' ? (
+          ) : firstStep === 'serve' || (firstStep === 'breaks' && plugin.startAction) ? (
             <View style={{ gap: theme.spacing(2), alignSelf: 'stretch' }}>
-              <Text style={[st.retirePrompt, { textAlign: 'center' }]}>Who serves first?</Text>
+              <Text style={[st.retirePrompt, { textAlign: 'center' }]}>{firstStep === 'breaks' ? 'Who breaks rack 1? (the lag winner chooses)' : 'Who serves first?'}</Text>
               <View style={st.retireRow}>
                 {(['home', 'away'] as const).map((side) => (
                   <TouchableOpacity key={side} style={[st.assignBtn, { flex: 1 }]} activeOpacity={0.85} accessibilityRole="button"
-                    accessibilityLabel={`Start the match: ${side === 'home' ? homeName : awayName} serves first`} onPress={() => tryStart(side)}>
-                    <Text style={st.assignBtnText} numberOfLines={1}>{`▶ ${side === 'home' ? homeName : awayName} serves`}</Text>
+                    accessibilityLabel={`Start the match: ${side === 'home' ? homeShown : awayShown} ${firstStep === 'breaks' ? 'breaks' : 'serves'} first`} onPress={() => tryStart(side)}>
+                    <Text style={[st.assignBtnText, { textAlign: 'center' }]} numberOfLines={2}>{`▶ ${side === 'home' ? homeShown : awayShown}`}</Text>
                   </TouchableOpacity>
                 ))}
               </View>

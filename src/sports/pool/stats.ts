@@ -118,7 +118,8 @@ export const poolStats: SportStatSchema<'pool'> = {
   ],
   careerView: 'sections',
   history: ['racksWon', 'breakAndRuns', 'goldenBreaks'],
-  box: [{ columns: ['racksWon', 'ballsPotted', 'potShots', 'missShots', 'safetyShots', 'fouls'] }],
+  // short headers so the per-player table fits a phone (pool polish PP2)
+  box: [{ columns: [{ key: 'racksWon', abbr: 'RW' }, { key: 'ballsPotted', abbr: 'BP' }, { key: 'potShots', abbr: 'POT' }, { key: 'missShots', abbr: 'MISS' }, { key: 'safetyShots', abbr: 'SAF' }, 'fouls'] }],
   compare: ['racksWon', 'breakAndRuns', 'ballsPotted', 'potPct', 'safetyShots', 'fouls'],
   leaders: ['matchesWon', 'racksWon', 'winPct', 'rackPct', 'breakAndRuns', 'goldenBreaks', 'runOuts', 'potPct', 'ballsPotted'],
   mvp: { stat: 'matchesWon', tieBreak: [{ key: 'winPct', better: 'higher' }, { key: 'rackPct', better: 'higher' }] },
