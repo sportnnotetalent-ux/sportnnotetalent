@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-02 — Release: pool scotch rotation live (web, Android OTA)
+
+auth-smoke passed. Published from a clean worktree at d95ed90: web (entry `index-5e045a93`, confirmed live on app.sportnnote.in) and Android OTA groups `78856db7` (preview) and `c87e08cb` (production), runtime 1.0.0.
+
 ### 2026-11-02 — Pool scotch doubles: who shoots, who breaks, a wrong ball first
 
 From the founder's scotch-doubles 8-ball friendly. (1) New organiser setting "Partners take turns" (scotch doubles only): *every other shot* (world rules, default — the partner shoots after the break, even after a pot) or *each player plays a full turn* (a player keeps shooting while potting; the partner plays the team's next turn). Founder's decision 2026-11-02. (2) The next shooter is now a line, not a question: "Likhi shoots next (partners alternate shots) · Change". (3) A team's first break goes to whoever played first for it, then partners alternate breaks. (4) 8-ball: when only the other group's balls are tapped, the screen asks what the cue ball hit first — own group (turn passes) or theirs (wrong-ball foul, ball in hand). Files: `src/sports/pool/{meta.ts,match.ts,controls.ts,index.tsx}`. Break-it list `docs/security/breaks/pool-scotch-rotation.md`; tests `tests/pool-scotch-rotation.test.mts`, `tests/sim-pool-scotch-rotation.test.mts` (1,000 simulated matches). Demo-checked on a phone-sized screen.
