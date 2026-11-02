@@ -502,7 +502,7 @@ const ScoringControls: SportPlugin<KabaddiState>['ScoringControls'] = ({ state, 
         if (!defenders.length) return null;
         return (
           <View style={ctrl.quickRow}>
-            <Text style={ctrl.meta}>🛡️ Tackled by? (optional — credits the defender)</Text>
+            <IconText label="🛡️ Tackled by? (optional — credits the defender)" style={ctrl.meta} />
             <View style={ctrl.chips}>
               {defenders.map((p) => (
                 <SelectChip key={p.id} label={p.fullName} active={false} onPress={() => {

@@ -13,6 +13,17 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-02 — Sport-expert audit of every sport, and Batch 1 (wrong results / wrong stats)
+
+Founder ask: go sport by sport as an expert (every way a play ends → how the scorer records it → the gap, like tennis) and keep the chain Info settings → Scoring → Stats + Commentary in sync in every sport. Seven expert audits (`docs/sport-expert/`, 109 fixes, plan in `PLAN.md`). Batch 1, the P0 correctness fixes, built in parallel (one isolated branch per sport family, each with its own break-it list, failing tests, fix and simulation), merged here:
+- **Cricket:** End match with the chase alive asks No result / Draw (100+ overs) / Award (`END {v:2}`); standings read NR / D / award; a timed game's level result says "Draw". Old logs replay unchanged. `docs/security/breaks/cricket-end-result.md`.
+- **Basketball:** a new offensive foul is also a turnover (`tov: true`). **Baseball:** quick pad K swinging / K looking; `kLooking` stat. `us-sports-batch1.md`.
+- **Kabaddi:** raider chips above the one-tap row and an optional "Tackled by?" after a quick Raider out; "Raider out — no tackle" with a reason (stepped out / baulk / 30 s / cant). **Volleyball:** "Block out" → "Block fault" (same key). `court-team-batch1.md`.
+- **Carrom:** the Queen-cover answer is required to record a played-out board (ICF: winner / loser only; voice must say "queen" / "no queen"). **Snooker:** "Ball involved" sets a foul's value (max of 4, ball on, ball involved). `cue-board-batch1.md`.
+- **Football / hockey:** a saved or missed penalty (stroke) and a grid save log the shot, so saves never exceed shots on target; a red card is always recordable. `invasion-batch1.md`.
+- **Athletics:** "r Retired" keeps marks and place; high jump / pole vault refuse a try after three failures in a row. `athletics-batch1.md`.
+Demo-checked: kabaddi raider out without a tackle (A 6/7 on the mat, +1 to B). The other screens are covered by their tests and simulations, not yet seen on a device.
+
 ### 2026-11-02 — Release: tennis extras live (web, Android OTA)
 
 auth-smoke passed. Published from a clean worktree at 43d073f: web (entry `index-b668806d`, confirmed live on app.sportnnote.in) and Android OTA groups `0f8160eb` (preview) and `b5f2c078` (production), runtime 1.0.0.
