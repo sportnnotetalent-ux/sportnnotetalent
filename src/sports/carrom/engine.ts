@@ -8,7 +8,8 @@
  * target (25), or after the board limit (8) — then the higher total wins; level
  * after the limit → an extra (tie-break) board. A match is best of 1 or 3 games.
  */
-import type { ScoreSummary } from '../types';
+import type { FormatField, LiveSettings, ScoreSummary } from '../types';
+import { CARROM_META } from './meta.ts';
 import { scoreLine as lineOf, finalSummary, pointsLineScore, type LineScore } from '../scoreline.ts';
 
 export type Side = 'home' | 'away';
@@ -181,6 +182,25 @@ function readTrack(v: Record<string, unknown> | undefined, base?: CarromTrack): 
   for (const k of Object.keys(t) as (keyof CarromTrack)[]) if (!t[k]) delete t[k];
   return Object.keys(t).length ? t : undefined;
 }
+
+/** Deep wave — "Stats to track": optional detail on the board form (event
+ *  mode: the format before board 1, then SET_TRACK from the next board).
+ *  Batch 3 — each default is the format field's (meta.ts: one source), so a
+ *  new match, Info and the card's "Standard" agree; an old match reads its own. */
+const trackOn = (k: string): boolean => (CARROM_META.formatFields ?? []).find((f) => f.key === k)?.default === true;
+export const CARROM_LIVE_SETTINGS: LiveSettings<CarromState> = {
+  title: '⚙️ Stats to track',
+  hint: 'Optional extra detail. Recording a board stays the same; the extra rows appear on the board form and feed the commentary, match stats and careers.',
+  mode: 'event',
+  actionType: 'SET_TRACK',
+  fields: ([
+    { key: 'trackFouls', label: 'Fouls & dues', type: 'toggle', default: trackOn('trackFouls'), group: 'Stats to track', hint: 'Fouls by type (striker pocketed, touching, base line, arrow line, elbow crossing, thumbing) and dues, per board; doubles: who fouled' },
+    { key: 'trackBreak', label: 'Coins on the break', type: 'toggle', default: trackOn('trackBreak'), group: 'Stats to track', hint: 'How many coins the breaker pocketed with the break stroke' },
+    { key: 'trackQueenMiss', label: 'Missed Queen covers', type: 'toggle', default: trackOn('trackQueenMiss'), group: 'Stats to track', hint: 'The Queen pocketed but the cover missed (she goes back)' },
+  ] as FormatField[]),
+  read: (st) => ({ trackFouls: !!st.track?.fouls, trackBreak: !!st.track?.brk, trackQueenMiss: !!st.track?.qMiss }),
+  defaults: { trackFouls: trackOn('trackFouls'), trackBreak: trackOn('trackBreak'), trackQueenMiss: trackOn('trackQueenMiss') },
+};
 
 /** SD-68 (CR-07) — what a penalty board gives the opponent. */
 export const PENALTY_POINTS = 3;

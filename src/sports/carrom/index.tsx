@@ -18,7 +18,7 @@ import { MatchBoxScore } from '../../components/BoxScore';
 import { carromBox } from '../boxSources';
 import {
   init, reducer, result, boardValue, boardCloses, boardCredit, creditedPoints, summary, scoreLine, lineScore, standingsUnits,
-  nextBreaker, nextBreakerPlayer, boardBreakers, boardReady, queenChoices, breakerPlayers, slamFor, boardInputs, boardCorrection, FOUL_TYPES, FOUL_CHIPS, FOUL_LABEL,
+  nextBreaker, nextBreakerPlayer, boardBreakers, boardReady, queenChoices, breakerPlayers, slamFor, boardInputs, boardCorrection, FOUL_TYPES, FOUL_CHIPS, FOUL_LABEL, CARROM_LIVE_SETTINGS,
   type BoardDetail, type BoardInput, type CarromCredit, type CarromState, type EndFoul, type FoulType, type PlayerFouls, type QueenBy, type Side, type Slam,
 } from './engine';
 import { carromFeed } from './feed';
@@ -543,19 +543,7 @@ export const carromPlugin: SportPlugin<CarromState> = {
   matchTabs: { Commentary: CarromCommentary, Stats: CarromStats },
   // Deep wave — "Stats to track": optional detail on the board form (event
   // mode: the format before board 1, then SET_TRACK from the next board)
-  liveSettings: {
-    title: '⚙️ Stats to track',
-    hint: 'Optional extra detail. Recording a board stays the same; the extra rows appear on the board form and feed the commentary, match stats and careers.',
-    mode: 'event',
-    actionType: 'SET_TRACK',
-    fields: [
-      { key: 'trackFouls', label: 'Fouls & dues', type: 'toggle', default: false, group: 'Stats to track', hint: 'Fouls by type (striker pocketed, touching, base line, arrow line, elbow crossing, thumbing) and dues, per board; doubles: who fouled' },
-      { key: 'trackBreak', label: 'Coins on the break', type: 'toggle', default: false, group: 'Stats to track', hint: 'How many coins the breaker pocketed with the break stroke' },
-      { key: 'trackQueenMiss', label: 'Missed Queen covers', type: 'toggle', default: false, group: 'Stats to track', hint: 'The Queen pocketed but the cover missed (she goes back)' },
-    ],
-    read: (st) => ({ trackFouls: !!st.track?.fouls, trackBreak: !!st.track?.brk, trackQueenMiss: !!st.track?.qMiss }),
-    defaults: { trackFouls: false, trackBreak: false, trackQueenMiss: false },
-  },
+  liveSettings: CARROM_LIVE_SETTINGS,
 };
 
 const ctrl = StyleSheet.create({

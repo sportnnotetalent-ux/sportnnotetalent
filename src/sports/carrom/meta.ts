@@ -42,9 +42,13 @@ export const CARROM_META: SportMeta = {
     // created before this option has no key and keeps its score rules)
     { key: 'foulScore', label: 'ICF foul penalties in the score', type: 'toggle', default: true, advanced: true,
       hint: 'a penalty board is 3 (1 at 22+); a board ended on a foul: +1 striker, +1 foul stroke; 12 a board at most' },
-    // Deep wave — the organiser can switch the optional stats on for every match
+    // Deep wave — the organiser can switch the optional stats on for every match.
+    // Batch 3 (founder 2026-11-02, docs/security/breaks/defaults-carrom-baseball.md):
+    // coins on the break and missed Queen covers are ON for a new match (an old
+    // match has no key and keeps them off); fouls stay off — skipped rows would
+    // read as "no fouls" (false zeros) on a casual match
     { key: 'trackFouls', label: 'Track fouls & dues', type: 'toggle', default: false, advanced: true, group: 'Stats to track', hint: 'optional rows on the board form' },
-    { key: 'trackBreak', label: 'Track coins on the break', type: 'toggle', default: false, advanced: true, group: 'Stats to track' },
-    { key: 'trackQueenMiss', label: 'Track missed Queen covers', type: 'toggle', default: false, advanced: true, group: 'Stats to track' },
+    { key: 'trackBreak', label: 'Track coins on the break', type: 'toggle', default: true, advanced: true, group: 'Stats to track' },
+    { key: 'trackQueenMiss', label: 'Track missed Queen covers', type: 'toggle', default: true, advanced: true, group: 'Stats to track' },
   ],
 };
