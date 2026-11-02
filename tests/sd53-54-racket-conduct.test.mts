@@ -150,8 +150,9 @@ describe('SD-53 · table tennis cards, badminton, squash, padel, pickleball', ()
     s = SQ.reducer(s, C('away', 'game'));
     assert.deepEqual(s.games, [[11, 0]]);
     assert.equal(suggestLevel('squash', s.events, 'away'), 'point'); // steps up one each time
-    // a Let in another sport is ignored
-    assert.equal(TT.reducer(TT.init(), { type: 'LET' }).events.length, 0);
+    // a Let in a sport without one is ignored (racket-batch5 RB12: table
+    // tennis and badminton now record one; pickleball doesn't)
+    assert.equal(PB.reducer(PB.init(), { type: 'LET' }).events.length, 0);
   });
 
   test('padel: warning → point → game', () => {

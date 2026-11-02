@@ -62,6 +62,7 @@ import {
   type DepthSport, type FaultKind, type RallyBucket, type ThirdShot, type Wing,
 } from './pointDetail.ts';
 import type { LiveEvent } from './liveEvents';
+import { conductRows, isMark } from './conduct.ts';
 
 type Side = 'home' | 'away';
 const opp = (s: Side): Side => (s === 'home' ? 'away' : 'home');
@@ -94,6 +95,9 @@ export interface LetMark { side?: Side; period: number }
 
 export interface RacketView {
   sport: DepthSport; st: ServeStats; points: RPoint[]; cov: RacketCoverage; lets: LetMark[];
+  /** racket-batch5 RB5 — the conduct / timeout / let / review records and
+   *  penalty points (the Conduct & timeouts rows) */
+  marks: LiveEvent[];
   /** round 2 — the rally-length buckets this match reads with */
   buckets: RallyBucket[];
 }
@@ -112,6 +116,7 @@ export function racketView(sport: DepthSport, state: unknown, rosters: ServeRost
   const net = !!NET_WORDS[sport] && netTracked(s);
   return {
     sport, st, points, lets,
+    marks: events.filter((e) => !!e && (isMark(e) || !!e.pen)),
     cov: {
       detail: detailCoverage(sport, s),
       serve: st.serveTracked,
@@ -263,7 +268,7 @@ export function blockOf(v: RacketView, scope: Scope): ServeBlock | null {
   return scope === 'all' ? v.st.match : v.st.periods[scope - 1] ?? null;
 }
 
-export interface StatSection { id: 'serve' | 'shots' | 'decisions' | 'points' | 'games'; title: string; rows: ServeRow[] }
+export interface StatSection { id: 'serve' | 'shots' | 'decisions' | 'points' | 'games' | 'conduct'; title: string; rows: ServeRow[] }
 
 type RowAdd = {
   ratio: (key: string, label: string, n: (x: SideServe) => number, d: (x: SideServe) => number) => void;
@@ -417,6 +422,10 @@ export function keyStats(v: RacketView, scope: Scope = 'all'): StatSection[] {
   }
   if (any((x) => x.mpFaced)) g.ratio('mps', 'Match points saved', (x) => x.mpSaved, (x) => x.mpFaced);
   if (games.length) out.push({ id: 'games', title: setSport ? 'Games' : 'Game & match points', rows: games });
+
+  // racket-batch5 RB5 (racket.md C7) — conduct, timeouts, lets, video reviews
+  const conduct = conductRows(sport, v.marks, scope);
+  if (conduct.length) out.push({ id: 'conduct', title: 'Conduct & timeouts', rows: conduct });
   return out;
 }
 

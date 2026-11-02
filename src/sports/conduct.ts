@@ -147,6 +147,14 @@ export const TIME_VIOLATION: { title: string; rule: string; levels: LevelDef[] }
   levels: [L('warning', 'Warning', '⏱️', 'none'), L('fault', 'Fault · loss of serve', '⏱️', 'none'), L('point', 'Point penalty', '🟥', 'point')],
 };
 
+/** racket-batch5 RB1 — the sports with a time-violation track (padel F13:
+ *  the ITF schedule, as tennis — warning, then the server loses a serve and
+ *  the receiver a point). */
+export const TIME_SPORTS: readonly RacketSport[] = ['tennis', 'padel'];
+/** The rule a sport's time violations come from. */
+export const timeRule = (sport: RacketSport): string =>
+  (sport === 'padel' ? 'FIP Rules — time between points (the ITF time-violation schedule)' : TIME_VIOLATION.rule);
+
 export function levelDef(sport: RacketSport, level: ConductLevel, track: ConductTrack = 'code'): LevelDef | undefined {
   const list = track === 'time' ? TIME_VIOLATION.levels : CONDUCT_RULES[sport].levels;
   return list.find((l) => l.level === level);
@@ -251,7 +259,13 @@ export interface ConductOps<S> {
 
 type Base = { events: LiveEvent[]; seq: number; ended: boolean };
 
-const MARK_KINDS = new Set(['conduct', 'timeout', 'let']);
+const MARK_KINDS = new Set(['conduct', 'timeout', 'let', 'review']);
+/** racket-batch5 RB12 — the sports a Let marker is recorded in (squash: its
+ *  Let buttons; table tennis / badminton: Quick options). */
+export const LET_SPORTS: readonly RacketSport[] = ['squash', 'tabletennis', 'badminton'];
+/** racket-batch5 RB14 — PSA video review (squash): one per player per game,
+ *  kept when upheld. */
+export const REVIEWS_PER_GAME = 1;
 /** A timeline record with no score effect that a correction must keep. */
 export const isMark = (e: LiveEvent): boolean => !!e.kind && MARK_KINDS.has(e.kind);
 
@@ -341,11 +355,107 @@ export function applyRacketExtras<S extends Base>(s: S, a: ScoreAction, ops: Con
     return push(s, { ...w, icon: TIMEOUT_ICON[t], label: TIMEOUT_LABEL[t], detail: playerName, side, kind: 'timeout', tmo: t, ...(playerId ? { playerId } : {}) });
   }
   if (a.type === 'LET') {
-    if (s.ended || ops.sport !== 'squash') return s;
+    if (s.ended || !LET_SPORTS.includes(ops.sport)) return s;
     const side = a.side === 'home' || a.side === 'away' ? a.side : undefined;
     return push(s, { ...ops.where(s), icon: '🔁', label: 'Let', detail: 'rally replayed · no point', ...(side ? { side } : {}), kind: 'let' });
   }
+  if (a.type === 'REVIEW') {
+    // racket-batch5 RB14 — a PSA video review (squash): a marker, upheld or
+    // not; a side with an unsuccessful review in this game has none left
+    const side = a.side;
+    const upheld = a.payload?.upheld;
+    if (s.ended || ops.sport !== 'squash' || (side !== 'home' && side !== 'away') || typeof upheld !== 'boolean') return s;
+    const w = ops.where(s);
+    if (!upheld && reviewsLeft(s.events, side, w.game) === 0) return s;
+    const playerId = typeof a.payload?.playerId === 'string' && a.payload.playerId && a.payload.playerId.length <= 64 ? a.payload.playerId : undefined;
+    return push(s, { ...w, icon: '📺', label: `Video review · ${upheld ? 'upheld' : 'not upheld'}`, side, kind: 'review', rev: upheld ? 'upheld' : 'rejected', ...(playerId ? { playerId } : {}) });
+  }
   return null;
+}
+
+/** racket-batch5 RB14 — a side's unsuccessful video reviews left in a game. */
+export function reviewsLeft(events: LiveEvent[], side: Side, game?: number): number {
+  const used = (events ?? []).filter((e) => e.kind === 'review' && e.side === side && e.rev === 'rejected' && e.game === game).length;
+  return Math.max(0, REVIEWS_PER_GAME - used);
+}
+
+// ------------------------------------------------ the Stats-tab rows --
+
+/** One Stats-tab row (the shape of serveStats' ServeRow). */
+export interface MarkRow { key: string; label: string; home: string; away: string; hv: number; av: number }
+
+/** What each sport calls a conduct violation on the Stats tab. */
+const CONDUCT_ROW_LABEL: Record<RacketSport, string> = {
+  tennis: 'Code violations', padel: 'Code violations', tabletennis: 'Cards (misbehaviour)',
+  badminton: 'Misconduct (cards)', squash: 'Conduct penalties', pickleball: 'Technicals',
+};
+
+/**
+ * racket-batch5 RB5 / RB6 (racket.md C7 / F12) — conduct, timeouts, lets and
+ * video reviews on the Stats tab, from the log's records. Rows only for what
+ * the match recorded (never a false 0); `scope` = one game / set (the event's
+ * `game` / `set`). Per side:
+ *   cv      violations on the code track (a follow-on point is not one)
+ *   warn    of which warnings (yellow cards)
+ *   tv      time violations (tennis, padel)
+ *   penPts  penalty points conceded: every point a penalty gave the opponent
+ *           (a game penalty's and a 2-point card's follow-on points too)
+ *   tmo / med / toilet   timeouts, medical timeouts, toilet breaks
+ *   lets    table tennis / badminton lets (squash has its own row)
+ *   rev     squash video reviews (how many upheld)
+ * Marks that don't name a side (or a known timeout) are left out.
+ */
+export function conductRows(sport: RacketSport, events: LiveEvent[] | null | undefined, scope: 'all' | number = 'all'): MarkRow[] {
+  const isSide = (x: unknown): x is Side => x === 'home' || x === 'away';
+  const z = () => ({ home: 0, away: 0 });
+  const c = { cv: z(), warn: z(), tv: z(), pen: z(), tmo: z(), med: z(), toilet: z(), lets: z(), rev: z(), up: z() };
+  let letsAll = 0;
+  for (const e of events ?? []) {
+    if (!e || typeof e !== 'object') continue;
+    if (scope !== 'all' && (e.game ?? e.set) !== scope) continue;
+    const p = e.pen;
+    if (p && typeof p === 'object' && isSide(p.by)) {
+      if (e.kind === 'point') c.pen[p.by] += 1;
+      if (!p.part) {
+        if ((p.track ?? 'code') === 'time') c.tv[p.by] += 1;
+        else {
+          c.cv[p.by] += 1;
+          if (p.level === 'warning') c.warn[p.by] += 1;
+        }
+      }
+      continue;
+    }
+    if (e.kind === 'timeout' && isSide(e.side) && (e.tmo === 'timeout' || e.tmo === 'medical' || e.tmo === 'toilet')) {
+      c[e.tmo === 'timeout' ? 'tmo' : e.tmo === 'medical' ? 'med' : 'toilet'][e.side] += 1;
+    } else if (e.kind === 'let' && sport !== 'squash') {
+      letsAll += 1;
+      if (isSide(e.side)) c.lets[e.side] += 1;
+    } else if (e.kind === 'review' && isSide(e.side) && (e.rev === 'upheld' || e.rev === 'rejected')) {
+      c.rev[e.side] += 1;
+      if (e.rev === 'upheld') c.up[e.side] += 1;
+    }
+  }
+  const rows: MarkRow[] = [];
+  const count = (key: string, label: string, v: { home: number; away: number }) => {
+    if (v.home + v.away > 0) rows.push({ key, label, home: String(v.home), away: String(v.away), hv: v.home, av: v.away });
+  };
+  const cards = sport === 'tabletennis' || sport === 'badminton';
+  count('cv', CONDUCT_ROW_LABEL[sport], c.cv);
+  count('warn', cards ? 'Yellow cards (warnings)' : 'Warnings', c.warn);
+  count('tv', 'Time violations', c.tv);
+  count('penPts', 'Penalty points conceded', c.pen);
+  count('tmo', 'Timeouts', c.tmo);
+  count('med', 'Medical timeouts', c.med);
+  count('toilet', 'Toilet breaks', c.toilet);
+  if (letsAll) {
+    const none = letsAll - c.lets.home - c.lets.away;
+    rows.push({ key: 'lets', label: none ? `Lets (${letsAll} in all${none === letsAll ? '' : ` · ${none} not named`})` : 'Lets', home: String(c.lets.home), away: String(c.lets.away), hv: c.lets.home, av: c.lets.away });
+  }
+  if (c.rev.home + c.rev.away > 0) {
+    const t = (x: Side) => (c.rev[x] ? `${c.rev[x]} (${c.up[x]} upheld)` : '0');
+    rows.push({ key: 'rev', label: 'Video reviews', home: t('home'), away: t('away'), hv: c.rev.home, av: c.rev.away });
+  }
+  return rows;
 }
 
 // ----------------------------------------- corrections keep the records --
@@ -399,7 +509,7 @@ export const withStamps = <S extends Base>(core: (s: S, a: ScoreAction) => S) =>
 
 /** The scorer clock on a racket action (the controls add it). */
 export const stamped = (a: ScoreAction, now = Date.now()): ScoreAction => ({ ...a, payload: { ...(a.payload ?? {}), at: now } });
-const STAMPED = new Set(['POINT', 'ACE', 'CONDUCT', 'TIMEOUT', 'LET']);
+const STAMPED = new Set(['POINT', 'ACE', 'CONDUCT', 'TIMEOUT', 'LET', 'REVIEW']);
 /** A dispatch that stamps the scoring steps (POINT / ACE / CONDUCT / TIMEOUT / LET). */
 export const stampDispatch = (dispatch: (a: ScoreAction) => void) => (a: ScoreAction) => dispatch(STAMPED.has(a.type) && a.payload?.at == null ? stamped(a) : a);
 

@@ -185,7 +185,8 @@ export function PointDetailRow({
       {sel?.strokes && pd && (pd.how === 'ue' || pd.how === 'fe' || pd.how === 'sf') && (
         <View style={st.chips}>
           <Text style={[st.meta, st.rowLabel]}>{pd.how === 'sf' ? 'Fault:' : 'Error:'}</Text>
-          {sel.strokes.map((k) => (
+          {/* racket-batch5 RB9: the types offered (an older type only on its own point) */}
+          {(sel.offer ?? sel.strokes).concat(et && sel.offer && !sel.offer.includes(et) && sel.strokes.includes(et) ? [et] : []).map((k) => (
             <SelectChip key={k} label={STROKES[k]?.chip ?? k} active={et === k} onPress={() => setType(k)} />
           ))}
         </View>

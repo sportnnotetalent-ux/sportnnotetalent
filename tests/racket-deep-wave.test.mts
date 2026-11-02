@@ -59,14 +59,16 @@ describe('deep wave · the model (wing + each sport\'s shots)', () => {
     }
     // round 2: + jump smash and block (founder)
     assert.deepEqual(RACKET_SHOTS.badminton.map((d) => d.id), ['smash', 'jumpSmash', 'drop', 'clear', 'netShot', 'netKill', 'drive', 'lift', 'push', 'block', 'serve']);
-    assert.deepEqual(RACKET_SHOTS.tabletennis.map((d) => d.id), ['receive', 'flick', 'push', 'chop', 'loop', 'block', 'smash', 'lob']);
-    assert.deepEqual(RACKET_SHOTS.squash.map((d) => d.id), ['drive', 'drop', 'boast', 'volley', 'lob', 'kill', 'nick']);
+    // racket-batch5: + edge / net cord (TT-b), + serve (squash, F11)
+    assert.deepEqual(RACKET_SHOTS.tabletennis.map((d) => d.id), ['receive', 'flick', 'push', 'chop', 'loop', 'block', 'smash', 'lob', 'edge']);
+    assert.deepEqual(RACKET_SHOTS.squash.map((d) => d.id), ['drive', 'drop', 'boast', 'volley', 'lob', 'kill', 'nick', 'serve']);
     assert.ok(['bandeja', 'vibora', 'x3', 'chiquita', 'bajada', 'wall'].every((k) => RACKET_SHOTS.padel.some((d) => d.id === k)));
     assert.ok(['dink', 'drop', 'reset', 'erne', 'atp'].every((k) => RACKET_SHOTS.pickleball.some((d) => d.id === k)));
     // service-fault types (BWF Law 9.1, ITTF, WSF, USA Pickleball)
-    assert.deepEqual(DETAIL_HOWS.badminton.find((h) => h.how === 'sf')!.strokes, ['high', 'foot', 'net', 'out', 'fault']);
+    // racket-batch5 RB9: new types offered; the old ids still read (last)
+    assert.deepEqual(DETAIL_HOWS.badminton.find((h) => h.how === 'sf')!.strokes, ['high', 'foot', 'net', 'out', 'balk', 'fault']);
     assert.deepEqual(DETAIL_HOWS.tabletennis.find((h) => h.how === 'sf')!.strokes, ['net', 'out', 'illegal']);
-    assert.deepEqual(DETAIL_HOWS.squash.find((h) => h.how === 'sf')!.strokes, ['short', 'foot', 'out']);
+    assert.deepEqual(DETAIL_HOWS.squash.find((h) => h.how === 'sf')!.strokes, ['low', 'shortLine', 'sideWall', 'foot', 'out', 'short']);
   });
   test('SD-107 winner stroke ids are normalised on read to the same shot (or wing) — never rewritten', () => {
     assert.deepEqual(shotOf('badminton', { how: 'winner', stroke: 'netKill' }), { shot: 'netKill' });

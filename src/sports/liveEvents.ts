@@ -77,6 +77,8 @@ export interface LiveEvent {
   vs?: import('./volleyball/sanctions').VbSanction;
   /** SD-54 — racket timeouts (`kind: 'timeout'`): which one. */
   tmo?: 'timeout' | 'medical' | 'toilet';
+  /** racket-batch5 RB14 — a squash video review (`kind: 'review'`): its outcome. */
+  rev?: 'upheld' | 'rejected';
   /** SD-54 — when the step was logged (ms, from the action's `payload.at`);
    *  match / game durations are derived from it. Absent on older events. */
   at?: number;

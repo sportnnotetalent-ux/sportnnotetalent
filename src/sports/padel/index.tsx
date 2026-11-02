@@ -212,7 +212,8 @@ export const padelPlugin: SportPlugin<PadelState> = {
   summary: (s) => withDuration(summary(s), s.events, s.ended),
   scoreLine,
   // SD-53 — FIP code violations (Quick options)
-  QuickOptions: makeRacketQuickOptions('padel'),
+  // racket-batch5 RB1 — time violations need the server (fault vs point)
+  QuickOptions: makeRacketQuickOptions('padel', { serverOf: (st) => serveInfo(st as PadelState).side }),
   // SD-20: the line score (board grid, "6-4, 3-2 ret.", [10-7]) + FIP/ITF result marks.
   lineScore,
   Scoreboard: PadelScoreboard,
