@@ -30,6 +30,23 @@ export function manualResultLine(r: MatchResult, home: string, away: string, opt
 /** Abandoned / no result: nobody won, and it doesn't count as a normal game. */
 export const isNoResult = (r?: MatchResult | null) => !!r && (r.kind === 'no_result' || r.kind === 'abandoned');
 
+/** A sport plugin's `result` (cricket's early end, audit C1 — `END { v: 2 }`). */
+type StateRes = { winner: 'home' | 'away' | 'draw'; home: number; away: number; kind?: 'no_result' | 'draw' | 'awarded'; reason?: string };
+
+/** The result a scoring state itself carries (cricket's no result / draw /
+ *  award), read like one closed by hand so the tables and players' W/D/NR
+ *  agree. Its unfinished runs and overs stay out of NRR. Derived on read,
+ *  never stored: an Undo of the END takes it away. Undefined = a played result. */
+export function stateResult(res: StateRes | null | undefined, at = ''): MatchResult | undefined {
+  if (!res?.kind) return undefined;
+  const winner = res.kind === 'awarded' && res.winner !== 'draw' ? { winner: res.winner } : {};
+  return { kind: res.kind, ...winner, reason: res.reason ?? '', countNrr: false, at };
+}
+
+/** The `winner` column for a derived result: empty for a no result. */
+export const savedWinner = (res: StateRes | null | undefined): 'home' | 'away' | 'draw' | null =>
+  !res || res.kind === 'no_result' ? null : res.winner;
+
 /** What a live-state snapshot may write to a match. A match closed by hand keeps
  *  its result: it stays completed (never back to live) and its winner / won
  *  flags are not re-derived — whatever `completed` the caller says (a #05

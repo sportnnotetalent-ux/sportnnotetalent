@@ -19,7 +19,7 @@ import { canManageTeamLocal } from '../core/teamPermissions';
 import { editAccess, type EditAccess } from '../core/playerEditAccess';
 import { parseTournamentToken } from '../core/tournamentInvite';
 import { getDeviceId } from '../core/deviceId';
-import { snapshotOutcome } from '../core/matchResult';
+import { snapshotOutcome, stateResult, savedWinner } from '../core/matchResult';
 import type { LiveSummary } from '../core/liveSummary';
 import { followDisputes } from './eventLog';
 import { planStatSync, applyStatWrites, onlyKeys, changedKeys, type MatchTotals } from './statSync';
@@ -80,7 +80,7 @@ import { joinBlockReason } from '../core/registration';
 import { getSport, getSportMeta, loadSport, loadSports } from '../sports/registry';
 import { exposeGlobal } from '../core/devGlobals';
 import { replayLog } from '../sports/amend';
-import type { StatTotalsContext } from '../sports/types';
+import type { StatTotalsContext, SportPlugin } from '../sports/types';
 import { mergeMatchConfig } from '../core/matchConfig';
 import { seriesLegFormat, readSeriesMeta, deriveSeries, aggregatePriorFor, type SeriesFormat } from './series';
 import { aggregateLegFormat } from './matchFormat';
@@ -238,7 +238,7 @@ function loadMatchSports(ms: readonly { sport: string; state?: unknown; status?:
 /** A completed match's result, derived from its stored sport state via the sport
  *  plugin — the source of truth for winner + score. Defensive: a malformed state
  *  must never break a match read (returns null). Null while in progress/undecided. */
-function deriveResult(sport: string, state: unknown): { winner: 'home' | 'away' | 'draw'; home: number; away: number } | null {
+function deriveResult(sport: string, state: unknown): ReturnType<NonNullable<SportPlugin<unknown>['result']>> | null {
   if (!state) return null;
   try { return getSport(sport as SportId).result?.(state as never) ?? null; } catch { return null; }
 }
@@ -247,6 +247,8 @@ function toMatch(r: MatchRow): Match {
   const home = one(r.home_team);
   const away = one(r.away_team);
   const res = deriveResult(r.sport, r.state);
+  // Audit C1: a result the state carries (cricket's no result / draw / award).
+  const result = r.result ?? stateResult(res, r.updated_at ?? '');
   return {
     id: r.id,
     tournamentId: r.tournament_id,
@@ -264,9 +266,9 @@ function toMatch(r: MatchRow): Match {
     // (seed/archived matches with a winner but no state). Score has no column —
     // it's always derived from state, so for/against works in standings.
     // A result closed by hand (abandoned, conceded…) beats what the state derives.
-    winner: r.result ? (r.result.winner ?? (r.result.kind === 'draw' || r.result.kind === 'tie' ? 'draw' : undefined)) : res?.winner ?? r.winner ?? undefined,
+    winner: result ? (result.winner ?? (result.kind === 'draw' || result.kind === 'tie' ? 'draw' : undefined)) : res?.winner ?? r.winner ?? undefined,
     score: r.result?.score ?? (res ? { home: res.home, away: res.away } : undefined),
-    result: r.result ?? undefined,
+    result: result ?? undefined,
     walkover: (r.format as Record<string, unknown> | null)?.__walkover === true,
     onBreak: readBreak(r.format as Record<string, unknown> | null),
     hostIds: r.host_ids ?? undefined,
@@ -3072,9 +3074,9 @@ export async function updateMatchSnapshot(matchId: string, state: object, comple
     m.status = out.status;
     if (out.rederive) {
       const res = deriveResult(m.sport, state);
-      m.winner = res?.winner;
+      m.winner = savedWinner(res) ?? undefined;
       m.score = res ? { home: res.home, away: res.away } : undefined;
-      const winTeam = res && res.winner !== 'draw' ? (res.winner === 'home' ? m.homeTeam : m.awayTeam) : null;
+      const winTeam = res && res.winner !== 'draw' && res.kind !== 'no_result' ? (res.winner === 'home' ? m.homeTeam : m.awayTeam) : null;
       const winRoster = winTeam
         ? (winTeam.roster && winTeam.roster.length ? winTeam.roster : demo.players.filter((p) => p.houseName === winTeam.name).map((p) => p.id))
         : [];
@@ -3103,7 +3105,7 @@ export async function updateMatchSnapshot(matchId: string, state: object, comple
   if (completed) {
     const { data } = await supabase.from('matches').select('sport, home_team_id, away_team_id').eq('id', matchId).single();
     meta = (data as MatchMeta | null) ?? null;
-    winner = meta ? (deriveResult(meta.sport, state)?.winner ?? null) : null;
+    winner = meta ? savedWinner(deriveResult(meta.sport, state)) : null;
   }
   await updateMatchRow(matchId, { state, status: completed ? 'completed' : 'live', winner, updated_at: new Date().toISOString(), ...summaryCol(summary) });
 

@@ -203,6 +203,10 @@ export interface CricketState {
    *  DLS appendix). Set only by a `v: 2` RAIN_STOP (new action — no older log
    *  has it, REVIEW Decision 8). `par` = the score that ties; above it wins. */
   rainStop?: { par: number; balls: number; wickets: number; minOvers: number; byHand?: true };
+  /** Audit C1 — how a match ended early with the chase unfinished (`END
+   *  { v: 2, how }`): no result, a draw (timed game only) or awarded to `side`.
+   *  Absent on a plain `END` (every older log), which keeps the par margin. */
+  endHow?: { how: 'nr' | 'draw' | 'award'; side?: 'home' | 'away'; reason?: string };
   /** SD-133 — "Innings ended by rain" in innings 1 (`RAIN_END_INNINGS`, v:2):
    *  the balls / wickets when play stopped. The rest of the innings' resources
    *  (incl. the lost part-over) were booked to `r1Lost`. */
@@ -1859,8 +1863,13 @@ const step = (s: CricketState, a: ScoreAction): CricketState => {
     case 'END_INNINGS':
       if (s.innings === 1) return { ...s, innings: 2, battingSide: other(bat), ...chaseStart(s, cur.runs), thisOver: [], ballsInOver: 0, ...clearCrease };
       return { ...s, ended: true };
-    case 'END':
+    case 'END': {
+      // Audit C1 — `v: 2` says how an unfinished match ended. It never replaces
+      // a decided result (ended, a tie awaiting the call, a Super Over), and a
+      // draw needs a timed game. Bad payloads change nothing.
+      if (a.payload?.v !== undefined) return endEarly(s, a.payload);
       return { ...s, ended: true };
+    }
     default:
       return s;
   }
@@ -2038,6 +2047,39 @@ export function snapshotState(s: CricketState): CricketState {
   return { ...rest, superOver: { ...rest.superOver, state: inner } };
 }
 
+/** A timed game (Test / multi-day, 100+ overs) is drawn, not tied. */
+export const drawWord = (s: Pick<CricketState, 'oversLimit'>): 'Draw' | 'Tie' => (s.oversLimit >= 100 ? 'Draw' : 'Tie');
+
+/** Audit C1 — the chase can still go on: innings 2, target not reached,
+ *  wickets and overs left, no tie call or Super Over. */
+export function chaseAlive(s: CricketState): boolean {
+  if (s.ended || s.pendingTie || s.superOver || s.innings !== 2 || s.target === undefined) return false;
+  const c = s.scores[s.battingSide];
+  return c.runs < s.target && c.wickets < s.wicketsLimit && c.balls < s.oversLimit * s.ballsPerOver;
+}
+
+/** `END { v: 2, how, side?, reason? }` — see the reducer's END. */
+function endEarly(s: CricketState, p: Record<string, unknown>): CricketState {
+  if (p.v !== 2 || s.ended || s.pendingTie || s.superOver || s.isSuperOver) return s;
+  const how = p.how;
+  if (how !== 'nr' && how !== 'draw' && how !== 'award') return s;
+  if (how === 'draw' && drawWord(s) !== 'Draw') return s;
+  const side = p.side === 'home' || p.side === 'away' ? p.side : undefined;
+  if (how === 'award' && !side) return s;
+  const reason = typeof p.reason === 'string' ? p.reason.trim().slice(0, 120) : '';
+  return { ...s, ended: true, endHow: { how, ...(how === 'award' ? { side } : {}), ...(reason ? { reason } : {}) } };
+}
+
+/** Audit C1 — the result kind an early end carries, for the data layer
+ *  (`plugin.result`): standings, players' W/D/NR. Undefined = a played result. */
+export function endResult(s: CricketState): { kind: 'no_result' | 'draw' | 'awarded'; winner?: 'home' | 'away'; reason?: string } | undefined {
+  const e = s.endHow;
+  if (!e) return undefined;
+  const reason = e.reason ? { reason: e.reason } : {};
+  if (e.how === 'award') return { kind: 'awarded', winner: e.side, ...reason };
+  return { kind: e.how === 'nr' ? 'no_result' : 'draw', ...reason };
+}
+
 /** Winner of a completed Super-Over round (more runs wins); null = still level. */
 function superOverWinner(inn: CricketState): 'home' | 'away' | null {
   if (inn.scores.home.runs > inn.scores.away.runs) return 'home';
@@ -2103,6 +2145,13 @@ export function outcome(s: CricketState): { winner: 'home' | 'away' | null; text
     const margin = Math.abs(inn.scores.home.runs - inn.scores.away.runs);
     const roundTag = s.superOver.round > 1 ? ` (Super Over ${s.superOver.round})` : '';
     return { winner: so, text: `Won the Super Over by ${margin} run${margin === 1 ? '' : 's'}${roundTag}` };
+  }
+  // Audit C1 — ended early by the scorer's call (`END { v: 2 }`).
+  if (s.endHow) {
+    const e = s.endHow;
+    const why = e.reason ? ` — ${e.reason}` : '';
+    if (e.how === 'award') return { winner: e.side ?? null, text: `Awarded the match${why}` };
+    return { winner: null, text: `${e.how === 'nr' ? 'No result' : 'Match drawn'}${why}` };
   }
   const chaseSide = s.battingSide;
   // SD-121 — rain stopped the chase after the minimum overs: decided on par.

@@ -1230,7 +1230,9 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
   // End a match by hand (parity #04): win / conceded / draw|tie / no result /
   // abandoned, with a required reason. Knockouts must produce a winner.
   const knockout = isEliminationStage(meta.stage);
-  const drawLabel = plugin.manualEnd?.drawLabel ?? 'Draw';
+  // Cricket: "Tie" in limited overs, "Draw" in a timed game (audit C1).
+  const dl = plugin.manualEnd?.drawLabel;
+  const drawLabel = (typeof dl === 'function' ? dl(state) : dl) ?? 'Draw';
   const endKinds: { kind: ResultKind; label: string }[] = [
     // "Awarded" — the result line reads "X awarded the match" (manualResultLine).
     // SD-20: racket sports use the ITF / BWF words — Retired (= conceded, "ret.")
