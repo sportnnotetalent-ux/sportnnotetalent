@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-02 — Release: pool doubles polish live (web, Android OTA)
+
+auth-smoke passed. Published from a clean worktree at fb4be4e: web (entry `index-7f061de3`, confirmed live on app.sportnnote.in) and Android OTA groups `836f27b2` (preview) and `51766157` (production), runtime 1.0.0.
+
 ### 2026-11-02 — Pool scotch doubles: names, headers, key, one-tap start
 
 Found while taking the founder's scotch-doubles screenshots. (1) The Stats tab labelled the pairs with initials ("AMRN"); a two-player side now reads "Aarav / Rohan" everywhere, masked like the board (pool and carrom). (2) Pool's per-player table had no short headers and cut off on phones: now RW · BP · POT · MISS · SAF · FLS. (3) The key printed a label twice when a column had no short header ("Racks won Racks won"); `boxLegend` fixes it for every sport. (4) Pool needed two taps to start; now one ("Who breaks rack 1?"), logging the same lag action. Files: `src/sports/pool/{index.tsx,stats.ts}`, `src/sports/carrom/index.tsx`, `src/sports/boxScore.ts`, `src/components/BoxScore.tsx`, `src/core/startStep.ts`, `src/sports/types.ts`, `src/screens/LiveScoringScreen.tsx`. Break-it list `docs/security/breaks/pool-doubles-polish.md`; tests `tests/pool-doubles-polish.test.mts`, `tests/sim-pool-doubles-polish.test.mts` (1,000 simulated starts). Demo-checked on a phone-sized screen.
