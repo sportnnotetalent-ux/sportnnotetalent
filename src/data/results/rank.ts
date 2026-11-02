@@ -49,6 +49,8 @@ export function performanceOf(e: ResultEntry, def: DisciplineDef, upToAttempt?: 
   const decider = r.decider != null ? -r.decider : undefined;
   const status = effectiveStatus(r, def);
   const flags: ResultFlag[] = [];
+  // a field athlete who retired keeps their marks and place, shown "r"
+  if (r.retired && (def.capture === 'attempts' || def.capture === 'heights')) flags.push('r');
   switch (def.capture) {
     case 'attempts': {
       const s = summarizeAttempts(r.attempts, def, upToAttempt, !!handLegal);

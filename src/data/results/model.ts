@@ -500,6 +500,11 @@ export interface EntryResult {
   rc?: number;
   /** SD-93 combined events: this athlete was warned for the race's one allowed false start (TR 39.8.3) */
   fsWarn?: boolean;
+  /** Field events: retired ("r", World Athletics notation) — stopped competing
+   *  but keeps the marks made and the place they earn; no further trials. Where
+   *  they stopped: after trial `afterRound` (LJ / TJ / throws) or at bar
+   *  `atHeight` (HJ / PV). Unlike WD (unranked), the row is still ranked. */
+  retired?: { afterRound?: number; atHeight?: number };
   /** SD-128: scratched from the start list (status DNS) — why and when; the
    *  lane stays empty and the entrant can't go on to a later round */
   scratch?: { reason: string; at: string };
@@ -542,7 +547,7 @@ export interface ResultEntry {
 }
 
 /** Markers shown next to a result. */
-export type ResultFlag = 'Q' | 'q' | 'PB' | '=PB' | 'SB' | '=SB' | 'MR' | '=MR' | 'SR' | '=SR' | 'w' | 'h' | 'JO' | 'SO';
+export type ResultFlag = 'Q' | 'q' | 'PB' | '=PB' | 'SB' | '=SB' | 'MR' | '=MR' | 'SR' | '=SR' | 'w' | 'h' | 'JO' | 'SO' | 'r';
 
 export interface RankedEntry {
   id: string;
