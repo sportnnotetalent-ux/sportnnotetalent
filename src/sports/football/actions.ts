@@ -78,7 +78,7 @@ export const sinBinAction = (side: Side, p: Who, minutes: number | undefined, o:
 });
 
 /** Deep wave detail on a stat (shot zone / big chance / woodwork, a key pass's shot). */
-export type StatDetail = { onTarget?: boolean; complete?: boolean; blocked?: boolean; zone?: ShotZone; bigChance?: boolean; woodwork?: boolean; ref?: number };
+export type StatDetail = { onTarget?: boolean; complete?: boolean; blocked?: boolean; zone?: ShotZone; bigChance?: boolean; woodwork?: boolean; ref?: number; pen?: boolean };
 
 /** A granular stat (shot, tackle, corner…), by `player` when one is named.
  *  `possSide` = who has the ball after it; `at` = the device clock. */
@@ -108,6 +108,36 @@ export function afterTeamPick(kind: StatKind | 'card', hasPlayers: boolean): 'pl
   if (hasPlayers || kind === 'card') return 'player';
   return kind === 'shot' || kind === 'pass' ? 'detail' : 'record';
 }
+
+/** Invasion batch 1 (audit fix 1): a penalty not scored — the taker's miss,
+ *  the keeper's save (saved, when the keeper is known) and the attempt as a
+ *  shot (saved = on target, missed = off), flagged `pen` so the commentary
+ *  keeps one "Penalty saved / missed" line. A scored penalty is a goal (a shot
+ *  on target already). No taker = the team's shot. */
+export function penaltyMissActions(side: Side, outcome: 'saved' | 'missed', taker: Who | null | undefined, keeper: Who | null | undefined, o: { at?: number; tracked?: string[] } = {}): ScoreAction[] {
+  const saved = outcome === 'saved';
+  return [
+    statAction('penaltyMissed', side, taker, {}, { at: o.at, tracked: o.tracked }),
+    ...(saved && keeper ? [statAction('save', opp(side), keeper, {}, { possSide: opp(side), at: o.at, tracked: o.tracked })] : []),
+    statAction('shot', side, taker, { onTarget: saved, pen: true }, { at: o.at, tracked: o.tracked }),
+  ];
+}
+
+/** Invasion batch 1 (audit fix 1): the grid's 🧤 Save — the other side's shot
+ *  on target first (the shooter optional: "Not sure" = the team's), then the
+ *  keeper's save, so saves never outrun the shots on target they stopped.
+ *  `edit` (re-entering a save from the timeline) logs the save only: its shot
+ *  is still on the log. */
+export function gridSaveActions(side: Side, keeper: Who | null | undefined, shooter: Who | null | undefined, o: { at?: number; tracked?: string[]; edit?: boolean } = {}): ScoreAction[] {
+  const save = statAction('save', side, keeper, {}, { possSide: side, at: o.at, tracked: o.tracked });
+  return o.edit ? [save] : [statAction('shot', opp(side), shooter, { onTarget: true }, { at: o.at, tracked: o.tracked }), save];
+}
+
+/** Invasion batch 1 (audit fix 3): what the Card button offers. A red card
+ *  changes who is on the pitch, so it is always recordable; "Cards" off hides
+ *  only the yellows. */
+export const cardChoices = (cardsTracked: boolean): { icon: string; label: string; colours: ('yellow' | 'red')[] } =>
+  (cardsTracked ? { icon: '🟨', label: 'Card', colours: ['yellow', 'red'] } : { icon: '🟥', label: 'Red card', colours: ['red'] });
 
 /** A foul by `fouler` — and the fouled player (`victim`, optional), by id. */
 export const foulAction = (side: Side, fouler: Who, victim: Who | null | undefined, o: { at?: number; tracked?: string[] } = {}): ScoreAction => ({

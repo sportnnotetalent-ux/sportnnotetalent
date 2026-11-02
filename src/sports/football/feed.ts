@@ -149,6 +149,8 @@ export function footballFeed(s0: FootballState, names: Names, nameOf: NameOf = l
   const absorbed = new Set<number>();
   const extra = new Map<number, { saver?: string; blocker?: string; passer?: string }>();
   for (const st of stats) {
+    // a penalty not scored is also a shot: its "Penalty saved / missed" line says it
+    if (st.kind === 'shot' && st.pen) { absorbed.add(st.id); continue; }
     if (st.kind !== 'shot' && st.kind !== 'penaltyMissed') continue;
     const next = byId.get(st.id + 1);
     const x: { saver?: string; blocker?: string; passer?: string } = {};
