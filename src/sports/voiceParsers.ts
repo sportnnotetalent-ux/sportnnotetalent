@@ -364,7 +364,8 @@ export function handballVoiceEnds(actions: ScoreAction[], state: unknown): Voice
 /* ---------------------------------- carrom ---------------------------------- */
 
 /** Carrom: "board home 5" / "Rao 3 queen" (the opponent's coins left, the
- *  Queen covered by the board winner), "… slam" (white / black from who
+ *  Queen covered by the board winner; ICF: "… no queen" = the loser covered
+ *  it, and one of the two must be said), "… slam" (white / black from who
  *  broke), "penalty home" (3 to that side). Coins must be said — no default
  *  (as the buttons, SD-116). The board winner's player(s) are credited as
  *  the buttons do. */
@@ -380,7 +381,11 @@ export function carromVoice(text: string, ctx: VoiceContext): ScoreAction[] | nu
   const nums = numbersFromText(q.replace(/\bqueen\b/g, ''));
   const coins = nums.find((n) => n >= 0 && n <= 9);
   if (!penalty && coins == null) return null;
-  const queen = !penalty && /\bqueen\b/.test(q) && !/\bno queen\b|\bwithout (the )?queen\b/.test(q);
+  const noQueen = /\bno queen\b|\bwithout (the )?queen\b/.test(q);
+  const queen = !penalty && /\bqueen\b/.test(q) && !noQueen;
+  // ICF: the Queen is always covered before a board ends (cue-board batch 1) —
+  // say "queen" (the winner covered it) or "no queen" (the loser did), as the buttons ask
+  if (s.icf && !penalty && !queen && !noQueen) return null;
   const breaker = nextBreaker(s);
   const slam = !penalty && /\bslam\b/.test(q)
     ? (/\bwhite\b/.test(q) ? 'white' : /\bblack\b/.test(q) ? 'black' : slamFor(side, breaker))
@@ -395,7 +400,7 @@ export function carromVoice(text: string, ctx: VoiceContext): ScoreAction[] | nu
   const attr = (p: Player) => boardCredit(p, credit, { penalty, queen });
   return [{
     type: 'BOARD', side,
-    payload: penalty ? { coins: 0, queen: false, penalty: true } : { coins, queen, ...(queen ? { queenBy: 'winner' } : {}), ...(slam ? { slam } : {}) },
+    payload: penalty ? { coins: 0, queen: false, penalty: true } : { coins, queen, ...(queen ? { queenBy: 'winner' } : s.icf ? { queenBy: 'loser' } : {}), ...(slam ? { slam } : {}) },
     attribution: players[0] ? attr(players[0]) : undefined,
     attribution2: players[1] ? attr(players[1]) : undefined,
   }];

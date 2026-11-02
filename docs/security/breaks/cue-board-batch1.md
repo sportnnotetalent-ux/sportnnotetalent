@@ -27,3 +27,6 @@
 `tests/cue-board-batch1.test.mts` (10) and `tests/sim-cue-board-batch1.test.mts` (800 boards, 600 fouls). Carrom, snooker and every test importing these plugins: 158 tests, 0 failing; `tsc --noEmit` clean. Not checked on a device or in the browser.
 
 Files: `src/sports/carrom/engine.ts`, `src/sports/carrom/index.tsx`, `src/sports/snooker/controls.ts`, `src/sports/snooker/index.tsx`. No shared files changed.
+
+## Follow-on fixed by the lead (2026-11-02)
+- **Voice could still record an ICF board without the Queen answer.** **Fixed:** under ICF rules a spoken board must say "queen" (the winner covered it) or "no queen" (the loser did), else it is not taken; other rules unchanged. Test: `tests/carrom-voice-queen.test.mts`.
