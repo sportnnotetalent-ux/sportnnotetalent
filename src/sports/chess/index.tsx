@@ -13,11 +13,12 @@ import { confirmCopy } from '../../core/matchSafety';
 import type { Attribution, SportPlugin } from '../types';
 import { Scoreboard } from '../../components/Scoreboard';
 import {
-  init, reducer, points, resultString, resultSentence, scoreFor, DECISIVE, DRAWN, METHOD_LABEL, isForfeit, isDoubleForfeit, clockText, parseClock,
+  init, reducer, points, resultString, resultSentence, scoreFor, METHOD_LABEL, isForfeit, isDoubleForfeit, clockText, parseClock,
   DEFAULT_KO_PLAN, koPhases, koPoints, koStatus, koPhaseText, KO_PHASE_LABEL,
   type ChessMethod, type ChessState, type Side, type KoState,
 } from './engine';
 import { chessResultCredit } from './stats';
+import { howChoices, sentHow } from './how';
 import { listMoves, openingOf, boardResult } from './engine';
 import { MovesPanel } from './MovesPanel';
 import { chessFeed } from './gameFeed';
@@ -75,6 +76,9 @@ const ScoringControls: SportPlugin<ChessState>['ScoringControls'] = ({ state, di
   const [whiteDraft, setWhiteDraft] = useState<Side | null>(null);
   const [unlockColour, setUnlockColour] = useState(false);
   const [method, setMethod] = useState<ChessMethod | null>(null);
+  // batch 5: "How" is pre-set (no extra tap); "Not recorded" sends none; More… shows the rarer methods
+  const [noHow, setNoHow] = useState(false);
+  const [moreHow, setMoreHow] = useState(false);
   const [moves, setMoves] = useState('');
   // SD-117c — optional clock times left (typed "4:07", "1:05:30" or minutes)
   const [clockW, setClockW] = useState('');
@@ -135,9 +139,10 @@ const ScoringControls: SportPlugin<ChessState>['ScoringControls'] = ({ state, di
   const dff = pick === 'dff';
   const winner: Side | 'draw' | null = pick === 'draw' || dff ? 'draw' : pick === 'white' ? white : pick === 'black' ? black : null;
   const colourLocked = !unlockColour && !armageddon;
-  const methods = dff ? [] : winner === 'draw' ? DRAWN : winner ? DECISIVE : [];
-  // SD-67: a double forfeit carries its own method
-  const sentMethod: ChessMethod | undefined = dff ? 'double-forfeit' : method ?? undefined;
+  const how = dff ? { common: [], more: [] } : howChoices(winner);
+  // SD-67: a double forfeit carries its own method; batch 5: else the pick, or the default (resignation / agreement)
+  const sentMethod: ChessMethod | undefined = sentHow({ winner, picked: method, none: noHow, dff });
+  const methods = moreHow || (sentMethod && how.more.includes(sentMethod)) ? [...how.common, ...how.more] : how.common;
   const record = async () => {
     if (!winner || busy) return;
     const what = `${resultSentence(white, winner, nameOf(white), nameOf(black), sentMethod)}${koAt ? ` — ${koPhaseText(koNow, koAt.phase, koAt.game)}${armageddon && winner === 'draw' ? `: ${nameOf(black)} (Black) goes through` : ''}` : ''}`;
@@ -150,7 +155,7 @@ const ScoringControls: SportPlugin<ChessState>['ScoringControls'] = ({ state, di
     // instead of `games` + `wins` / `losses` (FIDE: excluded from played games).
     // SD-119: each credit carries its player's side (the line's opponent is the other player).
     const credit = (side: Side): Attribution | undefined =>
-      chessResultCredit(side, (side === 'home' ? homeRoster : awayRoster)[0], winner, method, dff);
+      chessResultCredit(side, (side === 'home' ? homeRoster : awayRoster)[0], winner, sentMethod, dff);
     const w = dff ? null : parseClock(clockW); const b = dff ? null : parseClock(clockB);
     const clock = w != null || b != null ? { ...(w != null ? { white: w } : {}), ...(b != null ? { black: b } : {}) } : undefined;
     // the colour is committed only now, and only if it really changed
@@ -167,9 +172,9 @@ const ScoringControls: SportPlugin<ChessState>['ScoringControls'] = ({ state, di
       attribution2: credit('away'),
     });
     // SD-121 — a knockout goes on to its next game: a clean form
-    setPick(null); setMethod(null); setMoves(''); setClockW(''); setClockB(''); setWhiteDraft(null); setUnlockColour(false); setAuto(false);
+    setPick(null); setMethod(null); setNoHow(false); setMoreHow(false); setMoves(''); setClockW(''); setClockB(''); setWhiteDraft(null); setUnlockColour(false); setAuto(false);
   };
-  const choose = (p: Pick | null) => { setPick(p); setMethod(null); setAuto(false); };
+  const choose = (p: Pick | null) => { setPick(p); setMethod(null); setNoHow(false); setAuto(false); };
   const tile = (p: Pick, score: string, caption: string, names: string) => (
     <TouchableOpacity key={p} onPress={() => choose(p)} activeOpacity={0.8} accessibilityRole="button"
       accessibilityLabel={`${score} ${caption} — ${names}`} accessibilityState={{ selected: pick === p }} aria-pressed={pick === p}
@@ -234,9 +239,11 @@ const ScoringControls: SportPlugin<ChessState>['ScoringControls'] = ({ state, di
       </View>
       {methods.length > 0 && (
         <View style={{ gap: theme.spacing(2) }}>
-          <Text style={ctrl.label}>How (optional)</Text>
+          <Text style={ctrl.label}>How <Text style={ctrl.meta}>(pre-set · tap to change)</Text></Text>
           <View style={ctrl.chips}>
-            {methods.map((m) => <SelectChip key={m} label={METHOD_LABEL[m]} active={method === m} onPress={() => setMethod(method === m ? null : m)} />)}
+            {methods.map((m) => <SelectChip key={m} label={METHOD_LABEL[m]} active={sentMethod === m} onPress={() => { setMethod(m); setNoHow(false); }} />)}
+            {!moreHow && how.more.length > 0 && !(sentMethod && how.more.includes(sentMethod)) ? <SelectChip label="More…" active={false} onPress={() => setMoreHow(true)} /> : null}
+            <SelectChip label="Not recorded" active={noHow} onPress={() => { setNoHow(!noHow); if (!noHow) setMethod(null); }} />
           </View>
           <TextInput
             style={ctrl.input}
@@ -248,7 +255,7 @@ const ScoringControls: SportPlugin<ChessState>['ScoringControls'] = ({ state, di
             accessibilityLabel="Number of moves"
           />
           {/* SD-117c — optional clock times left at the end */}
-          {!isForfeit(method) && (
+          {!isForfeit(sentMethod) && (
             <>
               <Text style={ctrl.meta}>Time left on the clocks (optional · 4:07, 1:05:30 or minutes)</Text>
               <View style={ctrl.tiles}>
@@ -261,7 +268,7 @@ const ScoringControls: SportPlugin<ChessState>['ScoringControls'] = ({ state, di
               </View>
             </>
           )}
-          {isForfeit(method) && <Text style={ctrl.meta}>A forfeit counts in the table, but no game is credited as played.</Text>}
+          {isForfeit(sentMethod) && <Text style={ctrl.meta}>A forfeit counts in the table, but no game is credited as played.</Text>}
         </View>
       )}
       <Button label={winner ? `✓ Record ${scoreFor(white, winner, sentMethod)}…` : '✓ Record result'} onPress={() => void record()} disabled={!winner || busy} />

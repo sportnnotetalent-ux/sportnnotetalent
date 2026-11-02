@@ -136,7 +136,7 @@ export function SportFormatEditor({
       )}
 
       {rest.map((field, i) =>
-        (field.advanced && !revealAdvanced) || isHidden(field, value) ? null : (
+        (field.advanced && !revealAdvanced) || isHidden(field, value, plugin.formatFields) ? null : (
           <React.Fragment key={field.key}>
             {/* deep wave: a heading over toggles that share a group (event sports' "Stats to track") */}
             {field.group && field.group !== rest[i - 1]?.group ? <Text style={fe.group}>{field.group}</Text> : null}

@@ -679,6 +679,11 @@ export interface SnookerSideStats {
   potStrokes: number;
   missedPots: number;
   safeties: number;
+  /** cue batch 5 — safeties judged on the opponent's next visit (once it has
+   *  ended in the same frame), and those it held: that visit scored 0 and
+   *  ended in a miss, a safety or a foul */
+  safetiesJudged: number;
+  safetiesWon: number;
   /** potting strokes ÷ (potting strokes + missed pots); null = none attempted */
   potSuccess: number | null;
   /** every break of 1 or more, in the order made */
@@ -693,7 +698,7 @@ export interface SnookerSideStats {
 
 const zeroStats = (): SnookerSideStats => ({
   framesWon: 0, points: 0, potted: 0, penaltyReceived: 0, penaltyConceded: 0, fouls: 0, foulsByKind: {}, missesCalled: 0, freeBalls: 0,
-  visits: 0, potStrokes: 0, missedPots: 0, safeties: 0, potSuccess: null, breaks: [], highestBreak: 0, fiftyPlus: 0, centuries: 0,
+  visits: 0, potStrokes: 0, missedPots: 0, safeties: 0, safetiesJudged: 0, safetiesWon: 0, potSuccess: null, breaks: [], highestBreak: 0, fiftyPlus: 0, centuries: 0,
   maximums: 0, detailedFrames: 0, quickFrames: 0,
 });
 
@@ -758,6 +763,17 @@ function statsOf(s: SnookerState): { home: SnookerSideStats; away: SnookerSideSt
       if (v.pts >= 100) t.centuries++;
       if (v.pts === max && !v.fb) t.maximums++;
     }
+    // cue batch 5 — safety success: the opponent's next visit, once it ended
+    f.visits.forEach((v, i) => {
+      const nx = f.visits[i + 1];
+      if (v.end !== 'safety' || !nx || nx.side === v.side) return;
+      if (nx.end !== 'miss' && nx.end !== 'safety' && nx.end !== 'foul') {
+        // a visit still in play, or one that ended the frame / on the re-spotted black: judged only if it scored
+        if (!(nx.end === 'frame' || nx.end === 'respot') || !(nx.pts > 0)) return;
+      }
+      out[v.side].safetiesJudged++;
+      if (nx.pts === 0) out[v.side].safetiesWon++;
+    });
     for (const x of f.fouls) {
       const t = out[x.by];
       const o = out[other(x.by)];

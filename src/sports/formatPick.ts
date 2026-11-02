@@ -21,6 +21,19 @@ export const clampNumber = (field: FormatField, v: number): number => {
   return Math.min(max, Math.max(min, v));
 };
 
-/** MVP PD1 — a field that doesn't apply to the current values (hideWhen). */
-export const isHidden = (field: FormatField, values: Record<string, Val | undefined>): boolean =>
-  !!field.hideWhen && values[field.hideWhen.key] === field.hideWhen.value;
+/** Does a `hideWhen` rule hide its field, given the other field's value?
+ *  `{ value }`: hidden while equal (MVP PD1). `{ unless: [...] }` (cue batch 5):
+ *  hidden unless the value is one of the list — a malformed list hides. */
+export const hideRuleHolds = (rule: NonNullable<FormatField['hideWhen']>, v: unknown): boolean => {
+  if ('unless' in rule) return !Array.isArray(rule.unless) || !rule.unless.includes(v as Val);
+  return v === rule.value;
+};
+
+/** MVP PD1 — a field that doesn't apply to the current values (hideWhen).
+ *  `fields` (optional): a value not set yet reads its field's default. */
+export const isHidden = (field: FormatField, values: Record<string, Val | undefined>, fields?: readonly FormatField[]): boolean => {
+  const rule = field.hideWhen;
+  if (!rule) return false;
+  const v = values[rule.key] ?? fields?.find((f) => f.key === rule.key)?.default;
+  return hideRuleHolds(rule, v);
+};

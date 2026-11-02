@@ -8,6 +8,7 @@ import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type { SportMeta } from '../src/sports/types.ts';
 import { matchRules, matchCaptures, liveOwnedKeys, settingsUnit } from '../src/sports/matchRules.ts';
+import { hideRuleHolds } from '../src/sports/formatPick.ts';
 import { detailLiveSettings } from '../src/sports/pointDetailSettings.ts';
 import * as tennis from '../src/sports/tennis/engine.ts';
 import type { FormatField, LiveSettings } from '../src/sports/types.ts';
@@ -33,7 +34,7 @@ describe('IC1: the rules, every sport', () => {
       const fmt = defaults(fields);
       const lines = matchRules(fields, fmt);
       for (const l of lines) assert.ok(!BAD.test(l.label) && !BAD.test(l.value), `${m.id}.${l.key}: "${l.label}" = "${l.value}"`);
-      const hidden = (f: FormatField) => !!f.hideWhen && (fmt[f.hideWhen.key] ?? null) === f.hideWhen.value;
+      const hidden = (f: FormatField) => !!f.hideWhen && hideRuleHolds(f.hideWhen, fmt[f.hideWhen.key] ?? null); // cue batch 5: `unless` too
       const want = fields.filter((f) => !isCapture(f) && !hidden(f)).map((f) => f.key);
       assert.deepEqual(lines.map((l) => l.key), want, m.id);
     });
@@ -43,8 +44,11 @@ describe('IC1: the rules, every sport', () => {
     const lines = Object.fromEntries(matchRules(pool, { ...defaults(pool), game: 'nine', raceTo: 7, tenEarly: true }).map((l) => [l.key, l.value]));
     assert.equal(lines.game, '9-Ball');
     assert.equal(lines.raceTo, '7');
-    assert.equal(lines.tenEarly, 'On');
     assert.equal(lines.threeBallRule, 'On');
+    // cue batch 5: the 10-ball option shows only in a 10-ball match
+    assert.equal(lines.tenEarly, undefined);
+    const ten = Object.fromEntries(matchRules(pool, { ...defaults(pool), game: 'ten', tenEarly: true }).map((l) => [l.key, l.value]));
+    assert.equal(ten.tenEarly, 'On');
   });
   test('hideWhen: scotch-doubles turns only in doubles', () => {
     const pool = getSportMeta('pool').formatFields!;

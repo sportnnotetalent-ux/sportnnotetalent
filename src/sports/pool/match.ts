@@ -11,8 +11,8 @@
  *   cr       who shot: shot counters per set and side, and per player id in
  *            scotch doubles (`payload.pid`, the id the scorer picked); the ids
  *            seen per side; the scotch-doubles rotation
- *   feed     the shots of the rack in play and the last FEED_RACKS racks
- *            (commentary, undo label), at most FEED_PER_RACK per rack
+ *   feed     the shots of every rack (commentary, undo label), at most
+ *            FEED_PER_RACK per rack and FEED_MAX in all (oldest racks dropped whole)
  *   rat      when each completed rack ended (the scorer's clock, ms; 0 = none)
  *
  * The game pin (break #26): the controls stamp the game on a match's first
@@ -94,9 +94,12 @@ export interface PoolMatch extends PoolState {
 
 /** A scotch-doubles pair, plus room for a substitute or two. */
 export const MAX_IDS_PER_SIDE = 4;
-/** Completed racks whose shots the feed keeps (besides the rack in play). */
-export const FEED_RACKS = 3;
+/** Cue batch 5 (audit row 6): the feed keeps every rack's shots, so the
+ *  commentary covers the whole match. It is bounded: at most FEED_PER_RACK
+ *  lines per rack and FEED_MAX lines in all (the snapshot is saved per event);
+ *  past that, the oldest racks are dropped whole and read as one summary line. */
 export const FEED_PER_RACK = 120;
+export const FEED_MAX = 1500;
 
 /** The actions that are a shot at the table (the break is counted apart). */
 export const SHOT_TYPES: ReadonlySet<string> = new Set(['POT', 'MISS', 'SAFETY', 'FOUL', 'PUSH']);
@@ -105,6 +108,8 @@ export const SHOT_TYPES: ReadonlySet<string> = new Set(['POT', 'MISS', 'SAFETY',
 export const SHOT_KEYS = [
   'shotsPlayed', 'potShots', 'missShots', 'safetyShots', 'pushOuts', 'ballsPotted',
   'fouls', 'foulScratch', 'foulWrongBall', 'foulNoRail', 'foulOffTable', 'foulOther',
+  // cue batch 5: every foul kind its own key (before, these counted as foulOther)
+  'foulTouch', 'foulDoubleHit', 'foulPush', 'foulJump', 'foulMoving', 'foulNoFoot', 'foulPlacement', 'foulSlowPlay', 'foulOutOfTurn', 'foulIllegalBreak',
   'breakShots', 'breakBalls', 'dryBreaks', 'breakFouls', 'illegalBreaks', 'eightBreaks',
 ] as const;
 const SHOT_KEY_SET: ReadonlySet<string> = new Set(SHOT_KEYS);
@@ -116,8 +121,14 @@ const TALLY_KEY: ReadonlyArray<[keyof Tally, string]> = [
   ['illegalBreaks', 'illegalBreaks'], ['eightOnBreak', 'eightBreaks'], ['potted', 'ballsPotted'], ['fouls', 'fouls'],
   ['safeties', 'safetyShots'], ['pushOuts', 'pushOuts'],
 ];
-const FOUL_KEY: Partial<Record<FoulKind, string>> = { scratch: 'foulScratch', wrongBall: 'foulWrongBall', noRail: 'foulNoRail', offTable: 'foulOffTable' };
-/** The line key a foul kind counts under (the rarer kinds: "other"). */
+/** Cue batch 5: every kind its own key; `foulOther` is the "Other foul" chip
+ *  only (an older line, never re-derived, still has the rarer kinds in it). */
+const FOUL_KEY: Partial<Record<FoulKind, string>> = {
+  scratch: 'foulScratch', wrongBall: 'foulWrongBall', noRail: 'foulNoRail', offTable: 'foulOffTable',
+  touched: 'foulTouch', doubleHit: 'foulDoubleHit', pushShot: 'foulPush', jump: 'foulJump', moving: 'foulMoving', noFoot: 'foulNoFoot',
+  placement: 'foulPlacement', slowPlay: 'foulSlowPlay', outOfTurn: 'foulOutOfTurn', illegalBreak: 'foulIllegalBreak',
+};
+/** The line key a foul kind counts under. */
 export const foulKeyOf = (k: FoulKind): string => FOUL_KEY[k] ?? 'foulOther';
 
 const ID_RE = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$/;
@@ -184,7 +195,7 @@ export function feedOf(s: unknown): FeedEntry[] {
   // balls are read against the game's own set (a 9-ball feed never shows a 14)
   const top = TOP[knownGame(own(s, 'game')) ?? 'eight'];
   const out: FeedEntry[] = [];
-  for (const e of f.slice(-(FEED_RACKS + 1) * FEED_PER_RACK)) {
+  for (const e of f.slice(-FEED_MAX)) {
     if (!isObj(e)) continue;
     const n = cnt(e.n), t = e.t;
     if (!n || typeof t !== 'string' || !FEED_TYPES.has(t)) continue;
@@ -377,10 +388,29 @@ function withCredit(base: PoolMatch, next: PoolMatch, a: unknown, p: Record<stri
   }
   const at = cnt(p.at);
   if (at) e.at = at;
-  const cur = r1 ? r1.n : r0.n;
-  const kept = [...(trusted ? base.feed! : feedOf(base)).filter((x) => x.n >= cur - FEED_RACKS), e];
-  // at most FEED_PER_RACK lines per rack, the newest kept (break #27: a stored
-  // feed may already hold more than that for one rack)
+  const feed = trusted ? appendFeed(base.feed!, e) : capFeed([...feedOf(base), e]);
+
+  const out: PoolMatch = { ...next, perSide, cr, feed };
+  const rat = trusted ? base.rat! : rackTimes(base);
+  out.rat = ended ? [...rat, at] : rat;
+  return mine(out);
+}
+
+/** A feed this module built (clean, capped, racks in order) plus one line:
+ *  the same result as capFeed, without re-reading the whole feed (break #29). */
+function appendFeed(f: readonly FeedEntry[], e: FeedEntry): FeedEntry[] {
+  const out = [...f, e];
+  // the tail run is e's rack (racks only go forward)
+  let run = 0;
+  for (let i = out.length - 1; i >= 0 && out[i].n === e.n; i--) run++;
+  if (run > FEED_PER_RACK) out.splice(out.length - run, run - FEED_PER_RACK);
+  return out.length > FEED_MAX ? dropOldRacks(out) : out;
+}
+
+/** Any feed, bounded: at most FEED_PER_RACK lines per rack (the newest kept;
+ *  break #27: a stored feed may hold more than that for one rack) and
+ *  FEED_MAX in all. */
+function capFeed(kept: FeedEntry[]): FeedEntry[] {
   const perRack = new Map<number, number>();
   const feed: FeedEntry[] = [];
   for (let i = kept.length - 1; i >= 0; i--) {
@@ -389,11 +419,24 @@ function withCredit(base: PoolMatch, next: PoolMatch, a: unknown, p: Record<stri
     if (k <= FEED_PER_RACK) feed.push(kept[i]);
   }
   feed.reverse();
+  return feed.length > FEED_MAX ? dropOldRacks(feed) : feed;
+}
 
-  const out: PoolMatch = { ...next, perSide, cr, feed };
-  const rat = trusted ? base.rat! : rackTimes(base);
-  out.rat = ended ? [...rat, at] : rat;
-  return mine(out);
+/** Cue batch 5: over FEED_MAX, the oldest racks are dropped whole (never the
+ *  newest line's rack); a feed still too long keeps its newest lines. */
+function dropOldRacks(feed: FeedEntry[]): FeedEntry[] {
+  const newest = feed[feed.length - 1].n;
+  const per = new Map<number, number>();
+  for (const x of feed) per.set(x.n, (per.get(x.n) ?? 0) + 1);
+  let total = feed.length;
+  const drop = new Set<number>();
+  for (const n of [...per.keys()].sort((a, b) => a - b)) {
+    if (total <= FEED_MAX || n >= newest) break;
+    drop.add(n);
+    total -= per.get(n) ?? 0;
+  }
+  const out = feed.filter((x) => !drop.has(x.n));
+  return out.length > FEED_MAX ? out.slice(-FEED_MAX) : out;
 }
 
 /** Replay a log from a fresh match (tests and tools; the app uses deriveLog). */

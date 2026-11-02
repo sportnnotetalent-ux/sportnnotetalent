@@ -63,7 +63,8 @@ export const POOL_META: SportMeta = {
         { value: false, label: 'Off' },
       ],
     },
-    { key: 'threeBallRule', label: '9-ball: three-ball rule on the break', type: 'toggle', default: true, advanced: true, hint: 'at least three balls must be pocketed or pass the head string on the break (WPA 5.3(c))' },
-    { key: 'tenEarly', label: '10-ball: an early called 10 wins', type: 'toggle', default: false, advanced: true, hint: 'the older practice; WPA 2026 spots it, and the 10 wins only as the last ball' },
+    // cue batch 5: each game's own option shows only in that game (Info, setup, Edit format)
+    { key: 'threeBallRule', label: '9-ball: three-ball rule on the break', type: 'toggle', default: true, advanced: true, hideWhen: { key: 'game', unless: ['nine'] }, hint: 'at least three balls must be pocketed or pass the head string on the break (WPA 5.3(c))' },
+    { key: 'tenEarly', label: '10-ball: an early called 10 wins', type: 'toggle', default: false, advanced: true, hideWhen: { key: 'game', unless: ['ten'] }, hint: 'the older practice; WPA 2026 spots it, and the 10 wins only as the last ball' },
   ],
 };

@@ -63,7 +63,7 @@ describe('SD-119 chess — each player\'s line names the OTHER player', () => {
     const c = actionLineCredits(result('home', 'checkmate'), names, rosters);
     assert.deepEqual(c.map((x) => [x.playerId, x.stat, x.by]), [
       ['kabir', 'games', 1], ['kabir', 'wins', 1], ['kabir', 'winsMate', 1],
-      ['meera', 'games', 1], ['meera', 'losses', 1],
+      ['meera', 'games', 1], ['meera', 'losses', 1], ['meera', 'lossesMate', 1], // cue & board batch 5: losses by method
     ]);
     // IDs-only scoring: the credit (a public match event) names the player by id only
     assert.deepEqual(chessResultCredit('home', kabir, 'draw', null, true), { playerId: 'kabir', by: 1, side: 'home', stat: 'forfeitLosses' });

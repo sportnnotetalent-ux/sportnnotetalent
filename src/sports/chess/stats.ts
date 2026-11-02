@@ -27,6 +27,30 @@ export function winMethodKey(method?: string | null): typeof WIN_METHOD_KEYS[num
   }
 }
 
+/** Cue & board batch 5 (audit row 8) — how a game was lost (on the LOSER's
+ *  line) and how a draw came about (on both lines). New results only, so an
+ *  older line has none and the rows say over how many games it was recorded. */
+export const LOSS_METHOD_KEYS = ['lossesMate', 'lossesResign', 'lossesTime', 'lossesOther'] as const;
+export const DRAW_METHOD_KEYS = ['drawsAgreed', 'drawsRepetition', 'drawsStalemate', 'drawsOther'] as const;
+export function lossMethodKey(method?: string | null): typeof LOSS_METHOD_KEYS[number] | undefined {
+  switch (method) {
+    case 'checkmate': return 'lossesMate';
+    case 'resignation': return 'lossesResign';
+    case 'time': return 'lossesTime';
+    case 'illegal-move': case 'adjudication': case 'arbiter': return 'lossesOther';
+    default: return undefined;
+  }
+}
+export function drawMethodKey(method?: string | null): typeof DRAW_METHOD_KEYS[number] | undefined {
+  switch (method) {
+    case 'agreement': return 'drawsAgreed';
+    case 'repetition': case 'fivefold': return 'drawsRepetition';
+    case 'stalemate': return 'drawsStalemate';
+    case 'fifty-move': case 'seventy-five-move': case 'insufficient': case 'time-insufficient': case 'dead-position': case 'adjudication': case 'arbiter': return 'drawsOther';
+    default: return undefined;
+  }
+}
+
 /** The profile credit for ONE player when a result is recorded (both players
  *  get one): a game + the outcome (+ how it was won on the winner's line);
  *  SD-117c a forfeit is no game — a forfeit win / loss instead; SD-67 a double
@@ -46,7 +70,7 @@ export function chessResultCredit(
   if (dff) return { ...base, stat: 'forfeitLosses' };
   if (method === 'forfeit' && winner !== 'draw') return { ...base, stat: winner === side ? 'forfeitWins' : 'forfeitLosses' };
   const outcome = winner === 'draw' ? 'draws' : winner === side ? 'wins' : 'losses';
-  const how = winner === side ? winMethodKey(method) : undefined;
+  const how = winner === 'draw' ? drawMethodKey(method) : winner === side ? winMethodKey(method) : lossMethodKey(method);
   return { ...base, stat: 'games', extra: { [outcome]: 1, ...(how ? { [how]: 1 } : {}) } };
 }
 
@@ -55,6 +79,11 @@ const n = (l: StatLine, k: string) => Number(l.stats?.[k] ?? 0) || 0;
 const winHow = (l: StatLine) => WIN_METHOD_KEYS.some((k) => n(l, k) > 0);
 /** a game won over the board (the wins the method could be recorded for) */
 const wonOtb = (l: StatLine) => n(l, 'wins') > 0;
+/** batch 5: a lost / drawn game whose method was recorded, and every lost / drawn game */
+const lossHow = (l: StatLine) => LOSS_METHOD_KEYS.some((k) => n(l, k) > 0);
+const lostOtb = (l: StatLine) => n(l, 'losses') > 0;
+const drawHow = (l: StatLine) => DRAW_METHOD_KEYS.some((k) => n(l, k) > 0);
+const drawn = (l: StatLine) => n(l, 'draws') > 0;
 
 export const chessStats: SportStatSchema<'chess'> = {
   sport: 'chess',
@@ -62,7 +91,7 @@ export const chessStats: SportStatSchema<'chess'> = {
   splits: ['colour', 'timeControl', 'tournament', 'season', 'opponent'],
   /** SD-137a — tournament / hub leaderboard + awards chips (classical / rapid / blitz) */
   leaderSplits: ['timeControl'],
-  filters: { winHow, wonOtb },
+  filters: { winHow, wonOtb, lossHow, lostOtb, drawHow, drawn },
   stats: [
     // SD-27: the rating weights are the game score (win 1, draw ½)
     { key: 'wins', label: 'Wins', short: 'wins', one: 'win', leaderLabel: 'Most wins', group: 'results', weight: 1, matchSummary: true, coverage: 'core',
@@ -87,6 +116,15 @@ export const chessStats: SportStatSchema<'chess'> = {
     { key: 'winsResign', label: 'By resignation', short: 'wins by resignation', one: 'win by resignation', group: 'how', coverage: 'core', agg: { kind: 'sum', over: 'winHow' }, coverOf: 'wonOtb' },
     { key: 'winsTime', label: 'On time', short: 'wins on time', one: 'win on time', group: 'how', coverage: 'core', agg: { kind: 'sum', over: 'winHow' }, coverOf: 'wonOtb' },
     { key: 'winsOther', label: 'Other', short: 'other wins', one: 'other win', group: 'how', coverage: 'core', agg: { kind: 'sum', over: 'winHow' }, coverOf: 'wonOtb' },
+    // batch 5 — losses and draws by method (same pattern as the wins)
+    { key: 'lossesMate', label: 'Lost to checkmate', short: 'losses to checkmate', one: 'loss to checkmate', group: 'howLost', coverage: 'core', agg: { kind: 'sum', over: 'lossHow' }, coverOf: 'lostOtb' },
+    { key: 'lossesResign', label: 'Resigned', short: 'resignations', one: 'resignation', group: 'howLost', coverage: 'core', agg: { kind: 'sum', over: 'lossHow' }, coverOf: 'lostOtb' },
+    { key: 'lossesTime', label: 'Lost on time', short: 'losses on time', one: 'loss on time', group: 'howLost', coverage: 'core', agg: { kind: 'sum', over: 'lossHow' }, coverOf: 'lostOtb' },
+    { key: 'lossesOther', label: 'Lost otherwise', short: 'other losses', one: 'other loss', group: 'howLost', coverage: 'core', agg: { kind: 'sum', over: 'lossHow' }, coverOf: 'lostOtb' },
+    { key: 'drawsAgreed', label: 'Draws agreed', short: 'draws agreed', one: 'draw agreed', group: 'howDrawn', coverage: 'core', agg: { kind: 'sum', over: 'drawHow' }, coverOf: 'drawn' },
+    { key: 'drawsRepetition', label: 'Draws by repetition', short: 'draws by repetition', one: 'draw by repetition', group: 'howDrawn', coverage: 'core', agg: { kind: 'sum', over: 'drawHow' }, coverOf: 'drawn' },
+    { key: 'drawsStalemate', label: 'Draws by stalemate', short: 'draws by stalemate', one: 'draw by stalemate', group: 'howDrawn', coverage: 'core', agg: { kind: 'sum', over: 'drawHow' }, coverOf: 'drawn' },
+    { key: 'drawsOther', label: 'Other draws', short: 'other draws', one: 'other draw', group: 'howDrawn', coverage: 'core', agg: { kind: 'sum', over: 'drawHow' }, coverOf: 'drawn' },
     // Deep wave — the game record (chess/totals.ts statTotals: 'keyed', only
     // on games that have them; an older line reads "not tracked", never 0)
     { key: 'lenGames', label: 'Games with a length', short: 'games with a length', one: 'game with a length', group: 'game', coverage: 'keyed' },
@@ -127,6 +165,9 @@ export const chessStats: SportStatSchema<'chess'> = {
     { id: 'results', title: 'Results', rows: [{ stat: 'games' }, { stat: 'score' }, { stat: 'scorePct' }, { stat: 'wins' }, { stat: 'draws' }, { stat: 'losses' }, { stat: 'forfeitWins' }, { stat: 'forfeitLosses' }] },
     // SD-36 — shown once any win recorded how it ended
     { id: 'how', title: 'Wins by method', rows: [{ stat: 'winsMate' }, { stat: 'winsResign' }, { stat: 'winsTime' }, { stat: 'winsOther', label: 'Other (illegal, arbiter)' }] },
+    // batch 5 — shown once a loss / draw recorded how it ended
+    { id: 'howLost', title: 'Losses by method', rows: [{ stat: 'lossesMate' }, { stat: 'lossesResign' }, { stat: 'lossesTime' }, { stat: 'lossesOther', label: 'Other (illegal, arbiter)' }] },
+    { id: 'howDrawn', title: 'Draws by method', rows: [{ stat: 'drawsAgreed' }, { stat: 'drawsRepetition' }, { stat: 'drawsStalemate' }, { stat: 'drawsOther', label: 'Other (50-move, material, arbiter)' }] },
     // Deep wave — shown once a game recorded its length / moves / clocks
     { id: 'game', title: 'Game record', rows: [
       { stat: 'avgLength' }, { stat: 'mvGames' }, { stat: 'checksPerGame' }, { stat: 'matPerGame' }, { stat: 'castledPct' },

@@ -89,7 +89,7 @@ describe('B7 badminton numbers', () => {
 describe('the editor uses them', () => {
   const src = readFileSync(join(import.meta.dirname, '..', 'src/components/FormatEditor.tsx'), 'utf8');
   test('hidden fields are skipped, and a number is clamped when you leave the box', () => {
-    assert.match(src, /isHidden\(field, value\)/);
+    assert.match(src, /isHidden\(field, value(, plugin\.formatFields)?\)/); // cue batch 5: a value not set reads its default
     assert.match(src, /onBlur=\{\(\) => onChange\(clampNumber\(field, Number\(value\)\)\)\}/);
   });
 });

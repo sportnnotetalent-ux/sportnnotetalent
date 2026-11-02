@@ -6,9 +6,10 @@
  * breaks) is left out, never shown as a false 0.
  */
 import { countRow, nonEmpty, ofPct, type CompareCategory, type CompareRow } from '../gcc/model.ts';
-import { breaks, type Side, type SnookerState } from './engine.ts';
+import { breaks, FOUL_KINDS, type Side, type SnookerState } from './engine.ts';
 import { readFrames, statsFor } from './read.ts';
-import { HOW_LABEL } from './controls.ts';
+import { FOUL_KIND_LABEL, HOW_LABEL } from './controls.ts';
+import { SNOOKER_FOUL_KEY } from './totals.ts';
 
 /** The break list's default floor: 20+. A school or club player's good visit
  *  (about five pots with colours); 50+ and centuries stand out inside it, and
@@ -44,6 +45,11 @@ export function snookerMatchStats(s: SnookerState, frame?: number): CompareCateg
       },
       countRow('missedPots', 'Missed pots', H.missedPots, A.missedPots, 'lower'),
       countRow('safeties', 'Safeties', H.safeties, A.safeties),
+      // cue batch 5: a safety held when the opponent's next visit scored nothing
+      ...(H.safetiesJudged || A.safetiesJudged ? [{
+        key: 'safetySuccess', label: 'Safety success', home: ofPct(H.safetiesWon, H.safetiesJudged), away: ofPct(A.safetiesWon, A.safetiesJudged),
+        hv: H.safetiesJudged ? H.safetiesWon / H.safetiesJudged : 0, av: A.safetiesJudged ? A.safetiesWon / A.safetiesJudged : 0,
+      }] : []),
       countRow('visits', 'Visits to the table', H.visits, A.visits),
     ] });
     const fouls: CompareRow[] = [
@@ -52,6 +58,11 @@ export function snookerMatchStats(s: SnookerState, frame?: number): CompareCateg
     ];
     if (H.missesCalled || A.missesCalled) fouls.push(countRow('foulMisses', 'Fouls and a miss', H.missesCalled, A.missesCalled, 'lower'));
     if (H.freeBalls || A.freeBalls) fouls.push(countRow('freeBalls', 'Free balls received', H.freeBalls, A.freeBalls));
+    // cue batch 5: one row per foul kind (non-zero only), as billiards
+    for (const k of FOUL_KINDS) {
+      const h = H.foulsByKind[k] ?? 0, a = A.foulsByKind[k] ?? 0;
+      if (h || a) fouls.push(countRow(SNOOKER_FOUL_KEY[k], FOUL_KIND_LABEL[k], h, a, 'lower'));
+    }
     cats.push({ id: 'fouls', title: 'Fouls', rows: fouls });
   }
   return nonEmpty(cats);

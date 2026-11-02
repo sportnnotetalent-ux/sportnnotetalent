@@ -12,6 +12,7 @@ import type { SportStatSchema, StatDef } from '../statSchema.ts';
 import {
   CENTURIES, CUE_FOULS, CUE_POINTS, FIFTY_PLUS, FOUL_POINTS, FOULS_PER_FRAME, FRAME_PCT, FRAMES_LOST, FRAMES_WL, FRAMES_WON, HIGHEST_BREAK,
   MATCHES_WON, PENALTY_POINTS, POINTS_AGAINST, POINTS_PER_FRAME, SAFETIES, SHOT_FRAMES, VISITS, WIN_PCT,
+  cueFoulKind,
 } from '../cue/stats.ts';
 
 const keyed = { coverage: 'keyed' as const };
@@ -30,6 +31,14 @@ const SNOOKER_ONLY: StatDef[] = [
     agg: { kind: 'rate', num: 'pots', den: ['pots', 'missedPots'], scale: 100, dp: 0, qualifier: { den: 50, unit: { label: 'pot attempts', one: 'pot attempt' } } },
     tieBreak: [{ key: 'pots', better: 'higher' }],
   },
+  // cue batch 5 — safety success (judged on the opponent's next visit) and the foul kinds
+  { key: 'safetiesJudged', label: 'Safeties judged', short: 'safeties judged', one: 'safety judged', group: 'potting', ...keyed },
+  { key: 'safetiesWon', label: 'Safeties held', short: 'safeties held', one: 'safety held', group: 'potting', ...keyed },
+  {
+    key: 'safetySuccess', label: 'Safety success', source: 'derived', group: 'potting', format: { unit: 'percent', dp: 0 },
+    agg: { kind: 'rate', num: 'safetiesWon', den: 'safetiesJudged', scale: 100, dp: 0 },
+  },
+  ...['foulInOff', 'foulNoContact', 'foulWrongBall', 'foulPottedWrong', 'foulPush', 'foulJump', 'foulTouch', 'foulOffTable', 'foulOther'].map((k) => cueFoulKind(k, 'fouls')),
   { key: 'pointsPerVisit', label: 'Points per visit', source: 'derived', group: 'potting', format: { unit: 'decimal', dp: 1 }, agg: { kind: 'rate', num: 'potted', den: 'visits', dp: 1 } },
 ];
 
@@ -46,10 +55,15 @@ export const snookerStats: SportStatSchema<'snooker'> = {
     { id: 'match', title: 'Match play', rows: [{ stat: 'framesWL' }, { stat: 'framePct' }] },
     { id: 'breaks', title: 'Breaks', rows: [{ stat: 'highestBreak' }, { stat: 'centuries' }, { stat: 'fiftyPlus' }, { stat: 'maximums', hideZero: true }] },
     { id: 'scoring', title: 'Scoring', rows: [{ stat: 'points', label: 'Points scored' }, { stat: 'pointsPerFrame' }, { stat: 'pointsAgainst' }] },
-    { id: 'potting', title: 'Potting', rows: [{ stat: 'potSuccess' }, { stat: 'pots' }, { stat: 'pointsPerVisit' }, { stat: 'safeties' }, { stat: 'visits' }] },
+    { id: 'potting', title: 'Potting', rows: [{ stat: 'potSuccess' }, { stat: 'pots' }, { stat: 'pointsPerVisit' }, { stat: 'safeties' }, { stat: 'safetySuccess' }, { stat: 'visits' }] },
     { id: 'fouls', title: 'Fouls', rows: [
       { stat: 'fouls' }, { stat: 'foulsPerFrame' }, { stat: 'foulPoints' }, { stat: 'penaltyPoints' },
       { stat: 'foulMisses', hideZero: true }, { stat: 'freeBalls', hideZero: true },
+      { stat: 'foulInOff', label: 'In-off', hideZero: true }, { stat: 'foulNoContact', label: 'Missed every ball', hideZero: true },
+      { stat: 'foulWrongBall', label: 'Wrong ball first', hideZero: true }, { stat: 'foulPottedWrong', label: 'Potted a ball not on', hideZero: true },
+      { stat: 'foulPush', label: 'Push stroke', hideZero: true }, { stat: 'foulJump', label: 'Jump shot', hideZero: true },
+      { stat: 'foulTouch', label: 'Touched a ball', hideZero: true }, { stat: 'foulOffTable', label: 'Ball off the table', hideZero: true },
+      { stat: 'foulOther', label: 'Other', hideZero: true },
     ] },
   ],
   careerView: 'sections',

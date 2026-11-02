@@ -15,6 +15,26 @@ const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 
 const racksOf = (s: unknown): RackRecord[] =>
   (isObj(s) && Array.isArray(s.racks) ? s.racks : []).filter((r): r is RackRecord => isObj(r) && isSide(r.winner));
 
+/** Cue batch 5: the Stats tab's foul rows, one per kind (shown when non-zero). */
+export const FOUL_ROWS: ReadonlyArray<[string, string]> = [
+  ['foulScratch', 'Scratch (cue ball)'], ['foulWrongBall', 'Wrong ball first'], ['foulNoRail', 'No rail'], ['foulOffTable', 'Ball off the table'],
+  ['foulTouch', 'Touched a ball'], ['foulDoubleHit', 'Double hit'], ['foulPush', 'Push shot'], ['foulJump', 'Illegal jump'],
+  ['foulMoving', 'Shot while balls were moving'], ['foulNoFoot', 'No foot on the floor'], ['foulPlacement', 'Cue ball placed wrongly'],
+  ['foulSlowPlay', 'Slow play'], ['foulOutOfTurn', 'Played out of turn'], ['foulIllegalBreak', 'Illegal break (foul)'], ['foulOther', 'Other fouls'],
+];
+
+/**
+ * Cue batch 5 (audit row 10) — TPA, total performance average (Accu-Stats):
+ * (balls pocketed + safeties + breaks) ÷ (the same + misses + fouls), 0–1.
+ * null when the side has nothing counted ("–", never 0).
+ */
+export function poolTpa(c: Counts): number | null {
+  const n = (k: string) => cnt(c?.[k]);
+  const good = n('ballsPotted') + n('safetyShots') + n('breakShots');
+  const all = good + n('missShots') + n('fouls');
+  return all ? good / all : null;
+}
+
 /** Category rows for the match (`set` absent) or one set (1-based). */
 export function poolCompare(s: PoolMatch, set?: number): CompareCategory[] {
   if (!isObj(s)) return [];
@@ -70,6 +90,10 @@ export function poolCompare(s: PoolMatch, set?: number): CompareCategory[] {
     table.push({ key: 'potPct', label: 'Pot success (pots / pots + misses)', home: ofPct(v('home', 'potShots'), att('home')), away: ofPct(v('away', 'potShots'), att('away')),
       hv: att('home') ? v('home', 'potShots') / att('home') : 0, av: att('away') ? v('away', 'potShots') / att('away') : 0 });
     table.push(countRow('safeties', 'Safeties', v('home', 'safetyShots'), v('away', 'safetyShots')));
+    // cue batch 5: TPA, the pro standard (Accu-Stats), from what is already counted
+    const tpa = (sd: Side) => poolTpa(c[sd]);
+    const tpaText = (x: number | null) => (x == null ? '–' : x.toFixed(3));
+    table.push({ key: 'tpa', label: 'TPA (total performance average)', home: tpaText(tpa('home')), away: tpaText(tpa('away')), hv: tpa('home') ?? 0, av: tpa('away') ?? 0 });
     if (s.game !== 'eight' && (v('home', 'pushOuts') || v('away', 'pushOuts'))) table.push(countRow('pushOuts', 'Push-outs', v('home', 'pushOuts'), v('away', 'pushOuts')));
     if (det.length) {
       table.push(countRow('innings', 'Innings (visits to the table)', H.innings, A.innings, 'lower'));
@@ -80,8 +104,7 @@ export function poolCompare(s: PoolMatch, set?: number): CompareCategory[] {
   const fouls: CompareRow[] = [];
   if (detail) {
     fouls.push(countRow('fouls', 'Fouls', v('home', 'fouls'), v('away', 'fouls'), 'lower', cover));
-    const KINDS: Array<[string, string]> = [['foulScratch', 'Scratch (cue ball)'], ['foulWrongBall', 'Wrong ball first'], ['foulNoRail', 'No rail'], ['foulOffTable', 'Ball off the table'], ['foulOther', 'Other fouls']];
-    for (const [k, label] of KINDS) if (v('home', k) || v('away', k)) fouls.push(countRow(k, label, v('home', k), v('away', k), 'lower'));
+    for (const [k, label] of FOUL_ROWS) if (v('home', k) || v('away', k)) fouls.push(countRow(k, label, v('home', k), v('away', k), 'lower'));
   }
   if (s.threeFoul === true && (detail || H.threeFoul || A.threeFoul)) fouls.push(countRow('threeFoul', 'Racks lost on three fouls', H.threeFoul, A.threeFoul, 'lower'));
   if (s.game === 'eight' && (detail || H.eight || A.eight)) fouls.push(countRow('eightLoss', 'Racks lost on the 8', H.eight, A.eight, 'lower'));

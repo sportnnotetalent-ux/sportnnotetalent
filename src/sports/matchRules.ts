@@ -16,6 +16,7 @@
  *   settingsUnit   the sport's word for what the settings apply from
  */
 import type { FormatField, FormatValue, LiveSettings } from './types';
+import { hideRuleHolds } from './formatPick.ts';
 
 export interface RuleLine { key: string; label: string; value: string }
 export interface CaptureLine { key: string; label: string; on: boolean }
@@ -39,7 +40,7 @@ function valueText(f: FormatField, v: unknown): string {
 const hidden = (f: FormatField, fields: readonly FormatField[], fmt: Record<string, unknown>): boolean => {
   if (!f.hideWhen) return false;
   const dep = fields.find((x) => x.key === f.hideWhen!.key);
-  return (dep ? valueOf(dep, fmt) : fmt[f.hideWhen.key]) === f.hideWhen.value;
+  return hideRuleHolds(f.hideWhen, dep ? valueOf(dep, fmt) : fmt[f.hideWhen.key]);
 };
 
 /** Every rule of the match, in the format's order. */

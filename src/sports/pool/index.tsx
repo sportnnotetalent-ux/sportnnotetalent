@@ -27,11 +27,11 @@ import { useMask } from '../../core/disputeMask';
 import { withRosters } from '../racketNames';
 import { entryDisplayName } from '../../data/participantEntry';
 import type { NameOf } from '../../core/playerNames';
-import type { FoulKind } from './engine';
+import { AWARD_REASONS, type AwardReason, type FoulKind } from './engine';
 import { other, type Side } from './balls';
 import { perSideOf, poolReducer, type PoolMatch } from './match';
 import {
-  BREAK_FOULS, FOUL_LABEL, PLAY_FOULS, bestOfLine, boardStatus, breakAction, breakLine, chooseAction, choiceOptions, choiceQuestion,
+  AWARD_REASON_LABEL, BREAK_FOULS, FOUL_LABEL, PLAY_FOULS, bestOfLine, boardStatus, breakAction, breakLine, chooseAction, choiceOptions, choiceQuestion,
   confirmFor, foulAction, lagAction, makeTapGuard, missAction, outcomeOf, poolPanel, potAction, pushAction, rackAction,
   otherGroupOnly, safetyAction, scotchTurns, setUnits, shooterPick, stalemateAction, type TapOpts,
 } from './controls';
@@ -75,10 +75,12 @@ const ScoringControls: SportPlugin<PoolMatch>['ScoringControls'] = ({ state, dis
   const [changing, setChanging] = useState(false);
   const [flags, setFlags] = useState({ bnr: false, golden: false, runOut: false });
   const [more, setMore] = useState(false);
+  // cue batch 5: why a rack is awarded (optional)
+  const [reason, setReason] = useState<AwardReason | null>(null);
   const moved = `${s?.seq}:${s?.rack?.n}:${s?.rack?.reracks}`;
   useEffect(() => {
     setSel([]); setFoulOpen(false); setFoulKind(null); setNotCalled(false); setTenCalled(false); setShooter({ home: null, away: null }); setChanging(false);
-    setFlags({ bnr: false, golden: false, runOut: false }); setMore(false);
+    setFlags({ bnr: false, golden: false, runOut: false }); setMore(false); setReason(null);
   }, [moved]);
 
   const p = poolPanel(s);
@@ -168,10 +170,19 @@ const ScoringControls: SportPlugin<PoolMatch>['ScoringControls'] = ({ state, dis
         {(['home', 'away'] as Side[]).map((sd) => (
           <Button key={sd} label={`Rack to ${name(sd)}`} variant="ghost" style={ctrl.flex}
             accessibilityLabel={`${award ? 'Award' : 'Record'} rack ${s.rack?.n ?? ''} to ${name(sd)}`}
-            onPress={() => void send(rackAction(s, sd, award ? {} : { ...flags, breaker: flags.runOut ? (brk && brk !== sd ? brk : other(sd)) : flags.bnr || flags.golden ? sd : brk }, opts(null)))} />
+            onPress={() => void send(rackAction(s, sd, award ? { reason } : { ...flags, breaker: flags.runOut ? (brk && brk !== sd ? brk : other(sd)) : flags.bnr || flags.golden ? sd : brk }, opts(null)))} />
         ))}
       </View>
       {!award && (flags.bnr || flags.golden) ? <Text style={ctrl.meta}>A break-and-run or golden break goes to the player who broke.</Text> : null}
+      {award ? (
+        // cue batch 5: the reason is optional — the Rack buttons work without it
+        <View style={ctrl.chips}>
+          <Text style={[ctrl.meta, ctrl.chipLead]}>Why (optional)</Text>
+          {AWARD_REASONS.map((r) => (
+            <SelectChip key={r} label={AWARD_REASON_LABEL[r]} active={reason === r} onPress={() => setReason(reason === r ? null : r)} accessibilityLabel={`Reason: ${AWARD_REASON_LABEL[r]}`} />
+          ))}
+        </View>
+      ) : null}
     </View>
   );
 

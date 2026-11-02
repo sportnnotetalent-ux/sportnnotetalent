@@ -72,3 +72,36 @@ export const CUE_SHARED_STATS: StatDef[] = [
   FRAMES_WON, FRAMES_LOST, CUE_POINTS, POINTS_AGAINST, SHOT_FRAMES, HIGHEST_BREAK, FIFTY_PLUS, CENTURIES, VISITS, SAFETIES,
   CUE_FOULS, FOUL_POINTS, PENALTY_POINTS, MATCHES_WON, WIN_PCT, FRAMES_WL, FRAME_PCT, POINTS_PER_FRAME, FOULS_PER_FRAME,
 ];
+
+/**
+ * Cue batch 5 — foul kinds as career keys (pool and snooker; 'keyed': only on
+ * a line whose match was scored shot by shot, so an older line reads "not
+ * tracked"). A key two sports share (wrong ball first, off the table, push,
+ * jump, touching, other) has one set of labels, here; `foulTouch` and
+ * `foulOther` match carrom's.
+ */
+export const CUE_FOUL_KIND_LABELS: Readonly<Record<string, readonly [label: string, short: string, one: string]>> = {
+  foulWrongBall: ['Fouls: wrong ball first', 'wrong-ball fouls', 'wrong-ball foul'],
+  foulOffTable: ['Fouls: ball off the table', 'off-table fouls', 'off-table foul'],
+  foulOther: ['Fouls: other', 'other fouls', 'other foul'],
+  foulTouch: ['Fouls: touching', 'touching fouls', 'touching foul'],
+  foulPush: ['Fouls: push stroke', 'push-stroke fouls', 'push-stroke foul'],
+  foulJump: ['Fouls: jump shot', 'jump-shot fouls', 'jump-shot foul'],
+  // pool only
+  foulDoubleHit: ['Fouls: double hit', 'double hits', 'double hit'],
+  foulMoving: ['Fouls: balls moving', 'moving-ball fouls', 'moving-ball foul'],
+  foulNoFoot: ['Fouls: no foot on the floor', 'no-foot fouls', 'no-foot foul'],
+  foulPlacement: ['Fouls: cue ball placement', 'placement fouls', 'placement foul'],
+  foulSlowPlay: ['Fouls: slow play', 'slow-play fouls', 'slow-play foul'],
+  foulOutOfTurn: ['Fouls: out of turn', 'out-of-turn fouls', 'out-of-turn foul'],
+  foulIllegalBreak: ['Fouls: illegal break', 'illegal-break fouls', 'illegal-break foul'],
+  // snooker only
+  foulInOff: ['Fouls: in-off', 'in-offs', 'in-off'],
+  foulNoContact: ['Fouls: missed every ball', 'no-contact fouls', 'no-contact foul'],
+  foulPottedWrong: ['Fouls: potted a ball not on', 'wrong-pot fouls', 'wrong-pot foul'],
+};
+/** One foul-kind StatDef (keyed, fewer is better) in the sport's group. */
+export function cueFoulKind(key: string, group: string): StatDef {
+  const [label, short, one] = CUE_FOUL_KIND_LABELS[key] ?? [key, key, key];
+  return { key, label, short, one, group, ...keyed, ...fewer };
+}
