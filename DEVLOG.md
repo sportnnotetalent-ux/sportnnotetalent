@@ -13,6 +13,18 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-03 — Batch 5: captured-but-hidden stats, and each sport's P1 depth
+
+Seven sport-family branches (each with its break-it list, tests, simulation), merged here:
+- **Cricket** (`cricket-batch5.md`): shot types on dots and dismissals; catches by position in Stats; ⇄ Swap logs a "strike changed" event; the toss opens the commentary; optional DRS (`reviews` rule, REVIEW action, reviews left); Impact / concussion subs marked. Not done (L): multi-innings, declaration, follow-on.
+- **Football / hockey / rugby** (`invasion-batch5.md`): stoppage reasons (injury / VAR / cooling break) reach commentary; "Who gave it away?" on a penalty (foul + optional card); penalty-try cards; league "Penalty to …" set ending; hockey second green / yellow warnings and team-official cards.
+- **Basketball / baseball / American football** (`us-sports-batch5.md`): team rebounds and team / shot-clock turnovers; steal ↔ turnover and block ↔ miss pairing; "Rebound?" prompt; WP / balks / pick-offs / PB / IBB in stats and careers; fielder chips after the out (non-blocking) and "Ask for fielders" on for new matches; AF Kneel, tackle presets play-by-play, ruleset-aware Standard.
+- **Volleyball / kabaddi / handball** (`court-team-batch5.md`): "Who was aced?" (on for new matches); sanctions in Stats; catch / back-row fault chips; kabaddi technical points by reason; handball optional "Who's in goal?".
+- **Pool / snooker / billiards / chess** (`cue-board-batch5.md`): every foul kind its own Stats row and career key; full-match pool commentary; per-game options (hideWhen `unless`: no 9- / 10-ball rules in an 8-ball match); billiards break composition; chess result method pre-set (no "other wins").
+- **Measured sports** (`measured-batch5.md`): WD keeps what was done (weightlifting, shooting); shooting DNF; penalties / jury reversal without a prior switch; archery penalty; athletics draw of lots and a false-starts stat; crew false-start warning (verify vs World Rowing / ICF); golf max score and WD / DQ reasons in the timeline.
+- **Racket leftovers** (`racket-batch5.md`): padel time-violation fault costs a serve; "Conduct & timeouts" in Stats for all six; pickleball ace, serve shots, serve-fault types, TT edge / net-cord, lets, squash video review.
+Old logs replay identically in every sport (tests and simulations). Full suite 6,742 tests, 0 failing (2 known todo); tsc clean. Demo-checked: pool 8-ball Info no longer lists 9- / 10-ball rules; pool Stats shows "Wrong ball first" on its own row.
+
 ### 2026-11-03 — Release: Batch 4 (racket scoring mechanism) live (web, Android OTA)
 
 auth-smoke passed. Published from a clean worktree at 2046864: web (entry `index-a74f21b8`, confirmed live on app.sportnnote.in) and Android OTA groups `28de7e05` (preview) and `e875fd56` (production), runtime 1.0.0.

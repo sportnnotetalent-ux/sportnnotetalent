@@ -23,6 +23,8 @@ Seven expert audits (code read only, file:line cited), 109 ranked fixes in all:
 
 ## Batches (in order)
 
+**Status (2026-11-03):** Batches 1–4 live; Batch 5 built (see DEVLOG). Not done yet: Batch 6 (P2s), plus the L items each batch doc lists as not done (cricket multi-innings, TT expedite, precision stats switches per event, softball DP/FLEX …).
+
 Every batch follows the quality mandate (break-it list → failing tests → fix → simulation → full suite + tsc → demo check → DEVLOG → founder's "commit, publish, push").
 
 **Batch 1: wrong results and wrong stats (P0 correctness, small each).**
