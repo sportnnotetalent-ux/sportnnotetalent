@@ -176,7 +176,7 @@ describe('deep wave · Decision 8 — old logs', () => {
 // ------------------------------------------------------- settings --
 
 describe('deep wave · "Stats to track"', () => {
-  test('each sport\'s options, every one off by default with a hint, under one group', () => {
+  test('each sport\'s options with a hint, under one group (point detail on, the rest off)', () => {
     const keys = (sp: DepthSport) => trackFields(sp).map((f) => f.key);
     assert.deepEqual(keys('badminton'), ['pointDetail', 'rallyDetail']);
     assert.deepEqual(keys('tabletennis'), ['pointDetail', 'rallyDetail']);
@@ -187,7 +187,8 @@ describe('deep wave · "Stats to track"', () => {
     for (const sp of DEPTH_SPORTS) {
       const ls = detailLiveSettings(sp);
       const toggles = ls.fields.filter((f) => f.type === 'toggle');
-      assert.ok(toggles.every((f) => f.default === false && f.group === 'Stats to track' && (f.hint ?? '').length > 20), sp);
+      // Batch 3 (defaults-racket DR1): point detail on for a new match, the rest off
+      assert.ok(toggles.every((f) => f.default === (f.key === 'pointDetail') && f.group === 'Stats to track' && (f.hint ?? '').length > 20), sp);
       // round 2: + the rally-length buckets option (a choice, the deep-wave buckets by default)
       assert.deepEqual(ls.fields.filter((f) => f.type !== 'toggle').map((f) => [f.key, f.default]), [['rallyBuckets', 'std']], sp);
       assert.ok(trackFormatFields(sp).every((f) => f.advanced === true), sp);

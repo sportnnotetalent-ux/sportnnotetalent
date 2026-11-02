@@ -57,10 +57,12 @@ const RALLY_HINT: Record<Exclude<DetailSport, 'tennis'>, string> = {
   pickleball: 'Tap 0–4, 5–8 or 9+ shots (or the buckets chosen below): points won by rally length',
 };
 
-/** The "Stats to track" options of `sport`, in card order (off by default; tennis: point detail and 1st / 2nd serve on). */
+/** The "Stats to track" options of `sport`, in card order (off by default; point detail on in every racket
+ *  sport, and tennis' 1st / 2nd serve; padel's waits for a Fault button, defaults-racket DR3). */
 export function trackFields(sport: DetailSport): TrackField[] {
   if (sport === 'tennis') return [...TENNIS_TRACK_FIELDS];
-  const out: TrackField[] = [{ key: 'pointDetail', label: 'Point detail', hint: POINT_HINT[sport] }];
+  // Batch 3 (defaults-racket DR1): point detail on for a new match, as tennis
+  const out: TrackField[] = [{ key: 'pointDetail', label: 'Point detail', hint: POINT_HINT[sport], on: true }];
   if (sport === 'padel') out.push({ key: 'serveDetail', label: '1st / 2nd serve', hint: 'Mark points played on a 2nd serve: 1st serve %, 1st / 2nd serve points won' });
   const nw = NET_WORDS[sport];
   if (nw) {
