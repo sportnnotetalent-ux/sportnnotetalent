@@ -16,7 +16,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const envFile = ['.env.local', '.env.local.bak'].map((f) => join(ROOT, f)).find(existsSync);
 if (!envFile) { console.error('No .env.local / .env.local.bak with the live keys.'); process.exit(1); }
 const env = Object.fromEntries(readFileSync(envFile, 'utf8').split('\n')
-  .map((l) => l.match(/^(EXPO_PUBLIC_SUPABASE_(?:URL|ANON_KEY))=["']?([^"'\n]*)["']?$/)).filter(Boolean).map((m) => [m[1], m[2]]));
+  .map((l) => l.match(/^(EXPO_PUBLIC_(?:SUPABASE_(?:URL|ANON_KEY)|FIREBASE_API_KEY))=["']?([^"'\n]*)["']?$/)).filter(Boolean).map((m) => [m[1], m[2]]));
 const URL_ = env.EXPO_PUBLIC_SUPABASE_URL; const KEY = env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 if (!URL_ || !KEY) { console.error('Supabase URL / anon key missing.'); process.exit(1); }
 
@@ -40,6 +40,18 @@ row(s.external?.email === true, 'email sign-in enabled', String(s.external?.emai
 row(s.disable_signup === false, 'sign-ups open', `disable_signup=${s.disable_signup}`);
 row(s.mailer_autoconfirm === true, 'email confirmation off (pilot)', `mailer_autoconfirm=${s.mailer_autoconfirm} — if this changes, see docs/email-verification.md`);
 row(s.external?.phone === false, 'Supabase SMS off (the app uses Firebase)', `phone=${s.external?.phone} — AuthScreen SMS_LOGIN_ENABLED must match`);
+
+// 1b. Web phone sign-in (Firebase) works only on domains Firebase lists. The web
+// app moved to app.sportnnote.in on 2026-11-01 without it: every web phone
+// sign-in there failed the robot check. Every host the web app runs on must be listed.
+const WEB_HOSTS = ['app.sportnnote.in', 'sportnnote.expo.app'];
+if (env.EXPO_PUBLIC_FIREBASE_API_KEY) {
+  const pc = await fetch(`https://www.googleapis.com/identitytoolkit/v3/relyingparty/getProjectConfig?key=${env.EXPO_PUBLIC_FIREBASE_API_KEY}`).then((r) => r.json()).catch(() => ({}));
+  const listed = pc.authorizedDomains ?? [];
+  for (const h of WEB_HOSTS) row(listed.includes(h), `Firebase allows web phone sign-in on ${h}`, listed.includes(h) ? 'listed' : 'NOT listed: Firebase → Authentication → Settings → Authorized domains');
+} else {
+  row(false, 'Firebase web key present', 'EXPO_PUBLIC_FIREBASE_API_KEY missing');
+}
 
 // 2. Real errors → the app's message. Each must be specific, never the generic one.
 const email = `smoke-${Date.now()}@example.com`;

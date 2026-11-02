@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-02 — Fixed: web phone sign-in on app.sportnnote.in
+
+A tester couldn't sign in with his mobile on the website: "Couldn't confirm you're not a robot". Cause: Firebase allows web phone sign-in only on its authorized domains (localhost, its own two, sportnnote.expo.app), and the L8 move of the web app to app.sportnnote.in (2026-11-01) didn't add it, so every web phone sign-in there failed Firebase's robot check since then (Android app unaffected). Read from Firebase's public getProjectConfig. The founder added app.sportnnote.in. Guard: `scripts/auth-smoke.mjs` (run before every publish) now checks Firebase lists every web host (app.sportnnote.in, sportnnote.expo.app); it failed before the fix and passes now.
+
 ### 2026-11-02 — Store step 0.3: reviewers' test number works
 
 A landline-format Indian test number (the project's SMS region policy allows India only, which refused a +1 test number with `auth/operation-not-allowed`; a real mobile would lock its owner out) added in Firebase; the founder signed in with it on the Android app. The number and code live only in the stores' review notes.
