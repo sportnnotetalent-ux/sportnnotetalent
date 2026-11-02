@@ -147,7 +147,8 @@ describe('LR1: lost by rule', () => {
     assert.ok(detailKeys('tennis').includes('ruleLosses'));
     assert.ok(statDefIn(STAT_SCHEMAS.tennis as never, 'ruleLosses'));
     assert.equal(pdText({ how: 'rule' }, false, 'tennis'), 'Lost by rule');
-    assert.equal(DETAIL_HOWS.badminton.some((h) => h.how === 'rule'), false);
+    // racket-depth RD2 (2026-11-03): the other racket sports now have it too, with their own rule examples
+    assert.equal(DETAIL_HOWS.badminton.some((h) => h.how === 'rule'), true);
   });
   test('the Stats tab counts it apart from errors', () => {
     const s = run(fresh(), P('home'), PD({ how: 'rule' }));

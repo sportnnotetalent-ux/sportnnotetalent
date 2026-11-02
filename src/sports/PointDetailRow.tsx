@@ -8,9 +8,10 @@
  *   Service fault, as the sport has them and as the rally's server allows;
  *   squash Stroke / No let) → Forehand / Backhand → the sport's shot (smash,
  *   net kill, loop, chop, boast, nick, bandeja, víbora, dink, erne …) → for an
- *   unforced error its type (into the net, out, tin, kitchen …), for a
- *   service fault its type (above 1.15 m, foot fault, illegal serve …) → by
- *   whom (doubles errors); plus padel's 2nd serve, who was at the net (padel)
+ *   unforced or forced error its type (into the net, out, tin, kitchen …), for
+ *   a service fault its type (above 1.15 m, foot fault, illegal serve …) → by
+ *   whom (doubles errors, and doubles winners: racket-depth RD4, new matches
+ *   only); "Lost by rule" with the sport's own examples (RD2); plus padel's 2nd serve, who was at the net (padel)
  *   / the kitchen line (pickleball), the rally length, and pickleball's 3rd
  *   shot when those options are on.
  * Round 2: the Rally chips offer the match's bucket scheme (`rallyBuckets`,
@@ -112,7 +113,11 @@ export function PointDetailRow({
     const d = howDef(sport, how);
     // keep the wing / shot already picked when switching between winner / errors
     const keep = d?.wingShot && sel?.wingShot ? { ...(cur.wing ? { wing: cur.wing } : {}), ...(cur.shot ? { shot: cur.shot } : {}) } : {};
-    send({ pd: { how, ...keep, ...(d?.credit === 'loser' && soloErr ? { err: soloErr } : {}) } });
+    // racket-depth RD8: an error's type carries over between unforced / forced,
+    // the hitter between the winner hows
+    const keepType = et && d?.strokes?.includes(et) && (how === 'ue' || how === 'fe') ? { stroke: et } : {};
+    const keepBy = d?.credit === 'winner' && pd?.by ? { by: pd.by } : {};
+    send({ pd: { how, ...keep, ...keepType, ...keepBy, ...(d?.credit === 'loser' && soloErr ? { err: soloErr } : {}) } });
   };
   /** a new wing / shot on the detail (an older winner stroke id is normalised;
    *  an error's type is kept) */
@@ -136,7 +141,8 @@ export function PointDetailRow({
     return <View style={st.bare}>{options}{chooser}</View>;
   }
   const viewer = withRosters(mask.nameOf, homeRoster, awayRoster);
-  const credited = e.kind !== 'rally' ? whoName(viewer, e.playerId, e.playerName) : undefined;
+  // racket-depth RD4: a named hitter first (new matches), else the point's player
+  const credited = (pd?.by ? whoName(viewer, pd.by) : undefined) || (e.kind !== 'rally' ? whoName(viewer, e.playerId, e.playerName) : undefined);
   const who = credited || (winnerRoster.length === 1 ? winnerRoster[0].fullName : nameOf(W));
   const bucketText = (b: keyof typeof RALLY_LABEL) => (sport === 'tabletennis' ? TT_PHASE_LABEL[b] ?? RALLY_LABEL[b] : RALLY_LABEL[b]);
   const summary = [
@@ -175,11 +181,21 @@ export function PointDetailRow({
           </View>
         </>
       )}
-      {sel?.strokes && pd && (pd.how === 'ue' || pd.how === 'sf') && (
+      {sel?.hint && pd ? <Text style={st.meta}>{sel.hint}</Text> : null}
+      {sel?.strokes && pd && (pd.how === 'ue' || pd.how === 'fe' || pd.how === 'sf') && (
         <View style={st.chips}>
           <Text style={[st.meta, st.rowLabel]}>{pd.how === 'sf' ? 'Fault:' : 'Error:'}</Text>
           {sel.strokes.map((k) => (
             <SelectChip key={k} label={STROKES[k]?.chip ?? k} active={et === k} onPress={() => setType(k)} />
+          ))}
+        </View>
+      )}
+      {sel?.credit === 'winner' && pd && winnerRoster.length >= 2 && (
+        <View style={st.chips}>
+          <Text style={[st.meta, st.rowLabel]}>By:</Text>
+          {winnerRoster.map((p) => (
+            <SelectChip key={p.id} label={p.fullName} active={pd.by === p.id} accessibilityLabel={`Hit by ${p.fullName}`}
+              onPress={() => { const { by: _b, ...rest } = pd; send({ pd: pd.by === p.id ? rest : { ...rest, by: p.id } }); }} />
           ))}
         </View>
       )}

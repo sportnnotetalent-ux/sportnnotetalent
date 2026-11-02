@@ -145,10 +145,13 @@ export interface RSide {
   winners: number; ue: number; fe: number; aces: number; sw: number; sf: number;
   /** squash decisions: strokes won / conceded, no lets (appeals refused) */
   strokes: number; conceded: number; nolets: number;
+  /** racket-depth RD3: points lost by rule (apart from errors) */
+  rule: number;
   /** how → wing ('all' = either / unknown) → shot id ('all' = any / unknown) */
   shots: Record<HowSel, Record<WingSel, Record<string, number>>>;
-  /** unforced errors by type, service faults by type */
-  errTypes: Record<string, number>; sfTypes: Record<string, number>;
+  /** unforced errors by type, service faults by type (racket-depth RD1:
+   *  forced errors by type) */
+  errTypes: Record<string, number>; sfTypes: Record<string, number>; feTypes: Record<string, number>;
   netPlayed: number; netWon: number;
   /** pickleball: this side's 3rd shots (as the serving team) and rallies won after them */
   third: Record<ThirdShot, { n: number; won: number }>;
@@ -171,9 +174,9 @@ const zeroSide = (sport: DepthSport, buckets: readonly RallyBucket[]): RSide => 
   const byShot = () => Object.fromEntries(ids.map((k) => [k, 0])) as Record<string, number>;
   const byWing = () => ({ all: byShot(), fh: byShot(), bh: byShot() });
   return {
-    winners: 0, ue: 0, fe: 0, aces: 0, sw: 0, sf: 0, strokes: 0, conceded: 0, nolets: 0,
+    winners: 0, ue: 0, fe: 0, aces: 0, sw: 0, sf: 0, strokes: 0, conceded: 0, nolets: 0, rule: 0,
     shots: { winner: byWing(), ue: byWing(), fe: byWing() },
-    errTypes: {}, sfTypes: {}, netPlayed: 0, netWon: 0,
+    errTypes: {}, sfTypes: {}, feTypes: {}, netPlayed: 0, netWon: 0,
     third: { drop: { n: 0, won: 0 }, drive: { n: 0, won: 0 }, lob: { n: 0, won: 0 } },
     phase: Object.fromEntries(buckets.map((b) => [b, { srvP: 0, srvW: 0, rcvP: 0, rcvW: 0 }])),
     arrival: { all: { n: 0, of: 0 }, srv: { n: 0, of: 0 }, rcv: { n: 0, of: 0 } },
@@ -208,6 +211,7 @@ export function racketTally(v: RacketView, scope: Scope = 'all'): RTally {
         case 'sf': out[L].sf += 1; break;
         case 'stroke': out[W].strokes += 1; out[L].conceded += 1; break;
         case 'nolet': out[L].nolets += 1; break;
+        case 'rule': out[L].rule += 1; break;
         default: break;
       }
       if (def?.wingShot && (pd.how === 'winner' || pd.how === 'ue' || pd.how === 'fe')) {
@@ -221,6 +225,7 @@ export function racketTally(v: RacketView, scope: Scope = 'all'): RTally {
       const et = errTypeOf(sport, pd);
       if (et && pd.how === 'ue') out[L].errTypes[et] = (out[L].errTypes[et] ?? 0) + 1;
       if (et && pd.how === 'sf') out[L].sfTypes[et] = (out[L].sfTypes[et] ?? 0) + 1;
+      if (et && pd.how === 'fe') out[L].feTypes[et] = (out[L].feTypes[et] ?? 0) + 1;
     }
     const at = netSides(p, W);
     for (const n of at) { out[n].netPlayed += 1; if (n === W) out[n].netWon += 1; }
@@ -327,6 +332,8 @@ export function keyStats(v: RacketView, scope: Scope = 'all'): StatSection[] {
     const rt = (x: RSide) => (x.ue ? (x.winners / x.ue).toFixed(2) : x.winners ? `${x.winners}–0` : '–');
     const rh = ratio(t.home), ra = ratio(t.away);
     shots.push({ key: 'wue', label: 'Winners / UE', home: rt(t.home), away: rt(t.away), hv: Number.isFinite(rh) ? rh : 99, av: Number.isFinite(ra) ? ra : 99 });
+    // racket-depth RD3: counted apart from errors, once a match recorded one
+    if (t.home.rule + t.away.rule > 0) shots.push(countRow('rule', 'Points lost by rule', t.home.rule, t.away.rule));
     out.push({ id: 'shots', title: 'Winners & errors', rows: shots });
   }
 
@@ -419,19 +426,20 @@ export function strokeSummary(v: RacketView, scope: Scope = 'all'): Array<{ key:
   return out;
 }
 
-/** SHOTS — unforced errors by type and service faults by type (the types
- *  that occurred). */
+/** SHOTS — unforced errors by type, forced errors by type (racket-depth RD1)
+ *  and service faults by type (the types that occurred). */
 export function errorTypeRows(v: RacketView, scope: Scope = 'all'): ServeRow[] {
   const t = racketTally(v, scope);
   const rows: ServeRow[] = [];
   for (const d of DETAIL_HOWS[v.sport]) {
-    if (d.how !== 'ue' && d.how !== 'sf') continue;
+    if (d.how !== 'ue' && d.how !== 'fe' && d.how !== 'sf') continue;
+    const head = d.how === 'ue' ? 'Unforced errors' : d.how === 'fe' ? 'Forced errors' : 'Service faults';
     for (const et of d.strokes ?? []) {
-      const pick = (x: RSide) => (d.how === 'ue' ? x.errTypes[et] : x.sfTypes[et]) ?? 0;
+      const pick = (x: RSide) => (d.how === 'ue' ? x.errTypes[et] : d.how === 'fe' ? x.feTypes[et] : x.sfTypes[et]) ?? 0;
       const hv = pick(t.home), av = pick(t.away);
       if (hv + av === 0) continue;
       const lab = STROKES[et]?.label ?? et;
-      rows.push(countRow(`${d.how}-${et}`, d.how === 'ue' ? `Unforced errors · ${lab.toLowerCase()}` : `Service faults · ${lab.toLowerCase()}`, hv, av));
+      rows.push(countRow(`${d.how}-${et}`, `${head} · ${lab.toLowerCase()}`, hv, av));
     }
   }
   return rows;

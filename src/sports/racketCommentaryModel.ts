@@ -73,14 +73,18 @@ export function racketSentence(sport: DepthSport, p: PointInput, who: { winner: 
   const et = errTypeOf(sport, pd);
   const type = et && STROKES[et] ? ` (${STROKES[et].label.toLowerCase()})` : '';
   const loser = (pd.err && whoName(nameOf, pd.err.playerId, pd.err.playerName)) || who.loser;
+  // racket-depth RD4: a doubles winner names its hitter (new matches; by id)
+  const winner = (pd.by && whoName(nameOf, pd.by)) || who.winner;
   switch (pd.how) {
-    case 'sw': return `${who.winner} wins the ${unit} with a Service Winner`;
-    case 'winner': return `${who.winner} wins the ${unit} with ${what('Winner')}`;
-    case 'fe': return `${loser} loses the ${unit} with ${what('Forced Error')}`;
+    case 'sw': return `${winner} wins the ${unit} with a Service Winner`;
+    case 'winner': return `${winner} wins the ${unit} with ${what('Winner')}`;
+    case 'fe': return `${loser} loses the ${unit} with ${what('Forced Error')}${type}`;
     case 'ue': return `${loser} loses the ${unit} with ${what('Unforced Error')}${type}`;
     case 'sf': return `${loser} loses the ${unit} with a Service Fault${type}`;
-    case 'stroke': return `Stroke to ${who.winner}`;
+    case 'stroke': return `Stroke to ${winner}`;
     case 'nolet': return `No let to ${loser} — ${unit} to ${who.winner}`;
+    // racket-depth RD3: neither a winner nor an error
+    case 'rule': return `${loser} loses the ${unit} by rule`;
     default: return undefined;
   }
 }
