@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-02 — Release: tennis extras live (web, Android OTA)
+
+auth-smoke passed. Published from a clean worktree at 43d073f: web (entry `index-b668806d`, confirmed live on app.sportnnote.in) and Android OTA groups `0f8160eb` (preview) and `b5f2c078` (production), runtime 1.0.0.
+
 ### 2026-11-02 — Tennis: error direction, fault type, lost by rule
 
 The three extras the founder approved. (1) Forced / unforced errors take an optional direction: "Went: Net · Long · Wide" ("Unforced error (backhand, long)"). (2) After a Fault, "1st serve was: Net · Long · Wide · Foot fault"; after a double fault, "Double fault was: …" (stored on the point as `sf1` / `sf2`, kept through timeline corrections; new action FAULT_TYPE). (3) "Lost by rule" (net touch, hindrance, double bounce, hit by the ball) as its own ending, charged to the player who broke the rule. Stats tab rows and career keys for each, shown only when recorded. Also: point-detail parsing now checks own properties only (a `__proto__` stroke or how is dropped). Files: `src/sports/pointDetail.ts`, `src/sports/rallyEdit.ts`, `src/sports/rallyStats.ts`, `src/sports/liveEvents.ts`, `src/sports/undoLabel.ts`, `src/sports/tennis/{engine.ts,index.tsx,PointCapture.tsx,matchStats.ts,stats.ts,commentaryModel.ts}`. Break-it list `docs/security/breaks/tennis-endings-depth.md`; tests `tests/tennis-endings-depth.test.mts`, `tests/sim-tennis-endings-depth.test.mts` (1,000 simulated matches). Demo-checked on a phone-sized screen.
