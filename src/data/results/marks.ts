@@ -221,6 +221,13 @@ export function liftProgressionError(list: LiftAttempt[] | undefined): string | 
  *  with every attempt taken and no valid mark, or a vertical jumper out without
  *  a clearance, is NM; a weightlifter with no total after bombing out is NM. */
 export function effectiveStatus(r: EntryResult, def: DisciplineDef): ResultStatus {
+  // batch 5: a lifter withdrawn after competing (marked `wdKeep` with the WD
+  // tap) keeps what was done — a good snatch still ranks in the snatch; the
+  // total only if there is one (IWF). Old WD rows carry no marker.
+  if (r.status === 'WD' && r.wdKeep === true && def.capture === 'lifts') {
+    const only = def.lifts?.length === 1 ? def.lifts[0] : undefined;
+    if (only ? bestLift(r.lifts?.[only]) != null : summarizeLifts(r.lifts).total != null) return 'ok';
+  }
   if (r.status && r.status !== 'ok') return r.status;
   if (def.capture === 'attempts') {
     const s = summarizeAttempts(r.attempts, def);

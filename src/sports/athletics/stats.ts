@@ -133,6 +133,8 @@ export const athleticsStats: SportStatSchema<'athletics'> = {
     { key: 'hand', label: 'Hand-timed', short: 'hand-timed', group: 'line' },
     { key: 'dnf', label: 'Did not finish', short: 'DNF', group: 'line', format: { unit: 'count', better: 'lower' } },
     { key: 'dq', label: 'Disqualified', short: 'DQ', group: 'line', format: { unit: 'count', better: 'lower' } },
+    // batch 5: false starts (also counted in dq) — from lines written from now on
+    { key: 'fs', label: 'False starts', short: 'FS', group: 'line', coverage: 'keyed', format: { unit: 'count', better: 'lower' } },
     ...markStats,
     ...pbStats,
     ...fieldMarkStats,

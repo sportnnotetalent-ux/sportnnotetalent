@@ -16,13 +16,14 @@ import { askConfirm } from '../ConfirmSheet';
 import {
   seriesCount, positionOf, stageOf, parseShot, seriesError, seriesLow, setSeries, seriesFromShots, scoreText, totalText, finalState, finalShotError,
   setFinalShot, addShootOff, finalStatusText, ordinal, POSITION_LABEL, ruleOf, setPenalty, penaltyTotal, PENALTY_POINTS,
-  setFinalPenalty, finalPenaltyTotal, netFinalShots,
+  setFinalPenalty, finalPenaltyTotal, netFinalShots, penaltyInView,
   type EntryResult, type ResultEntry, type ShootEventDef, type CompRules,
 } from '../../data/results';
 
 type Save = (entryId: string, next: EntryResult, undoLabel?: string) => void;
 const first = (name: string) => name.split(' ')[0];
-const inPlay = (e: ResultEntry) => !['DNS', 'WD', 'DQ'].includes(e.result.status ?? 'ok');
+// batch 5: a shooter who did not finish (DNF) leaves the card too
+const inPlay = (e: ResultEntry) => !['DNS', 'WD', 'DQ', 'DNF'].includes(e.result.status ?? 'ok');
 const num = (t: string): number | undefined => { const v = Number(t.trim().replace(',', '.')); return t.trim() && Number.isFinite(v) ? v : undefined; };
 
 /** A final shot as typed: "10.5", or the digits only — "105" → 10.5, "98" → 9.8 (a decimal keypad shortcut). */
@@ -82,6 +83,8 @@ function SeriesInput({ e, i, per, ev, mode, editable, onSave, pens }: { e: Resul
   const [t, setT] = useState(mode === 'shot' && shotsHere?.length ? shotsHere.join(' ') : have != null ? scoreText(have, ev.scoring) : '');
   const [x, setX] = useState(r.seriesX?.[i] != null && have != null ? String(r.seriesX[i]) : '');
   const [err, setErr] = useState<string | null>(null);
+  // batch 5: the −2 is a result, never locked behind the meet's switch — off, it waits behind this row's ⋯
+  const [more, setMore] = useState(false);
   const busy = useRef(false);
   const blocked = (r.series ?? []).length < i;
   const preview = mode === 'shot' && t.trim() ? readShots(t, ev) : null;
@@ -143,7 +146,10 @@ function SeriesInput({ e, i, per, ev, mode, editable, onSave, pens }: { e: Resul
       </View>
       {preview && !('error' in preview) ? <Text style={st.hint}>{preview.shots.length} shots = {scoreText(preview.total, ev.scoring)}{preview.xs ? ` · ${preview.xs}x` : ''}</Text> : null}
       {/* deep wave: a 2-point penalty on this series (ISSF) — tap to add another, a third tap clears */}
-      {pens && have != null && (editable || r.pen?.[i]) ? (
+      {!penaltyInView(!!pens || more, !!r.pen?.[i]) && have != null && editable ? (
+        <Text style={st.hint} accessibilityRole="button" accessibilityLabel={`More for series ${i + 1} of ${e.name}: penalty`} onPress={() => setMore(true)}>⋯ Penalty</Text>
+      ) : null}
+      {penaltyInView(!!pens || more, !!r.pen?.[i]) && have != null && (editable || r.pen?.[i]) ? (
         <View style={st.wrap}>
           <SelectChip label={r.pen?.[i] ? `Penalty −${r.pen[i]} (tap to change)` : `＋ Penalty −${PENALTY_POINTS}`} active={!!r.pen?.[i]} disabled={!editable}
             onPress={() => { const now = r.pen?.[i] ?? 0; const next = now >= 2 * PENALTY_POINTS ? 0 : now + PENALTY_POINTS; onSave(e.id, setPenalty(r, i, next, ev.scoring), next ? `S${i + 1} penalty −${next} · ${first(e.name)}` : `S${i + 1} penalty cleared · ${first(e.name)}`); }} />
@@ -219,7 +225,7 @@ export function FinalCard({ entries, ev, editable, onSave, rules }: { entries: R
           <View style={st.wrap}>
             {entries.filter(inPlay).map((e) => <SelectChip key={e.id} label={first(e.name)} active={fixing === e.id} onPress={() => setFixing(fixing === e.id ? null : e.id)} />)}
           </View>
-          {fixing && byId.get(fixing) && <ShotFixer key={fixing} e={byId.get(fixing)!} passed={passed} onSave={onSave} onDone={() => setFixing(null)} pens={pens} />}
+          {fixing && byId.get(fixing) && <ShotFixer key={fixing} e={byId.get(fixing)!} passed={passed} onSave={onSave} onDone={() => setFixing(null)} pens />}
           {pens ? <Text style={st.hint}>Penalty: tap the finalist, then the shot it was given on — 2 points come off that shot and the totals and eliminations follow.</Text> : null}
         </View>
       )}

@@ -433,6 +433,8 @@ export function phaseLines(f: Pick<PhaseFormat, 'discipline' | 'phase' | 'catego
     if (r.position != null) s.place = r.position;
     if (r.status === 'DNF') s.dnf = 1;
     if (r.status === 'DQ' || r.status === 'FS') s.dq = 1;
+    // batch 5: a false start is also counted on its own (a "false starts" stat)
+    if (r.status === 'FS') s.fs = 1;
     if (r.flags.includes('Q') || r.flags.includes('q')) s.qualified = 1;
     if (f.phase === 'final') s.finals = 1;
     if (a?.medal === 'gold') s.golds = 1;

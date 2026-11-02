@@ -498,8 +498,18 @@ export interface EntryResult {
   bo?: 1 | 3;
   /** SD-92 race walk: red cards from the judges (TR 54.6 / 54.7) */
   rc?: number;
-  /** SD-93 combined events: this athlete was warned for the race's one allowed false start (TR 39.8.3) */
+  /** SD-93 combined events: this athlete was warned for the race's one allowed false start (TR 39.8.3).
+   *  Batch 5: also a rowing / canoe crew's first false start (yellow card); the second excludes (FS). */
   fsWarn?: boolean;
+  /** Batch 5: withdrawn (WD) AFTER competing — what was done stands: a
+   *  weightlifter's snatch stays in the snatch ranking (no total), a shooter's
+   *  fired series reach the profile. Set with the WD tap from now on
+   *  (`withStatusChange`); an old WD row has no marker and reads as before. */
+  wdKeep?: boolean;
+  /** Batch 5 archery: per ranking-round end, how many of its highest-scoring
+   *  arrows don't count (World Archery Book 3 penalty — an arrow shot before /
+   *  after the signal). The arrows stay as shot; `mark` / `tens` / `xs` are net. */
+  arrPen?: number[];
   /** Field events: retired ("r", World Athletics notation) — stopped competing
    *  but keeps the marks made and the place they earn; no further trials. Where
    *  they stopped: after trial `afterRound` (LJ / TJ / throws) or at bar

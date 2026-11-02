@@ -6,6 +6,9 @@
  */
 import type { SportMeta } from '../types';
 
+/** batch 5: a setting with no effect in match play is not offered there (expert audit, golf chain break 2) */
+const STROKE_ONLY = { key: 'competition', value: 'match' } as const;
+
 export const GOLF_META: SportMeta = {
   id: 'golf',
   name: 'Golf',
@@ -40,16 +43,28 @@ export const GOLF_META: SportMeta = {
       ],
     },
     {
-      key: 'netScoring', label: 'Scores', type: 'choice', default: 'gross', advanced: true,
+      key: 'netScoring', hideWhen: STROKE_ONLY, label: 'Scores', type: 'choice', default: 'gross', advanced: true,
       hint: 'stroke play: rank on gross or net (handicap) scores',
       options: [
         { value: 'gross', label: 'Gross' },
         { value: 'net', label: 'Net (handicap)' },
       ],
     },
+    // batch 5 — the maximum per hole for the adjusted gross (WHS Rule 3.1);
+    // absent = net double bogey, as before. Stroke play / Stableford only.
+    {
+      key: 'maxScore', label: 'Maximum hole score (adjusted gross)', type: 'choice', default: 'ndb', advanced: true, hideWhen: STROKE_ONLY,
+      hint: 'caps a hole for the adjusted gross on profiles; the round itself counts every stroke',
+      options: [
+        { value: 'ndb', label: 'Net double bogey (WHS)' },
+        { value: 'par3', label: 'Par + 3' },
+        { value: 'par5', label: 'Par + 5' },
+        { value: 'none', label: 'No cap' },
+      ],
+    },
     { key: 'allowance', label: 'Handicap allowance %', type: 'number', default: 95, min: 0, max: 100, advanced: true, hint: 'WHS: 95% stroke/Stableford, 100% match play' },
     {
-      key: 'tieBreak', label: 'Ties', type: 'choice', default: 'countback', advanced: true,
+      key: 'tieBreak', hideWhen: STROKE_ONLY, label: 'Ties', type: 'choice', default: 'countback', advanced: true,
       options: [
         { value: 'countback', label: 'Countback (last 9/6/3/1)' },
         { value: 'shared', label: 'Shared' },
@@ -59,7 +74,7 @@ export const GOLF_META: SportMeta = {
     },
     {
       // SD-66 — Best Gross / Best Net boards side by side (stroke play with handicaps)
-      key: 'prizes', label: 'Gross + net prizes', type: 'choice', default: 'both', advanced: true,
+      key: 'prizes', hideWhen: STROKE_ONLY, label: 'Gross + net prizes', type: 'choice', default: 'both', advanced: true,
       hint: 'stroke play: can one player win both the gross and the net prize?',
       options: [
         { value: 'both', label: 'Can win both' },
@@ -69,7 +84,7 @@ export const GOLF_META: SportMeta = {
     // Round 2 — drives and first-putt lengths in yards (the PGA TOUR / DP
     // World Tour unit, default) or metres; cards always store yards
     {
-      key: 'distUnit', label: 'Distances', type: 'choice', default: 'yd', advanced: true,
+      key: 'distUnit', hideWhen: STROKE_ONLY, label: 'Distances', type: 'choice', default: 'yd', advanced: true,
       hint: 'measured drives and first-putt lengths (Stats to track)',
       options: [
         { value: 'yd', label: 'Yards' },

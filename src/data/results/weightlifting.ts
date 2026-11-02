@@ -441,7 +441,8 @@ export function liftLines(f: Pick<PhaseFormat, 'category' | 'rules'>, entries: R
   const out: LiftLine[] = [];
   for (const r of total) {
     const e = r.entry;
-    if (!e.athleteId || r.status === 'DNS' || r.status === 'WD') continue;
+    // batch 5: a lifter withdrawn after competing (`wdKeep`) keeps a line for what was done
+    if (!e.athleteId || r.status === 'DNS' || (r.status === 'WD' && e.result?.wdKeep !== true)) continue;
     const res = e.result ?? {};
     const s: Record<string, number> = { comps: 1 };
     if (r.position != null) s.place = r.position;

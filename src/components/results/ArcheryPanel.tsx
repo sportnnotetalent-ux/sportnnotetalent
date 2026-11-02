@@ -19,7 +19,7 @@ import { theme } from '../../core/theme';
 import { Button, Card, SelectChip, textStyles } from '../ui';
 import { askConfirm } from '../ConfirmSheet';
 import {
-  endsOf, endSum, endText, parseEnd, archRowText, setEnd, sortEnd,
+  endsOf, endSum, endText, parseEnd, archRowText, setEnd, sortEnd, setArrowPenalty,
   bracketState, staleMatchData, outcomeText, roundShort, setMatchEnd, setMatchSo, setCloser, setWalkover, clearMatches,
   matchSpecOf, setMatchSoRound,
   faceOf, ruleOf, perArcherOf, endInArcherOrder,
@@ -190,6 +190,15 @@ export function EndCard({ entries, round, editable, onSave, rules }: { entries: 
             </>
           )}
           {err ? <Text style={st.bad}>{err}</Text> : null}
+          {/* batch 5 (World Archery Book 3): an arrow shot before / after the signal — the end's highest arrow(s) don't count; the arrows stay as shot */}
+          {up.result.ends?.[cur]?.length ? (() => {
+            const now = Array.isArray(up.result.arrPen) && Number.isInteger(up.result.arrPen[cur]) ? up.result.arrPen[cur] : 0;
+            const nextN = now >= Math.min(2, round.perEnd) ? 0 : now + 1;
+            return (
+              <SelectChip label={now ? `Penalty: highest ${now === 1 ? 'arrow' : `${now} arrows`} of end ${cur + 1} off (tap to change)` : `⋯ Penalty: end ${cur + 1}’s highest arrow doesn’t count`} active={now > 0}
+                onPress={() => onSave(up.id, setArrowPenalty(up.result, cur, nextN), nextN ? `E${cur + 1} penalty: highest ${nextN === 1 ? 'arrow' : `${nextN} arrows`} off · ${first(up.name)}` : `E${cur + 1} penalty cleared · ${first(up.name)}`)} />
+            );
+          })() : null}
           {(up.result.ends?.length ?? 0) > 0 && <SelectChip label={`Remove ${first(up.name)}'s last end`} active={false} onPress={() => void clearLast()} />}
         </View>
       )}

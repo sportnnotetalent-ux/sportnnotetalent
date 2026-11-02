@@ -347,6 +347,16 @@ export const COMPETITION_RULES: RuleDef[] = [
     help: 'How crews are given lanes in repechages, semi-finals and finals.',
     source: 'World Rowing / ICF lane allocation',
   },
+  // batch 5: the crew false start — first a warning, the second excludes
+  {
+    key: 'crewFalseStart', sports: ['rowing', 'canoe'], group: 'Starts', label: 'False starts', kind: 'choice', phase: true, default: 'warn',
+    choices: [
+      { value: 'warn', label: 'First a warning (yellow card), the second excludes (red card)' },
+      { value: 'zero', label: 'Excluded at the first false start' },
+    ],
+    help: 'A crew that starts early is warned; a second false start by the same crew in that race excludes it. The FS chip on the crew’s row keeps count, so nobody has to remember the first one.',
+    source: 'World Rowing Rules of Racing (yellow / red card), as remembered — verify; ICF canoe sprint: verify the current false-start rule',
+  },
 ];
 
 /** The rule definitions for one sport, in screen order. */
