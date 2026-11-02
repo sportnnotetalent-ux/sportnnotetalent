@@ -33,6 +33,7 @@ import {
   canBowl, midOver, oversUsed, snapshotState, lastBall,
   minOversOf, rainStopPar, chaseHasMinOvers, withNewDlsTable,
   powerplaySpan, SHOT_TYPES, ballStamp, chaseAlive, drawWord, endResult,
+  reviewsLeft, type ReviewOutcome,
 } from './engine';
 import type { ShotType } from './engine';
 import { WagonField, WagonWheelView } from './WagonWheel';
@@ -40,7 +41,7 @@ import { mirrorZone, zoneName, shotsOf, coverage } from './wagon';
 import { cricketUndoLabel } from './undo';
 import {
   hasLog, extrasBreakdown, extrasText, fallOfWickets, fowText, partnerships, overHistory, bowlerSplits, statTotals,
-  adjustmentsText, fieldingNotesText,
+  adjustmentsText, fieldingNotesText, subMarks,
 } from './scorecard';
 import type { CricketState, DismissalKind, Innings, RunsAs, FieldNoteKind } from './engine';
 import { OverEditor } from './OverEditor';
@@ -1226,7 +1227,10 @@ const ScoringControls: SportPlugin<CricketState>['ScoringControls'] = ({
     return null;
   })();
   // (the last ball of innings 1 can still be tagged until the chase's first ball)
-  const shotBall = rules.wagonWheel && !soActive && lastRec && lastRec.bat > 0 && lastRec.strikerId
+  // Batch 5 (C2): also a dot ball or a wicket off the bat's ball (shot type only,
+  // no field tap) — not a wide, a bye or a leg bye (no shot to name).
+  const shotOk = (r: NonNullable<typeof lastRec>) => r.bat > 0 || (r.ext !== 'wd' && r.b + r.lb === 0);
+  const shotBall = rules.wagonWheel && !soActive && lastRec && shotOk(lastRec) && lastRec.strikerId
     && ((lastRec.inn === state.innings && lastRec.side === state.battingSide) || (state.innings === 2 && lastRec.inn === 1 && cur.balls === 0))
     ? { rec: lastRec, at: ballStamp(lastRec.legal ? lastRec.lb6 : lastRec.lb6 + 1, state.ballsPerOver), nb: lastRec.ext === 'nb' } : null;
   const shotKey = shotBall ? `${shotBall.rec.inn}:${shotBall.at}:${shotBall.rec.strikerId}:${shotBall.nb ? 'nb' : ''}` : '';
@@ -1241,6 +1245,23 @@ const ScoringControls: SportPlugin<CricketState>['ScoringControls'] = ({
     } });
     const name = state.batting[bid]?.name ?? 'the batter';
     const screenSel = tag?.zone ? { zone: tag.lh ? mirrorZone(tag.zone) : tag.zone, deep: !!tag.deep } : null;
+    // Batch 5 (C2) — a dot ball / a wicket: just the shot type (Defended too).
+    if (rec.bat === 0) {
+      const outNow = !!rec.out && rec.out.kind !== 'retired';
+      return (
+        <View style={ctrl.morePanel}>
+          <View style={ctrl.creaseHead}>
+            <Text style={[ctrl.label, ctrl.flex]} numberOfLines={2}>🏏 {name} ({at}){outNow ? ' — out' : ''} — the shot? (optional)</Text>
+            <Button label={tag ? 'Done' : 'Skip'} variant="ghost" style={ctrl.swapBtn} onPress={() => setShotSkip(shotKey)} />
+          </View>
+          <View style={ctrl.chips}>
+            {SHOT_TYPES.map((t) => (
+              <SelectChip key={t} label={t} active={tag?.shot === t} onPress={() => send({ shot: t as ShotType })} />
+            ))}
+          </View>
+        </View>
+      );
+    }
     return (
       <View style={ctrl.morePanel}>
         <View style={ctrl.creaseHead}>
@@ -1330,7 +1351,7 @@ const ScoringControls: SportPlugin<CricketState>['ScoringControls'] = ({
       <View style={{ gap: theme.spacing(2) }}>
         <View style={ctrl.creaseHead}>
           <Text style={ctrl.label}>Batsmen — {battingName}</Text>
-          <Button label="⇄ Swap" variant="ghost" style={ctrl.swapBtn} disabled={!bothSet} onPress={() => dispatch({ type: 'SWAP_STRIKE' })} />
+          <Button label="⇄ Swap" variant="ghost" style={ctrl.swapBtn} disabled={!bothSet} onPress={() => dispatch({ type: 'SWAP_STRIKE', payload: { v: 2 } })} />
         </View>
         <Text style={ctrl.meta}>
           Striker: <Text style={ctrl.creaseHi}>{strikerName ?? '—'}</Text>{strikerId ? ' 🏏' : ''}   ·   Non-striker: <Text style={ctrl.creaseHi}>{nonStrikerName ?? '—'}</Text>
@@ -1637,6 +1658,11 @@ const ScoringControls: SportPlugin<CricketState>['ScoringControls'] = ({
             onPress={() => { if (k === 'pen' && ballPen) { setBallPen(null); return; } setMorePanel((m) => (m === k ? null : k)); }} />
         ))}
       </View>
+      {/* Batch 5 (audit fix 3) — DRS: only when the match rules allow reviews. */}
+      {!soActive && !rootState.ended && (rules.reviews ?? 0) > 0 && (
+        <ReviewPanel s={rootState} dispatch={dispatch} homeName={homeName} awayName={awayName} />
+      )}
+
       {morePanel && (
         <MoreRunsPanel key={`${morePanel}:${state.innings}`} mode={morePanel} state={state} dispatch={dispatch}
           battingName={battingName} bowlingName={bowlingName} homeName={homeName} awayName={awayName}
@@ -2038,7 +2064,9 @@ function InningsCard({
   const sr = (runs: number, balls: number) => (balls ? ((runs / balls) * 100).toFixed(1) : '-');
   const captainId = s.captains[side]?.id;
   const keeperId = s.keepers[side]?.id;
-  const role = (id: string) => (id === captainId ? ' (c)' : '') + (id === keeperId ? ' †' : '');
+  // Batch 5 (C5) — ⚡ the Impact Player, "(concussion sub)" a replacement
+  const marks = subMarks(s, side);
+  const role = (id: string) => (id === captainId ? ' (c)' : '') + (id === keeperId ? ' †' : '') + (marks[id] ?? '');
   const eco = (runs: number, balls: number) => (balls ? (runs / (balls / s.ballsPerOver)).toFixed(2) : '-');
   // Parity #19 — depth from the replayed ball log (a persisted snapshot has none:
   // those rows simply don't show).
@@ -2431,7 +2459,8 @@ function CricketQuickOptions({ state, dispatch, homeRoster, awayRoster, homeName
       type: kind === 'concussion' ? 'CONCUSSION_SUB' : 'IMPACT_SUB',
       side,
       // IDs-only: who went off / came on, by id
-      payload: { side, outId: out.id, inId: inP.id },
+      // batch 5 (C5): v:2 — the concussion sub is kept for the scorecard mark
+      payload: { side, outId: out.id, inId: inP.id, v: 2 },
     });
   };
 
@@ -2571,6 +2600,52 @@ export const cricketPlugin: SportPlugin<CricketState> = {
   voice: { hints: ['four', 'six', 'dot', 'wicket', 'wide', 'two runs', 'five', 'all run four'], parse: cricketVoice },
   liveSettings: CRICKET_LIVE_SETTINGS,
 };
+
+/** Batch 5 (audit fix 3, R9) — DRS. A small "📺 DRS review" button; open, it asks
+ *  who reviewed (batting side: an out decision; fielding side: a not-out one)
+ *  and how it ended. Shows each side's reviews left. Overturning an OUT: Undo
+ *  the wicket first, then log the review. Score-neutral, every tap optional. */
+function ReviewPanel({ s, dispatch, homeName, awayName }: {
+  s: CricketState; dispatch: (a: ScoreAction) => void; homeName: string; awayName: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [side, setSide] = useState<'home' | 'away' | null>(null);
+  const nameOf = (sd: 'home' | 'away') => (sd === 'home' ? homeName : awayName);
+  const bat = s.battingSide;
+  const left = { home: reviewsLeft(s, 'home'), away: reviewsLeft(s, 'away') };
+  const send = (outcome: ReviewOutcome) => {
+    if (!side) return;
+    dispatch({ type: 'REVIEW', side, payload: { v: 2, side, outcome, ...(side === bat && s.strikerId ? { batterId: s.strikerId } : {}) } });
+    setSide(null);
+    setOpen(false);
+  };
+  const line = `📺 Reviews left — ${homeName} ${left.home} · ${awayName} ${left.away}`;
+  if (!open) {
+    return <Button label={line} variant="ghost" accessibilityLabel="DRS review" onPress={() => setOpen(true)} />;
+  }
+  return (
+    <View style={ctrl.morePanel}>
+      <View style={ctrl.creaseHead}>
+        <Text style={[ctrl.label, ctrl.flex]} numberOfLines={2}>📺 DRS review — who asked?</Text>
+        <Button label="Close" variant="ghost" style={ctrl.swapBtn} onPress={() => { setSide(null); setOpen(false); }} />
+      </View>
+      <View style={ctrl.chips}>
+        {([bat, other(bat)] as const).map((sd) => (
+          <SelectChip key={sd} label={`${nameOf(sd)} (${sd === bat ? 'out decision' : 'not-out decision'}) · ${left[sd]} left`}
+            active={side === sd} disabled={left[sd] <= 0} onPress={() => setSide(sd)} />
+        ))}
+      </View>
+      {side ? (
+        <View style={ctrl.chips}>
+          <SelectChip label="Decision stands (review lost)" active={false} onPress={() => send('upheld')} />
+          <SelectChip label="Overturned" active={false} onPress={() => send('overturned')} />
+          <SelectChip label="Umpire’s call (kept)" active={false} onPress={() => send('umpires_call')} />
+        </View>
+      ) : null}
+      <Text style={ctrl.meta}>Out overturned? Undo the wicket first, then log the review.</Text>
+    </View>
+  );
+}
 
 const ctrl = StyleSheet.create({
   row: { flexDirection: 'row', gap: theme.spacing(2) },

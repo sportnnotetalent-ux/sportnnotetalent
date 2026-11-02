@@ -490,3 +490,14 @@ export function statTotals(s: CricketState): Record<string, { side: Side; stats:
   }
   return out;
 }
+
+/** Batch 5 (C5) — the scorecard marks for `side`'s substitutes, by player id:
+ *  " ⚡" the Impact Player who came in, " (concussion sub)" a like-for-like
+ *  replacement (a `v: 2` CONCUSSION_SUB that named him). Read-only. */
+export function subMarks(s: Pick<CricketState, 'impactUsed' | 'concussionSubs'>, side: Side): Record<string, string> {
+  const out: Record<string, string> = {};
+  const imp = s.impactUsed?.[side];
+  if (imp?.inId) out[imp.inId] = ' ⚡';
+  for (const c of s.concussionSubs ?? []) if (c.side === side && c.inId && !out[c.inId]) out[c.inId] = ' (concussion sub)';
+  return out;
+}

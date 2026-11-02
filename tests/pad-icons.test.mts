@@ -29,7 +29,7 @@ const SAME = [
   ['goalie pulled', 'pull goalie'], ['goalie back', 'goalie back in net', 'goalie in'], ['golden raid', 'gr'],
   ['positions', 'swap', 'tactical change'], ['kick at goal', 'penalty goal'], ['placed on report', 'put on report'],
   ['reception', 'who was aced?'], ['attack', 'attack in play'], ['referral', 'video referral'], ['blocked', 'defended'],
-  ['pc', 'penalty corner'], ['steal', 'ball stolen'], ['intercept', 'interception'], ['shot', 'shot at goal'],
+  ['pc', 'penalty corner'], ['swap', 'strike changed'], ['steal', 'ball stolen'], ['intercept', 'interception'], ['shot', 'shot at goal'],
   ['missed shot', 'miss'], ['opp. error', 'opp. serve error'],
 ];
 const norm = (l: string) => l.replace(/\$\{.*$/, '').split(/ — | · |:|…|\(/)[0].trim().toLowerCase();
