@@ -38,10 +38,10 @@ test('bonus is offered only when it would count', () => {
 
 describe('the raid panel', () => {
   const src = readFileSync(join(import.meta.dirname, '..', 'src/sports/kabaddi/index.tsx'), 'utf8');
-  test('a one-tap row before the raider chips, new raids only', () => {
+  test('a one-tap row right after the raider chips (court-team batch 1), new raids only', () => {
     const row = src.indexOf('One tap');
     assert.ok(row > 0);
-    assert.ok(row < src.indexOf('Raider (optional)'));
+    assert.ok(row > src.indexOf('Raider (optional)'), 'the raider is picked first, then one tap');
     assert.match(src, /raidFlow\.editOf == null && \(\s*<View style=\{ctrl\.quickRow\}/);
     assert.match(src, /recordForm\(quickRaidForm\(/);
   });

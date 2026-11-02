@@ -17,7 +17,7 @@
  * lookup its text reads as before).
  */
 import type { KabaddiState, KabaddiEvent, RaidEntry, ExtraEntry } from './engine.ts';
-import { extrasOf, isShootoutEvent, perRaidByIndex, replayOf, raidSkillLabel, tackleTypeLabel, techReasonLabel, halfLabel } from './engine.ts';
+import { extrasOf, isShootoutEvent, perRaidByIndex, replayOf, raidSkillLabel, tackleTypeLabel, techReasonLabel, routShort, halfLabel } from './engine.ts';
 import { YELLOW_MINUTES, type RaidBreakdown } from './rules.ts';
 import { joinNames, plural, type FeedEntry, type FeedGroup, type Side } from '../netraid/feed.ts';
 import { extraName, raiderName, subPlayers, tacklerName, touchedName, whoName, withRosters, type NameOf, type RosterLike } from './names.ts';
@@ -49,7 +49,9 @@ export function raidSentence(r: RaidEntry, b: RaidBreakdown, n: number, names: K
   if (r.gr) tags.push('GOLDEN RAID');
   if (b.doOrDie) tags.push('DO-OR-DIE');
   const parts: string[] = [];
-  if (b.lineOut) parts.push(`stepped out of bounds — out, +1 to ${O}`);
+  // court-team batch 1: a raider out without a tackle names why (an older
+  // line-out, with no reason, reads as it always did)
+  if (b.lineOut) parts.push(r.rout ? `out without a tackle (${routShort(r.rout)}) — +1 to ${O}` : `stepped out of bounds — out, +1 to ${O}`);
   else if (b.doOrDieFail) parts.push(`do-or-die raid failed — out, +1 to ${O}`);
   else {
     if (b.raidPts > 0) {

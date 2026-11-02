@@ -36,7 +36,7 @@ import { kabaddiEventDetail, withRosters } from './names';
 import {
   init, reducer, currentMinute, halfLabel, previewRaid, raidOfEvent, raidActions, isRaidHead, kabaddiWinner, halfPoints, defendersOnMat,
   expectedRaider, outPlayers, clockPaused, timeoutsUsed, TIMEOUTS_PER_HALF, TACKLE_TYPES,
-  formOutcome, quickRaidForm, quickBonusCounts, matNow, kabaddiCfg, touchChips, unavailable, unavailableOf, listHas, isSubbedOff, cardsOf, suggestedCard, TECH_REASONS, CARD_ICON, RAID_SKILLS,
+  formOutcome, quickRaidForm, quickBonusCounts, matNow, kabaddiCfg, touchChips, unavailable, unavailableOf, listHas, isSubbedOff, cardsOf, suggestedCard, NEW_TECH_REASONS, ROUT_REASONS, CARD_ICON, RAID_SKILLS, tacklerActions, tacklerAskable,
   type KabaddiState, type KabaddiEvent, type CardColour, type RaidForm,
 } from './engine.ts';
 import { KABADDI_META } from './meta';
@@ -99,13 +99,16 @@ const ScoringControls: SportPlugin<KabaddiState>['ScoringControls'] = ({ state, 
   const [raidFlow, setRaidFlow] = useState<{
     side: 'home' | 'away'; raider?: Player; touches: number; bonus: boolean; tackled: boolean; tackler?: Player;
     editOf?: number; at?: { minute: number; half: number }; tackleType?: string;
-    /** SD-59: line-outs */
-    defOut?: number; lineOut?: boolean;
+    /** SD-59: line-outs; court-team batch 1: why the raider was out without a tackle */
+    defOut?: number; lineOut?: boolean; rout?: string;
     /** deep wave ("Stats to track"): raid skill, defenders touched */
     skill?: string; touched?: Player[];
   } | null>(null);
   // SD-59: a technical point (to `side`); SD-72: a card (to a player of `side`)
   const [tech, setTech] = useState<{ side?: 'home' | 'away'; reason?: string; by?: Player } | null>(null);
+  // court-team batch 1: the raid a quick "Raider out" just logged — an optional
+  // "Tackled by?" row names its tackler (an in-place raid edit)
+  const [askTackler, setAskTackler] = useState<number | null>(null);
   const [card, setCard] = useState<{ side?: 'home' | 'away'; colour?: CardColour; who?: Player | 'official' | 'player'; tp: boolean; tpSet?: boolean } | null>(null);
 
   const hm = state.halfMinutes, et = state.extraTimeMinutes;
@@ -148,7 +151,7 @@ const ScoringControls: SportPlugin<KabaddiState>['ScoringControls'] = ({ state, 
         side: raid.side, touches: raid.touches, bonus: raid.bonus, tackled: raid.raiderOut,
         raider: byId(raid.raiderId, raid.raider), tackler: raid.raiderOut ? byId(raid.tacklerId, raid.tackler) : undefined,
         tackleType: raid.raiderOut ? raid.tt : undefined,
-        ...(raid.defOut ? { defOut: raid.defOut } : null), ...(raid.lineOut ? { lineOut: true } : null),
+        ...(raid.defOut ? { defOut: raid.defOut } : null), ...(raid.lineOut ? { lineOut: true } : null), ...(raid.rout ? { rout: raid.rout } : null),
         ...(raid.sk ? { skill: raid.sk } : null),
         ...(raid.touched?.length ? { touched: raid.touched.map((p) => byId(p.id, p.name)).filter((p): p is Player => !!p) } : null),
         editOf: raid.eid, at: { minute: raid.minute ?? 0, half: raid.half ?? state.half },
@@ -317,7 +320,7 @@ const ScoringControls: SportPlugin<KabaddiState>['ScoringControls'] = ({ state, 
               <Button key={side} label={`🤼 ${nm} raiding${dod ? ' · ⚠ DoD' : ''}${due ? ' ◀ next' : ''}`}
                 variant={expected && !due ? 'ghost' : side} style={ctrl.flex}
                 accessibilityHint={due ? 'Expected to raid next' : undefined}
-                onPress={() => setRaidFlow({ side, touches: 0, bonus: false, tackled: false })} />
+                onPress={() => { setAskTackler(null); setRaidFlow({ side, touches: 0, bonus: false, tackled: false }); }} />
             );
           })}
         </View>
@@ -331,20 +334,7 @@ const ScoringControls: SportPlugin<KabaddiState>['ScoringControls'] = ({ state, 
           {raidFlow.editOf == null && doOrDieOn(kabaddiCfg(state)) && kEmpty[raidFlow.side] >= 2 && (
             <IconText label={"⚠ DO-OR-DIE raid — the raider is out if this raid scores nothing."} style={ctrl.doOrDie} />
           )}
-          {/* MVP K3 — the common raids in one tap (nobody else to credit); a
-              raider picked below is still credited. New raids only. */}
-          {raidFlow.editOf == null && (
-            <View style={ctrl.quickRow}>
-              <Text style={ctrl.meta}>One tap — records at once{raidFlow.raider ? ` (raider: ${raidFlow.raider.fullName})` : ''}:</Text>
-              <View style={ctrl.chips}>
-                <Button label="Empty" variant="ghost" onPress={() => recordForm(quickRaidForm(raidFlow.side, 'empty', raidFlow.raider))} />
-                <Button label="+1 touch" variant="ghost" onPress={() => recordForm(quickRaidForm(raidFlow.side, 'touch', raidFlow.raider))} />
-                {quickBonusCounts(state, raidFlow.side) ? <Button label="Bonus" variant="ghost" onPress={() => recordForm(quickRaidForm(raidFlow.side, 'bonus', raidFlow.raider))} /> : null}
-                <Button label="Raider out" variant="ghost" onPress={() => recordForm(quickRaidForm(raidFlow.side, 'out', raidFlow.raider))} />
-              </View>
-              <Text style={ctrl.meta}>Anything else (more touches, line-outs, who tackled): fill in below.</Text>
-            </View>
-          )}
+          {/* court-team batch 1: the raider first, so the one-tap row below credits him */}
           {onField(raidFlow.side, raidFlow.side === 'home' ? homeRoster : awayRoster).length > 0 && (
             <>
               <Text style={ctrl.meta}>Raider (optional)</Text>
@@ -359,6 +349,20 @@ const ScoringControls: SportPlugin<KabaddiState>['ScoringControls'] = ({ state, 
                 })}
               </View>
             </>
+          )}
+          {/* MVP K3 — the common raids in one tap (nobody else to credit); a
+              raider picked above is still credited. New raids only. */}
+          {raidFlow.editOf == null && (
+            <View style={ctrl.quickRow}>
+              <Text style={ctrl.meta}>One tap — records at once{raidFlow.raider ? ` (raider: ${raidFlow.raider.fullName})` : ''}:</Text>
+              <View style={ctrl.chips}>
+                <Button label="Empty" variant="ghost" onPress={() => recordForm(quickRaidForm(raidFlow.side, 'empty', raidFlow.raider))} />
+                <Button label="+1 touch" variant="ghost" onPress={() => recordForm(quickRaidForm(raidFlow.side, 'touch', raidFlow.raider))} />
+                {quickBonusCounts(state, raidFlow.side) ? <Button label="Bonus" variant="ghost" onPress={() => recordForm(quickRaidForm(raidFlow.side, 'bonus', raidFlow.raider))} /> : null}
+                <Button label="Raider out" variant="ghost" onPress={() => { const eid = state.seq + 1; recordForm(quickRaidForm(raidFlow.side, 'out', raidFlow.raider)); setAskTackler(eid); }} />
+              </View>
+              <Text style={ctrl.meta}>Anything else (more touches, line-outs, who tackled): fill in below.</Text>
+            </View>
           )}
           {(() => {
             // SD-114: you can't touch more defenders than are on the mat (the
@@ -415,10 +419,21 @@ const ScoringControls: SportPlugin<KabaddiState>['ScoringControls'] = ({ state, 
           })()}
           <View style={ctrl.chips}>
             <SelectChip label={`Bonus point: ${raidFlow.bonus ? 'Yes' : 'No'}`} active={raidFlow.bonus} onPress={() => setRaidFlow({ ...raidFlow, bonus: !raidFlow.bonus })} />
-            <SelectChip label={`Raider tackled: ${raidFlow.tackled ? 'Yes' : 'No'}`} active={raidFlow.tackled} onPress={() => setRaidFlow({ ...raidFlow, tackled: !raidFlow.tackled, lineOut: raidFlow.tackled ? raidFlow.lineOut : undefined, tackler: raidFlow.tackled ? undefined : raidFlow.tackler, tackleType: raidFlow.tackled ? undefined : raidFlow.tackleType })} />
-            {/* SD-59: the raider stepped out of bounds — out, +1 to the defence, no tackle */}
-            <SelectChip label={`Raider stepped out: ${raidFlow.lineOut ? 'Yes' : 'No'}`} active={!!raidFlow.lineOut} onPress={() => setRaidFlow({ ...raidFlow, lineOut: !raidFlow.lineOut || undefined, ...(!raidFlow.lineOut ? { tackled: false, tackler: undefined, tackleType: undefined } : null) })} />
+            <SelectChip label={`Raider tackled: ${raidFlow.tackled ? 'Yes' : 'No'}`} active={raidFlow.tackled} onPress={() => setRaidFlow({ ...raidFlow, tackled: !raidFlow.tackled, lineOut: raidFlow.tackled ? raidFlow.lineOut : undefined, rout: raidFlow.tackled ? raidFlow.rout : undefined, tackler: raidFlow.tackled ? undefined : raidFlow.tackler, tackleType: raidFlow.tackled ? undefined : raidFlow.tackleType })} />
+            {/* SD-59 / court-team batch 1: the raider out without a tackle (stepped
+                out, baulk line, raid time, cant) — out, +1 to the defence */}
+            <SelectChip label={`Raider out — no tackle: ${raidFlow.lineOut ? 'Yes' : 'No'}`} active={!!raidFlow.lineOut} onPress={() => setRaidFlow({ ...raidFlow, lineOut: !raidFlow.lineOut || undefined, rout: raidFlow.lineOut ? undefined : 'line', ...(!raidFlow.lineOut ? { tackled: false, tackler: undefined, tackleType: undefined } : null) })} />
           </View>
+          {raidFlow.lineOut && (
+            <>
+              <Text style={ctrl.meta}>Why was the raider out?</Text>
+              <View style={ctrl.chips}>
+                {ROUT_REASONS.map((r) => (
+                  <SelectChip key={r.key} label={r.label} active={(raidFlow.rout ?? 'line') === r.key} onPress={() => setRaidFlow({ ...raidFlow, rout: r.key })} />
+                ))}
+              </View>
+            </>
+          )}
           {/* deep wave — "Raid skill" (Stats to track): how the points were scored */}
           {state.track?.skills && !raidFlow.lineOut && (
             <>
@@ -469,7 +484,7 @@ const ScoringControls: SportPlugin<KabaddiState>['ScoringControls'] = ({ state, 
             const bits = [
               `raid +${b.raidPts}${raidFlow.bonus && !b.bonusPts ? ' (bonus void: under 6 defenders)' : ''}`,
               b.defOutPts ? `line-out +${b.defOutPts}` : null,
-              b.lineOut ? `line-out +1 to ${oppName}` : b.raiderOut ? `${b.superTackle ? 'super tackle' : b.doOrDieFail ? 'do-or-die stop' : 'tackle'} +${b.tacklePts} to ${oppName}` : null,
+              b.lineOut ? `raider out (no tackle) +1 to ${oppName}` : b.raiderOut ? `${b.superTackle ? 'super tackle' : b.doOrDieFail ? 'do-or-die stop' : 'tackle'} +${b.tacklePts} to ${oppName}` : null,
               b.allOuts.length ? `all out +2` : null,
             ].filter(Boolean).join(' · ');
             return <Text style={ctrl.meta}>Scores: {bits}</Text>;
@@ -477,6 +492,29 @@ const ScoringControls: SportPlugin<KabaddiState>['ScoringControls'] = ({ state, 
           <Button label={raidFlow.editOf != null ? '✓ Save raid' : '✓ Record raid'} onPress={recordRaid} />
         </View>
       )}
+      {/* court-team batch 1: after a quick "Raider out", name the tackler
+          (optional, non-blocking) — an in-place edit of that raid. */}
+      {!raidFlow && askTackler != null && (() => {
+        const r = tacklerAskable(state, askTackler);
+        if (!r) return null;
+        const defSide = r.side === 'home' ? 'away' : 'home';
+        const defenders = onField(defSide, rosterFor(defSide));
+        if (!defenders.length) return null;
+        return (
+          <View style={ctrl.quickRow}>
+            <Text style={ctrl.meta}>🛡️ Tackled by? (optional — credits the defender)</Text>
+            <View style={ctrl.chips}>
+              {defenders.map((p) => (
+                <SelectChip key={p.id} label={p.fullName} active={false} onPress={() => {
+                  for (const action of tacklerActions(state, askTackler, p, rosterId)) dispatch(action);
+                  setAskTackler(null);
+                }} />
+              ))}
+              <SelectChip label="Skip" active={false} onPress={() => setAskTackler(null)} />
+            </View>
+          </View>
+        );
+      })()}
       {/* SD-117b: pause the clock for a timeout / injury / review; team timeouts.
           MVP K4: below the raid buttons, so a thumb slip can't cost a timeout. */}
       {!state.goldenRaid && (
@@ -525,7 +563,7 @@ const ScoringControls: SportPlugin<KabaddiState>['ScoringControls'] = ({ state, 
             </View>
             <Text style={ctrl.meta}>Why?</Text>
             <View style={ctrl.chips}>
-              {TECH_REASONS.map((r) => (
+              {NEW_TECH_REASONS.map((r) => (
                 <SelectChip key={r.key} label={r.label} active={tech.reason === r.key} onPress={() => setTech({ ...tech, reason: tech.reason === r.key ? undefined : r.key })} />
               ))}
             </View>

@@ -176,8 +176,14 @@ export const VB_ERROR_TYPES: Array<{ key: string; label: string }> = [
   { key: 'rotation', label: 'Rotation' },
   { key: 'hits', label: 'Double / 4 hits' },
   { key: 'attackout', label: 'Attack out' },
-  { key: 'blockout', label: 'Block out' },
+  // court-team batch 1: a BLOCKING fault (net touch while blocking, reaching
+  // over, blocking a serve). The key stays `blockout`, so older logs keep their
+  // meaning (a block error); the ball off the block and out is the attacker's kill.
+  { key: 'blockout', label: 'Block fault (net / over / blocked a serve)' },
 ];
+/** court-team batch 1 — shown under the fault chips (FIVB: a ball off the
+ *  block and out is an attack kill, not a blocking error). */
+export const VB_BLOCK_HINT = 'Ball off the block and out = ⚡ Attack point (the attacker’s kill), not a fault.';
 const ERROR_LABEL = Object.fromEntries(VB_ERROR_TYPES.map((t) => [t.key, t.label]));
 export const errorTypeLabel = (k?: string) => (k ? ERROR_LABEL[k] ?? k : undefined);
 

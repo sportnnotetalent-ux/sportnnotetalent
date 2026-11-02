@@ -16,7 +16,7 @@
  * by `nameOf` (this viewer's name; an older log's stored name without one).
  */
 import type { KabaddiState, RaidEntry } from './engine.ts';
-import { extrasOf, isShootoutEvent, perRaidByIndex, replayOf, raidSkillLabel, RAID_SKILLS, TACKLE_TYPES, tackleTypeLabel } from './engine.ts';
+import { extrasOf, isShootoutEvent, perRaidByIndex, replayOf, raidSkillLabel, RAID_SKILLS, ROUT_REASONS, TACKLE_TYPES, tackleTypeLabel } from './engine.ts';
 import type { RaidBreakdown } from './rules.ts';
 import { kabaddiMatchCentre, kabaddiTouchedTracked, unsuccessfulTacklers } from './totals.ts';
 import { countRow, pctRow, ratioRow, type CmpCat, type CmpRow, type Side } from '../netraid/feed.ts';
@@ -89,6 +89,17 @@ export function kabaddiMatchStats(s: KabaddiState, scope: KbScope = 'all', nameO
         ratioRow('dod', 'Do-or-die raids won', c.home.doOrDieWon, c.home.doOrDieRaids, c.away.doOrDieWon, c.away.doOrDieRaids),
         countRow('dodPts', 'Do-or-die points', dodPts[0], dodPts[1]),
       );
+    }
+    // court-team batch 1: raider self-outs (out without a tackle) by reason —
+    // an older line-out (no reason logged) counts as "stepped out"
+    const selfOuts = rs.filter((y) => y.b.lineOut);
+    const so = H((x) => selfOuts.filter((y) => y.r.side === x).length);
+    if (so[0] + so[1] > 0) {
+      raiding.push(countRow('selfOuts', 'Raider self-outs (no tackle)', so[0], so[1], { better: 'lower' }));
+      for (const k of ROUT_REASONS) {
+        const v = H((x) => selfOuts.filter((y) => y.r.side === x && (y.r.rout ?? 'line') === k.key).length);
+        if (v[0] + v[1]) raiding.push(countRow(`rout_${k.key}`, `of which ${k.label.toLowerCase()}`, v[0], v[1], { sub: true, better: 'lower' }));
+      }
     }
     cats.push({ id: 'raiding', title: 'Raiding', rows: raiding });
 

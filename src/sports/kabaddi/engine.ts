@@ -61,6 +61,10 @@ export interface RaidEntry extends RaidOutcome {
    *  IDs-only: `{ id }`; an older log's entry may carry the `name` (legacy,
    *  read-only) — or only the name. */
   touched?: TouchedRef[];
+  /** court-team batch 1 — the raider was out without a tackle, and why
+   *  (ROUT_REASONS key; always with `lineOut`). Absent on older logs: their
+   *  raider line-out reads as "stepped out", as it always did. */
+  rout?: string;
 }
 
 /** A defender touched on a raid: by id (an older log: `name`, legacy). */
@@ -100,6 +104,23 @@ export const TECH_REASONS: Array<{ key: string; label: string; short: string }> 
   { key: 'other', label: 'Other', short: 'other' },
 ];
 export const techReasonLabel = (k?: string) => (k ? TECH_REASONS.find((r) => r.key === k)?.label ?? k : undefined);
+/** court-team batch 1 — the reasons offered for a NEW technical point. A late
+ *  / broken cant puts the raider out (ROUT_REASONS), so it is no longer a
+ *  technical point; older logs' `cant` technical points still read and replay. */
+export const NEW_TECH_REASONS = TECH_REASONS.filter((r) => r.key !== 'cant');
+
+/** court-team batch 1 — why a raider was out without a tackle (AKFI / IKF):
+ *  out, +1 to the defence, a defender revived; not a tackle. Stored as `rout`. */
+export const ROUT_REASONS: Array<{ key: string; label: string; short: string }> = [
+  { key: 'line', label: 'Stepped out', short: 'stepped out' },
+  { key: 'baulk', label: 'Baulk line not crossed', short: 'baulk line not crossed' },
+  { key: 'time', label: 'Raid time (30 s)', short: 'raid time (30 s) up' },
+  { key: 'cant', label: 'Cant lost / broken', short: 'cant lost' },
+];
+const ROUT_KEYS = new Set(ROUT_REASONS.map((r) => r.key));
+export const routLabel = (k?: string) => (k ? ROUT_REASONS.find((r) => r.key === k)?.label ?? k : undefined);
+/** the short reason for a raid's self-out (undefined: an older line-out) */
+export const routShort = (k?: string) => (k ? ROUT_REASONS.find((r) => r.key === k)?.short : undefined);
 
 export type CardColour = 'green' | 'yellow' | 'red';
 export const CARD_ICON: Record<CardColour, string> = { green: '🟩', yellow: '🟨', red: '🟥' };
@@ -508,6 +529,8 @@ export interface RaidForm {
   side: Side; touches: number; bonus: boolean; tackled: boolean; raider?: Who; tackler?: Who; editOf?: number; tackleType?: string;
   /** SD-59: defenders who stepped out (line-out) / the raider stepped out */
   defOut?: number; lineOut?: boolean;
+  /** court-team batch 1: with `lineOut`, why the raider was out (ROUT_REASONS key) */
+  rout?: string;
   /** deep wave: the raid skill (RAID_SKILLS key) and the defenders touched */
   skill?: string; touched?: Who[];
 }
@@ -585,10 +608,41 @@ export function raidActions(s: KabaddiState, f: RaidForm, idOf?: (name?: string)
       // deep wave: optional, only on a raid that scored / touched
       ...(f.skill && (raidPts > 0 || f.skill === 'escape') ? { skill: f.skill } : null),
       ...(f.touched?.length && !f.lineOut && outcome.touches > 0 ? { touched: f.touched.slice(0, outcome.touches).map((p) => ({ id: p.id })) } : null),
+      // court-team batch 1: optional, only on a raider out without a tackle
+      ...(f.lineOut && f.rout && ROUT_KEYS.has(f.rout) ? { rout: f.rout } : null),
       ...(f.editOf != null ? { replaces: f.editOf } : null),
     },
   });
   return out;
+}
+
+/** court-team batch 1 — the raid `eid` if "Tackled by?" can still name its
+ *  tackler: in play, a tackle (not a line-out), no tackler named yet. */
+export function tacklerAskable(s: KabaddiState, eid: number): RaidEntry | undefined {
+  const raid = raidsOf(s).find((r) => r.eid === eid);
+  return raid && !raid.hidden && raid.raiderOut && !raid.lineOut && !raid.tacklerId && !raid.tackler ? raid : undefined;
+}
+
+/** court-team batch 1 — "Tackled by?" after a quick "Raider out": the raid
+ *  `eid` re-entered with its tackler, through the raid edit (raidActions with
+ *  `editOf`), stamped at the raid's own minute. Every other answer is the
+ *  raid's own, so the score and the mat don't move. Nothing ([]) when the raid
+ *  is gone, isn't a tackle, or already names its tackler. */
+export function tacklerActions(s: KabaddiState, eid: number, tackler: Who, idOf?: (name?: string) => string | undefined): ScoreAction[] {
+  const raid = tacklerAskable(s, eid);
+  if (!raid) return [];
+  const raiderId = raid.raiderId ?? idOf?.(raid.raider);
+  const touched = (raid.touched ?? []).flatMap((p) => (p.id ? [{ id: p.id }] : []));
+  const f: RaidForm = {
+    side: raid.side, touches: raid.touches, bonus: raid.bonus, tackled: true, tackler, editOf: eid,
+    ...(raiderId ? { raider: { id: raiderId } } : null),
+    ...(raid.tt ? { tackleType: raid.tt } : null),
+    ...(raid.defOut ? { defOut: raid.defOut } : null),
+    ...(raid.sk ? { skill: raid.sk } : null),
+    ...(touched.length ? { touched } : null),
+  };
+  const at = { minute: raid.minute ?? 0, half: raid.half ?? s.half };
+  return raidActions(s, f, idOf).map((a) => (a.type === 'RAID_OUTCOME' ? { ...a, payload: { ...a.payload, ...at } } : a));
 }
 
 /** The raid entry + its current breakdown for a timeline line (head or child). */
@@ -631,7 +685,7 @@ export function raidEvents(raids: RaidEntry[], orphans: RaidEntry[], cfg: Kabadd
       b.touchesLost ? `${plural(b.touchesLost, 'touch')} lost (caught)` : null,
       b.bonusPts ? 'bonus' : r.bonus ? 'bonus (void — under 6 defenders)' : null,
       b.defOutPts ? `${plural(b.defOutPts, 'defender')} stepped out` : null,
-      b.lineOut ? 'raider stepped out' : b.raiderOut ? 'raider out' : null,
+      b.lineOut ? (r.rout ? `raider out (${routShort(r.rout)})` : 'raider stepped out') : b.raiderOut ? 'raider out' : null,
     ].filter(Boolean).join(' · ');
     const name = b.raidPts >= 3 ? 'Super raid' : b.raidPts === 0 && !b.raiderOut ? 'Empty raid' : 'Raid';
     const head = `${b.doOrDie ? 'Do-or-die · ' : ''}${name}${b.raidPts ? ` +${b.raidPts}` : ''}${parts ? ` — ${parts}` : ''}`;
@@ -643,7 +697,7 @@ export function raidEvents(raids: RaidEntry[], orphans: RaidEntry[], cfg: Kabadd
       k += 1;
     }
     if (b.lineOut) {
-      out.push({ ...base, id: eid + k / 10, icon: '🚩', label: 'Line-out +1 — raider out', detail: r.raider, side: other(r.side), kind: 'lineout', points: 1 });
+      out.push({ ...base, id: eid + k / 10, icon: '🚩', label: r.rout ? `Raider out +1 — ${routShort(r.rout)} (no tackle)` : 'Line-out +1 — raider out', detail: r.raider, side: other(r.side), kind: 'lineout', points: 1 });
       k += 1;
     } else if (b.raiderOut) {
       const tl = b.superTackle ? 'Super tackle' : b.doOrDieFail ? 'Do-or-die stop' : 'Tackle';
@@ -800,6 +854,7 @@ export const reducer = (s: KabaddiState, a: ScoreAction): KabaddiState => {
       const raiderId = str(p.raiderId) ?? whoId;
       // (a correction of a past raid may name a player subbed off since)
       if (p.replaces == null && listHas(s.subbedOff[a.side], { id: raiderId, name: raider })) return s;
+      const rout = typeof p.rout === 'string' && ROUT_KEYS.has(p.rout) ? p.rout : undefined;
       const outcome: RaidOutcome = {
         side: a.side,
         touches: Math.max(0, Math.floor(Number(p.touches ?? 0))),
@@ -812,7 +867,9 @@ export const reducer = (s: KabaddiState, a: ScoreAction): KabaddiState => {
         ...(Number(p.rv) >= 3 ? { rv: 3 as const } : null),
         // SD-59 (new optional keys): line-outs
         ...(Number(p.defOut) > 0 ? { defOut: Math.floor(Number(p.defOut)) } : null),
-        ...(p.lineOut === true ? { lineOut: true } : null),
+        // court-team batch 1 (new optional key): a raider out without a
+        // tackle, and why — always a line-out (an unknown value is ignored)
+        ...(p.lineOut === true || rout ? { lineOut: true } : null),
       };
       const cfg = kabaddiCfg(s);
       const ex = extrasOf(s);
@@ -832,6 +889,7 @@ export const reducer = (s: KabaddiState, a: ScoreAction): KabaddiState => {
         // deep wave (new optional keys): raid skill, the defenders touched
         ...(str(p.skill) ? { sk: str(p.skill) } : null),
         ...(touchedList(p.touched, outcome.touches) ? { touched: touchedList(p.touched, outcome.touches) } : null),
+        ...(rout ? { rout } : null),
       };
       // SD-72: the clock time orders the raid against suspensions (live raids only)
       const t = replaces >= 0 ? prev[replaces].t : liveT(s, a);
