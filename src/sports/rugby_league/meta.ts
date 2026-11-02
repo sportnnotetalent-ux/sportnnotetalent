@@ -22,7 +22,8 @@ export const TRACK_FIELDS: FormatField[] = [
   { key: 'trackSets', label: 'Six-tackle sets', type: 'toggle', default: false, group: 'Stats to track', hint: 'A Tackle button and the tackle count: sets, completion rate, tackles per set, possession' },
   { key: 'trackDefence', label: 'Tackles & missed tackles', type: 'toggle', default: false, group: 'Stats to track', hint: 'Per player, from the Detail button' },
   { key: 'trackAttack', label: 'Runs, line breaks & offloads', type: 'toggle', default: false, group: 'Stats to track', hint: 'Per player, from the Detail button' },
-  { key: 'trackErrors', label: 'Errors & penalties conceded', type: 'toggle', default: false, group: 'Stats to track', hint: 'The player or Team (no name)' },
+  // batch 3 (founder, 2026-11-02): on for a new match; a saved match keeps its own (engine init)
+  { key: 'trackErrors', label: 'Errors & penalties conceded', type: 'toggle', default: true, group: 'Stats to track', hint: 'The player or Team (no name)' },
 ];
 
 export const RUGBY_LEAGUE_META: SportMeta = {

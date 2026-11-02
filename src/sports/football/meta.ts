@@ -39,10 +39,13 @@ export const BASE_TRACKABLE: [string, string, boolean][] = [
 /** "Quick" (founder, 2026-10-31; MVP F8): a friendly tracks goals, assists,
  *  subs (always) and cards; everything else is opt-in. Tournaments keep the
  *  full set. Stamped on new matches only — a saved match has no `track*` keys
- *  and keeps the full set (engine `readTrack`). */
+ *  and keeps the full set (engine `readTrack`).
+ *  Batch 3 (founder, 2026-11-02): shots and saves are on for a new friendly too
+ *  (docs/security/breaks/defaults-invasion.md); a saved friendly keeps its own. */
+const FRIENDLY_ON = ['cards', 'shots', 'saves'];
 export const TRACK_FIELDS: FormatField[] = BASE_TRACKABLE.map(([k, label, full]) => ({
   key: trackKey(k), label: `Track ${label.toLowerCase()}`, type: 'toggle', group: 'Stats to track', advanced: true,
-  default: k === 'cards', tournamentDefault: full,
+  default: FRIENDLY_ON.includes(k), tournamentDefault: full,
 }));
 
 /** Deep wave — the optional toggles as format fields (live settings group;
