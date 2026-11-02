@@ -31,6 +31,8 @@ const SAME = [
   ['reception', 'who was aced?'], ['attack', 'attack in play'], ['referral', 'video referral'], ['blocked', 'defended'],
   ['pc', 'penalty corner'], ['swap', 'strike changed'], ['steal', 'ball stolen'], ['intercept', 'interception'], ['shot', 'shot at goal'],
   ['missed shot', 'miss'], ['opp. error', 'opp. serve error'],
+  // US batch 5: the team versions of the same basketball actions
+  ['turnover', 'team to'], ['def. rebound', 'team rebound', 'rebound?'],
 ];
 const norm = (l: string) => l.replace(/\$\{.*$/, '').split(/ — | · |:|…|\(/)[0].trim().toLowerCase();
 const sameAction = (labels: string[]) => labels.length < 2 || SAME.some((g) => labels.every((l) => g.includes(l)));

@@ -12,6 +12,7 @@ import { TextField } from '../../components/ui';
 import { theme } from '../../core/theme';
 import { Button, SelectChip } from '../../components/ui';
 import { askConfirm, confirmMatchAction } from '../../components/ConfirmSheet';
+import { IconText } from '../../components/Icon';
 import { SubViews } from '../SubViews';
 import { MatchBoxScore } from '../../components/BoxScore';
 import { basketballBox } from '../boxSources';
@@ -791,7 +792,7 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
         return (
           <View style={ctrl.assistBox}>
             <View style={ctrl.editHead}>
-              <Text style={[ctrl.label, ctrl.flex]}>⏬ Rebound?</Text>
+              <IconText label="⏬ Rebound?" style={[ctrl.label, ctrl.flex]} />
               <Button label="Skip" variant="ghost" onPress={() => setReboundFor(null)} />
             </View>
             <View style={ctrl.chips}>
