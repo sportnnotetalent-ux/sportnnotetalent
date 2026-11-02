@@ -9,7 +9,7 @@
  *    or the end of the half;
  *  - COMPLETED: the set ends in a kick, a score, a kick at goal from a
  *    penalty, or a six again / penalty to the side with the ball (a fresh set
- *    starts). INCOMPLETE: it ends in an error (knock-on, forward pass, into
+ *    starts; a penalty to the side with the ball is one too). INCOMPLETE: it ends in an error (knock-on, forward pass, into
  *    touch…), a penalty against the side with the ball, or being tackled on
  *    the last tackle (handover). A set still running at the end of a half, or
  *    when the ball changed hands without an ending being tapped, counts as a
@@ -36,7 +36,7 @@ export interface SetFigures {
   ends: Record<SetEnd, number>;
 }
 
-const EMPTY_ENDS = (): Record<SetEnd, number> => ({ kick: 0, error: 0, penalty: 0, sixth: 0, restart: 0, score: 0, goal: 0, other: 0, period: 0 });
+const EMPTY_ENDS = (): Record<SetEnd, number> => ({ kick: 0, error: 0, penalty: 0, sixth: 0, restart: 0, penWon: 0, score: 0, goal: 0, other: 0, period: 0 });
 
 /** A side's set figures over a scope ('all' or a period). `nowSec` = the live playing second. */
 export function setFigures(s: LeagueState, side: Side, scope: 'all' | number = 'all', nowSec?: number): SetFigures {

@@ -86,6 +86,7 @@ export function leagueSheet(s: LeagueState, scope: 'all' | number = 'all', nowSe
       ends('sixth', 'Handovers on the last tackle', true),
       ends('kick', 'Sets ended with a kick'),
       ends('restart', 'Six agains / penalties won'),
+      ends('penWon', 'Penalties won (with the ball)'),
     ], 'A set is complete unless it ends in an error, a penalty against the side with the ball, or a handover on the last tackle. Possession: time on the playing clock.'),
     (has('run') || has('lineBreak') || has('offload')) && section('attack', 'Attack', [
       has('run') && countRow('carries', 'Runs', dt('carries').h, dt('carries').a),

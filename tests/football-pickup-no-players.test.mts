@@ -43,6 +43,8 @@ describe('the screen wires it in', () => {
   test('team pick, foul and penalty skip the player step when the side has no players', () => {
     assert.match(src, /afterTeamPick\(kind, xi\(side\)\.length > 0\)/);
     assert.match(src, /recordTeamFoul\(/);
-    assert.match(src, /xi\(side\)\.length === 0 \? setFlow\(\{ mode: 'pen', step: 'outcome', side \}\)/);
+    // invasion batch 5: the penalty's steps come from penaltyStepAfter (no players → straight to the outcome)
+    assert.match(src, /step: penaltyStepAfter\('team', penHas\(side\)\)/);
+    assert.match(src, /const penHas = \(side: 'home' \| 'away'\) => \(\{ attackers: xi\(side\)\.length > 0, defenders: xi\(opp\(side\)\)\.length > 0 \}\)/);
   });
 });

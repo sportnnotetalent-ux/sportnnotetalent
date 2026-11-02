@@ -93,11 +93,13 @@ type Flow =
   | { mode: 'try'; side: Side; step: 'zone' | 'scorer' | 'assist'; scorer?: Player | null; bonus?: boolean }
   | { mode: 'conv'; side: Side; step: 'result' | 'kicker'; made?: boolean }
   | { mode: 'kick'; side: Side; kick: 'pen' | 'fg'; step: 'result' | 'points' | 'kicker'; made?: boolean; two?: boolean }
-  | { mode: 'sanction'; side: Side; step: 'kind' | 'player'; sanction?: Sanction }
+  /** `pt` (invasion batch 5): straight after a penalty try by `pt` — a sanction for the offender? (optional), then the conversion */
+  | { mode: 'sanction'; side: Side; step: 'kind' | 'player'; sanction?: Sanction; pt?: Side }
   | { mode: 'sub'; side: Side; step: 'kind' | 'off' | 'on' | 'back'; kind?: SubKind; off?: Player | null }
   | { mode: 'detail'; side: Side; step: 'kind' | 'player'; detail?: DetailKey }
   /** six-tackle sets: an error / penalty against the side with the ball — who (with errors tracked) */
-  | { mode: 'setEnd'; side: Side; how: 'error' | 'penalty' };
+  /** invasion batch 5: 'penWon' — a penalty to the side with the ball; `side` = the defence (who conceded it) */
+  | { mode: 'setEnd'; side: Side; how: 'error' | 'penalty' | 'penWon' };
 
 /* -------------------------------- controls --------------------------------- */
 
@@ -183,15 +185,23 @@ const ScoringControls: SportPlugin<LeagueState>['ScoringControls'] = ({
     fire({ type: 'TRY', side: sd, payload: bonus ? { bonus: true } : {}, ...credit({ type: 'try', bonus, playerId: scorer?.id, secondId: assist?.id }) });
     conversionNext(sd);
   };
-  const penaltyTry = (sd: Side) => { fire({ type: 'PENALTY_TRY', side: sd }); conversionNext(sd); };
+  // invasion batch 5: an optional sanction for the offender, then the conversion
+  // (golden point: the try ends the match — no step; a re-entry keeps its rows)
+  const penaltyTry = (sd: Side) => {
+    fire({ type: 'PENALTY_TRY', side: sd });
+    if (editAt || isGoldenPoint(s, s.period)) conversionNext(sd);
+    else setFlow({ mode: 'sanction', side: other(sd), step: 'kind', pt: sd });
+  };
   const kick = (sd: Side, k: 'conv' | 'pen' | 'fg', made: boolean, p: Player | null, two = false) => {
     fire({ type: 'KICK', side: sd, payload: { kick: k, made, ...(two ? { two: true } : {}) }, ...credit({ type: 'kick', kick: k, made, two, playerId: p?.id }) });
     setFlow(null);
   };
   const sanction = (sd: Side, k: Sanction, p: Player | null) => {
     fire({ type: 'SANCTION', side: sd, payload: { sanction: k }, ...credit({ type: 'sanction', sanction: k, playerId: p?.id }) });
-    setFlow(null);
+    ptNext();
   };
+  /** after a penalty try's sanction step (or "No sanction"): its conversion */
+  const ptNext = () => { if (flow?.mode === 'sanction' && flow.pt) conversionNext(flow.pt); else setFlow(null); };
   const sub = (sd: Side, off: Player | null, on: Player, kind: SubKind = 'perm', back = false) => {
     fire(subAction(sd, off, on, { ...(kind !== 'perm' ? { temp: kind } : {}), ...(back ? { back: true } : {}) }));
     setFlow(null);
@@ -204,9 +214,10 @@ const ScoringControls: SportPlugin<LeagueState>['ScoringControls'] = ({
   const open = currentSet(s);
   const errorsOn = s.trackErrors === true;
   const setEnd = (how: SetEnd, p?: Player | null) => {
-    const named = (how === 'error' || how === 'penalty') && errorsOn;
-    fire({ type: 'SET_END', payload: { how, ...(named ? { detail: how } : {}) },
-      ...(named && open ? credit({ type: 'detail', detail: how as DetailKey, playerId: p?.id }) : {}) });
+    const named = (how === 'error' || how === 'penalty' || how === 'penWon') && errorsOn;
+    const d: DetailKey = how === 'error' ? 'error' : 'penalty';
+    fire({ type: 'SET_END', payload: { how, ...(named ? { detail: d } : {}) },
+      ...(named && open ? credit({ type: 'detail', detail: d, playerId: p?.id }) : {}) });
     setFlow(null);
   };
 
@@ -279,7 +290,8 @@ const ScoringControls: SportPlugin<LeagueState>['ScoringControls'] = ({
     const head = (t: string) => (
       <View style={c.flowHead}>
         <Text style={[c.h, { color: color(sd) }]} numberOfLines={1}>{t} · {name(sd)}</Text>
-        <Text style={c.cancel} accessibilityRole="button" onPress={() => setFlow(null)}>Cancel</Text>
+        {/* a penalty try's sanction step: Cancel still goes on to its conversion */}
+        <Text style={c.cancel} accessibilityRole="button" onPress={() => (flow.mode === 'sanction' && flow.pt ? ptNext() : setFlow(null))}>Cancel</Text>
       </View>
     );
     switch (flow.mode) {
@@ -348,12 +360,13 @@ const ScoringControls: SportPlugin<LeagueState>['ScoringControls'] = ({
       }
       case 'sanction': {
         if (flow.step === 'kind') return (
-          <View style={c.panel}>{head('Sin bin · send-off')}
+          <View style={c.panel}>{head(flow.pt ? 'Penalty try — sanction for the offender? (optional)' : 'Sin bin · send-off')}
             <View style={c.row}>
               <Button label="⏱ Sin bin" accessibilityLabel={`Sin bin, ${s.sinBinMinutes} minutes`} variant="ghost" style={c.flex} onPress={() => setFlow({ ...flow, sanction: 'sinBin', step: 'player' })} />
               <Button label="🟥 Send off" variant="ghost" style={c.flex} onPress={() => setFlow({ ...flow, sanction: 'sendOff', step: 'player' })} />
             </View>
             <Button label="📝 Put on report" variant="ghost" onPress={() => setFlow({ ...flow, sanction: 'report', step: 'player' })} />
+            {flow.pt ? <Button label="✓ No sanction — to the conversion" variant="ghost" onPress={ptNext} /> : null}
             <Text style={c.meta}>Sin bin: {s.sinBinMinutes} minutes of playing time, the team plays a player short. Send-off: off for the rest of the match, not replaced. On report: play goes on — the judiciary decides.</Text>
           </View>
         );
@@ -429,7 +442,7 @@ const ScoringControls: SportPlugin<LeagueState>['ScoringControls'] = ({
       }
       case 'setEnd':
         return (
-          <View style={c.panel}>{head(flow.how === 'error' ? 'Error' : 'Penalty against')}
+          <View style={c.panel}>{head(flow.how === 'error' ? 'Error' : flow.how === 'penWon' ? `Penalty to ${name(other(sd))} — conceded` : 'Penalty against')}
             <Text style={c.small}>Who? (optional — tapping records it)</Text>
             <PlayerGrid players={onField(sd)} onPick={(p) => setEnd(flow.how, p)} skip={{ label: 'Team (no name)', onPress: () => setEnd(flow.how, null) }} />
           </View>
@@ -485,8 +498,11 @@ const ScoringControls: SportPlugin<LeagueState>['ScoringControls'] = ({
             onPress={() => (errorsOn ? setFlow({ mode: 'setEnd', side: sd, how: 'penalty' }) : setEnd('penalty'))} />
           <Button label="🔂 Six again" accessibilityLabel={`Six again: a fresh set for ${name(sd)}`} variant="ghost" style={c.flex} onPress={() => setEnd('restart')} />
         </View>
+        {/* invasion batch 5: a full penalty against the defence — a fresh set, the defence's penalty conceded (who: optional) */}
+        <Button label={`📣 Penalty to ${name(sd)}`} accessibilityLabel={`Penalty to ${name(sd)}, against ${name(other(sd))}: a fresh set for ${name(sd)}`} variant="ghost"
+          onPress={() => (errorsOn ? setFlow({ mode: 'setEnd', side: other(sd), how: 'penWon' }) : setEnd('penWon'))} />
         <Text style={c.link} accessibilityRole="button" accessibilityLabel={`Ball to ${name(other(sd))} (no ending)`} onPress={() => fire({ type: 'SET_BALL', side: other(sd) })}>↔ Ball to {name(other(sd))}</Text>
-        <Text style={c.meta}>Completions {completionText(fh)} – {completionText(fa)}. The {s.setTackles}th tackle hands the ball over by itself; a score ends the set. Six again: a set restart or a penalty to the side with the ball.</Text>
+        <Text style={c.meta}>Completions {completionText(fh)} – {completionText(fa)}. The {s.setTackles}th tackle hands the ball over by itself; a score ends the set. Six again: a set restart. Penalty to {name(sd)}: a penalty against {name(other(sd))}.</Text>
       </View>
     );
   })() : null;

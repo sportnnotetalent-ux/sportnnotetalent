@@ -98,6 +98,8 @@ export function footballStatSentence(e: StatEvent, names: Names, extra: { saver?
       return { icon: '↗️', text: `Attempt missed. ${who(e.playerName)} ${shot} misses the target.${assisted}${e.bigChance ? ' A big chance missed.' : ''}`, ...(e.bigChance ? { major: true, tone: 'chance' as const } : {}) };
     }
     case 'foul':
+      // invasion batch 5: the foul that gave away a penalty
+      if (e.pen) return { icon: '⚖️', text: `Penalty conceded by ${who(e.playerName)}${e.secondName ? `, fouling ${e.secondName} (${names[other(e.side)]})` : ''}.`, major: true, tone: 'chance' };
       return { icon: '🟫', text: `Foul by ${who(e.playerName)}.${e.secondName ? ` ${e.secondName} (${names[other(e.side)]}) wins a free kick.` : ''}` };
     case 'corner':
       return { icon: '⛳', text: `Corner, ${team}.` };

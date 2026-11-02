@@ -24,6 +24,7 @@ import {
   goalAction, teamGoalAction, undoGoalAction, ownGoalAction, assistAction, cardActions, officialCardActions, sinBinAction, afterTeamPick, benchFor,
   statAction, foulAction, subAction, xiAction, xiOf, penKickAction, eventRemoval, statRemoval as statRemovalAction, type StatDetail,
   penaltyMissActions, gridSaveActions, cardChoices,
+  stoppageAction, stoppageReasonAction, penaltyConcededActions, penaltyStepAfter, footballTrackedKeys, STOPPAGE_REASONS, STOPPAGE_LABEL,
 } from './actions';
 import { Button, TextField, SelectChip } from '../../components/ui';
 import { askConfirm, confirmMatchAction } from '../../components/ConfirmSheet';
@@ -141,6 +142,9 @@ type Flow =
   // Penalty: won by → taken by → scored / saved / missed.
   | { mode: 'pen'; step: 'team' }
   | { mode: 'pen'; step: 'wonBy'; side: 'home' | 'away' }
+  // Invasion batch 5: who gave the penalty away (optional) → the card step
+  | { mode: 'pen'; step: 'concededBy'; side: 'home' | 'away'; wonBy?: Player }
+  | { mode: 'pen'; step: 'card'; side: 'home' | 'away'; conceder: Player }
   | { mode: 'pen'; step: 'takenBy'; side: 'home' | 'away'; wonBy?: Player }
   | { mode: 'pen'; step: 'outcome'; side: 'home' | 'away'; taker?: Player; wonBy?: Player };
 
@@ -172,6 +176,10 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
   // Multi-step capture: tap an action → pick the player(s) from a jersey+name
   // table → any follow-up (goal type, assist, on/off target). One tap per step.
   const [flow, setFlow] = useState<Flow | null>(null);
+  // Invasion batch 5 (audit fix 5): the stoppage just logged (its event id) —
+  // an optional "Why?" chip row under the button until a reason is picked or
+  // anything else is logged. Never a panel: scoring carries straight on.
+  const [stopAsk, setStopAsk] = useState<number | null>(null);
   // MVP F2: the "Assist?" step finds its goal once it is on the board (the first
   // goal of that side logged after it opened), and closes if Undo removes it —
   // so a stale prompt can't move an assist onto an earlier goal.
@@ -252,20 +260,9 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
   const deep = state.deep ?? {};
   // The player-attributed stat keys being tracked this match — stamped on each
   // stat line so a profile can show "this total spans N of M games".
-  const trackedKeys = (): string[] => {
-    const keys = ['goals', 'openPlayGoals', 'penaltyGoals', 'freekickGoals', 'assists', 'yellowCards', 'redCards', 'cleanSheets'];
-    if (t.shots) keys.push('shots', 'shotsOnTarget', 'blocks');
-    if (t.fouls) keys.push('fouls');
-    if (t.tackles) keys.push('tackles');
-    if (t.interceptions) keys.push('interceptions');
-    if (t.saves) keys.push('saves');
-    if (t.passes) keys.push('passes', 'passesComplete');
-    if (t.attackContribution) keys.push('attackingContributions');
-    if (t.defenceContribution) keys.push('defensiveContributions');
-    if (deep.keyPasses) keys.push('keyPasses');
-    if (deep.clearances) keys.push('clearances');
-    return keys;
-  };
+  // Invasion batch 5: every captured stat (crosses, dribbles, offsides,
+  // handballs, penalties won / missed too) — see actions.ts.
+  const trackedKeys = (): string[] => footballTrackedKeys(t, deep);
 
   // IDs-only scoring: every action is built by ./actions.ts (ids only)
 
@@ -479,6 +476,8 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
 
   // Penalty in open play: credit who won it, then the outcome — a scored goal, or
   // a miss (with the opponent GK's save when saved). Each is its own timeline row.
+  // Invasion batch 5: which penalty steps have someone to pick
+  const penHas = (side: 'home' | 'away') => ({ attackers: xi(side).length > 0, defenders: xi(opp(side)).length > 0 });
   const finishPenalty = (side: 'home' | 'away', outcome: 'scored' | 'saved' | 'missed', taker: Player | undefined, wonBy?: Player) => {
     if (wonBy) recordStat('penaltyWon', side, wonBy);
     if (outcome === 'scored') {
@@ -1008,15 +1007,48 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
 
     if (flow.mode === 'pen') {
       if (flow.step === 'team') {
-        return panel('⭕ Penalty', 'Which team has the penalty?', teamButtons((side) => (xi(side).length === 0 ? setFlow({ mode: 'pen', step: 'outcome', side }) : setFlow({ mode: 'pen', step: 'wonBy', side }))));
+        return panel('⭕ Penalty', 'Which team has the penalty?', teamButtons((side) => setFlow({ mode: 'pen', step: penaltyStepAfter('team', penHas(side)), side })));
       }
       const sideName = flow.side === 'home' ? homeName : awayName;
       if (flow.step === 'wonBy') {
         return panel(`⭕ Penalty — ${sideName}`, 'Who won the penalty?', (
           <>
-            <PlayerTable players={xi(flow.side)} onPick={(p) => setFlow({ mode: 'pen', step: 'takenBy', side: flow.side, wonBy: p })} />
-            <Button label="Skip — not recorded" variant="ghost" onPress={() => setFlow({ mode: 'pen', step: 'takenBy', side: flow.side })} />
+            <PlayerTable players={xi(flow.side)} onPick={(p) => setFlow({ mode: 'pen', step: penaltyStepAfter('wonBy', penHas(flow.side)) as 'concededBy' | 'takenBy', side: flow.side, wonBy: p })} />
+            <Button label="Skip — not recorded" variant="ghost" onPress={() => setFlow({ mode: 'pen', step: penaltyStepAfter('wonBy', penHas(flow.side)) as 'concededBy' | 'takenBy', side: flow.side })} />
           </>
+        ));
+      }
+      if (flow.step === 'concededBy') {
+        // Invasion batch 5 (audit fix 6): the defender — his foul (fouls
+        // tracked) and the card step; Skip goes straight on to the taker.
+        const { side, wonBy } = flow;
+        const after = (w?: Player) => setFlow(penaltyStepAfter('concededBy', penHas(side)) === 'takenBy'
+          ? { mode: 'pen', step: 'takenBy', side, wonBy: w } : { mode: 'pen', step: 'outcome', side, wonBy: w });
+        return panel(`⭕ Penalty — ${sideName}`, 'Who gave it away? (optional)', (
+          <>
+            <PlayerTable players={xi(opp(side))} onPick={(p) => {
+              for (const a of penaltyConcededActions(side, p, wonBy, { fouls: t.fouls, at: Date.now(), tracked: trackedKeys() })) fire(a);
+              setFlow({ mode: 'pen', step: 'card', side, conceder: p });
+            }} />
+            <Button label="Skip — not recorded" variant="ghost" onPress={() => after(wonBy)} />
+          </>
+        ));
+      }
+      if (flow.step === 'card') {
+        // Invasion batch 5: a card for who gave it away (one tap, or No card);
+        // who won it is already on the log.
+        const { side, conceder } = flow;
+        const on = () => setFlow(penaltyStepAfter('concededBy', penHas(side)) === 'takenBy' ? { mode: 'pen', step: 'takenBy', side } : { mode: 'pen', step: 'outcome', side });
+        return panel(`⭕ Penalty — ${conceder.fullName} gave it away`, `Card for ${conceder.fullName}?`, (
+          <View style={{ gap: theme.spacing(2) }}>
+            <View style={ctrl.row}>
+              {cards.colours.includes('yellow') && (
+                <Button label={`🟨 Yellow for ${conceder.fullName}`} variant="home" style={[ctrl.flex, { backgroundColor: theme.colors.accent }]} onPress={() => { recordCard(opp(side), 'yellow', conceder, 'foul'); on(); }} />
+              )}
+              <Button label="🟥 Red" variant="danger" style={ctrl.flex} onPress={() => { recordCard(opp(side), 'red', conceder, 'foul'); on(); }} />
+            </View>
+            <Button label="✓ No card" variant="ghost" onPress={on} />
+          </View>
         ));
       }
       if (flow.step === 'takenBy') {
@@ -1237,7 +1269,18 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
 
       {/* In-play stoppage marker (injury / cooling break / VAR check) — a timeline
           note; distinct from signalling ADDED time (which extends the clock). */}
-      <Button label="⏸️ Stoppage / injury" variant="ghost" onPress={() => dispatch({ type: 'STOPPAGE', side: state.possession.side ?? 'home' })} />
+      {/* Invasion batch 5: one tap logs it (at the backfilled minute too — fire);
+          the reason (injury / VAR / cooling break / other) is optional, after. */}
+      <Button label="⏸️ Stoppage / injury" variant="ghost" onPress={() => { setStopAsk(state.seq + 1); fire(stoppageAction(state.possession.side ?? 'home')); }} />
+      {stopAsk != null && state.seq === stopAsk && state.events.some((e) => e.id === stopAsk && e.type === 'stoppage' && !e.playerName) ? (
+        <View style={ctrl.chips} accessibilityLabel="Why did play stop? (optional)">
+          <Text style={ctrl.meta}>Why? (optional)</Text>
+          {STOPPAGE_REASONS.map((r) => (
+            <Button key={r} label={STOPPAGE_LABEL[r]} variant="ghost" style={ctrl.actionBtn}
+              onPress={() => { dispatch(stoppageReasonAction(stopAsk, r)); setStopAsk(null); }} />
+          ))}
+        </View>
+      ) : null}
 
       {/* Penalty — won by → taken by → scored / saved / missed (credits the GK on a save). */}
       <View style={{ gap: theme.spacing(2) }}>
@@ -1311,7 +1354,7 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
         </View>
         {showEdit && (() => {
           const items = [
-            ...named.events.map((e) => ({ key: `e${e.id}`, minute: e.minute, half: eventHalf(e, fmt), order: e.id, label: `${EVENT_META[e.type].icon} ${EVENT_META[e.type].label}${e.type === 'sub' ? ` — ${e.secondName ?? ''} for ${e.playerName ?? ''}` : e.type === 'timeout' || e.type === 'nogoal' ? ` — ${nameOf(e.side)}` : e.playerName ? ` — ${e.playerName}` : ''}${e.official ? ' (team official)' : ''}`, onRemove: () => removeEvent(e), detail: removeDetail(e), onEdit: e.type === 'timeout' || e.type === 'nogoal' || e.type === 'stoppage' ? undefined : () => editEvent(e) })),
+            ...named.events.map((e) => ({ key: `e${e.id}`, minute: e.minute, half: eventHalf(e, fmt), order: e.id, label: `${EVENT_META[e.type].icon} ${EVENT_META[e.type].label}${e.type === 'sub' ? ` — ${e.secondName ?? ''} for ${e.playerName ?? ''}` : e.type === 'timeout' || e.type === 'nogoal' ? ` — ${nameOf(e.side)}` : e.type === 'stoppage' ? (e.playerName && e.playerName in STOPPAGE_LABEL ? ` — ${STOPPAGE_LABEL[e.playerName as keyof typeof STOPPAGE_LABEL]}` : '') : e.playerName ? ` — ${e.playerName}` : ''}${e.official ? ' (team official)' : ''}`, onRemove: () => removeEvent(e), detail: removeDetail(e), onEdit: e.type === 'timeout' || e.type === 'nogoal' || e.type === 'stoppage' ? undefined : () => editEvent(e) })),
             ...named.stats.map((st) => ({ key: `s${st.id}`, minute: st.minute, half: eventHalf(st, fmt), order: st.id, label: `${STAT_META[st.kind].icon} ${STAT_META[st.kind].label}${st.playerName ? ` — ${st.playerName}` : ''}`, onRemove: () => removeStat(st), detail: undefined as string | undefined, onEdit: () => editStat(st) })),
           ].sort(byMatchTimeDesc);
           if (items.length === 0) return <Text style={ctrl.meta}>Nothing logged yet.</Text>;

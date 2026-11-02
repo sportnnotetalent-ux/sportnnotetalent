@@ -83,6 +83,8 @@ function setSentence(x: LeagueSet, names: Names, by?: LeagueEvent): { text: stri
     case 'penalty': return { icon: '⚖', text: `Penalty against ${team}${who}${on}. ${opp} ball.` };
     case 'sixth': return { icon: '🔄', text: `${team} are tackled on the last — handover to ${opp}.` };
     case 'restart': return { icon: '🔁', text: `Six again — a fresh set for ${team}.` };
+    // invasion batch 5: a penalty against the defence (the defender when named)
+    case 'penWon': return { icon: '⚖', text: `Penalty to ${team}${by?.playerName ? ` — conceded by ${by.playerName} (${opp})` : ` — conceded by ${opp}`}${on}. ${team} keep the ball, a fresh set.` };
     default: return null;
   }
 }

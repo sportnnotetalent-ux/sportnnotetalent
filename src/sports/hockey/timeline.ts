@@ -25,7 +25,7 @@ export function describeEvent(e: HockeyEvent, saver?: string): { icon: string; l
     case 'card': {
       const c = e.card ?? 'green';
       const word = c[0].toUpperCase() + c.slice(1);
-      return { icon: CARD_ICON[c], label: `${word} card${e.minutes ? ` (${e.minutes} min)` : ''}`, detail: e.playerName };
+      return { icon: CARD_ICON[c], label: `${word} card${e.minutes ? ` (${e.minutes} min)` : ''}`, detail: e.official ? `${e.official} (official)` : e.playerName };
     }
     case 'sub':
       return { icon: '🔁', label: 'Substitution', detail: `${e.secondName ?? '?'} ⬆  ${e.playerName ?? '?'} ⬇` };

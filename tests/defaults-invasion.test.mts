@@ -68,8 +68,10 @@ describe('football', () => {
     const ui = src('src/sports/football/index.tsx');
     assert.match(ui, /shot: t\.shots,/);
     assert.match(ui, /save: t\.saves,/);
-    assert.equal((ui.match(/t\.shots\b/g) ?? []).length, 2, 'only the button map and trackedKeys');
-    assert.equal((ui.match(/t\.saves\b/g) ?? []).length, 2, 'only the button map and trackedKeys');
+    // invasion batch 5: trackedKeys moved to actions.ts (footballTrackedKeys)
+    assert.equal((ui.match(/t\.shots\b/g) ?? []).length, 1, 'only the button map');
+    assert.equal((ui.match(/t\.saves\b/g) ?? []).length, 1, 'only the button map');
+    assert.match(ui, /footballTrackedKeys\(t, deep\)/);
   });
 });
 

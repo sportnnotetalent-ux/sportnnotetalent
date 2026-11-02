@@ -84,6 +84,10 @@ export interface HockeyEvent {
   /** invasion batch 1: a stroke not scored that counts as a shot (saved = on
    *  goal), as a scored one does. New logs only — an older stroke keeps its figures. */
   shot?: true;
+  /** invasion batch 5 (FIH: team officials can be carded): a card for a team
+   *  official — the typed role ("Coach"), never a player: no stat line, no
+   *  suspension on the field, not in the team's player-card counts. New logs only. */
+  official?: string;
 }
 
 /** Deep wave — optional depth a scorer / organiser switches on (format keys
@@ -439,6 +443,11 @@ export const reducer = (s: HockeyState, a: ScoreAction): HockeyState => {
     case 'CARD': {
       if (!side) return s;
       const card: CardColour = a.payload?.card === 'yellow' || a.payload?.card === 'red' ? a.payload.card : 'green';
+      // invasion batch 5: a team official's card (a string role, capped; blank = "Team official")
+      if (typeof a.payload?.official === 'string') {
+        const official = (a.payload.official as string).trim().slice(0, OFFICIAL_MAX) || 'Team official';
+        return push(s, { type: 'card', side, card, official });
+      }
       const d = CARD_MINUTES[card];
       const minutes = d.permanent ? undefined : Math.min(d.maxMinutes ?? d.minutes!, Math.max(d.minutes!, Number(a.payload?.minutes ?? d.minutes)));
       return push(s, { type: 'card', side, card, ...(minutes ? { minutes } : {}), ...who1 });
@@ -587,7 +596,7 @@ export function teamFigures(s: HockeyState, side: Side, scope: 'all' | number = 
       } else if (e.type === 'shot') { f.shots++; if (e.onGoal) f.shotsOnGoal++; }
       else if (e.type === 'pc') f.pcs++;
       else if (e.type === 'stroke') { f.strokes++; if (e.shot) { f.shots++; if (e.outcome === 'saved') f.shotsOnGoal++; } }
-      else if (e.type === 'card') f[CARD_KEY[e.card ?? 'green'] as 'greenCards' | 'yellowCards' | 'redCards']++;
+      else if (e.type === 'card' && !e.official) f[CARD_KEY[e.card ?? 'green'] as 'greenCards' | 'yellowCards' | 'redCards']++;
       else if (e.type === 'save') f.saves++;
     }
   }
@@ -620,3 +629,31 @@ export const HOCKEY_LIVE_SETTINGS: LiveSettings<HockeyState> = {
   read: (s) => ({ periodMinutes: s.periodMinutes, stopClock: s.stopClock, trackPossession: s.track?.possession === true, trackReferrals: s.track?.referrals === true }),
   defaults: { periodMinutes: 15, stopClock: true, trackPossession: false, trackReferrals: false },
 };
+
+/* ------------- invasion batch 5 (audit fix 11): card warnings ------------- */
+
+/** The longest team official's role kept on a card. */
+export const OFFICIAL_MAX = 40;
+
+/** The players of `side` a `colour` card would warn about: already on a
+ *  green (for a green — FIH: the next card after a green is at least a
+ *  yellow) or on a yellow (for a yellow). Ids (or legacy names), in order. */
+export function cardWarnIds(s: Pick<HockeyState, 'events'>, side: Side, colour: CardColour): string[] {
+  if (colour === 'red') return [];
+  const out: string[] = [];
+  for (const e of s.events) {
+    if (e.type !== 'card' || e.side !== side || e.official || e.card !== colour) continue;
+    const k = e.playerId ?? e.playerName;
+    if (k && !out.includes(k)) out.push(k);
+  }
+  return out;
+}
+
+/** The warning shown over the player grid for those players (warn only — the
+ *  scorer records what the umpire shows). */
+export const cardWarning = (colour: CardColour): string =>
+  colour === 'green'
+    ? 'Already on a green card — under FIH rules the next card for that player is at least a yellow.'
+    : colour === 'yellow'
+      ? 'Already on a yellow card — under FIH rules a further card for that player is usually a red.'
+      : '';

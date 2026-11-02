@@ -29,6 +29,14 @@ export const CARD_REASON_PHRASE: Record<CardReason, string> = {
 export type NoGoalReason = 'offside' | 'foul' | 'handball' | 'other';
 export const NO_GOAL_LABEL: Record<NoGoalReason, string> = { offside: 'Offside', foul: 'Foul', handball: 'Handball', other: 'Other' };
 
+/** Invasion batch 5 (audit fix 5): why play stopped — asked after the
+ *  "Stoppage" tap (optional). Stored as the stoppage's `playerName` (the
+ *  commentary has read it there since the deep wave). */
+export type StoppageReason = 'injury' | 'var' | 'cooling' | 'other';
+export const STOPPAGE_REASONS: StoppageReason[] = ['injury', 'var', 'cooling', 'other'];
+export const STOPPAGE_LABEL: Record<StoppageReason, string> = { injury: 'Injury', var: 'VAR check', cooling: 'Cooling break', other: 'Other' };
+export const isStoppageReason = (v: unknown): v is StoppageReason => typeof v === 'string' && (STOPPAGE_REASONS as string[]).includes(v);
+
 export type GoalType = 'open' | 'penalty' | 'freekick' | 'header';
 
 /** How the ball was struck for a goal — captured separately from how it was won. */

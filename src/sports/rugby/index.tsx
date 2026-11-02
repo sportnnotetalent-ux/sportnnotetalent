@@ -106,11 +106,13 @@ function PlayerGrid({ players, onPick, skip }: { players: Player[]; onPick: (p: 
 }
 
 type SubKind = 'perm' | 'hia' | 'blood';
+const other = (sd: Side): Side => (sd === 'home' ? 'away' : 'home');
 type Flow =
   | { mode: 'try'; side: Side; step: 'scorer' | 'assist'; scorer?: Player | null }
   | { mode: 'conv'; side: Side; step: 'result' | 'kicker'; made?: boolean }
   | { mode: 'kick'; side: Side; step: 'kind' | 'result' | 'kicker'; kick?: KickKind; made?: boolean }
-  | { mode: 'card'; side: Side; step: 'kind' | 'player'; card?: CardKind; red20?: boolean }
+  /** `pt` (invasion batch 5): straight after a penalty try — a card for the offender? (optional) */
+  | { mode: 'card'; side: Side; step: 'kind' | 'player'; card?: CardKind; red20?: boolean; pt?: boolean }
   | { mode: 'sub'; side: Side; step: 'kind' | 'off' | 'on' | 'back'; kind?: SubKind; off?: Player | null }
   | { mode: 'detail'; side: Side; step: 'kind' | 'player'; detail?: DetailKey }
   /** deep wave: a penalty (offence) / turnover (cause) / offload — the pick and the player optional */
@@ -424,12 +426,13 @@ const ScoringControls: SportPlugin<RugbyState>['ScoringControls'] = ({
         );
       case 'card': {
         if (flow.step === 'kind') return (
-          <View style={c.panel}>{head('Card')}
+          <View style={c.panel}>{head(flow.pt ? 'Penalty try — card for the offender? (optional)' : 'Card')}
             <View style={c.row}>
               <Button label="🟨 Yellow" variant="ghost" style={c.flex} onPress={() => setFlow({ ...flow, card: 'yellow', step: 'player' })} />
               <Button label="🟥 Red" variant="ghost" style={c.flex} onPress={() => setFlow({ ...flow, card: 'red', red20: false, step: 'player' })} />
             </View>
             {s.red20 ? <Button label="🟥 20-minute red" accessibilityLabel="20-minute red card: replaceable after 20 minutes" variant="ghost" onPress={() => setFlow({ ...flow, card: 'red', red20: true, step: 'player' })} /> : null}
+            {flow.pt ? <Button label="✓ No card" variant="ghost" onPress={() => setFlow(null)} /> : null}
             <Text style={c.meta}>Yellow: the sin-bin, {s.sinBinMinutes} minutes of playing time, the team plays a player short. Red: off for the rest of the match.{s.red20 ? ' 20-minute red (World Rugby trial): off for good, a replacement may come on after 20 minutes.' : ''} A second yellow is a red.</Text>
           </View>
         );
@@ -550,7 +553,8 @@ const ScoringControls: SportPlugin<RugbyState>['ScoringControls'] = ({
       <Text style={[c.team, { color: color(sd) }]} numberOfLines={1}>{name(sd)}</Text>
       <Button label="🏉 Try" color={color(sd)} onPress={() => setFlow({ mode: 'try', side: sd, step: 'scorer' })} />
       <Button label="🎯 Kick at goal" accessibilityLabel="Penalty goal or drop goal" variant="ghost" onPress={() => setFlow({ mode: 'kick', side: sd, step: 'kind' })} />
-      <Button label="🏉 Penalty try" accessibilityLabel="Penalty try, 7 points" variant="ghost" onPress={() => fire({ type: 'PENALTY_TRY', side: sd })} />
+      {/* invasion batch 5 (Law 8): the offender is usually carded — an optional card step follows */}
+      <Button label="🏉 Penalty try" accessibilityLabel="Penalty try, 7 points" variant="ghost" onPress={() => { fire({ type: 'PENALTY_TRY', side: sd }); if (!editAt && !isSuddenDeath(s, s.period)) setFlow({ mode: 'card', side: other(sd), step: 'kind', pt: true }); }} />
       <Button label="🟨 Card" variant="ghost" onPress={() => setFlow({ mode: 'card', side: sd, step: 'kind' })} />
       <Button label="🔁 Sub" accessibilityLabel="Replacement" variant="ghost" onPress={() => setFlow({ mode: 'sub', side: sd, step: 'kind' })} />
       {s.trackDetail ? <Button label="📋 Detail" accessibilityLabel="Tackles, carries, set pieces" variant="ghost" onPress={() => setFlow({ mode: 'detail', side: sd, step: 'kind' })} /> : null}
