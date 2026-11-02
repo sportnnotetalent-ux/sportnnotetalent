@@ -23,6 +23,7 @@ import { withNames, nameRow } from '../invasion/names';
 import {
   goalAction, teamGoalAction, undoGoalAction, ownGoalAction, assistAction, cardActions, officialCardActions, sinBinAction, afterTeamPick, benchFor,
   statAction, foulAction, subAction, xiAction, xiOf, penKickAction, eventRemoval, statRemoval as statRemovalAction, type StatDetail,
+  penaltyMissActions, gridSaveActions, cardChoices,
 } from './actions';
 import { Button, TextField, SelectChip } from '../../components/ui';
 import { askConfirm, confirmMatchAction } from '../../components/ConfirmSheet';
@@ -130,6 +131,8 @@ type Flow =
   // A shot on target branches into its outcome (saved / blocked / goal).
   | { mode: 'stat'; kind: 'shot'; step: 'outcome'; side: 'home' | 'away'; player?: Player }
   | { mode: 'stat'; kind: 'shot'; step: 'blocker'; side: 'home' | 'away'; player?: Player; shotId?: number }
+  // Invasion batch 1: a grid save — who took the shot? (`player` = the keeper, if known)
+  | { mode: 'stat'; kind: 'save'; step: 'shooter'; side: 'home' | 'away'; player?: Player }
   // Deep wave: who set up the shot just logged (key passes tracked)
   | { mode: 'keypass'; side: 'home' | 'away'; shooter: Player; shotId: number }
   // Deep wave: a goal ruled out — which team, then why (offside / foul / …)
@@ -243,6 +246,8 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
   }, [flow, sub]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const t = state.track;
+  // Invasion batch 1: the Card button always offers a red; yellows follow "Cards"
+  const cards = cardChoices(t.cards);
   // Deep wave: the optional depth this match tracks (absent = none)
   const deep = state.deep ?? {};
   // The player-attributed stat keys being tracked this match — stamped on each
@@ -480,11 +485,22 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
       // MVP F5: no players listed → the goal is the team's
       if (taker) recordGoal(side, taker, 'penalty'); else fire(teamGoalAction(side));
     } else {
-      recordStat('penaltyMissed', side, taker);
-      if (outcome === 'saved') { const gk = gkOf(opp(side)); if (gk) recordStat('save', opp(side), gk); }
+      // invasion batch 1: the attempt is a shot too (saved = on target)
+      for (const a of penaltyMissActions(side, outcome, taker, gkOf(opp(side)), { at: Date.now(), tracked: trackedKeys() })) fire(a);
     }
     setFlow(null);
   };
+
+  // Invasion batch 1: the grid's 🧤 Save logs the shot it stopped (the other
+  // side's, on target; shooter optional). Re-entering a save from the
+  // timeline logs the save only — its shot is still on the log.
+  const recordSave = (side: 'home' | 'away', keeper: Player | undefined, shooter: Player | null) => {
+    for (const a of gridSaveActions(side, keeper, shooter, { at: Date.now(), tracked: trackedKeys(), edit: editMin != null })) fire(a);
+    setFlow(null);
+  };
+  // After the keeper: who took the shot? (skipped with nobody listed, or when editing)
+  const afterKeeper = (side: 'home' | 'away', keeper: Player | undefined) =>
+    (editMin == null && xi(opp(side)).length ? setFlow({ mode: 'stat', kind: 'save', step: 'shooter', side, player: keeper }) : recordSave(side, keeper, null));
 
   // SD-09: who started for a side — the lineup's starters and keeper (the GK
   // slot, else a starter listed as a GK), or with no lineup the squad's keeper —
@@ -565,7 +581,8 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
         if (flow.step === 'team') {
           const s = matchTeam(text, homeTeams, awayTeams); if (!s) { say('Which team?'); return; }
           const kind = flow.kind;
-          if (kind === 'save') { const gk = gkOf(s); if (gk) { recordStat('save', s, gk); say(`Save by ${gk.fullName}.`); } else setFlow({ mode: 'stat', kind, step: 'player', side: s }); return; }
+          // invasion batch 1: a spoken save logs the other side's shot on target too (shooter not asked)
+          if (kind === 'save') { const gk = gkOf(s); if (gk) { recordSave(s, gk, null); say(`Save by ${gk.fullName}.`); } else setFlow({ mode: 'stat', kind, step: 'player', side: s }); return; }
           if (!playerNeeded(kind)) { recordStat(kind as StatKind, s); say(`${STAT_META[kind].label} — ${teamName(s)}.`); return; }
           setFlow({ mode: 'stat', kind, step: 'player', side: s }); say('Which player?'); return;
         }
@@ -578,10 +595,12 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
             return;
           }
           if (detailNeeded(flow.kind)) { setFlow({ mode: 'stat', kind: flow.kind, step: 'detail', side: flow.side, player: p }); say(flow.kind === 'shot' ? 'On target or off?' : 'Completed or misplaced?'); return; }
+          if (flow.kind === 'save') { recordSave(flow.side, p, null); say(`Save by ${p.fullName}.`); return; }
           recordStat(flow.kind as StatKind, flow.side, p); say(`${STAT_META[flow.kind as StatKind].label}: ${p.fullName}.`); return;
         }
         // detail
         if (flow.step === 'official') { say('Use the Yellow / Red buttons for a team official.'); return; }
+        if (flow.step === 'shooter') { const sh = matchPlayer(text, xi(opp(flow.side))); recordSave(flow.side, flow.player, sh ?? null); say(sh ? `Saved from ${sh.fullName}.` : 'Save recorded.'); return; }
         const { kind, side, player } = flow;
         const who = player?.fullName ?? (side === 'home' ? homeName : awayName);
         if (kind === 'card') { if (!player) { setFlow(null); return; } const col = /red/.test(deburr(text)) ? 'red' : /yellow/.test(deburr(text)) ? 'yellow' : null; if (!col) { say('Yellow or red?'); return; } recordCard(side, col, player); setFlow(null); say(`${col} card: ${player.fullName}.`); return; }
@@ -1015,7 +1034,7 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
     }
 
     // Generic stat (shot, corner, offside, tackle, interception, save, pass, card)
-    const meta = flow.kind === 'card' ? { icon: '🟨', label: 'Card' } : STAT_META[flow.kind];
+    const meta = flow.kind === 'card' ? cards : STAT_META[flow.kind];
     if (flow.step === 'team') {
       const kind = flow.kind;
       const hint = kind === 'save' ? 'Which team made the save? (credited to their goalkeeper)' : 'Which team?';
@@ -1023,7 +1042,7 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
         // A save defaults to the team's current goalkeeper — no player pick needed.
         if (kind === 'save') {
           const gk = gkOf(side);
-          return gk ? recordStat('save', side, gk) : xi(side).length ? setFlow({ mode: 'stat', kind, step: 'player', side }) : recordStat('save', side);
+          return gk || !xi(side).length ? afterKeeper(side, gk) : setFlow({ mode: 'stat', kind, step: 'player', side });
         }
         // MVP F5: with no players listed, skip "who?" — the stat is the team's
         const next = afterTeamPick(kind, xi(side).length > 0);
@@ -1037,7 +1056,8 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
       return panel(`${meta.icon} ${meta.label} — ${sideName}`, 'Who?', (
         <>
           <PlayerTable players={xi(flow.side)} onPick={(p) => (
-            detailNeeded(flow.kind)
+            flow.kind === 'save' ? afterKeeper(flow.side, p)
+            : detailNeeded(flow.kind)
               ? setFlow({ mode: 'stat', kind: flow.kind, step: 'detail', side: flow.side, player: p })
               : recordStat(flow.kind as StatKind, flow.side, p)
           )} />
@@ -1049,6 +1069,15 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
         </>
       ));
     }
+    if (flow.step === 'shooter') {
+      const { side, player: keeper } = flow;
+      return panel(`🧤 Save — ${keeper?.fullName ?? (side === 'home' ? homeName : awayName)}`, `Who took the shot? (${opp(side) === 'home' ? homeName : awayName})`, (
+        <>
+          <PlayerTable players={xi(opp(side))} onPick={(p) => recordSave(side, keeper, p)} />
+          <Button label="Not sure — skip" variant="ghost" onPress={() => recordSave(side, keeper, null)} />
+        </>
+      ));
+    }
     if (flow.step === 'official') {
       const { side } = flow;
       const sideName = side === 'home' ? homeName : awayName;
@@ -1056,7 +1085,9 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
         <View style={{ gap: theme.spacing(2) }}>
           <TextField label="" value={officialName} onChange={setOfficialName} placeholder="e.g. Head coach" />
           <View style={ctrl.row}>
-            <Button label="🟨 Yellow" variant="home" style={[ctrl.flex, { backgroundColor: theme.colors.accent }]} onPress={() => { recordOfficialCard(side, 'yellow', officialName); setFlow(null); }} />
+            {cards.colours.includes('yellow') && (
+              <Button label="🟨 Yellow" variant="home" style={[ctrl.flex, { backgroundColor: theme.colors.accent }]} onPress={() => { recordOfficialCard(side, 'yellow', officialName); setFlow(null); }} />
+            )}
             <Button label="🟥 Red" variant="danger" style={ctrl.flex} onPress={() => { recordOfficialCard(side, 'red', officialName); setFlow(null); }} />
           </View>
         </View>
@@ -1126,7 +1157,7 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
       ));
     }
     if (!player) return null; // a card always names a person (afterTeamPick)
-    return panel(`🟨 Card — ${player.fullName}`, 'Which card?', (
+    return panel(`${cards.icon} ${cards.label} — ${player.fullName}`, 'Which card?', (
       <View style={{ gap: theme.spacing(2) }}>
         {/* deep wave: why (optional — pick before the colour; no extra tap) */}
         {deep.cardReasons ? (
@@ -1135,7 +1166,9 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
           </View>
         ) : null}
         <View style={ctrl.row}>
-          <Button label="🟨 Yellow" variant="home" style={[ctrl.flex, { backgroundColor: theme.colors.accent }]} onPress={() => { recordCard(side, 'yellow', player, cardReason); setFlow(null); }} />
+          {cards.colours.includes('yellow') && (
+            <Button label="🟨 Yellow" variant="home" style={[ctrl.flex, { backgroundColor: theme.colors.accent }]} onPress={() => { recordCard(side, 'yellow', player, cardReason); setFlow(null); }} />
+          )}
           <Button label="🟥 Red" variant="danger" style={ctrl.flex} onPress={() => { recordCard(side, 'red', player, cardReason); setFlow(null); }} />
           {(state.sinBinMinutes ?? 0) > 0 && (
             <Button label={`⏱️ Sin-bin ${state.sinBinMinutes}'`} variant="ghost" style={ctrl.flex} onPress={() => { recordSinBin(side, player); setFlow(null); }} />
@@ -1150,7 +1183,9 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
   const trackFor: Record<string, boolean> = {
     shot: t.shots, cross: t.crosses, dribble: t.dribbles, corner: t.corners, pass: t.passes, attackContribution: t.attackContribution,
     tackle: t.tackles, interception: t.interceptions, save: t.saves, defenceContribution: t.defenceContribution,
-    foul: t.fouls, offside: t.offsides, handball: t.handball, card: t.cards,
+    // invasion batch 1: a red card changes who is on the pitch — the Card
+    // button stays; "Cards" off hides only the yellows (cardChoices)
+    foul: t.fouls, offside: t.offsides, handball: t.handball, card: true,
     // deep wave (optional): clearances, goal kicks / throw-ins
     clearance: !!deep.clearances, goalKick: !!deep.setPieces, throwIn: !!deep.setPieces,
   };
@@ -1225,7 +1260,7 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
             <Text style={ctrl.label}>{g.title}</Text>
             <View style={ctrl.chips}>
               {kinds.map((k) => {
-                const m = k === 'card' ? { icon: '🟨', label: 'Card' } : STAT_META[k];
+                const m = k === 'card' ? cards : STAT_META[k];
                 return <Button key={k} label={`${m.icon} ${m.label}`} variant="ghost" style={ctrl.actionBtn} onPress={() => startAction(k)} />;
               })}
             </View>

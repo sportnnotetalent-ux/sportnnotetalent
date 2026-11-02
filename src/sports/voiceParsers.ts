@@ -260,7 +260,8 @@ export function hockeyVoice(text: string, ctx: VoiceContext): ScoreAction[] | nu
   if (/\bstroke\b/.test(q)) {
     const result: 'saved' | 'missed' = saved ? 'saved' : 'missed';
     const st = stamp();
-    return [{ type: 'STROKE', side, payload: { outcome: result, ...st }, ...credit({ type: 'stroke', outcome: result, playerId: player?.id }) },
+    // invasion batch 1: a stroke not scored is a shot too (saved = on goal)
+    return [hk.strokeAction(side, result, player?.id, st, HOCKEY_TRACKED),
       ...(result === 'saved' ? [keeperSave(st.uid)] : [])];
   }
   if (/\bshot\b|\bshoots?\b/.test(q)) {

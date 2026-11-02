@@ -31,7 +31,7 @@ import type { ScoreAction, SportPlugin } from '../types';
 import {
   init, reducer, isComplete, result, levelAtEnd, aggLine, matchSec, periodSec, clockFace, periodName, periodLong, periodStarted, running,
   eventCredits, creditAttribution, currentKeeper, soScore, nextShooter, needsSdPick, hockeyScoreLine, HOCKEY_PRESETS, HOCKEY_LIVE_SETTINGS,
-  HOCKEY_TRACK_FIELDS, openPc,
+  HOCKEY_TRACK_FIELDS, openPc, strokeAction,
   type CardColour, type GoalType, type HockeyEvent, type HockeyState, type Side,
 } from './engine';
 import { hockeyPossession } from './depth';
@@ -187,7 +187,8 @@ const ScoringControls: SportPlugin<HockeyState>['ScoringControls'] = ({
   };
   const stroke = (sd: Side, outcome: 'saved' | 'missed', p: Player | null, pc?: string) => {
     const id = uid();
-    fire({ type: 'STROKE', side: sd, payload: { outcome, uid: id, ...pcLink(pc) }, ...credit({ type: 'stroke', outcome, playerId: p?.id }) });
+    // invasion batch 1: a stroke not scored is a shot too (saved = on goal)
+    fire(strokeAction(sd, outcome, p?.id, { uid: id, ...pcLink(pc) }, TRACKED));
     if (outcome === 'saved') save(opp(sd), id);
     setFlow(null);
   };

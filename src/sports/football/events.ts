@@ -173,6 +173,9 @@ export interface StatEvent {
   woodwork?: true;
   /** deep wave: a key pass — the id of the shot it set up */
   ref?: number;
+  /** invasion batch 1: a shot that was a penalty not scored (its
+   *  "Penalty saved / missed" row tells it; new logs only) */
+  pen?: true;
 }
 
 export const STAT_META: Record<StatKind, { icon: string; label: string }> = {

@@ -81,6 +81,9 @@ export interface HockeyEvent {
   miss?: 'wide' | 'blocked';
   /** deep wave: a video referral's outcome (upheld = the team keeps it) */
   upheld?: boolean;
+  /** invasion batch 1: a stroke not scored that counts as a shot (saved = on
+   *  goal), as a scored one does. New logs only — an older stroke keeps its figures. */
+  shot?: true;
 }
 
 /** Deep wave — optional depth a scorer / organiser switches on (format keys
@@ -241,7 +244,7 @@ export const LIVE_KEYS = ['goals', 'fieldGoals', 'pcGoals', 'strokeGoals', 'assi
 type Credit = { playerId: string; playerName?: string; stats: Record<string, number> };
 
 /** The stat-line credits one event writes: [primary player, second player]. */
-export function eventCredits(e: Pick<HockeyEvent, 'type' | 'playerId' | 'playerName' | 'secondId' | 'secondName' | 'goalType' | 'onGoal' | 'outcome' | 'card'>): { first?: Credit; second?: Credit } {
+export function eventCredits(e: Pick<HockeyEvent, 'type' | 'playerId' | 'playerName' | 'secondId' | 'secondName' | 'goalType' | 'onGoal' | 'outcome' | 'card' | 'shot'>): { first?: Credit; second?: Credit } {
   // Every credit belongs to a player of the event's own side (a keeper's save
   // is its own SAVE event on the keeper's side — the live layer writes a line
   // against the action's side, so one action never credits both teams).
@@ -254,7 +257,8 @@ export function eventCredits(e: Pick<HockeyEvent, 'type' | 'playerId' | 'playerN
     case 'shot':
       return { first: p(e.onGoal ? { shots: 1, shotsOnGoal: 1 } : { shots: 1 }) };
     case 'stroke':
-      return { first: p({ strokesMissed: 1 }) };
+      // invasion batch 1: a new stroke is a shot too (saved = on goal)
+      return { first: p(e.shot ? { strokesMissed: 1, shots: 1, ...(e.outcome === 'saved' ? { shotsOnGoal: 1 } : {}) } : { strokesMissed: 1 }) };
     case 'save':
       return { first: p({ saves: 1 }) };
     case 'card':
@@ -275,6 +279,16 @@ export function creditAttribution(c: Credit | undefined, sign = 1, tracked?: str
     ...(rest.length ? { extra: Object.fromEntries(rest.map(([k, v]) => [k, v * sign])) } : {}),
     ...(tracked ? { tracked } : {}),
   };
+}
+
+/** Invasion batch 1: a penalty stroke not scored, as the controls and voice
+ *  fire it — flagged `shot` (saved = on goal), credited from `eventCredits`.
+ *  `payload` = the stamp (uid / sec / period, a PC link). The keeper's save is
+ *  its own SAVE action. */
+export function strokeAction(side: Side, outcome: 'saved' | 'missed', playerId: string | undefined, payload: Record<string, unknown> = {}, tracked?: string[]): ScoreAction {
+  const cr = eventCredits({ type: 'stroke', outcome, playerId, shot: true });
+  const attribution = creditAttribution(cr.first, 1, tracked);
+  return { type: 'STROKE', side, payload: { outcome, shot: true, ...payload }, ...(attribution ? { attribution } : {}) };
 }
 
 /** The second player of an action: live `attribution2`, or on replay the copy
@@ -380,7 +394,7 @@ export const reducer = (s: HockeyState, a: ScoreAction): HockeyState => {
     case 'STROKE': {
       // a penalty stroke NOT scored (a scored stroke is a GOAL of type stroke)
       if (!side) return s;
-      return push(s, { type: 'stroke', side, outcome: a.payload?.outcome === 'saved' ? 'saved' : 'missed', ...who1, ...ref });
+      return push(s, { type: 'stroke', side, outcome: a.payload?.outcome === 'saved' ? 'saved' : 'missed', ...who1, ...ref, ...(a.payload?.shot === true ? { shot: true as const } : {}) });
     }
     case 'SHOT': {
       if (!side) return s;
@@ -572,7 +586,7 @@ export function teamFigures(s: HockeyState, side: Side, scope: 'all' | number = 
         if (e.goalType === 'pc') f.pcGoals++; else if (e.goalType === 'stroke') { f.strokeGoals++; f.strokes++; } else f.fieldGoals++;
       } else if (e.type === 'shot') { f.shots++; if (e.onGoal) f.shotsOnGoal++; }
       else if (e.type === 'pc') f.pcs++;
-      else if (e.type === 'stroke') f.strokes++;
+      else if (e.type === 'stroke') { f.strokes++; if (e.shot) { f.shots++; if (e.outcome === 'saved') f.shotsOnGoal++; } }
       else if (e.type === 'card') f[CARD_KEY[e.card ?? 'green'] as 'greenCards' | 'yellowCards' | 'redCards']++;
       else if (e.type === 'save') f.saves++;
     }

@@ -554,6 +554,8 @@ export const reducer = (s: FootballState, a: ScoreAction): FootballState => {
         ...zone, ...big,
         ...(a.payload?.woodwork === true ? { woodwork: true as const } : {}),
         ...(typeof a.payload?.ref === 'number' ? { ref: a.payload.ref } : {}),
+        // invasion batch 1: a penalty not scored, as a shot (new logs only)
+        ...(a.payload?.pen === true ? { pen: true as const } : {}),
       };
       let next: FootballState = { ...s, seq: s.seq + 1, stats: [...s.stats, ev] };
       // some actions hand the ball to the other side (foul, corner won, tackle…)
