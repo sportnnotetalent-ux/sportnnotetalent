@@ -13,6 +13,13 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-03 — Batch 4: the racket scoring mechanism (padel Fault, error types, lost by rule, doubles credit)
+
+Tennis's depth brought to the other racket sports (racket.md fixes 1, 3, 4, 5), two isolated branches merged here:
+- **Padel:** ✋ Fault (1st serve) with the tennis exactness rules (server only, once a point, every point clears it, Undo, corrections keep it); fault types net / long / wide / foot fault / **mesh** (landed in, then hit the wire mesh); 2nd-serve banner and "Fault again = double fault"; Stats and career fault rows. Shared `serveFault.ts` (tennis unchanged). Padel 1st / 2nd serve now on for new matches (it waited for this button). `padel-fault.md`.
+- **All five racket sports:** forced errors take the sport's error types (as unforced errors do); **Lost by rule** with each sport's own examples (badminton net touch / double hit / receiver fault, TT obstruction / free hand, squash double hit, padel net touch, pickleball two-bounce / kitchen momentum) — badminton used to log these as unforced errors; doubles winners take an optional **By:** chip (`pd.by`) and are credited to that player — **new matches only** (founder 2026-11-03); without it the credit is exactly as before (simulation checks against a frozen copy of the old credit code). `racket-depth.md`.
+Full suite 6,511 tests, 0 failing; tsc clean. Demo-checked on a new padel match: Fault → "1st serve was: … Mesh", 2nd-serve banner; the next point auto-marked 2nd serve; Forced error → "Error: Net / Out"; "Lost by rule" offered.
+
 ### 2026-11-03 — Release: Batch 3 (richer stats by default) live (web, Android OTA)
 
 auth-smoke passed. Published from a clean worktree at b90bd23: web (entry `index-72392f79`, confirmed live on app.sportnnote.in) and Android OTA groups `94f58b63` (preview) and `a5d44f04` (production), runtime 1.0.0.
