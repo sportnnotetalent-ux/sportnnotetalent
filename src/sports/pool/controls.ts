@@ -21,8 +21,8 @@
  */
 import type { ScoreAction } from '../types';
 import { cnt, onTwoFouls, summary, type FoulKind, type PendingKind, type RackEnd } from './engine.ts';
-import { isSide, knownGame, MONEY, other, TOP, type PoolGame, type Side } from './balls.ts';
-import { creditOf, poolReducer, SHOT_TYPES, validPid, type PoolMatch } from './match.ts';
+import { isSide, knownGame, MONEY, other, SOLIDS, STRIPES, TOP, type PoolGame, type Side } from './balls.ts';
+import { creditOf, feedOf, poolReducer, SHOT_TYPES, validPid, type PoolMatch } from './match.ts';
 
 export type { Side };
 type Name = (side: Side) => string;
@@ -351,19 +351,59 @@ export function makeTapGuard<S>(reduce: (s: S, a: ScoreAction) => S): (s: S, a: 
 
 // ------------------------------------------- scotch doubles: who shoots --
 
+/** How scotch-doubles partners take turns: 'shot' = every other shot (world
+ *  rules, the default), 'turn' = each plays a full turn at the table. */
+export const scotchTurns = (s: PoolMatch): 'shot' | 'turn' =>
+  (isObj(s) && isObj(s.opt) && s.opt.turns === 'turn' ? 'turn' : 'shot');
+
 /**
- * Scotch doubles: partners alternate shots. The side's two players (the
- * first two of its roster) and the one to suggest: the partner who did not
- * take the side's last shot — on a break, the partner who did not break the
- * side's last break. The scorer can always tap the other one.
+ * Scotch doubles: who shoots. The side's two players (the first two of its
+ * roster) and the one to suggest:
+ *  - a break: the partner who did not break the side's last break; the side's
+ *    first break goes to whoever played first for it (pool-scotch-rotation SR3);
+ *  - world rules: the partner who did not take the side's last shot (the break
+ *    counts as a shot);
+ *  - full turn: the same player while the side's turn goes on (`keeps`), else
+ *    the partner of the side's last shooter.
+ * The scorer can always tap the other one; the rotation follows who was credited.
  */
-export function shooterPick(s: PoolMatch, side: Side, ids: readonly string[]): { ids: string[]; suggested: string | null } {
+export function shooterPick(s: PoolMatch, side: Side, ids: readonly string[]): { ids: string[]; suggested: string | null; keeps: boolean } {
   const two = [...new Set(ids.map(validPid).filter((x): x is string => !!x))].slice(0, 2);
-  if (!two.length) return { ids: [], suggested: null };
+  if (!two.length) return { ids: [], suggested: null, keeps: false };
   const cr = creditOf(s);
-  const prev = liveRack(s)?.phase === 'break' ? cr.lastBreak[side] : cr.last[side];
-  const suggested = prev && two.length > 1 && two.includes(prev) ? two.find((x) => x !== prev)! : two[0];
-  return { ids: two, suggested };
+  const r = liveRack(s);
+  const partner = (x: string | null) => (x && two.length > 1 && two.includes(x) ? two.find((y) => y !== x)! : null);
+  if (r?.phase === 'break') {
+    const first = cr.ids[side].find((x) => two.includes(x));
+    return { ids: two, suggested: partner(cr.lastBreak[side]) ?? (cr.lastBreak[side] ? null : first) ?? two[0], keeps: false };
+  }
+  const prev = cr.last[side];
+  const keeps = scotchTurns(s) === 'turn' && !!r && !!prev && two.includes(prev) && turnGoesOn(s, side, r.n, prev);
+  return { ids: two, suggested: keeps ? prev : partner(prev) ?? two[0], keeps };
+}
+
+/** Full turn: the side's last line in this rack was `pid`'s shot and the side
+ *  stayed at the table (a spotted 8 on the break that the breaker plays on, too). */
+function turnGoesOn(s: PoolMatch, side: Side, n: number, pid: string): boolean {
+  const f = feedOf(s);
+  let i = f.length - 1;
+  if (f[i]?.t === 'CHOOSE' && f[i].q === 'eightBreak' && f[i].c === 'play' && f[i].s === side) i -= 1;
+  const e = f[i];
+  return !!e && e.n === n && e.s === side && e.p === pid && e.nx === side && !e.end && !e.pd && !e.bih
+    && (e.t === 'BREAK' || SHOT_TYPES.has(e.t)) && e.t !== 'FOUL' && e.t !== 'PUSH';
+}
+
+/**
+ * 8-ball, groups decided: the balls tapped are only the other side's group
+ * (no 8, none of the shooter's own). Then the scorer is asked what the cue
+ * ball hit first: own group (the turn passes) or theirs (a wrong-ball foul).
+ * Returns their group's name, or null when there is nothing to ask.
+ */
+export function otherGroupOnly(s: PoolMatch, picked: readonly number[]): 'solids' | 'stripes' | null {
+  const r = liveRack(s);
+  if (!r || r.game !== 'eight' || r.phase !== 'play' || !r.solids || !r.shooter || !picked.length) return null;
+  const theirs = r.solids === r.shooter ? STRIPES : SOLIDS;
+  return picked.every((b) => theirs.includes(b)) ? (theirs === SOLIDS ? 'solids' : 'stripes') : null;
 }
 
 // ------------------------------------------------- the board's lines --

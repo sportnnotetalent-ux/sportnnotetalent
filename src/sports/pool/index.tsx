@@ -33,7 +33,7 @@ import { perSideOf, poolReducer, type PoolMatch } from './match';
 import {
   BREAK_FOULS, FOUL_LABEL, PLAY_FOULS, bestOfLine, boardStatus, breakAction, breakLine, chooseAction, choiceOptions, choiceQuestion,
   confirmFor, foulAction, lagAction, makeTapGuard, missAction, outcomeOf, poolPanel, potAction, pushAction, rackAction,
-  safetyAction, setUnits, shooterPick, stalemateAction, type TapOpts,
+  otherGroupOnly, safetyAction, scotchTurns, setUnits, shooterPick, stalemateAction, type TapOpts,
 } from './controls';
 import { ballsText, poolFeed } from './feed';
 import { poolCompare, poolRackList } from './compare';
@@ -71,11 +71,13 @@ const ScoringControls: SportPlugin<PoolMatch>['ScoringControls'] = ({ state, dis
   const [tenCalled, setTenCalled] = useState(false);
   const [breaker, setBreaker] = useState<Side | null>(null);
   const [shooter, setShooter] = useState<Record<Side, string | null>>({ home: null, away: null });
+  // doubles: the order is known, so the next shooter is a line; "Change" shows the two (rotation SR2)
+  const [changing, setChanging] = useState(false);
   const [flags, setFlags] = useState({ bnr: false, golden: false, runOut: false });
   const [more, setMore] = useState(false);
   const moved = `${s?.seq}:${s?.rack?.n}:${s?.rack?.reracks}`;
   useEffect(() => {
-    setSel([]); setFoulOpen(false); setFoulKind(null); setNotCalled(false); setTenCalled(false); setShooter({ home: null, away: null });
+    setSel([]); setFoulOpen(false); setFoulKind(null); setNotCalled(false); setTenCalled(false); setShooter({ home: null, away: null }); setChanging(false);
     setFlags({ bnr: false, golden: false, runOut: false }); setMore(false);
   }, [moved]);
 
@@ -109,18 +111,33 @@ const ScoringControls: SportPlugin<PoolMatch>['ScoringControls'] = ({ state, dis
   };
   const toggleBall = (b: number) => setSel((cur) => (cur.includes(b) ? cur.filter((x) => x !== b) : [...cur, b]));
 
-  /** Doubles: who is shooting for `sd` (two chips, the suggestion pre-selected). */
-  const shooterChips = (sd: Side, label: string) => {
+  /** Doubles: who shoots / breaks for `sd`. The rotation is known, so it is a
+   *  line ("Likhi shoots next · Change"); Change shows both partners. */
+  const shooterChips = (sd: Side, label: string, mode: 'break' | 'shot') => {
     if (!doubles) return null;
     const pick = shooterPick(s, sd, ids(sd));
     if (pick.ids.length < 2) return <Text style={ctrl.meta}>Add both players of {name(sd)} to credit who shot.</Text>;
     const cur = shooter[sd] ?? pick.suggested;
+    const nm = (id: string) => who(id, roster(sd).find((x) => x.id === id)?.fullName);
+    if (!changing && cur) {
+      const keeps = pick.keeps && !shooter[sd];
+      const line = mode === 'break' ? `${nm(cur)} breaks` : keeps ? `${nm(cur)} keeps shooting` : `${nm(cur)} shoots next`;
+      const why = shooter[sd] ? '' : mode === 'break' ? ' (partners take turns to break)' : keeps ? ' (a ball went in)'
+        : scotchTurns(s) === 'turn' ? ' (partners take turns at the table)' : ' (partners alternate shots)';
+      return (
+        <Text style={ctrl.meta} accessibilityLiveRegion="polite">
+          <Text style={ctrl.next}>{line}</Text>{why}{' · '}
+          <Text style={ctrl.link} accessibilityRole="button" accessibilityLabel={`Change who ${mode === 'break' ? 'breaks' : 'shoots'} for ${name(sd)}`}
+            onPress={() => setChanging(true)}>Change</Text>
+        </Text>
+      );
+    }
     return (
       <View style={ctrl.chips}>
         <Text style={[ctrl.meta, ctrl.chipLead]}>{label}</Text>
         {pick.ids.map((id) => (
-          <SelectChip key={id} label={who(id, roster(sd).find((x) => x.id === id)?.fullName)} active={cur === id}
-            onPress={() => setShooter((x) => ({ ...x, [sd]: id }))} accessibilityLabel={`${who(id, roster(sd).find((x) => x.id === id)?.fullName)} is shooting for ${name(sd)}`} />
+          <SelectChip key={id} label={nm(id)} active={cur === id}
+            onPress={() => { setShooter((x) => ({ ...x, [sd]: id })); setChanging(false); }} accessibilityLabel={`${nm(id)} is ${mode === 'break' ? 'breaking' : 'shooting'} for ${name(sd)}`} />
         ))}
       </View>
     );
@@ -189,7 +206,7 @@ const ScoringControls: SportPlugin<PoolMatch>['ScoringControls'] = ({ state, dis
             </View>
           </View>
         )}
-        {brk ? shooterChips(brk, 'Breaking:') : null}
+        {brk ? shooterChips(brk, 'Breaking:', 'break') : null}
         <Text style={ctrl.label}>Balls in on the break <Text style={ctrl.meta}>(tap each · none = a dry break)</Text></Text>
         {ballChips(p.balls, s.game === 'eight' ? 8 : s.game === 'nine' ? 9 : 10)}
         <View style={ctrl.row}>
@@ -241,6 +258,8 @@ const ScoringControls: SportPlugin<PoolMatch>['ScoringControls'] = ({ state, dis
   const o = opts(sh);
   const picked = sel.filter((b) => p.table.includes(b));
   const tenFlag = p.tenCall && picked.includes(10) && tenCalled ? { calledBall: 10 } : {};
+  // 8-ball: only the other group went in — what did the cue ball hit first? (rotation SR4)
+  const theirs = otherGroupOnly(s, picked);
   const groups = s.game === 'eight'
     ? p.solids ? `${name(p.solids)}: solids (1–7) · ${name(other(p.solids))}: stripes (9–15)` : 'Open table · tap the called ball first'
     : null;
@@ -253,7 +272,7 @@ const ScoringControls: SportPlugin<PoolMatch>['ScoringControls'] = ({ state, dis
           ⚠️ {name(sh)} is on two fouls. A third foul in a row loses the rack.
         </Text>
       ) : null}
-      {shooterChips(sh, 'Shooting:')}
+      {shooterChips(sh, 'Shooting:', 'shot')}
       <Text style={ctrl.label}>Balls that went in <Text style={ctrl.meta}>(tap each, then the shot)</Text></Text>
       {ballChips(p.table, p.money)}
       {p.callShot && picked.length ? (
@@ -263,9 +282,20 @@ const ScoringControls: SportPlugin<PoolMatch>['ScoringControls'] = ({ state, dis
           {p.tenCall && picked.includes(10) ? <SelectChip label="The 10 was the called ball" active={tenCalled} onPress={() => setTenCalled((v) => !v)} /> : null}
         </View>
       ) : null}
+      {theirs ? (
+        <View style={ctrl.box}>
+          <Text style={ctrl.label}>Only {theirs} went in. What did the cue ball hit first?</Text>
+          <Button label={`A ${theirs === 'solids' ? 'stripe' : 'solid'} (own group) · turn passes`} variant="ghost"
+            accessibilityHint="A legal shot: no foul, the other side comes to the table"
+            onPress={() => void send(potAction(s, picked, { called: !notCalled, ...tenFlag }, o))} />
+          <Button label={`A ${theirs === 'solids' ? 'solid' : 'stripe'} · foul, ball in hand`} variant="danger"
+            accessibilityHint="Wrong ball hit first: the balls stay down, ball in hand to the other side"
+            onPress={() => void send(foulAction(s, 'wrongBall', { balls: picked }, o))} />
+        </View>
+      ) : null}
       <View style={ctrl.row}>
         <Button label={picked.length ? `Pot · ${ballsText(picked)}` : 'Pot (tap balls)'} variant={sh} color={sh === 'home' ? homeColor : awayColor} style={ctrl.flex2}
-          disabled={!picked.length} onPress={() => void send(potAction(s, picked, { called: !notCalled, ...tenFlag }, o))} />
+          disabled={!picked.length || !!theirs} onPress={() => void send(potAction(s, picked, { called: !notCalled, ...tenFlag }, o))} />
         <Button label="Miss" variant="ghost" style={ctrl.flex} disabled={picked.length > 0} accessibilityHint="Nothing went in, no foul"
           onPress={() => void send(missAction(s, o))} />
       </View>
@@ -378,6 +408,7 @@ const ctrl = StyleSheet.create({
   flex2: { flexGrow: 2, flexBasis: 140 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing(2), alignItems: 'center' },
   chipLead: { fontWeight: '700' },
+  next: { color: theme.colors.text, fontSize: theme.font.body, fontWeight: '800' },
   label: { color: theme.colors.text, fontSize: theme.font.body, fontWeight: '700' },
   meta: { color: theme.colors.textMuted, fontSize: theme.font.small },
   link: { color: theme.colors.primary, fontSize: theme.font.small, fontWeight: '700', paddingVertical: theme.spacing(2) },

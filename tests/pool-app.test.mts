@@ -377,7 +377,7 @@ describe('controls: scotch doubles — who shoots', () => {
   test('the suggested shooter alternates within the side; the break alternates between partners', () => {
     let s = M.poolInit({ game: 'nine', raceTo: 3, playersPerSide: 2 });
     s = M.poolReducer(s, C.lagAction(s, 'home'));
-    assert.deepEqual(C.shooterPick(s, 'home', ['h1', 'h2']), { ids: ['h1', 'h2'], suggested: 'h1' });
+    assert.deepEqual(C.shooterPick(s, 'home', ['h1', 'h2']), { ids: ['h1', 'h2'], suggested: 'h1', keeps: false });
     s = M.poolReducer(s, C.breakAction(s, { pots: [1] }, { pid: 'h1' }));
     assert.equal(C.shooterPick(s, 'home', ['h1', 'h2']).suggested, 'h2');
     s = M.poolReducer(s, C.potAction(s, [2], {}, { pid: 'h2' }));
@@ -391,7 +391,7 @@ describe('controls: scotch doubles — who shoots', () => {
     assert.equal(C.shooterPick(s, 'home', ['h1', 'h2']).suggested, 'h2');
     // a roster bigger than two: the first two (the matchday pair) are offered
     assert.deepEqual(C.shooterPick(s, 'away', ['a1', 'a2', 'a3']).ids, ['a1', 'a2']);
-    assert.deepEqual(C.shooterPick(s, 'away', []), { ids: [], suggested: null });
+    assert.deepEqual(C.shooterPick(s, 'away', []), { ids: [], suggested: null, keeps: false });
   });
 });
 

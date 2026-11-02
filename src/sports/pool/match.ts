@@ -85,7 +85,8 @@ export interface PoolCredit {
 
 export interface PoolMatch extends PoolState {
   perSide?: 1 | 2;
-  opt?: { threeFoul?: boolean; threeBallRule?: boolean; tenEarly?: boolean };
+  /** turns: 'turn' = scotch doubles partners play full turns (absent = every other shot) */
+  opt?: { threeFoul?: boolean; threeBallRule?: boolean; tenEarly?: boolean; turns?: 'turn' };
   cr?: PoolCredit;
   feed?: FeedEntry[];
   rat?: number[];
@@ -245,6 +246,7 @@ export function poolInit(config?: Record<string, unknown>): PoolMatch {
   const c = ownRecord(config) ?? (Object.create(null) as Record<string, unknown>);
   const opt: NonNullable<PoolMatch['opt']> = {};
   for (const k of ['threeFoul', 'threeBallRule', 'tenEarly'] as const) if (typeof c[k] === 'boolean') opt[k] = c[k] as boolean;
+  if (c.scotchTurns === 'turn') opt.turns = 'turn';
   return mine({ ...engineInit(config), perSide: readInt(c.playersPerSide, 1, 1, 2) as 1 | 2, opt, cr: emptyCredit(), feed: [], rat: [] });
 }
 

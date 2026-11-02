@@ -30,6 +30,16 @@ export const POOL_META: SportMeta = {
       ],
     },
     {
+      // founder 2026-11-02: organiser's choice, world rules by default (pool-scotch-rotation SR1)
+      key: 'scotchTurns', label: 'Partners take turns', type: 'choice', default: 'shot',
+      hideWhen: { key: 'playersPerSide', value: 1 },
+      options: [
+        { value: 'shot', label: 'Every other shot (world rules)' },
+        { value: 'turn', label: 'Each player plays a full turn' },
+      ],
+      hint: 'world rules: the partner takes the next shot, even after a ball goes in; full turn: a player keeps shooting while potting',
+    },
+    {
       key: 'setsToWin', label: 'Sets', type: 'choice', default: 1, advanced: true,
       options: [
         { value: 1, label: 'One race' },
