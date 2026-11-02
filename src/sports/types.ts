@@ -346,6 +346,9 @@ export interface LiveSettings<S = unknown> {
   actionType?: string;
   /** "standard" values — drive the Standard / N custom pill and Reset */
   defaults?: Record<string, FormatValue>;
+  /** US batch 5: the standard values for THIS match, where they depend on its
+   *  rules (American football: flag vs tackle); wins over `defaults`. */
+  defaultsFor?: (state: S) => Record<string, FormatValue>;
 }
 
 /** SD-19 — one player's absolute figures for a match (`SportPlugin.statTotals`). */

@@ -20,7 +20,7 @@ import type { BBEvent } from './basketball/events.ts';
 import { eventCredits } from './basketball/credits.ts';
 import { shotsTracked } from './basketball/totals.ts';
 import { boxField } from './basketball/fieldTime.ts';
-import { bbDeepRows, type BbKeyOf } from './basketball/deep.ts';
+import { bbDeepRows, pairedPlays, type BbKeyOf } from './basketball/deep.ts';
 import { hasPlayer } from './basketball/names.ts';
 import { tally as volleyballTally, vbCreditKeyer, type VolleyballState } from './volleyball/engine.ts';
 import { detailTally as vbDetailTally, detailTracked as vbDetailTracked } from './volleyball/detail.ts';
@@ -203,6 +203,12 @@ export function basketballBox(s: BasketballState, ctx: BoxContext = {}): MatchBo
         // points / rebounds … logged with no player: the side's "Team" row
         const team = blankLine('Team');
         for (const e of s.events) if (e.side === sd && !hasPlayer(e) && (scope === 'all' || e.quarter === scope)) add(team, e, halfCourt, cov.shots);
+        // US batch 5: the other side's paired steals / blocks with no ball-handler / shooter named
+        for (const x of pairedPlays(s)) {
+          if (x.side !== sd || (scope !== 'all' && x.quarter !== scope)) continue;
+          if (x.kind === 'tov') team.to++;
+          else { team.fga++; team.fgx++; }
+        }
         return { rows, team: { label: 'Team', stats: { ...bbStats(team, cov), ...deep.zero, ...deep[sd].team } } };
       };
       return { home: side('home'), away: side('away'), ...(cov.shots ? null : { untracked: ['fgPct', 'threePct'] }) };

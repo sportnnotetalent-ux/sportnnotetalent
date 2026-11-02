@@ -8,7 +8,7 @@
  *    four and strike three close the plate appearance by themselves;
  *  - "In play →" opens the outcome sheet (1B 2B 3B HR, groundout, flyout,
  *    lineout, double play, sac fly / bunt, fielder's choice, error); with
- *    nobody on base (and fielders not asked) the tap IS the play — otherwise
+ *    nobody on base the tap IS the play (fielders: optional chips after it) — otherwise
  *    the runners show with their usual advance pre-picked and one ✓ confirms;
  *  - runners (steal, caught stealing, wild pitch, passed ball, balk, pick-off),
  *    subs (pinch hitter / runner, defensive change, pitching change) and
@@ -45,7 +45,7 @@ import {
   lineupAction, subAction, ejectAction,
   stateAfter, eventCredits, creditAttribution, halfLong, halfShort, inningOf, whoKey, mercyText, newUid, defaultRbi, pitchTypesFor, battedBallOfPlay,
   BASEBALL_PRESETS, BASEBALL_LIVE_SETTINGS, OUTCOME_LABEL, RUNNER_LABEL, POSITIONS, TRACK_FIELDS, ZONES, ZONE_LABEL, IN_PLAY, PITCH_TYPE_LABEL, PITCH_TYPE_CHIP,
-  BATTED_BALLS, BATTED_BALL_LABEL, BATTED_BALL_CHIP,
+  BATTED_BALLS, BATTED_BALL_LABEL, BATTED_BALL_CHIP, fieldersAction, isFieldersNote,
   type BaseballEvent, type BaseballState, type BattedBall, type Dest, type LineupEntry, type Move, type Outcome, type PitchType, type RunnerKind, type Side, type SubKind, type Who, type Zone,
 } from './engine';
 import { withNames, whoText } from './names';
@@ -72,7 +72,8 @@ const HIT_BTNS: Outcome[] = ['1B', '2B', '3B', 'HR'];
 const OUT_BTNS: Outcome[] = ['GO', 'FO', 'LO', 'DP', 'SF', 'SH'];
 const REACH_BTNS: Outcome[] = ['FC', 'E'];
 const SHORT: Partial<Record<Outcome, string>> = { '1B': 'Single', '2B': 'Double', '3B': 'Triple', HR: 'Home run', GO: 'Groundout', FO: 'Fly / pop out', LO: 'Lineout', DP: 'Double play', SF: 'Sac fly', SH: 'Sac bunt', FC: "Fielder's choice", E: 'Error' };
-/** outcomes that ask for the fielders when "Ask for fielders" is on */
+/** outcomes that ask for the fielders when "Ask for fielders" is on — US batch 5:
+ *  AFTER the play is recorded (optional chips; never a blocking step) */
 const FIELDED: Outcome[] = ['GO', 'FO', 'LO', 'DP', 'SF', 'SH', 'FC'];
 /** US batch 1: a quick-pad strikeout's third strike — called (looking) or swinging */
 type ThirdStrike = 'called' | 'swinging';
@@ -136,6 +137,8 @@ const ScoringControls: SportPlugin<BaseballState>['ScoringControls'] = ({
   const [zone, setZone] = useState<Zone | null>(null);
   /** round 2 (optional capture): the batted-ball type of this ball in play */
   const [btype, setBtype] = useState<BattedBall | null>(null);
+  /** US batch 5: the fielded out just recorded, waiting for its optional fielders ("6-3") */
+  const [fieldFor, setFieldFor] = useState<{ ref: string; fielders: string } | null>(null);
   useEffect(() => { if (flow === null && editAfter !== null) { setEditAfter(null); dropHeldRemoval(); } }, [flow]); // eslint-disable-line react-hooks/exhaustive-deps
   // a cancelled play forgets its zone and type (a picked pitch type waits for the pitch)
   useEffect(() => { if (flow === null) { setZone(null); setBtype(null); } }, [flow]);
@@ -196,6 +199,7 @@ const ScoringControls: SportPlugin<BaseballState>['ScoringControls'] = ({
     setPtype(null);
     setZone(null);
     setBtype(null);
+    setFieldFor(null);
   };
   const extra = (): Record<string, unknown> => (editAfter !== null ? { after: editAfter, edit: true } : {});
 
@@ -214,11 +218,26 @@ const ScoringControls: SportPlugin<BaseballState>['ScoringControls'] = ({
   const captured = (o: Outcome): { zone?: Zone; ptype?: PitchType; btype?: BattedBall } =>
     ({ ...(zone && IN_PLAY.includes(o) ? { zone } : {}), ...(ptype ? { ptype } : {}), ...(btype && IN_PLAY.includes(o) ? { btype } : {}) });
   const pitch = (k: 'ball' | 'called' | 'swinging' | 'foul') => fire(buildPitch(s, k, { ...extra(), ...(ptype ? { ptype } : {}) }));
-  const playNow = (o: Outcome, opts: { moves?: Move[]; fielders?: string; rbi?: number; pitch?: ThirdStrike } = {}) =>
-    fire(buildPlay(s, o, { ...opts, ...captured(o), extra: extra() }));
+  const playNow = (o: Outcome, opts: { moves?: Move[]; fielders?: string; rbi?: number; pitch?: ThirdStrike } = {}) => {
+    // US batch 5: a fielded out is recorded NOW; its fielders are optional chips after it
+    const ask = askFielders && FIELDED.includes(o) && editAfter === null;
+    const uid = newUid();
+    fire(buildPlay(s, o, { ...opts, ...captured(o), uid, extra: extra() }));
+    if (ask) setFieldFor({ ref: uid, fielders: '' });
+  };
+  /** US batch 5: each tap notes the fielders on the recorded play ("6", then "6-3") */
+  const tapFieldFor = (n: number) => {
+    if (!fieldFor) return;
+    const next = fieldFor.fielders ? `${fieldFor.fielders}-${n}` : String(n);
+    if (!isFieldersNote(next)) return;
+    dispatch(fieldersAction(fieldFor.ref, next));
+    setFieldFor({ ...fieldFor, fielders: next });
+  };
+  const clearFieldFor = () => { if (!fieldFor) return; dispatch(fieldersAction(fieldFor.ref, '')); setFieldFor({ ...fieldFor, fielders: '' }); };
   /** `k`: a quick-pad strikeout's third strike, looking or swinging (US batch 1) */
   const outcome = (o: Outcome, k?: ThirdStrike) => {
-    const needsSheet = (runners.length > 0 && !['HR', '3B', 'BB', 'IBB', 'HBP', 'K'].includes(o)) || o === 'E' || (askFielders && FIELDED.includes(o));
+    // US batch 5: "Ask for fielders" no longer opens the sheet — the chips come after the play
+    const needsSheet = (runners.length > 0 && !['HR', '3B', 'BB', 'IBB', 'HBP', 'K'].includes(o)) || o === 'E';
     if (!needsSheet) { playNow(o, k ? { pitch: k } : {}); return; }
     setFlow({ mode: 'advance', outcome: o, moves: withStays(s, defaultMoves(s, o)), fielders: '' });
   };
@@ -262,6 +281,24 @@ const ScoringControls: SportPlugin<BaseballState>['ScoringControls'] = ({
     if (ok) dispatch({ type: 'END', payload: { reason: 'called', at: Date.now() } });
   };
 
+  /* ---- US batch 5: fielders after the play (optional; any next play closes it) ---- */
+  const fieldersBox = fieldFor ? (
+    <View style={c.panel} accessibilityLabel="Fielders for the last out (optional)">
+      <View style={c.flowHead}>
+        <Text style={c.small}>Fielders? (optional){fieldFor.fielders ? ` · ${fieldFor.fielders}` : ''}</Text>
+        <Text style={c.cancel} accessibilityRole="button" onPress={() => setFieldFor(null)}>{fieldFor.fielders ? 'Done' : 'Skip'}</Text>
+      </View>
+      <View style={c.grid}>
+        {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => (
+          <TouchableOpacity key={n} accessibilityRole="button" accessibilityLabel={`Fielder ${n}, ${POSITIONS[n - 1]}`} style={c.num} onPress={() => tapFieldFor(n)}>
+            <Text style={c.numTxt}>{n}</Text>
+          </TouchableOpacity>
+        ))}
+        {fieldFor.fielders ? <TouchableOpacity accessibilityRole="button" accessibilityLabel="Clear the fielders" style={c.num} onPress={clearFieldFor}><Text style={c.numTxt}>Clear</Text></TouchableOpacity> : null}
+      </View>
+    </View>
+  ) : null;
+
   /* ---- after the last out ---- */
   if (view.g.ended && editAfter === null) {
     const r = result(view);
@@ -271,6 +308,7 @@ const ScoringControls: SportPlugin<BaseballState>['ScoringControls'] = ({
           <Text style={c.h}>{statusText(view)} · {name('home')} {view.g.score.home} – {view.g.score.away} {name('away')}</Text>
           <Text style={c.meta}>{r ? (r.winner === 'draw' ? 'Tied game.' : `${name(r.winner)} win.`) : ''} Use “Correct the plays” below to fix a play.</Text>
         </View>
+        {fieldersBox}
         <EditList s={view} names={pn} show={showEdit} setShow={setShowEdit} onRemove={remove} onEarned={toggleEarned} homeName={homeName} awayName={awayName} />
       </View>
     );
@@ -608,6 +646,7 @@ const ScoringControls: SportPlugin<BaseballState>['ScoringControls'] = ({
               </View>
             </View>
           )}
+          {fieldersBox}
           <View style={c.row}>
             <Button label="Runners" accessibilityLabel="Runner plays: steal, wild pitch, pick-off" variant="ghost" style={c.flex} disabled={!runners.length} onPress={() => setFlow({ mode: 'runner' })} />
             <Button label="Subs" accessibilityLabel="Substitutions and pitching changes" variant="ghost" style={c.flex} onPress={() => setFlow({ mode: 'sub', step: 'kind' })} />
@@ -771,6 +810,7 @@ export const baseballPlugin: SportPlugin<BaseballState> = {
     const next = step.next as BaseballState | undefined;
     if (!prev?.events || !next?.events) return null;
     if (step.type === 'LINEUP') return 'line-up';
+    if (step.type === 'FIELDERS') return 'fielders note'; // US batch 5
     if (next.events.length <= prev.events.length) return step.type === 'REMOVE_EVENT' ? 'play correction' : step.type === 'END' ? 'called game' : null;
     const e0 = next.events.find((x) => !prev.events.some((y) => y.id === x.id));
     if (!e0) return null;

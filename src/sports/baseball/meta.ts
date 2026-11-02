@@ -64,7 +64,9 @@ export const BASEBALL_META: SportMeta = {
     { key: 'allowTies', label: 'A tied game may stand', type: 'toggle', default: false, advanced: true, hint: 'time-limited league games; never in a knockout' },
     { key: 'maxInnings', label: 'Stop after inning (0 = play on)', type: 'number', default: 0, min: 0, max: 20, advanced: true },
     { key: 'pitches', label: 'Pitch-by-pitch (balls & strikes)', type: 'toggle', default: true, advanced: true },
-    { key: 'askFielders', label: 'Ask for fielders (6-3)', type: 'toggle', default: false, advanced: true },
+    // US batch 5: optional fielder chips after an out is recorded (never a blocking step) — on for
+    // new matches; a stored format without the key reads off (readConfig), so old games are unchanged
+    { key: 'askFielders', label: 'Ask for fielders (6-3)', type: 'toggle', default: true, advanced: true, hint: 'optional 1–9 chips after an out is recorded — putouts and assists' },
     // deep wave: "Stats to track" (off by default)
     ...TRACK_FIELDS.map((f) => ({ ...f, advanced: true })),
   ],

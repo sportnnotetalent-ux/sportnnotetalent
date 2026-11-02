@@ -83,6 +83,8 @@ export const baseballStats: SportStatSchema<'baseball'> = {
     { key: 'strikeouts', label: 'Strikeouts (batting)', short: 'strikeouts', one: 'strikeout', abbr: 'SO', group: 'batting', format: { unit: 'count', better: 'lower' }, weight: -0.5 },
     // US batch 1: of those, called third strikes (a strikeout logged before it as "swinging" stays one)
     { key: 'kLooking', label: 'Strikeouts looking', short: 'strikeouts looking', one: 'strikeout looking', abbr: 'KL', group: 'batting', format: { unit: 'count', better: 'lower' } },
+    // US batch 5: of the walks, the intentional ones (derived; keyed — a line from before reads "not tracked")
+    { key: 'intentionalWalks', label: 'Intentional walks', short: 'intentional walks', one: 'intentional walk', abbr: 'IBB', group: 'batting', coverage: 'keyed' },
     { key: 'sacFlies', label: 'Sacrifice flies', short: 'sacrifice flies', one: 'sacrifice fly', abbr: 'SF', group: 'batting', weight: 0.5 },
     { key: 'sacBunts', label: 'Sacrifice bunts', short: 'sacrifice bunts', one: 'sacrifice bunt', abbr: 'SH', group: 'batting', weight: 0.5 },
     { key: 'gidp', label: 'Grounded into double plays', short: 'GDP', abbr: 'GDP', group: 'batting', format: { unit: 'count', better: 'lower' }, weight: -1 },
@@ -118,6 +120,11 @@ export const baseballStats: SportStatSchema<'baseball'> = {
     { key: 'hbpAllowed', label: 'Hit batters', short: 'hit batters', one: 'hit batter', abbr: 'HB', group: 'pitching', format: { unit: 'count', better: 'lower' } },
     { key: 'kPitched', label: 'Strikeouts (pitching)', matchSummary: true, short: 'strikeouts pitched', one: 'strikeout pitched', abbr: 'SO', group: 'pitching', weight: 1.5,
       tieBreak: [{ key: 'outsPitched', better: 'lower' }] },
+    // US batch 5: runner plays charged to the pitcher, intentional walks issued (derived, keyed)
+    { key: 'wildPitches', label: 'Wild pitches', short: 'wild pitches', one: 'wild pitch', abbr: 'WP', group: 'pitching', format: { unit: 'count', better: 'lower' }, coverage: 'keyed' },
+    { key: 'balks', label: 'Balks', short: 'balks', one: 'balk', abbr: 'BK', group: 'pitching', format: { unit: 'count', better: 'lower' }, coverage: 'keyed' },
+    { key: 'pickoffs', label: 'Pick-offs', short: 'pick-offs', one: 'pick-off', abbr: 'PK', group: 'pitching', coverage: 'keyed' },
+    { key: 'ibbAllowed', label: 'Intentional walks issued', short: 'intentional walks issued', one: 'intentional walk issued', abbr: 'IBB', group: 'pitching', coverage: 'keyed' },
     { key: 'hrAllowed', label: 'Home runs allowed', short: 'home runs allowed', one: 'home run allowed', abbr: 'HR', group: 'pitching', format: { unit: 'count', better: 'lower' } },
     { key: 'pitchWins', label: 'Wins (pitching)', short: 'pitching wins', one: 'pitching win', abbr: 'W', group: 'pitching', weight: 4, coverage: 'present',
       tieBreak: [{ key: 'pitchLosses', better: 'lower' }] },
@@ -155,6 +162,8 @@ export const baseballStats: SportStatSchema<'baseball'> = {
     // round 2 — batted-ball types (keyed: only games that tracked them)
     ...battedBallStats(),
     // fielding (from the scorer's notation, when asked)
+    // US batch 5: the catcher's passed balls (derived, keyed)
+    { key: 'passedBalls', label: 'Passed balls', short: 'passed balls', one: 'passed ball', abbr: 'PB', group: 'fielding', format: { unit: 'count', better: 'lower' }, coverage: 'keyed' },
     { key: 'putouts', label: 'Putouts', short: 'putouts', one: 'putout', abbr: 'PO', group: 'fielding', coverage: 'present', weight: 0.25 },
     { key: 'fieldAssists', label: 'Assists (fielding)', short: 'fielding assists', one: 'fielding assist', abbr: 'A', group: 'fielding', coverage: 'present', weight: 0.25 },
     { key: 'fieldErrors', label: 'Errors (fielding)', short: 'fielding errors', one: 'fielding error', abbr: 'E', group: 'fielding', format: { unit: 'count', better: 'lower' }, coverage: 'present', weight: -1 },
@@ -169,7 +178,7 @@ export const baseballStats: SportStatSchema<'baseball'> = {
   sections: [
     { id: 'batting', title: 'Batting', rows: [
       { stat: 'plateAppearances' }, { stat: 'atBats' }, { stat: 'runs' }, { stat: 'hits' }, { stat: 'twoB', hideZero: true }, { stat: 'threeB', hideZero: true },
-      { stat: 'homeRuns' }, { stat: 'rbi' }, { stat: 'baseOnBalls' }, { stat: 'hitByPitch', hideZero: true }, { stat: 'strikeouts' }, { stat: 'kLooking', hideZero: true },
+      { stat: 'homeRuns' }, { stat: 'rbi' }, { stat: 'baseOnBalls' }, { stat: 'intentionalWalks', hideZero: true }, { stat: 'hitByPitch', hideZero: true }, { stat: 'strikeouts' }, { stat: 'kLooking', hideZero: true },
       { stat: 'sacFlies', hideZero: true }, { stat: 'sacBunts', hideZero: true }, { stat: 'gidp', hideZero: true },
       { stat: 'battingAvg', label: 'AVG' }, { stat: 'obp', label: 'OBP' }, { stat: 'slg', label: 'SLG' }, { stat: 'ops', label: 'OPS' }, { stat: 'totalBases' },
     ] },
@@ -184,7 +193,8 @@ export const baseballStats: SportStatSchema<'baseball'> = {
     { id: 'pitching', title: 'Pitching', leadWhen: 'pitched', rows: [
       { stat: 'gamesPitched' }, { stat: 'pitchWins', label: 'W' }, { stat: 'pitchLosses', label: 'L' }, { stat: 'pitchSaves', label: 'SV', hideZero: true },
       { stat: 'outsPitched', label: 'IP' }, { stat: 'era', label: 'ERA' }, { stat: 'whip', label: 'WHIP' }, { stat: 'hitsAllowed' }, { stat: 'runsAllowed' }, { stat: 'earnedRuns' },
-      { stat: 'bbAllowed' }, { stat: 'kPitched' }, { stat: 'hrAllowed' }, { stat: 'hbpAllowed', hideZero: true }, { stat: 'battersFaced' }, { stat: 'pitches' },
+      { stat: 'bbAllowed' }, { stat: 'kPitched' }, { stat: 'hrAllowed' }, { stat: 'hbpAllowed', hideZero: true }, { stat: 'ibbAllowed', hideZero: true },
+      { stat: 'wildPitches', hideZero: true }, { stat: 'balks', hideZero: true }, { stat: 'pickoffs', hideZero: true }, { stat: 'battersFaced' }, { stat: 'pitches' },
       // deep wave
       { stat: 'strikePct', label: 'Strike %' }, { stat: 'firstPitchStrikePct', label: 'First-pitch strike %' }, { stat: 'goAo', label: 'GO/AO' },
       { stat: 'inheritedRunners', hideZero: true }, { stat: 'inheritedScored', hideZero: true },
@@ -192,7 +202,7 @@ export const baseballStats: SportStatSchema<'baseball'> = {
     { id: 'battedBallsAllowed', title: 'Batted balls allowed', rows: [
       { stat: 'pitchBattedBalls' }, ...TYPES.map((t) => ({ stat: `pitch${cap(t.pct)}`, label: `${t.ab} %` })),
     ] },
-    { id: 'fielding', title: 'Fielding', rows: [{ stat: 'putouts', hideZero: true }, { stat: 'fieldAssists', hideZero: true }, { stat: 'fieldErrors', hideZero: true }] },
+    { id: 'fielding', title: 'Fielding', rows: [{ stat: 'putouts', hideZero: true }, { stat: 'fieldAssists', hideZero: true }, { stat: 'fieldErrors', hideZero: true }, { stat: 'passedBalls', hideZero: true }] },
     { id: 'bests', title: 'Bests', rows: [{ stat: 'mostHits', label: 'Most hits (game)', hideZero: true }, { stat: 'mostKPitched', label: 'Most strikeouts (game, pitching)', hideZero: true }] },
   ],
   filters: { pitched: (l) => Number(l.stats?.gamesPitched ?? 0) > 0 || Number(l.stats?.outsPitched ?? 0) > 0 },

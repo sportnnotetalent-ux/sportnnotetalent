@@ -117,22 +117,25 @@ describe('DC6 · Info › Rules & stats captured shows the new defaults', () => 
   });
 });
 
-describe('DB1 · baseball: Ask for fielders stays off (it would add a blocking sheet to every out)', () => {
-  test('format field and live settings both default off', () => {
-    assert.equal(fieldOf(BASEBALL_META.formatFields!, 'askFielders').default, false);
-    assert.equal(fieldOf(baseball.BASEBALL_LIVE_SETTINGS.fields, 'askFielders').default, false);
-    assert.equal(baseball.BASEBALL_LIVE_SETTINGS.defaults?.askFielders, false);
+// US batch 5 (docs/security/breaks/us-sports-batch5.md BS9 / BS11) replaced DB1: the
+// fielders are optional chips AFTER the play is recorded (no blocking sheet), so
+// "Ask for fielders" is on for a NEW match; a stored format without the key reads off.
+describe('DB1 · baseball: Ask for fielders on for new matches (non-blocking since US batch 5)', () => {
+  test('format field and live settings both default on', () => {
+    assert.equal(fieldOf(BASEBALL_META.formatFields!, 'askFielders').default, true);
+    assert.equal(fieldOf(baseball.BASEBALL_LIVE_SETTINGS.fields, 'askFielders').default, true);
+    assert.equal(baseball.BASEBALL_LIVE_SETTINGS.defaults?.askFielders, true);
   });
-  test('the reason holds: with it on, a fielded out opens the sheet (one more Confirm before the play is recorded)', () => {
-    // index.tsx `outcome`: askFielders && FIELDED → needsSheet (the advance sheet, recorded only on ✓ Confirm)
-    assert.match(src('src/sports/baseball/index.tsx'), /\(askFielders && FIELDED\.includes\(o\)\)/);
+  test('no blocking step: a fielded out no longer opens the sheet for fielders', () => {
+    assert.doesNotMatch(src('src/sports/baseball/index.tsx'), /\(askFielders && FIELDED\.includes\(o\)\)/);
   });
-  test('a new game reads it off; Info shows Off', () => {
+  test('a new game reads it on; Info shows On; an old format reads off', () => {
     const fmt = defaultsFor(BASEBALL_META.formatFields!);
     const s = baseball.init(fmt);
-    assert.equal(s.cfg.askFielders, false);
+    assert.equal(s.cfg.askFielders, true);
     const cap = matchCaptures(baseball.BASEBALL_LIVE_SETTINGS as never, s, BASEBALL_META.formatFields!, fmt).captures.find((c) => c.key === 'askFielders');
-    assert.equal(cap?.on, false);
+    assert.equal(cap?.on, true);
+    assert.equal(baseball.init({ innings: 9 }).cfg.askFielders, false);
   });
 });
 

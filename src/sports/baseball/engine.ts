@@ -76,6 +76,13 @@ export interface Move { from: Base; to: Dest; id?: string; name?: string }
 
 export const HITS: Outcome[] = ['1B', '2B', '3B', 'HR'];
 export const NO_AB: Outcome[] = ['BB', 'IBB', 'HBP', 'SF', 'SH'];
+/** US batch 5: the plays a fielders note ("6-3", "F8") can be added to after
+ *  they are recorded (the non-blocking "Fielders?" chips) */
+export const FIELDED_OUTCOMES: Outcome[] = ['GO', 'FO', 'LO', 'DP', 'SF', 'SH', 'FC'];
+/** a scorer's fielders note: an optional letter (G, F, L, P, LD, IF), then 1–6
+ *  fielders "6-4-3" (positions 1–10). Anything else is ignored. */
+export const isFieldersNote = (v: unknown): v is string =>
+  typeof v === 'string' && v.length <= 16 && /^(?:IF|LD|[LPGF])?(?:10|[1-9])(?:-(?:10|[1-9])){0,5}$/.test(v);
 /** the outcomes where the batter is put out at the plate / before 1B */
 export const BATTER_OUT: Outcome[] = ['K', 'GO', 'FO', 'LO', 'SF', 'SH', 'DP'];
 
@@ -742,7 +749,7 @@ const withCredits = (a: ScoreAction, e: Parameters<typeof eventCredits>[0]): Sco
 
 /* --------------------------------- reducer --------------------------------- */
 
-const ENDED_OK = new Set(['STAT_ADJUST', 'REMOVE_EVENT', 'ER', 'SUB', 'EJECT', 'LINEUP']);
+const ENDED_OK = new Set(['STAT_ADJUST', 'REMOVE_EVENT', 'ER', 'SUB', 'EJECT', 'LINEUP', 'FIELDERS']);
 const whoIn = (v: unknown): Who | undefined => {
   if (!v || typeof v !== 'object') return undefined;
   const o = v as Record<string, unknown>;
@@ -854,6 +861,18 @@ export const reducer = (s: BaseballState, a: ScoreAction): BaseballState => {
       const ref = String(p.ref ?? '');
       if (!s.events.some((e) => e.id === ref)) return s;
       return push({ type: 'er', ref, earned: p.earned !== false });
+    }
+    case 'FIELDERS': {
+      // US batch 5: the fielders of a fielded out, noted AFTER it was recorded
+      // (the non-blocking chips) — replaces the play's note; '' clears it.
+      // Only a fielded out takes one; a bad note or an unknown play is ignored.
+      const ref = typeof p.ref === 'string' ? p.ref : '';
+      const ev = s.events.find((e) => e.id === ref);
+      if (!ev || ev.type !== 'pa' || !ev.outcome || !FIELDED_OUTCOMES.includes(ev.outcome)) return s;
+      const f = p.fielders;
+      if (f !== '' && !isFieldersNote(f)) return s;
+      const next: BaseballEvent = f === '' ? (({ fielders: _drop, ...rest }) => rest)(ev) : { ...ev, fielders: f };
+      return commit({ ...s, events: s.events.map((e) => (e === ev ? next : e)) });
     }
     case 'REMOVE_EVENT': {
       const id = String(p.id ?? '');
@@ -1020,6 +1039,9 @@ export function buildRunner(s: BaseballState, kind: RunnerKind, moves?: Move[], 
  * controls and the tests build them the same way). IDs-only scoring: every
  * player by id (`storedWho`) — never a name in the public log. */
 
+/** US batch 5: the fielders of a recorded fielded out ('' clears). */
+export const fieldersAction = (ref: string, fielders: string): ScoreAction => ({ type: 'FIELDERS', payload: { ref, fielders } });
+
 /** A team's line-up before the first pitch: the batting order and the pitcher. */
 export function lineupAction(team: Side, order: LineupEntry[], pitcher?: Who | null): ScoreAction {
   const p = storedWho(pitcher);
@@ -1132,9 +1154,10 @@ export const BASEBALL_LIVE_SETTINGS: LiveSettings<BaseballState> = {
   mode: 'config',
   fields: [
     { key: 'pitches', label: 'Pitch-by-pitch (balls & strikes)', type: 'toggle', default: true, group: 'Detail' },
-    { key: 'askFielders', label: 'Ask for fielders (6-3)', type: 'toggle', default: false, group: 'Detail' },
+    // US batch 5: the fielders chips come AFTER the play (never a blocking step), so on for new matches
+    { key: 'askFielders', label: 'Ask for fielders (6-3)', type: 'toggle', default: true, group: 'Detail', hint: 'optional 1–9 chips after an out is recorded — putouts and assists' },
     ...TRACK_FIELDS,
   ] as FormatField[],
   read: (s) => ({ pitches: s.cfg.pitches, askFielders: s.cfg.askFielders, ...Object.fromEntries(TRACK_FLAGS.map((f) => [f, s.cfg[f] === true])) }),
-  defaults: { pitches: true, askFielders: false, ...Object.fromEntries(TRACK_FLAGS.map((f) => [f, false])) },
+  defaults: { pitches: true, askFielders: true, ...Object.fromEntries(TRACK_FLAGS.map((f) => [f, false])) },
 };

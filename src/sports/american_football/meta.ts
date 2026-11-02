@@ -6,12 +6,16 @@
  */
 import type { FormatField, SportMeta } from '../types';
 
+/* US batch 5: a tackle preset picks play by play (the organiser can still pick
+ * Scores only); flag friendlies stay Scores only. `init` reads the mode from
+ * the stored format only — never the preset underneath — so an older match
+ * without the key stays Scores only. */
 export const AF_PRESETS: Record<string, { label: string; set: Record<string, number | string | boolean> }> = {
-  flag: { label: 'Flag 5v5 (IFAF) · 2 × 20', set: { variant: 'flag', rules: 'ifaf', playersPerSide: 5, periods: 2, periodMinutes: 20, timeoutsPerHalf: 2, twoMinute: false, decider: 'flag' } },
-  flagSchool: { label: 'Flag 5v5 school · 2 × 15', set: { variant: 'flag', rules: 'ifaf', playersPerSide: 5, periods: 2, periodMinutes: 15, timeoutsPerHalf: 1, twoMinute: false, decider: 'flag' } },
-  nfl: { label: 'Tackle · NFL 4 × 15', set: { variant: 'tackle', rules: 'nfl', playersPerSide: 11, periods: 4, periodMinutes: 15, timeoutsPerHalf: 3, twoMinute: true, decider: 'nfl', otMinutes: 10 } },
-  ncaa: { label: 'Tackle · College 4 × 15', set: { variant: 'tackle', rules: 'ncaa', playersPerSide: 11, periods: 4, periodMinutes: 15, timeoutsPerHalf: 3, twoMinute: false, decider: 'kansas', otSpot: 25 } },
-  nfhs: { label: 'Tackle · High school (NFHS) 4 × 12', set: { variant: 'tackle', rules: 'nfhs', playersPerSide: 11, periods: 4, periodMinutes: 12, timeoutsPerHalf: 3, twoMinute: false, decider: 'kansas', otSpot: 10 } },
+  flag: { label: 'Flag 5v5 (IFAF) · 2 × 20', set: { variant: 'flag', rules: 'ifaf', playersPerSide: 5, periods: 2, periodMinutes: 20, timeoutsPerHalf: 2, twoMinute: false, decider: 'flag', mode: 'score' } },
+  flagSchool: { label: 'Flag 5v5 school · 2 × 15', set: { variant: 'flag', rules: 'ifaf', playersPerSide: 5, periods: 2, periodMinutes: 15, timeoutsPerHalf: 1, twoMinute: false, decider: 'flag', mode: 'score' } },
+  nfl: { label: 'Tackle · NFL 4 × 15', set: { variant: 'tackle', rules: 'nfl', playersPerSide: 11, periods: 4, periodMinutes: 15, timeoutsPerHalf: 3, twoMinute: true, decider: 'nfl', otMinutes: 10, mode: 'pbp' } },
+  ncaa: { label: 'Tackle · College 4 × 15', set: { variant: 'tackle', rules: 'ncaa', playersPerSide: 11, periods: 4, periodMinutes: 15, timeoutsPerHalf: 3, twoMinute: false, decider: 'kansas', otSpot: 25, mode: 'pbp' } },
+  nfhs: { label: 'Tackle · High school (NFHS) 4 × 12', set: { variant: 'tackle', rules: 'nfhs', playersPerSide: 11, periods: 4, periodMinutes: 12, timeoutsPerHalf: 3, twoMinute: false, decider: 'kansas', otSpot: 10, mode: 'pbp' } },
 };
 
 /** Deep wave — the "Stats to track" toggles (live settings + the match format;
@@ -47,9 +51,10 @@ export const AMERICAN_FOOTBALL_META: SportMeta = {
     { key: 'periodMinutes', label: 'Minutes per half / quarter', type: 'number', default: 20, min: 1, max: 30, advanced: true },
     { key: 'timeoutsPerHalf', label: 'Timeouts per team per half', type: 'number', default: 2, min: 0, max: 5, advanced: true, hint: 'NFL / NCAA / NFHS: 3 · IFAF flag: 2 (verify)' },
     { key: 'twoMinute', label: 'Two-minute warning (NFL)', type: 'toggle', default: false, advanced: true, hint: 'the clock stops at 2:00 of the 2nd and 4th quarters' },
-    { key: 'trackTackles', label: 'Ask who made the tackle / flag pull (play by play)', type: 'toggle', default: false, advanced: true },
+    // US batch 5: these act play by play only — hidden while the game is Scores only
+    { key: 'trackTackles', label: 'Ask who made the tackle / flag pull (play by play)', type: 'toggle', default: false, advanced: true, hideWhen: { key: 'mode', value: 'score' } },
     // deep wave — "Stats to track" (off by default)
-    ...TRACK_FIELDS.map((f) => ({ ...f, advanced: true })),
+    ...TRACK_FIELDS.map((f) => ({ ...f, advanced: true, hideWhen: { key: 'mode', value: 'score' } })),
     {
       key: 'decider', label: 'If tied at the end of regulation', type: 'choice', default: 'flag',
       options: [

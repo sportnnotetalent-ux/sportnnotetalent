@@ -640,6 +640,8 @@ const ScoringControls: SportPlugin<AFState>['ScoringControls'] = ({
           {!flag ? <Button label="🥅 Field goal" variant="ghost" style={c.third} onPress={() => setFlow({ mode: 'fg', side: sd, step: 'result', yards: String(fgDistance(s, d.spot)) })} /> : null}
           <Button label="🚩 Penalty" variant="ghost" style={c.third} onPress={() => setFlow({ mode: 'penalty', side: sd, step: 'foul' })} />
           <Button label="⛔ Turnover on downs" variant="ghost" style={c.third} onPress={() => play(sd, { play: 'downs' })} />
+          {/* US batch 5: a kneel-down, one tap (a 1-yard loss, credited to the last passer as a rush) */}
+          <Button label="🧎 Kneel" accessibilityLabel="Kneel-down" variant="ghost" style={c.third} onPress={() => play(sd, { play: 'kneel', yards: -1, p1: lastPasser(s, sd) })} />
         </View>
       </View>
     );

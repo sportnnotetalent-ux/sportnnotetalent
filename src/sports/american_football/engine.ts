@@ -235,7 +235,9 @@ export const init = (cfg?: Record<string, unknown>): AFState => {
     warned: [],
     decider: resolveDecider(config?.decider, variant, rules),
     otSpot: num(config?.otSpot, rules === 'ncaa' ? 25 : 10, 1),
-    mode: config?.mode === 'pbp' || config?.mode === true || config?.mode === 'true' ? 'pbp' : 'score',
+    // US batch 5: from the stored format only (a tackle preset now carries
+    // mode 'pbp' for new matches; an older match without the key stays Scores only)
+    mode: cfg?.mode === 'pbp' || cfg?.mode === true || cfg?.mode === 'true' ? 'pbp' : 'score',
     trackTackles: bool(config?.trackTackles, false),
     // deep wave: only when on (an old match's state shape never changes)
     ...Object.fromEntries(TRACK_FLAGS.filter((f) => bool(config?.[f], false)).map((f) => [f, true])),
@@ -1022,12 +1024,22 @@ export const AF_LIVE_SETTINGS: LiveSettings<AFState> = {
     { key: 'periodMinutes', label: 'Period length', type: 'number', default: 15, min: 1, max: 30, step: 1, hint: 'min / quarter or half' },
     { key: 'timeoutsPerHalf', label: 'Timeouts per half', type: 'number', default: 3, min: 0, max: 5, step: 1 },
     { key: 'mode', label: 'Play-by-play (downs, yards, player stats)', type: 'toggle', default: false, group: 'Detail' },
-    { key: 'trackTackles', label: 'Ask who made the tackle / flag pull', type: 'toggle', default: false, group: 'Stats to track' },
-    ...TRACK_FIELDS,
+    // US batch 5: the stats switches act play by play only — hidden in Scores only
+    { key: 'trackTackles', label: 'Ask who made the tackle / flag pull', type: 'toggle', default: false, group: 'Stats to track', hideWhen: { key: 'mode', value: false } },
+    ...TRACK_FIELDS.map((f) => ({ ...f, hideWhen: { key: 'mode', value: false } })),
   ] as FormatField[],
   read: (s) => ({
     periodMinutes: s.periodMinutes, timeoutsPerHalf: s.timeoutsPerHalf, mode: s.mode === 'pbp', trackTackles: s.trackTackles,
     ...Object.fromEntries(TRACK_FLAGS.map((f) => [f, s[f] === true])),
   }),
   defaults: { periodMinutes: 15, timeoutsPerHalf: 3, mode: false, trackTackles: false, ...Object.fromEntries(TRACK_FLAGS.map((f) => [f, false])) },
+  // US batch 5: "Standard" is this game's rules — flag 2 × 20, 2 timeouts,
+  // Scores only; NFHS 12-minute quarters; tackle play by play (3 timeouts)
+  defaultsFor: (s) => {
+    const flag = s.variant === 'flag';
+    return {
+      periodMinutes: flag ? 20 : s.rules === 'nfhs' ? 12 : 15, timeoutsPerHalf: flag ? 2 : 3, mode: !flag,
+      trackTackles: false, ...Object.fromEntries(TRACK_FLAGS.map((f) => [f, false])),
+    };
+  },
 };
