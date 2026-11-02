@@ -19,16 +19,27 @@
  *    free ball), potted (points from pots), pots (potting strokes),
  *    missedPots, safeties, visits, fouls, foulPoints (penalty points given
  *    away), penaltyPoints (points from the opponent's fouls), foulMisses
- *    (fouls and a miss called), freeBalls (free balls received).
+ *    (fouls and a miss called), freeBalls (free balls received);
+ *    cue batch 5: safetiesJudged / safetiesWon (safety success) and one key
+ *    per foul kind (foulInOff … foulOther; a foul with no kind is in none).
  */
 import type { StatTotalsContext, StatTotalsEntry } from '../types';
-import { snookerStats, type Side, type SnookerState } from './engine.ts';
+import { FOUL_KINDS, snookerStats, type FoulKind, type Side, type SnookerState } from './engine.ts';
 
 export const SNOOKER_RECORD_KEYS = ['framesWon', 'framesLost', 'points', 'pointsAgainst'] as const;
 export const SNOOKER_SHOT_KEYS = [
   'shotFrames', 'highestBreak', 'fiftyPlus', 'centuries', 'maximums', 'potted', 'pots', 'missedPots', 'safeties', 'visits',
   'fouls', 'foulPoints', 'penaltyPoints', 'foulMisses', 'freeBalls',
+  // cue batch 5: safety success, and every foul kind its own key
+  'safetiesJudged', 'safetiesWon',
+  'foulInOff', 'foulNoContact', 'foulWrongBall', 'foulPottedWrong', 'foulPush', 'foulJump', 'foulTouch', 'foulOffTable', 'foulOther',
 ] as const;
+
+/** Cue batch 5: the engine's foul kind → its career key. */
+export const SNOOKER_FOUL_KEY: Readonly<Record<FoulKind, string>> = {
+  inOff: 'foulInOff', noContact: 'foulNoContact', wrongBall: 'foulWrongBall', pottedWrong: 'foulPottedWrong', push: 'foulPush',
+  jump: 'foulJump', touch: 'foulTouch', offTable: 'foulOffTable', other: 'foulOther',
+};
 
 const other = (s: Side): Side => (s === 'home' ? 'away' : 'home');
 const n = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : 0);
@@ -44,7 +55,10 @@ export function snookerSideRecord(s: SnookerState, side: Side): Record<string, n
       shotFrames: n(t.detailedFrames), highestBreak: n(t.highestBreak), fiftyPlus: n(t.fiftyPlus), centuries: n(t.centuries), maximums: n(t.maximums),
       potted: n(t.potted), pots: n(t.potStrokes), missedPots: n(t.missedPots), safeties: n(t.safeties), visits: n(t.visits),
       fouls: n(t.fouls), foulPoints: n(t.penaltyConceded), penaltyPoints: n(t.penaltyReceived), foulMisses: n(t.missesCalled), freeBalls: n(t.freeBalls),
+      safetiesJudged: n(t.safetiesJudged), safetiesWon: n(t.safetiesWon),
     });
+    // cue batch 5: the foul kinds (0 when none; a fouls without a kind counts in none)
+    for (const k of FOUL_KINDS) rec[SNOOKER_FOUL_KEY[k]] = n(t.foulsByKind?.[k]);
   }
   return rec;
 }

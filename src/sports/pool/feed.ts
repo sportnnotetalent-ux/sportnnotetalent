@@ -3,7 +3,7 @@
  * first, each shot a plain sentence, newest first, the rack's result and the
  * running score on the shot that ended it. PURE: from the state's feed and
  * rack list (both replay from the event log), so Undo or a correction
- * re-derives it. Racks older than the feed keeps (match.ts FEED_RACKS) show
+ * re-derives it. Racks the feed no longer keeps (match.ts FEED_MAX: the oldest of a very long match) show
  * one summary line from the rack list.
  *
  * Names: `names` are the sides' labels for this viewer (a singles player's
@@ -11,10 +11,10 @@
  */
 import type { FeedGroup, FeedItem } from '../gcc/model.ts';
 import { whoName, type NameOf } from '../racketNames.ts';
-import { cnt, type RackRecord } from './engine.ts';
+import { awardReasonOf, cnt, type RackRecord } from './engine.ts';
 import { isSide, knownGame, MONEY, other, type Side } from './balls.ts';
 import { feedOf, rackTimes, type FeedEntry, type PoolMatch } from './match.ts';
-import { FOUL_SHORT } from './controls.ts';
+import { AWARD_REASON_WORD, FOUL_SHORT } from './controls.ts';
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 
@@ -42,7 +42,11 @@ export function rackTag(r: RackRecord, name: (s: Side) => string): string {
     case 'eightEarly': return `${L} pocketed the 8 too early`;
     case 'eightPocket': return `${L} pocketed the 8 in the wrong pocket`;
     case 'eightOff': return `${L} knocked the 8 off the table`;
-    case 'awarded': return 'awarded';
+    case 'awarded': {
+      // cue batch 5: the reason, when the referee gave one (read through the whitelist)
+      const why = awardReasonOf((r as { reason?: unknown }).reason);
+      return why ? `awarded: ${AWARD_REASON_WORD[why]}` : 'awarded';
+    }
     case 'quick': return 'result only';
     default: return '';
   }

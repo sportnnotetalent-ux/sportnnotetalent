@@ -162,11 +162,11 @@ describe('match state: the engine state plus what the app adds', () => {
     assert.deepEqual([changed.raceTo, changed.setsToWin], [5, 1]);
   });
 
-  test('the feed keeps the shots of the rack in play and the last 3 racks, at most 120 per rack', () => {
-    // seven quick racks: entries for racks 5–8 only (8 = in play, no entry yet)
+  test('the feed keeps the shots of every rack, at most 120 per rack', () => {
+    // cue batch 5 (was: the rack in play and the last 3 racks): seven quick racks, an entry each
     let s = M.poolInit({ game: 'nine', raceTo: 9 });
     for (let i = 0; i < 7; i++) s = M.poolReducer(s, C.rackAction(s, i % 2 ? 'away' : 'home'));
-    assert.deepEqual(M.feedOf(s).map((e) => e.n), [5, 6, 7]);
+    assert.deepEqual(M.feedOf(s).map((e) => e.n), [1, 2, 3, 4, 5, 6, 7]);
     assert.equal(M.rackTimes(s).length, 7, 'one time per completed rack');
     // 300 safeties in one rack keep the newest 120
     s = M.poolInit({ game: 'nine', raceTo: 9 });
@@ -448,6 +448,8 @@ describe('integration: a 9-ball match (break-and-run, golden break, three fouls)
       detailRacks: 3, innings: 4,
       shotsPlayed: 7, potShots: 5, missShots: 2, safetyShots: 0, pushOuts: 0, ballsPotted: 8,
       fouls: 0, foulScratch: 0, foulWrongBall: 0, foulNoRail: 0, foulOffTable: 0, foulOther: 0,
+      // cue batch 5: every foul kind its own key
+      foulTouch: 0, foulDoubleHit: 0, foulPush: 0, foulJump: 0, foulMoving: 0, foulNoFoot: 0, foulPlacement: 0, foulSlowPlay: 0, foulOutOfTurn: 0, foulIllegalBreak: 0,
       breakShots: 2, breakBalls: 1, dryBreaks: 1, breakFouls: 0, illegalBreaks: 0,
     } });
     assert.deepEqual(t.a1, { side: 'away', stats: {
@@ -455,6 +457,7 @@ describe('integration: a 9-ball match (break-and-run, golden break, three fouls)
       detailRacks: 3, innings: 4,
       shotsPlayed: 4, potShots: 0, missShots: 0, safetyShots: 0, pushOuts: 1, ballsPotted: 0,
       fouls: 3, foulScratch: 2, foulWrongBall: 1, foulNoRail: 0, foulOffTable: 0, foulOther: 0,
+      foulTouch: 0, foulDoubleHit: 0, foulPush: 0, foulJump: 0, foulMoving: 0, foulNoFoot: 0, foulPlacement: 0, foulSlowPlay: 0, foulOutOfTurn: 0, foulIllegalBreak: 0,
       breakShots: 1, breakBalls: 1, dryBreaks: 0, breakFouls: 0, illegalBreaks: 0,
     } });
   });
@@ -552,7 +555,8 @@ describe('integration: 8-ball scotch doubles (who shot)', () => {
     assert.deepEqual(POOL_CORE.result!(s), { winner: 'away', home: 0, away: 1 });
     const t = POOL_CORE.statTotals!(s, ctx(['h1', 'h2'], ['a1', 'a2']));
     const rec = { racksBroken: 0, racksWonOnBreak: 0, breakAndRuns: 0, runOuts: 0, eightLosses: 0, detailRacks: 1, innings: 2 };
-    const zero = { shotsPlayed: 0, potShots: 0, missShots: 0, safetyShots: 0, ballsPotted: 0, fouls: 0, foulScratch: 0, foulWrongBall: 0, foulNoRail: 0, foulOffTable: 0, foulOther: 0, breakShots: 0, breakBalls: 0, dryBreaks: 0, breakFouls: 0, illegalBreaks: 0, eightBreaks: 0 };
+    const zero = { shotsPlayed: 0, potShots: 0, missShots: 0, safetyShots: 0, ballsPotted: 0, fouls: 0, foulScratch: 0, foulWrongBall: 0, foulNoRail: 0, foulOffTable: 0, foulOther: 0, breakShots: 0, breakBalls: 0, dryBreaks: 0, breakFouls: 0, illegalBreaks: 0, eightBreaks: 0,
+      foulTouch: 0, foulDoubleHit: 0, foulPush: 0, foulJump: 0, foulMoving: 0, foulNoFoot: 0, foulPlacement: 0, foulSlowPlay: 0, foulOutOfTurn: 0, foulIllegalBreak: 0 }; // cue batch 5
     assert.deepEqual(t.h1, { side: 'home', partnerId: 'h2', stats: { racksWon: 0, racksLost: 1, ...rec, racksBroken: 1, ...zero, breakShots: 1, breakBalls: 2, shotsPlayed: 2, potShots: 1, ballsPotted: 1, fouls: 1, foulScratch: 1 } });
     assert.deepEqual(t.h2, { side: 'home', partnerId: 'h1', stats: { racksWon: 0, racksLost: 1, ...rec, racksBroken: 1, ...zero, shotsPlayed: 2, potShots: 1, ballsPotted: 1, missShots: 1 } });
     assert.deepEqual(t.a1, { side: 'away', partnerId: 'a2', stats: { racksWon: 1, racksLost: 0, ...rec, ...zero, shotsPlayed: 4, potShots: 4, ballsPotted: 4 } });
@@ -821,7 +825,7 @@ describe('breaks · hostile and old snapshots (#24, #25, #28)', () => {
     s = M.poolReducer(s, C.lagAction(s, 'home'));
     const big = { ...s, feed: Array.from({ length: 200_000 }, () => ({ n: 1, t: 'MISS', s: 'home' })) } as S;
     const t0 = performance.now();
-    assert.ok(M.feedOf(big).length <= (M.FEED_RACKS + 1) * M.FEED_PER_RACK);
+    assert.ok(M.feedOf(big).length <= M.FEED_MAX); // cue batch 5: the whole-feed cap
     const next = M.poolReducer(big, C.breakAction(big, { pots: [] }));
     assert.ok(M.feedOf(next).length <= M.FEED_PER_RACK);
     assert.ok(performance.now() - t0 < 200);

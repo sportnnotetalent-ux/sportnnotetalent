@@ -190,7 +190,7 @@ function checkMatch(config: Record<string, unknown>, s: S, log: ScoreAction[], r
   }
   // the feed stays bounded
   const f = M.feedOf(s);
-  assert.ok(f.length <= (M.FEED_RACKS + 1) * M.FEED_PER_RACK);
+  assert.ok(f.length <= M.FEED_MAX); // cue batch 5: every rack kept, the whole feed capped
   const per = new Map<number, number>();
   for (const e of f) per.set(e.n, (per.get(e.n) ?? 0) + 1);
   for (const v of per.values()) assert.ok(v <= M.FEED_PER_RACK);

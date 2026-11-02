@@ -62,8 +62,10 @@ function feedOf(s: BilliardsState, names: { home: string; away: string }, unit: 
       const parts = strokeSummary(v);
       const brk = v.pts > 0 ? `${who} — break of ${v.pts}${parts ? ` (${parts})` : ''}` : '';
       let text: string;
-      if (st.foul) text = `${who} fouled${st.foul.kind ? ` (${KIND_WORD[st.foul.kind]})` : ''}: ${st.foul.value} to ${name(other(v.side))}${v.pts > 0 ? ` after a break of ${v.pts}` : ''}`;
-      else if (v.end === 'live') text = `${who} at the table — break of ${v.pts} so far`;
+      // cue batch 5 (audit row 13): the make-up on every break line, the foul's and the one in play too
+      const made = parts ? ` (${parts})` : '';
+      if (st.foul) text = `${who} fouled${st.foul.kind ? ` (${KIND_WORD[st.foul.kind]})` : ''}: ${st.foul.value} to ${name(other(v.side))}${v.pts > 0 ? ` after a break of ${v.pts}${made}` : ''}`;
+      else if (v.end === 'live') text = `${who} at the table — break of ${v.pts} so far${v.pts > 0 ? made : ''}`;
       else if (v.end === 'safety') text = brk ? `${brk}, then played safe` : `${who} played safe`;
       else if (v.end === 'frame') text = brk || `${who} ended the ${unit}`;
       else text = brk ? `${brk}, then missed` : `${who} missed`;

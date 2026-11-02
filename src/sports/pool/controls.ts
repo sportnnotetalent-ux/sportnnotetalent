@@ -20,7 +20,7 @@
  * figure is derived from the replayed state (./totals.ts).
  */
 import type { ScoreAction } from '../types';
-import { cnt, onTwoFouls, summary, type FoulKind, type PendingKind, type RackEnd } from './engine.ts';
+import { awardReasonOf, cnt, onTwoFouls, summary, type AwardReason, type FoulKind, type PendingKind, type RackEnd } from './engine.ts';
 import { isSide, knownGame, MONEY, other, SOLIDS, STRIPES, TOP, type PoolGame, type Side } from './balls.ts';
 import { creditOf, feedOf, poolReducer, SHOT_TYPES, validPid, type PoolMatch } from './match.ts';
 
@@ -125,10 +125,11 @@ export const chooseAction = (s: PoolMatch, choice: 'play' | 'pass' | 'rerack', b
   stamp(s, { type: 'CHOOSE', payload: { choice, ...(breaker ? { breaker } : {}) } }, o);
 
 /** RACK — the rack result only (quick mode), or an award mid-rack. */
-export function rackAction(s: PoolMatch, winner: Side, f: { bnr?: boolean; golden?: boolean; runOut?: boolean; breaker?: Side | null } = {}, o?: TapOpts): ScoreAction {
+export function rackAction(s: PoolMatch, winner: Side, f: { bnr?: boolean; golden?: boolean; runOut?: boolean; breaker?: Side | null; reason?: AwardReason | null } = {}, o?: TapOpts): ScoreAction {
+  const reason = awardReasonOf(f.reason);
   return stamp(s, {
     type: 'RACK', side: winner,
-    payload: { ...(f.breaker ? { breaker: f.breaker } : {}), ...(f.bnr ? { bnr: true } : {}), ...(f.golden ? { golden: true } : {}), ...(f.runOut ? { runOut: true } : {}) },
+    payload: { ...(f.breaker ? { breaker: f.breaker } : {}), ...(f.bnr ? { bnr: true } : {}), ...(f.golden ? { golden: true } : {}), ...(f.runOut ? { runOut: true } : {}), ...(reason ? { reason } : {}) },
   }, o);
 }
 
@@ -259,6 +260,9 @@ export const FOUL_SHORT: Record<FoulKind, string> = {
   doubleHit: 'double hit', pushShot: 'push shot', jump: 'illegal jump', moving: 'balls moving', noFoot: 'no foot down',
   placement: 'cue ball placement', slowPlay: 'slow play', outOfTurn: 'out of turn', illegalBreak: 'illegal break', other: 'other',
 };
+/** Cue batch 5: an awarded rack's reason (the chips; the commentary words). */
+export const AWARD_REASON_LABEL: Record<AwardReason, string> = { concession: 'Concession', conduct: 'Conduct (3.16)', forfeit: 'Forfeit', other: 'Other' };
+export const AWARD_REASON_WORD: Record<AwardReason, string> = { concession: 'conceded', conduct: 'conduct', forfeit: 'forfeit', other: 'other' };
 /** The foul chips at the table (the break has its own short list). */
 // (no 'outOfTurn': the chips are fouls by the player at the table; playing out
 // of turn is the other player's, and has its own button)

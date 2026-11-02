@@ -24,6 +24,10 @@
  */
 import type { SportStatSchema, StatDef } from '../statSchema.ts';
 import { FOULS } from '../sharedStats.ts';
+import { cueFoulKind } from '../cue/stats.ts';
+
+/** Cue batch 5: the foul kinds that had no key of their own before. */
+const POOL_NEW_FOUL_KEYS = ['foulTouch', 'foulDoubleHit', 'foulPush', 'foulJump', 'foulMoving', 'foulNoFoot', 'foulPlacement', 'foulSlowPlay', 'foulOutOfTurn', 'foulIllegalBreak'];
 
 const rec = (key: string, label: string, short: string, one: string, extra: Partial<StatDef> = {}): StatDef =>
   ({ key, label, short, one, group: 'record', coverage: 'present', ...extra });
@@ -70,10 +74,13 @@ export const poolStats: SportStatSchema<'pool'> = {
     keyed('eightBreaks', '8 on the break', '8s on the break', '8 on the break', 'break'),
     { ...FOULS, abbr: 'FLS', group: 'discipline', format: { unit: 'count', better: 'lower' }, coverage: 'keyed', matchSummary: false },
     keyed('foulScratch', 'Fouls: scratch', 'scratches', 'scratch', 'discipline', lower),
-    keyed('foulWrongBall', 'Fouls: wrong ball first', 'wrong-ball fouls', 'wrong-ball foul', 'discipline', lower),
+    cueFoulKind('foulWrongBall', 'discipline'),
     keyed('foulNoRail', 'Fouls: no rail', 'no-rail fouls', 'no-rail foul', 'discipline', lower),
-    keyed('foulOffTable', 'Fouls: ball off the table', 'off-table fouls', 'off-table foul', 'discipline', lower),
-    keyed('foulOther', 'Fouls: other', 'other fouls', 'other foul', 'discipline', lower),
+    cueFoulKind('foulOffTable', 'discipline'),
+    cueFoulKind('foulOther', 'discipline'),
+    // cue batch 5: every foul kind its own key (an older line: "not tracked";
+    // its foulOther still holds these kinds)
+    ...POOL_NEW_FOUL_KEYS.map((k) => cueFoulKind(k, 'discipline')),
     // derived (career / leaderboards; never written)
     { key: 'racksWL', label: 'Racks W-L', source: 'derived', group: 'record', format: { unit: 'figure' }, agg: { kind: 'pair', a: 'racksWon', b: 'racksLost' } },
     pct('rackPct', 'Racks won %', 'racksWon', ['racksWon', 'racksLost'], 'record', { leaderLabel: 'Best racks won %', agg: { kind: 'rate', num: 'racksWon', den: ['racksWon', 'racksLost'], scale: 100, dp: 0, qualifier: MATCHES } }),
@@ -86,6 +93,9 @@ export const poolStats: SportStatSchema<'pool'> = {
     }),
     { key: 'ballsPerBreak', label: 'Balls per break', source: 'derived', group: 'break', format: { unit: 'decimal', dp: 2 }, agg: { kind: 'rate', num: 'breakBalls', den: 'breakShots', dp: 2 } },
     { key: 'inningsPerRack', label: 'Innings per rack', source: 'derived', group: 'table', format: { unit: 'decimal', dp: 2, better: 'lower' }, agg: { kind: 'rate', num: 'innings', den: 'detailRacks', dp: 2 } },
+    // cue batch 5 — TPA (Accu-Stats total performance average): (balls + safeties + breaks) ÷ (the same + misses + fouls)
+    { key: 'tpa', label: 'TPA (total performance average)', leaderLabel: 'Best TPA', source: 'derived', group: 'table', format: { unit: 'decimal', dp: 3 },
+      agg: { kind: 'rate', num: ['ballsPotted', 'safetyShots', 'breakShots'], den: ['ballsPotted', 'safetyShots', 'breakShots', 'missShots', 'fouls'], dp: 3 } },
     { key: 'foulsPerRack', label: 'Fouls per rack', source: 'derived', group: 'discipline', format: { unit: 'decimal', dp: 2, better: 'lower' }, agg: { kind: 'rate', num: 'fouls', den: 'detailRacks', dp: 2 } },
     // SD-27 — the match record as leaderboard stats (same labels as the racket sports)
     { key: 'matchesWon', label: 'Matches won', short: 'wins', one: 'win', leaderLabel: 'Most wins', source: 'derived', group: 'record',
@@ -105,13 +115,18 @@ export const poolStats: SportStatSchema<'pool'> = {
       { stat: 'breakFouls' }, { stat: 'illegalBreaks', hideZero: true }, { stat: 'eightBreaks', hideZero: true },
     ] },
     { id: 'table', title: 'At the table', rows: [
-      { stat: 'potPct' }, { stat: 'ballsPotted' }, { stat: 'potShots' }, { stat: 'missShots' }, { stat: 'safetyShots' },
+      { stat: 'potPct' }, { stat: 'tpa' }, { stat: 'ballsPotted' }, { stat: 'potShots' }, { stat: 'missShots' }, { stat: 'safetyShots' },
       { stat: 'pushOuts', hideZero: true }, { stat: 'innings' }, { stat: 'inningsPerRack' }, { stat: 'detailRacks' },
     ] },
     { id: 'fouls', title: 'Fouls', rows: [
       { stat: 'fouls' }, { stat: 'foulsPerRack' },
       { stat: 'foulScratch', label: 'Scratch', hideZero: true }, { stat: 'foulWrongBall', label: 'Wrong ball first', hideZero: true },
       { stat: 'foulNoRail', label: 'No rail', hideZero: true }, { stat: 'foulOffTable', label: 'Ball off the table', hideZero: true },
+      { stat: 'foulTouch', label: 'Touched a ball', hideZero: true }, { stat: 'foulDoubleHit', label: 'Double hit', hideZero: true },
+      { stat: 'foulPush', label: 'Push shot', hideZero: true }, { stat: 'foulJump', label: 'Illegal jump', hideZero: true },
+      { stat: 'foulMoving', label: 'Balls moving', hideZero: true }, { stat: 'foulNoFoot', label: 'No foot on the floor', hideZero: true },
+      { stat: 'foulPlacement', label: 'Cue ball placement', hideZero: true }, { stat: 'foulSlowPlay', label: 'Slow play', hideZero: true },
+      { stat: 'foulOutOfTurn', label: 'Out of turn', hideZero: true }, { stat: 'foulIllegalBreak', label: 'Illegal break', hideZero: true },
       { stat: 'foulOther', label: 'Other', hideZero: true },
       { stat: 'threeFoulLosses', hideZero: true }, { stat: 'eightLosses', hideZero: true },
     ] },

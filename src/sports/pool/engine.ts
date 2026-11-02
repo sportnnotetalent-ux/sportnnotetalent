@@ -117,7 +117,16 @@ export interface RackRecord {
   /** detail only */
   innings?: PerSide<number>;
   breakPots?: number;
+  /** cue batch 5: why an awarded rack was awarded (optional, RACK `reason`) */
+  reason?: AwardReason;
 }
+
+/** Cue batch 5 (audit row 7): why a rack was awarded — the cue sports' words. */
+export const AWARD_REASONS = ['concession', 'conduct', 'forfeit', 'other'] as const;
+export type AwardReason = typeof AWARD_REASONS[number];
+const REASON_SET: ReadonlySet<string> = new Set(AWARD_REASONS);
+/** A reason from a payload or snapshot (anything else: none). */
+export const awardReasonOf = (v: unknown): AwardReason | undefined => (typeof v === 'string' && REASON_SET.has(v) ? (v as AwardReason) : undefined);
 
 /** Per-side stat counters (POOL_DESIGN §5). */
 export interface Tally {
@@ -774,7 +783,13 @@ function quickRack(s: PoolState, side: unknown, p: Record<string, unknown>): Poo
   if (!isSide(side)) return s;
   const r = s.rack!;
   const d = draft(s);
-  if (r.phase === 'play' || r.reracks > 0) { endRack(d, side, 'awarded'); return d; }
+  if (r.phase === 'play' || r.reracks > 0) {
+    endRack(d, side, 'awarded');
+    // cue batch 5: the optional reason (whitelisted; an older RACK has none)
+    const why = awardReasonOf(p.reason);
+    if (why) d.racks[d.racks.length - 1].reason = why;
+    return d;
+  }
   let breaker: Side | null = isSide(p.breaker) ? p.breaker : r.breaker;
   let golden = p.golden === true && s.game === 'nine';
   let bnr = p.bnr === true || golden;
