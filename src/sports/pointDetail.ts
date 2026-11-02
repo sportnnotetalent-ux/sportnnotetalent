@@ -92,6 +92,12 @@ export interface PointDetail {
    *  IDs-only scoring: new details carry `playerId` only; `playerName` is
    *  legacy, read-only (an older log stored it). */
   err?: { playerId?: string; playerName?: string };
+  /** racket-depth RD4 (badminton, table tennis, squash, padel, pickleball;
+   *  new matches only): the player who HIT a winner-credit how (winner, ace,
+   *  service winner, stroke awarded), by id — the doubles "By:" chips. Absent
+   *  (every older log) = credited exactly as before: the point's player (the
+   *  server in side-out doubles), else the side's only player. */
+  by?: string;
 }
 
 export interface HowDef {
@@ -107,6 +113,9 @@ export interface HowDef {
   strokes?: string[];
   /** SD-157 (tennis): offered with Forehand / Backhand + a shot type */
   wingShot?: true;
+  /** racket-depth RD2: a short hint under the chip once picked (the sport's
+   *  own examples of a point lost by rule) */
+  hint?: string;
 }
 
 // ------------------------------------------------- SD-157 tennis strokes --
@@ -470,6 +479,12 @@ export const isFaultKind = (v: unknown): v is FaultKind => v === 'net' || v === 
  *  neither a winner nor an error, charged to the player who broke it. */
 const T_DIR = ['net', 'long', 'wide'];
 const T_RULE: HowDef = { how: 'rule', label: 'Lost by rule', chip: 'Lost by rule', credit: 'loser' };
+/** racket-depth — the other racket sports: an unforced error's types are also
+ *  a forced error's (RD1: into the net, out, tin, kitchen …), and a point lost
+ *  by rule with the sport's own examples (RD2; charged to the player who broke
+ *  the rule, counted apart from errors). */
+const R_ERRS = (strokes: string[]): HowDef[] => [{ ...T_FE, strokes }, R_UE(strokes)];
+const R_RULE = (hint: string): HowDef => ({ ...T_RULE, hint });
 
 /** Each sport's options, in chip order. Tennis aces and double faults keep
  *  their own one-tap buttons (SD-104), so they're not repeated here. Deep
@@ -478,18 +493,29 @@ const T_RULE: HowDef = { how: 'rule', label: 'Lost by rule', chip: 'Lost by rule
 export const DETAIL_HOWS: Record<DetailSport, HowDef[]> = {
   // ATP / WTA match-stat conventions (SD-157: wing + shot, see strokeOf)
   tennis: [SW, T_WINNER, { ...T_FE, strokes: T_DIR }, { ...T_UE, strokes: T_DIR }, T_RULE],
-  // BWF: errors into the net, out, faults; service faults (Law 9.1)
-  badminton: [T_WINNER, T_FE, R_UE(['net', 'out', 'fault']), SF(['high', 'foot', 'net', 'out', 'fault'])],
+  // BWF: errors into the net, out, faults; service faults (Law 9.1); faults
+  // of Law 13 (incl. the receiver's) as a point lost by rule
+  badminton: [
+    T_WINNER, ...R_ERRS(['net', 'out', 'fault']), SF(['high', 'foot', 'net', 'out', 'fault']),
+    R_RULE('e.g. net touch, double hit, obstruction, receiver fault (BWF Law 13)'),
+  ],
   // ITTF / WTT: the ace and the service fault are the serve's outcomes
-  tabletennis: [ACE, T_WINNER, T_FE, R_UE(['net', 'out']), SF(['net', 'out', 'illegal'])],
+  tabletennis: [
+    ACE, T_WINNER, ...R_ERRS(['net', 'out']), SF(['net', 'out', 'illegal']),
+    R_RULE('e.g. obstruction, free hand on the table, moved the table, double hit (ITTF 2.10)'),
+  ],
   // WSF: winners incl. the nick; referee decisions (SQ-03): stroke awarded, no let
   squash: [
-    T_WINNER, T_FE, R_UE(['tin', 'out']), SF(['short', 'foot', 'out']),
+    T_WINNER, ...R_ERRS(['tin', 'out']), SF(['short', 'foot', 'out']),
     { how: 'stroke', label: 'Stroke awarded', chip: 'Stroke', credit: 'winner' },
     { how: 'nolet', label: 'No let', chip: 'No let', credit: 'loser' },
+    R_RULE('e.g. double hit, carry'),
   ],
-  padel: [ACE, SW, T_WINNER, T_FE, R_UE(['net', 'out'])],
-  pickleball: [T_WINNER, T_FE, R_UE(['net', 'out', 'kitchen', 'foot']), SF(['net', 'out', 'kitchen', 'foot'])],
+  padel: [ACE, SW, T_WINNER, ...R_ERRS(['net', 'out']), R_RULE('e.g. net touch, ball hit before it crossed the net, double hit')],
+  pickleball: [
+    T_WINNER, ...R_ERRS(['net', 'out', 'kitchen', 'foot']), SF(['net', 'out', 'kitchen', 'foot']),
+    R_RULE('e.g. two-bounce rule, non-volley-zone momentum, net touch'),
+  ],
 };
 
 export const isDetailSport = (s: string): s is DetailSport => s in DETAIL_HOWS;
@@ -619,11 +645,19 @@ export function pdText(pd: PointDetail | undefined | null, names = true, sport?:
   }
   const errBy = names && pd.err ? whoName(nameOf, pd.err.playerId, pd.err.playerName) : undefined;
   if (errBy && (pd.how === 'ue' || pd.how === 'fe' || pd.how === 'sf' || pd.how === 'nolet' || pd.how === 'rule')) t += ` · ${errBy}`;
+  // racket-depth RD4: the hitter of a doubles winner (new matches; by id)
+  const hitBy = names && pd.by && WINNER_HOWS.has(pd.how) ? whoName(nameOf, pd.by) : undefined;
+  if (hitBy) t += ` · ${hitBy}`;
   if (pd.net) t += ' · at net';
   return t;
 }
 
 // ------------------------------------------------------------- reducer --
+
+/** The hows credited to the point winner (the ones a "By:" hitter can name). */
+const WINNER_HOWS: ReadonlySet<How> = new Set<How>(['winner', 'ace', 'sw', 'stroke']);
+/** racket-depth RD6: a hitter id is a short non-empty string (player ids are uuids). */
+const BY_MAX = 64;
 
 /** Kinds a detail can describe: a scored point, a tennis ace, a side-out rally. */
 const DESCRIBABLE = new Set(['point', 'ace', 'rally']);
@@ -637,6 +671,10 @@ const validPd = (v: unknown, sport?: DetailSport): PointDetail | null | undefine
   const o = v as Record<string, unknown>;
   if (typeof o.how !== 'string' || !Object.hasOwn(HOW_KEY, o.how)) return undefined;
   const err = o.err && typeof o.err === 'object' ? o.err as { playerId?: unknown; playerName?: unknown } : undefined;
+  // racket-depth RD4 / RD6: the hitter, own property only, on a winner-credit
+  // how of the five racket sports (tennis unchanged)
+  const by = Object.hasOwn(o, 'by') && typeof o.by === 'string' && o.by && o.by.length <= BY_MAX
+    && sport && sport !== 'tennis' && WINNER_HOWS.has(o.how as How) ? o.by : undefined;
   return {
     how: o.how as How,
     ...(typeof o.stroke === 'string' && Object.hasOwn(STROKES, o.stroke) ? { stroke: o.stroke } : {}),
@@ -646,6 +684,7 @@ const validPd = (v: unknown, sport?: DetailSport): PointDetail | null | undefine
     ...(err && (typeof err.playerId === 'string' || typeof err.playerName === 'string') ? {
       err: { ...(typeof err.playerId === 'string' && err.playerId ? { playerId: err.playerId } : {}), ...(typeof err.playerName === 'string' && err.playerName ? { playerName: err.playerName } : {}) },
     } : {}),
+    ...(by ? { by } : {}),
   };
 };
 
@@ -878,7 +917,11 @@ export function detailPlayerCredits(
     if (!e.pd || !DESCRIBABLE.has(e.kind ?? '')) continue;
     const W = winnerSide(e);
     if (W !== 'home' && W !== 'away') continue;
-    const winnerId = resolve(W, e.kind === 'rally' ? undefined : { playerId: e.playerId, playerName: e.playerName });
+    // racket-depth RD4: a named hitter (new matches) when it resolves on the
+    // winning side; else exactly as before (the point's player — the server
+    // in side-out doubles — else the side's only player)
+    const hitter = e.pd.by ? resolve(W, { playerId: e.pd.by }) : undefined;
+    const winnerId = hitter ?? resolve(W, e.kind === 'rally' ? undefined : { playerId: e.playerId, playerName: e.playerName });
     const loserId = resolve(opp(W), e.pd.err);
     for (const [who, key] of creditsOf(sport, e.pd)) add(who === 'winner' ? winnerId : loserId, key);
   }
@@ -927,7 +970,7 @@ export function detailRows(sport: DetailSport, events: LiveEvent[] | undefined, 
   for (const d of hows) {
     for (const st of d.strokes ?? []) {
       const lab = STROKES[st]?.label ?? st;
-      count(strokeKey(d.how, st)!, d.how === 'winner' ? `${lab} winners` : d.how === 'sf' ? `Service fault · ${lab.toLowerCase()}` : `UE · ${lab.toLowerCase()}`);
+      count(strokeKey(d.how, st)!, d.how === 'winner' ? `${lab} winners` : d.how === 'sf' ? `Service fault · ${lab.toLowerCase()}` : `${d.how === 'fe' ? 'FE' : 'UE'} · ${lab.toLowerCase()}`);
     }
   }
   // SD-157 tennis (deep wave: every racket sport): by wing, then by shot type (the rows that occurred)
