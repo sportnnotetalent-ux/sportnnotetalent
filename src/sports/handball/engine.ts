@@ -652,5 +652,5 @@ export const HANDBALL_LIVE_SETTINGS: LiveSettings<HandballState> = {
     ...HANDBALL_TRACK_FIELDS,
   ] as FormatField[],
   read: (s) => ({ periodMinutes: s.periodMinutes, stopClock: s.stopClock, trackFaultTypes: s.track?.faultTypes === true, trackSevenMDrawn: s.track?.sevenMDrawn === true }),
-  defaults: { periodMinutes: 30, stopClock: true, trackFaultTypes: false, trackSevenMDrawn: false },
+  defaults: { periodMinutes: 30, stopClock: true, trackFaultTypes: true, trackSevenMDrawn: true },
 };

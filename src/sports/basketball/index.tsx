@@ -1036,7 +1036,8 @@ const BasketballScoreboard: NonNullable<SportPlugin<BasketballState>['Scoreboard
 
 /** SD-31 — the scorer's coverage toggle (config mode: patches the match
  *  format; each make records its own `fga`, so past plays keep their credit).
- *  Round 2: "Standard" = BB_TRACK_DEFAULTS (shot zones on, the rest off). */
+ *  Round 2: "Standard" = BB_TRACK_DEFAULTS (shot zones on; batch 3: missed
+ *  shots on; fast breaks and fouls drawn off). */
 const BASKETBALL_LIVE_SETTINGS: LiveSettings<BasketballState> = {
   title: '⚙️ Scoring settings',
   hint: 'Stats to track — capture only what this scorer can keep up with. A switch applies from the next play (earlier plays keep what they had); this match only.',

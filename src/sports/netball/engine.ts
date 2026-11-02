@@ -680,7 +680,8 @@ export const NETBALL_LIVE_SETTINGS: LiveSettings<NetballState> = {
   fields: [
     { key: 'periodMinutes', label: 'Quarter length', type: 'number', default: 15, min: 1, max: 20, step: 1, hint: 'min / period' },
     // Deep wave — "Stats to track": each applies from the next play (plays stamp their own detail)
-    { key: 'detail', label: 'Feeds & rebounds', type: 'toggle', default: false, group: 'Stats to track' },
+    // Batch 3: on by default with the international 4 × 15 preset, like CPR
+    { key: 'detail', label: 'Feeds & rebounds', type: 'toggle', default: true, group: 'Stats to track' },
     // Round 2: on by default with the international 4 × 15 preset — the "Standard"
     { key: 'trackCpr', label: 'Centre pass receives', type: 'toggle', default: true, group: 'Stats to track' },
     { key: 'trackGains', label: 'Gains & pick-ups', type: 'toggle', default: false, group: 'Stats to track' },
@@ -688,5 +689,5 @@ export const NETBALL_LIVE_SETTINGS: LiveSettings<NetballState> = {
     { key: 'stopClock', label: 'Stop clock on suspensions', type: 'toggle', default: true, group: 'Clock' },
   ] as FormatField[],
   read: (s) => ({ periodMinutes: s.periodMinutes, detail: s.detail, trackCpr: s.trackCpr === true, trackGains: s.trackGains === true, trackTurnovers: s.trackTurnovers === true, stopClock: s.stopClock }),
-  defaults: { periodMinutes: 15, detail: false, trackCpr: true, trackGains: false, trackTurnovers: false, stopClock: true },
+  defaults: { periodMinutes: 15, detail: true, trackCpr: true, trackGains: false, trackTurnovers: false, stopClock: true },
 };

@@ -12,11 +12,15 @@ export const HANDBALL_PRESETS: Record<string, { label: string; set: Record<strin
   youth20: { label: 'Youth 2 × 20 (8–12)', set: { playersPerSide: 7, periodMinutes: 20 } },
 };
 
-/** Deep wave — the optional "Stats to track" (off by default: one tap per
- *  event stays the default; these add a chip / a step when on). */
+/** Deep wave — the optional "Stats to track". Batch 3 (founder 2026-11-02,
+ *  only what is captured in scoring reaches the stats): both on for a NEW
+ *  match, since each is an optional chip on a screen the scorer already sees
+ *  (the fault's kind beside the player pick; "won by" on the 7 m result
+ *  screen) — no extra tap. A stored format without the keys (every older
+ *  match) keeps both off (readHandballTrack). */
 export const HANDBALL_TRACK_FIELDS: FormatField[] = [
-  { key: 'trackFaultTypes', label: 'Technical fault types', type: 'toggle', default: false, group: 'Stats to track', hint: 'steps, double dribble, area, offensive foul, passive play…' },
-  { key: 'trackSevenMDrawn', label: '7 m won by', type: 'toggle', default: false, group: 'Stats to track', hint: 'who won each 7-metre throw' },
+  { key: 'trackFaultTypes', label: 'Technical fault types', type: 'toggle', default: true, group: 'Stats to track', hint: 'steps, double dribble, area, offensive foul, passive play… (an optional chip)' },
+  { key: 'trackSevenMDrawn', label: '7 m won by', type: 'toggle', default: true, group: 'Stats to track', hint: 'who won each 7-metre throw (an optional chip)' },
 ];
 
 export const HANDBALL_META: SportMeta = {
