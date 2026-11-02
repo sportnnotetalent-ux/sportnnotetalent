@@ -77,14 +77,19 @@ const ScoringControls: SportPlugin<TennisState>['ScoringControls'] = ({ state, d
         disabled={needsServer} disabledHint="Pick who serves first to start scoring."
         onPoint={(side, p) => act('POINT', side, 'points', p)}
       />
-      {/* Ace / Double fault: secondary (outline, smaller), below the point buttons */}
+      {/* Ace / Fault / Double fault: secondary (outline, smaller), below the point
+          buttons. Founder 2026-11-02: Fault = the 1st serve missed (no point; the
+          next point is a 2nd-serve point); on the 2nd serve a fault is the double fault. */}
       {!needsServer && <View style={[ctrl.row, ctrl.secGap]}>
         <SecondaryAction label={`🎯 Ace · ${by}`} color={serverColor} onPress={() => act('ACE', serve.side, 'aces', serverP)} />
-        <SecondaryAction label={`⚠️ Double fault · ${by} → point ${receiverSideName}`} onPress={() => doubleFault(serve.side, serverP)} />
+        {!s.fault && !s.ended && (
+          <SecondaryAction label={`✋ Fault (1st serve) · ${by}`} onPress={() => dispatch({ type: 'FAULT', side: serve.side })} />
+        )}
+        <SecondaryAction label={s.fault ? `⚠️ Fault again = double fault · ${by}` : `⚠️ Double fault · ${by} → point ${receiverSideName}`} onPress={() => doubleFault(serve.side, serverP)} />
       </View>}
       {/* SD-117c — derived "Change ends" cue and the tiebreak rules */}
       <CueBanner cue={tennisCue(s)} />
-      {!noPlayYet && <Text style={ctrl.serveBanner}>🎾 Serving: {serverName}{s.doubles ? `  ·  ${serverSideName}` : ''}</Text>}
+      {(!noPlayYet || s.fault) && <Text style={ctrl.serveBanner} accessibilityLiveRegion="polite">🎾 Serving: {serverName}{s.doubles ? `  ·  ${serverSideName}` : ''}{s.fault ? '  ·  2nd serve' : ''}</Text>}
       {tiebreakBanner(s) && <Text style={ctrl.tbBanner}>🎾 {tiebreakBanner(s)}</Text>}
       <ServeFirstPicker
         icon="🎾" homeName={homeName} awayName={awayName} started={!noPlayYet}

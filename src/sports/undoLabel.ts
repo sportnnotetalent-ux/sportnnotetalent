@@ -21,6 +21,7 @@ const QUIET: Record<string, string> = {
   RESUME: 'clock restart',
   SET_ROTATION: 'rotation', // SD-58
   SET_DETAIL: 'point-detail setting',
+  FAULT: '1st-serve fault', // tennis (founder 2026-11-02)
   POINT_DETAIL: 'point detail',
   VB_DETAIL: 'rally detail', // SD-81 volleyball attack / reception detail
   EDIT_LOG: 'timeline correction',

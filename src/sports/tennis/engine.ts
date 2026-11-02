@@ -76,6 +76,10 @@ export interface TennisState {
   netDetail?: boolean;
   rallyDetail?: boolean;
   speedDetail?: boolean;
+  /** founder 2026-11-02 — the 1st serve of the point in play was a fault
+   *  (FAULT, or a time violation's loss of serve): the next point is a 2nd-
+   *  serve point. Cleared by every point. */
+  fault?: true;
   events: LiveEvent[];
   seq: number;
   ended: boolean;
@@ -165,7 +169,9 @@ function winSet(s: TennisState, side: 'home' | 'away', games: { home: number; aw
   return { ...s, pts: { home: 0, away: 0 }, games: { home: 0, away: 0 }, sets, setsWon, tb, events, seq, ended };
 }
 
-function scorePoint(s: TennisState, side: 'home' | 'away', who: string | undefined, ace: boolean, whoId?: string, df?: { playerId?: string; playerName?: string }, serve?: 1 | 2): TennisState {
+function scorePoint(s0: TennisState, side: 'home' | 'away', who: string | undefined, ace: boolean, whoId?: string, df?: { playerId?: string; playerName?: string }, serve?: 1 | 2): TennisState {
+  // every point ends the serve in play: a 1st-serve fault is spent
+  const { fault: _spent, ...s } = s0;
   let seq = s.seq;
   const events = [...s.events];
   const o = other(side);
@@ -221,6 +227,14 @@ const conductOps: ConductOps<TennisState> = {
   where: (s) => { const setNo = s.setsWon.home + s.setsWon.away + 1; return { stamp: `Set ${setNo}`, set: setNo }; },
 };
 
+/** `side` is serving the point in play (after the toss, before the match ends). */
+const canServe = (s: TennisState, side: unknown): boolean => {
+  if (s.ended || (side !== 'home' && side !== 'away')) return false;
+  const started = gamesPlayed(s) > 0 || s.pts.home > 0 || s.pts.away > 0 || s.sets.length > 0;
+  return (started || s.serverPicked === true) && serveInfo(s).side === side;
+};
+const canFault = (s: TennisState, side: unknown): boolean => !s.fault && canServe(s, side);
+
 const core = (s: TennisState, a: ScoreAction): TennisState => {
   // Timeline correction: STAT_ADJUST only reconciles player profiles (no match
   // effect); EDIT_LOG replays a corrected point list so games/sets re-derive.
@@ -231,8 +245,10 @@ const core = (s: TennisState, a: ScoreAction): TennisState => {
     // untracked), then restore the setting.
     // SD-53: conduct / timeout records are put back after the replay.
     const r = replayKeepingMarks(reducer, clearMatch({ ...s, serveDetail: undefined }), (a.payload?.points as PointInput[]) ?? [], s.events);
-    const { serveDetail: _drop, ...rest } = r;
-    return s.serveDetail === undefined ? rest : { ...rest, serveDetail: s.serveDetail };
+    const { serveDetail: _drop, fault: _f, ...rest } = r;
+    // a 1st-serve fault on the point in play stays (the correction changed earlier points)
+    const kept = s.fault ? { ...rest, fault: true as const } : rest;
+    return s.serveDetail === undefined ? kept : { ...kept, serveDetail: s.serveDetail };
   }
   // SD-107 — capture settings (from the next point) and a point's detail
   // (annotates the last point; allowed after the match point too).
@@ -254,9 +270,21 @@ const core = (s: TennisState, a: ScoreAction): TennisState => {
     if (played && (a.payload?.v !== 2 || s.ended)) return s;
     return { ...s, firstServer: side, serverPicked: true };
   }
+  // founder 2026-11-02 — a 1st-serve fault (only the server; once per point:
+  // the 2nd-serve fault is the Double fault button). It turns 1st / 2nd serve
+  // tracking on from here, so the 2nd serve is always counted.
+  if (a.type === 'FAULT') return canFault(s, a.side) ? { ...s, fault: true, serveDetail: true } : s;
+  // TF4: a time violation's "fault · loss of serve" on the server: a fault, or
+  // on a 2nd serve a double fault (the point to the receiver)
+  const lossOfServe = a.type === 'CONDUCT' && a.payload?.track === 'time' && a.payload?.level === 'fault' && canServe(s, a.side);
   // SD-53 / SD-54 — code & time violations, medical / toilet markers
   const extra = applyRacketExtras(s, a, conductOps);
-  if (extra) return extra;
+  if (extra) {
+    if (!lossOfServe || extra === s) return extra;
+    if (!s.fault) return { ...extra, fault: true, serveDetail: true };
+    const pen = [...extra.events].reverse().find((e) => e.kind === 'conduct')?.pen;
+    return scorePoint(extra, other(a.side!), undefined, false, undefined, pen?.playerId ? { playerId: pen.playerId } : {}, 2);
+  }
   if (s.ended || !a.side) return s;
   // SD-19: the credited player's id rides on the point (absolute statTotals).
   // SD-104: a double fault dispatched with `payload.df` (new UI / voice) marks the
@@ -273,7 +301,7 @@ const core = (s: TennisState, a: ScoreAction): TennisState => {
   const a2 = a.attribution2 ?? (a.payload?._attr2 as ScoreAction['attribution2']);
   const legacyDf = a.type === 'POINT' && a.payload?.df === undefined && !a.attribution && a2?.stat === 'doubleFaults';
   const isDf = a.type === 'POINT' && (a.payload?.df === true || legacyDf);
-  const serve: 1 | 2 | undefined = given ?? (s.serveDetail ? (isDf ? 2 : 1) : undefined);
+  const serve: 1 | 2 | undefined = given ?? (s.serveDetail || s.fault ? (isDf || s.fault ? 2 : 1) : undefined);
   if (isDf) {
     const f = a.attribution2 ?? (a.payload?._attr2 as ScoreAction['attribution2']);
     return scorePoint(s, a.side, undefined, false, undefined, { ...(f?.playerId ? { playerId: f.playerId } : {}), ...(f?.playerName ? { playerName: f.playerName } : {}) }, serve);
