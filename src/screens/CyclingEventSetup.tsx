@@ -24,8 +24,11 @@ import { getTournamentTeams, getTeamRosters } from '../data/repos';
 import { createResultsEvent, type NewEntrant } from '../data/resultsStore';
 import {
   CYC_EVENTS, CYC_TEAM_EVENTS, isCycTeamKind, categoryLabel, eligibleFor, cycPlan, describeCycPlan, sprintFields, defaultSprintField, sprintCount, cycMeetSettings,
-  type CycKind, type Category, type CycFormat,
+  disciplineOf,
+  type CycKind, type Category, type CycFormat, type TrackOverrides,
 } from '../data/results';
+// batch 5: this event's "Stats to track" (intermediate times) shown at setup, as on the track / swimming setup
+import { EventTrackCard } from '../components/results/EventTrackCard';
 import { sportRule } from '../data/results/competitionRules';
 import { TeamBuilder, type TeamDraft } from '../components/results/TeamBuilder';
 import type { Player, Tournament } from '../core/types';
@@ -98,6 +101,7 @@ export function CyclingEventSetup({ tournamentId, preloaded, carried }: { tourna
     : CYC_EVENTS.find((e) => e.kind === kind && (e.metres == null || kind === 'sprint' || e.metres === (kind === 'itt' ? (dist.itt ?? 10) * 1000 : dist[kind]))) ?? CYC_EVENTS.find((e) => e.kind === kind)!;
   const [teams, setTeams] = useState<TeamDraft[]>([]);
   useEffect(() => { setTeams([]); }, [kind]);
+  const [track, setTrack] = useState<TrackOverrides | undefined>(undefined);
 
   // Teams / houses (as the other event setups)
   const [sources, setSources] = useState<Source[]>([]);
@@ -189,6 +193,7 @@ export function CyclingEventSetup({ tournamentId, preloaded, carried }: { tourna
         discipline: ev.key, category: cat, tournamentId, entrants: list, plan, cyc, handTimed,
         // the start order is drawn (a time trial's start list, a pursuit's pairs)
         lanes: 'draw', title: `${ev.label}${kmText} ${categoryLabel(cat)}`, startsAt: schedule.startsAt, sched: schedule.value,
+        ...(track ? { track } : {}),
       });
       nav.replace('ResultsEvent', { phaseId: evt.id });
     } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
@@ -332,6 +337,7 @@ export function CyclingEventSetup({ tournamentId, preloaded, carried }: { tourna
             {handTimed ? <Text style={textStyles.muted}>Hand timing is on for this meet (Points & timing).</Text> : null}
           </Card>
 
+          {disciplineOf(ev.key) ? <EventTrackCard def={disciplineOf(ev.key)!} f={{ track }} meet={tournament?.formats?.cycling as Record<string, unknown> | undefined} onChange={setTrack} collapsible={false} /> : null}
           <ScheduleCard state={schedule} tournamentId={tournamentId} discipline={ev.key} plan={plan} stage={kind === 'stage'} athleteIds={teamKind ? teams.flatMap((t) => t.seats.filter((x): x is string => !!x)) : picks} preset={seed ? carried?.sched : undefined} />
           <EventOfficials tournament={tournament} value={officials} onChange={setOfficials} />
         </KeyboardAwareScrollView>

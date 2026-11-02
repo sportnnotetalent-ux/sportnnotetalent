@@ -362,6 +362,8 @@ export function crewLines(f: Pick<PhaseFormat, 'discipline' | 'phase'> & Partial
     if (r.position != null) s.place = r.position;
     if (r.status === 'DNF') s.dnf = 1;
     if (r.status === 'DQ' || r.status === 'FS') s.dq = 1;
+    // batch 5: a false start is also counted on its own (a "false starts" stat)
+    if (r.status === 'FS') s.fs = 1;
     if (f.phase === 'final') { s.finals = 1; if ((r.entry.result.race ?? 'A') === 'A') s.finalsA = 1; }
     // deep wave: a heat / repechage / semi-final won (a final won is a gold; round 2: a timed final's heats count)
     if (heatWon.has(r.id)) s.heatWins = 1;

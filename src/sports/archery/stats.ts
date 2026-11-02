@@ -50,6 +50,8 @@ export const archeryStats: SportStatSchema<'archery'> = {
     // Deep wave: only on lines that wrote them (never a false 0)
     { key: 'rEnds', label: 'Ranking ends', short: 'ranking ends', one: 'ranking end', group: 'archery', coverage: 'keyed' },
     { key: 'n9', label: '9s', short: '9s', one: '9', group: 'archery', coverage: 'keyed' },
+    // batch 5: penalty points (an end's highest arrows that didn't count — World Archery Book 3)
+    { key: 'arPen', label: 'Penalty points', short: 'penalty pts', one: 'penalty pt', group: 'line', coverage: 'keyed', format: { unit: 'points', dp: 0, better: 'lower' } },
     { key: 'bestEnd', label: 'Best end', short: 'best end', group: 'line', coverage: 'keyed', format: { unit: 'points', dp: 0 }, agg: { kind: 'max' } },
     { key: 'xPerEnd', label: 'X per end', short: 'X / end', source: 'derived', group: 'archery', format: { unit: 'decimal', dp: 2 }, agg: { kind: 'rate', num: 'xs', den: 'rEnds', dp: 2, over: 'hasREnds', qualifier: { den: 12 } } },
     { key: 'mArrows', label: 'Match arrows', short: 'match arrows', one: 'match arrow', group: 'matches', coverage: 'keyed' },

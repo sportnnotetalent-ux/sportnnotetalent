@@ -23,7 +23,7 @@ import { askConfirm } from '../ConfirmSheet';
 import {
   activeLift, liftingOrder, callText, declareError, declare, recordLift, pendingIndex, taken, weighInIssue, classForBodyweight,
   summarizeLifts, bombedOutOf, fmtKg, WL_RANGE, BIG_JUMP, LIFT_LABEL, LIFT_SHORT, LIFTS, ordinal,
-  ruleOf, changeLimitIssue, juryReverse, decisionText, lightsScore, clockAllowance,
+  ruleOf, changeLimitIssue, juryReverse, decisionText, lightsScore, clockAllowance, juryOffered,
   type EntryResult, type LiftAttempt, type Lift, type ResultEntry, type CompRules,
 } from '../../data/results';
 import { LiftingClock } from './LiftingClock';
@@ -353,7 +353,8 @@ export function LiftGrid({ r, editable, onChange, rules, lb }: { r: EntryResult;
                 <SelectChip label="✗ No lift" active={cur.good === false && !cur.pass} onPress={() => void apply(false)} />
               </>
             ) : <SelectChip label="Set weight" active={false} onPress={() => void apply()} />}
-            {cur && taken(cur) && !cur.pass && (ruleOf(rules, 'wlJury') === true || cur.jury) ? (
+            {/* batch 5: a reversal changes the result — offered on any decided attempt, whatever the wlJury switch */}
+            {cur && juryOffered(cur) ? (
               <SelectChip label={cur.jury ? '⚖ Jury reversed ✓' : '⚖ Jury reversed'} active={!!cur.jury} onPress={() => { onChange({ ...r, lifts: { ...r.lifts, [sel.lift]: juryReverse(list, sel.i, rules) } }); setSel(null); }} />
             ) : null}
             {cur ? <SelectChip label="Clear" active={false} onPress={() => void clear()} /> : null}

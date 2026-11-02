@@ -98,19 +98,59 @@ export function endError(arrows: Arrow[], perEnd: number, minRing?: number): str
   return null;
 }
 
-/** Ranking totals from the ends: score, 10s (incl. X), X, arrows shot. */
-export function archTotals(ends: Arrow[][] = []): { mark: number; tens: number; xs: number; arrows: number } {
+/** Batch 5: a stored penalty count, made safe — a whole number from 0 to the end's arrows (anything else = 0). */
+const penCount = (n: unknown, arrows: number): number => (typeof n === 'number' && Number.isInteger(n) && n > 0 ? Math.min(n, arrows) : 0);
+
+/** Batch 5 (World Archery Book 3 penalty): what the penalised arrows were
+ *  worth — per end, its `pen[i]` highest-scoring arrows don't count. */
+export function archPenaltyOf(ends: Arrow[][] = [], pen?: number[] | null): { mark: number; tens: number; xs: number } {
+  const out = { mark: 0, tens: 0, xs: 0 };
+  if (!Array.isArray(pen)) return out;
+  ends.forEach((end, i) => {
+    const n = penCount(pen[i], end?.length ?? 0);
+    if (!n) return;
+    const off = sortEnd(end).slice(0, n);
+    out.mark += endSum(off); out.tens += endTens(off); out.xs += endXs(off);
+  });
+  return out;
+}
+
+/** Ranking totals from the ends: score, 10s (incl. X), X, arrows shot.
+ *  Batch 5: net of any penalty (`pen`, aligned with `ends`). */
+export function archTotals(ends: Arrow[][] = [], pen?: number[] | null): { mark: number; tens: number; xs: number; arrows: number } {
   const all = ends.flat();
-  return { mark: endSum(all), tens: endTens(all), xs: endXs(all), arrows: all.length };
+  const p = archPenaltyOf(ends, pen);
+  return { mark: endSum(all) - p.mark, tens: endTens(all) - p.tens, xs: endXs(all) - p.xs, arrows: all.length };
+}
+
+/** The ranking row's totals and penalty list after a change (the list dropped when no end has one). */
+function withEnds(r: EntryResult, ends: Arrow[][], pen: number[] | undefined): EntryResult {
+  const clean = pen?.map((n, i) => penCount(n, ends[i]?.length ?? 0));
+  const arrPen = clean?.some((n) => n > 0) ? clean : undefined;
+  const t = archTotals(ends, arrPen);
+  const { arrPen: _old, ...rest } = r;
+  return { ...rest, ends, ...(arrPen ? { arrPen } : {}), ...(ends.length ? { mark: t.mark, tens: t.tens, xs: t.xs } : { mark: undefined, tens: undefined, xs: undefined }) };
 }
 
 /** Set ranking-round end `i` (0-based); `null` clears it (only the last end really goes — later ends stay). */
 export function setEnd(r: EntryResult, i: number, arrows: Arrow[] | null): EntryResult {
   const ends = [...(r.ends ?? [])];
-  if (arrows == null) ends.splice(i, 1);
+  const pen = Array.isArray(r.arrPen) ? [...r.arrPen] : undefined;
+  if (arrows == null) { ends.splice(i, 1); pen?.splice(i, 1); }
   else { while (ends.length < i) ends.push([]); ends[i] = sortEnd(arrows); }
-  const t = archTotals(ends);
-  return { ...r, ends, ...(ends.length ? { mark: t.mark, tens: t.tens, xs: t.xs } : { mark: undefined, tens: undefined, xs: undefined }) };
+  // an old card (no penalty) totals exactly as before
+  if (!pen) { const t = archTotals(ends); return { ...r, ends, ...(ends.length ? { mark: t.mark, tens: t.tens, xs: t.xs } : { mark: undefined, tens: undefined, xs: undefined }) }; }
+  return withEnds(r, ends, pen);
+}
+
+/** Batch 5: end `i`'s penalty — its `n` highest-scoring arrows don't count
+ *  (0 clears it). The arrows stay on the record as shot. No end, no change. */
+export function setArrowPenalty(r: EntryResult, i: number, n: number): EntryResult {
+  const ends = r.ends ?? [];
+  if (!ends[i]?.length) return r;
+  const pen = Array.from({ length: ends.length }, (_, k) => (Array.isArray(r.arrPen) ? r.arrPen[k] ?? 0 : 0));
+  pen[i] = n;
+  return withEnds(r, [...ends], pen);
 }
 
 /** Halves of a ranking round (36 + 36 / 30 + 30) — the scoresheet's distance totals. */
@@ -123,11 +163,12 @@ export function halfTotals(ends: Arrow[][] = [], round: ArchRoundDef): number[] 
 export function archRowText(r: EntryResult, round: ArchRoundDef): string {
   const ends = (r.ends ?? []).filter((e) => e?.length);
   if (!ends.length && r.mark == null) return '';
-  const t = ends.length ? archTotals(ends) : { mark: r.mark ?? 0, tens: r.tens ?? 0, xs: r.xs ?? 0, arrows: 0 };
+  const t = ends.length ? archTotals(r.ends, r.arrPen) : { mark: r.mark ?? 0, tens: r.tens ?? 0, xs: r.xs ?? 0, arrows: 0 };
   const total = endsOf(round);
   const h = halfTotals(r.ends, round);
   const halves = ends.length > total / 2 ? ` · ${h[0]} + ${h[1]}` : '';
-  return `${ends.length}/${total} ends · ${t.mark} · 10s ${t.tens} · X ${t.xs}${halves}`;
+  const pen = archPenaltyOf(r.ends, r.arrPen).mark;
+  return `${ends.length}/${total} ends · ${t.mark}${pen ? ` (after −${pen} penalty)` : ''} · 10s ${t.tens} · X ${t.xs}${halves}`;
 }
 
 /* ---------------------------------- matches -------------------------------- */
@@ -325,8 +366,11 @@ export function archLines(f: Pick<PhaseFormat, 'discipline' | 'category' | 'rule
       s.comps = 1;
       const ends = (res.ends ?? []).filter((e) => e?.length);
       const t = archTotals(ends);
+      // batch 5: net of any penalty (highest arrows of an end that don't count)
+      const pen = archPenaltyOf(res.ends, res.arrPen);
       if (ends.length) {
-        s.arrows = t.arrows; s.pts = t.mark; s.tens = t.tens; s.xs = t.xs;
+        s.arrows = t.arrows; s.pts = t.mark - pen.mark; s.tens = t.tens - pen.tens; s.xs = t.xs - pen.xs;
+        if (pen.mark > 0) s.arPen = pen.mark;
         s.rEnds = ends.length; s.n9 = ends.flat().filter((a) => a === 9).length; s.bestEnd = Math.max(...ends.map(endSum));
       }
       if (r.bestLegal != null && ends.length >= endsOf(round)) s[archMarkKey(round.key)] = r.bestLegal;

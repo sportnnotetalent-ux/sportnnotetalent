@@ -293,7 +293,8 @@ export function shootLines(f: Pick<PhaseFormat, 'discipline' | 'category'> & Par
   // deep wave: each finalist's counted shots (to the elimination shot, or the last)
   const fin = kind === 'final' && isFinalRows(rows) ? finalState(rows, ev) : null;
   for (const r of ranked) {
-    if (r.status === 'DNS' || r.status === 'WD') continue;
+    // batch 5: a shooter withdrawn after firing (`wdKeep`) keeps the series fired
+    if (r.status === 'DNS' || (r.status === 'WD' && r.entry.result?.wdKeep !== true)) continue;
     if (teamEvent && isTeamRow(r.entry)) {
       if (kind === 'qual') continue;
       const extra: Record<string, number> = {};
@@ -334,7 +335,8 @@ export function shootLines(f: Pick<PhaseFormat, 'discipline' | 'category'> & Par
         s.shots = Math.min(nSeries * ev.seriesOf, shotsOf(ev, f.category));
         if (ev.scoring === 'integer') { s.xs = res.xs ?? 0; s.xShots = s.shots; }
         // a complete match counts as the score (PB / record line)
-        if (r.bestLegal != null && nSeries >= seriesCount(ev, shotsOf(ev, f.category))) s[shootMarkKey(ev.key, f.category?.shots)] = r.bestLegal;
+        // batch 5: a shooter who didn't finish / withdrew never sets a PB or record line
+        if (r.bestLegal != null && r.status !== 'DNF' && r.status !== 'WD' && nSeries >= seriesCount(ev, shotsOf(ev, f.category))) s[shootMarkKey(ev.key, f.category?.shots)] = r.bestLegal;
         // deep wave: the best series as shot, perfect series, penalty points
         const raw = res.series ?? [];
         s.bestSer = Math.max(...raw);

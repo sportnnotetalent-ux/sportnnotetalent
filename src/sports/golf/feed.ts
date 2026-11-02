@@ -143,7 +143,24 @@ export function golfRoundFeed(players: FeedPlayer[], o: { scoring: 'stroke' | 's
     const avg = played.length >= 2 ? ` · field avg ${(played.reduce((t, x) => t + x, 0) / played.length).toFixed(2)}` : '';
     groups.push({ key: `h${i}`, title: `Hole ${hole.n} · par ${hole.par}`, subtitle: `SI ${hole.si}${avg}`, items: items.map(({ order: _o, ...it }) => it) });
   }
+  // batch 5: withdrawals / disqualifications / did not start, with the reason, first
+  const admin = list.map((pl) => adminLine(pl)).filter((x): x is FeedItem => !!x);
+  if (admin.length) groups.unshift({ key: 'admin', title: 'Withdrawals & disqualifications', items: admin });
   return groups;
+}
+
+/** Batch 5: "Ravi K withdrew (WD) after 7 holes — injury" from the card's
+ *  entry admin (SD-35). An unknown status is ignored; the reason is trimmed to
+ *  one short line; a holes count that isn't a whole number in range is left out. */
+function adminLine(pl: FeedPlayer): FeedItem | null {
+  const a = pl.card.admin;
+  if (!a || (a.status !== 'wd' && a.status !== 'dq' && a.status !== 'dns')) return null;
+  const raw = typeof a.reason === 'string' ? a.reason.replace(/\s+/g, ' ').trim() : '';
+  const reason = raw.length > 100 ? `${raw.slice(0, 99)}…` : raw;
+  const thru = typeof a.thru === 'number' && Number.isInteger(a.thru) && a.thru > 0 && a.thru <= pl.holes.length ? a.thru : null;
+  const head = a.status === 'wd' ? `${pl.name} withdrew (WD)${thru ? ` after ${thru} hole${thru === 1 ? '' : 's'}` : ''}`
+    : a.status === 'dq' ? `${pl.name} disqualified (DQ)` : `${pl.name} did not start (DNS)`;
+  return { id: `${pl.id}-admin`, text: `${head}${reason ? ` — ${reason}` : ''}`, icon: a.status === 'dq' ? '🟥' : '🏳' };
 }
 
 /* ------------------------------ match play ------------------------------ */

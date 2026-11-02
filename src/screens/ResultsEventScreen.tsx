@@ -67,6 +67,7 @@ import {
   combinedStandings, combinedRanked, combinedAwards, combinedHeader, combinedText, falseStartStep, ruleOf, archMatch, combinedPhaseName, phasePoints, blankWarning,
   type CombinedPhaseInput, type ResultFlag,
   archTeamOf, shootTeamOf, isShootMatchRows, shootMatchState, matchSpecOf, memberScoresText, isTeamRow, isPursuitKind, scoreText,
+  withStatusChange, targetStatuses, drawOfLots, crewFalseStart, trackRuleLine, precisionRuleNote,
 } from '../data/results';
 import { isEventSport, eventWords } from '../sports/eventSports';
 import { useAuth } from '../core/auth';
@@ -87,7 +88,8 @@ const STATUSES: ResultStatus[] = ['DNS', 'DNF', 'FS', 'DQ'];
 // SD-99 / SD-100: rowing / canoe — did not start, did not finish, excluded / disqualified
 const statusesFor = (def: DisciplineDef): ResultStatus[] =>
   // SD-98 cycling: road — DNS, DNF, OTL (outside the time limit), DQ; track — DNS, DNF, DQ
-  def.sport === 'cycling' ? cycStatuses(def) : isRoadDiscipline(def) ? ['DNS', 'DNF', 'DQ'] : isCrewSport(def.sport) ? ['DNS', 'DNF', 'DQ'] : def.sport === 'swimming' ? ['DNS', 'DQ'] : def.capture === 'single' ? (def.unit === 'time' ? STATUSES : ['DNS', 'DQ']) : ['DNS', 'DQ', 'WD'];
+  def.sport === 'cycling' ? cycStatuses(def) : isRoadDiscipline(def) ? ['DNS', 'DNF', 'DQ'] : isCrewSport(def.sport) ? ['DNS', 'DNF', 'FS', 'DQ'] : def.sport === 'swimming' ? ['DNS', 'DQ'] : def.capture === 'single' ? (def.unit === 'time' ? STATUSES : ['DNS', 'DQ']) : def.capture === 'target' ? targetStatuses(def) : ['DNS', 'DQ', 'WD'];
+// batch 5: rowing / canoe — FS = excluded for false starts (the chip warns first, `crewFalseStart`); shooting adds DNF
 const ruleHint = (def: DisciplineDef) => (def.sport === 'cycling' ? 'e.g. irregular sprint / relegated (UCI)' : def.sport === 'rowing' ? 'Excluded — e.g. 2nd false start' : def.sport === 'canoe' ? 'e.g. False start / left lane (ICF)' : def.sport === 'swimming' ? 'SW 7.6' : def.sport === 'athletics' ? 'TR 16.8' : 'rule');
 /** The meet's points settings for an event sport (athletics / swimming / SD-97 weightlifting). */
 const pointsFor = (sport: string, fmt?: Record<string, unknown>) => eventMeetSettings(sport, fmt);
@@ -306,6 +308,14 @@ export default function ResultsEventScreen() {
     const q = qualify(rankByHeat(resEntries, def, { handLegal: looseLegal(f) }), def, f.progression);
     return new Set(q.tieAtLine);
   }, [swim, def, f, resEntries]);
+  // batch 5 (TR 21.3): athletics track — a tie at the qualifying line with no lane for both: a draw of lots
+  const athDraw = useMemo(() => {
+    if (!def || !f?.progression || def.sport !== 'athletics' || def.capture !== 'single' || def.tie === 'road' || f.combined) return new Set<string>();
+    const nx = f.plan?.[f.phaseNo];
+    if (!nx) return new Set<string>();
+    const q = qualify(rankByHeat(resEntries, def, { handLegal: looseLegal(f) }), def, f.progression);
+    return new Set(drawOfLots(q, nx.heats * (def.lanes ?? 8)));
+  }, [def, f, resEntries]);
 
   const heats = useMemo(() => [...new Set(entries.map((e) => e.groupNo))].sort((a, b) => a - b), [entries]);
   const activeHeat = heats.includes(heat) ? heat : heats[0] ?? 1;
@@ -452,6 +462,15 @@ export default function ResultsEventScreen() {
   const falseStart = async (e: FieldEntry) => {
     const r = resultOf(e);
     const who = toResultEntry(e, nameOf).name;
+    // batch 5: rowing / canoe — the crew's first false start is a warning (yellow card), the second excludes (red card)
+    if (crew) {
+      const step = crewFalseStart(r, f.rules, def.sport);
+      const ok = await askConfirm(step.step === 'warn'
+        ? { title: 'First false start — yellow card', message: `${who} is warned and the race is restarted. A second false start by this crew excludes it (red card).`, yesLabel: 'Yes, warn', noLabel: 'No, cancel', tone: 'caution' }
+        : { title: `Exclude ${who}?`, message: r.fsWarn === true ? 'Already warned for a false start in this race — a second one excludes (red card).' : 'False starts: excluded at the first one (meet rule).', yesLabel: 'Yes, exclude (FS)', noLabel: 'No, cancel', tone: 'danger' });
+      if (ok) void save(e, step.next);
+      return;
+    }
     const kind = comb ? 'combined' : swim ? 'swim' : 'track';
     const ref = comb ? 'TR 39.8.3' : swim ? 'SW 4.4' : 'TR 16.8';
     if (falseStartStep(f.rules, e.groupNo, comb ? comb.fsWarned : f.fsWarned, kind) === 'warn') {
@@ -665,6 +684,9 @@ export default function ResultsEventScreen() {
         {roadEv ? <Text style={textStyles.muted}>{roadHeader(def, f.road)}</Text> : null}
         {comb ? <Text style={textStyles.muted}>{combinedHeader(f, def)}</Text> : null}
         {fieldNote ? <Text style={textStyles.muted}>{fieldNote}</Text> : null}
+        {/* batch 5: the rules in force — athletics track; penalties / lights / jury / team arrows for the precision sports */}
+        {trackRuleLine(def, f) ? <Text style={textStyles.muted}>{trackRuleLine(def, f)}</Text> : null}
+        {(shoot || arch || lifts) && precisionRuleNote(def, f.rules) ? <Text style={textStyles.muted}>{precisionRuleNote(def, f.rules)}</Text> : null}
         {shoot ? <Text style={textStyles.muted}>{shoot.rules} · {shotsOf(shoot, f.category)} shots{shootFinalPhase ? ` · final from zero: ${shoot.final?.stage ?? 'single shots'}, eliminations from the bottom` : f.shootFinal ? ' · the best go to an elimination final' : f.shootMatch ? '' : ' · no final: the match decides the medals'}{shootFinalPhase ? ' · a tie for an elimination or for gold: shoot-off' : ruleOf(f.rules, 'shootTie') === 'inner' ? ` · ties: ${shoot.scoring === 'integer' ? 'inner tens, then ' : ''}${ruleOf(f.rules, 'shootOff') === 'share' ? 'shared' : 'shared (a medal place: shoot-off)'} (meet rule)` : ` · ties: ${shoot.scoring === 'integer' ? 'inner tens, then ' : ''}${shoot.positions ? 'standing, kneeling, prone, then ' : ''}the last series back`}</Text> : null}
         {arch ? <Text style={textStyles.muted}>World Archery · {BOW_LABEL[arch.bow]}{archTeamOf(def.key) ? ` · ${archTeamOf(def.key)!.kind === 'team' ? 'team of 3' : 'mixed team (a man and a woman)'}` : ''} · {archBracket ? (archTeamOf(def.key) ? matchRuleText(matchFormatOf(arch.bow), matchSpecOf(def.key)) : matchFormatOf(arch.bow) === 'sets' ? 'set system: ends of 3, 2 points an end, first to 6; 5–5 → one-arrow shoot-off' : 'cumulative: 5 ends of 3, higher total; level → one-arrow shoot-off') + (ruleOf(f.rules, 'archShootOff') === 'repeat' ? ' (level arrows shoot again — meet rule)' : '') : `${teamRank ? `team score = the members’ ${roundLine(arch).split(' · ')[0]} ranking scores added` : roundLine(arch, f.rules)} · ties: ${ruleOf(f.rules, 'archTie') === 'xs' ? 'most X, then most 10s (meet rule)' : 'most 10s (X included), then most X'}${f.progression ? ` · the best go to ${teamRank ? 'team ' : ''}match play` : ` · no match play: the ${teamRank ? 'team ranking' : 'ranking round'} decides the medals`}`}</Text> : null}
         {shootMatches ? <Text style={textStyles.muted}>Medal matches: gold 1st v 2nd, bronze 3rd v 4th · first to 16 points.</Text> : f.shootMatch ? <Text style={textStyles.muted}>The best 4 teams go to the medal matches (gold 1 v 2, bronze 3 v 4, first to 16 points).</Text> : null}
@@ -851,6 +873,12 @@ export default function ResultsEventScreen() {
                       <DeciderField label="Swim-off place" value={r.decider} onSave={(d) => void save(e, { ...r, decider: d })} />
                     </View>
                   )}
+                  {athDraw.has(e.id) && editable && (
+                    <View style={{ gap: theme.spacing(1) }}>
+                      <Text style={st.badTxt}>Tied for the last place through and the next round has no lane for both — lots are drawn (TR 21.3). Enter the draw place (1 = through).</Text>
+                      <DeciderField label="Draw place" value={r.decider} onSave={(d) => void save(e, { ...r, decider: d })} />
+                    </View>
+                  )}
                   {crew && editable && routing?.tieAtLine.includes(e.id) && (
                     <View style={{ gap: theme.spacing(1) }}>
                       <Text style={st.badTxt}>Dead heat on a qualifying line — both crews go on unless a re-row (or, failing that, a draw) separates them. Enter the re-row / draw place (1 = ahead).</Text>
@@ -869,7 +897,7 @@ export default function ResultsEventScreen() {
                   {row?.needsDecider && editable && (
                     <DeciderField label={def.tie === 'vertical' ? 'Jump-off place' : arch && f.progression ? 'Shoot-off / toss place' : 'Shoot-off place'} value={r.decider} onSave={(d) => void save(e, { ...r, decider: d })} />
                   )}
-                  {editable && (swim ? <SwimStatusChips def={def} r={r} onChange={(n) => void save(e, n)} onFalseStart={fsHandled ? () => void falseStart(e) : undefined} /> : <StatusChips def={def} r={r} onChange={(n) => void save(e, n)} onFalseStart={fsHandled && def.unit === 'time' && def.capture === 'single' ? () => void falseStart(e) : undefined} />)}
+                  {editable && (swim ? <SwimStatusChips def={def} r={r} onChange={(n) => void save(e, n)} onFalseStart={fsHandled ? () => void falseStart(e) : undefined} /> : <StatusChips def={def} r={r} onChange={(n) => void save(e, n)} onFalseStart={(fsHandled || crew) && def.unit === 'time' && def.capture === 'single' ? () => void falseStart(e) : undefined} />)}
                 </Card>
               );
             })}
@@ -1308,7 +1336,7 @@ function StatusChips({ def, r, onChange, onFalseStart }: { def: DisciplineDef; r
       <View style={st.wrap}>
         {statusesFor(def).map((x) => (
           <TouchableOpacity key={x} accessibilityRole="button" accessibilityState={{ selected: s === x }} aria-pressed={s === x} accessibilityLabel={`Mark ${x}`}
-            onPress={() => (x === 'FS' && s !== 'FS' && onFalseStart ? onFalseStart() : onChange({ ...r, status: s === x ? undefined : x, ruleRef: s === x ? undefined : x === 'FS' ? 'TR 16.8' : r.ruleRef }))}
+            onPress={() => (x === 'FS' && s !== 'FS' && onFalseStart ? onFalseStart() : onChange(withStatusChange(def, { ...r, ruleRef: s === x ? undefined : x === 'FS' ? 'TR 16.8' : r.ruleRef }, s === x ? undefined : x)))}
             style={[st.status, s === x && st.statusOn]}>
             <Text style={[st.statusTxt, s === x && st.statusTxtOn]}>{x}</Text>
           </TouchableOpacity>
@@ -1318,6 +1346,9 @@ function StatusChips({ def, r, onChange, onFalseStart }: { def: DisciplineDef; r
         <RuleRef key={r.ruleRef ?? ''} value={r.ruleRef} hint={ruleHint(def)} onSave={(v) => onChange({ ...r, ruleRef: v || undefined, ...(athDqReasonStale(r, v) ? { reason: undefined } : {}) })} />
       )}
       {s === 'DQ' && <AthDqChips def={def} r={r} onChange={onChange} />}
+      {/* batch 5: the crew's yellow card stays on view until the race is over */}
+      {isCrewSport(def.sport) && r.fsWarn === true && s !== 'FS' ? <IconText label="🟨 Warned for a false start — a second one excludes (FS)." style={st.badTxt} /> : null}
+      {s === 'WD' && r.wdKeep === true ? <Text style={textStyles.muted}>Withdrawn after competing — {def.capture === 'lifts' ? 'the lifts made stand (no total)' : 'the series fired stay on the sheet'}.</Text> : null}
     </View>
   );
 }

@@ -23,7 +23,7 @@ import { betterMark } from './rank.ts';
 import { attemptOrder } from './progression.ts';
 import { phaseLabel } from './plan.ts';
 import { phasePoints, combinedStandings } from './combined.ts';
-import { phaseTeams } from './road.ts';
+import { phaseTeams, walkCards, roadEventOf } from './road.ts';
 import { rowsForRecords } from './safety.ts';
 import type { RecordMark } from './records.ts';
 import type { MeetEvent } from './athletics.ts';
@@ -101,7 +101,9 @@ function phaseItems(ev: MeetEvent, p: Phase, o: CommentaryOptions, allPhases: Ph
       const rows = withFlags(raw, extra);
       const placed = rows.filter((r) => r.position != null).sort((a, b) => (a.position as number) - (b.position as number));
       const statuses = rows.filter((r) => r.status === 'DQ' || r.status === 'FS' || r.status === 'DNF' || r.status === 'OTL');
-      if (!placed.length && !statuses.length) continue;
+      // batch 5: what else was entered — race-walk red cards, false-start warnings
+      const notes = heatNotes(def, f, rows);
+      if (!placed.length && !statuses.length && !notes.length) continue;
       const complete = rows.every((r) => r.status !== 'ok' || r.position != null);
       const provisional = !complete && p.status !== 'completed';
       const hName = f.combined ? `${heatName(f, heat)}` : heatName(f, heat);
@@ -134,6 +136,7 @@ function phaseItems(ev: MeetEvent, p: Phase, o: CommentaryOptions, allPhases: Ph
       }
       const st = statuses.map((r) => `${name(r)} ${r.status}${r.entry.result.ruleRef && r.status !== 'DNF' ? ` (${r.entry.result.ruleRef}${r.entry.result.reason ? ` ${r.entry.result.reason}` : ''})` : ''}`);
       if (st.length) text += `${text ? ' · ' : ''}${st.join(', ')}`;
+      if (notes.length) text += `${text ? ' · ' : ''}${notes.join(', ')}`;
       out.push(base(heat, [0], 'heat', def.capture === 'order' ? '🏁' : '⏱', `${title} · ${hName}${provisional ? ' (so far)' : ''}: ${text}`, provisional));
     }
   }
@@ -154,6 +157,26 @@ function phaseItems(ev: MeetEvent, p: Phase, o: CommentaryOptions, allPhases: Ph
 }
 
 type Base = (heat: number, step: number[], kind: CommentaryKind, icon: string, text: string, provisional?: boolean) => CommentaryItem;
+
+/** Batch 5: a heat's entered details beyond the places — race-walk red cards
+ *  (TR 54.7, "3 red cards — penalty zone 1 min"), a crew's yellow card for a
+ *  false start, the athlete charged with a race's false start. Hostile values
+ *  (a negative or non-numeric card count, a non-boolean flag) are ignored. */
+function heatNotes(def: DisciplineDef, f: PhaseFormat, rows: RankedEntry[]): string[] {
+  const out: string[] = [];
+  const walk = roadEventOf(def.key);
+  const crew = def.sport === 'rowing' || def.sport === 'canoe';
+  for (const r of rows) {
+    const res = r.entry.result ?? {};
+    if (walk?.kind === 'walk' && typeof res.rc === 'number' && Number.isInteger(res.rc) && res.rc > 0 && r.status !== 'DQ') {
+      out.push(`${r.entry.name} ${walkCards({ rc: res.rc }, f.road, walk.metres).text}`);
+    }
+    if (res.fsWarn === true && r.status !== 'FS' && r.status !== 'DQ') {
+      out.push(crew ? `${r.entry.name} warned for a false start (yellow card)` : `${r.entry.name} charged with the false start`);
+    }
+  }
+  return out;
+}
 
 /** "Heats done — 8 through to the final (6 Q, 2 q); fastest: Priya Sharma 12.48". */
 function roundItem(title: string, p: Phase, pr: PhaseRanking, base: Base): CommentaryItem[] {
