@@ -18,7 +18,7 @@ import { MatchBoxScore } from '../../components/BoxScore';
 import { carromBox } from '../boxSources';
 import {
   init, reducer, result, boardValue, boardCloses, boardCredit, creditedPoints, summary, scoreLine, lineScore, standingsUnits,
-  nextBreaker, nextBreakerPlayer, boardBreakers, breakerPlayers, slamFor, boardInputs, boardCorrection, FOUL_TYPES, FOUL_CHIPS, FOUL_LABEL,
+  nextBreaker, nextBreakerPlayer, boardBreakers, boardReady, queenChoices, breakerPlayers, slamFor, boardInputs, boardCorrection, FOUL_TYPES, FOUL_CHIPS, FOUL_LABEL,
   type BoardDetail, type BoardInput, type CarromCredit, type CarromState, type EndFoul, type FoulType, type PlayerFouls, type QueenBy, type Side, type Slam,
 } from './engine';
 import { carromFeed } from './feed';
@@ -60,7 +60,8 @@ const ScoringControls: SportPlugin<CarromState>['ScoringControls'] = ({ state, d
   const nameOf = (side: Side) => sideName(pname, side === 'home' ? homeRoster : awayRoster, side === 'home' ? homeName : awayName);
   const [winner, setWinner] = useState<Side | null>(null);
   const [coins, setCoins] = useState<number | null>(null); // SD-116: no default — the scorer picks
-  // SD-117c — the three-way Queen chip (optional): winner / loser / not covered
+  // SD-117c — the Queen chip: winner / loser / not covered (batch 1: required
+  // on a played-out board; the ICF format offers winner / loser only)
   const [queenBy, setQueenBy] = useState<QueenBy | null>(null);
   const queen = queenBy === 'winner';
   const [slam, setSlam] = useState<Slam | null>(null);
@@ -98,7 +99,7 @@ const ScoringControls: SportPlugin<CarromState>['ScoringControls'] = ({ state, d
   const roster = winner ? (winner === 'home' ? homeRoster : awayRoster) : [];
   const players = winner ? creditedPlayers(roster, perSide, picked[winner]) : [];
   // SD-37: the game score counts at most to 25, and so do the players' points
-  const ready = penalty || coins != null;
+  const ready = boardReady(s, { penalty, coins, queenBy });
   // Round 2 — every score rule in one place (ICF foul penalties with foulScore)
   const ef: EndFoul | undefined = s.foulScore && (endFoul.striker || endFoul.improper) ? endFoul : undefined;
   const value = winner && ready ? boardValue(s, s.current[winner], { coins: coins ?? 0, queen, penalty, endFoul: ef }) : 0;
@@ -259,11 +260,11 @@ const ScoringControls: SportPlugin<CarromState>['ScoringControls'] = ({ state, d
           </View>
           {/* SD-117c — who covered the Queen: winner (+3 under 22) / loser (no points) / nobody */}
           <View style={{ gap: theme.spacing(2) }}>
-            <Text style={ctrl.label}>👑 Queen covered by <Text style={ctrl.meta}>(optional)</Text></Text>
+            <Text style={ctrl.label}>👑 Queen covered by{queenBy == null ? <Text style={ctrl.meta}> · tap one</Text> : null}</Text>
             <View style={ctrl.chips}>
               <SelectChip label={`Winner${queenCounts ? ' (+3)' : ' (no points at 22+)'}`} active={queenBy === 'winner'} onPress={() => setQueenBy(queenBy === 'winner' ? null : 'winner')} />
               <SelectChip label="Loser (no points)" active={queenBy === 'loser'} onPress={() => setQueenBy(queenBy === 'loser' ? null : 'loser')} />
-              <SelectChip label="Not covered" active={queenBy === 'none'} onPress={() => setQueenBy(queenBy === 'none' ? null : 'none')} />
+              {queenChoices(s).includes('none') ? <SelectChip label="Not covered" active={queenBy === 'none'} onPress={() => setQueenBy(queenBy === 'none' ? null : 'none')} /> : null}
             </View>
           </View>
           <View style={{ gap: theme.spacing(2) }}>
@@ -349,7 +350,7 @@ const ScoringControls: SportPlugin<CarromState>['ScoringControls'] = ({ state, d
             <Text style={ctrl.link} accessibilityRole="button" onPress={() => setEndOpen(true)}>Board ended on {nameOf(loser)}'s foul?</Text>
           )) : null}
           <Button
-            label={!ready ? '✓ Record board — pick the coins left'
+            label={!ready ? `✓ Record board — pick the ${coins == null ? 'coins left' : 'Queen'}`
               : `✓ Record ${penalty ? 'penalty board' : 'board'} · +${credit}${closes ? ` · ${closes.winner === winner ? '' : `${nameOf(closes.winner)} `}wins ${closes.kind === 'match' ? 'the match' : `Game ${closes.game}`}` : credit < value ? ` (game at ${s.target})` : ''}`}
             variant={closes ? 'primary' : winner} onPress={record} disabled={!ready} />
         </>

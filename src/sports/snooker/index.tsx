@@ -21,12 +21,12 @@ import { CommentaryFeed } from '../gcc/CommentaryFeed';
 import { CompareTable } from '../gcc/CompareTable';
 import {
   createInitialState, reducer, isComplete, result, summary, scoreLine, lineScore, standingsUnits, AWARD_REASONS, FOUL_KINDS,
-  type AwardReason, type FoulKind, type Side, type SnookerState,
+  type AwardReason, type Ball, type FoulKind, type Side, type SnookerState,
 } from './engine';
 import { SNOOKER_META } from './meta';
 import {
   snookerPanel, snookerBoard, foulAction, frameScoreAction, frameScoreCheck, awardAction, missWarning, situationLine,
-  BALL_COLOR, FOUL_KIND_LABEL, AWARD_REASON_LABEL, type BallTap, type SnookerPanel,
+  BALL_COLOR, BALL_LABEL, FOUL_KIND_LABEL, AWARD_REASON_LABEL, FOUL_BALLS, foulValue, type BallTap, type SnookerPanel,
 } from './controls';
 import { snookerFeed } from './feed';
 import { snookerMatchStats, snookerFrameNumbers, frameSheet, breakList, BREAK_LIST_MIN, BREAK_LIST_CHIPS } from './matchStats';
@@ -221,11 +221,14 @@ function AfterFoulBanner({ p, names, send, onPlayOn }: { p: SnookerPanel; names:
   );
 }
 
-/** The foul sheet: the value (the minimum pre-selected), the kind, foul and a
+/** The foul sheet: the value (the minimum pre-selected; the ball involved
+ *  raises it, S3 R11, and a value chip still overrides), the kind, foul and a
  *  miss, free ball, reds down, or a penalty on the player not at the table. */
 function FoulSheet({ s, p, names, send }: { s: SnookerState; p: SnookerPanel; names: { home: string; away: string }; send: (a: Act) => void }) {
   const [value, setValue] = useState(p.foul.min);
   const [kind, setKind] = useState<FoulKind | null>(null);
+  const [ball, setBall] = useState<Ball | null>(null);
+  const pickBall = (b: Ball) => { const next = ball === b ? null : b; setBall(next); setValue(foulValue(p.foul.min, next)); };
   const [miss, setMiss] = useState(false);
   const [freeBall, setFreeBall] = useState(false);
   const [reds, setReds] = useState(0);
@@ -240,11 +243,20 @@ function FoulSheet({ s, p, names, send }: { s: SnookerState; p: SnookerPanel; na
           <SelectChip key={v} label={String(v)} active={value === v} onPress={() => setValue(v)} accessibilityLabel={`${v} penalty points`} />
         ))}
       </View>
-      <Text style={cue.meta}>The minimum now is {p.foul.min}: 4, or the value of the ball on if higher.</Text>
+      <Text style={cue.meta}>The minimum now is {p.foul.min}: 4, or the value of the ball on if higher. Pick the ball involved to set it.</Text>
       <View style={cue.chips}>
         {FOUL_KINDS.map((k) => (
           <SelectChip key={k} label={FOUL_KIND_LABEL[k]} active={kind === k} onPress={() => setKind(kind === k ? null : k)} accessibilityLabel={`Kind of foul: ${FOUL_KIND_LABEL[k]}`} />
         ))}
+      </View>
+      <View style={{ gap: theme.spacing(1) }}>
+        <Text style={cue.meta}>Ball involved (hit first, potted or forced off)</Text>
+        <View style={cue.chips}>
+          {FOUL_BALLS.map((b) => (
+            <SelectChip key={b} label={BALL_LABEL[b]} active={ball === b} onPress={() => pickBall(b)}
+              accessibilityLabel={`Ball involved: the ${BALL_LABEL[b].toLowerCase()}, foul worth ${foulValue(p.foul.min, b)}`} />
+          ))}
+        </View>
       </View>
       {!byOther ? (
         <View style={cue.chips}>
