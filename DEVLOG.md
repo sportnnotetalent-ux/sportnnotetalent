@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-04 — Auto-named entries show their players' current names
+
+From the founder's phone: pool / pickleball cards read "Hrudhay Organizer" though his player profile is "Hrudhay". Live read-only check: those one-person entries were stored as "Hrudhay Organizer" — Schedule Match's "Me" named the entry from the account profile name when the player list hadn't loaded, and an entry's name never changed after. Fixed (`docs/security/breaks/entry-current-names.md`): auto-named singles / doubles entries (ad hoc, individual or racket sport, 1–2 players, each "/" part fitting its player by name or first word) read their players' current names and short code wherever a match is read (`autoEntryIds` in `participantEntry.ts`, via `revealEntryNames`; names from players_view, minors masked); a deliberately named team ("Hrudhay's 5s") keeps its name; "Me" takes the player's own name (`getMyEntrant`), the account name only if blank. No migration, no data writes.
+
 ### 2026-11-04 — Release: quick-game side names + doubles picker live (web, Android OTA)
 
 auth-smoke passed. Published from a clean worktree at 03b8cfd: web (entry `index-f4cb82fc`, confirmed live on app.sportnnote.in) and Android OTA groups `3ee04588` (preview) and `708b0095` (production), runtime 1.0.0.
