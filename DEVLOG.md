@@ -13,6 +13,18 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-03 — Batch 6: the P2s across all sports
+
+Seven sport-family branches (each with its break-it list, tests, simulation; old logs fingerprinted before and replayed identically after), merged here:
+- **Cricket** (`cricket-batch6.md`): free-hit dismissals refused in the reducer; "last man stands" rule; powerplay shortens after a rain cut, ODI P1 / P2 / P3 bands; Bouncer chip without the pitch map; "c sub (X)"; "Run out (backing up)"; one-short and beamer tags.
+- **Football / hockey / rugby** (`invasion-batch6.md`): goal straight to the assist panel; goal situations; concussion subs outside the limit; ice-hockey shoot-out saves / misses with the goalie credited, "served by"; goal / try ruled out (toggle); rugby restarts (50:22, 40/20, goal-line drop-outs; toggle); football career penalties conceded; voice stoppage reasons.
+- **Basketball / baseball / American football** (`us-sports-batch6.md`): NBA last-2-minutes bonus; jump / held ball and the possession arrow; coach / bench technicals; dropped third strike, catcher's interference, triple play; AF returns, blocked kicks, onside kick, forced fumble, penalty enforcement options; flag school reads Standard. Not done (L): softball DP / FLEX.
+- **Volleyball / netball / handball** (`court-team-batch6.md`): volleyball video challenges; netball toss-ups; handball "not sure" position, passive-play warning, "7 m caused by".
+- **Cue & board** (`cue-board-batch6.md`): snooker break make-up and clearances; chess illegal-move warnings, draw offers, ½-0, second time control; carrom awards with a reason; pool shot-clock extension and more stats rows; billiards foul kinds in careers.
+- **Measured** (`measured-batch6.md`): precision stats switches per event (no lock); archery match penalties; golf max score, penalty cap, match-play penalties; cycling relegation; crew exclusion vs DSQ; athletics start-conduct cards; weightlifting loading-error re-attempt; swimming relay take-over DQ. Rule details marked "verify" in the doc.
+- **Racket** (`racket-batch6.md`): badminton long / wide errors and shuttle change; squash injury categories (minutes to verify vs WSF); table tennis expedite (checked against an independent ITTF serve model).
+Full suite 7,018 tests, 0 failing (2 known todo); tsc clean. Demo-checked: badminton detail card "Error: Net / Long / Wide / Fault" and "Lost by rule".
+
 ### 2026-11-03 — Release: Batch 5 (depth across all sports) live (web, Android OTA)
 
 auth-smoke passed. Published from a clean worktree at bd068dc: web (entry `index-331c36f4`, confirmed live on app.sportnnote.in) and Android OTA groups `82d2ad75` (preview) and `b6ad19a3` (production), runtime 1.0.0.
