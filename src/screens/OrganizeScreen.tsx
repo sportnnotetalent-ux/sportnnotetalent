@@ -170,6 +170,12 @@ export default function OrganizeScreen() {
           style={{ marginTop: theme.spacing(2) }}
         />
         <Button
+          label="🎽 Start a session"
+          variant="ghost"
+          accessibilityHint="Who's here, captains pick teams, teams play in turns"
+          onPress={() => nav.navigate('SquadSession', {})}
+        />
+        <Button
           label="👥 Manage houses"
           variant="ghost"
           onPress={() => nav.navigate('Teams')}

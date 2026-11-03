@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-06 — Squad sessions v2: guests, one shared phone, game settings, start from Organize
+
+The four gaps left from v1 (`docs/security/breaks/squad-sessions.md` SS17–SS23). **Guests:** "+ Add a guest" finds anyone by name or mobile number (or a typed name, marked), when starting a session and in "Change who's here". **One shared phone:** new rule "Picking: each captain on their phone / one phone passed around"; in shared mode anyone in the session taps for the captain on turn ("Pass the phone to Kabir"), still only on turn and only available players. **Game settings:** the sport's own rules editor (length, points, sets, frames…) set once; every new game starts with them, a game in play keeps its own. **Organize → 🎽 Start a session:** pick one of your teams or "No team". Server: **`supabase/migrations/20261106120000_squad_sessions_v2.sql`** (founder runs) — `squad_sessions.format`, `pickOn` in the rules check, `squad_session_pick` (shared mode), new `squad_session_set_format`, `squad_session_next_game` copies the settings. Tests: 6 new server tests (PGlite) + pickOn unit test; full suite 7,311 pass, 0 fail; tsc clean; demo walked through (Organize → no team → 3 guests → shared picking for Kabir and Meera → game "to 21 · single game"); a setState-in-render warning in the settings card found and fixed.
+
 ### 2026-11-05 — Release: overdue games live (web, Android OTA)
 
 auth-smoke passed. Published from a clean worktree at 09f4967: web (entry `index-bbaaa081`, confirmed live on app.sportnnote.in) and Android OTA groups `753bc982` (preview) and `ad05dfb9` (production), runtime 1.0.0. No database change.

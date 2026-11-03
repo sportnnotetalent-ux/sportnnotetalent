@@ -22,9 +22,14 @@ import {
 } from '../core/squadSession';
 import {
   createSquadSession, endSession, getSquadSession, makeTeams, pickPlayer, restartPicks, sessionErrorText,
-  setSessionCaptains, setSessionPlayers, setSessionRules, shareRest, startNextGame,
+  setSessionCaptains, setSessionFormat, setSessionPlayers, setSessionRules, shareRest, startNextGame,
 } from '../data/squadSessions';
-import { getClub, getClubMembers, getClubSports, getMyPlayerId, getPlayerNamesById } from '../data/repos';
+import { getClub, getClubMembers, getClubSports, getClubsForPlayer, getMyPlayerId, getPlayerNamesById, invitePerson } from '../data/repos';
+import { PersonPicker } from '../components/PersonPicker';
+import { SportFormatEditor, type FormatVal } from '../components/FormatEditor';
+import { playerInviteText } from '../core/inviteText';
+import { SHARE_BASE } from '../core/shareText';
+import type { Club } from '../core/types';
 import type { Match, SportId } from '../core/types';
 import type { RootStackParamList } from '../navigation/types';
 
@@ -72,6 +77,11 @@ function RulesCard({ rules, teamsLocked, onChange, busy }: { rules: SessionRules
           </View>
         </>
       ) : null}
+      <FieldLabel>Picking</FieldLabel>
+      <View style={st.chips}>
+        <SelectChip label="Each captain on their phone" active={rules.pickOn === 'own'} disabled={busy} onPress={() => set({ pickOn: 'own' })} />
+        <SelectChip label="One phone passed around" active={rules.pickOn === 'shared'} disabled={busy} onPress={() => set({ pickOn: 'shared' })} />
+      </View>
       <FieldLabel hint="Snake: 1, 2, 3, then 3, 2, 1 — fairer teams.">Pick order</FieldLabel>
       <View style={st.chips}>
         <SelectChip label="Snake" active={rules.pickOrder === 'snake'} disabled={busy} onPress={() => set({ pickOrder: 'snake' })} />
@@ -81,6 +91,35 @@ function RulesCard({ rules, teamsLocked, onChange, busy }: { rules: SessionRules
       <Stepper label="Win" value={rules.points.win} min={0} max={10} disabled={busy} onChange={(win) => set({ points: { ...rules.points, win } })} />
       <Stepper label="Draw" value={rules.points.draw} min={0} max={10} disabled={busy} onChange={(draw) => set({ points: { ...rules.points, draw } })} />
       <Stepper label="Loss" value={rules.points.loss} min={0} max={10} disabled={busy} onChange={(loss) => set({ points: { ...rules.points, loss } })} />
+    </Card>
+  );
+}
+
+/** The sport's own game settings (length, points, sets…) for every NEW game (SS20–SS22). */
+function GameSettingsCard({ sport, value, busy, onSave, onChange }: {
+  sport: SportId; value: Record<string, unknown>; busy: boolean;
+  /** saved session: a Save button applies them to the next games */
+  onSave?: (f: Record<string, unknown>) => void;
+  /** new session: changes go straight to the draft */
+  onChange?: (f: Record<string, unknown>) => void;
+}) {
+  const [draft, setDraft] = useState<Record<string, FormatVal>>(value as Record<string, FormatVal>);
+  const latest = useRef(draft);
+  useEffect(() => { latest.current = value as Record<string, FormatVal>; setDraft(latest.current); }, [JSON.stringify(value)]); // eslint-disable-line react-hooks/exhaustive-deps
+  const dirty = JSON.stringify(draft) !== JSON.stringify(value);
+  return (
+    <Card style={st.gap}>
+      <Text style={textStyles.h3}>Game settings</Text>
+      <Text style={textStyles.muted}>Every game in this session starts with these. A game already being played keeps its own.</Text>
+      <SportFormatEditor sport={sport} value={draft} heading="game settings"
+        onChange={(k, v) => {
+          // a preset sends several keys in a row: build on the latest draft, then tell the parent
+          const n = { ...latest.current, [k]: v };
+          latest.current = n;
+          setDraft(n);
+          onChange?.(n);
+        }} />
+      {onSave ? <Button label={busy ? 'Saving…' : 'Save for the next games'} disabled={busy || !dirty} onPress={() => onSave(draft)} /> : null}
     </Card>
   );
 }
@@ -110,6 +149,13 @@ export default function SquadSessionScreen() {
   const [draftRules, setDraftRules] = useState<SessionRules>(DEFAULT_RULES);
   const [capDraft, setCapDraft] = useState<string[]>([]);
   const [editHere, setEditHere] = useState<Set<string> | null>(null);
+  const [draftFormat, setDraftFormat] = useState<Record<string, unknown>>({});
+  // started from Organize: one of my teams, or none (SS23); guests found by name / number (SS17)
+  const [myClubs, setMyClubs] = useState<Club[]>([]);
+  const [teamChoice, setTeamChoice] = useState<string | null>(clubId ?? null);
+  const [guests, setGuests] = useState<{ id: string; name: string }[]>([]);
+  const [addingGuest, setAddingGuest] = useState(false);
+  const activeClub = clubId ?? teamChoice ?? undefined;
 
   const load = useCallback(async () => {
     const myId = await getMyPlayerId(profile?.id);
@@ -124,16 +170,22 @@ export default function SquadSessionScreen() {
           setMembers(ms.map((m) => ({ id: m.playerId, name: m.player.fullName })));
         }
       }
-    } else if (clubId) {
-      const [club, ms, ss] = await Promise.all([getClub(clubId), getClubMembers(clubId), getClubSports(clubId)]);
-      setMembers(ms.map((m) => ({ id: m.playerId, name: m.player.fullName })));
-      setClubSports(ss);
-      setTitle((t) => t || club?.name || '');
-      setSport((s) => s ?? ss[0] ?? null);
+    } else {
+      if (!clubId) setMyClubs(await getClubsForPlayer(myId, profile?.id));
+      if (activeClub) {
+        const [club, ms, ss] = await Promise.all([getClub(activeClub), getClubMembers(activeClub), getClubSports(activeClub)]);
+        setMembers(ms.map((m) => ({ id: m.playerId, name: m.player.fullName })));
+        setClubSports(ss);
+        setTitle(club?.name ?? '');
+        setSport((s) => (s && ss.includes(s) ? s : ss[0] ?? s ?? null));
+      } else {
+        setMembers([]); setClubSports([]);
+      }
+      if (myId) setNames(await getPlayerNamesById([myId]));
       setHere((h) => (h.size || !myId ? h : new Set([myId])));
     }
     setLoading(false);
-  }, [sessionId, clubId, profile?.id]);
+  }, [sessionId, clubId, activeClub, profile?.id]);
 
   useFocusEffect(useCallback(() => { void load(); }, [load]));
   // Two phones: while picking or playing, refresh every few seconds.
@@ -158,7 +210,14 @@ export default function SquadSessionScreen() {
     }
   }
 
-  const nameOf = (id: string) => names.get(id) ?? members.find((m) => m.id === id)?.name ?? 'Player';
+  const nameOf = (id: string) => names.get(id) ?? members.find((m) => m.id === id)?.name ?? guests.find((g) => g.id === id)?.name ?? 'Player';
+  const guestInvite = (who?: string) => playerInviteText({ name: who, inviterName: profile?.fullName, link: SHARE_BASE });
+  // a guest is anyone found by name or mobile number, or a typed name (marked as not linked)
+  const guestPicker = (onAdd: (id: string, name: string) => void, exclude: string[]) => (
+    <PersonPicker role="player" excludeIds={exclude} inviteText={guestInvite} sport={(sport ?? session?.sport) as SportId | undefined}
+      cta="Add to the session" onPick={(p) => { setGuests((g) => [...g.filter((x) => x.id !== p.id), { id: p.id, name: p.fullName }]); onAdd(p.id, p.fullName); }}
+      onNameOnly={async (nm) => { const { player } = await invitePerson({ name: nm }); setGuests((g) => [...g, { id: player.id, name: player.fullName }]); onAdd(player.id, player.fullName); }} />
+  );
   const ruleSet = session?.rules ?? draftRules;
   const sessionGames = useMemo(() => (session ? asSessionGames(session.teamIds, games) : []), [session, games]);
   const teamName = (i: number) => `${session?.name ?? ''} ${i + 1}`;
@@ -179,10 +238,22 @@ export default function SquadSessionScreen() {
     const n = here.size;
     const toggle = (id: string) => setHere((h) => { const x = new Set(h); if (x.has(id)) x.delete(id); else x.add(id); return x; });
     const canStart = !!sport && title.trim().length > 0 && n >= draftRules.teams;
+    // me, the team's members, then guests — each once
+    const candidates = [...new Map([...(me ? [[me, names.get(me) ?? 'Me'] as const] : []), ...members.map((m) => [m.id, m.name] as const), ...guests.map((g) => [g.id, `${g.name} (guest)`] as const)])];
+    const allIn = candidates.every(([id]) => here.has(id));
     return (
       <SafeAreaView style={st.safe} edges={['bottom']}>
         <KeyboardAwareScrollView contentContainerStyle={st.content}>
           <ScreenTitle title="New session" subtitle="Who’s here, split into teams, play in turns" />
+          {!clubId ? (
+            <Card style={st.gap}>
+              <FieldLabel hint="Its members are listed below; anyone else can be added as a guest.">Team</FieldLabel>
+              <View style={st.chips}>
+                {myClubs.map((c) => <SelectChip key={c.id} label={c.name} active={teamChoice === c.id} onPress={() => setTeamChoice(c.id)} />)}
+                <SelectChip label="No team" active={!teamChoice} onPress={() => { setTeamChoice(null); setTitle(''); }} />
+              </View>
+            </Card>
+          ) : null}
           <Card style={st.gap}>
             <FieldLabel>Sport</FieldLabel>
             <View style={st.chips}>
@@ -194,20 +265,28 @@ export default function SquadSessionScreen() {
           <Card style={st.gap}>
             <View style={st.rowBetween}>
               <Text style={textStyles.h3}>Who’s here · {n}</Text>
-              <TouchableOpacity accessibilityRole="button" onPress={() => setHere(new Set(n === members.length ? (me ? [me] : []) : members.map((m) => m.id)))}>
-                <Text style={st.link}>{n === members.length ? 'Clear' : 'Everyone'}</Text>
-              </TouchableOpacity>
+              {candidates.length > 1 ? (
+                <TouchableOpacity accessibilityRole="button" onPress={() => setHere(new Set(allIn ? (me ? [me] : []) : candidates.map(([id]) => id)))}>
+                  <Text style={st.link}>{allIn ? 'Clear' : 'Everyone'}</Text>
+                </TouchableOpacity>
+              ) : null}
             </View>
-            {members.length === 0 ? <Text style={textStyles.muted}>Add members to the team first.</Text> : null}
             <View style={st.chips}>
-              {members.map((m) => <SelectChip key={m.id} label={m.name} active={here.has(m.id)} onPress={() => toggle(m.id)} />)}
+              {candidates.map(([id, nm]) => (
+                <SelectChip key={id} label={nm} active={here.has(id)} onPress={() => toggle(id)} />
+              ))}
             </View>
+            <TouchableOpacity accessibilityRole="button" onPress={() => setAddingGuest((v) => !v)}>
+              <Text style={st.link}>{addingGuest ? 'Close' : '+ Add a guest'}</Text>
+            </TouchableOpacity>
+            {addingGuest ? guestPicker((id) => setHere((h) => new Set([...h, id])), [...here]) : null}
           </Card>
           <RulesCard rules={draftRules} teamsLocked={false} busy={busy} onChange={setDraftRules} />
+          {sport ? <GameSettingsCard sport={sport} value={draftFormat} busy={busy} onChange={setDraftFormat} /> : null}
           {n < draftRules.teams ? <Text style={textStyles.muted}>Tick at least {draftRules.teams} players for {draftRules.teams} teams.</Text> : null}
           <FormError message={error} />
           <Button label={busy ? 'Starting…' : 'Start session'} disabled={!canStart || busy}
-            onPress={() => act(() => createSquadSession({ sport: sport!, name: title, players: [...here], rules: draftRules, clubId }), (s) => {
+            onPress={() => act(() => createSquadSession({ sport: sport!, name: title, players: [...here], rules: draftRules, clubId: activeClub, format: draftFormat }), (s) => {
               setSession(s); setSessionId(s.id); nav.setParams({ sessionId: s.id, clubId: undefined });
             })} />
         </KeyboardAwareScrollView>
@@ -222,6 +301,10 @@ export default function SquadSessionScreen() {
   const left = s.status === 'picking' ? available(s.players, s.captains, s.picks) : [];
   const rosters = teamRosters(s.captains, s.picks);
   const myTurn = !!turn && turn === me;
+  const amInSession = !!me && s.players.includes(me);
+  // one phone passed around: anyone in the session taps for the captain on turn (SS18)
+  const sharedPick = s.rules.pickOn === 'shared' && amInSession;
+  const canPick = myTurn || sharedPick;
   const next = s.status === 'playing' ? nextGame(s.teamIds.length, sessionGames, s.rules) : null;
   const table = s.teamIds.length ? sessionTable(s.teamIds.length, sessionGames, s.rules.points) : [];
   const amIn = !!me && s.players.includes(me);
@@ -250,7 +333,7 @@ export default function SquadSessionScreen() {
                   onPress={() => act(() => setSessionCaptains(s, capDraft))} />
               </View>
             </Card>
-            {amIn && members.length ? (
+            {amIn ? (
               <Card style={st.gap}>
                 <View style={st.rowBetween}>
                   <Text style={textStyles.h3}>Change who’s here</Text>
@@ -261,11 +344,12 @@ export default function SquadSessionScreen() {
                 {editHere ? (
                   <>
                     <View style={st.chips}>
-                      {[...new Map([...members.map((m) => [m.id, m.name] as const), ...s.players.map((p) => [p, nameOf(p)] as const)])].map(([id, nm]) => (
+                      {[...new Map([...members.map((m) => [m.id, m.name] as const), ...s.players.map((p) => [p, nameOf(p)] as const), ...guests.map((g) => [g.id, g.name] as const)])].map(([id, nm]) => (
                         <SelectChip key={id} label={nm} active={editHere.has(id)} disabled={busy}
                           onPress={() => setEditHere((h) => { const x = new Set(h); if (x.has(id)) x.delete(id); else x.add(id); return x; })} />
                       ))}
                     </View>
+                    {guestPicker((id, nm) => { setNames((n) => new Map(n).set(id, nm)); setEditHere((h) => new Set([...(h ?? []), id])); }, [...editHere])}
                     <Button label="Save players" disabled={busy || editHere.size < s.rules.teams}
                       onPress={() => act(() => setSessionPlayers(s, [...editHere]), (x) => {
                         setSession(x); setEditHere(null); setCapDraft((c) => c.filter((p) => x.players.includes(p)));
@@ -276,6 +360,7 @@ export default function SquadSessionScreen() {
               </Card>
             ) : null}
             {amIn ? <RulesCard rules={ruleSet} teamsLocked={false} busy={busy} onChange={(r) => act(() => setSessionRules(s, r))} /> : null}
+            {amIn ? <GameSettingsCard sport={s.sport as SportId} value={s.format} busy={busy} onSave={(f) => act(() => setSessionFormat(s, f))} /> : null}
           </>
         ) : null}
 
@@ -285,9 +370,10 @@ export default function SquadSessionScreen() {
               {left.length ? (
                 <>
                   <Text style={textStyles.h3}>{myTurn ? 'Your pick' : `${nameOf(turn!)}’s pick`}</Text>
-                  <Text style={textStyles.muted}>{myTurn ? 'Tap a player for your team.' : `Waiting for ${nameOf(turn!)} to pick on their phone.`}</Text>
+                  <Text style={textStyles.muted}>{myTurn ? 'Tap a player for your team.'
+                    : sharedPick ? `Pass the phone to ${nameOf(turn!)} — they tap a player.` : `Waiting for ${nameOf(turn!)} to pick on their phone.`}</Text>
                   <View style={st.chips}>
-                    {left.map((p) => <SelectChip key={p} label={nameOf(p)} active={false} disabled={busy || !myTurn} onPress={() => act(() => pickPlayer(s, p))} />)}
+                    {left.map((p) => <SelectChip key={p} label={nameOf(p)} active={false} disabled={busy || !canPick} onPress={() => act(() => pickPlayer(s, p))} />)}
                   </View>
                   {amIn ? <Button label="Share out the rest" variant="ghost" disabled={busy} onPress={() => act(() => shareRest(s))} /> : null}
                 </>
@@ -310,6 +396,7 @@ export default function SquadSessionScreen() {
               </TouchableOpacity>
             ) : null}
             {amIn ? <RulesCard rules={ruleSet} teamsLocked busy={busy} onChange={(r) => act(() => setSessionRules(s, r))} /> : null}
+            {amIn ? <GameSettingsCard sport={s.sport as SportId} value={s.format} busy={busy} onSave={(f) => act(() => setSessionFormat(s, f))} /> : null}
           </>
         ) : null}
 
@@ -366,6 +453,7 @@ export default function SquadSessionScreen() {
             {s.status === 'playing' && amIn ? (
               <>
                 <RulesCard rules={ruleSet} teamsLocked busy={busy} onChange={(r) => act(() => setSessionRules(s, r))} />
+                <GameSettingsCard sport={s.sport as SportId} value={s.format} busy={busy} onSave={(f) => act(() => setSessionFormat(s, f))} />
                 <Button label="End session" variant="ghost" disabled={busy} onPress={() => act(() => endSession(s))} />
               </>
             ) : null}

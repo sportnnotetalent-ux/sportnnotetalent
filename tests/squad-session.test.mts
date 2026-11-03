@@ -122,3 +122,9 @@ test('matches → games by team index; strangers and nulls skipped', async () =>
   assert.deepEqual(g, [{ home: 1, away: 2, status: 'completed', winner: 'away' }]);
   assert.deepEqual(sittingOut(4, { home: 0, away: 2 }), [1, 3]);
 });
+
+test('SS18: pick on own phones by default; "shared" is the only other value', () => {
+  assert.equal(cleanRules({}).pickOn, 'own');
+  assert.equal(cleanRules({ pickOn: 'shared' } as any).pickOn, 'shared');
+  assert.equal(cleanRules({ pickOn: 'anyone' } as any).pickOn, 'own');
+});

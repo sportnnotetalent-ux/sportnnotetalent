@@ -17,7 +17,7 @@ import { getMatch, getMyPlayerId } from './repos';
 type Row = {
   id: string; club_id: string | null; sport: string; name: string; starts_at: string; venue_name: string | null;
   status: SquadSession['status']; players: string[] | null; captains: string[] | null; picks: Pick[] | null;
-  rules: Partial<SessionRules> | null; team_ids: string[] | null; version: number; created_by: string | null;
+  rules: Partial<SessionRules> | null; team_ids: string[] | null; version: number; created_by: string | null; format?: Record<string, unknown> | null;
 };
 
 const fromRow = (r: Row): SquadSession => ({
@@ -25,6 +25,7 @@ const fromRow = (r: Row): SquadSession => ({
   venueName: r.venue_name ?? undefined, status: r.status, players: r.players ?? [], captains: r.captains ?? [],
   picks: Array.isArray(r.picks) ? r.picks : [], rules: cleanRules(r.rules), teamIds: r.team_ids ?? [],
   version: r.version, createdBy: r.created_by ?? undefined,
+  format: r.format && typeof r.format === 'object' && !Array.isArray(r.format) ? r.format : {},
 });
 
 /** Plain-words message for a refused change (the codes the server raises). */
@@ -43,6 +44,7 @@ export function sessionErrorText(e: unknown): string {
     [/teams_locked/, 'The number of teams is fixed once captains are chosen.'],
     [/picks_unfinished/, 'Some players haven’t been picked yet.'],
     [/bad_rules/, 'Those rules aren’t allowed.'],
+    [/bad_format/, 'Those game settings can’t be saved.'],
     [/too_many_players/, 'A session can have up to 100 players.'],
     [/too_few_players/, 'A session needs at least 2 players.'],
     [/not_in_club/, 'Only members of this team can start a session for it.'],
@@ -102,7 +104,7 @@ export async function getClubSessions(clubId: string, limit = 10): Promise<Squad
 
 /* -------------------------------- changes -------------------------------- */
 
-export async function createSquadSession(input: { sport: SportId; name: string; players: string[]; rules: SessionRules; clubId?: string; venueName?: string }): Promise<SquadSession> {
+export async function createSquadSession(input: { sport: SportId; name: string; players: string[]; rules: SessionRules; clubId?: string; venueName?: string; format?: Record<string, unknown> }): Promise<SquadSession> {
   const rules = cleanRules(input.rules);
   if (!isSupabaseConfigured || !supabase) {
     const me = await getMyPlayerId();
@@ -112,15 +114,16 @@ export async function createSquadSession(input: { sport: SportId; name: string; 
     const s: SquadSession = {
       id: `ss-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`, clubId: input.clubId, sport: input.sport,
       name: input.name.trim(), startsAt: new Date().toISOString(), venueName: input.venueName?.trim() || undefined,
-      status: 'setup', players, captains: [], picks: [], rules, teamIds: [], version: 1, createdBy: me!,
+      status: 'setup', players, captains: [], picks: [], rules, teamIds: [], format: input.format ?? {}, version: 1, createdBy: me!,
     };
     demo.squadSessions.push(s);
     return { ...s };
   }
-  return asSession(supabase.rpc('squad_session_create', {
+  const made = await asSession(supabase.rpc('squad_session_create', {
     p_sport: input.sport, p_name: input.name.trim(), p_players: input.players, p_rules: rules,
     p_club: input.clubId ?? null, p_venue: input.venueName?.trim() || null,
   }));
+  return input.format && Object.keys(input.format).length ? setSessionFormat(made, input.format) : made;
 }
 
 export async function setSessionRules(s: SquadSession, rules: SessionRules): Promise<SquadSession> {
@@ -132,6 +135,16 @@ export async function setSessionRules(s: SquadSession, rules: SessionRules): Pro
     return demoSave(x);
   }
   return asSession(supabase.rpc('squad_session_set_rules', { p_id: s.id, p_rules: r, p_version: s.version }));
+}
+
+/** Game settings for the session's next games (SS20–SS22). */
+export async function setSessionFormat(s: SquadSession, format: Record<string, unknown>): Promise<SquadSession> {
+  if (!isSupabaseConfigured || !supabase) {
+    const { s: x } = await demoLoad(s.id, s.version);
+    x.format = { ...format };
+    return demoSave(x);
+  }
+  return asSession(supabase.rpc('squad_session_set_format', { p_id: s.id, p_format: format, p_version: s.version }));
 }
 
 export async function setSessionPlayers(s: SquadSession, players: string[]): Promise<SquadSession> {
@@ -174,7 +187,7 @@ export async function pickPlayer(s: SquadSession, player: string): Promise<Squad
     const { s: x, me } = await demoLoad(s.id, s.version);
     if (x.status !== 'picking') fail('not_picking');
     const turn = pickTurn(x.captains, x.picks.length, x.rules.pickOrder);
-    // demo: one phone plays every captain, so any present player may pick for the captain on turn
+    // the demo is one phone: it acts as every player, so both modes allow the pick
     if (!turn || !x.players.includes(me)) fail('not_your_pick');
     if (!available(x.players, x.captains, x.picks).includes(player)) fail('not_available');
     x.picks = [...x.picks, { captain: turn!, player }];
@@ -217,7 +230,7 @@ export async function startNextGame(s: SquadSession, home: number, away: number)
     const m = addMatch({
       sport: x.sport as SportId, sessionId: x.id, status: 'scheduled', startsAt: new Date().toISOString(),
       venueName: x.venueName, hostIds: [...x.players], scorerIds: [...x.players], scorerId: me,
-      homeTeam: team(x.teamIds[home]), awayTeam: team(x.teamIds[away]), format: {}, state: null,
+      homeTeam: team(x.teamIds[home]), awayTeam: team(x.teamIds[away]), format: { ...(x.format ?? {}) }, state: null,
     } as Omit<Match, 'id'>);
     demoSave(x);
     return m.id;

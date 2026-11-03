@@ -10,6 +10,8 @@
 
 export type Rotation = 'round_robin' | 'winner_stays';
 export type PickOrder = 'snake' | 'straight';
+/** own: each captain picks on their own phone; shared: one phone passed around */
+export type PickOn = 'own' | 'shared';
 /** winner stays, on a draw: the team on longer goes off, or both go off */
 export type DrawRule = 'longer_on_goes_off' | 'both_off';
 
@@ -17,6 +19,7 @@ export interface SessionRules {
   teams: number;
   rotation: Rotation;
   pickOrder: PickOrder;
+  pickOn: PickOn;
   points: { win: number; draw: number; loss: number };
   /** winner stays: wins in a row before the winner goes off too */
   maxWins: number;
@@ -42,6 +45,8 @@ export interface SquadSession {
   picks: Pick[];
   rules: SessionRules;
   teamIds: string[];
+  /** game settings every new game starts with (the sport's own format keys) */
+  format: Record<string, unknown>;
   /** bumped on every change; a change must carry the version it saw */
   version: number;
   createdBy?: string;
@@ -51,7 +56,7 @@ export const MAX_PLAYERS = 100;
 export const MAX_TEAMS = 8;
 
 export const DEFAULT_RULES: SessionRules = {
-  teams: 3, rotation: 'round_robin', pickOrder: 'snake',
+  teams: 3, rotation: 'round_robin', pickOrder: 'snake', pickOn: 'own',
   points: { win: 3, draw: 1, loss: 0 }, maxWins: 2, drawRule: 'longer_on_goes_off',
 };
 
@@ -68,6 +73,7 @@ export function cleanRules(raw: Partial<SessionRules> | null | undefined): Sessi
     teams: int(r.teams, 2, MAX_TEAMS, DEFAULT_RULES.teams),
     rotation: r.rotation === 'winner_stays' ? 'winner_stays' : 'round_robin',
     pickOrder: r.pickOrder === 'straight' ? 'straight' : 'snake',
+    pickOn: r.pickOn === 'shared' ? 'shared' : 'own',
     points: {
       win: int(pts.win, 0, 10, DEFAULT_RULES.points.win),
       draw: int(pts.draw, 0, 10, DEFAULT_RULES.points.draw),

@@ -29,3 +29,18 @@ Points (listed before fixing; each gets a failing test first):
 Tests: tests/squad-session.test.mts (logic), tests/db-squad-sessions.test.mts
 (server), tests/sim-squad-sessions.test.mts (600 sessions).
 Migration: supabase/migrations/20261105120000_squad_sessions.sql.
+
+## v2 (2026-11-06): guests, one shared phone, game settings, start from Organize
+
+| # | Break | Fix |
+|---|-------|-----|
+| SS17 | A guest (not a team member) can't join | Players are any people found by name or number (or a typed name, marked); the server only needs real player rows |
+| SS18 | On one shared phone, captains can't take turns (the server wants the captain's own account) | Rule "Picking: own phones / one phone passed around". In "one phone", any player in the session picks for the captain on turn — still only on turn, still only available players |
+| SS19 | "One phone" mode lets a stranger pick | Still only players in the session (`not_in_session`) |
+| SS20 | Each game uses default settings; no session-wide length | Session game settings (the sport's own rules editor) saved once; every new game uses them |
+| SS21 | Junk or huge game settings stored | Must be an object, under 8 KB (`bad_format`); changes refused once ended |
+| SS22 | Changing settings mid-game changes the game being played | Settings apply to the NEXT game; a game keeps the settings it started with |
+| SS23 | No way to start a session outside a team page | Organize → "Start a session": pick one of your teams, or none |
+
+Tests: tests/db-squad-sessions-v2.test.mts, tests/squad-session.test.mts (pickOn), tests/sim-squad-sessions.test.mts.
+Migration: supabase/migrations/20261106120000_squad_sessions_v2.sql.
