@@ -8,27 +8,27 @@ import Svg, { Circle } from 'react-native-svg';
 import { theme } from '../core/theme';
 import { Glyph } from './Icon';
 import { SportBadge } from './SportSymbol';
-import { docKindLabel } from '../core/verificationReview';
-import { Card, Pill, Button, SelectChip, EmptyState, LoadingState, FormError, textStyles, plural } from './ui';
+import { verificationSummary } from '../core/verificationReview';
+import { useVerificationUpload } from '../data/useVerificationUpload';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RootStackParamList } from '../navigation/types';
+import { Card, Pill, Button, SelectChip, EmptyState, LoadingState, textStyles, plural } from './ui';
 import { profileViewState } from '../data/profileViewState';
 import { SectionHeader, SECTION_CAP } from './SectionHeader';
 import { ContactCard } from './ContactCard';
 import { inviteGuardianToLink } from '../data/messages';
 import { isSupabaseConfigured } from '../core/supabase';
-import { Linking } from 'react-native';
 import { usePlayerProfile, useOrganizations } from '../data/hooks';
-import { updatePlayer, uploadImage, verifyGuardianContact, submitVerificationDoc, reviewVerification, verificationDocUrl, getPendingVerifications, SUPPORT_EMAIL } from '../data/repos';
+import { updatePlayer, uploadImage, verifyGuardianContact, getPendingVerifications, SUPPORT_EMAIL } from '../data/repos';
 import { pickImage } from '../core/photo';
-import { pickDocument } from '../core/document';
-import { ageFromDob, ageOf, isMinor } from '../core/age';
-import { notify } from '../core/notifications';
+import { ageFromDob, ageOf } from '../core/age';
 import { useVerificationReviewer } from '../data/useVerificationReviewer';
 import { VerificationChecklist } from './VerificationChecklist';
 import { MyCertificatesCard } from './MyCertificatesCard';
 import { CareerPassportCard } from './CareerPassportCard';
 import { useAuth } from '../core/auth';
 import { isSupport } from '../core/roles';
-import { TextField } from './ui';
 import { activeOrgsForPlayer, pastOrgsForPlayer, roleInOrg, memberEntry, membershipPeriod, isAcademicCommunity, currentStandard } from '../core/org';
 import { teamsByRecency, teamPeriod, type TeamAffiliation } from '../core/teams';
 import { getSportMeta } from '../sports/sportMeta';
@@ -376,8 +376,8 @@ export function ProfileView({
         <VerificationCard
           player={player}
           owner={!!onEditProfile}
-          // A support reviewer viewing someone else's profile can act right here.
-          reviewer={!onEditProfile && isSupport(viewer?.role) ? { id: viewer?.id, name: viewer?.fullName } : undefined}
+          // A support reviewer viewing someone else's profile opens Details
+          // to see the document and approve / reject.
         />
       )}
 
@@ -515,161 +515,43 @@ function TeamRow({ team }: { team: TeamAffiliation }) {
   );
 }
 
-/** Age & guardian verification — the owner uploads a proof document; a support
- *  reviewer (viewing this profile) can open it and approve/reject right here. */
-function VerificationCard({ player, owner, reviewer }: { player: Player; owner: boolean; reviewer?: { id?: string; name?: string } }) {
+/** Age & guardian verification — compact: title, status chip, ONE line for what
+ *  to do next, "Details ›", and the action only when the owner must act. The
+ *  explanation, re-submit, support note, reviewer tools and full history live on
+ *  VerificationDetails (docs/security/breaks/verification-card.md). */
+function VerificationCard({ player, owner }: { player: Player; owner: boolean }) {
+  const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [v, setV] = useState(player.verification);
-  const [busy, setBusy] = useState(false);
-  const [note, setNote] = useState('');
-  const [opening, setOpening] = useState(false);
   useEffect(() => setV(player.verification), [player.verification]);
-
-  // Reviewer: open the submitted document via a short-lived signed URL.
-  const viewDoc = async () => {
-    setOpening(true);
-    try {
-      const url = await verificationDocUrl(v?.docPath);
-      if (url) await Linking.openURL(url);
-    } finally {
-      setOpening(false);
-    }
-  };
-
-  // Reviewer: approve/reject, record the decision, and notify the submitter so
-  // the update lands back on their profile (status + eligibility).
-  // Reviewer: approve/reject. The server records it (reviewer identity from
-  // the server) and notifies the player and their parent/guardian.
-  const [error, setError] = useState<string | null>(null);
-  const review = async (decision: 'approved' | 'rejected') => {
-    const reason = decision === 'rejected' ? note.trim() || undefined : undefined;
-    if (decision === 'rejected' && !reason) { setError('Add a reason, so they know what to fix.'); return; }
-    setBusy(true);
-    setError(null);
-    try {
-      const r = await reviewVerification(player.id, decision, reason, reviewer);
-      setV((prev) => ({
-        ...(prev ?? {}),
-        status: decision,
-        note: reason,
-        reviewedAt: r.reviewedAt,
-        reviewedById: reviewer?.id,
-        reviewedByName: r.reviewedByName ?? reviewer?.name,
-        history: [...(prev?.history ?? []), { action: decision, at: r.reviewedAt, byId: reviewer?.id, byName: r.reviewedByName ?? reviewer?.name, note: reason }],
-      }));
-      setNote('');
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Couldn’t save the decision.');
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const upload = async () => {
-    const doc = await pickDocument();
-    if (!doc) return;
-    setBusy(true);
-    setError(null);
-    try {
-      // Throws (and marks nothing pending) when the file didn't upload.
-      await submitVerificationDoc(player.id, doc);
-      const at = Date.now();
-      setV((prev) => ({
-        status: 'pending', docName: doc.name, submittedAt: at,
-        history: [...(prev?.history ?? []), { action: 'submitted', at, docName: doc.name }],
-      }));
-      // Confirmation + the follow-up action (esp. the guardian step for minors).
-      void notify({
-        title: '📄 Proof of date of birth sent',
-        body: isMinor(player.dob)
-          ? "A reviewer will check it, usually within a few hours. Meanwhile: add your parent/guardian's details and verify their mobile & email."
-          : "A reviewer will check it, usually within a few hours. You'll get a notification.",
-      });
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Couldn’t upload the document — please try again.');
-    } finally {
-      setBusy(false);
-    }
-  };
+  const { upload, uploading, uploadError } = useVerificationUpload(player, setV);
 
   const status = v?.status;
   // Fast lanes: a school / club or a parent may already have confirmed the age.
   const confirmedBy = status !== 'approved' && (player.ageVerifiedBy === 'school' || player.ageVerifiedBy === 'parent') ? player.ageVerifiedBy : undefined;
-  const badge =
-    status === 'approved' ? { label: '☑️ Verified', color: theme.colors.primary }
-    : confirmedBy ? { label: '☑️ Age confirmed', color: theme.colors.primary }
-    : status === 'pending' ? { label: '⏳ Pending review', color: theme.colors.accent }
-    : status === 'rejected' ? { label: '✗ Rejected', color: theme.colors.danger }
-    : { label: 'Not submitted', color: theme.colors.textMuted };
+  const summary = verificationSummary({ status, confirmedBy, viewer: owner ? 'owner' : 'reviewer' });
+  const tone = summary.tone === 'ok' ? theme.colors.primary : summary.tone === 'wait' ? theme.colors.accent : summary.tone === 'bad' ? theme.colors.danger : theme.colors.textMuted;
 
   return (
     <Card style={{ gap: theme.spacing(2) }}>
       <View style={st.verifyHead}>
         <Text style={[textStyles.h3, st.headTitle]}>Age & guardian verification</Text>
-        <Pill label={badge.label} color={theme.colors.surfaceAlt} textColor={badge.color} />
+        <Pill label={summary.chip} color={theme.colors.surfaceAlt} textColor={tone} />
       </View>
-      <Text style={textStyles.muted}>
-        Verify the player&apos;s date of birth by uploading a proof ID (image or PDF) — e.g. a birth certificate, school ID or passport. For under-18 players this also confirms the parent/guardian. Our support team reviews and approves it.
-      </Text>
-      {confirmedBy ? (
-        <Text style={textStyles.body}>
-          {confirmedBy === 'school' ? 'Your school / club has confirmed your date of birth from its records' : 'Your parent/guardian has confirmed your date of birth'} — no document needed.
-        </Text>
+      <Text style={textStyles.body} numberOfLines={2}>{summary.next}</Text>
+      {summary.action ? (
+        <Button label={uploading ? 'Uploading…' : summary.action.label} onPress={upload} disabled={uploading} />
       ) : null}
-      {owner && status !== 'approved' && !confirmedBy && (
-        <Button
-          label={busy ? 'Uploading…' : status === 'pending' || status === 'rejected' ? '📎 Re-submit proof (image / PDF)' : '📎 Upload proof of DOB (image / PDF)'}
-          variant="ghost"
-          onPress={upload}
-        />
-      )}
-      {status === 'pending' && !reviewer && (
-        <Text style={textStyles.muted}>Sent ✓ A SportnNote reviewer will check it — usually within a few hours. You&apos;ll get a notification.</Text>
-      )}
-      <FormError message={error} />
-
-      {/* Support reviewer, viewing this profile: open the doc + approve/reject. */}
-      {reviewer && (
-        <View style={{ gap: theme.spacing(2) }}>
-          {v?.docPath ? (
-            <Button label={opening ? 'Opening…' : '📄 View document'} variant="ghost" onPress={viewDoc} disabled={opening} />
-          ) : (
-            <Text style={textStyles.muted}>No file was uploaded with this submission — reject it so they can upload again.</Text>
-          )}
-          {status === 'pending' && (
-            <>
-              <TextField label="Reason (if rejecting)" value={note} onChange={setNote} placeholder="e.g. Document unclear / DOB doesn’t match" />
-              <View style={st.reviewRow}>
-                <Button label="✗ Reject" variant="danger" style={st.reviewBtn} onPress={() => review('rejected')} disabled={busy} />
-                <Button label={busy ? '…' : '☑️ Approve'} style={st.reviewBtn} onPress={() => review('approved')} disabled={busy} />
-              </View>
-            </>
-          )}
-          {status !== 'pending' && (
-            <Text style={textStyles.muted}>{status === 'approved' ? '☑️ Approved' : '✗ Rejected'}{v?.reviewedByName ? ` by ${v.reviewedByName}` : ''}.</Text>
-          )}
-        </View>
-      )}
-      {status === 'rejected' && v?.note ? <Text style={st.rejectNote}>Support note: {v.note}</Text> : null}
-      {/* Immutable, append-only history (compliance trail). */}
-      {v?.history && v.history.length > 0 ? (
-        <View style={st.historyBox}>
-          <Text style={st.historyTitle}>🧾 Verification history</Text>
-          {v.history.map((e, i) => (
-            <View key={i} style={st.historyRow}>
-              <Text style={[st.historyDot, { color: e.action === 'approved' ? theme.colors.primary : e.action === 'rejected' ? theme.colors.danger : theme.colors.accent }]}>
-                {e.action === 'approved' ? '☑️' : e.action === 'rejected' ? '✗' : '📄'}
-              </Text>
-              <View style={{ flex: 1 }}>
-                <Text style={st.historyLine}>
-                  {e.action === 'submitted' ? `${e.docName ? docKindLabel(e.docName) : 'Proof'} submitted` : e.action === 'approved' ? `Approved by ${e.byName ?? 'support'}` : `Rejected by ${e.byName ?? 'support'}`}
-                </Text>
-                {e.action === 'rejected' && e.note ? <Text style={st.historyNote}>{e.note}</Text> : null}
-              </View>
-              <Text style={st.historyAt}>{new Date(e.at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}</Text>
-            </View>
-          ))}
-        </View>
-      ) : null}
+      {uploadError ? <Text style={st.verifyError}>{uploadError}</Text> : null}
+      <TouchableOpacity
+        accessibilityRole="link"
+        accessibilityLabel="Verification details"
+        accessibilityHint="Opens the full explanation, actions and history"
+        hitSlop={8}
+        onPress={() => nav.navigate('VerificationDetails', { playerId: player.id })}
+        style={st.detailsLink}
+      >
+        <Text style={st.detailsText}>Details ›</Text>
+      </TouchableOpacity>
     </Card>
   );
 }
@@ -684,18 +566,11 @@ const st = StyleSheet.create({
   // Wraps: on a narrow phone the status drops under the title instead of being cut off.
   verifyHead: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: theme.spacing(2) },
   headTitle: { flexShrink: 1 },
-  reviewRow: { flexDirection: 'row', gap: theme.spacing(3), marginTop: theme.spacing(1) },
-  reviewBtn: { flex: 1 },
+  detailsLink: { alignSelf: 'flex-start', paddingVertical: theme.spacing(1) },
+  detailsText: { color: theme.colors.primary, fontSize: theme.font.small, fontWeight: '700' },
+  verifyError: { color: theme.colors.danger, fontSize: theme.font.small },
   reviewCard: { gap: theme.spacing(2), borderColor: theme.colors.accent },
   reviewCardRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: theme.spacing(2) },
-  rejectNote: { color: theme.colors.danger, fontSize: theme.font.small },
-  historyBox: { marginTop: theme.spacing(1), paddingTop: theme.spacing(2), borderTopWidth: 1, borderTopColor: theme.colors.border, gap: theme.spacing(1) },
-  historyTitle: { color: theme.colors.textMuted, fontSize: theme.font.tiny, fontWeight: '800', letterSpacing: 0.5, textTransform: 'uppercase' },
-  historyRow: { flexDirection: 'row', alignItems: 'flex-start', gap: theme.spacing(2) },
-  historyDot: { fontSize: 12, width: 18, textAlign: 'center' },
-  historyLine: { color: theme.colors.text, fontSize: theme.font.small },
-  historyNote: { color: theme.colors.textMuted, fontSize: theme.font.tiny },
-  historyAt: { color: theme.colors.textMuted, fontSize: theme.font.tiny },
   heroCard: { backgroundColor: theme.colors.primaryDark, borderRadius: theme.radius.xl, padding: theme.spacing(5), overflow: 'hidden' },
   heroArt: { position: 'absolute', right: -78, top: -78 },
   heroName: { color: theme.colors.heroText, fontFamily: theme.fonts.display, fontSize: 30, lineHeight: 31, textTransform: 'uppercase' },
