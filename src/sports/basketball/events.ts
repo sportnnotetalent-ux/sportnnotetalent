@@ -11,7 +11,8 @@ export type BBEventType =
   | 'turnover'
   | 'timeout'
   | 'sub'
-  | 'eject'; // a player removed for the rest of the game (ejection, not a foul-out)
+  | 'eject' // a player removed for the rest of the game (ejection, not a foul-out)
+  | 'jump'; // US batch 6: a jump ball (the opening tip) or a held ball — `side` = the team that gets the ball
 
 /** Foul kinds a scorer distinguishes at the ground. Shooting/technical/flagrant
  *  send a player to the free-throw line; technical fouls don't count toward the
@@ -92,7 +93,21 @@ export interface BBEvent {
    *  paired steal / block (that play's id) — it takes the paired figure's
    *  place, so the other side's TO / FGA counts once. */
   ref?: number;
+  /** US batch 6: a 'jump' that was a held ball (not the opening tip / a
+   *  period's jump), and one decided by the alternating-possession arrow
+   *  (`ap` — the reducer sets the side from the arrow, never the payload). */
+  held?: true;
+  ap?: true;
+  /** US batch 6 (FIBA Art. 36.3): a team technical charged to the head coach —
+   *  'C' (the coach's own behaviour) or 'B' (the bench: assistants,
+   *  substitutes, followers). Only on a technical with no player; not a team
+   *  foul. Absent on older logs (their team technicals read as before). */
+  bench?: BenchTech;
 }
+
+/** US batch 6: a coach ('C') or bench ('B') technical. */
+export type BenchTech = 'C' | 'B';
+export const isBenchTech = (v: unknown): v is BenchTech => v === 'C' || v === 'B';
 
 /** US batch 5 — turnover kinds (NBA play-by-play / FIBA LiveStats). */
 export const TO_TYPES = ['badPass', 'lostBall', 'travel', 'double', 'oob', 'backcourt', '3s', '5s', '8s', '24s', 'goaltend'] as const;
@@ -136,6 +151,7 @@ export const BB_META: Record<BBEventType, { icon: string; label: string }> = {
   timeout: { icon: '⏱️', label: 'Timeout' },
   sub: { icon: '🔀', label: 'Substitution' },
   eject: { icon: '🟥', label: 'Ejected' },
+  jump: { icon: '🔼', label: 'Jump ball' },
 };
 
 /** Points a single event puts on the board — field goals and made free throws. */

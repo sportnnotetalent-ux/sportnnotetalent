@@ -84,6 +84,7 @@ export function afSheet(s: AFState, scope: 'all' | number = 'all', nowSec?: numb
       countRow('turnovers', 'Turnovers', H.turnovers, A.turnovers, { lowerBetter: true }),
       countRow('fumblesLost', 'Fumbles lost', H.fumblesLost, A.fumblesLost, { lowerBetter: true }),
       countRow('intThrownTo', 'Interceptions thrown', H.intThrown, A.intThrown, { lowerBetter: true }),
+      (H.intRetYds || A.intRetYds) && countRow('intRetYds', 'Interception return yards', H.intRetYds, A.intRetYds),
     ]),
     pbp && section('penalties', 'Penalties', [
       countRow('penalties', 'Penalties', H.penalties, A.penalties, { lowerBetter: true }),
@@ -106,6 +107,11 @@ export function afSheet(s: AFState, scope: 'all' | number = 'all', nowSec?: numb
       pbp && countRow('punts', 'Punts', H.punts, A.punts),
       pbp && decRow('puntAvg', 'Punting average', avg(H.puntYds, H.punts), avg(A.puntYds, A.punts)),
       pbp && (H.puntRets || A.puntRets) && countRow('puntRetYds', 'Punt return yards', H.puntRetYds, A.puntRetYds),
+      // US batch 6: once recorded (never a false 0)
+      pbp && (H.kickRets || A.kickRets) && madeRow('kickRets', 'Kickoff returns – yards', H.kickRets, H.kickRetYds, A.kickRets, A.kickRetYds),
+      pbp && (H.kickRets || A.kickRets) && countRow('kickRetYds', 'Kickoff return yards', H.kickRetYds, A.kickRetYds),
+      pbp && (H.kicksBlocked || A.kicksBlocked) && countRow('kicksBlocked', 'Kicks blocked', H.kicksBlocked, A.kicksBlocked),
+      pbp && (H.onsideAtt || A.onsideAtt) && madeRow('onside', 'Onside kicks recovered', H.onsideRec, H.onsideAtt, A.onsideRec, A.onsideAtt),
     ]),
     log && (dh.length || da.length) && section('drives', 'Drives', [
       countRow('drives', 'Drives', dh.length, da.length, { plain: true }),

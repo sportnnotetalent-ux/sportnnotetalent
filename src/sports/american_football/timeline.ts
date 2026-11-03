@@ -27,7 +27,7 @@ export function describeEvent(e: AFEvent, s?: Pick<AFState, 'field' | 'variant'>
     case 'defTry':
       return { icon: '↩', label: 'Defensive conversion return (2)', detail: e.playerName };
     case 'fg':
-      return { icon: e.good ? '🥅' : '✗', label: `Field goal ${e.good ? 'good' : 'no good'}${e.yards ? ` · ${e.yards} yds` : ''}`, detail: e.playerName };
+      return { icon: e.good ? '🥅' : '✗', label: `Field goal ${e.good ? 'good' : e.blocked ? 'blocked' : 'no good'}${e.yards ? ` · ${e.yards} yds` : ''}`, detail: e.playerName };
     case 'safety':
       return { icon: '🛡️', label: 'Safety (2)', detail: e.playerName };
     case 'timeout':
@@ -36,6 +36,8 @@ export function describeEvent(e: AFEvent, s?: Pick<AFState, 'field' | 'variant'>
       return { icon: '🤚', label: e.tfl ? 'Tackle for loss' : 'Tackle', detail: e.playerName };
     case 'pd':
       return { icon: '🖐', label: 'Pass defended', detail: e.playerName };
+    case 'ff':
+      return { icon: '🤚', label: 'Forced fumble', detail: e.playerName };
     case 'eject':
       return { icon: '🚫', label: 'Ejected', detail: e.playerName };
     case 'possEnd':
@@ -52,7 +54,10 @@ export function describeEvent(e: AFEvent, s?: Pick<AFState, 'field' | 'variant'>
       else if (p === 'fumble') detail = [e.playerName, e.secondName && `recovered by ${e.secondName}`].filter(Boolean).join(' · ');
       else if (p === 'punt') detail = [e.playerName, yds(e.yards)].filter(Boolean).join(' · ');
       else if (p === 'penalty') detail = [e.foul, yds(Math.abs(e.yards ?? 0)), e.autoFirst ? 'automatic first down' : '', e.lossOfDown ? 'loss of down' : ''].filter(Boolean).join(' · ');
-      return { icon: p === 'penalty' ? '🚩' : p === 'int' || p === 'fumble' ? '🔄' : '▸', label: `${PLAY[p]}${e.first ? ' · 1st down' : ''}`, detail: [detail, at.trim()].filter(Boolean).join(' ') || undefined };
+      // US batch 6: a penalty on the play; a play it wiped out; a blocked punt; a fumble kept; an onside kick
+      if (e.pen) detail = [detail, `penalty ${e.pen.foul}${e.pen.enf === 'dec' ? ' (declined)' : e.pen.enf === 'off' ? ' (offsetting)' : ''}`].filter(Boolean).join(' · ');
+      const tag = e.nul ? ' · no play' : e.blocked ? ' · blocked' : e.kept && p === 'fumble' ? ' · kept' : e.onside ? ' · onside' : '';
+      return { icon: p === 'penalty' || e.pen ? '🚩' : (p === 'int' || p === 'fumble') && !e.kept ? '🔄' : '▸', label: `${PLAY[p]}${tag}${e.first ? ' · 1st down' : ''}`, detail: [detail, at.trim()].filter(Boolean).join(' ') || undefined };
     }
   }
 }

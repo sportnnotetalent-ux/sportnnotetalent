@@ -75,6 +75,15 @@ export const americanFootballStats: SportStatSchema<'american_football'> = {
     // the quarterback on a sack (from the last passer — no extra tap)
     pbp(count('timesSacked', 'Times sacked', 'times sacked', 'time sacked', 'SKD', 'passing', { format: { unit: 'count', better: 'lower' } })),
     pbp({ key: 'sackYdsLost', label: 'Yards lost to sacks', short: 'yards lost to sacks', one: 'yard lost to sacks', abbr: 'SYL', group: 'passing', format: { unit: 'count', better: 'lower' } }),
+    // US batch 6 — returns, blocked kicks, fumbles kept, forced fumbles (keyed: once recorded)
+    pbp(count('kickRet', 'Kickoff returns', 'kickoff returns', 'kickoff return', 'KR', 'returns')),
+    pbp({ key: 'kickRetYds', label: 'Kickoff return yards', short: 'kickoff return yards', one: 'kickoff return yard', abbr: 'KRYDS', group: 'returns' }),
+    pbp(count('puntRet', 'Punt returns', 'punt returns', 'punt return', 'PR', 'returns')),
+    pbp({ key: 'puntRetYds', label: 'Punt return yards', short: 'punt return yards', one: 'punt return yard', abbr: 'PRYDS', group: 'returns' }),
+    pbp({ key: 'intRetYds', label: 'Interception return yards', short: 'interception return yards', one: 'interception return yard', abbr: 'IRYDS', group: 'defence' }),
+    pbp(count('kicksBlocked', 'Kicks blocked', 'kicks blocked', 'kick blocked', 'BLK', 'defence', { weight: 2 })),
+    pbp(count('fumKept', 'Fumbles recovered by own team', 'fumbles kept', 'fumble kept', 'FUMK', 'rushing', { format: { unit: 'count', better: 'lower' } })),
+    pbp(count('forcedFum', 'Forced fumbles', 'forced fumbles', 'forced fumble', 'FF', 'defence', { weight: 2 })),
     // derived from the play-by-play log (never credited live)
     { key: 'rushLong', label: 'Longest run', short: 'longest run', abbr: 'RLNG', group: 'rushing', format: { unit: 'count' }, agg: { kind: 'max' }, coverage: 'keyed' },
     { key: 'recLong', label: 'Longest reception', short: 'longest reception', abbr: 'RCLNG', group: 'receiving', format: { unit: 'count' }, agg: { kind: 'max' }, coverage: 'keyed' },

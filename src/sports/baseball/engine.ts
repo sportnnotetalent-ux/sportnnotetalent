@@ -63,7 +63,9 @@ export type PitchKind = 'ball' | 'called' | 'swinging' | 'foul';
 export type Outcome =
   | '1B' | '2B' | '3B' | 'HR'
   | 'BB' | 'IBB' | 'HBP' | 'K'
-  | 'GO' | 'FO' | 'LO' | 'SF' | 'SH' | 'FC' | 'E' | 'DP';
+  | 'GO' | 'FO' | 'LO' | 'SF' | 'SH' | 'FC' | 'E' | 'DP'
+  // US batch 6: catcher's interference (batter to 1st, E2, no AB) and the triple play
+  | 'CI' | 'TP';
 /** a runner play between pitches */
 export type RunnerKind = 'SB' | 'CS' | 'WP' | 'PB' | 'BK' | 'PO' | 'ADV' | 'OUT';
 export type SubKind = 'ph' | 'pr' | 'def' | 'p';
@@ -75,16 +77,21 @@ export type Dest = 1 | 2 | 3 | 4 | -1;
 export interface Move { from: Base; to: Dest; id?: string; name?: string }
 
 export const HITS: Outcome[] = ['1B', '2B', '3B', 'HR'];
-export const NO_AB: Outcome[] = ['BB', 'IBB', 'HBP', 'SF', 'SH'];
+export const NO_AB: Outcome[] = ['BB', 'IBB', 'HBP', 'SF', 'SH', 'CI'];
 /** US batch 5: the plays a fielders note ("6-3", "F8") can be added to after
  *  they are recorded (the non-blocking "Fielders?" chips) */
-export const FIELDED_OUTCOMES: Outcome[] = ['GO', 'FO', 'LO', 'DP', 'SF', 'SH', 'FC'];
+export const FIELDED_OUTCOMES: Outcome[] = ['GO', 'FO', 'LO', 'DP', 'SF', 'SH', 'FC', 'TP'];
 /** a scorer's fielders note: an optional letter (G, F, L, P, LD, IF), then 1–6
  *  fielders "6-4-3" (positions 1–10). Anything else is ignored. */
 export const isFieldersNote = (v: unknown): v is string =>
   typeof v === 'string' && v.length <= 16 && /^(?:IF|LD|[LPGF])?(?:10|[1-9])(?:-(?:10|[1-9])){0,5}$/.test(v);
 /** the outcomes where the batter is put out at the plate / before 1B */
-export const BATTER_OUT: Outcome[] = ['K', 'GO', 'FO', 'LO', 'SF', 'SH', 'DP'];
+export const BATTER_OUT: Outcome[] = ['K', 'GO', 'FO', 'LO', 'SF', 'SH', 'DP', 'TP'];
+/** US batch 6 — a dropped third strike: how the batter reached first after
+ *  strike three (wild pitch, passed ball, error). The pitcher keeps the K. */
+export type DroppedThird = 'WP' | 'PB' | 'E';
+export const isDroppedThird = (v: unknown): v is DroppedThird => v === 'WP' || v === 'PB' || v === 'E';
+export const D3_WORDS: Record<DroppedThird, string> = { WP: 'a wild pitch', PB: 'a passed ball', E: 'an error' };
 
 /* -------------------- deep wave: optional "Stats to track" ------------------- */
 
@@ -120,7 +127,7 @@ export const ZONE_LABEL: Record<Zone, string> = {
   '3B': 'Third base', SS: 'Shortstop', '2B': 'Second base', '1B': 'First base', P: 'Pitcher', C: 'Catcher',
 };
 /** the outcomes where the ball was put in play (a zone can be recorded) */
-export const IN_PLAY: Outcome[] = ['1B', '2B', '3B', 'HR', 'GO', 'FO', 'LO', 'SF', 'SH', 'FC', 'E', 'DP'];
+export const IN_PLAY: Outcome[] = ['1B', '2B', '3B', 'HR', 'GO', 'FO', 'LO', 'SF', 'SH', 'FC', 'E', 'DP', 'TP'];
 /** scorer's position number → its zone (1 P … 9 RF; 10, the slow-pitch extra fielder, plays short centre) */
 const POS_ZONE: Record<number, Zone> = { 1: 'P', 2: 'C', 3: '1B', 4: '2B', 5: '3B', 6: 'SS', 7: 'LF', 8: 'CF', 9: 'RF', 10: 'CF' };
 /** The zone the scorer's notation implies: the first fielder to touch the
@@ -192,6 +199,7 @@ export const OUTCOME_LABEL: Record<Outcome, string> = {
   BB: 'Walk', IBB: 'Intentional walk', HBP: 'Hit by pitch', K: 'Strikeout',
   GO: 'Groundout', FO: 'Flyout', LO: 'Lineout', SF: 'Sacrifice fly', SH: 'Sacrifice bunt',
   FC: "Fielder's choice", E: 'Reached on error', DP: 'Double play',
+  CI: "Catcher's interference", TP: 'Triple play',
 };
 export const RUNNER_LABEL: Record<RunnerKind, string> = {
   SB: 'Stolen base', CS: 'Caught stealing', WP: 'Wild pitch', PB: 'Passed ball', BK: 'Balk', PO: 'Picked off', ADV: 'Runner advance', OUT: 'Runner out',
@@ -234,6 +242,10 @@ export interface BaseballEvent {
   zone?: Zone;
   /** round 2 (optional): the batted-ball type the scorer tapped (balls in play only) */
   btype?: BattedBall;
+  /** US batch 6: a strikeout where the batter reached first (dropped third
+   *  strike) — on a wild pitch, a passed ball or an error. Only on a K whose
+   *  batter reached; absent on older logs. */
+  d3?: DroppedThird;
 }
 
 /* --------------------------------- format ---------------------------------- */
@@ -504,7 +516,7 @@ export function derive(cfg: BaseballConfig, s: Pick<BaseballState, 'lineup' | 's
         const pk = whoKey(e.pitcher ?? g.pitcher[field]);
         r = {
           ...(e.batter?.id ? { id: e.batter.id } : m.id ? { id: m.id } : {}), name: e.batter?.name ?? m.name, slot: e.batter?.slot,
-          resp: pk, respName: (e.pitcher ?? g.pitcher[field])?.name, ue: e.outcome === 'E',
+          resp: pk, respName: (e.pitcher ?? g.pitcher[field])?.name, ue: e.outcome === 'E' || e.outcome === 'CI' || e.d3 === 'E',
         };
       } else {
         r = g.bases[m.from - 1] ?? runnerFromMove(m, e);
@@ -518,14 +530,15 @@ export function derive(cfg: BaseballConfig, s: Pick<BaseballState, 'lineup' | 's
     // OBR 5.08(a): no run scores on a 3rd out made by the batter before he
     // reaches 1B, or on a force out
     const third = g.outs >= 3;
-    const forced = third && (batterOut || e.outcome === 'FC' || e.outcome === 'DP' || e.outcome === 'GO');
+    const forced = third && (batterOut || e.outcome === 'FC' || e.outcome === 'DP' || e.outcome === 'GO' || e.outcome === 'TP');
     let runs = 0;
     if (!forced) {
       for (const { r, m } of scored) {
         g.score[bat]++;
         g.line[g.half] = (g.line[g.half] ?? 0) + 1;
         runs++;
-        const earned = !r.ue && e.outcome !== 'E' && e.kind !== 'PB';
+        // US batch 6: runs on catcher's interference, or a dropped third strike's passed ball / error, are unearned
+        const earned = !r.ue && e.outcome !== 'E' && e.outcome !== 'CI' && e.kind !== 'PB' && e.d3 !== 'PB' && e.d3 !== 'E';
         g.runs.push({ event: e.id, side: bat, ...(r.id ?? m.id ? { runnerId: r.id ?? m.id } : {}), ...(r.name ?? m.name ? { runnerName: r.name ?? m.name } : {}), resp: r.resp, respName: r.respName, earned, ...(r.ir ? { ir: r.ir } : {}) });
         // lead changes (pitchers of record)
         const d = g.score.home - g.score.away;
@@ -610,7 +623,7 @@ export function derive(cfg: BaseballConfig, s: Pick<BaseballState, 'lineup' | 's
       ann.runs = r.runs; ann.outsMade = r.outs;
       if (spell) spell.outs += r.outs;
       if (e.outcome && HITS.includes(e.outcome)) g.hits[bat]++;
-      if (e.outcome === 'E') g.errors[field]++;
+      if (e.outcome === 'E' || e.outcome === 'CI' || e.d3 === 'E') g.errors[field]++;
       const n = g.order[bat].length || 1;
       const slot = typeof e.batter?.slot === 'number' ? e.batter.slot : g.next[bat];
       g.next[bat] = (slot + 1) % n;
@@ -828,6 +841,8 @@ export const reducer = (s: BaseballState, a: ScoreAction): BaseballState => {
         ...(IN_PLAY.includes(o) && isZone(p.zone) ? { zone: p.zone } : {}),
         // round 2 (optional): the batted-ball type (unknown values ignored)
         ...(IN_PLAY.includes(o) && isBattedBall(p.btype) ? { btype: p.btype } : {}),
+        // US batch 6: a dropped third strike — only on a K whose batter reached
+        ...(o === 'K' && isDroppedThird(p.d3) && movesIn(p.moves).some((m) => m.from === 0 && m.to !== -1) ? { d3: p.d3 } : {}),
       });
     }
     case 'RUNNER': {
@@ -923,7 +938,7 @@ export function defaultMoves(s: BaseballState, o: Outcome): Move[] {
     case '2B': return [...mv(r3, 4), ...mv(r2, 4), ...mv(r1, 3), bat(2)];
     case '3B': return [...mv(r3, 4), ...mv(r2, 4), ...mv(r1, 4), bat(3)];
     case 'HR': return [...mv(r3, 4), ...mv(r2, 4), ...mv(r1, 4), bat(4)];
-    case 'BB': case 'IBB': case 'HBP': return [...forced(), bat(1)];
+    case 'BB': case 'IBB': case 'HBP': case 'CI': return [...forced(), bat(1)];
     case 'K': case 'GO': case 'FO': case 'LO': return [bat(-1)];
     case 'SF': return [...mv(r3, 4), bat(-1)];
     case 'SH': return [...mv(r3, 4), ...mv(r2, 3), ...mv(r1, 2), bat(-1)];
@@ -937,6 +952,11 @@ export function defaultMoves(s: BaseballState, o: Outcome): Move[] {
       if (r1) return [...mv(r1, -1), bat(-1)];
       const lead = r3 ?? r2;
       return [...mv(lead, -1), bat(-1)];
+    }
+    case 'TP': {
+      // US batch 6: the batter and two runners (the forced ones first)
+      const outs = (r1 ? [r1, r2 ?? r3] : [r3, r2]).filter((r): r is Move => !!r).slice(0, 2);
+      return [...outs.flatMap((r) => mv(r, -1)), bat(-1)];
     }
   }
 }
@@ -971,18 +991,22 @@ export interface PlayOpts {
   zone?: Zone; ptype?: PitchType;
   /** round 2 (optional capture): the batted-ball type */
   btype?: BattedBall;
+  /** US batch 6: a strikeout where the batter reached (dropped third strike) */
+  d3?: DroppedThird;
 }
 
 /** RBI the play earns by default (OBR 9.04, simplified): the runs it scored,
  *  none on an error or a double play. */
-export const defaultRbi = (o: Outcome, runs: number): number => (o === 'E' || o === 'DP' ? 0 : runs);
+export const defaultRbi = (o: Outcome, runs: number, d3?: DroppedThird): number => (o === 'E' || o === 'DP' || o === 'TP' || d3 ? 0 : runs);
 
 /** A plate appearance as an action (credits attached). */
 export function buildPlay(s: BaseballState, o: Outcome, opts: PlayOpts = {}): ScoreAction {
   const sit = situation(s);
   const uid = opts.uid ?? newUid();
   // IDs-only scoring: players by id only (a "Batter n" slot keeps its label)
-  const moves = (opts.moves ?? defaultMoves(s, o)).filter((m) => !(m.from !== 0 && m.from === m.to)).map(storedMove);
+  // US batch 6: a dropped third strike puts the batter on first (the runners forced up)
+  const d3 = o === 'K' && opts.d3 ? opts.d3 : undefined;
+  const moves = (opts.moves ?? defaultMoves(s, d3 ? 'BB' : o)).filter((m) => !(m.from !== 0 && m.from === m.to)).map(storedMove);
   const pitch = opts.pitch ?? (o === 'IBB' ? undefined : o === 'HBP' ? 'hbp' : o === 'BB' ? 'ball' : o === 'K' ? 'swinging' : 'inplay');
   const batter = { ...storedWho(sit.batter), slot: sit.batter.slot };
   const pitcher = storedWho(sit.pitcher);
@@ -992,10 +1016,13 @@ export function buildPlay(s: BaseballState, o: Outcome, opts: PlayOpts = {}): Sc
       ...(opts.extra ?? {}), uid, outcome: o, ...(pitch ? { pitch } : {}), batter, ...(pitcher ? { pitcher } : {}), moves, ...(opts.fielders ? { fielders: opts.fielders } : {}),
       ...(opts.zone && IN_PLAY.includes(o) ? { zone: opts.zone } : {}), ...(opts.ptype && pitch ? { ptype: opts.ptype } : {}),
       ...(opts.btype && IN_PLAY.includes(o) ? { btype: opts.btype } : {}),
+      ...(d3 ? { d3 } : {}),
+      // US batch 6: catcher's interference is the catcher's error (E2)
+      ...(o === 'CI' && !opts.fielders ? { fielders: 'E2' } : {}),
     },
   };
   const pv = preview(s, base);
-  const rbi = opts.rbi ?? defaultRbi(o, pv.runs);
+  const rbi = opts.rbi ?? defaultRbi(o, pv.runs, d3);
   const payload = { ...base.payload, outs: pv.outs, rbi };
   return withCredits({ ...base, payload }, { type: 'pa', outcome: o, pitch, batter, pitcher, outs: pv.outs, rbi });
 }

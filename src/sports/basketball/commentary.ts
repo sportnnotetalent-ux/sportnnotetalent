@@ -16,7 +16,7 @@
  */
 import type { FeedGroup, FeedRow } from '../feedModel.ts';
 import { leadTracker } from '../feedModel.ts';
-import { ballAfterFoul, countsAsTeamFoul, eventClock, periodLabel, teamFoulsThisQuarter, type BasketballState } from './engine.ts';
+import { arrowSide, ballAfterFoul, coachDisqualified, countsAsTeamFoul, eventClock, inBonus, periodLabel, teamFoulsThisQuarter, type BasketballState } from './engine.ts';
 import { BB_META, DQ_LABEL, FOUL_LABEL, TO_WORDS, pointsOf, type BBEvent, type ShotZone } from './events.ts';
 import { isFieldGoal } from './credits.ts';
 import { gameOrder, possessionTags } from './deep.ts';
@@ -45,7 +45,7 @@ const FOUL_WORD: Record<string, string> = {
  *  `nameOf` (default: an older log's stored names, as before). */
 export function describePlay(
   s: BasketballState, e: BBEvent, team: string,
-  ctx: { assist?: string; ft?: { k: number; n: number }; teamFoul?: number; second?: boolean; offTo?: boolean; linked?: BBEvent; opp?: string } = {},
+  ctx: { assist?: string; ft?: { k: number; n: number }; teamFoul?: number; second?: boolean; offTo?: boolean; linked?: BBEvent; opp?: string; penalty?: boolean } = {},
   nameOf: NameOf = legacyNameOf,
 ): string {
   const halfCourt = s.targetPoints > 0;
@@ -88,16 +88,32 @@ export function describePlay(
       return `Turnover — ${who}${e.toType ? ` (${TO_WORDS[e.toType]})` : ''}`;
     }
     case 'foul': {
+      // US batch 6: a coach / bench technical (FIBA C / B) and the coach's disqualification
+      if (e.bench) {
+        const dq = coachDisqualified(s, e.side, e.id);
+        const was = coachDisqualified(s, e.side, e.id - 1);
+        return `${e.bench === 'C' ? 'Coach technical (C)' : 'Bench technical (B)'} — ${team} · 1 free throw${dq && !was ? ` · coach disqualified (${dq === '2C' ? '2 coach technicals' : '3 bench / coach technicals'})` : ''}`;
+      }
       const kind = FOUL_WORD[e.foulType ?? 'personal'] ?? FOUL_LABEL[e.foulType ?? 'personal'];
       const by = drawnByOf(s, e, nameOf);
       const drawn = by ? ` (drawn by ${by})` : '';
-      const tf = ctx.teamFoul ? ` · team foul ${ctx.teamFoul}${s.foulsForBonus > 0 && ctx.teamFoul > s.foulsForBonus ? ', free throws' : ''}` : '';
+      // US batch 6: the NBA late / overtime bonus comes from the feed (`penalty`)
+      const pen = ctx.penalty ?? (s.foulsForBonus > 0 && (ctx.teamFoul ?? 0) > s.foulsForBonus);
+      const tf = ctx.teamFoul ? ` · team foul ${ctx.teamFoul}${pen ? ', free throws' : ''}` : '';
       // US batch 5: a U / D / flagrant foul gives the free throws and the ball
       const ball = e.foulType && ballAfterFoul(e.foulType) ? ' · free throws and the ball' : '';
       return `${kind} foul on ${who}${drawn}${tf}${e.tov ? ' · turnover' : ''}${ball}`;
     }
     case 'timeout': return `Timeout — ${team}`;
     case 'sub': return `${onPlayerOf(s, e, nameOf) ?? '?'} checks in for ${playerOf(s, e, nameOf) ?? '?'}`;
+    case 'jump': {
+      // US batch 6: the opening tip, a held ball by the arrow, a held ball jumped
+      if (e.ap) {
+        const after = arrowSide({ ...s, events: s.events.filter((x) => x.id <= e.id), quarter: e.quarter });
+        return `Held ball — ${team}' ball (alternating possession${after && ctx.opp ? `; arrow → ${after === e.side ? team : ctx.opp}` : ''})`;
+      }
+      return e.held ? `Held ball — jump ball won by ${team}` : `Jump ball — ${team} win the tip`;
+    }
     case 'eject': return e.reason ? `${who} is disqualified (${DQ_LABEL[e.reason]})` : `${who} is ejected`;
     default: return BB_META[(e as BBEvent).type]?.label ?? 'Play';
   }
@@ -155,13 +171,16 @@ export function basketballFeed(s: BasketballState, names: { home: string; away: 
     if (pts > 0) { if (e.side === 'home') h += pts; else a += pts; }
     const teamFoul = e.type === 'foul' && countsAsTeamFoul(s, e)
       ? teamFoulsThisQuarter({ ...s, quarter: e.quarter, events: ev.slice(0, i + 1) }, e.side) : undefined;
+    // US batch 6: under the NBA rules the bonus also follows the clock (last 2:00, overtime)
+    const penalty = teamFoul && s.nbaBonus
+      ? inBonus({ ...s, quarter: e.quarter, events: ev.slice(0, i) }, e.side === 'home' ? 'away' : 'home', typeof e.sec === 'number' ? e.sec : -1e9) : undefined;
     const tag = tags.get(e.id);
     const row: FeedRow = {
       id: String(e.id),
       ...(typeof e.sec === 'number' ? { clock: eventClock(s, e) } : { clock: `${e.minute}'` }),
       side: e.side,
       icon: BB_META[e.type]?.icon ?? '•',
-      text: describePlay(s, e, names[e.side as Side], { assist, ft: trip.get(e.id), teamFoul, second: tag?.second, offTo: tag?.offTo, linked: linkOf.get(e.id), opp: names[e.side === 'home' ? 'away' : 'home'] }, nameOf),
+      text: describePlay(s, e, names[e.side as Side], { assist, ft: trip.get(e.id), teamFoul, second: tag?.second, offTo: tag?.offTo, linked: linkOf.get(e.id), opp: names[e.side === 'home' ? 'away' : 'home'], ...(penalty !== undefined ? { penalty } : {}) }, nameOf),
       score: { home: h, away: a },
       ...(pts > 0 ? { scoring: true } : {}),
       ...rowPlayer(s, e, nameOf),

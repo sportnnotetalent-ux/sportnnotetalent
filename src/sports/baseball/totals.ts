@@ -90,6 +90,9 @@ export function baseballTotals(s: BaseballState): Record<string, Line> {
       if (e.kind === 'PO') add(e.pitcher?.id, field, { pickoffs: 1 });
       if (e.kind === 'PB') add(fielderAt(s, field, 2)?.id, field, { passedBalls: 1 });
     }
+    // US batch 6: a dropped third strike's wild pitch / passed ball
+    if (e.type === 'pa' && e.d3 === 'WP') add(e.pitcher?.id, other(e.side), { wildPitches: 1 });
+    if (e.type === 'pa' && e.d3 === 'PB') add(fielderAt(s, other(e.side), 2)?.id, other(e.side), { passedBalls: 1 });
     if (e.type === 'pa' && e.outcome === 'IBB') {
       add(e.batter?.id, e.side, { intentionalWalks: 1 });
       add(e.pitcher?.id, other(e.side), { ibbAllowed: 1 });

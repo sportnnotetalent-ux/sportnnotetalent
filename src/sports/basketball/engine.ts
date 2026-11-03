@@ -6,7 +6,7 @@
  */
 import type { ScoreAction } from '../types';
 import { aggPriorFromConfig, levelForDecider, type AggPrior } from '../aggregate.ts';
-import { isShotZone, isTurnoverType, pointsOf, type BBEvent, type DqReason, type FoulType, type ReboundType } from './events.ts';
+import { isBenchTech, isShotZone, isTurnoverType, pointsOf, type BBEvent, type DqReason, type FoulType, type ReboundType } from './events.ts';
 // Perf F-15 — the format presets / options live in the light meta module.
 import { BB_TRACK_DEFAULTS } from './meta.ts';
 export { BB_TRACK_DEFAULTS };
@@ -38,6 +38,15 @@ export interface BasketballState {
    *  `offTeamFoul: false`). Only on the state when the stored config has the
    *  key; absent = legacy (every non-technical foul counts). */
   offTeamFoul?: boolean;
+  /** US batch 6 — NBA penalty rules (Rule 12B V, format key `nbaBonus`): a
+   *  team that hasn't reached its quota may commit one team foul in the last
+   *  2:00 of a period without penalty — the 2nd puts the other side in the
+   *  bonus; an overtime's quota is one less (NBA: 3). Read on the game clock
+   *  (the plays' `sec`). Only on the state when the stored config says so. */
+  nbaBonus?: true;
+  /** US batch 6 — FIBA Art. 12: the alternating-possession arrow (format key
+   *  `possArrow`). Only on the state when the stored config carries the key. */
+  possArrow?: boolean;
   /** overtime period length in minutes (informational — the clock counts up) */
   overtimeMinutes: number;
   /** regulation periods before overtime: 4 quarters (default) or 2 halves */
@@ -135,6 +144,9 @@ export const init = (config?: Record<string, unknown>): BasketballState => ({
   ...(config?.otFoulsCarry != null ? { otFoulsCarry: config.otFoulsCarry === true } : {}),
   // US batch 5 — present only when the stored config carries it
   ...(config?.offTeamFoul != null ? { offTeamFoul: config.offTeamFoul !== false } : {}),
+  // US batch 6 — present only when the stored config carries it
+  ...(config?.nbaBonus === true ? { nbaBonus: true as const } : {}),
+  ...(config?.possArrow != null ? { possArrow: config.possArrow === true } : {}),
   ...(config?.trackMisses != null ? { trackMisses: config.trackMisses === true } : {}),
   // SD-57 — present only when the stored config carries the key.
   ...(config?.timeoutRule === 'fiba' || config?.timeoutRule === 'nba' ? { toRule: config.timeoutRule } : {}),
@@ -241,8 +253,8 @@ export const isPlayerOut = (s: BasketballState, name?: string, who?: PlayerRef):
 /** Does this foul count as a team foul? Every foul does, except a technical
  *  when the format says technicals aren't team fouls (NBA, and legacy configs),
  *  and (US batch 5) an offensive foul when the format says so (NBA). */
-export const countsAsTeamFoul = (s: Pick<BasketballState, 'techIsTeamFoul' | 'offTeamFoul'>, e: Pick<BBEvent, 'type' | 'foulType'>): boolean =>
-  e.type === 'foul' && (e.foulType !== 'technical' || s.techIsTeamFoul === true) && !(e.foulType === 'offensive' && s.offTeamFoul === false);
+export const countsAsTeamFoul = (s: Pick<BasketballState, 'techIsTeamFoul' | 'offTeamFoul'>, e: Pick<BBEvent, 'type' | 'foulType' | 'bench'>): boolean =>
+  e.type === 'foul' && !e.bench && (e.foulType !== 'technical' || s.techIsTeamFoul === true) && !(e.foulType === 'offensive' && s.offTeamFoul === false);
 const isTeamFoul = countsAsTeamFoul;
 /** US batch 5 (FIBA Art. 37 / 38, NBA flagrant): an unsportsmanlike,
  *  disqualifying or flagrant foul gives the free throws AND the ball (a
@@ -403,7 +415,7 @@ export function disqualifyingFoul(s: BasketballState, name: string | undefined, 
  *  disqualifying / flagrant 2, shooting 2 (3 on a three — the scorer can
  *  change it), any other non-offensive foul 2 once the fouling side is over
  *  the team-foul limit (the bonus). 0 = no free throws. */
-export function freeThrowsFor(s: BasketballState, side: 'home' | 'away', type: FoulType): number {
+export function freeThrowsFor(s: BasketballState, side: 'home' | 'away', type: FoulType, sec?: number): number {
   if (type === 'technical') return 1;
   if (s.ladder3x3) {
     // FIBA 3×3 Art. 15: a shooting foul inside the arc 1 (behind it 2 — the
@@ -416,13 +428,67 @@ export function freeThrowsFor(s: BasketballState, side: 'home' | 'away', type: F
   }
   if (type === 'unsportsmanlike' || type === 'disqualifying' || type === 'flagrant' || type === 'shooting') return 2;
   if (type === 'offensive') return 0;
-  return inBonus(s, side === 'home' ? 'away' : 'home') ? 2 : 0;
+  return inBonus(s, side === 'home' ? 'away' : 'home', sec) ? 2 : 0;
 }
 
 /** A side is in the bonus (shoots free throws on every further foul) once the
- *  OTHER side has committed `foulsForBonus` team fouls this period. */
-export const inBonus = (s: BasketballState, side: 'home' | 'away'): boolean =>
-  s.foulsForBonus > 0 && teamFoulsThisQuarter(s, side === 'home' ? 'away' : 'home') >= s.foulsForBonus;
+ *  OTHER side has committed `foulsForBonus` team fouls this period.
+ *  US batch 6 — NBA (`nbaBonus`): overtime's quota is one less, and in the
+ *  last 2:00 of a period (`sec` = seconds played in the current period; the
+ *  game clock's now by default) a side with a team foul already in that span
+ *  is over the limit. Without the key: exactly as before. */
+export function inBonus(s: BasketballState, side: 'home' | 'away', sec?: number): boolean {
+  if (s.foulsForBonus <= 0) return false;
+  const fouler = side === 'home' ? 'away' : 'home';
+  const tf = teamFoulsThisQuarter(s, fouler);
+  if (!s.nbaBonus) return tf >= s.foulsForBonus;
+  const quota = s.quarter > s.regPeriods ? Math.max(1, s.foulsForBonus - 1) : s.foulsForBonus;
+  if (tf >= quota) return true;
+  const len = periodSeconds(s);
+  const now = typeof sec === 'number' && Number.isFinite(sec) ? sec : s.gc ? gameSec(s, Date.now()) : undefined;
+  if (now === undefined || len <= 0 || len - now > 120) return false;
+  const late = s.events.filter((e) => e.side === fouler && e.quarter === s.quarter && typeof e.sec === 'number' && len - e.sec <= 120 && countsAsTeamFoul(s, e)).length;
+  return late >= 1;
+}
+
+/** US batch 6 (FIBA Art. 12) — who the alternating-possession arrow points to
+ *  now (null: no arrow in this format, or no opening tip logged yet). The
+ *  team not winning the opening tip gets the first alternating possession;
+ *  every held ball (`ap`) and every later period's start uses it and flips it. */
+export function arrowSide(s: BasketballState): 'home' | 'away' | null {
+  if (s.possArrow !== true) return null;
+  const flip = (x: 'home' | 'away', n: number) => (n % 2 === 0 ? x : x === 'home' ? 'away' : 'home');
+  let arrow: 'home' | 'away' | null = null;
+  let q = 0;
+  for (const e of s.events) {
+    if (e.type !== 'jump') continue;
+    if (arrow === null) { if (e.ap) continue; arrow = e.side === 'home' ? 'away' : 'home'; q = e.quarter; continue; }
+    if (!e.ap) continue;
+    arrow = flip(arrow, Math.max(0, e.quarter - q));
+    q = e.quarter;
+    // the arrow team got the ball: it now points to the other team
+    arrow = e.side === 'home' ? 'away' : 'home';
+  }
+  return arrow === null ? null : flip(arrow, Math.max(0, s.quarter - q));
+}
+
+/** US batch 6 (FIBA Art. 36.3) — a side's coach (C) and bench (B) technicals. */
+export function coachTechnicals(s: BasketballState, side: 'home' | 'away', upTo?: number): { c: number; b: number } {
+  const out = { c: 0, b: 0 };
+  for (const e of s.events) {
+    if (upTo != null && e.id > upTo) break;
+    if (e.type !== 'foul' || e.side !== side || !e.bench) continue;
+    if (e.bench === 'C') out.c++; else out.b++;
+  }
+  return out;
+}
+/** The head coach is disqualified (FIBA 2024 Art. 36.3.3): 2 technicals of
+ *  his own ('2C'), or 3 in all with a bench one among them ('3B'). */
+export function coachDisqualified(s: BasketballState, side: 'home' | 'away', upTo?: number): '2C' | '3B' | undefined {
+  const { c, b } = coachTechnicals(s, side, upTo);
+  if (c >= 2) return '2C';
+  return c + b >= 3 ? '3B' : undefined;
+}
 
 export function currentMinute(s: BasketballState): number {
   // SD-132: on a game clock, the minute of the period being played
@@ -617,10 +683,27 @@ const reduce = (s: BasketballState, a: ScoreAction): BasketballState => {
           ...(typeof a.payload?.drawnPid === 'string' && a.payload.drawnPid ? { drawnPid: a.payload.drawnPid } : {}),
           // US batch 1: a new offensive foul is the fouler's turnover too (older logs: no stamp)
           ...(a.payload?.tov === true && a.payload?.foulType === 'offensive' ? { tov: true as const } : {}),
+          // US batch 6: a coach / bench technical — a technical with no player only
+          ...(isBenchTech(a.payload?.bench) && a.payload?.foulType === 'technical' && !name && !pidIn ? { bench: a.payload.bench } : {}),
         }, quarter))
         : s;
     case 'TIMEOUT':
       return a.side ? whistle(push(s, { minute, type: 'timeout', side: a.side }, quarter), true) : s;
+    case 'JUMP_BALL': {
+      // US batch 6: the opening tip / a jump ball (`side` = who gets the ball),
+      // or a held ball (`held`). Under the arrow a held ball goes to the arrow's
+      // team whatever the payload says; a second tip is ignored (FIBA: one jump).
+      const held = a.payload?.held === true;
+      const side = a.side === 'home' || a.side === 'away' ? a.side : undefined;
+      if (s.possArrow === true) {
+        const arrow = arrowSide(s);
+        if (held && arrow) return whistle(push(s, { minute, type: 'jump', side: arrow, held: true, ap: true }, quarter));
+        if (arrow || !side) return s;
+        return push(s, { minute, type: 'jump', side, ...(held ? { held: true as const } : {}) }, quarter);
+      }
+      if (!side) return s;
+      return held ? whistle(push(s, { minute, type: 'jump', side, held: true }, quarter)) : push(s, { minute, type: 'jump', side }, quarter);
+    }
     case 'EJECT':
       // Remove a player for the rest of the game (2 technicals / flagrant-2 /
       // fighting) — independent of the personal-foul limit. Blocks further credit.

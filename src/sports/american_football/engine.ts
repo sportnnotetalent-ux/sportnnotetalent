@@ -74,7 +74,7 @@ export interface AFEvent {
   /** stable id from the action (`payload.uid`) */
   id: string;
   /** deep wave: 'pd' = a pass defended (broken up) on an incompletion — optional */
-  type: 'td' | 'try' | 'defTry' | 'fg' | 'safety' | 'timeout' | 'play' | 'tackle' | 'possEnd' | 'eject' | 'pd';
+  type: 'td' | 'try' | 'defTry' | 'fg' | 'safety' | 'timeout' | 'play' | 'tackle' | 'possEnd' | 'eject' | 'pd' | 'ff';
   /** scoring plays: the scoring team; plays: the offence; tackle: the defence */
   side: Side;
   /** game seconds elapsed (the periods before at full length + this one) */
@@ -126,7 +126,46 @@ export interface AFEvent {
    *  in passes defended). Set at record time, so a log replays the same;
    *  older interceptions never have it. */
   pdef?: boolean;
+  /** US batch 6 (all optional, absent on older logs): a blocked punt / field
+   *  goal (the blocker = the second player); an onside kick (`onside`) and
+   *  one the kicking team recovered (`kept`); a fumble the offence kept
+   *  (`kept` — no turnover); a penalty on this play (`pen`) and a play it
+   *  wiped out (`nul` — accepted from the previous spot, or offsetting: no
+   *  credits, no yards). */
+  blocked?: true;
+  onside?: true;
+  kept?: true;
+  pen?: PlayPenalty;
+  nul?: true;
 }
+
+/** US batch 6 — how a penalty on a play was settled: accepted and enforced
+ *  from the previous spot (the play doesn't count), accepted and enforced
+ *  from where the play ended (it counts), declined (the play stands, no
+ *  yards), offsetting fouls (the down is replayed, the play doesn't count). */
+export type PenEnf = 'prev' | 'end' | 'dec' | 'off';
+export const PEN_ENF: PenEnf[] = ['prev', 'end', 'dec', 'off'];
+export interface PlayPenalty {
+  foul: string; on: Side; yards: number; enf: PenEnf;
+  /** the penalised player (by id; `byName` only on the display copy) */
+  by?: string; byName?: string;
+  autoFirst?: true; lossOfDown?: true;
+}
+/** A penalty on a play, from a payload — anything malformed is dropped. */
+export function penIn(v: unknown): PlayPenalty | undefined {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return undefined;
+  const o = v as Record<string, unknown>;
+  if (!PEN_ENF.includes(o.enf as PenEnf) || (o.on !== 'home' && o.on !== 'away')) return undefined;
+  if (typeof o.yards !== 'number' || !Number.isFinite(o.yards)) return undefined;
+  const foul = typeof o.foul === 'string' && o.foul.trim() ? o.foul.trim().slice(0, 60) : 'Penalty';
+  return {
+    foul, on: o.on, yards: Math.min(99, Math.abs(Math.round(o.yards))), enf: o.enf as PenEnf,
+    ...(typeof o.by === 'string' && o.by && o.by.length <= 64 ? { by: o.by } : {}),
+    ...(o.autoFirst === true ? { autoFirst: true as const } : {}), ...(o.lossOfDown === true ? { lossOfDown: true as const } : {}),
+  };
+}
+/** The plays a penalty can ride on (scrimmage plays). */
+const PEN_PLAYS = ['run', 'pass', 'inc', 'sack', 'kneel'];
 
 /** IDs-only scoring: new stamps carry ids only (`name` = an older stamp's, read-only). */
 export interface XiStamp { players?: { id: string; name?: string }[] }
@@ -376,10 +415,15 @@ export const DETAIL_KEYS = ['tackles'] as const;
  *  defended / tackles for loss (defenders), times sacked / sack yards lost
  *  (the quarterback — credited from the last passer, no extra tap). */
 export const DEEP_KEYS = ['targets', 'passDef', 'tfl', 'timesSacked', 'sackYdsLost'] as const;
-export const LIVE_KEYS = [...SCORE_KEYS, ...PBP_KEYS, ...DETAIL_KEYS, ...DEEP_KEYS] as const;
+/** US batch 6 — returns (kickoff, punt, interception), blocked kicks, fumbles
+ *  kept by the offence, forced fumbles: keyed — a match carries them once one
+ *  was recorded (an older match never reads 0 for what it didn't capture). */
+export const RET_KEYS = ['kickRet', 'kickRetYds', 'puntRet', 'puntRetYds', 'intRetYds', 'kicksBlocked', 'fumKept', 'forcedFum'] as const;
+export const LIVE_KEYS = [...SCORE_KEYS, ...PBP_KEYS, ...DETAIL_KEYS, ...DEEP_KEYS, ...RET_KEYS] as const;
 
 type Credit = { playerId: string; playerName?: string; stats: Record<string, number> };
-type CreditEvent = Pick<AFEvent, 'type' | 'playerId' | 'playerName' | 'secondId' | 'secondName' | 'how' | 'yards' | 'kind' | 'good' | 'play' | 'pbp' | 'tgt' | 'tfl' | 'pdef'>;
+type CreditEvent = Pick<AFEvent, 'type' | 'playerId' | 'playerName' | 'secondId' | 'secondName' | 'how' | 'yards' | 'kind' | 'good' | 'play' | 'pbp' | 'tgt' | 'tfl' | 'pdef'>
+  & Partial<Pick<AFEvent, 'ret' | 'blocked' | 'onside' | 'kept' | 'nul'>>;
 
 /** The stat-line credits one event writes: [primary player, second player]. */
 export function eventCredits(e: CreditEvent): { first?: Credit; second?: Credit } {
@@ -388,6 +432,9 @@ export function eventCredits(e: CreditEvent): { first?: Credit; second?: Credit 
   const y = Math.round(Number(e.yards) || 0);
   // deep wave: a completion / incompletion recorded with "Targets" on
   const tg: Record<string, number> = e.tgt ? { targets: 1 } : {};
+  // US batch 6: a play wiped out by a penalty (previous spot / offsetting) credits nobody
+  if (e.nul) return {};
+  const ret = typeof e.ret === 'number' && Number.isFinite(e.ret) ? Math.round(e.ret) : undefined;
   switch (e.type) {
     case 'td': {
       const base = { points: TD_POINTS, touchdowns: 1 };
@@ -405,7 +452,10 @@ export function eventCredits(e: CreditEvent): { first?: Credit; second?: Credit 
     case 'defTry':
       return { first: p({ points: DEF_TRY_POINTS }) };
     case 'fg':
-      return { first: p(e.good ? { points: FG_POINTS, fgMade: 1, fgAtt: 1 } : { fgAtt: 1 }) };
+      // US batch 6: a blocked attempt credits the blocker (the second player)
+      return { first: p(e.good ? { points: FG_POINTS, fgMade: 1, fgAtt: 1 } : { fgAtt: 1 }), ...(!e.good && e.blocked ? { second: q({ kicksBlocked: 1 }) } : {}) };
+    case 'ff':
+      return { first: p({ forcedFum: 1 }) };
     case 'safety':
       return { first: p({ points: SAFETY_POINTS, safeties: 1 }) };
     case 'eject':
@@ -423,9 +473,17 @@ export function eventCredits(e: CreditEvent): { first?: Credit; second?: Credit 
         // the quarterback (deep wave: the last passer, when known) and the defender
         case 'sack': return { first: p({ timesSacked: 1, sackYdsLost: Math.abs(y) }), second: q({ sacks: 1 }) };
         // round 2: with "Defensive detail" on, an interception is also a pass defended (NFL)
-        case 'int': return { first: p({ passAtt: 1, passInt: 1 }), second: q({ defInt: 1, ...(e.pdef ? { passDef: 1 } : {}) }) };
-        case 'fumble': return { first: p({ fumblesLost: 1 }), second: q({ fumRec: 1 }) };
-        case 'punt': return { first: p({ punts: 1, puntYds: y }) };
+        // US batch 6: the interception's return yards to the defender
+        case 'int': return { first: p({ passAtt: 1, passInt: 1 }), second: q({ defInt: 1, ...(e.pdef ? { passDef: 1 } : {}), ...(ret !== undefined ? { intRetYds: ret } : {}) }) };
+        // US batch 6: a fumble the offence kept — the fumbler's, and the team-mate who fell on it
+        case 'fumble': return e.kept ? { first: p({ fumKept: 1 }), second: q({ fumRec: 1 }) } : { first: p({ fumblesLost: 1 }), second: q({ fumRec: 1 }) };
+        // US batch 6: the returner (or the blocker of a blocked punt) is the second player
+        case 'punt': return {
+          first: p({ punts: 1, puntYds: e.blocked ? 0 : y }),
+          ...(e.blocked ? { second: q({ kicksBlocked: 1 }) } : ret !== undefined ? { second: q({ puntRet: 1, puntRetYds: ret }) } : {}),
+        };
+        // US batch 6: the kick returner (the receiving team's player); an onside kick the kickers kept: none
+        case 'kickoff': return !(e.onside && e.kept) && ret !== undefined ? { first: p({ kickRet: 1, kickRetYds: ret }) } : {};
         default: return {};
       }
     default:
@@ -457,8 +515,10 @@ export function credit(e: CreditEvent, offence?: Side): { attribution?: Attribut
   return { ...(a1 ? { attribution: a1 } : {}), ...(a2 ? { attribution2: a2 } : {}) };
 }
 /** Is an event's second player on the other team (the defence)? */
-export const secondIsDefence = (e: Pick<AFEvent, 'type' | 'play'>): boolean =>
-  e.type === 'play' && (e.play === 'sack' || e.play === 'int' || e.play === 'fumble');
+export const secondIsDefence = (e: Pick<AFEvent, 'type' | 'play'> & Partial<Pick<AFEvent, 'kept' | 'blocked'>>): boolean =>
+  (e.type === 'play' && (e.play === 'sack' || e.play === 'int' || (e.play === 'fumble' && !e.kept) || e.play === 'punt'))
+  // US batch 6: a blocked field goal's blocker
+  || (e.type === 'fg' && !!e.blocked);
 
 /* -------------------------- building a play (UI + voice) -------------------------- */
 
@@ -477,6 +537,10 @@ export interface PlayInput {
   /** deep wave: a pass (complete / incomplete) recorded with "Targets" on —
    *  the receiver (`p2`, the intended one on an incompletion) gets a target */
   tgt?: boolean;
+  /** US batch 6: kickoff returner = `p1`, punt returner / blocker = `p2`;
+   *  a blocked punt, an onside kick (`kept` = the kickers recovered), a
+   *  fumble the offence kept, a penalty on the play */
+  blocked?: boolean; onside?: boolean; kept?: boolean; pen?: PlayPenalty;
 }
 
 const who1 = (w?: Who) => (w?.id ? { playerId: w.id, ...(w.name ? { playerName: w.name } : {}) } : w?.name ? { playerName: w.name } : {});
@@ -492,6 +556,17 @@ export function buildPlay(s: AFState, side: Side, inp: PlayInput, stamp: Record<
   const tgt = inp.tgt && (inp.play === 'pass' || inp.play === 'inc') ? { tgt: true } : {};
   // round 2: an interception while "Defensive detail" is on also counts as a pass defended
   const pdef = inp.play === 'int' && s.trackDefence === true ? { pdef: true } : {};
+  // US batch 6: a penalty on a scrimmage play; accepted from the previous spot or offsetting = the play doesn't count
+  const pen = inp.pen && PEN_PLAYS.includes(inp.play) ? penIn(inp.pen) : undefined;
+  const nul = !!pen && (pen.enf === 'prev' || pen.enf === 'off');
+  const extra6: Partial<Pick<AFEvent, 'blocked' | 'onside' | 'kept'>> = {
+    ...(inp.blocked && inp.play === 'punt' ? { blocked: true as const } : {}),
+    ...(inp.onside && inp.play === 'kickoff' ? { onside: true as const } : {}),
+    ...(inp.kept && (inp.play === 'fumble' || (inp.play === 'kickoff' && inp.onside)) ? { kept: true as const } : {}),
+  };
+  if (nul) {
+    return { type: 'PLAY', side, payload: { play: inp.play, yards: y, ...tgt, ...stamp, pen } };
+  }
   if (d && (inp.play === 'run' || inp.play === 'pass') && d.spot + y >= s.field) {
     const yards = s.field - d.spot;
     const ev: CreditEvent = inp.play === 'run'
@@ -502,11 +577,12 @@ export function buildPlay(s: AFState, side: Side, inp: PlayInput, stamp: Record<
   if (d && (inp.play === 'run' || inp.play === 'sack' || inp.play === 'kneel') && d.spot + y <= 0) {
     return { type: 'SAFETY', side: other(side), payload: { ...stamp }, ...credit({ type: 'safety', ...(inp.play === 'sack' ? who1(inp.p2) : {}) }) };
   }
-  const ev: CreditEvent = { type: 'play', play: inp.play, yards: y, pbp: true, ...who1(inp.p1), ...who2(inp.p2), ...tgt, ...pdef };
+  const ret = inp.ret !== undefined && Number.isFinite(inp.ret) ? Math.round(inp.ret) : undefined;
+  const ev: CreditEvent = { type: 'play', play: inp.play, yards: y, pbp: true, ...who1(inp.p1), ...who2(inp.p2), ...tgt, ...pdef, ...extra6, ...(ret !== undefined ? { ret } : {}) };
   return {
     type: 'PLAY', side,
     payload: {
-      play: inp.play, yards: y, ...tgt, ...pdef, ...stamp,
+      play: inp.play, yards: y, ...tgt, ...pdef, ...extra6, ...(pen ? { pen } : {}), ...stamp,
       ...(inp.newSpot !== undefined ? { newSpot: inp.newSpot } : {}), ...(inp.ret !== undefined ? { ret: inp.ret } : {}),
       ...(inp.foul ? { foul: inp.foul } : {}), ...(inp.on ? { on: inp.on } : {}),
       ...(inp.autoFirst ? { autoFirst: true } : {}), ...(inp.lossOfDown ? { lossOfDown: true } : {}),
@@ -615,6 +691,22 @@ function otTdEnds(s: AFState, side: Side, defensive: boolean): boolean {
   return s.otPoss.length % 2 === 1 && s[side] > s[other(side)];
 }
 
+/** A penalty's enforcement from drive `d` (offence `side`): on the offence —
+ *  back, at most half the distance to its goal, the down replayed (or lost);
+ *  on the defence — forward, at most half the distance, a first down when it
+ *  reaches the line (or automatic). */
+function enforce(s: AFState, d: Drive, side: Side, on: Side | undefined, yds: number, autoFirst: boolean, lossOfDown: boolean): { drive: Drive; first: boolean; closes: boolean } {
+  if (on === side) {
+    const ns = Math.max(1, d.spot - Math.min(yds, Math.floor(d.spot / 2)));
+    const down = lossOfDown ? d.down + 1 : d.down;
+    if (down > s.downs) return { drive: series(s, other(side), turnoverSpot(s, ns)), first: false, closes: true };
+    return { drive: { ...d, spot: ns, down }, first: false, closes: false };
+  }
+  const ns = Math.min(s.field - 1, d.spot + Math.min(yds, Math.floor((s.field - d.spot) / 2)));
+  if (autoFirst || ns >= d.line) return { drive: series(s, side, ns), first: true, closes: false };
+  return { drive: { ...d, spot: ns }, first: false, closes: false };
+}
+
 const ALWAYS = new Set(['CLOCK', 'SET_CLOCK', 'XI', 'STAT_ADJUST', 'REMOVE_EVENT', 'END', 'SET_DRIVE']);
 
 export const reducer = (s: AFState, a: ScoreAction): AFState => {
@@ -714,7 +806,9 @@ export const reducer = (s: AFState, a: ScoreAction): AFState => {
     case 'FG': {
       if (!side) return s;
       const good = a.payload?.good === true;
-      let st = push(good ? score(s, side, FG_POINTS) : s, { type: 'fg', side, good, ...(yards !== undefined ? { yards } : {}), ...w1, ...situation, ...(pbp ? { off: side } : {}) });
+      // US batch 6: a blocked attempt (never a good one) and its blocker
+      const blocked = !good && a.payload?.blocked === true;
+      let st = push(good ? score(s, side, FG_POINTS) : s, { type: 'fg', side, good, ...(yards !== undefined ? { yards } : {}), ...w1, ...(blocked ? { blocked: true as const, ...w2 } : {}), ...situation, ...(pbp ? { off: side } : {}) });
       if (!live) return st;
       if (good) st = afterScore(st, side);
       else if (pbp) {
@@ -745,6 +839,11 @@ export const reducer = (s: AFState, a: ScoreAction): AFState => {
       if (!side) return s;
       return push(s, { type: 'tackle', side, ...w1, ...(a.payload?.tfl === true ? { tfl: true } : {}) });
     }
+    case 'FORCED_FUMBLE': {
+      // US batch 6: who forced a fumble (`side` = the defence) — optional, after the fumble
+      if (!side) return s;
+      return push(s, { type: 'ff', side, ...w1 });
+    }
     case 'PASS_DEF': {
       // deep wave: who broke up an incomplete pass (`side` = the defence)
       if (!side) return s;
@@ -767,9 +866,21 @@ export const reducer = (s: AFState, a: ScoreAction): AFState => {
       const g = yards ?? 0;
       const newSpot = typeof a.payload?.newSpot === 'number' ? (a.payload.newSpot as number) : undefined;
       const on = a.payload?.on === 'home' || a.payload?.on === 'away' ? (a.payload.on as Side) : undefined;
+      // US batch 6 (all optional; malformed values dropped): a blocked punt, an onside kick
+      // (and the kickers keeping it), a fumble the offence kept, a penalty on the play
+      const blocked = play === 'punt' && a.payload?.blocked === true;
+      const onside = play === 'kickoff' && a.payload?.onside === true;
+      const kept = a.payload?.kept === true && (play === 'fumble' || onside);
+      const pen = PEN_PLAYS.includes(play) ? penIn(a.payload?.pen) : undefined;
+      const nul = !!pen && (pen.enf === 'prev' || pen.enf === 'off');
+      const rawRet = typeof a.payload?.ret === 'number' && Number.isFinite(a.payload.ret) ? (a.payload.ret as number) : undefined;
+      // a kickoff / interception return (new in batch 6) is clamped; a punt's as it always was
+      const ret = rawRet === undefined ? undefined : play === 'punt' ? rawRet : Math.max(-s.field, Math.min(s.field + 10, Math.round(rawRet)));
       const base: Omit<AFEvent, 'id' | 'sec' | 'psec' | 'period'> = {
-        type: 'play', side, play, yards: g, pbp: true, ...w1, ...w2, ...situation,
-        ...(newSpot !== undefined ? { newSpot } : {}), ...(typeof a.payload?.ret === 'number' ? { ret: a.payload.ret as number } : {}),
+        type: 'play', side, play, yards: g, pbp: true, ...(nul ? {} : { ...w1, ...w2 }), ...situation,
+        ...(newSpot !== undefined ? { newSpot } : {}), ...(ret !== undefined ? { ret } : {}),
+        ...(blocked ? { blocked: true as const } : {}), ...(onside ? { onside: true as const } : {}), ...(kept ? { kept: true as const } : {}),
+        ...(pen ? { pen } : {}), ...(nul ? { nul: true as const } : {}),
         ...(typeof a.payload?.foul === 'string' ? { foul: a.payload.foul as string } : {}), ...(on ? { on } : {}),
         ...(a.payload?.autoFirst ? { autoFirst: true } : {}), ...(a.payload?.lossOfDown ? { lossOfDown: true } : {}),
         // legacy (read-only): a name-only player's name from an older log
@@ -783,12 +894,24 @@ export const reducer = (s: AFState, a: ScoreAction): AFState => {
       let closes = false;
       if (!live) return push(s, base);
       if (play === 'kickoff') {
-        drive = series(s, side, newSpot ?? touchback(s));
+        // US batch 6: an onside kick the kicking team recovered — their ball (default: their own 45)
+        drive = onside && kept ? series(s, other(side), newSpot ?? 45) : series(s, side, newSpot ?? touchback(s));
       } else if (d && d.off === side) {
-        if (play === 'run' || play === 'pass' || play === 'sack' || play === 'kneel' || play === 'inc') {
+        if (nul) {
+          // US batch 6: wiped out — offsetting replays the down; accepted from the previous spot
+          if (pen!.enf === 'prev') { const r = enforce(s, d, side, pen!.on, pen!.yards, !!pen!.autoFirst, !!pen!.lossOfDown); drive = r.drive; first = r.first; closes = r.closes; }
+        } else if (play === 'run' || play === 'pass' || play === 'sack' || play === 'kneel' || play === 'inc' || (play === 'fumble' && kept)) {
           const r = advance(s, d, play === 'inc' ? 0 : g);
           drive = r.drive; first = r.first; closes = r.turnover;
+          // US batch 6: a penalty enforced from where the play ended (the play counts)
+          if (pen && pen.enf === 'end' && !closes && drive && drive.off === side) {
+            const x = enforce(s, drive, side, pen.on, pen.yards, !!pen.autoFirst, !!pen.lossOfDown);
+            drive = x.drive; first = first || x.first; closes = x.closes;
+          }
         } else if (play === 'int' || play === 'fumble') {
+          drive = series(s, other(side), newSpot ?? s.field - d.spot); closes = true;
+        } else if (play === 'punt' && blocked) {
+          // US batch 6: a blocked punt — the defence's ball where it ends (default: the line of scrimmage)
           drive = series(s, other(side), newSpot ?? s.field - d.spot); closes = true;
         } else if (play === 'punt') {
           const land = d.spot + g;
@@ -796,18 +919,9 @@ export const reducer = (s: AFState, a: ScoreAction): AFState => {
         } else if (play === 'downs') {
           drive = series(s, other(side), newSpot ?? turnoverSpot(s, d.spot)); closes = true;
         } else if (play === 'penalty') {
-          const yds = Math.abs(g);
-          if (on === side) {
-            // on the offence: back, half the distance to its own goal at most; replay the down (or lose it)
-            const ns = Math.max(1, d.spot - Math.min(yds, Math.floor(d.spot / 2)));
-            const down = a.payload?.lossOfDown ? d.down + 1 : d.down;
-            if (down > s.downs) { drive = series(s, other(side), turnoverSpot(s, ns)); closes = true; }
-            else drive = { ...d, spot: ns, down };
-          } else {
-            const ns = Math.min(s.field - 1, d.spot + Math.min(yds, Math.floor((s.field - d.spot) / 2)));
-            if (a.payload?.autoFirst || ns >= d.line) { drive = series(s, side, ns); first = true; }
-            else drive = { ...d, spot: ns };
-          }
+          // on the offence: back, half the distance to its own goal at most; replay the down (or lose it)
+          const r = enforce(s, d, side, on, Math.abs(g), !!a.payload?.autoFirst, !!a.payload?.lossOfDown);
+          drive = r.drive; first = r.first; closes = r.closes;
         }
       }
       let st = push(s, { ...base, ...(first ? { first: true } : {}) });
@@ -884,6 +998,9 @@ export interface AFTeamFigures {
   punts: number; puntYds: number;
   /** punts this side returned (a return recorded, or a punt-return TD) and the yards */
   puntRets: number; puntRetYds: number;
+  /** US batch 6: kickoffs returned (and yards), interception return yards,
+   *  kicks this side blocked, onside kicks tried / recovered (the kickers) */
+  kickRets: number; kickRetYds: number; intRetYds: number; kicksBlocked: number; onsideAtt: number; onsideRec: number;
 }
 const SCRIMMAGE = ['run', 'pass', 'inc', 'sack', 'int', 'fumble', 'kneel'];
 export function teamFigures(s: AFState, side: Side, scope: 'all' | number = 'all', nowSec?: number): AFTeamFigures {
@@ -893,6 +1010,7 @@ export function teamFigures(s: AFState, side: Side, scope: 'all' | number = 'all
     firstRush: 0, firstPass: 0, firstPen: 0, rushAtt: 0, passComp: 0, passAtt: 0, intThrown: 0, fumblesLost: 0, fourthConv: 0, fourthAtt: 0,
     rushTD: 0, passTD: 0, retTD: 0, safeties: 0, defTries: 0, patMade: 0, patAtt: 0, twoMade: 0, twoAtt: 0, oneMade: 0, oneAtt: 0,
     fgLong: 0, punts: 0, puntYds: 0, puntRets: 0, puntRetYds: 0,
+    kickRets: 0, kickRetYds: 0, intRetYds: 0, kicksBlocked: 0, onsideAtt: 0, onsideRec: 0,
   };
   const inScope = (e: AFEvent) => scope === 'all' || e.period === scope;
   const evs = s.events;
@@ -912,6 +1030,7 @@ export function teamFigures(s: AFState, side: Side, scope: 'all' | number = 'all
       if (e.pre?.down === 4 && e.pbp) { f.fourthAtt++; f.fourthConv++; }
     }
     if (e.type === 'fg' && e.side === side) { f.fgAtt++; if (e.good) { f.fgMade++; f.fgLong = Math.max(f.fgLong, e.yards ?? 0); } }
+    if (e.type === 'fg' && e.side !== side && e.blocked) f.kicksBlocked++;
     if (e.type === 'safety' && e.side === side) f.safeties++;
     if (e.type === 'defTry' && e.side === side) f.defTries++;
     if (e.type === 'try' && e.side === side && !e.none) {
@@ -921,13 +1040,24 @@ export function teamFigures(s: AFState, side: Side, scope: 'all' | number = 'all
     }
     if (e.type === 'timeout' && e.side === side) f.timeouts++;
     if (e.type === 'play') {
+      // US batch 6: a penalty on a play (accepted) counts for the side it was on; a wiped-out play only for its first down
+      if (e.pen && (e.pen.enf === 'prev' || e.pen.enf === 'end') && e.pen.on === side) { f.penalties++; f.penaltyYds += e.pen.yards; }
+      if (e.nul) { if (e.side === side && e.first) { f.firstDowns++; f.firstPen++; } continue; }
+      if (e.play === 'kickoff') {
+        const kicker = other(e.side);
+        if (e.onside && kicker === side) { f.onsideAtt++; if (e.kept) f.onsideRec++; }
+        if (e.side === side && !(e.onside && e.kept) && typeof e.ret === 'number') { f.kickRets++; f.kickRetYds += e.ret; }
+        continue;
+      }
+      if (e.play === 'int' && e.side !== side && typeof e.ret === 'number') f.intRetYds += e.ret;
+      if (e.play === 'punt' && e.side !== side && e.blocked) f.kicksBlocked++;
       if (e.play === 'penalty') {
         if (e.on === side) { f.penalties++; f.penaltyYds += Math.abs(e.yards ?? 0); }
         if (e.side === side && e.first) { f.firstDowns++; f.firstPen++; }
         continue;
       }
       // the other side's punt: our return
-      if (e.play === 'punt' && e.side !== side && typeof e.ret === 'number') { f.puntRets++; f.puntRetYds += e.ret; }
+      if (e.play === 'punt' && e.side !== side && typeof e.ret === 'number' && !e.blocked) { f.puntRets++; f.puntRetYds += e.ret; }
       if (e.side !== side) continue;
       if (e.first) { f.firstDowns++; if (e.play === 'pass') f.firstPass++; else f.firstRush++; }
       if (e.play === 'run' || e.play === 'kneel') { f.rushYds += e.yards ?? 0; f.plays++; f.rushAtt++; }
@@ -935,7 +1065,7 @@ export function teamFigures(s: AFState, side: Side, scope: 'all' | number = 'all
       else if (e.play === 'inc') { f.plays++; f.passAtt++; }
       else if (e.play === 'sack') { f.sacked++; f.sackYds += Math.abs(e.yards ?? 0); f.plays++; }
       else if (e.play === 'int') { f.turnovers++; f.plays++; f.passAtt++; f.intThrown++; }
-      else if (e.play === 'fumble') { f.turnovers++; f.plays++; f.fumblesLost++; }
+      else if (e.play === 'fumble') { f.plays++; if (!e.kept) { f.turnovers++; f.fumblesLost++; } }
       else if (e.play === 'punt') { f.punts++; f.puntYds += Math.abs(e.yards ?? 0); }
       if (e.pre?.down === 3 && SCRIMMAGE.includes(e.play ?? '')) { f.thirdAtt++; if (e.first) f.thirdConv++; }
       if (e.pre?.down === 4 && SCRIMMAGE.includes(e.play ?? '')) { f.fourthAtt++; if (e.first) f.fourthConv++; }
@@ -1035,10 +1165,12 @@ export const AF_LIVE_SETTINGS: LiveSettings<AFState> = {
   defaults: { periodMinutes: 15, timeoutsPerHalf: 3, mode: false, trackTackles: false, ...Object.fromEntries(TRACK_FLAGS.map((f) => [f, false])) },
   // US batch 5: "Standard" is this game's rules — flag 2 × 20, 2 timeouts,
   // Scores only; NFHS 12-minute quarters; tackle play by play (3 timeouts)
+  // US batch 6: a flag game of 15-minute halves is the school preset (1 timeout per half)
   defaultsFor: (s) => {
     const flag = s.variant === 'flag';
+    const school = flag && s.periodMinutes === AF_PRESETS.flagSchool.set.periodMinutes;
     return {
-      periodMinutes: flag ? 20 : s.rules === 'nfhs' ? 12 : 15, timeoutsPerHalf: flag ? 2 : 3, mode: !flag,
+      periodMinutes: flag ? (school ? 15 : 20) : s.rules === 'nfhs' ? 12 : 15, timeoutsPerHalf: flag ? (school ? Number(AF_PRESETS.flagSchool.set.timeoutsPerHalf) : 2) : 3, mode: !flag,
       trackTackles: false, ...Object.fromEntries(TRACK_FLAGS.map((f) => [f, false])),
     };
   },
