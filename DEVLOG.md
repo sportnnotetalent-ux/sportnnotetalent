@@ -13,6 +13,14 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-03 — Screen sweep of the Batch 1–6 controls, and its fixes
+
+One QA agent drove the offline demo at 375 px through 22 sport groups (report only): most new controls pass. Fixed (each with a break-it list, failing tests, simulation; no reducer changes, old logs identical):
+- **Hockey / ice hockey** (`screen-sweep-invasion.md`): with no squad, a stroke / shot / penalty-shot outcome opened a near-empty "who?" step and recorded nothing until Skip — now one tap records it (a saved penalty shot credits the goalie when set). **Rugby:** a penalty-try card with no squad was booked to a team official — now an unnamed player's card, plus a "Player not listed" chip.
+- **Chess / handball / volleyball / netball** (`screen-sweep-court.md`): a second illegal move now pre-selects the loss even over an earlier pick; handball "Not sure" goes through one tested path and "Breakthrough" fits at 375 px; volleyball fault types reachable with no roster ("Opp. fault type"); netball toss-up before play says "Start play first".
+- **Shared** (`screen-sweep-shared.md`): an unknown sport id in a link opens the picker instead of crashing Schedule Match; Info reads a meaningful 0 as words ("Auto", "No limit", "None").
+Not fixed (follow-up): some sports' Undo shows a generic "Undo" label (hockey, handball, kabaddi, chess, carrom); the Quick options sheet stays open after an action. Full suite 7,060 tests, 0 failing; tsc clean. Re-checked on screen: hockey Stroke → Saved records a shot on goal in one tap; handball "Not sure" moves on.
+
 ### 2026-11-03 — Release: Batch 6 (P2s across all sports) live (web, Android OTA)
 
 auth-smoke passed. Published from a clean worktree at ca6f241: web (entry `index-0117e06e`, confirmed live on app.sportnnote.in) and Android OTA groups `80a6006b` (preview) and `212cd409` (production), runtime 1.0.0.
