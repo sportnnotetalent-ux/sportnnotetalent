@@ -3,6 +3,7 @@
  *  the tournaments the user plays in or follows) filters the live & upcoming
  *  matches below, and a sport row jumps into each sport's section (schedule,
  *  organize, standings & stats). Deep standings/stats live on those pages. */
+import { yourSports } from '../core/playedSports';
 import { isStaleLive } from '../core/staleLive';
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal, Pressable, useWindowDimensions } from 'react-native';
@@ -134,7 +135,8 @@ export default function HomeScreen() {
     return 'Finish verifying your account to join matches.';
   };
   const allSports = SPORT_LIST.map((s) => s.id);
-  const mySports = (player?.sports ?? []).filter((s): s is SportId => allSports.includes(s as SportId));
+  // founder 2026-11-04: the sports you picked, then every sport you've played, scored or hosted
+  const mySports = yourSports(player?.sports, feed, playerId).filter((s) => allSports.includes(s));
   const newSports = allSports.filter((s) => !mySports.includes(s));
 
   const canScore = canScoreByRole(profile?.role);
