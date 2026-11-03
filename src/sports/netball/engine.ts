@@ -257,6 +257,10 @@ export function periodSec(s: NetballState, now = 0): number {
 export const matchSec = (s: NetballState, now = 0): number => periodOffset(s) + periodSec(s, now);
 export const running = (s: NetballState): boolean => !!s.clock.since && !s.ended;
 export const periodStarted = (s: NetballState): boolean => s.clock.ms > 0 || !!s.clock.since;
+/** Screen sweep N1 — why a toss-up can't be logged yet (World Netball 9.7: a
+ *  toss-up happens in play), or null once the period has started. */
+export const tossUpBlocked = (s: NetballState): string | null =>
+  periodStarted(s) ? null : !s.firstCentre ? 'Start play first (pick the first centre pass)' : 'Start play first (start the clock)';
 export const clockText = (sec: number): string => `${String(Math.floor(sec / 60)).padStart(2, '0')}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
 /** The clock face: time LEFT in the quarter (netball clocks count down); the
  *  play-on after extra time counts up. */

@@ -67,6 +67,7 @@ function SidePoints({ side, name, color, court, bench, opponents, oppColor, serv
   const [how, setHow] = useState<VbOutcome>('attack');
   const [err, setErr] = useState<string | undefined>(undefined);
   const [showBench, setShowBench] = useState(false);
+  const [showErr, setShowErr] = useState(false);
   const outcomes = VB_OUTCOMES.filter((o) => (blocks || o.kind !== 'block')
     && !(o.kind === 'ace' && serving === false) // only the server can ace
     && !(o.kind === 'serveerror' && serving === true)); // your own missed serve isn't your point
@@ -129,9 +130,22 @@ function SidePoints({ side, name, color, court, bench, opponents, oppColor, serv
           </View>
         </>
       ) : (
-        <View style={ctrl.chips}>
-          {outcomes.map((o) => <SelectChip key={o.kind} label={outcomeChip(o)} active={false} onPress={() => score(o.kind)} />)}
-        </View>
+        <>
+          <View style={ctrl.chips}>
+            {outcomes.map((o) => <SelectChip key={o.kind} label={outcomeChip(o)} active={false} onPress={() => score(o.kind)} />)}
+          </View>
+          {/* screen sweep V1: without a roster "Opp. fault" stays one tap; what went wrong is an optional pick first (applies to the next Opp. fault only) */}
+          {showErr ? (
+            <>
+              <Text style={ctrl.hint}>Opp. fault — what went wrong? (optional, then tap 🚩 Opp. fault)</Text>
+              <View style={ctrl.chips}>
+                {VB_ERROR_TYPES.map((t) => <SelectChip key={t.key} label={t.label} active={err === t.key} onPress={() => setErr(err === t.key ? undefined : t.key)} />)}
+              </View>
+            </>
+          ) : (
+            <Text style={ctrl.link} accessibilityRole="button" onPress={() => setShowErr(true)}>Opp. fault type (optional)</Text>
+          )}
+        </>
       )}
     </View>
   );
@@ -361,6 +375,7 @@ const ctrl = StyleSheet.create({
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing(2) },
   label: { color: theme.colors.text, fontSize: theme.font.body, fontWeight: '700' },
   hint: { color: theme.colors.textMuted, fontSize: theme.font.small },
+  link: { color: theme.colors.primary, fontSize: theme.font.small, fontWeight: '700' },
   headRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: theme.spacing(2) },
   serveBadge: { color: '#fff', fontSize: theme.font.tiny, fontWeight: '800', borderRadius: theme.radius.pill, paddingVertical: 2, paddingHorizontal: theme.spacing(2), overflow: 'hidden' },
   cue: { backgroundColor: theme.colors.accent + '22', borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.colors.accent, padding: theme.spacing(3), gap: theme.spacing(1) },

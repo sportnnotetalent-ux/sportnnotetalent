@@ -32,9 +32,9 @@ import type { ScoreAction, SportPlugin } from '../types';
 import {
   init, reducer, isComplete, result, levelAtEnd, aggLine, matchSec, periodSec, periodLen, clockFace, clockText, periodName, periodLong, periodStarted, running,
   eventCredits, creditAttribution, currentKeeper, soScore, nextThrower, needsSdPick, handballScoreLine, timeoutCheck, suspensionsOf, hasYellow, teamYellows,
-  totalPeriods, maxEtRounds, HANDBALL_PRESETS, HANDBALL_LIVE_SETTINGS, SHOT_LABEL, SHOT_TYPES, LIVE_KEYS,
+  totalPeriods, maxEtRounds, HANDBALL_PRESETS, HANDBALL_LIVE_SETTINGS, SHOT_LABEL, LIVE_KEYS,
   HANDBALL_TRACK_FIELDS, FAULT_TYPES, FAULT_LABEL, goalEmpty, UNSURE_SHOT,
-  type FaultType, type HandballEvent, type HandballState, type MissResult, type Sanction, type ShotType, type Side,
+  type FaultType, type HandballEvent, type HandballState, type MissResult, type Sanction, type Side,
 } from './engine';
 import { handballTotals, handballLiveField, handballField, unavailable } from './totals';
 import { handballBox } from './box';
@@ -50,15 +50,13 @@ import { BackfillBar, RowAction, confirmRemove } from '../TimelineControls';
 import { handballVoice, handballVoiceEnds } from '../voiceParsers';
 import { HANDBALL_META } from './meta';
 import { handballMatchRecords } from './records';
+// screen sweep: the position grid's step and sizing (a position and "Not sure" advance alike)
+import { FIELD_TYPES, GRID_BTN, afterPosition, pickLabel, type ShotPick } from './shotPick';
 
 const opp = (s: Side): Side => (s === 'home' ? 'away' : 'home');
 const uid = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 const isKeeperPos = (p?: string | null) => !!p && /^\s*(gk|goal\s*-?\s*keeper|keeper)\s*$/i.test(p);
 const TRACKED: string[] = LIVE_KEYS.filter((k) => k !== 'soTaken' && k !== 'soGoals');
-const FIELD_TYPES = SHOT_TYPES.filter((t) => t !== 'sevenM');
-/** batch 6: a position from the grid, or "Not sure" (no 9 m guess) */
-type ShotPick = ShotType | typeof UNSURE_SHOT;
-const pickLabel = (t?: ShotPick) => (t === UNSURE_SHOT ? 'position not sure' : SHOT_LABEL[t ?? 'nineM']);
 
 /* ------------------------------ player picker ------------------------------ */
 
@@ -405,7 +403,7 @@ const ScoringControls: SportPlugin<HandballState>['ScoringControls'] = ({
         if (flow.step === 'type') return (
           <View style={c.panel}>{head('Goal')}
             <Text style={c.small}>From where?</Text>
-            {typeGrid((t) => setFlow({ ...flow, shotType: t, step: 'scorer' }))}
+            {typeGrid((t) => setFlow(afterPosition(flow, t)))}
             <Text style={c.meta}>A 7-metre throw has its own 🎯 7 m button.</Text>
           </View>
         );
@@ -426,7 +424,7 @@ const ScoringControls: SportPlugin<HandballState>['ScoringControls'] = ({
         if (flow.step === 'type') return (
           <View style={c.panel}>{head('Shot — no goal')}
             <Text style={c.small}>From where?</Text>
-            {typeGrid((t) => setFlow({ ...flow, shotType: t, step: 'result' }))}
+            {typeGrid((t) => setFlow(afterPosition(flow, t)))}
           </View>
         );
         if (flow.step === 'result') return (
@@ -813,7 +811,7 @@ const c = StyleSheet.create({
   panel: { gap: theme.spacing(2), backgroundColor: theme.colors.surface, borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.colors.border, padding: theme.spacing(3) },
   row: { flexDirection: 'row', gap: theme.spacing(2), alignItems: 'flex-end' },
   flex: { flex: 1 },
-  typeBtn: { flexBasis: '30%', flexGrow: 1 },
+  typeBtn: GRID_BTN,
   cols: { flexDirection: 'row', gap: theme.spacing(2) },
   col: { flex: 1, gap: theme.spacing(2), minWidth: 0 },
   team: { fontSize: theme.font.small, fontWeight: '800', textAlign: 'center' },
