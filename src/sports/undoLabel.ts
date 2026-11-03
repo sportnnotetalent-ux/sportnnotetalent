@@ -88,3 +88,37 @@ export function undoLabel(
   const sc = scoreOf?.(step.next);
   return sc && !bad(sc) ? `${head} (${sc})` : head;
 }
+
+/** Undo labels batch (2026-11-03) — what the bar may print: trimmed text, or
+ *  null for nothing / junk (`undefined`, `null`, `NaN`, `[object …]`, an
+ *  empty "· " tail). */
+export function cleanUndoLabel(t: unknown): string | null {
+  if (typeof t !== 'string') return null;
+  const v = t.trim();
+  if (!v || /\bundefined\b|\bnull\b|\bNaN\b|\[object|·\s*$|^\s*·|·\s*·|\(\s*\)/.test(v)) return null;
+  return v;
+}
+
+/** The bar's label: the sport's own (when it has one and it names the step),
+ *  else the shared `undoLabel`. Either may throw on an odd state: that reads
+ *  as null (the bar then says a plain "Undo"). */
+export function resolveUndoLabel(own: (() => string | null | undefined) | null | undefined, shared: () => string | null | undefined): string | null {
+  if (own) {
+    try { const t = cleanUndoLabel(own()); if (t) return t; } catch { /* fall back */ }
+  }
+  try { return cleanUndoLabel(shared()); } catch { return null; }
+}
+
+/** A side's words for a sport's own label: the team / player name the screen
+ *  shows, else "Home" / "Away". */
+export const sideWord = (side: unknown, sides?: { home?: string; away?: string } | null): string => {
+  if (side !== 'home' && side !== 'away') return '';
+  const n = typeof sides?.[side] === 'string' ? sides[side]!.trim() : '';
+  return n || (side === 'home' ? 'Home' : 'Away');
+};
+
+/** "Field goal" → "field goal" (a leading capital only; "7 m", "GK" kept). */
+export const lowerFirst = (t: string): string => (/^[A-Z][a-z]/.test(t) ? t[0].toLowerCase() + t.slice(1) : t);
+
+export type UndoStep = { type: string; prev: unknown; next: unknown } | null | undefined;
+export type UndoSides = { home?: string; away?: string };

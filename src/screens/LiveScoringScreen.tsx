@@ -53,7 +53,7 @@ import { completesMatch } from '../sports/voiceMatch';
 import { Scoreboard } from '../components/Scoreboard';
 import { MiniScore } from '../components/MiniScore';
 import { Pill, textStyles } from '../components/ui';
-import { undoLabel } from '../sports/undoLabel';
+import { undoLabel, resolveUndoLabel } from '../sports/undoLabel';
 import { useLiveMatch } from '../data/useLiveMatch';
 import { matchOutbox } from '../data/matchOutbox';
 import { mergeLog, newestEvent } from '../data/eventLog';
@@ -1078,6 +1078,10 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
   // ----- Match housekeeping (parity #13): breaks, quick options, uneven squads -----
   const onBreak = !complete ? meta.onBreak : undefined;
   const [quickOpen, setQuickOpen] = useState(false);
+  // Undo labels batch (2026-11-03): an action applied from a Quick options tile
+  // closes the sheet — even a tile that forgets its onDone. A tile that opens a
+  // further step (its own panel) dispatches nothing, so the sheet stays open.
+  const quickDispatch = useCallback((a: Parameters<typeof dispatch>[0]) => { dispatch(a); setQuickOpen(false); }, [dispatch]);
   const [toast, setToast] = useState<string | null>(null);
   useEffect(() => {
     if (!toast) return;
@@ -1205,9 +1209,14 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
     }
     await undo();
   }, [lastStep, matchId, undo]);
-  const undoWhat = useMemo(() => (lastStep?.type === FORMAT_TYPE ? 'format change' : plugin.undoLabel ? plugin.undoLabel(lastStep, undoNameOf) : undoLabel(lastStep, { home: homeName, away: awayName, player: undoNameOf }, (s) => {
-    try { const m = plugin.summary(s as never); return m.homeScore != null && m.awayScore != null ? `${m.homeScore}-${m.awayScore}` : null; } catch { return null; }
-  })), [plugin, lastStep, homeName, awayName, undoNameOf]);
+  // Undo labels batch (2026-11-03): a sport's own label that can't name the
+  // step (null, junk, or a throw on an odd state) falls back to the shared one.
+  const undoWhat = useMemo(() => (lastStep?.type === FORMAT_TYPE ? 'format change' : resolveUndoLabel(
+    plugin.undoLabel ? () => plugin.undoLabel!(lastStep, undoNameOf, { home: homeName, away: awayName }) : null,
+    () => undoLabel(lastStep, { home: homeName, away: awayName, player: undoNameOf }, (s) => {
+      try { const m = plugin.summary(s as never); return m.homeScore != null && m.awayScore != null ? `${m.homeScore}-${m.awayScore}` : null; } catch { return null; }
+    }),
+  )), [plugin, lastStep, homeName, awayName, undoNameOf]);
   // SD-110 — keep the phone awake while this scorer is on a match in progress.
   const focused = useIsFocused();
   useKeepAwakeWhile(focused && canScore && started && !complete && !retiredLocally);
@@ -2887,7 +2896,7 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
           settingsPanel={showLiveSettings && !complete ? liveSettingsCard((msg) => { setQuickOpen(false); setToast(msg); }) : undefined}
           pluginTiles={plugin.QuickOptions ? (
             <plugin.QuickOptions
-              state={state} dispatch={dispatch} homeRoster={homeScoreRoster} awayRoster={awayScoreRoster}
+              state={state} dispatch={quickDispatch} homeRoster={homeScoreRoster} awayRoster={awayScoreRoster}
               homeName={fullHome} awayName={fullAway}
               onDone={(msg) => { setQuickOpen(false); if (msg) setToast(msg); }}
               onEndMatch={showEndEarly ? (r) => { setQuickOpen(false); void endMatchWith({ ...r, at: new Date().toISOString() }); } : undefined}

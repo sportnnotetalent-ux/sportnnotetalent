@@ -31,6 +31,7 @@ import { chessMatchRecords } from './records';
 import { useMask } from '../../core/disputeMask';
 import type { NameOf } from '../../core/playerNames';
 import type { Player } from '../../core/types';
+import { chessUndoLabel } from './undoLabel';
 
 /** IDs-only scoring (docs/privacy/ids-only-scoring.md): a 1-v-1 game names
  *  each side by its player, looked up for this viewer by id (players_view:
@@ -347,14 +348,9 @@ export const chessPlugin: SportPlugin<ChessState> = {
   Scoreboard: ChessScoreboard,
   // Deep wave — commentary (move by move / the result) and the game stats
   matchTabs: { Commentary: ChessCommentary, Stats: ChessStats, AfterMatch: ChessAfterMatch },
-  // Deep wave — Undo names the move(s) it takes back ("Undo move Nf3")
-  undoLabel: (step) => {
-    if (step?.type !== 'MOVES') return null;
-    const a = (step.prev as ChessState | undefined)?.game?.san ?? [];
-    const b = (step.next as ChessState | undefined)?.game?.san ?? [];
-    if (b.length > a.length && a.every((m, i) => b[i] === m)) return `move${b.length - a.length > 1 ? 's' : ''} ${b.slice(a.length).join(' ')}`;
-    return 'move list';
-  },
+  // Deep wave — Undo names the move(s) it takes back ("Undo move Nf3");
+  // undo labels batch — and the result, arbiter, clock and colour steps
+  undoLabel: chessUndoLabel,
   // Deep wave — the game-record figures from the move list (partial: the
   // result credit stays live)
   statTotals: chessStatTotals,

@@ -52,6 +52,7 @@ import { HANDBALL_META } from './meta';
 import { handballMatchRecords } from './records';
 // screen sweep: the position grid's step and sizing (a position and "Not sure" advance alike)
 import { FIELD_TYPES, GRID_BTN, afterPosition, pickLabel, type ShotPick } from './shotPick';
+import { handballUndoLabel } from './undoLabel';
 
 const opp = (s: Side): Side => (s === 'home' ? 'away' : 'home');
 const uid = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
@@ -792,6 +793,8 @@ export const handballPlugin: SportPlugin<HandballState> = {
   },
   // the 7-metre shoot-out under the score ("SO 4–3"); '' for every other match
   scoreLine: handballScoreLine,
+  // Undo labels batch — Undo names the step in the sport's own words
+  undoLabel: handballUndoLabel,
   statTotals: handballTotals,
   tickerDetail: handballTickerDetail,
   tickerFlash: handballTickerFlash,

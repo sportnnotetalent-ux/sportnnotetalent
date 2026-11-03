@@ -35,6 +35,7 @@ import { useMask } from '../../core/disputeMask';
 import { withRosters, whoName } from '../racketNames';
 import type { NameOf } from '../../core/playerNames';
 import { IconText } from '../../components/Icon';
+import { carromUndoLabel } from './undoLabel';
 
 /** IDs-only scoring (docs/privacy/ids-only-scoring.md): the match state and
  *  events keep player ids only; a player is named for this viewer by id
@@ -573,6 +574,8 @@ export const carromPlugin: SportPlugin<CarromState> = {
   lineScore,
   // SD-37: absolute lines at completion — both partners, capped points, games,
   // boards played, slams, 25-0 games (src/sports/carrom/totals.ts)
+  // Undo labels batch — Undo names the step in the sport's own words
+  undoLabel: carromUndoLabel,
   statTotals: carromStatTotals,
   statTotalsNeedsPlayers: true,
   statTotalsPartial: true,

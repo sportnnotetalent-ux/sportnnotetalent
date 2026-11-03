@@ -443,7 +443,10 @@ export interface SportPlugin<S = unknown> {
    *  Rohit (4.3)"), from useLiveMatch's `lastStep`. Absent = the shared
    *  `undoLabel` (SD-115). Null = plain "Undo". IDs-only scoring: `nameOf`
    *  names the players by id (the state keeps ids); optional. */
-  undoLabel?: (step: { type: string; prev: unknown; next: unknown } | null | undefined, nameOf?: import('../core/playerNames').NameOf) => string | null;
+  /** Undo labels batch (2026-11-03): `sides` = the team / player names the
+   *  screen shows (a sport names the side when no player is named). A null
+   *  from the sport falls back to the shared `undoLabel` (resolveUndoLabel). */
+  undoLabel?: (step: { type: string; prev: unknown; next: unknown } | null | undefined, nameOf?: import('../core/playerNames').NameOf, sides?: { home?: string; away?: string }) => string | null;
   /** Can a finished match be corrected with the generic list (parity #05)? false
    *  hides "Correct this match" — cricket until #06 ships its own editor, since
    *  re-crediting `attribution` alone would split its scorecard from its stats. */
