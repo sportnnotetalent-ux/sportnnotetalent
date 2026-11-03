@@ -6,7 +6,7 @@
  */
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   baseKey, baseOf, parseRefusal, staleDisposition, outboxOnError, serverDecision, canSwitchShared,
@@ -172,5 +172,58 @@ describe('wiring', () => {
     assert.match(src, /undoByLabel\(/);
     assert.match(src, /scoringRule\(/);
     assert.match(src, /staleMessage\(/);
+  });
+});
+
+describe('every append path sends a base (nothing legitimate refused in a shared match)', () => {
+  const walk = (d: string, out: string[] = []) => {
+    for (const f of readdirSync(join(import.meta.dirname, '..', d))) {
+      const p = `${d}/${f}`;
+      if (statSync(join(import.meta.dirname, '..', p)).isDirectory()) walk(p, out); else if (/\.tsx?$/.test(f)) out.push(p);
+    }
+    return out;
+  };
+  test('source scan: every appendMatchEvent / outbox enqueue call carries a base', () => {
+    const calls: string[] = [];
+    for (const f of walk('src')) {
+      const src = read(f);
+      for (const m of src.matchAll(/(?<!function )(appendMatchEvent|matchOutbox\.enqueue)\(([^;]*)\);/g)) {
+        calls.push(f);
+        const arg = m[2];
+        const near = src.slice(Math.max(0, m.index! - 1500), m.index!);
+        // the call names its base, or passes a record built just above with one
+        // (the outbox sends the records the hook stamped)
+        const ok = /\bbase\b/.test(arg) || (/^\s*[\w.]+,\s*(rec|setWhite)\s*$/.test(arg) && /\bbase\b/.test(near)) || (f.endsWith('matchOutbox.ts') && arg.trim() === 'matchId, rec');
+        assert.ok(ok, `${f}: ${m[0].slice(0, 120)}`);
+      }
+    }
+    for (const f of ['src/data/matchOutbox.ts', 'src/data/useLiveMatch.ts', 'src/data/chessRoundResults.ts', 'src/data/amendments.ts', 'src/data/teamTieDemoSeed.ts', 'src/data/guestClaim.ts']) {
+      assert.ok(calls.includes(f), `no append call found in ${f}`);
+    }
+  });
+  test('live taps, FORMAT changes and voice go through dispatch, which stamps the base', () => {
+    assert.match(read('src/data/useLiveMatch.ts'), /base: baseOf\(rawRef\.current\),\n\s*madeAt: Date\.now\(\)/);
+    assert.match(read('src/screens/LiveScoringScreen.tsx'), /dispatch\(\{ type: FORMAT_TYPE/);
+  });
+  test('live correction (AMEND through the outbox) is stamped', () => {
+    assert.match(read('src/data/useLiveMatch.ts'), /matchOutbox\.enqueue\(matchId, \{ \.\.\.plan\.record, [^}]*base: baseOf\(rawRef\.current\)/);
+  });
+  test('post-match correction (publishAmendment) asks the server for the newest key', () => {
+    assert.match(read('src/data/amendments.ts'), /appendMatchEvent\(matchId, \{ \.\.\.plan\.record, base: await newestEventKey\(matchId\) \}\)/);
+  });
+  test('chess round results chain SET_WHITE then RESULT on the log they read', () => {
+    const src = read('src/data/chessRoundResults.ts');
+    assert.match(src, /let base = baseOf\(log\);/);
+    assert.match(src, /base = setWhite\.clientId;/);
+    assert.match(src, /clientId: newId\(\), base,/);
+  });
+  test('guest claim upload and the team-tie demo seed use the newest key', () => {
+    assert.match(read('src/data/guestClaim.ts'), /appendMatchEvent\(id, \{ \.\.\.e, base: await newestEventKey\(id\) \}\)/);
+    assert.match(read('src/data/teamTieDemoSeed.ts'), /appendMatchEvent\(matchId, \{ \.\.\.e, base: await newestEventKey\(matchId\) \}\)/);
+  });
+  test('newestEventKey reads the newest row (seq, then id) and keys it like baseOf', () => {
+    const src = read('src/data/repos.ts');
+    assert.match(src, /export async function newestEventKey\(matchId: string\): Promise<string>/);
+    assert.match(src, /\.order\('seq', \{ ascending: false \}\)\.order\('id', \{ ascending: false \}\)\.limit\(1\)/);
   });
 });

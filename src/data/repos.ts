@@ -1940,6 +1940,18 @@ export async function setMatchBreak(matchId: string, info: { kind: string; note?
   if (error) throw new Error(error.message);
 }
 
+/** Shared scoring: the key of a match's newest event as the server has it now
+ *  ('' when none) — the base for writes made outside the live scoring screen
+ *  (chess round results, corrections, a guest match's upload). */
+export async function newestEventKey(matchId: string): Promise<string> {
+  if (!isSupabaseConfigured || !supabase) return baseOf(demo.matchEvents[matchId] ?? []);
+  const { data, error } = await supabase.from('match_events').select('id, seq, client_id').eq('match_id', matchId)
+    .order('seq', { ascending: false }).order('id', { ascending: false }).limit(1);
+  if (error) return '';
+  const r = (data ?? [])[0] as { id: number; seq: number; client_id?: string | null } | undefined;
+  return r ? baseOf([{ seq: r.seq, id: r.id, clientId: r.client_id ?? undefined }]) : '';
+}
+
 /** Save one scoring event. The server numbers it (and ignores a retried
  *  clientId); only the scoring-lock holder may write while the match is played.
  *  THROWS on any failure, so the outbox keeps the tap instead of dropping it. */

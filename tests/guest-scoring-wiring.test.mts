@@ -68,7 +68,7 @@ describe('G4 / G6 / G7: saving it', () => {
     const c = read('src/data/guestClaim.ts');
     assert.match(c, /createTeam: \(t\) => ensureTeamWithId\(t\)/);
     assert.match(c, /ensureFriendlyWithId\(/);
-    assert.match(c, /uploadOne: \(id, e\) => appendMatchEvent\(id, e\)/);
+    assert.match(c, /uploadOne: async \(id, e\) => appendMatchEvent\(id, \{ \.\.\.e, base: await newestEventKey\(id\) \}\)/); // shared scoring: with its base
     const r = read('src/data/repos.ts');
     assert.match(r, /const isDuplicate = \(e: \{ code\?: string \} \| null\) => e\?\.code === '23505';/);
   });

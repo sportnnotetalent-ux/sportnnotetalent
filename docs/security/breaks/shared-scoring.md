@@ -31,7 +31,7 @@
 | S21 | **A late retry brings back an undone step** (found by the simulation). A's reply is lost, B undoes A's step, A's outbox retries the same client id on its old base, which is the newest again. | **Fixed:** shared-mode Undo records the client id in `match_event_undone` (RLS on, no policies); a later append of it is `stale_tap`. Mirrored in `serverDecision({ undone })`; db test S21; sim invariant "an undone step never comes back". |
 
 ## Not done / for later
-- Other writers that call `append_match_event` without a base (chess round results, post-match amendments, the team-tie demo seed) would be refused while a shared match is being played; today they run only on unstarted / finished matches or with sharing off.
+- ~~Other writers call `append_match_event` without a base~~ **Fixed (follow-up commit):** every path sends a base. Taps, FORMAT changes and voice go through `dispatch`, and live corrections (AMEND) through the outbox; both are stamped `baseOf(rawRef)`. Chess round results chain SET_WHITE → RESULT on the log they read. Post-match `publishAmendment`, guest-claim upload and the team-tie demo seed use `newestEventKey` (the server's newest row). A source scan in `tests/shared-scoring.test.mts` fails if any `appendMatchEvent` / outbox enqueue call lacks one. The server rule is unchanged.
 - The screen was not checked in the demo preview (no servers in this run); the demo store does honour shared mode.
 - The migration is a file only; the founder runs it. Live check after: `select shared_scoring from matches limit 1`.
 

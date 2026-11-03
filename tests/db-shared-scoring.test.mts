@@ -159,6 +159,14 @@ describe('shared mode — optimistic concurrency', () => {
     const [r] = await db.sql<{ r: string | null }>(`select recorded_by as r from match_events where match_id = $1`, [m2]);
     assert.notEqual(r.r, bina.player);
   });
+  test('a writer outside the live screen (corrections, chess results, guest upload) using the newest key is accepted — also on a row with no client id', async () => {
+    const m4 = await friendly([ashok, bina], host);
+    await db.sql(`insert into match_events (match_id, seq, type, side, payload) values ($1, 1, 'pot', 'home', '{}')`, [m4]); // a legacy row
+    await share(ashok, m4);
+    const [r] = await db.sql<{ id: number; seq: number; client_id: string | null }>(`select id, seq, client_id from match_events where match_id = $1 order by seq desc, id desc limit 1`, [m4]);
+    const key = r.client_id ?? `id:${r.id}`; // what newestEventKey sends
+    assert.equal((await tap(bina, m4, 'dB', key)).seq, 2);
+  });
   test('after the match: base not required (post-match corrections as today)', async () => {
     const m3 = await friendly([ashok, bina], host);
     await share(ashok, m3);

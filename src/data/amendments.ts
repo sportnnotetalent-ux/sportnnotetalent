@@ -7,7 +7,7 @@
  */
 import { loadSport } from '../sports/registry';
 import { effectiveLog, replayLog, statDeltas, type AmendOp, type StatDelta } from '../sports/amend';
-import { appendMatchEvent, endMatchManually, getMatch, getMatchEvents, mapThroughDisputes, matchStatTotals, recordStatLine, syncMatchStatLines, updateMatchSnapshot } from './repos';
+import { appendMatchEvent, newestEventKey, endMatchManually, getMatch, getMatchEvents, mapThroughDisputes, matchStatTotals, recordStatLine, syncMatchStatLines, updateMatchSnapshot } from './repos';
 import { newUuid } from '../core/deviceId';
 import { deltasBesideTotals } from './statSync';
 import type { MatchEventRecord, SportId } from '../core/types';
@@ -43,7 +43,7 @@ export async function planAmendment(matchId: string, sport: SportId, config: Rec
  *  refreshed snapshot (a manual result is kept — see updateMatchSnapshot). */
 export async function publishAmendment(matchId: string, sport: SportId, config: Record<string, unknown> | undefined, ops: AmendOp[], lines: string[], byName: string): Promise<void> {
   const plan = await planAmendment(matchId, sport, config, ops, lines, byName);
-  await appendMatchEvent(matchId, plan.record);
+  await appendMatchEvent(matchId, { ...plan.record, base: await newestEventKey(matchId) }); // shared scoring
   const { plugin, afterState } = plan;
   const m = await getMatch(matchId);
   // Decision 6 / parity #19: a sport with absolute totals re-syncs the whole
