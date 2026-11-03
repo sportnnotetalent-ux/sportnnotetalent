@@ -20,7 +20,7 @@ import { SportFormatEditor, defaultsFor, type FormatVal } from '../components/Fo
 import { VenueField } from '../components/VenueField';
 import { ConflictNotice } from '../components/ConflictNotice';
 import { ClubQuickPick } from '../components/ClubQuickPick';
-import { SPORT_LIST, getSportMeta, participantMode, type ParticipantMode } from '../sports/sportMeta';
+import { SPORT_LIST, SPORT_META, getSportMeta, participantMode, type ParticipantMode } from '../sports/sportMeta';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LAST_SPORT_KEY, quickSideName, quickSideShort, startSport, isQuickPlaceholder } from '../core/quickGame';
 import { getMyPersonalisation } from '../data/personalise';
@@ -69,7 +69,9 @@ export default function ScheduleMatchScreen() {
 
   // No sport chosen yet → the picker reads "Select a sport" and the rest of the
   // form (teams, format) stays hidden until one is picked.
-  const [sport, setSport] = useState<SportId | null>(route.params?.sport ?? null);
+  // screen sweep: a link with a sport id we don't know (table_tennis …) opens the picker, never crashes
+  const routeSport = route.params?.sport && Object.hasOwn(SPORT_META, route.params.sport) ? route.params.sport : null;
+  const [sport, setSport] = useState<SportId | null>(routeSport);
   const [teamNonce, setTeamNonce] = useState(0); // bump to refetch after creating a team on the fly
   const teams = useTeams(sport ?? undefined, teamNonce);
   // Individual sports pick PEOPLE: everyone in the app is searchable, not just
@@ -92,7 +94,7 @@ export default function ScheduleMatchScreen() {
   const [groupLabel, setGroupLabel] = useState('A');
   // Per-match rules — seeded from the sport's defaults so casual users can ignore it.
   const [format, setFormat] = useState<Record<string, FormatVal>>(
-    () => (route.params?.sport ? defaultsFor(getSportMeta(route.params.sport).formatFields ?? []) : {})
+    () => (routeSport ? defaultsFor(getSportMeta(routeSport).formatFields ?? []) : {})
   );
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -130,7 +132,7 @@ export default function ScheduleMatchScreen() {
   const sportNow = useRef(sport);
   sportNow.current = sport;
   useEffect(() => {
-    if (!isFriendly || route.params?.sport || cloneOf) return;
+    if (!isFriendly || routeSport || cloneOf) return;
     let on = true;
     (async () => {
       const last = await AsyncStorage.getItem(LAST_SPORT_KEY).catch(() => null);

@@ -121,3 +121,23 @@ describe('the screen', () => {
     assert.match(card, /unit\.one/);
   });
 });
+
+describe('screen sweep: a zero that means something', () => {
+  test('"0 = auto / no limit / none" reads as words, not 0', () => {
+    const f = (hint: string) => ({ key: 'k', label: 'L', type: 'number' as const, default: 0, hint });
+    assert.equal(matchRules([f('0 = auto (overs ÷ 5, rounded up; none for Test)')], { k: 0 })[0].value, 'Auto');
+    assert.equal(matchRules([f('0 = no limit')], {})[0].value, 'No limit');
+    assert.equal(matchRules([f('0 = timed game · 21 for 3×3/streetball')], { k: 0 })[0].value, 'Timed game');
+    assert.equal(matchRules([f('0 = none · the player returns by himself')], { k: 0 })[0].value, 'None');
+    assert.equal(matchRules([f('0 = auto (overs ÷ 5)')], { k: 4 })[0].value, '4');
+    assert.equal(matchRules([{ key: 'k', label: 'L', type: 'number', default: 0 }], { k: 0 })[0].value, '0', 'no hint: the number');
+  });
+});
+
+describe('screen sweep: an unknown sport in a link', () => {
+  test('ScheduleMatch ignores a sport id it doesn\'t know (no crash)', () => {
+    const src = read('src/screens/ScheduleMatchScreen.tsx');
+    assert.match(src, /const routeSport = .*SPORT_META/);
+    assert.ok(!/getSportMeta\(route\.params\.sport\)/.test(src));
+  });
+});

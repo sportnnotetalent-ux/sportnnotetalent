@@ -32,6 +32,10 @@ function valueText(f: FormatField, v: unknown): string {
   const opt = f.options?.find((o) => o.value === v);
   if (opt) return opt.label;
   if (typeof v === 'boolean') return v ? 'On' : 'Off';
+  // screen sweep: a zero the field gives a meaning ("0 = auto (…)", "0 = no limit")
+  // reads as that meaning, never a bare 0
+  const zero = v === 0 ? /^0 = ([^(·.—]+)/.exec(f.hint ?? '')?.[1]?.trim() : undefined;
+  if (zero) return zero.charAt(0).toUpperCase() + zero.slice(1);
   if (typeof v === 'number' && Number.isFinite(v)) return String(v);
   if (typeof v === 'string' && v.trim()) return v.trim();
   return String(f.default);
