@@ -36,8 +36,14 @@ export type On = 'red' | 'colour' | Colour;
 
 export type VisitEnd = 'miss' | 'safety' | 'foul' | 'frame' | 'respot';
 /** One turn at the table. `pts` = the break; `pots` = balls potted; `shots` =
- *  potting strokes; `fb` = a free ball was potted in it. */
-export interface Visit { side: Side; pts: number; pots: number; shots: number; fb?: 1 }
+ *  potting strokes; `fb` = a free ball was potted in it.
+ *  Cue batch 6 (all optional, absent when 0 — an older visit has none):
+ *  `mk` = the break's make-up, balls potted by kind ('free' = a free ball);
+ *  `tc` = a total clearance (every red and every colour, from the first red
+ *  to the last black, in this visit); `lp` / `lm` = long pots made / missed
+ *  and `rs` = strokes with the rest (only when the organiser tracks them). */
+export type MakeUp = Partial<Record<Ball | 'free', number>>;
+export interface Visit { side: Side; pts: number; pots: number; shots: number; fb?: 1; mk?: MakeUp; tc?: 1; lp?: number; lm?: number; rs?: number }
 export interface VisitRecord extends Visit { end: VisitEnd }
 
 /** Optional foul types for the stats (the S3 R11 list, grouped). */
@@ -125,6 +131,9 @@ export interface SnookerState {
   tossed?: true;
   /** the organiser's preferred input (a UI hint; both kinds of action always work) */
   scoringMode: 'shot' | 'quick';
+  /** cue batch 6 — Stats to track: long pots and rest shots (format
+   *  `trackLongRest`; absent on every older match) */
+  trackLR?: true;
   frames: FrameRecord[];
   framesWon: { home: number; away: number };
   /** the frame in play; null once the match has ended */
@@ -201,6 +210,7 @@ export function createInitialState(config?: Record<string, unknown>): SnookerSta
   return {
     sport: 'snooker', reds, bestOf, framesToWin: (bestOf + 1) / 2, firstBreak,
     scoringMode: read('scoringMode') === 'quick' ? 'quick' : 'shot',
+    ...(read('trackLongRest') === true ? { trackLR: true as const } : {}),
     frames: [], framesWon: { home: 0, away: 0 }, frame: newFrame(1, firstBreak, reds), ended: false, winner: null, seq: 0,
   };
 }
@@ -317,7 +327,7 @@ function reduce(s: SnookerState, a: SnookerAction): SnookerState {
   switch (a.type) {
     case 'POT': return striking ? pot(s, fr, p) : s;
     case 'MISS':
-    case 'SAFETY': return striking ? endVisit(s, fr, a.type === 'MISS' ? 'miss' : 'safety') : s;
+    case 'SAFETY': return striking ? endVisit(s, fr, a.type === 'MISS' ? 'miss' : 'safety', p) : s;
     case 'FOUL': {
       if (a.side !== undefined && !isSide(a.side)) return s;
       // B-03 — a non-striker penalty (S3 R3(k)) says so and names the
@@ -456,12 +466,20 @@ function pot(s: SnookerState, fr: LiveFrame, p: Record<string, unknown> | undefi
   } else return s;
 
   const score = { ...fr.score, [fr.striker]: fr.score[fr.striker] + pts };
-  const visit: Visit = { ...fr.visit, pts: fr.visit.pts + pts, pots: fr.visit.pots + pots, shots: fr.visit.shots + 1, ...(fb ? { fb: 1 as const } : {}) };
+  // cue batch 6 — the make-up: each ball by kind (several reds count each; a free ball as 'free')
+  const mk: MakeUp = { ...(fr.visit.mk ?? {}) };
+  const add = (k: Ball | 'free', n: number) => { if (n > 0) mk[k] = (mk[k] ?? 0) + n; };
+  if (ball === 'free') add('free', 1);
+  else if (ball === 'red') { add('red', pots - (fb ? 1 : 0)); if (fb) add('free', 1); }
+  else add(ball as Colour, 1);
+  const visit: Visit = { ...fr.visit, pts: fr.visit.pts + pts, pots: fr.visit.pots + pots, shots: fr.visit.shots + 1, ...(fb ? { fb: 1 as const } : {}), mk, ...strokeFlags(s, fr.visit, p, true) };
   const next: LiveFrame = { ...afterStroke(fr), score, visit, redsLeft, on, ...(fr.respot ? { respotShots: (fr.respotShots ?? 0) + 1 } : {}) };
 
   // the last black (S3 R4(a)) or the re-spotted black (R4(b)(iv))
   if (ball === 'black' && fr.on === 'black') {
     if (fr.respot) return endFrame(s, next, fr.striker, 'respot');
+    // cue batch 6 — a total clearance: every red of the frame went down in this visit
+    if ((mk.red ?? 0) >= s.reds) visit.tc = 1;
     if (score.home === score.away) {
       return blackDecides(s, { ...next, visits: [...next.visits, { ...visit, end: 'respot' }], visit: emptyVisit(fr.striker) }, 'black', fr.striker);
     }
@@ -470,13 +488,28 @@ function pot(s: SnookerState, fr: LiveFrame, p: Record<string, unknown> | undefi
   return { ...s, frame: next, seq: s.seq + 1 };
 }
 
-function endVisit(s: SnookerState, fr: LiveFrame, end: 'miss' | 'safety'): SnookerState {
+/** Cue batch 6 — a stroke's optional long-pot / rest flags (`long`, `rest`:
+ *  `true` only), counted on the visit only while the organiser tracks them. */
+function strokeFlags(s: SnookerState, v: Visit, p: Record<string, unknown> | undefined, potted: boolean): Partial<Visit> {
+  if (s.trackLR !== true) return {};
+  const out: Partial<Visit> = {};
+  if (own(p, 'long') === true) {
+    if (potted) out.lp = (num(v.lp) ?? 0) + 1;
+    else out.lm = (num(v.lm) ?? 0) + 1;
+  }
+  if (own(p, 'rest') === true) out.rs = (num(v.rs) ?? 0) + 1;
+  return out;
+}
+
+function endVisit(s: SnookerState, fr: LiveFrame, end: 'miss' | 'safety', p?: Record<string, unknown>): SnookerState {
   if (full(fr)) return s;
   const striker = other(fr.striker);
+  // a missed pot may be a long one, or played with the rest (cue batch 6)
+  const ended: Visit = { ...fr.visit, ...(end === 'miss' ? strokeFlags(s, fr.visit, p, false) : {}) };
   return {
     ...s,
     frame: {
-      ...afterStroke(fr), visits: [...fr.visits, { ...fr.visit, end }], striker, visit: emptyVisit(striker),
+      ...afterStroke(fr), visits: [...fr.visits, { ...ended, end }], striker, visit: emptyVisit(striker),
       on: nextTurnOn(fr.on, fr.redsLeft), ...(fr.respot ? { respotShots: (fr.respotShots ?? 0) + 1 } : {}),
     },
     seq: s.seq + 1,
@@ -686,6 +719,12 @@ export interface SnookerSideStats {
   safetiesWon: number;
   /** potting strokes ÷ (potting strokes + missed pots); null = none attempted */
   potSuccess: number | null;
+  /** cue batch 6 — total clearances; long pots made and attempted (made +
+   *  missed) and rest shots, counted only on visits that carry them */
+  totalClearances: number;
+  longPots: number;
+  longAttempts: number;
+  restShots: number;
   /** every break of 1 or more, in the order made */
   breaks: number[];
   highestBreak: number;
@@ -698,7 +737,8 @@ export interface SnookerSideStats {
 
 const zeroStats = (): SnookerSideStats => ({
   framesWon: 0, points: 0, potted: 0, penaltyReceived: 0, penaltyConceded: 0, fouls: 0, foulsByKind: {}, missesCalled: 0, freeBalls: 0,
-  visits: 0, potStrokes: 0, missedPots: 0, safeties: 0, safetiesJudged: 0, safetiesWon: 0, potSuccess: null, breaks: [], highestBreak: 0, fiftyPlus: 0, centuries: 0,
+  visits: 0, potStrokes: 0, missedPots: 0, safeties: 0, safetiesJudged: 0, safetiesWon: 0, potSuccess: null,
+  totalClearances: 0, longPots: 0, longAttempts: 0, restShots: 0, breaks: [], highestBreak: 0, fiftyPlus: 0, centuries: 0,
   maximums: 0, detailedFrames: 0, quickFrames: 0,
 });
 
@@ -762,6 +802,12 @@ function statsOf(s: SnookerState): { home: SnookerSideStats; away: SnookerSideSt
       if (v.pts >= 50) t.fiftyPlus++;
       if (v.pts >= 100) t.centuries++;
       if (v.pts === max && !v.fb) t.maximums++;
+      // cue batch 6 — whole numbers only (a stored visit is public)
+      const k = (x: unknown) => { const n = num(x); return n !== undefined && Number.isInteger(n) && n > 0 && n <= 999 ? n : 0; };
+      if (v.tc === 1) t.totalClearances++;
+      t.longPots += k(v.lp);
+      t.longAttempts += k(v.lp) + k(v.lm);
+      t.restShots += k(v.rs);
     }
     // cue batch 5 — safety success: the opponent's next visit, once it ended
     f.visits.forEach((v, i) => {

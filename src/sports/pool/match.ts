@@ -40,7 +40,7 @@ export type Counts = Record<string, number>;
 export interface FeedEntry {
   /** the rack it belongs to */
   n: number;
-  /** the action type (LAG, BREAK, POT, MISS, SAFETY, FOUL, PUSH, CHOOSE, RACK, STALEMATE) */
+  /** the action type (LAG, BREAK, POT, MISS, SAFETY, FOUL, PUSH, CHOOSE, RACK, STALEMATE; cue batch 6: EXTENSION) */
   t: string;
   /** who acted: the shooter / breaker / fouler, the chooser, the rack winner, the breaker chosen */
   s?: Side;
@@ -86,10 +86,14 @@ export interface PoolCredit {
 export interface PoolMatch extends PoolState {
   perSide?: 1 | 2;
   /** turns: 'turn' = scotch doubles partners play full turns (absent = every other shot) */
-  opt?: { threeFoul?: boolean; threeBallRule?: boolean; tenEarly?: boolean; turns?: 'turn' };
+  opt?: { threeFoul?: boolean; threeBallRule?: boolean; tenEarly?: boolean; turns?: 'turn'; shotClock?: true };
   cr?: PoolCredit;
   feed?: FeedEntry[];
   rat?: number[];
+  /** cue batch 6 — the rack in which each side last took its shot-clock
+   *  extension (WPA playing regulations: one per player per rack). Absent
+   *  until the first one. */
+  xr?: Partial<PerSide<number>>;
 }
 
 /** A scotch-doubles pair, plus room for a substitute or two. */
@@ -111,8 +115,19 @@ export const SHOT_KEYS = [
   // cue batch 5: every foul kind its own key (before, these counted as foulOther)
   'foulTouch', 'foulDoubleHit', 'foulPush', 'foulJump', 'foulMoving', 'foulNoFoot', 'foulPlacement', 'foulSlowPlay', 'foulOutOfTurn', 'foulIllegalBreak',
   'breakShots', 'breakBalls', 'dryBreaks', 'breakFouls', 'illegalBreaks', 'eightBreaks',
+  // cue batch 6: a pot the shooter did not call (8- / 10-ball: the turn passes)
+  'notCalled',
 ] as const;
 const SHOT_KEY_SET: ReadonlySet<string> = new Set(SHOT_KEYS);
+
+/** Cue batch 6 — the side's own figures (kept per set and side, never per
+ *  player: in scotch doubles both partners share them, like racks won):
+ *  ball in hand received, the choice after the opponent's push-out (played
+ *  from there / handed back), racks re-racked on the side's break (stalemate,
+ *  illegal break, 8 on the break) and shot-clock extensions taken. */
+export const SIDE_KEYS = ['ballInHand', 'pushPlayed', 'pushPassed', 'rerackBreaks', 'extensions'] as const;
+/** Every key a stored credit may hold. */
+const CREDIT_KEYS: readonly string[] = [...SHOT_KEYS, ...SIDE_KEYS];
 
 /** Engine tally field → the stat-line key (who shot). The rest of the tally
  *  (racks, breaks won, break-and-runs, innings…) belongs to the side. */
@@ -144,7 +159,7 @@ const zero = (): PerSide<number> => ({ home: 0, away: 0 });
 function cleanCounts(v: unknown): Counts {
   const out: Counts = {};
   if (!isObj(v)) return out;
-  for (const k of SHOT_KEYS) { const n = cnt(own(v, k)); if (n) out[k] = n; }
+  for (const k of CREDIT_KEYS) { const n = cnt(own(v, k)); if (n) out[k] = n; }
   return out;
 }
 const addCounts = (a: Counts, b: Counts): Counts => {
@@ -180,7 +195,7 @@ export function creditOf(s: unknown): PoolCredit {
   };
 }
 
-const FEED_TYPES: ReadonlySet<string> = new Set(['LAG', 'BREAK', 'POT', 'MISS', 'SAFETY', 'FOUL', 'PUSH', 'CHOOSE', 'RACK', 'STALEMATE']);
+const FEED_TYPES: ReadonlySet<string> = new Set(['LAG', 'BREAK', 'POT', 'MISS', 'SAFETY', 'FOUL', 'PUSH', 'CHOOSE', 'RACK', 'STALEMATE', 'EXTENSION']);
 const KIND_SET: ReadonlySet<string> = new Set(FOUL_KINDS);
 const PENDING: ReadonlySet<string> = new Set(['push', 'wrongPot', 'threeBall', 'illegalBreak', 'eightBreak', 'eightFoul']);
 const balls = (v: unknown, top: number): number[] | undefined => {
@@ -258,6 +273,8 @@ export function poolInit(config?: Record<string, unknown>): PoolMatch {
   const opt: NonNullable<PoolMatch['opt']> = {};
   for (const k of ['threeFoul', 'threeBallRule', 'tenEarly'] as const) if (typeof c[k] === 'boolean') opt[k] = c[k] as boolean;
   if (c.scotchTurns === 'turn') opt.turns = 'turn';
+  // cue batch 6 — the organiser tracks shot-clock extensions (older formats: no key)
+  if (c.trackShotClock === true) opt.shotClock = true;
   return mine({ ...engineInit(config), perSide: readInt(c.playersPerSide, 1, 1, 2) as 1 | 2, opt, cr: emptyCredit(), feed: [], rat: [] });
 }
 
@@ -301,13 +318,42 @@ function reduce(s: PoolMatch, a: unknown): PoolMatch {
     const side = own(a, 'side');
     if (isSide(side) && (isSide(p?.breaks) ? p.breaks : side) === base.firstBreaker && base.rack.breaker === base.firstBreaker) return s;
   }
+  if (own(a, 'type') === 'EXTENSION') return extension(s, a, p ?? undefined);
   const next = engineReducer(base, a as never) as PoolMatch;
   if (next === base) return s;
   return withCredit(base, next, a, p ?? (Object.create(null) as Record<string, unknown>));
 }
 
+/** Cue batch 6 — EXTENSION {side, payload: {rack}}: the player at the table
+ *  takes the shot-clock extension (WPA playing regulations), only when the
+ *  organiser tracks it, during play with no choice waiting, once per side
+ *  per rack. No score effect: a counter, a feed line, the rack it was used in. */
+function extension(s: PoolMatch, a: unknown, p: Record<string, unknown> | undefined): PoolMatch {
+  const r = isObj(s.rack) ? s.rack : null;
+  const side = own(a, 'side');
+  if (!isObj(s.opt) || s.opt.shotClock !== true || s.ended === true || !r || r.phase !== 'play' || r.pending) return s;
+  if (!isSide(side) || side !== r.shooter || !p || p.rack !== r.n) return s;
+  const xr = isObj(s.xr) ? s.xr : {};
+  if (cnt(own(xr, side)) === r.n) return s;
+  const prevX: Partial<PerSide<number>> = {};
+  for (const sd of ['home', 'away'] as const) { const n = cnt(own(xr, sd)); if (n) prevX[sd] = n; }
+  const trusted = ours.has(s);
+  const cr = trusted ? s.cr! : creditOf(s);
+  const si = Math.max(0, Array.isArray(s.sets) ? s.sets.length : 0);
+  const ss = cr.ss.slice();
+  while (ss.length <= si) ss.push({ home: {}, away: {} });
+  ss[si] = { ...ss[si], [side]: addCounts(ss[si][side], { extensions: 1 }) };
+  const e: FeedEntry = { n: r.n, t: 'EXTENSION', s: side };
+  const pid = validPid(p.pid);
+  if (pid && perSideOf(s) === 2 && cr.ids[side].includes(pid)) e.p = pid;
+  const at = cnt(p.at);
+  if (at) e.at = at;
+  const feed = trusted ? appendFeed(s.feed!, e) : capFeed([...feedOf(s), e]);
+  return mine({ ...s, cr: { ...cr, ss }, feed, rat: trusted ? s.rat! : rackTimes(s), xr: { ...prevX, [side]: r.n }, seq: cnt(s.seq) + 1 });
+}
+
 /** The shot's own figures, from the engine's tally before / after it. */
-function shotDelta(type: string, before: Tally | undefined, after: Tally | undefined): Counts {
+function shotDelta(type: string, before: Tally | undefined, after: Tally | undefined, p?: Record<string, unknown>): Counts {
   const d: Counts = {};
   const add = (k: string, n: number) => { if (n > 0) d[k] = (d[k] ?? 0) + n; };
   for (const [f, k] of TALLY_KEY) add(k, cnt(own(after, f)) - cnt(own(before, f)));
@@ -316,6 +362,8 @@ function shotDelta(type: string, before: Tally | undefined, after: Tally | undef
   if (type === 'MISS') add('missShots', 1);
   // a pot; a 9-ball "safety" that pocketed a ball is scored as a pot (5.5)
   if (type === 'POT' || (type === 'SAFETY' && !d.safetyShots && d.ballsPotted)) add('potShots', 1);
+  // cue batch 6 — the shooter did not call it (the engine passed the turn)
+  if (type === 'POT' && p?.called === false) add('notCalled', 1);
   return d;
 }
 
@@ -340,7 +388,7 @@ function withCredit(base: PoolMatch, next: PoolMatch, a: unknown, p: Record<stri
 
   if (actor) {
     const tb = base.tally?.[actor], ta = next.tally?.[actor];
-    const d = shotDelta(type, tb, ta);
+    const d = shotDelta(type, tb, ta, p);
     const si = Math.max(0, Array.isArray(base.sets) ? base.sets.length : 0);
     const ss = cr.ss.slice();
     while (ss.length <= si) ss.push({ home: {}, away: {} });
@@ -363,6 +411,25 @@ function withCredit(base: PoolMatch, next: PoolMatch, a: unknown, p: Record<stri
 
   // the feed line
   const ended = Array.isArray(next.racks) && Array.isArray(base.racks) && next.racks.length > base.racks.length;
+
+  // cue batch 6 — the side's own figures (never a player's: see SIDE_KEYS)
+  const sideAdd: Array<[Side, string]> = [];
+  if (!ended && r1) {
+    // came to the table with ball in hand (not the same visit carrying it on)
+    if (r1.bih && isSide(r1.shooter) && !(r0.bih && r0.shooter === r1.shooter && r0.phase === r1.phase)) sideAdd.push([r1.shooter, 'ballInHand']);
+    if (r1.reracks > r0.reracks && isSide(r0.breaker)) sideAdd.push([r0.breaker, 'rerackBreaks']);
+  }
+  if (type === 'CHOOSE' && r0.pending?.kind === 'push' && isSide(r0.pending.by)) {
+    if (p.choice === 'play') sideAdd.push([r0.pending.by, 'pushPlayed']);
+    else if (p.choice === 'pass') sideAdd.push([r0.pending.by, 'pushPassed']);
+  }
+  if (sideAdd.length) {
+    const si = Math.max(0, Array.isArray(base.sets) ? base.sets.length : 0);
+    const ss = cr.ss.slice();
+    while (ss.length <= si) ss.push({ home: {}, away: {} });
+    for (const [sd, k] of sideAdd) ss[si] = { ...ss[si], [sd]: addCounts(ss[si][sd], { [k]: 1 }) };
+    cr = { ...cr, ss };
+  }
   const e: FeedEntry = { n: r0.n, t: type };
   const who = actor ?? (type === 'LAG' ? next.firstBreaker : type === 'CHOOSE' ? r0.pending?.by : type === 'RACK' ? (isSide(side) ? side : null) : type === 'STALEMATE' ? r0.breaker : null);
   if (isSide(who)) e.s = who;

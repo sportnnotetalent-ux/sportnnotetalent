@@ -33,6 +33,8 @@ export const SNOOKER_SHOT_KEYS = [
   // cue batch 5: safety success, and every foul kind its own key
   'safetiesJudged', 'safetiesWon',
   'foulInOff', 'foulNoContact', 'foulWrongBall', 'foulPottedWrong', 'foulPush', 'foulJump', 'foulTouch', 'foulOffTable', 'foulOther',
+  // cue batch 6: total clearances; long pots / rest shots (only when the match tracked them)
+  'totalClearances', 'longPots', 'longAttempts', 'restShots',
 ] as const;
 
 /** Cue batch 5: the engine's foul kind → its career key. */
@@ -59,6 +61,9 @@ export function snookerSideRecord(s: SnookerState, side: Side): Record<string, n
     });
     // cue batch 5: the foul kinds (0 when none; a fouls without a kind counts in none)
     for (const k of FOUL_KINDS) rec[SNOOKER_FOUL_KEY[k]] = n(t.foulsByKind?.[k]);
+    rec.totalClearances = n(t.totalClearances);
+    // cue batch 6: never a false 0 — only a match that tracked them writes these
+    if (s.trackLR === true) Object.assign(rec, { longPots: n(t.longPots), longAttempts: n(t.longAttempts), restShots: n(t.restShots) });
   }
   return rec;
 }

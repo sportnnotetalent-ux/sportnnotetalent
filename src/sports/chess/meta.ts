@@ -29,6 +29,13 @@ export const CHESS_META: SportMeta = {
       hint: 'optional — e.g. 90 for 90+30; 0 = not set' },
     { key: 'tcInc', label: 'Clock: seconds added per move', type: 'number', default: 0, min: 0, max: 600, advanced: true,
       hint: 'the increment — e.g. 30 for 90+30' },
+    // cue batch 6 (audit row 17) — FIDE classical: a second period after move N, and a delay
+    { key: 'tcMoves', label: 'Clock: moves to the first time control', type: 'number', default: 0, min: 0, max: 200, advanced: true,
+      hint: 'optional — e.g. 40 for 90/40 + 30; 0 = one period' },
+    { key: 'tcBase2', label: 'Clock: minutes added at the time control', type: 'number', default: 0, min: 0, max: 600, advanced: true,
+      hideWhen: { key: 'tcMoves', value: 0 }, hint: 'e.g. 30 for 90/40 + 30' },
+    { key: 'tcDelay', label: 'Clock: delay (seconds per move)', type: 'number', default: 0, min: 0, max: 600, advanced: true,
+      hint: 'optional — a Bronstein / US delay instead of (or with) the increment' },
     // SD-121 — knockout tie-breaks (FIDE World Cup style): used only in knockout
     // matches; a level match goes on to rapid, then blitz pairs, then Armageddon.
     { key: 'koGames', label: 'Knockout: games per match', type: 'number', default: 1, min: 1, max: 12, advanced: true,

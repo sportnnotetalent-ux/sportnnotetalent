@@ -62,6 +62,8 @@ export function chessResultCredit(
   winner: 'home' | 'away' | 'draw',
   method: string | null | undefined,
   dff: boolean,
+  /** cue batch 6 — ½-0 / 0-½: the winner's ½ counts as a draw, the other's 0 as a loss */
+  uneven = false,
 ): { playerId: string; stat: string; by: number; extra?: Record<string, number>; side: 'home' | 'away' } | undefined {
   if (!p) return undefined;
   // IDs-only scoring (docs/privacy/ids-only-scoring.md): match events are
@@ -69,6 +71,7 @@ export function chessResultCredit(
   const base = { playerId: p.id, by: 1, side };
   if (dff) return { ...base, stat: 'forfeitLosses' };
   if (method === 'forfeit' && winner !== 'draw') return { ...base, stat: winner === side ? 'forfeitWins' : 'forfeitLosses' };
+  if (uneven && winner !== 'draw') return { ...base, stat: 'games', extra: winner === side ? { draws: 1, drawsOther: 1 } : { losses: 1, lossesOther: 1 } };
   const outcome = winner === 'draw' ? 'draws' : winner === side ? 'wins' : 'losses';
   const how = winner === 'draw' ? drawMethodKey(method) : winner === side ? winMethodKey(method) : lossMethodKey(method);
   return { ...base, stat: 'games', extra: { [outcome]: 1, ...(how ? { [how]: 1 } : {}) } };

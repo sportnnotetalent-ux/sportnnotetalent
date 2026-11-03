@@ -46,7 +46,22 @@ export interface BoardResult {
    *  to the board winner) and / or an improper (foul) stroke (+1). Only on a
    *  match scored with `foulScore` (older matches: absent). */
   endFoul?: EndFoul;
+  /** Cue batch 6 (audit row 18) — the board was conceded or awarded, and why
+   *  (the umpire's call; scored from the coins and Queen as recorded). Only
+   *  on a board recorded as one (old logs: absent); never on a penalty board. */
+  award?: AwardReason;
 }
+
+/** Cue batch 6 — the award / concession vocabulary the cue sports share. */
+export const AWARD_REASONS = ['concession', 'conduct', 'time', 'forfeit', 'other'] as const;
+export type AwardReason = typeof AWARD_REASONS[number];
+/** A whitelisted reason, or undefined (junk, a prototype key, a number…). */
+export const awardReasonOf = (v: unknown): AwardReason | undefined =>
+  (typeof v === 'string' && (AWARD_REASONS as readonly string[]).includes(v) ? (v as AwardReason) : undefined);
+/** Cue batch 6 — a game conceded or awarded: recorded at the target for
+ *  `winner`; `boards` = boards played in that game when it was awarded (a
+ *  board correction re-applies it there). */
+export interface GameAward { game: number; winner: Side; boards: number; reason?: AwardReason }
 
 /** Round 2 — ICF r.102–112: what the board-ending stroke's foul adds to the
  *  board winner's points (each part claimed by the winner). */
@@ -284,6 +299,9 @@ export interface CarromState {
    *  covered before a board can end, so the board form offers Winner / Loser
    *  only. Display only (no score rule); absent on other formats. */
   icf?: true;
+  /** Cue batch 6 — games conceded or awarded (AWARD_GAME), in order. Absent
+   *  until the first (every older match). */
+  gameAwards?: GameAward[];
 }
 
 /** SD-117c — one board as the editor replays it (EDIT_LOG). */
@@ -299,6 +317,8 @@ export interface BoardInput {
   at?: number;
   /** Round 2 — the board-ending stroke's foul (with `foulScore`) */
   endFoul?: EndFoul;
+  /** Cue batch 6 — conceded / awarded, and why */
+  award?: AwardReason;
 }
 
 export function init(config?: Record<string, unknown>): CarromState {
@@ -323,14 +343,22 @@ export function init(config?: Record<string, unknown>): CarromState {
 /** Batch 1 (cue-board audit #1) — the answers to "Queen covered by" on a
  *  played-out board: under the ICF format the Queen is always covered (by the
  *  winner or the loser) before a board ends; other formats keep "Not covered". */
-export const queenChoices = (s: Pick<CarromState, 'icf'>): QueenBy[] =>
-  (s.icf ? ['winner', 'loser'] : ['winner', 'loser', 'none']);
+export const queenChoices = (s: Pick<CarromState, 'icf'>, award = false): QueenBy[] =>
+  // cue batch 6 — a conceded / awarded board may end with the Queen still on the board
+  (s.icf && !award ? ['winner', 'loser'] : ['winner', 'loser', 'none']);
 
 /** Batch 1 — the board form can record: a penalty board, or a played-out board
  *  with the coins left AND the Queen answered (a skipped Queen used to drop
  *  the winner's 3 points silently). Old boards are never re-asked. */
-export const boardReady = (s: Pick<CarromState, 'icf'>, b: { penalty: boolean; coins: number | null; queenBy: QueenBy | null }): boolean =>
-  b.penalty || (b.coins != null && b.queenBy != null && queenChoices(s).includes(b.queenBy));
+export const boardReady = (s: Pick<CarromState, 'icf'>, b: { penalty: boolean; coins: number | null; queenBy: QueenBy | null; award?: boolean }): boolean =>
+  b.penalty || (b.coins != null && b.queenBy != null && queenChoices(s, b.award === true).includes(b.queenBy));
+
+/** Cue batch 6 — AWARD_GAME: the game in play conceded / awarded to `side`
+ *  (stamped with the game number, so a repeated tap can't end the next one). */
+export const awardGameAction = (s: CarromState, side: Side, reason?: AwardReason | null): { type: string; side: Side; payload: Record<string, unknown> } => {
+  const r = awardReasonOf(reason);
+  return { type: 'AWARD_GAME', side, payload: { game: (s?.games?.length ?? 0) + 1, ...(r ? { reason: r } : {}) } };
+};
 
 /** Round 2 — a board-ending foul from a payload (unknown keys dropped). */
 export function readEndFoul(v: unknown): EndFoul | undefined {
@@ -424,6 +452,8 @@ export function reducer(s: CarromState, a: { type: string; side?: Side; payload?
     const { track: _old, ...rest } = s;
     return t ? { ...rest, track: t } : rest;
   }
+  // Cue batch 6 — a game conceded / awarded (a new action: no older log has one)
+  if (a.type === 'AWARD_GAME') return awardGame(s, a);
   if (a.type !== 'BOARD' || s.ended || (a.side !== 'home' && a.side !== 'away')) return s;
   const side = a.side;
   const penalty = a.payload?.penalty === true;
@@ -443,8 +473,10 @@ export function reducer(s: CarromState, a: { type: string; side?: Side; payload?
   // Deep wave — optional detail + the time stamp (new payload keys: old logs carry none)
   const det = readDetail(a.payload?.det);
   const at = Number(a.payload?.at);
+  // cue batch 6 — conceded / awarded (a new payload key; a penalty board is its own kind)
+  const award = penalty ? undefined : awardReasonOf(a.payload?.award);
   const boards = [...s.boards, { winner: side, coins, queen, points: pts, game: gameNo, ...(slam ? { slam } : {}), ...(queenBy ? { queenBy } : {}), ...(penalty ? { penalty: true as const } : {}),
-    ...(det ? { det } : {}), ...(Number.isFinite(at) && at > 0 ? { at } : {}), ...(endFoul ? { endFoul } : {}) }];
+    ...(det ? { det } : {}), ...(Number.isFinite(at) && at > 0 ? { at } : {}), ...(endFoul ? { endFoul } : {}), ...(award ? { award } : {}) }];
   const credited = creditsOf(side, a, s.credited);
   if (credited) s = { ...s, credited };
   // SD-117c — this board's own credits (for the editor's replay)
@@ -464,6 +496,40 @@ export function reducer(s: CarromState, a: { type: string; side?: Side; payload?
   const gamesWon = { ...s.gamesWon, [gameWinner]: s.gamesWon[gameWinner] + 1 };
   const ended = gamesWon[gameWinner] >= s.gamesToWin;
   return { ...s, current: { home: 0, away: 0 }, boardsInGame: 0, boards, games, gamesWon, ended, seq: s.seq + 1 };
+}
+
+/** Cue batch 6 — AWARD_GAME {side, payload: {game, reason?}}: the game in
+ *  play ends for `side`, recorded at the target (the other side keeps its
+ *  points); the next game starts, or the match ends. */
+function awardGame(s: CarromState, a: { side?: Side; payload?: Record<string, unknown> }): CarromState {
+  const side = a.side;
+  if (s.ended || (side !== 'home' && side !== 'away')) return s;
+  const own = a.payload && Object.prototype.hasOwnProperty.call(a.payload, 'game') ? a.payload.game : undefined;
+  const game = s.games.length + 1;
+  if (own !== game) return s;
+  const opp: Side = side === 'home' ? 'away' : 'home';
+  const final = { [side]: s.target, [opp]: Math.max(0, Math.min(s.current[opp], s.target - 1)) } as { home: number; away: number };
+  const reason = awardReasonOf(a.payload?.reason);
+  const games = [...s.games, [final.home, final.away] as [number, number]];
+  const gamesWon = { ...s.gamesWon, [side]: s.gamesWon[side] + 1 };
+  const ended = gamesWon[side] >= s.gamesToWin;
+  const rec: GameAward = { game, winner: side, boards: s.boardsInGame, ...(reason ? { reason } : {}) };
+  return { ...s, current: { home: 0, away: 0 }, boardsInGame: 0, games, gamesWon, ended, gameAwards: [...(s.gameAwards ?? []), rec], seq: s.seq + 1 };
+}
+
+/** A stored award list, read defensively. */
+function readAwards(v: unknown): GameAward[] {
+  if (!Array.isArray(v)) return [];
+  const out: GameAward[] = [];
+  for (const x of v.slice(0, 20)) {
+    if (!x || typeof x !== 'object') continue;
+    const o = x as Record<string, unknown>;
+    const game = Number(o.game), boards = Number(o.boards);
+    if (!Number.isInteger(game) || game < 1 || (o.winner !== 'home' && o.winner !== 'away') || !Number.isInteger(boards) || boards < 0) continue;
+    const reason = awardReasonOf(o.reason);
+    out.push({ game, winner: o.winner, boards, ...(reason ? { reason } : {}) });
+  }
+  return out;
 }
 
 export function result(s: CarromState): { winner: Side | 'draw'; home: number; away: number } | null {
@@ -595,7 +661,7 @@ export const slamFor = (winner: Side, breaker: Side | null): Slam | null =>
 /** Back to board 1 of game 1 keeping the format, the toss and the players
  *  credited so far — the clean slate an EDIT_LOG replays onto. */
 const clearMatch = (s: CarromState): CarromState => {
-  const { boardBy: _b, ...rest } = s;
+  const { boardBy: _b, gameAwards: _g, ...rest } = s;
   return { ...rest, current: { home: 0, away: 0 }, boardsInGame: 0, boards: [], games: [], gamesWon: { home: 0, away: 0 }, ended: false, seq: 0 };
 };
 
@@ -606,10 +672,11 @@ export function boardAction(b: BoardInput): { type: string; side: Side; payload:
   // Deep wave — the board's detail and time stamp ride along (absent = as
   // before); round 2 — and the board-ending foul
   const extra = { ...(b.det ? { det: b.det } : {}), ...(b.at ? { at: b.at } : {}), ...(b.endFoul ? { endFoul: b.endFoul } : {}) };
+  const award = b.penalty ? undefined : awardReasonOf(b.award);
   return {
     type: 'BOARD', side: b.side,
     payload: b.penalty ? { coins: 0, queen: false, penalty: true, ...extra }
-      : { coins: b.coins, queen: b.queenBy ? b.queenBy === 'winner' : !!b.queen, ...(b.queenBy ? { queenBy: b.queenBy } : {}), ...(b.slam ? { slam: b.slam } : {}), ...extra },
+      : { coins: b.coins, queen: b.queenBy ? b.queenBy === 'winner' : !!b.queen, ...(b.queenBy ? { queenBy: b.queenBy } : {}), ...(b.slam ? { slam: b.slam } : {}), ...extra, ...(award ? { award } : {}) },
     attribution: attrOf(b.by?.[0]), attribution2: attrOf(b.by?.[1]),
   };
 }
@@ -617,7 +684,16 @@ export function boardAction(b: BoardInput): { type: string; side: Side; payload:
 /** Replay a corrected board list through this reducer: games, totals and the
  *  match result re-derive (a board limit or a game end can move). */
 export function replayBoards(s: CarromState, boards: BoardInput[]): CarromState {
-  return boards.reduce((st, b) => reducer(st, boardAction(b)), clearMatch(s));
+  // cue batch 6 — an awarded game is re-applied where it was awarded (its
+  // game number, once that game has had as many boards)
+  const awards = readAwards(s?.gameAwards);
+  const apply = (st: CarromState): CarromState => {
+    for (const aw of awards) {
+      if (!st.ended && aw.game === st.games.length + 1 && st.boardsInGame >= aw.boards) st = reducer(st, awardGameAction(st, aw.winner, aw.reason));
+    }
+    return st;
+  };
+  return boards.reduce((st, b) => apply(reducer(st, boardAction(b))), apply(clearMatch(s)));
 }
 
 /** The board list a state replays from (the editor's rows). */
@@ -628,6 +704,7 @@ export function boardInputs(s: CarromState): BoardInput[] {
     ...(b.penalty ? { penalty: true } : {}),
     ...(s.boardBy?.[i]?.length ? { by: s.boardBy[i] } : {}),
     ...(b.det ? { det: b.det } : {}), ...(b.at ? { at: b.at } : {}), ...(b.endFoul ? { endFoul: b.endFoul } : {}),
+    ...(b.award ? { award: b.award } : {}),
   }));
 }
 

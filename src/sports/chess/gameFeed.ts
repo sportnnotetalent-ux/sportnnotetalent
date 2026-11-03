@@ -11,7 +11,27 @@
  *     (and the game in play its moves so far).
  * Derived from the state (the event log), so a taken-back move re-derives it.
  */
-import { clockText, koPhases, koStatus, KO_PHASE_LABEL, METHOD_LABEL, isDoubleForfeit, openingOf, resultSentence, listMoves, type ChessState, type Side } from './engine.ts';
+import { clockText, koPhases, koStatus, KO_PHASE_LABEL, METHOD_LABEL, isDoubleForfeit, openingOf, resultSentence, listMoves, MAX_EVENTS, type ArbiterEvent, type ChessState, type Side } from './engine.ts';
+
+/** Cue batch 6 — "2 minutes", "1 minute", "1:30". */
+const addedText = (t: number): string => (t % 60 === 0 ? `${t / 60} minute${t === 60 ? '' : 's'}` : clockText(t));
+
+/** Cue batch 6 — the arbiter's events as items, in order (a stored list is
+ *  read defensively: known kinds and sides only, at most MAX_EVENTS). */
+export function arbiterItems(events: unknown, name: (sd: Side) => string, idp = ''): FeedItem[] {
+  if (!Array.isArray(events)) return [];
+  const out: FeedItem[] = [];
+  events.slice(0, MAX_EVENTS).forEach((e: ArbiterEvent, i) => {
+    if (!e || typeof e !== 'object' || (e.s !== 'home' && e.s !== 'away')) return;
+    const opp: Side = e.s === 'home' ? 'away' : 'home';
+    const at = typeof e.at === 'number' && Number.isFinite(e.at) && e.at > 0 ? { at: e.at } : {};
+    if (e.k === 'illegal') {
+      const t = typeof e.t === 'number' && Number.isInteger(e.t) && e.t > 0 && e.t <= 600 ? e.t : 0;
+      out.push({ id: `${idp}ev${i}`, text: `Illegal move by ${name(e.s)}${t ? `: ${addedText(t)} added for ${name(opp)}` : ''}`, side: e.s, icon: '⚠️', ...at });
+    } else if (e.k === 'drawOffer') out.push({ id: `${idp}ev${i}`, text: `${name(e.s)} offered a draw`, side: e.s, icon: '🤝', ...at });
+  });
+  return out;
+}
 import { plies, plyWords, materialText } from './gameStats.ts';
 import type { FeedGroup, FeedItem } from '../gcc/model.ts';
 
@@ -20,7 +40,7 @@ function resultItem(s: ChessState, name: (sd: Side) => string): FeedItem | null 
   if (!s.ended || !s.winner || s.ko) return null;
   const black: Side = s.white === 'home' ? 'away' : 'home';
   const len = s.moves ?? (listMoves(s.game) || undefined);
-  const sentence = resultSentence(s.white, s.winner, name(s.white), name(black), s.method);
+  const sentence = resultSentence(s.white, s.winner, name(s.white), name(black), s.method, s.uneven === true);
   const sub = [
     len && !isDoubleForfeit(s.method) && s.method !== 'forfeit' ? `${len} moves` : '',
     s.clock && (s.clock.white != null || s.clock.black != null) ? `⏱ White ${s.clock.white != null ? clockText(s.clock.white) : '–'} · Black ${s.clock.black != null ? clockText(s.clock.black) : '–'}` : '',
@@ -100,6 +120,9 @@ export function chessFeed(s: ChessState, names: { home: string; away: string }):
     const op = openingOf(s);
     groups.push({ key: 'result', title: 'Result', subtitle: op ? `${op.eco} ${op.name}` : s.method ? METHOD_LABEL[s.method] : undefined, items: [res] });
   }
+  // cue batch 6 — the arbiter's events in the game (illegal moves, draw offers)
+  const evs = arbiterItems(s.events, name);
+  if (evs.length) groups.push({ key: 'arbiter', title: 'Arbiter', items: [...evs].reverse() });
   const byMove = new Map<number, FeedItem[]>();
   for (const { moveNo, item } of plyItems(s.game, s.white, s.tcExact, name)) {
     const items = byMove.get(moveNo) ?? [];

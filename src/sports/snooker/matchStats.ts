@@ -20,6 +20,8 @@ export const BREAK_LIST_CHIPS = [20, 50, 100];
 /** The frames the match has (completed + the one in play), for the unit chips. */
 export const snookerFrameNumbers = (s: SnookerState): number[] => readFrames(s).map((f) => f.n);
 
+const tracked = (s: SnookerState): boolean => !!s && typeof s === 'object' && s.trackLR === true;
+
 /** Categories for the whole match (`frame` absent) or one frame. */
 export function snookerMatchStats(s: SnookerState, frame?: number): CompareCategory[] {
   const { home: H, away: A } = statsFor(s, frame);
@@ -35,6 +37,8 @@ export function snookerMatchStats(s: SnookerState, frame?: number): CompareCateg
       countRow('fiftyPlus', '50+ breaks', H.fiftyPlus, A.fiftyPlus),
       countRow('centuries', 'Century breaks', H.centuries, A.centuries),
       ...(H.maximums || A.maximums ? [countRow('maximums', 'Maximum breaks', H.maximums, A.maximums)] : []),
+      // cue batch 6 — every red and every colour in one visit
+      ...(H.totalClearances || A.totalClearances ? [countRow('totalClearances', 'Total clearances', H.totalClearances, A.totalClearances)] : []),
       countRow('potted', 'Points from pots', H.potted, A.potted),
       { key: 'ppv', label: 'Points per visit', home: ppv(H.potted, H.visits), away: ppv(A.potted, A.visits), hv: H.visits ? H.potted / H.visits : 0, av: A.visits ? A.potted / A.visits : 0 },
     ] });
@@ -50,6 +54,12 @@ export function snookerMatchStats(s: SnookerState, frame?: number): CompareCateg
         key: 'safetySuccess', label: 'Safety success', home: ofPct(H.safetiesWon, H.safetiesJudged), away: ofPct(A.safetiesWon, A.safetiesJudged),
         hv: H.safetiesJudged ? H.safetiesWon / H.safetiesJudged : 0, av: A.safetiesJudged ? A.safetiesWon / A.safetiesJudged : 0,
       }] : []),
+      // cue batch 6 — long pots and the rest, only when the organiser tracks them
+      ...(tracked(s) ? [
+        { key: 'longPots', label: 'Long pots', home: ofPct(H.longPots, H.longAttempts), away: ofPct(A.longPots, A.longAttempts),
+          hv: H.longAttempts ? H.longPots / H.longAttempts : 0, av: A.longAttempts ? A.longPots / A.longAttempts : 0 },
+        countRow('restShots', 'Shots with the rest', H.restShots, A.restShots),
+      ] : []),
       countRow('visits', 'Visits to the table', H.visits, A.visits),
     ] });
     const fouls: CompareRow[] = [

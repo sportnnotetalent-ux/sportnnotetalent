@@ -135,6 +135,21 @@ export function rackAction(s: PoolMatch, winner: Side, f: { bnr?: boolean; golde
 
 export const stalemateAction = (s: PoolMatch, o?: TapOpts) => stamp(s, { type: 'STALEMATE', payload: {} }, o);
 
+/** Cue batch 6 — can the player at the table take the shot-clock extension
+ *  now? Only when the organiser tracks it (Stats to track), during play with
+ *  no choice waiting, and once per player per rack (WPA playing regulations). */
+export function extensionReady(s: PoolMatch): boolean {
+  const r = liveRack(s);
+  if (!r || r.phase !== 'play' || r.pending || !r.shooter || !isObj(s.opt) || s.opt.shotClock !== true) return false;
+  const used = isObj(s.xr) ? s.xr[r.shooter] : undefined;
+  return used !== r.n;
+}
+/** EXTENSION — the player at the table takes the shot-clock extension (null when it can't be taken). */
+export const extensionAction = (s: PoolMatch, o?: TapOpts): ScoreAction | null => {
+  const r = liveRack(s);
+  return r?.shooter ? stamp(s, { type: 'EXTENSION', side: r.shooter, payload: {} }, o) : null;
+};
+
 // ------------------------------------------------- what the screen offers --
 
 export type PoolPanel =

@@ -6,7 +6,10 @@
  * when it was tracked. PURE: derived from the state's boards (which replay
  * from the event log), so a board correction re-derives the feed.
  */
-import { scoreSheet, FOUL_TYPES, FOUL_LABEL, type BoardDetail, type CarromState, type Side } from './engine.ts';
+import { scoreSheet, awardReasonOf, FOUL_TYPES, FOUL_LABEL, type AwardReason, type BoardDetail, type CarromState, type Side } from './engine.ts';
+
+/** Cue batch 6 — an award reason inside a sentence. */
+export const AWARD_WORD: Record<AwardReason, string> = { concession: 'conceded', conduct: 'conduct', time: 'time', forfeit: 'forfeit', other: 'other' };
 import type { FeedGroup, FeedItem } from '../gcc/model.ts';
 import { legacyNameOf, whoName, type NameOf } from '../racketNames.ts';
 
@@ -37,6 +40,7 @@ export function carromFeed(s: CarromState, names: { home: string; away: string }
   const boards = s?.boards ?? [];
   let i = 0; // index into s.boards (the sheet lists them in order)
   const groups: FeedGroup[] = [];
+  const awardedGames = new Set((Array.isArray(s?.gameAwards) ? s.gameAwards : []).map((x) => x?.game));
   for (const g of sheet) {
     const items: FeedItem[] = [];
     g.rows.forEach((r, ri) => {
@@ -60,10 +64,13 @@ export function carromFeed(s: CarromState, names: { home: string; away: string }
         if (r.slam) { text = `${text} · ${r.slam === 'white' ? 'White' : 'Black'} slam!`; icon = r.slam === 'white' ? '⚪' : '⚫'; big = true; }
       }
       if (r.tieBreak) text = `${text} · tie-break board`;
+      // cue batch 6 — a conceded / awarded board says why (read through the whitelist)
+      const why = awardReasonOf(b?.award);
+      if (why) text = `${text} · awarded: ${AWARD_WORD[why]}`;
       // the running score after it
       const last = ri === g.rows.length - 1;
       let score: string;
-      if (last && g.done && g.winner) {
+      if (last && g.done && g.winner && !awardedGames.has(g.game)) {
         const hi = Math.max(g.score[0], g.score[1]), lo = Math.min(g.score[0], g.score[1]);
         const gamesH = sheet.filter((x) => x.game <= g.game && x.done && x.winner === 'home').length;
         const gamesA = sheet.filter((x) => x.game <= g.game && x.done && x.winner === 'away').length;
@@ -92,6 +99,9 @@ export function carromFeed(s: CarromState, names: { home: string; away: string }
         ...(sub.length ? { sub: sub.join(' · ') } : {}), ...(b?.at ? { at: b.at } : {}),
       });
     });
+    // cue batch 6 — a game conceded / awarded ends the group with its own line
+    const aw = (Array.isArray(s?.gameAwards) ? s.gameAwards : []).find((x) => x && x.game === g.game);
+    if (aw && (aw.winner === 'home' || aw.winner === 'away')) items.push(awardItem(s, aw.game, aw.winner, awardReasonOf(aw.reason), name));
     const [h, a] = g.score;
     groups.push({
       key: `g${g.game}`,
@@ -100,5 +110,20 @@ export function carromFeed(s: CarromState, names: { home: string; away: string }
       items: items.reverse(),
     });
   }
+  // a game awarded before any board was played has no sheet group of its own
+  for (const aw of Array.isArray(s?.gameAwards) ? s.gameAwards : []) {
+    if (!aw || (aw.winner !== 'home' && aw.winner !== 'away') || sheet.some((g) => g.game === aw.game)) continue;
+    const fin = s.games?.[aw.game - 1];
+    const [h, a] = Array.isArray(fin) ? fin : [0, 0];
+    groups.push({ key: `g${aw.game}`, title: `Game ${aw.game}`, subtitle: `${name(aw.winner)} won ${Math.max(h, a)}–${Math.min(h, a)}`, items: [awardItem(s, aw.game, aw.winner, awardReasonOf(aw.reason), name)] });
+  }
+  groups.sort((x, y) => Number(x.key.slice(1)) - Number(y.key.slice(1)));
   return groups.reverse();
+}
+
+/** Cue batch 6 — "Game 2 awarded to Priya (conduct)", with the game's record. */
+function awardItem(s: CarromState, game: number, w: Side, why: AwardReason | undefined, name: (s: Side) => string): FeedItem {
+  const fin = s.games?.[game - 1];
+  const score = Array.isArray(fin) ? `${name(w)} wins Game ${game} ${Math.max(fin[0], fin[1])}–${Math.min(fin[0], fin[1])}` : `${name(w)} wins Game ${game}`;
+  return { id: `${game}-award`, text: `Game ${game} awarded to ${name(w)}${why ? ` (${AWARD_WORD[why]})` : ''}`, score, side: w, icon: '🏁' };
 }

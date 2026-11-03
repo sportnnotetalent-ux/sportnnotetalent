@@ -27,7 +27,7 @@
 import type { StatTotalsContext, StatTotalsEntry } from '../types';
 import { cnt } from './engine.ts';
 import { isSide, own, type Side } from './balls.ts';
-import { creditOf, perSideOf, SHOT_KEYS, sideCounts, validPid, type Counts, type PoolMatch } from './match.ts';
+import { creditOf, perSideOf, SHOT_KEYS, SIDE_KEYS, sideCounts, validPid, type Counts, type PoolMatch } from './match.ts';
 
 const SIDES: Side[] = ['home', 'away'];
 
@@ -37,8 +37,16 @@ export const POOL_RECORD_KEYS = ['racksWon', 'racksLost', 'racksBroken', 'racksW
 export const POOL_SHOT_KEYS = SHOT_KEYS;
 /** Every key the totals may write (for the schema check). */
 export const POOL_TOTAL_KEYS: readonly string[] = [
-  ...POOL_RECORD_KEYS, 'goldenBreaks', 'eightLosses', 'threeFoulLosses', 'setsWon', 'setsLost', 'detailRacks', 'innings', ...SHOT_KEYS,
+  ...POOL_RECORD_KEYS, 'goldenBreaks', 'eightLosses', 'threeFoulLosses', 'setsWon', 'setsLost', 'detailRacks', 'innings', ...SHOT_KEYS, ...SIDE_KEYS,
 ];
+
+/** Cue batch 6 — the side's own figures a game writes (once a rack was scored
+ *  shot by shot): push-out choices at 9- / 10-ball only, extensions only
+ *  where the organiser tracked them. Both scotch partners get the side's. */
+export function sideKeysFor(game: Game, s: unknown): string[] {
+  const clock = isObj(s) && isObj(s.opt) && s.opt.shotClock === true;
+  return SIDE_KEYS.filter((k) => (k === 'pushPlayed' || k === 'pushPassed' ? game !== 'eight' : k === 'extensions' ? clock : true));
+}
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 type Game = 'eight' | 'nine' | 'ten' | null;
@@ -149,7 +157,7 @@ export function poolStatTotals(s: PoolMatch, ctx?: StatTotalsContext): Record<st
   for (const side of SIDES) {
     const list = ids[side];
     if (!list.length) continue;
-    const base: Counts = { ...poolSideRecord(s, side), ...(detail ? detailRecord(s, side) : {}) };
+    const base: Counts = { ...poolSideRecord(s, side), ...(detail ? { ...detailRecord(s, side), ...fill(sideKeysFor(game, s), sideCounts(s, side)) } : {}) };
     // who shot
     const shots = new Map<string, Counts>();
     if (detail) {

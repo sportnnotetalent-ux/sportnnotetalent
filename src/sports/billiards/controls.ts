@@ -11,7 +11,7 @@
  */
 import type { ScoreAction } from '../types';
 import {
-  reducer, isBilliardsState, limits, MAX_FRAME_SCORE, PARTS,
+  reducer, isBilliardsState, limits, redToCentre, MAX_FRAME_SCORE, PARTS,
   type AwardReason, type BilliardsState, type FoulKind, type LiveFrame, type Part, type Side,
 } from './engine.ts';
 
@@ -108,6 +108,8 @@ export interface BilliardsPanel {
   safety: Act | null;
   foulPoints: number;
   limits: { hazards: number; cannons: number; hazardLimit: number; cannonLimit: number; tenHazards: boolean; seventyCannons: boolean };
+  /** cue batch 6 — the red goes on the centre spot (a hint; no score) */
+  redCentre?: boolean;
   time: Act | null;
   toss: { home: Act | null; away: Act | null } | null;
   /** the scorer tapped who won the toss */
@@ -147,6 +149,7 @@ function panelOf(s: Live): BilliardsPanel {
     miss: missAction(s), safety: safetyAction(s), foulPoints: s.foulPoints,
     limits: { hazards: lim.hazards, cannons: lim.cannons, hazardLimit: s.hazardLimit, cannonLimit: s.cannonLimit, tenHazards: lim.tenHazards, seventyCannons: lim.seventyCannons },
     time: timeAction(s),
+    redCentre: redToCentre(s),
     toss: fresh ? { home: breakOffAction(s, 'home'), away: breakOffAction(s, 'away') } : null,
     tossed: s.tossed === true,
     frameScore: fresh && fr.score.home === 0 && fr.score.away === 0,
@@ -171,6 +174,7 @@ export function limitWarnings(p: BilliardsPanel): string[] {
       ? `${l.cannons} cannons in a row: ${left} more allowed, then a hazard is needed.`
       : `${l.cannons} cannons in a row: the next cannon without a hazard is a foul.`);
   }
+  if (p.redCentre) out.push('Red potted twice running from the billiard spot: it goes on the centre spot.');
   return out;
 }
 

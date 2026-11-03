@@ -102,6 +102,8 @@ export interface KoGame {
   game?: ChessMoves;
   /** Round 2 — this game's opening, named by hand / a PGN tag */
   opening?: { eco: string; name?: string; manual?: boolean };
+  /** Cue batch 6 — the arbiter's events during this game (moved here with its result) */
+  events?: ArbiterEvent[];
 }
 export interface KoState { plan: KoPlan; games: KoGame[] }
 
@@ -121,6 +123,42 @@ export interface ChessMoves {
 
 /** Deep wave — the optional detail being tracked ("Stats to track"). */
 export interface ChessTrack { moves?: boolean; clock?: boolean }
+
+/** Cue batch 6 (audit row 16) — an arbiter's in-game event: an illegal move
+ *  completed (FIDE Art. 7.5.5: the opponent gets `t` seconds, 2 minutes; blitz
+ *  1 minute; the same player's second one loses) or a draw offer (Art. 9.1.2).
+ *  No score effect. `s` = the player who made it. */
+export type ArbiterKind = 'illegal' | 'drawOffer';
+export interface ArbiterEvent { k: ArbiterKind; s: Side; t?: number; at?: number }
+/** The most events one game keeps (a hostile log can't grow the state). */
+export const MAX_EVENTS = 60;
+/** Art. 7.5.5 / B.3 — time added for the opponent of an illegal move. */
+export const illegalSecs = (timeControl: string): number => (timeControl === 'blitz' || timeControl === 'bullet' ? 60 : 120);
+
+/** Cue batch 6 (audit row 17) — a second time-control period and a delay:
+ *  `moves` to the first control, then `base2` minutes added; `delay` seconds
+ *  (Bronstein / US delay). Each only when set. */
+export interface TimeControl2 { moves?: number; base2?: number; delay?: number }
+const tcNum = (v: unknown, max: number): number | undefined => {
+  const n = Math.floor(Number(v));
+  return Number.isFinite(n) && n > 0 ? Math.min(max, n) : undefined;
+};
+export function tc2From(config?: Record<string, unknown>): TimeControl2 | undefined {
+  const moves = tcNum(config?.tcMoves, 200);
+  const base2 = moves ? tcNum(config?.tcBase2, 600) : undefined;
+  const delay = tcNum(config?.tcDelay, 600);
+  const out: TimeControl2 = { ...(moves && base2 ? { moves, base2 } : {}), ...(delay ? { delay } : {}) };
+  return Object.keys(out).length ? out : undefined;
+}
+/** "90+30 · +30 min after move 40 · 5 s delay" ('' when nothing is set). */
+export function timeControlText(s: Pick<ChessState, 'tcExact' | 'tc2'>): string {
+  const t = s?.tc2;
+  return [
+    s?.tcExact ?? '',
+    t?.moves && t.base2 ? `+${t.base2} min after move ${t.moves}` : '',
+    t?.delay ? `${t.delay} s delay` : '',
+  ].filter(Boolean).join(' · ');
+}
 
 const clampInt = (v: unknown, lo: number, hi: number, dv: number): number => {
   const n = Math.floor(Number(v));
@@ -231,6 +269,14 @@ export interface ChessState {
   track?: ChessTrack;
   /** Deep wave — when the result was recorded (ms) */
   resultAt?: number;
+  /** Cue batch 6 — the arbiter's events in the game in play (ARBITER).
+   *  Absent until the first (every older game). */
+  events?: ArbiterEvent[];
+  /** Cue batch 6 — an uneven arbiter score (Art. 11 / 12): the winner gets ½,
+   *  the other 0 ("½-0"). Only with the arbiter's decision or adjudication. */
+  uneven?: true;
+  /** Cue batch 6 — the second period / delay from the format */
+  tc2?: TimeControl2;
 }
 
 /** Deep wave — the tracking flags from the format (`trackMoves`,
@@ -266,7 +312,9 @@ export function init(config?: Record<string, unknown>): ChessState {
   const hasKo = config && ['koGames', 'koRapidPairs', 'koBlitzPairs'].some((k) => config[k] != null);
   // Deep wave — Stats to track, only when the organiser switched one on
   const track = readTrack(config);
-  return { white, timeControl: String(config?.timeControl ?? 'rapid'), ...(tcExact ? { tcExact } : {}), ended: false, seq: 0,
+  // cue batch 6 — only when the organiser set one (older fixtures unchanged)
+  const tc2 = tc2From(config);
+  return { white, timeControl: String(config?.timeControl ?? 'rapid'), ...(tcExact ? { tcExact } : {}), ...(tc2 ? { tc2 } : {}), ended: false, seq: 0,
     ...(hasKo ? { koPlan: koPlanFrom(config) } : {}), ...(track ? { track } : {}) };
 }
 
@@ -388,6 +436,19 @@ export function reducer(s: ChessState, a: { type: string; side?: Side; payload?:
     const { track: _t, ...rest } = s;
     return t ? { ...rest, track: t } : rest;
   }
+  // Cue batch 6 — an arbiter's event (a new action type: no older log has one)
+  if (a.type === 'ARBITER') {
+    const p = a.payload ?? {};
+    const k = p.kind;
+    const side = p.side ?? a.side;
+    if (s.ended || (k !== 'illegal' && k !== 'drawOffer') || (side !== 'home' && side !== 'away')) return s;
+    const list = s.events ?? [];
+    if (list.length >= MAX_EVENTS) return s;
+    const secs = typeof p.secs === 'number' && Number.isInteger(p.secs) && p.secs >= 0 && p.secs <= 600 ? p.secs : illegalSecs(s.timeControl);
+    const at = stampOf(p.at);
+    const ev: ArbiterEvent = { k, s: side, ...(k === 'illegal' ? { t: secs } : {}), ...(at ? { at } : {}) };
+    return { ...s, events: [...list, ev], seq: s.seq + 1 };
+  }
   if (a.type === 'SET_WHITE' && !s.ended) {
     const side = (a.payload?.side ?? a.side) as Side | undefined;
     return side === 'home' || side === 'away' ? { ...s, white: side } : s;
@@ -407,6 +468,9 @@ export function reducer(s: ChessState, a: { type: string; side?: Side; payload?:
     const clock = c && typeof c === 'object' ? { ...(secs(c.white) != null ? { white: secs(c.white) } : {}), ...(secs(c.black) != null ? { black: secs(c.black) } : {}) } : undefined;
     // SD-121 — a knockout match: this result is ONE game of it.
     const ko: KoState | undefined = s.ko ?? (a.payload?.ko ? { plan: koPlanFrom(a.payload.ko), games: [] } : undefined);
+    // Cue batch 6 — ½-0 / 0-½: only the arbiter's decision or adjudication of a
+    // decisive result, never in a knockout game (a new key: old logs have none)
+    const uneven = !ko && a.payload?.uneven === true && winner !== 'draw' && (method === 'arbiter' || method === 'adjudication');
     // Deep wave — when the result was recorded (a new optional key)
     const stamped = stampOf(a.payload?.at);
     if (ko) {
@@ -414,12 +478,13 @@ export function reducer(s: ChessState, a: { type: string; side?: Side; payload?:
       // Round 2 — the game in play's move list / opening go with its result
       // (absent on every older knockout game: nothing moves)
       const game: KoGame = { phase: at.phase, white: s.white, winner, ...(method ? { method } : {}), ...(moves ? { moves } : {}), ...(clock && Object.keys(clock).length ? { clock } : {}), ...(stamped ? { at: stamped } : {}),
-        ...slotOf(s) };
+        ...slotOf(s), ...(s.events?.length ? { events: s.events } : {}) };
       const next: KoState = { ...ko, games: [...ko.games, game] };
       const st = koStatus(next);
       const base: ChessState = { ...s };
       delete base.game;
       delete base.opening;
+      delete base.events;
       if (st.winner) {
         return { ...base, ko: next, winner: st.winner, method, moves, ...(clock && Object.keys(clock).length ? { clock } : {}), ...(stamped ? { resultAt: stamped } : {}), ended: true, seq: s.seq + 1 };
       }
@@ -428,9 +493,25 @@ export function reducer(s: ChessState, a: { type: string; side?: Side; payload?:
       const { winner: _w, method: _m, moves: _mv, clock: _c, ...rest } = base;
       return { ...rest, ko: next, white: s.white === 'home' ? 'away' : 'home', seq: s.seq + 1 };
     }
-    return { ...s, winner, method, moves, ...(clock && Object.keys(clock).length ? { clock } : {}), ...(stamped ? { resultAt: stamped } : {}), ended: true, seq: s.seq + 1 };
+    return { ...s, winner, method, moves, ...(clock && Object.keys(clock).length ? { clock } : {}), ...(stamped ? { resultAt: stamped } : {}), ...(uneven ? { uneven: true as const } : {}), ended: true, seq: s.seq + 1 };
   }
   return s;
+}
+
+/** Cue batch 6 — an ARBITER action for the game in play (null once it has ended). */
+export function arbiterAction(s: ChessState, kind: ArbiterKind, side: Side, at?: number): { type: string; payload: Record<string, unknown> } | null {
+  if (!s || s.ended) return null;
+  return { type: 'ARBITER', payload: { kind, side, ...(typeof at === 'number' && at > 0 ? { at } : {}) } };
+}
+/** Illegal moves `side` has made in the game in play. */
+export const illegalCount = (s: Pick<ChessState, 'events'>, side: Side): number =>
+  (Array.isArray(s?.events) ? s.events.filter((e) => e && e.k === 'illegal' && e.s === side).length : 0);
+/** Art. 7.5.5 — a player's second illegal move loses: the result the controls
+ *  pre-select (the arbiter still confirms). null = nobody has two. */
+export function arbiterPreset(s: Pick<ChessState, 'events' | 'ended'>): { winner: Side; method: 'illegal-move' } | null {
+  if (!s || s.ended) return null;
+  for (const side of ['home', 'away'] as const) if (illegalCount(s, side) >= 2) return { winner: side === 'home' ? 'away' : 'home', method: 'illegal-move' };
+  return null;
 }
 
 /** Game points: 1 / ½ / 0. */
@@ -439,6 +520,8 @@ export function points(s: ChessState): { home: number; away: number } {
   if (s.ko) return koPoints(s.ko);
   if (!s.ended || !s.winner) return { home: 0, away: 0 };
   if (isDoubleForfeit(s.method)) return { home: 0, away: 0 };
+  // cue batch 6 — ½-0 / 0-½: the winner gets half a point, the other none
+  if (s.uneven === true && s.winner !== 'draw') return s.winner === 'home' ? { home: 0.5, away: 0 } : { home: 0, away: 0.5 };
   if (s.winner === 'draw') return { home: 0.5, away: 0.5 };
   return s.winner === 'home' ? { home: 1, away: 0 } : { home: 0, away: 1 };
 }
@@ -457,22 +540,28 @@ export function resultString(s: ChessState): string {
   if (s.winner === 'draw') return '½-½';
   // Written white-first.
   const whiteWon = s.winner === s.white;
+  if (s.uneven === true) return whiteWon ? '½-0' : '0-½';
   return whiteWon ? '1-0' : '0-1';
 }
 
 /** SD-116 — the arbiter's result written White-first for a pending result:
  *  "1-0", "½-½" or "0-1" for `winner` when `white` has the white pieces. */
-export function scoreFor(white: Side, winner: Side | 'draw', method?: ChessMethod | null): '1-0' | '½-½' | '0-1' | '0-0' {
+export function scoreFor(white: Side, winner: Side | 'draw', method?: ChessMethod | null, uneven = false): '1-0' | '½-½' | '0-1' | '0-0' | '½-0' | '0-½' {
   if (winner === 'draw' && isDoubleForfeit(method)) return '0-0';
   if (winner === 'draw') return '½-½';
+  if (uneven) return winner === white ? '½-0' : '0-½';
   return winner === white ? '1-0' : '0-1';
 }
 
 /** SD-116 — the one-line result the confirm sheet asks about:
  *  "1-0: Anand beat Carlsen by Resignation", "½-½: Anand drew with Carlsen (Stalemate)".
  *  Names are White first (whiteName has the white pieces). */
-export function resultSentence(white: Side, winner: Side | 'draw', whiteName: string, blackName: string, method?: ChessMethod): string {
-  const sc = scoreFor(white, winner, method);
+export function resultSentence(white: Side, winner: Side | 'draw', whiteName: string, blackName: string, method?: ChessMethod, uneven = false): string {
+  const sc = scoreFor(white, winner, method, uneven && winner !== 'draw');
+  if (uneven && winner !== 'draw') {
+    const [w, l] = winner === white ? [whiteName, blackName] : [blackName, whiteName];
+    return `${sc}: ${w} ½, ${l} 0 (${method ? METHOD_LABEL[method].toLowerCase() : 'arbiter decision'})`;
+  }
   if (winner === 'draw' && isDoubleForfeit(method)) return `0-0: double forfeit — neither ${whiteName} nor ${blackName} played (both lose)`;
   if (winner === 'draw') return `${sc}: ${whiteName} drew with ${blackName}${method ? ` (${METHOD_LABEL[method]})` : ''}`;
   const [w, l] = winner === white ? [whiteName, blackName] : [blackName, whiteName];

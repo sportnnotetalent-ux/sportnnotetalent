@@ -7,7 +7,8 @@
  */
 import type { FeedGroup, FeedItem } from '../gcc/model.ts';
 import { maxBreak, type FoulKind, type Side, type SnookerState } from './engine.ts';
-import { readFrames, timeline, type RFoul, type RFrame } from './read.ts';
+import { readFrames, readMakeUp, timeline, MAKE_UP_ORDER, type RFoul, type RFrame } from './read.ts';
+import type { MakeUp } from './engine.ts';
 import { capFeed } from '../cue/uiState.ts';
 
 const other = (s: Side): Side => (s === 'home' ? 'away' : 'home');
@@ -31,14 +32,26 @@ function howText(f: RFrame, name: (s: Side) => string): string {
   }
 }
 
-function foulText(x: RFoul, name: (s: Side) => string, brk: number): string {
+function foulText(x: RFoul, name: (s: Side) => string, brk: number, mk?: MakeUp): string {
   const extras = [
     ...(x.miss ? ['foul and a miss'] : []),
     ...(x.fb ? ['free ball'] : []),
     ...(x.reds ? [`${plural(x.reds, 'red')} off the table`] : []),
   ];
-  return `${name(x.by)} fouled${x.kind ? ` (${KIND_WORD[x.kind]})` : ''}: ${x.value} to ${name(other(x.by))}${brk > 0 ? ` after a break of ${brk}` : ''}${extras.length ? ` · ${extras.join(' · ')}` : ''}`;
+  return `${name(x.by)} fouled${x.kind ? ` (${KIND_WORD[x.kind]})` : ''}: ${x.value} to ${name(other(x.by))}${brk > 0 ? ` after a break of ${withMakeUp(brk, mk)}` : ''}${extras.length ? ` · ${extras.join(' · ')}` : ''}`;
 }
+
+/** Cue batch 6 — a break's make-up in words: "3 reds, 1 pink, 2 blacks"
+ *  (ball order; '' when none or unreadable). */
+export function makeUpText(mk: MakeUp | undefined): string {
+  const m = readMakeUp(mk);
+  if (!m) return '';
+  return MAKE_UP_ORDER.filter((k) => m[k]).map((k) => (k === 'free' ? plural(m[k]!, 'free ball') : plural(m[k]!, k))).join(', ');
+}
+const withMakeUp = (pts: number, mk: MakeUp | undefined): string => {
+  const t = pts > 0 ? makeUpText(mk) : '';
+  return t ? `${pts} (${t})` : String(pts);
+};
 
 const leadText = ([h, a]: [number, number], name: (s: Side) => string) =>
   (h === a ? `Level ${h}–${a}` : `${name(h > a ? 'home' : 'away')} leads ${Math.max(h, a)}–${Math.min(h, a)}`);
@@ -69,12 +82,14 @@ function feedOf(s: SnookerState, names: { home: string; away: string }): FeedGro
       const { v } = st;
       const who = name(v.side);
       let text: string;
-      if (st.foul) text = foulText(st.foul, name, v.pts);
-      else if (v.end === 'live') text = `${who} at the table — break of ${v.pts} so far`;
-      else if (v.end === 'safety') text = v.pts > 0 ? `${who} — break of ${v.pts}, then played safe` : `${who} played a safety`;
-      else if (v.end === 'respot') text = `${who} — break of ${v.pts}: level, the black is re-spotted`;
-      else if (v.end === 'frame') text = `${who} — break of ${v.pts}`;
-      else text = v.pts > 0 ? `${who} — break of ${v.pts}, then missed a pot` : `${who} missed a pot`;
+      // cue batch 6 — every break line carries its make-up (an older visit has none: as before)
+      const brk = withMakeUp(v.pts, v.mk);
+      if (st.foul) text = foulText(st.foul, name, v.pts, v.mk);
+      else if (v.end === 'live') { const t = v.pts > 0 ? makeUpText(v.mk) : ''; text = `${who} at the table — break of ${v.pts} so far${t ? ` (${t})` : ''}`; }
+      else if (v.end === 'safety') text = v.pts > 0 ? `${who} — break of ${brk}, then played safe` : `${who} played a safety`;
+      else if (v.end === 'respot') text = `${who} — break of ${brk}: level, the black is re-spotted`;
+      else if (v.end === 'frame') text = `${who} — break of ${brk}${v.tc ? ' · a total clearance' : ''}`;
+      else text = v.pts > 0 ? `${who} — break of ${brk}, then missed a pot` : `${who} missed a pot`;
       const maximum = v.pts === max && !v.fb && v.end !== 'live';
       const icon = maximum ? '🏆' : v.pts >= 100 ? '💯' : v.pts >= 50 ? '🔥' : st.foul ? '⚠️' : undefined;
       items.push({

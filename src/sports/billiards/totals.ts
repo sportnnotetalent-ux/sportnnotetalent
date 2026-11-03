@@ -17,12 +17,22 @@
  *    safeties, fouls, foulPoints (given away), penaltyPoints (received).
  */
 import type { StatTotalsContext, StatTotalsEntry } from '../types';
-import { billiardsStats, type BilliardsState, type Side } from './engine.ts';
+import { billiardsStats, FOUL_KINDS, type BilliardsState, type FoulKind, type Side } from './engine.ts';
+
+/** Cue batch 6 — each foul kind's career key ('keyed', 0 on a shot-by-shot
+ *  line, absent on a quick or older one). "Missed every ball" shares
+ *  snooker's key; push, jump, touching, off the table and other share theirs. */
+export const BILLIARDS_FOUL_KEY: Readonly<Record<FoulKind, string>> = {
+  miss: 'foulNoContact', coup: 'foulCoup', inHand: 'foulInHand', push: 'foulPush', jump: 'foulJump', touch: 'foulTouch',
+  offTable: 'foulOffTable', hazards: 'foulHazards', cannons: 'foulCannons', baulkLine: 'foulBaulkLine', other: 'foulOther',
+};
 
 export const BILLIARDS_RECORD_KEYS = ['framesWon', 'framesLost', 'points', 'pointsAgainst'] as const;
 export const BILLIARDS_SHOT_KEYS = [
   'shotFrames', 'highestBreak', 'fiftyPlus', 'centuries', 'doubleCenturies', 'scored', 'visits', 'scoringStrokes',
   'potRed', 'potWhite', 'inOffRed', 'inOffWhite', 'cannons', 'misses', 'safeties', 'fouls', 'foulPoints', 'penaltyPoints',
+  // cue batch 6 — foul kinds
+  'foulNoContact', 'foulCoup', 'foulInHand', 'foulPush', 'foulJump', 'foulTouch', 'foulOffTable', 'foulHazards', 'foulCannons', 'foulBaulkLine', 'foulOther',
 ] as const;
 
 const other = (s: Side): Side => (s === 'home' ? 'away' : 'home');
@@ -41,6 +51,7 @@ export function billiardsSideRecord(s: BilliardsState, side: Side): Record<strin
       inOffWhite: n(t.inOffWhite), cannons: n(t.cannons), misses: n(t.misses), safeties: n(t.safeties), fouls: n(t.fouls),
       foulPoints: n(t.penaltyConceded), penaltyPoints: n(t.penaltyReceived),
     });
+    for (const k of FOUL_KINDS) rec[BILLIARDS_FOUL_KEY[k]] = n(t.foulsByKind?.[k]);
   }
   return rec;
 }

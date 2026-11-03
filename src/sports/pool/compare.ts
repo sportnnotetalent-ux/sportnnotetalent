@@ -95,6 +95,13 @@ export function poolCompare(s: PoolMatch, set?: number): CompareCategory[] {
     const tpaText = (x: number | null) => (x == null ? '–' : x.toFixed(3));
     table.push({ key: 'tpa', label: 'TPA (total performance average)', home: tpaText(tpa('home')), away: tpaText(tpa('away')), hv: tpa('home') ?? 0, av: tpa('away') ?? 0 });
     if (s.game !== 'eight' && (v('home', 'pushOuts') || v('away', 'pushOuts'))) table.push(countRow('pushOuts', 'Push-outs', v('home', 'pushOuts'), v('away', 'pushOuts')));
+    // cue batch 6 — what the engine already handled, now on the Stats tab (non-zero only)
+    const extra: Array<[string, string, 'higher' | 'lower']> = [
+      ['pushPlayed', 'Push-outs played from there', 'higher'], ['pushPassed', 'Push-outs handed back', 'higher'],
+      ['ballInHand', 'Ball in hand received', 'higher'], ['notCalled', 'Pots not called', 'lower'],
+      ['rerackBreaks', 'Re-racks on own break', 'lower'], ['extensions', 'Shot-clock extensions', 'lower'],
+    ];
+    for (const [k, label, better] of extra) if (v('home', k) || v('away', k)) table.push(countRow(k, label, v('home', k), v('away', k), better));
     if (det.length) {
       table.push(countRow('innings', 'Innings (visits to the table)', H.innings, A.innings, 'lower'));
       table.push({ key: 'ipr', label: 'Innings per rack', home: (H.innings / det.length).toFixed(1), away: (A.innings / det.length).toFixed(1), hv: H.innings / det.length, av: A.innings / det.length, better: 'lower' });

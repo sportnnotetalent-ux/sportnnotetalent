@@ -32,6 +32,7 @@ export function stepWords(e: FeedEntry): string {
     case 'CHOOSE': return e.c === 'play' ? 'choice: play on' : e.c === 'pass' ? 'choice: hand back' : 'choice: re-rack';
     case 'RACK': return `rack ${e.n} result`;
     case 'STALEMATE': return 'stalemate (re-rack)';
+    case 'EXTENSION': return 'shot-clock extension';
     default: return e.t.toLowerCase();
   }
 }
