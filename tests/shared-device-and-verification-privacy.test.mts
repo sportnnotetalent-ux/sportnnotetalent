@@ -78,9 +78,11 @@ describe('no raw file names', () => {
     assert.equal(docKindLabel(undefined), 'File');
   });
   test('profile history, reviewer card and school screen use it', () => {
-    const pv = read('src/components/ProfileView.tsx');
-    assert.match(pv, /`\$\{e\.docName \? docKindLabel\(e\.docName\) : 'Proof'\} submitted`/);
-    assert.doesNotMatch(pv, /Submitted\$\{e\.docName \? ` · \$\{e\.docName\}`/);
+    // 2026-11-03: the history moved to the VerificationDetails screen, built by historyRows
+    const vr = read('src/core/verificationReview.ts');
+    assert.match(vr, /`\$\{e\.docName \? docKindLabel\(e\.docName\) : 'Proof'\} submitted`/);
+    assert.match(read('src/screens/VerificationDetailsScreen.tsx'), /historyRows\(v\?\.history\)/);
+    assert.doesNotMatch(read('src/components/ProfileView.tsx'), /Submitted\$\{e\.docName \? ` · \$\{e\.docName\}`/);
     const rv = read('src/screens/VerificationReviewScreen.tsx');
     assert.doesNotMatch(rv, /Open \$\{docName/);
     assert.doesNotMatch(rv, /full size · \{docName\}/);

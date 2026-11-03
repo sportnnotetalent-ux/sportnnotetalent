@@ -152,6 +152,8 @@ export type RootStackParamList = {
    *  On web it may come back from the URL as the string 'true'. */
   EditProfile: { playerId: string; asAdmin?: boolean };
   VerificationReview: undefined;
+  /** The profile's age & guardian verification, in full (owner or support only). */
+  VerificationDetails: { playerId: string };
   /** SportnNote support: every queue on one screen (claims, filters, this week). */
   SupportConsole: undefined;
   CreateListing: undefined;
