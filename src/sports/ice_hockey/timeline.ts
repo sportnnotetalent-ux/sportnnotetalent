@@ -2,6 +2,7 @@
  *  the scorer's correction list. PURE. */
 import type { LiveEvent } from '../liveEvents';
 import { shootoutOrderRows } from '../shootoutOrder.ts';
+import { ruledOutRow } from '../invasion/ruledOut.ts';
 import { eventWhen, mmss, periodOffset, FO_ZONE_SHORT, PEN_LABEL, STRENGTH_LABEL, TALLY_LABEL, type IceEvent, type IceHockeyState } from './engine.ts';
 import { legacyNameOf, withNames, type NameOf } from '../invasion/names.ts';
 
@@ -32,8 +33,13 @@ export function describeEvent(e: IceEvent): { icon: string; label: string; detai
       return { icon: '↗', label: 'Penalty shot missed', detail: e.playerName };
     case 'pen': {
       const k = e.pen ?? 'minor';
-      return { icon: PEN_ICON[k], label: `${PEN_LABEL[k]}${e.infraction ? ` · ${e.infraction.toLowerCase()}` : ''}`, detail: e.playerName ?? (k === 'bench' ? 'Bench' : undefined) };
+      const who = e.playerName ?? (k === 'bench' ? 'Bench' : undefined);
+      // invasion batch 6: served by a team-mate
+      const served = e.servedId || e.servedName ? `served by ${e.servedName ?? 'a team-mate'}` : '';
+      return { icon: PEN_ICON[k], label: `${PEN_LABEL[k]}${e.infraction ? ` · ${e.infraction.toLowerCase()}` : ''}`, detail: [who, served].filter(Boolean).join(' · ') || undefined };
     }
+    case 'ruledout':
+      return ruledOutRow('ice_hockey', e);
     case 'gk':
       return { icon: '🔙', label: 'Goalie in', detail: e.playerName };
     case 'pull':

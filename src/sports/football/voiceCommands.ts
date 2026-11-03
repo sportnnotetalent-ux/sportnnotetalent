@@ -4,6 +4,7 @@
  *  on-screen buttons trigger; player/team names are matched separately against
  *  the live roster. (An LLM could be slotted in later for free-form phrasing.) */
 import type { Player } from '../../core/types';
+import type { StoppageReason } from './events.ts';
 
 /** Strip accents so "Modric" matches "Modrić", "Sutalo" matches "Šutalo", etc. */
 export const deburr = (s: string): string =>
@@ -75,6 +76,8 @@ export type Intent =
   | { kind: 'cancel' }
   | { kind: 'noAssist' }
   | { kind: 'goalType'; type: 'open' | 'penalty' | 'freekick' | 'header' }
+  // invasion batch 6 (batch 5 not done): "stoppage, injury" / "VAR check" / "cooling break"
+  | { kind: 'stoppage'; reason?: StoppageReason }
   | { kind: 'unknown' };
 
 /** Parse a free-standing command (used when no capture flow is mid-way). */
@@ -83,6 +86,11 @@ export function parseIntent(text: string): Intent {
   const has = (re: RegExp) => re.test(q);
 
   if (has(/\b(cancel|never mind|go back|nevermind)\b/)) return { kind: 'cancel' };
+  // invasion batch 6: a stoppage and its reason ("injury time" is added time, not an injury)
+  const injury = has(/\binjur(y|ed|ies)\b/) && !has(/\binjury time\b/);
+  if (has(/\bvar (check|review)\b|\bvar\b.*\bcheck/)) return { kind: 'stoppage', reason: 'var' };
+  if (has(/\b(cooling|drinks|water) break\b/)) return { kind: 'stoppage', reason: 'cooling' };
+  if (has(/\bstoppage\b/) || injury) return injury ? { kind: 'stoppage', reason: 'injury' } : { kind: 'stoppage' };
   if (has(/\bown goal\b/)) return { kind: 'ownGoal' };
   if (has(/\bgoal\b|\bscored?\b/)) return { kind: 'goal' };
   if (has(/\byellow\b/)) return { kind: 'card', color: 'yellow' };

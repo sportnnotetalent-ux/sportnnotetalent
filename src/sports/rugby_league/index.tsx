@@ -44,6 +44,8 @@ import {
   LEAGUE_PRESETS, LEAGUE_LIVE_SETTINGS, LIVE_KEYS, DETAIL_LABEL, FLAG_DETAILS, TRACK_FLAGS, TRACK_FIELDS, TEAM_DETAIL,
   type LeagueEvent, type LeagueState, type DetailKey, type Sanction, type Side, type SetEnd,
 } from './engine';
+import { ruledOutAction, RULED_OUT_REASONS, RULED_OUT_LABEL } from '../invasion/ruledOut';
+import { restartAction, RESTART_LABEL, LEAGUE_RESTARTS } from '../invasion/restarts';
 import { leagueTotals, leagueLiveField, leagueField, unavailable } from './totals';
 import { leagueBox } from './box';
 import { leagueCommentary, leagueScopeLabel, LEAGUE_FEED_TAGS } from './commentary';
@@ -99,7 +101,9 @@ type Flow =
   | { mode: 'detail'; side: Side; step: 'kind' | 'player'; detail?: DetailKey }
   /** six-tackle sets: an error / penalty against the side with the ball — who (with errors tracked) */
   /** invasion batch 5: 'penWon' — a penalty to the side with the ball; `side` = the defence (who conceded it) */
-  | { mode: 'setEnd'; side: Side; how: 'error' | 'penalty' | 'penWon' };
+  | { mode: 'setEnd'; side: Side; how: 'error' | 'penalty' | 'penWon' }
+  /** invasion batch 6: a try ruled out (only with the toggle on) — one tap logs it */
+  | { mode: 'ruledout'; side: Side; review?: boolean };
 
 /* -------------------------------- controls --------------------------------- */
 
@@ -227,8 +231,10 @@ const ScoringControls: SportPlugin<LeagueState>['ScoringControls'] = ({
     return [{ type: 'REMOVE_EVENT', side: e.side, payload: { id: e.id }, attribution: creditAttribution(cr.first, -1), attribution2: creditAttribution(cr.second, -1) }];
   };
   const remove = (e: LeagueEvent) => { for (const a of removalActions(e)) dispatch(a); };
+  // invasion batch 6: the "Try ruled out" button (the toggle on)
+  const ruledOutOn = s.trackRuledOut === true;
   const edit = (e: LeagueEvent) => {
-    if (e.type === 'pentry') { remove(e); return; }
+    if (e.type === 'pentry' || e.type === 'ruledout' || e.type === 'restart') { remove(e); return; }
     holdRemoval(removalActions(e));
     setEditAt({ sec: e.sec, psec: e.psec, period: e.period });
     setShowEdit(false);
@@ -422,6 +428,20 @@ const ScoringControls: SportPlugin<LeagueState>['ScoringControls'] = ({
           </View>
         );
       }
+      case 'ruledout':
+        return (
+          <View style={c.panel}>{head('❎ Try ruled out')}
+            <Text style={c.meta}>Why? (optional — one tap logs it; the score doesn’t move)</Text>
+            <View style={c.chips}>
+              <SelectChip label="After the Bunker" active={!!flow.review} onPress={() => setFlow({ ...flow, review: !flow.review })} />
+            </View>
+            <View style={c.chips}>
+              {RULED_OUT_REASONS.rugby_league.map((r) => <SelectChip key={r} label={RULED_OUT_LABEL[r]} active={false} onPress={() => { fire(ruledOutAction('rugby_league', sd, { reason: r, review: flow.review })); setFlow(null); }} />)}
+            </View>
+            <Button label="Log it — no reason" variant="ghost" onPress={() => { fire(ruledOutAction('rugby_league', sd, { review: flow.review })); setFlow(null); }} />
+            <Text style={c.meta}>Already on the board? Remove the try from the timeline too.</Text>
+          </View>
+        );
       case 'detail': {
         // with six-tackle sets on, the side in possession's errors go through the set's Error button
         const kinds = TRACK_FLAGS.filter((f) => s[f] === true).flatMap((f) => FLAG_DETAILS[f]).filter((d) => !(d === 'error' && s.trackSets));
@@ -462,6 +482,14 @@ const ScoringControls: SportPlugin<LeagueState>['ScoringControls'] = ({
       <Button label="⏱ Sin bin · off" accessibilityLabel="Sin bin, send-off or on report" variant="ghost" onPress={() => setFlow({ mode: 'sanction', side: sd, step: 'kind' })} />
       <Button label="🔁 Interchange" variant="ghost" onPress={() => setFlow({ mode: 'sub', side: sd, step: 'kind' })} />
       {detailOn ? <Button label="📋 Detail" accessibilityLabel="Player detail: tackles, runs, line breaks, offloads, errors, penalties" variant="ghost" onPress={() => setFlow({ mode: 'detail', side: sd, step: 'kind' })} /> : null}
+      {/* invasion batch 6: a try ruled out (Bunker or not) — only with the toggle on */}
+      {ruledOutOn ? <Button label="❎ Try ruled out" accessibilityLabel={`${name(sd)} try ruled out`} variant="ghost" onPress={() => setFlow({ mode: 'ruledout', side: sd })} /> : null}
+      {/* invasion batch 6: 40/20, 20/40, drop-outs, a penalty to touch / tapped — one tap, the team */}
+      {s.trackRestarts ? (
+        <View style={c.chips} accessibilityLabel={`Kicks and restarts for ${name(sd)}`}>
+          {LEAGUE_RESTARTS.map((k) => <SelectChip key={k} label={RESTART_LABEL[k]} active={false} onPress={() => fire(restartAction(sd, k))} />)}
+        </View>
+      ) : null}
       {live.short[sd] > 0 ? <Text style={c.short}>Playing {live.short[sd]} short</Text> : null}
     </View>
   );

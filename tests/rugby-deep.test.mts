@@ -432,7 +432,7 @@ describe('deep wave · schema, career, live settings', () => {
     assert.equal(r.trackEntries, true);
     assert.equal(r.trackPenalties, false);
     assert.equal(r.trackDetail, false);
-    assert.equal(RUGBY_LIVE_SETTINGS.fields.filter((f) => f.group === 'Stats to track').length, 6);
+    assert.equal(RUGBY_LIVE_SETTINGS.fields.filter((f) => f.group === 'Stats to track').length, 8); // invasion batch 6: + Tries ruled out, Penalty options & 50:22
     assert.equal(RUGBY_LIVE_SETTINGS.mode, 'config');
     assert.equal('trackEntries' in init({ trackEntries: false }), false, 'off = absent (an old match\'s state shape)');
   });

@@ -13,6 +13,7 @@ import { SHOOTOUT_PERIOD, groupByScorer, emptyFacts, scoreText, type FeedItem, t
 import { minuteText, periodLong, PC_RESULT_LABEL, soScore, type HockeyEvent, type HockeyState, type Side } from './engine.ts';
 import { hockeyPossession } from './depth.ts';
 import { legacyNameOf, withNames, type NameOf } from '../invasion/names.ts';
+import { ruledOutText } from '../invasion/ruledOut.ts';
 
 type Names = { home: string; away: string };
 const other = (s: Side): Side => (s === 'home' ? 'away' : 'home');
@@ -65,6 +66,8 @@ export function hockeySentence(e: HockeyEvent, names: Names, score: Score, saver
       return { icon: '🧤', text: `${e.playerName ?? 'A new keeper'} goes in goal for ${team}.` };
     case 'referral':
       return { icon: '📺', text: `Video referral by ${team} — ${e.upheld ? 'upheld, they keep it' : 'not upheld, referral lost'}.`, major: true };
+    case 'ruledout':
+      return { icon: '❎', text: ruledOutText('hockey', team, e), major: true };
   }
 }
 

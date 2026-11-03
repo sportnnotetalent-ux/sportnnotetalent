@@ -33,6 +33,8 @@ export { legacyNameOf };
 export const ID_NAME_PAIRS = [
   ['playerId', 'playerName'], ['secondId', 'secondName'], ['thirdId', 'thirdName'],
   ['gkId', 'gkName'], ['takerId', 'takerName'], ['keeperId', 'keeperName'],
+  // invasion batch 6: an ice hockey penalty served by a team-mate
+  ['servedId', 'servedName'],
 ] as const;
 
 /**

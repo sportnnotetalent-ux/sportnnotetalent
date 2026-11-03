@@ -34,6 +34,7 @@ import {
   HOCKEY_TRACK_FIELDS, openPc, strokeAction, cardWarnIds, cardWarning,
   type CardColour, type GoalType, type HockeyEvent, type HockeyState, type Side,
 } from './engine';
+import { ruledOutAction, RULED_OUT_REASONS, RULED_OUT_LABEL } from '../invasion/ruledOut';
 import { hockeyPossession } from './depth';
 import { hockeyFeed, hockeyFacts, hockeyFeedPeriods, hockeyPeriodLabel } from './feed';
 import { hockeyCentre } from './stats';
@@ -86,7 +87,9 @@ type Flow =
   | { mode: 'sub'; side: Side; step: 'off' | 'on'; off?: Player }
   | { mode: 'gk'; side: Side }
   // deep wave: a video referral (only when tracked)
-  | { mode: 'referral'; side: Side };
+  | { mode: 'referral'; side: Side }
+  // invasion batch 6: a goal ruled out (only with the toggle on) — one tap logs it
+  | { mode: 'ruledout'; side: Side; review?: boolean };
 
 /* -------------------------------- controls --------------------------------- */
 
@@ -222,9 +225,11 @@ const ScoringControls: SportPlugin<HockeyState>['ScoringControls'] = ({
     ];
   };
   const remove = (e: HockeyEvent) => { for (const a of removalActions(e)) dispatch(a); };
+  // invasion batch 6: the "Goal ruled out" button (the toggle on)
+  const ruledOutOn = s.track?.ruledOut === true;
   // SD-114: held until the re-entry commits — Cancel keeps the event as it was.
   const edit = (e: HockeyEvent) => {
-    if (e.type === 'pc' || e.type === 'save' || e.type === 'referral') { remove(e); return; }
+    if (e.type === 'pc' || e.type === 'save' || e.type === 'referral' || e.type === 'ruledout') { remove(e); return; }
     holdRemoval(removalActions(e));
     setEditAt({ sec: e.sec, period: e.period });
     setShowEdit(false);
@@ -474,6 +479,20 @@ const ScoringControls: SportPlugin<HockeyState>['ScoringControls'] = ({
             <Text style={c.meta}>Upheld: the team keeps its referral. Not upheld: it is lost.</Text>
           </View>
         );
+      case 'ruledout':
+        return (
+          <View style={c.panel}>{head('❎ Goal ruled out')}
+            <Text style={c.meta}>Why? (optional — one tap logs it; the score doesn’t move)</Text>
+            <View style={c.row}>
+              <SelectChip label="After a video referral" active={!!flow.review} onPress={() => setFlow({ ...flow, review: !flow.review })} />
+            </View>
+            <View style={c.row}>
+              {RULED_OUT_REASONS.hockey.map((r) => <Button key={r} label={RULED_OUT_LABEL[r]} variant="ghost" style={c.flex} onPress={() => { fire(ruledOutAction('hockey', sd, { reason: r, review: flow.review })); setFlow(null); }} />)}
+            </View>
+            <Button label="Log it — no reason" variant="ghost" onPress={() => { fire(ruledOutAction('hockey', sd, { review: flow.review })); setFlow(null); }} />
+            <Text style={c.meta}>Already on the board? Remove the goal from the timeline too.</Text>
+          </View>
+        );
     }
   })();
 
@@ -492,6 +511,7 @@ const ScoringControls: SportPlugin<HockeyState>['ScoringControls'] = ({
         <Button label="🟨 Card" variant="ghost" onPress={() => setFlow({ mode: 'card', side: sd, step: 'colour' })} />
         <Button label="🔁 Sub" variant="ghost" onPress={() => setFlow({ mode: 'sub', side: sd, step: 'off' })} />
         {s.track?.referrals ? <Button label="📺 Referral" accessibilityLabel={`Video referral by ${name(sd)}`} variant="ghost" onPress={() => setFlow({ mode: 'referral', side: sd })} /> : null}
+        {ruledOutOn ? <Button label="❎ Goal ruled out" accessibilityLabel={`${name(sd)} goal ruled out`} variant="ghost" onPress={() => setFlow({ mode: 'ruledout', side: sd })} /> : null}
         <Text style={c.gk} accessibilityRole="button" onPress={() => setFlow({ mode: 'gk', side: sd })} numberOfLines={2}>
           🧤 {gk ? gk.fullName : 'Set keeper'} ›
         </Text>
@@ -659,7 +679,7 @@ function EditList({ s: s0, show, setShow, onRemove, onEdit, homeName, awayName }
           <View key={e.id} style={c.editRow}>
             <Text style={c.editWhen}>{eventWhen(s, e)}</Text>
             <Text style={c.editLabel} numberOfLines={2}>{d.icon} {d.label} · {e.side === 'home' ? homeName : awayName}{d.detail ? ` · ${d.detail}` : ''}</Text>
-            {onEdit && e.type !== 'pc' && e.type !== 'save' && e.type !== 'referral' ? <RowAction label="✎ Edit" tone="edit" a11y={`Edit ${d.label}`} onPress={() => onEdit(e)} /> : null}
+            {onEdit && e.type !== 'pc' && e.type !== 'save' && e.type !== 'referral' && e.type !== 'ruledout' ? <RowAction label="✎ Edit" tone="edit" a11y={`Edit ${d.label}`} onPress={() => onEdit(e)} /> : null}
             <RowAction label="✕" tone="remove" a11y={`Remove ${d.label}`} onPress={() => void confirmRemove(`${d.label} (${eventWhen(s, e)})`, () => onRemove(e),
               s.events.some((x) => x.type === 'save' && x.ref === e.id) ? 'The keeper\'s save on it goes too. The score and player stats re-adjust.' : undefined)} />
           </View>

@@ -503,7 +503,7 @@ describe('Stats to track: off by default, keyed', () => {
   });
   test('live settings: config mode, the four toggles, off by default', () => {
     assert.equal(LEAGUE_LIVE_SETTINGS.mode, 'config');
-    assert.deepEqual(LEAGUE_LIVE_SETTINGS.read(init({ trackSets: true })), { periodMinutes: 40, sinBinMinutes: 10, trackSets: true, trackDefence: false, trackAttack: false, trackErrors: false });
+    assert.deepEqual(LEAGUE_LIVE_SETTINGS.read(init({ trackSets: true })), { periodMinutes: 40, sinBinMinutes: 10, trackSets: true, trackDefence: false, trackAttack: false, trackErrors: false, trackRuledOut: false, trackRestarts: false });
   });
 });
 

@@ -28,6 +28,7 @@ import type { ScoreAction, LiveSettings, FormatField, Attribution } from '../typ
 import { aggPriorFromConfig, aggregateText, levelForDecider, type AggPrior } from '../aggregate.ts';
 // Perf F-15 — the format presets / options live in the light meta module.
 import { HOCKEY_PRESETS, HOCKEY_TRACK_FIELDS } from './meta.ts';
+import { readRuledOut, ruledOutField } from '../invasion/ruledOut.ts';
 export { HOCKEY_PRESETS, HOCKEY_TRACK_FIELDS };
 
 export type Side = 'home' | 'away';
@@ -48,7 +49,8 @@ export interface HockeyEvent {
    *  finds it after an earlier row is voided by a correction */
   id: string;
   /** `referral` (deep wave): a team's video referral, only when tracked */
-  type: 'goal' | 'pc' | 'stroke' | 'shot' | 'save' | 'card' | 'sub' | 'gk' | 'referral';
+  /** `ruledout` (invasion batch 6): a goal ruled out — a timeline row, only when tracked */
+  type: 'goal' | 'pc' | 'stroke' | 'shot' | 'save' | 'card' | 'sub' | 'gk' | 'referral' | 'ruledout';
   side: Side;
   /** game-clock seconds since the start of the match (playing time) */
   sec: number;
@@ -88,6 +90,9 @@ export interface HockeyEvent {
    *  official — the typed role ("Coach"), never a player: no stat line, no
    *  suspension on the field, not in the team's player-card counts. New logs only. */
   official?: string;
+  /** invasion batch 6: a ruled-out goal's reason / after a video referral */
+  reason?: string;
+  review?: true;
 }
 
 /** Deep wave — optional depth a scorer / organiser switches on (format keys
@@ -98,6 +103,8 @@ export interface HockeyTrack {
   possession?: boolean;
   /** FIH video referrals per team, upheld / not upheld */
   referrals?: boolean;
+  /** invasion batch 6: the "Goal ruled out" button */
+  ruledOut?: boolean;
 }
 /** Deep wave — one possession change: `side` has the ball from game second `sec`. */
 export interface PossMark { side: Side; sec: number; period: number }
@@ -191,6 +198,7 @@ export function readHockeyTrack(config?: Record<string, unknown>): HockeyTrack |
   const t: HockeyTrack = {};
   if (config?.trackPossession === true) t.possession = true;
   if (config?.trackReferrals === true) t.referrals = true;
+  if (config?.trackRuledOut === true) t.ruledOut = true;
   return Object.keys(t).length ? t : undefined;
 }
 
@@ -468,6 +476,9 @@ export const reducer = (s: HockeyState, a: ScoreAction): HockeyState => {
       if (!side || !a.payload?.id) return s;
       return push(s, { type: 'gk', side, playerId: String(a.payload.id), ...(a.payload.name !== undefined ? { playerName: String(a.payload.name ?? '') } : {}) });
     }
+    case 'RULED_OUT':
+      // invasion batch 6: a goal ruled out — a timeline row; the score never moved
+      return side ? push(s, { type: 'ruledout', side, ...readRuledOut('hockey', a.payload) }) : s;
     case 'REMOVE_EVENT': {
       const id = String(a.payload?.id ?? '');
       const ev = s.events.find((e) => e.id === id);
@@ -625,9 +636,10 @@ export const HOCKEY_LIVE_SETTINGS: LiveSettings<HockeyState> = {
     { key: 'periodMinutes', label: 'Period length', type: 'number', default: 15, min: 1, max: 45, step: 1, hint: 'min / period' },
     { key: 'stopClock', label: 'Stop clock on goals & PCs', type: 'toggle', default: true, group: 'Clock' },
     ...HOCKEY_TRACK_FIELDS,
+    ruledOutField('hockey'),
   ] as FormatField[],
-  read: (s) => ({ periodMinutes: s.periodMinutes, stopClock: s.stopClock, trackPossession: s.track?.possession === true, trackReferrals: s.track?.referrals === true }),
-  defaults: { periodMinutes: 15, stopClock: true, trackPossession: false, trackReferrals: false },
+  read: (s) => ({ periodMinutes: s.periodMinutes, stopClock: s.stopClock, trackPossession: s.track?.possession === true, trackReferrals: s.track?.referrals === true, trackRuledOut: s.track?.ruledOut === true }),
+  defaults: { periodMinutes: 15, stopClock: true, trackPossession: false, trackReferrals: false, trackRuledOut: false },
 };
 
 /* ------------- invasion batch 5 (audit fix 11): card warnings ------------- */

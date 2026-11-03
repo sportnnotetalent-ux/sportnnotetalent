@@ -12,6 +12,8 @@ import {
 } from './engine.ts';
 import { groupLines, newestFirst, scoreText, type FeedGroup, type FeedLine } from '../feedGroups.ts';
 import { legacyNameOf, withNames, type NameOf } from '../invasion/names.ts';
+import { ruledOutText } from '../invasion/ruledOut.ts';
+import { restartRow, restartText } from '../invasion/restarts.ts';
 
 const other = (s: Side): Side => (s === 'home' ? 'away' : 'home');
 const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
@@ -92,6 +94,10 @@ export function sentence(s: RugbyState, e: RugbyEvent, names: Names): { text: st
         case 'entry': return { icon: '⏩', tags: ['detail'], text: `${team} get into the ${opp} 22.` };
         default: return { icon: '🤲', tags: ['detail'], text: `Offload by ${who}.` };
       }
+    case 'ruledout':
+      return { icon: '❎', key: true, tags: ['score'], text: ruledOutText('rugby', team, e) };
+    case 'restart':
+      return { icon: restartRow(e.restart ?? 'penTap').icon, tags: ['set'], ...(e.restart === 'fiftyTwentyTwo' ? { key: true } : {}), text: restartText(e.restart ?? 'penTap', team, opp) };
   }
 }
 

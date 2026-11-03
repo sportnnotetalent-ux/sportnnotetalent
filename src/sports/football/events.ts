@@ -39,6 +39,22 @@ export const isStoppageReason = (v: unknown): v is StoppageReason => typeof v ==
 
 export type GoalType = 'open' | 'penalty' | 'freekick' | 'header';
 
+/** Invasion batch 6 (audit fix 13, Opta "situation"): how an open-play goal
+ *  came about — from a corner, another set piece, an indirect free kick, or a
+ *  fast break. Optional ("Shot detail" on). A penalty / direct free kick is
+ *  its goal type already, so it never carries one. New logs only. */
+export type GoalSituation = 'corner' | 'setpiece' | 'ifk' | 'fastbreak';
+export const GOAL_SITUATIONS: GoalSituation[] = ['corner', 'setpiece', 'ifk', 'fastbreak'];
+export const SITUATION_LABEL: Record<GoalSituation, string> = { corner: 'From a corner', setpiece: 'Set piece', ifk: 'Indirect free kick', fastbreak: 'Fast break' };
+/** the commentary's closing sentence */
+export const SITUATION_PHRASE: Record<GoalSituation, string> = { corner: 'From a corner.', setpiece: 'From a set piece.', ifk: 'From an indirect free kick.', fastbreak: 'On the counter-attack.' };
+export const isGoalSituation = (v: unknown): v is GoalSituation => typeof v === 'string' && (GOAL_SITUATIONS as string[]).includes(v);
+/** Only an open-play goal (a header included) carries a situation. */
+export const situationFits = (goalType: GoalType | undefined): boolean => goalType === undefined || goalType === 'open' || goalType === 'header';
+/** Set-piece goals for the team figure (Opta: corners, free kicks — direct or indirect — and other set plays; penalties apart). */
+export const isSetPieceGoal = (e: { goalType?: GoalType; situation?: GoalSituation }): boolean =>
+  e.goalType === 'freekick' || e.situation === 'corner' || e.situation === 'setpiece' || e.situation === 'ifk';
+
 /** How the ball was struck for a goal — captured separately from how it was won. */
 export type BodyPart = 'left' | 'right' | 'head' | 'chest';
 export const BODY_PART_LABEL: Record<BodyPart, string> = {
@@ -92,6 +108,11 @@ export interface FootballEvent {
   reason?: string;
   /** deep wave: a ruled-out goal decided after a VAR review */
   review?: true;
+  /** invasion batch 6: how an open-play goal came about (new logs, Shot detail) */
+  situation?: GoalSituation;
+  /** invasion batch 6 (IFAB): a permanent concussion substitute — outside
+   *  the substitution limit (at most 2 a side). New logs only. */
+  concussion?: true;
 }
 
 /** SD-117 (F13): is this card a player's (not a team official's)? */

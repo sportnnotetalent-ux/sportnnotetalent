@@ -4,7 +4,7 @@
  *  cricket / kabaddi engines. */
 import type { ScoreAction, LiveSettings, FormatField } from "../types";
 import type { FootballEvent, GoalType, BodyPart, StatEvent, StatKind, ShotZone } from "./events";
-import { isPlayerCard, isStoppageReason } from "./events.ts";
+import { isPlayerCard, isStoppageReason, isGoalSituation, situationFits } from "./events.ts";
 import { aggPriorFromConfig, aggregateText, levelForDecider, type AggPrior } from "../aggregate.ts";
 import type { Player } from "../../core/types";
 // Perf F-15 — the format presets / options live in the light meta module.
@@ -13,6 +13,8 @@ import type { DeepTrackKey } from './meta.ts';
 export { DEEP_TRACK_KEYS, DEEP_TRACKABLE, DEEP_TRACK_FIELDS };
 export type { DeepTrackKey };
 export type Decider = 'none' | 'extra_time' | 'penalties';
+/** IFAB permanent concussion substitutes: at most two a team, outside the limit. */
+export const MAX_CONCUSSION_SUBS = 2;
 
 export interface FootballState {
   home: number;
@@ -32,6 +34,10 @@ export interface FootballState {
   subType: 'rolling' | 'fixed';
   maxSubs: number;
   subsUsed: { home: number; away: number };
+  /** Invasion batch 6 (IFAB): permanent concussion substitutes made — outside
+   *  the limit, at most MAX_CONCUSSION_SUBS a side. Absent until the first one
+   *  (an old match keeps its exact state shape). */
+  concussionSubs?: { home: number; away: number };
   /** players already substituted off (for 'fixed', they can't return): their
    *  ids (IDs-only scoring); an older log's SUB stored the name instead, so a
    *  legacy entry is the name (use `isSubbedOff`). */
@@ -568,7 +574,10 @@ export const reducer = (s: FootballState, a: ScoreAction): FootballState => {
     case 'GOAL': {
       if (!a.side) return s;
       const scored = { ...s, [a.side]: s[a.side] + 1 } as FootballState;
-      return push(scored, { minute, half: evHalf, type: 'goal', side: a.side, playerName: name, goalType: a.payload?.goalType as FootballEvent['goalType'], bodyPart: a.payload?.bodyPart as BodyPart | undefined, ...pid, ...zone, ...big });
+      const goalType = a.payload?.goalType as FootballEvent['goalType'];
+      // invasion batch 6: an open-play goal's situation (new logs only; a hostile value is dropped)
+      const sit = isGoalSituation(a.payload?.situation) && situationFits(goalType) ? { situation: a.payload.situation } : {};
+      return push(scored, { minute, half: evHalf, type: 'goal', side: a.side, playerName: name, goalType, bodyPart: a.payload?.bodyPart as BodyPart | undefined, ...pid, ...zone, ...big, ...sit });
     }
     case 'GOAL_DETAIL': {
       // deep wave: the zone / big chance of the side's latest goal, picked on
@@ -577,12 +586,14 @@ export const reducer = (s: FootballState, a: ScoreAction): FootballState => {
       for (let i = s.events.length - 1; i >= 0; i--) {
         const e = s.events[i];
         if (e.type !== 'goal' || e.side !== a.side) continue;
-        const { zone: _z, bigChance: _b, ...rest } = e;
+        const { zone: _z, bigChance: _b, situation: _s, ...rest } = e;
         const p = a.payload ?? {};
         const z = 'zone' in p ? (p.zone === 'box' || p.zone === 'out' ? { zone: p.zone as ShotZone } : {}) : (e.zone ? { zone: e.zone } : {});
         const b = 'bigChance' in p ? (p.bigChance === true ? { bigChance: true as const } : {}) : (e.bigChance ? { bigChance: true as const } : {});
+        // invasion batch 6: the situation (`null` clears it; only on an open-play goal)
+        const st = 'situation' in p ? (isGoalSituation(p.situation) && situationFits(e.goalType) ? { situation: p.situation } : {}) : (e.situation ? { situation: e.situation } : {});
         const events = [...s.events];
-        events[i] = { ...rest, ...z, ...b };
+        events[i] = { ...rest, ...z, ...b, ...st };
         return { ...s, events };
       }
       return s;
@@ -664,7 +675,11 @@ export const reducer = (s: FootballState, a: ScoreAction): FootballState => {
       // Rolling subs (futsal / small-sided / friendlies) let a player return, so
       // the substitution count is unlimited — `maxSubs` there is just bench size.
       // Fixed subs cap the number of changes.
-      if (!a.side || (s.subType === 'fixed' && s.subsUsed[a.side] >= s.maxSubs)) return s;
+      // Invasion batch 6 (IFAB): a permanent concussion substitute is outside the
+      // limit (at most MAX_CONCUSSION_SUBS a side); only `concussion === true`.
+      const conc = a.payload?.concussion === true;
+      if (!a.side) return s;
+      if (conc ? (s.concussionSubs?.[a.side] ?? 0) >= MAX_CONCUSSION_SUBS : s.subType === 'fixed' && s.subsUsed[a.side] >= s.maxSubs) return s;
       // SD-09: new logs also carry the two ids (keeper minutes / clean sheets).
       const ids = {
         ...(a.payload?.offId ? { playerId: String(a.payload.offId) } : {}),
@@ -675,13 +690,15 @@ export const reducer = (s: FootballState, a: ScoreAction): FootballState => {
       // names on the event, the name in `subbedOff`.
       const legacy = a.payload?.offName !== undefined || a.payload?.onName !== undefined || !(ids.playerId || ids.secondId);
       const offName = String(a.payload?.offName ?? '');
+      const cflag = conc ? { concussion: true as const } : {};
       const withEvent = legacy
-        ? push(s, { minute, half: evHalf, type: 'sub', side: a.side, playerName: offName, secondName: String(a.payload?.onName ?? ''), ...ids })
-        : push(s, { minute, half: evHalf, type: 'sub', side: a.side, ...ids });
+        ? push(s, { minute, half: evHalf, type: 'sub', side: a.side, playerName: offName, secondName: String(a.payload?.onName ?? ''), ...ids, ...cflag })
+        : push(s, { minute, half: evHalf, type: 'sub', side: a.side, ...ids, ...cflag });
       const offKey = legacy ? offName : (ids.playerId ?? '');
+      const cs = s.concussionSubs ?? { home: 0, away: 0 };
       return {
         ...withEvent,
-        subsUsed: { ...s.subsUsed, [a.side]: s.subsUsed[a.side] + 1 },
+        ...(conc ? { concussionSubs: { ...cs, [a.side]: cs[a.side] + 1 } } : { subsUsed: { ...s.subsUsed, [a.side]: s.subsUsed[a.side] + 1 } }),
         subbedOff: { ...s.subbedOff, [a.side]: [...s.subbedOff[a.side], offKey] },
       };
     }
@@ -706,7 +723,13 @@ export const reducer = (s: FootballState, a: ScoreAction): FootballState => {
       let next: FootballState = { ...s, events: s.events.filter((e) => e.id !== id) };
       if (ev.type === 'goal' || ev.type === 'owngoal') next = { ...next, [ev.side]: Math.max(0, next[ev.side] - 1) } as FootballState;
       // (`subbedOff` holds what the SUB put there: an older one's name, else the id)
-      else if (ev.type === 'sub') next = { ...next, subsUsed: { ...next.subsUsed, [ev.side]: Math.max(0, next.subsUsed[ev.side] - 1) }, subbedOff: { ...next.subbedOff, [ev.side]: next.subbedOff[ev.side].filter((n) => n !== (ev.playerName ?? ev.playerId)) } };
+      else if (ev.type === 'sub') {
+        const off = { subbedOff: { ...next.subbedOff, [ev.side]: next.subbedOff[ev.side].filter((n) => n !== (ev.playerName ?? ev.playerId)) } };
+        // invasion batch 6: a concussion substitute gives back its own count
+        next = ev.concussion && next.concussionSubs
+          ? { ...next, ...off, concussionSubs: { ...next.concussionSubs, [ev.side]: Math.max(0, next.concussionSubs[ev.side] - 1) } }
+          : { ...next, ...off, subsUsed: { ...next.subsUsed, [ev.side]: Math.max(0, next.subsUsed[ev.side] - 1) } };
+      }
       return next;
     }
     case 'NEXT_HALF': {

@@ -18,7 +18,7 @@
  */
 import { SHOOTOUT_PERIOD, groupByScorer, emptyFacts, scoreText, type FeedItem, type MatchFacts, type Score } from '../invasion/feed.ts';
 import { minuteText, eventHalf, halfTimeText, backfillKicks, penScore, type FootballState, type MinuteFormat } from './engine.ts';
-import { CARD_REASON_PHRASE, NO_GOAL_LABEL, type CardReason, type FootballEvent, type NoGoalReason, type StatEvent } from './events.ts';
+import { CARD_REASON_PHRASE, NO_GOAL_LABEL, SITUATION_PHRASE, type CardReason, type FootballEvent, type NoGoalReason, type StatEvent } from './events.ts';
 import { footballPossession } from './depth.ts';
 import { legacyNameOf, withNames, type NameOf } from '../invasion/names.ts';
 
@@ -50,7 +50,9 @@ export function footballEventSentence(e: FootballEvent, names: Names, score: Sco
   switch (e.type) {
     case 'goal': {
       const body = e.playerName ? `${who(e.playerName)} ${goalPhrase(e)}.` : `${team} score.`;
-      return { icon: '⚽', text: `Goal! ${line}. ${body}${e.secondName ? ` Assisted by ${e.secondName}.` : ''}${e.bigChance ? ' A big chance taken.' : ''}`, major: true, tone: 'goal' };
+      // invasion batch 6: how an open-play goal came about (a known value only)
+      const sit = e.situation && e.situation in SITUATION_PHRASE ? ` ${SITUATION_PHRASE[e.situation]}` : '';
+      return { icon: '⚽', text: `Goal! ${line}. ${body}${e.secondName ? ` Assisted by ${e.secondName}.` : ''}${sit}${e.bigChance ? ' A big chance taken.' : ''}`, major: true, tone: 'goal' };
     }
     case 'owngoal':
       return { icon: '🥅', text: `Own goal by ${who(e.playerName, names[other(e.side)])}. ${line}.`, major: true, tone: 'goal' };
@@ -66,7 +68,7 @@ export function footballEventSentence(e: FootballEvent, names: Names, score: Sco
       return { icon: '🟥', text: `Red card! ${who(e.playerName)} is sent off${why ? ` for ${why}` : ''}.`, major: true, tone: 'red' };
     }
     case 'sub':
-      return { icon: '🔄', text: `Substitution, ${team}. ${e.secondName || 'A substitute'} replaces ${e.playerName || 'a team-mate'}.`, major: true };
+      return { icon: '🔄', text: `${e.concussion ? 'Concussion substitution' : 'Substitution'}, ${team}. ${e.secondName || 'A substitute'} replaces ${e.playerName || 'a team-mate'}.${e.concussion ? ' An additional substitute — outside the limit.' : ''}`, major: true };
     case 'stoppage': {
       const r = e.playerName;
       return { icon: '⏸️', text: r === 'injury' ? 'Delay in match because of an injury.' : r === 'var' ? 'VAR check in progress.' : r === 'cooling' ? 'Cooling break.' : 'Delay in match.' };

@@ -79,7 +79,7 @@ describe('deep wave · hockey — off by default, old states unchanged', () => {
   });
   test('live settings: a "Stats to track" group read from the state', () => {
     const keys = HOCKEY_LIVE_SETTINGS.fields.filter((f) => f.group === 'Stats to track').map((f) => f.key);
-    assert.deepEqual(keys, ['trackPossession', 'trackReferrals']);
+    assert.deepEqual(keys, ['trackPossession', 'trackReferrals', 'trackRuledOut']);
     assert.deepEqual([HOCKEY_LIVE_SETTINGS.read(init({})).trackPossession, HOCKEY_LIVE_SETTINGS.read(init(CFG)).trackReferrals], [false, true]);
   });
 });

@@ -105,7 +105,11 @@ export function iceHockeyTotals(s: IceHockeyState): Record<string, Line> {
     for (const cr of [c.first, c.second, c.third]) if (cr) add(cr.playerId, cr.side ?? e.side, cr.stats);
   }
   for (const side of ['home', 'away'] as const) {
-    for (const k of s.shootout?.[side] ?? []) if (k.playerId) add(k.playerId, side, { soTaken: 1, soGoals: k.scored ? 1 : 0 });
+    for (const k of s.shootout?.[side] ?? []) {
+      if (k.playerId) add(k.playerId, side, { soTaken: 1, soGoals: k.scored ? 1 : 0 });
+      // invasion batch 6: the goalie facing it (new logs only — keyed)
+      if (k.gkId) add(k.gkId, side === 'home' ? 'away' : 'home', { soShotsFaced: 1, soSaves: k.outcome === 'saved' ? 1 : 0 });
+    }
   }
   // goalies
   const spells = [...goalieSpells(s).values()];

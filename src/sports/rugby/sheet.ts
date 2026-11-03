@@ -31,6 +31,8 @@ import {
   type RugbyEvent, type RugbyState, type Side,
 } from './engine.ts';
 import { countRow, decRow, madeRow, section, shareRow, sheet, timeRow, type StatSheet } from '../compareSheet.ts';
+import { ruledOutTracked } from '../invasion/ruledOut.ts';
+import { restartSection } from '../invasion/restarts.ts';
 
 const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
 const inScope = (e: RugbyEvent, scope: 'all' | number) => scope === 'all' || e.period === scope;
@@ -139,7 +141,11 @@ export function rugbySheet(s: RugbyState, scope: 'all' | number = 'all', nowSec?
       madeRow('penGoals', 'Penalty goals', H.penGoals, H.penGoalAttempts, A.penGoals, A.penGoalAttempts),
       madeRow('dropGoals', 'Drop goals', H.dropGoals, H.dropGoalAttempts, A.dropGoals, A.dropGoalAttempts),
       madeRow('goalKicking', 'Goal kicking', H.conversions + H.penGoals, H.conversionAttempts + H.penGoalAttempts, A.conversions + A.penGoals, A.conversionAttempts + A.penGoalAttempts),
+      // invasion batch 6: only a match that tracked them (the toggle, or one logged)
+      ruledOutTracked(s.trackRuledOut, s.events) && countRow('triesRuledOut', 'Tries ruled out', count(s, 'home', scope, (e) => e.type === 'ruledout'), count(s, 'away', scope, (e) => e.type === 'ruledout')),
     ]),
+    // invasion batch 6: penalty options & 50:22 (only a match that tracked them)
+    restartSection('rugby', s, scope),
     section('attack', 'Attack', [
       detail && countRow('carries', 'Carries', dt('carries').h, dt('carries').a),
       detail && countRow('lineBreaks', 'Line breaks', dt('lineBreaks').h, dt('lineBreaks').a),

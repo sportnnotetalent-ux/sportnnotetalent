@@ -5,6 +5,7 @@
  * PURE (no React Native): the sport list is in the first download.
  */
 import type { FormatField, SportMeta } from '../types';
+import { ruledOutField } from '../invasion/ruledOut.ts';
 
 export const HOCKEY_PRESETS: Record<string, { label: string; set: Record<string, number | string | boolean> }> = {
   fih: { label: 'FIH 4 × 15', set: { playersPerSide: 11, periods: 4, periodMinutes: 15, stopClock: true, penaltyCorners: true } },
@@ -41,6 +42,8 @@ export const HOCKEY_META: SportMeta = {
     { key: 'penaltyCorners', label: 'Penalty corners', type: 'toggle', default: true, advanced: true, hint: 'off for Hockey5s' },
     // deep wave: the optional "Stats to track" an organiser can switch on for an event
     ...HOCKEY_TRACK_FIELDS.map((f) => ({ ...f, label: `Track ${f.label.toLowerCase()}`, advanced: true })),
+    // invasion batch 6: goal / try ruled out (off by default)
+    { ...ruledOutField('hockey'), advanced: true },
     {
       key: 'decider', label: 'If level at full time', type: 'choice', default: 'none',
       options: [

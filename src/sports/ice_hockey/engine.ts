@@ -46,6 +46,7 @@ import type { ScoreAction, LiveSettings, FormatField, Attribution } from '../typ
 import { aggPriorFromConfig, aggregateText, levelForDecider, type AggPrior } from '../aggregate.ts';
 // Perf F-15 — the format presets / options live in the light meta module.
 import { ICE_HOCKEY_PRESETS, TRACK_FIELDS } from './meta.ts';
+import { readRuledOut, ruledOutConfig, ruledOutField } from '../invasion/ruledOut.ts';
 export { ICE_HOCKEY_PRESETS, TRACK_FIELDS };
 
 export type Side = 'home' | 'away';
@@ -116,7 +117,8 @@ export interface Who { id?: string; name?: string }
 export interface IceEvent {
   /** stable id from the action (`payload.uid`) */
   id: string;
-  type: 'goal' | 'shot' | 'miss' | 'pen' | 'gk' | 'pull' | 'back' | 'timeout' | 'tally';
+  /** `ruledout` (invasion batch 6): a goal ruled out — a timeline row, only with `trackRuledOut` */
+  type: 'goal' | 'shot' | 'miss' | 'pen' | 'gk' | 'pull' | 'back' | 'timeout' | 'tally' | 'ruledout';
   side: Side;
   /** elapsed game seconds since the start of the match (playing time) */
   sec: number;
@@ -152,9 +154,25 @@ export interface IceEvent {
   tally?: TallyKind;
   /** round 2 — a faceoff's zone from the WINNER's view (zones tracked only) */
   zone?: FoZone;
+  /** invasion batch 6: a penalty served by a team-mate (a bench minor, a
+   *  goalie's penalty, a match penalty — NHL / IIHF game sheets). No PIM for
+   *  him. New logs only. */
+  servedId?: string;
+  /** @deprecated legacy, read-only (filled by invasion/names.ts) */
+  servedName?: string;
+  /** invasion batch 6: a ruled-out goal's reason / after a video review */
+  reason?: string;
+  review?: true;
 }
 
-export interface SoShot { scored: boolean; playerId?: string; /** @deprecated legacy, read-only */ playerName?: string }
+/** Invasion batch 6 (audit fix 14): a miss saved by the goalie or missed
+ *  (`outcome`), and the goalie who faced it (`gkId`) — new logs only; an older
+ *  attempt carries `scored` (and the shooter) only. */
+export interface SoShot {
+  scored: boolean; playerId?: string; /** @deprecated legacy, read-only */ playerName?: string;
+  outcome?: 'saved' | 'missed';
+  gkId?: string; /** @deprecated legacy, read-only */ gkName?: string;
+}
 
 export interface XiStamp {
   players?: { id: string; /** @deprecated legacy, read-only */ name?: string }[];
@@ -200,6 +218,8 @@ export interface IceHockeyState {
   trackAttempts?: boolean;
   /** round 2 — faceoff zones (one more tap per draw; only with Faceoffs) */
   trackFaceoffZones?: boolean;
+  /** invasion batch 6: the "Goal ruled out" button (absent = off) */
+  trackRuledOut?: boolean;
   shootout: { home: SoShot[]; away: SoShot[]; first: Side; sdFirst?: Side } | null;
   shootoutWinner?: Side;
   agg?: AggPrior;
@@ -238,6 +258,7 @@ export const init = (config?: Record<string, unknown>): IceHockeyState => {
     plusMinus: bool(config?.plusMinus, false),
     ...Object.fromEntries(TRACK_FLAGS.filter((f) => bool(config?.[f], false)).map((f) => [f, true])),
     ...(bool(config?.trackFaceoffZones, false) ? { trackFaceoffZones: true } : {}),
+    ...ruledOutConfig(config),
     shootout: null,
     ...(aggPriorFromConfig(config) ? { agg: aggPriorFromConfig(config) } : {}),
   };
@@ -615,6 +636,21 @@ export const soScore = (s: Pick<IceHockeyState, 'shootout'>) => ({
 
 /* --------------------------------- reducer --------------------------------- */
 
+/** An id-shaped string (a hostile value is not an id). */
+const safeId = (v: unknown): string | undefined => (typeof v === 'string' && /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$/.test(v) ? v : undefined);
+
+/** Invasion batch 6 (audit fix 14): a shoot-out attempt — scored, saved or
+ *  missed — with the shooter and the goalie facing it (both optional). The
+ *  shooter's soTaken (+ soGoals); the goalie's soShotsFaced (+ soSaves). */
+export function soAction(side: Side, outcome: 'scored' | 'saved' | 'missed', shooter?: { id: string } | null, goalie?: { id: string } | null): ScoreAction {
+  const scored = outcome === 'scored';
+  return {
+    type: 'SO', side, payload: { scored, ...(scored ? {} : { outcome }) },
+    ...(shooter ? { attribution: { playerId: shooter.id, stat: 'soTaken', ...(scored ? { extra: { soGoals: 1 } } : {}) } } : {}),
+    ...(goalie ? { attribution2: { playerId: goalie.id, stat: 'soShotsFaced', ...(outcome === 'saved' ? { extra: { soSaves: 1 } } : {}), side: side === 'home' ? 'away' : 'home' } } : {}),
+  };
+}
+
 const ENDED_OK = new Set(['START_SHOOTOUT', 'SO', 'SO_ORDER', 'XI', 'STAT_ADJUST', 'REMOVE_EVENT', 'ASSIST2', 'END']);
 const strengthOf = (v: unknown): Strength | undefined => (v === 'ev' || v === 'pp' || v === 'sh' ? v : undefined);
 const penOf = (v: unknown): PenKind => (PEN_KINDS.includes(v as PenKind) ? (v as PenKind) : 'minor');
@@ -695,7 +731,9 @@ export const reducer = (s: IceHockeyState, a: ScoreAction): IceHockeyState => {
       if (!side) return s;
       const pen = penOf(a.payload?.pen);
       const infraction = typeof a.payload?.infraction === 'string' && a.payload.infraction ? (a.payload.infraction as string) : undefined;
-      const next = push(s, { type: 'pen', side, pen, ...(pen === 'bench' && !pid ? {} : who1), ...(infraction ? { infraction } : {}) });
+      // invasion batch 6: served by a team-mate (an id; never the penalised player himself)
+      const served = safeId(a.payload?.servedId);
+      const next = push(s, { type: 'pen', side, pen, ...(pen === 'bench' && !pid ? {} : who1), ...(infraction ? { infraction } : {}), ...(served && served !== pid ? { servedId: served } : {}) });
       return s.stopClock && !edit && at ? { ...next, clock: stopAt(next, at) } : next;
     }
     case 'GK': {
@@ -715,6 +753,9 @@ export const reducer = (s: IceHockeyState, a: ScoreAction): IceHockeyState => {
         ...(zone ? { zone } : {}),
       });
     }
+    case 'RULED_OUT':
+      // invasion batch 6: a goal ruled out — a timeline row; the score never moved
+      return side ? push(s, { type: 'ruledout', side, ...readRuledOut('ice_hockey', a.payload) }) : s;
     case 'TIMEOUT': {
       if (!side) return s;
       const next = push(s, { type: 'timeout', side });
@@ -754,7 +795,14 @@ export const reducer = (s: IceHockeyState, a: ScoreAction): IceHockeyState => {
     }
     case 'SO': {
       if (!s.shootout || s.shootoutWinner || !side) return s;
-      const shot: SoShot = { scored: a.payload?.scored === true, ...(p1?.playerId ? { playerId: p1.playerId } : {}), ...(p1?.playerName ? { playerName: p1.playerName } : {}) };
+      const scored = a.payload?.scored === true;
+      // invasion batch 6: saved / missed, and the goalie (credited, so read from attribution2 only)
+      const oc = a.payload?.outcome;
+      const shot: SoShot = {
+        scored, ...(p1?.playerId ? { playerId: p1.playerId } : {}), ...(p1?.playerName ? { playerName: p1.playerName } : {}),
+        ...(!scored && (oc === 'saved' || oc === 'missed') ? { outcome: oc } : {}),
+        ...(safeId(p2?.playerId) ? { gkId: p2!.playerId } : {}),
+      };
       const so = { ...s.shootout, [side]: [...s.shootout[side], shot] };
       return { ...s, shootout: so, shootoutWinner: decideShootout(so.home, so.away, s.soRounds) };
     }
@@ -867,7 +915,8 @@ export const ICE_HOCKEY_LIVE_SETTINGS: LiveSettings<IceHockeyState> = {
     { key: 'stopClock', label: 'Stop the clock on goals and penalties', type: 'toggle', default: true, group: 'Clock' },
     { key: 'plusMinus', label: 'Track +/- (who was on the ice at each goal)', type: 'toggle', default: false, group: 'Stats' },
     ...TRACK_FIELDS,
+    ruledOutField('ice_hockey'),
   ] as FormatField[],
-  read: (s) => ({ periodMinutes: s.periodMinutes, stopClock: s.stopClock, plusMinus: s.plusMinus, ...Object.fromEntries(TRACK_FLAGS.map((f) => [f, s[f] === true])), trackFaceoffZones: s.trackFaceoffZones === true }),
-  defaults: { periodMinutes: 20, stopClock: true, plusMinus: false, ...Object.fromEntries(TRACK_FLAGS.map((f) => [f, false])), trackFaceoffZones: false },
+  read: (s) => ({ periodMinutes: s.periodMinutes, stopClock: s.stopClock, plusMinus: s.plusMinus, ...Object.fromEntries(TRACK_FLAGS.map((f) => [f, s[f] === true])), trackFaceoffZones: s.trackFaceoffZones === true, trackRuledOut: s.trackRuledOut === true }),
+  defaults: { periodMinutes: 20, stopClock: true, plusMinus: false, ...Object.fromEntries(TRACK_FLAGS.map((f) => [f, false])), trackFaceoffZones: false, trackRuledOut: false },
 };

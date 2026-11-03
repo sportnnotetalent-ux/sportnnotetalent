@@ -25,6 +25,7 @@ import {
   statAction, foulAction, subAction, xiAction, xiOf, penKickAction, eventRemoval, statRemoval as statRemovalAction, type StatDetail,
   penaltyMissActions, gridSaveActions, cardChoices,
   stoppageAction, stoppageReasonAction, penaltyConcededActions, penaltyStepAfter, footballTrackedKeys, STOPPAGE_REASONS, STOPPAGE_LABEL,
+  goalDetailAction, concussionLeft, GOAL_SITUATIONS, SITUATION_LABEL,
 } from './actions';
 import { Button, TextField, SelectChip } from '../../components/ui';
 import { askConfirm, confirmMatchAction } from '../../components/ConfirmSheet';
@@ -47,7 +48,7 @@ import {
 import { useSpeech } from '../../core/speech';
 import { normalizeCommand as llmNormalize, enabled as llmEnabled } from '../../core/voiceLLM';
 import { parseIntent, parseGoalType, matchPlayer, matchTeam, isNoAssist, isYes, isNo, deburr } from './voiceCommands';
-import type { FootballEvent, GoalType, BodyPart } from './events';
+import type { FootballEvent, GoalType, BodyPart, GoalSituation } from './events';
 import { type StatEvent, type StatKind, STAT_META, EVENT_META, GOAL_TYPE_LABEL, BODY_PART_LABEL } from './events';
 import type { Player } from '../../core/types';
 import type { ScoreAction, SportPlugin } from '../types';
@@ -172,7 +173,8 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
   // Team kit colours for the home/away controls (fall back to the app's accents).
   const hc = homeColor ?? theme.colors.home;
   const ac = awayColor ?? theme.colors.away;
-  const [sub, setSub] = useState<{ side: 'home' | 'away'; off?: Player } | null>(null);
+  // invasion batch 6 (IFAB): `concussion` = a permanent concussion substitute (outside the limit)
+  const [sub, setSub] = useState<{ side: 'home' | 'away'; off?: Player; concussion?: boolean } | null>(null);
   // Multi-step capture: tap an action → pick the player(s) from a jersey+name
   // table → any follow-up (goal type, assist, on/off target). One tap per step.
   const [flow, setFlow] = useState<Flow | null>(null);
@@ -219,11 +221,12 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
   // Deep wave: the optional detail chips picked on the open shot / goal panel
   // (zone, big chance), the card's reason, a ruled-out goal's VAR flag — all
   // pre-selections, so skipping them costs no tap. Cleared when a flow closes.
-  const [mods, setMods] = useState<{ zone?: ShotZone; big?: boolean }>({});
+  // invasion batch 6: `sit` = an open-play goal's situation (Shot detail on)
+  const [mods, setMods] = useState<{ zone?: ShotZone; big?: boolean; sit?: GoalSituation }>({});
   const [cardReason, setCardReason] = useState<CardReason | undefined>(undefined);
   const [noGoalReview, setNoGoalReview] = useState(false);
   useEffect(() => {
-    if (flow === null) { setMods((m) => (m.zone || m.big ? {} : m)); setCardReason(undefined); setNoGoalReview(false); }
+    if (flow === null) { setMods((m) => (m.zone || m.big || m.sit ? {} : m)); setCardReason(undefined); setNoGoalReview(false); }
   }, [flow]);
   const opp = (side: 'home' | 'away') => (side === 'home' ? 'away' : 'home');
   // Re-render every few seconds so time-based prompts (added time) keep up.
@@ -381,7 +384,10 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
 
   // Deep wave: the picked zone / big chance ride on the goal (shot detail on).
   const recordGoal = (side: 'home' | 'away', scorer: Player, goalType: GoalType, bodyPart?: BodyPart, detail = mods) =>
-    fire(goalAction(side, scorer, goalType, { bodyPart, zone: deep.shotDetail ? detail.zone : undefined, bigChance: !!(deep.shotDetail && detail.big), tracked: trackedKeys() }));
+    fire(goalAction(side, scorer, goalType, { bodyPart, zone: deep.shotDetail ? detail.zone : undefined, bigChance: !!(deep.shotDetail && detail.big), situation: deep.shotDetail ? detail.sit : undefined, tracked: trackedKeys() }));
+  // Invasion batch 6 (audit fix 12): Shot → On target → ⚽ Goal goes straight to the
+  // assist panel, as the Goal button does (the type / foot chips are there) — 2 taps, not 4.
+  const shotGoal = (side: 'home' | 'away', player: Player) => { recordGoal(side, player, 'open'); setFlow({ mode: 'goal', side, step: 'assist', scorer: player, goalType: 'open', logged: true, fromSeq: state.seq }); };
   const recordOwnGoal = (side: 'home' | 'away', scorer: Player) => {
     // SD-30: the player's id rides along — `ownGoals` is credited to him by the
     // absolute totals at full time (not live: his line's opponent is this side).
@@ -669,6 +675,13 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
       case 'shot': startStat('shot'); say('Shot — which team?'); return;
       case 'attack': startStat('attackContribution'); say('Attacking play — which team?'); return;
       case 'defence': startStat('defenceContribution'); say('Defensive play — which team?'); return;
+      // invasion batch 6: a stoppage by voice, with its reason when said (fire: the backfill minute holds)
+      case 'stoppage': {
+        if (!state.startedAt) { say('Kick off first.'); return; }
+        fire(stoppageAction(state.possession.side ?? 'home', intent.reason));
+        say(`Stoppage${intent.reason ? ` — ${STOPPAGE_LABEL[intent.reason]}` : ''}.`);
+        return;
+      }
       default:
         // Free-form phrasing the grammar didn't catch → ask the optional LLM to
         // normalise it to a canonical command, then re-run that through the grammar.
@@ -730,21 +743,29 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
       <Text style={ctrl.label}>Substitution · {state.subType} ·{subsTally('home')} {homeName}{atCap('home') ? ' (none left)' : ''},{subsTally('away')} {awayName}{atCap('away') ? ' (none left)' : ''}
       </Text>
       <View style={ctrl.row}>
-        <Button label={atCap('home') ? `${homeName} · no subs left` : `Sub — ${homeName}`} variant="ghost" style={ctrl.flex}
-          disabled={atCap('home')}
-          onPress={() => setSub(sub?.side === 'home' ? null : { side: 'home' })} />
-        <Button label={atCap('away') ? `${awayName} · no subs left` : `Sub — ${awayName}`} variant="ghost" style={ctrl.flex}
-          disabled={atCap('away')}
-          onPress={() => setSub(sub?.side === 'away' ? null : { side: 'away' })} />
+        {/* invasion batch 6 (IFAB): at the limit, a concussion substitute is still allowed */}
+        <Button label={atCap('home') ? (concussionLeft(state, 'home') ? `${homeName} · concussion sub only` : `${homeName} · no subs left`) : `Sub — ${homeName}`} variant="ghost" style={ctrl.flex}
+          disabled={atCap('home') && !concussionLeft(state, 'home')}
+          onPress={() => setSub(sub?.side === 'home' ? null : { side: 'home', ...(atCap('home') ? { concussion: true } : {}) })} />
+        <Button label={atCap('away') ? (concussionLeft(state, 'away') ? `${awayName} · concussion sub only` : `${awayName} · no subs left`) : `Sub — ${awayName}`} variant="ghost" style={ctrl.flex}
+          disabled={atCap('away') && !concussionLeft(state, 'away')}
+          onPress={() => setSub(sub?.side === 'away' ? null : { side: 'away', ...(atCap('away') ? { concussion: true } : {}) })} />
       </View>
       {sub && (
         <View style={ctrl.subBox}>
+          {/* invasion batch 6: optional — a permanent concussion substitute is outside the limit (IFAB, max 2) */}
+          {concussionLeft(state, sub.side) > 0 ? (
+            <View style={ctrl.chips}>
+              <SelectChip label={`Concussion sub (extra, ${concussionLeft(state, sub.side)} left)`} active={!!sub.concussion}
+                onPress={() => (atCap(sub.side) ? undefined : setSub({ ...sub, concussion: !sub.concussion }))} />
+            </View>
+          ) : null}
           <Text style={ctrl.meta}>Player OFF (on the field):</Text>
           <PlayerTable players={xi(sub.side)} selectedId={sub.off?.id} onPick={(p) => setSub({ ...sub, off: p })} />
           {sub.off && (
             <>
               <Text style={ctrl.meta}>Player ON (from the bench){state.subType === 'fixed' ? ' — withdrawn players unavailable' : ''}:</Text>
-              <PlayerTable players={benchOf(sub.side, sub.off.id)} onPick={(p) => { fire(subAction(sub.side, sub.off!, p)); setSub(null); }} />
+              <PlayerTable players={benchOf(sub.side, sub.off.id)} onPick={(p) => { fire(subAction(sub.side, sub.off!, p, sub.concussion ? { concussion: true } : {})); setSub(null); }} />
             </>
           )}
         </View>
@@ -901,19 +922,27 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
         const refine = (nextType: GoalType, nextBody?: BodyPart) => {
           // (SD-30: the undone goal's credits are reversed, as a removal does)
           if (nextType === gt && nextBody === bp) return;
-          if (flow.logged) { dispatch(undoGoalAction(flow.side, flow.scorer, flow.goalType ?? 'open')); recordGoal(flow.side, flow.scorer, nextType, nextBody); }
+          // invasion batch 6: a penalty / direct free kick carries no situation
+          const keep = nextType === 'open' ? mods : { ...mods, sit: undefined };
+          if (keep !== mods) setMods(keep);
+          if (flow.logged) { dispatch(undoGoalAction(flow.side, flow.scorer, flow.goalType ?? 'open')); recordGoal(flow.side, flow.scorer, nextType, nextBody, keep); }
           setFlow({ mode: 'goal', side: flow.side, step: 'assist', scorer: flow.scorer, goalType: nextType, bodyPart: nextBody, logged: flow.logged, ...(flow.logged ? { fromSeq: state.seq } : {}) });
         };
         const typeChips: { label: string; t: GoalType; b?: BodyPart }[] = [
           { label: 'Open play', t: 'open' }, { label: 'Header', t: 'open', b: 'head' },
           // deep wave (shot detail on): which foot
           ...(deep.shotDetail ? [{ label: 'Left foot', t: 'open' as GoalType, b: 'left' as BodyPart }, { label: 'Right foot', t: 'open' as GoalType, b: 'right' as BodyPart }] : []),
-          { label: 'Penalty', t: 'penalty' }, { label: 'Free kick', t: 'freekick' },
+          { label: 'Penalty', t: 'penalty' }, { label: deep.shotDetail ? 'Direct free kick' : 'Free kick', t: 'freekick' },
         ];
         // deep wave: zone / big chance on the goal already on the board
-        const goalDetail = (next: { zone?: ShotZone; big?: boolean }) => {
+        const goalDetail = (next: { zone?: ShotZone; big?: boolean; sit?: GoalSituation }) => {
           setMods(next);
           if (flow.logged) dispatch({ type: 'GOAL_DETAIL', side: flow.side, payload: { zone: next.zone ?? null, bigChance: !!next.big } });
+        };
+        // invasion batch 6 (audit fix 13): how an open-play goal came about (optional)
+        const goalSituation = (sit: GoalSituation | undefined) => {
+          setMods({ ...mods, sit });
+          if (flow.logged) dispatch(goalDetailAction(flow.side, { situation: sit ?? null }));
         };
         return panel(`⚽ Goal — ${flow.scorer.fullName}`, flow.logged ? `✓ Goal recorded (${state.home}-${state.away}). Assist? (optional — pick one, or Close)` : 'Assist? (optional — type below)', (
           <>
@@ -933,6 +962,13 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
                   <SelectChip key={z} label={ZONE_LABEL[z]} active={mods.zone === z} onPress={() => goalDetail({ ...mods, zone: mods.zone === z ? undefined : z })} />
                 ))}
                 <SelectChip label="⭐ Big chance" active={!!mods.big} onPress={() => goalDetail({ ...mods, big: !mods.big })} />
+              </View>
+            ) : null}
+            {deep.shotDetail && gt === 'open' ? (
+              <View style={ctrl.chips}>
+                {GOAL_SITUATIONS.map((x) => (
+                  <SelectChip key={x} label={SITUATION_LABEL[x]} active={mods.sit === x} onPress={() => goalSituation(mods.sit === x ? undefined : x)} />
+                ))}
               </View>
             ) : null}
           </>
@@ -1144,7 +1180,7 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
           <View style={{ gap: theme.spacing(2) }}>
             {detailChips}
             <View style={ctrl.row}>
-              <Button label="⚽ Goal" variant="home" style={ctrl.flex} onPress={() => (player ? setFlow({ mode: 'goal', side, step: 'type', scorer: player }) : recordTeamGoal(side))} />
+              <Button label="⚽ Goal" variant="home" style={ctrl.flex} onPress={() => (player ? shotGoal(side, player) : recordTeamGoal(side))} />
               <Button label="🧤 Saved" variant="ghost" style={ctrl.flex}
                 onPress={() => recordShot(side, player, { onTarget: true }, () => { const gk = gkOf(opp(side)); if (gk) recordStat('save', opp(side), gk); })} />
             </View>

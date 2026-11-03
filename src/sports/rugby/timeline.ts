@@ -2,6 +2,8 @@
  *  scorer's correction list and the named Undo. PURE. */
 import type { LiveEvent } from '../liveEvents';
 import { shootoutOrderRows } from '../shootoutOrder.ts';
+import { ruledOutRow } from '../invasion/ruledOut.ts';
+import { restartOnTimeline, restartRow } from '../invasion/restarts.ts';
 import {
   minuteText, periodName, clockAt, pointsOf, CAUSE_LABEL, DETAIL_LABEL, INFRINGEMENT_LABEL, KICK_LABEL, TALLY_LABEL, type RugbyEvent, type RugbyState,
 } from './engine.ts';
@@ -41,6 +43,10 @@ export function describeEvent(e: RugbyEvent): { icon: string; label: string; det
         ...(e.playerName || why ? { detail: [e.playerName, why].filter(Boolean).join(' · ') } : {}),
       };
     }
+    case 'ruledout':
+      return ruledOutRow('rugby', e);
+    case 'restart':
+      return restartRow(e.restart ?? 'penTap');
   }
 }
 
@@ -49,7 +55,7 @@ export function describeEvent(e: RugbyEvent): { icon: string; label: string; det
  *  the scores) — they're in the commentary, the stats sheet and the box. */
 export function rugbyTimeline(s0: RugbyState, names?: { home?: string; away?: string }, nameOf: NameOf = legacyNameOf): LiveEvent[] {
   const s = withNames(s0, nameOf);
-  return [...s.events.map((e, i) => ({ e, i })).filter(({ e }) => e.type !== 'detail' && e.type !== 'setpiece' && e.type !== 'tally').map(({ e, i }) => {
+  return [...s.events.map((e, i) => ({ e, i })).filter(({ e }) => e.type !== 'detail' && e.type !== 'setpiece' && e.type !== 'tally' && (e.type !== 'restart' || restartOnTimeline(e.restart))).map(({ e, i }) => {
     const d = describeEvent(e);
     const name = e.type === 'sub' ? e.secondName : e.official ? undefined : e.playerName;
     return {
