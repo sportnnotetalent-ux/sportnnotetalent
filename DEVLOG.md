@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-03 — Release: Batch 6 (P2s across all sports) live (web, Android OTA)
+
+auth-smoke passed. Published from a clean worktree at ca6f241: web (entry `index-0117e06e`, confirmed live on app.sportnnote.in) and Android OTA groups `80a6006b` (preview) and `212cd409` (production), runtime 1.0.0.
+
 ### 2026-11-03 — Batch 6: the P2s across all sports
 
 Seven sport-family branches (each with its break-it list, tests, simulation; old logs fingerprinted before and replayed identically after), merged here:
