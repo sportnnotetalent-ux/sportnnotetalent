@@ -433,6 +433,18 @@ const samePlayer = (e: RugbyEvent, who: Who): boolean => (e.playerId && who.id ?
 /** Yellow cards a player has had this match (the next one is a red). */
 export const yellowsOf = (s: RugbyState, side: Side, who: Who): number =>
   s.events.filter((e) => e.type === 'card' && e.card === 'yellow' && e.side === side && !e.official && samePlayer(e, who)).length;
+/** Screen sweep (S3): the card a player-card tap logs, as the controls fire it.
+ *  `who` absent = an unnamed player (a friendly with no squad, or "Player not
+ *  listed"): still a PLAYER's card — the team's yellow / red, the side short —
+ *  never a team official. A second yellow to a named player is a red (the
+ *  20-minute red under the trial); `red20` asks for one straight. */
+export function cardTapAction(s: RugbyState, side: Side, kind: CardKind, who?: { id: string; name?: string }, red20?: boolean, tracked?: string[]): ScoreAction {
+  const second = kind === 'yellow' && !!who && yellowsOf(s, side, who) >= 1;
+  const card: CardKind = second ? 'red' : kind;
+  const r20 = card === 'red' && s.red20 && (second || !!red20);
+  const attribution = creditAttribution(eventCredits({ type: 'card', card, second, playerId: who?.id }).first, 1, tracked);
+  return { type: 'CARD', side, payload: { card, ...(second ? { second: true } : {}), ...(r20 ? { red20: true } : {}) }, ...(attribution ? { attribution } : {}) };
+}
 /** Permanent replacements a side has used (temporary HIA / blood ones and returns don't count). */
 export const subsUsed = (s: RugbyState, side: Side): number =>
   s.events.filter((e) => e.type === 'sub' && e.side === side && !e.temp && !e.back && (e.playerId || e.playerName)).length;
