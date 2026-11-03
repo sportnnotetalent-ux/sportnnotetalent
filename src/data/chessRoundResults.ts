@@ -8,6 +8,7 @@
  */
 import { loadSport } from '../sports/registry';
 import { getMatchEvents, appendMatchEvent, updateMatchSnapshot, recordStatLine, releaseScoring } from './repos';
+import { baseOf } from '../core/sharedScoring';
 import { effectiveLog } from '../sports/amend';
 import { withMatchRecords } from '../sports/matchRecords';
 import { actionLineCredits } from './lineOpponent';
@@ -44,14 +45,18 @@ export async function recordRoundResults(writes: BoardWrite[], players: Map<stri
       // the colour the arbiter sees is the game's: write SET_WHITE only if the log differs
       const cur = (s as { white?: string }).white;
       const seq0 = log.reduce((mx, e) => Math.max(mx, e.seq), 0);
+      // shared scoring: each write names the newest step it was made on
+      let base = baseOf(log);
       if (cur !== w.white) {
-        await appendMatchEvent(m.id, { seq: seq0 + 1, type: 'SET_WHITE', side: null, payload: { side: w.white }, attribution: null, clientId: newId() });
+        const setWhite = { seq: seq0 + 1, type: 'SET_WHITE', side: null, payload: { side: w.white }, attribution: null, clientId: newId(), base };
+        await appendMatchEvent(m.id, setWhite);
+        base = setWhite.clientId;
         s = plugin.reducer(s as never, { type: 'SET_WHITE', payload: { side: w.white } });
       }
       const rec: MatchEventRecord = {
         seq: seq0 + (cur !== w.white ? 2 : 1), type: 'RESULT', side: action.side ?? null,
         payload: action.attribution2 ? { ...action.payload, _attr2: action.attribution2 } : action.payload,
-        attribution: action.attribution ?? null, clientId: newId(),
+        attribution: action.attribution ?? null, clientId: newId(), base,
       };
       await appendMatchEvent(m.id, rec);
       s = plugin.reducer(s as never, { type: 'RESULT', side: action.side, payload: action.payload });

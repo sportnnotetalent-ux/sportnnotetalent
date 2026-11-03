@@ -16,6 +16,7 @@ import {
   createTournament, createTeam, invitePerson, setTeamRoster, addTournamentTeams, createTeamTie, saveTieLineup,
   getTieRubbers, appendMatchEvent, updateMatchSnapshot, matchStatTotals, syncMatchStatLines, settleTie, getTournaments,
   getMyPlayerId,
+  newestEventKey,
 } from './repos';
 import { TIE_PRESETS, TIE_POINTS, specFromPreset, withDeadRule, type TieLineup, type TieSpec } from './teamTie';
 import { readSeriesMeta } from './series';
@@ -54,7 +55,7 @@ async function play(matchId: string, sport: SportId, events: MatchEventRecord[],
   const plugin = await loadSport(sport);
   let s = plugin.createInitialState(cfg);
   for (const e of events) {
-    await appendMatchEvent(matchId, e);
+    await appendMatchEvent(matchId, { ...e, base: await newestEventKey(matchId) }); // shared scoring
     s = plugin.reducer(s, { type: e.type, side: e.side ?? undefined, payload: e.payload ?? undefined, attribution: e.attribution ?? undefined });
   }
   const done = plugin.isComplete(s as never);

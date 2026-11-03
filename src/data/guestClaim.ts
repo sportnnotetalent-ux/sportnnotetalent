@@ -17,6 +17,7 @@ import { guestStore } from './guestStore';
 import {
   getMyPlayerId, createMyPlayer, ensureTeamWithId, ensureFriendlyWithId, setMatchScorer, appendMatchEvent,
   updateMatchSnapshot, endMatchManually, claimScoring,
+  newestEventKey,
 } from './repos';
 
 export async function claimThisDevicesGuestMatch(profileId: string): Promise<string | null> {
@@ -30,7 +31,7 @@ export async function claimThisDevicesGuestMatch(profileId: string): Promise<str
     createMatch: (m) => ensureFriendlyWithId({ ...m, format: m.format as SportFormat }),
     // the scorer, holding the scoring lock on this device (as opening a match to score does)
     setScorer: async (id, p) => { await setMatchScorer(id, p); await claimScoring(id, { playerId: p }); },
-    uploadOne: (id, e) => appendMatchEvent(id, e),
+    uploadOne: async (id, e) => appendMatchEvent(id, { ...e, base: await newestEventKey(id) }), // shared scoring
     saveBoard: async (id, gm) => {
       const plugin = getSport(gm.sport);
       const s = deriveLog(plugin, gm.config, gm.events).state;

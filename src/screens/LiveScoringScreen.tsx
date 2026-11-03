@@ -69,13 +69,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { cardPng } from '../core/resultCardImage';
 import { viewsLabel } from '../core/personalise';
 import { viewerDeviceId, track } from '../core/telemetry';
-import { getRoster, getPlayers, getLineup, getMatch, getTournaments, getMatchSquads, getMatchStatLines, getMyPlayerId, setMatchScorers, setMatchHosts, setMatchLogo, setMatchFormat, setMatchStream, setMatchManagers, getOrganizations, getTeamLeaders, getMatchDisputes, raiseDispute, updateDispute, dismissDispute, resolveDispute, escalateDispute, createReplacementPlayer, retireMatch, walkoverMatch, rescheduleMatch, getMatchKickoffAt, getScoringLock, claimScoring, handoverScoring, endMatchManually, getScoreEdits, getMatchEvents, getTournamentOfficials, joinMatchAsScorer, getMatchOfficials, setMatchOfficials, deleteMatch, resetMatch, setMatchBreak, getMatchLastActivityAt, getMatchPotm, setMatchPotm, stampAggregatePrior, AWARDS_DB_MESSAGE } from '../data/repos';
+import { getRoster, getPlayers, getLineup, getMatch, getTournaments, getMatchSquads, getMatchStatLines, getMyPlayerId, setMatchScorers, setMatchHosts, setMatchLogo, setMatchFormat, setMatchStream, setMatchManagers, getOrganizations, getTeamLeaders, getMatchDisputes, raiseDispute, updateDispute, dismissDispute, resolveDispute, escalateDispute, createReplacementPlayer, retireMatch, walkoverMatch, rescheduleMatch, getMatchKickoffAt, getScoringLock, claimScoring, handoverScoring, setSharedScoring, endMatchManually, getScoreEdits, getMatchEvents, getTournamentOfficials, joinMatchAsScorer, getMatchOfficials, setMatchOfficials, deleteMatch, resetMatch, setMatchBreak, getMatchLastActivityAt, getMatchPotm, setMatchPotm, stampAggregatePrior, AWARDS_DB_MESSAGE } from '../data/repos';
 import { matchRatings as genericRatings, type PotmProp } from '../data/ratings';
 import { AwardPickerSheet, type PickerRow } from '../components/AwardPickerSheet';
 import { deleteVerdict, breakLabel, type BreakKind, type MatchBreak } from '../data/matchHousekeeping';
 import { QuickOptionsSheet } from '../components/QuickOptionsSheet';
 import { LiveSettingsCard } from '../components/LiveSettingsCard';
-import { matchRules, matchCaptures, liveOwnedKeys, settingsUnit, type CaptureLine, type RuleLine } from '../sports/matchRules';
+import { matchRules, matchCaptures, liveOwnedKeys, settingsUnit, scoringRule, type CaptureLine, type RuleLine } from '../sports/matchRules';
 import { OverlayPanel } from '../components/OverlayPanel';
 import type { TickerMeta } from '../sports/ticker';
 import { slotsFor, isCommentarySlot, type MatchOfficial } from '../data/matchOfficials';
@@ -90,6 +90,7 @@ import { SportFormatEditor, defaultsFor, type FormatVal } from '../components/Fo
 import { AddInvitePlayer } from '../components/AddInvitePlayer';
 import { tournamentHostPlayerIds } from '../core/org';
 import { canScoreMatch, isListedScorer, isMatchHost } from '../core/scoringAccess';
+import { canSwitchShared, staleMessage, undoByLabel, undoNeedsConfirm } from '../core/sharedScoring';
 import { seriesMetaFromFormat } from '../data/series';
 import { tieSpecFromFormat, TIE_KEYS } from '../data/teamTie';
 import { announceTieResult } from '../data/tieAlerts';
@@ -330,11 +331,12 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
     if (!tieSpecFromFormat(rawFormat)) return undefined;
     return { first: Number(rawFormat?.__seriesLeg) === 1 };
   }, [rawFormat]);
-  const { state, dispatch, undo, reset, eventCount, live, syncing, rejectedCount, discardRejected, refresh, amend, lastStep, resultSendsAt, sendResultNow, settleStatWrites } = useLiveMatch({
+  const { state, dispatch, undo, reset, eventCount, live, syncing, rejectedCount, discardRejected, refresh, amend, lastStep, resultSendsAt, sendResultNow, settleStatWrites, staleBy, clearStale } = useLiveMatch({
     matchId,
     sport,
     canScore,
     lockStatus: lockStat,
+    myPlayerId,
     homeTeamName,
     awayTeamName,
     rosters: sideRosters,
@@ -892,7 +894,7 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
   const [livePreview, setLivePreview] = useState<FormatPreview | null>(null);
   // Only from the device scoring now: its log row is what tells viewers (and
   // its own board replays under the new format at once).
-  const scoringHere = canScore && (lockStat === 'mine' || lockStat === 'free' || lockStat === 'unsupported');
+  const scoringHere = canScore && (lockStat === 'mine' || lockStat === 'free' || lockStat === 'unsupported' || lockStat === 'shared');
   const liveFormatOk = canChangeLiveFormat({ canManage: canManage && scoringHere, tournamentId: meta.tournamentId, sport, live: matchLive, complete });
   useEffect(() => {
     if (!editInfo || !matchLive || !liveFormatOk || !matchId) { setLivePreview(null); return; }
@@ -1204,7 +1206,13 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
   const undoNameOf = useMemo(() => makeNameOf(maskValue.people ?? new Map(), maskValue), [maskValue]);
   // MVP B6: undoing a format change puts the old format back first (viewers
   // reload it when the row leaves the log), then pops the row.
+  const sharedOn = lockStat === 'shared';
   const undoStep = useCallback(async () => {
+    // Shared scoring: undoing another scorer's step asks first.
+    if (undoNeedsConfirm({ shared: sharedOn, by: lastStep?.by, me: myPlayerId })) {
+      const who = undoNameOf(lastStep!.by!) || 'another scorer';
+      if (!(await confirmAction(`Undo ${who}’s step?`, `${who} recorded this step from their phone. Undo it for everyone?`, 'Undo'))) return;
+    }
     if (lastStep?.type === FORMAT_TYPE && matchId) {
       const tail = newestEvent(mergeLog(await getMatchEvents(matchId), matchOutbox.getPending(matchId)));
       const prev = tail?.type === FORMAT_TYPE ? (tail.payload as { prev?: Record<string, number | string | boolean> } | null)?.prev : undefined;
@@ -1214,7 +1222,7 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
       }
     }
     await undo();
-  }, [lastStep, matchId, undo]);
+  }, [lastStep, matchId, undo, sharedOn, myPlayerId, undoNameOf]);
   // Undo labels batch (2026-11-03): a sport's own label that can't name the
   // step (null, junk, or a throw on an odd state) falls back to the shared one.
   const undoWhat = useMemo(() => (lastStep?.type === FORMAT_TYPE ? 'format change' : resolveUndoLabel(
@@ -1223,6 +1231,14 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
       try { const m = plugin.summary(s as never); return m.homeScore != null && m.awayScore != null ? `${m.homeScore}-${m.awayScore}` : null; } catch { return null; }
     }),
   )), [plugin, lastStep, homeName, awayName, undoNameOf]);
+  // Shared scoring: "Undo: pot · recorded by Ashok"
+  const undoBy = undoByLabel({ shared: sharedOn, by: lastStep?.by, me: myPlayerId, nameOf: (id) => undoNameOf(id) });
+  // Shared scoring: the "your tap wasn't added" note clears itself after a few seconds.
+  useEffect(() => {
+    if (!staleBy) return;
+    const t = setTimeout(clearStale, 6000);
+    return () => clearTimeout(t);
+  }, [staleBy, clearStale]);
   // SD-110 — keep the phone awake while this scorer is on a match in progress.
   const focused = useIsFocused();
   useKeepAwakeWhile(focused && canScore && started && !complete && !retiredLocally);
@@ -1237,8 +1253,8 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
       <Text style={[st.undoText, { color: theme.colors.textMuted }]} numberOfLines={1}>Nothing to undo yet</Text>
     </View>
   ) : (
-    <TouchableOpacity style={st.undoBtn} activeOpacity={0.8} accessibilityRole="button" accessibilityLabel={`Undo${undoWhat ? `: ${undoWhat}` : ` last ${sport === 'cricket' ? 'ball' : 'update'}`}`} accessibilityHint="Tap repeatedly to rewind to any earlier point" onPress={() => void undoStep()}>
-      <Text style={[st.undoText, { flexShrink: 1 }]} numberOfLines={1}>↶  Undo{undoWhat ? `: ${undoWhat}` : ''}</Text>
+    <TouchableOpacity style={st.undoBtn} activeOpacity={0.8} accessibilityRole="button" accessibilityLabel={`Undo${undoWhat ? `: ${undoWhat}` : ` last ${sport === 'cricket' ? 'ball' : 'update'}`}${undoBy}`} accessibilityHint="Tap repeatedly to rewind to any earlier point" onPress={() => void undoStep()}>
+      <Text style={[st.undoText, { flexShrink: 1 }]} numberOfLines={1}>↶  Undo{undoWhat ? `: ${undoWhat}` : ''}{undoBy}</Text>
       {undoWhat ? null : <Text style={st.undoHint}>rewind step-by-step</Text>}
     </TouchableOpacity>
   ) : null;
@@ -1483,7 +1499,7 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
   const [liveEditLog, setLiveEditLog] = useState<MatchEventRecord[]>([]);
   const [liveOps, setLiveOps] = useState<{ ops: AmendOp[]; lines: string[] }>({ ops: [], lines: [] });
   const [strikeAsk, setStrikeAsk] = useState<{ before?: string; ids: [string, string]; names: [string, string] } | null>(null);
-  const liveCanWrite = canScore && (lockStat === 'mine' || lockStat === 'free' || lockStat === 'unsupported');
+  const liveCanWrite = canScore && (lockStat === 'mine' || lockStat === 'free' || lockStat === 'unsupported' || lockStat === 'shared');
   const pendingTaps = matchId ? matchOutbox.pendingCount(matchId) : 0;
   const openLiveEdit = async () => {
     if (!matchId) return;
@@ -1915,6 +1931,22 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
       notice('Couldn’t take over', e instanceof Error ? e.message : 'Please try again.');
     }
   };
+  // Shared scoring on / off (docs/security/breaks/shared-scoring.md).
+  const switchShared = async (on: boolean) => {
+    if (!matchId) return;
+    const ok = await confirmAction(
+      on ? 'Let every scorer score at once?' : 'Back to one scorer at a time?',
+      on ? 'Every listed scorer can record from their own phone at the same time. If two phones tap at once, the second tap is refused and that phone is told who scored first.'
+        : 'The next person to tap scores; everyone else follows along until scoring is handed over.',
+      on ? 'Turn on' : 'Switch back');
+    if (!ok) return;
+    try {
+      await setSharedScoring(matchId, on);
+      await refreshLock();
+    } catch (e) {
+      notice('Couldn’t change how this match is scored', e instanceof Error ? e.message : 'Please try again.');
+    }
+  };
   const handOver = async (toId: string) => {
     if (!matchId) return;
     const toName = nameOf(toId) ?? 'them';
@@ -2198,8 +2230,21 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
       <View style={st.infoCard}>
         <Text style={textStyles.h3}>Match scorers</Text>
         <Text style={textStyles.muted}>
-          Several people can be allowed to score; one scores at a time, from their own device, and everyone else follows along. Add or change scorers anytime — even mid-match.
+          {lockStat === 'shared'
+            ? 'Shared scoring is on: every scorer below can record from their own phone at the same time. If two tap at once, the second tap is refused and that phone is told.'
+            : 'Several people can be allowed to score; one scores at a time, from their own device, and everyone else follows along. Add or change scorers anytime — even mid-match.'}
         </Text>
+        {hasMatch && lock?.supported && !complete && canSwitchShared({ tournamentId: meta.tournamentId, isListedScorer: iAmListedScorer, isHost }) ? (
+          <Text
+            style={st.editLink}
+            accessibilityRole="switch"
+            accessibilityState={{ checked: lockStat === 'shared' }}
+            accessibilityLabel="Shared scoring"
+            onPress={() => void switchShared(lockStat !== 'shared')}
+          >
+            {lockStat === 'shared' ? '👥 Shared scoring: on · switch to one at a time' : '👥 Let several scorers score at once (shared scoring)'}
+          </Text>
+        ) : null}
 
         {/* Current scorers — each removable by a manager. */}
         {scorerIds.length === 0 ? (
@@ -2222,16 +2267,18 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={[textStyles.body, { fontWeight: '700' }]} numberOfLines={1}>{nameOf(id) ?? 'Scorer'}{mine ? ' · you' : ''}</Text>
-                  <Text style={textStyles.muted} numberOfLines={1}>{mine ? (lock?.supported && lock.holderId && lock.holderId !== id ? 'Can score — someone else is scoring now' : '📱 Scoring from this device') : personOf(id)?.invited ? '⏳ Invited · hasn’t joined yet' : matchLive ? 'Scoring from their device' : 'Can score this match'}</Text>
+                  <Text style={textStyles.muted} numberOfLines={1}>{lockStat === 'shared' && !personOf(id)?.invited ? (mine ? '📱 Can score now — from this device' : 'Can score now — from their device') : mine ? (lock?.supported && lock.holderId && lock.holderId !== id ? 'Can score — someone else is scoring now' : '📱 Scoring from this device') : personOf(id)?.invited ? '⏳ Invited · hasn’t joined yet' : matchLive ? 'Scoring from their device' : 'Can score this match'}</Text>
                   {canManage && personOf(id)?.invited ? (
                     <RemindInstall playerId={id} name={nameOf(id) ?? 'Scorer'} phone={personOf(id)?.phone} message={inviteTextFor('scorer')(realName(nameOf(id)))} />
                   ) : null}
                 </View>
-                {lock?.holderId === id ? (
+                {lockStat === 'shared' && !complete && !personOf(id)?.invited ? (
+                  <View style={st.scorerLive}><View style={st.scorerLiveDot} /><Text style={st.scorerLiveText}>CAN SCORE</Text></View>
+                ) : lock?.holderId === id ? (
                   <View style={st.scorerLive}><View style={st.scorerLiveDot} /><Text style={st.scorerLiveText}>SCORING NOW</Text></View>
                 ) : matchLive && lockStat === 'unsupported' ? (
                   <View style={st.scorerLive}><View style={st.scorerLiveDot} /><Text style={st.scorerLiveText}>LIVE</Text></View>
-                ) : (canManage || lockStat === 'mine') && lock?.supported && !complete && !personOf(id)?.invited ? (
+                ) : lockStat !== 'shared' && (canManage || lockStat === 'mine') && lock?.supported && !complete && !personOf(id)?.invited ? (
                   <Text style={st.editLink} accessibilityRole="button" accessibilityLabel={`Hand scoring to ${nameOf(id) ?? 'scorer'}`} onPress={() => void handOver(id)}>Hand over</Text>
                 ) : null}
                 {canManage && (
@@ -2665,7 +2712,7 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
               {matchId && canScore && (lostTo || rejectedCount > 0) ? (
                 <View style={[st.syncBanner, st.syncOffline]}>
                   <View style={{ flex: 1 }}>
-                    <Text style={st.syncTitle}>Scoring moved to {lock?.holderName ?? lostTo ?? 'another device'}</Text>
+                    <Text style={st.syncTitle}>{lockStat === 'shared' ? 'Another scorer recorded steps while these taps waited' : `Scoring moved to ${lock?.holderName ?? lostTo ?? 'another device'}`}</Text>
                     {rejectedCount > 0 ? <Text style={st.syncSub}>{rejectedCount === 1 ? '1 unsynced tap from this device wasn’t saved.' : `${rejectedCount} unsynced taps from this device weren’t saved.`}</Text> : null}
                   </View>
                   {rejectedCount > 0 ? (
@@ -2678,6 +2725,16 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
                 </View>
               ) : null}
               {matchId && canScore && rejectedCount === 0 ? offlineBannerNode : null}
+              {/* Shared scoring: this phone's tap / Undo came after another scorer's step */}
+              {matchId && canScore && staleBy ? (
+                <View style={[st.syncBanner, st.syncOffline]} accessibilityLiveRegion="polite">
+                  <View style={{ flex: 1 }}>
+                    <Text style={st.syncTitle}>{staleMessage(staleBy.by ? nameOf(staleBy.by) ?? undoNameOf(staleBy.by) : null)}</Text>
+                    <Text style={st.syncSub}>The board now shows their step. Tap again if yours still applies.</Text>
+                  </View>
+                  <Text style={st.syncBtnText} accessibilityRole="button" accessibilityLabel="Dismiss" onPress={clearStale}>✕</Text>
+                </View>
+              ) : null}
               {/* Running score, so the scorer never leaves this tab to check the
                   state. The big board above the tabs is suppressed here to avoid
                   duplication. Sports with a broadcast board (tennis/volleyball/
@@ -2726,7 +2783,7 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
                     {(() => {
                       const formatFields = getSport(sport).formatFields ?? [];
                       const cap = matchCaptures(plugin.liveSettings as never, state, formatFields, fmt);
-                      const rules = [...matchRules(formatFields, fmt, { omit: liveOwnedKeys(plugin.liveSettings as never) }), ...cap.rules];
+                      const rules = [...(hasMatch ? [scoringRule(lockStat === 'shared')] : []), ...matchRules(formatFields, fmt, { omit: liveOwnedKeys(plugin.liveSettings as never) }), ...cap.rules];
                       return rules.length || cap.captures.length ? <RulesCard rules={rules} captures={cap.captures} /> : null;
                     })()}
                     <InfoRow icon="📅" label="Date" value={dateStr} />

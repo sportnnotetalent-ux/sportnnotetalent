@@ -78,6 +78,12 @@ export function matchCaptures(
   return { captures, rules };
 }
 
+/** Shared scoring (docs/security/breaks/shared-scoring.md): how the match is
+ *  scored, as an Info rule line. */
+export const scoringRule = (shared: boolean): RuleLine => ({
+  key: '__scoring', label: 'Scoring', value: shared ? 'Shared — several phones at once' : 'One phone at a time',
+});
+
 /** The keys Scoring settings owns (Edit format leaves them out). */
 export const liveOwnedKeys = (ls: LiveSettings<unknown> | undefined): string[] => (ls ? ls.fields.map((f) => f.key) : []);
 
