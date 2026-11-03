@@ -144,6 +144,8 @@ export type RootStackParamList = {
   /** First-run questions (founder 2026-10-31): uses, sports, positions, city, location. */
   Personalise: undefined;
   PlayerProfile: { playerId: string };
+  /** a pair as one team across sports (core/pairs) */
+  Pair: { a: string; b: string };
   SportProfile: { playerId: string; sport: SportId };
   /** SD-47: head-to-head — player `a` vs `b` (no `b` = "Compare with…" picker),
    *  or team `teamA` vs `teamB`. Names are optional (shown while loading). */

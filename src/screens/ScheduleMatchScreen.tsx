@@ -30,7 +30,9 @@ import { onePerEntrant, sidesForStructure, recentPairs, searchSides, searchPeopl
 import { settlePairType, pairTypeFromDivisions } from '../sports/pairType';
 import { venueOptions } from '../data/tournamentForm';
 import { findScheduleConflicts, knownVenueNames } from '../data/scheduleConflicts';
-import { createMatch, createTeam, getMyEntrant, getMyPlayerId, setMatchScorer, getMatch, getTournaments, getMatchSquads, setMatchSquad } from '../data/repos';
+import { createMatch, createTeam, getMyEntrant, getMyPlayerId, setMatchScorer, getMatch, getTournaments, getMatchSquads, setMatchSquad, getEntryTeamsWith } from '../data/repos';
+import { pairKey, pairsFromTeams, type PairTeam } from '../core/pairs';
+import { isPairSport } from '../data/pairSport';
 import { cloneDraft } from '../data/matchHousekeeping';
 import { useAuth } from '../core/auth';
 import { KO_STAGES, KO_STAGE_LABEL, isKoStage, type KoStage } from '../data/bracket';
@@ -202,6 +204,23 @@ export default function ScheduleMatchScreen() {
   const recentFor = (other: string | null) => (sport ? recentPairs({ matches: allMatches, pairs: pairTeams, sport, me: myPid, exclude: other }) : []);
   const recentHome = useMemo(() => recentFor(away), [allMatches, pairTeams, sport, myPid, away]); // eslint-disable-line react-hooks/exhaustive-deps
   const recentAway = useMemo(() => recentFor(home), [allMatches, pairTeams, sport, myPid, home]); // eslint-disable-line react-hooks/exhaustive-deps
+  // PT8: every pair I've played in, in ANY sport — one tap reuses this sport's
+  // entry for them, or makes it (a pair is one team across sports, core/pairs).
+  const [myPairs, setMyPairs] = useState<PairTeam[]>([]);
+  useEffect(() => {
+    let on = true;
+    if (myPid) getEntryTeamsWith([myPid]).then((rows) => on && setMyPairs(pairsFromTeams(rows, myPid, isPairSport))).catch(() => {});
+    return () => { on = false; };
+  }, [myPid]);
+  const otherPairsFor = (recent: PickTeam[], other: string | null) => {
+    const shown = new Set(recent.map((t) => pairKey(t.roster)).filter(Boolean));
+    const otherKey = pairKey(teams.find((t) => t.id === other)?.roster);
+    const nameOf = (id: string) => allPlayers.find((p) => p.id === id)?.fullName;
+    return myPairs
+      .filter((p) => !shown.has(p.key) && p.key !== otherKey && nameOf(p.a) && nameOf(p.b))
+      .slice(0, 8)
+      .map((p) => ({ key: p.key, label: `${nameOf(p.a)} & ${nameOf(p.b)}`, a: { id: p.a, fullName: nameOf(p.a)! }, b: { id: p.b, fullName: nameOf(p.b)! } }));
+  };
   // DP11: a tournament's divisions (boys / girls / mixed) give its doubles pair type
   const divisions = useTournamentCategories(tournamentId);
   const divisionEntries = useTournamentEntries(tournamentId);
@@ -562,8 +581,10 @@ export default function ScheduleMatchScreen() {
               ) : (
                 <>
                   <Text style={textStyles.muted}>A doubles side is a pair of two players. Pick a pair, or pick a player to start a new pair — by name or mobile number, so the match lands on each partner’s profile.</Text>
-                  <TeamPicker noun="pair" label="Pair 1" teams={pairTeams} selected={home} onSelect={setHome} onClear={() => setHome(null)} onCreate={makeCreateHandler('home')} newEntrant={entrantPicker('home', 2)} people={pairPeople} recent={recentHome} onStartWithMe={profile?.fullName ? resolveMe : undefined} />
-                  <TeamPicker noun="pair" label="Pair 2" teams={pairTeams} selected={away} onSelect={setAway} onClear={() => setAway(null)} onCreate={makeCreateHandler('away')} newEntrant={entrantPicker('away', 2)} people={pairPeople} recent={recentAway} />
+                  <TeamPicker noun="pair" label="Pair 1" teams={pairTeams} selected={home} onSelect={setHome} onClear={() => setHome(null)} onCreate={makeCreateHandler('home')} newEntrant={entrantPicker('home', 2)} people={pairPeople} recent={recentHome} onStartWithMe={profile?.fullName ? resolveMe : undefined}
+                    otherPairs={otherPairsFor(recentHome, away)} onPickPair={(x) => void makeEntrantHandler('home')([{ kind: 'person', person: x.a }, { kind: 'person', person: x.b }])} />
+                  <TeamPicker noun="pair" label="Pair 2" teams={pairTeams} selected={away} onSelect={setAway} onClear={() => setAway(null)} onCreate={makeCreateHandler('away')} newEntrant={entrantPicker('away', 2)} people={pairPeople} recent={recentAway}
+                    otherPairs={otherPairsFor(recentAway, home)} onPickPair={(x) => void makeEntrantHandler('away')([{ kind: 'person', person: x.a }, { kind: 'person', person: x.b }])} />
                 </>
               )}
 
@@ -680,6 +701,8 @@ function TeamPicker({
   onSelectPerson,
   recent,
   onStartWithMe,
+  otherPairs,
+  onPickPair,
 }: {
   label: string;
   noun?: 'team' | 'pair' | 'player';
@@ -702,6 +725,9 @@ function TeamPicker({
   recent?: PickTeam[];
   /** doubles (DP5): "👤 Me +" — start a new pair with me as partner 1 */
   onStartWithMe?: () => Promise<EntrantPerson | null>;
+  /** doubles (PT8): my other pairs, from any sport — picking one makes / reuses this sport's entry */
+  otherPairs?: { key: string; label: string; a: EntrantPerson; b: EntrantPerson }[];
+  onPickPair?: (p: { a: EntrantPerson; b: EntrantPerson }) => void;
 }) {
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState('');
@@ -770,6 +796,16 @@ function TeamPicker({
               <View style={st.chips}>
                 {recent.map((t) => (
                   <SelectChip key={`r-${t.id}`} label={t.name} dotColor={t.colorHex} active={false} onPress={() => onSelect(t.id)} />
+                ))}
+              </View>
+            </>
+          )}
+          {!creating && q.length === 0 && !!otherPairs?.length && onPickPair && (
+            <>
+              <Text style={st.tinyLabel}>Your pairs</Text>
+              <View style={st.chips}>
+                {otherPairs.map((p) => (
+                  <SelectChip key={`p-${p.key}`} label={`🤝 ${p.label}`} active={false} onPress={() => onPickPair(p)} />
                 ))}
               </View>
             </>

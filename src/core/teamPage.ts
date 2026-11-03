@@ -5,14 +5,20 @@
  * again). Discover leaves out one-off sides and shows a club once. PURE.
  */
 import type { SportId } from './types';
+import { pairKey } from './pairs.ts';
 
-type Row = { id: string; clubId?: string | null; adhoc?: boolean | null; sport?: SportId | string };
+type Row = { id: string; clubId?: string | null; adhoc?: boolean | null; sport?: SportId | string; roster?: readonly string[] | null };
 
-export type TeamRoute = { route: 'ClubHome'; clubId: string; sport?: string } | { route: 'Team' };
+export type TeamRoute = { route: 'ClubHome'; clubId: string; sport?: string } | { route: 'Pair'; a: string; b: string } | { route: 'Team' };
 
 /** Where a team row opens: its club's page, or the single-team page. */
-export function teamRoute(row: Row | null | undefined, opts: { inClub?: boolean } = {}): TeamRoute {
-  if (!row || !row.clubId || opts.inClub) return { route: 'Team' };
+export function teamRoute(row: Row | null | undefined, opts: { inClub?: boolean; pairSport?: (sport: string) => boolean } = {}): TeamRoute {
+  if (!row) return { route: 'Team' };
+  // A two-person one-off side in a pairs sport is a pair: its page covers every sport (PT7).
+  const pairSportOk = !opts.pairSport || (!!row.sport && opts.pairSport(String(row.sport)));
+  const pair = row.adhoc && !row.clubId && pairSportOk ? pairKey(row.roster) : null;
+  if (pair) { const [a, b] = pair.split('|'); return { route: 'Pair', a, b }; }
+  if (!row.clubId || opts.inClub) return { route: 'Team' };
   return { route: 'ClubHome', clubId: row.clubId, ...(row.sport ? { sport: String(row.sport) } : {}) };
 }
 

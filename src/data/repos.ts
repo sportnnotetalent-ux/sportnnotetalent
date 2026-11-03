@@ -4056,15 +4056,57 @@ export async function getRoster(teamName: string, sport: SportId, teamId?: strin
 }
 
 /** The bits of a team row that decide which page opens it (core/teamPage). */
-export async function getTeamRouteRow(teamId: string): Promise<{ id: string; clubId?: string; adhoc?: boolean; sport?: SportId } | null> {
+export async function getTeamRouteRow(teamId: string): Promise<{ id: string; clubId?: string; adhoc?: boolean; sport?: SportId; roster?: string[] } | null> {
   if (!isSupabaseConfigured || !supabase) {
     const t = demo.teams.find((x) => x.id === teamId);
-    return t ? { id: t.id, clubId: t.clubId, adhoc: t.adhoc, sport: t.sport } : null;
+    return t ? { id: t.id, clubId: t.clubId, adhoc: t.adhoc, sport: t.sport, roster: t.roster } : null;
   }
-  const { data, error } = await supabase.from('teams').select('id, club_id, adhoc, sport').eq('id', teamId).maybeSingle();
+  const { data, error } = await supabase.from('teams').select('id, club_id, adhoc, sport, roster').eq('id', teamId).maybeSingle();
   if (error || !data) return null;
-  const r = data as { id: string; club_id?: string | null; adhoc?: boolean | null; sport?: string };
-  return { id: r.id, clubId: r.club_id ?? undefined, adhoc: r.adhoc ?? undefined, sport: r.sport as SportId | undefined };
+  const r = data as { id: string; club_id?: string | null; adhoc?: boolean | null; sport?: string; roster?: string[] | null };
+  return { id: r.id, clubId: r.club_id ?? undefined, adhoc: r.adhoc ?? undefined, sport: r.sport as SportId | undefined, roster: Array.isArray(r.roster) ? r.roster : undefined };
+}
+
+/** One-off sides that include these people (a player's pairs, or one pair's
+ *  rows across sports) — core/pairs merges them. */
+export async function getEntryTeamsWith(playerIds: string[]): Promise<Team[]> {
+  const ids = [...new Set(playerIds.filter(Boolean))];
+  if (!ids.length) return [];
+  if (!isSupabaseConfigured || !supabase) {
+    return demo.teams.filter((t) => t.adhoc && ids.every((id) => (t.roster ?? []).includes(id)));
+  }
+  const { data, error } = await fetchAllPages((from, to) => supabase!.from('teams')
+    .select('id,name,short_name,sport,color_hex,org_id,club_id,roster,adhoc').eq('adhoc', true).contains('roster', ids).order('id').range(from, to));
+  if (error || !data) return [];
+  return (data as unknown as TeamRow[]).map(toTeam);
+}
+
+/** Teams a player has played at least one game for (their match squads). */
+export async function getTeamsPlayedFor(playerId: string | null | undefined): Promise<Set<string>> {
+  const out = new Set<string>();
+  if (!playerId) return out;
+  if (!isSupabaseConfigured || !supabase) {
+    for (const m of demo.matches) {
+      const sq = (demo.matchSquads as Record<string, { home?: { starters?: string[]; subs?: string[] }; away?: { starters?: string[]; subs?: string[] } }>)[m.id];
+      const on = (s?: { starters?: string[]; subs?: string[] }) => !!s && [...(s.starters ?? []), ...(s.subs ?? [])].includes(playerId);
+      if (on(sq?.home)) out.add(m.homeTeam.id);
+      if (on(sq?.away)) out.add(m.awayTeam.id);
+    }
+    return out;
+  }
+  const want = JSON.stringify([playerId]);
+  const { data } = await supabase.from('match_squads').select('match_id, side').or(`starters.cs.${want},subs.cs.${want}`).limit(1000);
+  const rows = (data ?? []) as { match_id: string; side: 'home' | 'away' }[];
+  if (!rows.length) return out;
+  const { data: ms } = await fetchAllChunked(rows.map((r) => r.match_id), (part, from, to) =>
+    supabase!.from('matches').select('id, home_team_id, away_team_id').in('id', part).order('id').range(from, to));
+  const byId = new Map(((ms ?? []) as { id: string; home_team_id: string | null; away_team_id: string | null }[]).map((m) => [m.id, m]));
+  for (const r of rows) {
+    const m = byId.get(r.match_id);
+    const t = m && (r.side === 'home' ? m.home_team_id : m.away_team_id);
+    if (t) out.add(t);
+  }
+  return out;
 }
 
 /** Live: the squad of a team with no explicit roster — its `team_members` rows,

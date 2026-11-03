@@ -39,6 +39,7 @@ import { useImageUri } from '../data/useImageUri';
 import { avatarInitials, canFollowCard, isReducedCard, reducedCardNote } from '../core/minorPrivacy';
 import { notice } from '../core/confirm';
 import { FollowBell } from './FollowBell';
+import { PairsSection, FollowingSection } from './PairsAndFollowing';
 
 export function ProfileView({
   playerId,
@@ -424,6 +425,9 @@ export function ProfileView({
           ))}
         </>
       )}
+
+      <PairsSection playerId={player.id} />
+      {ownProfile ? <FollowingSection /> : null}
 
       {activeOrgsForPlayer(orgs, player.id).length > 0 && (
         <>

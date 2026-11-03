@@ -21,6 +21,7 @@ import { canScoreByRole } from '../core/roles';
 import { useTeamSummary, useMatches, usePlayers, useFollow, useTeamPermission } from '../data/hooks';
 import { getRoster, getMatchStatLines, getMatchSquads, getTournaments, getTeamRouteRow, getClub } from '../data/repos';
 import { teamRoute } from '../core/teamPage';
+import { isPairSport } from '../data/pairSport';
 import { getWaitingPlayerIds } from '../data/requestsStore';
 import { computeTeamStats, h2hLastText, resultFor, type Result } from '../data/teamStats';
 import { matchLineFor } from '../sports/matchLine';
@@ -52,8 +53,9 @@ export default function TeamProfileScreen() {
     let on = true;
     getTeamRouteRow(teamId).then(async (row) => {
       if (!on) return;
-      const r = teamRoute(row, { inClub });
+      const r = teamRoute(row, { inClub, pairSport: isPairSport });
       if (r.route === 'ClubHome') { nav.replace('ClubHome', { clubId: r.clubId, ...(r.sport ? { sport: r.sport } : {}) }); return; }
+      if (r.route === 'Pair') { nav.replace('Pair', { a: r.a, b: r.b }); return; }
       setRouted(true);
       if (row?.clubId) { const c = await getClub(row.clubId); if (on && c) setClub({ id: c.id, name: c.name }); }
     }).catch(() => on && setRouted(true));
