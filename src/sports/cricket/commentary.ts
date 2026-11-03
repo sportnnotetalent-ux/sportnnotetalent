@@ -29,6 +29,7 @@ import { withNames } from './names.ts';
 import { legacyNameOf, type NameOf } from '../../core/playerNames.ts';
 import { detailByRec, isDeliveryRec, recStamp, pitchPhrase, controlPhrase, fieldPosition, extraWhyPhrase, type BallDetailRec } from './detail.ts';
 import { phasePPBalls } from './phases.ts';
+import { ballEventMatches } from './timeline.ts';
 import type { LiveEvent } from '../liveEvents';
 
 type Side = 'home' | 'away';
@@ -168,33 +169,8 @@ export function outcomeOf(r: BallRec): { outcome: string; tone: ComTone } {
 
 // ─── Joining the log to the timeline ──────────────────────────────────────────
 
-const WICKET_WORDS = new Set(['BOWLED', 'CAUGHT', 'LBW', 'STUMPED', 'RUN OUT', 'HIT WICKET', 'HIT TWICE', 'OBSTRUCTING']);
-const isPenaltyLabel = (l: string) => /^Penalty — /.test(l) || /^\d+ penalty runs? to /.test(l);
-const isAdjustLabel = (l: string) => /^Bonus -?\d+/.test(l) || /^\d+ deducted/.test(l);
-
-/** Is timeline event `e` the entry the reducer wrote for ball-log record `r`?
- *  (Stamp + kind — a delivery's "12.4", a penalty's / retirement's "12.3"
- *  overs-completed stamp — mirroring the reducer's event for each action.) */
-export function ballEventMatches(e: LiveEvent, r: BallRec, bpo: number): boolean {
-  const l = String(e.label ?? '');
-  if (r.cross) return isPenaltyLabel(l) || isAdjustLabel(l);
-  if (r.adj !== undefined) return isAdjustLabel(l) && e.stamp === oversStr(r.lb6, bpo);
-  if (r.sym === undefined) {
-    if (r.out) {
-      const ok = r.out.kind === 'retired' ? l === 'RETIRED HURT' || l === 'RETIRED'
-        : r.out.kind === 'retiredout' ? l === 'RETIRED OUT' : r.out.kind === 'timedout' ? l === 'TIMED OUT' : false;
-      return ok && e.stamp === oversStr(r.lb6, bpo);
-    }
-    return isPenaltyLabel(l) && e.stamp === oversStr(r.lb6, bpo);
-  }
-  if (r.out?.kind === 'mankad') return l === 'MANKAD' && e.stamp === oversStr(r.lb6, bpo);
-  if (e.stamp !== recStamp(r, bpo)) return false;
-  if (r.ext === 'wd') return /^Wide\b/.test(l);
-  if (r.ext === 'nb') return /^No ball\b/.test(l);
-  if (r.out && r.out.kind !== 'retired') return e.icon === '🎯' && WICKET_WORDS.has(l);
-  if (r.bat === 0 && r.b + r.lb > 0) return /^(Bye|Leg bye)\b/.test(l);
-  return e.icon === '🏏';
-}
+// (batch 6: `ballEventMatches` lives in ./timeline.ts so phases.ts can use it)
+export { ballEventMatches };
 
 // ─── Building ─────────────────────────────────────────────────────────────────
 
@@ -207,7 +183,7 @@ const teamRuns = (r: BallRec) => r.bat + r.wd + r.nb + r.b + r.lb + (r.pen ?? 0)
 
 /** Powerplay length (legal balls) of an innings: the powerplay PHASE —
  *  round 2: the organiser's choice, else The Hundred 25 / the format's overs. */
-const ppBalls = (s: CricketState): number => phasePPBalls(s);
+const ppBalls = (s: CricketState, inn: 1 | 2): number => phasePPBalls(s, inn);
 
 /** Commentary for one (regulation or Super Over) state. */
 function build(s: CricketState, names: { home: string; away: string }, prefix: string): ComInnings[] {
@@ -220,7 +196,8 @@ function build(s: CricketState, names: { home: string; away: string }, prefix: s
   const shots = new Map((s.shots ?? []).map((x) => [shotKey(x.inn, x.side, x.at, x.batterId, !!x.nb), x]));
   const events = [...(s.events ?? [])].sort((a, b) => a.id - b.id);
   const nameOf = (id?: string) => (id ? s.batting[id]?.name : undefined) || 'the batter';
-  const pp = ppBalls(s);
+  // batch 6 (C11) — per innings: a rain cut shortens that innings' powerplay
+  const pp = (inn: 1 | 2) => ppBalls(s, inn);
   const noRevision = !s.revision && s.r1Lost === 0 && s.r2Lost === 0 && !s.rainStop && !s.inn1Rain;
 
   const inns: ComInnings[] = [];
@@ -394,6 +371,8 @@ function build(s: CricketState, names: { home: string; away: string }, prefix: s
         const pitch = pitchPhrase(det);
         if (pitch) parts.push(pitch);
         if (det?.kph) parts.push(`${det.kph} km/h`);
+        // Batch 6 (fix 13) — Law 18.9, an unintentional short run
+        if (r.short) parts.push('one short');
         const sp = shotPhrase(shot, r.bat);
         if (sp) parts.push(sp);
         const cp = controlPhrase(det?.ctrl);
@@ -448,7 +427,7 @@ function build(s: CricketState, names: { home: string; away: string }, prefix: s
     }
     if (r.out) pair = { key: '', runs: 0, balls: 0 };
     // The powerplay ends on this ball.
-    if (pp > 0 && r.legal && r.lb6 === pp) {
+    if (pp(r.inn) > 0 && r.legal && r.lb6 === pp(r.inn)) {
       over.powerplayEnd = true;
       over.items.push(note('⏱', `End of the powerplay — ${names[r.side]} ${r.tr}/${r.tw}`, 'milestone'));
     }

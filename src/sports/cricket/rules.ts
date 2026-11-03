@@ -55,6 +55,11 @@ export interface CricketRules {
    *  per innings (ICC T20I 2, ODI 3). A playing condition the organiser opts
    *  into; absent = off (no Review chip). 1–5; present only when set. */
   reviews?: number;
+  /** Batch 6 (audit fix 5, R8) — "last man stands" (box / gully cricket): when
+   *  one batter is left they bat on alone, keep the strike, and the innings
+   *  ends only when they are out too. A playing rule; absent = off (present
+   *  only when on, so older states keep their exact shape). */
+  lastManStands?: true;
 }
 
 /** Deep wave — the optional capture toggles ("Stats to track"), in chip order. */
@@ -96,7 +101,7 @@ export const STANDARD_RULES: CricketRules = {
 
 /** Config (format / SET_RULES payload) keys. Two differ from CricketRules:
  *  byesAllowed ⇄ byes, legByesAllowed ⇄ legByes. The rest are identical. */
-export const RULE_CONFIG_KEYS = ['wideRuns', 'wideLegal', 'noBallRuns', 'noBallLegal', 'freeHit', 'stdLastOvers', 'byesAllowed', 'legByesAllowed', 'wagonWheel', 'retireAt', 'retireBack', ...TRACK_KEYS, ...OPTION_KEYS, 'reviews'] as const;
+export const RULE_CONFIG_KEYS = ['wideRuns', 'wideLegal', 'noBallRuns', 'noBallLegal', 'freeHit', 'stdLastOvers', 'byesAllowed', 'legByesAllowed', 'wagonWheel', 'retireAt', 'retireBack', ...TRACK_KEYS, ...OPTION_KEYS, 'reviews', 'lastManStands'] as const;
 
 const clamp05 = (v: unknown, d: number) => {
   const n = Math.floor(Number(v));
@@ -115,6 +120,9 @@ export const reviewsOf = (v: unknown): number => {
   const n = Math.floor(Number(v));
   return Number.isFinite(n) && n > 0 ? Math.min(5, n) : 0;
 };
+
+/** Batch 6 — last man stands: only a real "on" (true / 'true' / 1) turns it on. */
+export const lastManOf = (v: unknown): boolean => v === true || v === 'true' || v === 1;
 
 /** Format / SET_RULES config → rules (missing keys = standard; numbers clamped 0–5). */
 export function rulesFromConfig(config?: Record<string, unknown> | null): CricketRules {
@@ -137,6 +145,8 @@ export function rulesFromConfig(config?: Record<string, unknown> | null): Cricke
     ...optionsOn((k) => c[k]),
     // Batch 5 — DRS, only when on (older states: no key).
     ...(reviewsOf(c.reviews) > 0 ? { reviews: reviewsOf(c.reviews) } : {}),
+    // Batch 6 — last man stands, only when on (older states: no key).
+    ...(lastManOf(c.lastManStands) ? { lastManStands: true as const } : {}),
   };
 }
 
@@ -150,6 +160,7 @@ export function rulesToConfig(r: CricketRules = STANDARD_RULES): Record<string, 
     ...trackOn((k) => r[k]),
     ...optionsOn((k) => r[k]),
     ...(r.reviews ? { reviews: r.reviews } : {}),
+    ...(r.lastManStands ? { lastManStands: true } : {}),
   };
 }
 
@@ -181,7 +192,7 @@ export function effectiveRules(s: Pick<CricketState, 'rules' | 'oversLimit' | 's
  *  nor are the stats phases — but a bouncer limit is. */
 export const isStandard = (r: CricketRules) =>
   (Object.keys(STANDARD_RULES) as (keyof CricketRules)[]).every((k) => k === 'wagonWheel' || r[k] === STANDARD_RULES[k])
-  && !r.retireAt && r.bouncerMax === undefined;
+  && !r.retireAt && r.bouncerMax === undefined && !r.lastManStands;
 
 const runsWord = (n: number) => `${n} run${n === 1 ? '' : 's'}`;
 
@@ -199,6 +210,7 @@ export function rulesChip(r: CricketRules): string {
   if (r.retireAt) parts.push(`retire at ${r.retireAt}`);
   if (r.bouncerMax !== undefined) parts.push(r.bouncerMax > 0 ? `${r.bouncerMax} bouncer${r.bouncerMax === 1 ? '' : 's'}/over` : 'no bouncer limit');
   if (r.reviews) parts.push(`DRS ${r.reviews}`);
+  if (r.lastManStands) parts.push('last man stands');
   return parts.join(' · ');
 }
 
@@ -247,6 +259,7 @@ export function describeRulesChange(prev: CricketRules, next: CricketRules): str
   if (prev.phaseDeath !== next.phaseDeath) parts.push(phaseDeathText(next.phaseDeath));
   if (prev.bouncerMax !== next.bouncerMax) parts.push(bouncerText(next.bouncerMax));
   if ((prev.reviews ?? 0) !== (next.reviews ?? 0)) parts.push(reviewsText(next.reviews));
+  if (!!prev.lastManStands !== !!next.lastManStands) parts.push(next.lastManStands ? 'Last man stands — the last batter bats on alone' : 'Last man stands off');
   return parts.join(' · ');
 }
 
@@ -307,6 +320,11 @@ export const LOCAL_RULE_FIELDS: FormatField[] = [
   { key: 'reviews', label: 'DRS reviews (per side, per innings)', type: 'choice', default: 0, advanced: true,
     hint: 'off = no Review chip · a struck-down review is lost; overturned or umpire’s call keeps it',
     options: [{ value: 0, label: 'Off' }, ...[1, 2, 3, 4, 5].map((n) => ({ value: n, label: `${n} per innings` }))] },
+  // Batch 6 (audit fix 5, R8) — box / gully cricket. A `choice` (0 / 1), not a
+  // toggle, so Info lists it as a rule, not a stats capture.
+  { key: 'lastManStands', label: 'Last man stands', type: 'choice', default: 0, advanced: true,
+    hint: 'box / gully cricket: the last batter bats on alone (keeps the strike); all out only when they are out too',
+    options: [{ value: 0, label: 'Off' }, { value: 1, label: 'On — the last batter bats alone' }] },
 ];
 
 export const LOCAL_RULE_DEFAULTS: Record<string, FormatValue> = {
@@ -314,6 +332,7 @@ export const LOCAL_RULE_DEFAULTS: Record<string, FormatValue> = {
   ...Object.fromEntries(TRACK_KEYS.map((k) => [k, false])),
   ...Object.fromEntries(OPTION_KEYS.map((k) => [k, 'auto'])),
   reviews: 0,
+  lastManStands: 0,
 };
 
 /** Cricket's live settings (event mode): before ball 1 a change patches the
@@ -330,6 +349,7 @@ export const CRICKET_LIVE_SETTINGS: LiveSettings<CricketState> = {
       ...rulesToConfig(r), retireAt: r.retireAt ?? 0, retireBack: r.retireBack !== false, ...Object.fromEntries(TRACK_KEYS.map((k) => [k, !!r[k]])),
       ...Object.fromEntries(OPTION_KEYS.map((k) => [k, r[k] ?? 'auto'])),
       reviews: r.reviews ?? 0,
+      lastManStands: r.lastManStands ? 1 : 0,
     };
   },
   beforeStart: cricketBeforeStart,

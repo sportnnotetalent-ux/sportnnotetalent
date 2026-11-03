@@ -6,7 +6,7 @@
  */
 import { block, otherSide, type MatchRecordItem, type MatchRecordsBlock, type Side } from '../matchRecords.ts';
 import { ordinal, topN } from '../recordHelpers.ts';
-import { outcome, oversStr, type CricketState } from './engine.ts';
+import { outcome, oversStr, allOutAt, type CricketState } from './engine.ts';
 import { partnerships, hasLog } from './scorecard.ts';
 
 /**
@@ -33,7 +33,8 @@ export function cricketMatchRecords(s: CricketState): MatchRecordsBlock | null {
   const items: MatchRecordItem[] = [];
   const chase: Side = s.innings === 2 ? s.battingSide : otherSide(s.battingSide);
   const first = otherSide(chase);
-  const allOut = (side: Side) => s.scores[side].wickets >= s.wicketsLimit || !!s.closedNoBatter?.[side];
+  // batch 6 — last man stands: all out only when the last batter is out too
+  const allOut = (side: Side) => s.scores[side].wickets >= allOutAt(s) || !!s.closedNoBatter?.[side];
   const totalText = (side: Side) => {
     const inn = s.scores[side];
     return `${inn.runs}${allOut(side) ? '' : `/${inn.wickets}`} (${oversStr(inn.balls, bpo)} ov)`;

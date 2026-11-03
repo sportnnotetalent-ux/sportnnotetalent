@@ -88,3 +88,57 @@ export function bouncerNoteFor(s: CricketState, rec: BallRec, isBouncer: boolean
   if (!isBouncer) return null;
   return bouncerWarning(bouncersInOver(s, rec.inn, rec.side, overIndexOf(rec, s.ballsPerOver)));
 }
+
+// ─── Batch 6 (C9) — the bouncer count without the pitch map ──────────────────
+
+/** Offer the single "Bouncer" chip after this delivery: the organiser set a
+ *  limit (not the standard default, not "no limit") and the pitch map — which
+ *  has its own length chips — was off for it. One optional tap. */
+export function bouncerChipOnly(s: CricketState, rec: BallRec): boolean {
+  const max = rulesOf(s).bouncerMax;
+  return max !== undefined && max > 0 && !rec.trk?.pitch && isDeliveryRec(rec);
+}
+
+// ─── Batch 6 (fix 13) — dangerous full tosses (Law 41.7) ─────────────────────
+
+/** No-balls by `bowlerId` in innings `inn` tagged "Above waist (full toss)"
+ *  (the wide / no-ball reason, "Stats to track"). Read-side only. */
+export function beamerCount(s: CricketState, bowlerId: string, inn: 1 | 2 = s.innings): number {
+  const log = s.log ?? [];
+  const det = detailByRec(log, s.detail, s.ballsPerOver);
+  let n = 0;
+  log.forEach((r, i) => {
+    if (r.inn === inn && r.bowlerId === bowlerId && r.ext === 'nb' && det[i]?.why === 'height') n += 1;
+  });
+  return n;
+}
+
+/** The scorer's prompt for the bowler of the last delivery this innings: the
+ *  first above-waist full toss is a warning; the second (Law 41.7) means the
+ *  bowler is taken off for the rest of the innings ("Change → Suspended").
+ *  Null when there is none. `justNow`: only right after such a ball (the
+ *  live slot — so the warning doesn't sit there all innings). */
+export function beamerWarning(s: CricketState, justNow = false): string | null {
+  const log = s.log ?? [];
+  let bowlerId = s.bowlerId;
+  if (justNow) {
+    let i = log.length - 1;
+    while (i >= 0 && !isDeliveryRec(log[i])) i--;
+    const r = log[i];
+    if (!r || r.inn !== s.innings || r.side !== s.battingSide || r.ext !== 'nb') return null;
+    if (detailByRec(log, s.detail, s.ballsPerOver)[i]?.why !== 'height') return null;
+    bowlerId = r.bowlerId;
+  }
+  if (!bowlerId) {
+    for (let i = log.length - 1; i >= 0; i--) {
+      const r = log[i];
+      if (r.inn === s.innings && r.side === s.battingSide && r.bowlerId && isDeliveryRec(r)) { bowlerId = r.bowlerId; break; }
+    }
+  }
+  if (!bowlerId) return null;
+  const n = beamerCount(s, bowlerId);
+  if (n <= 0) return null;
+  return n === 1
+    ? '⚠️ Above-waist full toss — the bowler’s first warning'
+    : `⚠️ ${n} above-waist full tosses — Law 41.7: take the bowler off for the innings (Change → Suspended)`;
+}

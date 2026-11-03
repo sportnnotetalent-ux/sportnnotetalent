@@ -73,11 +73,21 @@ interface DismissalRecord {
   /** Round 2 — a run out by a DIRECT HIT from `fielderId` (an optional chip in
    *  the run-out flow, payload `direct: true`). Absent on older logs. */
   direct?: true;
+  /** Batch 6 (C6) — fielder 1 was a substitute ("c sub (X) b Y"); only from a
+   *  `v: 2` caught / run out in a match whose format has substitutes. */
+  sub?: true;
 }
 
 /** Round 2 — a run out the payload marks as a direct hit (needs a fielder). */
 const directHit = (kind: string, p: Record<string, unknown> | undefined, fielderId?: string): boolean =>
   kind === 'runout' && p?.direct === true && !!fielderId;
+/** Batch 6 (C6) — the catch / run out was a substitute fielder's: a `v: 2`
+ *  payload with `sub: true` and a fielder, in a match whose format has subs. */
+const subFielder = (s: Pick<CricketState, 'subs'>, a: ScoreAction, kind: string): boolean =>
+  a.payload?.v === 2 && a.payload?.sub === true && (s.subs ?? 0) > 0
+  && (kind === 'caught' || kind === 'runout') && !!a.payload?.fielderId;
+/** Batch 6 (fix 13) — a `v: 2` RUNS marked one short (Law 18.9). */
+const isShortRun = (a: ScoreAction): boolean => a.payload?.v === 2 && a.payload?.short === true;
 
 export interface CricketState {
   oversLimit: number;
@@ -237,6 +247,10 @@ export interface CricketState {
    *  CONCUSSION_SUB that named the player coming on (scorecard mark).
    *  Absent until the first one (older logs: none). */
   concussionSubs?: { side: 'home' | 'away'; inId: string; outId: string }[];
+  /** Batch 6 (C6) — substitutes per side from the format (`substitutes`, 1–5).
+   *  Present only when the format sets some (older states: none). Lets a
+   *  catch / run out be marked as a substitute fielder's. */
+  subs?: number;
 }
 
 /** Batch 5 — a DRS review's outcome: the on-field decision stands (the review
@@ -348,6 +362,9 @@ export interface BallRec {
   /** Deep wave — the optional detail being tracked for this delivery (from
    *  the "Stats to track" toggles in force). Only present when one is on. */
   trk?: Tracking;
+  /** Batch 6 (fix 13) — an unintentional short run (Law 18.9): the runs are
+   *  as given, one fewer than run. Only from a `v: 2` RUNS with `short: true`. */
+  short?: true;
 }
 
 /** A Super Over: a self-contained 1-over, 2-wicket mini-match run through this
@@ -391,6 +408,13 @@ const quotaFromConfig = (config?: Record<string, unknown>) => {
     : { bowlerQuota: autoQuota(Number(config?.overs ?? 20)), bowlerQuotaAuto: true };
 };
 
+/** Batch 6 (C6) — the format's substitutes per side: a whole number 1–5, else 0. */
+const subsOf = (v: unknown): number => {
+  if (typeof v !== 'number' && typeof v !== 'string') return 0;
+  const n = Math.floor(Number(v));
+  return Number.isFinite(n) && n > 0 ? Math.min(5, n) : 0;
+};
+
 const init = (config?: Record<string, unknown>): CricketState => ({
   oversLimit: Number(config?.overs ?? 20),
   // players/side − 1 wickets (box cricket / 7-a-side etc. fall out of this)
@@ -427,6 +451,8 @@ const init = (config?: Record<string, unknown>): CricketState => ({
   // SD-133 — The Hundred rules, only when the format says so (older Hundred-preset
   // matches have no key and replay exactly as before).
   ...(config?.hundred === true || config?.hundred === 'true' ? { hundred: true as const } : {}),
+  // Batch 6 (C6) — only when the format names substitutes (older states: no key).
+  ...(subsOf(config?.substitutes) > 0 ? { subs: subsOf(config?.substitutes) } : {}),
   log: [],
   adj: [],
   fieldNotes: [],
@@ -519,8 +545,11 @@ export function symbolTone(sym: string): 'wicket' | 'boundary' | 'extra' | 'plai
 
 /** Scorecard dismissal text, e.g. "c Veer b Ishaan", "lbw b Ishaan", "run out (Veer)",
  *  "run out (Veer/Dev)" with a 2nd fielder, "run out (Ishaan)" for a Mankad. */
-function composeDismissal(kind: DismissalKind, bowler?: string, fielder?: string, keeper?: string, fielder2?: string): string {
+function composeDismissal(kind: DismissalKind, bowler?: string, fielder?: string, keeper?: string, fielder2?: string, sub = false): string {
   const b = bowler ?? 'bowler';
+  // Batch 6 (C6) — a substitute fielder: "c sub (X) b Y", "run out (sub (X))".
+  if (sub && kind === 'caught') return `c sub (${fielder ?? 'fielder'}) b ${b}`;
+  if (sub && kind === 'runout') return `run out (${[`sub (${fielder ?? 'fielder'})`, fielder2].filter(Boolean).join('/')})`;
   switch (kind) {
     case 'bowled': return `b ${b}`;
     case 'lbw': return `lbw b ${b}`;
@@ -552,7 +581,9 @@ const WICKET_LABEL: Record<DismissalKind, string> = {
 export const DISMISSAL_NAME: Record<DismissalKind, string> = {
   bowled: 'Bowled', caught: 'Caught', lbw: 'LBW', stumped: 'Stumped', runout: 'Run out', hitwicket: 'Hit wicket',
   retired: 'Retired hurt', timedout: 'Timed out',
-  retiredout: 'Retired out', mankad: 'Mankad', hittwice: 'Hit twice', obstruct: 'Obstructing',
+  // Batch 6 (fix 13) — the Law's words (Law 38.3); WICKET_LABEL keeps 'MANKAD'
+  // (it is the stored timeline headline, so old logs replay unchanged).
+  retiredout: 'Retired out', mankad: 'Run out (backing up)', hittwice: 'Hit twice', obstruct: 'Obstructing',
 };
 /** Dismissals that aren't credited to the bowler. */
 const NO_BOWLER: DismissalKind[] = ['runout', 'retired', 'timedout', 'retiredout', 'mankad', 'hittwice', 'obstruct'];
@@ -563,6 +594,28 @@ export const WIDE_WICKETS: DismissalKind[] = ['runout', 'stumped', 'hitwicket', 
 export const NOBALL_WICKETS: DismissalKind[] = ['runout', 'hittwice', 'obstruct'];
 /** Kinds whose completed runs count (and so take `runsAs`). */
 export const RUNS_KINDS: DismissalKind[] = ['runout', 'obstruct'];
+/** Batch 6 (R6) — on a free hit the striker can be out only as off a no-ball
+ *  (run out, hit the ball twice, obstructing); non-deliveries (retired, timed
+ *  out, a run out backing up) can still happen. Never bowled / caught / lbw /
+ *  stumped / hit wicket. */
+export const canFallOnFreeHit = (k: DismissalKind): boolean => NOBALL_WICKETS.includes(k) || NO_DELIVERY.includes(k);
+
+/** Batch 6 (R8) — the wickets that make a side all out: players − 1, or every
+ *  player under "last man stands" (the last batter bats on alone). */
+export const allOutAt = (s: Pick<CricketState, 'wicketsLimit' | 'rules'>): number =>
+  s.wicketsLimit + (rulesOf(s).lastManStands ? 1 : 0);
+/** Batch 6 (R8) — one batter left, batting on alone (last man stands). */
+export function lastManAlone(s: CricketState): boolean {
+  if (!rulesOf(s).lastManStands || s.ended || s.pendingTie || s.closedNoBatter?.[s.battingSide]) return false;
+  const w = s.scores[s.battingSide].wickets;
+  return w >= s.wicketsLimit && w < allOutAt(s);
+}
+/** …puts the lone batter on strike with the other end empty (the strike never
+ *  rotates). Both ends filled (a returning batter) is left alone. */
+const loneOnStrike = (s: CricketState): CricketState => {
+  if (!lastManAlone(s) || s.strikerId || !s.nonStrikerId) return s;
+  return { ...s, strikerId: s.nonStrikerId, strikerName: s.nonStrikerName, nonStrikerId: undefined, nonStrikerName: undefined };
+};
 
 type Crease = Pick<CricketState, 'strikerId' | 'strikerName' | 'nonStrikerId' | 'nonStrikerName'>;
 /** Who is where after a wicket broken at `end` (parity #16): the new batter
@@ -643,12 +696,13 @@ export function noBatterLeft(s: CricketState, side: 'home' | 'away'): boolean {
   // SD-113 — the scorer closed it: nobody on the roster could come in.
   if (s.closedNoBatter?.[side]) return true;
   const inn = s.scores[side];
-  if (inn.wickets >= s.wicketsLimit) return true;
+  const cap = allOutAt(s); // batch 6 — last man stands bats one more
+  if (inn.wickets >= cap) return true;
   // SD-133 — a batter retired at the local run limit may come back (unless the
   // rule says they can't), so they don't use up the order.
   const back = rulesOf(s).retireBack !== false;
   const retired = Object.values(s.batting ?? {}).filter((c) => c.side === side && c.retired && !c.out && !(c.retLimit && back)).length;
-  return retired > 0 && inn.wickets + retired >= s.wicketsLimit;
+  return retired > 0 && inn.wickets + retired >= cap;
 }
 
 /** SD-13 — the chase was played to a revised target (ICC NRR: DLS or a target
@@ -844,7 +898,7 @@ export function canBowl(s: CricketState, id: string): { ok: boolean; reason?: Bo
  *  scorer confirmed no batter was left to come in — `closedNoBatter`, which only
  *  a `v: 2` wicket sets, so legacy logs close exactly as before. */
 function inningsComplete(s: CricketState, inn: Innings, side: 'home' | 'away' = s.battingSide): boolean {
-  return inn.balls >= s.oversLimit * s.ballsPerOver || inn.wickets >= s.wicketsLimit || !!s.closedNoBatter?.[side];
+  return inn.balls >= s.oversLimit * s.ballsPerOver || inn.wickets >= allOutAt(s) || !!s.closedNoBatter?.[side];
 }
 
 /** SD-113 (R2) — a Law 28 / 41 five-run penalty riding on one delivery
@@ -1304,7 +1358,7 @@ const step = (s: CricketState, a: ScoreAction): CricketState => {
         seq: sq,
       };
     }
-    if (!inningsComplete(state, c)) return state;
+    if (!inningsComplete(state, c)) return loneOnStrike(state);
     if (state.innings === 1) {
       return { ...state, innings: 2, battingSide: other(state.battingSide), ...chaseStart(state, c.runs), thisOver: [], ballsInOver: 0, ...clearCrease };
     }
@@ -1404,10 +1458,13 @@ const step = (s: CricketState, a: ScoreAction): CricketState => {
       const balls = cur.balls + 1;
       seq += 1;
       const runsLabel = `${r} run${r === 1 ? '' : 's'}`;
-      const label = isBoundary ? (r === 4 ? 'FOUR' : 'SIX')
+      // Batch 6 (fix 13) — Law 18.9: one short (the runs given already exclude it).
+      const short = isShortRun(a) && !isBoundary;
+      const label0 = isBoundary ? (r === 4 ? 'FOUR' : 'SIX')
         : ot > 0 ? `${runsLabel} (incl. ${ot} overthrow${ot === 1 ? '' : 's'})`
         : r === 4 || r === 6 ? `${runsLabel} (all run)`
         : runsLabel;
+      const label = short ? `${label0} (one short)` : label0;
       const next: CricketState = touchBowler({
         ...s,
         scores: { ...s.scores, [bat]: { ...cur, runs: cur.runs + r, balls } },
@@ -1447,18 +1504,25 @@ const step = (s: CricketState, a: ScoreAction): CricketState => {
     }
     case 'WICKET': {
       const kind = (String(a.payload?.kind ?? 'bowled') as DismissalKind);
+      // Batch 6 (R6) — a `v: 2` wicket the Laws don't allow on a free hit is
+      // refused (voice, a hostile client). Older logs (no `v`) replay as before.
+      if (a.payload?.v === 2 && s.freeHit && !canFallOnFreeHit(kind)) return s;
+      // Batch 6 (R8) — the lone last batter: no non-striker to run out backing up.
+      const alone = lastManAlone(s);
+      if (alone && kind === 'mankad') return s;
       // Hit the ball twice: only the striker. A Mankad: always the non-striker,
       // whoever the payload names (parity #16).
       const batterOut: 'striker' | 'nonstriker' = kind === 'mankad' ? 'nonstriker'
-        : kind === 'hittwice' ? 'striker'
+        : kind === 'hittwice' || alone ? 'striker'
         : a.payload?.batterOut === 'nonstriker' ? 'nonstriker' : 'striker';
       const keeperP = s.keepers[other(bat)];
       const keeper = sn(keeperP?.name);
       const fielder2Id = kind === 'runout' ? (a.payload?.fielder2Id as string | undefined) : undefined;
       const fielder2Name = kind === 'runout' ? (a.payload?.fielder2Name as string | undefined) : undefined;
+      const subF = subFielder(s, a, kind);
       const dismissal = composeDismissal(kind, who(info.bowlerId, info.bowlerName),
         who(a.payload?.fielderId as string | undefined, a.payload?.fielderName as string | undefined),
-        who(keeperP?.id, keeper), who(fielder2Id, fielder2Name));
+        who(keeperP?.id, keeper), who(fielder2Id, fielder2Name), subF);
       const outId = batterOut === 'nonstriker' ? s.nonStrikerId : strikerId;
       const outName = batterOut === 'nonstriker' ? sn(s.nonStrikerName) : strikerName;
       const outWho = who(outId, outName);
@@ -1536,6 +1600,7 @@ const step = (s: CricketState, a: ScoreAction): CricketState => {
       const record: DismissalRecord = { kind, outId, bowlerId: info.bowlerId, fielderId, ...(L ? { fielderName } : {}) };
       if (fielder2Id || fielder2Name) { record.fielder2Id = fielder2Id; if (L) record.fielder2Name = fielder2Name; }
       if (directHit(kind, a.payload, fielderId)) record.direct = true;
+      if (subF) record.sub = true;
 
       const next: CricketState = touchBowler({
         ...s,
@@ -1678,11 +1743,13 @@ const step = (s: CricketState, a: ScoreAction): CricketState => {
       const wk = (a.payload?.wicket ? String(a.payload.wicket) : a.payload?.runout ? 'runout' : undefined) as DismissalKind | undefined;
       if (wk) {
         if (!(isNoBall ? NOBALL_WICKETS : WIDE_WICKETS).includes(wk)) return s;
+        // Batch 6 (R6) — a stumped / hit wicket off a wide that is a free hit.
+        if (a.payload?.v === 2 && s.freeHit && !canFallOnFreeHit(wk)) return s;
         const legacy = !a.payload?.wicket; // `runout: true` — replays exactly as before
         const completed = RUNS_KINDS.includes(wk) ? clampRuns(a.payload?.runs) : 0;
         const runsAs = isNoBall ? asRunsAs(a.payload?.runsAs) : 'bat';
         const offBat = isNoBall && runsAs === 'bat' ? completed : 0; // the batter's runs
-        const batterOut: 'striker' | 'nonstriker' = wk === 'stumped' || wk === 'hitwicket' || wk === 'hittwice' ? 'striker'
+        const batterOut: 'striker' | 'nonstriker' = wk === 'stumped' || wk === 'hitwicket' || wk === 'hittwice' || lastManAlone(s) ? 'striker'
           : a.payload?.batterOut === 'nonstriker' ? 'nonstriker' : 'striker';
         const outId = batterOut === 'nonstriker' ? s.nonStrikerId : strikerId;
         const outName = batterOut === 'nonstriker' ? sn(s.nonStrikerName) : strikerName;
@@ -1694,8 +1761,9 @@ const step = (s: CricketState, a: ScoreAction): CricketState => {
         const fielderName = wk === 'stumped' ? keeperName : (a.payload?.fielderName as string | undefined);
         const fielder2Id = wk === 'runout' ? (a.payload?.fielder2Id as string | undefined) : undefined;
         const fielder2Name = wk === 'runout' ? (a.payload?.fielder2Name as string | undefined) : undefined;
+        const subX = !legacy && subFielder(s, a, wk);
         const dismissal = legacy ? composeDismissal('runout', undefined, who(fielderId, fielderName))
-          : composeDismissal(wk, who(info.bowlerId, info.bowlerName), who(fielderId, fielderName), who(keeper?.id, keeperName), who(fielder2Id, fielder2Name));
+          : composeDismissal(wk, who(info.bowlerId, info.bowlerName), who(fielderId, fielderName), who(keeper?.id, keeperName), who(fielder2Id, fielder2Name), subX);
         const bowlersWicket = !NO_BOWLER.includes(wk);
         let batting = s.batting;
         if (isNoBall) batting = applyBat(batting, strikerId, strikerName, { runs: offBat, balls: 1 });
@@ -1716,6 +1784,7 @@ const step = (s: CricketState, a: ScoreAction): CricketState => {
           : { kind: wk, outId, bowlerId: info.bowlerId, fielderId, ...named };
         if (fielder2Id || fielder2Name) { record.fielder2Id = fielder2Id; if (L) record.fielder2Name = fielder2Name; }
         if (!legacy && directHit(wk, a.payload, fielderId)) record.direct = true;
+        if (subX) record.sub = true;
         const tail = completed > 0 ? ` (${runsText(completed, isNoBall ? runsAs : 'bat')})` : '';
         let next: CricketState = legalBits(touchBowler({
           ...s,
@@ -1847,6 +1916,9 @@ const step = (s: CricketState, a: ScoreAction): CricketState => {
       // Legacy (no v): a silent swap, exactly as before. Batch 5 (C4): a `v: 2`
       // swap needs both ends filled and, once the innings is under way, logs
       // "STRIKE CHANGED" so the commentary / Undo can say it.
+      // Batch 6 (R8) — the lone last batter keeps the strike (only matches
+      // with the rule on, so older logs are untouched).
+      if (lastManAlone(s)) return s;
       if (a.payload?.v !== 2) return swapStrike(s);
       if (!s.strikerId || !s.nonStrikerId) return s;
       const swapped = swapStrike(s);
@@ -2072,6 +2144,8 @@ function ballRec(s: CricketState, a: ScoreAction, next: CricketState): BallRec {
     const trk = trackingOf(rulesOf(s));
     if (trk) rec.trk = trk;
   }
+  // Batch 6 (fix 13) — one short, as the RUNS branch labelled it (never a boundary).
+  if (a.type === 'RUNS' && isShortRun(a) && !isBoundaryHit(clampRuns(a.payload?.runs), a.payload?.boundary, Math.min(clampRuns(a.payload?.runs), clampRuns(a.payload?.overthrows)))) rec.short = true;
   return rec;
 }
 

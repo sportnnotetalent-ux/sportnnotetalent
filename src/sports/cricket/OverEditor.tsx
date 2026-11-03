@@ -19,7 +19,7 @@ import { nameInitials, type NameOf } from '../../core/playerNames';
 import type { MatchEventRecord, Player } from '../../core/types';
 import type { AmendOp } from '../amend';
 import {
-  editableOvers, editBall, changeBowlerOps, swapBattersOps, applyOps, chipLabel, overSymbolTone,
+  editableOvers, editBall, editDropsBall, changeBowlerOps, swapBattersOps, applyOps, chipLabel, overSymbolTone,
   ballDiffLine, bowlerDiffLine, swapDiffLine, describeBall, recordToAction, CATEGORY_HINT,
   type EditableBall, type EditableInnings, type EditableOver, type BallEdit,
 } from './editOvers';
@@ -120,6 +120,10 @@ export function OverEditor({ log, config, onOps, homeName, awayName, homeRoster,
                     === JSON.stringify({ t: was.type, p: was.payload ?? undefined, a: was.attribution ?? null, a2: was.attribution2 ?? null })) {
                     stage(`ball:${rec.seq}`, [], ''); setEditing(null); return;
                   }
+                  // Batch 6 (R6) — refuse an edit that would put a later v:2 wicket on a free hit.
+                  const key = `ball:${rec.seq}`;
+                  const drop = editDropsBall(log, [...staged.filter((x) => x.key !== key).flatMap((x) => x.ops), { op: 'replace', seq: rec.seq, action }], config);
+                  if (drop) { setError(drop); return; }
                   stage(`ball:${rec.seq}`, [{ op: 'replace', seq: rec.seq, action }], ballDiffLine(editing.ball.stamp, editing.ball.action, action, lineName));
                   setEditing(null);
                 }} />}
