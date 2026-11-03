@@ -178,6 +178,8 @@ export type RootStackParamList = {
   MyTournaments: undefined;
   CreateClub: { orgId?: string } | undefined;
   ClubHome: { clubId: string };
+  /** a club game day (docs/product/squad-sessions.md): { clubId } starts one */
+  SquadSession: { sessionId?: string; clubId?: string };
   ClubSport: { clubId: string; sport: SportId; /** SD-154: one squad (JV, B team) when the club has several */ teamId?: string };
   JoinClub: { token?: string } | undefined;
   ScanQR: undefined;

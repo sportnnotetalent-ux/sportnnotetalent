@@ -932,6 +932,8 @@ export interface Match {
   id: UUID;
   /** the tournament this match belongs to — absent for an ad-hoc friendly */
   tournamentId?: UUID;
+  /** a squad session's game (src/core/squadSession.ts) — still a friendly */
+  sessionId?: UUID;
   /** group-stage label (e.g. "A", "B") for a grouped tournament; absent otherwise */
   group?: string;
   /** tournament phase — 'group' or a knockout round id ('r16' | 'qf' | 'sf' | 'final') */

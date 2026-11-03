@@ -27,6 +27,8 @@ import { inviteLabel, playerInviteText } from '../core/inviteText';
 import { SHARE_BASE } from '../core/shareText';
 import { InviteQrShare, type InviteQrShareHandle } from '../components/InviteQrShare';
 import type { Club, ClubMemberView, SportId } from '../core/types';
+import { getClubSessions } from '../data/squadSessions';
+import type { SquadSession } from '../core/squadSession';
 import type { RootStackParamList } from '../navigation/types';
 import { Glyph } from '../components/Icon';
 
@@ -43,6 +45,7 @@ export default function ClubHomeScreen() {
   const [sports, setSports] = useState<SportId[]>([]);
   const [myId, setMyId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [sessions, setSessions] = useState<SquadSession[]>([]);
 
   const [editSports, setEditSports] = useState(false);
   const [addingMember, setAddingMember] = useState(false);
@@ -52,16 +55,17 @@ export default function ClubHomeScreen() {
   const qrShare = useRef<InviteQrShareHandle>(null);
 
   const load = useCallback(async () => {
-    const [c, m, s, id] = await Promise.all([
-      getClub(clubId), getClubMembers(clubId), getClubSports(clubId), getMyPlayerId(profile?.id),
+    const [c, m, s, id, ss] = await Promise.all([
+      getClub(clubId), getClubMembers(clubId), getClubSports(clubId), getMyPlayerId(profile?.id), getClubSessions(clubId, 5),
     ]);
-    setClub(c); setMembers(m); setSports(s); setMyId(id); setLoading(false);
+    setClub(c); setMembers(m); setSports(s); setMyId(id); setSessions(ss); setLoading(false);
   }, [clubId, profile?.id]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const amAdmin = members.some((m) => m.playerId === myId && m.role === 'admin') || (!!club && club.createdBy === profile?.id);
   const adminCount = members.filter((m) => m.role === 'admin').length;
+  const amMember = amAdmin || members.some((m) => m.playerId === myId);
 
   async function toggleSport(s: SportId) {
     setBusy(true);
@@ -182,6 +186,33 @@ export default function ClubHomeScreen() {
               </TouchableOpacity>
             );
           })
+        )}
+
+        {/* Game days — squad sessions (docs/product/squad-sessions.md) */}
+        <View style={st.sectionHead}>
+          <Text style={textStyles.h3}>Game days</Text>
+          {amMember && (
+            <TouchableOpacity onPress={() => nav.navigate('SquadSession', { clubId })} accessibilityRole="button">
+              <Text style={st.link}>+ Start a session</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+        {sessions.length === 0 ? (
+          <Card><Text style={textStyles.muted}>Playing today? Start a session: pick who’s here, captains pick teams, and teams play in turns.</Text></Card>
+        ) : (
+          sessions.map((x) => (
+            <TouchableOpacity key={x.id} accessibilityRole="button" accessibilityLabel={`Open session ${x.name}`}
+              onPress={() => nav.navigate('SquadSession', { sessionId: x.id })}>
+              <Card style={st.sportRow}>
+                <SportBadge sport={x.sport as SportId} size={32} />
+                <View style={{ flex: 1 }}>
+                  <Text style={textStyles.body}>{new Date(x.startsAt).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}</Text>
+                  <Text style={textStyles.muted}>{x.players.length} players · {x.status === 'ended' ? 'ended' : x.status === 'playing' ? 'playing now' : 'making teams'}</Text>
+                </View>
+                <Text style={st.chev}>›</Text>
+              </Card>
+            </TouchableOpacity>
+          ))
         )}
 
         {/* Members */}

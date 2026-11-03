@@ -4,6 +4,7 @@
  * organizer creates while offline show up immediately. When Supabase is
  * configured, none of this is used; the repos hit Postgres instead.
  */
+import type { SquadSession } from '../core/squadSession';
 import type { RecordMark } from './results/records';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { TOURNAMENTS, MATCHES } from '../core/mockData';
@@ -861,6 +862,8 @@ function buildDemo() {
     teamPlayerRoles: [] as TeamPlayerRoles[],
     /** club join invites keyed by token (see migration 0019). */
     clubInvites: {} as Record<string, ClubInvite>,
+    /** squad sessions (club game days) — see migration 20261105120000. */
+    squadSessions: [] as SquadSession[],
     /** field events (golf rounds…) + their entries — docs/sports/GOLF_DESIGN.md */
     fieldEvents: [] as FieldEvent[],
     fieldEntries: [] as FieldEntry[],
@@ -902,7 +905,7 @@ function buildDemo() {
   return d;
 }
 export type DemoData = ReturnType<typeof buildDemo>;
-const DEMO_KEYS = ['tournaments', 'organizations', 'orgRequests', 'orgAdmissionNos', 'ownershipEvents', 'tournamentOfficials', 'activityLog', 'awards', 'potm', 'matches', 'teams', 'players', 'statLines', 'lineups', 'matchEvents', 'matchSquads', 'disputes', 'invites', 'tournamentTeams', 'tournamentCategories', 'clubs', 'clubMembers', 'teamPlayerRoles', 'clubInvites', 'fieldEvents', 'fieldEntries', 'resultRecords', 'golfCourses', 'captainTeams', 'footballProfiles', 'listings', 'teamLeaders'] as const satisfies readonly (keyof DemoData)[];
+const DEMO_KEYS = ['tournaments', 'organizations', 'orgRequests', 'orgAdmissionNos', 'ownershipEvents', 'tournamentOfficials', 'activityLog', 'awards', 'potm', 'matches', 'teams', 'players', 'statLines', 'lineups', 'matchEvents', 'matchSquads', 'disputes', 'invites', 'tournamentTeams', 'tournamentCategories', 'clubs', 'clubMembers', 'teamPlayerRoles', 'clubInvites', 'squadSessions', 'fieldEvents', 'fieldEntries', 'resultRecords', 'golfCourses', 'captainTeams', 'footballProfiles', 'listings', 'teamLeaders'] as const satisfies readonly (keyof DemoData)[];
 // every key of the store is listed (checked at compile time)
 const everyDemoKey: [Exclude<keyof DemoData, (typeof DEMO_KEYS)[number]>] extends [never] ? true : false = true;
 void everyDemoKey;
