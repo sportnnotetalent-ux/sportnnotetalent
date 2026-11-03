@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-04 — Release: quick-game side names + doubles picker live (web, Android OTA)
+
+auth-smoke passed. Published from a clean worktree at 03b8cfd: web (entry `index-f4cb82fc`, confirmed live on app.sportnnote.in) and Android OTA groups `3ee04588` (preview) and `708b0095` (production), runtime 1.0.0.
+
 ### 2026-11-04 — Real names for quick-game sides; the doubles picker
 
 From the founder's phone: a finished pool match read "Vivek C vs Player B" on Home, in the title and in the Summary ("VC / B"), while the scoreboard showed "Abhra Cho…" — a quick friendly started with an empty side makes a placeholder team "Player B", and adding the real player never renamed it (the scoreboard alone read the roster). And in doubles, typing "Hru" offered a one-person entry "Hrudhay" as a pair, skipping the partner.
