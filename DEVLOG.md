@@ -13,6 +13,13 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-04 — Shared scoring; Your sports; test-data clean-up SQL
+
+- **Shared scoring** (`docs/security/breaks/shared-scoring.md`): a per-match switch (off by default; friendlies: any listed scorer, tournament matches: hosts / organisers) lets several listed scorers record one match at the same time from their own phones. Every tap and Undo carries the key of the newest step the phone had; the server refuses a stale one (`stale_tap:<who>`) so nothing counts twice or lands on a moment that moved on; the phone refreshes and says who recorded the newer step; offline / waited taps that turn out stale go to the review list; Undo names who recorded the step and asks before removing someone else's; undone steps never come back on a late retry; old app versions are refused only in shared mode ("update the app"). Every write path sends the base (a test fails on any that doesn't). **Needs the founder to run** `supabase/migrations/20261103120000_shared_scoring.sql` (re-creates append / pop / claim / handover / write guard from their newest bodies, all checks kept, reviewed); until then the app falls back to the old call and one-at-a-time scoring. Tests: unit, 18 PGlite integration, 600-match two-phone simulation.
+- **Your sports** (`your-sports.md`): Home lists the sports you picked, then every sport you've played, scored or hosted (from its own feed), so pool leaves "Try a new sport" once you've played it.
+- **Test data**: `docs/ops/2026-11-04-delete-test-data.sql` (founder runs it) deletes 32 matches (Lions / Cheetahs / Tigers / Panthers, Hrudhay's 5s / 5s Hrudhay, all of Test tournamentzzzz), those 6 teams and 5 empty test tournaments, by exact id, all or nothing.
+Full suite 7,187+ tests, 0 failing; tsc clean.
+
 ### 2026-11-04 — Release: entries show current names live (web, Android OTA)
 
 auth-smoke passed. Published from a clean worktree at 484e058: web (entry `index-c9776d74`, confirmed live on app.sportnnote.in) and Android OTA groups `647374cb` (preview) and `aae0111d` (production), runtime 1.0.0.
