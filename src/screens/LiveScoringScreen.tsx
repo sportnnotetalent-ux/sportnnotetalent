@@ -47,6 +47,7 @@ import { theme } from '../core/theme';
 import { Glyph, IconText } from '../components/Icon';
 import { getSport } from '../sports/registry';
 import { entryDisplayName } from '../data/participantEntry';
+import { placeholderParamsPatch } from '../core/quickGame';
 import { distinctSideColors } from '../core/contrast';
 import { VoiceScorer } from '../sports/VoiceScorer';
 import { completesMatch } from '../sports/voiceMatch';
@@ -225,6 +226,11 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
                 ...(!route.params.homeColor && m.homeTeam.colorHex ? { homeColor: m.homeTeam.colorHex } : {}),
                 ...(!route.params.awayColor && m.awayTeam.colorHex ? { awayColor: m.awayTeam.colorHex } : {}),
               });
+            } else {
+              // A quick game's "Player B" side now has its real player / pair:
+              // the title, result card, share text and notifications follow.
+              const patch = placeholderParamsPatch(route.params, { home: m.homeTeam, away: m.awayTeam });
+              if (Object.keys(patch).length) navigation.setParams(patch);
             }
             setMeta({
               homeTeamId: m.homeTeam.id, awayTeamId: m.awayTeam.id, tournamentId: m.tournamentId,
@@ -1613,7 +1619,8 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
       wouldComplete={wouldComplete}
     />
   ) : null), [plugin, state, dispatch, homeName, awayName, homeScoreRoster, awayScoreRoster, undoStep, wouldComplete]);
-  const bumpRoster = useCallback(() => setRosterNonce((n) => n + 1), []);
+  // A roster change can rename a quick game's placeholder side: reload the match too.
+  const bumpRoster = useCallback(() => { setRosterNonce((n) => n + 1); setReloadTick((n) => n + 1); }, []);
   const addInviteEl = useMemo(() => (canScore && !retiredLocally && meta.homeTeamId && meta.awayTeamId ? (
     <AddInvitePlayer
       homeTeamId={meta.homeTeamId} awayTeamId={meta.awayTeamId}
@@ -2128,7 +2135,7 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
                   existingIds={(sd === 'home' ? homeFull : awayFull).map((p) => p.id)}
                   defaultOpen={(sd === 'home' ? homeFull : awayFull).length === 0}
                   // keep this card open after adding (it auto-opened while the team was empty)
-                  onChanged={() => { setInfoOpen(sd); setRosterNonce((n) => n + 1); }}
+                  onChanged={() => { setInfoOpen(sd); setRosterNonce((n) => n + 1); setReloadTick((n) => n + 1); }}
                 />
               )}
             </View>
