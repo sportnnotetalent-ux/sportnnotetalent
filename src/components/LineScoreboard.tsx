@@ -12,6 +12,7 @@ import React from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { theme } from '../core/theme';
 import { Glyph } from './Icon';
+import { PopNumber } from './pressFeedback';
 
 export interface LineCol { label: string; highlight?: boolean }
 export interface LineRow { name: string; color: string; lead: string; cells: string[] }
@@ -74,10 +75,10 @@ export function LineScoreboard({
                   <Text style={[st.name, { color: r.color }]} numberOfLines={1}>{r.name}</Text>
                   {won ? <Glyph emoji="🏆" style={st.trophy} /> : null}
                 </View>
-                <View style={[st.leadCell, wide && st.wideLead]}><Text style={st.leadText}>{r.lead}</Text></View>
+                <View style={[st.leadCell, wide && st.wideLead]}><PopNumber text={String(r.lead)} style={st.leadText} /></View>
                 {r.cells.map((cell, ci) => (
                   <View key={ci} style={[st.cell, columns[ci]?.highlight && st.cellHi]}>
-                    <Text style={[st.cellText, columns[ci]?.highlight && st.cellTextHi]}>{cell}</Text>
+                    <PopNumber text={String(cell)} style={[st.cellText, columns[ci]?.highlight && st.cellTextHi]} />
                   </View>
                 ))}
               </View>

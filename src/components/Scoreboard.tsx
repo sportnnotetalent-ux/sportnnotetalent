@@ -4,6 +4,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import { theme } from '../core/theme';
 import { ensureContrast } from '../core/contrast';
 import type { ScoreSummary } from '../sports/types';
+import { PopNumber } from './pressFeedback';
 
 export function Scoreboard({
   summary,
@@ -63,9 +64,8 @@ function Side({ name, score, color, reds }: { name: string; score: string; color
     <View style={s.side}>
       {/* Team colour as text: lifted to ≥3:1 on the card (large text) when a kit is dark.
           Already 52pt, so cap OS scaling at 1.5× rather than clip the digits. */}
-      <Text style={[s.score, { color: ensureContrast(color, theme.colors.surface, 3) }]} numberOfLines={1} maxFontSizeMultiplier={1.5} adjustsFontSizeToFit>
-        {score}
-      </Text>
+      {/* Tap feedback (2026-11-03): the number that changed pops */}
+      <PopNumber text={String(score)} style={[s.score, { color: ensureContrast(color, theme.colors.surface, 3) }]} numberOfLines={1} maxFontSizeMultiplier={1.5} adjustsFontSizeToFit />
       <View style={s.teamRow}>
         <Text style={s.team} numberOfLines={1}>
           {name}

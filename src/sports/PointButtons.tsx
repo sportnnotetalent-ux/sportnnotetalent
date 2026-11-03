@@ -15,7 +15,7 @@
  * and `SecondaryAction` (tennis Ace / Double fault — outline, smaller).
  */
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { theme } from '../core/theme';
 import { SelectChip } from '../components/ui';
 import { tapGuard } from '../core/tapGuard';
@@ -23,6 +23,7 @@ import { holdFeedback } from '../core/haptics';
 import { sideOrder } from './courtCues';
 import type { Player } from '../core/types';
 import { readableOn } from '../core/contrast';
+import { AnimatedPressable, usePressFeedback } from '../components/pressFeedback';
 
 type Side = 'home' | 'away';
 
@@ -84,14 +85,20 @@ export function PointButtons({
     setPick(null);
   };
 
+  // Tap feedback (2026-11-03): each side's button scales down while pressed
+  const pressHome = usePressFeedback({ disabled });
+  const pressAway = usePressFeedback({ disabled });
   const big = (s: Side) => {
     const bg = colorOf(s);
     const ink = inkOn(bg);
     const solo = rosterOf(s).length === 1 ? rosterOf(s)[0].fullName : undefined;
+    const press = s === 'home' ? pressHome : pressAway;
     return (
-      <Pressable
+      <AnimatedPressable
         key={s}
         onPress={() => tap(s)}
+        onPressIn={press.onPressIn}
+        onPressOut={press.onPressOut}
         // MVP B2: a firm press isn't a credit request — the hold is longer, and buzzes
         onLongPress={canCredit(s) && !disabled ? () => { holdFeedback(); setPick(s); } : undefined}
         delayLongPress={600}
@@ -100,12 +107,12 @@ export function PointButtons({
         accessibilityLabel={`${verb} to ${nameOf(s)}${serving === s ? ', serving' : ''}`}
         accessibilityHint={canCredit(s) ? 'Long-press to credit a player' : undefined}
         accessibilityState={{ disabled: !!disabled }}
-        style={({ pressed }) => [pb.big, { backgroundColor: bg }, pressed && pb.pressed, disabled && pb.off]}
+        style={[pb.big, { backgroundColor: bg }, disabled ? pb.off : press.style]}
       >
         <Text style={[pb.bigName, { color: ink }]} numberOfLines={2}>{solo ?? nameOf(s)}</Text>
         <Text style={[pb.bigSub, { color: ink }]} numberOfLines={1}>{flash === s ? '✓' : icon} {verb}</Text>
         {serving === s ? <Text style={[pb.bigServe, { color: ink, borderColor: ink }]} numberOfLines={1}>SERVING</Text> : null}
-      </Pressable>
+      </AnimatedPressable>
     );
   };
 
@@ -146,17 +153,20 @@ export function PointButtons({
 /** Secondary outline action (tennis Ace / Double fault): smaller, below the
  *  point buttons, so it never draws a tap meant for a plain point. */
 export function SecondaryAction({ label, onPress, color, disabled }: { label: string; onPress: () => void; color?: string; disabled?: boolean }) {
+  const press = usePressFeedback({ disabled });
   return (
-    <Pressable
+    <AnimatedPressable
       onPress={disabled ? undefined : onPress}
+      onPressIn={press.onPressIn}
+      onPressOut={press.onPressOut}
       disabled={disabled}
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ disabled: !!disabled }}
-      style={({ pressed }) => [pb.sec, color ? { borderColor: color } : null, pressed && pb.pressed, disabled && pb.off]}
+      style={[pb.sec, color ? { borderColor: color } : null, disabled ? pb.off : press.style]}
     >
       <Text style={pb.secText} numberOfLines={2}>{label}</Text>
-    </Pressable>
+    </AnimatedPressable>
   );
 }
 
@@ -223,7 +233,6 @@ const pb = StyleSheet.create({
     fontSize: theme.font.tiny, fontWeight: '900', letterSpacing: 0.6, marginTop: 3,
     borderWidth: 1, borderRadius: theme.radius.pill, paddingHorizontal: theme.spacing(2), paddingVertical: 1, overflow: 'hidden',
   },
-  pressed: { opacity: 0.75, transform: [{ scale: 0.98 }] },
   off: { opacity: 0.35 },
   hint: { color: theme.colors.accent, fontSize: theme.font.small, fontWeight: '700' },
   meta: { color: theme.colors.textMuted, fontSize: theme.font.small },

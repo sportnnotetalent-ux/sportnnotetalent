@@ -25,6 +25,7 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { theme } from '../core/theme';
+import { FadeInLine } from '../components/pressFeedback';
 import { SelectChip } from '../components/ui';
 import type { Player } from '../core/types';
 import type { LiveEvent } from './liveEvents';
@@ -244,7 +245,7 @@ export function PointDetailRow({
           ))}
         </View>
       )}
-      {summary ? <Text style={st.meta}>✓ {summary}</Text> : null}
+      {summary ? <FadeInLine id={summary}><Text style={st.meta}>✓ {summary}</Text></FadeInLine> : null}
     </View>
   );
 }

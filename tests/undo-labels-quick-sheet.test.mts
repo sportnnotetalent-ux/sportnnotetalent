@@ -177,7 +177,8 @@ describe('UQ-6 — chess', () => {
 describe('UQ-11 / UQ-12 — the Quick options sheet closes after an action', () => {
   const screen = src('src/screens/LiveScoringScreen.tsx');
   test('the sport tiles get a dispatch that closes the sheet', () => {
-    assert.match(screen, /const quickDispatch = useCallback\(\(a: [^)]*\) => \{ dispatch\(a\); setQuickOpen\(false\); \}, \[dispatch\]\);/);
+    // tap feedback (2026-11-03): through the capture wrapper, so a tile's step is confirmed too
+    assert.match(screen, /const quickDispatch = useCallback\(\(a: [^)]*\) => \{ scoreDispatch\(a\); setQuickOpen\(false\); \}, \[scoreDispatch\]\);/);
     assert.match(screen, /<plugin\.QuickOptions\s+state=\{state\} dispatch=\{quickDispatch\}/);
     assert.match(screen, /onDone=\{\(msg\) => \{ setQuickOpen\(false\);/);
   });

@@ -39,12 +39,14 @@ import { baseOf, parseRefusal } from '../core/sharedScoring';
 import { AppState } from 'react-native';
 import { createResultHold, type ResultHold } from './resultHold';
 import { pendingResults, flushPendingResults } from './pendingResults';
-import { tapFeedback, undoFeedback } from '../core/haptics';
+import { undoFeedback } from '../core/haptics';
 import { withMatchRecords } from '../sports/matchRecords'; // SD-51
 import { legacyNameOf, type NameOf } from '../core/playerNames'; // IDs-only scoring
 
 export interface UseLiveMatch {
   state: unknown;
+  /** the state right now, synchronously after a dispatch (tap feedback) */
+  getState: () => unknown;
   dispatch: (action: ScoreAction) => void;
   /** Undo the last recorded event (ball/setup step) — re-derives from the log. */
   undo: () => void;
@@ -366,7 +368,9 @@ export function useLiveMatch(params: {
       // MVP B6: a FORMAT marker is never reduced (the format lives in matches.format).
       const next = action.type === FORMAT_TYPE ? prevState : plugin.reducer(prevState, action);
       setBoth(next);
-      if (canScore && !readOnly) tapFeedback(); // SD-110: feel that the tap went in
+      // SD-110's buzz moved to the screen's capture wrapper (tap feedback,
+      // 2026-11-03): it buzzes only when this step changed the state, so a
+      // refused tap is no longer felt as "captured".
 
       // Guest scoring: keep the tap on the device only (no stats, alerts or server).
       if (!matchId && guestId && guestRef.current && action.type !== FORMAT_TYPE) {
@@ -647,5 +651,8 @@ export function useLiveMatch(params: {
   // SD-133 — let the in-flight live stat increments land (End match by hand
   // then writes the absolute totals over them, as completion does).
   const settleStatWrites = useCallback(async () => { await Promise.all([...statWritesRef.current]); }, []);
-  return { state, dispatch, undo, reset, eventCount, live, syncing, rejectedCount, discardRejected, refresh: rebuildFromLog, amend, lastStep, resultSendsAt, sendResultNow, settleStatWrites, staleBy, clearStale };
+  /** the state right now (the ref a dispatch has just written) — for the
+   *  screen's capture wrapper, which compares before / after a step */
+  const getState = useCallback(() => stateRef.current, []);
+  return { state, getState, dispatch, undo, reset, eventCount, live, syncing, rejectedCount, discardRejected, refresh: rebuildFromLog, amend, lastStep, resultSendsAt, sendResultNow, settleStatWrites, staleBy, clearStale };
 }

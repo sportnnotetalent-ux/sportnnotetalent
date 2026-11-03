@@ -30,7 +30,7 @@ import { canCorrectMatch, correctionHoursLeft, formatTimeLeft } from '../core/ro
 import { standingsConfigFromFormat, noResultPoints } from '../data/standings';
 import { lockStatus, type ScoringLock } from '../core/scoringLock';
 import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions, Platform } from 'react-native';
 import { KeyboardAwareScrollView } from '../components/keyboard';
 import { shareMessage, shareMessageWithCard } from '../core/share';
 import { PersonPicker } from '../components/PersonPicker';
@@ -117,6 +117,10 @@ import type { MatchEventRecord, MatchResult, ResultKind, DisputeEvent, LineupSlo
 import type { RootStackParamList } from '../navigation/types';
 import type { LiveExtrasProps, MatchTabs } from '../sports/types';
 import { RemindInstall } from '../components/RemindInstall';
+import { captureBus, captureDispatch, shouldBuzz } from '../core/tapCapture';
+import { tapFeedback } from '../core/haptics';
+import { hapticsPref } from '../core/hapticsPref';
+import { CapturedFlash } from '../components/pressFeedback';
 import { LiveAnnouncer, scoreSentence } from '../components/LiveAnnouncer';
 import { realName } from '../core/invite';
 import { inviteLabel, matchRoleInviteText, playerInviteText } from '../core/inviteText';
@@ -331,7 +335,7 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
     if (!tieSpecFromFormat(rawFormat)) return undefined;
     return { first: Number(rawFormat?.__seriesLeg) === 1 };
   }, [rawFormat]);
-  const { state, dispatch, undo, reset, eventCount, live, syncing, rejectedCount, discardRejected, refresh, amend, lastStep, resultSendsAt, sendResultNow, settleStatWrites, staleBy, clearStale } = useLiveMatch({
+  const { state, getState, dispatch, undo, reset, eventCount, live, syncing, rejectedCount, discardRejected, refresh, amend, lastStep, resultSendsAt, sendResultNow, settleStatWrites, staleBy, clearStale } = useLiveMatch({
     matchId,
     sport,
     canScore,
@@ -354,6 +358,15 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
       onResultSent: () => { if (matchId) void announceTieResult(matchId, { homeTeamId: meta.homeTeamId, awayTeamId: meta.awayTeamId, tournamentId: meta.tournamentId, sportName: getSport(sport).name }); },
     } : {}),
   });
+  // Tap feedback (2026-11-03, founder): every scoring step from any sport's
+  // controls goes through here. Only a step that changed the state is
+  // "captured": a light buzz on phones (preference on; never web), the Undo bar
+  // pulses with a ✓ (captureBus — no screen re-render) and the changed score
+  // pops. A refused / ignored tap confirms nothing. docs/security/breaks/tap-feedback.md
+  const scoreDispatch = useMemo(() => captureDispatch(getState, dispatch, () => {
+    if (shouldBuzz({ captured: true, hapticsOn: hapticsPref.get(), platform: Platform.OS, canScore })) tapFeedback();
+    captureBus.emit();
+  }), [getState, dispatch, canScore]) as typeof dispatch;
 
   const viewerTz = useUserTimeZone(); // show every time on this screen in the viewer's own zone
   // All players, only for resolving names of people outside the two rosters —
@@ -1089,7 +1102,7 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
   // Undo labels batch (2026-11-03): an action applied from a Quick options tile
   // closes the sheet — even a tile that forgets its onDone. A tile that opens a
   // further step (its own panel) dispatches nothing, so the sheet stays open.
-  const quickDispatch = useCallback((a: Parameters<typeof dispatch>[0]) => { dispatch(a); setQuickOpen(false); }, [dispatch]);
+  const quickDispatch = useCallback((a: Parameters<typeof dispatch>[0]) => { scoreDispatch(a); setQuickOpen(false); }, [scoreDispatch]);
   const [toast, setToast] = useState<string | null>(null);
   useEffect(() => {
     if (!toast) return;
@@ -1128,8 +1141,8 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
   const beginMatch = (side?: 'home' | 'away') => {
     setLocalStarted(true);
     // pool: who breaks rack 1, through the sport's own stamped action
-    if (firstStep === 'breaks' && side && plugin.startAction) { dispatch(plugin.startAction(state, side)); return; }
-    for (const a of startActions(firstStep, { side, now: Date.now() })) dispatch(a);
+    if (firstStep === 'breaks' && side && plugin.startAction) { scoreDispatch(plugin.startAction(state, side)); return; }
+    for (const a of startActions(firstStep, { side, now: Date.now() })) scoreDispatch(a);
   };
   const tryStart = (side?: 'home' | 'away') => {
     const h = squads?.home.starters.length ?? 0;
@@ -1557,7 +1570,7 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
       <View style={st.retireRow}>
         {strikeAsk.ids.map((id, i) => (
           <Button key={id} label={strikeAsk.names[i]} variant="ghost" style={{ flex: 1 }}
-            onPress={() => { if (i === 1) dispatch({ type: 'SWAP_STRIKE' }); setStrikeAsk(null); }} />
+            onPress={() => { if (i === 1) scoreDispatch({ type: 'SWAP_STRIKE' }); setStrikeAsk(null); }} />
         ))}
       </View>
     </View>
@@ -1617,24 +1630,24 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
   const awayKeeperId = squads?.away.keeperId;
   const scoringControlsEl = useMemo(() => (
     <plugin.ScoringControls
-      state={state} dispatch={dispatch} homeName={homeShown} awayName={awayShown}
+      state={state} dispatch={scoreDispatch} homeName={homeShown} awayName={awayShown}
       homeColor={homeColor} awayColor={awayColor}
       homeRoster={homeScoreRoster} awayRoster={awayScoreRoster} homeLineup={homeLineup} awayLineup={awayLineup}
       homeKeeperId={homeKeeperId} awayKeeperId={awayKeeperId}
       knockout={knockout}
       onEndMatch={controlsOnEnd}
     />
-  ), [plugin, state, dispatch, homeShown, awayShown, homeColor, awayColor, homeScoreRoster, awayScoreRoster, homeLineup, awayLineup, homeKeeperId, awayKeeperId, knockout, controlsOnEnd]);
+  ), [plugin, state, scoreDispatch, homeShown, awayShown, homeColor, awayColor, homeScoreRoster, awayScoreRoster, homeLineup, awayLineup, homeKeeperId, awayKeeperId, knockout, controlsOnEnd]);
   const wouldComplete = useCallback((acts: Parameters<typeof completesMatch>[2]) => completesMatch(plugin, state, acts), [plugin, state]);
   const voiceEl = useMemo(() => (plugin.voice ? (
     <VoiceScorer
-      voice={plugin.voice} state={state} dispatch={dispatch}
+      voice={plugin.voice} state={state} dispatch={scoreDispatch}
       homeName={homeName} awayName={awayName}
       homeRoster={homeScoreRoster} awayRoster={awayScoreRoster}
       onUndo={() => void undoStep()}
       wouldComplete={wouldComplete}
     />
-  ) : null), [plugin, state, dispatch, homeName, awayName, homeScoreRoster, awayScoreRoster, undoStep, wouldComplete]);
+  ) : null), [plugin, state, scoreDispatch, homeName, awayName, homeScoreRoster, awayScoreRoster, undoStep, wouldComplete]);
   // A roster change can rename a quick game's placeholder side: reload the match too.
   const bumpRoster = useCallback(() => { setRosterNonce((n) => n + 1); setReloadTick((n) => n + 1); }, []);
   const addInviteEl = useMemo(() => (canScore && !retiredLocally && meta.homeTeamId && meta.awayTeamId ? (
@@ -1801,7 +1814,7 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
   // (the old LiveExtras props). docs/sport-depth/deep-wave/match-tabs.md
   const tabSlots: MatchTabs = plugin.matchTabs ?? {};
   const slotProps: LiveExtrasProps = {
-    state, dispatch, canScore, matchId,
+    state, dispatch: scoreDispatch, canScore, matchId,
     homeName, awayName, homeColor, awayColor,
     homeRoster: homeScoreRoster, awayRoster: awayScoreRoster, homeLineup, awayLineup,
     homeManager: meta.managers?.home, awayManager: meta.managers?.away,
@@ -1823,7 +1836,7 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
   const serveCourtNode = plugin.ServeCourt ? (
     <plugin.ServeCourt
       state={state} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor}
-      homeRoster={homeScoreRoster} awayRoster={awayScoreRoster} canScore={canScore} dispatch={dispatch}
+      homeRoster={homeScoreRoster} awayRoster={awayScoreRoster} canScore={canScore} dispatch={scoreDispatch}
     />
   ) : null;
   // Info tab — squads & lineups: the sport's own lineups view (football), else
@@ -2743,7 +2756,7 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
               {guestBar}
               {started && !complete && scoringBoardNode}
               {resultHoldNote}
-              {undoBar}
+              {undoBar ? <CapturedFlash>{undoBar}</CapturedFlash> : null}
               {liveEditBar}
               {strikeCard}
               {addInviteEl}

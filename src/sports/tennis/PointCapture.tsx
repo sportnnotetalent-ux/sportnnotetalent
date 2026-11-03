@@ -18,6 +18,7 @@ import React, { useMemo, useState } from 'react';
 import { View, Text, TextInput, StyleSheet } from 'react-native';
 import { theme } from '../../core/theme';
 import { SelectChip } from '../../components/ui';
+import { FadeInLine } from '../../components/pressFeedback';
 import type { Player } from '../../core/types';
 import type { ScoreAction } from '../types';
 import { pointRows } from '../rallyEdit';
@@ -211,7 +212,7 @@ export function TennisPointDetail({
         <SpeedInput key={`${e.id}:${unit}`} value={e.kmh} unit={unit} onValid={(kmh) => send({ kmh })} onClear={() => send({ kmh: null })}
           onUnit={(u) => dispatch({ type: 'SET_DETAIL', payload: { speedUnit: u } })} />
       )}
-      {summary ? <Text style={st.meta}>✓ {summary}</Text> : null}
+      {summary ? <FadeInLine id={summary}><Text style={st.meta}>✓ {summary}</Text></FadeInLine> : null}
     </View>
   );
 }
