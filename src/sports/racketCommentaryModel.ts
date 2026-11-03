@@ -41,7 +41,7 @@ import { pointRows, replayPoints, type EditRow, type PointInput } from './rallyE
 import { makeRallyEngine, rallyRows, rallyServingSide, type RallyState } from './rallyEngine.ts';
 import { isMark } from './conduct.ts';
 import { serveStats, type RallyTrace } from './serveStats.ts';
-import { ttServer } from './tabletennis/serve.ts';
+import { ttExpediteOf, ttServerOf } from './tabletennis/serve.ts';
 import { pickleballCue, squashCue, tableTennisCue, type Cue } from './courtCues.ts';
 import * as badminton from './badminton/engine.ts';
 import * as padel from './padel/engine.ts';
@@ -221,13 +221,18 @@ export function racketCommentary(sport: DepthSport, state: unknown, names: Comme
   const g0 = s0 as GameState;
   let cur: GameState = sport === 'badminton'
     ? { ...(g0 as badminton.BadmintonState), current: { home: 0, away: 0 }, games: [], gamesWon: { home: 0, away: 0 }, events: [], seq: 0, ended: false }
-    : (() => { const x = g0 as RallyState; return { ...x, current: { home: 0, away: 0 }, games: [], gamesWon: { home: 0, away: 0 }, serving: x.opening ?? 'home', serverNo: 2 as const, srvStarter: true, events: [], seq: 0, ended: false }; })();
+    : (() => {
+      const x = g0 as RallyState;
+      // racket-batch6 R6-10 — the replay keeps no markers: carry the log's TT expedite
+      const ttExp = sport === 'tabletennis' ? { ttExp: ttExpediteOf(x.events, x.opening ?? 'home', x.target) } : {};
+      return { ...x, current: { home: 0, away: 0 }, games: [], gamesWon: { home: 0, away: 0 }, serving: x.opening ?? 'home', serverNo: 2 as const, srvStarter: true, events: [], seq: 0, ended: false, ...ttExp };
+    })();
   const sideOut = isRally && !!(g0 as RallyState).sideOut;
   /** who serves the next rally of `s` (the replayed state: its events hold the last rally only) */
   const nextServer = (s: GameState): Side => {
     if (sport === 'badminton') return badminton.serve(s as badminton.BadmintonState).side;
     const x = s as RallyState;
-    if (sport === 'tabletennis') return ttServer(x.current.home, x.current.away, x.games.length, x.opening ?? 'home', x.target);
+    if (sport === 'tabletennis') return ttServerOf(x);
     return rallyServingSide(x);
   };
   const total = (s: GameState) => s.games.reduce((n, g) => n + g[0] + g[1], 0) + s.current.home + s.current.away;

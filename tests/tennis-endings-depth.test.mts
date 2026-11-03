@@ -70,7 +70,7 @@ describe('ED2: older details stay as they were', () => {
   });
   test('badminton keeps its own error types', () => {
     const b = DETAIL_HOWS.badminton.find((h) => h.how === 'ue')!;
-    assert.deepEqual(b.strokes, ['net', 'out', 'fault']);
+    assert.deepEqual(b.strokes, ['net', 'out', 'fault', 'long', 'wide']); // racket-batch6 R6-1: + long / wide (old "out" read, not offered)
   });
 });
 

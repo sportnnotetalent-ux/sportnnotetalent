@@ -57,11 +57,12 @@ export function undoLabel(
   // IDs-only scoring: the player by id (an older log's stored name as the fallback)
   const nameOf: NameOf = names.player ?? ((_id, legacy) => (legacy ?? '').trim() || 'Player');
   const credited = eventWho(p, nameOf);
-  if (p.pen || p.kind === 'conduct' || p.kind === 'timeout' || p.kind === 'let' || p.kind === 'review') {
+  // racket-batch6 — "shuttle change · Home", "injury · self-inflicted · Nadal", "expedite system"
+  if (p.pen || p.kind === 'conduct' || p.kind === 'timeout' || p.kind === 'let' || p.kind === 'review' || p.kind === 'shuttle' || p.kind === 'injury' || p.kind === 'expedite') {
     const what = (p.label ?? '').trim().replace(/^./, (c) => c.toLowerCase());
     const who = p.pen ? whoName(nameOf, p.pen.playerId, p.pen.playerName) ?? name(p.pen.by)
       : credited ?? (p.kind === 'timeout' ? markDetail(p, nameOf) || name(p.side) : name(p.side));
-    head = who && p.kind !== 'let' ? `${what} · ${who}` : what;
+    head = who && p.kind !== 'let' && p.kind !== 'expedite' ? `${what} · ${who}` : what;
   } else if (p.kind === 'rally') head = `rally to ${name(p.wonBy)}${p.label ? ` · ${p.label.toLowerCase()}` : ''}`;
   else if (p.df) head = `double fault → point to ${name(p.side)}`;
   else if (p.kind === 'ace' || (p.kind === 'point' && p.pd?.how === 'ace')) head = `ace · ${credited ?? name(p.side)}`;

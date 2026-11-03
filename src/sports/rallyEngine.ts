@@ -10,6 +10,7 @@ import { pointRows, type EditRow, type PointInput } from './rallyEdit.ts';
 import { applyPointDetail, detailFlags, initDetailFlags } from './pointDetail.ts';
 import { applyRacketExtras, replayKeepingMarks, withStamps, type ConductOps } from './conduct.ts';
 import { withDoublesOrder, type DoublesOrder } from './doublesOrder.ts';
+import { ttExpediteAllowed } from './tabletennis/serve.ts';
 
 export interface RallyState {
   current: { home: number; away: number };
@@ -69,6 +70,10 @@ export interface RallyState {
    *  SET_FIRST_SERVER); absent (older matches) → the SD-06 naming (the
    *  right-court starter by score parity). Never affects the score. */
   rallyPos?: boolean;
+  /** racket-batch6 R6-10 — only on the replay copies serve stats / commentary
+   *  build (their events hold no markers): the original log's table tennis
+   *  expedite. Never on a live state (the marker in `events` is read). */
+  ttExp?: import('./tabletennis/serve').TTExpedite | null;
   events: LiveEvent[];
   seq: number;
   ended: boolean;
@@ -164,6 +169,23 @@ export function makeRallyEngine(opts: RallyEngineOpts) {
     if (a.type === 'EDIT_LOG') return replayKeepingMarks(reducer, clearMatch(s), (a.payload?.points as PointInput[]) ?? [], s.events);
     // SD-53 / SD-54 / SD-63 — conduct penalties, timeouts, squash lets
     { const x = applyRacketExtras(s, a, conductOps); if (x) return x; }
+    // racket-batch6 R6-7 / R6-8 — table tennis expedite (ITTF 2.15): a marker;
+    // who serves is derived from it (tabletennis/serve.ts ttExpediteOf). Once
+    // per match, not after the end, not once both have target − 2 (2.15.1).
+    if (a.type === 'EXPEDITE') {
+      if (opts.id !== 'tabletennis' || s.ended || s.events.some((e) => e.kind === 'expedite')) return s;
+      if (!ttExpediteAllowed(s.current.home, s.current.away, s.target)) return s;
+      const xr = a.payload?.rally === true && s.current.home + s.current.away > 0;
+      const gameNo = s.games.length + 1;
+      return {
+        ...s, seq: s.seq + 1,
+        events: [...s.events, {
+          id: s.seq + 1, stamp: `Game ${gameNo}`, game: gameNo, icon: '⏩', label: 'Expedite system',
+          detail: `from ${s.current.home}-${s.current.away} · service alternates every point · 13 good returns win the point for the receiver`,
+          kind: 'expedite', ...(xr ? { xr: true as const } : {}),
+        }],
+      };
+    }
     // SD-06 — who starts this game in the right-hand court, per team. Pre-serve
     // only (the game is still 0-0); no score effect and no timeline event.
     if (a.type === 'SET_START_RIGHT') {
