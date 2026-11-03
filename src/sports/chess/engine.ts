@@ -514,6 +514,11 @@ export function arbiterPreset(s: Pick<ChessState, 'events' | 'ended'>): { winner
   return null;
 }
 
+/** Screen sweep — the result tile a second-illegal-move loss pre-selects
+ *  (the winner's colour with the colour as it stands on the result screen). */
+export const presetPick = (preset: { winner: Side } | null, white: Side): 'white' | 'black' | null =>
+  preset ? (preset.winner === white ? 'white' : 'black') : null;
+
 /** Game points: 1 / ½ / 0. */
 export function points(s: ChessState): { home: number; away: number } {
   // SD-121 — a knockout match: every game's points (live too)

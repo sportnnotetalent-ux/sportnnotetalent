@@ -14,7 +14,7 @@ import type { Attribution, ScoreAction, SportPlugin } from '../types';
 import { Scoreboard } from '../../components/Scoreboard';
 import {
   init, reducer, points, resultString, resultSentence, scoreFor, METHOD_LABEL, isForfeit, isDoubleForfeit, clockText, parseClock,
-  DEFAULT_KO_PLAN, koPhases, koPoints, koStatus, koPhaseText, KO_PHASE_LABEL, arbiterAction, arbiterPreset, illegalCount, illegalSecs, timeControlText, type ArbiterKind,
+  DEFAULT_KO_PLAN, koPhases, koPoints, koStatus, koPhaseText, KO_PHASE_LABEL, arbiterAction, arbiterPreset, illegalCount, illegalSecs, timeControlText, presetPick, type ArbiterKind,
   type ChessMethod, type ChessState, type Side, type KoState,
 } from './engine';
 import { chessResultCredit } from './stats';
@@ -107,7 +107,8 @@ const ScoringControls: SportPlugin<ChessState>['ScoringControls'] = ({ state, di
   const preset = arbiterPreset(s);
   const presetKey = preset ? `${preset.winner}:${illegalCount(s, 'home')}:${illegalCount(s, 'away')}` : '';
   useEffect(() => {
-    if (preset && pick == null) { setPick(preset.winner === s.white ? 'white' : 'black'); setMethod(preset.method); setAuto(false); }
+    // screen sweep: the pre-select overrides an earlier pick (the banner says so); the scorer can still change it after
+    if (preset) { setPick(presetPick(preset, whiteDraft ?? s.white)); setMethod(preset.method); setNoHow(false); setAuto(false); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [presetKey]);
 
