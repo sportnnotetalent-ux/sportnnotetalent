@@ -52,6 +52,8 @@ import type { ScoreAction, LiveSettings, FormatField, Attribution } from '../typ
 import { aggPriorFromConfig, aggregateText, levelForDecider, type AggPrior } from '../aggregate.ts';
 // Perf F-15 — the format presets / options live in the light meta module.
 import { RUGBY_PRESETS, TRACK_FIELDS } from './meta.ts';
+import { readRuledOut, ruledOutField } from '../invasion/ruledOut.ts';
+import { isRestart, restartField, type RestartKind } from '../invasion/restarts.ts';
 export { RUGBY_PRESETS, TRACK_FIELDS };
 
 export type Side = 'home' | 'away';
@@ -128,7 +130,9 @@ export interface Who { id?: string; name?: string }
 export interface RugbyEvent {
   /** stable id from the action (`payload.uid`) */
   id: string;
-  type: 'try' | 'pentry' | 'kick' | 'card' | 'sub' | 'detail' | 'setpiece' | 'tally';
+  /** invasion batch 6: `ruledout` (a try ruled out — TMO or not) and
+   *  `restart` (a penalty's use / a 50:22) — only when tracked */
+  type: 'try' | 'pentry' | 'kick' | 'card' | 'sub' | 'detail' | 'setpiece' | 'tally' | 'ruledout' | 'restart';
   side: Side;
   /** playing seconds since the kick-off (the halves as actually played) */
   sec: number;
@@ -166,6 +170,10 @@ export interface RugbyEvent {
   infringement?: Infringement;
   /** a turnover's cause (optional) */
   cause?: TurnoverCause;
+  /** invasion batch 6: a ruled-out try's reason / after the TMO; a restart's kind */
+  reason?: string;
+  review?: true;
+  restart?: RestartKind;
   /** round 2 — a free kick recorded with the player asked (named or "Team (no
    *  name)"): free kicks are credited to players in a match once one was asked.
    *  An older one-tap free kick never has it, so its match never shows a false 0. */
@@ -209,6 +217,9 @@ export interface RugbyState {
   trackEntries?: boolean;
   trackPossession?: boolean;
   trackOffloads?: boolean;
+  /** invasion batch 6: "Tries ruled out" and "Penalty options & 50:22" (absent = off) */
+  trackRuledOut?: boolean;
+  trackRestarts?: boolean;
   /** deep wave — possession / territory switches (absent until the first one) */
   ball?: BallMark[];
   /** the kicking competition (`first` = the scorer's pick after the toss;
@@ -259,6 +270,8 @@ export const init = (config?: Record<string, unknown>): RugbyState => {
     rolling: bool(config?.rolling, false),
     trackDetail: bool(config?.trackDetail, false),
     ...Object.fromEntries(TRACK_FLAGS.filter((f) => bool(config?.[f], false)).map((f) => [f, true])),
+    ...(bool(config?.trackRuledOut, false) ? { trackRuledOut: true } : {}),
+    ...(bool(config?.trackRestarts, false) ? { trackRestarts: true } : {}),
     shootout: null,
     ...(aggPriorFromConfig(config) ? { agg: aggPriorFromConfig(config) } : {}),
   };
@@ -571,6 +584,14 @@ export const reducer = (s: RugbyState, a: ScoreAction): RugbyState => {
         ...(kind === 'freeKick' && a.payload?.asked === true ? { asked: true } : {}),
       });
     }
+    case 'RULED_OUT':
+      // invasion batch 6: a try ruled out — a timeline row; the score never moved
+      return side ? push(s, { type: 'ruledout', side, ...readRuledOut('rugby', a.payload) }) : s;
+    case 'RESTART': {
+      // invasion batch 6: a penalty's use (touch / scrum / tap) or a 50:22 — team only
+      const kind = a.payload?.kind;
+      return side && isRestart('rugby', kind) ? push(s, { type: 'restart', side, restart: kind }) : s;
+    }
     case 'POSSESSION':
     case 'TERRITORY': {
       // deep wave: who has the ball / whose territory from now on (a tap on the side already set changes nothing —
@@ -778,11 +799,14 @@ export const RUGBY_LIVE_SETTINGS: LiveSettings<RugbyState> = {
     { key: 'sinBinMinutes', label: 'Sin-bin', type: 'number', default: 10, min: 1, max: 10, step: 1, hint: 'minutes' },
     { key: 'trackDetail', label: 'Tackles, carries, set pieces', type: 'toggle', default: false, group: 'Stats to track' },
     ...TRACK_FIELDS,
+    ruledOutField('rugby'),
+    restartField('rugby'),
   ] as FormatField[],
   read: (s) => ({
     periodMinutes: s.periodMinutes, sinBinMinutes: s.sinBinMinutes, trackDetail: s.trackDetail,
     ...Object.fromEntries(TRACK_FLAGS.map((f) => [f, s[f] === true])),
+    trackRuledOut: s.trackRuledOut === true, trackRestarts: s.trackRestarts === true,
   }),
   // Batch 3 (defaults-invasion): the standard = a new match's (penalties on), so Reset agrees with the new-match form
-  defaults: { periodMinutes: 40, sinBinMinutes: 10, trackDetail: false, ...Object.fromEntries(TRACK_FLAGS.map((f) => [f, f === 'trackPenalties'])) },
+  defaults: { periodMinutes: 40, sinBinMinutes: 10, trackDetail: false, ...Object.fromEntries(TRACK_FLAGS.map((f) => [f, f === 'trackPenalties'])), trackRuledOut: false, trackRestarts: false },
 };

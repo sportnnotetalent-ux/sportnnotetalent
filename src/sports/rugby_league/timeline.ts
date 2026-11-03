@@ -1,5 +1,7 @@
 /** Rugby league events as timeline rows (the shared LiveTimeline), the
  *  scorer's correction list and the named Undo. PURE. */
+import { ruledOutRow } from '../invasion/ruledOut.ts';
+import { restartOnTimeline, restartRow } from '../invasion/restarts.ts';
 import type { LiveEvent } from '../liveEvents';
 import { minuteText, periodName, clockAt, pointsOf, DETAIL_LABEL, KICK_LABEL, type LeagueEvent, type LeagueState } from './engine.ts';
 import { legacyNameOf, withNames, type NameOf } from '../invasion/names.ts';
@@ -25,6 +27,10 @@ export function describeEvent(e: LeagueEvent): { icon: string; label: string; de
     }
     case 'detail':
       return { icon: e.detail === 'penalty' ? '⚖' : e.detail === 'error' ? '✋' : '📋', label: DETAIL_LABEL[e.detail ?? 'tackle'], ...(e.playerName ? { detail: e.playerName } : {}) };
+    case 'ruledout':
+      return ruledOutRow('rugby_league', e);
+    case 'restart':
+      return restartRow(e.restart ?? 'penTap');
   }
 }
 
@@ -33,7 +39,7 @@ export function describeEvent(e: LeagueEvent): { icon: string; label: string; de
  *  commentary, the stats sheet and the box. */
 export function leagueTimeline(s0: LeagueState, nameOf: NameOf = legacyNameOf): LiveEvent[] {
   const s = withNames(s0, nameOf);
-  return s.events.map((e, i) => ({ e, i })).filter(({ e }) => e.type !== 'detail').map(({ e, i }) => {
+  return s.events.map((e, i) => ({ e, i })).filter(({ e }) => e.type !== 'detail' && (e.type !== 'restart' || restartOnTimeline(e.restart))).map(({ e, i }) => {
     const d = describeEvent(e);
     const name = e.type === 'sub' ? e.secondName : e.playerName;
     return {

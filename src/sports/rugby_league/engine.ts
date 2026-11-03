@@ -43,6 +43,8 @@
 import type { ScoreAction, LiveSettings, FormatField, Attribution } from '../types';
 // Perf F-15 — the format presets / options live in the light meta module.
 import { LEAGUE_PRESETS, TRACK_FIELDS } from './meta.ts';
+import { readRuledOut, ruledOutField } from '../invasion/ruledOut.ts';
+import { isRestart, restartField, type RestartKind } from '../invasion/restarts.ts';
 export { LEAGUE_PRESETS, TRACK_FIELDS };
 
 export type Side = 'home' | 'away';
@@ -87,7 +89,9 @@ export interface Who { id?: string; name?: string }
 export interface LeagueEvent {
   /** stable id from the action (`payload.uid`) */
   id: string;
-  type: 'try' | 'pentry' | 'kick' | 'sanction' | 'sub' | 'detail';
+  /** invasion batch 6: `ruledout` (a try ruled out — Bunker or not) and
+   *  `restart` (40/20, 20/40, a goal-line drop-out, a penalty to touch / tapped) — only when tracked */
+  type: 'try' | 'pentry' | 'kick' | 'sanction' | 'sub' | 'detail' | 'ruledout' | 'restart';
   side: Side;
   /** playing seconds since the kick-off (the halves as actually played) */
   sec: number;
@@ -114,6 +118,10 @@ export interface LeagueEvent {
   /** sub: the temporarily replaced player coming back on */
   back?: boolean;
   detail?: DetailKey;
+  /** invasion batch 6: a ruled-out try's reason / after the Bunker; a restart's kind */
+  reason?: string;
+  review?: true;
+  restart?: RestartKind;
 }
 
 /* ------------------------------ six-tackle sets ------------------------------ */
@@ -240,6 +248,9 @@ export interface LeagueState {
   trackDefence?: boolean;
   trackAttack?: boolean;
   trackErrors?: boolean;
+  /** invasion batch 6: "Tries ruled out" and "Kicks & restarts" (absent = off) */
+  trackRuledOut?: boolean;
+  trackRestarts?: boolean;
   /** the six-tackle set log (absent until the first possession tap) */
   setLog?: SetMark[];
   xi?: { home?: XiStamp; away?: XiStamp };
@@ -278,6 +289,8 @@ export const init = (config?: Record<string, unknown>): LeagueState => {
     bonusTry: bool(config?.bonusTry, false),
     setTackles: Math.round(num(config?.setTackles, 6, 3)),
     ...Object.fromEntries(TRACK_FLAGS.filter((f) => bool(config?.[f], false)).map((f) => [f, true])),
+    ...(bool(config?.trackRuledOut, false) ? { trackRuledOut: true } : {}),
+    ...(bool(config?.trackRestarts, false) ? { trackRestarts: true } : {}),
   };
 };
 
@@ -573,6 +586,14 @@ export const reducer = (s: LeagueState, a: ScoreAction): LeagueState => {
       }
       return mark(s, { k: 'end', how });
     }
+    case 'RULED_OUT':
+      // invasion batch 6: a try ruled out — a timeline row; the score never moved
+      return side ? push(s, { type: 'ruledout', side, ...readRuledOut('rugby_league', a.payload) }) : s;
+    case 'RESTART': {
+      // invasion batch 6: 40/20, 20/40, a goal-line drop-out, a penalty to touch / tapped — team only
+      const kind = a.payload?.kind;
+      return side && isRestart('rugby_league', kind) ? push(s, { type: 'restart', side, restart: kind }) : s;
+    }
     case 'REMOVE_EVENT': {
       const id = String(a.payload?.id ?? '');
       const ev = s.events.find((e) => e.id === id);
@@ -670,11 +691,14 @@ export const LEAGUE_LIVE_SETTINGS: LiveSettings<LeagueState> = {
     { key: 'periodMinutes', label: 'Half length', type: 'number', default: 40, min: 1, max: 40, step: 1, hint: 'min / half' },
     { key: 'sinBinMinutes', label: 'Sin bin', type: 'number', default: 10, min: 1, max: 10, step: 1, hint: 'minutes' },
     ...TRACK_FIELDS,
+    ruledOutField('rugby_league'),
+    restartField('rugby_league'),
   ] as FormatField[],
   read: (s) => ({
     periodMinutes: s.periodMinutes, sinBinMinutes: s.sinBinMinutes,
     ...Object.fromEntries(TRACK_FLAGS.map((f) => [f, s[f] === true])),
+    trackRuledOut: s.trackRuledOut === true, trackRestarts: s.trackRestarts === true,
   }),
   // Batch 3 (defaults-invasion): the standard = a new match's (errors & penalties on), so Reset agrees
-  defaults: { periodMinutes: 40, sinBinMinutes: 10, ...Object.fromEntries(TRACK_FLAGS.map((f) => [f, f === 'trackErrors'])) },
+  defaults: { periodMinutes: 40, sinBinMinutes: 10, ...Object.fromEntries(TRACK_FLAGS.map((f) => [f, f === 'trackErrors'])), trackRuledOut: false, trackRestarts: false },
 };

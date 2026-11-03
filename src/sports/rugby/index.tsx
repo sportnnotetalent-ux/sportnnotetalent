@@ -48,6 +48,8 @@ import {
   TALLY_LABEL, TRACK_FLAGS, TRACK_KINDS, TRACK_FIELDS, INFRINGEMENTS, INFRINGEMENT_LABEL, TURNOVER_CAUSES, CAUSE_LABEL,
   type RugbyEvent, type RugbyState, type KickKind, type CardKind, type DetailKey, type Side, type TallyKind,
 } from './engine';
+import { ruledOutAction, RULED_OUT_REASONS, RULED_OUT_LABEL } from '../invasion/ruledOut';
+import { restartAction, RESTART_LABEL, UNION_RESTARTS } from '../invasion/restarts';
 import { rugbyTotals, rugbyLiveField, rugbyField, unavailable } from './totals';
 import { rugbyBox } from './box';
 import { rugbyCommentary, rugbyScopeLabel, RUGBY_FEED_TAGS } from './commentary';
@@ -116,7 +118,9 @@ type Flow =
   | { mode: 'sub'; side: Side; step: 'kind' | 'off' | 'on' | 'back'; kind?: SubKind; off?: Player | null }
   | { mode: 'detail'; side: Side; step: 'kind' | 'player'; detail?: DetailKey }
   /** deep wave: a penalty (offence) / turnover (cause) / offload — the pick and the player optional */
-  | { mode: 'tally'; side: Side; kind: TallyKind; pick?: string };
+  | { mode: 'tally'; side: Side; kind: TallyKind; pick?: string }
+  /** invasion batch 6: a try ruled out (only with the toggle on) — one tap logs it */
+  | { mode: 'ruledout'; side: Side; review?: boolean };
 
 /* -------------------------------- controls --------------------------------- */
 
@@ -249,8 +253,10 @@ const ScoringControls: SportPlugin<RugbyState>['ScoringControls'] = ({
     return [{ type: 'REMOVE_EVENT', side: e.side, payload: { id: e.id }, attribution: creditAttribution(cr.first, -1), attribution2: creditAttribution(cr.second, -1) }];
   };
   const remove = (e: RugbyEvent) => { for (const a of removalActions(e)) dispatch(a); };
+  // invasion batch 6: the "Try ruled out" button (the toggle on)
+  const ruledOutOn = s.trackRuledOut === true;
   const edit = (e: RugbyEvent) => {
-    if (e.type === 'pentry' || e.type === 'setpiece' || (e.type === 'tally' && ONE_TAP.includes(e.tally ?? 'entry'))) { remove(e); return; }
+    if (e.type === 'pentry' || e.type === 'setpiece' || e.type === 'ruledout' || e.type === 'restart' || (e.type === 'tally' && ONE_TAP.includes(e.tally ?? 'entry'))) { remove(e); return; }
     holdRemoval(removalActions(e));
     setEditAt({ sec: e.sec, psec: e.psec, period: e.period });
     setShowEdit(false);
@@ -491,6 +497,20 @@ const ScoringControls: SportPlugin<RugbyState>['ScoringControls'] = ({
           </View>
         );
       }
+      case 'ruledout':
+        return (
+          <View style={c.panel}>{head('❎ Try ruled out')}
+            <Text style={c.meta}>Why? (optional — one tap logs it; the score doesn’t move)</Text>
+            <View style={c.chips}>
+              <Chip label="After the TMO" on={!!flow.review} onPress={() => setFlow({ ...flow, review: !flow.review })} />
+            </View>
+            <View style={c.chips}>
+              {RULED_OUT_REASONS.rugby.map((r) => <Chip key={r} label={RULED_OUT_LABEL[r]} on={false} onPress={() => { fire(ruledOutAction('rugby', sd, { reason: r, review: flow.review })); setFlow(null); }} />)}
+            </View>
+            <Button label="Log it — no reason" variant="ghost" onPress={() => { fire(ruledOutAction('rugby', sd, { review: flow.review })); setFlow(null); }} />
+            <Text style={c.meta}>Already on the board? Remove the try from the timeline too.</Text>
+          </View>
+        );
       case 'detail':
         if (flow.step === 'kind') return (
           <View style={c.panel}>{head('Detail')}
@@ -558,7 +578,15 @@ const ScoringControls: SportPlugin<RugbyState>['ScoringControls'] = ({
       <Button label="🟨 Card" variant="ghost" onPress={() => setFlow({ mode: 'card', side: sd, step: 'kind' })} />
       <Button label="🔁 Sub" accessibilityLabel="Replacement" variant="ghost" onPress={() => setFlow({ mode: 'sub', side: sd, step: 'kind' })} />
       {s.trackDetail ? <Button label="📋 Detail" accessibilityLabel="Tackles, carries, set pieces" variant="ghost" onPress={() => setFlow({ mode: 'detail', side: sd, step: 'kind' })} /> : null}
+      {/* invasion batch 6: a try ruled out (TMO or not) — only with the toggle on */}
+      {ruledOutOn ? <Button label="❎ Try ruled out" accessibilityLabel={`${name(sd)} try ruled out`} variant="ghost" onPress={() => setFlow({ mode: 'ruledout', side: sd })} /> : null}
       {extras(sd)}
+      {/* invasion batch 6: what the penalty was used for, and the 50:22 — one tap, the team */}
+      {s.trackRestarts ? (
+        <View style={c.chips} accessibilityLabel={`Penalty options and kicks for ${name(sd)}`}>
+          {UNION_RESTARTS.map((k) => <Chip key={k} label={RESTART_LABEL[k]} on={false} a11y={`${RESTART_LABEL[k]}, ${name(sd)}`} onPress={() => fire(restartAction(sd, k))} />)}
+        </View>
+      ) : null}
       {live.short[sd] > 0 ? <Text style={c.short}>Playing {live.short[sd]} short</Text> : null}
     </View>
   );

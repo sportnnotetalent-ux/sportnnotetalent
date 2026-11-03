@@ -22,6 +22,7 @@ import type { StatTotalsEntry } from '../types';
 import { pct, putIf } from '../invasion/centre.ts';
 import type { FootballState } from './engine.ts';
 import { possessionPct } from './engine.ts';
+import { isSetPieceGoal } from './events.ts';
 
 type Side = 'home' | 'away';
 const SIDES = ['home', 'away'] as const;
@@ -131,6 +132,14 @@ export function footballDepthTeamStats(s: FootballState): Record<Side, Record<st
   // a tracked match with none reads 0 v 0, an untracked one has no row
   const ruledOut = (side: Side) => (s.events ?? []).filter((e) => e.type === 'nogoal' && e.side === side).length;
   if (ruledOutTracked(s)) for (const side of SIDES) out[side].goalsRuledOut = ruledOut(side);
+  // invasion batch 6: goals by situation — only once a goal carries one (an
+  // older match, or one that never picked a situation, has no row)
+  if ((s.events ?? []).some((e) => e.type === 'goal' && !!e.situation)) {
+    for (const side of SIDES) {
+      out[side].setPieceGoals = goals(side, isSetPieceGoal);
+      out[side].fastBreakGoals = goals(side, (e) => e.situation === 'fastbreak');
+    }
+  }
   return out;
 }
 

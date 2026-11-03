@@ -10,10 +10,12 @@
  * staff label, not a player. PURE.
  */
 import type { ScoreAction } from '../types';
-import type { FootballEvent, GoalType, BodyPart, ShotZone, StatEvent, StatKind, CardReason, StoppageReason } from './events.ts';
-import { isStoppageReason } from './events.ts';
+import type { FootballEvent, GoalType, BodyPart, ShotZone, StatEvent, StatKind, CardReason, StoppageReason, GoalSituation } from './events.ts';
+import { isStoppageReason, isGoalSituation, situationFits } from './events.ts';
+export { GOAL_SITUATIONS, SITUATION_LABEL } from './events.ts';
 export { STOPPAGE_REASONS, STOPPAGE_LABEL } from './events.ts';
-import type { XiStamp } from './engine.ts';
+import type { XiStamp, FootballState } from './engine.ts';
+import { MAX_CONCUSSION_SUBS } from './engine.ts';
 import { GOAL_STAT, STAT_KEY } from './totals.ts';
 
 type Side = 'home' | 'away';
@@ -22,10 +24,12 @@ export type Who = { id: string };
 const opp = (s: Side): Side => (s === 'home' ? 'away' : 'home');
 
 /** A goal by `scorer` (how it was won, the body part; deep wave: zone / big
- *  chance). `tracked` = the stat keys this match tracks (stamped on credits). */
-export const goalAction = (side: Side, scorer: Who, goalType: GoalType, o: { bodyPart?: BodyPart; zone?: ShotZone; bigChance?: boolean; tracked?: string[] } = {}): ScoreAction => ({
+ *  chance; invasion batch 6: an open-play goal's situation). `tracked` = the
+ *  stat keys this match tracks (stamped on credits). */
+export const goalAction = (side: Side, scorer: Who, goalType: GoalType, o: { bodyPart?: BodyPart; zone?: ShotZone; bigChance?: boolean; situation?: GoalSituation; tracked?: string[] } = {}): ScoreAction => ({
   type: 'GOAL', side,
-  payload: { goalType, bodyPart: o.bodyPart, pid: scorer.id, ...(o.zone ? { zone: o.zone } : {}), ...(o.bigChance ? { bigChance: true } : {}) },
+  payload: { goalType, bodyPart: o.bodyPart, pid: scorer.id, ...(o.zone ? { zone: o.zone } : {}), ...(o.bigChance ? { bigChance: true } : {}),
+    ...(isGoalSituation(o.situation) && situationFits(goalType) ? { situation: o.situation } : {}) },
   attribution: { playerId: scorer.id, stat: 'goals', extra: { shots: 1, shotsOnTarget: 1, [GOAL_STAT[goalType]]: 1 }, tracked: o.tracked },
 });
 
@@ -204,8 +208,20 @@ export function footballTrackedKeys(t: TrackFlags, deep: { keyPasses?: boolean; 
   return keys;
 }
 
-/** A substitution: who goes off / comes on, by id. */
-export const subAction = (side: Side, off: Who, on: Who): ScoreAction => ({ type: 'SUB', side, payload: { offId: off.id, onId: on.id } });
+/** Deep wave / invasion batch 6: detail on the side's latest goal, picked on
+ *  the assist panel after it is on the board. Only the keys given change
+ *  (`null` clears one). */
+export const goalDetailAction = (side: Side, d: { zone?: ShotZone | null; bigChance?: boolean; situation?: GoalSituation | null }): ScoreAction =>
+  ({ type: 'GOAL_DETAIL', side, payload: { ...d } });
+
+/** A substitution: who goes off / comes on, by id. Invasion batch 6 (IFAB):
+ *  `concussion` = a permanent concussion substitute (outside the limit). */
+export const subAction = (side: Side, off: Who, on: Who, o: { concussion?: boolean } = {}): ScoreAction =>
+  ({ type: 'SUB', side, payload: { offId: off.id, onId: on.id, ...(o.concussion ? { concussion: true } : {}) } });
+
+/** Invasion batch 6: concussion substitutes a side may still make. */
+export const concussionLeft = (s: Pick<FootballState, 'concussionSubs'>, side: Side): number =>
+  Math.max(0, MAX_CONCUSSION_SUBS - (s.concussionSubs?.[side] ?? 0));
 
 /** SD-09: a side's XI stamp (ids only — `xiOf`). */
 export const xiAction = (team: Side, stamp: XiStamp): ScoreAction => ({ type: 'XI', payload: { team, ...stamp } });

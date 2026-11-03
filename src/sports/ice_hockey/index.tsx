@@ -38,10 +38,11 @@ import {
   periodStarted, running, eventCredits, creditAttribution, goalFlagsNow, goalieAt, goalieOf, netEmpty, penaltyBox, partEnd, skatersOn, baseSkaters,
   soScore, nextShooter, needsSdPick, iceHockeyScoreLine, timeoutLeft, totalPeriods, nextIsOvertime, eventWhen, standingsUnits, ejects,
   ICE_HOCKEY_PRESETS, ICE_HOCKEY_LIVE_SETTINGS, PEN_LABEL, INFRACTIONS, STRENGTH_LABEL, LIVE_KEYS,
-  TALLY_LABEL, TRACK_FLAGS, TRACK_KINDS, TRACK_FIELDS, FLAG_KEYS, FO_ZONE_KEYS, tallyTracked, zonesTracked,
+  TALLY_LABEL, TRACK_FLAGS, TRACK_KINDS, TRACK_FIELDS, FLAG_KEYS, FO_ZONE_KEYS, tallyTracked, zonesTracked, soAction,
   type FoZone, type IceEvent, type IceHockeyState, type PenKind, type Side, type Strength, type TallyKind,
 } from './engine';
 import { iceHockeyCommentary, iceScopeLabel, ICE_FEED_TAGS } from './commentary';
+import { ruledOutAction, RULED_OUT_REASONS, RULED_OUT_LABEL } from '../invasion/ruledOut';
 import { iceHockeySheet } from './sheet';
 import { GroupedFeed } from '../GroupedFeed';
 import { StatSheetView } from '../StatSheetView';
@@ -103,7 +104,10 @@ type GoalDraft = { strength: Strength; en: boolean; scorer?: Player | null; a1?:
 type Flow =
   | { mode: 'goal'; side: Side; step: 'scorer' | 'a1' | 'a2' | 'onice'; d: GoalDraft; a2?: Player | null }
   | { mode: 'shot'; side: Side }
-  | { mode: 'pen'; side: Side; step: 'kind' | 'infraction' | 'player'; pen?: PenKind; infraction?: string }
+  // invasion batch 6: 'served' — served by a team-mate (optional; bench minor, goalie's or match penalty)
+  | { mode: 'pen'; side: Side; step: 'kind' | 'infraction' | 'player' | 'served'; pen?: PenKind; infraction?: string; who?: Player | null }
+  // invasion batch 6: a goal ruled out (only with the toggle on) — one tap logs it
+  | { mode: 'ruledout'; side: Side; review?: boolean }
   | { mode: 'ps'; side: Side; step: 'result' | 'player'; res?: 'saved' | 'missed' }
   | { mode: 'gk'; side: Side }
   | { mode: 'tally'; side: Side; kind: TallyKind }
@@ -221,11 +225,18 @@ const ScoringControls: SportPlugin<IceHockeyState>['ScoringControls'] = ({
     setFlow(null);
   };
   const psMiss = (sd: Side, p: Player | null) => { fire({ type: 'MISS', side: sd, payload: p ? { playerId: p.id } : {} }); setFlow(null); };
-  const penalty = (sd: Side, pen: PenKind, infraction: string | undefined, p: Player | null) => {
+  const penalty = (sd: Side, pen: PenKind, infraction: string | undefined, p: Player | null, served?: Player | null) => {
     const cr = credit({ type: 'pen', side: sd, pen, playerId: p?.id });
-    fire({ type: 'PEN', side: sd, payload: { pen, ...(infraction ? { infraction } : {}), ...(!cr.attribution && p ? { playerId: p.id } : {}) }, attribution: cr.attribution });
+    fire({ type: 'PEN', side: sd, payload: { pen, ...(infraction ? { infraction } : {}), ...(!cr.attribution && p ? { playerId: p.id } : {}), ...(served ? { servedId: served.id } : {}) }, attribution: cr.attribution });
     setFlow(null);
   };
+  /** invasion batch 6: who serves it — asked (optional) for a bench minor, a
+   *  goalie's penalty and a match / major + game misconduct (a team-mate sits
+   *  the time); otherwise the penalty is logged at once, as before */
+  const servedAsk = (sd: Side, pen: PenKind, p: Player | null) => pen === 'bench' || pen === 'match' || pen === 'majorGm' || (!!p && goalieOf(s, sd)?.id === p.id);
+  const penOrServe = (sd: Side, pen: PenKind, infraction: string | undefined, p: Player | null) =>
+    (servedAsk(sd, pen, p) ? setFlow({ mode: 'pen', side: sd, step: 'served', pen, infraction, who: p }) : penalty(sd, pen, infraction, p));
+  const ruledOutOn = s.trackRuledOut === true;
   const setGoalie = (sd: Side, p: Player) => { fire(keeperAction(sd, p)); setFlow(null); };
 
   const startGoal = (sd: Side) => {
@@ -314,16 +325,13 @@ const ScoringControls: SportPlugin<IceHockeyState>['ScoringControls'] = ({
                 <Text style={c.small}>Shooter (optional)</Text>
                 <PlayerGrid players={dressed(nextSide).filter((p) => p.id !== soTaker?.id)} onPick={(p) => setSoTaker(p)} />
                 {soTaker ? <Text style={c.meta}>Shooter: {soTaker.fullName}</Text> : null}
+                {/* invasion batch 6 (audit fix 14): saved and missed apart, the goalie facing it by itself (shoot-out save figures) */}
                 <View style={c.row}>
-                  <Button label="✓ Scored" color={color(nextSide)} style={c.flex} onPress={() => {
-                    dispatch({ type: 'SO', side: nextSide, payload: { scored: true }, ...(soTaker ? { attribution: { playerId: soTaker.id, stat: 'soTaken', extra: { soGoals: 1 } } } : {}) });
-                    setSoTaker(null);
-                  }} />
-                  <Button label="✗ Saved / missed" variant="ghost" style={c.flex} onPress={() => {
-                    dispatch({ type: 'SO', side: nextSide, payload: { scored: false }, ...(soTaker ? { attribution: { playerId: soTaker.id, stat: 'soTaken' } } : {}) });
-                    setSoTaker(null);
-                  }} />
+                  <Button label="✓ Scored" color={color(nextSide)} style={c.flex} onPress={() => { dispatch(soAction(nextSide, 'scored', soTaker, theGoalie(opp(nextSide)))); setSoTaker(null); }} />
+                  <Button label="🧤 Saved" variant="ghost" style={c.flex} onPress={() => { dispatch(soAction(nextSide, 'saved', soTaker, theGoalie(opp(nextSide)))); setSoTaker(null); }} />
+                  <Button label="↗ Missed" variant="ghost" style={c.flex} onPress={() => { dispatch(soAction(nextSide, 'missed', soTaker, theGoalie(opp(nextSide)))); setSoTaker(null); }} />
                 </View>
+                {theGoalie(opp(nextSide)) ? <Text style={c.meta}>Goalie: {theGoalie(opp(nextSide))!.fullName}</Text> : null}
               </>
             )}
           </View>
@@ -452,6 +460,20 @@ const ScoringControls: SportPlugin<IceHockeyState>['ScoringControls'] = ({
               skip={{ label: 'Skip shooter', onPress: () => (flow.res === 'saved' ? shot(sd, null, true) : flow.res === 'missed' ? psMiss(sd, null) : psGoal(sd, null)) }} />
           </View>
         );
+      case 'ruledout':
+        return (
+          <View style={c.panel}>{head('Goal ruled out')}
+            <Text style={c.small}>Why? (optional — one tap logs it; the score doesn’t move)</Text>
+            <View style={c.chips}>
+              <Chip label="Coach's challenge / video review" on={!!flow.review} onPress={() => setFlow({ ...flow, review: !flow.review })} />
+            </View>
+            <View style={c.chips}>
+              {RULED_OUT_REASONS.ice_hockey.map((r) => <Chip key={r} label={RULED_OUT_LABEL[r]} on={false} onPress={() => { fire(ruledOutAction('ice_hockey', sd, { reason: r, review: flow.review })); setFlow(null); }} />)}
+            </View>
+            <Button label="Log it — no reason" variant="ghost" onPress={() => { fire(ruledOutAction('ice_hockey', sd, { review: flow.review })); setFlow(null); }} />
+            <Text style={c.meta}>Already on the board? Remove the goal from the timeline too.</Text>
+          </View>
+        );
       case 'pen':
         if (flow.step === 'kind') return (
           <View style={c.panel}>{head('Penalty')}
@@ -465,16 +487,23 @@ const ScoringControls: SportPlugin<IceHockeyState>['ScoringControls'] = ({
           <View style={c.panel}>{head(PEN_LABEL[flow.pen ?? 'minor'])}
             <Text style={c.small}>Infraction (optional)</Text>
             <View style={c.chips}>
-              {INFRACTIONS.map((x) => <Chip key={x} label={x} on={false} onPress={() => (flow.pen === 'bench' ? penalty(sd, 'bench', x, null) : setFlow({ ...flow, infraction: x, step: 'player' }))} />)}
-              <Chip label="Skip" on={false} onPress={() => (flow.pen === 'bench' ? penalty(sd, 'bench', undefined, null) : setFlow({ ...flow, step: 'player' }))} />
+              {INFRACTIONS.map((x) => <Chip key={x} label={x} on={false} onPress={() => (flow.pen === 'bench' ? penOrServe(sd, 'bench', x, null) : setFlow({ ...flow, infraction: x, step: 'player' }))} />)}
+              <Chip label="Skip" on={false} onPress={() => (flow.pen === 'bench' ? penOrServe(sd, 'bench', undefined, null) : setFlow({ ...flow, step: 'player' }))} />
             </View>
+          </View>
+        );
+        if (flow.step === 'served') return (
+          <View style={c.panel}>{head(`${PEN_LABEL[flow.pen ?? 'minor']} · served by`)}
+            <Text style={c.small}>Served by (optional) — the team-mate who sits in the box</Text>
+            <PlayerGrid players={skatersOf(sd).filter((p) => p.id !== flow.who?.id)} onPick={(p) => penalty(sd, flow.pen ?? 'minor', flow.infraction, flow.who ?? null, p)}
+              skip={{ label: 'Skip', onPress: () => penalty(sd, flow.pen ?? 'minor', flow.infraction, flow.who ?? null) }} />
           </View>
         );
         return (
           <View style={c.panel}>{head(`${PEN_LABEL[flow.pen ?? 'minor']}${flow.infraction ? ` · ${flow.infraction.toLowerCase()}` : ''}`)}
             <Text style={c.small}>Who?</Text>
-            <PlayerGrid players={dressed(sd)} onPick={(p) => penalty(sd, flow.pen ?? 'minor', flow.infraction, p)}
-              skip={{ label: 'Bench / team', onPress: () => penalty(sd, flow.pen === 'minor' ? 'bench' : flow.pen ?? 'bench', flow.infraction, null) }} />
+            <PlayerGrid players={dressed(sd)} onPick={(p) => penOrServe(sd, flow.pen ?? 'minor', flow.infraction, p)}
+              skip={{ label: 'Bench / team', onPress: () => penOrServe(sd, flow.pen === 'minor' ? 'bench' : flow.pen ?? 'bench', flow.infraction, null) }} />
             {flow.pen === 'match' || flow.pen === 'majorGm' ? <Text style={c.meta}>A team-mate serves the 5 minutes; the player is out of the game.</Text> : null}
           </View>
         );
@@ -555,6 +584,7 @@ const ScoringControls: SportPlugin<IceHockeyState>['ScoringControls'] = ({
         <Button label="🎯 Shot" accessibilityLabel={`Shot on goal by ${name(sd)}`} variant="ghost" disabled={!periodStarted(s)} onPress={() => setFlow({ mode: 'shot', side: sd })} />
         <Button label="⏱ Penalty" variant="ghost" onPress={() => setFlow({ mode: 'pen', side: sd, step: 'kind' })} />
         <Button label="⭕ Penalty shot" variant="ghost" disabled={!periodStarted(s)} onPress={() => setFlow({ mode: 'ps', side: sd, step: 'result' })} />
+        {ruledOutOn ? <Button label="❎ Goal ruled out" accessibilityLabel={`${name(sd)} goal ruled out`} variant="ghost" disabled={!periodStarted(s)} onPress={() => setFlow({ mode: 'ruledout', side: sd })} /> : null}
         <Button label={pulled[sd] ? '🔙 Goalie back' : '🥅 Pull goalie'} accessibilityLabel={pulled[sd] ? `${name(sd)} goalie back in net` : `${name(sd)} pull the goalie for an extra skater`}
           variant="ghost" onPress={() => fire({ type: pulled[sd] ? 'BACK' : 'PULL', side: sd })} />
         <Button label={`⏸ Time-out · ${toLeft}`} accessibilityLabel={`Team time-out for ${name(sd)}, ${toLeft} left`} variant="ghost" disabled={toLeft === 0 || !periodStarted(s)} onPress={() => fire({ type: 'TIMEOUT', side: sd })} />

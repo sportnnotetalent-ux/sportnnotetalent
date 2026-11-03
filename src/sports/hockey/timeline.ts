@@ -4,6 +4,7 @@ import type { LiveEvent } from '../liveEvents';
 import { shootoutOrderRows } from '../shootoutOrder.ts';
 import { minuteText, periodName, PC_RESULT_LABEL, type HockeyEvent, type HockeyState } from './engine.ts';
 import { legacyNameOf, withNames, type NameOf } from '../invasion/names.ts';
+import { ruledOutRow } from '../invasion/ruledOut.ts';
 
 export const GOAL_LABEL = { field: 'Field goal', pc: 'Penalty-corner goal', stroke: 'Penalty-stroke goal' } as const;
 const CARD_ICON = { green: '🟩', yellow: '🟨', red: '🟥' } as const;
@@ -33,6 +34,8 @@ export function describeEvent(e: HockeyEvent, saver?: string): { icon: string; l
       return { icon: '🧤', label: 'Goalkeeper', detail: e.playerName };
     case 'referral':
       return { icon: '📺', label: `Video referral — ${e.upheld ? 'upheld' : 'not upheld'}` };
+    case 'ruledout':
+      return ruledOutRow('hockey', e);
   }
 }
 

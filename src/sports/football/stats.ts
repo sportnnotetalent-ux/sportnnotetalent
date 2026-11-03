@@ -54,6 +54,10 @@ export const footballStats: SportStatSchema<'football'> = {
     { key: 'penKicksTaken', label: 'Shootout kicks taken', short: 'shootout kicks', one: 'shootout kick', compact: 'SO kicks', group: 'attack', coverage: 'keyed' },
     { key: 'penKicksScored', label: 'Shootout kicks scored', short: 'shootout goals', one: 'shootout goal', compact: 'SO scored', group: 'attack', coverage: 'keyed' },
     { key: 'shootoutSaves', label: 'Shootout saves', short: 'shootout saves', one: 'shootout save', compact: 'SO saves', group: 'goalkeeping', coverage: 'keyed' },
+    // invasion batch 6 (batch 5 not done): the foul that gave away a penalty
+    // (the penalty flow's "Who gave it away?") — keyed: only the conceding
+    // player's line carries it (written by statTotals)
+    { key: 'penaltiesGivenAway', label: 'Penalties conceded', short: 'penalties conceded', one: 'penalty conceded', abbr: 'PC', group: 'discipline', format: { unit: 'count', better: 'lower' }, coverage: 'keyed' }, // (the rugby codes' key and labels)
     // SD-09 keeper lines (statTotals): goals let in
     { key: 'goalsConceded', label: 'Goals conceded', short: 'conceded', group: 'goalkeeping', format: { unit: 'count', better: 'lower' }, coverage: 'present' },
     // SD-29: minutes on the pitch for every player (statTotals; regulation
@@ -127,6 +131,9 @@ export const footballStats: SportStatSchema<'football'> = {
     { key: 'goalKicks', label: 'Goal kicks', short: 'goal kicks', one: 'goal kick', source: 'team' },
     { key: 'throwIns', label: 'Throw-ins', short: 'throw-ins', one: 'throw-in', source: 'team' },
     { key: 'goalsRuledOut', label: 'Goals ruled out', short: 'goals ruled out', one: 'goal ruled out', source: 'team' },
+    // invasion batch 6: goals by situation (only once a goal carries one)
+    { key: 'setPieceGoals', label: 'Goals from set pieces', short: 'set-piece goals', one: 'set-piece goal', source: 'team' },
+    { key: 'fastBreakGoals', label: 'Fast break goals', short: 'fast break goals', one: 'fast break goal', abbr: 'FBG', source: 'team' }, // (labels as handball's)
   ],
   filters: {
     withMinutes: (l) => Number(l.stats?.minutes) > 0,
@@ -149,7 +156,7 @@ export const footballStats: SportStatSchema<'football'> = {
     // SD-39 — leads the career when most of the player's games were in goal
     { id: 'goalkeeping', title: 'Goalkeeping', leadWhen: 'keeper', rows: [{ stat: 'keeperApps' }, { stat: 'cleanSheets' }, { stat: 'saves' }, { stat: 'goalsConceded' }, { stat: 'savePct' }, { stat: 'concededPerGame' }, { stat: 'concededPer90' }, { stat: 'shootoutSaves', hideZero: true }] },
     { id: 'bests', title: 'Bests', rows: [{ stat: 'mostGoals', label: 'Most goals (match)', hideZero: true }, { stat: 'hatTricks', hideZero: true }] },
-    { id: 'discipline', title: 'Discipline', rows: [{ stat: 'fouls' }, { stat: 'offsides' }, { stat: 'handballs' }, { stat: 'yellowCards' }, { stat: 'redCards' }, { stat: 'sinBins' }, { stat: 'ownGoals', hideZero: true }] },
+    { id: 'discipline', title: 'Discipline', rows: [{ stat: 'fouls' }, { stat: 'penaltiesGivenAway', hideZero: true }, { stat: 'offsides' }, { stat: 'handballs' }, { stat: 'yellowCards' }, { stat: 'redCards' }, { stat: 'sinBins' }, { stat: 'ownGoals', hideZero: true }] },
   ],
   careerView: 'sections',
   // SD-23 (FB-09) — the per-player match table: Opta / FIFA match report order
@@ -201,7 +208,7 @@ export const footballCentre: CentreCategory[] = [
   ] },
   { id: 'attack', label: 'Attack', rows: [
     'shots', 'shotsOnTarget', 'shotsOffTarget', 'blockedShots', 'woodwork', 'shotsInBox', 'shotsOutBox', 'bigChances', 'bigChancesMissed',
-    'penaltiesTaken', { key: 'penaltyGoals', label: 'Penalties scored' }, 'offsides', 'goalsRuledOut', 'attackingContributions',
+    'penaltiesTaken', { key: 'penaltyGoals', label: 'Penalties scored' }, 'setPieceGoals', 'fastBreakGoals', 'offsides', 'goalsRuledOut', 'attackingContributions',
   ] },
   { id: 'passing', label: 'Passing', rows: [{ key: 'possession', overallOnly: true }, 'passes', 'passAccuracy', 'keyPasses', 'crosses', 'dribbles'] },
   { id: 'defence', label: 'Defence', rows: ['tackles', 'interceptions', 'clearances', 'defensiveContributions'] },

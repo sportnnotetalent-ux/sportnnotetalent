@@ -5,6 +5,7 @@
  * PURE (no React Native): the sport list is in the first download.
  */
 import type { FormatField, SportMeta } from '../types';
+import { ruledOutField } from '../invasion/ruledOut.ts';
 
 export const ICE_HOCKEY_PRESETS: Record<string, { label: string; set: Record<string, number | string | boolean> }> = {
   iihf: { label: 'IIHF 3 × 20', set: { periodMinutes: 20, skaters: 5, otMinutes: 5, otSkaters: 3, poOtMinutes: 10, poOtSkaters: 3, poShootout: true, soRounds: 5, pimScale: 'iihf' } },
@@ -58,6 +59,8 @@ export const ICE_HOCKEY_META: SportMeta = {
     { key: 'stopClock', label: 'Stop the clock on goals and penalties', type: 'toggle', default: true, advanced: true },
     { key: 'plusMinus', label: 'Track +/- (pick who was on the ice at each goal)', type: 'toggle', default: false, advanced: true },
     ...TRACK_FIELDS.map((f) => ({ ...f, advanced: true })),
+    // invasion batch 6: goal / try ruled out (off by default)
+    { ...ruledOutField('ice_hockey'), advanced: true },
     { key: 'allowTies', label: 'League games may end tied (no overtime)', type: 'toggle', default: false, advanced: true, hint: 'groups otherwise play overtime + a shoot-out' },
   ],
 };

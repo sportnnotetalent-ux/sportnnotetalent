@@ -5,6 +5,8 @@
  * PURE (no React Native): the sport list is in the first download.
  */
 import type { FormatField, SportMeta } from '../types';
+import { ruledOutField } from '../invasion/ruledOut.ts';
+import { restartField } from '../invasion/restarts.ts';
 
 export const RUGBY_PRESETS: Record<string, { label: string; set: Record<string, number | string | boolean> }> = {
   senior: { label: '15s · 2 × 40', set: { variant: '15s', playersPerSide: 15, periodMinutes: 40, sinBinMinutes: 10, maxSubs: 8, rolling: false, etMinutes: 10, sdMinutes: 10 } },
@@ -47,6 +49,10 @@ export const RUGBY_META: SportMeta = {
     { key: 'red20', label: '20-minute red card (World Rugby trial)', type: 'toggle', default: false, advanced: true, hint: 'the scorer can give a 20-minute red: replaceable after 20 minutes; two yellows = a 20-minute red' },
     { key: 'trackDetail', label: 'Track tackles, carries and set pieces', type: 'toggle', default: false, advanced: true },
     ...TRACK_FIELDS.map((f) => ({ ...f, advanced: true })),
+    // invasion batch 6: goal / try ruled out (off by default)
+    { ...ruledOutField('rugby'), advanced: true },
+    // invasion batch 6: restart and penalty-use depth (off by default)
+    { ...restartField('rugby'), advanced: true },
     {
       key: 'decider', label: 'If level at full time', type: 'choice', default: 'none',
       options: [

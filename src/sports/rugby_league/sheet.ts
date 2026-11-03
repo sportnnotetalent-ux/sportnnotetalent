@@ -21,6 +21,8 @@ import {
 } from './engine.ts';
 import { setFigures } from './sets.ts';
 import { countRow, decRow, madeRow, section, shareRow, sheet, timeRow, type StatSheet } from '../compareSheet.ts';
+import { ruledOutTracked } from '../invasion/ruledOut.ts';
+import { restartSection } from '../invasion/restarts.ts';
 
 const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
 
@@ -57,6 +59,7 @@ export function leagueSheet(s: LeagueState, scope: 'all' | number = 'all', nowSe
   const ends = (k: keyof NonNullable<typeof SH>['ends'], label: string, lowerBetter = false) =>
     SH && SA && (SH.ends[k] || SA.ends[k]) && countRow(`end:${k}`, label, SH.ends[k], SA.ends[k], lowerBetter ? { lowerBetter: true } : undefined);
   const bin = { h: sinBinTime(s, 'home', scope, nowSec), a: sinBinTime(s, 'away', scope, nowSec) };
+  const ruled = (sd: Side) => s.events.filter((e) => e.type === 'ruledout' && e.side === sd && (scope === 'all' || e.period === scope)).length;
   const n = Math.min(totalPeriods(s), Math.max(1, s.period));
   const ptsIn = (sd: Side, p: number) => teamFigures(s, sd, p).points;
   const gps = s.plan.slice(0, n).filter((x) => x === 'gp').length;
@@ -74,7 +77,11 @@ export function leagueSheet(s: LeagueState, scope: 'all' | number = 'all', nowSe
       madeRow('fieldGoals', 'Field goals', H.fieldGoals, H.fieldGoalAttempts, A.fieldGoals, A.fieldGoalAttempts),
       (H.twoPointFieldGoals || A.twoPointFieldGoals) && countRow('twoPointFieldGoals', '2-point field goals', H.twoPointFieldGoals, A.twoPointFieldGoals),
       madeRow('goalKicking', 'Goal kicking', H.conversions + H.penGoals, H.conversionAttempts + H.penGoalAttempts, A.conversions + A.penGoals, A.conversionAttempts + A.penGoalAttempts),
+      // invasion batch 6: only a match that tracked them (the toggle, or one logged)
+      ruledOutTracked(s.trackRuledOut, s.events) && countRow('triesRuledOut', 'Tries ruled out', ruled('home'), ruled('away')),
     ]),
+    // invasion batch 6: kicks & restarts (only a match that tracked them)
+    restartSection('rugby_league', s, scope),
     SH && SA && section('sets', 'Sets & completions', [
       countRow('sets', 'Sets', SH.sets, SA.sets),
       madeRow('completion', 'Completed sets', SH.completed, SH.decided, SA.completed, SA.decided),

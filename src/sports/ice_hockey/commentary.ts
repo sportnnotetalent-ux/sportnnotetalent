@@ -12,6 +12,7 @@ import {
 } from './engine.ts';
 import { andList, groupLines, newestFirst, scoreText, type FeedGroup, type FeedLine } from '../feedGroups.ts';
 import { legacyNameOf, withNames, type NameOf } from '../invasion/names.ts';
+import { ruledOutText } from '../invasion/ruledOut.ts';
 
 const other = (s: Side): Side => (s === 'home' ? 'away' : 'home');
 const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
@@ -43,7 +44,9 @@ export function sentence(s: IceHockeyState, e: IceEvent, names: Names, coinciden
       const after = coincident?.has(e.id) ? ' Coincident penalties — no power play.'
         : manpower ? ` ${opp} on the power play.` : '';
       const out = ejects(k) ? ` ${e.playerName ?? 'The player'} is out of the game.` : '';
-      return { icon: k === 'major' || k === 'majorGm' ? '🟥' : ejects(k) ? '🚫' : '⏱', text: `${who} (${team}) — ${what}.${after}${out}`, key: k !== 'minor' && k !== 'bench' && k !== 'misconduct' ? true : undefined, tags: ['pen'] };
+      // invasion batch 6: served by a team-mate
+      const served = e.servedId || e.servedName ? ` Served by ${e.servedName ?? 'a team-mate'}.` : '';
+      return { icon: k === 'major' || k === 'majorGm' ? '🟥' : ejects(k) ? '🚫' : '⏱', text: `${who} (${team}) — ${what}.${served}${after}${out}`, key: k !== 'minor' && k !== 'bench' && k !== 'misconduct' ? true : undefined, tags: ['pen'] };
     }
     case 'gk':
       return { icon: '🧤', text: `${e.playerName ?? 'A new goalie'} in goal for ${team}.`, tags: ['play'] };
@@ -53,6 +56,8 @@ export function sentence(s: IceHockeyState, e: IceEvent, names: Names, coinciden
       return { icon: '🧤', text: `${team} goalie back in the net.`, tags: ['play'] };
     case 'timeout':
       return { icon: '⏸', text: `Time-out, ${team}.`, tags: ['play'] };
+    case 'ruledout':
+      return { icon: '❎', text: ruledOutText('ice_hockey', team, e), key: true, tags: ['goal'] };
     case 'tally': {
       const who = e.playerName ? `${e.playerName} (${team})` : team;
       switch (e.tally) {
@@ -127,7 +132,11 @@ export function iceHockeyCommentary(s0: IceHockeyState, names: Names, nameOf: Na
       const shot = so[side][k];
       if (shot.scored) run[side] += 1;
       const who = shot.playerName ? `${shot.playerName} (${names[side]})` : names[side];
-      const verb = shot.scored ? (shot.playerName ? 'scores' : 'score') : (shot.playerName ? 'is stopped' : 'are stopped');
+      // invasion batch 6: saved (by the goalie) / missed, when the scorer said which
+      const verb = shot.scored ? (shot.playerName ? 'scores' : 'score')
+        : shot.outcome === 'saved' ? `${shot.playerName ? 'is' : 'are'} denied — saved by ${shot.gkName ?? `the ${names[other(side)]} goalie`}`
+        : shot.outcome === 'missed' ? `${shot.playerName ? 'misses' : 'miss'} the net`
+        : (shot.playerName ? 'is stopped' : 'are stopped');
       return {
         id: `so-${side}-${k}`, when: `#${k + 1}`, icon: shot.scored ? '🚨' : '🧤', side, tags: ['goal'],
         text: `${who} ${verb}${k >= s.soRounds ? ' — sudden death' : ''}.`,

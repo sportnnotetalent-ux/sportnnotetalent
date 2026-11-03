@@ -89,6 +89,9 @@ export const iceHockeyStats: SportStatSchema<'ice_hockey'> = {
     // shoot-out (never counted as goals)
     { key: 'soGoals', label: 'Shoot-out goals', short: 'shoot-out goals', one: 'shoot-out goal', group: 'shootout' },
     { key: 'soTaken', label: 'Shoot-out attempts', short: 'shoot-out attempts', one: 'shoot-out attempt', group: 'shootout' },
+    // invasion batch 6: goalies in the shoot-out (keyed: only a goalie who faced an attempt, new logs)
+    { key: 'soShotsFaced', label: 'Shoot-out attempts faced', short: 'shoot-out attempts faced', one: 'shoot-out attempt faced', group: 'shootout', coverage: 'keyed' },
+    { key: 'soSaves', label: 'Shoot-out saves', short: 'shoot-out saves', one: 'shoot-out save', compact: 'SO saves', group: 'shootout', coverage: 'keyed' },
     // career rates and bests
     { key: 'pointsPerGame', label: 'Points per game', short: 'points per game', source: 'derived', group: 'scoring', format: { unit: 'decimal', dp: 2 },
       agg: { kind: 'perGame', key: 'points', dp: 2, qualifier: q2 }, tieBreak: [{ key: 'points', better: 'higher' }] },
@@ -141,7 +144,7 @@ export const iceHockeyStats: SportStatSchema<'ice_hockey'> = {
       ...ZONES.flatMap((z) => [{ stat: `faceoffs${z.sfx}`, label: `${z.word} zone (won-lost)` }, { stat: `faceoffPct${z.sfx}`, label: `FO% · ${z.word.toLowerCase()} zone` }]),
     ] },
     { id: 'physical', title: 'Hits, blocks & puck battles', rows: [{ stat: 'checks' }, { stat: 'shotBlocks' }, { stat: 'takeaways' }, { stat: 'giveaways' }, { stat: 'missedShots' }] },
-    { id: 'shootout', title: 'Shoot-outs', rows: [{ stat: 'soGoals', hideZero: true }, { stat: 'soTaken', hideZero: true }, { stat: 'soConversion' }] },
+    { id: 'shootout', title: 'Shoot-outs', rows: [{ stat: 'soGoals', hideZero: true }, { stat: 'soTaken', hideZero: true }, { stat: 'soConversion' }, { stat: 'soSaves', hideZero: true }, { stat: 'soShotsFaced', hideZero: true }] },
     { id: 'bests', title: 'Bests', rows: [
       { stat: 'mostGoals', label: 'Most goals (match)', hideZero: true }, { stat: 'hatTricks', hideZero: true }, { stat: 'mostSaves', label: 'Most saves (match)', hideZero: true },
     ] },

@@ -96,8 +96,21 @@ export function shootoutTotals(s: FootballState): Record<string, StatTotalsEntry
   return out;
 }
 
+/** Invasion batch 6 (batch 5 not done): fouls that gave away a penalty —
+ *  keyed: only on the conceding player's line (the foul's `pen` flag, new logs). */
+export const PEN_CONCEDED_KEYS = ['penaltiesGivenAway'] as const;
+export function penaltyConcededTotals(s: FootballState): Record<string, StatTotalsEntry> {
+  const out: Record<string, StatTotalsEntry> = {};
+  for (const e of s.stats ?? []) {
+    if (e.kind !== 'foul' || e.pen !== true || !e.playerId) continue;
+    const l = (out[e.playerId] ?? (out[e.playerId] = { side: e.side, stats: {} })).stats;
+    l.penaltiesGivenAway = (l.penaltiesGivenAway ?? 0) + 1;
+  }
+  return out;
+}
+
 /** Owned here but never credited live (deep wave: the shot-detail keys). */
-export const FOOTBALL_DERIVED_KEYS = ['headedGoals', 'ownGoals', 'minutes', 'cleanSheets', 'goalsConceded', ...SHOOTOUT_KEYS, ...SHOT_DETAIL_KEYS] as const;
+export const FOOTBALL_DERIVED_KEYS = ['headedGoals', 'ownGoals', 'minutes', 'cleanSheets', 'goalsConceded', ...SHOOTOUT_KEYS, ...SHOT_DETAIL_KEYS, ...PEN_CONCEDED_KEYS] as const;
 
 /** name → id per side, from every id / name pair the state and ctx hold. A
  *  name seen with two different ids on one side is ambiguous (no id). */
@@ -205,4 +218,4 @@ export function footballBoxTotals(s: FootballState, ctx?: StatTotalsContext): Re
  *  SD-09 keeper clean sheets / goals conceded. */
 export const footballStatTotals = (s: FootballState, ctx?: StatTotalsContext): Record<string, StatTotalsEntry> =>
   // deep wave: + the shot-detail keys (only a match that tracked them)
-  mergeTotals(mergeTotals(footballBoxTotals(s, ctx), footballTotals(s)), footballShotDetailTotals(s));
+  mergeTotals(mergeTotals(mergeTotals(footballBoxTotals(s, ctx), footballTotals(s)), footballShotDetailTotals(s)), penaltyConcededTotals(s));

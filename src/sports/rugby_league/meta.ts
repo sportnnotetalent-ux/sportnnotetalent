@@ -5,6 +5,8 @@
  * PURE (no React Native): the sport list is in the first download.
  */
 import type { FormatField, SportMeta } from '../types';
+import { ruledOutField } from '../invasion/ruledOut.ts';
+import { restartField } from '../invasion/restarts.ts';
 
 /** Format presets. Junior / school halves are house values (organiser-editable;
  *  check your league's age-grade rules). Nines: Rugby League Nines 9-a-side,
@@ -47,6 +49,10 @@ export const RUGBY_LEAGUE_META: SportMeta = {
     { key: 'fg2', label: 'Two-point field goal from 40 m (NRL)', type: 'toggle', default: false, advanced: true, hint: 'a successful field goal asks 1 or 2 points' },
     { key: 'bonusTry', label: 'Bonus try zone (Nines)', type: 'toggle', default: false, advanced: true, hint: 'a try under the posts is worth 5 — the try asks which' },
     ...TRACK_FIELDS.map((f) => ({ ...f, advanced: true })),
+    // invasion batch 6: goal / try ruled out (off by default)
+    { ...ruledOutField('rugby_league'), advanced: true },
+    // invasion batch 6: restart and penalty-use depth (off by default)
+    { ...restartField('rugby_league'), advanced: true },
     {
       key: 'decider', label: 'If level at full time', type: 'choice', default: 'none',
       options: [

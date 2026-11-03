@@ -6,7 +6,8 @@
  *   "penalty goal Rao" / "penalty goal missed Rao"
  *   "field goal Rao" / "drop goal Rao" / "one pointer Rao" / "two point field goal Rao" (with the NRL option on)
  *   "sin bin Rao" / "send off Rao" / "on report Rao"
- *   with six-tackle sets: "tackle", "six again", "knock on" / "error", "kick"
+ *   with six-tackle sets: "tackle", "six again", "knock on" / "error", "kick",
+ *     "penalty to the attack" / "penalty won" (a penalty to the side with the ball)
  *   "end half" / "full time" (full time only when it really is — `leagueVoiceEnds`)
  */
 import type { ScoreAction, VoiceContext, VoiceEnding } from '../types';
@@ -47,6 +48,11 @@ export function leagueVoice(text: string, ctx: VoiceContext): ScoreAction[] | nu
     if (/^(six again|set restart)$/.test(q)) return [{ type: 'SET_END', payload: { how: 'restart', ...stamp() } }];
     if (/^(knock ?on|error|forward pass)$/.test(q)) return [{ type: 'SET_END', payload: { how: 'error', ...stamp() } }];
     if (/^(kick|last tackle kick)$/.test(q)) return [{ type: 'SET_END', payload: { how: 'kick', ...stamp() } }];
+    // invasion batch 6 (batch 5 not done): a penalty to the side with the ball — the
+    // defence's penalty conceded (with "Errors & penalties" on, the team's, as the button with no name)
+    if (/^(penalty to (the )?(attack|attacking side|side with the ball|ball)|penalty with the ball|penalty won)$/.test(q)) {
+      return [{ type: 'SET_END', payload: { how: 'penWon', ...(s.trackErrors === true ? { detail: 'penalty' } : {}), ...stamp() } }];
+    }
   }
   // the command words never name a player ("send off" ⊃ "Sen"; "two point field goal Rao": the 2 isn't a shirt number)
   const twoSaid = /\b(two|2) ?-? ?point(er)?s?\b/i.test(q);

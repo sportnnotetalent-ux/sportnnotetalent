@@ -14,6 +14,8 @@ import {
 import { setFigures } from './sets.ts';
 import { groupLines, newestFirst, scoreText, type FeedGroup, type FeedLine } from '../feedGroups.ts';
 import { legacyNameOf, withNames, type NameOf } from '../invasion/names.ts';
+import { ruledOutText } from '../invasion/ruledOut.ts';
+import { restartOnTimeline, restartRow, restartText } from '../invasion/restarts.ts';
 
 const other = (s: Side): Side => (s === 'home' ? 'away' : 'home');
 const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
@@ -67,6 +69,12 @@ export function sentence(s: LeagueState, e: LeagueEvent, names: Names): { text: 
       if (d === 'error') return { icon: '✋', tags: ['disc'], text: `Error by ${who}.` };
       if (d === 'penalty') return { icon: '⚖', tags: ['disc'], text: `Penalty conceded by ${who}.` };
       return { icon: '📋', tags: ['detail'], text: `${DETAIL_LABEL[d]} by ${who}.` };
+    }
+    case 'ruledout':
+      return { icon: '❎', key: true, tags: ['score'], text: ruledOutText('rugby_league', team, e) };
+    case 'restart': {
+      const k = e.restart ?? 'penTap';
+      return { icon: restartRow(k).icon, tags: ['sets'], ...(restartOnTimeline(k) ? { key: true } : {}), text: restartText(k, team, names[e.side === 'home' ? 'away' : 'home']) };
     }
   }
 }
