@@ -13,6 +13,12 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-04 — A clean age & guardian card; every tap and scoring step visibly captured
+
+- **Verification card** (`docs/security/breaks/verification-card.md`): the Profile card is now compact — title, status chip (Verified / Pending / Rejected / Not started), one line on what to do next, "Details ›", and Upload / Re-submit only when the owner must act. "Details ›" opens the new **VerificationDetails** screen (`src/screens/VerificationDetailsScreen.tsx`) with the explanation, upload / re-submit, the latest support note and the full history; support reviewers act there. Who may open it is unchanged (the player's own login — a guardian-managed young player's account included — and support). Shared upload hook `src/data/useVerificationUpload.ts`.
+- **Tap feedback** (`docs/security/breaks/tap-feedback.md`): Button, SelectChip, the point buttons and secondary actions press in (scale 0.97 / dim, 80–120 ms); a chip fades into its selected look. Every scoring step in every sport goes through one wrapper (`scoreDispatch`): when the state really changed — a light buzz on phones (haptics preference; never web), a lime pulse and ✓ badge on the Undo bar, and the changed score pops; a refused / no-op tap shows nothing. Reduce Motion: a static ✓, no motion. `src/core/tapCapture.ts`, `src/components/pressFeedback.tsx`.
+Full suite: all pass except two load-sensitive timing tests (pool replay speed, student-lists sim) that pass alone (52/52); tsc clean. Demo-checked: a badminton point names itself on Undo and the ✓ badge appears on the bar, then clears.
+
 ### 2026-11-04 — Release: shared scoring + Your sports live; SQL run (web, Android OTA)
 
 The founder ran both SQL files; checked read-only: `matches.shared_scoring` exists, the 6 test teams and 5 test tournaments are gone (tournaments left: Hrudhay's 5 a side Hyd Tournament, Inter-School Championship 2026). Full suite 7,193 tests, 0 failing; auth-smoke passed. Published from a clean worktree at 6048cb2: web (entry `index-14a10f8d`, confirmed live on app.sportnnote.in) and Android OTA groups `047d5c3d` (preview) and `27126fe1` (production), runtime 1.0.0.
