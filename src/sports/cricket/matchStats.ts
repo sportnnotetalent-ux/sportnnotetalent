@@ -20,7 +20,7 @@ import { withNames } from './names.ts';
 import { legacyNameOf, type NameOf } from '../../core/playerNames.ts';
 import { phasePlan, phaseOf, PHASES, type Phase, type PhaseFilter } from './phases.ts';
 import {
-  detailByRec, isDeliveryRec, recStamp, isPace, LENGTHS, LINES, BOWL_TYPE_LABEL, WIDE_WHY, NB_WHY, WIDE_WHY_LABEL, NB_WHY_LABEL, extraWhyOf,
+  detailByRec, isDeliveryRec, isPitchTag, recStamp, isPace, LENGTHS, LINES, BOWL_TYPE_LABEL, WIDE_WHY, NB_WHY, WIDE_WHY_LABEL, NB_WHY_LABEL, extraWhyOf,
   type BallDetailRec, type BowlType, type Length, type Line, type WideWhy, type NbWhy,
 } from './detail.ts';
 import { partnerships, overHistory, boundaryOf } from './scorecard.ts';
@@ -103,10 +103,10 @@ export function teamBatting(s: CricketState, side: Side, f: PhaseFilter = 'all')
       c.balls += 1;
       if (d?.ctrl) { c.falseShots += 1; c[d.ctrl] += 1; }
     }
-    if (r.trk?.pitch || d?.len || d?.line) {
+    if (r.trk?.pitch || isPitchTag(d, r)) {
       const p = (t.pitch ??= { tagged: 0, deliveries: 0, lengths: zeroes(LENGTHS), lines: zeroes(LINES) });
       p.deliveries += 1;
-      if (d?.len || d?.line) p.tagged += 1;
+      if (isPitchTag(d, r)) p.tagged += 1;
       if (d?.len) p.lengths[d.len] += 1;
       if (d?.line) p.lines[d.line] += 1;
     }
@@ -486,7 +486,7 @@ export interface PitchDot { len?: Length; line?: Line; tone: 'wicket' | 'boundar
 /** The tagged deliveries bowled at `side`'s innings (optionally one bowler's). */
 export function pitchDots(s: CricketState, side: Side, bowlerId?: string): PitchDot[] {
   return inningsRecs(s, side)
-    .filter((j) => isDeliveryRec(j.r) && (j.d?.len || j.d?.line) && (!bowlerId || j.r.bowlerId === bowlerId))
+    .filter((j) => isDeliveryRec(j.r) && isPitchTag(j.d, j.r) && (!bowlerId || j.r.bowlerId === bowlerId))
     .map(({ r, d }) => ({
       len: d!.len, line: d!.line, bowlerId: r.bowlerId, ...(d!.kph ? { kph: d!.kph } : {}),
       tone: wicketFor(r) ? 'wicket' : boundaryOf(r) ? 'boundary' : r.ext ? 'extra' : r.bat > 0 ? 'run' : 'dot',
@@ -561,8 +561,10 @@ export function inningsTop(s0: CricketState, side: Side, n = 3, nameOf: NameOf =
 /** Does the match carry any of the optional detail (for the Stats tab's chips)? */
 export function trackedKinds(s: CricketState): { pitch: boolean; control: boolean; speed: boolean; types: boolean; shots: boolean } {
   const log = s.log ?? [];
+  // batch 6 (C9) — a lone bouncer tag (no pitch map) isn't a pitch map
+  const det = (s.detail ?? []).length ? detailByRec(log, s.detail, s.ballsPerOver) : [];
   return {
-    pitch: (s.detail ?? []).some((d) => d.len || d.line),
+    pitch: log.some((r, i) => isPitchTag(det[i], r)),
     control: log.some((r) => r.trk?.ctrl),
     speed: (s.detail ?? []).some((d) => d.kph),
     types: Object.keys(s.bowlTypes ?? {}).length > 0,

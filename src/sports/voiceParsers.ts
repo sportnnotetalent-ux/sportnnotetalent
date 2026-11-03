@@ -164,7 +164,8 @@ export function cricketVoice(text: string, ctx: VoiceContext): ScoreAction[] | n
       : 'bowled';
     // Credit the bowler for a bowler's wicket (not a run out) — parity with the
     // plugin's tap flow, so voice-scored wickets count toward player stats too.
-    return [{ ...wrap('WICKET', { kind }), attribution: s.bowlerId && kind !== 'runout' ? { playerId: s.bowlerId, stat: 'wickets', by: 1, side: s.battingSide === 'home' ? 'away' : 'home' } : undefined }];
+    // v: 2 — the reducer refuses a dismissal the Laws don't allow on a free hit (batch 6, R6).
+    return [{ ...wrap('WICKET', { kind, v: 2 }), attribution: s.bowlerId && kind !== 'runout' ? { playerId: s.bowlerId, stat: 'wickets', by: 1, side: s.battingSide === 'home' ? 'away' : 'home' } : undefined }];
   }
 
   // Runs — a run word or a bare 0-7 (parity #15: "five", "seven"; "all run" /

@@ -16,6 +16,7 @@
  */
 import { HUNDRED_PP_BALLS, type BallRec, type CricketState } from './engine.ts';
 import { rulesOf } from './rules.ts';
+import { ballsAtFirstCut } from './timeline.ts';
 
 export type Phase = 'pp' | 'middle' | 'death';
 export type PhaseFilter = 'all' | Phase;
@@ -43,12 +44,103 @@ export interface PhasePlan {
 }
 
 /** The powerplay PHASE length in legal balls (not the plan's: no length gate):
- *  the organiser's choice, else the format's powerplay. 0 = none. */
-export function phasePPBalls(s: CricketState): number {
+ *  the organiser's choice, else the format's powerplay. 0 = none. With `inn`
+ *  (batch 6, C11) the format's powerplay is the one that innings was played
+ *  under — shortened by a rain cut (`powerplayBalls`). */
+export function phasePPBalls(s: CricketState, inn?: 1 | 2): number {
   const r = rulesOf(s);
   if (r.phasePP !== undefined) return r.phasePP * s.ballsPerOver;
+  if (inn !== undefined) return powerplayBalls(s, inn);
   if (s.hundred) return HUNDRED_PP_BALLS;
   return s.powerplayOvers > 0 ? s.powerplayOvers * s.ballsPerOver : 0;
+}
+
+// ─── Batch 6 (C11, R7) — the FIELDING powerplay of an innings ────────────────
+// Display only (the live strip, the scoreboard tag, the stats' auto phase): it
+// is derived from the state, never stored, so every log replays unchanged.
+
+/** The scheduled innings length the format's powerplay was set for. */
+const ppBase = (s: CricketState): number => s.inn1Overs ?? s.oversLimit;
+/** The innings' length for its powerplay: as played (rain cuts included); an
+ *  innings 1 that rain ENDED keeps its scheduled length (its powerplay was set
+ *  before the stop). */
+const ppLen = (s: CricketState, inn: 1 | 2): number => (inn === 1 && s.inn1Rain ? ppBase(s) : inningsOvers(s, inn));
+
+/**
+ * The powerplay of innings `inn` in legal balls (0 = none). The format's
+ * `powerplayOvers` — The Hundred 25 balls — and, after a rain cut (`v: 2` DLS
+ * maths only, so legacy rain logs show what they always showed), the ICC
+ * reduced-overs table: the same share of the shorter innings, by balls in
+ * T20-length cricket (30 %: 10 overs → 3, 13 → 3.5, 19 → 5.4) and in whole
+ * overs in longer cricket (ODI 20 %: 30 overs → 6). Never longer than the innings.
+ */
+export function powerplayBalls(s: CricketState, inn: 1 | 2 = s.innings): number {
+  if (s.hundred) return HUNDRED_PP_BALLS;
+  const pp = s.powerplayOvers;
+  if (!(pp > 0)) return 0;
+  const bpo = s.ballsPerOver;
+  const base = ppBase(s);
+  const len = ppLen(s, inn);
+  let balls = pp * bpo;
+  if (s.dlsV === 2 && base > 0 && len < base) {
+    const full = balls;
+    balls = base > 20 ? Math.round((len * pp) / base) * bpo : Math.round((len * bpo * pp) / base);
+    balls = Math.max(1, balls);
+    // A cut can't take back powerplay balls already bowled under restrictions:
+    // cut after the powerplay → it stays as played; mid-powerplay → it ends
+    // no earlier than the cut.
+    const side = inn === s.innings ? s.battingSide : (s.battingSide === 'home' ? 'away' : 'home');
+    const at = ballsAtFirstCut(s, side, inn);
+    if (at !== null) balls = Math.max(balls, Math.min(full, at));
+  }
+  return Math.max(0, Math.min(balls, len * bpo));
+}
+
+/** One fielding-restriction band: legal balls [from, to) and the most fielders
+ *  allowed outside the 30-yard ring. */
+export interface PowerplayBand { name: 'P1' | 'P2' | 'P3'; from: number; to: number; outside: number }
+
+/**
+ * The powerplay bands of innings `inn`. T20-length cricket (and The Hundred):
+ * one (P1, 2 outside). Longer limited-overs cricket (over 20 overs, ICC ODI
+ * conditions): P1 (2 outside), P2 (4) and P3, the last stretch as long as P1
+ * (5) — 1–10 / 11–40 / 41–50 in an ODI, scaled with a rain cut. None for a
+ * timeless game or a format without a powerplay.
+ */
+export function powerplayBands(s: CricketState, inn: 1 | 2 = s.innings): PowerplayBand[] {
+  const p1 = powerplayBalls(s, inn);
+  if (p1 <= 0) return [];
+  const base = ppBase(s);
+  const total = ppLen(s, inn) * s.ballsPerOver;
+  const first: PowerplayBand = { name: 'P1', from: 0, to: p1, outside: 2 };
+  if (s.hundred || base <= 20 || base >= 100) return [first];
+  const p3From = Math.max(p1, total - p1);
+  const out = [first];
+  if (p3From > p1) out.push({ name: 'P2', from: p1, to: p3From, outside: 4 });
+  if (total > p3From) out.push({ name: 'P3', from: p3From, to: total, outside: 5 });
+  return out;
+}
+
+/** "overs 1–6" / "overs 11–40" / "the first 3.5 overs" / "balls 1–25". */
+function bandSpan(s: CricketState, b: PowerplayBand): string {
+  const bpo = s.ballsPerOver;
+  if (s.hundred) return `balls ${b.from + 1}–${b.to}`;
+  if (b.from % bpo === 0 && b.to % bpo === 0) return `overs ${b.from / bpo + 1}–${b.to / bpo}`;
+  if (b.from === 0) return `the first ${Math.floor(b.to / bpo)}.${b.to % bpo} overs`;
+  return `balls ${b.from + 1}–${b.to}`;
+}
+
+/** The band the NEXT ball is in, with the strip's text, or null (none / over). */
+export function powerplayNow(s: CricketState): (PowerplayBand & { label: string }) | null {
+  if (s.ended) return null;
+  const bands = powerplayBands(s, s.innings);
+  const balls = s.scores[s.battingSide].balls;
+  const b = bands.find((x) => balls >= x.from && balls < x.to);
+  if (!b) return null;
+  const label = bands.length === 1
+    ? `POWERPLAY · ${bandSpan(s, b)} — fielding restrictions in effect`
+    : `POWERPLAY ${b.name.slice(1)} · ${bandSpan(s, b)} — max ${b.outside} fielders outside the ring`;
+  return { ...b, label };
 }
 
 /**
@@ -64,7 +156,7 @@ export function phasePlan(s: CricketState, inn: 1 | 2): PhasePlan | null {
   const len = inningsOvers(s, inn);
   if (len >= 100 || len < (custom ? 2 : 4)) return null;
   const total = len * bpo;
-  const pp = Math.min(phasePPBalls(s), total);
+  const pp = Math.min(phasePPBalls(s, inn), total);
   const autoDeath = s.hundred ? 25 : (len >= 40 ? 10 : Math.max(1, Math.round(len / 4))) * bpo;
   const deathBalls = r.phaseDeath !== undefined ? r.phaseDeath * bpo : autoDeath;
   const deathFrom = deathBalls > 0 ? Math.max(pp, total - deathBalls) : total;

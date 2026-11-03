@@ -41,7 +41,7 @@ export function detailTarget(s: CricketState): { rec: BallRec; d: number; at: st
   return null;
 }
 
-export function BallDetailPanel({ state, target, dispatch, lh, catchSpot, onDone }: {
+export function BallDetailPanel({ state, target, dispatch, lh, catchSpot, bouncerChip = false, onDone }: {
   state: CricketState;
   target: { rec: BallRec; d: number; at: string };
   dispatch: (a: ScoreAction) => void;
@@ -49,6 +49,8 @@ export function BallDetailPanel({ state, target, dispatch, lh, catchSpot, onDone
   lh: boolean;
   /** offer "where was the catch taken?" (wagon wheel on + a catch) */
   catchSpot: boolean;
+  /** Batch 6 (C9) — the one "Bouncer" chip (a bouncer limit set, the pitch map off) */
+  bouncerChip?: boolean;
   onDone: () => void;
 }) {
   const { rec, d, at } = target;
@@ -70,7 +72,7 @@ export function BallDetailPanel({ state, target, dispatch, lh, catchSpot, onDone
     : NB_WHY.map((k) => ({ k: k as string, label: NB_WHY_LABEL[k] }))) : [];
   const why = extraWhyOf(rec.ext, tag?.why);
   // Round 2 — this bouncer reaches / passes the over's limit
-  const bouncerNote = trk.pitch ? bouncerNoteFor(state, rec, tag?.len === 'bouncer') : null;
+  const bouncerNote = trk.pitch || bouncerChip ? bouncerNoteFor(state, rec, tag?.len === 'bouncer') : null;
   return (
     <View style={st.panel}>
       <View style={st.head}>
@@ -96,6 +98,15 @@ export function BallDetailPanel({ state, target, dispatch, lh, catchSpot, onDone
           <View style={st.chips}>
             {LINE_CHIPS.map((k) => <SelectChip key={k} label={LINE_LABEL[k]} active={tag?.line === k} onPress={() => send({ line: tag?.line === k ? null : k })} />)}
           </View>
+        </>
+      ) : null}
+      {bouncerChip && !trk.pitch ? (
+        <>
+          <Text style={st.muted}>Bouncer? (counts toward the limit this over)</Text>
+          <View style={st.chips}>
+            <SelectChip label={LENGTH_LABEL.bouncer} active={tag?.len === 'bouncer'} onPress={() => send({ len: tag?.len === 'bouncer' ? null : 'bouncer' })} />
+          </View>
+          {bouncerNote ? <Text style={st.warn} accessibilityLiveRegion="polite">{bouncerNote}</Text> : null}
         </>
       ) : null}
       {trk.ctrl && faced ? (

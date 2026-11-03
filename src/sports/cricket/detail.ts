@@ -243,6 +243,12 @@ export function detailByRec(log: BallRec[], detail: BallDetailRec[] | undefined,
 
 // ─── Words ────────────────────────────────────────────────────────────────────
 
+/** Batch 6 (C9) — a pitch-map tag: a line, or a length on a ball bowled with
+ *  the pitch map on. A lone "Bouncer" tag (the bouncer count without the pitch
+ *  map) is not one, so it never makes the Stats tab's pitch map. */
+export const isPitchTag = (d: Pick<BallDetailRec, 'len' | 'line'> | undefined, r: Pick<BallRec, 'trk'>): boolean =>
+  !!d && (!!d.line || (!!d.len && (!!r.trk?.pitch || d.len !== 'bouncer')));
+
 /** "short of a length outside off" / "a yorker on the stumps" / "" */
 export function pitchPhrase(x: Pick<BallDetailRec, 'len' | 'line'> | undefined): string {
   if (!x) return '';

@@ -21,7 +21,7 @@ import { AMEND_TYPE, effectiveLog, type AmendOp } from '../amend.ts';
 import { effectiveRules } from './rules.ts';
 import {
   init, reducer, ballStamp, oversStr, alignCrease, NO_DELIVERY as ENGINE_NO_DELIVERY, clampRuns, isBoundaryHit, runSymbol, symbolTone, ballRuns as engineBallRuns,
-  wicketSymbol, wicketAttribution, RUNS_KINDS, WIDE_WICKETS, NOBALL_WICKETS,
+  wicketSymbol, wicketAttribution, RUNS_KINDS, WIDE_WICKETS, NOBALL_WICKETS, canFallOnFreeHit,
   type CricketState, type DismissalKind, type RunsAs,
 } from './engine.ts';
 import { stripNames } from './names.ts';
@@ -206,6 +206,30 @@ export function applyOps(effLog: MatchEventRecord[], ops: AmendOp[]): MatchEvent
   if (!ops.length) return effLog;
   const top = effLog.reduce((m, e) => Math.max(m, e.seq), 0);
   return effectiveLog([...effLog, { seq: top + 1, type: AMEND_TYPE, payload: { ops, lines: [], byName: '', deltas: [] } }]);
+}
+
+/**
+ * Batch 6 (R6) — would these ops make a recorded ball stop counting? The
+ * reducer refuses a `v: 2` bowled / caught / lbw / stumped / hit wicket on a
+ * free hit, so an edit that moves a free hit (an earlier wide made a no-ball)
+ * or turns a free-hit wicket into "caught" would silently drop that ball on
+ * replay. Returns the message to show, or null when every ball still counts.
+ */
+export function editDropsBall(effLog: MatchEventRecord[], ops: AmendOp[], config?: Record<string, unknown>): string | null {
+  if (!ops.length) return null;
+  let s = init(config);
+  for (const rec of applyOps(effLog, ops)) {
+    const a = recordToAction(rec);
+    const next = reducer(s, a);
+    const live = s.superOver && !s.superOver.state.ended ? s.superOver.state : s;
+    const kind = String(a.type === 'EXTRA' ? (a.payload?.wicket ?? '') : (a.payload?.kind ?? 'bowled')) as DismissalKind;
+    const wicket = a.type === 'WICKET' || (a.type === 'EXTRA' && !!a.payload?.wicket);
+    if (next === s && wicket && a.payload?.v === 2 && live.freeHit && !live.ended && !canFallOnFreeHit(kind)) {
+      return 'That change puts a later wicket on a free hit, where it can’t count (only a run out, hit twice or obstructing can). Undo back to it instead.';
+    }
+    s = next;
+  }
+  return null;
 }
 
 // ─── editableOvers ─────────────────────────────────────────────────────────

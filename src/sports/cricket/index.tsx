@@ -27,12 +27,12 @@ import { Tile } from '../../components/QuickOptionsSheet';
 import { cricketVoice } from '../voiceParsers';
 import {
   init, reducer, other, resultLine, outcome, superOverWinner, WICKET_LABEL, DISMISSAL_NAME, NO_BOWLER, composeDismissal,
-  oversStr, runRate, inPowerplay, nrrOvers, manualNrrOvers, nrrRuns, involvedPlayerIds,
+  oversStr, runRate, nrrOvers, manualNrrOvers, nrrRuns, involvedPlayerIds,
   clampRuns, ballRuns, symbolTone, penalty,
   NO_DELIVERY, RUNS_KINDS, WIDE_WICKETS, NOBALL_WICKETS, creaseAfterWicket, wicketAttribution,
   canBowl, midOver, oversUsed, snapshotState, lastBall,
   minOversOf, rainStopPar, chaseHasMinOvers, withNewDlsTable,
-  powerplaySpan, SHOT_TYPES, ballStamp, chaseAlive, drawWord, endResult,
+  SHOT_TYPES, ballStamp, chaseAlive, drawWord, endResult, allOutAt, lastManAlone,
   reviewsLeft, type ReviewOutcome,
 } from './engine';
 import type { ShotType } from './engine';
@@ -53,7 +53,8 @@ import { CricketMatchStats } from './MatchStatsView';
 import { SubViews } from '../SubViews';
 import { BallDetailPanel, BowlTypeChips, detailTarget, profileLeftArm } from './BallDetailPanel';
 import { bowlTypeFromProfile } from './detail';
-import { bouncerStatus, bouncerSlot } from './bouncers';
+import { bouncerStatus, bouncerSlot, bouncerChipOnly, beamerWarning } from './bouncers';
+import { powerplayNow } from './phases';
 import { inningsTop } from './matchStats';
 import {
   LOCAL_RULE_FIELDS, CRICKET_LIVE_SETTINGS, rulesOf, effectiveRules, inStandardWindow, isStandard,
@@ -249,7 +250,7 @@ const roster0 = (r: Player[]) => r.length > 0;
 /** The six everyday dismissals; the rare ones fold under "More ▾" (parity #16). */
 const MAIN_DISMISSALS: DismissalKind[] = ['bowled', 'caught', 'lbw', 'runout', 'stumped', 'hitwicket'];
 const MORE_DISMISSALS: DismissalKind[] = ['obstruct', 'hittwice', 'mankad', 'retired', 'retiredout', 'timedout'];
-/** On a free hit only these can happen (UI-only — the engine doesn't police it). */
+/** On a free hit only these can happen (batch 6, R6: the engine refuses the rest on a `v: 2` wicket). */
 const FREE_HIT_DISMISSALS: DismissalKind[] = ['runout', 'obstruct', 'hittwice', 'mankad', 'retired', 'retiredout', 'timedout'];
 const needsFielder = (k: DismissalKind) => k === 'caught' || k === 'runout';
 const needsBatter = (k: DismissalKind) => k === 'runout' || k === 'obstruct' || k === 'retired' || k === 'retiredout' || k === 'timedout';
@@ -785,6 +786,8 @@ const ScoringControls: SportPlugin<CricketState>['ScoringControls'] = ({
     fielder2?: Player | null;
     /** Round 2 — run out: a direct hit by the fielder (optional chip) */
     direct?: boolean;
+    /** Batch 6 (C6) — fielder 1 is a substitute ("c sub (X)") */
+    sub?: boolean;
     /** run out / obstructing: where the wicket was broken */
     end?: 'striker' | 'bowler';
     /** SD-113 (A6) — the next batter picked; committed by "Confirm wicket" */
@@ -853,7 +856,9 @@ const ScoringControls: SportPlugin<CricketState>['ScoringControls'] = ({
   const isUnavailable = (id: string) => state.unavailable.includes(id);
   const atCrease = (id: string) => id === strikerId || id === nonStrikerId;
   const bothSet = !!strikerId && !!nonStrikerId;
-  const canScore = bothSet && !!bowlerId;
+  // Batch 6 (R8) — last man stands: the lone batter scores with no non-striker.
+  const alone = lastManAlone(state) && !!strikerId;
+  const canScore = (bothSet || alone) && !!bowlerId;
 
   // Gate scoring on the pre-match setup.
   const configured = !!(state.captains.home && state.captains.away && state.keepers.home && state.keepers.away);
@@ -887,7 +892,7 @@ const ScoringControls: SportPlugin<CricketState>['ScoringControls'] = ({
 
   // `boundary`: 4/6 keys send true; all-run / overthrow / typed runs send false
   // (parity #15). A missing flag (old clients, voice) is read as a legacy event.
-  const runs = (r: number, extra: { boundary?: boolean; overthrows?: number } = {}) =>
+  const runs = (r: number, extra: { boundary?: boolean; overthrows?: number; short?: true; v?: 2 } = {}) =>
     ball({ type: 'RUNS', payload: { runs: r, ...extra }, attribution: strikerId ? { playerId: strikerId, stat: 'runs', by: r } : undefined });
   // Runs off the bat on a no-ball are the striker's (parity #19 — they used to
   // reach the scorecard but never the profile).
@@ -896,7 +901,10 @@ const ScoringControls: SportPlugin<CricketState>['ScoringControls'] = ({
   const closeMore = () => { setExtraMode(null); setOtRan(0); setOtOver(null); };
 
   // ----- wicket flow ----- (retired hurt isn't a wicket, so it never "all out")
-  const allOut = wf?.kind !== 'retired' && cur.wickets + 1 >= state.wicketsLimit;
+  // Batch 6 (R8) — last man stands: all out only when the last batter is out
+  // too; the wicket that leaves one batter lets them bat on alone.
+  const allOut = wf?.kind !== 'retired' && cur.wickets + 1 >= allOutAt(state);
+  const lastManIn = wf?.kind !== 'retired' && !!rules.lastManStands && cur.wickets + 1 === state.wicketsLimit;
   // SD-133 — a batter retired at the run limit comes back only once nobody else
   // can (and only if the rule allows it).
   const retLimitCard = (id: string) => !!state.batting[id]?.retLimit;
@@ -918,12 +926,17 @@ const ScoringControls: SportPlugin<CricketState>['ScoringControls'] = ({
     const batterOut = kind === 'mankad' ? 'nonstriker' : kind === 'hittwice' || kind === 'stumped' || kind === 'hitwicket' ? 'striker' : (wf.batterOut ?? 'striker');
     // IDs-only: who was involved, by id — the scorecard text ("c X b Y") is
     // built from them when shown.
+    // v: 2 (batch 6, R6) — the reducer then also refuses a dismissal the Laws
+    // don't allow on a free hit (this screen never offers one).
     const payload: Record<string, unknown> = {
       strikerId, bowlerId,
       fielderId: wf.fielder?.id,
       batterOut, runs: runsN,
       newBatId: newBat?.id,
+      v: 2,
     };
+    // Batch 6 (C6) — a substitute fielder's catch / run out ("c sub (X)").
+    if ((kind === 'caught' || kind === 'runout') && wf.fielder && wf.sub) payload.sub = true;
     if (kind === 'runout' && wf.fielder2) payload.fielder2Id = wf.fielder2.id;
     // Round 2 — a direct hit (career key for the fielder); score-neutral
     if (kind === 'runout' && wf.direct && wf.fielder) payload.direct = true;
@@ -958,10 +971,12 @@ const ScoringControls: SportPlugin<CricketState>['ScoringControls'] = ({
     // Kinds on offer: a wicket off a wide / no-ball; a free hit (only these can
     // happen on one — UI-only, replays don't change); otherwise all, the rare
     // ones folded under "More ▾".
-    const options: DismissalKind[] = wf.offExtra === 'wide' ? WIDE_WICKETS
+    const options0: DismissalKind[] = wf.offExtra === 'wide' ? WIDE_WICKETS
       : wf.offExtra === 'noball' ? NOBALL_WICKETS
       : state.freeHit ? FREE_HIT_DISMISSALS
       : wf.more ? [...MAIN_DISMISSALS, ...MORE_DISMISSALS] : MAIN_DISMISSALS;
+    // Batch 6 (R8) — the lone last batter: no non-striker to run out backing up.
+    const options = alone ? options0.filter((d) => d !== 'mankad') : options0;
     const showMore = !wf.offExtra && !state.freeHit && !wf.more;
     const takesRuns = !!k && RUNS_KINDS.includes(k);
     const runsN = takesRuns ? (wf.runs ?? 0) : 0;
@@ -1090,6 +1105,16 @@ const ScoringControls: SportPlugin<CricketState>['ScoringControls'] = ({
           </>
         )}
 
+        {/* Batch 6 (C6) — the format has substitutes: one optional chip marks
+            the catch / run out as a substitute fielder's ("c sub (X)"). */}
+        {(k === 'caught' || k === 'runout') && !!wf.fielder && (state.subs ?? 0) > 0 && wf.fielder.id !== bowlerId && (
+          <View style={ctrl.chips}>
+            <SelectChip label="Substitute fielder (optional)" active={!!wf.sub}
+              accessibilityLabel={`${wf.fielder.fullName} was a substitute fielder`}
+              onPress={() => setWf({ ...wf, sub: !wf.sub })} />
+          </View>
+        )}
+
         {/* Run out: the 2nd fielder is optional — folded, never a step. Round 2:
             so is "Direct hit" (the fielder hit the stumps; no 2nd fielder). */}
         {k === 'runout' && !!wf.fielder && (
@@ -1117,7 +1142,7 @@ const ScoringControls: SportPlugin<CricketState>['ScoringControls'] = ({
           <>
             <Text style={ctrl.meta}>Who's out, and at which end? (crossed → the far end)</Text>
             <View style={ctrl.chips}>
-              {([['striker', 'striker'], ['nonstriker', 'bowler'], ['striker', 'bowler'], ['nonstriker', 'striker']] as const).map(([who, end]) => (
+              {([['striker', 'striker'], ['nonstriker', 'bowler'], ['striker', 'bowler'], ['nonstriker', 'striker']] as const).filter(([who]) => !alone || who === 'striker').map(([who, end]) => (
                 <SelectChip key={`${who}-${end}`}
                   label={`${(who === 'striker' ? strikerName : nonStrikerName) ?? (who === 'striker' ? 'Striker' : 'Non-striker')}${who === 'nonstriker' ? ' (NS)' : ''} · ${end === 'striker' ? "striker's" : "bowler's"} end`}
                   active={false} onPress={() => setWf({ ...wf, batterOut: who, end, runs: runsN })} />
@@ -1131,7 +1156,7 @@ const ScoringControls: SportPlugin<CricketState>['ScoringControls'] = ({
             <Text style={ctrl.meta}>{k === 'retired' ? 'Which batsman is retiring hurt?' : k === 'retiredout' ? 'Which batsman is retiring out?' : k === 'timedout' ? 'Which batsman timed out?' : 'Which batsman is out?'}</Text>
             <View style={ctrl.chips}>
               <SelectChip label={strikerName ?? 'Striker'} active={false} onPress={() => setWf({ ...wf, batterOut: 'striker' })} />
-              <SelectChip label={`${nonStrikerName ?? 'Non-striker'} (NS)`} active={false} onPress={() => setWf({ ...wf, batterOut: 'nonstriker' })} />
+              {!alone && <SelectChip label={`${nonStrikerName ?? 'Non-striker'} (NS)`} active={false} onPress={() => setWf({ ...wf, batterOut: 'nonstriker' })} />}
             </View>
           </>
         )}
@@ -1157,7 +1182,12 @@ const ScoringControls: SportPlugin<CricketState>['ScoringControls'] = ({
               {wf.newBat ? (
                 <Button label={`${wktWord} — ${wf.newBat.fullName} in`} variant="danger" onPress={() => finishWicket(wf.newBat)} />
               ) : null}
-              {freshLeft.length === 0 ? (
+              {lastManIn && freshLeft.length === 0 ? (
+                <>
+                  <Text style={ctrl.hint}>Last man stands — the not-out batter bats on alone and keeps the strike.</Text>
+                  <Button label={`${wktWord} — last man bats on`} variant="danger" onPress={() => finishWicket(undefined)} />
+                </>
+              ) : freshLeft.length === 0 ? (
                 <>
                   <Text style={ctrl.hint}>{newBatOptions.length === 0 ? 'No batsmen left to come in.' : 'Only retired batters are left — pick one if they can resume.'}</Text>
                   <Button label={`${wktWord} — innings closed`} variant="danger" onPress={() => finishWicket(undefined, true)} />
@@ -1172,7 +1202,7 @@ const ScoringControls: SportPlugin<CricketState>['ScoringControls'] = ({
     );
   }
 
-  const need = !strikerId ? 'striker' : !nonStrikerId ? 'a non-striker' : null;
+  const need = !strikerId ? 'striker' : !nonStrikerId && !alone ? 'a non-striker' : null;
   const wk = state.keepers[other(state.battingSide)]?.name;
 
   // SD-133 — "retire at N runs" (local rule): a batter at the crease on N or more
@@ -1291,16 +1321,20 @@ const ScoringControls: SportPlugin<CricketState>['ScoringControls'] = ({
   const dCatch = !!(dTarget && rules.wagonWheel && dTarget.rec.out?.kind === 'caught');
   const dKey = dTarget ? `${dTarget.rec.inn}:${dTarget.rec.side}:${dTarget.d}` : '';
   const dTrk = dTarget?.rec.trk ?? {};
-  const dHas = !!(dTrk.pitch || dTrk.speed || (dTrk.ctrl && dTarget?.rec.ext !== 'wd') || dCatch
+  // Batch 6 (C9) — the one-chip bouncer tag (a limit set, the pitch map off)
+  const dBouncer = !!dTarget && bouncerChipOnly(state, dTarget.rec);
+  const dHas = !!(dTrk.pitch || dTrk.speed || (dTrk.ctrl && dTarget?.rec.ext !== 'wd') || dCatch || dBouncer
     // Round 2 — the wide / no-ball reason
     || (dTrk.why && (dTarget?.rec.ext === 'wd' || dTarget?.rec.ext === 'nb')));
   const detailPanel = dOk && dTarget && dHas && detailSkip !== dKey ? (() => {
     const sid = dTarget.rec.strikerId;
     const bp = sid ? battingRoster.find((p) => p.id === sid) : undefined;
     const lh = sid ? (lhOverride[sid] ?? bp?.sportDetails?.cricket?.sides?.bat === 'Left-handed') : false;
-    return <BallDetailPanel state={state} target={dTarget} dispatch={dispatch} lh={lh} catchSpot={dCatch} onDone={() => setDetailSkip(dKey)} />;
+    return <BallDetailPanel state={state} target={dTarget} dispatch={dispatch} lh={lh} catchSpot={dCatch} bouncerChip={dBouncer} onDone={() => setDetailSkip(dKey)} />;
   })() : null;
-  const pp = inPowerplay(state);
+  // Batch 6 (C11, R7) — the band the next ball is in: shortened after a rain
+  // cut; an ODI-length innings shows P1 / P2 / P3.
+  const pp = powerplayNow(state);
 
   // Over-complete flow: the reducer clears the bowler after the 6th legal ball, so
   // `!bowlerId` with a whole number of overs bowled means an over just finished.
@@ -1315,10 +1349,13 @@ const ScoringControls: SportPlugin<CricketState>['ScoringControls'] = ({
   const penLine = ballPen ? `⚖️ +${ballPen.runs} to ${ballPen.teamName} (${ballPen.reason}) on this ball` : '';
   // Round 2 — the bouncer limit (pitch map on): reached / passed this over.
   const bouncerLine = !soActive ? bouncerSlot(bouncerStatus(state)) : null;
+  // Batch 6 (fix 13) — the last delivery was tagged an above-waist full toss
+  // (Law 41.7): first warning / take the bowler off.
+  const beamerLine = !soActive ? beamerWarning(state, true) : null;
   const slotText = state.freeHit
     ? `🟢 FREE HIT — can’t be out bowled, caught, lbw or stumped${penLine ? ` · ${penLine}` : ''}`
-    : penLine || bouncerLine || `🏏 ${strikerName ?? '—'} on strike${bowlerName ? ` · 🎯 ${bowlerName}` : ''}`;
-  const slotWarn = !state.freeHit && !ballPen && !!bouncerLine;
+    : penLine || beamerLine || bouncerLine || `🏏 ${strikerName ?? '—'} on strike${alone ? ' (last man)' : ''}${bowlerName ? ` · 🎯 ${bowlerName}` : ''}`;
+  const slotWarn = !state.freeHit && !ballPen && !!(beamerLine || bouncerLine);
 
   return (
     <View style={{ gap: theme.spacing(4) }}>
@@ -1346,7 +1383,7 @@ const ScoringControls: SportPlugin<CricketState>['ScoringControls'] = ({
           </View>
         );
       })()}
-      {pp && <Text style={ctrl.powerplay}>🟡 POWERPLAY · {powerplaySpan(state)} — fielding restrictions in effect</Text>}
+      {pp && <Text style={ctrl.powerplay}>🟡 {pp.label}</Text>}
       {/* Batsmen at the crease — auto-rotated; dismissed players are grayed out. */}
       <View style={{ gap: theme.spacing(2) }}>
         <View style={ctrl.creaseHead}>
@@ -1559,6 +1596,15 @@ const ScoringControls: SportPlugin<CricketState>['ScoringControls'] = ({
                     onPress={() => { runs(otTotal, { boundary: false, overthrows: otOver }); closeMore(); }} />
                 </>
               ) : null}
+              {/* Batch 6 (fix 13) — Law 18.9: a run not grounded doesn't count */}
+              <Text style={ctrl.meta}>One short — the runs that count</Text>
+              <View style={ctrl.row}>
+                {[0, 1, 2].map((n) => (
+                  <Button key={n} label={`${n} (1 short)`} variant="ghost" style={ctrl.flex}
+                    accessibilityLabel={`${n} run${n === 1 ? '' : 's'}, one short`}
+                    onPress={() => { runs(n, { boundary: false, short: true, v: 2 }); closeMore(); }} />
+                ))}
+              </View>
               <Text style={ctrl.meta}>Any other number</Text>
               <RunsInput onAdd={(n) => { runs(n, { boundary: false }); closeMore(); }} addLabel={(n) => `Add ${n}`} />
             </View>
@@ -1701,7 +1747,7 @@ const LiveClock: NonNullable<SportPlugin<CricketState>['LiveClock']> = ({ state 
     <View style={ctrl.clockRow}>
       <View style={[ctrl.liveDot, { backgroundColor: s.ended ? theme.colors.textMuted : theme.colors.danger }]} />
       <Text style={ctrl.clockTime}>{s.ended ? 'Result' : `${oversStr(inn.balls, s.ballsPerOver)} / ${s.oversLimit} ov${s.revision === 'dls' ? ' · DLS' : ''}`}</Text>
-      {inPowerplay(s) && <Text style={ctrl.ppTag}>🟡 PP</Text>}
+      {powerplayNow(s) && <Text style={ctrl.ppTag}>🟡 PP</Text>}
     </View>
   );
 };
