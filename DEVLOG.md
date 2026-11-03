@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-05 — Release: squad sessions live (web, Android OTA)
+
+Founder ran `20261105120000_squad_sessions.sql` (checked read-only: table, `matches.session_id` and functions present; anon refused). auth-smoke passed. Published from a clean worktree at 84ddb6c: web (entry `index-579caf68`, confirmed live on app.sportnnote.in) and Android OTA groups `023c158a` (preview) and `01a4bc0a` (production), runtime 1.0.0.
+
 ### 2026-11-05 — Squad sessions: a team's game day (captains pick, teams play in turns)
 
 Founder's design (`docs/product/squad-sessions.md`, break-it `docs/security/breaks/squad-sessions.md`). Team page → **Game days** → start a session: sport, who's here (team members), rules (teams 2–8, round robin by default or winner stays with a cap and a draw rule, snake or straight pick order, win/draw/loss points). Any player present changes rules; captains by tap or 🎲 Random draw; each captain picks on their phone, only on their turn; "Share out the rest" fills the teams. "Make teams" creates "<Team> 1/2/3…" (short-lived teams whose roster is the picks). "Next game" shows who's on and who sits out; each game is an ordinary friendly every player can score (shared scoring), so it counts under Friendly stats and shows under Matches → Playing. Session table P/W/D/L/Pts. Round robin: fewest games first, then pairs that met least, then longest wait — 3 teams run 1v2, 2v3, 3v1; checked fair for 2–8 teams. Server: **`supabase/migrations/20261105120000_squad_sessions.sql`** (founder runs) — `squad_sessions` + `matches.session_id`; every change is a function checking the caller is in the session, whose pick it is, and the version the phone saw (`session_changed`); no write policies. Tests: 12 logic, 18 server (PGlite), a 600-game-day simulation; full suite green; tsc clean; demo walked through (create → captains → picks → teams → game → Matches/Playing).
