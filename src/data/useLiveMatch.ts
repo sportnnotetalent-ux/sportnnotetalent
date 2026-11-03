@@ -35,6 +35,7 @@ import { newUuid } from '../core/deviceId';
 import { appendGuestEvent, popGuestEvent, type GuestMatch } from '../core/guestMatch';
 import { guestStore } from './guestStore';
 import { canWriteWith, type LockStatus } from '../core/scoringLock';
+import { baseOf, parseRefusal } from '../core/sharedScoring';
 import { AppState } from 'react-native';
 import { createResultHold, type ResultHold } from './resultHold';
 import { pendingResults, flushPendingResults } from './pendingResults';
@@ -72,9 +73,15 @@ export interface UseLiveMatch {
   sendResultNow: () => void;
   /** SD-133 — resolves once the in-flight live stat increments have landed. */
   settleStatWrites: () => Promise<void>;
+  /** Shared scoring: a tap / Undo of this phone was refused because another
+   *  scorer had just recorded a step (`by` = their player id, when known); the
+   *  board has been refreshed. Null when there's nothing to say. */
+  staleBy: { by: string | null; at: number } | null;
+  clearStale: () => void;
 }
 
-export interface LastStep { type: string; prev: unknown; next: unknown }
+/** `by` — who recorded the step (a player id; shared scoring names it on Undo). */
+export interface LastStep { type: string; prev: unknown; next: unknown; by?: string | null }
 
 export function useLiveMatch(params: {
   matchId?: string;
@@ -118,6 +125,8 @@ export function useLiveMatch(params: {
   /** SD-48 — called after this device has sent the held result (the match is
    *  now completed): the tie settles and announces itself if this decided it. */
   onResultSent?: () => void;
+  /** this person's player id — who records this phone's steps (shared scoring) */
+  myPlayerId?: string | null;
 }): UseLiveMatch {
   const { matchId, sport, canScore = true, homeTeamName, awayTeamName, homeTeamId, awayTeamId, tournamentId, config, lockStatus = 'unsupported', readOnly = false } = params;
   const onRemoteRef = useRef(params.onRemoteEvent);
@@ -141,6 +150,11 @@ export function useLiveMatch(params: {
   const canWrite = canScore && canWriteWith(lockStatus);
   const plugin = getSport(sport);
   const live = isSupabaseConfigured && !!matchId && !!supabase;
+  const myPlayerRef = useRef(params.myPlayerId ?? null);
+  myPlayerRef.current = params.myPlayerId ?? null;
+  // Shared scoring: the last refusal to tell the scorer about.
+  const [staleBy, setStaleBy] = useState<{ by: string | null; at: number } | null>(null);
+  const clearStale = useCallback(() => setStaleBy(null), []);
 
   const [state, setState] = useState<unknown>(() => plugin.createInitialState(config));
   const [syncing, setSyncing] = useState(!!matchId);
@@ -308,7 +322,7 @@ export function useLiveMatch(params: {
           if (payload.eventType === 'INSERT') {
             // Fast path: apply the single new event incrementally.
             const row = payload.new as MatchEventRecord & { client_id?: string | null };
-            const e: MatchEventRecord = { ...row, clientId: row.client_id ?? undefined };
+            const e: MatchEventRecord = { ...row, clientId: row.client_id ?? undefined, recordedBy: (row as { recorded_by?: string | null }).recorded_by ?? null };
             // A correction rewrites earlier events → replay everything.
             if (e.type === AMEND_TYPE) { void rebuildFromLog(); return; }
             // MVP B6: the format changed — reload it (the board replays under it).
@@ -322,7 +336,7 @@ export function useLiveMatch(params: {
             const prev = stateRef.current;
             const next = plugin.reducer(prev, toAction(e));
             setBoth(next);
-            setLastStep({ type: e.type, prev, next });
+            setLastStep({ type: e.type, prev, next, by: e.recordedBy ?? null });
             setEventCount((c) => c + 1); // a viewer's count follows the log too (#25's pre → live)
             try { onRemoteRef.current?.(prev, next); } catch { /* a viewer's callback never breaks sync */ }
           } else {
@@ -363,7 +377,7 @@ export function useLiveMatch(params: {
         return;
       }
       if (!matchId || !canWrite) return;
-      setLastStep({ type: action.type, prev: prevState, next });
+      setLastStep({ type: action.type, prev: prevState, next, by: myPlayerRef.current });
 
       // Player attribution → stat line + notify followers (scorer side only,
       // so replay/realtime on viewers never double-counts).
@@ -427,6 +441,11 @@ export function useLiveMatch(params: {
         payload: action.attribution2 ? { ...(action.payload ?? {}), _attr2: action.attribution2 } : action.payload ?? {},
         attribution: action.attribution ?? null,
         clientId,
+        // Shared scoring: the newest step this phone had applied (the server
+        // refuses the tap if another phone's step is newer), and when it was made.
+        base: baseOf(rawRef.current),
+        madeAt: Date.now(),
+        recordedBy: myPlayerRef.current,
       };
       // Durably queue the event first (survives offline/refresh), then let the
       // outbox sync it to the backend with retry. The snapshot is derived state,
@@ -461,6 +480,7 @@ export function useLiveMatch(params: {
     if (undosInFlightRef.current++ === 0) {
       undoBurstRef.current = { raw: rawRef.current, applied: appliedRef.current, seq: seqRef.current, state: stateRef.current, count: eventCountRef.current, step: lastStepRef.current, version: logVersionRef.current };
     }
+    const undoFrom = rawRef.current; // the log this Undo is based on (shared scoring)
     const tail = newestEvent(rawRef.current);
     if (tail) {
       const rest = rawRef.current.filter((e) => e !== tail);
@@ -471,10 +491,15 @@ export function useLiveMatch(params: {
     // Undo the freshest event wherever it lives: an unsynced tap comes off the
     // outbox; otherwise pop it from the backend log (only the active scorer may).
     let removed: MatchEventRecord | null = null;
+    let staleUndo = false;
     try {
-      removed = matchOutbox.pendingCount(matchId) > 0 ? matchOutbox.popLast(matchId) : await popMatchEvent(matchId);
-    } catch {
-      // scoring moved to another device — the screen shows why
+      removed = matchOutbox.pendingCount(matchId) > 0 ? matchOutbox.popLast(matchId) : await popMatchEvent(matchId, baseOf(undoFrom));
+    } catch (e) {
+      // scoring moved to another device — the screen shows why. Shared scoring:
+      // another scorer's step is newer than the one this Undo meant — nothing was
+      // removed; the board refreshes and the scorer is told.
+      const r = parseRefusal(e instanceof Error ? e.message : String(e));
+      if (r?.kind === 'stale') { staleUndo = true; setStaleBy({ by: r.by, at: Date.now() }); }
     }
     if (removed) {
       // Reverse every stat the event credited (attribution, its extras, and a second
@@ -502,6 +527,7 @@ export function useLiveMatch(params: {
     }
     // Nothing was undone (refused, or nothing to pop): the board as it was —
     // or, if the log moved on meanwhile, as the server has it.
+    if (staleUndo) { await rebuildFromLog().catch(() => undefined); return; }
     if (!burst || burst.raw === rawRef.current) return;
     if (burst.version === logVersionRef.current) {
       rawRef.current = burst.raw; appliedRef.current = burst.applied; seqRef.current = burst.seq;
@@ -539,12 +565,26 @@ export function useLiveMatch(params: {
     await rebuildFromLog();
   }, [matchId, sport, rebuildFromLog]);
 
+  // Shared scoring: live taps the server refused as stale were dropped by the
+  // outbox — reverse the stats they credited, show the server's log, say who.
+  useEffect(() => {
+    if (!matchId) return;
+    return matchOutbox.onStale(matchId, (dropped, by) => {
+      for (const rec of dropped) {
+        for (const r of statReversals(rec)) void recordStatLine({ matchId, playerId: r.playerId, sport, stat: r.stat, by: r.by, opponent: opponentFor(r) });
+      }
+      setStaleBy({ by, at: Date.now() });
+      void rebuildFromLog().then(() => syncThenPersist(stateRef.current)).catch(() => {});
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [matchId, sport, rebuildFromLog]);
+
   const amend = useCallback(async (ops: AmendOp[], lines: string[], byName: string) => {
     // Unsynced taps have provisional seqs — an op could hit the wrong event, so the
     // screen blocks editing until the outbox is empty; double-check here.
     if (!matchId || !canWrite || !ops.length || matchOutbox.pendingCount(matchId) > 0) return;
     const plan = await planAmendment(matchId, sport, config, ops, lines, byName);
-    matchOutbox.enqueue(matchId, { ...plan.record, seq: seqRef.current + 1 });
+    matchOutbox.enqueue(matchId, { ...plan.record, seq: seqRef.current + 1, base: baseOf(rawRef.current), madeAt: Date.now(), recordedBy: myPlayerRef.current });
     // A sport with absolute totals, on a finished match: the sync below sets the
     // corrected values (Decision 6) — writing the deltas too would only add a
     // second write per row. The AMEND row still stores the deltas (undo).
@@ -607,5 +647,5 @@ export function useLiveMatch(params: {
   // SD-133 — let the in-flight live stat increments land (End match by hand
   // then writes the absolute totals over them, as completion does).
   const settleStatWrites = useCallback(async () => { await Promise.all([...statWritesRef.current]); }, []);
-  return { state, dispatch, undo, reset, eventCount, live, syncing, rejectedCount, discardRejected, refresh: rebuildFromLog, amend, lastStep, resultSendsAt, sendResultNow, settleStatWrites };
+  return { state, dispatch, undo, reset, eventCount, live, syncing, rejectedCount, discardRejected, refresh: rebuildFromLog, amend, lastStep, resultSendsAt, sendResultNow, settleStatWrites, staleBy, clearStale };
 }

@@ -44,6 +44,7 @@ import { readBreak, type MatchBreak } from './matchHousekeeping';
 import type { PointsAdjustment } from './standings';
 import { newTournamentFormats } from './standings';
 import type { ScoringLock } from '../core/scoringLock';
+import { baseOf } from '../core/sharedScoring';
 import { MATCHES } from '../core/mockData';
 import {
   demo,
@@ -1711,11 +1712,14 @@ export async function getMatchEvents(matchId: string): Promise<MatchEventRecord[
   // (match_id, seq) is unique, so seq alone is a stable order.
   const read = (cols: string) => fetchAllPages((from, to) =>
     supabase!.from('match_events').select(cols).eq('match_id', matchId).order('seq', { ascending: true }).range(from, to));
-  let { data, error } = await read('seq, type, side, payload, attribution, created_at, client_id');
+  // Shared scoring (20261103120000): the row id and who recorded each step.
+  let { data, error } = await read('id, seq, type, side, payload, attribution, created_at, client_id, recorded_by');
+  if (error && /recorded_by/.test(error.message)) ({ data, error } = await read('id, seq, type, side, payload, attribution, created_at, client_id'));
   // Before migration 0039 there's no client_id column — read without it.
-  if (error && /client_id/.test(error.message)) ({ data, error } = await read('seq, type, side, payload, attribution, created_at'));
+  if (error && /client_id/.test(error.message)) ({ data, error } = await read('id, seq, type, side, payload, attribution, created_at'));
   if (error || !data) return [];
-  return (data as unknown as (MatchEventRecord & { client_id?: string | null })[]).map(({ client_id, ...e }) => ({ ...e, clientId: client_id ?? undefined }));
+  return (data as unknown as (MatchEventRecord & { client_id?: string | null; recorded_by?: string | null })[])
+    .map(({ client_id, recorded_by, ...e }) => ({ ...e, clientId: client_id ?? undefined, ...(recorded_by ? { recordedBy: recorded_by } : {}) }));
 }
 
 /* ------------------------- Scoring lock (parity #03) ----------------------- */
@@ -1724,7 +1728,9 @@ export async function getMatchEvents(matchId: string): Promise<MatchEventRecord[
 // dev hook `__sportfolioScoring.takeover(matchId, name)` fakes another device.
 
 const demoLocks: Record<string, { holderId: string | null; holderName: string | null; device: string | null; at: string }> = {};
+const demoShared = new Set<string>(); // shared scoring in the demo
 let lockRpcMissing = false; // pre-migration database → today's behaviour
+let baseRpcMissing = false; // before shared scoring (20261103120000): the old signatures
 
 const isMissingFn = (e?: { code?: string; message?: string } | null) =>
   !!e && (e.code === 'PGRST202' || e.code === '42883' || /could not find the function/i.test(e.message ?? ''));
@@ -1732,11 +1738,14 @@ const isMissingFn = (e?: { code?: string; message?: string } | null) =>
 export async function getScoringLock(matchId: string): Promise<ScoringLock> {
   if (!isSupabaseConfigured || !supabase) {
     const l = demoLocks[matchId];
-    return { supported: true, holderId: l?.holderId ?? null, holderName: l?.holderName ?? null, device: l?.device ?? null, at: l?.at ?? null };
+    return { supported: true, holderId: l?.holderId ?? null, holderName: l?.holderName ?? null, device: l?.device ?? null, at: l?.at ?? null, shared: demoShared.has(matchId) };
   }
-  const { data, error } = await supabase.from('matches').select('active_scorer_id, active_scorer_device, active_scorer_at').eq('id', matchId).maybeSingle();
+  let { data, error } = await supabase.from('matches').select('active_scorer_id, active_scorer_device, active_scorer_at, shared_scoring').eq('id', matchId).maybeSingle();
+  // before shared scoring (20261103120000): no column — one at a time
+  if (error && /shared_scoring/.test(error.message)) ({ data, error } = await supabase.from('matches').select('active_scorer_id, active_scorer_device, active_scorer_at').eq('id', matchId).maybeSingle());
   if (error) return { supported: false };
-  const row = data as { active_scorer_id: string | null; active_scorer_device: string | null; active_scorer_at: string | null } | null;
+  const row = data as { active_scorer_id: string | null; active_scorer_device: string | null; active_scorer_at: string | null; shared_scoring?: boolean } | null;
+  if (row?.shared_scoring) return { supported: true, shared: true, holderId: null, holderName: null, device: null, at: null };
   let holderName: string | null = null;
   if (row?.active_scorer_id) {
     const { data: p } = await supabase.from(PLAYERS_READ).select('full_name').eq('id', row.active_scorer_id).maybeSingle();
@@ -1779,6 +1788,17 @@ export async function handoverScoring(matchId: string, toPlayerId: string, toNam
   }
   const { error } = await supabase.rpc('handover_scoring', { p_match: matchId, p_to: toPlayerId });
   if (error) throw new Error(isMissingFn(error) ? 'Handing over needs a database update first.' : error.message);
+}
+
+/** Shared scoring on / off (docs/security/breaks/shared-scoring.md). Friendlies:
+ *  anyone who may score; tournament matches: hosts / organisers (the server checks). */
+export async function setSharedScoring(matchId: string, on: boolean): Promise<void> {
+  if (!isSupabaseConfigured || !supabase) {
+    if (on) { demoShared.add(matchId); delete demoLocks[matchId]; } else demoShared.delete(matchId);
+    return;
+  }
+  const { error } = await supabase.rpc('set_shared_scoring', { p_match: matchId, p_on: on });
+  if (error) throw new Error(isMissingFn(error) ? 'Shared scoring needs a database update first.' : /not_allowed/.test(error.message) ? 'Only the match’s organisers can change how it is scored.' : error.message);
 }
 
 export async function releaseScoring(matchId: string): Promise<void> {
@@ -1926,20 +1946,31 @@ export async function setMatchBreak(matchId: string, info: { kind: string; note?
 export async function appendMatchEvent(matchId: string, rec: MatchEventRecord): Promise<void> {
   const device = await getDeviceId();
   if (!isSupabaseConfigured || !supabase) {
-    const l = demoLocks[matchId];
-    if (l?.holderId && l.device && l.device !== device) throw new Error('not_active_scorer');
-    if (!l?.holderId) demoLocks[matchId] = { holderId: 'me', holderName: 'You', device, at: new Date().toISOString() };
-    else demoLocks[matchId] = { ...l, device: l.device ?? device, at: new Date().toISOString() };
     const arr = demo.matchEvents[matchId] ?? [];
     if (rec.clientId && arr.some((e) => e.clientId === rec.clientId)) return;
-    appendDemoMatchEvent(matchId, { ...rec, seq: arr.reduce((m, e) => Math.max(m, e.seq), 0) + 1 });
+    if (!demoShared.has(matchId)) {
+      const l = demoLocks[matchId];
+      if (l?.holderId && l.device && l.device !== device) throw new Error('not_active_scorer');
+      if (!l?.holderId) demoLocks[matchId] = { holderId: 'me', holderName: 'You', device, at: new Date().toISOString() };
+      else demoLocks[matchId] = { ...l, device: l.device ?? device, at: new Date().toISOString() };
+    } else if (rec.base !== undefined && rec.base !== baseOf(arr)) throw new Error('stale_tap:');
+    const { base: _b, madeAt: _t, waited: _w, ...row } = rec;
+    appendDemoMatchEvent(matchId, { ...row, seq: arr.reduce((m, e) => Math.max(m, e.seq), 0) + 1 });
     return;
   }
   if (!lockRpcMissing) {
-    const { error } = await supabase.rpc('append_match_event', {
+    // Shared scoring: the tap's base ('' = this phone had no events); the server
+    // checks it only in shared mode. An old database has no p_base: the old call.
+    const args = {
       p_match: matchId, p_device: device, p_client_id: rec.clientId ?? null, p_type: rec.type,
       p_side: rec.side ?? null, p_payload: rec.payload ?? {}, p_attribution: rec.attribution ?? null,
-    });
+    };
+    let { error } = baseRpcMissing ? { error: { code: 'PGRST202', message: '' } as { code?: string; message: string } | null }
+      : await supabase.rpc('append_match_event', { ...args, p_base: rec.base ?? '' });
+    if (error && isMissingFn(error)) {
+      baseRpcMissing = true;
+      ({ error } = await supabase.rpc('append_match_event', args));
+    }
     if (!error) return;
     if (!isMissingFn(error)) throw new Error(error.message);
     lockRpcMissing = true; // pre-migration: plain insert below
@@ -1955,18 +1986,30 @@ export async function appendMatchEvent(matchId: string, rec: MatchEventRecord): 
   if (error) throw new Error(error.message);
 }
 
-/** Remove & return the most recent event for a match — powers undo. */
-export async function popMatchEvent(matchId: string): Promise<MatchEventRecord | null> {
+/** Remove & return the most recent event for a match — powers undo. `base` =
+ *  the key of the step this phone means to remove (shared scoring: refused as
+ *  stale if another phone's step is newer). */
+export async function popMatchEvent(matchId: string, base?: string): Promise<MatchEventRecord | null> {
   if (!isSupabaseConfigured || !supabase) {
+    if (demoShared.has(matchId)) {
+      if (base !== undefined && base !== baseOf(demo.matchEvents[matchId] ?? [])) throw new Error('stale_tap:');
+      return popDemoMatchEvent(matchId);
+    }
     const l = demoLocks[matchId];
     if (l?.holderId && l.device && l.device !== (await getDeviceId())) throw new Error('not_active_scorer');
     return popDemoMatchEvent(matchId);
   }
   if (!lockRpcMissing) {
-    const { data, error } = await supabase.rpc('pop_match_event', { p_match: matchId, p_device: await getDeviceId() });
+    const device = await getDeviceId();
+    let { data, error } = baseRpcMissing ? { data: null, error: { code: 'PGRST202', message: '' } as { code?: string; message: string } | null }
+      : await supabase.rpc('pop_match_event', { p_match: matchId, p_device: device, p_base: base ?? '' });
+    if (error && isMissingFn(error)) {
+      baseRpcMissing = true;
+      ({ data, error } = await supabase.rpc('pop_match_event', { p_match: matchId, p_device: device }));
+    }
     if (!error) {
-      const r = data as (MatchEventRecord & { client_id?: string | null }) | null;
-      return r ? { seq: r.seq, type: r.type, side: r.side, payload: r.payload, attribution: r.attribution, clientId: r.client_id ?? undefined } : null;
+      const r = data as (MatchEventRecord & { client_id?: string | null; recorded_by?: string | null }) | null;
+      return r ? { seq: r.seq, type: r.type, side: r.side, payload: r.payload, attribution: r.attribution, clientId: r.client_id ?? undefined, recordedBy: r.recorded_by ?? null } : null;
     }
     if (!isMissingFn(error)) throw new Error(error.message);
     lockRpcMissing = true;

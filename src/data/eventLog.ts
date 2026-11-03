@@ -48,8 +48,9 @@ export function statReversals(e: Pick<MatchEventRecord, 'attribution' | 'payload
 }
 
 /** A sync error the server will never accept (another device holds the scoring
- *  lock) vs. one worth retrying (network, timeout). */
-export const isRejection = (message?: string | null) => /not_active_scorer/i.test(message ?? '');
+ *  lock; shared scoring: a stale tap or an old app) vs. one worth retrying
+ *  (network, timeout). */
+export const isRejection = (message?: string | null) => /not_active_scorer|stale_tap:|update_app_shared_scoring/i.test(message ?? '');
 
 /** Who a player's stats belong to now: follows RESOLVED participation disputes
  *  (the disputed player → their confirmed replacement, possibly chained), the
@@ -92,8 +93,9 @@ export interface DerivedLog {
   /** every event this device has applied, by eventKey */
   applied: Set<string>;
   maxSeq: number;
-  /** what Undo would remove, with the state before / after it (SD-115) */
-  lastStep: { type: string; prev: unknown; next: unknown } | null;
+  /** what Undo would remove, with the state before / after it (SD-115), and
+   *  who recorded it (shared scoring; a player id when the server knows) */
+  lastStep: { type: string; prev: unknown; next: unknown; by?: string | null } | null;
 }
 
 /** Re-derive a live match from its raw log (backend + unsynced taps): the
@@ -120,8 +122,9 @@ export function deriveLog(
   for (const e of raw) { applied.add(eventKey(e)); maxSeq = Math.max(maxSeq, e.seq); }
   // The newest raw row is what Undo pops; an AMEND row isn't in `events` itself.
   const tail = newestEvent(raw);
+  const by = tail?.recordedBy ? { by: tail.recordedBy } : {};
   const lastStep = !tail ? null : tail.type === AMEND_TYPE || events[events.length - 1] !== tail
-    ? { type: tail.type, prev: s, next: s }
-    : { type: tail.type, prev: before, next: s };
+    ? { type: tail.type, prev: s, next: s, ...by }
+    : { type: tail.type, prev: before, next: s, ...by };
   return { state: s, applied, maxSeq, lastStep };
 }

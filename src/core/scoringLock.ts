@@ -11,12 +11,16 @@ export interface ScoringLock {
   device?: string | null;
   /** last scoring activity (ISO) */
   at?: string | null;
+  /** shared scoring (migration 20261103120000): every allowed scorer writes at
+   *  once; taps are base-checked instead of locked */
+  shared?: boolean;
 }
 
-export type LockStatus = 'unsupported' | 'free' | 'mine' | 'mine-other-device' | 'other';
+export type LockStatus = 'unsupported' | 'free' | 'mine' | 'mine-other-device' | 'other' | 'shared';
 
 export function lockStatus(lock: ScoringLock | null | undefined, myPlayerId: string | null | undefined, deviceId: string): LockStatus {
   if (!lock || !lock.supported) return 'unsupported';
+  if (lock.shared) return 'shared';
   if (!lock.holderId) return 'free';
   if (myPlayerId && lock.holderId === myPlayerId) {
     return !lock.device || lock.device === deviceId ? 'mine' : 'mine-other-device';
@@ -25,4 +29,4 @@ export function lockStatus(lock: ScoringLock | null | undefined, myPlayerId: str
 }
 
 /** May this device write events right now? (Free → the first tap takes the lock.) */
-export const canWriteWith = (status: LockStatus) => status === 'mine' || status === 'free' || status === 'unsupported';
+export const canWriteWith = (status: LockStatus) => status === 'mine' || status === 'free' || status === 'unsupported' || status === 'shared';

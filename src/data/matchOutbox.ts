@@ -13,7 +13,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { appendMatchEvent } from './repos';
 import type { MatchEventRecord } from '../core/types';
-import { isRejection } from './eventLog';
+import { outboxOnError } from '../core/sharedScoring';
 import { ownsQueue, queueAccount } from '../core/queueAccount';
 import { exposeGlobal } from '../core/devGlobals';
 
@@ -40,6 +40,10 @@ const STUCK_AFTER = 3;
 // Matches whose queued taps the server REFUSED (another device holds the scoring
 // lock). Never retried — the scorer discards them (see useLiveMatch).
 const rejected = new Set<string>();
+// Shared scoring: taps refused as stale while made live are dropped at once;
+// the live-match hook reverses their stats, refreshes and says who scored first.
+type StaleListener = (dropped: MatchEventRecord[], by: string | null) => void;
+const staleListeners = new Map<string, Set<StaleListener>>();
 
 // On the web we get real online/offline events; on native we probe instead.
 const hasOnlineEvents =
@@ -106,7 +110,8 @@ export const matchOutbox = {
     if (q.length && !mine(matchId)) return;
     const me = queueAccount();
     if (!q.length && me) owners.set(matchId, me);
-    q.push(rec);
+    // shared scoring: a tap made offline is never dropped silently if refused later
+    q.push(online ? rec : { ...rec, waited: true });
     queues.set(matchId, q);
     void persist(matchId);
     emit();
@@ -162,12 +167,29 @@ export const matchOutbox = {
         try {
           await appendMatchEvent(matchId, rec);
         } catch (e) {
-          if (isRejection(e instanceof Error ? e.message : String(e))) {
+          const outcome = outboxOnError(e instanceof Error ? e.message : String(e), q, Date.now());
+          if (outcome.action === 'drop') {
+            // Shared scoring: a live tap on a board that had moved on (and any
+            // tap queued behind it, based on it). Never retried, never merged.
+            const dropped = q.splice(0, q.length);
+            failures.delete(matchId);
+            lastError.delete(matchId);
+            await persist(matchId);
+            emit();
+            for (const l of staleListeners.get(matchId) ?? []) { try { l(dropped, outcome.by); } catch { /* a listener never breaks sync */ } }
+            return;
+          }
+          if (outcome.action === 'review') {
+            // Never retried — the scorer reviews and discards them.
             rejected.add(matchId);
-            lastError.set(matchId, 'Scoring moved to another device');
+            lastError.set(matchId, outcome.reason === 'lock' ? 'Scoring moved to another device'
+              : outcome.reason === 'update_app' ? 'Update SportnNote to score this match (shared scoring)'
+              : 'Another scorer recorded steps while these taps waited');
             emit();
             return;
           }
+          // shared scoring: these taps now wait — a later refusal goes to review
+          for (const r of q) r.waited = true;
           const n = (failures.get(matchId) ?? 0) + 1;
           failures.set(matchId, n);
           lastError.set(matchId, e instanceof Error ? e.message : 'Sync failed');
@@ -193,6 +215,14 @@ export const matchOutbox = {
   /** Flush every match with a pending queue (reconnect / interval / manual retry). */
   async flushAll(force = false): Promise<void> {
     await Promise.all([...queues.keys()].map((id) => this.flush(id, force)));
+  },
+
+  /** Shared scoring: called with taps dropped as stale (and who recorded the newer step). */
+  onStale(matchId: string, fn: StaleListener) {
+    const set = staleListeners.get(matchId) ?? new Set<StaleListener>();
+    set.add(fn);
+    staleListeners.set(matchId, set);
+    return () => { set.delete(fn); };
   },
 
   subscribe(fn: () => void) {

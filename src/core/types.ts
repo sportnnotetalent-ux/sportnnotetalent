@@ -885,6 +885,17 @@ export interface MatchEventRecord {
   created_at?: string;
   /** this device's id for the tap (idempotent retries; migration 0039) */
   clientId?: string;
+  /** the server's row id (read back); with clientId, what a shared-scoring base names */
+  id?: number;
+  /** shared scoring: who recorded the step (a PLAYER id, set by the server) */
+  recordedBy?: string | null;
+  /** shared scoring: the key of the newest event this phone had when it tapped
+   *  (sent with the tap, never stored in the row) */
+  base?: string;
+  /** when this phone made the tap (ms epoch; outbox only) */
+  madeAt?: number;
+  /** outbox only: the tap waited (made offline, or a send of it failed) */
+  waited?: boolean;
 }
 
 export type MatchStatus = 'scheduled' | 'live' | 'completed' | 'postponed' | 'cancelled';
