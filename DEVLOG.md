@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-05 — Release: overdue games live (web, Android OTA)
+
+auth-smoke passed. Published from a clean worktree at 09f4967: web (entry `index-bbaaa081`, confirmed live on app.sportnnote.in) and Android OTA groups `753bc982` (preview) and `ad05dfb9` (production), runtime 1.0.0. No database change.
+
 ### 2026-11-05 — Overdue games out of "Up next"
 
 From the founder's backlog (`docs/security/breaks/overdue-games.md`, `src/core/overdue.ts`): a scheduled game 12+ hours past its start (the 8 Oct Fnatic game) is overdue. Home's "Up next" leaves it out (lists sort by date, so it used to sit first); Matches → Upcoming shows real upcoming games first, then an "Overdue · date passed, not played" group, most recently missed first, each card saying to open it to play, reschedule or cancel (the tab count includes them, nothing is dropped); the sport hub lists overdue fixtures after the upcoming ones, marked. Postponed / cancelled keep their place. Tests: 3 unit + the Matches view tests, a 600-list simulation; full suite green (5 load-timeout tests pass alone); tsc clean; demo checked. No database change.
