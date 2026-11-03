@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-04 — Release: shared scoring + Your sports live; SQL run (web, Android OTA)
+
+The founder ran both SQL files; checked read-only: `matches.shared_scoring` exists, the 6 test teams and 5 test tournaments are gone (tournaments left: Hrudhay's 5 a side Hyd Tournament, Inter-School Championship 2026). Full suite 7,193 tests, 0 failing; auth-smoke passed. Published from a clean worktree at 6048cb2: web (entry `index-14a10f8d`, confirmed live on app.sportnnote.in) and Android OTA groups `047d5c3d` (preview) and `27126fe1` (production), runtime 1.0.0.
+
 ### 2026-11-04 — Shared scoring; Your sports; test-data clean-up SQL
 
 - **Shared scoring** (`docs/security/breaks/shared-scoring.md`): a per-match switch (off by default; friendlies: any listed scorer, tournament matches: hosts / organisers) lets several listed scorers record one match at the same time from their own phones. Every tap and Undo carries the key of the newest step the phone had; the server refuses a stale one (`stale_tap:<who>`) so nothing counts twice or lands on a moment that moved on; the phone refreshes and says who recorded the newer step; offline / waited taps that turn out stale go to the review list; Undo names who recorded the step and asks before removing someone else's; undone steps never come back on a late retry; old app versions are refused only in shared mode ("update the app"). Every write path sends the base (a test fails on any that doesn't). **Needs the founder to run** `supabase/migrations/20261103120000_shared_scoring.sql` (re-creates append / pop / claim / handover / write guard from their newest bodies, all checks kept, reviewed); until then the app falls back to the old call and one-at-a-time scoring. Tests: unit, 18 PGlite integration, 600-match two-phone simulation.
