@@ -19,9 +19,10 @@ import { carromBox } from '../boxSources';
 import {
   init, reducer, result, boardValue, boardCloses, boardCredit, creditedPoints, summary, scoreLine, lineScore, standingsUnits,
   nextBreaker, nextBreakerPlayer, boardBreakers, boardReady, queenChoices, breakerPlayers, slamFor, boardInputs, boardCorrection, FOUL_TYPES, FOUL_CHIPS, FOUL_LABEL, CARROM_LIVE_SETTINGS,
+  AWARD_REASONS, awardGameAction, type AwardReason,
   type BoardDetail, type BoardInput, type CarromCredit, type CarromState, type EndFoul, type FoulType, type PlayerFouls, type QueenBy, type Side, type Slam,
 } from './engine';
-import { carromFeed } from './feed';
+import { carromFeed, AWARD_WORD } from './feed';
 import { carromGames, carromMatchStats } from './matchStats';
 import { CommentaryFeed } from '../gcc/CommentaryFeed';
 import { CompareTable } from '../gcc/CompareTable';
@@ -67,6 +68,10 @@ const ScoringControls: SportPlugin<CarromState>['ScoringControls'] = ({ state, d
   const [slam, setSlam] = useState<Slam | null>(null);
   // SD-68 (CR-07) — a penalty board: 3 to the side picked, not a board won
   const [penalty, setPenalty] = useState(false);
+  // cue batch 6 — a board conceded / awarded (optional, with a reason), and a whole game
+  const [award, setAward] = useState<AwardReason | null>(null);
+  const [awardOpen, setAwardOpen] = useState(false);
+  const [gameAward, setGameAward] = useState<{ side: Side | null; reason: AwardReason | null } | null>(null);
   const [fixToss, setFixToss] = useState(false);
   // SD-134 — doubles: who breaks first for each side (A1 → B1 → A2 → B2)
   const [firstOf, setFirstOf] = useState<Record<Side, string | null>>({ home: null, away: null });
@@ -99,7 +104,7 @@ const ScoringControls: SportPlugin<CarromState>['ScoringControls'] = ({ state, d
   const roster = winner ? (winner === 'home' ? homeRoster : awayRoster) : [];
   const players = winner ? creditedPlayers(roster, perSide, picked[winner]) : [];
   // SD-37: the game score counts at most to 25, and so do the players' points
-  const ready = boardReady(s, { penalty, coins, queenBy });
+  const ready = boardReady(s, { penalty, coins, queenBy, award: award != null });
   // Round 2 — every score rule in one place (ICF foul penalties with foulScore)
   const ef: EndFoul | undefined = s.foulScore && (endFoul.striker || endFoul.improper) ? endFoul : undefined;
   const value = winner && ready ? boardValue(s, s.current[winner], { coins: coins ?? 0, queen, penalty, endFoul: ef }) : 0;
@@ -138,12 +143,12 @@ const ScoringControls: SportPlugin<CarromState>['ScoringControls'] = ({ state, d
       type: 'BOARD', side: winner,
       // Deep wave — `at` (the scorer's clock) for the commentary; `det` when tracked
       payload: penalty ? { coins: 0, queen: false, penalty: true, at: Date.now(), ...(ef ? { endFoul: ef } : {}) }
-        : { coins, queen, ...(queenBy ? { queenBy } : {}), ...(slam ? { slam } : {}), ...(det ? { det } : {}), at: Date.now(), ...(ef ? { endFoul: ef } : {}) },
+        : { coins, queen, ...(queenBy ? { queenBy } : {}), ...(slam ? { slam } : {}), ...(det ? { det } : {}), at: Date.now(), ...(ef ? { endFoul: ef } : {}), ...(award ? { award } : {}) },
       // SD-37: a board is the side's — both doubles partners are credited
       attribution: players[0] ? attr(players[0]) : undefined,
       attribution2: players[1] ? attr(players[1]) : undefined,
     });
-    setWinner(null); setCoins(null); setQueenBy(null); setSlam(null); setPenalty(false);
+    setWinner(null); setCoins(null); setQueenBy(null); setSlam(null); setPenalty(false); setAward(null); setAwardOpen(false);
     setFouls({ home: {}, away: {} }); setDues({ home: 0, away: 0 }); setBrk(null); setQMiss({ home: 0, away: 0 });
     setWhoLog({ home: {}, away: {} }); setEndFoul({}); setEndOpen(false);
   };
@@ -245,8 +250,19 @@ const ScoringControls: SportPlugin<CarromState>['ScoringControls'] = ({ state, d
           {/* SD-68 (CR-07) — a penalty board instead of a played-out one */}
           <View style={ctrl.chips}>
             <SelectChip label="Board played out" active={!penalty} onPress={() => setPenalty(false)} />
-            <SelectChip label={`⚠️ Penalty board · +${penaltyValue} to ${nameOf(winner)}`} active={penalty} onPress={() => { setPenalty(true); setSlam(null); setQueenBy(null); }} />
+            <SelectChip label={`⚠️ Penalty board · +${penaltyValue} to ${nameOf(winner)}`} active={penalty} onPress={() => { setPenalty(true); setSlam(null); setQueenBy(null); setAward(null); }} />
           </View>
+          {/* cue batch 6 — optional: the board was conceded or awarded (scored from the coins and Queen below) */}
+          {!penalty ? (awardOpen || award ? (
+            <View style={{ gap: theme.spacing(2) }}>
+              <Text style={ctrl.label}>Board conceded or awarded to {nameOf(winner)} <Text style={ctrl.meta}>· why (optional)</Text></Text>
+              <View style={ctrl.chips}>
+                {AWARD_REASONS.map((r) => <SelectChip key={r} label={r === 'concession' ? 'Conceded' : r[0].toUpperCase() + r.slice(1)} active={award === r} onPress={() => setAward(award === r ? null : r)} accessibilityLabel={`Board awarded: ${AWARD_WORD[r]}`} />)}
+              </View>
+            </View>
+          ) : (
+            <Text style={ctrl.link} accessibilityRole="button" onPress={() => setAwardOpen(true)}>Board conceded or awarded?</Text>
+          )) : null}
           {penalty ? (
             <Text style={ctrl.meta}>The opponent was penalised: {nameOf(winner)} get {penaltyValue} point{penaltyValue === 1 ? '' : 's'}{s.foulScore && penaltyValue < 3 ? ' (1, not 3, at 22 or more — ICF)' : ''}. It is not counted as a board won, a Queen or a slam.</Text>
           ) : (<>
@@ -264,7 +280,7 @@ const ScoringControls: SportPlugin<CarromState>['ScoringControls'] = ({ state, d
             <View style={ctrl.chips}>
               <SelectChip label={`Winner${queenCounts ? ' (+3)' : ' (no points at 22+)'}`} active={queenBy === 'winner'} onPress={() => setQueenBy(queenBy === 'winner' ? null : 'winner')} />
               <SelectChip label="Loser (no points)" active={queenBy === 'loser'} onPress={() => setQueenBy(queenBy === 'loser' ? null : 'loser')} />
-              {queenChoices(s).includes('none') ? <SelectChip label="Not covered" active={queenBy === 'none'} onPress={() => setQueenBy(queenBy === 'none' ? null : 'none')} /> : null}
+              {queenChoices(s, award != null).includes('none') ? <SelectChip label="Not covered" active={queenBy === 'none'} onPress={() => setQueenBy(queenBy === 'none' ? null : 'none')} /> : null}
             </View>
           </View>
           <View style={{ gap: theme.spacing(2) }}>
@@ -355,6 +371,30 @@ const ScoringControls: SportPlugin<CarromState>['ScoringControls'] = ({ state, d
             variant={closes ? 'primary' : winner} onPress={record} disabled={!ready} />
         </>
       )}
+      {/* cue batch 6 — a whole game conceded or awarded (recorded at the target), with a reason */}
+      {!s.ended ? (gameAward ? (
+        <View style={{ gap: theme.spacing(2) }}>
+          <Text style={ctrl.label}>Game {s.games.length + 1} conceded or awarded to</Text>
+          <View style={ctrl.chips}>
+            {(['home', 'away'] as Side[]).map((sd) => <SelectChip key={sd} label={nameOf(sd)} active={gameAward.side === sd} onPress={() => setGameAward({ ...gameAward, side: sd })} />)}
+          </View>
+          <View style={ctrl.chips}>
+            {AWARD_REASONS.map((r) => <SelectChip key={r} label={r === 'concession' ? 'Conceded' : r[0].toUpperCase() + r.slice(1)} active={gameAward.reason === r} onPress={() => setGameAward({ ...gameAward, reason: gameAward.reason === r ? null : r })} />)}
+          </View>
+          <Button label={gameAward.side ? `Award Game ${s.games.length + 1} to ${nameOf(gameAward.side)} (${s.target}–${Math.min(s.current[gameAward.side === 'home' ? 'away' : 'home'], s.target - 1)})…` : 'Pick who gets the game'}
+            variant="danger" disabled={!gameAward.side} onPress={() => void (async () => {
+              const side = gameAward.side;
+              if (!side) return;
+              const ok = await askConfirm({ title: `Award Game ${s.games.length + 1} to ${nameOf(side)}?`, message: `The game is recorded at ${s.target} for ${nameOf(side)}${gameAward.reason ? ` (${AWARD_WORD[gameAward.reason]})` : ''}. Boards already played stay on the sheet.`, yesLabel: 'Yes, award it', noLabel: 'No, go back', tone: 'danger' });
+              if (!ok) return;
+              dispatch(awardGameAction(s, side, gameAward.reason) as ScoreAction);
+              setGameAward(null);
+            })()} />
+          <Text style={ctrl.link} accessibilityRole="button" onPress={() => setGameAward(null)}>Cancel</Text>
+        </View>
+      ) : (
+        <Text style={ctrl.link} accessibilityRole="button" onPress={() => setGameAward({ side: null, reason: null })}>Game {s.games.length + 1} conceded or awarded?</Text>
+      )) : null}
       {/* SD-117c — fix or remove any past board (the boards replay: EDIT_LOG) */}
       <BoardEditor state={s} dispatch={dispatch} nameOf={nameOf} who={pname} homeRoster={homeRoster} awayRoster={awayRoster} />
     </View>

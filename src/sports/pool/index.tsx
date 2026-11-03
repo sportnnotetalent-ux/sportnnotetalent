@@ -33,7 +33,7 @@ import { perSideOf, poolReducer, type PoolMatch } from './match';
 import {
   AWARD_REASON_LABEL, BREAK_FOULS, FOUL_LABEL, PLAY_FOULS, bestOfLine, boardStatus, breakAction, breakLine, chooseAction, choiceOptions, choiceQuestion,
   confirmFor, foulAction, lagAction, makeTapGuard, missAction, outcomeOf, poolPanel, potAction, pushAction, rackAction,
-  otherGroupOnly, safetyAction, scotchTurns, setUnits, shooterPick, stalemateAction, type TapOpts,
+  otherGroupOnly, safetyAction, scotchTurns, setUnits, shooterPick, stalemateAction, extensionAction, extensionReady, type TapOpts,
 } from './controls';
 import { ballsText, poolFeed } from './feed';
 import { poolCompare, poolRackList } from './compare';
@@ -318,6 +318,13 @@ const ScoringControls: SportPlugin<PoolMatch>['ScoringControls'] = ({ state, dis
         {p.push ? <Button label="Push out" variant="ghost" style={ctrl.flex} accessibilityHint="The shot after the break: the other player then chooses who shoots"
           onPress={() => void send(pushAction(s, { pots: picked }, o))} /> : null}
       </View>
+      {/* cue batch 6 — WPA shot clock: one extension per player per rack (only when the organiser tracks it) */}
+      {extensionReady(s) ? (
+        <View style={ctrl.chips}>
+          <SelectChip label={`⏱ Extension · ${name(sh)}`} active={false} accessibilityLabel={`${name(sh)} takes the shot-clock extension`}
+            onPress={() => { const a = extensionAction(s, o); if (a) void send(a); }} />
+        </View>
+      ) : null}
       {foulOpen ? (
         <View style={ctrl.box}>
           <Text style={ctrl.label}>Foul by {name(sh)}{doubles && pidFor(sh) ? ` (${who(pidFor(sh)!)})` : ''}</Text>

@@ -11,8 +11,11 @@
 import type { SportStatSchema, StatDef } from '../statSchema.ts';
 import {
   CENTURIES, CUE_FOULS, CUE_POINTS, FIFTY_PLUS, FOUL_POINTS, FOULS_PER_FRAME, FRAME_PCT, FRAMES_LOST, FRAMES_WL, FRAMES_WON, HIGHEST_BREAK,
-  MATCHES_WON, PENALTY_POINTS, POINTS_AGAINST, POINTS_PER_FRAME, SAFETIES, SHOT_FRAMES, VISITS, WIN_PCT,
+  MATCHES_WON, PENALTY_POINTS, POINTS_AGAINST, POINTS_PER_FRAME, SAFETIES, SHOT_FRAMES, VISITS, WIN_PCT, cueFoulKind,
 } from '../cue/stats.ts';
+
+/** Cue batch 6 — the foul kinds' career keys (totals.ts BILLIARDS_FOUL_KEY). */
+const FOUL_KIND_KEYS = ['foulNoContact', 'foulCoup', 'foulInHand', 'foulPush', 'foulJump', 'foulTouch', 'foulOffTable', 'foulHazards', 'foulCannons', 'foulBaulkLine', 'foulOther'];
 
 const keyed = { coverage: 'keyed' as const };
 const count = (key: string, label: string, short: string, one: string, group: string): StatDef => ({ key, label, short, one, group, ...keyed });
@@ -42,6 +45,7 @@ export const billiardsStats: SportStatSchema<'billiards'> = {
     FRAMES_WON, FRAMES_LOST, CUE_POINTS, POINTS_AGAINST,
     SHOT_FRAMES, HIGHEST_BREAK, FIFTY_PLUS, CENTURIES, VISITS, SAFETIES, CUE_FOULS, FOUL_POINTS, PENALTY_POINTS,
     ...BILLIARDS_ONLY,
+    ...FOUL_KIND_KEYS.map((k) => cueFoulKind(k, 'fouls')),
     MATCHES_WON, WIN_PCT, FRAMES_WL, FRAME_PCT, POINTS_PER_FRAME, FOULS_PER_FRAME,
   ],
   sections: [
@@ -52,7 +56,8 @@ export const billiardsStats: SportStatSchema<'billiards'> = {
       { stat: 'potRed' }, { stat: 'inOffRed' }, { stat: 'cannons' }, { stat: 'potWhite' }, { stat: 'inOffWhite' }, { stat: 'scoringStrokes' },
     ] },
     { id: 'play', title: 'Safety and misses', rows: [{ stat: 'safeties' }, { stat: 'misses' }, { stat: 'visits' }] },
-    { id: 'fouls', title: 'Fouls', rows: [{ stat: 'fouls' }, { stat: 'foulsPerFrame' }, { stat: 'foulPoints' }, { stat: 'penaltyPoints' }] },
+    { id: 'fouls', title: 'Fouls', rows: [{ stat: 'fouls' }, { stat: 'foulsPerFrame' }, { stat: 'foulPoints' }, { stat: 'penaltyPoints' },
+      ...FOUL_KIND_KEYS.map((stat) => ({ stat, hideZero: true }))] },
   ],
   careerView: 'sections',
   history: ['framesWon', 'centuries', 'fiftyPlus'],

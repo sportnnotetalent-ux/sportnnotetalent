@@ -66,5 +66,8 @@ export const POOL_META: SportMeta = {
     // cue batch 5: each game's own option shows only in that game (Info, setup, Edit format)
     { key: 'threeBallRule', label: '9-ball: three-ball rule on the break', type: 'toggle', default: true, advanced: true, hideWhen: { key: 'game', unless: ['nine'] }, hint: 'at least three balls must be pocketed or pass the head string on the break (WPA 5.3(c))' },
     { key: 'tenEarly', label: '10-ball: an early called 10 wins', type: 'toggle', default: false, advanced: true, hideWhen: { key: 'game', unless: ['ten'] }, hint: 'the older practice; WPA 2026 spots it, and the 10 wins only as the last ball' },
+    // cue batch 6 (audit row 19) — WPA playing regulations: one extension per player per rack
+    { key: 'trackShotClock', label: 'Shot-clock extensions', type: 'toggle', default: false, advanced: true, group: 'Stats to track',
+      hint: 'an optional "Extension" chip for the player at the table (one per player per rack)' },
   ],
 };

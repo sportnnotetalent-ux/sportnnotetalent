@@ -99,6 +99,12 @@ export const CUE_FOUL_KIND_LABELS: Readonly<Record<string, readonly [label: stri
   foulInOff: ['Fouls: in-off', 'in-offs', 'in-off'],
   foulNoContact: ['Fouls: missed every ball', 'no-contact fouls', 'no-contact foul'],
   foulPottedWrong: ['Fouls: potted a ball not on', 'wrong-pot fouls', 'wrong-pot foul'],
+  // billiards only (cue batch 6; its "missed every ball" is snooker's foulNoContact)
+  foulCoup: ['Fouls: coup', 'coups', 'coup'],
+  foulInHand: ['Fouls: playing from hand', 'in-hand fouls', 'in-hand foul'],
+  foulHazards: ['Fouls: too many hazards', 'hazard-limit fouls', 'hazard-limit foul'],
+  foulCannons: ['Fouls: too many cannons', 'cannon-limit fouls', 'cannon-limit foul'],
+  foulBaulkLine: ['Fouls: baulk line not crossed', 'baulk-line fouls', 'baulk-line foul'],
 };
 /** One foul-kind StatDef (keyed, fewer is better) in the sport's group. */
 export function cueFoulKind(key: string, group: string): StatDef {

@@ -42,5 +42,8 @@ export const SNOOKER_META: SportMeta = {
         { value: 'quick', label: 'Frame scores only' },
       ],
     },
+    // cue batch 6 (audit row 19) — WST broadcast stats, optional chips on the pot buttons
+    { key: 'trackLongRest', label: 'Long pots and rest shots', type: 'toggle', default: false, advanced: true, group: 'Stats to track',
+      hint: 'two optional chips by the pot buttons: tag a long pot (made or missed) or a stroke with the rest' },
   ],
 };

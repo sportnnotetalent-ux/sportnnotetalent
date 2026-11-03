@@ -81,7 +81,8 @@ describe('match state: the engine state plus what the app adds', () => {
       (x) => C.foulAction(x, 'scratch'),
       (x) => C.safetyAction(x),
     );
-    assert.deepEqual(M.sideCounts(s, 'home'), { breakShots: 1, breakBalls: 1, shotsPlayed: 3, potShots: 1, ballsPotted: 1, missShots: 1, safetyShots: 1 });
+    // cue batch 6: + ball in hand (home came to the table with it after the away scratch)
+    assert.deepEqual(M.sideCounts(s, 'home'), { breakShots: 1, breakBalls: 1, shotsPlayed: 3, potShots: 1, ballsPotted: 1, missShots: 1, safetyShots: 1, ballInHand: 1 });
     assert.deepEqual(M.sideCounts(s, 'away'), { shotsPlayed: 1, fouls: 1, foulScratch: 1 });
     assert.deepEqual(M.sideCounts(s, 'home', 1), M.sideCounts(s, 'home'));
     assert.deepEqual(M.sideCounts(s, 'home', 2), {});
@@ -451,6 +452,8 @@ describe('integration: a 9-ball match (break-and-run, golden break, three fouls)
       // cue batch 5: every foul kind its own key
       foulTouch: 0, foulDoubleHit: 0, foulPush: 0, foulJump: 0, foulMoving: 0, foulNoFoot: 0, foulPlacement: 0, foulSlowPlay: 0, foulOutOfTurn: 0, foulIllegalBreak: 0,
       breakShots: 2, breakBalls: 1, dryBreaks: 1, breakFouls: 0, illegalBreaks: 0,
+      // cue batch 6: pots not called, and the side's own figures
+      notCalled: 0, ballInHand: 2, pushPlayed: 0, pushPassed: 1, rerackBreaks: 0,
     } });
     assert.deepEqual(t.a1, { side: 'away', stats: {
       racksWon: 1, racksLost: 2, racksBroken: 1, racksWonOnBreak: 1, breakAndRuns: 1, runOuts: 0, goldenBreaks: 1, threeFoulLosses: 1,
@@ -459,6 +462,7 @@ describe('integration: a 9-ball match (break-and-run, golden break, three fouls)
       fouls: 3, foulScratch: 2, foulWrongBall: 1, foulNoRail: 0, foulOffTable: 0, foulOther: 0,
       foulTouch: 0, foulDoubleHit: 0, foulPush: 0, foulJump: 0, foulMoving: 0, foulNoFoot: 0, foulPlacement: 0, foulSlowPlay: 0, foulOutOfTurn: 0, foulIllegalBreak: 0,
       breakShots: 1, breakBalls: 1, dryBreaks: 0, breakFouls: 0, illegalBreaks: 0,
+      notCalled: 0, ballInHand: 0, pushPlayed: 0, pushPassed: 0, rerackBreaks: 0, // cue batch 6
     } });
   });
   test('records: biggest win, break-and-runs, the golden break', () => {
@@ -556,11 +560,13 @@ describe('integration: 8-ball scotch doubles (who shot)', () => {
     const t = POOL_CORE.statTotals!(s, ctx(['h1', 'h2'], ['a1', 'a2']));
     const rec = { racksBroken: 0, racksWonOnBreak: 0, breakAndRuns: 0, runOuts: 0, eightLosses: 0, detailRacks: 1, innings: 2 };
     const zero = { shotsPlayed: 0, potShots: 0, missShots: 0, safetyShots: 0, ballsPotted: 0, fouls: 0, foulScratch: 0, foulWrongBall: 0, foulNoRail: 0, foulOffTable: 0, foulOther: 0, breakShots: 0, breakBalls: 0, dryBreaks: 0, breakFouls: 0, illegalBreaks: 0, eightBreaks: 0,
-      foulTouch: 0, foulDoubleHit: 0, foulPush: 0, foulJump: 0, foulMoving: 0, foulNoFoot: 0, foulPlacement: 0, foulSlowPlay: 0, foulOutOfTurn: 0, foulIllegalBreak: 0 }; // cue batch 5
+      foulTouch: 0, foulDoubleHit: 0, foulPush: 0, foulJump: 0, foulMoving: 0, foulNoFoot: 0, foulPlacement: 0, foulSlowPlay: 0, foulOutOfTurn: 0, foulIllegalBreak: 0, // cue batch 5
+      notCalled: 0, ballInHand: 0, rerackBreaks: 0 }; // cue batch 6 (8-ball: no push-outs; extensions untracked)
     assert.deepEqual(t.h1, { side: 'home', partnerId: 'h2', stats: { racksWon: 0, racksLost: 1, ...rec, racksBroken: 1, ...zero, breakShots: 1, breakBalls: 2, shotsPlayed: 2, potShots: 1, ballsPotted: 1, fouls: 1, foulScratch: 1 } });
     assert.deepEqual(t.h2, { side: 'home', partnerId: 'h1', stats: { racksWon: 0, racksLost: 1, ...rec, racksBroken: 1, ...zero, shotsPlayed: 2, potShots: 1, ballsPotted: 1, missShots: 1 } });
-    assert.deepEqual(t.a1, { side: 'away', partnerId: 'a2', stats: { racksWon: 1, racksLost: 0, ...rec, ...zero, shotsPlayed: 4, potShots: 4, ballsPotted: 4 } });
-    assert.deepEqual(t.a2, { side: 'away', partnerId: 'a1', stats: { racksWon: 1, racksLost: 0, ...rec, ...zero, shotsPlayed: 3, potShots: 2, ballsPotted: 3, safetyShots: 1 } });
+    // cue batch 6: ball in hand after h1's scratch is the away side's (both partners)
+    assert.deepEqual(t.a1, { side: 'away', partnerId: 'a2', stats: { racksWon: 1, racksLost: 0, ...rec, ...zero, shotsPlayed: 4, potShots: 4, ballsPotted: 4, ballInHand: 1 } });
+    assert.deepEqual(t.a2, { side: 'away', partnerId: 'a1', stats: { racksWon: 1, racksLost: 0, ...rec, ...zero, shotsPlayed: 3, potShots: 2, ballsPotted: 3, safetyShots: 1, ballInHand: 1 } });
   });
   test('a doubles side with an unattributed shot: its players get the record, not a guessed split', () => {
     const t = POOL_CORE.statTotals!(s, ctx(['h1', 'h2'], ['a1', 'a2']));

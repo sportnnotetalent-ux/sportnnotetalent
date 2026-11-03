@@ -95,9 +95,10 @@ describe('the panel', () => {
 
   test('ten hazards: the warning, then the 16th hazard is marked as a foul', () => {
     let s = init({ hazardLimit: 15 });
-    for (let i = 0; i < 9; i++) s = apply(s, strokeAction(s, { potRed: true }));
+    // cue batch 6: white pots (a run of red pots also brings the red-to-centre-spot hint)
+    for (let i = 0; i < 9; i++) s = apply(s, strokeAction(s, { potWhite: true }));
     assert.deepEqual(limitWarnings(billiardsPanel(s)!), []);
-    s = apply(s, strokeAction(s, { potRed: true }));
+    s = apply(s, strokeAction(s, { potWhite: true }));
     let w = limitWarnings(billiardsPanel(s)!);
     assert.equal(w.length, 1);
     assert.match(w[0], /10 hazards in a row.*5 more/);

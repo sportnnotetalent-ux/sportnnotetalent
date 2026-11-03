@@ -10,11 +10,11 @@ import { theme } from '../../core/theme';
 import { Button, SelectChip, textStyles } from '../../components/ui';
 import { askConfirm } from '../../components/ConfirmSheet';
 import { confirmCopy } from '../../core/matchSafety';
-import type { Attribution, SportPlugin } from '../types';
+import type { Attribution, ScoreAction, SportPlugin } from '../types';
 import { Scoreboard } from '../../components/Scoreboard';
 import {
   init, reducer, points, resultString, resultSentence, scoreFor, METHOD_LABEL, isForfeit, isDoubleForfeit, clockText, parseClock,
-  DEFAULT_KO_PLAN, koPhases, koPoints, koStatus, koPhaseText, KO_PHASE_LABEL,
+  DEFAULT_KO_PLAN, koPhases, koPoints, koStatus, koPhaseText, KO_PHASE_LABEL, arbiterAction, arbiterPreset, illegalCount, illegalSecs, timeControlText, type ArbiterKind,
   type ChessMethod, type ChessState, type Side, type KoState,
 } from './engine';
 import { chessResultCredit } from './stats';
@@ -84,6 +84,9 @@ const ScoringControls: SportPlugin<ChessState>['ScoringControls'] = ({ state, di
   const [clockW, setClockW] = useState('');
   const [clockB, setClockB] = useState('');
   const [busy, setBusy] = useState(false);
+  // cue batch 6 — ½-0 / 0-½ (the arbiter's decision / adjudication only), and the in-game arbiter row
+  const [uneven, setUneven] = useState(false);
+  const [arbOpen, setArbOpen] = useState(false);
   // Round 2 — a knockout game already recorded whose moves are being pasted
   // A person's name reads better than a team code ("AM") in a 1-v-1 game.
   const { nameOf: who } = useMask();
@@ -100,6 +103,13 @@ const ScoringControls: SportPlugin<ChessState>['ScoringControls'] = ({ state, di
     } else if (auto) { setPick(null); setMethod(null); setAuto(false); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [endKey]);
+  // cue batch 6 — Art. 7.5.5: a player's second illegal move loses; the loss is pre-selected (the arbiter confirms)
+  const preset = arbiterPreset(s);
+  const presetKey = preset ? `${preset.winner}:${illegalCount(s, 'home')}:${illegalCount(s, 'away')}` : '';
+  useEffect(() => {
+    if (preset && pick == null) { setPick(preset.winner === s.white ? 'white' : 'black'); setMethod(preset.method); setAuto(false); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [presetKey]);
 
   if (s.ended && s.ko && s.ko.games.length > 1) {
     const st = koStatus(s.ko);
@@ -143,9 +153,11 @@ const ScoringControls: SportPlugin<ChessState>['ScoringControls'] = ({ state, di
   // SD-67: a double forfeit carries its own method; batch 5: else the pick, or the default (resignation / agreement)
   const sentMethod: ChessMethod | undefined = sentHow({ winner, picked: method, none: noHow, dff });
   const methods = moreHow || (sentMethod && how.more.includes(sentMethod)) ? [...how.common, ...how.more] : how.common;
+  const unevenOk = !koOn && !dff && winner != null && winner !== 'draw' && (sentMethod === 'arbiter' || sentMethod === 'adjudication');
+  const unevenOn = uneven && unevenOk;
   const record = async () => {
     if (!winner || busy) return;
-    const what = `${resultSentence(white, winner, nameOf(white), nameOf(black), sentMethod)}${koAt ? ` — ${koPhaseText(koNow, koAt.phase, koAt.game)}${armageddon && winner === 'draw' ? `: ${nameOf(black)} (Black) goes through` : ''}` : ''}`;
+    const what = `${resultSentence(white, winner, nameOf(white), nameOf(black), sentMethod, unevenOn)}${koAt ? ` — ${koPhaseText(koNow, koAt.phase, koAt.game)}${armageddon && winner === 'draw' ? `: ${nameOf(black)} (Black) goes through` : ''}` : ''}`;
     setBusy(true);
     const ok = await askConfirm(confirmCopy('recordResult', { what }));
     setBusy(false);
@@ -155,7 +167,7 @@ const ScoringControls: SportPlugin<ChessState>['ScoringControls'] = ({ state, di
     // instead of `games` + `wins` / `losses` (FIDE: excluded from played games).
     // SD-119: each credit carries its player's side (the line's opponent is the other player).
     const credit = (side: Side): Attribution | undefined =>
-      chessResultCredit(side, (side === 'home' ? homeRoster : awayRoster)[0], winner, sentMethod, dff);
+      chessResultCredit(side, (side === 'home' ? homeRoster : awayRoster)[0], winner, sentMethod, dff, unevenOn);
     const w = dff ? null : parseClock(clockW); const b = dff ? null : parseClock(clockB);
     const clock = w != null || b != null ? { ...(w != null ? { white: w } : {}), ...(b != null ? { black: b } : {}) } : undefined;
     // the colour is committed only now, and only if it really changed
@@ -165,15 +177,16 @@ const ScoringControls: SportPlugin<ChessState>['ScoringControls'] = ({ state, di
       side: winner === 'draw' ? undefined : winner,
       // Deep wave — the length from the move list when none was typed; `at` for the commentary
       // (round 2: in a knockout match s.game is the game in play's list)
-      payload: { winner, method: sentMethod, moves: dff ? undefined : Number(moves) || listMoves(s.game) || undefined, ...(clock ? { clock } : {}), at: Date.now(),
+      payload: { winner, method: sentMethod, moves: dff ? undefined : Number(moves) || listMoves(s.game) || undefined, ...(clock ? { clock } : {}), at: Date.now(), ...(unevenOn ? { uneven: true } : {}),
         // SD-121 — the first game of a knockout match carries the plan
         ...(knockout && !s.ko ? { ko: koNow.plan } : {}) },
       attribution: credit('home'),
       attribution2: credit('away'),
     });
     // SD-121 — a knockout goes on to its next game: a clean form
-    setPick(null); setMethod(null); setNoHow(false); setMoreHow(false); setMoves(''); setClockW(''); setClockB(''); setWhiteDraft(null); setUnlockColour(false); setAuto(false);
+    setPick(null); setMethod(null); setNoHow(false); setMoreHow(false); setMoves(''); setClockW(''); setClockB(''); setWhiteDraft(null); setUnlockColour(false); setAuto(false); setUneven(false); setArbOpen(false);
   };
+  const arbiter = (kind: ArbiterKind, side: Side) => { const a = arbiterAction(s, kind, side, Date.now()); if (a) dispatch(a as ScoreAction); };
   const choose = (p: Pick | null) => { setPick(p); setMethod(null); setNoHow(false); setAuto(false); };
   const tile = (p: Pick, score: string, caption: string, names: string) => (
     <TouchableOpacity key={p} onPress={() => choose(p)} activeOpacity={0.8} accessibilityRole="button"
@@ -195,6 +208,24 @@ const ScoringControls: SportPlugin<ChessState>['ScoringControls'] = ({ state, di
       {onBoard && auto ? (
         <Text style={ctrl.meta}>{onBoard.method === 'checkmate' ? '#️⃣ Checkmate' : '🤝 Stalemate'} on the board — {onBoard.pick === 'draw' ? '½-½' : onBoard.pick === 'white' ? '1-0' : '0-1'} is pre-selected. Check it, then record.</Text>
       ) : null}
+      {/* cue batch 6 — in-game arbiter events (optional): an illegal move (time to the opponent; the second loses), a draw offer */}
+      {arbOpen ? (
+        <View style={{ gap: theme.spacing(2) }}>
+          <Text style={ctrl.label}>Arbiter <Text style={ctrl.meta}>(during the game · optional)</Text></Text>
+          {([white, black] as Side[]).map((sd) => (
+            <View key={sd} style={ctrl.chips}>
+              <SelectChip label={`Illegal move · ${nameOf(sd)}${illegalCount(s, sd) ? ` (${illegalCount(s, sd)})` : ''}`} active={false} onPress={() => arbiter('illegal', sd)}
+                accessibilityLabel={`${nameOf(sd)} completed an illegal move: ${illegalSecs(s.timeControl) / 60} minute${illegalSecs(s.timeControl) === 60 ? '' : 's'} added for the opponent`} />
+              <SelectChip label={`Draw offer · ${nameOf(sd)}`} active={false} onPress={() => arbiter('drawOffer', sd)} accessibilityLabel={`${nameOf(sd)} offered a draw`} />
+            </View>
+          ))}
+          <Text style={ctrl.meta}>An illegal move gives the opponent {illegalSecs(s.timeControl) / 60} minute{illegalSecs(s.timeControl) === 60 ? '' : 's'}; the same player's second one loses (FIDE 7.5.5) and the result is pre-selected.</Text>
+          <Text style={ctrl.link} accessibilityRole="button" onPress={() => setArbOpen(false)}>Hide</Text>
+        </View>
+      ) : !s.ended ? (
+        <Text style={ctrl.link} accessibilityRole="button" onPress={() => setArbOpen(true)}>Arbiter: illegal move or draw offer{s.events?.length ? ` (${s.events.length} so far)` : ''}</Text>
+      ) : null}
+      {preset ? <Text style={ctrl.meta}>Second illegal move by {nameOf(preset.winner === 'home' ? 'away' : 'home')}: the loss is pre-selected. Check it, then record.</Text> : null}
       {koAt ? (
         <View style={ctrl.koBox}>
           <Text style={ctrl.label}>Knockout · {koPhaseText(koNow, koAt.phase, koAt.game)}</Text>
@@ -269,9 +300,16 @@ const ScoringControls: SportPlugin<ChessState>['ScoringControls'] = ({ state, di
             </>
           )}
           {isForfeit(sentMethod) && <Text style={ctrl.meta}>A forfeit counts in the table, but no game is credited as played.</Text>}
+          {/* cue batch 6 — Art. 11 / 12 penalties: ½ to one player, 0 to the other */}
+          {unevenOk ? (
+            <View style={ctrl.chips}>
+              <SelectChip label={`${scoreFor(white, winner!, sentMethod, true)} instead (uneven score)`} active={unevenOn} onPress={() => setUneven(!uneven)}
+                accessibilityLabel={`Record ${scoreFor(white, winner!, sentMethod, true)}: half a point to ${nameOf(winner as Side)}, none to the other`} />
+            </View>
+          ) : null}
         </View>
       )}
-      <Button label={winner ? `✓ Record ${scoreFor(white, winner, sentMethod)}…` : '✓ Record result'} onPress={() => void record()} disabled={!winner || busy} />
+      <Button label={winner ? `✓ Record ${scoreFor(white, winner, sentMethod, unevenOn)}…` : '✓ Record result'} onPress={() => void record()} disabled={!winner || busy} />
     </View>
   );
 };
@@ -298,7 +336,7 @@ export const chessPlugin: SportPlugin<ChessState> = {
           : `${s.ko.games.length ? `${resultString(s)} · ` : ''}${(() => { const at = koStatus(s.ko!); return koPhaseText(s.ko!, at.phase, at.game); })()}`
         : s.ended
         ? `${resultString(s)}${s.method ? ` · ${METHOD_LABEL[s.method]}` : ''}`
-        : `${TIME_CONTROL_LABEL[s.timeControl] ?? s.timeControl}${s.tcExact ? ` ${s.tcExact}` : ''} · in play`,
+        : `${TIME_CONTROL_LABEL[s.timeControl] ?? s.timeControl}${timeControlText(s) ? ` ${timeControlText(s)}` : ''} · in play`,
       // SD-117c — the clock times left, when recorded
       detailLine: `${s.white === 'home' ? 'Home' : 'Away'} has White${s.clock && (s.clock.white != null || s.clock.black != null) ? ` · ⏱ White ${s.clock.white != null ? clockText(s.clock.white) : '–'} · Black ${s.clock.black != null ? clockText(s.clock.black) : '–'}` : ''}`,
     };

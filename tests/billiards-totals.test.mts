@@ -44,11 +44,14 @@ describe('the contract', () => {
       framesWon: 2, framesLost: 1, points: 130, pointsAgainst: 98,
       shotFrames: 2, highestBreak: 51, fiftyPlus: 1, centuries: 0, doubleCenturies: 0, scored: 81, visits: 3, scoringStrokes: 31,
       potRed: 19, potWhite: 10, inOffRed: 0, inOffWhite: 0, cannons: 2, misses: 1, safeties: 0, fouls: 1, foulPoints: 2, penaltyPoints: 0,
+      // cue batch 6: the foul kinds (0 when none)
+      foulNoContact: 0, foulCoup: 0, foulInHand: 0, foulPush: 1, foulJump: 0, foulTouch: 0, foulOffTable: 0, foulHazards: 0, foulCannons: 0, foulBaulkLine: 0, foulOther: 0,
     });
     assert.deepEqual(t.a1.stats, {
       framesWon: 1, framesLost: 2, points: 98, pointsAgainst: 130,
       shotFrames: 2, highestBreak: 35, fiftyPlus: 0, centuries: 0, doubleCenturies: 0, scored: 48, visits: 3, scoringStrokes: 13,
       potRed: 7, potWhite: 0, inOffRed: 1, inOffWhite: 0, cannons: 12, misses: 1, safeties: 1, fouls: 0, foulPoints: 0, penaltyPoints: 2,
+      foulNoContact: 0, foulCoup: 0, foulInHand: 0, foulPush: 0, foulJump: 0, foulTouch: 0, foulOffTable: 0, foulHazards: 0, foulCannons: 0, foulBaulkLine: 0, foulOther: 0,
     });
   });
 

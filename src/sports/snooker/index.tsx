@@ -52,6 +52,8 @@ const ScoringControls: SportPlugin<SnookerState>['ScoringControls'] = ({ state, 
   const [tossOpen, setTossOpen] = useState(false);
   // A-03 — "Play on" hides this foul's banner; an undo (the seq drops) forgets it
   const [hidden, setHidden] = useState<Hidden | null>(null);
+  // cue batch 6 — optional tags for the next pot / missed pot (Stats to track: long pots, the rest)
+  const [tags, setTags] = useState<{ long: boolean; rest: boolean }>({ long: false, rest: false });
   const seq = typeof s?.seq === 'number' ? s.seq : 0;
   const stillHidden = followHidden(hidden, seq);
   useEffect(() => { if (stillHidden !== hidden) setHidden(stillHidden); }, [stillHidden, hidden]);
@@ -61,6 +63,13 @@ const ScoringControls: SportPlugin<SnookerState>['ScoringControls'] = ({ state, 
   const send = (a: Act, warn?: string) => {
     setFoulOpen(false);
     void sendTap(reducer, s, a, dispatch, names, 'frame', warn);
+  };
+  // a pot or a missed pot carries the tags picked for it; then they clear
+  const sendShot = (a: Act) => {
+    const tagged = a && (a.type === 'POT' || a.type === 'MISS') && (tags.long || tags.rest)
+      ? { ...a, payload: { ...(a.payload ?? {}), ...(tags.long ? { long: true } : {}), ...(tags.rest ? { rest: true } : {}) } } : a;
+    setTags({ long: false, rest: false });
+    send(tagged);
   };
   const quickShown = p.frameScore && ((p.quick && shotOverride !== p.frame) || quickOpen);
   const striker = names[p.striker];
@@ -140,10 +149,16 @@ const ScoringControls: SportPlugin<SnookerState>['ScoringControls'] = ({ state, 
             </View>
           ) : null}
 
-          <BallPad p={p} send={send} />
+          {s.trackLR === true ? (
+            <View style={st.redRow}>
+              <SelectChip label="Long pot" active={tags.long} onPress={() => setTags((t) => ({ ...t, long: !t.long }))} accessibilityLabel="Tag the next pot or missed pot as a long pot" />
+              <SelectChip label="With the rest" active={tags.rest} onPress={() => setTags((t) => ({ ...t, rest: !t.rest }))} accessibilityLabel="Tag the next pot or missed pot as played with the rest" />
+            </View>
+          ) : null}
+          <BallPad p={p} send={sendShot} />
 
           <View style={cue.row}>
-            <Button label="Missed" variant="ghost" style={cue.flex} disabled={!p.miss} accessibilityLabel={`${striker} missed a pot: the turn passes`} onPress={() => send(p.miss)} />
+            <Button label="Missed" variant="ghost" style={cue.flex} disabled={!p.miss} accessibilityLabel={`${striker} missed a pot: the turn passes`} onPress={() => sendShot(p.miss)} />
             <Button label="Safety" variant="ghost" style={cue.flex} disabled={!p.safety} accessibilityLabel={`${striker} played a safety: the turn passes`} onPress={() => send(p.safety)} />
             <Button label="Foul…" variant={foulOpen ? 'danger' : 'ghost'} style={cue.flex} selected={foulOpen} accessibilityLabel="Record a foul" onPress={() => setFoulOpen((v) => !v)} />
           </View>

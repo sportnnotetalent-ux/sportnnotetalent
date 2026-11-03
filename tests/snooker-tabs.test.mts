@@ -54,7 +54,8 @@ describe('commentary', () => {
     assert.match(texts[1], /Ravi — break of 54/);
     assert.ok(texts.some((t) => /Ravi penalised while not at the table: 5 to Asha/.test(t)));
     assert.ok(texts.some((t) => /Asha fouled \(in-off.*\): 4 to Ravi · foul and a miss/i.test(t)));
-    assert.equal(texts[texts.length - 1], 'Asha — break of 15, then missed a pot');
+    // cue batch 6: a break line carries its make-up
+    assert.equal(texts[texts.length - 1], 'Asha — break of 15 (2 reds, 1 pink, 1 black), then missed a pot');
     assert.equal(f1.items[f1.items.length - 1].score, 'Asha leads 15–0');
     assert.equal(f1.items[1].score, 'Ravi leads 58–20');
     const f2 = g[1];

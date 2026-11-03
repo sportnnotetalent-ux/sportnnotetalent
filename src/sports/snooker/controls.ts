@@ -51,10 +51,14 @@ const framed = (s: unknown, type: string, payload: Record<string, unknown> = {})
 
 /** Pot `ball` (the striker's). `reds` = reds in one stroke (2, 3…); `free`
  *  with a red = the free ball (nominated as a red) went down too. */
-export function potAction(s: SnookerState, ball: Ball | 'free', opts: { reds?: number; free?: boolean } = {}): Act | null {
-  return shot(s, 'POT', { ball, ...(opts.reds !== undefined && opts.reds !== 1 ? { reds: opts.reds } : {}), ...(opts.free ? { free: true } : {}) });
+export function potAction(s: SnookerState, ball: Ball | 'free', opts: { reds?: number; free?: boolean } & StrokeTags = {}): Act | null {
+  return shot(s, 'POT', { ball, ...(opts.reds !== undefined && opts.reds !== 1 ? { reds: opts.reds } : {}), ...(opts.free ? { free: true } : {}), ...tags(opts) });
 }
-export const missAction = (s: SnookerState): Act | null => shot(s, 'MISS');
+/** Cue batch 6 — optional tags on a pot or a missed pot (Stats to track:
+ *  long pots and rest shots); sent only when set, so a plain tap is as before. */
+export interface StrokeTags { long?: boolean; rest?: boolean }
+const tags = (o: StrokeTags): Record<string, true> => ({ ...(o.long === true ? { long: true as const } : {}), ...(o.rest === true ? { rest: true as const } : {}) });
+export const missAction = (s: SnookerState, opts: StrokeTags = {}): Act | null => shot(s, 'MISS', tags(opts));
 export const safetyAction = (s: SnookerState): Act | null => shot(s, 'SAFETY');
 
 export interface FoulInput {

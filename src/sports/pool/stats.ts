@@ -81,6 +81,15 @@ export const poolStats: SportStatSchema<'pool'> = {
     // cue batch 5: every foul kind its own key (an older line: "not tracked";
     // its foulOther still holds these kinds)
     ...POOL_NEW_FOUL_KEYS.map((k) => cueFoulKind(k, 'discipline')),
+    // cue batch 6 — pots not called (the shooter's), and the side's own figures
+    // (both scotch partners share them, like racks won); keyed: an older line
+    // reads "not tracked"
+    keyed('notCalled', 'Pots not called', 'pots not called', 'pot not called', 'table', lower),
+    keyed('ballInHand', 'Ball in hand received', 'times with ball in hand', 'time with ball in hand', 'table'),
+    keyed('pushPlayed', 'Push-outs played from there', 'push-outs played', 'push-out played', 'table'),
+    keyed('pushPassed', 'Push-outs handed back', 'push-outs handed back', 'push-out handed back', 'table'),
+    keyed('rerackBreaks', 'Re-racks on own break', 're-racks on own break', 're-rack on own break', 'break'),
+    keyed('extensions', 'Shot-clock extensions', 'extensions', 'extension', 'table'),
     // derived (career / leaderboards; never written)
     { key: 'racksWL', label: 'Racks W-L', source: 'derived', group: 'record', format: { unit: 'figure' }, agg: { kind: 'pair', a: 'racksWon', b: 'racksLost' } },
     pct('rackPct', 'Racks won %', 'racksWon', ['racksWon', 'racksLost'], 'record', { leaderLabel: 'Best racks won %', agg: { kind: 'rate', num: 'racksWon', den: ['racksWon', 'racksLost'], scale: 100, dp: 0, qualifier: MATCHES } }),
@@ -112,11 +121,13 @@ export const poolStats: SportStatSchema<'pool'> = {
     ] },
     { id: 'break', title: 'The break', rows: [
       { stat: 'breakShots' }, { stat: 'ballsPerBreak' }, { stat: 'breakBalls' }, { stat: 'dryBreaks' },
-      { stat: 'breakFouls' }, { stat: 'illegalBreaks', hideZero: true }, { stat: 'eightBreaks', hideZero: true },
+      { stat: 'breakFouls' }, { stat: 'illegalBreaks', hideZero: true }, { stat: 'eightBreaks', hideZero: true }, { stat: 'rerackBreaks', hideZero: true },
     ] },
     { id: 'table', title: 'At the table', rows: [
       { stat: 'potPct' }, { stat: 'tpa' }, { stat: 'ballsPotted' }, { stat: 'potShots' }, { stat: 'missShots' }, { stat: 'safetyShots' },
       { stat: 'pushOuts', hideZero: true }, { stat: 'innings' }, { stat: 'inningsPerRack' }, { stat: 'detailRacks' },
+      { stat: 'ballInHand', hideZero: true }, { stat: 'pushPlayed', hideZero: true }, { stat: 'pushPassed', hideZero: true },
+      { stat: 'notCalled', hideZero: true }, { stat: 'extensions', hideZero: true },
     ] },
     { id: 'fouls', title: 'Fouls', rows: [
       { stat: 'fouls' }, { stat: 'foulsPerRack' },

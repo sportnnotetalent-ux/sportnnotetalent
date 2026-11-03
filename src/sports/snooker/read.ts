@@ -17,9 +17,23 @@
  * maximum (147 / 107 / 75, +8 with a free ball) or a fraction — is a crafted
  * snapshot and is not read.
  */
-import { isSnookerState, maxBreak, snookerStats, type FoulKind, type Side, type SnookerState, type VisitEnd } from './engine.ts';
+import { isSnookerState, maxBreak, snookerStats, COLOURS, type Ball, type FoulKind, type MakeUp, type Side, type SnookerState, type VisitEnd } from './engine.ts';
 
-export interface RVisit { side: Side; pts: number; pots: number; shots: number; fb: boolean; end: VisitEnd | 'live' }
+/** `mk` — cue batch 6: the break's make-up (absent on an older visit). */
+export interface RVisit { side: Side; pts: number; pots: number; shots: number; fb: boolean; end: VisitEnd | 'live'; mk?: MakeUp; tc?: true }
+
+/** Cue batch 6 — the make-up order (a stored make-up is read through it:
+ *  known balls, whole numbers 1–99 only). */
+export const MAKE_UP_ORDER: ReadonlyArray<Ball | 'free'> = ['red', ...COLOURS, 'free'];
+export function readMakeUp(v: unknown): MakeUp | undefined {
+  if (!isObj(v)) return undefined;
+  const out: MakeUp = {};
+  for (const k of MAKE_UP_ORDER) {
+    const n = Object.prototype.hasOwnProperty.call(v, k) ? v[k] : undefined;
+    if (typeof n === 'number' && Number.isInteger(n) && n >= 1 && n <= 99) out[k] = n;
+  }
+  return Object.keys(out).length ? out : undefined;
+}
 export interface RFoul { by: Side; value: number; kind?: FoulKind; miss: boolean; fb: boolean; reds: number; penalty: boolean }
 export interface RFrame {
   n: number;
@@ -52,7 +66,8 @@ function readVisit(v: unknown, max: number, live = false): RVisit | null {
   if (pts === null || pots === null || shots === null) return null;
   if (!Number.isInteger(pts) || pts > max) return null;
   const end = live ? 'live' : typeof v.end === 'string' && ENDS.has(v.end) ? (v.end as VisitEnd) : 'miss';
-  return { side: v.side, pts, pots, shots, fb: v.fb === 1 || v.fb === true, end };
+  const mk = readMakeUp(v.mk);
+  return { side: v.side, pts, pots, shots, fb: v.fb === 1 || v.fb === true, end, ...(mk ? { mk } : {}), ...(v.tc === 1 ? { tc: true as const } : {}) };
 }
 function readFoul(x: unknown): RFoul | null {
   if (!isObj(x) || !isSide(x.by)) return null;

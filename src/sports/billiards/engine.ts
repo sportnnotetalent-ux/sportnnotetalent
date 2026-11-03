@@ -52,6 +52,9 @@ export interface LiveFrame {
   shots: number;
   /** timed game level at TIME: the next score or foul wins (`timedTie: 'sudden'`) */
   sudden?: true;
+  /** cue batch 6 — consecutive strokes of this visit that potted the red (the
+   *  red-to-centre hint); absent when 0. Position only, never a score. */
+  redRun?: number;
 }
 
 export type FrameHow = 'target' | 'time' | 'sudden' | 'draw' | 'concede' | 'award' | 'quick';
@@ -299,15 +302,18 @@ function reduce(s: BilliardsState, a: BilliardsAction): BilliardsState {
         inOffRed: v.inOffRed + parts.inOffRed, inOffWhite: v.inOffWhite + parts.inOffWhite, cannon: v.cannon + parts.cannon,
       };
       const score = { ...fr.score, [fr.striker]: fr.score[fr.striker] + pts };
-      return decided(s, { ...fr, score, visit, hazardRun, cannonRun, shots: fr.shots + 1 }, fr.striker);
+      const { redRun: run, ...rest } = fr;
+      const redRun = parts.potRed ? (num(run) ?? 0) + 1 : 0;
+      return decided(s, { ...rest, score, visit, hazardRun, cannonRun, shots: fr.shots + 1, ...(redRun ? { redRun } : {}) }, fr.striker);
     }
     case 'MISS':
     case 'SAFETY': {
       if (!striking || full(fr)) return s;
       const striker = other(fr.striker);
+      const { redRun: _r, ...rest } = fr;
       return {
         ...s,
-        frame: { ...fr, visits: [...fr.visits, { ...fr.visit, end: a.type === 'MISS' ? 'miss' : 'safety' }], striker, visit: emptyVisit(striker), hazardRun: 0, cannonRun: 0, shots: fr.shots + 1 },
+        frame: { ...rest, visits: [...fr.visits, { ...fr.visit, end: a.type === 'MISS' ? 'miss' : 'safety' }], striker, visit: emptyVisit(striker), hazardRun: 0, cannonRun: 0, shots: fr.shots + 1 },
         seq: s.seq + 1,
       };
     }
@@ -372,8 +378,9 @@ function foul(s: BilliardsState, fr: LiveFrame, kind: FoulKind | undefined): Bil
   const by = fr.striker;
   const opp = other(by);
   const score = { ...fr.score, [opp]: fr.score[opp] + s.foulPoints };
+  const { redRun: _r, ...rest } = fr;
   const next: LiveFrame = {
-    ...fr, score, visits: [...fr.visits, { ...fr.visit, end: 'foul' }], fouls: [...fr.fouls, { by, value: s.foulPoints, ...(kind ? { kind } : {}) }],
+    ...rest, score, visits: [...fr.visits, { ...fr.visit, end: 'foul' }], fouls: [...fr.fouls, { by, value: s.foulPoints, ...(kind ? { kind } : {}) }],
     striker: opp, visit: emptyVisit(opp), hazardRun: 0, cannonRun: 0, shots: fr.shots + 1,
   };
   return decided(s, next, opp);
@@ -449,6 +456,20 @@ export const tossRecorded = (s: BilliardsState): boolean => isObj(s) && s.tossed
  *  still whoever won on frames. */
 export function standingsScore(s: BilliardsState): { home: number; away: number } | null {
   return safe(() => (isObj(s) ? standingsUnits(s)?.points ?? null : null), null);
+}
+
+/** Cue batch 6 (audit row 15) — the scorer's hint: the red was potted twice
+ *  running from the billiard spot, so it goes on the centre spot (WPBSA
+ *  billiards; position only, no score). After a red pot the red is spotted
+ *  on the billiard spot, so in a run of red pots the 2nd and 3rd come from
+ *  the spot: the 3rd sends it to the centre spot, the 4th (from the centre)
+ *  back to the billiard spot, and so on. Where the visit's first red came
+ *  from isn't recorded, so the scorer still judges the first one. */
+export function redToCentre(s: BilliardsState): boolean {
+  return safe(() => {
+    const run = num((liveFrame(s) as { redRun?: unknown } | null)?.redRun);
+    return run !== undefined && Number.isInteger(run) && run >= 3 && run % 3 === 0;
+  }, false);
 }
 
 /** The consecutive-stroke counts and the referee's calls (TEN HAZARDS /

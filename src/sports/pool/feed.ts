@@ -162,6 +162,7 @@ function sentence(e: FeedEntry, P: string, name: (s: Side) => string, money: num
     case 'CHOOSE': return e.c === 'play' ? `${P} plays from here` : e.c === 'pass' ? `${P} hands it back` : `${P} chooses a re-rack`;
     case 'RACK': return e.end ? 'Rack result recorded' : `Rack ${e.n}`;
     case 'STALEMATE': return `Stalemate: re-rack${P ? `, ${P} breaks again` : ''}`;
+    case 'EXTENSION': return `${P} takes the shot-clock extension`;
     default: return e.t;
   }
 }

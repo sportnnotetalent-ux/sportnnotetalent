@@ -52,6 +52,7 @@ describe('the contract (clean log, every undo prefix, determinism, derived ≥ 0
         fouls: 0, foulPoints: 0, penaltyPoints: 4, foulMisses: 0, freeBalls: 0,
         // cue batch 5: safety success and the foul kinds (home made no foul)
         safetiesJudged: 1, safetiesWon: 1, foulInOff: 0, foulNoContact: 0, foulWrongBall: 0, foulPottedWrong: 0, foulPush: 0, foulJump: 0, foulTouch: 0, foulOffTable: 0, foulOther: 0,
+        totalClearances: 1, // cue batch 6: the 147 is a total clearance
       },
     });
     assert.deepEqual(t.a1.stats, {
@@ -59,6 +60,7 @@ describe('the contract (clean log, every undo prefix, determinism, derived ≥ 0
       shotFrames: 2, highestBreak: 8, fiftyPlus: 0, centuries: 0, maximums: 0, potted: 8, pots: 2, missedPots: 1, safeties: 0, visits: 2,
       fouls: 1, foulPoints: 4, penaltyPoints: 0, foulMisses: 0, freeBalls: 0,
       safetiesJudged: 0, safetiesWon: 0, foulInOff: 1, foulNoContact: 0, foulWrongBall: 0, foulPottedWrong: 0, foulPush: 0, foulJump: 0, foulTouch: 0, foulOffTable: 0, foulOther: 0, // cue batch 5
+      totalClearances: 0, // cue batch 6
     });
   });
 

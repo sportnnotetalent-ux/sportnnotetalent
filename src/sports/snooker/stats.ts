@@ -39,6 +39,15 @@ const SNOOKER_ONLY: StatDef[] = [
     agg: { kind: 'rate', num: 'safetiesWon', den: 'safetiesJudged', scale: 100, dp: 0 },
   },
   ...['foulInOff', 'foulNoContact', 'foulWrongBall', 'foulPottedWrong', 'foulPush', 'foulJump', 'foulTouch', 'foulOffTable', 'foulOther'].map((k) => cueFoulKind(k, 'fouls')),
+  // cue batch 6 — total clearances; long pots and the rest (WST broadcast stats, tracked by choice)
+  { key: 'totalClearances', label: 'Total clearances', short: 'total clearances', one: 'total clearance', group: 'breaks', ...keyed },
+  { key: 'longPots', label: 'Long pots', short: 'long pots', one: 'long pot', group: 'potting', ...keyed },
+  { key: 'longAttempts', label: 'Long pots attempted', short: 'long pots attempted', one: 'long pot attempted', group: 'potting', ...keyed },
+  { key: 'restShots', label: 'Shots with the rest', short: 'rest shots', one: 'rest shot', group: 'potting', ...keyed },
+  {
+    key: 'longPotSuccess', label: 'Long pot success', source: 'derived', group: 'potting', format: { unit: 'percent', dp: 0 },
+    agg: { kind: 'rate', num: 'longPots', den: 'longAttempts', scale: 100, dp: 0 },
+  },
   { key: 'pointsPerVisit', label: 'Points per visit', source: 'derived', group: 'potting', format: { unit: 'decimal', dp: 1 }, agg: { kind: 'rate', num: 'potted', den: 'visits', dp: 1 } },
 ];
 
@@ -53,9 +62,9 @@ export const snookerStats: SportStatSchema<'snooker'> = {
   ],
   sections: [
     { id: 'match', title: 'Match play', rows: [{ stat: 'framesWL' }, { stat: 'framePct' }] },
-    { id: 'breaks', title: 'Breaks', rows: [{ stat: 'highestBreak' }, { stat: 'centuries' }, { stat: 'fiftyPlus' }, { stat: 'maximums', hideZero: true }] },
+    { id: 'breaks', title: 'Breaks', rows: [{ stat: 'highestBreak' }, { stat: 'centuries' }, { stat: 'fiftyPlus' }, { stat: 'maximums', hideZero: true }, { stat: 'totalClearances', hideZero: true }] },
     { id: 'scoring', title: 'Scoring', rows: [{ stat: 'points', label: 'Points scored' }, { stat: 'pointsPerFrame' }, { stat: 'pointsAgainst' }] },
-    { id: 'potting', title: 'Potting', rows: [{ stat: 'potSuccess' }, { stat: 'pots' }, { stat: 'pointsPerVisit' }, { stat: 'safeties' }, { stat: 'safetySuccess' }, { stat: 'visits' }] },
+    { id: 'potting', title: 'Potting', rows: [{ stat: 'potSuccess' }, { stat: 'pots' }, { stat: 'pointsPerVisit' }, { stat: 'safeties' }, { stat: 'safetySuccess' }, { stat: 'longPotSuccess' }, { stat: 'restShots', hideZero: true }, { stat: 'visits' }] },
     { id: 'fouls', title: 'Fouls', rows: [
       { stat: 'fouls' }, { stat: 'foulsPerFrame' }, { stat: 'foulPoints' }, { stat: 'penaltyPoints' },
       { stat: 'foulMisses', hideZero: true }, { stat: 'freeBalls', hideZero: true },
