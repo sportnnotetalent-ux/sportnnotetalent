@@ -9,6 +9,11 @@
  * Capture choices never change a result: they only add or hide optional
  * boxes on the entry screen. Used on the event's results screen (any time)
  * and on the track / swimming event setup.
+ *
+ * Batch 6: the precision sports too — referees' lights / jury reversals in
+ * view (weightlifting), penalty buttons in view (shooting), arrows per archer
+ * (archery teams). Their meet value is the Competition rule (locked once
+ * results exist); the event's override here never locks.
  */
 import React, { useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
@@ -16,13 +21,14 @@ import { theme } from '../../core/theme';
 import { Card, SelectChip, textStyles } from '../ui';
 import {
   trackOptions, trackDefaults, trackEffective, setTrackOverride, lapPointsLabel, LAP_POINT_CHOICES,
+  precisionTrackOptions, eventRules, setPrecisionOverride, ruleOf,
   type DisciplineDef, type PhaseFormat, type TrackOverrides, type LapPoints,
 } from '../../data/results';
 
 export function EventTrackCard({ def, f, meet, onChange, collapsible = true, busy }: {
   def: DisciplineDef;
   /** the event's phase format (or, at setup, what the new event will carry) */
-  f: Partial<Pick<PhaseFormat, 'reaction' | 'splits' | 'track' | 'road'>>;
+  f: Partial<Pick<PhaseFormat, 'reaction' | 'splits' | 'track' | 'road' | 'rules'>>;
   /** tournament.formats[sport] — the meet's "Stats to track" */
   meet?: Record<string, unknown> | null;
   onChange: (track: TrackOverrides | undefined) => void;
@@ -32,11 +38,14 @@ export function EventTrackCard({ def, f, meet, onChange, collapsible = true, bus
 }) {
   const [open, setOpen] = useState(!collapsible);
   const opts = trackOptions(def, f);
-  if (!opts.length) return null;
+  // batch 6: the precision sports' capture switches (lights, jury, penalties, team arrows)
+  const popts = precisionTrackOptions(def);
+  if (!opts.length && !popts.length) return null;
   const base = trackDefaults(def.sport, meet, f);
   const now = trackEffective(def.sport, meet, f);
   const own = f.track ?? {};
   const n = Object.keys(own).length;
+  const pnow = eventRules(def, f);
   if (!open) {
     return <SelectChip label={`⚙ Stats to track — this event${n ? ` (${n} changed)` : ''}`} active={false} onPress={() => setOpen(true)} />;
   }
@@ -66,6 +75,19 @@ export function EventTrackCard({ def, f, meet, onChange, collapsible = true, bus
             <View style={st.chips}>
               <SelectChip label="On" active={v} disabled={busy} onPress={() => set(o.key, true)} />
               <SelectChip label="Off" active={!v} disabled={busy} onPress={() => set(o.key, false)} />
+            </View>
+          </View>
+        );
+      })}
+      {popts.map((o) => {
+        const v = pnow[o.key] === true;
+        const changed = typeof own[o.key] === 'boolean';
+        return (
+          <View key={o.key} style={{ gap: theme.spacing(1) }}>
+            <Text style={textStyles.muted}>{o.label} · {o.hint}{changed ? ` (meet: ${ruleOf(f.rules, o.key) === true ? 'on' : 'off'})` : ''}</Text>
+            <View style={st.chips}>
+              <SelectChip label="On" active={v} disabled={busy} onPress={() => onChange(setPrecisionOverride(own, o.key, true, f.rules))} />
+              <SelectChip label="Off" active={!v} disabled={busy} onPress={() => onChange(setPrecisionOverride(own, o.key, false, f.rules))} />
             </View>
           </View>
         );

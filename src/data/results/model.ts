@@ -264,7 +264,10 @@ export interface PhaseFormat {
 export type TrackOverrides = Partial<Record<'reaction' | 'lapSplits' | 'relayLegs' | 'splits' | 'takeovers' | 'cycSplits' | 'chipTimes', boolean>> & {
   /** athletics lap times at the finish-line passes or every 400 m from the start */
   lapPoints?: 'finish' | 'start';
-};
+} & Partial<Record<'wlLights' | 'wlJury' | 'shootPen' | 'archTeamArrows', boolean>>;
+/* Batch 6: the precision sports' "Stats to track" (weightlifting lights / jury,
+ * shooting penalties, archery team arrows) per event, over the Competition
+ * rule of the same key (measuredDepth6.ts eventRules). Absent = the rule. */
 
 /** SD-137b: one team member's score in the individual event the team is ranked
  *  on (archery ranking round / shooting qualification), in member order. */
@@ -381,6 +384,9 @@ export interface LiftAttempt {
    *  one was changed by the coach (IWF: two changes an attempt). The app's
    *  automatic declaration is not counted. */
   chg?: number[];
+  /** Batch 6: a re-attempt — the decision was set aside (bar loaded wrongly /
+   *  a technical fault) and the lifter takes this attempt again. */
+  reat?: boolean;
 }
 
 /** The result payload stored in `field_entries.result`. Absent fields = not tracked. */
@@ -515,6 +521,12 @@ export interface EntryResult {
    *  they stopped: after trial `afterRound` (LJ / TJ / throws) or at bar
    *  `atHeight` (HJ / PV). Unlike WD (unranked), the row is still ranked. */
   retired?: { afterRound?: number; atHeight?: number };
+  /** Batch 6 cycling (keirin, scratch): relegated by the commissaires — placed
+   *  last of the riders who finished, still classified (UCI). Only `true` counts. */
+  relegated?: boolean;
+  /** Batch 6 athletics track: a yellow card for start conduct (TR 16.5) — a
+   *  warning; the second card in the race disqualifies (DQ, TR 16.5). */
+  scWarn?: boolean;
   /** SD-128: scratched from the start list (status DNS) — why and when; the
    *  lane stays empty and the entrant can't go on to a later round */
   scratch?: { reason: string; at: string };
@@ -541,6 +553,10 @@ export interface ArchSide {
    *  the archer of arrow `ends[k][j]`. Only when the meet credits arrows to each
    *  archer; an end without it (or that doesn't match) credits nobody. */
   by?: number[][];
+  /** Batch 6 (World Archery Book 3 penalty, verify): per end of this match,
+   *  how many of its highest-scoring arrows don't count. The arrows stay as
+   *  shot; the end's score (set points / total) is net. */
+  pen?: number[];
 }
 
 /** One entry in one phase, as the engine sees it. */

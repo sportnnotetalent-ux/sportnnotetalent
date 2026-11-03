@@ -27,15 +27,23 @@ export interface GolfRoundFormat extends GolfFormat {
   prizes: 'both' | 'one';
   /** SD-89 — the player who won the playoff for first */
   playoffWinner?: string;
+  /** Batch 6 — a maximum score competition (Rule 21.2, `competition:
+   *  'maxscore'`): stroke play with each hole capped at `maxScore` (never
+   *  'none'), a pickup scoring the cap. Absent on every other round. */
+  maxComp?: true;
 }
 
 export function golfFormatOf(ev: Pick<FieldEvent, 'format'>): GolfRoundFormat {
   const f = ev.format ?? {};
+  // batch 6 — maximum score: stroke play with a cap that always applies
+  const maxComp = f.competition === 'maxscore';
+  const ms = (['none', 'ndb', 'par3', 'par5'].includes(String(f.maxScore)) ? f.maxScore : 'ndb') as GolfFormat['maxScore'];
   return {
     scoring: f.competition === 'stableford' || f.scoring === 'stableford' ? 'stableford' : 'stroke',
     holes: (['18', 'front9', 'back9'].includes(String(f.holes)) ? String(f.holes) : '18') as HoleSet,
     allowance: typeof f.allowance === 'number' ? f.allowance : 95,
-    maxScore: (['none', 'ndb', 'par3', 'par5'].includes(String(f.maxScore)) ? f.maxScore : 'ndb') as GolfFormat['maxScore'],
+    maxScore: maxComp && ms === 'none' ? 'ndb' : ms,
+    ...(maxComp ? { maxComp: true as const } : {}),
     courseId: String(f.courseId ?? ''),
     tee: typeof f.tee === 'string' ? f.tee : undefined,
     net: f.net === true || f.netScoring === 'net',
@@ -151,7 +159,7 @@ export function buildLeaderboard(events: FieldEvent[], entries: FieldEntry[], co
     }
   }
   // SD-89 — a playoff ranks like "shared" until the winner is recorded
-  const opts = { scoring: last.scoring, net: override.net ?? last.net, tieBreak: last.tieBreak === 'countback' ? 'countback' as const : 'shared' as const };
+  const opts = { scoring: last.scoring, net: override.net ?? last.net, tieBreak: last.tieBreak === 'countback' ? 'countback' as const : 'shared' as const, ...(last.maxComp ? { cap: last.maxScore } : {}) };
   const players = [...byPlayer.entries()].map(([id, r]) => ({ id, status: r.status, rounds: r.rounds, lastRound: r.lastRound }));
   let board = rankLeaderboard(players.filter((p) => p.lastRound === latestRound), opts);
   // SD-35 — the organiser's reason on WD / DQ / DNS rows (only when there is one)

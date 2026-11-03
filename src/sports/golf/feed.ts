@@ -13,8 +13,8 @@
  *     first, from the match's event log (state).
  */
 import {
-  derivedGir, matchState, summarize, PUTT_BUCKETS, driveYards, driveIn, puttBucketText, upAndDown, toParLabel,
-  type DistUnit, type GolfCard, type Hole,
+  derivedGir, matchState, summarize, PUTT_BUCKETS, driveYards, driveIn, puttBucketText, upAndDown, toParLabel, holeCap, maxScoreToPar,
+  type DistUnit, type GolfCard, type Hole, type MaxScore,
 } from './engine.ts';
 import { matchHole, holeNumber } from './matchStrokes.ts';
 import type { GolfMatchState } from './match.ts';
@@ -92,10 +92,12 @@ export interface FeedPlayer { id: string; name: string; card: GolfCard; holes: H
 
 /** The running figure after hole `i`: "3 under through 7" (gross), "net 1
  *  under through 7", "16 pts through 7" (Stableford). */
-function runningAfter(pl: FeedPlayer, i: number, o: { scoring: 'stroke' | 'stableford'; net?: boolean }): string {
+function runningAfter(pl: FeedPlayer, i: number, o: { scoring: 'stroke' | 'stableford'; net?: boolean; maxComp?: MaxScore }): string {
   const upto: GolfCard = { strokes: pl.card.strokes.map((x, k) => (k <= i ? x : null)) };
   const s = summarize(upto, pl.holes, pl.received);
   if (o.scoring === 'stableford') return `${s.stableford} pts through ${s.thru}`;
+  // batch 6 — maximum score: the capped score (a pickup counts the cap)
+  if (o.maxComp) return `${o.net ? 'net ' : ''}${toParWords(maxScoreToPar(upto, pl.holes, pl.received, o.maxComp, o.net))} through ${s.thru}`;
   if (s.noReturn) return `no return · through ${s.thru}`;
   return `${o.net ? 'net ' : ''}${toParWords(o.net ? s.netToPar : s.toPar)} through ${s.thru}`;
 }
@@ -104,7 +106,7 @@ const SCORE_ICON: Record<string, string> = { 'hole in one': '🎯', albatross: '
 
 /** The field's commentary: groups by hole (newest hole first). `only` = one
  *  player's feed. */
-export function golfRoundFeed(players: FeedPlayer[], o: { scoring: 'stroke' | 'stableford'; net?: boolean; only?: string; unit?: DistUnit }): FeedGroup[] {
+export function golfRoundFeed(players: FeedPlayer[], o: { scoring: 'stroke' | 'stableford'; net?: boolean; only?: string; unit?: DistUnit; /** batch 6 — a maximum score round's limit */ maxComp?: MaxScore }): FeedGroup[] {
   const list = o.only ? players.filter((p) => p.id === o.only) : players;
   const n = Math.max(0, ...players.map((p) => p.holes.length));
   const groups: FeedGroup[] = [];
@@ -117,7 +119,9 @@ export function golfRoundFeed(players: FeedPlayer[], o: { scoring: 'stroke' | 's
       if (st == null) return;
       const at = pl.card.holeAt?.[i] ?? undefined;
       if (st === 'P') {
-        items.push({ id: `${pl.id}-${i}`, order, text: `${pl.name} picked up${o.scoring === 'stableford' ? ' · 0 points' : ' (no return)'}`, score: runningAfter(pl, i, o), ...(at ? { at } : {}) });
+        // batch 6 — maximum score: the pickup scores the hole's cap
+        const cap = o.maxComp && o.scoring === 'stroke' ? holeCap(hole.par, pl.received[i] ?? 0, o.maxComp === 'none' ? 'ndb' : o.maxComp) : null;
+        items.push({ id: `${pl.id}-${i}`, order, text: `${pl.name} picked up${o.scoring === 'stableford' ? ' · 0 points' : cap != null ? ` · scores the maximum (${cap})` : ' (no return)'}`, score: runningAfter(pl, i, o), ...(at ? { at } : {}) });
         return;
       }
       const name = scoreName(st, hole.par);
@@ -187,6 +191,10 @@ export function golfMatchFeed(s: GolfMatchState, names: { home: string; away: st
     else {
       const l = w === 'home' ? 'away' : 'home';
       text = sc ? `${head}: ${nm(w)} wins with ${/^[aeiou]/.test(gross(w)) ? 'an' : 'a'} ${gross(w)} to ${nm(l)}'s ${gross(l)}` : `${head}: ${nm(w)} wins the hole`;
+      // batch 6 — lost by penalty (the general penalty in match play = loss of hole) or conceded
+      const how = s.how?.[i];
+      if (how === 'penalty') text += ` — ${nm(l)} lost it by penalty (general penalty)`;
+      else if (how === 'conceded') text += ` — ${nm(l)} conceded it`;
     }
     const m = matchState(s.holes.slice(0, i + 1), s.regulation, s.extraHoles, s.firstHole ?? 1);
     const score = m.decided

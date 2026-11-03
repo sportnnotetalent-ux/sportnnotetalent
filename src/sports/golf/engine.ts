@@ -283,6 +283,16 @@ export const MAX_HOLE_STROKES = 20;
 /** SD-117c — has the card been certified by both the marker and the player? */
 export const cardSigned = (c: Pick<GolfCard, 'signed'> | null | undefined): boolean => !!c?.signed?.marker && !!c?.signed?.player;
 
+/** Batch 6 — penalty strokes on a hole as they may count: a whole number from
+ *  0 up to strokes − 1 (a hole of 2 can't hold 3 penalty strokes — the ball
+ *  still had to be played once). On a pickup the count stands (up to the
+ *  scorecard maximum). Anything else (negative, a fraction, text) is 0. */
+export const penaltyStrokes = (pen: unknown, strokes: HoleScore | undefined): number => {
+  if (typeof pen !== 'number' || !Number.isInteger(pen) || pen <= 0) return 0;
+  if (typeof strokes === 'number') return Math.min(pen, Math.max(0, strokes - 1));
+  return pen <= MAX_HOLE_STROKES ? pen : 0;
+};
+
 /** SD-117c — putts can't be more than the strokes on the hole (= strokes is a
  *  chip-in-free hole of all putts — allowed); null stays null. */
 export const clampPutts = (putts: number | null | undefined, strokes: HoleScore): number | null => {
@@ -425,6 +435,10 @@ export interface RankOptions {
   scoring: GolfScoring;
   /** use net (handicap) scores for stroke play */
   net: boolean;
+  /** Batch 6 — a maximum score competition (Rule 21.2): each hole capped at
+   *  this limit, a pickup scores the cap and the round still counts.
+   *  Absent = stroke play / Stableford as before. */
+  cap?: MaxScore;
   /** break ties by countback (last 9/6/3/1 of the final round) or share them */
   tieBreak: 'countback' | 'shared';
 }
@@ -434,6 +448,23 @@ export interface RankOptions {
 function roundValue(sum: CardSummary, o: RankOptions): number {
   if (o.scoring === 'stableford') return sum.stableford;
   return o.net ? sum.netToPar : sum.toPar;
+}
+
+/** Batch 6 — a round's score to par under a maximum score (Rule 21.2): every
+ *  hole played capped at the limit (net double bogey / par + 3 / par + 5; 'none'
+ *  is read as net double bogey — a maximum score round always has a cap), a
+ *  pickup scoring the cap. Net deducts the strokes received on those holes. */
+export function maxScoreToPar(card: Pick<GolfCard, 'strokes'>, holes: Hole[], received: number[], cap: MaxScore, net = false): number {
+  const rule: MaxScore = cap === 'none' ? 'ndb' : cap;
+  let v = 0;
+  holes.forEach((h, i) => {
+    const s = card.strokes[i] ?? null;
+    if (s == null) return;
+    const rcv = received[i] ?? 0;
+    const c = holeCap(h.par, rcv, rule) ?? h.par + 2 + rcv;
+    v += (s === 'P' ? c : Math.min(s, c)) - h.par - (net ? rcv : 0);
+  });
+  return v;
 }
 
 /** Countback on the final round over the last 9, 6, 3, then last hole (on 9
@@ -452,6 +483,8 @@ function countbackKey(r: RankInput, o: RankOptions): number[] {
     const card: GolfCard = { strokes: last.card.strokes.slice(from) };
     const sum = summarize(card, holes, last.received.slice(from));
     if (o.scoring === 'stableford') return sum.stableford;
+    // batch 6 — maximum score: the capped holes (net: the matching fraction of the handicap, as below)
+    if (o.cap) { const g = maxScoreToPar(card, holes, last.received.slice(from), o.cap); return o.net ? g - (ph * w) / n : g; }
     return o.net ? sum.toPar - (ph * w) / n : sum.toPar;
   });
 }
@@ -464,10 +497,12 @@ export function rankLeaderboard(inputs: RankInput[], o: RankOptions): RankRow[] 
     let total = 0, gross = 0, noReturn = false, today = 0, thru = 0;
     r.rounds.forEach((rd, i) => {
       const s = summarize(rd.card, rd.holes, rd.received);
-      total += roundValue(s, o);
+      // batch 6 — maximum score: capped holes, and a pickup is not "no return"
+      const v = o.cap && o.scoring === 'stroke' ? maxScoreToPar(rd.card, rd.holes, rd.received, o.cap, o.net) : roundValue(s, o);
+      total += v;
       gross += s.gross;
-      if (o.scoring === 'stroke' && s.noReturn) noReturn = true;
-      if (i === r.rounds.length - 1) { today = roundValue(s, o); thru = s.thru; }
+      if (o.scoring === 'stroke' && !o.cap && s.noReturn) noReturn = true;
+      if (i === r.rounds.length - 1) { today = v; thru = s.thru; }
     });
     // Stroke play: a pickup is "no return" — ranks with the non-finishers.
     const status: EntryStatus = noReturn && r.status === 'finished' ? 'dnf' : r.status;
@@ -676,8 +711,9 @@ export function roundStats(card: GolfCard, holes: Hole[], received: number[]): R
     const dir = card.firDir?.[i] ?? null;
     const f = card.fir?.[i] ?? (dir ? dir === 'hit' : null);
     if (f != null && h.par >= 4) { out.firHoles += 1; if (f) out.firHit += 1; }
+    // batch 6 — never more than strokes − 1; hostile values count 0 (legit cards unchanged)
     const pen = card.penalties?.[i];
-    if (typeof pen === 'number') out.penalties += pen;
+    if (typeof pen === 'number') out.penalties += penaltyStrokes(pen, st);
     if (typeof st !== 'number') return;
     // Deep wave — putting splits (whenever putts were entered on the hole)
     if (typeof p === 'number') {

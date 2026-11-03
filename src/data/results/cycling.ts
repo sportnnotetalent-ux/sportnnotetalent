@@ -216,6 +216,8 @@ export function cycRowText(r: RankedEntry, def: DisciplineDef): string {
       res.gc?.stages ? `${res.gc.stages + (st ? 1 : 0)} stage${res.gc.stages + (st ? 1 : 0) === 1 ? '' : 's'}` : '',
     ].filter(Boolean).join(' · ');
   }
+  // batch 6: relegated by the commissaires (keirin / scratch) — placed last of the finishers
+  if ((kind === 'keirin' || kind === 'scratch') && res.relegated === true && r.position != null) return 'relegated';
   if (kind === 'scratch' && res.laps) return `${res.laps > 0 ? 'gained' : 'lost'} ${Math.abs(res.laps)} lap${Math.abs(res.laps) === 1 ? '' : 's'}`;
   if (res.caught) return 'caught';
   return '';

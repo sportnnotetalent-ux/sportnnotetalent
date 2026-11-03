@@ -31,7 +31,7 @@ const inRace = (e: ResultEntry) => statusOf(e) === 'ok';
 const byOrder = (a: ResultEntry, b: ResultEntry) => (a.result?.order ?? 99) - (b.result?.order ?? 99) || a.name.localeCompare(b.name);
 const ROAD_TIME = { unit: 'time' as const, dp: 0 };
 const STATUS_HELP: Partial<Record<ResultStatus, string>> = {
-  DNF: 'did not finish', OTL: 'outside the time limit (not classified)', DQ: 'disqualified / relegated out', DNS: 'did not start',
+  DNF: 'did not finish', OTL: 'outside the time limit (not classified)', DQ: 'disqualified (a relegation is the REL button on the rider’s line — they stay classified)', DNS: 'did not start',
 };
 
 /** Apply several row changes (one undo label on the first). */
@@ -106,6 +106,9 @@ export function FinishOrderCard({ def, kind, entries, editable, onSave, statuses
     if (p.mark !== e.result.mark) onSave(e.id, { ...e.result, mark: p.mark }, `${secsText(p.mark)} · ${first(e.name)}`);
     return null;
   };
+  // batch 6: keirin / scratch — relegated by the commissaires: placed last of the finishers, still classified (UCI)
+  const relegatable = kind === 'keirin' || kind === 'scratch';
+  const relegate = (e: ResultEntry) => onSave(e.id, { ...e.result, relegated: e.result.relegated === true ? undefined : true }, `${e.result.relegated === true ? 'Relegation cleared' : 'Relegated'} · ${first(e.name)}`);
   const lap = (e: ResultEntry, d: number) => onSave(e.id, { ...e.result, laps: (e.result.laps ?? 0) + d || undefined }, `${d > 0 ? '+1 lap' : '−1 lap'} · ${first(e.name)}`);
 
   const modes: ('line' | ResultStatus)[] = ['line', ...statuses];
@@ -147,6 +150,8 @@ export function FinishOrderCard({ def, kind, entries, editable, onSave, statuses
                   </View>
                   {timed ? <Text style={st.gap}>{t?.time == null ? (i === 0 ? 'time?' : '') : i === 0 || !t.gap ? (i === 0 ? secsText(t.time) : 's.t.') : gapText(t.gap)}</Text> : null}
                   {kind === 'scratch' && e.result.laps ? <Text style={st.gap}>{e.result.laps > 0 ? '+' : ''}{e.result.laps} lap</Text> : null}
+                  {relegatable && e.result.relegated === true ? <Text style={st.gap}>relegated</Text> : null}
+                  {editable && relegatable ? <SmallBtn label={e.result.relegated === true ? 'REL ✓' : 'REL'} a11y={e.result.relegated === true ? `Clear ${e.name}'s relegation` : `Relegate ${e.name}: placed last of the finishers`} onPress={() => relegate(e)} /> : null}
                   {editable && !elim && i > 0 ? <SmallBtn label="↑" a11y={`Move ${e.name} up one place`} onPress={() => up(e)} /> : null}
                   {editable ? <SmallBtn label="✕" a11y={`Take ${e.name} off the line`} onPress={() => void remove(e)} /> : null}
                 </View>

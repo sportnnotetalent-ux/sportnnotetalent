@@ -23,7 +23,7 @@ import { askConfirm } from '../ConfirmSheet';
 import {
   activeLift, liftingOrder, callText, declareError, declare, recordLift, pendingIndex, taken, weighInIssue, classForBodyweight,
   summarizeLifts, bombedOutOf, fmtKg, WL_RANGE, BIG_JUMP, LIFT_LABEL, LIFT_SHORT, LIFTS, ordinal,
-  ruleOf, changeLimitIssue, juryReverse, decisionText, lightsScore, clockAllowance, juryOffered,
+  ruleOf, changeLimitIssue, juryReverse, decisionText, lightsScore, clockAllowance, juryOffered, reAttempt,
   type EntryResult, type LiftAttempt, type Lift, type ResultEntry, type CompRules,
 } from '../../data/results';
 import { LiftingClock } from './LiftingClock';
@@ -326,7 +326,7 @@ export function LiftGrid({ r, editable, onChange, rules, lb }: { r: EntryResult;
             const on = sel?.lift === lift && sel.i === i;
             const txt = a ? (a.pass ? `${a.kg} –` : `${a.kg}`) : '';
             // deep wave: the referees' lights, a jury reversal, weight changes
-            const sub = a ? [lightsScore(a) ?? '', a.jury ? 'J' : '', a.chg?.length ? `Δ${a.chg.length}` : ''].filter(Boolean).join(' ') : '';
+            const sub = a ? [lightsScore(a) ?? '', a.jury ? 'J' : '', a.chg?.length ? `Δ${a.chg.length}` : '', a.reat === true ? 'R' : ''].filter(Boolean).join(' ') : '';
             return (
               <TouchableOpacity key={i} accessibilityRole="button" disabled={!editable} onPress={() => pick(lift, i)}
                 accessibilityLabel={`${LIFT_LABEL[lift]} attempt ${i + 1}: ${a ? `${a.kg} kg ${taken(a) ? decisionText(a) : 'declared'}${a.chg?.length ? `, weight changed ${a.chg.length === 1 ? 'once' : `${a.chg.length} times`}` : ''}` : 'empty'}`}
@@ -356,6 +356,15 @@ export function LiftGrid({ r, editable, onChange, rules, lb }: { r: EntryResult;
             {/* batch 5: a reversal changes the result — offered on any decided attempt, whatever the wlJury switch */}
             {cur && juryOffered(cur) ? (
               <SelectChip label={cur.jury ? '⚖ Jury reversed ✓' : '⚖ Jury reversed'} active={!!cur.jury} onPress={() => { onChange({ ...r, lifts: { ...r.lifts, [sel.lift]: juryReverse(list, sel.i, rules) } }); setSel(null); }} />
+            ) : null}
+            {/* batch 6: the bar was loaded wrongly / a technical fault — the lifter takes this attempt again; later declarations stay */}
+            {cur && juryOffered(cur) && !list.slice(sel.i + 1).some(taken) ? (
+              <SelectChip label="Re-attempt (loading error)" active={false} onPress={() => void (async () => {
+                const ok = await askConfirm({ title: 'Give a re-attempt?', message: `${LIFT_LABEL[sel.lift]} attempt ${sel.i + 1} (${cur.kg} kg, ${cur.good ? 'good lift' : 'no lift'}) is set aside — the bar was loaded wrongly or there was a technical fault. The lifter is called again for this attempt; later declarations stay.`, yesLabel: 'Yes, re-attempt', noLabel: 'No, keep it', tone: 'caution' });
+                if (!ok) return;
+                onChange({ ...r, lifts: { ...r.lifts, [sel.lift]: reAttempt(list, sel.i) } });
+                setSel(null);
+              })()} />
             ) : null}
             {cur ? <SelectChip label="Clear" active={false} onPress={() => void clear()} /> : null}
           </View>

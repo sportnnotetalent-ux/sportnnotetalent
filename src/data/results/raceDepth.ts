@@ -17,6 +17,7 @@ import { rankByHeat, rankEntries } from './rank.ts';
 import { qualify, withQualification } from './progression.ts';
 import { splitDistances, swimEventOf } from './swimming.ts';
 import { isCrewSport, routeCrews, routeTarget } from './crews.ts';
+import { crewEventOf } from './crewDefs.ts';
 import { combinedPhaseName } from './combined.ts';
 import { athLapDistances, distanceLabel, lapPointsDiffer, lapPointsOf, raceMetres, type LapPoints } from './raceSplitDefs.ts';
 
@@ -407,9 +408,47 @@ export const ATH_DQ: { ref: string; label: string; when?: 'lanes' | 'break' | 'h
   { ref: 'TR 7.1', label: 'Unsporting conduct' },
 ];
 
-/** A reason picked from ATH_DQ no longer matches a rule reference typed over it (clear it). */
+/** Batch 6: UCI reasons a commissaire's DQ is usually for (Part 2 road / Part 3
+ *  track, as remembered — verify the article numbers before quoting them). A
+ *  relegation is NOT a DQ: it is the "REL" chip (the rider stays classified). */
+export const CYC_DQ: { ref: string; label: string }[] = [
+  { ref: 'UCI sprint', label: 'Irregular sprint — left the line / blocked a rider' },
+  { ref: 'UCI dangerous', label: 'Dangerous riding' },
+  { ref: 'UCI keirin', label: 'Passed the pacer before it left the track (keirin)' },
+  { ref: 'UCI assistance', label: 'Pushing, pulling or pacing help' },
+  { ref: 'UCI equipment', label: 'Bike or equipment not to the rules' },
+  { ref: 'UCI conduct', label: 'Unsporting conduct' },
+];
+
+/** Batch 6: rowing / canoe — exclusion from THIS race and disqualification
+ *  from the whole regatta are different penalties (World Rowing Rules of
+ *  Racing; ICF: verify), plus the weight / boat checks. `cox` = coxed boats only;
+ *  `sport` limits a reason to one federation. */
+export const CREW_DQ: { ref: string; label: string; cox?: boolean; sport?: 'rowing' | 'canoe' }[] = [
+  { ref: 'Exclusion', label: 'Excluded from this race' },
+  { ref: 'Disqualification', label: 'Disqualified from the regatta' },
+  { ref: 'Boat weight', label: 'Boat under the minimum weight' },
+  { ref: 'Cox weight', label: 'Cox under weight (no dead weight carried)', cox: true, sport: 'rowing' },
+  { ref: 'Boat check', label: 'Boat failed the boat check (ICF)', sport: 'canoe' },
+  { ref: 'Lane', label: 'Left the lane / interfered with another crew' },
+];
+
+/** Batch 6: the DQ reasons an official picks from for a race — athletics (TR),
+ *  cycling (UCI), rowing / canoe (exclusion vs regatta DQ, weight, boat check).
+ *  Swimming has its own (SW, by stroke and leg); [] elsewhere. */
+export function raceDqCodesFor(def: Pick<DisciplineDef, 'key' | 'sport' | 'capture' | 'lanes' | 'teamSize'>): { ref: string; label: string }[] {
+  if (def.sport === 'athletics') return def.capture === 'single' ? athDqCodesFor(def) : [];
+  if (def.sport === 'cycling') return CYC_DQ;
+  if (isCrewSport(def.sport)) {
+    const coxed = crewEventOf(def.key)?.boat.cox === true;
+    return CREW_DQ.filter((c) => (!c.cox || coxed) && (!c.sport || c.sport === def.sport)).map(({ ref, label }) => ({ ref, label }));
+  }
+  return [];
+}
+
+/** A reason picked from a DQ list (athletics, batch 6: cycling, crews) no longer matches a rule reference typed over it (clear it). */
 export const athDqReasonStale = (r: Pick<EntryResult, 'reason'>, newRef: string | undefined): boolean => {
-  const c = ATH_DQ.find((x) => x.label === r.reason);
+  const c = [...ATH_DQ, ...CYC_DQ, ...CREW_DQ].find((x) => x.label === r.reason);
   return !!c && c.ref !== (newRef ?? '').trim();
 };
 
