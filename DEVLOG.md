@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-05 — Release: one team page, My teams, pair teams, follows on profile live (web, Android OTA)
+
+auth-smoke passed. Published from a clean worktree at 9c336ab (includes 1ea072e one team page and b7b22c1 pairs / My teams): web (entry `index-6c962fe0`, confirmed live on app.sportnnote.in) and Android OTA groups `60d25f6e` (preview) and `f6df165b` (production), runtime 1.0.0. No database change.
+
 ### 2026-11-05 — My teams = teams I'm part of; every pair is a team; follows on my profile
 
 Founder's rules (`docs/security/breaks/pairs-and-my-teams.md`, `src/core/pairs.ts`). **My teams** now lists multi-sport teams I'm a member of, single-sport teams whose squad lists me or I've played for (match squads, `getTeamsPlayedFor`), **Your pairs**, and, apart, "Teams you run" (created or managed, not in the squad); one-off sides are never listed as teams. **Pairs:** a pair is the two people. Every one-off side of exactly them, in any sport played as singles/doubles (`isPairSport`; a two-person game-day football side is not a pair), duplicates included, is one pair. New **Pair page** (`PairProfileScreen`, route `Pair`): played / won / lost / win %, per sport with the two players' combined numbers from those games, the two players, games together. A pair's side opened from a match goes to the pair page. The doubles picker adds "Your pairs" from any sport (reuses or makes this sport's entry). **Profile:** a Pairs section for any player; a Following section (teams, players, tournaments; "See all" opens Following) on your own profile only. Tests: 8 unit (PT4b failed first), a 600-player simulation; full suite green (pool timing test passes alone); tsc clean; demo checked (My teams pairs, pair page, profile Pairs + Following). No database change.
