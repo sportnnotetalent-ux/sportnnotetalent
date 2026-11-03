@@ -2,6 +2,7 @@
 import React from 'react';
 import {
   ActivityIndicator,
+  Animated,
   Text,
   TextInput,
   TouchableOpacity,
@@ -19,6 +20,7 @@ import { splitLeading, stripLeadingEmoji } from '../core/leadingEmoji';
 import { EMOJI_ICONS, EMOJI_KEYS, EmojiIcon } from './Icon';
 import { SportBadge } from './SportSymbol';
 import { SPORT_LIST } from '../sports/sportMeta';
+import { AnimatedPressable, usePressFeedback, useSelectAnim } from './pressFeedback';
 
 /** Every sport's emoji, so a chip like "⚽ Football" draws it apart from the
  *  words with the same gap as an icon (not glued on: "⚽Football"). */
@@ -152,11 +154,14 @@ export function Button({
   const lead = splitLeading(label, EMOJI_KEYS);
   const spec = lead ? EMOJI_ICONS[lead.key] : undefined;
   const text = spec ? lead!.rest : label;
+  // Tap feedback (2026-11-03): a quick scale-down + dim while pressed
+  const press = usePressFeedback({ disabled });
   return (
-    <TouchableOpacity
+    <AnimatedPressable
       onPress={disabled ? undefined : onPress}
+      onPressIn={press.onPressIn}
+      onPressOut={press.onPressOut}
       disabled={disabled}
-      activeOpacity={0.85}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? (spec ? text || spec.name || label : label)}
       accessibilityHint={accessibilityHint}
@@ -169,13 +174,14 @@ export function Button({
         variant === 'ghost' && styles.btnGhost,
         disabled && styles.btnDisabled,
         style,
+        disabled ? null : press.style,
       ]}
     >
       <View style={styles.btnRow}>
         {spec ? <EmojiIcon spec={spec} color={fg} size={18} /> : null}
         {text ? <Text style={[styles.btnText, { color: fg }]}>{text}</Text> : null}
       </View>
-    </TouchableOpacity>
+    </AnimatedPressable>
   );
 }
 
@@ -374,11 +380,16 @@ export function SelectChip({
   const p = dotColor ? { text: label } : chipParts(label);
   const dot = dotColor;
   const ink = active ? theme.colors.onLime : theme.colors.textMuted;
+  // Tap feedback (2026-11-03): pressed = a quick scale-down; becoming selected
+  // fades the lime fill in (not a hard switch)
+  const press = usePressFeedback({ disabled });
+  const fill = useSelectAnim(active && !disabled);
   return (
-    <TouchableOpacity
+    <AnimatedPressable
       onPress={disabled ? undefined : onPress}
+      onPressIn={press.onPressIn}
+      onPressOut={press.onPressOut}
       disabled={disabled}
-      activeOpacity={0.8}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? p.text}
       // `selected` is what a screen reader announces as "selected"/"not selected" —
@@ -386,13 +397,14 @@ export function SelectChip({
       {...toggleA11y(active, disabled)}
       // ≥44pt touch target without making every chip row taller.
       hitSlop={{ top: 4, bottom: 4, left: 2, right: 2 }}
-      style={[styles.selChip, active && styles.selChipActive, disabled && styles.selChipDisabled]}
+      style={[styles.selChip, active && styles.selChipActiveEdge, disabled && styles.selChipDisabled, disabled ? null : press.style]}
     >
+      <Animated.View pointerEvents="none" style={[styles.selFill, { opacity: fill }]} />
       {dot ? <View style={[styles.selDot, { backgroundColor: dot }]} /> : null}
       {p.spec ? <EmojiIcon spec={p.spec} color={ink} size={15} /> : null}
       {p.emoji ? <Text style={styles.selEmoji}>{p.emoji}</Text> : null}
       <Text style={[styles.selChipText, active && styles.selChipTextActive, disabled && styles.selChipTextDisabled]}>{p.text}</Text>
-    </TouchableOpacity>
+    </AnimatedPressable>
   );
 }
 
@@ -462,7 +474,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.border,
   },
-  selChipActive: { backgroundColor: theme.colors.lime, borderColor: theme.colors.lime },
+  /** the selected look: the edge at once, the lime fill fades in (selFill) */
+  selChipActiveEdge: { borderColor: theme.colors.lime },
+  selFill: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: theme.colors.lime, borderRadius: theme.radius.pill },
   selChipDisabled: { opacity: 0.4, backgroundColor: theme.colors.surfaceAlt },
   selChipText: { color: theme.colors.textMuted, fontSize: theme.font.small, fontWeight: '700' },
   selChipTextActive: { color: theme.colors.onLime },

@@ -32,6 +32,6 @@ test('the scorer screen uses it for individual / pair sports only', () => {
   // a disputed player's name stays masked: names go through the mask-aware lookup
   assert.match(src, /entryDisplayName\(homeScoreRoster\.map\(\(p\) => shownNameOf\(p\.id, p\.fullName\)\)\)/);
   assert.match(src, /makeNameOf\(people, maskValue\)/);
-  assert.match(src, /plugin\.ScoringControls\s+state=\{state\} dispatch=\{dispatch\} homeName=\{homeShown\} awayName=\{awayShown\}/);
+  assert.match(src, /plugin\.ScoringControls\s+state=\{state\} dispatch=\{scoreDispatch\} homeName=\{homeShown\} awayName=\{awayShown\}/);
   assert.match(src, /<plugin\.Scoreboard state=\{state\} homeName=\{homeShown\} awayName=\{awayShown\}/);
 });
