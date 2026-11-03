@@ -461,6 +461,8 @@ export function phaseLines(f: Pick<PhaseFormat, 'discipline' | 'phase' | 'catego
     // the best jump's wind (LJ / TJ)
     if (def.wind === 'attempt' && r.wind != null) s.wind = r.wind;
     if (r.entry.result.hand) s.hand = 1;
+    // batch 6: field fouls (X) from the trials entered — only when trials were entered
+    if (def.capture === 'attempts' && Array.isArray(r.entry.result.attempts) && r.entry.result.attempts.length) s.fieldFouls = r.entry.result.attempts.filter((t) => t?.foul === true).length;
     out.push({ playerId: r.entry.athleteId!, stats: s, won: a?.medal === 'gold' });
   }
   return out;

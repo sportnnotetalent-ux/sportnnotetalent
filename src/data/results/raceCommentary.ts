@@ -174,6 +174,9 @@ function heatNotes(def: DisciplineDef, f: PhaseFormat, rows: RankedEntry[]): str
     if (res.fsWarn === true && r.status !== 'FS' && r.status !== 'DQ') {
       out.push(crew ? `${r.entry.name} warned for a false start (yellow card)` : `${r.entry.name} charged with the false start`);
     }
+    // batch 6: a start-conduct yellow card (TR 16.5); a relegated rider (keirin / scratch)
+    if (res.scWarn === true && def.sport === 'athletics' && r.status !== 'DQ') out.push(`${r.entry.name} yellow card for start conduct (TR 16.5)`);
+    if (res.relegated === true && def.sport === 'cycling' && /^cyc\.(keirin|scratch)$/.test(def.key) && r.position != null) out.push(`${r.entry.name} relegated (placed last of the finishers)`);
   }
   return out;
 }

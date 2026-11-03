@@ -10,13 +10,15 @@ import { CommentaryFeed } from '../../sports/gcc/CommentaryFeed';
 import { CompareTable } from '../../sports/gcc/CompareTable';
 import { golfRoundFeed, type FeedPlayer } from '../../sports/golf/feed';
 import { golfStatSheet, type NinePart } from '../../sports/golf/statSheet';
-import type { DistUnit } from '../../sports/golf/engine';
+import type { DistUnit, MaxScore } from '../../sports/golf/engine';
 
 const short = (name: string) => name.split(' ')[0] || name;
 
 /** The field's hole-by-hole commentary, with a player filter. */
-export function GolfRoundFeed({ players, scoring, net, only: fixed, unit }: {
+export function GolfRoundFeed({ players, scoring, net, only: fixed, unit, maxComp }: {
   players: FeedPlayer[];
+  /** batch 6 — a maximum score round's limit (a pickup scores the cap) */
+  maxComp?: MaxScore;
   scoring: 'stroke' | 'stableford';
   net?: boolean;
   /** one player's feed only (no filter chips) */
@@ -28,7 +30,7 @@ export function GolfRoundFeed({ players, scoring, net, only: fixed, unit }: {
   const only = fixed ?? (who === 'all' ? undefined : who);
   const filters = fixed ? undefined : [{ key: 'all', label: 'Everyone' }, ...players.map((p) => ({ key: p.id, label: short(p.name) }))];
   return (
-    <CommentaryFeed title={fixed ? null : '🎙 Hole by hole'} groups={golfRoundFeed(players, { scoring, net, only, unit })}
+    <CommentaryFeed title={fixed ? null : '🎙 Hole by hole'} groups={golfRoundFeed(players, { scoring, net, only, unit, maxComp })}
       filters={players.length > 1 ? filters : undefined} filter={who} onFilter={setWho} empty="No holes scored yet." />
   );
 }

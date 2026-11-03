@@ -57,6 +57,15 @@ export function driveHolesOf(format: Record<string, unknown> | undefined | null)
   return Array.isArray(v) ? [...new Set(v.map(Number).filter((n) => Number.isInteger(n) && n >= 1 && n <= 18))].sort((a, b) => a - b) : [];
 }
 
+/** Batch 6 — the round's format summary line for its "Stats to track":
+ *  "Stats kept: putts · fairways", "Stats kept: strokes only" (the organiser
+ *  chose none), '' when the round sets nothing (each marker's phone decides). */
+export function golfTrackSummary(format: Record<string, unknown> | undefined | null): string {
+  const t = roundTrackOf(format);
+  if (t == null) return '';
+  return `Stats kept: ${t.length ? t.map((k) => GOLF_TRACK_LABEL[k].label.toLowerCase()).join(' · ') : 'strokes only'}`;
+}
+
 /** What this marker tracks: the round's setting, else the phone's. */
 export function effectiveTrack(round: GolfTrackKey[] | null, phone: GolfTrackKey[]): GolfTrackKey[] {
   return round ?? cleanTrack(phone);

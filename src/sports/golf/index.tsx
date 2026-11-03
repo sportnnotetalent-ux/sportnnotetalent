@@ -10,12 +10,12 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { theme } from '../../core/theme';
-import { Button, textStyles } from '../../components/ui';
+import { Button, SelectChip, textStyles } from '../../components/ui';
 import { askConfirm } from '../../components/ConfirmSheet';
 import { confirmCopy } from '../../core/matchSafety';
 import type { SportPlugin } from '../types';
 import { concededLine, holeWinner, type HoleWinner } from './engine';
-import { initGolfMatch, golfMatchReducer, golfMatchStateOf, holeAction, type GolfMatchState } from './match';
+import { initGolfMatch, golfMatchReducer, golfMatchStateOf, holeAction, type GolfMatchState, type HoleHow } from './match';
 import { matchHole, holeNumber, strokesLine } from './matchStrokes';
 import { MatchStrokesSetup } from './MatchStrokesSetup';
 import { golfMatchVoice } from '../voiceParsers';
@@ -48,6 +48,8 @@ const ScoringControls: SportPlugin<GolfMatchState>['ScoringControls'] = ({ state
   const m = stateOf(s);
   const [conceding, setConceding] = useState(false);
   const [setup, setSetup] = useState(false);
+  // batch 6 — how the next hole is won when not on strokes: the other side's penalty (loss of hole) or concession
+  const [how, setHow] = useState<{ hole: number; how: HoleHow | null }>({ hole: -1, how: null });
   // SD-87 — this hole's gross strokes (null = start at par), reset per hole
   const [gross, setGross] = useState<{ hole: number; home: number | null; away: number | null }>({ hole: -1, home: null, away: null });
   const { nameOf: who } = useMask();
@@ -70,8 +72,11 @@ const ScoringControls: SportPlugin<GolfMatchState>['ScoringControls'] = ({ state
   // the hole (credits by player id only — match events are public); deep
   // wave — `at` (the scorer's clock) for the commentary; SD-87 — with strokes
   // entered, each player's score on the hole is credited too
-  const hole = (winner: HoleWinner, strokes?: { home: number; away: number }) =>
-    dispatch(holeAction(winner, { home: homeRoster[0], away: awayRoster[0] }, { ...(strokes && here ? { strokes, par: here.hole.par } : {}), at: Date.now() }));
+  const howNow = how.hole === m.played ? how.how : null;
+  const hole = (winner: HoleWinner, strokes?: { home: number; away: number }) => {
+    dispatch(holeAction(winner, { home: homeRoster[0], away: awayRoster[0] }, { ...(strokes && here ? { strokes, par: here.hole.par } : {}), at: Date.now(), ...(howNow && !strokes ? { how: howNow } : {}) }));
+    setHow({ hole: -1, how: null });
+  };
   const cur = gross.hole === m.played ? gross : { hole: m.played, home: null, away: null };
   const par = here?.hole.par ?? 4;
   const val = (side: 'home' | 'away') => cur[side] ?? par;
@@ -112,6 +117,12 @@ const ScoringControls: SportPlugin<GolfMatchState>['ScoringControls'] = ({ state
       <Button label={`${nm('home')} wins hole ${holeNo}`} variant="home" onPress={() => hole('home')} />
       <Button label={`Hole ${holeNo} halved`} variant="ghost" onPress={() => hole('halved')} />
       <Button label={`${nm('away')} wins hole ${holeNo}`} variant="away" onPress={() => hole('away')} />
+      {/* batch 6 — optional: why the hole was lost (shown in the commentary); then tap the winner */}
+      <View style={st.row}>
+        <SelectChip label="Lost by penalty" active={howNow === 'penalty'} onPress={() => setHow({ hole: m.played, how: howNow === 'penalty' ? null : 'penalty' })} />
+        <SelectChip label="Hole conceded" active={howNow === 'conceded'} onPress={() => setHow({ hole: m.played, how: howNow === 'conceded' ? null : 'conceded' })} />
+      </View>
+      {howNow ? <Text style={st.meta}>{howNow === 'penalty' ? 'The general penalty in match play is loss of hole' : 'The hole was conceded'} — now tap who wins hole {holeNo}.</Text> : null}
       {/* SD-87 — handicap strokes (WHS Appendix C: 100% of the difference) */}
       {setup ? (
         <MatchStrokesSetup

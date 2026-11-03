@@ -19,7 +19,7 @@ import { theme } from '../../core/theme';
 import { Button, Card, SelectChip, textStyles } from '../ui';
 import { askConfirm } from '../ConfirmSheet';
 import {
-  endsOf, endSum, endText, parseEnd, archRowText, setEnd, sortEnd, setArrowPenalty,
+  endsOf, endSum, endText, parseEnd, archRowText, setEnd, sortEnd, setArrowPenalty, setMatchPenalty,
   bracketState, staleMatchData, outcomeText, roundShort, setMatchEnd, setMatchSo, setCloser, setWalkover, clearMatches,
   matchSpecOf, setMatchSoRound,
   faceOf, ruleOf, perArcherOf, endInArcherOrder,
@@ -405,6 +405,22 @@ function MatchScorer({ m, rounds, entries, fmt, editable, onSave, match, spec, m
         </View>
       )}
 
+      {/* batch 6 (World Archery Book 3, verify): a penalty in the match — the end's highest arrow doesn't count; the arrows stay as shot */}
+      {editable && edit != null && !wo && (A?.ends?.[edit]?.length || B?.ends?.[edit]?.length) ? (
+        <View style={st.wrap}>
+          {(['a', 'b'] as const).map((sd) => {
+            const e = sd === 'a' ? ea : eb;
+            const sideNow = sd === 'a' ? A : B;
+            if (!sideNow?.ends?.[edit]?.length) return null;
+            const now = Array.isArray(sideNow.pen) && Number.isInteger(sideNow.pen[edit]) ? sideNow.pen[edit] : 0;
+            const nextN = now >= 1 ? 0 : 1;
+            return (
+              <SelectChip key={sd} label={now ? `${first(e.name)}: penalty, highest arrow of end ${edit + 1} off (tap to clear)` : `⋯ Penalty: ${first(e.name)}’s highest arrow of end ${edit + 1} doesn’t count`} active={now > 0}
+                onPress={() => void apply(sd === 'a' ? setMatchPenalty(ea.result, m.key, edit, nextN) : ea.result, sd === 'b' ? setMatchPenalty(eb.result, m.key, edit, nextN) : eb.result, nextN ? `E${edit + 1} penalty · ${first(e.name)}` : `E${edit + 1} penalty cleared · ${first(e.name)}`)} />
+            );
+          })}
+        </View>
+      ) : null}
       {editable && (idx != null || (soRound != null && soArrows)) && !wo && (
         <View style={{ gap: theme.spacing(2) }}>
           <Text style={st.name}>{idx != null ? `${edit != null ? 'Correct' : ''} end ${idx + 1}`.trim() : SO > 1 ? `Shoot-off${soRound! > 0 ? ` round ${soRound! + 1}` : ''} — ${SO} arrows a team, one per archer` : `Shoot-off arrow${soRound! > 0 ? ` ${soRound! + 1}` : ''} — one each`}</Text>

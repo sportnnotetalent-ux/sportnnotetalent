@@ -210,7 +210,9 @@ export function rankCycling(entries: ResultEntry[], def: DisciplineDef, o: { tie
       const t = rt?.get(e.id);
       const laps = kind === 'scratch' ? e.result?.laps ?? 0 : 0;
       const text = t?.time != null ? (t.gap ? gapText(t.gap) : t.st ? 's.t.' : secsText(t.time)) : laps ? `${laps > 0 ? '+' : ''}${laps} lap${Math.abs(laps) === 1 ? '' : 's'}` : '';
-      rows.push({ e, keys: [laps, fin != null ? -fin : undefined], best: t?.time ?? null, text, ranked: ok(e) && fin != null });
+      // batch 6: keirin / scratch — a relegated rider is placed last of those who finished (UCI), still classified
+      const rel = (kind === 'keirin' || kind === 'scratch') && e.result?.relegated === true;
+      rows.push({ e, keys: rel ? [-1e9, fin != null ? -fin : undefined] : [laps, fin != null ? -fin : undefined], best: t?.time ?? null, text: rel ? 'relegated' : text, ranked: ok(e) && fin != null });
     }
   }
   const ranked = rows.filter((r) => r.ranked).sort((a, b) => compareKeys(a.keys, b.keys) || (a.e.result?.order ?? 99) - (b.e.result?.order ?? 99) || a.e.name.localeCompare(b.e.name));

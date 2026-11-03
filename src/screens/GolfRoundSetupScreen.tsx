@@ -27,7 +27,8 @@ import {
 import { GolfCourseEditor, type CourseDraft } from '../components/golf/GolfCourseEditor';
 import { isSupabaseConfigured } from '../core/supabase';
 import { getSportMeta } from '../sports/sportMeta';
-import { holesFor, makesCut, type CutRule } from '../sports/golf/engine';
+import { holesFor, makesCut, GOLF_TRACK_KEYS, type CutRule, type GolfTrackKey } from '../sports/golf/engine';
+import { GOLF_TRACK_LABEL, roundTrackOf, cleanTrack } from '../sports/golf/track';
 import type { GolfCourse, Team } from '../core/types';
 import { golfTeamFormatOf, type GolfTeamFormat } from '../data/golfTeams';
 import { readGolfRounds } from '../data/tournamentCopyPlan';
@@ -65,6 +66,8 @@ export default function GolfRoundSetupScreen() {
     };
   });
   const [when, setWhen] = useState(() => new Date());
+  // batch 6 — the round's "Stats to track" for every marker (null = each marker's phone, as before)
+  const [track, setTrack] = useState<GolfTrackKey[] | null>(null);
   const [picks, setPicks] = useState<Pick[]>([]);
   const [groupSize, setGroupSize] = useState(4);
   const [interval, setIntervalMin] = useState(10);
@@ -102,6 +105,7 @@ export default function GolfRoundSetupScreen() {
       setCourseId(f.courseId);
       setTee(f.tee);
       setFormat((v) => ({ ...v, ...(last.format as Record<string, FormatVal>) }));
+      setTrack(roundTrackOf(last.format as Record<string, unknown>));
       const n = Math.max(...evs.map((e) => e.roundNo)) + 1;
       setRoundNo(n);
       setTitle(`Round ${n}`);
@@ -149,6 +153,7 @@ export default function GolfRoundSetupScreen() {
     if (typeof planned.format.courseId === 'string' && planned.format.courseId) setCourseId(planned.format.courseId);
     setTee(typeof planned.format.tee === 'string' ? planned.format.tee : undefined);
     setFormat((v) => ({ ...v, ...(planned.format as Record<string, FormatVal>) }));
+    setTrack(roundTrackOf(planned.format as Record<string, unknown>));
     const tr = golfTeamFormatOf({ format: planned.format });
     if (tr) { setTeamOn(true); setTeamRule(tr); }
   }, [planned, prev, params?.nextOf]);
@@ -258,7 +263,7 @@ export default function GolfRoundSetupScreen() {
       const holes = holesFor(course, String(format.holes ?? '18') as '18' | 'front9' | 'back9');
       // SD-122 — mixed tees: every player's tee is stored, and the round's tee
       // is the one most of them play (WHS 6.2b compares the tees in use)
-      const { entryTees: _et, ...restFormat } = baseFormat;
+      const { entryTees: _et, track: _tr, ...restFormat } = baseFormat;
       const valid = new Set(course.tees.map((t) => t.name));
       const teeOf = (p: Pick) => (p.tee && valid.has(p.tee) ? p.tee : roundTee);
       const mixed = course.tees.length > 1 && chosen.some((p) => teeOf(p) !== roundTee);
@@ -268,7 +273,7 @@ export default function GolfRoundSetupScreen() {
       const teeKeys = mixed ? { entryTees: Object.fromEntries(chosen.map((p) => [p.playerId, teeOf(p)])) } : {};
       const ev = await createFieldEvent({
         tournamentId, sport: 'golf', title: title.trim() || `Round ${roundNo}`, roundNo, startsAt: when.toISOString(),
-        format: { ...restFormat, ...cutKeys, courseId: course.id, tee: mainTee, ...teeKeys, net: format.netScoring === 'net', ...(teamOn ? { team: teamRule } : {}) },
+        format: { ...restFormat, ...(track ? { track } : {}), ...cutKeys, courseId: course.id, tee: mainTee, ...teeKeys, net: format.netScoring === 'net', ...(teamOn ? { team: teamRule } : {}) },
         hostIds: me ? [me] : [],
       });
       const groups = autoGroups(chosen.map((p) => p.playerId), groupSize, when, interval);
@@ -317,6 +322,20 @@ export default function GolfRoundSetupScreen() {
           )}
 
           <SportFormatEditor sport="golf" value={format} onChange={(k, v) => setFormat((f) => ({ ...f, [k]: v }))} heading="format" omitKeys={['extraHoles']} />
+          {/* batch 6 — Stats to track, chosen at setup so every marker keeps the same depth (shown on the round's header) */}
+          {competition !== 'match' && (
+            <View style={{ gap: 4 }}>
+              <FieldLabel>Stats to track (every marker)</FieldLabel>
+              <Text style={textStyles.muted}>{track == null ? 'Not set — each marker keeps what their phone is set to. Pick any to set it for the whole round.' : track.length ? 'Every marker keeps these on each hole.' : 'Strokes only for every marker.'}</Text>
+              <View style={st.chips}>
+                {GOLF_TRACK_KEYS.map((k) => {
+                  const on = !!track?.includes(k);
+                  return <SelectChip key={k} label={GOLF_TRACK_LABEL[k].label} active={on} onPress={() => setTrack(cleanTrack(on ? (track ?? []).filter((x) => x !== k) : [...(track ?? []), k]))} />;
+                })}
+                {track != null ? <SelectChip label="Each marker’s choice" active={false} onPress={() => setTrack(null)} /> : null}
+              </View>
+            </View>
+          )}
           {competition === 'match' && <Text style={st.warn}>Match play is head-to-head — set it up from “Start a friendly” or a tournament bracket.</Text>}
 
           <DateTimeField label="First tee time" value={when} onChange={setWhen} />

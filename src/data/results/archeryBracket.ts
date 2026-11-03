@@ -19,7 +19,7 @@
  */
 import type { ArchSide, DisciplineDef, RankedEntry, ResultEntry, ResultFlag, ResultStatus } from './model.ts';
 import { STATUS_ORDER } from './model.ts';
-import { archRoundOf, endSum, matchFormatOf, matchSpecOf, INDIVIDUAL_SPEC, type ArchMatchFormat, type Arrow, type MatchSpec } from './archeryDefs.ts';
+import { archRoundOf, endNet, endSum, matchFormatOf, matchSpecOf, INDIVIDUAL_SPEC, type ArchMatchFormat, type Arrow, type MatchSpec } from './archeryDefs.ts';
 import { ruleOf, type CompRules } from './competitionRules.ts';
 
 /** Is this a phase of match play (bracket rows carry `mp`)? */
@@ -97,7 +97,8 @@ export function matchOutcome(A: ArchSide | undefined, B: ArchSide | undefined, f
   const n = Math.min(ea.length, eb.length, spec.ends);
   const o = { ...base };
   for (let k = 0; k < n; k++) {
-    const sa = endSum(ea[k]), sb = endSum(eb[k]);
+    // batch 6: a match penalty (A.pen / B.pen) takes the end's highest arrow(s) off — absent = as before
+    const sa = endNet(ea[k], Array.isArray(A?.pen) ? A!.pen[k] : 0), sb = endNet(eb[k], Array.isArray(B?.pen) ? B!.pen[k] : 0);
     const pa = sa > sb ? 2 : sa === sb ? 1 : 0;
     const pb = 2 - pa;
     o.ends.push({ a: sa, b: sb, pa, pb });

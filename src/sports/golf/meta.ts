@@ -32,6 +32,8 @@ export const GOLF_META: SportMeta = {
         { value: 'stroke', label: 'Stroke play' },
         { value: 'stableford', label: 'Stableford' },
         { value: 'match', label: 'Match play' },
+        // batch 6 — Rule 21.2: each hole capped (the maximum below); a pickup scores the cap and the round still counts
+        { value: 'maxscore', label: 'Maximum score' },
       ],
     },
     {
@@ -54,7 +56,7 @@ export const GOLF_META: SportMeta = {
     // absent = net double bogey, as before. Stroke play / Stableford only.
     {
       key: 'maxScore', label: 'Maximum hole score (adjusted gross)', type: 'choice', default: 'ndb', advanced: true, hideWhen: STROKE_ONLY,
-      hint: 'caps a hole for the adjusted gross on profiles; the round itself counts every stroke',
+      hint: 'caps a hole for the adjusted gross on profiles; in a Maximum score competition it is the limit for the round (no cap = net double bogey)',
       options: [
         { value: 'ndb', label: 'Net double bogey (WHS)' },
         { value: 'par3', label: 'Par + 3' },

@@ -23,7 +23,7 @@ import { theme } from '../../core/theme';
 import { Card, SelectChip, textStyles } from '../ui';
 import { getPhaseEntries } from '../../data/resultsStore';
 import {
-  athDqCodesFor, eventCommentary, formatMark, groupMeet, hasAnalysis, heatAnalysis, isTimedRaceSport, meetCommentary, parseTakeover,
+  raceDqCodesFor, eventCommentary, formatMark, groupMeet, hasAnalysis, heatAnalysis, isTimedRaceSport, meetCommentary, parseTakeover,
   pathText, phaseOf, progressionPaths, raceGapText, takeoverEarly, takeoverText, toResultEntry,
   type CommentaryItem, type DisciplineDef, type EntryResult, type HeatAnalysis, type MeetEvent, type MeetPhase, type PhaseFormat, type RankedEntry, type ResultEntry, type ResultFlag,
 } from '../../data/results';
@@ -195,7 +195,7 @@ export function MeetCommentaryCard({ events, sport }: { events: MeetEvent[]; spo
 /* ---------------------------- capture fields ----------------------------- */
 
 /** A swimming relay's take-over readings, legs 2–4 ("0.21", "-0.05", or "21"). */
-export function TakeoverField({ r, onSave }: { r: EntryResult; onSave: (takeovers: (number | null)[] | undefined) => void }) {
+export function TakeoverField({ r, onSave, dq, onDq }: { r: EntryResult; onSave: (takeovers: (number | null)[] | undefined) => void; /** batch 6: the SW 10.13 DQ with the early leg, when a saved reading is early */ dq?: EntryResult | null; onDq?: (n: EntryResult) => void }) {
   const init = [0, 1, 2].map((i) => (r.takeovers?.[i] != null ? (r.takeovers[i] as number).toFixed(2) : ''));
   const [t, setT] = useState(init);
   const vals = t.map(parseTakeover);
@@ -222,14 +222,17 @@ export function TakeoverField({ r, onSave }: { r: EntryResult; onSave: (takeover
       </View>
       {bad ? <Text style={st.warn}>Can’t read a take-over — type seconds like 0.21 or −0.05.</Text> : null}
       {vals.some((v) => takeoverEarly(v)) ? <IconText label={"⚠ Earlier than −0.03 s on the pads — ask the take-off judge; disqualify with DQ → SW 10.13 if confirmed."} style={st.warn} /> : null}
+      {/* batch 6: the judge confirmed — one tap disqualifies with the rule and the leg filled in */}
+      {dq && onDq ? <SelectChip label={`Judge confirms: DQ ${dq.ruleRef} · ${dq.reason ?? ''}`} active={false} onPress={() => onDq(dq)} /> : null}
     </View>
   );
 }
 
 /** World Athletics DQ reasons for a track race (sets the rule reference and the reason). */
 export function AthDqChips({ def, r, onChange }: { def: DisciplineDef; r: EntryResult; onChange: (n: EntryResult) => void }) {
-  if (def.sport !== 'athletics' || def.capture !== 'single') return null;
-  const codes = athDqCodesFor(def);
+  // batch 6: cycling (UCI) and rowing / canoe (exclusion vs regatta DQ, weights) too
+  const codes = raceDqCodesFor(def);
+  if (!codes.length) return null;
   return (
     <View style={st.wrap}>
       {codes.map((c) => (

@@ -33,10 +33,10 @@ import {
 } from '../data/golf';
 import { isSupabaseConfigured } from '../core/supabase';
 import {
-  summarize, toParLabel, cardSigned, clampPutts, MAX_HOLE_STROKES, distUnitOf,
+  summarize, toParLabel, cardSigned, clampPutts, MAX_HOLE_STROKES, distUnitOf, penaltyStrokes, maxScoreToPar, holeCap,
   type GolfCard, type HoleScore, type EntryAdmin, type FairwayDir, type GolfTrackKey, type DistUnit,
 } from '../sports/golf/engine';
-import { cleanTrack, LEGACY_STATS_ROW, roundTrackOf, effectiveTrack, driveHolesOf, withTrack, stampHole } from '../sports/golf/track';
+import { cleanTrack, LEGACY_STATS_ROW, roundTrackOf, effectiveTrack, driveHolesOf, withTrack, stampHole, golfTrackSummary } from '../sports/golf/track';
 import type { FeedPlayer } from '../sports/golf/feed';
 import { GolfTrackCard } from '../components/golf/GolfTrackCard';
 import { GolfHoleStats } from '../components/golf/GolfHoleStats';
@@ -44,6 +44,9 @@ import { GolfRoundFeed, GolfRoundStats } from '../components/golf/GolfRoundDeep'
 import type { FieldEntry } from '../core/types';
 import type { RootStackParamList } from '../navigation/types';
 import { useParamState } from '../navigation/useParamState';
+
+/** Batch 6 — the maximum-score limits in words. */
+const MAX_LABEL: Record<string, string> = { ndb: 'net double bogey', par3: 'par + 3', par5: 'par + 5', none: 'net double bogey' };
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -189,6 +192,11 @@ export default function GolfRoundScreen() {
       card.putts = [...card.putts];
       card.putts[hole] = typeof value === 'number' ? clampPutts(card.putts[hole], value) : null;
     }
+    // batch 6 — a lowered score clamps the hole's penalty strokes (never more than strokes − 1)
+    if (card.penalties && typeof card.penalties[hole] === 'number' && typeof value === 'number') {
+      card.penalties = [...card.penalties];
+      card.penalties[hole] = penaltyStrokes(card.penalties[hole], value) || null;
+    }
     // SD-117c — a changed score un-signs the card: they certified it as it stood
     if (cur.strokes[hole] !== value) delete card.signed;
     setLocal((m) => new Map(m).set(e.id, card));
@@ -223,7 +231,9 @@ export default function GolfRoundScreen() {
   });
   const stepPenalty = (e: FieldEntry, by: 1 | -1) => setDetail(e, (c, n) => {
     const penalties = [...(c.penalties ?? new Array(n).fill(null))];
-    const next = Math.max(0, (penalties[hole] ?? 0) + by);
+    // batch 6 — never more than the strokes − 1 on the hole (the ball was still played once)
+    const want = Math.max(0, (penalties[hole] ?? 0) + by);
+    const next = penaltyStrokes(want, c.strokes[hole] ?? null);
     penalties[hole] = next || null;
     return { ...c, penalties };
   });
@@ -296,7 +306,7 @@ export default function GolfRoundScreen() {
   // it asks first (Stableford: a pick-up is just 0 points on the hole).
   const pickUp = async (e: FieldEntry, v: HoleScore) => {
     if (v === 'P') { await setStroke(e, null); return; }
-    if (fmt.scoring !== 'stableford' && !(await confirmMatchAction('pickUp', { what: `${nameOf(e.playerId)} on hole ${h.n}` }))) return;
+    if (fmt.scoring !== 'stableford' && !fmt.maxComp && !(await confirmMatchAction('pickUp', { what: `${nameOf(e.playerId)} on hole ${h.n}` }))) return;
     await setStroke(e, 'P');
   };
   // SD-116: Clear wipes the hole (the round screen has no undo) — it asks first.
@@ -356,8 +366,10 @@ export default function GolfRoundScreen() {
           <View style={{ flex: 1 }}>
             <Text style={textStyles.h3}>⛳ {ev.title}</Text>
             <Text style={textStyles.muted}>
-              {course.name} · {fmt.scoring === 'stableford' ? 'Stableford' : fmt.net ? 'Stroke play (net)' : 'Stroke play'} · {holes.length} holes
+              {course.name} · {fmt.scoring === 'stableford' ? 'Stableford' : fmt.maxComp ? `Maximum score (${MAX_LABEL[fmt.maxScore]})${fmt.net ? ' · net' : ''}` : fmt.net ? 'Stroke play (net)' : 'Stroke play'} · {holes.length} holes
             </Text>
+            {/* batch 6 — what the round's markers keep (the organiser's "Stats to track") */}
+            {golfTrackSummary(ev.format) ? <Text style={textStyles.muted}>{golfTrackSummary(ev.format)}</Text> : null}
           </View>
           <Pill
             label={ev.status === 'live' ? 'LIVE' : ev.status === 'completed' ? 'FINAL' : 'UPCOMING'}
@@ -413,7 +425,7 @@ export default function GolfRoundScreen() {
               const v = card.strokes[hole];
               const recv = ctx.received[hole] ?? 0;
               const sum = summarize(card, ctx.holes, ctx.received);
-              const runLabel = fmt.scoring === 'stableford' ? `${sum.stableford} pts` : toParLabel(fmt.net ? sum.netToPar : sum.toPar);
+              const runLabel = fmt.scoring === 'stableford' ? `${sum.stableford} pts` : fmt.maxComp ? toParLabel(maxScoreToPar(card, ctx.holes, ctx.received, fmt.maxScore, fmt.net)) : toParLabel(fmt.net ? sum.netToPar : sum.toPar);
               const par = h.par;
               const set = (x: HoleScore) => void setStroke(e, x);
               // SD-35 — a withdrawn / disqualified / DNS player's card is closed
@@ -459,7 +471,7 @@ export default function GolfRoundScreen() {
                   </View>
                   <View style={st.tabs}>
                     <SelectChip label="Par" active={v === par} onPress={() => canMark && set(par)} />
-                    <SelectChip label={fmt.scoring === 'stableford' ? 'Pick up' : 'Pick up (NR)'} active={v === 'P'} onPress={() => canMark && void pickUp(e, v)} />
+                    <SelectChip label={fmt.scoring === 'stableford' ? 'Pick up' : fmt.maxComp ? `Pick up (${holeCap(par, recv, fmt.maxScore) ?? par + 2 + recv})` : 'Pick up (NR)'} active={v === 'P'} onPress={() => canMark && void pickUp(e, v)} />
                     {v != null && <SelectChip label="Clear…" active={false} onPress={() => canMark && void clearHole(e)} />}
                   </View>
                   {track.includes('putts') && typeof v === 'number' && (() => {
@@ -531,7 +543,7 @@ export default function GolfRoundScreen() {
               <SelectChip label="📊 Round stats" active={boardView === 'stats'} onPress={() => setBoardView('stats')} />
             </View>
             {boardView === 'feed' ? (
-              <GolfRoundFeed players={feedPlayers} scoring={fmt.scoring} net={fmt.net} unit={unit} />
+              <GolfRoundFeed players={feedPlayers} scoring={fmt.scoring} net={fmt.net} unit={unit} maxComp={fmt.maxComp ? fmt.maxScore : undefined} />
             ) : boardView === 'stats' ? (
               <GolfRoundStats players={feedPlayers} initial={me ?? undefined} unit={unit} />
             ) : golfTeamFormatOf(ev) && boardView === 'teams' ? (
@@ -542,7 +554,7 @@ export default function GolfRoundScreen() {
               onShareCard={(pid) => { const c = lbCards.get(pid); if (c) void shareMessage(cardShareText(nameOf(pid), course.name, c.holes, c.card, c.received), 'golf'); }} />
             )}
             <Text style={textStyles.muted}>
-              {fmt.scoring === 'stableford' ? 'Most points wins.' : `Lowest ${fmt.net ? 'net ' : ''}score to par wins.`} Ties: {fmt.tieBreak === 'countback' ? 'countback on the last 9, 6, 3, 1 holes' : fmt.tieBreak === 'playoff' ? 'a playoff for first; other places shared' : 'shared'}. Tap a player to see their card{isHost ? '; long-press for WD / DQ / DNS, handicap or remove' : ''}.
+              {fmt.scoring === 'stableford' ? 'Most points wins.' : fmt.maxComp ? `Maximum score (Rule 21.2): each hole counts at most ${MAX_LABEL[fmt.maxScore]}; a pick-up scores that maximum and the round still counts. Lowest ${fmt.net ? 'net ' : ''}score to par wins.` : `Lowest ${fmt.net ? 'net ' : ''}score to par wins.`} Ties: {fmt.tieBreak === 'countback' ? 'countback on the last 9, 6, 3, 1 holes' : fmt.tieBreak === 'playoff' ? 'a playoff for first; other places shared' : 'shared'}. Tap a player to see their card{isHost ? '; long-press for WD / DQ / DNS, handicap or remove' : ''}.
             </Text>
             {/* SD-89 — the host records the playoff winner */}
             {fmt.tieBreak === 'playoff' && board.some((r) => r.playoff) && (

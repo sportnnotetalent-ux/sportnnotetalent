@@ -173,6 +173,14 @@ export const endSum = (arrows: Arrow[]): number => arrows.reduce<number>((s, a) 
 /** 10s as WA counts them for ties: X included. */
 export const endTens = (arrows: Arrow[]): number => arrows.filter((a) => a === 'X' || a === 10).length;
 export const endXs = (arrows: Arrow[]): number => arrows.filter((a) => a === 'X').length;
+/** Batch 6 (World Archery Book 3 penalty, verify): an end's score when its
+ *  `n` highest-scoring arrows don't count. `n` must be a whole number from 1 to
+ *  the end's arrows (more = all); anything else (absent, negative, a fraction,
+ *  text) is no penalty — the end scores as before. */
+export function endNet(arrows: Arrow[], n?: unknown): number {
+  const k = typeof n === 'number' && Number.isInteger(n) && n > 0 ? Math.min(n, arrows.length) : 0;
+  return endSum(arrows) - (k ? endSum(sortEnd(arrows).slice(0, k)) : 0);
+}
 
 /* --------------------- round 2: arrows credited to each archer --------------------- */
 

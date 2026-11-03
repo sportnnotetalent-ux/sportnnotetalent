@@ -196,6 +196,21 @@ export function setMatchEnd(r: EntryResult, key: string, i: number, arrows: Arro
   }
   side.ends = ends;
   if (credit && credit.some((x) => x?.length)) side.by = credit; else delete side.by;
+  // batch 6: a cleared end takes its penalty with it
+  if (arrows == null && Array.isArray(side.pen)) { const pen = side.pen.slice(0, i); if (pen.some((n) => n > 0)) side.pen = pen; else delete side.pen; }
+  return { ...r, mp: { ...(r.mp ?? {}), [key]: side } };
+}
+
+/** Batch 6 (World Archery Book 3, verify): match end `i`'s penalty — its `n`
+ *  highest-scoring arrows don't count (0 clears it). The arrows stay as shot;
+ *  no end shot, no change. The list goes when no end has a penalty. */
+export function setMatchPenalty(r: EntryResult, key: string, i: number, n: number): EntryResult {
+  const side: ArchSide = { ...(r.mp?.[key] ?? {}) };
+  const ends = side.ends ?? [];
+  if (!ends[i]?.length) return r;
+  const pen = Array.from({ length: ends.length }, (_, k) => penCount(Array.isArray(side.pen) ? side.pen[k] : 0, ends[k]?.length ?? 0));
+  pen[i] = penCount(n, ends[i].length);
+  if (pen.some((x) => x > 0)) side.pen = pen; else delete side.pen;
   return { ...r, mp: { ...(r.mp ?? {}), [key]: side } };
 }
 

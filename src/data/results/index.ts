@@ -46,3 +46,5 @@ export * from './recordsSet.ts';
 export * from './raceHighlights.ts';
 // Measured sports batch 5: WD keeps what was done, crew false starts, draw of lots, header rule lines
 export * from './measuredDepth.ts';
+// Measured sports batch 6: precision capture per event, start cards, re-attempt, take-over → DQ
+export * from './measuredDepth6.ts';

@@ -33,7 +33,15 @@ export interface GolfMatchState {
   holeAt?: (number | null)[];
   /** Deep wave — when the match was conceded (ms) */
   concededAt?: number;
+  /** Batch 6 — how a hole was won when it wasn't on strokes: the loser
+   *  incurred the general penalty (loss of hole, Rule 1.3c / 3.2) or conceded
+   *  the hole (Rule 3.2b). null = played out. Absent on older logs. */
+  how?: (HoleHow | null)[];
 }
+
+/** Batch 6 — a hole lost by penalty, or conceded. */
+export type HoleHow = 'penalty' | 'conceded';
+const HOWS: HoleHow[] = ['penalty', 'conceded'];
 
 export const initGolfMatch = (config?: Record<string, unknown>): GolfMatchState => ({
   regulation: String(config?.holes ?? '18') === '18' ? 18 : 9,
@@ -74,6 +82,15 @@ export const golfMatchReducer = (s: GolfMatchState, a: { type: string; side?: 'h
     } else if (s.holeAt) {
       next.holeAt = [...s.holeAt, null];
     }
+    // batch 6 — a hole won by the other side's penalty / concession (never a halved hole; unknown values ignored)
+    const how = w !== 'halved' && HOWS.includes(a.payload?.how as HoleHow) ? (a.payload!.how as HoleHow) : null;
+    if (how) {
+      const hs = [...(s.how ?? s.holes.map(() => null))];
+      hs[holes.length - 1] = how;
+      next.how = hs;
+    } else if (s.how) {
+      next.how = [...s.how, null];
+    }
     return next;
   }
   if (a.type === 'CONCEDE' && (a.side === 'home' || a.side === 'away')) {
@@ -108,10 +125,11 @@ export interface HoleCredit { playerId: string; stat: string; by: number; extra?
 export function holeAction(
   winner: HoleWinner,
   players: { home?: { id: string }; away?: { id: string } },
-  o: { strokes?: { home: number; away: number }; par?: number; at?: number } = {},
+  o: { strokes?: { home: number; away: number }; par?: number; at?: number; /** batch 6 */ how?: HoleHow } = {},
 ): { type: 'HOLE'; side?: Side; payload: Record<string, unknown>; attribution?: HoleCredit; attribution2?: HoleCredit } {
   const side = winner === 'halved' ? undefined : winner;
-  const at = o.at ? { at: o.at } : {};
+  // batch 6 — how the hole was lost (penalty / conceded) rides with the time stamp; a halved hole has none
+  const at = { ...(o.at ? { at: o.at } : {}), ...(side && o.how && HOWS.includes(o.how) ? { how: o.how } : {}) };
   if (!o.strokes || o.par == null) {
     const p = side ? players[side] : undefined;
     return { type: 'HOLE', ...(side ? { side } : {}), payload: { winner, ...at }, ...(p && side ? { attribution: { playerId: p.id, stat: 'holesWon', by: 1, side } } : {}) };

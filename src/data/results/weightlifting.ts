@@ -234,7 +234,7 @@ export function recordLift(list: LiftAttempt[] | undefined, decision: { good?: b
   const i = pendingIndex(l);
   if (i < 0) return l;
   const good = decision.pass ? undefined : decision.lights?.length === 3 ? majority(decision.lights) : !!decision.good;
-  const done: LiftAttempt = { kg: l[i].kg, seq, ...(l[i].rangeOk ? { rangeOk: true } : {}), ...(decision.pass ? { pass: true, good: false } : { good }), ...(decision.lights?.length === 3 ? { lights: decision.lights } : {}), ...(l[i].chg?.length ? { chg: l[i].chg } : {}) };
+  const done: LiftAttempt = { kg: l[i].kg, seq, ...(l[i].rangeOk ? { rangeOk: true } : {}), ...(decision.pass ? { pass: true, good: false } : { good }), ...(decision.lights?.length === 3 ? { lights: decision.lights } : {}), ...(l[i].chg?.length ? { chg: l[i].chg } : {}), ...(l[i].reat === true ? { reat: true } : {}) };
   l[i] = done;
   if (i < 2 && l.length === i + 1) l.push({ kg: autoNext(done.kg, done.good === true, rules), auto: true });
   return l;
