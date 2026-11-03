@@ -25,7 +25,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LAST_SPORT_KEY, quickSideName, quickSideShort, startSport, isQuickPlaceholder } from '../core/quickGame';
 import { getMyPersonalisation } from '../data/personalise';
 import { structureLabels } from '../sports/structureLabels';
-import { useTeams, useMatches, usePlayers, useTournamentById } from '../data/hooks';
+import { useTeams, useMatches, usePlayers, useTournamentById, useTournamentCategories, useTournamentEntries } from '../data/hooks';
+import { sidesForStructure, recentPairs, searchSides, searchPeople } from '../data/doublesPicker';
+import { settlePairType, pairTypeFromDivisions } from '../sports/pairType';
 import { venueOptions } from '../data/tournamentForm';
 import { findScheduleConflicts, knownVenueNames } from '../data/scheduleConflicts';
 import { createMatch, createTeam, createMyPlayer, getMyPlayerId, setMatchScorer, getMatch, getTournaments, getMatchSquads, setMatchSquad } from '../data/repos';
@@ -185,6 +187,27 @@ export default function ScheduleMatchScreen() {
   // MVP QG-01: untouched quick-game sides ("Team A", "Player B"…) stay out of
   // the pickers; one already picked for this match stays visible.
   const pickTeams = useMemo(() => teams.filter((t) => !isQuickPlaceholder(t) || t.id === home || t.id === away), [teams, home, away]);
+  // doubles-picker DP1/DP2: a singles side picks only one-person entries, a
+  // doubles side only real pairs (two different people) — never one for the other.
+  const singleTeams = useMemo(() => sidesForStructure(pickTeams, 'single'), [pickTeams]);
+  const pairTeams = useMemo(() => sidesForStructure(pickTeams, 'pair'), [pickTeams]);
+  // DP6: my player id, for the recent pairs I played in or hosted
+  const [myPid, setMyPid] = useState<string | null>(null);
+  useEffect(() => {
+    let on = true;
+    if (profile?.id) getMyPlayerId(profile.id).then((id) => on && setMyPid(id ?? null)).catch(() => {});
+    return () => { on = false; };
+  }, [profile?.id]);
+  const recentFor = (other: string | null) => (sport ? recentPairs({ matches: allMatches, pairs: pairTeams, sport, me: myPid, exclude: other }) : []);
+  const recentHome = useMemo(() => recentFor(away), [allMatches, pairTeams, sport, myPid, away]); // eslint-disable-line react-hooks/exhaustive-deps
+  const recentAway = useMemo(() => recentFor(home), [allMatches, pairTeams, sport, myPid, home]); // eslint-disable-line react-hooks/exhaustive-deps
+  // DP11: a tournament's divisions (boys / girls / mixed) give its doubles pair type
+  const divisions = useTournamentCategories(tournamentId);
+  const divisionEntries = useTournamentEntries(tournamentId);
+  const divisionPairType = useMemo(
+    () => (tournamentId ? pairTypeFromDivisions(divisions, divisionEntries, [home, away]) : undefined),
+    [tournamentId, divisions, divisionEntries, home, away],
+  );
   const homeTeam = teams.find((t) => t.id === home);
   const awayTeam = teams.find((t) => t.id === away);
   const conflicts = useMemo(
@@ -284,8 +307,11 @@ export default function ScheduleMatchScreen() {
     context: tournament?.name ? inviteLabel('Tournament', tournament.name) : undefined,
     link: tournamentId ? tournamentLink(tournamentId) : SHARE_BASE,
   });
-  const entrantPicker = (side: 'home' | 'away', count: 1 | 2) => (
+  const entrantPicker = (side: 'home' | 'away', count: 1 | 2) => (seed?: EntrantPerson) => (
     <EntrantPicker
+      // a new seed (a person picked from the search, or "Me +") starts afresh
+      key={seed?.id ?? 'new'}
+      initial={seed}
       count={count}
       sport={sport ?? 'tennis'}
       inviteText={playerInvite}
@@ -299,6 +325,9 @@ export default function ScheduleMatchScreen() {
   // entries) — the people list skips them so nobody appears twice.
   const soloIds = new Set(teams.map((t) => (t as PickTeam).roster).filter((r): r is string[] => !!r && r.length === 1).map((r) => r[0]));
   const people = allPlayers.filter((p) => !soloIds.has(p.id) && !p.reported).map((p) => ({ id: p.id, name: p.fullName }));
+  // DP4: in doubles everyone is pickable as a partner (a person with a singles
+  // entry can still play doubles) — picking one starts a new pair with them.
+  const pairPeople = allPlayers.filter((p) => !p.reported).map((p) => ({ id: p.id, name: p.fullName }));
 
   // Singles ⇄ Doubles for racket sports. Flipping the structure clears both sides
   // (a singles pick isn't a doubles pick) and updates playersPerSide.
@@ -344,7 +373,11 @@ export default function ScheduleMatchScreen() {
         hostIds: myId ? [myId] : [],
         // SD-120: a tournament match's decider is stage-aware (league / group:
         // the draw stands; knockout: always settled).
-        format: !isFriendly && tournamentId ? stageAwareFormat(format, sport, isKoStage(phase)) : format,
+        // DP9: a singles match never keeps a doubles pair type
+        format: (() => {
+          const f = settlePairType(format, mode === 'pairs');
+          return !isFriendly && tournamentId ? stageAwareFormat(f, sport, isKoStage(phase)) : f;
+        })(),
         streamUrl: safeWebUrl(stream) ?? undefined,
       });
       // For a friendly, the creator is the scorer by default — whether they score
@@ -387,6 +420,12 @@ export default function ScheduleMatchScreen() {
   // How the two sides are picked for this sport + format: two teams, two
   // individuals (Singles), or two pairs (Doubles).
   const mode: ParticipantMode = sport ? participantMode(sport, format) : 'team';
+  // DP11: a tournament doubles match takes its division's pair type (the
+  // organiser can still change it); a friendly never checks (DP12).
+  useEffect(() => {
+    if (!divisionPairType || mode !== 'pairs') return;
+    setFormat((f) => (f.category === divisionPairType || !('category' in f) ? f : { ...f, category: divisionPairType }));
+  }, [divisionPairType, mode]);
   // Golf stroke play / Stableford is a FIELD event (a group on one leaderboard),
   // set up on its own screen; match play stays head-to-head here.
   const golfField = sport === 'golf' && String(format.competition ?? 'stroke') !== 'match';
@@ -512,14 +551,14 @@ export default function ScheduleMatchScreen() {
                 </>
               ) : mode === 'individual' ? (
                 <>
-                  <TeamPicker noun="player" label="Player 1" teams={pickTeams} selected={home} onSelect={setHome} onClear={() => setHome(null)} onCreate={makeCreateHandler('home')} newEntrant={entrantPicker('home', 1)} onPickMe={pickMe('home')} meName={profile?.fullName} people={people} onSelectPerson={pickPerson('home')} />
-                  <TeamPicker noun="player" label="Player 2" teams={pickTeams} selected={away} onSelect={setAway} onClear={() => setAway(null)} onCreate={makeCreateHandler('away')} newEntrant={entrantPicker('away', 1)} people={people} onSelectPerson={pickPerson('away')} />
+                  <TeamPicker noun="player" label="Player 1" teams={singleTeams} selected={home} onSelect={setHome} onClear={() => setHome(null)} onCreate={makeCreateHandler('home')} newEntrant={entrantPicker('home', 1)} onPickMe={pickMe('home')} meName={profile?.fullName} people={people} onSelectPerson={pickPerson('home')} />
+                  <TeamPicker noun="player" label="Player 2" teams={singleTeams} selected={away} onSelect={setAway} onClear={() => setAway(null)} onCreate={makeCreateHandler('away')} newEntrant={entrantPicker('away', 1)} people={people} onSelectPerson={pickPerson('away')} />
                 </>
               ) : (
                 <>
-                  <Text style={textStyles.muted}>A doubles side is a pair of two players. Pick an existing pair, or pick both partners — by name or mobile number, so the match lands on each partner’s profile.</Text>
-                  <TeamPicker noun="pair" label="Pair 1" teams={pickTeams} selected={home} onSelect={setHome} onClear={() => setHome(null)} onCreate={makeCreateHandler('home')} newEntrant={entrantPicker('home', 2)} />
-                  <TeamPicker noun="pair" label="Pair 2" teams={pickTeams} selected={away} onSelect={setAway} onClear={() => setAway(null)} onCreate={makeCreateHandler('away')} newEntrant={entrantPicker('away', 2)} />
+                  <Text style={textStyles.muted}>A doubles side is a pair of two players. Pick a pair, or pick a player to start a new pair — by name or mobile number, so the match lands on each partner’s profile.</Text>
+                  <TeamPicker noun="pair" label="Pair 1" teams={pairTeams} selected={home} onSelect={setHome} onClear={() => setHome(null)} onCreate={makeCreateHandler('home')} newEntrant={entrantPicker('home', 2)} people={pairPeople} recent={recentHome} onStartWithMe={profile?.fullName ? resolveMe : undefined} />
+                  <TeamPicker noun="pair" label="Pair 2" teams={pairTeams} selected={away} onSelect={setAway} onClear={() => setAway(null)} onCreate={makeCreateHandler('away')} newEntrant={entrantPicker('away', 2)} people={pairPeople} recent={recentAway} />
                 </>
               )}
 
@@ -634,6 +673,8 @@ function TeamPicker({
   meName,
   people,
   onSelectPerson,
+  recent,
+  onStartWithMe,
 }: {
   label: string;
   noun?: 'team' | 'pair' | 'player';
@@ -645,28 +686,48 @@ function TeamPicker({
   onCreate: (name: string) => Promise<boolean>;
   /** singles / doubles: who's on a new side — the real people, picked by name or
    *  mobile number (never a free-typed name that links to no one) */
-  newEntrant?: React.ReactNode;
+  newEntrant?: (seed?: EntrantPerson) => React.ReactNode;
   /** individual sports only: one-tap select the signed-in user */
   onPickMe?: () => void;
   meName?: string;
   /** individual sports: everyone in the app, searchable by name */
   people?: { id: string; name: string }[];
   onSelectPerson?: (playerId: string) => void;
+  /** doubles (DP6): one-tap pairs this user recently played in or hosted */
+  recent?: PickTeam[];
+  /** doubles (DP5): "👤 Me +" — start a new pair with me as partner 1 */
+  onStartWithMe?: () => Promise<EntrantPerson | null>;
 }) {
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   const [query, setQuery] = useState('');
+  // doubles: partner 1 of a new pair, picked from the search or "Me +"
+  const [seed, setSeed] = useState<EntrantPerson | undefined>(undefined);
+  const [meErr, setMeErr] = useState<string | null>(null);
   // Once a side is chosen the add panel closes, so "Change" starts afresh.
-  useEffect(() => { if (selected) { setCreating(false); setQuery(''); } }, [selected]);
+  useEffect(() => { if (selected) { setCreating(false); setQuery(''); setSeed(undefined); } }, [selected]);
 
   const selectedTeam = teams.find((t) => t.id === selected);
   const q = query.trim().toLowerCase();
   // Search kicks in at 3+ letters.
-  const results = q.length >= 3 ? teams.filter((t) => t.name.toLowerCase().includes(q)).slice(0, 25) : [];
-  const personResults = q.length >= 3 && people ? people.filter((p) => p.name.toLowerCase().includes(q)).slice(0, 25 - results.length) : [];
+  const results = searchSides(teams, q);
+  const personResults = people ? searchPeople(people, q, 25 - results.length) : [];
 
-  const searchPlaceholder = noun === 'player' ? 'Search players (type 3+ letters)…' : noun === 'pair' ? 'Search pairs (type 3+ letters)…' : 'Search all teams (type 3+ letters)…';
+  const searchPlaceholder = noun === 'player' ? 'Search players (type 3+ letters)…' : noun === 'pair' ? 'Search pairs or players (type 3+ letters)…' : 'Search all teams (type 3+ letters)…';
+  // DP4: in doubles a person is never a one-person "pair" — picking one starts
+  // a new pair with them as partner 1 and asks for partner 2.
+  const choosePerson = (p: { id: string; name: string }) => {
+    if (noun === 'pair') { setSeed({ id: p.id, fullName: p.name }); setCreating(true); setQuery(''); return; }
+    onSelectPerson?.(p.id);
+  };
+  const startWithMe = async () => {
+    if (!onStartWithMe) return;
+    setMeErr(null);
+    const me = await onStartWithMe().catch(() => null);
+    if (!me) { setMeErr('Couldn’t add you — try again.'); return; }
+    setSeed(me); setCreating(true); setQuery('');
+  };
   const meFirst = meName ? meName.trim().split(/\s+/)[0] : 'Me';
   // players and pairs are people (picked), only a team is a typed name
   const pickPeople = !!newEntrant && noun !== 'team';
@@ -694,6 +755,20 @@ function TeamPicker({
           {onPickMe && (
             <SelectChip label={`👤 ${meFirst} (me)`} active={false} onPress={onPickMe} />
           )}
+          {onStartWithMe && !creating && (
+            <SelectChip label="👤 Me +" active={false} onPress={() => void startWithMe()} />
+          )}
+          <FormError message={meErr} />
+          {!creating && q.length === 0 && !!recent?.length && (
+            <>
+              <Text style={st.tinyLabel}>Recent pairs</Text>
+              <View style={st.chips}>
+                {recent.map((t) => (
+                  <SelectChip key={`r-${t.id}`} label={t.name} dotColor={t.colorHex} active={false} onPress={() => onSelect(t.id)} />
+                ))}
+              </View>
+            </>
+          )}
           {!creating && (
             <>
               <TextField label="" value={query} onChange={setQuery} placeholder={searchPlaceholder} autoCapitalize="none" />
@@ -704,7 +779,7 @@ function TeamPicker({
                     <SelectChip key={t.id} label={t.name} dotColor={t.colorHex} active={false} onPress={() => onSelect(t.id)} />
                   ))}
                   {personResults.map((p) => (
-                    <SelectChip key={`p-${p.id}`} label={`👤 ${p.name}`} active={false} onPress={() => onSelectPerson?.(p.id)} />
+                    <SelectChip key={`p-${p.id}`} label={`👤 ${p.name}`} active={false} onPress={() => choosePerson(p)} />
                   ))}
                 </View>
               )}
@@ -716,8 +791,8 @@ function TeamPicker({
             </>
           )}
 
-          <SelectChip label={newLabel} active={creating} onPress={() => setCreating((c) => !c)} />
-          {creating && (pickPeople ? newEntrant : (
+          <SelectChip label={newLabel} active={creating} onPress={() => { setSeed(undefined); setCreating((c) => !c); }} />
+          {creating && (pickPeople ? newEntrant?.(seed) : (
             <View style={{ gap: theme.spacing(2) }}>
               <TextField label={`New ${noun} name`} value={name} onChange={setName} placeholder="e.g. Sunday FC" />
               <Button label={busy ? 'Creating…' : '＋ Create & select'} onPress={create} disabled={busy || !name.trim()} />

@@ -5,6 +5,7 @@
  * PURE (no React Native): the sport list is in the first download.
  */
 import type { FormatField, SportMeta } from '../types';
+import { PAIR_TYPE_FIELD } from '../pairType.ts';
 import { trackFormatFields } from '../pointDetailSettings.ts';
 import { timeUpRuleField } from '../../core/timeUp.ts';
 
@@ -42,6 +43,8 @@ export const PICKLEBALL_FORMAT_FIELDS: FormatField[] = [
         { value: 1, label: 'Singles' },
       ],
     },
+    // doubles pair type (doubles-picker DP8): Open / Men's / Women's / Mixed, doubles only
+    PAIR_TYPE_FIELD,
     {
       key: 'scoring', label: 'Scoring', type: 'choice', default: 'rally',
       hint: 'how points are won',

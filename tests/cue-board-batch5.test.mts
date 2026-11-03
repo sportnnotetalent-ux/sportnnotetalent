@@ -54,7 +54,7 @@ describe('H — per-game options (hideWhen with several values)', () => {
     assert.equal(isHidden(scotch, { playersPerSide: 2 }), false);
     assert.equal(hideRuleHolds({ key: 'x', value: 1 }, 1), true);
     assert.equal(hideRuleHolds({ key: 'x', value: 1 }, 2), false);
-    const pf = PADEL_META.formatFields!.find((f) => f.hideWhen)!;
+    const pf = PADEL_META.formatFields!.find((f) => f.hideWhen?.key === 'setsToWin')!; // (the pair type also hides, on playersPerSide)
     assert.equal(isHidden(pf, { [pf.hideWhen!.key]: 1 }), true);
     assert.equal(matchRules(PADEL_META.formatFields!, { setsToWin: 1 }).some((r) => r.key === pf.key), false);
     assert.equal(matchRules(PADEL_META.formatFields!, { setsToWin: 2 }).some((r) => r.key === pf.key), true);
