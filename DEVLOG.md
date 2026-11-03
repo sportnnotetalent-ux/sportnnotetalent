@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-04 — Release: verification card + tap feedback live (web, Android OTA)
+
+auth-smoke passed. Published from a clean worktree at bb0ca06: web (entry `index-44cfe5c8`, confirmed live on app.sportnnote.in) and Android OTA groups `cdecd750` (preview) and `372c1713` (production), runtime 1.0.0.
+
 ### 2026-11-04 — A clean age & guardian card; every tap and scoring step visibly captured
 
 - **Verification card** (`docs/security/breaks/verification-card.md`): the Profile card is now compact — title, status chip (Verified / Pending / Rejected / Not started), one line on what to do next, "Details ›", and Upload / Re-submit only when the owner must act. "Details ›" opens the new **VerificationDetails** screen (`src/screens/VerificationDetailsScreen.tsx`) with the explanation, upload / re-submit, the latest support note and the full history; support reviewers act there. Who may open it is unchanged (the player's own login — a guardian-managed young player's account included — and support). Shared upload hook `src/data/useVerificationUpload.ts`.
