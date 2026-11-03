@@ -183,7 +183,7 @@ export function useMatches(filter?: SportId | 'all') {
  *  matches they play in or organize/score). Refetches on focus, so following a
  *  player then returning Home surfaces their matches. */
 export function useScopedMatches(profileId?: string, nonce = 0) {
-  const [data, setData] = useState<{ mine: Match[]; feed: Match[] }>({ mine: [], feed: [] });
+  const [data, setData] = useState<{ mine: Match[]; feed: Match[]; playingTeamIds: Set<string> }>({ mine: [], feed: [], playingTeamIds: new Set() });
   const [loading, setLoading] = useState(true);
   useFocusEffect(
     useCallback(() => {

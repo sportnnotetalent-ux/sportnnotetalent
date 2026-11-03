@@ -1,4 +1,6 @@
-/** Matches — every game across every sport, split into Upcoming and Completed.
+/** Matches — the games I play in (default), or the ones I host / score /
+ *  organise ("Running"), split into Live, Upcoming and Completed. Followed
+ *  games live on Home, not here (founder 2026-11-04, src/core/myMatches.ts).
  *  Completed matches open the same full page as a live game (final score, info,
  *  lineups, summary) so the app keeps a browsable history of every game. */
 import React, { useEffect, useState } from 'react';
@@ -21,6 +23,7 @@ import { SPORT_LIST } from '../sports/sportMeta';
 import type { Match, SportId } from '../core/types';
 import type { RootStackParamList, TabParamList } from '../navigation/types';
 import { useParamState } from '../navigation/useParamState';
+import { matchesView, normalView, type MatchesView } from '../core/myMatches';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -37,14 +40,15 @@ export default function MatchesScreen() {
   const { profile } = useAuth();
   const [tab, setTab] = useParamState<Tab>('tab', params?.initialTab ?? 'upcoming');
   const [filter, setFilter] = useState<SportId | 'all'>(params?.initialSport ?? 'all');
+  const [rawView, setView] = useParamState<MatchesView>('view', 'playing');
+  const view = normalView(rawView);
   // A "See all" link can re-open this tab with a different section/sport.
   useEffect(() => {
     if (params?.initialTab) setTab(params.initialTab);
     if (params?.initialSport) setFilter(params.initialSport);
   }, [params?.initialTab, params?.initialSport]);
-  // The Matches tab is only YOUR games — ones you play in, or organize/score.
-  const { mine, loading } = useScopedMatches(profile?.id);
-  const matches = filter === 'all' ? mine : mine.filter((m) => m.sport === filter);
+  // The Matches tab is only YOUR games — Playing, or Running (organize/score).
+  const { mine, playingTeamIds, loading } = useScopedMatches(profile?.id);
   const canScore = canScoreByRole(profile?.role);
   // Which of these I can score (scorer or host) → a "▶ Start scoring" shortcut on the card.
   const [myPlayerId, setMyPlayerId] = useState<string | null>(null);
@@ -68,20 +72,12 @@ export default function MatchesScreen() {
     tournamentHostIds: m.tournamentId ? tourHosts[m.tournamentId] : undefined,
   });
 
-  // Live = in progress; Upcoming = scheduled (soonest first); Completed = most recent first.
-  // Postponed / cancelled games are still pre-match, so they stay under Upcoming
-  // (badged) — otherwise the host loses sight of them and can't restore them.
-  const live = matches
-    .filter((m) => m.status === 'live')
-    .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
-  const upcoming = matches
-    .filter((m) => m.status === 'scheduled' || m.status === 'postponed' || m.status === 'cancelled')
-    .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
-  const completed = matches
-    .filter((m) => m.status === 'completed')
-    .sort((a, b) => b.startsAt.localeCompare(a.startsAt));
-  const list = tab === 'live' ? live : tab === 'upcoming' ? upcoming : completed;
-  const countFor = (key: Tab) => (key === 'live' ? live : key === 'upcoming' ? upcoming : completed).length;
+  // Live = in progress (idle 12 h+ → "Not finished" under Completed); Upcoming =
+  // scheduled, postponed or cancelled (soonest first); Completed = newest first.
+  const v = matchesView(mine, { playingTeamIds, playerId: myPlayerId, view, sport: filter, now: Date.now() });
+  const list = tab === 'live' ? v.live : tab === 'upcoming' ? v.upcoming : v.completed;
+  const notFinished = tab === 'completed' ? v.notFinished : [];
+  const countFor = (key: Tab) => v.tabCounts[key];
 
   const open = (m: Match, tab?: string) =>
     nav.navigate('LiveScoring', {
@@ -100,7 +96,12 @@ export default function MatchesScreen() {
   return (
     <SafeAreaView style={st.safe} edges={['top']}>
       <KeyboardAwareScrollView contentContainerStyle={st.content}>
-        <ScreenTitle title="Matches" subtitle="Games you play, organize or score" />
+        <ScreenTitle title="Matches" subtitle={view === 'playing' ? 'Games you play in' : 'Games you host, organize or score'} />
+
+        <View style={st.views}>
+          <SelectChip label={`Playing${v.counts.playing ? ` ${v.counts.playing}` : ''}`} active={view === 'playing'} onPress={() => setView('playing')} />
+          <SelectChip label={`Running${v.counts.running ? ` ${v.counts.running}` : ''}`} active={view === 'running'} onPress={() => setView('running')} />
+        </View>
 
         <View style={st.segment}>
           {TABS.map((t) => {
@@ -133,16 +134,29 @@ export default function MatchesScreen() {
 
         {loading ? (
           <LoadingState label="Loading matches…" />
-        ) : list.length === 0 ? (
+        ) : list.length === 0 && notFinished.length === 0 ? (
           <EmptyState
             icon={tab === 'live' ? '📡' : tab === 'upcoming' ? '📅' : '🏁'}
             title={tab === 'live' ? 'No matches are live right now' : tab === 'upcoming' ? 'No upcoming matches' : 'No completed matches yet'}
-            hint={tab === 'live' ? 'Live games will show here the moment scoring starts.' : tab === 'upcoming' ? 'Scheduled games will appear here.' : 'Finished games land here once scored.'}
+            hint={view === 'playing' && v.counts.running > 0
+              ? 'Games you host or score but don’t play in are under Running.'
+              : tab === 'live' ? 'Live games will show here the moment scoring starts.' : tab === 'upcoming' ? 'Scheduled games will appear here.' : 'Finished games land here once scored.'}
           />
         ) : (
-          list.map((m) => (
-            <MatchCard key={m.id} match={m} onPress={() => open(m)} onStart={iScore(m) ? () => open(m, 'scoring') : undefined} />
-          ))
+          <>
+            {notFinished.length ? (
+              <>
+                <Text style={[textStyles.label, st.groupHead]}>Not finished · no score for 12+ hours</Text>
+                {notFinished.map((m) => (
+                  <MatchCard key={m.id} match={m} onPress={() => open(m)} onStart={iScore(m) ? () => open(m, 'scoring') : undefined} />
+                ))}
+                {list.length ? <Text style={[textStyles.label, st.groupHead]}>Completed</Text> : null}
+              </>
+            ) : null}
+            {list.map((m) => (
+              <MatchCard key={m.id} match={m} onPress={() => open(m)} onStart={iScore(m) ? () => open(m, 'scoring') : undefined} />
+            ))}
+          </>
         )}
       </KeyboardAwareScrollView>
     </SafeAreaView>
@@ -158,5 +172,7 @@ const st = StyleSheet.create({
   segBtnActive: { backgroundColor: theme.colors.primary },
   segText: { color: theme.colors.textMuted, fontSize: theme.font.small, fontWeight: '700' },
   segTextActive: { color: theme.colors.onFill, fontWeight: '800' },
+  views: { flexDirection: 'row', gap: theme.spacing(2) },
+  groupHead: { color: theme.colors.textMuted, marginTop: theme.spacing(1) },
   filters: { gap: theme.spacing(2), paddingVertical: theme.spacing(1) },
 });

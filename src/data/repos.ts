@@ -603,6 +603,8 @@ export async function getMyTournaments(profileId?: string, followedIds: string[]
 export interface MyScope {
   playerId: string | null;
   teamIds: Set<string>;
+  /** teams they PLAY on: roster or team_members only (not managed / club teams) */
+  playingTeamIds: Set<string>;
   managedTeamIds: Set<string>;
   clubIds: Set<string>;
   /** clubs they can manage (club admin or creator) */
@@ -616,7 +618,7 @@ export interface MyScope {
 }
 
 const emptyScope = (playerId: string | null): MyScope => ({
-  playerId, teamIds: new Set(), managedTeamIds: new Set(), clubIds: new Set(), managedClubIds: new Set(), tournamentIds: new Set(),
+  playerId, teamIds: new Set(), playingTeamIds: new Set(), managedTeamIds: new Set(), clubIds: new Set(), managedClubIds: new Set(), tournamentIds: new Set(),
   hostedTournamentIds: new Set(), playingTournamentIds: new Set(), officiatingTournamentIds: new Set(), adminOrgIds: new Set(),
 });
 
@@ -628,14 +630,14 @@ export async function getMyScope(profileId?: string): Promise<MyScope> {
   if (!raw) return emptyScope(pid);
   return {
     playerId: pid,
-    teamIds: new Set(raw.teams), managedTeamIds: new Set(raw.managed), clubIds: new Set(raw.clubs), managedClubIds: new Set(raw.managedClubs),
+    teamIds: new Set(raw.teams), playingTeamIds: new Set(raw.playingTeams ?? []), managedTeamIds: new Set(raw.managed), clubIds: new Set(raw.clubs), managedClubIds: new Set(raw.managedClubs),
     tournamentIds: new Set([...raw.hosted, ...raw.playing, ...raw.officiating]),
     hostedTournamentIds: new Set(raw.hosted), playingTournamentIds: new Set(raw.playing),
     officiatingTournamentIds: new Set(raw.officiating), adminOrgIds: new Set(raw.adminOrgs),
   };
 }
 
-type ScopeIds = { teams: string[]; managed: string[]; clubs: string[]; managedClubs: string[]; hosted: string[]; playing: string[]; officiating: string[]; adminOrgs: string[] };
+type ScopeIds = { teams: string[]; playingTeams?: string[]; managed: string[]; clubs: string[]; managedClubs: string[]; hosted: string[]; playing: string[]; officiating: string[]; adminOrgs: string[] };
 
 async function liveScopeIds(profileId: string, pid: string | null): Promise<ScopeIds> {
   const sb = supabase!;
@@ -652,7 +654,8 @@ async function liveScopeIds(profileId: string, pid: string | null): Promise<Scop
     pid ? sb.from('tournament_officials').select('tournament_id').eq('player_id', pid) : Promise.resolve({ data: [] }),
   ]);
   const managed = new Set([...ids(managedRes.data, 'id'), ...ids(staffRes.data, 'team_id')]);
-  const teams = new Set([...managed, ...ids(rosterRes.data, 'id'), ...ids(membersRes.data, 'team_id'), ...ids(clubTeamsRes.data, 'id')]);
+  const playingTeams = new Set([...ids(rosterRes.data, 'id'), ...ids(membersRes.data, 'team_id')]);
+  const teams = new Set([...managed, ...playingTeams, ...ids(clubTeamsRes.data, 'id')]);
   // A club admin / creator manages the club's sport teams too.
   const adminClubs = new Set<string>();
   if (clubs.length) {
@@ -674,7 +677,7 @@ async function liveScopeIds(profileId: string, pid: string | null): Promise<Scop
       .order('team_id').order('tournament_id').range(from, to)),
   ]);
   return {
-    teams: teamList, managed: [...managed], clubs, managedClubs: [...adminClubs],
+    teams: teamList, playingTeams: [...playingTeams], managed: [...managed], clubs, managedClubs: [...adminClubs],
     hosted: ids(hostedRes.data, 'id'), playing: [...new Set(ids(entriesRes.data, 'tournament_id'))],
     officiating: [...new Set(ids(officialsRes.data, 'tournament_id'))], adminOrgs,
   };
@@ -692,7 +695,9 @@ async function demoScope(profileId: string | undefined, pid: string | null): Pro
   for (const t of demo.teams) {
     const mineManaged = demo.captainTeams.has(t.id) || (!!t.clubId && s.clubIds.has(t.clubId));
     if (mineManaged) s.managedTeamIds.add(t.id);
-    if (mineManaged || (pid && (rosters.get(t.id) ?? []).includes(pid))) s.teamIds.add(t.id);
+    const plays = !!pid && (rosters.get(t.id) ?? []).includes(pid);
+    if (plays) s.playingTeamIds.add(t.id);
+    if (mineManaged || plays) s.teamIds.add(t.id);
   }
   for (const o of demo.organizations) {
     if (o.members.some((m) => m.playerId === pid && !m.until && (m.role === 'Owner' || m.role === 'Admin' || m.role === 'Organizer'))) s.adminOrgIds.add(o.id);
@@ -855,7 +860,7 @@ async function getMatchesForScope(scope: MyScope): Promise<Match[]> {
  *  - `feed`: `mine` PLUS matches from any player / team / tournament they follow
  *    (following a player resolves to that player's team's matches).
  *  Used by the Home page (feed) and the Matches tab (mine). */
-export async function getScopedMatches(profileId?: string): Promise<{ mine: Match[]; feed: Match[] }> {
+export async function getScopedMatches(profileId?: string): Promise<{ mine: Match[]; feed: Match[]; playingTeamIds: Set<string> }> {
   // Perf F-09(4): one round trip (home_feed) when the database has it; it applies
   // the rule below on the server, through the same RLS. Else the reads below.
   // (perf F-15: the feed's sport plugins load while the scope is read)
@@ -877,7 +882,7 @@ export async function getScopedMatches(profileId?: string): Promise<{ mine: Matc
     for (const m of extra) if (!seen.has(m.id)) { feed.push(m); seen.add(m.id); }
     feed.sort((x, y) => x.startsAt.localeCompare(y.startsAt));
     const mineIds = new Set(homeFeed.mine_ids);
-    return { mine: feed.filter((m) => mineIds.has(m.id) || scopeMine(m)), feed };
+    return { mine: feed.filter((m) => mineIds.has(m.id) || scopeMine(m)), feed, playingTeamIds: scope.playingTeamIds };
   }
   const [matches, myPlayerId, followKeys, tournaments] = await Promise.all([
     getMatches(), getMyPlayerId(profileId), getFollows(profileId), getTournaments(),
@@ -909,7 +914,7 @@ export async function getScopedMatches(profileId?: string): Promise<{ mine: Matc
     (!!m.homeTeam && (followTeams.has(m.homeTeam.id) || followPlayerTeams.has(m.homeTeam.id))) ||
     (!!m.awayTeam && (followTeams.has(m.awayTeam.id) || followPlayerTeams.has(m.awayTeam.id)));
 
-  return { mine: matches.filter(isMine), feed: matches.filter((m) => isMine(m) || isFollowed(m)) };
+  return { mine: matches.filter(isMine), feed: matches.filter((m) => isMine(m) || isFollowed(m)), playingTeamIds: new Set([...scope.playingTeamIds, ...myTeams]) };
 }
 
 /** House-level teams (one per house, across sports) — the unit for follows,
