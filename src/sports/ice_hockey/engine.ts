@@ -415,6 +415,24 @@ export function creditAttribution(c: Credit | undefined, sign = 1, tracked?: str
   };
 }
 
+/** Screen sweep (S2): the one action a penalty-shot tap logs, as the controls
+ *  fire it. Saved = a shot on goal (`ps`) with the save for the goalie in net
+ *  when known (`gkId`); missed = a MISS (no shot on goal); scored = a goal
+ *  (`ps`, into the empty net when it was). Shooter optional (no squad = the
+ *  team's attempt). Same actions as before — no new key. */
+export function penaltyShotAction(s: IceHockeyState, side: Side, res: 'scored' | 'saved' | 'missed', shooterId?: string, gkId?: string, tracked?: string[]): ScoreAction {
+  if (res === 'missed') return { type: 'MISS', side, payload: shooterId ? { playerId: shooterId } : {} };
+  if (res === 'saved') {
+    const cr = eventCredits({ type: 'shot', side, playerId: shooterId, gkId }, s.pimScale);
+    const attribution = creditAttribution(cr.first, 1, tracked);
+    const attribution2 = creditAttribution(cr.second, 1, tracked);
+    return { type: 'SHOT', side, payload: { ps: true }, ...(attribution ? { attribution } : {}), ...(attribution2 ? { attribution2 } : {}) };
+  }
+  const en = netEmpty(s, side === 'home' ? 'away' : 'home');
+  const attribution = creditAttribution(eventCredits({ type: 'goal', side, playerId: shooterId, ps: true, en }, s.pimScale).first, 1, tracked);
+  return { type: 'GOAL', side, payload: { ps: true, ...(en ? { en: true } : {}) }, ...(attribution ? { attribution } : {}) };
+}
+
 /* ------------------------------- penalty box -------------------------------- */
 
 export interface BoxPen {

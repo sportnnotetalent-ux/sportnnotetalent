@@ -38,11 +38,12 @@ import {
   periodStarted, running, eventCredits, creditAttribution, goalFlagsNow, goalieAt, goalieOf, netEmpty, penaltyBox, partEnd, skatersOn, baseSkaters,
   soScore, nextShooter, needsSdPick, iceHockeyScoreLine, timeoutLeft, totalPeriods, nextIsOvertime, eventWhen, standingsUnits, ejects,
   ICE_HOCKEY_PRESETS, ICE_HOCKEY_LIVE_SETTINGS, PEN_LABEL, INFRACTIONS, STRENGTH_LABEL, LIVE_KEYS,
-  TALLY_LABEL, TRACK_FLAGS, TRACK_KINDS, TRACK_FIELDS, FLAG_KEYS, FO_ZONE_KEYS, tallyTracked, zonesTracked, soAction,
+  TALLY_LABEL, TRACK_FLAGS, TRACK_KINDS, TRACK_FIELDS, FLAG_KEYS, FO_ZONE_KEYS, tallyTracked, zonesTracked, soAction, penaltyShotAction,
   type FoZone, type IceEvent, type IceHockeyState, type PenKind, type Side, type Strength, type TallyKind,
 } from './engine';
 import { iceHockeyCommentary, iceScopeLabel, ICE_FEED_TAGS } from './commentary';
 import { ruledOutAction, RULED_OUT_REASONS, RULED_OUT_LABEL } from '../invasion/ruledOut';
+import { asksWho } from '../invasion/asksWho';
 import { iceHockeySheet } from './sheet';
 import { GroupedFeed } from '../GroupedFeed';
 import { StatSheetView } from '../StatSheetView';
@@ -213,18 +214,17 @@ const ScoringControls: SportPlugin<IceHockeyState>['ScoringControls'] = ({
     }
     setFlow(null);
   };
-  const shot = (sd: Side, p: Player | null, ps = false) => {
+  const shot = (sd: Side, p: Player | null) => {
     const gk = goalie(opp(sd));
     const cr = credit({ type: 'shot', side: sd, playerId: p?.id, gkId: gk?.id });
-    fire({ type: 'SHOT', side: sd, payload: ps ? { ps: true } : {}, attribution: cr.attribution, attribution2: cr.attribution2 });
+    fire({ type: 'SHOT', side: sd, payload: {}, attribution: cr.attribution, attribution2: cr.attribution2 });
     setFlow(null);
   };
-  const psGoal = (sd: Side, p: Player | null) => {
-    const cr = credit({ type: 'goal', side: sd, playerId: p?.id, ps: true, en: netEmpty(s, opp(sd)) });
-    fire({ type: 'GOAL', side: sd, payload: { ps: true, ...(netEmpty(s, opp(sd)) ? { en: true } : {}) }, attribution: cr.attribution });
+  // screen sweep (S2): a penalty shot (scored / saved / missed), built in the engine
+  const ps = (sd: Side, res: 'scored' | 'saved' | 'missed', p: Player | null) => {
+    fire(penaltyShotAction(s, sd, res, p?.id, goalie(opp(sd))?.id, TRACKED));
     setFlow(null);
   };
-  const psMiss = (sd: Side, p: Player | null) => { fire({ type: 'MISS', side: sd, payload: p ? { playerId: p.id } : {} }); setFlow(null); };
   const penalty = (sd: Side, pen: PenKind, infraction: string | undefined, p: Player | null, served?: Player | null) => {
     const cr = credit({ type: 'pen', side: sd, pen, playerId: p?.id });
     fire({ type: 'PEN', side: sd, payload: { pen, ...(infraction ? { infraction } : {}), ...(!cr.attribution && p ? { playerId: p.id } : {}), ...(served ? { servedId: served.id } : {}) }, attribution: cr.attribution });
@@ -448,16 +448,16 @@ const ScoringControls: SportPlugin<IceHockeyState>['ScoringControls'] = ({
         if (flow.step === 'result') return (
           <View style={c.panel}>{head('Penalty shot')}
             <View style={c.row}>
-              <Button label="✓ Scored" color={color(sd)} style={c.flex} onPress={() => setFlow({ mode: 'ps', side: sd, step: 'player' })} />
-              <Button label="🧤 Saved" variant="ghost" style={c.flex} onPress={() => setFlow({ ...flow, res: 'saved', step: 'player' })} />
-              <Button label="↗ Missed" variant="ghost" style={c.flex} onPress={() => setFlow({ ...flow, res: 'missed', step: 'player' })} />
+              <Button label="✓ Scored" color={color(sd)} style={c.flex} onPress={() => (asksWho(skatersOf(sd)) ? setFlow({ mode: 'ps', side: sd, step: 'player' }) : ps(sd, 'scored', null))} />
+              <Button label="🧤 Saved" variant="ghost" style={c.flex} onPress={() => (asksWho(skatersOf(sd)) ? setFlow({ ...flow, res: 'saved', step: 'player' }) : ps(sd, 'saved', null))} />
+              <Button label="↗ Missed" variant="ghost" style={c.flex} onPress={() => (asksWho(skatersOf(sd)) ? setFlow({ ...flow, res: 'missed', step: 'player' }) : ps(sd, 'missed', null))} />
             </View>
           </View>
         );
         return (
           <View style={c.panel}>{head('Penalty shot · shooter')}
-            <PlayerGrid players={skatersOf(sd)} onPick={(p) => (flow.res === 'saved' ? shot(sd, p, true) : flow.res === 'missed' ? psMiss(sd, p) : psGoal(sd, p))}
-              skip={{ label: 'Skip shooter', onPress: () => (flow.res === 'saved' ? shot(sd, null, true) : flow.res === 'missed' ? psMiss(sd, null) : psGoal(sd, null)) }} />
+            <PlayerGrid players={skatersOf(sd)} onPick={(p) => ps(sd, flow.res ?? 'scored', p)}
+              skip={{ label: 'Skip shooter', onPress: () => ps(sd, flow.res ?? 'scored', null) }} />
           </View>
         );
       case 'ruledout':

@@ -303,6 +303,33 @@ export function strokeAction(side: Side, outcome: 'saved' | 'missed', playerId: 
   return { type: 'STROKE', side, payload: { outcome, shot: true, ...payload }, ...(attribution ? { attribution } : {}) };
 }
 
+/** Screen sweep (S1): everything one stroke tap (Saved / Missed) logs, as the
+ *  controls fire it — the stroke (a shot, batch 1), then for a saved one the
+ *  keeper's SAVE on the other side, linked by `uid`. Taker and keeper optional
+ *  (a friendly with no squad logs a team stroke and a team save). */
+export function strokeTapActions(side: Side, outcome: 'saved' | 'missed', takerId: string | undefined, keeperId: string | undefined, payload: { uid: string; pcRef?: string }, tracked?: string[]): ScoreAction[] {
+  const stroke = strokeAction(side, outcome, takerId, payload, tracked);
+  return outcome === 'saved' ? [stroke, saveAction(side === 'home' ? 'away' : 'home', payload.uid, keeperId, tracked)] : [stroke];
+}
+
+/** Screen sweep (S1): everything one shot tap logs — the shot (on goal / wide /
+ *  blocked), then for one on goal the keeper's SAVE, linked by `uid`. */
+export function shotTapActions(side: Side, onGoal: boolean, shooterId: string | undefined, keeperId: string | undefined, payload: { uid: string; miss?: 'wide' | 'blocked'; pcRef?: string }, tracked?: string[]): ScoreAction[] {
+  const attribution = creditAttribution(eventCredits({ type: 'shot', onGoal, playerId: shooterId }).first, 1, tracked);
+  const shot: ScoreAction = {
+    type: 'SHOT', side,
+    payload: { onGoal, uid: payload.uid, ...(!onGoal && payload.miss ? { miss: payload.miss } : {}), ...(payload.pcRef ? { pcRef: payload.pcRef } : {}) },
+    ...(attribution ? { attribution } : {}),
+  };
+  return onGoal ? [shot, saveAction(side === 'home' ? 'away' : 'home', payload.uid, keeperId, tracked)] : [shot];
+}
+
+/** The keeper's save (side = the keeper's team), linked to the attempt `ref`. */
+export function saveAction(keeperSide: Side, ref: string, keeperId: string | undefined, tracked?: string[]): ScoreAction {
+  const attribution = creditAttribution(eventCredits({ type: 'save', playerId: keeperId }).first, 1, tracked);
+  return { type: 'SAVE', side: keeperSide, payload: { ref }, ...(attribution ? { attribution } : {}) };
+}
+
 /** The second player of an action: live `attribution2`, or on replay the copy
  *  stored in the payload (`_attr2`, see amend.ts / useLiveMatch). */
 const second = (a: ScoreAction): Attribution | undefined =>

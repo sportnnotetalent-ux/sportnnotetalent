@@ -42,13 +42,14 @@ import type { Player } from '../../core/types';
 import type { ScoreAction, SportPlugin } from '../types';
 import {
   init, reducer, isComplete, result, levelAtEnd, aggLine, matchSec, periodSec, periodLen, clockFace, clockAt, periodName, periodLong, periodStarted, running,
-  eventCredits, creditAttribution, soScore, nextKicker, needsSdPick, rugbyScoreLine, yellowsOf, subsUsed, openTemps, totalPeriods, nextPlan, kicksAfter,
-  isSuddenDeath, pointsOf, rugbyStandingsUnits, nominalOffset, trackedTallyKeys, currentBall, ballTime, ballDead,
+  eventCredits, creditAttribution, soScore, nextKicker, needsSdPick, rugbyScoreLine, subsUsed, openTemps, totalPeriods, nextPlan, kicksAfter,
+  isSuddenDeath, pointsOf, cardTapAction, rugbyStandingsUnits, nominalOffset, trackedTallyKeys, currentBall, ballTime, ballDead,
   RUGBY_PRESETS, RUGBY_LIVE_SETTINGS, LIVE_KEYS, DETAIL_KEYS, DETAIL_LABEL, KICK_LABEL,
   TALLY_LABEL, TRACK_FLAGS, TRACK_KINDS, TRACK_FIELDS, INFRINGEMENTS, INFRINGEMENT_LABEL, TURNOVER_CAUSES, CAUSE_LABEL,
   type RugbyEvent, type RugbyState, type KickKind, type CardKind, type DetailKey, type Side, type TallyKind,
 } from './engine';
 import { ruledOutAction, RULED_OUT_REASONS, RULED_OUT_LABEL } from '../invasion/ruledOut';
+import { asksWho } from '../invasion/asksWho';
 import { restartAction, RESTART_LABEL, UNION_RESTARTS } from '../invasion/restarts';
 import { rugbyTotals, rugbyLiveField, rugbyField, unavailable } from './totals';
 import { rugbyBox } from './box';
@@ -225,14 +226,16 @@ const ScoringControls: SportPlugin<RugbyState>['ScoringControls'] = ({
     fire({ type: 'KICK', side: sd, payload: { kick: k, made }, ...credit({ type: 'kick', kick: k, made, playerId: p?.id }) });
     setFlow(null);
   };
+  // two yellows under the trial = a 20-minute red (World Rugby 2025);
+  // screen sweep (S3): no player = an unnamed player's card, never an official's
   const card = (sd: Side, kind: CardKind, p: Player | null, red20?: boolean) => {
-    const second = kind === 'yellow' && !!p && yellowsOf(s, sd, { id: p.id, name: p.fullName }) >= 1;
-    const k: CardKind = second ? 'red' : kind;
-    // two yellows under the trial = a 20-minute red (World Rugby 2025)
-    const r20 = k === 'red' && s.red20 && (second || !!red20);
-    fire({ type: 'CARD', side: sd, payload: { card: k, ...(second ? { second: true } : {}), ...(r20 ? { red20: true } : {}) }, ...credit({ type: 'card', card: k, second, playerId: p?.id }) });
+    fire(cardTapAction(s, sd, kind, p ? { id: p.id, name: p.fullName } : undefined, red20, TRACKED));
     setFlow(null);
   };
+  // the card's player step — skipped (an unnamed player's card) after a
+  // penalty try when the offending side lists nobody: one tap stays one tap
+  const cardPick = (f: Extract<Flow, { mode: 'card' }>, kind: CardKind, red20?: boolean) =>
+    (f.pt && !asksWho(sanctionable(f.side)) ? card(f.side, kind, null, red20) : setFlow({ ...f, card: kind, ...(kind === 'red' ? { red20: !!red20 } : {}), step: 'player' }));
   const officialCard = (sd: Side, kind: CardKind) => {
     fire({ type: 'CARD', side: sd, payload: { card: kind, official: official.trim() || 'Team official' } });
     setOfficial(''); setFlow(null);
@@ -434,10 +437,10 @@ const ScoringControls: SportPlugin<RugbyState>['ScoringControls'] = ({
         if (flow.step === 'kind') return (
           <View style={c.panel}>{head(flow.pt ? 'Penalty try — card for the offender? (optional)' : 'Card')}
             <View style={c.row}>
-              <Button label="🟨 Yellow" variant="ghost" style={c.flex} onPress={() => setFlow({ ...flow, card: 'yellow', step: 'player' })} />
-              <Button label="🟥 Red" variant="ghost" style={c.flex} onPress={() => setFlow({ ...flow, card: 'red', red20: false, step: 'player' })} />
+              <Button label="🟨 Yellow" variant="ghost" style={c.flex} onPress={() => cardPick(flow, 'yellow')} />
+              <Button label="🟥 Red" variant="ghost" style={c.flex} onPress={() => cardPick(flow, 'red', false)} />
             </View>
-            {s.red20 ? <Button label="🟥 20-minute red" accessibilityLabel="20-minute red card: replaceable after 20 minutes" variant="ghost" onPress={() => setFlow({ ...flow, card: 'red', red20: true, step: 'player' })} /> : null}
+            {s.red20 ? <Button label="🟥 20-minute red" accessibilityLabel="20-minute red card: replaceable after 20 minutes" variant="ghost" onPress={() => cardPick(flow, 'red', true)} /> : null}
             {flow.pt ? <Button label="✓ No card" variant="ghost" onPress={() => setFlow(null)} /> : null}
             <Text style={c.meta}>Yellow: the sin-bin, {s.sinBinMinutes} minutes of playing time, the team plays a player short. Red: off for the rest of the match.{s.red20 ? ' 20-minute red (World Rugby trial): off for good, a replacement may come on after 20 minutes.' : ''} A second yellow is a red.</Text>
           </View>
@@ -445,7 +448,7 @@ const ScoringControls: SportPlugin<RugbyState>['ScoringControls'] = ({
         const k = flow.card ?? 'yellow';
         return (
           <View style={c.panel}>{head(k === 'yellow' ? 'Yellow card' : flow.red20 ? '20-minute red card' : 'Red card')}
-            <PlayerGrid players={sanctionable(sd)} onPick={(p) => card(sd, k, p, flow.red20)} />
+            <PlayerGrid players={sanctionable(sd)} onPick={(p) => card(sd, k, p, flow.red20)} skip={{ label: 'Player not listed', onPress: () => card(sd, k, null, flow.red20) }} />
             {k === 'yellow' ? <Text style={c.meta}>A player already on a yellow gets a red ({s.red20 ? '20-minute red under the trial' : 'second yellow'}).</Text> : null}
             <Text style={c.small}>Or a team official</Text>
             <View style={c.row}>
