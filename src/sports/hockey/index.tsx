@@ -52,6 +52,7 @@ import { hockeyVoice, hockeyVoiceEnds } from '../voiceParsers';
 import { HOCKEY_META } from './meta';
 import { hockeyMatchRecords } from './records';
 import { IconText } from '../../components/Icon';
+import { hockeyUndoLabel } from './undoLabel';
 
 const opp = (s: Side): Side => (s === 'home' ? 'away' : 'home');
 const uid = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
@@ -790,6 +791,8 @@ export const hockeyPlugin: SportPlugin<HockeyState> = {
   },
   // the shoot-out result under the score ("SO 4–3"); '' for every other match
   scoreLine: hockeyScoreLine,
+  // Undo labels batch — Undo names the step in the sport's own words
+  undoLabel: hockeyUndoLabel,
   statTotals: hockeyTotals,
   tickerDetail: hockeyTickerDetail,
   tickerFlash: hockeyTickerFlash,

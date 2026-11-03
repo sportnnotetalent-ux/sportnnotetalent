@@ -42,6 +42,7 @@ import {
 import { KABADDI_META } from './meta';
 import { kabaddiMatchRecords } from './records';
 import { IconText } from '../../components/Icon';
+import { kabaddiUndoLabel } from './undoLabel';
 
 export { halfLabel, currentMinute };
 export type { KabaddiState };
@@ -854,6 +855,8 @@ export const kabaddiPlugin: SportPlugin<KabaddiState> = {
   // pre-SD-03 +1-per-raid lines on completion / the D2 resync. Partial: when a
   // credited player can't be named (an old snapshot) the point keys are left
   // to the live increments.
+  // Undo labels batch — Undo names the step in the sport's own words
+  undoLabel: kabaddiUndoLabel,
   statTotals: kabaddiTotals,
   statTotalsPartial: true,
   statTotalsNeedsPlayers: true,
