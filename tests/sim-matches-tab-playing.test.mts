@@ -38,7 +38,7 @@ test('600 users: one view per game, playing = on a side, no stale Live', () => {
     const sport = rnd(3) ? 'all' : SPORTS[rnd(3)];
     const p = matchesView(games, { playingTeamIds, playerId: me, view: 'playing', sport, now: NOW });
     const r = matchesView(games, { playingTeamIds, playerId: me, view: 'running', sport, now: NOW });
-    const ids = (v: typeof p) => [...v.live, ...v.upcoming, ...v.completed, ...v.notFinished].map((g) => g.id);
+    const ids = (v: typeof p) => [...v.live, ...v.upcoming, ...v.overdue, ...v.completed, ...v.notFinished].map((g) => g.id);
     const pi = ids(p), ri = ids(r);
     const real = games.filter((g) => g && (sport === 'all' || g.sport === sport));
     assert.equal(new Set([...pi, ...ri]).size, pi.length + ri.length, 'a game in both views');

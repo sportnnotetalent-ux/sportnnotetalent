@@ -2,6 +2,7 @@
  *  game, the league table, and the statistics rail. Reached from the Home sport
  *  chips and from a tournament's sport list. */
 import { isStaleLive } from '../core/staleLive';
+import { splitOverdue, OVERDUE_NOTE } from '../core/overdue';
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { KeyboardAwareScrollView } from '../components/keyboard';
@@ -57,7 +58,10 @@ export default function SportHubScreen() {
   // MVP L11: skip a match left "live" with no activity for 12 hours
   const now = Date.now();
   const live = sportMatches.filter((m) => m.status === 'live' && !isStaleLive(m, now));
-  const upcoming = sportMatches.filter((m) => m.status === 'scheduled' || m.status === 'postponed');
+  // Overdue fixtures (12 h+ past their start, never played) come after the real upcoming ones (OD3).
+  const { upcoming: ahead, overdue } = splitOverdue(sportMatches.filter((m) => m.status === 'scheduled' || m.status === 'postponed'), now);
+  const upcoming = [...ahead, ...overdue];
+  const overdueIds = new Set(overdue.map((m) => m.id));
   const results = sportMatches.filter((m) => m.status === 'completed');
   const tournament = useTournamentById(tournamentId);
   // The first league phase's table (parity #07): never mixes in knockout results.
@@ -137,7 +141,7 @@ export default function SportHubScreen() {
         {upcoming.length === 0 ? (
           <EmptyState icon="📅" title={`No upcoming ${plugin.name.toLowerCase()} matches`} compact />
         ) : (
-          upcoming.slice(0, SECTION_CAP).map((m) => <MatchCard key={m.id} match={m} onPress={() => openScorer(m)} />)
+          upcoming.slice(0, SECTION_CAP).map((m) => <MatchCard key={m.id} match={m} note={overdueIds.has(m.id) ? OVERDUE_NOTE : undefined} onPress={() => openScorer(m)} />)
         )}
 
         <View style={st.section}>

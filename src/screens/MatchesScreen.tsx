@@ -24,6 +24,7 @@ import type { Match, SportId } from '../core/types';
 import type { RootStackParamList, TabParamList } from '../navigation/types';
 import { useParamState } from '../navigation/useParamState';
 import { matchesView, normalView, type MatchesView } from '../core/myMatches';
+import { OVERDUE_NOTE } from '../core/overdue';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -77,6 +78,7 @@ export default function MatchesScreen() {
   const v = matchesView(mine, { playingTeamIds, playerId: myPlayerId, view, sport: filter, now: Date.now() });
   const list = tab === 'live' ? v.live : tab === 'upcoming' ? v.upcoming : v.completed;
   const notFinished = tab === 'completed' ? v.notFinished : [];
+  const overdue = tab === 'upcoming' ? v.overdue : [];
   const countFor = (key: Tab) => v.tabCounts[key];
 
   const open = (m: Match, tab?: string) =>
@@ -134,7 +136,7 @@ export default function MatchesScreen() {
 
         {loading ? (
           <LoadingState label="Loading matches…" />
-        ) : list.length === 0 && notFinished.length === 0 ? (
+        ) : list.length === 0 && notFinished.length === 0 && overdue.length === 0 ? (
           <EmptyState
             icon={tab === 'live' ? '📡' : tab === 'upcoming' ? '📅' : '🏁'}
             title={tab === 'live' ? 'No matches are live right now' : tab === 'upcoming' ? 'No upcoming matches' : 'No completed matches yet'}
@@ -156,6 +158,14 @@ export default function MatchesScreen() {
             {list.map((m) => (
               <MatchCard key={m.id} match={m} onPress={() => open(m)} onStart={iScore(m) ? () => open(m, 'scoring') : undefined} />
             ))}
+            {overdue.length ? (
+              <>
+                <Text style={[textStyles.label, st.groupHead]}>Overdue · date passed, not played</Text>
+                {overdue.map((m) => (
+                  <MatchCard key={m.id} match={m} note={OVERDUE_NOTE} onPress={() => open(m)} onStart={iScore(m) ? () => open(m, 'scoring') : undefined} />
+                ))}
+              </>
+            ) : null}
           </>
         )}
       </KeyboardAwareScrollView>

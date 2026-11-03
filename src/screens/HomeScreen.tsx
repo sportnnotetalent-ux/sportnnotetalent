@@ -5,6 +5,7 @@
  *  organize, standings & stats). Deep standings/stats live on those pages. */
 import { yourSports } from '../core/playedSports';
 import { isStaleLive } from '../core/staleLive';
+import { isOverdue } from '../core/overdue';
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal, Pressable, useWindowDimensions } from 'react-native';
 import { KeyboardAwareScrollView } from '../components/keyboard';
@@ -83,7 +84,8 @@ export default function HomeScreen() {
   const live = scoped.filter((m) => m.status === 'live' && !isStaleLive(m, now));
   // Postponed games still appear under "Up next" (badged) so followers learn of
   // the change; a cancelled game drops off the forward-looking feed.
-  const upcoming = scoped.filter((m) => m.status === 'scheduled' || m.status === 'postponed');
+  // …and a scheduled game 12 h+ past its start is overdue, not "up next" (OD1).
+  const upcoming = scoped.filter((m) => (m.status === 'scheduled' || m.status === 'postponed') && !isOverdue(m, now));
 
   // "Explore a sport" = the sports the user has signed up for (their profile's
   // declared sports); the rest are offered under "Try a new sport".

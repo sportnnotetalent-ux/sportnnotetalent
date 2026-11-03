@@ -8,6 +8,7 @@
  */
 import type { Match } from './types';
 import { isStaleLive } from './staleLive.ts';
+import { splitOverdue } from './overdue.ts';
 
 export type MatchesView = 'playing' | 'running';
 export const normalView = (v: unknown): MatchesView => (v === 'running' ? 'running' : 'playing');
@@ -37,11 +38,12 @@ export function matchesView<T extends M>(
   const live = list.filter((m) => isLive(m) && !isStaleLive(m, o.now)).sort(byStart);
   const notFinished = list.filter((m) => isLive(m) && isStaleLive(m, o.now)).sort((a, b) => byStart(b, a));
   // Postponed / cancelled are still pre-match: they stay under Upcoming (badged).
-  const upcoming = list.filter((m) => m.status === 'scheduled' || m.status === 'postponed' || m.status === 'cancelled').sort(byStart);
+  // A scheduled game 12 h+ past its start is overdue: listed apart, never dropped (OD2/OD7).
+  const { upcoming, overdue } = splitOverdue(list.filter((m) => m.status === 'scheduled' || m.status === 'postponed' || m.status === 'cancelled').sort(byStart), o.now);
   const completed = list.filter((m) => m.status === 'completed').sort((a, b) => byStart(b, a));
   return {
-    live, upcoming, completed, notFinished,
+    live, upcoming, overdue, completed, notFinished,
     counts: { playing: playing.length, running: running.length },
-    tabCounts: { live: live.length, upcoming: upcoming.length, completed: completed.length + notFinished.length },
+    tabCounts: { live: live.length, upcoming: upcoming.length + overdue.length, completed: completed.length + notFinished.length },
   };
 }
