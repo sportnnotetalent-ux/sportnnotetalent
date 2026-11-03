@@ -13,11 +13,12 @@
  * reception (`rushLong` / `recLong`) are derived from the play-by-play log
  * (a player with a carry / a catch; never below 0) — never credited live.
  */
-import { deepKeys, eventCredits, isPbp, secondIsDefence, tacklesTracked, PBP_KEYS, SCORE_KEYS, type AFEvent, type AFState, type Side } from './engine.ts';
+import { deepKeys, eventCredits, isPbp, secondIsDefence, tacklesTracked, PBP_KEYS, RET_KEYS, SCORE_KEYS, type AFEvent, type AFState, type Side } from './engine.ts';
 
 /** A carry / catch's yards for "longest" (play by play only: a run, a kneel,
  *  a completion, a touchdown run / catch from scrimmage). */
 export function longGain(e: AFEvent): { kind: 'rush' | 'rec'; id?: string; name?: string; yards: number } | null {
+  if (e.nul) return null; // US batch 6: a play wiped out by a penalty
   const y = Math.round(Number(e.yards) || 0);
   if (e.type === 'play' && (e.play === 'run' || e.play === 'kneel')) return { kind: 'rush', id: e.playerId, name: e.playerName, yards: y };
   if (e.type === 'play' && e.play === 'pass') return { kind: 'rec', id: e.secondId, name: e.secondName, yards: y };
@@ -54,7 +55,10 @@ export function afTotals(s: AFState): Record<string, { side: Side; stats: Record
   const pbp = isPbp(s);
   const tackles = tacklesTracked(s);
   const deep = deepKeys(s);
+  // US batch 6: the return / blocked-kick / fumble keys, once the match recorded one (keyed)
+  const ret = RET_KEYS.filter((k) => Object.values(out).some((l) => k in l.stats));
   for (const l of Object.values(out)) {
+    for (const k of ret) l.stats[k] ??= 0;
     for (const k of SCORE_KEYS) l.stats[k] ??= 0;
     if (pbp) for (const k of PBP_KEYS) l.stats[k] ??= 0;
     if (tackles) l.stats.tackles ??= 0;

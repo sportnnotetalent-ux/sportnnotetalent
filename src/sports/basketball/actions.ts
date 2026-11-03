@@ -9,7 +9,7 @@
  */
 import type { ScoreAction } from '../types';
 import { creditAttribution, eventCredits, foulCredits, ftCredits, makeCredits, missCredits, reboundCredits, type Credits } from './credits.ts';
-import type { BBEvent, DqReason, FoulType, ReboundType, ShotZone, TurnoverType } from './events.ts';
+import type { BBEvent, BenchTech, DqReason, FoulType, ReboundType, ShotZone, TurnoverType } from './events.ts';
 
 type Side = 'home' | 'away';
 /** A picked player (a roster `Player` fits). */
@@ -87,11 +87,13 @@ export const statAction = (side: Side, type: StatPlay, p: Who, ref?: number): Sc
 /** A foul with its type. Deep wave — "Fouls drawn": `fdt` (tracked) and who
  *  was fouled (`drawnBy`, by id). US batch 1: an offensive foul is stamped
  *  `tov` — it is the fouler's turnover too. */
-export const foulAction = (side: Side, p: Who, foulType: FoulType = 'personal', o: { fdt?: boolean; drawnBy?: Who } = {}): ScoreAction => {
+export const foulAction = (side: Side, p: Who, foulType: FoulType = 'personal', o: { fdt?: boolean; drawnBy?: Who; bench?: BenchTech } = {}): ScoreAction => {
   const tov = foulType === 'offensive';
+  // US batch 6: a coach (C) / bench (B) technical — no player, technical only
+  const bench = o.bench && !p && foulType === 'technical' ? { bench: o.bench } : {};
   return {
     type: 'FOUL', side,
-    payload: { foulType, ...pidOf(p), ...(o.fdt ? { fdt: true } : {}), ...(o.drawnBy ? { drawnPid: o.drawnBy.id } : {}), ...(tov ? { tov: true } : {}) },
+    payload: { foulType, ...pidOf(p), ...(o.fdt ? { fdt: true } : {}), ...(o.drawnBy ? { drawnPid: o.drawnBy.id } : {}), ...(tov ? { tov: true } : {}), ...bench },
     ...(p ? { attribution: tov ? creditOf(p, foulCredits(true)) : { playerId: p.id, stat: 'fouls' } } : {}),
   };
 };
@@ -100,6 +102,11 @@ export const foulAction = (side: Side, p: Who, foulType: FoulType = 'personal', 
 export const ejectAction = (side: Side, p: { id: string }, reason?: DqReason): ScoreAction => ({
   type: 'EJECT', side, payload: { pid: p.id, ...(reason ? { reason } : {}) }, attribution: { playerId: p.id, stat: 'ejections' },
 });
+
+/** US batch 6: a jump ball — the opening tip (`side` = who wins it), or a
+ *  held ball (`held`; under the possession arrow the arrow decides the side). */
+export const jumpBallAction = (side: Side, held = false): ScoreAction =>
+  ({ type: 'JUMP_BALL', side, payload: held ? { held: true } : {} });
 
 /** A team time-out. */
 export const timeoutAction = (side: Side): ScoreAction => ({ type: 'TIMEOUT', side });

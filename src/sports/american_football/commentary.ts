@@ -25,6 +25,7 @@ import {
 import { afDrives, downsSpot, driveLine, gameOrder, halfKey, resultText, type AFDrive } from './drives.ts';
 import { groupLines, newestFirst, scoreText, type FeedGroup, type FeedLine } from '../feedGroups.ts';
 import { legacyNameOf, withNames, type NameOf } from '../invasion/names.ts';
+import type { PlayPenalty } from './engine.ts';
 
 export interface Names { home: string; away: string }
 
@@ -48,11 +49,8 @@ export interface Sentence { icon: string; text: string; key?: boolean; tags: str
  *  left after a timeout. Tackles and breakups return null (they join their play). */
 export function sentence(s: AFState, e: AFEvent, names: Names, extra: { downs?: boolean; left?: number } = {}): Sentence | null {
   const team = names[e.side];
-  const opp = names[other(e.side)];
-  const flag = s.variant === 'flag';
   const sit = situationText(s, e);
   const pre = sit ? `${sit} — ` : '';
-  const ballAt = (sd: Side, spot?: number) => (spot != null ? ` — ${names[sd]} ball at ${spotText(s, spot)}` : '');
   switch (e.type) {
     case 'td': {
       const y = e.yards;
@@ -86,6 +84,8 @@ export function sentence(s: AFState, e: AFEvent, names: Names, extra: { downs?: 
     case 'fg': {
       const len = e.yards ? `${e.yards}-yd ` : '';
       const what = e.playerName ? `${e.playerName} ${len}field goal` : cap(`${len}field goal`);
+      // US batch 6: a blocked attempt
+      if (e.blocked) return { icon: '🛡️', text: `${pre}${what} is blocked${e.secondName ? ` by ${e.secondName}` : ''}.`, key: true, tags: [] };
       return { icon: e.good ? '🥅' : '✗', text: `${pre}${what} is ${e.good ? 'good' : 'no good'}.`, key: true, tags: e.good ? ['score'] : [] };
     }
     case 'safety':
@@ -98,67 +98,105 @@ export function sentence(s: AFState, e: AFEvent, names: Names, extra: { downs?: 
       return { icon: '⛔', text: `${team} possession over — no score.`, key: true, tags: [] };
     case 'tackle':
     case 'pd':
+    case 'ff':
       return null;
     case 'play': {
-      const y = Math.round(Number(e.yards) || 0);
-      const first = e.first ? ' (1st down)' : '';
-      const downs = extra.downs ? ' Turnover on downs.' : '';
-      const p1 = e.playerName;
-      const p2 = e.secondName;
-      switch (e.play) {
-        case 'run':
-          return { icon: '🏃', text: `${pre}${p1 ? `${p1} runs` : 'Run'} ${gain(y)}${first}.${downs}`, tags: ['rush', ...(downs ? ['turnover'] : [])], ...(downs ? { key: true } : {}) };
-        case 'kneel':
-          return { icon: '🧎', text: `${pre}${p1 ? `${p1} kneels` : 'Kneel-down'}${y ? ` ${gain(y)}` : ''}${first}.${downs}`, tags: ['rush'] };
-        case 'pass':
-          return { icon: '🎯', text: `${pre}${p1 ? `${p1} pass` : 'Pass'} complete${p2 ? ` to ${p2}` : ''} ${gain(y)}${first}.${downs}`, tags: ['pass', ...(downs ? ['turnover'] : [])], ...(downs ? { key: true } : {}) };
-        case 'inc':
-          return { icon: '✗', text: `${pre}${p1 ? `${p1} pass` : 'Pass'} incomplete${e.tgt && p2 ? ` intended for ${p2}` : ''}.${downs}`, tags: ['pass', ...(downs ? ['turnover'] : [])], ...(downs ? { key: true } : {}) };
-        case 'sack': {
-          const loss = y < 0 ? `for a loss of ${yds(-y)}` : 'for no gain';
-          const text = flag
-            ? `${pre}Sack${p1 ? ` of ${p1}` : ''} — flag pulled behind the line${p2 ? ` by ${p2}` : ''} ${loss}.${downs}`
-            : `${pre}${p1 ? `${p1} sacked` : 'Sacked'}${p2 ? ` by ${p2}` : ''} ${loss}.${downs}`;
-          return { icon: '💥', text, tags: ['pass', ...(downs ? ['turnover'] : [])], ...(downs ? { key: true } : {}) };
-        }
-        case 'int':
-          return { icon: '🔄', text: `${pre}${p1 ? `${p1} pass` : 'Pass'} intercepted${p2 ? ` by ${p2}` : ''}${ballAt(other(e.side), e.newSpot)}.`, key: true, tags: ['turnover', 'pass'] };
-        case 'fumble':
-          return { icon: '🔄', text: `${pre}${p1 ? `${p1} fumbles` : 'Fumble'}${p2 ? ` — recovered by ${p2}` : ''}${ballAt(other(e.side), e.newSpot)}.`, key: true, tags: ['turnover'] };
-        case 'punt': {
-          const g = Math.abs(y);
-          const land = (e.pre?.spot ?? 0) + g;
-          const tb = e.ret == null && (e.newSpot === 20 || (!!e.pre && land >= s.field));
-          const ret = typeof e.ret === 'number' ? (e.ret > 0 ? `, returned ${yds(e.ret)}` : ', no return') : tb ? ', touchback' : '';
-          const spot = e.newSpot ?? (e.pre ? (land >= s.field ? 20 : s.field - land + (e.ret ?? 0)) : undefined);
-          return { icon: '🦶', text: `${pre}${p1 ? `${p1} punts` : 'Punt'} ${yds(g)}${ret}${ballAt(other(e.side), spot)}.`, tags: [] };
-        }
-        case 'kickoff': {
-          const tb = e.newSpot === touchback(s);
-          return { icon: '🦶', text: `Kickoff — ${team} ball at ${e.newSpot != null ? spotText(s, e.newSpot) : 'their own end'}${tb ? ' (touchback)' : ''}.`, tags: [] };
-        }
-        case 'penalty': {
-          const on = e.on ?? e.side;
-          const extraTxt = [e.first ? '1st down' : '', e.lossOfDown ? 'loss of down' : ''].filter(Boolean).join(', ');
-          return {
-            icon: '🚩', side: on, tags: ['penalty'],
-            text: `${pre}Penalty on ${names[on]} — ${e.foul ?? 'foul'}, ${yds(Math.abs(y))}${extraTxt ? ` (${extraTxt})` : ''}.${downs}`,
-          };
-        }
-        case 'downs': {
-          const sp = downsSpot(s, e);
-          return { icon: '⛔', text: `${pre}Turnover on downs${sp != null ? ` — ${opp} take over at ${spotText(s, sp)}` : ''}.`, key: true, tags: ['turnover'] };
-        }
-        default:
-          return { icon: '▸', text: `${pre}Play.`, tags: [] };
-      }
+      const base = playSentence(s, e, names, extra);
+      // US batch 6: a penalty on the play, and how it was settled
+      return e.pen ? { ...base, text: `${base.text} ${penText(e.pen, names)}`, tags: [...base.tags, 'penalty'] } : base;
     }
+  }
+}
+
+const PEN_HOW: Record<PlayPenalty['enf'], string> = {
+  prev: 'accepted — play nullified', end: 'enforced at the end of the play', dec: 'declined', off: 'offsetting fouls — down replayed',
+};
+/** "Penalty: Holding (offence) on Lions (Rao), 10 yds — accepted — play nullified." */
+export function penText(p: PlayPenalty, names: Names): string {
+  const yd = p.enf === 'off' || p.enf === 'dec' ? '' : `, ${yds(p.yards)}`;
+  return `Penalty: ${p.foul} on ${names[p.on]}${p.byName ? ` (${p.byName})` : ''}${yd} — ${PEN_HOW[p.enf]}.`;
+}
+
+/** A play's own sentence (before any penalty on it). */
+function playSentence(s: AFState, e: AFEvent, names: Names, extra: { downs?: boolean; left?: number }): Sentence {
+  const team = names[e.side];
+  const opp = names[other(e.side)];
+  const flag = s.variant === 'flag';
+  const sit = situationText(s, e);
+  const pre = sit ? `${sit} — ` : '';
+  const ballAt = (sd: Side, spot?: number) => (spot != null ? ` — ${names[sd]} ball at ${spotText(s, spot)}` : '');
+  const y = Math.round(Number(e.yards) || 0);
+  const first = e.first ? ' (1st down)' : '';
+  const downs = extra.downs ? ' Turnover on downs.' : '';
+  const p1 = e.playerName;
+  const p2 = e.secondName;
+  switch (e.play) {
+    case 'run':
+      return { icon: '🏃', text: `${pre}${p1 ? `${p1} runs` : 'Run'} ${gain(y)}${first}.${downs}`, tags: ['rush', ...(downs ? ['turnover'] : [])], ...(downs ? { key: true } : {}) };
+    case 'kneel':
+      return { icon: '🧎', text: `${pre}${p1 ? `${p1} kneels` : 'Kneel-down'}${y ? ` ${gain(y)}` : ''}${first}.${downs}`, tags: ['rush'] };
+    case 'pass':
+      return { icon: '🎯', text: `${pre}${p1 ? `${p1} pass` : 'Pass'} complete${p2 ? ` to ${p2}` : ''} ${gain(y)}${first}.${downs}`, tags: ['pass', ...(downs ? ['turnover'] : [])], ...(downs ? { key: true } : {}) };
+    case 'inc':
+      return { icon: '✗', text: `${pre}${p1 ? `${p1} pass` : 'Pass'} incomplete${e.tgt && p2 ? ` intended for ${p2}` : ''}.${downs}`, tags: ['pass', ...(downs ? ['turnover'] : [])], ...(downs ? { key: true } : {}) };
+    case 'sack': {
+      const loss = y < 0 ? `for a loss of ${yds(-y)}` : 'for no gain';
+      const text = flag
+        ? `${pre}Sack${p1 ? ` of ${p1}` : ''} — flag pulled behind the line${p2 ? ` by ${p2}` : ''} ${loss}.${downs}`
+        : `${pre}${p1 ? `${p1} sacked` : 'Sacked'}${p2 ? ` by ${p2}` : ''} ${loss}.${downs}`;
+      return { icon: '💥', text, tags: ['pass', ...(downs ? ['turnover'] : [])], ...(downs ? { key: true } : {}) };
+    }
+    case 'int': {
+      const r = typeof e.ret === 'number' ? `, returned ${yds(e.ret)}` : '';
+      return { icon: '🔄', text: `${pre}${p1 ? `${p1} pass` : 'Pass'} intercepted${p2 ? ` by ${p2}` : ''}${r}${ballAt(other(e.side), e.newSpot)}.`, key: true, tags: ['turnover', 'pass'] };
+    }
+    case 'fumble':
+      // US batch 6: a fumble the offence kept is no turnover
+      if (e.kept) return { icon: '🏈', text: `${pre}${p1 ? `${p1} fumbles` : 'Fumble'}${p2 ? ` — recovered by ${p2}` : ''} (${team} keep it)${y ? `, ${gain(y)}` : ''}.${downs}`, tags: [] };
+      return { icon: '🔄', text: `${pre}${p1 ? `${p1} fumbles` : 'Fumble'}${p2 ? ` — recovered by ${p2}` : ''}${ballAt(other(e.side), e.newSpot)}.`, key: true, tags: ['turnover'] };
+    case 'punt': {
+      if (e.blocked) {
+        const sp = e.newSpot ?? (e.pre ? s.field - e.pre.spot : undefined);
+        return { icon: '🛡️', text: `${pre}${p1 ? `${p1} punt` : 'Punt'} blocked${p2 ? ` by ${p2}` : ''}${ballAt(other(e.side), sp)}.`, key: true, tags: ['turnover'] };
+      }
+      const g = Math.abs(y);
+      const land = (e.pre?.spot ?? 0) + g;
+      const tb = e.ret == null && (e.newSpot === 20 || (!!e.pre && land >= s.field));
+      const ret = typeof e.ret === 'number' ? (e.ret > 0 ? `, returned ${yds(e.ret)}${p2 ? ` by ${p2}` : ''}` : ', no return') : tb ? ', touchback' : '';
+      const spot = e.newSpot ?? (e.pre ? (land >= s.field ? 20 : s.field - land + (e.ret ?? 0)) : undefined);
+      return { icon: '🦶', text: `${pre}${p1 ? `${p1} punts` : 'Punt'} ${yds(g)}${ret}${ballAt(other(e.side), spot)}.`, tags: [] };
+    }
+    case 'kickoff': {
+      // US batch 6: an onside kick (the kickers keeping it), a return with the returner
+      if (e.onside) {
+        const rec = e.kept ? other(e.side) : e.side;
+        return { icon: '🦶', text: `Onside kick — recovered by ${names[rec]}${e.newSpot != null ? ` at ${spotText(s, e.newSpot)}` : ''}.`, key: !!e.kept, tags: e.kept ? ['turnover'] : [] };
+      }
+      const tb = e.newSpot === touchback(s);
+      const r = typeof e.ret === 'number' ? ` — returned ${yds(e.ret)}${p1 ? ` by ${p1}` : ''}` : '';
+      return { icon: '🦶', text: `Kickoff${r} — ${team} ball at ${e.newSpot != null ? spotText(s, e.newSpot) : 'their own end'}${tb ? ' (touchback)' : ''}.`, tags: [] };
+    }
+    case 'penalty': {
+      const on = e.on ?? e.side;
+      const extraTxt = [e.first ? '1st down' : '', e.lossOfDown ? 'loss of down' : ''].filter(Boolean).join(', ');
+      return {
+        icon: '🚩', side: on, tags: ['penalty'],
+        text: `${pre}Penalty on ${names[on]} — ${e.foul ?? 'foul'}, ${yds(Math.abs(y))}${extraTxt ? ` (${extraTxt})` : ''}.${downs}`,
+      };
+    }
+    case 'downs': {
+      const sp = downsSpot(s, e);
+      return { icon: '⛔', text: `${pre}Turnover on downs${sp != null ? ` — ${opp} take over at ${spotText(s, sp)}` : ''}.`, key: true, tags: ['turnover'] };
+    }
+    default:
+      return { icon: '▸', text: `${pre}Play.`, tags: [] };
   }
 }
 
 /** A tackle / flag pull / pass breakup joined to its play's line. */
 export function addOnText(s: AFState, e: AFEvent): string {
   const who = e.playerName;
+  if (e.type === 'ff') return who ? ` Forced by ${who}.` : ' Fumble forced.';
   if (e.type === 'pd') return who ? ` Broken up by ${who}.` : ' Broken up.';
   if (!who) return '';
   if (e.tfl) return s.variant === 'flag' ? ` Flag pulled for a loss by ${who}.` : ` Tackle for loss by ${who}.`;
@@ -181,7 +219,11 @@ type Entry = { gk: string; period: number; idx: number; line: FeedLine; drive?: 
 
 /** The commentary feed, newest first. */
 export function afCommentary(s0: AFState, names: Names, nameOf: NameOf = legacyNameOf): FeedGroup[] {
-  const s = withNames(s0, nameOf);
+  const named = withNames(s0, nameOf);
+  // US batch 6: the penalised player of a penalty on a play, by id → this viewer's name
+  const s = named.events.some((e) => e.pen?.by)
+    ? { ...named, events: named.events.map((e) => (e.pen?.by ? { ...e, pen: { ...e.pen, byName: nameOf(e.pen.by) } } : e)) }
+    : named;
   const { drives, driveOf } = afDrives(s);
   const items: Item[] = gameOrder(s).map(({ e, i }) => ({ period: e.period, sec: e.sec, ord: i, e, hk: halfKey(s, e.period) }));
   // the two-minute warnings and the period ends (completed periods)
@@ -213,7 +255,7 @@ export function afCommentary(s0: AFState, names: Names, nameOf: NameOf = legacyN
     const e = it.e;
     if (e) {
       // a tackle / flag pull / breakup joins the play before it
-      if (e.type === 'tackle' || e.type === 'pd') {
+      if (e.type === 'tackle' || e.type === 'pd' || e.type === 'ff') {
         const add = addOnText(s, e);
         if (lastPlay && add) { lastPlay.text += add; continue; }
         if (!add) continue;
@@ -227,7 +269,7 @@ export function afCommentary(s0: AFState, names: Names, nameOf: NameOf = legacyN
       const di = driveOf.get(e.id);
       drive = di != null ? drives[di] : undefined;
       const downs = !!drive && drive.result === 'downs' && drive.lastId === e.id && e.type === 'play' && e.play !== 'downs';
-      const d: Sentence | null = e.type === 'tackle' || e.type === 'pd'
+      const d: Sentence | null = e.type === 'tackle' || e.type === 'pd' || e.type === 'ff'
         ? { icon: '🤚', text: addOnText(s, e).trim(), tags: [] }
         : sentence(s, e, names, { downs, left });
       if (!d) continue;
@@ -238,7 +280,7 @@ export function afCommentary(s0: AFState, names: Names, nameOf: NameOf = legacyN
         id: e.id, ...(c ? { when: c } : {}), icon: d.icon, text: d.text, side: d.side ?? e.side, tags: d.tags,
         ...(d.key ? { key: true } : {}), ...(pts ? { score: scoreText(score.home, score.away) } : {}),
       };
-      lastPlay = e.type === 'play' && ['run', 'pass', 'inc', 'sack', 'kneel'].includes(e.play ?? '') ? line : undefined;
+      lastPlay = e.type === 'play' && ['run', 'pass', 'inc', 'sack', 'kneel', 'fumble'].includes(e.play ?? '') ? line : undefined;
       if (drive) gk = `d${drive.n}`;
       // a touchdown outside any drive (a kickoff return) — its own group in a play-by-play game
       else if (e.type === 'td' && drives.length) { gk = `x${e.id}`; ret = e; }

@@ -103,6 +103,8 @@ export function basketballPanel(s: BasketballState, scope: BbScope = 'all', ctx:
   ball.push(countRow('stl', 'Steals', H.stl, A.stl));
   ball.push(countRow('blk', 'Blocks', H.blk, A.blk));
   ball.push(countRow('tov', 'Turnovers', H.tov, A.tov, { lowerBetter: true }));
+  // US batch 6: jump balls / held balls won (the arrow's possessions included), once logged
+  if (s.events.some((e) => e.type === 'jump')) ball.push(countRow('jump', 'Jump balls / held balls (ball)', H.jump, A.jump, { noBar: true }));
 
   /* ---- fouls & time-outs ---- */
   const fouls: PanelRow[] = [countRow('pf', 'Fouls', H.pf, A.pf, { lowerBetter: true })];
@@ -113,6 +115,8 @@ export function basketballPanel(s: BasketballState, scope: BbScope = 'all', ctx:
   }
   if (H.tech || A.tech) fouls.push(countRow('tech', 'Technical fouls', H.tech, A.tech, { lowerBetter: true }));
   if (H.unsport || A.unsport) fouls.push(countRow('unsport', 'Unsportsmanlike / disqualifying', H.unsport, A.unsport, { lowerBetter: true }));
+  // US batch 6: coach / bench technicals, once the match logged one
+  if (H.benchTech || A.benchTech) fouls.push(countRow('benchTech', 'Coach / bench technicals', H.benchTech, A.benchTech, { lowerBetter: true }));
   if (H.timeouts || A.timeouts) fouls.push(countRow('timeouts', 'Time-outs used', H.timeouts, A.timeouts, { noBar: true }));
 
   const categories: PanelCategory[] = [

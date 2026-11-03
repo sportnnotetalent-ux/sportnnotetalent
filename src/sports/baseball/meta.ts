@@ -16,7 +16,8 @@ export const BASEBALL_PRESETS: Record<string, { label: string; set: Record<strin
 
 /** Deep wave — the "Stats to track" toggles (live settings + the match format). */
 export const TRACK_FIELDS: FormatField[] = [
-  { key: 'pitchTypes', label: 'Pitch types', type: 'toggle', default: false, group: 'Stats to track', hint: 'A chip row over the pitch pad (FB SL CH … / softball Rise Drop …): tap the type, then the pitch — pitch mix per pitcher. Needs pitch-by-pitch' },
+  // US batch 6 (audit P2 #18): only acts with pitch-by-pitch, so hidden while it is off
+  { key: 'pitchTypes', label: 'Pitch types', type: 'toggle', default: false, group: 'Stats to track', hint: 'A chip row over the pitch pad (FB SL CH … / softball Rise Drop …): tap the type, then the pitch — pitch mix per pitcher. Needs pitch-by-pitch', hideWhen: { key: 'pitches', value: false } },
   { key: 'sprayZones', label: 'Where the ball went (spray)', type: 'toggle', default: false, group: 'Stats to track', hint: 'Optional LF · CF · RF … chips when the ball is put in play — hits and balls in play by zone' },
   { key: 'battedBallTypes', label: 'Batted-ball type', type: 'toggle', default: false, group: 'Stats to track', hint: 'Optional Grounder · Liner · Fly ball · Popup chips when the ball is put in play (outs fill it in themselves) — GB / LD / FB % for batters and pitchers' },
 ];

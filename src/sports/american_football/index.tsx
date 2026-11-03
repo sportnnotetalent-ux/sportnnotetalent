@@ -38,7 +38,7 @@ import {
   eventCredits, creditAttribution, credit, buildPlay, foulsFor, timeoutsLeft, isOT, clockless, isLast, downText, spotText, toGo, touchback,
   fgDistance, pointsOf, eventWhen, other, afScoreLine, totalPeriods,
   AF_PRESETS, AF_LIVE_SETTINGS, TRACK_FIELDS,
-  type AFEvent, type AFState, type Side, type TdHow, type TryKind, type Who, type Foul,
+  type AFEvent, type AFState, type Side, type TdHow, type TryKind, type Who, type Foul, type PenEnf, type PlayInput,
 } from './engine';
 import { afTotals } from './totals';
 import { afBox } from './box';
@@ -102,7 +102,7 @@ type Flow =
   | { mode: 'td'; side: Side; step: 'scorer' | 'passer'; how: TdHow; yards: string; scorer?: Player | null }
   | { mode: 'tryWho'; side: Side; kind: TryKind; good: boolean }
   | { mode: 'defTry'; side: Side }
-  | { mode: 'fg'; side: Side; step: 'result' | 'kicker'; yards: string; good?: boolean }
+  | { mode: 'fg'; side: Side; step: 'result' | 'kicker' | 'blocker'; yards: string; good?: boolean; blocked?: boolean; kicker?: Player | null }
   | { mode: 'safety'; side: Side }
   | { mode: 'eject'; side: Side }
   | { mode: 'tackle'; side: Side; loss?: boolean }
@@ -111,12 +111,15 @@ type Flow =
   | { mode: 'inc'; side: Side; step: 'passer' | 'target'; p1?: Who }
   | { mode: 'pd'; side: Side }
   | { mode: 'sack'; side: Side; step: 'who' | 'yards'; p2?: Player | null }
-  | { mode: 'int'; side: Side; step: 'who' | 'spot'; p2?: Player | null }
-  | { mode: 'fumble'; side: Side; step: 'who' | 'rec' | 'spot'; p1?: Player | null; p2?: Player | null }
-  | { mode: 'punt'; side: Side; step: 'who' | 'yards' | 'ret'; p1?: Player | null; gross?: number }
+  | { mode: 'int'; side: Side; step: 'who' | 'spot'; p2?: Player | null; ret?: number }
+  | { mode: 'fumble'; side: Side; step: 'who' | 'rec' | 'spot' | 'keptBy' | 'keptYds'; p1?: Player | null; p2?: Player | null }
+  | { mode: 'punt'; side: Side; step: 'who' | 'yards' | 'ret' | 'blocker'; p1?: Player | null; gross?: number; returner?: Player | null }
+  // US batch 6: who forced a fumble (optional); a flag thrown on a play — the foul, then how it was settled
+  | { mode: 'ff'; side: Side }
+  | { mode: 'penOn'; side: Side; inp: PlayInput; step: 'foul' | 'enf'; foul?: Foul; by?: Player | null }
   | { mode: 'penalty'; side: Side; step: 'foul' | 'yards'; foul?: Foul }
   | { mode: 'drive' }
-  | { mode: 'kickoff'; side: Side };
+  | { mode: 'kickoff'; side: Side; returner?: Player | null; ret?: number };
 
 /* -------------------------------- controls --------------------------------- */
 
@@ -132,6 +135,8 @@ const ScoringControls: SportPlugin<AFState>['ScoringControls'] = ({
   const [showEdit, setShowEdit] = useState(false);
   const [clockInput, setClockInput] = useState('');
   const [setting, setSetting] = useState(false);
+  // US batch 6: "Flag on the play" — the next scrimmage play asks for its penalty
+  const [flagOn, setFlagOn] = useState(false);
   const [driveIn, setDriveIn] = useState<{ off: Side; spot: string; down: number; toGo: string }>({ off: 'home', spot: '25', down: 1, toGo: '10' });
   const [, tick] = useState(0);
   useEffect(() => {
@@ -191,17 +196,26 @@ const ScoringControls: SportPlugin<AFState>['ScoringControls'] = ({
     fire({ type: 'TRY', side: sd, payload: { kind, good }, ...credit({ type: 'try', kind, good, playerId: p?.id }) });
     setFlow(null);
   };
-  const recordFg = (sd: Side, good: boolean, yardsText: string, p: Player | null) => {
+  const recordFg = (sd: Side, good: boolean, yardsText: string, p: Player | null, blocker?: Player | null, blocked = false) => {
     const y = Math.round(Number(yardsText));
-    fire({ type: 'FG', side: sd, payload: { good, ...(yardsText.trim() && Number.isFinite(y) && y > 0 ? { yards: y } : {}) }, ...credit({ type: 'fg', good, playerId: p?.id }) });
+    // US batch 6: a blocked attempt (and the blocker, a defender — optional)
+    const blk = !good && blocked;
+    fire({ type: 'FG', side: sd, payload: { good, ...(blk ? { blocked: true } : {}), ...(yardsText.trim() && Number.isFinite(y) && y > 0 ? { yards: y } : {}) },
+      ...credit({ type: 'fg', good, playerId: p?.id, ...(blk ? { blocked: true as const } : {}), ...(blk && blocker ? { secondId: blocker.id } : {}) }, sd) });
     setFlow(null);
   };
   const play = (sd: Side, inp: Parameters<typeof buildPlay>[2]) => {
+    // US batch 6: a flag on this scrimmage play — pick the foul and how it was settled first
+    if (flagOn && !inp.pen && ['run', 'pass', 'inc', 'sack', 'kneel'].includes(inp.play)) { setFlagOn(false); setFlow({ mode: 'penOn', side: sd, inp, step: 'foul' }); return; }
     // deep wave: a completion recorded with "Targets" on credits its receiver a target
     const a = buildPlay(s, sd, { ...inp, ...(s.trackTargets && (inp.play === 'pass' || (inp.play === 'inc' && inp.p2)) ? { tgt: true } : {}) }, stamp());
     dispatch(a);
+    // US batch 6: a play wiped out by a penalty asks nothing more
+    if (inp.pen && (inp.pen.enf === 'prev' || inp.pen.enf === 'off')) setFlow(null);
     // deep wave: who broke up an incomplete pass (optional), when tracked
-    if (s.trackDefence && a.type === 'PLAY' && inp.play === 'inc') setFlow({ mode: 'pd', side: other(sd) });
+    else if (s.trackDefence && a.type === 'PLAY' && inp.play === 'inc') setFlow({ mode: 'pd', side: other(sd) });
+    // US batch 6: who forced a fumble (optional), with defensive detail on
+    else if (s.trackDefence && a.type === 'PLAY' && inp.play === 'fumble') setFlow({ mode: 'ff', side: other(sd) });
     // a tackle / flag pull after a gain, when tracked (a loss = a tackle for loss with defensive detail on)
     else if (s.trackTackles && a.type === 'PLAY' && (inp.play === 'run' || inp.play === 'pass')) setFlow({ mode: 'tackle', side: other(sd), loss: !!s.trackDefence && (inp.yards ?? 0) < 0 });
     else setFlow(null);
@@ -332,11 +346,19 @@ const ScoringControls: SportPlugin<AFState>['ScoringControls'] = ({
               <Button label="✓ Good" color={color(sd)} style={c.flex} onPress={() => setFlow({ ...flow, good: true, step: 'kicker' })} />
               <Button label="✗ No good" variant="ghost" style={c.flex} onPress={() => setFlow({ ...flow, good: false, step: 'kicker' })} />
             </View>
+            {/* US batch 6: a blocked attempt (then the kicker and, optionally, the blocker) */}
+            <Button label="Blocked" accessibilityLabel="Field goal blocked" variant="ghost" onPress={() => setFlow({ ...flow, good: false, blocked: true, step: 'kicker' })} />
           </View>
         );
+        if (flow.step === 'blocker') return (
+          <View style={c.panel}>{head('Field goal blocked — by', other(sd))}
+            <PlayerGrid players={players(other(sd))} onPick={(p) => recordFg(sd, false, flow.yards, flow.kicker ?? null, p, true)} skip={{ label: 'Skip', onPress: () => recordFg(sd, false, flow.yards, flow.kicker ?? null, null, true) }} />
+          </View>
+        );
+        const kicked = (p: Player | null) => (flow.blocked ? setFlow({ ...flow, kicker: p, step: 'blocker' }) : recordFg(sd, !!flow.good, flow.yards, p));
         return (
-          <View style={c.panel}>{head(`Field goal ${flow.good ? 'good' : 'no good'} — kicker`, sd)}
-            <PlayerGrid players={players(sd)} onPick={(p) => recordFg(sd, !!flow.good, flow.yards, p)} skip={{ label: 'Skip kicker', onPress: () => recordFg(sd, !!flow.good, flow.yards, null) }} />
+          <View style={c.panel}>{head(`Field goal ${flow.good ? 'good' : flow.blocked ? 'blocked' : 'no good'} — kicker`, sd)}
+            <PlayerGrid players={players(sd)} onPick={kicked} skip={{ label: 'Skip kicker', onPress: () => kicked(null) }} />
           </View>
         );
       }
@@ -451,7 +473,10 @@ const ScoringControls: SportPlugin<AFState>['ScoringControls'] = ({
         );
         return (
           <View style={c.panel}>{head(`${name(def)} ball — on their own`, def)}
-            <SpotPad s={s} onPick={(sp) => play(sd, { play: 'int', p1: lastPasser(s, sd), p2: who(flow.p2), newSpot: sp })} />
+            {/* US batch 6: return yards (optional — tap before the spot) */}
+            <Text style={c.small}>Return yards (optional){flow.ret != null ? ` · ${flow.ret}` : ''}</Text>
+            <View style={c.grid}>{[0, 5, 10, 15, 20, 30].map((r) => <SelectChip key={r} label={String(r)} accessibilityLabel={`Returned ${r} yards`} active={flow.ret === r} onPress={() => setFlow({ ...flow, ret: flow.ret === r ? undefined : r })} />)}</View>
+            <SpotPad s={s} onPick={(sp) => play(sd, { play: 'int', p1: lastPasser(s, sd), p2: who(flow.p2), newSpot: sp, ...(flow.ret != null ? { ret: flow.ret } : {}) })} />
             <Button label="🏈 Returned for a touchdown" variant="ghost" onPress={() => {
               dispatch(buildPlay(s, sd, { play: 'int', p1: lastPasser(s, sd), p2: who(flow.p2) }, stamp()));
               setFlow({ mode: 'td', side: def, step: 'scorer', how: 'int', yards: '' });
@@ -463,13 +488,25 @@ const ScoringControls: SportPlugin<AFState>['ScoringControls'] = ({
         const sd = flow.side;
         const def = other(sd);
         if (flow.step === 'who') return (
-          <View style={c.panel}>{head('Fumble lost — who fumbled', sd)}
+          <View style={c.panel}>{head('Fumble — who fumbled', sd)}
             <PlayerGrid players={players(sd)} onPick={(p) => setFlow({ ...flow, p1: p, step: 'rec' })} skip={{ label: 'Skip player', onPress: () => setFlow({ ...flow, p1: null, step: 'rec' }) }} />
           </View>
         );
         if (flow.step === 'rec') return (
           <View style={c.panel}>{head('Recovered by', def)}
             <PlayerGrid players={players(def)} onPick={(p) => setFlow({ ...flow, p2: p, step: 'spot' })} skip={{ label: 'Skip player', onPress: () => setFlow({ ...flow, p2: null, step: 'spot' }) }} />
+            {/* US batch 6: the offence fell on it — no turnover */}
+            <Button label={`🔁 ${name(sd)} kept it`} accessibilityLabel={`Fumble recovered by ${name(sd)}: no turnover`} variant="ghost" onPress={() => setFlow({ ...flow, step: 'keptBy' })} />
+          </View>
+        );
+        if (flow.step === 'keptBy') return (
+          <View style={c.panel}>{head('Fumble kept — recovered by', sd)}
+            <PlayerGrid players={players(sd)} onPick={(p) => setFlow({ ...flow, p2: p, step: 'keptYds' })} skip={{ label: 'Skip player', onPress: () => setFlow({ ...flow, p2: null, step: 'keptYds' }) }} />
+          </View>
+        );
+        if (flow.step === 'keptYds') return (
+          <View style={c.panel}>{head('Fumble kept — net yards on the play', sd)}
+            <YardsPad chips={[-5, -3, -1, 0, 1, 2, 3, 5, 8, 10]} onPick={(y) => play(sd, { play: 'fumble', kept: true, yards: y, p1: who(flow.p1), p2: who(flow.p2) })} />
           </View>
         );
         return (
@@ -492,11 +529,22 @@ const ScoringControls: SportPlugin<AFState>['ScoringControls'] = ({
         if (flow.step === 'yards') return (
           <View style={c.panel}>{head('Punt — distance', sd)}
             <YardsPad chips={[30, 35, 38, 40, 42, 45, 48, 50, 55]} onPick={(y) => setFlow({ ...flow, gross: Math.abs(y), step: 'ret' })} label="Punt yards" />
+            {/* US batch 6: a blocked punt (the blocker next, optional) */}
+            <Button label="Blocked" accessibilityLabel="Punt blocked" variant="ghost" onPress={() => setFlow({ ...flow, step: 'blocker' })} />
+          </View>
+        );
+        if (flow.step === 'blocker') return (
+          <View style={c.panel}>{head('Punt blocked — by', other(sd))}
+            <PlayerGrid players={players(other(sd))} onPick={(p) => play(sd, { play: 'punt', blocked: true, p1: who(flow.p1), p2: who(p) })}
+              skip={{ label: 'Skip', onPress: () => play(sd, { play: 'punt', blocked: true, p1: who(flow.p1) }) }} />
           </View>
         );
         return (
           <View style={c.panel}>{head('Punt — return yards', other(sd))}
-            <YardsPad chips={[0, 3, 5, 8, 10, 15, 20]} onPick={(r) => play(sd, { play: 'punt', yards: flow.gross ?? 40, p1: who(flow.p1), ret: r })} label="Return yards" />
+            {/* US batch 6: the returner (optional — tap before the yards) */}
+            <Text style={c.small}>Returner (optional){flow.returner ? ` · ${flow.returner.fullName}` : ''}</Text>
+            <View style={c.grid}>{players(other(sd)).map((p) => <SelectChip key={p.id} label={p.fullName} active={flow.returner?.id === p.id} onPress={() => setFlow({ ...flow, returner: flow.returner?.id === p.id ? null : p })} />)}</View>
+            <YardsPad chips={[0, 3, 5, 8, 10, 15, 20]} onPick={(r) => play(sd, { play: 'punt', yards: flow.gross ?? 40, p1: who(flow.p1), ret: r, ...(flow.returner ? { p2: who(flow.returner) } : {}) })} label="Return yards" />
             <Button label="Touchback / downed in the end zone" variant="ghost" onPress={() => play(sd, { play: 'punt', yards: flow.gross ?? 40, p1: who(flow.p1), newSpot: 20 })} />
             <Button label="🏈 Returned for a touchdown" variant="ghost" onPress={() => {
               dispatch(buildPlay(s, sd, { play: 'punt', yards: flow.gross ?? 40, p1: who(flow.p1) }, stamp()));
@@ -527,6 +575,47 @@ const ScoringControls: SportPlugin<AFState>['ScoringControls'] = ({
           </View>
         );
       }
+      case 'ff': {
+        // US batch 6: who forced the fumble (optional)
+        const sd = flow.side;
+        return (
+          <View style={c.panel}>{head('Fumble forced by', sd)}
+            <PlayerGrid players={players(sd)} onPick={(p) => { dispatch({ type: 'FORCED_FUMBLE', side: sd, payload: stamp(), ...credit({ type: 'ff', playerId: p.id }) }); setFlow(null); }}
+              skip={{ label: 'Skip', onPress: () => setFlow(null) }} />
+          </View>
+        );
+      }
+      case 'penOn': {
+        // US batch 6: a flag on the play — the foul, then how it was settled (the penalised player optional)
+        const sd = flow.side;
+        const f = flow.foul;
+        if (flow.step === 'foul' || !f) return (
+          <View style={c.panel}>{head('Flag on the play — the foul', sd)}
+            <Text style={c.small}>On the offence ({name(sd)})</Text>
+            <View style={c.grid}>{foulsFor(s).filter((x) => x.on === 'off').map((x) => <SelectChip key={x.key} label={`${x.label} · ${x.yards}`} active={false} onPress={() => setFlow({ ...flow, foul: x, step: 'enf' })} />)}</View>
+            <Text style={c.small}>On the defence ({name(other(sd))})</Text>
+            <View style={c.grid}>{foulsFor(s).filter((x) => x.on === 'def').map((x) => <SelectChip key={x.key} label={`${x.label} · ${x.yards}`} active={false} onPress={() => setFlow({ ...flow, foul: x, step: 'enf' })} />)}</View>
+            <Button label="No flag after all — record the play" variant="ghost" onPress={() => play(sd, { ...flow.inp, pen: undefined })} />
+          </View>
+        );
+        const on = f.on === 'off' ? sd : other(sd);
+        const settle = (enf: PenEnf) => {
+          const pen = { foul: f.label, on, yards: f.yards, enf, ...(flow.by ? { by: flow.by.id } : {}), ...(f.autoFirst ? { autoFirst: true as const } : {}), ...(f.lossOfDown ? { lossOfDown: true as const } : {}) };
+          play(sd, { ...flow.inp, pen });
+        };
+        return (
+          <View style={c.panel}>{head(`${f.label} · on ${name(on)}`)}
+            <Text style={c.small}>Penalised player (optional){flow.by ? ` · ${flow.by.fullName}` : ''}</Text>
+            <View style={c.grid}>{players(on).map((p) => <SelectChip key={p.id} label={p.fullName} active={flow.by?.id === p.id} onPress={() => setFlow({ ...flow, by: flow.by?.id === p.id ? null : p })} />)}</View>
+            <View style={c.grid}>
+              <Button label={`Accept · no play (${f.yards} from the previous spot)`} color={color(on)} style={c.half} onPress={() => settle('prev')} />
+              <Button label={`Accept · the play stands, ${f.yards} from where it ended`} variant="ghost" style={c.half} onPress={() => settle('end')} />
+              <Button label="Declined · the play stands" variant="ghost" style={c.half} onPress={() => settle('dec')} />
+              <Button label="Offsetting · replay the down" variant="ghost" style={c.half} onPress={() => settle('off')} />
+            </View>
+          </View>
+        );
+      }
       case 'drive':
         return (
           <View style={c.panel}>{head('📍 Place the ball')}
@@ -547,10 +636,26 @@ const ScoringControls: SportPlugin<AFState>['ScoringControls'] = ({
         const rec = flow.side;
         const tb = touchback(s);
         const spots = [...new Set([tb, 20, 25, 30, 35, 40])].sort((a, b) => a - b);
+        // US batch 6: the returner and the return yards ride on the kickoff (optional — tap before the spot)
+        const kick = (sp: number) => {
+          const f = flow;
+          if (f.returner || f.ret != null) fire(buildPlay(s, rec, { play: 'kickoff', newSpot: sp, ...(f.returner ? { p1: who(f.returner) } : {}), ...(f.ret != null ? { ret: f.ret } : {}) }));
+          else fire({ type: 'PLAY', side: rec, payload: { play: 'kickoff', newSpot: sp } });
+          setFlow(null);
+        };
+        const onside = (kept: boolean) => { fire(buildPlay(s, rec, { play: 'kickoff', onside: true, kept, newSpot: kept ? 45 : s.field - 45 })); setFlow(null); };
         return (
           <View style={c.panel}>{head(`Kickoff — ${name(rec)} start on their own`, rec)}
-            <View style={c.grid}>{spots.map((sp) => <SelectChip key={sp} label={sp === tb ? `${sp} (touchback)` : String(sp)} active={false} onPress={() => { fire({ type: 'PLAY', side: rec, payload: { play: 'kickoff', newSpot: sp } }); setFlow(null); }} />)}</View>
-            <SpotPad s={s} onPick={(sp) => { fire({ type: 'PLAY', side: rec, payload: { play: 'kickoff', newSpot: sp } }); setFlow(null); }} chips={[]} />
+            <Text style={c.small}>Returner (optional){flow.returner ? ` · ${flow.returner.fullName}` : ''}</Text>
+            <View style={c.grid}>{players(rec).map((p) => <SelectChip key={p.id} label={p.fullName} active={flow.returner?.id === p.id} onPress={() => setFlow({ ...flow, returner: flow.returner?.id === p.id ? null : p })} />)}</View>
+            <Text style={c.small}>Return yards (optional){flow.ret != null ? ` · ${flow.ret}` : ''}</Text>
+            <View style={c.grid}>{[0, 10, 15, 20, 25, 30, 40].map((r) => <SelectChip key={r} label={String(r)} accessibilityLabel={`Returned ${r} yards`} active={flow.ret === r} onPress={() => setFlow({ ...flow, ret: flow.ret === r ? undefined : r })} />)}</View>
+            <View style={c.grid}>{spots.map((sp) => <SelectChip key={sp} label={sp === tb ? `${sp} (touchback)` : String(sp)} active={false} onPress={() => kick(sp)} />)}</View>
+            <SpotPad s={s} onPick={kick} chips={[]} />
+            <View style={c.row}>
+              <Button label={`Onside · ${name(other(rec))} recover`} accessibilityLabel={`Onside kick recovered by the kicking team, ${name(other(rec))}`} variant="ghost" style={c.flex} onPress={() => onside(true)} />
+              <Button label={`Onside · ${name(rec)} recover`} accessibilityLabel={`Onside kick recovered by ${name(rec)}`} variant="ghost" style={c.flex} onPress={() => onside(false)} />
+            </View>
             <Button label="🏈 Returned for a touchdown" variant="ghost" onPress={() => setFlow({ mode: 'td', side: rec, step: 'scorer', how: 'kick', yards: '' })} />
           </View>
         );
@@ -635,7 +740,7 @@ const ScoringControls: SportPlugin<AFState>['ScoringControls'] = ({
           <Button label="✗ Incomplete" accessibilityLabel="Pass incomplete" variant="ghost" style={c.third} onPress={() => incomplete(sd)} />
           <Button label="💥 Sack" variant="ghost" style={c.third} onPress={() => setFlow({ mode: 'sack', side: sd, step: 'who' })} />
           <Button label="🔄 Interception" variant="ghost" style={c.third} onPress={() => setFlow({ mode: 'int', side: sd, step: 'who' })} />
-          <Button label="🏈 Fumble lost" variant="ghost" style={c.third} onPress={() => setFlow({ mode: 'fumble', side: sd, step: 'who' })} />
+          <Button label="🏈 Fumble" accessibilityLabel="Fumble (lost or kept)" variant="ghost" style={c.third} onPress={() => setFlow({ mode: 'fumble', side: sd, step: 'who' })} />
           {!flag ? <Button label="🦶 Punt" variant="ghost" style={c.third} onPress={() => setFlow({ mode: 'punt', side: sd, step: 'who' })} /> : null}
           {!flag ? <Button label="🥅 Field goal" variant="ghost" style={c.third} onPress={() => setFlow({ mode: 'fg', side: sd, step: 'result', yards: String(fgDistance(s, d.spot)) })} /> : null}
           <Button label="🚩 Penalty" variant="ghost" style={c.third} onPress={() => setFlow({ mode: 'penalty', side: sd, step: 'foul' })} />
@@ -643,6 +748,8 @@ const ScoringControls: SportPlugin<AFState>['ScoringControls'] = ({
           {/* US batch 5: a kneel-down, one tap (a 1-yard loss, credited to the last passer as a rush) */}
           <Button label="🧎 Kneel" accessibilityLabel="Kneel-down" variant="ghost" style={c.third} onPress={() => play(sd, { play: 'kneel', yards: -1, p1: lastPasser(s, sd) })} />
         </View>
+        {/* US batch 6: a flag thrown during the next play — the play, then the foul and how it was settled */}
+        <SelectChip label="Flag on the play" accessibilityLabel={flagOn ? 'Flag on the play: on — the next play asks for its penalty' : 'Flag on the play'} active={flagOn} onPress={() => setFlagOn(!flagOn)} />
       </View>
     );
   })() : null;

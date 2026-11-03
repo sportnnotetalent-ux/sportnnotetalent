@@ -290,6 +290,9 @@ export interface BbTeamFigures {
   ast: number; stl: number; blk: number; tov: number;
   pf: number; teamFouls: number; tech: number; unsport: number; fd: number;
   timeouts: number;
+  /** US batch 6: coach / bench technicals (not a player's personal foul) and
+   *  jump balls / held balls that gave this side the ball */
+  benchTech: number; jump: number;
   /** points by how they were scored */
   fromFt: number; fromIn: number; fromArc: number; from3: number;
   zones: Record<ShotZone, ZoneLine>;
@@ -308,7 +311,7 @@ export function bbTeamFigures(s: BasketballState, side: Side, scope: BbScope = '
   const tracked = bbCoverage(s).shots;
   const f: BbTeamFigures = {
     points: 0, fgm: 0, fga: 0, fgx: 0, tpm: 0, tpa: 0, inM: 0, inA: 0, arcM: 0, arcA: 0, ftm: 0, fta: 0,
-    oreb: 0, dreb: 0, reb: 0, teamReb: 0, ast: 0, stl: 0, blk: 0, tov: 0, pf: 0, teamFouls: 0, tech: 0, unsport: 0, fd: 0, timeouts: 0,
+    oreb: 0, dreb: 0, reb: 0, teamReb: 0, ast: 0, stl: 0, blk: 0, tov: 0, pf: 0, teamFouls: 0, tech: 0, unsport: 0, fd: 0, timeouts: 0, benchTech: 0, jump: 0,
     fromFt: 0, fromIn: 0, fromArc: 0, from3: 0, zones: blankZones(), paint: 0, second: 0, fastBreak: 0, offTo: 0, eff: 0,
   };
   for (const e of s.events) {
@@ -348,6 +351,8 @@ export function bbTeamFigures(s: BasketballState, side: Side, scope: BbScope = '
       case 'block': f.blk++; break;
       case 'turnover': f.tov++; break;
       case 'foul':
+        // US batch 6: a coach / bench technical is the coach's, not a personal foul
+        if (e.bench) { f.tech++; f.benchTech++; break; }
         f.pf++;
         if (e.tov) f.tov++; // US batch 1: a new offensive foul is a turnover too
         if (countsAsTeamFoul(s, e)) f.teamFouls++;
@@ -355,6 +360,7 @@ export function bbTeamFigures(s: BasketballState, side: Side, scope: BbScope = '
         if (e.foulType === 'unsportsmanlike' || e.foulType === 'disqualifying' || e.foulType === 'flagrant') f.unsport++;
         break;
       case 'timeout': f.timeouts++; break;
+      case 'jump': f.jump++; break;
       default: break;
     }
   }

@@ -18,11 +18,11 @@ import { MatchBoxScore } from '../../components/BoxScore';
 import { basketballBox } from '../boxSources';
 import { basketballStatTotals, shotsTracked } from './totals';
 import { isFieldGoal } from './credits';
-import { blockAction, ejectAction, foulAction, freeThrowAction, lineupAction, missAction, reboundAction, removeAction, scoreAction, statAction, stealAction, subAction, teamReboundAction, turnoverAction, type StatPlay } from './actions';
+import { blockAction, ejectAction, foulAction, freeThrowAction, jumpBallAction, lineupAction, missAction, reboundAction, removeAction, scoreAction, statAction, stealAction, subAction, teamReboundAction, turnoverAction, type StatPlay } from './actions';
 import { hasPlayer, onPlayerOf, playId, playerOf } from './names';
 import { useMask } from '../../core/disputeMask';
 import { withRosters } from '../racketNames';
-import { BB_META, DQ_LABEL, FOUL_LABEL, TO_LABEL, pointsOf, zoneBehindArc, type BBEvent, type DqReason, type FoulType, type ReboundType, type ShotZone, type TurnoverType } from './events';
+import { BB_META, DQ_LABEL, FOUL_LABEL, TO_LABEL, pointsOf, zoneBehindArc, type BBEvent, type BenchTech, type DqReason, type FoulType, type ReboundType, type ShotZone, type TurnoverType } from './events';
 import { PlayFeed } from '../PlayFeed';
 import { CategoryStatsPanel } from '../CategoryStatsPanel';
 import { basketballFeed } from './commentary';
@@ -40,7 +40,7 @@ import { BackfillBar, RowAction, confirmRemove } from '../TimelineControls';
 import {
   type BasketballState, init, reducer, periodLabel, currentMinute,
   isFouledOut, isPlayerOut, isEjected, inBonus, timeoutStatus, onCourtRefs, courtSet, teamFoulsThisQuarter,
-  disqualifyingFoul, freeThrowsFor,
+  disqualifyingFoul, freeThrowsFor, arrowSide, coachTechnicals, coachDisqualified,
   gameSec, clockLeft, clockRunning, timedPeriod, timeUp, clockText, possessionAfterFoul, ballAfterFoul,
   BB_TRACK_DEFAULTS, scoringLayout,
 } from "./engine";
@@ -278,7 +278,14 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
   // team-foul limit opens the bonus 2 (B8). A D foul, or a 2nd T / 2nd U / T + U,
   // disqualifies (B12): asked first in the ConfirmSheet, then logged + ejected.
   // MVP B7: `fouler` null = a team foul (no player): it counts toward the team-foul limit; no one is ejected.
-  const recordFoul = async (side: 'home' | 'away', fouler: Player | null, type: FoulType, drawnBy?: Player | null) => {
+  // US batch 6: `bench` = a coach (C) / bench (B) technical (no player; 1 free throw; not a team foul)
+  const recordFoul = async (side: 'home' | 'away', fouler: Player | null, type: FoulType, drawnBy?: Player | null, bench?: BenchTech) => {
+    if (bench && !fouler && type === 'technical') {
+      // US batch 6: the coach's technical — one free throw for the other side, then their ball as before
+      fire(foulAction(side, null, 'technical', { bench }));
+      setFlow({ kind: 'ft', side: opp(side), remaining: 1, total: 1, reason: `${bench === 'C' ? 'Coach' : 'Bench'} technical on ${teamOf(side)} — 1 free throw for ${teamOf(opp(side))}` });
+      return;
+    }
     const dq = fouler ? disqualifyingFoul(state, fouler.fullName, type, { side, pid: fouler.id }) : null;
     if (dq && fouler && !(await confirmMatchAction('eject', {
       what: fouler.fullName,
@@ -398,6 +405,12 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
                 {TEAM_FOUL_TYPES.map((t) => (
                   <SelectChip key={t} label={FOUL_LABEL[t]} active={false} onPress={() => void recordFoul(flow.side, null, t, null)} />
                 ))}
+              </View>
+              {/* US batch 6 (FIBA Art. 36.3): technicals charged to the head coach — 1 free throw, not a team foul */}
+              <Text style={ctrl.meta}>Coach / bench technical (charged to the head coach{(() => { const ct = coachTechnicals(state, flow.side); return ct.c + ct.b ? ` · so far C ${ct.c} · B ${ct.b}` : ''; })()}):</Text>
+              <View style={ctrl.chips}>
+                <SelectChip label="Coach tech (C)" accessibilityLabel={`Coach technical, ${nm}`} active={false} onPress={() => void recordFoul(flow.side, null, 'technical', null, 'C')} />
+                <SelectChip label="Bench tech (B)" accessibilityLabel={`Bench technical, ${nm}`} active={false} onPress={() => void recordFoul(flow.side, null, 'technical', null, 'B')} />
               </View>
             </>
           ) : !flow.fouler ? (
@@ -848,6 +861,28 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
         <Button label={`🎯 Free throws — ${homeName}`} variant="home" style={ctrl.flex} onPress={() => setFlow({ kind: 'ft', side: 'home' })} />
         <Button label={`🎯 Free throws — ${awayName}`} variant="away" style={ctrl.flex} onPress={() => setFlow({ kind: 'ft', side: 'away' })} />
       </View>
+      {/* US batch 6: jump ball / held ball — the opening tip, then the arrow (FIBA) or a jump (NBA) */}
+      {(() => {
+        const arrow = arrowSide(state);
+        const tipped = state.events.some((e) => e.type === 'jump');
+        if (state.possArrow === true && tipped && arrow) {
+          return (
+            <View style={ctrl.chips} accessibilityLabel="Held ball and the possession arrow">
+              <Text style={ctrl.meta}>Possession arrow → {teamOf(arrow)}</Text>
+              <SelectChip label={`Held ball → ${teamOf(arrow)}`} accessibilityLabel={`Held ball: ${teamOf(arrow)} ball by the arrow`} active={false} onPress={() => fire(jumpBallAction(arrow, true))} />
+            </View>
+          );
+        }
+        return (
+          <View style={ctrl.chips} accessibilityLabel={tipped ? 'Held ball: who won the jump' : 'Opening tip: who won it'}>
+            <Text style={ctrl.meta}>{tipped ? 'Held ball — jump won by:' : 'Jump ball (tip-off) won by:'}</Text>
+            {(['home', 'away'] as const).map((sd) => (
+              <SelectChip key={sd} label={teamOf(sd)} active={false} onPress={() => fire(jumpBallAction(sd, tipped))} />
+            ))}
+          </View>
+        );
+      })()}
+      {(['home', 'away'] as const).map((sd) => { const dq = coachDisqualified(state, sd); return dq ? <Text key={`cdq-${sd}`} style={ctrl.fouledOut}>Coach disqualified — {teamOf(sd)} ({dq === '2C' ? '2 coach technicals' : '3 bench / coach technicals'})</Text> : null; })}
       {/* MVP B7: a foul with no player (pickup games, no roster) — team fouls and the bonus still work */}
       <View style={ctrl.row}>
         <Button label={`🟨 Team foul — ${homeName}`} variant="ghost" style={ctrl.flex} onPress={() => setFlow({ kind: 'foul', side: 'home', team: true })} />

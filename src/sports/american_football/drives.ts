@@ -133,7 +133,11 @@ export function afDrives(s: AFState): DriveLog {
   for (const { e } of gameOrder(s)) {
     const hk = halfKey(s, e.period);
     if (cur && cur.hk !== hk) close('half');
-    const play = e.type === 'play' ? e.play ?? 'run' : undefined;
+    // US batch 6: a play wiped out by a penalty reads as a penalty; a fumble the offence kept as a run
+    const play = e.type === 'play' ? (e.nul ? 'penalty' : e.play === 'fumble' && e.kept ? 'run' : e.play ?? 'run') : undefined;
+    const pen = e.type === 'play' && e.pen && (e.pen.enf === 'prev' || e.pen.enf === 'end') ? e.pen : undefined;
+    const penMove = (sp: number): number => (!pen ? sp : pen.on === e.side
+      ? Math.max(1, sp - Math.min(pen.yards, Math.floor(sp / 2))) : Math.min(field - 1, sp + Math.min(pen.yards, Math.floor((field - sp) / 2))));
     const snap = e.type === 'play' && !!e.pre && SNAPS.has(play!);
     const scrimTd = e.type === 'td' && !!e.pre && (e.off ?? e.side) === e.side && (e.how === 'run' || e.how === 'pass' || e.how === 'other');
     const fgTry = e.type === 'fg' && (!!e.pre || (cur !== null && cur.off === e.side));
@@ -166,9 +170,10 @@ export function afDrives(s: AFState): DriveLog {
         d.end = spot;
         close(e.good ? 'fg' : 'fgMissed');
       } else {
-        if (PLAYS.has(play!)) d.plays++;
+        if (PLAYS.has(play!) && !e.nul) d.plays++;
         if (e.first) d.firstDowns++;
-        if (play === 'run' || play === 'pass' || play === 'sack' || play === 'kneel') spot = clamp(spot + y);
+        if (e.nul) spot = penMove(spot);
+        else if (play === 'run' || play === 'pass' || play === 'sack' || play === 'kneel') spot = penMove(clamp(spot + y));
         else if (play === 'penalty') {
           const yds = Math.abs(y);
           spot = e.on === e.side ? Math.max(1, spot - Math.min(yds, Math.floor(spot / 2))) : Math.min(field - 1, spot + Math.min(yds, Math.floor((field - spot) / 2)));
@@ -200,7 +205,7 @@ export function afDrives(s: AFState): DriveLog {
         prev.returnTd = true;
         tdDrive = prev;
       }
-    } else if (cur && (e.type === 'tackle' || e.type === 'pd' || e.type === 'timeout')) {
+    } else if (cur && (e.type === 'tackle' || e.type === 'pd' || e.type === 'ff' || e.type === 'timeout')) {
       driveOf.set(e.id, cur.n - 1);
     }
     if (POSSESSION.has(e.type)) lastPoss = e;

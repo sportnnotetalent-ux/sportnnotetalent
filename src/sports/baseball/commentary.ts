@@ -15,7 +15,7 @@
  * changes nothing (the outcome already says it), so older games read the same.
  */
 import {
-  HITS, halfLong, inningOf, isTop, battingSide, lastInning, withAnn, zoneOf, PITCH_TYPE_LABEL,
+  HITS, halfLong, inningOf, isTop, battingSide, lastInning, withAnn, zoneOf, PITCH_TYPE_LABEL, D3_WORDS,
   type Ann, type BaseballEvent, type BaseballState, type BattedBall, type Move, type Side, type Zone,
 } from './engine.ts';
 import { andList, groupLines, newestFirst, nth, plural, scoreText, type FeedGroup, type FeedLine } from '../feedGroups.ts';
@@ -66,7 +66,7 @@ export function runnerText(moves: Move[], runs: number, opts: { batter?: boolean
 }
 
 /** the base a batter reaches on the outcome by itself */
-const NATURAL: Partial<Record<string, number>> = { '1B': 1, '2B': 2, '3B': 3, HR: 4, BB: 1, IBB: 1, HBP: 1, E: 1, FC: 1 };
+const NATURAL: Partial<Record<string, number>> = { '1B': 1, '2B': 2, '3B': 3, HR: 4, BB: 1, IBB: 1, HBP: 1, E: 1, FC: 1, CI: 1 };
 
 /** One plate appearance as a sentence (no runner moves). */
 export function paSentence(s: BaseballState, e: BaseballEvent, a?: Ann): string {
@@ -87,7 +87,10 @@ export function paSentence(s: BaseballState, e: BaseballEvent, a?: Ann): string 
     case 'BB': return `${b} walks${count}.`;
     case 'IBB': return `${b} is intentionally walked.`;
     case 'HBP': return `${b} is hit by ${e.ptype ? `a ${PITCH_TYPE_LABEL[e.ptype].toLowerCase()}` : 'a pitch'}.`;
-    case 'K': return `${b} strikes out ${e.pitch === 'called' ? 'looking' : e.pitch === 'foul' ? 'on a two-strike foul' : 'swinging'}${onPitch(e)}${count}.`;
+    case 'K': return `${b} strikes out ${e.pitch === 'called' ? 'looking' : e.pitch === 'foul' ? 'on a two-strike foul' : 'swinging'}${onPitch(e)}${count}${e.d3 ? ` but reaches first on ${D3_WORDS[e.d3]} (dropped third strike)` : ''}.`;
+    // US batch 6
+    case 'CI': return `${b} reaches on catcher's interference (E2).`;
+    case 'TP': return `${b} ${e.btype ? AIR_VERB[e.btype] : 'grounds'} into a triple play${ns.length >= 2 ? `, ${chainText(ns)}` : dirOf(e)}${f}!`;
     case 'GO':
       if (ns.length >= 2) return `${b} grounds out, ${chainText(ns)}${f}.`;
       if (ns.length === 1) return `${b} grounds out to ${TO_WORD[ns[0]]}, unassisted${f}.`;
@@ -129,7 +132,7 @@ export function runnerSentence(e: BaseballEvent, runs: number): string {
 
 type Entry = { half: number; line: FeedLine };
 
-const ICON: Partial<Record<string, string>> = { '1B': '⚾', '2B': '⚾', '3B': '⚾', HR: '💥', BB: '🚶', IBB: '🚶', HBP: '🤕', K: 'K', E: '⚠️', DP: '✌️' };
+const ICON: Partial<Record<string, string>> = { '1B': '⚾', '2B': '⚾', '3B': '⚾', HR: '💥', BB: '🚶', IBB: '🚶', HBP: '🤕', K: 'K', E: '⚠️', DP: '✌️', CI: '⚠️', TP: '✌️' };
 
 /** "Owls 2, Hawks 1" — visitors first, as a line score reads. */
 const scoreWords = (names: Names, sc: { home: number; away: number }) => `${names.away} ${sc.away}, ${names.home} ${sc.home}`;
