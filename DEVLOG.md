@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-03 — Release: Batch 5 (depth across all sports) live (web, Android OTA)
+
+auth-smoke passed. Published from a clean worktree at bd068dc: web (entry `index-331c36f4`, confirmed live on app.sportnnote.in) and Android OTA groups `82d2ad75` (preview) and `b6ad19a3` (production), runtime 1.0.0.
+
 ### 2026-11-03 — Batch 5: captured-but-hidden stats, and each sport's P1 depth
 
 Seven sport-family branches (each with its break-it list, tests, simulation), merged here:
