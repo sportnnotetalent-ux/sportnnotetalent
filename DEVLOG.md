@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-03 — Release: screen-sweep fixes live (web, Android OTA)
+
+auth-smoke passed. Published from a clean worktree at 81ec36e: web (entry `index-ff3ea8e1`, confirmed live on app.sportnnote.in) and Android OTA groups `b0d900ca` (preview) and `5b2c9d46` (production), runtime 1.0.0.
+
 ### 2026-11-03 — Screen sweep of the Batch 1–6 controls, and its fixes
 
 One QA agent drove the offline demo at 375 px through 22 sport groups (report only): most new controls pass. Fixed (each with a break-it list, failing tests, simulation; no reducer changes, old logs identical):
