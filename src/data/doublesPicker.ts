@@ -26,6 +26,19 @@ export function sidesForStructure<T extends Entry>(teams: readonly T[], structur
   return teams.filter(structure === 'pair' ? isPair : isSingle);
 }
 
+/** One entry per person (singles) or per pair, in any order (founder
+ *  2026-11-04: one player, several one-person entries pointing at him, listed
+ *  three times). The first of the duplicates stays; a side already picked for
+ *  this match (`keep`) always stays; an entry with no roster is left as it is. */
+export function onePerEntrant<T extends Entry>(list: readonly T[], keep: readonly (string | null | undefined)[] = []): T[] {
+  const keyOf = (t: T) => (t.roster && t.roster.length ? [...t.roster].sort().join('|') : null);
+  const kept = new Set(keep.filter((x): x is string => !!x));
+  const claimed = new Map<string, string>();
+  for (const t of list) { const k = keyOf(t); if (k && kept.has(t.id)) claimed.set(k, t.id); }
+  for (const t of list) { const k = keyOf(t); if (k && !claimed.has(k)) claimed.set(k, t.id); }
+  return list.filter((t) => { const k = keyOf(t); return !k || claimed.get(k) === t.id; });
+}
+
 const queryOf = (q: string) => q.trim().toLowerCase();
 
 /** Search kicks in at 3+ letters; a plain substring match (no regex). */

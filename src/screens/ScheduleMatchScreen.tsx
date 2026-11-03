@@ -26,7 +26,7 @@ import { LAST_SPORT_KEY, quickSideName, quickSideShort, startSport, isQuickPlace
 import { getMyPersonalisation } from '../data/personalise';
 import { structureLabels } from '../sports/structureLabels';
 import { useTeams, useMatches, usePlayers, useTournamentById, useTournamentCategories, useTournamentEntries } from '../data/hooks';
-import { sidesForStructure, recentPairs, searchSides, searchPeople } from '../data/doublesPicker';
+import { onePerEntrant, sidesForStructure, recentPairs, searchSides, searchPeople } from '../data/doublesPicker';
 import { settlePairType, pairTypeFromDivisions } from '../sports/pairType';
 import { venueOptions } from '../data/tournamentForm';
 import { findScheduleConflicts, knownVenueNames } from '../data/scheduleConflicts';
@@ -189,8 +189,9 @@ export default function ScheduleMatchScreen() {
   const pickTeams = useMemo(() => teams.filter((t) => !isQuickPlaceholder(t) || t.id === home || t.id === away), [teams, home, away]);
   // doubles-picker DP1/DP2: a singles side picks only one-person entries, a
   // doubles side only real pairs (two different people) — never one for the other.
-  const singleTeams = useMemo(() => sidesForStructure(pickTeams, 'single'), [pickTeams]);
-  const pairTeams = useMemo(() => sidesForStructure(pickTeams, 'pair'), [pickTeams]);
+  // each person / pair once, whatever duplicate entries point at them (founder 2026-11-04)
+  const singleTeams = useMemo(() => onePerEntrant(sidesForStructure(pickTeams, 'single'), [home, away]), [pickTeams, home, away]);
+  const pairTeams = useMemo(() => onePerEntrant(sidesForStructure(pickTeams, 'pair'), [home, away]), [pickTeams, home, away]);
   // DP6: my player id, for the recent pairs I played in or hosted
   const [myPid, setMyPid] = useState<string | null>(null);
   useEffect(() => {
@@ -261,8 +262,11 @@ export default function ScheduleMatchScreen() {
   // pair reuses their existing entry in this sport; a name-only spot (the marked
   // last resort) becomes a provisional player. Individuals and pairs ride on the
   // ad-hoc-team plumbing — the UI just calls them a "player" or "pair".
+  // a second tap while an entry is being made does nothing (two entries for one person)
+  const entrantBusy = useRef(false);
   const makeEntrantHandler = (side: 'home' | 'away') => async (slots: EntrantSlot[]): Promise<boolean> => {
-    if (!sport) return false;
+    if (!sport || entrantBusy.current) return false;
+    entrantBusy.current = true;
     try {
       const entry = await sideForEntrants(slots, { sport, teams, colorHex: TEAM_PALETTE[teams.length % TEAM_PALETTE.length], adhoc: true });
       if (entry.created) setTeamNonce((n) => n + 1); // refetch so it shows in both pickers
@@ -271,6 +275,8 @@ export default function ScheduleMatchScreen() {
     } catch {
       setError(slots.length > 1 ? 'Could not create the pair.' : 'Could not add that player.');
       return false;
+    } finally {
+      entrantBusy.current = false;
     }
   };
 
