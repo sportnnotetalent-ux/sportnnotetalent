@@ -31,7 +31,7 @@ import type { Player } from '../core/types';
 import type { FormatField, ScoreAction, SportPlugin } from './types';
 import { courtFormation, makeCourt } from './courts';
 import { pointVoice } from './voiceParsers';
-import { ttServer, ttServeHint } from './tabletennis/serve';
+import { ttServer, ttServerOf, ttServeHint, ttExpediteOn } from './tabletennis/serve';
 import { rallyCueOf } from './courtCues';
 import { CueBanner } from './CueBanner';
 import { rallyTotals } from './racketTotals';
@@ -256,9 +256,8 @@ export function makeRallyPlugin(opts: RallyOpts): SportPlugin<RallyState> {
     // to the rally winner, so show who's serving (the last rally winner, or the
     // opening server before the first point). Doubles names the side; singles the
     // player. No service-court shown here — that rule differs by sport.
-    const serverSide: 'home' | 'away' = opts.serveRule === 'tt'
-      ? ttServer(s.current.home, s.current.away, s.games.length, s.opening ?? 'home', s.target)
-      : rallyServingSide(s);
+    // racket-batch6 R6-10 — ttServerOf: the ITTF order, expedite included
+    const serverSide: 'home' | 'away' = opts.serveRule === 'tt' ? ttServerOf(s) : rallyServingSide(s);
     const serverSideName = serverSide === 'home' ? homeName : awayName;
     const serverName = spot
       ? `${positionedServer?.fullName ?? serverSideName} (${spot.court}) · ${spot.call}`
@@ -300,7 +299,7 @@ export function makeRallyPlugin(opts: RallyOpts): SportPlugin<RallyState> {
             {ttDbl.switched ? <Text style={ctrl.meta}>Deciding game: the receivers switched order at {Math.floor(s.target / 2)}.</Text> : null}
           </View>
         ) : !blocked && <Text style={ctrl.serve}>{opts.icon} Serving: {serverName}{s.doubles && serverName !== serverSideName ? `  ·  ${serverSideName}` : ''}</Text>}
-        {!blocked && isTT && !s.ended && <Text style={ctrl.meta}>{ttServeHint(s.current.home, s.current.away, s.target)}</Text>}
+        {!blocked && isTT && !s.ended && <Text style={ctrl.meta}>{ttServeHint(s.current.home, s.current.away, s.target, ttExpediteOn(s))}</Text>}
         {startPicker}
         {ttPicker}
         {letRow}
@@ -340,9 +339,7 @@ export function makeRallyPlugin(opts: RallyOpts): SportPlugin<RallyState> {
    *  ITTF rotation, side-out by who holds serve, else the last rally winner). */
   const Scoreboard: SportPlugin<RallyState>['Scoreboard'] = ({ state, homeName, awayName, homeColor, awayColor, live, closed }) => {
     const s = state as RallyState;
-    const serving: 'home' | 'away' = s.sideOut ? s.serving : opts.serveRule === 'tt'
-      ? ttServer(s.current.home, s.current.away, s.games.length, s.opening ?? 'home', s.target)
-      : rallyServingSide(s);
+    const serving: 'home' | 'away' = s.sideOut ? s.serving : opts.serveRule === 'tt' ? ttServerOf(s) : rallyServingSide(s);
     return (
       <SetLineBoard
         ls={rallyLineScore(s)} homeName={homeName} awayName={awayName} homeColor={homeColor} awayColor={awayColor} live={live} closed={closed}

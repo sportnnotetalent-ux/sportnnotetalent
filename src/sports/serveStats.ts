@@ -41,7 +41,7 @@
 import type { ScoreAction } from './types';
 import { pointInputs, type PointInput } from './rallyEdit.ts';
 import { makeRallyEngine, rallyDoublesStarter, rallyInputs, startPair, type RallyState } from './rallyEngine.ts';
-import { ttServer } from './tabletennis/serve.ts';
+import { ttExpediteOf, ttServerOf } from './tabletennis/serve.ts';
 import * as tennis from './tennis/engine.ts';
 import * as padel from './padel/engine.ts';
 import * as badminton from './badminton/engine.ts';
@@ -275,14 +275,16 @@ function rallyAdapter(sport: 'tabletennis' | 'squash' | 'pickleball'): Adapter {
     family: 'game',
     clear: (s) => {
       const x = s as RallyState;
-      return { ...x, current: { home: 0, away: 0 }, games: [], gamesWon: { home: 0, away: 0 }, serving: x.opening ?? 'home', serverNo: 2, srvStarter: true, events: [], seq: 0, ended: false };
+      // racket-batch6 R6-10 — the replay keeps no markers: carry the log's TT expedite
+      const ttExp = sport === 'tabletennis' ? { ttExp: x.ttExp !== undefined ? x.ttExp : ttExpediteOf(x.events, x.opening ?? 'home', x.target) } : {};
+      return { ...x, current: { home: 0, away: 0 }, games: [], gamesWon: { home: 0, away: 0 }, serving: x.opening ?? 'home', serverNo: 2, srvStarter: true, events: [], seq: 0, ended: false, ...ttExp };
     },
     inputs: (s) => rallyInputs(s.events ?? []),
     reduce: (s, a) => RALLY.reducer(s as RallyState, a),
     server: (s, w, rosters, gamePts) => {
       const x = s as RallyState;
       const side: Side = x.sideOut ? x.serving
-        : sport === 'tabletennis' ? ttServer(x.current.home, x.current.away, x.games.length, x.opening ?? 'home', x.target)
+        : sport === 'tabletennis' ? ttServerOf(x)
         : w ?? x.serving;
       const roster = rosters[side] ?? [];
       let id: string | undefined;

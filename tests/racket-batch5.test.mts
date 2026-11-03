@@ -251,7 +251,7 @@ describe('RB9: fault-type labels', () => {
     assert.equal(errTypeOf('badminton', { how: 'sf', stroke: 'fault' }), 'fault');
     assert.equal(pdText({ how: 'sf', stroke: 'balk' }, true, 'badminton'), 'Service fault (missed / balk / delay)');
     // the unforced error "fault" is unchanged (C8)
-    assert.deepEqual(howDef('badminton', 'ue')!.strokes, ['net', 'out', 'fault']);
+    assert.deepEqual(howDef('badminton', 'ue')!.strokes, ['net', 'out', 'fault', 'long', 'wide']); // racket-batch6 R6-1
     assert.ok(statDefIn(STAT_SCHEMAS.badminton as never, 'sfBalk'));
   });
   test('squash: below the service line / short line / side wall first; old "short" kept', () => {

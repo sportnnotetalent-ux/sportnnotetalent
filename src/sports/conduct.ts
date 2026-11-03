@@ -24,6 +24,10 @@
  *   TIMEOUT  {side, payload {t: 'timeout' | 'medical' | 'toilet', playerId?}} (older: + playerName)
  *     a marker; the sport's allowance is enforced (a timeout over it is ignored)
  *   LET      {side?} — squash: the rally is replayed, no point (WSF Rule 8)
+ *   SHUTTLE  {side?} — badminton: the shuttle changed (racket-batch6), a marker
+ *   INJURY   {side = the injured, payload {cat, playerId?}} — squash injury
+ *            category (WSF Rule 14, racket-batch6), a marker
+ *   (EXPEDITE, table tennis, is a marker the rally engine adds: it needs the score)
  *
  * Escalation (`suggestLevel`) follows each body's schedule:
  *   tennis    ITF Point Penalty Schedule — warning → point → game (3rd and
@@ -259,13 +263,26 @@ export interface ConductOps<S> {
 
 type Base = { events: LiveEvent[]; seq: number; ended: boolean };
 
-const MARK_KINDS = new Set(['conduct', 'timeout', 'let', 'review']);
+const MARK_KINDS = new Set(['conduct', 'timeout', 'let', 'review', 'shuttle', 'injury', 'expedite']);
 /** racket-batch5 RB12 — the sports a Let marker is recorded in (squash: its
  *  Let buttons; table tennis / badminton: Quick options). */
 export const LET_SPORTS: readonly RacketSport[] = ['squash', 'tabletennis', 'badminton'];
 /** racket-batch5 RB14 — PSA video review (squash): one per player per game,
  *  kept when upheld. */
 export const REVIEWS_PER_GAME = 1;
+/** racket-batch6 R6-5 — squash injury categories (WSF Rules of Singles
+ *  Squash, Rule 14 / PSA): who caused it decides the recovery time and what
+ *  happens if the injured player can't go on. */
+export type InjuryCat = 'self' | 'contributed' | 'opponent';
+export const INJURY_RULES: { rule: string; cats: Record<InjuryCat, { label: string; time: string; note: string }> } = {
+  rule: 'WSF Rules of Singles Squash, Rule 14 (injury)',
+  cats: {
+    self: { label: 'Self-inflicted', time: '3 minutes', note: 'then play on or concede the game' },
+    contributed: { label: 'Contributed', time: '15 minutes', note: 'both players contributed (e.g. an accidental collision)' },
+    opponent: { label: 'Opponent-inflicted', time: '15 minutes', note: 'if the injured player cannot go on, the match is theirs' },
+  },
+};
+const isInjuryCat = (v: unknown): v is InjuryCat => v === 'self' || v === 'contributed' || v === 'opponent';
 /** A timeline record with no score effect that a correction must keep. */
 export const isMark = (e: LiveEvent): boolean => !!e.kind && MARK_KINDS.has(e.kind);
 
@@ -370,6 +387,23 @@ export function applyRacketExtras<S extends Base>(s: S, a: ScoreAction, ops: Con
     const playerId = typeof a.payload?.playerId === 'string' && a.payload.playerId && a.payload.playerId.length <= 64 ? a.payload.playerId : undefined;
     return push(s, { ...w, icon: '📺', label: `Video review · ${upheld ? 'upheld' : 'not upheld'}`, side, kind: 'review', rev: upheld ? 'upheld' : 'rejected', ...(playerId ? { playerId } : {}) });
   }
+  if (a.type === 'SHUTTLE') {
+    // racket-batch6 R6-3 — badminton: the shuttle changed (BWF Law 16.2.1:
+    // only with the umpire's consent); a marker, optional who asked
+    if (s.ended || ops.sport !== 'badminton') return s;
+    const side = a.side === 'home' || a.side === 'away' ? a.side : undefined;
+    return push(s, { ...ops.where(s), icon: '🏸', label: 'Shuttle change', detail: 'with the umpire’s consent · no point', ...(side ? { side } : {}), kind: 'shuttle' });
+  }
+  if (a.type === 'INJURY') {
+    // racket-batch6 R6-5 — squash: an injury break by category (WSF Rule 14);
+    // `side` = the injured player's side; a marker, no score
+    const side = a.side;
+    const cat = a.payload?.cat;
+    if (s.ended || ops.sport !== 'squash' || (side !== 'home' && side !== 'away') || !isInjuryCat(cat)) return s;
+    const c = INJURY_RULES.cats[cat];
+    const playerId = typeof a.payload?.playerId === 'string' && a.payload.playerId && a.payload.playerId.length <= 64 ? a.payload.playerId : undefined;
+    return push(s, { ...ops.where(s), icon: '🩹', label: `Injury · ${c.label.toLowerCase()}`, detail: `up to ${c.time} · ${c.note}`, side, kind: 'injury', inj: cat, ...(playerId ? { playerId } : {}) });
+  }
   return null;
 }
 
@@ -408,8 +442,11 @@ const CONDUCT_ROW_LABEL: Record<RacketSport, string> = {
 export function conductRows(sport: RacketSport, events: LiveEvent[] | null | undefined, scope: 'all' | number = 'all'): MarkRow[] {
   const isSide = (x: unknown): x is Side => x === 'home' || x === 'away';
   const z = () => ({ home: 0, away: 0 });
-  const c = { cv: z(), warn: z(), tv: z(), pen: z(), tmo: z(), med: z(), toilet: z(), lets: z(), rev: z(), up: z() };
+  const c = { cv: z(), warn: z(), tv: z(), pen: z(), tmo: z(), med: z(), toilet: z(), lets: z(), rev: z(), up: z(), shuttle: z() };
+  const inj: Record<InjuryCat, { home: number; away: number }> = { self: z(), contributed: z(), opponent: z() };
   let letsAll = 0;
+  let shuttleAll = 0;
+  let expGame: number | null = null;
   for (const e of events ?? []) {
     if (!e || typeof e !== 'object') continue;
     if (scope !== 'all' && (e.game ?? e.set) !== scope) continue;
@@ -433,6 +470,14 @@ export function conductRows(sport: RacketSport, events: LiveEvent[] | null | und
     } else if (e.kind === 'review' && isSide(e.side) && (e.rev === 'upheld' || e.rev === 'rejected')) {
       c.rev[e.side] += 1;
       if (e.rev === 'upheld') c.up[e.side] += 1;
+    } else if (e.kind === 'shuttle' && sport === 'badminton') {
+      // racket-batch6 R6-4
+      shuttleAll += 1;
+      if (isSide(e.side)) c.shuttle[e.side] += 1;
+    } else if (e.kind === 'injury' && isSide(e.side) && isInjuryCat(e.inj)) {
+      inj[e.inj][e.side] += 1; // R6-6
+    } else if (e.kind === 'expedite' && sport === 'tabletennis' && expGame == null) {
+      expGame = typeof e.game === 'number' && e.game > 0 ? e.game : 1; // R6-13
     }
   }
   const rows: MarkRow[] = [];
@@ -455,6 +500,15 @@ export function conductRows(sport: RacketSport, events: LiveEvent[] | null | und
     const t = (x: Side) => (c.rev[x] ? `${c.rev[x]} (${c.up[x]} upheld)` : '0');
     rows.push({ key: 'rev', label: 'Video reviews', home: t('home'), away: t('away'), hv: c.rev.home, av: c.rev.away });
   }
+  // racket-batch6 — shuttle changes (who asked), injuries by category, expedite
+  if (shuttleAll) {
+    const none = shuttleAll - c.shuttle.home - c.shuttle.away;
+    rows.push({ key: 'shuttle', label: none ? `Shuttle changes (${shuttleAll} in all${none === shuttleAll ? '' : ` · ${none} not named`})` : 'Shuttle changes', home: String(c.shuttle.home), away: String(c.shuttle.away), hv: c.shuttle.home, av: c.shuttle.away });
+  }
+  count('injSelf', 'Injuries · self-inflicted', inj.self);
+  count('injContributed', 'Injuries · contributed', inj.contributed);
+  count('injOpponent', 'Injuries · opponent-inflicted', inj.opponent);
+  if (expGame != null) rows.push({ key: 'exp', label: 'Expedite system', home: `from game ${expGame}`, away: `from game ${expGame}`, hv: 0, av: 0 });
   return rows;
 }
 
@@ -509,7 +563,7 @@ export const withStamps = <S extends Base>(core: (s: S, a: ScoreAction) => S) =>
 
 /** The scorer clock on a racket action (the controls add it). */
 export const stamped = (a: ScoreAction, now = Date.now()): ScoreAction => ({ ...a, payload: { ...(a.payload ?? {}), at: now } });
-const STAMPED = new Set(['POINT', 'ACE', 'CONDUCT', 'TIMEOUT', 'LET', 'REVIEW']);
+const STAMPED = new Set(['POINT', 'ACE', 'CONDUCT', 'TIMEOUT', 'LET', 'REVIEW', 'SHUTTLE', 'INJURY', 'EXPEDITE']);
 /** A dispatch that stamps the scoring steps (POINT / ACE / CONDUCT / TIMEOUT / LET). */
 export const stampDispatch = (dispatch: (a: ScoreAction) => void) => (a: ScoreAction) => dispatch(STAMPED.has(a.type) && a.payload?.at == null ? stamped(a) : a);
 

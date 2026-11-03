@@ -23,15 +23,17 @@ import type { LiveEvent } from './liveEvents';
 import type { QuickOptionsProps } from './types';
 import { conductAction, timeoutAction } from './racketActions';
 import {
-  CONDUCT_RULES, TIME_SPORTS, TIME_VIOLATION, TIMEOUT_ICON, TIMEOUT_LABEL, TIMEOUT_RULES,
+  CONDUCT_RULES, INJURY_RULES, TIME_SPORTS, TIME_VIOLATION, TIMEOUT_ICON, TIMEOUT_LABEL, TIMEOUT_RULES,
   conductCount, conductLabel, levelDef, reviewsLeft, suggestLevel, suggestionText, timeRule, timeoutsLeft,
-  type ConductLevel, type ConductTrack, type RacketSport, type TimeoutKind,
+  type ConductLevel, type ConductTrack, type InjuryCat, type RacketSport, type TimeoutKind,
 } from './conduct';
+import { ttExpediteAllowed } from './tabletennis/serve';
 
 /** racket-batch5 RB12 — the sports whose Let marker is a Quick options tile
  *  (squash has its Let buttons beside the point buttons). */
 export const LET_TILE_SPORTS: readonly RacketSport[] = ['tabletennis', 'badminton'];
-type Extra = 'let' | 'review';
+// racket-batch6 — + badminton shuttle change, squash injury, table tennis expedite
+type Extra = 'let' | 'review' | 'shuttle' | 'injury' | 'expedite';
 
 type Side = 'home' | 'away';
 const opp = (s: Side): Side => (s === 'home' ? 'away' : 'home');
@@ -55,12 +57,14 @@ export function makeRacketQuickOptions(sport: RacketSport, h: RacketQuickHelpers
     const [player, setPlayer] = useState<Player | null>(null);
     const [level, setLevel] = useState<ConductLevel | null>(null);
     const [reason, setReason] = useState<string | null>(null);
+    const [cat, setCat] = useState<InjuryCat | null>(null);
+    const [inRally, setInRally] = useState(false);
     if (s.ended) return null;
 
     const nameOf = (x: Side) => (x === 'home' ? homeName : awayName);
     const rosterOf = (x: Side) => (x === 'home' ? homeRoster : awayRoster);
     const toggle = (k: ConductTrack | TimeoutKind | Extra) => {
-      setSide(null); setPlayer(null); setLevel(null); setReason(null);
+      setSide(null); setPlayer(null); setLevel(null); setReason(null); setCat(null); setInRally(false);
       setOpen((o) => (o === k ? null : k));
     };
     const pickSide = (x: Side) => {
@@ -208,12 +212,66 @@ export function makeRacketQuickOptions(sport: RacketSport, h: RacketQuickHelpers
       );
     };
 
+    // ------------------- racket-batch6 · shuttle, injury, expedite --
+    const shuttlePanel = () => (
+      <View style={st.panel}>
+        <Text style={textStyles.muted}>BWF Law 16.2.1: the shuttle is changed only with the umpire’s consent. No point. Who asked (optional)?</Text>
+        {sideChips}
+        <Button label="🏸 Record a shuttle change" onPress={() => { dispatch({ type: 'SHUTTLE', ...(side ? { side } : {}) }); onDone(`🏸 Shuttle change${side ? ` · ${nameOf(side)}` : ''}`); }} />
+      </View>
+    );
+    const injuryPanel = () => {
+      const c = cat ? INJURY_RULES.cats[cat] : null;
+      const record = () => {
+        if (!side || !cat) return;
+        dispatch({ type: 'INJURY', side, payload: { cat, ...(player ? { playerId: player.id } : {}) } });
+        onDone(`🩹 Injury · ${INJURY_RULES.cats[cat].label.toLowerCase()} · ${player?.fullName ?? nameOf(side)}`);
+      };
+      return (
+        <View style={st.panel}>
+          <Text style={textStyles.muted}>{INJURY_RULES.rule}. No score change. Who is injured?</Text>
+          {sideChips}
+          {playerChips}
+          <View style={st.chips}>
+            {(Object.keys(INJURY_RULES.cats) as InjuryCat[]).map((k) => (
+              <SelectChip key={k} label={INJURY_RULES.cats[k].label} active={cat === k} onPress={() => setCat(cat === k ? null : k)} />
+            ))}
+          </View>
+          {c ? <Text style={st.effect}>Up to {c.time}: {c.note}.</Text> : null}
+          <Button label="🩹 Record the injury" disabled={!side || !cat} onPress={record} />
+        </View>
+      );
+    };
+    const expeditePanel = () => {
+      const x = state as { current?: { home: number; away: number }; target?: number };
+      const on = events.some((e) => e.kind === 'expedite');
+      const ok = !on && !!x.current && ttExpediteAllowed(x.current.home, x.current.away, x.target ?? 11);
+      return (
+        <View style={st.panel}>
+          <Text style={textStyles.muted}>ITTF 2.15: after 10 minutes in a game (unless both have 9 points), or earlier if both ask. Service then alternates every point to the end of the match, and 13 good returns by the receiver win the point.</Text>
+          {on ? <Text style={st.effect}>Expedite is already on.</Text> : !ok ? <Text style={st.effect}>Not in this game: both have 9 points.</Text> : (
+            <>
+              <View style={st.chips}>
+                <SelectChip label="Between rallies" active={!inRally} onPress={() => setInRally(false)} />
+                <SelectChip label="A rally was in progress" active={inRally} onPress={() => setInRally(true)} />
+              </View>
+              <Text style={st.effect}>{inRally ? 'The rally is replayed: the player who served it serves.' : 'The receiver of the last rally serves next.'}</Text>
+            </>
+          )}
+          <Button label="⏩ Start expedite" disabled={!ok} onPress={() => { dispatch({ type: 'EXPEDITE', payload: inRally ? { rally: true } : {} }); onDone('⏩ Expedite system'); }} />
+        </View>
+      );
+    };
+
     const tiles: Array<{ k: ConductTrack | TimeoutKind | Extra; icon: string; label: string; hint: string }> = [
       { k: 'code', icon: sport === 'tabletennis' || sport === 'badminton' ? '🟨' : '⚠️', label: rules.title === 'Card' ? 'Cards' : rules.title, hint: Array.from(new Set(rules.ladder.map((l) => levelDef(sport, l)?.label.split(' · ')[0]))).join(' → ') },
       ...(TIME_SPORTS.includes(sport) ? [{ k: 'time' as const, icon: '⏱️', label: 'Time violation', hint: 'Warning, then fault / point' }] : []),
       ...tmo.kinds.map((k) => ({ k, icon: TIMEOUT_ICON[k], label: TIMEOUT_LABEL[k], hint: k === 'timeout' && tmo.length ? tmo.length.split(' · ')[0] : 'No score change' })),
       ...(LET_TILE_SPORTS.includes(sport) ? [{ k: 'let' as const, icon: '🔁', label: 'Let', hint: 'Replayed · no point' }] : []),
       ...(sport === 'squash' ? [{ k: 'review' as const, icon: '📺', label: 'Video review', hint: '1 per game · kept if upheld' }] : []),
+      ...(sport === 'badminton' ? [{ k: 'shuttle' as const, icon: '🏸', label: 'Shuttle change', hint: 'With consent · no point' }] : []),
+      ...(sport === 'squash' ? [{ k: 'injury' as const, icon: '🩹', label: 'Injury', hint: 'Self / contributed / opponent' }] : []),
+      ...(sport === 'tabletennis' ? [{ k: 'expedite' as const, icon: '⏩', label: 'Expedite', hint: 'One serve each to the end' }] : []),
     ];
 
     return (
@@ -226,7 +284,10 @@ export function makeRacketQuickOptions(sport: RacketSport, h: RacketQuickHelpers
         {open === 'time' && conductPanel('time')}
         {open === 'let' && letPanel()}
         {open === 'review' && reviewPanel()}
-        {open && open !== 'code' && open !== 'time' && open !== 'let' && open !== 'review' && timeoutPanel(open)}
+        {open === 'shuttle' && shuttlePanel()}
+        {open === 'injury' && injuryPanel()}
+        {open === 'expedite' && expeditePanel()}
+        {open && open !== 'code' && open !== 'time' && open !== 'let' && open !== 'review' && open !== 'shuttle' && open !== 'injury' && open !== 'expedite' && timeoutPanel(open)}
       </View>
     );
   }

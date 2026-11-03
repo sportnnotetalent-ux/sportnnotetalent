@@ -34,7 +34,7 @@ const TT = makeRallyEngine({ id: 'tabletennis', icon: '', sideOutValue: '__none_
 const SINGLES = L.ctxOf({ home: ['h1'], away: ['a1'] });
 const DOUBLES = L.ctxOf({ home: ['h1', 'h2'], away: ['a1', 'a2'] });
 const UE_TYPES: Record<string, string[]> = {
-  badminton: ['net', 'out', 'fault'], tabletennis: ['net', 'out'], squash: ['tin', 'out'], padel: ['net', 'out'], pickleball: ['net', 'out', 'kitchen', 'foot'],
+  badminton: ['net', 'out', 'fault', 'long', 'wide'] /* racket-batch6 R6-1: + long / wide */, tabletennis: ['net', 'out'], squash: ['tin', 'out'], padel: ['net', 'out'], pickleball: ['net', 'out', 'kitchen', 'foot'],
 };
 const lastPd = (s: { events: LiveEvent[] }) => [...s.events].reverse().find((e) => e.kind === 'point' || e.kind === 'rally')?.pd;
 const nameOf = (id?: string, legacy?: string) => (id === 'h1' ? 'Hana' : id === 'h2' ? 'Hiro' : id === 'a1' ? 'Asha' : legacy || 'Player');

@@ -27,7 +27,7 @@
  * replaying without a log (serveStats); else read from `s.events`.
  */
 import type { LiveEvent } from './liveEvents';
-import { ttServer, ttServesEach } from './tabletennis/serve.ts';
+import { ttExpOf, ttServer, ttServesEach, type TTExpedite } from './tabletennis/serve.ts';
 
 export type Side = 'home' | 'away';
 const other = (s: Side): Side => (s === 'home' ? 'away' : 'home');
@@ -58,6 +58,8 @@ interface GameLike {
   ended?: boolean;
   events: LiveEvent[];
   dblOrder?: DoublesOrder;
+  /** racket-batch6 — a replay copy's TT expedite (serve stats) */
+  ttExp?: TTExpedite | null;
 }
 
 const pairOf = (r: string[] | undefined): [string, string] | null => (r && r.length >= 2 && r[0] && r[1] && r[0] !== r[1] ? [r[0], r[1]] : null);
@@ -106,6 +108,18 @@ function ttTurn(n: number, target: number): number {
   return n < 2 * deuce ? Math.floor(n / each) : Math.floor((2 * deuce) / each) + (n - 2 * deuce);
 }
 
+/** racket-batch6 R6-7 — the turn index under expedite (ITTF 2.15): one serve
+ *  each from the point it came in (a rally in progress keeps its turn; else
+ *  the next turn — the last receiver serves); later games one each from 0-0.
+ *  Without expedite (every older match) exactly `ttTurn`. */
+function ttTurnExp(n: number, target: number, g: number, exp: TTExpedite | null): number {
+  if (!exp || g < exp.game) return ttTurn(n, target);
+  if (g > exp.game) return n;
+  if (n < exp.at) return ttTurn(n, target);
+  const base = exp.at === 0 ? 0 : exp.rally ? ttTurn(exp.at, target) : ttTurn(exp.at - 1, target) + 1;
+  return base + (n - exp.at);
+}
+
 /** First server / receiver of game `g` (no deciding-game switch inside). */
 function ttGameStart(s: GameLike & { opening?: Side }, g: number, R: { home: [string, string]; away: [string, string] }): { s: string; r: string } {
   const opening = s.opening ?? 'home';
@@ -152,8 +166,9 @@ export function ttDoublesTurn(s: GameLike & { opening?: Side }, rosters: Rosters
       if (c[pts[i]] === at && c[other(pts[i])] < at) { p5 = i + 1; break; }
     }
   }
-  const k = ttTurn(n, s.target);
-  const swapTurn = p5 >= 0 && n >= p5 ? ttTurn(p5, s.target) : -1;
+  const exp = ttExpOf(s);
+  const k = ttTurnExp(n, s.target, g, exp);
+  const swapTurn = p5 >= 0 && n >= p5 ? ttTurnExp(p5, s.target, g, exp) : -1;
   let cur = { s: start.s, r: start.r };
   const sideOf = (id: string): Side => (H.includes(id) ? 'home' : 'away');
   for (let i = 0; i <= k; i++) {
@@ -162,7 +177,7 @@ export function ttDoublesTurn(s: GameLike & { opening?: Side }, rosters: Rosters
   }
   const serverSide = sideOf(cur.s);
   // consistency with the side rotation the rest of the app uses
-  if (serverSide !== ttServer(s.current.home, s.current.away, g, s.opening ?? 'home', s.target)) return null;
+  if (serverSide !== ttServer(s.current.home, s.current.away, g, s.opening ?? 'home', s.target, exp)) return null;
   return { server: cur.s, receiver: cur.r, serverSide, ...(swapTurn >= 0 ? { switched: true } : {}) };
 }
 

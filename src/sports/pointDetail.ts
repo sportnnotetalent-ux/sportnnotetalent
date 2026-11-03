@@ -506,6 +506,10 @@ const T_RULE: HowDef = { how: 'rule', label: 'Lost by rule', chip: 'Lost by rule
  *  by rule with the sport's own examples (RD2; charged to the player who broke
  *  the rule, counted apart from errors). */
 const R_ERRS = (strokes: string[]): HowDef[] => [{ ...T_FE, strokes }, R_UE(strokes)];
+/** racket-batch6 R6-1 / R6-2 — error types with older ids that stay readable,
+ *  counted and keyed but are no longer offered (`offer`, as SF). */
+const R_ERRS_OFFER = (offer: string[], legacy: string[]): HowDef[] =>
+  R_ERRS([...legacy, ...offer.filter((x) => !legacy.includes(x))]).map((h) => ({ ...h, offer }));
 const R_RULE = (hint: string): HowDef => ({ ...T_RULE, hint });
 
 /** Each sport's options, in chip order. Tennis aces and double faults keep
@@ -518,13 +522,15 @@ export const DETAIL_HOWS: Record<DetailSport, HowDef[]> = {
   // BWF: errors into the net, out, faults; service faults (Law 9.1); faults
   // of Law 13 (incl. the receiver's) as a point lost by rule
   badminton: [
-    T_WINNER, ...R_ERRS(['net', 'out', 'fault']), SF(['high', 'foot', 'net', 'out', 'balk'], ['fault']),
+    // racket-batch6 R6-1: "out" split into long (past the back line) / wide (the side line); old "out" kept
+    T_WINNER, ...R_ERRS_OFFER(['net', 'long', 'wide', 'fault'], ['net', 'out', 'fault']), SF(['high', 'foot', 'net', 'out', 'balk'], ['fault']),
     R_RULE('e.g. net touch, double hit, obstruction, receiver fault (BWF Law 13)'),
   ],
   // ITTF / WTT: the ace and the service fault are the serve's outcomes
   tabletennis: [
     ACE, T_WINNER, ...R_ERRS(['net', 'out']), SF(['net', 'out', 'illegal']),
-    R_RULE('e.g. obstruction, free hand on the table, moved the table, double hit (ITTF 2.10)'),
+    // racket-batch6 R6-12: expedite's 13 returns (ITTF 2.15.4) — the server loses the point
+    R_RULE('e.g. obstruction, free hand on the table, moved the table, double hit (ITTF 2.10); 13 returns by the receiver under expedite (ITTF 2.15.4)'),
   ],
   // WSF: winners incl. the nick; referee decisions (SQ-03): stroke awarded, no let
   squash: [
