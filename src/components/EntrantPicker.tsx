@@ -13,7 +13,7 @@ import { PersonPicker } from './PersonPicker';
 import { entrantProblem, takenIds, type EntrantPerson, type EntrantSlot } from '../data/participantEntry';
 import type { SportId } from '../core/types';
 
-export function EntrantPicker({ count, sport, inviteText, onSubmit, submitLabel = '＋ Create pair', resolveMe, meName }: {
+export function EntrantPicker({ count, sport, inviteText, onSubmit, submitLabel = '＋ Create pair', resolveMe, meName, initial }: {
   /** 1 = a singles player, 2 = a doubles pair */
   count: 1 | 2;
   sport: SportId;
@@ -26,8 +26,12 @@ export function EntrantPicker({ count, sport, inviteText, onSubmit, submitLabel 
   /** one-tap "Me": the signed-in user's player (made if missing), or null */
   resolveMe?: () => Promise<EntrantPerson | null>;
   meName?: string;
+  /** doubles: partner 1 already chosen (a person picked from the pair search,
+   *  or "Me +") — the picker asks for partner 2 */
+  initial?: EntrantPerson;
 }) {
-  const [slots, setSlots] = useState<(EntrantSlot | null)[]>(() => Array(count).fill(null));
+  const [slots, setSlots] = useState<(EntrantSlot | null)[]>(() =>
+    Array.from({ length: count }, (_, i) => (i === 0 && initial && count === 2 ? { kind: 'person' as const, person: initial } : null)));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [meId, setMeId] = useState<string | null>(null);

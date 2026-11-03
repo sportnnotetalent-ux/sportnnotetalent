@@ -5,6 +5,7 @@
  * PURE (no React Native): the sport list is in the first download.
  */
 import type { FormatField, SportMeta } from '../types';
+import { PAIR_TYPE_FIELD } from '../pairType.ts';
 import { trackFormatFields } from '../pointDetailSettings.ts';
 import { timeUpRuleField } from '../../core/timeUp.ts';
 
@@ -28,6 +29,8 @@ export const SQUASH_FORMAT_FIELDS: FormatField[] = [
         { value: 2, label: 'Doubles' },
       ],
     },
+    // doubles pair type (doubles-picker DP8): Open / Men's / Women's / Mixed, doubles only
+    PAIR_TYPE_FIELD,
     {
       key: 'scoring', label: 'Scoring', type: 'choice', default: 'par', advanced: true,
       hint: 'how points are won',

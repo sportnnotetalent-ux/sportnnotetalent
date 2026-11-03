@@ -5,6 +5,7 @@
  * PURE (no React Native): the sport list is in the first download.
  */
 import type { SportMeta } from '../types';
+import { PAIR_TYPE_FIELD } from '../pairType.ts';
 import { trackFormatFields } from '../pointDetailSettings.ts';
 import { timeUpRuleField } from '../../core/timeUp.ts';
 
@@ -34,6 +35,8 @@ export const PADEL_META: SportMeta = {
         { value: 1, label: 'Singles' },
       ],
     },
+    // doubles pair type (doubles-picker DP8): Open / Men's / Women's / Mixed, doubles only
+    PAIR_TYPE_FIELD,
     {
       key: 'deuce', label: 'At deuce', type: 'choice', default: 'advantage',
       hint: 'how 40-40 is decided',

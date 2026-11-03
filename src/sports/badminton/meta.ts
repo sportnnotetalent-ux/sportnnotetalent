@@ -5,6 +5,7 @@
  * PURE (no React Native): the sport list is in the first download.
  */
 import type { SportMeta } from '../types';
+import { PAIR_TYPE_FIELD } from '../pairType.ts';
 import { trackFormatFields } from '../pointDetailSettings.ts';
 import { timeUpRuleField } from '../../core/timeUp.ts';
 
@@ -33,6 +34,8 @@ export const BADMINTON_META: SportMeta = {
         { value: 2, label: 'Doubles' },
       ],
     },
+    // doubles pair type (doubles-picker DP8): Open / Men's / Women's / Mixed, doubles only
+    PAIR_TYPE_FIELD,
     // MVP B7: the deuce cap follows the points (21 → 30, 15 → 24); blank / out of range is fixed on leaving the box
     { key: 'pointsPerGame', label: 'Points per game', type: 'number', default: 21, min: 5, max: 30, advanced: true,
       derive: (v): Record<string, number> => (Number(v) >= 5 ? { cap: Math.min(40, Number(v) + 9) } : {}) },

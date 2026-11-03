@@ -5,6 +5,7 @@
  * PURE (no React Native): the sport list is in the first download.
  */
 import type { SportMeta } from '../types';
+import { PAIR_TYPE_FIELD } from '../pairType.ts';
 import { trackFormatFields } from '../pointDetailSettings.ts';
 import { timeUpRuleField } from '../../core/timeUp.ts';
 
@@ -46,6 +47,8 @@ export const TENNIS_META: SportMeta = {
         { value: 2, label: 'Doubles' },
       ],
     },
+    // doubles pair type (doubles-picker DP8): Open / Men's / Women's / Mixed, doubles only
+    PAIR_TYPE_FIELD,
     {
       key: 'setsToWin', label: 'Match length', type: 'choice', default: 2, advanced: true,
       options: [
