@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-04 — Release: stale live + one-per-person picker live (web, Android OTA)
+
+auth-smoke passed. Published from a clean worktree at 3a97047: web (entry `index-6924f1cf`, confirmed live on app.sportnnote.in) and Android OTA groups `1fedf429` (preview) and `4fb68a3d` (production), runtime 1.0.0. The stale-live part needs the founder to run `20261104120000_home_feed_updated_at.sql`.
+
 ### 2026-11-04 — Stale "Live now" on Home; each person once in the picker
 
 From the founder's phone (`docs/security/breaks/stale-live-and-duplicate-entries.md`): two quick tennis games from 31 Oct / 1 Nov still under Live now — `home_feed` never returned `matches.updated_at`, so Home's 12-hour stale rule couldn't fire; **`supabase/migrations/20261104120000_home_feed_updated_at.sql`** (founder runs) re-creates it from its newest body with that one column. And "Abhra Chowdhury" listed three times: people are unique (one player per verified phone); duplicate one-person entries pointing at him were listed — `onePerEntrant` now shows each person / pair once, and a double tap can't create a second entry. Full suite 7,244 tests, 0 failing; tsc clean.
