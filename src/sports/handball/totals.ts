@@ -17,7 +17,7 @@
  * / `sevenMConceded` (7-metre shoot-out throws excluded).
  */
 import { trackField, timeLeft, type FieldEvent, type FieldLog, type FieldResult, type Who } from '../onField.ts';
-import { eventCredits, keeperAt, matchSec, LIVE_KEYS, SUSPENSION_MINUTES, type HandballEvent, type HandballState, type Side } from './engine.ts';
+import { eventCredits, keeperAt, matchSec, shotOf, LIVE_KEYS, SUSPENSION_MINUTES, type HandballEvent, type HandballState, type Side } from './engine.ts';
 import { FIELD_SHOT_TYPES, KEEPER_CONCEDED_KEY, KEEPER_SAVE_KEY, handballDerivedCredits, sevenMDrawnTracked } from './depth.ts';
 import { legacyNameOf, nameFor, type NameOf } from '../invasion/names.ts';
 
@@ -117,8 +117,9 @@ function keeperSpells(s: HandballState): Map<string, Spell> {
         if (r) {
           r.conceded += 1;
           if (e.shotType === 'sevenM') r.conceded7 += 1;
-          const t = e.shotType ?? 'nineM';
-          r.byType[t] = (r.byType[t] ?? 0) + 1;
+          // batch 6: a "Not sure" goal is conceded, at no position
+          const t = shotOf(e);
+          if (t) r.byType[t] = (r.byType[t] ?? 0) + 1;
         }
         continue;
       }
@@ -161,8 +162,8 @@ export function handballTotals(s: HandballState): Record<string, { side: Side; s
   for (const e of s.events) {
     if (e.type !== 'save' || !e.playerId) continue;
     const m = savesBy.get(e.playerId) ?? {};
-    const t = e.shotType ?? 'nineM';
-    m[t] = (m[t] ?? 0) + 1;
+    const t = shotOf(e);
+    if (t) m[t] = (m[t] ?? 0) + 1;
     savesBy.set(e.playerId, m);
   }
   for (const k of keeperSpells(s).values()) {
@@ -179,9 +180,13 @@ export function handballTotals(s: HandballState): Record<string, { side: Side; s
   // the taken-off keeper's minutes with an empty goal
   for (const [id, d] of Object.entries(handballDerivedCredits(s))) add(id, d.side, d.stats);
   const drawn = sevenMDrawnTracked(s);
+  // batch 6: only a match that logged a "caused by" owns the key (an older
+  // line keeps exactly its keys)
+  const caused = s.events.some((e) => e.type === 'caused');
   for (const l of Object.values(out)) {
     for (const k of ['goals', 'shots', 'assists', 'yellowCards', 'twoMinutes', 'redCards'] as const) l.stats[k] ??= 0;
     if (drawn) l.stats.sevenMDrawn ??= 0;
+    if (caused) l.stats.sevenMCaused ??= 0;
   }
   return out;
 }

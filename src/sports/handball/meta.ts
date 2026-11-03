@@ -20,7 +20,8 @@ export const HANDBALL_PRESETS: Record<string, { label: string; set: Record<strin
  *  match) keeps both off (readHandballTrack). */
 export const HANDBALL_TRACK_FIELDS: FormatField[] = [
   { key: 'trackFaultTypes', label: 'Technical fault types', type: 'toggle', default: true, group: 'Stats to track', hint: 'steps, double dribble, area, offensive foul, passive play… (an optional chip)' },
-  { key: 'trackSevenMDrawn', label: '7 m won by', type: 'toggle', default: true, group: 'Stats to track', hint: 'who won each 7-metre throw (an optional chip)' },
+  // batch 6: the same screen also asks who caused the throw (an optional chip)
+  { key: 'trackSevenMDrawn', label: '7 m won / caused by', type: 'toggle', default: true, group: 'Stats to track', hint: 'who won each 7-metre throw and which defender conceded it (optional chips)' },
 ];
 
 export const HANDBALL_META: SportMeta = {

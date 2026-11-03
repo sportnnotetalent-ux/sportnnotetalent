@@ -34,6 +34,12 @@ export const subAction = (side: Side, off: Who, on: Who, kind: SubKind): ScoreAc
 export const detailAction = (kind: VbDetailKind, side: Side, p: Who, q?: ReceptionGrade): ScoreAction =>
   ({ type: 'VB_DETAIL', side, payload: { kind, player: { playerId: p.id }, ...(q ? { q } : {}) } });
 
+/** Court-team batch 6 — a video challenge by `side` (FIVB Video Challenge
+ *  System): upheld or not, and optionally what was challenged
+ *  (VB_CHALLENGE_WHAT). A marker: no score effect. */
+export const challengeAction = (side: Side, upheld: boolean, what?: string | null): ScoreAction =>
+  ({ type: 'CHALLENGE', side, payload: { upheld, ...(what ? { what } : {}) } });
+
 /** SD-136 — a sanction against `by` (the offender by id, when named). */
 export const sanctionAction = (by: Side, level: VbSanctionLevel, o: { reason?: string | null; player?: Who | null } = {}): ScoreAction =>
   ({ type: 'CONDUCT', side: by, payload: { vb: level, ...(o.reason ? { reason: o.reason } : {}), ...(o.player ? { playerId: o.player.id } : {}) } });

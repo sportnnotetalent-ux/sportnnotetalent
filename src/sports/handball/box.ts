@@ -20,6 +20,8 @@ export interface HandballBoxContext { homeRoster?: Player[]; awayRoster?: Player
 
 /** every key a row carries (the comparison sums line keys over the rows) */
 const ROW_KEYS = LIVE_KEYS.filter((k) => k !== 'soTaken' && k !== 'soGoals');
+/** batch 6: "7 m caused by" only on a match that logged one (older boxes keep their keys) */
+const rowKeys = (s: HandballState) => (s.events.some((e) => e.type === 'caused') ? ROW_KEYS : ROW_KEYS.filter((k) => k !== 'sevenMCaused'));
 const TEAM_KEYS = ['goals', 'shots', 'saves', 'blocks', 'technicalFaults', 'steals', 'yellowCards', 'twoMinutes', 'redCards', 'blueCards', 'sevenMGoals', 'sevenMTaken'] as const;
 
 export function handballBox(s0: HandballState, ctx: HandballBoxContext = {}): MatchBoxSource {
@@ -43,7 +45,7 @@ export function handballBox(s0: HandballState, ctx: HandballBoxContext = {}): Ma
           let r = rows.get(k);
           if (!r) {
             const nm = name ?? roster.find((p) => p.id === id)?.fullName ?? 'Player';
-            r = { name: nm, ...(id ? { playerId: id } : {}), stats: Object.fromEntries(ROW_KEYS.map((x) => [x, 0])) };
+            r = { name: nm, ...(id ? { playerId: id } : {}), stats: Object.fromEntries(rowKeys(s).map((x) => [x, 0])) };
             rows.set(k, r);
           }
           return r;

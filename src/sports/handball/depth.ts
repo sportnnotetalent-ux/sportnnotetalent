@@ -21,7 +21,7 @@
  */
 import { putIf, pct } from '../invasion/centre.ts';
 import {
-  goalEmpty, keeperAt, matchSec, periodLen, periodOffset, periodSec, FAULT_KEY, FAULT_TYPES, SHOT_TYPES,
+  goalEmpty, keeperAt, matchSec, periodLen, periodOffset, periodSec, shotOf, FAULT_KEY, FAULT_TYPES, SHOT_TYPES,
   type HandballState, type ShotType, type Side, type Who,
 } from './engine.ts';
 
@@ -162,16 +162,20 @@ export function handballDepthFigures(s: HandballState, side: Side, scope: 'all' 
   let allSaves = 0, allAgainst = 0, eg = 0;
   const empties = emptyGoalIndexes(s);
   const faults: Record<string, number> = {};
+  let unsureGoals = 0, unsureShots = 0, passive = 0;
   s.events.forEach((e, i) => {
     if (!inScope(e.period)) return;
-    const t = e.shotType ?? 'nineM';
+    // batch 6: a "Not sure" attempt counts overall, at no position
+    const t = shotOf(e);
     if (e.side === side) {
-      if (e.type === 'save') { allSaves++; saves[t] = (saves[t] ?? 0) + 1; }
+      if (e.type === 'save') { allSaves++; if (t) saves[t] = (saves[t] ?? 0) + 1; }
       if (e.type === 'goal' && empties.has(i)) eg++;
       if (e.type === 'turnover' && e.fault) faults[FAULT_KEY[e.fault]] = (faults[FAULT_KEY[e.fault]] ?? 0) + 1;
+      if (e.unsure && (e.type === 'goal' || e.type === 'miss')) { unsureShots++; if (e.type === 'goal') unsureGoals++; }
+      if (e.type === 'passive') passive++;
     } else if (e.type === 'goal' && !empties.has(i)) {
       // a goal into an empty goal isn't a shot the keeper faced
-      allAgainst++; against[t] = (against[t] ?? 0) + 1;
+      allAgainst++; if (t) against[t] = (against[t] ?? 0) + 1;
     }
   });
   putIf(out, 'savePct', pct(allSaves, allSaves + allAgainst));
@@ -181,6 +185,9 @@ export function handballDepthFigures(s: HandballState, side: Side, scope: 'all' 
   // the clock measured it)
   if (emptyGoalTimed(s, now)) out.emptyGoalMinutes = egMinutes(emptyGoalSecs(s, side, scope, now));
   if (faultTypesTracked(s)) for (const f of FAULT_TYPES) out[FAULT_KEY[f]] = faults[FAULT_KEY[f]] ?? 0;
+  // batch 6: only on a match that has them (older matches keep their figures)
+  if (s.events.some((e) => e.unsure && (e.type === 'goal' || e.type === 'miss'))) { out.unsureGoals = unsureGoals; out.unsureShots = unsureShots; }
+  if (s.events.some((e) => e.type === 'passive')) out.passiveWarnings = passive;
   return out;
 }
 

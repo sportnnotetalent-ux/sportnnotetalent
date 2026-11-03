@@ -132,6 +132,8 @@ export interface NbTeamFigures {
   /** ball-winning plays: intercepts + deflections with gain + defensive
    *  rebounds + pick-ups + the opposition's turnovers */
   gains: number;
+  /** batch 6: toss-ups won */
+  tossUps: number;
 }
 
 /** A rebound's kind: offensive when the rebounder's side took the missed shot. */
@@ -149,7 +151,7 @@ export function nbTeamFigures(s: NetballState, side: Side, scope: NbScope = 'all
     intercepts: 0, deflections: 0, deflGain: 0, deflNoGain: 0, pickups: 0, rebounds: 0, oreb: 0, dreb: 0,
     turnovers: 0, byType: Object.fromEntries(TURNOVER_TYPES.map((t) => [t, 0])) as Record<TurnoverType, number>,
     penalties: 0, contacts: 0, obstructions: 0, warnings: 0, suspensions: 0, orderedOff: 0, timeouts: 0,
-    centrePasses: 0, cpGoals: 0, gainGoals: 0, gains: 0,
+    centrePasses: 0, cpGoals: 0, gainGoals: 0, gains: 0, tossUps: 0,
   };
   let oppTurnovers = 0;
   for (const e of s.events) {
@@ -182,6 +184,8 @@ export function nbTeamFigures(s: NetballState, side: Side, scope: NbScope = 'all
       case 'penalty': f.penalties++; if (e.penalty === 'contact') f.contacts++; else if (e.penalty === 'obstruction') f.obstructions++; break;
       case 'sanction': if (e.sanction === 'warning') f.warnings++; else if (e.sanction === 'suspension') f.suspensions++; else if (e.sanction === 'off') f.orderedOff++; break;
       case 'timeout': f.timeouts++; break;
+      // batch 6: toss-ups won (not a gain: Champion Data counts them apart)
+      case 'tossup': f.tossUps++; break;
       default: break;
     }
   }

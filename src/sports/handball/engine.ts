@@ -52,6 +52,12 @@ export const SHOT_LABEL: Record<ShotType, string> = {
 
 export interface Who { id?: string; name?: string }
 
+/** Court-team batch 6 — the payload value of "Not sure" on the position grid. */
+export const UNSURE_SHOT = 'unknown';
+/** An event's position: its shot type (absent → 9 m, as older logs always
+ *  read), or undefined for a "Not sure" attempt. */
+export const shotOf = (e: Pick<HandballEvent, 'shotType' | 'unsure'>): ShotType | undefined => (e.unsure ? undefined : e.shotType ?? 'nineM');
+
 /** Deep wave — the technical fault's kind (optional chip, `trackFaultTypes`). */
 export type FaultType = 'steps' | 'double' | 'area' | 'offensive' | 'passive' | 'pass' | 'other';
 export const FAULT_TYPES: FaultType[] = ['steps', 'double', 'area', 'offensive', 'passive', 'pass', 'other'];
@@ -77,7 +83,11 @@ export interface HandballEvent {
   id: string;
   /** deep wave: `empty` = a side takes its keeper off for a 7th court player
    *  (`on`) or brings one back; `drawn` = a 7-metre throw won by a player */
-  type: 'goal' | 'miss' | 'save' | 'block' | 'turnover' | 'steal' | 'card' | 'timeout' | 'sub' | 'gk' | 'empty' | 'drawn';
+  type: 'goal' | 'miss' | 'save' | 'block' | 'turnover' | 'steal' | 'card' | 'timeout' | 'sub' | 'gk' | 'empty' | 'drawn'
+    // court-team batch 6: `passive` = the referees' passive-play warning
+    // (forewarning signal, IHF 7:11) to the side in possession; `caused` = the
+    // defender who conceded a 7-metre throw (credits `sevenMCaused`)
+    | 'passive' | 'caused';
   side: Side;
   /** game-clock seconds since the start of the match (playing time) */
   sec: number;
@@ -111,6 +121,11 @@ export interface HandballEvent {
    *  `spell: true`) — the side's keepers get their full line (goals conceded,
    *  save %) even with no line-up keeper. Absent on every older log. */
   spell?: boolean;
+  /** court-team batch 6: a goal / attempt / save whose position the scorer
+   *  wasn't sure of ("Not sure", payload `shotType: 'unknown'`) — no
+   *  `shotType`, no position credit. Absent on every older event (an absent
+   *  or unknown payload type there reads as 9 m, as it always has). */
+  unsure?: true;
 }
 
 /** `outcome` / keeper (deep wave, new logs only): saved by the keeper or
@@ -274,24 +289,29 @@ export const LIVE_KEYS = [
   'technicalFaults', 'steals', 'yellowCards', 'twoMinutes', 'redCards', 'blueCards', 'soTaken', 'soGoals',
   // deep wave: the player who won a 7-metre throw (only when tracked)
   'sevenMDrawn',
+  // court-team batch 6: the defender who conceded a 7-metre throw (when logged)
+  'sevenMCaused',
 ] as const;
 
 type Credit = { playerId: string; playerName?: string; stats: Record<string, number> };
 
 /** The stat-line credits one event writes: [primary player, second player]. */
-export function eventCredits(e: Pick<HandballEvent, 'type' | 'playerId' | 'playerName' | 'secondId' | 'secondName' | 'shotType' | 'result' | 'card' | 'third' | 'blue' | 'official'>): { first?: Credit; second?: Credit } {
+export function eventCredits(e: Pick<HandballEvent, 'type' | 'playerId' | 'playerName' | 'secondId' | 'secondName' | 'shotType' | 'result' | 'card' | 'third' | 'blue' | 'official'> & { unsure?: boolean }): { first?: Credit; second?: Credit } {
   // every credit is to a player of the event's own side (a save, a block and a
   // steal are their own events on the defending side)
   const p = (stats: Record<string, number>) => (e.playerId && !e.official ? { playerId: e.playerId, playerName: e.playerName, stats } : undefined);
   const q = (stats: Record<string, number>) => (e.secondId ? { playerId: e.secondId, playerName: e.secondName, stats } : undefined);
-  const t = e.shotType ?? 'nineM';
+  // batch 6: a "Not sure" attempt credits no position key
+  const t = e.unsure ? undefined : e.shotType ?? 'nineM';
   switch (e.type) {
     case 'goal':
-      return { first: p({ goals: 1, shots: 1, [GOAL_KEY[t]]: 1, [SHOT_KEY[t]]: 1 }), second: t === 'sevenM' ? undefined : q({ assists: 1 }) };
+      return { first: p(t ? { goals: 1, shots: 1, [GOAL_KEY[t]]: 1, [SHOT_KEY[t]]: 1 } : { goals: 1, shots: 1 }), second: t === 'sevenM' ? undefined : q({ assists: 1 }) };
     case 'miss':
-      return { first: p({ shots: 1, [SHOT_KEY[t]]: 1 }) };
+      return { first: p(t ? { shots: 1, [SHOT_KEY[t]]: 1 } : { shots: 1 }) };
     case 'save':
       return { first: p(t === 'sevenM' ? { saves: 1, sevenMSaves: 1 } : { saves: 1 }) };
+    case 'caused':
+      return { first: p({ sevenMCaused: 1 }) };
     case 'block':
       return { first: p({ blocks: 1 }) };
     case 'turnover':
@@ -376,6 +396,9 @@ export const soScore = (s: Pick<HandballState, 'shootout'>) => ({
 
 const SO_ACTIONS = new Set(['START_SHOOTOUT', 'SO', 'SO_ORDER', 'XI', 'STAT_ADJUST', 'REMOVE_EVENT', 'END']);
 const shotTypeOf = (v: unknown): ShotType => (SHOT_TYPES.includes(v as ShotType) ? (v as ShotType) : 'nineM');
+/** batch 6: the stored position — "Not sure" (only the exact new value) or
+ *  the shot type as before (absent / hostile → 9 m). */
+const shotFields = (v: unknown): { shotType: ShotType } | { unsure: true } => (v === UNSURE_SHOT ? { unsure: true } : { shotType: shotTypeOf(v) });
 
 export const reducer = (s: HandballState, a: ScoreAction): HandballState => {
   if (s.ended && !SO_ACTIONS.has(a.type)) return s;
@@ -416,21 +439,21 @@ export const reducer = (s: HandballState, a: ScoreAction): HandballState => {
     }
     case 'GOAL': {
       if (!side) return s;
-      const shotType = shotTypeOf(a.payload?.shotType);
+      const pos = shotFields(a.payload?.shotType);
       const scored = { ...s, [side]: s[side] + 1 } as HandballState;
-      return push(scored, { type: 'goal', side, shotType, ...who1, ...(shotType === 'sevenM' ? {} : who2) });
+      return push(scored, { type: 'goal', side, ...pos, ...who1, ...('shotType' in pos && pos.shotType === 'sevenM' ? {} : who2) });
     }
     case 'MISS': {
       // an attempt that didn't score (the keeper's save / a block is its own action)
       if (!side) return s;
       const r = a.payload?.result;
       const result: MissResult = r === 'saved' || r === 'blocked' ? r : 'missed';
-      return push(s, { type: 'miss', side, shotType: shotTypeOf(a.payload?.shotType), result, ...who1 });
+      return push(s, { type: 'miss', side, ...shotFields(a.payload?.shotType), result, ...who1 });
     }
     case 'SAVE': {
       // the keeper's save (side = the keeper's team), linked to the attempt
       if (!side) return s;
-      return push(s, { type: 'save', side, shotType: shotTypeOf(a.payload?.shotType), ...who1, ...ref });
+      return push(s, { type: 'save', side, ...shotFields(a.payload?.shotType), ...who1, ...ref });
     }
     case 'BLOCK': {
       if (!side) return s;
@@ -452,6 +475,18 @@ export const reducer = (s: HandballState, a: ScoreAction): HandballState => {
       // deep wave: a 7-metre throw won by a player (credits `sevenMDrawn`)
       if (!side) return s;
       return push(s, { type: 'drawn', side, ...who1 });
+    }
+    case 'PASSIVE': {
+      // batch 6: the passive-play warning (forewarning signal, IHF 7:11) to
+      // the side in possession — no score, no credit, the clock runs on
+      if (!side) return s;
+      return push(s, { type: 'passive', side });
+    }
+    case 'CAUSED': {
+      // batch 6: the defender who conceded a 7-metre throw (side = his team;
+      // credits `sevenMCaused`) — no score effect
+      if (!side) return s;
+      return push(s, { type: 'caused', side, ...who1 });
     }
     case 'STEAL': {
       if (!side) return s;
@@ -611,15 +646,19 @@ export interface HandballTeamFigures {
   yellowCards: number; twoMinutes: number; redCards: number; blueCards: number; timeouts: number;
   /** goals / attempts per shot type */
   byType: Record<ShotType, { goals: number; shots: number }>;
+  /** batch 6: goals / attempts whose position wasn't recorded ("Not sure");
+   *  only when the side has one in scope (older figures keep their shape) */
+  unsureGoals?: number; unsureShots?: number;
 }
 export function teamFigures(s: HandballState, side: Side, scope: 'all' | number = 'all'): HandballTeamFigures {
   const byType = Object.fromEntries(SHOT_TYPES.map((t) => [t, { goals: 0, shots: 0 }])) as HandballTeamFigures['byType'];
   const f: HandballTeamFigures = { goals: 0, shots: 0, saves: 0, blocks: 0, technicalFaults: 0, steals: 0, sevenMGoals: 0, sevenMTaken: 0, yellowCards: 0, twoMinutes: 0, redCards: 0, blueCards: 0, timeouts: 0, byType };
   for (const e of s.events) {
     if (e.side !== side || (scope !== 'all' && e.period !== scope)) continue;
-    const t = e.shotType ?? 'nineM';
-    if (e.type === 'goal') { f.goals++; f.shots++; byType[t].goals++; byType[t].shots++; }
-    else if (e.type === 'miss') { f.shots++; byType[t].shots++; }
+    const t = shotOf(e);
+    const by = t ? byType[t] : undefined;
+    if (e.type === 'goal') { f.goals++; f.shots++; if (by) { by.goals++; by.shots++; } else { f.unsureGoals = (f.unsureGoals ?? 0) + 1; f.unsureShots = (f.unsureShots ?? 0) + 1; } }
+    else if (e.type === 'miss') { f.shots++; if (by) by.shots++; else { f.unsureGoals ??= 0; f.unsureShots = (f.unsureShots ?? 0) + 1; } }
     else if (e.type === 'save') f.saves++;
     else if (e.type === 'block') f.blocks++;
     else if (e.type === 'turnover') f.technicalFaults++;

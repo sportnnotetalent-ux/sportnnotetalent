@@ -85,6 +85,10 @@ export interface LiveEvent {
   /** racket-batch6 R6-7 — table tennis expedite (`kind: 'expedite'`): it came
    *  in while a rally was in progress (ITTF 2.15.2: that rally's server serves). */
   xr?: true;
+  /** court-team batch 6 — a volleyball video challenge (`kind: 'review'`):
+   *  what was challenged (volleyball/engine.ts VB_CHALLENGE_WHAT). Absent on
+   *  every older event. */
+  chw?: string;
   /** SD-54 — when the step was logged (ms, from the action's `payload.at`);
    *  match / game durations are derived from it. Absent on older events. */
   at?: number;

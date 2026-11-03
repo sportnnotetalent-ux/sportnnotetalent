@@ -238,6 +238,12 @@ export function volleyballMatchStats(s: VolleyballState, scope: VbScope = 'all')
   if (tos[0] + tos[1]) flowRows.push(countRow('timeouts', 'Timeouts used', tos[0], tos[1], { better: 'lower' }));
   const subs = H((x) => (s?.subs ?? []).filter((y) => y.side === x && (scope === 'all' || y.set === scope) && y.kind !== 'libero').length);
   if (subs[0] + subs[1]) flowRows.push(countRow('subs', 'Substitutions', subs[0], subs[1], { better: 'lower' }));
+  // batch 6: video challenges (FIVB VCS), only when any
+  const chal = H((x) => evs.filter((e) => e.kind === 'review' && e.side === x).length);
+  if (chal[0] + chal[1]) {
+    const up = H((x) => evs.filter((e) => e.kind === 'review' && e.side === x && e.rev === 'upheld').length);
+    flowRows.push(countRow('challenges', 'Video challenges', chal[0], chal[1]), countRow('challengesUpheld', 'of which upheld', up[0], up[1], { sub: true }));
+  }
   cats.push({ id: 'flow', title: 'Game flow', rows: flowRows, ...(rs.length ? { note: `Times tied ${flow.ties} · lead changes ${flow.changes}` } : {}) });
 
   /* -------- rotation analysis + by server -------- */

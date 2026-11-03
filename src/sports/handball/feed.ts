@@ -10,7 +10,7 @@
  * (7th court player).", "7-metre shoot-out: Asha Rao (India) scores. 3–2".
  */
 import { SHOOTOUT_PERIOD, emptyFacts, scoreText, type FeedItem, type MatchFacts, type Score } from '../invasion/feed.ts';
-import { clockText, periodLong, soScore, FAULT_LABEL, type HandballEvent, type HandballState, type ShotType, type Side } from './engine.ts';
+import { clockText, periodLong, shotOf, soScore, FAULT_LABEL, type HandballEvent, type HandballState, type ShotType, type Side } from './engine.ts';
 import { emptyGoalIndexes } from './depth.ts';
 import { legacyNameOf, withNames, type NameOf } from '../invasion/names.ts';
 
@@ -33,22 +33,23 @@ export const handballPeriodLabel = (s: Pick<HandballState, 'periods'>) => (p: nu
 export function handballSentence(e: HandballEvent, names: Names, answer?: string, empty?: boolean): { icon: string; text: string; major?: boolean; tone?: FeedItem['tone'] } {
   const team = names[e.side];
   const who = (n?: string) => (n ? `${n} (${team})` : team);
-  const t = e.shotType ?? 'nineM';
+  // batch 6: a "Not sure" attempt names no position
+  const t = shotOf(e);
   switch (e.type) {
     case 'goal': {
       const by = e.playerName ? `${who(e.playerName)} scores` : `Goal for ${team}`;
       return {
         icon: '🤾', major: true, tone: 'goal',
-        text: `${by} ${SHOT_PHRASE[t]}${empty ? ' into the empty goal' : ''}.${e.secondName ? ` Assist: ${e.secondName}.` : ''}`,
+        text: `${by}${t ? ` ${SHOT_PHRASE[t]}` : ''}${empty ? ' into the empty goal' : ''}.${e.secondName ? ` Assist: ${e.secondName}.` : ''}`,
       };
     }
     case 'miss': {
       const r = e.result ?? 'missed';
       const by = who(e.playerName);
-      const noun = SHOT_NOUN[t];
+      const noun = t ? SHOT_NOUN[t] : 'shot';
       const text = r === 'saved' ? `${by} — ${noun} saved${answer ? ` by ${answer}` : ''}.`
         : r === 'blocked' ? `${by} — ${noun} blocked${answer ? ` by ${answer}` : ''}.`
-        : `${by} misses ${SHOT_PHRASE[t]}.`;
+        : `${by} misses${t ? ` ${SHOT_PHRASE[t]}` : ''}.`;
       return { icon: r === 'saved' ? '🧤' : r === 'blocked' ? '🛡' : '↗', text, ...(t === 'sevenM' ? { major: true, tone: 'chance' as const } : {}) };
     }
     case 'save':
@@ -82,6 +83,10 @@ export function handballSentence(e: HandballEvent, names: Names, answer?: string
         : { icon: '🥅', text: `${team} take the goalkeeper off for a 7th court player — their goal is empty.`, major: true };
     case 'drawn':
       return { icon: '🎯', text: `7-metre throw to ${team}, won by ${e.playerName ?? 'a player'}.`, major: true };
+    case 'caused':
+      return { icon: '🚫', text: `7-metre throw conceded by ${who(e.playerName)}.` };
+    case 'passive':
+      return { icon: '⏳', text: `Passive-play warning to ${team} (forewarning signal).` };
   }
 }
 
