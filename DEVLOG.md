@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-05 — One team page wherever it's opened
+
+From the founder's phone (`docs/security/breaks/one-team-page.md`): Organize → My teams → Fnatic showed the team home (Game days, members) while Discover → Fnatic showed the old single-sport page ("Squad (0)", no game days). Now (`src/core/teamPage.ts`): every link to a club's sport team (Discover, matches, standings, tournaments, Following) opens the club's **team page**, with the sport you came for first. That page shows everyone Follow + 🔔 (covering every sport of the team), the sports (each opens its stats, squad and matches, linking back), Game days, recent results and members; edit / add / start-session / squad-picking stay with members and admins. A sport with no squad picked shows the team's members instead of "Squad (0)". One-off sides (quick games, game-day "Fnatic 1/2/3", "Fnatic Team 1 Thursday …") are left out of Discover search and browse; Discover shows a club once. Following list rows open the team and a club is listed once. 6 unit tests + a 600-community simulation; full suite green (pool timing test passes alone); tsc clean; demo checked (Discover → team page, Follow, Football view squad 6, old link forwards). No database change.
+
 ### 2026-11-05 — Release: squad sessions live (web, Android OTA)
 
 Founder ran `20261105120000_squad_sessions.sql` (checked read-only: table, `matches.session_id` and functions present; anon refused). auth-smoke passed. Published from a clean worktree at 84ddb6c: web (entry `index-579caf68`, confirmed live on app.sportnnote.in) and Android OTA groups `023c158a` (preview) and `01a4bc0a` (production), runtime 1.0.0.

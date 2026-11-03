@@ -11,12 +11,14 @@ import { useFollow } from '../data/hooks';
 import { ALERTS, prefsFromTicked, wants, type AlertKey } from '../data/followPrefs';
 import type { FollowType } from '../data/followStore';
 
-export function FollowAlertsSheet({ visible, type, id, name, onClose }: {
+export function FollowAlertsSheet({ visible, type, id, name, onClose, alsoIds }: {
   visible: boolean;
   type: FollowType;
   id: string;
   name: string;
   onClose: () => void;
+  /** more rows to save the same choices to (a club's other sports) */
+  alsoIds?: string[];
 }) {
   const { profile } = useAuth();
   const { prefsOf, savePrefs } = useFollow(profile?.id);
@@ -41,6 +43,7 @@ export function FollowAlertsSheet({ visible, type, id, name, onClose }: {
   const save = async () => {
     setSaving(true);
     const ok = await savePrefs(type, id, prefsFromTicked(type, ticked, prefsOf(type, id)));
+    if (ok) for (const other of alsoIds ?? []) if (other !== id) await savePrefs(type, other, prefsFromTicked(type, ticked, prefsOf(type, other)));
     setSaving(false);
     if (ok) onClose();
   };

@@ -19,7 +19,8 @@ import { PlayerFilters, activeFilterCount, type PlayerFilterState } from '../com
 import { looksLikeContact } from '../data/repos';
 import { SectionHeader, SECTION_CAP } from '../components/SectionHeader';
 import { SPORT_LIST, getSportMeta } from '../sports/sportMeta';
-import { usePlayerSearch, useCities, useTeamSummaries, useFollow, useOpenTournaments, useGlobalSearch, type PlayerSummary } from '../data/hooks';
+import { usePlayerSearch, useCities, useTeamSummaries, useTeams, useFollow, useOpenTournaments, useGlobalSearch, type PlayerSummary } from '../data/hooks';
+import { clubFollow, discoverTeams } from '../core/teamPage';
 import { bestTier, matchNames, parseVsQuery, orderSections, MIN_QUERY, type SearchKind } from '../data/search';
 import { tournamentStatus } from '../core/tournament';
 import { useAuth } from '../core/auth';
@@ -82,7 +83,10 @@ export default function DiscoverScreen() {
   // Browse content (empty / 1-letter query): players ranked by activity.
   const { results, loading: searching, error: searchError } = usePlayerSearch({ query: '', ...playerFilters });
   const contactSearch = looksLikeContact(query);
-  const teams = useTeamSummaries().filter((t) => !fSports.length || t.sports.some((s) => fSports.includes(s)));
+  // One entry per team (a club's sports merged), no one-off sides (TP6/TP7).
+  const teamRows = useTeams();
+  const summaries = useTeamSummaries();
+  const teams = discoverTeams(summaries, teamRows).filter((t) => !fSports.length || t.sports.some((s) => fSports.includes(s)));
   const { isFollowing, toggle } = useFollow(profile?.id);
   const openTournaments = useOpenTournaments().filter((t) => !fSports.length || t.sports.some((s) => fSports.includes(s)));
   const filtering = activeFilterCount(filters) > 0;
@@ -143,8 +147,11 @@ export default function DiscoverScreen() {
     </TouchableOpacity>
   );
 
-  const renderTeam = (t: { id: string; name: string; colorHex?: string; sports: SportId[] }) => {
-    const following = isFollowing('team', t.id);
+  const renderTeam = (t: { id: string; name: string; colorHex?: string; sports: SportId[]; teamIds?: string[]; clubId?: string }) => {
+    // A club: follow every sport row; open its team page (TP1/TP4).
+    const ids = t.teamIds?.length ? t.teamIds : [t.id];
+    const f = clubFollow(ids, (id) => isFollowing('team', id));
+    const following = f.following;
     return (
       // Row is a plain Card (View), not a button, so the two pressables
       // below are siblings — RN-web won't nest one <button> in another.
@@ -153,7 +160,7 @@ export default function DiscoverScreen() {
           accessibilityRole="button"
           style={st.teamOpen}
           activeOpacity={0.85}
-          onPress={() => nav.navigate('Team', { teamId: t.id })}
+          onPress={() => (t.clubId ? nav.navigate('ClubHome', { clubId: t.clubId }) : nav.navigate('Team', { teamId: t.id }))}
         >
           <View style={[st.teamDot, { backgroundColor: t.colorHex ?? theme.colors.surfaceAlt }]} />
           <View style={{ flex: 1 }}>
@@ -164,12 +171,12 @@ export default function DiscoverScreen() {
         <TouchableOpacity accessibilityRole="button"
           style={[st.followBtn, following && st.followBtnOn]}
           accessibilityState={{ selected: following }}
-          onPress={() => toggle('team', t.id)}
+          onPress={() => { for (const id of [...f.toFollow, ...f.toUnfollow]) toggle('team', id); }}
           activeOpacity={0.8}
         >
           <IconText label={following ? '★ Following' : '☆ Follow'} style={[st.followText, following && st.followTextOn]} />
         </TouchableOpacity>
-        <FollowBell type="team" id={t.id} name={t.name} />
+        <FollowBell type="team" id={ids[0]} name={t.name} alsoIds={ids.slice(1)} />
       </Card>
     );
   };
@@ -194,7 +201,7 @@ export default function DiscoverScreen() {
     const slice = <T,>(xs: T[]) => (cap ? xs.slice(0, cap) : xs);
     switch (kind) {
       case 'players': return slice(hits.players).map((p) => renderPlayer(p, undefined, true));
-      case 'teams': return slice(hits.teams).map((h) => renderTeam({ id: h.team.id, name: h.team.name, colorHex: h.team.colorHex, sports: h.sports }));
+      case 'teams': return slice(hits.teams).map((h) => renderTeam({ id: h.team.id, name: h.team.name, colorHex: h.team.colorHex, sports: h.sports, teamIds: h.teamIds, clubId: h.team.clubId }));
       case 'matches': return slice(hits.matches).map((m) => <MatchCard key={m.id} match={m} onPress={() => openMatchViewer(nav, m)} />);
       case 'tournaments': return slice(hits.tournaments).map((t) => renderTournament(t, true));
     }

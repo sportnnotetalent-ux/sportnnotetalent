@@ -19,7 +19,8 @@ import { getSportMeta } from '../sports/sportMeta';
 import { useAuth } from '../core/auth';
 import { canScoreByRole } from '../core/roles';
 import { useTeamSummary, useMatches, usePlayers, useFollow, useTeamPermission } from '../data/hooks';
-import { getRoster, getMatchStatLines, getMatchSquads, getTournaments } from '../data/repos';
+import { getRoster, getMatchStatLines, getMatchSquads, getTournaments, getTeamRouteRow, getClub } from '../data/repos';
+import { teamRoute } from '../core/teamPage';
 import { getWaitingPlayerIds } from '../data/requestsStore';
 import { computeTeamStats, h2hLastText, resultFor, type Result } from '../data/teamStats';
 import { matchLineFor } from '../sports/matchLine';
@@ -41,8 +42,23 @@ type Nav = NativeStackNavigationProp<RootStackParamList>;
 export default function TeamProfileScreen() {
   const nav = useNavigation<Nav>();
   const { params } = useRoute<RouteProp<RootStackParamList, 'Team'>>();
-  const { teamId } = params;
+  const { teamId, inClub } = params;
   const { profile } = useAuth();
+  // One team page (TP1/TP2): a club's sport row opens the club's page; its own
+  // sport links (inClub) stay here and link back to it.
+  const [routed, setRouted] = useState(!!inClub);
+  const [club, setClub] = useState<{ id: string; name: string } | null>(null);
+  useEffect(() => {
+    let on = true;
+    getTeamRouteRow(teamId).then(async (row) => {
+      if (!on) return;
+      const r = teamRoute(row, { inClub });
+      if (r.route === 'ClubHome') { nav.replace('ClubHome', { clubId: r.clubId, ...(r.sport ? { sport: r.sport } : {}) }); return; }
+      setRouted(true);
+      if (row?.clubId) { const c = await getClub(row.clubId); if (on && c) setClub({ id: c.id, name: c.name }); }
+    }).catch(() => on && setRouted(true));
+    return () => { on = false; };
+  }, [teamId, inClub]);
   const { team, loading } = useTeamSummary(teamId);
   const { matches: rawMatches } = useMatches();
   // SD-48: a team tie is ONE result for the team (W/L, form, records); its
@@ -150,7 +166,7 @@ export default function TeamProfileScreen() {
     if (team) nav.setOptions({ title: team.name });
   }, [nav, team?.name]);
 
-  if (loading) {
+  if (loading || !routed) {
     return (
       <SafeAreaView style={st.safe} edges={['bottom']}>
         <LoadingState label="Loading team…" />
@@ -223,15 +239,19 @@ export default function TeamProfileScreen() {
           </View>
         </View>
 
-        <View style={st.followRow}>
-          <Button
-            label={following ? '✓ Following' : '+ Follow team'}
-            variant={following ? 'ghost' : 'primary'}
-            onPress={() => toggle('team', team.id)}
-            style={{ flex: 1 }}
-          />
-          <FollowBell type="team" id={team.id} name={team.name} />
-        </View>
+        {club ? (
+          <Button label={`🛡️ ${club.name} · team page ›`} variant="ghost" onPress={() => nav.navigate('ClubHome', { clubId: club.id })} />
+        ) : (
+          <View style={st.followRow}>
+            <Button
+              label={following ? '✓ Following' : '+ Follow team'}
+              variant={following ? 'ghost' : 'primary'}
+              onPress={() => toggle('team', team.id)}
+              style={{ flex: 1 }}
+            />
+            <FollowBell type="team" id={team.id} name={team.name} />
+          </View>
+        )}
         <View style={st.actions}>
           <View style={{ flex: 1 }}><Button label="📊 Stats" variant="ghost" onPress={() => scrollRef.current?.scrollTo({ y: statsY, animated: true })} /></View>
           <View style={{ flex: 1 }}><Button label={canManageSquad ? '👥 Squad · ＋ Add' : '👥 Squad'} variant="ghost" onPress={() => nav.navigate('Squad', { teamId: team.id })} /></View>

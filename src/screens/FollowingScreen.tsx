@@ -17,6 +17,7 @@ import type { Tournament } from '../core/types';
 import { getSportMeta } from '../sports/sportMeta';
 import type { RootStackParamList } from '../navigation/types';
 import { SportLine } from '../components/SportSymbol';
+import { collapseClubs } from '../core/teamPage';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -34,7 +35,8 @@ export default function FollowingScreen() {
   const tournamentIds = idsOfType('tournament');
 
   const followedPlayers = players.filter((p) => playerIds.includes(p.id));
-  const followedTeams = teams.filter((t) => teamIds.includes(t.id));
+  // A club's followed sports show once; one-off sides you follow stay listed (TP8).
+  const followedTeams = collapseClubs(teams.filter((t) => teamIds.includes(t.id)));
   // every followed tournament (this used to show only the app's oldest one, and only if followed)
   const followedTournaments = tournaments.filter((t) => tournamentIds.includes(t.id));
   const total = followedPlayers.length + followedTeams.length + followedTournaments.length;
@@ -77,13 +79,16 @@ export default function FollowingScreen() {
             <SectionHeader title="Teams" count={followedTeams.length} onSeeAll={followedTeams.length > SECTION_CAP ? () => setShowAllTeams((v) => !v) : undefined} expanded={showAllTeams} />
             {(showAllTeams ? followedTeams : followedTeams.slice(0, SECTION_CAP)).map((t) => (
               <Card key={t.id} style={st.row}>
-                <View style={[st.dot, { backgroundColor: t.colorHex ?? theme.colors.surfaceAlt }]} />
-                <View style={{ flex: 1 }}>
-                  <Text style={textStyles.body}>{t.name}</Text>
-                  <SportLine sports={[t.sport]} />
-                </View>
-                <Unfollow onPress={() => toggle('team', t.id)} />
-                <FollowBell type="team" id={t.id} name={t.name} />
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Open ${t.name}`} style={st.open}
+                  onPress={() => (t.clubId ? nav.navigate('ClubHome', { clubId: t.clubId }) : nav.navigate('Team', { teamId: t.id }))}>
+                  <View style={[st.dot, { backgroundColor: t.colorHex ?? theme.colors.surfaceAlt }]} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={textStyles.body}>{t.name}</Text>
+                    <SportLine sports={t.sports} />
+                  </View>
+                </TouchableOpacity>
+                <Unfollow onPress={() => { for (const id of t.teamIds) toggle('team', id); }} />
+                <FollowBell type="team" id={t.teamIds[0]} name={t.name} alsoIds={t.teamIds.slice(1)} />
               </Card>
             ))}
           </>
@@ -127,6 +132,7 @@ const st = StyleSheet.create({
   content: { padding: theme.spacing(4), gap: theme.spacing(3) },
   section: { marginTop: theme.spacing(2) },
   row: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(2) },
+  open: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: theme.spacing(2) },
   icon: { fontSize: 24 },
   dot: { width: 16, height: 16, borderRadius: 8 },
   avatar: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },

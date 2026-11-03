@@ -34,6 +34,7 @@ import { readCache } from './readCache';
 import { fetchAllPages, fetchAllChunked, chunk, ID_CHUNK } from './paging';
 import { entryNameFromPlayers, entryShortName, autoEntryCandidate, autoEntryIds, shortCodeIsAuto, meEntrantName } from './participantEntry';
 import { looksQuickPlaceholder, placeholderEntryIds, placeholderRename } from '../core/quickGame';
+import { squadIds } from '../core/teamPage';
 import { reportError } from '../core/telemetry';
 import {
   orSafe, parseVsQuery, rankByName, filterByName, capIds, collapseTeams, liveOnly, selectMatchHits, matchNames, narrowBySports,
@@ -962,7 +963,7 @@ export async function getTeams(sport?: SportId): Promise<Team[]> {
     if (sport) q = q.eq('sport', sport);
     return q.order('name').order('id').range(from, to);
   });
-  let res = teamLevelMissing ? null : await run('id,name,short_name,sport,color_hex,org_id,club_id,roster,level,entry_ids');
+  let res = teamLevelMissing ? null : await run('id,name,short_name,sport,color_hex,org_id,club_id,roster,level,entry_ids,adhoc');
   if (!res || res.error) { if (res) teamLevelMissing = true; res = await run('id,name,short_name,sport,color_hex,org_id,roster'); }
   const { data, error } = res;
   if (error || !data) return [];
@@ -1478,7 +1479,8 @@ async function searchTeamRows(q: string, limit: number): Promise<Team[]> {
   const run = (cols: string) => supabase!.from('teams').select(cols)
     .or(`name.ilike.%${s}%,short_name.ilike.%${s}%`).order('name').limit(limit);
   // club_id arrives with migration 0018 — read it when it's there, so club teams collapse.
-  let res = await run(`${TEAM_SEARCH_COLS},club_id`);
+  let res = await run(`${TEAM_SEARCH_COLS},club_id,adhoc`);
+  if (res.error) res = await run(`${TEAM_SEARCH_COLS},club_id`);
   if (res.error) res = await run(TEAM_SEARCH_COLS);
   if (res.error) throw new Error('Couldn’t search teams just now.');
   return rankByName(((res.data ?? []) as unknown as TeamRow[]).map(toTeam), s, names);
@@ -1488,7 +1490,8 @@ async function searchTeamRows(q: string, limit: number): Promise<Team[]> {
  *  into one hit listing every sport. */
 export async function searchTeams(q: string, limit = SEARCH_LIMIT): Promise<TeamHit[]> {
   if (!isSearchable(q) || looksLikeContact(q)) return [];
-  return collapseTeams(await searchTeamRows(q, SEARCH_ID_CAP)).slice(0, limit);
+  // One-off sides (quick games, game-day teams) aren't teams to discover (TP6).
+  return collapseTeams((await searchTeamRows(q, SEARCH_ID_CAP)).filter((t) => !t.adhoc)).slice(0, limit);
 }
 
 /** Tournaments matching `q` by name or host, newest first, never a deleted one. */
@@ -4019,8 +4022,10 @@ export async function getRoster(teamName: string, sport: SportId, teamId?: strin
   if (!isSupabaseConfigured || !supabase) {
     const byId = teamId ? demo.teams.find((t) => t.id === teamId) : undefined;
     if (byId) {
-      if (byId.roster?.length) { const ids = new Set(byId.roster); return demo.players.filter((p) => ids.has(p.id)); }
-      return demo.players.filter((p) => p.houseName === byId.name && p.sports.includes(sport));
+      const derived = demo.players.filter((p) => p.houseName === byId.name && p.sports.includes(sport)).map((p) => p.id);
+      const club = byId.clubId ? demo.clubMembers.filter((m) => m.clubId === byId.clubId).map((m) => m.playerId) : [];
+      const ids = new Set(squadIds(byId.roster, derived, club));
+      return demo.players.filter((p) => ids.has(p.id));
     }
     const team = demo.teams.find((t) => t.name === teamName && t.sport === sport && t.roster?.length);
     if (team?.roster?.length) {
@@ -4033,15 +4038,33 @@ export async function getRoster(teamName: string, sport: SportId, teamId?: strin
   // added by phone) takes precedence over the house-name-derived squad — mirrors
   // demo. Fall back to house-name only when no explicit roster is set (house teams).
   const { data: teamRows } = teamId
-    ? await supabase.from('teams').select('id, roster').eq('id', teamId).limit(1)
-    : await supabase.from('teams').select('id, roster').eq('name', teamName).eq('sport', sport).limit(1);
-  const explicit = (teamRows?.[0]?.roster ?? null) as string[] | null;
-  const ids = explicit && explicit.length ? explicit : await liveDerivedSquadIds(teamRows?.[0]?.id as string | undefined, teamName, sport);
+    ? await supabase.from('teams').select('id, roster, club_id').eq('id', teamId).limit(1)
+    : await supabase.from('teams').select('id, roster, club_id').eq('name', teamName).eq('sport', sport).limit(1);
+  const row = teamRows?.[0] as { id?: string; roster?: string[] | null; club_id?: string | null } | undefined;
+  const explicit = row?.roster ?? null;
+  const derived = explicit && explicit.length ? [] : await liveDerivedSquadIds(row?.id, teamName, sport);
+  // A club's sport with no squad picked yet: the club's members (one team page, TP5).
+  const club = (!explicit || !explicit.length) && !derived.length && row?.club_id
+    ? (((await supabase.from('club_members').select('player_id').eq('club_id', row.club_id).limit(500)).data ?? []) as { player_id: string }[]).map((r) => r.player_id)
+    : [];
+  const ids = squadIds(explicit, derived, club);
   if (!ids.length) return [];
   const { data, error } = await readPlayers((cols) => fetchAllChunked(ids, (part, from, to) =>
     supabase!.from(PLAYERS_READ).select(cols).in('id', part).order('id').range(from, to)));
   if (error || !data) return [];
   return (data as PlayerRow[]).map(toPlayer);
+}
+
+/** The bits of a team row that decide which page opens it (core/teamPage). */
+export async function getTeamRouteRow(teamId: string): Promise<{ id: string; clubId?: string; adhoc?: boolean; sport?: SportId } | null> {
+  if (!isSupabaseConfigured || !supabase) {
+    const t = demo.teams.find((x) => x.id === teamId);
+    return t ? { id: t.id, clubId: t.clubId, adhoc: t.adhoc, sport: t.sport } : null;
+  }
+  const { data, error } = await supabase.from('teams').select('id, club_id, adhoc, sport').eq('id', teamId).maybeSingle();
+  if (error || !data) return null;
+  const r = data as { id: string; club_id?: string | null; adhoc?: boolean | null; sport?: string };
+  return { id: r.id, clubId: r.club_id ?? undefined, adhoc: r.adhoc ?? undefined, sport: r.sport as SportId | undefined };
 }
 
 /** Live: the squad of a team with no explicit roster — its `team_members` rows,

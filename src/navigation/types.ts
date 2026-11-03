@@ -163,7 +163,8 @@ export type RootStackParamList = {
   Bracket: { tournamentId?: string; sport?: SportId } | undefined;
   /** SD-138 — one entrant's tournament: group finish → knockout rounds → place */
   TeamJourney: { tournamentId: string; teamId: string; sport?: SportId };
-  Team: { teamId: string };
+  /** inClub: a club's sport view, opened from its team page (never sent on to it again) */
+  Team: { teamId: string; inClub?: boolean };
   Squad: { teamId: string };
   /** correct a finished match (parity #05) */
   CorrectMatch: { matchId: string; sport: SportId };
@@ -177,7 +178,8 @@ export type RootStackParamList = {
   /** every tournament that's mine: hosting / playing / officiating / following */
   MyTournaments: undefined;
   CreateClub: { orgId?: string } | undefined;
-  ClubHome: { clubId: string };
+  /** sport: the sport the visitor came for (shown first) */
+  ClubHome: { clubId: string; sport?: string };
   /** a club game day (docs/product/squad-sessions.md): { clubId } starts one */
   SquadSession: { sessionId?: string; clubId?: string };
   ClubSport: { clubId: string; sport: SportId; /** SD-154: one squad (JV, B team) when the club has several */ teamId?: string };

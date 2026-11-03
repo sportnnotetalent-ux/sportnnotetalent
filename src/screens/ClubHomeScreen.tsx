@@ -13,12 +13,12 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { theme } from '../core/theme';
 import { SportBadge } from '../components/SportSymbol';
 import { readableOn } from '../core/contrast';
-import { Card, SelectChip, ScreenTitle, LoadingState, textStyles } from '../components/ui';
+import { Button, Card, SelectChip, ScreenTitle, LoadingState, textStyles } from '../components/ui';
 import { PersonPicker } from '../components/PersonPicker';
 import { SPORT_LIST, getSportMeta } from '../sports/sportMeta';
 import { useAuth } from '../core/auth';
 import {
-  getClub, getClubMembers, getClubSports, getMyPlayerId,
+  getClub, getClubMembers, getClubSports, getClubTeams, getMyPlayerId,
   addClubSport, removeClubSport, addClubMember, removeClubMember, setClubMemberRole, invitePerson, createClubInvite, updateClub,
 } from '../data/repos';
 import { LogoPicker } from '../components/LogoPicker';
@@ -28,6 +28,12 @@ import { SHARE_BASE } from '../core/shareText';
 import { InviteQrShare, type InviteQrShareHandle } from '../components/InviteQrShare';
 import type { Club, ClubMemberView, SportId } from '../core/types';
 import { getClubSessions } from '../data/squadSessions';
+import { FollowBell } from '../components/FollowBell';
+import { MatchCard } from '../components/MatchCard';
+import { useFollow, useMatches } from '../data/hooks';
+import { clubFollow } from '../core/teamPage';
+import { openMatchViewer } from '../navigation/openMatch';
+import type { Team } from '../core/types';
 import type { SquadSession } from '../core/squadSession';
 import type { RootStackParamList } from '../navigation/types';
 import { Glyph } from '../components/Icon';
@@ -46,6 +52,9 @@ export default function ClubHomeScreen() {
   const [myId, setMyId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [sessions, setSessions] = useState<SquadSession[]>([]);
+  const [rows, setRows] = useState<Team[]>([]);
+  const { isFollowing, toggle } = useFollow(profile?.id);
+  const { matches } = useMatches();
 
   const [editSports, setEditSports] = useState(false);
   const [addingMember, setAddingMember] = useState(false);
@@ -55,10 +64,10 @@ export default function ClubHomeScreen() {
   const qrShare = useRef<InviteQrShareHandle>(null);
 
   const load = useCallback(async () => {
-    const [c, m, s, id, ss] = await Promise.all([
-      getClub(clubId), getClubMembers(clubId), getClubSports(clubId), getMyPlayerId(profile?.id), getClubSessions(clubId, 5),
+    const [c, m, s, id, ss, rs] = await Promise.all([
+      getClub(clubId), getClubMembers(clubId), getClubSports(clubId), getMyPlayerId(profile?.id), getClubSessions(clubId, 5), getClubTeams(clubId),
     ]);
-    setClub(c); setMembers(m); setSports(s); setMyId(id); setSessions(ss); setLoading(false);
+    setClub(c); setMembers(m); setSports(s); setMyId(id); setSessions(ss); setRows(rs); setLoading(false);
   }, [clubId, profile?.id]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
@@ -66,6 +75,17 @@ export default function ClubHomeScreen() {
   const amAdmin = members.some((m) => m.playerId === myId && m.role === 'admin') || (!!club && club.createdBy === profile?.id);
   const adminCount = members.filter((m) => m.role === 'admin').length;
   const amMember = amAdmin || members.some((m) => m.playerId === myId);
+  // Follow = every sport of the team (TP4); 🔔 choices go to all of them.
+  const rowIds = rows.map((t) => t.id);
+  const follow = clubFollow(rowIds, (id) => isFollowing('team', id));
+  const toggleFollow = () => { for (const id of [...follow.toFollow, ...follow.toUnfollow]) toggle('team', id); };
+  // The sport a visitor came for first, then the rest.
+  const ordered = params.sport && sports.includes(params.sport as SportId) ? [params.sport as SportId, ...sports.filter((x) => x !== params.sport)] : sports;
+  const rowFor = (sp: SportId) => rows.find((t) => t.sport === sp && !t.level) ?? rows.find((t) => t.sport === sp);
+  const rowSet = new Set(rowIds);
+  const results = matches
+    .filter((m) => m.status === 'completed' && (rowSet.has(m.homeTeam.id) || rowSet.has(m.awayTeam.id)))
+    .sort((a, b) => b.startsAt.localeCompare(a.startsAt)).slice(0, 5);
 
   async function toggleSport(s: SportId) {
     setBusy(true);
@@ -151,6 +171,13 @@ export default function ClubHomeScreen() {
           </View>
         </Card>
 
+        {rowIds.length ? (
+          <View style={st.followRow}>
+            <Button label={follow.following ? '✓ Following' : '+ Follow team'} variant={follow.following ? 'ghost' : 'primary'} onPress={toggleFollow} style={{ flex: 1 }} />
+            <FollowBell type="team" id={rowIds[0]} name={club.name} alsoIds={rowIds.slice(1)} />
+          </View>
+        ) : null}
+
         {/* Sports */}
         <View style={st.sectionHead}>
           <Text style={textStyles.h3}>Sports</Text>
@@ -173,17 +200,25 @@ export default function ClubHomeScreen() {
         ) : sports.length === 0 ? (
           <Card><Text style={textStyles.muted}>No sports yet. {amAdmin ? 'Tap Edit to add one.' : ''}</Text></Card>
         ) : (
-          sports.map((s) => {
+          ordered.map((s) => {
             const plugin = getSportMeta(s);
+            const row = rowFor(s);
+            // Everyone: the sport's stats, squad and matches. Admins: squad & captains too.
             return (
-              <TouchableOpacity key={s} accessibilityRole="button" accessibilityLabel={`Open ${plugin.name}`}
-                onPress={() => nav.navigate('ClubSport', { clubId, sport: s })}>
-                <Card style={st.sportRow}>
+              <Card key={s} style={st.sportRow}>
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Open ${plugin.name}`} style={st.sportOpen}
+                  onPress={() => (row ? nav.navigate('Team', { teamId: row.id, inClub: true }) : nav.navigate('ClubSport', { clubId, sport: s }))}>
                   <SportBadge sport={s} size={32} />
                   <Text style={[textStyles.body, { flex: 1 }]}>{plugin.name}</Text>
                   <Text style={st.chev}>›</Text>
-                </Card>
-              </TouchableOpacity>
+                </TouchableOpacity>
+                {amAdmin ? (
+                  <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Squad and captains for ${plugin.name}`}
+                    onPress={() => nav.navigate('ClubSport', { clubId, sport: s })}>
+                    <Text style={st.link}>Squad</Text>
+                  </TouchableOpacity>
+                ) : null}
+              </Card>
             );
           })
         )}
@@ -214,6 +249,14 @@ export default function ClubHomeScreen() {
             </TouchableOpacity>
           ))
         )}
+
+        {/* Recent results (everyone) */}
+        {results.length ? (
+          <>
+            <Text style={textStyles.h3}>Recent results</Text>
+            {results.map((m) => <MatchCard key={m.id} match={m} onPress={() => openMatchViewer(nav, m)} />)}
+          </>
+        ) : null}
 
         {/* Members */}
         <View style={st.sectionHead}>
@@ -307,6 +350,8 @@ const st = StyleSheet.create({
   danger: { color: theme.colors.danger, fontWeight: '800' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing(2) },
   sportRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(3) },
+  sportOpen: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: theme.spacing(3) },
+  followRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(2) },
   sportIcon: { fontSize: 22 },
   chev: { color: theme.colors.textMuted, fontSize: theme.font.h3, fontWeight: '800' },
   memberRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(2) },

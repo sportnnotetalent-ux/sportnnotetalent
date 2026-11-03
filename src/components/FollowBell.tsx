@@ -10,7 +10,8 @@ import { bellState } from '../data/followPrefs';
 import type { FollowType } from '../data/followStore';
 import { FollowAlertsSheet } from './FollowAlertsSheet';
 
-export function FollowBell({ type, id, name, style }: { type: FollowType; id: string; name: string; style?: StyleProp<ViewStyle> }) {
+/** `alsoIds`: a club's other sport rows — their alerts are saved the same way (one team page, TP4). */
+export function FollowBell({ type, id, name, style, alsoIds }: { type: FollowType; id: string; name: string; style?: StyleProp<ViewStyle>; alsoIds?: string[] }) {
   const { profile } = useAuth();
   const { isFollowing, prefsOf } = useFollow(profile?.id);
   const [open, setOpen] = useState(false);
@@ -29,7 +30,7 @@ export function FollowBell({ type, id, name, style }: { type: FollowType; id: st
         <Text style={st.glyph}>{state === 'none' ? '🔕' : '🔔'}</Text>
         {state === 'some' && <View style={st.dot} />}
       </TouchableOpacity>
-      {open && <FollowAlertsSheet visible={open} type={type} id={id} name={name} onClose={() => setOpen(false)} />}
+      {open && <FollowAlertsSheet visible={open} type={type} id={id} name={name} alsoIds={alsoIds} onClose={() => setOpen(false)} />}
     </>
   );
 }
