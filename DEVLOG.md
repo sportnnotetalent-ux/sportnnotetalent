@@ -13,6 +13,13 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-04 — Real names for quick-game sides; the doubles picker
+
+From the founder's phone: a finished pool match read "Vivek C vs Player B" on Home, in the title and in the Summary ("VC / B"), while the scoreboard showed "Abhra Cho…" — a quick friendly started with an empty side makes a placeholder team "Player B", and adding the real player never renamed it (the scoreboard alone read the roster). And in doubles, typing "Hru" offered a one-person entry "Hrudhay" as a pair, skipping the partner.
+- **Side names** (`placeholder-side-names.md`): adding a player / pair to a placeholder side renames it to the entry's full name and short code (`renamePlaceholderSide`, after `invitePlayer` / `setTeamRoster`; never a real team; never fails the add); older matches read their placeholder side's roster names wherever a match is read (`revealEntryNames`, names from `players_view` so children stay masked); the live title, Summary codes, share text and notifications follow.
+- **Doubles picker** (`doubles-picker.md`): doubles lists only real pairs (two different people); people show in the search and picking one (or "Me +") starts a new pair and asks for the partner; the same two people re-use their pair; up to 6 "Recent pairs" chips before typing; singles lists only one-person entries. **Pair type** (format `category`: Open / Men's / Women's / Mixed) for doubles in tennis, badminton, TT, squash, pickleball, padel — any pair may play any pair in a friendly; Mixed feeds the existing "Mixed" career split; in Info. Not done: gender checks (no gender stored), per-match division UI; old pairs saved without a roster no longer appear in doubles search.
+Full suite 7,121 tests, 0 failing; tsc clean. Demo-checked: doubles setup shows "Me +", Pair type; "Rohan" lists people and picking one opens "Partner 1: ✓ Rohan Nair" asking for partner 2. Side renaming covered by tests (not driven in the demo).
+
 ### 2026-11-04 — Release: Undo labels + Quick options closing live (web, Android OTA)
 
 auth-smoke passed. Published from a clean worktree at 1f675f0: web (entry `index-76fab0f4`, confirmed live on app.sportnnote.in) and Android OTA groups `3f7e3232` (preview) and `392fd630` (production), runtime 1.0.0.
