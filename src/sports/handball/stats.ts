@@ -74,6 +74,9 @@ export const handballStats: SportStatSchema<'handball'> = {
     // carry them tracked them
     { key: 'emptyGoalGoals', label: 'Empty-goal goals', short: 'empty-goal goals', one: 'empty-goal goal', group: 'types', coverage: 'keyed' },
     { key: 'sevenMDrawn', label: '7 m throws won', short: '7 m throws won', one: '7 m throw won', compact: '7 m won', group: 'attack', coverage: 'keyed' },
+    // batch 6: the defender who conceded a 7-metre throw (keyed: only a
+    // match that logged one)
+    { key: 'sevenMCaused', label: '7 m throws conceded', short: '7 m throws conceded', one: '7 m throw conceded', compact: '7 m conceded', group: 'defence', format: { unit: 'count', better: 'lower' }, coverage: 'keyed' },
     { key: 'soSaves', label: 'Shoot-out saves', short: 'shoot-out saves', one: 'shoot-out save', compact: 'SO saves', group: 'goalkeeping', coverage: 'keyed' },
     // round 2: minutes with an empty goal (IHF 4:1, the 7th-court-player
     // time) — a team figure on the match centre, and on the career of the
@@ -123,6 +126,11 @@ export const handballStats: SportStatSchema<'handball'> = {
     { key: 'tfPassive', label: 'Passive play', short: 'passive play', source: 'team' },
     { key: 'tfPass', label: 'Bad passes / catches', short: 'bad passes / catches', one: 'bad pass / catch', source: 'team' },
     { key: 'tfOther', label: 'Other technical faults', short: 'other technical faults', one: 'other technical fault', source: 'team' },
+    // batch 6: attempts whose position wasn't recorded ("Not sure"), and the
+    // referees' passive-play warnings (only on a match that has them)
+    { key: 'unsureGoals', label: 'Goals, position not recorded', short: 'goals, position not recorded', source: 'team' },
+    { key: 'unsureShots', label: 'Attempts, position not recorded', short: 'attempts, position not recorded', source: 'team' },
+    { key: 'passiveWarnings', label: 'Passive-play warnings', short: 'passive-play warnings', one: 'passive-play warning', source: 'team', format: { unit: 'count', better: 'lower' } },
   ],
   filters: {
     keeper: (l) => l.stats != null && 'goalsConceded' in l.stats,
@@ -133,7 +141,7 @@ export const handballStats: SportStatSchema<'handball'> = {
       { stat: 'sevenMGoals' }, { stat: 'sevenMTaken' }, { stat: 'sevenMPct' }, { stat: 'sevenMDrawn', hideZero: true },
     ] },
     { id: 'types', title: 'Goals by type', rows: [...TYPES.flatMap(([k]) => [{ stat: `${k}Goals`, hideZero: true }, { stat: `${k}Pct` }]), { stat: 'emptyGoalGoals', hideZero: true }] },
-    { id: 'defence', title: 'Defence & ball', rows: [{ stat: 'steals' }, { stat: 'blocks' }, { stat: 'technicalFaults' }] },
+    { id: 'defence', title: 'Defence & ball', rows: [{ stat: 'steals' }, { stat: 'blocks' }, { stat: 'technicalFaults' }, { stat: 'sevenMCaused', hideZero: true }] },
     { id: 'playing', title: 'Playing time', rows: [{ stat: 'minutes' }] },
     { id: 'goalkeeping', title: 'Goalkeeping', rows: [{ stat: 'saves' }, { stat: 'goalsConceded' }, { stat: 'savePct' }, { stat: 'sevenMSaves' }, { stat: 'sevenMSavePct' }, { stat: 'concededPerGame' }, { stat: 'soSaves', hideZero: true }, { stat: 'emptyGoalMinutes', hideZero: true }] },
     // deep wave: the IHF keeper line by position (save % from 6 m, 9 m …)
@@ -188,13 +196,15 @@ export const handballCentre: CentreCategory[] = [
   { id: 'shooting', label: 'Shooting', rows: [
     ...TYPES.flatMap(([k, label]) => [`${k}Goals`, { key: `${k}Pct`, label: `${label} shooting %` }]),
     'sevenMGoals', { key: 'sevenMPct', label: '7 m %' }, 'emptyGoalGoals', 'sevenMDrawn', 'assists',
+    // batch 6: so the position rows add up to the goals
+    'unsureGoals', 'unsureShots',
   ] },
   { id: 'keeping', label: 'Goalkeeping', rows: [
     { key: 'savePct', label: 'Save %' }, 'saves', 'sevenMSaves', ...TYPES.map(([k]) => `${k}SavePct`), 'sevenMSavePct',
     // round 2: only once a side used the empty goal
     { key: 'emptyGoalMinutes', label: 'Minutes with an empty goal (7th court player)' },
   ] },
-  { id: 'ball', label: 'Ball & defence', rows: ['steals', 'blocks', 'technicalFaults', 'tfSteps', 'tfDouble', 'tfArea', 'tfOffensive', 'tfPassive', 'tfPass', 'tfOther'] },
+  { id: 'ball', label: 'Ball & defence', rows: ['steals', 'blocks', 'technicalFaults', 'tfSteps', 'tfDouble', 'tfArea', 'tfOffensive', 'tfPassive', 'tfPass', 'tfOther', 'passiveWarnings', 'sevenMCaused'] },
   { id: 'discipline', label: 'Discipline', rows: [
     { key: 'yellowCards', label: 'Warnings' }, { key: 'twoMinutes', label: '2-minute suspensions' }, { key: 'redCards', label: 'Disqualifications' },
     { key: 'blueCards', label: 'Blue cards' }, 'timeouts',

@@ -328,10 +328,13 @@ const core = (s: VolleyballState, a: ScoreAction): VolleyballState => {
     const replayed = replayPoints(reducer, clearMatch(s), (a.payload?.points as PointInput[]) ?? []);
     // SD-136: sanction records (no score effect) go back where they were; a log
     // without any (every older match) is returned exactly as replayed.
-    return s.events.some((e) => e.kind === 'conduct')
-      ? keepMarks(s.events.filter((e) => e.kind === 'conduct' || isPointKind(e.kind)), replayed)
+    // Batch 6: video challenges (kind 'review') are kept the same way.
+    return s.events.some((e) => e.kind === 'conduct' || e.kind === 'review')
+      ? keepMarks(s.events.filter((e) => e.kind === 'conduct' || e.kind === 'review' || isPointKind(e.kind)), replayed)
       : replayed;
   }
+  // Batch 6: a video challenge — a marker (no score effect)
+  if (a.type === 'CHALLENGE') return challengeStep(s, a);
   // SD-136: sanctions (FIVB 16 / 21) — ./sanctions.ts
   if (a.type === 'CONDUCT' || a.type === 'PENALTY_POINT') return sanctionStep(s, a);
   if (a.type === 'TIMEOUT') {
@@ -397,7 +400,43 @@ const core = (s: VolleyballState, a: ScoreAction): VolleyballState => {
 const stamped = withStamps(core);
 
 /** Deep wave — the scoring steps the controls stamp with the scorer's clock. */
-const STAMP_TYPES = new Set(['POINT', 'ATTACK', 'BLOCK', 'ACE', 'OPP_ERROR', 'SERVE_ERROR', 'TIMEOUT', 'CONDUCT']);
+const STAMP_TYPES = new Set(['POINT', 'ATTACK', 'BLOCK', 'ACE', 'OPP_ERROR', 'SERVE_ERROR', 'TIMEOUT', 'CONDUCT', 'CHALLENGE']);
+
+/* ------------------------- video challenge (batch 6) ------------------------- */
+
+/** What a team may challenge (FIVB Video Challenge System). */
+export const VB_CHALLENGE_WHAT = ['inout', 'touch', 'net', 'antenna', 'line'] as const;
+export type VbChallengeWhat = (typeof VB_CHALLENGE_WHAT)[number];
+export const VB_CHALLENGE_LABEL: Record<VbChallengeWhat, string> = {
+  inout: 'Ball in / out', touch: 'Block touch', net: 'Net touch', antenna: 'Antenna', line: 'Foot fault / centre line',
+};
+/** FIVB: each team has 2 unsuccessful challenges per set. */
+export const VB_CHALLENGES_PER_SET = 2;
+/** Unsuccessful challenges `side` has left in the set in play. */
+export function challengesLeft(s: VolleyballState, side: 'home' | 'away'): number {
+  const setNo = s.setsWon.home + s.setsWon.away + 1;
+  const used = s.events.filter((e) => e.kind === 'review' && e.side === side && e.set === setNo && e.rev === 'rejected').length;
+  return Math.max(0, VB_CHALLENGES_PER_SET - used);
+}
+/** CHALLENGE {side = the challenging team, payload {upheld: boolean, what?}}:
+ *  a timeline marker that a correction keeps. Anything else is ignored. */
+function challengeStep(s: VolleyballState, a: ScoreAction): VolleyballState {
+  const side = a.side;
+  const upheld = a.payload?.upheld;
+  if (s.ended || (side !== 'home' && side !== 'away') || typeof upheld !== 'boolean' || challengesLeft(s, side) === 0) return s;
+  const w = a.payload?.what;
+  const what = VB_CHALLENGE_WHAT.includes(w as VbChallengeWhat) ? (w as VbChallengeWhat) : undefined;
+  const setNo = s.setsWon.home + s.setsWon.away + 1;
+  const seq = s.seq + 1;
+  return {
+    ...s, seq,
+    events: [...s.events, {
+      id: seq, stamp: `Set ${setNo}`, icon: '📺', label: `Video challenge · ${upheld ? 'upheld' : 'not upheld'}`,
+      ...(what ? { detail: VB_CHALLENGE_LABEL[what] } : {}),
+      side, kind: 'review', set: setNo, rev: upheld ? 'upheld' : 'rejected', ...(what ? { chw: what } : {}),
+    }],
+  };
+}
 /** The action with the scorer's clock (`payload.at`) when it's a scoring step. */
 export const stampAction = (a: ScoreAction, now: number = Date.now()): ScoreAction =>
   STAMP_TYPES.has(a.type) && a.payload?.at == null ? { ...a, payload: { ...(a.payload ?? {}), at: now } } : a;

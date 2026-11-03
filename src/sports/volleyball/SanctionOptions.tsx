@@ -15,8 +15,8 @@ import { Tile } from '../../components/QuickOptionsSheet';
 import { askConfirm } from '../../components/ConfirmSheet';
 import type { Player } from '../../core/types';
 import type { QuickOptionsProps } from '../types';
-import { stampAction, type VolleyballState } from './engine';
-import { sanctionAction } from './actions';
+import { challengesLeft, stampAction, VB_CHALLENGE_LABEL, VB_CHALLENGE_WHAT, type VbChallengeWhat, type VolleyballState } from './engine';
+import { challengeAction, sanctionAction } from './actions';
 import {
   VB_MISCONDUCT_REASONS, VB_SANCTIONS, oppSide, sanctionDef, sanctionEffect, sanctionsOf, suggestSanction,
   type VbSanctionLevel, type VbSanctionTrack,
@@ -26,7 +26,9 @@ type Side = 'home' | 'away';
 
 export function VolleyballQuickOptions({ state, dispatch, homeRoster, awayRoster, homeName, awayName, onDone }: QuickOptionsProps) {
   const s = state as VolleyballState;
-  const [open, setOpen] = useState<VbSanctionTrack | null>(null);
+  // batch 6: 'challenge' = the video challenge panel
+  const [open, setOpen] = useState<VbSanctionTrack | 'challenge' | null>(null);
+  const [what, setWhat] = useState<VbChallengeWhat | null>(null);
   const [side, setSide] = useState<Side | null>(null);
   const [player, setPlayer] = useState<Player | null>(null);
   const [level, setLevel] = useState<VbSanctionLevel | null>(null);
@@ -35,7 +37,40 @@ export function VolleyballQuickOptions({ state, dispatch, homeRoster, awayRoster
   const events = s.events ?? [];
   const nameOf = (x: Side) => (x === 'home' ? homeName : awayName);
   const rosterOf = (x: Side) => (x === 'home' ? homeRoster : awayRoster);
-  const toggle = (k: VbSanctionTrack) => { setSide(null); setPlayer(null); setLevel(null); setReason(null); setOpen((o) => (o === k ? null : k)); };
+  const toggle = (k: VbSanctionTrack | 'challenge') => { setSide(null); setPlayer(null); setLevel(null); setReason(null); setWhat(null); setOpen((o) => (o === k ? null : k)); };
+
+  // Batch 6 — a video challenge (FIVB VCS): a marker, no score effect; a team
+  // has 2 unsuccessful challenges per set. One step Undo takes it back.
+  const challengePanel = () => {
+    const left = side ? challengesLeft(s, side) : 0;
+    const log = (upheld: boolean) => {
+      if (!side || left === 0) return;
+      dispatch(stampAction(challengeAction(side, upheld, what)));
+      onDone();
+    };
+    return (
+      <View style={st.panel}>
+        <Text style={textStyles.muted}>Video challenge — no score change; correct the point with Undo if the call changes it. Who challenged?</Text>
+        <View style={st.chips}>
+          {(['home', 'away'] as const).map((x) => <SelectChip key={x} label={`${nameOf(x)} · ${challengesLeft(s, x)} left`} active={side === x} onPress={() => setSide(x)} />)}
+        </View>
+        {side && (
+          <>
+            <Text style={textStyles.muted}>What (optional)</Text>
+            <View style={st.chips}>
+              {VB_CHALLENGE_WHAT.map((w) => <SelectChip key={w} label={VB_CHALLENGE_LABEL[w]} active={what === w} onPress={() => setWhat(what === w ? null : w)} />)}
+            </View>
+            {left === 0 ? <Text style={st.effect}>{nameOf(side)} have used their 2 unsuccessful challenges this set.</Text> : (
+              <View style={st.chips}>
+                <Button label="Upheld" disabled={left === 0} onPress={() => log(true)} />
+                <Button label="Not upheld" variant="ghost" disabled={left === 0} onPress={() => log(false)} />
+              </View>
+            )}
+          </>
+        )}
+      </View>
+    );
+  };
 
   const panel = (track: VbSanctionTrack) => {
     const suggested = side ? suggestSanction(events, side, track, player?.id) : null;
@@ -103,8 +138,9 @@ export function VolleyballQuickOptions({ state, dispatch, homeRoster, awayRoster
       <View style={st.grid}>
         <Tile icon="🟨" label="Sanction" hint="Warning → penalty → expulsion → DQ" active={open === 'misconduct'} onPress={() => toggle('misconduct')} />
         <Tile icon="⏱️" label="Delay" hint="Warning, then penalty" active={open === 'delay'} onPress={() => toggle('delay')} />
+        <Tile icon="📺" label="Challenge" hint="Video challenge: upheld or not" active={open === 'challenge'} onPress={() => toggle('challenge')} />
       </View>
-      {open && panel(open)}
+      {open === 'challenge' ? challengePanel() : open && panel(open)}
     </View>
   );
 }

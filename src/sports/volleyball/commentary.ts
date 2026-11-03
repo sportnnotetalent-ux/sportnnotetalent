@@ -17,8 +17,8 @@
  * is the fallback, and without a lookup the text reads as before).
  */
 import type { LiveEvent } from '../liveEvents';
-import type { VolleyballState } from './engine.ts';
-import { errorTypeLabel } from './engine.ts';
+import type { VolleyballState, VbChallengeWhat } from './engine.ts';
+import { errorTypeLabel, VB_CHALLENGE_LABEL } from './engine.ts';
 import { trackCourt, type RallyServe } from './rotation.ts';
 import { RECEPTION_GRADES, type VbDetailEntry } from './detail.ts';
 import { fromPen, sanctionDef, type VbSanction } from './sanctions.ts';
@@ -180,6 +180,16 @@ export function volleyballCommentary(s: VolleyballState, names: VbNames): FeedGr
     if (e.kind === 'timeout' && (e.side === 'home' || e.side === 'away')) {
       const sc = score.get(set) ?? { h: 0, a: 0 };
       add(set, { id: `t${e.id}`, stamp: elapsedStamp(e.at, t0), icon: '⏱️', side: e.side, score: `${sc.h}-${sc.a}`, text: `Timeout ${names[e.side]}` });
+      continue;
+    }
+    if (e.kind === 'review' && (e.side === 'home' || e.side === 'away')) {
+      // batch 6: a video challenge (no score effect)
+      const sc = score.get(set) ?? { h: 0, a: 0 };
+      const what = e.chw && VB_CHALLENGE_LABEL[e.chw as VbChallengeWhat];
+      add(set, {
+        id: `r${e.id}`, stamp: elapsedStamp(e.at, t0), icon: '📺', side: e.side, score: `${sc.h}-${sc.a}`,
+        text: `Video challenge by ${names[e.side]}${what ? ` (${what.toLowerCase()})` : ''}: ${e.rev === 'upheld' ? 'upheld' : 'not upheld'}`,
+      });
       continue;
     }
     if (e.kind === 'conduct' && e.vs) {

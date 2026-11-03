@@ -33,7 +33,7 @@ import {
   init, reducer, isComplete, result, levelAtEnd, aggLine, matchSec, periodSec, periodLen, clockFace, clockText, periodName, periodLong, periodStarted, running,
   eventCredits, creditAttribution, currentKeeper, soScore, nextThrower, needsSdPick, handballScoreLine, timeoutCheck, suspensionsOf, hasYellow, teamYellows,
   totalPeriods, maxEtRounds, HANDBALL_PRESETS, HANDBALL_LIVE_SETTINGS, SHOT_LABEL, SHOT_TYPES, LIVE_KEYS,
-  HANDBALL_TRACK_FIELDS, FAULT_TYPES, FAULT_LABEL, goalEmpty,
+  HANDBALL_TRACK_FIELDS, FAULT_TYPES, FAULT_LABEL, goalEmpty, UNSURE_SHOT,
   type FaultType, type HandballEvent, type HandballState, type MissResult, type Sanction, type ShotType, type Side,
 } from './engine';
 import { handballTotals, handballLiveField, handballField, unavailable } from './totals';
@@ -56,6 +56,9 @@ const uid = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(
 const isKeeperPos = (p?: string | null) => !!p && /^\s*(gk|goal\s*-?\s*keeper|keeper)\s*$/i.test(p);
 const TRACKED: string[] = LIVE_KEYS.filter((k) => k !== 'soTaken' && k !== 'soGoals');
 const FIELD_TYPES = SHOT_TYPES.filter((t) => t !== 'sevenM');
+/** batch 6: a position from the grid, or "Not sure" (no 9 m guess) */
+type ShotPick = ShotType | typeof UNSURE_SHOT;
+const pickLabel = (t?: ShotPick) => (t === UNSURE_SHOT ? 'position not sure' : SHOT_LABEL[t ?? 'nineM']);
 
 /* ------------------------------ player picker ------------------------------ */
 
@@ -79,11 +82,12 @@ function PlayerGrid({ players, onPick, skip }: { players: Player[]; onPick: (p: 
 }
 
 type Flow =
-  | { mode: 'goal'; side: Side; step: 'type' | 'scorer' | 'assist'; shotType?: ShotType; scorer?: Player | null }
-  | { mode: 'shot'; side: Side; step: 'type' | 'result' | 'player' | 'blocker'; shotType?: ShotType; result?: MissResult; shooter?: Player | null; gk?: Player }
+  | { mode: 'goal'; side: Side; step: 'type' | 'scorer' | 'assist'; shotType?: ShotPick; scorer?: Player | null }
+  | { mode: 'shot'; side: Side; step: 'type' | 'result' | 'player' | 'blocker'; shotType?: ShotPick; result?: MissResult; shooter?: Player | null; gk?: Player }
   // `by` (deep wave, when tracked): who won the 7-metre throw — batch 3: an
   // optional chip on the result screen (no extra step), logged before the result
-  | { mode: 'seven'; side: Side; step: 'result' | 'player'; result?: 'saved' | 'missed'; by?: Player; gk?: Player }
+  // `cause` (batch 6, same toggle): the defender who conceded it — a chip row
+  | { mode: 'seven'; side: Side; step: 'result' | 'player'; result?: 'saved' | 'missed'; by?: Player; cause?: Player; gk?: Player }
   // `fault` (deep wave, when tracked): the technical fault's kind
   | { mode: 'turnover'; side: Side; step: 'kind' | 'player' | 'stealer'; stolen?: boolean; loser?: Player | null; fault?: FaultType }
   | { mode: 'card'; side: Side; step: 'kind' | 'player'; card?: Sanction; blue?: boolean }
@@ -166,20 +170,22 @@ const ScoringControls: SportPlugin<HandballState>['ScoringControls'] = ({
     const cr = eventCredits(e);
     return { attribution: creditAttribution(cr.first, 1, TRACKED), attribution2: creditAttribution(cr.second, 1, TRACKED) };
   };
-  const goal = (sd: Side, shotType: ShotType, scorer: Player | null, assist: Player | null) => {
-    fire({ type: 'GOAL', side: sd, payload: { shotType }, ...credit({ type: 'goal', shotType, playerId: scorer?.id, secondId: assist?.id }) });
+  // batch 6: "Not sure" logs `shotType: 'unknown'` (no position credit)
+  const posCredit = (t: ShotPick) => (t === UNSURE_SHOT ? { unsure: true } : { shotType: t });
+  const goal = (sd: Side, shotType: ShotPick, scorer: Player | null, assist: Player | null) => {
+    fire({ type: 'GOAL', side: sd, payload: { shotType }, ...credit({ type: 'goal', ...posCredit(shotType), playerId: scorer?.id, secondId: assist?.id }) });
     setFlow(null);
   };
   // an attempt that didn't score; a save goes to the other side's keeper (its
   // own action on the keeper's side), a block to the blocker. Batch 5: with no
   // keeper set, "Who's in goal?" (optional) logs the keeper first (savePrompt).
-  const miss = (sd: Side, shotType: ShotType, res: MissResult, p: Player | null, blocker?: Player | null, gkPick?: Player) => {
+  const miss = (sd: Side, shotType: ShotPick, res: MissResult, p: Player | null, blocker?: Player | null, gkPick?: Player) => {
     const id = uid();
     const saved = res === 'saved' ? savedByActions(s, opp(sd), gkPick) : null;
     for (const a of saved?.pre ?? []) fire(a);
-    fire({ type: 'MISS', side: sd, payload: { shotType, result: res, uid: id }, ...credit({ type: 'miss', shotType, playerId: p?.id }) });
+    fire({ type: 'MISS', side: sd, payload: { shotType, result: res, uid: id }, ...credit({ type: 'miss', ...posCredit(shotType), playerId: p?.id }) });
     if (saved) {
-      fire({ type: 'SAVE', side: opp(sd), payload: { ref: id, shotType }, ...credit({ type: 'save', shotType, playerId: saved.keeperId }) });
+      fire({ type: 'SAVE', side: opp(sd), payload: { ref: id, shotType }, ...credit({ type: 'save', ...posCredit(shotType), playerId: saved.keeperId }) });
     }
     if (res === 'blocked' && blocker) fire({ type: 'BLOCK', side: opp(sd), payload: { ref: id }, ...credit({ type: 'block', playerId: blocker.id }) });
     setFlow(null);
@@ -224,10 +230,16 @@ const ScoringControls: SportPlugin<HandballState>['ScoringControls'] = ({
   };
   // deep wave: who won a 7-metre throw (when tracked)
   const drawn = (sd: Side, p: Player) => fire({ type: 'DRAWN', side: sd, ...credit({ type: 'drawn', playerId: p.id }) });
+  // batch 6: the defender who conceded the 7 m (his side; credits sevenMCaused)
+  const caused = (sd: Side, p: Player) => fire({ type: 'CAUSED', side: sd, ...credit({ type: 'caused', playerId: p.id }) });
+  // batch 6: the passive-play warning (forewarning signal) to the side in possession
+  const passive = (sd: Side) => { fire({ type: 'PASSIVE', side: sd }); setFlow(null); };
   // batch 3: the 7 m result — the "won by" chip (if one was picked) is logged
-  // first, as the old step did, then the flow goes on to the scorer / thrower
-  const sevenResult = (sd: Side, by: Player | undefined, next: Flow) => {
+  // first, as the old step did, then (batch 6) "caused by", then the flow goes
+  // on to the scorer / thrower
+  const sevenResult = (sd: Side, by: Player | undefined, next: Flow, cause?: Player) => {
     if (by) drawn(sd, by);
+    if (cause) caused(opp(sd), cause);
     setFlow(next);
   };
   // deep wave (IHF 4:1): the keeper off for a 7th court player, or back
@@ -245,7 +257,7 @@ const ScoringControls: SportPlugin<HandballState>['ScoringControls'] = ({
   };
   const remove = (e: HandballEvent) => { for (const a of removalActions(e)) dispatch(a); };
   const edit = (e: HandballEvent) => {
-    if (e.type === 'timeout' || isAnswer(e) || e.type === 'save' || e.type === 'empty' || e.type === 'drawn') { remove(e); return; }
+    if (e.type === 'timeout' || isAnswer(e) || e.type === 'save' || e.type === 'empty' || e.type === 'drawn' || e.type === 'caused' || e.type === 'passive') { remove(e); return; }
     holdRemoval(removalActions(e));
     setEditAt({ sec: e.sec, period: e.period });
     setShowEdit(false);
@@ -379,11 +391,13 @@ const ScoringControls: SportPlugin<HandballState>['ScoringControls'] = ({
         <Text style={c.cancel} accessibilityRole="button" onPress={() => setFlow(null)}>Cancel</Text>
       </View>
     );
-    const typeGrid = (pick: (t: ShotType) => void) => (
+    const typeGrid = (pick: (t: ShotPick) => void) => (
       <View style={c.grid}>
         {FIELD_TYPES.map((t) => (
           <Button key={t} label={SHOT_LABEL[t]} variant="ghost" style={c.typeBtn} onPress={() => pick(t)} />
         ))}
+        {/* batch 6: no forced 9 m guess — counts as a goal / attempt, no position */}
+        <Button label="Not sure" accessibilityLabel="Position not sure" variant="ghost" style={c.typeBtn} onPress={() => pick(UNSURE_SHOT)} />
       </View>
     );
     switch (flow.mode) {
@@ -396,7 +410,7 @@ const ScoringControls: SportPlugin<HandballState>['ScoringControls'] = ({
           </View>
         );
         if (flow.step === 'scorer') return (
-          <View style={c.panel}>{head(`Goal · ${SHOT_LABEL[flow.shotType ?? 'nineM']}`)}
+          <View style={c.panel}>{head(`Goal · ${pickLabel(flow.shotType)}`)}
             <Text style={c.small}>Who scored?</Text>
             <PlayerGrid players={onCourt(sd)} onPick={(p) => (flow.shotType === 'sevenM' ? goal(sd, 'sevenM', p, null) : setFlow({ ...flow, scorer: p, step: 'assist' }))}
               skip={{ label: 'Team goal (no scorer)', onPress: () => goal(sd, flow.shotType ?? 'nineM', null, null) }} />
@@ -416,7 +430,7 @@ const ScoringControls: SportPlugin<HandballState>['ScoringControls'] = ({
           </View>
         );
         if (flow.step === 'result') return (
-          <View style={c.panel}>{head(`Shot · ${SHOT_LABEL[flow.shotType ?? 'nineM']}`)}
+          <View style={c.panel}>{head(`Shot · ${pickLabel(flow.shotType)}`)}
             <View style={c.row}>
               <Button label="🧤 Saved" variant="ghost" style={c.flex} onPress={() => setFlow({ ...flow, result: 'saved', step: 'player' })} />
               <Button label="✗ Missed" variant="ghost" style={c.flex} onPress={() => setFlow({ ...flow, result: 'missed', step: 'player' })} />
@@ -449,12 +463,17 @@ const ScoringControls: SportPlugin<HandballState>['ScoringControls'] = ({
                 <View style={c.grid}>
                   {onCourt(sd).map((p) => <SelectChip key={p.id} label={`${p.jerseyNo != null ? `${p.jerseyNo} ` : ''}${p.fullName}`} active={flow.by?.id === p.id} onPress={() => setFlow({ ...flow, by: flow.by?.id === p.id ? undefined : p })} />)}
                 </View>
+                {/* batch 6: the defender who conceded it — optional, same screen */}
+                <Text style={c.small}>Caused by (optional, {name(opp(sd))})</Text>
+                <View style={c.grid}>
+                  {onCourt(opp(sd)).map((p) => <SelectChip key={p.id} label={`${p.jerseyNo != null ? `${p.jerseyNo} ` : ''}${p.fullName}`} dotColor={color(opp(sd))} active={flow.cause?.id === p.id} onPress={() => setFlow({ ...flow, cause: flow.cause?.id === p.id ? undefined : p })} />)}
+                </View>
               </>
             ) : null}
             <View style={c.row}>
-              <Button label="✓ Scored" color={color(sd)} style={c.flex} onPress={() => sevenResult(sd, flow.by, { mode: 'goal', side: sd, step: 'scorer', shotType: 'sevenM' })} />
-              <Button label="🧤 Saved" variant="ghost" style={c.flex} onPress={() => sevenResult(sd, flow.by, { ...flow, by: undefined, result: 'saved', step: 'player' })} />
-              <Button label="✗ Missed" variant="ghost" style={c.flex} onPress={() => sevenResult(sd, flow.by, { ...flow, by: undefined, result: 'missed', step: 'player' })} />
+              <Button label="✓ Scored" color={color(sd)} style={c.flex} onPress={() => sevenResult(sd, flow.by, { mode: 'goal', side: sd, step: 'scorer', shotType: 'sevenM' }, flow.cause)} />
+              <Button label="🧤 Saved" variant="ghost" style={c.flex} onPress={() => sevenResult(sd, flow.by, { ...flow, by: undefined, cause: undefined, result: 'saved', step: 'player' }, flow.cause)} />
+              <Button label="✗ Missed" variant="ghost" style={c.flex} onPress={() => sevenResult(sd, flow.by, { ...flow, by: undefined, cause: undefined, result: 'missed', step: 'player' }, flow.cause)} />
             </View>
             {keeper(opp(sd)) ? <Text style={c.meta}>A save goes to {keeper(opp(sd))!.fullName} (keeper) as a 7 m save.</Text> : null}
           </View>
@@ -473,6 +492,9 @@ const ScoringControls: SportPlugin<HandballState>['ScoringControls'] = ({
               <Button label="✂️ Ball stolen" variant="ghost" style={c.flex} onPress={() => setFlow({ ...flow, stolen: true, step: 'player' })} />
             </View>
             <Text style={c.meta}>Technical faults: steps, double dribble, line violation, offensive foul, passive play, a bad pass… A stolen ball also credits the defender with a steal.</Text>
+            {/* batch 6: the referees' forewarning signal — not a turnover yet */}
+            <Button label="⏳ Passive-play warning" accessibilityLabel={`Passive-play warning to ${name(sd)}`} variant="ghost" onPress={() => passive(sd)} />
+            <Text style={c.meta}>The raised arm (forewarning signal): no turnover yet, the clock runs on. If {name(sd)} then lose the ball for passive play, log a technical fault.</Text>
           </View>
         );
         if (flow.step === 'player') return (

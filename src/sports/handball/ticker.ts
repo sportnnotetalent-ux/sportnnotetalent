@@ -3,7 +3,7 @@
  * Handball has many goals, so the ticker lists the top scorers with their
  * goal counts ("Asha R. 7 · Meera J. 5"), not every minute.
  */
-import { clockFace, periodName, soScore, SHOT_LABEL, type HandballEvent, type HandballState, type Side } from './engine.ts';
+import { clockFace, periodName, shotOf, soScore, SHOT_LABEL, type HandballEvent, type HandballState, type Side } from './engine.ts';
 import { shortName, type TickerDetail, type TickerFlash } from '../ticker.ts';
 import { legacyNameOf, withNames, type NameOf } from '../invasion/names.ts';
 
@@ -52,7 +52,8 @@ export function handballTickerFlash(prev: HandballState, next0: HandballState, n
   return {
     kind: 'goal',
     text: `GOAL!${who ? ` ${who}` : ''} ${String(m).padStart(2, '0')}:${String(sc).padStart(2, '0')}`,
-    sub: SHOT_LABEL[last.shotType ?? 'nineM'],
+    // batch 6: a "Not sure" goal names no position
+    sub: shotOf(last) ? SHOT_LABEL[shotOf(last)!] : 'Goal',
     side: last.side,
   };
 }

@@ -281,7 +281,7 @@ const ScoringControls: SportPlugin<NetballState>['ScoringControls'] = ({
   };
   const remove = (e: NetballEvent) => { for (const a of removalActions(e)) dispatch(a); };
   const edit = (e: NetballEvent) => {
-    if (!e.side || e.type === 'timeout' || e.type === 'stop' || e.type === 'centre' || e.type === 'cpr' || isAnswer(e)) { remove(e); return; }
+    if (!e.side || e.type === 'timeout' || e.type === 'stop' || e.type === 'centre' || e.type === 'cpr' || e.type === 'tossup' || isAnswer(e)) { remove(e); return; }
     holdRemoval(removalActions(e));
     setEditAt({ sec: e.sec, period: e.period });
     setShowEdit(false);
@@ -564,6 +564,8 @@ const ScoringControls: SportPlugin<NetballState>['ScoringControls'] = ({
             <Button label="🟨 Sanction" accessibilityLabel={`Sanction, ${name(sd)}`} variant="ghost" onPress={() => setFlow({ mode: 'sanction', side: sd, step: 'kind' })} />
             <Button label="🔁 Sub" accessibilityLabel={`Substitution, ${name(sd)}`} variant="ghost" onPress={() => setFlow({ mode: 'sub', side: sd, step: 'off' })} />
             <Button label="⇄ Positions" accessibilityLabel={`Position changes, ${name(sd)}`} variant="ghost" onPress={() => setFlow({ mode: 'pos', side: sd, step: 'player' })} />
+            {/* batch 6: a toss-up (World Netball 9.7) won by this side — one tap, no score effect */}
+            <Button label="🙌 Toss-up won" accessibilityLabel={`Toss-up won by ${name(sd)}`} variant="ghost" disabled={!periodStarted(s)} onPress={() => fire({ type: 'TOSS_UP', side: sd })} />
             {s.timeoutsPerHalf > 0 ? <Button label={`⏸ Time-out · ${to.left}`} accessibilityLabel={`Team time-out for ${name(sd)}, ${to.left} left`} variant="ghost" disabled={!to.ok || !periodStarted(s)} onPress={() => fire({ type: 'TIMEOUT', side: sd })} /> : null}
           </>
         ) : null}

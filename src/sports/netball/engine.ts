@@ -79,7 +79,8 @@ export interface Who { id?: string; name?: string }
 export interface NetballEvent {
   /** stable id from the action (`payload.uid`) */
   id: string;
-  type: 'goal' | 'miss' | 'stat' | 'penalty' | 'sanction' | 'timeout' | 'stop' | 'sub' | 'pos' | 'centre' | 'cpr';
+  // court-team batch 6: `tossup` = a toss-up (World Netball 9.7), `side` = who won it
+  type: 'goal' | 'miss' | 'stat' | 'penalty' | 'sanction' | 'timeout' | 'stop' | 'sub' | 'pos' | 'centre' | 'cpr' | 'tossup';
   side?: Side;
   /** game-clock seconds since the start of the match (playing time) */
   sec: number;
@@ -593,6 +594,12 @@ export const reducer = (s: NetballState, a: ScoreAction): NetballState => {
       // Deep wave: who received the centre pass ("Centre pass receives")
       if (!side || (!('playerId' in who1) && !('playerName' in who1))) return s;
       return push(s, { type: 'cpr', side, ...who1, ...(pos ? { pos } : {}) });
+    }
+    case 'TOSS_UP': {
+      // batch 6: a toss-up (simultaneous offence / contact, World Netball
+      // 9.7): who won the ball — no score, no centre-pass or clock effect
+      if (!side) return s;
+      return push(s, { type: 'tossup', side });
     }
     case 'REMOVE_EVENT': {
       const id = String(a.payload?.id ?? '');

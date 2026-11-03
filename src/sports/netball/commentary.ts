@@ -93,6 +93,7 @@ export function netballFeed(s0: NetballState, names: { home: string; away: strin
         break;
       case 'pos': icon = '⇄'; text = `${e.playerName ?? '?'} moves to ${e.pos}`; break;
       case 'centre': icon = '⚪'; text = `Centre pass order set — ${team} to take it`; break;
+      case 'tossup': icon = '🙌'; text = `Toss-up won by ${team}`; break;
     }
     const row: FeedRow = {
       id: e.id,

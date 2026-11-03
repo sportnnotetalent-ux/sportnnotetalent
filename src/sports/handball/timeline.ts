@@ -2,7 +2,7 @@
  *  scorer's correction list. PURE. */
 import type { LiveEvent } from '../liveEvents';
 import { shootoutOrderRows } from '../shootoutOrder.ts';
-import { clockText, periodName, FAULT_LABEL, SHOT_LABEL, type HandballEvent, type HandballState } from './engine.ts';
+import { clockText, periodName, shotOf, FAULT_LABEL, SHOT_LABEL, type HandballEvent, type HandballState } from './engine.ts';
 import { legacyNameOf, withNames, type NameOf } from '../invasion/names.ts';
 
 const CARD_ICON = { yellow: '🟨', twoMin: '⏱', red: '🟥' } as const;
@@ -11,10 +11,12 @@ const MISS_LABEL = { saved: 'saved', missed: 'missed', blocked: 'blocked' } as c
 /** One row's icon + words ("🥅 Goal · 9 m · Asha Rao · assist Meera"). `answer`
  *  = the keeper / blocker / stealer linked to an attempt or turnover. */
 export function describeEvent(e: HandballEvent, answer?: string): { icon: string; label: string; detail?: string } {
-  const type = SHOT_LABEL[e.shotType ?? 'nineM'];
+  // batch 6: a "Not sure" attempt names no position
+  const pos = shotOf(e);
+  const type = pos ? SHOT_LABEL[pos] : 'Shot';
   switch (e.type) {
     case 'goal':
-      return { icon: '🤾', label: `Goal · ${type}`, detail: [e.playerName ?? 'Team goal', e.secondName ? `assist ${e.secondName}` : ''].filter(Boolean).join(' · ') };
+      return { icon: '🤾', label: pos ? `Goal · ${type}` : 'Goal', detail: [e.playerName ?? 'Team goal', e.secondName ? `assist ${e.secondName}` : ''].filter(Boolean).join(' · ') };
     case 'miss': {
       const r = e.result ?? 'missed';
       return { icon: r === 'saved' ? '🧤' : r === 'blocked' ? '🛡' : '↗', label: `${type} ${MISS_LABEL[r]}`, detail: [e.playerName, answer ? `${r === 'saved' ? 'save' : 'block'} ${answer}` : ''].filter(Boolean).join(' · ') || undefined };
@@ -29,6 +31,10 @@ export function describeEvent(e: HandballEvent, answer?: string): { icon: string
       return { icon: '🥅', label: e.on === false ? 'Goalkeeper back in goal' : 'Empty goal — 7th court player' };
     case 'drawn':
       return { icon: '⭕', label: '7 m throw won', detail: e.playerName };
+    case 'caused':
+      return { icon: '🚫', label: '7 m throw conceded', detail: e.playerName };
+    case 'passive':
+      return { icon: '⏳', label: 'Passive-play warning' };
     case 'steal':
       return { icon: '✂️', label: 'Steal', detail: e.playerName };
     case 'card': {

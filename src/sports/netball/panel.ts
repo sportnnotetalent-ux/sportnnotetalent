@@ -63,6 +63,8 @@ export function netballPanel(s: NetballState, scope: NbScope = 'all'): StatPanel
     possession.push(countRow('cpr', 'Centre pass receives', H.cpr, A.cpr));
     if (cov.cpr.of > 0 && cov.cpr.logged < cov.cpr.of && scope === 'all') notes.push(`Centre pass receives logged for ${cov.cpr.logged} of ${cov.cpr.of} centre passes.`);
   }
+  // batch 6: toss-ups won (only once one is logged)
+  if (H.tossUps || A.tossUps) possession.push(countRow('tossUps', 'Toss-ups won', H.tossUps, A.tossUps));
   if (cov.feeds || s.detail) {
     possession.push(countRow('feeds', 'Feeds', H.feeds, A.feeds));
     possession.push(countRow('goalAssists', 'Goal assists', H.goalAssists, A.goalAssists));

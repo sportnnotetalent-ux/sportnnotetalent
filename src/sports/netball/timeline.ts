@@ -41,6 +41,8 @@ export function describeEvent(e: NetballEvent, answer?: string): { icon: string;
       return { icon: '⇄', label: `Position change · ${e.pos}`, detail: e.playerName };
     case 'centre':
       return { icon: '⚪', label: 'Centre pass order set', detail: 'by the scorer' };
+    case 'tossup':
+      return { icon: '🙌', label: 'Toss-up won' };
   }
 }
 

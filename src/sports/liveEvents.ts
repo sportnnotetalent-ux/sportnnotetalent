@@ -79,6 +79,10 @@ export interface LiveEvent {
   tmo?: 'timeout' | 'medical' | 'toilet';
   /** racket-batch5 RB14 — a squash video review (`kind: 'review'`): its outcome. */
   rev?: 'upheld' | 'rejected';
+  /** court-team batch 6 — a volleyball video challenge (`kind: 'review'`):
+   *  what was challenged (volleyball/engine.ts VB_CHALLENGE_WHAT). Absent on
+   *  every older event. */
+  chw?: string;
   /** SD-54 — when the step was logged (ms, from the action's `payload.at`);
    *  match / game durations are derived from it. Absent on older events. */
   at?: number;
