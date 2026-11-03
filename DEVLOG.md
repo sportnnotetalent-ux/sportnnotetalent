@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-04 — Release: Matches tab Playing / Running live (web, Android OTA)
+
+auth-smoke passed. Published from a clean worktree at f2fd875: web (entry `index-770079e4`, confirmed live on app.sportnnote.in) and Android OTA groups `4a83f8ac` (preview) and `42c0c796` (production), runtime 1.0.0. No database change.
+
 ### 2026-11-04 — Matches tab: games I play in; idle live games out of Live
 
 From the founder's phone (`docs/security/breaks/matches-tab-playing.md`): the Matches tab's Live list still held the two idle "Player A vs Likhi" games (Home already hid them), and Upcoming showed "Fnatic Team 1 vs Fnatic Team 2" though he's on neither roster — he created the teams and the match and is its host and scorer, so "mine" counted it. Rule now (`src/core/myMatches.ts`): Matches opens on **Playing** — games where I'm on a side (its roster, or a team I'm on by roster / team members; scope `playingTeamIds`). Games I only host, score or organise sit under **Running**; each game is in one view. Followed games stay on Home; Calendar unchanged. A live game idle 12 h+ leaves Live and shows under Completed as "Not finished" so its scorer can still end it. 9 unit tests + a 600-user simulation; full suite 7,256 tests, 0 failing; tsc clean; demo checked (Playing 4 / Running 92). No database change.
