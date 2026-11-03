@@ -31,7 +31,7 @@ import { ClubQuickPick } from '../components/ClubQuickPick';
 import { getSportMeta, participantMode } from '../sports/sportMeta';
 import { useAuth } from '../core/auth';
 import { useTournamentById, useTeams, useTournamentEntries, useTournamentCategories, useLeagueData, useCaptainships } from '../data/hooks';
-import { addTournamentTeams, removeTournamentTeam, createTeam, invitePerson, setTeamLeaders, createInvite, setTournamentTeamStatus, setTournamentTeamCheckIn, getTeamLeaders, enterOrgHousesAsTeams, getLiveTournamentInvite, setTournamentInvite, getTeamsSetup, canManageTeam, getMyPlayerId, createMyPlayer, isNeedsDbUpdate } from '../data/repos';
+import { addTournamentTeams, removeTournamentTeam, createTeam, invitePerson, setTeamLeaders, createInvite, setTournamentTeamStatus, setTournamentTeamCheckIn, getTeamLeaders, enterOrgHousesAsTeams, getLiveTournamentInvite, setTournamentInvite, getTeamsSetup, canManageTeam, getMyPlayerId, getMyEntrant, isNeedsDbUpdate } from '../data/repos';
 import { filterTeams } from '../core/teamSearch';
 import { tournamentInviteMessage, tournamentJoinLink } from '../core/tournamentInvite';
 import { inviteLabel, playerInviteText } from '../core/inviteText';
@@ -300,11 +300,8 @@ export default function TournamentTeamsScreen() {
     } finally { setBusy(false); }
   }
   // My own player (made now if I don't have one) — the organiser often plays too.
-  const resolveMe = async (): Promise<EntrantPerson | null> => {
-    if (!profile?.id) return null;
-    const id = (await getMyPlayerId(profile.id)) ?? (await createMyPlayer(profile.id).catch(() => null));
-    return id ? { id, fullName: profile.fullName ?? 'Me' } : null;
-  };
+  // Named as my player profile reads, never the account name (getMyEntrant).
+  const resolveMe = (): Promise<EntrantPerson | null> => getMyEntrant(profile);
   // The invite for a player added by a number that isn't on SportnNote yet.
   const playerInvite = (who?: string) => playerInviteText({
     name: who, inviterName: profile?.fullName, sportName: getSportMeta(sport).name,

@@ -30,7 +30,7 @@ import { sidesForStructure, recentPairs, searchSides, searchPeople } from '../da
 import { settlePairType, pairTypeFromDivisions } from '../sports/pairType';
 import { venueOptions } from '../data/tournamentForm';
 import { findScheduleConflicts, knownVenueNames } from '../data/scheduleConflicts';
-import { createMatch, createTeam, createMyPlayer, getMyPlayerId, setMatchScorer, getMatch, getTournaments, getMatchSquads, setMatchSquad } from '../data/repos';
+import { createMatch, createTeam, getMyEntrant, getMyPlayerId, setMatchScorer, getMatch, getTournaments, getMatchSquads, setMatchSquad } from '../data/repos';
 import { cloneDraft } from '../data/matchHousekeeping';
 import { useAuth } from '../core/auth';
 import { KO_STAGES, KO_STAGE_LABEL, isKoStage, type KoStage } from '../data/bracket';
@@ -275,12 +275,11 @@ export default function ScheduleMatchScreen() {
   };
 
   // The signed-in user as a person: my own player row (made now if I don't have
-  // one) — never a same-named entry, which could be someone else's.
+  // one) — never a same-named entry, which could be someone else's — named as
+  // my player profile reads, never the account name (getMyEntrant).
   const resolveMe = async (): Promise<EntrantPerson | null> => {
     if (!profile?.fullName) return null;
-    const myId = (await getMyPlayerId(profile.id)) ?? (await createMyPlayer(profile.id).catch(() => null));
-    if (!myId) return null;
-    return { id: myId, fullName: allPlayers.find((p) => p.id === myId)?.fullName ?? profile.fullName };
+    return getMyEntrant(profile);
   };
 
   // "Me" quick-pick for singles: a player scoring their own match taps once

@@ -32,7 +32,7 @@ import { myPlayerIdMemo } from './myPlayerIdMemo';
 import { readCache } from './readCache';
 // Reads past PostgREST's 1,000-row cap: page with a stable order, chunk long `.in()` lists.
 import { fetchAllPages, fetchAllChunked, chunk, ID_CHUNK } from './paging';
-import { entryNameFromPlayers, entryShortName } from './participantEntry';
+import { entryNameFromPlayers, entryShortName, autoEntryCandidate, autoEntryIds, shortCodeIsAuto, meEntrantName } from './participantEntry';
 import { looksQuickPlaceholder, placeholderEntryIds, placeholderRename } from '../core/quickGame';
 import { reportError } from '../core/telemetry';
 import {
@@ -192,17 +192,33 @@ const one = <T,>(v: T | T[] | null): T | null => (Array.isArray(v) ? v[0] ?? nul
  *  else initials). One read for every entry on screen; names kept a minute. */
 const entryPlayerNames = new Map<string, { name: string; at: number }>();
 const ENTRY_NAME_TTL = 60_000;
-/** A quick game's placeholder side ("Player B", "Pair A") played before it was
- *  renamed: its roster + adhoc flag (match reads don't carry them), kept a minute. */
+/** Teams whose stored name may be stale — a quick game's placeholder side
+ *  ("Player B", "Pair A") played before it was renamed, or an auto-named
+ *  singles / doubles entry the server didn't mark as one: their roster + adhoc
+ *  flag (match reads don't carry them), kept a minute. */
 const placeholderRows = new Map<string, { roster: string[] | null; adhoc: boolean; at: number }>();
+const sportKind = (sport: string | undefined) => (sport ? getSportMeta(sport as SportId)?.participantKind : undefined);
+/** Cheap pre-filter (no read): could this team be an auto-named entry? An
+ *  individual-sport team named in one or two parts (participantEntry rules 2+4). */
+const couldBeAutoEntry = (t: Team): boolean => {
+  const kind = sportKind(t.sport);
+  if (kind !== 'individual' && kind !== 'both') return false;
+  const parts = (t.name ?? '').split('/').filter((x) => x.trim());
+  return parts.length >= 1 && parts.length <= 2;
+};
 async function revealEntryNames(teams: readonly (Team | null | undefined)[]): Promise<void> {
   if (!isSupabaseConfigured || !supabase) return;
   const now = Date.now();
   // Old matches: a placeholder side whose roster is its real player / pair reads
   // as that entry — names through players_view like any entry (a child stays
-  // masked). One read, only for teams whose name looks like a placeholder.
+  // masked). An ad-hoc 1–2 person entry in an individual sport whose stored name
+  // is its people under an old / wrong name ("Hrudhay Organizer") reads its
+  // players' CURRENT names (participantEntry.autoEntryIds has the rule;
+  // docs/security/breaks/entry-current-names.md). One roster read, only for
+  // teams that could be either; no writes.
   const fallback = new Map<Team, string[]>();
-  const maybe = teams.filter((t): t is Team => !!t && !t.entryIds?.length && looksQuickPlaceholder(t.name));
+  const auto = new Map<Team, { name: string; adhoc: boolean; roster: string[] | null; kind: ReturnType<typeof sportKind> }>();
+  const maybe = teams.filter((t): t is Team => !!t && !t.entryIds?.length && (looksQuickPlaceholder(t.name) || couldBeAutoEntry(t)));
   if (maybe.length) {
     const ask = [...new Set(maybe.map((t) => t.id))].filter((id) => { const c = placeholderRows.get(id); return !c || now - c.at > ENTRY_NAME_TTL; });
     if (ask.length) {
@@ -214,13 +230,19 @@ async function revealEntryNames(teams: readonly (Team | null | undefined)[]): Pr
     }
     for (const t of maybe) {
       const row = placeholderRows.get(t.id);
-      const ids = row ? placeholderEntryIds({ name: t.name, adhoc: row.adhoc, roster: row.roster }) : undefined;
-      if (ids) fallback.set(t, ids);
+      if (!row) continue;
+      if (looksQuickPlaceholder(t.name)) {
+        const ids = placeholderEntryIds({ name: t.name, adhoc: row.adhoc, roster: row.roster });
+        if (ids) fallback.set(t, ids);
+        continue;
+      }
+      const cand = { name: t.name, adhoc: row.adhoc, roster: row.roster, kind: sportKind(t.sport) };
+      if (autoEntryCandidate(cand)) auto.set(t, cand);
     }
   }
-  const entries = teams.filter((t): t is Team => !!t?.entryIds?.length || (!!t && fallback.has(t)));
+  const entries = teams.filter((t): t is Team => !!t?.entryIds?.length || (!!t && (fallback.has(t) || auto.has(t))));
   if (!entries.length) return;
-  const idsOf = (t: Team) => t.entryIds?.length ? t.entryIds : fallback.get(t)!;
+  const idsOf = (t: Team) => t.entryIds?.length ? t.entryIds : fallback.get(t) ?? autoEntryCandidate(auto.get(t)!)!;
   const need = [...new Set(entries.flatMap(idsOf))]
     .filter((id) => { const c = entryPlayerNames.get(id); return !c || now - c.at > ENTRY_NAME_TTL; });
   if (need.length) {
@@ -230,12 +252,23 @@ async function revealEntryNames(teams: readonly (Team | null | undefined)[]): Pr
       if (r.full_name) entryPlayerNames.set(r.id, { name: r.full_name, at: now });
     }
   }
+  const nameOf = (id: string) => entryPlayerNames.get(id)?.name;
   for (const t of entries) {
-    const ids = idsOf(t);
-    const name = entryNameFromPlayers(ids, (id) => entryPlayerNames.get(id)?.name);
-    if (name) t.name = name;
-    // a placeholder's short code ("B") follows its new name
-    if (name && fallback.has(t)) t.shortName = entryShortName(ids.map((id) => entryPlayerNames.get(id)!.name));
+    let ids = idsOf(t);
+    const cand = auto.get(t);
+    if (cand) {
+      // rule 5: each part of the stored name belongs to its player (as this viewer sees them)
+      const fit = autoEntryIds(cand, nameOf);
+      if (!fit) continue;
+      ids = fit;
+    }
+    const storedName = t.name;
+    const name = entryNameFromPlayers(ids, nameOf);
+    if (!name) continue;
+    t.name = name;
+    // the short code follows the people: a placeholder's ("B") always, an
+    // entry's only when it was made from its stored name (a chosen code stays)
+    if (fallback.has(t) || shortCodeIsAuto(storedName, t.shortName)) t.shortName = entryShortName(ids.map((id) => nameOf(id)!));
   }
 }
 
@@ -4702,6 +4735,20 @@ export async function createMyPlayer(profileId: string): Promise<string> {
   if (error || !data) throw new Error(error?.message ?? 'Could not create your profile');
   myPlayerIdMemo.set(profileId, data.id as string);
   return data.id as string;
+}
+
+/** "Me" as a singles / doubles entrant: my own player row (made now if I don't
+ *  have one), named as my PLAYER profile reads (players_view) — never the
+ *  account name, which can differ and would stay on the entry for good
+ *  (docs/security/breaks/entry-current-names.md EN-01). The account name only
+ *  when my player has no name at all. Null when there's no player. */
+export async function getMyEntrant(profile: { id: string; fullName?: string | null } | null | undefined): Promise<{ id: string; fullName: string } | null> {
+  if (!profile?.id) return null;
+  const id = (await getMyPlayerId(profile.id)) ?? (await createMyPlayer(profile.id).catch(() => null));
+  if (!id) return null;
+  const player = await getPlayer(id).catch(() => null);
+  const fullName = meEntrantName(player?.fullName, profile.fullName);
+  return fullName ? { id, fullName } : null;
 }
 
 /* ----------------------------- Organizer writes ---------------------------- */
