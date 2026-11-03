@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-04 — Release: Undo labels + Quick options closing live (web, Android OTA)
+
+auth-smoke passed. Published from a clean worktree at 1f675f0: web (entry `index-76fab0f4`, confirmed live on app.sportnnote.in) and Android OTA groups `3f7e3232` (preview) and `392fd630` (production), runtime 1.0.0.
+
 ### 2026-11-04 — Undo names the action in every sport; Quick options closes after an action
 
 The two follow-ups from the screen sweep (`docs/security/breaks/undo-labels-quick-sheet.md`). Undo used to read a bare "Undo" in hockey, handball, kabaddi, chess and carrom: their events carry no label and they had no Undo wording of their own (chess's named moves only, and the screen never fell back). Now each has one in the sport's words — "field goal · Asha (1-0)", "2-minute suspension · Meera", "raid — raider out · Ravi · tackle +1 by Meera (2-0)", "board to Asha +7 with the Queen (7-0)", "result 0-1 · India wins (checkmate)" / "illegal move" / "draw offer" — and the screen falls back to the shared label when a sport's own returns nothing, junk or throws (`resolveUndoLabel`). Quick options: sport tiles get a dispatch that also closes the sheet (a tile that only opens a further step dispatches nothing, so it stays open). No scoring changes. Full suite 7,081 tests, 0 failing; tsc clean. Demo-checked: hockey "Undo: field goal · A (1-0)"; badminton shuttle change closes the sheet, Undo "shuttle change (1-0)".
