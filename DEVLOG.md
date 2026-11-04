@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-08 — Release: rulebook audit fixes live (web, Android OTA)
+
+auth-smoke passed. Published from a clean worktree at 882ebe9 (pickleball, table tennis, squash, padel, football, basketball, volleyball, netball, hockey; the 33-sport rulebook pass). Web entry `index-e4a43ba7` confirmed live on app.sportnnote.in; Android OTA groups `a91850de` (preview) and `7deb405b` (production), runtime 1.0.0. Not in this release: 5c9b27ac and 15d1bf9c from another session (not yet approved). No database change.
+
 ### 2026-11-09 — Release: score bar + sport rule updates live (web, Android OTA)
 
 auth-smoke passed; full suite at the release commit green apart from known load flakes (screen-sweep-court passes alone); netball tests run on the last-minute commit. Published from a clean worktree at 143ea48 (score bar 03349ec plus the sport-expert rule fixes: football, basketball, volleyball, hockey, padel, squash, table tennis, pickleball, netball): web (entry `index-e4a43ba7`, confirmed live on app.sportnnote.in) and Android OTA groups `c837f097` (preview) and `bf009602` (production), runtime 1.0.0. No database change.
