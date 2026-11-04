@@ -37,7 +37,7 @@ export function shotPhrase(points: number, zone: ShotZone | undefined, halfCourt
 
 const FOUL_WORD: Record<string, string> = {
   personal: 'Personal', shooting: 'Shooting', technical: 'Technical', flagrant: 'Flagrant', offensive: 'Offensive',
-  unsportsmanlike: 'Unsportsmanlike', disqualifying: 'Disqualifying',
+  unsportsmanlike: 'Unsportsmanlike', disqualifying: 'Disqualifying', disruptive: 'Disruptive',
 };
 
 /** The sentence for one play (`assist` = a passer merged into a make;

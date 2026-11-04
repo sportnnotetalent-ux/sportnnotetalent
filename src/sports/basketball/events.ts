@@ -18,15 +18,19 @@ export type BBEventType =
  *  send a player to the free-throw line; technical fouls don't count toward the
  *  team-foul bonus. SD-117 (B12): FIBA's unsportsmanlike (U) and disqualifying
  *  (D) fouls — both 2 free throws; a D, or 2 U / 2 T / T + U, disqualifies. */
-export type FoulType = 'personal' | 'shooting' | 'technical' | 'flagrant' | 'offensive' | 'unsportsmanlike' | 'disqualifying';
+// FIBA 2026 (Art. 37–38, from 1 Oct 2026): 'disruptive' and 'flagrant' replace
+// 'unsportsmanlike' (kept so older logs still read) — basketball-rulebook.md BK-1
+export type FoulType = 'personal' | 'shooting' | 'technical' | 'flagrant' | 'offensive' | 'unsportsmanlike' | 'disqualifying' | 'disruptive';
 /** SD-117 (B12): why a player was disqualified by rule (FIBA Art. 36–38). */
 export type DqReason = 'D' | '2T' | '2U' | 'T+U';
 export const DQ_LABEL: Record<DqReason, string> = {
-  D: 'disqualifying foul', '2T': '2 technical fouls', '2U': '2 unsportsmanlike fouls', 'T+U': 'a technical and an unsportsmanlike foul',
+  D: 'disqualifying foul', '2T': '2 technical fouls', '2U': '2 flagrant / unsportsmanlike fouls', 'T+U': 'a technical and a flagrant / unsportsmanlike foul',
 };
 export type ReboundType = 'off' | 'def';
 
 export interface BBEvent {
+  /** FIBA 2026 Art. 36.2: a category-2 (administrative) technical — doesn't count towards disqualification */
+  techCat?: 2;
   id: number;
   quarter: number;
   minute: number;
@@ -166,4 +170,5 @@ export const FOUL_LABEL: Record<FoulType, string> = {
   offensive: 'Offensive',
   unsportsmanlike: 'Unsportsmanlike (U)',
   disqualifying: 'Disqualifying (D)',
+  disruptive: 'Disruptive',
 };

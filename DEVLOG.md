@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-08 — Basketball: FIBA 2026 disruptive / flagrant fouls and technical categories
+
+Audited against the FIBA Official Basketball Rules 2026 (in force 1 Oct 2026; `docs/sport-expert/basketball-rulebook.md`). BK-1: the foul picker now offers Disruptive (2 free throws and the ball, never towards disqualification) and Flagrant (same penalty, counts) in place of Unsportsmanlike; older logs keep reading U. Disqualification = a D foul, or any two of a behaviour technical / flagrant / (old) unsportsmanlike. BK-2: "Technical (delay / ring)" is a category-2 technical: 1 free throw and a team foul, but it never disqualifies (`techCat: 2` on the event). Discipline table counts flagrant with U. Tests: 4 unit + a 600-player simulation; one source-guard test updated. No database change.
+
 ### 2026-11-08 — Football: IFAB Law 3 substitutions in 11-a-side; tennis 2026 check
 
 Audited against the IFAB 2026/27 law changes (`docs/sport-expert/football-rulebook.md`). FB-1: the 11-a-side preset (the tournament default) now uses fixed substitutions (up to 5, no return), since return substitutions are only for grassroots / youth / veterans; 7s, 5s and futsal stay rolling. Tennis checked against the ITF 2026 changes: none touch scoring (`tennis-rulebook.md`). Tests: 2 unit. No database change.

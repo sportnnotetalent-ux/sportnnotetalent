@@ -357,7 +357,7 @@ export function bbTeamFigures(s: BasketballState, side: Side, scope: BbScope = '
         if (e.tov) f.tov++; // US batch 1: a new offensive foul is a turnover too
         if (countsAsTeamFoul(s, e)) f.teamFouls++;
         if (e.foulType === 'technical') f.tech++;
-        if (e.foulType === 'unsportsmanlike' || e.foulType === 'disqualifying' || e.foulType === 'flagrant') f.unsport++;
+        if (e.foulType === 'unsportsmanlike' || e.foulType === 'disqualifying' || e.foulType === 'flagrant' || e.foulType === 'disruptive') f.unsport++;
         break;
       case 'timeout': f.timeouts++; break;
       case 'jump': f.jump++; break;

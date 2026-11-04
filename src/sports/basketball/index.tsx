@@ -49,7 +49,16 @@ import { basketballUndoLabel } from './undoLabel';
 import { basketballMatchRecords } from './records';
 
 /** SD-117 (B12): the foul-type chips, FIBA's U and D included. */
-const FOUL_TYPES: FoulType[] = ['personal', 'shooting', 'offensive', 'technical', 'unsportsmanlike', 'disqualifying', 'flagrant'];
+// FIBA 2026 (from 1 Oct 2026, basketball-rulebook.md BK-1/2): disruptive and flagrant
+// replace unsportsmanlike; a technical is category 1 (behaviour, counts towards
+// disqualification) or category 2 (delay / hanging on the ring, doesn't)
+const FOUL_CHOICES: { key: string; type: FoulType; cat2?: boolean; label: string }[] = [
+  { key: 'personal', type: 'personal', label: FOUL_LABEL.personal }, { key: 'shooting', type: 'shooting', label: FOUL_LABEL.shooting },
+  { key: 'offensive', type: 'offensive', label: FOUL_LABEL.offensive },
+  { key: 'technical', type: 'technical', label: 'Technical (behaviour)' }, { key: 'technical2', type: 'technical', cat2: true, label: 'Technical (delay / ring)' },
+  { key: 'disruptive', type: 'disruptive', label: FOUL_LABEL.disruptive }, { key: 'flagrant', type: 'flagrant', label: FOUL_LABEL.flagrant },
+  { key: 'disqualifying', type: 'disqualifying', label: FOUL_LABEL.disqualifying },
+];
 // MVP B7: a team foul (no player listed, or not known) — the types that don't eject a person
 const TEAM_FOUL_TYPES: FoulType[] = ['personal', 'shooting', 'offensive', 'technical'];
 
@@ -279,14 +288,14 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
   // disqualifies (B12): asked first in the ConfirmSheet, then logged + ejected.
   // MVP B7: `fouler` null = a team foul (no player): it counts toward the team-foul limit; no one is ejected.
   // US batch 6: `bench` = a coach (C) / bench (B) technical (no player; 1 free throw; not a team foul)
-  const recordFoul = async (side: 'home' | 'away', fouler: Player | null, type: FoulType, drawnBy?: Player | null, bench?: BenchTech) => {
+  const recordFoul = async (side: 'home' | 'away', fouler: Player | null, type: FoulType, drawnBy?: Player | null, bench?: BenchTech, cat2?: boolean) => {
     if (bench && !fouler && type === 'technical') {
       // US batch 6: the coach's technical — one free throw for the other side, then their ball as before
       fire(foulAction(side, null, 'technical', { bench }));
       setFlow({ kind: 'ft', side: opp(side), remaining: 1, total: 1, reason: `${bench === 'C' ? 'Coach' : 'Bench'} technical on ${teamOf(side)} — 1 free throw for ${teamOf(opp(side))}` });
       return;
     }
-    const dq = fouler ? disqualifyingFoul(state, fouler.fullName, type, { side, pid: fouler.id }) : null;
+    const dq = fouler ? disqualifyingFoul(state, fouler.fullName, type, { side, pid: fouler.id }, cat2 ? { cat2: true } : undefined) : null;
     if (dq && fouler && !(await confirmMatchAction('eject', {
       what: fouler.fullName,
       detail: `${FOUL_LABEL[type]} — that's ${DQ_LABEL[dq]}, so the rules disqualify ${fouler.fullName}. The foul is logged and the player is ejected. Undo can bring it back.`,
@@ -294,12 +303,12 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
     const shots = freeThrowsFor(state, side, type);
     // SD-132 (FIBA 3×3 Art. 15): team foul 10+ → 2 free throws AND the ball
     const ball = possessionAfterFoul(state, side, type);
-    // US batch 5 (FIBA Art. 37 / 38): U / D / flagrant — the free throws and then the ball
+    // US batch 5 (FIBA Art. 37 / 38): U / D / flagrant / disruptive — the free throws and then the ball
     const keep = ballAfterFoul(type);
     const bonus = shots > 0 && (type === 'personal');
     // Deep wave: "Fouls drawn" — the foul says it was tracked, and who drew it (by id)
     const drawn = state.trackFoulsDrawn ? { fdt: true, drawnBy } : {};
-    fire(foulAction(side, fouler, type, drawn));
+    fire(foulAction(side, fouler, type, { ...drawn, ...(cat2 ? { cat2: true } : {}) }));
     if (dq && fouler) fireEject(side, fouler, dq);
     if (shots > 0) {
       const why = bonus ? `Bonus — ${teamOf(side)} are over the team-foul limit` : `${FOUL_LABEL[type]} foul on ${fouler?.fullName ?? teamOf(side)}`;
@@ -438,12 +447,12 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
             <>
               <Text style={ctrl.meta}>{flow.fouler.fullName} — what kind of foul?</Text>
               <View style={ctrl.chips}>
-                {FOUL_TYPES.map((t) => (
-                  <SelectChip key={t} label={FOUL_LABEL[t]} active={false}
-                    onPress={() => (state.trackFoulsDrawn && t !== 'technical' ? setFlow({ ...flow, type: t }) : void recordFoul(flow.side, flow.fouler!, t))} />
+                {FOUL_CHOICES.map((c) => (
+                  <SelectChip key={c.key} label={c.label} active={false}
+                    onPress={() => (state.trackFoulsDrawn && c.type !== 'technical' ? setFlow({ ...flow, type: c.type }) : void recordFoul(flow.side, flow.fouler!, c.type, undefined, undefined, c.cat2))} />
                 ))}
               </View>
-              <Text style={ctrl.meta}>Free throws open next with the count filled in: technical 1; shooting, U, D, flagrant 2; a personal foul in the bonus 2. A D foul, or a 2nd T / 2nd U / T + U, disqualifies (asks first).</Text>
+              <Text style={ctrl.meta}>Free throws open next with the count filled in: technical 1; shooting, disruptive, flagrant, D 2; a personal foul in the bonus 2. A D foul, or any two of technical (behaviour) / flagrant, disqualifies (asks first). Disruptive fouls and delay / ring technicals never do (FIBA 2026).</Text>
               {/* SD-116 (B2): ejecting is a separate, confirmed step — set well
                   apart from the foul-type chips so a slip can't disqualify. */}
               <View style={ctrl.ejectZone}>

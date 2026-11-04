@@ -386,7 +386,7 @@ describe('deep wave · scorer UI guards', () => {
     assert.match(src, /score\(side, zoneValue\(b\.zone\), selected, tracking, \{ zone: b\.zone \}\)/);
     assert.match(src, /miss\(side, zoneValue\(b\.zone\), selected, b\.zone\)/);
     assert.match(src, /dispatch\(\{ type: 'TAG', side: assistFor\.side, payload: \{ fb: !assistFor\.fb \} \}\)/);
-    assert.match(src, /const drawn = state\.trackFoulsDrawn \? \{ fdt: true, drawnBy \} : \{\};\s*fire\(foulAction\(side, fouler, type, drawn\)\)/);
+    assert.match(src, /const drawn = state\.trackFoulsDrawn \? \{ fdt: true, drawnBy \} : \{\};\s*fire\(foulAction\(side, fouler, type, \{ \.\.\.drawn, \.\.\.\(cat2 \? \{ cat2: true \} : \{\}\) \}\)\)/);
     assert.doesNotMatch(src, /drawn: drawnBy\.fullName/, 'IDs-only: who drew it by id, never the name');
   });
   test('the live view: play-by-play, team stats (+ shot chart), box score', () => {

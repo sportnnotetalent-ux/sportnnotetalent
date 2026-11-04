@@ -259,7 +259,7 @@ const isTeamFoul = countsAsTeamFoul;
 /** US batch 5 (FIBA Art. 37 / 38, NBA flagrant): an unsportsmanlike,
  *  disqualifying or flagrant foul gives the free throws AND the ball (a
  *  throw-in) to the other side. */
-export const ballAfterFoul = (type: FoulType): boolean => type === 'unsportsmanlike' || type === 'disqualifying' || type === 'flagrant';
+export const ballAfterFoul = (type: FoulType): boolean => type === 'unsportsmanlike' || type === 'disqualifying' || type === 'flagrant' || type === 'disruptive';
 /** Is a foul logged in period `q` part of the current team-foul count? The
  *  current period only — except in overtime under FIBA (`otFoulsCarry`), where
  *  every OT period counts together with the last regulation period. */
@@ -394,20 +394,23 @@ export const onCourtNames = (s: BasketballState, side: 'home' | 'away'): string[
   (s.onCourt ? onCourtRefs(s, side).map((r) => r.name ?? r.id ?? '') : []);
 const isDqReason = (r: unknown): r is DqReason => r === 'D' || r === '2T' || r === '2U' || r === 'T+U';
 
-/** SD-117 (B12) — does this foul disqualify its player (FIBA Art. 36.2.3,
- *  37, 38)? A disqualifying foul does; so does a 2nd technical, a 2nd
- *  unsportsmanlike, or a technical + an unsportsmanlike. Counts the player's
- *  fouls already logged plus this one. */
-export function disqualifyingFoul(s: BasketballState, name: string | undefined, type: FoulType, who?: PlayerRef): DqReason | undefined {
+/** SD-117 (B12) — does this foul disqualify its player? A disqualifying foul
+ *  does; so do any two of: a category-1 technical, a flagrant (or, in older
+ *  logs, an unsportsmanlike) foul (FIBA 2026 Art. 36.2.3 / 38.2.3). Category-2
+ *  technicals and disruptive fouls never count (basketball-rulebook.md BK-1/2).
+ *  Counts the player's fouls already logged plus this one. */
+export function disqualifyingFoul(s: BasketballState, name: string | undefined, type: FoulType, who?: PlayerRef, o?: { cat2?: boolean }): DqReason | undefined {
   if (!named(name, who)) return undefined;
   if (type === 'disqualifying') return 'D';
-  if (type !== 'technical' && type !== 'unsportsmanlike') return undefined;
+  const isT = type === 'technical' && !o?.cat2;
+  const isF = type === 'flagrant' || type === 'unsportsmanlike';
+  if (!isT && !isF) return undefined;
   const mine = s.events.filter((e) => e.type === 'foul' && isPlayersEvent(s, e, name, who));
-  const t = mine.filter((e) => e.foulType === 'technical').length + (type === 'technical' ? 1 : 0);
-  const u = mine.filter((e) => e.foulType === 'unsportsmanlike').length + (type === 'unsportsmanlike' ? 1 : 0);
-  if (type === 'technical' && t >= 2) return '2T';
-  if (type === 'unsportsmanlike' && u >= 2) return '2U';
-  return t >= 1 && u >= 1 ? 'T+U' : undefined;
+  const t = mine.filter((e) => e.foulType === 'technical' && e.techCat !== 2).length + (isT ? 1 : 0);
+  const f = mine.filter((e) => e.foulType === 'flagrant' || e.foulType === 'unsportsmanlike').length + (isF ? 1 : 0);
+  if (isT && t >= 2) return '2T';
+  if (isF && f >= 2) return '2U';
+  return t >= 1 && f >= 1 ? 'T+U' : undefined;
 }
 
 /** SD-117 (B8 / B11) — free throws a foul gives the other side, before the
@@ -423,10 +426,10 @@ export function freeThrowsFor(s: BasketballState, side: 'home' | 'away', type: F
     if (type === 'offensive') return 0;
     const over = teamFoulsThisQuarter(s, side) >= 6;
     if (type === 'shooting') return over ? 2 : 1;
-    if (type === 'unsportsmanlike' || type === 'disqualifying' || type === 'flagrant') return 2;
+    if (type === 'unsportsmanlike' || type === 'disqualifying' || type === 'flagrant' || type === 'disruptive') return 2;
     return over ? 2 : 0;
   }
-  if (type === 'unsportsmanlike' || type === 'disqualifying' || type === 'flagrant' || type === 'shooting') return 2;
+  if (type === 'unsportsmanlike' || type === 'disqualifying' || type === 'flagrant' || type === 'disruptive' || type === 'shooting') return 2;
   if (type === 'offensive') return 0;
   return inBonus(s, side === 'home' ? 'away' : 'home', sec) ? 2 : 0;
 }
@@ -679,6 +682,7 @@ const reduce = (s: BasketballState, a: ScoreAction): BasketballState => {
           // Deep wave: "Fouls drawn" — who was fouled (new logs only; by id —
           // an older log's name only on its own actions)
           ...(a.payload?.fdt === true ? { fdt: true as const } : {}),
+          ...(a.payload?.techCat === 2 && a.payload?.foulType === 'technical' ? { techCat: 2 as const } : {}),
           ...(!idOnly && typeof a.payload?.drawn === 'string' && a.payload.drawn ? { drawn: a.payload.drawn } : {}),
           ...(typeof a.payload?.drawnPid === 'string' && a.payload.drawnPid ? { drawnPid: a.payload.drawnPid } : {}),
           // US batch 1: a new offensive foul is the fouler's turnover too (older logs: no stamp)

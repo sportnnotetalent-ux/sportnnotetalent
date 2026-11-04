@@ -87,13 +87,13 @@ export const statAction = (side: Side, type: StatPlay, p: Who, ref?: number): Sc
 /** A foul with its type. Deep wave — "Fouls drawn": `fdt` (tracked) and who
  *  was fouled (`drawnBy`, by id). US batch 1: an offensive foul is stamped
  *  `tov` — it is the fouler's turnover too. */
-export const foulAction = (side: Side, p: Who, foulType: FoulType = 'personal', o: { fdt?: boolean; drawnBy?: Who; bench?: BenchTech } = {}): ScoreAction => {
+export const foulAction = (side: Side, p: Who, foulType: FoulType = 'personal', o: { fdt?: boolean; drawnBy?: Who; bench?: BenchTech; cat2?: boolean } = {}): ScoreAction => {
   const tov = foulType === 'offensive';
   // US batch 6: a coach (C) / bench (B) technical — no player, technical only
   const bench = o.bench && !p && foulType === 'technical' ? { bench: o.bench } : {};
   return {
     type: 'FOUL', side,
-    payload: { foulType, ...pidOf(p), ...(o.fdt ? { fdt: true } : {}), ...(o.drawnBy ? { drawnPid: o.drawnBy.id } : {}), ...(tov ? { tov: true } : {}), ...bench },
+    payload: { foulType, ...pidOf(p), ...(o.fdt ? { fdt: true } : {}), ...(o.drawnBy ? { drawnPid: o.drawnBy.id } : {}), ...(tov ? { tov: true } : {}), ...bench, ...(o.cat2 && foulType === 'technical' ? { techCat: 2 } : {}) },
     ...(p ? { attribution: tov ? creditOf(p, foulCredits(true)) : { playerId: p.id, stat: 'fouls' } } : {}),
   };
 };

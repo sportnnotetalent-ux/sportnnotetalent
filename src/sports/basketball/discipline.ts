@@ -24,7 +24,7 @@ export const BASKETBALL_DISCIPLINE: SportDisciplineSpec = {
     { key: 'banRed', ask: 'A disqualifying (D) foul or ejection means', reason: 'disqualifying foul / ejection', def: 1 },
     { key: 'banEject', ask: 'A disqualification for 2 U / 2 T / T + U means', reason: 'disqualified (2 U / 2 T / T + U)', def: 0 },
   ],
-  caution: { col: 'U', plural: 'unsportsmanlike fouls', def: 0 },
+  caution: { col: 'U', plural: 'flagrant / unsportsmanlike fouls', def: 0 },
   source: 'FIBA: further sanctions are the competition’s call',
   marks(m) {
     const ev = (m.state as { events?: unknown } | null | undefined)?.events;
@@ -39,7 +39,8 @@ export const BASKETBALL_DISCIPLINE: SportDisciplineSpec = {
         const rule = e.reason === '2T' || e.reason === '2U' || e.reason === 'T+U';
         out.push({ side: e.side, ...whoOf(e), col: 'DQ', off: rule ? 'banEject' : 'banRed' });
       } else if (e.type === 'foul') {
-        if (e.foulType === 'unsportsmanlike') out.push({ side: e.side, ...whoOf(e), col: 'U', caution: true });
+        // FIBA 2026: a flagrant foul counts like the old unsportsmanlike (BK-1)
+        if (e.foulType === 'unsportsmanlike' || e.foulType === 'flagrant') out.push({ side: e.side, ...whoOf(e), col: 'U', caution: true });
         else if (e.foulType === 'technical') out.push({ side: e.side, ...whoOf(e), col: 'T' });
         else if (e.foulType === 'disqualifying') out.push({ side: e.side, ...whoOf(e), col: 'D', off: 'banRed' });
       }
