@@ -2,7 +2,7 @@
  *  league table + statistics rail, and participating teams. For a single-sport
  *  tournament the sport selector is skipped and its table shown directly. */
 import { QualifiesToCard } from '../components/FeederCards';
-import { notice } from '../core/confirm';
+import { confirmAction, notice } from '../core/confirm';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { makeNameOf, peopleMap } from '../core/playerNames';
 import { View, Text, TouchableOpacity, StyleSheet, Platform, Linking, type ScrollView } from 'react-native';
@@ -36,7 +36,7 @@ import { useAuth } from '../core/auth';
 import { useTournamentById, useTeamSummaries, useFollow, useLeagueData, usePlayers, useOrganizations, useTournamentTeams, useTournamentEntries } from '../data/hooks';
 import { LeaderMinimums } from '../components/LeaderMinimums';
 import { readLeaderMins, leaderMinsPatch, type LeaderMins } from '../data/leaderMinimums';
-import { getMyPlayerId, patchTournamentFormat, setTournamentHosts, setTournamentLogo, setTournamentBanner, getTournamentBanner, setTournamentReminderLeads, requestJoinTournament, setTournamentTeamStatus, transferTournamentOwnership, getOwnershipEvents, getTournamentOfficials, assignTournamentOfficial, unassignTournamentOfficial, getTournamentAwards, getTeamRosters, getMyTeams } from '../data/repos';
+import { getMyPlayerId, patchTournamentFormat, setTournamentHosts, setTournamentLogo, setTournamentBanner, getTournamentBanner, setTournamentReminderLeads, requestJoinTournament, setTournamentTeamStatus, transferTournamentOwnership, getOwnershipEvents, getTournamentOfficials, assignTournamentOfficial, unassignTournamentOfficial, getTournamentAwards, getTeamRosters, getMyTeams, deleteTournament } from '../data/repos';
 import { TournamentAwardsTab } from '../components/TournamentAwardsTab';
 import { LeaderSplitChips, useLeaderSplits } from '../components/LeaderSplitChips';
 import { DisciplineTable } from '../components/DisciplineTable';
@@ -498,6 +498,18 @@ export default function TournamentProfileScreen() {
   // excluding the current owner.
   const transferToIndividual: OwnerRef | null = tournament.hostOrgId && myId ? { kind: 'individual', playerIds: [myId] } : null;
   const transferOrgs = myOrgs.filter((o) => o.id !== tournament.hostOrgId);
+  // Founder 2026-11-05: delete sits at the end of Manage, not only in Edit's footer.
+  async function removeTournament() {
+    const ok = await confirmAction('Delete tournament?',
+      `“${tournament!.name}” will be removed for everyone. Upcoming matches are cancelled; completed results stay on players' profiles.`, 'Delete', true);
+    if (!ok) return;
+    try {
+      await deleteTournament(tournament!.id, { playerId: myId ?? undefined, name: profile?.fullName });
+      nav.popToTop();
+    } catch (e) {
+      notice('Couldn’t delete', e instanceof Error ? e.message : 'Please try again.');
+    }
+  }
   async function transferOwnership(target: OwnerRef) {
     try {
       await transferTournamentOwnership(tournament!.id, target, myId ?? undefined);
@@ -992,6 +1004,12 @@ export default function TournamentProfileScreen() {
               )}
             </Card>
             )}
+
+            <Card style={st.dangerCard}>
+              <Text style={textStyles.h3}>Delete tournament</Text>
+              <Text style={textStyles.muted}>Removes it for everyone. Upcoming matches are cancelled; completed results stay on players' profiles.</Text>
+              <Button label="🗑 Delete tournament" variant="danger" onPress={() => void removeTournament()} />
+            </Card>
           </>
         )}
 
@@ -1221,6 +1239,7 @@ function HubRow({ icon, sport, title, status, onPress, open }: { icon?: string; 
 }
 
 const st = StyleSheet.create({
+  dangerCard: { gap: theme.spacing(2), borderWidth: 1, borderColor: theme.colors.danger },
   followRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(2) },
   hubRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(3) },
   hubIcon: { fontSize: 20, width: 28, textAlign: 'center' },
