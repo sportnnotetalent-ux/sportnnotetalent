@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-07 — Release: sign-up source live (web, Android OTA)
+
+Founder ran `20261108120000_signup_source.sql` (checked live: `record_signup_source` exists). auth-smoke passed. Published from a clean worktree at d7ab626: web (entry `index-109e3887`, confirmed live on app.sportnnote.in) and Android OTA groups `1f501670` (preview) and `625f015a` (production), runtime 1.0.0.
+
 ### 2026-11-07 — Sign-up source: which link each new user came from
 
 Founder follow-up to the usage dashboard (`docs/security/breaks/signup-source.md`). When a signed-out visitor opens a SportnNote link, the device remembers the kind of link (game, tournament, friend invite, team / club invite, profile, results / certificate, parent link, school link) and, for public pages only, which one; first link wins, kept 30 days. Secret join tokens and `?c=` codes are never kept. On the first sign-in after the account is made the app sends it once (`record_signup_source`) and forgets it; the server keeps it only for an account made in the last 48 hours, one row per account, refs only when real (a game / tournament / player that exists, not yourself) and never for minors or people who don’t share usage data. Dashboard: the link tile is now **Links shared → views → sign-ups** ("3 of 6 sign-ups came from a link"), a new **Where sign-ups came from · last 4 weeks** card (no source = Direct / unknown), and each person in New sign-ups / Not activated shows "from: Friend invite (Aarav Mehta)" / "Game link" etc. Also "1 game" (not "1 games") in the lists. Server: **`supabase/migrations/20261108120000_signup_source.sql`** (founder runs) — `signup_sources` table (no grants, RLS on, deleted with the account), `record_signup_source`, and `usage_dashboard` / `usage_people` redefined with `from_links`, `by_source`, `source`, `source_detail`. Until it runs, the app keeps the remembered link and tries again next sign-in. Tests: 8 unit, 9 server (PGlite), a 600-person simulation (device journeys + 600 server sign-ups); tile tests updated; full suite 7,396 pass, 0 fail; tsc clean; demo checked.
