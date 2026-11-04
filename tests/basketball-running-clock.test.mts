@@ -13,6 +13,7 @@ import { join } from 'node:path';
 import { init, reducer, clockRunning, type BasketballState } from '../src/sports/basketball/engine.ts';
 import { foulAction, scoreAction } from '../src/sports/basketball/actions.ts';
 import { BASKETBALL_META } from '../src/sports/basketball/meta.ts';
+import { formatDefaults } from '../src/sports/formatPick.ts';
 import type { ScoreAction } from '../src/sports/types.ts';
 
 const T0 = 1_700_000_000_000;
@@ -54,7 +55,10 @@ describe('the format', () => {
     assert.deepEqual(f.hideWhen, { key: 'gameClock', value: false });
   });
   test('defaultsFor honours a field\'s own tournament default', () => {
-    const src = readFileSync(join(import.meta.dirname, '..', 'src/components/FormatEditor.tsx'), 'utf8');
-    assert.match(src, /ctx === 'tournament' && f\.tournamentDefault != null \? f\.tournamentDefault : f\.default/);
+    // defaultsFor = formatPick.ts formatDefaults (badminton-3x15 moved it there)
+    const fields = BASKETBALL_META.formatFields!;
+    const f = fields.find((x) => x.tournamentDefault != null && x.type !== 'preset')!;
+    assert.equal(formatDefaults(fields, 'tournament')[f.key], f.tournamentDefault);
+    assert.equal(formatDefaults(fields)[f.key], f.default);
   });
 });

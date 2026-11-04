@@ -22,9 +22,9 @@ const label = (m: SportMeta, key: string) => m.formatFields!.find((f) => f.key =
 
 describe('W1: badminton', () => {
   test('presets in plain words, same values and rules', () => {
-    assert.equal(opt(BADMINTON_META, 'preset', 'bwf21').label, 'Games to 21, best of 3');
-    assert.equal(opt(BADMINTON_META, 'preset', 'g5x11').label, 'Games to 11, best of 5');
-    assert.equal(opt(BADMINTON_META, 'preset', 'g15').label, 'Games to 15, best of 3');
+    assert.equal(opt(BADMINTON_META, 'preset', 'bwf21').label, 'Games to 21, best of 3 · BWF alternate');
+    assert.equal(opt(BADMINTON_META, 'preset', 'g5x11').label, 'Games to 11, best of 5 · not a BWF system');
+    assert.equal(opt(BADMINTON_META, 'preset', 'g15').label, 'Games to 15, best of 3 · BWF standard from 4 Jan 2027');
     assert.equal(opt(BADMINTON_META, 'preset', 'single').label, 'One game to 21');
     assert.deepEqual(opt(BADMINTON_META, 'preset', 'bwf21').set, { pointsPerGame: 21, cap: 30, gamesToWin: 2, goldenPoint: true });
   });

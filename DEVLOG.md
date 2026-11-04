@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-08 — Badminton: BWF 3×15 from 4 Jan 2027, cards per side
+
+First rulebook audit with Firecrawl (`docs/sport-expert/badminton-rulebook.md`: BWF Laws v5.0, the 3×15 announcement, Instant Review System). Built the three P1s (`docs/security/breaks/badminton-3x15.md`). **3×15 default:** a preset can name a dated default (`defaultFrom`); badminton formats seeded on or after 4 Jan 2027 (IST) start on games to 15, best of 3 (two clear at 14-all, cap 21); before that, 3×21. Only seeding is dated (`formatDefaults`, moved from FormatEditor to `formatPick.ts`), so saved matches and formats never change. **Labels** (plain words kept): "Games to 15, best of 3 · BWF standard from 4 Jan 2027", "Games to 21, best of 3 · BWF alternate", "Games to 11, best of 5 · not a BWF system". **Cards:** badminton warnings / faults now escalate per side (Law 16.7.1), so a partner's warning makes the next card a fault; squash stays per player. Tests: 5 unit + a 600-match simulation either side of the date; one source-grep test made behavioural; full suite 7,420 pass, 0 fail; tsc clean; demo checked. No database change.
+
 ### 2026-11-07 — Release: Delete tournament at the end of Manage (web, Android OTA)
 
 Founder: delete should be easy to find. The tournament page’s Manage tab now ends with a red-bordered Delete tournament card (same soft delete as Edit tournament: confirm, hidden for everyone, upcoming matches cancelled, logged; the Edit footer link stays). auth-smoke passed. Published from a clean worktree at b3227ee: web (entry `index-dede4b01`, confirmed live) and Android OTA groups `2b7e3c86` (preview) and `e7487b3c` (production). No database change. Also: Winter Shield (a24595d1) soft-deleted by the founder in SQL, checked live.

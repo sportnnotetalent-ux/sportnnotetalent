@@ -300,6 +300,10 @@ export interface FormatField {
    *  TOURNAMENT (e.g. pickleball: side-out, as sanctioned events play). Absent →
    *  `default`. One-off matches always use `default`. */
   tournamentDefault?: number | string | boolean;
+  /** For a 'preset' field: from this IST date ('YYYY-MM-DD') a freshly seeded
+   *  format uses `value` instead (badminton: BWF 3×15 from 4 Jan 2027). Seeding
+   *  only — stored formats keep reading `default` (badminton-3x15.md B15-2). */
+  defaultFrom?: { date: string; value: number | string | boolean };
   /** for 'choice' and 'preset' */
   options?: FormatFieldOption[];
   /** for 'number' and 'count' */

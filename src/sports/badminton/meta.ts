@@ -18,11 +18,14 @@ export const BADMINTON_META: SportMeta = {
   retireTerms: true,
   formatFields: [
     {
-      key: 'preset', label: 'Format', type: 'preset', default: 'bwf21',
+      // BWF 3×15 is the standard from 4 Jan 2027, 3×21 the alternate (AGM 25 Apr
+      // 2026; docs/sport-expert/badminton-rulebook.md BR-1/2). New formats seed
+      // 3×15 from that day; stored ones keep theirs.
+      key: 'preset', label: 'Format', type: 'preset', default: 'bwf21', defaultFrom: { date: '2027-01-04', value: 'g15' },
       options: [
-        { value: 'bwf21', label: 'Games to 21, best of 3', set: { pointsPerGame: 21, cap: 30, gamesToWin: 2, goldenPoint: true } },
-        { value: 'g5x11', label: 'Games to 11, best of 5', set: { pointsPerGame: 11, cap: 15, gamesToWin: 3, goldenPoint: true } },
-        { value: 'g15', label: 'Games to 15, best of 3', set: { pointsPerGame: 15, cap: 21, gamesToWin: 2, goldenPoint: true } },
+        { value: 'g15', label: 'Games to 15, best of 3 · BWF standard from 4 Jan 2027', set: { pointsPerGame: 15, cap: 21, gamesToWin: 2, goldenPoint: true } },
+        { value: 'bwf21', label: 'Games to 21, best of 3 · BWF alternate', set: { pointsPerGame: 21, cap: 30, gamesToWin: 2, goldenPoint: true } },
+        { value: 'g5x11', label: 'Games to 11, best of 5 · not a BWF system', set: { pointsPerGame: 11, cap: 15, gamesToWin: 3, goldenPoint: true } },
         { value: 'single', label: 'One game to 21', set: { pointsPerGame: 21, cap: 30, gamesToWin: 1, goldenPoint: true } },
         { value: 'custom', label: 'Custom' },
       ],

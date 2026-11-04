@@ -7,27 +7,14 @@ import { SportBadge } from './SportSymbol';
 import { theme } from '../core/theme';
 import { SelectChip, TextField, textStyles } from './ui';
 import { getSportMeta } from '../sports/sportMeta';
-import { clampNumber, fieldChanges, isHidden } from '../sports/formatPick';
+import { clampNumber, fieldChanges, formatDefaults, isHidden } from '../sports/formatPick';
 import type { FormatField, FormatFieldOption } from '../sports/types';
 import type { SportId } from '../core/types';
 
 export type FormatVal = number | string | boolean;
 
-/** Default values for a field set, e.g. to seed a fresh format map. Applies the
- *  DEFAULT preset's `set{}` on top of the per-field defaults, so a fresh format
- *  actually matches the preset shown as selected (otherwise a sport whose preset
- *  default names non-default siblings — e.g. padel "Premier" ⇒ golden point —
- *  would silently seed the wrong rules). */
-export const defaultsFor = (fields: FormatField[], ctx?: 'tournament'): Record<string, FormatVal> => {
-  const preset = fields.find((f) => f.type === 'preset');
-  // A preset may name a different default for tournaments (SD-06: pickleball).
-  const presetDefault = ctx === 'tournament' && preset?.tournamentDefault != null ? preset.tournamentDefault : preset?.default;
-  // A field may name its own tournament default too (MVP B2: basketball's clock mode)
-  const out: Record<string, FormatVal> = Object.fromEntries(fields.map((f) => [f.key, f === preset ? presetDefault! : (ctx === 'tournament' && f.tournamentDefault != null ? f.tournamentDefault : f.default)]));
-  const chosen = preset?.options?.find((o) => o.value === presetDefault);
-  if (chosen?.set) Object.assign(out, chosen.set);
-  return out;
-};
+/** Default values for a field set (formatPick.ts `formatDefaults`). */
+export const defaultsFor = (fields: FormatField[], ctx?: 'tournament'): Record<string, FormatVal> => formatDefaults(fields, ctx);
 
 export function FormatFieldEditor({ field, value, onChange, disabled }: { field: FormatField; value: FormatVal; onChange: (v: FormatVal) => void; disabled?: boolean }) {
   if (field.type === 'choice' || field.type === 'preset') {

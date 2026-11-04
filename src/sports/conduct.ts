@@ -126,7 +126,8 @@ export const CONDUCT_RULES: Record<RacketSport, ConductRules> = {
   badminton: {
     title: 'Misconduct', rule: 'BWF Laws of Badminton 16.7',
     levels: [L('warning', 'Warning · yellow card', '🟨', 'none'), L('point', 'Fault · red card', '🟥', 'point'), L('default', 'Disqualified · black card', '⬛', 'default')],
-    ladder: ['warning', 'point'], perPlayer: true,
+    // Law 16.7.1: warning / fault go to the offending SIDE (badminton-3x15.md B15-6)
+    ladder: ['warning', 'point'], perPlayer: false,
     reasons: ['Delaying play', 'Changing the shuttle', 'Offensive behaviour', 'Coaching during a rally', 'Leaving the court'],
     note: 'Disqualification (black card) is the Referee’s decision.',
   },
