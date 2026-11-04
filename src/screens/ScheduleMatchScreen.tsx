@@ -92,6 +92,7 @@ export default function ScheduleMatchScreen() {
   const [venue, setVenue] = useState('');
   const [venueUrl, setVenueUrl] = useState('');
   const [stream, setStream] = useState('');
+  const [moreOpen, setMoreOpen] = useState(false);
   // Which phase this match belongs to (tournament matches only) — lets an
   // organizer hand-tag a group game or a specific knockout tie (e.g. a Final).
   const [phase, setPhase] = useState<Phase>('league');
@@ -615,7 +616,7 @@ export default function ScheduleMatchScreen() {
                 </View>
               )}
 
-              {(getSportMeta(sport).formatFields ?? []).length > 0 && (
+              {(getSportMeta(sport).formatFields ?? []).length > 0 && (!isFriendly || moreOpen) && (
                 <SportFormatEditor
                   sport={sport}
                   value={format}
@@ -627,20 +628,29 @@ export default function ScheduleMatchScreen() {
             </>
           )}
 
-          <VenueField venue={venue} onVenue={setVenue} venueUrl={venueUrl} onVenueUrl={setVenueUrl} knownVenues={knownVenues} />
+          {/* UI audit step 6: a friendly shows sport, players and Create first; rules,
+              venue and a stream link fold under More options (standard rules by default) */}
+          {isFriendly && !moreOpen ? (
+            <Text style={st.moreLink} accessibilityRole="button" accessibilityState={{ expanded: false }} onPress={() => setMoreOpen(true)}>
+              More options — rules, venue, live stream ▾{venue.trim() ? ` · 📍 ${venue.trim()}` : ''}
+            </Text>
+          ) : (
+            <>
+              <VenueField venue={venue} onVenue={setVenue} venueUrl={venueUrl} onVenueUrl={setVenueUrl} knownVenues={knownVenues} />
+              <TextField
+                label="Live stream link (optional)"
+                value={stream}
+                onChange={setStream}
+                placeholder="youtu.be/… · youtube.com/live/… · twitch.tv/…"
+                autoCapitalize="none"
+              />
+              <Text style={textStyles.muted}>
+                Add a YouTube or Twitch link and it shows at the top of the live match. You can also set or change it later from the match’s Info tab.
+              </Text>
+            </>
+          )}
 
           <ConflictNotice conflicts={conflicts} />
-
-          <TextField
-            label="Live stream link (optional)"
-            value={stream}
-            onChange={setStream}
-            placeholder="youtu.be/… · youtube.com/live/… · twitch.tv/…"
-            autoCapitalize="none"
-          />
-          <Text style={textStyles.muted}>
-            Add a YouTube or Twitch link and it shows at the top of the live match. You can also set or change it later from the match’s Info tab.
-          </Text>
 
           </>
           )}
@@ -846,6 +856,7 @@ function TeamPicker({
 }
 
 const st = StyleSheet.create({
+  moreLink: { color: theme.colors.primary, fontWeight: '700', paddingVertical: theme.spacing(2) },
   safe: { flex: 1, backgroundColor: theme.colors.bg },
   content: { padding: theme.spacing(4), gap: theme.spacing(3) },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing(2) },

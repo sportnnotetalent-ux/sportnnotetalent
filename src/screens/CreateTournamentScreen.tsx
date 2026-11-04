@@ -72,6 +72,7 @@ const isValidISODate = (s: string) => {
 
 export default function CreateTournamentScreen() {
   const mySports = useMySports(); // UI audit step 4: your sports first
+  const [moreOpen, setMoreOpen] = useState(false);
   const nav = useNavigation<Nav>();
   const { params } = useRoute<RouteProp<RootStackParamList, 'CreateTournament'>>();
   const initialSport = params?.sport;
@@ -253,19 +254,6 @@ export default function CreateTournamentScreen() {
           </View>
           <Text style={st.hint}>{PARTICIPATION_OPTS.find((o) => o.key === participation)?.hint}</Text>
 
-          {/* Add other people as co-hosts — look them up, or invite them to install. */}
-          <CoHostPicker
-            value={coHosts}
-            onChange={setCoHosts}
-            inviterName={myName}
-            excludeIds={myId ? [myId] : []}
-            context={name.trim() || undefined}
-          />
-
-          {/* Divisions (age × gender) — school meets run many at once. Optional. */}
-          <DivisionsEditor value={divisions} onChange={setDivisions} market={market} />
-
-
           <View style={st.row}>
             <View style={st.flex}><DateField label="Start date" value={start} onChange={setStart} /></View>
             <View style={st.flex}><DateField label="End date" value={end} onChange={setEnd} /></View>
@@ -302,6 +290,23 @@ export default function CreateTournamentScreen() {
 
           <SportSettingsButtons sports={sports} />
 
+          {/* UI audit step 6 (#9): the optional parts fold away — co-hosts, divisions,
+              organiser contact and reminders (each keeps its default until opened) */}
+          {moreOpen ? (
+            <>
+          {/* Add other people as co-hosts — look them up, or invite them to install. */}
+          <CoHostPicker
+            value={coHosts}
+            onChange={setCoHosts}
+            inviterName={myName}
+            excludeIds={myId ? [myId] : []}
+            context={name.trim() || undefined}
+          />
+
+          {/* Divisions (age × gender) — school meets run many at once. Optional. */}
+          <DivisionsEditor value={divisions} onChange={setDivisions} market={market} />
+
+
           <TournamentContactFields value={details} onChange={patchDetails} />
 
           <FieldLabel>Player reminders</FieldLabel>
@@ -326,6 +331,13 @@ export default function CreateTournamentScreen() {
               ? 'Everyone playing in this tournament is reminded before kickoff on these times.'
               : 'Each player is reminded using their own settings from Profile.'}
           </Text>
+
+            </>
+          ) : (
+            <Text style={st.linkText} accessibilityRole="button" onPress={() => setMoreOpen(true)}>
+              More options — co-hosts, divisions, organiser contact, reminders ▾
+            </Text>
+          )}
 
           <FieldLabel>Registration</FieldLabel>
           <View style={st.chips}>

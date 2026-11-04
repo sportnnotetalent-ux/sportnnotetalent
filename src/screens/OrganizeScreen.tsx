@@ -8,7 +8,7 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { theme } from '../core/theme';
 import { Card, Button, Pill, ScreenTitle, EmptyState, ActionTile, textStyles } from '../components/ui';
-import { Handshake, Repeat, Send, ChartColumn } from 'lucide-react-native';
+import { Handshake, Repeat, Users, ChartColumn } from 'lucide-react-native';
 import { SectionHeader, SECTION_CAP } from '../components/SectionHeader';
 import { useAuth } from '../core/auth';
 import { useOrganizations } from '../data/hooks';
@@ -113,8 +113,9 @@ export default function OrganizeScreen() {
             icon={<Handshake color={theme.colors.home} size={20} strokeWidth={2.2} />} onPress={() => nav.navigate('ScheduleMatch', {})} />
           <ActionTile label="New series / tie" hint="Several games, one result" tint={theme.colors.hot}
             icon={<Repeat color={theme.colors.hot} size={20} strokeWidth={2.2} />} onPress={() => nav.navigate('CreateSeries', {})} />
-          <ActionTile label="Invite a friend" hint="WhatsApp or SMS" tint={theme.colors.primary}
-            icon={<Send color={theme.colors.primary} size={20} strokeWidth={2.2} />} onPress={() => nav.navigate('InviteFriend')} />
+          {/* UI audit step 6: every way to start something in one grid (invite lives on Profile) */}
+          <ActionTile label="Start a session" hint="Who's here, pick teams, play in turns" tint={theme.colors.primary}
+            icon={<Users color={theme.colors.primary} size={20} strokeWidth={2.2} />} onPress={() => nav.navigate('SquadSession', {})} />
           <ActionTile label="Organizer dashboard" hint="What's left to do" tint={theme.colors.accent}
             icon={<ChartColumn color={theme.colors.accent} size={20} strokeWidth={2.2} />} onPress={() => nav.navigate('OrganizerDashboard')} />
         </View>
@@ -168,12 +169,6 @@ export default function OrganizeScreen() {
           label="🛡️ My teams"
           onPress={() => nav.navigate('Clubs')}
           style={{ marginTop: theme.spacing(2) }}
-        />
-        <Button
-          label="🎽 Start a session"
-          variant="ghost"
-          accessibilityHint="Who's here, captains pick teams, teams play in turns"
-          onPress={() => nav.navigate('SquadSession', {})}
         />
         <Button
           label="👥 Manage houses"

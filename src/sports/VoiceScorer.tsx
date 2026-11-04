@@ -103,6 +103,9 @@ export function VoiceScorer({
   };
 
   const speech = useSpeech(handle);
+  // UI audit step 6 (#25): one compact row until it's used; the help, privacy note and typing open with it
+  const [open, setOpen] = useState(false);
+  const shown = open || speech.listening || !!pending || log.length > 0;
   const send = () => { if (text.trim()) { handle(text, undefined, true); setText(''); } };
 
   const kindIcon = (k: LogKind) => (k === 'applied' ? '✅' : k === 'confirmed' ? '✅' : k === 'discarded' ? '↩︎' : '🤔');
@@ -115,21 +118,23 @@ export function VoiceScorer({
           variant={speech.listening ? 'danger' : 'ghost'}
           style={st.flex}
           onPress={() =>
-            speech.listening ? speech.stop() : speech.supported ? speech.start()
+            speech.listening ? speech.stop() : (setOpen(true), speech.supported) ? speech.start()
               : pushLog('', Platform.OS === 'web'
                 ? 'voice needs Chrome or Edge — type below'
                 : 'this app version can’t hear yet — update the app, or type below', 'unheard')
           }
         />
-        <Button
+        {!shown ? <Button label="⌨ Type a call" variant="ghost" onPress={() => setOpen(true)} /> : null}
+        {shown ? <Button
           label={autoApply ? '⚡ Auto ON' : '✋ Confirm'}
           variant={autoApply ? 'primary' : 'ghost'}
           onPress={() => setAutoApply((v) => !v)}
           accessibilityHint={autoApply ? 'Confident calls apply automatically' : 'Every call waits for you to tap Apply'}
-        />
+        /> : null}
       </View>
       {speech.interim ? <Text style={st.heard}>🎙 {speech.interim}</Text> : null}
       {!speech.listening && speech.notice ? <Text style={st.notice}>{speech.notice}</Text> : null}
+      {shown ? (<>
       <Text style={textStyles.muted}>
         Say e.g. {hints.slice(0, 3).map((h) => `“${h}”`).join(', ')}.{' '}
         {autoApply ? 'Confident calls apply automatically.' : 'Each call waits for you to tap Apply.'}
@@ -157,6 +162,7 @@ export function VoiceScorer({
         </View>
         <Button label="Send" variant="ghost" onPress={send} disabled={!text.trim()} />
       </View>
+      </>) : null}
 
       {/* Live call feed + one-tap undo — so any wrong call is visible and reversible. */}
       {log.length > 0 ? (

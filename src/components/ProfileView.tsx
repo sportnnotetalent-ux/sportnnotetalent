@@ -243,7 +243,6 @@ export function ProfileView({
       {onEditProfile && (
         <Button label="✎ Edit profile" variant="ghost" onPress={onEditProfile} />
       )}
-      {ownProfile && mine}
       {!onEditProfile && onAdminEdit && (
         <Button label="✎ Edit player details" variant="ghost" onPress={onAdminEdit} />
       )}
@@ -272,26 +271,6 @@ export function ProfileView({
         />
       )}
 
-      {/* Support reviewer's own profile: a discoverable entry to the approvals
-          queue (so notifications aren't the only way in). */}
-      {ownProfile && viewerIsReviewer && onOpenVerificationReview && (
-        <TouchableOpacity accessibilityRole="button" activeOpacity={0.8} onPress={onOpenVerificationReview}>
-          <Card style={st.reviewCard}>
-            <View style={st.reviewCardRow}>
-              <Text style={[textStyles.h3, st.headTitle]}>Review verifications</Text>
-              {pendingCount != null && pendingCount > 0 && (
-                <Pill label={`${pendingCount} pending`} color={theme.colors.surfaceAlt} textColor={theme.colors.accent} />
-              )}
-            </View>
-            <Text style={textStyles.muted}>
-              {pendingCount == null ? 'Age & ID proofs awaiting review.'
-                : pendingCount === 0 ? 'No submissions waiting — you’re all caught up.'
-                : `${pendingCount} age/ID ${pendingCount === 1 ? 'proof is' : 'proofs are'} waiting. Tap to review — aim for the same day.`}
-            </Text>
-          </Card>
-        </TouchableOpacity>
-      )}
-
       {hasSplit && (
         <View style={st.tagRow}>
           <SelectChip label={`All · ${allStats.matches}`} active={scope === 'all'} onPress={() => setScope('all')} />
@@ -315,71 +294,6 @@ export function ProfileView({
             </View>
           );
         })()
-      )}
-
-      {/* Fast lanes Phase 3: one checklist — what's done and the next step. */}
-      {onEditProfile && ownProfile ? <VerificationChecklist player={player} onEditProfile={onEditProfile} /> : null}
-      {/* QR-verified certificates: yours (and your children's, as a linked parent) */}
-      {ownProfile ? <MyCertificatesCard playerId={player.id} /> : null}
-      {/* Career passport: the verified record to share / print */}
-      {ownProfile && !publicHidden ? <CareerPassportCard playerId={player.id} /> : null}
-      {onEditProfile && (player.phone || player.email) && (
-        <ContactCard
-          playerId={player.id}
-          title={player.showPhone || player.showEmail
-            ? `Contact · ${[player.showPhone && 'mobile', player.showEmail && 'email'].filter(Boolean).join(' & ')} shown on your profile`
-            : 'Contact · only you can see this'}
-          phone={player.phone}
-          email={player.email}
-          phoneVerified={player.phoneVerified}
-          emailVerified={player.emailVerified}
-          emailOtp
-          phoneOtp
-        />
-      )}
-
-      {/* Someone else's profile: contact details arrive only when they chose to
-          show them (adults) or you run a team they were invited to (migration 0026). */}
-      {!onEditProfile && (player.phone || player.email) && (
-        <Card style={{ gap: theme.spacing(1) }}>
-          <Text style={textStyles.h3}>Contact</Text>
-          {player.phone ? <Text style={textStyles.body}>📞 {player.phone}{player.phoneVerified ? '  ✓ verified' : ''}</Text> : null}
-          {player.email ? <Text style={textStyles.body}>✉️ {player.email}{player.emailVerified ? '  ✓ verified' : ''}</Text> : null}
-        </Card>
-      )}
-
-      {/* Parent/guardian — shown to the profile owner (young players whose
-          guardian manages the account). Verified the same way as own contact. */}
-      {onEditProfile && player.guardian && (
-        <ContactCard
-          playerId={player.id}
-          title="Parent / Guardian · only you can see this"
-          name={player.guardian.name}
-          phone={player.guardian.phone}
-          email={player.guardian.email}
-          phoneVerified={player.guardian.phoneVerified}
-          emailVerified={player.guardian.emailVerified}
-          verify={verifyGuardianContact}
-          // Live: the guardian's EMAIL is verified by them linking their own
-          // account (code emailed to them); their PHONE by a WhatsApp code to
-          // their number, checked server-side (guardian_phone channel).
-          canVerify={isSupabaseConfigured ? { phone: true, email: false } : true}
-          phoneOtpChannel="guardian_phone"
-        />
-      )}
-      {onEditProfile && player.guardian && (ageOf(player) ?? 0) < 18 && (
-        <GuardianLinkCard playerId={player.id} linked={!!player.guardianLinked} hasEmail={!!player.guardian.email} />
-      )}
-
-      {/* The verification workflow is the player's own business (and support's) —
-          everyone else just sees the ☑️ tick next to the name once approved. */}
-      {(onEditProfile || (player.verification && isSupport(viewer?.role))) && (
-        <VerificationCard
-          player={player}
-          owner={!!onEditProfile}
-          // A support reviewer viewing someone else's profile opens Details
-          // to see the document and approve / reject.
-        />
       )}
 
       {stats.bySport.length > 0 && (
@@ -476,6 +390,94 @@ export function ProfileView({
             );
           })}
         </>
+      )}
+
+      {/* UI audit step 6: the record (numbers, sports, teams, pairs) first; your links,
+          to-dos, documents and contact details after it */}
+      {ownProfile && mine}
+      {/* Support reviewer's own profile: a discoverable entry to the approvals
+          queue (so notifications aren't the only way in). */}
+      {ownProfile && viewerIsReviewer && onOpenVerificationReview && (
+        <TouchableOpacity accessibilityRole="button" activeOpacity={0.8} onPress={onOpenVerificationReview}>
+          <Card style={st.reviewCard}>
+            <View style={st.reviewCardRow}>
+              <Text style={[textStyles.h3, st.headTitle]}>Review verifications</Text>
+              {pendingCount != null && pendingCount > 0 && (
+                <Pill label={`${pendingCount} pending`} color={theme.colors.surfaceAlt} textColor={theme.colors.accent} />
+              )}
+            </View>
+            <Text style={textStyles.muted}>
+              {pendingCount == null ? 'Age & ID proofs awaiting review.'
+                : pendingCount === 0 ? 'No submissions waiting — you’re all caught up.'
+                : `${pendingCount} age/ID ${pendingCount === 1 ? 'proof is' : 'proofs are'} waiting. Tap to review — aim for the same day.`}
+            </Text>
+          </Card>
+        </TouchableOpacity>
+      )}
+
+      {/* Fast lanes Phase 3: one checklist — what's done and the next step. */}
+      {onEditProfile && ownProfile ? <VerificationChecklist player={player} onEditProfile={onEditProfile} /> : null}
+      {/* QR-verified certificates: yours (and your children's, as a linked parent) */}
+      {ownProfile ? <MyCertificatesCard playerId={player.id} /> : null}
+      {/* Career passport: the verified record to share / print */}
+      {ownProfile && !publicHidden ? <CareerPassportCard playerId={player.id} /> : null}
+      {onEditProfile && (player.phone || player.email) && (
+        <ContactCard
+          playerId={player.id}
+          title={player.showPhone || player.showEmail
+            ? `Contact · ${[player.showPhone && 'mobile', player.showEmail && 'email'].filter(Boolean).join(' & ')} shown on your profile`
+            : 'Contact · only you can see this'}
+          phone={player.phone}
+          email={player.email}
+          phoneVerified={player.phoneVerified}
+          emailVerified={player.emailVerified}
+          emailOtp
+          phoneOtp
+        />
+      )}
+
+      {/* Someone else's profile: contact details arrive only when they chose to
+          show them (adults) or you run a team they were invited to (migration 0026). */}
+      {!onEditProfile && (player.phone || player.email) && (
+        <Card style={{ gap: theme.spacing(1) }}>
+          <Text style={textStyles.h3}>Contact</Text>
+          {player.phone ? <Text style={textStyles.body}>📞 {player.phone}{player.phoneVerified ? '  ✓ verified' : ''}</Text> : null}
+          {player.email ? <Text style={textStyles.body}>✉️ {player.email}{player.emailVerified ? '  ✓ verified' : ''}</Text> : null}
+        </Card>
+      )}
+
+      {/* Parent/guardian — shown to the profile owner (young players whose
+          guardian manages the account). Verified the same way as own contact. */}
+      {onEditProfile && player.guardian && (
+        <ContactCard
+          playerId={player.id}
+          title="Parent / Guardian · only you can see this"
+          name={player.guardian.name}
+          phone={player.guardian.phone}
+          email={player.guardian.email}
+          phoneVerified={player.guardian.phoneVerified}
+          emailVerified={player.guardian.emailVerified}
+          verify={verifyGuardianContact}
+          // Live: the guardian's EMAIL is verified by them linking their own
+          // account (code emailed to them); their PHONE by a WhatsApp code to
+          // their number, checked server-side (guardian_phone channel).
+          canVerify={isSupabaseConfigured ? { phone: true, email: false } : true}
+          phoneOtpChannel="guardian_phone"
+        />
+      )}
+      {onEditProfile && player.guardian && (ageOf(player) ?? 0) < 18 && (
+        <GuardianLinkCard playerId={player.id} linked={!!player.guardianLinked} hasEmail={!!player.guardian.email} />
+      )}
+
+      {/* The verification workflow is the player's own business (and support's) —
+          everyone else just sees the ☑️ tick next to the name once approved. */}
+      {(onEditProfile || (player.verification && isSupport(viewer?.role))) && (
+        <VerificationCard
+          player={player}
+          owner={!!onEditProfile}
+          // A support reviewer viewing someone else's profile opens Details
+          // to see the document and approve / reject.
+        />
       )}
 
       {/* App/account preferences (reminders, timezone, sign out, support) now

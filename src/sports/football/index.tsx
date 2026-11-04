@@ -61,7 +61,7 @@ import { BackfillBar, RowAction, confirmRemove } from '../TimelineControls';
 import {
   type Decider, type FootballState, type TrackConfig, type TeamStatTotals,
   init, reducer, decideShootout, penScore, HALF_NAME, currentMinute, halfBase, startOffset,
-  clockLabel, clockTime, possessionPct, cardCount, FOOTBALL_LIVE_SETTINGS,
+  clockLabel, clockTime, possessionPct, accrue, cardCount, FOOTBALL_LIVE_SETTINGS,
   minuteText, halfOfMinute, eventHalf, byMatchTimeDesc, fairPlayScore, pairedSecondYellowRed, type XiStamp,
   footballDetailLine, halfTimeText, kickText, isSubbedOff,
   needsDecision, footballComplete, footballResult,
@@ -1490,10 +1490,13 @@ function PossessionBar({
     return () => clearInterval(id);
   }, [state.startedAt]);
   const pct = possessionPct(state, Date.now());
+  const tracked = accrue(state, Date.now());
+  const early = tracked.home + tracked.away < 60_000;
   const side = state.possession.side;
   return (
     <View style={{ gap: theme.spacing(2) }}>
-      <Text style={ctrl.label}>Possession — {homeName} {pct.home}% : {pct.away}% {awayName}</Text>
+      {/* UI audit #26: under a minute of tracked play reads as "—", not 100% : 0% */}
+      <Text style={ctrl.label}>Possession — {homeName} {early ? '—' : `${pct.home}%`} : {early ? '—' : `${pct.away}%`} {awayName}</Text>
       <View style={[ctrl.possTrack, { backgroundColor: ac }]}>
         <View style={[ctrl.possFill, { width: `${pct.home}%`, backgroundColor: hc }]} />
       </View>

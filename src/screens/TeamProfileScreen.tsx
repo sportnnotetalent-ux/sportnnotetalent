@@ -1,5 +1,6 @@
 /** Team (house) profile: stats (form, scored/conceded, top performers,
  *  head-to-head), record per sport, squad, matches — and a follow toggle. */
+import { nextGame } from '../core/nextGame';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { collapseTies, isTieMatch } from '../data/teamTie';
 import { View, Text, TouchableOpacity, StyleSheet, type ScrollView } from 'react-native';
@@ -206,6 +207,8 @@ export default function TeamProfileScreen() {
     canScore: canScoreByRole(profile?.role),
   });
   const teamMatches = matches.filter((m) => m.homeTeam.id === team.id || m.awayTeam.id === team.id);
+  // UI audit step 6: the next game (or the one in play) leads the page
+  const upNext = nextGame(teamMatches);
   const records = team.sports
     .map((sp) => ({ sport: sp, row: teamStandings(matches, sp).find((t) => t.teamId === team.id) }))
     .filter((r) => r.row);
@@ -258,6 +261,13 @@ export default function TeamProfileScreen() {
           <View style={{ flex: 1 }}><Button label="📊 Stats" variant="ghost" onPress={() => scrollRef.current?.scrollTo({ y: statsY, animated: true })} /></View>
           <View style={{ flex: 1 }}><Button label={canManageSquad ? '👥 Squad · ＋ Add' : '👥 Squad'} variant="ghost" onPress={() => nav.navigate('Squad', { teamId: team.id })} /></View>
         </View>
+
+        {upNext ? (
+          <View style={{ gap: theme.spacing(2) }}>
+            <Text style={[textStyles.h3, st.section]}>{upNext.status === 'live' ? 'Playing now' : 'Next match'}</Text>
+            <MatchCard match={upNext} onPress={() => openMatch(upNext)} />
+          </View>
+        ) : null}
 
         {/* ── Stats ── */}
         <View onLayout={(e) => setStatsY(e.nativeEvent.layout.y)} style={{ gap: theme.spacing(3) }}>

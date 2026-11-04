@@ -561,7 +561,9 @@ export default function TournamentProfileScreen() {
   // The admin tab is labelled "Manage" (same as the header's ⚙ Manage); its
   // param key stays 'Settings' so old links keep working, and 'Manage' works too.
   const tabKey: Tab = (tab as string) === 'Manage' ? 'Settings' : tab;
-  const activeTab: Tab = TABS.includes(tabKey) ? tabKey : 'Info';
+  // UI audit step 6: a tournament with games in play opens on Matches (unless a tab was asked for)
+  const opensOn: Tab = !(params as { tab?: string }).tab && matches.some((m) => m.status === 'live') ? 'Matches' : 'Info';
+  const activeTab: Tab = (params as { tab?: string }).tab ? (TABS.includes(tabKey) ? tabKey : 'Info') : opensOn;
   const tabLabel = (t: Tab) => (t === 'Settings' ? 'Manage' : t);
 
   return (
@@ -664,15 +666,18 @@ export default function TournamentProfileScreen() {
               </View>
             )}
 
-            <View style={st.followRow}>
-              <Button
-                label={following ? '✓ Following' : '+ Follow tournament'}
-                variant="ghost"
-                onPress={() => toggle('tournament', tournament.id)}
-                style={{ flex: 1 }}
-              />
-              <FollowBell type="tournament" id={tournament.id} name={tournament.name} />
-            </View>
+            {/* UI audit step 6: hosts run it — no Follow button on their own tournament */}
+            {!canManageHosts ? (
+              <View style={st.followRow}>
+                <Button
+                  label={following ? '✓ Following' : '+ Follow tournament'}
+                  variant="ghost"
+                  onPress={() => toggle('tournament', tournament.id)}
+                  style={{ flex: 1 }}
+                />
+                <FollowBell type="tournament" id={tournament.id} name={tournament.name} />
+              </View>
+            ) : null}
 
             <Text style={textStyles.muted}>
               Organized by {currentOwnerLabel}{creatorName ? ` · Created by ${creatorName}` : ''}
@@ -819,50 +824,6 @@ export default function TournamentProfileScreen() {
             {/* Admin hub (parity #08): the setup checklist, then grouped rows. */}
             <SetupChecklist steps={setupSteps} hidden={setupHidden} onHide={hideSetup} onStep={openSetupStep} />
 
-            <SectionHeader title="Tournament" />
-            <HubRow icon="✎" title="Edit details" status="Name, dates, sports, registration" onPress={() => nav.navigate('EditTournament', { tournamentId: tournament.id })} />
-            {/* Run it again: the next edition (linked), or this set-up for another tournament */}
-            <HubRow
-              icon="🔁" title="Run it again"
-              status={nextEdition ? `Next edition: ${nextEdition.name}` : 'Next edition — same sports, rules, age groups, venues, events'}
-              onPress={() => (nextEdition ? nav.push('Tournament', { tournamentId: nextEdition.id }) : nav.navigate('CopyTournament', { tournamentId: tournament.id, mode: 'next' }))}
-            />
-            <HubRow icon="📋" title="Copy this setup" status="A separate tournament with the same set-up" onPress={() => nav.navigate('CopyTournament', { tournamentId: tournament.id, mode: 'clone' })} />
-            {/* Link an earlier edition: last year's tournament, run before Run it again existed */}
-            <HubRow
-              icon="🔗" title={prevEdition ? 'Earlier edition' : 'Link an earlier edition'}
-              status={prevEdition ? prevEdition.name : 'Last time’s tournament, run before Run it again'}
-              onPress={() => nav.navigate('LinkEdition', { tournamentId: tournament.id })}
-            />
-            {/* SD-154: a feeder round — its top teams qualify into another tournament */}
-            <QualifiesToCard tournament={tournament} />
-            {tournament.sports.map((sp) => {
-              const fmt = tournament.formats?.[sp] as Record<string, unknown> | undefined;
-              const cfg = structureFromFormat(fmt);
-              // SD-90: athletics is a programme of events, not a league / knockout.
-              if (isEventSport(sp)) {
-                const ms = meetSettings(fmt);
-                const sw = sp === 'swimming' ? swimMeetSettings(fmt) : null;
-                const n = meet.events.filter((e) => e.discipline.startsWith(eventPrefix(sp))).length;
-                const name = getSportMeta(sp).name;
-                return (
-                  <React.Fragment key={sp}>
-                    <HubRow icon={eventWords(sp).icon} title={`${name} — events`} status={n ? `${n} event${n === 1 ? '' : 's'} · add, enter results` : 'None yet — add the first event'}
-                      onPress={() => nav.navigate('SportHub', { tournamentId: tournament.id, sport: sp, tournamentName: tournament.name })} />
-                    <HubRow icon="⚙" title={`${name} — ${sw ? 'pool, points & timing' : sp === 'weightlifting' ? 'medals & points' : sp === 'shooting' || sp === 'archery' ? 'points' : sp === 'rowing' || sp === 'canoe' ? 'lanes, points & timing' : 'points & timing'}`} status={`${sw ? `${courseShort(sw.course)} · ${sw.lanes} lanes · ` : ''}${sp === 'weightlifting' && fmt?.liftMedals === true ? 'snatch, C&J & total medals · ' : ''}${pointsLabel(ms.positionPoints)}${ms.relayFactor !== 1 ? ` · relays ×${ms.relayFactor}` : ''}${ms.handTimed ? (sw ? ' · manual timing' : ' · hand-timed') : ''}`}
-                      onPress={() => nav.navigate('SportSettings', { sport: sp, tournamentId: tournament.id })} />
-                  </React.Fragment>
-                );
-              }
-              return (
-                <HubRow key={sp} sport={sp} title={`${getSportMeta(sp).name} — format & points`}
-                  status={`${cfg ? describeStructure(cfg) : 'Not set yet'} · ${pointsSystemLabel(sp, fmt)}`}
-                  onPress={() => nav.navigate('SportSettings', { sport: sp, tournamentId: tournament.id })} />
-              );
-            })}
-            <HubRow icon="🏆" title="Points table" status="Adjust points, view groups" onPress={() => nav.navigate('Standings', { tournamentId: tournament.id })} />
-            <HubRow icon="📜" title="Certificates" status="Champions, awards, medals — printable, with a QR anyone can check" onPress={() => nav.navigate('Certificates', { tournamentId: tournament.id })} />
-
             <SectionHeader title="Teams" />
             <HubRow icon="👥" title="Participating teams" status={allTeamIds.length ? `${allTeamIds.length} team${allTeamIds.length === 1 ? '' : 's'}${allTeamIds.length > participants.length ? ` · ${allTeamIds.length - participants.length} only in fixtures` : ''}` : 'None yet — add them'} onPress={() => nav.navigate('TournamentTeams', { tournamentId: tournament.id })} />
             {isMedal && <HubRow icon="🏅" title="Contingents" status="One squad across every sport" onPress={() => nav.navigate('Contingents', { tournamentId: tournament.id })} />}
@@ -936,6 +897,51 @@ export default function TournamentProfileScreen() {
             </Card>
             )}
             <HubRow icon="🤝" title="Hosts" status={`${hostIds.length} host${hostIds.length === 1 ? '' : 's'}`} onPress={() => setTab('Info')} />
+
+            {/* UI audit step 6: everyday jobs (teams, matches, people) first; set-up and copies after */}
+            <SectionHeader title="Tournament" />
+            <HubRow icon="✎" title="Edit details" status="Name, dates, sports, registration" onPress={() => nav.navigate('EditTournament', { tournamentId: tournament.id })} />
+            {/* Run it again: the next edition (linked), or this set-up for another tournament */}
+            <HubRow
+              icon="🔁" title="Run it again"
+              status={nextEdition ? `Next edition: ${nextEdition.name}` : 'Next edition — same sports, rules, age groups, venues, events'}
+              onPress={() => (nextEdition ? nav.push('Tournament', { tournamentId: nextEdition.id }) : nav.navigate('CopyTournament', { tournamentId: tournament.id, mode: 'next' }))}
+            />
+            <HubRow icon="📋" title="Copy this setup" status="A separate tournament with the same set-up" onPress={() => nav.navigate('CopyTournament', { tournamentId: tournament.id, mode: 'clone' })} />
+            {/* Link an earlier edition: last year's tournament, run before Run it again existed */}
+            <HubRow
+              icon="🔗" title={prevEdition ? 'Earlier edition' : 'Link an earlier edition'}
+              status={prevEdition ? prevEdition.name : 'Last time’s tournament, run before Run it again'}
+              onPress={() => nav.navigate('LinkEdition', { tournamentId: tournament.id })}
+            />
+            {/* SD-154: a feeder round — its top teams qualify into another tournament */}
+            <QualifiesToCard tournament={tournament} />
+            {tournament.sports.map((sp) => {
+              const fmt = tournament.formats?.[sp] as Record<string, unknown> | undefined;
+              const cfg = structureFromFormat(fmt);
+              // SD-90: athletics is a programme of events, not a league / knockout.
+              if (isEventSport(sp)) {
+                const ms = meetSettings(fmt);
+                const sw = sp === 'swimming' ? swimMeetSettings(fmt) : null;
+                const n = meet.events.filter((e) => e.discipline.startsWith(eventPrefix(sp))).length;
+                const name = getSportMeta(sp).name;
+                return (
+                  <React.Fragment key={sp}>
+                    <HubRow icon={eventWords(sp).icon} title={`${name} — events`} status={n ? `${n} event${n === 1 ? '' : 's'} · add, enter results` : 'None yet — add the first event'}
+                      onPress={() => nav.navigate('SportHub', { tournamentId: tournament.id, sport: sp, tournamentName: tournament.name })} />
+                    <HubRow icon="⚙" title={`${name} — ${sw ? 'pool, points & timing' : sp === 'weightlifting' ? 'medals & points' : sp === 'shooting' || sp === 'archery' ? 'points' : sp === 'rowing' || sp === 'canoe' ? 'lanes, points & timing' : 'points & timing'}`} status={`${sw ? `${courseShort(sw.course)} · ${sw.lanes} lanes · ` : ''}${sp === 'weightlifting' && fmt?.liftMedals === true ? 'snatch, C&J & total medals · ' : ''}${pointsLabel(ms.positionPoints)}${ms.relayFactor !== 1 ? ` · relays ×${ms.relayFactor}` : ''}${ms.handTimed ? (sw ? ' · manual timing' : ' · hand-timed') : ''}`}
+                      onPress={() => nav.navigate('SportSettings', { sport: sp, tournamentId: tournament.id })} />
+                  </React.Fragment>
+                );
+              }
+              return (
+                <HubRow key={sp} sport={sp} title={`${getSportMeta(sp).name} — format & points`}
+                  status={`${cfg ? describeStructure(cfg) : 'Not set yet'} · ${pointsSystemLabel(sp, fmt)}`}
+                  onPress={() => nav.navigate('SportSettings', { sport: sp, tournamentId: tournament.id })} />
+              );
+            })}
+            <HubRow icon="🏆" title="Points table" status="Adjust points, view groups" onPress={() => nav.navigate('Standings', { tournamentId: tournament.id })} />
+            <HubRow icon="📜" title="Certificates" status="Champions, awards, medals — printable, with a QR anyone can check" onPress={() => nav.navigate('Certificates', { tournamentId: tournament.id })} />
 
             <SectionHeader title="More" />
             <HubRow icon="🔔" title="Player reminders" status={customReminders ? `Custom: ${(reminderMins ?? []).length} reminder${(reminderMins ?? []).length === 1 ? '' : 's'}` : 'Players’ own settings'} open={panel === 'reminders'} onPress={() => setPanel(panel === 'reminders' ? '' : 'reminders')} />

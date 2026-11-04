@@ -42,13 +42,7 @@ export default function GuardianLinkScreen() {
     <SafeAreaView style={st.safe} edges={['bottom']}>
       <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
         <ScreenTitle title="Link as a parent/guardian" subtitle="Receive messages about your child" />
-        <Text style={textStyles.muted}>
-          Coaches and scouts can&apos;t message players under 18 directly — their messages come to the parent/guardian. Enter the code we emailed you. Use your own account, not your child&apos;s.
-        </Text>
-        <TextField label="Code from the email" value={code} onChange={setCode} placeholder="e.g. 7KQ2XH9M" autoCapitalize="characters" />
-        <FormError message={error} />
-        <Button label={busy ? 'Linking…' : 'Link'} onPress={claim} disabled={busy || !code.trim()} />
-
+        {/* UI audit step 6: already linked → your child first; linking another below */}
         {children.length > 0 && (
           <Card style={{ gap: theme.spacing(2) }}>
             <Text style={textStyles.h3}>You&apos;re the parent/guardian of</Text>
@@ -66,6 +60,14 @@ export default function GuardianLinkScreen() {
             <Button label="💬 Open messages" variant="ghost" onPress={() => nav.navigate('Messages')} />
           </Card>
         )}
+        {children.length > 0 ? <Text style={[textStyles.h3, { marginTop: theme.spacing(2) }]}>Link another child</Text> : null}
+        <Text style={textStyles.muted}>
+          Coaches and scouts can&apos;t message players under 18 directly — their messages come to the parent/guardian. Enter the code we emailed you. Use your own account, not your child&apos;s.
+        </Text>
+        <TextField label="Code from the email" value={code} onChange={setCode} placeholder="e.g. 7KQ2XH9M" autoCapitalize="characters" />
+        <FormError message={error} />
+        <Button label={busy ? 'Linking…' : 'Link'} onPress={claim} disabled={busy || !code.trim()} />
+
       </KeyboardAwareScrollView>
     </SafeAreaView>
   );
