@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-08 — Release: badminton 3×15 default + cards per side live (web, Android OTA)
+
+auth-smoke passed. Published from a clean worktree at aa2287f: web (entry `index-3391adb3`, confirmed live on app.sportnnote.in) and Android OTA groups `2da9cc93` (preview) and `5fbcb047` (production), runtime 1.0.0. No database change.
+
 ### 2026-11-08 — Badminton: BWF 3×15 from 4 Jan 2027, cards per side
 
 First rulebook audit with Firecrawl (`docs/sport-expert/badminton-rulebook.md`: BWF Laws v5.0, the 3×15 announcement, Instant Review System). Built the three P1s (`docs/security/breaks/badminton-3x15.md`). **3×15 default:** a preset can name a dated default (`defaultFrom`); badminton formats seeded on or after 4 Jan 2027 (IST) start on games to 15, best of 3 (two clear at 14-all, cap 21); before that, 3×21. Only seeding is dated (`formatDefaults`, moved from FormatEditor to `formatPick.ts`), so saved matches and formats never change. **Labels** (plain words kept): "Games to 15, best of 3 · BWF standard from 4 Jan 2027", "Games to 21, best of 3 · BWF alternate", "Games to 11, best of 5 · not a BWF system". **Cards:** badminton warnings / faults now escalate per side (Law 16.7.1), so a partner's warning makes the next card a fault; squash stays per player. Tests: 5 unit + a 600-match simulation either side of the date; one source-grep test made behavioural; full suite 7,420 pass, 0 fail; tsc clean; demo checked. No database change.
