@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-06 — Release: team search-and-pick live (web, Android OTA)
+
+auth-smoke passed. Published from a clean worktree at 3b12e66: web (entry `index-502632db`, confirmed live on app.sportnnote.in) and Android OTA groups `047b4e06` (preview) and `e5e4cbd5` (production), runtime 1.0.0. No database change.
+
 ### 2026-11-06 — Pick tournament teams, don't type them
 
 Founder (`docs/security/breaks/pick-tournament-teams.md`): every team is one record, so Quick tournament (team sports) no longer takes a typed list. **Find a team** searches the sport's real teams (no one-off sides, slots or other sports; name-starts first; picked ones hidden) and taps to add; **+ New team** asks the team's name and the **captain's name and mobile** — the team is made (a real record), the captain is set and gets their invite (WhatsApp / SMS buttons, team code shown) to add the players; a new name matching an existing team offers "Pick it instead". **Teams not known yet** adds slots next to the picked teams. A team someone else runs is entered as invited (existing consent rule) and the organiser is told it joins the fixtures when its captain accepts (or to use a slot meanwhile). **Fill slot → a new team** also asks for the captain and shows the invite. Sports played by individuals keep their list for now. Shared helpers `src/core/teamPick.ts`, `src/data/teamCaptain.ts`, `src/components/TournamentTeamPicker.tsx`. Tests: 4 unit, a 600-search simulation; full suite 7,341 pass, 0 fail; tsc clean; demo checked (search "rov" → Rovers United; new "Winter Wolves" + captain → invite card; 2 not known → 4 teams, 6 league games). No database change.
