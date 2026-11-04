@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-08 — Table tennis: ITTF 2026 expedite rule
+
+Audited against the ITTF Laws 2026 (`docs/sport-expert/tabletennis-rulebook.md`). TT-1: the expedite system can’t start once 18 points have been played in a game (Law 2.15.2); we used the older "both on 9" test, so 10-8 slipped through. Now 2 × (target − 2) points played (18 for games to 11); the Quick options message and hint say so. Tests: 2 unit; the 400-match expedite simulation’s oracle updated to the 2026 law. No database change.
+
 ### 2026-11-08 — Pickleball: USA Pickleball 2026 pool standings, plain rally labels
 
 From the pickleball rulebook audit (`docs/sport-expert/pickleball-rulebook.md` PR-1, PR-3; `docs/security/breaks/pickleball-usap-2026.md`). **Standings (USAP 15.B.4):** new pickleball tournaments and the "Pool play (USA Pickleball)" preset rank by matches won, then head-to-head, point difference, head-to-head point difference, point difference vs the team just above, total points scored, then lots; no restart. Three new tie-breakers (`h2hRallyDiff`, `vsAbove`, `rallyFor`, rally points). **Withdrawn teams (15.B.4.a):** their matches are left out of everyone’s record and they are listed last, marked "withdrawn" (pickleball default, organiser can turn off). Saved tie-break orders keep theirs. **Labels:** "Rec (rally …)" → "Rally · 1 game to 11" etc. (rally is a sanctioned 2026 format); new "Rally · best of 3 to 15". Tests: 8 unit + a 600-pool simulation; full suite 7,426 pass (the student-lists sim failed under load, passes alone); tsc clean. No database change.

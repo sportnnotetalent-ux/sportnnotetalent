@@ -248,8 +248,8 @@ export function makeRacketQuickOptions(sport: RacketSport, h: RacketQuickHelpers
       const ok = !on && !!x.current && ttExpediteAllowed(x.current.home, x.current.away, x.target ?? 11);
       return (
         <View style={st.panel}>
-          <Text style={textStyles.muted}>ITTF 2.15: after 10 minutes in a game (unless both have 9 points), or earlier if both ask. Service then alternates every point to the end of the match, and 13 good returns by the receiver win the point.</Text>
-          {on ? <Text style={st.effect}>Expedite is already on.</Text> : !ok ? <Text style={st.effect}>Not in this game: both have 9 points.</Text> : (
+          <Text style={textStyles.muted}>ITTF 2.15: after 10 minutes in a game (not once 18 points have been played), or earlier if both ask. Service then alternates every point to the end of the match, and 13 good returns by the receiver win the point.</Text>
+          {on ? <Text style={st.effect}>Expedite is already on.</Text> : !ok ? <Text style={st.effect}>Not in this game: 18 points have been played (ITTF 2.15.2).</Text> : (
             <>
               <View style={st.chips}>
                 <SelectChip label="Between rallies" active={!inRally} onPress={() => setInRally(false)} />

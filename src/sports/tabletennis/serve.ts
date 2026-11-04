@@ -75,8 +75,11 @@ export interface TTExpedite { game: number; at: number; start: Side; rally?: tru
 /** Expedite may not start once both sides have `target − 2` (ITTF 2.15.1: 9
  *  each in an 11-point game). */
 export const ttExpediteAllowed = (home: number, away: number, target = 11): boolean => {
-  const lim = Math.max(1, (Number(target) || 11) - 2);
-  return !(home >= lim && away >= lim);
+  // ITTF Laws 2026, 2.15.2: not once at least 18 points have been scored in the
+  // game (games to 11); other lengths scale: 2 × (target − 2). The older "both
+  // on 9" test let it in at 10-8 (tabletennis-rulebook.md TT-1).
+  const lim = 2 * Math.max(1, (Number(target) || 11) - 2);
+  return (Number(home) || 0) + (Number(away) || 0) < lim;
 };
 
 type Ev = { kind?: string; game?: number; side?: string; wonBy?: string; xr?: boolean };

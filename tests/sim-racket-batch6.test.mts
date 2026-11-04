@@ -80,8 +80,9 @@ test('400 table tennis matches: the server follows the ITTF oracle, with and wit
       if (want && pts === expAt && !s.events.some((e) => e.kind === 'expedite')) {
         const rally = rnd(2) === 0;
         const next = TT.reducer(s, { type: 'EXPEDITE', payload: rally ? { rally: true } : pick([{}, { rally: 'yes' }, { rally: 1 }]) });
-        const both = Math.max(1, target - 2);
-        if (s.current.home >= both && s.current.away >= both) { assert.equal(next, s, 'refused at 9-all'); refused += 1; }
+        // ITTF 2026 2.15.2: not once 18 points (2 × (target − 2)) are played in the game
+        const lim = 2 * Math.max(1, target - 2);
+        if (s.current.home + s.current.away >= lim) { assert.equal(next, s, 'refused from 18 points played'); refused += 1; }
         else {
           assert.notEqual(next, s);
           assert.equal(score(next), score(s), 'a marker never scores');
