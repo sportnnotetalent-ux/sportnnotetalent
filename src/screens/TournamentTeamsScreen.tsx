@@ -33,6 +33,8 @@ import { useAuth } from '../core/auth';
 import { useTournamentById, useTeams, useTournamentEntries, useTournamentCategories, useLeagueData, useCaptainships } from '../data/hooks';
 import { addTournamentTeams, removeTournamentTeam, createTeam, invitePerson, setTeamLeaders, createInvite, setTournamentTeamStatus, setTournamentTeamCheckIn, getTeamLeaders, enterOrgHousesAsTeams, getLiveTournamentInvite, setTournamentInvite, getTeamsSetup, canManageTeam, getMyPlayerId, getMyEntrant, isNeedsDbUpdate, getTournamentSlotIds, fillTournamentSlot, nameTournamentSlot, createTournamentSlots } from '../data/repos';
 import { nextSlotNames } from '../core/slots';
+import { inviteCaptain } from '../data/teamCaptain';
+import { newTeamProblem } from '../core/teamPick';
 import { filterTeams } from '../core/teamSearch';
 import { tournamentInviteMessage, tournamentJoinLink } from '../core/tournamentInvite';
 import { inviteLabel, playerInviteText } from '../core/inviteText';
@@ -132,6 +134,9 @@ export default function TournamentTeamsScreen() {
   const [filling, setFilling] = useState<string | null>(null);
   const [slotName, setSlotName] = useState('');
   const [slotQuery, setSlotQuery] = useState('');
+  // PK8: a brand-new team in a slot gets its captain, invited to add the players
+  const [slotCapName, setSlotCapName] = useState('');
+  const [slotCapPhone, setSlotCapPhone] = useState('');
   useEffect(() => {
     let on = true;
     getTournamentSlotIds(params.tournamentId).then((ids) => on && setSlotIds(ids)).catch(() => {});
@@ -153,11 +158,19 @@ export default function TournamentTeamsScreen() {
     } finally { setBusy(false); }
   }
   async function fillSlot(slotId: string, how: { teamId: string } | { name: string }) {
-    setBusy(true); setError(null);
+    if (!('teamId' in how)) {
+      const why = newTeamProblem(how.name, slotCapName, slotCapPhone);
+      if (why) return setError(why);
+    }
+    setBusy(true); setError(null); setAdded(null);
     try {
       if ('teamId' in how) await fillTournamentSlot(slotId, how.teamId);
-      else await nameTournamentSlot(slotId, how.name);
-      setFilling(null); setSlotName(''); setSlotQuery('');
+      else {
+        await nameTournamentSlot(slotId, how.name);
+        const iv = await inviteCaptain(slotId, how.name.trim(), slotCapName, slotCapPhone, sport);
+        setAdded({ note: `✅ ${iv.teamName} is in · invite ${iv.captainName} to captain it and add the players:`, link: iv.link, phone: iv.phone, name: iv.captainName, context: teamAtTournament(iv.teamName, tournament?.name), code: iv.code });
+      }
+      setFilling(null); setSlotName(''); setSlotQuery(''); setSlotCapName(''); setSlotCapPhone('');
       setTick((n) => n + 1);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Couldn’t fill the slot.');
@@ -653,7 +666,9 @@ export default function TournamentTeamsScreen() {
                   filling === e.team.id ? (
                     <View key={`${e.team.id}-fill`} style={st.slotBox}>
                       <TextField label="A new team: its name" value={slotName} onChange={setSlotName} placeholder="e.g. Falcons FC" autoCapitalize="words" />
-                      <Button label={`Put “${slotName.trim() || 'this team'}” in ${e.team.name}`} disabled={busy || !slotName.trim()}
+                      <TextField label="Its captain’s name" value={slotCapName} onChange={setSlotCapName} autoCapitalize="words" />
+                      <PhoneField label="Captain’s mobile" value={slotCapPhone} onChange={setSlotCapPhone} hint="They get an invite to add the team’s players." />
+                      <Button label={`Put “${slotName.trim() || 'this team'}” in ${e.team.name} & invite the captain`} disabled={busy || !slotName.trim()}
                         onPress={() => void fillSlot(e.team.id, { name: slotName })} />
                       <TextField label="Or a team already on SportnNote" value={slotQuery} onChange={setSlotQuery} placeholder="Search by name" autoCapitalize="none" />
                       {q.length >= 2 && !found.length ? <Text style={textStyles.muted}>No team by that name in this sport.</Text> : null}

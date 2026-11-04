@@ -20,8 +20,9 @@ import { defaultsFor } from '../components/FormatEditor';
 import { withNewTournamentPoints } from '../data/standings';
 import { regionFormatDefaults } from '../core/units';
 import { regionStore } from '../core/region';
-import { addTournamentTeams, createTeam, createTournament, createTournamentSlots, getMyPlayerId, getPlayer } from '../data/repos';
+import { addTournamentTeams, createTeam, createTournament, createTournamentSlots, getMyPlayerId, getPlayer, getTournamentEntries } from '../data/repos';
 import { nextSlotNames, slotNames, splitTypedSlots } from '../core/slots';
+import { TournamentTeamPicker, type PickedTeam } from '../components/TournamentTeamPicker';
 import { getMyPersonalisation } from '../data/personalise';
 import { useAuth } from '../core/auth';
 import { notice } from '../core/confirm';
@@ -66,6 +67,9 @@ export default function QuickTournamentScreen() {
   // Teams not known yet (TS1): fixtures between slots (A1…, B1… / Team 1…), filled in later
   const [slotMode, setSlotMode] = useState(false);
   const [slotCount, setSlotCount] = useState('8');
+  // team sports (PK1): real teams picked from the list, plus how many aren't known yet
+  const [pickedTeams, setPickedTeams] = useState<PickedTeam[]>([]);
+  const [unknownCount, setUnknownCount] = useState('0');
 
   // The sport a person most likely means: the route's, else the last friendly's, else their first.
   useEffect(() => {
@@ -97,13 +101,22 @@ export default function QuickTournamentScreen() {
   );
   const slotN = Math.max(0, Math.min(128, parseInt(slotCount, 10) || 0));
   const noun = meta?.participantKind === 'individual' ? 'players' : meta?.participantKind === 'both' ? 'players or pairs' : 'teams';
+  const teamSport = (meta?.participantKind ?? 'team') === 'team';
+  const unknownN = Math.max(0, Math.min(128, parseInt(unknownCount, 10) || 0));
   // Suggested name and format until the organiser changes them.
   useEffect(() => { if (meta && !nameTouched.current) setName(quickName(meta.name, new Date())); }, [meta]);
-  const fmt: QuickFormat | null = chosenFmt ?? suggestFormat(slotMode ? slotN : typed.length);
+  const fmt: QuickFormat | null = chosenFmt ?? suggestFormat(teamSport ? pickedTeams.length + unknownN : slotMode ? slotN : typed.length);
   // the entrants: typed names, or slots named by their group when the teams aren't known yet
+  // team sports: the picked teams, then a slot for each team not known yet
+  const teamSlots = useMemo(() => {
+    if (!unknownN) return [];
+    if (!pickedTeams.length) return unknownN >= 2 ? slotNames(unknownN, fmt === 'groups' ? groupCount(unknownN) : 0) : ['Slot 1'];
+    return nextSlotNames(pickedTeams.map((t) => t.name), unknownN);
+  }, [unknownN, pickedTeams, fmt]);
   const entrants = useMemo(
-    () => (slotMode ? (slotN >= 2 ? slotNames(slotN, fmt === 'groups' ? groupCount(slotN) : 0) : []) : typed),
-    [slotMode, slotN, fmt, typed],
+    () => (teamSport ? [...pickedTeams.map((t) => t.name), ...teamSlots]
+      : slotMode ? (slotN >= 2 ? slotNames(slotN, fmt === 'groups' ? groupCount(slotN) : 0) : []) : typed),
+    [teamSport, pickedTeams, teamSlots, slotMode, slotN, fmt, typed],
   );
 
   const chips = useMemo(() => {
@@ -114,7 +127,7 @@ export default function QuickTournamentScreen() {
   async function create() {
     if (!sport || !meta) return setError('Pick a sport.');
     if (!name.trim()) return setError('Give the tournament a name.');
-    if (entrants.length < 2) return setError(`Add at least 2 ${noun}, one per line.`);
+    if (entrants.length < 2) return setError(teamSport ? 'Pick at least 2 teams (or add the ones not known yet).' : `Add at least 2 ${noun}, one per line.`);
     if (!fmt) return setError('Pick a format.');
     setError(null);
     let createdId: string | null = null;
@@ -137,7 +150,24 @@ export default function QuickTournamentScreen() {
         city: homeCity,
       });
       createdId = created.id;
-      if (slotMode) {
+      if (teamSport) {
+        // PK1/PK7: the picked teams are entered (one the organiser doesn't run is invited); then the slots
+        if (pickedTeams.length) {
+          setBusy(`Adding ${pickedTeams.length} teams…`);
+          await addTournamentTeams(created.id, pickedTeams.map((t) => t.id), 'confirmed');
+        }
+        if (teamSlots.length) {
+          setBusy(`Making ${teamSlots.length} slot${teamSlots.length === 1 ? '' : 's'}…`);
+          await createTournamentSlots(created.id, sport, teamSlots);
+        }
+        // PK7: a team someone else runs is invited — it joins the fixtures when its captain accepts
+        const waiting = (await getTournamentEntries(created.id, sport).catch(() => []))
+          .filter((e) => e.status === 'invited').map((e) => e.team.name);
+        if (waiting.length) {
+          notice(`${waiting.length === 1 ? waiting[0] : `${waiting.length} teams`} invited`,
+            `${waiting.join(', ')} ${waiting.length === 1 ? 'is' : 'are'} run by someone else, so ${waiting.length === 1 ? 'it joins' : 'they join'} the fixtures once ${waiting.length === 1 ? 'its captain accepts' : 'their captains accept'}. To make the fixtures now, add a slot for ${waiting.length === 1 ? 'it' : 'each'} and fill it later.`);
+        }
+      } else if (slotMode) {
         setBusy(`Making ${entrants.length} slots…`);
         await createTournamentSlots(created.id, sport, entrants);
       } else {
@@ -204,6 +234,16 @@ export default function QuickTournamentScreen() {
 
           <TextField label="Name" value={name} onChange={(v) => { nameTouched.current = true; setName(v); }} placeholder="e.g. Sunday Turf Cup" autoCapitalize="words" />
 
+          {teamSport && sport ? (
+            <View style={st.block}>
+              <FieldLabel>Teams</FieldLabel>
+              <TournamentTeamPicker sport={sport} picked={pickedTeams} onChange={setPickedTeams} context={name.trim() || undefined} />
+              <TextField label="Teams not known yet" value={unknownCount} onChange={(v) => setUnknownCount(v.replace(/[^0-9]/g, '').slice(0, 3))} />
+              <Text style={textStyles.muted}>
+                {summary}{teamSlots.length ? ` · slots ${teamSlots[0]}${teamSlots.length > 1 ? ` … ${teamSlots[teamSlots.length - 1]}` : ''}, filled in later from the tournament’s teams` : ''}.
+              </Text>
+            </View>
+          ) : (
           <View style={st.block}>
             <View style={st.chips}>
               <SelectChip label={`I have the ${noun}`} active={!slotMode} onPress={() => setSlotMode(false)} />
@@ -225,6 +265,7 @@ export default function QuickTournamentScreen() {
               </>
             )}
           </View>
+          )}
 
           <View style={st.block}>
             <FieldLabel>Format</FieldLabel>
