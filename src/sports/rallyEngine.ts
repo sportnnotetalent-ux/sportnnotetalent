@@ -158,6 +158,7 @@ export function makeRallyEngine(opts: RallyEngineOpts) {
     gameKey: (s) => `${s.games.length}${s.ended ? 'E' : ''}`,
     where: (s) => ({ stamp: `Game ${s.games.length + 1}`, game: s.games.length + 1 }),
     target: (s) => s.target,
+    gamesToWin: (s) => s.gamesToWin,
   };
 
   const core = (s: RallyState, a: ScoreAction): RallyState => {

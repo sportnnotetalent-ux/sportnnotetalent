@@ -197,10 +197,10 @@ export function makeRacketQuickOptions(sport: RacketSport, h: RacketQuickHelpers
         onDone(`📺 Video review ${upheld ? 'upheld' : 'not upheld'} · ${player?.fullName ?? nameOf(side)}`);
       };
       const game = h.gameOf?.(state).game;
-      const out = side ? reviewsLeft(events, side, game) === 0 : false;
+      const out = side ? reviewsLeft(events, side, game, (state as { gamesToWin?: number } | null)?.gamesToWin) === 0 : false;
       return (
         <View style={st.panel}>
-          <Text style={textStyles.muted}>PSA: one review per player per game, kept when upheld. Who asked?</Text>
+          <Text style={textStyles.muted}>World Squash: 2 reviews per player a match (best of 3: 1), plus 1 in the deciding game; kept when the decision is overruled. Who asked?</Text>
           {sideChips}
           {playerChips}
           {out ? <Text style={st.effect}>Their review for this game is used.</Text> : null}

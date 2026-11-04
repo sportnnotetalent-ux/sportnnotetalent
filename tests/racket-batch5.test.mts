@@ -324,14 +324,14 @@ describe('RB14: squash video review (PSA)', () => {
     assert.ok(isMark(e));
     assert.deepEqual(s.current, { home: 1, away: 0 });
   });
-  test('one unsuccessful review per player per game; an upheld one is kept', () => {
-    let s = run(SQ.reducer, SQ.init({}), [FS('home'), P('home'), RV('away', true), RV('away', true), RV('away', false)]);
+  test('World Squash 2025: 2 lost reviews a match (best of 5), +1 in the 5th; an overruled one is kept', () => {
+    let s = run(SQ.reducer, SQ.init({}), [FS('home'), P('home'), RV('away', true), RV('away', true), RV('away', false), RV('away', false)]);
     const n = s.events.filter((e) => e.kind === 'review').length;
     s = SQ.reducer(s, RV('away', false));
-    assert.equal(s.events.filter((e) => e.kind === 'review').length, n, 'the 2nd unsuccessful one is refused');
+    assert.equal(s.events.filter((e) => e.kind === 'review').length, n, 'a 3rd lost one is refused');
     s = run(SQ.reducer, s, [...L.rGame(0, 11).slice(0, 11)]);
     s = SQ.reducer(s, RV('away', false));
-    assert.equal(s.events.filter((e) => e.kind === 'review').length, n + 1, 'a new game, a new review');
+    assert.equal(s.events.filter((e) => e.kind === 'review').length, n, 'a new game does not reset them (squash-rulebook.md SQ-1)');
   });
   test('hostile: not squash, no side, a non-boolean outcome', () => {
     assert.equal(run(TT.reducer, TT.init({}), [FS('home'), RV('home', true)]).events.length, 0);

@@ -260,6 +260,8 @@ export interface ConductOps<S> {
   where: (s: S) => Pick<LiveEvent, 'stamp' | 'game' | 'set'>;
   /** pickleball per-game allowance: the game's target */
   target?: (s: S) => number;
+  /** games needed to win the match (squash video reviews are per match) */
+  gamesToWin?: (s: S) => number;
 }
 
 type Base = { events: LiveEvent[]; seq: number; ended: boolean };
@@ -384,7 +386,7 @@ export function applyRacketExtras<S extends Base>(s: S, a: ScoreAction, ops: Con
     const upheld = a.payload?.upheld;
     if (s.ended || ops.sport !== 'squash' || (side !== 'home' && side !== 'away') || typeof upheld !== 'boolean') return s;
     const w = ops.where(s);
-    if (!upheld && reviewsLeft(s.events, side, w.game) === 0) return s;
+    if (!upheld && reviewsLeft(s.events, side, w.game, ops.gamesToWin?.(s)) === 0) return s;
     const playerId = typeof a.payload?.playerId === 'string' && a.payload.playerId && a.payload.playerId.length <= 64 ? a.payload.playerId : undefined;
     return push(s, { ...w, icon: '📺', label: `Video review · ${upheld ? 'upheld' : 'not upheld'}`, side, kind: 'review', rev: upheld ? 'upheld' : 'rejected', ...(playerId ? { playerId } : {}) });
   }
@@ -409,9 +411,16 @@ export function applyRacketExtras<S extends Base>(s: S, a: ScoreAction, ops: Con
 }
 
 /** racket-batch5 RB14 — a side's unsuccessful video reviews left in a game. */
-export function reviewsLeft(events: LiveEvent[], side: Side, game?: number): number {
-  const used = (events ?? []).filter((e) => e.kind === 'review' && e.side === side && e.rev === 'rejected' && e.game === game).length;
-  return Math.max(0, REVIEWS_PER_GAME - used);
+export function reviewsLeft(events: LiveEvent[], side: Side, game?: number, gamesToWin?: number): number {
+  const lost = (f: (g: number) => boolean) => (events ?? []).filter((e) => e.kind === 'review' && e.side === side && e.rev === 'rejected' && typeof e.game === 'number' && f(e.game)).length;
+  // Without the match length (older callers): the old one-per-game allowance.
+  if (!gamesToWin || !game) return Math.max(0, REVIEWS_PER_GAME - lost((g) => g === game));
+  // World Squash Singles Rules 2025, Appendix 3 (squash-rulebook.md SQ-1): best
+  // of 5 → 2 a match, best of 3 (or shorter) → 1; the deciding game gives one
+  // fresh review and unused ones are not carried into it. Kept when overruled.
+  const decider = 2 * gamesToWin - 1;
+  if (gamesToWin > 1 && game >= decider) return Math.max(0, 1 - lost((g) => g >= decider));
+  return Math.max(0, (gamesToWin >= 3 ? 2 : 1) - lost((g) => g < decider));
 }
 
 // ------------------------------------------------ the Stats-tab rows --
