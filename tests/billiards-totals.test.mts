@@ -98,7 +98,8 @@ describe('inputs and wiring', () => {
   });
   test('the plugin is wired to these totals', () => {
     const src = readFileSync(new URL('../src/sports/billiards/index.tsx', import.meta.url), 'utf8');
-    assert.match(src, /statTotals: billiardsStatTotals,/);
+    // 2026-11-06: through the doubles layer (singles hands straight back to billiardsStatTotals)
+    assert.match(src, /statTotals: doublesStatTotals\(billiardsStatTotals as never/);
     assert.match(src, /statTotalsNeedsPlayers: true/);
     assert.doesNotMatch(src, /attribution/);
   });

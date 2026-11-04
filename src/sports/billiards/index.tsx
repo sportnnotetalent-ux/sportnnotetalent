@@ -30,7 +30,9 @@ import {
 } from './controls';
 import { billiardsFeed } from './feed';
 import { billiardsMatchStats, billiardsFrameNumbers, frameSheet, breakList, BREAK_LIST_MIN, BREAK_LIST_CHIPS } from './matchStats';
-import { billiardsStatTotals } from './totals';
+import { billiardsStatTotals, billiardsSideRecord, BILLIARDS_RECORD_KEYS } from './totals';
+import { withDoubles, doublesStatTotals } from '../cue/doubles';
+import { withCueDoubles } from '../cue/DoublesAtTable';
 import { billiardsMatchRecords } from './records';
 import { billiardsUndoLabel } from './undo';
 import { useSideNames } from '../cue/useNames';
@@ -244,12 +246,15 @@ const frameLineScore = (s: BilliardsState) => {
   return ls ? { ...ls, unit: (s?.bestOf === 1 ? 'game' : 'frame') as 'game' | 'frame' } : null;
 };
 
+// doubles: partners take alternate visits; each visit credited to who played it (cue/doubles.ts)
+const doubles = withDoubles(createInitialState, reducer as never);
+
 export const billiardsPlugin: SportPlugin<BilliardsState> = {
   ...BILLIARDS_META,
   // SD-51 — highest breaks, centuries, biggest frame wins
   matchRecords: billiardsMatchRecords,
-  createInitialState,
-  reducer: (s, a) => reducer(s, a as never),
+  createInitialState: (c) => doubles.init(c) as never,
+  reducer: (s, a) => doubles.reduce(s as never, a as never) as never,
   isComplete,
   result: (s) => result(s),
   summary,
@@ -262,14 +267,14 @@ export const billiardsPlugin: SportPlugin<BilliardsState> = {
   // the league table counts points (founder 2026-10-28)
   standingsScore,
   // SD-19 — derived only (nothing is credited live); one player per side
-  statTotals: billiardsStatTotals,
+  statTotals: doublesStatTotals(billiardsStatTotals as never, billiardsSideRecord as never, BILLIARDS_RECORD_KEYS, { potted: 'scored' }) as never,
   statTotalsNeedsPlayers: true,
   // SD-133 — "Undo: pot red + cannon · break 5"
   undoLabel: (step) => billiardsUndoLabel(step),
   Scoreboard: BilliardsScoreboard,
   // A-01 — "Correct this match": a frame's final score, later frames kept
   CorrectionEditor: BilliardsCorrections,
-  ScoringControls,
+  ScoringControls: withCueDoubles(ScoringControls),
   matchTabs: { Commentary: BilliardsCommentary, Stats: BilliardsStats },
 };
 

@@ -137,7 +137,8 @@ describe('corrections and inputs', () => {
 
   test('the plugin is wired to these totals', () => {
     const src = readFileSync(new URL('../src/sports/snooker/index.tsx', import.meta.url), 'utf8');
-    assert.match(src, /statTotals: snookerStatTotals,/);
+    // 2026-11-06: through the doubles layer (singles hands straight back to snookerStatTotals)
+    assert.match(src, /statTotals: doublesStatTotals\(snookerStatTotals as never/);
     assert.match(src, /statTotalsNeedsPlayers: true/);
     assert.doesNotMatch(src, /attribution/); // nothing credited live: the totals own every key
   });

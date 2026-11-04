@@ -9,7 +9,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const SPORTS = join(import.meta.dirname, '..', 'src', 'sports');
-const PAIR_SPORTS = ['badminton', 'carrom', 'padel', 'pickleball', 'pool', 'squash', 'tabletennis', 'tennis'];
+const PAIR_SPORTS = ['badminton', 'billiards', 'carrom', 'padel', 'pickleball', 'pool', 'snooker', 'squash', 'tabletennis', 'tennis'];
 const meta = (s: string) => readFileSync(join(SPORTS, s, 'meta.ts'), 'utf8');
 
 test('the pair sports are exactly the "both" sports', () => {

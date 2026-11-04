@@ -12,8 +12,17 @@ export const BILLIARDS_META: SportMeta = {
   icon: '⚪',
   archetype: 'set-game-point',
   // Four-handed billiards isn't modelled: a side is one player (design §8.11)
-  participantKind: 'individual',
+  // singles, or doubles (partners take alternate visits, cue/doubles.ts)
+  participantKind: 'both',
   formatFields: [
+    // founder 2026-11-06 — doubles: partners take alternate visits (docs/security/breaks/cue-doubles.md)
+    {
+      key: 'playersPerSide', label: 'Players', type: 'choice', default: 1,
+      options: [
+        { value: 1, label: 'Singles' },
+        { value: 2, label: 'Doubles' },
+      ],
+    },
     {
       key: 'preset', label: 'Format', type: 'preset', default: 'short',
       options: [
