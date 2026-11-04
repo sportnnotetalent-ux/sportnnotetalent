@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-06 — Release: snooker / billiards doubles live (web, Android OTA)
+
+auth-smoke passed. Published from a clean worktree at 7e4ddc9: web (entry `index-d8814285`, confirmed live on app.sportnnote.in) and Android OTA groups `4abd15bd` (preview) and `344190d6` (production), runtime 1.0.0. No database change.
+
 ### 2026-11-06 — Doubles in snooker and English billiards
 
 Founder: every sport played in pairs gets the pairs set-up (`docs/security/breaks/cue-doubles.md`). Snooker and billiards are now "singles or doubles" (Players: Singles / Doubles), so the shared pieces apply (Quick tournament pairs, the doubles picker, "both sides are pairs → doubles", pair teams). Doubles: partners take alternate visits (A1, B1, A2, B2 …). A shared layer (`src/sports/cue/doubles.ts`) wraps the two rule engines unchanged: only strokes (pot / miss / safety / foul / score) tag the visit they belong to with the player at the table (`pid`), first player stays, two ids a side and none on both; `atTable` gives the next player (same one mid-visit, else the partner of the side's last visit); `withCueDoubles` shows "Diya Rao at the table · Change" above each sport's own controls. Stats in doubles: frames and points to both partners (the pair's result), breaks / 50+ / centuries / points from breaks / pots / visits per player from their own visits; singles untouched. `tests/pair-sports-setup` now lists 10 pair sports. Tests: 7 unit + a 600-match simulation; two wiring checks updated; full suite green; tsc clean; demo checked (snooker doubles: Diya → Meera → Kabir). No database change.
