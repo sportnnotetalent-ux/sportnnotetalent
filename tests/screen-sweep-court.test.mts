@@ -75,7 +75,7 @@ describe('volleyball · fault-type chips without a roster', () => {
   const t = src('src/sports/volleyball/index.tsx');
   test('V1: the no-roster branch offers the fault types (optional)', () => {
     const noRoster = t.slice(t.indexOf('screen sweep V1'), t.indexOf('/** SD-117b: the side\'s court'));
-    assert.match(noRoster, /VB_ERROR_TYPES\.map/);
+    assert.match(noRoster, /vbErrorTypesFor\(serving\)\.map/); // FIVB 2025: rotation only for the receiving side (VB-1)
     assert.match(noRoster, /Opp\. fault type \(optional\)/);
     for (const k of ['handling', 'backrow', 'foot']) assert.ok(vb.VB_ERROR_TYPES.some((e) => e.key === k));
   });
@@ -102,11 +102,8 @@ describe('netball · toss-up before play', () => {
     assert.equal(nb.tossUpBlocked(s2), 'Start play first (start the clock)');
     assert.equal(nb.tossUpBlocked({ ...s, clock: { ...s.clock, ms: 1000 } }), null);
   });
-  test('N1/N2: the button is not silently disabled; before play it shows the reason and dispatches nothing', () => {
+  test('World Netball 2024 (netball-rulebook.md NB-1): no toss-ups, so no Toss-up button', () => {
     const t = src('src/sports/netball/index.tsx');
-    const line = t.split('\n').find((l) => l.includes('label="🙌 Toss-up won"'))!;
-    assert.doesNotMatch(line, /disabled=/);
-    assert.match(line, /periodStarted\(s\) \? fire\(\{ type: 'TOSS_UP', side: sd \}\) : setTossWhy\(sd\)/);
-    assert.match(t, /\{tossUpBlocked\(s\)\}/);
-  });
-});
+    assert.ok(!t.includes('label="🙌 Toss-up won"'));
+    assert.doesNotMatch(t, /type: 'TOSS_UP'/);
+  });});

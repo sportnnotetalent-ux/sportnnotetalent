@@ -287,7 +287,7 @@ describe('netball · toss-up', () => {
     assert.ok(texts.some((t) => /toss-up/i.test(t)), texts.join('\n'));
     assert.equal(nb.reducer(s, A('REMOVE_EVENT', undefined, { id: 't1' })).events.length, 0);
   });
-  test('U1: behind More (no new step)', () => {
-    assert.match(src('src/sports/netball/index.tsx'), /type: 'TOSS_UP'/);
+  test('U1: World Netball 2024 removed toss-ups — older logs still read, no button (NB-1)', () => {
+    assert.doesNotMatch(src('src/sports/netball/index.tsx'), /type: 'TOSS_UP'/);
   });
 });

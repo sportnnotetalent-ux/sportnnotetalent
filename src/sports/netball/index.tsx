@@ -35,7 +35,7 @@ import {
   init, reducer, isComplete, result, matchSec, periodLen, clockFace, periodName, periodLong, periodStarted, running, timeUp,
   eventCredits, creditAttribution, centreInfo, lineupAt, timeoutCheck, sanctionsOf, totalPeriods, isOpen, playOnLead, other,
   NETBALL_PRESETS, NETBALL_LIVE_SETTINGS, LIVE_KEYS, POSITIONS, POS_AREAS,
-  superShotLive, superShotText, SUPER_SHOT_RULE_OPTIONS, goalPoints, TURNOVER_TYPES, TURNOVER_LABEL, tossUpBlocked,
+  superShotLive, superShotText, SUPER_SHOT_RULE_OPTIONS, goalPoints, TURNOVER_TYPES, TURNOVER_LABEL,
   type NetballEvent, type NetballState, type Pos, type Sanction, type Side, type StatKind, type StopReason, type PenaltyKind, type TurnoverType,
 } from './engine';
 import { PlayFeed } from '../PlayFeed';
@@ -120,7 +120,6 @@ const ScoringControls: SportPlugin<NetballState>['ScoringControls'] = ({
   const [official, setOfficial] = useState('');
   // Deep wave: "⭐ Super shot" armed for the next shot of this side (super-shot formats)
   const [armed, setArmed] = useState<Side | null>(null);
-  const [tossWhy, setTossWhy] = useState<Side | null>(null);
   const [, tick] = useState(0);
   useEffect(() => {
     if (!running(s)) return;
@@ -565,10 +564,9 @@ const ScoringControls: SportPlugin<NetballState>['ScoringControls'] = ({
             <Button label="🟨 Sanction" accessibilityLabel={`Sanction, ${name(sd)}`} variant="ghost" onPress={() => setFlow({ mode: 'sanction', side: sd, step: 'kind' })} />
             <Button label="🔁 Sub" accessibilityLabel={`Substitution, ${name(sd)}`} variant="ghost" onPress={() => setFlow({ mode: 'sub', side: sd, step: 'off' })} />
             <Button label="⇄ Positions" accessibilityLabel={`Position changes, ${name(sd)}`} variant="ghost" onPress={() => setFlow({ mode: 'pos', side: sd, step: 'player' })} />
-            {/* batch 6: a toss-up (World Netball 9.7) won by this side — one tap, no score effect */}
-            {/* screen sweep N1: a toss-up happens in play (World Netball 9.7) — before play a tap says why instead of nothing */}
-            <Button label="🙌 Toss-up won" accessibilityLabel={`Toss-up won by ${name(sd)}`} variant="ghost" onPress={() => (periodStarted(s) ? fire({ type: 'TOSS_UP', side: sd }) : setTossWhy(sd))} />
-            {tossWhy === sd && !periodStarted(s) ? <Text style={c.meta} accessibilityLiveRegion="polite">{tossUpBlocked(s)}</Text> : null}
+            {/* World Netball Rules 2024 removed toss-ups (simultaneous offences → possession
+                to the team that last had the ball; netball-rulebook.md NB-1), so there is no
+                Toss-up button; older matches' toss-ups still show in their stats */}
             {s.timeoutsPerHalf > 0 ? <Button label={`⏸ Time-out · ${to.left}`} accessibilityLabel={`Team time-out for ${name(sd)}, ${to.left} left`} variant="ghost" disabled={!to.ok || !periodStarted(s)} onPress={() => fire({ type: 'TIMEOUT', side: sd })} /> : null}
           </>
         ) : null}
