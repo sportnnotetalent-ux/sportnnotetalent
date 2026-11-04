@@ -10,6 +10,7 @@
  * match asks first (cue/send.ts). IDs-only scoring: nothing here puts a name
  * into an action; names are looked up for this viewer when shown.
  */
+import { cueInPlay } from '../cue/inPlay';
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { theme } from '../../core/theme';
@@ -377,6 +378,7 @@ export const snookerPlugin: SportPlugin<SnookerState> = {
   // SD-133 — "Undo: black · break 8"
   undoLabel: (step) => snookerUndoLabel(step),
   Scoreboard: SnookerScoreboard,
+  inPlay: (s, r) => cueInPlay(s, r),
   // A-01 — "Correct this match": a frame's final score, later frames kept
   CorrectionEditor: SnookerCorrections,
   ScoringControls: withCueDoubles(ScoringControls),

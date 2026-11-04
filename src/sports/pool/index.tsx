@@ -12,6 +12,7 @@
  * only (`payload.pid`); names are looked up when shown (`useMask().nameOf`,
  * with the match's rosters).
  */
+import { poolInPlay } from '../cue/inPlay';
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { theme } from '../../core/theme';
@@ -412,6 +413,7 @@ export const poolPlugin: SportPlugin<PoolMatch> = {
   ...POOL_META,
   ...POOL_CORE,
   Scoreboard: PoolScoreboard,
+  inPlay: (s, r) => poolInPlay(s, r),
   ScoringControls,
   startAction: (state, side) => lagAction(state as PoolMatch, side, { at: Date.now() }),
   matchTabs: { Commentary: PoolCommentary, Stats: PoolStats },

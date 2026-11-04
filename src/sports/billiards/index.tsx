@@ -10,6 +10,7 @@
  * totals.ts, records.ts, undo.ts. A tap that ends a frame or the match asks
  * first (cue/send.ts). IDs-only scoring: no name ever goes into an action.
  */
+import { cueInPlay } from '../cue/inPlay';
 import React, { useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { theme } from '../../core/theme';
@@ -272,6 +273,7 @@ export const billiardsPlugin: SportPlugin<BilliardsState> = {
   // SD-133 — "Undo: pot red + cannon · break 5"
   undoLabel: (step) => billiardsUndoLabel(step),
   Scoreboard: BilliardsScoreboard,
+  inPlay: (s, r) => cueInPlay(s, r),
   // A-01 — "Correct this match": a frame's final score, later frames kept
   CorrectionEditor: BilliardsCorrections,
   ScoringControls: withCueDoubles(ScoringControls),

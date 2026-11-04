@@ -3,6 +3,7 @@
  * 2, cap 30). Each rally is logged to the play-by-play with the point-winner,
  * and game wins are highlighted. Points are attributed to players for profiles.
  */
+import { badmintonInPlay } from './inPlay';
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { theme } from '../../core/theme';
@@ -164,6 +165,7 @@ export const badmintonPlugin: SportPlugin<BadmintonState> = {
   statTotalsPartial: true,
   statTotalsNeedsPlayers: true,
   Scoreboard: BadmintonScoreboard,
+  inPlay: (s, r) => badmintonInPlay(s, r),
   // SD-01: once ended → games won + "21-18, 19-21, 21-15" (never the reset 0–0).
   // SD-54: + the match duration once it's over (stamped matches only)
   summary: (s) => withDuration(summary(s), s.events, s.ended),

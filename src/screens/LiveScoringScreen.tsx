@@ -52,7 +52,7 @@ import { distinctSideColors } from '../core/contrast';
 import { VoiceScorer } from '../sports/VoiceScorer';
 import { completesMatch } from '../sports/voiceMatch';
 import { Scoreboard } from '../components/Scoreboard';
-import { MiniScore } from '../components/MiniScore';
+import { LiveScoreBar } from '../components/LiveScoreBar';
 import { Pill, textStyles } from '../components/ui';
 import { undoLabel, resolveUndoLabel } from '../sports/undoLabel';
 import { useLiveMatch } from '../data/useLiveMatch';
@@ -1831,16 +1831,26 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
       live={matchLive} centerNode={plugin.LiveClock ? <plugin.LiveClock state={state} /> : undefined}
     />
   )), [plugin, state, summary, homeBoard, awayBoard, homeColor, awayColor, matchLive, closedBoard]);
-  // The Scoring tab's running score (the board above the tabs is hidden there).
-  const scoringBoardNode = useMemo(() => (plugin.Scoreboard ? (
-    <plugin.Scoreboard state={state} homeName={homeShown} awayName={awayShown} homeColor={homeColor} awayColor={awayColor} live={live} />
-  ) : (
-    <MiniScore
-      summary={summary} homeName={homeName} awayName={awayName}
-      homeColor={homeColor} awayColor={awayColor} live={live}
+  // The Scoring tab's running score (UI audit step 1, docs/security/breaks/score-bar.md):
+  // one shared bar for every sport, fixed above the scroll area so it never
+  // scrolls away while scoring; the side / player in play in a lime band.
+  const inPlayNow = useMemo(() => {
+    try { return plugin.inPlay?.(state as never, { home: homeScoreRoster.map((p) => p.id), away: awayScoreRoster.map((p) => p.id) }) ?? null; } catch { return null; }
+  }, [plugin, state, homeScoreRoster, awayScoreRoster]);
+  const barNameOf = useCallback((id: string) => {
+    const p = [...homeScoreRoster, ...awayScoreRoster].find((x) => x.id === id);
+    return p ? shownNameOf(p.id, p.fullName) : undefined;
+  }, [homeScoreRoster, awayScoreRoster, shownNameOf]);
+  // Pair / individual sports: the players' (mask-aware) names; teams: the full team name.
+  const homeBar = individualSport && homeShown !== homeName ? homeShown : homeTeamName || homeShown;
+  const awayBar = individualSport && awayShown !== awayName ? awayShown : awayTeamName || awayShown;
+  const scoringBoardNode = (
+    <LiveScoreBar
+      summary={summary} homeName={homeBar} awayName={awayBar} homeColor={homeColor ?? theme.colors.home} awayColor={awayColor ?? theme.colors.away}
+      inPlay={inPlayNow} nameOf={barNameOf} undoText={undoWhat ? `Undo: ${undoWhat}` : null} icon={plugin.icon}
       clockNode={plugin.LiveClock ? <plugin.LiveClock state={state} /> : undefined}
     />
-  )), [plugin, state, summary, homeName, awayName, homeShown, awayShown, homeColor, awayColor, live]);
+  );
 
   // Match tabs (2026-10-22): the sport's slots — every one gets the same props
   // (the old LiveExtras props). docs/sport-depth/deep-wave/match-tabs.md
@@ -2693,6 +2703,7 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
     return (
       <SafeAreaView style={st.safe} edges={['top']}>
        <DisputeMaskProvider value={maskValue}>
+        {activeTab === 'scoring' && started && !complete && !showFinalOnly ? scoringBoardNode : null}
         <KeyboardAwareScrollView contentContainerStyle={st.content}>
           {header}
           {/* SD-155: screen readers hear every score change (polite live region). */}
@@ -2786,7 +2797,6 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
                   badminton/basketball/kabaddi) show the same line-score the viewer
                   sees; football/cricket keep the compact one-row MiniScore. */}
               {guestBar}
-              {started && !complete && scoringBoardNode}
               {resultHoldNote}
               {undoBar ? <CapturedFlash>{undoBar}</CapturedFlash> : null}
               {liveEditBar}

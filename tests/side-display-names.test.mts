@@ -33,5 +33,7 @@ test('the scorer screen uses it for individual / pair sports only', () => {
   assert.match(src, /entryDisplayName\(homeScoreRoster\.map\(\(p\) => shownNameOf\(p\.id, p\.fullName\)\)\)/);
   assert.match(src, /makeNameOf\(people, maskValue\)/);
   assert.match(src, /plugin\.ScoringControls\s+state=\{state\} dispatch=\{scoreDispatch\} homeName=\{homeShown\} awayName=\{awayShown\}/);
-  assert.match(src, /<plugin\.Scoreboard state=\{state\} homeName=\{homeShown\} awayName=\{awayShown\}/);
+  // the Scoring tab's shared bar (score-bar.md): pair names when known, else the team name
+  assert.match(src, /const homeBar = individualSport && homeShown !== homeName \? homeShown : homeTeamName \|\| homeShown/);
+  assert.match(src, /<LiveScoreBar[\s\S]*?homeName=\{homeBar\} awayName=\{awayBar\}/);
 });

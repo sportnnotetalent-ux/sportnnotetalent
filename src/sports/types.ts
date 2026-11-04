@@ -543,6 +543,10 @@ export interface SportPlugin<S = unknown> {
    *  of the Commentary tab. A sport with it shows no Lineups court; it renders
    *  nothing in singles. */
   ServeCourt?: React.FC<ServeCourtProps>;
+  /** Score bar (docs/security/breaks/score-bar.md): who is in play now — the
+   *  side, and the player when the sport knows them ("at the table",
+   *  "serving"). Pure and defensive: null when it can't tell. */
+  inPlay?: (state: S, rosters: { home: string[]; away: string[] }) => import('../core/scoreBar').InPlay | null;
   /** Extra tiles for the in-play Quick options sheet (parity #13) — e.g.
    *  cricket's 🧤 Change keeper. `onDone(message)` closes the sheet and shows
    *  the message as a short toast. */
