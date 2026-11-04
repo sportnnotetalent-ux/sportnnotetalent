@@ -66,7 +66,23 @@ Checked in the offline demo: Home → Score a match → snooker friendly → liv
 | 40 | Tournament → Manage | About 20 rows at equal weight: everyday jobs (schedule, scorers, share fixtures) sit among rare ones (link an earlier edition, qualifies to, ownership, delete). | Everyday jobs on top as tiles; the rest under "More". |
 | 41 | Parent / guardian | The code-entry box comes first even when you're already linked; the screen is about linking, not about the child's games. | Linked: show the child first (next games, results, messages); "Link another child" below. |
 
-Not covered: fixtures generation, the Awards and Stats tabs, store-style screenshots on a real phone.
+
+## Round 5 (2026-11-05): fixture generation, tournament Awards and Stats
+
+| # | Where | Problem | Fix (proposed) |
+|---|-------|---------|----------------|
+| 42 | Auto-generate fixtures | Says "Add at least 2 teams first", then lists **every team in the app** (about 60: other tournaments' teams, old slots "A3", "1a", three "Team A") under "Teams · 0 selected". The 4 teams already playing in this tournament aren't pre-selected. | List this tournament's teams (the step-7 list: registered + already in fixtures), pre-selected; "Add another team" opens the team search (step-4 style), not the whole app. Hide the "Add at least 2 teams" box once there are 2. |
+| 43 | Auto-generate fixtures | Look-alike names can't be told apart ("Team A" ×3, "Slot 1" ×2). | Same rule as Home (#18): add the tournament / host that differs. |
+| 44 | Auto-generate fixtures | One long page: slots, teams, format, legs, groups/advance, ties, bracket kind, seeding, play-in, timing, venue, then "Generate preview" (outline) at the bottom. | Three short steps on one screen: 1) teams, 2) format (only the options that apply to it), 3) when & where — with "Preview fixtures" as the one main button, fixed at the bottom. |
+| 45 | Awards tab | "Publish awards" is offered while the tournament is still live (1 game played), and awards already pre-filled from one match. | While games remain: "Awards so far" (read-only leaders); Publish only once the last game ends (or with a clear "Publish early?" confirm). |
+| 46 | Awards tab | Empty categories ("Playmaker — No stats for this yet") take full rows; "1 m" is unclear. | Hide categories with no data (a "+ add" for them stays); write "1 match". |
+| 47 | Stats tab (knockout) | A knockout tournament shows a league table with 🥇🥈🥉 medals for table positions mid-tournament. | Knockout: lead with the bracket; no medals until the final; the table becomes "Results so far" without positions. |
+| 48 | Stats tab | Two big outline buttons ("Standings & leaders", "Knockout bracket") sit above the content; leaders scroll sideways ("Swipe for more →"). | The bracket / table inline as the first block; leaders as a vertical list with a sport stat picker. |
+
+### Proposed order
+1. Fixture generator: this tournament's teams pre-selected, distinct names, three-step layout (#42–44).
+2. Stats: knockout leads with the bracket, no premature medals, inline blocks (#47–48).
+3. Awards: "so far" while live, publish at the end, hide empty categories (#45–46).
 
 ## Patterns behind most findings
 - **Lime is overused.** It should mean one thing per area (the main action, or who's playing now); today it's on every card button.
