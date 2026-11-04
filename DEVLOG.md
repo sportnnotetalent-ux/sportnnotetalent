@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-06 — Release: doubles fix live (web, Android OTA)
+
+auth-smoke passed. Published from a clean worktree at 4a0707b: web (entry `index-714be82d`, confirmed live on app.sportnnote.in) and Android OTA groups `285df802` (preview) and `e6cb593f` (production), runtime 1.0.0. No database change.
+
 ### 2026-11-06 — Two players a side score as doubles
 
 From a real game (`docs/security/breaks/pairs-play-as-doubles.md`): a pool quick game made with one-player placeholder sides (singles), then two players added to each side on the scoring screen — the sides were renamed to the pairs, but the format stayed 1 a side, so the first 30 shots (9 minutes) credited no shooter and "Vivek C breaks · Change" never showed until the format was switched (read-only check of the live events: shots 1–30 no `pid`, 31–78 with). Now, in a sport played as singles or doubles, the sides decide (`perSideFromRosters`): before the first shot both pairs → 2 a side (both single → 1), saved at once by whoever can score; after play has started, a banner offers "Score as doubles" / "Score as singles" (format saved + the replay marker for viewers). Team sports untouched. Tests: 4 unit; full suite 7,336 pass, 0 fail; tsc clean; demo reproduced the exact flow → "Diya Rao breaks · Change", then "Meera Joshi shoots next", then "Kabir Singh shoots next".
