@@ -3,10 +3,11 @@
  *  the tournaments the user plays in or follows) filters the live & upcoming
  *  matches below, and a sport row jumps into each sport's section (schedule,
  *  organize, standings & stats). Deep standings/stats live on those pages. */
+import { distinctNames } from '../core/chipNames';
 import { yourSports } from '../core/playedSports';
 import { isStaleLive } from '../core/staleLive';
 import { isOverdue } from '../core/overdue';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useMemo, useCallback, useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal, Pressable, useWindowDimensions } from 'react-native';
 import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -61,6 +62,8 @@ export default function HomeScreen() {
   }, []));
   const { profile } = useAuth();
   const tournaments = useMyTournaments(profile?.id);
+  // UI audit step 5: repeated names get the detail that tells them apart
+  const chipNames = useMemo(() => distinctNames(tournaments, (d) => formatDayRange(d, null).replace(/^from /, '')), [tournaments]);
   // Home is a personal feed: matches from what you follow (players/teams/
   // tournaments) plus your own — not every match app-wide.
   const { feed, loading } = useScopedMatches(profile?.id);
@@ -308,7 +311,7 @@ export default function HomeScreen() {
                 <SelectChip label="All" active={selectedId === null} onPress={() => setSelectedId(null)} />
               )}
               {tournaments.map((t) => (
-                <SelectChip key={t.id} label={t.name} active={selectedId === t.id} onPress={() => setSelectedId(t.id)} />
+                <SelectChip key={t.id} label={chipNames.get(t.id) ?? t.name} active={selectedId === t.id} onPress={() => setSelectedId(t.id)} />
               ))}
             </KeyboardAwareScrollView>
             {selected && (
@@ -345,7 +348,7 @@ export default function HomeScreen() {
         {loading ? (
           <LoadingState label="Loading matches…" />
         ) : live.length ? (
-          live.slice(0, SECTION_CAP).map((m) => <MatchCard key={m.id} match={m} onPress={() => openScorer(m)} />)
+          live.slice(0, SECTION_CAP).map((m) => <MatchCard key={m.id} match={m} compact onPress={() => openScorer(m)} />)
         ) : (
           <EmptyState icon="📡" title={personal ? 'None live from what you follow' : 'No live matches right now'}
             hint="Your matches and the teams, players and tournaments you follow show here the moment scoring starts." compact />
@@ -357,7 +360,7 @@ export default function HomeScreen() {
         {loading ? (
           <LoadingState label="Loading…" />
         ) : upcoming.length ? (
-          upcoming.slice(0, SECTION_CAP).map((m) => <MatchCard key={m.id} match={m} onPress={() => openScorer(m)} />)
+          upcoming.slice(0, SECTION_CAP).map((m) => <MatchCard key={m.id} match={m} compact onPress={() => openScorer(m)} />)
         ) : (
           <EmptyState icon="📅" title="Nothing scheduled" hint="Upcoming matches will show up here." compact />
         )}

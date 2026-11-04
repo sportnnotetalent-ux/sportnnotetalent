@@ -50,8 +50,10 @@ function LiveBadge() {
 
 /** `onStart` (parity #13): the scorer's one-tap "▶ Start scoring" / "Continue
  *  scoring" straight into the Scoring tab. */
-export function MatchCard({ match, onPress, onStart, timeZone, note }: {
+export function MatchCard({ match, onPress, onStart, timeZone, note, compact }: {
   match: Match; onPress: () => void; onStart?: () => void;
+  /** UI audit step 5: Home's lists — tighter padding and gaps */
+  compact?: boolean;
   /** SD-150: show kickoff in this zone (a tournament's venue zone), labelled
    *  ("Thu, 4:00 pm GST") when it isn't the viewer's own clock. */
   timeZone?: string;
@@ -72,7 +74,9 @@ export function MatchCard({ match, onPress, onStart, timeZone, note }: {
   const postponed = match.status === 'postponed';
   const cancelled = match.status === 'cancelled';
   const walkover = done && match.walkover;
-  const showScore = (live || done) && !!match.score && !walkover;
+  // UI audit step 5: a live game always shows its score — 0–0 before the first point, not "vs"
+  const sc = match.score ?? { home: 0, away: 0 };
+  const showScore = (live || done) && (!!match.score || live) && !walkover;
   // SD-01/SD-20: a finished set/game match shows its per-set line under the
   // sets/games score ("21-18, 19-21, 21-15"; tennis "6-4, 3-6, 7-6(4)"; closed by
   // hand "6-4, 3-2 ret."). A walkover already reads W/O in the middle.
@@ -91,13 +95,13 @@ export function MatchCard({ match, onPress, onStart, timeZone, note }: {
   return (
     // The start button sits beside (not inside) the card's touchable — a button
     // can't nest inside another button on web.
-    <View style={[s.card, live && s.cardLive]}>
+    <View style={[s.card, compact && s.cardCompact, live && s.cardLive]}>
     <TouchableOpacity
       accessibilityRole="button"
       accessibilityLabel={`${sport.name}: ${teamLabel(match.homeTeam)} versus ${teamLabel(match.awayTeam)}${
-        showScore ? `, ${match.score!.home} to ${match.score!.away}${setLine ? ` (${setLine})` : ''}${cardLine ? ` (${cardLine})` : ''}` : ''
+        showScore ? `, ${sc.home} to ${sc.away}${setLine ? ` (${setLine})` : ''}${cardLine ? ` (${cardLine})` : ''}` : ''
       }, ${onBreak ? 'on a break' : live ? 'live now' : done ? 'final' : time}`}
-      style={s.body}
+      style={[s.body, compact && s.bodyCompact]}
       activeOpacity={0.85}
       onPress={onPress}
     >
@@ -127,9 +131,9 @@ export function MatchCard({ match, onPress, onStart, timeZone, note }: {
 
         {showScore ? (
           <View style={s.scoreWrap}>
-            <Text style={[s.score, live && s.scoreLive]}>{tie ? fmtPts(match.score!.home) : match.score!.home}</Text>
+            <Text style={[s.score, live && s.scoreLive]}>{tie ? fmtPts(sc.home) : sc.home}</Text>
             <Text style={s.scoreSep}>–</Text>
-            <Text style={[s.score, live && s.scoreLive]}>{tie ? fmtPts(match.score!.away) : match.score!.away}</Text>
+            <Text style={[s.score, live && s.scoreLive]}>{tie ? fmtPts(sc.away) : sc.away}</Text>
           </View>
         ) : walkover ? (
           <Text style={s.walkover}>W/O</Text>
@@ -192,6 +196,8 @@ const s = StyleSheet.create({
     ...theme.shadow.card,
   },
   body: { gap: theme.spacing(3), paddingHorizontal: theme.spacing(4) },
+  cardCompact: { paddingTop: theme.spacing(2.5), paddingBottom: theme.spacing(2.5), gap: theme.spacing(2) },
+  bodyCompact: { gap: theme.spacing(1.5) },
   cardLive: {
     borderColor: theme.colors.danger + '66',
     ...theme.shadow.live,

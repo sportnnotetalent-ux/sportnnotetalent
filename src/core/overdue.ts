@@ -21,3 +21,7 @@ export function splitOverdue<T extends { status: string; startsAt: string }>(lis
 
 /** The line an overdue card shows. */
 export const OVERDUE_NOTE = 'Date passed · not played yet — open it to play, reschedule or cancel';
+
+/** One line above the overdue group (UI audit step 5) instead of OVERDUE_NOTE on each card. */
+export const overdueHint = (n: number): string =>
+  `${n === 1 ? 'This game’s date has' : `These ${n} games’ dates have`} passed without play — open one to play it, reschedule or cancel.`;

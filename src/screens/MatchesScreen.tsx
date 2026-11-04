@@ -3,6 +3,8 @@
  *  games live on Home, not here (founder 2026-11-04, src/core/myMatches.ts).
  *  Completed matches open the same full page as a live game (final score, info,
  *  lineups, summary) so the app keeps a browsable history of every game. */
+import { SportPicker } from '../components/SportPicker';
+import { useMySports } from '../data/useMySports';
 import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { KeyboardAwareScrollView } from '../components/keyboard';
@@ -19,12 +21,12 @@ import { canScoreMatch } from '../core/scoringAccess';
 import { tournamentHostPlayerIds } from '../core/org';
 import { useAuth } from '../core/auth';
 import { canScoreByRole } from '../core/roles';
-import { SPORT_LIST } from '../sports/sportMeta';
+import { getSportMeta } from '../sports/sportMeta';
 import type { Match, SportId } from '../core/types';
 import type { RootStackParamList, TabParamList } from '../navigation/types';
 import { useParamState } from '../navigation/useParamState';
 import { matchesView, normalView, type MatchesView } from '../core/myMatches';
-import { OVERDUE_NOTE } from '../core/overdue';
+import { overdueHint } from '../core/overdue';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -41,6 +43,8 @@ export default function MatchesScreen() {
   const { profile } = useAuth();
   const [tab, setTab] = useParamState<Tab>('tab', params?.initialTab ?? 'upcoming');
   const [filter, setFilter] = useState<SportId | 'all'>(params?.initialSport ?? 'all');
+  const [sportsOpen, setSportsOpen] = useState(false);
+  const mySports = useMySports();
   const [rawView, setView] = useParamState<MatchesView>('view', 'playing');
   const view = normalView(rawView);
   // A "See all" link can re-open this tab with a different section/sport.
@@ -127,12 +131,16 @@ export default function MatchesScreen() {
           })}
         </View>
 
-        <KeyboardAwareScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.filters}>
-          <SelectChip label="All" active={filter === 'all'} onPress={() => setFilter('all')} />
-          {SPORT_LIST.map((s) => (
-            <SelectChip key={s.id} label={`${s.icon} ${s.name}`} active={filter === s.id} onPress={() => setFilter(s.id)} />
-          ))}
-        </KeyboardAwareScrollView>
+        {/* UI audit step 5: one compact "Sport" control instead of a third row of chips */}
+        <Text style={st.sportToggle} accessibilityRole="button" accessibilityState={{ expanded: sportsOpen }} onPress={() => setSportsOpen((o) => !o)}>
+          Sport: {filter === 'all' ? 'All' : `${getSportMeta(filter).icon} ${getSportMeta(filter).name}`} {sportsOpen ? '▴' : '▾'}
+        </Text>
+        {sportsOpen ? (
+          <View style={st.sportWrap}>
+            <SelectChip label="All" active={filter === 'all'} onPress={() => { setFilter('all'); setSportsOpen(false); }} />
+            <SportPicker mine={mySports} value={filter === 'all' ? null : filter} onChange={(id) => { setFilter(id); setSportsOpen(false); }} />
+          </View>
+        ) : null}
 
         {loading ? (
           <LoadingState label="Loading matches…" />
@@ -161,8 +169,10 @@ export default function MatchesScreen() {
             {overdue.length ? (
               <>
                 <Text style={[textStyles.label, st.groupHead]}>Overdue · date passed, not played</Text>
+                {/* UI audit step 5: the explanation once, not on every card */}
+                <Text style={textStyles.muted}>{overdueHint(overdue.length)}</Text>
                 {overdue.map((m) => (
-                  <MatchCard key={m.id} match={m} note={OVERDUE_NOTE} onPress={() => open(m)} onStart={iScore(m) ? () => open(m, 'scoring') : undefined} />
+                  <MatchCard key={m.id} match={m} onPress={() => open(m)} onStart={iScore(m) ? () => open(m, 'scoring') : undefined} />
                 ))}
               </>
             ) : null}
@@ -174,6 +184,8 @@ export default function MatchesScreen() {
 }
 
 const st = StyleSheet.create({
+  sportToggle: { color: theme.colors.primary, fontWeight: '700', fontSize: theme.font.small, paddingVertical: theme.spacing(1) },
+  sportWrap: { gap: theme.spacing(2) },
   safe: { flex: 1, backgroundColor: theme.colors.bg },
   content: { padding: theme.spacing(4), gap: theme.spacing(3) },
   segment: { flexDirection: 'row', backgroundColor: theme.colors.surfaceAlt, borderRadius: theme.radius.pill, padding: 3 },
