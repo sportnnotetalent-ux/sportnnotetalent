@@ -429,7 +429,7 @@ export default function ScheduleMatchScreen() {
           homeName: created.homeTeam.shortName, awayName: created.awayTeam.shortName,
           homeTeamName: created.homeTeam.name, awayTeamName: created.awayTeam.name,
           homeColor: created.homeTeam.colorHex, awayColor: created.awayTeam.colorHex,
-          canScore: true,
+          canScore: true, startNow: true,
         });
       } else {
         nav.goBack();
@@ -784,7 +784,7 @@ function TeamPicker({
       ) : (
         <>
           {onPickMe && (
-            <SelectChip label={`👤 ${meFirst} (me)`} active={false} onPress={onPickMe} />
+            <SelectChip label={`＋ Me (${meFirst})`} accessibilityLabel={`Add me, ${meFirst}`} active={false} onPress={onPickMe} />
           )}
           {onStartWithMe && !creating && (
             <SelectChip label="👤 Me +" active={false} onPress={() => void startWithMe()} />

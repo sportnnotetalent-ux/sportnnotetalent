@@ -192,13 +192,23 @@ export function ServeFirstPicker({
   title?: string;
 }) {
   const [open, setOpen] = useState(false);
+  // UI audit step 2 — no question twice: already answered (e.g. on the Start
+  // button) → one line with Change, not the question again.
+  if (!started && picked && !open) {
+    return (
+      <Text style={[pb.meta, pb.linkPad]}>
+        {icon} {picked === 'home' ? homeName : awayName} serves first ·{' '}
+        <Text style={pb.link} onPress={() => setOpen(true)} accessibilityRole="button">Change</Text>
+      </Text>
+    );
+  }
   if (!started) {
     return (
       <View style={pb.pickBox}>
         <Text style={pb.label}>{icon} {title}</Text>
         <View style={pb.chips}>
-          <SelectChip label={homeName} active={picked === 'home'} onPress={() => onPick('home', false)} />
-          <SelectChip label={awayName} active={picked === 'away'} onPress={() => onPick('away', false)} />
+          <SelectChip label={homeName} active={picked === 'home'} onPress={() => { onPick('home', false); setOpen(false); }} />
+          <SelectChip label={awayName} active={picked === 'away'} onPress={() => { onPick('away', false); setOpen(false); }} />
         </View>
       </View>
     );

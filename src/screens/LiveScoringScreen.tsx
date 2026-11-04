@@ -20,7 +20,7 @@ import { matchControls, showsControl } from '../core/matchSafety';
 import { getDeviceId } from '../core/deviceId';
 import { mergeMatchConfig, changedFormatKeys } from '../core/matchConfig';
 import { boardName } from '../core/teamShort';
-import { startStep, startActions } from '../core/startStep';
+import { startStep, startActions, autoStartOnArrival } from '../core/startStep';
 import { manualResultLine as baseResultLine, isNoResult } from '../core/matchResult';
 import { timeUpLeader, timeUpRuleOf } from '../core/timeUp';
 import { matchScoreLine, finalBoard, resultMark } from '../sports/scoreline';
@@ -1939,6 +1939,16 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
   // final whistle never yanks them off the tab they are reading.
   const [landing, setLanding] = useState<string | null>(null);
   const loaded = !hasMatch || (!!meta.status && !syncing);
+  // UI audit step 2: "Create & score now" lands already started when the sport's
+  // start asks nothing (racket sports / pool keep their one-tap start question).
+  const autoStarted = useRef(false);
+  useEffect(() => {
+    if (autoStarted.current || !loaded) return;
+    if (!autoStartOnArrival(firstStep, { asked: !!route.params.startNow, canScore, started, complete })) return;
+    autoStarted.current = true;
+    beginMatch();
+    navigation.setParams({ startNow: undefined });
+  }, [loaded, firstStep, route.params.startNow, canScore, started, complete]); // eslint-disable-line react-hooks/exhaustive-deps
   const landingNow = complete ? 'summary' : started || meta.status === 'live' ? watchTab : 'info';
   useEffect(() => { if (loaded && landing == null) setLanding(landingNow); }, [loaded, landing, landingNow]);
   // Listed scorers land on Scoring; a host does too when nobody else is down to

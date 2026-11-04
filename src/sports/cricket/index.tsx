@@ -818,6 +818,7 @@ const ScoringControls: SportPlugin<CricketState>['ScoringControls'] = ({
   const [shotSkip, setShotSkip] = useState<string | null>(null);
   // Deep wave — the ball whose optional detail panel was closed.
   const [detailSkip, setDetailSkip] = useState<string | null>(null);
+  const [setupOpen, setSetupOpen] = useState(false);
 
   // While a Super Over is live, ALL the live-scoring UI below operates on the
   // nested mini-match; dispatched actions are routed there by the reducer. The
@@ -861,11 +862,23 @@ const ScoringControls: SportPlugin<CricketState>['ScoringControls'] = ({
   const alone = lastManAlone(state) && !!strikerId;
   const canScore = (bothSet || alone) && !!bowlerId;
 
-  // Gate scoring on the pre-match setup.
+  // Pre-match setup (UI audit step 2, docs/security/breaks/start-taps.md): the
+  // toss opens scoring; captain and keeper are optional and settable any time.
   const configured = !!(state.captains.home && state.captains.away && state.keepers.home && state.keepers.away);
-  if (!configured) {
-    return <SetupPanel state={state} dispatch={dispatch} homeName={homeName} awayName={awayName} homeRoster={homeRoster} awayRoster={awayRoster} homeKeeperId={homeKeeperId} awayKeeperId={awayKeeperId} />;
+  if (!configured && (!state.toss || setupOpen)) {
+    return (
+      <View style={{ gap: theme.spacing(2) }}>
+        <SetupPanel state={state} dispatch={dispatch} homeName={homeName} awayName={awayName} homeRoster={homeRoster} awayRoster={awayRoster} homeKeeperId={homeKeeperId} awayKeeperId={awayKeeperId} />
+        {state.toss ? <Button label="Done — start scoring" onPress={() => setSetupOpen(false)} /> : null}
+      </View>
+    );
   }
+  const setupNote = !configured ? (
+    <Text style={ctrl.meta}>
+      Captain and keeper not set (optional).{' '}
+      <Text style={ctrl.link} accessibilityRole="button" onPress={() => setSetupOpen(true)}>Set captain & keeper</Text>
+    </Text>
+  ) : null;
 
   // SD-133 — out in an earlier Super Over (ICC): can't bat in this one.
   const soBarred = (id: string) => (state.soBarBat ?? []).includes(id);
@@ -1360,6 +1373,7 @@ const ScoringControls: SportPlugin<CricketState>['ScoringControls'] = ({
 
   return (
     <View style={{ gap: theme.spacing(4) }}>
+      {setupNote}
       {soActive && (() => {
         const so = rootState.superOver!;
         const bt = state.scores[state.battingSide];
@@ -2696,6 +2710,7 @@ function ReviewPanel({ s, dispatch, homeName, awayName }: {
 }
 
 const ctrl = StyleSheet.create({
+  link: { color: theme.colors.primary, fontWeight: '700' },
   row: { flexDirection: 'row', gap: theme.spacing(2) },
   flex: { flex: 1 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing(2) },

@@ -20,3 +20,11 @@ export function startActions(step: StartStep, o: { side?: 'home' | 'away'; now: 
   if (step === 'clock') return [{ type: 'KICKOFF', payload: { at: o.now } } as ScoreAction];
   return [];
 }
+
+/** UI audit step 2 (docs/security/breaks/start-taps.md): "Create & score now"
+ *  starts the match on arrival when the sport's start needs no question.
+ *  Racket sports (who serves) and pool (who breaks) keep their one-tap start,
+ *  which IS the question. Never for a viewer, a started or finished match. */
+export function autoStartOnArrival(step: StartStep, o: { asked: boolean; canScore: boolean; started: boolean; complete: boolean }): boolean {
+  return o.asked && o.canScore && !o.started && !o.complete && (step === 'plain' || step === 'clock');
+}

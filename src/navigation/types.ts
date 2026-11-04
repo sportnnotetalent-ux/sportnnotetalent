@@ -20,6 +20,8 @@ export type RootStackParamList = {
     guestId?: string;
     /** false for viewers — read-only scoreboard */
     canScore?: boolean;
+    /** "Create & score now": start the match on arrival when no first question is needed */
+    startNow?: boolean;
     /** the open tab / "Add scorer" panel — kept in params so they survive an iPhone
      *  background unload (the nav state is saved and restored) */
     tab?: string;
