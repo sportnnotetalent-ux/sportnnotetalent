@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-08 — Pickleball: USA Pickleball 2026 pool standings, plain rally labels
+
+From the pickleball rulebook audit (`docs/sport-expert/pickleball-rulebook.md` PR-1, PR-3; `docs/security/breaks/pickleball-usap-2026.md`). **Standings (USAP 15.B.4):** new pickleball tournaments and the "Pool play (USA Pickleball)" preset rank by matches won, then head-to-head, point difference, head-to-head point difference, point difference vs the team just above, total points scored, then lots; no restart. Three new tie-breakers (`h2hRallyDiff`, `vsAbove`, `rallyFor`, rally points). **Withdrawn teams (15.B.4.a):** their matches are left out of everyone’s record and they are listed last, marked "withdrawn" (pickleball default, organiser can turn off). Saved tie-break orders keep theirs. **Labels:** "Rec (rally …)" → "Rally · 1 game to 11" etc. (rally is a sanctioned 2026 format); new "Rally · best of 3 to 15". Tests: 8 unit + a 600-pool simulation; full suite 7,426 pass (the student-lists sim failed under load, passes alone); tsc clean. No database change.
+
 ### 2026-11-08 — Release: badminton 3×15 default + cards per side live (web, Android OTA)
 
 auth-smoke passed. Published from a clean worktree at aa2287f: web (entry `index-3391adb3`, confirmed live on app.sportnnote.in) and Android OTA groups `2da9cc93` (preview) and `5fbcb047` (production), runtime 1.0.0. No database change.

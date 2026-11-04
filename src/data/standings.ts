@@ -86,6 +86,9 @@ export interface TeamStanding {
   /** level on every tie-breaker of a chain that ends in `lots`: the order
    *  shown is by name and must be settled by drawing lots ("Drawn by lot") */
   lots?: boolean;
+  /** USAP 15.B.4.a — withdrew / retired / forfeited from the event: its results
+   *  are left out and it is listed last (cfg.dropWithdrawn) */
+  withdrawn?: boolean;
 }
 
 /** One round of a team's record (SD-10). `points` are the game points it took
@@ -182,7 +185,10 @@ export type BuiltinTieBreaker =
   // SD-143: rugby — tries scored / try difference over all matches
   | 'triesFor' | 'triesDiff'
   // SD-145: ice hockey — regulation wins (RW), regulation + overtime wins (ROW)
-  | 'regWins' | 'row';
+  | 'regWins' | 'row'
+  // USA Pickleball 15.B.4 (pickleball-usap-2026.md): rally-point difference among
+  // the tied, against the team ranked just above, and total rally points scored
+  | 'h2hRallyDiff' | 'vsAbove' | 'rallyFor';
 /** A built-in tie-breaker, or the key of one added with `registerTieBreaker`. */
 export type TieBreaker = BuiltinTieBreaker | (string & { readonly __customTieBreaker?: never });
 
@@ -200,6 +206,9 @@ export interface StandingsConfig {
    *  criterion (ITTF, FIBA, BWF); `'h2h'` = only after a head-to-head criterion
    *  (UEFA / IHF: re-apply the h2h criteria, then go on to the overall ones). */
   restart?: boolean | 'h2h';
+  /** USAP 15.B.4.a — leave a withdrawn team's matches out of the table and list
+   *  it last (teams passed to teamStandings with `withdrawn: true`). */
+  dropWithdrawn?: boolean;
   /** organiser points adjustments (parity #07) — absent when there are none */
   adjustments?: PointsAdjustment[];
   /** points for a Swiss pairing-allocated bye (SD-10, the organiser's
@@ -280,9 +289,10 @@ const BUILTIN_TB: BuiltinTieBreaker[] = [
   'triesFor', 'triesDiff',
   // SD-145: ice hockey RW / ROW
   'regWins', 'row',
+  'h2hRallyDiff', 'vsAbove', 'rallyFor',
 ];
 /** The criteria computed only from matches among the tied teams. */
-const AMONG_TIED = new Set<string>(['h2h', 'h2hDiff', 'h2hFor', 'h2hRatio', 'h2hPoints', 'rubbersRatio', 'h2hGames']);
+const AMONG_TIED = new Set<string>(['h2h', 'h2hRallyDiff', 'h2hDiff', 'h2hFor', 'h2hRatio', 'h2hPoints', 'rubbersRatio', 'h2hGames']);
 
 /** A tie-breaker added from outside the kit (chess Buchholz / Cut-1 / Median /
  *  Progressive in SD-26). `value` is higher-is-better; `seed` is its value
@@ -334,6 +344,8 @@ export function scoreUnit(sport: SportId | string): ScoreUnit {
  *  This is the LEGACY read-time default (existing tournaments store no keys and
  *  read this). New tournaments store their sport's body preset instead (D1,
  *  `newTournamentFormats`), so this function must not change. */
+const PICKLEBALL_ORDER: TieBreaker[] = ['h2h', 'pointsDiff', 'h2hRallyDiff', 'vsAbove', 'rallyFor', 'lots'];
+
 export function defaultStandingsConfig(sport: SportId): StandingsConfig {
   // Chess: game points 1 / ½ / 0. FIDE (C.07) leaves the order to each event;
   // elite round robins (Candidates 2024, Tata Steel 2024) rank ties by
@@ -343,6 +355,9 @@ export function defaultStandingsConfig(sport: SportId): StandingsConfig {
   // players only: match points, then games ratio, then points ratio — restarting
   // among any still level.
   if (sport === 'tabletennis') return { win: 2, draw: 0, loss: 1, order: ['h2h', 'h2hRatio', 'h2hPoints'], restart: true };
+  // USA Pickleball 15.B.4 (2026): matches won, then (b)–(f) in order, no restart
+  // ("the method that breaks the tie ranks all tied teams"); 15.B.4.a withdrawn out.
+  if (sport === 'pickleball') return { win: 2, draw: 1, loss: 0, order: [...PICKLEBALL_ORDER], dropWithdrawn: true };
   const win = sport === 'football' ? 3 : 2;
   const order: TieBreaker[] = sport === 'cricket' ? ['h2h', 'nrr', 'for'] : ['h2h', 'diff', 'for'];
   return { win, draw: 1, loss: 0, order };
@@ -429,8 +444,8 @@ const BODY_PRESETS: Record<string, PointsPreset[]> = {
       { winPoints: 2, drawPoints: 1, lossPoints: 0, tieBreak: 'h2h,diff,gamesDiff,lots', tieRestart: true }),
   ],
   pickleball: [
-    preset('pickleball', 'Pool play', 'Wins; ties: head-to-head, then point differential',
-      { winPoints: 2, drawPoints: 1, lossPoints: 0, tieBreak: 'h2h,pointsDiff,lots', tieRestart: true }),
+    preset('pickleball', 'Pool play (USA Pickleball)', 'Wins; ties: head-to-head, point difference, head-to-head point difference, vs the team above, points scored',
+      { winPoints: 2, drawPoints: 1, lossPoints: 0, tieBreak: 'h2h,pointsDiff,h2hRallyDiff,vsAbove,rallyFor,lots', tieRestart: false }),
   ],
   squash: [
     preset('wsf', 'WSF round robin', 'Wins; ties among the tied: match points, games ratio, points ratio',
@@ -678,7 +693,8 @@ export function availableTieBreakers(sport: SportId, ties = false): TieBreaker[]
     case 'games':
       return sport === 'tabletennis'
         ? ['h2h', 'h2hRatio', 'h2hPoints', 'diff', 'pointsDiff', 'pointRatio', 'gamesPct', 'wins', 'played', 'lots']
-        : ['h2h', 'diff', 'pointsDiff', 'h2hRatio', 'h2hPoints', 'pointRatio', 'gamesPct', 'wins', 'played', 'lots'];
+        : ['h2h', 'diff', 'pointsDiff', 'h2hRatio', 'h2hPoints', 'pointRatio', 'gamesPct', 'wins', 'played',
+          ...(sport === 'pickleball' ? ['h2hRallyDiff' as const, 'vsAbove' as const, 'rallyFor' as const] : []), 'lots'];
     case 'goals':
       return ['h2h', 'h2hDiff', 'h2hFor', 'diff', 'for', 'wins', ...(sport === 'football' ? ['fairPlay' as const] : []), ...(sport === 'netball' ? ['pointRatio' as const] : []), ...(sport === 'ice_hockey' ? ['regWins' as const, 'row' as const] : []), 'played', 'lots'];
     default:
@@ -723,6 +739,9 @@ export function tieBreakerLabel(tb: TieBreaker, sport?: SportId | string): strin
     case 'triesDiff': return 'try difference';
     case 'regWins': return 'regulation wins';
     case 'row': return 'regulation + overtime wins';
+    case 'h2hRallyDiff': return 'head-to-head point difference';
+    case 'vsAbove': return 'point difference vs the team above';
+    case 'rallyFor': return 'total points scored';
     default: return customTB.get(tb)?.label ?? tb;
   }
 }
@@ -770,6 +789,7 @@ export function standingsConfigFromFormat(sport: SportId, fmt?: Record<string, u
   const restart = fmt.tieRestart === true || fmt.tieRestart === 'h2h' ? fmt.tieRestart : fmt.tieRestart === false ? undefined : d.restart;
   return { win: num('winPoints', d.win), draw: num('drawPoints', d.draw), loss: num('lossPoints', d.loss), order: order.length ? order : d.order,
     ...(restart ? { restart } : {}),
+    ...(d.dropWithdrawn && fmt.dropWithdrawn !== false ? { dropWithdrawn: true } : {}),
     ...(typeof fmt.nrPoints === 'number' ? { noResult: fmt.nrPoints } : {}),
     ...(has('byePoints') ? { bye: fmt.byePoints as number } : {}),
     ...(adjustments.length ? { adjustments } : {}),
@@ -970,7 +990,7 @@ function unitNeeds(cfg: StandingsConfig) {
   return {
     sets: all || tbs.has('setRatio') || tbs.has('setsPct'),
     games: all || tbs.has('gamesDiff') || tbs.has('gamesPct') || tbs.has('h2hGames'),
-    points: all || tbs.has('h2hPoints') || tbs.has('pointRatio') || tbs.has('pointsDiff'),
+    points: all || tbs.has('h2hPoints') || tbs.has('pointRatio') || tbs.has('pointsDiff') || tbs.has('h2hRallyDiff') || tbs.has('vsAbove') || tbs.has('rallyFor'),
     fair: all || tbs.has('fairPlay'),
     tries: !!cfg.tryBonus || tbs.has('triesFor') || tbs.has('triesDiff'),
     ot: !!cfg.overtime || tbs.has('regWins') || tbs.has('row'),
@@ -993,8 +1013,17 @@ function unitNeeds(cfg: StandingsConfig) {
  *  and SB (counted in `forfeitWins` / `forfeitLosses`). */
 export function teamStandings(
   matches: Match[], sport: SportId, cfg: StandingsConfig = defaultStandingsConfig(sport), phaseKey?: string,
-  teams?: { id: string; name: string; colorHex?: string; level?: string }[],
+  teams?: { id: string; name: string; colorHex?: string; level?: string; withdrawn?: boolean }[],
 ): TeamStanding[] {
+  // USAP 15.B.4.a: a withdrawn team's matches don't count for anyone
+  const out = cfg.dropWithdrawn ? (teams ?? []).filter((t) => t.withdrawn) : [];
+  if (out.length) {
+    const ids = new Set(out.map((t) => t.id));
+    matches = matches.filter((m) => !ids.has(m.homeTeam.id) && !ids.has(m.awayTeam.id));
+    const rows = teamStandings(matches, sport, { ...cfg, dropWithdrawn: false }, phaseKey, teams);
+    return [...rows, ...out.map((t): TeamStanding => ({ teamId: t.id, name: t.name, colorHex: t.colorHex, played: 0, won: 0, lost: 0, drawn: 0, nr: 0,
+      for: 0, against: 0, diff: 0, points: 0, forUnits: 0, againstUnits: 0, adjust: 0, withdrawn: true }))];
+  }
   // SD-48: a team tie counts ONCE (its rubbers collapse into one fixture whose
   // score is rubbers won), so group tables rank ties, not rubbers.
   matches = collapseTies(matches);
@@ -1287,7 +1316,7 @@ export function rankTeams(rows: TeamStanding[], matches: Match[], cfg: Standings
     let j = i;
     while (j < byPoints.length && level(byPoints[j], byPoints[i])) j++;
     const cluster = byPoints.slice(i, j);
-    out.push(...orderCluster(cluster, chainFor(cluster.length, cfg), matches, cfg));
+    out.push(...orderCluster(cluster, chainFor(cluster.length, cfg), matches, cfg, out.length ? out[out.length - 1].teamId : undefined));
     i = j;
   }
   return out;
@@ -1326,6 +1355,7 @@ function overallKey(t: TeamStanding, tb: TieBreaker): number | null {
     case 'gamesPct': return pct(t.gamesFor ?? 0, t.gamesAgainst ?? 0);
     case 'pointRatio': return ratio(t.rallyFor ?? 0, t.rallyAgainst ?? 0);
     case 'pointsDiff': return (t.rallyFor ?? 0) - (t.rallyAgainst ?? 0);
+    case 'rallyFor': return t.rallyFor ?? 0;
     case 'fairPlay': return t.fairPlay ?? 0;
     // SD-48 — a tie table's score is rubbers (chess: game points)
     case 'rubbersDiff': return t.diff;
@@ -1346,7 +1376,7 @@ function overallKey(t: TeamStanding, tb: TieBreaker): number | null {
  *  never met), the ITTF games ratio becomes the team's overall score ratio, the
  *  points ratio its overall rally-point ratio; lots is skipped. Higher is better. */
 export function seedKey(t: TeamStanding, tb: TieBreaker): number | null {
-  if (tb === 'h2h' || tb === 'h2hDiff' || tb === 'h2hFor' || tb === 'lots') return null;
+  if (tb === 'h2h' || tb === 'h2hDiff' || tb === 'h2hFor' || tb === 'lots' || tb === 'h2hRallyDiff' || tb === 'vsAbove') return null;
   if (tb === 'h2hRatio' || tb === 'rubbersRatio') return ratio(t.for, t.against);
   if (tb === 'h2hGames') return t.gamesFor === undefined ? null : ratio(t.gamesFor, t.gamesAgainst ?? 0);
   if (tb === 'h2hPoints' || tb === 'pointRatio' || tb === 'pointsDiff') {
@@ -1431,8 +1461,25 @@ function headToHeadPoints(teamId: string, cluster: TeamStanding[], matches: Matc
   return pts;
 }
 
-function tieKey(t: TeamStanding, tb: TieBreaker, cluster: TeamStanding[], matches: Match[], cfg: StandingsConfig): number {
+/** USAP 15.B.4 — rally-point difference in `teamId`'s matches against `opp`
+ *  (a set of team ids). */
+function rallyDiffVs(teamId: string, opp: Set<string>, matches: Match[]): number {
+  let d = 0;
+  for (const m of matches) {
+    const isHome = m.homeTeam.id === teamId;
+    if (!isHome && m.awayTeam.id !== teamId) continue;
+    if (!opp.has(isHome ? m.awayTeam.id : m.homeTeam.id) || isNoResultMatch(m)) continue;
+    const p = pointsOf(m);
+    if (p) d += isHome ? p.home - p.away : p.away - p.home;
+  }
+  return d;
+}
+
+function tieKey(t: TeamStanding, tb: TieBreaker, cluster: TeamStanding[], matches: Match[], cfg: StandingsConfig, above?: string): number {
   switch (tb) {
+    case 'h2hRallyDiff': return rallyDiffVs(t.teamId, new Set(cluster.map((c) => c.teamId).filter((id) => id !== t.teamId)), matches);
+    // no team above (a tie for first): 0 for all, so it can't separate (PU-3)
+    case 'vsAbove': return above ? rallyDiffVs(t.teamId, new Set([above]), matches) : 0;
     case 'h2h': return headToHeadPoints(t.teamId, cluster, matches, cfg);
     case 'h2hRatio': return headToHeadRatio(t.teamId, cluster, matches, false);
     case 'rubbersRatio': return headToHeadRatio(t.teamId, cluster, matches, false);
@@ -1453,7 +1500,7 @@ function restartsAfter(tb: TieBreaker, cfg: StandingsConfig): boolean {
   return cfg.restart === 'h2h' && (AMONG_TIED.has(tb) || !!customTB.get(tb)?.amongTied);
 }
 
-function orderCluster(cluster: TeamStanding[], tbs: TieBreaker[], matches: Match[], cfg: StandingsConfig): TeamStanding[] {
+function orderCluster(cluster: TeamStanding[], tbs: TieBreaker[], matches: Match[], cfg: StandingsConfig, above?: string): TeamStanding[] {
   if (cluster.length <= 1) return cluster;
   const byName = () => [...cluster].sort((a, b) => a.name.localeCompare(b.name));
   if (tbs.length === 0) return byName();
@@ -1464,10 +1511,10 @@ function orderCluster(cluster: TeamStanding[], tbs: TieBreaker[], matches: Match
     if (cluster.some((t) => t.played + (t.byes ?? 0) + (t.forfeitWins ?? 0) + (t.forfeitLosses ?? 0) > 0)) for (const t of cluster) t.lots = true;
     return byName();
   }
-  const keyed = cluster.map((t) => ({ t, k: tieKey(t, tb, cluster, matches, cfg) }));
+  const keyed = cluster.map((t) => ({ t, k: tieKey(t, tb, cluster, matches, cfg, above) }));
   keyed.sort((a, b) => b.k - a.k);
   // Not separated at all by this criterion → straight on to the next one.
-  if (keyed[0].k === keyed[keyed.length - 1].k) return orderCluster(cluster, rest, matches, cfg);
+  if (keyed[0].k === keyed[keyed.length - 1].k) return orderCluster(cluster, rest, matches, cfg, above);
   const res: TeamStanding[] = [];
   for (let i = 0; i < keyed.length; ) {
     let j = i;
@@ -1476,7 +1523,8 @@ function orderCluster(cluster: TeamStanding[], tbs: TieBreaker[], matches: Match
     // just them (UEFA / IHF only after a head-to-head criterion) — it's strictly
     // smaller, so recursion terminates; otherwise continue with the NEXT one.
     const sub = keyed.slice(i, j).map((x) => x.t);
-    res.push(...orderCluster(sub, restartsAfter(tb, cfg) ? chainFor(sub.length, cfg) : rest, matches, cfg));
+    // the team just above a still-level sub-group is the last one placed (USAP 15.B.4.e)
+    res.push(...orderCluster(sub, restartsAfter(tb, cfg) ? chainFor(sub.length, cfg) : rest, matches, cfg, res.length ? res[res.length - 1].teamId : above));
     i = j;
   }
   return res;

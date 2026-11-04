@@ -479,7 +479,12 @@ export function useStandings(sport: SportId, tournamentId?: string, nonce = 0): 
   useFocusEffect(
     useCallback(() => {
       let on = true;
-      Promise.all([getMatches(), getAllStatLines(), getPlayers(), getTournaments(), tournamentId ? getTournamentTeams(tournamentId, sport).catch(() => [] as Team[]) : Promise.resolve([] as Team[])]).then(([matches, lines, players, tours, entrants]) => {
+      Promise.all([getMatches(), getAllStatLines(), getPlayers(), getTournaments(), tournamentId ? getTournamentTeams(tournamentId, sport).catch(() => [] as Team[]) : Promise.resolve([] as Team[]),
+        // USAP 15.B.4.a: which entrants withdrew (pickleball-usap-2026.md PU-4)
+        tournamentId ? getTournamentEntries(tournamentId, sport).catch(() => []) : Promise.resolve([])]).then(([matches, lines, players, tours, teamRows, entries]) => {
+        const out = new Set(entries.filter((e) => e.status === 'withdrawn').map((e) => e.team.id));
+        const entrants = [...teamRows.map((t) => ({ ...t, withdrawn: out.has(t.id) })),
+          ...entries.filter((e) => out.has(e.team.id) && !teamRows.some((t) => t.id === e.team.id)).map((e) => ({ ...e.team, withdrawn: true }))];
         if (!on) return;
         const scopedMatches = tournamentId ? matches.filter((m) => m.tournamentId === tournamentId) : matches;
         // Leaders come from stat lines, so scope those by the same match set.

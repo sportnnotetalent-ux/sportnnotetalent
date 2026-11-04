@@ -55,7 +55,7 @@ export default function StandingsScreen() {
   const { categories: divisions, entries, activeCat, setActiveCat } = useDivisions(params?.tournamentId);
   const table = useMemo(
     () => (activeCat
-      ? teamStandings(matchesInDivision(matches, entries, activeCat), activeSport, columnsConfig(activeSport, standingsConfigFromFormat(activeSport, tournament?.formats?.[activeSport])), undefined, entries.map((e) => e.team))
+      ? teamStandings(matchesInDivision(matches, entries, activeCat), activeSport, columnsConfig(activeSport, standingsConfigFromFormat(activeSport, tournament?.formats?.[activeSport])), undefined, entries.map((e) => ({ ...e.team, withdrawn: e.status === 'withdrawn' })))
       : teams),
     [activeCat, matches, entries, activeSport, teams, tournament],
   );
@@ -321,7 +321,7 @@ function PhaseTable({ title, phaseKey, rows, adjustments, canManage, expanded, o
     return tier ? { backgroundColor: tier + '14', borderRadius: split ? 0 : theme.radius.sm } : i > 3 ? st.rowDivider : null;
   };
   const rowLabel = (t: TeamStanding, i: number) =>
-    `${i + 1}. ${t.name}${vrow(t.teamId)?.live ? ', playing now' : ''}${vrow(t.teamId)?.mark ? `, ${vrow(t.teamId)!.mark}` : ''}, ${columns.map((c) => `${c.title} ${c.value(t, rows)}`).join(', ')}${t.adjust ? `, adjusted ${signed(t.adjust)}` : ''}`;
+    `${i + 1}. ${t.name}${t.withdrawn ? ', withdrawn' : ''}${vrow(t.teamId)?.live ? ', playing now' : ''}${vrow(t.teamId)?.mark ? `, ${vrow(t.teamId)!.mark}` : ''}, ${columns.map((c) => `${c.title} ${c.value(t, rows)}`).join(', ')}${t.adjust ? `, adjusted ${signed(t.adjust)}` : ''}`;
   const cells = (t: TeamStanding) => columns.map((c) => (
     <Text key={c.key} style={[st.num, { width: widthOf(c) }, c.emphasis && st.pts]} numberOfLines={1}>
       {c.value(t, rows)}{c.emphasis ? `${t.adjust ? '*' : ''}${t.lots ? '‡' : ''}` : ''}
@@ -372,7 +372,7 @@ function PhaseTable({ title, phaseKey, rows, adjustments, canManage, expanded, o
     return (
       <View style={[st.teamCol, st.teamCell, style]}>
         <View style={[st.dot, { backgroundColor: t.colorHex ?? theme.colors.surfaceAlt }]} />
-        <Text style={[textStyles.body, { flexShrink: 1 }, i === 0 && { fontWeight: '700' }, g?.mark === 'eliminated' && { color: theme.colors.textMuted }]} numberOfLines={1}>{t.name}</Text>
+        <Text style={[textStyles.body, { flexShrink: 1 }, i === 0 && { fontWeight: '700' }, (g?.mark === 'eliminated' || t.withdrawn) && { color: theme.colors.textMuted }]} numberOfLines={1}>{t.name}{t.withdrawn ? ' · withdrawn' : ''}</Text>
         {g?.live ? <LiveDot /> : null}
         {g?.mark ? <MarkTag mark={g.mark} via={g.via} /> : null}
       </View>

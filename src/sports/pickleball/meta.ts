@@ -29,10 +29,13 @@ export const PICKLEBALL_FORMAT_FIELDS: FormatField[] = [
         // "MLP". The value stays 'dreambreaker' (stored formats keep working).
         { value: 'dreambreaker', label: 'Rally to 21 (1 game)', set: { scoring: 'rally', pointsPerGame: 21, winBy: 2, gamesToWin: 1 } },
         // MVP PB1: the common rec game — ONE game to 11 — is the friendly default.
-        { value: 'rec11', label: 'Rec (rally · 1 game to 11)', set: { scoring: 'rally', pointsPerGame: 11, winBy: 2, gamesToWin: 1 } },
+        { value: 'rec11', label: 'Rally · 1 game to 11', set: { scoring: 'rally', pointsPerGame: 11, winBy: 2, gamesToWin: 1 } },
         { value: 'sideout11', label: 'Side-out · 1 game to 11', set: { scoring: 'sideout', pointsPerGame: 11, winBy: 2, gamesToWin: 1 } },
-        { value: 'rec', label: 'Rec (rally · best of 3 to 11)', set: { scoring: 'rally', pointsPerGame: 11, winBy: 2, gamesToWin: 2 } },
-        { value: 'rec1', label: 'Rec quick (rally · best of 3 to 11 · win by 1)', set: { scoring: 'rally', pointsPerGame: 11, winBy: 1, gamesToWin: 2 } },
+        { value: 'rec', label: 'Rally · best of 3 to 11', set: { scoring: 'rally', pointsPerGame: 11, winBy: 2, gamesToWin: 2 } },
+        // USAP 2026 15.C.2.b: rally scoring is a sanctioned (provisional) tournament
+        // format — plain "Rally" labels, values kept (pickleball-usap-2026.md PU-7)
+        { value: 'rally15', label: 'Rally · best of 3 to 15', set: { scoring: 'rally', pointsPerGame: 15, winBy: 2, gamesToWin: 2 } },
+        { value: 'rec1', label: 'Rally · best of 3 to 11 · win by 1', set: { scoring: 'rally', pointsPerGame: 11, winBy: 1, gamesToWin: 2 } },
         { value: 'custom', label: 'Custom' },
       ],
     },
