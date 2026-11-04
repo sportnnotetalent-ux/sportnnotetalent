@@ -664,7 +664,7 @@ export default function TournamentProfileScreen() {
             <View style={st.followRow}>
               <Button
                 label={following ? '✓ Following' : '+ Follow tournament'}
-                variant={following ? 'ghost' : 'primary'}
+                variant="ghost"
                 onPress={() => toggle('tournament', tournament.id)}
                 style={{ flex: 1 }}
               />

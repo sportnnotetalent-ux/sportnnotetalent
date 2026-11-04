@@ -173,7 +173,7 @@ export default function ClubHomeScreen() {
 
         {rowIds.length ? (
           <View style={st.followRow}>
-            <Button label={follow.following ? '✓ Following' : '+ Follow team'} variant={follow.following ? 'ghost' : 'primary'} onPress={toggleFollow} style={{ flex: 1 }} />
+            <Button label={follow.following ? '✓ Following' : '+ Follow team'} variant="ghost" onPress={toggleFollow} style={{ flex: 1 }} />
             <FollowBell type="team" id={rowIds[0]} name={club.name} alsoIds={rowIds.slice(1)} />
           </View>
         ) : null}

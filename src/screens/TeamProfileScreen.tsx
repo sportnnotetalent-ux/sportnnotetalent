@@ -247,7 +247,7 @@ export default function TeamProfileScreen() {
           <View style={st.followRow}>
             <Button
               label={following ? '✓ Following' : '+ Follow team'}
-              variant={following ? 'ghost' : 'primary'}
+              variant="ghost"
               onPress={() => toggle('team', team.id)}
               style={{ flex: 1 }}
             />

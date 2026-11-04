@@ -69,7 +69,7 @@ export function ConnectBoard() {
 
   return (
     <View style={{ gap: theme.spacing(3) }}>
-      <Button label="✏️ Post a listing" onPress={() => nav.navigate('CreateListing')} />
+      <Button label="✏️ Post a listing" variant="ghost" onPress={() => nav.navigate('CreateListing')} />
 
       <PlayerFilters value={filters} onChange={setFilters} cities={cities} sections={['types', 'sports', 'cities']} typeOptions={typeOptions} typeLabel="Post type" />
 

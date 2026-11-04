@@ -85,7 +85,7 @@ export function MatchCard({ match, onPress, onStart, timeZone, note }: {
 
   const footMain: React.ReactNode = tie
     ? `👥 Team tie · ${match.tieRubbers.length} rubbers${done ? '' : live ? ' · in progress' : ''}`
-    : live ? <Text style={s.cta}>Tap to score ›</Text>
+    : live && !onStart ? <Text style={s.cta}>Tap to score ›</Text>
     : done ? (match.result ? resultWords({ sport: match.sport, result: match.result }, match.homeTeam.name, match.awayTeam.name) : walkover ? 'Walkover' : 'Full time')
     : null;
   return (
@@ -214,8 +214,10 @@ const s = StyleSheet.create({
   postponedTag: { color: theme.colors.accent, fontSize: theme.font.tiny, fontWeight: '800', letterSpacing: 0.5 },
   cancelledTag: { color: theme.colors.danger, fontSize: theme.font.tiny, fontWeight: '800', letterSpacing: 0.5 },
   breakTag: { color: theme.colors.accent, backgroundColor: theme.colors.accent + '22', fontSize: theme.font.tiny, fontWeight: '800', letterSpacing: 0.5, paddingVertical: theme.spacing(1), paddingHorizontal: theme.spacing(2), borderRadius: theme.radius.pill, overflow: 'hidden' },
-  startBtn: { backgroundColor: theme.colors.lime, borderRadius: theme.radius.pill, paddingVertical: theme.spacing(2.5), alignItems: 'center', marginHorizontal: theme.spacing(4) },
-  startText: { color: theme.colors.onLime, fontSize: theme.font.small, fontWeight: '800', letterSpacing: 0.4 },
+  // UI audit step 3: lime is kept for one main action per screen — a card's
+  // own button is a plain outline
+  startBtn: { backgroundColor: theme.colors.surface, borderWidth: 1.5, borderColor: theme.colors.primary, borderRadius: theme.radius.pill, paddingVertical: theme.spacing(2), alignItems: 'center', marginHorizontal: theme.spacing(4) },
+  startText: { color: theme.colors.primary, fontSize: theme.font.small, fontWeight: '800', letterSpacing: 0.4 },
   timeTag: { color: theme.colors.hot, fontSize: theme.font.tiny, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase' },
 
   board: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(2) },

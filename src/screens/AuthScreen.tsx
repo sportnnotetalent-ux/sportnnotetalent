@@ -78,6 +78,9 @@ export default function AuthScreen() {
   const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   // Score first, sign up later: a game this phone is scoring without an account
   const [guestGame, setGuestGame] = useState<GuestMatch | null>(null);
+  // UI audit step 3: with phone sign-in on, its "Send code" is the one lime button;
+  // the email form's buttons are the green secondary style.
+  const emailSecondary = phoneLoginAvailable() ? ('brand' as const) : undefined;
   useEffect(() => {
     let on = true;
     const read = () => { void guestStore.get().then((g) => on && setGuestGame(g)); };
@@ -250,12 +253,12 @@ export default function AuthScreen() {
         {/* Score first, sign up later (growth plan 2026-10-31) */}
         <View style={st.guestRow}>
           {guestGame ? (
-            <Button label={`Continue your game: ${guestGame.homeTeamName} vs ${guestGame.awayTeamName}`} onPress={() => nav.navigate('LiveScoring', {
+            <Button variant="ghost" label={`Continue your game: ${guestGame.homeTeamName} vs ${guestGame.awayTeamName}`} onPress={() => nav.navigate('LiveScoring', {
               guestId: guestGame.id, sport: guestGame.sport, homeName: guestGame.homeName, awayName: guestGame.awayName,
               homeTeamName: guestGame.homeTeamName, awayTeamName: guestGame.awayTeamName, homeColor: guestGame.homeColor, awayColor: guestGame.awayColor, canScore: true,
             })} />
           ) : null}
-          <Button label="Score a game now, no sign-up" variant={guestGame ? 'ghost' : undefined} onPress={() => nav.navigate('GuestGame')} />
+          <Button label="Score a game now, no sign-up" variant="ghost" onPress={() => nav.navigate('GuestGame')} />
         </View>
 
         {/* Web: mobile number + SMS code is the main way in; email below. */}
@@ -388,7 +391,7 @@ export default function AuthScreen() {
 
           {mode === 'in' && flow === 'password' && (
             <>
-              <Button label={busy ? 'Please wait…' : 'Sign in'} onPress={submitPassword} disabled={busy} />
+              <Button label={busy ? 'Please wait…' : 'Sign in'} variant={emailSecondary} onPress={submitPassword} disabled={busy} />
               {showResend && (
                 <Text style={st.link} accessibilityRole="button" onPress={doResend}>Resend confirmation email</Text>
               )}
@@ -401,7 +404,7 @@ export default function AuthScreen() {
 
           {mode === 'in' && flow === 'otp' && (
             <>
-              <Button label={busy ? 'Please wait…' : sent ? 'Verify & sign in' : otpChannel === 'phone' ? 'Text me a code' : 'Email me a code'} onPress={sent ? otpVerify : otpRequest} disabled={busy} />
+              <Button label={busy ? 'Please wait…' : sent ? 'Verify & sign in' : otpChannel === 'phone' ? 'Text me a code' : 'Email me a code'} variant={emailSecondary} onPress={sent ? otpVerify : otpRequest} disabled={busy} />
               <View style={st.linkRow}>
                 {sent && <ResendLink waitS={resendIn} onPress={otpRequest} />}
                 <Text style={st.link} accessibilityRole="button" onPress={() => switchFlow('password')}>Use password instead</Text>
@@ -411,7 +414,7 @@ export default function AuthScreen() {
 
           {mode === 'in' && flow === 'reset' && (
             <>
-              <Button label={busy ? 'Please wait…' : sent ? 'Reset password & sign in' : 'Send reset code'} onPress={sent ? resetConfirm : resetRequest} disabled={busy} />
+              <Button label={busy ? 'Please wait…' : sent ? 'Reset password & sign in' : 'Send reset code'} variant={emailSecondary} onPress={sent ? resetConfirm : resetRequest} disabled={busy} />
               <View style={st.linkRow}>
                 {sent && <ResendLink waitS={resendIn} onPress={resetRequest} />}
                 <Text style={st.link} accessibilityRole="button" onPress={() => switchFlow('password')}>Back to sign in</Text>
