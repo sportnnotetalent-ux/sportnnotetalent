@@ -24,7 +24,7 @@ begin
   if auth.uid() is null or not can_manage_tournament(p_tournament) then
     raise exception 'not_allowed' using errcode = '42501';
   end if;
-  if coalesce(cardinality(p_names), 0) not between 2 and 128 or p_sport is null or char_length(p_sport) not between 1 and 40
+  if coalesce(cardinality(p_names), 0) not between 1 and 128 or p_sport is null or char_length(p_sport) not between 1 and 40
      or exists (select 1 from unnest(p_names) x where x is null or char_length(btrim(x)) not between 1 and 60) then
     raise exception 'bad_slots' using errcode = '22023';
   end if;

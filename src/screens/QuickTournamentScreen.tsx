@@ -21,7 +21,7 @@ import { withNewTournamentPoints } from '../data/standings';
 import { regionFormatDefaults } from '../core/units';
 import { regionStore } from '../core/region';
 import { addTournamentTeams, createTeam, createTournament, createTournamentSlots, getMyPlayerId, getPlayer } from '../data/repos';
-import { slotNames } from '../core/slots';
+import { nextSlotNames, slotNames, splitTypedSlots } from '../core/slots';
 import { getMyPersonalisation } from '../data/personalise';
 import { useAuth } from '../core/auth';
 import { notice } from '../core/confirm';
@@ -85,7 +85,16 @@ export default function QuickTournamentScreen() {
   }, [params?.sport]);
 
   const meta = sport ? getSportMeta(sport) : null;
-  const typed = useMemo(() => parseEntrantList(list), [list]);
+  // a "?" / TBC / TBD line is a team not known yet (TS12)
+  // counted on the raw lines: the list drops repeated names, and "?" repeats
+  const typedSplit = useMemo(() => {
+    const raw = splitTypedSlots(list.split(/\r?\n/));
+    return { teams: parseEntrantList(raw.teams.join('\n')), slots: raw.slots };
+  }, [list]);
+  const typed = useMemo(
+    () => [...typedSplit.teams, ...(typedSplit.slots ? nextSlotNames(typedSplit.teams, typedSplit.slots) : [])],
+    [typedSplit],
+  );
   const slotN = Math.max(0, Math.min(128, parseInt(slotCount, 10) || 0));
   const noun = meta?.participantKind === 'individual' ? 'players' : meta?.participantKind === 'both' ? 'players or pairs' : 'teams';
   // Suggested name and format until the organiser changes them.
@@ -132,13 +141,19 @@ export default function QuickTournamentScreen() {
         setBusy(`Making ${entrants.length} slots…`);
         await createTournamentSlots(created.id, sport, entrants);
       } else {
+        const realCount = typedSplit.teams.length;
         const ids: string[] = [];
-        for (let i = 0; i < entrants.length; i++) {
-          setBusy(`Adding ${noun} ${i + 1} of ${entrants.length}…`);
+        for (let i = 0; i < realCount; i++) {
+          setBusy(`Adding ${noun} ${i + 1} of ${realCount}…`);
           const t = await createTeam({ name: entrants[i], shortName: shortFrom(entrants[i]), sport, colorHex: PALETTE[i % PALETTE.length], adhoc: true });
           ids.push(t.id);
         }
         await addTournamentTeams(created.id, ids, 'confirmed');
+        // then the teams not known yet, as slots (entered after the real teams)
+        if (entrants.length > realCount) {
+          setBusy(`Making ${entrants.length - realCount} slot${entrants.length - realCount === 1 ? '' : 's'}…`);
+          await createTournamentSlots(created.id, sport, entrants.slice(realCount));
+        }
       }
       void AsyncStorage.setItem(LAST_SPORT_KEY, sport).catch(() => {});
       // The tournament page underneath, so making the fixtures lands on it.
@@ -206,7 +221,7 @@ export default function QuickTournamentScreen() {
               <>
                 <TextField label={`The ${noun}, one per line`} value={list} onChange={setList} multiline
                   placeholder={'Paste from WhatsApp:\nLions\nTigers\nPanthers\nCheetahs'} />
-                <Text style={textStyles.muted}>{summary}. Players can be added to each later.</Text>
+                <Text style={textStyles.muted}>{summary}{typedSplit.slots ? ` (${typedSplit.slots} not known yet)` : ''}. Type ? on a line for a team not known yet. Players can be added to each later.</Text>
               </>
             )}
           </View>

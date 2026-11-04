@@ -6462,7 +6462,7 @@ const slotError = (e: { message?: string } | null): Error => {
     [/wrong_team/, 'Pick a team of this sport (not another slot).'],
     [/slot_started/, 'One of this slot’s games has started — it can’t be swapped now.'],
     [/bad_name/, 'Type the team’s name (up to 60 letters).'],
-    [/bad_slots/, 'Between 2 and 128 slots, each with a name.'],
+    [/bad_slots/, 'Between 1 and 128 slots, each with a name.'],
     [/does not exist|schema cache/, 'Team slots need a database update. Ask the SportnNote team.'],
   ];
   return new Error(map.find(([re]) => re.test(m))?.[1] ?? 'Couldn’t save that — try again.');

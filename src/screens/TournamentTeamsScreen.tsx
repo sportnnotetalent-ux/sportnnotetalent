@@ -31,7 +31,8 @@ import { ClubQuickPick } from '../components/ClubQuickPick';
 import { getSportMeta, participantMode } from '../sports/sportMeta';
 import { useAuth } from '../core/auth';
 import { useTournamentById, useTeams, useTournamentEntries, useTournamentCategories, useLeagueData, useCaptainships } from '../data/hooks';
-import { addTournamentTeams, removeTournamentTeam, createTeam, invitePerson, setTeamLeaders, createInvite, setTournamentTeamStatus, setTournamentTeamCheckIn, getTeamLeaders, enterOrgHousesAsTeams, getLiveTournamentInvite, setTournamentInvite, getTeamsSetup, canManageTeam, getMyPlayerId, getMyEntrant, isNeedsDbUpdate, getTournamentSlotIds, fillTournamentSlot, nameTournamentSlot } from '../data/repos';
+import { addTournamentTeams, removeTournamentTeam, createTeam, invitePerson, setTeamLeaders, createInvite, setTournamentTeamStatus, setTournamentTeamCheckIn, getTeamLeaders, enterOrgHousesAsTeams, getLiveTournamentInvite, setTournamentInvite, getTeamsSetup, canManageTeam, getMyPlayerId, getMyEntrant, isNeedsDbUpdate, getTournamentSlotIds, fillTournamentSlot, nameTournamentSlot, createTournamentSlots } from '../data/repos';
+import { nextSlotNames } from '../core/slots';
 import { filterTeams } from '../core/teamSearch';
 import { tournamentInviteMessage, tournamentJoinLink } from '../core/tournamentInvite';
 import { inviteLabel, playerInviteText } from '../core/inviteText';
@@ -136,6 +137,21 @@ export default function TournamentTeamsScreen() {
     getTournamentSlotIds(params.tournamentId).then((ids) => on && setSlotIds(ids)).catch(() => {});
     return () => { on = false; };
   }, [params.tournamentId, tick]);
+  // TS12: some teams known, some not — add slots next to them any time
+  const [addSlotsOpen, setAddSlotsOpen] = useState(false);
+  const [addSlotCount, setAddSlotCount] = useState('1');
+  const [addSlotGroups, setAddSlotGroups] = useState('0');
+  const newSlotNames = nextSlotNames(entries.map((x) => x.team.name), parseInt(addSlotCount, 10) || 1, parseInt(addSlotGroups, 10) || 0);
+  async function addSlots() {
+    setBusy(true); setError(null);
+    try {
+      await createTournamentSlots(params.tournamentId, sport, newSlotNames);
+      setAddSlotsOpen(false); setAddSlotCount('1');
+      setTick((n) => n + 1);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Couldn’t add the slots.');
+    } finally { setBusy(false); }
+  }
   async function fillSlot(slotId: string, how: { teamId: string } | { name: string }) {
     setBusy(true); setError(null);
     try {
@@ -567,6 +583,27 @@ export default function TournamentTeamsScreen() {
               )}
             </Card>
           )}
+
+          {/* TS12: teams not known yet — slots next to the real teams, filled later */}
+          <Card style={{ gap: theme.spacing(2) }}>
+            <View style={st.entryRow}>
+              <View style={st.flex1}>
+                <Text style={textStyles.h3}>Teams not known yet?</Text>
+                <Text style={textStyles.muted}>Add slots now and make the fixtures; fill each slot when its team comes in.</Text>
+              </View>
+              <Button label={addSlotsOpen ? 'Close' : '+ Add slots'} variant="ghost" disabled={busy} onPress={() => setAddSlotsOpen((v) => !v)} />
+            </View>
+            {addSlotsOpen ? (
+              <>
+                <View style={st.row}>
+                  <View style={st.flex1}><TextField label="How many?" value={addSlotCount} onChange={(t) => setAddSlotCount(t.replace(/[^0-9]/g, '').slice(0, 3))} /></View>
+                  <View style={st.flex1}><TextField label="Name for groups (0 = no)" value={addSlotGroups} onChange={(t) => setAddSlotGroups(t.replace(/[^0-9]/g, '').slice(0, 2))} /></View>
+                </View>
+                <Text style={textStyles.muted}>New: {newSlotNames.slice(0, 6).join(', ')}{newSlotNames.length > 6 ? ' …' : ''}</Text>
+                <Button label={busy ? 'Adding…' : `Add ${newSlotNames.length} slot${newSlotNames.length === 1 ? '' : 's'}`} disabled={busy} onPress={() => void addSlots()} />
+              </>
+            ) : null}
+          </Card>
 
           {/* Confirmed teams — each can be withdrawn (soft, keeps history) without
               losing its place in past results. */}

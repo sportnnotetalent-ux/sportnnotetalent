@@ -48,7 +48,8 @@ describe('TS1/TS3/TS10/TS11 creating slots', () => {
   test('someone else can\'t; junk sizes and names refused', async () => {
     const t = await tournament(org);
     assert.match(await errOf(() => mkSlots(other, t, ['A1', 'A2'])) ?? '', /not_allowed/);
-    assert.match(await errOf(() => mkSlots(org, t, ['A1'])) ?? '', /bad_slots/);
+    assert.match(await errOf(() => mkSlots(org, t, [])) ?? '', /bad_slots/);
+    assert.equal((await mkSlots(org, t, ['Slot 1'])).length, 1, 'TS14: one slot is fine');
     assert.match(await errOf(() => mkSlots(org, t, Array.from({ length: 129 }, (_, i) => `T${i}`))) ?? '', /bad_slots/);
     assert.match(await errOf(() => mkSlots(org, t, ['A1', ''])) ?? '', /bad_slots/);
   });

@@ -23,3 +23,37 @@ test('TS2: a slot name tells its group (only for groups that exist)', () => {
   assert.equal(groupFromSlotName('Team 1', 2), undefined);
   assert.equal(groupFromSlotName('Aces', 2), undefined);
 });
+
+test('TS13: new slot names continue after the existing ones', async () => {
+  const { nextSlotNames } = await import('../src/core/slots.ts');
+  assert.deepEqual(nextSlotNames(['Lions', 'Slot 1', 'Slot 2'], 3), ['Slot 3', 'Slot 4', 'Slot 5']);
+  assert.deepEqual(nextSlotNames(['Lions'], 2), ['Slot 1', 'Slot 2']);
+  assert.deepEqual(nextSlotNames(['Slot 7'], 1), ['Slot 8']);
+});
+
+test('TS15: group slots go to the group with the fewest', async () => {
+  const { nextSlotNames } = await import('../src/core/slots.ts');
+  assert.deepEqual(nextSlotNames(['A1', 'A2', 'B1'], 3, 2), ['B2', 'A3', 'B3']);
+  assert.deepEqual(nextSlotNames([], 4, 2), ['A1', 'B1', 'A2', 'B2']);
+  assert.deepEqual(nextSlotNames(['C9'], 1, 2), ['A1']); // C isn't a group here
+});
+
+test('TS12: "?" / TBC / TBD lines in a typed list are slots', async () => {
+  const { splitTypedSlots } = await import('../src/core/slots.ts');
+  const r = splitTypedSlots(['Lions', '?', 'Tigers', 'tbc', 'TBD', 'To be decided FC']);
+  assert.deepEqual(r.teams, ['Lions', 'Tigers', 'To be decided FC']);
+  assert.equal(r.slots, 3);
+});
+
+test('TS14: at least one, at most 128', async () => {
+  const { nextSlotNames } = await import('../src/core/slots.ts');
+  assert.equal(nextSlotNames([], 0).length, 1);
+  assert.equal(nextSlotNames([], 999).length, 128);
+});
+
+test('TS12: repeated "?" lines are each a slot (counted before de-duplication)', async () => {
+  const { splitTypedSlots } = await import('../src/core/slots.ts');
+  assert.equal(splitTypedSlots('Lions\n?\n?\n?'.split('\n')).slots, 3);
+  const src = (await import('node:fs')).readFileSync(new URL('../src/screens/QuickTournamentScreen.tsx', import.meta.url), 'utf8');
+  assert.match(src, /splitTypedSlots\(list\.split/);
+});

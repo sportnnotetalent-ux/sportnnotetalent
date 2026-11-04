@@ -20,3 +20,14 @@ its slot. Migration: supabase/migrations/20261106130000_team_slots.sql.
 | TS11 | Huge slot counts / junk names | 2–128 slots, names 1–60 characters |
 
 Tests: tests/team-slots.test.mts (names), tests/db-team-slots.test.mts (server), tests/sim-team-slots.test.mts.
+
+## Mixed (2026-11-06): some teams known, some not
+
+| # | Break | Fix |
+|---|-------|-----|
+| TS12 | 5 teams confirmed, 3 to come: slots only when the tournament has no teams | Participating teams → "+ Add slots" any time; Quick tournament: a line "?" (or TBC / TBD) is a slot |
+| TS13 | Added slots clash with existing slot names (two "Slot 1") | New names continue after the existing ones (Slot 4, Slot 5 … / A3, B3 …) |
+| TS14 | One slot can't be added (the server wanted 2+) | 1–128 slots per call |
+| TS15 | Group-named slots pile into one group | Each new group slot goes to the group with the fewest so far |
+
+Tests: tests/team-slots.test.mts (nextSlotNames, splitTypedSlots), tests/db-team-slots.test.mts (one slot).

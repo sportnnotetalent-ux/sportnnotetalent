@@ -29,3 +29,20 @@ test('600 slot tournaments', () => {
     assert.equal(ps.length, sizes.reduce((a, s) => a + (s * (s - 1)) / 2, 0));
   }
 });
+
+test('600 mixed tournaments: added slots never clash and stay balanced', async () => {
+  const { nextSlotNames } = await import('../src/core/slots.ts');
+  for (let u = 0; u < 600; u++) {
+    const g = rnd(5); // 0–4 groups
+    let names: string[] = Array.from({ length: rnd(6) }, (_, i) => `Real ${u}-${i}`);
+    for (let round = 0; round < 1 + rnd(4); round++) {
+      const add = nextSlotNames(names, 1 + rnd(10), g);
+      names = [...names, ...add];
+      assert.equal(new Set(names).size, names.length, 'a duplicate slot name');
+    }
+    if (g >= 2) {
+      const per = Array.from({ length: g }, (_, gi) => names.filter((x) => x[0] === String.fromCharCode(65 + gi) && /^[A-Z]\d+$/.test(x)).length);
+      assert.ok(Math.max(...per) - Math.min(...per) <= 1, `unbalanced ${per}`);
+    }
+  }
+});
