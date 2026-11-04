@@ -62,7 +62,8 @@ export const FOOTBALL_META: SportMeta = {
       // MVP F3 (founder, 2026-10-31): friendlies start on 5s turf; tournaments keep 11-a-side
       key: 'preset', label: 'Format', type: 'preset', default: 'fives', tournamentDefault: 'eleven',
       options: [
-        { value: 'eleven', label: '11-a-side', set: { playersPerSide: 11, halfMinutes: 45, substitutes: 5, subType: 'rolling', stoppedClock: false, futsal: false } },
+        // IFAB Law 3: up to 5 substitutes, no return (return subs only in grassroots / youth / veterans) — football-rulebook.md FB-1
+        { value: 'eleven', label: '11-a-side', set: { playersPerSide: 11, halfMinutes: 45, substitutes: 5, subType: 'fixed', stoppedClock: false, futsal: false } },
         { value: 'sevens', label: '7-a-side', set: { playersPerSide: 7, halfMinutes: 25, substitutes: 5, subType: 'rolling', stoppedClock: false, futsal: false } },
         { value: 'fives', label: '5s turf', set: { playersPerSide: 5, halfMinutes: 20, substitutes: 5, subType: 'rolling', stoppedClock: false, futsal: false } },
         // SD-132: futsal — stopped clock (Law 7), time-outs + accumulated fouls, 2 × 5 extra time

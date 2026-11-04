@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-08 — Football: IFAB Law 3 substitutions in 11-a-side; tennis 2026 check
+
+Audited against the IFAB 2026/27 law changes (`docs/sport-expert/football-rulebook.md`). FB-1: the 11-a-side preset (the tournament default) now uses fixed substitutions (up to 5, no return), since return substitutions are only for grassroots / youth / veterans; 7s, 5s and futsal stay rolling. Tennis checked against the ITF 2026 changes: none touch scoring (`tennis-rulebook.md`). Tests: 2 unit. No database change.
+
 ### 2026-11-08 — Padel: FIP 2026 Star Point for tournaments
 
 Audited against the FIP Rules of Padel (Dec 2025 revision; `docs/sport-expert/padel-rulebook.md`). PD-1: new padel tournaments default to the Star Point (FIP events from 2026); friendlies keep golden point. PD-2: the golden point cue now says the receiving pair chooses who receives (Rule 1, option 3.2). Tests: 2 unit. No database change.
