@@ -18,7 +18,7 @@ export const PADEL_META: SportMeta = {
   retireTerms: true,
   formatFields: [
     {
-      key: 'preset', label: 'Format', type: 'preset', default: 'premier',
+      key: 'preset', label: 'Format', type: 'preset', default: 'premier', tournamentDefault: 'star', // FIP events use the Star Point from 2026 (padel-rulebook.md PD-1)
       options: [
         { value: 'premier', label: 'Golden point (best of 3)', set: { deuce: 'golden', gamesPerSet: 6, setsToWin: 2, decider: 'set' } },
         // SD-64 — FIP / Premier Padel from 2026 (Rules of Padel, Rule 1 option 2)

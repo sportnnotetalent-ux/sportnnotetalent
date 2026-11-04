@@ -123,7 +123,7 @@ const ScoringControls: SportPlugin<PadelState>['ScoringControls'] = ({ state, di
         <ServeOrderPicker state={s} homeName={homeName} awayName={awayName} homeRoster={homeRoster} awayRoster={awayRoster} dispatch={dispatch} icon="🟡" />
       )}
       {matchTbActive(s) && <Text style={ctrl.serve}>🟡 Match tiebreak — first to 10 (win by 2).</Text>}
-      {deucePoint && <IconText label={"⚡ Golden point — next point wins the game."} style={ctrl.serve} />}
+      {deucePoint && <IconText label={"⚡ Golden point — next point wins the game. The receiving pair chooses who receives."} style={ctrl.serve} />}
       {starNow ? <IconText label={"⭐ Star point — 3rd deuce: the next point wins the game. The receiving pair chooses who receives."} style={ctrl.serve} />
         : starDeuce > 0 ? <Text style={ctrl.serve}>Deuce {starDeuce} of 3 · Star Point: {starDeuce === 1 ? 'two advantages' : 'one more advantage'} before the deciding point.</Text> : null}
       {/* SD-107 / deep wave — optional detail for the last point: how, forehand /

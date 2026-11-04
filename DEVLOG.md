@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-08 — Padel: FIP 2026 Star Point for tournaments
+
+Audited against the FIP Rules of Padel (Dec 2025 revision; `docs/sport-expert/padel-rulebook.md`). PD-1: new padel tournaments default to the Star Point (FIP events from 2026); friendlies keep golden point. PD-2: the golden point cue now says the receiving pair chooses who receives (Rule 1, option 3.2). Tests: 2 unit. No database change.
+
 ### 2026-11-08 — Squash: World Squash 2025 video reviews per match
 
 Audited against the World Squash Singles Rules 2025 (`docs/sport-expert/squash-rulebook.md`). SQ-1: reviews are now per match: 2 lost reviews per player in best of 5 (1 in best of 3), plus one fresh review in the deciding game (unused ones not carried); kept when the decision is overruled. We used to allow one per game. `reviewsLeft` takes the match length (rally engine passes it); Quick options hint updated. Tests: 3 unit; the RB14 test rewritten to the 2025 rule. No database change.
