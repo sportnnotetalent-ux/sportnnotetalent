@@ -3,7 +3,7 @@
  *  8-week trend, today's counts, games by sport — and the people behind them:
  *  tap New sign-ups, Activation, Games scored or Weekly active users for the
  *  list, then a person's profile or a game. Under-18s are marked; no contact
- *  details. */
+ *  details. Sign-ups show which link they came from (signup-source.md). */
 import React, { useCallback, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -17,6 +17,7 @@ import { isSupport } from '../core/roles';
 import { usageTiles, type Tile } from '../core/usageKpis';
 import { getUsageDashboard, getUsagePeople, type UsageDashboard, type UsageGame, type UsageKind, type UsagePerson } from '../data/usage';
 import { getSportMeta } from '../sports/sportMeta';
+import { sourceLabel } from '../core/signupSource';
 import type { SportId } from '../core/types';
 import type { RootStackParamList } from '../navigation/types';
 
@@ -130,7 +131,8 @@ export default function UsageDashboardScreen() {
                   const line = list === 'active'
                     ? `last seen ${when(p.last_seen)} · ${p.opens ?? 0} opens`
                     : [`joined ${when(p.joined)}`, p.city, (p.sports ?? []).map((s) => getSportMeta(s as SportId)?.icon ?? '').join(' '),
-                      p.phone_verified ? '📱 verified' : 'phone not verified', `${p.games ?? 0} games`].filter(Boolean).join(' · ');
+                      p.phone_verified ? '📱 verified' : 'phone not verified', plural(p.games, 'game'),
+                      `from: ${sourceLabel(p.source)}${p.source_detail ? ` (${p.source_detail})` : ''}`].filter(Boolean).join(' · ');
                   return (
                     <TouchableOpacity key={p.player_id ?? `${p.name}-${i}`} accessibilityRole="button" style={st.row} disabled={!p.player_id}
                       onPress={() => p.player_id && nav.navigate('PlayerProfile', { playerId: p.player_id })}>
@@ -139,6 +141,15 @@ export default function UsageDashboardScreen() {
                     </TouchableOpacity>
                   );
                 })}
+              </Card>
+            ) : null}
+
+            {data.by_source ? (
+              <Card style={st.list}>
+                <Text style={textStyles.h3}>Where sign-ups came from · last 4 weeks</Text>
+                {data.by_source.length ? data.by_source.map((x) => (
+                  <Text key={x.kind} style={textStyles.body}>{sourceLabel(x.kind)} · {x.signups}</Text>
+                )) : <Text style={textStyles.muted}>No sign-ups yet.</Text>}
               </Card>
             ) : null}
 

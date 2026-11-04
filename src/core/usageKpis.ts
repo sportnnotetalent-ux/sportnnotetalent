@@ -6,6 +6,8 @@ export interface UsageWeek {
   week: string; games_scored: number; active_users: number; sign_ups: number; cohort: number; activated: number;
   started: number; finished: number; shares: number; game_views: number; prev_signups: number; retained: number;
   sessions: number; crashed: number;
+  /** sign-ups that came from a shared link (record_signup_source) */
+  from_links?: number;
 }
 
 export type TileKey = 'games' | 'wau' | 'signups' | 'activation' | 'finish' | 'shares' | 'retention' | 'crashfree';
@@ -35,7 +37,9 @@ export function usageTiles(weeks: readonly Partial<UsageWeek>[]): Tile[] {
     { key: 'signups', label: 'New sign-ups', list: 'signups', ...count((x) => num(x.sign_ups)) },
     { key: 'activation', label: 'Activation', list: 'inactive', note: 'First game within 7 days — of sign-ups who share usage data', ...ratio((x) => rate(num(x.activated), num(x.cohort))) },
     { key: 'finish', label: 'Games finished', note: 'Of games started this week', ...ratio((x) => rate(num(x.finished), num(x.started))) },
-    { key: 'shares', label: 'Links shared → game views', value: `${num(cur.shares)} → ${num(cur.game_views)}`, trend: series((x) => num(x.game_views)), delta: null, note: 'Who signed up from a link isn’t recorded yet' },
+    { key: 'shares', label: 'Links shared → views → sign-ups', value: `${num(cur.shares)} → ${num(cur.game_views)} → ${num(cur.from_links)}`,
+      trend: series((x) => num(x.from_links)), delta: null,
+      note: num(cur.sign_ups) > 0 ? `${num(cur.from_links)} of ${num(cur.sign_ups)} sign-ups came from a link` : 'No sign-ups this week' },
     { key: 'retention', label: '1-week retention', note: 'Last week’s sign-ups active this week (who share usage data)', ...ratio((x) => rate(num(x.retained), num(x.prev_signups))) },
     { key: 'crashfree', label: 'Crash-free sessions', ...ratio((x) => { const r = rate(num(x.sessions) - num(x.crashed), num(x.sessions)); return r; }) },
   ];

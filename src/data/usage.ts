@@ -6,8 +6,12 @@ import { demo } from './demoStore';
 import type { UsageWeek } from '../core/usageKpis';
 
 export type UsageKind = 'signups' | 'inactive' | 'games' | 'active';
-export interface UsageDashboard { weeks: UsageWeek[]; by_sport: { sport: string; games: number }[]; today: Record<string, number> }
-export type UsagePerson = { player_id?: string; name?: string; joined?: string; city?: string; sports?: string[]; phone_verified?: boolean; minor?: boolean; games?: number; last_seen?: string; opens?: number };
+export interface UsageDashboard { weeks: UsageWeek[]; by_sport: { sport: string; games: number }[]; today: Record<string, number>;
+  /** sign-ups by source, last 4 weeks ('direct' = none recorded); absent before the signup_source migration */
+  by_source?: { kind: string; signups: number }[] }
+export type UsagePerson = { player_id?: string; name?: string; joined?: string; city?: string; sports?: string[]; phone_verified?: boolean; minor?: boolean; games?: number; last_seen?: string; opens?: number;
+  /** the link they signed up from (core/signupSource.ts kinds) and which one, when kept */
+  source?: string | null; source_detail?: string | null };
 export type UsageGame = { match_id: string; sport: string; home?: string; away?: string; at?: string; steps?: number; tournament?: string };
 
 const errText = (m: string) => (/not_allowed/.test(m) ? 'Only SportnNote support can see usage.'
@@ -20,9 +24,10 @@ export async function getUsageDashboard(weeks = 8): Promise<UsageDashboard> {
     for (const m of done) sports.set(m.sport, (sports.get(m.sport) ?? 0) + 1);
     const wk = (i: number): UsageWeek => ({ week: new Date(Date.now() - i * 7 * 864e5).toISOString().slice(0, 10), games_scored: Math.max(0, done.length - i * 3),
       active_users: Math.max(0, demo.players.length - i * 4), sign_ups: Math.max(0, 6 - i), cohort: 4, activated: 3, started: 10, finished: 8,
-      shares: 5, game_views: 22, prev_signups: 5, retained: 2, sessions: 40, crashed: i % 3 === 0 ? 1 : 0 });
+      shares: 5, game_views: 22, prev_signups: 5, retained: 2, sessions: 40, crashed: i % 3 === 0 ? 1 : 0, from_links: Math.max(0, 3 - i) });
     return { weeks: Array.from({ length: weeks }, (_, i) => wk(i)), by_sport: [...sports].map(([sport, games]) => ({ sport, games })).sort((a, b) => b.games - a.games),
-      today: { sign_ups: 2, games_scored: 3, active_users: 9, tournaments: 1 } };
+      today: { sign_ups: 2, games_scored: 3, active_users: 9, tournaments: 1 },
+      by_source: [{ kind: 'invite', signups: 5 }, { kind: 'game', signups: 3 }, { kind: 'direct', signups: 2 }, { kind: 'tournament', signups: 1 }] };
   }
   const { data, error } = await supabase.rpc('usage_dashboard', { p_weeks: weeks });
   if (error) throw new Error(errText(error.message));
@@ -34,7 +39,8 @@ export async function getUsagePeople(kind: UsageKind, week?: string): Promise<(U
     if (kind === 'games') return demo.matches.filter((m) => m.status === 'completed').slice(0, 20)
       .map((m) => ({ match_id: m.id, sport: m.sport, home: m.homeTeam.name, away: m.awayTeam.name, at: m.startsAt, steps: 1 }));
     return demo.players.slice(0, 12).map((p, i) => ({ player_id: p.id, name: p.fullName, joined: new Date(Date.now() - i * 864e5).toISOString(),
-      city: p.city, sports: p.sports, phone_verified: !!p.phoneVerified, minor: i % 5 === 0, games: kind === 'inactive' ? 0 : i % 4, last_seen: new Date().toISOString(), opens: 3 + i }));
+      city: p.city, sports: p.sports, phone_verified: !!p.phoneVerified, minor: i % 5 === 0, games: kind === 'inactive' ? 0 : i % 4, last_seen: new Date().toISOString(), opens: 3 + i,
+      source: [null, 'invite', 'game', 'tournament'][i % 4], source_detail: [null, demo.players[0]?.fullName, null, null][i % 4] }));
   }
   const { data, error } = await supabase.rpc('usage_people', { p_kind: kind, p_week: week ?? null });
   if (error) throw new Error(errText(error.message));

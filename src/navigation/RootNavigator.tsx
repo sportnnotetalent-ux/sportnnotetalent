@@ -12,6 +12,7 @@ import { useAuth } from '../core/auth';
 import { listenForNotificationTaps, registerForPush, setCurrentPlayerId } from '../core/notifications';
 import { followStore } from '../data/followStore';
 import { applyPendingReferral } from '../data/referral';
+import { sendSignupSource, watchLandings } from '../data/signupSource';
 import { flushPendingResults } from '../data/pendingResults';
 import { getFollows, getFollowPrefs, savePushToken, getCaptainTeams, getMyPlayerId } from '../data/repos';
 import { captainStore } from '../data/captainStore';
@@ -321,6 +322,11 @@ const legalOpts = ({ route }: { route: { params?: { doc?: string } } }) => ({
 
 export default function RootNavigator() {
   const { authed, loading, profile } = useAuth();
+  const authedRef = useRef(authed);
+  authedRef.current = authed;
+
+  // Sign-up source: remember the link a signed-out visitor opened (data/signupSource.ts).
+  useEffect(() => (IS_OVERLAY ? undefined : watchLandings(() => authedRef.current)), []);
 
   // On sign-in: load existing follows into the store and register for push.
   useEffect(() => {
@@ -330,6 +336,8 @@ export default function RootNavigator() {
       // opened a friend's invite before signing up: follow them now (data/referral.ts)
       .then(() => (profile?.id ? applyPendingReferral(profile.id) : null))
       .catch(() => undefined);
+    // a new account: record which link it came from (once; the server ignores old accounts)
+    void sendSignupSource();
     // a tapped push with an in-app link opens that screen (e.g. a friend who joined)
     void listenForNotificationTaps((url) => { void Linking.openURL(url); });
     getCaptainTeams(profile?.id).then((ids) => captainStore.hydrate(ids));
