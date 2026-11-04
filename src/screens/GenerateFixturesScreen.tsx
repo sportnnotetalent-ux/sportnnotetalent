@@ -25,7 +25,7 @@ import { TIE_SPORTS, TIE_POINTS, tournamentTieSpec, type TieSpec } from '../data
 import { structureFromFormat, mergeStructure, structureFieldFor, type StructureConfig } from '../data/structureConfig';
 import { defaultsFor } from '../components/FormatEditor';
 import { matchFormatFor } from '../data/matchFormat';
-import { roundRobin, knockoutFirstRound, groupStage, drawGroups, type GeneratedPairing } from '../data/fixtures';
+import { roundRobin, knockoutFirstRound, groupStage, assignGroups, groupsProblem, type GeneratedPairing } from '../data/fixtures';
 import { swissRound1, swissPairRound, suggestedSwissRounds } from '../data/swiss';
 import { swissField } from '../data/swissField';
 import { swissOpsOf, swissOpsPatch, unavailableIn, roundStatusText, swissRoundComplete, type SwissOps } from '../data/swissOps';
@@ -98,6 +98,8 @@ export default function GenerateFixturesScreen() {
   }, [teams, tourMatches]);
 
   const [selected, setSelected] = useState<string[]>([]);
+  // CG1: the organiser's group for a team (0 = A); the rest are dealt alternately
+  const [chosenGroup, setChosenGroup] = useState<Record<string, number>>({});
   // Once the organizer edits the selection we stop auto-seeding it from the
   // registered participants (so a background refetch can't clobber their edits).
   const [touchedSel, setTouchedSel] = useState(false);
@@ -205,17 +207,19 @@ export default function GenerateFixturesScreen() {
   }, [divParticipants, touchedSel]);
 
   const invalidate = () => setDrafts(null);
-  const pickSport = (s: SportId) => { setSport(s); setSelected([]); setTouchedSel(false); setManualAdvance(false); setManualSel([]); setPlayIn(false); setAdvanceTo('knockout'); invalidate(); };
-  const pickCategory = (id: string) => { setActiveCat(id); setSelected([]); setTouchedSel(false); setManualAdvance(false); setManualSel([]); invalidate(); };
+  const pickSport = (s: SportId) => { setSport(s); setSelected([]); setChosenGroup({}); setTouchedSel(false); setManualAdvance(false); setManualSel([]); setPlayIn(false); setAdvanceTo('knockout'); invalidate(); };
+  const pickCategory = (id: string) => { setActiveCat(id); setSelected([]); setChosenGroup({}); setTouchedSel(false); setManualAdvance(false); setManualSel([]); invalidate(); };
   const toggleTeam = (id: string) => { invalidate(); setTouchedSel(true); setSelected((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id])); };
   const allSelected = pickTeams.length > 0 && selected.length === pickTeams.length;
 
   const groupCount = Math.max(2, Math.min(parseInt(numGroups, 10) || 2, Math.floor(selected.length / 2) || 2));
-  // Preview the group split (sizes) once enough teams are picked.
-  const groupSizes = useMemo(
-    () => (structure === 'groups' && selected.length >= 2 ? drawGroups(selected, groupCount).map((g) => g.teamIds.length) : []),
-    [structure, selected, groupCount],
+  // The groups as they stand (the organiser's choices, the rest dealt alternately).
+  const groupsNow = useMemo(
+    () => (structure === 'groups' && selected.length >= 2 ? assignGroups(selected, groupCount, chosenGroup) : []),
+    [structure, selected, groupCount, chosenGroup],
   );
+  const groupSizes = groupsNow.map((g) => g.teamIds.length);
+  const groupOfTeam = new Map(groupsNow.flatMap((g, gi) => g.teamIds.map((id) => [id, gi] as const)));
 
   // ── Advance: derive qualifiers from a finished phase — the group stage, or a
   //    Super round-robin phase (Super Four/Six) if one exists. Offered once the
@@ -359,6 +363,10 @@ export default function GenerateFixturesScreen() {
   const setPlaced = (ds: Draft[] | null) => setDrafts(ds && timing === 'weekly' ? placeWeekly(ds) : (setWeekNote(null), ds));
 
   function generate() {
+    if (structure === 'groups') {
+      const why = groupsProblem(groupsNow);
+      if (why) return setError(why);
+    }
     if (timing === 'weekly') {
       if (!weekdays.length) return setError('Pick at least one match day.');
       if (!readTime(weekTime)) return setError('Type the kickoff time like 15:30.');
@@ -456,7 +464,7 @@ export default function GenerateFixturesScreen() {
     }
     const pairings: (GeneratedPairing & { group?: string })[] =
       structure === 'knockout' ? knockoutFirstRound(selected)
-        : structure === 'groups' ? groupStage(selected, groupCount, doubleRound)
+        : structure === 'groups' ? groupStage(selected, groupCount, doubleRound, chosenGroup)
         : roundRobin(selected, doubleRound);
     // Tag a plain knockout's round 1 with its stage (r16/qf/…) so the bracket
     // renders it as a real round and can advance winners to the next one.
@@ -671,6 +679,29 @@ export default function GenerateFixturesScreen() {
               <Text style={textStyles.muted}>
                 {selected.length} teams → {groupSizes.length} groups (A–{String.fromCharCode(64 + groupSizes.length)}) of {groupSizes.join(', ')}. Round-robin within each; the top finishers advance to a knockout (from the tournament page) once the groups finish.
               </Text>
+            )}
+            {groupsNow.length > 0 && (
+              <View style={st.groupBox}>
+                <Text style={textStyles.body}>Which group is each team in?</Text>
+                <Text style={textStyles.muted}>Tap a letter to move a team. Teams you don’t move are shared out in turn.</Text>
+                {groupsNow.map((g) => (
+                  <Text key={g.name} style={textStyles.muted}>
+                    <Text style={st.groupPick}>Group {g.name} · {g.teamIds.length}: </Text>{g.teamIds.map((id) => teamName[id] ?? id).join(', ')}
+                  </Text>
+                ))}
+                {selected.map((id) => (
+                  <View key={id} style={st.groupRow}>
+                    <Text style={[textStyles.body, st.flex]} numberOfLines={1}>{teamName[id] ?? id}</Text>
+                    <View style={st.chips}>
+                      {groupsNow.map((g, gi) => (
+                        <SelectChip key={g.name} label={g.name} active={groupOfTeam.get(id) === gi}
+                          accessibilityLabel={`Put ${teamName[id] ?? 'team'} in Group ${g.name}`}
+                          onPress={() => { setChosenGroup((c) => ({ ...c, [id]: gi })); invalidate(); }} />
+                      ))}
+                    </View>
+                  </View>
+                ))}
+              </View>
             )}
           </>
         )}
@@ -954,6 +985,9 @@ const st = StyleSheet.create({
   safe: { flex: 1, backgroundColor: theme.colors.bg },
   content: { padding: theme.spacing(4), gap: theme.spacing(3) },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing(2) },
+  groupBox: { gap: theme.spacing(2), paddingTop: theme.spacing(1) },
+  groupRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(2) },
+  groupPick: { fontWeight: '800', color: theme.colors.text },
   row: { flexDirection: 'row', gap: theme.spacing(3) },
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   flex: { flex: 1 },

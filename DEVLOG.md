@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-06 — Choose each team's group
+
+Founder's real case, Winter Shield (`docs/security/breaks/choose-groups.md`): 8 teams in fixed groups A = 1a–4a, B = 1b–4b, but the fixtures screen dealt teams into groups alternately by pick order, with no way to choose. Auto-generate fixtures → Group stage now lists each group's teams and gives every team group chips (A, B …); untouched teams are still dealt in turn; a group with fewer than 2 teams blocks generating; uneven groups are allowed (`assignGroups`, `groupsProblem` in `src/data/fixtures.ts`). The rest of the flow was already there: top 2 per group, crossed-over semis (A1 v B2, B1 v A2) and the final from the bracket page. Tests: 4 unit, a 600-draw simulation; full suite 7,316 pass, 0 fail; tsc clean; demo checked (four taps → A = 1a–4a, B = 1b–4b, 12 in-group games). No database change.
+
 ### 2026-11-06 — Release: squad sessions v2 live (web, Android OTA)
 
 Founder ran `20261106120000_squad_sessions_v2.sql` (checked read-only: `format` column present, `squad_session_set_format` refused for anon). auth-smoke passed. Published from a clean worktree at 05e4b4e: web (entry `index-6531ce2c`, confirmed live on app.sportnnote.in) and Android OTA groups `0f29036f` (preview) and `08224cbd` (production), runtime 1.0.0.

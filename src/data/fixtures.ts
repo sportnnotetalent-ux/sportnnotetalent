@@ -47,18 +47,36 @@ export interface GroupPairing extends GeneratedPairing { group: string }
  *  (team i → group i % g), so counts stay as even as possible (25/5 → 5·5,
  *  22/4 → 6,6,5,5). Group labels are A, B, C… Returns the teamId list per group. */
 export function drawGroups(teamIds: string[], numGroups: number): { name: string; teamIds: string[] }[] {
+  return assignGroups(teamIds, numGroups);
+}
+
+/** The groups with the organiser's choices (founder 2026-11-06,
+ *  docs/security/breaks/choose-groups.md): `chosen[teamId]` = group index
+ *  (0 = A). A team without a valid choice (missing, not a whole number, a group
+ *  that no longer exists) keeps the default dealing (team i → group i % g). */
+export function assignGroups(teamIds: string[], numGroups: number, chosen: Record<string, number> = {}): { name: string; teamIds: string[] }[] {
   const ids = [...new Set(teamIds)];
   const g = Math.max(1, Math.min(Math.floor(numGroups) || 1, ids.length || 1));
   const groups = Array.from({ length: g }, (_, i) => ({ name: String.fromCharCode(65 + i), teamIds: [] as string[] }));
-  ids.forEach((id, i) => groups[i % g].teamIds.push(id));
+  ids.forEach((id, i) => {
+    const c = chosen[id];
+    const ok = typeof c === 'number' && Number.isInteger(c) && c >= 0 && c < g;
+    groups[ok ? c : i % g].teamIds.push(id);
+  });
   return groups;
+}
+
+/** What stops these groups being played, or null (each needs 2+ teams). */
+export function groupsProblem(groups: { name: string; teamIds: string[] }[]): string | null {
+  const thin = groups.find((x) => x.teamIds.length < 2);
+  return thin ? `Group ${thin.name} needs at least 2 teams.` : null;
 }
 
 /** Group stage = a round-robin *within* each group (not across), every pairing
  *  tagged with its group. Feeds a grouped tournament's league phase. */
-export function groupStage(teamIds: string[], numGroups: number, doubleRound = false): GroupPairing[] {
+export function groupStage(teamIds: string[], numGroups: number, doubleRound = false, chosen: Record<string, number> = {}): GroupPairing[] {
   const out: GroupPairing[] = [];
-  for (const grp of drawGroups(teamIds, numGroups)) {
+  for (const grp of assignGroups(teamIds, numGroups, chosen)) {
     for (const p of roundRobin(grp.teamIds, doubleRound)) out.push({ ...p, group: grp.name });
   }
   return out;
