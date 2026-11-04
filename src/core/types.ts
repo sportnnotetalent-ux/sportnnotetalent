@@ -421,6 +421,8 @@ export interface Team {
   /** created on the fly (e.g. a one-off side for a friendly). De-emphasised in
    *  "Manage teams" so ad-hoc teams don't clutter the real houses/clubs. */
   adhoc?: boolean;
+  /** a SLOT holding a place in this tournament until a team fills it (core/slots) */
+  slotTournamentId?: UUID;
   /** team logo (migration 0042) — absent before it / when unset */
   logoUrl?: string;
   /** A singles / doubles ENTRY (migration entry_names): the players it is named

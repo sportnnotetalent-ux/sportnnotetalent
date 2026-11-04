@@ -31,7 +31,7 @@ import { ClubQuickPick } from '../components/ClubQuickPick';
 import { getSportMeta, participantMode } from '../sports/sportMeta';
 import { useAuth } from '../core/auth';
 import { useTournamentById, useTeams, useTournamentEntries, useTournamentCategories, useLeagueData, useCaptainships } from '../data/hooks';
-import { addTournamentTeams, removeTournamentTeam, createTeam, invitePerson, setTeamLeaders, createInvite, setTournamentTeamStatus, setTournamentTeamCheckIn, getTeamLeaders, enterOrgHousesAsTeams, getLiveTournamentInvite, setTournamentInvite, getTeamsSetup, canManageTeam, getMyPlayerId, getMyEntrant, isNeedsDbUpdate } from '../data/repos';
+import { addTournamentTeams, removeTournamentTeam, createTeam, invitePerson, setTeamLeaders, createInvite, setTournamentTeamStatus, setTournamentTeamCheckIn, getTeamLeaders, enterOrgHousesAsTeams, getLiveTournamentInvite, setTournamentInvite, getTeamsSetup, canManageTeam, getMyPlayerId, getMyEntrant, isNeedsDbUpdate, getTournamentSlotIds, fillTournamentSlot, nameTournamentSlot } from '../data/repos';
 import { filterTeams } from '../core/teamSearch';
 import { tournamentInviteMessage, tournamentJoinLink } from '../core/tournamentInvite';
 import { inviteLabel, playerInviteText } from '../core/inviteText';
@@ -126,6 +126,27 @@ export default function TournamentTeamsScreen() {
   // Confirmed rows: next-step subtitle + which teams I may edit.
   const [setup, setSetup] = useState<Record<string, { hasCaptain: boolean; players: number }>>({});
   const [manageable, setManageable] = useState<Set<string>>(new Set());
+  // Team slots (TS1): open slots, and the one being filled
+  const [slotIds, setSlotIds] = useState<Set<string>>(new Set());
+  const [filling, setFilling] = useState<string | null>(null);
+  const [slotName, setSlotName] = useState('');
+  const [slotQuery, setSlotQuery] = useState('');
+  useEffect(() => {
+    let on = true;
+    getTournamentSlotIds(params.tournamentId).then((ids) => on && setSlotIds(ids)).catch(() => {});
+    return () => { on = false; };
+  }, [params.tournamentId, tick]);
+  async function fillSlot(slotId: string, how: { teamId: string } | { name: string }) {
+    setBusy(true); setError(null);
+    try {
+      if ('teamId' in how) await fillTournamentSlot(slotId, how.teamId);
+      else await nameTournamentSlot(slotId, how.name);
+      setFilling(null); setSlotName(''); setSlotQuery('');
+      setTick((n) => n + 1);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Couldn’t fill the slot.');
+    } finally { setBusy(false); }
+  }
   const { isCaptain } = useCaptainships();
 
   // Seed the selection from what's confirmed in the active division — but only
@@ -560,7 +581,7 @@ export default function TournamentTeamsScreen() {
                   <View style={st.flex1}>
                     <Text style={textStyles.body} numberOfLines={1}>{e.checkedInAt ? '✅ ' : ''}{teamLabel(e.team)}</Text>
                     {qualifiedBadge(e, feeders) ? <Text style={textStyles.muted} numberOfLines={1}>{qualifiedBadge(e, feeders)}</Text> : null}
-                    {pMode === 'team' && (() => {
+                    {pMode === 'team' && !slotIds.has(e.team.id) && (() => {
                       const s = setup[e.team.id];
                       const next = !s ? null : !s.hasCaptain ? 'No captain yet' : s.players === 0 ? 'No players yet' : null;
                       return next || manageable.has(e.team.id) ? (
@@ -573,10 +594,41 @@ export default function TournamentTeamsScreen() {
                       ) : null;
                     })()}
                   </View>
-                  <SelectChip label={e.checkedInAt ? 'Checked in' : 'Check in'} active={!!e.checkedInAt} onPress={() => void toggleCheckIn(e)} />
-                  <Button label="Withdraw" variant="ghost" onPress={() => changeStatus(e, 'withdrawn')} disabled={busy} />
+                  {slotIds.has(e.team.id) ? (
+                    <Button label={filling === e.team.id ? 'Close' : 'Fill slot'} variant="ghost" disabled={busy}
+                      onPress={() => { setFilling((f) => (f === e.team.id ? null : e.team.id)); setSlotName(''); setSlotQuery(''); }} />
+                  ) : (
+                    <>
+                      <SelectChip label={e.checkedInAt ? 'Checked in' : 'Check in'} active={!!e.checkedInAt} onPress={() => void toggleCheckIn(e)} />
+                      <Button label="Withdraw" variant="ghost" onPress={() => changeStatus(e, 'withdrawn')} disabled={busy} />
+                    </>
+                  )}
                 </View>
-              ))}
+              )).flatMap((row, i) => {
+                const e = confirmedInScope[i];
+                if (!slotIds.has(e.team.id)) return [row];
+                const q = slotQuery.trim().toLowerCase();
+                const entered = new Set(entries.map((x) => x.team.id));
+                const found = q.length >= 2 ? allTeams.filter((t) => !t.adhoc && !slotIds.has(t.id) && !entered.has(t.id) && t.name.toLowerCase().includes(q)).slice(0, 12) : [];
+                return [
+                  row,
+                  <Text key={`${e.team.id}-slot`} style={textStyles.muted}>Slot · waiting for a team — its fixtures are already made.</Text>,
+                  filling === e.team.id ? (
+                    <View key={`${e.team.id}-fill`} style={st.slotBox}>
+                      <TextField label="A new team: its name" value={slotName} onChange={setSlotName} placeholder="e.g. Falcons FC" autoCapitalize="words" />
+                      <Button label={`Put “${slotName.trim() || 'this team'}” in ${e.team.name}`} disabled={busy || !slotName.trim()}
+                        onPress={() => void fillSlot(e.team.id, { name: slotName })} />
+                      <TextField label="Or a team already on SportnNote" value={slotQuery} onChange={setSlotQuery} placeholder="Search by name" autoCapitalize="none" />
+                      {q.length >= 2 && !found.length ? <Text style={textStyles.muted}>No team by that name in this sport.</Text> : null}
+                      <View style={st.slotChips}>
+                        {found.map((t) => (
+                          <SelectChip key={t.id} label={t.name} active={false} disabled={busy} onPress={() => void fillSlot(e.team.id, { teamId: t.id })} />
+                        ))}
+                      </View>
+                    </View>
+                  ) : null,
+                ];
+              })}
             </Card>
           )}
 
@@ -741,6 +793,8 @@ export default function TournamentTeamsScreen() {
 }
 
 const st = StyleSheet.create({
+  slotBox: { gap: theme.spacing(2), paddingVertical: theme.spacing(1) },
+  slotChips: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing(2) },
   safe: { flex: 1, backgroundColor: theme.colors.bg },
   content: { padding: theme.spacing(4), gap: theme.spacing(3) },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing(2) },

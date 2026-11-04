@@ -20,7 +20,8 @@ import { defaultsFor } from '../components/FormatEditor';
 import { withNewTournamentPoints } from '../data/standings';
 import { regionFormatDefaults } from '../core/units';
 import { regionStore } from '../core/region';
-import { addTournamentTeams, createTeam, createTournament, getMyPlayerId, getPlayer } from '../data/repos';
+import { addTournamentTeams, createTeam, createTournament, createTournamentSlots, getMyPlayerId, getPlayer } from '../data/repos';
+import { slotNames } from '../core/slots';
 import { getMyPersonalisation } from '../data/personalise';
 import { useAuth } from '../core/auth';
 import { notice } from '../core/confirm';
@@ -62,6 +63,9 @@ export default function QuickTournamentScreen() {
   const [homeCity, setHomeCity] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Teams not known yet (TS1): fixtures between slots (A1…, B1… / Team 1…), filled in later
+  const [slotMode, setSlotMode] = useState(false);
+  const [slotCount, setSlotCount] = useState('8');
 
   // The sport a person most likely means: the route's, else the last friendly's, else their first.
   useEffect(() => {
@@ -81,11 +85,17 @@ export default function QuickTournamentScreen() {
   }, [params?.sport]);
 
   const meta = sport ? getSportMeta(sport) : null;
-  const entrants = useMemo(() => parseEntrantList(list), [list]);
+  const typed = useMemo(() => parseEntrantList(list), [list]);
+  const slotN = Math.max(0, Math.min(128, parseInt(slotCount, 10) || 0));
   const noun = meta?.participantKind === 'individual' ? 'players' : meta?.participantKind === 'both' ? 'players or pairs' : 'teams';
   // Suggested name and format until the organiser changes them.
   useEffect(() => { if (meta && !nameTouched.current) setName(quickName(meta.name, new Date())); }, [meta]);
-  const fmt: QuickFormat | null = chosenFmt ?? suggestFormat(entrants.length);
+  const fmt: QuickFormat | null = chosenFmt ?? suggestFormat(slotMode ? slotN : typed.length);
+  // the entrants: typed names, or slots named by their group when the teams aren't known yet
+  const entrants = useMemo(
+    () => (slotMode ? (slotN >= 2 ? slotNames(slotN, fmt === 'groups' ? groupCount(slotN) : 0) : []) : typed),
+    [slotMode, slotN, fmt, typed],
+  );
 
   const chips = useMemo(() => {
     const lead = [...new Set<SportId>([...mine, ...(sport ? [sport] : []), ...MVP_SPORTS])];
@@ -118,13 +128,18 @@ export default function QuickTournamentScreen() {
         city: homeCity,
       });
       createdId = created.id;
-      const ids: string[] = [];
-      for (let i = 0; i < entrants.length; i++) {
-        setBusy(`Adding ${noun} ${i + 1} of ${entrants.length}…`);
-        const t = await createTeam({ name: entrants[i], shortName: shortFrom(entrants[i]), sport, colorHex: PALETTE[i % PALETTE.length], adhoc: true });
-        ids.push(t.id);
+      if (slotMode) {
+        setBusy(`Making ${entrants.length} slots…`);
+        await createTournamentSlots(created.id, sport, entrants);
+      } else {
+        const ids: string[] = [];
+        for (let i = 0; i < entrants.length; i++) {
+          setBusy(`Adding ${noun} ${i + 1} of ${entrants.length}…`);
+          const t = await createTeam({ name: entrants[i], shortName: shortFrom(entrants[i]), sport, colorHex: PALETTE[i % PALETTE.length], adhoc: true });
+          ids.push(t.id);
+        }
+        await addTournamentTeams(created.id, ids, 'confirmed');
       }
-      await addTournamentTeams(created.id, ids, 'confirmed');
       void AsyncStorage.setItem(LAST_SPORT_KEY, sport).catch(() => {});
       // The tournament page underneath, so making the fixtures lands on it.
       nav.replace('Tournament', { tournamentId: created.id });
@@ -175,9 +190,25 @@ export default function QuickTournamentScreen() {
           <TextField label="Name" value={name} onChange={(v) => { nameTouched.current = true; setName(v); }} placeholder="e.g. Sunday Turf Cup" autoCapitalize="words" />
 
           <View style={st.block}>
-            <TextField label={`The ${noun}, one per line`} value={list} onChange={setList} multiline
-              placeholder={'Paste from WhatsApp:\nLions\nTigers\nPanthers\nCheetahs'} />
-            <Text style={textStyles.muted}>{summary}. Players can be added to each later.</Text>
+            <View style={st.chips}>
+              <SelectChip label={`I have the ${noun}`} active={!slotMode} onPress={() => setSlotMode(false)} />
+              <SelectChip label={`${noun[0].toUpperCase()}${noun.slice(1)} not known yet`} active={slotMode} onPress={() => setSlotMode(true)} />
+            </View>
+            {slotMode ? (
+              <>
+                <TextField label={`How many ${noun}?`} value={slotCount} onChange={(v) => setSlotCount(v.replace(/[^0-9]/g, '').slice(0, 3))} />
+                <Text style={textStyles.muted}>
+                  {entrants.length >= 2 ? `Slots ${entrants[0]} … ${entrants[entrants.length - 1]}. ` : ''}The fixtures are made between the slots; when a team comes in, open the tournament’s teams and fill its slot.
+                </Text>
+                <Text style={textStyles.muted}>{summary}.</Text>
+              </>
+            ) : (
+              <>
+                <TextField label={`The ${noun}, one per line`} value={list} onChange={setList} multiline
+                  placeholder={'Paste from WhatsApp:\nLions\nTigers\nPanthers\nCheetahs'} />
+                <Text style={textStyles.muted}>{summary}. Players can be added to each later.</Text>
+              </>
+            )}
           </View>
 
           <View style={st.block}>

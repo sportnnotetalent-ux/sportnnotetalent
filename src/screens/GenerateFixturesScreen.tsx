@@ -19,13 +19,14 @@ import { defaultKickoff, quickKickoff, weeklyTimes, parseSkipDates, readTime, da
 import { getSportMeta } from '../sports/sportMeta';
 import { useTeams, useTournamentById, useLeagueData, useTournamentTeams, useDivisions } from '../data/hooks';
 import { DivisionTabs } from '../components/DivisionTabs';
-import { createMatch, createTeamTie, getMyPlayerId, updateTournament, patchTournamentFormat, formatDiff } from '../data/repos';
+import { createMatch, createTeamTie, createTournamentSlots, getMyPlayerId, updateTournament, patchTournamentFormat, formatDiff } from '../data/repos';
 import { TieSetup } from '../components/TieSetup';
 import { TIE_SPORTS, TIE_POINTS, tournamentTieSpec, type TieSpec } from '../data/teamTie';
 import { structureFromFormat, mergeStructure, structureFieldFor, type StructureConfig } from '../data/structureConfig';
 import { defaultsFor } from '../components/FormatEditor';
 import { matchFormatFor } from '../data/matchFormat';
 import { roundRobin, knockoutFirstRound, groupStage, assignGroups, groupsProblem, type GeneratedPairing } from '../data/fixtures';
+import { slotNames, groupFromSlotName } from '../core/slots';
 import { swissRound1, swissPairRound, suggestedSwissRounds } from '../data/swiss';
 import { swissField } from '../data/swissField';
 import { swissOpsOf, swissOpsPatch, unavailableIn, roundStatusText, swissRoundComplete, type SwissOps } from '../data/swissOps';
@@ -100,6 +101,21 @@ export default function GenerateFixturesScreen() {
   const [selected, setSelected] = useState<string[]>([]);
   // CG1: the organiser's group for a team (0 = A); the rest are dealt alternately
   const [chosenGroup, setChosenGroup] = useState<Record<string, number>>({});
+  // TS1: slots when the teams aren't known yet
+  const [slotCount, setSlotCount] = useState('8');
+  const [slotGroups, setSlotGroups] = useState('2');
+  const [slotBusy, setSlotBusy] = useState(false);
+  const slotPreview = slotNames(parseInt(slotCount, 10) || 0, parseInt(slotGroups, 10) || 0);
+  async function makeSlots() {
+    setSlotBusy(true); setError(null);
+    try {
+      await createTournamentSlots(params.tournamentId, sport, slotPreview);
+      const g = parseInt(slotGroups, 10) || 0;
+      nav.replace('GenerateFixtures', { ...params, sport, ...(g >= 2 ? { structure: 'groups' as const, groups: g } : {}) });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Couldn’t make the slots.');
+    } finally { setSlotBusy(false); }
+  }
   // Once the organizer edits the selection we stop auto-seeding it from the
   // registered participants (so a background refetch can't clobber their edits).
   const [touchedSel, setTouchedSel] = useState(false);
@@ -215,8 +231,14 @@ export default function GenerateFixturesScreen() {
   const groupCount = Math.max(2, Math.min(parseInt(numGroups, 10) || 2, Math.floor(selected.length / 2) || 2));
   // The groups as they stand (the organiser's choices, the rest dealt alternately).
   const groupsNow = useMemo(
-    () => (structure === 'groups' && selected.length >= 2 ? assignGroups(selected, groupCount, chosenGroup) : []),
-    [structure, selected, groupCount, chosenGroup],
+    () => {
+      if (structure !== 'groups' || selected.length < 2) return [];
+      // TS2: a slot named A1… starts in Group A (the organiser's own choice wins)
+      const fromSlots: Record<string, number> = {};
+      for (const id of selected) { const gi = groupFromSlotName(teamName[id] ?? '', groupCount); if (gi !== undefined) fromSlots[id] = gi; }
+      return assignGroups(selected, groupCount, { ...fromSlots, ...chosenGroup });
+    },
+    [structure, selected, groupCount, chosenGroup, teamName],
   );
   const groupSizes = groupsNow.map((g) => g.teamIds.length);
   const groupOfTeam = new Map(groupsNow.flatMap((g, gi) => g.teamIds.map((id) => [id, gi] as const)));
@@ -464,7 +486,7 @@ export default function GenerateFixturesScreen() {
     }
     const pairings: (GeneratedPairing & { group?: string })[] =
       structure === 'knockout' ? knockoutFirstRound(selected)
-        : structure === 'groups' ? groupStage(selected, groupCount, doubleRound, chosenGroup)
+        : structure === 'groups' ? groupStage(selected, groupCount, doubleRound, Object.fromEntries(groupsNow.flatMap((g, gi) => g.teamIds.map((id) => [id, gi]))))
         : roundRobin(selected, doubleRound);
     // Tag a plain knockout's round 1 with its stage (r16/qf/…) so the bracket
     // renders it as a real round and can advance winners to the next one.
@@ -572,6 +594,17 @@ export default function GenerateFixturesScreen() {
           <View style={{ gap: theme.spacing(2) }}>
             <EmptyState icon="👥" title="Add at least 2 teams first" hint="Fixtures are drawn from this tournament's participating teams." compact />
             <Button label="Add teams" onPress={() => nav.navigate('TournamentTeams', { tournamentId: params.tournamentId })} />
+            {/* TS1: fixtures first — slots now, teams slotted in later */}
+            <View style={st.groupBox}>
+              <Text style={textStyles.body}>Teams not known yet?</Text>
+              <Text style={textStyles.muted}>Make slots and the fixtures now; fill each slot when its team comes in (Participating teams → Fill slot).</Text>
+              <View style={st.row}>
+                <View style={st.flex}><TextField label="How many teams?" value={slotCount} onChange={(t) => setSlotCount(t.replace(/[^0-9]/g, '').slice(0, 3))} autoCapitalize="none" /></View>
+                <View style={st.flex}><TextField label="Groups (0 = none)" value={slotGroups} onChange={(t) => setSlotGroups(t.replace(/[^0-9]/g, '').slice(0, 2))} autoCapitalize="none" /></View>
+              </View>
+              <Text style={textStyles.muted}>Slots: {slotPreview.slice(0, 4).join(', ')}{slotPreview.length > 4 ? ` … ${slotPreview[slotPreview.length - 1]}` : ''}</Text>
+              <Button label={slotBusy ? 'Making slots…' : `Make ${slotPreview.length} slots`} variant="ghost" disabled={slotBusy} onPress={() => void makeSlots()} />
+            </View>
           </View>
         )}
 

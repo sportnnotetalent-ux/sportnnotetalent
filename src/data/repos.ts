@@ -6451,6 +6451,79 @@ export async function removeTournamentTeam(tournamentId: string, teamId: string)
   }
 }
 
+/* ---------------- Team slots: fixtures first, teams later ----------------- */
+// docs/security/breaks/team-slots.md; migration 20261106130000_team_slots.sql.
+
+const slotError = (e: { message?: string } | null): Error => {
+  const m = e?.message ?? '';
+  const map: [RegExp, string][] = [
+    [/not_allowed/, 'Only this tournament’s organisers can do that.'],
+    [/already_entered/, 'That team is already in this tournament.'],
+    [/wrong_team/, 'Pick a team of this sport (not another slot).'],
+    [/slot_started/, 'One of this slot’s games has started — it can’t be swapped now.'],
+    [/bad_name/, 'Type the team’s name (up to 60 letters).'],
+    [/bad_slots/, 'Between 2 and 128 slots, each with a name.'],
+    [/does not exist|schema cache/, 'Team slots need a database update. Ask the SportnNote team.'],
+  ];
+  return new Error(map.find(([re]) => re.test(m))?.[1] ?? 'Couldn’t save that — try again.');
+};
+
+/** Make `names` slots in a tournament (entered, ready for fixtures). */
+export async function createTournamentSlots(tournamentId: string, sport: SportId, names: string[]): Promise<string[]> {
+  if (!isSupabaseConfigured || !supabase) {
+    const ids = names.map((n) => addTeam({ name: n, shortName: n.slice(0, 6), sport, adhoc: true, slotTournamentId: tournamentId } as Omit<Team, 'id'>).id);
+    addTournamentTeamsDemo(tournamentId, ids, 'confirmed');
+    return ids;
+  }
+  const { data, error } = await supabase.rpc('create_tournament_slots', { p_tournament: tournamentId, p_sport: sport, p_names: names });
+  if (error) throw slotError(error);
+  return (data as string[]) ?? [];
+}
+
+/** The slots still open in a tournament. */
+export async function getTournamentSlotIds(tournamentId: string): Promise<Set<string>> {
+  if (!isSupabaseConfigured || !supabase) return new Set(demo.teams.filter((t) => t.slotTournamentId === tournamentId).map((t) => t.id));
+  const { data, error } = await supabase.from('teams').select('id').eq('slot_tournament_id', tournamentId).limit(500);
+  if (error) return new Set();
+  return new Set(((data ?? []) as { id: string }[]).map((r) => r.id));
+}
+
+/** A team already on SportnNote takes the slot's place in this tournament. */
+export async function fillTournamentSlot(slotId: string, teamId: string): Promise<void> {
+  if (!isSupabaseConfigured || !supabase) {
+    const slot = demo.teams.find((t) => t.id === slotId);
+    const team = demo.teams.find((t) => t.id === teamId);
+    const tid = slot?.slotTournamentId;
+    if (!slot || !tid) throw new Error('That isn’t a slot.');
+    if (!team || team.slotTournamentId || team.sport !== slot.sport) throw new Error('Pick a team of this sport (not another slot).');
+    if (demo.tournamentTeams.some((r) => r.tournamentId === tid && r.teamId === teamId)) throw new Error('That team is already in this tournament.');
+    const games = demo.matches.filter((m) => m.tournamentId === tid && (m.homeTeam.id === slotId || m.awayTeam.id === slotId));
+    if (games.some((m) => m.status === 'live' || m.status === 'completed')) throw new Error('One of this slot’s games has started — it can’t be swapped now.');
+    for (const m of games) { if (m.homeTeam.id === slotId) m.homeTeam = team; if (m.awayTeam.id === slotId) m.awayTeam = team; }
+    const entry = demo.tournamentTeams.find((r) => r.tournamentId === tid && r.teamId === slotId);
+    if (entry) entry.teamId = teamId;
+    demo.teams = demo.teams.filter((t) => t.id !== slotId);
+    return;
+  }
+  const { error } = await supabase.rpc('fill_tournament_slot', { p_slot: slotId, p_team: teamId });
+  if (error) throw slotError(error);
+}
+
+/** A brand-new team: the slot becomes it (same games). */
+export async function nameTournamentSlot(slotId: string, name: string, shortName?: string): Promise<void> {
+  const nm = name.trim();
+  if (!nm || nm.length > 60) throw new Error('Type the team’s name (up to 60 letters).');
+  if (!isSupabaseConfigured || !supabase) {
+    const slot = demo.teams.find((t) => t.id === slotId);
+    if (!slot?.slotTournamentId) throw new Error('That isn’t a slot.');
+    slot.name = nm; slot.shortName = (shortName?.trim() || nm.slice(0, 3)).toUpperCase(); slot.adhoc = false; slot.slotTournamentId = undefined;
+    for (const m of demo.matches) { if (m.homeTeam.id === slotId) m.homeTeam = slot; if (m.awayTeam.id === slotId) m.awayTeam = slot; }
+    return;
+  }
+  const { error } = await supabase.rpc('name_tournament_slot', { p_slot: slotId, p_name: nm, p_short: shortName?.trim() || null });
+  if (error) throw slotError(error);
+}
+
 /* ---------------------- Tournament join link (parity #10) ------------------ */
 // One link per tournament (`T-XXXXXX`, migration 0042). While ON, a team's
 // manager enters their team with it and the entry is confirmed at once.
