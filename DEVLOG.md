@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-08 — Volleyball: FIVB 2025–2028 rotation faults (receiving team only)
+
+Audited against the FIVB Official Volleyball Rules 2025–2028 (`docs/sport-expert/volleyball-rulebook.md`). VB-1: only the receiving team can make a positional fault at the serve, so the "Rotation" fault chip is offered only when the team that erred was receiving. Tests: 3 unit; volleyball suite green. No database change.
+
 ### 2026-11-09 — Scoring: one score bar with who’s in play (UI audit step 1)
 
 From the UI audit (`docs/design/ui-audit.md`, 41 findings; design system page https://claude.ai/artifact/HKMekuw3Am4h7KYDCdwUGg). Break-it: `docs/security/breaks/score-bar.md`. The Scoring tab now has one shared score bar for every sport, fixed above the scroll area so it never scrolls away while you tap: the status line (and clock), each side’s full name in ink with a colour dot (team colours no longer used as text — yellow and pale green were unreadable), its score, the side or player in play in a lime band, and "Last: …" with a short flash on the side whose score changed (none with reduce-motion). Who’s in play: pool ("Rohan Nair at the table", "… to break"), snooker and billiards (the doubles rotation), badminton ("Diya Rao serving", BWF doubles rotation); other sports show the bar without the player line until their own `inPlay` is added. It replaces the tall cue-sports card and the old MiniScore on the Scoring tab; the other tabs keep their boards. Pair sports show the players’ (privacy-masked) names. Tests: 10 unit (real engines), a 600-match simulation, guards updated; full suite green (basketball-deep flaked under load, passes alone); tsc clean; demo checked on pool doubles (band moves Rohan Nair → Rohan Bhatt after a miss), badminton and football. No database change.

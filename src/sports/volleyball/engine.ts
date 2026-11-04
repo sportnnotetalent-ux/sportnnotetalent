@@ -186,6 +186,11 @@ export const VB_ERROR_TYPES: Array<{ key: string; label: string }> = [
   // meaning (a block error); the ball off the block and out is the attacker's kill.
   { key: 'blockout', label: 'Block fault (net / over / blocked a serve)' },
 ];
+/** FIVB Rules 2025–2028 (volleyball-rulebook.md VB-1): only the RECEIVING team
+ *  can make a positional (rotation) fault at the serve. `winnerServing`: the
+ *  point winner served (so the erring side was receiving); null = unknown. */
+export const vbErrorTypesFor = (winnerServing: boolean | null) =>
+  winnerServing === false ? VB_ERROR_TYPES.filter((t) => t.key !== 'rotation') : VB_ERROR_TYPES;
 /** court-team batch 1 — shown under the fault chips (FIVB: a ball off the
  *  block and out is an attack kill, not a blocking error). */
 export const VB_BLOCK_HINT = 'Ball off the block and out = ⚡ Attack point (the attacker’s kill), not a fault.';
