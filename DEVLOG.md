@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-06 — Release: player / pair picking live (web, Android OTA)
+
+auth-smoke passed. Published from a clean worktree at 1770748: web (entry `index-5ae74f2f`, confirmed live on app.sportnnote.in) and Android OTA groups `ab4c1485` (preview) and `ae717031` (production), runtime 1.0.0. No database change.
+
 ### 2026-11-06 — Pick a tournament's players and pairs
 
 Follow-on for sports played by individuals or pairs (`docs/security/breaks/pick-tournament-players.md`): Quick tournament no longer takes a typed list at all. **Singles / Doubles (pairs)** for sports played either way (sets the tournament's players a side); players or both partners are picked with the people picker (name or mobile, "Me" one tap); nobody is entered twice, alone or in a pair ("Diya Rao is already in."); each entry reuses that person's / pair's own record in the sport (`sideForEntrants`, first person captain when a new entry is made); "Pairs / Players not known yet" adds slots. The count reads "1 pair" / "2 players". `src/core/entryPick.ts`. Two older tests updated: Quick tournament no longer creates a team per typed name. Tests: 3 unit + a 600-organiser simulation; full suite 7,345 pass, 0 fail; tsc clean; demo checked (badminton doubles: Me + Diya, Diya refused again, + 1 not known → "Aarav Mehta / Diya Rao vs Slot 1"). No database change.
