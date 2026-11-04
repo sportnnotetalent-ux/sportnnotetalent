@@ -15,7 +15,7 @@ import { useAuth } from '../core/auth';
 import { useFollow } from '../data/hooks';
 import { getMyScope, getTournaments } from '../data/repos';
 import { getSportMeta } from '../sports/sportMeta';
-import { formatDayShort } from '../core/dates';
+import { formatDayShort, formatDayRange } from '../core/dates';
 import { todayIn, useUserTimeZone } from '../core/time';
 import type { Tournament } from '../core/types';
 import type { RootStackParamList } from '../navigation/types';
@@ -86,7 +86,7 @@ export default function MyTournamentsScreen() {
                 <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Open ${t.name}`} onPress={() => nav.navigate('Tournament', { tournamentId: t.id })}>
                   <Card style={{ gap: theme.spacing(1) }}>
                     <Text style={textStyles.body}>{t.name}</Text>
-                    <SportLine sports={t.sports}>{formatDayShort(t.startDate)} → {formatDayShort(t.endDate)}</SportLine>
+                    <SportLine sports={t.sports}>{formatDayRange(t.startDate, t.endDate)}</SportLine>
                     <Text style={st.roles}>{roles.map((r) => ROLE_LABEL[r]).join(' · ')}</Text>
                   </Card>
                 </TouchableOpacity>

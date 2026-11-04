@@ -5,6 +5,8 @@
  *   - Organizer: organize events (create & schedule tournaments/matches).
  *   - Scorer / Member: view only.
  *  Reached from a user's profile or a tournament's host. */
+import { formatDayRange } from '../core/dates';
+import { CityField } from '../components/CityField';
 import { eventZone, todayIn } from '../core/time';
 import { defaultSchoolYear, regionStore } from '../core/region';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -309,7 +311,7 @@ export default function OrganizationScreen() {
       <Card style={st.eventRow}>
         <View style={{ flex: 1 }}>
           <Text style={textStyles.body} numberOfLines={1}>{t.name}</Text>
-          <SportLine sports={t.sports}>{t.startDate} → {t.endDate}</SportLine>
+          <SportLine sports={t.sports}>{formatDayRange(t.startDate, t.endDate)}</SportLine>
         </View>
         <Text style={st.chevron}>›</Text>
       </Card>
@@ -996,7 +998,7 @@ function DetailsEditor({ org, onCancel, onSaved }: { org: Organization; onCancel
       </View>
       <TextField label="Category (custom)" value={type} onChange={setType} placeholder="e.g. Academy" />
       {org.verifiedAt ? <Text style={textStyles.muted}>Changing the name or category removes the ✓ — it would need verifying again.</Text> : null}
-      <TextField label="City" value={city} onChange={setCity} />
+      <CityField value={city} onChange={setCity} />
       <TextField label="Email" value={email} onChange={setEmail} autoCapitalize="none" />
       <PhoneField label="Phone" value={phone} onChange={setPhone} optional />
       <TextField label="Bio" value={bio} onChange={setBio} placeholder="What this community is about" />

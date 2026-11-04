@@ -4,6 +4,7 @@
  *  one; a school / college can add its official ID here (one verified community
  *  per ID — docs/verification/org-verification.md). Once created, the community
  *  can host recurring sports events year after year (all tracked under it). */
+import { CityField } from '../components/CityField';
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { KeyboardAwareScrollView, KeyboardFooterLayout } from '../components/keyboard';
@@ -188,7 +189,7 @@ export default function CreateCommunityScreen({ navigation }: Props) {
             </>
           )}
 
-          <TextField label="City" value={city} onChange={setCity} placeholder="Bengaluru" />
+          <CityField value={city} onChange={setCity} />
           <View style={st.wrapRow}>
             <View style={st.wrapCell}><TextField label="Email" value={email} onChange={setEmail} placeholder="sports@…" autoCapitalize="none" /></View>
             <View style={st.wrapCell}><PhoneField label="Phone" value={phone} onChange={setPhone} optional /></View>

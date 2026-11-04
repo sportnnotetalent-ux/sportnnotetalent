@@ -18,7 +18,7 @@ import { useActiveOrg } from '../core/orgContext';
 import { ContextSwitcher } from '../components/ContextSwitcher';
 import type { OrgRequest } from '../core/types';
 import { getSportMeta } from '../sports/sportMeta';
-import { formatDayShort } from '../core/dates';
+import { formatDayShort, formatDayRange } from '../core/dates';
 import { eventZone, todayIn } from '../core/time';
 import type { RootStackParamList } from '../navigation/types';
 import type { Tournament } from '../core/types';
@@ -151,7 +151,7 @@ export default function OrganizeScreen() {
                     <Pill label={meta.label} color={meta.color} textColor={meta.text} />
                   </View>
                   <Text style={textStyles.muted}>
-                    {t.hostName} · {formatDayShort(t.startDate)} → {formatDayShort(t.endDate)}
+                    {t.hostName} · {formatDayRange(t.startDate, t.endDate)}
                   </Text>
                   <View style={st.tags}>
                     {t.sports.map((s) => (

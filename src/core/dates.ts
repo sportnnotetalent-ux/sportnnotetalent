@@ -21,3 +21,13 @@ export function formatDayShort(iso: string, zone?: string): string {
   const [, m, d] = dayOf(iso, zone).slice(0, 10).split('-').map(Number);
   return !m || !d ? iso : `${d} ${MONTHS_SHORT[m - 1]}`;
 }
+
+/** The one way to show a date range (UI audit step 4): "29 Oct – 12 Nov",
+ *  one day as "29 Oct", a missing end as "from 29 Oct". */
+export function formatDayRange(from?: string | null, to?: string | null, zone?: string): string {
+  const a = from ? formatDayShort(from, zone) : '';
+  const b = to ? formatDayShort(to, zone) : '';
+  if (!a) return b;
+  if (!b || a === b) return b ? a : `from ${a}`;
+  return `${a} – ${b}`;
+}

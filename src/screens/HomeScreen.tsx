@@ -18,7 +18,7 @@ import { setStatusBarStyle } from 'expo-status-bar';
 import Svg, { Circle, Line, Rect } from 'react-native-svg';
 import { Search, Bell, Menu, Zap, Trophy, Users } from 'lucide-react-native';
 import { Glyph, IconText } from '../components/Icon';
-import { formatDayShort } from '../core/dates';
+import { formatDayShort, formatDayRange } from '../core/dates';
 import { MatchCard } from '../components/MatchCard';
 import { LiveGolfCards } from '../components/golf/LiveGolfCards';
 import { SectionHeader, SECTION_CAP } from '../components/SectionHeader';
@@ -322,7 +322,7 @@ export default function HomeScreen() {
                   <View style={{ flex: 1, gap: theme.spacing(1) }}>
                     <Text style={textStyles.body}>{selected.name}</Text>
                     <Text style={textStyles.muted}>
-                      {selected.hostName} · {plural(selected.sports.length, 'sport')} · {formatDayShort(selected.startDate)} → {formatDayShort(selected.endDate)}
+                      {selected.hostName} · {plural(selected.sports.length, 'sport')} · {formatDayRange(selected.startDate, selected.endDate)}
                     </Text>
                     {(() => {
                       const s = tournamentStatus(selected, matchProgress(feed.filter((m) => m.tournamentId === selected.id)));

@@ -17,7 +17,7 @@ import { getTournaments } from '../data/repos';
 import { useAuth } from '../core/auth';
 import { getSportMeta } from '../sports/sportMeta';
 import { exportToCalendar, type CalEvent } from '../core/ics';
-import { formatDay, formatDayShort } from '../core/dates';
+import { formatDay, formatDayShort, formatDayRange } from '../core/dates';
 import { matchLine } from '../sports/matchLine';
 import type { Match, Tournament } from '../core/types';
 import type { RootStackParamList } from '../navigation/types';
@@ -151,7 +151,7 @@ export default function CalendarScreen() {
         <Glyph emoji="🏆" style={st.itemIcon} color={theme.colors.primary} />
         <View style={{ flex: 1 }}>
           <Text style={textStyles.body} numberOfLines={1}>{t.name}</Text>
-          <SportLine sports={t.sports}>{formatDayShort(t.startDate)} → {formatDayShort(t.endDate)}{note ? ` · ${note}` : ''}</SportLine>
+          <SportLine sports={t.sports}>{formatDayRange(t.startDate, t.endDate)}{note ? ` · ${note}` : ''}</SportLine>
         </View>
         <Text style={st.chevron}>›</Text>
       </Card>

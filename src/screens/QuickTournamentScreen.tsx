@@ -9,6 +9,7 @@
  * and pairs with the people picker (EntrantPicker), each reusing their own
  * record; plus slots for anyone not known yet.
  */
+import { SportPicker } from '../components/SportPicker';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -45,7 +46,6 @@ import type { RootStackParamList } from '../navigation/types';
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 /** The MVP's sports lead the chips (docs/product/MVP.md). */
-const MVP_SPORTS: SportId[] = ['football', 'basketball', 'kabaddi', 'badminton', 'tennis', 'pickleball', 'padel'];
 const PALETTE = ['#FF5C5C', '#4DA3FF', '#4CD964', '#FFD60A', '#BF5AF2', '#FF9F0A', '#5AC8FA', '#FF375F'];
 const FORMATS: { id: QuickFormat; label: string; hint: string }[] = [
   { id: 'league', label: 'League', hint: 'Everyone plays everyone; the table decides' },
@@ -60,7 +60,6 @@ export default function QuickTournamentScreen() {
   const { profile } = useAuth();
   const [sport, setSport] = useState<SportId | null>(params?.sport ?? null);
   const [mine, setMine] = useState<SportId[]>([]);
-  const [showAll, setShowAll] = useState(false);
   const [name, setName] = useState('');
   const nameTouched = useRef(false);
   // The organiser's pick; until then the suggestion for the list's size, worked
@@ -123,10 +122,6 @@ export default function QuickTournamentScreen() {
     return true;
   };
 
-  const chips = useMemo(() => {
-    const lead = [...new Set<SportId>([...mine, ...(sport ? [sport] : []), ...MVP_SPORTS])];
-    return showAll ? [...lead, ...SPORT_LIST.map((m) => m.id as SportId).filter((s) => !lead.includes(s))] : lead;
-  }, [mine, sport, showAll]);
 
   async function create() {
     if (!sport || !meta) return setError('Pick a sport.');
@@ -232,13 +227,7 @@ export default function QuickTournamentScreen() {
 
           <View style={st.block}>
             <FieldLabel>Sport</FieldLabel>
-            <View style={st.chips}>
-              {chips.map((s) => (
-                <SelectChip key={s} label={`${getSportMeta(s).icon} ${getSportMeta(s).name}`} active={sport === s}
-                  onPress={() => { setSport(s); nameTouched.current = nameTouched.current && !!name.trim(); }} />
-              ))}
-              {!showAll ? <SelectChip label="More sports…" active={false} onPress={() => setShowAll(true)} /> : null}
-            </View>
+            <SportPicker mine={mine} value={sport} onChange={(s) => { setSport(s); nameTouched.current = nameTouched.current && !!name.trim(); }} />
           </View>
 
           <TextField label="Name" value={name} onChange={(v) => { nameTouched.current = true; setName(v); }} placeholder="e.g. Sunday Turf Cup" autoCapitalize="words" />

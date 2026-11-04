@@ -3,6 +3,8 @@
  *  games in rotation with a session table. Any player present may change the
  *  rules; only the captain on turn picks. Games are ordinary friendlies.
  *  Opened with { clubId } to start one, or { sessionId } to carry on. */
+import { SportPicker } from '../components/SportPicker';
+import { useMySports } from '../data/useMySports';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -125,6 +127,7 @@ function GameSettingsCard({ sport, value, busy, onSave, onChange }: {
 }
 
 export default function SquadSessionScreen() {
+  const mySports = useMySports(); // UI audit step 4: your sports first
   const nav = useNavigation<Nav>();
   const { params } = useRoute<RouteProp<RootStackParamList, 'SquadSession'>>();
   const { profile } = useAuth();
@@ -257,7 +260,7 @@ export default function SquadSessionScreen() {
           <Card style={st.gap}>
             <FieldLabel>Sport</FieldLabel>
             <View style={st.chips}>
-              {sports.map((s) => <SelectChip key={s.id} label={`${s.icon} ${s.name}`} active={sport === s.id} onPress={() => setSport(s.id)} />)}
+              <SportPicker mine={mySports} limitTo={clubSports} value={sport} onChange={setSport} />
             </View>
             <TextField label="Team name" value={title} onChange={(v) => setTitle(v.slice(0, 60))} placeholder="e.g. Fnatic" autoCapitalize="words" />
             <Text style={textStyles.muted}>Teams will be called “{title.trim() || 'Name'} 1”, “{title.trim() || 'Name'} 2” …</Text>

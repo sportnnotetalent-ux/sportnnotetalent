@@ -1,6 +1,7 @@
 /** Tournament hub: overview, follow, the overall house table, a per-sport
  *  league table + statistics rail, and participating teams. For a single-sport
  *  tournament the sport selector is skipped and its table shown directly. */
+import { formatDayRange } from '../core/dates';
 import { QualifiesToCard } from '../components/FeederCards';
 import { confirmAction, notice } from '../core/confirm';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -582,7 +583,7 @@ export default function TournamentProfileScreen() {
           />
           <View style={{ flex: 1 }}>
             <Text style={textStyles.h2} numberOfLines={1}>{tournament.name}</Text>
-            <Text style={textStyles.muted} numberOfLines={1}>{tournament.hostName} · {tournament.startDate} → {tournament.endDate}</Text>
+            <Text style={textStyles.muted} numberOfLines={1}>{tournament.hostName} · {formatDayRange(tournament.startDate, tournament.endDate)}</Text>
           </View>
         </View>
         {(() => {

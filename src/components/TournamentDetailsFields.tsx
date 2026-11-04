@@ -4,6 +4,7 @@
  *  interleave them with their existing fields in the spec's order:
  *  Images → Name → Place (city, grounds, category) → Dates & Sports (+ basics)
  *  → Contact & About → the rest. */
+import { CityField } from './CityField';
 import React, { useState, useSyncExternalStore } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { theme } from '../core/theme';
@@ -82,7 +83,7 @@ export function TournamentPlaceFields({ value, onChange, knownVenues }: {
 
   return (
     <View style={st.section}>
-      <TextField label="City" value={value.city} onChange={(city) => onChange({ city })} placeholder="e.g. Hyderabad" autoCapitalize="words" />
+      <CityField value={value.city} onChange={(city) => onChange({ city })} />
 
       <FieldLabel hint="Where matches are played — they lead the venue choices when scheduling.">Grounds (optional)</FieldLabel>
       {value.grounds.length > 0 && (

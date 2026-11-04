@@ -1,6 +1,8 @@
 /** Create a tournament: name, dates, sports, the competition structure, and the
  *  per-sport format (overs, players-a-side, sub rules…) the organizer chooses —
  *  all games in the tournament then follow that format. */
+import { SportPicker } from '../components/SportPicker';
+import { useMySports } from '../data/useMySports';
 import { regionFormatDefaults } from '../core/units';
 import { regionStore } from '../core/region';
 import React, { useCallback, useEffect, useState } from 'react';
@@ -69,6 +71,7 @@ const isValidISODate = (s: string) => {
 };
 
 export default function CreateTournamentScreen() {
+  const mySports = useMySports(); // UI audit step 4: your sports first
   const nav = useNavigation<Nav>();
   const { params } = useRoute<RouteProp<RootStackParamList, 'CreateTournament'>>();
   const initialSport = params?.sport;
@@ -270,9 +273,7 @@ export default function CreateTournamentScreen() {
 
           <FieldLabel>Sports</FieldLabel>
           <View style={st.chips}>
-            {SPORT_LIST.map((s) => (
-              <SelectChip key={s.id} label={`${s.icon} ${s.name}`} active={sports.includes(s.id)} onPress={() => toggleSport(s.id)} />
-            ))}
+            <SportPicker mine={mySports} values={sports} onToggle={toggleSport} />
           </View>
 
           {sports.length > 1 && <MedalScoringEditor sports={sports} value={scoring} onChange={setScoring} />}
