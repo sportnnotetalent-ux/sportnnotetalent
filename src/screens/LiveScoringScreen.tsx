@@ -60,6 +60,7 @@ import { matchOutbox } from '../data/matchOutbox';
 import { mergeLog, newestEvent } from '../data/eventLog';
 import { formatChangePreview, canChangeLiveFormat, type FormatPreview } from '../data/formatChange';
 import { FORMAT_TYPE } from '../sports/amend';
+import { perSideFromRosters } from '../core/sideSize';
 import { forfeitFor, forfeitNote } from '../data/walkover';
 import { recordMatchView } from '../data/personalise';
 import { cardModel, cardStar } from '../core/resultCard';
@@ -530,6 +531,25 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
   // Match-header status chip (Info tab): FINAL when done, LIVE while underway,
   // else UPCOMING. Distinct from `live` above, which means "synced to the backend".
   const matchLive = !complete && (meta.status === 'live' || started);
+  // PD1–PD6 (docs/security/breaks/pairs-play-as-doubles.md): in a sport played as
+  // singles or doubles the sides decide — both pairs → 2 a side, both one → 1.
+  // Before the first shot it follows the sides at once; after, a banner offers it.
+  const sizeFix = perSideFromRosters(getSport(sport).participantKind, homeScoreRoster.length, awayScoreRoster.length, meta.config?.playersPerSide);
+  useEffect(() => {
+    if (!sizeFix || !matchId || !canScore || started || complete) return;
+    void setMatchFormat(matchId, { playersPerSide: sizeFix });
+    setMeta((m) => ({ ...m, config: { ...((m.config as Record<string, unknown>) ?? {}), playersPerSide: sizeFix } }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sizeFix, matchId, canScore, started, complete]);
+  const switchPerSide = () => {
+    if (!sizeFix || !matchId) return;
+    const patch = { playersPerSide: sizeFix };
+    const prev = { playersPerSide: Number(meta.config?.playersPerSide) === 2 ? 2 : 1 };
+    void setMatchFormat(matchId, patch);
+    // the log marker: viewers reload the format; every shot so far is replayed under it
+    dispatch({ type: FORMAT_TYPE, payload: { patch, prev } });
+    setMeta((m) => ({ ...m, config: { ...((m.config as Record<string, unknown>) ?? {}), ...patch } }));
+  };
   const statusLabel = complete ? 'FINAL' : matchLive ? 'LIVE' : 'UPCOMING';
 
   // Header title reflects the match state: a completed game reads as match
@@ -1763,6 +1783,18 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
                 : 'only verified players can be scored (under-18 needs a verified guardian; 18+ needs verified mobile & email).'}
             </Text>
           )}
+          {sizeFix && canScore && started && !complete ? (
+            <View style={st.lockCard}>
+              <Text style={textStyles.body}>
+                {sizeFix === 2
+                  ? 'Both sides have two players, but this game is being scored as singles — no one is credited with a shot.'
+                  : 'Both sides have one player, but this game is being scored as doubles.'}
+              </Text>
+              <TouchableOpacity style={st.assignBtn} activeOpacity={0.85} accessibilityRole="button" onPress={switchPerSide}>
+                <Text style={st.assignBtnText}>{sizeFix === 2 ? 'Score as doubles' : 'Score as singles'}</Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
           {scoringControlsEl}
           {voiceEl}
         </View>
