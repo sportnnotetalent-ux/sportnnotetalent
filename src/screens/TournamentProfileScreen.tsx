@@ -1,6 +1,7 @@
 /** Tournament hub: overview, follow, the overall house table, a per-sport
  *  league table + statistics rail, and participating teams. For a single-sport
  *  tournament the sport selector is skipped and its table shown directly. */
+import { tournamentTeamIds } from '../core/tournamentTeams';
 import { formatDayRange } from '../core/dates';
 import { QualifiesToCard } from '../components/FeederCards';
 import { confirmAction, notice } from '../core/confirm';
@@ -268,7 +269,9 @@ export default function TournamentProfileScreen() {
     setSetupHidden(true);
     void AsyncStorage.setItem(`setupHidden:${params.tournamentId}`, '1').catch(() => {});
   };
-  const setupSteps = tournament ? setupChecklist(tournament, participants.length, matches.length, meet.events.length) : [];
+  // UI audit step 7: registered teams + teams already in its matches — one count everywhere
+  const allTeamIds = useMemo(() => tournamentTeamIds(participants, matches), [participants, matches]);
+  const setupSteps = tournament ? setupChecklist(tournament, allTeamIds.length, matches.length, meet.events.length) : [];
   const openSetupStep = (key: SetupStep['key']) => {
     if (!tournament) return;
     if (key === 'teams') nav.navigate('TournamentTeams', { tournamentId: tournament.id });
@@ -488,8 +491,7 @@ export default function TournamentProfileScreen() {
   const following = isFollowing('tournament', tournament.id);
   const singleSport = sports.length === 1;
   // Teams in this tournament (house ids appear in its matches).
-  const teamIds = new Set(matches.flatMap((m) => [m.homeTeam.id, m.awayTeam.id]));
-  const tourneyTeams = teams.filter((t) => teamIds.has(t.id));
+  const tourneyTeams = allTeamIds.map((id) => teams.find((t) => t.id === id) ?? participants.find((t) => t.id === id)).filter((t): t is NonNullable<typeof t> => !!t);
 
   // Ownership: creator (retained), current owner, and where it can be transferred.
   const creatorName = tournament.createdBy ? (playerName(tournament.createdBy) ?? 'Someone') : undefined;
@@ -862,7 +864,7 @@ export default function TournamentProfileScreen() {
             <HubRow icon="📜" title="Certificates" status="Champions, awards, medals — printable, with a QR anyone can check" onPress={() => nav.navigate('Certificates', { tournamentId: tournament.id })} />
 
             <SectionHeader title="Teams" />
-            <HubRow icon="👥" title="Participating teams" status={participants.length ? `${participants.length} team${participants.length === 1 ? '' : 's'}` : 'None yet — add them'} onPress={() => nav.navigate('TournamentTeams', { tournamentId: tournament.id })} />
+            <HubRow icon="👥" title="Participating teams" status={allTeamIds.length ? `${allTeamIds.length} team${allTeamIds.length === 1 ? '' : 's'}${allTeamIds.length > participants.length ? ` · ${allTeamIds.length - participants.length} only in fixtures` : ''}` : 'None yet — add them'} onPress={() => nav.navigate('TournamentTeams', { tournamentId: tournament.id })} />
             {isMedal && <HubRow icon="🏅" title="Contingents" status="One squad across every sport" onPress={() => nav.navigate('Contingents', { tournamentId: tournament.id })} />}
 
             <SectionHeader title="Matches" />
@@ -1208,7 +1210,7 @@ export default function TournamentProfileScreen() {
                     <View style={[st.dot, { backgroundColor: t.colorHex ?? theme.colors.surfaceAlt }]} />
                     <View style={{ flex: 1 }}>
                       <Text style={textStyles.body}>{t.name}</Text>
-                      <SportLine sports={t.sports} />
+                      <SportLine sports={"sports" in t ? t.sports : []} />
                     </View>
                     <Text style={st.chevron}>›</Text>
                   </Card>
