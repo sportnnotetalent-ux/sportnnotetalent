@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-08 — Hockey: FIH Rules 2026 (Rule 14 second cards)
+
+Audited against the FIH Rules of Hockey effective 1 Nov 2026 (`docs/sport-expert/hockey-rulebook.md`): no core changes. HK-1: the second-card warning now cites Rule 14 (2026); after a yellow, a further card must be red. It stays a warning. Tests: card test extended. No database change.
+
 ### 2026-11-08 — Volleyball: FIVB 2025–2028 rotation faults (receiving team only)
 
 Audited against the FIVB Official Volleyball Rules 2025–2028 (`docs/sport-expert/volleyball-rulebook.md`). VB-1: only the receiving team can make a positional fault at the serve, so the "Rotation" fault chip is offered only when the team that erred was receiving. Tests: 3 unit; volleyball suite green. No database change.

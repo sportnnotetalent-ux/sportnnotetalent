@@ -276,6 +276,8 @@ describe('H · hockey: card warnings and team-official cards', () => {
     assert.deepEqual(hk.cardWarnIds(s, 'home', 'red'), []);
     assert.deepEqual(hk.cardWarnIds(s, 'away', 'green'), ['a1']);
     assert.match(hk.cardWarning('green'), /at least a yellow/);
+    // FIH Rules of Hockey 2026, Rule 14 (hockey-rulebook.md HK-1): a further card after a yellow MUST be a red
+    assert.match(hk.cardWarning('yellow'), /Rule 14 \(2026\).*must be a red/);
     assert.match(src('hockey/index.tsx'), /cardWarnIds\(/);
   });
   test('H2 / H3 an official\'s card: listed, no player, nobody short, not a player card', () => {

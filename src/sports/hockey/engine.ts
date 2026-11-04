@@ -692,7 +692,7 @@ export function cardWarnIds(s: Pick<HockeyState, 'events'>, side: Side, colour: 
  *  scorer records what the umpire shows). */
 export const cardWarning = (colour: CardColour): string =>
   colour === 'green'
-    ? 'Already on a green card — under FIH rules the next card for that player is at least a yellow.'
+    ? 'Already on a green card — FIH Rule 14 (2026): the next card for that player must be at least a yellow.'
     : colour === 'yellow'
-      ? 'Already on a yellow card — under FIH rules a further card for that player is usually a red.'
+      ? 'Already on a yellow card — FIH Rule 14 (2026): a further card for that player must be a red.'
       : '';
