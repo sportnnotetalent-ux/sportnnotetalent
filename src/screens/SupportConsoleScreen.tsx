@@ -204,6 +204,7 @@ export default function SupportConsoleScreen() {
           <Tile icon="🎂" label="Age proofs" s={tileStat(ov?.age, ages.length)} now={now} active={tab === 'age'} onPress={() => pickTab('age')} />
           {ov?.reports ? <Tile icon="🚩" label="Message reports" s={ov.reports} now={now} onPress={() => nav.navigate('MessageReports')} /> : null}
         </View>
+        <Button label="📈 Usage dashboard — live numbers and who’s behind them" variant="ghost" onPress={() => nav.navigate('UsageDashboard')} />
 
         {notice ? <Text style={st.notice} accessibilityRole="alert">{notice}</Text> : null}
         <FormError message={error} />

@@ -158,6 +158,8 @@ export type RootStackParamList = {
   VerificationDetails: { playerId: string };
   /** SportnNote support: every queue on one screen (claims, filters, this week). */
   SupportConsole: undefined;
+  /** support / admin: live usage numbers and who's behind them (founder 2026-11-06) */
+  UsageDashboard: undefined;
   CreateListing: undefined;
   Following: undefined;
   Standings: { sport?: SportId; tournamentId?: string } | undefined;
