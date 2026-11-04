@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-08 — Usage dashboard filters: period, sports, places
+
+Founder (`docs/security/breaks/usage-filters.md`): the usage dashboard now has a filter card. **Period**: Today, Last 7 days, This week, Last 30 days, This month, Last 3 months or Custom (from–to, up to 400 days); tiles show the whole period, the change vs the same number of days just before ("vs previous 7 days", "vs yesterday"), and a trend by day (≤ 31 days), week (≤ 26 weeks) or month. **Sport** and **Location** are multi-select (tap to open; "All sports" / "All places" clears). Sport = games of those sports, people who play one. Location = cities from the app’s city list: a person’s "Where are you based?" answer, else their profile city; a game’s tournament city, else the city of the people running it; plus "No city set". The place chips show how many people are based there. Under a filter, the parts that have no sport or place say so: active users count signed-in people only, and links shared and crash-free sessions stay whole. The lists behind the tiles follow the same filters. Retention is now "Back in week 2": of sign-ups at least a week old, active again 7–14 days after joining. "Where sign-ups came from" and "Games by sport" follow the period. Server: **`supabase/migrations/20261109120000_usage_filters.sql`** (founder runs): `usage_report` and `usage_report_people` (support only; bad ranges and filters refused); the v1 functions stay for older app versions. Tests: 8 unit, 11 server (PGlite), a 600-person place/sport simulation (places add up exactly), the tile simulation reworked; full suite 7,412 pass, 0 fail; tsc clean; demo checked (Basketball + Football in Bengaluru + Hyderabad; Custom).
+
 ### 2026-11-07 — Release: sign-up source live (web, Android OTA)
 
 Founder ran `20261108120000_signup_source.sql` (checked live: `record_signup_source` exists). auth-smoke passed. Published from a clean worktree at d7ab626: web (entry `index-109e3887`, confirmed live on app.sportnnote.in) and Android OTA groups `1f501670` (preview) and `625f015a` (production), runtime 1.0.0.
