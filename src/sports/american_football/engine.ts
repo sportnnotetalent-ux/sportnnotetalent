@@ -26,8 +26,8 @@
  *
  * Overtime (`decider`, organiser option):
  *  - 'nfl'     NFL regular season: one 10-min period, both teams get a
- *              possession, then sudden death; still level = a tie (2025 rule
- *              — verify);
+ *              possession, then sudden death; still level = a tie (NFL 2025
+ *              rule, confirmed: operations.nfl.com — american_football-rulebook.md);
  *  - 'nfl_playoff' the same with 15-min periods until someone wins;
  *  - 'kansas'  NFHS / NCAA: each team one possession from the opponent's 10
  *              (NFHS) / 25 (NCAA) per overtime, repeat until one leads after
