@@ -50,9 +50,10 @@ describe('the format', () => {
 
 describe('the wiring', () => {
   const screen = readFileSync(new URL('../src/screens/QuickTournamentScreen.tsx', import.meta.url), 'utf8');
-  test('creates the tournament, a team per name, enters them, then opens the fixtures with the format picked, over the tournament page', () => {
+  test('creates the tournament, enters the picked teams / players (never typed names, 2026-11-06), then opens the fixtures with the format picked, over the tournament page', () => {
     assert.match(screen, /await createTournament\(/);
-    assert.match(screen, /await createTeam\(/);
+    assert.match(screen, /await sideForEntrants\(/, 'players / pairs reuse their own record');
+    assert.doesNotMatch(screen, /await createTeam\(/, 'no team made from a typed name');
     assert.match(screen, /await addTournamentTeams\(/);
     assert.match(screen, /replace\('Tournament', \{ tournamentId: created\.id \}\)/, 'lands on the tournament after the fixtures');
     assert.match(screen, /navigate\('GenerateFixtures', \{ tournamentId: created\.id, sport, structure: fmt, day, groups: fmt === 'groups' \? groupCount\(entrants\.length\) : undefined \}\)/);

@@ -1,9 +1,13 @@
 /**
  * Quick tournament (MVP, founder 2026-10-31): for a community organiser, a
- * name, a sport, the teams (paste a WhatsApp list) and a format. It makes the
- * tournament and its teams, then opens the fixtures screen with everything
- * picked: one more tap and the fixtures are there. "More options" opens the
- * full form (divisions, co-hosts, registration, banner…).
+ * name, a sport, who plays and a format. It makes the tournament and enters
+ * them, then opens the fixtures screen with everything picked: one more tap and
+ * the fixtures are there. "More options" opens the full form (divisions,
+ * co-hosts, registration, banner…).
+ * Who plays is PICKED, never typed (founder 2026-11-06): teams from the sport's
+ * list (or a new team with its captain invited, TournamentTeamPicker); players
+ * and pairs with the people picker (EntrantPicker), each reusing their own
+ * record; plus slots for anyone not known yet.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
@@ -20,14 +24,21 @@ import { defaultsFor } from '../components/FormatEditor';
 import { withNewTournamentPoints } from '../data/standings';
 import { regionFormatDefaults } from '../core/units';
 import { regionStore } from '../core/region';
-import { addTournamentTeams, createTeam, createTournament, createTournamentSlots, getMyPlayerId, getPlayer, getTournamentEntries } from '../data/repos';
-import { nextSlotNames, slotNames, splitTypedSlots } from '../core/slots';
+import { addTournamentTeams, createTournament, createTournamentSlots, getMyEntrant, getMyPlayerId, getPlayer, getTournamentEntries, setTeamLeaders } from '../data/repos';
+import { nextSlotNames, slotNames } from '../core/slots';
+import { EntrantPicker } from '../components/EntrantPicker';
+import { sideForEntrants } from '../data/entrants';
+import { entryName, slotId, slotName, type EntrantSlot } from '../data/participantEntry';
+import { entryClash } from '../core/entryPick';
+import { useTeams } from '../data/hooks';
+import { playerInviteText } from '../core/inviteText';
+import { SHARE_BASE } from '../core/shareText';
 import { TournamentTeamPicker, type PickedTeam } from '../components/TournamentTeamPicker';
 import { getMyPersonalisation } from '../data/personalise';
 import { useAuth } from '../core/auth';
 import { notice } from '../core/confirm';
 import { LAST_SPORT_KEY, startSport } from '../core/quickGame';
-import { groupCount, matchCount, parseEntrantList, quickName, structureFor, suggestFormat, type QuickFormat } from '../core/quickTournament';
+import { groupCount, matchCount, quickName, structureFor, suggestFormat, type QuickFormat } from '../core/quickTournament';
 import type { SportId } from '../core/types';
 import type { RootStackParamList } from '../navigation/types';
 
@@ -41,10 +52,6 @@ const FORMATS: { id: QuickFormat; label: string; hint: string }[] = [
   { id: 'knockout', label: 'Knockout', hint: 'Lose and you’re out, to a final' },
   { id: 'groups', label: 'Groups + knockout', hint: 'Small groups, the top 2 go through' },
 ];
-const shortFrom = (name: string) => {
-  const initials = name.split(/\s+/).filter(Boolean).map((w) => w[0]).join('').toUpperCase();
-  return ((initials.length >= 2 ? initials : name.replace(/[^a-zA-Z0-9]/g, '').toUpperCase()) || 'TM').slice(0, 4);
-};
 const isoDay = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
 export default function QuickTournamentScreen() {
@@ -56,7 +63,6 @@ export default function QuickTournamentScreen() {
   const [showAll, setShowAll] = useState(false);
   const [name, setName] = useState('');
   const nameTouched = useRef(false);
-  const [list, setList] = useState('');
   // The organiser's pick; until then the suggestion for the list's size, worked
   // out on every render (an effect lagged a render, so a fast tap saw no format).
   const [chosenFmt, setChosenFmt] = useState<QuickFormat | null>(null);
@@ -64,11 +70,12 @@ export default function QuickTournamentScreen() {
   const [homeCity, setHomeCity] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  // Teams not known yet (TS1): fixtures between slots (A1…, B1… / Team 1…), filled in later
-  const [slotMode, setSlotMode] = useState(false);
-  const [slotCount, setSlotCount] = useState('8');
-  // team sports (PK1): real teams picked from the list, plus how many aren't known yet
+  // team sports (PK1): real teams picked from the list
   const [pickedTeams, setPickedTeams] = useState<PickedTeam[]>([]);
+  // individual sports (PP1): players or pairs picked as people; Singles / Doubles for "both" sports
+  const [people, setPeople] = useState<EntrantSlot[][]>([]);
+  const [pairs, setPairs] = useState(false);
+  // anyone not known yet (TS1/TS12): slots, filled in later
   const [unknownCount, setUnknownCount] = useState('0');
 
   // The sport a person most likely means: the route's, else the last friendly's, else their first.
@@ -89,35 +96,32 @@ export default function QuickTournamentScreen() {
   }, [params?.sport]);
 
   const meta = sport ? getSportMeta(sport) : null;
-  // a "?" / TBC / TBD line is a team not known yet (TS12)
-  // counted on the raw lines: the list drops repeated names, and "?" repeats
-  const typedSplit = useMemo(() => {
-    const raw = splitTypedSlots(list.split(/\r?\n/));
-    return { teams: parseEntrantList(raw.teams.join('\n')), slots: raw.slots };
-  }, [list]);
-  const typed = useMemo(
-    () => [...typedSplit.teams, ...(typedSplit.slots ? nextSlotNames(typedSplit.teams, typedSplit.slots) : [])],
-    [typedSplit],
-  );
-  const slotN = Math.max(0, Math.min(128, parseInt(slotCount, 10) || 0));
   const noun = meta?.participantKind === 'individual' ? 'players' : meta?.participantKind === 'both' ? 'players or pairs' : 'teams';
   const teamSport = (meta?.participantKind ?? 'team') === 'team';
+  const kind = meta?.participantKind ?? 'team';
+  const perEntry: 1 | 2 = kind === 'both' && pairs ? 2 : 1;
+  const sportTeams = useTeams(sport ?? undefined);
+  const pickedNames = teamSport ? pickedTeams.map((t) => t.name) : people.map((e) => entryName(e.map(slotName)));
   const unknownN = Math.max(0, Math.min(128, parseInt(unknownCount, 10) || 0));
   // Suggested name and format until the organiser changes them.
   useEffect(() => { if (meta && !nameTouched.current) setName(quickName(meta.name, new Date())); }, [meta]);
-  const fmt: QuickFormat | null = chosenFmt ?? suggestFormat(teamSport ? pickedTeams.length + unknownN : slotMode ? slotN : typed.length);
-  // the entrants: typed names, or slots named by their group when the teams aren't known yet
-  // team sports: the picked teams, then a slot for each team not known yet
+  const fmt: QuickFormat | null = chosenFmt ?? suggestFormat(pickedNames.length + unknownN);
+  // the picked teams / players / pairs, then a slot for each one not known yet
+  // (all slots → named by group A1…; next to real entries → Slot 1…)
   const teamSlots = useMemo(() => {
     if (!unknownN) return [];
-    if (!pickedTeams.length) return unknownN >= 2 ? slotNames(unknownN, fmt === 'groups' ? groupCount(unknownN) : 0) : ['Slot 1'];
-    return nextSlotNames(pickedTeams.map((t) => t.name), unknownN);
-  }, [unknownN, pickedTeams, fmt]);
-  const entrants = useMemo(
-    () => (teamSport ? [...pickedTeams.map((t) => t.name), ...teamSlots]
-      : slotMode ? (slotN >= 2 ? slotNames(slotN, fmt === 'groups' ? groupCount(slotN) : 0) : []) : typed),
-    [teamSport, pickedTeams, teamSlots, slotMode, slotN, fmt, typed],
-  );
+    if (!pickedNames.length) return unknownN >= 2 ? slotNames(unknownN, fmt === 'groups' ? groupCount(unknownN) : 0) : ['Slot 1'];
+    return nextSlotNames(pickedNames, unknownN);
+  }, [unknownN, pickedNames.join('|'), fmt]); // eslint-disable-line react-hooks/exhaustive-deps
+  const entrants = useMemo(() => [...pickedNames, ...teamSlots], [pickedNames.join('|'), teamSlots]); // eslint-disable-line react-hooks/exhaustive-deps
+  // PP2–PP4: nobody twice, alone or in a pair
+  const addPeople = async (slots: EntrantSlot[]): Promise<boolean> => {
+    const why = entryClash(people, slots);
+    if (why) { setError(why); return false; }
+    setError(null);
+    setPeople((p) => [...p, slots]);
+    return true;
+  };
 
   const chips = useMemo(() => {
     const lead = [...new Set<SportId>([...mine, ...(sport ? [sport] : []), ...MVP_SPORTS])];
@@ -127,7 +131,7 @@ export default function QuickTournamentScreen() {
   async function create() {
     if (!sport || !meta) return setError('Pick a sport.');
     if (!name.trim()) return setError('Give the tournament a name.');
-    if (entrants.length < 2) return setError(teamSport ? 'Pick at least 2 teams (or add the ones not known yet).' : `Add at least 2 ${noun}, one per line.`);
+    if (entrants.length < 2) return setError(`Pick at least 2 ${teamSport ? 'teams' : perEntry === 2 ? 'pairs' : 'players'} (or add the ones not known yet).`);
     if (!fmt) return setError('Pick a format.');
     setError(null);
     let createdId: string | null = null;
@@ -144,7 +148,11 @@ export default function QuickTournamentScreen() {
         sports: [sport],
         startDate: isoDay(start),
         endDate: isoDay(start),
-        formats: { [sport]: { ...withNewTournamentPoints(sport, fields.length ? defaultsFor(fields, 'tournament') : {}), ...regionFormatDefaults(sport, regionStore.get().units) } },
+        formats: { [sport]: {
+          ...withNewTournamentPoints(sport, fields.length ? defaultsFor(fields, 'tournament') : {}), ...regionFormatDefaults(sport, regionStore.get().units),
+          // PP6: singles or doubles, as picked
+          ...(kind === 'both' ? { playersPerSide: perEntry } : {}),
+        } },
         structure: structureFor(fmt),
         // their home city puts the matches on the map for "Near you"
         city: homeCity,
@@ -167,22 +175,20 @@ export default function QuickTournamentScreen() {
           notice(`${waiting.length === 1 ? waiting[0] : `${waiting.length} teams`} invited`,
             `${waiting.join(', ')} ${waiting.length === 1 ? 'is' : 'are'} run by someone else, so ${waiting.length === 1 ? 'it joins' : 'they join'} the fixtures once ${waiting.length === 1 ? 'its captain accepts' : 'their captains accept'}. To make the fixtures now, add a slot for ${waiting.length === 1 ? 'it' : 'each'} and fill it later.`);
         }
-      } else if (slotMode) {
-        setBusy(`Making ${entrants.length} slots…`);
-        await createTournamentSlots(created.id, sport, entrants);
       } else {
-        const realCount = typedSplit.teams.length;
+        // PP5: each player / pair reuses their own record in this sport (else one is made, its first person captain)
         const ids: string[] = [];
-        for (let i = 0; i < realCount; i++) {
-          setBusy(`Adding ${noun} ${i + 1} of ${realCount}…`);
-          const t = await createTeam({ name: entrants[i], shortName: shortFrom(entrants[i]), sport, colorHex: PALETTE[i % PALETTE.length], adhoc: true });
-          ids.push(t.id);
+        for (let i = 0; i < people.length; i++) {
+          setBusy(`Adding ${perEntry === 2 ? 'pair' : 'player'} ${i + 1} of ${people.length}…`);
+          const entry = await sideForEntrants(people[i], { sport, teams: sportTeams, colorHex: PALETTE[i % PALETTE.length], adhoc: true });
+          const lead = people[i].map(slotId).find(Boolean);
+          if (entry.created && lead) await setTeamLeaders(entry.id, { captainId: lead }).catch(() => {});
+          ids.push(entry.id);
         }
-        await addTournamentTeams(created.id, ids, 'confirmed');
-        // then the teams not known yet, as slots (entered after the real teams)
-        if (entrants.length > realCount) {
-          setBusy(`Making ${entrants.length - realCount} slot${entrants.length - realCount === 1 ? '' : 's'}…`);
-          await createTournamentSlots(created.id, sport, entrants.slice(realCount));
+        if (ids.length) await addTournamentTeams(created.id, ids, 'confirmed');
+        if (teamSlots.length) {
+          setBusy(`Making ${teamSlots.length} slot${teamSlots.length === 1 ? '' : 's'}…`);
+          await createTournamentSlots(created.id, sport, teamSlots);
         }
       }
       void AsyncStorage.setItem(LAST_SPORT_KEY, sport).catch(() => {});
@@ -203,9 +209,12 @@ export default function QuickTournamentScreen() {
     }
   }
 
+  // what's being counted: teams, players or pairs (and one, not "1 players")
+  const unit = teamSport ? 'team' : perEntry === 2 ? 'pair' : 'player';
+  const counted = `${entrants.length} ${unit}${entrants.length === 1 ? '' : 's'}`;
   const summary = fmt && entrants.length >= 2
-    ? `${entrants.length} ${noun} · ${FORMATS.find((f) => f.id === fmt)!.label} · ${matchCount(fmt, entrants.length)} matches`
-    : `${entrants.length} ${noun}`;
+    ? `${counted} · ${FORMATS.find((f) => f.id === fmt)!.label} · ${matchCount(fmt, entrants.length)} matches`
+    : counted;
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
@@ -243,29 +252,36 @@ export default function QuickTournamentScreen() {
                 {summary}{teamSlots.length ? ` · slots ${teamSlots[0]}${teamSlots.length > 1 ? ` … ${teamSlots[teamSlots.length - 1]}` : ''}, filled in later from the tournament’s teams` : ''}.
               </Text>
             </View>
-          ) : (
-          <View style={st.block}>
-            <View style={st.chips}>
-              <SelectChip label={`I have the ${noun}`} active={!slotMode} onPress={() => setSlotMode(false)} />
-              <SelectChip label={`${noun[0].toUpperCase()}${noun.slice(1)} not known yet`} active={slotMode} onPress={() => setSlotMode(true)} />
+          ) : sport ? (
+            <View style={st.block}>
+              {kind === 'both' ? (
+                <View style={st.chips}>
+                  <SelectChip label="Singles" active={!pairs} onPress={() => { if (pairs) { setPairs(false); setPeople([]); } }} />
+                  <SelectChip label="Doubles (pairs)" active={pairs} onPress={() => { if (!pairs) { setPairs(true); setPeople([]); } }} />
+                </View>
+              ) : null}
+              <FieldLabel>{perEntry === 2 ? 'Pairs' : 'Players'}</FieldLabel>
+              {people.length ? (
+                <View style={st.chips}>
+                  {people.map((e, i) => {
+                    const label = entryName(e.map(slotName));
+                    return <SelectChip key={`${i}-${label}`} label={`${label}  ✕`} active accessibilityLabel={`Remove ${label}`}
+                      onPress={() => setPeople((p) => p.filter((_, k) => k !== i))} />;
+                  })}
+                </View>
+              ) : null}
+              <EntrantPicker key={`${perEntry}-${people.length}`} count={perEntry} sport={sport}
+                inviteText={(who) => playerInviteText({ name: who, inviterName: profile?.fullName, link: SHARE_BASE })}
+                onSubmit={addPeople}
+                submitLabel={perEntry === 2 ? '＋ Add pair' : undefined}
+                resolveMe={profile?.fullName ? () => getMyEntrant(profile) : undefined}
+                meName={profile?.fullName} />
+              <TextField label={`${perEntry === 2 ? 'Pairs' : 'Players'} not known yet`} value={unknownCount} onChange={(v) => setUnknownCount(v.replace(/[^0-9]/g, '').slice(0, 3))} />
+              <Text style={textStyles.muted}>
+                {summary}{teamSlots.length ? ` · slots ${teamSlots[0]}${teamSlots.length > 1 ? ` … ${teamSlots[teamSlots.length - 1]}` : ''}, filled in later` : ''}.
+              </Text>
             </View>
-            {slotMode ? (
-              <>
-                <TextField label={`How many ${noun}?`} value={slotCount} onChange={(v) => setSlotCount(v.replace(/[^0-9]/g, '').slice(0, 3))} />
-                <Text style={textStyles.muted}>
-                  {entrants.length >= 2 ? `Slots ${entrants[0]} … ${entrants[entrants.length - 1]}. ` : ''}The fixtures are made between the slots; when a team comes in, open the tournament’s teams and fill its slot.
-                </Text>
-                <Text style={textStyles.muted}>{summary}.</Text>
-              </>
-            ) : (
-              <>
-                <TextField label={`The ${noun}, one per line`} value={list} onChange={setList} multiline
-                  placeholder={'Paste from WhatsApp:\nLions\nTigers\nPanthers\nCheetahs'} />
-                <Text style={textStyles.muted}>{summary}{typedSplit.slots ? ` (${typedSplit.slots} not known yet)` : ''}. Type ? on a line for a team not known yet. Players can be added to each later.</Text>
-              </>
-            )}
-          </View>
-          )}
+          ) : null}
 
           <View style={st.block}>
             <FieldLabel>Format</FieldLabel>

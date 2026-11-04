@@ -54,6 +54,7 @@ test('TS14: at least one, at most 128', async () => {
 test('TS12: repeated "?" lines are each a slot (counted before de-duplication)', async () => {
   const { splitTypedSlots } = await import('../src/core/slots.ts');
   assert.equal(splitTypedSlots('Lions\n?\n?\n?'.split('\n')).slots, 3);
+  // 2026-11-06: Quick tournament no longer takes a typed list — a "not known yet" count makes the slots
   const src = (await import('node:fs')).readFileSync(new URL('../src/screens/QuickTournamentScreen.tsx', import.meta.url), 'utf8');
-  assert.match(src, /splitTypedSlots\(list\.split/);
+  assert.match(src, /nextSlotNames\(pickedNames, unknownN\)/);
 });
