@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-07 — Release: usage dashboard live (web, Android OTA)
+
+Founder ran `20261107120000_usage_dashboard.sql` (checked read-only: `usage_dashboard` and `usage_people` present, refused for anon). auth-smoke passed. Published from a clean worktree at 99a7092: web (entry `index-388cbb51`, confirmed live on app.sportnnote.in) and Android OTA groups `e0e156c8` (preview) and `370a89d7` (production), runtime 1.0.0.
+
 ### 2026-11-07 — Usage dashboard v1 (support console)
 
 Founder's agreed KPIs (`docs/security/breaks/usage-dashboard.md`): Support console → **📈 Usage dashboard**, support / admin only, computed live on every open and Refresh. Eight tiles with an 8-week trend and the change vs last week: games scored (distinct completed games with ≥ 1 scoring step), weekly active users (people + installs), new sign-ups (everyone), activation (first game within 7 days, scored or played), game finish rate, links shared → game views, 1-week retention, crash-free sessions; Today's counts; games by sport (4 weeks). **See who**: new sign-ups (name, joined, city, sports, phone verified, under 18 marked, games so far — no contact details), not activated yet, games scored (open the game), active this week (only people who share usage data). Privacy kept: analytics links only consenting adults (`analytics_actor`), so activation / retention / active-people are "of people who share usage data"; sign-ups count everyone. Weeks Monday IST. Not yet recorded: which link a sign-up came from. Server: **`supabase/migrations/20261107120000_usage_dashboard.sql`** (founder runs) — `usage_dashboard(p_weeks)`, `usage_people(p_kind, p_week)`. Tests: 3 unit, 7 server (PGlite), a 600-dashboard simulation; full suite 7,376 pass, 0 fail; tsc clean; demo checked.
