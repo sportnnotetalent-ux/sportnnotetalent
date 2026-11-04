@@ -11,6 +11,7 @@
  * team. The controls resolve the actual serving player from the lineup so points
  * are credited per player and the server is shown by name.
  */
+import { servingInPlay } from './inPlaySets';
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { theme } from '../core/theme';
@@ -381,6 +382,8 @@ export function makeRallyPlugin(opts: RallyOpts): SportPlugin<RallyState> {
     lineScore: rallyLineScore,
     retireTerms: true,
     Scoreboard,
+    // Score bar (docs/security/breaks/score-bar.md): the server, and game / match point.
+    inPlay: (s, r) => servingInPlay(s, r, (x) => (x.ended || (!x.serverPicked && x.events.length === 0) ? null : rallyServingSide(x)), reducer, 'game'),
     // SD-19: absolute games / points / deciders per player (and the doubles
     // partner), synced at completion and on correction. SD-22: + the replayed
     // serve / return keys (the sport names the serve rule).

@@ -6,7 +6,7 @@ import React, { useEffect, useRef } from 'react';
 import { Animated, View, Text, StyleSheet } from 'react-native';
 import { theme } from '../core/theme';
 import { useReducedMotion } from '../core/a11y';
-import { changedSide, lastAction, scoreBarRows, type InPlay, type Side } from '../core/scoreBar';
+import { changedSide, dueText, inPlayText, lastAction, scoreBarRows, type InPlay, type Side } from '../core/scoreBar';
 import type { ScoreSummary } from '../sports/types';
 
 export function LiveScoreBar({
@@ -39,8 +39,9 @@ export function LiveScoreBar({
   }, [summary.homeScore, summary.awayScore, still]); // eslint-disable-line react-hooks/exhaustive-deps
   const last = lastAction(undoText);
   const status = [summary.statusLine, summary.detailLine].filter(Boolean).join(' · ');
-  const who = rows.find((r) => r.who)?.who ?? null;
-  const label = [status, ...rows.map((r) => `${r.name} ${r.score}`), who, last ? `Last: ${last}` : null].filter(Boolean).join('. ');
+  const who = inPlayText(inPlay, { home: homeName, away: awayName }, nameOf);
+  const due = dueText(inPlay, { home: homeName, away: awayName });
+  const label = [status, due, ...rows.map((r) => `${r.name} ${r.score}`), who, last ? `Last: ${last}` : null].filter(Boolean).join('. ');
 
   return (
     <View style={s.wrap} accessible accessibilityRole="summary" accessibilityLabel={label} accessibilityLiveRegion="polite">
@@ -50,6 +51,7 @@ export function LiveScoreBar({
           {clockNode}
         </View>
       ) : null}
+      {due ? <Text style={s.due} accessibilityRole="alert">⏱ {due}</Text> : null}
       {rows.map((r) => (
         <View key={r.side} style={[s.row, r.active && s.rowActive]}>
           <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, s.flash, { opacity: flash[r.side] }]} />
@@ -86,5 +88,9 @@ const s = StyleSheet.create({
   who: { color: theme.colors.onLime, fontSize: theme.font.small, fontWeight: '700' },
   score: { color: theme.colors.text, fontFamily: theme.fonts.numeral, fontSize: 28, minWidth: 56, textAlign: 'right', fontVariant: ['tabular-nums'] },
   scoreActive: { color: theme.colors.onLime },
+  due: {
+    alignSelf: 'center', color: theme.colors.onFill, backgroundColor: theme.colors.accent, fontSize: theme.font.small, fontWeight: '800',
+    paddingHorizontal: theme.spacing(3), paddingVertical: theme.spacing(1), borderRadius: theme.radius.pill, overflow: 'hidden',
+  },
   last: { color: theme.colors.textMuted, fontSize: theme.font.small, textAlign: 'center' },
 });

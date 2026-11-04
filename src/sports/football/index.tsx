@@ -15,6 +15,7 @@
  * The reducer is pure, so it can't read the clock — the controls compute the
  * current minute (via `currentMinute`) and pass it in `payload.minute`.
  */
+import { footballInPlay } from './inPlay';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { theme } from '../../core/theme';
@@ -1763,6 +1764,7 @@ const Court: NonNullable<SportPlugin<FootballState>['Court']> = ({ homeLineup, a
 );
 
 export const footballPlugin: SportPlugin<FootballState> = {
+  inPlay: (s) => footballInPlay(s),
   ...FOOTBALL_META,
   matchRecords: footballMatchRecords, // SD-51 (set by the registry before perf F-15)
   // MVP F1: Undo names what it removes ("goal · Ravi (2-1)")

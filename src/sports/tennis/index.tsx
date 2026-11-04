@@ -3,6 +3,7 @@
  * (win by 2, a 7th game settles 6-6); points 0/15/30/40 with deuce & advantage.
  * Points and aces are attributed to players; games and sets hit the timeline.
  */
+import { servingInPlay } from '../inPlaySets';
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { theme } from '../../core/theme';
@@ -198,6 +199,7 @@ export const tennisPlugin: SportPlugin<TennisState> = {
   statTotalsPartial: true,
   statTotalsNeedsPlayers: true,
   Scoreboard: TennisScoreboard,
+  inPlay: (s, r) => servingInPlay(s, r, (x) => (!x.serverPicked && x.events.length === 0 ? null : serveInfo(x).side), reducer),
   // SD-01: once ended → sets won + "6-4, 3-6, 7-6(4)" (never the reset 0–0).
   // SD-54: + the match duration once it's over (stamped matches only)
   summary: (s) => withDuration(summary(s), s.events, s.ended),

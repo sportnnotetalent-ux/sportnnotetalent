@@ -14,3 +14,9 @@ UI audit step 1 (docs/design/ui-audit.md #1–3, 11–13, 24, 35, 37). One score
 | SB8 | The bar covers controls or the keyboard on a small phone | The bar sits above the scroll area (not over it), one compact block |
 
 Tests: tests/score-bar.test.mts (rows, in-play text, flash, every inPlay against real engines), tests/sim-score-bar.test.mts (600 random matches: never throws, the named player is always on the in-play side's roster).
+
+## Step 1b (2026-11-05)
+In play for tennis, padel, volleyball, table tennis, squash, pickleball (serving; singles names the player), football (on the ball) and cricket (batting / on strike). A "due now" note on the bar: match / set / break / game point (the same pointPressure the boards use) and football's "Added time due" / "Added time up" (the same rule as the Added time card). With no named player, the band says just the verb ("Serving") instead of repeating the side's name.
+
+| SB9 | A due note that's wrong or stale (match point after the match, added time with no clock) | Computed from the same state as the controls on every render; null when ended or unreadable |
+| SB10 | Cricket names a batter from the fielding side | The striker only if they're on the batting side's roster |

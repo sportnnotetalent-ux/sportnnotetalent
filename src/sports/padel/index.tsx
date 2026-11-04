@@ -12,6 +12,7 @@
  *
  * Points are attributed to players; games, sets and tiebreaks hit the timeline.
  */
+import { servingInPlay } from '../inPlaySets';
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { theme } from '../../core/theme';
@@ -217,6 +218,7 @@ export const padelPlugin: SportPlugin<PadelState> = {
   // SD-20: the line score (board grid, "6-4, 3-2 ret.", [10-7]) + FIP/ITF result marks.
   lineScore,
   Scoreboard: PadelScoreboard,
+  inPlay: (s, r) => servingInPlay(s, r, (x) => (!x.serverPicked && x.events.length === 0 ? null : serveInfo(x).side), reducer),
   ScoringControls,
   matchTabs: { Commentary: PadelCommentary, Stats: PadelStats },
   // SD-107 / deep wave — "Stats to track": point detail, 1st / 2nd serve, net

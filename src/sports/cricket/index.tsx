@@ -11,6 +11,7 @@
  * card — so a viewer replaying the log sees the same scorecard. The reducer is
  * pure; striker/bowler identity rides in each action's payload.
  */
+import { cricketInPlay } from './inPlay';
 import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { theme } from '../../core/theme';
@@ -2581,6 +2582,7 @@ function CricketQuickOptions({ state, dispatch, homeRoster, awayRoster, homeName
 }
 
 export const cricketPlugin: SportPlugin<CricketState> = {
+  inPlay: (s, r) => cricketInPlay(s, r),
   QuickOptions: CricketQuickOptions,
   involvedPlayerIds,
   ...CRICKET_META,

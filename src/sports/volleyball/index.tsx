@@ -3,6 +3,7 @@
  * (win by 2), best of 3 sets. Each point is logged with HOW it was won (attack,
  * block, ace, opponent error) — see ./engine.ts for who that credits.
  */
+import { servingInPlay } from '../inPlaySets';
 import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { theme } from '../../core/theme';
@@ -350,6 +351,7 @@ export const volleyballPlugin: SportPlugin<VolleyballState> = {
   // SD-17: rally points over every set (FIVB point ratio).
   standingsUnits,
   Scoreboard: VolleyballScoreboard,
+  inPlay: (s, r) => servingInPlay(s, r, (x) => servingSide(x), reducer),
   // SD-01: once ended → sets won + "25-21, 23-25, 15-12" (never the reset 0–0).
   scoreLine: (s, perspective) => scoreLine(s?.sets, { perspective }),
   // SD-20: the line score (a match closed by hand: "25-21, 12-8 conceded").
