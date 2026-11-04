@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-06 — Release: group choice + team slots live (web, Android OTA)
+
+Founder ran `20261106130000_team_slots.sql` (first run didn't apply; re-run checked read-only: `teams.slot_tournament_id` present, `create_tournament_slots` refused for anon). auth-smoke passed. Published from a clean worktree at fa34436 (b5c1182 group choice, 08dac98 slots, fa34436 mixed): web (entry `index-0de2aab8`, confirmed live on app.sportnnote.in) and Android OTA groups `6362676f` (preview) and `31664186` (production), runtime 1.0.0. The OTA upload failed three times on EAS's side (asset processing timed out, GraphQL request failed) before the fourth try went through.
+
 ### 2026-11-06 — Team slots: some teams known, some not
 
 The gap left by slots v1 (`docs/security/breaks/team-slots.md` TS12–TS15): slots were offered only when a tournament had no teams. Now **Participating teams → "+ Add slots"** any time (how many, optionally named for groups), and in **Quick tournament** a line "?" (or TBC / TBD) is a team not known yet — e.g. 5 names + "?" × 3 → 8 entries, the slots made after the real teams. New names continue after existing ones (Slot 4 … / A3, B3 … to the group with the fewest) (`nextSlotNames`, `splitTypedSlots`). `create_tournament_slots` now takes 1–128 (edited in `20261106130000_team_slots.sql`, not yet run live). A bug found in the demo — repeated "?" lines counted once (the list drops duplicates) — fixed with a test. Tests: 13 slot unit + 7 server + 2 simulations; full suite 7,331 pass, 0 fail; tsc clean; demo checked (5 teams + 3 "?" → 2 groups of 4; "+ Add slots" → Slot 4).
