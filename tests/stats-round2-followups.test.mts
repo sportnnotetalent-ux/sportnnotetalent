@@ -79,7 +79,7 @@ describe('1 · chess — "Best performance rating" award slot', () => {
     assert.deepEqual(top.map((c) => [c.name, c.value, c.display]), [['Asha', tprOf(5, 8800, 3.5), '1909']]);
     const leader = categoryLeaders(rated, players, 'chess').find((c) => c.key === 'tpr')!;
     assert.equal(top[0].value, leader.leaders[0].value, 'the award ranks the leader\'s figure');
-    assert.equal(top[0].detail, '1909 TPR · 5 rated games · 7 m');
+    assert.equal(top[0].detail, '1909 TPR · 5 rated games · 7 matches');
     const low = rankAwardCandidates(rated, players, 'chess', 'tpr', 10, { mins: { tpr: 2 } });
     assert.deepEqual(low.map((c) => [c.name, c.value]), [['Asha', 1909], ['Chen', 1500], ['Bala', 700]], 'the leader\'s min-2 order');
     // the minimum row is shared with the leader (listed once)
@@ -260,11 +260,11 @@ describe('3 · timed races — records set by a combined total; records held', (
   test('records held: the records an athlete set, still standing in the book now (by id, same mark)', () => {
     const c14 = { age: 'U14', gender: 'F' as const };
     const infos = new Map<string, PhaseInfo>([
-      ['f1', { discipline: 'ath.100m', phase: 'final', title: '100 m', date: '2026-03-01', category: c14, tournamentId: 't1', sport: 'athletics',
+      ['f1', { discipline: 'ath.100m', phase: 'final', title: '100 matches', date: '2026-03-01', category: c14, tournamentId: 't1', sport: 'athletics',
         recordsSet: [{ scope: 'MR', discipline: 'ath.100m', value: 12.3, holderId: 'p1' }, { scope: 'SR', discipline: 'ath.100m', value: 12.3, holderId: 'p1' }] }],
-      ['f2', { discipline: 'ath.4x100', phase: 'final', title: '4×100 m', date: '2026-03-01', category: c14, tournamentId: 't1', sport: 'athletics',
+      ['f2', { discipline: 'ath.4x100', phase: 'final', title: '4×100 matches', date: '2026-03-01', category: c14, tournamentId: 't1', sport: 'athletics',
         recordsSet: [{ scope: 'MR', discipline: 'ath.4x100', value: 52.1, holderIds: ['p1', 'p2', 'p3', 'p4'] }] }],
-      ['f3', { discipline: 'ath.200m', phase: 'final', title: '200 m', date: '2026-03-01', category: c14, tournamentId: 't1', recordsSet: [{ scope: 'MR', discipline: 'ath.200m', value: 25.9, holderId: 'p9' }] }],
+      ['f3', { discipline: 'ath.200m', phase: 'final', title: '200 matches', date: '2026-03-01', category: c14, tournamentId: 't1', recordsSet: [{ scope: 'MR', discipline: 'ath.200m', value: 25.9, holderId: 'p9' }] }],
       ['f4', { discipline: 'ath.lj', phase: 'final', title: 'Long jump', date: '2026-03-01', category: c14 }],
     ]);
     const refs = recordsSetBy('p1', infos);

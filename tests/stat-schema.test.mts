@@ -398,9 +398,9 @@ const handball: SportStatSchema<'handball'> = {
   stats: [
     { key: 'goals', label: 'Goals', group: 'attack', weight: 5 },
     ...['sixM', 'wing', 'nineM', 'fastBreak'].map((k) => ({ key: `${k}Goals`, label: `${k} goals`, group: 'attack' })),
-    { key: 'sevenMGoals', label: '7 m goals', group: 'attack' },
-    { key: 'sevenMTaken', label: '7 m throws', group: 'attack' },
-    { key: 'sevenMPct', label: '7 m %', source: 'derived', group: 'attack', format: { unit: 'percent', dp: 0 },
+    { key: 'sevenMGoals', label: '7 matches goals', group: 'attack' },
+    { key: 'sevenMTaken', label: '7 matches throws', group: 'attack' },
+    { key: 'sevenMPct', label: '7 matches %', source: 'derived', group: 'attack', format: { unit: 'percent', dp: 0 },
       agg: { kind: 'rate', num: 'sevenMGoals', den: 'sevenMTaken', scale: 100, dp: 0, qualifier: { den: 5 } } },
     { key: 'shots', label: 'Shots', group: 'attack' },
     { key: 'shotPct', label: 'Shooting %', source: 'derived', group: 'attack', format: { unit: 'percent', dp: 0 },
@@ -421,7 +421,7 @@ const handball: SportStatSchema<'handball'> = {
   box: [{ title: 'Per half', columns: ['goals', 'shots', 'sevenMGoals', 'saves', 'twoMinutes'] }],
   leaders: ['goals', 'savePct', 'sevenMPct'],
   headline: ['goals', 'saves'],
-  awards: [{ stat: 'goals', icon: '🤾', label: 'Top scorer' }, { stat: 'savePct', icon: '🧤', label: 'Best goalkeeper' }, { stat: 'sevenMPct', icon: '🎯', label: '7 m specialist' }],
+  awards: [{ stat: 'goals', icon: '🤾', label: 'Top scorer' }, { stat: 'savePct', icon: '🧤', label: 'Best goalkeeper' }, { stat: 'sevenMPct', icon: '🎯', label: '7 matches specialist' }],
 };
 
 /** Athletics — timed / measured marks: lower-is-better times, higher-is-better
@@ -433,7 +433,7 @@ const pb = (key: string, label: string, unit: 'time' | 'distance' | 'height' | '
 const athletics: SportStatSchema<'athletics'> = {
   sport: 'athletics',
   events: [
-    { key: 'm100', label: '100 m', format: { unit: 'time', dp: 2 } },
+    { key: 'm100', label: '100 matches', format: { unit: 'time', dp: 2 } },
     { key: 'longJump', label: 'Long jump', format: { unit: 'distance', dp: 2 }, attempts: 6 },
     { key: 'highJump', label: 'High jump', format: { unit: 'height', dp: 2 } },
     { key: 'snatch', label: 'Snatch (weightlifting)', format: { unit: 'mass', dp: 0 }, attempts: 3 },
@@ -441,13 +441,13 @@ const athletics: SportStatSchema<'athletics'> = {
   ],
   filters: Object.fromEntries(['m100', 'longJump', 'highJump', 'snatch', 'decathlon'].map((k) => [k, (l: StatLine) => l.stats?.[k] != null])),
   stats: [
-    { key: 'm100', label: '100 m', format: { unit: 'time', dp: 2 } },
+    { key: 'm100', label: '100 matches', format: { unit: 'time', dp: 2 } },
     { key: 'longJump', label: 'Long jump', format: { unit: 'distance', dp: 2 } },
     { key: 'highJump', label: 'High jump', format: { unit: 'height', dp: 2 } },
     { key: 'snatch', label: 'Snatch', format: { unit: 'mass', dp: 0 } },
     { key: 'decathlon', label: 'Decathlon', format: { unit: 'points', dp: 0 } },
     { key: 'golds', label: 'Golds', group: 'medals' },
-    pb('m100', '100 m PB', 'time', 2), pb('longJump', 'Long jump PB', 'distance', 2), pb('highJump', 'High jump PB', 'height', 2),
+    pb('m100', '100 matches PB', 'time', 2), pb('longJump', 'Long jump PB', 'distance', 2), pb('highJump', 'High jump PB', 'height', 2),
     pb('snatch', 'Snatch PB', 'mass', 0), pb('decathlon', 'Decathlon PB', 'points', 0),
   ],
   sections: [
@@ -477,7 +477,7 @@ describe('SD-15 — the schema shape expresses hockey, handball and timed / meas
     assert.deepEqual(statDefIn(hockey, 'yellowCards')?.suspension, { minutes: 5, maxMinutes: 10 });
     assert.equal(statDefIn(hockey, 'redCards')?.suspension?.permanent, true);
   });
-  test('handball: 7 m %, save %, 2-minute suspensions', () => {
+  test('handball: 7 matches %, save %, 2-minute suspensions', () => {
     const c = careerFromSchema(handball, [L({ goals: 6, shots: 9, sevenMGoals: 3, sevenMTaken: 4, twoMinutes: 1 }), L({ saves: 12, shotsFaced: 30 })]);
     const v = (sec: string, k: string) => c[sec].find((r) => r.key === k)?.value;
     assert.equal(v('attack', 'sevenMPct'), '75%');
@@ -495,7 +495,7 @@ describe('SD-15 — the schema shape expresses hockey, handball and timed / meas
     ];
     const c = careerFromSchema(athletics, lines);
     assert.deepEqual(c.bests.map((r) => [r.label, r.value]), [
-      ['100 m PB', '10.85'], ['Long jump PB', '6.88'], ['High jump PB', '2.01'], ['Snatch PB', '125'], ['Decathlon PB', '7420'],
+      ['100 matches PB', '10.85'], ['Long jump PB', '6.88'], ['High jump PB', '2.01'], ['Snatch PB', '125'], ['Decathlon PB', '7420'],
     ]);
     assert.equal(c.medals[0].value, '3');
     assert.equal(aggregateStat(athletics, statDefIn(athletics, 'pb_m100')!, []), '–'); // no mark → dash, never 0

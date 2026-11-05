@@ -2470,7 +2470,7 @@
      "teamName": "Blue",
      "value": 44.5,
      "games": 2,
-     "detail": "2 m · 3 goals · 1 assist · 4 on target"
+     "detail": "2 matches · 3 goals · 1 assist · 4 on target"
     },
     {
      "playerId": "c",
@@ -2478,7 +2478,7 @@
      "teamName": "Red",
      "value": 34.5,
      "games": 1,
-     "detail": "1 m · 2 assists · 1 goal · 1 clean sheet"
+     "detail": "1 match · 2 assists · 1 goal · 1 clean sheet"
     },
     {
      "playerId": "a",
@@ -2486,7 +2486,7 @@
      "teamName": "Red",
      "value": 16,
      "games": 1,
-     "detail": "1 m · 1 clean sheet · 4 saves"
+     "detail": "1 match · 1 clean sheet · 4 saves"
     }
    ],
    "goals": [
@@ -2496,7 +2496,7 @@
      "teamName": "Blue",
      "value": 3,
      "games": 2,
-     "detail": "3 goals · 2 m"
+     "detail": "3 goals · 2 matches"
     },
     {
      "playerId": "c",
@@ -2504,7 +2504,7 @@
      "teamName": "Red",
      "value": 1,
      "games": 1,
-     "detail": "1 goal · 1 m"
+     "detail": "1 goal · 1 match"
     }
    ],
    "assists": [
@@ -2514,7 +2514,7 @@
      "teamName": "Red",
      "value": 2,
      "games": 1,
-     "detail": "2 assists · 1 m"
+     "detail": "2 assists · 1 match"
     },
     {
      "playerId": "b",
@@ -2522,7 +2522,7 @@
      "teamName": "Blue",
      "value": 1,
      "games": 2,
-     "detail": "1 assist · 2 m"
+     "detail": "1 assist · 2 matches"
     }
    ],
    "cleanSheets": [
@@ -2532,7 +2532,7 @@
      "teamName": "Red",
      "value": 1,
      "games": 1,
-     "detail": "1 clean sheet · 4 saves · 0 conceded · 1 m"
+     "detail": "1 clean sheet · 4 saves · 0 conceded · 1 match"
     }
    ]
   },
@@ -2544,7 +2544,7 @@
      "teamName": "Blue",
      "value": 39.5,
      "games": 1,
-     "detail": "1 m · 7 assists · 9 reb · 12 pts"
+     "detail": "1 match · 7 assists · 9 reb · 12 pts"
     },
     {
      "playerId": "a",
@@ -2552,7 +2552,7 @@
      "teamName": "Red",
      "value": 31.5,
      "games": 1,
-     "detail": "1 m · 20 pts · 5 reb · 3 assists"
+     "detail": "1 match · 20 pts · 5 reb · 3 assists"
     }
    ],
    "points": [
@@ -2562,7 +2562,7 @@
      "teamName": "Red",
      "value": 20,
      "games": 1,
-     "detail": "20 pts · 1 m"
+     "detail": "20 pts · 1 match"
     },
     {
      "playerId": "b",
@@ -2570,7 +2570,7 @@
      "teamName": "Blue",
      "value": 12,
      "games": 1,
-     "detail": "12 pts · 1 m"
+     "detail": "12 pts · 1 match"
     }
    ],
    "rebounds": [
@@ -2580,7 +2580,7 @@
      "teamName": "Blue",
      "value": 9,
      "games": 1,
-     "detail": "9 reb · 1 m"
+     "detail": "9 reb · 1 match"
     },
     {
      "playerId": "a",
@@ -2588,7 +2588,7 @@
      "teamName": "Red",
      "value": 5,
      "games": 1,
-     "detail": "5 reb · 1 m"
+     "detail": "5 reb · 1 match"
     }
    ],
    "assists": [
@@ -2598,7 +2598,7 @@
      "teamName": "Blue",
      "value": 7,
      "games": 1,
-     "detail": "7 assists · 1 m"
+     "detail": "7 assists · 1 match"
     },
     {
      "playerId": "a",
@@ -2606,7 +2606,7 @@
      "teamName": "Red",
      "value": 3,
      "games": 1,
-     "detail": "3 assists · 1 m"
+     "detail": "3 assists · 1 match"
     }
    ]
   },
@@ -2618,7 +2618,7 @@
      "teamName": "Red",
      "value": 15,
      "games": 1,
-     "detail": "1 m · 10 pts · 2 aces · 1 block"
+     "detail": "1 match · 10 pts · 2 aces · 1 block"
     },
     {
      "playerId": "b",
@@ -2626,7 +2626,7 @@
      "teamName": "Blue",
      "value": 13,
      "games": 1,
-     "detail": "1 m · 8 pts · 3 blocks · 1 ace"
+     "detail": "1 match · 8 pts · 3 blocks · 1 ace"
     }
    ],
    "points": [
@@ -2636,7 +2636,7 @@
      "teamName": "Red",
      "value": 10,
      "games": 1,
-     "detail": "10 pts · 1 m"
+     "detail": "10 pts · 1 match"
     },
     {
      "playerId": "b",
@@ -2644,7 +2644,7 @@
      "teamName": "Blue",
      "value": 8,
      "games": 1,
-     "detail": "8 pts · 1 m"
+     "detail": "8 pts · 1 match"
     }
    ],
    "aces": [
@@ -2654,7 +2654,7 @@
      "teamName": "Red",
      "value": 2,
      "games": 1,
-     "detail": "2 aces · 1 m"
+     "detail": "2 aces · 1 match"
     },
     {
      "playerId": "b",
@@ -2662,7 +2662,7 @@
      "teamName": "Blue",
      "value": 1,
      "games": 1,
-     "detail": "1 ace · 1 m"
+     "detail": "1 ace · 1 match"
     }
    ]
   },
@@ -2674,7 +2674,7 @@
      "teamName": "Red",
      "value": 21,
      "games": 1,
-     "detail": "1 m · 21 pts"
+     "detail": "1 match · 21 pts"
     },
     {
      "playerId": "b",
@@ -2682,7 +2682,7 @@
      "teamName": "Blue",
      "value": 15,
      "games": 1,
-     "detail": "1 m · 15 pts"
+     "detail": "1 match · 15 pts"
     }
    ],
    "points": [
@@ -2692,7 +2692,7 @@
      "teamName": "Red",
      "value": 21,
      "games": 1,
-     "detail": "21 pts · 1 m"
+     "detail": "21 pts · 1 match"
     },
     {
      "playerId": "b",
@@ -2700,7 +2700,7 @@
      "teamName": "Blue",
      "value": 15,
      "games": 1,
-     "detail": "15 pts · 1 m"
+     "detail": "15 pts · 1 match"
     }
    ]
   },
@@ -2712,7 +2712,7 @@
      "teamName": "Red",
      "value": 50,
      "games": 1,
-     "detail": "1 m · 40 pts · 5 aces"
+     "detail": "1 match · 40 pts · 5 aces"
     },
     {
      "playerId": "b",
@@ -2720,7 +2720,7 @@
      "teamName": "Blue",
      "value": 32,
      "games": 1,
-     "detail": "1 m · 30 pts · 1 ace"
+     "detail": "1 match · 30 pts · 1 ace"
     }
    ],
    "points": [
@@ -2730,7 +2730,7 @@
      "teamName": "Red",
      "value": 40,
      "games": 1,
-     "detail": "40 pts · 1 m"
+     "detail": "40 pts · 1 match"
     },
     {
      "playerId": "b",
@@ -2738,7 +2738,7 @@
      "teamName": "Blue",
      "value": 30,
      "games": 1,
-     "detail": "30 pts · 1 m"
+     "detail": "30 pts · 1 match"
     }
    ],
    "aces": [
@@ -2748,7 +2748,7 @@
      "teamName": "Red",
      "value": 5,
      "games": 1,
-     "detail": "5 aces · 1 m"
+     "detail": "5 aces · 1 match"
     },
     {
      "playerId": "b",
@@ -2756,7 +2756,7 @@
      "teamName": "Blue",
      "value": 1,
      "games": 1,
-     "detail": "1 ace · 1 m"
+     "detail": "1 ace · 1 match"
     }
    ]
   },
@@ -2768,7 +2768,7 @@
      "teamName": "Red",
      "value": 20,
      "games": 1,
-     "detail": "1 m · 9 raid pts · 1 tackle pts"
+     "detail": "1 match · 9 raid pts · 1 tackle pts"
     },
     {
      "playerId": "b",
@@ -2776,7 +2776,7 @@
      "teamName": "Blue",
      "value": 10,
      "games": 1,
-     "detail": "1 m · 5 tackle pts"
+     "detail": "1 match · 5 tackle pts"
     }
    ],
    "raidPoints": [
@@ -2786,7 +2786,7 @@
      "teamName": "Red",
      "value": 9,
      "games": 1,
-     "detail": "9 raid pts · 1 m"
+     "detail": "9 raid pts · 1 match"
     }
    ],
    "tacklePoints": [
@@ -2796,7 +2796,7 @@
      "teamName": "Blue",
      "value": 5,
      "games": 1,
-     "detail": "5 tackle pts · 1 m"
+     "detail": "5 tackle pts · 1 match"
     },
     {
      "playerId": "a",
@@ -2804,7 +2804,7 @@
      "teamName": "Red",
      "value": 1,
      "games": 1,
-     "detail": "1 tackle pts · 1 m"
+     "detail": "1 tackle pts · 1 match"
     }
    ]
   },
@@ -2816,7 +2816,7 @@
      "teamName": "Red",
      "value": 64,
      "games": 1,
-     "detail": "1 m · 30 runs · 1 wkts · 2 catches"
+     "detail": "1 match · 30 runs · 1 wkts · 2 catches"
     },
     {
      "playerId": "a",
@@ -2824,7 +2824,7 @@
      "teamName": "Red",
      "value": 62,
      "games": 1,
-     "detail": "1 m · 54 runs · 1 catch"
+     "detail": "1 match · 54 runs · 1 catch"
     },
     {
      "playerId": "b",
@@ -2832,7 +2832,7 @@
      "teamName": "Blue",
      "value": 58,
      "games": 1,
-     "detail": "1 m · 3 wkts · 4 runs"
+     "detail": "1 match · 3 wkts · 4 runs"
     }
    ],
    "runs": [
@@ -2868,7 +2868,7 @@
      "teamName": "Blue",
      "value": 3,
      "games": 1,
-     "detail": "3 wkts · 1 m · econ 4.50 · avg 6.00"
+     "detail": "3 wkts · 1 match · econ 4.50 · avg 6.00"
     },
     {
      "playerId": "c",
@@ -2876,7 +2876,7 @@
      "teamName": "Red",
      "value": 1,
      "games": 1,
-     "detail": "1 wkts · 1 m"
+     "detail": "1 wkts · 1 match"
     }
    ]
   },
@@ -2888,7 +2888,7 @@
      "teamName": "Red",
      "value": 21,
      "games": 1,
-     "detail": "1 m · 21 pts"
+     "detail": "1 match · 21 pts"
     },
     {
      "playerId": "b",
@@ -2896,7 +2896,7 @@
      "teamName": "Blue",
      "value": 15,
      "games": 1,
-     "detail": "1 m · 15 pts"
+     "detail": "1 match · 15 pts"
     }
    ],
    "points": [
@@ -2906,7 +2906,7 @@
      "teamName": "Red",
      "value": 21,
      "games": 1,
-     "detail": "21 pts · 1 m"
+     "detail": "21 pts · 1 match"
     },
     {
      "playerId": "b",
@@ -2914,7 +2914,7 @@
      "teamName": "Blue",
      "value": 15,
      "games": 1,
-     "detail": "15 pts · 1 m"
+     "detail": "15 pts · 1 match"
     }
    ]
   },
@@ -2926,7 +2926,7 @@
      "teamName": "Red",
      "value": 21,
      "games": 1,
-     "detail": "1 m · 21 pts"
+     "detail": "1 match · 21 pts"
     },
     {
      "playerId": "b",
@@ -2934,7 +2934,7 @@
      "teamName": "Blue",
      "value": 15,
      "games": 1,
-     "detail": "1 m · 15 pts"
+     "detail": "1 match · 15 pts"
     }
    ],
    "points": [
@@ -2944,7 +2944,7 @@
      "teamName": "Red",
      "value": 21,
      "games": 1,
-     "detail": "21 pts · 1 m"
+     "detail": "21 pts · 1 match"
     },
     {
      "playerId": "b",
@@ -2952,7 +2952,7 @@
      "teamName": "Blue",
      "value": 15,
      "games": 1,
-     "detail": "15 pts · 1 m"
+     "detail": "15 pts · 1 match"
     }
    ]
   },
@@ -2964,7 +2964,7 @@
      "teamName": "Red",
      "value": 21,
      "games": 1,
-     "detail": "1 m · 21 pts"
+     "detail": "1 match · 21 pts"
     },
     {
      "playerId": "b",
@@ -2972,7 +2972,7 @@
      "teamName": "Blue",
      "value": 15,
      "games": 1,
-     "detail": "1 m · 15 pts"
+     "detail": "1 match · 15 pts"
     }
    ],
    "points": [
@@ -2982,7 +2982,7 @@
      "teamName": "Red",
      "value": 21,
      "games": 1,
-     "detail": "21 pts · 1 m"
+     "detail": "21 pts · 1 match"
     },
     {
      "playerId": "b",
@@ -2990,7 +2990,7 @@
      "teamName": "Blue",
      "value": 15,
      "games": 1,
-     "detail": "15 pts · 1 m"
+     "detail": "15 pts · 1 match"
     }
    ]
   },
@@ -3002,7 +3002,7 @@
      "teamName": "Red",
      "value": 21,
      "games": 1,
-     "detail": "1 m · 21 pts"
+     "detail": "1 match · 21 pts"
     },
     {
      "playerId": "b",
@@ -3010,7 +3010,7 @@
      "teamName": "Blue",
      "value": 15,
      "games": 1,
-     "detail": "1 m · 15 pts"
+     "detail": "1 match · 15 pts"
     }
    ],
    "points": [
@@ -3020,7 +3020,7 @@
      "teamName": "Red",
      "value": 21,
      "games": 1,
-     "detail": "21 pts · 1 m"
+     "detail": "21 pts · 1 match"
     },
     {
      "playerId": "b",
@@ -3028,7 +3028,7 @@
      "teamName": "Blue",
      "value": 15,
      "games": 1,
-     "detail": "15 pts · 1 m"
+     "detail": "15 pts · 1 match"
     }
    ]
   },
@@ -3040,7 +3040,7 @@
      "teamName": "Red",
      "value": 6,
      "games": 1,
-     "detail": "1 m · 2 wins"
+     "detail": "1 match · 2 wins"
     },
     {
      "playerId": "b",
@@ -3048,7 +3048,7 @@
      "teamName": "Blue",
      "value": 2,
      "games": 1,
-     "detail": "1 m · 2 draws"
+     "detail": "1 match · 2 draws"
     }
    ],
    "wins": [
@@ -3058,7 +3058,7 @@
      "teamName": "Red",
      "value": 2,
      "games": 1,
-     "detail": "2 wins · 1 m"
+     "detail": "2 wins · 1 match"
     }
    ]
   },
@@ -3070,7 +3070,7 @@
      "teamName": "Red",
      "value": 32,
      "games": 1,
-     "detail": "1 m · 25 pts · 2 queens · 3 boards"
+     "detail": "1 match · 25 pts · 2 queens · 3 boards"
     },
     {
      "playerId": "b",
@@ -3078,7 +3078,7 @@
      "teamName": "Blue",
      "value": 24,
      "games": 1,
-     "detail": "1 m · 18 pts · 2 queens · 2 boards"
+     "detail": "1 match · 18 pts · 2 queens · 2 boards"
     }
    ],
    "points": [
@@ -3088,7 +3088,7 @@
      "teamName": "Red",
      "value": 25,
      "games": 1,
-     "detail": "25 pts · 1 m"
+     "detail": "25 pts · 1 match"
     },
     {
      "playerId": "b",
@@ -3096,7 +3096,7 @@
      "teamName": "Blue",
      "value": 18,
      "games": 1,
-     "detail": "18 pts · 1 m"
+     "detail": "18 pts · 1 match"
     }
    ],
    "queens": [
@@ -3106,7 +3106,7 @@
      "teamName": "Red",
      "value": 2,
      "games": 1,
-     "detail": "2 queens · 1 m"
+     "detail": "2 queens · 1 match"
     },
     {
      "playerId": "b",
@@ -3114,7 +3114,7 @@
      "teamName": "Blue",
      "value": 2,
      "games": 1,
-     "detail": "2 queens · 1 m"
+     "detail": "2 queens · 1 match"
     }
    ]
   },
@@ -3126,7 +3126,7 @@
      "teamName": "Blue",
      "value": 21,
      "games": 1,
-     "detail": "1 m · 2 eagles · 2 birdies · 3 holes won"
+     "detail": "1 match · 2 eagles · 2 birdies · 3 holes won"
     },
     {
      "playerId": "a",
@@ -3134,7 +3134,7 @@
      "teamName": "Red",
      "value": 11,
      "games": 1,
-     "detail": "1 m · 2 birdies · 5 holes won"
+     "detail": "1 match · 2 birdies · 5 holes won"
     }
    ],
    "birdies": [
@@ -3144,7 +3144,7 @@
      "teamName": "Red",
      "value": 2,
      "games": 1,
-     "detail": "2 birdies · 1 m"
+     "detail": "2 birdies · 1 match"
     },
     {
      "playerId": "b",
@@ -3152,7 +3152,7 @@
      "teamName": "Blue",
      "value": 2,
      "games": 1,
-     "detail": "2 birdies · 1 m"
+     "detail": "2 birdies · 1 match"
     }
    ]
   }
@@ -3168,7 +3168,7 @@
     "playerName": "Bala",
     "teamName": "Blue",
     "value": 44.5,
-    "detail": "2 m · 3 goals · 1 assist · 4 on target"
+    "detail": "2 matches · 3 goals · 1 assist · 4 on target"
    },
    {
     "id": "football:goals",
@@ -3179,7 +3179,7 @@
     "playerName": "Bala",
     "teamName": "Blue",
     "value": 3,
-    "detail": "3 goals · 2 m"
+    "detail": "3 goals · 2 matches"
    },
    {
     "id": "football:assists",
@@ -3190,7 +3190,7 @@
     "playerName": "Chitra",
     "teamName": "Red",
     "value": 2,
-    "detail": "2 assists · 1 m"
+    "detail": "2 assists · 1 match"
    },
    {
     "id": "football:cleanSheets",
@@ -3201,7 +3201,7 @@
     "playerName": "Asha",
     "teamName": "Red",
     "value": 1,
-    "detail": "1 clean sheet · 4 saves · 0 conceded · 1 m"
+    "detail": "1 clean sheet · 4 saves · 0 conceded · 1 match"
    }
   ],
   "basketball": [
@@ -3214,7 +3214,7 @@
     "playerName": "Bala",
     "teamName": "Blue",
     "value": 39.5,
-    "detail": "1 m · 7 assists · 9 reb · 12 pts"
+    "detail": "1 match · 7 assists · 9 reb · 12 pts"
    },
    {
     "id": "basketball:points",
@@ -3225,7 +3225,7 @@
     "playerName": "Asha",
     "teamName": "Red",
     "value": 20,
-    "detail": "20 pts · 1 m"
+    "detail": "20 pts · 1 match"
    },
    {
     "id": "basketball:rebounds",
@@ -3236,7 +3236,7 @@
     "playerName": "Bala",
     "teamName": "Blue",
     "value": 9,
-    "detail": "9 reb · 1 m"
+    "detail": "9 reb · 1 match"
    },
    {
     "id": "basketball:assists",
@@ -3247,7 +3247,7 @@
     "playerName": "Bala",
     "teamName": "Blue",
     "value": 7,
-    "detail": "7 assists · 1 m"
+    "detail": "7 assists · 1 match"
    }
   ],
   "volleyball": [
@@ -3260,7 +3260,7 @@
     "playerName": "Asha",
     "teamName": "Red",
     "value": 15,
-    "detail": "1 m · 10 pts · 2 aces · 1 block"
+    "detail": "1 match · 10 pts · 2 aces · 1 block"
    },
    {
     "id": "volleyball:points",
@@ -3271,7 +3271,7 @@
     "playerName": "Asha",
     "teamName": "Red",
     "value": 10,
-    "detail": "10 pts · 1 m"
+    "detail": "10 pts · 1 match"
    },
    {
     "id": "volleyball:aces",
@@ -3282,7 +3282,7 @@
     "playerName": "Asha",
     "teamName": "Red",
     "value": 2,
-    "detail": "2 aces · 1 m"
+    "detail": "2 aces · 1 match"
    }
   ],
   "badminton": [
@@ -3295,7 +3295,7 @@
     "playerName": "Asha",
     "teamName": "Red",
     "value": 21,
-    "detail": "1 m · 21 pts"
+    "detail": "1 match · 21 pts"
    },
    {
     "id": "badminton:points",
@@ -3306,7 +3306,7 @@
     "playerName": "Asha",
     "teamName": "Red",
     "value": 21,
-    "detail": "21 pts · 1 m"
+    "detail": "21 pts · 1 match"
    }
   ],
   "tennis": [
@@ -3319,7 +3319,7 @@
     "playerName": "Asha",
     "teamName": "Red",
     "value": 50,
-    "detail": "1 m · 40 pts · 5 aces"
+    "detail": "1 match · 40 pts · 5 aces"
    },
    {
     "id": "tennis:points",
@@ -3330,7 +3330,7 @@
     "playerName": "Asha",
     "teamName": "Red",
     "value": 40,
-    "detail": "40 pts · 1 m"
+    "detail": "40 pts · 1 match"
    },
    {
     "id": "tennis:aces",
@@ -3341,7 +3341,7 @@
     "playerName": "Asha",
     "teamName": "Red",
     "value": 5,
-    "detail": "5 aces · 1 m"
+    "detail": "5 aces · 1 match"
    }
   ],
   "kabaddi": [
@@ -3354,7 +3354,7 @@
     "playerName": "Asha",
     "teamName": "Red",
     "value": 20,
-    "detail": "1 m · 9 raid pts · 1 tackle pts"
+    "detail": "1 match · 9 raid pts · 1 tackle pts"
    },
    {
     "id": "kabaddi:raidPoints",
@@ -3365,7 +3365,7 @@
     "playerName": "Asha",
     "teamName": "Red",
     "value": 9,
-    "detail": "9 raid pts · 1 m"
+    "detail": "9 raid pts · 1 match"
    },
    {
     "id": "kabaddi:tacklePoints",
@@ -3376,7 +3376,7 @@
     "playerName": "Bala",
     "teamName": "Blue",
     "value": 5,
-    "detail": "5 tackle pts · 1 m"
+    "detail": "5 tackle pts · 1 match"
    }
   ],
   "cricket": [
@@ -3389,7 +3389,7 @@
     "playerName": "Chitra",
     "teamName": "Red",
     "value": 64,
-    "detail": "1 m · 30 runs · 1 wkts · 2 catches"
+    "detail": "1 match · 30 runs · 1 wkts · 2 catches"
    },
    {
     "id": "cricket:runs",
@@ -3411,7 +3411,7 @@
     "playerName": "Bala",
     "teamName": "Blue",
     "value": 3,
-    "detail": "3 wkts · 1 m · econ 4.50 · avg 6.00"
+    "detail": "3 wkts · 1 match · econ 4.50 · avg 6.00"
    }
   ],
   "pickleball": [
@@ -3424,7 +3424,7 @@
     "playerName": "Asha",
     "teamName": "Red",
     "value": 21,
-    "detail": "1 m · 21 pts"
+    "detail": "1 match · 21 pts"
    },
    {
     "id": "pickleball:points",
@@ -3435,7 +3435,7 @@
     "playerName": "Asha",
     "teamName": "Red",
     "value": 21,
-    "detail": "21 pts · 1 m"
+    "detail": "21 pts · 1 match"
    }
   ],
   "padel": [
@@ -3448,7 +3448,7 @@
     "playerName": "Asha",
     "teamName": "Red",
     "value": 21,
-    "detail": "1 m · 21 pts"
+    "detail": "1 match · 21 pts"
    },
    {
     "id": "padel:points",
@@ -3459,7 +3459,7 @@
     "playerName": "Asha",
     "teamName": "Red",
     "value": 21,
-    "detail": "21 pts · 1 m"
+    "detail": "21 pts · 1 match"
    }
   ],
   "squash": [
@@ -3472,7 +3472,7 @@
     "playerName": "Asha",
     "teamName": "Red",
     "value": 21,
-    "detail": "1 m · 21 pts"
+    "detail": "1 match · 21 pts"
    },
    {
     "id": "squash:points",
@@ -3483,7 +3483,7 @@
     "playerName": "Asha",
     "teamName": "Red",
     "value": 21,
-    "detail": "21 pts · 1 m"
+    "detail": "21 pts · 1 match"
    }
   ],
   "tabletennis": [
@@ -3496,7 +3496,7 @@
     "playerName": "Asha",
     "teamName": "Red",
     "value": 21,
-    "detail": "1 m · 21 pts"
+    "detail": "1 match · 21 pts"
    },
    {
     "id": "tabletennis:points",
@@ -3507,7 +3507,7 @@
     "playerName": "Asha",
     "teamName": "Red",
     "value": 21,
-    "detail": "21 pts · 1 m"
+    "detail": "21 pts · 1 match"
    }
   ],
   "chess": [
@@ -3520,7 +3520,7 @@
     "playerName": "Asha",
     "teamName": "Red",
     "value": 6,
-    "detail": "1 m · 2 wins"
+    "detail": "1 match · 2 wins"
    },
    {
     "id": "chess:wins",
@@ -3531,7 +3531,7 @@
     "playerName": "Asha",
     "teamName": "Red",
     "value": 2,
-    "detail": "2 wins · 1 m"
+    "detail": "2 wins · 1 match"
    }
   ],
   "carrom": [
@@ -3544,7 +3544,7 @@
     "playerName": "Asha",
     "teamName": "Red",
     "value": 32,
-    "detail": "1 m · 25 pts · 2 queens · 3 boards"
+    "detail": "1 match · 25 pts · 2 queens · 3 boards"
    },
    {
     "id": "carrom:points",
@@ -3555,7 +3555,7 @@
     "playerName": "Asha",
     "teamName": "Red",
     "value": 25,
-    "detail": "25 pts · 1 m"
+    "detail": "25 pts · 1 match"
    },
    {
     "id": "carrom:queens",
@@ -3566,7 +3566,7 @@
     "playerName": "Asha",
     "teamName": "Red",
     "value": 2,
-    "detail": "2 queens · 1 m"
+    "detail": "2 queens · 1 match"
    }
   ],
   "golf": [
@@ -3579,7 +3579,7 @@
     "playerName": "Bala",
     "teamName": "Blue",
     "value": 21,
-    "detail": "1 m · 2 eagles · 2 birdies · 3 holes won"
+    "detail": "1 match · 2 eagles · 2 birdies · 3 holes won"
    },
    {
     "id": "golf:birdies",
@@ -3590,7 +3590,7 @@
     "playerName": "Asha",
     "teamName": "Red",
     "value": 2,
-    "detail": "2 birdies · 1 m"
+    "detail": "2 birdies · 1 match"
    }
   ]
  },

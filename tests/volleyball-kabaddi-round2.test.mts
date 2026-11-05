@@ -88,7 +88,7 @@ describe('round 2 · volleyball Best libero (FIVB: digs + perfect receptions per
     ];
     const ranked = rankAwardCandidates(lines, players, 'volleyball', 'digsReceptionsPerSet');
     assert.deepEqual(ranked.map((c) => [c.name, c.display]), [['Asha', '3.00'], ['Bala', '3.00']]);
-    assert.equal(ranked[0].detail, '3.00 D+R/S · 10 digs · 5 perfect receptions · 1 m');
+    assert.equal(ranked[0].detail, '3.00 D+R/S · 10 digs · 5 perfect receptions · 1 match');
     assert.deepEqual(rankAwardCandidates(lines, players, 'volleyball', 'digsReceptionsPerSet', 10, { mins: { digsReceptionsPerSet: 3 } }).map((c) => c.name), ['Chitra', 'Asha', 'Bala']);
     assert.equal(awardFormula('volleyball', 'digsReceptionsPerSet'),
       'Digs + perfect receptions per set: total digs + perfect receptions, divided by the sets the player was on court for. Players need at least 5 sets to rank. Ties: more digs, then more perfect receptions, then by name. You choose the winner.');
