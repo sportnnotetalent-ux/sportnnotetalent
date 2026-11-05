@@ -6,7 +6,7 @@
 | Platform / format | Instagram carousel, 5 slides, 4:5 |
 | Pillar | How-to |
 | Goal | Saves |
-| Status | Awaiting founder |
+| Status | Approved by founder 2026-11-05 |
 | AI | None. |
 
 ## Caption (post exactly)

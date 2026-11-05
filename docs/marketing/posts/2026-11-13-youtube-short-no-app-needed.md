@@ -6,7 +6,7 @@
 | Platform / format | YouTube Short, 20 s, 9:16 |
 | Pillar | How-to |
 | Goal | Subscribe |
-| Status | Awaiting founder |
+| Status | Approved by founder 2026-11-05 |
 | AI | None (no AI voice). "Altered or synthetic content": No. |
 
 ## Title (post exactly)

@@ -6,7 +6,7 @@
 | Platform / format | X + Threads, text + image |
 | Pillar | Builds itself |
 | Goal | Try the app |
-| Status | Awaiting founder |
+| Status | Approved by founder 2026-11-05 |
 | AI | None. |
 
 ## X (post exactly, 244 characters with the link counted as 23)

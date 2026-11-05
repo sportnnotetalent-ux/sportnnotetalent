@@ -6,7 +6,7 @@
 | Platform / format | LinkedIn — SportnNote company page, text + image |
 | Pillar | Building in public |
 | Goal | Follows from organisers |
-| Status | Awaiting founder |
+| Status | Approved by founder 2026-11-05 |
 | AI | None. |
 
 ## Post text (post exactly)

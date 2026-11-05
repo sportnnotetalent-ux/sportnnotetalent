@@ -6,7 +6,7 @@
 | Platform / format | Instagram + Facebook, single image post, 4:5 |
 | Pillar | Moment |
 | Goal | Engagement |
-| Status | Awaiting founder |
+| Status | Approved by founder 2026-11-05 |
 | AI | None. |
 
 ## Caption — Instagram (post exactly)

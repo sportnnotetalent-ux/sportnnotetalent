@@ -7,7 +7,7 @@
 | Pillar | The link |
 | Goal | Awareness |
 | Audience | Adult organisers and players of friends' and community games |
-| Status | Awaiting founder |
+| Status | Approved by founder 2026-11-05 |
 | AI | None. Screen recording + text. |
 
 ## Caption — Instagram (post exactly)
