@@ -1,10 +1,11 @@
-/** Horizontal swipe rail of leaderboard cards — one card per stat category
- *  (Goals, Assists, Clean sheets, …). Each card ranks the top players; tapping
- *  a player opens their profile. Swipe sideways to see more categories. */
-import React from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native';
+/** Stat leaders (UI audit #48): pick a stat (Goals, Assists, Clean sheets, …)
+ *  from a row of chips; one full-width list ranks the top players for it —
+ *  no sideways swiping. Tapping a player opens their profile. */
+import React, { useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { theme } from '../core/theme';
-import { EmptyState, textStyles } from './ui';
+import { EmptyState, SelectChip, textStyles } from './ui';
+import { pickedCategory } from '../core/leaderPick';
 import type { LeaderCategory } from '../data/standings';
 
 const MEDAL = ['🥇', '🥈', '🥉'];
@@ -18,23 +19,22 @@ export function StatLeaderRail({
   onPlayer?: (playerId: string) => void;
   topN?: number;
 }) {
-  const { width } = useWindowDimensions();
-  const cardW = Math.min(300, Math.max(240, width - theme.spacing(14)));
+  const [picked, setPicked] = useState<string | null>(null);
 
   if (categories.length === 0) {
     return <EmptyState icon="📊" title="No statistics recorded yet" compact />;
   }
+  const cat = pickedCategory(categories, picked)!;
 
   return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      decelerationRate="fast"
-      snapToInterval={cardW + theme.spacing(3)}
-      contentContainerStyle={st.rail}
-    >
-      {categories.map((cat) => (
-        <View key={cat.key} style={[st.card, { width: cardW }]}>
+    <View style={st.wrap}>
+      {categories.length > 1 ? (
+        <View style={st.chips}>
+          {categories.map((c) => <SelectChip key={c.key} label={c.label} active={c.key === cat.key} onPress={() => setPicked(c.key)} />)}
+        </View>
+      ) : null}
+      {[cat].map((cat) => (
+        <View key={cat.key} style={st.card}>
           <View style={st.titleRow}>
             <Text style={st.cardTitle} numberOfLines={1}>{cat.label}</Text>
             {cat.qualifier ? <Text style={st.qualifier} numberOfLines={1}>{cat.qualifier}</Text> : null}
@@ -59,12 +59,13 @@ export function StatLeaderRail({
           ))}
         </View>
       ))}
-    </ScrollView>
+    </View>
   );
 }
 
 const st = StyleSheet.create({
-  rail: { gap: theme.spacing(3), paddingVertical: theme.spacing(1), paddingRight: theme.spacing(2) },
+  wrap: { gap: theme.spacing(2) },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing(2) },
   card: {
     backgroundColor: theme.colors.surface,
     borderRadius: theme.radius.md,

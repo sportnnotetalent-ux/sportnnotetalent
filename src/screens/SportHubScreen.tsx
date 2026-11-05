@@ -165,7 +165,6 @@ export default function SportHubScreen() {
             <LeaderSplitChips scope={leaderScope} note="Leaders from" />
             {categories.length > 0 ? (
               <>
-                <Text style={textStyles.muted}>Swipe for more leaderboards →</Text>
                 <StatLeaderRail categories={categories} onPlayer={(id) => nav.navigate('PlayerProfile', { playerId: id })} />
               </>
             ) : <Text style={textStyles.muted}>No leaders for this filter yet.</Text>}
