@@ -100,7 +100,7 @@ Nothing below happens without the founder's explicit yes, given in chat or writt
 | When | Who | Output |
 |---|---|---|
 | Daily, 08:30 IST | each Director that has work, then `cos` | Division report in `<division>/reports/`; `cos` writes the founder's **short daily report** in [reports/](reports/) (5–10 lines: what moved, what needs the founder, anything red) |
-| Weekly, Monday | each Director | Plans the week: updates `roadmap.md` and `backlog.md`, assigns roles, opens hand-offs |
+| Weekly, Monday | each Director | Plans the week: updates `roadmap.md` and `backlog.md`, assigns roles, opens hand-offs, and adds any **connector** that would help its work to [connectors.md](connectors.md) (every role may suggest one; only the founder connects) |
 | Weekly, Sunday | `cos` | **Weekly digest**: each division's results, the numbers, decisions needed |
 
 Schedules are set up only after the founder has reviewed the role files.

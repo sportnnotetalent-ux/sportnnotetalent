@@ -1,5 +1,7 @@
 # Connecting each platform's analytics
 
+> **Shorter route (proposed, [connectors.md](../connectors.md) C-01):** a social-media connector such as Metricool reads every platform's stats after one sign-in, instead of the four developer-app setups below. If the founder picks it, skip Part 1 and Part 2.
+
 Founder 2026-11-05: connect every platform's stats right away (weekly exports until then).
 
 **How it works:** the founder signs in and creates the access on each platform (agents never sign in or see passwords). Each platform gives a **read-only** access key. The founder puts the keys in one local file, `.env.analytics.local` (already git-ignored by `.env*.local`; never committed, never pasted in chat). Engineering builds a small script that reads that file, pulls the numbers (counts only) and writes them to `stats/log.md`. The daily run then logs stats automatically.
