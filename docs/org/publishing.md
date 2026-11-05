@@ -1,0 +1,13 @@
+# Publish lock
+
+One publish (web + Android OTA) at a time, across every session and agent. Before publishing, check this file. If it's free, write your line under "Now", publish, then move the line to "History" with the result.
+
+Why: on 2026-11-05 two sessions published within minutes of each other, and one republished an older commit, briefly rolling back the other's live change.
+
+## Now
+*(free)*
+
+## History
+| When | Who | Commit | Web | OTA (preview / production) |
+|---|---|---|---|---|
+| 2026-11-05 | usage-filters session | 8333121 | index-dede4b01 | 04a6da93 / 5cbf9deb |
