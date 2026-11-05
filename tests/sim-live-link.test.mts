@@ -54,7 +54,7 @@ test('500 matches through the database read and the live link page', { timeout: 
   }
 
   for (const t of truth) {
-    const [{ r }] = await db.asAnon<{ r: Record<string, any> | null }>(`select share_match($1) as r`, [t.id]);
+    const [{ r }] = await db.asAnonWith<{ r: Record<string, any> | null }>({ 'x-share': `m:${t.id}` }, `select share_match($1) as r`, [t.id]);
     if (t.deleted) { assert.equal(r, null, 'deleted tournament hidden'); continue; }
     assert.ok(r, t.id);
     assert.deepEqual([r.sport, r.status, r.home.name, r.away.name, r.winner], [t.sport, t.status, t.home, t.away, t.winner]);

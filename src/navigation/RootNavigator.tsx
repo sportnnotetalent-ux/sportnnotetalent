@@ -14,6 +14,7 @@ import { listenForNotificationTaps, registerForPush, setCurrentPlayerId } from '
 import { followStore } from '../data/followStore';
 import { applyPendingReferral } from '../data/referral';
 import { sendSignupSource, watchLandings } from '../data/signupSource';
+import { overlayScope, scopeForRoute, setShareScopeProvider } from '../core/shareScope';
 import { flushPendingResults } from '../data/pendingResults';
 import { getFollows, getFollowPrefs, savePushToken, getCaptainTeams, getMyPlayerId } from '../data/repos';
 import { captainStore } from '../data/captainStore';
@@ -326,6 +327,18 @@ export default function RootNavigator() {
   const { authed, loading, profile } = useAuth();
   const authedRef = useRef(authed);
   authedRef.current = authed;
+
+  // Signed-out scope (signed-out-scope.md): while signed out, every request names
+  // the shared item in view, read from the current route at request time.
+  useEffect(() => {
+    setShareScopeProvider(() => {
+      if (authedRef.current) return null;
+      if (IS_OVERLAY && typeof window !== 'undefined') return overlayScope(window.location.pathname);
+      const r = navRef.isReady() ? navRef.getCurrentRoute() : undefined;
+      return r ? scopeForRoute(r.name, r.params as Record<string, unknown> | undefined) : null;
+    });
+    return () => setShareScopeProvider(null);
+  }, []);
 
   // Sign-up source: remember the link a signed-out visitor opened (data/signupSource.ts).
   useEffect(() => (IS_OVERLAY ? undefined : watchLandings(() => authedRef.current)), []);

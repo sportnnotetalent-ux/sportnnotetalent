@@ -10,6 +10,7 @@ import 'react-native-url-polyfill/auto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
 import { clearReadCache, writeAwareFetch } from '../data/readCache';
+import { withShareHeader } from './shareScope';
 
 const url = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const anonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
@@ -26,6 +27,7 @@ export const supabase = isSupabaseConfigured
       },
       // Perf F-19: every write empties the short-lived read cache (data/readCache.ts),
       // so the user's own changes are always read back fresh.
-      global: { fetch: writeAwareFetch((input: RequestInfo | URL, init?: RequestInit) => fetch(input, init), clearReadCache) },
+      // signed-out-scope.md: while signed out, name the shared item in view (x-share)
+      global: { fetch: writeAwareFetch((input: RequestInfo | URL, init?: RequestInit) => fetch(input, withShareHeader(init ?? {})), clearReadCache) },
     })
   : null;

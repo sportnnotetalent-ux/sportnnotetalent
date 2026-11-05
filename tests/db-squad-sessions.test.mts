@@ -84,7 +84,8 @@ describe('creating and rules', () => {
   });
   test('reads are open, writes only through the functions', async () => {
     const s = await create(P[0], P);
-    assert.equal((await db.asAnon<{ id: string }>(`select id from squad_sessions where id = $1`, [s.id])).length, 1);
+    // signed-out-scope.md SO8: squad sessions are for signed-in players only
+    assert.equal((await db.asAnon<{ id: string }>(`select id from squad_sessions where id = $1`, [s.id])).length, 0);
     assert.ok(await errOf(() => db.as(P[0].uid, `update squad_sessions set status = 'ended' where id = $1`, [s.id])));
     assert.ok(await errOf(() => db.as(P[0].uid, `insert into squad_sessions (sport, name, rules) values ('football', 'x', '{}')`)));
   });

@@ -116,6 +116,8 @@ export interface TestDb {
   /** run as a signed-in user (RLS on), like PostgREST */
   as<T = Record<string, unknown>>(userId: string, q: string, params?: unknown[]): Promise<T[]>;
   asAnon<T = Record<string, unknown>>(q: string, params?: unknown[]): Promise<T[]>;
+  /** as anon with PostgREST request headers (e.g. { 'x-share': 'm:<id>' }) */
+  asAnonWith<T = Record<string, unknown>>(headers: Record<string, string>, q: string, params?: unknown[]): Promise<T[]>;
   asService<T = Record<string, unknown>>(q: string, params?: unknown[]): Promise<T[]>;
   /** a confirmed account (auth.users) — the sign-up trigger makes its profile */
   signUp(opts?: { email?: string; phone?: string; phoneConfirmed?: boolean; meta?: Record<string, unknown>; name?: string; dob?: string }): Promise<string>;
@@ -134,9 +136,10 @@ export async function bootDb(opts: { strict?: boolean; skip?: RegExp } = {}): Pr
       if (opts.strict) throw new Error(`${f}: ${e instanceof Error ? e.message : e}`);
     }
   }
-  const run = async <T,>(role: string, claims: Record<string, unknown> | null, q: string, params: unknown[] = []): Promise<T[]> => {
+  const run = async <T,>(role: string, claims: Record<string, unknown> | null, q: string, params: unknown[] = [], headers?: Record<string, string>): Promise<T[]> => {
     return pg.transaction(async (tx) => {
       await tx.query(`select set_config('request.jwt.claims', $1, true)`, [claims ? JSON.stringify(claims) : '']);
+      await tx.query(`select set_config('request.headers', $1, true)`, [headers ? JSON.stringify(headers) : '']);
       if (role !== 'postgres') await tx.query(`set local role ${role}`);
       const r = await tx.query<T>(q, params);
       return r.rows;
@@ -148,6 +151,7 @@ export async function bootDb(opts: { strict?: boolean; skip?: RegExp } = {}): Pr
     sql: (q, p) => run('postgres', null, q, p),
     as: (uid, q, p) => run('authenticated', { sub: uid, role: 'authenticated' }, q, p),
     asAnon: (q, p) => run('anon', { role: 'anon' }, q, p),
+    asAnonWith: (h, q, p) => run('anon', { role: 'anon' }, q, p, h),
     asService: (q, p) => run('service_role', { role: 'service_role' }, q, p),
     async signUp(o = {}) {
       const id = randomUUID();

@@ -141,7 +141,8 @@ describe('match views', () => {
     assert.ok(!rows[0].viewer.includes(a.uid) && /^[0-9a-f]{64}$/.test(rows[0].viewer));
     assert.ok(await err(() => db.asAnon(`select * from match_views`)));
     assert.ok(await err(() => db.as(a.uid, `select * from match_views`)));
-    assert.equal((await db.asAnon<{ views: number }>(`select views from match_view_counts where match_id = $1`, [m]))[0].views, 1);
+    // signed out: the count is readable on that match's own page (signed-out-scope.md)
+    assert.equal((await db.asAnonWith<{ views: number }>({ 'x-share': `m:${m}` }, `select views from match_view_counts where match_id = $1`, [m]))[0].views, 1);
     assert.ok(await err(() => db.as(a.uid, `update match_view_counts set views = 99999 where match_id = $1`, [m])) !== null
       || (await db.sql<{ views: number }>(`select views from match_view_counts where match_id = $1`, [m]))[0].views === 1);
   });

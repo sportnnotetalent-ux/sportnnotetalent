@@ -45,6 +45,7 @@ describe('DB-08 — internal functions are not callable by the app', () => {
       'revoke_verification_reviewer',
       'is_tie_host',                    // the caller's own host status
       'usage_dashboard',                // v1 usage dashboard: app versions before the filters (support only)
+      'share_scope',                    // signed-out scope: called by share_ids() inside the anon read policies (ids only)
     ]);
     const used = (await db.sql<{ t: string }>(`
       select coalesce(qual, '') || ' ' || coalesce(with_check, '') as t from pg_policies

@@ -26,7 +26,8 @@ async function setup(o: { tournament?: 'live' | 'deleted' | null; summary?: unkn
     [o.status ?? 'live', tid, h.id, a.id, o.summary === undefined ? null : JSON.stringify(o.summary)]);
   return m.id;
 }
-const share = (id: string) => db.asAnon<{ r: Record<string, any> | null }>(`select share_match($1) as r`, [id]).then((x) => x[0].r);
+// signed out, the app names the match in view (signed-out-scope.md)
+const share = (id: string) => db.asAnonWith<{ r: Record<string, any> | null }>({ 'x-share': `m:${id}` }, `select share_match($1) as r`, [id]).then((x) => x[0].r);
 
 describe('the live summary on a match', () => {
   test('an object of a few short strings is kept', async () => {

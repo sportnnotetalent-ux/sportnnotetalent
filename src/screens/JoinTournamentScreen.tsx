@@ -17,6 +17,7 @@ import { isGuestSession, promptSignIn } from '../core/guest';
 import { notice } from '../core/confirm';
 import { getSportMeta } from '../sports/sportMeta';
 import { useCaptainships, useTournamentCategories } from '../data/hooks';
+import { setShareScope } from '../core/shareScope';
 import { getTournamentInvite, redeemTournamentInvite, getMyTeams, createTeam, type TournamentInviteInfo } from '../data/repos';
 import { filterTeams } from '../core/teamSearch';
 import { OpenInAppBanner } from '../components/OpenInAppBanner';
@@ -62,6 +63,8 @@ export default function JoinTournamentScreen() {
     catch (e) { setBusy(false); return setError((e as Error).message); }
     setBusy(false);
     if (!inv) return setError('That code isn’t valid.');
+    // signed-out-scope.md: a signed-out visitor may read this tournament's categories
+    setShareScope(`t:${inv.tournamentId}`);
     setInfo(inv);
     setNewSport(inv.sports[0] ?? null);
   }

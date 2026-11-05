@@ -18,8 +18,10 @@
  * Other people's changes show up within `ttlMs` at most (it was "on the next
  * focus" before); live scoring has its own realtime channel and isn't cached.
  *
- * Pure — no imports — so it is unit-tested.
+ * Pure (its one import, core/shareScope, is pure too) — unit-tested. Keys are
+ * per signed-out shared item (signed-out-scope.md).
  */
+import { getShareScope } from '../core/shareScope.ts';
 export interface ReadCache {
   /** The cached answer for `key` if younger than the TTL (or still in flight), else `load()`. */
   get<T>(key: string, load: () => Promise<T>): Promise<T>;
@@ -29,11 +31,14 @@ export interface ReadCache {
 
 export const READ_CACHE_TTL_MS = 10_000;
 
-export function createReadCache(ttlMs: number = READ_CACHE_TTL_MS, now: () => number = Date.now): ReadCache {
+export function createReadCache(ttlMs: number = READ_CACHE_TTL_MS, now: () => number = Date.now, scope: () => string | null = () => null): ReadCache {
   let gen = 0;
   const entries = new Map<string, { gen: number; at: number; done: boolean; promise: Promise<unknown> }>();
   return {
-    get<T>(key: string, load: () => Promise<T>): Promise<T> {
+    get<T>(rawKey: string, load: () => Promise<T>): Promise<T> {
+      // signed-out-scope.md: one shared page's rows never answer another's
+      const sc = scope();
+      const key = sc ? `${sc}|${rawKey}` : rawKey;
       const t = now();
       const hit = entries.get(key);
       // age counts from when the read STARTED, so an answer is never older than ttlMs
@@ -93,7 +98,7 @@ export function writeAwareFetch<F extends FetchLike>(base: F, onWrite: () => voi
 }
 
 /** The app-wide cache used by data/repos.ts. */
-export const readCache = createReadCache();
+export const readCache = createReadCache(READ_CACHE_TTL_MS, Date.now, getShareScope);
 
 /** Empty the read cache (sign-out, account switch, a write outside the Supabase client). */
 export function clearReadCache(): void {
