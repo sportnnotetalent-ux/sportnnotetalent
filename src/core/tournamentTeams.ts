@@ -10,3 +10,14 @@ export function tournamentTeamIds(registered: readonly { id: string }[], matches
   for (const m of matches) { add(m?.homeTeam?.id); add(m?.awayTeam?.id); }
   return out;
 }
+
+/** UI audit #47: a knockout tournament with games still to play (or none yet) —
+ *  the table is "results so far", no medals until the final is done. */
+export function knockoutInProgress(structure: string | null | undefined, matches: readonly { status: string }[]): boolean {
+  if (structure !== 'knockout') return false;
+  return matches.length === 0 || matches.some((m) => m.status !== 'completed' && m.status !== 'cancelled');
+}
+
+/** UI audit #45: games of the tournament not yet finished (cancelled ones don't count). */
+export const gamesLeft = (matches: readonly { status: string }[]): number =>
+  matches.filter((m) => m.status !== 'completed' && m.status !== 'cancelled').length;

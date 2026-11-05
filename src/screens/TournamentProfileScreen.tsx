@@ -1,6 +1,7 @@
 /** Tournament hub: overview, follow, the overall house table, a per-sport
  *  league table + statistics rail, and participating teams. For a single-sport
  *  tournament the sport selector is skipped and its table shown directly. */
+import { knockoutInProgress } from '../core/tournamentTeams';
 import { tournamentTeamIds } from '../core/tournamentTeams';
 import { formatDayRange } from '../core/dates';
 import { QualifiesToCard } from '../components/FeederCards';
@@ -271,6 +272,8 @@ export default function TournamentProfileScreen() {
   };
   // UI audit step 7: registered teams + teams already in its matches — one count everywhere
   const allTeamIds = useMemo(() => tournamentTeamIds(participants, matches), [participants, matches]);
+  // UI audit #47: a knockout still being played has no table medals yet
+  const koInProgress = knockoutInProgress(tournament?.structure, matches);
   const setupSteps = tournament ? setupChecklist(tournament, allTeamIds.length, matches.length, meet.events.length) : [];
   const openSetupStep = (key: SetupStep['key']) => {
     if (!tournament) return;
@@ -1066,19 +1069,21 @@ export default function TournamentProfileScreen() {
         {/* ------------------------------ STATS ------------------------------- */}
         {activeTab === 'Stats' && (
           <>
+            {/* UI audit #47–48: a knockout leads with its bracket (the main button); the
+                full standings page is secondary */}
+            {tournament.structure !== 'league' && !(singleSport && isEventSport(sports[0])) && (
+              <Button
+                label="🏆 Knockout bracket"
+                variant={tournament.structure === 'knockout' ? undefined : 'ghost'}
+                onPress={() => nav.navigate('Bracket', { tournamentId: tournament.id, ...(singleSport ? { sport: sports[0] } : {}) })}
+              />
+            )}
             {!(singleSport && isEventSport(sports[0])) && (
             <Button
               label="📊 Standings & leaders"
               variant="ghost"
               onPress={() => nav.navigate('Standings', { tournamentId: tournament.id, ...(singleSport ? { sport: sports[0] } : {}) })}
             />
-            )}
-            {tournament.structure !== 'league' && !(singleSport && isEventSport(sports[0])) && (
-              <Button
-                label="🏆 Knockout bracket"
-                variant="ghost"
-                onPress={() => nav.navigate('Bracket', { tournamentId: tournament.id, ...(singleSport ? { sport: sports[0] } : {}) })}
-              />
             )}
 
             {/* Medal meet — overall ranked by position points across every sport. */}
@@ -1120,7 +1125,7 @@ export default function TournamentProfileScreen() {
             )}
 
             {/* Per-sport standings + statistics */}
-            <IconText label={singleSport ? '🏆 Standings' : '📊 By sport'} style={[textStyles.h3, st.section]} />
+            <IconText label={koInProgress ? '📋 Results so far' : singleSport ? '🏆 Standings' : '📊 By sport'} style={[textStyles.h3, st.section]} />
             {!singleSport && (
               <KeyboardAwareScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.chips}>
                 {sports.map((s) => (
@@ -1146,7 +1151,7 @@ export default function TournamentProfileScreen() {
                 return (
                 <View key={ph.key} style={{ gap: theme.spacing(1) }}>
                   {phases.length > 1 || ph.key !== 'league' ? <Text style={st.groupHead}>{ph.key === 'super' ? '🔁 ' : ''}{gv ? groupHeading(gv) : ph.title}</Text> : null}
-                  <LeagueTable sport={activeSport} cfg={stCfg} teams={gv ? gv.rows : ph.rows} onTeam={openJourney} emptyLabel="No results yet." />
+                  <LeagueTable sport={activeSport} cfg={stCfg} teams={gv ? gv.rows : ph.rows} onTeam={openJourney} emptyLabel="No results yet." noMedals={koInProgress} />
                   {gv && gv.live.length > 0 ? (
                     <Text style={st.liveLine}>● Live: {gv.live.map((m) => `${m.homeTeam.name} ${m.score ? `${m.score.home}–${m.score.away}` : 'v'} ${m.awayTeam.name}`).join(' · ')}</Text>
                   ) : null}

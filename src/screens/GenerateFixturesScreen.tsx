@@ -2,6 +2,8 @@
  *  match" flow. The organizer picks teams + a structure, we generate the pairings
  *  (round-robin or knockout round 1), they review/adjust times, then we create
  *  every match at once. Manual scheduling is untouched; this is an extra path. */
+import { tournamentTeamIds } from '../core/tournamentTeams';
+import { distinctNames } from '../core/chipNames';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { KeyboardAwareScrollView } from '../components/keyboard';
@@ -87,7 +89,23 @@ export default function GenerateFixturesScreen() {
     () => (activeCat ? new Set(entries.filter((e) => e.categoryId === activeCat).map((e) => e.team.id)) : null),
     [entries, activeCat],
   );
-  const pickTeams = useMemo(() => (divTeamIds ? teams.filter((t) => divTeamIds.has(t.id)) : teams), [teams, divTeamIds]);
+  // UI audit #42: this tournament's teams (registered + already in its fixtures for
+  // this sport) by default; every other team only behind "Show other teams".
+  const [showOthers, setShowOthers] = useState(false);
+  const ownIds = useMemo(
+    () => tournamentTeamIds(participants, tourMatches.filter((m) => m.sport === sport)),
+    [participants, tourMatches, sport],
+  );
+  const pickTeams = useMemo(() => {
+    // match teams can carry ids the team list doesn't have — use the match's own team then
+    const fromMatches = tourMatches.filter((m) => m.sport === sport).flatMap((m) => [m.homeTeam, m.awayTeam]) as unknown as typeof teams;
+    const byId = new Map([...fromMatches, ...teams, ...participants].map((t) => [t.id, t] as const));
+    const own = ownIds.map((id) => byId.get(id)).filter((t): t is NonNullable<typeof t> => !!t);
+    const base = showOthers ? [...own, ...teams.filter((t) => !ownIds.includes(t.id))] : own;
+    return divTeamIds ? base.filter((t) => divTeamIds.has(t.id)) : base;
+  }, [teams, participants, ownIds, showOthers, divTeamIds, tourMatches, sport]);
+  // #43: look-alike names get the detail that tells them apart
+  const pickNames = useMemo(() => distinctNames(pickTeams.map((t) => ({ id: t.id, name: t.name, city: (t as { city?: string | null }).city ?? null }))), [pickTeams]);
   // Name lookup for draft cards: the pickable team list, plus the team ids
   // embedded in this tournament's matches (advance-mode brackets seed from
   // those, whose ids can differ from the team-list ids).
@@ -120,6 +138,11 @@ export default function GenerateFixturesScreen() {
   // registered participants (so a background refetch can't clobber their edits).
   const [touchedSel, setTouchedSel] = useState(false);
   const [structure, setStructure] = useState<Structure>(params.structure ?? (tournament?.structure === 'knockout' ? 'knockout' : 'league'));
+  // The tournament may load after the first render: follow its format until the organiser picks one
+  const pickedStructure = useRef(!!params.structure);
+  useEffect(() => {
+    if (!pickedStructure.current && tournament?.structure === 'knockout') setStructure('knockout');
+  }, [tournament?.structure]);
   const [doubleRound, setDoubleRound] = useState(false);
   const [numGroups, setNumGroups] = useState(String(params.groups ?? 4));
   const [topK, setTopK] = useState('2');
@@ -214,8 +237,8 @@ export default function GenerateFixturesScreen() {
   // Default the team picker to the registered participants of the active division
   // — the organizer sets "who's in" once, then generates without re-picking.
   const divParticipants = useMemo(
-    () => (divTeamIds ? participants.filter((t) => divTeamIds.has(t.id)) : participants),
-    [participants, divTeamIds],
+    () => { const own = pickTeams.filter((t) => ownIds.includes(t.id)); return divTeamIds ? own.filter((t) => divTeamIds.has(t.id)) : own; },
+    [pickTeams, ownIds, divTeamIds],
   );
   useEffect(() => {
     if (!touchedSel && divParticipants.length) setSelected(divParticipants.map((t) => t.id));
@@ -590,7 +613,7 @@ export default function GenerateFixturesScreen() {
       <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
         <ScreenTitle title="Auto-generate fixtures" subtitle={tournament?.name ?? 'Bulk-schedule matches'} />
         {/* Prerequisite (parity #08): fixtures need at least two participants. */}
-        {participants.length < 2 && (
+        {ownIds.length < 2 && (
           <View style={{ gap: theme.spacing(2) }}>
             <EmptyState icon="👥" title="Add at least 2 teams first" hint="Fixtures are drawn from this tournament's participating teams." compact />
             <Button label="Add teams" onPress={() => nav.navigate('TournamentTeams', { tournamentId: params.tournamentId })} />
@@ -624,13 +647,18 @@ export default function GenerateFixturesScreen() {
         {structure !== 'advance' && (
           <>
             <View style={st.rowBetween}>
-              <Text style={textStyles.muted}>Teams · {selected.length} selected</Text>
+              <Text style={st.step}>1 · Teams <Text style={textStyles.muted}>· {selected.length} selected</Text></Text>
               {pickTeams.length >= 2 && (
                 <Text style={st.link} onPress={() => { invalidate(); setTouchedSel(true); setSelected(allSelected ? [] : pickTeams.map((t) => t.id)); }}>
                   {allSelected ? 'Clear' : 'Select all'}
                 </Text>
               )}
             </View>
+            {teams.some((t) => !ownIds.includes(t.id)) ? (
+              <Text style={st.link} accessibilityRole="button" onPress={() => setShowOthers((v) => !v)}>
+                {showOthers ? 'Only this tournament’s teams' : '＋ Show other teams'}
+              </Text>
+            ) : null}
             {pickTeams.length < 2 ? (
               <Text style={textStyles.muted}>
                 {activeCat ? 'Add at least two teams to this division under “Participating teams” first.' : `Add at least two ${getSportMeta(sport).name} teams under “Manage teams” first.`}
@@ -638,21 +666,21 @@ export default function GenerateFixturesScreen() {
             ) : (
               <View style={st.chips}>
                 {pickTeams.map((t) => (
-                  <SelectChip key={t.id} label={t.name} active={selected.includes(t.id)} onPress={() => toggleTeam(t.id)} />
+                  <SelectChip key={t.id} label={pickNames.get(t.id) ?? t.name} active={selected.includes(t.id)} onPress={() => toggleTeam(t.id)} />
                 ))}
               </View>
             )}
           </>
         )}
 
-        <Text style={textStyles.muted}>Format</Text>
+        <Text style={st.step}>2 · Format</Text>
         <View style={st.chips}>
-          <SelectChip label="🔁 Round-robin (league)" active={structure === 'league'} onPress={() => { setStructure('league'); invalidate(); }} />
-          <SelectChip label="👥 Group stage" active={structure === 'groups'} onPress={() => { setStructure('groups'); invalidate(); }} />
-          <SelectChip label="🏆 Knockout (round 1)" active={structure === 'knockout'} onPress={() => { setStructure('knockout'); invalidate(); }} />
-          <SelectChip label="🇨🇭 Swiss" active={structure === 'swiss'} onPress={() => { setStructure('swiss'); invalidate(); }} />
+          <SelectChip label="🔁 Round-robin (league)" active={structure === 'league'} onPress={() => { pickedStructure.current = true; setStructure('league'); invalidate(); }} />
+          <SelectChip label="👥 Group stage" active={structure === 'groups'} onPress={() => { pickedStructure.current = true; setStructure('groups'); invalidate(); }} />
+          <SelectChip label="🏆 Knockout (round 1)" active={structure === 'knockout'} onPress={() => { pickedStructure.current = true; setStructure('knockout'); invalidate(); }} />
+          <SelectChip label="🇨🇭 Swiss" active={structure === 'swiss'} onPress={() => { pickedStructure.current = true; setStructure('swiss'); invalidate(); }} />
           {(hasGroups || hasSuper) && (
-            <SelectChip label={advanceFromSuper ? '🏅 Advance Super phase' : '🏅 Advance groups'} active={structure === 'advance'} onPress={() => { setStructure('advance'); invalidate(); }} />
+            <SelectChip label={advanceFromSuper ? '🏅 Advance Super phase' : '🏅 Advance groups'} active={structure === 'advance'} onPress={() => { pickedStructure.current = true; setStructure('advance'); invalidate(); }} />
           )}
         </View>
         {structure === 'swiss' && (
@@ -920,7 +948,7 @@ export default function GenerateFixturesScreen() {
           </Text>
         )}
 
-        <Text style={textStyles.muted}>When are the matches?</Text>
+        <Text style={st.step}>3 · When &amp; where</Text>
         <View style={st.chips}>
           <SelectChip label="Minutes apart" active={timing === 'apart'} onPress={() => setTiming('apart')} />
           <SelectChip label="Weekly across a term" active={timing === 'weekly'} onPress={() => setTiming('weekly')} />
@@ -951,7 +979,8 @@ export default function GenerateFixturesScreen() {
           <View style={st.flex}><TextField label="Venue (optional)" value={venue} onChange={setVenue} placeholder="Main ground" /></View>
         </View>
 
-        <Button label="⚡ Generate preview" variant="ghost" onPress={generate} />
+        {/* UI audit #44: the one main action until there's a preview; then Create is */}
+        <Button label={drafts ? '↻ Preview again' : '⚡ Preview fixtures'} variant={drafts ? 'ghost' : undefined} onPress={generate} />
         <FormError message={error} />
         {drafts && weekNote ? <Text style={textStyles.muted}>🗓 {weekNote}</Text> : null}
 
@@ -1015,6 +1044,7 @@ export default function GenerateFixturesScreen() {
 }
 
 const st = StyleSheet.create({
+  step: { color: theme.colors.text, fontSize: theme.font.h3, fontWeight: '800', marginTop: theme.spacing(2) },
   safe: { flex: 1, backgroundColor: theme.colors.bg },
   content: { padding: theme.spacing(4), gap: theme.spacing(3) },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing(2) },

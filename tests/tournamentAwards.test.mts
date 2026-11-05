@@ -55,13 +55,13 @@ describe('rankAwardCandidates — cricket', () => {
   test('wickets: detail shows matches / econ / avg', () => {
     const r = rankAwardCandidates(lines, players, 'cricket', 'wickets');
     assert.deepEqual(r.map((x) => [x.playerId, x.value]), [['b', 6]]);
-    assert.equal(r[0].detail, '6 wkts · 2 m · econ 6.25 · avg 8.33');
+    assert.equal(r[0].detail, '6 wkts · 2 matches · econ 6.25 · avg 8.33');
   });
   test('mvp: weighted sum incl. catches (×8)', () => {
     const r = rankAwardCandidates(lines, players, 'cricket', 'mvp');
     // b: 10 + 6×18 = 118; c: 70 + 5×8 = 110; a: 100; d: 100 (name tiebreak a < d)
     assert.deepEqual(r.map((x) => [x.playerId, x.value]), [['b', 118], ['c', 110], ['a', 100], ['d', 100]]);
-    assert.match(r[1].detail, /^1 m · 70 runs · 5 catches$/);
+    assert.match(r[1].detail, /^1 match · 70 runs · 5 catches$/);
   });
   test('defaultAwards picks the #1 of each slot', () => {
     const d = defaultAwards(lines, players, 'cricket');
@@ -85,7 +85,7 @@ describe('rankAwardCandidates — football + scoping', () => {
   test('goals: only this tournament\'s lines count; ties by name', () => {
     const r = rankAwardCandidates(lines, players, 'football', 'goals', 10, { matchIds: ['t1', 't2'] });
     assert.deepEqual(r.map((x) => [x.name, x.value]), [['Xavi', 2], ['Yash', 2], ['Zane', 1]]);
-    assert.equal(r[0].detail, '2 goals · 1 m');
+    assert.equal(r[0].detail, '2 goals · 1 match');
   });
   test('without scoping the other tournament would change the order', () => {
     assert.equal(rankAwardCandidates(lines, players, 'football', 'goals')[0].name, 'Yash');

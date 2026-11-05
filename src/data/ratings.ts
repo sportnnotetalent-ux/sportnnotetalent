@@ -359,7 +359,7 @@ export function rankAwardCandidates(
           .sort((a, b) => b[1] * (w[b[0]] ?? 0) - a[1] * (w[a[0]] ?? 0))
           .slice(0, 3)
           .map(([k, v]) => `${v} ${statLabel(k, v)}`);
-        const n = sport === 'golf' && ls.every((l) => l.eventId) ? `${ls.length} ${ls.length === 1 ? 'round' : 'rounds'}` : `${ls.length} m`;
+        const n = sport === 'golf' && ls.every((l) => l.eventId) ? `${ls.length} ${ls.length === 1 ? 'round' : 'rounds'}` : `${ls.length} ${ls.length === 1 ? 'match' : 'matches'}`;
         return { pid, value, games: ls.length, detail: [n, ...top].join(' · ') };
       })
       .filter((r) => r.value > 0)
@@ -396,7 +396,7 @@ export function rankAwardCandidates(
     const ls = linesOf.get(r.playerId) ?? [];
     const games = ls.length;
     // SD-49: golf rounds (field-event lines) read "2 rounds", not "2 m"
-    const m = sport === 'golf' && ls.length && ls.every((l) => l.eventId) ? `${games} ${games === 1 ? 'round' : 'rounds'}` : `${games} m`;
+    const m = sport === 'golf' && ls.length && ls.every((l) => l.eventId) ? `${games} ${games === 1 ? 'round' : 'rounds'}` : `${games} ${games === 1 ? 'match' : 'matches'}`;
     let detail: string;
     if (sport === 'cricket' && slot === 'runs') {
       const c = career(ls);

@@ -165,7 +165,7 @@ describe('SD-27 — minimums and the organiser override', () => {
   });
   test('the Top scorer slot ranks by PPG with the same minimum (and the override)', () => {
     assert.deepEqual(rankAwardCandidates(lines, players, 'basketball', 'points').map((c) => [c.name, c.display, c.detail]),
-      [['Bala', '20.0', '20.0 PPG · 40 pts · 2 m'], ['Chitra', '15.0', '15.0 PPG · 30 pts · 2 m']]);
+      [['Bala', '20.0', '20.0 PPG · 40 pts · 2 matches'], ['Chitra', '15.0', '15.0 PPG · 30 pts · 2 matches']]);
     assert.equal(rankAwardCandidates(lines, players, 'basketball', 'points', 10, { mins: { ppg: 1 } })[0].name, 'Asha');
   });
   test('basketball Player of the Tournament = efficiency per game', () => {
@@ -262,7 +262,7 @@ describe('SD-27 — racket leaders and Player of the Tournament rank by results'
   test('Player of the Tournament: wins, then win %, then the games ratio; the detail says so', () => {
     const c = rankAwardCandidates(lines, players, 'badminton', 'mvp');
     assert.deepEqual(c.map((x) => [x.name, x.value]), [['Bina', 3], ['Asha', 3], ['Chen', 1]]);
-    assert.equal(c[0].detail, '3 wins · 100% win · 86% games won · 3 m');
+    assert.equal(c[0].detail, '3 wins · 100% win · 86% games won · 3 matches');
     assert.equal(defaultAwards(lines, players, 'badminton')[0].playerName, 'Bina');
   });
   test('level on wins and win % → the higher games won % (the set / game ratio order)', () => {
@@ -317,7 +317,7 @@ describe('SD-27 — tie-break chains and eligibility', () => {
     assert.deepEqual(top(categoryLeaders(lines, players, 'football'), 'goals')?.map((r) => r[0]), order);
     assert.deepEqual(rankAwardCandidates(lines, players, 'football', 'goals').map((c) => c.name), order);
     // the football detail line is unchanged (golden)
-    assert.equal(rankAwardCandidates(lines, players, 'football', 'goals')[0].detail, '4 goals · 1 m');
+    assert.equal(rankAwardCandidates(lines, players, 'football', 'goals')[0].detail, '4 goals · 1 match');
   });
   test('goals per 90 needs 180 minutes; save % is keepers-only with 10 shots faced', () => {
     const lines = [
@@ -345,7 +345,7 @@ describe('SD-27 — tie-break chains and eligibility', () => {
       L('b', 'kabaddi', { raidPoints: 20 }, 'k3'),
     ];
     assert.deepEqual(rankAwardCandidates(lines, players, 'kabaddi', 'raidPoints').map((c) => [c.name, c.detail]), [
-      ['Bala', '20 raid pts · 1 m'], ['Asha', '20 raid pts · 2 m'],
+      ['Bala', '20 raid pts · 1 match'], ['Asha', '20 raid pts · 2 matches'],
     ]);
   });
   test('chess: score leads, score % needs 3 games, the Player of the Tournament is the top score', () => {

@@ -32,8 +32,11 @@ export function LeagueTable({
   emptyLabel = 'No completed matches yet.',
   sport,
   cfg,
+  noMedals = false,
 }: {
   teams: TeamStanding[];
+  /** UI audit #47: a knockout in progress — results so far, no medals or podium tint */
+  noMedals?: boolean;
   /** the table's points / tie-break config — picks the tie-break columns (SD-18) */
   cfg?: StandingsConfig;
   /** the table's sport — cricket labels a tie "T", always shows NR and shows
@@ -50,11 +53,11 @@ export function LeagueTable({
   return (
     <Card style={{ gap: theme.spacing(1) }}>
       {teams.map((t, i) => {
-        const tier = podiumColor(i);
+        const tier = noMedals ? null : podiumColor(i);
         return (
           <TouchableOpacity accessibilityRole="button" key={t.teamId} activeOpacity={onTeam ? 0.8 : 1} onPress={() => onTeam?.(t.teamId)}>
             <View style={[st.row, tier ? { backgroundColor: tier + '14', borderRadius: theme.radius.sm } : i > 3 && st.divider]}>
-              <RankBadge index={i} width={22} />
+              <RankBadge index={i} width={22} plain={noMedals} />
               <View style={[st.dot, { backgroundColor: t.colorHex ?? theme.colors.surfaceAlt }]} />
               <View style={{ flex: 1 }}>
                 <Text style={[textStyles.body, i === 0 && { fontWeight: '700' }]} numberOfLines={1}>{t.name}</Text>

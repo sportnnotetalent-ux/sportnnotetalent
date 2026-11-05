@@ -13,8 +13,8 @@ const MEDALS = ['🥇', '🥈', '🥉'];
 export const podiumColor = (index: number): string | null => (index < 3 ? PODIUM[index] : null);
 
 /** A rank cell: a medal for the top three, otherwise the plain number. */
-export function RankBadge({ index, width = 28 }: { index: number; width?: number }) {
-  const tier = podiumColor(index);
+export function RankBadge({ index, width = 28, plain = false }: { index: number; width?: number; /** no medals (UI audit #47: a knockout still being played) */ plain?: boolean }) {
+  const tier = plain ? null : podiumColor(index);
   return (
     <View style={[rk.cell, { width }]}>
       {tier ? (

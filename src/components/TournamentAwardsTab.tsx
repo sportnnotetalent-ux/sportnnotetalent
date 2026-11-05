@@ -3,6 +3,7 @@
  *  AwardPickerSheet, add custom awards and publish (winners notified). Everyone
  *  else sees the award cards once published. Rendered in place of the profile's
  *  scroll area so the Publish button can sit in a sticky footer. */
+import { gamesLeft } from '../core/tournamentTeams';
 import React, { useMemo, useState } from 'react';
 import { usePlayerNameOf } from '../data/usePlayerNameOf';
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
@@ -56,6 +57,8 @@ export function TournamentAwardsTab({
   // SD-49: field-event lines here (golf rounds …) — `lines` is this tournament's
   const eventIds = useMemo(() => new Set(lines.flatMap((l) => (l.eventId ? [l.eventId] : []))), [lines]);
   const published = !!awards?.publishedAt;
+  // UI audit #45: games still to play → "awards so far"; publishing early asks first
+  const stillPlaying = gamesLeft(matches);
   // SD-27: every ranking uses the matches (W / L) and the organiser's minimums
   const optsFor = useMemo(() => {
     const cache = new Map<SportId, { matchIds: Set<string>; eventIds: Set<string>; matches: Match[]; mins: LeaderMins }>();
@@ -109,7 +112,7 @@ export function TournamentAwardsTab({
     for (const l of rankLines) if (l.sport === sport && (matchIds.has(l.matchId) || (!!l.eventId && eventIds.has(l.eventId)))) games.set(l.playerId, (games.get(l.playerId) ?? 0) + 1);
     return [...games.entries()].map(([pid, g]) => {
       const p = byId.get(pid);
-      return { id: pid, name: p?.fullName ?? 'Player', teamName: p?.houseName, teamColor: p?.houseColor, detail: mvpBy.get(pid)?.detail ?? `${g} m` };
+      return { id: pid, name: p?.fullName ?? 'Player', teamName: p?.houseName, teamColor: p?.houseColor, detail: mvpBy.get(pid)?.detail ?? `${g} ${g === 1 ? 'match' : 'matches'}` };
     }).sort((a, b) => a.name.localeCompare(b.name));
   }, [sport, players, rankLines, matchIds, eventIds, candidatesMvp]);
 
@@ -145,7 +148,7 @@ export function TournamentAwardsTab({
   const publish = async () => {
     const items = current.filter((i) => i.playerId && i.label.trim());
     if (items.length === 0) { notice('Nothing to publish', 'Pick at least one winner first.'); return; }
-    const ok = await confirmAction(published ? 'Update awards?' : 'Publish awards?', 'Winners will be notified. You can edit later.', published ? 'Update' : 'Publish');
+    const ok = await confirmAction(published ? 'Update awards?' : stillPlaying ? 'Publish awards early?' : 'Publish awards?', stillPlaying && !published ? `${stillPlaying} game${stillPlaying === 1 ? ' is' : 's are'} still to play — the winners could change. Winners will be notified; you can edit later.` : 'Winners will be notified. You can edit later.', published ? 'Update' : 'Publish');
     if (!ok) return;
     const next: TournamentAwards = { publishedAt: awards?.publishedAt ?? new Date().toISOString(), items };
     setSaving(true);
@@ -269,9 +272,11 @@ export function TournamentAwardsTab({
           <EmptyState icon="🏆" title="Awards" hint="Suggestions appear once matches have player stats." />
         ) : (
           <>
-            <Text style={textStyles.muted}>{published ? 'Edit the awards, then tap Update.' : 'Pre-filled from the stats — change any, then publish.'}</Text>
+            <Text style={textStyles.muted}>{published ? 'Edit the awards, then tap Update.' : stillPlaying ? `Awards so far — ${stillPlaying} game${stillPlaying === 1 ? '' : 's'} still to play. Publish once the last one ends.` : 'Pre-filled from the stats — change any, then publish.'}</Text>
             {slots.map((s) => {
               const has = sport ? rankAwardCandidates(rankLines, players, sport, s.slot, 1, optsFor(sport)).length > 0 : false;
+              // UI audit #46: an award with no stats and no winner isn't shown
+              if (!has && !current.find((i) => i.id === awardId(sport!, s.slot))) return null;
               return slotCard(s.slot, s.label, s.icon, current.find((i) => i.id === awardId(sport!, s.slot)),
                 has ? () => setPicker({ kind: 'slot', sport: sport!, slot: s.slot, label: s.label }) : undefined);
             })}
@@ -299,7 +304,7 @@ export function TournamentAwardsTab({
       {current.length > 0 || published ? (
         <View style={st.footer}>
           {published ? <Button label="Cancel" variant="ghost" style={{ flex: 1 }} onPress={() => { setDraft(null); setTouched(new Set()); setEditing(false); }} /> : null}
-          <Button label={saving ? 'Saving…' : published ? 'Update awards' : 'Publish awards'} disabled={saving} style={{ flex: 2 }} onPress={() => void publish()} />
+          <Button label={saving ? 'Saving…' : published ? 'Update awards' : stillPlaying ? 'Publish early…' : 'Publish awards'} variant={stillPlaying && !published ? 'ghost' : undefined} disabled={saving} style={{ flex: 2 }} onPress={() => void publish()} />
         </View>
       ) : null}
       <AwardPickerSheet
