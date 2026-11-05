@@ -17,7 +17,8 @@ describe('the stack header fits its buttons on the web', () => {
     assert.match(nav, /export const webHeaderFit = \(Platform\.OS === 'web'/);
     assert.match(nav, /headerTitleContainerStyle: \{ flexShrink: 1, minWidth: 0 \}/);
     assert.match(nav, /headerRightContainerStyle: \{ flexBasis: 'auto', flexShrink: 0 \}/);
-    assert.match(nav, /<Stack\.Navigator\s+screenOptions=\{webHeaderFit\}/);
+    // (iPad: the same options also carry the readable column — readable-width.test.mts)
+    assert.match(nav, /<Stack\.Navigator[\s\S]{0,200}?screenOptions=\{\(\{ route \}\) => \(\{ \.\.\.webHeaderFit,/);
   });
   test('the library still lets these styles win (re-check after a React Navigation upgrade)', () => {
     const header = read('node_modules/@react-navigation/elements/src/Header/Header.tsx');

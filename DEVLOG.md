@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-05 — iPad: content in a readable column (not yet published)
+
+The iOS build is a real iPad app (`supportsTablet: true`; Expo allows all four iPad orientations and Split View), so Apple reviews it on an iPad. `docs/security/breaks/ipad.md` (IP1–IP10). On a wide screen every page ran edge to edge (1,100+ pt lines in landscape). Now stack screens and tab screens sit in a centred column of at most 840 pt; the header and tab bar stay full width (`src/core/readableWidth.ts`, wired in `RootNavigator` through `contentStyle` / `sceneStyle`). The bracket, meet timetable, golf round, support console and usage dashboard keep the full width. Phones, iPad portrait (744–834) and Split View don't change, because the cap is wider than they are. Wide browser windows on a laptop get the same column. Scan: 112 screens at 1180×820, plus 14 key screens at 744×1133 and 375×1024, with no overflow and no error screens. Tests: readable-width 8, header-fit updated; full suite 7,501 pass, 0 fail on a clean worktree; tsc clean. Found on the way, not fixed here: `/LiveScoring?matchId=…` without `sport` (a hand-typed URL) shows the error screen (IP7). Still needs Xcode's iPad simulator: keyboard and share sheet (IP8–IP9), and the 13" iPad store screenshots (added to `docs/launch/store-launch.md`). No database change.
+
 ### 2026-11-09 — Stat leaders: one list with a stat picker — live (UI audit #48)
 
 The tournament Stats tab and the sport hub no longer scroll leaderboards sideways ("Swipe for more →" removed): a row of stat chips (Goals, Shots, Shots on target, …) picks the stat and one full-width list ranks its leaders; if a filter removes the picked stat, the first one shows (`src/core/leaderPick.ts`). Tests: leader-list 2; full suite 7,493 pass, 0 fail; tsc clean; demo checked (Goals → Shots). auth-smoke passed. Published from a clean worktree at 7b48e1c0: web `index-7c8a88ca` (confirmed live), Android OTA `9a67d0b8` (preview) / `f05df8d7` (production). No database change.

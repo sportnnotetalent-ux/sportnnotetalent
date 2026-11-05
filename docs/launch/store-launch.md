@@ -63,7 +63,7 @@
 
 **B3. The first iPhone build.** It needs you at the keyboard once: `npx eas-cli build -p ios --profile production` asks you to sign in to your Apple account (EAS then makes the certificates). *(Me + you.)*
 
-**B4. App Store Connect.** New app: SportnNote, bundle id `in.sportnnote.app`, SKU `sportnnote-ios`, primary language English (India). Fill it with sections C and E, add iPhone screenshots (6.9" and 6.5"), and submit for review after `eas submit -p ios`. *(You, with me preparing the submit.)*
+**B4. App Store Connect.** New app: SportnNote, bundle id `in.sportnnote.app`, SKU `sportnnote-ios`, primary language English (India). Fill it with sections C and E, add iPhone screenshots (6.9" and 6.5") and 13" iPad screenshots (the app runs on iPad, so Apple asks for them; see section D), and submit for review after `eas submit -p ios`. *(You, with me preparing the submit.)*
 
 ---
 
@@ -108,6 +108,8 @@ Built in India for school, college and community sport. Free while we're new.
 4. The shared live score page on a phone browser.
 5. Full time: "Share the result" and "Play again".
 6. A tournament table.
+
+**iPad (Apple only):** the same shots at 13" iPad size (2064×2752 portrait). I take these from the iPad simulator once Xcode is installed; the app shows its content in a centred column on iPad (docs/security/breaks/ipad.md).
 
 ## E. Store answers
 

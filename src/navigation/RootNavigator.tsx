@@ -7,6 +7,7 @@ import { promptSignIn, takePendingRoute } from '../core/guest';
 import { GuestBar } from '../components/GuestBar';
 import { createNativeStackNavigator, type NativeStackNavigationOptions } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { readableContentStyle, stackContentStyle } from '../core/readableWidth';
 import { theme } from '../core/theme';
 import { useAuth } from '../core/auth';
 import { listenForNotificationTaps, registerForPush, setCurrentPlayerId } from '../core/notifications';
@@ -281,6 +282,7 @@ function Tabs() {
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
+        sceneStyle: readableContentStyle('Tabs'),
         tabBarStyle: { backgroundColor: theme.colors.surface, borderTopColor: theme.colors.surfaceAlt, height: Platform.OS === 'web' ? 64 : undefined, paddingTop: 6 },
         tabBarActiveTintColor: theme.colors.text,
         tabBarInactiveTintColor: theme.colors.textMuted,
@@ -502,7 +504,8 @@ export default function RootNavigator() {
       onUnhandledAction={() => { if (!authed) promptSignIn(); }}
     >
       <Stack.Navigator
-        screenOptions={webHeaderFit}
+        // iPad / wide windows: content in a centred column (core/readableWidth.ts)
+        screenOptions={({ route }) => ({ ...webHeaderFit, contentStyle: stackContentStyle(route.name) })}
         // Lazy screens (lazyScreens.ts) show a spinner for the moment their chunk loads.
         screenLayout={({ children, route }) => (
           <Suspense fallback={<View style={{ flex: 1, backgroundColor: theme.colors.bg, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color={theme.colors.primary} /></View>}>
