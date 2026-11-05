@@ -1,5 +1,11 @@
 # Marketing decisions (newest first)
 
+## 2026-11-05 (later): founder answers
+- **"Live now"** in warm-up posts (not "coming soon"): the app is live and in use.
+- **Posts come from the SportnNote pages**, introducing the app and its value — not from the founder's personal profiles. The founder doesn't appear in posts; a founder-on-camera or personal-profile post would be a separate, explicitly marked item (and then needs the Salesforce clearance).
+- **Demo names Omar and Sara** are fine.
+- **Stats:** weekly exports for now, and **connect every platform's analytics right away** ([analytics-setup.md](analytics-setup.md)).
+
 ## 2026-11-05: the agent marketing division (founder)
 - **Posting:** agents prepare a ready-to-post queue; the founder publishes. Direct posting by agents comes later.
 - **Approval:** the founder approves **every** post (not a weekly calendar).
@@ -17,7 +23,6 @@
 See docs/marketing/README.md: "free" with the free-while-new line; AI presenter allowed with disclosure; no AI faces as users; founder on camera for launch and major announcements; children's privacy rules; no competitor names; launch Mon 11 Jan 2027 10:00 IST; pre-launch from 7 Dec.
 
 ## Open (founder to decide)
-- Soft open: say "live now, free while we're new" in warm-up posts, or stay "coming soon" until 7 Dec? *(The warm-up drafts assume "live now", because the app is live and friends are using it.)*
 - X API Basic (about $200/month) for X stats, or monthly exports.
 - Paid promotion: when, budget, which platforms.
-- Salesforce clearance for the founder appearing publicly as the founder.
+- Salesforce clearance: only if a post ever features the founder personally.

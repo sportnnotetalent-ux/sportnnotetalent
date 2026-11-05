@@ -3,13 +3,13 @@
 | Field | Value |
 |---|---|
 | Publish | Wed 11 Nov 2026, 09:30 IST |
-| Platform / format | LinkedIn (founder profile; company page reshares), text + image |
+| Platform / format | LinkedIn — SportnNote company page, text + image |
 | Pillar | Building in public |
 | Goal | Follows from organisers |
-| Status | Awaiting founder — **Founder voice — edit before approval** |
+| Status | Awaiting founder |
 | AI | None. |
 
-## Post text (post exactly, after the founder's edit)
+## Post text (post exactly)
 ```
 Most sport isn't played in stadiums. It's the Thursday five-a-side, the weekend badminton doubles, the kabaddi game on the community ground.
 
@@ -21,7 +21,7 @@ One person scores on their phone. They tap Share and drop a link in the group ch
 
 We're starting with football, basketball, kabaddi, badminton, tennis, pickleball and padel, and the app already covers 33 sports, each by its own rules.
 
-If you run a regular game, I'd like you to try it and tell me what's missing.
+If you run a regular game, try it this week and tell us what's missing.
 
 https://sportnnote.in
 ```
@@ -51,11 +51,10 @@ https://sportnnote.in
 - [ ] One call to action; link typed in full, no shortener, no tracking parameters.
 - [ ] Hashtags 3–5. Alt text matches the final visual.
 - [ ] Founder approval recorded in docs/org/marketing/queue.md.
-- [ ] Founder has rewritten in their own voice.
 - [ ] Sport count still 33 on sportnnote.in (scripts/build-website.mjs SPORT_ORDER) on the day.
-- [ ] Salesforce clearance for appearing publicly as founder (decisions.md, Open).
 
 ## Editor notes
+- 2026-11-05: founder: page posts, not the founder's personal profile → company voice ("we"), no founder appearance, no Salesforce clearance needed.
 - Facts checked: Share link / browser follow, standings and stats, 33 sports (SPORT_ORDER in scripts/build-website.mjs). No change to the founder's meaning.
 
 ## Checks
