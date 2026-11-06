@@ -12,8 +12,8 @@
  * - It sits over the app, which loads underneath, and never takes touches
  *   (pointerEvents="none"). A hard stop always removes it, so it can never
  *   hang.
- * - Silent for now. The "Sport n Note" voice comes with the next app build
- *   (it needs expo-audio).
+ * - The "Sport n Note" voice plays with the full version on app builds that
+ *   have expo-audio (1.1.0+), once the real recording is in (data/launchVoice).
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Animated, Easing, Platform, StyleSheet, Text, View } from 'react-native';
@@ -21,6 +21,9 @@ import Svg, { G, Path } from 'react-native-svg';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LAUNCH_FADE_MS, LAUNCH_FULL_MS, LAUNCH_SEEN_KEY, LAUNCH_SHORT_MS, launchPlan, launchTracks, type LaunchPlan, type Track } from '../core/launchPlan';
 import { theme } from '../core/theme';
+import { shouldPlayVoice } from '../core/launchVoice';
+import { hydrateLaunchSoundPref, launchSoundPref } from '../core/launchSoundPref';
+import { VOICE_CLIP_READY, audioModuleReady, playLaunchVoice } from '../data/launchVoice';
 
 const TILE = '#0D5A3F'; // the app icon's green, so icon → launch is seamless
 const LIME = '#C6EE3E';
@@ -110,7 +113,13 @@ export function LaunchAnimation({ fontsReady = true }: { fontsReady?: boolean })
       try { seen = (await AsyncStorage.getItem(LAUNCH_SEEN_KEY)) === '1'; } catch { seen = null; }
       let reducedMotion = false;
       try { reducedMotion = await AccessibilityInfo.isReduceMotionEnabled(); } catch { /* assume motion is fine */ }
-      if (on) setPlan(launchPlan({ seen, reducedMotion, overlay: false }));
+      const next = launchPlan({ seen, reducedMotion, overlay: false });
+      if (on) setPlan(next);
+      // A2: the "Sport n Note" voice with the full version (first launch), lands on the dot tick
+      await hydrateLaunchSoundPref();
+      if (on && shouldPlayVoice({ full: next.full, web: WEB, reducedMotion, soundOn: launchSoundPref.get(), moduleReady: audioModuleReady(), clipReady: VOICE_CLIP_READY })) {
+        setTimeout(() => void playLaunchVoice(), 200);
+      }
     })();
     // Hard stop: whatever happens, the overlay is gone after 4.5 s.
     const stop = setTimeout(() => on && setGone(true), 4500);

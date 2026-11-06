@@ -203,6 +203,22 @@
             "useFrameworks": "static"
           }
         }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#0D5A3F",
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 96
+        }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "SportnNote uses the microphone for hands-free voice scoring. Audio isn’t recorded or uploaded by SportnNote — only the recognized words are used.",
+          "enableBackgroundPlayback": false,
+          "enableBackgroundRecording": false
+        }
       ]
     ],
     "extra": {

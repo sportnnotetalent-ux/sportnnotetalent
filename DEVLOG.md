@@ -25,6 +25,18 @@ auth-smoke passed. Published from a clean worktree at 9c758015 (the tip; the com
 
 Founder: rename the Matches views from Playing / Running to **Player** / **Organizer**. A game you play in and also host stays under Player only, and its card now says "You're hosting" (`VIEW_LABEL`, `hostingNote` in `src/core/myMatches.ts`; MatchesScreen). The internal keys didn't change. Tests: matches-tab-playing 4 new (MM9–MM12), 14 pass with the sim; tsc clean. Not checked in the demo yet. Open: the founder's Player view is empty. Live data shows hosts on their own rosters, so the next step is to check the founder's own account. No database change.
 
+### 2026-11-06 — Launch voice (A2) + native splash (A3), ready for the 1.1.0 build (not yet published)
+
+Both need native modules, so they take effect in the next app build. Break-it list: `docs/security/breaks/launch-voice-splash.md` (LV1–LV7, SP1–SP2).
+- **Splash:** `expo-splash-screen` with the launch animation's first frame (green `#0D5A3F`, the mark, 96 wide), so icon → splash → animation is seamless. It's never held open from code, so it can't get stuck.
+- **Voice:** "Sport n Note" with the full first-launch animation only, on phones; it respects the silent switch, lowers (not stops) music, and is off with reduced motion. A Settings switch, "Welcome sound when the app opens", turns it off.
+  - `expo-audio` loads only after `requireOptionalNativeModule('ExpoAudio')`. APK 41 lacks it and gets this code over the air; a top-level import would have crashed it, and a test forbids one.
+  - The plugin's background audio is turned off (App Review) and our microphone wording is kept.
+  - The clip is a machine-voice placeholder with `VOICE_CLIP_READY = false`, so nothing plays until the founder's recording is in.
+- **Dependencies:** installing `expo-audio` pulled `expo-asset` 58 (wrong SDK — the bundle failed) and moved expo-asset and expo-constants patches. npm `overrides` pin them to APK 41's exact versions (56.0.17 / 56.0.18), so over-the-air JS keeps matching its native code. Android and web exports build.
+
+Tests: launch-voice-splash 8; full suite 7,585 pass, 0 fail; tsc clean. Not checked on a phone yet (needs the 1.1.0 build or the iOS simulator). At the sdk57 merge: `npx expo install --fix`. No database change.
+
 ### 2026-11-06 — Reference-video batch 2: who's playing, officials at setup, lighter teams, one sheet, placeholders, calmer type — live
 
 The founder approved "the next suggested batch" from `docs/design/reference-video/README.md`. Break-it list: `docs/security/breaks/reference-batch-2.md` (R1–R19).

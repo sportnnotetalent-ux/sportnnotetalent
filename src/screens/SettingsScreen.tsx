@@ -8,7 +8,7 @@
  * and a natural anchor for Help & support.
  */
 import React, { useState, useSyncExternalStore } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -24,6 +24,7 @@ import { useRegion } from '../core/region';
 import { reminderPrefsStore, formatLead } from '../data/reminderPrefs';
 import { onboardingStore } from '../data/onboardingStore';
 import { hapticsPref, useHapticsOn } from '../core/hapticsPref';
+import { launchSoundPref, useLaunchSoundOn } from '../core/launchSoundPref';
 import { getMyPlayerId } from '../data/repos';
 import { getUnreadThreadCount } from '../data/messages';
 import { useFocusEffect } from '@react-navigation/native';
@@ -95,6 +96,7 @@ export default function SettingsScreen() {
   const tz = useUserTimeZone();
   const region = useRegion();
   const hapticsOn = useHapticsOn();
+  const launchSoundOn = useLaunchSoundOn();
 
   const version = Constants.expoConfig?.version ?? '1.0.0';
 
@@ -112,6 +114,9 @@ export default function SettingsScreen() {
           <View style={st.divider} />
           {/* SD-110: a light buzz on each scoring tap — this phone only. */}
           <Row icon="📳" label="Buzz on scoring taps" value={hapticsOn ? 'On' : 'Off'} onPress={() => hapticsPref.set(!hapticsOn)} />
+          {Platform.OS !== 'web' && (
+            <Row icon="🔊" label="Welcome sound when the app opens" value={launchSoundOn ? 'On' : 'Off'} onPress={() => launchSoundPref.set(!launchSoundOn)} />
+          )}
         </Group>
 
         <Group title="Account">
