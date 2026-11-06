@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-06 — Release: fill a slot with a team you already have (web, Android OTA)
+
+Founder ran `20261113120000_slot_fill_existing.sql` (confirmed read-only: the live `fill_tournament_slot` has the new rule). auth-smoke passed. Published from a clean worktree at the tip b68ced4c (live 2c3c3da4 + this fix + marketing docs): web `index-d4c15664`, confirmed live; Android OTA `593a1d8f` (preview) / `ab6d1e7a` (production). Checked live on the demo account’s Demo Kabaddi League: the slot search now finds Demo Greens / Golds / Panthers (two of them already entered), and all three slots filled with no error — the tournament now lists exactly those 3 teams.
+
 ### 2026-11-06 — Fill a tournament slot with a team you already have
 
 Found while making the marketing demo (`docs/security/breaks/slot-fill-existing.md`): Participating teams → Fill slot → "Or a team already on SportnNote" found nothing for teams the organiser had just made, even ones already in the tournament, so a fixtures-first tournament could only fill a slot with a brand-new team plus a captain’s name and mobile. Two causes: the search hid every team made from a friendly’s "+ New team" (not only untouched "Team A / Player B" quick sides), and the app and server refused any team already entered. Now the search uses the QG-01 rule (`slotCandidates` in src/core/slots.ts) and a team already entered may take a slot while it has no game in the tournament (its entry kept; a team with a game is still refused). Server: **`supabase/migrations/20261113120000_slot_fill_existing.sql`** (founder runs) — `fill_tournament_slot`. Tests: 5 unit incl. a 600-search simulation, 1 new server test, one existing test updated (it relied on the old refusal); full suite 7,626 pass, 0 fail; tsc clean. Not demo-checked (the offline demo has no slot tournament) — to be checked on the live demo league after release.
