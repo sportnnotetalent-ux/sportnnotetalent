@@ -13,6 +13,14 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-06 — Release: match roles, team join link, grounds + Schedule, voice/splash (web, Android OTA)
+
+The founder ran both SQL files; confirmed read-only on the live database: `match_squads.captain_id`, the trigger `match_squads_roles`, the 6 team-join functions and 2 tables. auth-smoke passed.
+- **Published** from a clean worktree at the tip 2c3c3da4: A2+A3 (a5eb85f7), C6 (b67fe89d), C9+C10 (0c63746c), C8 (e0fd8725), plus the start-a-friendly fix (6e927ab3), which was already live.
+- **Web:** `index-4243d73d`. The custom domain served a mix of old and new edges for about 5 minutes before settling. Confirmed live: `tj/:token`, "This link isn't active", "Captain", "Schedule matches".
+- **Android OTA:** `c4034293` (preview) / `3c8b5c37` (production), runtime 1.0.0.
+- **Voice and splash:** they stay dormant on APK 41 (expo-audio is guarded; the splash is native config only) until the 1.1.0 build.
+
 ### 2026-11-06 — Release: every account can start a friendly (web, Android OTA)
 
 auth-smoke passed. The branch tip also held three commits marked "not yet published" (launch voice + splash, match-day roles with SQL still to run, grounds), so this was published from a clean worktree at the live code (a003c574 / 3b51dd4a) plus this fix only: release commit 8a836d66 (detached, not on the branch). Web `index-cb8bbda2`, confirmed live on app.sportnnote.in; Android OTA `af154c36` (preview) / `fdd92fd8` (production), runtime 1.0.0. No database change. The next publish from the tip will carry the fix again (it is in 6e927ab3) together with whatever the founder approves of the held commits.
@@ -33,7 +41,7 @@ auth-smoke passed. Published from a clean worktree at 9c758015 (the tip; the com
 
 Founder: rename the Matches views from Playing / Running to **Player** / **Organizer**. A game you play in and also host stays under Player only, and its card now says "You're hosting" (`VIEW_LABEL`, `hostingNote` in `src/core/myMatches.ts`; MatchesScreen). The internal keys didn't change. Tests: matches-tab-playing 4 new (MM9–MM12), 14 pass with the sim; tsc clean. Not checked in the demo yet. Open: the founder's Player view is empty. Live data shows hosts on their own rosters, so the next step is to check the founder's own account. No database change.
 
-### 2026-11-06 — Team join link: players ask, the captain accepts (C8) (not yet published; SQL to run)
+### 2026-11-06 — Team join link: players ask, the captain accepts (C8) — live
 
 Break-it list: `docs/security/breaks/team-join-link.md` (TJ1–TJ10).
 - **On the squad page**, next to "add by mobile or contacts", a "🔗 Join link" card (managers only): get the link, share it, New link (the old one stops), Turn off. Below it, "Asked to join (N)" with Accept / Decline.
@@ -50,7 +58,7 @@ Break-it list: `docs/security/breaks/team-join-link.md` (TJ1–TJ10).
 
 Tests: db-team-join-link 9 (PGlite), team-join-link 4, sim-team-join-link (600 people, 20 teams); db-wave3 guard passes. Full suite 7,620 pass, 0 fail; tsc clean. Demo checked: the card (link, share, new, off); a dead link's screen. Not done: a printable QR for the team link; telling the person when they're accepted.
 
-### 2026-11-06 — Grounds with game counts (C9) + one "Schedule matches" entry (C10) (not yet published)
+### 2026-11-06 — Grounds with game counts (C9) + one "Schedule matches" entry (C10) — live
 
 Break-it list: `docs/security/breaks/grounds-and-schedule.md` (GS1–GS4).
 - **Grounds (C9):** a tournament's ground suggestions (create and edit) show how many games each has hosted ("Bangalore Football Stadium · 10 games"), busiest first (`core/venueCounts`). Several grounds could already be picked.
@@ -58,7 +66,7 @@ Break-it list: `docs/security/breaks/grounds-and-schedule.md` (GS1–GS4).
 
 Tests: grounds-and-schedule 4. Full suite 7,602 pass, 0 fail; tsc clean. Demo checked: the Manage choice panel; ground chips with counts. No database change.
 
-### 2026-11-06 — Match-day roles: captain + keeper for every team sport (C6) (not yet published; SQL to run)
+### 2026-11-06 — Match-day roles: captain + keeper for every team sport (C6) — live
 
 Break-it list: `docs/security/breaks/match-roles.md` (MR1–MR8).
 - **Roles:** each side's squad can name this match's **captain** (every team sport) and its **keeper**: Wicket-keeper (cricket), Goalkeeper (football / handball / hockey), Goalie (ice hockey).
@@ -74,7 +82,7 @@ Break-it list: `docs/security/breaks/match-roles.md` (MR1–MR8).
 
 Tests: db-match-roles 6 (PGlite), match-roles 6, sim-match-roles (600 sides × 30 changes). Full suite 7,598 pass, 0 fail; tsc clean. Demo checked: captain Rohan Nair + goalkeeper Kiran Rao saved; Info shows "This match: Rohan Nair"; roles kept on reopen. Not done: volleyball libero; cricket toss captain prefill.
 
-### 2026-11-06 — Launch voice (A2) + native splash (A3), ready for the 1.1.0 build (not yet published)
+### 2026-11-06 — Launch voice (A2) + native splash (A3), ready for the 1.1.0 build — live
 
 Both need native modules, so they take effect in the next app build. Break-it list: `docs/security/breaks/launch-voice-splash.md` (LV1–LV7, SP1–SP2).
 - **Splash:** `expo-splash-screen` with the launch animation's first frame (green `#0D5A3F`, the mark, 96 wide), so icon → splash → animation is seamless. It's never held open from code, so it can't get stuck.
