@@ -51,6 +51,18 @@ describe('the job finishes held results whose hold ran out', () => {
   });
 });
 
+describe('HR7: one odd row never blocks the others', () => {
+  test("a held winner of 'none' (allowed by the shape check, not by matches.winner) finishes with no winner, and the other due matches still finish", async () => {
+    const odd = await match({ winner: 'none', until: ago(45) });
+    const fine = await match({ winner: 'away', until: ago(45) });
+    await db.sql(`select finish_held_results()`);
+    const o = await row(odd);
+    assert.equal(o.status, 'completed');
+    assert.equal(o.winner, null);
+    assert.equal((await row(fine)).winner, 'away');
+  });
+});
+
 describe('guards', () => {
   test('HR4: a completed match never keeps a held result', async () => {
     const id = await match({ winner: 'home', until: ago(5) });

@@ -38,7 +38,9 @@ begin
   perform set_config('app.trusted_rpc', 'on', true);
   update matches
      set status = 'completed',
-         winner = nullif(held_result->>'winner', ''),
+         -- HR7: only a real winner; 'none' or anything odd = no winner, so one
+         -- bad row can never fail the whole job (matches_winner_check)
+         winner = case when held_result->>'winner' in ('home', 'away', 'draw') then held_result->>'winner' end,
          updated_at = now()
    where status = 'live'
      and held_result is not null
