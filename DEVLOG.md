@@ -29,6 +29,23 @@ auth-smoke passed. Published from a clean worktree at 9c758015 (the tip; the com
 
 Founder: rename the Matches views from Playing / Running to **Player** / **Organizer**. A game you play in and also host stays under Player only, and its card now says "You're hosting" (`VIEW_LABEL`, `hostingNote` in `src/core/myMatches.ts`; MatchesScreen). The internal keys didn't change. Tests: matches-tab-playing 4 new (MM9–MM12), 14 pass with the sim; tsc clean. Not checked in the demo yet. Open: the founder's Player view is empty. Live data shows hosts on their own rosters, so the next step is to check the founder's own account. No database change.
 
+### 2026-11-06 — Team join link: players ask, the captain accepts (C8) (not yet published; SQL to run)
+
+Break-it list: `docs/security/breaks/team-join-link.md` (TJ1–TJ10).
+- **On the squad page**, next to "add by mobile or contacts", a "🔗 Join link" card (managers only): get the link, share it, New link (the old one stops), Turn off. Below it, "Asked to join (N)" with Accept / Decline.
+- **Opening `app.sportnnote.in/tj/<code>`** shows only the team's name and sport (`TeamJoinScreen`):
+  - an adult taps "Ask to join";
+  - a parent asks for each child;
+  - a teen is told to ask a parent.
+- **Database:** migration `20261112120000_team_join_link.sql`.
+  - Tables `team_join_links`, `team_join_requests` with no grants; six functions, all checking `can_manage_team` or who you are.
+  - Rate limits; at most 100 pending per team; one pending per player.
+  - Children show to managers as initials.
+  - Accepting adds the player once and records `member_consents` 'joined'.
+  - School house teams with no squad list get no link, so their derived squad can't be replaced.
+
+Tests: db-team-join-link 9 (PGlite), team-join-link 4, sim-team-join-link (600 people, 20 teams); db-wave3 guard passes. Full suite 7,620 pass, 0 fail; tsc clean. Demo checked: the card (link, share, new, off); a dead link's screen. Not done: a printable QR for the team link; telling the person when they're accepted.
+
 ### 2026-11-06 — Grounds with game counts (C9) + one "Schedule matches" entry (C10) (not yet published)
 
 Break-it list: `docs/security/breaks/grounds-and-schedule.md` (GS1–GS4).

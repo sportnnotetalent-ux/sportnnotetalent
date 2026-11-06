@@ -20,6 +20,7 @@ import { PlayerPhoto } from '../components/PlayerPhoto';
 import { avatarInitials } from '../core/minorPrivacy';
 import type { EditAccess } from '../core/playerEditAccess';
 import { AddInvitePlayer } from '../components/AddInvitePlayer';
+import { TeamJoinCard } from '../components/TeamJoinCard';
 import { useCaptainships, useTeamPermission } from '../data/hooks';
 import { nextLeaders } from '../core/teamPermissions';
 import { confirmAction } from '../core/confirm';
@@ -176,6 +177,8 @@ export default function SquadScreen() {
           sport={team.sports[0]} invited={squad.filter((p) => p.invited)} existingIds={squad.map((p) => p.id)}
           onChanged={load}
         />}
+        {/* C8: or share one join link — joining is a request you accept */}
+        {canManage && <TeamJoinCard teamId={team.id} teamName={team.name} onJoined={load} />}
 
         <Text style={[textStyles.h3, st.section]}>Squad</Text>
         {squad.length === 0 ? (

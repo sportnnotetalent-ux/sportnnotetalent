@@ -177,6 +177,8 @@ export type RootStackParamList = {
   EditTeam: { teamId: string };
   JoinTournament: { token?: string } | undefined;
   JoinTeam: { token?: string } | undefined;
+  /** reference-video C8: a team's join link (a request the captain approves) */
+  TeamJoin: { token: string };
   /** The multi-sport "Team" (Club) system. Clubs = my teams list; CreateClub =
    *  the simple create flow; ClubHome = the team dashboard; ClubSport = one sport's
    *  profile (captain/VC, squad, roles). See migration 0018. */

@@ -123,6 +123,7 @@ const JoinClubScreen = lazyScreen(() => import('../screens/JoinClubScreen'));
 const ScanQRScreen = lazyScreen(() => import('../screens/ScanQRScreen'));
 const DiscoverOrgsScreen = lazyScreen(() => import('../screens/DiscoverOrgsScreen'));
 const JoinTeamScreen = lazyScreen(() => import('../screens/JoinTeamScreen'));
+const TeamJoinScreen = lazyScreen(() => import('../screens/TeamJoinScreen'));
 const TournamentProfileScreen = lazyScreen(() => import('../screens/TournamentProfileScreen'));
 const OrganizationScreen = lazyScreen(() => import('../screens/OrganizationScreen'));
 const CreateCommunityScreen = lazyScreen(() => import('../screens/CreateCommunityScreen'));
@@ -165,7 +166,7 @@ const Tab = createBottomTabNavigator<TabParamList>();
 // the Join screen with the code prefilled.
 // Stack screens reachable by URL on web (/GolfRound?eventId=…). Keep in sync with
 // the <Stack.Screen> list below — a screen missing here just opens Home on refresh.
-const STACK_SCREENS = new Set<string>(['Americano', 'AssignScorers', 'AthleticsEventSetup', 'CorrectMatch', 'Bracket', 'Calendar', 'ClubHome', 'ClubSport', 'Clubs', 'MyTournaments', 'CompetitionRules', 'Contingents', 'Conversation', 'CreateClub', 'CreateCommunity', 'CreateListing', 'CreateSeries', 'CopyTournament', 'CreateTournament', 'CricketLineup', 'DeleteAccount', 'DiscoverOrgs', 'EditMatch', 'EditProfile', 'EditTeam', 'EditTournament', 'Feedback', 'Following', 'GenerateFixtures', 'GolfCourseEdit', 'GolfRound', 'GolfRoundSetup', 'GuardianConsent', 'GuestGame', 'GuardianLink', 'GuardianProof', 'HeadToHead', 'InviteFriend', 'ImportSchedule', 'RosterImport', 'StudentImport', 'SchoolRequest', 'JoinClub', 'JoinTeam', 'JoinTournament', 'Legal', 'LineupEditor', 'LinkEdition', 'LiveScoring', 'ManageChild', 'MatchLink', 'OrgDobs', 'OrgVerify', 'Pair', 'Personalise', 'QuickTournament', 'Certificates', 'MatchSquad', 'MeetEntries', 'MeetTimetable', 'MessageReports', 'Messages', 'NotificationPrefs', 'RegionSettings', 'Notifications', 'Organization', 'OrganizerDashboard', 'PlayerProfile', 'Privacy', 'RecordBoard', 'ResultsEvent', 'ResultsLab', 'ScanQR', 'ScheduleMatch', 'Series', 'Settings', 'SportHub', 'SportProfile', 'SportSettings', 'Squad', 'SquadSession', 'Standings', 'Support', 'SupportConsole', 'SwissRound', 'Team', 'TeamJourney', 'Teams', 'Tournament', 'TournamentTeams', 'TryNewSport', 'UsageDashboard', 'VerificationDetails', 'VerificationReview']);
+const STACK_SCREENS = new Set<string>(['Americano', 'AssignScorers', 'AthleticsEventSetup', 'CorrectMatch', 'Bracket', 'Calendar', 'ClubHome', 'ClubSport', 'Clubs', 'MyTournaments', 'CompetitionRules', 'Contingents', 'Conversation', 'CreateClub', 'CreateCommunity', 'CreateListing', 'CreateSeries', 'CopyTournament', 'CreateTournament', 'CricketLineup', 'DeleteAccount', 'DiscoverOrgs', 'EditMatch', 'EditProfile', 'EditTeam', 'EditTournament', 'Feedback', 'Following', 'GenerateFixtures', 'GolfCourseEdit', 'GolfRound', 'GolfRoundSetup', 'GuardianConsent', 'GuestGame', 'GuardianLink', 'GuardianProof', 'HeadToHead', 'InviteFriend', 'ImportSchedule', 'RosterImport', 'StudentImport', 'SchoolRequest', 'JoinClub', 'JoinTeam', 'TeamJoin', 'JoinTournament', 'Legal', 'LineupEditor', 'LinkEdition', 'LiveScoring', 'ManageChild', 'MatchLink', 'OrgDobs', 'OrgVerify', 'Pair', 'Personalise', 'QuickTournament', 'Certificates', 'MatchSquad', 'MeetEntries', 'MeetTimetable', 'MessageReports', 'Messages', 'NotificationPrefs', 'RegionSettings', 'Notifications', 'Organization', 'OrganizerDashboard', 'PlayerProfile', 'Privacy', 'RecordBoard', 'ResultsEvent', 'ResultsLab', 'ScanQR', 'ScheduleMatch', 'Series', 'Settings', 'SportHub', 'SportProfile', 'SportSettings', 'Squad', 'SquadSession', 'Standings', 'Support', 'SupportConsole', 'SwissRound', 'Team', 'TeamJourney', 'Teams', 'Tournament', 'TournamentTeams', 'TryNewSport', 'UsageDashboard', 'VerificationDetails', 'VerificationReview']);
 
 // Web deep links / refresh. React Navigation 7 only recognises screens listed in
 // `config`, and a URL that resolves to NO state makes it call resetRoot(undefined),
@@ -207,6 +208,7 @@ const linking: LinkingOptions<RootStackParamList> = {
     screens: {
       Tabs: { path: '', screens: { Home: '', Matches: 'Tabs/Matches', Organize: 'Tabs/Organize', Discover: 'Tabs/Discover', Profile: 'Tabs/Profile' } },
       JoinTeam: 'join/:token',
+      TeamJoin: 'tj/:token',
       // Short share links (core/shareText.ts).
       MatchLink: 'm/:matchId',
       Certificate: 'c/:code',
@@ -826,6 +828,11 @@ export default function RootNavigator() {
               name="JoinTeam"
               component={JoinTeamScreen}
               options={{ ...stackScreenOpts, title: 'Join a Team' }}
+            />
+            <Stack.Screen
+              name="TeamJoin"
+              component={TeamJoinScreen}
+              options={{ ...stackScreenOpts, title: 'Join a team' }}
             />
             <Stack.Screen
               name="EditTournament"

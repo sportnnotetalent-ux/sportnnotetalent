@@ -6891,3 +6891,93 @@ export async function createSeries(input: NewSeries): Promise<{ seriesId: string
   }
   return { seriesId, matches };
 }
+
+/* ------------------- Team join link + requests (reference-video C8) ------------------- */
+// docs/security/breaks/team-join-link.md · migration 20261112120000_team_join_link.sql.
+// One link per team; joining is a request the team's managers accept. An
+// under-18 is asked for by their parent; the managers see a child's initials.
+export type TeamJoinAsk = 'requested' | 'already_member' | 'already_requested' | 'ask_parent' | 'link_off' | 'team_busy';
+export interface TeamJoinRequest { id: string; playerId: string; name: string; adult: boolean; byParent: boolean; createdAt: string }
+
+const demoJoin = { links: new Map<string, { token: string; on: boolean }>(), reqs: [] as (TeamJoinRequest & { teamId: string; status: string })[] };
+
+export async function getTeamJoinLink(teamId: string, fresh = false): Promise<string> {
+  if (!isSupabaseConfigured || !supabase) {
+    const cur = demoJoin.links.get(teamId);
+    const token = !cur || fresh ? `TJ${Math.random().toString(36).slice(2, 8).toUpperCase()}` : cur.token;
+    demoJoin.links.set(teamId, { token, on: true });
+    return token;
+  }
+  const { data, error } = await supabase.rpc('team_join_link', { p_team: teamId, p_new: fresh });
+  if (error || !data) throw new Error(error?.message ?? 'Could not get the join link');
+  return data as string;
+}
+
+export async function turnOffTeamJoinLink(teamId: string): Promise<void> {
+  if (!isSupabaseConfigured || !supabase) {
+    const cur = demoJoin.links.get(teamId);
+    if (cur) cur.on = false;
+    return;
+  }
+  const { error } = await supabase.rpc('team_join_link_off', { p_team: teamId });
+  if (error) throw new Error(error.message);
+}
+
+export async function previewTeamJoin(token: string): Promise<{ teamId: string; teamName: string; sport: SportId } | null> {
+  const t = token.trim().toUpperCase();
+  if (!isSupabaseConfigured || !supabase) {
+    for (const [teamId, l] of demoJoin.links) {
+      if (l.token === t && l.on) {
+        const team = demo.teams.find((x) => x.id === teamId);
+        return team ? { teamId, teamName: team.name, sport: team.sport } : null;
+      }
+    }
+    return null;
+  }
+  const { data, error } = await supabase.rpc('team_join_preview', { p_token: t });
+  if (error) throw new Error(error.message);
+  const r = (data as { team_id: string; team_name: string; sport: string }[] | null)?.[0];
+  return r ? { teamId: r.team_id, teamName: r.team_name, sport: r.sport as SportId } : null;
+}
+
+export async function requestTeamJoin(token: string, playerId: string): Promise<TeamJoinAsk> {
+  if (!isSupabaseConfigured || !supabase) {
+    const p = await previewTeamJoin(token);
+    if (!p) return 'link_off';
+    const team = demo.teams.find((x) => x.id === p.teamId);
+    if (team?.roster?.includes(playerId)) return 'already_member';
+    if (demoJoin.reqs.some((r) => r.teamId === p.teamId && r.playerId === playerId && r.status === 'pending')) return 'already_requested';
+    const pl = demo.players.find((x) => x.id === playerId);
+    demoJoin.reqs.push({ id: `tjr-${demoJoin.reqs.length + 1}`, teamId: p.teamId, playerId, name: pl?.fullName ?? 'Player', adult: true, byParent: false, createdAt: new Date().toISOString(), status: 'pending' });
+    return 'requested';
+  }
+  const { data, error } = await supabase.rpc('request_team_join', { p_token: token.trim().toUpperCase(), p_player: playerId });
+  if (error) throw new Error(error.message);
+  return data as TeamJoinAsk;
+}
+
+export async function getTeamJoinRequests(teamId: string): Promise<TeamJoinRequest[]> {
+  if (!isSupabaseConfigured || !supabase) {
+    return demoJoin.reqs.filter((r) => r.teamId === teamId && r.status === 'pending').map(({ teamId: _t, status: _s, ...r }) => r);
+  }
+  const { data, error } = await supabase.rpc('team_join_requests_for', { p_team: teamId });
+  if (error) return [];
+  return ((data as { id: string; player_id: string; name: string; adult: boolean; by_parent: boolean; created_at: string }[] | null) ?? [])
+    .map((r) => ({ id: r.id, playerId: r.player_id, name: r.name, adult: r.adult, byParent: r.by_parent, createdAt: r.created_at }));
+}
+
+export async function decideTeamJoin(requestId: string, accept: boolean): Promise<string> {
+  if (!isSupabaseConfigured || !supabase) {
+    const r = demoJoin.reqs.find((x) => x.id === requestId);
+    if (!r || r.status !== 'pending') return r?.status ?? 'declined';
+    r.status = accept ? 'accepted' : 'declined';
+    if (accept) {
+      const team = demo.teams.find((x) => x.id === r.teamId);
+      if (team && !team.roster?.includes(r.playerId)) team.roster = [...(team.roster ?? []), r.playerId];
+    }
+    return r.status;
+  }
+  const { data, error } = await supabase.rpc('decide_team_join', { p_request: requestId, p_accept: accept });
+  if (error) throw new Error(error.message);
+  return data as string;
+}
