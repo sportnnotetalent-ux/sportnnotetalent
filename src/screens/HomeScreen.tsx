@@ -37,7 +37,7 @@ import { locationAllowed, shouldAutoOpen } from '../core/personalise';
 import { markOnboardingSeen } from '../core/onboarding';
 import { onboardingStore } from '../data/onboardingStore';
 import { useAuth } from '../core/auth';
-import { canScoreByRole } from '../core/roles';
+import { canScoreByRole, canStartFriendly } from '../core/roles';
 import type { Match, SportId, Tournament } from '../core/types';
 import type { RootStackParamList } from '../navigation/types';
 import { WebPushCard } from '../components/WebPushCard';
@@ -146,6 +146,7 @@ export default function HomeScreen() {
   const newSports = allSports.filter((s) => !mySports.includes(s));
 
   const canScore = canScoreByRole(profile?.role);
+  const canStart = canStartFriendly(profile?.role);
   const openScorer = (m: Match) =>
     nav.navigate('LiveScoring', {
       matchId: m.id, sport: m.sport,
@@ -233,7 +234,7 @@ export default function HomeScreen() {
         <View style={st.quickRow}>
           <QuickTile label="Score a match" color={theme.colors.lime} ink={theme.colors.onLime}
             icon={<Zap color={theme.colors.onLime} size={26} strokeWidth={2.2} />}
-            onPress={() => (canScore ? nav.navigate('ScheduleMatch', {}) : nav.navigate('Tabs', { screen: 'Matches' }))} />
+            onPress={() => nav.navigate('ScheduleMatch', {})} />
           <QuickTile label="Organize" color={theme.colors.home} ink={theme.colors.onFill}
             icon={<Trophy color={theme.colors.onFill} size={26} strokeWidth={2.2} />}
             onPress={() => nav.navigate('Tabs', { screen: 'Organize' })} />
@@ -248,7 +249,7 @@ export default function HomeScreen() {
             <View style={[st.menu, { top: insets.top + 60, right: theme.spacing(4) }]} onStartShouldSetResponder={() => true}>
               {[
                 { icon: '🎙', label: 'Voice — find a game', onPress: () => setVoiceOpen(true) },
-                ...(canScore ? [{ icon: '🤝', label: 'Start a friendly', onPress: () => nav.navigate('ScheduleMatch', {}) }] : []),
+                ...(canStart ? [{ icon: '🤝', label: 'Start a friendly', onPress: () => nav.navigate('ScheduleMatch', {}) }] : []),
                 { icon: '📅', label: 'Calendar', onPress: () => nav.navigate('Calendar') },
               ].map((item, idx) => (
                 <React.Fragment key={item.label}>

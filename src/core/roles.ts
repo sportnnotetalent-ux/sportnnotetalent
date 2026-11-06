@@ -8,6 +8,11 @@ export const isSupport = (r?: Role) => r === 'support';
 /** May organize: create tournaments, manage matches. */
 export const canOrganize = (r?: Role) => r === 'organizer' || r === 'support';
 
+/** May start a friendly from Home (Score a match / Start a friendly): every
+ *  signed-in account — founder 2026-10-31, friendlies are never gated; the server
+ *  already allows it (docs/security/breaks/start-a-friendly.md). */
+export const canStartFriendly = (_r?: Role) => true;
+
 /** May score ad-hoc/local games (the per-match assigned scorer is separate). */
 export const canScoreByRole = (r?: Role) => r === 'scorer' || r === 'organizer' || r === 'support';
 

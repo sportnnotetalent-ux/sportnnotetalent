@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-06 — Every account can start a friendly from Home
+
+Found while making the marketing demo screenshots (`docs/security/breaks/start-a-friendly.md`): Home’s **Score a match** tile and the menu’s **Start a friendly** only worked for scorer, organiser and support accounts; a **player** account (16 of 19 live accounts) was sent to the Matches tab with no way to start a game. Founder decision 2026-10-31: friendlies are never gated, and the server already allowed it. Both now open the match set-up for every signed-in account (`canStartFriendly` in src/core/roles.ts). Scoring someone else’s match keeps its per-match rights. Tests: tests/start-a-friendly.test.mts (every role, wiring, 600 accounts); full suite 7,605 pass, 1 fail — db-wave3, caused by another session’s uncommitted team-join-link migration, not this change; tsc clean; demo checked. No database change.
+
 ### 2026-11-06 — Release: Player / Organizer views + Player view fix (web, Android OTA)
 
 auth-smoke passed. Published from a clean worktree at 9c758015 (the tip; the commit above the two changes is a design doc): web built `index-0900d8e4`; another publish of the same code landed right after, so the live index is `index-91763e5e`. Checked it holds `rosterContains` in both roster queries and the "Organizer" label. Android OTA `25341bb7` (preview) / `459dd41e` (production). No database change.
