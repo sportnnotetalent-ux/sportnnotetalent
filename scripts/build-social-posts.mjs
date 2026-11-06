@@ -104,6 +104,12 @@ SLIDES.forEach((s, i) => POSTS.push([`2026-11-12-instagram-carousel-${i + 2}.png
     brand(W * 0.08, H * 0.925, W * 0.05) + dots(W, H, i + 2);
 }]));
 
+// Post 6 — Instagram + Facebook, 1080×1350: captains pick on one phone
+POSTS.push(['2026-11-14-instagram-captains-pick.png', 1080, 1350, (W, H) =>
+  headline(W * 0.08, H * 0.12, W * 0.1, [[['Captains pick.']], [['Teams play', true]], [['in turns.', true]]], 0.9) +
+  phone('c', W * 0.2, H * 0.355, W * 0.6, H * 0.56, 'squad-session-captains-pick.jpg', 210, [34, 246, 682, 440]) +
+  brand(W * 0.08, H * 0.925, W * 0.05)]);
+
 mkdirSync(OUT, { recursive: true });
 for (const [name, W, H, draw] of POSTS) {
   const doc = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
