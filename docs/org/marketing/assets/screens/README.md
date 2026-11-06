@@ -17,3 +17,9 @@ Still to make: kabaddi result + standings (post 3, needs a demo tournament), squ
 - Pair names swap order between set-up and scoring ("Meera / Arjun" → "Arjun / Meera", "Kabir / Dev" → "Dev / Kabir").
 - Yellow pair colour as text on white (badminton "Dev / Kabir" header before the first point) is hard to read.
 - Undo label uses short codes ("point to KD", "point to MA") instead of names.
+- **Blocking (tournament slots):** Participating teams → Fill slot → "Or a team already on SportnNote" finds nothing ("No team by that name in this sport") for kabaddi teams the same account just made (Demo Greens / Golds / Panthers), even ones already added to the tournament. So a fixtures-first tournament can only fill a slot with a brand-new team, which requires a captain's name + mobile (sends an invite).
+- **Inconsistent:** a new team in a friendly needs only a name; a new team in a tournament (Quick tournament, Fill slot) requires a captain's name and mobile.
+- **Confusing:** on Participating teams, the slot-fill search sits right above the "teams in" picker chips; tapping a chip there changes the participant list instead of filling the slot.
+- Slots are listed out of order (Team 3, Team 1, Team 2).
+
+Demo data left on the demo account: tournament "Demo Kabaddi League" (3 slot fixtures; Demo Golds and Demo Panthers added as extra participants), friendlies Demo Reds v Demo Blues (football), Asha Rao / Priya v Meera / Arjun (pickleball), Kabir / Dev v Rahul / Veer (badminton).
