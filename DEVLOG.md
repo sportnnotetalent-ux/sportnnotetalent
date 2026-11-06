@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-06 — Release: every account can start a friendly (web, Android OTA)
+
+auth-smoke passed. The branch tip also held three commits marked "not yet published" (launch voice + splash, match-day roles with SQL still to run, grounds), so this was published from a clean worktree at the live code (a003c574 / 3b51dd4a) plus this fix only: release commit 8a836d66 (detached, not on the branch). Web `index-cb8bbda2`, confirmed live on app.sportnnote.in; Android OTA `af154c36` (preview) / `fdd92fd8` (production), runtime 1.0.0. No database change. The next publish from the tip will carry the fix again (it is in 6e927ab3) together with whatever the founder approves of the held commits.
+
 ### 2026-11-06 — Every account can start a friendly from Home
 
 Found while making the marketing demo screenshots (`docs/security/breaks/start-a-friendly.md`): Home’s **Score a match** tile and the menu’s **Start a friendly** only worked for scorer, organiser and support accounts; a **player** account (16 of 19 live accounts) was sent to the Matches tab with no way to start a game. Founder decision 2026-10-31: friendlies are never gated, and the server already allowed it. Both now open the match set-up for every signed-in account (`canStartFriendly` in src/core/roles.ts). Scoring someone else’s match keeps its per-match rights. Tests: tests/start-a-friendly.test.mts (every role, wiring, 600 accounts); full suite 7,605 pass, 1 fail — db-wave3, caused by another session’s uncommitted team-join-link migration, not this change; tsc clean; demo checked. No database change.

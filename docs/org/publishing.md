@@ -11,3 +11,4 @@ Why: on 2026-11-05 two sessions published within minutes of each other, and one 
 | When | Who | Commit | Web | OTA (preview / production) |
 |---|---|---|---|---|
 | 2026-11-05 | usage-filters session | 8333121 | index-dede4b01 | 04a6da93 / 5cbf9deb |
+| 2026-11-06 | start-a-friendly session | 8a836d66 (live a003c574 + fix) | index-cb8bbda2 | af154c36 / fdd92fd8 |
