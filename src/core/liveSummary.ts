@@ -8,7 +8,10 @@
  */
 import type { ScoreSummary } from '../sports/types.ts';
 
-export type LiveSummary = { h: string; a: string; s: string; d?: string };
+/** `f: 1` — the board says the match is decided but the result is still held
+ *  (SD-111, ~60 s undo window): viewers see FULL TIME, not LIVE
+ *  (docs/security/breaks/full-time-held.md). */
+export type LiveSummary = { h: string; a: string; s: string; d?: string; f?: 1 };
 
 /** The database refuses a summary longer than this (as JSON text). */
 export const SUMMARY_MAX_CHARS = 600;
@@ -31,6 +34,10 @@ export function compactSummary(x: ScoreSummary): LiveSummary {
 
 /** The summary for a sport's state; null when the sport can't describe it
  *  (a malformed state must never stop the match from saving). */
-export function liveSummaryOf<S>(plugin: { summary: (s: S) => ScoreSummary }, state: S): LiveSummary | null {
-  try { return compactSummary(plugin.summary(state)); } catch { return null; }
+export function liveSummaryOf<S>(plugin: { summary: (s: S) => ScoreSummary; isComplete?: (s: S) => boolean }, state: S): LiveSummary | null {
+  try {
+    const out = compactSummary(plugin.summary(state));
+    if (plugin.isComplete?.(state)) out.f = 1;
+    return out;
+  } catch { return null; }
 }

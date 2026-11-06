@@ -13,7 +13,8 @@ export interface SharedMatch {
   starts_at?: string | null;
   venue_name?: string | null;
   winner?: 'home' | 'away' | 'draw' | null;
-  summary?: { h?: string; a?: string; s?: string; d?: string } | null;
+  /** f: 1 — full time, result still held (docs/security/breaks/full-time-held.md) */
+  summary?: { h?: string; a?: string; s?: string; d?: string; f?: number } | null;
   result_score?: { home?: number; away?: number } | null;
   home?: { name?: string; short_name?: string; color_hex?: string | null } | null;
   away?: { name?: string; short_name?: string; color_hex?: string | null } | null;
@@ -66,7 +67,8 @@ export function previewText(m: SharedMatch): { title: string; description: strin
   const sc = scores(m);
   const done = m.status === 'completed';
   const live = m.status === 'live';
-  const badge = done ? 'RESULT' : live ? 'LIVE' : m.status === 'postponed' ? 'POSTPONED' : m.status === 'cancelled' ? 'CANCELLED' : 'UPCOMING';
+  const held = live && !!m.summary?.f;
+  const badge = done ? 'RESULT' : held ? 'FULL TIME' : live ? 'LIVE' : m.status === 'postponed' ? 'POSTPONED' : m.status === 'cancelled' ? 'CANCELLED' : 'UPCOMING';
   const title = sc && (live || done) ? `${sp.icon} ${badge} · ${home} ${sc[0]}–${sc[1]} ${away}` : `${sp.icon} ${badge} · ${home} vs ${away}`;
   const t = m.tournament?.name;
   let parts: (string | null | undefined)[];
@@ -111,12 +113,13 @@ export function renderMatchPage(m: SharedMatch, appOrigin: string = APP_ORIGIN):
   const sc = scores(m);
   const live = m.status === 'live';
   const done = m.status === 'completed';
+  const held = live && !!m.summary?.f; // full time, result still held: not "LIVE"
   const views = viewsLabel(m.views);
   const side = (t: SharedMatch['home'], id: 'h' | 'a', v: string | undefined) =>
     `<div class="side"><span class="dot" style="background:${colour(t?.color_hex)}"></span><span class="name">${esc(t?.name || (id === 'h' ? 'Home' : 'Away'))}</span><span class="score" id="${id}">${esc(v ?? '')}</span></div>`;
   const where = [m.tournament?.name, m.venue_name].filter(Boolean).map(esc).join(' · ');
   const status = live ? m.summary?.s : done ? description.split(' · ')[0] : when(m.starts_at);
-  const body = `<main class="card"><div class="row"><span class="sport">${esc(sp.icon)} ${esc(sp.name)}</span><span class="badge${live ? ' live' : done ? ' done' : ''}" id="b">${live ? '● ' : ''}${esc(badge)}</span></div>
+  const body = `<main class="card"><div class="row"><span class="sport">${esc(sp.icon)} ${esc(sp.name)}</span><span class="badge${held ? ' done' : live ? ' live' : done ? ' done' : ''}" id="b">${live && !held ? '● ' : ''}${esc(badge)}</span></div>
 ${side(m.home, 'h', sc?.[0])}${side(m.away, 'a', sc?.[1])}
 <p class="status" id="st">${esc(status ?? '')}</p><p class="detail" id="d">${esc(live ? m.summary?.d ?? '' : '')}</p>
 ${where ? `<p class="where">${where}</p>` : ''}
@@ -129,7 +132,7 @@ ${views ? `<p class="views">${esc(views)}</p>` : ''}</main>`;
     ? `<script>(function(){var u=${JSON.stringify(`/m/${m.id}.json`)},t;
 function x(i,v){var e=document.getElementById(i);if(e&&v!=null)e.textContent=v}
 function tick(){if(document.hidden)return;fetch(u).then(function(r){return r.json()}).then(function(m){if(!m)return;var s=m.summary||{};
-if(m.status==="live"){x("h",s.h);x("a",s.a);x("st",s.s);x("d",s.d||"");var b=document.getElementById("b");if(b){b.className="badge live";b.textContent="● LIVE"}}
+if(m.status==="live"){x("h",s.h);x("a",s.a);x("st",s.s);x("d",s.d||"");var b=document.getElementById("b");if(b){b.className=s.f?"badge done":"badge live";b.textContent=s.f?"FULL TIME":"● LIVE"}}
 else if(m.status==="completed"){x("h",s.h);x("a",s.a);x("st",s.s);x("d","");var c=document.getElementById("b");if(c){c.className="badge done";c.textContent="RESULT"}clearInterval(t)}}).catch(function(){})}
 t=setInterval(tick,${live ? 5000 : 30000});document.addEventListener("visibilitychange",tick)})();</script>`
     : '';

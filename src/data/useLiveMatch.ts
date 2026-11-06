@@ -642,8 +642,14 @@ export function useLiveMatch(params: {
   useEffect(() => {
     if (!matchId) return;
     const sub = AppState.addEventListener('change', (st) => { if (st === 'background' || st === 'inactive') hold.sendNow(); });
+    // Web: closing, reloading or leaving the tab sends it too (it never unmounts) —
+    // viewers otherwise kept seeing LIVE until the next open (full-time-held.md)
+    const onHide = () => { hold.sendNow(); };
+    const web = typeof window !== 'undefined' && typeof window.addEventListener === 'function';
+    if (web) window.addEventListener('pagehide', onHide);
     return () => {
       sub.remove();
+      if (web) window.removeEventListener('pagehide', onHide);
       if (!hold.sendNow()) pendingResults.release(matchId);
     };
   }, [matchId, hold]);

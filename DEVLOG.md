@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-07 — Viewers see FULL TIME, not LIVE, while a result is held
+
+Found while making the marketing demo (`docs/security/breaks/full-time-held.md`): after the deciding tap the result is held ~60 s (SD-111 undo window), but the score link page and its preview said **LIVE** with "Full Time" under it, and on the web closing or reloading the tab never sent the held result, so viewers kept seeing LIVE until the scorer next opened the app. Now the saved summary carries `f: 1` while the board says the match is decided (`liveSummaryOf`); the light page (worker/matchPage.ts) and the preview show **FULL TIME** and keep refreshing until the result lands (an Undo takes it back to LIVE). On the web, `pagehide` sends the held result at once, like backgrounding the app. No database change; the Worker deploys from `main` on push. Tests: 6 new (tests/full-time-held.test.mts); full suite 7,632 pass, 0 fail; tsc clean. To check live after release on the demo account.
+
 ### 2026-11-06 — Release: fill a slot with a team you already have (web, Android OTA)
 
 Founder ran `20261113120000_slot_fill_existing.sql` (confirmed read-only: the live `fill_tournament_slot` has the new rule). auth-smoke passed. Published from a clean worktree at the tip b68ced4c (live 2c3c3da4 + this fix + marketing docs): web `index-d4c15664`, confirmed live; Android OTA `593a1d8f` (preview) / `ab6d1e7a` (production). Checked live on the demo account’s Demo Kabaddi League: the slot search now finds Demo Greens / Golds / Panthers (two of them already entered), and all three slots filled with no error — the tournament now lists exactly those 3 teams.
