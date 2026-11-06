@@ -15,7 +15,7 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ### 2026-11-07 — Release: FULL TIME while a result is held (web, Android OTA, Worker)
 
-auth-smoke passed. Published from a clean worktree at the tip 9cb857de (live 8619f7ad + this fix + a marketing commit). Web: the entry name stayed `index-d4c15664` (the change is in the shared chunk `__common-00e7ae0f`); confirmed the live chunk holds the `pagehide` send. Android OTA `002325b8` (preview) / `f2607216` (production). Pushed `main` so Cloudflare redeploys the Worker (the light score page). Not yet checked with a real held result: the browser pane reopened signed out of the demo account — to check after the founder signs it back in.
+auth-smoke passed. Published from a clean worktree at the tip 9cb857de (live 8619f7ad + this fix + a marketing commit). Web: the entry name stayed `index-d4c15664` (the change is in the shared chunk `__common-00e7ae0f`); confirmed the live chunk holds the `pagehide` send. Android OTA `002325b8` (preview) / `f2607216` (production). Pushed `main` so Cloudflare redeploys the Worker (the light score page). Checked live on the demo account (2026-11-07): during the hold the light page and its preview read **FULL TIME · … 1–0** (was LIVE) — fixed. But leaving the tab inside the hold (navigating to the light page) did **not** land the completed write: the database still said `live` afterwards. The browser cancels the in-flight save when the page goes away, so `pagehide` alone doesn’t finish it; the result still lands on the scorer’s next open (as before). Follow-up proposed: finish a held result without the scorer’s app (server-side, or a keepalive request).
 
 ### 2026-11-07 — Viewers see FULL TIME, not LIVE, while a result is held
 
