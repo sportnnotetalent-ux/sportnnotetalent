@@ -3,6 +3,7 @@
  * demo-mode fallback lives in exactly one place. Each function returns the same
  * domain shapes whether the data came from Postgres or the local mock.
  */
+import { cleanSquadRoles } from '../core/matchRoles';
 import { readQualifiesTo, type QualifiesTo } from './feeders';
 import { ageOf } from '../core/age';
 import { canMoveDispute, movesInto } from '../core/disputeFlow';
@@ -3804,11 +3805,27 @@ export async function afterRubberResult(matchId: string): Promise<{ decidedNow: 
 
 const blankSquads = (): MatchSquads => ({ home: { starters: [], subs: [] }, away: { starters: [], subs: [] } });
 
+// C6 (match-roles MR3): captain_id arrives with migration 20261111120000. Until
+// it has been run, reads fall back to the old columns instead of failing (which
+// would empty every squad) and writes leave the captain out.
+type SquadRow = { side: string; starters: string[] | null; subs: string[] | null; keeper_id?: string | null; captain_id?: string | null; match_id?: string };
+const toSquad = (r: SquadRow): MatchSquad => ({
+  starters: r.starters ?? [], subs: r.subs ?? [], keeperId: r.keeper_id ?? undefined,
+  ...(r.captain_id ? { captainId: r.captain_id } : {}),
+});
+const noCaptainCol = (e: { message?: string } | null | undefined) => !!e && /captain_id/.test(e.message ?? '');
+async function readSquadRows(run: (cols: string) => PromiseLike<{ data: unknown; error: { message?: string } | null }>, extra = ''): Promise<SquadRow[]> {
+  const first = await run(`${extra}side, starters, subs, keeper_id, captain_id`);
+  if (!noCaptainCol(first.error)) return (first.data as SquadRow[] | null) ?? [];
+  const old = await run(`${extra}side, starters, subs, keeper_id`);
+  return (old.data as SquadRow[] | null) ?? [];
+}
+
 export async function getMatchSquads(matchId: string): Promise<MatchSquads> {
   if (!isSupabaseConfigured || !supabase) return demo.matchSquads[matchId] ?? blankSquads();
-  const { data } = await supabase.from('match_squads').select('side, starters, subs, keeper_id').eq('match_id', matchId);
+  const rows = await readSquadRows((cols) => supabase!.from('match_squads').select(cols).eq('match_id', matchId));
   const out = blankSquads();
-  for (const r of data ?? []) out[r.side as 'home' | 'away'] = { starters: r.starters ?? [], subs: r.subs ?? [], keeperId: r.keeper_id ?? undefined };
+  for (const r of rows) out[r.side as 'home' | 'away'] = toSquad(r);
   return out;
 }
 
@@ -3824,22 +3841,25 @@ export async function getMatchSquadsMany(matchIds: string[]): Promise<Record<str
   }
   for (const id of ids) out[id] = blankSquads();
   for (const part of chunked(ids)) {
-    const { data } = await supabase.from('match_squads').select('match_id, side, starters, subs, keeper_id').in('match_id', part);
-    for (const r of data ?? []) {
+    const rows = await readSquadRows((cols) => supabase!.from('match_squads').select(cols).in('match_id', part), 'match_id, ');
+    for (const r of rows) {
       const sq = out[r.match_id as string];
-      if (sq) sq[r.side as 'home' | 'away'] = { starters: r.starters ?? [], subs: r.subs ?? [], keeperId: r.keeper_id ?? undefined };
+      if (sq) sq[r.side as 'home' | 'away'] = toSquad(r);
     }
   }
   return out;
 }
 
 export async function setMatchSquad(matchId: string, side: 'home' | 'away', squad: MatchSquad): Promise<void> {
+  const sq = cleanSquadRoles(squad); // MR5: a role whose player left the squad is dropped (the database does the same)
   if (!isSupabaseConfigured || !supabase) {
-    setDemoMatchSquad(matchId, side, squad);
+    setDemoMatchSquad(matchId, side, sq);
     return;
   }
-  // NOTE: `keeper_id` column is demo-first — add it to the match_squads table to persist live.
-  await supabase.from('match_squads').upsert({ match_id: matchId, side, starters: squad.starters, subs: squad.subs, keeper_id: squad.keeperId ?? null });
+  const row = { match_id: matchId, side, starters: sq.starters, subs: sq.subs, keeper_id: sq.keeperId ?? null };
+  const { error } = await supabase.from('match_squads').upsert({ ...row, captain_id: sq.captainId ?? null });
+  // MR3: before migration 20261111120000 there is no captain_id column — save the rest
+  if (noCaptainCol(error)) await supabase.from('match_squads').upsert(row);
 }
 
 /** The matchday squad this team fielded in its most recent OTHER match, so the

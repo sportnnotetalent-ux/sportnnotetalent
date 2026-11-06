@@ -11,7 +11,9 @@ import { getSport } from '../sports/registry';
 import { reconcilePositions } from '../core/lineupPlace';
 import type { SportId } from '../core/types';
 
-export type DraftSquads = Partial<Record<'home' | 'away', string[]>>;
+/** A side picked at setup: its starters, plus the match-day roles (C6). */
+export type DraftSide = { starters: string[]; captainId?: string; keeperId?: string };
+export type DraftSquads = Partial<Record<'home' | 'away', DraftSide>>;
 
 export async function saveDraftSquads(o: {
   matchId: string;
@@ -20,16 +22,19 @@ export async function saveDraftSquads(o: {
   drafts: DraftSquads;
   nameOf: (id: string) => string | undefined;
 }): Promise<boolean> {
-  const sides = (['home', 'away'] as const).filter((sd) => (o.drafts[sd]?.length ?? 0) > 0);
+  const sides = (['home', 'away'] as const).filter((sd) => (o.drafts[sd]?.starters.length ?? 0) > 0);
   if (!sides.length) return true;
   try {
-    for (const sd of sides) await setMatchSquad(o.matchId, sd, { starters: o.drafts[sd]!, subs: [] });
+    for (const sd of sides) {
+      const d = o.drafts[sd]!;
+      await setMatchSquad(o.matchId, sd, { starters: d.starters, subs: [], captainId: d.captainId, keeperId: d.keeperId });
+    }
     const plugin = getSport(o.sport);
     if (plugin.Court) {
       const lineup = await getLineup(o.matchId, o.sport, o.playersPerSide);
       const fresh = plugin.formation?.(o.playersPerSide) ?? [];
       const next = { ...lineup };
-      for (const sd of sides) next[sd] = reconcilePositions(o.drafts[sd]!, lineup[sd], fresh, o.nameOf);
+      for (const sd of sides) next[sd] = reconcilePositions(o.drafts[sd]!.starters, lineup[sd], fresh, o.nameOf);
       await setLineup(o.matchId, next);
     }
     return true;

@@ -632,7 +632,7 @@ export default function ScheduleMatchScreen() {
                       {(['home', 'away'] as const).map((sd) => {
                         const t = teams.find((x) => x.id === (sd === 'home' ? home : away));
                         if (!t) return null;
-                        const n = draftSquads[sd]?.length ?? 0;
+                        const n = draftSquads[sd]?.starters.length ?? 0;
                         return (
                           <Text key={sd} style={st.moreLink} accessibilityRole="button" onPress={() => setWhoPlays(sd)}>
                             {n ? `👥 ${t.name}: ${n} playing · change` : `👥 Who's playing for ${t.name}? (optional)`}
@@ -649,14 +649,14 @@ export default function ScheduleMatchScreen() {
                       <WhoPlaysSheet
                         visible
                         onClose={() => setWhoPlays(null)}
-                        onDone={(ids) => setDraftSquads((d) => ({ ...d, [whoPlays]: ids }))}
+                        onDone={(draft) => setDraftSquads((d) => ({ ...d, [whoPlays]: draft }))}
                         teamId={t.id}
                         teamName={t.name}
                         color={t.colorHex}
                         sport={sport}
                         playersPerSide={perSideNow}
-                        picked={draftSquads[whoPlays] ?? []}
-                        taken={draftSquads[other] ?? []}
+                        picked={draftSquads[whoPlays] ?? { starters: [] }}
+                        taken={draftSquads[other]?.starters ?? []}
                       />
                     );
                   })()}

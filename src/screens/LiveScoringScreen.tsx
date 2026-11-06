@@ -2112,6 +2112,8 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
             <Text style={textStyles.muted}>
               {L.captainId ? `Captain: ${nameOf(L.captainId) ?? '—'}` : ''}
               {L.viceCaptainId ? `${L.captainId ? ' · ' : ''}Vice: ${nameOf(L.viceCaptainId) ?? '—'}` : ''}
+              {/* C6: this match's own captain, when the squad names one */}
+              {sq?.captainId && sq.captainId !== L.captainId ? `${L.captainId || L.viceCaptainId ? ' · ' : ''}This match: ${nameOf(sq.captainId) ?? '—'}` : ''}
             </Text>
           )}
           {/* Setting the XI is a pre-match task — don't nag once the match is live or done. */}
@@ -2139,7 +2141,9 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
                   const disputed = disputedOpenIds.has(p.id);
                   const reported = !disputed && flaggedIds.has(p.id);
                   const mine = p.id === myPlayerId;
-                  const role = p.id === L.captainId ? 'C' : p.id === L.viceCaptainId ? 'V' : null;
+                  // C6: this match's captain (from its squad) wins over the team's
+                  const matchCap = sq?.captainId;
+                  const role = p.id === (matchCap ?? L.captainId) ? 'C' : !matchCap && p.id === L.viceCaptainId ? 'V' : null;
                   const keeper = p.id === sq?.keeperId;
                   return (
                     <View key={p.id} style={st.partRow}>

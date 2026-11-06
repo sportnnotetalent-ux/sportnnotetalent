@@ -16,6 +16,7 @@ import { theme } from '../core/theme';
 import { EmptyState, Button, ScreenTitle, textStyles, plural } from '../components/ui';
 import { getSport } from '../sports/registry';
 import { reconcilePositions } from '../core/lineupPlace';
+import { MatchRolesPicker } from '../components/MatchRolesPicker';
 import { getRoster, getMatchSquads, setMatchSquad, getLineup, setLineup, getLastSquadForTeam, removePlayerFromTeam } from '../data/repos';
 import { AddInvitePlayer } from '../components/AddInvitePlayer';
 import { matchEligibility, canFieldPlayer, TESTING_ALLOW_UNVERIFIED, ageRequirementReason } from '../core/eligibility';
@@ -54,6 +55,9 @@ export default function MatchSquadScreen() {
   const [lastSquad, setLastSquad] = useState<{ starters: string[]; subs: string[] } | null>(null);
   const [rosterNonce, setRosterNonce] = useState(0); // bumped after adding/inviting a player
   const [busy, setBusy] = useState(false);
+  // C6: this match's captain and keeper (kept on save — MR4: saving used to wipe the keeper)
+  const [captainId, setCaptainId] = useState<string | undefined>(undefined);
+  const [keeperId, setKeeperId] = useState<string | undefined>(undefined);
   // SD-70: players suspended for this match (football tournament rule) — a warning
   const suspended = useMatchSuspensions(matchId, sport)[side];
 
@@ -68,6 +72,8 @@ export default function MatchSquadScreen() {
         setLineupState(lu);
         setLastSquad(last);
         const sq = squads[side];
+        setCaptainId(sq.captainId);
+        setKeeperId(sq.keeperId);
         const other = new Set([...squads[otherSide].starters, ...squads[otherSide].subs]);
         setTaken(other);
         // Preserve any picks already made this session (e.g. after adding a player).
@@ -149,7 +155,7 @@ export default function MatchSquadScreen() {
     setTaken(busyElsewhere);
     const starters = roster.filter((p) => roles[p.id] === 'start' && !busyElsewhere.has(p.id)).map((p) => p.id);
     const subs = roster.filter((p) => roles[p.id] === 'sub' && !busyElsewhere.has(p.id)).map((p) => p.id);
-    await setMatchSquad(matchId, side, { starters, subs });
+    await setMatchSquad(matchId, side, { starters, subs, keeperId, captainId });
     // For pitch sports, keep a positional lineup in sync so the Lineups tab is
     // populated even if the user never opens the pitch.
     if (hasPitch && lineup) {
@@ -278,6 +284,18 @@ export default function MatchSquadScreen() {
                 </View>
               );
             })
+          )}
+
+          {/* C6: match-day roles from the players picked above */}
+          {roster.some((p) => roles[p.id] === 'start' || roles[p.id] === 'sub') && (
+            <MatchRolesPicker
+              sport={sport}
+              players={roster.filter((p) => roles[p.id] === 'start').concat(roster.filter((p) => roles[p.id] === 'sub')).map((p) => ({ id: p.id, name: p.fullName }))}
+              captainId={captainId}
+              keeperId={keeperId}
+              onCaptain={setCaptainId}
+              onKeeper={setKeeperId}
+            />
           )}
 
           {/* Grow the squad right here — adds persist to the team for every match. */}

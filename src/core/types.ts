@@ -851,8 +851,11 @@ export interface MatchLineup {
 export interface MatchSquad {
   starters: string[]; // player ids — ordered (cricket uses this as the batting order)
   subs: string[];
-  /** Cricket: the designated wicket-keeper (pre-fills live match setup). */
+  /** The side's keeper for this match — cricket wicket-keeper, football /
+   *  handball / hockey goalkeeper, ice hockey goalie (pre-fills live scoring). */
   keeperId?: string;
+  /** Reference-video C6: this match's captain (match_squads.captain_id). */
+  captainId?: string;
 }
 export interface MatchSquads {
   home: MatchSquad;

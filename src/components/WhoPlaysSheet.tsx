@@ -15,6 +15,8 @@ import { theme } from '../core/theme';
 import { getLastSquadForTeam, getRoster } from '../data/repos';
 import { canFieldPlayer } from '../core/eligibility';
 import { copyLast, togglePick } from '../core/whoPlays';
+import { MatchRolesPicker } from './MatchRolesPicker';
+import type { DraftSide } from '../data/draftSquad';
 import type { Player, SportId } from '../core/types';
 
 export function WhoPlaysSheet({
@@ -22,22 +24,24 @@ export function WhoPlaysSheet({
 }: {
   visible: boolean;
   onClose: () => void;
-  onDone: (ids: string[]) => void;
+  onDone: (draft: DraftSide) => void;
   teamId: string;
   teamName: string;
   color?: string;
   sport: SportId;
   playersPerSide: number;
-  picked: string[];
+  picked: DraftSide;
   /** picked for the other side — one person plays for one side */
   taken: string[];
 }) {
   const [roster, setRoster] = useState<Player[]>([]);
   const [last, setLast] = useState<string[]>([]);
-  const [sel, setSel] = useState<string[]>(picked);
+  const [sel, setSel] = useState<string[]>(picked.starters);
+  const [captainId, setCaptainId] = useState<string | undefined>(picked.captainId);
+  const [keeperId, setKeeperId] = useState<string | undefined>(picked.keeperId);
   const [nonce, setNonce] = useState(0);
   const [loading, setLoading] = useState(true);
-  useEffect(() => { if (visible) setSel(picked); }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (visible) { setSel(picked.starters); setCaptainId(picked.captainId); setKeeperId(picked.keeperId); } }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!visible) return;
     let on = true;
@@ -69,7 +73,11 @@ export function WhoPlaysSheet({
       visible={visible}
       onClose={onClose}
       title={`Who's playing · ${teamName}`}
-      footer={<Button variant="primary" label={sel.length ? `Done · ${sel.length} picked` : 'Done'} onPress={() => { onDone(sel); onClose(); }} />}
+      footer={<Button variant="primary" label={sel.length ? `Done · ${sel.length} picked` : 'Done'} onPress={() => {
+        // C6: a role only for someone still picked
+        onDone({ starters: sel, captainId: captainId && sel.includes(captainId) ? captainId : undefined, keeperId: keeperId && sel.includes(keeperId) ? keeperId : undefined });
+        onClose();
+      }} />}
     >
       <Text style={textStyles.muted}>Optional. {sel.length} of {playersPerSide} picked. You can change this any time from the match.</Text>
       {fromLast.length > 0 && (
@@ -94,6 +102,14 @@ export function WhoPlaysSheet({
           ))}
         </View>
       )}
+      <MatchRolesPicker
+        sport={sport}
+        players={sel.map((id) => ({ id, name: byId.get(id)?.fullName ?? 'Player' }))}
+        captainId={captainId && sel.includes(captainId) ? captainId : undefined}
+        keeperId={keeperId && sel.includes(keeperId) ? keeperId : undefined}
+        onCaptain={setCaptainId}
+        onKeeper={setKeeperId}
+      />
       <AddInvitePlayer
         fixedSide="home"
         title="＋ Add a player to this team"

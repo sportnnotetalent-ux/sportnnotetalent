@@ -25,6 +25,22 @@ auth-smoke passed. Published from a clean worktree at 9c758015 (the tip; the com
 
 Founder: rename the Matches views from Playing / Running to **Player** / **Organizer**. A game you play in and also host stays under Player only, and its card now says "You're hosting" (`VIEW_LABEL`, `hostingNote` in `src/core/myMatches.ts`; MatchesScreen). The internal keys didn't change. Tests: matches-tab-playing 4 new (MM9–MM12), 14 pass with the sim; tsc clean. Not checked in the demo yet. Open: the founder's Player view is empty. Live data shows hosts on their own rosters, so the next step is to check the founder's own account. No database change.
 
+### 2026-11-06 — Match-day roles: captain + keeper for every team sport (C6) (not yet published; SQL to run)
+
+Break-it list: `docs/security/breaks/match-roles.md` (MR1–MR8).
+- **Roles:** each side's squad can name this match's **captain** (every team sport) and its **keeper**: Wicket-keeper (cricket), Goalkeeper (football / handball / hockey), Goalie (ice hockey).
+- **Where they're set:** on the Matchday Squad screen and in setup's "Who's playing". Tapping the chosen player again clears the role (`MatchRolesPicker`).
+- **Where they show:** the match Info tab shows "This match: X" and the C tag follows the match captain. The keeper keeps feeding the scoring screens (🧤).
+- **Database:** migration `20261111120000_match_roles.sql` adds `match_squads.captain_id` plus the trigger `guard_match_squad_roles`.
+  - The captain and keeper must be in that side's squad.
+  - Leaving the squad clears the role.
+  - Older rows are left alone until edited.
+  - The write policy is unchanged (a side's managers only); no new grants.
+- **Safe before the SQL:** squads read with and without `captain_id`; a write retries without it.
+- **Fixed on the way:** saving the Matchday Squad used to wipe a keeper set from the cricket lineup screen.
+
+Tests: db-match-roles 6 (PGlite), match-roles 6, sim-match-roles (600 sides × 30 changes). Full suite 7,598 pass, 0 fail; tsc clean. Demo checked: captain Rohan Nair + goalkeeper Kiran Rao saved; Info shows "This match: Rohan Nair"; roles kept on reopen. Not done: volleyball libero; cricket toss captain prefill.
+
 ### 2026-11-06 — Launch voice (A2) + native splash (A3), ready for the 1.1.0 build (not yet published)
 
 Both need native modules, so they take effect in the next app build. Break-it list: `docs/security/breaks/launch-voice-splash.md` (LV1–LV7, SP1–SP2).
