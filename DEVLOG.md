@@ -15,7 +15,7 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ### 2026-11-07 — Release: a held result finishes on the server (web, Android OTA)
 
-Founder ran `20261114120000_held_result_server.sql` — the version with fb489589 (another session’s HR7 catch: an odd winner value could have failed the every-minute job for every match). Confirmed read-only: the `held_result` column, `finish_held_results` (fixed version) and the `finish-held-results` cron job. auth-smoke passed. Published from a clean worktree at the tip fb489589: web `index-894e077b`, confirmed live; Android OTA `c8d07027` (preview) / `cce6bf84` (production).
+Founder ran `20261114120000_held_result_server.sql` — the version with fb489589 (another session’s HR7 catch: an odd winner value could have failed the every-minute job for every match). Confirmed read-only: the `held_result` column, `finish_held_results` (fixed version) and the `finish-held-results` cron job. auth-smoke passed. Published from a clean worktree at the tip fb489589: web `index-894e077b`, confirmed live; Android OTA `c8d07027` (preview) / `cce6bf84` (production). Checked live on the demo account: won a pickleball game, left the tab at once (the case that failed before) — the held result was saved (winner home), the light page read FULL TIME, and ~100 s later the server job completed it (winner home, `completed_at` stamped, `held_result` cleared) with no app open.
 
 ### 2026-11-07 — A held result finishes without the scorer’s app
 
