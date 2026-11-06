@@ -1,6 +1,7 @@
 /** Tournament hub: overview, follow, the overall house table, a per-sport
  *  league table + statistics rail, and participating teams. For a single-sport
  *  tournament the sport selector is skipped and its table shown directly. */
+import { SkeletonList } from '../components/Skeleton';
 import { knockoutInProgress } from '../core/tournamentTeams';
 import { tournamentTeamIds } from '../core/tournamentTeams';
 import { formatDayRange } from '../core/dates';
@@ -479,7 +480,10 @@ export default function TournamentProfileScreen() {
   if (!tournament) {
     return (
       <SafeAreaView style={st.safe} edges={['bottom']}>
-        <Text style={[textStyles.muted, { padding: theme.spacing(4) }]}>Loading…</Text>
+        <View style={{ padding: theme.spacing(4) }}>
+          {/* Reference-video B6: placeholders, and a message if it never loads (e.g. a wrong link) */}
+          <SkeletonList loading rows={3} slowAfterMs={8000} slowLabel="Couldn't load this tournament. Check the link and your connection, then try again." />
+        </View>
       </SafeAreaView>
     );
   }

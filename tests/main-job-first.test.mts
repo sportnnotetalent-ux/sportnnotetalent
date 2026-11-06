@@ -31,7 +31,7 @@ test('MJ6: Profile leads with the record; nothing dropped', () => {
 });
 
 test('MJ2/MJ5: folds keep values and the voice privacy note', () => {
-  assert.match(read('src/screens/ScheduleMatchScreen.tsx'), /More options — rules, venue, live stream ▾\{venue\.trim\(\)/);
+  assert.match(read('src/screens/ScheduleMatchScreen.tsx'), /More options — rules, venue, stream, officials ▾\{venue\.trim\(\)/);
   assert.match(read('src/screens/CreateTournamentScreen.tsx'), /More options — co-hosts, divisions, organiser contact, reminders/);
   const v = read('src/sports/VoiceScorer.tsx');
   assert.match(v, /const shown = open \|\| speech\.listening \|\| !!pending \|\| log\.length > 0;/);

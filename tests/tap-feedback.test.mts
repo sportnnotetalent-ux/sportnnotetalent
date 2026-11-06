@@ -139,7 +139,7 @@ describe('source checks', () => {
   test('T8/T9 Button and SelectChip have the shared press state, respecting disabled', () => {
     const ui = read('src/components/ui.tsx');
     assert.match(ui, /usePressFeedback\(\{ disabled \}\)/);
-    assert.equal(ui.match(/usePressFeedback\(/g)?.length, 2, 'Button and SelectChip');
+    assert.equal(ui.match(/usePressFeedback\(/g)?.length, 3, 'Button, SelectChip and ListRow (reference-video B4)');
     assert.match(ui, /useSelectAnim\(active/, 'a chip animates into its selected look');
   });
   test('PointButtons and SecondaryAction use it too', () => {

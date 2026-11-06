@@ -20,6 +20,10 @@ import { useActiveOrg } from '../core/orgContext';
 import type { SportId, Team } from '../core/types';
 import type { RootStackParamList } from '../navigation/types';
 import { SportLine } from '../components/SportSymbol';
+import { SportPicker } from '../components/SportPicker';
+import { useMySports } from '../data/useMySports';
+import { startSport } from '../core/quickGame';
+import { shortCodeFrom, shortCodeToSave } from '../core/shortCode';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -38,7 +42,11 @@ export default function TeamsScreen() {
   }, [activeOrg?.id, profile?.id, tick]));
   const [name, setName] = useState('');
   const [short, setShort] = useState('');
-  const [sport, setSport] = useState<SportId>('football');
+  // Reference-video C5: the sport starts as yours (Personalise), not football
+  const mine = useMySports();
+  const [picked, setPicked] = useState<SportId | null>(null);
+  const sport: SportId = picked ?? ((startSport({ last: null, mine, known: SPORT_LIST.map((x) => x.id) }) as SportId | null) ?? 'football');
+  const setSport = (s: SportId) => setPicked(s);
   const [color, setColor] = useState(PALETTE[0]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -46,11 +54,12 @@ export default function TeamsScreen() {
   const [showCasual, setShowCasual] = useState(false);
 
   async function add() {
-    if (!name.trim() || !short.trim()) return setError('Name and short code are required.');
+    // C5: the short code is optional — worked out from the name when left empty
+    if (!name.trim()) return setError('Give the team a name.');
     setError(null);
     setBusy(true);
     try {
-      const team = await createTeam({ name: name.trim(), shortName: short.trim().toUpperCase(), sport, colorHex: color, ...(activeOrg ? { orgId: activeOrg.id } : {}) });
+      const team = await createTeam({ name: name.trim(), shortName: shortCodeToSave(short, name.trim()), sport, colorHex: color, ...(activeOrg ? { orgId: activeOrg.id } : {}) });
       setName('');
       setShort('');
       setTick((t) => t + 1);
@@ -84,16 +93,12 @@ export default function TeamsScreen() {
               <TextField label="Name" value={name} onChange={setName} placeholder="Red House" />
             </View>
             <View style={st.flex1}>
-              <TextField label="Short" value={short} onChange={setShort} placeholder="RED" autoCapitalize="characters" />
+              <TextField label="Short (optional)" value={short} onChange={setShort} placeholder={name.trim() ? shortCodeFrom(name) : 'RED'} autoCapitalize="characters" />
             </View>
           </View>
 
           <Text style={textStyles.muted}>Sport</Text>
-          <View style={st.chips}>
-            {SPORT_LIST.map((s) => (
-              <SelectChip key={s.id} label={`${s.icon} ${s.name}`} active={sport === s.id} onPress={() => setSport(s.id)} />
-            ))}
-          </View>
+          <SportPicker value={sport} onChange={setSport} mine={mine} />
 
           <Text style={textStyles.muted}>Colour</Text>
           <View style={st.chips}>

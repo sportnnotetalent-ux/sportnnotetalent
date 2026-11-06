@@ -3,8 +3,8 @@
  *  sport adds (cricket: Change keeper). A `Modal` sheet like ContextSwitcher.
  *  Each tile either acts and closes, or opens a small panel inside the sheet. */
 import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, Modal, Pressable, StyleSheet } from 'react-native';
-import { KeyboardAwareScrollView, KeyboardSheetScope, useKeyboardSheet } from './keyboard';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { Sheet } from './Sheet';
 import { theme } from '../core/theme';
 import { Glyph } from './Icon';
 import { Button, SelectChip, TextField, textStyles } from './ui';
@@ -34,8 +34,6 @@ type Panel = null | 'break' | 'squad' | 'settings';
 
 export function QuickOptionsSheet({ visible, onClose, homeName, awayName, onBreak, onSquad, onScorer, onScorecard, settingsPanel, pluginTiles }: QuickOptionsSheetProps) {
   const [panel, setPanel] = useState<Panel>(null);
-  // keyboard: the sheet stays above it while one of its fields is focused
-  const kbSheet = useKeyboardSheet(visible);
   const [kind, setKind] = useState<BreakKind | null>(null);
   const [note, setNote] = useState('');
   useEffect(() => { if (!visible) { setPanel(null); setKind(null); setNote(''); } }, [visible]);
@@ -48,16 +46,13 @@ export function QuickOptionsSheet({ visible, onClose, homeName, awayName, onBrea
   };
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={[st.backdrop, kbSheet.backdrop]} onPress={onClose} accessibilityLabel="Close quick options">
-        <Pressable ref={kbSheet.panel} style={[st.sheet, kbSheet.sheet]} onPress={(e) => e.stopPropagation()}>
-          <KeyboardSheetScope value={kbSheet.scope}>
-            <KeyboardAwareScrollView contentContainerStyle={{ gap: theme.spacing(3) }} keyboardShouldPersistTaps="handled">
-              <View style={st.head}>
-                <Text style={st.title}>{panel === 'break' ? '⏸ Match break' : panel === 'squad' ? '👥 Change squad' : panel === 'settings' ? '⚙️ Match settings' : 'Quick options'}</Text>
-                <Text style={st.close} accessibilityRole="button" onPress={panel ? () => setPanel(null) : onClose}>{panel ? '‹ Back' : '✕'}</Text>
-              </View>
-
+    <Sheet
+      visible={visible}
+      onClose={onClose}
+      onBack={panel ? () => setPanel(null) : undefined}
+      closeLabel="Close quick options"
+      title={panel === 'break' ? '⏸ Match break' : panel === 'squad' ? '👥 Change squad' : panel === 'settings' ? '⚙️ Match settings' : 'Quick options'}
+    >
               {panel === null && (
                 <>
                   <View style={st.grid}>
@@ -90,11 +85,7 @@ export function QuickOptionsSheet({ visible, onClose, homeName, awayName, onBrea
                   <Tile icon="✈️" label={awayName} hint="Edit squad" onPress={() => { onClose(); onSquad('away'); }} />
                 </View>
               )}
-            </KeyboardAwareScrollView>
-          </KeyboardSheetScope>
-        </Pressable>
-      </Pressable>
-    </Modal>
+    </Sheet>
   );
 }
 

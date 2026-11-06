@@ -3,6 +3,7 @@
  *  the tournaments the user plays in or follows) filters the live & upcoming
  *  matches below, and a sport row jumps into each sport's section (schedule,
  *  organize, standings & stats). Deep standings/stats live on those pages. */
+import { SkeletonList } from '../components/Skeleton';
 import { distinctNames } from '../core/chipNames';
 import { yourSports } from '../core/playedSports';
 import { isStaleLive } from '../core/staleLive';
@@ -346,7 +347,7 @@ export default function HomeScreen() {
         {/* Live now — top 5, "See all" opens the full live list */}
         <SectionHeader title="Live now" count={live.length} onSeeAll={live.length > SECTION_CAP ? () => seeAll('live') : undefined} />
         {loading ? (
-          <LoadingState label="Loading matches…" />
+          <SkeletonList loading rows={2} label="Loading matches" />
         ) : live.length ? (
           live.slice(0, SECTION_CAP).map((m) => <MatchCard key={m.id} match={m} compact onPress={() => openScorer(m)} />)
         ) : (

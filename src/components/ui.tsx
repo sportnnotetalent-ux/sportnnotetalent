@@ -13,6 +13,7 @@ import {
   StyleProp,
 } from 'react-native';
 import { HeaderShownContext } from '@react-navigation/elements';
+import { initialsOf } from '../core/initials';
 import { theme } from '../core/theme';
 import { useFormField, useKeyboardFocus } from './keyboard';
 import { readableOn } from '../core/contrast';
@@ -110,6 +111,74 @@ const emptyStyles = StyleSheet.create({
   link: { color: theme.colors.primary, fontSize: theme.font.small, fontWeight: '700', paddingVertical: theme.spacing(1) },
   title: { color: theme.colors.text, fontSize: theme.font.body, fontWeight: '600', textAlign: 'center' },
   hint: { color: theme.colors.textMuted, fontSize: theme.font.small, textAlign: 'center', lineHeight: theme.font.small * 1.4 },
+});
+
+/** Reference-video B4: one row for every team / player list — an avatar
+ *  (initials on the team colour, or a neutral disc), the name, a muted detail
+ *  line, an optional trailing slot, and a clear selected state (a check and an
+ *  outline). Pass the name as the app already shows it: an under-18's masked
+ *  name stays masked here. */
+export function ListRow({
+  title,
+  meta,
+  color,
+  selected,
+  disabled,
+  onPress,
+  trailing,
+  accessibilityLabel,
+}: {
+  title: string;
+  meta?: string;
+  /** the team colour behind the initials */
+  color?: string;
+  selected?: boolean;
+  disabled?: boolean;
+  onPress?: () => void;
+  trailing?: React.ReactNode;
+  accessibilityLabel?: string;
+}) {
+  const press = usePressFeedback({ disabled: disabled || !onPress });
+  const disc = color ?? theme.colors.surfaceAlt;
+  return (
+    <AnimatedPressable
+      onPress={disabled ? undefined : onPress}
+      onPressIn={press.onPressIn}
+      onPressOut={press.onPressOut}
+      disabled={disabled || !onPress}
+      accessibilityRole={onPress ? 'button' : undefined}
+      accessibilityLabel={accessibilityLabel ?? (meta ? `${title}, ${meta}` : title)}
+      accessibilityState={{ selected: !!selected, disabled: !!disabled }}
+      style={[rowStyles.row, selected && rowStyles.rowOn, disabled && rowStyles.rowOff, press.style]}
+    >
+      <View style={[rowStyles.avatar, { backgroundColor: color ? disc + '33' : disc }]}>
+        <Text style={[rowStyles.initials, color ? { color: theme.colors.text } : null]}>{initialsOf(title)}</Text>
+      </View>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text style={rowStyles.title} numberOfLines={1}>{title}</Text>
+        {meta ? <Text style={rowStyles.meta} numberOfLines={1}>{meta}</Text> : null}
+      </View>
+      {trailing}
+      {selected ? (
+        <View style={rowStyles.check}><EmojiIcon spec={EMOJI_ICONS['✓']} color={theme.colors.onLime} size={14} /></View>
+      ) : null}
+    </AnimatedPressable>
+  );
+}
+
+const rowStyles = StyleSheet.create({
+  row: {
+    flexDirection: 'row', alignItems: 'center', gap: theme.spacing(3),
+    paddingVertical: theme.spacing(2), paddingHorizontal: theme.spacing(3),
+    backgroundColor: theme.colors.surface, borderRadius: theme.radius.md, borderWidth: 1.5, borderColor: theme.colors.border,
+  },
+  rowOn: { borderColor: theme.colors.primary },
+  rowOff: { opacity: 0.5 },
+  avatar: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  initials: { color: theme.colors.textMuted, fontSize: theme.font.small, fontWeight: '700' },
+  title: { color: theme.colors.text, ...theme.type.body, fontWeight: '600' },
+  meta: { color: theme.colors.textMuted, ...theme.type.meta, marginTop: 1 },
+  check: { width: 24, height: 24, borderRadius: 12, backgroundColor: theme.colors.lime, alignItems: 'center', justifyContent: 'center' },
 });
 
 export function Card({
@@ -288,7 +357,7 @@ const sectionStyles = StyleSheet.create({
     borderWidth: 1, borderColor: theme.colors.surfaceAlt, padding: theme.spacing(4), gap: theme.spacing(1.5), ...theme.shadow.card,
   },
   actionIcon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginBottom: theme.spacing(1) },
-  actionLabel: { color: theme.colors.text, fontSize: theme.font.body, fontWeight: '800' },
+  actionLabel: { color: theme.colors.text, ...theme.type.button },
   actionHint: { color: theme.colors.textMuted, fontSize: theme.font.tiny, lineHeight: theme.font.tiny * 1.35 },
   tile: {
     flex: 1, minHeight: 108, borderRadius: theme.radius.lg, padding: theme.spacing(3),
@@ -437,7 +506,7 @@ export const textStyles: Record<string, TextStyle> = StyleSheet.create({
   // section titles in the condensed upright (no fontWeight: the face is the weight)
   h1: { color: theme.colors.text, fontSize: theme.font.h1 + 4, fontFamily: theme.fonts.display, textTransform: 'uppercase', letterSpacing: 0.2, lineHeight: (theme.font.h1 + 4) * 1.05 },
   h2: { color: theme.colors.text, fontSize: theme.font.h2 + 4, fontFamily: theme.fonts.heading, letterSpacing: 0.2, lineHeight: (theme.font.h2 + 4) * 1.1 },
-  h3: { color: theme.colors.text, fontSize: theme.font.h3, fontWeight: '700', letterSpacing: -0.2 },
+  h3: { color: theme.colors.text, ...theme.type.title, letterSpacing: -0.2 },
   body: { color: theme.colors.text, fontSize: theme.font.body, lineHeight: theme.font.body * 1.4 },
   muted: { color: theme.colors.textMuted, fontSize: theme.font.small, lineHeight: theme.font.small * 1.4 },
 });
@@ -462,7 +531,7 @@ const styles = StyleSheet.create({
   btnGhost: { borderWidth: 1.5, borderColor: theme.colors.inputBorder },
   btnDisabled: { opacity: 0.4 },
   btnRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: theme.spacing(2), maxWidth: '100%' },
-  btnText: { fontSize: theme.font.body, fontWeight: '800', letterSpacing: 0.2, textAlign: 'center', flexShrink: 1 },
+  btnText: { ...theme.type.button, letterSpacing: 0.2, textAlign: 'center', flexShrink: 1 },
   pill: {
     flexDirection: 'row', alignItems: 'center', gap: theme.spacing(1.5),
     paddingVertical: theme.spacing(1),

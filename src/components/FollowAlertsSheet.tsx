@@ -3,7 +3,8 @@
  *  follow type actually sends, a one-tap "Turn all off/on", and Save. All alerts
  *  start ticked (opt-out); only the OFF switches are stored. */
 import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, Modal, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { Sheet } from './Sheet';
 import { theme } from '../core/theme';
 import { textStyles, Button } from './ui';
 import { useAuth } from '../core/auth';
@@ -49,11 +50,12 @@ export function FollowAlertsSheet({ visible, type, id, name, onClose, alsoIds }:
   };
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={st.backdrop} onPress={onClose} accessibilityLabel="Close">
-        <Pressable style={st.sheet} onPress={(e) => e.stopPropagation()}>
-          <ScrollView contentContainerStyle={{ gap: theme.spacing(2) }} keyboardShouldPersistTaps="handled">
-            <Text style={textStyles.h3}>Which alerts?</Text>
+    <Sheet
+      visible={visible}
+      onClose={onClose}
+      title="Which alerts?"
+      footer={<Button variant="primary" label={saving ? 'Saving…' : 'Save'} onPress={save} disabled={saving} />}
+    >
             <Text style={textStyles.muted}>
               For <Text style={st.bold}>{name}</Text>. Untick what you don’t need.
             </Text>
@@ -93,17 +95,11 @@ export function FollowAlertsSheet({ visible, type, id, name, onClose, alsoIds }:
                 You’ll get nothing for {name} — unfollow to remove it from your feed too.
               </Text>
             )}
-            <Button variant="primary" label={saving ? 'Saving…' : 'Save'} onPress={save} disabled={saving} />
-          </ScrollView>
-        </Pressable>
-      </Pressable>
-    </Modal>
+    </Sheet>
   );
 }
 
 const st = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: '#00000088', justifyContent: 'flex-end', padding: theme.spacing(4) },
-  sheet: { backgroundColor: theme.colors.surface, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: theme.colors.border, padding: theme.spacing(4), maxHeight: '90%', width: '100%', maxWidth: 520, alignSelf: 'center' },
   bold: { color: theme.colors.text, fontWeight: '800' },
   row: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(3), paddingVertical: theme.spacing(2), paddingHorizontal: theme.spacing(2), borderRadius: theme.radius.md, minHeight: 48 },
   box: { color: theme.colors.primary, fontSize: 24, lineHeight: 28, width: 28, textAlign: 'center' },

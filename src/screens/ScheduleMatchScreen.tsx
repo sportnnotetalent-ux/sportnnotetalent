@@ -30,7 +30,7 @@ import { onePerEntrant, sidesForStructure, recentPairs, searchSides, searchPeopl
 import { settlePairType, pairTypeFromDivisions } from '../sports/pairType';
 import { venueOptions } from '../data/tournamentForm';
 import { findScheduleConflicts, knownVenueNames } from '../data/scheduleConflicts';
-import { createMatch, createTeam, getMyEntrant, getMyPlayerId, setMatchScorer, getMatch, getTournaments, getMatchSquads, setMatchSquad, getEntryTeamsWith } from '../data/repos';
+import { createMatch, createTeam, getMyEntrant, getMyPlayerId, setMatchScorer, getMatch, getTournaments, getMatchSquads, setMatchSquad, getEntryTeamsWith, setMatchOfficials } from '../data/repos';
 import { pairKey, pairsFromTeams, type PairTeam } from '../core/pairs';
 import { isPairSport } from '../data/pairSport';
 import { cloneDraft } from '../data/matchHousekeeping';
@@ -53,6 +53,10 @@ import { Glyph } from '../components/Icon';
 import { SportLine } from '../components/SportSymbol';
 import { matchEnding, type MatchEndingChoice } from '../core/matchEnding';
 import { teamSuggestions, teamDetail } from '../core/teamSuggestions';
+import { WhoPlaysSheet } from '../components/WhoPlaysSheet';
+import { OfficialsDraft } from '../components/OfficialsDraft';
+import { saveDraftSquads, type DraftSquads } from '../data/draftSquad';
+import { cleanOfficials, type MatchOfficial } from '../data/matchOfficials';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type PickTeam = Pick<Team, 'id' | 'name' | 'colorHex'> & { roster?: string[] };
@@ -371,7 +375,15 @@ export default function ScheduleMatchScreen() {
   // C4 (reference video): a friendly ends with two clear buttons — "Start now"
   // always kicks off now and opens scoring, "Save for later" never does.
   const twoEndings = isFriendly && !cloneOf;
+  const perSideNow = Number(format.playersPerSide) > 0 ? Number(format.playersPerSide) : 11;
   const [ending, setEnding] = useState<MatchEndingChoice | null>(null);
+  // C3 (reference video): optional "Who's playing" per side, saved once the match exists
+  const [draftSquads, setDraftSquads] = useState<DraftSquads>({});
+  const [whoPlays, setWhoPlays] = useState<'home' | 'away' | null>(null);
+  useEffect(() => { setDraftSquads((d) => (d.home ? { ...d, home: undefined } : d)); }, [home]);
+  useEffect(() => { setDraftSquads((d) => (d.away ? { ...d, away: undefined } : d)); }, [away]);
+  // C7: optional officials at setup, saved once the match exists
+  const [officialsDraft, setOfficialsDraft] = useState<MatchOfficial[]>([]);
   async function submit(choice?: MatchEndingChoice) {
     if (!sport) return setError('Pick a sport.');
     const end = twoEndings && choice
@@ -426,6 +438,15 @@ export default function ScheduleMatchScreen() {
       // the Info tab anytime. (Tournament matches are left unassigned — the organizer
       // schedules many they won't personally score.)
       if (isFriendly && myId) await setMatchScorer(created.id, myId);
+      // C3 / C7: best effort — a failure never blocks or undoes the match.
+      if (twoEndings) {
+        await saveDraftSquads({
+          matchId: created.id, sport, playersPerSide: perSideNow, drafts: draftSquads,
+          nameOf: (id) => allPlayers.find((p) => p.id === id)?.fullName,
+        });
+        const offs = cleanOfficials(officialsDraft);
+        if (offs.length) await setMatchOfficials(created.id, offs).catch(() => {});
+      }
       if (isFriendly) void AsyncStorage.setItem(LAST_SPORT_KEY, sport).catch(() => {});
       // A clone copies the source match's matchday squads (each side that has one).
       if (cloneOf) {
@@ -606,6 +627,39 @@ export default function ScheduleMatchScreen() {
                   )}
                   <TeamPicker noun="team" label="Home team" teams={pickTeams} selected={home} onSelect={setHome} onClear={() => setHome(null)} onCreate={makeCreateHandler('home')} suggest={suggestHome} />
                   <TeamPicker noun="team" label="Away team" teams={pickTeams} selected={away} onSelect={setAway} onClear={() => setAway(null)} onCreate={makeCreateHandler('away')} suggest={suggestAway} />
+                  {twoEndings && mode === 'team' && (home || away) && (
+                    <View style={{ gap: theme.spacing(1) }}>
+                      {(['home', 'away'] as const).map((sd) => {
+                        const t = teams.find((x) => x.id === (sd === 'home' ? home : away));
+                        if (!t) return null;
+                        const n = draftSquads[sd]?.length ?? 0;
+                        return (
+                          <Text key={sd} style={st.moreLink} accessibilityRole="button" onPress={() => setWhoPlays(sd)}>
+                            {n ? `👥 ${t.name}: ${n} playing · change` : `👥 Who's playing for ${t.name}? (optional)`}
+                          </Text>
+                        );
+                      })}
+                    </View>
+                  )}
+                  {twoEndings && mode === 'team' && whoPlays && sport && (() => {
+                    const t = teams.find((x) => x.id === (whoPlays === 'home' ? home : away));
+                    if (!t) return null;
+                    const other = whoPlays === 'home' ? 'away' : 'home';
+                    return (
+                      <WhoPlaysSheet
+                        visible
+                        onClose={() => setWhoPlays(null)}
+                        onDone={(ids) => setDraftSquads((d) => ({ ...d, [whoPlays]: ids }))}
+                        teamId={t.id}
+                        teamName={t.name}
+                        color={t.colorHex}
+                        sport={sport}
+                        playersPerSide={perSideNow}
+                        picked={draftSquads[whoPlays] ?? []}
+                        taken={draftSquads[other] ?? []}
+                      />
+                    );
+                  })()}
                 </>
               ) : mode === 'individual' ? (
                 <>
@@ -665,7 +719,7 @@ export default function ScheduleMatchScreen() {
               venue and a stream link fold under More options (standard rules by default) */}
           {isFriendly && !moreOpen ? (
             <Text style={st.moreLink} accessibilityRole="button" accessibilityState={{ expanded: false }} onPress={() => setMoreOpen(true)}>
-              More options — rules, venue, live stream ▾{venue.trim() ? ` · 📍 ${venue.trim()}` : ''}
+              More options — rules, venue, stream, officials ▾{venue.trim() ? ` · 📍 ${venue.trim()}` : ''}
             </Text>
           ) : (
             <>
@@ -680,6 +734,7 @@ export default function ScheduleMatchScreen() {
               <Text style={textStyles.muted}>
                 Add a YouTube or Twitch link and it shows at the top of the live match. You can also set or change it later from the match’s Info tab.
               </Text>
+              {twoEndings && sport && <OfficialsDraft sport={sport} value={officialsDraft} onChange={setOfficialsDraft} />}
             </>
           )}
 

@@ -1,6 +1,8 @@
 /** Create a tournament: name, dates, sports, the competition structure, and the
  *  per-sport format (overs, players-a-side, sub rules…) the organizer chooses —
  *  all games in the tournament then follow that format. */
+import { prefillCity } from '../core/prefill';
+import { getMyPersonalisation } from '../data/personalise';
 import { SportPicker } from '../components/SportPicker';
 import { useMySports } from '../data/useMySports';
 import { regionFormatDefaults } from '../core/units';
@@ -125,13 +127,20 @@ export default function CreateTournamentScreen() {
   const hostOrg = hostChoice !== 'self' ? myOrgs.find((o) => o.id === hostChoice) : undefined;
   // SD-153: the meet's market — the host community's, else the organiser's region.
   const market: MarketId = isMarket(hostOrg?.market) ? hostOrg!.market as MarketId : marketForCountry(regionStore.get().country);
+  // Reference-video B9: no host community → your own home city (from Personalise).
+  const [myCity, setMyCity] = useState<string | null>(null);
+  React.useEffect(() => {
+    let on = true;
+    getMyPersonalisation().then((p) => on && setMyCity(p?.homeCity?.name ?? null)).catch(() => undefined);
+    return () => { on = false; };
+  }, []);
   React.useEffect(() => {
     setDetails((d) => ({
       ...d,
-      city: touched.current.city ? d.city : (hostOrg?.city ?? ''),
+      city: prefillCity({ typed: d.city, touched: touched.current.city, hostOrgCity: hostOrg?.city, myCity }),
       eventCategory: touched.current.category ? d.eventCategory : categoryFromOrgType(hostOrg?.type),
     }));
-  }, [hostOrg?.id, hostOrg?.city, hostOrg?.type]);
+  }, [hostOrg?.id, hostOrg?.city, hostOrg?.type, myCity]);
   const [start, setStart] = useState(() => toISODate(new Date()));
   const [end, setEnd] = useState(() => toISODate(addDays(new Date(), 5)));
   const [sports, setSports] = useState<SportId[]>(initialSport ? [initialSport] : []);

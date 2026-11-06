@@ -54,6 +54,15 @@ export const theme = {
     /** the hero headline ("READY TO PLAY?") */
     display: 44,
   },
+  /** Reference-video B3: one calm type ramp. Bold (800/900) is for scores,
+   *  numbers and the display face only; everyday text uses these. */
+  type: {
+    title: { fontSize: 18, fontWeight: '700' as const },
+    body: { fontSize: 15, fontWeight: '400' as const },
+    label: { fontSize: 13, fontWeight: '600' as const },
+    meta: { fontSize: 12, fontWeight: '400' as const },
+    button: { fontSize: 15, fontWeight: '700' as const },
+  },
   /** Barlow Condensed, loaded at start-up (App.tsx). Until it has loaded (or if it
    *  can't), the platform font is used — never a blank screen. */
   fonts: {

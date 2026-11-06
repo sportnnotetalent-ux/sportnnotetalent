@@ -25,6 +25,26 @@ auth-smoke passed. Published from a clean worktree at 9c758015 (the tip; the com
 
 Founder: rename the Matches views from Playing / Running to **Player** / **Organizer**. A game you play in and also host stays under Player only, and its card now says "You're hosting" (`VIEW_LABEL`, `hostingNote` in `src/core/myMatches.ts`; MatchesScreen). The internal keys didn't change. Tests: matches-tab-playing 4 new (MM9–MM12), 14 pass with the sim; tsc clean. Not checked in the demo yet. Open: the founder's Player view is empty. Live data shows hosts on their own rosters, so the next step is to check the founder's own account. No database change.
 
+### 2026-11-06 — Reference-video batch 2: who's playing, officials at setup, lighter teams, one sheet, placeholders, calmer type (not yet published)
+
+The founder approved "the next suggested batch" from `docs/design/reference-video/README.md`. Break-it list: `docs/security/breaks/reference-batch-2.md` (R1–R19).
+- **Who's playing (C3):** an optional "👥 Who's playing for X?" link on friendly setup (team sports). It opens a panel:
+  - last match's players listed first, "Same as last match", a players-a-side counter;
+  - greyed rows with the reason when someone can't be picked;
+  - add a player to the team from the panel.
+  The picks are saved as the matchday squad, and the pitch lineup, right after the match is created (best effort, never blocks "Start now").
+- **One list row (B4):** `ListRow`, with an initials avatar on the team colour, a muted detail line, and a selected check plus outline. Used first in Who's playing.
+- **Officials at setup (C7):** under More options, each sport's own titles; saved after the match exists.
+- **Lighter teams (C5):** the short code is optional (made from the name), with the shared sport picker defaulting to your sport.
+- **One sheet (B7):** a `Sheet` shell (handle, title, ✕ / ‹ Back, keyboard-safe, Android back). Quick options and Which alerts? use it.
+- **Placeholders (B6):** `SkeletonList` on Home and the tournament page. A wrong tournament link no longer says "Loading…" forever; after 8 s it says it couldn't load.
+- **Calmer type (B3):** a `theme.type` ramp for buttons, section titles, rows and h3, so buttons go 800 → 700. A test stops hand-typed sizes and 900 weights from growing.
+- **Smarter forms (B9):** a new tournament's city fills from your own home city when no community hosts it.
+
+Tests: reference-batch-2 21, sim-reference-batch-2 (600 organisers); main-job-first, tap-feedback and leading-emoji updated or kept green (the row's ✓ is an icon). Full suite 7,577 pass, 0 fail; tsc clean.
+Demo checked: Who's playing → Starting 2/5 on the match; referee "Mr Rao" on the match's Info tab; team form; wrong-link tournament (placeholders → message).
+Not done: every list on ListRow, every sheet on Sheet, more placeholders, type beyond the shared components, chips inside fields, "I play in this team". No database change.
+
 ### 2026-11-06 — Reference-video quick wins + silent launch animation — live
 
 The founder approved the quick wins (B1, B2, B5, B8, C1, C2, C4) and A1 from `docs/design/reference-video/README.md`. Break-it list: `docs/security/breaks/quick-wins-reference.md` (QW1–QW20).

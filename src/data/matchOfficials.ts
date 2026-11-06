@@ -176,3 +176,17 @@ export function officialsLine(list: MatchOfficial[], sport: SportId | string | u
   }
   return groups.map((g) => `${g.names.length > 1 ? g.label[1] : g.label[0]}: ${g.names.join(', ')}`).join(' · ');
 }
+
+/** Setup draft (reference-video C7): set one slot, dropping blank names and
+ *  never the same linked person in two slots. */
+export function withOfficial(list: readonly MatchOfficial[], slot: string, o: { playerId?: string; name: string }): MatchOfficial[] {
+  const name = o.name.trim();
+  if (!name) return [...list];
+  const rest = list.filter((x) => x.slot !== slot && !(o.playerId && x.playerId === o.playerId));
+  return [...rest, { slot, name, ...(o.playerId ? { playerId: o.playerId } : {}) }];
+}
+
+/** A setup draft ready to save: trimmed, blanks dropped, one slot each. */
+export function cleanOfficials(list: readonly MatchOfficial[]): MatchOfficial[] {
+  return list.reduce<MatchOfficial[]>((acc, o) => withOfficial(acc, o.slot, o), []);
+}

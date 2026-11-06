@@ -15,11 +15,12 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { theme } from '../core/theme';
 import { EmptyState, Button, ScreenTitle, textStyles, plural } from '../components/ui';
 import { getSport } from '../sports/registry';
+import { reconcilePositions } from '../core/lineupPlace';
 import { getRoster, getMatchSquads, setMatchSquad, getLineup, setLineup, getLastSquadForTeam, removePlayerFromTeam } from '../data/repos';
 import { AddInvitePlayer } from '../components/AddInvitePlayer';
 import { matchEligibility, canFieldPlayer, TESTING_ALLOW_UNVERIFIED, ageRequirementReason } from '../core/eligibility';
 import { useAgeRequirement } from '../data/useAgeRequirement';
-import type { LineupSlot, MatchLineup, Player } from '../core/types';
+import type { MatchLineup, Player } from '../core/types';
 import type { RootStackParamList } from '../navigation/types';
 import { RemindInstall } from '../components/RemindInstall';
 import { askConfirm } from '../components/ConfirmSheet';
@@ -28,29 +29,6 @@ import { isSuspended, suspendedPickCopy } from '../sports/football/discipline';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type Role = 'start' | 'sub' | 'out';
-
-/** Merge a chosen set of starters into a side's positional slots without losing
- *  hand-placed positions: keep placed players who are still starting, drop those
- *  no longer starting, then fill the empty slots (in order) with the rest. */
-function reconcilePositions(
-  starters: string[],
-  existing: LineupSlot[],
-  fresh: LineupSlot[],
-  nameOf: (id: string) => string | undefined,
-): LineupSlot[] {
-  const base = existing.length ? existing : fresh;
-  const slots = base.map((s) => ({ ...s }));
-  for (const s of slots) {
-    if (s.playerId && !starters.includes(s.playerId)) { s.playerId = undefined; s.playerName = undefined; }
-  }
-  const placed = new Set(slots.map((s) => s.playerId).filter(Boolean) as string[]);
-  const queue = starters.filter((id) => !placed.has(id));
-  let qi = 0;
-  for (const s of slots) {
-    if (!s.playerId && qi < queue.length) { const id = queue[qi++]; s.playerId = id; s.playerName = nameOf(id); }
-  }
-  return slots;
-}
 
 export default function MatchSquadScreen() {
   const nav = useNavigation<Nav>();

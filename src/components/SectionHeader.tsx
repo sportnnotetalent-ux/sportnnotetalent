@@ -39,6 +39,6 @@ export function SectionHeader({
 const st = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: theme.spacing(2), marginTop: theme.spacing(3) },
   // 2026-10-29 redesign: "UPCOMING MATCH ········ SEE ALL (12) ›"
-  title: { flexShrink: 1, color: theme.colors.text, fontSize: theme.font.small, fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase' },
+  title: { flexShrink: 1, color: theme.colors.text, fontSize: theme.font.small, fontWeight: '700', letterSpacing: 1.2, textTransform: 'uppercase' },
   seeAll: { color: theme.colors.hot, fontSize: theme.font.tiny, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase' },
 });
