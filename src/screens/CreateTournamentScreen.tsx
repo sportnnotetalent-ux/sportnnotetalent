@@ -1,6 +1,7 @@
 /** Create a tournament: name, dates, sports, the competition structure, and the
  *  per-sport format (overs, players-a-side, sub rules…) the organizer chooses —
  *  all games in the tournament then follow that format. */
+import { venueCounts } from '../core/venueCounts';
 import { prefillCity } from '../core/prefill';
 import { getMyPersonalisation } from '../data/personalise';
 import { SportPicker } from '../components/SportPicker';
@@ -109,6 +110,7 @@ export default function CreateTournamentScreen() {
   };
   const { matches: allMatches } = useMatches();
   const knownVenues = React.useMemo(() => knownVenueNames(allMatches), [allMatches]);
+  const venueGames = React.useMemo(() => venueCounts(allMatches), [allMatches]); // C9
   React.useEffect(() => {
     let on = true;
     getMyPlayerId(profile?.id).then(async (id) => {
@@ -240,7 +242,7 @@ export default function CreateTournamentScreen() {
           <ScreenTitle title="New tournament" subtitle="Set up your meet & its format" />
           <TournamentImagesField logoUrl={logoUrl} bannerUrl={bannerUrl} onLogo={setLogoUrl} onBanner={setBannerUrl} />
           <TextField label="Name" value={name} onChange={setName} placeholder="Annual Sports Meet 2026" />
-          <TournamentPlaceFields value={details} onChange={patchDetails} knownVenues={knownVenues} />
+          <TournamentPlaceFields value={details} onChange={patchDetails} knownVenues={knownVenues} venueCounts={venueGames} />
 
           <FieldLabel>Host</FieldLabel>
           <View style={st.chips}>

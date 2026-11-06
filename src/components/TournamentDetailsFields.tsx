@@ -4,6 +4,7 @@
  *  interleave them with their existing fields in the spec's order:
  *  Images → Name → Place (city, grounds, category) → Dates & Sports (+ basics)
  *  → Contact & About → the rest. */
+import { rankVenues, venueLabel } from '../core/venueCounts';
 import { CityField } from './CityField';
 import React, { useState, useSyncExternalStore } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
@@ -69,17 +70,19 @@ export function TournamentImagesField({ logoUrl, bannerUrl, onLogo, onBanner }: 
 }
 
 /** 3–5. City, grounds (removable chips + add) and the optional event category. */
-export function TournamentPlaceFields({ value, onChange, knownVenues }: {
+export function TournamentPlaceFields({ value, onChange, knownVenues, venueCounts }: {
   value: DetailsValue;
   onChange: (patch: Partial<DetailsValue>) => void;
   /** venues used before (knownVenueNames of all matches) — offered as suggestions */
   knownVenues: string[];
+  /** C9: games each ground has hosted (core/venueCounts), shown on its chip */
+  venueCounts?: Record<string, number>;
 }) {
   const [draft, setDraft] = useState('');
   const add = (name: string) => { onChange({ grounds: addGround(value.grounds, name) }); setDraft(''); };
   const q = draft.trim().toLowerCase();
   const have = new Set(value.grounds.map((g) => g.toLowerCase()));
-  const suggestions = knownVenues.filter((v) => !have.has(v.toLowerCase()) && (!q || v.toLowerCase().includes(q))).slice(0, 6);
+  const suggestions = rankVenues(knownVenues, venueCounts ?? {}).filter((v) => !have.has(v.toLowerCase()) && (!q || v.toLowerCase().includes(q))).slice(0, 6);
 
   return (
     <View style={st.section}>
@@ -102,7 +105,7 @@ export function TournamentPlaceFields({ value, onChange, knownVenues }: {
       </View>
       {suggestions.length > 0 && (
         <View style={st.chips}>
-          {suggestions.map((v) => <SelectChip key={v} label={`＋ ${v}`} active={false} onPress={() => add(v)} />)}
+          {suggestions.map((v) => <SelectChip key={v} label={`＋ ${venueLabel(v, venueCounts)}`} active={false} onPress={() => add(v)} />)}
         </View>
       )}
 

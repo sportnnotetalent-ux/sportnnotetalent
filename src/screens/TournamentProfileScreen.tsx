@@ -1,6 +1,7 @@
 /** Tournament hub: overview, follow, the overall house table, a per-sport
  *  league table + statistics rail, and participating teams. For a single-sport
  *  tournament the sport selector is skipped and its table shown directly. */
+import { Sheet } from '../components/Sheet';
 import { SkeletonList } from '../components/Skeleton';
 import { knockoutInProgress } from '../core/tournamentTeams';
 import { tournamentTeamIds } from '../core/tournamentTeams';
@@ -301,6 +302,8 @@ export default function TournamentProfileScreen() {
   const [showClasses, setShowClasses] = useState(false);
   const [showOverall, setShowOverall] = useState(false);
   const [showTeams, setShowTeams] = useState(false);
+  // C10 (reference video): one "Schedule matches" entry → automatic / one at a time / import
+  const [scheduleOpen, setScheduleOpen] = useState(false);
   // Ownership: the audit trail + the transfer panel.
   const [ownershipEvents, setOwnershipEvents] = useState<OwnershipEvent[]>([]);
   const [ownTick, setOwnTick] = useState(0);
@@ -843,9 +846,16 @@ export default function TournamentProfileScreen() {
                 ? <HubRow icon="🎾" title={`Americano — ${getSportMeta(amSport).name}`} status="Rounds and partners" onPress={() => nav.navigate('Americano', { tournamentId: tournament.id, sport: amSport })} />
                 : (
                   <>
-                    <HubRow icon="📅" title="Schedule a match" status="One fixture at a time" onPress={() => nav.navigate('ScheduleMatch', { tournamentId: tournament.id })} />
-                    <HubRow icon="⚡" title={`Auto-generate ${term(viewerMarket, 'fixtures').toLowerCase()}`} status="League, groups or knockout" onPress={() => nav.navigate('GenerateFixtures', { tournamentId: tournament.id })} />
-                    <HubRow icon="📥" title="Import schedule (spreadsheet)" status="Paste from Excel / Sheets or a CSV" onPress={() => nav.navigate('ImportSchedule', { tournamentId: tournament.id })} />
+                    <HubRow icon="📅" title="Schedule matches" status="Automatically, one at a time, or import" onPress={() => setScheduleOpen(true)} />
+                    <Sheet visible={scheduleOpen} onClose={() => setScheduleOpen(false)} title="How do you want to schedule?">
+                      <Button
+                        variant="primary"
+                        label={`⚡ Automatically — ${term(viewerMarket, 'fixtures').toLowerCase()} for league, groups or knockout`}
+                        onPress={() => { setScheduleOpen(false); nav.navigate('GenerateFixtures', { tournamentId: tournament.id }); }}
+                      />
+                      <Button label="📅 One match at a time" onPress={() => { setScheduleOpen(false); nav.navigate('ScheduleMatch', { tournamentId: tournament.id }); }} />
+                      <Button label="📥 Import a spreadsheet (Excel, Sheets or CSV)" onPress={() => { setScheduleOpen(false); nav.navigate('ImportSchedule', { tournamentId: tournament.id }); }} />
+                    </Sheet>
                   </>
                 );
             })()}

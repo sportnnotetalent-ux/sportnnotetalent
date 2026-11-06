@@ -1,6 +1,7 @@
 /** Edit an existing tournament: name, dates, sports (add/remove), structure,
  *  knockout format, and per-sport formats. Host/co-hosts, divisions and reminders
  *  are managed on the tournament page; those aren't repeated here. */
+import { venueCounts } from '../core/venueCounts';
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { KeyboardAwareScrollView, KeyboardFooterLayout } from '../components/keyboard';
@@ -50,6 +51,7 @@ export default function EditTournamentScreen() {
   const { profile } = useAuth();
   const { matches: allMatches } = useMatches();
   const knownVenues = React.useMemo(() => knownVenueNames(allMatches), [allMatches]);
+  const venueGames = React.useMemo(() => venueCounts(allMatches), [allMatches]); // C9
   const [me, setMe] = useState<{ playerId?: string; name?: string }>({});
   useEffect(() => {
     let on = true;
@@ -216,7 +218,7 @@ export default function EditTournamentScreen() {
 
           <TextField label="Name" value={name} onChange={setName} placeholder="Annual Sports Meet 2026" />
 
-          <TournamentPlaceFields value={details} onChange={patchDetails} knownVenues={knownVenues} />
+          <TournamentPlaceFields value={details} onChange={patchDetails} knownVenues={knownVenues} venueCounts={venueGames} />
 
           <View style={st.row}>
             <View style={st.flex}><DateField label="Start date" value={start} onChange={setStart} /></View>

@@ -25,6 +25,14 @@ auth-smoke passed. Published from a clean worktree at 9c758015 (the tip; the com
 
 Founder: rename the Matches views from Playing / Running to **Player** / **Organizer**. A game you play in and also host stays under Player only, and its card now says "You're hosting" (`VIEW_LABEL`, `hostingNote` in `src/core/myMatches.ts`; MatchesScreen). The internal keys didn't change. Tests: matches-tab-playing 4 new (MM9–MM12), 14 pass with the sim; tsc clean. Not checked in the demo yet. Open: the founder's Player view is empty. Live data shows hosts on their own rosters, so the next step is to check the founder's own account. No database change.
 
+### 2026-11-06 — Grounds with game counts (C9) + one "Schedule matches" entry (C10) (not yet published)
+
+Break-it list: `docs/security/breaks/grounds-and-schedule.md` (GS1–GS4).
+- **Grounds (C9):** a tournament's ground suggestions (create and edit) show how many games each has hosted ("Bangalore Football Stadium · 10 games"), busiest first (`core/venueCounts`). Several grounds could already be picked.
+- **Scheduling (C10):** the Manage tab's three rows (schedule a match, auto-generate, import) are now one "Schedule matches" row, which opens a choice: ⚡ Automatically (lime), 📅 One match at a time, 📥 Import a spreadsheet.
+
+Tests: grounds-and-schedule 4. Full suite 7,602 pass, 0 fail; tsc clean. Demo checked: the Manage choice panel; ground chips with counts. No database change.
+
 ### 2026-11-06 — Match-day roles: captain + keeper for every team sport (C6) (not yet published; SQL to run)
 
 Break-it list: `docs/security/breaks/match-roles.md` (MR1–MR8).
