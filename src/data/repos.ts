@@ -21,6 +21,7 @@ import { editAccess, type EditAccess } from '../core/playerEditAccess';
 import { parseTournamentToken } from '../core/tournamentInvite';
 import { getDeviceId } from '../core/deviceId';
 import { snapshotOutcome, stateResult, savedWinner } from '../core/matchResult';
+import { heldResultColumn } from './resultHold';
 import type { LiveSummary } from '../core/liveSummary';
 import { followDisputes } from './eventLog';
 import { planStatSync, applyStatWrites, onlyKeys, changedKeys, type MatchTotals } from './statSync';
@@ -3217,15 +3218,27 @@ let summaryMissing = false;
 const summaryCol = (summary?: LiveSummary | null) => (summary && !summaryMissing ? { summary } : {});
 /** Update a match row; a database without the summary column gets the row again without it. */
 async function updateMatchRow(matchId: string, row: Record<string, unknown>): Promise<void> {
+  if (heldMissing && 'held_result' in row) { const { held_result: _h, ...r } = row; row = r; }
   const { error } = await supabase!.from('matches').update(row).eq('id', matchId);
+  if (error && 'held_result' in row && /held_result/i.test(error.message ?? '')) {
+    // HR7: a database without held_result (migration not run yet) gets the row without it
+    heldMissing = true;
+    const { held_result: _drop, ...rest } = row;
+    return updateMatchRow(matchId, rest);
+  }
   if (error && 'summary' in row && /summary/i.test(error.message ?? '')) {
     summaryMissing = true;
     const { summary: _drop, ...rest } = row;
     await supabase!.from('matches').update(rest).eq('id', matchId);
   }
 }
+let heldMissing = false;
 
-export async function updateMatchSnapshot(matchId: string, state: object, completed: boolean, summary?: LiveSummary | null): Promise<void> {
+/** `held` (held-result-server.md): while a result is held, its sport and when the hold runs out —
+ *  saved as matches.held_result so the server finishes it if the app never does; null clears it;
+ *  undefined (other callers) leaves it alone. */
+export async function updateMatchSnapshot(matchId: string, state: object, completed: boolean, summary?: LiveSummary | null,
+  held?: { sport: SportId; until: number } | null): Promise<void> {
   if (!isSupabaseConfigured || !supabase) {
     const m = demo.matches.find((x) => x.id === matchId);
     if (!m) return;
@@ -3268,7 +3281,9 @@ export async function updateMatchSnapshot(matchId: string, state: object, comple
     meta = (data as MatchMeta | null) ?? null;
     winner = meta ? savedWinner(deriveResult(meta.sport, state)) : null;
   }
-  await updateMatchRow(matchId, { state, status: completed ? 'completed' : 'live', winner, updated_at: new Date().toISOString(), ...summaryCol(summary) });
+  const heldCol = held === undefined || completed ? {}
+    : { held_result: held ? heldResultColumn(savedWinner(deriveResult(held.sport, state)) ?? null, held.until) : null };
+  await updateMatchRow(matchId, { state, status: completed ? 'completed' : 'live', winner, updated_at: new Date().toISOString(), ...summaryCol(summary), ...heldCol });
 
   if (completed && meta) {
     // Reset, then flag the winning side's players (handles draws + re-completion).

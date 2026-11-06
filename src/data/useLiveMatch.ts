@@ -202,7 +202,11 @@ export function useLiveMatch(params: {
   const writeChainRef = useRef<Promise<unknown>>(Promise.resolve());
   const persist = (s: unknown, completed = plugin.isComplete(s as never)) => {
     const id = matchId!;
-    const p = writeChainRef.current.then(() => updateMatchSnapshot(id, withMatchRecords(plugin, s as never, completed), completed, liveSummaryOf(plugin, s as never)));
+    // held-result-server.md: a held, decided board also saves the held result (the server
+    // finishes it if this app never sends it); any other open board clears it
+    const sendsAt = hold.sendsAt();
+    const held = !completed ? (sendsAt != null && plugin.isComplete(s as never) ? { sport, until: sendsAt } : null) : undefined;
+    const p = writeChainRef.current.then(() => updateMatchSnapshot(id, withMatchRecords(plugin, s as never, completed), completed, liveSummaryOf(plugin, s as never), held));
     writeChainRef.current = p.catch(() => {});
     return p;
   };

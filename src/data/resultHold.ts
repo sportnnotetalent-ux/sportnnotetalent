@@ -20,6 +20,11 @@
 
 export const RESULT_HOLD_MS = 60_000;
 
+/** The held result as saved with the board (matches.held_result): the server
+ *  finishes it if the app never sends it (docs/security/breaks/held-result-server.md). */
+export const heldResultColumn = (winner: 'home' | 'away' | 'draw' | null, untilMs: number) =>
+  ({ winner, until: new Date(untilMs).toISOString() });
+
 export interface HoldTimers {
   now: () => number;
   set: (fn: () => void, ms: number) => unknown;

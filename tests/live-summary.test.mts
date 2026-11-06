@@ -41,7 +41,7 @@ describe('the wiring', () => {
   const live = readFileSync(new URL('../src/data/useLiveMatch.ts', import.meta.url), 'utf8');
   const repos = readFileSync(new URL('../src/data/repos.ts', import.meta.url), 'utf8');
   test('every save of the match passes the sport\'s summary along', () => {
-    assert.match(live, /updateMatchSnapshot\(id, withMatchRecords\(plugin, s as never, completed\), completed, liveSummaryOf\(plugin, s as never\)\)/);
+    assert.match(live, /updateMatchSnapshot\(id, withMatchRecords\(plugin, s as never, completed\), completed, liveSummaryOf\(plugin, s as never\)(, held)?\)/);
   });
   test('the summary goes into both of the snapshot\'s writes, and a database without the column still saves the match', () => {
     const fn = repos.slice(repos.indexOf('export async function updateMatchSnapshot'), repos.indexOf('export async function updateMatchSnapshot') + 4000);
