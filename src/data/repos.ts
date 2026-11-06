@@ -647,7 +647,7 @@ async function liveScopeIds(profileId: string, pid: string | null): Promise<Scop
   const managedOr = [`created_by.eq.${profileId}`, ...(pid ? [`captain_id.eq.${pid}`, `vice_captain_id.eq.${pid}`, `admin_ids.cs.{${pid}}`] : [])];
   const [managedRes, rosterRes, membersRes, staffRes, clubTeamsRes, orgRes, officialsRes] = await Promise.all([
     sb.from('teams').select('id').or(managedOr.join(',')),
-    pid ? sb.from('teams').select('id').contains('roster', [pid]) : Promise.resolve({ data: [] }),
+    pid ? sb.from('teams').select('id').contains('roster', rosterContains([pid])) : Promise.resolve({ data: [] }),
     pid ? sb.from('team_members').select('team_id').eq('player_id', pid) : Promise.resolve({ data: [] }),
     sb.from('team_staff').select('team_id').eq('profile_id', profileId),
     clubs.length ? sb.from('teams').select('id').in('club_id', clubs) : Promise.resolve({ data: [] }),
@@ -1397,6 +1397,7 @@ const AGE_RANGE: Record<NonNullable<PlayerSearch['age']>, [number, number]> = {
 
 export { looksLikeContact } from '../core/contactQuery';
 import { looksLikeContact } from '../core/contactQuery';
+import { rosterContains } from '../core/rosterFilter';
 
 const sameCity = (a?: string, b?: string) => !!a && !!b && a.trim().toLowerCase() === b.trim().toLowerCase();
 
@@ -4076,7 +4077,7 @@ export async function getEntryTeamsWith(playerIds: string[]): Promise<Team[]> {
     return demo.teams.filter((t) => t.adhoc && ids.every((id) => (t.roster ?? []).includes(id)));
   }
   const { data, error } = await fetchAllPages((from, to) => supabase!.from('teams')
-    .select('id,name,short_name,sport,color_hex,org_id,club_id,roster,adhoc').eq('adhoc', true).contains('roster', ids).order('id').range(from, to));
+    .select('id,name,short_name,sport,color_hex,org_id,club_id,roster,adhoc').eq('adhoc', true).contains('roster', rosterContains(ids)).order('id').range(from, to));
   if (error || !data) return [];
   return (data as unknown as TeamRow[]).map(toTeam);
 }
