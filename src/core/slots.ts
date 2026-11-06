@@ -2,6 +2,8 @@
  *  organiser without their teams yet makes fixtures between slots, then slots
  *  teams in. Group slots are named by group (A1…A4, B1…B4) so the group stage
  *  puts each in its group; otherwise Team 1, Team 2 … Pure. */
+import { isQuickPlaceholder } from './quickGame.ts';
+
 export const MIN_SLOTS = 2;
 export const MAX_SLOTS = 128;
 
@@ -63,4 +65,17 @@ export function splitTypedSlots(lines: readonly string[]): { teams: string[]; sl
     else teams.push(l);
   }
   return { teams, slots };
+}
+
+/** Fill slot → "Or a team already on SportnNote" (docs/security/breaks/slot-fill-existing.md):
+ *  teams of the sport matching 2+ letters, up to 12. Hidden: slots, untouched
+ *  quick sides (QG-01 — a named team made from a friendly IS shown), and teams
+ *  that already have a game in this tournament (SL1). A team already entered
+ *  but with no game yet can take a slot. */
+export function slotCandidates<T extends { id: string; name: string; adhoc?: boolean }>(
+  teams: readonly T[], query: string, o: { slotIds: ReadonlySet<string>; inFixtures: ReadonlySet<string> },
+): T[] {
+  const q = query.trim().toLowerCase();
+  if (q.length < 2) return [];
+  return teams.filter((t) => !isQuickPlaceholder(t) && !o.slotIds.has(t.id) && !o.inFixtures.has(t.id) && t.name.toLowerCase().includes(q)).slice(0, 12);
 }

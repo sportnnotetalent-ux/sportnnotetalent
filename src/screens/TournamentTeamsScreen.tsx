@@ -32,7 +32,7 @@ import { getSportMeta, participantMode } from '../sports/sportMeta';
 import { useAuth } from '../core/auth';
 import { useTournamentById, useTeams, useTournamentEntries, useTournamentCategories, useLeagueData, useCaptainships } from '../data/hooks';
 import { addTournamentTeams, removeTournamentTeam, createTeam, invitePerson, setTeamLeaders, createInvite, setTournamentTeamStatus, setTournamentTeamCheckIn, getTeamLeaders, enterOrgHousesAsTeams, getLiveTournamentInvite, setTournamentInvite, getTeamsSetup, canManageTeam, getMyPlayerId, getMyEntrant, isNeedsDbUpdate, getTournamentSlotIds, fillTournamentSlot, nameTournamentSlot, createTournamentSlots } from '../data/repos';
-import { nextSlotNames } from '../core/slots';
+import { nextSlotNames, slotCandidates } from '../core/slots';
 import { inviteCaptain } from '../data/teamCaptain';
 import { newTeamProblem } from '../core/teamPick';
 import { filterTeams } from '../core/teamSearch';
@@ -657,9 +657,9 @@ export default function TournamentTeamsScreen() {
               )).flatMap((row, i) => {
                 const e = confirmedInScope[i];
                 if (!slotIds.has(e.team.id)) return [row];
-                const q = slotQuery.trim().toLowerCase();
-                const entered = new Set(entries.map((x) => x.team.id));
-                const found = q.length >= 2 ? allTeams.filter((t) => !t.adhoc && !slotIds.has(t.id) && !entered.has(t.id) && t.name.toLowerCase().includes(q)).slice(0, 12) : [];
+                const q = slotQuery.trim();
+                // a named team from a friendly, or one already entered with no game yet, can take the slot
+                const found = slotCandidates(allTeams, q, { slotIds, inFixtures: new Set(inFixtures) });
                 return [
                   row,
                   <Text key={`${e.team.id}-slot`} style={textStyles.muted}>Slot · waiting for a team — its fixtures are already made.</Text>,

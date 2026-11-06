@@ -88,6 +88,7 @@ describe('TS4/TS5/TS6 refusals', () => {
     const t = await tournament(org);
     const [a1, a2, a3] = await mkSlots(org, t, ['A1', 'A2', 'A3']);
     const lions = await realTeam(org, 'Lions');
+    await game(t, a1, a3); // SL1: once Lions has a game here, it can't take another slot
     await fill(org, a1, lions);
     assert.match(await errOf(() => fill(org, a2, lions)) ?? '', /already_entered/);
     const tennis = await realTeam(org, 'Racket', 'tennis');
@@ -98,6 +99,21 @@ describe('TS4/TS5/TS6 refusals', () => {
     await game(t, a2, a3, 'live');
     assert.match(await errOf(() => fill(org, a2, puma)) ?? '', /slot_started/);
     assert.match(await errOf(() => fill(org, lions, puma)) ?? '', /not_a_slot/);
+  });
+});
+
+describe('SL1/SL2/SL3 a team already entered (no game yet) takes a slot', () => {
+  test('placed once, its entry kept, the slot gone', async () => {
+    const t = await tournament(org);
+    const [a1, a2] = await mkSlots(org, t, ['A1', 'A2']);
+    await game(t, a1, a2);
+    const greens = await realTeam(org, 'Greens');
+    await db.sql(`insert into tournament_teams (tournament_id, team_id, status) values ($1, $2, 'confirmed')`, [t, greens]);
+    await fill(org, a1, greens);
+    const rows = await db.sql<{ team_id: string; status: string }>(`select team_id, status from tournament_teams where tournament_id = $1 and team_id in ($2, $3)`, [t, greens, a1]);
+    assert.deepEqual(rows, [{ team_id: greens, status: 'confirmed' }]);
+    const [{ n }] = await db.sql<{ n: number }>(`select count(*)::int as n from matches where tournament_id = $1 and $2 in (home_team_id, away_team_id)`, [t, greens]);
+    assert.ok(n >= 1, 'it took the slot\'s games');
   });
 });
 
