@@ -25,3 +25,19 @@ Points (listed before fixing):
 
 Not changed: Home (followed games stay), Calendar (keeps everything I run).
 Tests: tests/matches-tab-playing.test.mts, tests/sim-matches-tab-playing.test.mts.
+
+## 2026-11-06: renamed to Player / Organizer, "You're hosting" tag
+
+Founder: the views read **Player** and **Organizer**. A game you play in and host
+stays under Player only (no duplicate), and its card says "You're hosting".
+
+- MM9: labels come from `VIEW_LABEL`. The internal keys (`playing` / `running`)
+  stay the same, so saved state and links keep working.
+- MM10: play + host → Player only, tagged.
+- MM11: no tag when you only play, in the Organizer view, signed out, or with
+  no host list.
+- MM12: the screen uses the labels and the tag; no "Running" text is left.
+
+Open: the founder sees an empty Player view. On live data, hosts are on their
+own rosters (5 of 6 top hosts play in their games), so the rule is sound. Need
+to know which account the founder signs in with to check that account's teams.

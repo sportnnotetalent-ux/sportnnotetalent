@@ -1,8 +1,9 @@
 /**
  * Matches tab (founder 2026-11-04): Home may show followed people's games, but
  * Matches shows the games I PLAY in. Games I only host, score or organise sit
- * in a second view, "Running", so I can still reach them. Each game is in one
- * view only (playing wins). A live game idle 12 h+ is not "Live"; it shows
+ * in a second view, "Organizer" (was "Running"), so I can still reach them.
+ * Each game is in one view only (playing wins); one I play in AND host is
+ * tagged "You're hosting" in the Player view (founder 2026-11-06). A live game idle 12 h+ is not "Live"; it shows
  * under Completed as "Not finished" so its scorer can still end it.
  * Break-it: docs/security/breaks/matches-tab-playing.md. PURE.
  */
@@ -12,6 +13,13 @@ import { splitOverdue } from './overdue.ts';
 
 export type MatchesView = 'playing' | 'running';
 export const normalView = (v: unknown): MatchesView => (v === 'running' ? 'running' : 'playing');
+/** What the two views are called on screen (founder 2026-11-06). */
+export const VIEW_LABEL: Record<MatchesView, string> = { playing: 'Player', running: 'Organizer' };
+
+/** A Player-view card for a game I also host says so. */
+export function hostingNote(m: { hostIds?: readonly string[] }, me: string | null | undefined, view: MatchesView): string | null {
+  return view === 'playing' && !!me && !!m.hostIds?.includes(me) ? 'You’re hosting' : null;
+}
 
 type Side = { id?: string; roster?: readonly string[] } | null | undefined;
 type M = Pick<Match, 'id' | 'sport' | 'status' | 'startsAt' | 'updatedAt'> & { homeTeam?: Side; awayTeam?: Side };

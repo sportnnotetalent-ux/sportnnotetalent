@@ -25,7 +25,7 @@ import { getSportMeta } from '../sports/sportMeta';
 import type { Match, SportId } from '../core/types';
 import type { RootStackParamList, TabParamList } from '../navigation/types';
 import { useParamState } from '../navigation/useParamState';
-import { matchesView, normalView, type MatchesView } from '../core/myMatches';
+import { matchesView, normalView, VIEW_LABEL, hostingNote, type MatchesView } from '../core/myMatches';
 import { overdueHint } from '../core/overdue';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -105,8 +105,8 @@ export default function MatchesScreen() {
         <ScreenTitle title="Matches" subtitle={view === 'playing' ? 'Games you play in' : 'Games you host, organize or score'} />
 
         <View style={st.views}>
-          <SelectChip label={`Playing${v.counts.playing ? ` ${v.counts.playing}` : ''}`} active={view === 'playing'} onPress={() => setView('playing')} />
-          <SelectChip label={`Running${v.counts.running ? ` ${v.counts.running}` : ''}`} active={view === 'running'} onPress={() => setView('running')} />
+          <SelectChip label={`${VIEW_LABEL.playing}${v.counts.playing ? ` ${v.counts.playing}` : ''}`} active={view === 'playing'} onPress={() => setView('playing')} />
+          <SelectChip label={`${VIEW_LABEL.running}${v.counts.running ? ` ${v.counts.running}` : ''}`} active={view === 'running'} onPress={() => setView('running')} />
         </View>
 
         <View style={st.segment}>
@@ -149,7 +149,7 @@ export default function MatchesScreen() {
             icon={tab === 'live' ? '📡' : tab === 'upcoming' ? '📅' : '🏁'}
             title={tab === 'live' ? 'No matches are live right now' : tab === 'upcoming' ? 'No upcoming matches' : 'No completed matches yet'}
             hint={view === 'playing' && v.counts.running > 0
-              ? 'Games you host or score but don’t play in are under Running.'
+              ? `Games you host or score but don’t play in are under ${VIEW_LABEL.running}.`
               : tab === 'live' ? 'Live games will show here the moment scoring starts.' : tab === 'upcoming' ? 'Scheduled games will appear here.' : 'Finished games land here once scored.'}
           />
         ) : (
@@ -158,13 +158,13 @@ export default function MatchesScreen() {
               <>
                 <Text style={[textStyles.label, st.groupHead]}>Not finished · no score for 12+ hours</Text>
                 {notFinished.map((m) => (
-                  <MatchCard key={m.id} match={m} onPress={() => open(m)} onStart={iScore(m) ? () => open(m, 'scoring') : undefined} />
+                  <MatchCard key={m.id} match={m} note={hostingNote(m, myPlayerId, view)} onPress={() => open(m)} onStart={iScore(m) ? () => open(m, 'scoring') : undefined} />
                 ))}
                 {list.length ? <Text style={[textStyles.label, st.groupHead]}>Completed</Text> : null}
               </>
             ) : null}
             {list.map((m) => (
-              <MatchCard key={m.id} match={m} onPress={() => open(m)} onStart={iScore(m) ? () => open(m, 'scoring') : undefined} />
+              <MatchCard key={m.id} match={m} note={hostingNote(m, myPlayerId, view)} onPress={() => open(m)} onStart={iScore(m) ? () => open(m, 'scoring') : undefined} />
             ))}
             {overdue.length ? (
               <>
@@ -172,7 +172,7 @@ export default function MatchesScreen() {
                 {/* UI audit step 5: the explanation once, not on every card */}
                 <Text style={textStyles.muted}>{overdueHint(overdue.length)}</Text>
                 {overdue.map((m) => (
-                  <MatchCard key={m.id} match={m} onPress={() => open(m)} onStart={iScore(m) ? () => open(m, 'scoring') : undefined} />
+                  <MatchCard key={m.id} match={m} note={hostingNote(m, myPlayerId, view)} onPress={() => open(m)} onStart={iScore(m) ? () => open(m, 'scoring') : undefined} />
                 ))}
               </>
             ) : null}

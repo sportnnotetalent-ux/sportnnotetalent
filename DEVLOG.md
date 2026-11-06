@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-06 — Matches: "Player" / "Organizer" views, "You're hosting" tag (not yet published)
+
+Founder: rename the Matches views from Playing / Running to **Player** / **Organizer**. A game you play in and also host stays under Player only, and its card now says "You're hosting" (`VIEW_LABEL`, `hostingNote` in `src/core/myMatches.ts`; MatchesScreen). The internal keys didn't change. Tests: matches-tab-playing 4 new (MM9–MM12), 14 pass with the sim; tsc clean. Not checked in the demo yet. Open: the founder's Player view is empty. Live data shows hosts on their own rosters, so the next step is to check the founder's own account. No database change.
+
 ### 2026-11-06 — Release: restore the full app (web, Android OTA)
 
 On 2026-11-05 at about 14:40 IST, web (`index-760cdca2`) and Android OTA (`40f06649` / `5e9eb268`) were published from side branch `pub/lockdown` (ae19a650: the anti-scraping commit on top of 882ebe98). That rolled back UI audit steps 1–7, round 5 (fixture generator, Stats, Awards), stat leaders and the iPad column. Found on 2026-11-06 by checking the live bundle (old fixture generator, no iPad code). The founder approved the republish. auth-smoke passed. Published from a clean worktree at the tip cbe5747e. The tip has the same anti-scraping code as ae19a650; only `RootNavigator` differs, because it also carries the iPad lines. Web `index-e88cfb8a` is confirmed live: it has the iPad column, "Show other teams" and the `x-share` header. The first deploy hit a temporary hosting error, and the retry used the same build. Android OTA: `28e42ed2` (preview) / `d90bdbd9` (production). The anti-scraping SQL (`20261110120000_signed_out_scope.sql`) has still not been run; checked read-only, the `share_*` functions are absent. No database change.
