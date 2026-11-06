@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-07 — Release: FULL TIME while a result is held (web, Android OTA, Worker)
+
+auth-smoke passed. Published from a clean worktree at the tip 9cb857de (live 8619f7ad + this fix + a marketing commit). Web: the entry name stayed `index-d4c15664` (the change is in the shared chunk `__common-00e7ae0f`); confirmed the live chunk holds the `pagehide` send. Android OTA `002325b8` (preview) / `f2607216` (production). Pushed `main` so Cloudflare redeploys the Worker (the light score page). Not yet checked with a real held result: the browser pane reopened signed out of the demo account — to check after the founder signs it back in.
+
 ### 2026-11-07 — Viewers see FULL TIME, not LIVE, while a result is held
 
 Found while making the marketing demo (`docs/security/breaks/full-time-held.md`): after the deciding tap the result is held ~60 s (SD-111 undo window), but the score link page and its preview said **LIVE** with "Full Time" under it, and on the web closing or reloading the tab never sent the held result, so viewers kept seeing LIVE until the scorer next opened the app. Now the saved summary carries `f: 1` while the board says the match is decided (`liveSummaryOf`); the light page (worker/matchPage.ts) and the preview show **FULL TIME** and keep refreshing until the result lands (an Undo takes it back to LIVE). On the web, `pagehide` sends the held result at once, like backgrounding the app. No database change; the Worker deploys from `main` on push. Tests: 6 new (tests/full-time-held.test.mts); full suite 7,632 pass, 0 fail; tsc clean. To check live after release on the demo account.
