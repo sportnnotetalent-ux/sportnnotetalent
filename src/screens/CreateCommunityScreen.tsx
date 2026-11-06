@@ -118,7 +118,7 @@ export default function CreateCommunityScreen({ navigation }: Props) {
         footer={(
           <>
             <FormError message={error} />
-            <Button label={busy ? 'Creating…' : 'Create community'} onPress={submit} disabled={busy} />
+            <Button variant="primary" label={busy ? 'Creating…' : 'Create community'} onPress={submit} disabled={busy} />
           </>
         )}
       >

@@ -117,7 +117,7 @@ export function PhoneLoginCard({ onUseEmail, onUseEmailCode }: { onUseEmail?: ()
           <Text style={textStyles.muted}>We’ll text you a code — no password needed.</Text>
           <PhoneField label="Mobile number" value={phone} onChange={onPhoneChange} />
           <FormError message={error} />
-          <Button label={busy ? 'Sending…' : 'Send code'} onPress={() => void send()} disabled={busy} />
+          <Button variant="primary" label={busy ? 'Sending…' : 'Send code'} onPress={() => void send()} disabled={busy} />
         </>
       )}
 
@@ -126,7 +126,7 @@ export function PhoneLoginCard({ onUseEmail, onUseEmailCode }: { onUseEmail?: ()
           <Text style={textStyles.muted}>Enter the 6-digit code we sent to {formatPhone(phone)}.</Text>
           <TextField label="Code" value={code} onChange={(v) => setCode(v.replace(/\D/g, '').slice(0, 6))} placeholder="••••••" autoCapitalize="none" />
           <FormError message={error} />
-          <Button label={busy ? 'Checking…' : 'Continue'} onPress={() => void confirm()} disabled={busy} />
+          <Button variant="primary" label={busy ? 'Checking…' : 'Continue'} onPress={() => void confirm()} disabled={busy} />
           <View style={st.links}>
             <Text style={st.link} accessibilityRole="button" onPress={() => { setStep('phone'); setError(null); }}>Change number</Text>
             <Text style={st.link} accessibilityRole="button" onPress={() => void send()}>Resend code</Text>
@@ -163,7 +163,7 @@ export function PhoneLoginCard({ onUseEmail, onUseEmailCode }: { onUseEmail?: ()
             {minor ? ', and my parent/guardian agrees on my behalf.' : '.'}
           </Check>
           <FormError message={error} />
-          <Button label={busy ? 'Creating…' : 'Create account'} onPress={() => void create()} disabled={busy} />
+          <Button variant="primary" label={busy ? 'Creating…' : 'Create account'} onPress={() => void create()} disabled={busy} />
         </>
       )}
 

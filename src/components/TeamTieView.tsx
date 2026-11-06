@@ -264,7 +264,7 @@ function LineupEditor({ spec, side, roster, initial, onCancel, onSave }: {
       <FormError message={err} />
       <View style={st.rowGap}>
         <Button label="Cancel" variant="ghost" style={{ flex: 1 }} onPress={onCancel} />
-        <Button label={busy ? 'Saving…' : 'Save lineup'} style={{ flex: 1 }} disabled={busy || problems.errors.length > 0}
+        <Button variant="primary" label={busy ? 'Saving…' : 'Save lineup'} style={{ flex: 1 }} disabled={busy || problems.errors.length > 0}
           onPress={async () => { setBusy(true); setErr(null); try { await onSave(l); } catch (e) { setErr(e instanceof Error ? e.message : 'Could not save.'); } finally { setBusy(false); } }} />
       </View>
     </View>

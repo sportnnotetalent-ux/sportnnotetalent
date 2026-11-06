@@ -705,7 +705,7 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
           ? 'This game is only on this phone. Save it to your account to share a live link.'
           : 'Not saved yet. Sign up (about a minute) to save this game and share a live link. The score so far is kept.'}
       </Text>
-      <Button label={guestSaving ? 'Saving…' : authed ? 'Save to my account' : 'Save & share'} disabled={guestSaving} onPress={() => void saveGuestGame()} />
+      <Button variant="primary" label={guestSaving ? 'Saving…' : authed ? 'Save to my account' : 'Save & share'} disabled={guestSaving} onPress={() => void saveGuestGame()} />
     </View>
   ) : null;
 
@@ -1578,7 +1578,7 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
           onOps={(ops, lines) => setLiveOps({ ops, lines })}
           homeName={fullHome} awayName={fullAway} homeRoster={homeScoreRoster} awayRoster={awayScoreRoster} />
         <View style={st.retireRow}>
-          <Button label={`Update score (${liveOps.ops.length})`} style={{ flex: 1 }} disabled={liveOps.ops.length === 0} onPress={() => void updateScore()} />
+          <Button variant="primary" label={`Update score (${liveOps.ops.length})`} style={{ flex: 1 }} disabled={liveOps.ops.length === 0} onPress={() => void updateScore()} />
           <Button label="Cancel" variant="ghost" style={{ flex: 1 }} onPress={() => { setLiveEditOpen(false); setLiveOps({ ops: [], lines: [] }); }} />
         </View>
       </View>
@@ -2356,7 +2356,7 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
 
         {/* A tournament scorer who isn't on this match yet takes it in one tap. */}
         {!!myPlayerId && !canScore && !complete && meta.status !== 'cancelled' && tourScorerIds.includes(myPlayerId) && (
-          <Button label={joining ? 'Joining…' : '🎯 Score this match'} onPress={() => void joinAsScorer()} disabled={joining} />
+          <Button variant="primary" label={joining ? 'Joining…' : '🎯 Score this match'} onPress={() => void joinAsScorer()} disabled={joining} />
         )}
 
         {canManage && (

@@ -141,7 +141,7 @@ export function OnboardingOverlay({ onChoose }: { onChoose?: (c: FirstRunChoice)
             </View>
             <View style={st.row}>
               {i > 0 && <View style={st.flex}><Button label="Back" variant="ghost" onPress={() => setI(i - 1)} /></View>}
-              <View style={st.flex}><Button label={last ? 'Get started' : 'Next'} onPress={() => (last ? finish() : setI(i + 1))} /></View>
+              <View style={st.flex}><Button variant="primary" label={last ? 'Get started' : 'Next'} onPress={() => (last ? finish() : setI(i + 1))} /></View>
             </View>
           </View>
         </View>

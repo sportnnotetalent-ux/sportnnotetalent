@@ -139,7 +139,7 @@ export default function JoinTournamentScreen() {
           <Card style={{ gap: theme.spacing(2) }}>
             <Text style={textStyles.body}>Sign in to enter your team.</Text>
             <Text style={textStyles.muted}>You’ll come straight back here with the code filled in.</Text>
-            <Button label="Sign in" onPress={() => promptSignIn('in')} />
+            <Button variant="primary" label="Sign in" onPress={() => promptSignIn('in')} />
           </Card>
         ) : (
           <>
@@ -224,7 +224,7 @@ export default function JoinTournamentScreen() {
             )}
 
             <FormError message={error} />
-            <Button
+            <Button variant="primary"
               label={busy ? 'Entering…' : selected ? `Enter ${selected.name}` : 'Pick a team to enter'}
               onPress={enter}
               disabled={busy || !selected}

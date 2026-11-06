@@ -207,7 +207,7 @@ export default function OrgVerifyScreen() {
                     {codeSent ? (
                       <>
                         <TextField label="6-digit code" value={code} onChange={setCode} placeholder="123456" />
-                        <Button label={busy === 'code' ? 'Checking…' : 'Confirm the code'} onPress={() => void run('code', () => verifyOrgEmailCode(orgId, code, email.trim()), '✓ Email confirmed')} disabled={!!busy || code.replace(/\D/g, '').length !== 6} />
+                        <Button variant="primary" label={busy === 'code' ? 'Checking…' : 'Confirm the code'} onPress={() => void run('code', () => verifyOrgEmailCode(orgId, code, email.trim()), '✓ Email confirmed')} disabled={!!busy || code.replace(/\D/g, '').length !== 6} />
                       </>
                     ) : null}
                   </>
@@ -256,7 +256,7 @@ export default function OrgVerifyScreen() {
         {!locked ? (
           <>
             {!progress.ready ? <Text style={textStyles.muted}>Still to do: {progress.todo.join(' · ')}</Text> : null}
-            <Button label={busy === 'submit' ? 'Sending…' : 'Send to SportnNote'} disabled={!!busy || !progress.ready}
+            <Button variant="primary" label={busy === 'submit' ? 'Sending…' : 'Send to SportnNote'} disabled={!!busy || !progress.ready}
               onPress={() => void run('submit', () => submitOrgVerification(orgId), '📨 Sent. SportnNote support will check it — usually within a day.')} />
           </>
         ) : null}

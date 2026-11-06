@@ -81,7 +81,7 @@ export default function InviteFriendScreen() {
           <PhoneField key={picked} label="Their mobile number" value={phone} onChange={setPhone} />
           <TextField label="Their name (optional)" value={name} onChange={setName} placeholder="So the message says hi to them" autoCapitalize="words" />
           <View style={st.row}>
-            <View style={st.flex}><Button label="💬 WhatsApp" onPress={() => send('whatsapp')} disabled={!reachable} /></View>
+            <View style={st.flex}><Button variant="primary" label="💬 WhatsApp" onPress={() => send('whatsapp')} disabled={!reachable} /></View>
             <View style={st.flex}><Button label="✉️ SMS" variant="ghost" onPress={() => send('sms')} disabled={!reachable} /></View>
           </View>
           <View style={st.preview}>

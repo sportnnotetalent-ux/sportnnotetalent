@@ -343,7 +343,7 @@ export default function BracketScreen() {
             {de.reset && !de.reset2 && <Text style={textStyles.muted}>If the losers'-bracket team wins the grand final, a reset match decides it.</Text>}
             {drawPickers([...de.winners, ...de.losers, { stage: 'gf', label: 'Grand final', nodes: [de.final, ...(de.reset2 ? [de.reset2] : [])] }])}
             {canManage && de.ready.length > 0 && (
-              <Button
+              <Button variant="primary"
                 label={busy ? 'Creating…' : `▶ Create ${de.ready.length} match${de.ready.length === 1 ? '' : 'es'} ready to play`}
                 onPress={() => createReady(de.ready)}
                 disabled={busy}
@@ -362,7 +362,7 @@ export default function BracketScreen() {
               </View>
             ))}
             {canManage && dcNext && (
-              <Button
+              <Button variant="primary"
                 label={busy ? 'Creating…' : `▶ Create ${DC_STAGE_LABEL[dcNext[0].stage]}`}
                 onPress={createNextDc}
                 disabled={busy}
@@ -402,7 +402,7 @@ export default function BracketScreen() {
               </View>
             )}
             {canManage && pendingNext && pendingNext.length > 0 && (
-              <Button
+              <Button variant="primary"
                 label={busy ? 'Creating…' : `▶ Create ${KO_STAGE_LABEL[pendingNext[0].stage]} (${pendingNext.length} tie${pendingNext.length === 1 ? '' : 's'})`}
                 onPress={createNextRound}
                 disabled={busy}

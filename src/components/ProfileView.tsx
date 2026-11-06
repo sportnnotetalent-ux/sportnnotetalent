@@ -168,7 +168,7 @@ export function ProfileView({
           />
           {failed && <Button label="Try again" onPress={() => { if (lookupFailed) onRetryLookup?.(); else retry(); }} />}
           {!failed && onCreateProfile && (
-            <Button label={creating ? 'Setting up…' : '✎ Set up your profile'} onPress={onCreateProfile} disabled={creating} />
+            <Button variant="primary" label={creating ? 'Setting up…' : '✎ Set up your profile'} onPress={onCreateProfile} disabled={creating} />
           )}
           {/* A support / reviewer account often has no player profile — keep
               the approvals queue reachable from here too. */}

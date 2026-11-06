@@ -192,7 +192,7 @@ export default function SwissRoundScreen() {
             <FormError message={error} />
             {msg ? <Text style={[textStyles.body, { color: theme.colors.primary }]}>{msg}</Text> : null}
             {canEdit && open.length > 0 && (
-              <Button label={busy ? 'Saving…' : chosen.length ? `✓ Save ${chosen.length} result${chosen.length === 1 ? '' : 's'}…` : '✓ Save results'} onPress={() => void save()} disabled={!chosen.length || busy} />
+              <Button variant="primary" label={busy ? 'Saving…' : chosen.length ? `✓ Save ${chosen.length} result${chosen.length === 1 ? '' : 's'}…` : '✓ Save results'} onPress={() => void save()} disabled={!chosen.length || busy} />
             )}
             {canEdit && open.length === 0 && (
               <Button label="⚡ Next round — Auto-generate fixtures" variant="ghost" onPress={() => nav.navigate('GenerateFixtures', { tournamentId: params.tournamentId, sport })} />

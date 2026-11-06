@@ -142,7 +142,7 @@ export function WeightliftingEventSetup({ tournamentId, preloaded, carried }: { 
         footer={(
           <>
             <FormError message={error} />
-            <Button label={busy ? 'Creating…' : 'Create event & weigh-in list'} onPress={() => void create()} disabled={busy || !picks.length} />
+            <Button variant="primary" label={busy ? 'Creating…' : 'Create event & weigh-in list'} onPress={() => void create()} disabled={busy || !picks.length} />
           </>
         )}
       >

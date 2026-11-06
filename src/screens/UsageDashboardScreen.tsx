@@ -115,7 +115,7 @@ export default function UsageDashboardScreen() {
               <DateField label="From" value={draft.from} onChange={(from) => setDraft((d) => ({ ...d, from }))} />
               <DateField label="To" value={draft.to} onChange={(to) => setDraft((d) => ({ ...d, to }))} />
               <FormError message={draftProblem} />
-              <Button label="Show this period" disabled={!!draftProblem || (draft.from === custom.from && draft.to === custom.to)} onPress={() => setCustom(draft)} />
+              <Button variant="primary" label="Show this period" disabled={!!draftProblem || (draft.from === custom.from && draft.to === custom.to)} onPress={() => setCustom(draft)} />
             </View>
           ) : null}
 

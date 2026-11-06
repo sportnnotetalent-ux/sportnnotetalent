@@ -136,7 +136,7 @@ export default function RecordBoardScreen() {
                 <TextField label="Year (optional)" value={year} onChange={setYear} placeholder="2009" autoCapitalize="none" />
                 <FormError message={error} />
                 {info ? <Text style={st.ok}>✓ {info}</Text> : null}
-                <Button label={busy ? 'Saving…' : `Save ${categoryLabel(cat)} record`} onPress={() => void saveOne()} disabled={busy || !discipline} />
+                <Button variant="primary" label={busy ? 'Saving…' : `Save ${categoryLabel(cat)} record`} onPress={() => void saveOne()} disabled={busy || !discipline} />
               </>
             ) : (
               <>

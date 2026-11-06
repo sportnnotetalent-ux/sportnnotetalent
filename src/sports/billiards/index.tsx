@@ -174,7 +174,7 @@ function ComboSheet({ s, send }: { s: BilliardsState; send: (a: Act) => void }) 
         ))}
       </View>
       {foul ? <Text style={cue.warn}>Over the {foul === 'hazards' ? 'hazard' : 'cannon'} limit: this stroke is a foul.</Text> : null}
-      <Button label={pts ? `Record stroke · ${foul ? 'foul' : `${pts} points`}` : 'Pick the parts of the stroke'} disabled={!action} onPress={() => send(action)} />
+      <Button variant="primary" label={pts ? `Record stroke · ${foul ? 'foul' : `${pts} points`}` : 'Pick the parts of the stroke'} disabled={!action} onPress={() => send(action)} />
     </View>
   );
 }

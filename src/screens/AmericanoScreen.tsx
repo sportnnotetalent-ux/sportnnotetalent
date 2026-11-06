@@ -192,7 +192,7 @@ export default function AmericanoScreen() {
                     {rnd.resting.length > 0 && <Text style={textStyles.muted}>Resting: {rnd.resting.map(nameOf).join(', ')}</Text>}
                   </Card>
                 ))}
-                {dirty && <Button label={busy ? 'Saving…' : 'Save scores'} onPress={saveScores} />}
+                {dirty && <Button variant="primary" label={busy ? 'Saving…' : 'Save scores'} onPress={saveScores} />}
               </>
             )}
           </>

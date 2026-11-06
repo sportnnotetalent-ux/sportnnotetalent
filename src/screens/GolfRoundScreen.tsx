@@ -390,7 +390,7 @@ export default function GolfRoundScreen() {
 
         {tab === 'card' && (
           <>
-            {ev.status === 'scheduled' && isHost && <Button label={busy ? 'Starting…' : '▶ Start the round'} onPress={start} disabled={busy} />}
+            {ev.status === 'scheduled' && isHost && <Button variant="primary" label={busy ? 'Starting…' : '▶ Start the round'} onPress={start} disabled={busy} />}
             {groups.length > 1 && (
               <View style={st.tabs}>
                 {groups.map((g) => (
@@ -524,7 +524,7 @@ export default function GolfRoundScreen() {
               <GolfScorecard holes={holes} stableford={fmt.scoring === 'stableford'}
                 players={groupEntries.map((e) => ({ name: nameOf(e.playerId).split(' ')[0], card: cardFor(e, holes.length), received: ctxByEntry.get(e.id)?.received ?? [] }))} />
             )}
-            {hole < holes.length - 1 && <Button label={`Next: hole ${holes[hole + 1].n} ▶`} onPress={() => setHole(hole + 1)} />}
+            {hole < holes.length - 1 && <Button variant="primary" label={`Next: hole ${holes[hole + 1].n} ▶`} onPress={() => setHole(hole + 1)} />}
             {ev.status === 'live' && isHost && <Button label={busy ? 'Finishing…' : '🏁 Finish the round'} variant="ghost" onPress={() => void finish()} disabled={busy} />}
             {isHost && ev.status !== 'completed' && canEditCourse(course, profile?.id, !isSupabaseConfigured) && (
               <Text style={st.courseLink} accessibilityRole="button" onPress={() => nav.navigate('GolfCourseEdit', { courseId: course.id })}>✏️ Wrong par, stroke index or tee rating? Edit the course</Text>

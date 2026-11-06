@@ -207,7 +207,7 @@ export function CyclingEventSetup({ tournamentId, preloaded, carried }: { tourna
         footer={(
           <>
             <FormError message={error} />
-            <Button label={busy ? 'Creating…' : 'Create race & start list'} onPress={() => void create()} disabled={busy || !n} />
+            <Button variant="primary" label={busy ? 'Creating…' : 'Create race & start list'} onPress={() => void create()} disabled={busy || !n} />
           </>
         )}
       >

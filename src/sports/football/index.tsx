@@ -795,7 +795,7 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
           <IconText label={"⏱ Already underway? Enter the current match minute (optional)."} style={ctrl.meta} />
           <TextField label="" value={koMin} onChange={setKoMin} placeholder={`e.g. ${base + 25}`} autoCapitalize="none" />
         </View>
-        <Button label={startAt > base ? `▶ ${koLabel} at ${startAt}'` : `▶ ${koLabel}`} onPress={kickoff} />
+        <Button variant="primary" label={startAt > base ? `▶ ${koLabel} at ${startAt}'` : `▶ ${koLabel}`} onPress={kickoff} />
         {voiceBar}
       </View>
     );
@@ -1454,8 +1454,8 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
           if (await confirmMatchAction('endPeriod', { period: state.half === 1 ? '1st half' : 'ET 1st half', score })) dispatch({ type: 'NEXT_HALF', payload: { at: Date.now() } });
         };
         // MVP F4: a single-period game ends (or goes to its decision) from the period
-        if (state.half === 1 && !state.onePeriod) return <Button label="End 1st Half →" onPress={nextHalf} />;
-        if (state.half === 3) return <Button label="End ET 1st half →" onPress={nextHalf} />;
+        if (state.half === 1 && !state.onePeriod) return <Button variant="primary" label="End 1st Half →" onPress={nextHalf} />;
+        if (state.half === 3) return <Button variant="primary" label="End ET 1st half →" onPress={nextHalf} />;
         // End of 2nd half (or 2nd ET half): a level knockout tie goes to the ET/penalty
         // decision (END without awarding clean sheets yet); otherwise it's full time.
         const toDecision = needsDecision(state);
@@ -1550,7 +1550,7 @@ function StoppedClockPanel({ state, dispatch, nameOf, onTimeout }: {
       {setting ? (
         <View style={ctrl.row}>
           <View style={ctrl.flex}><TextField label="Match clock (mm:ss)" value={clockInput} onChange={setClockInput} placeholder={clockTime(state)} /></View>
-          <Button label="Set" onPress={applyClock} />
+          <Button variant="primary" label="Set" onPress={applyClock} />
         </View>
       ) : null}
       {state.futsal ? (

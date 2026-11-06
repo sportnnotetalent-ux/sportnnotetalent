@@ -62,7 +62,7 @@ export default function CertificateScreen() {
             ) : null}
             <TextField label="Certificate code" value={code} onChange={setCode} placeholder="e.g. ABCD-E234-56" autoCapitalize="characters" />
             <FormError message={error} />
-            <Button label="Check" onPress={() => void check(code)} disabled={!code.trim()} />
+            <Button variant="primary" label="Check" onPress={() => void check(code)} disabled={!code.trim()} />
           </>
         )}
       </KeyboardAwareScrollView>

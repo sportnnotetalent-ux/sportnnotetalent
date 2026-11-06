@@ -642,7 +642,7 @@ export default function TournamentProfileScreen() {
                   {invitedMine.map((t) => (
                     <View key={t.id} style={st.entryRow}>
                       <Text style={[textStyles.body, st.flex1]} numberOfLines={1}>{t.name} · invited</Text>
-                      <Button label="Accept invite" onPress={() => acceptInvite(t.id, t.name)} />
+                      <Button variant="primary" label="Accept invite" onPress={() => acceptInvite(t.id, t.name)} />
                     </View>
                   ))}
                   {requestable.map((t) => (
@@ -1051,7 +1051,18 @@ export default function TournamentProfileScreen() {
               </KeyboardAwareScrollView>
             )}
             {(matchTab === 'upcoming' ? upcomingMatches : completedMatches).length === 0 ? (
-              <EmptyState icon={matchTab === 'upcoming' ? '📅' : '🏁'} title={matchTab === 'upcoming' ? 'No upcoming matches' : 'No completed matches yet'} compact />
+              <EmptyState
+                icon={matchTab === 'upcoming' ? '📅' : '🏁'}
+                title={matchTab === 'upcoming' ? 'No upcoming matches' : 'No completed matches yet'}
+                compact
+                // Reference-video C2: an empty tab says what to do next (organisers only)
+                {...(matchTab === 'upcoming' && canManageHosts && tournament
+                  ? {
+                      action: { label: `Make ${term(viewerMarket, 'fixtures').toLowerCase()} automatically`, onPress: () => nav.navigate('GenerateFixtures', { tournamentId: tournament.id }) },
+                      secondaryAction: { label: 'Add one match', onPress: () => nav.navigate('ScheduleMatch', { tournamentId: tournament.id }) },
+                    }
+                  : {})}
+              />
             ) : (
               (() => {
                 const list = matchTab === 'upcoming' ? upcomingMatches : completedMatches;
@@ -1212,7 +1223,15 @@ export default function TournamentProfileScreen() {
               expanded={showTeams}
             />
             {tourneyTeams.length === 0 ? (
-              <EmptyState icon="🛡️" title="No teams yet" hint={canManageHosts ? 'Add participating teams from the Manage tab.' : undefined} compact />
+              <EmptyState
+                icon="🛡️"
+                title="No teams yet"
+                hint={canManageHosts ? 'Share the join link with captains, or add the teams yourself.' : undefined}
+                compact
+                {...(canManageHosts && tournament
+                  ? { action: { label: 'Add teams or invite captains', onPress: () => nav.navigate('TournamentTeams', { tournamentId: tournament.id }) } }
+                  : {})}
+              />
             ) : (
               (showTeams ? tourneyTeams : tourneyTeams.slice(0, SECTION_CAP)).map((t) => (
                 <TouchableOpacity accessibilityRole="button" key={t.id} activeOpacity={0.85} onPress={() => nav.navigate('Team', { teamId: t.id })}>

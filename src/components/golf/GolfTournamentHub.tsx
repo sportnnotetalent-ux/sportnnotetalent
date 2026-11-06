@@ -92,7 +92,7 @@ export function GolfTournamentHub({ tournamentId, format, canOrganize }: { tourn
       {canOrganize && (
         last && last.status === 'completed'
           ? <Button label={`＋ Set up round ${last.roundNo + 1}`} variant="ghost" onPress={() => nav.navigate('GolfRoundSetup', { tournamentId, nextOf: last.id })} />
-          : !last && <Button label="⛳ Set up round 1" onPress={() => nav.navigate('GolfRoundSetup', { tournamentId, competition: String(format?.competition ?? 'stroke'), holes: String(format?.holes ?? '18') })} />
+          : !last && <Button variant="primary" label="⛳ Set up round 1" onPress={() => nav.navigate('GolfRoundSetup', { tournamentId, competition: String(format?.competition ?? 'stroke'), holes: String(format?.holes ?? '18') })} />
       )}
       {canOrganize && !loading && <CarriedRounds tournamentId={tournamentId} format={format} events={events} courses={courses} />}
 

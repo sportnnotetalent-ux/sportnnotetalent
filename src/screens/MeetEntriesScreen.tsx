@@ -424,7 +424,7 @@ function BulkAdd({ sport, tournamentId, doc, meet, athletes, players, sources, c
                   </View>
                 );
               })}
-              <Button label={busy ? 'Adding…' : `Add ${usable.length}`} onPress={() => void add()} disabled={busy || !usable.length} />
+              <Button variant="primary" label={busy ? 'Adding…' : `Add ${usable.length}`} onPress={() => void add()} disabled={busy || !usable.length} />
             </View>
           )}
           {athletes.length ? null : <Text style={textStyles.muted}>Tip: add the houses as teams of the meet first, so pasted athletes score for them.</Text>}

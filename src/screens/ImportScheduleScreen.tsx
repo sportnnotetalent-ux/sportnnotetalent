@@ -195,7 +195,7 @@ export default function ImportScheduleScreen() {
         footer={rows.length > 0 ? (
           <>
             <FormError message={error} />
-            <Button label={label} onPress={() => void create()} disabled={busy || n === 0} />
+            <Button variant="primary" label={label} onPress={() => void create()} disabled={busy || n === 0} />
           </>
         ) : null}
       >

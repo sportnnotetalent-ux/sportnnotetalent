@@ -154,7 +154,7 @@ export default function CorrectMatchScreen() {
         ) : (
           <View style={st.barRow}>
             <View style={{ flex: 1 }}><Button label="Back to edit" variant="ghost" onPress={() => setPlan(null)} /></View>
-            <View style={{ flex: 1 }}><Button label={busy ? 'Publishing…' : 'Publish'} onPress={() => void publish()} disabled={busy || unfinished} /></View>
+            <View style={{ flex: 1 }}><Button variant="primary" label={busy ? 'Publishing…' : 'Publish'} onPress={() => void publish()} disabled={busy || unfinished} /></View>
           </View>
         )}
       </View>

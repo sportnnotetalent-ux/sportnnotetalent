@@ -165,7 +165,7 @@ export default function CertificatesScreen() {
       <KeyboardFooterLayout footer={fresh.length ? (
         <>
           <FormError message={error} />
-          <Button label={busy === 'issue' ? 'Issuing…' : `🏅 Issue ${fresh.length} certificate${fresh.length === 1 ? '' : 's'}`} onPress={() => void issue()} disabled={!!busy} />
+          <Button variant="primary" label={busy === 'issue' ? 'Issuing…' : `🏅 Issue ${fresh.length} certificate${fresh.length === 1 ? '' : 's'}`} onPress={() => void issue()} disabled={!!busy} />
         </>
       ) : null}>
         <KeyboardAwareScrollView contentContainerStyle={st.content}>

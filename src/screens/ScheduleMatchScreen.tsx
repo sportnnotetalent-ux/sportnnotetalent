@@ -51,6 +51,8 @@ type Phase = 'league' | 'group' | KoStage;
 import type { RootStackParamList } from '../navigation/types';
 import { Glyph } from '../components/Icon';
 import { SportLine } from '../components/SportSymbol';
+import { matchEnding, type MatchEndingChoice } from '../core/matchEnding';
+import { teamSuggestions, teamDetail } from '../core/teamSuggestions';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type PickTeam = Pick<Team, 'id' | 'name' | 'colorHex'> & { roster?: string[] };
@@ -205,6 +207,10 @@ export default function ScheduleMatchScreen() {
   const recentFor = (other: string | null) => (sport ? recentPairs({ matches: allMatches, pairs: pairTeams, sport, me: myPid, exclude: other }) : []);
   const recentHome = useMemo(() => recentFor(away), [allMatches, pairTeams, sport, myPid, away]); // eslint-disable-line react-hooks/exhaustive-deps
   const recentAway = useMemo(() => recentFor(home), [allMatches, pairTeams, sport, myPid, home]); // eslint-disable-line react-hooks/exhaustive-deps
+  // C1 (reference video): before typing, a team side lists "Your teams" and the
+  // teams from your own past games in this sport (core/teamSuggestions).
+  const suggestHome = useMemo(() => (sport ? teamSuggestions({ teams: pickTeams, matches: allMatches, sport, me: myPid, exclude: away }) : undefined), [pickTeams, allMatches, sport, myPid, away]);
+  const suggestAway = useMemo(() => (sport ? teamSuggestions({ teams: pickTeams, matches: allMatches, sport, me: myPid, exclude: home }) : undefined), [pickTeams, allMatches, sport, myPid, home]);
   // PT8: every pair I've played in, in ANY sport — one tap reuses this sport's
   // entry for them, or makes it (a pair is one team across sports, core/pairs).
   const [myPairs, setMyPairs] = useState<PairTeam[]>([]);
@@ -362,8 +368,16 @@ export default function ScheduleMatchScreen() {
     setAway(null);
   };
 
-  async function submit() {
+  // C4 (reference video): a friendly ends with two clear buttons — "Start now"
+  // always kicks off now and opens scoring, "Save for later" never does.
+  const twoEndings = isFriendly && !cloneOf;
+  const [ending, setEnding] = useState<MatchEndingChoice | null>(null);
+  async function submit(choice?: MatchEndingChoice) {
     if (!sport) return setError('Pick a sport.');
+    const end = twoEndings && choice
+      ? matchEnding(choice, when.getTime(), Date.now())
+      : { startsAt: when.getTime(), openScoring: isImmediate };
+    setEnding(choice ?? null);
     const noun = mode === 'individual' ? 'players' : mode === 'pairs' ? 'pairs' : 'teams';
     let h = home;
     let a = away;
@@ -392,7 +406,7 @@ export default function ScheduleMatchScreen() {
         // stage:'group'; a knockout tie carries its stage; a league game neither.
         group: !isFriendly && phase === 'group' ? groupLabel.trim().toUpperCase() || 'A' : undefined,
         stage: isFriendly ? undefined : isKoStage(phase) ? phase : phase === 'group' ? 'group' : undefined,
-        startsAt: when.toISOString(),
+        startsAt: new Date(end.startsAt).toISOString(),
         venueName: venue.trim() || undefined,
         venueMapsUrl: venueUrl.trim() || undefined,
         hostIds: myId ? [myId] : [],
@@ -424,7 +438,7 @@ export default function ScheduleMatchScreen() {
       }
       // A "now" friendly jumps straight into scoring (replace so Back skips the
       // form); a friendly set for later just files as scheduled → Upcoming.
-      if (isImmediate) {
+      if (end.openScoring) {
         nav.replace('LiveScoring', {
           matchId: created.id, sport,
           homeName: created.homeTeam.shortName, awayName: created.awayTeam.shortName,
@@ -465,16 +479,35 @@ export default function ScheduleMatchScreen() {
         footer={matchForm ? (
           <>
             <FormError message={error} />
-            <Button
-              label={
-                busy
-                  ? isImmediate ? 'Starting…' : 'Scheduling…'
-                  : isFriendly
-                    ? isImmediate ? '▶ Create & score now' : '📅 Schedule friendly'
-                    : 'Schedule match'
-              }
-              onPress={submit}
-            />
+            {twoEndings ? (
+              <View style={st.endings}>
+                <Button
+                  label={busy && ending === 'later' ? 'Saving…' : 'Save for later'}
+                  onPress={() => void submit('later')}
+                  disabled={busy}
+                  style={{ flex: 1 }}
+                />
+                <Button
+                  variant="primary"
+                  label={busy && ending === 'now' ? 'Starting…' : '▶ Start now'}
+                  onPress={() => void submit('now')}
+                  disabled={busy}
+                  style={{ flex: 1 }}
+                />
+              </View>
+            ) : (
+              <Button
+                variant="primary"
+                label={
+                  busy
+                    ? isImmediate ? 'Starting…' : 'Scheduling…'
+                    : isFriendly
+                      ? isImmediate ? '▶ Create & score now' : '📅 Schedule friendly'
+                      : 'Schedule match'
+                }
+                onPress={() => void submit()}
+              />
+            )}
           </>
         ) : null}
       >
@@ -491,47 +524,47 @@ export default function ScheduleMatchScreen() {
               <Text style={textStyles.muted}>
                 🏃 Athletics isn’t a match: each race is an event with heats and a final. Add the event, its athletes (or relay teams), rounds and lanes, then enter times heat by heat.
               </Text>
-              <Button label="🏃 Set up an athletics event →" onPress={() => nav.navigate('AthleticsEventSetup', { tournamentId })} />
+              <Button variant="primary" label="🏃 Set up an athletics event →" onPress={() => nav.navigate('AthleticsEventSetup', { tournamentId })} />
             </>
           ) : sport === 'swimming' ? (
             <>
               <Text style={textStyles.muted}>
                 🏊 Swimming isn’t a match: each race is an event — a timed final, or heats and a final. Add the event, its swimmers (or relay teams), rounds and lanes, then enter times heat by heat.
               </Text>
-              <Button label="🏊 Set up a swimming event →" onPress={() => nav.navigate('AthleticsEventSetup', { tournamentId, sport: 'swimming' })} />
+              <Button variant="primary" label="🏊 Set up a swimming event →" onPress={() => nav.navigate('AthleticsEventSetup', { tournamentId, sport: 'swimming' })} />
             </>
           ) : sport === 'cycling' ? (
             <>
               <Text style={textStyles.muted}>🚴 Cycling isn’t a match: each race (time trial, road race, stage race, pursuit, sprint, keirin, points race …) is an event. Add the race, the category and the riders, then enter times or the order on the line.</Text>
-              <Button label="🚴 Set up a cycling race →" onPress={() => nav.navigate('AthleticsEventSetup', { tournamentId, sport: 'cycling' })} />
+              <Button variant="primary" label="🚴 Set up a cycling race →" onPress={() => nav.navigate('AthleticsEventSetup', { tournamentId, sport: 'cycling' })} />
             </>
           ) : sport === 'rowing' || sport === 'canoe' ? (
             <>
               <Text style={textStyles.muted}>
                 {sport === 'rowing' ? '🚣 Rowing isn’t a match: each race (1x, 2x, 4+, 8+ …) is an event with heats, a repechage and Finals A / B. Add the boat class, the crews seat by seat, the progression and lanes, then enter finish times race by race.' : '🛶 Canoe sprint isn’t a match: each race (K1 … C4, 200 / 500 / 1000 m) is an event with heats, semi-finals and Finals A / B. Add the boat, the paddlers, the progression and lanes, then enter finish times race by race.'}
               </Text>
-              <Button label={sport === 'rowing' ? '🚣 Set up a rowing race →' : '🛶 Set up a canoe sprint race →'} onPress={() => nav.navigate('AthleticsEventSetup', { tournamentId, sport })} />
+              <Button variant="primary" label={sport === 'rowing' ? '🚣 Set up a rowing race →' : '🛶 Set up a canoe sprint race →'} onPress={() => nav.navigate('AthleticsEventSetup', { tournamentId, sport })} />
             </>
           ) : sport === 'archery' ? (
             <>
               <Text style={textStyles.muted}>
                 🏹 Archery isn’t a single match: each event (Recurve 70 m, Compound 50 m …) is a ranking round of ends, then a seeded match-play bracket with a bronze medal match. Add the event and its archers, then enter each end as it is scored.
               </Text>
-              <Button label="🏹 Set up an archery event →" onPress={() => nav.navigate('AthleticsEventSetup', { tournamentId, sport: 'archery' })} />
+              <Button variant="primary" label="🏹 Set up an archery event →" onPress={() => nav.navigate('AthleticsEventSetup', { tournamentId, sport: 'archery' })} />
             </>
           ) : sport === 'shooting' ? (
             <>
               <Text style={textStyles.muted}>
                 🎯 Shooting isn’t a match: each event (10 m Air Rifle, 10 m Air Pistol …) is a qualification of series, then a final for the best eight. Add the event and its shooters, then enter each series as it is scored.
               </Text>
-              <Button label="🎯 Set up a shooting event →" onPress={() => nav.navigate('AthleticsEventSetup', { tournamentId, sport: 'shooting' })} />
+              <Button variant="primary" label="🎯 Set up a shooting event →" onPress={() => nav.navigate('AthleticsEventSetup', { tournamentId, sport: 'shooting' })} />
             </>
           ) : sport === 'weightlifting' ? (
             <>
               <Text style={textStyles.muted}>
                 🏋️ Weightlifting isn’t a match: each bodyweight category is an event — weigh-in, then three snatch and three clean & jerk attempts per lifter. Add the category and its lifters, then enter each attempt as it is lifted.
               </Text>
-              <Button label="🏋️ Set up a weightlifting event →" onPress={() => nav.navigate('AthleticsEventSetup', { tournamentId, sport: 'weightlifting' })} />
+              <Button variant="primary" label="🏋️ Set up a weightlifting event →" onPress={() => nav.navigate('AthleticsEventSetup', { tournamentId, sport: 'weightlifting' })} />
             </>
           ) : golfField ? (
             <>
@@ -539,7 +572,7 @@ export default function ScheduleMatchScreen() {
               <Text style={textStyles.muted}>
                 ⛳ Stroke play and Stableford put everyone on one leaderboard — pick the course, add your group (and Handicap Indexes), and score hole by hole. Choose “Match play” above for a head-to-head game.
               </Text>
-              <Button label="⛳ Set up the round →" onPress={() => nav.navigate('GolfRoundSetup', { tournamentId, competition: String(format.competition ?? 'stroke'), holes: String(format.holes ?? '18') })} />
+              <Button variant="primary" label="⛳ Set up the round →" onPress={() => nav.navigate('GolfRoundSetup', { tournamentId, competition: String(format.competition ?? 'stroke'), holes: String(format.holes ?? '18') })} />
             </>
           ) : (
           <>
@@ -571,8 +604,8 @@ export default function ScheduleMatchScreen() {
                       }}
                     />
                   )}
-                  <TeamPicker noun="team" label="Home team" teams={pickTeams} selected={home} onSelect={setHome} onClear={() => setHome(null)} onCreate={makeCreateHandler('home')} />
-                  <TeamPicker noun="team" label="Away team" teams={pickTeams} selected={away} onSelect={setAway} onClear={() => setAway(null)} onCreate={makeCreateHandler('away')} />
+                  <TeamPicker noun="team" label="Home team" teams={pickTeams} selected={home} onSelect={setHome} onClear={() => setHome(null)} onCreate={makeCreateHandler('home')} suggest={suggestHome} />
+                  <TeamPicker noun="team" label="Away team" teams={pickTeams} selected={away} onSelect={setAway} onClear={() => setAway(null)} onCreate={makeCreateHandler('away')} suggest={suggestAway} />
                 </>
               ) : mode === 'individual' ? (
                 <>
@@ -591,7 +624,7 @@ export default function ScheduleMatchScreen() {
 
               {isFriendly && (!home || !away) && (
                 <Text style={textStyles.muted}>
-                  In a hurry? Leave {home || away ? 'it' : 'them'} empty and tap Create &amp; score now: {mode === 'team' ? 'Team A and Team B' : mode === 'pairs' ? 'Pair A and Pair B' : 'Player A and Player B'} start straight away. Add names and players any time.
+                  In a hurry? Leave {home || away ? 'it' : 'them'} empty and tap {twoEndings ? 'Start now' : 'Create & score now'}: {mode === 'team' ? 'Team A and Team B' : mode === 'pairs' ? 'Pair A and Pair B' : 'Player A and Player B'} start straight away. Add names and players any time.
                 </Text>
               )}
 
@@ -713,6 +746,7 @@ function TeamPicker({
   onStartWithMe,
   otherPairs,
   onPickPair,
+  suggest,
 }: {
   label: string;
   noun?: 'team' | 'pair' | 'player';
@@ -738,6 +772,8 @@ function TeamPicker({
   /** doubles (PT8): my other pairs, from any sport — picking one makes / reuses this sport's entry */
   otherPairs?: { key: string; label: string; a: EntrantPerson; b: EntrantPerson }[];
   onPickPair?: (p: { a: EntrantPerson; b: EntrantPerson }) => void;
+  /** team sides (C1): "Your teams" and "Played before", shown before typing */
+  suggest?: { yours: PickTeam[]; before: PickTeam[] };
 }) {
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState('');
@@ -810,6 +846,17 @@ function TeamPicker({
               </View>
             </>
           )}
+          {!creating && q.length === 0 && !!suggest && ([['Your teams', suggest.yours], ['Played before', suggest.before]] as const).map(([title, list]) => list.length > 0 && (
+            <View key={title} style={{ gap: theme.spacing(2) }}>
+              <Text style={st.tinyLabel}>{title}</Text>
+              <View style={st.chips}>
+                {list.map((t) => {
+                  const detail = teamDetail(t);
+                  return <SelectChip key={`s-${t.id}`} label={detail ? `${t.name} · ${detail}` : t.name} dotColor={t.colorHex} active={false} onPress={() => onSelect(t.id)} />;
+                })}
+              </View>
+            </View>
+          ))}
           {!creating && q.length === 0 && !!otherPairs?.length && onPickPair && (
             <>
               <Text style={st.tinyLabel}>Your pairs</Text>
@@ -877,4 +924,5 @@ const st = StyleSheet.create({
   check: { color: theme.colors.primary, fontSize: theme.font.body, fontWeight: '900' },
   selectedRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(3) },
   changeLink: { color: theme.colors.primary, fontSize: theme.font.small, fontWeight: '800' },
+  endings: { flexDirection: 'row', gap: theme.spacing(2) },
 });

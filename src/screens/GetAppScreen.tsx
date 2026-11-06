@@ -61,7 +61,7 @@ export default function GetAppScreen() {
 
   const signUp = phoneLoginAvailable()
     ? <PhoneLoginCard />
-    : <Button label="Sign up — it takes a minute" onPress={() => promptSignIn('up')} />;
+    : <Button variant="primary" label="Sign up — it takes a minute" onPress={() => promptSignIn('up')} />;
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>

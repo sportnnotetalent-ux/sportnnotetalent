@@ -117,7 +117,7 @@ export default function HallOfFameScreen() {
                 ? 'Anyone with the link sees it — share it on your website, WhatsApp groups and newsletters.'
                 : 'Only your school’s members see it. Publish it to share the link with parents and the public.'}
             </Text>
-            {hall.public ? <Button label="↗ Share the link" onPress={share} /> : <Button label={busy === 'publish' ? 'Publishing…' : '🌐 Publish'} onPress={() => void publish(true)} disabled={!!busy} />}
+            {hall.public ? <Button label="↗ Share the link" onPress={share} /> : <Button variant="primary" label={busy === 'publish' ? 'Publishing…' : '🌐 Publish'} onPress={() => void publish(true)} disabled={!!busy} />}
             <Button label={busy === 'print' ? 'Opening…' : '🖨 Print honours board'} variant="ghost" onPress={() => void print()} disabled={!!busy} />
             <Button label="＋ Add an honour" variant="ghost" onPress={() => setEditing('new')} disabled={!!editing} />
             {hall.public ? <Button label={busy === 'publish' ? 'Saving…' : 'Make private'} variant="ghost" onPress={() => void publish(false)} disabled={!!busy} /> : null}
@@ -283,7 +283,7 @@ function HonourEditor({ orgId, entry, onDone }: { orgId: string; entry?: HallEnt
       </View>
       <TextField label="Note (optional)" value={note} onChange={setNote} placeholder="e.g. Beat Delhi Public School 2–1 in the final" multiline />
       <FormError message={error} />
-      <Button label={busy ? 'Saving…' : entry ? 'Save changes' : 'Add to the hall of fame'} onPress={() => void save()} disabled={busy} />
+      <Button variant="primary" label={busy ? 'Saving…' : entry ? 'Save changes' : 'Add to the hall of fame'} onPress={() => void save()} disabled={busy} />
       <Button label="Cancel" variant="ghost" onPress={() => void onDone(false)} disabled={busy} />
       {entry?.id ? <Button label="Remove this honour" variant="danger" onPress={() => void remove()} disabled={busy} /> : null}
     </Card>

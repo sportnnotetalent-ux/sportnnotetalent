@@ -147,7 +147,7 @@ export default function CopyTournamentScreen() {
         footer={(
           <>
             <FormError message={error} />
-            <Button label={busy ? 'Creating…' : next ? `🔁 Create the ${start.slice(0, 4) || 'next'} edition` : '📋 Create my tournament'} onPress={submit} disabled={busy} />
+            <Button variant="primary" label={busy ? 'Creating…' : next ? `🔁 Create the ${start.slice(0, 4) || 'next'} edition` : '📋 Create my tournament'} onPress={submit} disabled={busy} />
           </>
         )}
       >

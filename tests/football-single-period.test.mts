@@ -46,6 +46,6 @@ describe('one period', () => {
     assert.equal(f.default, 2);
     assert.deepEqual(f.options!.map((o) => o.value), [2, 1]);
     const src = readFileSync(join(import.meta.dirname, '..', 'src/sports/football/index.tsx'), 'utf8');
-    assert.match(src, /if \(state\.half === 1 && !state\.onePeriod\) return <Button label="End 1st Half →"/);
+    assert.match(src, /if \(state\.half === 1 && !state\.onePeriod\) return <Button (?:variant="primary" )?label="End 1st Half →"/);
   });
 });

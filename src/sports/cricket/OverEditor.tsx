@@ -141,7 +141,7 @@ export function OverEditor({ log, config, onOps, homeName, awayName, homeRoster,
                   </View>
                   {bowlerPick.to ? (
                     <View style={st.row}>
-                      <Button label={`Replace ${nm(ov.bowler.id, ov.bowler.name)} with ${bowlerPick.to.fullName}`} style={{ flex: 1 }} onPress={() => {
+                      <Button variant="primary" label={`Replace ${nm(ov.bowler.id, ov.bowler.name)} with ${bowlerPick.to.fullName}`} style={{ flex: 1 }} onPress={() => {
                         const to = bowlerPick.to!;
                         const ops = changeBowlerOps(inn, ov.n, { id: to.id, name: to.fullName }, bowlerPick.scope, log);
                         if ('error' in ops) { setError(ops.error); return; }
@@ -165,7 +165,7 @@ export function OverEditor({ log, config, onOps, homeName, awayName, homeRoster,
                   </View>
                   <View style={st.row}>
                     {swapPick.to ? (
-                      <Button label={`Swap ${nm(swapPick.batter.id, swapPick.batter.name)} ⇄ ${swapPick.to.fullName}`} style={{ flex: 1 }} onPress={() => {
+                      <Button variant="primary" label={`Swap ${nm(swapPick.batter.id, swapPick.batter.name)} ⇄ ${swapPick.to.fullName}`} style={{ flex: 1 }} onPress={() => {
                         const b = { id: swapPick.to!.id, name: swapPick.to!.fullName };
                         stage(`swap:${inn.inningsIx}:${[swapPick.batter.id, b.id].sort().join(':')}`, swapBattersOps(log, inn.inningsIx, swapPick.batter, b, config),
                           swapDiffLine(lineName(swapPick.batter.id, swapPick.batter.name || undefined), lineName(b.id, b.name)));
@@ -312,7 +312,7 @@ function BallCard({ ball, log, bowlerName, nameOf: playerName, fielders, onSave,
       )}
       <Text style={textStyles.muted}>{CATEGORY_HINT}</Text>
       <View style={st.row}>
-        <Button label="Save" style={{ flex: 1 }} onPress={save} />
+        <Button variant="primary" label="Save" style={{ flex: 1 }} onPress={save} />
         <Button label="Cancel" variant="ghost" onPress={onCancel} />
       </View>
     </View>

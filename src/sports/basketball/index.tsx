@@ -379,7 +379,7 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
                 <Button label="✅ Made +1" variant={flow.side} style={ctrl.flex} onPress={() => freeThrow(flow.side, true, flow.shooter)} />
                 <Button label="❌ Miss" variant="ghost" style={ctrl.flex} onPress={() => freeThrow(flow.side, false, flow.shooter)} />
               </View>
-              <Button label="Done" onPress={() => setFlow(null)} />
+              <Button variant="primary" label="Done" onPress={() => setFlow(null)} />
             </>
           ) : (
             <>
@@ -551,7 +551,7 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
             <SelectChip key={p.id} label={p.fullName} active={flow.picked.includes(p.id)} onPress={() => toggle(p.id)} />
           ))}
         </View>
-        <Button label={`Confirm (${flow.picked.length})`} disabled={flow.picked.length === 0} onPress={() => confirmFive(flow.side, flow.picked)} />
+        <Button variant="primary" label={`Confirm (${flow.picked.length})`} disabled={flow.picked.length === 0} onPress={() => confirmFive(flow.side, flow.picked)} />
       </View>
     );
   };
@@ -588,7 +588,7 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
       <View style={{ gap: theme.spacing(3) }}>
         {otBanner}
         <Text style={ctrl.meta}>Tip off {periodLabel(state.quarter, state.regPeriods)} to start the {timedPeriod(state) ? `game clock (${clockText(clockLeft(state))})` : 'clock'}.</Text>
-        <Button label={`▶ Start ${periodLabel(state.quarter, state.regPeriods)}`} onPress={() => dispatch({ type: 'KICKOFF', payload: { at: Date.now() } })} />
+        <Button variant="primary" label={`▶ Start ${periodLabel(state.quarter, state.regPeriods)}`} onPress={() => dispatch({ type: 'KICKOFF', payload: { at: Date.now() } })} />
       </View>
     );
   }
@@ -1009,14 +1009,14 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
       )}
 
       {state.quarter < state.regPeriods ? (
-        <Button label={`End ${periodLabel(state.quarter, state.regPeriods)} →`} onPress={() => void endQuarter()} />
+        <Button variant="primary" label={`End ${periodLabel(state.quarter, state.regPeriods)} →`} onPress={() => void endQuarter()} />
       ) : levelForDecider(state) && (!timedPeriod(state) || timeUp(state, Date.now())) ? (
         // Level at the end of Q4 or an OT period → play (another) overtime.
         // SD-57: a draw only where the format allows one (league / friendly
         // option); otherwise ending level asks first and offers overtime.
         <View style={{ gap: theme.spacing(2) }}>
           <Text style={ctrl.meta}>{state.agg ? `Level on aggregate (${aggregateText(state)}) at the end of ${periodLabel(state.quarter, state.regPeriods)} — overtime decides the tie.` : `Scores level (${state.home}–${state.away}) at the end of ${periodLabel(state.quarter, state.regPeriods)}${state.allowDraw ? ' — this format allows a draw.' : ' — basketball plays overtime until there is a winner.'}`}</Text>
-          <Button label={`🏀 Start Overtime (${periodLabel(state.quarter + 1, state.regPeriods)})${state.otTarget ? ` · first to ${state.otTarget}` : ''}`} onPress={async () => {
+          <Button variant="primary" label={`🏀 Start Overtime (${periodLabel(state.quarter + 1, state.regPeriods)})${state.otTarget ? ` · first to ${state.otTarget}` : ''}`} onPress={async () => {
             if (await askConfirm({
               title: 'Start overtime?',
               message: `It's ${state.home}-${state.away} at the end of ${periodLabel(state.quarter, state.regPeriods)}. Overtime${state.otTarget ? `: the first side to ${state.otTarget} points wins` : ' is played until there is a winner'}.`,
@@ -1086,14 +1086,14 @@ function GameClockPanel({ state, dispatch, teamOf, onEndQuarter }: {
       {up ? (
         <View style={{ gap: theme.spacing(2) }}>
           <Text style={ctrl.stopped} accessibilityRole="alert">⏰ 0:00 — end of {per}{state.targetPoints > 0 && state.quarter <= state.regPeriods ? ` · time is up: ${state.home === state.away ? `level, so overtime${state.otTarget ? ` (first to ${state.otTarget})` : ''}` : 'the higher score wins'}` : ''}.</Text>
-          {state.quarter < state.regPeriods ? <Button label={`End ${per} →`} onPress={onEndQuarter} /> : <Text style={ctrl.meta}>Finish any free throws, then use the button at the bottom.</Text>}
+          {state.quarter < state.regPeriods ? <Button variant="primary" label={`End ${per} →`} onPress={onEndQuarter} /> : <Text style={ctrl.meta}>Finish any free throws, then use the button at the bottom.</Text>}
         </View>
       ) : null}
       <Text style={ctrl.editLink} accessibilityRole="button" onPress={() => setSetting((v) => !v)}>{setting ? 'Cancel' : '⏱ Set clock'}</Text>
       {setting ? (
         <View style={ctrl.row}>
           <View style={ctrl.flex}><TextField label="Time left (mm:ss)" value={clockInput} onChange={setClockInput} placeholder={clockText(clockLeft(state, nowMs))} /></View>
-          <Button label="Set" onPress={applyClock} />
+          <Button variant="primary" label="Set" onPress={applyClock} />
         </View>
       ) : null}
     </View>

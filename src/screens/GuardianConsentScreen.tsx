@@ -108,7 +108,7 @@ export default function GuardianConsentScreen() {
                 <Text style={textStyles.body}>It must be your account (18 or over), not {child}’s. You’ll then send a photo ID and a document showing you’re the parent or guardian — so nobody else can approve in your name.</Text>
                 <View style={st.row}>
                   <Button label="Sign in" variant="ghost" style={st.flex} onPress={() => promptSignIn('in')} />
-                  <Button label="Create an account" style={st.flex} onPress={() => promptSignIn('up')} />
+                  <Button variant="primary" label="Create an account" style={st.flex} onPress={() => promptSignIn('up')} />
                 </View>
               </Card>
             ) : childId ? (
@@ -125,7 +125,7 @@ export default function GuardianConsentScreen() {
             <Text style={textStyles.body}>Enter the code from the email we sent you.</Text>
             <TextField label="Code" value={code} onChange={setCode} placeholder="e.g. 7KQ2-XH9M-…" autoCapitalize="characters" />
             <FormError message={error} />
-            <Button label="Continue" onPress={() => void check(code)} disabled={!code.trim()} />
+            <Button variant="primary" label="Continue" onPress={() => void check(code)} disabled={!code.trim()} />
           </>
         )}
       </KeyboardAwareScrollView>

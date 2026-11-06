@@ -12,6 +12,7 @@ import {
   TextStyle,
   StyleProp,
 } from 'react-native';
+import { HeaderShownContext } from '@react-navigation/elements';
 import { theme } from '../core/theme';
 import { useFormField, useKeyboardFocus } from './keyboard';
 import { readableOn } from '../core/contrast';
@@ -69,6 +70,8 @@ export function EmptyState({
   title,
   hint,
   compact = false,
+  action,
+  secondaryAction,
 }: {
   icon?: string;
   /** a sport's empty page: its drawn badge instead of an icon */
@@ -76,14 +79,23 @@ export function EmptyState({
   title: string;
   hint?: string;
   compact?: boolean;
+  /** Reference-video B5: the next step — one main button (pass it only to
+   *  someone who can do it)… */
+  action?: { label: string; onPress: () => void };
+  /** …and an optional second step as a text link. */
+  secondaryAction?: { label: string; onPress: () => void };
 }) {
   return (
     <View style={[emptyStyles.wrap, compact && emptyStyles.compact]}>
       {sport ? <SportBadge sport={sport} size={48} /> : icon ? (EMOJI_ICONS[icon.replace('\uFE0F', '')] ? (
-        <View style={emptyStyles.iconCircle}><EmojiIcon spec={EMOJI_ICONS[icon.replace('\uFE0F', '')]} color={theme.colors.primary} size={26} /></View>
+        <View style={emptyStyles.iconCircle}><EmojiIcon spec={EMOJI_ICONS[icon.replace('\uFE0F', '')]} color={theme.colors.textMuted} size={30} /></View>
       ) : <Text style={emptyStyles.icon}>{icon}</Text>) : null}
       <Text style={emptyStyles.title}>{title}</Text>
       {hint ? <Text style={emptyStyles.hint}>{hint}</Text> : null}
+      {action ? <Button variant="primary" label={action.label} onPress={action.onPress} style={emptyStyles.action} /> : null}
+      {secondaryAction ? (
+        <Text style={emptyStyles.link} accessibilityRole="button" onPress={secondaryAction.onPress}>{secondaryAction.label}</Text>
+      ) : null}
     </View>
   );
 }
@@ -92,7 +104,10 @@ const emptyStyles = StyleSheet.create({
   wrap: { alignItems: 'center', justifyContent: 'center', gap: theme.spacing(2), paddingVertical: theme.spacing(6), paddingHorizontal: theme.spacing(4) },
   compact: { paddingVertical: theme.spacing(4) },
   icon: { fontSize: 30 },
-  iconCircle: { width: 56, height: 56, borderRadius: 28, backgroundColor: theme.colors.primary + '14', alignItems: 'center', justifyContent: 'center' },
+  // Reference-video B5: a thin grey icon, no tinted circle
+  iconCircle: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
+  action: { alignSelf: 'stretch', marginTop: theme.spacing(1) },
+  link: { color: theme.colors.primary, fontSize: theme.font.small, fontWeight: '700', paddingVertical: theme.spacing(1) },
   title: { color: theme.colors.text, fontSize: theme.font.body, fontWeight: '600', textAlign: 'center' },
   hint: { color: theme.colors.textMuted, fontSize: theme.font.small, textAlign: 'center', lineHeight: theme.font.small * 1.4 },
 });
@@ -110,7 +125,7 @@ export function Card({
 export function Button({
   label,
   onPress,
-  variant = 'primary',
+  variant = 'ghost',
   color,
   style,
   disabled = false,
@@ -121,7 +136,9 @@ export function Button({
   label: string;
   onPress: () => void;
   /** 2026-10-29 redesign: `primary` is the lime call to action (dark ink);
-   *  `brand` the solid pitch green (white ink) for a second strong action. */
+   *  `brand` the solid pitch green (white ink) for a second strong action.
+   *  2026-11-06 (reference-video B1): no variant = the outline (`ghost`)
+   *  button; lime is only ever asked for, for a screen's one main action. */
   variant?: 'primary' | 'brand' | 'ghost' | 'home' | 'away' | 'danger';
   /** Override the solid background (e.g. a team's kit colour on a home/away
    *  button). Ignored for the transparent `ghost` variant. */
@@ -211,6 +228,11 @@ export function ScreenTitle({
   title: string;
   subtitle?: string;
 }) {
+  // Reference-video B2: one title per screen. Under a visible header (a stack
+  // screen) the header already names it, so only the subtitle stays; tab
+  // screens and header-less screens keep the big title.
+  const underHeader = React.useContext(HeaderShownContext);
+  if (underHeader) return subtitle ? <Text style={[textStyles.muted, { marginBottom: theme.spacing(3) }]}>{subtitle}</Text> : null;
   return (
     <View style={{ marginBottom: theme.spacing(4) }}>
       <Text style={textStyles.h1} accessibilityRole="header">

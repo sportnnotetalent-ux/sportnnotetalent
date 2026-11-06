@@ -183,7 +183,7 @@ export default function StandingsScreen() {
                   </View>
                 ))}
                 <Text style={st.addRow} accessibilityRole="button" onPress={addRow}>＋ Add row</Text>
-                {dirty && <Button label={saving ? 'Saving…' : 'Save table'} onPress={saveRows} />}
+                {dirty && <Button variant="primary" label={saving ? 'Saving…' : 'Save table'} onPress={saveRows} />}
               </Card>
             ) : (
               <Card style={{ gap: theme.spacing(1) }}>

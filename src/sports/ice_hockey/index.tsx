@@ -315,8 +315,8 @@ const ScoringControls: SportPlugin<IceHockeyState>['ScoringControls'] = ({
                 <Text style={c.meta}>{s.soRounds} each and still level — one shooter each until decided. Who shoots first?</Text>
                 <Text style={c.meta}>IIHF: the team that shot second goes first; NHL keeps the order. Pick what the referee says.</Text>
                 <View style={c.row}>
-                  <Button label={`${homeName} first`} color={color('home')} style={c.flex} onPress={() => dispatch({ type: 'SO_ORDER', payload: { first: 'home' } })} />
-                  <Button label={`${awayName} first`} color={color('away')} style={c.flex} onPress={() => dispatch({ type: 'SO_ORDER', payload: { first: 'away' } })} />
+                  <Button variant="primary" label={`${homeName} first`} color={color('home')} style={c.flex} onPress={() => dispatch({ type: 'SO_ORDER', payload: { first: 'home' } })} />
+                  <Button variant="primary" label={`${awayName} first`} color={color('away')} style={c.flex} onPress={() => dispatch({ type: 'SO_ORDER', payload: { first: 'away' } })} />
                 </View>
               </>
             ) : (
@@ -327,7 +327,7 @@ const ScoringControls: SportPlugin<IceHockeyState>['ScoringControls'] = ({
                 {soTaker ? <Text style={c.meta}>Shooter: {soTaker.fullName}</Text> : null}
                 {/* invasion batch 6 (audit fix 14): saved and missed apart, the goalie facing it by itself (shoot-out save figures) */}
                 <View style={c.row}>
-                  <Button label="✓ Scored" color={color(nextSide)} style={c.flex} onPress={() => { dispatch(soAction(nextSide, 'scored', soTaker, theGoalie(opp(nextSide)))); setSoTaker(null); }} />
+                  <Button variant="primary" label="✓ Scored" color={color(nextSide)} style={c.flex} onPress={() => { dispatch(soAction(nextSide, 'scored', soTaker, theGoalie(opp(nextSide)))); setSoTaker(null); }} />
                   <Button label="🧤 Saved" variant="ghost" style={c.flex} onPress={() => { dispatch(soAction(nextSide, 'saved', soTaker, theGoalie(opp(nextSide)))); setSoTaker(null); }} />
                   <Button label="↗ Missed" variant="ghost" style={c.flex} onPress={() => { dispatch(soAction(nextSide, 'missed', soTaker, theGoalie(opp(nextSide)))); setSoTaker(null); }} />
                 </View>
@@ -349,8 +349,8 @@ const ScoringControls: SportPlugin<IceHockeyState>['ScoringControls'] = ({
               <Text style={c.h}>🪙 Who shoots first?</Text>
               <Text style={c.meta}>As the referee decides (often the home team chooses) — pick the team going first.</Text>
               <View style={c.row}>
-                <Button label={`${homeName} first`} color={color('home')} style={c.flex} onPress={() => dispatch({ type: 'START_SHOOTOUT', payload: { first: 'home' } })} />
-                <Button label={`${awayName} first`} color={color('away')} style={c.flex} onPress={() => dispatch({ type: 'START_SHOOTOUT', payload: { first: 'away' } })} />
+                <Button variant="primary" label={`${homeName} first`} color={color('home')} style={c.flex} onPress={() => dispatch({ type: 'START_SHOOTOUT', payload: { first: 'home' } })} />
+                <Button variant="primary" label={`${awayName} first`} color={color('away')} style={c.flex} onPress={() => dispatch({ type: 'START_SHOOTOUT', payload: { first: 'away' } })} />
               </View>
             </>
           ) : (
@@ -431,7 +431,7 @@ const ScoringControls: SportPlugin<IceHockeyState>['ScoringControls'] = ({
               </View>
             ))}
             <View style={c.row}>
-              <Button label="✓ Save goal" color={color(sd)} style={c.flex} onPress={() => goal(sd, d, flow.a2 ?? null, { home: [...onIce.home], away: [...onIce.away] })} />
+              <Button variant="primary" label="✓ Save goal" color={color(sd)} style={c.flex} onPress={() => goal(sd, d, flow.a2 ?? null, { home: [...onIce.home], away: [...onIce.away] })} />
               <Button label="Skip +/-" variant="ghost" onPress={() => goal(sd, d, flow.a2 ?? null)} />
             </View>
           </View>
@@ -448,7 +448,7 @@ const ScoringControls: SportPlugin<IceHockeyState>['ScoringControls'] = ({
         if (flow.step === 'result') return (
           <View style={c.panel}>{head('Penalty shot')}
             <View style={c.row}>
-              <Button label="✓ Scored" color={color(sd)} style={c.flex} onPress={() => (asksWho(skatersOf(sd)) ? setFlow({ mode: 'ps', side: sd, step: 'player' }) : ps(sd, 'scored', null))} />
+              <Button variant="primary" label="✓ Scored" color={color(sd)} style={c.flex} onPress={() => (asksWho(skatersOf(sd)) ? setFlow({ mode: 'ps', side: sd, step: 'player' }) : ps(sd, 'scored', null))} />
               <Button label="🧤 Saved" variant="ghost" style={c.flex} onPress={() => (asksWho(skatersOf(sd)) ? setFlow({ ...flow, res: 'saved', step: 'player' }) : ps(sd, 'saved', null))} />
               <Button label="↗ Missed" variant="ghost" style={c.flex} onPress={() => (asksWho(skatersOf(sd)) ? setFlow({ ...flow, res: 'missed', step: 'player' }) : ps(sd, 'missed', null))} />
             </View>
@@ -550,7 +550,7 @@ const ScoringControls: SportPlugin<IceHockeyState>['ScoringControls'] = ({
               </View>
             ))}
             <View style={c.row}>
-              <Button label="✓ Done" style={c.flex} onPress={() => setFlow(null)} />
+              <Button variant="primary" label="✓ Done" style={c.flex} onPress={() => setFlow(null)} />
               <Button label="Clear" variant="ghost" onPress={() => { setCentres({}); setFlow(null); }} />
             </View>
           </View>
@@ -580,7 +580,7 @@ const ScoringControls: SportPlugin<IceHockeyState>['ScoringControls'] = ({
     return (
       <View key={sd} style={c.col}>
         <Text style={[c.team, { color: ink(sd) }]} numberOfLines={1}>{name(sd)}</Text>
-        <Button label="🚨 Goal" color={color(sd)} disabled={!periodStarted(s)} onPress={() => startGoal(sd)} />
+        <Button variant="primary" label="🚨 Goal" color={color(sd)} disabled={!periodStarted(s)} onPress={() => startGoal(sd)} />
         <Button label="🎯 Shot" accessibilityLabel={`Shot on goal by ${name(sd)}`} variant="ghost" disabled={!periodStarted(s)} onPress={() => setFlow({ mode: 'shot', side: sd })} />
         <Button label="⏱ Penalty" variant="ghost" onPress={() => setFlow({ mode: 'pen', side: sd, step: 'kind' })} />
         <Button label="⭕ Penalty shot" variant="ghost" disabled={!periodStarted(s)} onPress={() => setFlow({ mode: 'ps', side: sd, step: 'result' })} />
@@ -621,14 +621,14 @@ const ScoringControls: SportPlugin<IceHockeyState>['ScoringControls'] = ({
         {setting ? (
           <View style={c.row}>
             <View style={c.flex}><TextField label="Time left (mm:ss)" value={clockInput} onChange={setClockInput} placeholder={clockFace(s, now)} /></View>
-            <Button label="Set" onPress={applyClock} />
+            <Button variant="primary" label="Set" onPress={applyClock} />
           </View>
         ) : null}
         {periodSec(s, now) >= periodLen(s, s.period) && running(s) ? <Text style={c.short}>0:00 — end of the {periodLong(s, s.period)}.</Text> : null}
         {!running(s) && periodStarted(s) && periodSec(s, now) < periodLen(s, s.period) ? (
           <View style={c.stopped} accessibilityRole="alert">
             <IconText label={"⏸ Clock stopped (whistle)"} style={c.stoppedTxt} />
-            <Button label="▶ Resume" onPress={startStop} />
+            <Button variant="primary" label="▶ Resume" onPress={startStop} />
           </View>
         ) : null}
         {on.home !== base || on.away !== base || pulled.home || pulled.away ? (

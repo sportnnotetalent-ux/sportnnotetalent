@@ -88,7 +88,7 @@ export default function InviteScreen() {
             </View>
             {phoneLoginAvailable()
               ? <PhoneLoginCard />
-              : <Button label="Sign up" onPress={() => promptSignIn('up')} />}
+              : <Button variant="primary" label="Sign up" onPress={() => promptSignIn('up')} />}
             <Text style={st.link} accessibilityRole="link" onPress={() => void Linking.openURL(APP_INSTALL_URL)}>Prefer the Android app? Download it from {SITE_HOST} ›</Text>
           </>
         )}

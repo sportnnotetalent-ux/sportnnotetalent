@@ -602,8 +602,8 @@ const ScoringControls: SportPlugin<NetballState>['ScoringControls'] = ({
             <Text style={c.h}>🪙 Who has the first centre pass?</Text>
             <Text style={c.meta}>The captain who won the toss chooses. After that the centre pass alternates by itself.</Text>
             <View style={c.row}>
-              <Button label={homeName} color={color('home')} style={c.flex} onPress={() => dispatch({ type: 'FIRST_CENTRE', side: 'home' })} />
-              <Button label={awayName} color={color('away')} style={c.flex} onPress={() => dispatch({ type: 'FIRST_CENTRE', side: 'away' })} />
+              <Button variant="primary" label={homeName} color={color('home')} style={c.flex} onPress={() => dispatch({ type: 'FIRST_CENTRE', side: 'home' })} />
+              <Button variant="primary" label={awayName} color={color('away')} style={c.flex} onPress={() => dispatch({ type: 'FIRST_CENTRE', side: 'away' })} />
             </View>
           </View>
         ) : null}
@@ -615,7 +615,7 @@ const ScoringControls: SportPlugin<NetballState>['ScoringControls'] = ({
         {setting ? (
           <View style={c.row}>
             <View style={c.flex}><TextField label={isOpen(s) ? 'Time played (mm:ss)' : 'Time left (mm:ss)'} value={clockInput} onChange={setClockInput} placeholder={clockFace(s, now).replace('+', '')} /></View>
-            <Button label="Set" onPress={applyClock} />
+            <Button variant="primary" label="Set" onPress={applyClock} />
           </View>
         ) : null}
         {s.playOn ? <Text style={c.short}>Level after extra time — play on until a team leads by {playOnLead(s)} goal{playOnLead(s) === 1 ? '' : 's'}. It ends by itself.</Text> : null}
@@ -624,7 +624,7 @@ const ScoringControls: SportPlugin<NetballState>['ScoringControls'] = ({
         {!running(s) && periodStarted(s) && !timeUp(s, now) ? (
           <View style={c.stopped} accessibilityRole="alert">
             <Text style={c.stoppedTxt}>⏸ Clock stopped{stoppedWhy}</Text>
-            <Button label="▶ Resume" onPress={startStop} />
+            <Button variant="primary" label="▶ Resume" onPress={startStop} />
           </View>
         ) : null}
       </View>

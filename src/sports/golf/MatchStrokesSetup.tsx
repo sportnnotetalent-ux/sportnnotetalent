@@ -61,7 +61,7 @@ export function MatchStrokesSetup({
       </View>
       {bad ? <Text style={st.warn}>Enter a Handicap Index like 12.4 (or +1.2 for a plus handicap), or leave it blank.</Text>
         : preview ? <Text style={st.preview}>{strokesLine(preview, homeName, awayName)}</Text> : null}
-      <Button label="Save" disabled={!!bad} onPress={() => preview && onSave(preview)} />
+      <Button variant="primary" label="Save" disabled={!!bad} onPress={() => preview && onSave(preview)} />
       {hasStrokes && <Button label="Stop entering strokes" variant="ghost" onPress={() => onSave(null)} />}
       <Button label="Cancel" variant="ghost" onPress={onCancel} />
     </View>

@@ -197,7 +197,7 @@ export default function CompetitionRulesScreen() {
         {info ? <Text style={textStyles.muted}>{info}</Text> : null}
         {editable && (
           <View style={st.wrap}>
-            <Button label={busy ? 'Saving…' : dirty ? 'Save rules' : saved.rulesSetAt ? 'Saved' : 'Use these rules'} onPress={() => void save()} disabled={busy || (!dirty && !!saved.rulesSetAt)} />
+            <Button variant="primary" label={busy ? 'Saving…' : dirty ? 'Save rules' : saved.rulesSetAt ? 'Saved' : 'Use these rules'} onPress={() => void save()} disabled={busy || (!dirty && !!saved.rulesSetAt)} />
             <Button label="Back to standard" variant="ghost" onPress={() => void reset()} disabled={busy} />
           </View>
         )}

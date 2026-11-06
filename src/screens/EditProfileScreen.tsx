@@ -258,7 +258,7 @@ export default function EditProfileScreen({ route, navigation }: Props) {
         footer={(
           <>
             <FormError message={error} />
-            <Button label={busy ? 'Saving…' : asAdmin ? 'Save details' : 'Save profile'} onPress={save} />
+            <Button variant="primary" label={busy ? 'Saving…' : asAdmin ? 'Save details' : 'Save profile'} onPress={save} />
           </>
         )}
       >

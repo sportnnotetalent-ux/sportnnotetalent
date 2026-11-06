@@ -322,8 +322,8 @@ const ScoringControls: SportPlugin<RugbyState>['ScoringControls'] = ({
               <>
                 <Text style={c.meta}>5 each and still level — one kick each until decided. Who kicks first?</Text>
                 <View style={c.row}>
-                  <Button label={`${homeName} first`} color={color('home')} style={c.flex} onPress={() => dispatch({ type: 'SO_ORDER', payload: { first: 'home' } })} />
-                  <Button label={`${awayName} first`} color={color('away')} style={c.flex} onPress={() => dispatch({ type: 'SO_ORDER', payload: { first: 'away' } })} />
+                  <Button variant="primary" label={`${homeName} first`} color={color('home')} style={c.flex} onPress={() => dispatch({ type: 'SO_ORDER', payload: { first: 'home' } })} />
+                  <Button variant="primary" label={`${awayName} first`} color={color('away')} style={c.flex} onPress={() => dispatch({ type: 'SO_ORDER', payload: { first: 'away' } })} />
                 </View>
               </>
             ) : (
@@ -333,7 +333,7 @@ const ScoringControls: SportPlugin<RugbyState>['ScoringControls'] = ({
                 <PlayerGrid players={sanctionable(nextSide).filter((p) => p.id !== soTaker?.id)} onPick={(p) => setSoTaker(p)} />
                 {soTaker ? <Text style={c.meta}>Kicker: {soTaker.fullName}</Text> : null}
                 <View style={c.row}>
-                  <Button label="✓ Over" accessibilityLabel="Kick successful" color={color(nextSide)} style={c.flex} onPress={() => {
+                  <Button variant="primary" label="✓ Over" accessibilityLabel="Kick successful" color={color(nextSide)} style={c.flex} onPress={() => {
                     dispatch({ type: 'SO', side: nextSide, payload: { scored: true }, ...(soTaker ? { attribution: { playerId: soTaker.id, stat: 'soTaken', extra: { soGoals: 1 } } } : {}) });
                     setSoTaker(null);
                   }} />
@@ -358,8 +358,8 @@ const ScoringControls: SportPlugin<RugbyState>['ScoringControls'] = ({
               <Text style={c.h}>🪙 Who kicks first?</Text>
               <Text style={c.meta}>After the referee’s toss (or however they decide) — pick the team going first.</Text>
               <View style={c.row}>
-                <Button label={`${homeName} first`} color={color('home')} style={c.flex} onPress={() => dispatch({ type: 'START_SHOOTOUT', payload: { first: 'home' } })} />
-                <Button label={`${awayName} first`} color={color('away')} style={c.flex} onPress={() => dispatch({ type: 'START_SHOOTOUT', payload: { first: 'away' } })} />
+                <Button variant="primary" label={`${homeName} first`} color={color('home')} style={c.flex} onPress={() => dispatch({ type: 'START_SHOOTOUT', payload: { first: 'home' } })} />
+                <Button variant="primary" label={`${awayName} first`} color={color('away')} style={c.flex} onPress={() => dispatch({ type: 'START_SHOOTOUT', payload: { first: 'away' } })} />
               </View>
             </>
           ) : (
@@ -400,7 +400,7 @@ const ScoringControls: SportPlugin<RugbyState>['ScoringControls'] = ({
         if (flow.step === 'result') return (
           <View style={c.panel}>{head('Conversion (2)')}
             <View style={c.row}>
-              <Button label="✓ Good" color={color(sd)} style={c.flex} onPress={() => setFlow({ ...flow, made: true, step: 'kicker' })} />
+              <Button variant="primary" label="✓ Good" color={color(sd)} style={c.flex} onPress={() => setFlow({ ...flow, made: true, step: 'kicker' })} />
               <Button label="✗ Missed" variant="ghost" style={c.flex} onPress={() => setFlow({ ...flow, made: false, step: 'kicker' })} />
             </View>
             <Button label="Not taken" variant="ghost" onPress={() => setFlow(null)} />
@@ -423,7 +423,7 @@ const ScoringControls: SportPlugin<RugbyState>['ScoringControls'] = ({
         if (flow.step === 'result') return (
           <View style={c.panel}>{head(KICK_LABEL[flow.kick ?? 'pen'])}
             <View style={c.row}>
-              <Button label="✓ Good" color={color(sd)} style={c.flex} onPress={() => setFlow({ ...flow, made: true, step: 'kicker' })} />
+              <Button variant="primary" label="✓ Good" color={color(sd)} style={c.flex} onPress={() => setFlow({ ...flow, made: true, step: 'kicker' })} />
               <Button label="✗ Missed" variant="ghost" style={c.flex} onPress={() => setFlow({ ...flow, made: false, step: 'kicker' })} />
             </View>
           </View>
@@ -574,7 +574,7 @@ const ScoringControls: SportPlugin<RugbyState>['ScoringControls'] = ({
   const sideCol = (sd: Side) => (
     <View key={sd} style={c.col}>
       <Text style={[c.team, { color: color(sd) }]} numberOfLines={1}>{name(sd)}</Text>
-      <Button label="🏉 Try" color={color(sd)} onPress={() => setFlow({ mode: 'try', side: sd, step: 'scorer' })} />
+      <Button variant="primary" label="🏉 Try" color={color(sd)} onPress={() => setFlow({ mode: 'try', side: sd, step: 'scorer' })} />
       <Button label="🎯 Kick at goal" accessibilityLabel="Penalty goal or drop goal" variant="ghost" onPress={() => setFlow({ mode: 'kick', side: sd, step: 'kind' })} />
       {/* invasion batch 5 (Law 8): the offender is usually carded — an optional card step follows */}
       <Button label="🏉 Penalty try" accessibilityLabel="Penalty try, 7 points" variant="ghost" onPress={() => { fire({ type: 'PENALTY_TRY', side: sd }); if (!editAt && !isSuddenDeath(s, s.period)) setFlow({ mode: 'card', side: other(sd), step: 'kind', pt: true }); }} />
@@ -647,14 +647,14 @@ const ScoringControls: SportPlugin<RugbyState>['ScoringControls'] = ({
         {setting ? (
           <View style={c.row}>
             <View style={c.flex}><TextField label="Match clock (mm:ss)" value={clockInput} onChange={setClockInput} placeholder={clockFace(s, now).split(' ')[0]} /></View>
-            <Button label="Set" onPress={applyClock} />
+            <Button variant="primary" label="Set" onPress={applyClock} />
           </View>
         ) : null}
         {ps >= len && running(s) ? <Text style={c.short}>Time is up — the half ends when the ball is next dead.</Text> : null}
         {!running(s) && periodStarted(s) ? (
           <View style={c.stopped} accessibilityRole="alert">
             <IconText label={"⏸ Clock stopped"} style={c.stoppedTxt} />
-            <Button label="▶ Resume" onPress={startStop} />
+            <Button variant="primary" label="▶ Resume" onPress={startStop} />
           </View>
         ) : null}
       </View>

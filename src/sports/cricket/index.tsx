@@ -416,7 +416,7 @@ function OversTargetCard({ s, dispatch, battingName, bowlingName, knockout, onEn
       {m === 'target' ? <IconText label={"⚠️ Built-in DLS will be switched off for this match."} style={ctrl.ovWarn} /> : null}
       {m === 'rainEnd' ? <Text style={ctrl.meta}>{battingName}’s innings ends at this ball ({bowled} ov). The overs it lost — the unfinished over too — count in the DLS target.</Text> : null}
       {error ? <Text style={ctrl.rainErr}>{error}</Text> : preview ? <Text style={ctrl.rainPreview}>→ {preview}</Text> : null}
-      <Button label={m === 'rainEnd' ? 'End the innings…' : 'Apply'} disabled={!ok} onPress={async () => {
+      <Button variant="primary" label={m === 'rainEnd' ? 'End the innings…' : 'Apply'} disabled={!ok} onPress={async () => {
         if (!action || !ok) return;
         if (m === 'rainEnd' && !(await askConfirm({
           title: 'Innings ended by rain?', tone: 'danger', yesLabel: 'Yes, end the innings', noLabel: 'No, keep scoring',
@@ -509,7 +509,7 @@ function RainStopPanel({ s, dispatch, battingName, bowlingName, knockout, onEndM
         <Text style={ctrl.rainErr}>{why}{knockout ? ' A knockout needs a winner: the organiser picks who goes through (🏁 End match… → Awarded).' : onEndMatch ? '' : ' Use 🏁 End match… → No result.'}</Text>
       ) : s.dlsLocked && reached ? <Text style={ctrl.rainErr}>Type the par score from the official sheet.</Text> : null}
       {ok || !knockout || !why ? (
-        <Button label={ok ? 'Record result on par…' : 'Record no result…'} disabled={busy || (!ok && !(why && onEndMatch && !knockout))} onPress={() => void record()} />
+        <Button variant="primary" label={ok ? 'Record result on par…' : 'Record no result…'} disabled={busy || (!ok && !(why && onEndMatch && !knockout))} onPress={() => void record()} />
       ) : null}
     </View>
   );
@@ -628,7 +628,7 @@ function MoreRunsPanel({
     </View>
   );
   const apply = (a: ScoreAction | null, ok: boolean, label = 'Apply') => (
-    <Button label={label} disabled={!ok} onPress={() => { if (a && ok) { dispatch(a); onClose(); } }} />
+    <Button variant="primary" label={label} disabled={!ok} onPress={() => { if (a && ok) { dispatch(a); onClose(); } }} />
   );
 
   if (mode === 'pen') {
@@ -869,7 +869,7 @@ const ScoringControls: SportPlugin<CricketState>['ScoringControls'] = ({
     return (
       <View style={{ gap: theme.spacing(2) }}>
         <SetupPanel state={state} dispatch={dispatch} homeName={homeName} awayName={awayName} homeRoster={homeRoster} awayRoster={awayRoster} homeKeeperId={homeKeeperId} awayKeeperId={awayKeeperId} />
-        {state.toss ? <Button label="Done — start scoring" onPress={() => setSetupOpen(false)} /> : null}
+        {state.toss ? <Button variant="primary" label="Done — start scoring" onPress={() => setSetupOpen(false)} /> : null}
       </View>
     );
   }
@@ -1568,7 +1568,7 @@ const ScoringControls: SportPlugin<CricketState>['ScoringControls'] = ({
         <View style={[ctrl.padFrame, state.freeHit && ctrl.padFrameFreeHit]}>
           <View style={ctrl.row}>
             {[0, 1, 2, 3, 4, 6].map((r) => (
-              <Button key={r} label={String(r)} color={r === 4 || r === 6 ? theme.colors.primary : battingColor} style={[ctrl.flex, ctrl.padKey]} disabled={!canScore}
+              <Button variant="primary" key={r} label={String(r)} color={r === 4 || r === 6 ? theme.colors.primary : battingColor} style={[ctrl.flex, ctrl.padKey]} disabled={!canScore}
                 accessibilityLabel={r === 0 ? 'Dot ball, no run' : r === 4 ? 'Four (boundary)' : r === 6 ? 'Six (boundary)' : `${r} run${r === 1 ? '' : 's'}`}
                 onPress={() => (r === 4 || r === 6 ? runs(r, { boundary: true }) : runs(r))} />
             ))}
@@ -1591,7 +1591,7 @@ const ScoringControls: SportPlugin<CricketState>['ScoringControls'] = ({
               <Text style={ctrl.meta}>All run — not a boundary</Text>
               <View style={ctrl.row}>
                 {[4, 5, 7].map((n) => (
-                  <Button key={n} label={`${n} runs`} color={battingColor} style={ctrl.flex}
+                  <Button variant="primary" key={n} label={`${n} runs`} color={battingColor} style={ctrl.flex}
                     onPress={() => { runs(n, { boundary: false }); closeMore(); }} />
                 ))}
               </View>
@@ -1607,7 +1607,7 @@ const ScoringControls: SportPlugin<CricketState>['ScoringControls'] = ({
               {otOver ? (
                 <>
                   <Text style={ctrl.morePreview}>= {otTotal} to {strikerName ?? 'the striker'}{credit}</Text>
-                  <Button label={`Add ${otTotal} run${otTotal === 1 ? '' : 's'}`} color={battingColor}
+                  <Button variant="primary" label={`Add ${otTotal} run${otTotal === 1 ? '' : 's'}`} color={battingColor}
                     onPress={() => { runs(otTotal, { boundary: false, overthrows: otOver }); closeMore(); }} />
                 </>
               ) : null}
@@ -1637,7 +1637,7 @@ const ScoringControls: SportPlugin<CricketState>['ScoringControls'] = ({
             <Text style={ctrl.meta}>No ball{R.noBallRuns !== STANDARD_RULES.noBallRuns ? ` (+${R.noBallRuns})` : ''}{R.noBallLegal ? ' · counts as a ball' : ''} — runs off the bat?</Text>
             <View style={ctrl.row}>
               {[0, 1, 2, 3, 4, 5, 6].map((n) => (
-                <Button key={n} label={n === 0 ? 'Nb' : `+${n}`} accessibilityLabel={n === 0 ? 'No ball, no runs off the bat' : `No ball plus ${n} run${n === 1 ? '' : 's'} off the bat${n === 4 || n === 6 ? ', boundary' : ''}`} color={n === 4 || n === 6 ? theme.colors.primary : battingColor} style={[ctrl.flex, ctrl.padKey]}
+                <Button variant="primary" key={n} label={n === 0 ? 'Nb' : `+${n}`} accessibilityLabel={n === 0 ? 'No ball, no runs off the bat' : `No ball plus ${n} run${n === 1 ? '' : 's'} off the bat${n === 4 || n === 6 ? ', boundary' : ''}`} color={n === 4 || n === 6 ? theme.colors.primary : battingColor} style={[ctrl.flex, ctrl.padKey]}
                   // 4 and 6 are boundaries; an all-run 4 off a no-ball goes in the field below.
                   onPress={() => { ball({ type: 'EXTRA', payload: { kind: 'No ball', runs: n, boundary: n === 4 || n === 6 }, attribution: nbRuns(n) }); setExtraMode(null); }} />
               ))}
@@ -1672,7 +1672,7 @@ const ScoringControls: SportPlugin<CricketState>['ScoringControls'] = ({
             <View style={ctrl.row}>
               {[0, 1, 2, 3, 4].map((n) => (
                 // label shows the total with the wide penalty in force, e.g. Wd+3 (=4)
-                <Button key={n} label={n === 0 ? 'Wd' : `Wd+${n} (=${penalty('wide', R) + n})`}
+                <Button variant="primary" key={n} label={n === 0 ? 'Wd' : `Wd+${n} (=${penalty('wide', R) + n})`}
                   accessibilityLabel={n === 0 ? `Wide, ${penalty('wide', R)} total` : `Wide plus ${n} run${n === 1 ? '' : 's'}, ${penalty('wide', R) + n} total`} color={n === 4 ? theme.colors.primary : battingColor} style={[ctrl.flex, ctrl.padKey]}
                   onPress={() => { ball({ type: 'EXTRA', payload: { kind: 'Wide', runs: n } }); setExtraMode(null); }} />
               ))}
@@ -1695,7 +1695,7 @@ const ScoringControls: SportPlugin<CricketState>['ScoringControls'] = ({
           <>
             <View style={ctrl.row}>
               {[1, 2, 3, 4, 5].map((n) => (
-                <Button key={n} label={`${extraMode === 'lb' ? 'LB' : 'B'} ${n}`} accessibilityLabel={`${n} ${extraMode === 'lb' ? 'leg bye' : 'bye'}${n === 1 ? '' : 's'}`} color={battingColor} style={[ctrl.flex, ctrl.padKey]}
+                <Button variant="primary" key={n} label={`${extraMode === 'lb' ? 'LB' : 'B'} ${n}`} accessibilityLabel={`${n} ${extraMode === 'lb' ? 'leg bye' : 'bye'}${n === 1 ? '' : 's'}`} color={battingColor} style={[ctrl.flex, ctrl.padKey]}
                   onPress={() => { ball({ type: extraMode === 'lb' ? 'LEGBYES' : 'BYES', payload: { runs: n } }); setExtraMode(null); }} />
               ))}
             </View>

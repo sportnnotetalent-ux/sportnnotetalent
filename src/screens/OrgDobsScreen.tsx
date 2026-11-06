@@ -58,7 +58,7 @@ export default function OrgDobsScreen() {
         footer={open.length ? (
           <>
             <FormError message={error} />
-            <Button
+            <Button variant="primary"
               label={busy ? 'Confirming…' : picked.size ? `☑️ Confirm ${picked.size} date${picked.size === 1 ? '' : 's'} of birth` : 'Pick the ones that match your records'}
               onPress={() => void confirm()}
               disabled={busy || picked.size === 0}

@@ -127,7 +127,7 @@ export default function RosterImportScreen() {
           <>
             <FormError message={error} />
             {done ? <Text style={textStyles.muted}>✅ {done}</Text> : null}
-            <Button label={busy ? 'Importing…' : `Import ${newRows.length + linkOnly.length} ${newRows.length + linkOnly.length === 1 ? 'person' : 'people'} into ${where}`} disabled={busy || !(newRows.length + linkOnly.length)} onPress={() => void run()} />
+            <Button variant="primary" label={busy ? 'Importing…' : `Import ${newRows.length + linkOnly.length} ${newRows.length + linkOnly.length === 1 ? 'person' : 'people'} into ${where}`} disabled={busy || !(newRows.length + linkOnly.length)} onPress={() => void run()} />
             {done ? <Button label="Done" variant="ghost" onPress={() => nav.goBack()} /> : null}
           </>
         )}

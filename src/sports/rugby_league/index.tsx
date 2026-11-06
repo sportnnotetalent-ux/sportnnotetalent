@@ -305,7 +305,7 @@ const ScoringControls: SportPlugin<LeagueState>['ScoringControls'] = ({
         if (flow.step === 'zone') return (
           <View style={c.panel}>{head('Try')}
             <View style={c.row}>
-              <Button label="🏉 Try (4)" color={color(sd)} style={c.flex} onPress={() => setFlow({ ...flow, bonus: false, step: 'scorer' })} />
+              <Button variant="primary" label="🏉 Try (4)" color={color(sd)} style={c.flex} onPress={() => setFlow({ ...flow, bonus: false, step: 'scorer' })} />
               <Button label="⭐ Bonus zone (5)" accessibilityLabel="Try in the bonus zone, 5 points" variant="ghost" style={c.flex} onPress={() => setFlow({ ...flow, bonus: true, step: 'scorer' })} />
             </View>
           </View>
@@ -327,7 +327,7 @@ const ScoringControls: SportPlugin<LeagueState>['ScoringControls'] = ({
         if (flow.step === 'result') return (
           <View style={c.panel}>{head('Conversion (2)')}
             <View style={c.row}>
-              <Button label="✓ Good" color={color(sd)} style={c.flex} onPress={() => setFlow({ ...flow, made: true, step: 'kicker' })} />
+              <Button variant="primary" label="✓ Good" color={color(sd)} style={c.flex} onPress={() => setFlow({ ...flow, made: true, step: 'kicker' })} />
               <Button label="✗ Missed" variant="ghost" style={c.flex} onPress={() => setFlow({ ...flow, made: false, step: 'kicker' })} />
             </View>
             <Button label="Not taken" variant="ghost" onPress={() => setFlow(null)} />
@@ -343,7 +343,7 @@ const ScoringControls: SportPlugin<LeagueState>['ScoringControls'] = ({
         if (flow.step === 'result') return (
           <View style={c.panel}>{head(what)}
             <View style={c.row}>
-              <Button label="✓ Good" color={color(sd)} style={c.flex} onPress={() => setFlow({ ...flow, made: true, step: flow.kick === 'fg' && s.fg2 ? 'points' : 'kicker' })} />
+              <Button variant="primary" label="✓ Good" color={color(sd)} style={c.flex} onPress={() => setFlow({ ...flow, made: true, step: flow.kick === 'fg' && s.fg2 ? 'points' : 'kicker' })} />
               <Button label="✗ Missed" variant="ghost" style={c.flex} onPress={() => setFlow({ ...flow, made: false, step: 'kicker' })} />
             </View>
             {flow.kick === 'fg' ? <Text style={c.meta}>A field goal (drop goal) is worth 1{s.fg2 ? ' — 2 from 40 metres or more' : ''}.</Text> : null}
@@ -352,7 +352,7 @@ const ScoringControls: SportPlugin<LeagueState>['ScoringControls'] = ({
         if (flow.step === 'points') return (
           <View style={c.panel}>{head('Field goal good')}
             <View style={c.row}>
-              <Button label="1 point" color={color(sd)} style={c.flex} onPress={() => setFlow({ ...flow, two: false, step: 'kicker' })} />
+              <Button variant="primary" label="1 point" color={color(sd)} style={c.flex} onPress={() => setFlow({ ...flow, two: false, step: 'kicker' })} />
               <Button label="2 points (40 m+)" accessibilityLabel="2 points, kicked from 40 metres or more" variant="ghost" style={c.flex} onPress={() => setFlow({ ...flow, two: true, step: 'kicker' })} />
             </View>
           </View>
@@ -475,7 +475,7 @@ const ScoringControls: SportPlugin<LeagueState>['ScoringControls'] = ({
   const sideCol = (sd: Side) => (
     <View key={sd} style={c.col}>
       <Text style={[c.team, { color: color(sd) }]} numberOfLines={1}>{name(sd)}</Text>
-      <Button label="🏉 Try" color={color(sd)} onPress={() => setFlow({ mode: 'try', side: sd, step: s.bonusTry ? 'zone' : 'scorer' })} />
+      <Button variant="primary" label="🏉 Try" color={color(sd)} onPress={() => setFlow({ mode: 'try', side: sd, step: s.bonusTry ? 'zone' : 'scorer' })} />
       <Button label="🎯 Kick at goal" accessibilityLabel="Penalty goal, 2 points" variant="ghost" onPress={() => setFlow({ mode: 'kick', side: sd, kick: 'pen', step: 'result' })} />
       <Button label="🥅 Field goal" accessibilityLabel={`Field goal (drop goal), ${s.fg2 ? '1 or 2 points' : '1 point'}`} variant="ghost" onPress={() => setFlow({ mode: 'kick', side: sd, kick: 'fg', step: 'result' })} />
       <Button label="🏉 Penalty try" accessibilityLabel="Penalty try, 4 points, then the conversion" variant="ghost" onPress={() => penaltyTry(sd)} />
@@ -501,7 +501,7 @@ const ScoringControls: SportPlugin<LeagueState>['ScoringControls'] = ({
         <Text style={c.small}>Six-tackle sets · who has the ball?</Text>
         <View style={c.row}>
           {(['home', 'away'] as const).map((sd) => (
-            <Button key={sd} label={`Ball: ${name(sd)}`} color={color(sd)} style={c.flex} accessibilityLabel={`${name(sd)} have the ball`} onPress={() => fire({ type: 'SET_BALL', side: sd })} />
+            <Button variant="primary" key={sd} label={`Ball: ${name(sd)}`} color={color(sd)} style={c.flex} accessibilityLabel={`${name(sd)} have the ball`} onPress={() => fire({ type: 'SET_BALL', side: sd })} />
           ))}
         </View>
       </View>
@@ -557,14 +557,14 @@ const ScoringControls: SportPlugin<LeagueState>['ScoringControls'] = ({
         {setting ? (
           <View style={c.row}>
             <View style={c.flex}><TextField label="Match clock (mm:ss)" value={clockInput} onChange={setClockInput} placeholder={clockFace(s, now).split(' ')[0]} /></View>
-            <Button label="Set" onPress={applyClock} />
+            <Button variant="primary" label="Set" onPress={applyClock} />
           </View>
         ) : null}
         {ps >= len && running(s) ? <Text style={c.short}>Siren — play goes on until the ball is next dead.</Text> : null}
         {!running(s) && periodStarted(s) ? (
           <View style={c.stopped} accessibilityRole="alert">
             <IconText label={"⏸ Clock stopped"} style={c.stoppedTxt} />
-            <Button label="▶ Resume" onPress={startStop} />
+            <Button variant="primary" label="▶ Resume" onPress={startStop} />
           </View>
         ) : null}
       </View>

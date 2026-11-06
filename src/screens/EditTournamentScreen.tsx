@@ -200,7 +200,7 @@ export default function EditTournamentScreen() {
         footer={(
           <View style={st.bar}>
             <Text style={st.delete} accessibilityRole="button" onPress={busy ? undefined : remove}>Delete tournament</Text>
-            <Button label={busy ? 'Saving…' : 'Save changes'} onPress={save} disabled={busy} />
+            <Button variant="primary" label={busy ? 'Saving…' : 'Save changes'} onPress={save} disabled={busy} />
           </View>
         )}
       >

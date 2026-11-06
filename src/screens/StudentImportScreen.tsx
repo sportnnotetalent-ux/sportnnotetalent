@@ -169,9 +169,9 @@ export default function StudentImportScreen() {
               </Text>
             ) : null}
             {!plan ? (
-              <Button label={checking ? 'Checking…' : `🔎 Check ${inputs.length || ''} student${inputs.length === 1 ? '' : 's'}`.replace('  ', ' ')} disabled={checking || !inputs.length} onPress={() => void check()} />
+              <Button variant="primary" label={checking ? 'Checking…' : `🔎 Check ${inputs.length || ''} student${inputs.length === 1 ? '' : 's'}`.replace('  ', ' ')} disabled={checking || !inputs.length} onPress={() => void check()} />
             ) : (
-              <Button label={busy ? 'Saving…' : doing ? `Save the list (${doing} change${doing === 1 ? '' : 's'})` : 'Nothing to change'} disabled={busy || !doing} onPress={() => void save()} />
+              <Button variant="primary" label={busy ? 'Saving…' : doing ? `Save the list (${doing} change${doing === 1 ? '' : 's'})` : 'Nothing to change'} disabled={busy || !doing} onPress={() => void save()} />
             )}
             {done ? <Button label="Done" variant="ghost" onPress={() => nav.goBack()} /> : null}
           </>

@@ -236,7 +236,7 @@ export default function MatchSquadScreen() {
 
       <KeyboardFooterLayout
         safeBottom={false}
-        footer={<Button label={busy ? 'Saving…' : 'Save matchday squad'} onPress={save} />}
+        footer={<Button variant="primary" label={busy ? 'Saving…' : 'Save matchday squad'} onPress={save} />}
       >
         <KeyboardAwareScrollView contentContainerStyle={st.content}>
           {TESTING_ALLOW_UNVERIFIED && (

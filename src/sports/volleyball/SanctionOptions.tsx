@@ -62,7 +62,7 @@ export function VolleyballQuickOptions({ state, dispatch, homeRoster, awayRoster
             </View>
             {left === 0 ? <Text style={st.effect}>{nameOf(side)} have used their 2 unsuccessful challenges this set.</Text> : (
               <View style={st.chips}>
-                <Button label="Upheld" disabled={left === 0} onPress={() => log(true)} />
+                <Button variant="primary" label="Upheld" disabled={left === 0} onPress={() => log(true)} />
                 <Button label="Not upheld" variant="ghost" disabled={left === 0} onPress={() => log(false)} />
               </View>
             )}

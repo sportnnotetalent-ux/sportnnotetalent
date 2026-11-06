@@ -293,7 +293,7 @@ export default function AuthScreen() {
                 <>
                   <Field label="Code from the text message" value={smsCode} onChange={setSmsCode} placeholder="6 digits" keyboardType="number-pad" autoComplete="one-time-code" />
                   <View style={st.linkRow}>
-                    <Button label={busy ? 'Checking…' : 'Verify mobile'} onPress={verifySignupCode} disabled={busy} />
+                    <Button variant="primary" label={busy ? 'Checking…' : 'Verify mobile'} onPress={verifySignupCode} disabled={busy} />
                     <Text style={st.link} accessibilityRole="button" onPress={textSignupCode}>Resend code</Text>
                   </View>
                 </>
@@ -387,7 +387,7 @@ export default function AuthScreen() {
           <FormError message={error} />
 
           {/* Primary action + flow switches */}
-          {mode === 'up' && <Button label={busy ? 'Please wait…' : 'Create account'} onPress={submitPassword} disabled={busy || !canSms} />}
+          {mode === 'up' && <Button variant="primary" label={busy ? 'Please wait…' : 'Create account'} onPress={submitPassword} disabled={busy || !canSms} />}
 
           {mode === 'in' && flow === 'password' && (
             <>

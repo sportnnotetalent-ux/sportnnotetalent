@@ -92,7 +92,7 @@ function YardsPad({ chips, onPick, label = 'Yards', unit = 'yds' }: { chips: num
       </View>
       <View style={c.row}>
         <View style={c.flex}><TextField label={`${label} (other)`} value={v} onChange={setV} placeholder="e.g. 23 or -4" autoCapitalize="none" /></View>
-        <Button label="Go" disabled={!v.trim() || !Number.isFinite(n)} onPress={() => { onPick(Math.round(n)); setV(''); }} />
+        <Button variant="primary" label="Go" disabled={!v.trim() || !Number.isFinite(n)} onPress={() => { onPick(Math.round(n)); setV(''); }} />
       </View>
     </View>
   );
@@ -343,7 +343,7 @@ const ScoringControls: SportPlugin<AFState>['ScoringControls'] = ({
           <View style={c.panel}>{head('Field goal (3)', sd)}
             <TextField label="Distance in yards (optional)" value={flow.yards} onChange={(v) => setFlow({ ...flow, yards: v })} placeholder="e.g. 32" autoCapitalize="none" />
             <View style={c.row}>
-              <Button label="✓ Good" color={color(sd)} style={c.flex} onPress={() => setFlow({ ...flow, good: true, step: 'kicker' })} />
+              <Button variant="primary" label="✓ Good" color={color(sd)} style={c.flex} onPress={() => setFlow({ ...flow, good: true, step: 'kicker' })} />
               <Button label="✗ No good" variant="ghost" style={c.flex} onPress={() => setFlow({ ...flow, good: false, step: 'kicker' })} />
             </View>
             {/* US batch 6: a blocked attempt (then the kicker and, optionally, the blocker) */}
@@ -570,7 +570,7 @@ const ScoringControls: SportPlugin<AFState>['ScoringControls'] = ({
         return (
           <View style={c.panel}>{head(`${f.label} · on ${name(on)}`)}
             <Text style={c.meta}>{f.autoFirst ? 'Automatic first down. ' : ''}{f.lossOfDown ? 'Loss of down. ' : ''}Half the distance to the goal at most.</Text>
-            <Button label={`Accept · ${f.yards} yards`} color={color(on)} onPress={() => go(f.yards)} />
+            <Button variant="primary" label={`Accept · ${f.yards} yards`} color={color(on)} onPress={() => go(f.yards)} />
             <YardsPad chips={[5, 10, 15]} onPick={go} label="Other yardage" />
           </View>
         );
@@ -608,7 +608,7 @@ const ScoringControls: SportPlugin<AFState>['ScoringControls'] = ({
             <Text style={c.small}>Penalised player (optional){flow.by ? ` · ${flow.by.fullName}` : ''}</Text>
             <View style={c.grid}>{players(on).map((p) => <SelectChip key={p.id} label={p.fullName} active={flow.by?.id === p.id} onPress={() => setFlow({ ...flow, by: flow.by?.id === p.id ? null : p })} />)}</View>
             <View style={c.grid}>
-              <Button label={`Accept · no play (${f.yards} from the previous spot)`} color={color(on)} style={c.half} onPress={() => settle('prev')} />
+              <Button variant="primary" label={`Accept · no play (${f.yards} from the previous spot)`} color={color(on)} style={c.half} onPress={() => settle('prev')} />
               <Button label={`Accept · the play stands, ${f.yards} from where it ended`} variant="ghost" style={c.half} onPress={() => settle('end')} />
               <Button label="Declined · the play stands" variant="ghost" style={c.half} onPress={() => settle('dec')} />
               <Button label="Offsetting · replay the down" variant="ghost" style={c.half} onPress={() => settle('off')} />
@@ -629,7 +629,7 @@ const ScoringControls: SportPlugin<AFState>['ScoringControls'] = ({
               <View style={c.flex}><TextField label={`Ball on (own yard line, 1–${s.field - 1})`} value={driveIn.spot} onChange={(v) => setDriveIn({ ...driveIn, spot: v })} autoCapitalize="none" /></View>
               <View style={c.flex}><TextField label="Yards to go" value={driveIn.toGo} onChange={(v) => setDriveIn({ ...driveIn, toGo: v })} autoCapitalize="none" /></View>
             </View>
-            <Button label="Set" onPress={() => { dispatch({ type: 'SET_DRIVE', payload: { off: driveIn.off, down: driveIn.down, spot: Number(driveIn.spot) || 25, ...(driveIn.toGo.trim() ? { toGo: Number(driveIn.toGo) } : {}) } }); setFlow(null); }} />
+            <Button variant="primary" label="Set" onPress={() => { dispatch({ type: 'SET_DRIVE', payload: { off: driveIn.off, down: driveIn.down, spot: Number(driveIn.spot) || 25, ...(driveIn.toGo.trim() ? { toGo: Number(driveIn.toGo) } : {}) } }); setFlow(null); }} />
           </View>
         );
       case 'kickoff': {
@@ -697,7 +697,7 @@ const ScoringControls: SportPlugin<AFState>['ScoringControls'] = ({
         return (
           <View style={c.panel}>
             <Text style={c.h}>Kickoff · {name(s.kickBy)} kick to {name(rec)}</Text>
-            <Button label={`${name(rec)} ball · touchback (own ${touchback(s)})`} color={color(rec)} onPress={() => fire({ type: 'PLAY', side: rec, payload: { play: 'kickoff', newSpot: touchback(s) } })} />
+            <Button variant="primary" label={`${name(rec)} ball · touchback (own ${touchback(s)})`} color={color(rec)} onPress={() => fire({ type: 'PLAY', side: rec, payload: { play: 'kickoff', newSpot: touchback(s) } })} />
             <Button label="Returned — set where" variant="ghost" onPress={() => setFlow({ mode: 'kickoff', side: rec })} />
           </View>
         );
@@ -707,7 +707,7 @@ const ScoringControls: SportPlugin<AFState>['ScoringControls'] = ({
           <Text style={c.h}>{flag ? 'Who has the ball?' : 'Who receives the kickoff?'}</Text>
           <View style={c.row}>
             {(['home', 'away'] as const).map((sd) => (
-              <Button key={sd} label={name(sd)} color={color(sd)} style={c.flex} onPress={() => (flag
+              <Button variant="primary" key={sd} label={name(sd)} color={color(sd)} style={c.flex} onPress={() => (flag
                 ? dispatch({ type: 'SET_DRIVE', payload: { off: sd, spot: s.flagStart } })
                 : setFlow({ mode: 'kickoff', side: sd }))} />
             ))}
@@ -732,8 +732,8 @@ const ScoringControls: SportPlugin<AFState>['ScoringControls'] = ({
           <View style={[c.lineMark, { left: `${linePct}%` }]} />
         </View>
         <View style={c.grid}>
-          <Button label="🏃 Run" color={ballCol} style={c.third} onPress={() => setFlow({ mode: 'run', side: sd, step: 'who' })} />
-          <Button label="🎯 Pass ✓" accessibilityLabel="Pass complete" color={ballCol} style={c.third} onPress={() => {
+          <Button variant="primary" label="🏃 Run" color={ballCol} style={c.third} onPress={() => setFlow({ mode: 'run', side: sd, step: 'who' })} />
+          <Button variant="primary" label="🎯 Pass ✓" accessibilityLabel="Pass complete" color={ballCol} style={c.third} onPress={() => {
             const qb = lastPasser(s, sd);
             setFlow(qb ? { mode: 'pass', side: sd, step: 'receiver', p1: qb } : { mode: 'pass', side: sd, step: 'passer' });
           }} />
@@ -757,7 +757,7 @@ const ScoringControls: SportPlugin<AFState>['ScoringControls'] = ({
   const sideCol = (sd: Side) => (
     <View key={sd} style={c.col}>
       <Text style={[c.team, { color: ink(sd) }]} numberOfLines={1}>{name(sd)}</Text>
-      <Button label="🏈 Touchdown" color={color(sd)} onPress={() => setFlow({ mode: 'td', side: sd, step: 'scorer', how: 'run', yards: '' })} />
+      <Button variant="primary" label="🏈 Touchdown" color={color(sd)} onPress={() => setFlow({ mode: 'td', side: sd, step: 'scorer', how: 'run', yards: '' })} />
       {!flag ? <Button label="🥅 Field goal" variant="ghost" onPress={() => setFlow({ mode: 'fg', side: sd, step: 'result', yards: '' })} /> : null}
       <Button label="🛡️ Safety (2)" accessibilityLabel={`Safety, 2 points to ${name(sd)}`} variant="ghost" onPress={() => setFlow({ mode: 'safety', side: sd })} />
     </View>
@@ -772,7 +772,7 @@ const ScoringControls: SportPlugin<AFState>['ScoringControls'] = ({
         <>
           <Text style={c.meta}>After the coin toss — who has the ball first?</Text>
           <View style={c.row}>
-            {(['home', 'away'] as const).map((sd) => <Button key={sd} label={`${name(sd)} first`} color={color(sd)} style={c.flex} onPress={() => dispatch({ type: 'OT_FIRST', payload: { first: sd } })} />)}
+            {(['home', 'away'] as const).map((sd) => <Button variant="primary" key={sd} label={`${name(sd)} first`} color={color(sd)} style={c.flex} onPress={() => dispatch({ type: 'OT_FIRST', payload: { first: sd } })} />)}
           </View>
         </>
       ) : otOffence ? (
@@ -782,7 +782,7 @@ const ScoringControls: SportPlugin<AFState>['ScoringControls'] = ({
             <View style={c.grid}>
               {(['one', 'two'] as const).map((k) => (
                 <React.Fragment key={k}>
-                  <Button label={`✓ ${k === 'one' ? '1 pt' : '2 pts'}`} accessibilityLabel={`${k === 'one' ? '1-point' : '2-point'} try good`} color={color(otOffence)} style={c.half} onPress={() => setFlow({ mode: 'tryWho', side: otOffence, kind: k, good: true })} />
+                  <Button variant="primary" label={`✓ ${k === 'one' ? '1 pt' : '2 pts'}`} accessibilityLabel={`${k === 'one' ? '1-point' : '2-point'} try good`} color={color(otOffence)} style={c.half} onPress={() => setFlow({ mode: 'tryWho', side: otOffence, kind: k, good: true })} />
                   <Button label={`✗ ${k === 'one' ? '1 pt' : '2 pts'}`} accessibilityLabel={`${k === 'one' ? '1-point' : '2-point'} try failed`} variant="ghost" style={c.half} onPress={() => recordTry(otOffence, k, false, null)} />
                 </React.Fragment>
               ))}
@@ -816,7 +816,7 @@ const ScoringControls: SportPlugin<AFState>['ScoringControls'] = ({
         {setting ? (
           <View style={c.row}>
             <View style={c.flex}><TextField label="Time left (m:ss)" value={clockInput} onChange={setClockInput} placeholder={clockFace(s, now)} autoCapitalize="none" /></View>
-            <Button label="Set" onPress={applyClock} />
+            <Button variant="primary" label="Set" onPress={applyClock} />
           </View>
         ) : null}
         {s.warned.includes(s.period) && !isOT(s, s.period) ? <Text style={c.short}>Two-minute warning given</Text> : null}
@@ -858,7 +858,7 @@ function SpotPad({ s, onPick, chips }: { s: AFState; onPick: (spot: number) => v
       {list.length ? <View style={c.grid}>{list.map((x) => <SelectChip key={x} label={`Own ${x}`} active={false} onPress={() => onPick(x)} />)}</View> : null}
       <View style={c.row}>
         <View style={c.flex}><TextField label={`Own yard line (1–${s.field - 1})`} value={v} onChange={setV} placeholder="e.g. 28" autoCapitalize="none" /></View>
-        <Button label="Go" disabled={!v.trim() || !(n >= 1 && n < s.field)} onPress={() => { onPick(n); setV(''); }} />
+        <Button variant="primary" label="Go" disabled={!v.trim() || !(n >= 1 && n < s.field)} onPress={() => { onPick(n); setV(''); }} />
       </View>
     </View>
   );

@@ -202,7 +202,7 @@ export function ShootingEventSetup({ tournamentId, preloaded, carried }: { tourn
         footer={(
           <>
             <FormError message={error} />
-            <Button label={busy ? 'Creating…' : 'Create event & start list'} onPress={() => void create()} disabled={busy || !entrants} />
+            <Button variant="primary" label={busy ? 'Creating…' : 'Create event & start list'} onPress={() => void create()} disabled={busy || !entrants} />
           </>
         )}
       >

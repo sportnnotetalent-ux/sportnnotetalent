@@ -100,7 +100,7 @@ export default function CreateSeriesScreen() {
         footer={(
           <>
             <FormError message={error} />
-            <Button label={busy ? 'Creating…' : isTie ? `Create tie (${legsCount} rubbers)` : `Create series (${legsCount} match${legsCount === 1 ? '' : 'es'})`} onPress={submit} disabled={busy || !sport} />
+            <Button variant="primary" label={busy ? 'Creating…' : isTie ? `Create tie (${legsCount} rubbers)` : `Create series (${legsCount} match${legsCount === 1 ? '' : 'es'})`} onPress={submit} disabled={busy || !sport} />
           </>
         )}
       >

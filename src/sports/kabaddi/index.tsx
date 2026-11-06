@@ -191,7 +191,7 @@ const ScoringControls: SportPlugin<KabaddiState>['ScoringControls'] = ({ state, 
     return (
       <View style={{ gap: theme.spacing(3) }}>
         <Text style={ctrl.meta}>{startHint}</Text>
-        <Button label={startLabel} onPress={() => dispatch({ type: 'KICKOFF', payload: { at: Date.now() } })} />
+        <Button variant="primary" label={startLabel} onPress={() => dispatch({ type: 'KICKOFF', payload: { at: Date.now() } })} />
       </View>
     );
   }
@@ -490,7 +490,7 @@ const ScoringControls: SportPlugin<KabaddiState>['ScoringControls'] = ({ state, 
             ].filter(Boolean).join(' · ');
             return <Text style={ctrl.meta}>Scores: {bits}</Text>;
           })()}
-          <Button label={raidFlow.editOf != null ? '✓ Save raid' : '✓ Record raid'} onPress={recordRaid} />
+          <Button variant="primary" label={raidFlow.editOf != null ? '✓ Save raid' : '✓ Record raid'} onPress={recordRaid} />
         </View>
       )}
       {/* court-team batch 1: after a quick "Raider out", name the tackler
@@ -578,7 +578,7 @@ const ScoringControls: SportPlugin<KabaddiState>['ScoringControls'] = ({ state, 
                 </View>
               </>
             )}
-            <Button label={tech.side ? `✓ +1 to ${tech.side === 'home' ? homeName : awayName}` : 'Pick who gets the point'} disabled={!tech.side}
+            <Button variant="primary" label={tech.side ? `✓ +1 to ${tech.side === 'home' ? homeName : awayName}` : 'Pick who gets the point'} disabled={!tech.side}
               onPress={() => {
                 if (!tech.side) return;
                 fire(techPointAction(tech.side, { reason: tech.reason, by: tech.by }));
@@ -656,7 +656,7 @@ const ScoringControls: SportPlugin<KabaddiState>['ScoringControls'] = ({ state, 
                 <SelectChip label={`Technical point to ${sd ? nm(opp) : 'the opponent'}: ${card.tp ? 'Yes' : 'No'}`} active={card.tp} onPress={() => setCard({ ...card, tp: !card.tp, tpSet: true })} />
               </View>
             ) : null}
-            <Button label={ready ? `✓ ${card.colour === 'red' ? 'Red card' : card.colour === 'yellow' ? 'Yellow card' : 'Green card'} — ${whoLabel}` : 'Pick the team, card and who'} disabled={!ready} onPress={() => void record()} />
+            <Button variant="primary" label={ready ? `✓ ${card.colour === 'red' ? 'Red card' : card.colour === 'yellow' ? 'Yellow card' : 'Green card'} — ${whoLabel}` : 'Pick the team, card and who'} disabled={!ready} onPress={() => void record()} />
           </View>
         );
       })()}
@@ -724,9 +724,9 @@ const ScoringControls: SportPlugin<KabaddiState>['ScoringControls'] = ({ state, 
       {state.goldenRaid ? (
         <Button label="End as a tie" variant="ghost" onPress={async () => { if (await confirmMatchAction('endTie', { drawWord: 'Tie', score: `${state.home}-${state.away}` })) dispatch({ type: 'END' }); }} />
       ) : state.half === 1 ? (
-        <Button label="End 1st Half →" onPress={async () => { if (await confirmMatchAction('endPeriod', { period: '1st half', score: `${state.home}-${state.away}` })) dispatch({ type: 'NEXT_HALF' }); }} />
+        <Button variant="primary" label="End 1st Half →" onPress={async () => { if (await confirmMatchAction('endPeriod', { period: '1st half', score: `${state.home}-${state.away}` })) dispatch({ type: 'NEXT_HALF' }); }} />
       ) : state.half === 3 ? (
-        <Button label="End Extra Time · 1st half →" onPress={async () => { if (await confirmMatchAction('endPeriod', { period: 'extra-time 1st half', score: `${state.home}-${state.away}` })) dispatch({ type: 'NEXT_HALF' }); }} />
+        <Button variant="primary" label="End Extra Time · 1st half →" onPress={async () => { if (await confirmMatchAction('endPeriod', { period: 'extra-time 1st half', score: `${state.home}-${state.away}` })) dispatch({ type: 'NEXT_HALF' }); }} />
       ) : tied ? (
         // Level after the 2nd half or extra time → the tie-breaker the organizer
         // chose (draw stands / extra time then Golden Raid / Golden Raid direct).
@@ -734,7 +734,7 @@ const ScoringControls: SportPlugin<KabaddiState>['ScoringControls'] = ({ state, 
           <Text style={ctrl.meta}>Scores level ({state.home}–{state.away}) at the end of {halfLabel(state.half)}.
             {state.decider === 'none' ? ' This match can end level.' : ''}</Text>
           {state.decider !== 'none' && (
-            <Button label="⚡ Golden Raid — sudden death" onPress={() => dispatch({ type: 'START_GOLDEN_RAID' })} />
+            <Button variant="primary" label="⚡ Golden Raid — sudden death" onPress={() => dispatch({ type: 'START_GOLDEN_RAID' })} />
           )}
           {state.decider === 'extra_time' && state.half === 2 && (
             <Button label={`Extra time (2 × ${state.extraTimeMinutes} min)`} variant="ghost" onPress={() => dispatch({ type: 'START_EXTRA_TIME' })} />

@@ -107,7 +107,7 @@ export default function TeamsScreen() {
           </View>
 
           <FormError message={error} />
-          <Button label={busy ? 'Adding…' : 'Add team'} onPress={add} />
+          <Button variant="primary" label={busy ? 'Adding…' : 'Add team'} onPress={add} />
         </Card>
 
         {Object.entries(grouped).map(([sp, list]) => (

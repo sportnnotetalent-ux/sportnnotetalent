@@ -219,7 +219,7 @@ export default function LineupEditorScreen() {
           )}
         </View>
 
-        <Button label={busy ? 'Saving…' : 'Save lineup & squad'} onPress={save} style={{ marginTop: theme.spacing(2) }} />
+        <Button variant="primary" label={busy ? 'Saving…' : 'Save lineup & squad'} onPress={save} style={{ marginTop: theme.spacing(2) }} />
       </KeyboardAwareScrollView>
     </SafeAreaView>
   );

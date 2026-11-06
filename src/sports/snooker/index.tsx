@@ -188,7 +188,7 @@ const ScoringControls: SportPlugin<SnookerState>['ScoringControls'] = ({ state, 
  *  in one stroke and the free ball as chips. */
 function BallPad({ p, send }: { p: SnookerPanel; send: (a: Act) => void }) {
   const ball = (b: BallTap, wide = false) => (
-    <Button key={b.ball} label={`${b.label} ${b.value}`} color={BALL_COLOR[b.ball]} disabled={!b.action}
+    <Button variant="primary" key={b.ball} label={`${b.label} ${b.value}`} color={BALL_COLOR[b.ball]} disabled={!b.action}
       style={wide ? cue.flex : st.colour}
       accessibilityLabel={b.ball === 'free' ? `Pot the free ball, ${plural(b.value, 'point')}` : `Pot the ${b.label.toLowerCase()}, ${plural(b.value, 'point')}`}
       onPress={() => send(b.action)} />

@@ -66,7 +66,7 @@ export default function GuardianLinkScreen() {
         </Text>
         <TextField label="Code from the email" value={code} onChange={setCode} placeholder="e.g. 7KQ2XH9M" autoCapitalize="characters" />
         <FormError message={error} />
-        <Button label={busy ? 'Linking…' : 'Link'} onPress={claim} disabled={busy || !code.trim()} />
+        <Button variant="primary" label={busy ? 'Linking…' : 'Link'} onPress={claim} disabled={busy || !code.trim()} />
 
       </KeyboardAwareScrollView>
     </SafeAreaView>

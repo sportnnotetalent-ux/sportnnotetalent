@@ -14,6 +14,7 @@ import { hydrateHapticsPref } from './src/core/hapticsPref';
 import { startTelemetry } from './src/core/telemetry';
 import { hydrateAnalyticsConsent } from './src/core/analyticsConsent';
 import { AnalyticsConsentBanner } from './src/components/AnalyticsConsentBanner';
+import { LaunchAnimation } from './src/components/LaunchAnimation';
 import ErrorBoundary from './src/components/ErrorBoundary';
 import { ConfirmSheetHost } from './src/components/ConfirmSheet';
 
@@ -65,6 +66,8 @@ export default function App() {
       <ConfirmSheetHost />
       {/* SD-152: UK/EU first visit — ask before analytics. */}
       <AnalyticsConsentBanner />
+      {/* Reference-video A1: the launch animation, over the app as it loads. */}
+      <LaunchAnimation fontsReady={fontsLoaded} />
     </SafeAreaProvider>
   );
 }

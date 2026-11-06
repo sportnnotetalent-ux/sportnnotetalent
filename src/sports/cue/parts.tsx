@@ -81,7 +81,7 @@ export function FrameScoreForm({ title, names, check, onSave, saveLabel, hint }:
       </View>
       {touched && !res.ok ? <Text style={cue.bad} accessibilityLiveRegion="polite">{res.error}</Text> : null}
       {res.ok && res.warn ? <Text style={cue.warn} accessibilityLiveRegion="polite">{res.warn}</Text> : null}
-      <Button label={saveLabel} disabled={!res.ok} onPress={() => void save()} />
+      <Button variant="primary" label={saveLabel} disabled={!res.ok} onPress={() => void save()} />
     </View>
   );
 }

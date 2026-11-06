@@ -83,7 +83,7 @@ export function FrameCorrections<S>({ log, config, ops, onOps, homeName, awayNam
                 </View>
                 {error ? <Text style={cue.bad} accessibilityLiveRegion="polite">{error}</Text> : null}
                 <View style={cue.row}>
-                  <Button label="Use this score" style={cue.flex} onPress={save} />
+                  <Button variant="primary" label="Use this score" style={cue.flex} onPress={save} />
                   <Button label="Cancel" variant="ghost" onPress={() => setEditing(null)} />
                 </View>
               </View>

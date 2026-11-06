@@ -294,7 +294,7 @@ export default function GolfRoundSetupScreen() {
         footer={(
           <>
             <FormError message={error} />
-            <Button label={busy ? 'Creating…' : '⛳ Create round'} onPress={submit} disabled={busy} />
+            <Button variant="primary" label={busy ? 'Creating…' : '⛳ Create round'} onPress={submit} disabled={busy} />
           </>
         )}
       >

@@ -77,9 +77,12 @@ export const EMOJI_ICONS: Record<string, EmojiIconSpec> = {
 export const EMOJI_KEYS: readonly string[] = Object.keys(EMOJI_ICONS).map((k) => k.trim()).sort((a, b) => b.length - a.length);
 
 /** An emoji's icon at a size, in `color` unless the icon has its own. */
+/** Reference-video B8: one thin line weight for every converted icon. */
+export const ICON_STROKE = 1.75;
+
 export function EmojiIcon({ spec, color, size = 18 }: { spec: EmojiIconSpec; color: string; size?: number }) {
   const { Icon } = spec;
-  return <Icon color={spec.color ?? color} fill={spec.fill ?? 'none'} size={size} strokeWidth={2.2} />;
+  return <Icon color={spec.color ?? color} fill={spec.fill ?? 'none'} size={size} strokeWidth={ICON_STROKE} />;
 }
 
 /** An icon slot that used to hold an emoji: its line icon when it has one —

@@ -218,7 +218,7 @@ export default function AssignScorersScreen() {
       </KeyboardAwareScrollView>
       {count > 0 && (
         <View style={st.footer}>
-          <Button label={busy ? 'Assigning…' : `Assign ${count} match${count === 1 ? '' : 'es'}`} onPress={() => void save(plan)} disabled={busy} />
+          <Button variant="primary" label={busy ? 'Assigning…' : `Assign ${count} match${count === 1 ? '' : 'es'}`} onPress={() => void save(plan)} disabled={busy} />
         </View>
       )}
     </SafeAreaView>

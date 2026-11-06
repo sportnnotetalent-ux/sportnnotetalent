@@ -311,7 +311,7 @@ const ScoringControls: SportPlugin<ChessState>['ScoringControls'] = ({ state, di
           ) : null}
         </View>
       )}
-      <Button label={winner ? `✓ Record ${scoreFor(white, winner, sentMethod, unevenOn)}…` : '✓ Record result'} onPress={() => void record()} disabled={!winner || busy} />
+      <Button variant="primary" label={winner ? `✓ Record ${scoreFor(white, winner, sentMethod, unevenOn)}…` : '✓ Record result'} onPress={() => void record()} disabled={!winner || busy} />
     </View>
   );
 };

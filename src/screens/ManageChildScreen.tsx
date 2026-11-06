@@ -117,7 +117,7 @@ export default function ManageChildScreen() {
           <Text style={textStyles.body}>{consent}</Text>
           {child.limited && <Text style={textStyles.muted}>While it’s not confirmed, nobody can follow them or message about them, and only their teams see their profile.</Text>}
           {child.hasAccount && (child.consent === 'pending' || child.consent === 'withdrawn') && (
-            <Button label={busy === 'confirm' ? 'Saving…' : '✅ Confirm consent'} onPress={() => void setConsent(true)} disabled={!!busy} />
+            <Button variant="primary" label={busy === 'confirm' ? 'Saving…' : '✅ Confirm consent'} onPress={() => void setConsent(true)} disabled={!!busy} />
           )}
           {child.hasAccount && (child.consent === 'confirmed' || child.consent === 'self_declared') && (
             <Button label={busy === 'withdraw' ? 'Saving…' : 'Withdraw consent'} variant="ghost" onPress={() => void setConsent(false)} disabled={!!busy} />

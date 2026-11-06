@@ -219,7 +219,7 @@ export function CrewEventSetup({ tournamentId, sport, preloaded, carried }: { to
         footer={(
           <>
             <FormError message={error} />
-            <Button label={busy ? 'Creating…' : 'Create race & draw lanes'} onPress={() => void create()} disabled={busy || !entrants} />
+            <Button variant="primary" label={busy ? 'Creating…' : 'Create race & draw lanes'} onPress={() => void create()} disabled={busy || !entrants} />
           </>
         )}
       >

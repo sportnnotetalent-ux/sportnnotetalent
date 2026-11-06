@@ -71,7 +71,7 @@ export default function JoinClubScreen() {
           <Card style={{ gap: theme.spacing(2) }}>
             <Text style={textStyles.h3}>{invite.clubName ?? 'Team'}</Text>
             <Text style={textStyles.muted}>You’ll join as a member. The team’s admins can set your sport squads and roles.</Text>
-            <Button label={busy ? 'Joining…' : 'Join team'} onPress={join} disabled={busy} />
+            <Button variant="primary" label={busy ? 'Joining…' : 'Join team'} onPress={join} disabled={busy} />
           </Card>
         )}
       </KeyboardAwareScrollView>

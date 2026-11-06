@@ -93,7 +93,7 @@ export function FollowAlertsSheet({ visible, type, id, name, onClose, alsoIds }:
                 You’ll get nothing for {name} — unfollow to remove it from your feed too.
               </Text>
             )}
-            <Button label={saving ? 'Saving…' : 'Save'} onPress={save} disabled={saving} />
+            <Button variant="primary" label={saving ? 'Saving…' : 'Save'} onPress={save} disabled={saving} />
           </ScrollView>
         </Pressable>
       </Pressable>

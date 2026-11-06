@@ -71,7 +71,7 @@ export default function JoinTeamScreen() {
             <Text style={textStyles.muted}>You’ve been invited to join</Text>
             <Text style={textStyles.h2}>{invite.teamName}</Text>
             <Text style={textStyles.muted}>as {invite.role}</Text>
-            <Button label={busy ? 'Claiming…' : `Claim as ${invite.role}`} onPress={claim} disabled={busy} />
+            <Button variant="primary" label={busy ? 'Claiming…' : `Claim as ${invite.role}`} onPress={claim} disabled={busy} />
           </Card>
         )}
 

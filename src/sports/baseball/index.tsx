@@ -364,7 +364,7 @@ const ScoringControls: SportPlugin<BaseballState>['ScoringControls'] = ({
             {zoneRow}
             {btypeRow()}
             <Text style={c.small}>Hit</Text>
-            <View style={c.grid}>{HIT_BTNS.map((o) => <Button key={o} label={SHORT[o]!} color={color(bat)} style={c.quarter} onPress={() => outcome(o)} />)}</View>
+            <View style={c.grid}>{HIT_BTNS.map((o) => <Button variant="primary" key={o} label={SHORT[o]!} color={color(bat)} style={c.quarter} onPress={() => outcome(o)} />)}</View>
             <Text style={c.small}>Out</Text>
             <View style={c.grid}>{OUT_BTNS.map((o) => <Button key={o} label={SHORT[o]!} variant="ghost" style={c.third} disabled={((o === 'DP' || o === 'SF' || o === 'SH') && g.outs >= 2) || (o === 'TP' && (g.outs > 0 || runners.length < 2))} onPress={() => outcome(o)} />)}</View>
             <Text style={c.small}>Reached</Text>
@@ -425,7 +425,7 @@ const ScoringControls: SportPlugin<BaseballState>['ScoringControls'] = ({
                 <Text style={c.meta}>{runs} run{runs === 1 ? '' : 's'} score</Text>
               </View>
             ) : null}
-            <Button label="✓ Confirm" color={color(bat)} onPress={() => fire(draft())} />
+            <Button variant="primary" label="✓ Confirm" color={color(bat)} onPress={() => fire(draft())} />
           </View>
         );
       }
@@ -513,7 +513,7 @@ const ScoringControls: SportPlugin<BaseballState>['ScoringControls'] = ({
       case 'eject': {
         if (!flow.side) return (
           <View style={c.panel}>{head('🟥 Ejection — which team?')}
-            <View style={c.row}>{(['away', 'home'] as const).map((sd) => <Button key={sd} label={name(sd)} color={color(sd)} style={c.flex} onPress={() => setFlow({ mode: 'eject', side: sd })} />)}</View>
+            <View style={c.row}>{(['away', 'home'] as const).map((sd) => <Button variant="primary" key={sd} label={name(sd)} color={color(sd)} style={c.flex} onPress={() => setFlow({ mode: 'eject', side: sd })} />)}</View>
           </View>
         );
         const sd = flow.side;
@@ -644,7 +644,7 @@ const ScoringControls: SportPlugin<BaseballState>['ScoringControls'] = ({
               </View>
               <View style={c.row}>
                 <Button label="Foul" variant="ghost" style={c.flex} onPress={() => pitch('foul')} />
-                <Button label="In play" accessibilityLabel="Ball in play — pick the outcome" color={color(bat)} style={c.flex} onPress={() => setFlow({ mode: 'inplay' })} />
+                <Button variant="primary" label="In play" accessibilityLabel="Ball in play — pick the outcome" color={color(bat)} style={c.flex} onPress={() => setFlow({ mode: 'inplay' })} />
                 <Button label="HBP" accessibilityLabel="Hit by pitch" variant="ghost" style={c.flex} onPress={() => outcome('HBP')} />
               </View>
             </View>
@@ -653,7 +653,7 @@ const ScoringControls: SportPlugin<BaseballState>['ScoringControls'] = ({
               {zoneRow}
               {btypeRow()}
               <View style={c.grid}>
-                {HIT_BTNS.map((o) => <Button key={o} label={SHORT[o]!} color={color(bat)} style={c.quarter} onPress={() => outcome(o)} />)}
+                {HIT_BTNS.map((o) => <Button variant="primary" key={o} label={SHORT[o]!} color={color(bat)} style={c.quarter} onPress={() => outcome(o)} />)}
                 <Button label="Walk" variant="ghost" style={c.quarter} onPress={() => outcome('BB')} />
                 <Button label="K swinging" accessibilityLabel="Strikeout swinging" variant="ghost" style={c.quarter} onPress={() => outcome('K', 'swinging')} />
                 <Button label="K looking" accessibilityLabel="Strikeout looking (called third strike)" variant="ghost" style={c.quarter} onPress={() => outcome('K', 'called')} />

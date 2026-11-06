@@ -104,7 +104,7 @@ export default function CreateListingScreen({ navigation }: Props) {
         footer={(
           <>
             <FormError message={error} />
-            <Button label={busy ? 'Posting…' : 'Post listing'} onPress={submit} disabled={busy} />
+            <Button variant="primary" label={busy ? 'Posting…' : 'Post listing'} onPress={submit} disabled={busy} />
           </>
         )}
       >

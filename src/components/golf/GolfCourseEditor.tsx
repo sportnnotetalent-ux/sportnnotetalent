@@ -164,7 +164,7 @@ export function GolfCourseEditor({ initial, saveLabel, onSave, onCancel }: {
       <FormError message={error} />
       <View style={st.row}>
         {onCancel && <View style={st.flex}><Button label="Cancel" variant="ghost" onPress={onCancel} /></View>}
-        <View style={st.flex}><Button label={busy ? 'Saving…' : saveLabel ?? 'Save course'} onPress={() => void save()} disabled={busy} /></View>
+        <View style={st.flex}><Button variant="primary" label={busy ? 'Saving…' : saveLabel ?? 'Save course'} onPress={() => void save()} disabled={busy} /></View>
       </View>
     </Card>
   );

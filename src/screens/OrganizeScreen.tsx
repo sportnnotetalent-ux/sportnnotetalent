@@ -106,7 +106,7 @@ export default function OrganizeScreen() {
 
         {/* Primary create action leads; supporting actions follow. */}
         {/* MVP 2026-10-31: people get the quick tournament; an organisation keeps the full form */}
-        <Button label="🏆 New tournament" onPress={() => (activeOrg ? nav.navigate('CreateTournament', { orgId: activeOrg.id }) : nav.navigate('QuickTournament', undefined))} />
+        <Button variant="primary" label="🏆 New tournament" onPress={() => (activeOrg ? nav.navigate('CreateTournament', { orgId: activeOrg.id }) : nav.navigate('QuickTournament', undefined))} />
         {/* 2026-10-29 redesign: the supporting actions as a 2 × 2 grid */}
         <View style={st.actionGrid}>
           <ActionTile label="Start a friendly" hint="A one-off game" tint={theme.colors.home}

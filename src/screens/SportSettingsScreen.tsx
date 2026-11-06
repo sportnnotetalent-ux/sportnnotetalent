@@ -160,7 +160,7 @@ export default function SportSettingsScreen() {
         {params.tournamentId ? (
           <>
             <FormError message={saveErr} />
-            <Button label={saving ? 'Saving…' : 'Save'} onPress={() => void saveDirect()} disabled={saving || !seeded} />
+            <Button variant="primary" label={saving ? 'Saving…' : 'Save'} onPress={() => void saveDirect()} disabled={saving || !seeded} />
           </>
         ) : (
           <Button label="Done" onPress={() => nav.goBack()} />

@@ -920,7 +920,7 @@ export default function ResultsEventScreen() {
             {f.road?.team ? <TeamTable rows={teams} scorers={f.road.team.scorers} basis={f.road.team.basis} size={f.road.team.size} /> : null}
 
             {editable && next && <Button label={busy ? 'Seeding…' : comb ? `Close ${combinedPhaseName(f)} → start ${ceNextName}` : f.progression?.stage ? `Close stage ${f.phaseNo} → start stage ${f.phaseNo + 1}` : `Close ${pName(f.phase).toLowerCase()} → seed ${arch ? '' : 'the '}${pName(next.phase).toLowerCase()}`} onPress={() => void advance()} disabled={busy} />}
-            {editable && !next && <Button label={busy ? 'Finishing…' : '🏁 Finish & lock results'} onPress={() => void finish()} disabled={busy} />}
+            {editable && !next && <Button variant="primary" label={busy ? 'Finishing…' : '🏁 Finish & lock results'} onPress={() => void finish()} disabled={busy} />}
           </>
         )}
 

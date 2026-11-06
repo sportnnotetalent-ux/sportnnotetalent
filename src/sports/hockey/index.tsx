@@ -298,8 +298,8 @@ const ScoringControls: SportPlugin<HockeyState>['ScoringControls'] = ({
                 <Text style={c.meta}>5 each and still level — sudden death. Who shoots first?</Text>
                 <Text style={c.meta}>FIH order: the team that shot second in the first five now goes first ({name(s.shootout.first === 'home' ? 'away' : 'home')}).</Text>
                 <View style={c.row}>
-                  <Button label={`${homeName} first`} color={color('home')} style={c.flex} onPress={() => dispatch({ type: 'SO_ORDER', payload: { first: 'home' } })} />
-                  <Button label={`${awayName} first`} color={color('away')} style={c.flex} onPress={() => dispatch({ type: 'SO_ORDER', payload: { first: 'away' } })} />
+                  <Button variant="primary" label={`${homeName} first`} color={color('home')} style={c.flex} onPress={() => dispatch({ type: 'SO_ORDER', payload: { first: 'home' } })} />
+                  <Button variant="primary" label={`${awayName} first`} color={color('away')} style={c.flex} onPress={() => dispatch({ type: 'SO_ORDER', payload: { first: 'away' } })} />
                 </View>
               </>
             ) : (
@@ -312,7 +312,7 @@ const ScoringControls: SportPlugin<HockeyState>['ScoringControls'] = ({
                 {soTaker ? <Text style={c.meta}>Taker: {soTaker.fullName}</Text> : null}
                 {keeper(opp(nextSide)) ? <Text style={c.meta}>🧤 Keeper: {keeper(opp(nextSide))!.fullName}</Text> : null}
                 <View style={c.row}>
-                  <Button label="✓ Scored" color={color(nextSide)} style={c.flex} onPress={() => soAttempt(nextSide, 'scored')} />
+                  <Button variant="primary" label="✓ Scored" color={color(nextSide)} style={c.flex} onPress={() => soAttempt(nextSide, 'scored')} />
                   <Button label="🧤 Saved" variant="ghost" style={c.flex} onPress={() => soAttempt(nextSide, 'saved')} />
                   <Button label="✗ Missed" variant="ghost" style={c.flex} onPress={() => soAttempt(nextSide, 'missed')} />
                 </View>
@@ -332,8 +332,8 @@ const ScoringControls: SportPlugin<HockeyState>['ScoringControls'] = ({
               <Text style={c.h}>🪙 Who shoots first?</Text>
               <Text style={c.meta}>After the umpires’ toss (or however they decide) — pick the team going first.</Text>
               <View style={c.row}>
-                <Button label={`${homeName} first`} color={color('home')} style={c.flex} onPress={() => dispatch({ type: 'START_SHOOTOUT', payload: { first: 'home' } })} />
-                <Button label={`${awayName} first`} color={color('away')} style={c.flex} onPress={() => dispatch({ type: 'START_SHOOTOUT', payload: { first: 'away' } })} />
+                <Button variant="primary" label={`${homeName} first`} color={color('home')} style={c.flex} onPress={() => dispatch({ type: 'START_SHOOTOUT', payload: { first: 'home' } })} />
+                <Button variant="primary" label={`${awayName} first`} color={color('away')} style={c.flex} onPress={() => dispatch({ type: 'START_SHOOTOUT', payload: { first: 'away' } })} />
               </View>
             </>
           ) : (
@@ -404,7 +404,7 @@ const ScoringControls: SportPlugin<HockeyState>['ScoringControls'] = ({
         if (flow.step === 'result') return (
           <View style={c.panel}>{head('Penalty stroke')}
             <View style={c.row}>
-              <Button label="Scored" color={color(sd)} style={c.flex} onPress={() => (asksWho(onField(sd)) ? setFlow({ mode: 'goal', side: sd, step: 'scorer', goalType: 'stroke', ...(flow.pc ? { pc: flow.pc } : {}) }) : goal(sd, 'stroke', null, null, flow.pc))} />
+              <Button variant="primary" label="Scored" color={color(sd)} style={c.flex} onPress={() => (asksWho(onField(sd)) ? setFlow({ mode: 'goal', side: sd, step: 'scorer', goalType: 'stroke', ...(flow.pc ? { pc: flow.pc } : {}) }) : goal(sd, 'stroke', null, null, flow.pc))} />
               <Button label="Saved" variant="ghost" style={c.flex} onPress={() => (asksWho(onField(sd)) ? setFlow({ ...flow, outcome: 'saved', step: 'player' }) : stroke(sd, 'saved', null, flow.pc))} />
               <Button label="Missed" variant="ghost" style={c.flex} onPress={() => (asksWho(onField(sd)) ? setFlow({ ...flow, outcome: 'missed', step: 'player' }) : stroke(sd, 'missed', null, flow.pc))} />
             </View>
@@ -497,7 +497,7 @@ const ScoringControls: SportPlugin<HockeyState>['ScoringControls'] = ({
     return (
       <View key={sd} style={c.col}>
         <Text style={[c.team, { color: color(sd) }]} numberOfLines={1}>{name(sd)}</Text>
-        <Button label="🏑 Goal" color={color(sd)} onPress={() => setFlow({ mode: 'goal', side: sd, step: 'type' })} />
+        <Button variant="primary" label="🏑 Goal" color={color(sd)} onPress={() => setFlow({ mode: 'goal', side: sd, step: 'type' })} />
         {s.penaltyCorners ? (
           <Button label="🚩 PC" accessibilityLabel="Penalty corner" variant="ghost" onPress={() => { const id = uid(); fire({ type: 'PC', side: sd, payload: { uid: id } }); setPcOpen({ side: sd, id }); }} />
         ) : null}
@@ -551,7 +551,7 @@ const ScoringControls: SportPlugin<HockeyState>['ScoringControls'] = ({
         {setting ? (
           <View style={c.row}>
             <View style={c.flex}><TextField label="Time left (mm:ss)" value={clockText} onChange={setClockText} placeholder={clockFace(s, now)} /></View>
-            <Button label="Set" onPress={applyClock} />
+            <Button variant="primary" label="Set" onPress={applyClock} />
           </View>
         ) : null}
         {/* (the suspension banner sits in the board above, with the clock) */}
@@ -563,7 +563,7 @@ const ScoringControls: SportPlugin<HockeyState>['ScoringControls'] = ({
           return (
             <View style={c.stopped} accessibilityRole="alert">
               <Text style={c.stoppedTxt}>⏸ Clock stopped{why}</Text>
-              <Button label="▶ Resume" onPress={startStop} />
+              <Button variant="primary" label="▶ Resume" onPress={startStop} />
             </View>
           );
         })() : null}
@@ -616,7 +616,7 @@ const ScoringControls: SportPlugin<HockeyState>['ScoringControls'] = ({
             </View>
             <Text style={c.small}>How did it end?</Text>
             <View style={c.row}>
-              <Button label="🏑 Goal" color={color(sd)} style={c.flex} onPress={() => setFlow({ mode: 'goal', side: sd, step: 'scorer', goalType: 'pc', pc: id })} />
+              <Button variant="primary" label="🏑 Goal" color={color(sd)} style={c.flex} onPress={() => setFlow({ mode: 'goal', side: sd, step: 'scorer', goalType: 'pc', pc: id })} />
               <Button label="🧤 Saved" variant="ghost" style={c.flex} onPress={() => (asksWho(onField(sd)) ? setFlow({ mode: 'shot', side: sd, step: 'player', onGoal: true, pc: id }) : shot(sd, true, null, id))} />
             </View>
             <View style={c.row}>

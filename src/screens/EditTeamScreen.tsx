@@ -128,7 +128,7 @@ export default function EditTeamScreen() {
         footer={(
           <>
             <FormError message={error} />
-            <Button label={busy ? 'Saving…' : 'Save'} onPress={save} disabled={busy} />
+            <Button variant="primary" label={busy ? 'Saving…' : 'Save'} onPress={save} disabled={busy} />
           </>
         )}
       >

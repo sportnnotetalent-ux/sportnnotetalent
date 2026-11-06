@@ -188,7 +188,7 @@ export function ArcheryEventSetup({ tournamentId, preloaded, carried }: { tourna
         footer={(
           <>
             <FormError message={error} />
-            <Button label={busy ? 'Creating…' : 'Create event & start list'} onPress={() => void create()} disabled={busy || !entrants} />
+            <Button variant="primary" label={busy ? 'Creating…' : 'Create event & start list'} onPress={() => void create()} disabled={busy || !entrants} />
           </>
         )}
       >

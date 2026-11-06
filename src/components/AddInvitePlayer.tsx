@@ -275,7 +275,7 @@ export function AddInvitePlayer({
           )}
 
           {(valid || (isEmail && matched)) && !looking && !(matched && (matchedReported || existingIds.includes(matched.id))) && (
-            <Button
+            <Button variant="primary"
               label={busy ? 'Adding…' : matched ? `＋ Add ${realName(matched.fullName) || 'them'} to ${teamName}` : (waFirst ? '＋ Add & invite (WhatsApp / SMS)' : '＋ Add & invite (SMS / WhatsApp)')}
               onPress={() => void submit()}
               disabled={busy}

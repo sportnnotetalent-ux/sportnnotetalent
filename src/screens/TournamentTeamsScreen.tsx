@@ -477,7 +477,7 @@ export default function TournamentTeamsScreen() {
         footer={(
           <>
             <FormError message={error} />
-            <Button
+            <Button variant="primary"
               label={busy ? 'Saving…' : !dirty ? 'Done' : entryMode === 'invited' ? 'Send invites & save' : `Save ${selected.length} participant${selected.length === 1 ? '' : 's'}`}
               onPress={save}
               disabled={busy}

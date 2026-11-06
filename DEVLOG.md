@@ -25,6 +25,22 @@ auth-smoke passed. Published from a clean worktree at 9c758015 (the tip; the com
 
 Founder: rename the Matches views from Playing / Running to **Player** / **Organizer**. A game you play in and also host stays under Player only, and its card now says "You're hosting" (`VIEW_LABEL`, `hostingNote` in `src/core/myMatches.ts`; MatchesScreen). The internal keys didn't change. Tests: matches-tab-playing 4 new (MM9–MM12), 14 pass with the sim; tsc clean. Not checked in the demo yet. Open: the founder's Player view is empty. Live data shows hosts on their own rosters, so the next step is to check the founder's own account. No database change.
 
+### 2026-11-06 — Reference-video quick wins + silent launch animation (not yet published)
+
+The founder approved the quick wins (B1, B2, B5, B8, C1, C2, C4) and A1 from `docs/design/reference-video/README.md`. Break-it list: `docs/security/breaks/quick-wins-reference.md` (QW1–QW20).
+- **Lime only when asked:** `Button` defaults to outline. The scoring pads name their variant (121, look unchanged). Each screen's main action is lime explicitly (100 in all). A test caps lime per screen.
+- **One title:** `ScreenTitle` hides under a visible header and keeps the subtitle. Adds `@react-navigation/elements` pinned at 2.9.23, the navigators' copy.
+- **Empty states:** a thin grey icon plus an optional main button and text link. The empty tournament Matches tab offers "Make fixtures automatically" and "Add one match"; the Teams tab offers "Add teams or invite captains". Both are for organisers only.
+- **Your teams first:** match setup lists "Your teams" and "Played before" (your own games, this sport, up to 6, with player count) before you type (`core/teamSuggestions`).
+- **Two endings:** a friendly ends with "Save for later" or "Start now" (`core/matchEnding`).
+- **Thin icons:** stroke 1.75.
+- **Launch animation:** the S:N colon dots tick, the wordmark slides in, a lime line sweeps, then it fades. 1.9 s once, 0.6 s after, a fade for reduced motion, never on the overlay or shared links on the web.
+  - Phones run it on one native-driven value and the web as CSS keyframes, so the app's start-up can't stall it. The first JS-driven build ran about 5× slow on the web, which I caught in the demo.
+  - It never takes touches, and a hard stop is at 4.5 s.
+  - Silent: the voice and the native splash wait for the next app build.
+
+Tests: quick-wins-reference 25, sim-team-suggestions (600 users), football-single-period updated. Full suite 7,556 pass, 0 fail; tsc clean. Demo checked: the animation was frozen at five moments and measured; friendly setup (one title, Played before, two endings); the empty Matches and Teams tabs; the teams screen (one lime); the kabaddi scoring pad (unchanged). No database change.
+
 ### 2026-11-06 — Release: restore the full app (web, Android OTA)
 
 On 2026-11-05 at about 14:40 IST, web (`index-760cdca2`) and Android OTA (`40f06649` / `5e9eb268`) were published from side branch `pub/lockdown` (ae19a650: the anti-scraping commit on top of 882ebe98). That rolled back UI audit steps 1–7, round 5 (fixture generator, Stats, Awards), stat leaders and the iPad column. Found on 2026-11-06 by checking the live bundle (old fixture generator, no iPad code). The founder approved the republish. auth-smoke passed. Published from a clean worktree at the tip cbe5747e. The tip has the same anti-scraping code as ae19a650; only `RootNavigator` differs, because it also carries the iPad lines. Web `index-e88cfb8a` is confirmed live: it has the iPad column, "Show other teams" and the `x-share` header. The first deploy hit a temporary hosting error, and the retry used the same build. Android OTA: `28e42ed2` (preview) / `d90bdbd9` (production). The anti-scraping SQL (`20261110120000_signed_out_scope.sql`) has still not been run; checked read-only, the `share_*` functions are absent. No database change.

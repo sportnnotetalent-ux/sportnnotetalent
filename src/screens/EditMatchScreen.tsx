@@ -149,7 +149,7 @@ export default function EditMatchScreen() {
             <ConflictNotice conflicts={conflicts} />
 
             <FormError message={error} />
-            <Button label={busy ? 'Saving…' : 'Save new date & venue'} onPress={saveSchedule} disabled={busy} />
+            <Button variant="primary" label={busy ? 'Saving…' : 'Save new date & venue'} onPress={saveSchedule} disabled={busy} />
 
             <FieldLabel>Status</FieldLabel>
             <View style={st.statusRow}>

@@ -154,7 +154,7 @@ export function CombinedEventSetup({ tournamentId, preloaded, carried }: { tourn
         footer={(
           <>
             <FormError message={error} />
-            <Button label={busy ? 'Creating…' : `Create ${label.toLowerCase()} & first start list`} onPress={() => void create()} disabled={busy || !picks.length || events.length < 2} />
+            <Button variant="primary" label={busy ? 'Creating…' : `Create ${label.toLowerCase()} & first start list`} onPress={() => void create()} disabled={busy || !picks.length || events.length < 2} />
           </>
         )}
       >

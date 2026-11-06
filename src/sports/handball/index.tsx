@@ -335,8 +335,8 @@ const ScoringControls: SportPlugin<HandballState>['ScoringControls'] = ({
                 <Text style={c.meta}>5 each and still level — one throw each until decided. Who throws first?</Text>
                 <Text style={c.meta}>Pick the order the referees give (it can stay the same or change).</Text>
                 <View style={c.row}>
-                  <Button label={`${homeName} first`} color={color('home')} style={c.flex} onPress={() => dispatch({ type: 'SO_ORDER', payload: { first: 'home' } })} />
-                  <Button label={`${awayName} first`} color={color('away')} style={c.flex} onPress={() => dispatch({ type: 'SO_ORDER', payload: { first: 'away' } })} />
+                  <Button variant="primary" label={`${homeName} first`} color={color('home')} style={c.flex} onPress={() => dispatch({ type: 'SO_ORDER', payload: { first: 'home' } })} />
+                  <Button variant="primary" label={`${awayName} first`} color={color('away')} style={c.flex} onPress={() => dispatch({ type: 'SO_ORDER', payload: { first: 'away' } })} />
                 </View>
               </>
             ) : (
@@ -347,7 +347,7 @@ const ScoringControls: SportPlugin<HandballState>['ScoringControls'] = ({
                 {soTaker ? <Text style={c.meta}>Thrower: {soTaker.fullName}</Text> : null}
                 {keeper(opp(nextSide)) ? <Text style={c.meta}>🧤 Keeper: {keeper(opp(nextSide))!.fullName}</Text> : null}
                 <View style={c.row}>
-                  <Button label="✓ Scored" color={color(nextSide)} style={c.flex} onPress={() => soThrow(nextSide, 'scored')} />
+                  <Button variant="primary" label="✓ Scored" color={color(nextSide)} style={c.flex} onPress={() => soThrow(nextSide, 'scored')} />
                   <Button label="🧤 Saved" variant="ghost" style={c.flex} onPress={() => soThrow(nextSide, 'saved')} />
                   <Button label="✗ Missed" variant="ghost" style={c.flex} onPress={() => soThrow(nextSide, 'missed')} />
                 </View>
@@ -367,8 +367,8 @@ const ScoringControls: SportPlugin<HandballState>['ScoringControls'] = ({
               <Text style={c.h}>🪙 Who throws first?</Text>
               <Text style={c.meta}>After the referees’ toss (or however they decide) — pick the team going first.</Text>
               <View style={c.row}>
-                <Button label={`${homeName} first`} color={color('home')} style={c.flex} onPress={() => dispatch({ type: 'START_SHOOTOUT', payload: { first: 'home' } })} />
-                <Button label={`${awayName} first`} color={color('away')} style={c.flex} onPress={() => dispatch({ type: 'START_SHOOTOUT', payload: { first: 'away' } })} />
+                <Button variant="primary" label={`${homeName} first`} color={color('home')} style={c.flex} onPress={() => dispatch({ type: 'START_SHOOTOUT', payload: { first: 'home' } })} />
+                <Button variant="primary" label={`${awayName} first`} color={color('away')} style={c.flex} onPress={() => dispatch({ type: 'START_SHOOTOUT', payload: { first: 'away' } })} />
               </View>
             </>
           ) : (
@@ -470,7 +470,7 @@ const ScoringControls: SportPlugin<HandballState>['ScoringControls'] = ({
               </>
             ) : null}
             <View style={c.row}>
-              <Button label="✓ Scored" color={color(sd)} style={c.flex} onPress={() => sevenResult(sd, flow.by, { mode: 'goal', side: sd, step: 'scorer', shotType: 'sevenM' }, flow.cause)} />
+              <Button variant="primary" label="✓ Scored" color={color(sd)} style={c.flex} onPress={() => sevenResult(sd, flow.by, { mode: 'goal', side: sd, step: 'scorer', shotType: 'sevenM' }, flow.cause)} />
               <Button label="🧤 Saved" variant="ghost" style={c.flex} onPress={() => sevenResult(sd, flow.by, { ...flow, by: undefined, cause: undefined, result: 'saved', step: 'player' }, flow.cause)} />
               <Button label="✗ Missed" variant="ghost" style={c.flex} onPress={() => sevenResult(sd, flow.by, { ...flow, by: undefined, cause: undefined, result: 'missed', step: 'player' }, flow.cause)} />
             </View>
@@ -580,7 +580,7 @@ const ScoringControls: SportPlugin<HandballState>['ScoringControls'] = ({
     return (
       <View key={sd} style={c.col}>
         <Text style={[c.team, { color: color(sd) }]} numberOfLines={1}>{name(sd)}</Text>
-        <Button label="🥅 Goal" color={color(sd)} onPress={() => setFlow({ mode: 'goal', side: sd, step: 'type' })} />
+        <Button variant="primary" label="🥅 Goal" color={color(sd)} onPress={() => setFlow({ mode: 'goal', side: sd, step: 'type' })} />
         <Button label="🎯 7 m" accessibilityLabel="7-metre throw" variant="ghost" onPress={() => setFlow({ mode: 'seven', side: sd, step: 'result' })} />
         <Button label="🎯 Shot" accessibilityLabel="Shot without a goal" variant="ghost" onPress={() => setFlow({ mode: 'shot', side: sd, step: 'type' })} />
         <Button label="⚠️ Turnover" variant="ghost" onPress={() => setFlow({ mode: 'turnover', side: sd, step: 'kind' })} />
@@ -630,7 +630,7 @@ const ScoringControls: SportPlugin<HandballState>['ScoringControls'] = ({
         {setting ? (
           <View style={c.row}>
             <View style={c.flex}><TextField label="Match clock (mm:ss)" value={clockInput} onChange={setClockInput} placeholder={clockFace(s, now)} /></View>
-            <Button label="Set" onPress={applyClock} />
+            <Button variant="primary" label="Set" onPress={applyClock} />
           </View>
         ) : null}
         {periodSec(s, now) >= periodLen(s, s.period) && running(s) ? <Text style={c.short}>Time is up — finish any 7 m or free throw, then end the half.</Text> : null}
@@ -640,7 +640,7 @@ const ScoringControls: SportPlugin<HandballState>['ScoringControls'] = ({
           return (
             <View style={c.stopped} accessibilityRole="alert">
               <Text style={c.stoppedTxt}>⏸ Clock stopped{why}</Text>
-              <Button label="▶ Resume" onPress={startStop} />
+              <Button variant="primary" label="▶ Resume" onPress={startStop} />
             </View>
           );
         })() : null}

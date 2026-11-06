@@ -50,7 +50,7 @@ export function CricketShareCard({ state, homeName, awayName, matchId, tournamen
       <View style={st.preview}>
         <Text style={st.previewText} selectable>{previewText(text)}</Text>
       </View>
-      <Button label="Share on WhatsApp / chat" onPress={() => void shareMessage(text, 'match')} />
+      <Button variant="primary" label="Share on WhatsApp / chat" onPress={() => void shareMessage(text, 'match')} />
     </View>
   );
 }

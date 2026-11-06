@@ -288,7 +288,7 @@ export default function SquadSessionScreen() {
           {sport ? <GameSettingsCard sport={sport} value={draftFormat} busy={busy} onChange={setDraftFormat} /> : null}
           {n < draftRules.teams ? <Text style={textStyles.muted}>Tick at least {draftRules.teams} players for {draftRules.teams} teams.</Text> : null}
           <FormError message={error} />
-          <Button label={busy ? 'Starting…' : 'Start session'} disabled={!canStart || busy}
+          <Button variant="primary" label={busy ? 'Starting…' : 'Start session'} disabled={!canStart || busy}
             onPress={() => act(() => createSquadSession({ sport: sport!, name: title, players: [...here], rules: draftRules, clubId: activeClub, format: draftFormat }), (s) => {
               setSession(s); setSessionId(s.id); nav.setParams({ sessionId: s.id, clubId: undefined });
             })} />
@@ -419,7 +419,7 @@ export default function SquadSessionScreen() {
                     <Text style={textStyles.muted}>Sitting out: {sittingOut(s.teamIds.length, next).map(teamName).join(', ')}</Text>
                   ) : null}
                   {amIn ? (
-                    <Button label={busy ? 'Starting…' : '▶ Start game'} disabled={busy}
+                    <Button variant="primary" label={busy ? 'Starting…' : '▶ Start game'} disabled={busy}
                       onPress={() => act(() => startNextGame(s, next.home, next.away), async () => {
                         const r = await getSquadSession(s.id);
                         if (r) { setSession(r.session); setGames(r.games); const g = r.games.find((x) => x.status === 'scheduled'); if (g) openMatch(g, true); }

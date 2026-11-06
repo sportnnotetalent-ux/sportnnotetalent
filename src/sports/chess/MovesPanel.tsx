@@ -94,7 +94,7 @@ export function MovesPanel({ state: s, dispatch, nameOf, after = false, koGame }
           placeholder="⏱ Clock after this move (optional · 1:23:05 or 4:07)" placeholderTextColor={theme.colors.textMuted} accessibilityLabel="Clock left after this move" />
       ) : null}
       <View style={st.row}>
-        <Button label={paste ? (n ? 'Replace the moves…' : 'Save the moves') : 'Add move'} style={{ flex: 1 }} disabled={!ok} onPress={() => void save()} />
+        <Button variant="primary" label={paste ? (n ? 'Replace the moves…' : 'Save the moves') : 'Add move'} style={{ flex: 1 }} disabled={!ok} onPress={() => void save()} />
         {!paste && n ? <Button label="⌫ Last move" variant="ghost" onPress={() => dispatch({ type: 'MOVES', payload: { drop: 1, ...target } })} /> : null}
       </View>
       {!after ? (
@@ -107,7 +107,7 @@ export function MovesPanel({ state: s, dispatch, nameOf, after = false, koGame }
         <View style={st.row}>
           <TextInput style={[st.input, { flex: 1 }, eco && !ecoCode(eco) ? st.bad : null]} value={eco} onChangeText={(t) => setEco(t.toUpperCase().slice(0, 3))}
             placeholder="ECO, e.g. B90" placeholderTextColor={theme.colors.textMuted} autoCapitalize="characters" accessibilityLabel="Opening ECO code" />
-          <Button label="Set" disabled={!ecoCode(eco)} onPress={() => { dispatch({ type: 'OPENING', payload: { eco: ecoCode(eco), ...target } }); setEcoOpen(false); setEco(''); }} />
+          <Button variant="primary" label="Set" disabled={!ecoCode(eco)} onPress={() => { dispatch({ type: 'OPENING', payload: { eco: ecoCode(eco), ...target } }); setEcoOpen(false); setEco(''); }} />
           {opening?.manual ? <Button label="Clear" variant="ghost" onPress={() => { dispatch({ type: 'OPENING', payload: { ...target } }); setEcoOpen(false); }} /> : null}
         </View>
       ) : (

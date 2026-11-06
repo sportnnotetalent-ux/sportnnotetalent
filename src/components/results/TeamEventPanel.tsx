@@ -230,7 +230,7 @@ export function ShootMatchCard({ entries, discipline, editable, onSave }: { entr
                 <Text style={[st.memberName, { width: 84 }]} numberOfLines={1}>{first(eb.name)}</Text>
                 <TextInput style={[st.input, { flex: 1 }]} value={tb} onChangeText={setTb} placeholder={scoring === 'decimal' ? '10.1 10.6' : '10 10'} placeholderTextColor={theme.colors.textMuted} keyboardType="numbers-and-punctuation" accessibilityLabel={`${eb.name}: both shots`} onSubmitEditing={save} />
               </View>
-              <Button label={shoot ? 'Save shoot-off shots' : `Save series ${out.series.length + 1}`} onPress={save} />
+              <Button variant="primary" label={shoot ? 'Save shoot-off shots' : `Save series ${out.series.length + 1}`} onPress={save} />
             </>
           )}
           {err ? <Text style={st.bad}>{err}</Text> : null}

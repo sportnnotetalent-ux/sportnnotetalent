@@ -1034,7 +1034,7 @@ export default function GenerateFixturesScreen() {
                   <DateTimeField label={d.stage === 'super' ? `Super · Round ${d.round}` : d.stage && d.stage !== 'group' ? STAGE_LABEL[d.stage] ?? stageLabel(d.stage) : `${d.group ? `Group ${d.group} · ` : ''}Round ${d.round}`} value={d.when} timeZone={tournament?.timeZone} onChange={(w) => setDrafts((ds) => (ds ? ds.map((x, ix) => (ix === i ? { ...x, when: w } : x)) : ds))} />
                 </View>
               ))}
-              <Button label={busy ? 'Creating…' : `✅ Create ${drafts.length} match${drafts.length === 1 ? '' : 'es'}`} onPress={create} disabled={busy} />
+              <Button variant="primary" label={busy ? 'Creating…' : `✅ Create ${drafts.length} match${drafts.length === 1 ? '' : 'es'}`} onPress={create} disabled={busy} />
             </View>
           )
         )}

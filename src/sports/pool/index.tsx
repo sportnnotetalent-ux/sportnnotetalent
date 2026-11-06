@@ -222,7 +222,7 @@ const ScoringControls: SportPlugin<PoolMatch>['ScoringControls'] = ({ state, dis
         <Text style={ctrl.label}>Balls in on the break <Text style={ctrl.meta}>(tap each · none = a dry break)</Text></Text>
         {ballChips(p.balls, s.game === 'eight' ? 8 : s.game === 'nine' ? 9 : 10)}
         <View style={ctrl.row}>
-          <Button label={dry ? 'Dry break (nothing in)' : `✓ Break · ${ballsText(sel)} in`} style={ctrl.flex} disabled={!brk}
+          <Button variant="primary" label={dry ? 'Dry break (nothing in)' : `✓ Break · ${ballsText(sel)} in`} style={ctrl.flex} disabled={!brk}
             onPress={() => brk && void send(breakAction(s, { pots: sel, side: brk }, o))} />
         </View>
         <View style={ctrl.row}>

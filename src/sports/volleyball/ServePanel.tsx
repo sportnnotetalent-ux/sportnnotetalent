@@ -196,7 +196,7 @@ function RotationPicker({ info, size, six, setNo, midSet, current, carried, libe
         </>
       )}
       <View style={css.row}>
-        <Button label={`✓ Save rotation${order.length < n ? ` (${order.length}/${n})` : ''}`} style={{ flex: 1 }} disabled={order.length < n || n === 0}
+        <Button variant="primary" label={`✓ Save rotation${order.length < n ? ` (${order.length}/${n})` : ''}`} style={{ flex: 1 }} disabled={order.length < n || n === 0}
           onPress={() => onSave(order.map((id) => cp(byId(id)!)), six ? libs.map((id) => cp(byId(id)!)) : [])} />
         <Button label="Cancel" variant="ghost" onPress={onCancel} />
       </View>

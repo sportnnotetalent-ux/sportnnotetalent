@@ -180,7 +180,7 @@ export default function CricketLineupScreen() {
           </Text>
         )}
 
-        <Button label={busy ? 'Saving…' : 'Save batting order'} onPress={save} style={{ marginTop: theme.spacing(2) }} />
+        <Button variant="primary" label={busy ? 'Saving…' : 'Save batting order'} onPress={save} style={{ marginTop: theme.spacing(2) }} />
       </KeyboardAwareScrollView>
     </SafeAreaView>
   );

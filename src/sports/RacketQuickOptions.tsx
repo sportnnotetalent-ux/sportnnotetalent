@@ -177,7 +177,7 @@ export function makeRacketQuickOptions(sport: RacketSport, h: RacketQuickHelpers
             ))}
           </View>
           {kind !== 'timeout' ? playerChips : null}
-          <Button label={`${TIMEOUT_ICON[kind]} Start ${TIMEOUT_LABEL[kind].toLowerCase()}`} disabled={!side || left(side) === 0} onPress={start} />
+          <Button variant="primary" label={`${TIMEOUT_ICON[kind]} Start ${TIMEOUT_LABEL[kind].toLowerCase()}`} disabled={!side || left(side) === 0} onPress={start} />
         </View>
       );
     };
@@ -187,7 +187,7 @@ export function makeRacketQuickOptions(sport: RacketSport, h: RacketQuickHelpers
       <View style={st.panel}>
         <Text style={textStyles.muted}>The rally is replayed: no point. Who asked (optional)?</Text>
         {sideChips}
-        <Button label="🔁 Record a let" onPress={() => { dispatch({ type: 'LET', ...(side ? { side } : {}) }); onDone(`🔁 Let${side ? ` · ${nameOf(side)}` : ''}`); }} />
+        <Button variant="primary" label="🔁 Record a let" onPress={() => { dispatch({ type: 'LET', ...(side ? { side } : {}) }); onDone(`🔁 Let${side ? ` · ${nameOf(side)}` : ''}`); }} />
       </View>
     );
     const reviewPanel = () => {
@@ -205,8 +205,8 @@ export function makeRacketQuickOptions(sport: RacketSport, h: RacketQuickHelpers
           {playerChips}
           {out ? <Text style={st.effect}>Their review for this game is used.</Text> : null}
           <View style={st.chips}>
-            <Button label="✅ Upheld" disabled={!side} onPress={() => review(true)} />
-            <Button label="❌ Not upheld" disabled={!side || out} onPress={() => review(false)} />
+            <Button variant="primary" label="✅ Upheld" disabled={!side} onPress={() => review(true)} />
+            <Button variant="primary" label="❌ Not upheld" disabled={!side || out} onPress={() => review(false)} />
           </View>
         </View>
       );
@@ -217,7 +217,7 @@ export function makeRacketQuickOptions(sport: RacketSport, h: RacketQuickHelpers
       <View style={st.panel}>
         <Text style={textStyles.muted}>BWF Law 16.2.1: the shuttle is changed only with the umpire’s consent. No point. Who asked (optional)?</Text>
         {sideChips}
-        <Button label="🏸 Record a shuttle change" onPress={() => { dispatch({ type: 'SHUTTLE', ...(side ? { side } : {}) }); onDone(`🏸 Shuttle change${side ? ` · ${nameOf(side)}` : ''}`); }} />
+        <Button variant="primary" label="🏸 Record a shuttle change" onPress={() => { dispatch({ type: 'SHUTTLE', ...(side ? { side } : {}) }); onDone(`🏸 Shuttle change${side ? ` · ${nameOf(side)}` : ''}`); }} />
       </View>
     );
     const injuryPanel = () => {
@@ -238,7 +238,7 @@ export function makeRacketQuickOptions(sport: RacketSport, h: RacketQuickHelpers
             ))}
           </View>
           {c ? <Text style={st.effect}>Up to {c.time}: {c.note}.</Text> : null}
-          <Button label="🩹 Record the injury" disabled={!side || !cat} onPress={record} />
+          <Button variant="primary" label="🩹 Record the injury" disabled={!side || !cat} onPress={record} />
         </View>
       );
     };
@@ -258,7 +258,7 @@ export function makeRacketQuickOptions(sport: RacketSport, h: RacketQuickHelpers
               <Text style={st.effect}>{inRally ? 'The rally is replayed: the player who served it serves.' : 'The receiver of the last rally serves next.'}</Text>
             </>
           )}
-          <Button label="⏩ Start expedite" disabled={!ok} onPress={() => { dispatch({ type: 'EXPEDITE', payload: inRally ? { rally: true } : {} }); onDone('⏩ Expedite system'); }} />
+          <Button variant="primary" label="⏩ Start expedite" disabled={!ok} onPress={() => { dispatch({ type: 'EXPEDITE', payload: inRally ? { rally: true } : {} }); onDone('⏩ Expedite system'); }} />
         </View>
       );
     };

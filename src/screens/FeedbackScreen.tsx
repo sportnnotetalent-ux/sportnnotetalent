@@ -77,7 +77,7 @@ export default function FeedbackScreen() {
         footer={(
           <>
             <FormError message={error} />
-            <Button label={busy ? 'Sending…' : 'Send'} onPress={() => void send()} disabled={busy} />
+            <Button variant="primary" label={busy ? 'Sending…' : 'Send'} onPress={() => void send()} disabled={busy} />
           </>
         )}
       >

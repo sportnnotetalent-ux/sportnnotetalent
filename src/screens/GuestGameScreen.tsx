@@ -64,7 +64,7 @@ export default function GuestGameScreen() {
 
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
-      <KeyboardFooterLayout safeBottom={false} footer={<Button label="Start scoring" onPress={() => void start()} />}>
+      <KeyboardFooterLayout safeBottom={false} footer={<Button variant="primary" label="Start scoring" onPress={() => void start()} />}>
         <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
           <ScreenTitle title="Score a game" subtitle="No sign-up needed to start. Sign up when you want to share the live link." />
           <View style={st.block}>

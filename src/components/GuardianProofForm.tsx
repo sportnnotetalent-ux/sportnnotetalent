@@ -87,7 +87,7 @@ export function GuardianProofForm({ code, childProfileId, childFirstName, dob, o
 
       <IconText label="🔒 Only SportnNote’s reviewers see these documents. They’re deleted 30 days after the check, and we never keep ID numbers." style={textStyles.muted} />
       <FormError message={error} />
-      <Button label={busy ? 'Sending…' : 'Send for checking'} onPress={() => void send()} disabled={busy} />
+      <Button variant="primary" label={busy ? 'Sending…' : 'Send for checking'} onPress={() => void send()} disabled={busy} />
       <Text style={textStyles.muted}>{REVIEW_PROMISE} You and {childFirstName} will be told. By sending, you confirm you are {childFirstName}’s parent or legal guardian and agree to the Terms of Use and Privacy Policy on their behalf.</Text>
     </View>
   );

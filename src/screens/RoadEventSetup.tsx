@@ -196,7 +196,7 @@ export function RoadEventSetup({ tournamentId, preloaded, carried }: { tournamen
         footer={(
           <>
             <FormError message={error} />
-            <Button label={busy ? 'Creating…' : 'Create race & start list'} onPress={() => void create()} disabled={busy || !n} />
+            <Button variant="primary" label={busy ? 'Creating…' : 'Create race & start list'} onPress={() => void create()} disabled={busy || !n} />
           </>
         )}
       >

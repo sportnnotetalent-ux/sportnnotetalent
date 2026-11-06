@@ -71,7 +71,7 @@ export default function OrgConfirmScreen() {
             <Text style={textStyles.body}>Is this person authorised by the {noun} to do this?</Text>
             <TextField label="Your name" value={name} onChange={setName} placeholder={`As ${cfg.head}`} autoCapitalize="words" />
             <FormError message={error} />
-            <Button label={busy ? 'Saving…' : '✓ Yes, they’re authorised'} onPress={() => void decide(true)} disabled={busy} />
+            <Button variant="primary" label={busy ? 'Saving…' : '✓ Yes, they’re authorised'} onPress={() => void decide(true)} disabled={busy} />
             <Button label="No, I don’t know them" variant="ghost" onPress={() => void decide(false)} disabled={busy} />
           </Card>
         ) : (

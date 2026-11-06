@@ -435,8 +435,8 @@ function MatchScorer({ m, rounds, entries, fmt, editable, onSave, match, spec, m
           {credit && idx != null ? <Text style={st.hint}>Each archer’s {PER} arrows in turn — they count for the team and for the archer’s own team-match average.</Text> : null}
           <Keypad onKey={key} onBack={back} minRing={minRing} />
           {idx != null
-            ? <Button label={busy ? 'Saving…' : `Save end ${idx + 1}${bufA.length === MATCH_ARROWS && bufB.length === MATCH_ARROWS ? ` (${endSum(bufA)}–${endSum(bufB)})` : ''}`} onPress={() => void saveEnd()} disabled={busy} />
-            : <Button label={busy ? 'Saving…' : 'Save shoot-off arrows'} onPress={() => void saveSo()} disabled={busy} />}
+            ? <Button variant="primary" label={busy ? 'Saving…' : `Save end ${idx + 1}${bufA.length === MATCH_ARROWS && bufB.length === MATCH_ARROWS ? ` (${endSum(bufA)}–${endSum(bufB)})` : ''}`} onPress={() => void saveEnd()} disabled={busy} />
+            : <Button variant="primary" label={busy ? 'Saving…' : 'Save shoot-off arrows'} onPress={() => void saveSo()} disabled={busy} />}
           {edit != null && <SelectChip label="Cancel correction" active={false} onPress={() => { setEdit(null); setBufA([]); setBufB([]); }} />}
           <Text style={st.hint}>{idx != null ? `Tap the arrows for one ${SO > 1 ? 'team' : 'archer'}, then the other. Tap an end above to correct it.` : SO > 1 ? 'The higher total wins; if level, the judge says which team’s arrow is closest to the centre.' : 'The higher arrow wins; if both score the same, the judge says which arrow is closer to the centre.'}</Text>
         </View>

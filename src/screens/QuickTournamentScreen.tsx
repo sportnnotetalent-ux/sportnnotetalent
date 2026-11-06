@@ -218,7 +218,7 @@ export default function QuickTournamentScreen() {
         footer={(
           <>
             <FormError message={error} />
-            <Button label={busy ?? 'Create & make fixtures'} onPress={create} disabled={!!busy} />
+            <Button variant="primary" label={busy ?? 'Create & make fixtures'} onPress={create} disabled={!!busy} />
           </>
         )}
       >

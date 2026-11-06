@@ -96,7 +96,7 @@ export default function SchoolRequestScreen() {
             <FormError message={error} />
             <View style={st.row}>
               <Button label="No" variant="ghost" style={st.flex} onPress={() => void decide(false)} disabled={busy} />
-              <Button label={busy ? 'Saving…' : adult ? 'Yes, add me' : 'Yes, add them'} style={st.flex} onPress={() => void decide(true)} disabled={busy} />
+              <Button variant="primary" label={busy ? 'Saving…' : adult ? 'Yes, add me' : 'Yes, add them'} style={st.flex} onPress={() => void decide(true)} disabled={busy} />
             </View>
             {!adult ? <Text style={textStyles.muted}>By agreeing you confirm you are {child}’s parent or legal guardian.</Text> : null}
           </>
