@@ -58,9 +58,9 @@ function phone(id, x, y, w, h, file, top = 0, hl = null) {
   <g clip-path="url(#${id})"><rect x="${x + pad}" y="${y + pad}" width="${sw}" height="${sh}" fill="#F3F0E8"/>
     <image href="data:image/jpeg;base64,${img}" x="${x + pad}" y="${y + pad - top * k}" width="${sw}" height="${1624 * k}"/></g>
   ${ring}
-  <!-- "Demo data" sits just above the phone's top-right corner, never over the app -->
-  <rect x="${x + w - w * 0.25}" y="${y - w * 0.075}" width="${w * 0.22}" height="${w * 0.055}" rx="${w * 0.0275}" fill="#FFFFFF" fill-opacity="0.12"/>
-  <text x="${x + w - w * 0.14}" y="${y - w * 0.036}" text-anchor="middle" font-family="Helvetica Neue" font-weight="700" font-size="${w * 0.028}" fill="${SOFT}" letter-spacing="1.5">DEMO DATA</text>`;
+  <!-- "Demo data" sits just above the phone's top-left corner, never over the app or the lime ball -->
+  <rect x="${x + w * 0.03}" y="${y - w * 0.075}" width="${w * 0.22}" height="${w * 0.055}" rx="${w * 0.0275}" fill="#FFFFFF" fill-opacity="0.12"/>
+  <text x="${x + w * 0.14}" y="${y - w * 0.036}" text-anchor="middle" font-family="Helvetica Neue" font-weight="700" font-size="${w * 0.028}" fill="${SOFT}" letter-spacing="1.5">DEMO DATA</text>`;
 }
 const dots = (W, H, n) => [1, 2, 3, 4, 5].map((i) =>
   `<circle cx="${W * 0.82 + i * 26}" cy="${H * 0.945}" r="7" fill="${i === n ? BRAND.lime : '#FFFFFF'}" fill-opacity="${i === n ? 1 : 0.3}"/>`).join('');
@@ -74,6 +74,14 @@ POSTS.push(['2026-11-11-linkedin-scoreboard.png', 1200, 1200, (W, H) =>
   headline(W * 0.535, H * 0.33, W * 0.086, [[['Every game']], [['deserves a']], [['scoreboard.', true]]]) +
   body(W * 0.54, H * 0.66, W * 0.03, ['Score it live on your phone.', 'Everyone follows from one link.']) +
   brand(W * 0.54, H * 0.83, W * 0.06)]);
+// Post 3 — X + Threads, 1600×900: the result and the table, side by side
+POSTS.push(['2026-11-11-x-threads-table.png', 1600, 900, (W, H) =>
+  headline(W * 0.06, H * 0.3, W * 0.058, [[['Score it.']], [['The table', true]], [['does itself.', true]]]) +
+  body(W * 0.06, H * 0.66, W * 0.019, ['Result, standings and stats —', 'no spreadsheet after the game.']) +
+  brand(W * 0.06, H * 0.82, W * 0.038) +
+  // the result page is cropped above its footer line ("Score your own game, free →"): house rule on "free"
+  phone('r', W * 0.43, H * 0.24, W * 0.25, H * 0.5, 'kabaddi-result-5-3.jpg', 0) +
+  phone('t', W * 0.71, H * 0.24, W * 0.25, H * 0.5, 'kabaddi-standings.jpg', 690, [64, 804, 620, 284])]);
 // Post 4 — Instagram carousel, 1080×1350
 const SLIDES = [
   { text: [[['Open Home, tap']], [['Score a match', true]]], shot: ['home.jpg', 0, [32, 455, 218, 215]] },

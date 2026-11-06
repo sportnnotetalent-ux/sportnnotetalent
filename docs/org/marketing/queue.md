@@ -20,6 +20,6 @@ Built by `node scripts/build-social-posts.mjs` (founder: the Canva AI designs ha
 |---|---|---|
 | 2 LinkedIn | `2026-11-11-linkedin-scoreboard.png` (1200×1200) | ready for the founder's check |
 | 4 Instagram carousel | `2026-11-12-instagram-carousel-1.png` … `-5.png` (1080×1350) | ready for the founder's check |
-| 3 X + Threads | — | needs the kabaddi result + standings screenshots |
+| 3 X + Threads | `2026-11-11-x-threads-table.png` (1600×900) | ready for the founder's check |
 | 6 Instagram + Facebook | — | needs the squad session screenshot |
 | 1, 5 videos | — | founder records (recording-checklists.md); demo games are live on the demo account |
