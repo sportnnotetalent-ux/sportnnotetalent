@@ -13,11 +13,15 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
-### 2026-11-06 — Fix: Matches "Player" view was empty for everyone (not yet published)
+### 2026-11-06 — Release: Player / Organizer views + Player view fix (web, Android OTA)
+
+auth-smoke passed. Published from a clean worktree at 9c758015 (the tip; the commit above the two changes is a design doc): web built `index-0900d8e4`; another publish of the same code landed right after, so the live index is `index-91763e5e`. Checked it holds `rosterContains` in both roster queries and the "Organizer" label. Android OTA `25341bb7` (preview) / `459dd41e` (production). No database change.
+
+### 2026-11-06 — Fix: Matches "Player" view was empty for everyone — live
 
 `teams.roster` is jsonb, but the "teams I play on" query sent `contains('roster', [pid])`, which supabase-js writes as a Postgres array (`cs.{id}`). jsonb rejects that ("invalid input syntax for type json"), so the query returned nothing and every game a person played in landed under Running / Organizer. Found from the founder's report: Hrudhay is on 9 team rosters, and his Player view was empty. Fixed by sending JSON (`src/core/rosterFilter.ts`, used by both roster "contains" queries in `repos.ts`; the second one, the quick-game side lookup, had the same fault). Checked on live data read-only: the JSON form finds his 9 teams. Tests: roster-contains 2. No database change.
 
-### 2026-11-06 — Matches: "Player" / "Organizer" views, "You're hosting" tag (not yet published)
+### 2026-11-06 — Matches: "Player" / "Organizer" views, "You're hosting" tag — live
 
 Founder: rename the Matches views from Playing / Running to **Player** / **Organizer**. A game you play in and also host stays under Player only, and its card now says "You're hosting" (`VIEW_LABEL`, `hostingNote` in `src/core/myMatches.ts`; MatchesScreen). The internal keys didn't change. Tests: matches-tab-playing 4 new (MM9–MM12), 14 pass with the sim; tsc clean. Not checked in the demo yet. Open: the founder's Player view is empty. Live data shows hosts on their own rosters, so the next step is to check the founder's own account. No database change.
 
