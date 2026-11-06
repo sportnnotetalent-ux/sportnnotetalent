@@ -14,3 +14,4 @@ Why: on 2026-11-05 two sessions published within minutes of each other, and one 
 | 2026-11-06 | start-a-friendly session | 8a836d66 (live a003c574 + fix) | index-cb8bbda2 | af154c36 / fdd92fd8 |
 | 2026-11-06 | slot-fill session | b68ced4c | index-d4c15664 | 593a1d8f / ab6d1e7a |
 | 2026-11-07 | full-time session | 9cb857de | index-d4c15664 (common 00e7ae0f) | 002325b8 / f2607216 |
+| 2026-11-07 | held-result session | fb489589 | index-894e077b | c8d07027 / cce6bf84 |

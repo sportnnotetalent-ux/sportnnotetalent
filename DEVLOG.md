@@ -13,6 +13,10 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-07 — Release: a held result finishes on the server (web, Android OTA)
+
+Founder ran `20261114120000_held_result_server.sql` — the version with fb489589 (another session’s HR7 catch: an odd winner value could have failed the every-minute job for every match). Confirmed read-only: the `held_result` column, `finish_held_results` (fixed version) and the `finish-held-results` cron job. auth-smoke passed. Published from a clean worktree at the tip fb489589: web `index-894e077b`, confirmed live; Android OTA `c8d07027` (preview) / `cce6bf84` (production).
+
 ### 2026-11-07 — A held result finishes without the scorer’s app
 
 Follow-up to the FULL TIME release (`docs/security/breaks/held-result-server.md`): the live check showed that leaving or closing the browser tab inside the ~60 s hold never landed the completed write, so the follower alert, standings and Completed waited for the scorer’s next open. Now the app saves `matches.held_result = { winner, until }` with the board while a result is held (any other open save clears it, so Undo cancels it). A server job every minute (`finish_held_results`, pg_cron) completes any live match whose hold ran out 30+ s ago — the same row change as the app’s, so the existing triggers send the alert, stamp `completed_at` and update standings. Player stat-line W/L flags still refresh on the scorer’s next open. Server: **`supabase/migrations/20261114120000_held_result_server.sql`** (founder runs). A new app on a database without the column saves without it. Tests: 7 server (PGlite), 2 client; one older wiring test updated for the extra argument; full suite 7,640 pass + that one fixed, 0 fail; tsc clean. To check live after release on the demo account (finish a game, close the tab, watch it complete within ~2 minutes).
