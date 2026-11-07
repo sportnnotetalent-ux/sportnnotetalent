@@ -24,6 +24,7 @@ Seeded 2026-11-05 from `docs/HANDOFF.md` §4, `docs/sport-expert/PLAN.md`, DEVLO
 | ENG-016 | Fit the founder's illustrations into the UI when they arrive | eng-app + Design | awaiting founder | HANDOFF §4.5; **check** vs the "no drawn sport art" decision |
 | ENG-017 | Remaining P1s in `docs/mvp/*.md` not covered by P1 batches | eng-pm | todo | **check** each audit against DEVLOG "mvp-p1-batch*" entries |
 | ENG-018 | Re-create the 08:30 morning error check under the new account, if not running | eng-director | awaiting founder | HANDOFF §6; **check** |
+| ENG-019 | Live fatal error (new 2026-11-06 20:27 IST): Android 1.0.0, Discover screen, `TypeError: Cannot read property 'icon' of undefined`, seen once, first time ever. Also: `scripts/error-triage.mjs` fails under the new account (`--linked`); the plain `--remote` read-only query works | eng-director → eng-app | todo | routed by cos 2026-11-07 from the daily error count (counts only) |
 
 ## Done (verified in DEVLOG, for reference)
 | Id | Title | Where |

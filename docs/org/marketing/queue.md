@@ -21,5 +21,9 @@ Built by `node scripts/build-social-posts.mjs` (founder: the Canva AI designs ha
 | 2 LinkedIn | `2026-11-11-linkedin-scoreboard.png` (1200×1200) | ready for the founder's check |
 | 4 Instagram carousel | `2026-11-12-instagram-carousel-1.png` … `-5.png` (1080×1350) | ready for the founder's check |
 | 3 X + Threads | `2026-11-11-x-threads-table.png` (1600×900) | ready for the founder's check |
-| 6 Instagram + Facebook | — | needs the squad session screenshot |
+| 6 Instagram + Facebook | `2026-11-14-instagram-captains-pick.png` (1080×1350) | ready for the founder's check (made 2026-11-07) |
 | 1, 5 videos | — | founder records (recording-checklists.md); demo games are live on the demo account |
+
+## Notes
+- 2026-11-07 (mkt-director): all six posts are approved and their four image posts have files ready for the founder's check. Posts 1 and 5 wait for the founder's recordings (see [recording-checklists.md](recording-checklists.md)). Nothing is posted yet; the first slot is Tue 10 Nov 19:00 IST (post 1).
+- 2026-11-07: Metricool is connected (connectors C-01) with **Facebook and Instagram** only, time zone Asia/Calcutta. LinkedIn, YouTube, X and Threads are not in it yet. Stats will be logged from Metricool (read-only) once posts are live.

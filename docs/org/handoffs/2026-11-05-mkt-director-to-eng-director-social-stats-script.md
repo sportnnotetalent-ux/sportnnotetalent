@@ -8,6 +8,8 @@ The founder wants every platform's analytics connected right away (2026-11-05). 
 
 Security writes the break-it list (token handling, read-only scopes, no personal data) — hand-off to sec-director.
 
+**Update 2026-11-07 (mkt-director):** the founder connected **Metricool** (connectors C-01) on 2026-11-05 with Facebook and Instagram; the daily run already reads it (read-only). If the founder adds LinkedIn, YouTube, X and Threads there too, this script is only needed for whatever Metricool can't read. Eng-director: hold this until the founder says which route; no work lost yet.
+
 ## Done when
 - The script runs with whichever platforms have keys, skips the rest with a clear line, never prints a key.
 - Tests pass on recorded sample responses (no live calls in tests); quality mandate followed.
