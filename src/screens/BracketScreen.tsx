@@ -30,7 +30,7 @@ import { tournamentTieSpec } from '../data/teamTie';
 import { canManageTournament } from '../core/org';
 import {
   knockoutBracket, bracketChampion, type BracketSlot, type BracketMatch, type DecideFn,
-  knockoutStageRounds, nextRoundPairs, matchWinnerId, stageChampionId, KO_STAGE_LABEL,
+  knockoutStageRounds, matchWinnerId, stageChampionId, KO_STAGE_LABEL,
   thirdPlacePair, THIRD_PLACE_STAGE, pairingWinnerId, type KnockoutPairing, isEliminationStage,
   pairingNeedsOrganiser, advanceTargetMatch, pairingAdvanceOverride,
   isDoubleChanceStage, doubleChanceNext, doubleChanceChampion, DC_STAGE_LABEL, DOUBLE_CHANCE_STAGES, type DoubleChanceStage,
@@ -38,6 +38,7 @@ import {
 } from '../data/bracket';
 import { doubleElimState, plateState, plateEntrants, plateOpeners, type DrawRound, type DrawNode, type DrawSide } from '../data/elimDraws';
 import { structureFromFormat } from '../data/structureConfig';
+import { oddRuleOf, nextRealRound } from '../data/drawRules';
 import { resolveSeries, advancePatch, type SeriesFormat } from '../data/series';
 import type { Match, SportId } from '../core/types';
 import type { RootStackParamList } from '../navigation/types';
@@ -139,7 +140,12 @@ export default function BracketScreen() {
   // The next round to create: winners of the furthest completed round, if that
   // round is done and its next stage doesn't exist yet.
   const lastRound = koRounds[koRounds.length - 1];
-  const pendingNext = useMemo(() => (lastRound ? nextRoundPairs(lastRound) : null), [lastRound]);
+  // FM19: the next round follows the organiser's odd-team rule — the same draw the fixture map shows
+  const oddRule = oddRuleOf(tournament?.formats?.[activeSport] as Record<string, unknown> | undefined);
+  const pendingNext = useMemo(
+    () => (lastRound ? nextRealRound(lastRound, oddRule, (id) => nameColor.get(id)?.name ?? id) : null),
+    [lastRound, oddRule, nameColor],
+  );
 
   // 3rd-place playoff — the two semi-final losers. Offered once both semis are
   // decided and it hasn't been created yet.
@@ -163,7 +169,7 @@ export default function BracketScreen() {
   };
 
   /** `slot` (SD-124) and `extra` (SD-125 draw keys) ride on each new match's format. */
-  async function createRound(pairs: { homeId: string; awayId: string; stage: string; slot?: number; extra?: Record<string, string | number | boolean> }[], baseTimeMs: number) {
+  async function createRound(pairs: { homeId: string; awayId: string; stage: string; slot?: number; byes?: string[]; extra?: Record<string, string | number | boolean> }[], baseTimeMs: number) {
     if (!tournamentId) return;
     setError(null); setBusy(true);
     try {
@@ -190,6 +196,7 @@ export default function BracketScreen() {
           homeTeamId: pairs[i].homeId, awayTeamId: pairs[i].awayId,
           startsAt: new Date(baseTimeMs + (i + 1) * 24 * 60 * 60 * 1000).toISOString(),
           hostIds: myId ? [myId] : [], format,
+          ...(pairs[i].byes?.length ? { byes: pairs[i].byes } : {}),
         });
       }
       setNonce((n) => n + 1);
@@ -411,6 +418,9 @@ export default function BracketScreen() {
                 disabled={busy}
               />
             )}
+            {canManage && pendingNext?.[0]?.byes?.length ? (
+              <Text style={textStyles.muted}>Straight through to the round after: {pendingNext[0].byes.map((id) => nameColor.get(id)?.name ?? id).join(', ')}</Text>
+            ) : null}
             {canManage && pendingThird && (
               <Button
                 label={busy ? 'Creating…' : '🥉 Create 3rd-place playoff'}

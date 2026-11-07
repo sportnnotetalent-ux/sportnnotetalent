@@ -30,12 +30,15 @@ import { onePerEntrant, sidesForStructure, recentPairs, searchSides, searchPeopl
 import { settlePairType, pairTypeFromDivisions } from '../sports/pairType';
 import { venueOptions } from '../data/tournamentForm';
 import { findScheduleConflicts, knownVenueNames } from '../data/scheduleConflicts';
-import { createMatch, createTeam, getMyEntrant, getMyPlayerId, setMatchScorer, getMatch, getTournaments, getMatchSquads, setMatchSquad, getEntryTeamsWith, setMatchOfficials } from '../data/repos';
+import { createMatch, createTeam, getMyEntrant, getMyPlayerId, setMatchScorer, getMatch, getTournaments, getMatchSquads, setMatchSquad, getEntryTeamsWith, setMatchOfficials, getTournamentSlotIds } from '../data/repos';
 import { pairKey, pairsFromTeams, type PairTeam } from '../core/pairs';
 import { isPairSport } from '../data/pairSport';
 import { cloneDraft } from '../data/matchHousekeeping';
 import { useAuth } from '../core/auth';
-import { KO_STAGES, KO_STAGE_LABEL, isKoStage, type KoStage } from '../data/bracket';
+import { KO_STAGES, KO_STAGE_LABEL, KO_SLOT_KEY, isKoStage, type KoStage } from '../data/bracket';
+import { buildFixtureMap, freeBoxes, sideLabel } from '../core/fixtureMap';
+import { structureFromFormat } from '../data/structureConfig';
+import { oddRuleOf, plannedTeamsOf, drawOf } from '../data/drawRules';
 import { stageAwareFormat } from '../data/matchFormat';
 import { EntrantPicker } from '../components/EntrantPicker';
 import { sideForEntrants } from '../data/entrants';
@@ -102,6 +105,8 @@ export default function ScheduleMatchScreen() {
   // Which phase this match belongs to (tournament matches only) — lets an
   // organizer hand-tag a group game or a specific knockout tie (e.g. a Final).
   const [phase, setPhase] = useState<Phase>('league');
+  // FM27/FM28 (fixture map): which free box of that round this match fills
+  const [box, setBox] = useState<number | null>(null);
   const [groupLabel, setGroupLabel] = useState('A');
   // Per-match rules — seeded from the sport's defaults so casual users can ignore it.
   const [format, setFormat] = useState<Record<string, FormatVal>>(
@@ -235,6 +240,24 @@ export default function ScheduleMatchScreen() {
   // DP11: a tournament's divisions (boys / girls / mixed) give its doubles pair type
   const divisions = useTournamentCategories(tournamentId);
   const divisionEntries = useTournamentEntries(tournamentId);
+  const [mapSlots, setMapSlots] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    let on = true;
+    if (tournamentId) getTournamentSlotIds(tournamentId).then((ids) => on && setMapSlots(ids)).catch(() => {});
+    return () => { on = false; };
+  }, [tournamentId]);
+  // The fixture map's free boxes in the chosen round (same plan as the map)
+  const freeInRound = useMemo(() => {
+    if (!tournamentId || !sport || !isKoStage(phase)) return [];
+    const fmt = (tournament?.formats?.[sport] ?? {}) as Record<string, unknown>;
+    const map = buildFixtureMap({
+      cfg: structureFromFormat(fmt), structure: tournament?.structure,
+      matches: allMatches.filter((m) => m.tournamentId === tournamentId && m.sport === sport),
+      entries: divisionEntries.filter((e) => e.status === 'confirmed' && e.team.sport === sport).map((e) => ({ id: e.team.id, name: e.team.name })),
+      slotIds: mapSlots, plannedTeams: plannedTeamsOf(fmt), oddRule: oddRuleOf(fmt), draw: drawOf(fmt),
+    });
+    return freeBoxes(map).filter((b) => b.stage === phase);
+  }, [tournamentId, phase, tournament, sport, allMatches, divisionEntries, mapSlots]);
   const divisionPairType = useMemo(
     () => (tournamentId ? pairTypeFromDivisions(divisions, divisionEntries, [home, away]) : undefined),
     [tournamentId, divisions, divisionEntries, home, away],
@@ -427,7 +450,9 @@ export default function ScheduleMatchScreen() {
         // DP9: a singles match never keeps a doubles pair type
         format: (() => {
           const f = settlePairType(format, mode === 'pairs');
-          return !isFriendly && tournamentId ? stageAwareFormat(f, sport, isKoStage(phase)) : f;
+          const staged = !isFriendly && tournamentId ? stageAwareFormat(f, sport, isKoStage(phase)) : f;
+          // FM28: the box sets the match's place in its round
+          return !isFriendly && isKoStage(phase) && box !== null && freeInRound.some((b) => b.box === box) ? { ...(staged ?? {}), [KO_SLOT_KEY]: box } : staged;
         })(),
         streamUrl: safeWebUrl(stream) ?? undefined,
       });
@@ -691,12 +716,24 @@ export default function ScheduleMatchScreen() {
                 <View style={{ gap: theme.spacing(2) }}>
                   <FieldLabel>Stage</FieldLabel>
                   <View style={st.chips}>
-                    <SelectChip label="League" active={phase === 'league'} onPress={() => setPhase('league')} />
-                    <SelectChip label="👥 Group" active={phase === 'group'} onPress={() => setPhase('group')} />
+                    <SelectChip label="League" active={phase === 'league'} onPress={() => { setPhase('league'); setBox(null); }} />
+                    <SelectChip label="👥 Group" active={phase === 'group'} onPress={() => { setPhase('group'); setBox(null); }} />
                     {KO_STAGES.map((s) => (
-                      <SelectChip key={s} label={KO_STAGE_LABEL[s]} active={phase === s} onPress={() => setPhase(s)} />
+                      <SelectChip key={s} label={KO_STAGE_LABEL[s]} active={phase === s} onPress={() => { setPhase(s); setBox(null); }} />
                     ))}
                   </View>
+                  {freeInRound.length > 0 && (
+                    <View style={{ gap: theme.spacing(2) }}>
+                      <FieldLabel>Its box on the fixture map</FieldLabel>
+                      <View style={st.chips}>
+                        <SelectChip label="Next free box" active={box === null} onPress={() => setBox(null)} />
+                        {freeInRound.map((b) => (
+                          <SelectChip key={b.box} label={`${b.label}: ${sideLabel(b.home)} v ${sideLabel(b.away)}`} active={box === b.box} onPress={() => setBox(b.box)} />
+                        ))}
+                      </View>
+                      <Text style={textStyles.muted}>The winner moves on from that box.</Text>
+                    </View>
+                  )}
                   {phase === 'group' && (
                     <TextField label="Group" value={groupLabel} onChange={(t) => setGroupLabel(t.replace(/[^a-zA-Z0-9]/g, '').slice(0, 3).toUpperCase())} placeholder="A" autoCapitalize="characters" />
                   )}

@@ -77,3 +77,63 @@ test('600 organisers: every team once, one final, real next rounds agree, fast',
   assert.ok(teamsSeen > 0);
   assert.ok(performance.now() - t0 < 15000, 'fast for 600 organisers');
 });
+
+import { nextRealRound, type OddRule } from '../src/data/drawRules.ts';
+import { freeBoxes } from '../src/core/fixtureMap.ts';
+
+test('600 organisers with a plan: rules, planned counts, edited draws, custom boxes — map = app', () => {
+  const t0 = performance.now();
+  const RULES: OddRule[] = ['playin', 'byes', 'bestLosers'];
+  for (let u = 0; u < 600; u++) {
+    const rule = RULES[u % 3];
+    const field = int(3, 40);
+    const entries = Array.from({ length: field }, (_, i) => ({ id: `p${u}t${i}`, name: `T${i}` }));
+    const planned = rnd() < 0.4 ? field + int(0, 8) : undefined;
+    // an edited draw (half the time): the automatic one, shuffled
+    const auto = buildFixtureMap({ cfg: cfg({}), matches: [], entries, slotIds: new Set(), plannedTeams: planned, oddRule: rule });
+    let draw = null;
+    if (rnd() < 0.5 && auto.rounds[0]?.refs) {
+      const order = [...auto.rounds[0].refs];
+      for (let k = 0; k < 4; k++) { const a = int(0, order.length - 1), b = int(0, order.length - 1); if (order[a] !== null && order[b] !== null) [order[a], order[b]] = [order[b], order[a]]; }
+      draw = { order };
+    }
+    const m = buildFixtureMap({ cfg: cfg({}), matches: [], entries, slotIds: new Set(), plannedTeams: planned, oddRule: rule, draw });
+    assert.ok(!m.drawStale, `user ${u}: own draw is never stale`);
+    const r0 = m.rounds[0];
+    const all = [...r0.ties.flatMap((t) => [t.home, t.away]), ...r0.byes];
+    assert.equal(all.length, Math.max(field, planned ?? 0), `user ${u}: the planned field`);
+    assert.equal(new Set(all.map((s) => (s.kind === 'team' ? s.id : s.kind === 'open' ? s.ref : '?'))).size, all.length);
+    assert.equal(m.rounds[m.rounds.length - 1].ties.length, 1, `user ${u}: one final`);
+
+    // play the opening round for real (only real teams, no open places), then the app's next round = the map's
+    if (planned === undefined || planned <= field) {
+      let mn = 0;
+      const ms = r0.ties.map((t) => {
+        const h = t.home.kind === 'team' ? t.home.id : '', a = t.away.kind === 'team' ? t.away.id : '';
+        const hs = int(0, 5), as = hs === 0 ? int(1, 5) : int(0, hs - 1);
+        return { id: `u${u}m${++mn}`, sport: 'football', stage: r0.stage, status: 'completed', winner: hs > as ? 'home' : 'away', score: { home: hs, away: as },
+          startsAt: new Date(1.8e12 + mn * 6e4).toISOString(), format: { __koSlot: t.box }, byes: r0.byes.map((b) => (b.kind === 'team' ? b.id : '')).filter(Boolean),
+          homeTeam: { id: h, name: h }, awayTeam: { id: a, name: a } } as unknown as Match;
+      });
+      const played = buildFixtureMap({ cfg: cfg({}), matches: ms, entries, slotIds: new Set(), oddRule: rule });
+      const real = knockoutStageRounds(ms)[0];
+      const app = nextRealRound(real, rule);
+      if (app) {
+        const mapNext = played.rounds[1].ties.map((t) => [label(t.home), label(t.away)].sort().join('|')).sort();
+        const appNext = app.map((p) => [p.homeId, p.awayId].sort().join('|')).sort();
+        assert.deepEqual(mapNext, appNext, `user ${u} (${rule}, field ${field}): map = app next round`);
+      }
+      // a custom match in the next round's last free box lands there
+      const free = freeBoxes(played).filter((b) => b.stage === played.rounds[1]?.stage);
+      if (free.length) {
+        const pick = free[free.length - 1];
+        const custom = { id: `u${u}c`, sport: 'football', stage: pick.stage, status: 'scheduled', startsAt: new Date(1.9e12).toISOString(), format: { __koSlot: pick.box },
+          homeTeam: { id: entries[0].id, name: 'X' }, awayTeam: { id: entries[1].id, name: 'Y' } } as unknown as Match;
+        const withCustom = buildFixtureMap({ cfg: cfg({}), matches: [...ms, custom], entries, slotIds: new Set(), oddRule: rule });
+        const r1 = withCustom.rounds.find((r) => r.stage === pick.stage)!;
+        assert.equal(r1.ties.find((t) => t.box === pick.box)?.matchId, custom.id, `user ${u}: custom match in its box`);
+      }
+    }
+  }
+  assert.ok(performance.now() - t0 < 20000, 'fast for 600 organisers');
+});

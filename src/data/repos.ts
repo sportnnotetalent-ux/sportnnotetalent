@@ -6772,8 +6772,10 @@ export interface NewMatch {
 
 export async function createMatch(input: NewMatch): Promise<Match> {
   if (!isSupabaseConfigured || !supabase) {
-    const home = demo.teams.find((t) => t.id === input.homeTeamId)!;
-    const away = demo.teams.find((t) => t.id === input.awayTeamId)!;
+    const home = demo.teams.find((t) => t.id === input.homeTeamId);
+    const away = demo.teams.find((t) => t.id === input.awayTeamId);
+    // never store a match without its teams (it would break every match list after)
+    if (!home || !away) throw new Error('Pick two teams of this tournament.');
     return addMatch({
       tournamentId: input.tournamentId,
       group: input.group,

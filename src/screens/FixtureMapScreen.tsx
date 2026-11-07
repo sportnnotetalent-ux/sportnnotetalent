@@ -19,7 +19,14 @@ import { DivisionTabs } from '../components/DivisionTabs';
 import { useAuth } from '../core/auth';
 import { useTournamentById, useLeagueData, useOrganizations, useTeams, useDivisions, useTournamentEntries } from '../data/hooks';
 import { matchesInDivision } from '../data/groups';
-import { getMyPlayerId, getTournamentSlotIds } from '../data/repos';
+import { getMyPlayerId, getTournamentSlotIds, patchTournamentFormat, createMatch, createTournamentSlots } from '../data/repos';
+import { DateTimeField } from '../components/DateTimeField';
+import { FormError } from '../components/ui';
+import { nextSlotNames } from '../core/slots';
+import { matchFormatFor } from '../data/matchFormat';
+import { defaultsFor } from '../components/FormatEditor';
+import { KO_SLOT_KEY } from '../data/bracket';
+import { oddRuleOf, plannedTeamsOf, drawOf, drawToFormat, ODD_RULES, ODD_RULE_KEY, PLANNED_KEY, DRAW_KEY, type OddRule } from '../data/drawRules';
 import { canManageTournament } from '../core/org';
 import { structureFromFormat, describeStructure } from '../data/structureConfig';
 import { buildFixtureMap, fixtureMapSheet, treeLayout, type MapSide, type MapTie, type MapRound } from '../core/fixtureMap';
@@ -77,7 +84,23 @@ export default function FixtureMapScreen() {
     if (tournament) nav.setOptions({ title: tournament.name });
   }, [nav, tournament?.name]);
 
-  const cfg = structureFromFormat(tournament?.formats?.[sport] as Record<string, unknown> | undefined);
+  // The organiser's plan (data/drawRules): saved on the sport's format; shown at once
+  const [fmtPatch, setFmtPatch] = useState<Record<string, unknown>>({});
+  // saved values stay shown when the tournament is re-read (they are in it by then)
+  useEffect(() => { setFmtPatch({}); }, [sport]);
+  const fmt = useMemo(() => ({ ...((tournament?.formats?.[sport] as Record<string, unknown> | undefined) ?? {}), ...fmtPatch }), [tournament, sport, fmtPatch]);
+  const cfg = structureFromFormat(fmt);
+  const rule = oddRuleOf(fmt);
+  const planned = plannedTeamsOf(fmt) ?? (tournament?.maxTeams && tournament.maxTeams >= 2 ? Math.min(128, tournament.maxTeams) : undefined);
+  const drawRaw = fmt[DRAW_KEY] as string | undefined;
+  const draw = useMemo(() => drawOf({ [DRAW_KEY]: drawRaw }), [drawRaw]);
+  const [planError, setPlanError] = useState<string | null>(null);
+  async function savePlan(patch: Record<string, unknown>) {
+    setPlanError(null);
+    setFmtPatch((p) => ({ ...p, ...patch }));
+    try { await patchTournamentFormat(tournamentId, sport, patch); }
+    catch (e) { setPlanError(e instanceof Error ? e.message : 'Couldn’t save that.'); }
+  }
   const entries = useMemo(
     () => sportEntries
       .filter((e) => e.status === 'confirmed' && (!activeCat || (e.categoryId ?? null) === activeCat))
@@ -85,8 +108,8 @@ export default function FixtureMapScreen() {
     [sportEntries, activeCat],
   );
   const map = useMemo(
-    () => buildFixtureMap({ cfg, structure: tournament?.structure, matches: divMatches, entries, slotIds }),
-    [cfg?.shape, cfg?.groupCount, cfg?.advanceTopN, cfg?.advanceBest, cfg?.superPhase, cfg?.manualStandings, cfg?.bracket, tournament?.structure, divMatches, entries, slotIds],
+    () => buildFixtureMap({ cfg, structure: tournament?.structure, matches: divMatches, entries, slotIds, plannedTeams: planned, oddRule: rule, draw }),
+    [cfg?.shape, cfg?.groupCount, cfg?.advanceTopN, cfg?.advanceBest, cfg?.superPhase, cfg?.manualStandings, cfg?.bracket, tournament?.structure, divMatches, entries, slotIds, planned, rule, draw],
   );
   const inFixtures = useMemo(() => new Set(matches.filter((m) => m.sport === sport).flatMap((m) => [m.homeTeam.id, m.awayTeam.id])), [matches, sport]);
 
@@ -100,7 +123,45 @@ export default function FixtureMapScreen() {
   const [invite, setInvite] = useState<CaptainInvite | null>(null);
   const [exportNote, setExportNote] = useState<string | null>(null);
   const openTeam = useCallback((teamId: string) => nav.navigate('TeamJourney', { tournamentId, teamId, sport }), [nav, tournamentId, sport]);
+  // FM23: an open place becomes a slot (named for its group), then is filled like one
+  async function openPlace(s: Extract<MapSide, { kind: 'open' }>) {
+    setPlanError(null);
+    try {
+      const name = s.group ? s.label : nextSlotNames(entries.map((e) => e.name), 1)[0];
+      const [id] = await createTournamentSlots(tournamentId, sport, [name]);
+      if (id && draw?.order.includes(s.ref)) await savePlan({ [DRAW_KEY]: drawToFormat({ order: draw.order.map((x) => (x === s.ref ? id : x)) }) });
+      setNonce((n) => n + 1);
+      if (id) setFilling({ id, name });
+    } catch (e) { setPlanError(e instanceof Error ? e.message : 'Couldn’t add the place.'); }
+  }
+  // Edit draw (FM25): tap two places in the opening round to swap them
+  const [editing, setEditing] = useState(false);
+  const [pick, setPick] = useState<number | null>(null);
+  const opening = map.rounds[0];
+  const canEditDraw = !!opening?.projected && !!opening.refs && map.rounds.every((r) => r.ties.every((t) => !t.matchId));
+  function pickRef(idx: number) {
+    if (!opening?.refs || opening.refs[idx] === null) return;
+    if (pick === null) return setPick(idx);
+    if (pick === idx) return setPick(null);
+    const order = [...opening.refs];
+    [order[pick], order[idx]] = [order[idx], order[pick]];
+    setPick(null);
+    void savePlan({ [DRAW_KEY]: drawToFormat({ order }) });
+  }
+  // Make this match (FM27/FM28): a free box → a real match in that box
+  const [making, setMaking] = useState<{ stage: string; box: number; label: string; byes: string[]; homeId?: string; awayId?: string } | null>(null);
+  const fieldTeams = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const e of entries) m.set(e.id, e.name);
+    for (const x of divMatches) { m.set(x.homeTeam.id, x.homeTeam.name); m.set(x.awayTeam.id, x.awayTeam.name); }
+    return [...m.entries()].map(([id, name]) => ({ id, name }));
+  }, [entries, divMatches]);
+  const onMake = (r: MapRound, t: MapTie) => {
+    const id = (x: MapSide) => (x.kind === 'team' ? x.id : undefined);
+    setMaking({ stage: r.stage, box: t.box, label: t.label, byes: r.byes.flatMap((b) => (b.kind === 'team' ? [b.id] : [])), homeId: id(t.home), awayId: id(t.away) });
+  };
   const onSide = (s: MapSide) => {
+    if (s.kind === 'open') { if (canManage) void openPlace(s); return; }
     if (s.kind !== 'team') return;
     if (s.slot) { if (canManage) setFilling({ id: s.id, name: s.name }); return; }
     openTeam(s.id);
@@ -194,6 +255,14 @@ export default function FixtureMapScreen() {
 
         {map.note && shownStage === 'knockout' && <Text style={textStyles.muted}>{map.note}</Text>}
 
+        {canManage && <PlanCard show={map.kind !== 'empty' && map.kind !== 'other'} planned={map.planned ?? planned} field={fieldTeams.length} rule={rule}
+          knockout={map.kind !== 'league'} editing={editing} canEditDraw={canEditDraw} edited={!!draw} stale={!!map.drawStale}
+          onPlanned={(n) => void savePlan({ [PLANNED_KEY]: n })} onRule={(r) => void savePlan({ [ODD_RULE_KEY]: r })}
+          onEdit={() => { setEditing((v) => !v); setPick(null); setStage('knockout'); setStart(0); }}
+          onReset={() => { setEditing(false); setPick(null); void savePlan({ [DRAW_KEY]: undefined }); }} />}
+        <FormError message={planError} />
+        {canManage && editing && <Text style={st.slotsNote}>{pick === null ? 'Tap a team (or place) in the first round, then another to swap them.' : 'Now tap the one to swap with.'}</Text>}
+
         {(map.kind === 'knockout' || (map.kind === 'groups' && shownStage === 'knockout')) && map.rounds.length > 0 && (
           <>
             <View style={st.stepper}>
@@ -208,7 +277,18 @@ export default function FixtureMapScreen() {
                 <Text style={st.stepArrow}>›</Text>
               </Pressable>
             </View>
-            <Tree rounds={map.rounds.slice(first)} championId={map.champion?.kind === 'team' ? map.champion.id : undefined} canFill={canManage} onSide={onSide} />
+            <Tree rounds={map.rounds.slice(first)} championId={map.champion?.kind === 'team' ? map.champion.id : undefined} canFill={canManage} onSide={onSide}
+              edit={canManage && editing && first === 0 ? { pick, onPick: pickRef } : undefined}
+              onMake={canManage && !editing ? onMake : undefined} />
+            {canManage && editing && first === 0 && opening?.byes.length ? (
+              <View style={st.chips}>
+                <Text style={textStyles.muted}>Straight through:</Text>
+                {opening.byes.map((b, j) => {
+                  const idx = opening.ties.length * 2 + j * 2;
+                  return <SelectChip key={idx} label={sideName(b)} active={pick === idx} onPress={() => pickRef(idx)} />;
+                })}
+              </View>
+            ) : null}
             <Text style={textStyles.muted}>Swipe sideways for the whole tree. Boxes without teams say where they come from.</Text>
           </>
         )}
@@ -250,6 +330,21 @@ export default function FixtureMapScreen() {
         )}
       </KeyboardAwareScrollView>
 
+      <Sheet visible={canManage && !!making} onClose={() => setMaking(null)} title={making ? `Make ${making.label}` : 'Make a match'}>
+        {canManage && making ? (
+          <MakeMatch box={making} teams={fieldTeams} onCancel={() => setMaking(null)}
+            onCreate={async (homeId, awayId, when) => {
+              const base = matchFormatFor(tournament, sport, true, defaultsFor(getSportMeta(sport).formatFields ?? [], 'tournament'));
+              await createMatch({
+                tournamentId, sport, stage: making.stage, homeTeamId: homeId, awayTeamId: awayId, startsAt: when.toISOString(),
+                hostIds: myId ? [myId] : [], format: { ...(base ?? {}), [KO_SLOT_KEY]: making.box },
+                ...(making.byes.length ? { byes: making.byes } : {}),
+              });
+              setMaking(null); setNonce((n) => n + 1);
+            }} />
+        ) : null}
+      </Sheet>
+
       <Sheet visible={canManage && !!filling} onClose={() => setFilling(null)} title={filling ? `Fill ${filling.name}` : 'Fill a slot'}>
         {canManage && filling ? (
           <SlotFillPanel slot={filling} sport={sport} teams={allTeams} slotIds={slotIds} inFixtures={inFixtures}
@@ -260,13 +355,32 @@ export default function FixtureMapScreen() {
   );
 }
 
-const sideName = (s: MapSide): string => (s.kind === 'team' ? s.name : s.kind === 'from' ? s.label : 'Bye');
+const sideName = (s: MapSide): string => (s.kind === 'team' ? s.name : s.kind === 'from' || s.kind === 'open' ? s.label : 'Bye');
 
 /** One line of a box: a team (tap → their journey), an open slot (tap → fill),
  *  or where the team comes from. */
-function SideRow({ side, score, state, canFill, onPress, champion }: {
+function SideRow({ side, score, state, canFill, onPress, champion, picked }: {
   side: MapSide; score?: number; state?: 'won' | 'lost'; canFill: boolean; onPress: () => void; champion?: boolean;
+  /** Edit draw: tapping picks this place; true = picked */
+  picked?: boolean | null;
 }) {
+  if (picked !== undefined && picked !== null) {
+    return (
+      <Pressable onPress={onPress} style={[st.row, picked && st.rowPicked]} accessibilityRole="button" accessibilityState={{ selected: picked }} accessibilityLabel={`Swap ${sideName(side)}`}>
+        <Text style={st.swap}>⇅</Text>
+        <Text style={st.teamName} numberOfLines={1}>{sideName(side)}</Text>
+      </Pressable>
+    );
+  }
+  if (side.kind === 'open') {
+    return (
+      <Pressable onPress={onPress} disabled={!canFill} style={st.slotRow} accessibilityRole={canFill ? 'button' : undefined}
+        accessibilityLabel={canFill ? `Open place ${side.label}, tap to add a team` : `Open place ${side.label}`}>
+        <Text style={st.slotName} numberOfLines={1}>{side.label}</Text>
+        <Text style={st.slotHint}>{canFill ? 'Open place · tap to add a team' : 'Open place'}</Text>
+      </Pressable>
+    );
+  }
   if (side.kind !== 'team') {
     return (
       <View style={st.row}>
@@ -297,7 +411,15 @@ function SideRow({ side, score, state, canFill, onPress, champion }: {
   );
 }
 
-function TieCard({ tie, canFill, onSide, championId }: { tie: MapTie; canFill: boolean; onSide: (s: MapSide) => void; championId?: string }) {
+type EditProps = { pick: number | null; onPick: (refIndex: number) => void };
+
+function TieCard({ tie, canFill, onSide, championId, edit, onMake }: {
+  tie: MapTie; canFill: boolean; onSide: (s: MapSide) => void; championId?: string;
+  /** Edit draw: this box is in the opening round */
+  edit?: EditProps;
+  /** a free box: "Make this match" */
+  onMake?: () => void;
+}) {
   const pill = tie.state === 'done' ? 'FT' : tie.state === 'live' ? 'LIVE' : tie.startsAt ? formatShort(tie.startsAt) : 'Planned';
   const st2 = (k: 'home' | 'away') => (tie.winner ? (tie.winner === k ? 'won' as const : 'lost' as const) : undefined);
   const isChamp = (s: MapSide) => !!championId && s.kind === 'team' && s.id === championId && tie.label === 'Final';
@@ -305,16 +427,27 @@ function TieCard({ tie, canFill, onSide, championId }: { tie: MapTie; canFill: b
     <View style={[st.tie, tie.label === 'Final' && st.tieFinal]}>
       <View style={[st.tieHead, tie.label === 'Final' && st.tieHeadFinal]}>
         <Text style={[st.tieLabel, tie.label === 'Final' && st.tieLabelFinal]} numberOfLines={1}>{tie.label === 'Final' ? '🏆 Final' : tie.label}</Text>
-        <Text style={[st.pill, tie.state === 'live' && st.pillLive]}>{pill}</Text>
+        {onMake && !tie.matchId ? (
+          <Text style={[st.pill, st.pillMake]} onPress={onMake} accessibilityRole="button" accessibilityLabel={`Make ${tie.label}`}>＋ Make</Text>
+        ) : (
+          <Text style={[st.pill, tie.state === 'live' && st.pillLive]}>{pill}</Text>
+        )}
       </View>
-      <SideRow side={tie.home} score={tie.score?.home} state={st2('home')} canFill={canFill} onPress={() => onSide(tie.home)} champion={isChamp(tie.home)} />
-      <SideRow side={tie.away} score={tie.score?.away} state={st2('away')} canFill={canFill} onPress={() => onSide(tie.away)} champion={isChamp(tie.away)} />
+      <SideRow side={tie.home} score={tie.score?.home} state={st2('home')} canFill={canFill} champion={isChamp(tie.home)}
+        picked={edit ? edit.pick === tie.box * 2 : undefined} onPress={() => (edit ? edit.onPick(tie.box * 2) : onSide(tie.home))} />
+      <SideRow side={tie.away} score={tie.score?.away} state={st2('away')} canFill={canFill} champion={isChamp(tie.away)}
+        picked={edit ? edit.pick === tie.box * 2 + 1 : undefined} onPress={() => (edit ? edit.onPick(tie.box * 2 + 1) : onSide(tie.away))} />
     </View>
   );
 }
 
 /** FM4: the tree — one column per round, boxes placed by treeLayout, joining lines between. */
-function Tree({ rounds, canFill, onSide, championId }: { rounds: MapRound[]; canFill: boolean; onSide: (s: MapSide) => void; championId?: string }) {
+function Tree({ rounds, canFill, onSide, championId, edit, onMake }: {
+  rounds: MapRound[]; canFill: boolean; onSide: (s: MapSide) => void; championId?: string;
+  /** set when the first shown round is the opening one and the draw is being edited */
+  edit?: EditProps;
+  onMake?: (r: MapRound, t: MapTie) => void;
+}) {
   const l = treeLayout(rounds, CARD_H, GAP);
   const HEAD = 30;
   return (
@@ -322,11 +455,12 @@ function Tree({ rounds, canFill, onSide, championId }: { rounds: MapRound[]; can
       <ScrollView horizontal showsHorizontalScrollIndicator contentContainerStyle={st.treeRow}>
         {rounds.map((r, k) => (
           <React.Fragment key={r.stage + k}>
-            <View style={{ width: COL_W, height: l.height + HEAD }}>
+            <View style={{ width: COL_W, height: l.height + HEAD + (rounds.some((x) => x.byes.length) ? 36 : 0) }}>
               <Text style={st.colTitle} numberOfLines={1}>{r.label.toUpperCase()} <Text style={st.colCount}>({r.ties.length})</Text></Text>
               {r.ties.map((t, i) => (
                 <View key={t.key} style={{ position: 'absolute', top: HEAD + l.tops[k][i], left: 0, right: 0 }}>
-                  <TieCard tie={t} canFill={canFill} onSide={onSide} championId={championId} />
+                  <TieCard tie={t} canFill={canFill} onSide={onSide} championId={championId}
+                    edit={k === 0 ? edit : undefined} onMake={onMake ? () => onMake(r, t) : undefined} />
                 </View>
               ))}
               {r.byes.length > 0 && (
@@ -380,6 +514,92 @@ function InviteCard({ invite, tournamentName, inviterName, onDismiss }: { invite
   );
 }
 
+/** The organiser's plan (FM22, FM19, FM25): planned teams, the odd-team rule, Edit draw. */
+function PlanCard({ show, planned, field, rule, knockout, editing, canEditDraw, edited, stale, onPlanned, onRule, onEdit, onReset }: {
+  show: boolean; planned?: number; field: number; rule: OddRule; knockout: boolean; editing: boolean; canEditDraw: boolean; edited: boolean; stale: boolean;
+  onPlanned: (n: number) => void; onRule: (r: OddRule) => void; onEdit: () => void; onReset: () => void;
+}) {
+  if (!show) return null;
+  const n = Math.max(planned ?? 0, field, 2);
+  return (
+    <Card style={st.planCard}>
+      <Text style={st.groupTitle}>Your plan</Text>
+      <View style={st.planRow}>
+        <Text style={[textStyles.body, st.flex1]}>Teams planned</Text>
+        <Pressable onPress={() => onPlanned(Math.max(2, field, n - 1))} disabled={n <= Math.max(2, field)} style={[st.stepBtn, n <= Math.max(2, field) && st.stepOff]} accessibilityRole="button" accessibilityLabel="One team fewer">
+          <Text style={st.stepArrow}>−</Text>
+        </Pressable>
+        <Text style={st.planNum}>{n}</Text>
+        <Pressable onPress={() => onPlanned(Math.min(128, n + 1))} disabled={n >= 128} style={[st.stepBtn, n >= 128 && st.stepOff]} accessibilityRole="button" accessibilityLabel="One team more">
+          <Text style={st.stepArrow}>+</Text>
+        </Pressable>
+      </View>
+      <Text style={textStyles.muted}>{field} in so far{n > field ? ` · ${n - field} open place${n - field === 1 ? '' : 's'} on the map` : ''}.</Text>
+      {knockout && (
+        <>
+          <Text style={[textStyles.body, st.planLabel]}>When the numbers are odd</Text>
+          <View style={st.chips}>
+            {ODD_RULES.map((r) => <SelectChip key={r.key} label={r.label} active={rule === r.key} onPress={() => onRule(r.key)} />)}
+          </View>
+          <Text style={textStyles.muted}>{ODD_RULES.find((r) => r.key === rule)?.hint}</Text>
+          {stale && <Text style={st.staleNote}>Your edited draw no longer matches the teams, so the automatic draw shows — edit it again.</Text>}
+          {canEditDraw ? (
+            <View style={st.chips}>
+              <Button label={editing ? 'Done editing the draw' : 'Edit draw'} onPress={onEdit} />
+              {edited && <Button label="Back to the automatic draw" onPress={onReset} />}
+            </View>
+          ) : (
+            <Text style={textStyles.muted}>The draw is fixed once its first matches are made; add or change matches box by box.</Text>
+          )}
+        </>
+      )}
+    </Card>
+  );
+}
+
+/** Make a match in a free box (FM27/FM28): the box sets its stage and place. */
+function MakeMatch({ box, teams, onCreate, onCancel }: {
+  box: { label: string; homeId?: string; awayId?: string };
+  teams: { id: string; name: string }[];
+  onCreate: (homeId: string, awayId: string, when: Date) => Promise<void>;
+  onCancel: () => void;
+}) {
+  const [home, setHome] = useState<string | undefined>(box.homeId);
+  const [away, setAway] = useState<string | undefined>(box.awayId);
+  // a sensible start the organiser can change: tomorrow at 10:00
+  const [when, setWhen] = useState<Date | null>(() => { const d = new Date(); d.setDate(d.getDate() + 1); d.setHours(10, 0, 0, 0); return d; });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const pickRow = (label: string, value: string | undefined, set: (id: string) => void, other?: string) => (
+    <View style={st.gap}>
+      <Text style={textStyles.body}>{label}</Text>
+      <View style={st.chips}>
+        {teams.filter((t) => t.id !== other).map((t) => <SelectChip key={t.id} label={t.name} active={value === t.id} onPress={() => set(t.id)} />)}
+      </View>
+    </View>
+  );
+  async function create() {
+    if (!home || !away) return setError('Pick both teams.');
+    if (home === away) return setError('Pick two different teams.');
+    if (!when) return setError('Pick the date and time.');
+    setBusy(true); setError(null);
+    try { await onCreate(home, away, when); }
+    catch (e) { setError(e instanceof Error ? e.message : 'Couldn’t make the match.'); }
+    finally { setBusy(false); }
+  }
+  return (
+    <View style={st.gap}>
+      <Text style={textStyles.muted}>This match goes in the {box.label} box on the map; its winner moves on from there.</Text>
+      {pickRow('Home', home, setHome, away)}
+      {pickRow('Away', away, setAway, home)}
+      <DateTimeField label="When" value={when} onChange={setWhen} />
+      <FormError message={error} />
+      <Button variant="primary" label={busy ? 'Making…' : `Make ${box.label}`} disabled={busy} onPress={() => void create()} />
+      <Button label="Cancel" onPress={onCancel} />
+    </View>
+  );
+}
+
 const st = StyleSheet.create({
   safe: { flex: 1, backgroundColor: theme.colors.bg },
   content: { padding: theme.spacing(4), gap: theme.spacing(3) },
@@ -414,6 +634,14 @@ const st = StyleSheet.create({
   tieLabel: { color: theme.colors.textMuted, fontSize: theme.font.tiny, fontWeight: '600', flexShrink: 1 },
   tieLabelFinal: { color: theme.colors.onFill },
   pill: { fontSize: theme.font.tiny, fontWeight: '700', color: theme.colors.text, backgroundColor: theme.colors.surfaceAlt, paddingHorizontal: 6, paddingVertical: 1, borderRadius: 6, overflow: 'hidden' },
+  pillMake: { backgroundColor: theme.colors.lime, color: theme.colors.onLime },
+  rowPicked: { backgroundColor: theme.colors.lime },
+  swap: { color: theme.colors.primary, fontSize: theme.font.small, width: 14 },
+  planCard: { gap: theme.spacing(2), padding: theme.spacing(3) },
+  planRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(2) },
+  planNum: { fontFamily: theme.fonts.numeral, fontSize: theme.font.h2, color: theme.colors.text, minWidth: 32, textAlign: 'center' },
+  planLabel: { marginTop: theme.spacing(2), fontWeight: '600' },
+  staleNote: { color: theme.colors.accent, fontSize: theme.font.small },
   pillLive: { backgroundColor: theme.colors.dangerStrong, color: theme.colors.onFill },
   row: { height: 46, flexDirection: 'row', alignItems: 'center', gap: theme.spacing(2), paddingHorizontal: theme.spacing(2) },
   rowWon: { backgroundColor: '#F1F9D6' },

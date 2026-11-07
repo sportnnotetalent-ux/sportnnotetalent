@@ -3,9 +3,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { buildFixtureMap, groupLabel, fixtureMapSheet, treeLayout, type FixtureMap, type MapSide, type MapInput } from '../src/core/fixtureMap.ts';
+import { buildFixtureMap, groupLabel, fixtureMapSheet, treeLayout, freeBoxes, type FixtureMap, type MapSide, type MapInput } from '../src/core/fixtureMap.ts';
 import type { StructureConfig } from '../src/data/structureConfig.ts';
 import type { Match } from '../src/core/types.ts';
+import { nextRoundByRule } from '../src/data/drawRules.ts';
 
 const read = (p: string) => readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
 
@@ -23,7 +24,7 @@ function match(h: string, a: string, o: Partial<Match> = {}): Match {
   } as unknown as Match;
 }
 const input = (o: Partial<MapInput>): MapInput => ({ cfg: null, matches: [], entries: [], slotIds: new Set(), ...o });
-const label = (s: MapSide): string => (s.kind === 'team' ? s.name : s.kind === 'from' ? s.label : 'bye');
+const label = (s: MapSide): string => (s.kind === 'team' ? s.name : s.kind === 'from' || s.kind === 'open' ? s.label : 'bye');
 const ties = (m: FixtureMap, i: number) => m.rounds[i].ties.map((t) => `${label(t.home)} v ${label(t.away)}`);
 
 test('FM1: 2 groups, top 2 → crossed semi-finals, then the final, before any team is known', () => {
@@ -159,6 +160,10 @@ test('FM4: tree layout — later boxes sit midway between the two they come from
   const lo = treeLayout(odd.rounds, 100, 20);
   assert.equal(lo.joined[0], false, 'byes: no joining lines');
   for (const col of lo.tops) for (const y of col) assert.ok(y >= 0 && y + 100 <= Math.max(lo.height, 100));
+  // a play-in round smaller than the next: no box overlaps another
+  const ten = buildFixtureMap(input({ cfg: cfg({ shape: 'knockout' }), entries: Array.from({ length: 10 }, (_, i) => team(`t${i}`)) }));
+  const lt = treeLayout(ten.rounds, 100, 20);
+  for (const col of lt.tops) for (let k = 1; k < col.length; k++) assert.ok(col[k] - col[k - 1] >= 100, `boxes overlap: ${col.join(', ')}`);
 });
 
 test('FM10: a knockout whose teams are only in its fixtures still draws them', () => {
@@ -231,4 +236,134 @@ test('the map is reachable: a route, the tournament page and the bracket link to
   assert.match(read('src/navigation/types.ts'), /FixtureMap: \{ tournamentId: string; sport\?: SportId \}/);
   assert.match(read('src/screens/TournamentProfileScreen.tsx'), /navigate\('FixtureMap'/);
   assert.match(read('src/screens/BracketScreen.tsx'), /navigate\('FixtureMap'/);
+});
+
+// ---------- Part 2: the organiser's plan ----------
+
+test('FM22/FM23: a planned 12 with 8 entered — 4 open places, drawn for 12', () => {
+  const entries = Array.from({ length: 8 }, (_, i) => team(`t${i}`));
+  const m = buildFixtureMap(input({ cfg: cfg({ shape: 'knockout' }), entries, plannedTeams: 12 }));
+  assert.equal(m.planned, 12);
+  const r0 = m.rounds[0];
+  const all = [...r0.ties.flatMap((t) => [t.home, t.away]), ...r0.byes];
+  assert.equal(all.length, 12);
+  assert.equal(all.filter((x) => x.kind === 'open').length, 4);
+  assert.ok(all.every((x) => x.kind !== 'open' || !('id' in x)), 'an open place is never a team');
+  assert.equal(r0.ties.length, 4, '12 → 4 play-in ties, 4 byes');
+  // a planned count below the field changes nothing
+  assert.equal(buildFixtureMap(input({ cfg: cfg({ shape: 'knockout' }), entries, plannedTeams: 4 })).rounds[0].ties.length, 4);
+});
+
+test('FM22/FM23: groups — open places go to the smallest groups, named A3, B3 …', () => {
+  const m = buildFixtureMap(input({ cfg: cfg({ shape: 'groups', groupCount: 2 }), plannedTeams: 6,
+    entries: ['A1', 'A2', 'B1'].map((x) => ({ id: x, name: x })), slotIds: new Set(['A1', 'A2', 'B1']) }));
+  assert.deepEqual(m.groups.map((g) => g.teams.map(label)), [['A1', 'A2', 'A3'], ['B1', 'B2', 'B3']]);
+  const open = m.groups[1].teams.find((x) => x.kind === 'open');
+  assert.equal(open && open.kind === 'open' && open.group, 'B');
+});
+
+test('FM19: the map draws each odd-team rule the way the app will (6 teams)', () => {
+  const entries = Array.from({ length: 6 }, (_, i) => team(`t${i}`));
+  const p = buildFixtureMap(input({ cfg: cfg({ shape: 'knockout' }), entries, oddRule: 'playin' }));
+  assert.equal(p.rounds[0].ties.length, 2);
+  assert.equal(p.rounds[0].byes.length, 2);
+  const b = buildFixtureMap(input({ cfg: cfg({ shape: 'knockout' }), entries, oddRule: 'byes' }));
+  assert.equal(b.rounds[0].ties.length, 3);
+  assert.equal(b.rounds[1].byes.length, 1, '3 winners: the top one goes straight through');
+  const l = buildFixtureMap(input({ cfg: cfg({ shape: 'knockout' }), entries, oddRule: 'bestLosers' }));
+  assert.equal(l.rounds[0].ties.length, 3);
+  const sf = l.rounds[1].ties.flatMap((t) => [label(t.home), label(t.away)]);
+  assert.ok(sf.includes('Best loser 1'), sf.join(', '));
+  assert.equal(l.rounds[1].ties.length, 2);
+  // the map's next round = the rules module's, for the same winners
+  const nx = nextRoundByRule({ winners: ['W1', 'W2', 'W3'], byes: [], losers: ['L1', 'L2', 'L3'] }, 'bestLosers');
+  assert.equal(nx.pairs.length, l.rounds[1].ties.length);
+});
+
+test('FM20: best losers are named by margin once the round is decided', () => {
+  const entries = 'abcdef'.split('').map(team);
+  const ms = [
+    match('a', 'f', { stage: 'qf', status: 'completed', winner: 'home', score: { home: 5, away: 0 } }),
+    match('b', 'e', { stage: 'qf', status: 'completed', winner: 'home', score: { home: 2, away: 1 } }),
+    match('c', 'd', { stage: 'qf', status: 'completed', winner: 'home', score: { home: 3, away: 0 } }),
+  ];
+  const m = buildFixtureMap(input({ cfg: cfg({ shape: 'knockout' }), entries, matches: ms, oddRule: 'bestLosers' }));
+  const sf = m.rounds[1].ties.flatMap((t) => [label(t.home), label(t.away)]);
+  assert.ok(sf.includes('E'), 'E lost by one: the best loser');
+  assert.ok(!sf.includes('F') && !sf.includes('D'));
+});
+
+test('FM25: an edited draw shows; a stale one falls back and says so', () => {
+  const entries = 'abcd'.split('').map(team);
+  const m = buildFixtureMap(input({ cfg: cfg({ shape: 'knockout' }), entries, draw: { order: ['a', 'b', 'c', 'd'] } }));
+  assert.deepEqual(ties(m, 0), ['A v B', 'C v D']);
+  assert.deepEqual(m.rounds[0].refs, ['a', 'b', 'c', 'd']);
+  assert.ok(!m.drawStale);
+  const stale = buildFixtureMap(input({ cfg: cfg({ shape: 'knockout' }), entries, draw: { order: ['a', 'b', 'c', 'x'] } }));
+  assert.ok(stale.drawStale);
+  assert.equal(stale.rounds[0].ties.length, 2, 'the automatic draw still shows');
+});
+
+test('FM25 / FM30: groups draw edited by place codes', () => {
+  const m = buildFixtureMap(input({ cfg: cfg({ shape: 'groups', groupCount: 2 }), entries: [team('x'), team('y')], draw: { order: ['@A#1', '@A#2', '@B#1', '@B#2'] } }));
+  assert.deepEqual(ties(m, 0), ['Group A winner v Group A runner-up', 'Group B winner v Group B runner-up']);
+});
+
+test('FM27/FM28: a custom match fills its box; free boxes are the rest', () => {
+  const entries = 'abcdefgh'.split('').map(team);
+  const sf2 = match('c', 'g', { stage: 'sf', format: { __koSlot: 1 } } as Partial<Match>);
+  const m = buildFixtureMap(input({ cfg: cfg({ shape: 'knockout' }), entries, matches: [sf2] }));
+  const sf = m.rounds.find((r) => r.stage === 'sf')!;
+  assert.equal(sf.ties[1].matchId, sf2.id, 'box 2');
+  assert.equal(label(sf.ties[0].home), 'Winner of Quarter-final 1', 'box 1 still projected');
+  const free = freeBoxes(m);
+  assert.ok(free.some((f) => f.stage === 'sf' && f.box === 0));
+  assert.ok(!free.some((f) => f.stage === 'sf' && f.box === 1), 'a taken box is not offered');
+  assert.ok(free.some((f) => f.stage === 'final'));
+});
+
+test('FM27: part of the opening round made by hand — the rest re-drawn, no team twice or lost', () => {
+  const entries = 'abcdefgh'.split('').map(team);
+  const one = match('a', 'h', { stage: 'qf', format: { __koSlot: 2 } } as Partial<Match>);
+  const m = buildFixtureMap(input({ cfg: cfg({ shape: 'knockout' }), entries, matches: [one] }));
+  const r0 = m.rounds[0];
+  assert.equal(r0.ties[2].matchId, one.id);
+  const names = [...r0.ties.flatMap((t) => [t.home, t.away]), ...r0.byes].map(label);
+  assert.equal(names.length, 8);
+  assert.equal(new Set(names).size, 8);
+});
+
+test('FM29: a custom round the plan doesn\'t have — the real rounds lead, nothing hidden', () => {
+  const entries = 'abcd'.split('').map(team);
+  const r16 = match('a', 'b', { stage: 'r16' });
+  const m = buildFixtureMap(input({ cfg: cfg({ shape: 'knockout' }), entries, matches: [r16] }));
+  assert.equal(m.rounds[0].stage, 'r16');
+  assert.equal(m.rounds[0].ties[0].matchId, r16.id);
+});
+
+test('the screen: plan controls and draw edits only for organisers (FM26)', () => {
+  const s = read('src/screens/FixtureMapScreen.tsx');
+  assert.match(s, /canManage && <PlanCard/);
+  assert.match(s, /canManage && editing/);
+  assert.match(s, /patchTournamentFormat\(/);
+  assert.match(s, /oddRuleOf\(/);
+  assert.match(s, /plannedTeamsOf\(/);
+  assert.match(s, /drawOf\(/);
+  assert.match(s, /KO_SLOT_KEY/);
+});
+
+test('FM27/FM28: Schedule match offers only the round\'s free boxes and saves the box as the bracket place', () => {
+  const s = read('src/screens/ScheduleMatchScreen.tsx');
+  assert.match(s, /freeBoxes\(map\)\.filter\(\(b\) => b\.stage === phase\)/);
+  assert.match(s, /\[KO_SLOT_KEY\]: box/);
+  assert.match(s, /freeInRound\.some\(\(b\) => b\.box === box\)/, 'a box taken meanwhile is not saved');
+});
+
+test('the organiser\'s structure decides the shape, even after the first knockout match exists', () => {
+  const sf = match('a', 'b', { stage: 'sf' });
+  const g = buildFixtureMap(input({ cfg: null, structure: 'league_knockout', entries: [team('a'), team('b')], matches: [sf] }));
+  assert.equal(g.kind, 'groups');
+  const lp = buildFixtureMap(input({ cfg: null, structure: 'league', entries: [team('a'), team('b')], matches: [match('a', 'b', { stage: 'final' })] }));
+  assert.equal(lp.kind, 'league');
+  assert.equal(lp.rounds[0]?.stage, 'final', 'a league with playoffs still shows its real knockout');
 });

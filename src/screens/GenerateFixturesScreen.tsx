@@ -36,7 +36,8 @@ import { SwissFieldPanel } from '../components/SwissFieldPanel';
 import { BOARD_KEY } from '../sports/chess/roundSheet';
 import { chessRatingsOf, ratingListFor, ratingOn, ratingSeedOrder } from '../data/chessRatings';
 import { entrantPlayers } from '../data/chessCrosstable';
-import { groupTables, advancement, seedKnockout, knockoutRoundLabel, qualifiersFromSelection, superPhaseLabel, matchesInDivision, seedFromGroups, seededRound, advancementBasis, crossoverFits, type GroupTable } from '../data/groups';
+import { groupTables, advancement, seedKnockout, knockoutRoundLabel, qualifiersFromSelection, superPhaseLabel, matchesInDivision, advancementBasis, crossoverFits, type GroupTable } from '../data/groups';
+import { firstRound, applyDraw, oddRuleOf, drawOf, groupsKnockoutOpening } from '../data/drawRules';
 import { doubleElimOpeners } from '../data/elimDraws';
 import { teamStandings, standingsConfigFromFormat, byePointsFor, FIDE_SWISS_ORDER } from '../data/standings';
 import { stageForTeams, planKnockout, seedPlayIn, KO_STAGE_LABEL, doubleChanceOpeners, isEliminationStage, stageLabel, KO_SLOT_KEY } from '../data/bracket';
@@ -446,8 +447,11 @@ export default function GenerateFixturesScreen() {
       if (seeding !== 'draw') {
         // SD-124: cross-over from the groups (A1 v B2 …) or seeded positions,
         // byes to the top seeds — saved with bracket slots.
-        const sr = seedFromGroups(effectiveQualifiers);
-        setPlaced(sr.ties.map((t, i) => ({ round: 1, homeId: t.homeId, awayId: t.awayId, stage: sr.stage, slot: t.slot, byes: sr.byeIds.length ? sr.byeIds : undefined, when: at(i) })));
+        // FM19/FM30: the organiser's odd-team rule and edited draw (fixture map),
+        // drawn on place codes ("@A#1") then resolved to the real qualifiers
+        const fmt = tournament?.formats?.[sport] as Record<string, unknown> | undefined;
+        const op = groupsKnockoutOpening(effectiveQualifiers, oddRuleOf(fmt), drawOf(fmt));
+        setPlaced(op.ties.map((t, i) => ({ round: 1, homeId: t.homeId, awayId: t.awayId, stage: op.stage, slot: t.slot, byes: op.byeIds.length ? op.byeIds : undefined, when: at(i) })));
         return;
       }
       if (playIn && !koPlan.clean) {
@@ -498,7 +502,10 @@ export default function GenerateFixturesScreen() {
         setPlaced(doubleElimOpeners(seeds, gfReset).map((o, i) => ({ round: 1, homeId: o.homeId, awayId: o.awayId, stage: o.stage, slot: o.slot, extra: o.extra, when: at(i) })));
         return;
       }
-      const sr = seededRound(seeds);
+      // FM19/FM25: the organiser's odd-team rule, and their edited draw when it holds these teams
+      const fmt = tournament?.formats?.[sport] as Record<string, unknown> | undefined;
+      const auto = firstRound(seeds, oddRuleOf(fmt));
+      const sr = applyDraw(auto, drawOf(fmt)) ?? auto;
       setPlaced(sr.ties.map((t, i) => ({ round: 1, homeId: t.homeId, awayId: t.awayId, stage: sr.stage, slot: t.slot, byes: sr.byeIds.length ? sr.byeIds : undefined, when: at(i) })));
       return;
     }

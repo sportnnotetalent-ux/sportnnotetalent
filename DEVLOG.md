@@ -13,6 +13,21 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-07 — Fixture map part 2: the organiser's plan drives the map
+
+The founder asked that the map follow what the organiser set up, handle odd numbers, and place custom matches in the right box. All four recommended options were chosen.
+- **Planned team count:** the map draws the planned field, with open places ("Open place 9", or "A3" in groups). Tapping one makes a slot and opens the fill panel.
+- **Odd numbers, the organiser's pick per sport:**
+  - top seeds skip round 1 (default; the usual draw);
+  - everyone plays, byes when odd (the top team of an odd round goes straight through);
+  - best losers go through (closest margin, then most scored; never a walkover loser).
+- **Custom matches:** "＋ Make" on any free box, or in Schedule match ("Its box on the fixture map"). The box sets both the round and the position, and the winner moves on from there.
+- **Edit draw:** tap two places in the first round to swap them. Auto-generate fixtures uses the edited draw: for groups, "Group A winner" codes are resolved to the real qualifiers. If teams change, the map says the edited draw no longer matches and shows the automatic one.
+- **One rules module (`src/data/drawRules.ts`)** is used by the map, Auto-generate fixtures and the bracket's "Create next round". The next round records its byes.
+- **Saved on `formats[sport]`:** `structTeams`, `structOdd`, `structDraw`. No migration.
+- **Files:** `drawRules.ts`, `fixtureMap.ts`, `FixtureMapScreen`, `BracketScreen`, `GenerateFixturesScreen`, `ScheduleMatchScreen`, `repos.ts` (demo createMatch guard).
+- **Checks:** break doc FM19–FM33; `tests/draw-rules.test.mts` (13); fixture-map tests (34); 600-organiser sim (map = app next round for every rule); full suite 7,702 pass; tsc clean; demo check of every part.
+
 ### 2026-11-07 — Fixture map: the whole format from day one, slots filled on it
 
 From the founder's Figma "Tournament Fixture Map": every tournament now has a **Fixture map** for each sport. Organisers open it from Stats or Manage, and the bracket links to it.
