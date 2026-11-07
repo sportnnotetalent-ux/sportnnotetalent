@@ -16,3 +16,4 @@ Why: on 2026-11-05 two sessions published within minutes of each other, and one 
 | 2026-11-07 | full-time session | 9cb857de | index-d4c15664 (common 00e7ae0f) | 002325b8 / f2607216 |
 | 2026-11-07 | held-result session | fb489589 | index-894e077b | c8d07027 / cce6bf84 |
 | 2026-11-07 | main session (demo-recording fixes + launch animation) | 1f327540 | index-f300b6f2 | 4c4128bc / 960e2ed7 |
+| 2026-11-07 | launch-voice session | a88e7f48 | index-9a7ceda6 | 2441c19a / aeed18ea |

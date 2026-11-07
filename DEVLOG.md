@@ -13,6 +13,13 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-07 — Release: the AI launch voice (web, Android OTA)
+
+auth-smoke passed; publish lock taken. Published from a clean worktree at a88e7f48.
+- **Web:** `index-9a7ceda6`, stable on app.sportnnote.in (the web never plays the voice).
+- **Android OTA:** `2441c19a` (preview) / `aeed18ea` (production). APK 41 stays silent (no native audio); the voice is heard from the 1.1.0 build.
+- **Live check:** the Demo Kabaddi League teams page loads signed in; it has 3 teams and no slots, so the slot order and fill panel had nothing to show (no live data changed to test it).
+
 ### 2026-11-07 — The AI "Sport n Note" voice, after the S:N mark, every launch
 
 The founder chose AI voice option 1 (MiniMax Speech 2.8 HD via Figma Weave: deep, slow, smooth; 1.75 s, 19 KB) over their own recording. S:N shows first; the voice starts 600 ms into the animation, as "SportnNote" slides in, and ends before Home (2.4 s). It plays every launch now; the Launch sound switch, reduced motion and web keep it silent.
