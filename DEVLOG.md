@@ -13,6 +13,12 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-07 — Release: the fixture map, parts 1 and 2 (web, Android OTA)
+
+auth-smoke passed and the publish lock was taken. Published from a clean worktree at 96335226. No database change.
+- **Web:** `index-58d99960`, stable on app.sportnnote.in; the FixtureMapScreen chunk is served live.
+- **Android OTA:** `5b7ea53e` (preview) / `709a3294` (production).
+
 ### 2026-11-07 — Fixture map part 2: the organiser's plan drives the map
 
 The founder asked that the map follow what the organiser set up, handle odd numbers, and place custom matches in the right box. All four recommended options were chosen.
