@@ -13,7 +13,14 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
-### 2026-11-07 — Launch animation on every launch, Home after it (not yet published)
+### 2026-11-07 — Release: demo-recording fixes + launch animation every launch (web, Android OTA)
+
+auth-smoke passed. The publish lock was taken (docs/org/publishing.md). Published from a clean worktree at the tip 1f327540; the only app code unreleased was 862b1219 and 1f327540 (the other unreleased commits were docs and marketing images).
+- **Web:** `index-f300b6f2`, live on app.sportnnote.in (stable over 6 checks). The new fill-slot panel and the launch animation are confirmed in the live code.
+- **Android OTA:** `4c4128bc` (preview) / `960e2ed7` (production).
+- **Not checked live:** the slot order and the fill panel on the Demo Kabaddi League. The browser pane isn't signed in, and I don't sign in for the founder, so the founder will check them.
+
+### 2026-11-07 — Launch animation on every launch, Home after it — live
 
 The founder found the animation too quick on later launches: the full version played only once per device, then a 0.6 s flash. Now:
 - **Every launch:** the full S:N → SportnNote animation (about 2.4 s: tick, lockup, line, a longer hold, then fade). Home becomes visible only as it fades.
@@ -22,7 +29,7 @@ The founder found the animation too quick on later launches: the full version pl
 
 Tests updated (quick-wins-reference QW15/QW19, launch-voice-splash LV1, sim-team-suggestions). Demo: a repeat launch showed the full animation with the wordmark for 2.49 s. Full suite 7,652 pass, 0 fail.
 
-### 2026-11-07 — Six app issues from the marketing demo recording (not yet published)
+### 2026-11-07 — Six app issues from the marketing demo recording — live
 
 `docs/security/breaks/demo-recording-bugs.md` (DR1–DR6). Of the nine logged in `docs/org/marketing/assets/screens/README.md`, the slot fill and the held result were already live. The founder kept item 4 (the captain's details stay compulsory for tournament teams). Fixed:
 - **Pair order:** pairs keep their set-up order (squads come back in the team's own order).
