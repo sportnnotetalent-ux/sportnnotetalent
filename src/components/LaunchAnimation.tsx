@@ -117,7 +117,7 @@ export function LaunchAnimation({ fontsReady = true }: { fontsReady?: boolean })
       if (on) setPlan(next);
       // A2: the "Sport n Note" voice with the full version (first launch), lands on the dot tick
       await hydrateLaunchSoundPref();
-      if (on && shouldPlayVoice({ full: next.full, web: WEB, reducedMotion, soundOn: launchSoundPref.get(), moduleReady: audioModuleReady(), clipReady: VOICE_CLIP_READY })) {
+      if (on && shouldPlayVoice({ firstLaunch: seen === false && next.full, web: WEB, reducedMotion, soundOn: launchSoundPref.get(), moduleReady: audioModuleReady(), clipReady: VOICE_CLIP_READY })) {
         setTimeout(() => void playLaunchVoice(), 200);
       }
     })();
@@ -130,7 +130,8 @@ export function LaunchAnimation({ fontsReady = true }: { fontsReady?: boolean })
     if (!plan || !go) return;
     if (!plan.show) { setGone(true); return; }
     if (plan.full) {
-      try { void AsyncStorage.setItem(LAUNCH_SEEN_KEY, '1').catch(() => {}); } catch { /* storage blocked: the short version plays next time anyway */ }
+      // "seen" now only keeps the welcome voice to the first launch
+      try { void AsyncStorage.setItem(LAUNCH_SEEN_KEY, '1').catch(() => {}); } catch { /* storage blocked: no voice next time either way */ }
     }
     if (WEB) {
       const t = setTimeout(() => setGone(true), plan.ms + 50);

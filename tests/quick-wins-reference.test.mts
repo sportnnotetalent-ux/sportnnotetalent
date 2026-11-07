@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { launchPlan, LAUNCH_FULL_MS, LAUNCH_SHORT_MS } from '../src/core/launchPlan.ts';
+import { launchPlan, LAUNCH_FULL_MS } from '../src/core/launchPlan.ts';
 import { teamSuggestions, teamDetail } from '../src/core/teamSuggestions.ts';
 import { matchEnding } from '../src/core/matchEnding.ts';
 
@@ -143,10 +143,11 @@ test('QW11: 20,000 matches resolve quickly and the lists are capped', () => {
 });
 
 // ---------- A1: silent launch animation ----------
-test('QW15: full version only on first launch; short afterwards; both short', () => {
-  assert.ok(LAUNCH_FULL_MS <= 2000 && LAUNCH_SHORT_MS <= 700);
-  assert.deepEqual(launchPlan({ seen: false, reducedMotion: false, overlay: false }), { show: true, full: true, ms: LAUNCH_FULL_MS });
-  assert.deepEqual(launchPlan({ seen: true, reducedMotion: false, overlay: false }), { show: true, full: false, ms: LAUNCH_SHORT_MS });
+test('QW15 (founder 2026-11-07): the full animation plays on EVERY launch, about 2–2.5 s, then Home', () => {
+  assert.ok(LAUNCH_FULL_MS >= 2000 && LAUNCH_FULL_MS <= 2500);
+  for (const seen of [false, true, null]) {
+    assert.deepEqual(launchPlan({ seen, reducedMotion: false, overlay: false }), { show: true, full: true, ms: LAUNCH_FULL_MS });
+  }
 });
 
 test('QW17: reduced motion → a short plain fade, never the full animation', () => {
@@ -159,8 +160,8 @@ test('QW18: never on the TV overlay', () => {
   assert.equal(launchPlan({ seen: false, reducedMotion: false, overlay: true }).show, false);
 });
 
-test('QW19: unknown "seen" (storage failed) plays the short version, not the full one forever', () => {
-  assert.equal(launchPlan({ seen: null, reducedMotion: false, overlay: false }).full, false);
+test('QW19: storage failing changes nothing — the full animation still plays and still ends', () => {
+  assert.equal(launchPlan({ seen: null, reducedMotion: false, overlay: false }).full, true);
 });
 
 test('QW16: the overlay always ends — a hard stop timer, and it never blocks touches to the app', () => {

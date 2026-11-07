@@ -1,22 +1,22 @@
 /**
- * The launch animation (docs/design/reference-video, A1): the full scoreline
- * animation once, after install; a short one on later launches; a plain fade
- * for reduced motion; never on the TV overlay. It runs over the app, which
- * loads underneath, so it never makes the app slower to use.
+ * The launch animation (docs/design/reference-video, A1). Founder 2026-11-07:
+ * the full scoreline animation on EVERY launch (it builds the brand), and
+ * Home shows only once it has finished; a plain fade for reduced motion;
+ * never on the TV overlay. The app loads underneath meanwhile.
  */
-export const LAUNCH_FULL_MS = 1900;
+export const LAUNCH_FULL_MS = 2400;
 export const LAUNCH_SHORT_MS = 600;
 export const LAUNCH_FADE_MS = 250;
 export const LAUNCH_SEEN_KEY = 'sn.launch.seen.v1';
 
 export interface LaunchPlan { show: boolean; full: boolean; ms: number }
 
-/** `seen`: whether the full version has played on this device (null = unknown). */
+/** `seen` (whether it has played on this device before) no longer changes the
+ *  animation — only the welcome voice, which stays first-launch only. */
 export function launchPlan(o: { seen: boolean | null; reducedMotion: boolean; overlay: boolean }): LaunchPlan {
   if (o.overlay) return { show: false, full: false, ms: 0 };
   if (o.reducedMotion) return { show: true, full: false, ms: LAUNCH_FADE_MS };
-  if (o.seen === false) return { show: true, full: true, ms: LAUNCH_FULL_MS };
-  return { show: true, full: false, ms: LAUNCH_SHORT_MS };
+  return { show: true, full: true, ms: LAUNCH_FULL_MS };
 }
 
 /** One property's keyframes: times in ms from the start, and the values. */
@@ -34,15 +34,16 @@ const tick = (at: number, ms: number): Track => ({ t: [0, at, at + 140, at + 300
 export function launchTracks(plan: LaunchPlan, shift: number): LaunchTracks {
   const ms = Math.max(plan.ms, 1);
   if (plan.full) {
+    // tick 200–580 · lockup 580–960 · line 960–1300 · hold 1300–2100 · fade 2100–2400
     return {
-      overlay: { t: [0, 1600, 1900], v: [1, 1, 0] },
-      grow: { t: [0, 1600, 1900], v: [1, 1, 1.08] },
+      overlay: { t: [0, 2100, ms], v: [1, 1, 0] },
+      grow: { t: [0, 2100, ms], v: [1, 1, 1.08] },
       dot1: tick(200, ms),
       dot2: tick(280, ms),
-      slide: { t: [0, 580, 960, 1900], v: [shift, shift, 0, 0] },
-      word: { t: [0, 580, 960, 1900], v: [0, 0, 1, 1] },
-      wordX: { t: [0, 580, 960, 1900], v: [-16, -16, 0, 0] },
-      line: { t: [0, 960, 1300, 1900], v: [0, 0, 1, 1] },
+      slide: { t: [0, 580, 960, ms], v: [shift, shift, 0, 0] },
+      word: { t: [0, 580, 960, ms], v: [0, 0, 1, 1] },
+      wordX: { t: [0, 580, 960, ms], v: [-16, -16, 0, 0] },
+      line: { t: [0, 960, 1300, ms], v: [0, 0, 1, 1] },
     };
   }
   const ticks = ms > 300;

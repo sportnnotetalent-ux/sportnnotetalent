@@ -13,6 +13,27 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-07 — Launch animation on every launch, Home after it (not yet published)
+
+The founder found the animation too quick on later launches: the full version played only once per device, then a 0.6 s flash. Now:
+- **Every launch:** the full S:N → SportnNote animation (about 2.4 s: tick, lockup, line, a longer hold, then fade). Home becomes visible only as it fades.
+- **Unchanged exceptions:** reduced motion still gets a 0.25 s fade, and shared links on the web still skip it.
+- **The welcome voice stays first-launch only**, so it doesn't speak every time.
+
+Tests updated (quick-wins-reference QW15/QW19, launch-voice-splash LV1, sim-team-suggestions). Demo: a repeat launch showed the full animation with the wordmark for 2.49 s. Full suite 7,652 pass, 0 fail.
+
+### 2026-11-07 — Six app issues from the marketing demo recording (not yet published)
+
+`docs/security/breaks/demo-recording-bugs.md` (DR1–DR6). Of the nine logged in `docs/org/marketing/assets/screens/README.md`, the slot fill and the held result were already live. The founder kept item 4 (the captain's details stay compulsory for tournament teams). Fixed:
+- **Pair order:** pairs keep their set-up order (squads come back in the team's own order).
+- **Readable colours:** pale team colours used as text are darkened to WCAG AA everywhere they're used as text, and a losing side dims its numbers, not its name.
+- **Undo names:** undo names the sides as shown ("Aisha / Tina", not "KD").
+- **Fill slot:** a boxed panel that leads with existing teams, as "Put X in Team 1" rows.
+- **Slot order:** slots read Team 1, Team 2 … Team 10.
+- **Scoreboard names:** they use the free room and wrap instead of being cut.
+
+Tests: demo-recording-bugs 9, sim-demo-recording-bugs (600 cases); undo-labels test updated. Full suite 7,652 pass, 0 fail; tsc clean. Demo checked: badminton pairs and undo, volleyball scoreboard and summary colours. Slots checked by tests only (the offline demo has none). No database change.
+
 ### 2026-11-07 — Release: a held result finishes on the server (web, Android OTA)
 
 Founder ran `20261114120000_held_result_server.sql` — the version with fb489589 (another session’s HR7 catch: an odd winner value could have failed the every-minute job for every match). Confirmed read-only: the `held_result` column, `finish_held_results` (fixed version) and the `finish-held-results` cron job. auth-smoke passed. Published from a clean worktree at the tip fb489589: web `index-894e077b`, confirmed live; Android OTA `c8d07027` (preview) / `cce6bf84` (production). Checked live on the demo account: won a pickleball game, left the tab at once (the case that failed before) — the held result was saved (winner home), the light page read FULL TIME, and ~100 s later the server job completed it (winner home, `completed_at` stamped, `held_result` cleared) with no app open.

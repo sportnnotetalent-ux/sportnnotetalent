@@ -11,11 +11,11 @@ const walk = (dir: string): string[] => readdirSync(dir).flatMap((f) => {
   const p = join(dir, f);
   return statSync(p).isDirectory() ? walk(p) : /\.tsx?$/.test(p) ? [p] : [];
 });
-const base = { full: true, web: false, reducedMotion: false, soundOn: true, moduleReady: true, clipReady: true };
+const base = { firstLaunch: true, web: false, reducedMotion: false, soundOn: true, moduleReady: true, clipReady: true };
 
-test('LV1: plays only with the full first-launch animation, on a phone, switched on, with the module and the real clip', () => {
+test('LV1: plays only on the first launch (the animation plays every launch, the voice does not), on a phone, switched on, with the module and the real clip', () => {
   assert.equal(shouldPlayVoice(base), true);
-  for (const k of ['full', 'soundOn', 'moduleReady', 'clipReady'] as const) assert.equal(shouldPlayVoice({ ...base, [k]: false }), false, k);
+  for (const k of ['firstLaunch', 'soundOn', 'moduleReady', 'clipReady'] as const) assert.equal(shouldPlayVoice({ ...base, [k]: false }), false, k);
   assert.equal(shouldPlayVoice({ ...base, web: true }), false, 'web');
   assert.equal(shouldPlayVoice({ ...base, reducedMotion: true }), false, 'reduced motion');
 });

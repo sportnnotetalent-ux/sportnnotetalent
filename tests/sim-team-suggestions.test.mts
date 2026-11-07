@@ -67,7 +67,7 @@ test('600 users: the two endings and the launch plan always do what they say', (
     if (choice === 'now') assert.deepEqual(e, { startsAt: now, openScoring: true });
     else assert.deepEqual(e, { startsAt: when, openScoring: false });
     const p = launchPlan({ seen: rnd() < 0.3 ? null : rnd() < 0.5, reducedMotion: rnd() < 0.1, overlay: rnd() < 0.05 });
-    assert.ok(p.ms <= 2000);
-    if (p.full) assert.equal(p.ms, 1900);
+    assert.ok(p.ms <= 2500);
+    if (p.full) assert.equal(p.ms, 2400);
   }
 });
