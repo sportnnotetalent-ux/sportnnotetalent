@@ -24,17 +24,17 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { theme } from '../core/theme';
-import { Card, Button, TextField, SelectChip, ScreenTitle, FormError, ListRow, textStyles } from '../components/ui';
+import { Card, Button, TextField, SelectChip, ScreenTitle, FormError, textStyles } from '../components/ui';
 import { PhoneField } from '../components/PhoneField';
 import { RegistrationBanner } from '../components/RegistrationBanner';
 import { ClubQuickPick } from '../components/ClubQuickPick';
 import { getSportMeta, participantMode } from '../sports/sportMeta';
 import { useAuth } from '../core/auth';
 import { useTournamentById, useTeams, useTournamentEntries, useTournamentCategories, useLeagueData, useCaptainships } from '../data/hooks';
-import { addTournamentTeams, removeTournamentTeam, createTeam, invitePerson, setTeamLeaders, createInvite, setTournamentTeamStatus, setTournamentTeamCheckIn, getTeamLeaders, enterOrgHousesAsTeams, getLiveTournamentInvite, setTournamentInvite, getTeamsSetup, canManageTeam, getMyPlayerId, getMyEntrant, isNeedsDbUpdate, getTournamentSlotIds, fillTournamentSlot, nameTournamentSlot, createTournamentSlots } from '../data/repos';
-import { nextSlotNames, slotCandidates, slotsInOrder } from '../core/slots';
-import { inviteCaptain } from '../data/teamCaptain';
-import { newTeamProblem } from '../core/teamPick';
+import { addTournamentTeams, removeTournamentTeam, createTeam, invitePerson, setTeamLeaders, createInvite, setTournamentTeamStatus, setTournamentTeamCheckIn, getTeamLeaders, enterOrgHousesAsTeams, getLiveTournamentInvite, setTournamentInvite, getTeamsSetup, canManageTeam, getMyPlayerId, getMyEntrant, isNeedsDbUpdate, getTournamentSlotIds, createTournamentSlots } from '../data/repos';
+import { nextSlotNames, slotsInOrder } from '../core/slots';
+import { SlotFillPanel } from '../components/SlotFillPanel';
+import type { CaptainInvite } from '../data/teamCaptain';
 import { filterTeams } from '../core/teamSearch';
 import { tournamentInviteMessage, tournamentJoinLink } from '../core/tournamentInvite';
 import { inviteLabel, playerInviteText } from '../core/inviteText';
@@ -134,11 +134,6 @@ export default function TournamentTeamsScreen() {
   // DR5: slots read Team 1, Team 2 … in their places; real teams keep theirs
   const confirmedOrdered = slotsInOrder(confirmedInScope, (e) => slotIds.has(e.team.id));
   const [filling, setFilling] = useState<string | null>(null);
-  const [slotName, setSlotName] = useState('');
-  const [slotQuery, setSlotQuery] = useState('');
-  // PK8: a brand-new team in a slot gets its captain, invited to add the players
-  const [slotCapName, setSlotCapName] = useState('');
-  const [slotCapPhone, setSlotCapPhone] = useState('');
   useEffect(() => {
     let on = true;
     getTournamentSlotIds(params.tournamentId).then((ids) => on && setSlotIds(ids)).catch(() => {});
@@ -159,24 +154,11 @@ export default function TournamentTeamsScreen() {
       setError(e instanceof Error ? e.message : 'Couldn’t add the slots.');
     } finally { setBusy(false); }
   }
-  async function fillSlot(slotId: string, how: { teamId: string } | { name: string }) {
-    if (!('teamId' in how)) {
-      const why = newTeamProblem(how.name, slotCapName, slotCapPhone);
-      if (why) return setError(why);
-    }
-    setBusy(true); setError(null); setAdded(null);
-    try {
-      if ('teamId' in how) await fillTournamentSlot(slotId, how.teamId);
-      else {
-        await nameTournamentSlot(slotId, how.name);
-        const iv = await inviteCaptain(slotId, how.name.trim(), slotCapName, slotCapPhone, sport);
-        setAdded({ note: `✅ ${iv.teamName} is in · invite ${iv.captainName} to captain it and add the players:`, link: iv.link, phone: iv.phone, name: iv.captainName, context: teamAtTournament(iv.teamName, tournament?.name), code: iv.code });
-      }
-      setFilling(null); setSlotName(''); setSlotQuery(''); setSlotCapName(''); setSlotCapPhone('');
-      setTick((n) => n + 1);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Couldn’t fill the slot.');
-    } finally { setBusy(false); }
+  // PK8 / FM3: the shared fill panel; a brand-new team's captain gets the invite
+  function slotFilled(iv?: CaptainInvite) {
+    setFilling(null); setError(null);
+    if (iv) setAdded({ note: `✅ ${iv.teamName} is in · invite ${iv.captainName} to captain it and add the players:`, link: iv.link, phone: iv.phone, name: iv.captainName, context: teamAtTournament(iv.teamName, tournament?.name), code: iv.code });
+    setTick((n) => n + 1);
   }
   const { isCaptain } = useCaptainships();
 
@@ -648,7 +630,7 @@ export default function TournamentTeamsScreen() {
                   </View>
                   {slotIds.has(e.team.id) ? (
                     <Button label={filling === e.team.id ? 'Close' : 'Fill slot'} variant="ghost" disabled={busy}
-                      onPress={() => { setFilling((f) => (f === e.team.id ? null : e.team.id)); setSlotName(''); setSlotQuery(''); }} />
+                      onPress={() => setFilling((f) => (f === e.team.id ? null : e.team.id))} />
                   ) : (
                     <>
                       <SelectChip label={e.checkedInAt ? 'Checked in' : 'Check in'} active={!!e.checkedInAt} onPress={() => void toggleCheckIn(e)} />
@@ -659,33 +641,12 @@ export default function TournamentTeamsScreen() {
               )).flatMap((row, i) => {
                 const e = confirmedOrdered[i];
                 if (!slotIds.has(e.team.id)) return [row];
-                const q = slotQuery.trim();
-                // a named team from a friendly, or one already entered with no game yet, can take the slot
-                const found = slotCandidates(allTeams, q, { slotIds, inFixtures: new Set(inFixtures) });
                 return [
                   row,
                   <Text key={`${e.team.id}-slot`} style={textStyles.muted}>Slot · waiting for a team — its fixtures are already made.</Text>,
                   filling === e.team.id ? (
-                    <View key={`${e.team.id}-fill`} style={st.slotBox}>
-                      {/* DR4: the usual case first — a team already on SportnNote — as rows
-                          that say where they go, not chips like the team picker below */}
-                      <Text style={textStyles.h3}>Fill {e.team.name}</Text>
-                      <TextField label="Or a team already on SportnNote" value={slotQuery} onChange={setSlotQuery} placeholder="Search by name" autoCapitalize="none" />
-                      {q.length >= 2 && !found.length ? <Text style={textStyles.muted}>No team by that name in this sport.</Text> : null}
-                      <View style={{ gap: theme.spacing(2) }}>
-                        {found.map((t) => (
-                          <ListRow key={t.id} title={t.name} meta={`Put in ${e.team.name}`} color={t.colorHex}
-                            disabled={busy} onPress={() => void fillSlot(e.team.id, { teamId: t.id })}
-                            accessibilityLabel={`Put ${t.name} in ${e.team.name}`} />
-                        ))}
-                      </View>
-                      <Text style={[textStyles.muted, st.slotOr]}>— or a new team —</Text>
-                      <TextField label="A new team: its name" value={slotName} onChange={setSlotName} placeholder="e.g. Falcons FC" autoCapitalize="words" />
-                      <TextField label="Its captain’s name" value={slotCapName} onChange={setSlotCapName} autoCapitalize="words" />
-                      <PhoneField label="Captain’s mobile" value={slotCapPhone} onChange={setSlotCapPhone} hint="They get an invite to add the team’s players." />
-                      <Button label={`Put “${slotName.trim() || 'this team'}” in ${e.team.name} & invite the captain`} disabled={busy || !slotName.trim()}
-                        onPress={() => void fillSlot(e.team.id, { name: slotName })} />
-                    </View>
+                    <SlotFillPanel key={`${e.team.id}-fill`} slot={{ id: e.team.id, name: e.team.name }} sport={sport}
+                      teams={allTeams} slotIds={slotIds} inFixtures={new Set(inFixtures)} onFilled={slotFilled} />
                   ) : null,
                 ];
               })}
@@ -854,11 +815,6 @@ export default function TournamentTeamsScreen() {
 
 const st = StyleSheet.create({
   // DR4: the fill panel is its own boxed area, set apart from the team picker below
-  slotBox: {
-    gap: theme.spacing(2), padding: theme.spacing(3), marginBottom: theme.spacing(3),
-    borderWidth: 1.5, borderColor: theme.colors.primary, borderRadius: theme.radius.md, backgroundColor: theme.colors.surface,
-  },
-  slotOr: { textAlign: 'center', marginTop: theme.spacing(1) },
   slotChips: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing(2) },
   safe: { flex: 1, backgroundColor: theme.colors.bg },
   content: { padding: theme.spacing(4), gap: theme.spacing(3) },

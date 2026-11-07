@@ -167,6 +167,8 @@ export type RootStackParamList = {
   Standings: { sport?: SportId; tournamentId?: string } | undefined;
   SportHub: { tournamentId: string; sport: SportId; tournamentName?: string };
   Bracket: { tournamentId?: string; sport?: SportId } | undefined;
+  /** Fixture map (founder 2026-11-07): the whole format from day one; organisers fill slots on it */
+  FixtureMap: { tournamentId: string; sport?: SportId };
   /** SD-138 — one entrant's tournament: group finish → knockout rounds → place */
   TeamJourney: { tournamentId: string; teamId: string; sport?: SportId };
   /** inClub: a club's sport view, opened from its team page (never sent on to it again) */

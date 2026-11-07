@@ -309,6 +309,9 @@ export default function BracketScreen() {
     <SafeAreaView style={st.safe} edges={['bottom']}>
       <KeyboardAwareScrollView contentContainerStyle={st.content}>
         <ScreenTitle title="Knockout bracket" subtitle={subtitle} />
+        {tournamentId ? (
+          <Text style={st.mapLink} accessibilityRole="link" onPress={() => nav.navigate('FixtureMap', { tournamentId, sport: activeSport })}>🗺 See the whole format on the fixture map ›</Text>
+        ) : null}
         {(isStaged || de || dcActive) && <Text style={textStyles.muted}>Tap a name to see their whole journey.{anyLive ? ' Live — updates every 30 seconds.' : ''}</Text>}
 
         {sports.length > 1 && (
@@ -613,6 +616,7 @@ function StagedMatchCard({ m }: { m: Match }) {
 }
 
 const st = StyleSheet.create({
+  mapLink: { color: theme.colors.primary, fontWeight: '600', fontSize: theme.font.small },
   safe: { flex: 1, backgroundColor: theme.colors.bg },
   content: { padding: theme.spacing(4), gap: theme.spacing(3) },
   chips: { gap: theme.spacing(2), paddingVertical: theme.spacing(1) },

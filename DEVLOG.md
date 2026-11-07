@@ -13,6 +13,20 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-07 — Fixture map: the whole format from day one, slots filled on it
+
+From the founder's Figma "Tournament Fixture Map": every tournament now has a **Fixture map** for each sport. Organisers open it from Stats or Manage, and the bracket links to it.
+- **Groups:** each group with its teams, and open slots (dashed) that an organiser taps to fill.
+- **Knockout:** a Group stage / Knockout stage switch and a round stepper (‹ Semi-finals · Next: Final ›). The sideways tree has joining lines. Boxes say where a team comes from ("Group A winner", "Winner of Semi-final 1") until real matches replace them, and decided ties move winners on by name.
+- **Final and extras:** a green Final box with the champion, third place, played / to-play (plus goals for goal sports), and Export as PDF.
+- **Same seeding as the app:** the projection uses the app's own seeding (cross-over, or seeded with byes).
+- **Other formats:** double elimination, IPL playoff, Swiss, Americano and hand-kept tables say "this format has its own view" instead of drawing a wrong tree.
+- **Filling slots:** the fill panel moved into `SlotFillPanel`, shared by Participating teams and the map. Captain details stay compulsory.
+- **Files:** `src/core/fixtureMap.ts`, `src/screens/FixtureMapScreen.tsx`, `src/components/SlotFillPanel.tsx`, `TournamentTeamsScreen`, `TournamentProfileScreen`, `BracketScreen`, navigation.
+- **Checks:** break doc `docs/security/breaks/fixture-map.md` (FM1–FM18); `tests/fixture-map.test.mts` (24); `tests/sim-fixture-map.test.mts` (600 organisers, fields 2–128); full suite 7,676 pass; tsc clean; demo check done.
+- **No database change.**
+- **Known limit (FM17):** a team put in a slot before the group fixtures exist is grouped when the fixtures are made. The map tells organisers to make fixtures first.
+
 ### 2026-11-07 — Release: the AI launch voice (web, Android OTA)
 
 auth-smoke passed; publish lock taken. Published from a clean worktree at a88e7f48.

@@ -47,8 +47,10 @@ test('DR3: the undo button names the sides as the screen shows them, not by code
 });
 
 test('DR4: filling a slot leads with "a team already on SportnNote", as rows that say where they go', () => {
-  const s = read('src/screens/TournamentTeamsScreen.tsx');
-  const box = s.slice(s.indexOf('<View key={`${e.team.id}-fill`}'), s.indexOf('</View>\n                  ) : null,', s.indexOf('<View key={`${e.team.id}-fill`}')));
+  // the fill panel is shared with the fixture map (fixture-map.md)
+  assert.match(read('src/screens/TournamentTeamsScreen.tsx'), /<SlotFillPanel/);
+  const s = read('src/components/SlotFillPanel.tsx');
+  const box = s.slice(s.indexOf('<View style={st.box}>'));
   assert.ok(box.indexOf('Or a team already on SportnNote') < box.indexOf('A new team: its name'), 'existing teams first');
   assert.match(box, /<ListRow/);
   assert.doesNotMatch(box, /<SelectChip key=\{t\.id\}/);

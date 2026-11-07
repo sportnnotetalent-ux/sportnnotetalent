@@ -108,6 +108,7 @@ const StandingsScreen = lazyScreen(() => import('../screens/StandingsScreen'));
 const SportHubScreen = lazyScreen(() => import('../screens/SportHubScreen'));
 const TryNewSportScreen = lazyScreen(() => import('../screens/TryNewSportScreen'));
 const BracketScreen = lazyScreen(() => import('../screens/BracketScreen'));
+const FixtureMapScreen = lazyScreen(() => import('../screens/FixtureMapScreen'));
 const TeamJourneyScreen = lazyScreen(() => import('../screens/TeamJourneyScreen'));
 const TeamProfileScreen = lazyScreen(() => import('../screens/TeamProfileScreen'));
 const SquadScreen = lazyScreen(() => import('../screens/SquadScreen'));
@@ -483,6 +484,11 @@ export default function RootNavigator() {
       name="Bracket"
       component={BracketScreen}
       options={{ ...stackScreenOpts, title: 'Bracket' }}
+        />
+      <Stack.Screen
+      name="FixtureMap"
+      component={FixtureMapScreen}
+      options={{ ...stackScreenOpts, title: 'Fixture map' }}
         />
       <Stack.Screen
       name="TeamJourney"

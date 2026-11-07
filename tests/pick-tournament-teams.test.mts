@@ -34,5 +34,7 @@ test('PK1/PK8: Quick tournament picks teams; Fill slot invites a captain', () =>
   const quick = readFileSync(new URL('../src/screens/QuickTournamentScreen.tsx', import.meta.url), 'utf8');
   assert.match(quick, /TournamentTeamPicker/);
   const teamsScreen = readFileSync(new URL('../src/screens/TournamentTeamsScreen.tsx', import.meta.url), 'utf8');
-  assert.match(teamsScreen, /inviteCaptain\(/);
+  // the fill panel is shared with the fixture map (fixture-map.md)
+  assert.match(teamsScreen, /<SlotFillPanel/);
+  assert.match(readFileSync(new URL('../src/components/SlotFillPanel.tsx', import.meta.url), 'utf8'), /inviteCaptain\(/);
 });

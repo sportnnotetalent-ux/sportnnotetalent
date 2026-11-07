@@ -836,6 +836,7 @@ export default function TournamentProfileScreen() {
 
             <SectionHeader title="Teams" />
             <HubRow icon="👥" title="Participating teams" status={allTeamIds.length ? `${allTeamIds.length} team${allTeamIds.length === 1 ? '' : 's'}${allTeamIds.length > participants.length ? ` · ${allTeamIds.length - participants.length} only in fixtures` : ''}` : 'None yet — add them'} onPress={() => nav.navigate('TournamentTeams', { tournamentId: tournament.id })} />
+            {!(singleSport && isEventSport(sports[0])) && <HubRow icon="🗺" title="Fixture map" status="The whole format — fill open slots on it" onPress={() => nav.navigate('FixtureMap', { tournamentId: tournament.id, ...(singleSport ? { sport: sports[0] } : {}) })} />}
             {isMedal && <HubRow icon="🏅" title="Contingents" status="One squad across every sport" onPress={() => nav.navigate('Contingents', { tournamentId: tournament.id })} />}
 
             <SectionHeader title="Matches" />
@@ -1096,10 +1097,18 @@ export default function TournamentProfileScreen() {
           <>
             {/* UI audit #47–48: a knockout leads with its bracket (the main button); the
                 full standings page is secondary */}
+            {/* Fixture map (founder 2026-11-07): the whole format from day one, slots filled on it */}
+            {!(singleSport && isEventSport(sports[0])) && (
+              <Button
+                label="🗺 Fixture map"
+                variant={tournament.structure === 'knockout' ? undefined : 'ghost'}
+                onPress={() => nav.navigate('FixtureMap', { tournamentId: tournament.id, ...(singleSport ? { sport: sports[0] } : {}) })}
+              />
+            )}
             {tournament.structure !== 'league' && !(singleSport && isEventSport(sports[0])) && (
               <Button
                 label="🏆 Knockout bracket"
-                variant={tournament.structure === 'knockout' ? undefined : 'ghost'}
+                variant="ghost"
                 onPress={() => nav.navigate('Bracket', { tournamentId: tournament.id, ...(singleSport ? { sport: sports[0] } : {}) })}
               />
             )}
