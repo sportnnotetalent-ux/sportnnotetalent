@@ -21,6 +21,14 @@
 
 **Not checked yet:** sound and splash on a real phone. That needs the 1.1.0 build (or the iOS simulator once Xcode is in).
 
-**For the founder:** record "Sport n Note" (about 1 s, quiet room, phone voice memo is fine). I'll trim it, put it in `assets/sounds/launch-voice.m4a`, and switch it on.
+**2026-11-07 update — the AI voice, every launch.** The founder chose an AI voice (option 1: MiniMax Speech 2.8 HD via Figma Weave, `Deep_Voice_Man`, speed 0.85, pitch −1 — slow, smooth, deep). The clip is 1.75 s, AAC mono, 19 KB; `VOICE_CLIP_READY = true`. Founder: "First S:N should get displayed and then with voice Sport n Note."
+
+| # | Break | Kind | Fix |
+|---|---|---|---|
+| LV8 | The voice starts before the S:N mark shows, because a slow font delays the animation by up to 1 s while the voice timer runs from the plan. | Timing | The voice timer starts in the same effect as the animation, `VOICE_AT_MS` = 600 ms after it (the mark is in at 580 ms). The timer is cleared if the animation is torn down. |
+| LV9 | The voice runs past the end of the animation, talking over Home. | Polish | `VOICE_AT_MS + VOICE_MS` (600 + 1750) stays within `LAUNCH_FULL_MS` (2400), tested. |
+| LV10 | Playing the voice every launch annoys people. | UX | The existing "Launch sound" switch turns it off; reduced motion never plays it; web never plays it. |
+
+**Open:** confirm MiniMax/Weave commercial-use terms for the brand sound before the 1.1.0 build ships it.
 
 **At the 1.1.0 merge with `sdk57`:** run `npx expo install --fix` so `expo-audio` / `expo-splash-screen` move to their SDK 57 versions.

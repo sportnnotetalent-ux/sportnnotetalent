@@ -13,6 +13,13 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-07 — The AI "Sport n Note" voice, after the S:N mark, every launch
+
+The founder chose AI voice option 1 (MiniMax Speech 2.8 HD via Figma Weave: deep, slow, smooth; 1.75 s, 19 KB) over their own recording. S:N shows first; the voice starts 600 ms into the animation, as "SportnNote" slides in, and ends before Home (2.4 s). It plays every launch now; the Launch sound switch, reduced motion and web keep it silent.
+- **Files:** `assets/sounds/launch-voice.m4a`, `src/core/launchVoice.ts` (`VOICE_AT_MS`, `VOICE_MS`, no first-launch rule), `src/data/launchVoice.ts` (`VOICE_CLIP_READY = true`), `src/components/LaunchAnimation.tsx` (the timer starts with the animation, after the font wait).
+- **Checks:** `tests/launch-voice-splash.test.mts` (LV1, LV4, LV8), break doc LV8–LV10; full suite 7653 pass, tsc clean.
+- **Heard only on the 1.1.0 build:** APK 41 has no native `expo-audio`, so it stays silent there (guarded). Weave/MiniMax commercial-use terms still to confirm.
+
 ### 2026-11-07 — Release: demo-recording fixes + launch animation every launch (web, Android OTA)
 
 auth-smoke passed. The publish lock was taken (docs/org/publishing.md). Published from a clean worktree at the tip 1f327540; the only app code unreleased was 862b1219 and 1f327540 (the other unreleased commits were docs and marketing images).

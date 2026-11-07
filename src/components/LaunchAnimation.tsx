@@ -21,7 +21,7 @@ import Svg, { G, Path } from 'react-native-svg';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LAUNCH_FADE_MS, LAUNCH_FULL_MS, LAUNCH_SEEN_KEY, LAUNCH_SHORT_MS, launchPlan, launchTracks, type LaunchPlan, type Track } from '../core/launchPlan';
 import { theme } from '../core/theme';
-import { shouldPlayVoice } from '../core/launchVoice';
+import { shouldPlayVoice, VOICE_AT_MS } from '../core/launchVoice';
 import { hydrateLaunchSoundPref, launchSoundPref } from '../core/launchSoundPref';
 import { VOICE_CLIP_READY, audioModuleReady, playLaunchVoice } from '../data/launchVoice';
 
@@ -98,6 +98,8 @@ const FONT_WAIT_MS = 1000;
 export function LaunchAnimation({ fontsReady = true }: { fontsReady?: boolean }) {
   const [gone, setGone] = useState(false);
   const [plan, setPlan] = useState<LaunchPlan | null>(null);
+  // the voice is decided with the plan, but timed from the moment the animation starts
+  const voice = useRef(false);
   const [fontWaitOver, setFontWaitOver] = useState(false);
   useEffect(() => { const t = setTimeout(() => setFontWaitOver(true), FONT_WAIT_MS); return () => clearTimeout(t); }, []);
   const go = fontsReady || fontWaitOver;
@@ -114,12 +116,10 @@ export function LaunchAnimation({ fontsReady = true }: { fontsReady?: boolean })
       let reducedMotion = false;
       try { reducedMotion = await AccessibilityInfo.isReduceMotionEnabled(); } catch { /* assume motion is fine */ }
       const next = launchPlan({ seen, reducedMotion, overlay: false });
-      if (on) setPlan(next);
-      // A2: the "Sport n Note" voice with the full version (first launch), lands on the dot tick
+      // A2: the "Sport n Note" voice with the full animation, every launch
       await hydrateLaunchSoundPref();
-      if (on && shouldPlayVoice({ firstLaunch: seen === false && next.full, web: WEB, reducedMotion, soundOn: launchSoundPref.get(), moduleReady: audioModuleReady(), clipReady: VOICE_CLIP_READY })) {
-        setTimeout(() => void playLaunchVoice(), 200);
-      }
+      voice.current = next.full && shouldPlayVoice({ web: WEB, reducedMotion, soundOn: launchSoundPref.get(), moduleReady: audioModuleReady(), clipReady: VOICE_CLIP_READY });
+      if (on) setPlan(next);
     })();
     // Hard stop: whatever happens, the overlay is gone after 4.5 s.
     const stop = setTimeout(() => on && setGone(true), 4500);
@@ -130,16 +130,19 @@ export function LaunchAnimation({ fontsReady = true }: { fontsReady?: boolean })
     if (!plan || !go) return;
     if (!plan.show) { setGone(true); return; }
     if (plan.full) {
-      // "seen" now only keeps the welcome voice to the first launch
-      try { void AsyncStorage.setItem(LAUNCH_SEEN_KEY, '1').catch(() => {}); } catch { /* storage blocked: no voice next time either way */ }
+      try { void AsyncStorage.setItem(LAUNCH_SEEN_KEY, '1').catch(() => {}); } catch { /* storage blocked: harmless */ }
     }
+    // S:N first, then the voice as "SportnNote" slides in (core/launchVoice) —
+    // timed from the animation's own start, so a slow font never makes it early
+    const voiceTimer = voice.current ? setTimeout(() => void playLaunchVoice(), VOICE_AT_MS) : null;
+    const stopVoiceTimer = () => { if (voiceTimer) clearTimeout(voiceTimer); };
     if (WEB) {
       const t = setTimeout(() => setGone(true), plan.ms + 50);
-      return () => clearTimeout(t);
+      return () => { clearTimeout(t); stopVoiceTimer(); };
     }
     const anim = Animated.timing(progress, { toValue: plan.ms, duration: plan.ms, easing: Easing.linear, useNativeDriver: true });
     anim.start(() => setGone(true));
-    return () => anim.stop();
+    return () => { anim.stop(); stopVoiceTimer(); };
   }, [plan, go, progress]);
 
   if (gone) return null;

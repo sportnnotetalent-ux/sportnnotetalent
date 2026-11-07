@@ -11,13 +11,23 @@ const walk = (dir: string): string[] => readdirSync(dir).flatMap((f) => {
   const p = join(dir, f);
   return statSync(p).isDirectory() ? walk(p) : /\.tsx?$/.test(p) ? [p] : [];
 });
-const base = { firstLaunch: true, web: false, reducedMotion: false, soundOn: true, moduleReady: true, clipReady: true };
+const base = { web: false, reducedMotion: false, soundOn: true, moduleReady: true, clipReady: true };
 
-test('LV1: plays only on the first launch (the animation plays every launch, the voice does not), on a phone, switched on, with the module and the real clip', () => {
+test('LV1 (founder 2026-11-07): the voice plays on every launch — on a phone, switched on, with the module and the real clip', () => {
   assert.equal(shouldPlayVoice(base), true);
-  for (const k of ['firstLaunch', 'soundOn', 'moduleReady', 'clipReady'] as const) assert.equal(shouldPlayVoice({ ...base, [k]: false }), false, k);
+  for (const k of ['soundOn', 'moduleReady', 'clipReady'] as const) assert.equal(shouldPlayVoice({ ...base, [k]: false }), false, k);
   assert.equal(shouldPlayVoice({ ...base, web: true }), false, 'web');
   assert.equal(shouldPlayVoice({ ...base, reducedMotion: true }), false, 'reduced motion');
+});
+
+test('LV8 (founder): S:N shows first, then the voice says "Sport n Note" with the wordmark, finishing before the fade ends', async () => {
+  const { VOICE_AT_MS, VOICE_MS } = await import('../src/core/launchVoice.ts');
+  const { LAUNCH_FULL_MS } = await import('../src/core/launchPlan.ts');
+  assert.ok(VOICE_AT_MS >= 500 && VOICE_AT_MS <= 960, 'starts as the wordmark comes in, after the mark has shown');
+  assert.ok(VOICE_AT_MS + VOICE_MS <= LAUNCH_FULL_MS, 'done before the screen fades into Home');
+  const anim = read("src/components/LaunchAnimation.tsx");
+  const startEffect = anim.slice(anim.indexOf("if (!plan || !go) return;"));
+  assert.match(startEffect, /setTimeout\(\(\) => void playLaunchVoice\(\), VOICE_AT_MS\)/, "timed from the animation start, not from the plan");
 });
 
 test('LV2: expo-audio is never imported at the top of any file (old builds lack it — an import would crash them)', () => {
@@ -41,8 +51,8 @@ test('LV3: silent switch respected, music ducked not stopped, no background audi
   assert.equal(audio[1].microphonePermission, app.expo.ios.infoPlist.NSMicrophoneUsageDescription, 'our own microphone wording kept');
 });
 
-test('LV4: the placeholder clip stays off until the real recording is in', () => {
-  assert.match(read('src/data/launchVoice.ts'), /export const VOICE_CLIP_READY = false;/);
+test('LV4: the chosen AI voice (option 1, deep and slow) is in and switched on', () => {
+  assert.match(read('src/data/launchVoice.ts'), /export const VOICE_CLIP_READY = true;/);
 });
 
 test('SP1: native splash = the animation\'s first frame (same green, same mark, same size)', () => {
