@@ -5,6 +5,7 @@
  * a bar per row. Coverage notes sit under it ("Shot zones charted on 30 of
  * 42 field goals"). `children` render under the rows (a shot chart).
  */
+import { ensureContrast } from '../core/contrast';
 import React, { useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { theme } from '../core/theme';
@@ -63,9 +64,9 @@ export function CategoryStatsPanel({
               return (
                 <View key={r.key} style={st.row} accessible accessibilityLabel={`${r.label}: ${homeName} ${r.home}, ${awayName} ${r.away}`}>
                   <View style={st.vals}>
-                    <Text style={[st.val, lead === 'home' && { color: homeColor, fontWeight: '900' }]} numberOfLines={1}>{r.home}</Text>
+                    <Text style={[st.val, lead === 'home' && { color: ensureContrast(homeColor, theme.colors.bg), fontWeight: '900' }]} numberOfLines={1}>{r.home}</Text>
                     <Text style={st.label} numberOfLines={2}>{r.label}</Text>
-                    <Text style={[st.val, st.right, lead === 'away' && { color: awayColor, fontWeight: '900' }]} numberOfLines={1}>{r.away}</Text>
+                    <Text style={[st.val, st.right, lead === 'away' && { color: ensureContrast(awayColor, theme.colors.bg), fontWeight: '900' }]} numberOfLines={1}>{r.away}</Text>
                   </View>
                   {r.sub ? (
                     <View style={st.vals}>

@@ -5,6 +5,7 @@
  * the team-vs-team rows with a split bar and the leader highlighted. The rows
  * come from the sport (./compareSheet — only what the match tracked).
  */
+import { ensureContrast } from '../core/contrast';
 import React, { useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { theme } from '../core/theme';
@@ -60,9 +61,9 @@ export function StatSheetView({
                 return (
                   <View key={r.key} style={st.row} accessible accessibilityLabel={rowSpoken(r, homeName, awayName)}>
                     <View style={st.vals}>
-                      <Text style={[st.val, lead === 'home' && { color: homeColor }]}>{r.home}</Text>
+                      <Text style={[st.val, lead === 'home' && { color: ensureContrast(homeColor, theme.colors.bg) }]}>{r.home}</Text>
                       <Text style={st.label} numberOfLines={2}>{r.label}</Text>
-                      <Text style={[st.val, { textAlign: 'right' }, lead === 'away' && { color: awayColor }]}>{r.away}</Text>
+                      <Text style={[st.val, { textAlign: 'right' }, lead === 'away' && { color: ensureContrast(awayColor, theme.colors.bg) }]}>{r.away}</Text>
                     </View>
                     {r.plain ? null : (
                       <View style={st.bar}>

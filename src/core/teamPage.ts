@@ -97,3 +97,14 @@ export function collapseClubs(rows: readonly { id: string; name: string; colorHe
   }
   return out;
 }
+
+/** DR1 (demo-recording-bugs.md): a squad in the team's own order — the order
+ *  it was set up in, so a pair keeps "Meera / Arjun". Anyone not in `ids`
+ *  keeps their place after; an id that couldn't be read is skipped. */
+export function inRosterOrder<T extends { id: string }>(players: readonly T[], ids: readonly string[]): T[] {
+  const at = new Map(ids.map((id, i) => [id, i] as const));
+  return players
+    .map((p, i) => ({ p, k: at.has(p.id) ? at.get(p.id)! : ids.length + i }))
+    .sort((a, b) => a.k - b.k)
+    .map((x) => x.p);
+}

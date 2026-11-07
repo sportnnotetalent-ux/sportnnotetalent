@@ -6,7 +6,7 @@
  *  match is live the ratings read "Live — provisional". */
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { readableOn } from '../core/contrast';
+import { readableOn, ensureContrast } from '../core/contrast';
 import { theme } from '../core/theme';
 import { Card, EmptyState, textStyles } from './ui';
 import { RankBadge, podiumColor } from './Rank';
@@ -57,7 +57,8 @@ export function MatchSummary({
   const teamColor = (s: 'home' | 'away') => (s === 'home' ? homeColor : awayColor);
   const teamName = (s: 'home' | 'away') => (s === 'home' ? homeName : awayName);
 
-  // Once a match is decided, dim the loser's score so the winner reads at a
+  // Once a match is decided, dim the loser's score (DR2: the score only — the
+  // team name stays readable) so the winner reads at a
   // glance (the app's "results board" cue). Draws / non-numeric scores (pens,
   // shootouts) keep both at full strength.
   const hs = parseFloat(summary.homeScore), as = parseFloat(summary.awayScore);
@@ -74,14 +75,14 @@ export function MatchSummary({
           <Text style={st.resultLabel}>{summary.statusLine}</Text>
         </View>
         <View style={st.scoreRow}>
-          <View style={[st.side, decided && !homeWon && st.scoreLost]}>
-            <Text style={[st.score, { color: homeColor }]}>{summary.homeScore}</Text>
-            <Text style={[st.sideName, { color: homeColor }]} numberOfLines={1}>{homeName}</Text>
+          <View style={st.side}>
+            <Text style={[st.score, { color: ensureContrast(homeColor, theme.colors.surface) }, decided && !homeWon && st.scoreLost]}>{summary.homeScore}</Text>
+            <Text style={[st.sideName, { color: ensureContrast(homeColor, theme.colors.surface) }]} numberOfLines={1}>{homeName}</Text>
           </View>
           <Text style={st.colon}>:</Text>
-          <View style={[st.side, decided && !awayWon && st.scoreLost]}>
-            <Text style={[st.score, { color: awayColor }]}>{summary.awayScore}</Text>
-            <Text style={[st.sideName, { color: awayColor }]} numberOfLines={1}>{awayName}</Text>
+          <View style={st.side}>
+            <Text style={[st.score, { color: ensureContrast(awayColor, theme.colors.surface) }, decided && !awayWon && st.scoreLost]}>{summary.awayScore}</Text>
+            <Text style={[st.sideName, { color: ensureContrast(awayColor, theme.colors.surface) }]} numberOfLines={1}>{awayName}</Text>
           </View>
         </View>
         {complete && scoreLine ? <Text style={st.scoreLine}>{scoreLine}</Text> : null}
@@ -105,7 +106,7 @@ export function MatchSummary({
             <Text style={st.mvpDetail} numberOfLines={1}>{[mvp.detail, teamName(mvp.side)].filter(Boolean).join(' · ')}</Text>
             {mvp.changed ? <Text style={st.mvpNote} numberOfLines={1}>Chosen by officials</Text> : null}
           </View>
-          {mvp.rating > 0 ? <Text style={[st.mvpRating, { color: teamColor(mvp.side) }]}>★{mvp.rating.toFixed(1)}</Text> : null}
+          {mvp.rating > 0 ? <Text style={[st.mvpRating, { color: ensureContrast(teamColor(mvp.side), theme.colors.surface) }]}>★{mvp.rating.toFixed(1)}</Text> : null}
         </TouchableOpacity>
       )}
 

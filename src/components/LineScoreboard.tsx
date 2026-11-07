@@ -8,11 +8,13 @@
  * Sports feed it via their own `plugin.Scoreboard`; the generic <Scoreboard/>
  * still serves the "home : away" total sports (football).
  */
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { theme } from '../core/theme';
 import { Glyph } from './Icon';
 import { PopNumber } from './pressFeedback';
+import { ensureContrast } from '../core/contrast';
+import { nameColumnWidth, CELL } from './lineScoreLayout';
 
 export interface LineCol { label: string; highlight?: boolean }
 export interface LineRow { name: string; color: string; lead: string; cells: string[] }
@@ -36,9 +38,12 @@ export function LineScoreboard({
   winner?: 'home' | 'away' | null;
 }) {
   const wide = leadLabel.length > 5;
+  // DR6: the name column grows into the room the score columns leave
+  const [innerW, setInnerW] = useState(0);
+  const nameW = nameColumnWidth(innerW, columns.length, wide);
   const rows: Array<LineRow & { side: 'home' | 'away' }> = [{ ...home, side: 'home' }, { ...away, side: 'away' }];
   return (
-    <View style={st.wrap}>
+    <View style={st.wrap} onLayout={(e) => { const w = Math.round(e.nativeEvent.layout.width) - 2 * PAD; if (w !== innerW) setInnerW(w); }}>
       <View style={st.statusRow}>
         {clock ? clock : (
           <>
@@ -52,7 +57,7 @@ export function LineScoreboard({
         <View>
           {/* Header: name spacer · lead label · period labels */}
           <View style={st.headRow}>
-            <View style={st.nameCell} />
+            <View style={{ width: nameW }} />
             {/* a longer word (FRAMES, RACKS) gets a wider column, header and cells alike */}
             <Text style={[st.leadHead, wide && st.wideLead]} numberOfLines={1}>{leadLabel}</Text>
             {columns.map((c, i) => (
@@ -70,14 +75,16 @@ export function LineScoreboard({
             const won = winner === r.side;
             const lost = !!winner && !won;
             return (
-              <View key={ri} style={[st.row, lost && st.rowLost]}>
-                <View style={st.nameRow}>
-                  <Text style={[st.name, { color: r.color }]} numberOfLines={1}>{r.name}</Text>
+              <View key={ri} style={st.row}>
+                <View style={[st.nameRow, { width: nameW }]}>
+                  {/* DR2: a pale team colour is darkened just enough to read; the
+                      losing side dims its numbers, not its name */}
+                  <Text style={[st.name, { color: ensureContrast(r.color, theme.colors.surface) }]} numberOfLines={2}>{r.name}</Text>
                   {won ? <Glyph emoji="🏆" style={st.trophy} /> : null}
                 </View>
-                <View style={[st.leadCell, wide && st.wideLead]}><PopNumber text={String(r.lead)} style={st.leadText} /></View>
+                <View style={[st.leadCell, wide && st.wideLead, lost && st.rowLost]}><PopNumber text={String(r.lead)} style={st.leadText} /></View>
                 {r.cells.map((cell, ci) => (
-                  <View key={ci} style={[st.cell, columns[ci]?.highlight && st.cellHi]}>
+                  <View key={ci} style={[st.cell, columns[ci]?.highlight && st.cellHi, lost && st.rowLost]}>
                     <PopNumber text={String(cell)} style={[st.cellText, columns[ci]?.highlight && st.cellTextHi]} />
                   </View>
                 ))}
@@ -90,12 +97,12 @@ export function LineScoreboard({
   );
 }
 
-const CELL = 34;
+const PAD = theme.spacing(4); // the card's side padding (st.wrap)
 const st = StyleSheet.create({
   wrap: {
     backgroundColor: theme.colors.surface, borderRadius: theme.radius.lg,
     borderWidth: 1, borderColor: theme.colors.border,
-    paddingVertical: theme.spacing(4), paddingHorizontal: theme.spacing(4),
+    paddingVertical: theme.spacing(4), paddingHorizontal: PAD,
   },
   statusRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: theme.spacing(2), marginBottom: theme.spacing(3) },
   liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: theme.colors.danger },
@@ -104,7 +111,6 @@ const st = StyleSheet.create({
   grid: { minWidth: '100%', justifyContent: 'center' },
 
   headRow: { flexDirection: 'row', alignItems: 'center', marginBottom: theme.spacing(2) },
-  nameCell: { width: 120 },
   leadHead: { width: 52, textAlign: 'center', color: theme.colors.textMuted, fontSize: theme.font.tiny, fontWeight: '800', letterSpacing: 0.5 },
   wideLead: { width: 64 },
   colHead: { width: CELL, alignItems: 'center' },
@@ -115,7 +121,8 @@ const st = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', paddingVertical: theme.spacing(2) },
   rowLost: { opacity: 0.55 },
   nameRow: { width: 120, flexDirection: 'row', alignItems: 'center', gap: theme.spacing(1) },
-  name: { flexShrink: 1, fontSize: theme.font.h3, fontWeight: '900' },
+  // DR6: a long name wraps to a second line rather than being cut
+  name: { flexShrink: 1, fontSize: theme.font.h3, fontWeight: '900', lineHeight: theme.font.h3 * 1.15 },
   trophy: { fontSize: theme.font.small },
   leadCell: { width: 52, height: 40, borderRadius: theme.radius.sm, backgroundColor: theme.colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' },
   leadText: { color: theme.colors.accent, fontSize: theme.font.h2, fontWeight: '900' },

@@ -57,7 +57,8 @@ describe('UQ-1 / UQ-9 — the screen falls back to the shared label', () => {
   });
   test('LiveScoringScreen resolves the sport label with the shared one as the fallback', () => {
     const s = src('src/screens/LiveScoringScreen.tsx');
-    assert.match(s, /resolveUndoLabel\(\s*plugin\.undoLabel \? \(\) => plugin\.undoLabel!\(lastStep, undoNameOf, \{ home: homeName, away: awayName \}\) : null,\s*\(\) => undoLabel\(lastStep/);
+    // DR3 (demo-recording-bugs.md): the sides as the screen shows them, not their codes
+    assert.match(s, /resolveUndoLabel\(\s*(?:\/\/[^\n]*\n\s*)?plugin\.undoLabel \? \(\) => plugin\.undoLabel!\(lastStep, undoNameOf, \{ home: homeShown, away: awayShown \}\) : null,\s*\(\) => undoLabel\(lastStep/);
     assert.doesNotMatch(s, /plugin\.undoLabel \? plugin\.undoLabel\(lastStep, undoNameOf\) : undoLabel\(/);
   });
   test('each of the five sports registers its own label', () => {

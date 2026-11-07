@@ -12,6 +12,7 @@
  * screen's `useMask().nameOf`, dispute mask included); `mask.text` still
  * masks a disputed name an older log stored in its text.
  */
+import { ensureContrast } from '../core/contrast';
 import React, { useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { theme } from '../core/theme';
@@ -36,7 +37,8 @@ export function CommentaryFeed({
   const [all, setAll] = useState(false);
   if (!blocks.length) return <Text style={st.empty}>{emptyText}</Text>;
   const shown = all ? blocks : blocks.slice(0, FIRST_BLOCKS);
-  const color = (side?: 'home' | 'away') => (side === 'home' ? homeColor : side === 'away' ? awayColor : theme.colors.textMuted);
+  // DR2: a pale team colour is darkened just enough to read on the page
+  const color = (side?: 'home' | 'away') => (side === 'home' ? ensureContrast(homeColor, theme.colors.bg) : side === 'away' ? ensureContrast(awayColor, theme.colors.bg) : theme.colors.textMuted);
 
   const avatar = (name: string, side?: 'home' | 'away') => (
     <View style={[st.avatar, { backgroundColor: color(side) }]} accessibilityElementsHidden importantForAccessibility="no">

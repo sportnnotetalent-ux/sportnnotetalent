@@ -15,7 +15,7 @@ import { cricketInPlay } from './inPlay';
 import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { theme } from '../../core/theme';
-import { readableOn } from '../../core/contrast';
+import { readableOn, ensureContrast } from '../../core/contrast';
 import { useMask } from '../../core/disputeMask';
 import { playerLink, idByName } from '../playerLink';
 import { Button, SelectChip, TextField, textStyles } from '../../components/ui';
@@ -105,13 +105,13 @@ function SuperOverDecision({
       <Text style={ctrl.soTitle}>🔥 {tiedRound ? `${soName} ${so!.round} tied!` : 'Scores level — it’s a tie!'}</Text>
       <View style={ctrl.tieBoard}>
         <View style={ctrl.tieSide}>
-          <Text style={[ctrl.tieScore, { color: col('home') }]}>{rootState.scores.home.runs}/{rootState.scores.home.wickets}</Text>
-          <Text style={[ctrl.tieName, { color: col('home') }]} numberOfLines={1}>{homeName}</Text>
+          <Text style={[ctrl.tieScore, { color: ensureContrast(col('home'), theme.colors.surface) }]}>{rootState.scores.home.runs}/{rootState.scores.home.wickets}</Text>
+          <Text style={[ctrl.tieName, { color: ensureContrast(col('home'), theme.colors.surface) }]} numberOfLines={1}>{homeName}</Text>
         </View>
         <View style={ctrl.tieTag}><Text style={ctrl.tieTagText}>TIED</Text></View>
         <View style={ctrl.tieSide}>
-          <Text style={[ctrl.tieScore, { color: col('away') }]}>{rootState.scores.away.runs}/{rootState.scores.away.wickets}</Text>
-          <Text style={[ctrl.tieName, { color: col('away') }]} numberOfLines={1}>{awayName}</Text>
+          <Text style={[ctrl.tieScore, { color: ensureContrast(col('away'), theme.colors.surface) }]}>{rootState.scores.away.runs}/{rootState.scores.away.wickets}</Text>
+          <Text style={[ctrl.tieName, { color: ensureContrast(col('away'), theme.colors.surface) }]} numberOfLines={1}>{awayName}</Text>
         </View>
       </View>
       {rootState.rainStop ? (
@@ -1959,7 +1959,7 @@ const CricketSummary: NonNullable<SportPlugin<CricketState>['Summary']> = ({ sta
           <Text style={sum.awardDetail} numberOfLines={1}>{detail} · {teamName(p.side)}</Text>
           {note ? <Text style={sum.awardNote} numberOfLines={1}>{note}</Text> : null}
         </View>
-        <Text style={[sum.awardPts, { color: teamColor(p.side) }]} numberOfLines={1}>★{p.rating.toFixed(1)}</Text>
+        <Text style={[sum.awardPts, { color: ensureContrast(teamColor(p.side), theme.colors.surface) }]} numberOfLines={1}>★{p.rating.toFixed(1)}</Text>
       </TouchableOpacity>
     );
   };
@@ -2071,8 +2071,8 @@ const CricketSummary: NonNullable<SportPlugin<CricketState>['Summary']> = ({ sta
   const { winner: winnerSide, text: resultTail } = outcome(s);
   const FinalSide = ({ side }: { side: 'home' | 'away' }) => (
     <View style={[sum.finalSide, winnerSide && winnerSide !== side && sum.finalLost]}>
-      <Text style={[sum.finalTeam, { color: teamColor(side) }]} numberOfLines={1}>{teamName(side)}</Text>
-      <Text style={[sum.finalScore, { color: teamColor(side) }]}>{s.scores[side].runs}/{s.scores[side].wickets}</Text>
+      <Text style={[sum.finalTeam, { color: ensureContrast(teamColor(side), theme.colors.surface) }]} numberOfLines={1}>{teamName(side)}</Text>
+      <Text style={[sum.finalScore, { color: ensureContrast(teamColor(side), theme.colors.surface) }]}>{s.scores[side].runs}/{s.scores[side].wickets}</Text>
       <Text style={sum.finalOvers}>({oversStr(s.scores[side].balls, s.ballsPerOver)})</Text>
       {winnerSide === side ? <Glyph emoji="🏆" style={sum.finalCrown} /> : null}
     </View>

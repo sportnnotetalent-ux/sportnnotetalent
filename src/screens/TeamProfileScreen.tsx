@@ -1,5 +1,6 @@
 /** Team (house) profile: stats (form, scored/conceded, top performers,
  *  head-to-head), record per sport, squad, matches — and a follow toggle. */
+import { ensureContrast } from '../core/contrast';
 import { nextGame } from '../core/nextGame';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { collapseTies, isTieMatch } from '../data/teamTie';
@@ -230,7 +231,7 @@ export default function TeamProfileScreen() {
       <KeyboardAwareScrollView ref={scrollRef} contentContainerStyle={st.content}>
         <View style={st.headerRow}>
           <View style={[st.crest, { backgroundColor: (team.colorHex ?? theme.colors.surfaceAlt) + '33', borderColor: team.colorHex ?? theme.colors.border }]}>
-            <Text style={[st.crestText, { color: team.colorHex ?? theme.colors.text }]}>
+            <Text style={[st.crestText, { color: ensureContrast(team.colorHex ?? theme.colors.text, theme.colors.surface) }]}>
               {team.name.split(' ').map((w) => w[0]).join('').slice(0, 3).toUpperCase()}
             </Text>
           </View>
@@ -451,7 +452,7 @@ export default function TeamProfileScreen() {
             <TouchableOpacity accessibilityRole="button" key={p.id} activeOpacity={0.85} onPress={() => nav.navigate('PlayerProfile', { playerId: p.id })}>
               <Card style={st.playerRow}>
                 <View style={[st.avatar, { backgroundColor: (team.colorHex ?? theme.colors.surfaceAlt) + '33' }]}>
-                  <Text style={[st.avatarText, { color: team.colorHex ?? theme.colors.primary }]}>
+                  <Text style={[st.avatarText, { color: ensureContrast(team.colorHex ?? theme.colors.primary, theme.colors.surface) }]}>
                     {p.fullName.split(' ').map((n) => n[0]).join('').slice(0, 2)}
                   </Text>
                 </View>

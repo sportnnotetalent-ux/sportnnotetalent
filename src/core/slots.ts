@@ -79,3 +79,11 @@ export function slotCandidates<T extends { id: string; name: string; adhoc?: boo
   if (q.length < 2) return [];
   return teams.filter((t) => !isQuickPlaceholder(t) && !o.slotIds.has(t.id) && !o.inFixtures.has(t.id) && t.name.toLowerCase().includes(q)).slice(0, 12);
 }
+
+/** DR5 (demo-recording-bugs.md): slots read Team 1, Team 2 … Team 10, in the
+ *  places slots already hold; real teams keep theirs. */
+export function slotsInOrder<T extends { team: { name: string } }>(entries: readonly T[], isSlot: (e: T) => boolean): T[] {
+  const sorted = entries.filter(isSlot).sort((a, b) => a.team.name.localeCompare(b.team.name, undefined, { numeric: true, sensitivity: 'base' }));
+  let k = 0;
+  return entries.map((e) => (isSlot(e) ? sorted[k++] : e));
+}

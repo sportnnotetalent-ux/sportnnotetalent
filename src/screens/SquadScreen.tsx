@@ -2,6 +2,7 @@
  *  Players are added the one way used everywhere (AddInvitePlayer): by mobile
  *  number / from contacts for new people, or by number, name or email for anyone
  *  already on SportnNote — never a bare typed name. */
+import { ensureContrast } from '../core/contrast';
 import { notice } from '../core/confirm';
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
@@ -199,7 +200,7 @@ export default function SquadScreen() {
                 <View style={st.playerRow}>
                   <View style={[st.avatar, { backgroundColor: (team.colorHex ?? theme.colors.surfaceAlt) + '33' }]}>
                     <PlayerPhoto url={p.photoUrl} style={st.avatarImg} fallback={
-                      <Text style={[st.avatarText, { color: team.colorHex ?? theme.colors.primary }]}>
+                      <Text style={[st.avatarText, { color: ensureContrast(team.colorHex ?? theme.colors.primary, theme.colors.surface) }]}>
                         {avatarInitials(p.fullName)}
                       </Text>
                     } />

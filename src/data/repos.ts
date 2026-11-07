@@ -36,7 +36,7 @@ import { readCache } from './readCache';
 import { fetchAllPages, fetchAllChunked, chunk, ID_CHUNK } from './paging';
 import { entryNameFromPlayers, entryShortName, autoEntryCandidate, autoEntryIds, shortCodeIsAuto, meEntrantName } from './participantEntry';
 import { looksQuickPlaceholder, placeholderEntryIds, placeholderRename } from '../core/quickGame';
-import { squadIds } from '../core/teamPage';
+import { squadIds, inRosterOrder } from '../core/teamPage';
 import { reportError } from '../core/telemetry';
 import {
   orSafe, parseVsQuery, rankByName, filterByName, capIds, collapseTeams, liveOnly, selectMatchHits, matchNames, narrowBySports,
@@ -4060,13 +4060,15 @@ export async function getRoster(teamName: string, sport: SportId, teamId?: strin
     if (byId) {
       const derived = demo.players.filter((p) => p.houseName === byId.name && p.sports.includes(sport)).map((p) => p.id);
       const club = byId.clubId ? demo.clubMembers.filter((m) => m.clubId === byId.clubId).map((m) => m.playerId) : [];
-      const ids = new Set(squadIds(byId.roster, derived, club));
-      return demo.players.filter((p) => ids.has(p.id));
+      // DR1: in the team's own order (a pair keeps "Meera / Arjun")
+      const order = squadIds(byId.roster, derived, club);
+      const ids = new Set(order);
+      return inRosterOrder(demo.players.filter((p) => ids.has(p.id)), order);
     }
     const team = demo.teams.find((t) => t.name === teamName && t.sport === sport && t.roster?.length);
     if (team?.roster?.length) {
       const ids = new Set(team.roster);
-      return demo.players.filter((p) => ids.has(p.id));
+      return inRosterOrder(demo.players.filter((p) => ids.has(p.id)), team.roster);
     }
     return demo.players.filter((p) => p.houseName === teamName && p.sports.includes(sport));
   }
@@ -4088,7 +4090,7 @@ export async function getRoster(teamName: string, sport: SportId, teamId?: strin
   const { data, error } = await readPlayers((cols) => fetchAllChunked(ids, (part, from, to) =>
     supabase!.from(PLAYERS_READ).select(cols).in('id', part).order('id').range(from, to)));
   if (error || !data) return [];
-  return (data as PlayerRow[]).map(toPlayer);
+  return inRosterOrder((data as PlayerRow[]).map(toPlayer), ids); // DR1: the team's own order
 }
 
 /** The bits of a team row that decide which page opens it (core/teamPage). */

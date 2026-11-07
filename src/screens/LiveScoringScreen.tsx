@@ -48,7 +48,7 @@ import { Glyph, IconText } from '../components/Icon';
 import { getSport } from '../sports/registry';
 import { entryDisplayName } from '../data/participantEntry';
 import { placeholderParamsPatch } from '../core/quickGame';
-import { distinctSideColors } from '../core/contrast';
+import { distinctSideColors, ensureContrast } from '../core/contrast';
 import { VoiceScorer } from '../sports/VoiceScorer';
 import { completesMatch } from '../sports/voiceMatch';
 import { Scoreboard } from '../components/Scoreboard';
@@ -1259,11 +1259,12 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
   // Undo labels batch (2026-11-03): a sport's own label that can't name the
   // step (null, junk, or a throw on an odd state) falls back to the shared one.
   const undoWhat = useMemo(() => (lastStep?.type === FORMAT_TYPE ? 'format change' : resolveUndoLabel(
-    plugin.undoLabel ? () => plugin.undoLabel!(lastStep, undoNameOf, { home: homeName, away: awayName }) : null,
-    () => undoLabel(lastStep, { home: homeName, away: awayName, player: undoNameOf }, (s) => {
+    // DR3: the sides as the screen shows them ("Kabir / Dev"), not their codes ("KD")
+    plugin.undoLabel ? () => plugin.undoLabel!(lastStep, undoNameOf, { home: homeShown, away: awayShown }) : null,
+    () => undoLabel(lastStep, { home: homeShown, away: awayShown, player: undoNameOf }, (s) => {
       try { const m = plugin.summary(s as never); return m.homeScore != null && m.awayScore != null ? `${m.homeScore}-${m.awayScore}` : null; } catch { return null; }
     }),
-  )), [plugin, lastStep, homeName, awayName, undoNameOf]);
+  )), [plugin, lastStep, homeShown, awayShown, undoNameOf]);
   // Shared scoring: "Undo: pot · recorded by Ashok"
   const undoBy = undoByLabel({ shared: sharedOn, by: lastStep?.by, me: myPlayerId, nameOf: (id) => undoNameOf(id) });
   // Shared scoring: the "your tap wasn't added" note clears itself after a few seconds.
@@ -1807,9 +1808,9 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
     <View style={st.finalCard}>
       <Text style={st.finalLabel}>FINAL SCORE</Text>
       <View style={st.finalRow}>
-        <Text style={[st.finalScore, { color: homeColor ?? theme.colors.home }]}>{meta.score!.home}</Text>
+        <Text style={[st.finalScore, { color: ensureContrast(homeColor ?? theme.colors.home, theme.colors.surface) }]}>{meta.score!.home}</Text>
         <Text style={st.finalVs}>{homeName}  ·  {awayName}</Text>
-        <Text style={[st.finalScore, { color: awayColor ?? theme.colors.away }]}>{meta.score!.away}</Text>
+        <Text style={[st.finalScore, { color: ensureContrast(awayColor ?? theme.colors.away, theme.colors.surface) }]}>{meta.score!.away}</Text>
       </View>
       <Text style={st.finalResult}>
         {meta.winner === 'draw'
