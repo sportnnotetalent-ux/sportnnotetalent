@@ -321,7 +321,7 @@ export const LOCAL_RULE_FIELDS: FormatField[] = [
     ] },
   // Round 2 — bouncers per over (ICC: 1 in T20, 2 in longer cricket); the warning reads the pitch map
   { key: 'bouncerMax', label: 'Bouncers allowed per over', type: 'choice', default: 'auto', advanced: true,
-    hint: 'with the pitch map on, a warning once the limit is reached — the next bouncer is a no-ball',
+    hint: 'a warning once the bouncers you tag reach the limit — untagged balls aren\'t counted, so no warning doesn\'t mean no bouncers',
     options: [
       { value: 'auto', label: 'Standard (T20 1 · longer 2)' }, { value: 0, label: 'No limit' },
       ...[1, 2, 3].map((n) => ({ value: n, label: String(n) })),

@@ -7,7 +7,7 @@
  */
 import type { FeedGroup, FeedItem } from '../gcc/model.ts';
 import { maxBreak, type FoulKind, type Side, type SnookerState } from './engine.ts';
-import { readFrames, readMakeUp, timeline, MAKE_UP_ORDER, type RFoul, type RFrame } from './read.ts';
+import { readFrames, readMakeUp, timeline, MAKE_UP_ORDER, type RFoul, type RFrame, type RVisit } from './read.ts';
 import type { MakeUp } from './engine.ts';
 import { capFeed } from '../cue/uiState.ts';
 
@@ -53,6 +53,17 @@ const withMakeUp = (pts: number, mk: MakeUp | undefined): string => {
   return t ? `${pts} (${t})` : String(pts);
 };
 
+/** Polish PQ2 — the long-pot / rest tags a visit carries, in words
+ *  ("2 long pots · 1 missed long pot · 1 with the rest"); '' when untagged,
+ *  so an untagged visit reads exactly as before (never "0 long pots"). */
+export function tagText(v: Pick<RVisit, 'lp' | 'lm' | 'rs'>): string {
+  return [
+    ...(v.lp ? [plural(v.lp, 'long pot')] : []),
+    ...(v.lm ? [plural(v.lm, 'missed long pot')] : []),
+    ...(v.rs ? [`${v.rs} with the rest`] : []),
+  ].join(' · ');
+}
+
 const leadText = ([h, a]: [number, number], name: (s: Side) => string) =>
   (h === a ? `Level ${h}–${a}` : `${name(h > a ? 'home' : 'away')} leads ${Math.max(h, a)}–${Math.min(h, a)}`);
 
@@ -90,6 +101,9 @@ function feedOf(s: SnookerState, names: { home: string; away: string }): FeedGro
       else if (v.end === 'respot') text = `${who} — break of ${brk}: level, the black is re-spotted`;
       else if (v.end === 'frame') text = `${who} — break of ${brk}${v.tc ? ' · a total clearance' : ''}`;
       else text = v.pts > 0 ? `${who} — break of ${brk}, then missed a pot` : `${who} missed a pot`;
+      // polish PQ2 — what the scorer tagged in this visit (long pots, the rest)
+      const tags = tagText(v);
+      if (tags) text = `${text} · ${tags}`;
       const maximum = v.pts === max && !v.fb && v.end !== 'live';
       const icon = maximum ? '🏆' : v.pts >= 100 ? '💯' : v.pts >= 50 ? '🔥' : st.foul ? '⚠️' : undefined;
       items.push({

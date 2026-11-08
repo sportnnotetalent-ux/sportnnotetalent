@@ -319,12 +319,14 @@ describe('6 · bouncers-per-over warning (pitch map, organiser limit)', () => {
     const at = bouncerStatus(m.s)!;
     assert.deepEqual(at, { count: 1, limit: 1, over: 1 });
     assert.match(bouncerWarning(at)!, /limit reached .* another is a no-ball/);
-    assert.equal(bouncerSlot(at), '⚠️ 1/1 bouncer this over — the next is a no-ball');
+    // polish PQ8 — the slot says "tagged": it counts only tagged bouncers (cricket R5)
+    assert.equal(bouncerSlot(at), '⚠️ 1/1 bouncer tagged this over — the next is a no-ball');
     assert.match(bouncerNoteFor(m.s, m.s.log!.at(-1)!, true)!, /limit reached/);
     assert.equal(bouncerNoteFor(m.s, m.s.log!.at(-1)!, false), null);
     m.runs(1);
     m.detail({ len: 'bouncer' });
-    assert.equal(bouncerSlot(bouncerStatus(m.s)), '⚠️ 2 bouncers this over — over the limit of 1');
+    // polish PQ8 — "tagged" (cricket R5)
+    assert.equal(bouncerSlot(bouncerStatus(m.s)), '⚠️ 2 bouncers tagged this over — over the limit of 1');
     m.runs(0, 0, 0, 0);
     assert.equal(bouncerStatus(m.s), null, 'over break: nothing bowled of the next over yet');
     m.bowler('a6');

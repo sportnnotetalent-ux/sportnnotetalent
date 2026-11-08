@@ -67,19 +67,21 @@ export function bouncerStatus(s: CricketState): BouncerCount | null {
  *  no-ball") or passed. Null below the limit. */
 export function bouncerWarning(b: BouncerCount | null): string | null {
   if (!b || b.count < b.limit) return null;
-  const n = `${b.count} bouncer${b.count === 1 ? '' : 's'}`;
+  // polish PQ8 (cricket R5) — the count is of TAGGED bouncers: an untagged
+  // ball isn't counted, so the words never claim the umpire's count
+  const n = `${b.count} bouncer${b.count === 1 ? '' : 's'} tagged`;
   return b.count === b.limit
     ? `⚠️ Bouncer limit reached — ${n} this over (max ${b.limit}): another is a no-ball`
     : `⚠️ ${n} this over — over the limit of ${b.limit}: that's a no-ball`;
 }
 
 /** The one-line version for the fixed slot above the run pad ("⚠️ 1/1
- *  bouncers this over — the next is a no-ball"). Null below the limit. */
+ *  bouncer tagged this over — the next is a no-ball"). Null below the limit. */
 export function bouncerSlot(b: BouncerCount | null): string | null {
   if (!b || b.count < b.limit) return null;
   return b.count === b.limit
-    ? `⚠️ ${b.count}/${b.limit} bouncer${b.limit === 1 ? '' : 's'} this over — the next is a no-ball`
-    : `⚠️ ${b.count} bouncers this over — over the limit of ${b.limit}`;
+    ? `⚠️ ${b.count}/${b.limit} bouncer${b.limit === 1 ? '' : 's'} tagged this over — the next is a no-ball`
+    : `⚠️ ${b.count} bouncers tagged this over — over the limit of ${b.limit}`;
 }
 
 /** For one tagged delivery (the detail panel): the warning for ITS over, but

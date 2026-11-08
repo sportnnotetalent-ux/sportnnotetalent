@@ -19,8 +19,13 @@
  */
 import { isSnookerState, maxBreak, snookerStats, COLOURS, type Ball, type FoulKind, type MakeUp, type Side, type SnookerState, type VisitEnd } from './engine.ts';
 
-/** `mk` — cue batch 6: the break's make-up (absent on an older visit). */
-export interface RVisit { side: Side; pts: number; pots: number; shots: number; fb: boolean; end: VisitEnd | 'live'; mk?: MakeUp; tc?: true }
+/** `mk` — cue batch 6: the break's make-up (absent on an older visit).
+ *  `lp` / `lm` / `rs` — polish PQ2/PQ4: long pots made / missed and rest
+ *  shots tagged in the visit (whole numbers 1–999 only; absent = none). */
+export interface RVisit { side: Side; pts: number; pots: number; shots: number; fb: boolean; end: VisitEnd | 'live'; mk?: MakeUp; tc?: true; lp?: number; lm?: number; rs?: number }
+
+/** Polish PQ4 — a stored tag count: a whole number 1–999, else not read. */
+const tagCount = (v: unknown): number | undefined => (typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= 999 ? v : undefined);
 
 /** Cue batch 6 — the make-up order (a stored make-up is read through it:
  *  known balls, whole numbers 1–99 only). */
@@ -67,7 +72,11 @@ function readVisit(v: unknown, max: number, live = false): RVisit | null {
   if (!Number.isInteger(pts) || pts > max) return null;
   const end = live ? 'live' : typeof v.end === 'string' && ENDS.has(v.end) ? (v.end as VisitEnd) : 'miss';
   const mk = readMakeUp(v.mk);
-  return { side: v.side, pts, pots, shots, fb: v.fb === 1 || v.fb === true, end, ...(mk ? { mk } : {}), ...(v.tc === 1 ? { tc: true as const } : {}) };
+  const lp = tagCount(v.lp), lm = tagCount(v.lm), rs = tagCount(v.rs);
+  return {
+    side: v.side, pts, pots, shots, fb: v.fb === 1 || v.fb === true, end, ...(mk ? { mk } : {}), ...(v.tc === 1 ? { tc: true as const } : {}),
+    ...(lp ? { lp } : {}), ...(lm ? { lm } : {}), ...(rs ? { rs } : {}),
+  };
 }
 function readFoul(x: unknown): RFoul | null {
   if (!isObj(x) || !isSide(x.by)) return null;

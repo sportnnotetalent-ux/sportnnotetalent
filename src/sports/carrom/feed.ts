@@ -6,7 +6,7 @@
  * when it was tracked. PURE: derived from the state's boards (which replay
  * from the event log), so a board correction re-derives the feed.
  */
-import { scoreSheet, awardReasonOf, FOUL_TYPES, FOUL_LABEL, type AwardReason, type BoardDetail, type CarromState, type Side } from './engine.ts';
+import { scoreSheet, awardReasonOf, carromFoulsCaptured, FOUL_TYPES, FOUL_LABEL, type AwardReason, type BoardDetail, type CarromState, type Side } from './engine.ts';
 
 /** Cue batch 6 — an award reason inside a sentence. */
 export const AWARD_WORD: Record<AwardReason, string> = { concession: 'conceded', conduct: 'conduct', time: 'time', forfeit: 'forfeit', other: 'other' };
@@ -40,6 +40,9 @@ export function carromFeed(s: CarromState, names: { home: string; away: string }
   const boards = s?.boards ?? [];
   let i = 0; // index into s.boards (the sheet lists them in order)
   const groups: FeedGroup[] = [];
+  // polish PQ6 — "No fouls" only once the match has captured a foul or due
+  // (an old all-zero foul log is "not recorded", as in Stats and careers)
+  const foulsLive = carromFoulsCaptured(boards);
   const awardedGames = new Set((Array.isArray(s?.gameAwards) ? s.gameAwards : []).map((x) => x?.game));
   for (const g of sheet) {
     const items: FeedItem[] = [];
@@ -85,7 +88,7 @@ export function carromFeed(s: CarromState, names: { home: string; away: string }
       const brName = (r.breakerBy ? whoName(nameOf, r.breakerBy.id, r.breakerBy.name) : undefined) ?? (r.breaker ? name(r.breaker) : null);
       if (brName) sub.push(`${brName} broke${det?.brk != null ? ` · ${det.brk} pocketed on the break` : ''}`);
       else if (det?.brk != null) sub.push(`${det.brk} pocketed on the break`);
-      const f = foulText(det, name);
+      const f = foulsLive ? foulText(det, name) : '';
       if (f) sub.push(f);
       const dues = (['home', 'away'] as Side[]).filter((sd) => det?.dues?.[sd]).map((sd) => `${name(sd)} ${det!.dues![sd]}`);
       if (dues.length) sub.push(`Dues — ${dues.join(' · ')}`);

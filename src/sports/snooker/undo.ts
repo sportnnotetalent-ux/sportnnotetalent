@@ -4,26 +4,37 @@
  * "concession · frame 2"). PURE; no names (the state holds sides only, and
  * the bar reads fine without them). Null = the plain "Undo".
  */
-import { COLOURS, isSnookerState, type SnookerState, type LiveFrame } from './engine.ts';
+import { COLOURS, isSnookerState, type SnookerState, type LiveFrame, type Visit } from './engine.ts';
 
 type Step = { type: string; prev: unknown; next: unknown } | null | undefined;
 
 const frameOf = (s: unknown): LiveFrame | null => (isSnookerState(s) ? s.frame : null);
 const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? '' : 's'}`;
 
+/** Polish PQ1 — how much a visit's tag count went up with this stroke. */
+const cnt = (v: unknown): number => (typeof v === 'number' && Number.isInteger(v) && v > 0 && v <= 999 ? v : 0);
+const grew = (before: Visit | undefined, after: Visit | undefined, k: 'lp' | 'lm' | 'rs'): boolean =>
+  !!after && cnt(after[k]) > cnt(before?.[k]);
+
+/** The visit as it stands after a pot (the frame's last visit when the pot
+ *  ended the frame or re-spotted the black, else the one in play). */
+function visitAfterPot(prev: SnookerState, next: SnookerState): Visit | undefined {
+  const pf = prev.frame;
+  const nf = next.frame;
+  if (next.frames.length > prev.frames.length) {
+    const rec = next.frames[next.frames.length - 1];
+    return rec.visits?.[rec.visits.length - 1];
+  }
+  if (nf && nf.respot && !pf?.respot) return nf.visits[nf.visits.length - 1];
+  return nf?.visit;
+}
+
 function potLabel(prev: SnookerState, next: SnookerState): string | null {
   const pf = prev.frame;
   if (!pf) return null;
   const nf = next.frame;
-  let brk: number;
-  if (next.frames.length > prev.frames.length) {
-    const rec = next.frames[next.frames.length - 1];
-    brk = rec.visits?.[rec.visits.length - 1]?.pts ?? pf.visit.pts;
-  } else if (nf && nf.respot && !pf.respot) {
-    brk = nf.visits[nf.visits.length - 1]?.pts ?? pf.visit.pts;
-  } else {
-    brk = nf?.visit.pts ?? pf.visit.pts;
-  }
+  const after = visitAfterPot(prev, next);
+  const brk: number = after?.pts ?? pf.visit.pts;
   const pts = brk - pf.visit.pts;
   let ball: string;
   if (pf.respot) ball = 'black';
@@ -32,7 +43,18 @@ function potLabel(prev: SnookerState, next: SnookerState): string | null {
     ball = reds === 0 ? 'free ball' : pts > reds ? `free ball + ${plural(reds, 'red')}` : reds === 1 ? 'red' : plural(reds, 'red');
   } else if (pf.freeBall && pf.on !== 'colour' && nf && nf.on === pf.on) ball = 'free ball';
   else ball = COLOURS[pts - 2] ?? 'pot';
-  return `${ball} · break ${brk}`;
+  // polish PQ1 — the stroke's tags, only when the engine counted them
+  const tags = [...(grew(pf.visit, after, 'lp') ? ['long pot'] : []), ...(grew(pf.visit, after, 'rs') ? ['with the rest'] : [])];
+  return `${ball}${tags.map((x) => ` · ${x}`).join('')} · break ${brk}`;
+}
+
+/** Polish PQ1 — "missed long pot · with the rest" (the ended visit's counts). */
+function missLabel(prev: SnookerState, next: SnookerState): string | null {
+  const pf = prev.frame, nf = next.frame;
+  if (!pf || !nf || next.frames.length !== prev.frames.length) return null;
+  const ended = nf.visits[nf.visits.length - 1];
+  if (!ended || nf.visits.length <= pf.visits.length) return null;
+  return `missed ${grew(pf.visit, ended, 'lm') ? 'long pot' : 'pot'}${grew(pf.visit, ended, 'rs') ? ' · with the rest' : ''}`;
 }
 
 function foulLabel(prev: SnookerState, next: SnookerState): string | null {
@@ -53,7 +75,7 @@ export function snookerUndoLabel(step: Step): string | null {
     const frame = n ? ` · frame ${n}` : '';
     switch (step.type) {
       case 'POT': return (valid && potLabel(prev, next)) || 'pot';
-      case 'MISS': return 'missed pot';
+      case 'MISS': return (valid && missLabel(prev, next)) || 'missed pot';
       case 'SAFETY': return 'safety';
       case 'FOUL': return (valid && foulLabel(prev, next)) || 'foul';
       case 'FREE_BALL': return 'free ball call';
