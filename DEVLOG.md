@@ -38,6 +38,16 @@ Where it changed:
   - Marketing posts already rendered keep the old mark.
   - The mint experiment was undone and never committed.
 
+### 2026-11-08 — Release: racket stats on + Done, wave 0 (web, Android OTA)
+
+auth-smoke passed and the publish lock was taken. Published from a clean worktree at 0da44ad1.
+- **Web:** `index-77737c28`, live on app.sportnnote.in.
+- **Android OTA:** `397b40a7` (preview) / `7eca4c1c` (production).
+- **Includes:**
+  - racket stats on by default and Done / Saved (7aad15c9);
+  - grouped card, no false zeros, doubles hint, specialist plan (a1c7c0b2);
+  - wave 0, goals / tries never lost on close (0da44ad1).
+
 ### 2026-11-08 — Wave 0: closing a follow-up never loses the goal / try
 
 The specialist review found a live score-loss bug (score-on-close.md). In netball (feeds on, the International preset), hockey, ice hockey, rugby union and rugby league, the goal or try was sent only when its last follow-up step finished, and the header's Cancel threw it away.

@@ -23,3 +23,4 @@ Why: on 2026-11-05 two sessions published within minutes of each other, and one 
 | 2026-11-08 | logo-2f session | 5e59892c | index-2f423b5f | e2e354bd / 6cf61dd3 |
 | 2026-11-08 | top-bar session | 51f6915b | index-dea45f0c | 29c56002 / e18994b7 |
 | 2026-11-08 | sport-hub fix session | 9354f29f | index-edc92f20 | 1a099eff / fa28c5a9 |
+| 2026-11-08 | racket+wave0 session | 0da44ad1 | index-77737c28 | 397b40a7 / 7eca4c1c |
