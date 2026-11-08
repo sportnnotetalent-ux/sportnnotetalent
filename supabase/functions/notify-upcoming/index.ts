@@ -154,7 +154,7 @@ Deno.serve(async (req) => {
   //    Paged: a busy day across every tournament passes 1,000 fixtures.
   const { data: matches } = await fetchAllPages((from, to) => supabase
     .from('matches')
-    .select('id, sport, starts_at, venue_name, tournament_id, scorer_id, scorer_ids, host_ids, home_team_id, away_team_id')
+    .select('id, sport, starts_at, venue_name, tournament_id, scorer_id, scorer_ids, host_ids, home_team_id, away_team_id, format')
     .eq('status', 'scheduled')
     .gt('starts_at', nowISO)
     .lte('starts_at', horizonISO)
@@ -231,6 +231,7 @@ Deno.serve(async (req) => {
       id: t.id, name: t.name, shortName: t.short_name,
       captainId: t.captain_id ?? null, viceCaptainId: t.vice_captain_id ?? null, adminIds: idsOf(t.admin_ids),
       staffProfileIds: staffByTeam.get(t.id) ?? [],
+      squadSize: Array.isArray(t.roster) ? t.roster.length : undefined, // WP9
     }])),
     tournaments: new Map(prepTours.map((t) => [t.id, { id: t.id, hostIds: idsOf(t.host_ids), organizerId: t.organizer_id ?? null, hostOrgId: t.host_org_id ?? null }])),
     orgMembers,
@@ -242,6 +243,8 @@ Deno.serve(async (req) => {
     tournamentId: (m.tournament_id as string | null) ?? null,
     hostIds: idsOf(m.host_ids), scorerIds: scorerIdsOf(m),
     squadSaved: { home: startersSaved.has(`${m.id}:home`), away: startersSaved.has(`${m.id}:away`) },
+    // WP9: how many play a side (doubles = 2)
+    playersPerSide: Number((m.format as Record<string, unknown> | null)?.playersPerSide) || undefined,
   });
   const prepMatches = prepDue.map(({ m, prep }) => ({ pm: toPrepMatch(m), windows: prep }));
   const prepRefList: PrepRef[] = prepMatches.flatMap(({ pm }) => { const r = prepRefs(pm, prepLk); return [...r.squad, ...r.host]; });

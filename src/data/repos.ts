@@ -48,6 +48,7 @@ import type { PointsAdjustment } from './standings';
 import { newTournamentFormats } from './standings';
 import { isPairSport } from './pairSport';
 import { withStatsDefaults } from '../core/statsDefaults';
+import { isStandIn } from '../core/teamPlay';
 import type { ScoringLock } from '../core/scoringLock';
 import { baseOf } from '../core/sharedScoring';
 import { MATCHES } from '../core/mockData';
@@ -4194,6 +4195,8 @@ export async function recordStatLine(args: {
   /** stat keys tracked this match (for per-stat game coverage on profiles) */
   tracked?: string[];
 }): Promise<void> {
+  // team-whos-playing WP4: a stand-in player's stats wait for phase 4's mapping
+  if (isStandIn(args.playerId)) return;
   if (!isSupabaseConfigured || !supabase) {
     recordStat({ ...args, date: undefined });
     return;

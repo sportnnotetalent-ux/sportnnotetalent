@@ -58,6 +58,8 @@ export function planStatSync(
   /** NZI15: keys owned even when no player has them now (`syncOwnedKeys`) */
   alsoOwned: Iterable<string> = [],
 ): StatWrite[] {
+  // team-whos-playing WP4: a stand-in ("{Team} Player n") is no player — its stats wait for phase 4's mapping
+  totals = Object.fromEntries(Object.entries(totals).filter(([id]) => !id.startsWith('ph:'))) as MatchTotals;
   // State ids → whoever holds the line now. Two ids landing on one player
   // (can't normally happen) add up rather than overwrite each other.
   const mapped = new Map<string, { side: 'home' | 'away'; stats: Record<string, number> }>();

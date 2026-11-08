@@ -69,3 +69,21 @@ export function remapStatLines<L extends { matchId: string; playerId: string; st
   }
   return [...out.values()];
 }
+
+/** Phase 3 (team-whos-playing.md WP1 / WP2): the players on a side's scoring
+ *  buttons — the pick, else the whole squad when it is exactly the number
+ *  playing, else "{Team} Player n" stand-ins. Never the whole bigger squad. */
+export function sidePlayers<P extends { id: string; fullName: string }>(o: { teamId: string; teamName: string; squad: readonly P[]; needed: number; picked?: readonly string[] | null }): { kind: Playing['kind']; players: (P | { id: string; fullName: string })[] } {
+  const play = playingFor({ teamId: o.teamId, squad: o.squad.map((p) => p.id), needed: o.needed, picked: o.picked });
+  if (play.kind === 'standin') return { kind: 'standin', players: play.ids.map((id, i) => ({ id, fullName: standInName(o.teamName, i + 1) })) };
+  const byId = new Map(o.squad.map((p) => [p.id, p] as const));
+  return { kind: play.kind, players: play.ids.map((id) => byId.get(id)!) };
+}
+
+/** WP7: a pick can be saved only with exactly the number playing, all distinct */
+export const canSavePick = (ids: readonly string[], needed: number): boolean => ids.length === needed && new Set(ids).size === needed;
+
+/** WP8: who "Ask {Team} to pick" reminds — captain, vice-captain, admins (once each) */
+export function remindTargets(l: TeamLeadership): string[] {
+  return [...new Set([l.captainId, l.viceCaptainId, ...(l.adminIds ?? [])].filter((x): x is string => !!x))];
+}

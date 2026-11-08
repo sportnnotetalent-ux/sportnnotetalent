@@ -70,7 +70,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { cardPng } from '../core/resultCardImage';
 import { viewsLabel } from '../core/personalise';
 import { viewerDeviceId, track } from '../core/telemetry';
-import { getRoster, getPlayers, getLineup, getMatch, getTournaments, getMatchSquads, getMatchStatLines, getMyPlayerId, setMatchScorers, setMatchHosts, setMatchLogo, setMatchFormat, setMatchStream, setMatchManagers, getOrganizations, getTeamLeaders, getMatchDisputes, raiseDispute, updateDispute, dismissDispute, resolveDispute, escalateDispute, createReplacementPlayer, retireMatch, walkoverMatch, rescheduleMatch, getMatchKickoffAt, getScoringLock, claimScoring, handoverScoring, setSharedScoring, endMatchManually, getScoreEdits, getMatchEvents, getTournamentOfficials, joinMatchAsScorer, getMatchOfficials, setMatchOfficials, deleteMatch, resetMatch, setMatchBreak, getMatchLastActivityAt, getMatchPotm, setMatchPotm, stampAggregatePrior, AWARDS_DB_MESSAGE } from '../data/repos';
+import { getRoster, getPlayers, getLineup, getMatch, getTournaments, getMatchSquads, setMatchSquad, getMatchStatLines, getMyPlayerId, setMatchScorers, setMatchHosts, setMatchLogo, setMatchFormat, setMatchStream, setMatchManagers, getOrganizations, getTeamLeaders, getMatchDisputes, raiseDispute, updateDispute, dismissDispute, resolveDispute, escalateDispute, createReplacementPlayer, retireMatch, walkoverMatch, rescheduleMatch, getMatchKickoffAt, getScoringLock, claimScoring, handoverScoring, setSharedScoring, endMatchManually, getScoreEdits, getMatchEvents, getTournamentOfficials, joinMatchAsScorer, getMatchOfficials, setMatchOfficials, deleteMatch, resetMatch, setMatchBreak, getMatchLastActivityAt, getMatchPotm, setMatchPotm, stampAggregatePrior, AWARDS_DB_MESSAGE } from '../data/repos';
 import { matchRatings as genericRatings, type PotmProp } from '../data/ratings';
 import { AwardPickerSheet, type PickerRow } from '../components/AwardPickerSheet';
 import { deleteVerdict, breakLabel, type BreakKind, type MatchBreak } from '../data/matchHousekeeping';
@@ -105,6 +105,8 @@ import { openVenue } from '../core/venue';
 import { formatDateTime, formatTime, useUserTimeZone } from '../core/time';
 import { exportToCalendar } from '../core/ics';
 import { notify, scheduleNudge, cancelNudge } from '../core/notifications';
+import { WhoPlaysCard } from '../components/WhoPlaysCard';
+import { sidePlayers, isStandIn, pickerFor, remindTargets } from '../core/teamPlay';
 import { replayNudge } from '../core/nudge';
 import { playAgain } from '../data/playAgain';
 import { MatchSummary } from '../components/MatchSummary';
@@ -448,15 +450,31 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
     const ids = [...squad.starters, ...squad.subs];
     return ids.map((id) => full.find((p) => p.id === id)).filter((p): p is Player => !!p);
   };
-  const homeRoster = useMemo(() => applySquad(homeFull, squads?.home, squads?.away), [homeFull, squads]);
-  const awayRoster = useMemo(() => applySquad(awayFull, squads?.away, squads?.home), [awayFull, squads]);
+  // team-whos-playing (teams for doubles, phase 3): in a doubles match a side whose
+  // squad is bigger than the number playing plays its pick, else "{Team} Player n"
+  // stand-ins — never its whole squad (WP2)
+  const doublesN = (getSport(sport).participantKind ?? 'team') === 'both' && Number(meta.config?.playersPerSide ?? 1) >= 2 ? Number(meta.config!.playersPerSide) : 0;
+  const teamSideOf = (sd: 'home' | 'away') => {
+    const full = sd === 'home' ? homeFull : awayFull;
+    if (!doublesN || full.length <= doublesN) return null;
+    return sidePlayers({
+      teamId: (sd === 'home' ? meta.homeTeamId : meta.awayTeamId) ?? sd,
+      teamName: sd === 'home' ? homeTeamName ?? homeName : awayTeamName ?? awayName,
+      squad: full, needed: doublesN, picked: (sd === 'home' ? squads?.home : squads?.away)?.starters,
+    });
+  };
+  const homeSide = useMemo(() => teamSideOf('home'), [homeFull, squads, doublesN, meta.homeTeamId, homeTeamName, homeName]); // eslint-disable-line react-hooks/exhaustive-deps
+  const awaySide = useMemo(() => teamSideOf('away'), [awayFull, squads, doublesN, meta.awayTeamId, awayTeamName, awayName]); // eslint-disable-line react-hooks/exhaustive-deps
+  const homeRoster = useMemo(() => (homeSide ? (homeSide.players as Player[]) : applySquad(homeFull, squads?.home, squads?.away)), [homeSide, homeFull, squads]);
+  const awayRoster = useMemo(() => (awaySide ? (awaySide.players as Player[]) : applySquad(awayFull, squads?.away, squads?.home)), [awaySide, awayFull, squads]);
   // Only verified players can take part in scoring (under-18 → verified guardian;
   // 18+ → own verified mobile & email). Ineligible players are kept out of the
   // scoring roster & lineups so they can't be fielded or credited stats.
   // Fast lanes Phase 3: the tournament's own age requirement (always enforced).
   const ageReq = useAgeRequirement({ tournamentId: meta.tournamentId });
-  const homeScoreRoster = useMemo(() => homeRoster.filter((p) => canFieldPlayer(p, ageReq)), [homeRoster, ageReq]);
-  const awayScoreRoster = useMemo(() => awayRoster.filter((p) => canFieldPlayer(p, ageReq)), [awayRoster, ageReq]);
+  // WP3: a stand-in isn't a person, so it skips the eligibility check
+  const homeScoreRoster = useMemo(() => homeRoster.filter((p) => isStandIn(p.id) || canFieldPlayer(p, ageReq)), [homeRoster, ageReq]);
+  const awayScoreRoster = useMemo(() => awayRoster.filter((p) => isStandIn(p.id) || canFieldPlayer(p, ageReq)), [awayRoster, ageReq]);
   const excludedCount = (homeRoster.length - homeScoreRoster.length) + (awayRoster.length - awayScoreRoster.length);
   // MVP B3: singles / doubles sides show names on the controls and board, not
   // their short code ("Ravi / Arjun", not "RKAS"); team sports keep theirs.
@@ -465,8 +483,9 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
   const shownNameOf = useMemo(() => makeNameOf(people, maskValue), [people, maskValue]);
   // MVP F9: two team sides with the same code (both "KF") show their full names
   const sameCode = !individualSport && homeName === awayName && !!homeTeamName && !!awayTeamName && homeTeamName !== awayTeamName;
-  const homeShown = (individualSport ? entryDisplayName(homeScoreRoster.map((p) => shownNameOf(p.id, p.fullName))) : undefined) ?? (sameCode ? homeTeamName! : homeName);
-  const awayShown = (individualSport ? entryDisplayName(awayScoreRoster.map((p) => shownNameOf(p.id, p.fullName))) : undefined) ?? (sameCode ? awayTeamName! : awayName);
+  // WP5: a side on stand-ins shows its team's name
+  const homeShown = (homeSide?.kind === 'standin' ? homeTeamName ?? homeName : undefined) ?? (individualSport ? entryDisplayName(homeScoreRoster.map((p) => shownNameOf(p.id, p.fullName))) : undefined) ?? (sameCode ? homeTeamName! : homeName);
+  const awayShown = (awaySide?.kind === 'standin' ? awayTeamName ?? awayName : undefined) ?? (individualSport ? entryDisplayName(awayScoreRoster.map((p) => shownNameOf(p.id, p.fullName))) : undefined) ?? (sameCode ? awayTeamName! : awayName);
   // MVP L9: the spectator board shows full team names when they fit the screen
   // (the Scoring tab keeps the codes, next to the buttons).
   const { width: boardW } = useWindowDimensions();
@@ -1687,6 +1706,24 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
     />
   ) : null), [canScore, retiredLocally, meta.homeTeamId, meta.awayTeamId, homeTeamName, awayTeamName, sport, matchId, invitedPlayers, bumpRoster]);
 
+  // team-whos-playing: before the first point, a bigger squad picks its players
+  const whoPlaysEl = canScore && !complete && matchId ? (['home', 'away'] as const).map((sd) => {
+            const side = sd === 'home' ? homeSide : awaySide;
+            if (side?.kind !== 'standin') return null;
+            const L = leadersFor(sd);
+            const teamNm = sd === 'home' ? homeTeamName ?? homeName : awayTeamName ?? awayName;
+            const label = `${homeName} vs ${awayName}`;
+            const ask = (pid: string) => void notify({ title: `📋 Who's playing? — ${teamNm}`, body: `Please pick who plays for ${teamNm} in ${label}.`, playerId: pid, matchId });
+            return (
+              <WhoPlaysCard key={sd} teamName={teamNm} color={sd === 'home' ? homeColor : awayColor}
+                squad={(sd === 'home' ? homeFull : awayFull).map((p) => ({ id: p.id, fullName: shownNameOf(p.id, p.fullName) }))}
+                needed={doublesN} mode={pickerFor({ myPlayerId, leaders: L, role: profile?.role, isHost })}
+                captainName={remindTargets(L).map((id) => nameOf(id)).filter(Boolean).slice(0, 2).join(' & ')}
+                onSave={async (ids) => { await setMatchSquad(matchId, sd, { starters: ids, subs: [] }); setSquads(await getMatchSquads(matchId)); }}
+                onAsk={() => remindTargets(L).forEach(ask)} onAskMember={ask} />
+            );
+          }) : null;
+
   const controlsNode = (
     <View style={st.controls}>
       {syncing ? (
@@ -1745,6 +1782,7 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
       ) : !started ? (
         <View style={{ gap: theme.spacing(3), alignItems: 'center' }}>
           <Text style={[textStyles.muted, { textAlign: 'center' }]}>{iAmListedScorer ? 'You’re a scorer for this match.' : 'You can score this match as a host.'}</Text>
+          {whoPlaysEl ? <View style={{ alignSelf: 'stretch', gap: theme.spacing(2) }}>{whoPlaysEl}</View> : null}
           {unevenAsk ? (
             <View style={[st.retirePanel, { alignSelf: 'stretch' }]}>
               <Text style={st.retirePrompt}>Squads look uneven — {unevenAsk}. Start anyway?</Text>

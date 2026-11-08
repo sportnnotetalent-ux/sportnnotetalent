@@ -38,6 +38,20 @@ Where it changed:
   - Marketing posts already rendered keep the old mark.
   - The mint experiment was undone and never committed.
 
+### 2026-11-08 — Teams for doubles, phase 3: "Who's playing?" before the first point
+
+Phase 3 of docs/product/teams-for-doubles.md (team-whos-playing.md).
+- **When it shows:** in a doubles match, a side whose squad is bigger than the number playing gets a "Who's playing? · {Team}" card on the pre-start screen (`WhoPlaysCard`). A two-person team never sees it.
+- **Who can pick:** a team manager or the host taps the playing 2, saved as the matchday squad.
+- **Everyone else** taps "Ask {Team} to pick", which reminds the captain, vice-captain and admins, or reminds any squad member with one tap.
+- **Not picked:** the side plays as "{Team} Player 1 / 2" stand-ins (`sidePlayers`), and the board shows the team name. Stand-ins skip the eligibility filter and never reach the career table (`recordStatLine`, `planStatSync` skip them; phase 4 maps them).
+- **Server reminders:** a racket / cue side with a squad bigger than the number playing now gets the "Squad needed" nudge; two-person teams and singles don't (`prepReminders` WP9; `notify-upcoming` reads roster size and `format.playersPerSide`).
+- **Checks:**
+  - `tests/team-whos-playing.test.mts` (7 tests incl. a 600-match sim; failed first);
+  - full suite 8352 (0 failing), tsc clean;
+  - demo: badminton doubles, Smashers 1 (3 players) vs Meera / Diya. The card shows only for Smashers 1 and the board reads "Smashers 1". After picking Kabir + Rohan → Save, the card goes and the board reads "Kabir / Rohan".
+- **Needs a deploy:** the `notify-upcoming` edge function (server reminders) only changes once deployed.
+
 ### 2026-11-08 — Teams for doubles, phase 2: match setup picks teams
 
 Phase 2 of docs/product/teams-for-doubles.md (team-doubles-setup.md).

@@ -69,6 +69,8 @@ export const NO_SQUAD_SPORTS: readonly string[] = [
   'athletics', 'swimming', 'weightlifting', 'shooting', 'archery', 'rowing', 'canoe', 'cycling',
 ];
 export const sportHasSquads = (sport: string | null | undefined): boolean => !NO_SQUAD_SPORTS.includes(sport ?? '');
+/** teams for doubles (team-whos-playing WP9): racket / cue sports whose sides are teams */
+export const TEAM_DOUBLES_SPORTS: readonly string[] = ['tennis', 'badminton', 'padel', 'squash', 'tabletennis', 'pickleball', 'carrom', 'pool', 'snooker', 'billiards'];
 
 /** 18+ by date of birth ('YYYY-MM-DD…') on `now`'s UTC date. No DOB ⇒ not known. */
 export function isKnownAdult(dob: string | null | undefined, now: number): boolean {
@@ -84,6 +86,8 @@ export interface PrepTeam {
   captainId: string | null; viceCaptainId: string | null; adminIds: string[];
   /** team_staff (PROFILE ids) */
   staffProfileIds: string[];
+  /** team-whos-playing WP9: how many people are in the squad (roster length) */
+  squadSize?: number;
 }
 export interface PrepTournament { id: string; hostIds: string[]; organizerId: string | null; hostOrgId: string | null }
 export interface PrepOrgMember { orgId: string; playerId: string; role: string; until: string | null }
@@ -93,6 +97,8 @@ export interface PrepMatch {
   hostIds: string[]; scorerIds: string[];
   /** a matchday squad with starters is saved for that side */
   squadSaved: { home: boolean; away: boolean };
+  /** WP9: format.playersPerSide (doubles = 2); unknown counts as 2 */
+  playersPerSide?: number;
 }
 export interface PrepLookups {
   teams: Map<string, PrepTeam>;
@@ -143,12 +149,15 @@ export function hostRefs(m: PrepMatch, tour: PrepTournament | undefined, orgMemb
  *  the caller can load exactly those players and accounts. */
 export function prepRefs(m: PrepMatch, lk: Pick<PrepLookups, 'teams' | 'tournaments' | 'orgMembers'>): { squad: PrepRef[]; host: PrepRef[] } {
   const squad: PrepRef[] = [];
-  if (sportHasSquads(m.sport)) {
-    for (const side of ['home', 'away'] as const) {
-      const teamId = side === 'home' ? m.homeTeamId : m.awayTeamId;
-      const team = teamId ? lk.teams.get(teamId) : undefined;
-      if (team && !m.squadSaved[side]) squad.push(...squadLeaderRefs(team));
-    }
+  for (const side of ['home', 'away'] as const) {
+    const teamId = side === 'home' ? m.homeTeamId : m.awayTeamId;
+    const team = teamId ? lk.teams.get(teamId) : undefined;
+    if (!team || m.squadSaved[side]) continue;
+    // WP9: a racket / cue side (teams for doubles) needs a pick only when its
+    // squad is bigger than the number playing; other team-less sports never do
+    const needsPick = sportHasSquads(m.sport)
+      || (TEAM_DOUBLES_SPORTS.includes(m.sport) && (team.squadSize ?? 0) > (m.playersPerSide ?? 2));
+    if (needsPick) squad.push(...squadLeaderRefs(team));
   }
   const host = m.scorerIds.length ? [] : hostRefs(m, m.tournamentId ? lk.tournaments.get(m.tournamentId) : undefined, lk.orgMembers);
   return { squad, host };
