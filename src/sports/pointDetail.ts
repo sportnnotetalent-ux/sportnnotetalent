@@ -686,6 +686,16 @@ export function pdText(pd: PointDetail | undefined | null, names = true, sport?:
 
 /** The hows credited to the point winner (the ones a "By:" hitter can name). */
 const WINNER_HOWS: ReadonlySet<How> = new Set<How>(['winner', 'ace', 'sw', 'stroke']);
+/** tennis-hitter TH8 / TH9 — the hitter a new winner-credit how starts with
+ *  on the doubles card (`winnerIds` = the winning side's roster; fewer than
+ *  two = singles, never a hitter): a Service winner's is the server when the
+ *  serve order names them on that side; else the hitter already picked stays
+ *  (Winner ↔ Service winner); an error has none. */
+export function hitterFor(how: How, prev: PointDetail | undefined, serverId: string | undefined, winnerIds: readonly string[]): string | undefined {
+  if (!WINNER_HOWS.has(how) || winnerIds.length < 2) return undefined;
+  if (how === 'sw' && serverId && winnerIds.includes(serverId)) return serverId;
+  return prev?.by && winnerIds.includes(prev.by) ? prev.by : undefined;
+}
 /** racket-depth RD6: a hitter id is a short non-empty string (player ids are uuids). */
 const BY_MAX = 64;
 
@@ -702,9 +712,10 @@ const validPd = (v: unknown, sport?: DetailSport): PointDetail | null | undefine
   if (typeof o.how !== 'string' || !Object.hasOwn(HOW_KEY, o.how)) return undefined;
   const err = o.err && typeof o.err === 'object' ? o.err as { playerId?: unknown; playerName?: unknown } : undefined;
   // racket-depth RD4 / RD6: the hitter, own property only, on a winner-credit
-  // how of the five racket sports (tennis unchanged)
+  // how (tennis-hitter TH5: tennis too, new matches — the tennis engine calls
+  // without a sport)
   const by = Object.hasOwn(o, 'by') && typeof o.by === 'string' && o.by && o.by.length <= BY_MAX
-    && sport && sport !== 'tennis' && WINNER_HOWS.has(o.how as How) ? o.by : undefined;
+    && WINNER_HOWS.has(o.how as How) ? o.by : undefined;
   return {
     how: o.how as How,
     ...(typeof o.stroke === 'string' && Object.hasOwn(STROKES, o.stroke) ? { stroke: o.stroke } : {}),

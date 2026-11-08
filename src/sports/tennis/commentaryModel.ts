@@ -105,9 +105,11 @@ export function pointSentence(p: PointInput, who: { winner: string; loser: strin
   const phrase = strokePhrase(strokeOf(pd), true);
   const what = (s: string) => article(phrase ? `${phrase} ${s}` : s);
   const loser = (pd.err && whoName(nameOf, pd.err.playerId, pd.err.playerName)) || who.loser;
+  // tennis-hitter TH11: a doubles winner names its hitter (new matches; by id)
+  const winner = (pd.by && whoName(nameOf, pd.by)) || who.winner;
   switch (pd.how) {
-    case 'sw': return `${who.winner} wins the point with a Service Winner`;
-    case 'winner': return `${who.winner} wins the point with ${what('Winner')}`;
+    case 'sw': return `${winner} wins the point with a Service Winner`;
+    case 'winner': return `${winner} wins the point with ${what('Winner')}`;
     case 'fe': return `${loser} loses the point with ${what('Forced Error')}${dirOf(pd)}`;
     case 'ue': return `${loser} loses the point with ${what('Unforced Error')}${dirOf(pd)}`;
     // tennis-endings-depth LR1 — net touch, hindrance, double bounce …

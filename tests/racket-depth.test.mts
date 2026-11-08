@@ -163,7 +163,8 @@ describe('RD6: hostile values', () => {
   test('a bad by is dropped', () => {
     for (const by of [1, '', null, {}, ['h1'], 'x'.repeat(200)]) assert.deepEqual(put({ how: 'winner', by }), { how: 'winner' }, String(by));
     assert.deepEqual(put({ how: 'ue', by: 'h1' }), { how: 'ue' }, 'an error has no hitter');
-    assert.deepEqual(applyPointDetail(ev(), { pd: { how: 'winner', by: 'h1' } })?.[0].pd, { how: 'winner' }, 'tennis unchanged');
+    // tennis-hitter TH5: tennis now keeps a winner's hitter too (doubles "By:", wave 4)
+    assert.deepEqual(applyPointDetail(ev(), { pd: { how: 'winner', by: 'h1' } })?.[0].pd, { how: 'winner', by: 'h1' }, 'tennis keeps the hitter');
     const proto = JSON.parse('{"how":"winner","__proto__":{"by":"h1"}}');
     assert.deepEqual(put(proto), { how: 'winner' });
   });

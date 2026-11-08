@@ -12,6 +12,9 @@
  * Round 2: the serve speed is typed in the match's unit — km/h or mph, with a
  * one-tap switch beside the box (SET_DETAIL speedUnit) — and stored in km/h;
  * the Rally chips offer the match's bucket scheme (`rallyBuckets`).
+ * Wave 4 (tennis-hitter, docs/security/breaks/tennis-doubles-hitter.md):
+ * doubles asks "By:" who hit a winner / service winner (`pd.by`, a player id;
+ * a Service winner starts with the server), as it asks who erred.
  * See pointDetail.ts for the model and tennis/matchStats.ts for the figures.
  */
 import React, { useMemo, useState } from 'react';
@@ -25,7 +28,7 @@ import { pointRows } from '../rallyEdit';
 import { serveStats } from '../serveStats';
 import {
   DETAIL_HOWS, RALLY_LABEL, SHOTS, SHOT_LABEL, SPEED_UNITS, SPEED_UNIT_LABEL, STROKES, WINGS, WING_LABEL,
-  errTypeOf, howDef, pdText, rallyBucketsOf, speedIn, speedRange, speedText, speedUnitOf, strokeOf, toggleNet, validSpeed, winnerSide,
+  errTypeOf, hitterFor, howDef, pdText, rallyBucketsOf, speedIn, speedRange, speedText, speedUnitOf, strokeOf, toggleNet, validSpeed, winnerSide,
   type How, type PointDetail, type Shot, type SpeedUnit, type Wing,
 } from '../pointDetail';
 import { TENNIS_TRACK_FIELDS } from '../pointDetailSettings';
@@ -36,8 +39,8 @@ import { panelMode, doneLabel, howSections, byHint, type PanelMark } from '../de
 import type { TennisState } from './engine';
 
 type Side = 'home' | 'away';
-/** DD12: tennis credits only the erring player for now (no hitter on a winner) */
-const WINNER_BY = false;
+/** DD12 / tennis-hitter: doubles asks who hit a winner, as it asks who erred */
+const WINNER_BY = true;
 const opp = (s: Side): Side => (s === 'home' ? 'away' : 'home');
 
 export function TennisPointDetail({
@@ -62,11 +65,20 @@ export function TennisPointDetail({
   const [choose, setChoose] = useState(false);
   const rows = pointRows(s.events ?? []);
   const last = rows[rows.length - 1];
-  // Who served the last point: Service winner only for the server's side.
+  // Who served the last point: Service winner only for the server's side;
+  // tennis-hitter TH9: the doubles server (by id, from the serve order) is a
+  // Service winner's hitter
   const n = s.events?.length ?? 0;
-  const server = useMemo(() => (on.pointDetail ? serveStats('tennis', s)?.last?.server : undefined),
+  const ids = (r: Player[]) => r.map((p) => p.id).join(',');
+  const lastServe = useMemo(() => {
+    if (!on.pointDetail) return undefined;
+    const st = serveStats('tennis', s, { home: homeRoster.map((p) => p.id), away: awayRoster.map((p) => p.id) });
+    const tr = st?.trace?.[st.trace.length - 1];
+    return st?.last ? { server: st.last.server, serverId: tr?.serverId } : undefined;
+  },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [n, on.pointDetail]);
+    [n, on.pointDetail, ids(homeRoster), ids(awayRoster)]);
+  const server = lastServe?.server;
 
   const nameOf = (side: Side) => (side === 'home' ? homeName : awayName);
   // IDs-only scoring: the point's player by id for this viewer
@@ -113,7 +125,10 @@ export function TennisPointDetail({
     // an error's direction carries over between forced / unforced (tennis-endings-depth ED1)
     const dir = errTypeOf('tennis', pd);
     const keepDir = dir && d?.strokes?.includes(dir) ? { stroke: dir } : {};
-    send({ pd: { how, ...keep, ...keepDir, ...(d?.credit === 'loser' && soloErr ? { err: soloErr } : {}) } });
+    // tennis-hitter TH8 / TH9: the hitter stays between Winner / Service winner;
+    // a Service winner starts with the server (doubles, server known)
+    const by = d?.credit === 'winner' ? hitterFor(how, pd, lastServe?.serverId, winnerRoster.map((p) => p.id)) : undefined;
+    send({ pd: { how, ...keep, ...keepDir, ...(by ? { by } : {}), ...(d?.credit === 'loser' && soloErr ? { err: soloErr } : {}) } });
   };
   /** a new wing / shot on the detail (a legacy stroke id is normalised first) */
   const setStroke = (patch: { wing?: Wing | null; shot?: Shot | null }) => {
@@ -132,10 +147,12 @@ export function TennisPointDetail({
   if (!hows.length && !pd && !serve2 && !on.netDetail && !on.rallyDetail && !on.speedDetail) {
     return <View style={st.bare}>{options}{chooser}</View>;
   }
-  const credited = e.kind !== 'rally' ? whoName(withRosters(mask.nameOf, homeRoster, awayRoster), e.playerId, e.playerName) : undefined;
+  const viewer = withRosters(mask.nameOf, homeRoster, awayRoster);
+  // tennis-hitter: a named hitter first (new matches), else the point's player
+  const credited = (pd?.by ? whoName(viewer, pd.by) : undefined) || (e.kind !== 'rally' ? whoName(viewer, e.playerId, e.playerName) : undefined);
   const who = credited || (winnerRoster.length === 1 ? winnerRoster[0].fullName : nameOf(W));
   const summary = [
-    pd ? pdText(pd, true, undefined, withRosters(mask.nameOf, homeRoster, awayRoster)) : isAce ? 'Ace' : '',
+    pd ? pdText(pd, true, undefined, viewer) : isAce ? 'Ace' : '',
     e.serve === 2 ? '2nd serve' : '',
     e.atNet === 'home' || e.atNet === 'away' ? `at the net: ${nameOf(e.atNet)}` : e.atNet === 'both' ? 'at the net: both' : '',
     e.rallyLen ? RALLY_LABEL[e.rallyLen] : '',
@@ -196,6 +213,16 @@ export function TennisPointDetail({
                 const { stroke: _o, ...rest } = pd;
                 send({ pd: pd.stroke === k ? rest : { ...rest, stroke: k } });
               }} />
+          ))}
+        </View>
+      )}
+      {/* tennis-hitter: who hit the winner, in doubles (as PointDetailRow) */}
+      {sel?.credit === 'winner' && pd && winnerRoster.length >= 2 && (
+        <View style={st.chips}>
+          <Text style={[st.meta, st.rowLabel]}>By:</Text>
+          {winnerRoster.map((p) => (
+            <SelectChip key={p.id} label={p.fullName} active={pd.by === p.id} accessibilityLabel={`Hit by ${p.fullName}`}
+              onPress={() => { const { by: _b, ...rest } = pd; send({ pd: pd.by === p.id ? rest : { ...rest, by: p.id } }); }} />
           ))}
         </View>
       )}
