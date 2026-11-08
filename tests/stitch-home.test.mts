@@ -76,5 +76,6 @@ test('HM13/HM14: many sports fold into one row; four or fewer stay a grid', () =
   assert.deepEqual(sportsSummary([] as never), { folded: false, names: [], more: 0 });
   const h = read('src/screens/HomeScreen.tsx');
   assert.match(h, /sportsSummary\(mySports\)/);
-  assert.match(h, /Show less/);
+  // home-sports.md HS2: the fold opens its own page now, like Try a new sport
+  assert.match(h, /navigate\('YourSports'/);
 });

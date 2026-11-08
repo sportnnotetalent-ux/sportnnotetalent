@@ -11,6 +11,7 @@ import { getMyPlayerId, createMyPlayer } from '../data/repos';
 import type { RootStackParamList } from '../navigation/types';
 import { useProfileShare } from '../data/useProfileShare';
 import { getMyPrivacyStatus } from '../data/privacy';
+import { BrandBar } from '../components/BrandBar';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -60,7 +61,9 @@ export default function ProfileScreen() {
   }, [profile?.id]);
 
   return (
-    <SafeAreaView style={st.safe} edges={['top']}>
+    <SafeAreaView style={st.safe} edges={[]}>
+      {/* brand-bar.md: the shared top bar (name → Home, search, alerts, menu) */}
+      <BrandBar tab />
       <ProfileView
         playerId={playerId}
         lookupFailed={idFailed}

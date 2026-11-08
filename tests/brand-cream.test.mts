@@ -47,17 +47,19 @@ test('BC4/BC5: launch on cream (matching the splash); Home on a cream badge; sig
   const la = read('src/components/LaunchAnimation.tsx');
   assert.match(la, /const TILE = '#F3F0E8'/);
   assert.match(la, /<Wordmark /);
-  const home = read('src/screens/HomeScreen.tsx');
-  assert.match(home, /st\.brandBadge/);
-  assert.match(home, /<Wordmark /);
+  // Home's header is now the shared top bar (brand-bar.md BB2)
+  assert.match(read('src/screens/HomeScreen.tsx'), /<BrandBar /);
+  const bar = read('src/components/BrandBar.tsx');
+  assert.match(bar, /badge: \{ backgroundColor: theme\.colors\.bg/);
+  assert.match(bar, /<Wordmark /);
   assert.match(read('src/screens/AuthScreen.tsx'), /<Wordmark /);
   assert.match(read('scripts/build-website.mjs'), /src="\/wordmark\.svg"/);
 });
 
 test('BC9: app screens show the name only; the S:N stays on the launch screen', () => {
-  for (const f of ['src/screens/HomeScreen.tsx', 'src/screens/AuthScreen.tsx', 'src/screens/GetAppScreen.tsx', 'src/screens/InviteScreen.tsx']) {
+  for (const f of ['src/components/BrandBar.tsx', 'src/screens/HomeScreen.tsx', 'src/screens/AuthScreen.tsx', 'src/screens/GetAppScreen.tsx', 'src/screens/InviteScreen.tsx']) {
     assert.doesNotMatch(read(f), /<Logo /, f);
-    assert.match(read(f), /<Wordmark /, f);
+    assert.match(read(f), /<Wordmark |<BrandBar /, f);
   }
   assert.match(read('src/components/LaunchAnimation.tsx'), /S_PATH|M80 68 H52/, 'the launch screen keeps the mark');
 });

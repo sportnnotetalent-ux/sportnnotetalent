@@ -41,5 +41,6 @@ test('wiring: one overdue line, compact Home cards, folded sport filter', () => 
   assert.match(m, /Sport: \{filter === 'all'/);
   const h = read('src/screens/HomeScreen.tsx');
   assert.match(h, /<MatchCard key=\{m\.id\} match=\{m\} compact /);
-  assert.match(h, /chipNames\.get\(t\.id\)/);
+  // the tournament chip row was removed (home-sports.md HS5); the cards open each tournament
+  assert.match(h, /tournamentCards\(/);
 });

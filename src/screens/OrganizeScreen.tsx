@@ -23,6 +23,7 @@ import { eventZone, todayIn } from '../core/time';
 import type { RootStackParamList } from '../navigation/types';
 import type { Tournament } from '../core/types';
 import { Glyph } from '../components/Icon';
+import { BrandBar } from '../components/BrandBar';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -94,7 +95,9 @@ export default function OrganizeScreen() {
   const scheduleTarget = hosted[0] ?? fallback;
 
   return (
-    <SafeAreaView style={st.safe} edges={['top']}>
+    <SafeAreaView style={st.safe} edges={[]}>
+      {/* brand-bar.md: the shared top bar (name → Home, search, alerts, menu) */}
+      <BrandBar tab />
       <KeyboardAwareScrollView contentContainerStyle={st.content}>
         <ScreenTitle title="Organize" subtitle="Run your sports meet" />
 

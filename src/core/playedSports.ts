@@ -25,3 +25,14 @@ export function yourSports(declared: readonly string[] | undefined, feed: Feed, 
   }
   return out as SportId[];
 }
+
+/** home-sports.md HS1: of `sports`, the one with the most games `me` took part
+ *  in (played, scored or hosted); a tie goes to the first listed; no games → null. */
+export function mostPlayedSport(sports: readonly SportId[], feed: Feed, me: string | null | undefined): SportId | null {
+  if (!me || !sports.length) return null;
+  const n = new Map<string, number>();
+  for (const m of feed ?? []) if (m && typeof m.sport === 'string' && tookPart(m, me)) n.set(m.sport, (n.get(m.sport) ?? 0) + 1);
+  let best: SportId | null = null, most = 0;
+  for (const s of sports) if ((n.get(s) ?? 0) > most) { best = s; most = n.get(s)!; }
+  return best;
+}

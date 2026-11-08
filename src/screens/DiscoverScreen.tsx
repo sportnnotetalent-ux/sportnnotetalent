@@ -29,6 +29,7 @@ import type { SportId, Tournament } from '../core/types';
 import type { RootStackParamList, TabParamList } from '../navigation/types';
 import { useParamState } from '../navigation/useParamState';
 import { openMatchViewer } from '../navigation/openMatch';
+import { BrandBar } from '../components/BrandBar';
 
 const MODES = [
   { key: 'connect', label: '🤝 Connect' },
@@ -221,7 +222,9 @@ export default function DiscoverScreen() {
   ) : null;
 
   return (
-    <SafeAreaView style={st.safe} edges={['top']}>
+    <SafeAreaView style={st.safe} edges={[]}>
+      {/* brand-bar.md: the shared top bar (name → Home, search, alerts, menu) */}
+      <BrandBar tab />
       <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
         <ScreenTitle title="Discover" subtitle="People & opportunities across the community" />
 

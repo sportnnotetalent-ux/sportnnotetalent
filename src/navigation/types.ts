@@ -143,6 +143,8 @@ export type RootStackParamList = {
   /** Hidden dev entry point for the results engine (URL /ResultsLab only). */
   ResultsLab: undefined;
   TryNewSport: { sports?: SportId[] } | undefined;
+  /** the folded "Your sports" row on Home (home-sports.md) */
+  YourSports: undefined;
   /** First-run questions (founder 2026-10-31): uses, sports, positions, city, location. */
   Personalise: undefined;
   PlayerProfile: { playerId: string };
@@ -235,7 +237,8 @@ export type RootStackParamList = {
 };
 
 export type TabParamList = {
-  Home: undefined;
+  /** voice: open the voice panel (the top bar's menu on another screen, brand-bar.md) */
+  Home: { voice?: boolean } | undefined;
   /** Optional entry state when opened via a "See all" link. */
   Matches: { initialTab?: 'live' | 'upcoming' | 'completed'; initialSport?: SportId } | undefined;
   Organize: undefined;

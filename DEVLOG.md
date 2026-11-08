@@ -38,6 +38,25 @@ Where it changed:
   - Marketing posts already rendered keep the old mark.
   - The mint experiment was undone and never committed.
 
+### 2026-11-08 — One top bar (name → Home), Your sports page, no tournament filter
+
+Founder asked for Home's top row across the app, with a tap on the name going Home. Three Home fixes came in while it was being built.
+- **Top bar (`BrandBar`):** the SportnNote name on its cream badge (tap → Home), search, alerts with the unread count, and the quick-actions menu.
+  - **Phones:** on all five tab screens. Match, scoring and detail screens keep their back arrow and title.
+  - **Wide web (≥ 1024 px):** one bar across every signed-in screen, drawn once at the root.
+  - **Menu away from Home:** "Voice — find a game" opens Home with the voice panel.
+  - **Placement:** decided by `src/core/brandBar.ts`.
+- **Your sports:** the folded row now opens its own "Your sports" page with a back arrow, like "Try a new sport". "Show less" is gone.
+  - **Icon:** the sport you've played most (played, scored or hosted); 🏅 if none yet.
+  - **Taps:** a sport opens the same place from Home and from the page (`sportTarget`).
+- **Tournament filter removed:** the chip row above Live now is gone. Live now and Up next show all your matches, and the tournament cards open each tournament.
+- **Checks:**
+  - break docs `brand-bar.md` and `home-sports.md`;
+  - `tests/brand-bar`, `sim-brand-bar` (600 users × 40 screens) and `home-sports` (with a 600-user sim);
+  - full suite 7777, with 2 tests updated on purpose and the student-lists sim passing alone;
+  - tsc;
+  - demo-checked at 375 px and 1280 px.
+
 ### 2026-11-08 — Release: logo 2f on cream (web, Android OTA, website)
 
 auth-smoke passed and the publish lock was taken. Published from a clean worktree at 5e59892c.

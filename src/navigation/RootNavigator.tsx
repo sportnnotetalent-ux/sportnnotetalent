@@ -1,5 +1,5 @@
-import React, { Suspense, useEffect, useRef } from 'react';
-import { Text, View, ActivityIndicator, Platform, Linking, StyleSheet } from 'react-native';
+import React, { Suspense, useEffect, useRef, useState } from 'react';
+import { Text, View, ActivityIndicator, Platform, Linking, StyleSheet, useWindowDimensions } from 'react-native';
 import { House, CalendarDays, Trophy, Compass, CircleUserRound } from 'lucide-react-native';
 import { NavigationContainer, DefaultTheme, getStateFromPath, type LinkingOptions } from '@react-navigation/native';
 import { navRef } from './navRef';
@@ -24,6 +24,8 @@ import { loadSport } from '../sports/registry';
 import type { SportId } from '../core/types';
 import '../data/matchRecordsBackfill'; // SD-51: registers __sportnnoteAdmin.backfillMatchRecords (console only)
 import { OnboardingOverlay } from '../components/OnboardingOverlay';
+import { RootBrandBar } from '../components/BrandBar';
+import { barPlacement } from '../core/brandBar';
 import HomeScreen from '../screens/HomeScreen';
 import MatchesScreen from '../screens/MatchesScreen';
 import DiscoverScreen from '../screens/DiscoverScreen';
@@ -107,6 +109,7 @@ const CompetitionRulesScreen = lazyScreen(() => import('../screens/CompetitionRu
 const StandingsScreen = lazyScreen(() => import('../screens/StandingsScreen'));
 const SportHubScreen = lazyScreen(() => import('../screens/SportHubScreen'));
 const TryNewSportScreen = lazyScreen(() => import('../screens/TryNewSportScreen'));
+const YourSportsScreen = lazyScreen(() => import('../screens/YourSportsScreen'));
 const BracketScreen = lazyScreen(() => import('../screens/BracketScreen'));
 const FixtureMapScreen = lazyScreen(() => import('../screens/FixtureMapScreen'));
 const TeamJourneyScreen = lazyScreen(() => import('../screens/TeamJourneyScreen'));
@@ -167,7 +170,7 @@ const Tab = createBottomTabNavigator<TabParamList>();
 // the Join screen with the code prefilled.
 // Stack screens reachable by URL on web (/GolfRound?eventId=…). Keep in sync with
 // the <Stack.Screen> list below — a screen missing here just opens Home on refresh.
-const STACK_SCREENS = new Set<string>(['Americano', 'AssignScorers', 'AthleticsEventSetup', 'CorrectMatch', 'Bracket', 'Calendar', 'ClubHome', 'ClubSport', 'Clubs', 'MyTournaments', 'CompetitionRules', 'Contingents', 'Conversation', 'CreateClub', 'CreateCommunity', 'CreateListing', 'CreateSeries', 'CopyTournament', 'CreateTournament', 'CricketLineup', 'DeleteAccount', 'DiscoverOrgs', 'EditMatch', 'EditProfile', 'EditTeam', 'EditTournament', 'Feedback', 'Following', 'GenerateFixtures', 'GolfCourseEdit', 'GolfRound', 'GolfRoundSetup', 'GuardianConsent', 'GuestGame', 'GuardianLink', 'GuardianProof', 'HeadToHead', 'InviteFriend', 'ImportSchedule', 'RosterImport', 'StudentImport', 'SchoolRequest', 'JoinClub', 'JoinTeam', 'TeamJoin', 'JoinTournament', 'Legal', 'LineupEditor', 'LinkEdition', 'LiveScoring', 'ManageChild', 'MatchLink', 'OrgDobs', 'OrgVerify', 'Pair', 'Personalise', 'QuickTournament', 'Certificates', 'MatchSquad', 'MeetEntries', 'MeetTimetable', 'MessageReports', 'Messages', 'NotificationPrefs', 'RegionSettings', 'Notifications', 'Organization', 'OrganizerDashboard', 'PlayerProfile', 'Privacy', 'RecordBoard', 'ResultsEvent', 'ResultsLab', 'ScanQR', 'ScheduleMatch', 'Series', 'Settings', 'SportHub', 'SportProfile', 'SportSettings', 'Squad', 'SquadSession', 'Standings', 'Support', 'SupportConsole', 'SwissRound', 'Team', 'TeamJourney', 'Teams', 'Tournament', 'TournamentTeams', 'TryNewSport', 'UsageDashboard', 'VerificationDetails', 'VerificationReview']);
+const STACK_SCREENS = new Set<string>(['Americano', 'AssignScorers', 'AthleticsEventSetup', 'CorrectMatch', 'Bracket', 'Calendar', 'ClubHome', 'ClubSport', 'Clubs', 'MyTournaments', 'CompetitionRules', 'Contingents', 'Conversation', 'CreateClub', 'CreateCommunity', 'CreateListing', 'CreateSeries', 'CopyTournament', 'CreateTournament', 'CricketLineup', 'DeleteAccount', 'DiscoverOrgs', 'EditMatch', 'EditProfile', 'EditTeam', 'EditTournament', 'Feedback', 'Following', 'GenerateFixtures', 'GolfCourseEdit', 'GolfRound', 'GolfRoundSetup', 'GuardianConsent', 'GuestGame', 'GuardianLink', 'GuardianProof', 'HeadToHead', 'InviteFriend', 'ImportSchedule', 'RosterImport', 'StudentImport', 'SchoolRequest', 'JoinClub', 'JoinTeam', 'TeamJoin', 'JoinTournament', 'Legal', 'LineupEditor', 'LinkEdition', 'LiveScoring', 'ManageChild', 'MatchLink', 'OrgDobs', 'OrgVerify', 'Pair', 'Personalise', 'QuickTournament', 'Certificates', 'MatchSquad', 'MeetEntries', 'MeetTimetable', 'MessageReports', 'Messages', 'NotificationPrefs', 'RegionSettings', 'Notifications', 'Organization', 'OrganizerDashboard', 'PlayerProfile', 'Privacy', 'RecordBoard', 'ResultsEvent', 'ResultsLab', 'ScanQR', 'ScheduleMatch', 'Series', 'Settings', 'SportHub', 'SportProfile', 'SportSettings', 'Squad', 'SquadSession', 'Standings', 'Support', 'SupportConsole', 'SwissRound', 'Team', 'TeamJourney', 'Teams', 'Tournament', 'TournamentTeams', 'TryNewSport', 'YourSports', 'UsageDashboard', 'VerificationDetails', 'VerificationReview']);
 
 // Web deep links / refresh. React Navigation 7 only recognises screens listed in
 // `config`, and a URL that resolves to NO state makes it call resetRoot(undefined),
@@ -328,6 +331,10 @@ const legalOpts = ({ route }: { route: { params?: { doc?: string } } }) => ({
 
 export default function RootNavigator() {
   const { authed, loading, profile } = useAuth();
+  // brand-bar.md BB4: on wide web one top bar for every signed-in screen
+  const { width } = useWindowDimensions();
+  const [routeName, setRouteName] = useState<string | undefined>();
+  const rootBar = barPlacement({ os: Platform.OS, width, authed, route: routeName }).root;
   const authedRef = useRef(authed);
   authedRef.current = authed;
 
@@ -516,14 +523,15 @@ export default function RootNavigator() {
       theme={navTheme}
       linking={linking}
       ref={navRef}
-      onReady={() => trackScreen(navRef.getCurrentRoute()?.name)}
-      onStateChange={() => { trackScreen(navRef.getCurrentRoute()?.name); saveNavState(authed); }}
+      onReady={() => { trackScreen(navRef.getCurrentRoute()?.name); setRouteName(navRef.getCurrentRoute()?.name); }}
+      onStateChange={() => { trackScreen(navRef.getCurrentRoute()?.name); setRouteName(navRef.getCurrentRoute()?.name); saveNavState(authed); }}
       // Back on the same screen after iPhone unloaded the minimised app (see above).
       initialState={restoredNav && restoredNav.authed === authed ? (restoredNav.state as never) : undefined}
       // A guest tapping something that needs an account (a screen that only exists
       // for members) → sign up, then come back here.
       onUnhandledAction={() => { if (!authed) promptSignIn(); }}
     >
+      {rootBar ? <RootBrandBar onHome={routeName === 'Home'} /> : null}
       <Stack.Navigator
         // iPad / wide windows: content in a centred column (core/readableWidth.ts)
         screenOptions={({ route }) => ({ ...webHeaderFit, contentStyle: stackContentStyle(route.name) })}
@@ -769,6 +777,11 @@ export default function RootNavigator() {
               name="TryNewSport"
               component={TryNewSportScreen}
               options={{ ...stackScreenOpts, title: 'Try a New Sport' }}
+            />
+            <Stack.Screen
+              name="YourSports"
+              component={YourSportsScreen}
+              options={{ ...stackScreenOpts, title: 'Your sports' }}
             />
             <Stack.Screen
               name="Squad"

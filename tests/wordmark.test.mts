@@ -7,7 +7,8 @@ import { readFileSync } from 'node:fs';
 const read = (p: string) => readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
 
 test('WM1: the launch screen, Home and sign-in draw the same Wordmark; the website uses the same shapes', () => {
-  for (const f of ['src/components/LaunchAnimation.tsx', 'src/screens/HomeScreen.tsx', 'src/screens/AuthScreen.tsx']) {
+  // Home draws it through the shared top bar (brand-bar.md)
+  for (const f of ['src/components/LaunchAnimation.tsx', 'src/components/BrandBar.tsx', 'src/screens/AuthScreen.tsx']) {
     assert.match(read(f), /<Wordmark /, f);
     assert.doesNotMatch(read(f), />nNote</, f);
   }

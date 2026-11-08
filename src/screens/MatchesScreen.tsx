@@ -27,6 +27,7 @@ import type { RootStackParamList, TabParamList } from '../navigation/types';
 import { useParamState } from '../navigation/useParamState';
 import { matchesView, normalView, VIEW_LABEL, hostingNote, type MatchesView } from '../core/myMatches';
 import { overdueHint } from '../core/overdue';
+import { BrandBar } from '../components/BrandBar';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -100,7 +101,9 @@ export default function MatchesScreen() {
     });
 
   return (
-    <SafeAreaView style={st.safe} edges={['top']}>
+    <SafeAreaView style={st.safe} edges={[]}>
+      {/* brand-bar.md: the shared top bar (name → Home, search, alerts, menu) */}
+      <BrandBar tab />
       <KeyboardAwareScrollView contentContainerStyle={st.content}>
         <ScreenTitle title="Matches" subtitle={view === 'playing' ? 'Games you play in' : 'Games you host, organize or score'} />
 

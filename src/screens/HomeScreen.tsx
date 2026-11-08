@@ -5,22 +5,21 @@
  *  organize, standings & stats). Deep standings/stats live on those pages. */
 import { SkeletonList } from '../components/Skeleton';
 import { distinctNames } from '../core/chipNames';
-import { yourSports } from '../core/playedSports';
+import { yourSports, mostPlayedSport } from '../core/playedSports';
 import { isStaleLive } from '../core/staleLive';
 import { isOverdue } from '../core/overdue';
 import React, { useMemo, useCallback, useEffect, useState, useSyncExternalStore } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Modal, Pressable, ScrollView, useWindowDimensions } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, useWindowDimensions, Platform } from 'react-native';
 import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation, useFocusEffect, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { theme } from '../core/theme';
 import { EmptyState, Card, LoadingState, Pill, SelectChip, Button, textStyles, plural } from '../components/ui';
-import { weekLine, heroSportChips, heroGreeting, heroFontSize, tournamentCards, sportsSummary } from '../core/homeHero';
+import { weekLine, heroSportChips, heroGreeting, heroFontSize, tournamentCards, sportsSummary, sportTarget } from '../core/homeHero';
 import { matchOutbox } from '../data/matchOutbox';
-import { setStatusBarStyle } from 'expo-status-bar';
 import Svg, { Circle, Line, Rect } from 'react-native-svg';
-import { Search, Bell, Menu, Zap, Trophy, UserPlus } from 'lucide-react-native';
+import { Zap, Trophy, UserPlus } from 'lucide-react-native';
 import { Glyph, IconText } from '../components/Icon';
 import { formatDayShort, formatDayRange } from '../core/dates';
 import { MatchCard } from '../components/MatchCard';
@@ -41,12 +40,13 @@ import { onboardingStore } from '../data/onboardingStore';
 import { useAuth } from '../core/auth';
 import { canScoreByRole, canStartFriendly } from '../core/roles';
 import type { Match, SportId, Tournament } from '../core/types';
-import type { RootStackParamList } from '../navigation/types';
+import type { RootStackParamList, TabParamList } from '../navigation/types';
 import { WebPushCard } from '../components/WebPushCard';
 import { GuardianPendingCard } from '../components/GuardianPendingCard';
 import { RequestsCard } from '../components/RequestsCard';
 import { LinkByPhoneCard } from '../components/LinkByPhoneCard';
-import { Wordmark } from '../components/Wordmark';
+import { BrandBar } from '../components/BrandBar';
+import { barPlacement } from '../core/brandBar';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -58,11 +58,7 @@ export default function HomeScreen() {
   // Three header buttons (🔍 🔔 ▾) leave a phone's wordmark ~140px — step it down so it isn't clipped.
   const { width } = useWindowDimensions();
   const narrow = width < 420;
-  // 2026-10-29 redesign: light status-bar text over the pitch-green hero
-  useFocusEffect(useCallback(() => {
-    setStatusBarStyle('light');
-    return () => setStatusBarStyle('dark');
-  }, []));
+  const barHere = barPlacement({ os: Platform.OS, width, authed: true, route: 'Home' }).screen;
   const { profile } = useAuth();
   const tournaments = useMyTournaments(profile?.id);
   // UI audit step 5: repeated names get the detail that tells them apart
@@ -72,21 +68,18 @@ export default function HomeScreen() {
   const { feed, loading } = useScopedMatches(profile?.id);
   const { unread } = useNotifications();
 
-  // Selected tournament (null = "All"). Default to the first once loaded.
-  const [selectedId, setSelectedId] = useState<string | null>(null);
   // Quick actions (voice / friendly / calendar) live in a dropdown menu under one
   // toggle so the wordmark keeps its line; notifications stays always-visible.
-  const [actionsOpen, setActionsOpen] = useState(false);
   const [voiceOpen, setVoiceOpen] = useState(false);
-  const [heroW, setHeroW] = useState(0);
-  const [sportsOpen, setSportsOpen] = useState(false);
-  const insets = useSafeAreaInsets();
+  // BB6: "Voice — find a game" from the bar on another screen opens Home with voice: true
+  const route = useRoute<RouteProp<TabParamList, 'Home'>>();
   useEffect(() => {
-    if (selectedId === null && tournaments.length === 1) setSelectedId(tournaments[0].id);
-  }, [tournaments, selectedId]);
-  const selected: Tournament | undefined = tournaments.find((t) => t.id === selectedId);
-
-  const scoped = selectedId ? feed.filter((m) => m.tournamentId === selectedId) : feed;
+    if (route.params?.voice) { setVoiceOpen(true); nav.setParams?.({ voice: undefined } as never); }
+  }, [route.params?.voice]);
+  const [heroW, setHeroW] = useState(0);
+  const insets = useSafeAreaInsets();
+  // home-sports.md HS5: no tournament filter; the tournament cards open each one
+  const scoped = feed;
   // MVP L11: a match left "live" with no activity for 12 hours isn't live
   const now = Date.now();
   const live = scoped.filter((m) => m.status === 'live' && !isStaleLive(m, now));
@@ -166,15 +159,10 @@ export default function HomeScreen() {
   // "See all" opens the full Matches browser at the matching section.
   const seeAll = (initialTab: 'live' | 'upcoming') => nav.navigate('Tabs', { screen: 'Matches', params: { initialTab } });
 
+  // HS3: the same place as on the Your sports page
   const openSport = (sport: Match['sport']) => {
-    // A specific tournament is needed for a sport section; default to the first
-    // tournament that actually features the sport when "All" is selected.
-    const t = selected ?? tournaments.find((x) => x.sports.includes(sport));
-    if (t) return nav.navigate('SportHub', { tournamentId: t.id, sport, tournamentName: t.name });
-    // None of MY tournaments features the sport: open my own stats in it (never a
-    // stranger's tournament — tournaments[0] used to be anyone's).
-    if (playerId) nav.navigate('SportProfile', { playerId, sport });
-    else nav.navigate('Tabs', { screen: 'Discover', params: { in: 'tournaments' } });
+    const to = sportTarget(sport, tournaments, playerId);
+    (nav.navigate as (name: string, params: object) => void)(to.name, to.params);
   };
 
   return (
@@ -189,49 +177,10 @@ export default function HomeScreen() {
             <Line x1={8} y1={50} x2={92} y2={50} stroke={theme.colors.heroText} strokeOpacity={0.12} strokeWidth={1.2} />
             <Circle cx={50} cy={50} r={12} stroke={theme.colors.heroText} strokeOpacity={0.12} strokeWidth={1.2} fill="none" />
           </Svg>
-          <View style={st.header}>
-            {/* BC4 (brand-cream.md): the logo and name sit on a cream badge, never straight on green */}
-            <View style={st.brand}>
-              <View style={st.brandBadge} accessible accessibilityLabel="SportnNote">
-                <Wordmark height={narrow ? 24 : 27} />
-              </View>
-            </View>
-          <TouchableOpacity
-            style={st.iconBtn}
-            activeOpacity={0.8}
-            accessibilityRole="button"
-            accessibilityLabel="Search players, teams, matches and tournaments"
-            onPress={() => nav.navigate('Tabs', { screen: 'Discover', params: { mode: 'people', focus: true } })}
-          >
-            <Search color={theme.colors.heroText} size={20} strokeWidth={2.2} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={st.iconBtn}
-            activeOpacity={0.8}
-            accessibilityRole="button"
-            accessibilityLabel={unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'}
-            onPress={() => nav.navigate('Notifications')}
-          >
-            <Bell color={theme.colors.heroText} size={20} strokeWidth={2.2} />
-            {unread > 0 && (
-              <View style={st.badge}>
-                <Text style={st.badgeText} maxFontSizeMultiplier={1.5}>{unread > 9 ? '9+' : unread}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={st.iconBtn}
-            activeOpacity={0.8}
-            accessibilityRole="button"
-            accessibilityState={{ expanded: actionsOpen }} aria-expanded={actionsOpen}
-            accessibilityLabel="Quick actions"
-            onPress={() => setActionsOpen((v) => !v)}
-          >
-            <Menu color={theme.colors.heroText} size={20} strokeWidth={2.2} />
-          </TouchableOpacity>
-          {/* Voice panel opens from the menu; the built-in mic trigger is hidden. */}
+          {/* brand-bar.md: the shared top bar; on wide web the root draws it instead (BB4) */}
+          {barHere ? <BrandBar embedded onHome onVoice={() => setVoiceOpen(true)} /> : null}
+          {/* Voice panel opens from the bar's menu; the built-in mic trigger is hidden. */}
           <VoiceNav matches={feed} onOpenMatch={openScorer} open={voiceOpen} onOpenChange={setVoiceOpen} hideTrigger />
-          </View>
           <View style={st.heroCopy}>
             {/* Round 2 (HM9/HM10): one line, "Ready to play, Aarav?", sized to fit */}
             {(() => {
@@ -279,32 +228,6 @@ export default function HomeScreen() {
           </Card>
         ) : null}
 
-        {/* Quick actions as an anchored dropdown menu. */}
-        <Modal visible={actionsOpen} transparent animationType="fade" onRequestClose={() => setActionsOpen(false)}>
-          <Pressable style={st.menuBackdrop} onPress={() => setActionsOpen(false)} accessibilityRole="button" accessibilityLabel="Close menu">
-            <View style={[st.menu, { top: insets.top + 60, right: theme.spacing(4) }]} onStartShouldSetResponder={() => true}>
-              {[
-                { icon: '🎙', label: 'Voice — find a game', onPress: () => setVoiceOpen(true) },
-                ...(canStart ? [{ icon: '🤝', label: 'Start a friendly', onPress: () => nav.navigate('ScheduleMatch', {}) }] : []),
-                { icon: '📅', label: 'Calendar', onPress: () => nav.navigate('Calendar') },
-              ].map((item, idx) => (
-                <React.Fragment key={item.label}>
-                  {idx > 0 && <View style={st.menuDivider} />}
-                  <TouchableOpacity
-                    style={st.menuRow}
-                    activeOpacity={0.7}
-                    accessibilityRole="button"
-                    accessibilityLabel={item.label}
-                    onPress={() => { setActionsOpen(false); item.onPress(); }}
-                  >
-                    <Glyph emoji={item.icon} style={st.menuIcon} color={theme.colors.primary} />
-                    <Text style={st.menuLabel}>{item.label}</Text>
-                  </TouchableOpacity>
-                </React.Fragment>
-              ))}
-            </View>
-          </Pressable>
-        </Modal>
 
         {/* Web app: nudge to turn on notifications (iPhone: Add to Home Screen first). */}
         <WebPushCard compact />
@@ -340,21 +263,6 @@ export default function HomeScreen() {
           </TouchableOpacity>
         )}
 
-        {/* Tournament switcher */}
-        {tournaments.length > 0 && (
-          <View style={{ gap: theme.spacing(2) }}>
-            <Text style={st.eyebrow}>Tournament</Text>
-            <KeyboardAwareScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.chips}>
-              {tournaments.length > 1 && (
-                <SelectChip label="All" active={selectedId === null} onPress={() => setSelectedId(null)} />
-              )}
-              {tournaments.map((t) => (
-                <SelectChip key={t.id} label={chipNames.get(t.id) ?? t.name} active={selectedId === t.id} onPress={() => setSelectedId(t.id)} />
-              ))}
-            </KeyboardAwareScrollView>
-          </View>
-        )}
-
         {/* Near you (founder 2026-10-31): their sports, around them */}
         <NearYouSection personal={personal} playerSports={mySports} canLocate={locationAllowed(player)}
           onOpen={openScorer} onPersonalise={() => nav.navigate('Personalise')} />
@@ -369,7 +277,7 @@ export default function HomeScreen() {
           <EmptyState icon="📡" title={personal ? 'None live from what you follow' : 'No live matches right now'}
             hint="Your matches and the teams, players and tournaments you follow show here the moment scoring starts." compact />
         )}
-        <LiveGolfCards tournamentId={selectedId} />
+        <LiveGolfCards tournamentId={null} />
 
         {/* Up next — top 5, "See all" opens the full upcoming list */}
         <SectionHeader title="Up next" count={upcoming.length} onSeeAll={upcoming.length > SECTION_CAP ? () => seeAll('upcoming') : undefined} />
@@ -420,14 +328,16 @@ export default function HomeScreen() {
         <Text style={textStyles.muted}>
           {mySports.length ? 'Schedule, standings and stats for each.' : 'Sports you sign up for will show up here.'}
         </Text>
-        {/* Round 3 (HM13/HM14): many sports fold into one row, like "Try a new sport" */}
-        {(() => {
+        {/* Round 3 (HM13/HM14): many sports fold into one row, like "Try a new sport";
+            it opens its own page, as that one does (home-sports.md HS2) */}
+        {sportsSummary(mySports).folded ? (() => {
           const sum = sportsSummary(mySports);
-          if (!sum.folded || sportsOpen) return null;
+          // HS1: the sport you've played most, else a generic medal
+          const top = mostPlayedSport(mySports, feed, playerId);
           return (
             <TouchableOpacity accessibilityRole="button" activeOpacity={0.85} style={st.tryTile}
-              accessibilityLabel={`Your ${mySports.length} sports — show them all`} onPress={() => setSportsOpen(true)}>
-              <Text style={st.sportIcon}>{getSportMeta(sum.names[0]).icon}</Text>
+              accessibilityLabel={`Your ${mySports.length} sports`} onPress={() => nav.navigate('YourSports')}>
+              <Text style={st.sportIcon}>{top ? getSportMeta(top).icon : '🏅'}</Text>
               <View style={{ flex: 1 }}>
                 <Text style={[textStyles.body, { fontWeight: '700' }]}>Your {mySports.length} sports</Text>
                 <Text style={textStyles.muted} numberOfLines={1}>{sum.names.map((x) => getSportMeta(x).name).join(', ')} +{sum.more} more</Text>
@@ -435,8 +345,7 @@ export default function HomeScreen() {
               <Text style={st.chevron}>›</Text>
             </TouchableOpacity>
           );
-        })()}
-        {!sportsSummary(mySports).folded || sportsOpen ? (
+        })() : (
         <View style={st.sportGrid}>
           {mySports.map((s) => (
             <TouchableOpacity
@@ -453,8 +362,7 @@ export default function HomeScreen() {
             </TouchableOpacity>
           ))}
         </View>
-        ) : null}
-        {sportsOpen ? <Text style={st.showLess} accessibilityRole="button" onPress={() => setSportsOpen(false)}>Show less</Text> : null}
+        )}
         {newSports.length > 0 && (
           <TouchableOpacity accessibilityRole="button"
             activeOpacity={0.85}
@@ -570,7 +478,6 @@ const st = StyleSheet.create({
     width: '48%',
   },
   sportIcon: { fontSize: 22 },
-  showLess: { color: theme.colors.primary, fontWeight: '700', textAlign: 'center', paddingVertical: theme.spacing(1) },
   tryTile: {
     flexDirection: 'row', alignItems: 'center', gap: theme.spacing(3),
     backgroundColor: theme.colors.surface, borderRadius: theme.radius.md,

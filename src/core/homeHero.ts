@@ -1,5 +1,5 @@
 /** Home, Stitch picks 12–16 (docs/security/breaks/stitch-home.md). Pure. */
-import type { SportId } from './types';
+import type { SportId, Tournament } from './types';
 
 type FeedMatch = { status: string; startsAt?: string; tournamentId?: string };
 const WEEK = 7 * 24 * 3600_000;
@@ -62,4 +62,13 @@ export function tournamentCards<T extends { id: string; sports: readonly string[
 export function sportsSummary(sports: readonly SportId[]): { folded: boolean; names: SportId[]; more: number } {
   if (sports.length <= 4) return { folded: false, names: [...sports], more: 0 };
   return { folded: true, names: sports.slice(0, 3), more: sports.length - 3 };
+}
+
+/** home-sports.md HS3: where tapping a sport goes, on Home and on Your sports —
+ *  one of MY tournaments that has it, else my stats in it, else Discover. */
+export function sportTarget(sport: SportId, myTournaments: ReadonlyArray<Pick<Tournament, 'id' | 'name' | 'sports'>>, playerId: string | null | undefined) {
+  const t = myTournaments.find((x) => x.sports.includes(sport));
+  if (t) return { name: 'SportHub' as const, params: { tournamentId: t.id, sport, tournamentName: t.name } };
+  if (playerId) return { name: 'SportProfile' as const, params: { playerId, sport } };
+  return { name: 'Tabs' as const, params: { screen: 'Discover' as const, params: { in: 'tournaments' as const } } };
 }
