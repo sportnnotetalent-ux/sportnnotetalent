@@ -15,7 +15,8 @@ describe('empty sides get plain names', () => {
   test('teams, singles and doubles', () => {
     assert.deepEqual([quickSideName('team', 'home'), quickSideName('team', 'away')], ['Team A', 'Team B']);
     assert.deepEqual([quickSideName('individual', 'home'), quickSideName('individual', 'away')], ['Player A', 'Player B']);
-    assert.deepEqual([quickSideName('pairs', 'home'), quickSideName('pairs', 'away')], ['Pair A', 'Pair B']);
+    // team-doubles-setup TD3: a doubles side is a team
+    assert.deepEqual([quickSideName('pairs', 'home'), quickSideName('pairs', 'away')], ['Team A', 'Team B']);
     assert.deepEqual([quickSideShort('home'), quickSideShort('away')], ['A', 'B']);
   });
 });

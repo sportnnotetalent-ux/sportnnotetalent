@@ -21,9 +21,16 @@ export const isSingle = (t: Entry): boolean => {
   return !t.name.includes(' / ');
 };
 
+/** team-doubles-setup.md TD2: a doubles side is a TEAM — any squad of two or
+ *  more different people (who plays is picked before scoring, core/teamPlay). */
+export const isTeamSide = (t: Entry): boolean => {
+  const r = (t.roster ?? []).filter(Boolean);
+  return r.length >= 2 && new Set(r).size === r.length;
+};
+
 /** The entries a singles ('single') or doubles ('pair') side may pick. */
 export function sidesForStructure<T extends Entry>(teams: readonly T[], structure: 'single' | 'pair'): T[] {
-  return teams.filter(structure === 'pair' ? isPair : isSingle);
+  return teams.filter(structure === 'pair' ? isTeamSide : isSingle);
 }
 
 /** One entry per person (singles) or per pair, in any order (founder
@@ -73,7 +80,8 @@ export function recentPairs<T extends Entry>(opts: {
 }): T[] {
   const { me, exclude, max = 6 } = opts;
   if (!me) return [];
-  const byId = new Map(opts.pairs.filter(isPair).map((t) => [t.id, t] as const));
+  // team-doubles-setup TD2: any team side, as the picker lists
+  const byId = new Map(opts.pairs.filter(isTeamSide).map((t) => [t.id, t] as const));
   const mine = (t: T) => (t.roster ?? []).includes(me);
   const out: T[] = [];
   const seen = new Set<string>();

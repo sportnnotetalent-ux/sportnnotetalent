@@ -286,7 +286,7 @@ export default function CreateTournamentScreen() {
                 <FieldLabel>{getSportMeta(s).name} — format</FieldLabel>
                 <View style={st.chips}>
                   <SelectChip label={`👤 ${structureLabels(getSportMeta(s)).one}`} active={pps < 2} onPress={() => setPps(1)} />
-                  <SelectChip label={`👥 ${structureLabels(getSportMeta(s)).two} (pairs)`} active={pps >= 2} onPress={() => setPps(2)} />
+                  <SelectChip label={`👥 ${structureLabels(getSportMeta(s)).two} (teams)`} active={pps >= 2} onPress={() => setPps(2)} />
                 </View>
               </View>
             );

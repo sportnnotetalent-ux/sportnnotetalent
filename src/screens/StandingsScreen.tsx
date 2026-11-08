@@ -227,7 +227,7 @@ export default function StandingsScreen() {
         ) : phases.map((ph) => {
           const view = views.get(ph.key);
           return (
-            <PhaseTable key={ph.key} title={view ? groupHeading(view) : phases.length === 1 && ph.key === 'league' ? `${participant === 'team' ? 'Team' : participant === 'pairs' ? 'Pair' : 'Player'} standings` : ph.title}
+            <PhaseTable key={ph.key} title={view ? groupHeading(view) : phases.length === 1 && ph.key === 'league' ? `${participant === 'team' ? 'Team' : participant === 'pairs' ? 'Team' : 'Player'} standings` : ph.title}
               sport={activeSport} cfg={cfg} participant={participant} phaseKey={ph.key} rows={view ? view.rows : ph.rows} view={view} adjustments={cfg.adjustments ?? []} canManage={canManage}
               expanded={showTeams} onToggle={() => setShowTeams((v) => !v)}
               onTeam={openEntrant}

@@ -95,7 +95,7 @@ export default function QuickTournamentScreen() {
   }, [params?.sport]);
 
   const meta = sport ? getSportMeta(sport) : null;
-  const noun = meta?.participantKind === 'individual' ? 'players' : meta?.participantKind === 'both' ? 'players or pairs' : 'teams';
+  const noun = meta?.participantKind === 'individual' ? 'players' : meta?.participantKind === 'both' ? 'players or teams' : 'teams';
   const teamSport = (meta?.participantKind ?? 'team') === 'team';
   const kind = meta?.participantKind ?? 'team';
   const perEntry: 1 | 2 = kind === 'both' && pairs ? 2 : 1;
@@ -126,7 +126,7 @@ export default function QuickTournamentScreen() {
   async function create() {
     if (!sport || !meta) return setError('Pick a sport.');
     if (!name.trim()) return setError('Give the tournament a name.');
-    if (entrants.length < 2) return setError(`Pick at least 2 ${teamSport ? 'teams' : perEntry === 2 ? 'pairs' : 'players'} (or add the ones not known yet).`);
+    if (entrants.length < 2) return setError(`Pick at least 2 ${teamSport ? 'teams' : perEntry === 2 ? 'teams' : 'players'} (or add the ones not known yet).`);
     if (!fmt) return setError('Pick a format.');
     setError(null);
     let createdId: string | null = null;
@@ -174,7 +174,7 @@ export default function QuickTournamentScreen() {
         // PP5: each player / pair reuses their own record in this sport (else one is made, its first person captain)
         const ids: string[] = [];
         for (let i = 0; i < people.length; i++) {
-          setBusy(`Adding ${perEntry === 2 ? 'pair' : 'player'} ${i + 1} of ${people.length}…`);
+          setBusy(`Adding ${perEntry === 2 ? 'team' : 'player'} ${i + 1} of ${people.length}…`);
           const entry = await sideForEntrants(people[i], { sport, teams: sportTeams, colorHex: PALETTE[i % PALETTE.length], adhoc: true });
           const lead = people[i].map(slotId).find(Boolean);
           if (entry.created && lead) await setTeamLeaders(entry.id, { captainId: lead }).catch(() => {});
@@ -205,7 +205,7 @@ export default function QuickTournamentScreen() {
   }
 
   // what's being counted: teams, players or pairs (and one, not "1 players")
-  const unit = teamSport ? 'team' : perEntry === 2 ? 'pair' : 'player';
+  const unit = teamSport ? 'team' : perEntry === 2 ? 'team' : 'player';
   const counted = `${entrants.length} ${unit}${entrants.length === 1 ? '' : 's'}`;
   const summary = fmt && entrants.length >= 2
     ? `${counted} · ${FORMATS.find((f) => f.id === fmt)!.label} · ${matchCount(fmt, entrants.length)} matches`
@@ -246,10 +246,10 @@ export default function QuickTournamentScreen() {
               {kind === 'both' ? (
                 <View style={st.chips}>
                   <SelectChip label="Singles" active={!pairs} onPress={() => { if (pairs) { setPairs(false); setPeople([]); } }} />
-                  <SelectChip label="Doubles (pairs)" active={pairs} onPress={() => { if (!pairs) { setPairs(true); setPeople([]); } }} />
+                  <SelectChip label="Doubles (teams)" active={pairs} onPress={() => { if (!pairs) { setPairs(true); setPeople([]); } }} />
                 </View>
               ) : null}
-              <FieldLabel>{perEntry === 2 ? 'Pairs' : 'Players'}</FieldLabel>
+              <FieldLabel>{perEntry === 2 ? 'Teams' : 'Players'}</FieldLabel>
               {people.length ? (
                 <View style={st.chips}>
                   {people.map((e, i) => {
@@ -262,10 +262,10 @@ export default function QuickTournamentScreen() {
               <EntrantPicker key={`${perEntry}-${people.length}`} count={perEntry} sport={sport}
                 inviteText={(who) => playerInviteText({ name: who, inviterName: profile?.fullName, link: SHARE_BASE })}
                 onSubmit={addPeople}
-                submitLabel={perEntry === 2 ? '＋ Add pair' : undefined}
+                submitLabel={perEntry === 2 ? '＋ Add team' : undefined}
                 resolveMe={profile?.fullName ? () => getMyEntrant(profile) : undefined}
                 meName={profile?.fullName} />
-              <TextField label={`${perEntry === 2 ? 'Pairs' : 'Players'} not known yet`} value={unknownCount} onChange={(v) => setUnknownCount(v.replace(/[^0-9]/g, '').slice(0, 3))} />
+              <TextField label={`${perEntry === 2 ? 'Teams' : 'Players'} not known yet`} value={unknownCount} onChange={(v) => setUnknownCount(v.replace(/[^0-9]/g, '').slice(0, 3))} />
               <Text style={textStyles.muted}>
                 {summary}{teamSlots.length ? ` · slots ${teamSlots[0]}${teamSlots.length > 1 ? ` … ${teamSlots[teamSlots.length - 1]}` : ''}, filled in later` : ''}.
               </Text>

@@ -38,6 +38,22 @@ Where it changed:
   - Marketing posts already rendered keep the old mark.
   - The mint experiment was undone and never committed.
 
+### 2026-11-08 — Teams for doubles, phase 2: match setup picks teams
+
+Phase 2 of docs/product/teams-for-doubles.md (team-doubles-setup.md).
+- **Doubles setup offers teams:** any team of 2+ different people (`isTeamSide`), including bigger squads; recent sides too. Who plays is picked before the first point (phase 3).
+- **Wording:** no "pair" left on the setup screens:
+  - Schedule match: "Team 1 / Team 2", "Recent teams", "Your teams", "＋ New team", "Search teams or players";
+  - Quick tournament: "Doubles (teams)", "＋ Add team";
+  - tournament entries, Create tournament, "Team standings".
+- **Stand-ins:** "Start now" doubles sides are "Team A / Team B". In a racket / cue sport they still take their two people's names once added. Team sports keep "Team A". Old "Pair A" sides still work.
+- **Checks:**
+  - `tests/team-doubles-setup.test.mts` (failed first);
+  - 2 pinned tests updated on purpose (quick-game names, the doubles-picker sim);
+  - full suite 8345 (0 failing), tsc clean;
+  - demo: badminton → Doubles shows Team 1 / Team 2, Recent teams, Your teams, ＋ New team, and no "pair" anywhere on the screen.
+- **Still to do:** pair profile pages and "Your pairs" elsewhere (phase 5).
+
 ### 2026-11-08 — Teams for doubles, phase 1: who plays, stand-ins, mapping (pure rules)
 
 Founder: no more "pairs". Every side with more than one person is a team with a squad, and the playing N are picked before scoring (docs/product/teams-for-doubles.md has the decisions and phases). Phase 1 is the pure rules in `src/core/teamPlay.ts` (team-play.md):

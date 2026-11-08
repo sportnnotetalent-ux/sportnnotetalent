@@ -46,6 +46,7 @@ import { normalizeOfficials, type MatchOfficial } from './matchOfficials';
 import { readBreak, type MatchBreak } from './matchHousekeeping';
 import type { PointsAdjustment } from './standings';
 import { newTournamentFormats } from './standings';
+import { isPairSport } from './pairSport';
 import { withStatsDefaults } from '../core/statsDefaults';
 import type { ScoringLock } from '../core/scoringLock';
 import { baseOf } from '../core/sharedScoring';
@@ -223,7 +224,7 @@ async function revealEntryNames(teams: readonly (Team | null | undefined)[]): Pr
   // teams that could be either; no writes.
   const fallback = new Map<Team, string[]>();
   const auto = new Map<Team, { name: string; adhoc: boolean; roster: string[] | null; kind: ReturnType<typeof sportKind> }>();
-  const maybe = teams.filter((t): t is Team => !!t && !t.entryIds?.length && (looksQuickPlaceholder(t.name) || couldBeAutoEntry(t)));
+  const maybe = teams.filter((t): t is Team => !!t && !t.entryIds?.length && (looksQuickPlaceholder(t.name, isPairSport(t.sport)) || couldBeAutoEntry(t)));
   if (maybe.length) {
     const ask = [...new Set(maybe.map((t) => t.id))].filter((id) => { const c = placeholderRows.get(id); return !c || now - c.at > ENTRY_NAME_TTL; });
     if (ask.length) {
@@ -236,8 +237,8 @@ async function revealEntryNames(teams: readonly (Team | null | undefined)[]): Pr
     for (const t of maybe) {
       const row = placeholderRows.get(t.id);
       if (!row) continue;
-      if (looksQuickPlaceholder(t.name)) {
-        const ids = placeholderEntryIds({ name: t.name, adhoc: row.adhoc, roster: row.roster });
+      if (looksQuickPlaceholder(t.name, isPairSport(t.sport))) {
+        const ids = placeholderEntryIds({ name: t.name, adhoc: row.adhoc, roster: row.roster }, isPairSport(t.sport));
         if (ids) fallback.set(t, ids);
         continue;
       }
@@ -290,16 +291,18 @@ async function renamePlaceholderSide(teamId: string, roster: readonly string[]):
       const t = demo.teams.find((x) => x.id === teamId);
       if (!t) return;
       const names = roster.map((id) => demo.players.find((p) => p.id === id)?.fullName ?? '');
-      const r = placeholderRename(t, names);
+      const r = placeholderRename(t, names, isPairSport(t.sport));
       if (r) { t.name = r.name; t.shortName = r.shortName; }
       return;
     }
-    const { data: team } = await supabase.from('teams').select('name, adhoc').eq('id', teamId).maybeSingle();
-    const row = team as { name?: string | null; adhoc?: boolean | null } | null;
-    if (!row?.name || !looksQuickPlaceholder(row.name) || !placeholderEntryIds({ name: row.name, adhoc: row.adhoc, roster: [...roster] })) return;
+    const { data: team } = await supabase.from('teams').select('name, adhoc, sport').eq('id', teamId).maybeSingle();
+    const row = team as { name?: string | null; adhoc?: boolean | null; sport?: string | null } | null;
+    // TD4: a racket / cue "Team A" stand-in is a doubles entry, like the old "Pair A"
+    const doubles = !!row?.sport && isPairSport(row.sport);
+    if (!row?.name || !looksQuickPlaceholder(row.name, doubles) || !placeholderEntryIds({ name: row.name, adhoc: row.adhoc, roster: [...roster] }, doubles)) return;
     const { data: ps } = await supabase.from(PLAYERS_READ).select('id, full_name').in('id', [...roster]);
     const byId = new Map(((ps ?? []) as { id: string; full_name: string | null }[]).map((p) => [p.id, p.full_name ?? '']));
-    const r = placeholderRename({ name: row.name, adhoc: row.adhoc }, roster.map((id) => byId.get(id) ?? ''));
+    const r = placeholderRename({ name: row.name, adhoc: row.adhoc }, roster.map((id) => byId.get(id) ?? ''), doubles);
     if (!r) return;
     await supabase.from('teams').update({ name: r.name, short_name: r.shortName }).eq('id', teamId);
   } catch (e) {

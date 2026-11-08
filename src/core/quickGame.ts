@@ -11,7 +11,8 @@ export type ParticipantMode = 'team' | 'individual' | 'pairs';
 /** Where the last friendly's sport is remembered on this device. */
 export const LAST_SPORT_KEY = 'sn.friendly.lastSport';
 
-const NOUN: Record<ParticipantMode, string> = { team: 'Team', individual: 'Player', pairs: 'Pair' };
+// team-doubles-setup.md TD3: a doubles side is a team, so its stand-in is "Team A"
+const NOUN: Record<ParticipantMode, string> = { team: 'Team', individual: 'Player', pairs: 'Team' };
 
 export const quickSideName = (mode: ParticipantMode, side: 'home' | 'away'): string => `${NOUN[mode]} ${side === 'home' ? 'A' : 'B'}`;
 export const quickSideShort = (side: 'home' | 'away'): string => (side === 'home' ? 'A' : 'B');
@@ -37,20 +38,26 @@ export const isQuickPlaceholder = (t: { name: string; adhoc?: boolean }): boolea
 /** How many people make each placeholder a real entry: one player, two
  *  partners. A "Team" placeholder keeps its name until the user gives one. */
 const ENTRY_SIZE: Record<string, number> = { Player: 1, Pair: 2 };
-const placeholderSize = (name: string): number | undefined => ENTRY_SIZE[name.trim().split(' ')[0]];
+/** TD4–TD6: `doubles` = a racket / cue sport, where a "Team A" stand-in is a
+ *  two-person entry like the old "Pair A"; in a team sport "Team" keeps its name. */
+const placeholderSize = (name: string, doubles = false): number | undefined => {
+  const word = name.trim().split(' ')[0];
+  return doubles && word === 'Team' ? 2 : ENTRY_SIZE[word];
+};
 
 /** Cheap pre-filter on a name alone (a match read has no `adhoc` / roster):
  *  could this be a "Player X" / "Pair X" placeholder? */
-export const looksQuickPlaceholder = (name: string): boolean => /^(Player|Pair) [AB]$/.test((name ?? '').trim());
+export const looksQuickPlaceholder = (name: string, doubles = false): boolean =>
+  (doubles ? /^(Player|Pair|Team) [AB]$/ : /^(Player|Pair) [AB]$/).test((name ?? '').trim());
 
 /** The rename for a placeholder side whose roster is now its real entry: the
  *  entry name the server recognises (participantEntry.entryName — full names
  *  joined " / ", or as players_view masks them; the teams_entry_names trigger
  *  then masks a child's name in the stored copy) and its short code. Null for
  *  a real team, a renamed side, a "Team" placeholder, or an incomplete entry. */
-export function placeholderRename(t: { name: string; adhoc?: boolean | null }, names: readonly string[]): { name: string; shortName: string } | null {
+export function placeholderRename(t: { name: string; adhoc?: boolean | null }, names: readonly string[], doubles = false): { name: string; shortName: string } | null {
   if (!isQuickPlaceholder({ name: t.name, adhoc: t.adhoc === true })) return null;
-  const size = placeholderSize(t.name);
+  const size = placeholderSize(t.name, doubles);
   const clean = names.map((n) => (n ?? '').trim().replace(/\s+/g, ' '));
   if (!size || clean.length !== size || clean.some((n) => !n)) return null;
   return { name: entryName(clean), shortName: entryShortName(clean) };
@@ -59,9 +66,9 @@ export function placeholderRename(t: { name: string; adhoc?: boolean | null }, n
 /** Old matches (no rename yet): the players a placeholder side's name should be
  *  rebuilt from — its whole roster when that is exactly its entry (one player /
  *  two different partners); undefined otherwise. */
-export function placeholderEntryIds(t: { name: string; adhoc?: boolean | null; roster?: readonly string[] | null }): string[] | undefined {
+export function placeholderEntryIds(t: { name: string; adhoc?: boolean | null; roster?: readonly string[] | null }, doubles = false): string[] | undefined {
   if (!isQuickPlaceholder({ name: t.name, adhoc: t.adhoc === true })) return undefined;
-  const size = placeholderSize(t.name);
+  const size = placeholderSize(t.name, doubles);
   const ids = (t.roster ?? []).map((x) => (typeof x === 'string' ? x.trim() : ''));
   if (!size || ids.length !== size || ids.some((x) => !x) || new Set(ids).size !== ids.length) return undefined;
   return ids;

@@ -5,7 +5,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { isPair, isSingle, sidesForStructure, searchSides, searchPeople, recentPairs } from '../src/data/doublesPicker.ts';
+import { isTeamSide, isPair, isSingle, sidesForStructure, searchSides, searchPeople, recentPairs } from '../src/data/doublesPicker.ts';
 import { findEntryFor } from '../src/data/participantEntry.ts';
 import { pairTypeOf, settlePairType, pairTypeFromDivisions, PAIR_TYPES } from '../src/sports/pairType.ts';
 
@@ -29,7 +29,8 @@ test('600 simulated organisers: picker invariants hold', () => {
     const pairs = sidesForStructure(teams, 'pair');
     const singles = sidesForStructure(teams, 'single');
     // DP1–DP3: never both; a pair is two different people; a single is one
-    for (const t of pairs) { assert.equal(t.roster!.length, 2); assert.notEqual(t.roster![0], t.roster![1]); assert.ok(!isSingle(t)); }
+    // team-doubles-setup TD2: a doubles side is any team of 2+ different people
+    for (const t of pairs) { assert.ok(t.roster!.length >= 2); assert.equal(new Set(t.roster).size, t.roster!.length); assert.ok(!isSingle(t)); }
     for (const t of singles) { assert.ok((t.roster?.length ?? 0) <= 1); assert.ok(!isPair(t)); }
     // DP14: any query is safe, capped, and a subset of the list
     for (let k = 0; k < 4; k++) {
@@ -58,7 +59,7 @@ test('600 simulated organisers: picker invariants hold', () => {
     assert.equal(new Set(rec.map((t) => t.id)).size, rec.length);
     if (!me) assert.equal(rec.length, 0);
     for (const t of rec) {
-      assert.ok(isPair(t) && pairs.includes(t));
+      assert.ok(isTeamSide(t) && pairs.includes(t)); // team-doubles-setup TD2
       assert.notEqual(t.id, exclude);
       const hosted = matches.some((m) => m.sport === sport && (m.homeTeam.id === t.id || m.awayTeam.id === t.id) && m.hostIds.includes(me!));
       assert.ok(t.roster!.includes(me!) || hosted, 'only my pairs or pairs from matches I hosted');
@@ -66,7 +67,8 @@ test('600 simulated organisers: picker invariants hold', () => {
     // DP6: re-creating a pair with the same two people (any order) finds it
     for (const t of pairs.slice(0, 3)) {
       const found = findEntryFor(teams, [...t.roster!].reverse());
-      assert.ok(found && new Set(found.roster).size === 2 && found.roster!.every((id) => t.roster!.includes(id)));
+      // team-doubles-setup TD2: a team side of any size is found by its people
+      assert.ok(found && new Set(found.roster).size === new Set(t.roster).size && found.roster!.every((id) => t.roster!.includes(id)));
     }
     // DP8–DP11: pair type
     const fmt: Record<string, unknown> = { playersPerSide: pick([1, 2, undefined]), ...(rnd(3) ? { category: pick(['open', 'men', 'women', 'mixed', 'junk', 7, null]) } : {}) };

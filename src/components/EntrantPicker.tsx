@@ -13,7 +13,7 @@ import { PersonPicker } from './PersonPicker';
 import { entrantProblem, takenIds, type EntrantPerson, type EntrantSlot } from '../data/participantEntry';
 import type { SportId } from '../core/types';
 
-export function EntrantPicker({ count, sport, inviteText, onSubmit, submitLabel = '＋ Create pair', resolveMe, meName, initial }: {
+export function EntrantPicker({ count, sport, inviteText, onSubmit, submitLabel = '＋ Create team', resolveMe, meName, initial }: {
   /** 1 = a singles player, 2 = a doubles pair */
   count: 1 | 2;
   sport: SportId;

@@ -329,7 +329,7 @@ export default function TournamentTeamsScreen() {
       setTick((n) => n + 1);
       return true;
     } catch (e) {
-      setError(errMsg(e, slots.length > 1 ? 'Could not add the pair' : 'Could not add the player'));
+      setError(errMsg(e, slots.length > 1 ? 'Could not add the team' : 'Could not add the player'));
       return false;
     } finally { setBusy(false); }
   }
@@ -451,7 +451,7 @@ export default function TournamentTeamsScreen() {
   // SD-90: athletics athletes are entered per EVENT (event setup); the meet's
   // participants are the houses / schools they score for (and relay teams come from).
   const pMode = isEventSport(sport) ? 'team' : participantMode(sport, tournament?.formats?.[sport] as Record<string, unknown> | undefined);
-  const noun = pMode === 'individual' ? 'player' : pMode === 'pairs' ? 'pair' : 'team';
+  const noun = pMode === 'individual' ? 'player' : pMode === 'pairs' ? 'team' : 'team';
   const nounPl = `${noun}s`;
 
   return (
@@ -735,7 +735,7 @@ export default function TournamentTeamsScreen() {
             <Card style={{ gap: theme.spacing(3) }}>
               <Text style={textStyles.h3}>Add {/^[aeiou]/i.test(sportName) ? 'an' : 'a'} {sportName} {noun}</Text>
               <Text style={textStyles.muted}>
-                {pMode === 'pairs' ? 'Pick both partners' : 'Pick the player'} — search by name, or type a mobile number to add & invite someone new, so the entry lands on {pMode === 'pairs' ? 'each partner’s' : 'their'} profile.
+                {pMode === 'pairs' ? 'Pick the two players' : 'Pick the player'} — search by name, or type a mobile number to add & invite someone new, so the entry lands on {pMode === 'pairs' ? 'each player’s' : 'their'} profile.
               </Text>
               <EntrantPicker
                 count={pMode === 'pairs' ? 2 : 1}

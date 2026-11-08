@@ -413,7 +413,7 @@ export default function ScheduleMatchScreen() {
       ? matchEnding(choice, when.getTime(), Date.now())
       : { startsAt: when.getTime(), openScoring: isImmediate };
     setEnding(choice ?? null);
-    const noun = mode === 'individual' ? 'players' : mode === 'pairs' ? 'pairs' : 'teams';
+    const noun = mode === 'individual' ? 'players' : 'teams';
     let h = home;
     let a = away;
     // Quick game (MVP 2026-10-31): a friendly never waits for names. An empty side
@@ -693,17 +693,17 @@ export default function ScheduleMatchScreen() {
                 </>
               ) : (
                 <>
-                  <Text style={textStyles.muted}>A doubles side is a pair of two players. Pick a pair, or pick a player to start a new pair — by name or mobile number, so the match lands on each partner’s profile.</Text>
-                  <TeamPicker noun="pair" label="Pair 1" teams={pairTeams} selected={home} onSelect={setHome} onClear={() => setHome(null)} onCreate={makeCreateHandler('home')} newEntrant={entrantPicker('home', 2)} people={pairPeople} recent={recentHome} onStartWithMe={profile?.fullName ? resolveMe : undefined}
+                  <Text style={textStyles.muted}>A doubles side is a team. Pick a team, or pick players to start a new one — by name or mobile number, so the match lands on each player’s profile. Who plays is picked before the first point.</Text>
+                  <TeamPicker noun="pair" label="Team 1" teams={pairTeams} selected={home} onSelect={setHome} onClear={() => setHome(null)} onCreate={makeCreateHandler('home')} newEntrant={entrantPicker('home', 2)} people={pairPeople} recent={recentHome} onStartWithMe={profile?.fullName ? resolveMe : undefined}
                     otherPairs={otherPairsFor(recentHome, away)} onPickPair={(x) => void makeEntrantHandler('home')([{ kind: 'person', person: x.a }, { kind: 'person', person: x.b }])} />
-                  <TeamPicker noun="pair" label="Pair 2" teams={pairTeams} selected={away} onSelect={setAway} onClear={() => setAway(null)} onCreate={makeCreateHandler('away')} newEntrant={entrantPicker('away', 2)} people={pairPeople} recent={recentAway}
+                  <TeamPicker noun="pair" label="Team 2" teams={pairTeams} selected={away} onSelect={setAway} onClear={() => setAway(null)} onCreate={makeCreateHandler('away')} newEntrant={entrantPicker('away', 2)} people={pairPeople} recent={recentAway}
                     otherPairs={otherPairsFor(recentAway, home)} onPickPair={(x) => void makeEntrantHandler('away')([{ kind: 'person', person: x.a }, { kind: 'person', person: x.b }])} />
                 </>
               )}
 
               {isFriendly && (!home || !away) && (
                 <Text style={textStyles.muted}>
-                  In a hurry? Leave {home || away ? 'it' : 'them'} empty and tap {twoEndings ? 'Start now' : 'Create & score now'}: {mode === 'team' ? 'Team A and Team B' : mode === 'pairs' ? 'Pair A and Pair B' : 'Player A and Player B'} start straight away. Add names and players any time.
+                  In a hurry? Leave {home || away ? 'it' : 'them'} empty and tap {twoEndings ? 'Start now' : 'Create & score now'}: {mode === 'team' ? 'Team A and Team B' : mode === 'pairs' ? 'Team A and Team B' : 'Player A and Player B'} start straight away. Add names and players any time.
                 </Text>
               )}
 
@@ -883,7 +883,7 @@ function TeamPicker({
   const results = searchSides(teams, q);
   const personResults = people ? searchPeople(people, q, 25 - results.length) : [];
 
-  const searchPlaceholder = noun === 'player' ? 'Search players (type 3+ letters)…' : noun === 'pair' ? 'Search pairs or players (type 3+ letters)…' : 'Search all teams (type 3+ letters)…';
+  const searchPlaceholder = noun === 'player' ? 'Search players (type 3+ letters)…' : noun === 'pair' ? 'Search teams or players (type 3+ letters)…' : 'Search all teams (type 3+ letters)…';
   // DP4: in doubles a person is never a one-person "pair" — picking one starts
   // a new pair with them as partner 1 and asks for partner 2.
   const choosePerson = (p: { id: string; name: string }) => {
@@ -900,7 +900,9 @@ function TeamPicker({
   const meFirst = meName ? meName.trim().split(/\s+/)[0] : 'Me';
   // players and pairs are people (picked), only a team is a typed name
   const pickPeople = !!newEntrant && noun !== 'team';
-  const newLabel = noun === 'player' ? '＋ Someone else (mobile or name)' : `＋ New ${noun}`;
+  // team-doubles-setup TD1: a doubles side is shown as a team
+  const shown = noun === 'pair' ? 'team' : noun;
+  const newLabel = noun === 'player' ? '＋ Someone else (mobile or name)' : `＋ New ${shown}`;
 
   const create = async () => {
     if (!name.trim() || busy) return;
@@ -930,7 +932,7 @@ function TeamPicker({
           <FormError message={meErr} />
           {!creating && q.length === 0 && !!recent?.length && (
             <>
-              <Text style={st.tinyLabel}>Recent pairs</Text>
+              <Text style={st.tinyLabel}>Recent teams</Text>
               <View style={st.chips}>
                 {recent.map((t) => (
                   <SelectChip key={`r-${t.id}`} label={t.name} dotColor={t.colorHex} active={false} onPress={() => onSelect(t.id)} />
@@ -951,7 +953,7 @@ function TeamPicker({
           ))}
           {!creating && q.length === 0 && !!otherPairs?.length && onPickPair && (
             <>
-              <Text style={st.tinyLabel}>Your pairs</Text>
+              <Text style={st.tinyLabel}>Your teams</Text>
               <View style={st.chips}>
                 {otherPairs.map((p) => (
                   <SelectChip key={`p-${p.key}`} label={`🤝 ${p.label}`} active={false} onPress={() => onPickPair(p)} />
@@ -975,7 +977,7 @@ function TeamPicker({
               )}
               {q.length >= 3 && results.length === 0 && personResults.length === 0 && (
                 <Text style={textStyles.muted}>
-                  {pickPeople ? `No ${noun}s match “${query.trim()}”. Add them below — their mobile number links the real person.` : `No ${noun}s match “${query.trim()}”. Create one below.`}
+                  {pickPeople ? `No ${shown}s match “${query.trim()}”. Add them below — their mobile number links the real person.` : `No ${shown}s match “${query.trim()}”. Create one below.`}
                 </Text>
               )}
             </>
@@ -984,7 +986,7 @@ function TeamPicker({
           <SelectChip label={newLabel} active={creating} onPress={() => { setSeed(undefined); setCreating((c) => !c); }} />
           {creating && (pickPeople ? newEntrant?.(seed) : (
             <View style={{ gap: theme.spacing(2) }}>
-              <TextField label={`New ${noun} name`} value={name} onChange={setName} placeholder="e.g. Sunday FC" />
+              <TextField label={`New ${shown} name`} value={name} onChange={setName} placeholder="e.g. Sunday FC" />
               <Button label={busy ? 'Creating…' : '＋ Create & select'} onPress={create} disabled={busy || !name.trim()} />
             </View>
           ))}
