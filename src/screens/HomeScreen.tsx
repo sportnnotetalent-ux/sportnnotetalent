@@ -9,18 +9,18 @@ import { yourSports } from '../core/playedSports';
 import { isStaleLive } from '../core/staleLive';
 import { isOverdue } from '../core/overdue';
 import React, { useMemo, useCallback, useEffect, useState, useSyncExternalStore } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Modal, Pressable, useWindowDimensions } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Modal, Pressable, ScrollView, useWindowDimensions } from 'react-native';
 import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { theme } from '../core/theme';
 import { EmptyState, Card, LoadingState, Pill, SelectChip, Button, textStyles, plural } from '../components/ui';
-import { weekLine, heroSportChips, scheduleProgress } from '../core/homeHero';
+import { weekLine, heroSportChips, heroGreeting, heroFontSize, tournamentCards } from '../core/homeHero';
 import { matchOutbox } from '../data/matchOutbox';
 import { setStatusBarStyle } from 'expo-status-bar';
 import Svg, { Circle, Line, Rect } from 'react-native-svg';
-import { Search, Bell, Menu } from 'lucide-react-native';
+import { Search, Bell, Menu, Zap, Trophy, UserPlus } from 'lucide-react-native';
 import { Glyph, IconText } from '../components/Icon';
 import { formatDayShort, formatDayRange } from '../core/dates';
 import { MatchCard } from '../components/MatchCard';
@@ -78,6 +78,7 @@ export default function HomeScreen() {
   // toggle so the wordmark keeps its line; notifications stays always-visible.
   const [actionsOpen, setActionsOpen] = useState(false);
   const [voiceOpen, setVoiceOpen] = useState(false);
+  const [heroW, setHeroW] = useState(0);
   const insets = useSafeAreaInsets();
   useEffect(() => {
     if (selectedId === null && tournaments.length === 1) setSelectedId(tournaments[0].id);
@@ -229,8 +230,18 @@ export default function HomeScreen() {
           <VoiceNav matches={feed} onOpenMatch={openScorer} open={voiceOpen} onOpenChange={setVoiceOpen} hideTrigger />
           </View>
           <View style={st.heroCopy}>
-            {profile?.fullName ? <Text style={st.heroHello} numberOfLines={1}>Hi {profile.fullName.split(' ')[0]},</Text> : null}
-            <Text style={st.heroTitle} accessibilityRole="header">Ready to{'\n'}<Text style={st.heroTitleLime}>play?</Text></Text>
+            {/* Round 2 (HM9/HM10): one line, "Ready to play, Aarav?", sized to fit */}
+            {(() => {
+              const g = heroGreeting(profile?.fullName);
+              const size = heroFontSize(`${g.lead}${g.accent}`, heroW);
+              return (
+                <View onLayout={(e) => setHeroW(e.nativeEvent.layout.width)}>
+                  <Text style={[st.heroTitle, { fontSize: size, lineHeight: size * 1.05 }]} numberOfLines={1} accessibilityRole="header">
+                    {g.lead}<Text style={st.heroTitleLime}>{g.accent}</Text>
+                  </Text>
+                </View>
+              );
+            })()}
             <Text style={st.heroTag}>Play a Sport, Make a Note.</Text>
             {/* Stitch picks 12–13: your sports, and what's coming this week (HM2/HM3) */}
             {(() => {
@@ -251,13 +262,11 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Stitch pick 12 (HM1): one lime main job, the other two as outline buttons */}
-        <View style={st.quickCol}>
-          <Button variant="primary" label="Score a match" onPress={() => nav.navigate('ScheduleMatch', {})} />
-          <View style={st.quickRow}>
-            <Button label="Organize" style={st.flex1} onPress={() => nav.navigate('Tabs', { screen: 'Organize' })} />
-            <Button label="Find players" style={st.flex1} onPress={() => nav.navigate('Tabs', { screen: 'Discover', params: { mode: 'people', focus: true } })} />
-          </View>
+        {/* Round 2 (HM8, founder's pick): three tiles, only Score a match in lime */}
+        <View style={st.quickRow}>
+          <HomeTile lime label="Score a match" icon={<Zap color={theme.colors.onLime} size={22} strokeWidth={2.2} />} onPress={() => nav.navigate('ScheduleMatch', {})} />
+          <HomeTile label="Organize" icon={<Trophy color={theme.colors.primary} size={22} strokeWidth={2.2} />} onPress={() => nav.navigate('Tabs', { screen: 'Organize' })} />
+          <HomeTile label="Find players" icon={<UserPlus color={theme.colors.primary} size={22} strokeWidth={2.2} />} onPress={() => nav.navigate('Tabs', { screen: 'Discover', params: { mode: 'people', focus: true } })} />
         </View>
         {/* Stitch pick 17 (HM6): only while offline */}
         {!online ? (
@@ -340,44 +349,6 @@ export default function HomeScreen() {
                 <SelectChip key={t.id} label={chipNames.get(t.id) ?? t.name} active={selectedId === t.id} onPress={() => setSelectedId(t.id)} />
               ))}
             </KeyboardAwareScrollView>
-            {selected && (
-              <TouchableOpacity
-                activeOpacity={0.8}
-                accessibilityRole="button"
-                accessibilityLabel={`Open ${selected.name}`}
-                onPress={() => nav.navigate('Tournament', { tournamentId: selected.id })}
-              >
-                <Card style={st.tourCard}>
-                  <View style={{ flex: 1, gap: theme.spacing(1) }}>
-                    <Text style={textStyles.body}>{selected.name}</Text>
-                    <Text style={textStyles.muted}>
-                      {selected.hostName} · {plural(selected.sports.length, 'sport')} · {formatDayRange(selected.startDate, selected.endDate)}
-                    </Text>
-                    {(() => {
-                      const ms = feed.filter((m) => m.tournamentId === selected.id);
-                      const s = tournamentStatus(selected, matchProgress(ms));
-                      // Stitch pick 16 (HM4): how much of the schedule is played
-                      const pct = scheduleProgress(ms);
-                      return (
-                        <>
-                          <View style={st.statusRow}><Pill label={s.label} color={s.color + '22'} textColor={s.color} /></View>
-                          {pct !== null ? (
-                            <View style={st.progressWrap} accessible accessibilityLabel={`${pct} percent of the matches played`}>
-                              <View style={st.progressRow}>
-                                <Text style={textStyles.muted}>Matches played</Text>
-                                <Text style={st.progressPct}>{pct}%</Text>
-                              </View>
-                              <View style={st.progressTrack}><View style={[st.progressFill, { width: `${pct}%` }]} /></View>
-                            </View>
-                          ) : null}
-                        </>
-                      );
-                    })()}
-                  </View>
-                  <Text style={st.chevron}>›</Text>
-                </Card>
-              </TouchableOpacity>
-            )}
           </View>
         )}
 
@@ -406,6 +377,38 @@ export default function HomeScreen() {
         ) : (
           <EmptyState icon="📅" title="Nothing scheduled" hint="Upcoming matches will show up here." compact />
         )}
+
+        {/* Round 2 (HM11/HM12): your tournaments, side by side — swipe for more */}
+        {tournaments.length > 0 ? (
+          <>
+            <SectionHeader title="Your tournaments" onSeeAll={() => nav.navigate('Tabs', { screen: 'Organize' })} />
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.tourRow}>
+              {tournamentCards(tournaments, feed).map(({ tournament: t, sports, teams, pct }) => {
+                const s = tournamentStatus(t, matchProgress(feed.filter((m) => m.tournamentId === t.id)));
+                return (
+                  <TouchableOpacity key={t.id} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel={`Open ${t.name}`}
+                    onPress={() => nav.navigate('Tournament', { tournamentId: t.id })} style={st.tourTile}>
+                    <View style={st.tourTop}>
+                      <Text style={st.tourDates} numberOfLines={1}>{formatDayRange(t.startDate, t.endDate).toUpperCase()}</Text>
+                      <Pill label={s.label} color={s.color + '22'} textColor={s.color} />
+                    </View>
+                    <Text style={st.tourName} numberOfLines={2}>{t.name}</Text>
+                    <Text style={textStyles.muted} numberOfLines={1}>{[plural(sports, 'sport'), teams ? plural(teams, 'team') : null].filter(Boolean).join(' · ')}</Text>
+                    {pct !== null ? (
+                      <View style={st.progressWrap} accessible accessibilityLabel={`${pct} percent of the matches played`}>
+                        <View style={st.progressRow}>
+                          <Text style={textStyles.muted}>Matches played</Text>
+                          <Text style={st.progressPct}>{pct}%</Text>
+                        </View>
+                        <View style={st.progressTrack}><View style={[st.progressFill, { width: `${pct}%` }]} /></View>
+                      </View>
+                    ) : null}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </>
+        ) : null}
 
         {/* Your sports — the ones the user signed up for (schedule, standings,
             stats), plus a path into the ones they haven't. A plain list: the
@@ -451,6 +454,17 @@ export default function HomeScreen() {
   );
 }
 
+/** Round 2 (HM8): a Home shortcut tile — an icon in a circle over a short label;
+ *  only the main job (Score a match) is lime. */
+function HomeTile({ label, icon, onPress, lime }: { label: string; icon: React.ReactNode; onPress: () => void; lime?: boolean }) {
+  return (
+    <TouchableOpacity onPress={onPress} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel={label} style={[st.tile, lime && st.tileLime]}>
+      <View style={[st.tileIcon, lime && st.tileIconLime]}>{icon}</View>
+      <Text style={[st.tileLabel, lime && { color: theme.colors.onLime }]} numberOfLines={2}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
+
 const st = StyleSheet.create({
   safe: { flex: 1, backgroundColor: theme.colors.bg },
   content: { padding: theme.spacing(4), paddingTop: 0, gap: theme.spacing(3) },
@@ -466,8 +480,17 @@ const st = StyleSheet.create({
   heroTitle: { color: theme.colors.heroText, fontFamily: theme.fonts.display, fontSize: theme.font.display, lineHeight: theme.font.display * 0.98, textTransform: 'uppercase' },
   heroTitleLime: { color: theme.colors.lime },
   heroTag: { color: theme.colors.heroMuted, fontSize: theme.font.body, marginTop: theme.spacing(1) },
-  quickCol: { gap: theme.spacing(2), marginTop: -theme.spacing(8) },
-  quickRow: { flexDirection: 'row', gap: theme.spacing(2) },
+  quickRow: { flexDirection: 'row', gap: theme.spacing(2), marginTop: -theme.spacing(8) },
+  tile: { flex: 1, minHeight: 104, alignItems: 'center', justifyContent: 'center', gap: theme.spacing(2), padding: theme.spacing(2), borderRadius: theme.radius.md, backgroundColor: theme.colors.surface, ...theme.shadow.card },
+  tileLime: { backgroundColor: theme.colors.lime },
+  tileIcon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.colors.surfaceAlt },
+  tileIconLime: { backgroundColor: 'rgba(20,24,29,0.10)' },
+  tileLabel: { color: theme.colors.text, fontSize: theme.font.small, fontWeight: '700', textAlign: 'center' },
+  tourRow: { gap: theme.spacing(3), paddingVertical: theme.spacing(1), paddingRight: theme.spacing(4) },
+  tourTile: { width: 250, gap: theme.spacing(1.5), padding: theme.spacing(3), borderRadius: theme.radius.md, backgroundColor: theme.colors.surface, borderWidth: 1, borderColor: theme.colors.border, ...theme.shadow.card },
+  tourTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: theme.spacing(2) },
+  tourDates: { flexShrink: 1, color: theme.colors.hot, fontSize: theme.font.tiny, fontWeight: '800', letterSpacing: 0.4 },
+  tourName: { fontFamily: theme.fonts.heading, fontSize: theme.font.h3 + 2, color: theme.colors.text },
   flex1: { flex: 1, backgroundColor: theme.colors.surface },
   heroChips: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing(1.5), marginTop: theme.spacing(2) },
   heroChip: { color: theme.colors.heroText, fontSize: theme.font.small, fontWeight: '700', backgroundColor: 'rgba(243,240,232,0.14)', paddingHorizontal: theme.spacing(2.5), paddingVertical: theme.spacing(1), borderRadius: theme.radius.pill, overflow: 'hidden' },

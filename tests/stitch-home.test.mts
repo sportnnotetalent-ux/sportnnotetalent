@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { weekLine, heroSportChips, scheduleProgress } from '../src/core/homeHero.ts';
+import { weekLine, heroSportChips, scheduleProgress, heroGreeting, heroFontSize, tournamentCards } from '../src/core/homeHero.ts';
 
 const read = (p: string) => readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
 const NOW = Date.parse('2026-11-08T06:00:00Z');
@@ -31,10 +31,40 @@ test('HM1/HM5/HM6 wiring', () => {
   const h = read('src/screens/HomeScreen.tsx');
   assert.match(h, /weekLine\(/);
   assert.match(h, /heroSportChips\(/);
-  assert.match(h, /scheduleProgress\(/);
+  assert.match(read('src/core/homeHero.ts'), /pct: scheduleProgress\(ms\)/, 'HM4 via the cards');
   assert.match(h, /matchOutbox\.isOnline\(\)/);
-  assert.equal((h.match(/<QuickTile /g) ?? []).length, 0, 'the three tiles are gone');
-  assert.match(h, /variant="primary" label="Score a match"/);
+  // round 2 (HM8): three tiles, only Score a match in lime
+  assert.equal((h.match(/<HomeTile /g) ?? []).length, 3);
+  assert.equal((h.match(/<HomeTile [^>]*\blime\b/g) ?? []).length, 1);
+  assert.match(h, /<HomeTile lime label="Score a match"/);
+  assert.match(h, /heroGreeting\(/);
+  assert.match(h, /tournamentCards\(/);
   const c = read('src/components/MatchCard.tsx');
   assert.match(c, /archetype === 'set-game-point'/);
+});
+
+test('HM9/HM10: one-line greeting with the first name, shrinking to fit', () => {
+  assert.deepEqual(heroGreeting('Aarav Mehta'), { lead: 'Ready to ', accent: 'play, Aarav?' });
+  assert.deepEqual(heroGreeting(''), { lead: 'Ready to ', accent: 'play?' });
+  assert.deepEqual(heroGreeting(undefined), { lead: 'Ready to ', accent: 'play?' });
+  assert.deepEqual(heroGreeting('Bartholomewsky Smith'), { lead: 'Ready to ', accent: 'play?' }, 'a very long name is left out');
+  const long = heroFontSize('Ready to play, Aarav?', 343);
+  assert.ok(long <= 44 && long >= 26);
+  assert.ok(heroFontSize('Ready to play?', 343) >= long);
+  assert.equal(heroFontSize('Ready to play?', 0), 44, 'before measuring: the full size');
+  assert.equal(heroFontSize('Ready to play, Christopher?', 200), 26, 'never below the floor');
+});
+
+test('HM11/HM12: tournament cards — real counts, at most 10', () => {
+  const t = (id: string, sports: string[]) => ({ id, name: id, sports, startDate: '2026-11-01', endDate: '2026-11-09' });
+  const ms = [
+    { tournamentId: 'a', status: 'completed', homeTeam: { id: 'x' }, awayTeam: { id: 'y' } },
+    { tournamentId: 'a', status: 'scheduled', homeTeam: { id: 'x' }, awayTeam: { id: 'z' } },
+    { tournamentId: 'a', status: 'cancelled', homeTeam: { id: 'y' }, awayTeam: { id: 'z' } },
+  ];
+  const cards = tournamentCards([t('a', ['football', 'cricket'])] as never, ms as never);
+  assert.equal(cards[0].sports, 2);
+  assert.equal(cards[0].teams, 3);
+  assert.equal(cards[0].pct, 50);
+  assert.equal(tournamentCards(Array.from({ length: 14 }, (_, i) => t(`t${i}`, ['football'])) as never, []).length, 10);
 });

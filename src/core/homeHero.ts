@@ -30,3 +30,29 @@ export function scheduleProgress(matches: readonly { status: string }[]): number
   if (!live.length) return null;
   return Math.round((live.filter((m) => m.status === 'completed').length / live.length) * 100);
 }
+
+/** HM9/HM10 (round 2): "Ready to play, Aarav?" on one line — the signed-in
+ *  user's own first name; a very long one is left out. */
+export function heroGreeting(fullName?: string | null): { lead: string; accent: string } {
+  const first = (fullName ?? '').trim().split(/\s+/)[0] ?? '';
+  return { lead: 'Ready to ', accent: first && first.length <= 12 ? `play, ${first}?` : 'play?' };
+}
+
+/** HM9: the display size that keeps the greeting on one line in `width`
+ *  points (the condensed italic face runs ~0.55 em a letter), 26–44. */
+export function heroFontSize(text: string, width: number): number {
+  if (width <= 0) return 44;
+  return Math.max(26, Math.min(44, Math.floor(width / (text.length * 0.55))));
+}
+
+/** HM11/HM12 (round 2): the "Your tournaments" cards — real counts, at most 10. */
+export function tournamentCards<T extends { id: string; sports: readonly string[] }>(
+  tournaments: readonly T[],
+  feed: readonly { tournamentId?: string; status: string; homeTeam: { id: string }; awayTeam: { id: string } }[],
+): { tournament: T; sports: number; teams: number; pct: number | null }[] {
+  return tournaments.slice(0, 10).map((t) => {
+    const ms = feed.filter((m) => m.tournamentId === t.id);
+    const teams = new Set(ms.filter((m) => m.status !== 'cancelled').flatMap((m) => [m.homeTeam.id, m.awayTeam.id]));
+    return { tournament: t, sports: t.sports.length, teams: teams.size, pct: scheduleProgress(ms) };
+  });
+}

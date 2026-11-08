@@ -13,6 +13,13 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-08 — Home round 2 (founder's pick from the Stitch "Home Page")
+
+- **Tiles:** three equal tiles again, only **Score a match** in lime. Organize and Find players are white, each with its icon in a circle.
+- **Greeting:** one line, "Ready to play, Aarav?". It shrinks to fit, and a name over 12 letters is left out.
+- **Your tournaments:** swipeable cards (dates, status, name, sports · teams, "Matches played" bar; at most 10, "See all ›" to Organize). They replace the single card under the tournament chips; the chips stay as the Live / Up next filter.
+- **Files and checks:** `src/core/homeHero.ts` (heroGreeting, heroFontSize, tournamentCards) and `HomeScreen`. Break doc stitch-home.md HM8–HM12; tests 6/6; full suite 7,753 pass; demo-checked at phone width.
+
 ### 2026-11-08 — Release: Stitch picks, pair names, website front page, guides (web, Android OTA, website)
 
 auth-smoke passed and the publish lock was taken. Published from a clean worktree at 825223e8.
