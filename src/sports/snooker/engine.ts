@@ -17,7 +17,8 @@
  * state holds sides and numbers; payload fields are read one by one from a
  * fixed list and nothing else is copied.
  */
-import type { ScoreSummary } from '../types';
+import type { FormatField, LiveSettings, ScoreSummary } from '../types';
+import { SNOOKER_META } from './meta.ts';
 import { scoreLine as lineOf, finalSummary, pointsLineScore, type LineScore } from '../scoreline.ts';
 
 export type Side = 'home' | 'away';
@@ -216,6 +217,22 @@ export function createInitialState(config?: Record<string, unknown>): SnookerSta
 }
 export const init = createInitialState;
 
+/** Defaults-on DOK2/DOK5 (S2) — "Stats to track" on the Info tab (event mode:
+ *  the format before the first shot, then SET_TRACK from the next shot), as
+ *  carrom's and chess's. Its default is the format field's (meta.ts: one source). */
+const lrField = (SNOOKER_META.formatFields ?? []).find((f) => f.key === 'trackLongRest');
+export const SNOOKER_LIVE_SETTINGS: LiveSettings<SnookerState> = {
+  title: '⚙️ Stats to track',
+  hint: 'Optional. Scoring a shot stays the same; the chips sit by the pot buttons and feed the match stats and careers. Tags already made are kept.',
+  mode: 'event',
+  actionType: 'SET_TRACK',
+  fields: ([
+    { key: 'trackLongRest', label: 'Long pots and rest shots', type: 'toggle', default: lrField?.default === true, group: 'Stats to track', hint: lrField?.hint },
+  ] as FormatField[]),
+  read: (st) => ({ trackLongRest: st?.trackLR === true }),
+  defaults: { trackLongRest: lrField?.default === true },
+};
+
 /** S3 R11: 4, or the value of the ball on when higher; the re-spotted black 7. */
 function minFoul(fr: LiveFrame): number {
   if (fr.respot) return 7;
@@ -325,6 +342,14 @@ function reduce(s: SnookerState, a: SnookerAction): SnookerState {
   };
 
   switch (a.type) {
+    // defaults-on DOK5 (S2) — Stats to track switched mid-match: from the next
+    // shot; no score, turn or frame change (an older log has no SET_TRACK)
+    case 'SET_TRACK': {
+      const v = own(p, 'trackLongRest');
+      if (typeof v !== 'boolean') return s;
+      const { trackLR: _was, ...rest } = s;
+      return v ? { ...rest, trackLR: true } : rest;
+    }
     case 'POT': return striking ? pot(s, fr, p) : s;
     case 'MISS':
     case 'SAFETY': return striking ? endVisit(s, fr, a.type === 'MISS' ? 'miss' : 'safety', p) : s;

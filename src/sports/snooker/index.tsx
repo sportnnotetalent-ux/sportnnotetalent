@@ -21,7 +21,7 @@ import { SetLineBoard } from '../SetLineBoard';
 import { CommentaryFeed } from '../gcc/CommentaryFeed';
 import { CompareTable } from '../gcc/CompareTable';
 import {
-  createInitialState, reducer, isComplete, result, summary, scoreLine, lineScore, standingsUnits, AWARD_REASONS, FOUL_KINDS,
+  createInitialState, reducer, isComplete, result, summary, scoreLine, lineScore, standingsUnits, AWARD_REASONS, FOUL_KINDS, SNOOKER_LIVE_SETTINGS,
   type AwardReason, type Ball, type FoulKind, type Side, type SnookerState,
 } from './engine';
 import { SNOOKER_META } from './meta';
@@ -383,6 +383,8 @@ export const snookerPlugin: SportPlugin<SnookerState> = {
   CorrectionEditor: SnookerCorrections,
   ScoringControls: withCueDoubles(ScoringControls),
   matchTabs: { Commentary: SnookerCommentary, Stats: SnookerStats },
+  // defaults-on DOK5 (S2) — Stats to track: switch the long / rest chips off mid-match
+  liveSettings: SNOOKER_LIVE_SETTINGS,
 };
 
 const st = StyleSheet.create({

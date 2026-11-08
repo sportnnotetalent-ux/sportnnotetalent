@@ -76,7 +76,7 @@ import { AwardPickerSheet, type PickerRow } from '../components/AwardPickerSheet
 import { deleteVerdict, breakLabel, type BreakKind, type MatchBreak } from '../data/matchHousekeeping';
 import { QuickOptionsSheet } from '../components/QuickOptionsSheet';
 import { LiveSettingsCard } from '../components/LiveSettingsCard';
-import { matchRules, matchCaptures, liveOwnedKeys, settingsUnit, scoringRule, type CaptureLine, type RuleLine } from '../sports/matchRules';
+import { matchRules, matchCaptures, liveOwnedKeys, settingsUnit, scoringRule, existingFormatShown, type CaptureLine, type RuleLine } from '../sports/matchRules';
 import { OverlayPanel } from '../components/OverlayPanel';
 import type { TickerMeta } from '../sports/ticker';
 import { slotsFor, isCommentarySlot, type MatchOfficial } from '../data/matchOfficials';
@@ -945,7 +945,8 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
     setEditWhen(meta.startsAt ? new Date(meta.startsAt) : new Date());
     setEditVenue(meta.venueName ?? '');
     setEditVenueUrl(meta.venueMapsUrl ?? '');
-    const shown = { ...defaultsFor(getSport(sport).formatFields ?? [], meta.tournamentId ? 'tournament' : undefined), ...((meta.config as Record<string, FormatVal>) ?? {}) };
+    // defaults-on DOK4: a stats switch this match never stored shows Off (its engine reads it off)
+    const shown = existingFormatShown(getSport(sport).formatFields ?? [], defaultsFor(getSport(sport).formatFields ?? [], meta.tournamentId ? 'tournament' : undefined), (meta.config as Record<string, FormatVal>) ?? {});
     setEditFmt(shown);
     setEditFmtShown(shown);
     setEditInfo(true);

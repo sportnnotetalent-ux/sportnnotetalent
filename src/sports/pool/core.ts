@@ -3,13 +3,14 @@
  * (adding the screens), and the node tests drive whole matches through the
  * very same functions. No React Native here.
  *
- * No live settings (founder 2026-10-28): the game, the race and the sets are
- * pinned by the match's first event (match.ts, the pin; break #26), so a later
- * format change can't re-score a match in play.
+ * No live RULE settings (founder 2026-10-28): the game, the race and the sets
+ * are pinned by the match's first event (match.ts, the pin; break #26), so a
+ * later format change can't re-score a match in play. The only live card is
+ * Stats to track (defaults-on DOK5): it never changes a score.
  */
 import type { SportPlugin } from '../types';
 import { cnt, isComplete, lineScore, result, scoreLine, summary } from './engine.ts';
-import { creditOf, poolInit, poolReducer, type PoolMatch } from './match.ts';
+import { creditOf, poolInit, poolReducer, POOL_LIVE_SETTINGS, type PoolMatch } from './match.ts';
 import { poolStatTotals } from './totals.ts';
 import { poolMatchRecords } from './records.ts';
 import { poolUndoLabel } from './undo.ts';
@@ -49,5 +50,6 @@ export const POOL_CORE = {
   matchRecords: poolMatchRecords,
   undoLabel: poolUndoLabel,
   // founder 2026-10-28: the race and sets lock once the match starts (like the
-  // game), so there's nothing to change during play
+  // game), so there's no rule to change during play; only what is tracked
+  liveSettings: POOL_LIVE_SETTINGS,
 } satisfies Partial<SportPlugin<PoolMatch>>;

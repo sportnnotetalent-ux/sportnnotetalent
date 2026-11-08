@@ -34,18 +34,20 @@ const boardActs = (det?: carrom.BoardDetail) => BOARDS.map(([side, coins, queen]
 const runC = (cfg: Record<string, unknown>, acts = boardActs()) => acts.reduce((s, a) => carrom.reducer(s, a as never), carrom.init(cfg));
 
 describe('DC1 · carrom: coins on the break and missed Queen covers on for a new match', () => {
-  test('the format fields default them on; fouls stay off (DC3)', () => {
+  // defaults-on DOK8 (wave 3, docs/security/breaks/defaults-on-cricket-cue.md): fouls are
+  // on too now that a board is foul-tracked only from the first tapped foul (NZG3)
+  test('the format fields default them on; fouls on too since wave 3 (was DC3)', () => {
     const f = CARROM_META.formatFields!;
     assert.equal(fieldOf(f, 'trackBreak').default, true);
     assert.equal(fieldOf(f, 'trackQueenMiss').default, true);
-    assert.equal(fieldOf(f, 'trackFouls').default, false);
+    assert.equal(fieldOf(f, 'trackFouls').default, true);
   });
-  test('a new match (format from defaultsFor) tracks break + missed covers, not fouls', () => {
+  test('a new match (format from defaultsFor) tracks break + missed covers + fouls', () => {
     const s = carrom.init(defaultsFor(CARROM_META.formatFields!));
-    assert.deepEqual(s.track, { brk: true, qMiss: true });
+    assert.deepEqual(s.track, { fouls: true, brk: true, qMiss: true });
   });
   test('the organiser / scorer can still switch either off', () => {
-    assert.equal(carrom.init({ ...defaultsFor(CARROM_META.formatFields!), trackBreak: false, trackQueenMiss: false }).track, undefined);
+    assert.equal(carrom.init({ ...defaultsFor(CARROM_META.formatFields!), trackBreak: false, trackQueenMiss: false, trackFouls: false }).track, undefined); // defaults-on DOK8
     let s = carrom.init(defaultsFor(CARROM_META.formatFields!));
     s = carrom.reducer(s, { type: 'SET_TRACK', payload: { trackBreak: false, trackQueenMiss: false, trackFouls: false } });
     assert.equal(s.track, undefined);
@@ -87,7 +89,7 @@ describe('DC4 · one source for the carrom default (format field = live settings
   });
   test('read: a new match reads on; an old match reads off', () => {
     const ls = carrom.CARROM_LIVE_SETTINGS;
-    assert.deepEqual(ls.read(carrom.init(defaultsFor(CARROM_META.formatFields!))), { trackFouls: false, trackBreak: true, trackQueenMiss: true });
+    assert.deepEqual(ls.read(carrom.init(defaultsFor(CARROM_META.formatFields!))), { trackFouls: true, trackBreak: true, trackQueenMiss: true }); // defaults-on DOK8
     assert.deepEqual(ls.read(carrom.init(OLD_CARROM)), { trackFouls: false, trackBreak: false, trackQueenMiss: false });
   });
 });
@@ -109,8 +111,8 @@ describe('DC5 · the newly-on captures stay optional', () => {
 describe('DC6 · Info › Rules & stats captured shows the new defaults', () => {
   const caps = (cfg: Record<string, unknown>) =>
     Object.fromEntries(matchCaptures(carrom.CARROM_LIVE_SETTINGS as never, carrom.init(cfg), CARROM_META.formatFields!, cfg).captures.map((c) => [c.key, c.on]));
-  test('new match: break + missed covers On, fouls Off', () => {
-    assert.deepEqual(caps(defaultsFor(CARROM_META.formatFields!)), { trackFouls: false, trackBreak: true, trackQueenMiss: true });
+  test('new match: break + missed covers On, fouls On (defaults-on DOK8)', () => {
+    assert.deepEqual(caps(defaultsFor(CARROM_META.formatFields!)), { trackFouls: true, trackBreak: true, trackQueenMiss: true });
   });
   test('old match: all Off (what it actually captured)', () => {
     assert.deepEqual(caps(OLD_CARROM), { trackFouls: false, trackBreak: false, trackQueenMiss: false });

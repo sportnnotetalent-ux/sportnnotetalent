@@ -6,6 +6,8 @@
 import { replayMoves, parseFen, boardEnd, START_FEN } from './board.ts';
 import { readMoveList } from './pgn.ts';
 import { detectOpening, ecoCode, nameForEco } from './openings.ts';
+import type { FormatField, LiveSettings } from '../types';
+import { CHESS_META } from './meta.ts';
 
 export type Side = 'home' | 'away';
 export type ChessMethod =
@@ -288,6 +290,24 @@ function readTrack(v: Record<string, unknown> | undefined, base?: ChessTrack): C
   for (const k of Object.keys(t) as (keyof ChessTrack)[]) if (!t[k]) delete t[k];
   return Object.keys(t).length ? t : undefined;
 }
+/** Deep wave — "Stats to track" (event mode: the format before the game,
+ *  then SET_TRACK). Defaults-on H1 (docs/security/breaks/defaults-on-cricket-cue.md
+ *  DOK2): each default is the format field's (meta.ts: one source), so a new
+ *  game, Info and the card's Standard / Reset agree. */
+const metaField = (k: string) => (CHESS_META.formatFields ?? []).find((f) => f.key === k);
+const trackDefault = (k: string): boolean => metaField(k)?.default === true;
+export const CHESS_LIVE_SETTINGS: LiveSettings<ChessState> = {
+  title: '⚙️ Stats to track',
+  hint: 'Optional. Recording the result stays the same; the move list can also be pasted after the game.',
+  mode: 'event',
+  actionType: 'SET_TRACK',
+  fields: ([
+    { key: 'trackMoves', label: 'Move list (SAN / PGN)', type: 'toggle', default: trackDefault('trackMoves'), group: 'Stats to track', hint: 'Type each move as it is played (checked for legality) — commentary, opening, game stats' },
+    { key: 'trackClock', label: 'Clock after each move', type: 'toggle', default: trackDefault('trackClock'), group: 'Stats to track', hint: 'With the move list: the time left after each move → time used per move' },
+  ] as FormatField[]),
+  read: (st) => ({ trackMoves: !!st?.track?.moves, trackClock: !!st?.track?.clock }),
+  defaults: { trackMoves: trackDefault('trackMoves'), trackClock: trackDefault('trackClock') },
+};
 const stampOf = (v: unknown): number | undefined => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : undefined);
 
 /** Deep wave — the game's opening: named by hand / a PGN tag, else the

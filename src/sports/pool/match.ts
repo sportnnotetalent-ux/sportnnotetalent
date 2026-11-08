@@ -30,6 +30,8 @@ import {
   type FoulKind, type PendingKind, type PerSide, type PoolState, type Tally,
 } from './engine.ts';
 import { isSide, knownGame, other, own, ownRecord, readBalls, readInt, TOP, type PoolGame, type Side } from './balls.ts';
+import type { FormatField, LiveSettings } from '../types';
+import { POOL_META } from './meta.ts';
 
 export type { Side, PoolGame } from './balls.ts';
 
@@ -319,10 +321,39 @@ function reduce(s: PoolMatch, a: unknown): PoolMatch {
     if (isSide(side) && (isSide(p?.breaks) ? p.breaks : side) === base.firstBreaker && base.rack.breaker === base.firstBreaker) return s;
   }
   if (own(a, 'type') === 'EXTENSION') return extension(s, a, p ?? undefined);
+  if (own(a, 'type') === 'SET_TRACK') return setTrack(s, p ?? undefined);
   const next = engineReducer(base, a as never) as PoolMatch;
   if (next === base) return s;
   return withCredit(base, next, a, p ?? (Object.create(null) as Record<string, unknown>));
 }
+
+/** Defaults-on DOK5 — SET_TRACK {trackShotClock}: the Stats to track card
+ *  switched mid-match (from the next shot). No score, rack, turn or feed
+ *  change; extensions already taken stay counted (totals.ts). */
+function setTrack(s: PoolMatch, p: Record<string, unknown> | undefined): PoolMatch {
+  const v = p ? own(p, 'trackShotClock') : undefined;
+  if (typeof v !== 'boolean' || s.ended === true) return s;
+  const o = isObj(s.opt) ? s.opt : {};
+  if ((o.shotClock === true) === v) return s;
+  const { shotClock: _was, ...rest } = o;
+  return mine({ ...s, opt: v ? { ...rest, shotClock: true } : rest });
+}
+
+/** Defaults-on DOK2/DOK5 — "Stats to track" on the Info tab (event mode: the
+ *  format before the first shot, then SET_TRACK from the next shot). Its
+ *  default is the format field's (meta.ts: one source). */
+const clockField = (POOL_META.formatFields ?? []).find((f) => f.key === 'trackShotClock');
+export const POOL_LIVE_SETTINGS: LiveSettings<PoolMatch> = {
+  title: '⚙️ Stats to track',
+  hint: 'Optional. Scoring a shot stays the same; extensions already taken are kept.',
+  mode: 'event',
+  actionType: 'SET_TRACK',
+  fields: ([
+    { key: 'trackShotClock', label: 'Shot-clock extensions', type: 'toggle', default: clockField?.default === true, group: 'Stats to track', hint: clockField?.hint },
+  ] as FormatField[]),
+  read: (st) => ({ trackShotClock: isObj(st) && isObj(st.opt) && st.opt.shotClock === true }),
+  defaults: { trackShotClock: clockField?.default === true },
+};
 
 /** Cue batch 6 — EXTENSION {side, payload: {rack}}: the player at the table
  *  takes the shot-clock extension (WPA playing regulations), only when the

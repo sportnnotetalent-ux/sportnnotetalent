@@ -58,13 +58,19 @@ class Rec {
 const replay = (log: MatchEventRecord[], cfg: Record<string, unknown> = CFG) => replayCricket(log, cfg);
 
 describe('standard rules = today', () => {
+  // defaults-on DOK1/DOK9: the defaults now switch four captures on (each ball stamps
+  // what was tracked), so the playing rules are compared with the captures off, and
+  // the scores with them on
+  const CAPTURES_OFF = { wagonWheel: false, pitchMap: false, shotCtrl: false, ballSpeed: false, bowlerType: false, extraWhy: false };
   test('seed and live demo logs replay identically with explicit standard local rules', () => {
     for (const e of CRICKET_SEED_EXPECT) {
       const cfg = { overs: e.overs, playersPerSide: e.players };
-      assert.deepEqual(replay(CRICKET_MATCH_EVENTS[e.id], { ...cfg, ...LOCAL_RULE_DEFAULTS }), replay(CRICKET_MATCH_EVENTS[e.id], cfg));
+      assert.deepEqual(replay(CRICKET_MATCH_EVENTS[e.id], { ...cfg, ...LOCAL_RULE_DEFAULTS, ...CAPTURES_OFF }), replay(CRICKET_MATCH_EVENTS[e.id], cfg));
+      assert.deepEqual(replay(CRICKET_MATCH_EVENTS[e.id], { ...cfg, ...LOCAL_RULE_DEFAULTS }).scores, replay(CRICKET_MATCH_EVENTS[e.id], cfg).scores);
     }
     const cfg = { overs: LIVE.overs, playersPerSide: LIVE.players };
-    assert.deepEqual(replay(CRICKET_LIVE_EVENTS[LIVE.id], { ...cfg, ...LOCAL_RULE_DEFAULTS }), replay(CRICKET_LIVE_EVENTS[LIVE.id], cfg));
+    assert.deepEqual(replay(CRICKET_LIVE_EVENTS[LIVE.id], { ...cfg, ...LOCAL_RULE_DEFAULTS, ...CAPTURES_OFF }), replay(CRICKET_LIVE_EVENTS[LIVE.id], cfg));
+    assert.deepEqual(replay(CRICKET_LIVE_EVENTS[LIVE.id], { ...cfg, ...LOCAL_RULE_DEFAULTS }).scores, replay(CRICKET_LIVE_EVENTS[LIVE.id], cfg).scores);
   });
   test('init carries standard rules; wide/no-ball are +1 and not a ball; a no-ball gives a free hit', () => {
     const r = new Rec();
@@ -288,8 +294,11 @@ describe('live settings Apply (generic card decisions)', () => {
     assert.deepEqual(planLiveApply(LS, r.s, r.log.length, cur, cur), { kind: 'none' });
   });
   test('Standard / N custom pill', () => {
-    assert.equal(customCount(LS, LS.read(init(CFG))), 0);
-    assert.equal(customCount(LS, LS.read(init({ ...CFG, wideRuns: 2, freeHit: false }))), 2);
+    // defaults-on DOK2/DOK3: a new match (the defaults) is Standard; an older format
+    // without the four capture keys reads them off, so it shows 4 custom (its truth)
+    assert.equal(customCount(LS, LS.read(init({ ...CFG, ...LOCAL_RULE_DEFAULTS }))), 0);
+    assert.equal(customCount(LS, LS.read(init(CFG))), 4);
+    assert.equal(customCount(LS, LS.read(init({ ...CFG, ...LOCAL_RULE_DEFAULTS, wideRuns: 2, freeHit: false }))), 2);
   });
   test('who can edit: scorer only while live; scorer or manager before play', () => {
     assert.deepEqual(liveSettingsAccess({ mode: 'event', beforeStart: false, canScore: false, canManage: true, complete: false }),

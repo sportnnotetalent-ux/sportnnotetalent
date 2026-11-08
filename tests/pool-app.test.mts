@@ -529,8 +529,10 @@ describe('integration: a 9-ball match (break-and-run, golden break, three fouls)
     assert.deepEqual(POOL_CORE.involvedPlayerIds!(M.poolInit()), []);
     assert.deepEqual(POOL_CORE.involvedPlayerIds!(null as never), []);
   });
-  test('no live settings: the game, race and sets are fixed once the match has started', () => {
-    assert.equal((POOL_CORE as { liveSettings?: unknown }).liveSettings, undefined);
+  test('no live RULE settings: the game, race and sets are fixed once the match has started', () => {
+    // defaults-on DOK5: the only live card is Stats to track (the shot-clock switch)
+    const ls = (POOL_CORE as { liveSettings?: { fields: { key: string }[] } }).liveSettings;
+    assert.deepEqual(ls?.fields.map((f) => f.key), ['trackShotClock']);
   });
   test('replay of the stored log (JSON) is identical, and every prefix is what the scorer saw (undo)', () => {
     assert.deepEqual(replay(NINE2, JSON.parse(JSON.stringify(log))), s);

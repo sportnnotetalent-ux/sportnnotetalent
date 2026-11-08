@@ -243,6 +243,7 @@ describe('pool · the race and sets lock once the match starts (founder 2026-10-
     const changed = M.poolReplay({ game: 'eight', raceTo: 1, setsToWin: 2 }, actions);
     assert.deepEqual([changed.raceTo, changed.setsToWin], [3, 1], 'the replay keeps the race and sets the match started with');
     assert.equal(M.poolInit({ game: 'eight', raceTo: 1 }).raceTo, 1, 'before any event the format is whatever was set');
-    assert.equal(POOL_CORE.liveSettings, undefined, 'no race / sets settings during play');
+    // defaults-on DOK5: the live card holds only the Stats to track switch, never the race / sets
+    assert.deepEqual(POOL_CORE.liveSettings?.fields.map((f) => f.key), ['trackShotClock'], 'no race / sets settings during play');
   });
 });

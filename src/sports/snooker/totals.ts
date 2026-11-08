@@ -50,7 +50,9 @@ const n = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) &
  *  only once the match has at least one tag of that kind (either side) — the
  *  toggle on with nothing tagged shows nothing and writes nothing. */
 export function snookerLongRestCaptured(s: SnookerState): { long: boolean; rest: boolean } {
-  if (!s || typeof s !== 'object' || s.trackLR !== true) return { long: false, rest: false };
+  // defaults-on DOK6: a tag exists only if it was tracked when made, so the
+  // tags (not today's switch) decide — switched off mid-match keeps them
+  if (!s || typeof s !== 'object') return { long: false, rest: false };
   const st = snookerStats(s);
   return {
     long: n(st.home.longAttempts) + n(st.away.longAttempts) > 0,

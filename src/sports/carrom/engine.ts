@@ -831,6 +831,16 @@ export const carromFoulsCaptured = (boards: readonly { det?: BoardDetail }[] | u
 export const carromQMissCaptured = (boards: readonly { det?: BoardDetail }[] | undefined): boolean =>
   (boards ?? []).some((b) => sumCounts(b?.det?.qMiss) > 0);
 
+/** Defaults-on C3 / DOK7 (docs/security/breaks/defaults-on-cricket-cue.md):
+ *  is the board form's fouls row open, or folded behind "Fouls ▾"? Folded only
+ *  while nothing can be lost: the scorer has not opened it, this board has no
+ *  foul (the end-foul chip logs one too) and the match has captured none (from
+ *  the first foul on, every board saves a real count, so the row stays open). */
+export function carromFoulsOpen(s: Pick<CarromState, 'boards' | 'track'>, o: { opened: boolean; boardFouls: number }): boolean {
+  if (!s?.track?.fouls) return false;
+  return o.opened || o.boardFouls > 0 || carromFoulsCaptured(s.boards);
+}
+
 /** What the board form holds when "Record board" is tapped. */
 export interface BoardDetailInput {
   doubles: boolean;

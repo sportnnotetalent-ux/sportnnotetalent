@@ -58,6 +58,7 @@ export function snookerUndoLabel(step: Step): string | null {
       case 'FOUL': return (valid && foulLabel(prev, next)) || 'foul';
       case 'FREE_BALL': return 'free ball call';
       case 'PLAY_AGAIN': return 'play again';
+      case 'SET_TRACK': return 'stats-to-track setting';
       case 'REPLACE': return 'balls replaced';
       case 'RESPOT_TURN': return 're-spotted black: who plays';
       case 'BREAK_OFF': return 'break-off pick';

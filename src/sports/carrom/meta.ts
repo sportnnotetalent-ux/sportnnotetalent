@@ -47,7 +47,9 @@ export const CARROM_META: SportMeta = {
     // coins on the break and missed Queen covers are ON for a new match (an old
     // match has no key and keeps them off); fouls stay off — skipped rows would
     // read as "no fouls" (false zeros) on a casual match
-    { key: 'trackFouls', label: 'Track fouls & dues', type: 'toggle', default: false, advanced: true, group: 'Stats to track', hint: 'optional rows on the board form' },
+    // Defaults-on wave 3: fouls ON too, now that a board counts as foul-tracked only
+    // from the first tapped foul (NZG3) and the row folds behind Fouls ▾ (C3)
+    { key: 'trackFouls', label: 'Track fouls & dues', type: 'toggle', default: true, advanced: true, group: 'Stats to track', hint: 'optional rows on the board form' },
     { key: 'trackBreak', label: 'Track coins on the break', type: 'toggle', default: true, advanced: true, group: 'Stats to track' },
     { key: 'trackQueenMiss', label: 'Track missed Queen covers', type: 'toggle', default: true, advanced: true, group: 'Stats to track' },
   ],

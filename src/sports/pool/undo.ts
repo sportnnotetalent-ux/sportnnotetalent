@@ -40,6 +40,8 @@ export function stepWords(e: FeedEntry): string {
 export function poolUndoLabel(step: { type: string; prev: unknown; next: unknown } | null | undefined, nameOf?: NameOf): string | null {
   if (!step || !isObj(step.prev) || !isObj(step.next) || step.prev === step.next) return null;
   const prev = step.prev as unknown as PoolMatch, next = step.next as unknown as PoolMatch;
+  // defaults-on DOK5 — the Stats to track switch adds no feed line
+  if (step.type === 'SET_TRACK') return 'stats-to-track setting';
   if (cnt(next.seq) !== cnt(prev.seq) + 1) return null;
   const f = feedOf(next);
   const e = f[f.length - 1];

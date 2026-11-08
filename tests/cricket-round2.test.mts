@@ -125,7 +125,8 @@ describe('1 · Fastest ball and Best control % are tournament leaders, with mini
 describe('2 · powerplay / death phases are organiser options (format defaults)', () => {
   test('rules keys: absent by default, sanitised, round-trip; not a playing rule', () => {
     assert.deepEqual(rulesFromConfig({ phasePP: 'auto', phaseDeath: 'auto', bouncerMax: 'auto' }), STANDARD_RULES);
-    assert.deepEqual(rulesFromConfig({ ...LOCAL_RULE_DEFAULTS }), STANDARD_RULES);
+    // defaults-on DOK2: the new-match defaults are the standard playing rules plus the four captures on
+    assert.deepEqual(rulesFromConfig({ ...LOCAL_RULE_DEFAULTS }), { ...STANDARD_RULES, wagonWheel: true, pitchMap: true, bowlerType: true, extraWhy: true });
     const r = rulesFromConfig({ phasePP: 4, phaseDeath: '0' });
     assert.deepEqual([r.phasePP, r.phaseDeath], [4, 0]);
     assert.equal(isStandard(r), true, 'stats phases are not playing rules');

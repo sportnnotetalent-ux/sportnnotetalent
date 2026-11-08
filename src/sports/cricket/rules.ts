@@ -273,6 +273,16 @@ export function cricketBeforeStart(s: CricketState): boolean {
     && home.wickets + away.wickets === 0 && s.thisOver.length === 0;
 }
 
+/** Defaults-on wave 3 (docs/security/breaks/defaults-on-cricket-cue.md DOK2):
+ *  the "Stats to track" switches a NEW match starts with — one source for the
+ *  format fields, LOCAL_RULE_DEFAULTS and the card's Standard / Reset. Ball
+ *  speed (typed, needs a speed gun) and shot control (an untagged ball counts
+ *  as in control: a false 100%) stay off. An older match keeps what it stored;
+ *  a missing key still reads off (`rulesFromConfig`). */
+export const CRICKET_TRACK_DEFAULTS = {
+  wagonWheel: true, pitchMap: true, shotCtrl: false, ballSpeed: false, bowlerType: true, extraWhy: true,
+} as const satisfies Record<'wagonWheel' | TrackKey, boolean>;
+
 /** Shared by formatFields (advanced) and liveSettings.fields. */
 export const LOCAL_RULE_FIELDS: FormatField[] = [
   { key: 'wideRuns', label: 'Runs for a wide', type: 'count', default: 1, min: 0, max: 5, advanced: true },
@@ -288,14 +298,14 @@ export const LOCAL_RULE_FIELDS: FormatField[] = [
   { key: 'retireBack', label: 'Retired batters may bat again', type: 'toggle', default: true, advanced: true, hint: 'once everyone else has batted' },
   // SD-133 (CK-11) — wagon wheel + shot type after each scoring shot (optional taps);
   // batch 5 (C2) — the shot type on a dot ball or a dismissal too
-  { key: 'wagonWheel', label: 'Wagon wheel (where each shot went)', type: 'toggle', default: false, advanced: true, hint: 'an optional field tap after each scoring shot, and the shot type on a dot ball or a wicket', group: 'Stats to track' },
+  { key: 'wagonWheel', label: 'Wagon wheel (where each shot went)', type: 'toggle', default: CRICKET_TRACK_DEFAULTS.wagonWheel, advanced: true, hint: 'an optional field tap after each scoring shot, and the shot type on a dot ball or a wicket', group: 'Stats to track' },
   // Deep wave — optional depth, one chip row ("Stats to track"); every tap is optional
-  { key: 'pitchMap', label: 'Pitch map (line & length)', type: 'toggle', default: false, advanced: true, hint: 'optional length + line chips after each ball', group: 'Stats to track' },
-  { key: 'shotCtrl', label: 'Shot control (beaten / edged)', type: 'toggle', default: false, advanced: true, hint: 'tap Beaten / Edged / Mistimed on a false shot — untagged balls count as in control', group: 'Stats to track' },
-  { key: 'ballSpeed', label: 'Ball speed (speed gun)', type: 'toggle', default: false, advanced: true, hint: 'type the km/h after a ball', group: 'Stats to track' },
-  { key: 'bowlerType', label: 'Bowler type (pace / spin)', type: 'toggle', default: false, advanced: true, hint: 'one tap per bowler — free when the profile has it', group: 'Stats to track' },
+  { key: 'pitchMap', label: 'Pitch map (line & length)', type: 'toggle', default: CRICKET_TRACK_DEFAULTS.pitchMap, advanced: true, hint: 'optional length + line chips after each ball', group: 'Stats to track' },
+  { key: 'shotCtrl', label: 'Shot control (beaten / edged)', type: 'toggle', default: CRICKET_TRACK_DEFAULTS.shotCtrl, advanced: true, hint: 'tap Beaten / Edged / Mistimed on a false shot — untagged balls count as in control', group: 'Stats to track' },
+  { key: 'ballSpeed', label: 'Ball speed (speed gun)', type: 'toggle', default: CRICKET_TRACK_DEFAULTS.ballSpeed, advanced: true, hint: 'type the km/h after a ball', group: 'Stats to track' },
+  { key: 'bowlerType', label: 'Bowler type (pace / spin)', type: 'toggle', default: CRICKET_TRACK_DEFAULTS.bowlerType, advanced: true, hint: 'one tap per bowler — free when the profile has it', group: 'Stats to track' },
   // Round 2 — why a wide / no-ball was called (an optional chip after the extra)
-  { key: 'extraWhy', label: 'Wide / no-ball reason', type: 'toggle', default: false, advanced: true, hint: 'tap why after a wide (down leg, outside off, over head) or a no-ball (front foot, height, bouncers, fielding)', group: 'Stats to track' },
+  { key: 'extraWhy', label: 'Wide / no-ball reason', type: 'toggle', default: CRICKET_TRACK_DEFAULTS.extraWhy, advanced: true, hint: 'tap why after a wide (down leg, outside off, over head) or a no-ball (front foot, height, bouncers, fielding)', group: 'Stats to track' },
   // Round 2 — the stats phases (organiser options; the format's powerplay still sets fielding restrictions)
   { key: 'phasePP', label: 'Stats phases — powerplay', type: 'choice', default: 'auto', advanced: true,
     hint: 'splits the Stats tab and careers into powerplay / middle / death',
@@ -329,7 +339,7 @@ export const LOCAL_RULE_FIELDS: FormatField[] = [
 
 export const LOCAL_RULE_DEFAULTS: Record<string, FormatValue> = {
   ...rulesToConfig(STANDARD_RULES), retireAt: 0, retireBack: true,
-  ...Object.fromEntries(TRACK_KEYS.map((k) => [k, false])),
+  ...CRICKET_TRACK_DEFAULTS,
   ...Object.fromEntries(OPTION_KEYS.map((k) => [k, 'auto'])),
   reviews: 0,
   lastManStands: 0,
@@ -339,7 +349,7 @@ export const LOCAL_RULE_DEFAULTS: Record<string, FormatValue> = {
  *  match format; after it, Apply logs SET_RULES (from the next ball). */
 export const CRICKET_LIVE_SETTINGS: LiveSettings<CricketState> = {
   title: '⚙️ Match rules',
-  hint: 'Local rules for this match — wides, no-balls, byes — and the optional stats to track.',
+  hint: 'Local rules for this match — wides, no-balls, byes — and the optional stats to track. Reset to standard turns the standard stats on from the next ball.',
   mode: 'event',
   actionType: 'SET_RULES',
   fields: LOCAL_RULE_FIELDS,

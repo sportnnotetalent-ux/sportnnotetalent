@@ -19,7 +19,7 @@ import { carromBox } from '../boxSources';
 import {
   init, reducer, result, boardValue, boardCloses, boardCredit, creditedPoints, summary, scoreLine, lineScore, standingsUnits,
   nextBreaker, nextBreakerPlayer, boardBreakers, boardReady, queenChoices, breakerPlayers, slamFor, boardInputs, boardCorrection, FOUL_TYPES, FOUL_CHIPS, FOUL_LABEL, CARROM_LIVE_SETTINGS,
-  AWARD_REASONS, awardGameAction, boardDetail, type AwardReason,
+  AWARD_REASONS, awardGameAction, boardDetail, carromFoulsOpen, type AwardReason,
   type BoardDetail, type BoardInput, type CarromCredit, type CarromState, type EndFoul, type FoulType, type PlayerFouls, type QueenBy, type Side, type Slam,
 } from './engine';
 import { carromFeed, AWARD_WORD } from './feed';
@@ -91,6 +91,8 @@ const ScoringControls: SportPlugin<CarromState>['ScoringControls'] = ({ state, d
   // Round 2 — ICF r.102–112: the board-ending stroke's foul (with foulScore)
   const [endFoul, setEndFoul] = useState<EndFoul>({});
   const [endOpen, setEndOpen] = useState(false);
+  // defaults-on C3 — the fouls row folds behind "Fouls ▾" until it matters (DOK7)
+  const [foulsOpened, setFoulsOpened] = useState(false);
   if (s.ended) return <Text style={textStyles.muted}>Match over.</Text>;
   const track = s.track ?? {};
   // SD-117c (CR-04) — who breaks this board (toss, then alternating)
@@ -143,7 +145,7 @@ const ScoringControls: SportPlugin<CarromState>['ScoringControls'] = ({ state, d
     });
     setWinner(null); setCoins(null); setQueenBy(null); setSlam(null); setPenalty(false); setAward(null); setAwardOpen(false);
     setFouls({ home: {}, away: {} }); setDues({ home: 0, away: 0 }); setBrk(null); setQMiss({ home: 0, away: 0 });
-    setWhoLog({ home: {}, away: {} }); setEndFoul({}); setEndOpen(false);
+    setWhoLog({ home: {}, away: {} }); setEndFoul({}); setEndOpen(false); setFoulsOpened(false);
   };
   // Round 2 — doubles: a foul / due also goes to the player picked with the who chip
   const logWho = (sd: Side, f: (p: PlayerFouls) => PlayerFouls) => {
@@ -301,7 +303,10 @@ const ScoringControls: SportPlugin<CarromState>['ScoringControls'] = ({ state, d
               </View>
             ) : <Text style={ctrl.meta}>Record the toss to log coins on the break.</Text>
           ) : null}
-          {track.fouls ? (
+          {track.fouls && !carromFoulsOpen(s, { opened: foulsOpened, boardFouls: foulCount('home') + foulCount('away') }) ? (
+            <Text style={ctrl.link} accessibilityRole="button" accessibilityLabel="Show the fouls row to log a foul or a due" onPress={() => setFoulsOpened(true)}>Fouls ▾ <Text style={ctrl.meta}>(optional · a foul or a due this board)</Text></Text>
+          ) : null}
+          {track.fouls && carromFoulsOpen(s, { opened: foulsOpened, boardFouls: foulCount('home') + foulCount('away') }) ? (
             <View style={{ gap: theme.spacing(2) }}>
               <Text style={ctrl.label}>Fouls this board <Text style={ctrl.meta}>(tap each foul)</Text></Text>
               {(['home', 'away'] as Side[]).map((sd) => {

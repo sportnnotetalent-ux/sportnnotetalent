@@ -83,8 +83,9 @@ test('sim · 600 carrom matches: old ones replay as before, new ones track break
       for (const e of Object.values(t)) for (const k of [...CARROM_BRK_KEYS, ...CARROM_QMISS_KEYS, ...CARROM_FOUL_KEYS]) assert.equal(e.stats[k], undefined, `m${m} ${k}`);
       assert.deepEqual(caps, OFF, `m${m} Info`);
     } else {
-      assert.deepEqual(s0.track, { brk: true, qMiss: true }, `m${m} track`);
-      assert.deepEqual(caps, { trackFouls: false, trackBreak: true, trackQueenMiss: true }, `m${m} Info`);
+      // defaults-on DOK8 (wave 3): fouls on for a new match too; still no foul key until one is tapped (NZG3)
+      assert.deepEqual(s0.track, { fouls: true, brk: true, qMiss: true }, `m${m} track`);
+      assert.deepEqual(caps, { trackFouls: true, trackBreak: true, trackQueenMiss: true }, `m${m} Info`);
       for (const e of Object.values(t)) for (const k of CARROM_FOUL_KEYS) assert.equal(e.stats[k], undefined, `m${m} no foul zeros: ${k}`);
       // coins on the break: counted only over the breaks a chip was tapped for
       const tapped = s.boards.filter((b) => b.det?.brk !== undefined).length;

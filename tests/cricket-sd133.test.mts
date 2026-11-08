@@ -220,7 +220,9 @@ describe('(5) retire at N runs (local rule)', () => {
     assert.equal(describeRulesChange(r, patchRules(r, { retireBack: false })), 'Retired batters can’t return');
     assert.equal(describeRulesChange(STANDARD_RULES, patchRules(STANDARD_RULES, { wagonWheel: true })), 'Wagon wheel on');
     assert.equal(isStandard(patchRules(STANDARD_RULES, { wagonWheel: true })), true, 'the wagon wheel is not a playing rule');
-    assert.deepEqual(CRICKET_LIVE_SETTINGS.read(init({ retireAt: 30 })), { ...CRICKET_LIVE_SETTINGS.defaults, retireAt: 30 });
+    // defaults-on DOK1/DOK4: a config without the capture keys reads them off (not the new defaults)
+    const capturesOff = { wagonWheel: false, pitchMap: false, shotCtrl: false, ballSpeed: false, bowlerType: false, extraWhy: false };
+    assert.deepEqual(CRICKET_LIVE_SETTINGS.read(init({ retireAt: 30 })), { ...CRICKET_LIVE_SETTINGS.defaults, ...capturesOff, retireAt: 30 });
   });
 
   test('retired not out at the limit: not a wicket; may come back and resumes on the same score', () => {

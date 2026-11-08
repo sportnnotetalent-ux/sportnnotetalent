@@ -51,7 +51,9 @@ export const SNOOKER_META: SportMeta = {
       ],
     },
     // cue batch 6 (audit row 19) — WST broadcast stats, optional chips on the pot buttons
-    { key: 'trackLongRest', label: 'Long pots and rest shots', type: 'toggle', default: false, advanced: true, group: 'Stats to track',
+    // defaults-on wave 3 (docs/security/breaks/defaults-on-cricket-cue.md): on for a NEW
+    // match (an old one has no key and keeps it off); switch off mid-match on Info
+    { key: 'trackLongRest', label: 'Long pots and rest shots', type: 'toggle', default: true, advanced: true, group: 'Stats to track',
       hint: 'two optional chips by the pot buttons: tag a long pot (made or missed) or a stroke with the rest' },
   ],
 };

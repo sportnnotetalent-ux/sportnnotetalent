@@ -44,7 +44,9 @@ export const POOL_TOTAL_KEYS: readonly string[] = [
  *  shot by shot): push-out choices at 9- / 10-ball only, extensions only
  *  where the organiser tracked them. Both scotch partners get the side's. */
 export function sideKeysFor(game: Game, s: unknown): string[] {
-  const clock = isObj(s) && isObj(s.opt) && s.opt.shotClock === true;
+  // defaults-on DOK6: tracked now, or an extension was taken while it was
+  // (switched off mid-match keeps what was captured)
+  const clock = isObj(s) && ((isObj(s.opt) && s.opt.shotClock === true) || (isObj(s.xr) && Object.values(s.xr).some((n) => typeof n === 'number' && n > 0)));
   return SIDE_KEYS.filter((k) => (k === 'pushPlayed' || k === 'pushPassed' ? game !== 'eight' : k === 'extensions' ? clock : true));
 }
 

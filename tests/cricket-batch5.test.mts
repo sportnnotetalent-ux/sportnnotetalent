@@ -236,7 +236,8 @@ describe('DRS — optional reviews (B5-10 … B5-13)', () => {
     assert.equal(rulesFromConfig({ reviews: 99 }).reviews, 5);
     assert.equal(rulesFromConfig({ reviews: 'x' }).reviews, undefined);
     assert.deepEqual(rulesFromConfig(rulesToConfig(rulesFromConfig({ reviews: 3 }))), rulesFromConfig({ reviews: 3 }));
-    assert.deepEqual(rulesFromConfig({ ...LOCAL_RULE_DEFAULTS }), STANDARD_RULES);
+    // defaults-on DOK2: the new-match defaults are the standard playing rules plus the four captures on
+    assert.deepEqual(rulesFromConfig({ ...LOCAL_RULE_DEFAULTS }), { ...STANDARD_RULES, wagonWheel: true, pitchMap: true, bowlerType: true, extraWhy: true });
     assert.equal(describeRulesChange(STANDARD_RULES, patchRules(STANDARD_RULES, { reviews: 2 })), 'DRS: 2 reviews per innings');
     assert.equal(rulesChip(rulesFromConfig({ reviews: 2 })), 'DRS 2');
     const f = LOCAL_RULE_FIELDS.find((x) => x.key === 'reviews');

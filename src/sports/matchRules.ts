@@ -67,15 +67,29 @@ export function matchCaptures(
     try { cur = ls.read(state) ?? {}; } catch { cur = {}; }
     for (const f of ls.fields) {
       const v = cur[f.key] ?? f.default;
-      if (f.type === 'toggle') captures.push({ key: f.key, label: f.label, on: v === true });
+      // defaults-on DOK4: a switch the match's read leaves out is Off (never the default)
+      if (f.type === 'toggle') captures.push({ key: f.key, label: f.label, on: cur[f.key] === true });
       else rules.push({ key: f.key, label: f.label, value: valueText(f, v) });
     }
   }
   const owned = new Set(captures.map((c) => c.key));
   for (const f of formatFields) {
-    if (isCapture(f) && !owned.has(f.key)) captures.push({ key: f.key, label: f.label, on: valueOf(f, fmt) === true });
+    // defaults-on DOK4: a stats switch the stored format never had is Off — the
+    // engines read a missing capture key as off, whatever today's default is
+    if (isCapture(f) && !owned.has(f.key)) captures.push({ key: f.key, label: f.label, on: fmt[f.key] === true });
   }
   return { captures, rules };
+}
+
+/** Defaults-on DOK4 (docs/security/breaks/defaults-on-cricket-cue.md): the
+ *  format an EXISTING match shows (Edit format): its stored values over today's
+ *  defaults (`defaults`), except a stats-to-track switch it never stored, which
+ *  reads Off — every engine reads a missing capture key as off, so a newer
+ *  default must never show On for a match that does not track it. */
+export function existingFormatShown<V>(fields: readonly FormatField[], defaults: Record<string, V>, stored: Record<string, V> | null | undefined): Record<string, V> {
+  const out: Record<string, V> = { ...defaults };
+  for (const f of fields) if (isCapture(f)) out[f.key] = false as V;
+  return { ...out, ...(stored ?? {}) };
 }
 
 /** Shared scoring (docs/security/breaks/shared-scoring.md): how the match is
@@ -95,6 +109,8 @@ export function settingsUnit(sport: string): { one: string; many: string; done: 
     case 'kabaddi': return { one: 'raid', many: 'Raids', done: 'made' };
     case 'volleyball': return { one: 'rally', many: 'Rallies', done: 'played' };
     case 'chess': return { one: 'game', many: 'Games', done: 'played' };
+    // defaults-on DOK5: the snooker / pool Stats to track card applies from the next shot
+    case 'snooker': case 'pool': return { one: 'shot', many: 'Shots', done: 'played' };
     default: return { one: 'point', many: 'Points', done: 'played' };
   }
 }

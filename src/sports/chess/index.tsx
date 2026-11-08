@@ -19,7 +19,7 @@ import {
 } from './engine';
 import { chessResultCredit } from './stats';
 import { howChoices, sentHow } from './how';
-import { listMoves, openingOf, boardResult } from './engine';
+import { listMoves, openingOf, boardResult, CHESS_LIVE_SETTINGS } from './engine';
 import { MovesPanel } from './MovesPanel';
 import { chessFeed } from './gameFeed';
 import { chessGameStats, phasesOf, type Phase } from './gameStats';
@@ -356,18 +356,8 @@ export const chessPlugin: SportPlugin<ChessState> = {
   statTotals: chessStatTotals,
   statTotalsNeedsPlayers: true,
   statTotalsPartial: true,
-  liveSettings: {
-    title: '⚙️ Stats to track',
-    hint: 'Optional. Recording the result stays the same; the move list can also be pasted after the game.',
-    mode: 'event',
-    actionType: 'SET_TRACK',
-    fields: [
-      { key: 'trackMoves', label: 'Move list (SAN / PGN)', type: 'toggle', default: false, group: 'Stats to track', hint: 'Type each move as it is played (checked for legality) — commentary, opening, game stats' },
-      { key: 'trackClock', label: 'Clock after each move', type: 'toggle', default: false, group: 'Stats to track', hint: 'With the move list: the time left after each move → time used per move' },
-    ],
-    read: (st) => ({ trackMoves: !!st.track?.moves, trackClock: !!st.track?.clock }),
-    defaults: { trackMoves: false, trackClock: false },
-  },
+  // defaults-on H1: the card lives in the pure engine, its defaults from meta.ts
+  liveSettings: CHESS_LIVE_SETTINGS,
 };
 
 /** Match tabs (2026-10-22): the commentary (moves newest first, or the
