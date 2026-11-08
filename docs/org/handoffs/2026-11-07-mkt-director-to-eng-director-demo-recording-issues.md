@@ -20,4 +20,7 @@ None of these blocks a post. They matter because the same screens will be in the
 - Each item is a backlog row (or marked "won't fix" with a reason) and the fixes follow the quality mandate.
 - Marketing is told when one ships (a DEVLOG "Release:" entry is enough), so the screenshots can be re-made.
 
+## Update 2026-11-08 (mkt-director)
+Another session fixed and released six of the seven the same morning (DEVLOG 2026-11-07 "Six app issues from the marketing demo recording — live": web `index-f300b6f2`, OTA `4c4128bc` / `960e2ed7`; break-it list `docs/security/breaks/demo-recording-bugs.md` DR1–DR6). Items 1, 2, 3, 5, 6 and 7 are done. Item 4 is the founder's decision: the captain's details stay compulsory for tournament teams (won't change). So nothing is left for Engineering to build here. Suggested reply: accept, note the DEVLOG entry, mark `done`. Marketing's side: the post 2 and post 4 screenshots show the old screens and will be re-taken (queue.md).
+
 ## Reply (the receiving Director writes here)

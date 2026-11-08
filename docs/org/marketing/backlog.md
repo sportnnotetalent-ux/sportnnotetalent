@@ -4,7 +4,7 @@ Status: `todo` / `doing` / `review` / `awaiting founder` / `done`. Owner = the r
 
 | Id | Item | Owner | Status | Notes |
 |---|---|---|---|---|
-| M-01 | First batch: 6 warm-up posts across all platforms | mkt-writer → mkt-editor → Security | doing | [queue.md](queue.md) |
+| M-01 | First batch: 6 warm-up posts across all platforms | mkt-writer → mkt-editor → Security | doing | [queue.md](queue.md); 2026-11-08: post 2 and carousel slides 3–4 show pre-fix screens, three screenshots to re-take (founder signs in to the demo account) |
 | M-02 | Weekly stats export routine (10 min, until analytics are connected) | founder | awaiting founder | Exports into `stats/inbox/`: Meta Business Suite (Instagram, Facebook, Threads), LinkedIn page analytics, YouTube Studio, X analytics |
 | M-12 | Analytics pull script (read-only, all platforms) | eng-backend | awaiting founder | Hand-off to Engineering open; 2026-11-07: probably replaced by Metricool (C-01) — founder decides which route |
 | M-03 | Connect every platform's analytics | founder | doing | 2026-11-05: **Metricool connected** with Facebook + Instagram (C-01). Still to add in Metricool: LinkedIn, YouTube, X, Threads (founder signs in; agents never do) |

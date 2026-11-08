@@ -18,12 +18,13 @@ Visual: `briefed` (brief written in the post file) → `ready` (asset made).
 Built by `node scripts/build-social-posts.mjs` (founder: the Canva AI designs had too many flaws; replaced). Files in [assets/posts/](assets/posts/).
 | Post | Image(s) | Status |
 |---|---|---|
-| 2 LinkedIn | `2026-11-11-linkedin-scoreboard.png` (1200×1200) | ready for the founder's check |
-| 4 Instagram carousel | `2026-11-12-instagram-carousel-1.png` … `-5.png` (1080×1350) | ready for the founder's check |
+| 2 LinkedIn | `2026-11-11-linkedin-scoreboard.png` (1200×1200) | **re-take**: shows the old undo wording ("point to KD"); the app now names the pair (fixed 2026-11-07) |
+| 4 Instagram carousel | `2026-11-12-instagram-carousel-1.png` … `-5.png` (1080×1350) | slides 1, 2, 5 ready; **slides 3–4 re-take**: pair order flips ("Meera / Arjun" → "Arjun / Meera") and "point to MA" codes, both fixed 2026-11-07 |
 | 3 X + Threads | `2026-11-11-x-threads-table.png` (1600×900) | ready for the founder's check |
 | 6 Instagram + Facebook | `2026-11-14-instagram-captains-pick.png` (1080×1350) | ready for the founder's check (made 2026-11-07) |
 | 1, 5 videos | — | founder records (recording-checklists.md); demo games are live on the demo account |
 
 ## Notes
 - 2026-11-07 (mkt-director): all six posts are approved and their four image posts have files ready for the founder's check. Posts 1 and 5 wait for the founder's recordings (see [recording-checklists.md](recording-checklists.md)). Nothing is posted yet; the first slot is Tue 10 Nov 19:00 IST (post 1).
+- 2026-11-08 (mkt-director): no post moved (all six approved, none due before Tue 10 Nov). Checked the ready images against the six app fixes released 2026-11-07: post 2 and carousel slides 3–4 show the old screens (undo codes, flipped pair order). Three screenshots need re-taking on the live app with the marketing demo account (`badminton-doubles-4-2`, `pickleball-doubles-setup`, `pickleball-scoring-3-4`), then `node scripts/build-social-posts.mjs` rebuilds the images. Agents don't sign in, so the founder signs in to the demo account first (or re-takes them). Posts 3 and 6 are unaffected. Post 2 is due Wed 11 Nov, post 4 Thu 12 Nov.
 - 2026-11-07: Metricool is connected (connectors C-01) with **Facebook and Instagram** only, time zone Asia/Calcutta. LinkedIn, YouTube, X and Threads are not in it yet. Stats will be logged from Metricool (read-only) once posts are live.
