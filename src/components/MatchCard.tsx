@@ -90,7 +90,7 @@ export function MatchCard({ match, onPress, onStart, timeZone, note, compact }: 
 
   const footMain: React.ReactNode = tie
     ? `👥 Team tie · ${match.tieRubbers.length} rubbers${done ? '' : live ? ' · in progress' : ''}`
-    : live && !onStart ? <Text style={s.cta}>Tap to score ›</Text>
+    : live && !onStart ? <Text style={s.cta}>Live scorecard ›</Text>
     : done ? (match.result ? resultWords({ sport: match.sport, result: match.result }, match.homeTeam.name, match.awayTeam.name) : walkover ? 'Walkover' : 'Full time')
     : null;
   return (

@@ -103,6 +103,8 @@ function basicsLine(t: Tournament, sport: SportId): string {
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 import { useViewerMarket } from '../data/useMarket';
 import { term } from '../core/markets';
+import { countStrip, miniStandings } from '../core/tournamentPage';
+import { MiniStandingsCard } from '../components/MiniStandingsCard';
 import { SportLine, SportBadge } from '../components/SportSymbol';
 
 const PARTICIPATION_LABEL: Record<string, string> = {
@@ -600,6 +602,11 @@ export default function TournamentProfileScreen() {
             <Text style={textStyles.muted} numberOfLines={1}>{tournament.hostName} · {formatDayRange(tournament.startDate, tournament.endDate)}</Text>
           </View>
         </View>
+        {/* Stitch pick 7: "23 Fixtures · 4 Sports · 8 Teams" (TP1/TP2) */}
+        {(() => {
+          const items = countStrip({ fixtures: matches.length, sports: sports.length, teams: allTeamIds.length, fixturesWord: term(viewerMarket, 'fixtures') === 'Fixtures' ? 'Fixtures' : `${term(viewerMarket, 'match')}s` });
+          return items.length ? <Text style={st.countStrip} numberOfLines={1}>{items.join('  ·  ')}</Text> : null;
+        })()}
         {(() => {
           const s = tournamentStatus(tournament, matchProgress(matches));
           return (
@@ -1043,6 +1050,17 @@ export default function TournamentProfileScreen() {
         {/* ----------------------------- MATCHES ------------------------------ */}
         {activeTab === 'Matches' && (
           <>
+            {/* Stitch pick 8: the top of the table, Q for teams through (TP3–TP5) */}
+            {(() => {
+              const ph = phases[0];
+              const gv = ph ? groupViewMap.get(ph.key) : undefined;
+              const mini = showMedal
+                ? miniStandings({ medal })
+                : ph && activeSport && !isEventSport(activeSport) ? miniStandings({ rows: gv ? gv.rows : ph.rows, marks: new Map((gv?.rows ?? []).filter((r) => r.mark).map((r) => [r.teamId, r.mark as string])) }) : null;
+              if (!mini) return null;
+              const title = showMedal ? 'Overall standings' : phases.length > 1 || ph?.key !== 'league' ? `${getSportMeta(activeSport!).name} · ${ph?.title ?? ''}` : `${getSportMeta(activeSport!).name} standings`;
+              return <MiniStandingsCard title={title} table={mini} onMore={() => setTab('Stats')} onTeam={openJourney} />;
+            })()}
             <View style={st.segment}>
               {(['upcoming', 'completed'] as const).map((k) => (
                 <TouchableOpacity accessibilityRole="button"
@@ -1294,6 +1312,7 @@ function HubRow({ icon, sport, title, status, onPress, open }: { icon?: string; 
 }
 
 const st = StyleSheet.create({
+  countStrip: { color: theme.colors.primary, fontSize: theme.font.small, fontWeight: '700', marginTop: theme.spacing(1) },
   dangerCard: { gap: theme.spacing(2), borderWidth: 1, borderColor: theme.colors.danger },
   followRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(2) },
   hubRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(3) },

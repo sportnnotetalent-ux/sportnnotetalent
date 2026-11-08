@@ -10,7 +10,7 @@ const read = (p: string) => readFileSync(join(import.meta.dirname, '..', p), 'ut
 test('a match card’s own button is an outline, and no "Tap to score" beside it', () => {
   const c = read('src/components/MatchCard.tsx');
   assert.doesNotMatch(c, /startBtn: \{ backgroundColor: theme\.colors\.lime/);
-  assert.match(c, /live && !onStart \? <Text style=\{s\.cta\}>Tap to score/);
+  assert.match(c, /live && !onStart \? <Text style=\{s\.cta\}>Live scorecard/); // TP6 (stitch-tournament-page.md)
 });
 
 test('Follow, Post a listing and Continue your game are outline buttons', () => {
