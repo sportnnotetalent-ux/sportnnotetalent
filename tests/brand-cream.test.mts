@@ -53,3 +53,11 @@ test('BC4/BC5: launch on cream (matching the splash); Home on a cream badge; sig
   assert.match(read('src/screens/AuthScreen.tsx'), /<Wordmark /);
   assert.match(read('scripts/build-website.mjs'), /src="\/wordmark\.svg"/);
 });
+
+test('BC9: app screens show the name only; the S:N stays on the launch screen', () => {
+  for (const f of ['src/screens/HomeScreen.tsx', 'src/screens/AuthScreen.tsx', 'src/screens/GetAppScreen.tsx', 'src/screens/InviteScreen.tsx']) {
+    assert.doesNotMatch(read(f), /<Logo /, f);
+    assert.match(read(f), /<Wordmark /, f);
+  }
+  assert.match(read('src/components/LaunchAnimation.tsx'), /S_PATH|M80 68 H52/, 'the launch screen keeps the mark');
+});

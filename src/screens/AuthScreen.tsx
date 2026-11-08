@@ -25,7 +25,6 @@ import { PhoneField } from '../components/PhoneField';
 import { phoneLoginAvailable, proveSignupPhone, sendPhoneCode } from '../core/phoneLogin';
 import { PhoneLoginCard } from '../components/PhoneLoginCard';
 import type { Role } from '../core/types';
-import { Logo } from '../components/Logo';
 import { IconText } from '../components/Icon';
 import { guestStore } from '../data/guestStore';
 import type { GuestMatch } from '../core/guestMatch';
@@ -246,8 +245,7 @@ export default function AuthScreen() {
     <SafeAreaView style={st.safe}>
       <KeyboardAwareScrollView contentContainerStyle={st.content}>
         <View style={st.brand}>
-          <Logo size={72} />
-          <Wordmark height={40} />
+          <Wordmark height={52} />
           <Text style={[textStyles.muted, st.tagline]}>Play a Sport, Make a Note.</Text>
         </View>
 

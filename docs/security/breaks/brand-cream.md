@@ -25,3 +25,4 @@ Where it applies:
 | BC6 | The favicon or app icon stays cached in its old look. | Polish | The favicon gets a new name (`favicon-v4.png`); the app icon updates with the next APK/store build. |
 | BC8 | Founder 2026-11-08 (option 2f): the near-black n looked out of line with the outlined letters. | Consistency | The n and the colon are now green `#1F7A50` with the same dark outline as every other letter, so all ten letters share the same weight and line. Tested. |
 | BC7 | The generated shapes drift from the real font, e.g. after an update. | Integrity | The generator reads the brand TTF already in the repo, and a test checks the module was made from it (font name and units). |
+| BC9 | Founder 2026-11-08: on app screens (other than the launch screen), the S:N next to the name is repetition. | Brand | Home, sign-in, Get the app and Invite show only the "SportnNote" wordmark. The S:N mark stays on the launch screen, the app icon, the favicon and the website. Tested. |

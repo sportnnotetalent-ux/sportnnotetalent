@@ -46,7 +46,6 @@ import { WebPushCard } from '../components/WebPushCard';
 import { GuardianPendingCard } from '../components/GuardianPendingCard';
 import { RequestsCard } from '../components/RequestsCard';
 import { LinkByPhoneCard } from '../components/LinkByPhoneCard';
-import { Logo } from '../components/Logo';
 import { Wordmark } from '../components/Wordmark';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -194,8 +193,7 @@ export default function HomeScreen() {
             {/* BC4 (brand-cream.md): the logo and name sit on a cream badge, never straight on green */}
             <View style={st.brand}>
               <View style={st.brandBadge} accessible accessibilityLabel="SportnNote">
-                <Logo size={30} />
-                <Wordmark height={narrow ? 21 : 24} />
+                <Wordmark height={narrow ? 24 : 27} />
               </View>
             </View>
           <TouchableOpacity

@@ -19,7 +19,7 @@ import { useNavigation, useRoute, type RouteProp } from '@react-navigation/nativ
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { theme } from '../core/theme';
 import { Button, Card, textStyles } from '../components/ui';
-import { Logo } from '../components/Logo';
+import { Wordmark } from '../components/Wordmark';
 import { PhoneLoginCard } from '../components/PhoneLoginCard';
 import { phoneLoginAvailable } from '../core/phoneLogin';
 import { promptSignIn } from '../core/guest';
@@ -66,7 +66,7 @@ export default function GetAppScreen() {
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
       <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
-        <View style={st.brand}><Logo size={56} /></View>
+        <View style={st.brand}><Wordmark height={40} /></View>
         <View style={{ gap: theme.spacing(2) }}>
           <Text style={st.title}>{inviter ? `${inviter} invited you to SportnNote 🏆` : 'You’re invited to SportnNote 🏆'}</Text>
           <Text style={textStyles.body}>Score your games, run tournaments and keep everyone’s stats in one place. Free while it’s new.</Text>

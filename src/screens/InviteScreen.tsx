@@ -16,7 +16,7 @@ import { theme } from '../core/theme';
 import { fnPath } from '../core/functionPath';
 import { clearReadCache } from '../data/readCache';
 import { Button, Card, textStyles } from '../components/ui';
-import { Logo } from '../components/Logo';
+import { Wordmark } from '../components/Wordmark';
 import { PhoneLoginCard } from '../components/PhoneLoginCard';
 import { phoneLoginAvailable } from '../core/phoneLogin';
 import { promptSignIn } from '../core/guest';
@@ -62,7 +62,7 @@ export default function InviteScreen() {
   return (
     <SafeAreaView style={st.safe} edges={['bottom']}>
       <KeyboardAwareScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
-        <View style={st.brand}><Logo size={56} /></View>
+        <View style={st.brand}><Wordmark height={40} /></View>
 
         {reported === 'done' ? (
           <Card style={{ gap: theme.spacing(2) }}>
