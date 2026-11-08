@@ -93,6 +93,13 @@ export function rugbyUndoLabel(step: { type: string; prev: unknown; next: unknow
   if (step.type === 'TERRITORY') return 'territory switch';
   // round 2: the possession bar's "Ball dead" switch
   if (step.type === 'BALL_DEAD') return 'ball dead / live switch';
+  if (step.type === 'TRY_DETAIL') {
+    // describe-invasion DI4: the assist attached after the try — the try whose assister changed
+    const b0 = prev?.events ?? [], a0 = next?.events ?? [];
+    const g = a0.find((e, i) => e.type === 'try' && e.secondId !== b0[i]?.secondId);
+    if (!g) return 'try detail';
+    return g.secondId ? (g.secondName ? `assist · ${g.secondName}` : 'assist') : 'assist removal';
+  }
   if (!prev?.events || !next?.events || next.events.length <= prev.events.length) return null;
   const e = next.events[next.events.length - 1];
   const d = describeEvent(e);

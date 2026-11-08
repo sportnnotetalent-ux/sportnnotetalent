@@ -17,8 +17,9 @@
  * rows (the reducer reads the scorer from `attribution`, so totals follow).
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { closeSaves, closeLabel } from '../flowClose';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { DescribeCard, useDescribeMarks } from '../../components/DescribeCard';
+import { assistPart } from '../invasion/goalDetail';
 import { theme } from '../../core/theme';
 import { useMask } from '../../core/disputeMask';
 import { withNames, nameFor } from '../invasion/names';
@@ -32,7 +33,7 @@ import type { ScoreAction, SportPlugin } from '../types';
 import {
   init, reducer, isComplete, result, levelAtEnd, aggLine, matchSec, periodSec, clockFace, periodName, periodLong, periodStarted, running,
   eventCredits, creditAttribution, currentKeeper, soScore, nextShooter, needsSdPick, hockeyScoreLine, HOCKEY_PRESETS, HOCKEY_LIVE_SETTINGS,
-  HOCKEY_TRACK_FIELDS, openPc, strokeTapActions, shotTapActions, cardWarnIds, cardWarning,
+  HOCKEY_TRACK_FIELDS, openPc, strokeTapActions, shotTapActions, cardWarnIds, cardWarning, goalDetailAction, PC_RESULT_LABEL,
   type CardColour, type GoalType, type HockeyEvent, type HockeyState, type Side,
 } from './engine';
 import { ruledOutAction, RULED_OUT_REASONS, RULED_OUT_LABEL } from '../invasion/ruledOut';
@@ -83,8 +84,11 @@ function PlayerGrid({ players, onPick, skip }: { players: Player[]; onPick: (p: 
 }
 
 // `pc` (SD-117, H6): the attempt comes from this penalty corner (its id).
+// describe-invasion DI1: the goal is on the board at the scorer tap — the
+// assist is described after, on the goal card. `carry` (DI9): a re-entered
+// goal keeps its original assister.
 type Flow =
-  | { mode: 'goal'; side: Side; step: 'type' | 'scorer' | 'assist'; goalType?: GoalType; scorer?: Player | null; pc?: string }
+  | { mode: 'goal'; side: Side; step: 'type' | 'scorer'; goalType?: GoalType; pc?: string; carry?: string }
   | { mode: 'shot'; side: Side; step: 'result' | 'player'; onGoal?: boolean; miss?: 'wide' | 'blocked'; pc?: string }
   | { mode: 'stroke'; side: Side; step: 'result' | 'player'; outcome?: 'saved' | 'missed'; pc?: string }
   | { mode: 'card'; side: Side; step: 'colour' | 'player'; card?: CardColour; minutes?: number }
@@ -108,6 +112,11 @@ const ScoringControls: SportPlugin<HockeyState>['ScoringControls'] = ({
   const [flow, setFlow] = useState<Flow | null>(null);
   // SD-117 (H6): the penalty corner awaiting its outcome (side + its event id)
   const [pcOpen, setPcOpen] = useState<{ side: Side; id: string } | null>(null);
+  // describe-invasion: the goal just scored (its id) — its card describes the assist;
+  // a newer goal replaces it (DI6). Done / Skip per goal, and per penalty corner (DI13).
+  const [goalCard, setGoalCard] = useState<string | null>(null);
+  const goalMarks = useDescribeMarks<string>();
+  const pcMarks = useDescribeMarks<string>();
   const [editAt, setEditAt] = useState<{ sec: number; period: number } | null>(null);
   // SD-137a: ⏪ backfill — every tap is stamped at a past minute until "Back to live"
   const [backfill, setBackfill] = useState<{ sec: number; period: number } | null>(null);
@@ -177,16 +186,28 @@ const ScoringControls: SportPlugin<HockeyState>['ScoringControls'] = ({
     return { attribution: creditAttribution(cr.first, 1, TRACKED), attribution2: creditAttribution(cr.second, 1, TRACKED) };
   };
   const pcLink = (pc?: string) => (pc ? { pcRef: pc } : {});
-  const goal = (sd: Side, goalType: GoalType, scorer: Player | null, assist: Player | null, pc?: string) => {
-    fire({ type: 'GOAL', side: sd, payload: { goalType, ...pcLink(pc) }, ...credit({ type: 'goal', goalType, playerId: scorer?.id, secondId: assist?.id }) });
+  // describe-invasion DI1: on the board at the scorer tap ("Team goal" too); the
+  // assist is attached after (GOAL_DETAIL, by the goal's id). DI9: a re-entered
+  // goal carries its original assister (not a stroke, not the new scorer).
+  const goal = (sd: Side, goalType: GoalType, scorer: Player | null, pc?: string, carry?: string) => {
+    const id = uid();
+    const assist = carry && goalType !== 'stroke' && carry !== scorer?.id ? carry : undefined;
+    fire({ type: 'GOAL', side: sd, payload: { uid: id, goalType, ...pcLink(pc) }, ...credit({ type: 'goal', goalType, playerId: scorer?.id, secondId: assist }) });
     setFlow(null); setPcOpen(null);
+    // (a stroke takes no assist: no card — and the last goal's card closes, DI6)
+    setGoalCard(goalType !== 'stroke' ? id : null);
+  };
+  /** the goal card's assist tap: attach (or change / clear) on that goal */
+  const setAssist = (ref: string, p: Player, current?: string) => {
+    const a = goalDetailAction(s, ref, { a1: current === p.id ? null : p.id }, TRACKED);
+    if (a) dispatch(a);
   };
   // deep wave: a miss says wide or blocked (one tap either way)
   const shot = (sd: Side, onGoal: boolean, p: Player | null, pc?: string, miss?: 'wide' | 'blocked') => {
     // screen sweep (S1): the shot and its keeper's save, built in the engine
     for (const a of shotTapActions(sd, onGoal, p?.id, keeper(opp(sd))?.id, { uid: uid(), ...(miss ? { miss } : {}), ...pcLink(pc) }, TRACKED)) fire(a);
+    // (describe-invasion DI13: the PC card stays, reading "✓ PC shot saved" until Done)
     setFlow(null);
-    if (pc) setPcOpen(null);
   };
   const stroke = (sd: Side, outcome: 'saved' | 'missed', p: Player | null, pc?: string) => {
     // invasion batch 1: a stroke not scored is a shot too (saved = on goal);
@@ -231,7 +252,7 @@ const ScoringControls: SportPlugin<HockeyState>['ScoringControls'] = ({
     setEditAt({ sec: e.sec, period: e.period });
     setShowEdit(false);
     const pc = e.pcRef ? { pc: e.pcRef } : {};
-    if (e.type === 'goal') setFlow({ mode: 'goal', side: e.side, step: 'type', ...pc });
+    if (e.type === 'goal') setFlow({ mode: 'goal', side: e.side, step: 'type', ...pc, ...(e.secondId ? { carry: e.secondId } : {}) });
     else if (e.type === 'shot') setFlow({ mode: 'shot', side: e.side, step: 'result', ...pc });
     else if (e.type === 'stroke') setFlow({ mode: 'stroke', side: e.side, step: 'result', ...pc });
     else if (e.type === 'card') setFlow({ mode: 'card', side: e.side, step: 'colour' });
@@ -276,6 +297,23 @@ const ScoringControls: SportPlugin<HockeyState>['ScoringControls'] = ({
     });
     setSoTaker(null);
   };
+  // describe-invasion: the card for the goal just scored (DI6: only that one; gone
+  // with its goal; hidden while a correction is open, which holds a removal)
+  const cardGoal = goalCard && !editAt ? s.events.find((e) => e.id === goalCard && e.type === 'goal') : undefined;
+  const goalCardView = cardGoal ? (
+    <DescribeCard
+      title={`Last goal · ${cardGoal.playerId ? nameFor(playerNameOf, cardGoal.playerId, cardGoal.playerName) ?? name(cardGoal.side) : name(cardGoal.side)}`}
+      summary={assistPart(playerNameOf, cardGoal.secondId, cardGoal.secondName)}
+      mode={goalMarks.modeOf(cardGoal.id)}
+      onDone={() => goalMarks.mark(cardGoal.id, 'done')} onSkip={() => goalMarks.mark(cardGoal.id, 'skipped')} onEdit={() => goalMarks.mark(cardGoal.id, null)}>
+      <Text style={c.small}>Assist (optional)</Text>
+      <View style={c.grid}>
+        {onField(cardGoal.side).filter((p) => p.id !== cardGoal.playerId).map((p) => (
+          <SelectChip key={p.id} label={`${p.jerseyNo != null ? `${p.jerseyNo} ` : ''}${p.fullName}`} active={cardGoal.secondId === p.id} onPress={() => setAssist(cardGoal.id, p, cardGoal.secondId)} />
+        ))}
+      </View>
+    </DescribeCard>
+  ) : null;
   const level = levelAtEnd(s); // SD-120: on aggregate in a new leg 2
   if (s.ended) {
     if (s.shootout) {
@@ -342,6 +380,7 @@ const ScoringControls: SportPlugin<HockeyState>['ScoringControls'] = ({
             <Text style={c.meta}>{s.agg ? `${aggLine(s)}${level ? '.' : ` — ${name(s.home + s.agg.home > s.away + s.agg.away ? 'home' : 'away')} go through.`}` : level ? 'Draw.' : `${name(s.home > s.away ? 'home' : 'away')} win.`} Use “Correct the timeline” below to fix a moment.</Text>
           )}
         </View>
+        {goalCardView}
         <EditList s={s} show={showEdit} setShow={setShowEdit} onRemove={remove} homeName={homeName} awayName={awayName} />
       </View>
     );
@@ -351,13 +390,12 @@ const ScoringControls: SportPlugin<HockeyState>['ScoringControls'] = ({
   const flowPanel = (() => {
     if (!flow) return null;
     const sd = flow.side;
-    // wave 0 (score-on-close SC4): closing the assist step keeps the goal
-    const saveAsIs = closeSaves({ editing: !!editAt, describing: flow.mode === 'goal' && flow.step === 'assist' })
-      ? () => { if (flow.mode === 'goal' && flow.step === 'assist') goal(sd, flow.goalType ?? 'field', flow.scorer ?? null, null, flow.pc); } : null;
+    // describe-invasion DI1: every step left here DEFINES the play (Cancel backs
+    // out); the goal's assist is described after, on the goal card
     const head = (t: string) => (
       <View style={c.flowHead}>
         <Text style={[c.h, { color: color(sd) }]} numberOfLines={1}>{t} · {name(sd)}{pastAt ? ` · ${Math.max(1, Math.ceil(pastAt.sec / 60))}'` : ''}</Text>
-        <Text style={c.cancel} accessibilityRole="button" onPress={saveAsIs ?? (() => setFlow(null))}>{closeLabel(!!saveAsIs)}</Text>
+        <Text style={c.cancel} accessibilityRole="button" onPress={() => setFlow(null)}>Cancel</Text>
       </View>
     );
     switch (flow.mode) {
@@ -373,17 +411,11 @@ const ScoringControls: SportPlugin<HockeyState>['ScoringControls'] = ({
             </View>
           </View>
         );
-        if (flow.step === 'scorer') return (
+        return (
           <View style={c.panel}>{head(GOAL_LABEL[flow.goalType ?? 'field'])}
             <Text style={c.small}>Who scored?</Text>
-            <PlayerGrid players={onField(sd)} onPick={(p) => (flow.goalType === 'stroke' ? goal(sd, 'stroke', p, null, flow.pc) : setFlow({ ...flow, scorer: p, step: 'assist' }))}
-              skip={{ label: 'Team goal (no scorer)', onPress: () => goal(sd, flow.goalType ?? 'field', null, null, flow.pc) }} />
-          </View>
-        );
-        return (
-          <View style={c.panel}>{head('Assist')}
-            <PlayerGrid players={onField(sd).filter((p) => p.id !== flow.scorer?.id)} onPick={(p) => goal(sd, flow.goalType ?? 'field', flow.scorer ?? null, p, flow.pc)}
-              skip={{ label: 'No assist', onPress: () => goal(sd, flow.goalType ?? 'field', flow.scorer ?? null, null, flow.pc) }} />
+            <PlayerGrid players={onField(sd)} onPick={(p) => goal(sd, flow.goalType ?? 'field', p, flow.pc, flow.carry)}
+              skip={{ label: 'Team goal (no scorer)', onPress: () => goal(sd, flow.goalType ?? 'field', null, flow.pc, flow.carry) }} />
           </View>
         );
       case 'shot':
@@ -409,7 +441,7 @@ const ScoringControls: SportPlugin<HockeyState>['ScoringControls'] = ({
         if (flow.step === 'result') return (
           <View style={c.panel}>{head('Penalty stroke')}
             <View style={c.row}>
-              <Button variant="primary" label="Scored" color={color(sd)} style={c.flex} onPress={() => (asksWho(onField(sd)) ? setFlow({ mode: 'goal', side: sd, step: 'scorer', goalType: 'stroke', ...(flow.pc ? { pc: flow.pc } : {}) }) : goal(sd, 'stroke', null, null, flow.pc))} />
+              <Button variant="primary" label="Scored" color={color(sd)} style={c.flex} onPress={() => (asksWho(onField(sd)) ? setFlow({ mode: 'goal', side: sd, step: 'scorer', goalType: 'stroke', ...(flow.pc ? { pc: flow.pc } : {}) }) : goal(sd, 'stroke', null, flow.pc))} />
               <Button label="Saved" variant="ghost" style={c.flex} onPress={() => (asksWho(onField(sd)) ? setFlow({ ...flow, outcome: 'saved', step: 'player' }) : stroke(sd, 'saved', null, flow.pc))} />
               <Button label="Missed" variant="ghost" style={c.flex} onPress={() => (asksWho(onField(sd)) ? setFlow({ ...flow, outcome: 'missed', step: 'player' }) : stroke(sd, 'missed', null, flow.pc))} />
             </View>
@@ -609,16 +641,16 @@ const ScoringControls: SportPlugin<HockeyState>['ScoringControls'] = ({
         );
       })() : null}
 
-      {pcOpen && !flow ? (() => {
-        // SD-117 (H6): how the corner ended — each outcome is linked to the PC
+      {pcOpen && !flow && s.events.some((e) => e.id === pcOpen.id && e.type === 'pc') ? (() => {
+        // SD-117 (H6): how the corner ended — each outcome is linked to the PC.
+        // describe-invasion DI13: a DescribeCard keyed by the PC — "✓ PC defended",
+        // then Done (Skip while nothing is picked) and "✓ Saved · … Edit"
         const { side: sd, id } = pcOpen;
         const settle = (result: 'defended' | 'stroke') => fire({ type: 'PC_OUTCOME', side: sd, payload: { id, result } });
+        const res = s.events.find((e) => e.id === id)?.pcResult;
         return (
-          <View style={c.panel}>
-            <View style={c.flowHead}>
-              <Text style={[c.h, { color: color(sd) }]}>🚩 Penalty corner · {name(sd)}</Text>
-              <Button label="Later" variant="ghost" onPress={() => setPcOpen(null)} />
-            </View>
+          <DescribeCard title={`🚩 Penalty corner · ${name(sd)}`} summary={res ? `PC ${PC_RESULT_LABEL[res]}` : ''} mode={pcMarks.modeOf(id)}
+            onDone={() => pcMarks.mark(id, 'done')} onSkip={() => pcMarks.mark(id, 'skipped')} onEdit={() => pcMarks.mark(id, null)}>
             <Text style={c.small}>How did it end?</Text>
             <View style={c.row}>
               <Button variant="primary" label="🏑 Goal" color={color(sd)} style={c.flex} onPress={() => setFlow({ mode: 'goal', side: sd, step: 'scorer', goalType: 'pc', pc: id })} />
@@ -626,19 +658,21 @@ const ScoringControls: SportPlugin<HockeyState>['ScoringControls'] = ({
             </View>
             <View style={c.row}>
               <Button label="↗ Wide" variant="ghost" style={c.flex} onPress={() => (asksWho(onField(sd)) ? setFlow({ mode: 'shot', side: sd, step: 'player', onGoal: false, miss: 'wide', pc: id }) : shot(sd, false, null, id, 'wide'))} />
-              <Button label="🛡 Defended" variant="ghost" style={c.flex} onPress={() => { settle('defended'); setPcOpen(null); }} />
+              <Button label="🛡 Defended" variant="ghost" style={c.flex} onPress={() => settle('defended')} />
             </View>
             <View style={c.row}>
               <Button label="⚪ Stroke awarded" variant="ghost" style={c.flex} onPress={() => { settle('stroke'); setPcOpen(null); setFlow({ mode: 'stroke', side: sd, step: 'result', pc: id }); }} />
               <Button label="♻️ Re-awarded" variant="ghost" style={c.flex} onPress={() => { const next = uid(); fire({ type: 'PC', side: sd, payload: { uid: next, reawardOf: id } }); setPcOpen({ side: sd, id: next }); }} />
             </View>
-          </View>
+          </DescribeCard>
         );
       })() : null}
 
       {flowPanel ?? (
         <View style={c.cols}>{sideCol('home')}{sideCol('away')}</View>
       )}
+      {/* describe-invasion: under the controls — scoring carries straight on */}
+      {goalCardView}
 
       <EditList s={s} show={showEdit} setShow={setShowEdit} onRemove={remove} onEdit={edit} homeName={homeName} awayName={awayName} />
       {/* SD-137a: ⏪ add a goal / card / shot the scorer missed, at its minute */}

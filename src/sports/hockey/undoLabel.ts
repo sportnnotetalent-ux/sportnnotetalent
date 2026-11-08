@@ -46,6 +46,14 @@ export function hockeyUndoLabel(step: UndoStep, nameOf: NameOf = legacyNameOf, s
     }
     return 'shoot-out attempt';
   }
+  if (step.type === 'GOAL_DETAIL') {
+    // describe-invasion DI4: the assist attached after the goal — the goal whose assister changed
+    const b0 = (listOf(prev, 'events') ?? []) as HockeyEvent[], a0 = (listOf(next, 'events') ?? []) as HockeyEvent[];
+    const g = a0.find((e, i) => e?.type === 'goal' && (e.secondId !== b0[i]?.secondId || e.secondName !== b0[i]?.secondName));
+    if (!g) return 'goal detail';
+    const who = whoName(nameOf, g.secondId, g.secondName);
+    return g.secondId || g.secondName ? cleanUndoLabel(who ? `assist · ${who}` : 'assist') : 'assist removal';
+  }
   const before = listOf(prev, 'events'), after = listOf(next, 'events');
   if (!before || !after || after.length <= before.length) return null;
   const e = after[after.length - 1] as HockeyEvent;

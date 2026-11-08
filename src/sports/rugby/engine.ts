@@ -53,6 +53,7 @@ import { aggPriorFromConfig, aggregateText, levelForDecider, type AggPrior } fro
 // Perf F-15 — the format presets / options live in the light meta module.
 import { RUGBY_PRESETS, TRACK_FIELDS } from './meta.ts';
 import { readRuledOut, ruledOutField } from '../invasion/ruledOut.ts';
+import { creditDiff, detailAction, patchId, sameEvent } from '../invasion/goalDetail.ts';
 import { isRestart, restartField, type RestartKind } from '../invasion/restarts.ts';
 export { RUGBY_PRESETS, TRACK_FIELDS };
 
@@ -424,6 +425,26 @@ export function creditAttribution(c: Credit | undefined, sign = 1, tracked?: str
   };
 }
 
+/** Wave 2 (describe-invasion DI1–DI3, DI12): the try with its assist attached
+ *  after the scorer tap — `a1` = the assister (null clears). Null when it
+ *  doesn't fit (not a try, the scorer, a junk id). PURE. */
+export function tryPatch(e: RugbyEvent, p: Record<string, unknown>): RugbyEvent | null {
+  if (e.type !== 'try' || !('a1' in p)) return null;
+  const a1 = patchId(p.a1);
+  if (a1 === undefined || (a1 && a1 === e.playerId)) return null;
+  const { secondId: _i, secondName: _n, ...rest } = e;
+  return a1 ? { ...rest, secondId: a1 } : rest;
+}
+
+/** The TRY_DETAIL step for the try `ref` (its credits: the difference). */
+export function tryDetailAction(s: Pick<RugbyState, 'events'>, ref: string, patch: Record<string, unknown>, tracked?: string[]): ScoreAction | null {
+  const e = s.events.find((x) => x.id === ref);
+  const n = e ? tryPatch(e, patch) : null;
+  if (!e || !n) return null;
+  const b = eventCredits(e), a = eventCredits(n);
+  return detailAction('TRY_DETAIL', e.side, ref, patch, creditDiff([b.first, b.second], [a.first, a.second], tracked), !sameEvent(e, n));
+}
+
 const second = (a: ScoreAction): Attribution | undefined =>
   a.attribution2 ?? (a.payload?._attr2 as Attribution | undefined);
 
@@ -492,7 +513,8 @@ export const soScore = (s: Pick<RugbyState, 'shootout'>) => ({
 
 /* --------------------------------- reducer --------------------------------- */
 
-const SO_ACTIONS = new Set(['START_SHOOTOUT', 'SO', 'SO_ORDER', 'XI', 'STAT_ADJUST', 'REMOVE_EVENT', 'END']);
+// (TRY_DETAIL: a sudden-death try described after it ended the match — describe-invasion DI11)
+const SO_ACTIONS = new Set(['START_SHOOTOUT', 'SO', 'SO_ORDER', 'XI', 'STAT_ADJUST', 'REMOVE_EVENT', 'TRY_DETAIL', 'END']);
 const kickOf = (v: unknown): KickKind => (v === 'conv' || v === 'drop' ? v : 'pen');
 
 /** A score in sudden death ends the match at once (no conversion). */
@@ -537,6 +559,14 @@ export const reducer = (s: RugbyState, a: ScoreAction): RugbyState => {
     case 'TRY': {
       if (!side) return s;
       return sdEnd(push(score(s, side, TRY_POINTS), { type: 'try', side, ...who1, ...who2 }), at, edit);
+    }
+    case 'TRY_DETAIL': {
+      // describe-invasion: the assist attached to ITS try (by ref) after the scorer tap
+      const i = s.events.findIndex((e) => e.id === String(a.payload?.ref ?? ''));
+      const n = i >= 0 && s.events[i].side === side ? tryPatch(s.events[i], a.payload ?? {}) : null;
+      if (!n) return s;
+      const events = [...s.events]; events[i] = n;
+      return { ...s, events };
     }
     case 'PENALTY_TRY': {
       if (!side) return s;

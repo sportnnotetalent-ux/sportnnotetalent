@@ -29,6 +29,7 @@ import { aggPriorFromConfig, aggregateText, levelForDecider, type AggPrior } fro
 // Perf F-15 — the format presets / options live in the light meta module.
 import { HOCKEY_PRESETS, HOCKEY_TRACK_FIELDS } from './meta.ts';
 import { readRuledOut, ruledOutField } from '../invasion/ruledOut.ts';
+import { creditDiff, detailAction, patchId, sameEvent } from '../invasion/goalDetail.ts';
 export { HOCKEY_PRESETS, HOCKEY_TRACK_FIELDS };
 
 export type Side = 'home' | 'away';
@@ -293,6 +294,27 @@ export function creditAttribution(c: Credit | undefined, sign = 1, tracked?: str
   };
 }
 
+/** Wave 2 (describe-invasion DI1–DI3, DI12): the goal with a detail attached
+ *  after the scorer tap — `a1` = the assister (null clears). Null when the
+ *  patch doesn't fit: not a goal, a stroke goal (no assist), the scorer as
+ *  his own assister, a junk id. PURE (the reducer and the builder share it). */
+export function hockeyGoalPatch(e: HockeyEvent, p: Record<string, unknown>): HockeyEvent | null {
+  if (e.type !== 'goal' || e.goalType === 'stroke' || !('a1' in p)) return null;
+  const a1 = patchId(p.a1);
+  if (a1 === undefined || (a1 && a1 === e.playerId)) return null;
+  const { secondId: _i, secondName: _n, ...rest } = e;
+  return a1 ? { ...rest, secondId: a1 } : rest;
+}
+
+/** The GOAL_DETAIL step for the goal `ref` (its credits: the difference). */
+export function goalDetailAction(s: Pick<HockeyState, 'events'>, ref: string, patch: Record<string, unknown>, tracked?: string[]): ScoreAction | null {
+  const e = s.events.find((x) => x.id === ref);
+  const n = e ? hockeyGoalPatch(e, patch) : null;
+  if (!e || !n) return null;
+  const b = eventCredits(e), a = eventCredits(n);
+  return detailAction('GOAL_DETAIL', e.side, ref, patch, creditDiff([b.first, b.second], [a.first, a.second], tracked), !sameEvent(e, n));
+}
+
 /** Invasion batch 1: a penalty stroke not scored, as the controls and voice
  *  fire it — flagged `shot` (saved = on goal), credited from `eventCredits`.
  *  `payload` = the stamp (uid / sec / period, a PC link). The keeper's save is
@@ -374,7 +396,8 @@ export const soScore = (s: Pick<HockeyState, 'shootout'>) => ({
 
 /* --------------------------------- reducer --------------------------------- */
 
-const SO_ACTIONS = new Set(['START_SHOOTOUT', 'SO', 'SO_ORDER', 'XI', 'STAT_ADJUST', 'REMOVE_EVENT', 'END']);
+// (GOAL_DETAIL: a goal described after full time — describe-invasion DI11)
+const SO_ACTIONS = new Set(['START_SHOOTOUT', 'SO', 'SO_ORDER', 'XI', 'STAT_ADJUST', 'REMOVE_EVENT', 'GOAL_DETAIL', 'END']);
 
 export const reducer = (s: HockeyState, a: ScoreAction): HockeyState => {
   if (s.ended && !SO_ACTIONS.has(a.type)) return s;
@@ -422,6 +445,14 @@ export const reducer = (s: HockeyState, a: ScoreAction): HockeyState => {
       const scored = { ...s, [side]: s[side] + 1 } as HockeyState;
       const next = linkPc(push(scored, { type: 'goal', side, goalType, ...who1, ...who2, ...ref }), 'goal');
       return s.stopClock && !a.payload?.edit ? { ...next, clock: stopAt(next, at) } : next;
+    }
+    case 'GOAL_DETAIL': {
+      // describe-invasion: the assist attached to ITS goal (by ref) after the scorer tap
+      const i = s.events.findIndex((e) => e.id === String(a.payload?.ref ?? ''));
+      const n = i >= 0 && s.events[i].side === side ? hockeyGoalPatch(s.events[i], a.payload ?? {}) : null;
+      if (!n) return s;
+      const events = [...s.events]; events[i] = n;
+      return { ...s, events };
     }
     case 'PC': {
       if (!side) return s;

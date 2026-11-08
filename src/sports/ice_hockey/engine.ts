@@ -47,6 +47,7 @@ import { aggPriorFromConfig, aggregateText, levelForDecider, type AggPrior } fro
 // Perf F-15 — the format presets / options live in the light meta module.
 import { ICE_HOCKEY_PRESETS, TRACK_FIELDS } from './meta.ts';
 import { readRuledOut, ruledOutConfig, ruledOutField } from '../invasion/ruledOut.ts';
+import { creditDiff, detailAction, patchId, sameEvent } from '../invasion/goalDetail.ts';
 export { ICE_HOCKEY_PRESETS, TRACK_FIELDS };
 
 export type Side = 'home' | 'away';
@@ -415,6 +416,53 @@ export function creditAttribution(c: Credit | undefined, sign = 1, tracked?: str
   };
 }
 
+/** Wave 2 (describe-invasion DI1–DI3, DI12): the goal with ONE detail
+ *  attached after the scorer tap — `a1` / `a2` (the assisters; null clears),
+ *  `strength`, `en`, `onIce` (null clears). Null when it doesn't fit: not a
+ *  goal, a penalty-shot goal (no assists), the scorer or the other assister
+ *  named, a second assist with no first (or the first cleared under one), a
+ *  junk value. PURE (the reducer and the builder share it). */
+export function iceGoalPatch(e: IceEvent, p: Record<string, unknown>): IceEvent | null {
+  if (e.type !== 'goal' || e.ps) return null;
+  const keys = (['a1', 'a2', 'strength', 'en', 'onIce'] as const).filter((k) => k in p);
+  if (keys.length !== 1) return null;
+  const k = keys[0];
+  const n = { ...e } as IceEvent & Record<string, unknown>;
+  if (k === 'a1' || k === 'a2') {
+    const id = patchId(p[k]);
+    if (id === undefined) return null;
+    const other = k === 'a1' ? e.thirdId : e.secondId;
+    if (id && (id === e.playerId || id === other)) return null;
+    if (k === 'a2' && id && !e.secondId) return null;
+    if (k === 'a1' && !id && e.thirdId) return null;
+    const [idK, nmK] = k === 'a1' ? ['secondId', 'secondName'] : ['thirdId', 'thirdName'];
+    delete n[idK]; delete n[nmK];
+    if (id) n[idK] = id;
+  } else if (k === 'strength') {
+    const v = strengthOf(p.strength);
+    if (!v) return null;
+    n.strength = v;
+  } else if (k === 'en') {
+    if (typeof p.en !== 'boolean') return null;
+    if (p.en) n.en = true; else delete n.en;
+  } else {
+    const o = p.onIce as { home?: unknown; away?: unknown } | null;
+    const oi = o && typeof o === 'object' ? { ...(ids(o.home) ? { home: ids(o.home) } : {}), ...(ids(o.away) ? { away: ids(o.away) } : {}) } : undefined;
+    if (o !== null && !oi) return null;
+    if (oi && (oi.home || oi.away)) n.onIce = oi; else delete n.onIce;
+  }
+  return n;
+}
+
+/** The GOAL_DETAIL step for the goal `ref` (its credits: the difference). */
+export function goalDetailAction(s: Pick<IceHockeyState, 'events' | 'pimScale'>, ref: string, patch: Record<string, unknown>, tracked?: string[]): ScoreAction | null {
+  const e = s.events.find((x) => x.id === ref);
+  const n = e ? iceGoalPatch(e, patch) : null;
+  if (!e || !n) return null;
+  const b = eventCredits(e, s.pimScale), a = eventCredits(n, s.pimScale);
+  return detailAction('GOAL_DETAIL', e.side, ref, patch, creditDiff([b.first, b.second, b.third], [a.first, a.second, a.third], tracked), !sameEvent(e, n));
+}
+
 /** Screen sweep (S2): the one action a penalty-shot tap logs, as the controls
  *  fire it. Saved = a shot on goal (`ps`) with the save for the goalie in net
  *  when known (`gkId`); missed = a MISS (no shot on goal); scored = a goal
@@ -669,7 +717,8 @@ export function soAction(side: Side, outcome: 'scored' | 'saved' | 'missed', sho
   };
 }
 
-const ENDED_OK = new Set(['START_SHOOTOUT', 'SO', 'SO_ORDER', 'XI', 'STAT_ADJUST', 'REMOVE_EVENT', 'ASSIST2', 'END']);
+// (GOAL_DETAIL: an OT winner described after it ended the match — describe-invasion DI11)
+const ENDED_OK = new Set(['START_SHOOTOUT', 'SO', 'SO_ORDER', 'XI', 'STAT_ADJUST', 'REMOVE_EVENT', 'ASSIST2', 'GOAL_DETAIL', 'END']);
 const strengthOf = (v: unknown): Strength | undefined => (v === 'ev' || v === 'pp' || v === 'sh' ? v : undefined);
 const penOf = (v: unknown): PenKind => (PEN_KINDS.includes(v as PenKind) ? (v as PenKind) : 'minor');
 const ids = (v: unknown): string[] | undefined => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && !!x) : undefined);
@@ -726,6 +775,14 @@ export const reducer = (s: IceHockeyState, a: ScoreAction): IceHockeyState => {
       // sudden death: a goal in overtime ends the match (on aggregate, the tie)
       if (isOvertime(s, period) && !edit && !levelForDecider(next)) next = { ...next, clock: stopAt(next, at), ended: true };
       return next;
+    }
+    case 'GOAL_DETAIL': {
+      // describe-invasion: one detail attached to ITS goal (by ref) after the scorer tap
+      const i = s.events.findIndex((e) => e.id === String(a.payload?.ref ?? ''));
+      const n = i >= 0 && s.events[i].side === side ? iceGoalPatch(s.events[i], a.payload ?? {}) : null;
+      if (!n) return s;
+      const events = [...s.events]; events[i] = n;
+      return { ...s, events };
     }
     case 'ASSIST2': {
       // the second assist on a goal (its own action: a credit for a third player)

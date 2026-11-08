@@ -74,6 +74,13 @@ export function leagueUndoLabel(step: { type: string; prev: unknown; next: unkno
   if (step.type === 'TACKLE') return 'tackle';
   if (step.type === 'SET_BALL') return 'possession';
   if (step.type === 'SET_END' && (next?.events.length ?? 0) <= (prev?.events.length ?? 0)) return 'set ending';
+  if (step.type === 'TRY_DETAIL') {
+    // describe-invasion DI4: the assist attached after the try — the try whose assister changed
+    const b0 = prev?.events ?? [], a0 = next?.events ?? [];
+    const g = a0.find((e, i) => e.type === 'try' && e.secondId !== b0[i]?.secondId);
+    if (!g) return 'try detail';
+    return g.secondId ? (g.secondName ? `assist · ${g.secondName}` : 'assist') : 'assist removal';
+  }
   if (!prev?.events || !next?.events || next.events.length <= prev.events.length) return null;
   const e = next.events[next.events.length - 1];
   const d = describeEvent(e);

@@ -17,10 +17,9 @@ test('SC7/SC8: Save as is only on a describe step of a new play', () => {
 // describe-court-team DC1–DC3: netball left this list — its feed / rebound /
 // outcome / type steps are gone, the play is logged on the tap (tested below)
 const CASES: [string, RegExp[]][] = [
-  ['hockey', [/flow\.mode === 'goal' && flow\.step === 'assist'[\s\S]{0,120}goal\(sd, flow\.goalType \?\? 'field', flow\.scorer \?\? null, null, flow\.pc\)/]],
-  ['ice_hockey', [/flow\.step === 'onice'[\s\S]{0,80}goal\(sd, flow\.d, flow\.a2 \?\? null\)/, /flow\.step === 'a1' \|\| flow\.step === 'a2'[\s\S]{0,60}goal\(sd, flow\.d, null\)/]],
-  ['rugby', [/flow\.mode === 'try' && flow\.step === 'assist'[\s\S]{0,80}scoreTry\(sd, flow\.scorer \?\? null, null\)/]],
-  ['rugby_league', [/flow\.mode === 'try' && flow\.step === 'assist'[\s\S]{0,80}scoreTry\(sd, flow\.scorer \?\? null, null, flow\.bonus\)/]],
+  // describe-invasion DI1: hockey, ice hockey, union and league have no describe
+  // step BEFORE the score any more — the goal / try is on the board at the scorer
+  // tap, so closing can never lose it (checked in SC4–SC6 below)
 ];
 
 test('SC1–SC6: each sport saves the play when a describe step is closed', () => {
@@ -36,6 +35,18 @@ test('SC1–SC3 (describe-court-team DC1–DC3): netball has no describe step to
   const s = read('src/sports/netball/index.tsx');
   assert.doesNotMatch(s, /step: 'feed'|step: 'rebound'|step: 'outcome'/);
   assert.match(s, /if \(isMiss\) miss\(sd, pos, shooter\); else goal\(sd, pos, shooter\);/);
+});
+
+// describe-invasion DI1 (replaces SC4–SC6's "Save as is"): the score fires on the
+// scorer tap, before anything is described — tests/describe-invasion.test.mts has the rest
+test('SC4–SC6: hockey / ice hockey / union / league score on the scorer tap', () => {
+  const hit: [string, RegExp][] = [
+    ['hockey', /onPick=\{\(p\) => goal\(sd, flow\.goalType \?\? 'field', p, flow\.pc, flow\.carry\)\}/],
+    ['ice_hockey', /onPick=\{\(p\) => goal\(sd, d, p, flow\.carry\)\}/],
+    ['rugby', /onPick=\{\(p\) => scoreTry\(sd, p, flow\.carry\)\}/],
+    ['rugby_league', /onPick=\{\(p\) => scoreTry\(sd, p, flow\.bonus, flow\.carry\)\}/],
+  ];
+  for (const [sp, re] of hit) assert.match(read(`src/sports/${sp}/index.tsx`), re, sp);
 });
 
 test('600 scorers: a decided play is never lost; a mis-tap never becomes a play', () => {

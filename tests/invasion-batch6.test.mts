@@ -71,7 +71,8 @@ describe('G · football: fast Shot → Goal and the goal situation', () => {
     assert.doesNotMatch(ui, /setFlow\(\{ mode: 'goal', side, step: 'type', scorer: player \}\)/);
     // the goal is on the board at the tap (as from the Goal button) and the panel opens on the assist
     assert.match(ui, /label="⚽ Goal" variant="home" style=\{ctrl\.flex\} onPress=\{\(\) => \(player \? shotGoal\(side, player\) : recordTeamGoal\(side\)\)\}/);
-    assert.match(ui, /const shotGoal = \(side: 'home' \| 'away', player: Player\) => \{ recordGoal\(side, player, 'open'\); setFlow\(\{ mode: 'goal', side, step: 'assist', scorer: player, goalType: 'open', logged: true, fromSeq: state\.seq \}\); \}/);
+    // describe-invasion DI15: the goal is on the board and its card opens (no assist panel)
+    assert.match(ui, /const shotGoal = \(side: 'home' \| 'away', player: Player\) => \{ scoreThenDescribe\(side, player, 'open'\); setFlow\(null\); \}/);
   });
   test('G2 the zone / big chance picked on the shot ride on the goal (recordGoal reads mods); one goal', () => {
     const s = fbRun([at(fa.goalAction('home', { id: 'p9' }, 'open', { zone: 'box', bigChance: true }), 10)]);
@@ -134,7 +135,8 @@ describe('G · football: fast Shot → Goal and the goal situation', () => {
   test('G the assist panel offers the situation chips under Shot detail, and refine keeps / drops them', () => {
     const ui = src('football/index.tsx');
     assert.match(ui, /GOAL_SITUATIONS\.map\(/);
-    assert.match(ui, /goalDetailAction\(flow\.side, \{ situation:/);
+    // describe-invasion DI15: on the goal card, read from the goal on the board
+    assert.match(ui, /goalDetailAction\(side, \{ situation: g\.situation === x \? null : x \}\)/);
     assert.match(ui, /Direct free kick/);
   });
 });

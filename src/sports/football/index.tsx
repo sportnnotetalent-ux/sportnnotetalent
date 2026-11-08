@@ -30,6 +30,9 @@ import {
 } from './actions';
 import { footballCapturedKeys } from './depth';
 import { Button, TextField, SelectChip } from '../../components/ui';
+import { DescribeCard, useDescribeMarks } from '../../components/DescribeCard';
+import { footballGoalSummary } from '../invasion/goalDetail';
+import { isStoppageReason } from './events';
 import { askConfirm, confirmMatchAction } from '../../components/ConfirmSheet';
 import { Pitch } from './Pitch';
 import { LineupView } from './LineupView';
@@ -118,11 +121,10 @@ type Flow =
   | { mode: 'goal'; side: 'home' | 'away'; step: 'og' }
   | { mode: 'goal'; side: 'home' | 'away'; step: 'type'; scorer: Player } // voice path only
   | { mode: 'goal'; side: 'home' | 'away'; step: 'body'; scorer: Player; goalType: GoalType } // voice path only
-  // Consolidated fast panel: open-play is the default; type/header & assist are
-  // optional. `logged` = the goal is already on the board (voice path); otherwise
-  // it's recorded when the scorer finishes (picks an assister or "no assist").
-  // MVP F2: `fromSeq` = the log counter when the goal was recorded; `goalId` = that goal, once it is on the board
-  | { mode: 'goal'; side: 'home' | 'away'; step: 'assist'; scorer: Player; goalType?: GoalType; bodyPart?: BodyPart; logged?: boolean; fromSeq?: number; goalId?: number }
+  // describe-invasion DI15: the goal is on the board at the scorer tap and its
+  // card (under the Goal buttons) describes it — no panel. Voice still asks
+  // "who assisted?": this step takes the answer (the controls stay usable).
+  | { mode: 'voiceAssist'; side: 'home' | 'away'; scorer: Player }
   | { mode: 'foul'; step: 'team' }
   | { mode: 'foul'; step: 'by'; side: 'home' | 'away' }
   | { mode: 'foul'; step: 'victim'; side: 'home' | 'away'; fouler: Player }
@@ -185,16 +187,21 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
   // an optional "Why?" chip row under the button until a reason is picked or
   // anything else is logged. Never a panel: scoring carries straight on.
   const [stopAsk, setStopAsk] = useState<number | null>(null);
-  // MVP F2: the "Assist?" step finds its goal once it is on the board (the first
-  // goal of that side logged after it opened), and closes if Undo removes it —
-  // so a stale prompt can't move an assist onto an earlier goal.
+  // describe-invasion DI14: Done / Skip per stoppage; DI15: per goal
+  const stopMarks = useDescribeMarks<number>();
+  const goalMarks = useDescribeMarks<number>();
+  // describe-invasion DI15 (MVP F2 kept): the card of the goal just scored. It
+  // finds its goal once it is on the board (the first goal of that side logged
+  // after it opened) and closes if Undo removes it — so a stale card can't move
+  // an assist onto an earlier goal (DI5). A newer goal replaces it (DI6).
+  const [goalCard, setGoalCard] = useState<{ side: 'home' | 'away'; fromSeq: number; goalId?: number } | null>(null);
   useEffect(() => {
-    if (flow?.mode !== 'goal' || flow.step !== 'assist' || !flow.logged || flow.fromSeq == null) return;
-    if (flow.goalId == null) {
-      const g = state.events.find((e) => e.type === 'goal' && e.side === flow.side && e.id > flow.fromSeq!);
-      if (g) setFlow({ ...flow, goalId: g.id });
-    } else if (!state.events.some((e) => e.id === flow.goalId)) setFlow(null);
-  }, [flow, state.events]);
+    if (!goalCard) return;
+    if (goalCard.goalId == null) {
+      const g = state.events.find((e) => e.type === 'goal' && e.side === goalCard.side && e.id > goalCard.fromSeq);
+      if (g) setGoalCard({ ...goalCard, goalId: g.id });
+    } else if (!state.events.some((e) => e.id === goalCard.goalId)) setGoalCard(null);
+  }, [goalCard, state.events]);
   // Joining a game already in progress: the minute to kick the clock off at.
   const [koMin, setKoMin] = useState('');
   // Backfill mode: when set, everything logged is stamped at this past minute
@@ -392,11 +399,17 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
     fire(goalAction(side, scorer, goalType, { bodyPart, zone: deep.shotDetail ? detail.zone : undefined, bigChance: !!(deep.shotDetail && detail.big), situation: deep.shotDetail ? detail.sit : undefined, tracked: trackedKeys() }));
   // Invasion batch 6 (audit fix 12): Shot → On target → ⚽ Goal goes straight to the
   // assist panel, as the Goal button does (the type / foot chips are there) — 2 taps, not 4.
-  const shotGoal = (side: 'home' | 'away', player: Player) => { recordGoal(side, player, 'open'); setFlow({ mode: 'goal', side, step: 'assist', scorer: player, goalType: 'open', logged: true, fromSeq: state.seq }); };
+  // describe-invasion DI15: every goal opens a fresh card (keyed by its id once on the board)
+  const scoreThenDescribe = (side: 'home' | 'away', player: Player, goalType: GoalType, bodyPart?: BodyPart) => {
+    recordGoal(side, player, goalType, bodyPart);
+    setGoalCard({ side, fromSeq: state.seq });
+  };
+  const shotGoal = (side: 'home' | 'away', player: Player) => { scoreThenDescribe(side, player, 'open'); setFlow(null); };
   const recordOwnGoal = (side: 'home' | 'away', scorer: Player) => {
     // SD-30: the player's id rides along — `ownGoals` is credited to him by the
     // absolute totals at full time (not live: his line's opponent is this side).
     fire(ownGoalAction(side, scorer));
+    setGoalCard(null); // describe-invasion DI6: a newer goal closes the last goal's card
     setFlow(null);
   };
   // Team goal — no named scorer. Keeps the scoreline correct for a friendly whose
@@ -404,11 +417,13 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
   // timeline editor once they register.
   const recordTeamGoal = (side: 'home' | 'away') => {
     fire(teamGoalAction(side));
+    setGoalCard(null); // describe-invasion DI6: a newer goal closes the last goal's card
     setFlow(null);
   };
   // MVP F2: `goalId` = the goal the prompt was opened for (it takes the assist only if still there)
-  const recordAssist = (side: 'home' | 'away', p: Player | null, goalId?: number) => {
-    if (p) fire(assistAction(side, p, trackedKeys(), goalId));
+  // describe-invasion DI3: `prev` = the goal's assister so far (reversed on a change)
+  const recordAssist = (side: 'home' | 'away', p: Player | null, goalId?: number, prev?: string) => {
+    if (p && p.id !== prev) fire(assistAction(side, p, trackedKeys(), goalId, prev));
     setFlow(null);
   };
 
@@ -567,11 +582,16 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
           return;
         }
         if (flow.step === 'og') { const p = matchPlayer(text, xi(opp(flow.side))); if (p) { recordOwnGoal(flow.side, p); say(`Own goal by ${p.fullName}.`); } else say("Didn't catch the player."); return; }
-        if (flow.step === 'type') { const gt = parseGoalType(text) ?? 'open'; recordGoal(flow.side, flow.scorer, gt); setFlow({ mode: 'goal', side: flow.side, step: 'assist', scorer: flow.scorer, goalType: gt, logged: true, fromSeq: state.seq }); say(`${GOAL_TYPE_LABEL[gt]} — who assisted? (or say "no assist")`); return; }
-        // assist
-        if (isNoAssist(text)) { recordAssist(flow.side, null); say('Goal recorded — no assist.'); return; }
+        if (flow.step === 'type') { const gt = parseGoalType(text) ?? 'open'; scoreThenDescribe(flow.side, flow.scorer, gt); setFlow({ mode: 'voiceAssist', side: flow.side, scorer: flow.scorer }); say(`${GOAL_TYPE_LABEL[gt]} — who assisted? (or say "no assist")`); return; }
+        return;
+      }
+      if (flow.mode === 'voiceAssist') {
+        // describe-invasion DI7: the goal is on the board; the assist attaches to IT (its ref)
+        const gid = goalCard?.goalId;
+        if (isNoAssist(text)) { recordAssist(flow.side, null); if (gid != null) goalMarks.mark(gid, 'skipped'); say('Goal recorded — no assist.'); return; }
         const a = matchPlayer(text, xi(flow.side).filter((x) => x.id !== flow.scorer.id));
-        if (a) { recordAssist(flow.side, a); say(`Assist: ${a.fullName}.`); } else say('Say the assister\'s name, or "no assist".');
+        const prev = state.events.find((e) => e.id === gid)?.secondId;
+        if (a) { recordAssist(flow.side, a, gid, prev); say(`Assist: ${a.fullName}.`); } else say('Say the assister\'s name, or "no assist".');
         return;
       }
       if (flow.mode === 'foul') {
@@ -873,14 +893,15 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
     </View>
   );
 
-  if (flow) {
+  // (describe-invasion: the voice "who assisted?" step keeps the controls on screen)
+  if (flow && flow.mode !== 'voiceAssist') {
     if (flow.mode === 'goal') {
       const sideName = flow.side === 'home' ? homeName : awayName;
       if (flow.step === 'scorer') {
         return panel(`⚽ Goal — ${sideName}`, 'Who scored?', (
           <>
             {/* SD-114 (F2): the goal is on the board on the scorer tap; the assist is attached after (Close keeps the goal). */}
-            <PlayerTable players={xi(flow.side)} onPick={(p) => { recordGoal(flow.side, p, 'open'); setFlow({ mode: 'goal', side: flow.side, step: 'assist', scorer: p, goalType: 'open', logged: true, fromSeq: state.seq }); }} />
+            <PlayerTable players={xi(flow.side)} onPick={(p) => { scoreThenDescribe(flow.side, p, 'open'); setFlow(null); }} />
             <Button label={`⚽ Team goal — no scorer${xi(flow.side).length === 0 ? ' (no players yet)' : ''}`} variant="ghost" onPress={() => recordTeamGoal(flow.side)} />
             <Button label="🔃 Own goal instead" variant="ghost" onPress={() => setFlow({ mode: 'goal', side: flow.side, step: 'og' })} />
           </>
@@ -906,79 +927,14 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
           <View style={ctrl.chips}>
             {BODY_PARTS.map((b) => (
               <Button key={b} label={BODY_PART_LABEL[b]} variant="ghost" style={ctrl.actionBtn}
-                onPress={() => { recordGoal(flow.side, flow.scorer, flow.goalType, b); setFlow({ mode: 'goal', side: flow.side, step: 'assist', scorer: flow.scorer, goalType: flow.goalType, bodyPart: b, logged: true, fromSeq: state.seq }); }} />
+                onPress={() => { scoreThenDescribe(flow.side, flow.scorer, flow.goalType, b); setFlow({ mode: 'voiceAssist', side: flow.side, scorer: flow.scorer }); }} />
             ))}
           </View>
         ));
       }
-      {
-        // Consolidated fast panel — the goal is open-play by default; type/header
-        // and assist are optional. SD-114: every path now records the goal BEFORE
-        // this step (`logged: true`) — the assist attaches to it, and Close just
-        // closes. (Shot → Goal → type → body recorded it twice before: F1.)
-        const gt = flow.goalType ?? 'open';
-        const bp = flow.bodyPart;
-        const finish = (assister: Player | null) => {
-          if (!flow.logged) recordGoal(flow.side, flow.scorer, gt, bp);
-          recordAssist(flow.side, assister, flow.logged ? flow.goalId : undefined); // attaches to the just-scored goal, then closes
-        };
-        // A goal-type/header refinement after the goal is already logged (voice
-        // path) re-logs it with the corrected type so the score stays right.
-        const refine = (nextType: GoalType, nextBody?: BodyPart) => {
-          // (SD-30: the undone goal's credits are reversed, as a removal does)
-          if (nextType === gt && nextBody === bp) return;
-          // invasion batch 6: a penalty / direct free kick carries no situation
-          const keep = nextType === 'open' ? mods : { ...mods, sit: undefined };
-          if (keep !== mods) setMods(keep);
-          if (flow.logged) { dispatch(undoGoalAction(flow.side, flow.scorer, flow.goalType ?? 'open')); recordGoal(flow.side, flow.scorer, nextType, nextBody, keep); }
-          setFlow({ mode: 'goal', side: flow.side, step: 'assist', scorer: flow.scorer, goalType: nextType, bodyPart: nextBody, logged: flow.logged, ...(flow.logged ? { fromSeq: state.seq } : {}) });
-        };
-        const typeChips: { label: string; t: GoalType; b?: BodyPart }[] = [
-          { label: 'Open play', t: 'open' }, { label: 'Header', t: 'open', b: 'head' },
-          // deep wave (shot detail on): which foot
-          ...(deep.shotDetail ? [{ label: 'Left foot', t: 'open' as GoalType, b: 'left' as BodyPart }, { label: 'Right foot', t: 'open' as GoalType, b: 'right' as BodyPart }] : []),
-          { label: 'Penalty', t: 'penalty' }, { label: deep.shotDetail ? 'Direct free kick' : 'Free kick', t: 'freekick' },
-        ];
-        // deep wave: zone / big chance on the goal already on the board
-        const goalDetail = (next: { zone?: ShotZone; big?: boolean; sit?: GoalSituation }) => {
-          setMods(next);
-          if (flow.logged) dispatch({ type: 'GOAL_DETAIL', side: flow.side, payload: { zone: next.zone ?? null, bigChance: !!next.big } });
-        };
-        // invasion batch 6 (audit fix 13): how an open-play goal came about (optional)
-        const goalSituation = (sit: GoalSituation | undefined) => {
-          setMods({ ...mods, sit });
-          if (flow.logged) dispatch(goalDetailAction(flow.side, { situation: sit ?? null }));
-        };
-        return panel(`⚽ Goal — ${flow.scorer.fullName}`, flow.logged ? `✓ Goal recorded (${state.home}-${state.away}). Assist? (optional — pick one, or Close)` : 'Assist? (optional — type below)', (
-          <>
-            <PlayerTable players={xi(flow.side).filter((p) => p.id !== flow.scorer.id)} onPick={finish} />
-            <Button label="✓ No assist" variant="ghost" onPress={() => finish(null)} />
-            <Text style={ctrl.meta}>Goal type {bp === 'head' ? '· header' : ''}</Text>
-            <View style={ctrl.chips}>
-              {typeChips.map((c) => (
-                <Button key={c.label} label={c.label} variant="ghost" style={ctrl.actionBtn}
-                  color={(c.t === gt && (c.b ?? undefined) === (bp ?? undefined)) ? theme.colors.primary : undefined}
-                  onPress={() => refine(c.t, c.b)} />
-              ))}
-            </View>
-            {deep.shotDetail ? (
-              <View style={ctrl.chips}>
-                {(['box', 'out'] as ShotZone[]).map((z) => (
-                  <SelectChip key={z} label={ZONE_LABEL[z]} active={mods.zone === z} onPress={() => goalDetail({ ...mods, zone: mods.zone === z ? undefined : z })} />
-                ))}
-                <SelectChip label="⭐ Big chance" active={!!mods.big} onPress={() => goalDetail({ ...mods, big: !mods.big })} />
-              </View>
-            ) : null}
-            {deep.shotDetail && gt === 'open' ? (
-              <View style={ctrl.chips}>
-                {GOAL_SITUATIONS.map((x) => (
-                  <SelectChip key={x} label={SITUATION_LABEL[x]} active={mods.sit === x} onPress={() => goalSituation(mods.sit === x ? undefined : x)} />
-                ))}
-              </View>
-            ) : null}
-          </>
-        ), flow.logged ? 'Close' : 'Cancel');
-      }
+      // describe-invasion DI15: the "assist" step is no longer a panel — the goal
+      // is on the board and its card (DescribeCard, under the Goal buttons)
+      // describes it; voice still answers "who assisted?" through this step.
     }
 
     if (flow.mode === 'keypass') {
@@ -1289,6 +1245,83 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
     </View>
   ) : null;
 
+  // describe-invasion DI15: the card of the goal just scored, under the Goal
+  // buttons. Everything on it is read from the goal on the board; every tap is
+  // saved as it happens (ASSIST with the goal's ref, GOAL_DETAIL, or a re-typed
+  // goal). Done / Skip finish it; the next goal opens a fresh one.
+  const cardGoal = goalCard?.goalId != null && editMin == null ? state.events.find((e) => e.id === goalCard.goalId && e.type === 'goal' && !!e.playerId) : undefined;
+  const goalCardView = cardGoal ? (() => {
+    const g = cardGoal, side = g.side, gid = g.id;
+    const scorer = { id: g.playerId! } as Player;
+    const gt: GoalType = g.goalType ?? 'open';
+    const bp = g.bodyPart;
+    // a re-typed goal is re-logged (score unchanged); its assist goes with it and
+    // is re-attached to the new goal (DI10), and the card follows the new goal
+    const refine = (nextType: GoalType, nextBody?: BodyPart) => {
+      if (nextType === gt && nextBody === bp) return;
+      const detail = { zone: g.zone, big: !!g.bigChance, sit: nextType === 'open' ? g.situation : undefined };
+      dispatch(undoGoalAction(side, scorer, gt, g.secondId, trackedKeys()));
+      recordGoal(side, scorer, nextType, nextBody, detail);
+      if (g.secondId) fire(assistAction(side, { id: g.secondId }, trackedKeys()));
+      setGoalCard({ side, fromSeq: state.seq });
+    };
+    const typeChips: { label: string; t: GoalType; b?: BodyPart }[] = [
+      { label: 'Open play', t: 'open' }, { label: 'Header', t: 'open', b: 'head' },
+      // deep wave (shot detail on): which foot
+      ...(deep.shotDetail ? [{ label: 'Left foot', t: 'open' as GoalType, b: 'left' as BodyPart }, { label: 'Right foot', t: 'open' as GoalType, b: 'right' as BodyPart }] : []),
+      { label: 'Penalty', t: 'penalty' }, { label: deep.shotDetail ? 'Direct free kick' : 'Free kick', t: 'freekick' },
+    ];
+    return (
+      <DescribeCard title={`Last goal · ${playerNameOf(g.playerId, g.playerName)} (${state.home}-${state.away})`}
+        summary={footballGoalSummary(g, playerNameOf)} mode={goalMarks.modeOf(gid)}
+        onDone={() => goalMarks.mark(gid, 'done')} onSkip={() => goalMarks.mark(gid, 'skipped')} onEdit={() => goalMarks.mark(gid, null)}>
+        <Text style={ctrl.meta}>Assist (optional)</Text>
+        <View style={ctrl.chips}>
+          {xi(side).filter((p) => p.id !== g.playerId).map((p) => (
+            <SelectChip key={p.id} label={`${p.jerseyNo != null ? `${p.jerseyNo} ` : ''}${p.fullName}`} active={g.secondId === p.id}
+              onPress={() => recordAssist(side, p, gid, g.secondId)} />
+          ))}
+        </View>
+        <Text style={ctrl.meta}>Goal type</Text>
+        <View style={ctrl.chips}>
+          {typeChips.map((c) => (
+            <SelectChip key={c.label} label={c.label} active={c.t === gt && (c.b ?? undefined) === (bp ?? undefined)} onPress={() => refine(c.t, c.b)} />
+          ))}
+        </View>
+        {deep.shotDetail ? (
+          <View style={ctrl.chips}>
+            {(['box', 'out'] as ShotZone[]).map((z) => (
+              <SelectChip key={z} label={ZONE_LABEL[z]} active={g.zone === z} onPress={() => dispatch({ type: 'GOAL_DETAIL', side, payload: { zone: g.zone === z ? null : z } })} />
+            ))}
+            <SelectChip label="⭐ Big chance" active={!!g.bigChance} onPress={() => dispatch({ type: 'GOAL_DETAIL', side, payload: { bigChance: !g.bigChance } })} />
+          </View>
+        ) : null}
+        {deep.shotDetail && gt === 'open' ? (
+          <View style={ctrl.chips}>
+            {GOAL_SITUATIONS.map((x) => (
+              <SelectChip key={x} label={SITUATION_LABEL[x]} active={g.situation === x} onPress={() => dispatch(goalDetailAction(side, { situation: g.situation === x ? null : x }))} />
+            ))}
+          </View>
+        ) : null}
+      </DescribeCard>
+    );
+  })() : null;
+
+  // describe-invasion DI14: the stoppage just logged — why (optional), Done / Skip
+  // (the engine keeps a stoppage's reason in `playerName`; a re-pick replaces it)
+  const stopEv = stopAsk != null && state.seq === stopAsk ? state.events.find((e) => e.id === stopAsk && e.type === 'stoppage') : undefined;
+  const stopWhy = stopEv?.playerName && isStoppageReason(stopEv.playerName) ? stopEv.playerName : undefined;
+  const stopCard = stopEv ? (
+    <DescribeCard title="⏸️ Stoppage · why? (optional)" summary={stopWhy ? STOPPAGE_LABEL[stopWhy] : ''} mode={stopMarks.modeOf(stopEv.id)}
+      onDone={() => stopMarks.mark(stopEv.id, 'done')} onSkip={() => stopMarks.mark(stopEv.id, 'skipped')} onEdit={() => stopMarks.mark(stopEv.id, null)}>
+      <View style={ctrl.chips}>
+        {STOPPAGE_REASONS.map((r) => (
+          <SelectChip key={r} label={STOPPAGE_LABEL[r]} active={stopWhy === r} onPress={() => dispatch(stoppageReasonAction(stopEv.id, r))} />
+        ))}
+      </View>
+    </DescribeCard>
+  ) : null;
+
   return (
     <View style={{ gap: theme.spacing(4) }}>
       {backfillBar}
@@ -1304,6 +1337,8 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
           <MainAction team={homeName} label="⚽ Goal" plus="+1" color={hc} style={ctrl.flex} accessibilityLabel={`Goal — ${homeName}`} onPress={() => setFlow({ mode: 'goal', side: 'home', step: 'scorer' })} />
           <MainAction team={awayName} label="⚽ Goal" plus="+1" color={ac} style={ctrl.flex} accessibilityLabel={`Goal — ${awayName}`} onPress={() => setFlow({ mode: 'goal', side: 'away', step: 'scorer' })} />
         </View>
+        {/* describe-invasion DI15: the last goal's card — scoring carries straight on */}
+        {goalCardView}
       </View>
 
       {voiceBar}
@@ -1314,15 +1349,7 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
       {/* Invasion batch 5: one tap logs it (at the backfilled minute too — fire);
           the reason (injury / VAR / cooling break / other) is optional, after. */}
       <Button label="⏸️ Stoppage / injury" variant="ghost" onPress={() => { setStopAsk(state.seq + 1); fire(stoppageAction(state.possession.side ?? 'home')); }} />
-      {stopAsk != null && state.seq === stopAsk && state.events.some((e) => e.id === stopAsk && e.type === 'stoppage' && !e.playerName) ? (
-        <View style={ctrl.chips} accessibilityLabel="Why did play stop? (optional)">
-          <Text style={ctrl.meta}>Why? (optional)</Text>
-          {STOPPAGE_REASONS.map((r) => (
-            <Button key={r} label={STOPPAGE_LABEL[r]} variant="ghost" style={ctrl.actionBtn}
-              onPress={() => { dispatch(stoppageReasonAction(stopAsk, r)); setStopAsk(null); }} />
-          ))}
-        </View>
-      ) : null}
+      {stopCard}
 
       {/* Penalty — won by → taken by → scored / saved / missed (credits the GK on a save). */}
       <View style={{ gap: theme.spacing(2) }}>

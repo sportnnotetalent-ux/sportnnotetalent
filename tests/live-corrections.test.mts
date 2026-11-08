@@ -26,12 +26,14 @@ describe('football — goal recorded once (F1) and kept on Close (F2)', () => {
   const fbSrc = src('sports/football/index.tsx');
   test('every path into the assist step has already logged the goal', () => {
     // the body step (Shot → On target → Goal → type → body) and the scorer tap
+    // describe-invasion DI15: the assist step is now the goal card — every path
+    // logs the goal once (scoreThenDescribe) before the card / voice asks
     assert.ok(!/logged: false/.test(fbSrc), 'no path opens the assist step with an unlogged goal');
-    const body = fbSrc.slice(fbSrc.indexOf("flow.step === 'body'"), fbSrc.lastIndexOf('Consolidated fast panel'));
-    assert.equal((body.match(/recordGoal\(/g) ?? []).length, 1);
-    assert.match(body, /logged: true/);
+    const body = fbSrc.slice(fbSrc.indexOf("flow.step === 'body'"), fbSrc.indexOf('describe-invasion DI15: the "assist" step'));
+    assert.equal((body.match(/scoreThenDescribe\(/g) ?? []).length, 1);
+    assert.doesNotMatch(body, /recordGoal\(/);
     const scorer = fbSrc.slice(fbSrc.lastIndexOf("flow.step === 'scorer'"), fbSrc.lastIndexOf("flow.step === 'og'"));
-    assert.match(scorer, /recordGoal\(flow\.side, p, 'open'\); setFlow\(\{[^}]*logged: true/);
+    assert.match(scorer, /scoreThenDescribe\(flow\.side, p, 'open'\); setFlow\(null\)/);
   });
   test('a goal then its assist: score +1, the assist on that goal', () => {
     let s = fb.reducer(fb.init(), { type: 'KICKOFF', payload: { at: 1 } });

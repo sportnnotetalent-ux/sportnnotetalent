@@ -37,9 +37,12 @@ export const goalAction = (side: Side, scorer: Who, goalType: GoalType, o: { bod
 export const teamGoalAction = (side: Side): ScoreAction => ({ type: 'GOAL', side, payload: { goalType: 'open' } });
 
 /** The goal just logged taken back (a refined goal type re-logs it): its credits reversed. */
-export const undoGoalAction = (side: Side, scorer: Who, goalType: GoalType = 'open'): ScoreAction => ({
+export const undoGoalAction = (side: Side, scorer: Who, goalType: GoalType = 'open', assister?: string, tracked?: string[]): ScoreAction => ({
   type: 'UNDO_GOAL', side,
   attribution: { playerId: scorer.id, stat: 'goals', by: -1, extra: { shots: -1, shotsOnTarget: -1, [GOAL_STAT[goalType]]: -1 } },
+  // describe-invasion DI10: the goal card re-types a goal that already has its
+  // assist — the assist goes with it (and is re-attached to the re-logged goal)
+  ...(assister ? { attribution2: { playerId: assister, stat: 'assists', by: -1, ...(tracked ? { tracked } : {}) } } : {}),
 });
 
 /** SD-30: an own goal for `side` by the opponent `p` (credited `ownGoals` at full time). */
@@ -51,9 +54,11 @@ export const creditAction = (type: string, side: Side, stat: string, p: Who, o: 
 
 /** The assist on the side's latest goal — or, with `ref` (MVP F2), on that
  *  goal only (a goal Undo removed takes no assist). */
-export const assistAction = (side: Side, p: Who, tracked?: string[], ref?: number): ScoreAction => {
+export const assistAction = (side: Side, p: Who, tracked?: string[], ref?: number, prev?: string): ScoreAction => {
   const a = creditAction('ASSIST', side, 'assists', p, { tracked });
-  return ref == null ? a : { ...a, payload: { ...a.payload, ref } };
+  // describe-invasion DI3: a changed assister on the goal card — the first one's assist is reversed
+  const back = prev && prev !== p.id ? { attribution2: { playerId: prev, stat: 'assists', by: -1, ...(tracked ? { tracked } : {}) } } : {};
+  return ref == null ? { ...a, ...back } : { ...a, payload: { ...a.payload, ref }, ...back };
 };
 
 /** A card for `p`: a red, or a yellow — plus the red when it is the player's

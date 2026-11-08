@@ -27,8 +27,9 @@
  * original time; Cancel keeps the event — SD-114).
  */
 import React, { useEffect, useState, useMemo } from 'react';
-import { closeSaves, closeLabel } from '../flowClose';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { DescribeCard, useDescribeMarks } from '../../components/DescribeCard';
+import { assistPart } from '../invasion/goalDetail';
 import { theme } from '../../core/theme';
 import { useMask } from '../../core/disputeMask';
 import { withNames, nameFor } from '../invasion/names';
@@ -44,7 +45,7 @@ import type { ScoreAction, SportPlugin } from '../types';
 import {
   init, reducer, isComplete, result, levelAtEnd, aggLine, matchSec, periodSec, periodLen, clockFace, clockAt, periodName, periodLong, periodStarted, running,
   eventCredits, creditAttribution, soScore, nextKicker, needsSdPick, rugbyScoreLine, subsUsed, openTemps, totalPeriods, nextPlan, kicksAfter,
-  isSuddenDeath, pointsOf, cardTapAction, rugbyStandingsUnits, nominalOffset, trackedTallyKeys, currentBall, ballTime, ballDead,
+  isSuddenDeath, pointsOf, cardTapAction, tryDetailAction, rugbyStandingsUnits, nominalOffset, trackedTallyKeys, currentBall, ballTime, ballDead,
   RUGBY_PRESETS, RUGBY_LIVE_SETTINGS, LIVE_KEYS, DETAIL_KEYS, DETAIL_LABEL, KICK_LABEL,
   TALLY_LABEL, TRACK_FLAGS, TRACK_KINDS, TRACK_FIELDS, INFRINGEMENTS, INFRINGEMENT_LABEL, TURNOVER_CAUSES, CAUSE_LABEL,
   type RugbyEvent, type RugbyState, type KickKind, type CardKind, type DetailKey, type Side, type TallyKind,
@@ -114,7 +115,9 @@ function PlayerGrid({ players, onPick, skip }: { players: Player[]; onPick: (p: 
 type SubKind = 'perm' | 'hia' | 'blood';
 const other = (sd: Side): Side => (sd === 'home' ? 'away' : 'home');
 type Flow =
-  | { mode: 'try'; side: Side; step: 'scorer' | 'assist'; scorer?: Player | null }
+  // describe-invasion DI1: the try is on the board at the scorer tap; the assist
+  // is described after, on the try card. `carry` (DI9): a re-entered try keeps its assister.
+  | { mode: 'try'; side: Side; step: 'scorer'; carry?: string }
   | { mode: 'conv'; side: Side; step: 'result' | 'kicker'; made?: boolean }
   | { mode: 'kick'; side: Side; step: 'kind' | 'result' | 'kicker'; kick?: KickKind; made?: boolean }
   /** `pt` (invasion batch 5): straight after a penalty try — a card for the offender? (optional) */
@@ -136,6 +139,10 @@ const ScoringControls: SportPlugin<RugbyState>['ScoringControls'] = ({
   // IDs-only scoring: the state keeps player ids; names are looked up when shown
   const { nameOf: playerNameOf } = useMask();
   const [flow, setFlow] = useState<Flow | null>(null);
+  // describe-invasion: the try just scored (its id) — its card describes the
+  // assist; a newer try replaces it (DI6); Done / Skip per try
+  const [tryCard, setTryCard] = useState<string | null>(null);
+  const tryMarks = useDescribeMarks<string>();
   const [editAt, setEditAt] = useState<{ sec: number; psec: number; period: number } | null>(null);
   const [showEdit, setShowEdit] = useState(false);
   const [clockInput, setClockInput] = useState('');
@@ -219,8 +226,14 @@ const ScoringControls: SportPlugin<RugbyState>['ScoringControls'] = ({
     if (currentBall(s, type === 'POSSESSION' ? 'poss' : 'terr') === sd && !(type === 'POSSESSION' && ballDead(s))) return;
     fire({ type, side: sd });
   };
-  const scoreTry = (sd: Side, scorer: Player | null, assist: Player | null) => {
-    fire({ type: 'TRY', side: sd, ...credit({ type: 'try', playerId: scorer?.id, secondId: assist?.id }) });
+  // describe-invasion DI1: on the board at the scorer tap ("Team try" too); the
+  // assist is attached after (TRY_DETAIL, by the try's id). DI9: a re-entered
+  // try carries its original assister (not the new scorer).
+  const scoreTry = (sd: Side, scorer: Player | null, carry?: string) => {
+    const id = uid();
+    const assist = carry && carry !== scorer?.id ? carry : undefined;
+    fire({ type: 'TRY', side: sd, payload: { uid: id }, ...credit({ type: 'try', playerId: scorer?.id, secondId: assist }) });
+    setTryCard(id);
     // a try in sudden death ends the match (no conversion); else the conversion follows
     // (a re-entered try keeps its own conversion row — no second conversion)
     if (editAt || isSuddenDeath(s, s.period)) setFlow(null);
@@ -267,7 +280,7 @@ const ScoringControls: SportPlugin<RugbyState>['ScoringControls'] = ({
     holdRemoval(removalActions(e));
     setEditAt({ sec: e.sec, psec: e.psec, period: e.period });
     setShowEdit(false);
-    if (e.type === 'try') setFlow({ mode: 'try', side: e.side, step: 'scorer' });
+    if (e.type === 'try') setFlow({ mode: 'try', side: e.side, step: 'scorer', ...(e.secondId ? { carry: e.secondId } : {}) });
     else if (e.type === 'kick') setFlow(e.kick === 'conv' ? { mode: 'conv', side: e.side, step: 'result' } : { mode: 'kick', side: e.side, step: 'kind' });
     else if (e.type === 'card') setFlow({ mode: 'card', side: e.side, step: 'kind' });
     else if (e.type === 'sub') setFlow({ mode: 'sub', side: e.side, step: 'kind' });
@@ -303,6 +316,28 @@ const ScoringControls: SportPlugin<RugbyState>['ScoringControls'] = ({
     dispatch({ type: 'SET_CLOCK', payload: { periodSec: Math.max(0, want - nominalOffset(s, s.period)), at: Date.now() } });
     setSetting(false); setClockInput('');
   };
+
+  /* ---- describe-invasion: the card for the try just scored ---- */
+  // DI6: only that try's; gone with it; hidden while a correction is open (it
+  // holds a removal). DI11: a sudden-death try keeps it after the whistle.
+  const cardTry = tryCard && !editAt ? s.events.find((e) => e.id === tryCard && e.type === 'try') : undefined;
+  const tryCardView = cardTry ? (
+    <DescribeCard
+      title={`Last try · ${cardTry.playerId ? nameFor(playerNameOf, cardTry.playerId, cardTry.playerName) ?? name(cardTry.side) : name(cardTry.side)}`}
+      summary={assistPart(playerNameOf, cardTry.secondId, cardTry.secondName)}
+      mode={tryMarks.modeOf(cardTry.id)}
+      onDone={() => tryMarks.mark(cardTry.id, 'done')} onSkip={() => tryMarks.mark(cardTry.id, 'skipped')} onEdit={() => tryMarks.mark(cardTry.id, null)}>
+      <Text style={c.small}>Try assist (optional)</Text>
+      <View style={c.grid}>
+        {onField(cardTry.side).filter((p) => p.id !== cardTry.playerId).map((p) => (
+          <SelectChip key={p.id} label={`${p.jerseyNo != null ? `${p.jerseyNo} ` : ''}${p.fullName}`} active={cardTry.secondId === p.id} onPress={() => {
+            const a = tryDetailAction(s, cardTry.id, { a1: cardTry.secondId === p.id ? null : p.id }, TRACKED);
+            if (a) dispatch(a);
+          }} />
+        ))}
+      </View>
+    </DescribeCard>
+  ) : null;
 
   /* ---- after the final whistle: the kicking competition ---- */
   if (s.ended) {
@@ -370,6 +405,7 @@ const ScoringControls: SportPlugin<RugbyState>['ScoringControls'] = ({
             <Text style={c.meta}>{s.agg ? `${aggLine(s)}${level ? '.' : ` — ${name(s.home + s.agg.home > s.away + s.agg.away ? 'home' : 'away')} go through.`}` : level ? 'Draw.' : `${name(s.home > s.away ? 'home' : 'away')} win.`} Use “Correct the timeline” below to fix a moment.</Text>
           )}
         </View>
+        {tryCardView}
         <EditList s={s} show={showEdit} setShow={setShowEdit} onRemove={remove} homeName={homeName} awayName={awayName} />
       </View>
     );
@@ -379,28 +415,21 @@ const ScoringControls: SportPlugin<RugbyState>['ScoringControls'] = ({
   const flowPanel = (() => {
     if (!flow) return null;
     const sd = flow.side;
-    // wave 0 (score-on-close SC6): closing the assist step keeps the try
-    const saveAsIs = closeSaves({ editing: !!editAt, describing: flow.mode === 'try' && flow.step === 'assist' })
-      ? () => { if (flow.mode === 'try' && flow.step === 'assist') scoreTry(sd, flow.scorer ?? null, null); } : null;
+    // describe-invasion DI1: the try is on the board at the scorer tap (no
+    // assist step before it); the assist is described after, on the try card
     const head = (t: string) => (
       <View style={c.flowHead}>
         <Text style={[c.h, { color: color(sd) }]} numberOfLines={1}>{t} · {name(sd)}</Text>
-        <Text style={c.cancel} accessibilityRole="button" onPress={saveAsIs ?? (() => setFlow(null))}>{closeLabel(!!saveAsIs)}</Text>
+        <Text style={c.cancel} accessibilityRole="button" onPress={() => setFlow(null)}>Cancel</Text>
       </View>
     );
     switch (flow.mode) {
       case 'try':
-        if (flow.step === 'scorer') return (
+        return (
           <View style={c.panel}>{head('Try (5)')}
             <Text style={c.small}>Who scored?</Text>
-            <PlayerGrid players={onField(sd)} onPick={(p) => setFlow({ ...flow, scorer: p, step: 'assist' })}
-              skip={{ label: 'Team try (no scorer)', onPress: () => scoreTry(sd, null, null) }} />
-          </View>
-        );
-        return (
-          <View style={c.panel}>{head('Try assist')}
-            <PlayerGrid players={onField(sd).filter((p) => p.id !== flow.scorer?.id)} onPick={(p) => scoreTry(sd, flow.scorer ?? null, p)}
-              skip={{ label: 'No assist', onPress: () => scoreTry(sd, flow.scorer ?? null, null) }} />
+            <PlayerGrid players={onField(sd)} onPick={(p) => scoreTry(sd, p, flow.carry)}
+              skip={{ label: 'Team try (no scorer)', onPress: () => scoreTry(sd, null, flow.carry) }} />
           </View>
         );
       case 'conv':
@@ -584,7 +613,7 @@ const ScoringControls: SportPlugin<RugbyState>['ScoringControls'] = ({
       <MainAction label="🏉 Try" color={color(sd)} onPress={() => setFlow({ mode: 'try', side: sd, step: 'scorer' })} />
       <Button label="🎯 Kick at goal" accessibilityLabel="Penalty goal or drop goal" variant="ghost" onPress={() => setFlow({ mode: 'kick', side: sd, step: 'kind' })} />
       {/* invasion batch 5 (Law 8): the offender is usually carded — an optional card step follows */}
-      <Button label="🏉 Penalty try" accessibilityLabel="Penalty try, 7 points" variant="ghost" onPress={() => { fire({ type: 'PENALTY_TRY', side: sd }); if (!editAt && !isSuddenDeath(s, s.period)) setFlow({ mode: 'card', side: other(sd), step: 'kind', pt: true }); }} />
+      <Button label="🏉 Penalty try" accessibilityLabel="Penalty try, 7 points" variant="ghost" onPress={() => { fire({ type: 'PENALTY_TRY', side: sd }); if (!editAt && !isSuddenDeath(s, s.period)) setFlow({ mode: 'card', side: other(sd), step: 'kind', pt: true }); setTryCard(null); }} />
       <Button label="🟨 Card" variant="ghost" onPress={() => setFlow({ mode: 'card', side: sd, step: 'kind' })} />
       <Button label="🔁 Sub" accessibilityLabel="Replacement" variant="ghost" onPress={() => setFlow({ mode: 'sub', side: sd, step: 'kind' })} />
       {s.trackDetail ? <Button label="📋 Detail" accessibilityLabel="Tackles, carries, set pieces" variant="ghost" onPress={() => setFlow({ mode: 'detail', side: sd, step: 'kind' })} /> : null}
@@ -672,6 +701,8 @@ const ScoringControls: SportPlugin<RugbyState>['ScoringControls'] = ({
           <View style={c.cols}>{sideCol('home')}{sideCol('away')}</View>
         </>
       )}
+      {/* describe-invasion: under the controls (and the conversion) — scoring carries straight on */}
+      {tryCardView}
 
       <EditList s={s} show={showEdit} setShow={setShowEdit} onRemove={remove} onEdit={edit} homeName={homeName} awayName={awayName} />
       {last ? <Button label="🏁 Full time" variant="danger" disabled={!periodStarted(s)} onPress={() => void endPeriod()} /> : null}

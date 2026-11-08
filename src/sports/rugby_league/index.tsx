@@ -25,8 +25,9 @@
  * original time; Cancel keeps the event — SD-114).
  */
 import React, { useEffect, useState, useMemo } from 'react';
-import { closeSaves, closeLabel } from '../flowClose';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { DescribeCard, useDescribeMarks } from '../../components/DescribeCard';
+import { assistPart } from '../invasion/goalDetail';
 import { theme } from '../../core/theme';
 import { useMask } from '../../core/disputeMask';
 import { withNames, nameFor } from '../invasion/names';
@@ -41,7 +42,7 @@ import type { ScoreAction, SportPlugin } from '../types';
 import {
   init, reducer, isComplete, result, levelAtEnd, matchSec, periodSec, periodLen, clockFace, clockAt, periodName, periodLong, periodStarted, running,
   eventCredits, creditAttribution, sinBinsOf, interchangesUsed, openTemps, totalPeriods, nextPlan, isGoldenPoint, pointsOf, leagueStandingsUnits,
-  nominalOffset, trackedDetailKeys, currentSet,
+  nominalOffset, trackedDetailKeys, currentSet, tryDetailAction,
   LEAGUE_PRESETS, LEAGUE_LIVE_SETTINGS, LIVE_KEYS, DETAIL_LABEL, FLAG_DETAILS, TRACK_FLAGS, TRACK_FIELDS, TEAM_DETAIL,
   type LeagueEvent, type LeagueState, type DetailKey, type Sanction, type Side, type SetEnd,
 } from './engine';
@@ -95,7 +96,10 @@ function PlayerGrid({ players, onPick, skip }: { players: Player[]; onPick: (p: 
 
 type SubKind = 'perm' | 'hia' | 'blood';
 type Flow =
-  | { mode: 'try'; side: Side; step: 'zone' | 'scorer' | 'assist'; scorer?: Player | null; bonus?: boolean }
+  // describe-invasion DI1: the zone and the scorer define the try (on the board at
+  // the scorer tap); the assist is described after, on the try card. `carry`
+  // (DI9): a re-entered try keeps its assister.
+  | { mode: 'try'; side: Side; step: 'zone' | 'scorer'; bonus?: boolean; carry?: string }
   | { mode: 'conv'; side: Side; step: 'result' | 'kicker'; made?: boolean }
   | { mode: 'kick'; side: Side; kick: 'pen' | 'fg'; step: 'result' | 'points' | 'kicker'; made?: boolean; two?: boolean }
   /** `pt` (invasion batch 5): straight after a penalty try by `pt` — a sanction for the offender? (optional), then the conversion */
@@ -118,6 +122,10 @@ const ScoringControls: SportPlugin<LeagueState>['ScoringControls'] = ({
   // IDs-only scoring: the state keeps player ids; names are looked up when shown
   const { nameOf: playerNameOf } = useMask();
   const [flow, setFlow] = useState<Flow | null>(null);
+  // describe-invasion: the try just scored (its id) — its card describes the
+  // assist; a newer try replaces it (DI6); Done / Skip per try
+  const [tryCard, setTryCard] = useState<string | null>(null);
+  const tryMarks = useDescribeMarks<string>();
   const [editAt, setEditAt] = useState<{ sec: number; psec: number; period: number } | null>(null);
   const [showEdit, setShowEdit] = useState(false);
   const [clockInput, setClockInput] = useState('');
@@ -188,14 +196,21 @@ const ScoringControls: SportPlugin<LeagueState>['ScoringControls'] = ({
     if (editAt || isGoldenPoint(s, s.period)) setFlow(null);
     else setFlow({ mode: 'conv', side: sd, step: 'result' });
   };
-  const scoreTry = (sd: Side, scorer: Player | null, assist: Player | null, bonus?: boolean) => {
-    fire({ type: 'TRY', side: sd, payload: bonus ? { bonus: true } : {}, ...credit({ type: 'try', bonus, playerId: scorer?.id, secondId: assist?.id }) });
+  // describe-invasion DI1: on the board at the scorer tap ("Team try" too); the
+  // assist is attached after (TRY_DETAIL, by the try's id). DI9: a re-entered
+  // try carries its original assister (not the new scorer).
+  const scoreTry = (sd: Side, scorer: Player | null, bonus?: boolean, carry?: string) => {
+    const id = uid();
+    const assist = carry && carry !== scorer?.id ? carry : undefined;
+    fire({ type: 'TRY', side: sd, payload: { uid: id, ...(bonus ? { bonus: true } : {}) }, ...credit({ type: 'try', bonus, playerId: scorer?.id, secondId: assist }) });
+    setTryCard(id);
     conversionNext(sd);
   };
   // invasion batch 5: an optional sanction for the offender, then the conversion
   // (golden point: the try ends the match — no step; a re-entry keeps its rows)
   const penaltyTry = (sd: Side) => {
     fire({ type: 'PENALTY_TRY', side: sd });
+    setTryCard(null); // describe-invasion DI6: a newer try closes the last try's card
     if (editAt || isGoldenPoint(s, s.period)) conversionNext(sd);
     else setFlow({ mode: 'sanction', side: other(sd), step: 'kind', pt: sd });
   };
@@ -241,7 +256,7 @@ const ScoringControls: SportPlugin<LeagueState>['ScoringControls'] = ({
     holdRemoval(removalActions(e));
     setEditAt({ sec: e.sec, psec: e.psec, period: e.period });
     setShowEdit(false);
-    if (e.type === 'try') setFlow({ mode: 'try', side: e.side, step: s.bonusTry ? 'zone' : 'scorer' });
+    if (e.type === 'try') setFlow({ mode: 'try', side: e.side, step: s.bonusTry ? 'zone' : 'scorer', ...(e.secondId ? { carry: e.secondId } : {}) });
     else if (e.type === 'kick') setFlow(e.kick === 'conv' ? { mode: 'conv', side: e.side, step: 'result' } : { mode: 'kick', side: e.side, kick: e.kick === 'fg' ? 'fg' : 'pen', step: 'result' });
     else if (e.type === 'sanction') setFlow({ mode: 'sanction', side: e.side, step: 'kind' });
     else if (e.type === 'sub') setFlow({ mode: 'sub', side: e.side, step: 'kind' });
@@ -279,6 +294,28 @@ const ScoringControls: SportPlugin<LeagueState>['ScoringControls'] = ({
     setSetting(false); setClockInput('');
   };
 
+  /* ---- describe-invasion: the card for the try just scored ---- */
+  // DI6: only that try's; gone with it; hidden while a correction is open (it
+  // holds a removal). DI11: a golden-point try keeps it after the whistle.
+  const cardTry = tryCard && !editAt ? s.events.find((e) => e.id === tryCard && e.type === 'try') : undefined;
+  const tryCardView = cardTry ? (
+    <DescribeCard
+      title={`Last try · ${cardTry.playerId ? nameFor(playerNameOf, cardTry.playerId, cardTry.playerName) ?? name(cardTry.side) : name(cardTry.side)}`}
+      summary={assistPart(playerNameOf, cardTry.secondId, cardTry.secondName)}
+      mode={tryMarks.modeOf(cardTry.id)}
+      onDone={() => tryMarks.mark(cardTry.id, 'done')} onSkip={() => tryMarks.mark(cardTry.id, 'skipped')} onEdit={() => tryMarks.mark(cardTry.id, null)}>
+      <Text style={c.small}>Try assist (optional)</Text>
+      <View style={c.grid}>
+        {onField(cardTry.side).filter((p) => p.id !== cardTry.playerId).map((p) => (
+          <SelectChip key={p.id} label={`${p.jerseyNo != null ? `${p.jerseyNo} ` : ''}${p.fullName}`} active={cardTry.secondId === p.id} onPress={() => {
+            const a = tryDetailAction(s, cardTry.id, { a1: cardTry.secondId === p.id ? null : p.id }, trackedKeys(s));
+            if (a) dispatch(a);
+          }} />
+        ))}
+      </View>
+    </DescribeCard>
+  ) : null;
+
   /* ---- after the final whistle ---- */
   if (s.ended) {
     return (
@@ -287,6 +324,7 @@ const ScoringControls: SportPlugin<LeagueState>['ScoringControls'] = ({
           <Text style={c.h}>Full time · {s.home}–{s.away}{s.plan.length > 2 ? ` (after ${gpWord})` : ''}</Text>
           <Text style={c.meta}>{level ? 'Draw.' : `${name(s.home > s.away ? 'home' : 'away')} win.`} Use “Correct the timeline” below to fix a moment.</Text>
         </View>
+        {tryCardView}
         <EditList s={s} show={showEdit} setShow={setShowEdit} onRemove={remove} homeName={homeName} awayName={awayName} />
       </View>
     );
@@ -296,14 +334,13 @@ const ScoringControls: SportPlugin<LeagueState>['ScoringControls'] = ({
   const flowPanel = (() => {
     if (!flow) return null;
     const sd = flow.side;
-    // wave 0 (score-on-close SC6): closing the assist step keeps the try (and its bonus zone)
-    const saveAsIs = closeSaves({ editing: !!editAt, describing: flow.mode === 'try' && flow.step === 'assist' })
-      ? () => { if (flow.mode === 'try' && flow.step === 'assist') scoreTry(sd, flow.scorer ?? null, null, flow.bonus); } : null;
+    // describe-invasion DI1: the try (with its zone) is on the board at the
+    // scorer tap; the assist is described after, on the try card
     const head = (t: string) => (
       <View style={c.flowHead}>
         <Text style={[c.h, { color: color(sd) }]} numberOfLines={1}>{t} · {name(sd)}</Text>
         {/* a penalty try's sanction step: Cancel still goes on to its conversion */}
-        <Text style={c.cancel} accessibilityRole="button" onPress={saveAsIs ?? (() => (flow.mode === 'sanction' && flow.pt ? ptNext() : setFlow(null)))}>{closeLabel(!!saveAsIs)}</Text>
+        <Text style={c.cancel} accessibilityRole="button" onPress={() => (flow.mode === 'sanction' && flow.pt ? ptNext() : setFlow(null))}>Cancel</Text>
       </View>
     );
     switch (flow.mode) {
@@ -316,17 +353,11 @@ const ScoringControls: SportPlugin<LeagueState>['ScoringControls'] = ({
             </View>
           </View>
         );
-        if (flow.step === 'scorer') return (
+        return (
           <View style={c.panel}>{head(flow.bonus ? 'Bonus-zone try (5)' : 'Try (4)')}
             <Text style={c.small}>Who scored?</Text>
-            <PlayerGrid players={onField(sd)} onPick={(p) => setFlow({ ...flow, scorer: p, step: 'assist' })}
-              skip={{ label: 'Team try (no scorer)', onPress: () => scoreTry(sd, null, null, flow.bonus) }} />
-          </View>
-        );
-        return (
-          <View style={c.panel}>{head('Try assist')}
-            <PlayerGrid players={onField(sd).filter((p) => p.id !== flow.scorer?.id)} onPick={(p) => scoreTry(sd, flow.scorer ?? null, p, flow.bonus)}
-              skip={{ label: 'No assist', onPress: () => scoreTry(sd, flow.scorer ?? null, null, flow.bonus) }} />
+            <PlayerGrid players={onField(sd)} onPick={(p) => scoreTry(sd, p, flow.bonus, flow.carry)}
+              skip={{ label: 'Team try (no scorer)', onPress: () => scoreTry(sd, null, flow.bonus, flow.carry) }} />
           </View>
         );
       case 'conv':
@@ -581,6 +612,8 @@ const ScoringControls: SportPlugin<LeagueState>['ScoringControls'] = ({
           <View style={c.cols}>{sideCol('home')}{sideCol('away')}</View>
         </>
       )}
+      {/* describe-invasion: under the controls (and the conversion) — scoring carries straight on */}
+      {tryCardView}
 
       <EditList s={s} show={showEdit} setShow={setShowEdit} onRemove={remove} onEdit={edit} homeName={homeName} awayName={awayName} />
       {last ? <Button label="🏁 Full time" variant="danger" disabled={!periodStarted(s)} onPress={() => void endPeriod()} /> : null}

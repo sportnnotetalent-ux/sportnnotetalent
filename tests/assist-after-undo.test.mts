@@ -70,11 +70,13 @@ describe('the screens', () => {
   const fb = readFileSync(join(import.meta.dirname, '..', 'src/sports/football/index.tsx'), 'utf8');
   const bb = readFileSync(join(import.meta.dirname, '..', 'src/sports/basketball/index.tsx'), 'utf8');
   test('the prompts pass their goal / basket id and close when it is gone', () => {
-    assert.match(fb, /assistAction\(side, p, trackedKeys\(\), goalId\)/);
+    // describe-invasion DI3/DI5: the goal card passes its goal id, and the assister so far (reversed on a change)
+    assert.match(fb, /assistAction\(side, p, trackedKeys\(\), goalId, prev\)/);
     assert.match(fb, /goalId/);
     // describe-us DU13: the card's assist names its basket (`ref` = assistFor.ref), stamped without closing the card
     assert.match(bb, /const ref = assistFor\.ref;/);
     assert.match(bb, /stamped\(statAction\(assistFor\.side, 'ASSIST', p, ref\)\)/);
+    assert.match(fb, /else if \(!state\.events\.some\(\(e\) => e\.id === goalCard\.goalId\)\) setGoalCard\(null\)/);
     assert.match(bb, /assistFor && assistFor\.ref != null && !state\.events\.some\(\(e\) => e\.id === assistFor\.ref\)/);
   });
 });

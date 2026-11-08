@@ -19,8 +19,9 @@
  * SD-114: Cancel keeps the event).
  */
 import React, { useEffect, useState, useMemo } from 'react';
-import { closeSaves, closeLabel } from '../flowClose';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { DescribeCard, useDescribeMarks } from '../../components/DescribeCard';
+import { assistPart } from '../invasion/goalDetail';
 import { theme } from '../../core/theme';
 import { useMask } from '../../core/disputeMask';
 import { withNames, nameFor, legacyNameOf, type NameOf } from '../invasion/names';
@@ -39,7 +40,7 @@ import {
   periodStarted, running, eventCredits, creditAttribution, goalFlagsNow, goalieAt, goalieOf, netEmpty, penaltyBox, partEnd, skatersOn, baseSkaters,
   soScore, nextShooter, needsSdPick, iceHockeyScoreLine, timeoutLeft, totalPeriods, nextIsOvertime, eventWhen, standingsUnits, ejects,
   ICE_HOCKEY_PRESETS, ICE_HOCKEY_LIVE_SETTINGS, PEN_LABEL, INFRACTIONS, STRENGTH_LABEL, LIVE_KEYS,
-  TALLY_LABEL, TRACK_FLAGS, TRACK_KINDS, TRACK_FIELDS, iceTrackedKeys, soAction, penaltyShotAction,
+  TALLY_LABEL, TRACK_FLAGS, TRACK_KINDS, TRACK_FIELDS, iceTrackedKeys, soAction, penaltyShotAction, goalDetailAction,
   type FoZone, type IceEvent, type IceHockeyState, type PenKind, type Side, type Strength, type TallyKind,
 } from './engine';
 import { iceHockeyCommentary, iceScopeLabel, ICE_FEED_TAGS } from './commentary';
@@ -104,9 +105,14 @@ function Chip({ label, on, onPress, a11y }: { label: string; on: boolean; onPres
   );
 }
 
-type GoalDraft = { strength: Strength; en: boolean; scorer?: Player | null; a1?: Player | null };
+// describe-invasion DI1: strength / EN are picked before the scorer (pre-set
+// from the penalties and the net); the goal is on the board at the scorer tap,
+// and the assists, strength and on-ice players are described after, on the goal
+// card. `carry` (DI9): a re-entered goal keeps its assists and on-ice players.
+type GoalDraft = { strength: Strength; en: boolean };
+type Carry = { a1?: string; a2?: string; onIce?: { home?: string[]; away?: string[] } };
 type Flow =
-  | { mode: 'goal'; side: Side; step: 'scorer' | 'a1' | 'a2' | 'onice'; d: GoalDraft; a2?: Player | null }
+  | { mode: 'goal'; side: Side; step: 'scorer'; d: GoalDraft; carry?: Carry }
   | { mode: 'shot'; side: Side }
   // invasion batch 6: 'served' — served by a team-mate (optional; bench minor, goalie's or match penalty)
   | { mode: 'pen'; side: Side; step: 'kind' | 'infraction' | 'player' | 'served'; pen?: PenKind; infraction?: string; who?: Player | null }
@@ -134,6 +140,10 @@ const ScoringControls: SportPlugin<IceHockeyState>['ScoringControls'] = ({
   const [setting, setSetting] = useState(false);
   const [soTaker, setSoTaker] = useState<Player | null>(null);
   const [onIce, setOnIce] = useState<{ home: Set<string>; away: Set<string> }>({ home: new Set(), away: new Set() });
+  // describe-invasion: the goal just scored (its id) — its card describes it; a
+  // newer goal replaces it (DI6); Done / Skip per goal
+  const [goalCard, setGoalCard] = useState<string | null>(null);
+  const goalMarks = useDescribeMarks<string>();
   /** deep wave: the centres taking the draws (one-tap faceoffs credit them) */
   const [centres, setCentres] = useState<{ home?: Player; away?: Player }>({});
   const [, tick] = useState(0);
@@ -208,15 +218,34 @@ const ScoringControls: SportPlugin<IceHockeyState>['ScoringControls'] = ({
     fire({ type: 'TALLY', side: sd, payload: { kind, ...(z ? { zone: z } : {}) }, attribution: cr.attribution, attribution2: cr.attribution2 });
     setFlow(null);
   };
-  const goal = (sd: Side, d: GoalDraft, a2: Player | null, ice?: { home: string[]; away: string[] }) => {
+  // describe-invasion DI1: on the board at the scorer tap ("Team goal" too); the
+  // rest is attached after (GOAL_DETAIL, by the goal's id). DI9: a re-entered
+  // goal carries its original assists (not the new scorer) and on-ice players.
+  const goal = (sd: Side, d: GoalDraft, scorer: Player | null, carry: Carry = {}) => {
     const id = uid();
-    const cr = credit({ type: 'goal', side: sd, playerId: d.scorer?.id, secondId: d.a1?.id, strength: d.strength, en: d.en });
-    fire({ type: 'GOAL', side: sd, payload: { uid: id, strength: d.strength, ...(d.en ? { en: true } : {}), ...(ice ? { onIce: ice } : {}) }, attribution: cr.attribution, attribution2: cr.attribution2 });
+    const a1 = carry.a1 && carry.a1 !== scorer?.id ? carry.a1 : undefined;
+    const a2 = a1 && carry.a2 && carry.a2 !== scorer?.id ? carry.a2 : undefined;
+    const cr = credit({ type: 'goal', side: sd, playerId: scorer?.id, secondId: a1, strength: d.strength, en: d.en });
+    fire({ type: 'GOAL', side: sd, payload: { uid: id, strength: d.strength, ...(d.en ? { en: true } : {}), ...(carry.onIce ? { onIce: carry.onIce } : {}) }, attribution: cr.attribution, attribution2: cr.attribution2 });
     if (a2) {
-      const c3 = credit({ type: 'goal', side: sd, thirdId: a2.id }).third;
+      const c3 = credit({ type: 'goal', side: sd, thirdId: a2 }).third;
       fire({ type: 'ASSIST2', side: sd, payload: { ref: id }, attribution: c3 });
     }
     setFlow(null);
+    setGoalCard(id);
+    if (s.plusMinus) {
+      // prefill the on-ice picks from the last goal (lines change, so they're checked on the card)
+      const lastIce = carry.onIce ?? [...s.events].reverse().find((e) => e.type === 'goal' && e.onIce)?.onIce;
+      const keep = (side: Side) => new Set((lastIce?.[side] ?? []).filter((pid) => skatersOf(side).some((p) => p.id === pid)));
+      const h = keep('home'), a = keep('away');
+      for (const pid of [scorer?.id, a1, a2]) if (pid) (sd === 'home' ? h : a).add(pid);
+      setOnIce({ home: h, away: a });
+    }
+  };
+  /** one detail of the goal card, on that goal (its credits: the difference) */
+  const detail = (ref: string, patch: Record<string, unknown>) => {
+    const a = goalDetailAction(s, ref, patch, TRACKED);
+    if (a) dispatch(a);
   };
   const shot = (sd: Side, p: Player | null) => {
     const gk = goalie(opp(sd));
@@ -227,6 +256,7 @@ const ScoringControls: SportPlugin<IceHockeyState>['ScoringControls'] = ({
   // screen sweep (S2): a penalty shot (scored / saved / missed), built in the engine
   const ps = (sd: Side, res: 'scored' | 'saved' | 'missed', p: Player | null) => {
     fire(penaltyShotAction(s, sd, res, p?.id, goalie(opp(sd))?.id, TRACKED));
+    if (res === 'scored') setGoalCard(null); // (no assists on it; the last goal's card closes — DI6)
     setFlow(null);
   };
   const penalty = (sd: Side, pen: PenKind, infraction: string | undefined, p: Player | null, served?: Player | null) => {
@@ -263,7 +293,10 @@ const ScoringControls: SportPlugin<IceHockeyState>['ScoringControls'] = ({
     setEditAt({ sec: e.sec, period: e.period });
     setShowEdit(false);
     if (e.type === 'goal' && e.ps) setFlow({ mode: 'ps', side: e.side, step: 'result' });
-    else if (e.type === 'goal') setFlow({ mode: 'goal', side: e.side, step: 'scorer', d: { strength: e.strength ?? 'ev', en: !!e.en } });
+    else if (e.type === 'goal') {
+      const carry: Carry = { ...(e.secondId ? { a1: e.secondId } : {}), ...(e.thirdId ? { a2: e.thirdId } : {}), ...(e.onIce ? { onIce: e.onIce } : {}) };
+      setFlow({ mode: 'goal', side: e.side, step: 'scorer', d: { strength: e.strength ?? 'ev', en: !!e.en }, carry });
+    }
     else if (e.type === 'shot') setFlow(e.ps ? { mode: 'ps', side: e.side, step: 'result' } : { mode: 'shot', side: e.side });
     else setFlow({ mode: 'pen', side: e.side, step: 'kind' });
   };
@@ -295,6 +328,69 @@ const ScoringControls: SportPlugin<IceHockeyState>['ScoringControls'] = ({
     dispatch({ type: 'SET_CLOCK', payload: { periodSec: Math.max(0, Math.min(periodLen(s, s.period), periodLen(s, s.period) - left)), at: Date.now() } });
     setSetting(false); setClockInput('');
   };
+
+  /* ---- describe-invasion: the card for the goal just scored ---- */
+  // DI6: only that goal's; gone with it (Undo, a correction); hidden while a
+  // correction is open (it holds a removal). DI11: an OT winner keeps it after the horn.
+  const cardGoal = goalCard && !editAt ? s.events.find((e) => e.id === goalCard && e.type === 'goal' && !e.ps) : undefined;
+  const goalCardView = cardGoal ? (() => {
+    const g = cardGoal, ref = g.id, sd = g.side;
+    const pname = (id?: string, nm?: string) => nameFor(playerNameOf, id, nm) ?? 'Player';
+    const summary = [
+      g.strength && g.strength !== 'ev' ? g.strength.toUpperCase() : '',
+      g.en ? 'Empty net' : '',
+      assistPart(playerNameOf, g.secondId, g.secondName),
+      assistPart(playerNameOf, g.thirdId, g.thirdName, '2nd assist'),
+      g.onIce ? `On ice: ${g.onIce.home?.length ?? 0} · ${g.onIce.away?.length ?? 0}` : '',
+    ].filter(Boolean).join(' · ');
+    const mates = skatersOf(sd).filter((p) => p.id !== g.playerId);
+    const toggle = (side: Side, p: Player) => setOnIce((cur) => {
+      const nx = new Set(cur[side]);
+      if (nx.has(p.id)) nx.delete(p.id); else nx.add(p.id);
+      return { ...cur, [side]: nx };
+    });
+    const gkIds = new Set([goalieOf(s, 'home')?.id, goalieOf(s, 'away')?.id].filter(Boolean) as string[]);
+    return (
+      <DescribeCard title={`Last goal · ${g.playerId ? pname(g.playerId, g.playerName) : name(sd)}`} summary={summary} mode={goalMarks.modeOf(ref)}
+        onDone={() => goalMarks.mark(ref, 'done')} onSkip={() => goalMarks.mark(ref, 'skipped')} onEdit={() => goalMarks.mark(ref, null)}>
+        <View style={c.chips}>
+          {(['ev', 'pp', 'sh'] as const).map((k) => <Chip key={k} label={k.toUpperCase()} a11y={STRENGTH_LABEL[k]} on={(g.strength ?? 'ev') === k} onPress={() => detail(ref, { strength: k })} />)}
+          <Chip label="EN" a11y="Empty net" on={!!g.en} onPress={() => detail(ref, { en: !g.en })} />
+        </View>
+        <Text style={c.small}>Assist (optional)</Text>
+        <View style={c.chips}>
+          {mates.filter((p) => p.id !== g.thirdId).map((p) => (
+            <SelectChip key={p.id} label={`${p.jerseyNo != null ? `${p.jerseyNo} ` : ''}${p.fullName}`} active={g.secondId === p.id}
+              // (the first assist can't be cleared under a second one)
+              onPress={() => detail(ref, { a1: g.secondId === p.id ? (g.thirdId ? p.id : null) : p.id })} />
+          ))}
+        </View>
+        {g.secondId ? (
+          <>
+            <Text style={c.small}>Second assist (optional)</Text>
+            <View style={c.chips}>
+              {mates.filter((p) => p.id !== g.secondId).map((p) => (
+                <SelectChip key={p.id} label={`${p.jerseyNo != null ? `${p.jerseyNo} ` : ''}${p.fullName}`} active={g.thirdId === p.id} onPress={() => detail(ref, { a2: g.thirdId === p.id ? null : p.id })} />
+              ))}
+            </View>
+          </>
+        ) : null}
+        {s.plusMinus ? (
+          <>
+            <Text style={c.small}>On the ice (+/-)</Text>
+            <Text style={c.meta}>Tap the skaters on the ice when the goal went in (goalies don’t count). {g.strength === 'pp' ? 'A power-play goal doesn’t count for +/-.' : ''}</Text>
+            {(['home', 'away'] as const).map((side) => (
+              <View key={side} style={{ gap: theme.spacing(1) }}>
+                <Text style={c.small}>{name(side)} · {onIce[side].size}</Text>
+                <PlayerGrid players={skatersOf(side).filter((p) => !gkIds.has(p.id))} picked={onIce[side]} onPick={(p) => toggle(side, p)} />
+              </View>
+            ))}
+            <Button label={`✓ Save on-ice (${onIce.home.size} · ${onIce.away.size})`} variant="ghost" onPress={() => detail(ref, { onIce: { home: [...onIce.home], away: [...onIce.away] } })} />
+          </>
+        ) : null}
+      </DescribeCard>
+    );
+  })() : null;
 
   /* ---- after the final horn: the shoot-out ---- */
   if (s.ended) {
@@ -361,6 +457,7 @@ const ScoringControls: SportPlugin<IceHockeyState>['ScoringControls'] = ({
             <Text style={c.meta}>{s.agg ? `${aggLine(s)}${level ? '.' : ` — ${name(s.home + s.agg.home > s.away + s.agg.away ? 'home' : 'away')} go through.`}` : level ? 'Tie.' : `${name(s.home > s.away ? 'home' : 'away')} win.`} Use “Correct the timeline” below to fix a moment.</Text>
           )}
         </View>
+        {goalCardView}
         <EditList s={s} show={showEdit} setShow={setShowEdit} onRemove={remove} homeName={homeName} awayName={awayName} />
       </View>
     );
@@ -370,17 +467,12 @@ const ScoringControls: SportPlugin<IceHockeyState>['ScoringControls'] = ({
   const flowPanel = (() => {
     if (!flow) return null;
     const sd = flow.side;
-    // wave 0 (score-on-close SC5): closing an assist / on-ice step keeps the goal
-    const iceDescribe = flow.mode === 'goal' && (flow.step === 'a1' || flow.step === 'a2' || flow.step === 'onice');
-    const saveAsIs = closeSaves({ editing: !!editAt, describing: iceDescribe }) ? () => {
-      if (flow.mode !== 'goal') return;
-      if (flow.step === 'onice') goal(sd, flow.d, flow.a2 ?? null);
-      else if (flow.step === 'a1' || flow.step === 'a2') goal(sd, flow.d, null);
-    } : null;
+    // describe-invasion DI1: every step left here DEFINES the play (Cancel backs
+    // out); the goal's assists, strength and on-ice players are described after
     const head = (t: string) => (
       <View style={c.flowHead}>
         <Text style={[c.h, { color: ink(sd) }]} numberOfLines={1}>{t} · {name(sd)}</Text>
-        <Text style={[c.cancel, c.tap]} accessibilityRole="button" onPress={saveAsIs ?? (() => setFlow(null))}>{closeLabel(!!saveAsIs)}</Text>
+        <Text style={[c.cancel, c.tap]} accessibilityRole="button" onPress={() => setFlow(null)}>Cancel</Text>
       </View>
     );
     switch (flow.mode) {
@@ -392,59 +484,13 @@ const ScoringControls: SportPlugin<IceHockeyState>['ScoringControls'] = ({
             <Chip label="EN" a11y="Empty net" on={d.en} onPress={() => setFlow({ ...flow, d: { ...d, en: !d.en } })} />
           </View>
         );
-        const finish = (a2: Player | null) => {
-          if (s.plusMinus) {
-            // prefill the on-ice picks from the last goal (lines change, so check them)
-            const lastIce = [...s.events].reverse().find((e) => e.type === 'goal' && e.onIce)?.onIce;
-            const keep = (side: Side) => new Set((lastIce?.[side] ?? []).filter((id) => skatersOf(side).some((p) => p.id === id)));
-            const h = keep('home'), a = keep('away');
-            for (const p of [d.scorer, d.a1, a2]) if (p) (sd === 'home' ? h : a).add(p.id);
-            setOnIce({ home: h, away: a });
-            setFlow({ ...flow, step: 'onice', a2 });
-            return;
-          }
-          goal(sd, d, a2);
-        };
-        if (flow.step === 'scorer') return (
+        return (
           <View style={c.panel}>{head('Goal')}
             {flags}
             <Text style={c.meta}>{STRENGTH_LABEL[d.strength]}{d.en ? ' · empty net' : ''} — set from the penalties and the net; tap to change.</Text>
             <Text style={c.small}>Who scored?</Text>
-            <PlayerGrid players={skatersOf(sd)} onPick={(p) => setFlow({ ...flow, d: { ...d, scorer: p }, step: 'a1' })}
-              skip={{ label: 'Team goal (no scorer)', onPress: () => setFlow({ ...flow, d: { ...d, scorer: null }, step: 'a1' }) }} />
-          </View>
-        );
-        if (flow.step === 'a1') return (
-          <View style={c.panel}>{head('Assist')}
-            <PlayerGrid players={skatersOf(sd).filter((p) => p.id !== d.scorer?.id)} onPick={(p) => setFlow({ ...flow, d: { ...d, a1: p }, step: 'a2' })}
-              skip={{ label: 'Unassisted', onPress: () => finish(null) }} />
-          </View>
-        );
-        if (flow.step === 'a2') return (
-          <View style={c.panel}>{head('Second assist')}
-            <PlayerGrid players={skatersOf(sd).filter((p) => p.id !== d.scorer?.id && p.id !== d.a1?.id)} onPick={(p) => finish(p)}
-              skip={{ label: 'No second assist', onPress: () => finish(null) }} />
-          </View>
-        );
-        const toggle = (side: Side, p: Player) => setOnIce((cur) => {
-          const nx = new Set(cur[side]);
-          if (nx.has(p.id)) nx.delete(p.id); else nx.add(p.id);
-          return { ...cur, [side]: nx };
-        });
-        const gkIds = new Set([goalieOf(s, 'home')?.id, goalieOf(s, 'away')?.id].filter(Boolean) as string[]);
-        return (
-          <View style={c.panel}>{head('On the ice (+/-)')}
-            <Text style={c.meta}>Tap the skaters on the ice when the goal went in (goalies don’t count). {d.strength === 'pp' ? 'A power-play goal doesn’t count for +/-.' : ''}</Text>
-            {(['home', 'away'] as const).map((side) => (
-              <View key={side} style={{ gap: theme.spacing(1) }}>
-                <Text style={c.small}>{name(side)} · {onIce[side].size}</Text>
-                <PlayerGrid players={skatersOf(side).filter((p) => !gkIds.has(p.id))} picked={onIce[side]} onPick={(p) => toggle(side, p)} />
-              </View>
-            ))}
-            <View style={c.row}>
-              <Button variant="primary" label="✓ Save goal" color={color(sd)} style={c.flex} onPress={() => goal(sd, d, flow.a2 ?? null, { home: [...onIce.home], away: [...onIce.away] })} />
-              <Button label="Skip +/-" variant="ghost" onPress={() => goal(sd, d, flow.a2 ?? null)} />
-            </View>
+            <PlayerGrid players={skatersOf(sd)} onPick={(p) => goal(sd, d, p, flow.carry)}
+              skip={{ label: 'Team goal (no scorer)', onPress: () => goal(sd, d, null, flow.carry) }} />
           </View>
         );
       }
@@ -657,6 +703,8 @@ const ScoringControls: SportPlugin<IceHockeyState>['ScoringControls'] = ({
       </View>
 
       {flowPanel ?? <View style={c.cols}>{sideCol('home')}{sideCol('away')}</View>}
+      {/* describe-invasion: under the controls — scoring carries straight on */}
+      {goalCardView}
       {!flowPanel && s.trackFaceoffs ? (
         <Text style={[c.gk, c.tap]} accessibilityRole="button" onPress={() => setFlow({ mode: 'centres', side: 'home' })}>
           ⚪ Centres: {centres.home?.fullName ?? '—'} v {centres.away?.fullName ?? '—'} · change ›
@@ -807,6 +855,18 @@ export function iceHockeyUndoLabel(step: { type: string; prev: unknown; next: un
   if (step.type === 'ASSIST2') {
     const g = next.events.find((e, i) => e.type === 'goal' && (e.thirdId || e.thirdName) && !(prev.events[i]?.thirdId || prev.events[i]?.thirdName));
     return g?.thirdName ? `second assist · ${g.thirdName}` : 'second assist';
+  }
+  if (step.type === 'GOAL_DETAIL') {
+    // describe-invasion DI4: one detail attached after the goal
+    const differs = (e: IceEvent, o?: IceEvent) => !o || e.secondId !== o.secondId || e.thirdId !== o.thirdId || e.strength !== o.strength || !!e.en !== !!o.en || JSON.stringify(e.onIce ?? null) !== JSON.stringify(o.onIce ?? null);
+    const i = next.events.findIndex((e, k) => e.type === 'goal' && differs(e, prev.events[k]));
+    const g = next.events[i], o = prev.events[i];
+    if (!g || !o) return 'goal detail';
+    if (g.secondId !== o.secondId) return g.secondId ? `assist · ${g.secondName ?? 'player'}` : 'assist removal';
+    if (g.thirdId !== o.thirdId) return g.thirdId ? `second assist · ${g.thirdName ?? 'player'}` : 'second assist removal';
+    if (g.strength !== o.strength) return 'goal strength';
+    if (!!g.en !== !!o.en) return 'empty net';
+    return 'players on the ice';
   }
   if (step.type === 'CLOCK') return 'clock start / stop';
   if (step.type === 'SET_CLOCK') return 'clock set';
