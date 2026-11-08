@@ -46,6 +46,7 @@ import { normalizeOfficials, type MatchOfficial } from './matchOfficials';
 import { readBreak, type MatchBreak } from './matchHousekeeping';
 import type { PointsAdjustment } from './standings';
 import { newTournamentFormats } from './standings';
+import { withStatsDefaults } from '../core/statsDefaults';
 import type { ScoringLock } from '../core/scoringLock';
 import { baseOf } from '../core/sharedScoring';
 import { MATCHES } from '../core/mockData';
@@ -5022,7 +5023,9 @@ export interface NewTournament extends TournamentDetails {
 export async function createTournament(input: NewTournament): Promise<Tournament & { profileSaved?: boolean; editionLinked?: boolean }> {
   // D1: a new tournament stores each sport's international points system
   // (basketball FIBA win 2 / loss 1) unless the organiser already chose points.
-  input = { ...input, formats: newTournamentFormats(input.sports, input.formats) };
+  // TS1 (tournament-stats-defaults.md): + each sport's "Stats to track" defaults,
+  // since a tournament match reads a missing stats key as off
+  input = { ...input, formats: withStatsDefaults(input.sports, newTournamentFormats(input.sports, input.formats), (sp) => getSportMeta(sp)?.formatFields ?? []) };
   const me = demo.players[0]?.id;
   // Org-hosted → no individual hostIds (the org's members are the hosts);
   // otherwise the creator is the sole individual host.

@@ -10,7 +10,8 @@ import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/nativ
 import type { RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { theme } from '../core/theme';
-import { Button, TextField, SelectChip, ScreenTitle, FieldLabel, FormError, LoadingState, textStyles } from '../components/ui';
+import { Button, Card, TextField, SelectChip, ScreenTitle, FieldLabel, FormError, LoadingState, textStyles } from '../components/ui';
+import { statsUpdates } from '../core/statsDefaults';
 import { DateField, DateTimeField } from '../components/DateTimeField';
 import { MedalScoringEditor } from '../components/MedalScoringEditor';
 import { WalkoverSetupCard } from '../components/DisciplineSettings';
@@ -244,6 +245,30 @@ export default function EditTournamentScreen() {
 
           <SportSettingsButtons sports={sports} />
 
+          {/* TS3 (tournament-stats-defaults.md): an older tournament can take the new
+              "Stats to track" defaults — missing keys only, saved with Save changes */}
+          {(() => {
+            const ups = statsUpdates(sports, formats as Record<string, Record<string, unknown>>, (sp) => getSportMeta(sp)?.formatFields ?? []);
+            if (!ups.length) return null;
+            // TS4: name every stat it will change, per sport
+            const bySport = new Map<SportId, string[]>();
+            for (const u of ups) bySport.set(u.sport, [...(bySport.get(u.sport) ?? []), `${u.label} ${u.value ? 'on' : 'off'}`]);
+            return (
+              <Card style={st.statsCard}>
+                <Text style={textStyles.h3}>New stats defaults</Text>
+                <Text style={textStyles.muted}>Scorers can now capture more by default. Each stat is optional to tap and can be switched off per match. This would set:</Text>
+                {[...bySport].map(([sp, items]) => (
+                  <Text key={sp} style={textStyles.body}>{getSportMeta(sp).icon} {getSportMeta(sp).name}: {items.join(', ')}</Text>
+                ))}
+                <Button label="Use the new defaults" variant="ghost" onPress={() => {
+                  for (const u of ups) tournamentDraft.setField(u.sport, u.key, u.value);
+                  setFormats(tournamentDraft.all() as FormatMap);
+                }} />
+                <Text style={textStyles.muted}>Then tap Save changes. Matches already played keep their numbers.</Text>
+              </Card>
+            );
+          })()}
+
           <TournamentContactFields value={details} onChange={patchDetails} />
 
           <FieldLabel>Registration</FieldLabel>
@@ -298,6 +323,7 @@ function NumberStepper({ value, min, max, onChange, zeroLabel }: { value: number
 }
 
 const st = StyleSheet.create({
+  statsCard: { gap: theme.spacing(2) },
   safe: { flex: 1, backgroundColor: theme.colors.bg },
   bar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: theme.spacing(3) },
   delete: { color: theme.colors.danger, fontWeight: '800', fontSize: theme.font.body },
