@@ -13,6 +13,30 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-08 — Stitch picks (app) and pair names on two lines
+
+The founder picked elements from the Google Stitch designs (docs/design/stitch-picks/), and asked that pairs show both names, consistently, on every scorecard.
+- **Pair names:** "Aanya Verma /" over "Divya Nair", one size smaller, on every scorecard via `SideName` (sizes in one place). Covers the match card, live bar, scoreboards, header, summary, line score, bracket and fixture map. Break doc `pair-names.md`.
+- **Live scoring (picks 1–5):**
+  - green score panel (clock in a light pill, "LAST" strip);
+  - boxed undo ("LAST STEP" + "↶ Undo" pill);
+  - a big team-coloured main action ("⚽ GOAL +1") in football, hockey, handball, ice hockey, rugby union and league, and American football;
+  - "⏸ Pause clock", and a lime "End <period> →" while the period runs (still asks first);
+  - football feed tags from recorded values only ("HEADER", "RIGHT FOOT", card reasons).
+  - Basketball, kabaddi and netball keep their own pads (netball gets the period bar).
+  - Break doc `stitch-live-scoring.md`.
+- **Tournament page (7–9):** a count strip, a standings card at the top of Matches (top 4, Q only when through), and "Live scorecard ›" on live cards. Pick 10 (seeds/houses) and the "Set alert" part of 9 are not built: there's no stored seed data and no match follow yet. Break doc `stitch-tournament-page.md`.
+- **Home (12–14, 16, 17):**
+  - your sports as hero chips;
+  - "N matches this week · M active tournaments";
+  - one lime "Score a match" plus outline Organize / Find players;
+  - a "Matches played" progress bar on the tournament card;
+  - an offline note only while offline;
+  - a live set line on racket cards.
+  - Pick 15 (spots left / Join match) is not built: it needs an open-games feature.
+  - Break doc `stitch-home.md`.
+- **Checks:** new tests: pair-names, stitch-live-scoring, stitch-tournament-page, stitch-home, sim-stitch-picks (600 users). Full suite 7,750 pass; tsc clean. Demo-checked at phone width (snooker doubles bar, football pad, Karnataka State Cup standings, Home hero).
+
 ### 2026-11-07 — Release: the fixture map, parts 1 and 2 (web, Android OTA)
 
 auth-smoke passed and the publish lock was taken. Published from a clean worktree at 96335226. No database change.
