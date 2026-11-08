@@ -59,3 +59,10 @@ test('600 tournaments: chosen values never change; nothing missing after', () =>
     assert.deepEqual(missingStatsDefaults(sports, out, of), {});
   }
 });
+
+test('TS8: a tournament uses the tournament default (football possession on)', () => {
+  const fields = [{ key: 'trackPossession', type: 'toggle', default: false, tournamentDefault: true, group: 'Stats to track', label: 'Possession' }];
+  assert.deepEqual(statsDefaults(fields), { trackPossession: true });
+  assert.deepEqual(withStatsDefaults(['football'], {}, () => fields).football, { trackPossession: true });
+  assert.deepEqual(statsUpdates(['football'], { football: { trackPossession: false } }, () => fields).map((u) => u.value), [true]);
+});

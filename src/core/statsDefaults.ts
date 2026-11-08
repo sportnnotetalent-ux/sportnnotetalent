@@ -4,13 +4,15 @@
  *  the defaults are written in when a tournament is created, and older ones get
  *  them through Edit tournament → "Use the new defaults". Only missing keys;
  *  only toggles in the "Stats to track" group (TS2 / TS7). PURE. */
-type Field = { key: string; type: string; default?: unknown; group?: string; label?: string };
+type Field = { key: string; type: string; default?: unknown; tournamentDefault?: unknown; group?: string; label?: string };
+/** TS8: a tournament's value — the field's tournament default if it has one */
+const tourValue = (f: Field) => (f.tournamentDefault !== undefined && f.tournamentDefault !== null ? f.tournamentDefault : f.default) === true;
 type Formats = Partial<Record<string, Record<string, unknown>>>;
 export const STATS_GROUP = 'Stats to track';
 
 export function statsDefaults(fields: readonly Field[]): Record<string, boolean> {
   const out: Record<string, boolean> = {};
-  for (const f of fields) if (f.type === 'toggle' && f.group === STATS_GROUP) out[f.key] = f.default === true;
+  for (const f of fields) if (f.type === 'toggle' && f.group === STATS_GROUP) out[f.key] = tourValue(f);
   return out;
 }
 
@@ -43,7 +45,7 @@ export function statsUpdates<S extends string>(sports: readonly S[], formats: Fo
     const have = formats?.[sp] ?? {};
     for (const f of fieldsOf(sp)) {
       if (f.type !== 'toggle' || f.group !== STATS_GROUP) continue;
-      const value = f.default === true;
+      const value = tourValue(f);
       if (have[f.key] !== value) out.push({ sport: sp, key: f.key, value, label: f.label ?? f.key });
     }
   }

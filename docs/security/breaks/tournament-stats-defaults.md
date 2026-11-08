@@ -13,3 +13,4 @@
 | TS5 | Matches already played change their stats. | Stats | Stats come from what was captured (wave 1), so a finished match shows the same numbers. Only its Info toggles read on. Matches not yet started score with the new defaults. Tested. |
 | TS6 | The card stays after use, or shows for nothing. | UI | It shows only while something is missing (`missingStatsDefaults`), and disappears once added. Tested. |
 | TS7 | A toggle outside "Stats to track" (a rule, a points option) is switched. | Data | Only toggles in the "Stats to track" group are touched. Tested. |
+| TS8 | A sport has a different default for tournaments than for friendlies (football keeps possession on in tournaments), but the tournament gets the friendly value. | Defaults | Tournament defaults use a field's `tournamentDefault` when it has one, else its `default`. That covers both creation and the button. Tested. |
