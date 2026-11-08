@@ -49,6 +49,7 @@ import { newTournamentFormats } from './standings';
 import { isPairSport } from './pairSport';
 import { withStatsDefaults } from '../core/statsDefaults';
 import { isStandIn } from '../core/teamPlay';
+import { AMEND_TYPE, type AmendOp } from '../sports/amend';
 import type { ScoringLock } from '../core/scoringLock';
 import { baseOf } from '../core/sharedScoring';
 import { MATCHES } from '../core/mockData';
@@ -7012,4 +7013,31 @@ export async function decideTeamJoin(requestId: string, accept: boolean): Promis
   const { data, error } = await supabase.rpc('decide_team_join', { p_request: requestId, p_accept: accept });
   if (error) throw new Error(error.message);
   return data as string;
+}
+
+/** Teams for doubles, phase 4b (team-who-played.md WH10–WH16): a side's team
+ *  captain / admins (or the match's managers) say who really played for its
+ *  stand-ins — the "who played" AMEND, the matchday squad and the mapped players'
+ *  stat lines, in one database call that checks every play itself
+ *  (map_team_stand_ins, migration 20261115120000). */
+export async function mapTeamStandIns(o: {
+  matchId: string; side: 'home' | 'away'; starters: string[]; ops: AmendOp[]; lines: string[]; byName: string;
+  stats: { playerId: string; stats: Record<string, number>; opponent?: string }[];
+}): Promise<void> {
+  if (!isSupabaseConfigured || !supabase) {
+    const log = (demo.matchEvents[o.matchId] ??= []);
+    const seq = log.reduce((n, e) => Math.max(n, e.seq), 0) + 1;
+    log.push({ seq, type: AMEND_TYPE, side: null, payload: { ops: o.ops, lines: o.lines, byName: o.byName, deltas: [] }, attribution: null });
+    const sq = (demo.matchSquads[o.matchId] ??= { home: { starters: [], subs: [] }, away: { starters: [], subs: [] } });
+    sq[o.side] = { ...sq[o.side], starters: [...o.starters], subs: [] };
+    for (const l of o.stats) {
+      demo.statLines = demo.statLines.filter((x) => !(x.matchId === o.matchId && x.playerId === l.playerId && !x.eventId));
+      demo.statLines.push({ ...newDemoStatLine({ matchId: o.matchId, playerId: l.playerId, sport: (demo.matches.find((m) => m.id === o.matchId)?.sport ?? 'badminton') as SportId, stats: l.stats, opponent: l.opponent }), date: new Date().toISOString() });
+    }
+    return;
+  }
+  const { error } = await supabase.rpc('map_team_stand_ins', {
+    p_match: o.matchId, p_side: o.side, p_starters: o.starters, p_ops: o.ops, p_lines: o.lines, p_by_name: o.byName, p_stats: o.stats,
+  });
+  if (error) throw new Error(error.message);
 }

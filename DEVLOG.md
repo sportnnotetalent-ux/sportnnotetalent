@@ -38,6 +38,21 @@ Where it changed:
   - Marketing posts already rendered keep the old mark.
   - The mint experiment was undone and never committed.
 
+### 2026-11-08 — Teams for doubles, phase 4b: team captains can say who played
+
+Founder: captains too, not only the scorer / host (team-who-played.md WH10–WH16).
+- **Who sees it:** the "Who played?" card now shows for the side's team managers (captain, vice-captain, admins, club / org admins, staff), not only the scorer / host.
+- **How a captain saves:** a captain who isn't scoring saves through a new database function, `map_team_stand_ins` (migration `20261115120000_map_team_stand_ins.sql`). In one transaction it checks the caller manages that team or the match, and that the players are exactly the number playing, distinct and from the squad.
+  - Every op must be a `replace` that differs from the play as it stands only by `ph:{team}:{n}` → that player.
+  - Stats are allowed only for the mapped players, as whole numbers within the match's plays.
+  - Then it adds the AMEND, sets the matchday squad and writes those stat lines.
+- **Scorers** keep the normal correction path.
+- **Checks:**
+  - `tests/db-map-stand-ins.test.mts` (PGlite, 7 tests; the "allowed" ones failed before the migration);
+  - source checks in `team-who-played`;
+  - full suite (0 failing besides the pinned check updated on purpose), tsc clean.
+- **Founder to run:** the migration in the Supabase SQL editor. Until then a captain's save fails with a clear error, and scorers / hosts are unaffected.
+
 ### 2026-11-08 — Teams for doubles, phase 4: "Who played?" moves stand-ins' stats to the real players
 
 Phase 4 of docs/product/teams-for-doubles.md (team-who-played.md).

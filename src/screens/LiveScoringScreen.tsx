@@ -25,7 +25,7 @@ import { manualResultLine as baseResultLine, isNoResult } from '../core/matchRes
 import { timeUpLeader, timeUpRuleOf } from '../core/timeUp';
 import { matchScoreLine, finalBoard, resultMark } from '../sports/scoreline';
 import { isEliminationStage } from '../data/bracket';
-import { completedAt, effectiveLog, type AmendOp } from '../sports/amend';
+import { completedAt, effectiveLog, replayLog, AMEND_TYPE, type AmendOp } from '../sports/amend';
 import { canCorrectMatch, correctionHoursLeft, formatTimeLeft } from '../core/roles';
 import { standingsConfigFromFormat, noResultPoints } from '../data/standings';
 import { lockStatus, type ScoringLock } from '../core/scoringLock';
@@ -70,7 +70,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { cardPng } from '../core/resultCardImage';
 import { viewsLabel } from '../core/personalise';
 import { viewerDeviceId, track } from '../core/telemetry';
-import { getRoster, getPlayers, getLineup, getMatch, getTournaments, getMatchSquads, setMatchSquad, getMatchStatLines, getMyPlayerId, setMatchScorers, setMatchHosts, setMatchLogo, setMatchFormat, setMatchStream, setMatchManagers, getOrganizations, getTeamLeaders, getMatchDisputes, raiseDispute, updateDispute, dismissDispute, resolveDispute, escalateDispute, createReplacementPlayer, retireMatch, walkoverMatch, rescheduleMatch, getMatchKickoffAt, getScoringLock, claimScoring, handoverScoring, setSharedScoring, endMatchManually, getScoreEdits, getMatchEvents, getTournamentOfficials, joinMatchAsScorer, getMatchOfficials, setMatchOfficials, deleteMatch, resetMatch, setMatchBreak, getMatchLastActivityAt, getMatchPotm, setMatchPotm, stampAggregatePrior, AWARDS_DB_MESSAGE } from '../data/repos';
+import { getRoster, getPlayers, getLineup, getMatch, getTournaments, getMatchSquads, setMatchSquad, mapTeamStandIns, matchStatTotals, getMatchStatLines, getMyPlayerId, setMatchScorers, setMatchHosts, setMatchLogo, setMatchFormat, setMatchStream, setMatchManagers, getOrganizations, getTeamLeaders, getMatchDisputes, raiseDispute, updateDispute, dismissDispute, resolveDispute, escalateDispute, createReplacementPlayer, retireMatch, walkoverMatch, rescheduleMatch, getMatchKickoffAt, getScoringLock, claimScoring, handoverScoring, setSharedScoring, endMatchManually, getScoreEdits, getMatchEvents, getTournamentOfficials, joinMatchAsScorer, getMatchOfficials, setMatchOfficials, deleteMatch, resetMatch, setMatchBreak, getMatchLastActivityAt, getMatchPotm, setMatchPotm, stampAggregatePrior, AWARDS_DB_MESSAGE } from '../data/repos';
 import { matchRatings as genericRatings, type PotmProp } from '../data/ratings';
 import { AwardPickerSheet, type PickerRow } from '../components/AwardPickerSheet';
 import { deleteVerdict, breakLabel, type BreakKind, type MatchBreak } from '../data/matchHousekeeping';
@@ -1727,9 +1727,12 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
 
   // team-who-played (phase 4): a side that played as stand-ins says who they were —
   // one AMEND moves every point and stat to the real players (scorer / host only, WH8)
-  const whoPlayedEl = canScore && matchId && eventCount > 0 ? (['home', 'away'] as const).map((sd) => {
+  const whoPlayedEl = matchId && eventCount > 0 ? (['home', 'away'] as const).map((sd) => {
     const side = sd === 'home' ? homeSide : awaySide;
     if (side?.kind !== 'standin') return null;
+    // founder 2026-11-08 (WH10): the side's captain / admins too, not only the scorer / host
+    const teamManager = pickerFor({ myPlayerId, leaders: leadersFor(sd), role: profile?.role, isHost }) === 'pick';
+    if (!canScore && !teamManager) return null;
     const teamNm = sd === 'home' ? homeTeamName ?? homeName : awayTeamName ?? awayName;
     const full = sd === 'home' ? homeFull : awayFull;
     const other = (sd === 'home' ? awayRoster : homeRoster).map((p) => p.id);
@@ -1739,10 +1742,25 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
         squad={full.map((p) => ({ id: p.id, fullName: shownNameOf(p.id, p.fullName) }))}
         check={(map) => checkMapping(map, { squad: full.map((p) => p.id), alreadyPlaying: other })}
         onSave={async (map) => {
-          const ops = standInAmendOps(effectiveLog(await getMatchEvents(matchId)), map);
+          const raw = await getMatchEvents(matchId);
+          const ops = standInAmendOps(effectiveLog(raw), map);
           const names = side.players.map((p) => `${p.fullName} → ${shownNameOf(map[p.id], full.find((q) => q.id === map[p.id])?.fullName)}`).join(', ');
-          if (ops.length) await amend(ops as AmendOp[], [`Who played for ${teamNm}: ${names}`], profile?.fullName ?? 'Scorer');
-          await setMatchSquad(matchId, sd, { starters: side.players.map((p) => map[p.id]), subs: [] });
+          const lines = [`Who played for ${teamNm}: ${names}`];
+          const starters = side.players.map((p) => map[p.id]);
+          if (canScore) {
+            if (ops.length) await amend(ops as AmendOp[], lines, profile?.fullName ?? 'Scorer');
+            await setMatchSquad(matchId, sd, { starters, subs: [] });
+          } else {
+            // WH10–WH16: a team captain / admin — one checked database call; the
+            // mapped players' totals come from the corrected log
+            const seq = raw.reduce((n, e) => Math.max(n, e.seq), 0) + 1;
+            const after = replayLog(plugin, meta.config, [...raw, { seq, type: AMEND_TYPE, side: null, payload: { ops, lines, byName: '', deltas: [] }, attribution: null }]);
+            const totals = await matchStatTotals(matchId, sport, after).catch(() => null);
+            const opponent = sd === 'home' ? awayTeamName ?? awayName : homeTeamName ?? homeName;
+            const stats = totals ? starters.map((id) => ({ playerId: id, stats: (totals[id]?.stats ?? {}) as Record<string, number>, opponent })) : [];
+            await mapTeamStandIns({ matchId, side: sd, starters, ops: ops as AmendOp[], lines, byName: profile?.fullName ?? 'Captain', stats });
+            await refresh();
+          }
           setSquads(await getMatchSquads(matchId));
         }} />
     );

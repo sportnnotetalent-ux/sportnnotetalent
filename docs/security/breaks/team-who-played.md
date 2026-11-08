@@ -4,7 +4,7 @@
 
 **How:** one AMEND correction (the existing, append-only mechanism: live screens rebuild, Undo reverses it, stats are resynced). It replaces every play that names a stand-in with the same play naming the real player. The side's matchday squad is set to the real players. Pure part: `standInAmendOps` in `src/core/teamPlay.ts`.
 
-**Who:** the match's scorer or host. The amendment path and the database's write guard allow only them; a team captain who isn't scoring is an open question for the founder.
+**Who:** the match's scorer or host through the normal correction path. Founder 2026-11-08: **team captains too**. A side's team managers (captain, vice-captain, admins, club / org admins, staff) use the database function `map_team_stand_ins` (migration 20261115120000), which checks every play itself.
 
 | # | Break | Kind | Fix |
 |---|---|---|---|
@@ -17,3 +17,10 @@
 | WH7 | Career stats keep nothing (stand-ins were never written) or double-count. | Stats | The AMEND path resyncs the finished match's totals for the real players (absolute sports), or writes the deltas for the real players (stand-in deltas are skipped). Tested. |
 | WH8 | A viewer or non-scorer sees a "Who played?" button that can't work. | Access | The card shows only to someone who can score / amend the match. Tested. |
 | WH9 | Mapping is impossible to undo. | Recovery | It's one AMEND row, so Undo removes it like any correction. Tested. |
+| WH10 | Someone who manages neither the team nor the match adds a "who played" correction. | Access | `map_team_stand_ins` requires `can_manage_team(that side's team)` or `can_manage_match`. Tested in PGlite. |
+| WH11 | A captain names someone outside the squad, twice, or the wrong number. | Data | Checked in the database: exactly the number playing (format, 2 if unknown), distinct, all in the team's squad. Tested in PGlite. |
+| WH12 | A captain uses the function to change a play (the side, the score, someone else's credit) or void one. | Integrity | Only `replace` ops. Each op must equal the play as it stands (latest correction wins) with only `ph:{team}:{n}` → that player's id swapped, compared as normalised JSON in the database. A play without a stand-in can't be touched. Tested in PGlite. |
+| WH13 | A captain inflates their own career with made-up stats. | Stats | Stats only for the mapped players, whole numbers ≥ 0, each at most the number of plays in the match. They replace that player's line for this match. Tested in PGlite. (The numbers come from the app's own totals of the corrected log.) |
+| WH14 | The correction, squad and stats land partly. | Data | One function call, one transaction. Tested in PGlite. |
+| WH15 | The host loses the ability. | Access | Match managers can still map. Tested in PGlite. |
+| WH16 | The function is used on a match with no stand-ins. | Data | No op passes WH12, so nothing is written. Tested. |

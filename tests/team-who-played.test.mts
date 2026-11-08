@@ -48,7 +48,7 @@ test('WH5/WH8/WH9: the screen checks the mapping, gates by amend rights and uses
   assert.match(s, /standInAmendOps\(/);
   assert.match(s, /checkMapping\(/);
   assert.match(s, /<WhoPlayedCard /);
-  assert.match(s, /amend\(ops( as AmendOp\[\])?, \[/);
+  assert.match(s, /amend\(ops( as AmendOp\[\])?, (\[|lines)/);
   const card = read('src/components/WhoPlayedCard.tsx');
   assert.match(card, /Who played\?/);
 });
@@ -65,4 +65,12 @@ test('600 matches: mapping never changes score, side or order; no stand-in survi
     assert.deepEqual(amended.map((e) => [e.seq, e.type, e.side]), log.map((e) => [e.seq, e.type, e.side]), `${u}: score / order unchanged`);
     assert.ok(!JSON.stringify(amended).includes('ph:t:'), `${u}: no stand-in left`);
   }
+});
+
+test('WH10: the side’s captain / admins see the card and save through map_team_stand_ins', () => {
+  const s = read('src/screens/LiveScoringScreen.tsx');
+  assert.match(s, /const teamManager = pickerFor\(\{ myPlayerId, leaders: leadersFor\(sd\)/);
+  assert.match(s, /if \(!canScore && !teamManager\) return null;/);
+  assert.match(s, /await mapTeamStandIns\(\{ matchId, side: sd, starters, ops/);
+  assert.match(read('src/data/repos.ts'), /supabase\.rpc\('map_team_stand_ins'/);
 });
