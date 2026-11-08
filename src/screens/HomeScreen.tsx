@@ -47,6 +47,7 @@ import { GuardianPendingCard } from '../components/GuardianPendingCard';
 import { RequestsCard } from '../components/RequestsCard';
 import { LinkByPhoneCard } from '../components/LinkByPhoneCard';
 import { Logo } from '../components/Logo';
+import { Wordmark } from '../components/Wordmark';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -192,7 +193,7 @@ export default function HomeScreen() {
           <View style={st.header}>
             <Logo size={38} />
             <View style={st.brand}>
-              <Text style={[st.wordmark, narrow && st.wordmarkNarrow]} numberOfLines={1}>Sport<Text style={st.wordmarkAccent}>nNote</Text></Text>
+              <Wordmark tone="dark" style={[st.wordmark, narrow && st.wordmarkNarrow]} />
             </View>
           <TouchableOpacity
             style={st.iconBtn}

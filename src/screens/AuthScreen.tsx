@@ -29,6 +29,7 @@ import { Logo } from '../components/Logo';
 import { IconText } from '../components/Icon';
 import { guestStore } from '../data/guestStore';
 import type { GuestMatch } from '../core/guestMatch';
+import { Wordmark } from '../components/Wordmark';
 
 const ROLES: Role[] = ['player', 'parent', 'scorer', 'organizer', 'fan'];
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -246,7 +247,7 @@ export default function AuthScreen() {
       <KeyboardAwareScrollView contentContainerStyle={st.content}>
         <View style={st.brand}>
           <Logo size={72} />
-          <Text style={st.logo}>Sport<Text style={st.logoAccent}>nNote</Text></Text>
+          <Wordmark tone="light" style={st.logo} />
           <Text style={[textStyles.muted, st.tagline]}>Play a Sport, Make a Note.</Text>
         </View>
 

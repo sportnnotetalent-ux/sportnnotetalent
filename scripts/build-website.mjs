@@ -122,7 +122,7 @@ function page({ title, description, path, body, ogType = 'website', head = '', n
 <body>
 <a class="skip" href="#main">Skip to content</a>
 <header class="top"><div class="wrap">
-  <a class="brand" href="/"><img src="/icon.png" alt="" width="30" height="30"><span>Sport<span class="accent">nNote</span></span></a>
+  <a class="brand" href="/"><img src="/icon.png" alt="" width="30" height="30"><span><span class="word">Sport</span><span class="n">n</span><span class="word">Note</span></span></a>
   <nav>
     <a class="hide-sm" href="/#features">Features</a>
     <a${path.startsWith('/guides/') ? ' aria-current="page"' : ''} href="/guides/">Guides</a>

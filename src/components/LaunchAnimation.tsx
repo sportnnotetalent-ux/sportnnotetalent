@@ -24,6 +24,7 @@ import { theme } from '../core/theme';
 import { shouldPlayVoice, VOICE_AT_MS } from '../core/launchVoice';
 import { hydrateLaunchSoundPref, launchSoundPref } from '../core/launchSoundPref';
 import { VOICE_CLIP_READY, audioModuleReady, playLaunchVoice } from '../data/launchVoice';
+import { Wordmark } from './Wordmark';
 
 const TILE = '#0D5A3F'; // the app icon's green, so icon → launch is seamless
 const LIME = '#C6EE3E';
@@ -182,9 +183,7 @@ export function LaunchAnimation({ fontsReady = true }: { fontsReady?: boolean })
             {dot('dot2', 100, 114, tr.dot2)}
           </View>
           <Animated.View style={[{ width: WORD_W }, wordStyle as object]}>
-            <Text style={[st.word, !fontsReady && st.wordFallback]} numberOfLines={1}>
-              <Text style={{ color: LIME }}>Sport</Text>n<Text style={{ color: LIME }}>Note</Text>
-            </Text>
+            <Wordmark tone="dark" style={[st.word, !fontsReady && st.wordFallback]} />
             <Animated.View style={[st.line, lineStyle as object]} />
           </Animated.View>
         </Animated.View>

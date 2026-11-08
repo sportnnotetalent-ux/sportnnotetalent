@@ -13,6 +13,13 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-08 — One SportnNote wordmark, as on the launch screen
+
+The founder tried a mint colon and "n", didn't like it, and kept the lime; the mint was never committed. They then asked that SportnNote look everywhere as it does on the launch screen.
+- **Shared component:** `Wordmark` draws it. On green (launch, Home): lime "Sport" / "Note" with a white "n". On cream (sign-in, website header): deep green "Sport" / "Note" with a near-black "n".
+- **Unchanged:** the S:N mark.
+- **Checks:** break doc `wordmark.md`; `tests/wordmark.test.mts`; demo- and preview-checked.
+
 ### 2026-11-08 — Release: Home round 2 (web, Android OTA)
 
 auth-smoke passed and the publish lock was taken. Published from a clean worktree at 049e44ed.
