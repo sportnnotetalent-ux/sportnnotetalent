@@ -158,13 +158,15 @@ describe('DOU2 / DOU4 · Standard = the new-match format (one const per sport); 
     const oldFlag = afInit(withoutKeys(newFormat(afMeta.AMERICAN_FOOTBALL_META.formatFields, 'flag'), AF_STATS));
     assert.equal(customCount(AF_LIVE_SETTINGS, AF_LIVE_SETTINGS.read(oldFlag), oldFlag), 0);
     const oldNfl = afInit(withoutKeys(newFormat(afMeta.AMERICAN_FOOTBALL_META.formatFields, 'nfl'), AF_STATS));
-    assert.equal(customCount(AF_LIVE_SETTINGS, AF_LIVE_SETTINGS.read(oldNfl), oldNfl), 2);
+    // custom-count CC1: stats choices aren't rule changes — the old play-by-play game reads Standard too
+    assert.equal(customCount(AF_LIVE_SETTINGS, AF_LIVE_SETTINGS.read(oldNfl), oldNfl), 0);
     // switching an old flag game to play by play shows the new standard for the now-visible switches
     assert.deepEqual(AF_STATS.map((k) => standardOf(AF_LIVE_SETTINGS, { ...oldFlag, mode: 'pbp' })![k]), [false, true, true]);
   });
   test('an old match reads its count against the new standard (accepted, as carrom DC4)', () => {
     const s = baInit(withoutKeys(newFormat(baMeta.BASEBALL_META.formatFields), BA_STATS));
-    assert.equal(customCount(BASEBALL_LIVE_SETTINGS, BASEBALL_LIVE_SETTINGS.read(s), s), 3);
+    // custom-count CC1: stats choices aren't rule changes
+    assert.equal(customCount(BASEBALL_LIVE_SETTINGS, BASEBALL_LIVE_SETTINGS.read(s), s), 0);
   });
 });
 

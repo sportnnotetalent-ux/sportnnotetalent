@@ -57,8 +57,11 @@ export function standardOf<S>(ls: LiveSettings<S>, state?: S): Record<string, Fo
   return ls.defaults;
 }
 
-/** How many fields differ from the standard values (`state`: this match's). */
+/** How many RULES differ from the standard values (`state`: this match's).
+ *  custom-count.md: "Stats to track" choices aren't rule changes — after the
+ *  wave 3 defaults, older matches and football tournament fixtures would
+ *  otherwise all read "N custom" (Reset still resets them). */
 export function customCount<S>(ls: LiveSettings<S>, values: Record<string, FormatValue>, state?: S): number {
   const std = standardOf(ls, state);
-  return ls.fields.filter((f) => (values[f.key] ?? f.default) !== (std?.[f.key] ?? f.default)).length;
+  return ls.fields.filter((f) => f.group !== 'Stats to track' && (values[f.key] ?? f.default) !== (std?.[f.key] ?? f.default)).length;
 }

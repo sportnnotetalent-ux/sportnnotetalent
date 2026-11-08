@@ -297,7 +297,8 @@ describe('live settings Apply (generic card decisions)', () => {
     // defaults-on DOK2/DOK3: a new match (the defaults) is Standard; an older format
     // without the four capture keys reads them off, so it shows 4 custom (its truth)
     assert.equal(customCount(LS, LS.read(init({ ...CFG, ...LOCAL_RULE_DEFAULTS }))), 0);
-    assert.equal(customCount(LS, LS.read(init(CFG))), 4);
+    // custom-count CC1: stats choices aren't rule changes — an older format reads Standard
+    assert.equal(customCount(LS, LS.read(init(CFG))), 0);
     assert.equal(customCount(LS, LS.read(init({ ...CFG, ...LOCAL_RULE_DEFAULTS, wideRuns: 2, freeHit: false }))), 2);
   });
   test('who can edit: scorer only while live; scorer or manager before play', () => {
