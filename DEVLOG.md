@@ -38,6 +38,11 @@ Where it changed:
   - Marketing posts already rendered keep the old mark.
   - The mint experiment was undone and never committed.
 
+### 2026-11-08 — Deployed: notify-upcoming v22 (squad reminders for doubles teams)
+
+The founder approved the deploy. `notify-upcoming` now sends the "📋 Squad needed" reminder for racket and cue sports when a side's squad is bigger than the number playing. A two-person team is still never nudged.
+- **Status:** v22 ACTIVE.
+
 ### 2026-11-08 — Release: teams for doubles (phases 1–6) + racket box-score fix (web, Android OTA)
 
 Live: web `index-947f33ed`; Android OTA preview `3a0b9374`, production `b62be06f` (commit e5872464).
