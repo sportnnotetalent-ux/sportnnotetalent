@@ -67,9 +67,12 @@ export const kabaddiCountsTracked = (s: KabaddiState): boolean => plainLines(s).
 /** SD-72: cards / technical points conceded are tracked on this match. */
 export const kabaddiDisciplineTracked = (s: KabaddiState): boolean => s.caughtTouches != null || extrasOf(s).length > 0;
 
-/** Deep wave — defenders touched are named on this match ("Defenders touched"
- *  tracking on, or a raid that named one): `touchedOut` is written then. */
-export const kabaddiTouchedTracked = (s: KabaddiState): boolean => !!s?.track?.touched || raidsOf(s).some((r) => !!r.touched?.length);
+/** Deep wave — defenders touched are named on this match (a raid in play
+ *  named one): `touchedOut` / `unsuccessfulTackles` are written then.
+ *  no-false-zeros NZC5 (wave 1): the "Defenders touched" switch alone no
+ *  longer counts — on with only quick raids would write 0 for every defender
+ *  and push career tackle success towards 100%. An undone raid doesn't count. */
+export const kabaddiTouchedTracked = (s: KabaddiState): boolean => !!s && raidsOf(s).some((r) => !r.hidden && !!r.touched?.length);
 /** Deep wave — a defender's times put out by a raider's touch (keyed). */
 export const KABADDI_TOUCHED_KEY = 'touchedOut';
 /** Round 2 — a defender's unsuccessful tackles (keyed, with `touchedOut`). */

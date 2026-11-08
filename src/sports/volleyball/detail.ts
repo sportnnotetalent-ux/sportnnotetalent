@@ -125,16 +125,21 @@ export function entryCat(s: VolleyballState, x: VbDetailEntry): VbDetailCat {
   return CAT_OF_KIND[x.kind];
 }
 
-/** Was category `cat` captured at any point of the match (switched on, or an
- *  entry of it logged)? The keyed stats of the category are written then. */
+/** Was category `cat` captured in the match — at least one entry of it
+ *  logged? The keyed stats of the category are written then.
+ *  no-false-zeros NZC1 (wave 1, docs/security/breaks/no-false-zeros-court-team.md):
+ *  the switch alone no longer counts — switched on with nothing captured is
+ *  "not tracked" (no key, no row), never a 0 on every line. */
 export const catTracked = (s: VolleyballState | null | undefined, cat: VbDetailCat): boolean =>
-  !!s && ((s.detail ?? []).some((t) => catsOf(t).includes(cat)) || (s.vd ?? []).some((x) => entryCat(s, x) === cat));
+  !!s && (s.vd ?? []).some((x) => entryCat(s, x) === cat);
 
 /** Did this match capture attack attempts? (the attack keys are written
- *  then). An older match (no `cats` anywhere) keeps SD-81's rule: any switch
- *  on, or any detail entry. */
+ *  then). NZC4: only once an in-play / blocked swing was captured — kills
+ *  count as attempts automatically, so the switch alone would make attempts =
+ *  kills (efficiency near 100%). An older match (no `cats` anywhere) keeps
+ *  SD-81's rule for its entries: any detail entry captured. */
 export const detailTracked = (s: VolleyballState | null | undefined): boolean =>
-  !!s && (hasCats(s) ? catTracked(s, 'attack') : (s.detail ?? []).some((t) => t.on) || (s.vd ?? []).length > 0);
+  !!s && (hasCats(s) ? catTracked(s, 'attack') : (s.vd ?? []).length > 0);
 
 /** Was rally `idx` (0-based) of set `set` played with detail on? */
 export function coveredAt(s: VolleyballState, set: number, idx: number): boolean {
@@ -290,10 +295,12 @@ export const VB_ASSIST_KEY = 'setAssists';
 export const receptionTracked = (s: VolleyballState | null | undefined): boolean =>
   !!s && (hasCats(s) ? catTracked(s, 'reception') : (s.vd ?? []).some((x) => x.kind === 'reception' || x.kind === 'aced'));
 
-/** Were aced receivers named (reception errors)? An older match never.
- *  Batch 5: or the "Who was aced?" category was on. */
+/** Were aced receivers named (reception errors)? NZC2: only once one was
+ *  named — the rule an older match always had. Reception quality or "Who was
+ *  aced?" switched on with no aced receiver named would write
+ *  `receptionErrors 0` and a reception efficiency with no errors. */
 export const acedTracked = (s: VolleyballState | null | undefined): boolean =>
-  !!s && (hasCats(s) ? catTracked(s, 'reception') || catTracked(s, 'aced') : (s.vd ?? []).some((x) => x.kind === 'aced'));
+  !!s && (s.vd ?? []).some((x) => x.kind === 'aced');
 /** Digs / set assists captured on this match? */
 export const digTracked = (s: VolleyballState | null | undefined): boolean => catTracked(s, 'dig');
 export const assistTracked = (s: VolleyballState | null | undefined): boolean => catTracked(s, 'assist');

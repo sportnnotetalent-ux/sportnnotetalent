@@ -38,7 +38,12 @@ const mods = {
 describe('sim · old matches replay identically (R1, V1, K2, H2)', () => {
   test('180 old-style logs: the same fingerprint as the code before this batch', () => {
     assert.deepEqual(oldFingerprint(mods), {
-      vb: 'a0696d80cb52e166f0c9ed352718aee3002043dce23556712a86819d56b0552a',
+      // no-false-zeros NZC1 / NZC2 / NZC4: 12 of these 60 volleyball logs had a
+      // category switched on with nothing of it captured — their setAssists 0,
+      // receptionErrors 0, kills-only attack attempts (efficiency 100%) and
+      // reception efficiency without errors are gone (verified old-vs-new log
+      // by log: nothing else changed). Was 'a0696d80cb52e166f0c9ed352718aee3002043dce23556712a86819d56b0552a'.
+      vb: 'fc8bf30a32415df6f34c2cfd1f86852971ef7ff30d0201a6d0a873d427b70e6a',
       kb: '3dab044cb43b2e3a60c2b47a1bbbdcbe806f6c6f2fc044c3a47b5f64fdf24388',
       hb: '77b1392145f470ececfae87059725661fb45999d154f7ba2f8e6cef2265cf70d',
     });

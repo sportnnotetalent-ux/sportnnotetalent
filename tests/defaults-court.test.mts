@@ -103,11 +103,12 @@ describe('DC2 · volleyball: "Set by?" on for a new match', () => {
     assert.deepEqual(capOf(ls, s, fields, fmt), { vbAttack: false, vbReception: false, vbDig: false, vbAssist: true, vbAced: true });
     assert.equal(customCount(ls, ls.read(s)), 0);
   });
-  test('DC10 · a kill is still one tap: the setter is optional; tracked → a real 0', () => {
+  test('DC10 · a kill is still one tap: the setter is optional; none named → not tracked (NZC1)', () => {
     const s = [vb.outcomeAction('attack', 'home', P('h1'))].reduce(vb.reducer, vb.init(defaultsFor(fields)));
     assert.equal(s.current.home, 1, 'the point counts with no setter named');
     const t = volleyballStatTotals(s);
-    assert.equal(t.h1.stats.setAssists, 0);
+    // no-false-zeros NZC1: no setter named in the match → not tracked (was a 0)
+    assert.equal('setAssists' in t.h1.stats, false);
     assert.equal('attackAttempts' in t.h1.stats, false);
   });
   test('DC8/DC9 · an old match (no keys): no detail, no set-assist key; Info lists it Off', () => {

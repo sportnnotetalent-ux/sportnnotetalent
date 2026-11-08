@@ -53,7 +53,11 @@ describe('sim · old logs replay identically (R1)', () => {
     assert.deepEqual(oldFingerprint(), {
       vb: 'a581606437b8f12fb027f6c2e540014a9ab923ff1c410fa0697e7800a26d9b50',
       nb: '0f432372fb1223f7455289e2af2b2ccd7e000742d1bb97f9540dceb05d7e2726',
-      hb: 'fcc56601a15d15339d2bc111d527dae0e5cf0af855fdfaec0b4b59ef8e8039e3',
+      // no-false-zeros NZC9 / NZC10: 6 of these 60 handball logs had a "Stats to
+      // track" switch on with no fault kind / no 7 m winner captured — their
+      // tf* zeros and sevenMDrawn 0 are gone (verified old-vs-new log by log:
+      // nothing else changed). Was 'fcc56601a15d15339d2bc111d527dae0e5cf0af855fdfaec0b4b59ef8e8039e3'.
+      hb: 'de98f6910e24c2b30abe6fcd8756ac30aa0316555a1f38c52a5248d2fc740107',
     });
   });
 });

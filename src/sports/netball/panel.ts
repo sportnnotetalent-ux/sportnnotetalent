@@ -65,7 +65,9 @@ export function netballPanel(s: NetballState, scope: NbScope = 'all'): StatPanel
   }
   // batch 6: toss-ups won (only once one is logged)
   if (H.tossUps || A.tossUps) possession.push(countRow('tossUps', 'Toss-ups won', H.tossUps, A.tossUps));
-  if (cov.feeds || s.detail) {
+  // no-false-zeros NZC8: only once a feed was logged ("Feeds & rebounds" on
+  // with every feeder skipped would show Feeds 0 · Goal assists 0)
+  if (cov.feeds) {
     possession.push(countRow('feeds', 'Feeds', H.feeds, A.feeds));
     possession.push(countRow('goalAssists', 'Goal assists', H.goalAssists, A.goalAssists));
   }

@@ -196,7 +196,9 @@ describe('SD-81 · attack tally + efficiency', () => {
     const s = vplay([ON, kill('home', H[0]), OFF, kill('home', H[0])]);
     assert.equal(vd.detailTally(s).get('home|h1')!.attackKills, 1);
     assert.equal(vd.detailOn(s), false);
-    assert.equal(vd.detailTracked(s), true);
+    // no-false-zeros NZC4: on with only kills (no in-play / blocked swing)
+    // isn't tracked — attempts would equal kills (was true)
+    assert.equal(vd.detailTracked(s), false);
   });
   test('a timeline correction (EDIT_LOG) keeps the switch and the entries', () => {
     const s = detailedMatch();

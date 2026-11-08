@@ -83,7 +83,8 @@ describe('deep wave · Stats to track categories', () => {
     assert.deepEqual(detailCats(s), []);
     s = vb.reducer(s, { type: 'SET_DETAIL', payload: { detail: true } });
     assert.deepEqual(detailCats(s), ['attack', 'dig']);
-    assert.equal(catTracked(s, 'dig'), true);
+    // no-false-zeros NZC1: switched on with no dig captured isn't tracked (was true)
+    assert.equal(catTracked(s, 'dig'), false);
     assert.equal(catTracked(s, 'assist'), false);
   });
 

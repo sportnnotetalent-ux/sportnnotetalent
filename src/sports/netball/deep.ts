@@ -95,7 +95,9 @@ export interface NbCoverage {
   feeds: boolean;
   /** the format plays super shots */
   superShot: boolean;
-  /** gains are tracked (switch on, or a play carries gain detail) */
+  /** gains are tracked: a play carries gain detail (a pick-up, or a
+   *  deflection's gain / no gain). no-false-zeros NZC7: the switch alone no
+   *  longer counts (it wrote pickups / deflection outcomes 0 on every line). */
   gains: boolean;
 }
 
@@ -110,10 +112,13 @@ export function nbCoverage(s: NetballState, split = centreSplit(s)): NbCoverage 
     rebounds: { linked: rebs.filter((e) => !!e.ref && s.events.some((m) => m.id === e.ref && m.type === 'miss')).length, of: rebs.length },
     feeds: s.events.some((e) => (e.type === 'goal' || e.type === 'miss') && (e.secondId || e.secondName)),
     superShot: s.superShot === true || s.events.some((e) => e.points === 2 || e.ss === true),
-    gains: s.trackGains === true || s.events.some((e) => (e.type === 'stat' && e.stat === 'pickup') || typeof e.gain === 'boolean'),
+    gains: s.events.some((e) => (e.type === 'stat' && e.stat === 'pickup') || typeof e.gain === 'boolean'),
   };
 }
-export const cprOn = (s: NetballState, c: NbCoverage): boolean => s.trackCpr === true || c.cpr.logged > 0;
+/** Centre pass receives tracked: at least one logged. no-false-zeros NZC6:
+ *  `trackCpr` alone (on in the International preset) no longer counts — it
+ *  wrote `centrePassReceives` 0 on every line. */
+export const cprOn = (_s: NetballState, c: NbCoverage): boolean => c.cpr.logged > 0;
 
 /* ------------------------------- team figures -------------------------------- */
 

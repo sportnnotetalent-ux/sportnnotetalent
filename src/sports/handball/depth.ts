@@ -36,12 +36,15 @@ export const KEEPER_CONCEDED_KEY = Object.fromEntries(FIELD_SHOT_TYPES.map((t) =
 
 /** Did either side play with an empty goal? */
 export const emptyGoalUsed = (s: Pick<HandballState, 'events'>): boolean => s.events.some((e) => e.type === 'empty');
-/** Technical-fault kinds tracked (the toggle, or any fault carrying a kind). */
-export const faultTypesTracked = (s: Pick<HandballState, 'track' | 'events'>): boolean =>
-  s.track?.faultTypes === true || s.events.some((e) => e.type === 'turnover' && !!e.fault);
-/** 7 m won-by tracked (the toggle, or any logged). */
-export const sevenMDrawnTracked = (s: Pick<HandballState, 'track' | 'events'>): boolean =>
-  s.track?.sevenMDrawn === true || s.events.some((e) => e.type === 'drawn');
+/** Technical-fault kinds tracked: a fault carries a kind. no-false-zeros
+ *  NZC9 (wave 1): the toggle alone (on by default) no longer counts — it
+ *  zero-filled every fault kind. */
+export const faultTypesTracked = (s: Pick<HandballState, 'events'>): boolean =>
+  s.events.some((e) => e.type === 'turnover' && !!e.fault);
+/** 7 m won-by tracked: at least one logged. NZC10: the toggle alone (on by
+ *  default) no longer counts — it wrote `sevenMDrawn` 0 on every career line. */
+export const sevenMDrawnTracked = (s: Pick<HandballState, 'events'>): boolean =>
+  s.events.some((e) => e.type === 'drawn');
 
 /** The goals scored into an empty goal (by event index). */
 export function emptyGoalIndexes(s: HandballState): Set<number> {

@@ -52,7 +52,10 @@ const fp = (h: ReturnType<typeof createHash>, x: unknown) => h.update(JSON.strin
 const BEFORE = {
   basketball: '6031ecc8fc84e0b58ff06ed80adf3a570f5ae242f147188d1bbf2666a21215dc',
   volleyball: 'cc7d51358149412e226c073f1f9b720fc8f401c43af9c68725ab00498e89aebe',
-  netball: 'f3028c39219e4b522f9d3125bcba9265a23882a30a5298ddb06e16489093fb7c',
+  // no-false-zeros NZC6: the old International matches here have trackCpr on
+  // and log no centre pass receive — centrePassReceives 0 is no longer written.
+  // Was 'f3028c39219e4b522f9d3125bcba9265a23882a30a5298ddb06e16489093fb7c'.
+  netball: '82be5194b5ca63780acfc97363f04e99211d82c274241b5362cceb85a3475ba8',
   handball: 'c5c5bc5624d415eb12d49c1e8b99b730c2cd747668bc857c06abaf986c99f06c',
 };
 const N = 130; // per sport and per kind (old / new): 1,040 matches in all
