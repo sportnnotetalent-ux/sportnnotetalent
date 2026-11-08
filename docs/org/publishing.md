@@ -26,3 +26,4 @@ Why: on 2026-11-05 two sessions published within minutes of each other, and one 
 | 2026-11-08 | racket+wave0 session | 0da44ad1 | index-77737c28 | 397b40a7 / 7eca4c1c |
 | 2026-11-08 | wave1+urgent session | 6d5a24cc | index-933d956c | a375a5c3 / cd273971 |
 | 2026-11-08 | android-nav session | 66f10a30 | index-d4ae74d5 | 1394d8a4 / 05e0cb85 |
+| 2026-11-08 | wave2 session | e0226570 | index-0430d902 | bb4eb266 / 1c7cd375 |

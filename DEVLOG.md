@@ -38,6 +38,13 @@ Where it changed:
   - Marketing posts already rendered keep the old mark.
   - The mint experiment was undone and never committed.
 
+### 2026-11-08 — Release: wave 2, describe cards with Done (web, Android OTA)
+
+auth-smoke passed and the publish lock was taken. Published from a clean worktree at e0226570.
+- **Web:** `index-0430d902`, live on app.sportnnote.in.
+- **Android OTA:** `bb4eb266` (preview) / `1c7cd375` (production).
+- **Includes:** wave 2 across all families (78f61409, 6bb44213, 2cb55f57, 8768c2b8, 42839480) on the shared card (fc566f60).
+
 ### 2026-11-08 — Wave 2: one describe card with Done in every sport; plays logged on the tap
 
 Wave 2 of docs/sport-expert/defaults-on/PLAN.md. A shared `DescribeCard` (fc566f60, describe-card.md) was built first. Five engineering agents then applied it in parallel worktrees, merged here. The pattern everywhere:
