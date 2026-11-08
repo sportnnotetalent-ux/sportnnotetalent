@@ -19,6 +19,7 @@
  * SD-114: Cancel keeps the event).
  */
 import React, { useEffect, useState, useMemo } from 'react';
+import { closeSaves, closeLabel } from '../flowClose';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { theme } from '../../core/theme';
 import { useMask } from '../../core/disputeMask';
@@ -367,10 +368,17 @@ const ScoringControls: SportPlugin<IceHockeyState>['ScoringControls'] = ({
   const flowPanel = (() => {
     if (!flow) return null;
     const sd = flow.side;
+    // wave 0 (score-on-close SC5): closing an assist / on-ice step keeps the goal
+    const iceDescribe = flow.mode === 'goal' && (flow.step === 'a1' || flow.step === 'a2' || flow.step === 'onice');
+    const saveAsIs = closeSaves({ editing: !!editAt, describing: iceDescribe }) ? () => {
+      if (flow.mode !== 'goal') return;
+      if (flow.step === 'onice') goal(sd, flow.d, flow.a2 ?? null);
+      else if (flow.step === 'a1' || flow.step === 'a2') goal(sd, flow.d, null);
+    } : null;
     const head = (t: string) => (
       <View style={c.flowHead}>
         <Text style={[c.h, { color: ink(sd) }]} numberOfLines={1}>{t} · {name(sd)}</Text>
-        <Text style={[c.cancel, c.tap]} accessibilityRole="button" onPress={() => setFlow(null)}>Cancel</Text>
+        <Text style={[c.cancel, c.tap]} accessibilityRole="button" onPress={saveAsIs ?? (() => setFlow(null))}>{closeLabel(!!saveAsIs)}</Text>
       </View>
     );
     switch (flow.mode) {

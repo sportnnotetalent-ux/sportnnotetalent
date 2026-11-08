@@ -27,6 +27,7 @@
  * original time; Cancel keeps the event — SD-114).
  */
 import React, { useEffect, useState, useMemo } from 'react';
+import { closeSaves, closeLabel } from '../flowClose';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { theme } from '../../core/theme';
 import { useMask } from '../../core/disputeMask';
@@ -376,10 +377,13 @@ const ScoringControls: SportPlugin<RugbyState>['ScoringControls'] = ({
   const flowPanel = (() => {
     if (!flow) return null;
     const sd = flow.side;
+    // wave 0 (score-on-close SC6): closing the assist step keeps the try
+    const saveAsIs = closeSaves({ editing: !!editAt, describing: flow.mode === 'try' && flow.step === 'assist' })
+      ? () => { if (flow.mode === 'try' && flow.step === 'assist') scoreTry(sd, flow.scorer ?? null, null); } : null;
     const head = (t: string) => (
       <View style={c.flowHead}>
         <Text style={[c.h, { color: color(sd) }]} numberOfLines={1}>{t} · {name(sd)}</Text>
-        <Text style={c.cancel} accessibilityRole="button" onPress={() => setFlow(null)}>Cancel</Text>
+        <Text style={c.cancel} accessibilityRole="button" onPress={saveAsIs ?? (() => setFlow(null))}>{closeLabel(!!saveAsIs)}</Text>
       </View>
     );
     switch (flow.mode) {

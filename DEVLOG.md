@@ -38,6 +38,20 @@ Where it changed:
   - Marketing posts already rendered keep the old mark.
   - The mint experiment was undone and never committed.
 
+### 2026-11-08 — Wave 0: closing a follow-up never loses the goal / try
+
+The specialist review found a live score-loss bug (score-on-close.md). In netball (feeds on, the International preset), hockey, ice hockey, rugby union and rugby league, the goal or try was sent only when its last follow-up step finished, and the header's Cancel threw it away.
+- **Fix:**
+  - On a step that only describes a play already decided (assist, second assist, on-ice, netball feed / rebound / deflection and turnover outcome), the header now reads **Save as is** and logs the play with what is known: scorer, type, PC link, strength / empty net, bonus zone.
+  - Defining steps (goal type, who scored, try zone) keep **Cancel**, so a mis-tap still backs out. While editing, it stays Cancel and keeps the original.
+  - The rule is shared in `src/sports/flowClose.ts`.
+- **Checks:**
+  - `tests/score-on-close.test.mts` (with a 600-scorer sim);
+  - full suite 7789 (0 failing);
+  - tsc;
+  - demo: a netball International friendly, Goal → feed step → Save as is → 1-0 kept.
+- **Not in this wave:** making these follow-ups non-blocking cards with Done (wave 2).
+
 ### 2026-11-08 — Last point card: groups, no false zeros, doubles hint; specialist review of every sport
 
 Founder follow-ups on the racket card (describe-done.md DD10–DD12), and a stats-defaults review by sport specialists across all families.

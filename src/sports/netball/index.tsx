@@ -18,6 +18,7 @@
  * then the same flow stamped at the original time, SD-114).
  */
 import React, { useEffect, useState, useMemo } from 'react';
+import { closeSaves, closeLabel } from '../flowClose';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { theme } from '../../core/theme';
 import { useMask } from '../../core/disputeMask';
@@ -350,10 +351,19 @@ const ScoringControls: SportPlugin<NetballState>['ScoringControls'] = ({
   /* ---- flows ---- */
   const flowPanel = (() => {
     if (!flow) return null;
+    // wave 0 (score-on-close SC1–SC3): closing the feed / rebound / outcome step keeps the play
+    const netDescribe = (flow.mode === 'goal' && flow.step === 'feed') || (flow.mode === 'miss' && (flow.step === 'feed' || flow.step === 'rebound'))
+      || (flow.mode === 'stat' && flow.step === 'outcome');
+    const saveAsIs = closeSaves({ editing: !!editAt, describing: netDescribe }) ? () => {
+      if (flow.mode === 'goal' && flow.step === 'feed') goal(flow.side, flow.pos, flow.shooter, null);
+      else if (flow.mode === 'miss' && flow.step === 'feed') miss(flow.side, flow.pos, flow.shooter, null, null);
+      else if (flow.mode === 'miss' && flow.step === 'rebound') miss(flow.side, flow.pos, flow.shooter, flow.feeder ?? null, null);
+      else if (flow.mode === 'stat' && flow.step === 'outcome') stat(flow.side, flow.kind, flow.player ?? null);
+    } : null;
     const head = (t: string, sd?: Side) => (
       <View style={c.flowHead}>
         <Text style={[c.h, sd ? { color: ink(sd) } : null]} numberOfLines={1}>{t}{sd ? ` · ${name(sd)}` : ''}</Text>
-        <Text style={c.cancel} accessibilityRole="button" onPress={() => setFlow(null)}>Cancel</Text>
+        <Text style={c.cancel} accessibilityRole="button" onPress={saveAsIs ?? (() => setFlow(null))}>{closeLabel(!!saveAsIs)}</Text>
       </View>
     );
     if (flow.mode === 'hold') return (

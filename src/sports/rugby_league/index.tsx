@@ -25,6 +25,7 @@
  * original time; Cancel keeps the event — SD-114).
  */
 import React, { useEffect, useState, useMemo } from 'react';
+import { closeSaves, closeLabel } from '../flowClose';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { theme } from '../../core/theme';
 import { useMask } from '../../core/disputeMask';
@@ -294,11 +295,14 @@ const ScoringControls: SportPlugin<LeagueState>['ScoringControls'] = ({
   const flowPanel = (() => {
     if (!flow) return null;
     const sd = flow.side;
+    // wave 0 (score-on-close SC6): closing the assist step keeps the try (and its bonus zone)
+    const saveAsIs = closeSaves({ editing: !!editAt, describing: flow.mode === 'try' && flow.step === 'assist' })
+      ? () => { if (flow.mode === 'try' && flow.step === 'assist') scoreTry(sd, flow.scorer ?? null, null, flow.bonus); } : null;
     const head = (t: string) => (
       <View style={c.flowHead}>
         <Text style={[c.h, { color: color(sd) }]} numberOfLines={1}>{t} · {name(sd)}</Text>
         {/* a penalty try's sanction step: Cancel still goes on to its conversion */}
-        <Text style={c.cancel} accessibilityRole="button" onPress={() => (flow.mode === 'sanction' && flow.pt ? ptNext() : setFlow(null))}>Cancel</Text>
+        <Text style={c.cancel} accessibilityRole="button" onPress={saveAsIs ?? (() => (flow.mode === 'sanction' && flow.pt ? ptNext() : setFlow(null)))}>{closeLabel(!!saveAsIs)}</Text>
       </View>
     );
     switch (flow.mode) {

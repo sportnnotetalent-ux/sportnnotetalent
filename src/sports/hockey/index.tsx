@@ -17,6 +17,7 @@
  * rows (the reducer reads the scorer from `attribution`, so totals follow).
  */
 import React, { useEffect, useMemo, useState } from 'react';
+import { closeSaves, closeLabel } from '../flowClose';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { theme } from '../../core/theme';
 import { useMask } from '../../core/disputeMask';
@@ -350,10 +351,13 @@ const ScoringControls: SportPlugin<HockeyState>['ScoringControls'] = ({
   const flowPanel = (() => {
     if (!flow) return null;
     const sd = flow.side;
+    // wave 0 (score-on-close SC4): closing the assist step keeps the goal
+    const saveAsIs = closeSaves({ editing: !!editAt, describing: flow.mode === 'goal' && flow.step === 'assist' })
+      ? () => { if (flow.mode === 'goal' && flow.step === 'assist') goal(sd, flow.goalType ?? 'field', flow.scorer ?? null, null, flow.pc); } : null;
     const head = (t: string) => (
       <View style={c.flowHead}>
         <Text style={[c.h, { color: color(sd) }]} numberOfLines={1}>{t} · {name(sd)}{pastAt ? ` · ${Math.max(1, Math.ceil(pastAt.sec / 60))}'` : ''}</Text>
-        <Text style={c.cancel} accessibilityRole="button" onPress={() => setFlow(null)}>Cancel</Text>
+        <Text style={c.cancel} accessibilityRole="button" onPress={saveAsIs ?? (() => setFlow(null))}>{closeLabel(!!saveAsIs)}</Text>
       </View>
     );
     switch (flow.mode) {
