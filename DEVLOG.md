@@ -38,6 +38,51 @@ Where it changed:
   - Marketing posts already rendered keep the old mark.
   - The mint experiment was undone and never committed.
 
+### 2026-11-08 — Wave 3: stats to track on by default in every sport (new matches)
+
+Wave 3 of docs/sport-expert/defaults-on/PLAN.md. Founder decisions:
+- football friendlies get the deeper stats too;
+- goals / tries ruled out stay off;
+- older tournaments get a "Use the new defaults" button.
+
+Five engineering agents switched each family's tap-optional stats on, following the specialists' lists, for NEW matches only. Every family has one defaults constant per sport, so Reset matches. Replay fallbacks are untouched, so old matches read off.
+- **Invasion** (defaults-on-invasion.md, 0fe3fd34):
+  - Football friendlies: fouls, offsides, corners, tackles, interceptions, crosses, dribbles, shot detail, key passes (now a non-blocking card), clearances, set pieces, card reasons.
+  - Ice hockey: faceoffs, hits / blocks, giveaways / takeaways, missed shots.
+  - Rugby union: details, turnovers, 22 entries, offloads, restarts.
+  - Rugby league: defence, attack, restarts.
+  - Stay off: possession (friendlies), passes, referrals, +/-, faceoff zones (still blocking), sets, ruled out.
+- **Court team** (defaults-on-court-team.md, a94d4415):
+  - volleyball reception / digs;
+  - kabaddi skills;
+  - netball feeds / centre-pass receives / gains / turnovers in every preset (presets no longer set stats).
+  - Stay off: volleyball attack, kabaddi defenders touched.
+- **US** (defaults-on-us.md, f727bb39):
+  - basketball fast break / fouls drawn;
+  - American football targets / breakups & TFL;
+  - baseball spray zones / batted-ball types.
+  - Stay off: tackles, pitch types.
+- **Cricket, cue / board** (defaults-on-cricket-cue.md, 890a292f):
+  - cricket wagon wheel / pitch map / bowler type / extra reason;
+  - snooker long / rest, with a new in-match card to switch it off (pool too);
+  - carrom fouls behind a "Fouls ▾" fold.
+  - Stay off: ball speed, shot control, shot clock, chess moves / clock.
+  - Shared: an existing match's Info shows a never-stored stat as Off.
+- **Measured** (defaults-on-measured.md, b90d3e2f):
+  - golf putts / fairways / bunkers / up-and-downs / penalties / first putt for new rounds;
+  - weightlifting jury reversals and archery team arrows, written at event creation.
+  - Stay off: all timing extras.
+  - Also fixed: golf "Missed left 0" with no fairway tapped; "led at every split" from one runner.
+- **Tournaments** (tournament-stats-defaults.md, 70ba2974 + 5939a8c3):
+  - Found: a tournament stores only what was set and its matches read a missing stats key as off, so new tournaments (racket included) got none of the defaults. Only friendlies did.
+  - Now creation writes each sport's stats defaults, using a field's tournament default (football keeps possession on).
+  - Edit tournament shows "New stats defaults" naming each change (e.g. "🏸 Badminton: Rally length on"), with **Use the new defaults**, saved via Save changes.
+- **Checks:**
+  - every family has a break doc, failing tests first and a 600-user sim;
+  - pinned-default tests updated on purpose (marked DO*);
+  - merged full suite 8214 (0 failing), tsc clean;
+  - demo: the Badminton Cup card reads "Rally length on"; a new football friendly offers tackles / fouls / offsides / crosses / dribbles after kick-off, possession off.
+
 ### 2026-11-08 — Release: wave 2, describe cards with Done (web, Android OTA)
 
 auth-smoke passed and the publish lock was taken. Published from a clean worktree at e0226570.
