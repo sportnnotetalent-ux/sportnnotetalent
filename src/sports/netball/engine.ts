@@ -753,6 +753,60 @@ export function describeAction(s: NetballState, id: string, d: NbDescribe): Scor
   return { type: 'DESCRIBE', ...(ev.side ? { side: ev.side } : {}), payload: { id, field: 'tt', value: d.tt } };
 }
 
+/* ------------------------ an edited play's detail ------------------------- */
+
+/** polish-court-team PC15–PC18: what a play carries into its re-entry when it
+ *  is corrected from the timeline (✎ Edit) — its feeder, its rebound, a
+ *  deflection's outcome, a turnover's type. IDs-only: ids, no names. */
+export interface NbCarry { feed?: string; rebound?: { side: Side; playerId: string }; gain?: boolean; tt?: TurnoverType; stat?: StatKind }
+
+/** The detail play `e` has now (undefined: nothing to carry). Read when the
+ *  edit opens, before the held removal takes the play (and its rebound) away. */
+export function carryOf(s: NetballState, e: NetballEvent): NbCarry | undefined {
+  const c: NbCarry = {};
+  if (e.type === 'goal' || e.type === 'miss') {
+    if (e.secondId) c.feed = e.secondId;
+    const reb = e.type === 'miss' ? reboundOf(s, e.id) : undefined;
+    if (reb?.side && reb.playerId) c.rebound = { side: reb.side, playerId: reb.playerId };
+  } else if (e.type === 'stat') {
+    if (e.stat === 'deflection' && typeof e.gain === 'boolean') { c.stat = e.stat; c.gain = e.gain; }
+    if (e.stat === 'turnover' && isTurnoverType(e.tt)) { c.stat = e.stat; c.tt = e.tt; }
+  }
+  return Object.keys(c).length ? c : undefined;
+}
+
+const pickKeys = (p: Record<string, unknown> | undefined, keys: string[]): Record<string, unknown> =>
+  Object.fromEntries(keys.filter((k) => p?.[k] !== undefined).map((k) => [k, p![k]]));
+
+/** The re-entered play `a` (GOAL / MISS / STAT, already carrying its player)
+ *  with the carried detail put back in the shape the original flow logged it:
+ *  the feeder as the GOAL / MISS second credit (not when she is now the
+ *  shooter, PC18), `gain` / `tt` in a STAT of the same kind, and a miss's
+ *  rebound as the linked `STAT rebound` right after it (`ref` = the miss's
+ *  uid). Nothing to carry: `[a]` unchanged. */
+export function withCarry(a: ScoreAction, carry: NbCarry | undefined, o: { reboundUid: string }): ScoreAction[] {
+  if (!carry) return [a];
+  if (a.type === 'GOAL' || a.type === 'MISS') {
+    const kind = a.type === 'GOAL' ? 'goal' : 'miss';
+    const feed = carry.feed && carry.feed !== a.attribution?.playerId ? carry.feed : undefined;
+    const play: ScoreAction = feed
+      ? { ...a, attribution2: creditAttribution(eventCredits({ type: kind, secondId: feed }).second, 1, TRACKED_KEYS) }
+      : a;
+    const ref = typeof a.payload?.uid === 'string' ? (a.payload.uid as string) : undefined;
+    if (kind !== 'miss' || !carry.rebound || !ref) return [play];
+    const r = carry.rebound;
+    return [play, {
+      // at the miss's own moment (the controls' `fire` stamps the same edit time)
+      type: 'STAT', side: r.side, payload: { kind: REBOUND_KIND, ref, uid: o.reboundUid, ...pickKeys(a.payload, ['sec', 'period']) },
+      attribution: creditAttribution(eventCredits({ type: 'stat', stat: REBOUND_KIND, playerId: r.playerId }).first, 1, TRACKED_KEYS),
+    }];
+  }
+  if (a.type !== 'STAT' || !carry.stat || a.payload?.kind !== carry.stat) return [a];
+  const extra = carry.stat === 'deflection' && typeof carry.gain === 'boolean' ? { gain: carry.gain }
+    : carry.stat === 'turnover' && carry.tt ? { tt: carry.tt } : {};
+  return [{ ...a, payload: { ...a.payload, ...extra } }];
+}
+
 /* ----------------------------- derived figures ----------------------------- */
 
 /** Over: ended, and decided unless a draw may stand (a knockout's level score

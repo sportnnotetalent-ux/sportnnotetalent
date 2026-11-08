@@ -655,6 +655,53 @@ export function tacklerActions(s: KabaddiState, eid: number, tackler: Who, idOf?
   return raidActions(s, f, idOf).map((a) => (a.type === 'RAID_OUTCOME' ? { ...a, payload: { ...a.payload, ...at } } : a));
 }
 
+/** polish-court-team PC1–PC5 — "Who was touched?" after a quick "+1 touch":
+ *  the raid `eid` when its touched defenders can be named (in play, touches
+ *  that count, not a line-out — the raid form's own rule, raidActions). */
+export function touchedAskable(s: KabaddiState, eid: number): RaidEntry | undefined {
+  const raid = raidsOf(s).find((r) => r.eid === eid);
+  return raid && !raid.hidden && !raid.lineOut && raid.touches > 0 ? raid : undefined;
+}
+
+/** The touched defenders a RAID_TOUCHED names: ids only (IDs-only scoring —
+ *  a name never enters the log), once each, at most the raid's touches. */
+function touchedIds(v: unknown, n: number): TouchedRef[] {
+  const ids: string[] = [];
+  for (const x of v as unknown[]) {
+    const id = (x as { id?: unknown } | null)?.id;
+    if (typeof id === 'string' && id && !ids.includes(id)) ids.push(id);
+  }
+  return ids.slice(0, n).map((id) => ({ id }));
+}
+
+/** PC1 / PC2 — the one RAID_TOUCHED step naming raid `eid`'s touched
+ *  defenders ([] clears them). It sets `touched` on that raid in place —
+ *  the score, the mat, `seq`, `lp` and every credit stay as they are — so the
+ *  match is the same as naming them in the raid form. Null when the raid
+ *  can't take names (PC3, PC4) or nothing changes. */
+export function touchedAction(s: KabaddiState, eid: number, defenders: Who[]): ScoreAction | null {
+  const raid = touchedAskable(s, eid);
+  if (!raid) return null;
+  const next = touchedIds(defenders, raid.touches);
+  const cur = (raid.touched ?? []).map((p) => p.id ?? `name:${p.name ?? ''}`);
+  if (next.length === cur.length && next.every((p, i) => p.id === cur[i])) return null;
+  return { type: 'RAID_TOUCHED', side: raid.side, payload: { eid, touched: next } };
+}
+
+/** The RAID_TOUCHED step (new action — no older log has it). */
+function raidTouched(s: KabaddiState, p: Record<string, unknown> | undefined): KabaddiState {
+  if (!p || !Array.isArray(p.touched)) return s;
+  const eid = Number(p.eid);
+  const raid = touchedAskable(s, eid);
+  if (!raid) return s;
+  const named = touchedIds(p.touched, raid.touches);
+  // a list of junk (nothing usable) is ignored; [] clears the names
+  if (!named.length && p.touched.length) return s;
+  const { touched: _t, ...rest } = raid;
+  const entry: RaidEntry = named.length ? { ...rest, touched: named } : rest;
+  return withRaids(s, raidsOf(s).map((r) => (r === raid ? entry : r)));
+}
+
 /** The raid entry + its current breakdown for a timeline line (head or child). */
 export function raidOfEvent(s: KabaddiState, e: KabaddiEvent): { raid: RaidEntry; breakdown?: RaidBreakdown } | null {
   if (e.group == null) return null;
@@ -796,7 +843,8 @@ function addExtra(s: KabaddiState, entry: ExtraEntry): KabaddiState {
 }
 
 export const reducer = (s: KabaddiState, a: ScoreAction): KabaddiState => {
-  if (s.ended && a.type !== 'END') return s;
+  // polish-court-team PC8: the touch that ended the match can still be named
+  if (s.ended && a.type !== 'END' && a.type !== 'RAID_TOUCHED') return s;
   const minute = Number(a.payload?.minute ?? currentMinute(s));
   const hf = Number(a.payload?.half ?? s.half);
   /** legacy, read-only: the credited name an older log's action carried
@@ -849,6 +897,9 @@ export const reducer = (s: KabaddiState, a: ScoreAction): KabaddiState => {
     case 'SET_TRACK':
       // deep wave (new action): the ⚙️ Stats to track switches
       return setTrack(s, a.payload);
+    case 'RAID_TOUCHED':
+      // polish-court-team (new action): name a raid's touched defenders after the tap
+      return raidTouched(s, a.payload);
     case 'RAID':
       return pushPt('RAID');
     case 'TACKLE':

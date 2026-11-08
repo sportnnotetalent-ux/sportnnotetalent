@@ -36,7 +36,7 @@ import { kabaddiEventDetail, withRosters } from './names';
 import {
   init, reducer, currentMinute, halfLabel, previewRaid, raidOfEvent, raidActions, isRaidHead, kabaddiWinner, halfPoints, defendersOnMat,
   expectedRaider, outPlayers, clockPaused, timeoutsUsed, TIMEOUTS_PER_HALF, TACKLE_TYPES,
-  formOutcome, quickRaidForm, quickBonusCounts, matNow, kabaddiCfg, touchChips, unavailable, unavailableOf, listHas, isSubbedOff, cardsOf, suggestedCard, NEW_TECH_REASONS, ROUT_REASONS, CARD_ICON, RAID_SKILLS, tacklerActions, tacklerAskable, lastRaidEid,
+  formOutcome, quickRaidForm, quickBonusCounts, matNow, kabaddiCfg, touchChips, unavailable, unavailableOf, listHas, isSubbedOff, cardsOf, suggestedCard, NEW_TECH_REASONS, ROUT_REASONS, CARD_ICON, RAID_SKILLS, tacklerActions, tacklerAskable, lastRaidEid, touchedAction, touchedAskable,
   type KabaddiState, type KabaddiEvent, type CardColour, type RaidForm,
 } from './engine.ts';
 import { KABADDI_META } from './meta';
@@ -113,6 +113,10 @@ const ScoringControls: SportPlugin<KabaddiState>['ScoringControls'] = ({ state, 
   const [askTackler, setAskTackler] = useState<number | null>(null);
   // describe-court-team DC15: Done / Skip per raid (its eid) for the "Tackled by?" card
   const tackleMarks = useDescribeMarks<number>();
+  // polish-court-team PC1 (K1): the raid a quick "+1 touch" just logged — an
+  // optional "Who was touched?" card names the defender (RAID_TOUCHED)
+  const [askTouched, setAskTouched] = useState<number | null>(null);
+  const touchMarks = useDescribeMarks<number>();
   const [card, setCard] = useState<{ side?: 'home' | 'away'; colour?: CardColour; who?: Player | 'official' | 'player'; tp: boolean; tpSet?: boolean } | null>(null);
 
   const hm = state.halfMinutes, et = state.extraTimeMinutes;
@@ -361,7 +365,7 @@ const ScoringControls: SportPlugin<KabaddiState>['ScoringControls'] = ({ state, 
               <Text style={ctrl.meta}>One tap — records at once{raidFlow.raider ? ` (raider: ${raidFlow.raider.fullName})` : ''}:</Text>
               <View style={ctrl.chips}>
                 <Button label="Empty" variant="ghost" onPress={() => recordForm(quickRaidForm(raidFlow.side, 'empty', raidFlow.raider))} />
-                <Button label="+1 touch" variant="ghost" onPress={() => recordForm(quickRaidForm(raidFlow.side, 'touch', raidFlow.raider))} />
+                <Button label="+1 touch" variant="ghost" onPress={() => { const eid = state.seq + 1; recordForm(quickRaidForm(raidFlow.side, 'touch', raidFlow.raider)); setAskTouched(eid); }} />
                 {quickBonusCounts(state, raidFlow.side) ? <Button label="Bonus" variant="ghost" onPress={() => recordForm(quickRaidForm(raidFlow.side, 'bonus', raidFlow.raider))} /> : null}
                 <Button label="Raider out" variant="ghost" onPress={() => { const eid = state.seq + 1; recordForm(quickRaidForm(raidFlow.side, 'out', raidFlow.raider)); setAskTackler(eid); }} />
               </View>
@@ -518,6 +522,37 @@ const ScoringControls: SportPlugin<KabaddiState>['ScoringControls'] = ({ state, 
                   for (const action of tacklerActions(state, askTackler, p, rosterId, { rename: true })) dispatch(action);
                 }} />
               ))}
+            </View>
+          </DescribeCard>
+        );
+      })()}
+      {/* polish-court-team PC1 (K1): after a quick "+1 touch", name the
+          defender touched (optional, non-blocking) — the same raid as the
+          form with him named; Done / Skip / "✓ Saved · … Edit" per raid. */}
+      {!raidFlow && askTouched != null && state.track?.touched && (() => {
+        // PC9: only while that raid is the latest one
+        if (lastRaidEid(state) !== askTouched) return null;
+        const r = touchedAskable(state, askTouched);
+        if (!r) return null;
+        const defSide = r.side === 'home' ? 'away' : 'home';
+        const defenders = onField(defSide, rosterFor(defSide));
+        if (!defenders.length) return null;
+        const ids = (r.touched ?? []).flatMap((p) => (p.id ? [p.id] : []));
+        const names = (r.touched ?? []).map((p) => byId(p.id, p.name)?.fullName ?? p.name ?? 'defender');
+        const summary = names.length ? `Touched ${names.join(', ')}` : '';
+        return (
+          <DescribeCard title="👋 Who was touched? (optional — names who is out)" summary={summary} mode={touchMarks.modeOf(askTouched)}
+            onDone={() => touchMarks.mark(askTouched, 'done')} onSkip={() => touchMarks.mark(askTouched, 'skipped')} onEdit={() => touchMarks.mark(askTouched, null)}>
+            <View style={ctrl.chips}>
+              {defenders.map((p) => {
+                const on = ids.includes(p.id);
+                return (
+                  <SelectChip key={p.id} label={p.fullName} active={on} disabled={!on && ids.length >= r.touches} accessibilityLabel={`Touched ${p.fullName}`} onPress={() => {
+                    const a = touchedAction(state, askTouched, on ? ids.filter((x) => x !== p.id).map((id) => ({ id })) : [...ids.map((id) => ({ id })), { id: p.id }]);
+                    if (a) dispatch(a);
+                  }} />
+                );
+              })}
             </View>
           </DescribeCard>
         );
@@ -870,7 +905,7 @@ export const kabaddiPlugin: SportPlugin<KabaddiState> = {
   LiveClock,
   // its match centre has its own Game flow category (no shared card under it)
   matchTabs: { Commentary: KabaddiCommentary, Stats: KabaddiStats, ownGameFlow: true },
-  // deep wave — "Stats to track": raid skill (on for a new match), defenders touched (off)
+  // deep wave — "Stats to track": raid skill and defenders touched (both on for a new match, polish-court-team PC12)
   liveSettings: KABADDI_LIVE_SETTINGS,
   formation: () => courtFormation('kabaddi'),
   Court: makeCourt('kabaddi'),

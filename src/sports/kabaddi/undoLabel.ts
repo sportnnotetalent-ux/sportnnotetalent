@@ -16,6 +16,7 @@ import { subPlayers } from './names.ts';
 /** Steps that add no timeline line — named by what they set. */
 const QUIET: Record<string, string> = {
   KICKOFF: 'clock start', PAUSE: 'clock pause', RESUME: 'clock restart', SET_TRACK: 'stats-to-track setting',
+  RAID_TOUCHED: 'who was touched', // polish-court-team PC6
   NEXT_HALF: 'start of the next half', START_EXTRA_TIME: 'start of extra time',
   START_GOLDEN_RAID: 'start of the Golden Raid', START_SHOOTOUT: 'start of the shootout',
   END: 'full time', REMOVE_EVENT: 'timeline correction', STAT_ADJUST: 'stat correction',

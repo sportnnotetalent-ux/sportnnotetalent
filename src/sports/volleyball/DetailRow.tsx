@@ -69,15 +69,6 @@ export function VolleyballDetailRow({ state: s, dispatch, home, away }: {
       <SelectChip label={on ? 'On' : 'Off'} active={on} onPress={() => { dispatch({ type: 'SET_DETAIL', payload: { detail: !on } }); setOpen(null); setToast(null); }} />
     </View>
   );
-  if (!on || s.ended) {
-    return (
-      <View style={st.box}>
-        {toggle}
-        {!on && <Text style={st.meta}>Choose what to track in ⚙️ Stats to track (attack attempts, reception, digs, set assists, who was aced).</Text>}
-      </View>
-    );
-  }
-
   const opp = (sd: Side): Side => (sd === 'home' ? 'away' : 'home');
   const has = (c: VbDetailCat) => cats.includes(c);
 
@@ -115,6 +106,22 @@ export function VolleyballDetailRow({ state: s, dispatch, home, away }: {
       </DescribeCard>
     );
   })();
+
+  // polish-court-team PC13: after full time only the "Last point" card stays —
+  // the match's last point can still get "Set by" / "Who was blocked" / "Who
+  // was aced" (anchored entries are accepted after the end). The switch
+  // (SET_DETAIL) and the rally chips (in play, reception, dig) are closed then.
+  if (s.ended) {
+    return lastPointCard ? <View style={st.box} accessibilityLabel="Detailed stats">{lastPointCard}</View> : null;
+  }
+  if (!on) {
+    return (
+      <View style={st.box}>
+        {toggle}
+        <Text style={st.meta}>Choose what to track in ⚙️ Stats to track (attack attempts, reception, digs, set assists, who was aced).</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={st.box} accessibilityLabel="Detailed stats">

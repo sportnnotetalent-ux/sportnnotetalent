@@ -118,9 +118,10 @@ describe('volleyball: reception and digs on; set assists and aced kept; attack a
 
 /* ================================== kabaddi ================================== */
 
-const KB_WANT = { trackSkills: true, trackTouched: false };
+// polish PC12: defenders touched is on too, now that K1 ("Who was touched?" after a quick +1 touch) is built
+const KB_WANT = { trackSkills: true, trackTouched: true };
 
-describe('kabaddi: raid skill on; defenders touched stays off (K1 not built)', () => {
+describe('kabaddi: raid skill on; defenders touched on (polish PC12, K1 built)', () => {
   const fields = KABADDI_META.formatFields ?? [];
   const ls = kbSettings.KABADDI_LIVE_SETTINGS;
   test('DOC3 · one defaults constant', () => {
@@ -133,10 +134,11 @@ describe('kabaddi: raid skill on; defenders touched stays off (K1 not built)', (
     for (const [k, v] of Object.entries(KB_WANT)) assert.equal(fields.find((f) => f.key === k)!.default, v, k);
   });
   for (const ctx of [undefined, 'tournament'] as const) {
-    test(`DOC4 / DOC6 · a new ${ctx ?? 'friendly'} match tracks skills only; Info agrees; 0 custom`, () => {
+    test(`DOC4 / DOC6 · a new ${ctx ?? 'friendly'} match tracks skills and touched; Info agrees; 0 custom`, () => {
       const fmt = defaultsFor(fields, ctx);
       const s = kbInit(fmt);
-      assert.deepEqual(s.track, { skills: true });
+      // polish PC12: touched on for a new match
+      assert.deepEqual(s.track, { skills: true, touched: true });
       assert.deepEqual(capOf(ls, s, fields, fmt), KB_WANT);
       assert.equal(customCount(ls, ls.read(s), s), 0);
     });
@@ -144,10 +146,12 @@ describe('kabaddi: raid skill on; defenders touched stays off (K1 not built)', (
   test('DOC1 · old formats: no `track`', () => {
     for (const cfg of [{}, { playersPerSide: 7 }, { trackSkills: false, trackTouched: false }]) assert.equal('track' in kbInit(cfg), false);
   });
-  test('DOC13 · the quick "+1 touch" has no "Who was touched?" yet, so trackTouched stays off', () => {
+  // polish PC1 / PC12: the quick "+1 touch" now opens "Who was touched?", so trackTouched is on
+  test('DOC13 · the quick "+1 touch" opens "Who was touched?", so trackTouched is on', () => {
     const ui = src('src/sports/kabaddi/index.tsx');
     assert.match(ui, /label="\+1 touch"/);
-    assert.equal(KB_WANT.trackTouched, false);
+    assert.match(ui, /setAskTouched\(eid\)/);
+    assert.equal(KB_WANT.trackTouched, true);
   });
   test('DOC7 / DOC8 / DOC9 · quick and voice raids score with skill on; no skills rows until one is described', () => {
     const play = (cfg: Record<string, unknown>) => {

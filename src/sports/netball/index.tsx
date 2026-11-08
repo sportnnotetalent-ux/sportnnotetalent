@@ -39,8 +39,8 @@ import {
   eventCredits, creditAttribution, centreInfo, lineupAt, timeoutCheck, sanctionsOf, totalPeriods, isOpen, playOnLead, other,
   NETBALL_PRESETS, NETBALL_LIVE_SETTINGS, LIVE_KEYS, POSITIONS, POS_AREAS,
   superShotLive, superShotText, SUPER_SHOT_RULE_OPTIONS, goalPoints, TURNOVER_TYPES, TURNOVER_LABEL,
-  describeAction, describeFields, lastDescribable, reboundOf,
-  type NetballEvent, type NetballState, type Pos, type Sanction, type Side, type StatKind, type StopReason, type PenaltyKind,
+  describeAction, describeFields, lastDescribable, reboundOf, carryOf, withCarry,
+  type NbCarry, type NetballEvent, type NetballState, type Pos, type Sanction, type Side, type StatKind, type StopReason, type PenaltyKind,
 } from './engine';
 import { PlayFeed } from '../PlayFeed';
 import { CategoryStatsPanel } from '../CategoryStatsPanel';
@@ -117,6 +117,9 @@ const ScoringControls: SportPlugin<NetballState>['ScoringControls'] = ({
   // describe-court-team: Done / Skip per play (its event id), so the next play opens fresh
   const marks = useDescribeMarks<string>();
   const [editAt, setEditAt] = useState<{ sec: number; period: number } | null>(null);
+  // polish-court-team PC15–PC19: the edited play's feeder / rebound / outcome /
+  // type, read when ✎ Edit opens and put back on its re-entry (hockey's `carry`)
+  const [carry, setCarry] = useState<NbCarry | null | undefined>(null);
   const [showEdit, setShowEdit] = useState(false);
   const [more, setMore] = useState(false);
   const [clockInput, setClockInput] = useState('');
@@ -131,7 +134,8 @@ const ScoringControls: SportPlugin<NetballState>['ScoringControls'] = ({
     return () => clearInterval(id);
   }, [s.clock.since, s.ended]); // eslint-disable-line react-hooks/exhaustive-deps
   // deep wave: a cancelled re-entry of a super shot doesn't leave the next shot armed
-  useEffect(() => { if (flow === null && editAt) { setEditAt(null); dropHeldRemoval(); setArmed(null); } }, [flow]); // eslint-disable-line react-hooks/exhaustive-deps
+  // PC19: the carry goes with the edit, so it never reaches a live play
+  useEffect(() => { if (flow === null && editAt) { setEditAt(null); dropHeldRemoval(); setArmed(null); setCarry(null); } }, [flow]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const now = Date.now();
   const name = (sd: Side) => (sd === 'home' ? homeName : awayName);
@@ -204,16 +208,20 @@ const ScoringControls: SportPlugin<NetballState>['ScoringControls'] = ({
   const ssText = superShotText(s);
   // describe-court-team DC1 / DC2: the goal / miss goes on the board at the tap;
   // its feeder and rebound are attached after (DESCRIBE, the "Last play" card)
+  // PC15–PC18: a re-entry (✎ Edit) puts the play's detail back; a live play has none
+  const kept = () => (editAt ? carry : undefined) ?? undefined;
+  const fireCarried = (a: ScoreAction) => { for (const x of withCarry(a, kept(), { reboundUid: uid() })) fire(x); };
   const goal = (sd: Side, pos: Pos, shooter: Player | null) => {
     const two = superArmed(sd);
     setArmed(null);
-    fire({ type: 'GOAL', side: sd, payload: { pos, ...(two ? { points: 2 } : {}) }, ...credit({ type: 'goal', playerId: shooter?.id }) });
+    fireCarried({ type: 'GOAL', side: sd, payload: { pos, uid: uid(), ...(two ? { points: 2 } : {}) }, ...credit({ type: 'goal', playerId: shooter?.id }) });
     setFlow(null);
   };
   const miss = (sd: Side, pos: Pos, shooter: Player | null) => {
     const ss = superArmed(sd);
     setArmed(null);
-    fire({ type: 'MISS', side: sd, payload: { pos, ...(ss ? { ss: true } : {}) }, ...credit({ type: 'miss', playerId: shooter?.id }) });
+    // its uid up front: a carried rebound links to it (PC16)
+    fireCarried({ type: 'MISS', side: sd, payload: { pos, uid: uid(), ...(ss ? { ss: true } : {}) }, ...credit({ type: 'miss', playerId: shooter?.id }) });
     setFlow(null);
   };
   /** the one-tap shot: GS / GA from the line-up (the feed is described after) */
@@ -230,7 +238,7 @@ const ScoringControls: SportPlugin<NetballState>['ScoringControls'] = ({
   const stat = (sd: Side, kind: StatKind, p: Player | null) => {
     // deep wave: a pick-up is a statTotals-only credit, so its player rides in the payload
     const who = kind === 'pickup' && p ? { playerId: p.id } : {};
-    fire({ type: 'STAT', side: sd, payload: { kind, ...who }, ...credit({ type: 'stat', stat: kind, playerId: p?.id }) });
+    fireCarried({ type: 'STAT', side: sd, payload: { kind, ...who }, ...credit({ type: 'stat', stat: kind, playerId: p?.id }) });
     setFlow(null);
   };
   const penalty = (sd: Side, kind: PenaltyKind, p: Player | null) => {
@@ -282,6 +290,8 @@ const ScoringControls: SportPlugin<NetballState>['ScoringControls'] = ({
   const remove = (e: NetballEvent) => { for (const a of removalActions(e)) dispatch(a); };
   const edit = (e: NetballEvent) => {
     if (!e.side || e.type === 'timeout' || e.type === 'stop' || e.type === 'centre' || e.type === 'cpr' || e.type === 'tossup' || isAnswer(e)) { remove(e); return; }
+    // PC15–PC17: read the detail before the held removal takes the play (and its rebound) away
+    setCarry(carryOf(s, e));
     holdRemoval(removalActions(e));
     setEditAt({ sec: e.sec, period: e.period });
     setShowEdit(false);

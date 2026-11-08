@@ -180,7 +180,8 @@ test(`kabaddi: ${USERS} new matches (all rule sets) — skill on, never blocked,
   const r = rng(20261109);
   for (let u = 0; u < USERS; u++) {
     const fmt = newMatchFormat(KABADDI_META.formatFields ?? [], r);
-    assert.deepEqual(kbInit(fmt).track, { skills: true }, 'skill on, touched off (DOC13)');
+    // polish PC12: touched is on for a new match too (K1 built); nothing named still writes no touched keys
+    assert.deepEqual(kbInit(fmt).track, { skills: true, touched: true }, 'skill and touched on');
     const { s, plain, described } = kbGame(fmt, r);
     assert.deepEqual([s.home, s.away, s.out], [plain.home, plain.away, plain.out], 'DOC8');
     const skills = kabaddiMatchStats(s).cats.find((c) => c.id === 'skills');
@@ -188,7 +189,7 @@ test(`kabaddi: ${USERS} new matches (all rule sets) — skill on, never blocked,
     else assert.match(skills!.note ?? '', new RegExp(`${described} raid skills? of`));
     for (const l of Object.values(kabaddiTotals(s, KCTX))) {
       assert.equal(Object.keys(l.stats).some((k) => /skill|^sk_/i.test(k)), false, 'skills never reach careers');
-      assert.equal('touchedOut' in l.stats, false, 'touched not tracked');
+      assert.equal('touchedOut' in l.stats, false, 'touched on but nobody named: not tracked (polish PC10)');
     }
   }
 });
