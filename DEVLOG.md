@@ -38,6 +38,19 @@ Where it changed:
   - Marketing posts already rendered keep the old mark.
   - The mint experiment was undone and never committed.
 
+### 2026-11-08 — Teams for doubles, phase 4: "Who played?" moves stand-ins' stats to the real players
+
+Phase 4 of docs/product/teams-for-doubles.md (team-who-played.md).
+- **The card:** a side that played as "{Team} Player 1 / 2" gets a "Who played? · {Team}" card (`WhoPlayedCard`) for the match's scorer / host, once play has started and at full time. Each stand-in is given a squad member; mistakes are refused (`checkMapping`).
+- **How it saves:** one AMEND correction (`standInAmendOps`) replaces every play that names a stand-in with the same play naming the real player, deep credits included ("By:", errors, second credits). It's built from the effective log, so earlier corrections stay. Score, side and order are unchanged.
+  - The live screen rebuilds, stats resync to the real players, and Undo reverses it.
+  - The side's matchday squad becomes the real players.
+- **Checks:**
+  - `tests/team-who-played.test.mts` (5 tests incl. a 600-match sim; failed first);
+  - full suite 8357 (0 failing), tsc clean;
+  - demo: badminton doubles, Smashers 1 (3 players) left unpicked, so it played as stand-ins. A winner was credited to "Smashers 1 Player 2". Then "Player 1 was Kabir, Player 2 was Rohan" → Save. The board reads Kabir / Rohan (1-0 kept), the last step reads "correction", and the commentary reads "Rohan Nair wins the point with a Winner".
+- **Open (founder):** only the scorer / host can map, because the amendment path and the database's write guard allow only them. Letting a team captain who isn't scoring do it needs a database permission change.
+
 ### 2026-11-08 — Teams for doubles, phase 3: "Who's playing?" before the first point
 
 Phase 3 of docs/product/teams-for-doubles.md (team-whos-playing.md).

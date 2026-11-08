@@ -87,3 +87,22 @@ export const canSavePick = (ids: readonly string[], needed: number): boolean => 
 export function remindTargets(l: TeamLeadership): string[] {
   return [...new Set([l.captainId, l.viceCaptainId, ...(l.adminIds ?? [])].filter((x): x is string => !!x))];
 }
+
+/** Phase 4 (team-who-played.md): the AMEND ops that move stand-ins to the real
+ *  players — one `replace` per play that actually names a mapped stand-in (WH2),
+ *  rewritten whole (WH1), from the EFFECTIVE log so earlier corrections stay
+ *  (WH3); type, side and seq are kept (WH4). */
+type LogRow = { seq: number; type: string; side?: string | null; payload?: unknown; attribution?: unknown };
+export function standInAmendOps(effective: readonly LogRow[], map: Record<string, string>): { op: 'replace'; seq: number; action: { type: string; side?: string; payload?: Record<string, unknown>; attribution?: Record<string, unknown> } }[] {
+  const ops: { op: 'replace'; seq: number; action: { type: string; side?: string; payload?: Record<string, unknown>; attribution?: Record<string, unknown> } }[] = [];
+  for (const e of effective) {
+    const payload = remapEvents(e.payload ?? undefined, map);
+    const attribution = remapEvents(e.attribution ?? undefined, map);
+    if (JSON.stringify(payload) === JSON.stringify(e.payload ?? undefined) && JSON.stringify(attribution) === JSON.stringify(e.attribution ?? undefined)) continue;
+    ops.push({
+      op: 'replace', seq: e.seq,
+      action: { type: e.type, ...(e.side ? { side: e.side } : {}), ...(payload ? { payload: payload as Record<string, unknown> } : {}), ...(attribution ? { attribution: attribution as Record<string, unknown> } : {}) },
+    });
+  }
+  return ops;
+}

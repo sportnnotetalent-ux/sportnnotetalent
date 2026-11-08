@@ -106,7 +106,8 @@ import { formatDateTime, formatTime, useUserTimeZone } from '../core/time';
 import { exportToCalendar } from '../core/ics';
 import { notify, scheduleNudge, cancelNudge } from '../core/notifications';
 import { WhoPlaysCard } from '../components/WhoPlaysCard';
-import { sidePlayers, isStandIn, pickerFor, remindTargets } from '../core/teamPlay';
+import { WhoPlayedCard } from '../components/WhoPlayedCard';
+import { sidePlayers, isStandIn, pickerFor, remindTargets, checkMapping, standInAmendOps } from '../core/teamPlay';
 import { replayNudge } from '../core/nudge';
 import { playAgain } from '../data/playAgain';
 import { MatchSummary } from '../components/MatchSummary';
@@ -1724,8 +1725,32 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
             );
           }) : null;
 
+  // team-who-played (phase 4): a side that played as stand-ins says who they were —
+  // one AMEND moves every point and stat to the real players (scorer / host only, WH8)
+  const whoPlayedEl = canScore && matchId && eventCount > 0 ? (['home', 'away'] as const).map((sd) => {
+    const side = sd === 'home' ? homeSide : awaySide;
+    if (side?.kind !== 'standin') return null;
+    const teamNm = sd === 'home' ? homeTeamName ?? homeName : awayTeamName ?? awayName;
+    const full = sd === 'home' ? homeFull : awayFull;
+    const other = (sd === 'home' ? awayRoster : homeRoster).map((p) => p.id);
+    return (
+      <WhoPlayedCard key={`wp-${sd}`} teamName={teamNm} color={sd === 'home' ? homeColor : awayColor}
+        slots={side.players.map((p) => ({ id: p.id, fullName: p.fullName }))}
+        squad={full.map((p) => ({ id: p.id, fullName: shownNameOf(p.id, p.fullName) }))}
+        check={(map) => checkMapping(map, { squad: full.map((p) => p.id), alreadyPlaying: other })}
+        onSave={async (map) => {
+          const ops = standInAmendOps(effectiveLog(await getMatchEvents(matchId)), map);
+          const names = side.players.map((p) => `${p.fullName} → ${shownNameOf(map[p.id], full.find((q) => q.id === map[p.id])?.fullName)}`).join(', ');
+          if (ops.length) await amend(ops as AmendOp[], [`Who played for ${teamNm}: ${names}`], profile?.fullName ?? 'Scorer');
+          await setMatchSquad(matchId, sd, { starters: side.players.map((p) => map[p.id]), subs: [] });
+          setSquads(await getMatchSquads(matchId));
+        }} />
+    );
+  }) : null;
+
   const controlsNode = (
     <View style={st.controls}>
+      {whoPlayedEl}
       {syncing ? (
         <Text style={[textStyles.muted, { textAlign: 'center' }]}>Syncing live score…</Text>
       ) : complete && !guestMode ? (
