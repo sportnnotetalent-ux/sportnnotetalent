@@ -52,7 +52,10 @@ import { CricketCommentary } from './CommentaryView';
 import { CricketShareCard } from './ShareCardView';
 import { CricketMatchStats } from './MatchStatsView';
 import { SubViews } from '../SubViews';
-import { BallDetailPanel, BowlTypeChips, detailTarget, profileLeftArm } from './BallDetailPanel';
+import { BallDetailPanel, BowlTypeChips, profileLeftArm } from './BallDetailPanel';
+// Wave 2 — one per-ball describe card (docs/security/breaks/describe-cricket.md)
+import { DescribeCard, useDescribeMarks } from '../../components/DescribeCard';
+import { ballKey, ballSummary, detailTarget, doneAction, flushOnMove, pendingKph, type KphDraft } from './describeBall';
 import { bowlTypeFromProfile } from './detail';
 import { bouncerStatus, bouncerSlot, bouncerChipOnly, beamerWarning } from './bouncers';
 import { powerplayNow } from './phases';
@@ -813,11 +816,12 @@ const ScoringControls: SportPlugin<CricketState>['ScoringControls'] = ({
   // SD-133 — retire-at-N: batters the scorer chose "Not now" for; the new batter picked.
   const [skipRetire, setSkipRetire] = useState<string[]>([]);
   const [retireIn, setRetireIn] = useState<Player | undefined>(undefined);
-  // SD-133 (CK-11) — wagon wheel: left-hander overrides (this session) and the ball whose panel was skipped.
+  // SD-133 (CK-11) — wagon wheel: left-hander overrides (this session).
   const [lhOverride, setLhOverride] = useState<Record<string, boolean>>({});
-  const [shotSkip, setShotSkip] = useState<string | null>(null);
-  // Deep wave — the ball whose optional detail panel was closed.
-  const [detailSkip, setDetailSkip] = useState<string | null>(null);
+  // Wave 2 (describe-cricket DK4) — Done / Skip remembered per ball, and the
+  // typed km/h not yet saved (DK2/DK3), for the one per-ball describe card.
+  const describe = useDescribeMarks<string>();
+  const [kphDraft, setKphDraft] = useState<KphDraft | null>(null);
   const [setupOpen, setSetupOpen] = useState(false);
 
   // While a Super Over is live, ALL the live-scoring UI below operates on the
@@ -831,6 +835,18 @@ const ScoringControls: SportPlugin<CricketState>['ScoringControls'] = ({
   // An armed penalty belongs to this innings only.
   const innKey = `${soActive ? 'so' : ''}${state.innings}`;
   useEffect(() => { setBallPen(null); }, [innKey]);
+  // Wave 2 (describe-cricket DK3/DK5) — the describe card moved to another
+  // ball (the next ball, voice, another scorer, an undo): a valid typed speed
+  // goes to the ball it was typed for, only if that very ball still exists.
+  // Here, before any early return, so it runs on every render path.
+  const lastBallKey = (() => { const t = soActive ? null : detailTarget(state); return t ? ballKey(t.rec, t.d) : ''; })();
+  useEffect(() => {
+    if (!kphDraft || kphDraft.key === lastBallKey) return;
+    const a = flushOnMove(kphDraft, state.log ?? [], state.detail, state.ballsPerOver);
+    setKphDraft(null);
+    if (a) dispatch(a);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastBallKey]);
 
   // Regulation ended level (or a Super Over just tied) — offer the tie-breaker.
   if (rootState.pendingTie && !soActive) {
@@ -1277,55 +1293,6 @@ const ScoringControls: SportPlugin<CricketState>['ScoringControls'] = ({
   const shotBall = rules.wagonWheel && !soActive && lastRec && shotOk(lastRec) && lastRec.strikerId
     && ((lastRec.inn === state.innings && lastRec.side === state.battingSide) || (state.innings === 2 && lastRec.inn === 1 && cur.balls === 0))
     ? { rec: lastRec, at: ballStamp(lastRec.legal ? lastRec.lb6 : lastRec.lb6 + 1, state.ballsPerOver), nb: lastRec.ext === 'nb' } : null;
-  const shotKey = shotBall ? `${shotBall.rec.inn}:${shotBall.at}:${shotBall.rec.strikerId}:${shotBall.nb ? 'nb' : ''}` : '';
-  const shotPanel = shotBall && shotSkip !== shotKey ? (() => {
-    const { rec, at, nb } = shotBall;
-    const bid = rec.strikerId!;
-    const bp = battingRoster.find((p) => p.id === bid);
-    const lh = lhOverride[bid] ?? bp?.sportDetails?.cricket?.sides?.bat === 'Left-handed';
-    const tag = (state.shots ?? []).find((x) => x.inn === rec.inn && x.side === rec.side && x.at === at && x.batterId === bid && !!x.nb === nb);
-    const send = (extra: Record<string, unknown>) => dispatch({ type: 'SHOT', side: rec.side, payload: {
-      v: 2, inn: rec.inn, side: rec.side, at, batterId: bid, bowlerId: rec.bowlerId, runs: rec.bat, ...(nb ? { nb: true } : {}), ...(lh ? { lh: true } : {}), ...extra,
-    } });
-    const name = state.batting[bid]?.name ?? 'the batter';
-    const screenSel = tag?.zone ? { zone: tag.lh ? mirrorZone(tag.zone) : tag.zone, deep: !!tag.deep } : null;
-    // Batch 5 (C2) — a dot ball / a wicket: just the shot type (Defended too).
-    if (rec.bat === 0) {
-      const outNow = !!rec.out && rec.out.kind !== 'retired';
-      return (
-        <View style={ctrl.morePanel}>
-          <View style={ctrl.creaseHead}>
-            <Text style={[ctrl.label, ctrl.flex]} numberOfLines={2}>🏏 {name} ({at}){outNow ? ' — out' : ''} — the shot? (optional)</Text>
-            <Button label={tag ? 'Done' : 'Skip'} variant="ghost" style={ctrl.swapBtn} onPress={() => setShotSkip(shotKey)} />
-          </View>
-          <View style={ctrl.chips}>
-            {SHOT_TYPES.map((t) => (
-              <SelectChip key={t} label={t} active={tag?.shot === t} onPress={() => send({ shot: t as ShotType })} />
-            ))}
-          </View>
-        </View>
-      );
-    }
-    return (
-      <View style={ctrl.morePanel}>
-        <View style={ctrl.creaseHead}>
-          <Text style={[ctrl.label, ctrl.flex]} numberOfLines={2}>🎯 {name}’s {rec.bat} ({at}) — where did it go?</Text>
-          <Button label={tag ? 'Done' : 'Skip'} variant="ghost" style={ctrl.swapBtn} onPress={() => setShotSkip(shotKey)} />
-        </View>
-        <View style={[ctrl.chips, { alignItems: 'center' }]}>
-          <SelectChip label="Left-hander" active={lh} onPress={() => setLhOverride((m) => ({ ...m, [bid]: !lh }))} />
-          {tag?.zone ? <Text style={ctrl.meta}>✓ {zoneName(screenSel!.zone, lh)}{tag.deep ? ' (deep)' : ''}{tag.shot ? ` · ${tag.shot}` : ''}</Text> : <Text style={ctrl.meta}>Optional — tap the field</Text>}
-        </View>
-        <WagonField lh={lh} selected={screenSel}
-          onPick={(z, deep) => send({ zone: lh ? mirrorZone(z) : z, deep: deep || rec.bat === 4 || rec.bat === 6 })} />
-        <View style={ctrl.chips}>
-          {SHOT_TYPES.filter((t) => t !== 'Defended').map((t) => (
-            <SelectChip key={t} label={t} active={tag?.shot === t} onPress={() => send({ shot: t as ShotType })} />
-          ))}
-        </View>
-      </View>
-    );
-  })() : null;
   // Deep wave — the optional ball detail ("Stats to track") for the LAST
   // delivery: length / line, a false shot, the speed, where a catch was taken.
   // Offered only for what was being tracked when that ball was bowled (its
@@ -1333,18 +1300,82 @@ const ScoringControls: SportPlugin<CricketState>['ScoringControls'] = ({
   const dTarget = !soActive ? detailTarget(state) : null;
   const dOk = dTarget && ((dTarget.rec.inn === state.innings && dTarget.rec.side === state.battingSide) || (state.innings === 2 && dTarget.rec.inn === 1 && cur.balls === 0));
   const dCatch = !!(dTarget && rules.wagonWheel && dTarget.rec.out?.kind === 'caught');
-  const dKey = dTarget ? `${dTarget.rec.inn}:${dTarget.rec.side}:${dTarget.d}` : '';
   const dTrk = dTarget?.rec.trk ?? {};
   // Batch 6 (C9) — the one-chip bouncer tag (a limit set, the pitch map off)
   const dBouncer = !!dTarget && bouncerChipOnly(state, dTarget.rec);
   const dHas = !!(dTrk.pitch || dTrk.speed || (dTrk.ctrl && dTarget?.rec.ext !== 'wd') || dCatch || dBouncer
     // Round 2 — the wide / no-ball reason
     || (dTrk.why && (dTarget?.rec.ext === 'wd' || dTarget?.rec.ext === 'nb')));
-  const detailPanel = dOk && dTarget && dHas && detailSkip !== dKey ? (() => {
-    const sid = dTarget.rec.strikerId;
+  // Wave 2 (describe-cricket DK1) — ONE card per ball: the shot section, then
+  // the detail section, one "✓ summary", one full-width Done / Skip, then
+  // "✓ Saved · … Edit". Keyed per delivery + device stamp (DK5/DK7/DK9).
+  // `lastRec` and `dTarget.rec` are the same record (same delivery filter).
+  const cardKey = dTarget && dOk && (shotBall || dHas) ? ballKey(dTarget.rec, dTarget.d) : '';
+  const describeCard = cardKey && dTarget ? (() => {
+    const rec = dTarget.rec;
+    const sid = rec.strikerId;
     const bp = sid ? battingRoster.find((p) => p.id === sid) : undefined;
     const lh = sid ? (lhOverride[sid] ?? bp?.sportDetails?.cricket?.sides?.bat === 'Left-handed') : false;
-    return <BallDetailPanel state={state} target={dTarget} dispatch={dispatch} lh={lh} catchSpot={dCatch} bouncerChip={dBouncer} onDone={() => setDetailSkip(dKey)} />;
+    const name = (sid && state.batting[sid]?.name) || 'the batter';
+    const dTag = (state.detail ?? []).find((x) => x.inn === rec.inn && x.side === rec.side && x.d === dTarget.d && x.at === dTarget.at);
+    const nb = rec.ext === 'nb';
+    const shotTag = shotBall && sid ? (state.shots ?? []).find((x) => x.inn === rec.inn && x.side === rec.side && x.at === shotBall.at && x.batterId === sid && !!x.nb === nb) : undefined;
+    const kphText = kphDraft?.key === cardKey ? kphDraft.text : (dTag?.kph ? String(dTag.kph) : '');
+    const typed = dHas && dTrk.speed ? pendingKph(kphText, dTag?.kph) : null;
+    const summary = ballSummary({ shot: shotTag, detail: dTag, ext: rec.ext, kph: typed });
+    const outNow = !!rec.out && rec.out.kind !== 'retired';
+    let shotSection: React.ReactNode = null;
+    if (shotBall && sid) {
+      const at = shotBall.at;
+      const send = (extra: Record<string, unknown>) => dispatch({ type: 'SHOT', side: rec.side, payload: {
+        v: 2, inn: rec.inn, side: rec.side, at, batterId: sid, bowlerId: rec.bowlerId, runs: rec.bat, ...(nb ? { nb: true } : {}), ...(lh ? { lh: true } : {}), ...extra,
+      } });
+      const screenSel = shotTag?.zone ? { zone: shotTag.lh ? mirrorZone(shotTag.zone) : shotTag.zone, deep: !!shotTag.deep } : null;
+      // Batch 5 (C2) — a dot ball / a wicket: just the shot type (Defended too).
+      shotSection = rec.bat === 0 ? (
+        <>
+          <Text style={ctrl.meta}>The shot?{outNow ? ' (out)' : ''}</Text>
+          <View style={ctrl.chips}>
+            {SHOT_TYPES.map((t) => (
+              <SelectChip key={t} label={t} active={shotTag?.shot === t} onPress={() => send({ shot: t as ShotType })} />
+            ))}
+          </View>
+        </>
+      ) : (
+        <>
+          <View style={[ctrl.chips, { alignItems: 'center' }]}>
+            <Text style={[ctrl.meta, ctrl.flex]}>Where did it go? (tap the field)</Text>
+            <SelectChip label="Left-hander" active={lh} onPress={() => setLhOverride((m) => ({ ...m, [sid]: !lh }))} />
+          </View>
+          <WagonField lh={lh} selected={screenSel}
+            onPick={(z, deep) => send({ zone: lh ? mirrorZone(z) : z, deep: deep || rec.bat === 4 || rec.bat === 6 })} />
+          <View style={ctrl.chips}>
+            {SHOT_TYPES.filter((t) => t !== 'Defended').map((t) => (
+              <SelectChip key={t} label={t} active={shotTag?.shot === t} onPress={() => send({ shot: t as ShotType })} />
+            ))}
+          </View>
+        </>
+      );
+    }
+    const title = `${rec.bat > 0 ? '🎯' : '🏏'} Ball ${dTarget.at} · ${name}${rec.bat > 0 ? `’s ${rec.bat}` : ''}${outNow ? ' — out' : ''} (optional)`;
+    return (
+      <DescribeCard title={title} summary={summary} mode={describe.modeOf(cardKey)}
+        onDone={() => {
+          // DK2 — save a valid typed speed first, then grey the card
+          const a = doneAction(kphDraft, dTarget, dTag?.kph);
+          if (a) dispatch(a);
+          setKphDraft(null);
+          describe.mark(cardKey, 'done');
+        }}
+        onSkip={() => { setKphDraft(null); describe.mark(cardKey, 'skipped'); }}
+        onEdit={() => describe.mark(cardKey, null)}>
+        {shotSection}
+        {dHas ? (
+          <BallDetailPanel state={state} target={dTarget} dispatch={dispatch} lh={lh} catchSpot={dCatch} bouncerChip={dBouncer}
+            kph={kphText} onKph={(text) => setKphDraft({ key: cardKey, text })} />
+        ) : null}
+      </DescribeCard>
+    );
   })() : null;
   // Batch 6 (C11, R7) — the band the next ball is in: shortened after a rain
   // cut; an ODI-length innings shows P1 / P2 / P3.
@@ -1707,8 +1738,7 @@ const ScoringControls: SportPlugin<CricketState>['ScoringControls'] = ({
         )}
       </View>
 
-      {shotPanel}
-      {detailPanel}
+      {describeCard}
 
       {/* Parity #20 — penalty to either side, bonus / minus runs, fielding notes.
           Concussion / Impact subs live in Quick options (SD-113 A1). */}

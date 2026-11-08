@@ -15,13 +15,14 @@ import { theme } from '../../core/theme';
 import { Button, SelectChip, TextField } from '../../components/ui';
 import type { Player } from '../../core/types';
 import type { ScoreAction } from '../types';
-import type { BallRec, CricketState } from './engine';
+import type { CricketState } from './engine';
 import {
   LENGTH_LABEL, LINE_LABEL, CONTROL_LABEL, CONTROLS, BOWL_KINDS, BOWL_KIND_LABEL, BOWL_TYPE_LABEL,
   WIDE_WHY, NB_WHY, WIDE_WHY_LABEL, NB_WHY_LABEL, extraWhyOf,
-  bowlTypeCode, bowlKindOf, isLeftArm, asKph, recStamp, deliveryOrdinals, fieldPosition,
+  bowlTypeCode, bowlKindOf, isLeftArm, asKph, fieldPosition,
   type Length, type Line, type BallDetailRec, type BowlType,
 } from './detail';
+import { detailAction, detailTarget, type BallTarget } from './describeBall';
 import { bouncerNoteFor } from './bouncers';
 import { WagonField } from './WagonWheel';
 import { mirrorZone } from './wagon';
@@ -30,20 +31,16 @@ import { mirrorZone } from './wagon';
 const LEN_CHIPS: Length[] = ['yorker', 'full', 'good', 'short', 'bouncer', 'fulltoss'];
 const LINE_CHIPS: Line[] = ['wideOff', 'off', 'stumps', 'leg', 'wideLeg'];
 
-/** The last delivery the panel can tag, with its key, or null. */
-export function detailTarget(s: CricketState): { rec: BallRec; d: number; at: string } | null {
-  const log = s.log ?? [];
-  const ords = deliveryOrdinals(log);
-  for (let i = log.length - 1; i >= 0; i--) {
-    if (!ords[i]) continue;
-    return { rec: log[i], d: ords[i], at: recStamp(log[i], s.ballsPerOver) };
-  }
-  return null;
-}
+/** The last delivery the panel can tag (moved to describeBall.ts, pure). */
+export { detailTarget };
 
-export function BallDetailPanel({ state, target, dispatch, lh, catchSpot, bouncerChip = false, onDone }: {
+/** The detail section of the one per-ball describe card (describe-cricket.md
+ *  DK1): no Done of its own — the card's Done finishes the whole ball. The
+ *  typed speed lives in the parent (`kph` / `onKph`) so Done, or the next ball,
+ *  can save it (DK2/DK3). */
+export function BallDetailPanel({ state, target, dispatch, lh, catchSpot, bouncerChip = false, kph, onKph }: {
   state: CricketState;
-  target: { rec: BallRec; d: number; at: string };
+  target: BallTarget;
   dispatch: (a: ScoreAction) => void;
   /** the striker bats left-handed (mirrors the catch field) */
   lh: boolean;
@@ -51,20 +48,17 @@ export function BallDetailPanel({ state, target, dispatch, lh, catchSpot, bounce
   catchSpot: boolean;
   /** Batch 6 (C9) — the one "Bouncer" chip (a bouncer limit set, the pitch map off) */
   bouncerChip?: boolean;
-  onDone: () => void;
+  /** the typed km/h (not yet saved) and its setter — held by the card's parent */
+  kph: string;
+  onKph: (text: string) => void;
 }) {
   const { rec, d, at } = target;
   const trk = rec.trk ?? {};
   const tag: BallDetailRec | undefined = (state.detail ?? []).find((x) => x.inn === rec.inn && x.side === rec.side && x.d === d && x.at === at);
-  const send = (patch: Record<string, unknown>) => dispatch({
-    type: 'BALL_DETAIL', side: rec.side,
-    payload: { v: 2, inn: rec.inn, side: rec.side, d, at, ...(rec.strikerId ? { batterId: rec.strikerId } : {}), ...(rec.bowlerId ? { bowlerId: rec.bowlerId } : {}), ...patch },
-  });
+  // DK11 — the same payload as before, built in one place
+  const send = (patch: Record<string, unknown>) => dispatch(detailAction(target, patch));
   const faced = rec.ext !== 'wd';
-  const [kph, setKph] = useState(tag?.kph ? String(tag.kph) : '');
-  useEffect(() => { setKph(tag?.kph ? String(tag.kph) : ''); }, [tag?.kph, d]);
   const n = asKph(kph);
-  const any = !!(tag?.len || tag?.line || tag?.ctrl || tag?.kph || tag?.cz || tag?.why);
   const sel = tag?.cz ? { zone: lh ? mirrorZone(tag.cz) : tag.cz, deep: !!tag.cdeep } : null;
   // Round 2 — why the wide / no-ball was called (reason chips for that extra)
   const whyChips = trk.why && rec.ext ? (rec.ext === 'wd'
@@ -75,10 +69,6 @@ export function BallDetailPanel({ state, target, dispatch, lh, catchSpot, bounce
   const bouncerNote = trk.pitch || bouncerChip ? bouncerNoteFor(state, rec, tag?.len === 'bouncer') : null;
   return (
     <View style={st.panel}>
-      <View style={st.head}>
-        <Text style={st.title} numberOfLines={2}>📍 Ball {at} — detail <Text style={st.muted}>(optional)</Text></Text>
-        <Button label={any ? 'Done' : 'Skip'} variant="ghost" style={st.btn} onPress={onDone} />
-      </View>
       {whyChips.length ? (
         <>
           <Text style={st.muted}>Why was it {rec.ext === 'wd' ? 'a wide' : 'a no-ball'}?</Text>
@@ -120,7 +110,7 @@ export function BallDetailPanel({ state, target, dispatch, lh, catchSpot, bounce
       {trk.speed ? (
         <View style={st.row}>
           <View style={{ flex: 1 }}>
-            <TextField label="" value={kph} onChange={(t) => setKph(t.replace(/[^0-9]/g, '').slice(0, 3))} placeholder="Speed, km/h (40–180)" autoCapitalize="none" />
+            <TextField label="" value={kph} onChange={(t) => onKph(t.replace(/[^0-9]/g, '').slice(0, 3))} placeholder="Speed, km/h (40–180)" autoCapitalize="none" />
           </View>
           <Button label={tag?.kph && n === tag.kph ? `✓ ${tag.kph}` : 'Save'} variant="ghost" disabled={n === null || n === tag?.kph}
             onPress={() => { if (n !== null) send({ kph: n }); }} />
@@ -174,9 +164,7 @@ export function BowlTypeChips({ id, name, current, profileLeft, dispatch }: {
 export const profileLeftArm = (p?: Player) => p?.sportDetails?.cricket?.sides?.bowl === 'Left-arm';
 
 const st = StyleSheet.create({
-  panel: { gap: theme.spacing(2), padding: theme.spacing(3), borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.surface },
-  head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: theme.spacing(2) },
-  title: { flex: 1, color: theme.colors.text, fontSize: theme.font.body, fontWeight: '700' },
+  panel: { gap: theme.spacing(2) },
   muted: { color: theme.colors.textMuted, fontSize: theme.font.small },
   warn: { color: theme.colors.danger, fontSize: theme.font.small, fontWeight: '800' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing(2) },
