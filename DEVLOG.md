@@ -38,6 +38,15 @@ Where it changed:
   - Marketing posts already rendered keep the old mark.
   - The mint experiment was undone and never committed.
 
+### 2026-11-08 — Done: 8 false-zero racket career lines cleaned (founder ran the SQL)
+
+The founder ran `docs/ops/sql/2026-11-08-racket-false-zeros.sql` in the Supabase SQL editor.
+- **First attempt:** the original step 2 began with `begin;`. The editor discards an uncommitted transaction at the end of the run, so nothing changed. The file now runs step 2 as one auto-committed statement (2a148f1c).
+- **Second run, verified read-only:**
+  - all 8 lines (badminton 4, pickleball 4) have 0 zero point-detail keys left;
+  - real stats are kept (9 keys per badminton line, 11 per pickleball line);
+  - all 41 career lines are still there, and only these 8 were updated (12:33 UTC).
+
 ### 2026-11-08 — Release: racket point detail, no false zeros (web, Android OTA)
 
 auth-smoke passed and the publish lock was taken. Published from a clean worktree at a3f0a298.
