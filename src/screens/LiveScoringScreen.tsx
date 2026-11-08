@@ -1287,10 +1287,16 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
       <Text style={[st.undoText, { color: theme.colors.textMuted }]} numberOfLines={1}>Nothing to undo yet</Text>
     </View>
   ) : (
-    <TouchableOpacity style={st.undoBtn} activeOpacity={0.8} accessibilityRole="button" accessibilityLabel={`Undo${undoWhat ? `: ${undoWhat}` : ` last ${sport === 'cricket' ? 'ball' : 'update'}`}${undoBy}`} accessibilityHint="Tap repeatedly to rewind to any earlier point" onPress={() => void undoStep()}>
-      <Text style={[st.undoText, { flexShrink: 1 }]} numberOfLines={1}>↶  Undo{undoWhat ? `: ${undoWhat}` : ''}{undoBy}</Text>
-      {undoWhat ? null : <Text style={st.undoHint}>rewind step-by-step</Text>}
-    </TouchableOpacity>
+    // Stitch pick 2 (LS4): a box naming the last step, Undo its own pill on the right
+    <View style={st.undoBox}>
+      <View style={st.undoLast}>
+        <Text style={st.undoLabel}>LAST STEP</Text>
+        <Text style={[st.undoText, { flexShrink: 1 }]} numberOfLines={1}>{undoWhat ? `${undoWhat}${undoBy}` : `Rewind step by step${undoBy}`}</Text>
+      </View>
+      <TouchableOpacity style={st.undoBtn} activeOpacity={0.8} accessibilityRole="button" accessibilityLabel={`Undo${undoWhat ? `: ${undoWhat}` : ` last ${sport === 'cricket' ? 'ball' : 'update'}`}${undoBy}`} accessibilityHint="Tap repeatedly to rewind to any earlier point" onPress={() => void undoStep()}>
+        <Text style={st.undoPill}>↶ Undo</Text>
+      </TouchableOpacity>
+    </View>
   ) : null;
 
   // End a match by hand (parity #04): win / conceded / draw|tie / no result /
@@ -3287,12 +3293,20 @@ const st = StyleSheet.create({
     borderWidth: 1, borderColor: theme.colors.border,
     paddingVertical: theme.spacing(2.5), paddingHorizontal: theme.spacing(4), opacity: 0.55,
   },
-  undoBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: theme.spacing(2),
-    backgroundColor: theme.colors.surfaceAlt, borderRadius: theme.radius.md,
+  undoBox: {
+    flexDirection: 'row', alignItems: 'center', gap: theme.spacing(3),
+    backgroundColor: theme.colors.surface, borderRadius: theme.radius.md,
     borderWidth: 1, borderColor: theme.colors.border,
-    paddingVertical: theme.spacing(2.5), paddingHorizontal: theme.spacing(4),
+    paddingVertical: theme.spacing(2), paddingLeft: theme.spacing(4), paddingRight: theme.spacing(2),
   },
+  undoLast: { flex: 1, minWidth: 0 },
+  undoLabel: { color: theme.colors.textMuted, fontSize: theme.font.tiny, fontWeight: '800', letterSpacing: 0.5 },
+  undoBtn: {
+    minHeight: 44, justifyContent: 'center', alignItems: 'center',
+    backgroundColor: theme.colors.surfaceAlt, borderRadius: theme.radius.pill,
+    borderWidth: 1, borderColor: theme.colors.inputBorder, paddingHorizontal: theme.spacing(4),
+  },
+  undoPill: { color: theme.colors.primary, fontSize: theme.font.body, fontWeight: '800' },
   undoText: { color: theme.colors.text, fontSize: theme.font.body, fontWeight: '800' },
   undoHint: { color: theme.colors.textMuted, fontSize: theme.font.tiny },
   // SD-106 Match controls: a separate card at the bottom; centred, red-outlined,

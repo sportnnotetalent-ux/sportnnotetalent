@@ -49,7 +49,8 @@ export function LiveScoreBar({
       {status || clockNode ? (
         <View style={s.statusRow}>
           {status ? <Text style={s.status} numberOfLines={1}>{status}</Text> : null}
-          {clockNode}
+          {/* LS2: each sport's clock keeps its own colours on a light pill */}
+          {clockNode ? <View style={s.clockPill}>{clockNode}</View> : null}
         </View>
       ) : null}
       {due ? <Text style={s.due} accessibilityRole="alert">⏱ {due}</Text> : null}
@@ -64,34 +65,43 @@ export function LiveScoreBar({
           <Text style={[s.score, r.active && s.scoreActive]} numberOfLines={1} maxFontSizeMultiplier={1.5}>{r.score}</Text>
         </View>
       ))}
-      {last ? <Text style={s.last} numberOfLines={1}>Last: {last}</Text> : null}
+      {last ? (
+        <View style={s.lastStrip}>
+          <Text style={s.last} numberOfLines={1}><Text style={s.lastLabel}>LAST · </Text>{last}</Text>
+        </View>
+      ) : null}
     </View>
   );
 }
 
+// Stitch pick 1 (stitch-live-scoring.md): the green score panel — cream names,
+// white scores, the status in lime, the side in play on a lime band (LS1/LS3)
 const s = StyleSheet.create({
   wrap: {
-    backgroundColor: theme.colors.surface, borderBottomWidth: 1, borderBottomColor: theme.colors.border,
-    paddingHorizontal: theme.spacing(4), paddingVertical: theme.spacing(2), gap: theme.spacing(1), ...theme.shadow.card,
+    backgroundColor: theme.colors.primaryDark, borderBottomLeftRadius: theme.radius.md, borderBottomRightRadius: theme.radius.md,
+    paddingHorizontal: theme.spacing(4), paddingTop: theme.spacing(2), paddingBottom: theme.spacing(2), gap: theme.spacing(1), ...theme.shadow.card,
   },
-  statusRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: theme.spacing(2) },
-  status: { color: theme.colors.textMuted, fontSize: theme.font.small, fontWeight: '700' },
+  statusRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: theme.spacing(2) },
+  status: { flexShrink: 1, color: theme.colors.lime, fontSize: theme.font.small, fontWeight: '800', letterSpacing: 0.4, textTransform: 'uppercase' },
+  clockPill: { backgroundColor: theme.colors.surface, borderRadius: theme.radius.pill, paddingHorizontal: theme.spacing(2), paddingVertical: 2 },
   row: {
     flexDirection: 'row', alignItems: 'center', gap: theme.spacing(2), borderRadius: theme.radius.sm,
     paddingHorizontal: theme.spacing(2), paddingVertical: theme.spacing(1.5), overflow: 'hidden',
   },
   rowActive: { backgroundColor: theme.colors.lime },
-  flash: { backgroundColor: theme.colors.primary, borderRadius: theme.radius.sm },
-  dot: { width: 12, height: 12, borderRadius: 6, borderWidth: 1, borderColor: theme.colors.inputBorder },
+  flash: { backgroundColor: theme.colors.lime, borderRadius: theme.radius.sm },
+  dot: { width: 12, height: 12, borderRadius: 6, borderWidth: 1.5, borderColor: theme.colors.heroText },
   nameCol: { flex: 1, minWidth: 0 },
-  name: { color: theme.colors.text, fontSize: theme.font.body, fontWeight: '600' },
+  name: { color: theme.colors.heroText, fontWeight: '700' },
   nameActive: { color: theme.colors.onLime, fontWeight: '800' },
   who: { color: theme.colors.onLime, fontSize: theme.font.small, fontWeight: '700' },
-  score: { color: theme.colors.text, fontFamily: theme.fonts.numeral, fontSize: 28, minWidth: 56, textAlign: 'right', fontVariant: ['tabular-nums'] },
+  score: { color: '#FFFFFF', fontFamily: theme.fonts.numeral, fontSize: theme.font.h1, minWidth: 56, textAlign: 'right', fontVariant: ['tabular-nums'] },
   scoreActive: { color: theme.colors.onLime },
   due: {
     alignSelf: 'center', color: theme.colors.onFill, backgroundColor: theme.colors.accent, fontSize: theme.font.small, fontWeight: '800',
     paddingHorizontal: theme.spacing(3), paddingVertical: theme.spacing(1), borderRadius: theme.radius.pill, overflow: 'hidden',
   },
-  last: { color: theme.colors.textMuted, fontSize: theme.font.small, textAlign: 'center' },
+  lastStrip: { marginTop: theme.spacing(1), marginHorizontal: -theme.spacing(4), paddingHorizontal: theme.spacing(4), paddingTop: theme.spacing(1.5), borderTopWidth: 1, borderTopColor: 'rgba(243,240,232,0.18)' },
+  last: { color: theme.colors.heroText, fontSize: theme.font.small },
+  lastLabel: { color: theme.colors.lime, fontWeight: '800' },
 });
