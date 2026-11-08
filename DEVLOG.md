@@ -38,6 +38,32 @@ Where it changed:
   - Marketing posts already rendered keep the old mark.
   - The mint experiment was undone and never committed.
 
+### 2026-11-08 — Wave 4: polish across the sports
+
+Wave 4 of docs/sport-expert/defaults-on/PLAN.md. One shared fix by me, five engineering agents in parallel, merged here.
+- **"N custom" counts rules, not stats choices** (custom-count.md, cd1d5058): older matches and football tournament fixtures no longer read "custom" because the stats defaults changed. Reset still resets the stats.
+- **Invasion** (polish-invasion.md, d827ea4f):
+  - The ice hockey faceoff logs at the winner tap, with the zone on a "Last faceoff · where?" card (FO_ZONE), so `trackFaceoffZones` is on for new matches.
+  - Corrections that delete the last event of a kind in a finished hockey / ice hockey / rugby match no longer leave a stale stat (statSync owned keys).
+  - A football goal edited from the timeline keeps its assist and detail.
+- **Court team** (polish-court-team.md, c39accb2):
+  - Kabaddi's quick "+1 touch" opens "Who was touched?" (RAID_TOUCHED), so defenders touched is on for new matches.
+  - The volleyball "Last point" card works after full time.
+  - An edited netball play keeps its feeder / rebound / outcome / type.
+- **Tennis** (tennis-doubles-hitter.md, 9e68e391):
+  - Doubles asks "By:" for a winner / service winner (a service winner is pre-filled with the server).
+  - Player stats and commentary credit the hitter; singles is unchanged.
+- **Basketball** (polish-basketball.md, d071d482): "Rebound?" and "Steal — who lost it?" are Done cards.
+- **Cue / cricket** (polish-cue-cricket.md, 52077d36):
+  - Snooker long-pot / rest tags and carrom board detail show on the last-play bar and in the commentary, only when captured.
+  - Old carrom matches lose a false "No fouls".
+  - Cricket bouncer warnings say "tagged".
+- **Checks:**
+  - every item has a break doc, failing tests first and a 600-scorer sim;
+  - merged full suite 8328 (0 failing), tsc clean;
+  - demo: an ice hockey friendly → Face-off → "Faceoff won, A" logs at once, and the "Last faceoff · A won it · where?" card offers B end / Neutral zone / A end with Skip.
+- **Open, for a decision:** the box score can show a phantom row if a racket hitter is named from the wrong side (TH4 / RD11; careers check the side). The shared resolver affects all six racket sports.
+
 ### 2026-11-08 — Release: wave 3, stats to track on by default (web, Android OTA)
 
 auth-smoke passed and the publish lock was taken. Published from a clean worktree at d7fc90de.
