@@ -38,6 +38,13 @@ Where it changed:
   - Marketing posts already rendered keep the old mark.
   - The mint experiment was undone and never committed.
 
+### 2026-11-08 — Release: wave 3, stats to track on by default (web, Android OTA)
+
+auth-smoke passed and the publish lock was taken. Published from a clean worktree at d7fc90de.
+- **Web:** `index-ec4fd7ce`, live on app.sportnnote.in.
+- **Android OTA:** `8cbb738a` (preview) / `968ee226` (production).
+- **Includes:** wave 3 across all families plus tournament stats defaults and "Use the new defaults".
+
 ### 2026-11-08 — Wave 3: stats to track on by default in every sport (new matches)
 
 Wave 3 of docs/sport-expert/defaults-on/PLAN.md. Founder decisions:
