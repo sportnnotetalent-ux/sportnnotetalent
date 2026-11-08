@@ -72,6 +72,7 @@ import { FOOTBALL_META } from './meta';
 import { footballMatchRecords } from './records';
 import { footballUndoLabel } from './undoLabel';
 import { IconText } from '../../components/Icon';
+import { MainAction } from '../MainAction';
 
 /* ------------------------------- Controls ---------------------------------- */
 
@@ -1296,8 +1297,9 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
         <Text style={ctrl.label}>Goal</Text>
         <Text style={ctrl.meta}>Pick the scorer (or own goal), the goal type, then the assist.</Text>
         <View style={ctrl.row}>
-          <Button label={`Goal — ${homeName}`} variant="home" color={hc} style={ctrl.flex} onPress={() => setFlow({ mode: 'goal', side: 'home', step: 'scorer' })} />
-          <Button label={`Goal — ${awayName}`} variant="away" color={ac} style={ctrl.flex} onPress={() => setFlow({ mode: 'goal', side: 'away', step: 'scorer' })} />
+          {/* Stitch pick 3: the big Goal button, one per team */}
+          <MainAction team={homeName} label="⚽ Goal" plus="+1" color={hc} style={ctrl.flex} accessibilityLabel={`Goal — ${homeName}`} onPress={() => setFlow({ mode: 'goal', side: 'home', step: 'scorer' })} />
+          <MainAction team={awayName} label="⚽ Goal" plus="+1" color={ac} style={ctrl.flex} accessibilityLabel={`Goal — ${awayName}`} onPress={() => setFlow({ mode: 'goal', side: 'away', step: 'scorer' })} />
         </View>
       </View>
 

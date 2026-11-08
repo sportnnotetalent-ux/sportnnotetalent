@@ -58,6 +58,7 @@ import { BackfillBar, RowAction, confirmRemove } from '../TimelineControls';
 import { ICE_HOCKEY_META } from './meta';
 import { iceHockeyMatchRecords } from './records';
 import { IconText } from '../../components/Icon';
+import { MainAction } from '../MainAction';
 
 const opp = (s: Side): Side => (s === 'home' ? 'away' : 'home');
 const uid = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
@@ -580,7 +581,7 @@ const ScoringControls: SportPlugin<IceHockeyState>['ScoringControls'] = ({
     return (
       <View key={sd} style={c.col}>
         <Text style={[c.team, { color: ink(sd) }]} numberOfLines={1}>{name(sd)}</Text>
-        <Button variant="primary" label="🚨 Goal" color={color(sd)} disabled={!periodStarted(s)} onPress={() => startGoal(sd)} />
+        <MainAction label="🚨 Goal" plus="+1" color={color(sd)} disabled={!periodStarted(s)} onPress={() => startGoal(sd)} />
         <Button label="🎯 Shot" accessibilityLabel={`Shot on goal by ${name(sd)}`} variant="ghost" disabled={!periodStarted(s)} onPress={() => setFlow({ mode: 'shot', side: sd })} />
         <Button label="⏱ Penalty" variant="ghost" onPress={() => setFlow({ mode: 'pen', side: sd, step: 'kind' })} />
         <Button label="⭕ Penalty shot" variant="ghost" disabled={!periodStarted(s)} onPress={() => setFlow({ mode: 'ps', side: sd, step: 'result' })} />
@@ -611,10 +612,10 @@ const ScoringControls: SportPlugin<IceHockeyState>['ScoringControls'] = ({
             <Text style={c.small}>{periodLong(s, s.period)}{s.period > s.periods ? ` · sudden death, ${base} on ${base}` : ''}</Text>
             <Text style={c.clock} accessibilityLabel={`${clockFace(s, now)} left in the ${periodLong(s, s.period)}`}>{clockFace(s, now)}</Text>
           </View>
-          <Button label={running(s) ? '⏸ Stop' : periodStarted(s) ? '▶ Resume' : s.period === 1 ? '▶ Face-off' : `▶ Start ${periodName(s, s.period)}`} variant={running(s) ? 'ghost' : 'primary'} onPress={startStop} />
+          <Button label={running(s) ? '⏸ Pause clock' : periodStarted(s) ? '▶ Resume' : s.period === 1 ? '▶ Face-off' : `▶ Start ${periodName(s, s.period)}`} variant={running(s) ? 'ghost' : 'primary'} onPress={startStop} />
         </View>
         <View style={c.row}>
-          {!last ? <Button label={`⏭ End ${periodName(s, s.period)}`} variant="ghost" style={c.flex} disabled={!periodStarted(s)} onPress={() => void endPeriod()} /> : null}
+          {!last ? <Button label={`End ${periodName(s, s.period)} →`} variant={periodStarted(s) && running(s) ? 'primary' : 'ghost'} style={c.flex} disabled={!periodStarted(s)} onPress={() => void endPeriod()} /> : null}
           <Button label="⏱ Set clock" variant="ghost" style={c.flex} onPress={() => setSetting((v) => !v)} />
         </View>
         {toOt && periodStarted(s) ? <Text style={c.meta}>Level — ending this period goes to overtime (sudden death).</Text> : null}

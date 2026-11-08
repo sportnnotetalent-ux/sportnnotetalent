@@ -63,6 +63,7 @@ import { leagueVoice, leagueVoiceEnds, leagueLast } from './voice';
 import { RUGBY_LEAGUE_META } from './meta';
 import { leagueMatchRecords } from './records';
 import { IconText } from '../../components/Icon';
+import { MainAction } from '../MainAction';
 
 const uid = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 /** the keys this match tracks (the base set + the detail switched on) */
@@ -475,7 +476,7 @@ const ScoringControls: SportPlugin<LeagueState>['ScoringControls'] = ({
   const sideCol = (sd: Side) => (
     <View key={sd} style={c.col}>
       <Text style={[c.team, { color: color(sd) }]} numberOfLines={1}>{name(sd)}</Text>
-      <Button variant="primary" label="🏉 Try" color={color(sd)} onPress={() => setFlow({ mode: 'try', side: sd, step: s.bonusTry ? 'zone' : 'scorer' })} />
+      <MainAction label="🏉 Try" color={color(sd)} onPress={() => setFlow({ mode: 'try', side: sd, step: s.bonusTry ? 'zone' : 'scorer' })} />
       <Button label="🎯 Kick at goal" accessibilityLabel="Penalty goal, 2 points" variant="ghost" onPress={() => setFlow({ mode: 'kick', side: sd, kick: 'pen', step: 'result' })} />
       <Button label="🥅 Field goal" accessibilityLabel={`Field goal (drop goal), ${s.fg2 ? '1 or 2 points' : '1 point'}`} variant="ghost" onPress={() => setFlow({ mode: 'kick', side: sd, kick: 'fg', step: 'result' })} />
       <Button label="🏉 Penalty try" accessibilityLabel="Penalty try, 4 points, then the conversion" variant="ghost" onPress={() => penaltyTry(sd)} />
@@ -546,11 +547,11 @@ const ScoringControls: SportPlugin<LeagueState>['ScoringControls'] = ({
             <Text style={c.small}>{periodLong(s, s.period)}</Text>
             <Text style={[c.clock, ps > len ? { color: theme.colors.danger } : null]}>{clockFace(s, now)}</Text>
           </View>
-          <Button label={running(s) ? '⏸ Stop' : periodStarted(s) ? '▶ Resume' : s.period === 1 ? '▶ Kick-off' : `▶ Start ${periodName(s, s.period)}`} variant={running(s) ? 'ghost' : 'primary'} onPress={startStop} />
+          <Button label={running(s) ? '⏸ Pause clock' : periodStarted(s) ? '▶ Resume' : s.period === 1 ? '▶ Kick-off' : `▶ Start ${periodName(s, s.period)}`} variant={running(s) ? 'ghost' : 'primary'} onPress={startStop} />
         </View>
         <View style={c.row}>
           {/* the final whistle's Full time sits at the bottom of the controls (SD-106) */}
-          {!last ? <Button label={`⏭ End ${periodName(s, s.period)}`} variant="ghost" style={c.flex} disabled={!periodStarted(s)} onPress={() => void endPeriod()} /> : null}
+          {!last ? <Button label={`End ${periodName(s, s.period)} →`} variant={periodStarted(s) && running(s) ? 'primary' : 'ghost'} style={c.flex} disabled={!periodStarted(s)} onPress={() => void endPeriod()} /> : null}
           <Button label="⏱ Set clock" variant="ghost" style={c.flex} onPress={() => setSetting((v) => !v)} />
         </View>
         {toMore && periodStarted(s) ? <Text style={c.meta}>Level — ending this period goes on to {gpWord} ({s.gpMinutes} min{s.decider === 'gpFinal' ? ' periods until someone scores' : ' × 2, then the draw stands'}).</Text> : null}

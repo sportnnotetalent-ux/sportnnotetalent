@@ -56,6 +56,7 @@ import { BackfillBar, RowAction, confirmRemove } from '../TimelineControls';
 import { afVoice, afVoiceEnds, lastPasser } from './voice';
 import { AMERICAN_FOOTBALL_META } from './meta';
 import { afMatchRecords } from './records';
+import { MainAction } from '../MainAction';
 
 const uid = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 const who = (p?: Player | null): Who | undefined => (p ? { id: p.id } : undefined); // IDs-only scoring: the id, never the name
@@ -757,7 +758,7 @@ const ScoringControls: SportPlugin<AFState>['ScoringControls'] = ({
   const sideCol = (sd: Side) => (
     <View key={sd} style={c.col}>
       <Text style={[c.team, { color: ink(sd) }]} numberOfLines={1}>{name(sd)}</Text>
-      <Button variant="primary" label="🏈 Touchdown" color={color(sd)} onPress={() => setFlow({ mode: 'td', side: sd, step: 'scorer', how: 'run', yards: '' })} />
+      <MainAction label="🏈 Touchdown" color={color(sd)} onPress={() => setFlow({ mode: 'td', side: sd, step: 'scorer', how: 'run', yards: '' })} />
       {!flag ? <Button label="🥅 Field goal" variant="ghost" onPress={() => setFlow({ mode: 'fg', side: sd, step: 'result', yards: '' })} /> : null}
       <Button label="🛡️ Safety (2)" accessibilityLabel={`Safety, 2 points to ${name(sd)}`} variant="ghost" onPress={() => setFlow({ mode: 'safety', side: sd })} />
     </View>
@@ -806,11 +807,11 @@ const ScoringControls: SportPlugin<AFState>['ScoringControls'] = ({
             <Text style={c.small}>{periodLong(s, s.period)}</Text>
             <Text style={[c.clock, !noClock && remainingSec(s, now) === 0 && periodStarted(s) ? { color: theme.colors.danger } : null]}>{noClock ? 'No clock' : clockFace(s, now)}</Text>
           </View>
-          {!noClock ? <Button label={running(s) ? '⏸ Stop' : periodStarted(s) ? '▶ Resume' : s.period === 1 ? '▶ Kickoff' : `▶ Start ${periodName(s, s.period)}`} variant={running(s) ? 'ghost' : 'primary'} onPress={startStop} /> : null}
+          {!noClock ? <Button label={running(s) ? '⏸ Pause clock' : periodStarted(s) ? '▶ Resume' : s.period === 1 ? '▶ Kickoff' : `▶ Start ${periodName(s, s.period)}`} variant={running(s) ? 'ghost' : 'primary'} onPress={startStop} /> : null}
         </View>
         <View style={c.row}>
           {/* the game's end sits at the bottom of the controls (SD-106) */}
-          {!last ? <Button label={`⏭ End ${periodName(s, s.period)}`} variant="ghost" style={c.flex} disabled={!periodStarted(s)} onPress={() => void endPeriod()} /> : null}
+          {!last ? <Button label={`End ${periodName(s, s.period)} →`} variant={periodStarted(s) && running(s) ? 'primary' : 'ghost'} style={c.flex} disabled={!periodStarted(s)} onPress={() => void endPeriod()} /> : null}
           {!noClock ? <Button label="⏱ Set clock" variant="ghost" style={c.flex} onPress={() => setSetting((v) => !v)} /> : null}
         </View>
         {setting ? (

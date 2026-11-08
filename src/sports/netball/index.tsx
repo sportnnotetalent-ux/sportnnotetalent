@@ -594,7 +594,7 @@ const ScoringControls: SportPlugin<NetballState>['ScoringControls'] = ({
             <Text style={c.small}>{periodLong(s, s.period)}</Text>
             <Text style={c.clock} accessibilityLabel={`${periodLong(s, s.period)}, ${clockFace(s, now)} ${isOpen(s) ? 'played' : 'left'}`}>{clockFace(s, now)}</Text>
           </View>
-          <Button label={running(s) ? '⏸ Stop' : periodStarted(s) ? '▶ Resume' : s.period === 1 ? '▶ Start' : `▶ Start ${periodName(s, s.period)}`}
+          <Button label={running(s) ? '⏸ Pause clock' : periodStarted(s) ? '▶ Resume' : s.period === 1 ? '▶ Start' : `▶ Start ${periodName(s, s.period)}`}
             variant={running(s) ? 'ghost' : 'primary'} disabled={needToss} onPress={startStop} />
         </View>
         {needToss ? (
@@ -608,7 +608,7 @@ const ScoringControls: SportPlugin<NetballState>['ScoringControls'] = ({
           </View>
         ) : null}
         <View style={c.row}>
-          {!last && !(s.playOn && level) ? <Button label={`⏭ End ${periodName(s, s.period)}`} variant="ghost" style={c.flex} disabled={!periodStarted(s)} onPress={() => void endPeriod()} /> : null}
+          {!last && !(s.playOn && level) ? <Button label={`End ${periodName(s, s.period)} →`} variant={periodStarted(s) && running(s) ? 'primary' : 'ghost'} style={c.flex} disabled={!periodStarted(s)} onPress={() => void endPeriod()} /> : null}
           <Button label="⏱ Set" accessibilityLabel="Set the clock" variant="ghost" style={c.flex} onPress={() => setSetting((v) => !v)} />
           <Button label="⏸ Hold" accessibilityLabel="Hold time (injury, blood, tactical change)" variant="ghost" style={c.flex} disabled={!running(s)} onPress={() => setFlow({ mode: 'hold' })} />
         </View>

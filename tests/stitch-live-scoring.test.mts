@@ -46,3 +46,26 @@ test('LS7/LS8: feed tags come only from what the scorer recorded', () => {
   const s = read('src/sports/invasion/Commentary.tsx');
   assert.match(s, /it\.detail \? <Text style=\{st\.detail\}/);
 });
+
+const SIDE_SPORTS = ['hockey', 'handball', 'ice_hockey', 'rugby', 'rugby_league', 'american_football'];
+
+test('LS9/LS10: the main action is the shared big team-coloured button', () => {
+  const m = read('src/sports/MainAction.tsx');
+  assert.match(m, /readableOn\(/);
+  assert.match(m, /minHeight: 64/);
+  for (const sp of SIDE_SPORTS) {
+    const s = read(`src/sports/${sp}/index.tsx`);
+    assert.match(s, /<MainAction /, sp);
+    assert.doesNotMatch(s, /<Button variant="primary" label="(🏑 Goal|🥅 Goal|🚨 Goal|🏉 Try|🏈 Touchdown)" color=\{color\(sd\)\} (disabled|onPress)/, sp);
+  }
+  assert.match(read('src/sports/football/index.tsx'), /<MainAction team=\{homeName\}/);
+});
+
+test('LS11: "End period →" is lime only while the period runs, and still asks first', () => {
+  for (const sp of [...SIDE_SPORTS, 'netball']) {
+    const s = read(`src/sports/${sp}/index.tsx`);
+    assert.match(s, /label=\{`End \$\{periodName\(s, s\.period\)\} →`\} variant=\{periodStarted\(s\) && running\(s\) \? 'primary' : 'ghost'\}/, sp);
+    assert.match(s, /'⏸ Pause clock'/, sp);
+    assert.match(s, /confirmMatchAction\('endPeriod'/, sp);
+  }
+});

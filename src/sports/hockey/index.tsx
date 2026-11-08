@@ -53,6 +53,7 @@ import { HOCKEY_META } from './meta';
 import { hockeyMatchRecords } from './records';
 import { IconText } from '../../components/Icon';
 import { hockeyUndoLabel } from './undoLabel';
+import { MainAction } from '../MainAction';
 
 const opp = (s: Side): Side => (s === 'home' ? 'away' : 'home');
 const uid = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
@@ -497,7 +498,7 @@ const ScoringControls: SportPlugin<HockeyState>['ScoringControls'] = ({
     return (
       <View key={sd} style={c.col}>
         <Text style={[c.team, { color: color(sd) }]} numberOfLines={1}>{name(sd)}</Text>
-        <Button variant="primary" label="🏑 Goal" color={color(sd)} onPress={() => setFlow({ mode: 'goal', side: sd, step: 'type' })} />
+        <MainAction label="🏑 Goal" plus="+1" color={color(sd)} onPress={() => setFlow({ mode: 'goal', side: sd, step: 'type' })} />
         {s.penaltyCorners ? (
           <Button label="🚩 PC" accessibilityLabel="Penalty corner" variant="ghost" onPress={() => { const id = uid(); fire({ type: 'PC', side: sd, payload: { uid: id } }); setPcOpen({ side: sd, id }); }} />
         ) : null}
@@ -540,11 +541,11 @@ const ScoringControls: SportPlugin<HockeyState>['ScoringControls'] = ({
             <Text style={c.small}>{periodLong(s, s.period)}{s.stopClock ? ' · clock stops on goals & PCs' : ''}</Text>
             <Text style={c.clock}>{clockFace(s, now)}</Text>
           </View>
-          <Button label={running(s) ? '⏸ Stop' : periodStarted(s) ? '▶ Resume' : s.period === 1 ? '▶ Push back' : `▶ Start ${periodName(s, s.period)}`} variant={running(s) ? 'ghost' : 'primary'} onPress={startStop} />
+          <Button label={running(s) ? '⏸ Pause clock' : periodStarted(s) ? '▶ Resume' : s.period === 1 ? '▶ Push back' : `▶ Start ${periodName(s, s.period)}`} variant={running(s) ? 'ghost' : 'primary'} onPress={startStop} />
         </View>
         <View style={c.row}>
           {/* the last period's Full time sits at the bottom of the controls (SD-106) */}
-          {!last ? <Button label={`⏭ End ${periodName(s, s.period)}`} variant="ghost" style={c.flex}
+          {!last ? <Button label={`End ${periodName(s, s.period)} →`} variant={periodStarted(s) && running(s) ? 'primary' : 'ghost'} style={c.flex}
             disabled={!periodStarted(s)} onPress={() => void endPeriod()} /> : null}
           <Button label="⏱ Set clock" variant="ghost" style={c.flex} onPress={() => setSetting((v) => !v)} />
         </View>

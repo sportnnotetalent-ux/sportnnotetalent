@@ -17,3 +17,7 @@
 | LS6 | Pair names on the green panel are cut. | UX | The panel uses `SideName` (pair-names.md). |
 | LS7 | Detail tags invent detail the scorer never recorded ("RIGHT FOOT VOLLEY" on every goal). | Trust | A tag only comes from a recorded value: a goal's type or foot, a card's reason. No value, no tag. Tested. |
 | LS8 | A tag repeats a child's name or squeezes the sentence off screen. | Privacy / UX | Tags hold no names, only the recorded type, ≤ 18 characters, one line, small caps on the right. |
+| LS9 | The big main action is pressed for the wrong team (two big buttons look alike). | Safety | Each is in its own team's colour, inside that team's column (or with the team's name on it for football). Ink is picked by `readableOn` (≥ 4.5:1). It is ≥ 64 pt tall. |
+| LS10 | Making the main action big hides the other actions (card, sub, shot) off screen. | UX | Only the main action grows; the rest stay as they are, just below it. |
+| LS11 | Lime "End period →" is tapped by accident mid-play. | Safety | It still asks first (the existing `confirmMatchAction` sheet) and is lime only while the period is running. Before the period starts, Start is the one lime button. |
+| LS12 | A sport outside the shared pattern (basketball, kabaddi) is half-changed and looks inconsistent. | Consistency | They keep their own pads, which are already built around per-team score buttons. Listed in the report, not partly restyled. |

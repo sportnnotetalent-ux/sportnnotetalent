@@ -1294,7 +1294,7 @@ export default function LiveScoringScreen({ route, navigation }: Props) {
         <Text style={[st.undoText, { flexShrink: 1 }]} numberOfLines={1}>{undoWhat ? `${undoWhat}${undoBy}` : `Rewind step by step${undoBy}`}</Text>
       </View>
       <TouchableOpacity style={st.undoBtn} activeOpacity={0.8} accessibilityRole="button" accessibilityLabel={`Undo${undoWhat ? `: ${undoWhat}` : ` last ${sport === 'cricket' ? 'ball' : 'update'}`}${undoBy}`} accessibilityHint="Tap repeatedly to rewind to any earlier point" onPress={() => void undoStep()}>
-        <Text style={st.undoPill}>↶ Undo</Text>
+        <IconText label="↶ Undo" style={st.undoPill} />
       </TouchableOpacity>
     </View>
   ) : null;
