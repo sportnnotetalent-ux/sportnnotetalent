@@ -38,6 +38,17 @@ Where it changed:
   - Marketing posts already rendered keep the old mark.
   - The mint experiment was undone and never committed.
 
+### 2026-11-08 — Old career zeros counted; point detail fixed; clean-up SQL for the founder
+
+Read-only count of live career lines (stat_lines): 41 in total (pool 26, badminton 6, pickleball 4, tennis 4, volleyball 1). Most zeros are real counts (pool foul types / racks, sets, break points).
+- **Found:** racket Point detail, on by default since batch 3, counted as "tracked" when merely switched on (wave 1 had gated rally / net / 3rd shot only). Matches where nobody described a point wrote "0 winners / 0 errors …" to careers. It still did until this fix.
+- **Fix** (describe-done.md DD13, 5e8091ca): `detailTracked` / `detailCoverage` count only once a point carries a description. 3 older tests updated on purpose; tsc and the related tests pass.
+- **Clean-up** (`docs/ops/sql/2026-11-08-racket-false-zeros.sql`, for the founder to run in the SQL editor):
+  - It removes only point-detail keys that are exactly 0, in the 2 matches with no described point anywhere (badminton 4 lines, pickleball 4).
+  - The keys come from the code's `detailKeys()`. A read-only preview gives 8 rows, 60 / 58 zero keys each, and 0 real values touched.
+  - A tennis match was left out: a timeline correction described one point there, so its zeros are genuine.
+- **Not published yet:** until the code fix ships, new racket matches with no described points still write these zeros.
+
 ### 2026-11-08 — Release: wave 4 polish (web, Android OTA)
 
 auth-smoke passed and the publish lock was taken. Published from a clean worktree at bb90add0.
