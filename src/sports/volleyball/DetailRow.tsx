@@ -1,6 +1,8 @@
 /**
  * SD-81 + deep wave — volleyball's optional "Stats to track" row under the
- * point panels. Off by default (the point buttons stay one or two taps). The
+ * point panels. Every prompt is optional (the point buttons stay one or two
+ * taps); a NEW match starts with reception, digs, set by and who was aced on
+ * (settings.ts VB_STATS_DEFAULTS), attack attempts off. The
  * categories are chosen in ⚙️ Stats to track (settings.ts); the inline chip
  * turns the chosen ones on / off. With a category on it adds:
  *   attack     after a Block point: "Who was blocked?" (an attack attempt

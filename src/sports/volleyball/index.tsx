@@ -364,7 +364,7 @@ export const volleyballPlugin: SportPlugin<VolleyballState> = {
   }),
   ScoringControls,
   matchTabs: { Commentary: VolleyballCommentary, Stats: VolleyballStats },
-  // deep wave — "Stats to track": attack attempts, reception, digs, set assists (all off by default)
+  // deep wave — "Stats to track": attack attempts (off), reception, digs, set assists, who was aced (on for a new match; VB_STATS_DEFAULTS)
   liveSettings: VOLLEYBALL_LIVE_SETTINGS,
   // SD-136 — FIVB sanctions (misconduct 21, delays 16.2) in Quick options
   QuickOptions: VolleyballQuickOptions,

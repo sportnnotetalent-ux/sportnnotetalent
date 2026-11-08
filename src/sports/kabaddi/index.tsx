@@ -870,7 +870,7 @@ export const kabaddiPlugin: SportPlugin<KabaddiState> = {
   LiveClock,
   // its match centre has its own Game flow category (no shared card under it)
   matchTabs: { Commentary: KabaddiCommentary, Stats: KabaddiStats, ownGameFlow: true },
-  // deep wave — "Stats to track": raid skill, defenders touched (both off by default)
+  // deep wave — "Stats to track": raid skill (on for a new match), defenders touched (off)
   liveSettings: KABADDI_LIVE_SETTINGS,
   formation: () => courtFormation('kabaddi'),
   Court: makeCourt('kabaddi'),

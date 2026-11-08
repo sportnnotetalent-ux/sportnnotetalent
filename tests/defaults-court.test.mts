@@ -90,18 +90,20 @@ describe('DC1 · basketball: Track missed shots on for a new match', () => {
 describe('DC2 · volleyball: "Set by?" on for a new match', () => {
   const fields = VOLLEYBALL_META.formatFields ?? [];
   const ls = VOLLEYBALL_LIVE_SETTINGS;
-  test('the format and the Standard: set assists on; attack attempts, reception, digs off', () => {
+  test('the format and the Standard: set assists on; attack attempts off', () => {
     // batch 5 (court-team-batch5.md V6): + "Who was aced?" on for new matches
-    assert.deepEqual(ls.defaults, { vbAttack: false, vbReception: false, vbDig: false, vbAssist: true, vbAced: true });
+    // defaults-on DOC3 (wave 3): + reception quality and digs on (was off)
+    assert.deepEqual(ls.defaults, { vbAttack: false, vbReception: true, vbDig: true, vbAssist: true, vbAced: true });
     assert.equal(fields.find((f) => f.key === 'vbAssist')!.default, true);
     assert.equal(fields.find((f) => f.key === 'vbAttack')!.default, false);
   });
-  test('a new match captures set assists only (no attack keys); Info lists Set assists On', () => {
+  test('a new match captures set assists (no attack keys); Info lists Set assists On', () => {
     const fmt = defaultsFor(fields);
     const s = vb.init(fmt);
-    assert.deepEqual(detailCats(s), ['assist', 'aced']); // batch 5: + aced
+    // batch 5: + aced; defaults-on DOC3 (wave 3): + reception, digs
+    assert.deepEqual(detailCats(s), ['reception', 'dig', 'assist', 'aced']);
     assert.equal(detailTracked(s), false, 'attack attempts not tracked');
-    assert.deepEqual(capOf(ls, s, fields, fmt), { vbAttack: false, vbReception: false, vbDig: false, vbAssist: true, vbAced: true });
+    assert.deepEqual(capOf(ls, s, fields, fmt), { vbAttack: false, vbReception: true, vbDig: true, vbAssist: true, vbAced: true });
     assert.equal(customCount(ls, ls.read(s)), 0);
   });
   test('DC10 · a kill is still one tap: the setter is optional; none named → not tracked (NZC1)', () => {
@@ -128,10 +130,12 @@ describe('DC2 · volleyball: "Set by?" on for a new match', () => {
 describe('DC4 / DC5 / DC12 · netball: feeds & rebounds on with International 4 × 15; CPR default agrees', () => {
   const fields = NETBALL_META.formatFields ?? [];
   const ls = nb.NETBALL_LIVE_SETTINGS;
-  test('International switches feeds & rebounds on; School and Halves off (a preset switch never carries it)', () => {
-    assert.equal(NETBALL_PRESETS.international.set.detail, true);
-    assert.equal(NETBALL_PRESETS.school.set.detail, false);
-    assert.equal(NETBALL_PRESETS.halves.set.detail, false);
+  test('feeds & rebounds on in every preset; a preset never names it (defaults-on DOC5)', () => {
+    // defaults-on DOC5 (wave 3): was "International on, School / Halves off"
+    for (const [k, p] of Object.entries(NETBALL_PRESETS)) {
+      assert.equal('detail' in p.set, false, k);
+      assert.equal(nb.init({ ...defaultsFor(fields), preset: k, ...p.set }).detail, true, k);
+    }
   });
   test('the format field defaults agree with the live Standard (CPR, feeds & rebounds)', () => {
     for (const k of ['trackCpr', 'detail', 'trackGains', 'trackTurnovers']) {
@@ -148,8 +152,8 @@ describe('DC4 / DC5 / DC12 · netball: feeds & rebounds on with International 4 
     assert.equal(cap.trackCpr, true);
     assert.equal(customCount(ls, ls.read(s)), 0);
   });
-  test('a new School match: feeds off (one tap a shot)', () => {
-    assert.equal(nb.init({ ...defaultsFor(fields), preset: 'school', ...NETBALL_PRESETS.school.set }).detail, false);
+  test('a new School match: feeds on too (defaults-on DOC5; the card is optional since wave 2)', () => {
+    assert.equal(nb.init({ ...defaultsFor(fields), preset: 'school', ...NETBALL_PRESETS.school.set }).detail, true);
   });
   test('DC8 · an old match keeps what it had (no key: off; CPR not on the state)', () => {
     const old = nb.init({ preset: 'international', periods: 4, periodMinutes: 15 });

@@ -50,10 +50,11 @@ const row = (st: ReturnType<typeof volleyballMatchStats>, cat: string, id: strin
 describe('volleyball · Who was aced? (its own category)', () => {
   const aceLog = (who = 'a1') => [vb.outcomeAction('ace', 'home', P('h1')), detailAction('aced', 'away', P(who))];
 
-  test('V6: a new match starts with Set by and Who was aced on; the rest off', () => {
+  test('V6: a new match starts with Set by and Who was aced on; attack attempts off', () => {
     const fmt = defaultsFor(VOLLEYBALL_META.formatFields ?? []);
     assert.equal(fmt.vbAced, true);
-    assert.deepEqual([...detailCats(vb.init(fmt))].sort(), ['aced', 'assist']);
+    // defaults-on DOC3 (wave 3): reception quality and digs are on for a new match too
+    assert.deepEqual([...detailCats(vb.init(fmt))].sort(), ['aced', 'assist', 'dig', 'reception']);
     assert.equal(VOLLEYBALL_LIVE_SETTINGS.defaults.vbAced, true);
     assert.ok(liveOwnedKeys(VOLLEYBALL_LIVE_SETTINGS as never).includes('vbAced'), 'Edit format leaves it out');
     const caps = matchCaptures(VOLLEYBALL_LIVE_SETTINGS as never, vb.init(fmt)).captures;

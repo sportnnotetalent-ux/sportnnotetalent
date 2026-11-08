@@ -22,7 +22,7 @@ import { basketballPanel } from '../src/sports/basketball/panel.ts';
 import { basketballStatTotals } from '../src/sports/basketball/totals.ts';
 import {
   init as nbInit, reducer as nbReducer, superShotConfig, superShotLive, superShotText,
-  NETBALL_PRESETS, NETBALL_LIVE_SETTINGS, SUPER_SHOT_PRESETS, SUPER_SHOT_RULE_OPTIONS, type NetballState,
+  NETBALL_PRESETS, NETBALL_STATS_DEFAULTS, NETBALL_LIVE_SETTINGS, SUPER_SHOT_PRESETS, SUPER_SHOT_RULE_OPTIONS, type NetballState,
 } from '../src/sports/netball/engine.ts';
 import { customCount } from '../src/sports/liveSettings.ts';
 
@@ -147,12 +147,13 @@ describe('round 2 · basketball: shot-zone buttons are the default layout for a 
 /* ---------------------------------- netball ---------------------------------- */
 
 describe('round 2 · netball: centre pass receives on by default for International 4 × 15', () => {
-  test('the international preset switches CPR on; school and halves switch it off (a preset switch never carries it)', () => {
-    assert.equal(NETBALL_PRESETS.international.set.trackCpr, true);
-    assert.equal(NETBALL_PRESETS.school.set.trackCpr, false);
-    assert.equal(NETBALL_PRESETS.halves.set.trackCpr, false);
-    assert.equal(nbInit({ preset: 'international', ...NETBALL_PRESETS.international.set }).trackCpr, true);
-    assert.equal(nbInit({ preset: 'school', ...NETBALL_PRESETS.school.set }).trackCpr, false);
+  test('CPR is on for a new match in every preset; a preset never names it (defaults-on DOC5)', () => {
+    // defaults-on DOC5 (wave 3): was "international on, school / halves off" —
+    // the presets no longer carry the stats keys; the field default (on) holds
+    for (const [k, p] of Object.entries(NETBALL_PRESETS)) {
+      assert.equal('trackCpr' in p.set, false, k);
+      assert.equal(nbInit({ trackCpr: NETBALL_STATS_DEFAULTS.trackCpr, preset: k, ...p.set }).trackCpr, true, k);
+    }
   });
   test('an existing match keeps what it had (no key: not on the state); still switchable off', () => {
     assert.equal('trackCpr' in nbInit({ preset: 'international', periods: 4, periodMinutes: 15 }), false);
@@ -160,7 +161,8 @@ describe('round 2 · netball: centre pass receives on by default for Internation
   });
   test('the live settings call the international set-up "Standard" (CPR on)', () => {
     assert.equal(NETBALL_LIVE_SETTINGS.defaults?.trackCpr, true);
-    const intl = nbInit({ ...NETBALL_PRESETS.international.set });
+    // defaults-on DOC2: a new match carries every stats default (no longer in the preset)
+    const intl = nbInit({ ...NETBALL_STATS_DEFAULTS, ...NETBALL_PRESETS.international.set });
     assert.equal(customCount(NETBALL_LIVE_SETTINGS, NETBALL_LIVE_SETTINGS.read(intl)), 0);
   });
 });

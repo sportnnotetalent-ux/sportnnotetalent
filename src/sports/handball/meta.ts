@@ -18,10 +18,14 @@ export const HANDBALL_PRESETS: Record<string, { label: string; set: Record<strin
  *  (the fault's kind beside the player pick; "won by" on the 7 m result
  *  screen) — no extra tap. A stored format without the keys (every older
  *  match) keeps both off (readHandballTrack). */
+/** defaults-on DOC3 (wave 3): the one source for a NEW match's stats switches —
+ *  the format fields and the live card's Standard (Reset). Both stay on. */
+export const HANDBALL_STATS_DEFAULTS: Readonly<{ trackFaultTypes: boolean; trackSevenMDrawn: boolean }> = { trackFaultTypes: true, trackSevenMDrawn: true };
+
 export const HANDBALL_TRACK_FIELDS: FormatField[] = [
-  { key: 'trackFaultTypes', label: 'Technical fault types', type: 'toggle', default: true, group: 'Stats to track', hint: 'steps, double dribble, area, offensive foul, passive play… (an optional chip)' },
+  { key: 'trackFaultTypes', label: 'Technical fault types', type: 'toggle', default: HANDBALL_STATS_DEFAULTS.trackFaultTypes, group: 'Stats to track', hint: 'steps, double dribble, area, offensive foul, passive play… (an optional chip)' },
   // batch 6: the same screen also asks who caused the throw (an optional chip)
-  { key: 'trackSevenMDrawn', label: '7 m won / caused by', type: 'toggle', default: true, group: 'Stats to track', hint: 'who won each 7-metre throw and which defender conceded it (optional chips)' },
+  { key: 'trackSevenMDrawn', label: '7 m won / caused by', type: 'toggle', default: HANDBALL_STATS_DEFAULTS.trackSevenMDrawn, group: 'Stats to track', hint: 'who won each 7-metre throw and which defender conceded it (optional chips)' },
 ];
 
 export const HANDBALL_META: SportMeta = {

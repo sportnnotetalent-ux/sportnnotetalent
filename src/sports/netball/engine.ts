@@ -37,9 +37,9 @@
  */
 import type { ScoreAction, LiveSettings, FormatField, Attribution } from '../types';
 // Perf F-15 — the format presets / options live in the light meta module.
-import { NETBALL_PRESETS, SUPER_SHOT_PRESETS, SUPER_SHOT_RULE_OPTIONS } from './meta.ts';
+import { NETBALL_PRESETS, NETBALL_STATS_DEFAULTS, SUPER_SHOT_PRESETS, SUPER_SHOT_RULE_OPTIONS } from './meta.ts';
 import type { SuperShotRule, SuperShotPreset } from './meta.ts';
-export { NETBALL_PRESETS, SUPER_SHOT_PRESETS, SUPER_SHOT_RULE_OPTIONS };
+export { NETBALL_PRESETS, NETBALL_STATS_DEFAULTS, SUPER_SHOT_PRESETS, SUPER_SHOT_RULE_OPTIONS };
 export type { SuperShotRule, SuperShotPreset };
 
 export type Side = 'home' | 'away';
@@ -808,15 +808,14 @@ export const NETBALL_LIVE_SETTINGS: LiveSettings<NetballState> = {
   mode: 'config',
   fields: [
     { key: 'periodMinutes', label: 'Quarter length', type: 'number', default: 15, min: 1, max: 20, step: 1, hint: 'min / period' },
-    // Deep wave — "Stats to track": each applies from the next play (plays stamp their own detail)
-    // Batch 3: on by default with the international 4 × 15 preset, like CPR
-    { key: 'detail', label: 'Feeds & rebounds', type: 'toggle', default: true, group: 'Stats to track' },
-    // Round 2: on by default with the international 4 × 15 preset — the "Standard"
-    { key: 'trackCpr', label: 'Centre pass receives', type: 'toggle', default: true, group: 'Stats to track' },
-    { key: 'trackGains', label: 'Gains & pick-ups', type: 'toggle', default: false, group: 'Stats to track' },
-    { key: 'trackTurnovers', label: 'Turnover types', type: 'toggle', default: false, group: 'Stats to track' },
+    // Deep wave — "Stats to track": each applies from the next play (plays stamp their own detail).
+    // Wave 3: all four on for a NEW match (NETBALL_STATS_DEFAULTS, shared with the format fields).
+    { key: 'detail', label: 'Feeds & rebounds', type: 'toggle', default: NETBALL_STATS_DEFAULTS.detail, group: 'Stats to track' },
+    { key: 'trackCpr', label: 'Centre pass receives', type: 'toggle', default: NETBALL_STATS_DEFAULTS.trackCpr, group: 'Stats to track' },
+    { key: 'trackGains', label: 'Gains & pick-ups', type: 'toggle', default: NETBALL_STATS_DEFAULTS.trackGains, group: 'Stats to track' },
+    { key: 'trackTurnovers', label: 'Turnover types', type: 'toggle', default: NETBALL_STATS_DEFAULTS.trackTurnovers, group: 'Stats to track' },
     { key: 'stopClock', label: 'Stop clock on suspensions', type: 'toggle', default: true, group: 'Clock' },
   ] as FormatField[],
   read: (s) => ({ periodMinutes: s.periodMinutes, detail: s.detail, trackCpr: s.trackCpr === true, trackGains: s.trackGains === true, trackTurnovers: s.trackTurnovers === true, stopClock: s.stopClock }),
-  defaults: { periodMinutes: 15, detail: true, trackCpr: true, trackGains: false, trackTurnovers: false, stopClock: true },
+  defaults: { periodMinutes: 15, ...NETBALL_STATS_DEFAULTS, stopClock: true },
 };

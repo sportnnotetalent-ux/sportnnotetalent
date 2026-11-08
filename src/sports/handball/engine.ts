@@ -33,7 +33,7 @@
 import type { ScoreAction, LiveSettings, FormatField, Attribution } from '../types';
 import { aggPriorFromConfig, aggregateText, levelForDecider, type AggPrior } from '../aggregate.ts';
 // Perf F-15 — the format presets / options live in the light meta module.
-import { HANDBALL_PRESETS, HANDBALL_TRACK_FIELDS } from './meta.ts';
+import { HANDBALL_PRESETS, HANDBALL_STATS_DEFAULTS, HANDBALL_TRACK_FIELDS } from './meta.ts';
 export { HANDBALL_PRESETS, HANDBALL_TRACK_FIELDS };
 
 export type Side = 'home' | 'away';
@@ -695,5 +695,5 @@ export const HANDBALL_LIVE_SETTINGS: LiveSettings<HandballState> = {
     ...HANDBALL_TRACK_FIELDS,
   ] as FormatField[],
   read: (s) => ({ periodMinutes: s.periodMinutes, stopClock: s.stopClock, trackFaultTypes: s.track?.faultTypes === true, trackSevenMDrawn: s.track?.sevenMDrawn === true }),
-  defaults: { periodMinutes: 30, stopClock: true, trackFaultTypes: true, trackSevenMDrawn: true },
+  defaults: { periodMinutes: 30, stopClock: true, ...HANDBALL_STATS_DEFAULTS },
 };
