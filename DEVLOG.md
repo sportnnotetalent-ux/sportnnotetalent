@@ -13,6 +13,13 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-08 — Release: Stitch picks, pair names, website front page, guides (web, Android OTA, website)
+
+auth-smoke passed and the publish lock was taken. Published from a clean worktree at 825223e8.
+- **App web:** `index-27f428a3`, stable on app.sportnnote.in; the new LiveScoringScreen chunk ("LAST STEP") is served live.
+- **Android OTA:** `7086e031` (preview) / `f5b96b51` (production).
+- **Website and guides:** deployed by the Cloudflare Worker from the `main` push.
+
 ### 2026-11-08 — Stitch picks (app) and pair names on two lines
 
 The founder picked elements from the Google Stitch designs (docs/design/stitch-picks/), and asked that pairs show both names, consistently, on every scorecard.
