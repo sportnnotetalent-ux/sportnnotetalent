@@ -208,7 +208,8 @@ describe('deep wave · "Stats to track"', () => {
     assert.deepEqual(initDetailFlags({ rallyDetail: true, thirdDetail: true, x: true }), { rallyDetail: true, thirdDetail: true });
     assert.equal(PB.init({ thirdDetail: true }).thirdDetail, true);
     assert.equal(detailFlags({ thirdDetail: false }, {}), null);
-    assert.ok(thirdTracked(after));
+    // describe-done.md DD11: switched on but nothing tagged yet is not tracked (no false zero)
+    assert.equal(thirdTracked(after), false);
   });
 });
 

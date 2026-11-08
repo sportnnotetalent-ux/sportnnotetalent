@@ -67,3 +67,41 @@ test('DD3/DD6: 600 scorers — a fresh card every point, never blocked', () => {
     }
   }
 });
+
+test('DD10: endings grouped — Won it first, then Errors; empty groups dropped', async () => {
+  const { howSections } = await import('../src/sports/describePanel.ts');
+  const { DETAIL_HOWS } = await import('../src/sports/pointDetail.ts');
+  for (const sp of ['tennis', 'badminton', 'tabletennis', 'squash', 'padel', 'pickleball'] as const) {
+    const secs = howSections(DETAIL_HOWS[sp]);
+    assert.deepEqual(secs.map((x) => x.title), ['Won it', 'Errors'], sp);
+    assert.ok(secs[0].hows.every((h) => h.credit === 'winner') && secs[1].hows.every((h) => h.credit === 'loser'), sp);
+    assert.equal(secs[0].hows.length + secs[1].hows.length, DETAIL_HOWS[sp].length, `${sp}: nothing lost`);
+  }
+  assert.deepEqual(howSections(DETAIL_HOWS.badminton.filter((h) => h.credit === 'loser')).map((x) => x.title), ['Errors']);
+  for (const f of ['src/sports/PointDetailRow.tsx', 'src/sports/tennis/PointCapture.tsx']) {
+    const s = read(f);
+    assert.match(s, /howSections\(hows\)/, f);
+    assert.match(s, />Shot</, f);
+  }
+});
+
+test('DD11: switched on but never tagged is not "tracked" (no false zeros)', async () => {
+  const { rallyTracked, netTracked, thirdTracked } = await import('../src/sports/pointDetail.ts');
+  const on = { rallyDetail: true, netDetail: true, thirdDetail: true, events: [{ id: 1, kind: 'point' }] };
+  assert.equal(rallyTracked(on as never), false);
+  assert.equal(netTracked(on as never), false);
+  assert.equal(thirdTracked(on as never), false);
+  const tagged = { ...on, events: [{ id: 1, kind: 'point', rallyLen: 'short', atNet: 'home', third: 'drop' }] };
+  assert.equal(rallyTracked(tagged as never), true);
+  assert.equal(netTracked(tagged as never), true);
+  assert.equal(thirdTracked(tagged as never), true);
+});
+
+test('DD12: doubles asks who; a doubles side with no names gets a hint, never silence', async () => {
+  const { byHint } = await import('../src/sports/describePanel.ts');
+  assert.equal(byHint(true, 0, 'Pair B'), "By: add Pair B's two players (Add / invite a player) to credit each one");
+  assert.equal(byHint(true, 1, 'Pair B'), "By: add Pair B's two players (Add / invite a player) to credit each one");
+  assert.equal(byHint(true, 2, 'Pair B'), null, 'named players: the By: chips show instead');
+  assert.equal(byHint(false, 0, 'Ravi'), null, 'singles: the opponent is credited automatically');
+  for (const f of ['src/sports/PointDetailRow.tsx', 'src/sports/tennis/PointCapture.tsx']) assert.match(read(f), /byHint\(/, f);
+});

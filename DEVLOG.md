@@ -38,6 +38,17 @@ Where it changed:
   - Marketing posts already rendered keep the old mark.
   - The mint experiment was undone and never committed.
 
+### 2026-11-08 — Last point card: groups, no false zeros, doubles hint; specialist review of every sport
+
+Founder follow-ups on the racket card (describe-done.md DD10–DD12), and a stats-defaults review by sport specialists across all families.
+- **DD10:** the endings sit under small headings: Won it, then Errors, then Shot, then Rally, then Done.
+- **DD11:** Rally length, Net points and 3rd shot count as tracked only once a point is tagged. Switched on with nothing tagged shows no "0 / 0".
+- **DD12:** doubles already asks "By:" (who hit the winner / who erred). A doubles side with no named players now says how to add them, instead of silently skipping. Tennis has no winner hitter yet (wave 4).
+- **Specialist review:** six family reports plus a product plan in `docs/sport-expert/defaults-on/` (PLAN.md).
+  - Main findings: false zeros everywhere once stats are on; blocking follow-ups; and two live score-loss bugs (netball Cancel; assist step in hockey / ice hockey / rugby).
+  - Waves 0–4 and 3 founder decisions are listed in the plan.
+- **Checks:** describe-done tests (12) and 1 older test updated on purpose; full suite 7786 (0 failing); tsc; demo-checked groups and the doubles hint.
+
 ### 2026-11-08 — Racket sports: every stat on by default; Done button on "Last point"
 
 Founder, scoring a friendly badminton game: the extra stats should be on by default, and the hard-to-see "Choose" link needed a clear Done under the summary (describe-done.md).

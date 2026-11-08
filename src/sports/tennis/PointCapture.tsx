@@ -32,10 +32,12 @@ import { TENNIS_TRACK_FIELDS } from '../pointDetailSettings';
 import { useMask } from '../../core/disputeMask';
 import { whoName, withRosters } from '../racketNames';
 import { errOf } from '../racketActions';
-import { panelMode, doneLabel, type PanelMark } from '../describePanel';
+import { panelMode, doneLabel, howSections, byHint, type PanelMark } from '../describePanel';
 import type { TennisState } from './engine';
 
 type Side = 'home' | 'away';
+/** DD12: tennis credits only the erring player for now (no hitter on a winner) */
+const WINNER_BY = false;
 const opp = (s: Side): Side => (s === 'home' ? 'away' : 'home');
 
 export function TennisPointDetail({
@@ -160,13 +162,18 @@ export function TennisPointDetail({
       <View style={st.head}>
         <Text style={st.label} numberOfLines={1}>Last point · {who}{isAce ? ' · ace' : ''}</Text>
       </View>
-      {hows.length > 0 && (
-        <View style={st.chips}>
-          {hows.map((h) => <SelectChip key={h.how} label={h.chip} active={pd?.how === h.how} onPress={() => pick(h.how)} />)}
+      {/* DD10: the endings in groups — Won it, then Errors — for a quick glance */}
+      {howSections(hows).map((g) => (
+        <View key={g.title} style={st.group}>
+          <Text style={st.section}>{g.title}</Text>
+          <View style={st.chips}>
+            {g.hows.map((h) => <SelectChip key={h.how} label={h.chip} active={pd?.how === h.how} onPress={() => pick(h.how)} />)}
+          </View>
         </View>
-      )}
+      ))}
       {sel?.wingShot && pd && (
         <>
+          <Text style={st.section}>Shot</Text>
           <View style={st.chips}>
             {WINGS.map((w) => (
               <SelectChip key={w} label={WING_LABEL[w]} active={stroke.wing === w} onPress={() => setStroke({ wing: stroke.wing === w ? null : w })} />
@@ -192,6 +199,13 @@ export function TennisPointDetail({
           ))}
         </View>
       )}
+      {/* DD12: doubles with nobody named on the credited side — say how, never silence */}
+      {sel && pd && (() => {
+        const side: Side = sel.credit === 'winner' ? W : L;
+        if (sel.credit === 'winner' && !WINNER_BY) return null;
+        const h = byHint((state as { doubles?: boolean }).doubles === true, (side === 'home' ? homeRoster : awayRoster).length, nameOf(side));
+        return h ? <Text style={st.meta}>{h}</Text> : null;
+      })()}
       {sel?.credit === 'loser' && pd && loserRoster.length >= 2 && (
         <View style={st.chips}>
           <Text style={[st.meta, st.rowLabel]}>By:</Text>
@@ -286,6 +300,8 @@ const st = StyleSheet.create({
   meta: { color: theme.colors.textMuted, fontSize: theme.font.small, flexShrink: 1 },
   rowLabel: { alignSelf: 'center' },
   saved: { opacity: 0.7 },
+  group: { gap: theme.spacing(1) },
+  section: { color: theme.colors.textMuted, fontSize: theme.font.tiny, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase', marginTop: theme.spacing(1) },
   flex: { flex: 1 },
   done: { alignSelf: 'stretch' },
   link: { color: theme.colors.primary, fontSize: theme.font.small, fontWeight: '700', paddingHorizontal: theme.spacing(2), paddingVertical: theme.spacing(2) },

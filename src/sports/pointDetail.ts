@@ -843,15 +843,17 @@ export const serveTracked = (s: { events?: LiveEvent[] } | null | undefined): bo
 
 type Tracks = { netDetail?: boolean; rallyDetail?: boolean; speedDetail?: boolean; thirdDetail?: boolean; events?: LiveEvent[] } | null | undefined;
 /** Deep wave — did this (pickleball) match track the 3rd shot? */
+// describe-done.md DD11: these options are on by default, so "tracked" means at
+// least one point was tagged — switched on with nothing tagged is no false zero
 export const thirdTracked = (s: Tracks): boolean =>
-  !!s && (s.thirdDetail === true || (s.events ?? []).some((e) => !!e.third));
+  !!s && (s.events ?? []).some((e) => !!e.third);
 /** SD-157 — did this match track net points? (switched on, or a point marked,
  *  a legacy `pd.net` included) */
 export const netTracked = (s: Tracks): boolean =>
-  !!s && (s.netDetail === true || (s.events ?? []).some((e) => !!e.atNet || e.pd?.net === true));
+  !!s && (s.events ?? []).some((e) => !!e.atNet || e.pd?.net === true);
 /** SD-157 — did this match track rally length? */
 export const rallyTracked = (s: Tracks): boolean =>
-  !!s && (s.rallyDetail === true || (s.events ?? []).some((e) => !!e.rallyLen));
+  !!s && (s.events ?? []).some((e) => !!e.rallyLen);
 /** SD-157 — did this match track serve speed? */
 export const speedTracked = (s: Tracks): boolean =>
   !!s && (s.speedDetail === true || (s.events ?? []).some((e) => typeof e.kmh === 'number'));
