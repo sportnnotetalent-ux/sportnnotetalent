@@ -38,6 +38,21 @@ Where it changed:
   - Marketing posts already rendered keep the old mark.
   - The mint experiment was undone and never committed.
 
+### 2026-11-08 — Teams for doubles, phase 6: existing pairs become teams (migration ready, founder runs it)
+
+`supabase/migrations/20261116120000_doubles_pairs_to_teams.sql` adds a one-off `pairs_to_teams()` and runs it once. Each two-person quick-game side in a doubles sport joins one **team** (a club, so one team in any sport), and both players become its admins so either can rename it or add people.
+- **Kept on the team rows:** name, `entry_ids`, `adhoc`, roster, matches and entries. Only `club_id` and `admin_ids` change, and nothing is deleted or repointed.
+- **Names:** the club takes the pair's oldest stored team name, already masked for children (e.g. "K. / D."), masked again to be safe.
+- **Left alone:** team-sport sides (the two-person football / cricket teams), placeholders, stand-in rosters and teams already in a club.
+- **Safety:** safe to run twice; app users can't call the function.
+- **Live preview (read-only, `docs/product/pairs-to-teams-preview.sql`):** 17 rows → 12 teams. Hrudhay / Vivek C covers 3 sports; four other pairs cover 2.
+- **"Merge the 5 duplicates" is done by the club:** the duplicates are the same pair in different sports, and per-sport team rows can't merge.
+- **Checks:**
+  - break doc `docs/security/breaks/pairs-to-teams.md` DP1–DP9;
+  - `tests/db-pairs-to-teams.test.mts` (PGlite, incl. a 600-player / 300-pair sim);
+  - full suite green (8,378 pass, 0 fail, 2 known todo), tsc clean.
+  - No app code changed, so no demo check applies.
+
 ### 2026-11-08 — Teams for doubles, phase 5: doubles teams open team pages
 
 A doubles side is a team now, so there is no separate "pair" page:
