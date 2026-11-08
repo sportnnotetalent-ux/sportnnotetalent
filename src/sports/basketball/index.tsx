@@ -48,7 +48,7 @@ import { BASKETBALL_META } from './meta';
 import { basketballUndoLabel } from './undoLabel';
 import { basketballMatchRecords } from './records';
 import { DescribeCard, useDescribeMarks } from '../../components/DescribeCard';
-import { assistCard, assistOwn, blockCard, blockOwn, cardStale, describesDrawn, foulCard, foulDrawnAction, foulOwn, tagAction } from './describe';
+import { assistCard, assistOwn, blockCard, blockOwn, cardStale, describesDrawn, foulCard, foulDrawnAction, foulOwn, reboundCard, reboundOwn, reboundPlan, reboundShot, reboundSummary, stealCard, stealOwn, stealPlan, stealSummary, tagAction, type CardPlan, type ReboundPick } from './describe';
 
 /** SD-117 (B12): the foul-type chips, FIBA's U and D included. */
 // FIBA 2026 (from 1 Oct 2026, basketball-rulebook.md BK-1/2): disruptive and flagrant
@@ -148,7 +148,9 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
   // "Rebound?" after a miss / a missed last free throw; "Who lost it?" after a
   // steal; "Whose shot?" after a block. `fromSeq` finds the steal / block once
   // it is on the board (`ref`); Undo removing it closes the prompt.
-  const [reboundFor, setReboundFor] = useState<{ shotSide: 'home' | 'away' } | null>(null);
+  // polish-basketball: the rebound card finds its shot the same way (the miss /
+  // missed free throw logged after `fromSeq`) and is keyed by it.
+  const [reboundFor, setReboundFor] = useState<{ shotSide: 'home' | 'away'; fromSeq: number; ref?: number } | null>(null);
   const [stealFor, setStealFor] = useState<{ side: 'home' | 'away'; fromSeq: number; ref?: number } | null>(null);
   const [blockFor, setBlockFor] = useState<{ side: 'home' | 'away'; fromSeq: number; ref?: number; three?: boolean } | null>(null);
   useEffect(() => {
@@ -168,13 +170,22 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
   useEffect(() => {
     if (assistFor?.ref != null && cardStale(state, assistFor.ref, assistOwn(state, assistFor.ref))) setAssistFor(null);
     if (blockFor?.ref != null && cardStale(state, blockFor.ref, blockOwn(state, blockFor.ref))) setBlockFor(null);
+    // polish-basketball PB4-PB6: the card's own pick keeps it open; Undo of the
+    // shot / steal or a newer play closes it
+    if (reboundFor) {
+      if (reboundFor.ref == null) {
+        const shot = reboundShot(state, reboundFor.shotSide, reboundFor.fromSeq);
+        if (shot) setReboundFor({ ...reboundFor, ref: shot.id });
+      } else if (cardStale(state, reboundFor.ref, reboundOwn(state, reboundFor.ref))) setReboundFor(null);
+    }
+    if (stealFor?.ref != null && cardStale(state, stealFor.ref, stealOwn(state, stealFor.ref))) setStealFor(null);
     if (foulFor) {
       if (foulFor.ref == null) {
         const f = state.events.find((e) => e.type === 'foul' && e.side === foulFor.side && e.id > foulFor.fromSeq);
         if (f) setFoulFor({ ...foulFor, ref: f.id });
       } else if (cardStale(state, foulFor.ref, foulOwn(state, foulFor.ref))) setFoulFor(null);
     }
-  }, [assistFor, blockFor, foulFor, state.events]);
+  }, [assistFor, blockFor, foulFor, reboundFor, stealFor, state.events]);
   // IDs-only scoring: the log names players by id; this viewer's names (the
   // squads' as the fallback) are put in when shown.
   const { nameOf: viewerNameOf } = useMask();
@@ -226,9 +237,10 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
   };
   const miss = (side: 'home' | 'away', pts: number, p: Player | undefined = sel[side], zone?: ShotZone) => {
     clearSel(side);
+    const fromSeq = state.seq; // polish-basketball: finds the miss for its card
     fire(missAction(side, pts, p, zone));
     // US batch 5: "Rebound?" — optional, live plays only
-    if (!edit) setReboundFor({ shotSide: side });
+    if (!edit) setReboundFor({ shotSide: side, fromSeq });
   };
   // Deep wave — "Shot zones": a made / missed shot from a zone is one tap
   // (inside the arc 2, behind it 3; half-court 1 and 2).
@@ -252,6 +264,13 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
   // Reverse exactly what the play credited (credits.ts — FG / 3P / misses /
   // OREB-DREB included), so the lines match the log again.
   const removal = (e: BBEvent): ScoreAction => removeAction(e, idOfPlay(e), { halfCourt, tracked: shotsTracked(state) });
+  // polish-basketball PB3 / PB4: a card's pick — its old pick out first (with
+  // its own credits), then the new one; dispatched (stamped), never `fire`d, so
+  // the card stays open for Done / a change of mind
+  const applyPlan = (plan: CardPlan) => {
+    if (plan.remove) dispatch(removal(plan.remove));
+    if (plan.add) dispatch(stamped(plan.add));
+  };
   const removeEvent = (e: BBEvent) => dispatch(removal(e));
   // Edit = remove the old play, then re-enter it stamped at the same moment so
   // the score and every player tally re-adjust to match. SD-114: the removal is
@@ -374,10 +393,11 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
       // auto-advances and the panel closes on the last shot — no "Done" tap.
       const counted = flow.remaining != null && flow.total != null;
       const shoot = (made: boolean) => {
+        const fromSeq = state.seq; // polish-basketball: finds the missed free throw for its card
         freeThrow(flow.side, made, flow.shooter);
         if (counted) {
           const left = (flow.remaining ?? 1) - 1;
-          if (left <= 0) { setFlow(null); if (!made && !edit) setReboundFor({ shotSide: flow.side }); } // US batch 5: a missed last FT is live
+          if (left <= 0) { setFlow(null); if (!made && !edit) setReboundFor({ shotSide: flow.side, fromSeq }); } // US batch 5: a missed last FT is live
           else setFlow({ ...flow, remaining: left });
         }
       };
@@ -866,47 +886,54 @@ const ScoringControls: SportPlugin<BasketballState>['ScoringControls'] = ({
         );
       })()}
 
-      {/* US batch 5: "Rebound?" after a miss — the defence (or a team rebound), else the offence; Skip keeps scoring */}
-      {reboundFor && (() => {
+      {/* US batch 5: "Rebound?" after a miss — the defence (or a team rebound), else the offence */}
+      {/* polish-basketball (PB1-PB3, PB12): the shared card, keyed by the shot; one pick — a re-tap clears, another replaces */}
+      {reboundFor && reboundFor.ref != null && (() => {
+        const ref = reboundFor.ref;
+        const { shot, rebound } = reboundCard(state, ref);
+        if (!shot) return null;
         const def = opp(reboundFor.shotSide);
         const offSide = reboundFor.shotSide;
-        return (
-          <View style={ctrl.assistBox}>
-            <View style={ctrl.editHead}>
-              <IconText label="⏬ Rebound?" style={[ctrl.label, ctrl.flex]} />
-              <Button label="Skip" variant="ghost" onPress={() => setReboundFor(null)} />
-            </View>
-            <View style={ctrl.chips}>
-              <Text style={ctrl.meta}>Def. — {teamOf(def)}:</Text>
-              {courtOf(def).filter((p) => !fouledOut(p)).map((p) => (
-                <SelectChip key={p.id} label={p.fullName} active={false} onPress={() => fire(reboundAction(def, p, 'def'))} />
-              ))}
-              <SelectChip label="Team" accessibilityLabel={`Defensive team rebound, ${teamOf(def)}`} active={false} onPress={() => fire(teamReboundAction(def, 'def'))} />
-            </View>
-            <View style={ctrl.chips}>
-              <Text style={ctrl.meta}>Off. — {teamOf(offSide)}:</Text>
-              {courtOf(offSide).filter((p) => !fouledOut(p)).map((p) => (
-                <SelectChip key={p.id} label={p.fullName} active={false} onPress={() => fire(reboundAction(offSide, p, 'off'))} />
-              ))}
-              <SelectChip label="Team" accessibilityLabel={`Offensive team rebound, ${teamOf(offSide)}`} active={false} onPress={() => fire(teamReboundAction(offSide, 'off'))} />
-            </View>
+        const key = `r${reboundFor.fromSeq}`;
+        const summary = reboundSummary(rebound, pName);
+        const isPick = (p: ReboundPick) => !!rebound && rebound.side === p.side && rebound.reboundType === p.rt && (p.pid ? rebound.pid === p.pid : rebound.team === true);
+        const pickRebound = (p: ReboundPick) => applyPlan(reboundPlan(state, ref, p));
+        const chips = (side: 'home' | 'away', rt: ReboundType, label: 'Def.' | 'Off.') => (
+          <View style={ctrl.chips}>
+            <Text style={ctrl.meta}>{label} — {teamOf(side)}:</Text>
+            {courtOf(side).filter((p) => !fouledOut(p)).map((p) => (
+              <SelectChip key={p.id} label={p.fullName} accessibilityLabel={`${label} rebound: ${p.fullName}`} active={isPick({ side, pid: p.id, rt })} onPress={() => pickRebound({ side, pid: p.id, rt })} />
+            ))}
+            <SelectChip label="Team" accessibilityLabel={`${label === 'Def.' ? 'Defensive' : 'Offensive'} team rebound, ${teamOf(side)}`} active={isPick({ side, pid: null, rt })} onPress={() => pickRebound({ side, pid: null, rt })} />
           </View>
+        );
+        return (
+          <DescribeCard title={`Last miss · ${shot.pid || shot.playerName ? pName(shot.pid, shot.playerName) : teamOf(shot.side)} — rebound?`}
+            summary={summary} mode={marks.modeOf(key)} onDone={() => marks.mark(key, 'done')} onSkip={() => marks.mark(key, 'skipped')} onEdit={() => marks.mark(key, null)}>
+            {chips(def, 'def', 'Def.')}
+            {chips(offSide, 'off', 'Off.')}
+          </DescribeCard>
         );
       })()}
       {/* US batch 5: "Who lost it?" after a steal — names the other side's ball-handler (the turnover already counts) */}
-      {stealFor && stealFor.ref != null && (
-        <View style={ctrl.assistBox}>
-          <View style={ctrl.editHead}>
-            <Text style={[ctrl.label, ctrl.flex]}>✋ Steal — who lost it? ({teamOf(opp(stealFor.side))})</Text>
-            <Button label="Skip" variant="ghost" onPress={() => setStealFor(null)} />
-          </View>
-          <View style={ctrl.chips}>
-            {courtOf(opp(stealFor.side)).filter((p) => !fouledOut(p)).map((p) => (
-              <SelectChip key={p.id} label={p.fullName} active={false} onPress={() => fire(turnoverAction(opp(stealFor.side), p, { ref: stealFor.ref }))} />
-            ))}
-          </View>
-        </View>
-      )}
+      {/* polish-basketball (PB1-PB3): the shared card, keyed by the steal; one pick — a re-tap clears, another replaces */}
+      {stealFor && stealFor.ref != null && (() => {
+        const ref = stealFor.ref;
+        const { steal, lost } = stealCard(state, ref);
+        if (!steal) return null;
+        const key = `s${stealFor.fromSeq}`;
+        const lostSide = opp(stealFor.side);
+        return (
+          <DescribeCard title={`Last steal · ${pName(steal.pid, steal.playerName)} — who lost it? (${teamOf(lostSide)})`}
+            summary={stealSummary(lost, pName)} mode={marks.modeOf(key)} onDone={() => marks.mark(key, 'done')} onSkip={() => marks.mark(key, 'skipped')} onEdit={() => marks.mark(key, null)}>
+            <View style={ctrl.chips}>
+              {courtOf(lostSide).filter((p) => !fouledOut(p)).map((p) => (
+                <SelectChip key={p.id} label={p.fullName} accessibilityLabel={`Lost it: ${p.fullName}`} active={lost?.pid === p.id} onPress={() => applyPlan(stealPlan(state, ref, p.id))} />
+              ))}
+            </View>
+          </DescribeCard>
+        );
+      })()}
       {/* US batch 5: "Whose shot?" after a block — names the shooter (the missed shot already counts) */}
       {/* describe-us (US-DON-5): the shared card; a re-tap clears, another shooter (or the 3-pt toggle) replaces it */}
       {blockFor && blockFor.ref != null && (() => {

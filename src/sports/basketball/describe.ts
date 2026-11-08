@@ -7,7 +7,8 @@
  */
 import type { ScoreAction } from '../types';
 import type { BasketballState } from './engine.ts';
-import type { BBEvent } from './events.ts';
+import type { BBEvent, ReboundType } from './events.ts';
+import { reboundAction, teamReboundAction, turnoverAction } from './actions.ts';
 
 type Side = 'home' | 'away';
 
@@ -67,3 +68,77 @@ export function blockCard(s: Pick<BasketballState, 'events'>, ref: number): { bl
  *  (as the one-step flow asked). */
 export const describesDrawn = (e: Pick<BBEvent, 'type' | 'foulType' | 'bench'> | undefined): boolean =>
   !!e && e.type === 'foul' && e.foulType !== 'technical' && !e.bench;
+
+/* ---- wave 4 polish (docs/security/breaks/polish-basketball.md) ----
+ * "Rebound?" and "Steal — who lost it?" as describe cards, keyed by the miss /
+ * steal. Neither blocks scoring (the play is on the board at its tap), so they
+ * log the same REBOUND / TURNOVER actions the one-step prompts did; the plans
+ * make each card single-choice (PB3): a re-tap clears, another pick replaces. */
+
+/** The shot a "Rebound?" card is about: the first miss of `side` (a missed
+ *  field goal, or a missed free throw) logged after `fromSeq`. */
+export function reboundShot(s: Pick<BasketballState, 'events'>, side: Side, fromSeq: number): BBEvent | undefined {
+  return s.events.find((e) => e.id > fromSeq && e.side === side && (e.type === 'miss' || (e.type === 'freethrow' && e.made === false)));
+}
+
+/** PB4: a shot's own detail — the rebound logged right after it (one). */
+export const reboundOwn = (s: Pick<BasketballState, 'events'>, ref: number): Own => {
+  const i = s.events.findIndex((e) => e.id === ref);
+  const next = i < 0 ? undefined : s.events[i + 1];
+  return (e) => e === next && e.type === 'rebound';
+};
+
+/** The rebound card's detail: its shot and the rebound picked for it. */
+export function reboundCard(s: Pick<BasketballState, 'events'>, ref: number): { shot?: BBEvent; rebound?: BBEvent } {
+  const i = s.events.findIndex((e) => e.id === ref);
+  if (i < 0) return {};
+  const next = s.events[i + 1];
+  return { shot: s.events[i], rebound: next?.type === 'rebound' ? next : undefined };
+}
+
+/** A rebound pick: the side, the player (`null` = the team) and off / def. */
+export type ReboundPick = { side: Side; pid: string | null; rt: ReboundType };
+/** A card plan: the card's own pick to remove first (Undo-safe: its own
+ *  credits go with it), then the new pick to log. `{}` = nothing to do. */
+export type CardPlan = { remove?: BBEvent; add?: ScoreAction };
+
+const samePick = (e: BBEvent, p: ReboundPick) =>
+  e.side === p.side && (e.reboundType ?? null) === (p.rt ?? null) && (p.pid ? e.pid === p.pid : e.team === true && !e.pid);
+
+/** PB3 / PB12: the same pick again clears it; another replaces it. Only the
+ *  card's own rebound is ever removed (PB11). */
+export function reboundPlan(s: Pick<BasketballState, 'events'>, ref: number, p: ReboundPick): CardPlan {
+  const { shot, rebound } = reboundCard(s, ref);
+  if (!shot) return {};
+  if (rebound && samePick(rebound, p)) return { remove: rebound };
+  const add = p.pid ? reboundAction(p.side, { id: p.pid }, p.rt) : teamReboundAction(p.side, p.rt);
+  return rebound ? { remove: rebound, add } : { add };
+}
+
+/** PB4: a steal's own detail — the turnover naming it (`ref`). */
+export const stealOwn = (_s: Pick<BasketballState, 'events'>, ref: number): Own => (e) => e.type === 'turnover' && e.ref === ref;
+
+/** The steal card's detail: the steal and who lost the ball. */
+export function stealCard(s: Pick<BasketballState, 'events'>, ref: number): { steal?: BBEvent; lost?: BBEvent } {
+  return { steal: s.events.find((e) => e.id === ref && e.type === 'steal'), lost: s.events.find((e) => e.type === 'turnover' && e.ref === ref) };
+}
+
+/** PB3: the steal's ball-handler, single-choice (the engine would silently
+ *  drop a second one). Only the turnover naming this steal is ever removed. */
+export function stealPlan(s: Pick<BasketballState, 'events'>, ref: number, pid: string): CardPlan {
+  const { steal, lost } = stealCard(s, ref);
+  if (!steal) return {};
+  if (lost && lost.pid === pid) return { remove: lost };
+  const add = turnoverAction(steal.side === 'home' ? 'away' : 'home', { id: pid }, { ref });
+  return lost ? { remove: lost, add } : { add };
+}
+
+/** PB2: "Rebound: Ben (def.)", "Rebound: Team (off.)"; '' = nothing picked. */
+export function reboundSummary(e: BBEvent | undefined, nameOf: (pid?: string, legacy?: string) => string): string {
+  if (!e) return '';
+  const who = e.team || (!e.pid && !e.playerName) ? 'Team' : nameOf(e.pid, e.playerName);
+  return `Rebound: ${who}${e.reboundType ? ` (${e.reboundType}.)` : ''}`;
+}
+/** PB2: "Lost it: Ben"; '' = nothing picked. */
+export const stealSummary = (e: BBEvent | undefined, nameOf: (pid?: string, legacy?: string) => string): string =>
+  (e ? `Lost it: ${nameOf(e.pid, e.playerName)}` : '');
