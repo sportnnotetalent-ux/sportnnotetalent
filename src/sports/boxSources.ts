@@ -660,7 +660,12 @@ function detailByPlayer(sport: DetailSport, events: LiveEvent[], ctx: BoxContext
   };
   const legacy = new Map<string, string>();
   const credits = detailPlayerCredits(sport, events, (sd, p) => {
-    const key = creditKey(p, rosterOf(ctx, sd)) ?? solo(sd);
+    // racket-depth RD11: an id that isn't in this side's squad is no credit here
+    // (careers check the side the same way) — no phantom row; fall back as they do
+    const r = rosterOf(ctx, sd);
+    const named = creditKey(p, r);
+    const onSide = named && (named.startsWith('~') || !r.length || r.some((x) => x.id === named)) ? named : undefined;
+    const key = onSide ?? solo(sd);
     if (key && p?.playerName && !legacy.has(`${sd}|${key}`)) legacy.set(`${sd}|${key}`, p.playerName);
     return key ? `${sd}|${key}` : undefined;
   });

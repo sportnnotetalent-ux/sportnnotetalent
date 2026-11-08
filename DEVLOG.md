@@ -38,6 +38,15 @@ Where it changed:
   - Marketing posts already rendered keep the old mark.
   - The mint experiment was undone and never committed.
 
+### 2026-11-08 — Racket box score checks the side (RD11 / TH4)
+
+Founder: fix it. The box score keyed a hitter / error credit by whatever player id the point named, so a hitter from the wrong side (or nobody's squad) made a phantom row. Careers already checked the side.
+- **Fix:** in all six racket sports (shared `detailByPlayer`), an id not in that side's squad is ignored, and the credit falls back exactly as in careers.
+- **Checks:**
+  - `tests/box-side-check.test.mts` (failed first);
+  - full suite 8332 (0 failing), tsc clean;
+  - racket-depth.md RD11 is marked Fixed.
+
 ### 2026-11-08 — Done: 8 false-zero racket career lines cleaned (founder ran the SQL)
 
 The founder ran `docs/ops/sql/2026-11-08-racket-false-zeros.sql` in the Supabase SQL editor.
