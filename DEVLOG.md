@@ -38,6 +38,12 @@ Where it changed:
   - Marketing posts already rendered keep the old mark.
   - The mint experiment was undone and never committed.
 
+### 2026-11-08 — Release: "Organize a game" starts with the sport (web, Android OTA)
+
+auth-smoke passed and the publish lock was taken. Published from a clean worktree at 9354f29f, which includes e0a7e3fc.
+- **Web:** `index-edc92f20`, live on app.sportnnote.in.
+- **Android OTA:** `1a099eff` (preview) / `fa28c5a9` (production).
+
 ### 2026-11-08 — Release: top bar, Your sports page, name-only screens (web, Android OTA)
 
 auth-smoke passed and the publish lock was taken. Published from a clean worktree at 51f6915b.

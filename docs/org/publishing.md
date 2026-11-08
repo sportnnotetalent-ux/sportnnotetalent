@@ -22,3 +22,4 @@ Why: on 2026-11-05 two sessions published within minutes of each other, and one 
 | 2026-11-08 | home-round-2 session | 049e44ed | index-d213aee5 | b5a32573 / bf166feb |
 | 2026-11-08 | logo-2f session | 5e59892c | index-2f423b5f | e2e354bd / 6cf61dd3 |
 | 2026-11-08 | top-bar session | 51f6915b | index-dea45f0c | 29c56002 / e18994b7 |
+| 2026-11-08 | sport-hub fix session | 9354f29f | index-edc92f20 | 1a099eff / fa28c5a9 |
