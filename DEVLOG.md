@@ -38,6 +38,13 @@ Where it changed:
   - Marketing posts already rendered keep the old mark.
   - The mint experiment was undone and never committed.
 
+### 2026-11-08 — Release: wave 1 (no false zeros), session sport row, contacts picker (web, Android OTA)
+
+auth-smoke passed and the publish lock was taken. Published from a clean worktree at 6d5a24cc.
+- **Web:** `index-933d956c`, live on app.sportnnote.in.
+- **Android OTA:** `a375a5c3` (preview) / `cd273971` (production).
+- **Includes:** wave 1 (3675c58e, 5f7bf0fc, c3b54994, e15db072) and the urgent fixes (6d5a24cc).
+
 ### 2026-11-08 — Urgent: session sport row wraps; "Pick from contacts" reads the number
 
 Two founder-reported bugs from real phones (sport-row-contacts.md).
