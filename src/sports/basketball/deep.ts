@@ -73,10 +73,13 @@ export function bbCoverage(s: BasketballState): BbCoverage {
     possession: s.events.some((e) => e.type === 'turnover' || e.type === 'steal'),
   };
 }
-/** Is the feature on for this match (switched on, or plays carry it)? */
+/** Is the feature on for this match? Tracked means captured (no-false-zeros
+ *  NZU1–NZU4, the racket rule DD11): at least one play carries it. The toggle
+ *  alone, or the `fbt` / `fdt` stamps every play gets while it is on, never
+ *  show a row of zeros or write a career key. `c` is kept for callers. */
 export const zonesOn = (s: BasketballState, c = bbCoverage(s)): boolean => c.zones.charted > 0;
-export const fastBreakOn = (s: BasketballState, c = bbCoverage(s)): boolean => c.fastBreak.tracked > 0 || (s.trackFastBreak === true && c.fastBreak.of === 0);
-export const foulsDrawnOn = (s: BasketballState, c = bbCoverage(s)): boolean => c.foulsDrawn.tracked > 0 || (s.trackFoulsDrawn === true && c.foulsDrawn.of === 0);
+export const fastBreakOn = (s: BasketballState, _c?: BbCoverage): boolean => s.events.some((e) => e.type === 'score' && e.fb === true && isFieldGoal(e.points ?? 0, s.targetPoints > 0));
+export const foulsDrawnOn = (s: BasketballState, _c?: BbCoverage): boolean => s.events.some((e) => e.type === 'foul' && !!(e.drawnPid || e.drawn));
 
 /* ------------------------ paired plays (US batch 5) ------------------------- */
 

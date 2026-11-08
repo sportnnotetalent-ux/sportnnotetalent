@@ -457,9 +457,13 @@ describe('deep wave · optional capture: targets, passes defended, tackles for l
     assert.equal('passDef' in t.h3.stats, false);
     const d = afTotals([kick('home', 25, at(1, 0))].reduce(reducer, init({ ...PBP, trackDefence: true })));
     assert.deepEqual(d, {}, 'no lines yet');
+    // no-false-zeros NZU5 / NZU6 / NZU9: a toggle alone owns no key (tracked means captured);
+    // each key comes with its first captured event — PD and TFL on their own
     const tk = init({ ...PBP, trackDefence: true });
-    assert.deepEqual(deepKeys(tk), ['passDef'], 'no tackles asked → no TFL key');
-    assert.deepEqual(deepKeys(init({ ...PBP, trackDefence: true, trackTackles: true })), ['passDef', 'tfl']);
+    assert.deepEqual(deepKeys(tk), [], 'switched on, nothing captured → no PD key');
+    assert.deepEqual(deepKeys(init({ ...PBP, trackDefence: true, trackTackles: true })), [], 'nor a TFL key');
+    const pd = reducer(init({ ...PBP, trackDefence: true, trackTackles: true }), { type: 'PASS_DEF', side: 'away', payload: at(1, 10), ...credit({ type: 'pd', playerId: 'a4', playerName: 'A4' }) });
+    assert.deepEqual(deepKeys(pd), ['passDef'], 'a breakup → PD, not TFL');
   });
   test('box: TGT, PD, TFL, SKD, YPC, RLNG… only when tracked; flag has no kicking columns', () => {
     const table = buildBoxTable(americanFootballStats, afBox(s).data('all'));

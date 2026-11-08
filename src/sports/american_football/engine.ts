@@ -1078,20 +1078,32 @@ export function teamFigures(s: AFState, side: Side, scope: 'all' | number = 'all
 
 /** Was the match (or part of it) scored play by play? */
 export const isPbp = (s: Pick<AFState, 'mode' | 'events'>): boolean => s.mode === 'pbp' || s.events.some((e) => e.pbp);
-/** Is a "Stats to track" toggle tracked in the match — on, or any such event recorded? */
-export function afTracked(s: Pick<AFState, TrackFlag | 'events'>, f: TrackFlag): boolean {
-  if (s[f] === true) return true;
-  return f === 'trackTargets' ? s.events.some((e) => e.tgt) : s.events.some((e) => e.type === 'pd' || e.tfl || e.pdef);
+/** Did any event in the match capture this key: an event that actually
+ *  credits it (no-false-zeros NZU5-NZU10: tracked means captured; a play wiped
+ *  out by a penalty credits nobody, so it doesn't count). */
+export function afCaptured(s: Pick<AFState, 'events'>, key: string): boolean {
+  return s.events.some((e) => {
+    const c = eventCredits(e);
+    return !!(c.first && key in c.first.stats) || !!(c.second && key in c.second.stats);
+  });
 }
-/** Tackles tracked (the toggle, or any tackle recorded). */
-export const tacklesTracked = (s: Pick<AFState, 'trackTackles' | 'events'>): boolean => s.trackTackles || s.events.some((e) => e.type === 'tackle');
+/** Is a "Stats to track" toggle tracked in the match: any of its events
+ *  captured? The toggle alone no longer counts (NZU5, NZU8): switched on with
+ *  every prompt skipped shows no column of zeros. */
+export function afTracked(s: Pick<AFState, TrackFlag | 'events'>, f: TrackFlag): boolean {
+  return f === 'trackTargets' ? afCaptured(s, 'targets') : afCaptured(s, 'passDef') || afCaptured(s, 'tfl');
+}
+/** Tackles tracked: a tackle was recorded (NZU7: not the toggle alone). */
+export const tacklesTracked = (s: Pick<AFState, 'trackTackles' | 'events'>): boolean => afCaptured(s, 'tackles');
 /** Times sacked is known once a sack names the quarterback (deep wave — no extra tap). */
 export const sackedTracked = (s: Pick<AFState, 'events'>): boolean => s.events.some((e) => e.type === 'play' && e.play === 'sack' && !!e.playerId);
-/** The deep-wave keys a match tracks (they read 0 on every line; absent otherwise). */
+/** The deep-wave keys a match tracks, each only once an event of its own kind
+ *  was captured (NZU9); then they read 0 on every other line (a true 0). */
 export function deepKeys(s: AFState): string[] {
   const out: string[] = [];
-  if (afTracked(s, 'trackTargets')) out.push('targets');
-  if (afTracked(s, 'trackDefence')) out.push('passDef', ...(tacklesTracked(s) ? ['tfl'] : []));
+  if (afCaptured(s, 'targets')) out.push('targets');
+  if (afCaptured(s, 'passDef')) out.push('passDef');
+  if (afCaptured(s, 'tfl')) out.push('tfl');
   if (sackedTracked(s)) out.push('timesSacked', 'sackYdsLost');
   return out;
 }

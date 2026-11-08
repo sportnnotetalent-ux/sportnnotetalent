@@ -140,8 +140,11 @@ export function baseballTotals(s: BaseballState): Record<string, Line> {
   // deep wave: situational figures — derived from the log, never credited live
   const st = withAnn(s);
   // round 2: batted-ball types only when the game tracked them (else absent: "not tracked")
-  const typed = trackTracked(st, 'battedBallTypes');
-  for (const b of batterFigures(st)) {
+  // no-false-zeros NZU11: and only once a ball in play has a type (tapped, or fixed by the out);
+  // the toggle on with only strikeouts, walks and untapped hits writes nothing (tracked means captured)
+  const bf = batterFigures(st);
+  const typed = trackTracked(st, 'battedBallTypes') && bf.some((b) => Object.values(b.batted).some((n) => n > 0));
+  for (const b of bf) {
     if (!b.id) continue;
     const l = line(b.id, b.side).stats;
     l.rispAb = b.rispAb;
