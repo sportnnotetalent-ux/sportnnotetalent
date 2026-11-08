@@ -19,3 +19,4 @@ Why: on 2026-11-05 two sessions published within minutes of each other, and one 
 | 2026-11-07 | launch-voice session | a88e7f48 | index-9a7ceda6 | 2441c19a / aeed18ea |
 | 2026-11-07 | fixture-map session | 96335226 | index-58d99960 | 5b7ea53e / 709a3294 |
 | 2026-11-08 | stitch-picks session | 825223e8 | index-27f428a3 | 7086e031 / f5b96b51 |
+| 2026-11-08 | home-round-2 session | 049e44ed | index-d213aee5 | b5a32573 / bf166feb |

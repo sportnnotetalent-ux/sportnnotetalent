@@ -13,6 +13,13 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-08 — Release: Home round 2 (web, Android OTA)
+
+auth-smoke passed and the publish lock was taken. Published from a clean worktree at 049e44ed.
+- **Web:** `index-d213aee5`, live on app.sportnnote.in.
+- **Android OTA:** `b5a32573` (preview) / `bf166feb` (production).
+- **Not in this release:** the "Your sports" fold (f711fc22), committed after it.
+
 ### 2026-11-08 — Home round 2 (founder's pick from the Stitch "Home Page")
 
 - **Tiles:** three equal tiles again, only **Score a match** in lime. Organize and Find players are white, each with its icon in a circle.
