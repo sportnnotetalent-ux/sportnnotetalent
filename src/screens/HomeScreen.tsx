@@ -191,9 +191,12 @@ export default function HomeScreen() {
             <Circle cx={50} cy={50} r={12} stroke={theme.colors.heroText} strokeOpacity={0.12} strokeWidth={1.2} fill="none" />
           </Svg>
           <View style={st.header}>
-            <Logo size={38} />
+            {/* BC4 (brand-cream.md): the logo and name sit on a cream badge, never straight on green */}
             <View style={st.brand}>
-              <Wordmark tone="dark" style={[st.wordmark, narrow && st.wordmarkNarrow]} />
+              <View style={st.brandBadge} accessible accessibilityLabel="SportnNote">
+                <Logo size={30} />
+                <Wordmark height={narrow ? 21 : 24} />
+              </View>
             </View>
           <TouchableOpacity
             style={st.iconBtn}
@@ -523,7 +526,8 @@ const st = StyleSheet.create({
   progressTrack: { height: 6, borderRadius: 3, backgroundColor: theme.colors.surfaceAlt, overflow: 'hidden' },
   progressFill: { height: 6, borderRadius: 3, backgroundColor: theme.colors.primary },
   header: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(2) },
-  brand: { flex: 1, gap: theme.spacing(1) },
+  brand: { flex: 1, gap: theme.spacing(1), alignItems: 'flex-start' },
+  brandBadge: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(1.5), backgroundColor: theme.colors.bg, borderRadius: theme.radius.sm, paddingVertical: 4, paddingLeft: 4, paddingRight: theme.spacing(2) },
   // The wordmark in the headline face, leaning like the logo (no fontWeight: Android
   // would swap a custom family for the system font).
   wordmark: { color: theme.colors.heroText, fontSize: 28, fontFamily: theme.fonts.display, letterSpacing: 0.2 },

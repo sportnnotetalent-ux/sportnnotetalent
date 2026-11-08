@@ -1,27 +1,32 @@
-/** The SportnNote wordmark, as on the launch screen (founder 2026-11-08,
- *  docs/security/breaks/wordmark.md): "Sport" and "Note" in one colour, the
- *  "n" between them in another, in the italic display face. `dark` is the
- *  launch look (lime + white) for the green screens; `light` is the same
- *  pattern for cream / white (deep green + near-black). */
+/** The SportnNote wordmark, option 2d (founder 2026-11-08,
+ *  docs/security/breaks/brand-cream.md): lime "Sport" and white "Note", each
+ *  with a thin dark green outline, and a plain near-black "n", for a cream
+ *  background. Drawn from vector shapes made from the brand font
+ *  (src/brand/wordmark.ts), so it looks the same on every platform. The
+ *  outlines are a layer underneath and the letters sit on top, so the n is
+ *  never covered (BC2). */
 import React from 'react';
-import { Text, type StyleProp, type TextStyle } from 'react-native';
-import { theme } from '../core/theme';
+import Svg, { Path } from 'react-native-svg';
+import { WORDMARK } from '../brand/wordmark';
 
-export const WORDMARK_TONES = {
-  dark: { word: theme.colors.lime, n: '#FFFFFF' },
-  light: { word: theme.colors.primary, n: theme.colors.text },
-} as const;
+const LIME = '#C6EE3E';
+const WHITE = '#FFFFFF';
+const INK = '#14181D';
+const KEY = '#0A3A2B';
 
-export function Wordmark({ tone, style, numberOfLines = 1 }: {
-  tone: keyof typeof WORDMARK_TONES;
-  /** size, font, spacing — the colours come from the tone */
-  style?: StyleProp<TextStyle>;
-  numberOfLines?: number;
-}) {
-  const c = WORDMARK_TONES[tone];
+/** `height` in points; the width follows the word. */
+export function Wordmark({ height = 28 }: { height?: number }) {
+  const width = (WORDMARK.width / WORDMARK.height) * height;
   return (
-    <Text style={style} numberOfLines={numberOfLines} accessibilityLabel="SportnNote">
-      <Text style={{ color: c.word }}>Sport</Text><Text style={{ color: c.n }}>n</Text><Text style={{ color: c.word }}>Note</Text>
-    </Text>
+    <Svg width={width} height={height} viewBox={`0 0 ${WORDMARK.width} ${WORDMARK.height}`} accessibilityLabel="SportnNote" accessibilityRole="image">
+      <Path d={WORDMARK.parts.sport} fill={KEY} stroke={KEY} strokeWidth={WORDMARK.stroke} strokeLinejoin="round" />
+      <Path d={WORDMARK.parts.note} fill={KEY} stroke={KEY} strokeWidth={WORDMARK.stroke} strokeLinejoin="round" />
+      <Path d={WORDMARK.parts.sport} fill={LIME} />
+      <Path d={WORDMARK.parts.n} fill={INK} />
+      <Path d={WORDMARK.parts.note} fill={WHITE} />
+    </Svg>
   );
 }
+
+/** the wordmark's width for a given height */
+export const wordmarkWidth = (height: number) => (WORDMARK.width / WORDMARK.height) * height;

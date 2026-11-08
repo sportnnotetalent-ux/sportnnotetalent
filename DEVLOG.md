@@ -13,6 +13,26 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-08 — New logo and name: option 2d, on cream, everywhere
+
+The founder's design (docs/design/logo-options/cream-option-2d.png), on a cream `#F3F0E8` background:
+- **S and "Sport":** lime, with a thin dark green outline.
+- **N and "Note":** white, with the same outline.
+- **The colon and "n":** plain near-black.
+- **Spacing:** continuous; the outlines sit underneath, so the n is never covered.
+
+Where it changed:
+- **The name as vector shapes:** `scripts/build-wordmark.mjs` turns "SportnNote" into shapes from the brand font, giving `src/brand/wordmark.ts` and `assets/brand/sportnnote-wordmark.svg`. `Wordmark` and the website draw those shapes, so the name looks identical everywhere.
+- **The mark:** the icon script (app icon, adaptive icon, splash image, favicon → `favicon-v4.png`, web app icons, brand SVGs) and `<Logo>` draw the cream tile with the outlined S and N and the near-black colon.
+- **Launch screen:** now on cream, with the same mark and name and a dark green underline. `app.json` splash and adaptive-icon backgrounds are cream too.
+- **Home header:** the logo and name sit on a cream badge in the green banner (black on green would be unreadable).
+- **Sign-in and website header:** the same mark and name.
+- **Checks:** break doc `brand-cream.md`; tests in `brand-cream.test.mts`. Older tests were updated to the new design (logo, launch splash SP1, wordmark, website favicon). Full suite 7,760 pass; tsc clean; demo-checked (launch, Home) and preview-checked (website).
+- **Known limits:**
+  - The installed APK 41 keeps its green home-screen icon and shows a brief green native splash before the cream animation, until the next APK build.
+  - Marketing posts already rendered keep the old mark.
+  - The mint experiment was undone and never committed.
+
 ### 2026-11-08 — One SportnNote wordmark, as on the launch screen
 
 The founder tried a mint colon and "n", didn't like it, and kept the lime; the mint was never committed. They then asked that SportnNote look everywhere as it does on the launch screen.

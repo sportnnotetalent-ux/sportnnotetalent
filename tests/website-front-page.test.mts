@@ -178,7 +178,7 @@ describe('W6 SEO, sharing and structured data kept', () => {
     assert.ok(html.includes(`<link rel="canonical" href="${cfg.siteUrl}/">`));
     for (const p of ['og:type', 'og:site_name', 'og:title', 'og:description', 'og:url', 'og:image']) assert.match(html, new RegExp(`<meta property="${p}" content="[^"]+">`), p);
     assert.match(html, /<meta name="theme-color" content="#0D5A3F">/);
-    assert.match(html, /<link rel="icon" type="image\/png" sizes="48x48" href="\/favicon-v3.png">/);
+    assert.match(html, /<link rel="icon" type="image\/png" sizes="48x48" href="\/favicon-v4.png">/);
     const ld = JSON.parse(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/.exec(html)![1]);
     assert.equal(ld['@type'], 'Organization');
     assert.deepEqual(ld.sameAs, cfg.social.map((s: { url: string }) => s.url));

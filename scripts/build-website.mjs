@@ -115,14 +115,14 @@ function page({ title, description, path, body, ogType = 'website', head = '', n
 <meta property="og:description" content="${esc(description)}">
 <meta property="og:url" content="${esc(url)}">
 <meta property="og:image" content="${esc(cfg.siteUrl)}/icon.png">
-<link rel="icon" type="image/png" sizes="48x48" href="/favicon-v3.png">
+<link rel="icon" type="image/png" sizes="48x48" href="/favicon-v4.png">
 <link rel="apple-touch-icon" href="/icon.png">
 <link rel="stylesheet" href="/styles.css">${head}
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
 <header class="top"><div class="wrap">
-  <a class="brand" href="/"><img src="/icon.png" alt="" width="30" height="30"><span><span class="word">Sport</span><span class="n">n</span><span class="word">Note</span></span></a>
+  <a class="brand" href="/"><img class="mark" src="/mark.svg" alt="" width="34" height="34"><img class="wordmark" src="/wordmark.svg" alt="SportnNote" height="26"></a>
   <nav>
     <a class="hide-sm" href="/#features">Features</a>
     <a${path.startsWith('/guides/') ? ' aria-current="page"' : ''} href="/guides/">Guides</a>
@@ -766,7 +766,10 @@ for (const f of ['700Bold/BarlowCondensed_700Bold.ttf', '800ExtraBold_Italic/Bar
 copyFileSync(join(ROOT, 'assets/icon.png'), join(OUT, 'icon.png'));
 copyFileSync(join(ROOT, 'assets/favicon.png'), join(OUT, 'favicon.png'));
 // Versioned copy (browsers cache favicons by URL) + /favicon.ico for browsers that ask for it.
-copyFileSync(join(ROOT, 'assets/favicon.png'), join(OUT, 'favicon-v3.png'));
+copyFileSync(join(ROOT, 'assets/favicon.png'), join(OUT, 'favicon-v4.png'));
+// brand-cream.md: the wordmark, the same vector shapes as the app
+copyFileSync(join(ROOT, 'assets/brand/sportnnote-wordmark.svg'), join(OUT, 'wordmark.svg'));
+copyFileSync(join(ROOT, 'assets/brand/sportnnote-mark.svg'), join(OUT, 'mark.svg'));
 copyFileSync(join(ROOT, 'assets/favicon.png'), join(OUT, 'favicon.ico'));
 // Android App Links (src/core/androidAppLinks.ts): which APK may open
 // app.sportnnote.in share links. Served here and, through a Worker route, on

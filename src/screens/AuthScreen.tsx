@@ -247,7 +247,7 @@ export default function AuthScreen() {
       <KeyboardAwareScrollView contentContainerStyle={st.content}>
         <View style={st.brand}>
           <Logo size={72} />
-          <Wordmark tone="light" style={st.logo} />
+          <Wordmark height={40} />
           <Text style={[textStyles.muted, st.tagline]}>Play a Sport, Make a Note.</Text>
         </View>
 

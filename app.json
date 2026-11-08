@@ -23,7 +23,7 @@
     "android": {
       "package": "in.sportnnote.app",
       "adaptiveIcon": {
-        "backgroundColor": "#0D5A3F",
+        "backgroundColor": "#F3F0E8",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -207,7 +207,7 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#0D5A3F",
+          "backgroundColor": "#F3F0E8",
           "image": "./assets/splash-icon.png",
           "imageWidth": 96
         }

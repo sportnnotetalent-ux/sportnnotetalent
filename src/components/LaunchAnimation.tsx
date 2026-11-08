@@ -25,8 +25,11 @@ import { shouldPlayVoice, VOICE_AT_MS } from '../core/launchVoice';
 import { hydrateLaunchSoundPref, launchSoundPref } from '../core/launchSoundPref';
 import { VOICE_CLIP_READY, audioModuleReady, playLaunchVoice } from '../data/launchVoice';
 import { Wordmark } from './Wordmark';
+import { WORDMARK } from '../brand/wordmark';
 
-const TILE = '#0D5A3F'; // the app icon's green, so icon → launch is seamless
+const TILE = '#F3F0E8'; // the app icon's cream (brand-cream.md), so icon → launch is seamless
+const KEY = '#0A3A2B'; // the letters' outline
+const INK = '#14181D'; // the colon
 const LIME = '#C6EE3E';
 const MARK = 96; // px
 const K = MARK / 200; // the mark's 200-unit drawing → px
@@ -175,6 +178,8 @@ export function LaunchAnimation({ fontsReady = true }: { fontsReady?: boolean })
           <View style={{ width: MARK, height: MARK }}>
             <Svg width={MARK} height={MARK} viewBox="0 0 200 200">
               <G transform={`translate(100 100) skewX(${SKEW}) translate(-100 -100)`}>
+                <Path d="M80 68 H52 a16 16 0 0 0 0 32 h12 a16 16 0 0 1 0 32 H34" fill="none" stroke={KEY} strokeWidth={23} strokeLinecap="round" strokeLinejoin="round" />
+                <Path d="M122 132 V68 L166 132 V68" fill="none" stroke={KEY} strokeWidth={23} strokeLinecap="round" strokeLinejoin="round" />
                 <Path d="M80 68 H52 a16 16 0 0 0 0 32 h12 a16 16 0 0 1 0 32 H34" fill="none" stroke={LIME} strokeWidth={16} strokeLinecap="round" strokeLinejoin="round" />
                 <Path d="M122 132 V68 L166 132 V68" fill="none" stroke="#FFFFFF" strokeWidth={16} strokeLinecap="round" strokeLinejoin="round" />
               </G>
@@ -183,7 +188,7 @@ export function LaunchAnimation({ fontsReady = true }: { fontsReady?: boolean })
             {dot('dot2', 100, 114, tr.dot2)}
           </View>
           <Animated.View style={[{ width: WORD_W }, wordStyle as object]}>
-            <Wordmark tone="dark" style={[st.word, !fontsReady && st.wordFallback]} />
+            <Wordmark height={WORD_W * (WORDMARK.height / WORDMARK.width)} />
             <Animated.View style={[st.line, lineStyle as object]} />
           </Animated.View>
         </Animated.View>
@@ -195,9 +200,6 @@ export function LaunchAnimation({ fontsReady = true }: { fontsReady?: boolean })
 const st = StyleSheet.create({
   wrap: { backgroundColor: TILE, alignItems: 'center', justifyContent: 'center', zIndex: 1000, elevation: 1000 },
   row: { flexDirection: 'row', alignItems: 'center', gap: GAP },
-  dot: { position: 'absolute', width: DOT_R * 2, height: DOT_R * 2, borderRadius: DOT_R, backgroundColor: LIME },
-  word: { color: '#FFFFFF', fontFamily: theme.fonts.display, fontSize: 44, letterSpacing: 0.5, fontStyle: 'italic' },
-  // the platform font is ~25% wider: smaller, so "SportnNote" still fits WORD_W
-  wordFallback: { fontSize: 36, fontWeight: '800' },
-  line: { height: 6, borderRadius: 3, backgroundColor: LIME, marginTop: 4, transformOrigin: 'left' },
+  dot: { position: 'absolute', width: DOT_R * 2, height: DOT_R * 2, borderRadius: DOT_R, backgroundColor: INK },
+  line: { height: 6, borderRadius: 3, backgroundColor: KEY, marginTop: 4, transformOrigin: 'left' },
 });

@@ -24,7 +24,11 @@ try { ({ Resvg } = require('@resvg/resvg-js')); } catch {
   console.error('Needs @resvg/resvg-js: npm i --no-save @resvg/resvg-js@2.6.2'); process.exit(1);
 }
 
-export const BRAND = { tile: '#0D5A3F', lime: '#C6EE3E', white: '#FFFFFF' };
+// Option 2d (founder 2026-11-08, brand-cream.md): cream tile; lime S and white N,
+// each with a thin dark green outline (key); a plain near-black colon (ink)
+export const BRAND = { tile: '#F3F0E8', lime: '#C6EE3E', white: '#FFFFFF', key: '#0A3A2B', ink: '#14181D' };
+/** the outline under the letters (the letters are 16 on the 200 grid) */
+const KEY_W = 23;
 /** The lean, in degrees (negative = forward, like an italic). */
 export const SKEW = -8;
 const SW = 16; // stroke weight on the 200 grid
@@ -32,10 +36,12 @@ const lean = Math.tan((SKEW * Math.PI) / 180);
 
 /** The S:N mark on a 200×200 grid, centred on (100,100), scaled by `s`. The
  *  letters lean; the colon's dots stay round (moved to follow the lean). */
-export function mark(s, c = { s: BRAND.lime, colon: BRAND.lime, n: BRAND.white }) {
+export function mark(s, c = { s: BRAND.lime, colon: BRAND.ink, n: BRAND.white, key: BRAND.key }) {
   const dot = (cy) => `<circle cx="${(100 + lean * (cy - 100)).toFixed(2)}" cy="${cy}" r="${SW / 2 + 0.5}" fill="${c.colon}"/>`;
   return `<g transform="translate(100 100) scale(${s}) translate(-100 -100)">
   <g transform="translate(100 100) skewX(${SKEW}) translate(-100 -100)">
+  ${c.key ? `<path d="M80 68 H52 a16 16 0 0 0 0 32 h12 a16 16 0 0 1 0 32 H34" fill="none" stroke="${c.key}" stroke-width="${KEY_W}" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M122 132 V68 L166 132 V68" fill="none" stroke="${c.key}" stroke-width="${KEY_W}" stroke-linecap="round" stroke-linejoin="round"/>` : ''}
   <path d="M80 68 H52 a16 16 0 0 0 0 32 h12 a16 16 0 0 1 0 32 H34" fill="none" stroke="${c.s}" stroke-width="${SW}" stroke-linecap="round" stroke-linejoin="round"/>
   <path d="M122 132 V68 L166 132 V68" fill="none" stroke="${c.n}" stroke-width="${SW}" stroke-linecap="round" stroke-linejoin="round"/>
   </g>${dot(86)}${dot(114)}
@@ -57,14 +63,14 @@ const png = {
   'assets/android-icon-background.png': [svg(tile(0)), 1024],
   'assets/android-icon-foreground.png': [svg(mark(0.68)), 1024],
   // Android 13 themed icons + the notification icon: one colour, shape only.
-  'assets/android-icon-monochrome.png': [svg(mark(0.68, { s: BRAND.white, colon: BRAND.white, n: BRAND.white })), 1024],
+  'assets/android-icon-monochrome.png': [svg(mark(0.68, { s: BRAND.white, colon: BRAND.white, n: BRAND.white, key: null })), 1024],
   'assets/splash-icon.png': [svg(mark(1)), 1024],
   // Browser tab: a rounded tile reads best at 16–48 px.
   'assets/favicon.png': [svg(tile(44) + mark(0.98)), 48],
   'assets/brand/sportnnote-logo-512.png': [svg(tile(44) + mark(0.94)), 512],
   // Web app (iPhone Home Screen + Android "Add to Home screen"), maskable-safe.
   // Versioned name: browsers cache favicons by URL for weeks, so a new logo needs a new name.
-  'public/favicon-v3.png': [svg(tile(44) + mark(0.98)), 48],
+  'public/favicon-v4.png': [svg(tile(44) + mark(0.98)), 48],
   'public/apple-touch-icon.png': [svg(tile(0) + mark(0.78)), 180],
   'public/icon-192.png': [svg(tile(0) + mark(0.78)), 192],
   'public/icon-512.png': [svg(tile(0) + mark(0.78)), 512],

@@ -55,13 +55,13 @@ test('LV4: the chosen AI voice (option 1, deep and slow) is in and switched on',
   assert.match(read('src/data/launchVoice.ts'), /export const VOICE_CLIP_READY = true;/);
 });
 
-test('SP1: native splash = the animation\'s first frame (same green, same mark, same size)', () => {
+test('SP1: native splash = the animation\'s first frame (same cream — brand-cream.md, same mark, same size)', () => {
   const app = JSON.parse(read('app.json'));
   const sp = app.expo.plugins.find((p: unknown) => Array.isArray(p) && p[0] === 'expo-splash-screen');
-  assert.equal(sp[1].backgroundColor, '#0D5A3F');
+  assert.equal(sp[1].backgroundColor, '#F3F0E8');
   assert.equal(sp[1].image, './assets/splash-icon.png');
   const anim = read('src/components/LaunchAnimation.tsx');
-  assert.match(anim, /const TILE = '#0D5A3F'/);
+  assert.match(anim, /const TILE = '#F3F0E8'/);
   assert.match(anim, new RegExp(`const MARK = ${sp[1].imageWidth};`));
 });
 
