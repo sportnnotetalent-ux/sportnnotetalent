@@ -223,6 +223,11 @@ export function detailReducer(s: VolleyballState, a: ScoreAction): VolleyballSta
   // with no Block point to annotate (anchored to the rally in play) — kept.
   const last = anchor ? lastPoint(s, anchor) : null;
   if (anchor && kind !== 'blocked' && !last) return s;
+  // describe-court-team DC9: a new entry names the point it describes (`pt`);
+  // once a newer point is on the board, a late tap is dropped, never moved
+  // onto it. An older entry (no `pt`) keeps the rule above.
+  const pt = a.payload?.pt as { set?: unknown; at?: unknown } | undefined;
+  if (anchor && pt && (!last || last.set !== pt.set || last.at !== pt.at)) return s;
   const n = last?.set ?? setNo(s);
   const at = last?.at ?? scoredIn(s, n);
   // one entry per annotated point: a second tap replaces it
@@ -245,6 +250,18 @@ export function lastPoint(s: VolleyballState, kind: string): { set: number; at: 
     const set = e.set ?? 1;
     const at = ev.slice(0, i + 1).filter((x) => x.set === set && SCORED.has(x.kind ?? '')).length;
     return { set, at, side: e.side, e };
+  }
+  return null;
+}
+
+/** describe-court-team: the last scored point of any kind — the point the
+ *  "Last point" card describes (its event id keys the card, DC14). */
+export function lastScored(s: VolleyballState): { set: number; at: number; side: Side; e: LiveEvent } | null {
+  const ev = s.events ?? [];
+  for (let i = ev.length - 1; i >= 0; i--) {
+    const e = ev[i];
+    if (!SCORED.has(e.kind ?? '')) continue;
+    return e.side === 'home' || e.side === 'away' ? lastPoint(s, e.kind!) : null;
   }
   return null;
 }

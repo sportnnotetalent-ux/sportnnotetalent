@@ -618,9 +618,17 @@ export function raidActions(s: KabaddiState, f: RaidForm, idOf?: (name?: string)
 
 /** court-team batch 1 — the raid `eid` if "Tackled by?" can still name its
  *  tackler: in play, a tackle (not a line-out), no tackler named yet. */
-export function tacklerAskable(s: KabaddiState, eid: number): RaidEntry | undefined {
+export function tacklerAskable(s: KabaddiState, eid: number, opts: { rename?: boolean } = {}): RaidEntry | undefined {
   const raid = raidsOf(s).find((r) => r.eid === eid);
-  return raid && !raid.hidden && raid.raiderOut && !raid.lineOut && !raid.tacklerId && !raid.tackler ? raid : undefined;
+  // describe-court-team DC15: the card's Edit may rename a tackler already named
+  return raid && !raid.hidden && raid.raiderOut && !raid.lineOut && (opts.rename || (!raid.tacklerId && !raid.tackler)) ? raid : undefined;
+}
+
+/** describe-court-team DC10: the latest raid's `eid` (the "Tackled by?" card
+ *  shows only while its raid is the latest one). */
+export function lastRaidEid(s: KabaddiState): number | undefined {
+  const raids = raidsOf(s).filter((r) => !r.hidden && r.eid != null);
+  return raids.length ? raids.reduce((m, r) => Math.max(m, r.eid!), -Infinity) : undefined;
 }
 
 /** court-team batch 1 — "Tackled by?" after a quick "Raider out": the raid
@@ -628,9 +636,11 @@ export function tacklerAskable(s: KabaddiState, eid: number): RaidEntry | undefi
  *  `editOf`), stamped at the raid's own minute. Every other answer is the
  *  raid's own, so the score and the mat don't move. Nothing ([]) when the raid
  *  is gone, isn't a tackle, or already names its tackler. */
-export function tacklerActions(s: KabaddiState, eid: number, tackler: Who, idOf?: (name?: string) => string | undefined): ScoreAction[] {
-  const raid = tacklerAskable(s, eid);
+export function tacklerActions(s: KabaddiState, eid: number, tackler: Who, idOf?: (name?: string) => string | undefined, opts: { rename?: boolean } = {}): ScoreAction[] {
+  const raid = tacklerAskable(s, eid, opts);
   if (!raid) return [];
+  // DC16: the same tackler again writes nothing
+  if ((raid.tacklerId ?? idOf?.(raid.tackler)) === tackler.id) return [];
   const raiderId = raid.raiderId ?? idOf?.(raid.raider);
   const touched = (raid.touched ?? []).flatMap((p) => (p.id ? [{ id: p.id }] : []));
   const f: RaidForm = {

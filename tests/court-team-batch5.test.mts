@@ -130,7 +130,8 @@ describe('volleyball · Who was aced? (its own category)', () => {
 
   test('V7: the row is optional and asked only after an Ace', () => {
     const t = src('src/sports/volleyball/DetailRow.tsx');
-    assert.match(t, /has\('aced'\) \|\| has\('reception'\)\) && annotate\('aced', 'ace'/);
+    // describe-court-team DC14: the row is part of the one "Last point" card
+    assert.match(t, /pt\.e\.kind === 'ace' && \(has\('aced'\) \|\| has\('reception'\)\) \? \{ kind: 'aced'/);
     // an aced entry with no Ace point is dropped
     const s = vrun([vb.outcomeAction('attack', 'home', P('h1')), detailAction('aced', 'away', P('a1'))], { vbAced: true });
     assert.equal((s.vd ?? []).length, 0);

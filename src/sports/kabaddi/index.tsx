@@ -36,12 +36,13 @@ import { kabaddiEventDetail, withRosters } from './names';
 import {
   init, reducer, currentMinute, halfLabel, previewRaid, raidOfEvent, raidActions, isRaidHead, kabaddiWinner, halfPoints, defendersOnMat,
   expectedRaider, outPlayers, clockPaused, timeoutsUsed, TIMEOUTS_PER_HALF, TACKLE_TYPES,
-  formOutcome, quickRaidForm, quickBonusCounts, matNow, kabaddiCfg, touchChips, unavailable, unavailableOf, listHas, isSubbedOff, cardsOf, suggestedCard, NEW_TECH_REASONS, ROUT_REASONS, CARD_ICON, RAID_SKILLS, tacklerActions, tacklerAskable,
+  formOutcome, quickRaidForm, quickBonusCounts, matNow, kabaddiCfg, touchChips, unavailable, unavailableOf, listHas, isSubbedOff, cardsOf, suggestedCard, NEW_TECH_REASONS, ROUT_REASONS, CARD_ICON, RAID_SKILLS, tacklerActions, tacklerAskable, lastRaidEid,
   type KabaddiState, type KabaddiEvent, type CardColour, type RaidForm,
 } from './engine.ts';
 import { KABADDI_META } from './meta';
 import { kabaddiMatchRecords } from './records';
 import { IconText } from '../../components/Icon';
+import { DescribeCard, useDescribeMarks } from '../../components/DescribeCard';
 import { kabaddiUndoLabel } from './undoLabel';
 
 export { halfLabel, currentMinute };
@@ -110,6 +111,8 @@ const ScoringControls: SportPlugin<KabaddiState>['ScoringControls'] = ({ state, 
   // court-team batch 1: the raid a quick "Raider out" just logged — an optional
   // "Tackled by?" row names its tackler (an in-place raid edit)
   const [askTackler, setAskTackler] = useState<number | null>(null);
+  // describe-court-team DC15: Done / Skip per raid (its eid) for the "Tackled by?" card
+  const tackleMarks = useDescribeMarks<number>();
   const [card, setCard] = useState<{ side?: 'home' | 'away'; colour?: CardColour; who?: Player | 'official' | 'player'; tp: boolean; tpSet?: boolean } | null>(null);
 
   const hm = state.halfMinutes, et = state.extraTimeMinutes;
@@ -496,24 +499,27 @@ const ScoringControls: SportPlugin<KabaddiState>['ScoringControls'] = ({ state, 
       {/* court-team batch 1: after a quick "Raider out", name the tackler
           (optional, non-blocking) — an in-place edit of that raid. */}
       {!raidFlow && askTackler != null && (() => {
-        const r = tacklerAskable(state, askTackler);
+        // describe-court-team DC10: only while that raid is the latest one
+        if (lastRaidEid(state) !== askTackler) return null;
+        // DC15: a named tackler can be changed (Edit) — the raid edit reverses the first one's points
+        const r = tacklerAskable(state, askTackler, { rename: true });
         if (!r) return null;
         const defSide = r.side === 'home' ? 'away' : 'home';
         const defenders = onField(defSide, rosterFor(defSide));
         if (!defenders.length) return null;
+        const named = r.tacklerId ? defenders.find((p) => p.id === r.tacklerId) ?? byId(r.tacklerId) : byId(undefined, r.tackler);
+        const summary = r.tacklerId || r.tackler ? `Tackled by ${named?.fullName ?? r.tackler ?? 'defender'}` : '';
         return (
-          <View style={ctrl.quickRow}>
-            <IconText label="🛡️ Tackled by? (optional — credits the defender)" style={ctrl.meta} />
+          <DescribeCard title="🛡️ Tackled by? (optional — credits the defender)" summary={summary} mode={tackleMarks.modeOf(askTackler)}
+            onDone={() => tackleMarks.mark(askTackler, 'done')} onSkip={() => tackleMarks.mark(askTackler, 'skipped')} onEdit={() => tackleMarks.mark(askTackler, null)}>
             <View style={ctrl.chips}>
               {defenders.map((p) => (
-                <SelectChip key={p.id} label={p.fullName} active={false} onPress={() => {
-                  for (const action of tacklerActions(state, askTackler, p, rosterId)) dispatch(action);
-                  setAskTackler(null);
+                <SelectChip key={p.id} label={p.fullName} active={r.tacklerId === p.id} accessibilityLabel={`Tackled by ${p.fullName}`} onPress={() => {
+                  for (const action of tacklerActions(state, askTackler, p, rosterId, { rename: true })) dispatch(action);
                 }} />
               ))}
-              <SelectChip label="Skip" active={false} onPress={() => setAskTackler(null)} />
             </View>
-          </View>
+          </DescribeCard>
         );
       })()}
       {/* SD-117b: pause the clock for a timeout / injury / review; team timeouts.

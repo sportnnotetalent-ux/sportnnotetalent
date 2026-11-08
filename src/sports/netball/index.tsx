@@ -10,15 +10,17 @@
  * Team" — the scorer can swap it if the umpire's order differs). Everything
  * else (intercepts, deflections, rebounds, turnovers, penalties, sanctions,
  * substitutions, position changes, held time) sits behind "More". With
- * "Feeds & rebounds" on (match settings), a goal / miss also asks who fed it
- * and who took the rebound.
+ * "Feeds & rebounds" on (match settings), a goal / miss is logged on the tap
+ * and a "Last goal / Last miss" card under the buttons names the feeder and
+ * the rebound after (describe-court-team, wave 2 — never blocking); the same
+ * card takes a deflection's outcome and a turnover's type.
  *
  * Corrections: "Correct the timeline" removes or re-enters a past moment
  * (REMOVE_EVENT with the reversed credits — a miss's rebound goes with it —
  * then the same flow stamped at the original time, SD-114).
  */
 import React, { useEffect, useState, useMemo } from 'react';
-import { closeSaves, closeLabel } from '../flowClose';
+import { DescribeCard, useDescribeMarks } from '../../components/DescribeCard';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { theme } from '../../core/theme';
 import { useMask } from '../../core/disputeMask';
@@ -37,7 +39,8 @@ import {
   eventCredits, creditAttribution, centreInfo, lineupAt, timeoutCheck, sanctionsOf, totalPeriods, isOpen, playOnLead, other,
   NETBALL_PRESETS, NETBALL_LIVE_SETTINGS, LIVE_KEYS, POSITIONS, POS_AREAS,
   superShotLive, superShotText, SUPER_SHOT_RULE_OPTIONS, goalPoints, TURNOVER_TYPES, TURNOVER_LABEL,
-  type NetballEvent, type NetballState, type Pos, type Sanction, type Side, type StatKind, type StopReason, type PenaltyKind, type TurnoverType,
+  describeAction, describeFields, lastDescribable, reboundOf,
+  type NetballEvent, type NetballState, type Pos, type Sanction, type Side, type StatKind, type StopReason, type PenaltyKind,
 } from './engine';
 import { PlayFeed } from '../PlayFeed';
 import { CategoryStatsPanel } from '../CategoryStatsPanel';
@@ -58,7 +61,6 @@ import { IconText } from '../../components/Icon';
 
 const uid = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 const TRACKED: string[] = [...LIVE_KEYS];
-const REBOUND: StatKind = 'rebound';
 const isPos = (p?: string | null): p is Pos => !!p && (POSITIONS as readonly string[]).includes(p);
 const STAT_BTN: { kind: StatKind; label: string; a11y: string }[] = [
   { kind: 'intercept', label: '✂️ Intercept', a11y: 'Intercept' },
@@ -92,12 +94,11 @@ function PlayerGrid({ players, onPick, skip, tag }: { players: Player[]; onPick:
   );
 }
 
+// describe-court-team DC1–DC3: no feed / rebound / outcome / type steps — the
+// play is logged on the tap and described after, in the "Last play" card
 type Flow =
-  | { mode: 'goal'; side: Side; pos: Pos; shooter: Player | null; step: 'feed' }
-  | { mode: 'miss'; side: Side; pos: Pos; shooter: Player | null; step: 'feed' | 'rebound'; feeder?: Player | null }
   | { mode: 'shooter'; side: Side; pos: Pos; miss: boolean }
-  // Deep wave: a deflection's outcome / a turnover's type follow the player (when tracked)
-  | { mode: 'stat'; side: Side; kind: StatKind; player?: Player | null; step?: 'outcome' }
+  | { mode: 'stat'; side: Side; kind: StatKind }
   | { mode: 'penalty'; side: Side; step: 'kind' | 'player'; kind?: PenaltyKind }
   | { mode: 'sanction'; side: Side; step: 'kind' | 'player'; kind?: Sanction }
   | { mode: 'sub'; side: Side; step: 'off' | 'on' | 'pos'; off?: Player | null; on?: Player }
@@ -113,6 +114,8 @@ const ScoringControls: SportPlugin<NetballState>['ScoringControls'] = ({
   // IDs-only scoring: the state keeps player ids; names are looked up when shown
   const { nameOf: playerNameOf } = useMask();
   const [flow, setFlow] = useState<Flow | null>(null);
+  // describe-court-team: Done / Skip per play (its event id), so the next play opens fresh
+  const marks = useDescribeMarks<string>();
   const [editAt, setEditAt] = useState<{ sec: number; period: number } | null>(null);
   const [showEdit, setShowEdit] = useState(false);
   const [more, setMore] = useState(false);
@@ -199,40 +202,36 @@ const ScoringControls: SportPlugin<NetballState>['ScoringControls'] = ({
   const superArmed = (sd: Side) => armed === sd && !!s.superShot && (superShotLive(s, Date.now()) || !!editAt);
   // Round 2: "Super shot" / "2-point shot" and its zone, per the organiser's preset
   const ssText = superShotText(s);
-  const goal = (sd: Side, pos: Pos, shooter: Player | null, feeder: Player | null) => {
+  // describe-court-team DC1 / DC2: the goal / miss goes on the board at the tap;
+  // its feeder and rebound are attached after (DESCRIBE, the "Last play" card)
+  const goal = (sd: Side, pos: Pos, shooter: Player | null) => {
     const two = superArmed(sd);
     setArmed(null);
-    fire({ type: 'GOAL', side: sd, payload: { pos, ...(two ? { points: 2 } : {}) }, ...credit({ type: 'goal', playerId: shooter?.id, secondId: feeder?.id }) });
+    fire({ type: 'GOAL', side: sd, payload: { pos, ...(two ? { points: 2 } : {}) }, ...credit({ type: 'goal', playerId: shooter?.id }) });
     setFlow(null);
   };
-  const miss = (sd: Side, pos: Pos, shooter: Player | null, feeder: Player | null, rebound?: { side: Side; p: Player } | null) => {
-    const id = uid();
+  const miss = (sd: Side, pos: Pos, shooter: Player | null) => {
     const ss = superArmed(sd);
     setArmed(null);
-    fire({ type: 'MISS', side: sd, payload: { pos, uid: id, ...(ss ? { ss: true } : {}) }, ...credit({ type: 'miss', playerId: shooter?.id, secondId: feeder?.id }) });
-    if (rebound) fire({ type: 'STAT', side: rebound.side, payload: { kind: 'rebound', ref: id }, ...credit({ type: 'stat', stat: REBOUND, playerId: rebound.p.id }) });
+    fire({ type: 'MISS', side: sd, payload: { pos, ...(ss ? { ss: true } : {}) }, ...credit({ type: 'miss', playerId: shooter?.id }) });
     setFlow(null);
   };
-  /** the one-tap shot: GS / GA from the line-up (detail mode asks for the feed) */
+  /** the one-tap shot: GS / GA from the line-up (the feed is described after) */
   const shot = (sd: Side, pos: Pos, isMiss: boolean) => {
     const shooter = lineup(sd)[pos] ?? null;
     if (!shooter && rosterOf(sd).length && !s.xi?.[sd]) { setFlow({ mode: 'shooter', side: sd, pos, miss: isMiss }); return; }
     afterShooter(sd, pos, shooter, isMiss);
   };
   const afterShooter = (sd: Side, pos: Pos, shooter: Player | null, isMiss: boolean) => {
-    if (!s.detail) { if (isMiss) miss(sd, pos, shooter, null); else goal(sd, pos, shooter, null); return; }
-    setFlow(isMiss ? { mode: 'miss', side: sd, pos, shooter, step: 'feed' } : { mode: 'goal', side: sd, pos, shooter, step: 'feed' });
+    if (isMiss) miss(sd, pos, shooter); else goal(sd, pos, shooter);
   };
-  const stat = (sd: Side, kind: StatKind, p: Player | null, extra: { gain?: boolean; tt?: TurnoverType } = {}) => {
+  // DC3: the stat is logged on the player pick; a deflection's outcome / a
+  // turnover's type (when tracked) are attached after, in the "Last play" card
+  const stat = (sd: Side, kind: StatKind, p: Player | null) => {
     // deep wave: a pick-up is a statTotals-only credit, so its player rides in the payload
     const who = kind === 'pickup' && p ? { playerId: p.id } : {};
-    fire({ type: 'STAT', side: sd, payload: { kind, ...who, ...(typeof extra.gain === 'boolean' ? { gain: extra.gain } : {}), ...(extra.tt ? { tt: extra.tt } : {}) }, ...credit({ type: 'stat', stat: kind, playerId: p?.id }) });
+    fire({ type: 'STAT', side: sd, payload: { kind, ...who }, ...credit({ type: 'stat', stat: kind, playerId: p?.id }) });
     setFlow(null);
-  };
-  /** after the player: a deflection's outcome / a turnover's type when tracked */
-  const statPicked = (sd: Side, kind: StatKind, p: Player | null) => {
-    if ((kind === 'deflection' && s.trackGains) || (kind === 'turnover' && s.trackTurnovers)) setFlow({ mode: 'stat', side: sd, kind, player: p, step: 'outcome' });
-    else stat(sd, kind, p);
   };
   const penalty = (sd: Side, kind: PenaltyKind, p: Player | null) => {
     fire({ type: 'PENALTY', side: sd, payload: { penalty: kind }, ...credit({ type: 'penalty', penalty: kind, playerId: p?.id }) });
@@ -322,6 +321,72 @@ const ScoringControls: SportPlugin<NetballState>['ScoringControls'] = ({
     setSetting(false); setClockInput('');
   };
 
+  /* ---- describe the last play (describe-court-team, wave 2) ---- */
+  // The play is already on the board; each tap here is one DESCRIBE (undo
+  // removes just that tap). Keyed by the play's id (DC9), it follows the last
+  // play (DC10) and shows after full time too (DC12).
+  const describeCard = (() => {
+    const ev = lastDescribable(s);
+    if (!ev?.side) return null;
+    const sd = ev.side;
+    const fields = describeFields(s, ev);
+    const send = (d: Parameters<typeof describeAction>[2]) => { const a = describeAction(s, ev.id, d); if (a) dispatch(a); };
+    const nameOfId = (x: Side, id?: string, nm?: string) => (id || nm ? byId(x, id, nm)?.fullName ?? nameFor(playerNameOf, id, nm) ?? 'Player' : undefined);
+    const who = nameOfId(sd, ev.playerId, ev.playerName);
+    const reb = fields.includes('rebound') ? reboundOf(s, ev.id) : undefined;
+    const rebName = reb?.side ? nameOfId(reb.side, reb.playerId, reb.playerName) : undefined;
+    const feeder = nameOfId(sd, ev.secondId, ev.secondName);
+    const summary = [
+      feeder ? `Fed by ${feeder}` : '',
+      rebName ? `Rebound ${rebName}` : '',
+      ev.gain === true ? 'Gain' : ev.gain === false ? 'No gain' : '',
+      ev.tt ? TURNOVER_LABEL[ev.tt] : '',
+    ].filter(Boolean).join(' · ');
+    const what = ev.type === 'goal' ? `Last goal · ${ev.pos ?? ''}` : ev.type === 'miss' ? `Last miss · ${ev.pos ?? ''}` : ev.stat === 'deflection' ? 'Last deflection' : 'Last turnover';
+    const circle = (x: Side, ps: Pos[]) => {
+      const l = lineup(x);
+      const placed = ps.map((p) => l[p]).filter((p): p is Player => !!p && !gone(x, p));
+      return placed.length ? placed : onCourt(x);
+    };
+    return (
+      <DescribeCard title={`${what}${who ? ` ${who}` : ''} · ${name(sd)}`} summary={summary} mode={marks.modeOf(ev.id)}
+        onDone={() => marks.mark(ev.id, 'done')} onSkip={() => marks.mark(ev.id, 'skipped')} onEdit={() => marks.mark(ev.id, null)}>
+        {fields.includes('feed') ? (
+          <View style={c.grid}>
+            <Text style={c.small}>Fed by</Text>
+            {onCourt(sd).filter((p) => p.id !== ev.playerId).map((p) => (
+              <SelectChip key={p.id} label={`${posOfPlayer(sd, p) ?? ''} ${p.fullName}`.trim()} active={ev.secondId === p.id} accessibilityLabel={`Fed by ${p.fullName}`}
+                onPress={() => send({ feed: ev.secondId === p.id ? null : p.id })} />
+            ))}
+          </View>
+        ) : null}
+        {fields.includes('rebound') ? (
+          <View style={c.grid}>
+            <Text style={c.small}>Rebound</Text>
+            {([[sd, ['GS', 'GA']], [other(sd), ['GK', 'GD']]] as [Side, Pos[]][]).flatMap(([x, ps]) => circle(x, ps).map((p) => {
+              const on = reb?.side === x && reb.playerId === p.id;
+              return (
+                <SelectChip key={`${x}${p.id}`} label={p.fullName} dotColor={color(x)} active={on} accessibilityLabel={`Rebound by ${p.fullName}, ${name(x)}`}
+                  onPress={() => send({ rebound: on ? null : { side: x, playerId: p.id, uid: uid() } })} />
+              );
+            }))}
+          </View>
+        ) : null}
+        {fields.includes('gain') ? (
+          <View style={c.grid}>
+            <SelectChip label="Gain — won it" active={ev.gain === true} onPress={() => send({ gain: ev.gain === true ? null : true })} />
+            <SelectChip label="No gain" active={ev.gain === false} onPress={() => send({ gain: ev.gain === false ? null : false })} />
+          </View>
+        ) : null}
+        {fields.includes('tt') ? (
+          <View style={c.grid}>
+            {TURNOVER_TYPES.map((t) => <SelectChip key={t} label={TURNOVER_LABEL[t]} active={ev.tt === t} onPress={() => send({ tt: ev.tt === t ? null : t })} />)}
+          </View>
+        ) : null}
+      </DescribeCard>
+    );
+  })();
+
   /* ---- after the final whistle ---- */
   if (s.ended) {
     const r = result(s);
@@ -331,6 +396,7 @@ const ScoringControls: SportPlugin<NetballState>['ScoringControls'] = ({
           <Text style={c.h}>Full time · {s.home}–{s.away}{s.playOn ? ' (after play-on)' : s.et ? ' (after extra time)' : ''}</Text>
           <Text style={c.meta}>{r ? (r.winner === 'draw' ? 'Draw.' : `${name(r.winner)} win.`) : 'Level — end it from Match controls.'} Use “Correct the timeline” below to fix a moment.</Text>
         </View>
+        {describeCard}
         <EditList s={s} show={showEdit} setShow={setShowEdit} onRemove={remove} homeName={homeName} awayName={awayName} />
       </View>
     );
@@ -351,19 +417,13 @@ const ScoringControls: SportPlugin<NetballState>['ScoringControls'] = ({
   /* ---- flows ---- */
   const flowPanel = (() => {
     if (!flow) return null;
-    // wave 0 (score-on-close SC1–SC3): closing the feed / rebound / outcome step keeps the play
-    const netDescribe = (flow.mode === 'goal' && flow.step === 'feed') || (flow.mode === 'miss' && (flow.step === 'feed' || flow.step === 'rebound'))
-      || (flow.mode === 'stat' && flow.step === 'outcome');
-    const saveAsIs = closeSaves({ editing: !!editAt, describing: netDescribe }) ? () => {
-      if (flow.mode === 'goal' && flow.step === 'feed') goal(flow.side, flow.pos, flow.shooter, null);
-      else if (flow.mode === 'miss' && flow.step === 'feed') miss(flow.side, flow.pos, flow.shooter, null, null);
-      else if (flow.mode === 'miss' && flow.step === 'rebound') miss(flow.side, flow.pos, flow.shooter, flow.feeder ?? null, null);
-      else if (flow.mode === 'stat' && flow.step === 'outcome') stat(flow.side, flow.kind, flow.player ?? null);
-    } : null;
+    // describe-court-team: every step left here DEFINES the play (who shot,
+    // which stat, which penalty …), so its header is Cancel — the describe
+    // steps that wave 0 made "Save as is" are gone (the play logs on the tap)
     const head = (t: string, sd?: Side) => (
       <View style={c.flowHead}>
         <Text style={[c.h, sd ? { color: ink(sd) } : null]} numberOfLines={1}>{t}{sd ? ` · ${name(sd)}` : ''}</Text>
-        <Text style={c.cancel} accessibilityRole="button" onPress={saveAsIs ?? (() => setFlow(null))}>{closeLabel(!!saveAsIs)}</Text>
+        <Text style={c.cancel} accessibilityRole="button" onPress={() => setFlow(null)}>Cancel</Text>
       </View>
     );
     if (flow.mode === 'hold') return (
@@ -391,61 +451,11 @@ const ScoringControls: SportPlugin<NetballState>['ScoringControls'] = ({
             <Text style={c.meta}>Only the GS and GA can score. Set positions (More → Positions) to make this one tap.</Text>
           </View>
         );
-      case 'goal':
-        return (
-          <View style={c.panel}>{head(`Goal · ${flow.pos}${flow.shooter ? ` ${flow.shooter.fullName}` : ''}`, sd)}
-            <Text style={c.small}>Goal assist — who fed the circle?</Text>
-            <PlayerGrid players={onCourt(sd).filter((p) => p.id !== flow.shooter?.id)} tag={tagOf(sd)} onPick={(p) => goal(sd, flow.pos, flow.shooter, p)}
-              skip={{ label: 'No feed / skip', onPress: () => goal(sd, flow.pos, flow.shooter, null) }} />
-          </View>
-        );
-      case 'miss':
-        if (flow.step === 'feed') return (
-          <View style={c.panel}>{head(`Missed · ${flow.pos}${flow.shooter ? ` ${flow.shooter.fullName}` : ''}`, sd)}
-            <Text style={c.small}>Feed — who passed into the circle?</Text>
-            <PlayerGrid players={onCourt(sd).filter((p) => p.id !== flow.shooter?.id)} tag={tagOf(sd)} onPick={(p) => setFlow({ ...flow, feeder: p, step: 'rebound' })}
-              skip={{ label: 'Skip', onPress: () => setFlow({ ...flow, feeder: null, step: 'rebound' }) }} />
-          </View>
-        );
-        {
-          const circle = (x: Side, ps: Pos[]) => ps.map((p) => lineup(x)[p]).filter((p): p is Player => !!p && !gone(x, p));
-          return (
-            <View style={c.panel}>{head('Rebound')}
-              <Text style={[c.small, { color: ink(sd) }]}>{name(sd)} (attack)</Text>
-              <PlayerGrid players={circle(sd, ['GS', 'GA'])} tag={tagOf(sd)} onPick={(p) => miss(sd, flow.pos, flow.shooter, flow.feeder ?? null, { side: sd, p })} />
-              <Text style={[c.small, { color: ink(other(sd)) }]}>{name(other(sd))} (defence)</Text>
-              <PlayerGrid players={circle(other(sd), ['GK', 'GD'])} tag={tagOf(other(sd))} onPick={(p) => miss(sd, flow.pos, flow.shooter, flow.feeder ?? null, { side: other(sd), p })}
-                skip={{ label: 'No rebound / skip', onPress: () => miss(sd, flow.pos, flow.shooter, flow.feeder ?? null, null) }} />
-            </View>
-          );
-        }
       case 'stat': {
         const b = [...STAT_BTN, PICKUP_BTN].find((x) => x.kind === flow.kind)!;
-        if (flow.step === 'outcome') {
-          const who = flow.player ? ` · ${flow.player.fullName}` : '';
-          // Deep wave — "Gains & pick-ups": did the deflection win the ball?
-          if (flow.kind === 'deflection') return (
-            <View style={c.panel}>{head(`${b.label}${who}`, sd)}
-              <View style={c.row}>
-                <Button label="Gain — won it" variant="ghost" style={c.flex} onPress={() => stat(sd, flow.kind, flow.player ?? null, { gain: true })} />
-                <Button label="No gain" variant="ghost" style={c.flex} onPress={() => stat(sd, flow.kind, flow.player ?? null, { gain: false })} />
-              </View>
-              <Text style={c.cancel} accessibilityRole="button" onPress={() => stat(sd, flow.kind, flow.player ?? null)}>Skip</Text>
-            </View>
-          );
-          // Deep wave — "Turnover types"
-          return (
-            <View style={c.panel}>{head(`${b.label}${who}`, sd)}
-              <View style={c.grid}>
-                {TURNOVER_TYPES.map((t) => <SelectChip key={t} label={TURNOVER_LABEL[t]} active={false} onPress={() => stat(sd, flow.kind, flow.player ?? null, { tt: t })} />)}
-                <SelectChip label="Skip" active={false} onPress={() => stat(sd, flow.kind, flow.player ?? null)} />
-              </View>
-            </View>
-          );
-        }
         return (
           <View style={c.panel}>{head(b.label, sd)}
-            <PlayerGrid players={onCourt(sd)} tag={tagOf(sd)} onPick={(p) => statPicked(sd, flow.kind, p)} skip={{ label: 'Skip player', onPress: () => statPicked(sd, flow.kind, null) }} />
+            <PlayerGrid players={onCourt(sd)} tag={tagOf(sd)} onPick={(p) => stat(sd, flow.kind, p)} skip={{ label: 'Skip player', onPress: () => stat(sd, flow.kind, null) }} />
           </View>
         );
       }
@@ -664,6 +674,7 @@ const ScoringControls: SportPlugin<NetballState>['ScoringControls'] = ({
       {flowPanel ?? (
         <>
           <View style={c.cols}>{sideCol('home')}{sideCol('away')}</View>
+          {describeCard}
           <Button label={more ? 'Fewer buttons ▴' : 'More — intercepts, penalties, subs, positions ▾'} variant="ghost" onPress={() => setMore((v) => !v)} />
           {noPositions ? <Text style={c.meta}>Tip: set each team’s line-up (GS…GK) before the start and the GS / GA buttons show the shooters’ names — one tap per goal.</Text> : null}
           {!periodStarted(s) && s.period > 1 ? <Text style={c.meta}>Break — make substitutions and position changes from “More”, then start {periodName(s, s.period)}.</Text> : null}

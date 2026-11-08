@@ -157,9 +157,14 @@ describe('DC4 / DC5 / DC12 · netball: feeds & rebounds on with International 4 
     assert.equal(capOf(ls, old, fields, { preset: 'international', periods: 4, periodMinutes: 15 }).detail, false);
   });
   test('DC10 · the feed and rebound steps keep their Skip', () => {
+    // describe-court-team DC1 / DC2: the feed and rebound are no longer blocking
+    // steps; they live on the "Last play" DescribeCard, whose button reads Skip
+    // when nothing is picked (the play is already on the board)
     const ui = src('src/sports/netball/index.tsx');
-    assert.match(ui, /label: 'No feed \/ skip'/);
-    assert.match(ui, /label: 'No rebound \/ skip'/);
+    assert.match(ui, /<DescribeCard /);
+    assert.match(ui, /onSkip=\{\(\) => marks\.mark\(ev\.id, 'skipped'\)\}/);
+    assert.match(ui, /fields\.includes\('feed'\)/);
+    assert.match(ui, /fields\.includes\('rebound'\)/);
   });
 });
 

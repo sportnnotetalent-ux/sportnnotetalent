@@ -14,8 +14,9 @@ test('SC7/SC8: Save as is only on a describe step of a new play', () => {
   assert.equal(closeLabel(false), 'Cancel');
 });
 
+// describe-court-team DC1–DC3: netball left this list — its feed / rebound /
+// outcome / type steps are gone, the play is logged on the tap (tested below)
 const CASES: [string, RegExp[]][] = [
-  ['netball', [/flow\.mode === 'goal' && flow\.step === 'feed'[\s\S]{0,80}goal\(flow\.side, flow\.pos, flow\.shooter, null\)/, /flow\.mode === 'miss' && flow\.step === 'rebound'[\s\S]{0,120}miss\(flow\.side, flow\.pos, flow\.shooter, flow\.feeder \?\? null, null\)/, /flow\.mode === 'stat' && flow\.step === 'outcome'[\s\S]{0,80}stat\(flow\.side, flow\.kind, flow\.player \?\? null\)/]],
   ['hockey', [/flow\.mode === 'goal' && flow\.step === 'assist'[\s\S]{0,120}goal\(sd, flow\.goalType \?\? 'field', flow\.scorer \?\? null, null, flow\.pc\)/]],
   ['ice_hockey', [/flow\.step === 'onice'[\s\S]{0,80}goal\(sd, flow\.d, flow\.a2 \?\? null\)/, /flow\.step === 'a1' \|\| flow\.step === 'a2'[\s\S]{0,60}goal\(sd, flow\.d, null\)/]],
   ['rugby', [/flow\.mode === 'try' && flow\.step === 'assist'[\s\S]{0,80}scoreTry\(sd, flow\.scorer \?\? null, null\)/]],
@@ -29,6 +30,12 @@ test('SC1–SC6: each sport saves the play when a describe step is closed', () =
     assert.match(s, /closeLabel\(/, sp);
     for (const re of res) assert.match(s, re, sp);
   }
+});
+
+test('SC1–SC3 (describe-court-team DC1–DC3): netball has no describe step to close — the play logs on the tap', () => {
+  const s = read('src/sports/netball/index.tsx');
+  assert.doesNotMatch(s, /step: 'feed'|step: 'rebound'|step: 'outcome'/);
+  assert.match(s, /if \(isMiss\) miss\(sd, pos, shooter\); else goal\(sd, pos, shooter\);/);
 });
 
 test('600 scorers: a decided play is never lost; a mis-tap never becomes a play', () => {

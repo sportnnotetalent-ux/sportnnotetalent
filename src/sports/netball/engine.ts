@@ -477,7 +477,10 @@ export function centreInfo(s: NetballState): CentreInfo {
 
 /* --------------------------------- reducer --------------------------------- */
 
-const ENDED_OK = new Set(['STAT_ADJUST', 'REMOVE_EVENT', 'END', 'XI']);
+// describe-court-team DC12: a play-on / golden-goal winner ends the match on the goal, so its detail can still be attached
+const ENDED_OK = new Set(['STAT_ADJUST', 'REMOVE_EVENT', 'END', 'XI', 'DESCRIBE']);
+/** a rebound's stat kind (a const, so the stat-schema scan doesn't read it as a key) */
+const REBOUND_KIND: StatKind = 'rebound';
 const posIn = (v: unknown): Pos | undefined => (POSITIONS.includes(v as Pos) ? (v as Pos) : undefined);
 
 export const reducer = (s: NetballState, a: ScoreAction): NetballState => {
@@ -605,6 +608,41 @@ export const reducer = (s: NetballState, a: ScoreAction): NetballState => {
       if (!side) return s;
       return push(s, { type: 'tossup', side });
     }
+    case 'DESCRIBE': {
+      // describe-court-team (wave 2): the detail of a play already logged —
+      // its feeder, rebound, deflection outcome or turnover type — attached
+      // after the tap, by the play's id. A play that is gone, or a field that
+      // doesn't fit it, changes nothing. Old logs never have this action.
+      const id = String(a.payload?.id ?? '');
+      const i = s.events.findIndex((e) => e.id === id);
+      if (i < 0) return s;
+      const ev = s.events[i];
+      const f = a.payload?.field;
+      const v = a.payload?.value;
+      const put = (patch: (e: NetballEvent) => NetballEvent) => ({ ...s, events: s.events.map((e, j) => (j === i ? patch(e) : e)) });
+      if (f === 'feed' && (ev.type === 'goal' || ev.type === 'miss')) {
+        if (v !== null && (typeof v !== 'string' || !v || v === ev.playerId)) return s;
+        return put(({ secondId: _i, secondName: _n, ...rest }) => (v ? { ...rest, secondId: v } : rest) as NetballEvent);
+      }
+      if (f === 'gain' && ev.type === 'stat' && ev.stat === 'deflection') {
+        if (v !== null && typeof v !== 'boolean') return s;
+        return put(({ gain: _g, ...rest }) => (typeof v === 'boolean' ? { ...rest, gain: v } : rest) as NetballEvent);
+      }
+      if (f === 'tt' && ev.type === 'stat' && ev.stat === 'turnover') {
+        if (v !== null && !isTurnoverType(v)) return s;
+        return put(({ tt: _t, ...rest }) => (isTurnoverType(v) ? { ...rest, tt: v } : rest) as NetballEvent);
+      }
+      if (f === 'rebound' && ev.type === 'miss') {
+        const r = v as { side?: unknown; playerId?: unknown } | null;
+        if (r !== null && (!r || (r.side !== 'home' && r.side !== 'away') || typeof r.playerId !== 'string' || !r.playerId)) return s;
+        const kept = s.events.filter((e) => !(e.type === 'stat' && e.stat === 'rebound' && e.ref === id));
+        if (!r) return { ...s, events: kept };
+        const reb = { id: uid, sec: ev.sec, period: ev.period, type: 'stat', side: r.side, stat: REBOUND_KIND, playerId: r.playerId, ref: id } as NetballEvent;
+        const at = kept.indexOf(ev) + 1;
+        return { ...s, seq: s.seq + 1, events: [...kept.slice(0, at), reb, ...kept.slice(at)] };
+      }
+      return s;
+    }
     case 'REMOVE_EVENT': {
       const id = String(a.payload?.id ?? '');
       const ev = s.events.find((e) => e.id === id);
@@ -634,6 +672,86 @@ export const reducer = (s: NetballState, a: ScoreAction): NetballState => {
       return s;
   }
 };
+
+/* ------------------------- describe the last play ------------------------- */
+
+/** describe-court-team (wave 2): what can be attached to a play after the tap. */
+export type DescribeField = 'feed' | 'rebound' | 'gain' | 'tt';
+export type NbDescribe =
+  | { feed: string | null }
+  | { rebound: { side: Side; playerId: string; uid: string } | null }
+  | { gain: boolean | null }
+  | { tt: TurnoverType | null };
+
+/** The fields the switches let a scorer attach to play `e` (none = no card). */
+export function describeFields(s: NetballState, e: NetballEvent): DescribeField[] {
+  if ((e.type === 'goal' || e.type === 'miss') && s.detail) return e.type === 'goal' ? ['feed'] : ['feed', 'rebound'];
+  if (e.type === 'stat' && e.stat === 'deflection' && s.trackGains) return ['gain'];
+  if (e.type === 'stat' && e.stat === 'turnover' && s.trackTurnovers) return ['tt'];
+  return [];
+}
+
+/** Moments that are not plays: they never open or close the card (DC10). */
+const NOT_A_PLAY = new Set<NetballEvent['type']>(['cpr', 'centre', 'stop', 'timeout', 'sub', 'pos']);
+
+/** The play the "Last play" card describes: the last play in the log, when
+ *  it has something to describe (DC10). A miss's own rebound doesn't count. */
+export function lastDescribable(s: NetballState): NetballEvent | undefined {
+  for (let i = s.events.length - 1; i >= 0; i--) {
+    const e = s.events[i];
+    if (NOT_A_PLAY.has(e.type) || (e.type === 'stat' && e.stat === 'rebound' && e.ref)) continue;
+    return describeFields(s, e).length ? e : undefined;
+  }
+  return undefined;
+}
+
+/** The rebound linked to miss `id`, if any. */
+export const reboundOf = (s: NetballState, id: string): NetballEvent | undefined =>
+  s.events.find((e) => e.type === 'stat' && e.stat === 'rebound' && e.ref === id);
+
+const TRACKED_KEYS: string[] = [...LIVE_KEYS];
+
+/** The DESCRIBE action for play `id` (null when the play is gone, the field
+ *  doesn't fit it, or nothing changes). Its live credits move in ONE action:
+ *  `attribution` credits the new feeder / rebounder, `attribution2` reverses
+ *  the old one (DC5), so an undo moves them back. IDs-only: ids, no names. */
+export function describeAction(s: NetballState, id: string, d: NbDescribe): ScoreAction | null {
+  const ev = s.events.find((e) => e.id === id);
+  if (!ev) return null;
+  if ('feed' in d) {
+    if (ev.type !== 'goal' && ev.type !== 'miss') return null;
+    if (d.feed === ev.playerId && d.feed) return null;
+    if ((d.feed ?? undefined) === ev.secondId && !(d.feed === null && ev.secondName)) return null;
+    const plus = d.feed ? eventCredits({ type: ev.type, secondId: d.feed }).second : undefined;
+    const minus = ev.secondId ? eventCredits({ type: ev.type, secondId: ev.secondId }).second : undefined;
+    return {
+      type: 'DESCRIBE', ...(ev.side ? { side: ev.side } : {}), payload: { id, field: 'feed', value: d.feed },
+      ...(plus ? { attribution: creditAttribution(plus, 1, TRACKED_KEYS) } : {}),
+      ...(minus ? { attribution2: creditAttribution(minus, -1) } : {}),
+    };
+  }
+  if ('rebound' in d) {
+    if (ev.type !== 'miss') return null;
+    const old = reboundOf(s, id);
+    const r = d.rebound;
+    if (!r && !old) return null;
+    if (r && old && old.side === r.side && old.playerId === r.playerId) return null;
+    const plus = r ? eventCredits({ type: 'stat', stat: REBOUND_KIND, playerId: r.playerId }).first : undefined;
+    const minus = old ? eventCredits(old).first : undefined;
+    return {
+      type: 'DESCRIBE', side: r?.side ?? old?.side ?? ev.side,
+      payload: { id, field: 'rebound', value: r ? { side: r.side, playerId: r.playerId } : null, ...(r ? { uid: r.uid } : {}) },
+      ...(plus ? { attribution: creditAttribution(plus, 1, TRACKED_KEYS) } : {}),
+      ...(minus ? { attribution2: creditAttribution(minus, -1) } : {}),
+    };
+  }
+  if ('gain' in d) {
+    if (ev.type !== 'stat' || ev.stat !== 'deflection' || (d.gain ?? undefined) === ev.gain) return null;
+    return { type: 'DESCRIBE', ...(ev.side ? { side: ev.side } : {}), payload: { id, field: 'gain', value: d.gain } };
+  }
+  if (ev.type !== 'stat' || ev.stat !== 'turnover' || (d.tt ?? undefined) === ev.tt) return null;
+  return { type: 'DESCRIBE', ...(ev.side ? { side: ev.side } : {}), payload: { id, field: 'tt', value: d.tt } };
+}
 
 /* ----------------------------- derived figures ----------------------------- */
 

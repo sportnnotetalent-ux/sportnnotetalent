@@ -30,9 +30,11 @@ export const rotationAction = (team: Side, set: number, players: Who[], liberos:
 export const subAction = (side: Side, off: Who, on: Who, kind: SubKind): ScoreAction =>
   ({ type: 'SUB', side, payload: { off: courtPlayer(off), on: courtPlayer(on), kind } });
 
-/** SD-81 — a detail entry (attack in play, blocked attacker, reception …). */
-export const detailAction = (kind: VbDetailKind, side: Side, p: Who, q?: ReceptionGrade): ScoreAction =>
-  ({ type: 'VB_DETAIL', side, payload: { kind, player: { playerId: p.id }, ...(q ? { q } : {}) } });
+/** SD-81 — a detail entry (attack in play, blocked attacker, reception …).
+ *  describe-court-team DC9: `pt` names the point an annotation describes
+ *  (set + rally number), so a late tap never lands on a newer point. */
+export const detailAction = (kind: VbDetailKind, side: Side, p: Who, q?: ReceptionGrade, pt?: { set: number; at: number }): ScoreAction =>
+  ({ type: 'VB_DETAIL', side, payload: { kind, player: { playerId: p.id }, ...(q ? { q } : {}), ...(pt ? { pt: { set: pt.set, at: pt.at } } : {}) } });
 
 /** Court-team batch 6 — a video challenge by `side` (FIVB Video Challenge
  *  System): upheld or not, and optionally what was challenged

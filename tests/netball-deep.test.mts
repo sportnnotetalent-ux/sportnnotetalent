@@ -314,7 +314,11 @@ describe('netball deep · scorer UI guards', () => {
   test('CPR is one tap on the centre strip; outcome / type steps follow the player; the views', () => {
     // IDs-only scoring: the receiver by id only
     assert.match(src, /fire\(\{ type: 'CPR', side: cp, payload: \{ playerId: p\.id, pos \} \}\)/);
-    assert.match(src, /kind === 'deflection' && s\.trackGains\) \|\| \(kind === 'turnover' && s\.trackTurnovers\)/);
+    // describe-court-team DC3: the outcome / type no longer follow the player as a
+    // blocking step — the stat logs on the pick and the "Last play" card asks after
+    assert.match(src, /describeFields\(s, ev\)/);
+    assert.match(src, /fields\.includes\('gain'\)/);
+    assert.match(src, /fields\.includes\('tt'\)/);
     assert.match(src, /<PlayFeed groups=\{netballFeed\(s/);
     assert.match(src, /<CategoryStatsPanel periods=\{nbPanelPeriods\(s\)\}/);
   });
