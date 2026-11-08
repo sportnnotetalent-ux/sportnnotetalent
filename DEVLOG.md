@@ -38,6 +38,18 @@ Where it changed:
   - Marketing posts already rendered keep the old mark.
   - The mint experiment was undone and never committed.
 
+### 2026-11-08 — Release: teams for doubles (phases 1–6) + racket box-score fix (web, Android OTA)
+
+Live: web `index-947f33ed`; Android OTA preview `3a0b9374`, production `b62be06f` (commit e5872464).
+- **Doubles sides are teams:** match setup picks teams, "Who's playing?" comes before the first point, and "{Team} Player 1 / 2" stand-ins mean scoring never waits.
+- **"Who played?" moves stats:** stand-ins' stats move to the real players. Captains can do this too.
+- **Team pages instead of pair pages.**
+- **Racket box-score edge case fixed (RD11).**
+
+Founder ran both migrations first: `map_team_stand_ins` and `doubles_pairs_to_teams`. Read-only check afterwards: 17 rows are in 12 teams, and nothing is left to convert.
+- **Checks:** auth-smoke passed.
+- **Still waiting on the founder:** the `notify-upcoming` edge-function deploy (switches squad reminders on for racket and cue sports).
+
 ### 2026-11-08 — Teams for doubles, phase 6: existing pairs become teams (migration ready, founder runs it)
 
 `supabase/migrations/20261116120000_doubles_pairs_to_teams.sql` adds a one-off `pairs_to_teams()` and runs it once. Each two-person quick-game side in a doubles sport joins one **team** (a club, so one team in any sport), and both players become its admins so either can rename it or add people.
