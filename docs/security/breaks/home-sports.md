@@ -13,3 +13,4 @@
 | HS4 | The new page is empty or broken when opened from an old link or with no sports. | Robustness | It works out your sports itself (no route params) and shows an empty state with a way to Try a new sport. Tested. |
 | HS5 | Removing the tournament filter quietly hides matches: a person with one tournament was auto-filtered to it. | Content | Live now and Up next always show every match of yours. The tournament cards lower down open each tournament. Tested. |
 | HS6 | A sport opened from Home picks the "selected" tournament, which no longer exists. | Logic | `sportTarget` has no selected-tournament input. Tested. |
+| HS7 | Founder: from Your sports → a sport → "＋ Organize a game", match setup asks for the sport again. | Consistency | The sport page passes its sport, so setup opens with that sport chosen. An unknown sport id still falls back to the picker. Tested. |

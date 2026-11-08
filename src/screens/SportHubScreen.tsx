@@ -127,7 +127,7 @@ export default function SportHubScreen() {
         <DivisionTabs categories={divisions} activeCat={activeCat} onChange={setActiveCat} />
 
         {canOrganize(profile?.role) && (
-          <Button label="＋ Organize a game" variant="ghost" onPress={() => nav.navigate('ScheduleMatch', { tournamentId })} />
+          <Button label="＋ Organize a game" variant="ghost" onPress={() => nav.navigate('ScheduleMatch', { tournamentId, sport })} />
         )}
 
         {live.length > 0 && (

@@ -68,3 +68,8 @@ test('600 users: the icon is always one of their sports, or none', () => {
     }
   }
 });
+
+test('HS7: "Organize a game" from a sport page starts with that sport chosen', () => {
+  assert.match(read('src/screens/SportHubScreen.tsx'), /navigate\('ScheduleMatch', \{ tournamentId, sport \}\)/);
+  assert.match(read('src/screens/ScheduleMatchScreen.tsx'), /useState<SportId \| null>\(routeSport\)/);
+});

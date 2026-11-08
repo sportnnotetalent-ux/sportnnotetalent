@@ -38,6 +38,11 @@ Where it changed:
   - Marketing posts already rendered keep the old mark.
   - The mint experiment was undone and never committed.
 
+### 2026-11-08 — "Organize a game" from a sport page starts with that sport
+
+The founder found that Your sports → a sport → "＋ Organize a game" asked for the sport again. The sport page now passes its sport, so match setup opens with it already chosen (home-sports.md HS7).
+- **Checks:** failing test first; demo-checked (Badminton preselected).
+
 ### 2026-11-08 — One top bar (name → Home), Your sports page, no tournament filter
 
 Founder asked for Home's top row across the app, with a tap on the name going Home. Three Home fixes came in while it was being built.
