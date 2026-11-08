@@ -11,8 +11,8 @@ export const DEEP_TRACK_KEYS = ['shotDetail', 'keyPasses', 'clearances', 'setPie
 
 export type DeepTrackKey = typeof DEEP_TRACK_KEYS[number];
 
-/** Deep wave — "Deeper stats (optional)": off by default; each adds a chip or
- *  a step only when on. */
+/** Deep wave — the deeper "Stats to track"; each adds a chip, a button or a
+ *  non-blocking card only when on (defaults: FOOTBALL_STATS_DEFAULTS). */
 export const DEEP_TRACKABLE: [DeepTrackKey, string, string][] = [
   ['shotDetail', 'Shot detail', 'inside / outside the box, big chances, woodwork'],
   ['keyPasses', 'Key passes', 'who set up each shot'],
@@ -36,21 +36,33 @@ export const BASE_TRACKABLE: [string, string, boolean][] = [
   ['crosses', 'Crosses', true], ['dribbles', 'Dribbles', true], ['handball', 'Handballs', true],
 ];
 
-/** "Quick" (founder, 2026-10-31; MVP F8): a friendly tracks goals, assists,
- *  subs (always) and cards; everything else is opt-in. Tournaments keep the
- *  full set. Stamped on new matches only — a saved match has no `track*` keys
- *  and keeps the full set (engine `readTrack`).
- *  Batch 3 (founder, 2026-11-02): shots and saves are on for a new friendly too
- *  (docs/security/breaks/defaults-invasion.md); a saved friendly keeps its own. */
-const FRIENDLY_ON = ['cards', 'shots', 'saves'];
+/** "Quick" (founder, 2026-10-31; MVP F8) friendlies tracked goals, assists,
+ *  subs (always) and cards; batch 3 (2026-11-02) added shots and saves.
+ *  Defaults-on wave 3 (founder, 2026-11-08; docs/security/breaks/defaults-on-invasion.md):
+ *  a NEW friendly now gets every tap-optional stat, base and deep — all but
+ *  possession (a tap at every change), passes (too fast for one scorer) and
+ *  goals ruled out. Tournaments keep the full base set (`tournamentDefault`,
+ *  possession on) plus the same deep stats. Stamped on new matches only — a
+ *  saved match keeps its stored keys, and one with no `track*` keys keeps the
+ *  full base set and no deep stats (engine `readTrack` / `readDeepTrack`). */
+const FRIENDLY_OFF = ['possession', 'passes'];
+const DEEP_OFF: DeepTrackKey[] = ['ruledOut'];
+
+/** The one source of a new match's "Stats to track" (friendly): the format
+ *  fields, the live settings and their `defaults` (Reset) all read it. */
+export const FOOTBALL_STATS_DEFAULTS: Record<string, boolean> = {
+  ...Object.fromEntries(BASE_TRACKABLE.map(([k]) => [trackKey(k), !FRIENDLY_OFF.includes(k)])),
+  ...Object.fromEntries(DEEP_TRACK_KEYS.map((k) => [trackKey(k), !DEEP_OFF.includes(k)])),
+};
+
 export const TRACK_FIELDS: FormatField[] = BASE_TRACKABLE.map(([k, label, full]) => ({
   key: trackKey(k), label: `Track ${label.toLowerCase()}`, type: 'toggle', group: 'Stats to track', advanced: true,
-  default: FRIENDLY_ON.includes(k), tournamentDefault: full,
+  default: FOOTBALL_STATS_DEFAULTS[trackKey(k)], tournamentDefault: full,
 }));
 
 /** Deep wave — the optional toggles as format fields (live settings group;
  *  also an organiser's advanced format options). */
-export const DEEP_TRACK_FIELDS: FormatField[] = DEEP_TRACKABLE.map(([k, label, hint]) => ({ key: trackKey(k), label, type: 'toggle', default: false, group: 'Deeper stats (optional)', hint }));
+export const DEEP_TRACK_FIELDS: FormatField[] = DEEP_TRACKABLE.map(([k, label, hint]) => ({ key: trackKey(k), label, type: 'toggle', default: FOOTBALL_STATS_DEFAULTS[trackKey(k)], group: 'Stats to track', hint }));
 
 export const FOOTBALL_META: SportMeta = {
   id: 'football',
@@ -105,7 +117,7 @@ export const FOOTBALL_META: SportMeta = {
     { key: 'stoppedClock', label: 'Stopped clock', type: 'toggle', default: false, advanced: true, hint: 'Futsal: stop and restart the clock on every stoppage' },
     { key: 'futsal', label: 'Futsal time-outs and accumulated fouls', type: 'toggle', default: false, advanced: true, hint: '1 time-out a half · 6th foul a half = 10 m free kick' },
     ...TRACK_FIELDS,
-    // deep wave: the optional "Deeper stats" an organiser can switch on for an event
+    // deep wave: the deeper "Stats to track" (on for a new match, but goals ruled out)
     ...DEEP_TRACK_FIELDS.map((f) => ({ ...f, label: `Track ${f.label.charAt(0).toLowerCase()}${f.label.slice(1)}`, advanced: true })),
   ],
 };

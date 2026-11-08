@@ -15,11 +15,17 @@ export const HOCKEY_PRESETS: Record<string, { label: string; set: Record<string,
   fives: { label: 'Hockey5s', set: { playersPerSide: 5, periods: 2, periodMinutes: 10, stopClock: false, penaltyCorners: false } },
 };
 
-/** Deep wave — the optional "Stats to track" (off by default: one tap per
- *  event stays the default; these add their own buttons when on). */
+/** Defaults-on wave 3 (docs/security/breaks/defaults-on-invasion.md): the one
+ *  source of a new match's "Stats to track" — the format fields, the live
+ *  settings and their `defaults` (Reset) all read it. All three stay OFF:
+ *  possession needs a tap at every change, referrals need a video umpire, and
+ *  goals ruled out stays off (founder, 2026-11-08). */
+export const HOCKEY_STATS_DEFAULTS: Record<string, boolean> = { trackPossession: false, trackReferrals: false, trackRuledOut: false };
+
+/** Deep wave — the optional "Stats to track" (these add their own buttons when on). */
 export const HOCKEY_TRACK_FIELDS: FormatField[] = [
-  { key: 'trackPossession', label: 'Possession', type: 'toggle', default: false, group: 'Stats to track', hint: 'tap who has the ball; % on the game clock' },
-  { key: 'trackReferrals', label: 'Video referrals', type: 'toggle', default: false, group: 'Stats to track', hint: 'per team, upheld or not' },
+  { key: 'trackPossession', label: 'Possession', type: 'toggle', default: HOCKEY_STATS_DEFAULTS.trackPossession, group: 'Stats to track', hint: 'tap who has the ball; % on the game clock' },
+  { key: 'trackReferrals', label: 'Video referrals', type: 'toggle', default: HOCKEY_STATS_DEFAULTS.trackReferrals, group: 'Stats to track', hint: 'per team, upheld or not' },
 ];
 
 export const HOCKEY_META: SportMeta = {
@@ -43,7 +49,7 @@ export const HOCKEY_META: SportMeta = {
     // deep wave: the optional "Stats to track" an organiser can switch on for an event
     ...HOCKEY_TRACK_FIELDS.map((f) => ({ ...f, label: `Track ${f.label.toLowerCase()}`, advanced: true })),
     // invasion batch 6: goal / try ruled out (off by default)
-    { ...ruledOutField('hockey'), advanced: true },
+    { ...ruledOutField('hockey'), default: HOCKEY_STATS_DEFAULTS.trackRuledOut, advanced: true },
     {
       key: 'decider', label: 'If level at full time', type: 'choice', default: 'none',
       options: [

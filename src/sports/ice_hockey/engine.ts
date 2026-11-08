@@ -45,7 +45,7 @@
 import type { ScoreAction, LiveSettings, FormatField, Attribution } from '../types';
 import { aggPriorFromConfig, aggregateText, levelForDecider, type AggPrior } from '../aggregate.ts';
 // Perf F-15 — the format presets / options live in the light meta module.
-import { ICE_HOCKEY_PRESETS, TRACK_FIELDS } from './meta.ts';
+import { ICE_HOCKEY_PRESETS, TRACK_FIELDS, ICE_HOCKEY_STATS_DEFAULTS } from './meta.ts';
 import { readRuledOut, ruledOutConfig, ruledOutField } from '../invasion/ruledOut.ts';
 import { creditDiff, detailAction, patchId, sameEvent } from '../invasion/goalDetail.ts';
 export { ICE_HOCKEY_PRESETS, TRACK_FIELDS };
@@ -1012,10 +1012,12 @@ export const ICE_HOCKEY_LIVE_SETTINGS: LiveSettings<IceHockeyState> = {
   fields: [
     { key: 'periodMinutes', label: 'Period length', type: 'number', default: 20, min: 1, max: 30, step: 1, hint: 'min / period' },
     { key: 'stopClock', label: 'Stop the clock on goals and penalties', type: 'toggle', default: true, group: 'Clock' },
-    { key: 'plusMinus', label: 'Track +/- (who was on the ice at each goal)', type: 'toggle', default: false, group: 'Stats' },
+    // defaults-on DOI5: one group for every stats toggle
+    { key: 'plusMinus', label: 'Track +/- (who was on the ice at each goal)', type: 'toggle', default: ICE_HOCKEY_STATS_DEFAULTS.plusMinus, group: 'Stats to track' },
     ...TRACK_FIELDS,
-    ruledOutField('ice_hockey'),
+    { ...ruledOutField('ice_hockey'), default: ICE_HOCKEY_STATS_DEFAULTS.trackRuledOut },
   ] as FormatField[],
   read: (s) => ({ periodMinutes: s.periodMinutes, stopClock: s.stopClock, plusMinus: s.plusMinus, ...Object.fromEntries(TRACK_FLAGS.map((f) => [f, s[f] === true])), trackFaceoffZones: s.trackFaceoffZones === true, trackRuledOut: s.trackRuledOut === true }),
-  defaults: { periodMinutes: 20, stopClock: true, plusMinus: false, ...Object.fromEntries(TRACK_FLAGS.map((f) => [f, false])), trackFaceoffZones: false, trackRuledOut: false },
+  // defaults-on DOI2: the stats standard is the one constant (a new match's), so Reset agrees
+  defaults: { periodMinutes: 20, stopClock: true, ...ICE_HOCKEY_STATS_DEFAULTS },
 };

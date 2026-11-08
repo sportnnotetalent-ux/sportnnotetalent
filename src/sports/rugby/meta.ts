@@ -18,14 +18,24 @@ export const RUGBY_PRESETS: Record<string, { label: string; set: Record<string, 
   sevensFinal: { label: 'Sevens final · 2 × 10', set: { variant: '7s', playersPerSide: 7, periodMinutes: 10, sinBinMinutes: 2, maxSubs: 5, rolling: false, etMinutes: 5, sdMinutes: 5 } },
 };
 
+/** Defaults-on wave 3 (founder, 2026-11-08; docs/security/breaks/defaults-on-invasion.md):
+ *  the one source of a new match's "Stats to track" — the format fields, the
+ *  live settings and their `defaults` (Reset) all read it. NEW matches only:
+ *  the engine reads a saved match's own keys with an OFF fallback. Possession
+ *  & territory (a tap at every change) and tries ruled out stay OFF. */
+export const RUGBY_STATS_DEFAULTS: Record<string, boolean> = {
+  trackDetail: true, trackPenalties: true, trackTurnovers: true, trackEntries: true, trackPossession: false, trackOffloads: true,
+  trackRuledOut: false, trackRestarts: true,
+};
+
 /** Deep wave — the "Stats to track" toggles (live settings + the match format). */
 export const TRACK_FIELDS: FormatField[] = [
   // batch 3 (founder, 2026-11-02): on for a new match; a saved match keeps its own (engine init)
-  { key: 'trackPenalties', label: 'Penalties by offence & free kicks', type: 'toggle', default: true, group: 'Stats to track', hint: 'A ⚖ Penalty button: the offence and the player (both optional); a Free kick button: the player (optional)' },
-  { key: 'trackTurnovers', label: 'Turnovers conceded', type: 'toggle', default: false, group: 'Stats to track', hint: 'Knock-ons, forward passes, handling errors… the cause and the player (both optional)' },
-  { key: 'trackEntries', label: '22 entries', type: 'toggle', default: false, group: 'Stats to track', hint: 'One tap when a team gets into the opposition 22 — points per entry' },
-  { key: 'trackPossession', label: 'Possession & territory', type: 'toggle', default: false, group: 'Stats to track', hint: 'Tap who has the ball and which half play is in — % on the playing clock; "Ball dead" pauses both at stoppages' },
-  { key: 'trackOffloads', label: 'Offloads', type: 'toggle', default: false, group: 'Stats to track', hint: 'An Offload button — who made it (optional)' },
+  { key: 'trackPenalties', label: 'Penalties by offence & free kicks', type: 'toggle', default: RUGBY_STATS_DEFAULTS.trackPenalties, group: 'Stats to track', hint: 'A ⚖ Penalty button: the offence and the player (both optional); a Free kick button: the player (optional)' },
+  { key: 'trackTurnovers', label: 'Turnovers conceded', type: 'toggle', default: RUGBY_STATS_DEFAULTS.trackTurnovers, group: 'Stats to track', hint: 'Knock-ons, forward passes, handling errors… the cause and the player (both optional)' },
+  { key: 'trackEntries', label: '22 entries', type: 'toggle', default: RUGBY_STATS_DEFAULTS.trackEntries, group: 'Stats to track', hint: 'One tap when a team gets into the opposition 22 — points per entry' },
+  { key: 'trackPossession', label: 'Possession & territory', type: 'toggle', default: RUGBY_STATS_DEFAULTS.trackPossession, group: 'Stats to track', hint: 'Tap who has the ball and which half play is in — % on the playing clock; "Ball dead" pauses both at stoppages' },
+  { key: 'trackOffloads', label: 'Offloads', type: 'toggle', default: RUGBY_STATS_DEFAULTS.trackOffloads, group: 'Stats to track', hint: 'An Offload button — who made it (optional)' },
 ];
 
 export const RUGBY_META: SportMeta = {
@@ -47,12 +57,12 @@ export const RUGBY_META: SportMeta = {
     { key: 'maxSubs', label: 'Replacements allowed (0 = no limit)', type: 'number', default: 8, min: 0, max: 30, advanced: true },
     { key: 'rolling', label: 'Rolling replacements (age-grade)', type: 'toggle', default: false, advanced: true, hint: 'a replaced player may come back on' },
     { key: 'red20', label: '20-minute red card (World Rugby trial)', type: 'toggle', default: false, advanced: true, hint: 'the scorer can give a 20-minute red: replaceable after 20 minutes; two yellows = a 20-minute red' },
-    { key: 'trackDetail', label: 'Track tackles, carries and set pieces', type: 'toggle', default: false, advanced: true },
+    { key: 'trackDetail', label: 'Track tackles, carries and set pieces', type: 'toggle', default: RUGBY_STATS_DEFAULTS.trackDetail, group: 'Stats to track', advanced: true },
     ...TRACK_FIELDS.map((f) => ({ ...f, advanced: true })),
     // invasion batch 6: goal / try ruled out (off by default)
-    { ...ruledOutField('rugby'), advanced: true },
-    // invasion batch 6: restart and penalty-use depth (off by default)
-    { ...restartField('rugby'), advanced: true },
+    { ...ruledOutField('rugby'), default: RUGBY_STATS_DEFAULTS.trackRuledOut, advanced: true },
+    // invasion batch 6: restart and penalty-use depth (on for a new match: defaults-on)
+    { ...restartField('rugby'), default: RUGBY_STATS_DEFAULTS.trackRestarts, advanced: true },
     {
       key: 'decider', label: 'If level at full time', type: 'choice', default: 'none',
       options: [

@@ -140,8 +140,6 @@ type Flow =
   | { mode: 'stat'; kind: 'shot'; step: 'blocker'; side: 'home' | 'away'; player?: Player; shotId?: number }
   // Invasion batch 1: a grid save — who took the shot? (`player` = the keeper, if known)
   | { mode: 'stat'; kind: 'save'; step: 'shooter'; side: 'home' | 'away'; player?: Player }
-  // Deep wave: who set up the shot just logged (key passes tracked)
-  | { mode: 'keypass'; side: 'home' | 'away'; shooter: Player; shotId: number }
   // Deep wave: a goal ruled out — which team, then why (offside / foul / …)
   | { mode: 'nogoal'; step: 'team' }
   | { mode: 'nogoal'; step: 'reason'; side: 'home' | 'away' }
@@ -190,6 +188,11 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
   // describe-invasion DI14: Done / Skip per stoppage; DI15: per goal
   const stopMarks = useDescribeMarks<number>();
   const goalMarks = useDescribeMarks<number>();
+  // defaults-on DOI9: who set up the shot just logged (key passes tracked) —
+  // a non-blocking card keyed by the shot's id (it was a panel that replaced
+  // the controls until Skip). A newer shot replaces it.
+  const kpMarks = useDescribeMarks<number>();
+  const [kpAsk, setKpAsk] = useState<{ side: 'home' | 'away'; shooterId: string; shotId: number } | null>(null);
   // describe-invasion DI15 (MVP F2 kept): the card of the goal just scored. It
   // finds its goal once it is on the board (the first goal of that side logged
   // after it opened) and closes if Undo removes it — so a stale card can't move
@@ -325,7 +328,7 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
     const shotId = state.seq + 1;
     recordStat('shot', side, player, { ...detail, ...shotDetail() });
     then?.();
-    if (deep.keyPasses && !detail.blocked && player) setFlow({ mode: 'keypass', side, shooter: player, shotId });
+    if (deep.keyPasses && !detail.blocked && player) setKpAsk({ side, shooterId: player.id, shotId });
     return shotId;
   };
   const setPossession = (side: 'home' | 'away') => dispatch({ type: 'POSSESSION', payload: { side, at: Date.now() } });
@@ -937,17 +940,6 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
       // describes it; voice still answers "who assisted?" through this step.
     }
 
-    if (flow.mode === 'keypass') {
-      // deep wave: who set up the shot just logged (a key pass) — or Skip
-      const { side, shooter, shotId } = flow;
-      return panel(`🔑 Key pass — ${shooter.fullName}'s shot`, 'Who set it up? (optional)', (
-        <>
-          <PlayerTable players={xi(side).filter((p) => p.id !== shooter.id)} onPick={(p) => recordStat('keyPass', side, p, { ref: shotId })} />
-          <Button label="✓ Skip — no key pass" variant="ghost" onPress={() => setFlow(null)} />
-        </>
-      ), 'Close');
-    }
-
     if (flow.mode === 'nogoal') {
       // deep wave: a goal ruled out — a timeline row; the score never moved
       if (flow.step === 'team') {
@@ -1151,7 +1143,7 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
       }
       if (flow.step === 'blocker') {
         // deep wave: then (key passes on) who set the shot up
-        const next = () => (deep.keyPasses && flow.shotId && player ? setFlow({ mode: 'keypass', side, shooter: player, shotId: flow.shotId }) : setFlow(null));
+        const next = () => { if (deep.keyPasses && flow.shotId && player) setKpAsk({ side, shooterId: player.id, shotId: flow.shotId }); setFlow(null); };
         return panel('🧱 Blocked by…', `Which ${opp(side) === 'home' ? homeName : awayName} player blocked it?`, (
           <>
             <PlayerTable players={xi(opp(side))} onPick={(b) => { recordStat('block', opp(side), b); next(); }} />
@@ -1307,6 +1299,29 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
     );
   })() : null;
 
+  // defaults-on DOI9: the key pass of the shot just logged — who set it up
+  // (optional), Done / Skip. Each pick is saved as it happens (a key-pass stat
+  // with the shot's ref); a re-pick replaces it, a second tap on the same
+  // player takes it off. Gone once its shot is (Undo).
+  const kpShot = kpAsk && editMin == null ? state.stats.find((e) => e.id === kpAsk.shotId && e.kind === 'shot') : undefined;
+  const kpOf = kpShot ? state.stats.find((e) => e.kind === 'keyPass' && e.ref === kpShot.id) : undefined;
+  const keyPassCard = kpAsk && kpShot ? (
+    <DescribeCard title={`🔑 Key pass · ${playerNameOf(kpAsk.shooterId, kpShot.playerName)}'s shot`}
+      summary={kpOf ? `Key pass: ${playerNameOf(kpOf.playerId, kpOf.playerName)}` : ''} mode={kpMarks.modeOf(kpShot.id)}
+      onDone={() => kpMarks.mark(kpShot.id, 'done')} onSkip={() => kpMarks.mark(kpShot.id, 'skipped')} onEdit={() => kpMarks.mark(kpShot.id, null)}>
+      <Text style={ctrl.meta}>Who set it up? (optional)</Text>
+      <View style={ctrl.chips}>
+        {xi(kpAsk.side).filter((p) => p.id !== kpAsk.shooterId).map((p) => (
+          <SelectChip key={p.id} label={`${p.jerseyNo != null ? `${p.jerseyNo} ` : ''}${p.fullName}`} active={kpOf?.playerId === p.id}
+            onPress={() => {
+              if (kpOf) removeStat(kpOf);
+              if (kpOf?.playerId !== p.id) recordStat('keyPass', kpAsk.side, p, { ref: kpShot.id });
+            }} />
+        ))}
+      </View>
+    </DescribeCard>
+  ) : null;
+
   // describe-invasion DI14: the stoppage just logged — why (optional), Done / Skip
   // (the engine keeps a stoppage's reason in `playerName`; a re-pick replaces it)
   const stopEv = stopAsk != null && state.seq === stopAsk ? state.events.find((e) => e.id === stopAsk && e.type === 'stoppage') : undefined;
@@ -1339,6 +1354,8 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
         </View>
         {/* describe-invasion DI15: the last goal's card — scoring carries straight on */}
         {goalCardView}
+        {/* defaults-on DOI9: the last shot's key pass — scoring carries straight on */}
+        {keyPassCard}
       </View>
 
       {voiceBar}

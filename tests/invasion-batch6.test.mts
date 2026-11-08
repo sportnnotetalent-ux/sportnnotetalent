@@ -468,14 +468,15 @@ describe('X · union / league restart and penalty-use depth', () => {
     }
     assert.equal(ru.reducer(ru.init({}), { type: 'RESTART', side: 'up', payload: { kind: 'penTap' } } as unknown as ScoreAction).events.length, 0);
   });
-  test('X4 no restart section on a match that never tracked them; the toggle is in Info, off by default', () => {
+  test('X4 no restart section on a match that never tracked them; the toggle is in Info, off on an old match', () => {
     assert.equal(rugbySheet(ru.init({})).sections.some((x) => x.key === 'restarts'), false);
     assert.equal(leagueSheet(rl.init({})).sections.some((x) => x.key === 'restarts'), false);
     // no-false-zeros NZI13: switched on with none recorded is no section of zeros
     assert.equal(rugbySheet(ru.init({ trackRestarts: true })).sections.some((x) => x.key === 'restarts'), false);
     for (const [ls, meta, st] of [[RUGBY_LIVE_SETTINGS, RUGBY_META, ru.init({})], [LEAGUE_LIVE_SETTINGS, RUGBY_LEAGUE_META, rl.init({})]] as const) {
       assert.ok(ls.fields.some((f) => f.key === 'trackRestarts'));
-      assert.equal(meta.formatFields.find((f) => f.key === 'trackRestarts')?.default, false);
+      // defaults-on DOI10: on for a new match; an old match (no key) still reads off
+      assert.equal(meta.formatFields.find((f) => f.key === 'trackRestarts')?.default, true);
       assert.equal(matchCaptures(ls as never, st).captures.find((c) => c.key === 'trackRestarts')?.on, false);
       assert.equal('trackRestarts' in st, false);
     }

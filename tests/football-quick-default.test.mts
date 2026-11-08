@@ -20,11 +20,12 @@ describe('the format', () => {
     for (const k of TRACK_KEYS) assert.ok(field(k), k);
   });
   // batch 3 (founder, 2026-11-02; defaults-invasion.md): shots and saves joined cards for a new friendly
-  test('Q5/Q6: a friendly tracks cards, shots and saves (goals, assists, subs are always on); possession off', () => {
+  // defaults-on DOI10 (founder, 2026-11-08): Quick friendlies get every tap stat; possession and passes stay off
+  test('Q5/Q6: a friendly tracks every tap stat (goals, assists, subs are always on); possession and passes off', () => {
     const t = readTrack(friendly);
     assert.equal(t.cards, true);
     assert.equal(t.possession, false);
-    for (const k of TRACK_KEYS) if (!['cards', 'shots', 'saves'].includes(k)) assert.equal(t[k], false, k);
+    for (const k of TRACK_KEYS) assert.equal(t[k], !['possession', 'passes'].includes(k), k);
   });
   test('Q2: a tournament keeps the full set it had (passes off, as before)', () => {
     assert.deepEqual(readTrack(tournament), readTrack({}));

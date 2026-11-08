@@ -45,10 +45,11 @@ describe('round 2 · football "Goal ruled out" behind a toggle', () => {
     assert.deepEqual(football.init({ trackRuledOut: true }).deep, { ruledOut: true });
     assert.equal(football.init({ trackRuledOut: false }).deep, undefined);
   });
-  test('live settings: a "Deeper stats (optional)" toggle, default off, read from the state', () => {
+  test('live settings: a "Stats to track" toggle, default off, read from the state', () => {
     const LS = football.FOOTBALL_LIVE_SETTINGS;
     const f = LS.fields.find((x) => x.key === 'trackRuledOut')!;
-    assert.deepEqual([f.label, f.type, f.default, f.group], ['Goals ruled out', 'toggle', false, 'Deeper stats (optional)']);
+    // defaults-on DOI5: the one "Stats to track" group (was "Deeper stats (optional)"); still off (founder)
+    assert.deepEqual([f.label, f.type, f.default, f.group], ['Goals ruled out', 'toggle', false, 'Stats to track']);
     assert.equal(LS.defaults?.trackRuledOut, false);
     assert.equal(LS.read(football.init({})).trackRuledOut, false);
     assert.equal(LS.read(football.init({ trackRuledOut: true })).trackRuledOut, true);

@@ -19,13 +19,22 @@ export const LEAGUE_PRESETS: Record<string, { label: string; set: Record<string,
   nines: { label: 'Nines · 2 × 9', set: { variant: '9s', playersPerSide: 9, periodMinutes: 9, sinBinMinutes: 3, maxInterchanges: 0, setTackles: 6, gpMinutes: 5 } },
 };
 
+/** Defaults-on wave 3 (founder, 2026-11-08; docs/security/breaks/defaults-on-invasion.md):
+ *  the one source of a new match's "Stats to track" — the format fields, the
+ *  live settings and their `defaults` (Reset) all read it. NEW matches only:
+ *  the engine reads a saved match's own keys with an OFF fallback. Six-tackle
+ *  sets (a tap on every tackle) and tries ruled out stay OFF. */
+export const RUGBY_LEAGUE_STATS_DEFAULTS: Record<string, boolean> = {
+  trackSets: false, trackDefence: true, trackAttack: true, trackErrors: true, trackRuledOut: false, trackRestarts: true,
+};
+
 /** The "Stats to track" toggles (live settings + the match format). */
 export const TRACK_FIELDS: FormatField[] = [
-  { key: 'trackSets', label: 'Six-tackle sets', type: 'toggle', default: false, group: 'Stats to track', hint: 'A Tackle button and the tackle count: sets, completion rate, tackles per set, possession' },
-  { key: 'trackDefence', label: 'Tackles & missed tackles', type: 'toggle', default: false, group: 'Stats to track', hint: 'Per player, from the Detail button' },
-  { key: 'trackAttack', label: 'Runs, line breaks & offloads', type: 'toggle', default: false, group: 'Stats to track', hint: 'Per player, from the Detail button' },
+  { key: 'trackSets', label: 'Six-tackle sets', type: 'toggle', default: RUGBY_LEAGUE_STATS_DEFAULTS.trackSets, group: 'Stats to track', hint: 'A Tackle button and the tackle count: sets, completion rate, tackles per set, possession' },
+  { key: 'trackDefence', label: 'Tackles & missed tackles', type: 'toggle', default: RUGBY_LEAGUE_STATS_DEFAULTS.trackDefence, group: 'Stats to track', hint: 'Per player, from the Detail button' },
+  { key: 'trackAttack', label: 'Runs, line breaks & offloads', type: 'toggle', default: RUGBY_LEAGUE_STATS_DEFAULTS.trackAttack, group: 'Stats to track', hint: 'Per player, from the Detail button' },
   // batch 3 (founder, 2026-11-02): on for a new match; a saved match keeps its own (engine init)
-  { key: 'trackErrors', label: 'Errors & penalties conceded', type: 'toggle', default: true, group: 'Stats to track', hint: 'The player or Team (no name)' },
+  { key: 'trackErrors', label: 'Errors & penalties conceded', type: 'toggle', default: RUGBY_LEAGUE_STATS_DEFAULTS.trackErrors, group: 'Stats to track', hint: 'The player or Team (no name)' },
 ];
 
 export const RUGBY_LEAGUE_META: SportMeta = {
@@ -50,9 +59,9 @@ export const RUGBY_LEAGUE_META: SportMeta = {
     { key: 'bonusTry', label: 'Bonus try zone (Nines)', type: 'toggle', default: false, advanced: true, hint: 'a try under the posts is worth 5 — the try asks which' },
     ...TRACK_FIELDS.map((f) => ({ ...f, advanced: true })),
     // invasion batch 6: goal / try ruled out (off by default)
-    { ...ruledOutField('rugby_league'), advanced: true },
-    // invasion batch 6: restart and penalty-use depth (off by default)
-    { ...restartField('rugby_league'), advanced: true },
+    { ...ruledOutField('rugby_league'), default: RUGBY_LEAGUE_STATS_DEFAULTS.trackRuledOut, advanced: true },
+    // invasion batch 6: restart and penalty-use depth (on for a new match: defaults-on)
+    { ...restartField('rugby_league'), default: RUGBY_LEAGUE_STATS_DEFAULTS.trackRestarts, advanced: true },
     {
       key: 'decider', label: 'If level at full time', type: 'choice', default: 'none',
       options: [

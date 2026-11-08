@@ -42,7 +42,7 @@
  */
 import type { ScoreAction, LiveSettings, FormatField, Attribution } from '../types';
 // Perf F-15 — the format presets / options live in the light meta module.
-import { LEAGUE_PRESETS, TRACK_FIELDS } from './meta.ts';
+import { LEAGUE_PRESETS, TRACK_FIELDS, RUGBY_LEAGUE_STATS_DEFAULTS } from './meta.ts';
 import { readRuledOut, ruledOutField } from '../invasion/ruledOut.ts';
 import { creditDiff, detailAction, patchId, sameEvent } from '../invasion/goalDetail.ts';
 import { isRestart, restartField, type RestartKind } from '../invasion/restarts.ts';
@@ -737,14 +737,14 @@ export const LEAGUE_LIVE_SETTINGS: LiveSettings<LeagueState> = {
     { key: 'periodMinutes', label: 'Half length', type: 'number', default: 40, min: 1, max: 40, step: 1, hint: 'min / half' },
     { key: 'sinBinMinutes', label: 'Sin bin', type: 'number', default: 10, min: 1, max: 10, step: 1, hint: 'minutes' },
     ...TRACK_FIELDS,
-    ruledOutField('rugby_league'),
-    restartField('rugby_league'),
+    { ...ruledOutField('rugby_league'), default: RUGBY_LEAGUE_STATS_DEFAULTS.trackRuledOut },
+    { ...restartField('rugby_league'), default: RUGBY_LEAGUE_STATS_DEFAULTS.trackRestarts },
   ] as FormatField[],
   read: (s) => ({
     periodMinutes: s.periodMinutes, sinBinMinutes: s.sinBinMinutes,
     ...Object.fromEntries(TRACK_FLAGS.map((f) => [f, s[f] === true])),
     trackRuledOut: s.trackRuledOut === true, trackRestarts: s.trackRestarts === true,
   }),
-  // Batch 3 (defaults-invasion): the standard = a new match's (errors & penalties on), so Reset agrees
-  defaults: { periodMinutes: 40, sinBinMinutes: 10, ...Object.fromEntries(TRACK_FLAGS.map((f) => [f, f === 'trackErrors'])), trackRuledOut: false, trackRestarts: false },
+  // Batch 3 / defaults-on DOI2: the standard = a new match's (the one constant), so Reset agrees
+  defaults: { periodMinutes: 40, sinBinMinutes: 10, ...RUGBY_LEAGUE_STATS_DEFAULTS },
 };

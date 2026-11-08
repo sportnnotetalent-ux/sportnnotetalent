@@ -112,13 +112,16 @@ describe('deep wave · football — off by default, old states unchanged', () =>
     const t = footballStatTotals(s);
     for (const k of [...SHOT_DETAIL_KEYS, 'keyPasses', 'clearances']) assert.equal(k in (t.hst?.stats ?? {}), false, k);
   });
-  test('live settings: a "Deeper stats (optional)" group, read from `deep`, defaults off', () => {
+  test('live settings: the deeper stats, read from `deep`, on for a new match (but goals ruled out)', () => {
     const LS = football.FOOTBALL_LIVE_SETTINGS;
-    const keys = LS.fields.filter((f) => f.group === 'Deeper stats (optional)').map((f) => f.key);
+    // defaults-on DOI5: one "Stats to track" group for every stats toggle
+    const keys = LS.fields.filter((f) => football.DEEP_TRACK_FIELDS.some((d) => d.key === f.key)).map((f) => f.key);
+    for (const k of keys) assert.equal(LS.fields.find((f) => f.key === k)?.group, 'Stats to track', k);
     assert.deepEqual(keys, ['trackShotDetail', 'trackKeyPasses', 'trackClearances', 'trackSetPieces', 'trackCardReasons', 'trackRuledOut']);
     assert.equal(LS.read(football.init({})).trackShotDetail, false);
     assert.equal(LS.read(football.init({ trackShotDetail: true })).trackShotDetail, true);
-    for (const k of keys) assert.equal(LS.defaults?.[k], false);
+    // defaults-on DOI2: the standard is a new match's — on, but goals ruled out
+    for (const k of keys) assert.equal(LS.defaults?.[k], k !== 'trackRuledOut', k);
     // FB-17: crosses / dribbles / handballs can be switched off too
     assert.ok(['trackCrosses', 'trackDribbles', 'trackHandball'].every((k) => LS.fields.some((f) => f.key === k)));
   });

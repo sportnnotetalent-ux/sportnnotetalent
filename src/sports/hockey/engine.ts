@@ -27,7 +27,7 @@
 import type { ScoreAction, LiveSettings, FormatField, Attribution } from '../types';
 import { aggPriorFromConfig, aggregateText, levelForDecider, type AggPrior } from '../aggregate.ts';
 // Perf F-15 — the format presets / options live in the light meta module.
-import { HOCKEY_PRESETS, HOCKEY_TRACK_FIELDS } from './meta.ts';
+import { HOCKEY_PRESETS, HOCKEY_TRACK_FIELDS, HOCKEY_STATS_DEFAULTS } from './meta.ts';
 import { readRuledOut, ruledOutField } from '../invasion/ruledOut.ts';
 import { creditDiff, detailAction, patchId, sameEvent } from '../invasion/goalDetail.ts';
 export { HOCKEY_PRESETS, HOCKEY_TRACK_FIELDS };
@@ -694,10 +694,11 @@ export const HOCKEY_LIVE_SETTINGS: LiveSettings<HockeyState> = {
     { key: 'periodMinutes', label: 'Period length', type: 'number', default: 15, min: 1, max: 45, step: 1, hint: 'min / period' },
     { key: 'stopClock', label: 'Stop clock on goals & PCs', type: 'toggle', default: true, group: 'Clock' },
     ...HOCKEY_TRACK_FIELDS,
-    ruledOutField('hockey'),
+    { ...ruledOutField('hockey'), default: HOCKEY_STATS_DEFAULTS.trackRuledOut },
   ] as FormatField[],
   read: (s) => ({ periodMinutes: s.periodMinutes, stopClock: s.stopClock, trackPossession: s.track?.possession === true, trackReferrals: s.track?.referrals === true, trackRuledOut: s.track?.ruledOut === true }),
-  defaults: { periodMinutes: 15, stopClock: true, trackPossession: false, trackReferrals: false, trackRuledOut: false },
+  // defaults-on DOI2: the stats standard is the one constant (a new match's)
+  defaults: { periodMinutes: 15, stopClock: true, ...HOCKEY_STATS_DEFAULTS },
 };
 
 /* ------------- invasion batch 5 (audit fix 11): card warnings ------------- */

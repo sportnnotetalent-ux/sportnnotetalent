@@ -51,7 +51,7 @@
 import type { ScoreAction, LiveSettings, FormatField, Attribution } from '../types';
 import { aggPriorFromConfig, aggregateText, levelForDecider, type AggPrior } from '../aggregate.ts';
 // Perf F-15 — the format presets / options live in the light meta module.
-import { RUGBY_PRESETS, TRACK_FIELDS } from './meta.ts';
+import { RUGBY_PRESETS, TRACK_FIELDS, RUGBY_STATS_DEFAULTS } from './meta.ts';
 import { readRuledOut, ruledOutField } from '../invasion/ruledOut.ts';
 import { creditDiff, detailAction, patchId, sameEvent } from '../invasion/goalDetail.ts';
 import { isRestart, restartField, type RestartKind } from '../invasion/restarts.ts';
@@ -858,16 +858,16 @@ export const RUGBY_LIVE_SETTINGS: LiveSettings<RugbyState> = {
   fields: [
     { key: 'periodMinutes', label: 'Half length', type: 'number', default: 40, min: 1, max: 40, step: 1, hint: 'min / half' },
     { key: 'sinBinMinutes', label: 'Sin-bin', type: 'number', default: 10, min: 1, max: 10, step: 1, hint: 'minutes' },
-    { key: 'trackDetail', label: 'Tackles, carries, set pieces', type: 'toggle', default: false, group: 'Stats to track' },
+    { key: 'trackDetail', label: 'Tackles, carries, set pieces', type: 'toggle', default: RUGBY_STATS_DEFAULTS.trackDetail, group: 'Stats to track' },
     ...TRACK_FIELDS,
-    ruledOutField('rugby'),
-    restartField('rugby'),
+    { ...ruledOutField('rugby'), default: RUGBY_STATS_DEFAULTS.trackRuledOut },
+    { ...restartField('rugby'), default: RUGBY_STATS_DEFAULTS.trackRestarts },
   ] as FormatField[],
   read: (s) => ({
     periodMinutes: s.periodMinutes, sinBinMinutes: s.sinBinMinutes, trackDetail: s.trackDetail,
     ...Object.fromEntries(TRACK_FLAGS.map((f) => [f, s[f] === true])),
     trackRuledOut: s.trackRuledOut === true, trackRestarts: s.trackRestarts === true,
   }),
-  // Batch 3 (defaults-invasion): the standard = a new match's (penalties on), so Reset agrees with the new-match form
-  defaults: { periodMinutes: 40, sinBinMinutes: 10, trackDetail: false, ...Object.fromEntries(TRACK_FLAGS.map((f) => [f, f === 'trackPenalties'])), trackRuledOut: false, trackRestarts: false },
+  // Batch 3 / defaults-on DOI2: the standard = a new match's (the one constant), so Reset agrees with the new-match form
+  defaults: { periodMinutes: 40, sinBinMinutes: 10, ...RUGBY_STATS_DEFAULTS },
 };

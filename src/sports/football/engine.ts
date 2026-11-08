@@ -8,7 +8,7 @@ import { isPlayerCard, isStoppageReason, isGoalSituation, situationFits } from "
 import { aggPriorFromConfig, aggregateText, levelForDecider, type AggPrior } from "../aggregate.ts";
 import type { Player } from "../../core/types";
 // Perf F-15 — the format presets / options live in the light meta module.
-import { DEEP_TRACK_KEYS, DEEP_TRACKABLE, trackKey, DEEP_TRACK_FIELDS, BASE_TRACKABLE } from './meta.ts';
+import { DEEP_TRACK_KEYS, DEEP_TRACKABLE, trackKey, DEEP_TRACK_FIELDS, BASE_TRACKABLE, FOOTBALL_STATS_DEFAULTS } from './meta.ts';
 import type { DeepTrackKey } from './meta.ts';
 export { DEEP_TRACK_KEYS, DEEP_TRACKABLE, DEEP_TRACK_FIELDS };
 export type { DeepTrackKey };
@@ -203,7 +203,8 @@ export const FOOTBALL_LIVE_SETTINGS: LiveSettings<FootballState> = {
   hint: 'Capture only what this scorer can keep up with — toggles apply to this match only.',
   mode: 'config',
   fields: [
-    ...TRACKABLE.map(([k, label]): FormatField => ({ key: trackKey(k), label, type: 'toggle', default: readTrack()[k] as boolean, group: 'Stats captured' })),
+    // defaults-on DOI2/DOI5: one source (FOOTBALL_STATS_DEFAULTS), one group
+    ...TRACKABLE.map(([k, label]): FormatField => ({ key: trackKey(k), label, type: 'toggle', default: FOOTBALL_STATS_DEFAULTS[trackKey(k)], group: 'Stats to track' })),
     ...DEEP_TRACK_FIELDS,
     { key: 'halfMinutes', label: 'Match length', type: 'number', default: 45, min: 5, max: 60, step: 5, hint: 'min / half' },
   ],
@@ -212,9 +213,11 @@ export const FOOTBALL_LIVE_SETTINGS: LiveSettings<FootballState> = {
     ...Object.fromEntries(DEEP_TRACKABLE.map(([k]) => [trackKey(k), s.deep?.[k] === true])),
     halfMinutes: s.halfMinutes ?? 45,
   }),
+  // defaults-on DOI2/DOI6: the standard = a new match's stats (Reset agrees with
+  // the new-match form). A tournament fixture's possession (full set) reads as
+  // one change against it — accepted (the state can't tell a fixture apart).
   defaults: {
-    ...Object.fromEntries(TRACKABLE.map(([k]) => [trackKey(k), readTrack()[k]])),
-    ...Object.fromEntries(DEEP_TRACKABLE.map(([k]) => [trackKey(k), false])),
+    ...FOOTBALL_STATS_DEFAULTS,
     halfMinutes: 45,
   },
 };

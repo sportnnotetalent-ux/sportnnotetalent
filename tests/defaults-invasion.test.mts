@@ -41,7 +41,8 @@ describe('football', () => {
     assert.equal(t.shots, true);
     assert.equal(t.saves, true);
     assert.equal(t.cards, true);
-    for (const k of football.TRACK_KEYS) if (!['shots', 'saves', 'cards'].includes(k)) assert.equal(t[k], false, k);
+    // defaults-on DOI10: every tap stat is now on for a new friendly; possession and passes stay off
+    for (const k of football.TRACK_KEYS) assert.equal(t[k], !['possession', 'passes'].includes(k), k);
   });
   test('D8: a new tournament match keeps the full set (passes off)', () => {
     assert.deepEqual(football.readTrack(newMatch(fields, 'tournament')), football.readTrack({}));
@@ -89,8 +90,9 @@ describe('rugby union', () => {
   });
   test('only penalties: the other "Stats to track" stay off for a new match', () => {
     const s = rugby.init(newMatch(fields));
-    for (const f of rugby.TRACK_FLAGS) if (f !== 'trackPenalties') assert.notEqual(s[f], true, f);
-    assert.equal(s.trackDetail, false);
+    // defaults-on DOI10: wave 3 turns the rest on too; possession & territory stays off
+    for (const f of rugby.TRACK_FLAGS) assert.equal(s[f] === true, f !== 'trackPossession', f);
+    assert.equal(s.trackDetail, true);
   });
   test('D3/D4: an old match (key absent or off) stays off, with no false zero', () => {
     for (const cfg of [{}, { trackPenalties: false }]) {
@@ -122,7 +124,8 @@ describe('rugby league', () => {
   });
   test('only errors: sets, defence and attack stay off for a new match', () => {
     const s = league.init(newMatch(fields));
-    for (const f of league.TRACK_FLAGS) if (f !== 'trackErrors') assert.notEqual(s[f], true, f);
+    // defaults-on DOI10: wave 3 turns defence and attack on; six-tackle sets stay off
+    for (const f of league.TRACK_FLAGS) assert.equal(s[f] === true, f !== 'trackSets', f);
   });
   test('D3/D4: an old match (key absent or off) stays off, with no false zero', () => {
     for (const cfg of [{}, { trackErrors: false }]) {
