@@ -17,5 +17,6 @@ test('RC2: no roster query sends a bare array to contains()', () => {
   const src = readFileSync(new URL('../src/data/repos.ts', import.meta.url), 'utf8');
   assert.doesNotMatch(src, /contains\('roster', \[/);
   assert.doesNotMatch(src, /contains\('roster', ids\)/);
-  assert.equal((src.match(/contains\('roster', rosterContains\(/g) ?? []).length, 2);
+  // team-pages.md PG3: + getTeamsWithPlayers (the same safe helper)
+  assert.equal((src.match(/contains\('roster', rosterContains\(/g) ?? []).length, 3);
 });

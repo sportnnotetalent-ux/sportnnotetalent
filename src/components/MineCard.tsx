@@ -16,7 +16,7 @@ export function MineCard({ onTeams, onTournaments, onMatches, onCalendar, onInvi
   onInvite?: () => void;
 }) {
   const rows: { icon: string; label: string; hint: string; onPress: () => void }[] = [
-    { icon: '🛡️', label: 'My teams', hint: 'Teams you’re part of, and your pairs', onPress: onTeams },
+    { icon: '🛡️', label: 'My teams', hint: 'Teams you’re part of, doubles included', onPress: onTeams },
     { icon: '🏆', label: 'My tournaments', hint: 'Hosting, playing, officiating, following', onPress: onTournaments },
     { icon: '📋', label: 'My matches', hint: 'Games you play, organise or score', onPress: onMatches },
     { icon: '📅', label: 'My calendar', hint: 'Everything of yours by date', onPress: onCalendar },

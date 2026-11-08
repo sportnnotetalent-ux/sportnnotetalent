@@ -70,8 +70,8 @@ test('PT1/PT2: my teams = on or played for; run separately; one-offs never teams
   assert.deepEqual(v.pairs.map((p) => p.key), ['me|v']);
 });
 
-test('PT7: a two-person one-off side opens the pair page', () => {
-  assert.deepEqual(teamRoute({ id: 't', adhoc: true, roster: ['v', 'me'] } as any), { route: 'Pair', a: 'me', b: 'v' });
+test('PT7: a two-person one-off side opens its TEAM page (team-pages.md PG1: no pair page)', () => {
+  assert.deepEqual(teamRoute({ id: 't', adhoc: true, roster: ['v', 'me'] } as any), { route: 'Team' });
   assert.deepEqual(teamRoute({ id: 't', adhoc: true, roster: ['v', 'me', 'k'] } as any), { route: 'Team' });
   assert.deepEqual(teamRoute({ id: 't', adhoc: false, roster: ['v', 'me'] } as any), { route: 'Team' });
 });
@@ -84,7 +84,8 @@ test('PT4b: a two-person side in a TEAM sport (a game-day football side) is not 
   ];
   assert.deepEqual(pairsFromTeams(rows, 'me', pairSport).map((p) => p.teamIds), [['t']]);
   assert.deepEqual(teamRoute({ id: 'f', adhoc: true, roster: ['me', 'd'], sport: 'football' } as any, { pairSport }), { route: 'Team' });
-  assert.deepEqual(teamRoute({ id: 't', adhoc: true, roster: ['me', 'd'], sport: 'tennis' } as any, { pairSport }), { route: 'Pair', a: 'd', b: 'me' });
+  // team-pages.md PG1: a doubles side is a team — its own page
+  assert.deepEqual(teamRoute({ id: 't', adhoc: true, roster: ['me', 'd'], sport: 'tennis' } as any, { pairSport }), { route: 'Team' });
   const v = myTeamsView({ me: 'me', teams: rows.map((r) => ({ ...r, name: r.id })), playingIds: new Set(), playedIds: new Set(), managedIds: new Set(), pairSport });
   assert.deepEqual(v.pairs.map((p) => p.teamIds), [['t']]);
 });

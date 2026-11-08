@@ -57,7 +57,6 @@ export default function TeamProfileScreen() {
       if (!on) return;
       const r = teamRoute(row, { inClub, pairSport: isPairSport });
       if (r.route === 'ClubHome') { nav.replace('ClubHome', { clubId: r.clubId, ...(r.sport ? { sport: r.sport } : {}) }); return; }
-      if (r.route === 'Pair') { nav.replace('Pair', { a: r.a, b: r.b }); return; }
       setRouted(true);
       if (row?.clubId) { const c = await getClub(row.clubId); if (on && c) setClub({ id: c.id, name: c.name }); }
     }).catch(() => on && setRouted(true));
@@ -262,6 +261,10 @@ export default function TeamProfileScreen() {
           <View style={{ flex: 1 }}><Button label="📊 Stats" variant="ghost" onPress={() => scrollRef.current?.scrollTo({ y: statsY, animated: true })} /></View>
           <View style={{ flex: 1 }}><Button label={canManageSquad ? '👥 Squad · ＋ Add' : '👥 Squad'} variant="ghost" onPress={() => nav.navigate('Squad', { teamId: team.id })} /></View>
         </View>
+        {/* team-pages.md PG7: a doubles team (any team) can be renamed by its managers */}
+        {canManageSquad ? (
+          <Button label="✎ Rename or edit team" variant="ghost" onPress={() => nav.navigate('EditTeam', { teamId: team.id })} />
+        ) : null}
 
         {upNext ? (
           <View style={{ gap: theme.spacing(2) }}>

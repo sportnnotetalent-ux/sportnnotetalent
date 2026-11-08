@@ -38,6 +38,19 @@ Where it changed:
   - Marketing posts already rendered keep the old mark.
   - The mint experiment was undone and never committed.
 
+### 2026-11-08 — Teams for doubles, phase 5: doubles teams open team pages
+
+A doubles side is a team now, so there is no separate "pair" page:
+- **Old pair links still work:** `PairProfileScreen` only forwards to the two players' team. It prefers their club page (one team, any sport), then the team of exactly those two, then any team with both. If none exists, it shows "No team found for these two players".
+- **Lists:** "Your pairs" is now "Doubles teams" (`PairsAndFollowing`) and "Your doubles teams" (`ClubsScreen`), and each opens the team page. The `MineCard` hint says doubles teams are included.
+- **Rename or add people:** the team page has "✎ Rename or edit team" for its captain and admins.
+- **Fixed old rule:** a third player added to a two-person team no longer reroutes it away from its team page. `teamRoute` has no Pair route, and `getTeamsWithPlayers` matches any roster that contains both players.
+
+Checks:
+- break doc `docs/security/breaks/team-pages.md` PG1–PG7, `tests/team-pages.test.mts` (600-lookup sim);
+- full suite green (8,369 pass, 0 fail, 2 known todo), tsc clean;
+- demo-checked: Clubs → doubles team → team page → Edit team.
+
 ### 2026-11-08 — Teams for doubles, phase 4b: team captains can say who played
 
 Founder: captains too, not only the scorer / host (team-who-played.md WH10–WH16).

@@ -43,12 +43,12 @@ export function PairsSection({ playerId }: { playerId: string }) {
   const shown = all ? pairs : pairs.slice(0, SECTION_CAP);
   return (
     <>
-      <SectionHeader title="Pairs" count={pairs.length} onSeeAll={pairs.length > SECTION_CAP ? () => setAll((v) => !v) : undefined} expanded={all} />
+      <SectionHeader title="Doubles teams" count={pairs.length} onSeeAll={pairs.length > SECTION_CAP ? () => setAll((v) => !v) : undefined} expanded={all} />
       {shown.map((p) => {
         const partner = p.a === playerId ? p.b : p.a;
         return (
-          <TouchableOpacity key={p.key} accessibilityRole="button" accessibilityLabel={`Open pair with ${names.get(partner) ?? 'partner'}`}
-            onPress={() => nav.navigate('Pair', { a: p.a, b: p.b })}>
+          <TouchableOpacity key={p.key} accessibilityRole="button" accessibilityLabel={`Open your team with ${names.get(partner) ?? 'partner'}`}
+            onPress={() => nav.navigate('Team', { teamId: [...p.teamIds].sort()[0] })}>
             <Card style={st.row}>
               <Glyph emoji="🤝" style={st.icon} color={theme.colors.primary} />
               <View style={{ flex: 1 }}>

@@ -4129,6 +4129,20 @@ export async function getEntryTeamsWith(playerIds: string[]): Promise<Team[]> {
   return (data as unknown as TeamRow[]).map(toTeam);
 }
 
+/** team-pages.md PG3: every team whose squad has all these players — one-off or
+ *  not (after the pairs → teams migration a pair's team is no longer one-off). */
+export async function getTeamsWithPlayers(playerIds: string[]): Promise<Team[]> {
+  const ids = [...new Set(playerIds.filter(Boolean))];
+  if (!ids.length) return [];
+  if (!isSupabaseConfigured || !supabase) {
+    return demo.teams.filter((t) => ids.every((id) => (t.roster ?? []).includes(id)));
+  }
+  const { data, error } = await fetchAllPages((from, to) => supabase!.from('teams')
+    .select('id,name,short_name,sport,color_hex,org_id,club_id,roster,adhoc').contains('roster', rosterContains(ids)).order('id').range(from, to));
+  if (error || !data) return [];
+  return (data as unknown as TeamRow[]).map(toTeam);
+}
+
 /** Teams a player has played at least one game for (their match squads). */
 export async function getTeamsPlayedFor(playerId: string | null | undefined): Promise<Set<string>> {
   const out = new Set<string>();

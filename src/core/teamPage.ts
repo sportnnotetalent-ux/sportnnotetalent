@@ -5,19 +5,16 @@
  * again). Discover leaves out one-off sides and shows a club once. PURE.
  */
 import type { SportId } from './types';
-import { pairKey } from './pairs.ts';
 
 type Row = { id: string; clubId?: string | null; adhoc?: boolean | null; sport?: SportId | string; roster?: readonly string[] | null };
 
-export type TeamRoute = { route: 'ClubHome'; clubId: string; sport?: string } | { route: 'Pair'; a: string; b: string } | { route: 'Team' };
+export type TeamRoute = { route: 'ClubHome'; clubId: string; sport?: string } | { route: 'Team' };
 
 /** Where a team row opens: its club's page, or the single-team page. */
 export function teamRoute(row: Row | null | undefined, opts: { inClub?: boolean; pairSport?: (sport: string) => boolean } = {}): TeamRoute {
   if (!row) return { route: 'Team' };
-  // A two-person one-off side in a pairs sport is a pair: its page covers every sport (PT7).
-  const pairSportOk = !opts.pairSport || (!!row.sport && opts.pairSport(String(row.sport)));
-  const pair = row.adhoc && !row.clubId && pairSportOk ? pairKey(row.roster) : null;
-  if (pair) { const [a, b] = pair.split('|'); return { route: 'Pair', a, b }; }
+  // team-pages.md PG1 (teams for doubles): a doubles side is a team — its own page,
+  // or its club's page when it belongs to one (one team, any sport); no "Pair" page.
   if (!row.clubId || opts.inClub) return { route: 'Team' };
   return { route: 'ClubHome', clubId: row.clubId, ...(row.sport ? { sport: String(row.sport) } : {}) };
 }
@@ -107,4 +104,14 @@ export function inRosterOrder<T extends { id: string }>(players: readonly T[], i
     .map((p, i) => ({ p, k: at.has(p.id) ? at.get(p.id)! : ids.length + i }))
     .sort((a, b) => a.k - b.k)
     .map((x) => x.p);
+}
+
+/** PG2 / PG5: where an old "Pair" (a, b) link goes — the two players' club page
+ *  (one team, any sport) when one of their teams has a club, else the team with
+ *  the smallest id, so the choice never depends on read order; null = no team. */
+export function pairTarget(teams: readonly { id: string; clubId?: string | null }[]): { route: 'ClubHome'; clubId: string } | { route: 'Team'; teamId: string } | null {
+  if (!teams.length) return null;
+  const clubs = teams.map((t) => t.clubId).filter((c): c is string => !!c).sort();
+  if (clubs.length) return { route: 'ClubHome', clubId: clubs[0] };
+  return { route: 'Team', teamId: [...teams].map((t) => t.id).sort()[0] };
 }

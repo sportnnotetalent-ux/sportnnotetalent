@@ -123,13 +123,13 @@ export default function ClubsScreen() {
 
         {!loading && pairs.length > 0 && (
           <View style={{ gap: theme.spacing(2) }}>
-            <Text style={textStyles.h3}>Your pairs</Text>
-            <Text style={textStyles.muted}>Everyone you’ve partnered in doubles — one record across every sport.</Text>
+            <Text style={textStyles.h3}>Your doubles teams</Text>
+            <Text style={textStyles.muted}>Teams you’ve played doubles in — open one to rename it or add players.</Text>
             {pairs.map((p) => {
               const partner = p.a === me ? p.b : p.a;
               return (
-                <TouchableOpacity key={p.key} accessibilityRole="button" accessibilityLabel={`Open pair with ${names.get(partner) ?? 'partner'}`}
-                  onPress={() => nav.navigate('Pair', { a: p.a, b: p.b })}>
+                <TouchableOpacity key={p.key} accessibilityRole="button" accessibilityLabel={`Open your team with ${names.get(partner) ?? 'partner'}`}
+                  onPress={() => nav.navigate('Team', { teamId: [...p.teamIds].sort()[0] })}>
                   <Card style={st.row}>
                     <View style={[st.badge, { backgroundColor: theme.colors.surfaceAlt }]}>
                       <Glyph emoji="🤝" style={[st.badgeText, { color: theme.colors.text }]} color={theme.colors.text} />
