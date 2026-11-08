@@ -22,7 +22,7 @@ test('the site lists one chip per sport in the app', () => {
 
 test('the features grid lists features people use, not a sport (founder 2026-10-29: "Real golf" → finding a game)', () => {
   const src = readFileSync(join(ROOT, 'scripts/build-website.mjs'), 'utf8');
-  const grid = /<section id="features">([\s\S]*?)<\/section>/.exec(src)![1];
+  const grid = /<section id="features"[^>]*>([\s\S]*?)<\/section>/.exec(src)![1];
   assert.doesNotMatch(grid, /Real golf/);
   assert.match(grid, /<h3>Find a game<\/h3>/);
   assert.equal([...grid.matchAll(/<div class="card">/g)].length, 6, 'still six cards');

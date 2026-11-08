@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const SITE = join(ROOT, 'website');
-const OUT = join(SITE, 'dist');
+const OUT = process.env.WEBSITE_OUT || join(SITE, 'dist'); // override only for build tests (no races on website/dist)
 const cfg = JSON.parse(readFileSync(join(SITE, 'config.json'), 'utf8'));
 // SD-151: the .com switch is a config change — SITE_URL / APP_URL / SUPPORT_EMAIL in the
 // build environment override config.json (docs/international/domain-move-com.md).
@@ -35,6 +35,45 @@ const SPORT_ORDER = [
 ];
 const sportMeta = (id) => readFileSync(join(ROOT, 'src/sports', id, 'meta.ts'), 'utf8');
 const SPORTS = SPORT_ORDER.map((id) => [/^  icon: '([^']+)'/m.exec(sportMeta(id))[1], /^  name: '([^']+)'/m.exec(sportMeta(id))[1]]);
+
+// Front-page sports grid (Stitch pick 22): one short rule note per sport, each
+// taken from that sport's own scoring guide (website/guides/<slug>.md), which the
+// tile links to. No guide → no note (tests/website-front-page.test.mts).
+const SPORT_NOTES = {
+  cricket: ['Overs, wickets, DLS', 'score-cricket'],
+  football: ['Goals, cards, added time', 'score-football'],
+  basketball: ['Team fouls, FIBA box score', 'score-basketball'],
+  volleyball: ['Rally scoring, sets', 'score-volleyball'],
+  kabaddi: ['Raids, tackles, all outs', 'score-kabaddi'],
+  tennis: ['15-30-40, tiebreaks', 'score-tennis'],
+  badminton: ['21-point games, setting to 30', 'score-badminton'],
+  tabletennis: ['Games to 11, ITTF service', 'score-table-tennis'],
+  squash: ['PAR to 11 or hand-out to 9', 'score-squash'],
+  padel: ['Golden point or advantage', 'score-padel'],
+  pickleball: ['Side-out or rally scoring', 'score-pickleball'],
+  golf: ['Hole by hole, the cut', 'golf-scoring-and-leaderboard'],
+  chess: ['1-0, ½-½, 0-1', 'score-chess'],
+  carrom: ['Board by board, ICF rules', 'score-carrom'],
+  pool: ['8-, 9- and 10-ball, WPA rules', 'score-pool'],
+  snooker: ['15-, 10- or 6-red frames', 'score-snooker'],
+  billiards: ['Pots, in-offs, cannons', 'score-billiards'],
+  athletics: ['Heats, finals, records', 'run-athletics-track-events'],
+  hockey: ['Penalty corners, shoot-outs', 'score-hockey'],
+  handball: ['7 m throws, 2-minute suspensions', 'score-handball'],
+  ice_hockey: ['Stop-time clock, penalty box', 'score-ice-hockey'],
+  netball: ['Centre pass, quarters', 'score-netball'],
+  swimming: ['Heats, finals, records', 'run-a-swim-meet'],
+  weightlifting: ['Snatch, clean & jerk, totals', 'run-a-weightlifting-meet'],
+  shooting: ['Series, finals, shoot-offs', 'run-a-shooting-competition'],
+  archery: ['Ends, match play, shoot-offs', 'run-an-archery-competition'],
+  rowing: ['Heats, repechage, finals', 'run-a-rowing-regatta'],
+  canoe: ['K1 to C4, 200 to 1000 m', 'run-a-canoe-sprint'],
+  cycling: ['Time trials, road and track', 'run-a-cycling-event'],
+  rugby: ['Tries, conversions, sin-bins', 'score-rugby'],
+  baseball: ['Innings, run rule, extra innings', 'score-baseball'],
+  american_football: ['Flag 5v5 or tackle', 'score-american-football'],
+  rugby_league: ['Six-tackle sets, golden point', 'score-rugby-league'],
+};
 
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
@@ -68,14 +107,14 @@ function page({ title, description, path, body, ogType = 'website', head = '', n
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(title)}</title>
 <meta name="description" content="${esc(description)}">
-<link rel="canonical" href="${url}">${noindex ? '\n<meta name="robots" content="noindex">' : ''}
+<link rel="canonical" href="${esc(url)}">${noindex ? '\n<meta name="robots" content="noindex">' : ''}
 <meta name="theme-color" content="#0D5A3F">
 <meta property="og:type" content="${ogType}">
 <meta property="og:site_name" content="SportnNote">
 <meta property="og:title" content="${esc(title)}">
 <meta property="og:description" content="${esc(description)}">
-<meta property="og:url" content="${url}">
-<meta property="og:image" content="${cfg.siteUrl}/icon.png">
+<meta property="og:url" content="${esc(url)}">
+<meta property="og:image" content="${esc(cfg.siteUrl)}/icon.png">
 <link rel="icon" type="image/png" sizes="48x48" href="/favicon-v3.png">
 <link rel="apple-touch-icon" href="/icon.png">
 <link rel="stylesheet" href="/styles.css">${head}
@@ -88,7 +127,7 @@ function page({ title, description, path, body, ogType = 'website', head = '', n
     <a class="hide-sm" href="/#features">Features</a>
     <a${path.startsWith('/guides/') ? ' aria-current="page"' : ''} href="/guides/">Guides</a>
     <a class="hide-sm" href="/#get">Get the app</a>
-    <a class="btn btn-primary btn-sm" href="${cfg.appUrl}">Open app</a>
+    <a class="btn btn-primary btn-sm" href="${esc(cfg.appUrl)}">Open app</a>
   </nav>
 </div></header>
 ${/<main\b/.test(body) ? body.replace(/<main(?![^>]*\bid=)/, '<main id="main"') : `<main id="main">${body}</main>`}
@@ -313,7 +352,7 @@ function guidesIndex() {
 </div></section>
 <div class="wrap guides-list">
   ${guides.length ? sections : '<p class="sub">Guides are on their way. Meanwhile, <a href="' + cfg.appUrl + '">open SportnNote</a> and explore, or write to us at <a href="mailto:' + cfg.contactEmail + '">' + esc(cfg.contactEmail) + '</a>.</p>'}
-  <p class="sub guide-empty" hidden>No guides match that. Try another word, or write to us at <a href="mailto:${cfg.contactEmail}">${esc(cfg.contactEmail)}</a>.</p>
+  <p class="sub guide-empty" hidden>No guides match that. Try another word, or write to us at <a href="mailto:${esc(cfg.contactEmail)}">${esc(cfg.contactEmail)}</a>.</p>
 </div>
 </main>
 ${guides.length ? `<script>
@@ -377,7 +416,7 @@ ${html}
       </div>
       <div class="article-cta card">
         <div><h2>Try it in SportnNote</h2><p>Works on iPhone, Android and desktop. ${esc(cfg.pricingLine)}</p></div>
-        <a class="btn btn-primary" href="${cfg.appUrl}">Open SportnNote</a>
+        <a class="btn btn-primary" href="${esc(cfg.appUrl)}">Open SportnNote</a>
       </div>
       ${prev || next ? `<nav class="pager" aria-label="More in ${esc(g.category)}">
         ${prev ? `<a class="pager-prev" href="/guides/${prev.slug}/"><span>Previous</span>${esc(prev.title)}</a>` : '<span></span>'}
@@ -395,13 +434,39 @@ ${html}
 }
 
 const androidCta = cfg.androidApkUrl
-  ? `<a class="btn btn-ghost" href="${esc(cfg.androidApkUrl)}">🤖 Android app</a>`
-  : '';
+  ? `<a class="btn btn-ghost" href="${esc(cfg.androidApkUrl)}">Get the Android app</a>`
+  : `<a class="btn btn-ghost" href="#get">Get the app</a>`;
 const androidSteps = cfg.androidApkUrl
   ? `<ol><li>Open the <a href="${esc(cfg.androidApkUrl)}">Android download link</a>.</li><li>Download and allow “Install unknown apps” when asked.</li><li>Install and open SportnNote.</li></ol>
      <a class="btn btn-primary" href="${esc(cfg.androidApkUrl)}">Download for Android</a>`
   : `<ol><li>Open <strong>${esc(cfg.appUrl.replace('https://', ''))}</strong> in Chrome.</li><li>Tap ⋮ → <strong>Add to Home screen</strong>.</li><li>The Android app download is coming soon.</li></ol>
-     <a class="btn btn-primary" href="${cfg.appUrl}">Open in Chrome</a>`;
+     <a class="btn btn-ghost" href="${esc(cfg.appUrl)}">Open in Chrome</a>`;
+
+// Stat strip (Stitch pick 19, adapted): only facts the build can prove.
+// Price: "Free while we’re new" is the pricingLine's first clause, the rest its label.
+const [priceHead, ...priceRest] = String(cfg.pricingLine ?? '').split(';');
+const publishedGuides = guides.filter((g) => !g.draft).length;
+const FACTS = [
+  [String(SPORTS.length), 'sports, each scored to its own rules'],
+  [priceHead.trim(), priceRest.join(';').trim()],
+  [String(publishedGuides), 'step-by-step guides, free to read'],
+  ['No ads', 'anywhere in the app'],
+];
+// Audience cards (pick 21): one true line each, and the guide that shows how.
+const AUDIENCE_CARDS = [
+  ['🏆', 'Organisers', 'Leagues, knockouts, groups and age groups: fixtures, brackets and standings update as the scores come in.', 'create-a-tournament', 'Create a tournament'],
+  ['📊', 'Players', 'Every match you play adds to your career stats, and your career passport shares them in one link.', 'career-passport', 'Your career passport'],
+  ['👪', 'Parents', 'Approve your child’s account, then follow their games live from anywhere.', 'parent-guardian-consent', 'Approving your child’s account'],
+  ['🏫', 'Schools', 'Verify your school, add students by class or section, and run sports day with house points.', 'verify-your-school', 'Verify your school'],
+];
+const sportTiles = SPORT_ORDER.map((id, i) => {
+  const [icon, name] = SPORTS[i];
+  const [note, slug] = SPORT_NOTES[id] ?? [];
+  const inner = `<span class="sym" aria-hidden="true">${icon}</span><span class="nm">${esc(name)}</span>`;
+  return slug && guides.some((g) => g.slug === slug && !g.draft)
+    ? `<a class="sport" href="/guides/${slug}/">${inner}<span class="rule">${esc(note)}</span></a>`
+    : `<div class="sport">${inner}</div>`;
+}).join('\n    ');
 
 const home = page({
   // who SportnNote is, and its official profiles (search engines link them)
@@ -413,36 +478,57 @@ const home = page({
   description: `Live scoring, tournaments, stats and player profiles for ${SPORTS.length} sports — cricket, football, badminton, golf and more. For schools, clubs and open tournaments anywhere.`,
   path: '/',
   body: `
-<section class="hero"><div class="wrap">
-  <div>
-    <p class="eyebrow">Free while we’re new</p>
-    <h1>Score every match.<br><em>Run any tournament.</em></h1>
-    <p class="lead">Live scoring, fixtures, standings and player stats for ${SPORTS.length} sports — in one app your whole team can follow. Built for open tournaments, clubs and schools.</p>
+<section id="top" class="hero"><div class="wrap">
+  <div class="hero-copy">
+    <h1>Score any game.<br><em>Share it live.</em></h1>
+    <p class="lead">Live scores, tournaments and every player’s stats — for ${SPORTS.length} sports. Works on iPhone, Android and desktop, in any country.</p>
     <div class="cta">
-      <a class="btn btn-primary" href="${cfg.appUrl}">Open SportnNote</a>
+      <a class="btn btn-primary" href="${esc(cfg.appUrl)}">Score a game now — no sign-up <span aria-hidden="true">→</span></a>
       ${androidCta}
     </div>
-    <p class="note">Works on iPhone, Android and desktop, in any country. ${esc(cfg.pricingLine)} No ads.</p>
+    <p class="note">${esc(cfg.pricingLine)} No ads.</p>
   </div>
   <div class="phone" aria-hidden="true">
-    <div class="score-card">
-      <span class="live">LIVE</span>
-      <div class="teams"><span>🏏 Riverside XI</span><span class="s">142/4</span><span>Northfield Strikers</span><span class="s">—</span></div>
-      <div class="meta">16.2 overs · Run rate 8.69 · Open T20 Cup</div>
+    <div class="phone-bar"><span>SportnNote</span><span>Live link</span></div>
+    <div class="phone-body">
+      <div class="match-top"><span class="live">LIVE · 2nd half 63’</span><span class="tag">School match</span></div>
+      <p class="match-name">⚽ House Cup · Football</p>
+      <div class="side"><span><i class="dot red"></i>Red House</span><b>2</b></div>
+      <div class="side"><span><i class="dot blue"></i>Blue House</span><b>1</b></div>
+      <div class="event"><span class="ball">⚽</span><span><strong>Goal — Rohan Nair 61’</strong><br>Assist: K. Sharma</span></div>
+      <div class="pad"><span>+ Goal</span><span>Foul</span><span>Card</span></div>
     </div>
-    <div class="score-card">
-      <span class="live">LIVE</span>
-      <div class="teams"><span>🏸 R. Varma</span><span class="s">21 · 18</span><span>S. Khan</span><span class="s">17 · 20</span></div>
-      <div class="meta">Game 3 · Doubles league, Court 2</div>
-    </div>
-    <div class="score-card">
-      <div class="teams"><span>⛳ Leader: A. Reddy</span><span class="s">−3</span></div>
-      <div class="meta">Thru 14 · Sunday Stableford</div>
-    </div>
-  </div>
+    <div class="phone-foot">Share the live link</div>
+  </div><!-- /phone -->
 </div></section>
 
-<section id="features"><div class="wrap">
+<section id="facts" class="facts" aria-label="SportnNote in numbers"><div class="wrap">
+  <ul>
+    ${FACTS.map(([v, l]) => `<li><strong>${esc(v)}</strong><span>${esc(l)}</span></li>`).join('\n    ')}
+  </ul>
+</div></section>
+
+<section id="how" class="band"><div class="wrap">
+  <p class="eyebrow">How it works</p>
+  <h2>From kick-off to a live link in three steps</h2>
+  <ol class="how">
+    <li class="card"><span class="num">01</span><h3>Pick a sport</h3><p>Choose the sport and its format. The rules start at the governing body’s standard, and you can change any of them.</p></li>
+    <li class="card"><span class="num">02</span><h3>Tap to score</h3><p>One tap per goal, point, run or rally. The app keeps the clock, the server and the stats, and Undo fixes a wrong tap.</p></li>
+    <li class="card"><span class="num">03</span><h3>Share the live link</h3><p>Sign up free when you want to share. Anyone with the link follows the score as it happens.</p></li>
+  </ol>
+</div></section>
+
+<section id="who"><div class="wrap">
+  <p class="eyebrow">Who it’s for</p>
+  <h2>For everyone at the ground</h2>
+  <p class="sub">From the person running the tournament to the parent watching from work.</p>
+  <div class="who">
+    ${AUDIENCE_CARDS.map(([i, h, p, slug, label]) => `<div class="card"><div class="ico" aria-hidden="true">${i}</div><h3>${esc(h)}</h3><p>${esc(p)}</p><a href="/guides/${slug}/">${esc(label)} <span aria-hidden="true">›</span></a></div>`).join('\n    ')}
+  </div>
+  <p class="more"><a href="/guides/">Browse all the guides</a></p>
+</div></section>
+
+<section id="features" class="band"><div class="wrap">
   <h2>Everything a match day needs</h2>
   <p class="sub">From a Sunday friendly to a 64-team open — set it up in minutes and let the scores flow.</p>
   <div class="grid">
@@ -455,28 +541,23 @@ const home = page({
   </div>
 </div></section>
 
-<section class="band"><div class="wrap">
+<section id="sports"><div class="wrap">
+  <p class="eyebrow">Every sport, its own rules</p>
   <h2>${SPORTS.length} sports, played the international way</h2>
-  <p class="sub">Each sport follows its governing body’s rules — sets, overs, raids, frames, holes.</p>
-  <div class="sports">${SPORTS.map(([i, n]) => `<span class="chip">${i} ${esc(n)}</span>`).join('')}</div>
-</div></section>
-
-<section><div class="wrap">
-  <h2>Running a tournament?</h2>
-  <p class="sub">Organisers set it up once; scorers and players do the rest from their phones.</p>
-  <div class="steps">
-    <div class="card step"><h3>Create</h3><p>Pick the sport and format, set dates, venues and age groups.</p></div>
-    <div class="card step"><h3>Invite</h3><p>Share one link — teams and players register themselves.</p></div>
-    <div class="card step"><h3>Play</h3><p>Generate fixtures, score live, and watch standings and stats update.</p></div>
+  <p class="sub">Each sport follows its governing body’s rules — sets, overs, raids, frames, holes. Tap one for its scoring guide.</p>
+  <div class="sports-grid">
+    ${sportTiles}
   </div>
 </div></section>
 
-<section id="learn"><div class="wrap learn">
-  <div>
-    <h2>Learn how it works</h2>
-    <p class="sub">Short, step-by-step guides for organisers, scorers, captains and fans — from your first match to a full tournament.</p>
+<section id="safety" class="safety-wrap"><div class="wrap">
+  <div class="safety">
+    <div class="shield" aria-hidden="true">🛡️</div>
+    <div>
+      <h2>Children’s details stay private — parents approve, names are masked.</h2>
+      <p>Under-18s need a parent’s or guardian’s approval. People outside their team, school or tournament see only initials: no photo, phone number or school. <a href="/guides/parent-guardian-consent/">How parent approval works</a></p>
+    </div>
   </div>
-  <a class="btn btn-ghost" href="/guides/">Browse the guides</a>
 </div></section>
 
 <section id="get" class="band"><div class="wrap">
@@ -485,7 +566,7 @@ const home = page({
   <div class="install">
     <div class="card"><h3>📱 iPhone</h3>
       <ol><li>Open <strong>${esc(cfg.appUrl.replace('https://', ''))}</strong> in <strong>Safari</strong>.</li><li>Tap Share → <strong>Add to Home Screen</strong>.</li><li>Open SportnNote from your home screen.</li></ol>
-      <a class="btn btn-primary" href="${cfg.appUrl}">Open in Safari</a>
+      <a class="btn btn-ghost" href="${esc(cfg.appUrl)}">Open in Safari</a>
     </div>
     <div class="card"><h3>🤖 Android</h3>
       ${androidSteps}
@@ -493,9 +574,13 @@ const home = page({
   </div>
 </div></section>
 
-<section><div class="wrap">
-  <h2>Questions or want SportnNote for your club?</h2>
-  <p class="sub">We work closely with the organisers, schools and clubs who use SportnNote. Write to us at <a href="mailto:${cfg.contactEmail}">${esc(cfg.contactEmail)}</a> — ${esc(cfg.supportHours)}. <a href="/support/">More ways to get help</a>.</p>
+<section id="start" class="cta-band"><div class="wrap">
+  <div>
+    <p class="eyebrow">Get started</p>
+    <h2>Ready to score your next game?</h2>
+    <p>No payment card needed. Questions, or want SportnNote for your club? Write to <a href="mailto:${esc(cfg.contactEmail)}">${esc(cfg.contactEmail)}</a> — ${esc(cfg.supportHours)}. <a href="/support/">More ways to get help</a>.</p>
+  </div>
+  <a class="btn btn-primary" href="${esc(cfg.appUrl)}">Score a game now — free <span aria-hidden="true">→</span></a>
 </div></section>
 `,
 });
@@ -521,7 +606,7 @@ const supportPage = page({
   <li><strong>Guides:</strong> step-by-step pages for organisers, scorers and players at <a href="/guides/">Guides</a>.</li>
 </ul>
 <h3>Contact us</h3>
-<p>Email <a href="mailto:${cfg.contactEmail}">${esc(cfg.contactEmail)}</a>, or use <strong>Contact support</strong> in the app’s help.</p>
+<p>Email <a href="mailto:${esc(cfg.contactEmail)}">${esc(cfg.contactEmail)}</a>, or use <strong>Contact support</strong> in the app’s help.</p>
 <ul>
   <li><strong>Support hours:</strong> ${esc(cfg.supportHours)}.</li>
   <li>${esc(cfg.supportReply)}</li>
@@ -548,13 +633,13 @@ const deleteAccountPage = page({
 <p>You can delete your account and personal data at any time. This page explains how, and what happens next.</p>
 <h3>In the app (fastest)</h3>
 <ol>
-  <li>Open SportnNote (the phone app, or the web app at <a href="${cfg.appUrl}">${esc(cfg.appUrl.replace('https://', ''))}</a>) and sign in.</li>
+  <li>Open SportnNote (the phone app, or the web app at <a href="${esc(cfg.appUrl)}">${esc(cfg.appUrl.replace('https://', ''))}</a>) and sign in.</li>
   <li>Go to <strong>Profile</strong> → <strong>⚙ Settings</strong>.</li>
   <li>Under <strong>Privacy &amp; legal</strong>, tap <strong>Delete my account</strong>.</li>
   <li>Read what is removed, type <strong>DELETE</strong> and confirm. It happens straight away.</li>
 </ol>
 <h3>Without the app</h3>
-<p>Can’t sign in, or no longer have the app? Email <a href="mailto:${cfg.contactEmail}?subject=Delete%20my%20account">${esc(cfg.contactEmail)}</a> with the subject <strong>Delete my account</strong>.</p>
+<p>Can’t sign in, or no longer have the app? Email <a href="mailto:${esc(cfg.contactEmail)}?subject=Delete%20my%20account">${esc(cfg.contactEmail)}</a> with the subject <strong>Delete my account</strong>.</p>
 <ul>
   <li>Send it from the email address on your account, or include the mobile number on your account.</li>
   <li>We check the request is really from you, then delete the account and tell you when it’s done — within 30 days.</li>
@@ -636,7 +721,7 @@ ${A11Y_ROWS.map(([c, l, k, n]) => `<tr><th scope="row">${esc(c)}</th><td>${l}</t
   <li>The browser’s “text size only” setting (zoom works; text-only resizing does not yet).</li>
 </ul>
 <h3>Tell us about a problem</h3>
-<p>If something is hard or impossible to use, email <a href="mailto:${cfg.contactEmail}?subject=Accessibility">${esc(cfg.contactEmail)}</a> with “Accessibility” in the subject. Tell us the screen, the sport and the device or assistive technology. We answer within our support hours (${esc(cfg.supportHours)}) and fix anything that blocks scoring first.</p>
+<p>If something is hard or impossible to use, email <a href="mailto:${esc(cfg.contactEmail)}?subject=Accessibility">${esc(cfg.contactEmail)}</a> with “Accessibility” in the subject. Tell us the screen, the sport and the device or assistive technology. We answer within our support hours (${esc(cfg.supportHours)}) and fix anything that blocks scoring first.</p>
 <p>Schools and districts can ask for our VPAT (Accessibility Conformance Report, WCAG edition) at the same address.</p>
 </main>`,
 });
@@ -645,7 +730,7 @@ const notFound = page({
   title: 'Page not found — SportnNote',
   description: 'Page not found.',
   path: '/404',
-  body: `<main class="doc"><h2>Page not found</h2><p>Looking for the app? <a href="${cfg.appUrl}">Open SportnNote</a>.</p></main>`,
+  body: `<main class="doc"><h2>Page not found</h2><p>Looking for the app? <a href="${esc(cfg.appUrl)}">Open SportnNote</a>.</p></main>`,
 });
 
 rmSync(OUT, { recursive: true, force: true });
