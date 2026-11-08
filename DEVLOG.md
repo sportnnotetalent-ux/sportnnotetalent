@@ -38,6 +38,15 @@ Where it changed:
   - Marketing posts already rendered keep the old mark.
   - The mint experiment was undone and never committed.
 
+### 2026-11-08 — Release: logo 2f on cream (web, Android OTA, website)
+
+auth-smoke passed and the publish lock was taken. Published from a clean worktree at 5e59892c.
+- **Web:** `index-2f423b5f`, live on app.sportnnote.in.
+- **Android OTA:** `e2e354bd` (preview) / `6cf61dd3` (production).
+- **Website:** deploys from `main` on push (new header wordmark, mark and favicon-v4).
+- **Also included:** the "Your sports" fold (f711fc22).
+- **Not included:** the installed Android app icon and splash. These are native, so they change only with a new APK build.
+
 ### 2026-11-08 — One SportnNote wordmark, as on the launch screen
 
 The founder tried a mint colon and "n", didn't like it, and kept the lime; the mint was never committed. They then asked that SportnNote look everywhere as it does on the launch screen.
