@@ -38,6 +38,39 @@ Where it changed:
   - Marketing posts already rendered keep the old mark.
   - The mint experiment was undone and never committed.
 
+### 2026-11-08 — Wave 1: no false zeros in any sport (tracked means captured)
+
+Wave 1 of docs/sport-expert/defaults-on/PLAN.md, built by four engineering agents in parallel worktrees and merged here.
+- **The rule (as racket DD11):** a "Stats to track" stat counts only once something of that kind is captured in the match. Switched on with nothing captured: no row, no box column, no career key, no rate.
+- **US sports** (no-false-zeros-us.md, 3675c58e):
+  - basketball fast-break points and fouls drawn;
+  - American football passes defended, tackles for loss and tackles, each per kind;
+  - baseball batted-ball career keys.
+- **Snooker, carrom, golf** (no-false-zeros-cue-golf.md, 5f7bf0fc):
+  - snooker long / rest;
+  - carrom fouls and missed Queen covers from the first tap (row now "tap each foul");
+  - golf up-and-downs / sand saves only with an entry; penalties only when one is entered.
+- **Court team** (no-false-zeros-court-team.md, c3b54994):
+  - volleyball digs / assists / reception / attack (no "100% efficiency" from kills alone);
+  - kabaddi defenders touched (no tackle success drifting to 100%);
+  - netball centre-pass receives, gains and feeds;
+  - handball fault types and 7 m won.
+- **Invasion** (no-false-zeros-invasion.md, e15db072):
+  - football (per kind; possession needs a bar tap);
+  - hockey referrals / possession;
+  - ice hockey tallies / zones;
+  - rugby union details / penalties / possession;
+  - rugby league tackles / sets.
+- **Checks:**
+  - every family has a break doc, failing tests first and a 600-user sim;
+  - older tests that pinned "switched on = tracked" were updated on purpose (marked NZ*);
+  - merged full suite 7879 (0 failing), tsc clean;
+  - demo: a netball International match with feeds on and none logged shows no Feeds / receive rows.
+- **Open:**
+  - Career lines already stored in the live DB keep their old zeros; a rebuild needs the founder's approval.
+  - NZI15: a correction that deletes the only event of a kind in a completed hockey / rugby match can leave a stale key in statSync.
+  - Founder look: football possession now needs a bar tap; Shots are hidden when only goals were tapped.
+
 ### 2026-11-08 — Release: racket stats on + Done, wave 0 (web, Android OTA)
 
 auth-smoke passed and the publish lock was taken. Published from a clean worktree at 0da44ad1.
