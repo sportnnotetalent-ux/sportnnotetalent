@@ -15,8 +15,8 @@ describe('DR1 + DR4: new matches', () => {
     test(sp, () => {
       const d = defaults(sp);
       assert.equal(d.pointDetail, true, 'point detail on');
-      // Batch 4a (padel-fault PF7): padel's 1st / 2nd serve is on too, with its Fault button
-      for (const [k, v] of Object.entries(d)) if (typeof v === 'boolean' && k !== 'pointDetail' && !(sp === 'padel' && k === 'serveDetail')) assert.equal(v, false, `${sp}.${k} stays off`);
+      // founder 2026-11-08 (describe-done.md DD1): every stat to track is on for a new match
+      for (const [k, v] of Object.entries(d)) if (typeof v === 'boolean') assert.equal(v, true, `${sp}.${k} on`);
       assert.equal(detailLiveSettings(sp).defaults!.pointDetail, true);
     });
   }

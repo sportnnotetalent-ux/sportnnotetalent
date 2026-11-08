@@ -26,7 +26,7 @@ import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { theme } from '../core/theme';
 import { FadeInLine } from '../components/pressFeedback';
-import { SelectChip } from '../components/ui';
+import { Button, SelectChip } from '../components/ui';
 import type { Player } from '../core/types';
 import type { LiveEvent } from './liveEvents';
 import type { ScoreAction } from './types';
@@ -41,6 +41,7 @@ import { trackFields } from './pointDetailSettings';
 import { useMask } from '../core/disputeMask';
 import { whoName, withRosters } from './racketNames';
 import { errOf } from './racketActions';
+import { panelMode, doneLabel, type PanelMark } from './describePanel';
 
 type Side = 'home' | 'away';
 type Flags = { pointDetail?: boolean; serveDetail?: boolean; netDetail?: boolean; rallyDetail?: boolean; thirdDetail?: boolean; rallyBuckets?: string };
@@ -61,7 +62,9 @@ export function PointDetailRow({
   const fields = trackFields(sport);
   const on = Object.fromEntries(fields.map((f) => [f.key, state[f.key as keyof Flags] === true])) as Record<string, boolean>;
   const anyOn = fields.some((f) => on[f.key]);
-  const [skipped, setSkipped] = useState<number | null>(null);
+  // describe-done.md: Done / Skip per point (its event id), so the next point opens fresh
+  const [marks, setMarks] = useState<Map<number, PanelMark>>(() => new Map());
+  const mark = (id: number, m: PanelMark | null) => setMarks((prev) => { const next = new Map(prev); if (m) next.set(id, m); else next.delete(id); return next; });
   const [choose, setChoose] = useState(false);
   const rows = rowsOf(state.events ?? []);
   const last = rows[rows.length - 1];
@@ -94,7 +97,7 @@ export function PointDetailRow({
 
   const e = last?.e;
   const W = e ? (winnerSide(e) as Side | undefined) : undefined;
-  if (!e || !anyOn || e.df || e.pen || skipped === e.id || (W !== 'home' && W !== 'away')) {
+  if (!e || !anyOn || e.df || e.pen || panelMode(e.id, marks) === 'hidden' || (W !== 'home' && W !== 'away')) {
     return <View style={st.bare}>{options}{chooser}</View>;
   }
   const L: Side = W === 'home' ? 'away' : 'home';
@@ -155,13 +158,25 @@ export function PointDetailRow({
     e.third ? THIRD_LABEL[e.third] : '',
   ].filter(Boolean).join(' · ');
 
+  // DD5: after Done, a greyed saved line; Edit reopens it (the tags are already saved, DD8)
+  if (panelMode(e.id, marks) === 'saved') {
+    return (
+      <View style={[st.box, st.saved]}>
+        {options}
+        {chooser}
+        <View style={st.head}>
+          <Text style={[st.meta, st.flex]} numberOfLines={2}>✓ Saved · {summary || 'nothing picked'}</Text>
+          <Text style={st.link} onPress={() => mark(e.id, null)} accessibilityRole="button" accessibilityLabel="Edit the description of this point">Edit</Text>
+        </View>
+      </View>
+    );
+  }
   return (
     <View style={st.box} accessibilityLabel="Describe the last rally">
       {options}
       {chooser}
       <View style={st.head}>
         <Text style={st.label} numberOfLines={1}>Last {e.kind === 'rally' ? 'rally' : 'point'} · {who}</Text>
-        <Text style={st.link} onPress={() => setSkipped(e.id)} accessibilityRole="button" accessibilityLabel="Skip describing this rally">Skip</Text>
       </View>
       {hows.length > 0 && (
         <View style={st.chips}>
@@ -246,6 +261,9 @@ export function PointDetailRow({
         </View>
       )}
       {summary ? <FadeInLine id={summary}><Text style={st.meta}>✓ {summary}</Text></FadeInLine> : null}
+      {/* DD4: a clear finish under the summary — Done once something is picked, else Skip */}
+      <Button label={doneLabel(summary)} variant="ghost" style={st.done} accessibilityLabel={summary ? 'Done describing this point' : 'Skip describing this point'}
+        onPress={() => mark(e.id, summary ? 'done' : 'skipped')} />
     </View>
   );
 }
@@ -258,6 +276,9 @@ const st = StyleSheet.create({
   label: { flex: 1, color: theme.colors.text, fontSize: theme.font.body, fontWeight: '700' },
   meta: { color: theme.colors.textMuted, fontSize: theme.font.small, flexShrink: 1 },
   rowLabel: { alignSelf: 'center' },
+  saved: { opacity: 0.7 },
+  flex: { flex: 1 },
+  done: { alignSelf: 'stretch' },
   link: { color: theme.colors.primary, fontSize: theme.font.small, fontWeight: '700', paddingHorizontal: theme.spacing(2), paddingVertical: theme.spacing(2) },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing(2) },
 });

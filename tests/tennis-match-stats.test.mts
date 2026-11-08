@@ -352,7 +352,8 @@ describe('SD-157 · schema, career rows, leaders, settings', () => {
     const toggles = ls.fields.filter((f) => f.type === 'toggle');
     assert.deepEqual(toggles.map((f) => [f.key, f.group]), TENNIS_TRACK_FIELDS.map((f) => [f.key, 'Stats to track']));
     // founder 2026-11-02 (tennis-serve-and-endings TF2 / TF3): point detail and 1st / 2nd serve on for a new match
-    assert.ok(toggles.every((f) => f.default === (f.key === 'pointDetail' || f.key === 'serveDetail') && (f.hint ?? '').length > 10));
+    // describe-done.md DD1 / DD2: every option on for a new match except the typed serve speed
+    assert.ok(toggles.every((f) => f.default === (f.key !== 'speedDetail') && (f.hint ?? '').length > 10));
     assert.deepEqual(ls.fields.filter((f) => f.type !== 'toggle').map((f) => [f.key, f.type, f.default]), [['speedUnit', 'choice', 'kmh'], ['rallyBuckets', 'choice', 'std']]);
     const fresh = tennis.init();
     assert.deepEqual(ls.read(fresh), { pointDetail: false, serveDetail: false, netDetail: false, rallyDetail: false, speedDetail: false, speedUnit: 'kmh', rallyBuckets: 'std' });

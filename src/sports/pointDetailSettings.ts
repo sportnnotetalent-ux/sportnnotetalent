@@ -37,8 +37,9 @@ export interface TrackField { key: DetailFlagKey; label: string; hint: string; /
 export const TENNIS_TRACK_FIELDS: ReadonlyArray<{ key: 'pointDetail' | 'serveDetail' | 'netDetail' | 'rallyDetail' | 'speedDetail'; label: string; hint: string; on?: boolean }> = [
   { key: 'pointDetail', label: 'Point detail', hint: 'How each point ended (winner, forced / unforced error, service winner), then forehand / backhand and the shot', on: true },
   { key: 'serveDetail', label: '1st / 2nd serve', hint: 'Tap Fault when a 1st serve misses: 1st serve %, 1st / 2nd serve points won', on: true },
-  { key: 'netDetail', label: 'Net points', hint: 'Who came to the net: net points played and won' },
-  { key: 'rallyDetail', label: 'Rally length', hint: 'Tap 0–4, 5–8 or 9+ shots: points won by rally length' },
+  { key: 'netDetail', label: 'Net points', hint: 'Who came to the net: net points played and won', on: true },
+  { key: 'rallyDetail', label: 'Rally length', hint: 'Tap 0–4, 5–8 or 9+ shots: points won by rally length', on: true },
+  // describe-done.md DD2: the one typed stat (needs a speed gun) stays off
   { key: 'speedDetail', label: 'Serve speed', hint: 'Type the serve speed (km/h or mph, see the unit below): fastest serve and averages' },
 ];
 
@@ -57,8 +58,9 @@ const RALLY_HINT: Record<Exclude<DetailSport, 'tennis'>, string> = {
   pickleball: 'Tap 0–4, 5–8 or 9+ shots (or the buckets chosen below): points won by rally length',
 };
 
-/** The "Stats to track" options of `sport`, in card order (off by default; point detail on in every racket
- *  sport, and 1st / 2nd serve in tennis and padel — padel's since its Fault button, padel-fault PF7). */
+/** The "Stats to track" options of `sport`, in card order. Founder 2026-11-08
+ *  (describe-done.md DD1): every one is on for a new match — each is optional to
+ *  fill in and the point buttons stay one tap; only tennis' typed serve speed is off. */
 export function trackFields(sport: DetailSport): TrackField[] {
   if (sport === 'tennis') return [...TENNIS_TRACK_FIELDS];
   // Batch 3 (defaults-racket DR1): point detail on for a new match, as tennis
@@ -71,10 +73,11 @@ export function trackFields(sport: DetailSport): TrackField[] {
       hint: sport === 'pickleball'
         ? 'Which team(s) got to the kitchen line, or nobody: kitchen-line rallies won and kitchen arrival %'
         : 'Who was at the net: net points played and won',
+      on: true,
     });
   }
-  out.push({ key: 'rallyDetail', label: 'Rally length', hint: RALLY_HINT[sport] });
-  if (sport === 'pickleball') out.push({ key: 'thirdDetail', label: '3rd shot', hint: "The serving team's 3rd shot (drop, drive or lob) and who won the rally" });
+  out.push({ key: 'rallyDetail', label: 'Rally length', hint: RALLY_HINT[sport], on: true });
+  if (sport === 'pickleball') out.push({ key: 'thirdDetail', label: '3rd shot', hint: "The serving team's 3rd shot (drop, drive or lob) and who won the rally", on: true });
   return out;
 }
 

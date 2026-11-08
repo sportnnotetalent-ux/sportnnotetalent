@@ -44,8 +44,9 @@ describe('PF7: 1st / 2nd serve is on for new padel matches', () => {
     const d = Object.fromEntries(trackFormatFields('padel').map((f) => [f.key, f.default]));
     assert.equal(d.serveDetail, true);
     assert.equal(d.pointDetail, true);
-    assert.equal(d.netDetail, false);
-    assert.equal(d.rallyDetail, false);
+    // describe-done.md DD1: the rest are on too now
+    assert.equal(d.netDetail, true);
+    assert.equal(d.rallyDetail, true);
     assert.equal(detailLiveSettings('padel').defaults!.serveDetail, true);
   });
   test('a new match starts with it on; its first point is a 1st-serve point', () => {

@@ -30,8 +30,9 @@ describe('TF2 + TF3: point detail and 1st / 2nd serve are on for new tennis matc
     const d = Object.fromEntries(trackFormatFields('tennis').map((f) => [f.key, f.default]));
     assert.equal(d.pointDetail, true);
     assert.equal(d.serveDetail, true);
-    assert.equal(d.netDetail, false);
-    assert.equal(d.rallyDetail, false);
+    // describe-done.md DD1 / DD2: net points and rally length on too; the typed serve speed off
+    assert.equal(d.netDetail, true);
+    assert.equal(d.rallyDetail, true);
     assert.equal(d.speedDetail, false);
     assert.equal(detailLiveSettings('tennis').defaults.pointDetail, true);
   });
@@ -42,7 +43,8 @@ describe('TF2 + TF3: point detail and 1st / 2nd serve are on for new tennis matc
   });
   test('the other racket sports: point detail on (Batch 3, defaults-racket.md), padel 1st / 2nd serve (Batch 4a, padel-fault.md), the rest off', () => {
     for (const sp of ['badminton', 'tabletennis', 'squash', 'padel', 'pickleball'] as const) {
-      for (const f of trackFormatFields(sp)) if (f.type === 'toggle') assert.equal(f.default, f.key === 'pointDetail' || (sp === 'padel' && f.key === 'serveDetail'), `${sp} ${f.key}`);
+      // describe-done.md DD1: every option on for a new match
+      for (const f of trackFormatFields(sp)) if (f.type === 'toggle') assert.equal(f.default, true, `${sp} ${f.key}`);
     }
   });
 });

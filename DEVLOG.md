@@ -38,6 +38,21 @@ Where it changed:
   - Marketing posts already rendered keep the old mark.
   - The mint experiment was undone and never committed.
 
+### 2026-11-08 — Racket sports: every stat on by default; Done button on "Last point"
+
+Founder, scoring a friendly badminton game: the extra stats should be on by default, and the hard-to-see "Choose" link needed a clear Done under the summary (describe-done.md).
+- **On by default:** every "Stats to track" option is on for new matches in all six racket sports: rally length, net points, kitchen line and 3rd shot, with point detail and padel / tennis 1st / 2nd serve already on. Tennis serve speed stays off, because it is typed and needs a speed gun. Matches already started keep their settings.
+- **Done:** a full-width button under the "✓ …" summary. It reads Done once something is picked, else Skip.
+  - Done greys the card to "✓ Saved · …" with an Edit link.
+  - The next point opens a fresh card.
+  - Remembered per point (`src/sports/describePanel.ts`); badminton/TT/squash/padel/pickleball and tennis share it.
+- **Checks:**
+  - `tests/describe-done.test.mts` (with a 600-scorer sim);
+  - 9 older tests that pinned "the rest off" were updated on purpose;
+  - tsc;
+  - demo-checked on a new badminton friendly: Rally length on by default; Done → Saved; next point fresh.
+- **Next:** six sport specialists are reviewing the other families (docs/sport-expert/defaults-on/).
+
 ### 2026-11-08 — Release: "Organize a game" starts with the sport (web, Android OTA)
 
 auth-smoke passed and the publish lock was taken. Published from a clean worktree at 9354f29f, which includes e0a7e3fc.
