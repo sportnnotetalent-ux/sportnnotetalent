@@ -38,6 +38,13 @@ Where it changed:
   - Marketing posts already rendered keep the old mark.
   - The mint experiment was undone and never committed.
 
+### 2026-11-08 — Release: wave 4 polish (web, Android OTA)
+
+auth-smoke passed and the publish lock was taken. Published from a clean worktree at bb90add0.
+- **Web:** `index-82a6f99d`, live on app.sportnnote.in.
+- **Android OTA:** `e336b966` (preview) / `aeaac34f` (production).
+- **Includes:** wave 4 (cd1d5058, d827ea4f, c39accb2, 9e68e391, d071d482, 52077d36).
+
 ### 2026-11-08 — Wave 4: polish across the sports
 
 Wave 4 of docs/sport-expert/defaults-on/PLAN.md. One shared fix by me, five engineering agents in parallel, merged here.
