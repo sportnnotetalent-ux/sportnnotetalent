@@ -39,6 +39,8 @@ export interface FeedItem {
    *  the "Key events" filter keeps only these */
   major?: boolean;
   tone?: 'goal' | 'red' | 'yellow' | 'chance';
+  /** Stitch pick 4: a short tag from a recorded value only ("HEADER", "RIGHT FOOT") — never invented (LS7) */
+  detail?: string;
   /** the lead player (tap → profile). IDs-only scoring: by id; the name is
    *  the viewer's (built from a named state, never stored). */
   playerId?: string;

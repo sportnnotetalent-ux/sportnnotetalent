@@ -18,7 +18,7 @@
  */
 import { SHOOTOUT_PERIOD, groupByScorer, emptyFacts, scoreText, type FeedItem, type MatchFacts, type Score } from '../invasion/feed.ts';
 import { minuteText, eventHalf, halfTimeText, backfillKicks, penScore, type FootballState, type MinuteFormat } from './engine.ts';
-import { CARD_REASON_PHRASE, NO_GOAL_LABEL, SITUATION_PHRASE, type CardReason, type FootballEvent, type NoGoalReason, type StatEvent } from './events.ts';
+import { CARD_REASON_PHRASE, CARD_REASON_LABEL, BODY_PART_LABEL, NO_GOAL_LABEL, SITUATION_PHRASE, type CardReason, type FootballEvent, type NoGoalReason, type StatEvent } from './events.ts';
 import { footballPossession } from './depth.ts';
 import { legacyNameOf, withNames, type NameOf } from '../invasion/names.ts';
 
@@ -40,6 +40,22 @@ function goalPhrase(e: FootballEvent): string {
   const head = e.goalType === 'header' || e.bodyPart === 'head';
   const strike = head ? 'header' : e.bodyPart === 'left' ? 'left-footed shot' : e.bodyPart === 'right' ? 'right-footed shot' : e.bodyPart === 'chest' ? 'finish off the chest' : '';
   return strike ? `${strike}${zonePhrase(e.zone)}` : `scores${zonePhrase(e.zone)}`;
+}
+
+/** LS7/LS8: the feed's small tag, from what the scorer recorded only (≤ 18 letters, no names). */
+export function footballDetail(e: FootballEvent): string | undefined {
+  if (e.type === 'goal') {
+    if (e.goalType === 'penalty') return 'PENALTY';
+    if (e.goalType === 'freekick') return 'FREE KICK';
+    if (e.goalType === 'header' || e.bodyPart === 'head') return 'HEADER';
+    return e.bodyPart ? BODY_PART_LABEL[e.bodyPart].toUpperCase() : undefined;
+  }
+  if ((e.type === 'yellow' || e.type === 'red') && e.reason && e.reason !== 'other') {
+    const short: Partial<Record<CardReason, string>> = { dogso: 'DENIED A CHANCE' };
+    const t = short[e.reason as CardReason] ?? CARD_REASON_LABEL[e.reason as CardReason]?.toUpperCase();
+    return t && t.length <= 18 ? t : undefined;
+  }
+  return undefined;
 }
 
 /** The sentence for a goal-list event (goal, card, sub …). */
@@ -187,6 +203,7 @@ export function footballFeed(s0: FootballState, names: Names, nameOf: NameOf = l
       side: r.ev ? r.ev.side : r.st!.side, score: { ...score },
       ...(d.major ? { major: true } : {}), ...(d.tone ? { tone: d.tone } : {}),
       ...(lead.id ? { playerId: lead.id } : {}), ...(lead.name ? { playerName: lead.name } : {}),
+      ...(r.ev && footballDetail(r.ev) ? { detail: footballDetail(r.ev) } : {}),
     });
   });
   // the shoot-out, kick by kick (older logs: the dots, takers unknown)

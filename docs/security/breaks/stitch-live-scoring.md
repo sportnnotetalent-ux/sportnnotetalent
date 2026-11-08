@@ -15,3 +15,5 @@
 | LS4 | The boxed undo bar shows "Undo" with nothing to say what it removes, or someone taps it by accident. | Safety | The box says what was last recorded ("Last: Goal — Rohan Nair 61′"). Undo is its own pill button on the right (≥ 44 pt). One tap still undoes one step, as before (no new behaviour). |
 | LS5 | Restyling the bar breaks the screen-reader summary or the score flash. | Regression | The same `accessibilityLabel` summary and the same flash. The existing score-bar tests still pass. |
 | LS6 | Pair names on the green panel are cut. | UX | The panel uses `SideName` (pair-names.md). |
+| LS7 | Detail tags invent detail the scorer never recorded ("RIGHT FOOT VOLLEY" on every goal). | Trust | A tag only comes from a recorded value: a goal's type or foot, a card's reason. No value, no tag. Tested. |
+| LS8 | A tag repeats a child's name or squeezes the sentence off screen. | Privacy / UX | Tags hold no names, only the recorded type, ≤ 18 characters, one line, small caps on the right. |

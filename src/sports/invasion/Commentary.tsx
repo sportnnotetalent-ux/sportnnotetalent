@@ -83,6 +83,7 @@ export function Commentary({
                   <Text style={[st.text, toneColor && big ? { color: theme.colors.text, fontWeight: '700' } : null]} {...playerLink(pid, mask.text(it.text), onPlayer)}>
                     {mask.text(it.text)}
                   </Text>
+                  {it.detail ? <Text style={st.detail} numberOfLines={1}>{it.detail}</Text> : null}
                   <Text style={[st.score, big && { color: toneColor, fontWeight: '900' }]}>{it.scoreText ?? scoreText(it.score)}</Text>
                 </View>
               );
@@ -155,4 +156,5 @@ const st = StyleSheet.create({
   icon: { fontSize: 16, width: 22, textAlign: 'center' },
   text: { flex: 1, minWidth: 0, color: theme.colors.text, fontSize: theme.font.small, lineHeight: 19 },
   score: { color: theme.colors.textMuted, fontSize: theme.font.small, fontWeight: '700', fontVariant: ['tabular-nums'], minWidth: 36, textAlign: 'right' },
+  detail: { color: theme.colors.textMuted, fontSize: theme.font.tiny, fontWeight: '800', letterSpacing: 0.4, maxWidth: 110 },
 });

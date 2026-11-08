@@ -27,3 +27,22 @@ test('LS4: the undo bar names the last step and Undo is its own button', () => {
   assert.match(s, /st\.undoPill/);
   assert.match(s, /accessibilityLabel=\{`Undo\$\{undoWhat/);
 });
+
+import { footballFeed } from '../src/sports/football/feed.ts';
+
+test('LS7/LS8: feed tags come only from what the scorer recorded', () => {
+  const names = { home: 'Red', away: 'Blue' };
+  const base = { half: 1, halfMinutes: 45, events: [] as unknown[], stats: [] } as never;
+  const st = (events: unknown[]) => ({ ...(base as object), events }) as never;
+  const goal = (extra: object) => ({ id: 1, type: 'goal', side: 'home', minute: 10, half: 1, playerName: 'Rohan', ...extra });
+  const tag = (extra: object) => footballFeed(st([goal(extra)]), names)[0]?.detail;
+  assert.equal(tag({ goalType: 'open', bodyPart: 'right' }), 'RIGHT FOOT');
+  assert.equal(tag({ goalType: 'header' }), 'HEADER');
+  assert.equal(tag({ goalType: 'penalty' }), 'PENALTY');
+  assert.equal(tag({ goalType: 'open' }), undefined, 'nothing recorded, no tag');
+  const card = footballFeed(st([{ id: 2, type: 'yellow', side: 'away', minute: 54, half: 1, playerName: 'David', reason: 'spa' }]), names)[0];
+  assert.equal(card.detail, 'STOPPING AN ATTACK');
+  for (const t of [tag({ goalType: 'freekick' }), card.detail]) assert.ok(!t || t.length <= 18, t);
+  const s = read('src/sports/invasion/Commentary.tsx');
+  assert.match(s, /it\.detail \? <Text style=\{st\.detail\}/);
+});
