@@ -38,6 +38,18 @@ Where it changed:
   - Marketing posts already rendered keep the old mark.
   - The mint experiment was undone and never committed.
 
+### 2026-11-08 — Teams for doubles, phase 1: who plays, stand-ins, mapping (pure rules)
+
+Founder: no more "pairs". Every side with more than one person is a team with a squad, and the playing N are picked before scoring (docs/product/teams-for-doubles.md has the decisions and phases). Phase 1 is the pure rules in `src/core/teamPlay.ts` (team-play.md):
+- `playingFor`: a valid pick, else automatic when the squad is exactly N, else stand-ins (scoring is never blocked);
+- `standInId` / `standInName`: "ph:{team}:{n}", "{Team} Player n";
+- `pickerFor`: team managers (the existing `canManageTeamLocal`) or the host pick; everyone else asks the team;
+- `checkMapping`, `remapEvents`, `remapStatLines`: stand-in → real player, moving every credit at any depth and merging stat lines.
+- **Checks:**
+  - `tests/team-play.test.mts` (8 tests incl. a 600-user sim; failed first);
+  - full suite 8340 (0 failing), tsc clean.
+  - No screens yet (phases 2–5); nothing visible to demo.
+
 ### 2026-11-08 — Racket box score checks the side (RD11 / TH4)
 
 Founder: fix it. The box score keyed a hitter / error credit by whatever player id the point named, so a hitter from the wrong side (or nobody's squad) made a phantom row. Careers already checked the side.
