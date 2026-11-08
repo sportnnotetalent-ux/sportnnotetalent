@@ -38,6 +38,38 @@ Where it changed:
   - Marketing posts already rendered keep the old mark.
   - The mint experiment was undone and never committed.
 
+### 2026-11-08 — Wave 2: one describe card with Done in every sport; plays logged on the tap
+
+Wave 2 of docs/sport-expert/defaults-on/PLAN.md. A shared `DescribeCard` (fc566f60, describe-card.md) was built first. Five engineering agents then applied it in parallel worktrees, merged here. The pattern everywhere:
+- the play goes on the board at the tap;
+- the card describes it after, with a full-width Done (Skip when nothing is picked);
+- "✓ Saved · … Edit";
+- a fresh card for the next play.
+- **Invasion** (describe-invasion.md, 78f61409):
+  - Football's goal card replaces the blocking assist panel; stoppage reason is now a card too.
+  - Hockey, ice hockey and both rugby codes log the goal / try at the scorer pick. Assists, strength, empty net and on-ice players are attached after (new GOAL_DETAIL / TRY_DETAIL).
+  - Hockey's penalty-corner card loses "Later".
+- **Court team** (describe-court-team.md, 6bb44213):
+  - Netball logs the goal / miss / deflection / turnover on the tap; feeder, rebound, outcome and type come after (DESCRIBE).
+  - Volleyball has one "Last point" card.
+  - Kabaddi "Tackled by?" is a card.
+- **US** (describe-us.md, 2cb55f57):
+  - Basketball logs the foul on the tap and "who was fouled" is optional (FOUL_DRAWN); assist / fast break and block are cards.
+  - American football logs the play on the tap, with one card for receiver / breakup / forced fumble / tackle (TARGET).
+  - Baseball "Fielders?" is a card.
+- **Cricket** (describe-cricket.md, 8768c2b8): the two per-ball cards merged into one, Done remembered per ball, and a typed speed is never lost.
+- **Measured** (describe-measured.md, 42839480): splits, relay take-overs and DQ reasons fold to Saved, and Done saves typed values.
+- **Same results:** in every family, stats, careers, box scores and commentary equal the old one-step flow for the same taps, and old logs replay unchanged. Undo takes the detail first, then the play.
+- **Checks:**
+  - every family has a break doc, failing tests first and a 600-scorer sim;
+  - merged full suite 8012 (0 failing), tsc clean;
+  - demo: a football goal shows 3-1 at once, assist Kiran Rao on the card, Done gives "✓ Saved · Assist: Kiran Rao".
+- **Known small gaps** (in the break docs):
+  - the volleyball card is hidden after full time;
+  - editing an old netball / football goal asks for its feeder / assist again;
+  - basketball "Rebound?" / "Steal" keep their small Skip;
+  - the ice hockey faceoff zone is left for wave 3.
+
 ### 2026-11-08 — Release: Android tab bar clears the navigation keys (web, Android OTA)
 
 auth-smoke passed and the publish lock was taken. Published from a clean worktree at 66f10a30.
