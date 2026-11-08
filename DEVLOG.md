@@ -35,6 +35,9 @@ The founder picked elements from the Google Stitch designs (docs/design/stitch-p
   - a live set line on racket cards.
   - Pick 15 (spots left / Join match) is not built: it needs an open-games feature.
   - Break doc `stitch-home.md`.
+- **Website front page (18–24), 9ec0534b:** the "SCORE ANY GAME. SHARE IT LIVE." hero with an HTML phone mock-up; proven facts only (33 sports from the registry, free while new, 124 guides, no ads); how it works in 3 steps; four audience cards linked to real guides; a 33-sport grid with rule notes; a reworded child-safety banner (no law claims); and the green call-to-action band. Unescaped config URLs in hrefs fixed. Break doc `website-front-page.md`; 30 new tests.
+- **Guides (92a4b1ae):** 19 guides updated to the new labels ("⏸ Pause clock", "End Q1 →", the undo box, the big Goal button).
+- **Marketing:** the asset check is in `docs/org/marketing/reports/2026-11-08-stitch-asset-impact.md`. If this goes live before the posts, re-take post 2 (11 Nov) and carousel slides 2, 4 and 5 (12 Nov), and record the videos for posts 1 and 5 after the release.
 - **Checks:** new tests: pair-names, stitch-live-scoring, stitch-tournament-page, stitch-home, sim-stitch-picks (600 users). Full suite 7,750 pass; tsc clean. Demo-checked at phone width (snooker doubles bar, football pad, Karnataka State Cup standings, Home hero).
 
 ### 2026-11-07 — Release: the fixture map, parts 1 and 2 (web, Android OTA)
