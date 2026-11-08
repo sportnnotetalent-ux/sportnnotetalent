@@ -828,16 +828,17 @@ export function initDetailFlags(config?: Record<string, unknown>): Partial<Recor
   return out;
 }
 
-/** Did this match track point detail? (switched on, or any annotated point) */
+/** Did this match track point detail? describe-done.md DD13: only once a point
+ *  is described — switched on with nothing described is no false zero */
 export const detailTracked = (s: { pointDetail?: boolean; events?: LiveEvent[] } | null | undefined): boolean =>
-  !!s && (s.pointDetail === true || (s.events ?? []).some((e) => !!e.pd));
+  !!s && (s.events ?? []).some((e) => !!e.pd);
 
 /** SD-135 (PD-a) — how much detail a match tracked: 'full' = point detail
  *  was on, or a point carries a how no one-tap button records; 'quick' =
  *  only one-tap hows (padel Ace, squash Stroke / No let); null = none. */
 export function detailCoverage(sport: DetailSport, s: { pointDetail?: boolean; events?: LiveEvent[] } | null | undefined): 'full' | 'quick' | null {
   if (!s) return null;
-  if (s.pointDetail === true) return 'full';
+  // DD13: coverage comes from what was described, not from the switch
   const quick = QUICK_HOWS[sport] ?? [];
   let any = false;
   for (const e of s.events ?? []) {

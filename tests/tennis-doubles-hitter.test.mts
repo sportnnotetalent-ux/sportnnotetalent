@@ -142,7 +142,8 @@ describe('TH7: undo', () => {
     const undone = run(dbl(), acts.slice(0, 1));
     const again = run(undone, [P('home')]);
     assert.equal(lastPd(again), undefined);
-    assert.equal(tennisTotals(again, DOUBLES).h2.stats.winners, 0);
+    // describe-done DD13: nothing described after the undo, so no winners key at all
+    assert.equal(tennisTotals(again, DOUBLES).h2.stats.winners ?? 0, 0);
   });
   test('a timeline replay keeps the hitter', () => {
     const s0 = run(dbl(), [FS('home')]);

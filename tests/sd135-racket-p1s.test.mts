@@ -154,11 +154,11 @@ describe('SD-135 · squash Stroke / No let one-tap + 90 s cue', () => {
     const box = rallyBox(s, {}, 'squash').data('all');
     assert.equal('winners' in (box.home.rows[0]?.stats ?? {}), false);
   });
-  test('detail mode on: still a full-detail match', () => {
+  test('detail mode on, only a one-tap how described: quick coverage (describe-done DD13)', () => {
     const s = run(SQUASH.reducer, SQUASH.init({ pointDetail: true }), [FS('home'), P('away', { pd: { how: 'stroke' } })]);
-    assert.equal(detailCoverage('squash', s), 'full');
+    assert.equal(detailCoverage('squash', s), 'quick');
     const t = rallyTotals(s, L.ctxOf({ home: ['h1'], away: ['a1'] }) as never, 'squash');
-    assert.equal(t.h1.stats.winners, 0);
+    assert.equal('winners' in t.h1.stats, false, 'no false 0 for winners nobody described');
   });
   test('the replayed log keeps the decision (timeline correction)', () => {
     const s = run(SQUASH.reducer, sq(), [P('away', { pd: { how: 'stroke' } }), ...pts('hh')]);

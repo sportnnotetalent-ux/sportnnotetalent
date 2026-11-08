@@ -157,9 +157,9 @@ describe('SD-107 · tennis', () => {
     assert.equal(s3.events[0].pd?.stroke, 'bh');
     assert.equal(tennisTotals(s3, SINGLES).h1.stats.netPtsWon, 1);
   });
-  test('detail on, nothing described: keys written as 0 (tracked), not left out', () => {
+  test('detail on, nothing described: keys left out (describe-done DD13: no false zeros)', () => {
     const s0 = run(tennis.reducer, tennis.init(), [ON(), P('home', 'h1')]);
-    assert.equal(tennisTotals(s0, SINGLES).h1.stats.winners, 0);
+    assert.equal('winners' in tennisTotals(s0, SINGLES).h1.stats, false);
     assert.equal('srv1Pts' in tennisTotals(s0, SINGLES).h1.stats, false); // serve tracking off
   });
   test('doubles: an error credits the picked opponent, else nobody (side-level only)', () => {

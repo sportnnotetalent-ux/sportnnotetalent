@@ -105,3 +105,14 @@ test('DD12: doubles asks who; a doubles side with no names gets a hint, never si
   assert.equal(byHint(false, 0, 'Ravi'), null, 'singles: the opponent is credited automatically');
   for (const f of ['src/sports/PointDetailRow.tsx', 'src/sports/tennis/PointCapture.tsx']) assert.match(read(f), /byHint\(/, f);
 });
+
+test('DD13: point detail switched on but nothing described is not tracked (no false zeros)', async () => {
+  const { detailTracked, detailCoverage } = await import('../src/sports/pointDetail.ts');
+  const on = { pointDetail: true, events: [{ id: 1, kind: 'point', side: 'home' }, { id: 2, kind: 'point', side: 'away' }] };
+  assert.equal(detailTracked(on as never), false);
+  assert.equal(detailCoverage('badminton', on as never), null);
+  const described = { ...on, events: [...on.events, { id: 3, kind: 'point', side: 'home', pd: { how: 'winner' } }] };
+  assert.equal(detailTracked(described as never), true);
+  assert.equal(detailCoverage('badminton', described as never), 'full');
+  assert.equal(detailCoverage('padel', { pointDetail: true, events: [{ id: 1, kind: 'point', pd: { how: 'ace' } }] } as never), 'quick', 'only one-tap hows: quick');
+});
