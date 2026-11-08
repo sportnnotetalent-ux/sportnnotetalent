@@ -22,7 +22,7 @@ When the umpire gives a warning, a card or a penalty, or a player calls a timeou
 5. Tap a reason if you like, for example **Racket abuse**.
 6. Read the line above the button, for example "Point to Aarav Mehta.", then tap **Apply: Point penalty**.
 
-The violation goes into the commentary (the point log), for example "Code violation · point penalty · Racket abuse". The Undo bar names it too: "↶ Undo: code violation · point penalty · Ishaan Verma (30-0)".
+The violation goes into the commentary (the point log), for example "Code violation · point penalty · Racket abuse". The undo box names it too: "Last step: code violation · point penalty · Ishaan Verma (30-0)".
 
 ## What each sport's schedule suggests
 - **Tennis** (ITF Point Penalty Schedule): **Warning**, then **Point penalty**, then **Game penalty** for the 3rd violation and every one after that. A **Default** is the Referee's call.

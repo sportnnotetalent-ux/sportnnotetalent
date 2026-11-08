@@ -86,7 +86,7 @@ The **Commentary** tab tells the match game by game, newest first, the game in p
 It updates after every point and after a correction.
 
 ## Fix a mistake
-- Wrong tap just now? The Undo bar names what it removes, e.g. "↶ Undo: point to Red House (30-15)".
+- Wrong tap just now? The undo box names the last step, e.g. "Last step: point to Red House (30-15)", next to the **↶ Undo** button.
 - Older point: tap **Edit** next to **Correct the timeline** on the **Scoring** tab.
 1. Tap ✎ to change a point (winner, type, player, detail), then **Save**.
 2. Tap ✕ to remove one (the app asks first).

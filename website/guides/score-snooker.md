@@ -46,7 +46,7 @@ With **Frame scores only**, each frame shows "Frame 1 final score". Type both sc
 **Frame options: concede, award, re-rack** records a concession, the referee's award, or a stalemate re-rack (the frame starts again, same player to break off).
 
 ## Fix a mistake
-- Tap **↶ Undo**. It names what it takes back, for example "↶ Undo: black · break 8".
+- Tap **↶ Undo**. The box beside it names what it takes back, for example "Last step: black · break 8".
 - A finished frame is wrong? On the **Scoring** tab, tap **✎ Correct a finished frame** → **✎ Change frame 2**, type the score, then **Use this score** and **Update score (1)**. Later frames stay as played.
 - After the match, use **✏️ Correct this match** on the **Info** tab. See [Correct a match after full time](/guides/correct-a-finished-match/).
 

@@ -17,8 +17,8 @@ Score a flag or tackle game on one phone. By default you tap only the scoring pl
 
 ## Step by step: run the clock
 1. Open the match → **Scoring** and tap **▶ Kickoff**. The clock counts down.
-2. Tap **⏸ Stop** and **▶ Resume** whenever the officials stop it.
-3. When a period ends, tap **⏭ End Q1** (**⏭ End H1** in flag) and confirm.
+2. Tap **⏸ Pause clock** and **▶ Resume** whenever the officials stop it.
+3. When a period ends, tap **End Q1 →** (**End H1 →** in flag) and confirm.
 4. Timeouts: tap **⏸ Lions TO · 3 left**. The clock stops; the count resets at half-time.
 5. NFL format: the clock stops by itself at 2:00 of the 2nd and 4th quarters (two-minute warning).
 6. Clock wrong? Tap **⏱ Set clock** and type the time left (`4:12`).

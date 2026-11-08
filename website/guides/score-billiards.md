@@ -43,7 +43,7 @@ With **Frame (or game) scores only**, each frame shows "Frame 1 final score". Ty
 **Frame options: concede, award** records a concession, or a frame the referee awards for **Conduct**, **Time** or **Other**.
 
 ## Fix a mistake
-- Tap **↶ Undo**. It names what it takes back, for example "↶ Undo: pot red + cannon · break 5".
+- Tap **↶ Undo**. The box beside it names what it takes back, for example "Last step: pot red + cannon · break 5".
 - A finished frame is wrong? On the **Scoring** tab, tap **✎ Correct a finished frame** → **✎ Change frame 2**, type the score, then **Use this score** and **Update score (1)**. Later frames stay as played. The link shows once a frame has finished, so a one-game match doesn't show it during play.
 - After the match, use **✏️ Correct this match** on the **Info** tab. See [Correct a match after full time](/guides/correct-a-finished-match/).
 

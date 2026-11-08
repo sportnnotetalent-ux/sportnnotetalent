@@ -17,9 +17,9 @@ Score a hockey match on one phone. You run the game clock and tap what happens; 
 
 ## Step by step: run the clock
 1. Open the match → **Scoring** and tap **▶ Push back**. The clock counts down the quarter.
-2. Tap **⏸ Stop** when the umpires stop time and **▶ Resume** when play restarts.
+2. Tap **⏸ Pause clock** when the umpires stop time and **▶ Resume** when play restarts.
 3. With the FIH format, the clock stops by itself after a goal and when you award a penalty corner. A bar under the clock says "Clock stopped (goal)" until you tap **▶ Resume**.
-4. When the hooter goes, tap **⏭ End Q1**, then **▶ Start Q2** after the break. **🏁 Full time**, at the bottom of the controls, stays off until the last period has started, so a slip at half-time can't end the match.
+4. When the hooter goes, tap **End Q1 →**, then **▶ Start Q2** after the break. **🏁 Full time**, at the bottom of the controls, stays off until the last period has started, so a slip at half-time can't end the match.
 5. Clock wrong, or you joined late? Tap **⏱ Set clock**, type the time left (for example `8:30`) and tap **Set**.
 
 ## Step by step: log the play
@@ -68,4 +68,4 @@ Off by default. Switch on in **⚙️ Match settings → Stats to track** (organ
 No. If the umpire shows a yellow instead, record a yellow.
 
 ### Can I score without running the clock?
-Mostly. Every moment is then stamped at the start of the quarter and suspensions can't be timed. Tap **▶ Push back** (or **▶ Start**) once per period anyway: **⏭ End** and **🏁 Full time** only unlock once the period has started.
+Mostly. Every moment is then stamped at the start of the quarter and suspensions can't be timed. Tap **▶ Push back** (or **▶ Start**) once per period anyway: **End …** and **🏁 Full time** only unlock once the period has started.

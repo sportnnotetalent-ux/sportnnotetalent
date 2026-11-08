@@ -17,9 +17,9 @@ Score a rugby union match on one phone: you run the clock and tap what happens; 
 
 ## Step by step: run the clock
 1. Open the match → **Scoring** and tap **▶ Kick-off**. The clock counts up; the second half starts at 40:00 (7:00 in sevens).
-2. Tap **⏸ Stop** and **▶ Resume** whenever the referee stops time.
+2. Tap **⏸ Pause clock** and **▶ Resume** whenever the referee stops time.
 3. When time is up the clock turns red and keeps going (`40:00 +1:12`): the half ends when the ball is next dead.
-4. At half-time tap **⏭ End H1**, then **▶ Start H2** after the break. **🏁 Full time**, at the bottom of the controls, stays off until the second half has started.
+4. At half-time tap **End H1 →**, then **▶ Start H2** after the break. **🏁 Full time**, at the bottom of the controls, stays off until the second half has started.
 5. Clock wrong? Tap **⏱ Set clock**, type the match time (`52:30`) and tap **Set**.
 
 ## Step by step: log the scores

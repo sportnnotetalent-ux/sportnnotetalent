@@ -17,7 +17,7 @@ Score a football match on one phone. The app runs the clock, stamps each moment'
 
 ## Step by step: kick off and score
 1. Open the match → **Scoring** and tap **Kick off**. Joined late? Type the minute under "Already underway?" first.
-2. For a goal, tap **Goal — Red House** (your team's name), then the scorer. It is on the board straight away. Pick the goal type or an assister, or tap **Close**. Use **Own goal instead** for an own goal, or **Team goal — no scorer**.
+2. For a goal, tap the big **⚽ GOAL +1** button under your team's name, then the scorer. It is on the board straight away. Pick the goal type or an assister, or tap **Close**. Use **Own goal instead** for an own goal, or **Team goal — no scorer**.
 3. For a shot, tap **Shot**, the team and the player, then **On target**, **Off target** or **Blocked**.
 4. For a foul, tap **Foul**, the team and the player, then who was fouled (or **Skip victim**). The app then offers a card: **Yellow for …**, **Red**, or **No card**.
 5. For a coach or staff card, tap **Card**, the team, then **👔 Team official (coach / staff)**. It is on no player's stats.

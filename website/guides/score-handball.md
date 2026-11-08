@@ -17,11 +17,11 @@ Score a handball match on one phone. You run the clock and tap what happens; the
 
 ## Step by step: run the clock
 1. Open the match → **Scoring** and tap **▶ Throw-off**. The clock counts up, like a handball scoreboard: the second half starts at 30:00.
-2. Tap **⏸ Stop** and **▶ Resume** when the referees stop and restart time.
-3. At half-time tap **⏭ End H1**, then **▶ Start H2** after the break. **🏁 Full time**, at the bottom of the controls, stays off until the second half has started.
+2. Tap **⏸ Pause clock** and **▶ Resume** when the referees stop and restart time.
+3. At half-time tap **End H1 →**, then **▶ Start H2** after the break. **🏁 Full time**, at the bottom of the controls, stays off until the second half has started.
 4. Clock wrong, or you joined late? Tap **⏱ Set clock**, type the match time (for example `41:30`) and tap **Set**.
 
-> **Tip:** With extra time on and the score level, the second half ends with **⏭ End H2**, not Full time, and play goes on to **ET1** and **ET2**.
+> **Tip:** With extra time on and the score level, the second half ends with **End H2 →**, not Full time, and play goes on to **ET1** and **ET2**.
 
 ## Step by step: log the play
 1. **🤾 Goal**: choose **6 m**, **9 m**, **Wing**, **Breakthrough** or **Fast break**, tap the scorer (or **Team goal (no scorer)**), then the assist or **No assist**.
@@ -71,4 +71,4 @@ Off by default. Switch on in **⚙️ Match settings → Stats to track** (organ
 ## Common questions
 
 ### Can I score without running the clock?
-Mostly, but moments are stamped at the start of the half and suspensions can't be timed. Tap **▶ Throw-off** (or **▶ Start H2**) once per half anyway: **⏭ End** and **🏁 Full time** unlock only then.
+Mostly, but moments are stamped at the start of the half and suspensions can't be timed. Tap **▶ Throw-off** (or **▶ Start H2**) once per half anyway: **End …** and **🏁 Full time** unlock only then.

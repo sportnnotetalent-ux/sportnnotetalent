@@ -22,7 +22,7 @@ Anything that ends, restarts, resets or deletes a match opens a check sheet firs
 - **No, keep scoring** (green): nothing changes.
 - **Yes, end match** (red): it goes ahead.
 
-The sport's own end buttons ask the same way: **End 1st Half →**, **⏭ End Q1**, **End innings →**, **🏁 End Match**, **🏁 Full time** and "End as a draw / tie". Ending a half or quarter uses an amber **Yes**, because **↶ Undo** can bring it back.
+The sport's own end buttons ask the same way: **End 1st Half →**, **End Q1 →**, **End innings →**, **🏁 End Match**, **🏁 Full time** and "End as a draw / tie". Ending a half or quarter uses an amber **Yes**, because **↶ Undo** can bring it back.
 
 ## Step by step: end a match that has started
 1. Open the match → **Scoring** tab.

@@ -43,7 +43,7 @@ Before a rack's break, under **Rack result only**, tap **Rack to Asha** or **Rac
 If a rack can't be finished, tap **More: stalemate, award the rack ▸** to re-rack with the same breaker or award the rack. Both ask first.
 
 ## Fix a mistake
-- Tap **↶ Undo**. It names what it takes back, for example "↶ Undo: pot 3, 5 · Asha".
+- Tap **↶ Undo**. The box beside it names what it takes back, for example "Last step: pot 3, 5 · Asha".
 - The game, race and sets are fixed once the first rack starts, so check them on the match card first. Set up wrong? In the first 5 minutes, tap **↺ Restart match**. See [End a match early or record a walkover](/guides/end-a-match-early/).
 - After the match, you can remove a shot or, in doubles, credit it to the other partner. See [Correct a match after full time](/guides/correct-a-finished-match/).
 

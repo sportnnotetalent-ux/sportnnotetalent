@@ -18,10 +18,10 @@ Score an ice hockey game on one phone. You run the clock and tap what happens; t
 
 ## Step by step: run the clock
 1. Open the game → **Scoring** and tap **▶ Face-off**. The clock counts down from 20:00.
-2. Tap **⏸ Stop** at each whistle and **▶ Resume** at the face-off. The clock stops by itself after a goal or a penalty.
-3. At 0:00 tap **⏭ End P1** and answer **Yes**. Tap **▶ Start P2** after the break.
+2. Tap **⏸ Pause clock** at each whistle and **▶ Resume** at the face-off. The clock stops by itself after a goal or a penalty.
+3. At 0:00 tap **End P1 →** and answer **Yes**. Tap **▶ Start P2** after the break.
 4. Clock wrong? Tap **⏱ Set clock**, type the time left (for example `12:30`) and tap **Set**.
-5. In the 3rd period, **🏁 Final horn** ends the game. If the score is level and the game has overtime, you see **⏭ End P3** instead and play goes on to **OT**.
+5. In the 3rd period, **🏁 Final horn** ends the game. If the score is level and the game has overtime, you see **End P3 →** instead and play goes on to **OT**.
 
 ## Step by step: log the play
 1. **🚨 Goal**: the panel already says **EV**, **PP** or **SH** from the penalties, and **EN** if the other net is empty. Tap a chip to change it. Then tap the scorer, the first assist (or **Unassisted**) and the second assist (or **No second assist**).

@@ -82,7 +82,7 @@ It updates after every rally and after a correction.
 - Technical warnings and fouls, timeouts (2 per game, 3 to 21) and match time: see [Code violations, cards and timeouts](/guides/racket-conduct-and-timeouts/).
 
 ## Fix a mistake
-- Wrong tap just now? The Undo bar names what it removes, e.g. "↶ Undo: point to Red House (4-2)". Score, server and call go back too.
+- Wrong tap just now? The undo box names the last step, e.g. "Last step: point to Red House (4-2)", next to the **↶ Undo** button. Score, server and call go back too.
 - Wrong player on the right? Mid-game, tap **Fix who started on the right** and pick the right player. The score stays; only the server's name updates.
 - Wrong first server in rally scoring? Tap **Fix who served first**. In side-out scoring there is no such link, because the server decides who can score; use **Correct the timeline** instead.
 - Older rally: tap **Edit** next to **Correct the timeline** on the **Scoring** tab.

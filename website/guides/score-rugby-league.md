@@ -16,9 +16,9 @@ Score a rugby league match on one phone: you run the clock and tap what happens;
 - Put each team's starting players on the **Info** tab so everyone gets minutes.
 
 ## Step by step: run the clock
-1. Open the match → **Scoring** and tap **▶ Kick-off**. Tap **⏸ Stop** and **▶ Resume** whenever the referee stops time.
+1. Open the match → **Scoring** and tap **▶ Kick-off**. Tap **⏸ Pause clock** and **▶ Resume** whenever the referee stops time.
 2. At the siren the clock turns red and keeps going (`40:00 +0:20`): play goes on until the ball is dead, so a try on the siren and its conversion still count.
-3. At half-time tap **⏭ End H1**, then **▶ Start H2**. **🏁 Full time** sits at the bottom of the controls.
+3. At half-time tap **End H1 →**, then **▶ Start H2**. **🏁 Full time** sits at the bottom of the controls.
 4. Clock wrong? Tap **⏱ Set clock**, type the match time (`52:30`) and tap **Set**.
 
 ## Step by step: log the scores

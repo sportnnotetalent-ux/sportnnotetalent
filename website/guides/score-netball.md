@@ -40,7 +40,7 @@ In **⚙️ Match settings**, turn on only what you can keep up with. Each switc
 ## Held time, subs and breaks
 1. When the umpires hold time, tap **⏸ Hold** and pick **🩹 Injury / illness**, **🩸 Blood**, **⇄ Tactical change** or **Other**. The clock stops; tap **▶ Resume** when play restarts.
 2. Substitutions are allowed at any time under the 2024 World Netball rules. Tap **🔁 Sub**, then who comes off and who comes on. The new player takes the same position.
-3. At the end of a quarter, tap **⏭ End Q1** and confirm. During the break, make position changes from **More**. Then tap **▶ Start Q2**.
+3. At the end of a quarter, tap **End Q1 →** and confirm. During the break, make position changes from **More**. Then tap **▶ Start Q2**.
 4. **🏁 Full time** sits at the bottom of the controls and stays off until the last quarter has started.
 
 ## Sanctions
@@ -49,7 +49,7 @@ In **⚙️ Match settings**, turn on only what you can keep up with. Each switc
 3. An ordered-off player takes no further part and isn't replaced. Her position stays empty.
 
 ## Extra time in knockouts
-Group matches keep a draw. In a knockout, a level score at the end of the fourth quarter goes to extra time: two halves of 7 minutes. **⏭ End Q4** says so before you tap it.
+Group matches keep a draw. In a knockout, a level score at the end of the fourth quarter goes to extra time: two halves of 7 minutes. **End Q4 →** says so before you tap it.
 1. Still level after extra time? The match plays on with no clock limit ("Play on · 2-goal lead").
 2. The match ends by itself the moment a team leads by two goals, or on the first goal if your organiser chose **Golden goal**.
 

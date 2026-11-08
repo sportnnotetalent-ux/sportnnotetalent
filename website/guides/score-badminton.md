@@ -82,7 +82,7 @@ The **Commentary** tab tells the match game by game, newest first, the game in p
 It updates after every rally and after a correction.
 
 ## Fix a mistake
-- Wrong tap just now? The Undo bar names what it removes, e.g. "↶ Undo: point to Asha Rao (20-18)". Each tap undoes one step.
+- Wrong tap just now? The undo box names the last step, e.g. "Last step: point to Asha Rao (20-18)", next to the **↶ Undo** button. Each tap undoes one step.
 - Older rally: tap **Edit** next to **Correct the timeline** on the **Scoring** tab.
 1. Tap ✎ to change a point (winner, player or detail), then **Save**.
 2. Tap ✕ to remove one (the app asks first).
