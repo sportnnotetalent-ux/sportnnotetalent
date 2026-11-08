@@ -8,17 +8,19 @@ import { distinctNames } from '../core/chipNames';
 import { yourSports } from '../core/playedSports';
 import { isStaleLive } from '../core/staleLive';
 import { isOverdue } from '../core/overdue';
-import React, { useMemo, useCallback, useEffect, useState } from 'react';
+import React, { useMemo, useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal, Pressable, useWindowDimensions } from 'react-native';
 import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { theme } from '../core/theme';
-import { EmptyState, Card, LoadingState, Pill, SelectChip, QuickTile, textStyles, plural } from '../components/ui';
+import { EmptyState, Card, LoadingState, Pill, SelectChip, Button, textStyles, plural } from '../components/ui';
+import { weekLine, heroSportChips, scheduleProgress } from '../core/homeHero';
+import { matchOutbox } from '../data/matchOutbox';
 import { setStatusBarStyle } from 'expo-status-bar';
 import Svg, { Circle, Line, Rect } from 'react-native-svg';
-import { Search, Bell, Menu, Zap, Trophy, Users } from 'lucide-react-native';
+import { Search, Bell, Menu } from 'lucide-react-native';
 import { Glyph, IconText } from '../components/Icon';
 import { formatDayShort, formatDayRange } from '../core/dates';
 import { MatchCard } from '../components/MatchCard';
@@ -89,6 +91,9 @@ export default function HomeScreen() {
   // Postponed games still appear under "Up next" (badged) so followers learn of
   // the change; a cancelled game drops off the forward-looking feed.
   // …and a scheduled game 12 h+ past its start is overdue, not "up next" (OD1).
+  // Stitch pick 17: the scorer's own online flag
+  useSyncExternalStore(matchOutbox.subscribe, matchOutbox.getSnapshot);
+  const online = matchOutbox.isOnline();
   const upcoming = scoped.filter((m) => (m.status === 'scheduled' || m.status === 'postponed') && !isOverdue(m, now));
 
   // "Explore a sport" = the sports the user has signed up for (their profile's
@@ -227,21 +232,40 @@ export default function HomeScreen() {
             {profile?.fullName ? <Text style={st.heroHello} numberOfLines={1}>Hi {profile.fullName.split(' ')[0]},</Text> : null}
             <Text style={st.heroTitle} accessibilityRole="header">Ready to{'\n'}<Text style={st.heroTitleLime}>play?</Text></Text>
             <Text style={st.heroTag}>Play a Sport, Make a Note.</Text>
+            {/* Stitch picks 12–13: your sports, and what's coming this week (HM2/HM3) */}
+            {(() => {
+              const chips = heroSportChips(mySports);
+              const week = weekLine(feed, now);
+              return (
+                <>
+                  {chips.shown.length ? (
+                    <View style={st.heroChips}>
+                      {chips.shown.map((sp) => <Text key={sp} style={st.heroChip}>{getSportMeta(sp).icon} {getSportMeta(sp).name}</Text>)}
+                      {chips.more ? <Text style={st.heroChip}>+{chips.more}</Text> : null}
+                    </View>
+                  ) : null}
+                  {week ? <IconText label={`📅 ${week}`} style={st.heroWeek} /> : null}
+                </>
+              );
+            })()}
           </View>
         </View>
 
-        {/* The three big shortcuts */}
-        <View style={st.quickRow}>
-          <QuickTile label="Score a match" color={theme.colors.lime} ink={theme.colors.onLime}
-            icon={<Zap color={theme.colors.onLime} size={26} strokeWidth={2.2} />}
-            onPress={() => nav.navigate('ScheduleMatch', {})} />
-          <QuickTile label="Organize" color={theme.colors.home} ink={theme.colors.onFill}
-            icon={<Trophy color={theme.colors.onFill} size={26} strokeWidth={2.2} />}
-            onPress={() => nav.navigate('Tabs', { screen: 'Organize' })} />
-          <QuickTile label="Find players" color={theme.colors.hot} ink={theme.colors.onFill}
-            icon={<Users color={theme.colors.onFill} size={26} strokeWidth={2.2} />}
-            onPress={() => nav.navigate('Tabs', { screen: 'Discover', params: { mode: 'people', focus: true } })} />
+        {/* Stitch pick 12 (HM1): one lime main job, the other two as outline buttons */}
+        <View style={st.quickCol}>
+          <Button variant="primary" label="Score a match" onPress={() => nav.navigate('ScheduleMatch', {})} />
+          <View style={st.quickRow}>
+            <Button label="Organize" style={st.flex1} onPress={() => nav.navigate('Tabs', { screen: 'Organize' })} />
+            <Button label="Find players" style={st.flex1} onPress={() => nav.navigate('Tabs', { screen: 'Discover', params: { mode: 'people', focus: true } })} />
+          </View>
         </View>
+        {/* Stitch pick 17 (HM6): only while offline */}
+        {!online ? (
+          <Card style={st.offline}>
+            <Text style={[textStyles.body, { fontWeight: '700' }]}>You're offline</Text>
+            <Text style={textStyles.muted}>Scores you record are kept on this phone and sent once you're back online.</Text>
+          </Card>
+        ) : null}
 
         {/* Quick actions as an anchored dropdown menu. */}
         <Modal visible={actionsOpen} transparent animationType="fade" onRequestClose={() => setActionsOpen(false)}>
@@ -330,8 +354,24 @@ export default function HomeScreen() {
                       {selected.hostName} · {plural(selected.sports.length, 'sport')} · {formatDayRange(selected.startDate, selected.endDate)}
                     </Text>
                     {(() => {
-                      const s = tournamentStatus(selected, matchProgress(feed.filter((m) => m.tournamentId === selected.id)));
-                      return <View style={st.statusRow}><Pill label={s.label} color={s.color + '22'} textColor={s.color} /></View>;
+                      const ms = feed.filter((m) => m.tournamentId === selected.id);
+                      const s = tournamentStatus(selected, matchProgress(ms));
+                      // Stitch pick 16 (HM4): how much of the schedule is played
+                      const pct = scheduleProgress(ms);
+                      return (
+                        <>
+                          <View style={st.statusRow}><Pill label={s.label} color={s.color + '22'} textColor={s.color} /></View>
+                          {pct !== null ? (
+                            <View style={st.progressWrap} accessible accessibilityLabel={`${pct} percent of the matches played`}>
+                              <View style={st.progressRow}>
+                                <Text style={textStyles.muted}>Matches played</Text>
+                                <Text style={st.progressPct}>{pct}%</Text>
+                              </View>
+                              <View style={st.progressTrack}><View style={[st.progressFill, { width: `${pct}%` }]} /></View>
+                            </View>
+                          ) : null}
+                        </>
+                      );
                     })()}
                   </View>
                   <Text style={st.chevron}>›</Text>
@@ -426,7 +466,18 @@ const st = StyleSheet.create({
   heroTitle: { color: theme.colors.heroText, fontFamily: theme.fonts.display, fontSize: theme.font.display, lineHeight: theme.font.display * 0.98, textTransform: 'uppercase' },
   heroTitleLime: { color: theme.colors.lime },
   heroTag: { color: theme.colors.heroMuted, fontSize: theme.font.body, marginTop: theme.spacing(1) },
-  quickRow: { flexDirection: 'row', gap: theme.spacing(2), marginTop: -theme.spacing(8) },
+  quickCol: { gap: theme.spacing(2), marginTop: -theme.spacing(8) },
+  quickRow: { flexDirection: 'row', gap: theme.spacing(2) },
+  flex1: { flex: 1, backgroundColor: theme.colors.surface },
+  heroChips: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing(1.5), marginTop: theme.spacing(2) },
+  heroChip: { color: theme.colors.heroText, fontSize: theme.font.small, fontWeight: '700', backgroundColor: 'rgba(243,240,232,0.14)', paddingHorizontal: theme.spacing(2.5), paddingVertical: theme.spacing(1), borderRadius: theme.radius.pill, overflow: 'hidden' },
+  heroWeek: { color: theme.colors.lime, fontSize: theme.font.small, fontWeight: '700', marginTop: theme.spacing(2) },
+  offline: { gap: theme.spacing(1), borderColor: theme.colors.accent },
+  progressWrap: { gap: theme.spacing(1), marginTop: theme.spacing(2) },
+  progressRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  progressPct: { color: theme.colors.primary, fontWeight: '800', fontSize: theme.font.small },
+  progressTrack: { height: 6, borderRadius: 3, backgroundColor: theme.colors.surfaceAlt, overflow: 'hidden' },
+  progressFill: { height: 6, borderRadius: 3, backgroundColor: theme.colors.primary },
   header: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing(2) },
   brand: { flex: 1, gap: theme.spacing(1) },
   // The wordmark in the headline face, leaning like the logo (no fontWeight: Android

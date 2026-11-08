@@ -86,7 +86,12 @@ export function MatchCard({ match, onPress, onStart, timeZone, note, compact }: 
   // SD-48: a team tie shown as one fixture (rubbers won; ½ for chess draws)
   const tie = isTieMatch(match);
   const plugin = showScore && !setLine && match.state ? getSport(match.sport) : null;
-  const cardLine = plugin?.cardLine ? safeLine(() => plugin.cardLine!(match.state as never)) : '';
+  const cardLine = plugin?.cardLine ? safeLine(() => plugin.cardLine!(match.state as never))
+    // Stitch pick 14 (HM5): a live racket match shows its set and game ("Set 2 · 15–12"),
+    // from the same summary the live score bar uses
+    : live && plugin?.archetype === 'set-game-point' && plugin.summary
+      ? safeLine(() => { const x = plugin.summary!(match.state as never); return [x.statusLine, x.detailLine].filter(Boolean).join(' · '); })
+      : '';
 
   const footMain: React.ReactNode = tie
     ? `👥 Team tie · ${match.tieRubbers.length} rubbers${done ? '' : live ? ' · in progress' : ''}`
