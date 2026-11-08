@@ -21,7 +21,7 @@ const FONT = join(ROOT, 'node_modules/@expo-google-fonts/barlow-condensed/800Ext
 const SIZE = 100;
 /** the outline, as in option 2d (font size ÷ 14) */
 const STROKE = SIZE / 14;
-export const COLORS = { sport: '#C6EE3E', n: '#14181D', note: '#FFFFFF', key: '#0A3A2B' };
+export const COLORS = { sport: '#C6EE3E', n: '#1F7A50', note: '#FFFFFF', key: '#0A3A2B' };
 
 const buf = readFileSync(FONT);
 const font = opentype.parse(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
@@ -71,7 +71,7 @@ writeFileSync(join(ROOT, 'src/brand/wordmark.ts'), ts);
 
 const o = `stroke="${COLORS.key}" stroke-width="${STROKE.toFixed(3)}" stroke-linejoin="round"`;
 const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="SportnNote">
-<path d="${shifted.sport}" fill="${COLORS.key}" ${o}/><path d="${shifted.note}" fill="${COLORS.key}" ${o}/>
+<path d="${shifted.sport}" fill="${COLORS.key}" ${o}/><path d="${shifted.n}" fill="${COLORS.key}" ${o}/><path d="${shifted.note}" fill="${COLORS.key}" ${o}/>
 <path d="${shifted.sport}" fill="${COLORS.sport}"/><path d="${shifted.n}" fill="${COLORS.n}"/><path d="${shifted.note}" fill="${COLORS.note}"/>
 </svg>
 `;

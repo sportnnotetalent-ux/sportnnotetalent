@@ -29,13 +29,13 @@ import { WORDMARK } from '../brand/wordmark';
 
 const TILE = '#F3F0E8'; // the app icon's cream (brand-cream.md), so icon → launch is seamless
 const KEY = '#0A3A2B'; // the letters' outline
-const INK = '#14181D'; // the colon
+const MID = '#1F7A50'; // the colon (option 2f), outlined like the letters
 const LIME = '#C6EE3E';
 const MARK = 96; // px
 const K = MARK / 200; // the mark's 200-unit drawing → px
 const SKEW = -8;
 const lean = Math.tan((SKEW * Math.PI) / 180);
-const DOT_R = 8.5 * K;
+const DOT_R = 12 * K; // the dot with its outline (8.5 + the 3.5 outline)
 const GAP = 14;
 const WORD_W = 196; // the wordmark's width at this size (fixed, so the start is centred)
 const SHIFT = (WORD_W + GAP) / 2;
@@ -169,7 +169,7 @@ export function LaunchAnimation({ fontsReady = true }: { fontsReady?: boolean })
   const lineStyle = WEB ? web('line', [tr.line], ([v]) => ({ transform: [{ scaleX: v }] })) : { transform: [{ scaleX: n(tr.line) }] };
   const dotStyle = (key: 'dot1' | 'dot2', track: Track) => (WEB ? web(key, [track], ([v]) => ({ transform: [{ scale: v }] })) : { transform: [{ scale: n(track) }] });
   const dot = (key: 'dot1' | 'dot2', cx: number, cy: number, track: Track) => (
-    <Animated.View style={[st.dot, { left: (cx + lean * (cy - 100) - 8.5) * K, top: (cy - 8.5) * K }, dotStyle(key, track) as object]} />
+    <Animated.View style={[st.dot, { left: (cx + lean * (cy - 100) - 12) * K, top: (cy - 12) * K }, dotStyle(key, track) as object]} />
   );
   return (
     <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, st.wrap, overlayStyle as object]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
@@ -200,6 +200,6 @@ export function LaunchAnimation({ fontsReady = true }: { fontsReady?: boolean })
 const st = StyleSheet.create({
   wrap: { backgroundColor: TILE, alignItems: 'center', justifyContent: 'center', zIndex: 1000, elevation: 1000 },
   row: { flexDirection: 'row', alignItems: 'center', gap: GAP },
-  dot: { position: 'absolute', width: DOT_R * 2, height: DOT_R * 2, borderRadius: DOT_R, backgroundColor: INK },
+  dot: { position: 'absolute', width: DOT_R * 2, height: DOT_R * 2, borderRadius: DOT_R, backgroundColor: MID, borderWidth: 3.5 * K, borderColor: KEY },
   line: { height: 6, borderRadius: 3, backgroundColor: KEY, marginTop: 4, transformOrigin: 'left' },
 });

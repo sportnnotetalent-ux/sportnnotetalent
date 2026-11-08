@@ -13,6 +13,11 @@ verified. **Maintained continuously — new work is appended here as it ships.**
 
 ---
 
+### 2026-11-08 — Logo option 2f: the n and colon in green, outlined like every letter
+
+The founder found the near-black "n" out of line with the outlined letters. The "n" and the colon are now green `#1F7A50` with the same dark outline as every other letter, so all ten letters share one weight and line. This applies to the wordmark shapes, the website SVG, the icon script (icons and favicon rebuilt), `<Logo>` and the launch screen's animated dots (outline as a border, re-centred).
+- **Checks:** brand-cream.md BC8; tests updated; full suite green; demo-checked (launch, Home).
+
 ### 2026-11-08 — New logo and name: option 2d, on cream, everywhere
 
 The founder's design (docs/design/logo-options/cream-option-2d.png), on a cream `#F3F0E8` background:

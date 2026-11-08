@@ -1,7 +1,7 @@
 /** The SportnNote logo, option 2d (founder 2026-11-08,
  *  docs/security/breaks/brand-cream.md): the "S:N" scoreline on a cream tile —
  *  a lime "S" and a white "N", each with a thin dark green outline, leaning
- *  forward like the italic headlines, and a plain near-black colon. Same
+ *  forward like the italic headlines, and a green colon outlined the same way (2f). Same
  *  drawing as every app/web icon — see scripts/build-icons.mjs. */
 import React from 'react';
 import Svg, { Rect, Path, Circle, G } from 'react-native-svg';
@@ -10,7 +10,8 @@ const TILE = '#F3F0E8';
 const LIME = '#C6EE3E';
 const WHITE = '#FFFFFF';
 const KEY = '#0A3A2B';
-const INK = '#14181D';
+/** the colon — option 2f: green, outlined like the letters */
+const MID = '#1F7A50';
 /** The lean, in degrees (negative = forward). */
 const SKEW = -8;
 const SW = 16;
@@ -34,8 +35,12 @@ export function Logo({ size = 32 }: { size?: number }) {
           {line(S_PATH, LIME, SW)}
           {line(N_PATH, WHITE, SW)}
         </G>
-        <Circle cx={dotX(86)} cy={86} r={SW / 2 + 0.5} fill={INK} />
-        <Circle cx={dotX(114)} cy={114} r={SW / 2 + 0.5} fill={INK} />
+        {[86, 114].map((cy) => (
+          <React.Fragment key={cy}>
+            <Circle cx={dotX(cy)} cy={cy} r={KEY_W / 2 + 0.5} fill={KEY} />
+            <Circle cx={dotX(cy)} cy={cy} r={SW / 2 + 0.5} fill={MID} />
+          </React.Fragment>
+        ))}
       </G>
     </Svg>
   );

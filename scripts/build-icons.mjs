@@ -26,7 +26,7 @@ try { ({ Resvg } = require('@resvg/resvg-js')); } catch {
 
 // Option 2d (founder 2026-11-08, brand-cream.md): cream tile; lime S and white N,
 // each with a thin dark green outline (key); a plain near-black colon (ink)
-export const BRAND = { tile: '#F3F0E8', lime: '#C6EE3E', white: '#FFFFFF', key: '#0A3A2B', ink: '#14181D' };
+export const BRAND = { tile: '#F3F0E8', lime: '#C6EE3E', white: '#FFFFFF', key: '#0A3A2B', ink: '#14181D', mid: '#1F7A50' };
 /** the outline under the letters (the letters are 16 on the 200 grid) */
 const KEY_W = 23;
 /** The lean, in degrees (negative = forward, like an italic). */
@@ -36,8 +36,12 @@ const lean = Math.tan((SKEW * Math.PI) / 180);
 
 /** The S:N mark on a 200×200 grid, centred on (100,100), scaled by `s`. The
  *  letters lean; the colon's dots stay round (moved to follow the lean). */
-export function mark(s, c = { s: BRAND.lime, colon: BRAND.ink, n: BRAND.white, key: BRAND.key }) {
-  const dot = (cy) => `<circle cx="${(100 + lean * (cy - 100)).toFixed(2)}" cy="${cy}" r="${SW / 2 + 0.5}" fill="${c.colon}"/>`;
+export function mark(s, c = { s: BRAND.lime, colon: BRAND.mid, n: BRAND.white, key: BRAND.key }) {
+  // the colon's dots: outlined like the letters (option 2f) when there is an outline
+  const dot = (cy) => {
+    const cx = (100 + lean * (cy - 100)).toFixed(2);
+    return `${c.key ? `<circle cx="${cx}" cy="${cy}" r="${KEY_W / 2 + 0.5}" fill="${c.key}"/>` : ''}<circle cx="${cx}" cy="${cy}" r="${SW / 2 + 0.5}" fill="${c.colon}"/>`;
+  };
   return `<g transform="translate(100 100) scale(${s}) translate(-100 -100)">
   <g transform="translate(100 100) skewX(${SKEW}) translate(-100 -100)">
   ${c.key ? `<path d="M80 68 H52 a16 16 0 0 0 0 32 h12 a16 16 0 0 1 0 32 H34" fill="none" stroke="${c.key}" stroke-width="${KEY_W}" stroke-linecap="round" stroke-linejoin="round"/>

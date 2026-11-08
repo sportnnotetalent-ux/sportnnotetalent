@@ -6,7 +6,7 @@ import { contrastRatio } from '../src/core/contrast.ts';
 import { WORDMARK } from '../src/brand/wordmark.ts';
 
 const read = (p: string) => readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
-const CREAM = '#F3F0E8', KEY = '#0A3A2B', INK = '#14181D';
+const CREAM = '#F3F0E8', KEY = '#0A3A2B', INK = '#14181D', MID = '#1F7A50';
 
 test('BC1: the outline and the black colon/n read on cream', () => {
   assert.ok(contrastRatio(KEY, CREAM) >= 4.5);
@@ -20,21 +20,23 @@ test('BC3/BC7: the wordmark shapes come from the brand font, in three parts', ()
   assert.ok(existsSync(new URL('../assets/brand/sportnnote-wordmark.svg', import.meta.url)));
 });
 
-test('BC2: outlines underneath, letters on top, no outline on the n', () => {
+test('BC2/BC8: outlines underneath for all ten letters (the n too), letters on top; the n is green #1F7A50', () => {
   const w = read('src/components/Wordmark.tsx');
-  const under = w.indexOf('stroke={KEY}'), top = w.indexOf('fill={INK}');
+  for (const k of ['sport', 'n', 'note']) assert.match(w, new RegExp(`parts\\.${k}\\} fill=\\{KEY\\} stroke=\\{KEY\\}`), `${k} outlined`);
+  const under = w.lastIndexOf('stroke={KEY}'), top = w.indexOf('fill={MID}');
   assert.ok(under > 0 && top > under, 'outline layer first, then the letters');
-  assert.match(w, /<Path d=\{WORDMARK\.parts\.n\} fill=\{INK\} \/>/, 'the n is plain');
-  assert.doesNotMatch(w, /parts\.n\}[^/]*stroke/, 'no stroke on the n');
+  assert.match(w, /const MID = '#1F7A50'/);
+  assert.ok(contrastRatio(MID, CREAM) >= 4.5, 'the green n reads on cream on its own too');
 });
 
 test('the mark: cream tile, outlined lime S and white N, black colon — everywhere', () => {
   const icons = read('scripts/build-icons.mjs');
   assert.match(icons, /tile: '#F3F0E8'/);
   assert.match(icons, /key: '#0A3A2B'/);
-  assert.match(icons, /colon: BRAND\.ink/);
+  assert.match(icons, /colon: BRAND\.mid/);
+  assert.match(icons, /mid: '#1F7A50'/);
   const logo = read('src/components/Logo.tsx').toUpperCase();
-  for (const c of [CREAM, KEY, '#C6EE3E', '#FFFFFF', INK]) assert.ok(logo.includes(c), c);
+  for (const c of [CREAM, KEY, '#C6EE3E', '#FFFFFF', MID]) assert.ok(logo.includes(c), c);
 });
 
 test('BC4/BC5: launch on cream (matching the splash); Home on a cream badge; sign-in and website use the same name', () => {
