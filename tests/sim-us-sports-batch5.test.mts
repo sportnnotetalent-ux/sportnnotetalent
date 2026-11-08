@@ -32,7 +32,7 @@ import {
 } from '../src/sports/baseball/engine.ts';
 import { baseballTotals } from '../src/sports/baseball/totals.ts';
 import { init as afInit, reducer as afReducer, buildPlay as afPlay, AF_LIVE_SETTINGS, TRACK_FLAGS } from '../src/sports/american_football/engine.ts';
-import { AF_PRESETS, AMERICAN_FOOTBALL_META } from '../src/sports/american_football/meta.ts';
+import { AF_PRESETS, AF_TRACK_DEFAULTS, AMERICAN_FOOTBALL_META } from '../src/sports/american_football/meta.ts';
 import { customCount } from '../src/sports/liveSettings.ts';
 import { isHidden } from '../src/sports/formatPick.ts';
 
@@ -257,7 +257,8 @@ describe('sim · American football mode and Standard', () => {
       const s = afInit(cfg);
       assert.equal(s.mode, cfg.mode === 'pbp' ? 'pbp' : 'score', `m${m} ${pk}`);
       // a new match made from the preset (its own mode) reads Standard
-      const fresh = afInit({ ...AF_PRESETS[pk].set, preset: pk });
+      // defaults-on DOU4: a new match's format carries the stats defaults too
+      const fresh = afInit({ ...AF_PRESETS[pk].set, preset: pk, ...AF_TRACK_DEFAULTS });
       if (pk !== 'flagSchool') assert.equal(customCount(AF_LIVE_SETTINGS, AF_LIVE_SETTINGS.read(fresh), fresh), 0, `m${m} ${pk} Standard`);
       const vals = AF_LIVE_SETTINGS.read(s);
       for (const f of AF_LIVE_SETTINGS.fields) {

@@ -14,12 +14,26 @@ export const BASEBALL_PRESETS: Record<string, { label: string; set: Record<strin
   school: { label: 'School 7 inn', set: { innings: 7, mercy: '10@5', tiebreak: 'none', tbFrom: 8, dh: true, lineupSize: 9, startCount: '0-0', foulOut: false } },
 };
 
+/** Defaults-on wave 3 (docs/security/breaks/defaults-on-us.md): the "Stats to
+ *  track" standards for a NEW match — the ONE source the format fields and the
+ *  live settings' `defaults` (engine.ts) both read. Spray and batted-ball type
+ *  are optional pre-play chips (outs fill the type in themselves); ask for
+ *  fielders is an optional chip card after the out. Pitch types stay off: a
+ *  school scorer can't call a slider from a curveball, and wrong labels are
+ *  worse than none. `init` never applies these: a stored format without the
+ *  key — every match made before — keeps what it was scored with (off). */
+export const BASEBALL_TRACK_DEFAULTS = { askFielders: true, pitchTypes: false, sprayZones: true, battedBallTypes: true } as const;
+
+/** US batch 5: optional fielder chips after an out is recorded (never a
+ *  blocking step). Defaults-on DOU9: under "Stats to track" with the others. */
+export const FIELDERS_FIELD: FormatField = { key: 'askFielders', label: 'Ask for fielders (6-3)', type: 'toggle', default: BASEBALL_TRACK_DEFAULTS.askFielders, group: 'Stats to track', hint: 'optional 1–9 chips after an out is recorded — putouts and assists' };
+
 /** Deep wave — the "Stats to track" toggles (live settings + the match format). */
 export const TRACK_FIELDS: FormatField[] = [
   // US batch 6 (audit P2 #18): only acts with pitch-by-pitch, so hidden while it is off
-  { key: 'pitchTypes', label: 'Pitch types', type: 'toggle', default: false, group: 'Stats to track', hint: 'A chip row over the pitch pad (FB SL CH … / softball Rise Drop …): tap the type, then the pitch — pitch mix per pitcher. Needs pitch-by-pitch', hideWhen: { key: 'pitches', value: false } },
-  { key: 'sprayZones', label: 'Where the ball went (spray)', type: 'toggle', default: false, group: 'Stats to track', hint: 'Optional LF · CF · RF … chips when the ball is put in play — hits and balls in play by zone' },
-  { key: 'battedBallTypes', label: 'Batted-ball type', type: 'toggle', default: false, group: 'Stats to track', hint: 'Optional Grounder · Liner · Fly ball · Popup chips when the ball is put in play (outs fill it in themselves) — GB / LD / FB % for batters and pitchers' },
+  { key: 'pitchTypes', label: 'Pitch types', type: 'toggle', default: BASEBALL_TRACK_DEFAULTS.pitchTypes, group: 'Stats to track', hint: 'A chip row over the pitch pad (FB SL CH … / softball Rise Drop …): tap the type, then the pitch — pitch mix per pitcher. Needs pitch-by-pitch', hideWhen: { key: 'pitches', value: false } },
+  { key: 'sprayZones', label: 'Where the ball went (spray)', type: 'toggle', default: BASEBALL_TRACK_DEFAULTS.sprayZones, group: 'Stats to track', hint: 'Optional LF · CF · RF … chips when the ball is put in play — hits and balls in play by zone' },
+  { key: 'battedBallTypes', label: 'Batted-ball type', type: 'toggle', default: BASEBALL_TRACK_DEFAULTS.battedBallTypes, group: 'Stats to track', hint: 'Optional Grounder · Liner · Fly ball · Popup chips when the ball is put in play (outs fill it in themselves) — GB / LD / FB % for batters and pitchers' },
 ];
 
 export const BASEBALL_META: SportMeta = {
@@ -67,8 +81,8 @@ export const BASEBALL_META: SportMeta = {
     { key: 'pitches', label: 'Pitch-by-pitch (balls & strikes)', type: 'toggle', default: true, advanced: true },
     // US batch 5: optional fielder chips after an out is recorded (never a blocking step) — on for
     // new matches; a stored format without the key reads off (readConfig), so old games are unchanged
-    { key: 'askFielders', label: 'Ask for fielders (6-3)', type: 'toggle', default: true, advanced: true, hint: 'optional 1–9 chips after an out is recorded — putouts and assists' },
-    // deep wave: "Stats to track" (off by default)
+    { ...FIELDERS_FIELD, advanced: true },
+    // deep wave: "Stats to track" (defaults: BASEBALL_TRACK_DEFAULTS)
     ...TRACK_FIELDS.map((f) => ({ ...f, advanced: true })),
   ],
 };

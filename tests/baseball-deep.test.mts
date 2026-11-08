@@ -233,12 +233,13 @@ describe('deep wave · pitch types and spray zones (optional capture)', () => {
     assert.deepEqual(spray.rows.map((r) => [r.label, r.away]), [['Left field', '2 · 2 H'], ['Centre field', '1 · 0 H'], ['Shortstop', '1 · 0 H']]);
     assert.ok(!baseballSheet(play(start({ askFielders: true }), [P('GO', { fielders: '6-3' })]).s).sections.some((x) => x.key === 'spray'), 'notation alone is not a spray chart');
   });
-  test('live settings and the format carry the toggles (off by default)', () => {
+  test('live settings and the format carry the toggles (spray + batted on for new matches, pitch types off)', () => {
     // round 2 added the "Batted-ball type" toggle (battedBallTypes) to both lists
-    assert.deepEqual(TRACK_FIELDS.map((f) => [f.key, f.default, f.group]), [['pitchTypes', false, 'Stats to track'], ['sprayZones', false, 'Stats to track'], ['battedBallTypes', false, 'Stats to track']]);
+    // defaults-on DOU2: spray and batted-ball type on for NEW matches; pitch types stay off (DOU8)
+    assert.deepEqual(TRACK_FIELDS.map((f) => [f.key, f.default, f.group]), [['pitchTypes', false, 'Stats to track'], ['sprayZones', true, 'Stats to track'], ['battedBallTypes', true, 'Stats to track']]);
     assert.deepEqual(BASEBALL_LIVE_SETTINGS.read(init({ pitchTypes: true })), { pitches: true, askFielders: false, pitchTypes: true, sprayZones: false, battedBallTypes: false });
     assert.equal(BASEBALL_LIVE_SETTINGS.mode, 'config');
-    assert.equal(BASEBALL_LIVE_SETTINGS.defaults?.sprayZones, false);
+    assert.equal(BASEBALL_LIVE_SETTINGS.defaults?.sprayZones, true); // defaults-on DOU2
   });
 });
 

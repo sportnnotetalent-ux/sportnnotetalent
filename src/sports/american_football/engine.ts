@@ -43,7 +43,7 @@
  */
 import type { ScoreAction, LiveSettings, FormatField, Attribution } from '../types';
 // Perf F-15 — the format presets / options live in the light meta module.
-import { AF_PRESETS, TRACK_FIELDS } from './meta.ts';
+import { AF_PRESETS, AF_TRACK_DEFAULTS, TACKLES_FIELD, TRACK_FIELDS } from './meta.ts';
 export { AF_PRESETS, TRACK_FIELDS };
 
 export type Side = 'home' | 'away';
@@ -1183,14 +1183,15 @@ export const AF_LIVE_SETTINGS: LiveSettings<AFState> = {
     { key: 'timeoutsPerHalf', label: 'Timeouts per half', type: 'number', default: 3, min: 0, max: 5, step: 1 },
     { key: 'mode', label: 'Play-by-play (downs, yards, player stats)', type: 'toggle', default: false, group: 'Detail' },
     // US batch 5: the stats switches act play by play only — hidden in Scores only
-    { key: 'trackTackles', label: 'Ask who made the tackle / flag pull', type: 'toggle', default: false, group: 'Stats to track', hideWhen: { key: 'mode', value: false } },
+    { ...TACKLES_FIELD, hideWhen: { key: 'mode', value: false } },
     ...TRACK_FIELDS.map((f) => ({ ...f, hideWhen: { key: 'mode', value: false } })),
   ] as FormatField[],
   read: (s) => ({
     periodMinutes: s.periodMinutes, timeoutsPerHalf: s.timeoutsPerHalf, mode: s.mode === 'pbp', trackTackles: s.trackTackles,
     ...Object.fromEntries(TRACK_FLAGS.map((f) => [f, s[f] === true])),
   }),
-  defaults: { periodMinutes: 15, timeoutsPerHalf: 3, mode: false, trackTackles: false, ...Object.fromEntries(TRACK_FLAGS.map((f) => [f, false])) },
+  // defaults-on DOU2: the stats standards come from AF_TRACK_DEFAULTS (meta.ts), the one source
+  defaults: { periodMinutes: 15, timeoutsPerHalf: 3, mode: false, ...AF_TRACK_DEFAULTS },
   // US batch 5: "Standard" is this game's rules — flag 2 × 20, 2 timeouts,
   // Scores only; NFHS 12-minute quarters; tackle play by play (3 timeouts)
   // US batch 6: a flag game of 15-minute halves is the school preset (1 timeout per half)
@@ -1199,7 +1200,10 @@ export const AF_LIVE_SETTINGS: LiveSettings<AFState> = {
     const school = flag && s.periodMinutes === AF_PRESETS.flagSchool.set.periodMinutes;
     return {
       periodMinutes: flag ? (school ? 15 : 20) : s.rules === 'nfhs' ? 12 : 15, timeoutsPerHalf: flag ? (school ? Number(AF_PRESETS.flagSchool.set.timeoutsPerHalf) : 2) : 3, mode: !flag,
-      trackTackles: false, ...Object.fromEntries(TRACK_FLAGS.map((f) => [f, false])),
+      // defaults-on DOU4: in Scores only the stats switches are hidden and do
+      // nothing, so they are never "custom" (an old flag game reads Standard);
+      // play by play, the standard is AF_TRACK_DEFAULTS
+      ...(s.mode === 'pbp' ? AF_TRACK_DEFAULTS : { trackTackles: s.trackTackles === true, ...Object.fromEntries(TRACK_FLAGS.map((f) => [f, s[f] === true])) }),
     };
   },
 };

@@ -118,8 +118,9 @@ describe('round 2 · basketball: fast-break points include the and-one free thro
 });
 
 describe('round 2 · basketball: shot-zone buttons are the default layout for a new match', () => {
-  test('the standards: shot zones on (batch 3: missed shots on too); fast breaks and fouls drawn opt-in', () => {
-    assert.deepEqual(BB_TRACK_DEFAULTS, { trackMisses: true, trackZones: true, trackFastBreak: false, trackFoulsDrawn: false });
+  test('the standards: shot zones on (batch 3: missed shots on too; defaults-on wave 3: fast breaks and fouls drawn on)', () => {
+    // defaults-on DOU2: fast breaks and fouls drawn on for NEW matches (an old format without the key still reads off)
+    assert.deepEqual(BB_TRACK_DEFAULTS, { trackMisses: true, trackZones: true, trackFastBreak: true, trackFoulsDrawn: true });
   });
   test('a new match (its format seeded with the defaults) scores with the zone buttons', () => {
     const s = init({ preset: 'fiba', ...BB_TRACK_DEFAULTS });

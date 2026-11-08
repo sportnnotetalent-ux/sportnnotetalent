@@ -379,7 +379,8 @@ describe('deep wave · team stats panel', () => {
 
 describe('deep wave · scorer UI guards', () => {
   const src = readFileSync(new URL('../src/sports/basketball/index.tsx', import.meta.url), 'utf8');
-  test('the four "Stats to track" switches in the live settings; their defaults come from BB_TRACK_DEFAULTS (round 2: shot zones on, the rest off)', () => {
+  test('the four "Stats to track" switches in the live settings; their defaults come from BB_TRACK_DEFAULTS (round 2: shot zones on; defaults-on DOU2: all four on for new matches)', () => {
+    // defaults-on DOU2: the line still reads BB_TRACK_DEFAULTS; the values flipped in meta.ts
     for (const k of ['trackMisses', 'trackZones', 'trackFastBreak', 'trackFoulsDrawn']) assert.match(src, new RegExp(`key: '${k}'[^\\n]*default: BB_TRACK_DEFAULTS\\.${k}[^\\n]*group: 'Stats to track'`));
   });
   test('zone buttons log one SCORE / MISS with the zone; the fast-break chip dispatches TAG; fouls drawn ride on the FOUL', () => {

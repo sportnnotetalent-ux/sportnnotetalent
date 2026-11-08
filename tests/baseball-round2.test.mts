@@ -247,10 +247,11 @@ describe('round 2 · old logs replay identically; the toggle', () => {
     assert.equal('battedBallTypes' in init().cfg, false);
     assert.equal(readConfig({ battedBallTypes: 'true' }).battedBallTypes, true);
   });
-  test('live settings and the format carry it (off by default, "Stats to track")', () => {
+  test('live settings and the format carry it (on for new matches, "Stats to track")', () => {
     const f = TRACK_FIELDS.find((x) => x.key === 'battedBallTypes')!;
-    assert.deepEqual([f.label, f.default, f.group], ['Batted-ball type', false, 'Stats to track']);
+    // defaults-on DOU2: on for NEW matches (a stored format without the key still reads off)
+    assert.deepEqual([f.label, f.default, f.group], ['Batted-ball type', true, 'Stats to track']);
     assert.equal(BASEBALL_LIVE_SETTINGS.read(init(ON)).battedBallTypes, true);
-    assert.equal(BASEBALL_LIVE_SETTINGS.defaults?.battedBallTypes, false);
+    assert.equal(BASEBALL_LIVE_SETTINGS.defaults?.battedBallTypes, true); // defaults-on DOU2
   });
 });

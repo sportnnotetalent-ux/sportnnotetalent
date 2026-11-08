@@ -18,11 +18,26 @@ export const AF_PRESETS: Record<string, { label: string; set: Record<string, num
   nfhs: { label: 'Tackle · High school (NFHS) 4 × 12', set: { variant: 'tackle', rules: 'nfhs', playersPerSide: 11, periods: 4, periodMinutes: 12, timeoutsPerHalf: 3, twoMinute: false, decider: 'kansas', otSpot: 10, mode: 'pbp' } },
 };
 
+/** Defaults-on wave 3 (docs/security/breaks/defaults-on-us.md): the "Stats to
+ *  track" standards for a NEW match — the ONE source the format fields, the
+ *  live settings' `defaults` and `defaultsFor` (engine.ts) all read, so
+ *  "Standard" never drifts from what a new match starts with. Targets and
+ *  pass breakups / TFL are on: each is an optional chip on the non-blocking
+ *  "describe the last play" card (wave 2), and nothing reads as tracked until
+ *  one is credited (wave 1). Tackles stay off (US-DON-6): asked after every
+ *  scrimmage play, and one scorer can't see who tackled in a pile.
+ *  `init` never applies these: a stored format without the key — every match
+ *  made before — keeps what it was scored with (off). */
+export const AF_TRACK_DEFAULTS = { trackTackles: false, trackTargets: true, trackDefence: true } as const;
+
+/** "Ask who made the tackle / flag pull" (play by play only). */
+export const TACKLES_FIELD: FormatField = { key: 'trackTackles', label: 'Ask who made the tackle / flag pull', type: 'toggle', default: AF_TRACK_DEFAULTS.trackTackles, group: 'Stats to track' };
+
 /** Deep wave — the "Stats to track" toggles (live settings + the match format;
  *  they act in play-by-play mode). */
 export const TRACK_FIELDS: FormatField[] = [
-  { key: 'trackTargets', label: 'Targets (who a pass was meant for)', type: 'toggle', default: false, group: 'Stats to track', hint: 'Play by play: one optional tap after ✗ Incomplete — receivers get targets (complete + incomplete)' },
-  { key: 'trackDefence', label: 'Pass breakups & tackles for loss', type: 'toggle', default: false, group: 'Stats to track', hint: 'Play by play: who broke up an incomplete pass (optional tap) — an interception counts as a pass defended too (NFL); with tackles asked, a run or catch that lost yards is a tackle for loss' },
+  { key: 'trackTargets', label: 'Targets (who a pass was meant for)', type: 'toggle', default: AF_TRACK_DEFAULTS.trackTargets, group: 'Stats to track', hint: 'Play by play: one optional tap after ✗ Incomplete — receivers get targets (complete + incomplete)' },
+  { key: 'trackDefence', label: 'Pass breakups & tackles for loss', type: 'toggle', default: AF_TRACK_DEFAULTS.trackDefence, group: 'Stats to track', hint: 'Play by play: who broke up an incomplete pass (optional tap) — an interception counts as a pass defended too (NFL); with tackles asked, a run or catch that lost yards is a tackle for loss' },
 ];
 
 export const AMERICAN_FOOTBALL_META: SportMeta = {
@@ -52,8 +67,9 @@ export const AMERICAN_FOOTBALL_META: SportMeta = {
     { key: 'timeoutsPerHalf', label: 'Timeouts per team per half', type: 'number', default: 2, min: 0, max: 5, advanced: true, hint: 'NFL / NCAA / NFHS: 3 · IFAF flag: 2 (verify)' },
     { key: 'twoMinute', label: 'Two-minute warning (NFL)', type: 'toggle', default: false, advanced: true, hint: 'the clock stops at 2:00 of the 2nd and 4th quarters' },
     // US batch 5: these act play by play only — hidden while the game is Scores only
-    { key: 'trackTackles', label: 'Ask who made the tackle / flag pull (play by play)', type: 'toggle', default: false, advanced: true, hideWhen: { key: 'mode', value: 'score' } },
-    // deep wave — "Stats to track" (off by default)
+    // defaults-on DOU9: grouped under "Stats to track" like the live settings
+    { ...TACKLES_FIELD, label: 'Ask who made the tackle / flag pull (play by play)', advanced: true, hideWhen: { key: 'mode', value: 'score' } },
+    // deep wave — "Stats to track" (defaults: AF_TRACK_DEFAULTS)
     ...TRACK_FIELDS.map((f) => ({ ...f, advanced: true, hideWhen: { key: 'mode', value: 'score' } })),
     {
       key: 'decider', label: 'If tied at the end of regulation', type: 'choice', default: 'flag',

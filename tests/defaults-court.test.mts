@@ -48,8 +48,9 @@ const P = (id: string) => ({ id, fullName: id.toUpperCase() });
 
 describe('DC1 · basketball: Track missed shots on for a new match', () => {
   const fields = BASKETBALL_META.formatFields ?? [];
-  test('the standard: misses on (shot zones on; fast breaks, fouls drawn opt-in)', () => {
-    assert.deepEqual(BB_TRACK_DEFAULTS, { trackMisses: true, trackZones: true, trackFastBreak: false, trackFoulsDrawn: false });
+  test('the standard: misses on (shot zones on; defaults-on wave 3: fast breaks, fouls drawn on)', () => {
+    // defaults-on DOU2: fast breaks and fouls drawn on for NEW matches
+    assert.deepEqual(BB_TRACK_DEFAULTS, { trackMisses: true, trackZones: true, trackFastBreak: true, trackFoulsDrawn: true });
     assert.equal(fields.find((f) => f.key === 'trackMisses')!.default, true);
   });
   for (const ctx of [undefined, 'tournament'] as const) {

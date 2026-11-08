@@ -38,7 +38,7 @@ import { baseballSheet } from '../src/sports/baseball/sheet.ts';
 import { BASEBALL_META } from '../src/sports/baseball/meta.ts';
 import { STAT_SCHEMAS } from '../src/sports/statSchemas.ts';
 import { init as afInit, reducer as afReducer, buildPlay as afPlay, AF_LIVE_SETTINGS, type AFState } from '../src/sports/american_football/engine.ts';
-import { AMERICAN_FOOTBALL_META, AF_PRESETS } from '../src/sports/american_football/meta.ts';
+import { AMERICAN_FOOTBALL_META, AF_PRESETS, AF_TRACK_DEFAULTS } from '../src/sports/american_football/meta.ts';
 import { afCommentary } from '../src/sports/american_football/commentary.ts';
 import { customCount } from '../src/sports/liveSettings.ts';
 import { isHidden } from '../src/sports/formatPick.ts';
@@ -395,9 +395,10 @@ describe('American football (AF1–AF5)', () => {
   test('AF5: "Standard" follows the ruleset — a standard flag game reads Standard', () => {
     const flag = afInit({ preset: 'flag' });
     assert.equal(customCount(AF_LIVE_SETTINGS, AF_LIVE_SETTINGS.read(flag), flag), 0);
-    const nfl = afInit({ preset: 'nfl', mode: 'pbp' });
+    // defaults-on DOU4: a new play-by-play match's format carries the stats defaults (AF_TRACK_DEFAULTS)
+    const nfl = afInit({ preset: 'nfl', mode: 'pbp', ...AF_TRACK_DEFAULTS });
     assert.equal(customCount(AF_LIVE_SETTINGS, AF_LIVE_SETTINGS.read(nfl), nfl), 0);
-    const nfhs = afInit({ preset: 'nfhs', mode: 'pbp' });
+    const nfhs = afInit({ preset: 'nfhs', mode: 'pbp', ...AF_TRACK_DEFAULTS }); // defaults-on DOU4
     assert.equal(customCount(AF_LIVE_SETTINGS, AF_LIVE_SETTINGS.read(nfhs), nfhs), 0);
     const odd = afInit({ preset: 'flag', periodMinutes: 25 });
     assert.equal(customCount(AF_LIVE_SETTINGS, AF_LIVE_SETTINGS.read(odd), odd), 1);

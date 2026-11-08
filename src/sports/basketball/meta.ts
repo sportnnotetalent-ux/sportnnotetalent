@@ -12,10 +12,13 @@ import type { SportMeta } from '../types';
  *  default scoring layout (founder 2026-10-22); switched off, the plain
  *  +2 / +3 row comes back. Batch 3 (founder 2026-11-02, only what is captured
  *  in scoring reaches the stats): missed shots are on for a new match too
- *  (FG%, 3P%, EFF; a miss is one tap, like a make). Fast breaks and fouls
- *  drawn stay opt-in. `init` never applies these: a stored config without
- *  the key — every match made before — keeps what it was scored with. */
-export const BB_TRACK_DEFAULTS = { trackMisses: true, trackZones: true, trackFastBreak: false, trackFoulsDrawn: false } as const;
+ *  (FG%, 3P%, EFF; a miss is one tap, like a make). Defaults-on wave 3
+ *  (docs/security/breaks/defaults-on-us.md): fast breaks and fouls drawn are
+ *  on too — both are optional chips on a card that never blocks the next play,
+ *  and nothing reads as tracked until one is tagged (no false zeros).
+ *  `init` never applies these: a stored config without the key — every
+ *  match made before — keeps what it was scored with. */
+export const BB_TRACK_DEFAULTS = { trackMisses: true, trackZones: true, trackFastBreak: true, trackFoulsDrawn: true } as const;
 
 export const BASKETBALL_META: SportMeta = {
   id: 'basketball',
@@ -61,7 +64,7 @@ export const BASKETBALL_META: SportMeta = {
     { key: 'possArrow', label: 'Alternating-possession arrow', type: 'toggle', default: true, advanced: true, hint: 'FIBA / NCAA: held balls and period starts go by the arrow · NBA / 3×3: off' },
     { key: 'otFoulsCarry', label: 'Overtime team fouls carry over from the last quarter', type: 'toggle', default: true, advanced: true, hint: 'FIBA yes · NBA resets' },
     { key: 'overtimeMinutes', label: 'Overtime length (min)', type: 'number', default: 5, min: 1, max: 10, advanced: true, hint: 'played when tied after regulation; repeats until decided' },
-    { key: 'trackMisses', label: 'Track missed shots', type: 'toggle', default: BB_TRACK_DEFAULTS.trackMisses, hint: 'Miss 2 / Miss 3 buttons — FG%, 3P% and full EFF' },
+    { key: 'trackMisses', label: 'Track missed shots', type: 'toggle', default: BB_TRACK_DEFAULTS.trackMisses, group: 'Stats to track', hint: 'Miss 2 / Miss 3 buttons — FG%, 3P% and full EFF' },
     // Deep wave — "Stats to track" (the scorer can also switch them in ⚙️ Scoring settings).
     // Round 2: the shot-zone buttons are the default layout for a new match and
     // shown without Customize, so switching back to plain +2 / +3 is one tap.

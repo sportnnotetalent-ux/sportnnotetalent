@@ -35,7 +35,7 @@
  */
 import type { ScoreAction, LiveSettings, FormatField, Attribution } from '../types';
 // Perf F-15 — the format presets / options live in the light meta module.
-import { BASEBALL_PRESETS, TRACK_FIELDS } from './meta.ts';
+import { BASEBALL_PRESETS, BASEBALL_TRACK_DEFAULTS, FIELDERS_FIELD, TRACK_FIELDS } from './meta.ts';
 export { BASEBALL_PRESETS, TRACK_FIELDS };
 
 export type Side = 'home' | 'away';
@@ -1182,9 +1182,11 @@ export const BASEBALL_LIVE_SETTINGS: LiveSettings<BaseballState> = {
   fields: [
     { key: 'pitches', label: 'Pitch-by-pitch (balls & strikes)', type: 'toggle', default: true, group: 'Detail' },
     // US batch 5: the fielders chips come AFTER the play (never a blocking step), so on for new matches
-    { key: 'askFielders', label: 'Ask for fielders (6-3)', type: 'toggle', default: true, group: 'Detail', hint: 'optional 1–9 chips after an out is recorded — putouts and assists' },
+    // defaults-on DOU9: grouped under "Stats to track" (it was "Detail")
+    FIELDERS_FIELD,
     ...TRACK_FIELDS,
   ] as FormatField[],
   read: (s) => ({ pitches: s.cfg.pitches, askFielders: s.cfg.askFielders, ...Object.fromEntries(TRACK_FLAGS.map((f) => [f, s.cfg[f] === true])) }),
-  defaults: { pitches: true, askFielders: true, ...Object.fromEntries(TRACK_FLAGS.map((f) => [f, false])) },
+  // defaults-on DOU2: the stats standards come from BASEBALL_TRACK_DEFAULTS (meta.ts), the one source
+  defaults: { pitches: true, ...BASEBALL_TRACK_DEFAULTS },
 };

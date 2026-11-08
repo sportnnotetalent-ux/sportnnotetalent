@@ -41,7 +41,7 @@ import {
   init as afInit, reducer as afReducer, buildPlay as afPlay, eventCredits as afCredits, teamFigures, foulsFor, AF_LIVE_SETTINGS,
   type AFState, type PlayInput, type PenEnf,
 } from '../src/sports/american_football/engine.ts';
-import { AF_PRESETS } from '../src/sports/american_football/meta.ts';
+import { AF_PRESETS, AF_TRACK_DEFAULTS } from '../src/sports/american_football/meta.ts';
 import { afTotals } from '../src/sports/american_football/totals.ts';
 import { afCommentary } from '../src/sports/american_football/commentary.ts';
 import { afSheet } from '../src/sports/american_football/sheet.ts';
@@ -303,7 +303,7 @@ describe('sim · American football batch 6', () => {
   });
   test('every flag preset reads Standard; tackle presets too', () => {
     for (const k of Object.keys(AF_PRESETS)) {
-      const st = afInit({ preset: k, mode: AF_PRESETS[k].set.mode });
+      const st = afInit({ preset: k, mode: AF_PRESETS[k].set.mode, ...AF_TRACK_DEFAULTS }); // defaults-on DOU4: a new match's format carries them
       assert.equal(customCount(AF_LIVE_SETTINGS, AF_LIVE_SETTINGS.read(st), st), 0, k);
     }
   });
