@@ -38,6 +38,24 @@ Where it changed:
   - Marketing posts already rendered keep the old mark.
   - The mint experiment was undone and never committed.
 
+### 2026-11-08 — Urgent: session sport row wraps; "Pick from contacts" reads the number
+
+Two founder-reported bugs from real phones (sport-row-contacts.md).
+- **Sport row:**
+  - Bug: Organize → Start a session → Sport ran off the right edge in one unscrollable row (iPhone). The session screen nested the shared `SportPicker` inside a second row, so it never wrapped; Create tournament had the same nesting.
+  - Fix: `SportPicker` now always takes the full width and wraps, and the extra wrappers are removed. "More sports…" lists all of them.
+- **Pick from contacts:**
+  - Bug: Invite a friend / Add a player → Pick from contacts (Android) said "That contact has no number saved". Android's picker grants only the contact's link; reading its name and numbers needs the contacts permission, which was never asked. The failed read was swallowed.
+  - Fix: `src/core/pickedContact.ts` reads, and if that fails or comes back empty, asks for contacts access once (only after a pick) and reads again.
+  - A refusal now says "Allow contacts access to pick a friend, or type their number below." It is no longer reported as a crash.
+  - JS only (READ_CONTACTS is already in the manifest), so it ships by OTA.
+- **Checks:**
+  - `tests/sport-row-contacts.test.mts` (with a 600-picker sim);
+  - full suite 7885 (0 failing);
+  - tsc;
+  - demo at 375 px: the session sport row wraps and Badminton is visible.
+  - Contacts can't be demo-checked on the web; it needs a phone.
+
 ### 2026-11-08 — Wave 1: no false zeros in any sport (tracked means captured)
 
 Wave 1 of docs/sport-expert/defaults-on/PLAN.md, built by four engineering agents in parallel worktrees and merged here.

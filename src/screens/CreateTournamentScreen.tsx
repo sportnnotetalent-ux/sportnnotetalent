@@ -271,9 +271,7 @@ export default function CreateTournamentScreen() {
           </View>
 
           <FieldLabel>Sports</FieldLabel>
-          <View style={st.chips}>
-            <SportPicker mine={mySports} values={sports} onToggle={toggleSport} />
-          </View>
+          <SportPicker mine={mySports} values={sports} onToggle={toggleSport} />
 
           {sports.length > 1 && <MedalScoringEditor sports={sports} value={scoring} onChange={setScoring} />}
 

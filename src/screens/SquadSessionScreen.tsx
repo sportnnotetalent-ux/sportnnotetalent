@@ -259,9 +259,7 @@ export default function SquadSessionScreen() {
           ) : null}
           <Card style={st.gap}>
             <FieldLabel>Sport</FieldLabel>
-            <View style={st.chips}>
-              <SportPicker mine={mySports} limitTo={clubSports} value={sport} onChange={setSport} />
-            </View>
+            <SportPicker mine={mySports} limitTo={clubSports} value={sport} onChange={setSport} />
             <TextField label="Team name" value={title} onChange={(v) => setTitle(v.slice(0, 60))} placeholder="e.g. Fnatic" autoCapitalize="words" />
             <Text style={textStyles.muted}>Teams will be called “{title.trim() || 'Name'} 1”, “{title.trim() || 'Name'} 2” …</Text>
           </Card>

@@ -13,7 +13,7 @@ import { theme } from '../core/theme';
 import { SelectChip, TextField, Button, textStyles } from './ui';
 import { invitePlayer, invitePerson, markPlayerRegistered, findPlayerByPhone, findPlayerByEmail, lookupPeople, getReportedPlayerIds, removePlayerFromTeam } from '../data/repos';
 import { looksLikeContact, nameOnlyOk } from '../core/contactQuery';
-import { canPickContact, pickContact, canPaste, pasteText } from '../core/pickContact';
+import { canPickContact, pickContact, canPaste, pasteText, ContactsDenied } from '../core/pickContact';
 import { notify } from '../core/notifications';
 import { openWhatsApp, openSms } from '../core/connect';
 import { preferredChat } from '../core/chatRegion';
@@ -122,7 +122,8 @@ export function AddInvitePlayer({
       if (!num) { setNote('That contact has no mobile number.'); return; }
       setPhone(toE164(num) || num.trim()); setName(c.name ?? '');
     } catch (e) {
-      reportError(e);
+      // PC2: a refused contacts permission is the user's choice, not a crash
+      if (!(e instanceof ContactsDenied)) reportError(e);
       setNote(Platform.OS === 'web' ? 'Couldn’t open your contacts — paste or type the number instead.' : 'Couldn’t open your contacts — allow SportnNote to access them in Settings, or type the number.');
     }
   };

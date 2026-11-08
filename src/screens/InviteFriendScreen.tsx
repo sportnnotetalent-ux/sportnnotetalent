@@ -17,7 +17,7 @@ import { useAuth } from '../core/auth';
 import { friendInviteLink, friendInviteText } from '../core/inviteText';
 import { openSms, openWhatsApp } from '../core/connect';
 import { intlDigits } from '../core/phone';
-import { canPickContact, pickContact } from '../core/pickContact';
+import { canPickContact, pickContact, ContactsDenied } from '../core/pickContact';
 import { shareMessage } from '../core/share';
 import { track } from '../core/telemetry';
 import { notice } from '../core/confirm';
@@ -60,8 +60,10 @@ export default function InviteFriendScreen() {
       if (c.name) setName(c.name);
       if (c.phones[0]) { setPhone(c.phones[0]); setPicked((n) => n + 1); }
       else notice('No mobile number', `${c.name ?? 'That contact'} has no number saved — type it below.`);
-    } catch {
-      notice('Couldn’t open contacts', 'Type their number below instead.');
+    } catch (e) {
+      // PC2: access refused after picking — say so, not "no number saved"
+      if (e instanceof ContactsDenied) notice('Contacts access needed', 'Allow contacts access to pick a friend, or type their number below.');
+      else notice('Couldn’t open contacts', 'Type their number below instead.');
     }
   };
   const send = (via: 'whatsapp' | 'sms') => {

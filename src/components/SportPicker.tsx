@@ -33,4 +33,5 @@ export function SportPicker(props: Props) {
   );
 }
 
-const st = StyleSheet.create({ chips: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing(2) } });
+// SR1/SR2 (sport-row-contacts.md): full width so it always wraps, even inside a row
+const st = StyleSheet.create({ chips: { width: '100%', flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing(2) } });
