@@ -8,6 +8,7 @@ import { theme } from '../core/theme';
 import { useReducedMotion } from '../core/a11y';
 import { changedSide, dueText, inPlayText, lastAction, scoreBarRows, type InPlay, type Side } from '../core/scoreBar';
 import type { ScoreSummary } from '../sports/types';
+import { SideName } from './SideName';
 
 export function LiveScoreBar({
   summary, homeName, awayName, homeColor, awayColor, inPlay, nameOf, undoText, clockNode, icon,
@@ -57,7 +58,7 @@ export function LiveScoreBar({
           <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, s.flash, { opacity: flash[r.side] }]} />
           <View style={[s.dot, { backgroundColor: r.side === 'home' ? homeColor : awayColor }]} />
           <View style={s.nameCol}>
-            <Text style={[s.name, r.active && s.nameActive]} numberOfLines={2}>{r.name}</Text>
+            <SideName name={r.name} style={[s.name, r.active && s.nameActive]} />
             {r.who ? <Text style={s.who} numberOfLines={1}>{icon ? `${icon} ` : ''}{r.who}</Text> : null}
           </View>
           <Text style={[s.score, r.active && s.scoreActive]} numberOfLines={1} maxFontSizeMultiplier={1.5}>{r.score}</Text>

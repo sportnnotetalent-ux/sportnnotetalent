@@ -9,6 +9,7 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { theme } from '../core/theme';
 import { LogoPicker } from './LogoPicker';
+import { SideName } from './SideName';
 
 export function MatchHeader({
   sportIcon, sportName, statusLabel, matchLive, complete,
@@ -38,7 +39,7 @@ export function MatchHeader({
     const body = (
       <>
         <View style={[st.bar, { backgroundColor: color }]} />
-        <Text style={[st.teamName, { color }]} numberOfLines={2}>{name}</Text>
+        <SideName name={name} size="board" align="center" style={[st.teamName, { color }]} />
         {onTeamPress ? <Text style={st.teamLink}>{teamLinkLabel}</Text> : null}
       </>
     );

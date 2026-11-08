@@ -9,6 +9,7 @@ import { theme } from '../core/theme';
 import { ensureContrast } from '../core/contrast';
 import { RedBadges } from './Scoreboard';
 import type { ScoreSummary } from '../sports/types';
+import { SideName } from './SideName';
 
 export function MiniScore({
   summary,
@@ -47,7 +48,7 @@ export function MiniScore({
       {clockNode ? <View style={s.clock}>{clockNode}</View> : null}
       <View style={s.row}>
         <View style={[s.nameWrap, s.nameLeftWrap]}>
-          <Text style={[s.name, s.nameLeft]} numberOfLines={1}>{homeName}</Text>
+          <SideName name={homeName} size="board" style={[s.name, s.nameLeft]} />
           <RedBadges count={summary.homeReds} />
         </View>
         <View style={s.scoreGroup}>
@@ -57,7 +58,7 @@ export function MiniScore({
         </View>
         <View style={[s.nameWrap, s.nameRightWrap]}>
           <RedBadges count={summary.awayReds} />
-          <Text style={[s.name, s.nameRight]} numberOfLines={1}>{awayName}</Text>
+          <SideName name={awayName} size="board" align="right" style={[s.name, s.nameRight]} />
         </View>
       </View>
     </View>

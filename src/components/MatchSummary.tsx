@@ -14,6 +14,7 @@ import { useMask } from '../core/disputeMask';
 import { matchRatings, awardsFor, ratingStars, statLabel, resolvePotm, type MatchRating, type PotmProp } from '../data/ratings';
 import type { Player, SportId, StatLine } from '../core/types';
 import type { ScoreSummary } from '../sports/types';
+import { SideName } from './SideName';
 
 /** Up to two initials from a (possibly masked) name, for a rating-row avatar. */
 const initials = (name?: string): string =>
@@ -77,12 +78,12 @@ export function MatchSummary({
         <View style={st.scoreRow}>
           <View style={st.side}>
             <Text style={[st.score, { color: ensureContrast(homeColor, theme.colors.surface) }, decided && !homeWon && st.scoreLost]}>{summary.homeScore}</Text>
-            <Text style={[st.sideName, { color: ensureContrast(homeColor, theme.colors.surface) }]} numberOfLines={1}>{homeName}</Text>
+            <SideName name={homeName} align="center" style={[st.sideName, { color: ensureContrast(homeColor, theme.colors.surface) }]} />
           </View>
           <Text style={st.colon}>:</Text>
           <View style={st.side}>
             <Text style={[st.score, { color: ensureContrast(awayColor, theme.colors.surface) }, decided && !awayWon && st.scoreLost]}>{summary.awayScore}</Text>
-            <Text style={[st.sideName, { color: ensureContrast(awayColor, theme.colors.surface) }]} numberOfLines={1}>{awayName}</Text>
+            <SideName name={awayName} align="center" style={[st.sideName, { color: ensureContrast(awayColor, theme.colors.surface) }]} />
           </View>
         </View>
         {complete && scoreLine ? <Text style={st.scoreLine}>{scoreLine}</Text> : null}

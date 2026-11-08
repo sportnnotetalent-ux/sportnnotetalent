@@ -15,6 +15,7 @@ import { Glyph } from './Icon';
 import { PopNumber } from './pressFeedback';
 import { ensureContrast } from '../core/contrast';
 import { nameColumnWidth, CELL } from './lineScoreLayout';
+import { SideName } from './SideName';
 
 export interface LineCol { label: string; highlight?: boolean }
 export interface LineRow { name: string; color: string; lead: string; cells: string[] }
@@ -79,7 +80,7 @@ export function LineScoreboard({
                 <View style={[st.nameRow, { width: nameW }]}>
                   {/* DR2: a pale team colour is darkened just enough to read; the
                       losing side dims its numbers, not its name */}
-                  <Text style={[st.name, { color: ensureContrast(r.color, theme.colors.surface) }]} numberOfLines={2}>{r.name}</Text>
+                  <SideName name={r.name} style={[st.name, { color: ensureContrast(r.color, theme.colors.surface) }]} />
                   {won ? <Glyph emoji="🏆" style={st.trophy} /> : null}
                 </View>
                 <View style={[st.leadCell, wide && st.wideLead, lost && st.rowLost]}><PopNumber text={String(r.lead)} style={st.leadText} /></View>

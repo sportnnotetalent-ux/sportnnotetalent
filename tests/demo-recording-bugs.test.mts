@@ -77,5 +77,7 @@ test('DR2 sweep: team colours used as text go through ensureContrast on the resu
     'src/screens/TeamProfileScreen.tsx': 2, 'src/screens/SquadScreen.tsx': 1,
   };
   for (const [f, n] of Object.entries(files)) assert.ok((read(f).match(/ensureContrast\(/g) ?? []).length >= n, f);
-  assert.match(read('src/components/LineScoreboard.tsx'), /numberOfLines=\{2\}>\{r\.name\}/, 'DR6: names wrap instead of being cut');
+  // DR6 → pair-names.md: names wrap (two lines) through the shared SideName
+  assert.match(read('src/components/LineScoreboard.tsx'), /<SideName name=\{r\.name\}/, 'DR6: names wrap instead of being cut');
+  assert.match(read('src/components/SideName.tsx'), /numberOfLines=\{pair \? 1 : 2\}/);
 });

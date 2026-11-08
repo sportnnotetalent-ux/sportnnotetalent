@@ -15,6 +15,7 @@ import { theme } from '../core/theme';
 import { Card, Button, SelectChip, ScreenTitle, textStyles } from '../components/ui';
 import { Sheet } from '../components/Sheet';
 import { SlotFillPanel } from '../components/SlotFillPanel';
+import { SideName } from '../components/SideName';
 import { DivisionTabs } from '../components/DivisionTabs';
 import { useAuth } from '../core/auth';
 import { useTournamentById, useLeagueData, useOrganizations, useTeams, useDivisions, useTournamentEntries } from '../data/hooks';
@@ -402,7 +403,7 @@ function SideRow({ side, score, state, canFill, onPress, champion, picked }: {
     <Pressable onPress={onPress} style={[st.row, state === 'won' && st.rowWon]} accessibilityRole="link" accessibilityHint="Opens their tournament journey">
       {side.color ? <View style={[st.dot, { backgroundColor: side.color }]} /> : <View style={st.dotGap} />}
       <View style={st.flex1}>
-        <Text style={[st.teamName, state === 'won' && st.won, state === 'lost' && st.lost]} numberOfLines={1}>{side.name}</Text>
+        <SideName name={side.name} style={[st.teamName, state === 'won' && st.won, state === 'lost' && st.lost]} />
         {champion ? <Text style={st.champTag}>CHAMPION</Text> : null}
       </View>
       {score != null ? <Text style={[st.score, state === 'lost' && st.lost]}>{score}</Text> : null}

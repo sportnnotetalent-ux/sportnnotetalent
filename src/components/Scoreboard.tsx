@@ -5,6 +5,7 @@ import { theme } from '../core/theme';
 import { ensureContrast } from '../core/contrast';
 import type { ScoreSummary } from '../sports/types';
 import { PopNumber } from './pressFeedback';
+import { SideName } from './SideName';
 
 export function Scoreboard({
   summary,
@@ -67,9 +68,7 @@ function Side({ name, score, color, reds }: { name: string; score: string; color
       {/* Tap feedback (2026-11-03): the number that changed pops */}
       <PopNumber text={String(score)} style={[s.score, { color: ensureContrast(color, theme.colors.surface, 3) }]} numberOfLines={1} maxFontSizeMultiplier={1.5} adjustsFontSizeToFit />
       <View style={s.teamRow}>
-        <Text style={s.team} numberOfLines={1}>
-          {name}
-        </Text>
+        <SideName name={name} align="center" style={s.team} />
         <RedBadges count={reds} />
       </View>
     </View>

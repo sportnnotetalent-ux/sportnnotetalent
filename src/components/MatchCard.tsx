@@ -18,6 +18,7 @@ import { matchLine, resultWords } from '../sports/matchLine';
 import { isTieMatch, fmtPts } from '../data/teamTie';
 import { MapPin } from 'lucide-react-native';
 import { IconText } from './Icon';
+import { SideName } from './SideName';
 
 /** A stored snapshot from an older engine must never break a card. */
 function safeLine(f: () => string): string {
@@ -125,7 +126,7 @@ export function MatchCard({ match, onPress, onStart, timeZone, note, compact }: 
       {/* Scoreboard: team · score · team */}
       <View style={s.board}>
         <View style={[s.side, s.sideLeft]}>
-          <Text style={s.team} numberOfLines={1}>{teamLabel(match.homeTeam)}</Text>
+          <SideName name={teamLabel(match.homeTeam)} align="right" style={s.team} />
           <View style={[s.dot, { backgroundColor: match.homeTeam.colorHex }]} />
         </View>
 
@@ -143,7 +144,7 @@ export function MatchCard({ match, onPress, onStart, timeZone, note, compact }: 
 
         <View style={[s.side, s.sideRight]}>
           <View style={[s.dot, { backgroundColor: match.awayTeam.colorHex }]} />
-          <Text style={s.team} numberOfLines={1}>{teamLabel(match.awayTeam)}</Text>
+          <SideName name={teamLabel(match.awayTeam)} style={s.team} />
         </View>
       </View>
 

@@ -6,7 +6,8 @@
  *    (byes for non-power-of-two) as a preview. Group-stage matches are excluded
  *    from both, so a grouped tournament's bracket shows only its knockout. */
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { SideName } from '../components/SideName';
 import { KeyboardAwareScrollView } from '../components/keyboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -56,7 +57,7 @@ function Slot({ slot, state = 'neutral' }: { slot: BracketSlot; state?: SlotStat
   return (
     <View style={st.slot}>
       {slot.color ? <View style={[st.dot, { backgroundColor: slot.color }]} /> : <View style={st.dotGap} />}
-      <Text style={[st.slotName, dim && st.muted, state === 'won' && st.winnerName]} numberOfLines={1}>{slot.name}</Text>
+      <View style={st.nameFlex}><SideName name={slot.name} style={[st.slotName, dim && st.muted, state === 'won' && st.winnerName]} /></View>
       {state === 'won' && <Glyph emoji="✓" style={st.check} />}
     </View>
   );
@@ -68,8 +69,10 @@ function StagedSide({ name, color, score, state, teamId }: { name: string; color
   return (
     <View style={st.slot}>
       {color ? <View style={[st.dot, { backgroundColor: color }]} /> : <View style={st.dotGap} />}
-      <Text style={[st.slotName, state === 'lost' && st.muted, state === 'won' && st.winnerName]} numberOfLines={1}
-        {...(onTeam && teamId ? { onPress: () => onTeam(teamId), accessibilityRole: 'link' as const, accessibilityHint: 'Opens their tournament journey' } : {})}>{name}</Text>
+      <Pressable style={st.nameFlex} disabled={!(onTeam && teamId)}
+        {...(onTeam && teamId ? { onPress: () => onTeam(teamId), accessibilityRole: 'link' as const, accessibilityHint: 'Opens their tournament journey' } : {})}>
+        <SideName name={name} style={[st.slotName, state === 'lost' && st.muted, state === 'won' && st.winnerName]} />
+      </Pressable>
       {score != null && <Text style={[st.score, state === 'won' && st.winnerName, state === 'lost' && st.muted]}>{score}</Text>}
       {state === 'won' && <Glyph emoji="✓" style={st.check} />}
     </View>
@@ -626,6 +629,7 @@ function StagedMatchCard({ m }: { m: Match }) {
 }
 
 const st = StyleSheet.create({
+  nameFlex: { flex: 1, minWidth: 0 },
   mapLink: { color: theme.colors.primary, fontWeight: '600', fontSize: theme.font.small },
   safe: { flex: 1, backgroundColor: theme.colors.bg },
   content: { padding: theme.spacing(4), gap: theme.spacing(3) },
