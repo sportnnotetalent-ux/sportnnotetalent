@@ -80,6 +80,9 @@ import { shareMessage } from '../core/share';
 import { resultsLink } from '../core/shareText';
 import { meetHeaderOf, printDoc, phaseSheet, hasCard, type SheetKind } from '../components/results/printPhase';
 import { IconText } from '../components/Icon';
+import { DescribeCard, useDescribeMarks } from '../components/DescribeCard';
+import type { PanelMark, PanelMode } from '../sports/describePanel';
+import { doneStep, dqSummary, foldKey, foldMode, splitsSummary, trimTrailing } from '../data/results/measuredFold';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type Change = (next: EntryResult) => void;
@@ -141,6 +144,8 @@ export default function ResultsEventScreen() {
   // the 5 s Undo after a one-tap foul / pass, the time boxes for "Next ›"
   const [nextResults, setNextResults] = useState<{ status: string; results: EntryResult[] } | null>(null);
   const [openSplits, setOpenSplits] = useState<Set<string>>(new Set());
+  // wave 2 (describe-measured.md): splits / take-overs / DQ reason fold to "✓ Saved" per entry and phase
+  const folds = useDescribeMarks<string>();
   const [undo, setUndo] = useState<{ label: string; entryId: string; prev: EntryResult } | null>(null);
   useEffect(() => { if (!undo) return; const t = setTimeout(() => setUndo(null), 5000); return () => clearTimeout(t); }, [undo]);
   // SD-93: a combined event — its other events (with entries) and the athletes' earlier totals (PB / SB)
@@ -856,12 +861,14 @@ export default function ResultsEventScreen() {
                   )}
                   {/* SD-112: splits stay folded behind "＋ Splits" (a 1500 m card would show 29 boxes) */}
                   {editable && splitsOffered(def, f, track) && (r.status ?? 'ok') === 'ok' && (
-                    openSplits.has(e.id) || r.splits?.length
-                      ? <SplitsField key={`${e.id}:s:${(r.splits ?? []).join(',')}:${entryLapPoints(r, track)}`} def={def} r={r} track={track} onChange={(n) => void save(e, n)} />
-                      : <SelectChip label="＋ Splits" active={false} onPress={() => setOpenSplits((cur) => new Set(cur).add(e.id))} />
+                    (openSplits.has(e.id) || r.splits?.length) && folds.modeOf(foldKey('splits', phase.id, e.id)) !== 'hidden'
+                      ? <SplitsField key={`${e.id}:s:${(r.splits ?? []).join(',')}:${entryLapPoints(r, track)}`} def={def} r={r} track={track} onChange={(n) => void save(e, n)}
+                          who={re.name} mode={folds.modeOf(foldKey('splits', phase.id, e.id))} onMark={(m) => folds.mark(foldKey('splits', phase.id, e.id), m)} />
+                      : <SelectChip label="＋ Splits" accessibilityLabel={`Add splits for ${re.name}`} active={false} onPress={() => { folds.mark(foldKey('splits', phase.id, e.id), null); setOpenSplits((cur) => new Set(cur).add(e.id)); }} />
                   )}
                   {editable && takeoversOffered(def, track) && (r.status ?? 'ok') !== 'DNS' && (
-                    <TakeoverField key={`${e.id}:t:${(r.takeovers ?? []).join(',')}`} r={r} onSave={(t) => void save(e, { ...r, takeovers: t })} dq={takeoverDq(def, r)} onDq={(n) => void save(e, n)} />
+                    <TakeoverField key={`${e.id}:t:${(r.takeovers ?? []).join(',')}`} r={r} onSave={(t) => void save(e, { ...r, takeovers: t })} dq={takeoverDq(def, r)} onDq={(n) => void save(e, n)}
+                      who={re.name} mode={folds.modeOf(foldKey('takeovers', phase.id, e.id))} onMark={(m) => folds.mark(foldKey('takeovers', phase.id, e.id), m)} />
                   )}
                   {/* SD-98: a pursuit final ends when one rider catches the other */}
                   {isPursuitKind(cycK) && raceFinal && editable && (r.status ?? 'ok') === 'ok' && (
@@ -900,7 +907,10 @@ export default function ResultsEventScreen() {
                   {row?.needsDecider && editable && (
                     <DeciderField label={def.tie === 'vertical' ? 'Jump-off place' : arch && f.progression ? 'Shoot-off / toss place' : 'Shoot-off place'} value={r.decider} onSave={(d) => void save(e, { ...r, decider: d })} />
                   )}
-                  {editable && (swim ? <SwimStatusChips def={def} r={r} onChange={(n) => void save(e, n)} onFalseStart={fsHandled ? () => void falseStart(e) : undefined} /> : <StatusChips def={def} r={r} onChange={(n) => void save(e, n)} onFalseStart={(fsHandled || crew) && def.unit === 'time' && def.capture === 'single' ? () => void falseStart(e) : undefined} />)}
+                  {editable && (swim ? <SwimStatusChips def={def} r={r} onChange={(n) => void save(e, n)} onFalseStart={fsHandled ? () => void falseStart(e) : undefined}
+                    dqMode={folds.modeOf(foldKey('dq', phase.id, e.id))} onDqMark={(m) => folds.mark(foldKey('dq', phase.id, e.id), m)} onStatus={() => folds.mark(foldKey('dq', phase.id, e.id), null)} />
+                    : <StatusChips def={def} r={r} onChange={(n) => void save(e, n)} onFalseStart={(fsHandled || crew) && def.unit === 'time' && def.capture === 'single' ? () => void falseStart(e) : undefined}
+                      dqMode={folds.modeOf(foldKey('dq', phase.id, e.id))} onDqMark={(m) => folds.mark(foldKey('dq', phase.id, e.id), m)} onStatus={() => folds.mark(foldKey('dq', phase.id, e.id), null)} />)}
                 </Card>
               );
             })}
@@ -1242,23 +1252,31 @@ function WatchesField({ def, r, course, register, onNext, onChange }: {
 
 /** SD-94: cumulative 50 m splits (stopwatch digits or "1:05.30").
  *  Round 2: athletics laps at the event's lap points (a result keeps its own). */
-function SplitsField({ def, r, track, onChange }: { def: DisciplineDef; r: EntryResult; track: RaceTracking; onChange: Change }) {
+function SplitsField({ def, r, track, onChange, who, mode, onMark }: {
+  def: DisciplineDef; r: EntryResult; track: RaceTracking; onChange: Change;
+  /** wave 2 (describe-measured.md): Done folds to "✓ Saved · 3 splits · Edit", per entry */
+  who: string; mode: PanelMode; onMark: (m: PanelMark | null) => void;
+}) {
   const ds = entrySplitDistances(def, r, track);
   // lapsFrom is only kept where the two choices differ (1000 m, 1500 m, 3000 m)
   const from = lapPointsDiffer(def.key) && !def.teamSize ? entryLapPoints(r, track) : 'finish';
   const [t, setT] = useState(ds.map((_, i) => (r.splits?.[i] != null ? formatMark(r.splits[i], def) : '')));
+  const lastSent = useRef<string | undefined>(undefined);
   const read = (x: string) => (!x.trim() ? undefined : (/[.:,]/.test(x) ? parseMark(x, def)?.mark : digitsToTime(x)) ?? NaN);
   const vals = t.map(read);
   const err = vals.some((v) => Number.isNaN(v)) ? "Can't read a split" : splitsError(vals as (number | undefined)[], r.mark);
+  // one commit for blur and Done / Skip (DM1–DM3): same list, same onChange as before
   const commit = () => {
-    if (err) return;
-    const list = vals as (number | undefined)[];
-    while (list.length && list[list.length - 1] == null) list.pop();
-    if (JSON.stringify(list) !== JSON.stringify(r.splits ?? [])) onChange(resultWithSplits(r, list.length ? (list as number[]) : undefined, from));
+    const list = trimTrailing(vals) as (number | undefined)[];
+    const step = doneStep({ bad: !!err, next: list, saved: r.splits, lastSent: lastSent.current });
+    if (step.send) { lastSent.current = step.key ?? undefined; onChange(resultWithSplits(r, list.length ? (list as number[]) : undefined, from)); }
+    return step;
   };
+  const finish = (m: PanelMark) => { if (commit().fold) onMark(m); };
+  const summary = splitsSummary(vals, ds.length);
   const legs = swimEventOf(def.key);
   return (
-    <View style={{ gap: theme.spacing(1) }}>
+    <DescribeCard title={`Splits · ${who}`} summary={summary} mode={foldMode(mode, summary)} onDone={() => finish('done')} onSkip={() => finish('skipped')} onEdit={() => onMark(null)}>
       <View style={st.wrap}>
         {ds.map((d, i) => (
           <View key={d} style={{ gap: 2 }}>
@@ -1269,17 +1287,24 @@ function SplitsField({ def, r, track, onChange }: { def: DisciplineDef; r: Entry
         ))}
       </View>
       {err ? <Text style={st.badTxt}>{err}</Text> : null}
-    </View>
+    </DescribeCard>
   );
 }
 
 /** SD-94: DNS / DQ with the World Aquatics reason (the event's strokes, the
  *  relay rules — early take-off by leg). */
-function SwimStatusChips({ def, r, onChange, onFalseStart }: { def: DisciplineDef; r: EntryResult; onChange: Change; /** SD-141: the meet recalls the first false start */ onFalseStart?: () => void }) {
+function SwimStatusChips({ def, r, onChange, onFalseStart, dqMode, onDqMark, onStatus }: {
+  def: DisciplineDef; r: EntryResult; onChange: Change; /** SD-141: the meet recalls the first false start */ onFalseStart?: () => void;
+  /** wave 2 (describe-measured.md): the DQ reason folds to "✓ Saved · DQ · SW 7.6 — … Edit" */
+  dqMode: PanelMode; onDqMark: (m: PanelMark | null) => void; /** DM7: a status change opens the reason fresh */ onStatus?: () => void;
+}) {
   const s = r.status ?? 'ok';
   const codes = dqCodesFor(def.key);
   const [leg, setLeg] = useState<number | undefined>(undefined);
   const relay = !!def.teamSize;
+  // DM7: read from the saved row, so a removed reason never shows as saved
+  const summary = dqSummary(r);
+  const shown = foldMode(dqMode, summary);
   return (
     <View style={{ gap: theme.spacing(2) }}>
       <View style={st.wrap}>
@@ -1290,14 +1315,15 @@ function SwimStatusChips({ def, r, onChange, onFalseStart }: { def: DisciplineDe
         ) : null}
         {(['DNS', 'DQ'] as ResultStatus[]).map((x) => (
           <TouchableOpacity key={x} accessibilityRole="button" accessibilityState={{ selected: s === x }} aria-pressed={s === x} accessibilityLabel={`Mark ${x}`}
-            onPress={() => onChange({ ...r, status: s === x ? undefined : x, ruleRef: undefined, reason: undefined })}
+            onPress={() => { onStatus?.(); onChange({ ...r, status: s === x ? undefined : x, ruleRef: undefined, reason: undefined }); }}
             style={[st.status, s === x && st.statusOn]}>
             <Text style={[st.statusTxt, s === x && st.statusTxtOn]}>{x}</Text>
           </TouchableOpacity>
         ))}
       </View>
-      {s === 'DQ' && (
-        <>
+      {s === 'DQ' && shown === 'hidden' && <SelectChip label="＋ DQ reason" accessibilityLabel="Add a DQ reason" active={false} onPress={() => onDqMark(null)} />}
+      {s === 'DQ' && shown !== 'hidden' && (
+        <DescribeCard title="DQ reason" summary={summary} mode={shown} onDone={() => onDqMark('done')} onSkip={() => onDqMark('skipped')} onEdit={() => onDqMark(null)}>
           {relay && (
             <View style={st.wrap}>
               <Text style={st.label}>Leg</Text>
@@ -1310,8 +1336,9 @@ function SwimStatusChips({ def, r, onChange, onFalseStart }: { def: DisciplineDe
               return <SelectChip key={c.ref} label={`${c.ref} · ${c.label}`} active={on} onPress={() => onChange({ ...r, ruleRef: on ? undefined : c.ref, reason: on ? undefined : dqReason(c, relay && (c.legged || leg != null) ? leg : undefined, def.key) })} />;
             })}
           </View>
-          {r.reason ? <Text style={textStyles.muted}>{r.ruleRef} — {r.reason}</Text> : <Text style={textStyles.muted}>Pick the reason{relay ? ' (and the leg)' : ''}; no time or place is recorded for a DQ (SW 11.4).</Text>}
-        </>
+          {/* the picked reason shows on the card's "✓ DQ · SW 7.6 — …" line */}
+          {r.reason ? null : <Text style={textStyles.muted}>Pick the reason{relay ? ' (and the leg)' : ''}; no time or place is recorded for a DQ (SW 11.4).</Text>}
+        </DescribeCard>
       )}
     </View>
   );
@@ -1332,14 +1359,18 @@ function DeciderField({ label, value, onSave }: { label: string; value?: number;
   return <SmallNum label={label} value={value} editable onSave={onSave} />;
 }
 
-function StatusChips({ def, r, onChange, onFalseStart }: { def: DisciplineDef; r: EntryResult; onChange: Change; /** SD-93: combined events — FS warns first (TR 39.8.3) */ onFalseStart?: () => void }) {
+function StatusChips({ def, r, onChange, onFalseStart, dqMode, onDqMark, onStatus }: {
+  def: DisciplineDef; r: EntryResult; onChange: Change; /** SD-93: combined events — FS warns first (TR 39.8.3) */ onFalseStart?: () => void;
+  /** wave 2 (describe-measured.md): the race DQ reason folds to "✓ Saved · DQ · TR 17.3 — … Edit" */
+  dqMode: PanelMode; onDqMark: (m: PanelMark | null) => void; /** DM7: a status change opens the reason fresh */ onStatus?: () => void;
+}) {
   const s = r.status ?? 'ok';
   return (
     <View style={{ gap: theme.spacing(2) }}>
       <View style={st.wrap}>
         {statusesFor(def).map((x) => (
           <TouchableOpacity key={x} accessibilityRole="button" accessibilityState={{ selected: s === x }} aria-pressed={s === x} accessibilityLabel={`Mark ${x}`}
-            onPress={() => (x === 'FS' && s !== 'FS' && onFalseStart ? onFalseStart() : onChange(withStatusChange(def, { ...r, ruleRef: s === x ? undefined : x === 'FS' ? 'TR 16.8' : r.ruleRef }, s === x ? undefined : x)))}
+            onPress={() => { onStatus?.(); if (x === 'FS' && s !== 'FS' && onFalseStart) onFalseStart(); else onChange(withStatusChange(def, { ...r, ruleRef: s === x ? undefined : x === 'FS' ? 'TR 16.8' : r.ruleRef }, s === x ? undefined : x)); }}
             style={[st.status, s === x && st.statusOn]}>
             <Text style={[st.statusTxt, s === x && st.statusTxtOn]}>{x}</Text>
           </TouchableOpacity>
@@ -1348,7 +1379,7 @@ function StatusChips({ def, r, onChange, onFalseStart }: { def: DisciplineDef; r
       {(s === 'DQ' || s === 'FS') && (
         <RuleRef key={r.ruleRef ?? ''} value={r.ruleRef} hint={ruleHint(def)} onSave={(v) => onChange({ ...r, ruleRef: v || undefined, ...(athDqReasonStale(r, v) ? { reason: undefined } : {}) })} />
       )}
-      {s === 'DQ' && <AthDqChips def={def} r={r} onChange={onChange} />}
+      {s === 'DQ' && <AthDqChips def={def} r={r} onChange={onChange} mode={dqMode} onMark={onDqMark} />}
       {/* batch 6: start conduct (TR 16.5) — a yellow card first, the second disqualifies */}
       {def.sport === 'athletics' && def.capture === 'single' && def.unit === 'time' && def.tie !== 'road' && s === 'ok' ? (
         <View style={st.wrap}>

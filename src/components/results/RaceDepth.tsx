@@ -15,7 +15,7 @@
  * Everything shown is derived from the stored results (data/results/raceDepth.ts,
  * raceCommentary.ts): what wasn't recorded isn't shown, never as a 0.
  */
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -30,6 +30,9 @@ import {
 import type { FieldEntry, FieldEvent } from '../../core/types';
 import type { RootStackParamList } from '../../navigation/types';
 import { IconText } from '../Icon';
+import { DescribeCard } from '../DescribeCard';
+import type { PanelMark, PanelMode } from '../../sports/describePanel';
+import { doneStep, dqSummary, foldMode, takeoverSummary, trimTrailing } from '../../data/results/measuredFold';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -194,23 +197,56 @@ export function MeetCommentaryCard({ events, sport }: { events: MeetEvent[]; spo
 
 /* ---------------------------- capture fields ----------------------------- */
 
-/** A swimming relay's take-over readings, legs 2–4 ("0.21", "-0.05", or "21"). */
-export function TakeoverField({ r, onSave, dq, onDq }: { r: EntryResult; onSave: (takeovers: (number | null)[] | undefined) => void; /** batch 6: the SW 10.13 DQ with the early leg, when a saved reading is early */ dq?: EntryResult | null; onDq?: (n: EntryResult) => void }) {
+/** A swimming relay's take-over readings, legs 2–4 ("0.21", "-0.05", or "21").
+ *  Wave 2 (describe-measured.md): Done folds it to "✓ Saved · L2 0.21 · … Edit"
+ *  per team entry. Blur still saves; Done saves a typed reading first (DM1). */
+export function TakeoverField({ r, who, mode, onMark, onSave, dq, onDq }: {
+  r: EntryResult; who: string; mode: PanelMode; onMark: (m: PanelMark | null) => void;
+  onSave: (takeovers: (number | null)[] | undefined) => void;
+  /** batch 6: the SW 10.13 DQ with the early leg, when a saved reading is early */ dq?: EntryResult | null; onDq?: (n: EntryResult) => void;
+}) {
   const init = [0, 1, 2].map((i) => (r.takeovers?.[i] != null ? (r.takeovers[i] as number).toFixed(2) : ''));
   const [t, setT] = useState(init);
+  const lastSent = useRef<string | undefined>(undefined);
   const vals = t.map(parseTakeover);
   const bad = vals.some((v) => v != null && Number.isNaN(v));
   const commit = () => {
-    if (bad) return;
-    const list: (number | null)[] = vals.map((v) => (v == null ? null : v));
-    while (list.length && list[list.length - 1] == null) list.pop();
-    const next = list.length ? list : undefined;
-    if (JSON.stringify(next ?? null) !== JSON.stringify(r.takeovers?.length ? r.takeovers : null)) onSave(next);
+    const list = trimTrailing(vals.map((v) => (v == null ? null : v))) as (number | null)[];
+    const step = doneStep({ bad, next: list, saved: r.takeovers, lastSent: lastSent.current });
+    if (step.send) { lastSent.current = step.key ?? undefined; onSave(list.length ? list : undefined); }
+    return step;
   };
+  const summary = takeoverSummary(vals);
+  // DM6: the early-reading warning and the judge's DQ chip stay in view when folded
+  const alerts = (
+    <>
+      {vals.some((v) => takeoverEarly(v)) ? <IconText label={"⚠ Earlier than −0.03 s on the pads — ask the take-off judge; disqualify with DQ → SW 10.13 if confirmed."} style={st.warn} /> : null}
+      {/* batch 6: the judge confirmed — one tap disqualifies with the rule and the leg filled in */}
+      {dq && onDq ? <SelectChip label={`Judge confirms: DQ ${dq.ruleRef} · ${dq.reason ?? ''}`} active={false} onPress={() => onDq(dq)} /> : null}
+    </>
+  );
+  const shown = foldMode(mode, summary);
+  if (shown === 'hidden') {
+    return (
+      <View style={{ gap: theme.spacing(1) }}>
+        <SelectChip label="＋ Take-overs" accessibilityLabel={`Add take-overs for ${who}`} active={false} onPress={() => onMark(null)} />
+        {alerts}
+      </View>
+    );
+  }
+  if (shown === 'saved') {
+    return (
+      <View style={{ gap: theme.spacing(1) }}>
+        <DescribeCard title={`Take-overs · ${who}`} summary={summary} mode="saved" onDone={() => onMark('done')} onSkip={() => onMark('skipped')} onEdit={() => onMark(null)} />
+        {alerts}
+      </View>
+    );
+  }
+  // DM1 / DM2: Done and Skip commit like blur; an unreadable reading keeps the card open
+  const finish = (m: PanelMark) => { if (commit().fold) onMark(m); };
   return (
-    <View style={{ gap: theme.spacing(1) }}>
+    <DescribeCard title={`Take-overs · ${who}`} summary={summary} mode="open" onDone={() => finish('done')} onSkip={() => finish('skipped')} onEdit={() => onMark(null)}>
       <View style={st.wrap}>
-        <Text style={st.label}>Take-overs</Text>
         {[2, 3, 4].map((leg, i) => (
           <View key={leg} style={{ gap: 2 }}>
             <Text style={st.small}>Leg {leg}</Text>
@@ -221,25 +257,30 @@ export function TakeoverField({ r, onSave, dq, onDq }: { r: EntryResult; onSave:
         ))}
       </View>
       {bad ? <Text style={st.warn}>Can’t read a take-over — type seconds like 0.21 or −0.05.</Text> : null}
-      {vals.some((v) => takeoverEarly(v)) ? <IconText label={"⚠ Earlier than −0.03 s on the pads — ask the take-off judge; disqualify with DQ → SW 10.13 if confirmed."} style={st.warn} /> : null}
-      {/* batch 6: the judge confirmed — one tap disqualifies with the rule and the leg filled in */}
-      {dq && onDq ? <SelectChip label={`Judge confirms: DQ ${dq.ruleRef} · ${dq.reason ?? ''}`} active={false} onPress={() => onDq(dq)} /> : null}
-    </View>
+      {alerts}
+    </DescribeCard>
   );
 }
 
-/** World Athletics DQ reasons for a track race (sets the rule reference and the reason). */
-export function AthDqChips({ def, r, onChange }: { def: DisciplineDef; r: EntryResult; onChange: (n: EntryResult) => void }) {
+/** World Athletics DQ reasons for a track race (sets the rule reference and the reason).
+ *  Wave 2: once a reason is picked, Done folds it to "✓ Saved · DQ · TR 17.3 — … Edit". */
+export function AthDqChips({ def, r, onChange, mode, onMark }: { def: DisciplineDef; r: EntryResult; onChange: (n: EntryResult) => void; mode: PanelMode; onMark: (m: PanelMark | null) => void }) {
   // batch 6: cycling (UCI) and rowing / canoe (exclusion vs regatta DQ, weights) too
   const codes = raceDqCodesFor(def);
   if (!codes.length) return null;
+  // DM7: read from the saved row, so a removed reason never shows as saved
+  const summary = dqSummary(r);
+  const shown = foldMode(mode, summary);
+  if (shown === 'hidden') return <SelectChip label="＋ DQ reason" accessibilityLabel="Add a DQ reason" active={false} onPress={() => onMark(null)} />;
   return (
-    <View style={st.wrap}>
-      {codes.map((c) => (
-        <SelectChip key={c.ref} label={`${c.ref} · ${c.label}`} active={r.ruleRef === c.ref}
-          onPress={() => onChange({ ...r, ruleRef: r.ruleRef === c.ref ? undefined : c.ref, reason: r.ruleRef === c.ref ? undefined : c.label })} />
-      ))}
-    </View>
+    <DescribeCard title="DQ reason" summary={summary} mode={shown} onDone={() => onMark('done')} onSkip={() => onMark('skipped')} onEdit={() => onMark(null)}>
+      <View style={st.wrap}>
+        {codes.map((c) => (
+          <SelectChip key={c.ref} label={`${c.ref} · ${c.label}`} active={r.ruleRef === c.ref}
+            onPress={() => onChange({ ...r, ruleRef: r.ruleRef === c.ref ? undefined : c.ref, reason: r.ruleRef === c.ref ? undefined : c.label })} />
+        ))}
+      </View>
+    </DescribeCard>
   );
 }
 
