@@ -56,3 +56,10 @@ export function tournamentCards<T extends { id: string; sports: readonly string[
     return { tournament: t, sports: t.sports.length, teams: teams.size, pct: scheduleProgress(ms) };
   });
 }
+
+/** HM13/HM14 (round 3): more than 4 sports fold into one "Your sports" row —
+ *  the first 3 names, then "+N more" — in the grid's own order. */
+export function sportsSummary(sports: readonly SportId[]): { folded: boolean; names: SportId[]; more: number } {
+  if (sports.length <= 4) return { folded: false, names: [...sports], more: 0 };
+  return { folded: true, names: sports.slice(0, 3), more: sports.length - 3 };
+}

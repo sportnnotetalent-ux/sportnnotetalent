@@ -16,7 +16,7 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { theme } from '../core/theme';
 import { EmptyState, Card, LoadingState, Pill, SelectChip, Button, textStyles, plural } from '../components/ui';
-import { weekLine, heroSportChips, heroGreeting, heroFontSize, tournamentCards } from '../core/homeHero';
+import { weekLine, heroSportChips, heroGreeting, heroFontSize, tournamentCards, sportsSummary } from '../core/homeHero';
 import { matchOutbox } from '../data/matchOutbox';
 import { setStatusBarStyle } from 'expo-status-bar';
 import Svg, { Circle, Line, Rect } from 'react-native-svg';
@@ -79,6 +79,7 @@ export default function HomeScreen() {
   const [actionsOpen, setActionsOpen] = useState(false);
   const [voiceOpen, setVoiceOpen] = useState(false);
   const [heroW, setHeroW] = useState(0);
+  const [sportsOpen, setSportsOpen] = useState(false);
   const insets = useSafeAreaInsets();
   useEffect(() => {
     if (selectedId === null && tournaments.length === 1) setSelectedId(tournaments[0].id);
@@ -417,6 +418,23 @@ export default function HomeScreen() {
         <Text style={textStyles.muted}>
           {mySports.length ? 'Schedule, standings and stats for each.' : 'Sports you sign up for will show up here.'}
         </Text>
+        {/* Round 3 (HM13/HM14): many sports fold into one row, like "Try a new sport" */}
+        {(() => {
+          const sum = sportsSummary(mySports);
+          if (!sum.folded || sportsOpen) return null;
+          return (
+            <TouchableOpacity accessibilityRole="button" activeOpacity={0.85} style={st.tryTile}
+              accessibilityLabel={`Your ${mySports.length} sports — show them all`} onPress={() => setSportsOpen(true)}>
+              <Text style={st.sportIcon}>{getSportMeta(sum.names[0]).icon}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={[textStyles.body, { fontWeight: '700' }]}>Your {mySports.length} sports</Text>
+                <Text style={textStyles.muted} numberOfLines={1}>{sum.names.map((x) => getSportMeta(x).name).join(', ')} +{sum.more} more</Text>
+              </View>
+              <Text style={st.chevron}>›</Text>
+            </TouchableOpacity>
+          );
+        })()}
+        {!sportsSummary(mySports).folded || sportsOpen ? (
         <View style={st.sportGrid}>
           {mySports.map((s) => (
             <TouchableOpacity
@@ -433,6 +451,8 @@ export default function HomeScreen() {
             </TouchableOpacity>
           ))}
         </View>
+        ) : null}
+        {sportsOpen ? <Text style={st.showLess} accessibilityRole="button" onPress={() => setSportsOpen(false)}>Show less</Text> : null}
         {newSports.length > 0 && (
           <TouchableOpacity accessibilityRole="button"
             activeOpacity={0.85}
@@ -547,6 +567,7 @@ const st = StyleSheet.create({
     width: '48%',
   },
   sportIcon: { fontSize: 22 },
+  showLess: { color: theme.colors.primary, fontWeight: '700', textAlign: 'center', paddingVertical: theme.spacing(1) },
   tryTile: {
     flexDirection: 'row', alignItems: 'center', gap: theme.spacing(3),
     backgroundColor: theme.colors.surface, borderRadius: theme.radius.md,

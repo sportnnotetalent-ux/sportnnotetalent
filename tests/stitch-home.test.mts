@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { weekLine, heroSportChips, scheduleProgress, heroGreeting, heroFontSize, tournamentCards } from '../src/core/homeHero.ts';
+import { weekLine, heroSportChips, scheduleProgress, heroGreeting, heroFontSize, tournamentCards, sportsSummary } from '../src/core/homeHero.ts';
 
 const read = (p: string) => readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
 const NOW = Date.parse('2026-11-08T06:00:00Z');
@@ -67,4 +67,14 @@ test('HM11/HM12: tournament cards — real counts, at most 10', () => {
   assert.equal(cards[0].teams, 3);
   assert.equal(cards[0].pct, 50);
   assert.equal(tournamentCards(Array.from({ length: 14 }, (_, i) => t(`t${i}`, ['football'])) as never, []).length, 10);
+});
+
+test('HM13/HM14: many sports fold into one row; four or fewer stay a grid', () => {
+  const many = ['football', 'cricket', 'basketball', 'badminton', 'tennis', 'kabaddi'];
+  assert.deepEqual(sportsSummary(many as never), { folded: true, names: ['football', 'cricket', 'basketball'], more: 3 });
+  assert.deepEqual(sportsSummary(many.slice(0, 4) as never), { folded: false, names: many.slice(0, 4), more: 0 });
+  assert.deepEqual(sportsSummary([] as never), { folded: false, names: [], more: 0 });
+  const h = read('src/screens/HomeScreen.tsx');
+  assert.match(h, /sportsSummary\(mySports\)/);
+  assert.match(h, /Show less/);
 });

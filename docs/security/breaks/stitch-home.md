@@ -31,3 +31,12 @@
 | HM10 | The greeting shows a child's full name, or someone else's name on a shared device. | Privacy | It uses only the signed-in user's own first name (as before). Sign-out clears the profile (shared-device rule). |
 | HM11 | Tournament cards show wrong counts (cancelled games in progress, teams counted twice). | Trust | Progress = scheduleProgress (HM4). Teams = distinct teams in that tournament's games. Sports = the tournament's own list. Tested. |
 | HM12 | Dozens of tournaments make Home slow. | Perf | At most 10 cards, then "See all ›" to Organize. |
+
+## Round 3 — founder 2026-11-08: Your sports, compact
+
+"The your sports section should look similar to Try a new sport … we don't want too much scrolling if someone has played multiple sports."
+
+| # | Break | Kind | Fix |
+|---|---|---|---|
+| HM13 | A player with 20+ sports gets a full screen of sport rows before anything else. | UX | More than 4 sports: one row like "Try a new sport" ("Your sports · Football, Cricket, Basketball +18 more"); tapping it opens the full grid in place, with "Show less". Four or fewer stay as the small grid. Tested. |
+| HM14 | The summary names sports out of order or counts wrong. | Trust | It uses the same `mySports` order as the grid: the first 3 names, then "+N more" for the rest. Tested. |
