@@ -5,7 +5,10 @@
 export type PanelMark = 'done' | 'skipped';
 export type PanelMode = 'open' | 'saved' | 'hidden';
 
-export function panelMode(eventId: number, marks: ReadonlyMap<number, PanelMark>): PanelMode {
+/** a play's key: an event id (most sports) or a string (cricket's "2.3") — CD2 */
+export type PlayKey = string | number;
+
+export function panelMode<K extends PlayKey>(eventId: K, marks: ReadonlyMap<K, PanelMark>): PanelMode {
   const m = marks.get(eventId);
   return m === 'done' ? 'saved' : m === 'skipped' ? 'hidden' : 'open';
 }
