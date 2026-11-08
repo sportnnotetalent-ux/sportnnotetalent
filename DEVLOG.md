@@ -38,6 +38,13 @@ Where it changed:
   - Marketing posts already rendered keep the old mark.
   - The mint experiment was undone and never committed.
 
+### 2026-11-08 — Release: racket point detail, no false zeros (web, Android OTA)
+
+auth-smoke passed and the publish lock was taken. Published from a clean worktree at a3f0a298.
+- **Web:** `index-072d317a`, live on app.sportnnote.in.
+- **Android OTA:** `31c1b039` (preview) / `8955c8bf` (production).
+- **Includes:** the point-detail fix (5e8091ca). The clean-up SQL for the 8 old lines waits for the founder to run it.
+
 ### 2026-11-08 — Old career zeros counted; point detail fixed; clean-up SQL for the founder
 
 Read-only count of live career lines (stat_lines): 41 in total (pool 26, badminton 6, pickleball 4, tennis 4, volleyball 1). Most zeros are real counts (pool foul types / racks, sets, break points).

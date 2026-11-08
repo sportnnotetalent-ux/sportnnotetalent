@@ -29,3 +29,4 @@ Why: on 2026-11-05 two sessions published within minutes of each other, and one 
 | 2026-11-08 | wave2 session | e0226570 | index-0430d902 | bb4eb266 / 1c7cd375 |
 | 2026-11-08 | wave3 session | d7fc90de | index-ec4fd7ce | 8cbb738a / 968ee226 |
 | 2026-11-08 | wave4 session | bb90add0 | index-82a6f99d | e336b966 / aeaac34f |
+| 2026-11-08 | point-detail session | a3f0a298 | index-072d317a | 31c1b039 / 8955c8bf |
