@@ -27,6 +27,7 @@ import {
   penaltyMissActions, gridSaveActions, cardChoices,
   stoppageAction, stoppageReasonAction, penaltyConcededActions, penaltyStepAfter, footballTrackedKeys, STOPPAGE_REASONS, STOPPAGE_LABEL,
   goalDetailAction, concussionLeft, GOAL_SITUATIONS, SITUATION_LABEL,
+  goalCarry, reenterGoalActions, type GoalCarry,
 } from './actions';
 import { footballCapturedKeys } from './depth';
 import { Button, TextField, SelectChip } from '../../components/ui';
@@ -117,7 +118,9 @@ const BODY_PARTS: BodyPart[] = ['left', 'right', 'head', 'chest'];
 
 /** Flow state for the multi-step capture (goal, foul, or a generic stat/card). */
 type Flow =
-  | { mode: 'goal'; side: 'home' | 'away'; step: 'scorer' }
+  // wave 4 (polish-invasion PI17–PI21): `carry` = a goal re-entered from the
+  // timeline keeps its assist and detail
+  | { mode: 'goal'; side: 'home' | 'away'; step: 'scorer'; carry?: GoalCarry }
   | { mode: 'goal'; side: 'home' | 'away'; step: 'og' }
   | { mode: 'goal'; side: 'home' | 'away'; step: 'type'; scorer: Player } // voice path only
   | { mode: 'goal'; side: 'home' | 'away'; step: 'body'; scorer: Player; goalType: GoalType } // voice path only
@@ -408,6 +411,13 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
     setGoalCard({ side, fromSeq: state.seq });
   };
   const shotGoal = (side: 'home' | 'away', player: Player) => { scoreThenDescribe(side, player, 'open'); setFlow(null); };
+  // wave 4 (polish-invasion PI17–PI21): an edited goal re-entered with its old
+  // assist and detail; the assist names the re-entered goal (its own id)
+  const reenterGoal = (side: 'home' | 'away', scorer: Player, carry: GoalCarry) => {
+    for (const a of reenterGoalActions(state, side, scorer, carry, { tracked: trackedKeys() })) fire(a);
+    setGoalCard({ side, fromSeq: state.seq });
+    setFlow(null);
+  };
   const recordOwnGoal = (side: 'home' | 'away', scorer: Player) => {
     // SD-30: the player's id rides along — `ownGoals` is credited to him by the
     // absolute totals at full time (not live: his line's opponent is this side).
@@ -464,7 +474,7 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
     setEditMin(ev.minute);
     setEditHalf(eventHalf(ev, fmt));
     setShowEdit(false);
-    if (ev.type === 'goal') setFlow({ mode: 'goal', side: ev.side, step: 'scorer' });
+    if (ev.type === 'goal') setFlow({ mode: 'goal', side: ev.side, step: 'scorer', carry: goalCarry(ev) });
     else if (ev.type === 'owngoal') setFlow({ mode: 'goal', side: ev.side, step: 'og' });
     else if (ev.official) { setOfficialName(ev.playerName ?? ''); setFlow({ mode: 'stat', kind: 'card', step: 'official', side: ev.side }); }
     else if (ev.type === 'yellow' || ev.type === 'red' || ev.type === 'sinbin') setFlow({ mode: 'stat', kind: 'card', step: 'player', side: ev.side });
@@ -580,7 +590,9 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
         if (flow.step === 'scorer') {
           if (/own goal/.test(deburr(text))) { setFlow({ mode: 'goal', side: flow.side, step: 'og' }); say('Own goal — which opponent?'); return; }
           const p = matchPlayer(text, xi(flow.side));
-          if (p) { setFlow({ mode: 'goal', side: flow.side, step: 'type', scorer: p }); say(`${p.fullName} — penalty, free kick, header or open play?`); }
+          // wave 4 (PI21): a re-entered goal keeps its type, detail and assist — no more questions
+          if (p && flow.carry) { reenterGoal(flow.side, p, flow.carry); say(`Goal re-entered: ${p.fullName}.`); }
+          else if (p) { setFlow({ mode: 'goal', side: flow.side, step: 'type', scorer: p }); say(`${p.fullName} — penalty, free kick, header or open play?`); }
           else say("Didn't catch the scorer — say a name.");
           return;
         }
@@ -904,7 +916,7 @@ const ScoringControls: SportPlugin<FootballState>['ScoringControls'] = ({
         return panel(`⚽ Goal — ${sideName}`, 'Who scored?', (
           <>
             {/* SD-114 (F2): the goal is on the board on the scorer tap; the assist is attached after (Close keeps the goal). */}
-            <PlayerTable players={xi(flow.side)} onPick={(p) => { scoreThenDescribe(flow.side, p, 'open'); setFlow(null); }} />
+            <PlayerTable players={xi(flow.side)} onPick={(p) => { if (flow.carry) { reenterGoal(flow.side, p, flow.carry); return; } scoreThenDescribe(flow.side, p, 'open'); setFlow(null); }} />
             <Button label={`⚽ Team goal — no scorer${xi(flow.side).length === 0 ? ' (no players yet)' : ''}`} variant="ghost" onPress={() => recordTeamGoal(flow.side)} />
             <Button label="🔃 Own goal instead" variant="ghost" onPress={() => setFlow({ mode: 'goal', side: flow.side, step: 'og' })} />
           </>

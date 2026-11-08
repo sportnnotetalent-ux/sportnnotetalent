@@ -153,3 +153,6 @@ export function hockeyTotals(s: HockeyState): Record<string, { side: Side; stats
 /** The keys statTotals owns that no live action credits (contract rule 5). */
 export const DERIVED_KEYS = ['minutes', 'suspensionMinutes', 'goalsConceded', 'cleanSheets', 'soSaves'] as const;
 export const OWNED_LIVE_KEYS = LIVE_KEYS;
+/** NZI15 (polish-invasion PI12): every key hockeyTotals can write — the plugin's
+ *  `statTotalsKeys`, so the sync clears one a correction left no player with. */
+export const STAT_TOTALS_KEYS: readonly string[] = [...new Set<string>([...LIVE_KEYS, ...DERIVED_KEYS])];

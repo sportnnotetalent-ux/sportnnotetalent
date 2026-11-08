@@ -53,7 +53,7 @@ import {
 import { ruledOutAction, RULED_OUT_REASONS, RULED_OUT_LABEL } from '../invasion/ruledOut';
 import { asksWho } from '../invasion/asksWho';
 import { restartAction, RESTART_LABEL, UNION_RESTARTS } from '../invasion/restarts';
-import { rugbyTotals, rugbyLiveField, rugbyField, unavailable } from './totals';
+import { rugbyTotals, rugbyLiveField, rugbyField, unavailable, STAT_TOTALS_KEYS } from './totals';
 import { rugbyBox } from './box';
 import { rugbyCommentary, rugbyScopeLabel, RUGBY_FEED_TAGS } from './commentary';
 import { rugbySheet } from './sheet';
@@ -859,6 +859,7 @@ export const rugbyPlugin: SportPlugin<RugbyState> = {
   },
   scoreLine: rugbyScoreLine,
   statTotals: rugbyTotals,
+  statTotalsKeys: STAT_TOTALS_KEYS, // NZI15: the sync clears a key no player has any more
   standingsUnits: rugbyStandingsUnits as SportPlugin<RugbyState>['standingsUnits'],
   undoLabel: rugbyUndoLabel,
   tickerDetail: rugbyTickerDetail,

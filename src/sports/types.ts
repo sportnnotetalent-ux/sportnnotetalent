@@ -595,6 +595,11 @@ export interface SportPlugin<S = unknown> {
    *  absolutely; every other stat keeps moving by live increments and #05
    *  correction deltas. Absent = the totals own the whole line (cricket). */
   statTotalsPartial?: boolean;
+  /** NZI15 (polish-invasion PI12) — for a sport whose totals own the WHOLE
+   *  line: every key `statTotals` can ever write. The sync owns them all, so a
+   *  correction that deletes the only event of a kind clears that key (0)
+   *  instead of leaving the stale value. Ignored with `statTotalsPartial`. */
+  statTotalsKeys?: readonly string[];
   /** SD-15 (GEN-02) — the sport's declarative stat schema: keys, labels,
    *  formats, aggregation, box / career / leaders / awards / MVP weights. Set
    *  for every sport by the registry from `statSchemas.ts` (pure, so the data

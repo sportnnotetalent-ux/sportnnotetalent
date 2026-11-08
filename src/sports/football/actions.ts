@@ -61,6 +61,32 @@ export const assistAction = (side: Side, p: Who, tracked?: string[], ref?: numbe
   return ref == null ? { ...a, ...back } : { ...a, payload: { ...a.payload, ref }, ...back };
 };
 
+/** Wave 4 (polish-invasion PI17–PI20): what a goal re-entered from the
+ *  timeline (✎ Edit) keeps — its assister (by id; IDs-only scoring, so a
+ *  legacy name-only assist is not carried) and its detail. */
+export type GoalCarry = { a1?: string; goalType?: GoalType; bodyPart?: BodyPart; zone?: ShotZone; bigChance?: boolean; situation?: GoalSituation };
+export const goalCarry = (e: FootballEvent): GoalCarry => ({
+  ...(e.secondId ? { a1: e.secondId } : {}),
+  ...(e.goalType ? { goalType: e.goalType } : {}),
+  ...(e.bodyPart ? { bodyPart: e.bodyPart } : {}),
+  ...(e.zone ? { zone: e.zone } : {}),
+  ...(e.bigChance ? { bigChance: true } : {}),
+  ...(e.situation ? { situation: e.situation } : {}),
+});
+
+/** The re-entry of an edited goal: the GOAL with the carried detail, then (when
+ *  carried, and not the new scorer himself) the ASSIST on THAT goal — `ref` is
+ *  its own id, `seq + 1` of the state the re-entry is dispatched on (the
+ *  controls' `view`, the held removal already applied), so a later goal of the
+ *  same side never takes it (PI19). */
+export function reenterGoalActions(s: Pick<FootballState, 'seq'>, side: Side, scorer: Who, carry: GoalCarry, o: { tracked?: string[] } = {}): ScoreAction[] {
+  const goal = goalAction(side, scorer, carry.goalType ?? 'open', {
+    bodyPart: carry.bodyPart, zone: carry.zone, bigChance: carry.bigChance, situation: carry.situation, tracked: o.tracked,
+  });
+  const a1 = carry.a1 && carry.a1 !== scorer.id ? carry.a1 : undefined;
+  return a1 ? [goal, assistAction(side, { id: a1 }, o.tracked, s.seq + 1)] : [goal];
+}
+
 /** A card for `p`: a red, or a yellow — plus the red when it is the player's
  *  second (`events` = the match so far; an older yellow may carry a name only). */
 export function cardActions(events: FootballEvent[], side: Side, color: 'yellow' | 'red', p: Who & { fullName?: string }, o: { reason?: CardReason; tracked?: string[] } = {}): ScoreAction[] {

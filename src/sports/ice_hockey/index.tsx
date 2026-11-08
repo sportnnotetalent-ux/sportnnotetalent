@@ -40,7 +40,7 @@ import {
   periodStarted, running, eventCredits, creditAttribution, goalFlagsNow, goalieAt, goalieOf, netEmpty, penaltyBox, partEnd, skatersOn, baseSkaters,
   soScore, nextShooter, needsSdPick, iceHockeyScoreLine, timeoutLeft, totalPeriods, nextIsOvertime, eventWhen, standingsUnits, ejects,
   ICE_HOCKEY_PRESETS, ICE_HOCKEY_LIVE_SETTINGS, PEN_LABEL, INFRACTIONS, STRENGTH_LABEL, LIVE_KEYS,
-  TALLY_LABEL, TRACK_FLAGS, TRACK_KINDS, TRACK_FIELDS, iceTrackedKeys, soAction, penaltyShotAction, goalDetailAction,
+  TALLY_LABEL, TRACK_FLAGS, TRACK_KINDS, TRACK_FIELDS, iceTrackedKeys, soAction, penaltyShotAction, goalDetailAction, foZoneAction, foZonePatch,
   type FoZone, type IceEvent, type IceHockeyState, type PenKind, type Side, type Strength, type TallyKind,
 } from './engine';
 import { iceHockeyCommentary, iceScopeLabel, ICE_FEED_TAGS } from './commentary';
@@ -49,7 +49,7 @@ import { asksWho } from '../invasion/asksWho';
 import { iceHockeySheet } from './sheet';
 import { GroupedFeed } from '../GroupedFeed';
 import { StatSheetView } from '../StatSheetView';
-import { iceHockeyTotals } from './totals';
+import { iceHockeyTotals, STAT_TOTALS_KEYS } from './totals';
 import { iceHockeyBox } from './box';
 import { iceHockeyTimeline, describeEvent, goalTags } from './timeline';
 import { iceHockeyTickerDetail, iceHockeyTickerFlash } from './ticker';
@@ -121,9 +121,9 @@ type Flow =
   | { mode: 'ps'; side: Side; step: 'result' | 'player'; res?: 'saved' | 'missed' }
   | { mode: 'gk'; side: Side }
   | { mode: 'tally'; side: Side; kind: TallyKind }
-  | { mode: 'centres'; side: Side }
-  /** round 2: faceoff zones on — the one extra tap (where the draw was) */
-  | { mode: 'foZone'; side: Side };
+  | { mode: 'centres'; side: Side };
+// (wave 4, polish-invasion PI1: the faceoff zone is no longer a panel — it is
+// attached after, on the faceoff card)
 
 /* -------------------------------- controls --------------------------------- */
 
@@ -144,6 +144,10 @@ const ScoringControls: SportPlugin<IceHockeyState>['ScoringControls'] = ({
   // newer goal replaces it (DI6); Done / Skip per goal
   const [goalCard, setGoalCard] = useState<string | null>(null);
   const goalMarks = useDescribeMarks<string>();
+  // wave 4 (polish-invasion PI1, PI10): the faceoff just won (its id) — its card
+  // takes the zone after the winner tap; a newer faceoff replaces it
+  const [foCard, setFoCard] = useState<string | null>(null);
+  const foMarks = useDescribeMarks<string>();
   /** deep wave: the centres taking the draws (one-tap faceoffs credit them) */
   const [centres, setCentres] = useState<{ home?: Player; away?: Player }>({});
   const [, tick] = useState(0);
@@ -210,13 +214,22 @@ const ScoringControls: SportPlugin<IceHockeyState>['ScoringControls'] = ({
     const tr = trackedKeys(s, e);
     return { attribution: creditAttribution(cr.first, 1, tr), attribution2: creditAttribution(cr.second, 1, tr), third: creditAttribution(cr.third, 1, tr) };
   };
-  /** deep wave: an optional tally (a faceoff credits the winning centre and the loser;
-   *  round 2: with zones tracked, the zone from the winner's view) */
-  const tally = (sd: Side, kind: TallyKind, p: Player | null | undefined, loser?: Player | null, zone?: FoZone) => {
-    const z = kind === 'faceoff' ? zone : undefined;
-    const cr = credit({ type: 'tally', side: sd, tally: kind, playerId: p?.id, ...(kind === 'faceoff' && loser ? { secondId: loser.id } : {}), ...(z ? { zone: z } : {}) });
-    fire({ type: 'TALLY', side: sd, payload: { kind, ...(z ? { zone: z } : {}) }, attribution: cr.attribution, attribution2: cr.attribution2 });
+  /** deep wave: an optional tally (a faceoff credits the winning centre and the loser).
+   *  Wave 4 (polish-invasion PI1): a faceoff logs at the winner tap with no zone;
+   *  with zones on, its card then takes the zone (FO_ZONE, by the faceoff's id). */
+  const tally = (sd: Side, kind: TallyKind, p: Player | null | undefined, loser?: Player | null) => {
+    const id = uid();
+    const cr = credit({ type: 'tally', side: sd, tally: kind, playerId: p?.id, ...(kind === 'faceoff' && loser ? { secondId: loser.id } : {}) });
+    fire({ type: 'TALLY', side: sd, payload: { uid: id, kind }, attribution: cr.attribution, attribution2: cr.attribution2 });
+    if (kind === 'faceoff' && s.trackFaceoffZones) setFoCard(id);
     setFlow(null);
+  };
+  /** the faceoff card's zone (null clears), on that faceoff (its credits: the difference) */
+  const foZone = (ref: string, z: FoZone | null) => {
+    const e = s.events.find((x) => x.id === ref);
+    const n = e ? foZonePatch(e, z) : null;
+    const a = n ? foZoneAction(s, ref, z, trackedKeys(s, n)) : null;
+    if (a) dispatch(a);
   };
   // describe-invasion DI1: on the board at the scorer tap ("Team goal" too); the
   // rest is attached after (GOAL_DETAIL, by the goal's id). DI9: a re-entered
@@ -392,6 +405,28 @@ const ScoringControls: SportPlugin<IceHockeyState>['ScoringControls'] = ({
     );
   })() : null;
 
+  /* ---- wave 4 (polish-invasion PI1, PI10): the card for the faceoff just won ---- */
+  // Only that faceoff's (a newer one replaces it); gone with it (Undo, a
+  // correction); hidden while a correction is open. Named by the END the draw
+  // was in, so it can't be read backwards; stored from the winner's view.
+  const cardFo = foCard && !editAt && s.trackFaceoffZones ? s.events.find((e) => e.id === foCard && e.type === 'tally' && e.tally === 'faceoff') : undefined;
+  const foCardView = cardFo ? (() => {
+    const f = cardFo, ref = f.id, sd = f.side, o = opp(sd);
+    const endOf: Record<FoZone, string> = { oz: `${name(o)} end`, nz: 'Neutral zone', dz: `${name(sd)} end` };
+    const summary = f.zone ? endOf[f.zone] : '';
+    const who = f.playerId ? nameFor(playerNameOf, f.playerId, f.playerName) ?? 'Player' : name(sd);
+    return (
+      <DescribeCard title={`Last faceoff · ${who} won it · where?`} summary={summary} mode={foMarks.modeOf(ref)}
+        onDone={() => foMarks.mark(ref, 'done')} onSkip={() => foMarks.mark(ref, 'skipped')} onEdit={() => foMarks.mark(ref, null)}>
+        <View style={c.chips}>
+          <Chip label={endOf.oz} a11y={`In the ${name(o)} end: offensive zone for ${name(sd)}`} on={f.zone === 'oz'} onPress={() => foZone(ref, f.zone === 'oz' ? null : 'oz')} />
+          <Chip label={endOf.nz} a11y="Neutral zone" on={f.zone === 'nz'} onPress={() => foZone(ref, f.zone === 'nz' ? null : 'nz')} />
+          <Chip label={endOf.dz} a11y={`In the ${name(sd)} end: defensive zone for ${name(sd)}`} on={f.zone === 'dz'} onPress={() => foZone(ref, f.zone === 'dz' ? null : 'dz')} />
+        </View>
+      </DescribeCard>
+    );
+  })() : null;
+
   /* ---- after the final horn: the shoot-out ---- */
   if (s.ended) {
     if (s.shootout) {
@@ -458,6 +493,7 @@ const ScoringControls: SportPlugin<IceHockeyState>['ScoringControls'] = ({
           )}
         </View>
         {goalCardView}
+        {foCardView}
         <EditList s={s} show={showEdit} setShow={setShowEdit} onRemove={remove} homeName={homeName} awayName={awayName} />
       </View>
     );
@@ -578,24 +614,6 @@ const ScoringControls: SportPlugin<IceHockeyState>['ScoringControls'] = ({
               skip={{ label: 'Team (no name)', onPress: () => tally(sd, flow.kind, null) }} />
           </View>
         );
-      case 'foZone': {
-        // round 2: where was the draw? Named by the END it was in, so it can't be read backwards;
-        // stored from the winner's view (in the other team's end = offensive zone)
-        const o = opp(sd);
-        const pick = (z?: FoZone) => tally(sd, 'faceoff', centres[sd], centres[o], z);
-        return (
-          <View style={c.panel}>{head('Faceoff won')}
-            <Text style={c.small}>Where was the draw?</Text>
-            <View style={c.grid}>
-              <Button label={`${name(o)} end`} accessibilityLabel={`In the ${name(o)} end: offensive zone for ${name(sd)}`} variant="ghost" style={c.third} onPress={() => pick('oz')} />
-              <Button label="Neutral zone" accessibilityLabel="Neutral zone" variant="ghost" style={c.third} onPress={() => pick('nz')} />
-              <Button label={`${name(sd)} end`} accessibilityLabel={`In the ${name(sd)} end: defensive zone for ${name(sd)}`} variant="ghost" style={c.third} onPress={() => pick('dz')} />
-            </View>
-            <Text style={c.meta}>{name(sd)} won it: the {name(o)} end is their offensive zone, their own end their defensive zone.</Text>
-            <Text style={[c.link, c.tap]} accessibilityRole="button" onPress={() => pick()}>Skip the zone</Text>
-          </View>
-        );
-      }
       case 'centres':
         return (
           <View style={c.panel}>{head('Centres on the draw')}
@@ -625,8 +643,8 @@ const ScoringControls: SportPlugin<IceHockeyState>['ScoringControls'] = ({
       {kindsOn.map((k) => (
         <Chip key={k} label={TALLY_CHIP[k]} on={false} a11y={`${TALLY_LABEL[k]}, ${name(sd)}`}
           onPress={() => (k === 'faceoff'
-            // round 2: faceoff zones on → one more tap (the zone); off → one tap, as before
-            ? (s.trackFaceoffZones ? setFlow({ mode: 'foZone', side: sd }) : tally(sd, 'faceoff', centres[sd], centres[opp(sd)]))
+            // one tap logs it (wave 4: with zones on, the zone goes on the faceoff card after)
+            ? tally(sd, 'faceoff', centres[sd], centres[opp(sd)])
             : setFlow({ mode: 'tally', side: sd, kind: k }))} />
       ))}
     </View>
@@ -705,6 +723,7 @@ const ScoringControls: SportPlugin<IceHockeyState>['ScoringControls'] = ({
       {flowPanel ?? <View style={c.cols}>{sideCol('home')}{sideCol('away')}</View>}
       {/* describe-invasion: under the controls — scoring carries straight on */}
       {goalCardView}
+      {foCardView}
       {!flowPanel && s.trackFaceoffs ? (
         <Text style={[c.gk, c.tap]} accessibilityRole="button" onPress={() => setFlow({ mode: 'centres', side: 'home' })}>
           ⚪ Centres: {centres.home?.fullName ?? '—'} v {centres.away?.fullName ?? '—'} · change ›
@@ -868,6 +887,11 @@ export function iceHockeyUndoLabel(step: { type: string; prev: unknown; next: un
     if (!!g.en !== !!o.en) return 'empty net';
     return 'players on the ice';
   }
+  if (step.type === 'FO_ZONE') {
+    // wave 4 (polish-invasion PI11): a faceoff's zone attached after the winner tap
+    const i = next.events.findIndex((e, k) => e.type === 'tally' && e.tally === 'faceoff' && e.zone !== prev.events[k]?.zone);
+    return i >= 0 && !next.events[i].zone ? 'faceoff zone removal' : 'faceoff zone';
+  }
   if (step.type === 'CLOCK') return 'clock start / stop';
   if (step.type === 'SET_CLOCK') return 'clock set';
   if (step.type === 'END_PERIOD') return 'period end';
@@ -913,6 +937,7 @@ export const iceHockeyPlugin: SportPlugin<IceHockeyState> = {
   scoreLine: iceHockeyScoreLine,
   standingsUnits: (s) => standingsUnits(s),
   statTotals: iceHockeyTotals,
+  statTotalsKeys: STAT_TOTALS_KEYS, // NZI15: the sync clears a key no player has any more
   tickerDetail: iceHockeyTickerDetail,
   tickerFlash: iceHockeyTickerFlash,
   undoLabel: iceHockeyUndoLabel,

@@ -70,8 +70,8 @@ const SPECS: Spec[] = [
   {
     name: 'ice hockey', fields: icMeta.ICE_HOCKEY_META.formatFields!, ls: ice.ICE_HOCKEY_LIVE_SETTINGS, init: ice.init,
     defaults: () => (icMeta as any).ICE_HOCKEY_STATS_DEFAULTS,
-    // DOI9: faceoff zones still replace the controls (describe-invasion DI16) → OFF
-    on: ['trackFaceoffs', 'trackPhysical', 'trackPuck', 'trackAttempts'], off: ['trackFaceoffZones', 'plusMinus', 'trackRuledOut'],
+    // polish PI9: faceoff zones are a non-blocking card now (was DOI9: OFF while the zone panel replaced the controls) → ON
+    on: ['trackFaceoffs', 'trackFaceoffZones', 'trackPhysical', 'trackPuck', 'trackAttempts'], off: ['plusMinus', 'trackRuledOut'],
   },
   {
     name: 'rugby union', fields: ruMeta.RUGBY_META.formatFields!, ls: rugby.RUGBY_LIVE_SETTINGS, init: rugby.init,
@@ -193,9 +193,10 @@ describe('football specifics', () => {
 
 describe('ice hockey specifics', () => {
   const fields = icMeta.ICE_HOCKEY_META.formatFields!;
-  test('DOI9: faceoff zones stay OFF while the zone panel still replaces the controls', () => {
-    assert.match(src('src/sports/ice_hockey/index.tsx'), /setFlow\(\{ mode: 'foZone', side: sd \}\)/);
-    assert.equal(ice.init(newMatch(fields)).trackFaceoffZones, undefined);
+  // polish PI1/PI9: the zone panel is gone (a card after the winner tap), so zones default ON
+  test('DOI9 → polish PI9: faceoff zones ON now that the zone panel no longer replaces the controls', () => {
+    assert.doesNotMatch(src('src/sports/ice_hockey/index.tsx'), /mode: 'foZone'/);
+    assert.equal(ice.init(newMatch(fields)).trackFaceoffZones, true);
   });
   test('DOI8: a new match that taps only goals tracks no tally', () => {
     const s = ice.init(newMatch(fields));

@@ -286,13 +286,14 @@ describe('round 2 · old logs replay identically; power plays per penalty', () =
     assert.equal(teamFigures(s, 'home').ppChances, 2);
     assert.equal(iceHockeySheet(s, 'all', 600).sections.find((x) => x.key === 'pp')!.rows.find((r) => r.key === 'ppConv')!.home, '0/2 (0%)');
   });
-  test('live settings and the format: "Faceoff zones" right after "Faceoffs", off by default', () => {
+  // polish PI9: ON by default for NEW matches (a saved match without the key still reads OFF)
+  test('live settings and the format: "Faceoff zones" right after "Faceoffs", on by default (new matches)', () => {
     const keys = TRACK_FIELDS.map((f) => f.key);
     assert.equal(keys.indexOf('trackFaceoffZones'), keys.indexOf('trackFaceoffs') + 1);
     const f = TRACK_FIELDS.find((x) => x.key === 'trackFaceoffZones')!;
-    assert.deepEqual([f.label, f.type, f.default, f.group], ['Faceoff zones', 'toggle', false, 'Stats to track']);
+    assert.deepEqual([f.label, f.type, f.default, f.group], ['Faceoff zones', 'toggle', true, 'Stats to track']);
     assert.equal(ICE_HOCKEY_LIVE_SETTINGS.read(init(ZONES_ON)).trackFaceoffZones, true);
     assert.equal(ICE_HOCKEY_LIVE_SETTINGS.read(init()).trackFaceoffZones, false);
-    assert.equal(ICE_HOCKEY_LIVE_SETTINGS.defaults?.trackFaceoffZones, false);
+    assert.equal(ICE_HOCKEY_LIVE_SETTINGS.defaults?.trackFaceoffZones, true);
   });
 });

@@ -48,7 +48,7 @@ import {
 } from './engine';
 import { ruledOutAction, RULED_OUT_REASONS, RULED_OUT_LABEL } from '../invasion/ruledOut';
 import { restartAction, RESTART_LABEL, LEAGUE_RESTARTS } from '../invasion/restarts';
-import { leagueTotals, leagueLiveField, leagueField, unavailable } from './totals';
+import { leagueTotals, leagueLiveField, leagueField, unavailable, STAT_TOTALS_KEYS } from './totals';
 import { leagueBox } from './box';
 import { leagueCommentary, leagueScopeLabel, LEAGUE_FEED_TAGS } from './commentary';
 import { leagueSheet } from './sheet';
@@ -757,6 +757,7 @@ export const rugbyLeaguePlugin: SportPlugin<LeagueState> = {
     awayReds: s.events.filter((e) => e.type === 'sanction' && e.sanction === 'sendOff' && e.side === 'away').length,
   }),
   statTotals: leagueTotals,
+  statTotalsKeys: STAT_TOTALS_KEYS, // NZI15: the sync clears a key no player has any more
   standingsUnits: leagueStandingsUnits as SportPlugin<LeagueState>['standingsUnits'],
   undoLabel: leagueUndoLabel,
   tickerDetail: leagueTickerDetail,

@@ -43,7 +43,7 @@ import { hockeyFeed, hockeyFacts, hockeyFeedPeriods, hockeyPeriodLabel } from '.
 import { hockeyCentre } from './stats';
 import { Commentary, MatchFactsCard, resultFacts } from '../invasion/Commentary';
 import { MatchCentre } from '../invasion/MatchCentre';
-import { hockeyTotals, hockeyLiveField, hockeyField, unavailable } from './totals';
+import { hockeyTotals, hockeyLiveField, hockeyField, unavailable, STAT_TOTALS_KEYS } from './totals';
 import { hockeyBox } from './box';
 import { describeEvent, eventWhen, timelineEvents, GOAL_LABEL } from './timeline';
 import { hockeyTickerDetail, hockeyTickerFlash } from './ticker';
@@ -833,6 +833,7 @@ export const hockeyPlugin: SportPlugin<HockeyState> = {
   // Undo labels batch — Undo names the step in the sport's own words
   undoLabel: hockeyUndoLabel,
   statTotals: hockeyTotals,
+  statTotalsKeys: STAT_TOTALS_KEYS, // NZI15: the sync clears a key no player has any more
   tickerDetail: hockeyTickerDetail,
   tickerFlash: hockeyTickerFlash,
   // SD-137a — voice scoring (period / match ends ask first)

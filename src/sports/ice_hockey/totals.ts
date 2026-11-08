@@ -158,3 +158,7 @@ export function iceHockeyTotals(s: IceHockeyState): Record<string, Line> {
 /** The keys statTotals owns that no live action credits (contract rule 5). */
 export const DERIVED_KEYS = ['gkMinutes', 'goalsAgainst', 'shotsAgainst', 'shutouts', 'gkGames', 'gwg', 'plusMinus'] as const;
 export const OWNED_LIVE_KEYS = [...LIVE_KEYS, ...TALLY_KEYS, ...FO_ZONE_KEYS] as const;
+/** NZI15 (polish-invasion PI12): every key iceHockeyTotals can write (the
+ *  shoot-out goalie's keys included) — the plugin's `statTotalsKeys`, so the
+ *  sync clears one a correction left no player with. */
+export const STAT_TOTALS_KEYS: readonly string[] = [...new Set<string>([...OWNED_LIVE_KEYS, ...DERIVED_KEYS, 'soShotsFaced', 'soSaves'])];

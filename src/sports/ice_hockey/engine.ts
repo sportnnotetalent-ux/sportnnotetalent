@@ -463,6 +463,34 @@ export function goalDetailAction(s: Pick<IceHockeyState, 'events' | 'pimScale'>,
   return detailAction('GOAL_DETAIL', e.side, ref, patch, creditDiff([b.first, b.second, b.third], [a.first, a.second, a.third], tracked), !sameEvent(e, n));
 }
 
+/** Wave 4 (polish-invasion PI1–PI8): a faceoff's zone attached AFTER the
+ *  winner tap (the faceoff is logged at once, with no zone). `zone` from the
+ *  WINNER's view; `null` clears it. Null when it doesn't fit: not a faceoff, a
+ *  junk zone, no change. PURE (the reducer and the builder share it). */
+export function foZonePatch(e: IceEvent, zone: unknown): IceEvent | null {
+  if (e.type !== 'tally' || e.tally !== 'faceoff') return null;
+  if (zone === null) {
+    if (!e.zone) return null;
+    const { zone: _z, ...rest } = e;
+    return rest;
+  }
+  if (!isFoZone(zone) || e.zone === zone) return null;
+  return { ...e, zone };
+}
+
+/** The FO_ZONE step for the faceoff `ref`: its credits are the difference of
+ *  the faceoff's own credits before and after, so the faceoff plus its zone
+ *  credit exactly what the old one-step TALLY with a zone did (the winner's
+ *  zone, the loser's mirror). `tracked` = the keys stamped on the credits (the
+ *  controls pass `iceTrackedKeys` with the patched faceoff). */
+export function foZoneAction(s: Pick<IceHockeyState, 'events' | 'pimScale'>, ref: string, zone: FoZone | null, tracked?: string[]): ScoreAction | null {
+  const e = s.events.find((x) => x.id === ref);
+  const n = e ? foZonePatch(e, zone) : null;
+  if (!e || !n) return null;
+  const b = eventCredits(e, s.pimScale), a = eventCredits(n, s.pimScale);
+  return detailAction('FO_ZONE', e.side, ref, { zone }, creditDiff([b.first, b.second], [a.first, a.second], tracked), true);
+}
+
 /** Screen sweep (S2): the one action a penalty-shot tap logs, as the controls
  *  fire it. Saved = a shot on goal (`ps`) with the save for the goalie in net
  *  when known (`gkId`); missed = a MISS (no shot on goal); scored = a goal
@@ -718,7 +746,8 @@ export function soAction(side: Side, outcome: 'scored' | 'saved' | 'missed', sho
 }
 
 // (GOAL_DETAIL: an OT winner described after it ended the match — describe-invasion DI11)
-const ENDED_OK = new Set(['START_SHOOTOUT', 'SO', 'SO_ORDER', 'XI', 'STAT_ADJUST', 'REMOVE_EVENT', 'ASSIST2', 'GOAL_DETAIL', 'END']);
+// (FO_ZONE: the last faceoff's zone attached after the final horn — polish-invasion PI7)
+const ENDED_OK = new Set(['START_SHOOTOUT', 'SO', 'SO_ORDER', 'XI', 'STAT_ADJUST', 'REMOVE_EVENT', 'ASSIST2', 'GOAL_DETAIL', 'FO_ZONE', 'END']);
 const strengthOf = (v: unknown): Strength | undefined => (v === 'ev' || v === 'pp' || v === 'sh' ? v : undefined);
 const penOf = (v: unknown): PenKind => (PEN_KINDS.includes(v as PenKind) ? (v as PenKind) : 'minor');
 const ids = (v: unknown): string[] | undefined => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && !!x) : undefined);
@@ -827,6 +856,14 @@ export const reducer = (s: IceHockeyState, a: ScoreAction): IceHockeyState => {
         type: 'tally', side, tally: kind, ...who1, ...(kind === 'faceoff' && p2?.playerId ? { secondId: p2.playerId, ...(p2.playerName ? { secondName: p2.playerName } : {}) } : {}),
         ...(zone ? { zone } : {}),
       });
+    }
+    case 'FO_ZONE': {
+      // wave 4 (polish-invasion): a faceoff's zone attached to IT (by ref) after the winner tap
+      const i = s.events.findIndex((e) => e.id === String(a.payload?.ref ?? ''));
+      const n = i >= 0 && s.events[i].side === side && a.payload && 'zone' in a.payload ? foZonePatch(s.events[i], a.payload.zone) : null;
+      if (!n) return s;
+      const events = [...s.events]; events[i] = n;
+      return { ...s, events };
     }
     case 'RULED_OUT':
       // invasion batch 6: a goal ruled out — a timeline row; the score never moved

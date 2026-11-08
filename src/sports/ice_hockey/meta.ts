@@ -20,17 +20,18 @@ export const ICE_HOCKEY_PRESETS: Record<string, { label: string; set: Record<str
  *  the one source of a new match's "Stats to track" — the format fields, the
  *  live settings and their `defaults` (Reset) all read it. NEW matches only:
  *  the engine reads a saved match's own keys with an OFF fallback. Faceoff
- *  zones stay OFF while the zone tap still replaces the controls (describe-
- *  invasion DI16), +/- (an on-ice picker of 10+ taps) and goals ruled out too. */
+ *  zones are ON since wave 4: the faceoff logs at the winner tap and its zone
+ *  is attached after on a non-blocking card (polish-invasion PI1, PI9). +/-
+ *  (an on-ice picker of 10+ taps) and goals ruled out stay OFF. */
 export const ICE_HOCKEY_STATS_DEFAULTS: Record<string, boolean> = {
-  trackFaceoffs: true, trackFaceoffZones: false, trackPhysical: true, trackPuck: true, trackAttempts: true,
+  trackFaceoffs: true, trackFaceoffZones: true, trackPhysical: true, trackPuck: true, trackAttempts: true,
   plusMinus: false, trackRuledOut: false,
 };
 
 /** Deep wave — the "Stats to track" toggles (live settings + the match format). */
 export const TRACK_FIELDS: FormatField[] = [
   { key: 'trackFaceoffs', label: 'Faceoffs', type: 'toggle', default: ICE_HOCKEY_STATS_DEFAULTS.trackFaceoffs, group: 'Stats to track', hint: 'One tap per draw for the team that won it (name the centres once) — FO% by player' },
-  { key: 'trackFaceoffZones', label: 'Faceoff zones', type: 'toggle', default: ICE_HOCKEY_STATS_DEFAULTS.trackFaceoffZones, group: 'Stats to track', hint: 'With Faceoffs on: one more tap per draw — in whose end it was (or neutral) — FO% by zone' },
+  { key: 'trackFaceoffZones', label: 'Faceoff zones', type: 'toggle', default: ICE_HOCKEY_STATS_DEFAULTS.trackFaceoffZones, group: 'Stats to track', hint: 'With Faceoffs on: where each draw was (in whose end, or neutral), picked after on the faceoff card (optional) — FO% by zone' },
   { key: 'trackPhysical', label: 'Hits & blocked shots', type: 'toggle', default: ICE_HOCKEY_STATS_DEFAULTS.trackPhysical, group: 'Stats to track', hint: 'Hit / Block buttons — who made it (optional)' },
   { key: 'trackPuck', label: 'Giveaways & takeaways', type: 'toggle', default: ICE_HOCKEY_STATS_DEFAULTS.trackPuck, group: 'Stats to track', hint: 'Who lost / won the puck (optional)' },
   { key: 'trackAttempts', label: 'Missed shots (shot attempts)', type: 'toggle', default: ICE_HOCKEY_STATS_DEFAULTS.trackAttempts, group: 'Stats to track', hint: 'Shots wide / over the net — shot attempts with blocks' },

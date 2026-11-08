@@ -19,7 +19,7 @@
  */
 import { trackField, timeLeft, type FieldEvent, type FieldLog, type FieldResult, type Who } from '../onField.ts';
 import {
-  detailStatsTracked, eventCredits, matchSec, pointsOf, trackedTallyKeys, type RugbyEvent, type RugbyState, type Side,
+  detailStatsTracked, eventCredits, matchSec, pointsOf, trackedTallyKeys, DETAIL_STATS, LIVE_KEYS, TALLY_KEYS, type RugbyEvent, type RugbyState, type Side,
 } from './engine.ts';
 import { legacyNameOf, nameFor, type NameOf } from '../invasion/names.ts';
 
@@ -121,3 +121,6 @@ export function rugbyTotals(s: RugbyState): Record<string, { side: Side; stats: 
 
 /** The keys statTotals owns that no live action credits (contract rule 5). */
 export const DERIVED_KEYS = ['minutes'] as const;
+/** NZI15 (polish-invasion PI12): every key rugbyTotals can write — the plugin's
+ *  `statTotalsKeys`, so the sync clears one a correction left no player with. */
+export const STAT_TOTALS_KEYS: readonly string[] = [...new Set<string>([...LIVE_KEYS, ...DETAIL_STATS, ...TALLY_KEYS, ...DERIVED_KEYS])];

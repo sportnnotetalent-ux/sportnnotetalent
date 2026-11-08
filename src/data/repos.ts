@@ -24,7 +24,7 @@ import { snapshotOutcome, stateResult, savedWinner } from '../core/matchResult';
 import { heldResultColumn } from './resultHold';
 import type { LiveSummary } from '../core/liveSummary';
 import { followDisputes } from './eventLog';
-import { planStatSync, applyStatWrites, onlyKeys, changedKeys, type MatchTotals } from './statSync';
+import { planStatSync, applyStatWrites, onlyKeys, changedKeys, syncOwnedKeys, type MatchTotals } from './statSync';
 import { planAppearances, sideResults, subsCameOn, type AppearanceWrite } from './appearances';
 import { matchSideOf, planOpponentRepair } from './lineOpponent';
 import { mergeSportFormat } from './formatPatch';
@@ -2434,10 +2434,12 @@ export async function disputeMapper(matchId: string): Promise<(playerId: string)
  *  `won` covers inserted lines. Returns how many rows were written. */
 export async function syncMatchStatLines(
   matchId: string, sport: SportId, totals: MatchTotals, names: { home?: string; away?: string } = {},
+  /** NZI15: the keys owned beyond the totals' own (default: all the sport declares; SD-69 passes its `keys`) */
+  owned?: string[],
 ): Promise<number> {
   const mapId = await disputeMapper(matchId);
   const existing = (await getMatchStatLines(matchId)).filter((l) => l.sport === sport && !l.eventId);
-  const writes = planStatSync(existing, totals, mapId, names);
+  const writes = planStatSync(existing, totals, mapId, names, owned ?? syncOwnedKeys(await loadSport(sport)));
   if (!writes.length) return 0;
   if (!isSupabaseConfigured || !supabase) {
     applyStatWrites(demo.statLines, writes, (w) => newDemoStatLine({ matchId, playerId: w.playerId, sport, stats: w.stats, opponent: w.opponent }));
@@ -2525,16 +2527,18 @@ export async function resyncSportLines(
     const all = await matchStatTotals(m.id, sport, state, m);
     if (!all) continue;
     const totals = opts.keys ? onlyKeys(all, opts.keys) : all;
+    // NZI15: a whole-line sport owns its declared keys (only `opts.keys` when given)
+    const owned = syncOwnedKeys(plugin, opts.keys);
     let rows = 0;
     let keys: string[] | undefined;
     if (opts.dryRun) {
       const mapId = await disputeMapper(m.id);
       const existing = (await getMatchStatLines(m.id)).filter((l) => l.sport === sport && !l.eventId);
-      const writes = planStatSync(existing, totals, mapId, { home: m.homeTeam.name, away: m.awayTeam.name });
+      const writes = planStatSync(existing, totals, mapId, { home: m.homeTeam.name, away: m.awayTeam.name }, owned);
       rows = writes.length;
       keys = changedKeys(existing, writes);
     } else {
-      rows = await syncMatchStatLines(m.id, sport, totals, { home: m.homeTeam.name, away: m.awayTeam.name });
+      rows = await syncMatchStatLines(m.id, sport, totals, { home: m.homeTeam.name, away: m.awayTeam.name }, owned);
     }
     out.rowsWritten += rows;
     out.perMatch.push({ matchId: m.id, rows, source, ...(keys ? { keys } : {}) });

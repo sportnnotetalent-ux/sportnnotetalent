@@ -13,6 +13,8 @@
  *    webhook fires on every INSERT/UPDATE), so a second run writes nothing.
  *  • A line of this match whose player is no longer in the totals (a correction
  *    moved their catch to someone else) has the totals-owned keys zeroed.
+ *  • NZI15: a whole-line sport also owns every key it CAN write
+ *    (`syncOwnedKeys`), so a key no player has any more is zeroed too.
  * No React Native imports — node tests load this file.
  */
 
@@ -35,11 +37,26 @@ export function sameStats(a: Record<string, number>, b: Record<string, number>):
   return ka.every((k) => Object.prototype.hasOwnProperty.call(b, k) && a[k] === b[k]);
 }
 
+/** NZI15 (polish-invasion PI12–PI15) — the keys a sync owns beyond those the
+ *  totals return this time: for a sport whose totals own the WHOLE line, every
+ *  key they can ever write (`statTotalsKeys`). A correction that deletes the
+ *  only event of a kind leaves no player with that key; owning it anyway lets
+ *  the sync set the stale value to 0. A partial sport (football) owns nothing
+ *  extra — its other keys move by deltas. `keys` (the SD-69 key-limited
+ *  resync) narrows them to those keys. */
+export function syncOwnedKeys(plugin: { statTotalsPartial?: boolean; statTotalsKeys?: readonly string[] }, keys?: string[]): string[] {
+  if (plugin.statTotalsPartial || !plugin.statTotalsKeys?.length) return [];
+  const all = [...new Set(plugin.statTotalsKeys)];
+  return keys ? all.filter((k) => keys.includes(k)) : all;
+}
+
 export function planStatSync(
   existing: ExistingStatLine[],
   totals: MatchTotals,
   mapId: (playerId: string) => string,
   names: { home?: string; away?: string } = {},
+  /** NZI15: keys owned even when no player has them now (`syncOwnedKeys`) */
+  alsoOwned: Iterable<string> = [],
 ): StatWrite[] {
   // State ids → whoever holds the line now. Two ids landing on one player
   // (can't normally happen) add up rather than overwrite each other.
@@ -52,6 +69,7 @@ export function planStatSync(
   }
   const owned = new Set<string>();
   for (const t of Object.values(totals)) for (const k of Object.keys(t.stats)) owned.add(k);
+  for (const k of alsoOwned) owned.add(k);
 
   const byPlayer = new Map(existing.map((l) => [l.playerId, l]));
   const writes: StatWrite[] = [];

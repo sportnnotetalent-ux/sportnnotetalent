@@ -164,7 +164,8 @@ describe('600 users · new matches with the new defaults, random play', () => {
       const used = ice.TALLY_KINDS.filter((k) => k !== 'faceoff' && r() < 0.35);
       const acts: ScoreAction[] = [xi('home'), xi('away')];
       let s = acts.reduce(ice.reducer, ice.init(cfg));
-      assert.equal(s.trackFaceoffZones, undefined, 'DOI9: zones stay off');
+      // polish PI9: zones ON by default for a new match (the zone is a card after the faceoff)
+      assert.equal(s.trackFaceoffZones, true, 'PI9: zones on');
       assert.equal(s.plusMinus, false);
       let goals = 0;
       for (let i = 0; i < 15; i++) {
