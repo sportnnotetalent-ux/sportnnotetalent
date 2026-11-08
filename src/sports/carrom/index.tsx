@@ -19,7 +19,7 @@ import { carromBox } from '../boxSources';
 import {
   init, reducer, result, boardValue, boardCloses, boardCredit, creditedPoints, summary, scoreLine, lineScore, standingsUnits,
   nextBreaker, nextBreakerPlayer, boardBreakers, boardReady, queenChoices, breakerPlayers, slamFor, boardInputs, boardCorrection, FOUL_TYPES, FOUL_CHIPS, FOUL_LABEL, CARROM_LIVE_SETTINGS,
-  AWARD_REASONS, awardGameAction, type AwardReason,
+  AWARD_REASONS, awardGameAction, boardDetail, type AwardReason,
   type BoardDetail, type BoardInput, type CarromCredit, type CarromState, type EndFoul, type FoulType, type PlayerFouls, type QueenBy, type Side, type Slam,
 } from './engine';
 import { carromFeed, AWARD_WORD } from './feed';
@@ -121,19 +121,11 @@ const ScoringControls: SportPlugin<CarromState>['ScoringControls'] = ({ state, d
     return { ...cur, [side]: next.length ? next : now };
   });
   // Deep wave — the tracked detail of this board (a part only when tracked;
-  // fouls / dues / missed covers default to none, coins on the break to "not
-  // recorded" until a chip is tapped)
-  const detail = (): BoardDetail | undefined => {
-    if (penalty) return undefined;
-    // Round 2 — the split foul chips (`split`) and, in doubles, who fouled
-    const det: BoardDetail = {
-      ...(track.fouls ? { fouls: { home: fouls.home, away: fouls.away }, dues: { home: dues.home, away: dues.away }, split: true as const,
-        ...(perSide === 2 ? { who: { home: whoLog.home, away: whoLog.away } } : {}) } : {}),
-      ...(track.brk && breaker && brk != null ? { brk } : {}),
-      ...(track.qMiss ? { qMiss: { home: qMiss.home, away: qMiss.away } } : {}),
-    };
-    return Object.keys(det).length ? det : undefined;
-  };
+  // coins on the break "not recorded" until a chip is tapped). NZG3/NZG6:
+  // fouls / dues / missed covers only from the first tap in the match on.
+  const detail = (): BoardDetail | undefined => (penalty ? undefined : boardDetail(s, {
+    doubles: perSide === 2, breakerKnown: !!breaker, brk, fouls, dues, qMiss, whoLog,
+  }));
   const record = () => {
     if (!winner || !ready) return;
     // SD-68 — a penalty board credits its points, never a board won / Queen;
@@ -311,7 +303,7 @@ const ScoringControls: SportPlugin<CarromState>['ScoringControls'] = ({ state, d
           ) : null}
           {track.fouls ? (
             <View style={{ gap: theme.spacing(2) }}>
-              <Text style={ctrl.label}>Fouls this board <Text style={ctrl.meta}>(tap each foul · none = no fouls)</Text></Text>
+              <Text style={ctrl.label}>Fouls this board <Text style={ctrl.meta}>(tap each foul)</Text></Text>
               {(['home', 'away'] as Side[]).map((sd) => {
                 // Round 2 — doubles: pick who fouled first (careers carry it)
                 const pair = perSide === 2 ? pairOf(sd) : [];

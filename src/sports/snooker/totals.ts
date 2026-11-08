@@ -46,6 +46,18 @@ export const SNOOKER_FOUL_KEY: Readonly<Record<FoulKind, string>> = {
 const other = (s: Side): Side => (s === 'home' ? 'away' : 'home');
 const n = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : 0);
 
+/** No false zeros (NZG1/NZG2): the long-pot and rest kinds count as tracked
+ *  only once the match has at least one tag of that kind (either side) — the
+ *  toggle on with nothing tagged shows nothing and writes nothing. */
+export function snookerLongRestCaptured(s: SnookerState): { long: boolean; rest: boolean } {
+  if (!s || typeof s !== 'object' || s.trackLR !== true) return { long: false, rest: false };
+  const st = snookerStats(s);
+  return {
+    long: n(st.home.longAttempts) + n(st.away.longAttempts) > 0,
+    rest: n(st.home.restShots) + n(st.away.restShots) > 0,
+  };
+}
+
 /** One side's figures for the match (the engine's stats, never throws). */
 export function snookerSideRecord(s: SnookerState, side: Side): Record<string, number> {
   const st = snookerStats(s);
@@ -62,8 +74,11 @@ export function snookerSideRecord(s: SnookerState, side: Side): Record<string, n
     // cue batch 5: the foul kinds (0 when none; a fouls without a kind counts in none)
     for (const k of FOUL_KINDS) rec[SNOOKER_FOUL_KEY[k]] = n(t.foulsByKind?.[k]);
     rec.totalClearances = n(t.totalClearances);
-    // cue batch 6: never a false 0 — only a match that tracked them writes these
-    if (s.trackLR === true) Object.assign(rec, { longPots: n(t.longPots), longAttempts: n(t.longAttempts), restShots: n(t.restShots) });
+    // cue batch 6 + NZG1/NZG2: never a false 0 — only a match that tagged
+    // that kind (long, rest) writes its keys
+    const cap = snookerLongRestCaptured(s);
+    if (cap.long) Object.assign(rec, { longPots: n(t.longPots), longAttempts: n(t.longAttempts) });
+    if (cap.rest) rec.restShots = n(t.restShots);
   }
   return rec;
 }

@@ -5,7 +5,7 @@
  * boards (they replay from the event log). A row the match didn't track is
  * left out (never a false 0); a stat tracked on only some boards says so.
  */
-import { boardBreakers, creditedPoints, FOUL_TYPES, FOUL_LABEL, type CarromState, type Side } from './engine.ts';
+import { boardBreakers, carromFoulsCaptured, carromQMissCaptured, creditedPoints, FOUL_TYPES, FOUL_LABEL, type CarromState, type Side } from './engine.ts';
 import { countRow, nonEmpty, ofPct, type CompareCategory, type CompareRow } from '../gcc/model.ts';
 
 /** Per-side totals over a set of boards (indexes into `s.boards`). */
@@ -36,6 +36,9 @@ export function carromMatchStats(s: CarromState, game?: number): CompareCategory
   const idx = boards.map((_, i) => i).filter((i) => game == null || boards[i].game === game);
   const agg: Record<Side, SideAgg> = { home: zero(), away: zero() };
   let queenRecorded = 0, slamAny = 0, foulBoards = 0, brkBoards = 0, qMissBoards = 0, tossKnown = 0;
+  // NZG4/NZG6 — a match whose logs are all zero (older boards saved them on
+  // every board) never tapped one: not tracked, never "0 fouls"
+  const foulsLive = carromFoulsCaptured(boards), qMissLive = carromQMissCaptured(boards);
   for (const i of idx) {
     const b = boards[i];
     const w = b.winner;
@@ -64,7 +67,7 @@ export function carromMatchStats(s: CarromState, game?: number): CompareCategory
       if (b.det?.brk != null) { agg[br].brk += b.det.brk; agg[br].brkN += 1; }
     }
     if (b.det?.brk != null) brkBoards += 1;
-    if (b.det?.fouls) {
+    if (foulsLive && b.det?.fouls) {
       foulBoards += 1;
       for (const sd of ['home', 'away'] as Side[]) {
         for (const t of FOUL_TYPES) {
@@ -74,7 +77,7 @@ export function carromMatchStats(s: CarromState, game?: number): CompareCategory
         agg[sd].dues += b.det.dues?.[sd] ?? 0;
       }
     }
-    if (b.det?.qMiss) { qMissBoards += 1; for (const sd of ['home', 'away'] as Side[]) agg[sd].qMiss += b.det.qMiss[sd] ?? 0; }
+    if (qMissLive && b.det?.qMiss) { qMissBoards += 1; for (const sd of ['home', 'away'] as Side[]) agg[sd].qMiss += b.det.qMiss[sd] ?? 0; }
   }
   const n = idx.length;
   const H = agg.home, A = agg.away;

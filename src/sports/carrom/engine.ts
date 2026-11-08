@@ -814,3 +814,51 @@ export function scoreSheet(s: CarromState): SheetGame[] {
   }
   return out;
 }
+
+/* ------------------------- no false zeros (NZG3–NZG6) ------------------------ */
+
+const sumCounts = (o: Record<string, number | undefined> | undefined): number =>
+  Object.values(o ?? {}).reduce<number>((t, v) => t + (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : 0), 0);
+const boardFouls = (det: BoardDetail | undefined): number =>
+  det?.fouls ? sumCounts(det.fouls.home) + sumCounts(det.fouls.away) + sumCounts(det.dues) : 0;
+
+/** A foul or due was tapped somewhere in these boards? Before the first one
+ *  the match is NOT foul-tracked: nothing saved, nothing shown, nothing in
+ *  careers (an all-zero log is "not recorded", never "0 fouls"). */
+export const carromFoulsCaptured = (boards: readonly { det?: BoardDetail }[] | undefined): boolean =>
+  (boards ?? []).some((b) => boardFouls(b?.det) > 0);
+/** The same for missed Queen covers. */
+export const carromQMissCaptured = (boards: readonly { det?: BoardDetail }[] | undefined): boolean =>
+  (boards ?? []).some((b) => sumCounts(b?.det?.qMiss) > 0);
+
+/** What the board form holds when "Record board" is tapped. */
+export interface BoardDetailInput {
+  doubles: boolean;
+  /** the toss is known, so "coins on the break" can be credited */
+  breakerKnown: boolean;
+  brk: number | null;
+  fouls: Record<Side, Partial<Record<FoulType, number>>>;
+  dues: Record<Side, number>;
+  qMiss: Record<Side, number>;
+  whoLog: Record<Side, Record<string, PlayerFouls>>;
+}
+
+/** The tracked detail of the next board (PURE; the screen calls it). Fouls
+ *  and missed covers are saved only from the first tap in the match on (this
+ *  board or an earlier one); from then on an untapped board is a real 0.
+ *  undefined = nothing to save. */
+export function boardDetail(s: Pick<CarromState, 'boards' | 'track'>, i: BoardDetailInput): BoardDetail | undefined {
+  const track = s?.track ?? {};
+  const foulsNow = sumCounts(i.fouls.home) + sumCounts(i.fouls.away) + sumCounts(i.dues) > 0;
+  const qNow = sumCounts(i.qMiss) > 0;
+  const foulsOn = !!track.fouls && (foulsNow || carromFoulsCaptured(s?.boards));
+  const qOn = !!track.qMiss && (qNow || carromQMissCaptured(s?.boards));
+  const det: BoardDetail = {
+    // Round 2 — the split foul chips (`split`) and, in doubles, who fouled
+    ...(foulsOn ? { fouls: { home: i.fouls.home, away: i.fouls.away }, dues: { home: i.dues.home, away: i.dues.away }, split: true as const,
+      ...(i.doubles ? { who: { home: i.whoLog.home, away: i.whoLog.away } } : {}) } : {}),
+    ...(track.brk && i.breakerKnown && i.brk != null ? { brk: i.brk } : {}),
+    ...(qOn ? { qMiss: { home: i.qMiss.home, away: i.qMiss.away } } : {}),
+  };
+  return Object.keys(det).length ? det : undefined;
+}

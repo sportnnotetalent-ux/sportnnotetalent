@@ -147,13 +147,18 @@ describe('2 · golf — chip-ins', () => {
     assert.equal(s.upDowns, 2, 'both chip-ins are up and downs (1 + 0, 2 + 0)');
     assert.equal(s.udChances, 3);
     // putts 0 on a hole with no off-green shot recorded (holed the approach): not a chip-in
+    // no-false-zeros NZG7: with no "Off green" entry on the card at all, up and
+    // downs are not tracked — no key (was a written 0); one entry elsewhere makes it a real 0
     const holed = roundStats(card([-1], { track: ['putts', 'upDown'], putts: arr({ 0: 0 }) }), H, zeros);
-    assert.equal(holed.chipIns, 0);
+    assert.equal('chipIns' in holed, false);
+    const holedWithEntry = roundStats(card([-1, 0], { track: ['putts', 'upDown'], putts: arr({ 0: 0, 1: 2 }), offGreen: arr({ 1: 1 }) }), H, zeros);
+    assert.equal(holedWithEntry.chipIns, 0);
     // not kept with up and downs, or an SD-45 card: no key (never a false 0)
     assert.equal('chipIns' in roundStats(card([], { track: ['putts'], putts: flat(2) }), H, zeros), false);
     assert.equal('chipIns' in roundStats(card([], { putts: flat(2), firDir: H.map(() => 'hit' as const) }), H, zeros), false);
     assert.equal('chipIns' in roundStats(card([]), H, zeros), false);
-    assert.equal(roundStats(card([], { track: ['putts', 'upDown'], putts: flat(2) }), H, zeros).chipIns, 0);
+    // no-false-zeros NZG7: kept with up and downs, nothing entered off the green → no key (was 0)
+    assert.equal('chipIns' in roundStats(card([], { track: ['putts', 'upDown'], putts: flat(2) }), H, zeros), false);
   });
 
   test('the round panel: a "Chip-ins" row once someone has one (mine vs the field)', () => {

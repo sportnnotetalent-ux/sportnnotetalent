@@ -32,7 +32,7 @@
  * totals are always right; only the in-between live line may lag.
  */
 import type { StatTotalsContext, StatTotalsEntry } from '../types';
-import { boardBreakers, breakerPlayers, creditedPoints, whoFouls, FOUL_TYPES, type CarromState, type FoulType } from './engine.ts';
+import { boardBreakers, breakerPlayers, carromFoulsCaptured, carromQMissCaptured, creditedPoints, whoFouls, FOUL_TYPES, type CarromState, type FoulType } from './engine.ts';
 
 type Side = 'home' | 'away';
 const SIDES: Side[] = ['home', 'away'];
@@ -96,13 +96,14 @@ const addFouls = (out: Record<string, number>, by: Partial<Record<FoulType, numb
 export function carromTrackedRecord(s: CarromState, side: Side): Record<string, number> {
   const out: Record<string, number> = {};
   const boards = s?.boards ?? [];
-  const fb = boards.filter((b) => b.det?.fouls);
+  // NZG4/NZG6 — an all-zero log (nothing ever tapped) is "not recorded"
+  const fb = carromFoulsCaptured(boards) ? boards.filter((b) => b.det?.fouls) : [];
   if (fb.length) {
     Object.assign(out, foulZeros(fb));
     out.foulBoards = fb.length;
     for (const b of fb) addFouls(out, b.det!.fouls![side], b.det!.dues?.[side] ?? 0);
   }
-  const qb = boards.filter((b) => b.det?.qMiss);
+  const qb = carromQMissCaptured(boards) ? boards.filter((b) => b.det?.qMiss) : [];
   if (qb.length) {
     out.qMissBoards = qb.length;
     out.queenMisses = qb.reduce((t, b) => t + (b.det!.qMiss![side] ?? 0), 0);
@@ -116,6 +117,8 @@ export function carromTrackedRecord(s: CarromState, side: Side): Record<string, 
  *  board is fully attributed — an older doubles match (no who chips) never
  *  gets foul keys, as before. */
 export function carromPlayerFouls(s: CarromState, side: Side, playerId: string): Record<string, number> {
+  // NZG4 — nothing ever tapped in the match: no foul keys (never a false 0)
+  if (!carromFoulsCaptured(s?.boards)) return {};
   const fb = (s?.boards ?? []).filter((b) => whoFouls(b.det, side));
   if (!fb.length) return {};
   const out = foulZeros(fb);

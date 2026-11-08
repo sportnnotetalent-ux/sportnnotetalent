@@ -123,8 +123,12 @@ describe('round 2 · golf up and downs (PGA TOUR definition)', () => {
     assert.equal('udChances' in plain, false);
     const legacy = roundStats(card(flat(), { putts: flat(2), firDir: H.map(() => 'hit' as const) }), H, zeros);
     assert.equal('udChances' in legacy, false, 'an SD-45 card replays with exactly its old keys');
+    // no-false-zeros NZG7: kept with up and downs but "Off green" never entered
+    // is not tracked (no keys); one entry makes the zeros real
     const kept = roundStats(card(flat(), { track: ['putts', 'upDown'], putts: flat(2) }), H, zeros);
-    assert.deepEqual([kept.udChances, kept.upDowns], [0, 0]);
+    assert.equal('udChances' in kept, false);
+    const entered = roundStats(card(flat(), { track: ['putts', 'upDown'], putts: flat(2), offGreen: arr({ 0: 2 }) }), H, zeros);
+    assert.deepEqual([entered.udChances, entered.upDowns], [1, 0]);
   });
   test('the stats panel: "Up and downs" beside "Scrambling" (older cards keep their label)', () => {
     const c = card([0, 1, ...new Array(16).fill(0)], { track: ['putts', 'upDown'], putts: H.map((_, i) => (i < 2 ? 1 : 2)), offGreen: arr({ 0: 1, 1: 2 }) });

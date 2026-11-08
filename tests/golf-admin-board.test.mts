@@ -132,7 +132,8 @@ describe('SD-45 — the per-hole stats row', () => {
     // bounce back) and the putting splits from the putts it already had — the
     // score and every older key are unchanged.
     const DEEP_FREE = ['holesInOne', 'albatrosses', 'p3Holes', 'p3Strokes', 'p4Holes', 'p4Strokes', 'p5Holes', 'p5Strokes', 'bounceOps', 'bounceBacks', 'onePutts', 'threePutts'];
-    assert.deepEqual(Object.keys(s).filter((k) => !DEEP_FREE.includes(k)).sort(), ['birdies', 'bogeys', 'doubles', 'eagles', 'firHit', 'firHoles', 'girHit', 'girHoles', 'holes', 'pars', 'penalties', 'putts', 'puttHoles', 'rounds', 'stableford', 'strokes'].sort());
+    // no-false-zeros NZG9: no penalty entered on the card → no `penalties` key (was a written 0)
+    assert.deepEqual(Object.keys(s).filter((k) => !DEEP_FREE.includes(k)).sort(), ['birdies', 'bogeys', 'doubles', 'eagles', 'firHit', 'firHoles', 'girHit', 'girHoles', 'holes', 'pars', 'putts', 'puttHoles', 'rounds', 'stableford', 'strokes'].sort());
     assert.deepEqual(Object.keys(s).filter((k) => DEEP_FREE.includes(k)).sort(), [...DEEP_FREE].sort());
   });
 

@@ -660,7 +660,7 @@ export function roundStats(card: GolfCard, holes: Hole[], received: number[]): R
   const out: Record<string, number> = {
     rounds: 1, holes: s.thru, strokes: s.gross, stableford: s.stableford,
     eagles: 0, birdies: 0, pars: 0, bogeys: 0, doubles: 0,
-    putts: 0, puttHoles: 0, girHit: 0, girHoles: 0, firHit: 0, firHoles: 0, penalties: 0,
+    putts: 0, puttHoles: 0, girHit: 0, girHoles: 0, firHit: 0, firHoles: 0,
   };
   // SD-45 — stats-mode cards add their keys (absent on older lines = not tracked).
   // Deep wave — a card kept with "Stats to track" (`card.track`) gets them stat
@@ -669,13 +669,24 @@ export function roundStats(card: GolfCard, holes: Hole[], received: number[]): R
   const legacy = !tr && cardHasDetail(card);
   const on = (k: GolfTrackKey) => legacy || !!tr?.includes(k);
   const fairOn = on('fairway'), puttOn = on('putts'), sandOn = on('bunker');
-  // Round 2 — up and downs (a card kept with 'upDown': never an SD-45 card)
-  const udOn = !!tr?.includes('upDown');
-  // (follow-up: chip-ins come free with it — a true 0 on a card kept with it)
+  // No false zeros (NZG7–NZG9): a kind counts as tracked only once the card
+  // holds at least one entry of it, on a hole of the round.
+  const entered = <T,>(arr: readonly (T | null | undefined)[] | undefined, ok: (v: T | null | undefined) => boolean) =>
+    Array.isArray(arr) && holes.some((_, i) => ok(arr[i]));
+  // Round 2 — up and downs (a card kept with 'upDown': never an SD-45 card),
+  // written only once an "Off green" value was entered (NZG7)
+  const udOn = !!tr?.includes('upDown') && entered(card.offGreen, (v) => typeof v === 'number' && Number.isFinite(v) && v >= 1);
+  // (follow-up: chip-ins come free with it — a true 0 once off-green shots are entered)
   if (udOn) Object.assign(out, { udChances: 0, upDowns: 0, chipIns: 0 });
   if (fairOn) Object.assign(out, { firLeft: 0, firRight: 0 });
   if (puttOn) Object.assign(out, { scrambles: 0, scrambleHoles: 0, puttsGir: 0, girPutted: 0 });
-  if (sandOn) Object.assign(out, { sandSaves: 0, sandHoles: 0 });
+  // NZG8 — sand saves only once a greenside bunker was tapped on the card
+  const sandKept = sandOn && entered(card.bunker, (v) => v === true);
+  if (sandKept) Object.assign(out, { sandSaves: 0, sandHoles: 0 });
+  // NZG9 — penalty strokes only once at least one was entered on the card
+  // (the stepper exists only when Penalties is tracked; an untouched card is
+  // "not tracked", never "0 penalty strokes")
+  if (entered(card.penalties, (v) => typeof v === 'number' && Number.isFinite(v) && v > 0)) out.penalties = 0;
   // Deep wave — free figures from the strokes alone (every round from now on):
   // aces and albatrosses (inside "Eagles+"), par-3 / 4 / 5 scoring, bounce back
   Object.assign(out, { holesInOne: 0, albatrosses: 0, p3Holes: 0, p3Strokes: 0, p4Holes: 0, p4Strokes: 0, p5Holes: 0, p5Strokes: 0, bounceOps: 0, bounceBacks: 0 });
@@ -713,7 +724,7 @@ export function roundStats(card: GolfCard, holes: Hole[], received: number[]): R
     if (f != null && h.par >= 4) { out.firHoles += 1; if (f) out.firHit += 1; }
     // batch 6 — never more than strokes − 1; hostile values count 0 (legit cards unchanged)
     const pen = card.penalties?.[i];
-    if (typeof pen === 'number') out.penalties += penaltyStrokes(pen, st);
+    if (typeof pen === 'number' && 'penalties' in out) out.penalties += penaltyStrokes(pen, st);
     if (typeof st !== 'number') return;
     // Deep wave — putting splits (whenever putts were entered on the hole)
     if (typeof p === 'number') {
@@ -749,7 +760,7 @@ export function roundStats(card: GolfCard, holes: Hole[], received: number[]): R
       if (ud != null) { out.udChances += 1; if (ud) out.upDowns += 1; }
       if (chipIn(card.offGreen?.[i], p)) out.chipIns += 1;
     }
-    if (sandOn && card.bunker?.[i] === true) {
+    if (sandKept && card.bunker?.[i] === true) {
       out.sandHoles += 1;
       // up and down from the greenside bunker: out + at most one putt (without
       // putts entered: par or better)
